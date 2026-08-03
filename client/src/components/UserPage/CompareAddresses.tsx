@@ -38,12 +38,14 @@ import {
 import { PolisQuestionHoverCard } from '../PolisReport/PolisReport';
 import { createLogger } from 'utilities/logging.js';
 import { normalizeArweaveUrl } from 'utilities/arweave/arweaveUrls.js';
-import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { listNamespaceEntriesSync, subscribeCacheUpdates } from '../../utilities/cache/cacheScripts.js';
 import { createCacheUpdateCoalescer } from '../../utilities/cache/cacheUpdateCoalescer.js';
 import {
+  COMPARE_GRAPHIC_FILENAME,
   buildCompareRoutePath,
   resolveCompareSessionSlug,
+  resolveCompareRunLabel,
+  runCompareSectionTasks,
   scanCompareAddressesSequentially,
   selectCompareCacheValues,
 } from './compareSessionRuntime';
@@ -358,29 +360,6 @@ const getQuestionPrompt = (questionId: string, sessionSlug: string = ''): string
   return 'Unknown Question';
 };
 
-const getSbtDetails = (sbtName: string): { name: string; image: string | null } => {
-  try {
-    const nameLower = String(sbtName || '').toLowerCase();
-    const sbtCaches = readDgObjectValues('sbtCache');
-    for (const cacheObj of sbtCaches) {
-      for (const netKey of Object.keys(cacheObj || {})) {
-        const list = readRecordProperty(readRecordProperty(cacheObj, netKey), 'sbtList');
-        for (const sbtAddrLower in list) {
-          const entry = toUnknownRecord(list[sbtAddrLower]);
-          const info = toUnknownRecord(entry.sbtInfo);
-          const displayName = String(getSbtDisplayName(info) || '').trim();
-          if (displayName && displayName.toLowerCase() === nameLower) {
-            return { name: displayName, image: typeof info.image === 'string' ? info.image : null };
-          }
-        }
-      }
-    }
-  } catch (e) {
-    accountLog.error('CompareAddresses: getSbtDetails failed:', e);
-  }
-  return { name: sbtName, image: null };
-};
-
 const resolveSbtDisplayNameForCompareEntry = (entry: unknown = null): string => getCompareSbtLabelTyped(entry);
 const resolveSbtCompareKeyForEntry = (entry: unknown = null): string => getCompareSbtKeyTyped(entry);
 
@@ -595,6 +574,7 @@ const CompareAddress = ({
   const [loading, setLoading] = useState(false);
   const [bulletsLoading, setBulletsLoading] = useState(false);
   const [compassLoading, setCompassLoading] = useState(false);
+  const [vennLoading, setVennLoading] = useState(false);
   const [comparisonError, setComparisonError] = useState('');
 
   // Bullets + visuals fed by the unified bundle
@@ -860,6 +840,7 @@ const CompareAddress = ({
     setLoading(true);
     setBulletsLoading(true);
     setCompassLoading(true);
+    setVennLoading(true);
     setShowComparison(true);
 
     // Reset UI slices
@@ -909,80 +890,71 @@ const CompareAddress = ({
     if (vizMode === 'matrix' && (n < 2 || n > 10)) setVizMode('summary');
     if (n >= 2 && n <= 10) setVizMode('compass');
 
-    // Stage AI calls for faster first content: bullets first, visuals after.
+    // These sections are independent; let each render as soon as its own result is ready.
     const aiScope = activeSessionSlug ? { sessionSlug: activeSessionSlug } : {};
-    try {
-      const bulletsRaw = await runCompareToolkit('compare', { users, ...aiScope });
-      const bullets = normalizeCompareBullets(bulletsRaw, fallbackBullets(users));
-      if (!isStale()) setComparisonResult(bullets);
-    } catch (err) {
-      accountLog.error('compare bullets failed:', err);
-      const fallback = fallbackBullets(users);
-      if (!isStale()) {
-        setComparisonResult({
-          agreements: (fallback.agreements || []).slice(0, 12),
-          disagreements: (fallback.disagreements || []).slice(0, 12),
-        });
-      }
-    } finally {
-      if (!isStale()) setBulletsLoading(false);
-    }
-
-    if (isStale()) return;
-
     const addrOrder = users.map((u) => u.address);
 
-    try {
-      let compass = null;
+    const bulletsTask = async () => {
       try {
-        const axesRaw = await runCompareToolkit('axes', { users, ...aiScope });
-        compass = axesRaw ? (sanitizeCompass(axesRaw, addrOrder) as CompareCompassData) : null;
+        const bulletsRaw = await runCompareToolkit('compare', { users, ...aiScope });
+        const bullets = normalizeCompareBullets(bulletsRaw, fallbackBullets(users));
+        if (!isStale()) setComparisonResult(bullets);
       } catch (err) {
-        accountLog.error('compare axes failed:', err);
-      }
-      if (!compass) {
-        compass = sanitizeCompass(pcaLiteCompass(users), addrOrder) as CompareCompassData;
-      }
-      if (!isStale()) setCompassData(compass);
-    } finally {
-      if (!isStale()) setCompassLoading(false);
-    }
-
-    if (isStale()) return;
-
-    if (users.length === 2 || users.length === 3) {
-      let venn = null;
-      if (users.length === 3) {
-        try {
-          const vennRaw = await runCompareToolkit('venn', { users, ...aiScope });
-          if (vennRaw && vennRaw.counts) {
-            const ensure = computeVennEvidence(users);
-            const out: CompareVennResult = {
-              counts: { ...ensure.counts, ...vennRaw.counts },
-              semantics: vennRaw.semantics || ensure.semantics,
-              evidenceMap: { ...ensure.evidenceMap, ...(vennRaw.evidenceMap || {}) } as Partial<
-                Record<VennRegionKey, unknown[]>
-              >,
-            };
-            const vennKeys: VennRegionKey[] = ['a', 'b', 'c', 'ab', 'ac', 'bc', 'abc'];
-            for (const k of vennKeys) {
-              if (
-                (out.counts[k] || 0) > 0 &&
-                (!Array.isArray(out.evidenceMap?.[k]) || out.evidenceMap[k]?.length === 0)
-              ) {
-                out.evidenceMap = out.evidenceMap || {};
-                out.evidenceMap[k] = ensure.evidenceMap[k];
-              }
-            }
-            venn = out;
-          }
-        } catch (err) {
-          accountLog.error('compare venn failed:', err);
+        accountLog.error('compare bullets failed:', err);
+        const fallback = fallbackBullets(users);
+        if (!isStale()) {
+          setComparisonResult({
+            agreements: (fallback.agreements || []).slice(0, 12),
+            disagreements: (fallback.disagreements || []).slice(0, 12),
+          });
         }
+      } finally {
+        if (!isStale()) setBulletsLoading(false);
       }
-      if (!venn) venn = computeVennEvidence(users);
-      if (!isStale()) setVennResult(venn);
-    }
+    };
+
+    const compassTask = async () => {
+      try {
+        let compass = null;
+        try {
+          const axesRaw = await runCompareToolkit('axes', { users, ...aiScope });
+          compass = axesRaw ? (sanitizeCompass(axesRaw, addrOrder) as CompareCompassData) : null;
+        } catch (err) {
+          accountLog.error('compare axes failed:', err);
+        }
+        if (!compass) {
+          compass = sanitizeCompass(pcaLiteCompass(users), addrOrder) as CompareCompassData;
+        }
+        if (!isStale()) setCompassData(compass);
+      } finally {
+        if (!isStale()) setCompassLoading(false);
+      }
+    };
+
+    const vennTask = async () => {
+      try {
+        if (users.length === 2 || users.length === 3) {
+          let venn = null;
+          if (users.length === 3) {
+            try {
+              const vennRaw = await runCompareToolkit('venn', { users, ...aiScope });
+              venn = mergeCompareVennWithEvidence(vennRaw, computeVennEvidence(users));
+            } catch (err) {
+              accountLog.error('compare venn failed:', err);
+            }
+          }
+          if (!venn) venn = computeVennEvidence(users);
+          if (!isStale()) setVennResult(venn);
+        }
+      } finally {
+        if (!isStale()) setVennLoading(false);
+      }
+    };
+
+    const sectionResults = await runCompareSectionTasks([bulletsTask, compassTask, vennTask]);
+    sectionResults.forEach((result) => {
+      if (result.status === 'rejected') accountLog.error('compare section failed:', result.reason);
+    });
 
     if (!isStale()) setLoading(false);
   };
@@ -1747,7 +1719,7 @@ const CompareAddress = ({
         {loading ? (
           <>
             <FontAwesomeIcon icon={faSpinner} spin />
-            &nbsp;Comparing
+            &nbsp;{resolveCompareRunLabel(sessionCachesReady)}
           </>
         ) : (
           'Compare Views & Activity'
@@ -1846,28 +1818,42 @@ const CompareAddress = ({
 
               {participantsCount === 2 && (
                 <div style={resolveCompareVisualSectionStyle()}>
-                  <Venn2
-                    users={currentUsers.slice(0, 2)} /* NEW: pass users for prompt/image maps */
-                    sets={sbtSetsMemo.slice(0, 2)}
-                    labels={userLabels.slice(0, 2)}
-                    sessionSlug={activeSessionSlug}
-                    preCounts={vennResult?.counts || null}
-                    evidence={vennResult?.evidenceMap || null}
-                    semantics={vennResult?.semantics || null}
-                  />
+                  {vennLoading ? (
+                    <div className={styles.placeholderNote}>
+                      <FontAwesomeIcon icon={faSpinner} spin />
+                      <span style={resolveCompareLoadingTextStyle()}>Loading overlap...</span>
+                    </div>
+                  ) : (
+                    <Venn2
+                      users={currentUsers.slice(0, 2)}
+                      sets={sbtSetsMemo.slice(0, 2)}
+                      labels={userLabels.slice(0, 2)}
+                      sessionSlug={activeSessionSlug}
+                      preCounts={vennResult?.counts || null}
+                      evidence={vennResult?.evidenceMap || null}
+                      semantics={vennResult?.semantics || null}
+                    />
+                  )}
                 </div>
               )}
               {participantsCount === 3 && (
                 <div style={resolveCompareVisualSectionStyle()}>
-                  <Venn3
-                    users={currentUsers.slice(0, 3)} /* opinion-first fallback only */
-                    sets={sbtSetsMemo.slice(0, 3)} /* fallback only */
-                    labels={userLabels.slice(0, 3)}
-                    sessionSlug={activeSessionSlug}
-                    preCounts={vennResult?.counts || null}
-                    evidence={vennResult?.evidenceMap || null}
-                    semantics={vennResult?.semantics || null}
-                  />
+                  {vennLoading ? (
+                    <div className={styles.placeholderNote}>
+                      <FontAwesomeIcon icon={faSpinner} spin />
+                      <span style={resolveCompareLoadingTextStyle()}>Loading overlap...</span>
+                    </div>
+                  ) : (
+                    <Venn3
+                      users={currentUsers.slice(0, 3)}
+                      sets={sbtSetsMemo.slice(0, 3)}
+                      labels={userLabels.slice(0, 3)}
+                      sessionSlug={activeSessionSlug}
+                      preCounts={vennResult?.counts || null}
+                      evidence={vennResult?.evidenceMap || null}
+                      semantics={vennResult?.semantics || null}
+                    />
+                  )}
                 </div>
               )}
 
@@ -2828,7 +2814,7 @@ export function OpinionCompass2D({ users = [], labels = [], precomputed = null }
       if (!ctx) return;
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       const a = document.createElement('a');
-      a.download = 'compass.png';
+      a.download = COMPARE_GRAPHIC_FILENAME;
       a.href = canvas.toDataURL('image/png');
       a.click();
     };

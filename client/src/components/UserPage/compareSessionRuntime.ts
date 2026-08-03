@@ -26,6 +26,8 @@ type ScanCompareAddressesOptions = {
   seen?: Set<string>;
 };
 
+type CompareSectionTask = () => Promise<void> | void;
+
 export type CompareProfileScanFailure = {
   address: string;
   error: unknown;
@@ -33,6 +35,22 @@ export type CompareProfileScanFailure = {
 
 const isUnknownRecord = (value: unknown): value is UnknownRecord =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+export const COMPARE_GRAPHIC_FILENAME = 'contextEngine_comparisonGraphic.png';
+
+export const resolveCompareRunLabel = (sessionCachesReady?: boolean): string =>
+  sessionCachesReady === false ? 'Loading session data…' : 'Comparing';
+
+export const runCompareSectionTasks = (tasks: CompareSectionTask[] = []): Promise<PromiseSettledResult<void>[]> => {
+  const pending = (Array.isArray(tasks) ? tasks : []).map((task) => {
+    try {
+      return Promise.resolve(task());
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  });
+  return Promise.allSettled(pending);
+};
 
 export const resolveCompareSessionSlug = ({
   activeSessionSlug,
@@ -74,10 +92,7 @@ export const selectCompareCacheValues = (
 ): UnknownRecord[] => {
   const normalizedSessionSlug = normalizeSessionSlug(sessionSlug);
   return (Array.isArray(entries) ? entries : [])
-    .filter(
-      (entry) =>
-        !normalizedSessionSlug || normalizeSessionSlug(entry?.slug ?? '') === normalizedSessionSlug,
-    )
+    .filter((entry) => !normalizedSessionSlug || normalizeSessionSlug(entry?.slug ?? '') === normalizedSessionSlug)
     .map((entry) => entry?.value)
     .filter(isUnknownRecord);
 };

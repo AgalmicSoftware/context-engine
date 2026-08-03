@@ -1,6 +1,9 @@
 import {
+  COMPARE_GRAPHIC_FILENAME,
   buildCompareRoutePath,
   resolveCompareSessionSlug,
+  resolveCompareRunLabel,
+  runCompareSectionTasks,
   scanCompareAddressesSequentially,
   selectCompareCacheValues,
 } from './compareSessionRuntime';
@@ -75,5 +78,33 @@ describe('compare session runtime', () => {
       seen,
     });
     expect(scan).toHaveBeenCalledTimes(3);
+  });
+
+  it('starts independent comparison sections together and isolates failures', async () => {
+    const started: string[] = [];
+    const finishers: Array<() => void> = [];
+    const task =
+      (name: string, shouldFail = false) =>
+      () =>
+        new Promise<void>((resolve, reject) => {
+          started.push(name);
+          finishers.push(() => (shouldFail ? reject(new Error(name)) : resolve()));
+        });
+
+    const pending = runCompareSectionTasks([task('bullets'), task('compass', true), task('venn')]);
+
+    expect(started).toEqual(['bullets', 'compass', 'venn']);
+    finishers.forEach((finish) => finish());
+    await expect(pending).resolves.toEqual([
+      { status: 'fulfilled', value: undefined },
+      { status: 'rejected', reason: expect.any(Error) },
+      { status: 'fulfilled', value: undefined },
+    ]);
+  });
+
+  it('uses honest loading copy and a descriptive export filename', () => {
+    expect(resolveCompareRunLabel(false)).toBe('Loading session data…');
+    expect(resolveCompareRunLabel(true)).toBe('Comparing');
+    expect(COMPARE_GRAPHIC_FILENAME).toBe('contextEngine_comparisonGraphic.png');
   });
 });
