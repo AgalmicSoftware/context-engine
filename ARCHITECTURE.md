@@ -190,7 +190,7 @@ Lit opt-in:
 | Arweave | `utilities/arweave/arweaveClient.js`, `arweaveUrls.ts` |
 | Session helpers | `utilities/session/sessionNaming.ts`, `sessionMetadata.ts`, `resourceKeys.ts`, `sessionModeProfile.ts`, `groupCreationPolicy.ts`, `sessionBackendKind.ts`, `agentClientLogin.ts`, `telegramAgentData.ts`, `telegramSessionBackend.ts` |
 | Worker auth | `utilities/worker/workerAuth.ts`, `corsProxy.ts` |
-| Cache | `utilities/cache/cacheScripts.ts`, `storageManager.ts` |
+| Cache | `utilities/cache/cacheScripts.ts` |
 | AI | `utilities/ai/aiClient.js`, `aiSettings.ts` |
 | Survey logic | `utilities/survey/questionRouting.ts`, `filterStateUtils.ts`, `compareUsers.ts` |
 | **Config / variables** | |
