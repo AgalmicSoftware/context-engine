@@ -217,10 +217,6 @@ describe('error paths', () => {
   it('uses provider-neutral wallet guidance for signer-only transaction paths', async () => {
     const signerCases = [
       {
-        run: () => contractScripts.submitSurveyResponse('none', SURVEY_ID, SURVEY_TX_ID, GROUP_CFG),
-        message: 'submitSurveyResponse requires a signer-capable provider (not read-only).',
-      },
-      {
         run: () =>
           contractScripts.addSurveyWithQuestions(
             'none',

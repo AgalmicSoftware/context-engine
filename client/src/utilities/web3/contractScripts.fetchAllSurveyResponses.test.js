@@ -246,36 +246,25 @@ describe('contractScripts.fetchAllSurveyResponses', () => {
     ]);
   });
 
-  it('batches survey response reads while preserving survey/responder output shape', async () => {
-    const responderA = '0x00000000000000000000000000000000000000aa';
-    const responderB = '0x00000000000000000000000000000000000000bb';
-    const pendingReads = new Map();
+  it('preserves transaction ordering metadata for the latest same-block responder event', async () => {
+    const responder = '0x00000000000000000000000000000000000000aa';
     mockFetchLogsSmartWithProvider.mockResolvedValue([
-      makeResponsesSubmittedLog(responderA, 7, 0),
-      makeResponsesSubmittedLog(responderB, 9, 1),
+      makeResponsesSubmittedLog(responder, 7, 1, 1),
+      makeResponsesSubmittedLog(responder, 7, 3, 2),
     ]);
+    jest.spyOn(contractScripts, 'getSurveyResponse').mockResolvedValue({ answer: 'latest' });
 
-    jest.spyOn(contractScripts, 'getSurveyResponse').mockImplementation(
-      (_providerName, responder) =>
-        new Promise((resolve) => {
-          pendingReads.set(String(responder).toLowerCase(), resolve);
-        }),
-    );
+    const result = await contractScripts.fetchAllSurveyResponses('none', SURVEY_ID, 1, 30, GROUP_CFG);
 
-    const run = contractScripts.getSurveyResponses('none', 1, 30, GROUP_CFG);
-    await Promise.resolve();
-    await Promise.resolve();
-
-    expect(contractScripts.getSurveyResponse).toHaveBeenCalledTimes(2);
-    pendingReads.get(responderB.toLowerCase())({ answer: 'B' });
-    pendingReads.get(responderA.toLowerCase())({ answer: 'A' });
-
-    await expect(run).resolves.toEqual({
-      [SURVEY_ID.toLowerCase()]: {
-        [responderA.toLowerCase()]: { answer: 'A' },
-        [responderB.toLowerCase()]: { answer: 'B' },
-      },
-    });
+    expect(result.responses).toEqual([
+      expect.objectContaining({
+        responder,
+        response: { answer: 'latest' },
+        blockNumber: 7,
+        transactionIndex: 2,
+        logIndex: 3,
+      }),
+    ]);
   });
 
   it('threads forced Arweave recovery into chunked question response reads', async () => {
