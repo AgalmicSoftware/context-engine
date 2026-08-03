@@ -42,7 +42,7 @@ const buildSbtKeySets = buildCompareSbtKeySets as (entries: Array<Record<string,
 const buildSbtImageMap = buildCompareSbtImageMap as (
   entries: Array<Record<string, unknown>>,
 ) => Map<string, { name: string; image: string | null }>;
-const readObjectValues = readDgObjectValues as (namespace: string) => unknown[];
+const readObjectValues = readDgObjectValues as (namespace: string, sessionSlug?: string) => unknown[];
 
 describe('CompareAddresses cache scan helpers', () => {
   beforeEach(() => {
@@ -63,11 +63,21 @@ describe('CompareAddresses cache scan helpers', () => {
     expect(result).toEqual([{ a: 1 }, { b: 2 }]);
   });
 
+  it('reads only the resolved session cache when a session slug is supplied', () => {
+    mockListNamespaceEntriesSync.mockReturnValue([
+      { slug: 'edge', value: { id: 'edge' } },
+      { slug: 'worker', value: { id: 'worker' } },
+    ]);
+
+    expect(readObjectValues('questionsCache', 'worker')).toEqual([{ id: 'worker' }]);
+  });
+
   it('builds compare profile links under the configured PUBLIC_URL base path', () => {
     const previousPublicUrl = process.env.PUBLIC_URL;
     process.env.PUBLIC_URL = '/ce';
     try {
       expect(buildCompareProfileHref('0xabc')).toBe('/ce/u/0xabc');
+      expect(buildCompareProfileHref('0xabc', 'worker-session')).toBe('/ce/u/0xabc?session=worker-session');
       expect(buildCompareProfileHref('')).toBe('');
     } finally {
       if (previousPublicUrl === undefined) {

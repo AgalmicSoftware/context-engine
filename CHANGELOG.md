@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Made address comparison session-aware across legacy registry, pure
+  Cloudflare, and hybrid session profiles. Compare routes now preserve the
+  active session, wait for its canonical caches, isolate cache and prompt
+  fallbacks by slug, await on-chain profile enrichment before analysis, and
+  skip chain scans for pure Worker sessions.
 - Clarified the repository boundary between canonical Worker source,
   Cloudflare-native deployment packages, local bundle output, immutable CI
   bundle releases, and the stripped public-source snapshot. Release docs now

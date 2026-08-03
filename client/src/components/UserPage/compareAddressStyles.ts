@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
+import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 
 export const resolveCompareAddressPillContentStyle = (): CSSProperties => ({
   alignItems: 'center',
@@ -11,9 +12,12 @@ export const resolveCompareAddressBlockieStyle = (): CSSProperties => ({
   borderRadius: 3,
 });
 
-export const buildCompareProfileHref = (address: unknown): string => {
+export const buildCompareProfileHref = (address: unknown, sessionSlug: unknown = ''): string => {
   const normalizedAddress = String(address || '').trim();
-  return normalizedAddress ? buildPublicRoute(`/u/${normalizedAddress}`) : '';
+  if (!normalizedAddress) return '';
+  const normalizedSessionSlug = normalizeSessionSlug(sessionSlug);
+  const query = normalizedSessionSlug ? `?session=${encodeURIComponent(normalizedSessionSlug)}` : '';
+  return buildPublicRoute(`/u/${normalizedAddress}${query}`);
 };
 
 export const buildCompareClassName = (...classNames: unknown[]): string =>

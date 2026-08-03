@@ -41,7 +41,12 @@ import { normalizeArweaveUrl } from 'utilities/arweave/arweaveUrls.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { listNamespaceEntriesSync, subscribeCacheUpdates } from '../../utilities/cache/cacheScripts.js';
 import { createCacheUpdateCoalescer } from '../../utilities/cache/cacheUpdateCoalescer.js';
-import { resolveSessionSlugFromPathname } from '../../utilities/session/sessionNaming.js';
+import {
+  buildCompareRoutePath,
+  resolveCompareSessionSlug,
+  scanCompareAddressesSequentially,
+  selectCompareCacheValues,
+} from './compareSessionRuntime';
 
 const accountLog = createLogger('account');
 
@@ -267,8 +272,10 @@ interface CompareCoalescer {
 }
 
 interface CompareAddressProps {
+  activeSessionSlug?: string;
   firstAddress?: string;
   account?: string;
+  sessionCachesReady?: boolean;
   scanSpecificUserProfile?: (address: string) => Promise<unknown> | unknown;
 }
 
@@ -284,6 +291,7 @@ interface VennProps {
   sets?: Set<string>[];
   labels?: string[];
   users?: CompareUser[] | null;
+  sessionSlug?: string;
   preCounts?: Partial<Record<VennRegionKey, number>> | null;
   evidence?: Partial<Record<VennRegionKey, unknown[]>> | null;
   semantics?: string | null;
@@ -313,11 +321,8 @@ const readRecordProperty = (record: UnknownRecord, key: string): UnknownRecord =
 const getCompareSbtLabelTyped = getCompareSbtLabel as (entry?: unknown) => string;
 const getCompareSbtKeyTyped = getCompareSbtKey as (entry?: unknown) => string;
 
-export const readDgObjectValues = (name: string): UnknownRecord[] => {
-  return listNamespaceEntriesSync(name, { cloneValues: false })
-    .map((entry) => entry?.value)
-    .filter(isUnknownRecord);
-};
+export const readDgObjectValues = (name: string, sessionSlug: string = ''): UnknownRecord[] =>
+  selectCompareCacheValues(listNamespaceEntriesSync(name, { cloneValues: false }), sessionSlug);
 
 export const buildNicknameByAddressMap = (bookmarks: CompareBookmark[] = []): Map<string, string> => {
   const map = new Map<string, string>();
@@ -333,10 +338,10 @@ export const buildNicknameByAddressMap = (bookmarks: CompareBookmark[] = []): Ma
 };
 
 // NEW HELPERS FOR VENN TOOLTIPS (updated to scan all group-scoped caches)
-const getQuestionPrompt = (questionId: string): string => {
+const getQuestionPrompt = (questionId: string, sessionSlug: string = ''): string => {
   try {
     const qidLower = String(questionId || '').toLowerCase();
-    const questionsCaches = readDgObjectValues('questionsCache');
+    const questionsCaches = readDgObjectValues('questionsCache', sessionSlug);
     for (const cacheObj of questionsCaches) {
       // Read all top-level keys (string or legacy numeric)
       for (const netKey of Object.keys(cacheObj || {})) {
@@ -407,7 +412,10 @@ const normalizeBinaryAnswer = (answerValue: unknown): 1 | 0 | -1 | null => {
   return null;
 };
 
-const getCommonUnsureQuestions = (users: CompareUser[] = []): CompareUnsureQuestion[] => {
+const getCommonUnsureQuestions = (
+  users: CompareUser[] = [],
+  sessionSlug: string = '',
+): CompareUnsureQuestion[] => {
   const arr = Array.isArray(users) ? users : [];
   if (arr.length < 2) return [];
   const count = arr.length;
@@ -429,11 +437,11 @@ const getCommonUnsureQuestions = (users: CompareUser[] = []): CompareUnsureQuest
 
       const existing = byQid.get(qid) || {
         id: qid,
-        prompt: String(q?.prompt || '').trim() || getQuestionPrompt(qid) || 'Unknown Question',
+        prompt: String(q?.prompt || '').trim() || getQuestionPrompt(qid, sessionSlug) || 'Unknown Question',
         stances: Array(count).fill(null),
       };
       existing.stances[idx] = stance;
-      if (!existing.prompt) existing.prompt = getQuestionPrompt(qid) || 'Unknown Question';
+      if (!existing.prompt) existing.prompt = getQuestionPrompt(qid, sessionSlug) || 'Unknown Question';
       byQid.set(qid, existing);
     });
   });
@@ -512,7 +520,11 @@ const formatRatingValue = (val: unknown, scale: number | null): string => {
   return scale ? `${rounded}/${scale}` : rounded;
 };
 
-const buildQuestionEntries = (users: CompareUser[] = [], labels: string[] = []): CompareQuestionEntry[] => {
+const buildQuestionEntries = (
+  users: CompareUser[] = [],
+  labels: string[] = [],
+  sessionSlug: string = '',
+): CompareQuestionEntry[] => {
   const map = new Map<string, CompareQuestionEntry>();
   (users || []).forEach((u, idx) => {
     const label = String(labels[idx] || getShortenedAddress(u?.address || '', false) || `User ${idx + 1}`);
@@ -520,7 +532,7 @@ const buildQuestionEntries = (users: CompareUser[] = [], labels: string[] = []):
       const qidRaw = q?.id || q?.questionID || q?.questionId || q?.qId;
       if (!qidRaw) return;
       const qidLower = String(qidRaw || '').toLowerCase();
-      const prompt = toCleanText(q?.prompt) || getQuestionPrompt(qidLower) || 'Unknown Question';
+      const prompt = toCleanText(q?.prompt) || getQuestionPrompt(qidLower, sessionSlug) || 'Unknown Question';
       const type = normalizeQuestionType(q?.type || '');
       const entry = map.get(qidLower) || {
         id: qidRaw,
@@ -571,145 +583,13 @@ export const buildCompareSbtImageMap = (
   return m;
 };
 
-export const resolveCompareAddressPillContentStyle = (): React.CSSProperties => ({
-  alignItems: 'center',
-  display: 'inline-flex',
-  gap: 8,
-});
-
-export const resolveCompareAddressBlockieStyle = (): React.CSSProperties => ({
-  borderRadius: 3,
-});
-
-export const buildCompareProfileHref = (address: unknown): string => {
-  const normalizedAddress = String(address || '').trim();
-  return normalizedAddress ? buildPublicRoute(`/u/${normalizedAddress}`) : '';
-};
-
-export const buildCompareClassName = (...classNames: unknown[]): string =>
-  classNames
-    .map((className) => String(className || ''))
-    .filter(Boolean)
-    .join(' ');
-
-export const resolveCompareUnsurePanelStyle = (): React.CSSProperties => ({
-  marginTop: 8,
-});
-
-export const resolveCompareUnsureHeaderStyle = (): React.CSSProperties => ({
-  fontWeight: 700,
-  marginBottom: 6,
-});
-
-export const resolveCompareUnsureMoreStyle = (): React.CSSProperties => ({
-  fontSize: 12,
-  marginTop: 6,
-  opacity: 0.8,
-});
-
-export const resolveCompareBookmarksHeaderStyle = (): React.CSSProperties => ({
-  color: 'white',
-  fontWeight: '600',
-  marginBottom: '10px',
-});
-
-export const resolveCompareBookmarksListStyle = (): React.CSSProperties => ({
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 10,
-});
-
-export const resolveCompareErrorStyle = (): React.CSSProperties => ({
-  marginTop: 8,
-});
-
-export const resolveCompareVisualSectionStyle = (): React.CSSProperties => ({
-  padding: '6px 0',
-});
-
-export const resolveCompareLoadingTextStyle = (): React.CSSProperties => ({
-  marginLeft: 6,
-});
-
-export const resolveCompareClickableResultItemStyle = (): React.CSSProperties => ({
-  cursor: 'pointer',
-});
-
-export const resolveCompareDrillBodyStyle = (): React.CSSProperties => ({
-  marginTop: 6,
-});
-
-export const resolveCompareVennWrapStyle = (): React.CSSProperties => ({
-  overflowX: 'auto',
-  position: 'relative',
-});
-
-export const resolveCompareVennTooltipStyle = ({
-  clientWidth,
-  x = 0,
-  y = 0,
-}: {
-  clientWidth?: unknown;
-  x?: unknown;
-  y?: unknown;
-} = {}): React.CSSProperties => {
-  const width = Number(clientWidth || 420);
-  const left = Math.max(8, Math.min(Number(x || 0) + 6, width - 420));
-  return {
-    left,
-    top: Number(y || 0) + 8,
-  };
-};
-
-export const resolveCompareVennTooltipHeaderStyle = (): React.CSSProperties => ({
-  fontWeight: 700,
-  marginBottom: 4,
-});
-
-export const resolveCompareVennTooltipListStyle = (): React.CSSProperties => ({
-  listStyle: 'none',
-  margin: 0,
-  padding: 0,
-});
-
-export const resolveCompareVennSbtRowStyle = (): React.CSSProperties => ({
-  alignItems: 'center',
-  display: 'flex',
-  gap: '8px',
-});
-
-export const resolveCompareVennSbtImageStyle = (): React.CSSProperties => ({
-  borderRadius: '4px',
-  flexShrink: 0,
-});
-
-export const resolveCompareVennNoteStyle = (): React.CSSProperties => ({
-  fontSize: 12,
-  marginTop: 4,
-  opacity: 0.75,
-});
-
-export const resolveCompareCompassLegendStyle = (): React.CSSProperties => ({
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 8,
-  marginBottom: 8,
-});
-
-export const resolveCompareCompassLegendSwatchStyle = (background: unknown): React.CSSProperties => ({
-  background: String(background || ''),
-  borderRadius: 5,
-  display: 'inline-block',
-  height: 10,
-  marginRight: 6,
-  width: 10,
-});
-
-export const resolveCompareCompassScrollStyle = (): React.CSSProperties => ({
-  overflowX: 'auto',
-});
-
-const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: CompareAddressProps) => {
+const CompareAddress = ({
+  activeSessionSlug: activeSessionSlugProp,
+  firstAddress,
+  account,
+  sessionCachesReady,
+  scanSpecificUserProfile,
+}: CompareAddressProps) => {
   const [compareAddresses, setCompareAddresses] = useState<string[]>([]);
   const [showComparison, setShowComparison] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -732,11 +612,19 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
 
   const navigate = useNavigate();
   const location = useLocation();
-  const activeSessionSlug = useMemo(() => resolveSessionSlugFromPathname(location.pathname) || '', [location.pathname]);
+  const activeSessionSlug = useMemo(
+    () =>
+      resolveCompareSessionSlug({
+        activeSessionSlug: activeSessionSlugProp,
+        pathname: location.pathname,
+        search: location.search,
+      }),
+    [activeSessionSlugProp, location.pathname, location.search],
+  );
   const lastAutoKeyRef = useRef('');
-  const deepScanQueueRef = useRef<Promise<void>>(Promise.resolve());
   const deepScanSeenRef = useRef<Set<string>>(new Set());
   const compareRunIdRef = useRef(0);
+  const pendingComparisonRef = useRef<{ addresses: string[]; skipNavigate: boolean } | null>(null);
 
   // Viz mode (Compass-first; Matrix is behind “More visuals”)
   const [vizMode, setVizMode] = useState<'summary' | 'compass' | 'venn' | 'matrix'>('compass');
@@ -932,32 +820,6 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
     });
   };
 
-  const enqueueDeepScan = React.useCallback(
-    (addresses: string[] = []) => {
-      if (typeof scanSpecificUserProfile !== 'function') return;
-      const queue: string[] = [];
-      (addresses || []).forEach((addr) => {
-        const raw = String(addr || '').trim();
-        if (!/^0x[0-9a-fA-F]{40}$/.test(raw)) return;
-        const lower = raw.toLowerCase();
-        if (deepScanSeenRef.current.has(lower)) return;
-        deepScanSeenRef.current.add(lower);
-        queue.push(raw);
-      });
-      if (queue.length === 0) return;
-      deepScanQueueRef.current = deepScanQueueRef.current.then(async () => {
-        for (const addr of queue) {
-          try {
-            await scanSpecificUserProfile(addr);
-          } catch (err) {
-            accountLog.warn('[CompareAddresses] deep scan failed:', addr, err);
-          }
-        }
-      });
-    },
-    [scanSpecificUserProfile],
-  );
-
   const runComparison = async (addresses: string[], { skipNavigate = false }: { skipNavigate?: boolean } = {}) => {
     const validAddresses = (addresses || []).map((a) => a.trim()).filter((a) => isValidAddress(a) && a !== '');
 
@@ -966,10 +828,14 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
       return;
     }
 
-    if (!skipNavigate) {
-      const path = `/compare/${validAddresses.join('&')}`;
-      navigate(path);
-    }
+    if (!skipNavigate)
+      navigate(
+        buildCompareRoutePath({
+          addresses: validAddresses,
+          sessionSlug: activeSessionSlug,
+          search: location.search,
+        }),
+      );
 
     const hexOnly = validAddresses.filter((a) => /^0x[0-9a-fA-F]{40}$/.test(a));
     if (hexOnly.length < 2) {
@@ -979,10 +845,17 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
       setComparisonError('');
     }
 
-    enqueueDeepScan(validAddresses);
-
     const runId = ++compareRunIdRef.current;
     const isStale = () => compareRunIdRef.current !== runId;
+
+    if (sessionCachesReady === false) {
+      pendingComparisonRef.current = { addresses: validAddresses, skipNavigate };
+      setLoading(true);
+      setShowComparison(true);
+      setComparisonError('');
+      return;
+    }
+    pendingComparisonRef.current = null;
 
     setLoading(true);
     setBulletsLoading(true);
@@ -999,10 +872,21 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
     setDrillState({});
     setVizMode('compass'); // Compass-first
 
+    const scanFailures = await scanCompareAddressesSequentially({
+      addresses: validAddresses,
+      sessionSlug: activeSessionSlug,
+      scanSpecificUserProfile,
+      seen: deepScanSeenRef.current,
+    });
+    scanFailures.forEach(({ address, error }) => {
+      accountLog.warn('[CompareAddresses] deep scan failed:', address, error);
+    });
+    if (isStale()) return;
+
     // Read caches via component-level helper (side-effect)
-    const sbtCaches = readDgObjectValues('sbtCache');
-    const questionsCaches = readDgObjectValues('questionsCache');
-    const surveysCaches = readDgObjectValues('surveysCache');
+    const sbtCaches = readDgObjectValues('sbtCache', activeSessionSlug);
+    const questionsCaches = readDgObjectValues('questionsCache', activeSessionSlug);
+    const surveysCaches = readDgObjectValues('surveysCache', activeSessionSlug);
 
     // Assemble deterministic user payloads strictly from caches (2–10 supported) via pure utility
     const users = buildUsersFromCaches(validAddresses, sbtCaches, questionsCaches, surveysCaches);
@@ -1103,6 +987,14 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
     if (!isStale()) setLoading(false);
   };
   runComparisonRef.current = runComparison;
+
+  useEffect(() => {
+    if (sessionCachesReady === false) return;
+    const pending = pendingComparisonRef.current;
+    if (!pending) return;
+    pendingComparisonRef.current = null;
+    void runComparisonRef.current?.(pending.addresses, { skipNavigate: pending.skipNavigate });
+  }, [sessionCachesReady]);
 
   // If user toggles “More visuals” after initial run and we don't have a matrix yet,
   // ask just for the matrix using the same users (avoid recomputing others).
@@ -1228,7 +1120,10 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
   // Labels (nickname/username/shortened)
   const userLabels = useMemo(() => deriveUserLabels(currentUsers, bookmarks), [currentUsers, bookmarks]);
 
-  const questionEntries = useMemo(() => buildQuestionEntries(currentUsers, userLabels), [currentUsers, userLabels]);
+  const questionEntries = useMemo(
+    () => buildQuestionEntries(currentUsers, userLabels, activeSessionSlug),
+    [activeSessionSlug, currentUsers, userLabels],
+  );
 
   const buildDrillTree = React.useCallback(
     (pointText: string, type: ComparisonTone): CompareDrillTree => {
@@ -1604,7 +1499,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
     if (existing.loading) return;
 
     const hasUnsureHint = /\bunsure\b/i.test(String(pointText || ''));
-    const unsureQuestions = hasUnsureHint ? getCommonUnsureQuestions(currentUsers) : null;
+    const unsureQuestions = hasUnsureHint ? getCommonUnsureQuestions(currentUsers, activeSessionSlug) : null;
     const tree = buildDrillTree(pointText, type);
 
     setDrillState((prev) => ({
@@ -1905,7 +1800,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
                   <span>{label}</span>
                   {addr && (
                     <a
-                      href={buildCompareProfileHref(addr)}
+                      href={buildCompareProfileHref(addr, activeSessionSlug)}
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label={`Open profile for ${label}`}
@@ -1955,6 +1850,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
                     users={currentUsers.slice(0, 2)} /* NEW: pass users for prompt/image maps */
                     sets={sbtSetsMemo.slice(0, 2)}
                     labels={userLabels.slice(0, 2)}
+                    sessionSlug={activeSessionSlug}
                     preCounts={vennResult?.counts || null}
                     evidence={vennResult?.evidenceMap || null}
                     semantics={vennResult?.semantics || null}
@@ -1967,6 +1863,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
                     users={currentUsers.slice(0, 3)} /* opinion-first fallback only */
                     sets={sbtSetsMemo.slice(0, 3)} /* fallback only */
                     labels={userLabels.slice(0, 3)}
+                    sessionSlug={activeSessionSlug}
                     preCounts={vennResult?.counts || null}
                     evidence={vennResult?.evidenceMap || null}
                     semantics={vennResult?.semantics || null}
@@ -2100,6 +1997,7 @@ function Venn2({
   sets = [],
   labels = [],
   users = null,
+  sessionSlug = '',
   preCounts = null,
   evidence = null,
   semantics = null,
@@ -2120,7 +2018,7 @@ function Venn2({
     });
     if (m.size === 0) {
       try {
-        const questionsCaches = readDgObjectValues('questionsCache');
+        const questionsCaches = readDgObjectValues('questionsCache', sessionSlug);
         questionsCaches.forEach((cacheObj) => {
           if (!cacheObj || typeof cacheObj !== 'object') return;
           for (const netId in cacheObj) {
@@ -2138,7 +2036,7 @@ function Venn2({
       }
     }
     return m;
-  }, [users]);
+  }, [sessionSlug, users]);
 
   const sbtImageMap = useMemo(() => buildCompareSbtImageMap(users || []), [users]);
 
@@ -2465,6 +2363,7 @@ function Venn3({
   sets = [],
   labels = [],
   users = null,
+  sessionSlug = '',
   preCounts = null,
   evidence = null,
   semantics = null,
@@ -2485,7 +2384,7 @@ function Venn3({
     });
     if (m.size === 0) {
       try {
-        const questionsCaches = readDgObjectValues('questionsCache');
+        const questionsCaches = readDgObjectValues('questionsCache', sessionSlug);
         questionsCaches.forEach((cacheObj) => {
           if (!cacheObj || typeof cacheObj !== 'object') return;
           for (const netId in cacheObj) {
@@ -2503,7 +2402,7 @@ function Venn3({
       }
     }
     return m;
-  }, [users]);
+  }, [sessionSlug, users]);
 
   const sbtImageMap = useMemo(() => buildCompareSbtImageMap(users || []), [users]);
 

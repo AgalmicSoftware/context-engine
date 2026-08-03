@@ -3692,8 +3692,10 @@ class UserPage extends Component<any, any> {
 
         <UserPageComparePanel collapseOpen={collapseOpen} minimized={minimized}>
           <CompareAddressSection
+            activeSessionSlug={this.props.activeSessionSlug ?? this.props.sessionSlug ?? ''}
             firstAddress={propViewAddress}
             account={account}
+            sessionCachesReady={this.props.isAllCachesReady}
             scanSpecificUserProfile={this.props.scanSpecificUserProfile}
           />
         </UserPageComparePanel>

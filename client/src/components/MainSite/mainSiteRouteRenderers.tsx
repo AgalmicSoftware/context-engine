@@ -265,21 +265,31 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
   },
 
   _renderCompareRoute: (ctx: RouteRenderCtx) => {
-    const { fullPath } = ctx;
+    const { fullPath, defaultSlug, defaultSessionCfg } = ctx;
     const comparePath = String(fullPath || '').split('?')[0];
     const firstAddress =
       comparePath
         .replace(/^\/compare\/?/, '')
         .split('&')
         .filter(Boolean)[0] || '';
+    const compareCapabilityContext = resolveMainSiteRouteCapabilityContext({
+      slug: defaultSlug,
+      sessionConfig: defaultSessionCfg,
+    });
+    const onChainProfileEnabled =
+      compareCapabilityContext.capabilities.source === 'legacy_registry' ||
+      compareCapabilityContext.capabilities.source === 'missing' ||
+      compareCapabilityContext.capabilities.usesOnChainSbt;
     return (
       <Suspense fallback={<LazyFallback label="Loading..." />}>
         <RouteErrorBoundary resetKey={fullPath}>
           <div data-testid={E2E_TESTIDS.PAGE_COMPARE_ROOT}>
             <CompareAddresses
+              activeSessionSlug={defaultSlug}
               firstAddress={firstAddress}
               account={host.props.account}
-              scanSpecificUserProfile={host.scanSpecificUserProfile}
+              sessionCachesReady={!!host.state.isAllCachesReady}
+              scanSpecificUserProfile={onChainProfileEnabled ? host.scanSpecificUserProfile : undefined}
             />
           </div>
         </RouteErrorBoundary>

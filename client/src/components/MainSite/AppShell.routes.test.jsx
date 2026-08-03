@@ -277,6 +277,9 @@ jest.mock('../UserPage/CompareAddresses', () => {
       return React.createElement('div', {
         'data-testid': 'mock-compare-addresses',
         'data-first-address': String(props.firstAddress || ''),
+        'data-active-session-slug': String(props.activeSessionSlug || ''),
+        'data-cache-ready': String(props.sessionCachesReady),
+        'data-profile-scan-enabled': String(typeof props.scanSpecificUserProfile === 'function'),
       });
     },
   };
@@ -1652,6 +1655,31 @@ describe('AppShell route render smoke', () => {
 
     expect(await screen.findByTestId(E2E_TESTIDS.PAGE_COMPARE_ROOT)).toBeInTheDocument();
     expect(await screen.findByTestId('mock-compare-addresses')).toHaveAttribute('data-first-address', '');
+    expect(screen.getByTestId('mock-compare-addresses')).toHaveAttribute('data-active-session-slug', 'edge');
+    expect(screen.getByTestId('mock-compare-addresses')).toHaveAttribute('data-cache-ready', 'true');
+    expect(screen.getByTestId('mock-compare-addresses')).toHaveAttribute('data-profile-scan-enabled', 'true');
+  });
+
+  it('keeps pure Worker comparison session-scoped without invoking the on-chain profile scanner', async () => {
+    const workerConfig = buildSessionConfig({
+      slug: 'worker-session',
+      networkChainId: null,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    });
+    const subject = createSubject({
+      path: '/compare',
+      search: '?session=worker-session',
+      activeSessionSlug: 'worker-session',
+      sessionConfig: workerConfig,
+    });
+
+    render(subject.render());
+
+    expect(await screen.findByTestId('mock-compare-addresses')).toHaveAttribute(
+      'data-active-session-slug',
+      'worker-session',
+    );
+    expect(screen.getByTestId('mock-compare-addresses')).toHaveAttribute('data-profile-scan-enabled', 'false');
   });
 
   it('switches page roots cleanly when navigating between surveys and questions routes', async () => {
