@@ -4,10 +4,9 @@
   "source": "npm --prefix client run test:coverage:full-universe",
   "denominator": "Every tracked executable client/src JS/JSX/TS/TSX production file under the documented exclusion contract.",
   "nonComparableWithLegacyImportedMetric": true,
-  "productionFileCount": 1044,
-  "zeroHitFileCount": 11,
+  "productionFileCount": 1040,
+  "zeroHitFileCount": 10,
   "zeroHitFiles": [
-    "client/src/components/DemoViews/DebateHUD/DebateSelector.tsx",
     "client/src/components/DemoViews/DemoAnalysis/IndicatorHeatmap.tsx",
     "client/src/components/DemoViews/DemosIndex.tsx",
     "client/src/components/DemoViews/RiskMatrixDemo.tsx",
