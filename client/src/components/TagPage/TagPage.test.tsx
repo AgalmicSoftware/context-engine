@@ -13,7 +13,12 @@ import { buildDemoCorpusRecords } from '../../utilities/demo/demoCorpusRecords.j
 import { installSessionRegistryQueryInvalidation } from '../../utilities/query/sessionRegistryQueryInvalidation.js';
 
 const mockListNamespaceEntriesSync = jest.fn();
-const mockSubscribeCacheUpdates = jest.fn(() => () => {});
+type MockCacheUpdatePayload = {
+  namespace: string;
+  slug: string;
+  value: unknown;
+};
+const mockSubscribeCacheUpdates = jest.fn((_listener: (payload: MockCacheUpdatePayload) => void) => () => {});
 const mockGetAllSessionSlugs = jest.fn();
 const mockGetSessionConfigBySlug = jest.fn();
 const mockGetDemoSessionConfigBySlug = jest.fn();
@@ -924,7 +929,8 @@ describe('TagPage', () => {
     });
     expect(await screen.findByText('Mocked interpretation')).toBeInTheDocument();
 
-    const cacheSubscriber = mockSubscribeCacheUpdates.mock.calls[0][0];
+    const cacheSubscriber = mockSubscribeCacheUpdates.mock.calls[0]?.[0];
+    if (!cacheSubscriber) throw new Error('Expected TagPage to subscribe to cache updates');
     act(() => {
       cacheSubscriber({ namespace: 'questionsCache', slug: 'alpha', value: { unrelated: true } });
     });
