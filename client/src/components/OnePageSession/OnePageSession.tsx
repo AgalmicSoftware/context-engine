@@ -432,6 +432,7 @@ class OnePageSession extends Component<any, any> {
   }
 
   componentWillUnmount() {
+    this.disposeTelegramActions();
     this._autoMintLegacyCredentialQuery = '';
     window.removeEventListener('ce-agent-client-login', this.handleAgentClientLoginEvent as EventListener);
     if (this._autoOpenResultsTimer) {
@@ -794,6 +795,13 @@ class OnePageSession extends Component<any, any> {
           sessionSlug: nextSlug,
         }),
       );
+    const telegramIdentityChanged = slugChanged || telegramTargetChanged;
+    if (telegramIdentityChanged) {
+      this.handleTelegramComponentDidUpdate({
+        slugChanged: true,
+        loginJustCompleted: !prevProps.loginComplete && this.props.loginComplete,
+      });
+    }
     const prevRouteUiState = resolveOnePageSessionRouteUiState(prevProps);
     const nextRouteUiState = resolveOnePageSessionRouteUiState(this.props);
     const routeUiPatch: Record<string, any> = {};
@@ -920,10 +928,12 @@ class OnePageSession extends Component<any, any> {
       }
     }
 
-    this.handleTelegramComponentDidUpdate({
-      slugChanged: slugChanged || telegramTargetChanged,
-      loginJustCompleted: !prevProps.loginComplete && this.props.loginComplete,
-    });
+    if (!telegramIdentityChanged) {
+      this.handleTelegramComponentDidUpdate({
+        slugChanged: false,
+        loginJustCompleted: !prevProps.loginComplete && this.props.loginComplete,
+      });
+    }
   }
 
   scheduleBuildAggregator(

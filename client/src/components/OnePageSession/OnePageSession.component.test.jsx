@@ -432,6 +432,64 @@ describe('OnePageSession view gating', () => {
     expect(screen.queryByTestId('survey-page-pile')).not.toBeInTheDocument();
   });
 
+  it('keeps /session/demo in the normal shell when stale telegram session-meta belongs to another slug', () => {
+    const subject = createSubject({
+      slug: 'demo',
+      sessionConfig: {
+        ...buildProps().sessionConfig,
+        slug: 'demo',
+        sessionMode: 'standard',
+      },
+    });
+    subject.state.telegramSessionMeta = {
+      ok: true,
+      sessionSlug: 'edge',
+      telegramOnly: true,
+      telegramBridgeEnabled: true,
+      clientSubmitReady: true,
+    };
+
+    expect(subject.isTelegramBackendMode(subject.resolveCurrentSessionConfig(), 'demo')).toBe(false);
+  });
+
+  it('clears prior Telegram state before a route-state early return on slug change', () => {
+    const alphaConfig = {
+      ...buildProps().sessionConfig,
+      slug: 'alpha',
+      telegramOnly: true,
+      sessionMode: 'telegram_only',
+    };
+    const subject = createSubject({
+      slug: 'alpha',
+      sessionConfig: alphaConfig,
+      routeQuestionsOpen: false,
+    });
+    subject.state = {
+      ...subject.state,
+      telegramAgentQuestionsStatus: 'ready',
+      telegramAgentQuestions: [{ questionId: 'alpha-question', prompt: 'Old session question' }],
+    };
+    const prevProps = subject.props;
+    const prevState = { ...subject.state };
+    subject.props = {
+      ...prevProps,
+      slug: 'beta',
+      sessionConfig: {
+        ...alphaConfig,
+        slug: 'beta',
+        telegramOnly: false,
+        sessionMode: 'standard',
+      },
+      routeQuestionsOpen: true,
+    };
+
+    subject.componentDidUpdate(prevProps, prevState);
+
+    expect(subject.state.telegramAgentQuestionsStatus).toBe('idle');
+    expect(subject.state.telegramAgentQuestions).toEqual([]);
+    expect(subject.state.showQuestions).toBe(true);
+  });
+
   it('derives scoped Chipotle Lit hooks for embedded survey pages from session config', async () => {
     const litProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     litProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
