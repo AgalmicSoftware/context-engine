@@ -14,6 +14,8 @@ type PrfResults = {
   };
 };
 
+const PASSKEY_PRF_OUTPUT_BYTES = 32;
+
 export const PASSKEY_PRF_INFO = new TextEncoder().encode('context-engine:passkey-eoa:v1');
 
 export const buildPrfExtension = (salt: ArrayBuffer | Uint8Array): Record<string, unknown> => ({
@@ -27,7 +29,7 @@ export const buildPrfExtension = (salt: ArrayBuffer | Uint8Array): Record<string
 export const getOptionalCredentialPrfOutput = (credential: PublicKeyCredential): ArrayBuffer | null => {
   const results = credential.getClientExtensionResults?.() as PrfResults | undefined;
   const first = results?.prf?.results?.first;
-  return isArrayBufferLike(first) && first.byteLength > 0 ? first : null;
+  return isArrayBufferLike(first) && first.byteLength === PASSKEY_PRF_OUTPUT_BYTES ? first : null;
 };
 
 export const getCredentialPrfOutput = (credential: PublicKeyCredential): ArrayBuffer => {
