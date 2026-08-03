@@ -4,6 +4,7 @@ import { ethers } from 'ethers';
 import { webcrypto } from 'crypto';
 import sessionCorsWorker from '../../workers/sessionCorsWorker/worker.js';
 import { installSessionCoordinatorBinding } from '../helpers/sessionCorsWorkerTestUtils.mjs';
+import groupPasswordDerivation from '../../client/src/utilities/crypto/groupPasswordDerivation.cjs';
 
 const REGISTRY_ADDRESS = '0x0000000000000000000000000000000000000001';
 const RPC_URL = 'https://rpc.example';
@@ -126,20 +127,14 @@ Issued At: ${resolvedIssuedAt}
 Expiration Time: ${resolvedExpirationTime}`;
 };
 
-const deriveGroupPasswordWallet = (password) => {
-  const pwHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(password || ''));
-  const salt = ethers.utils.solidityKeccak256(['string'], ['sbt-group-password-v2']);
-  const seed = ethers.utils.solidityKeccak256(['bytes32', 'bytes32'], [pwHash, salt]);
-  const tmpSk = ethers.utils.keccak256(ethers.utils.arrayify(seed));
-  return new ethers.Wallet(tmpSk);
-};
-
-const buildGroupPasswordHash = (password) => (
-  ethers.utils.solidityKeccak256(['address'], [deriveGroupPasswordWallet(password).address])
+const { computeGroupPasswordHash, deriveGroupPasswordWallet } = (
+  groupPasswordDerivation.createGroupPasswordDerivation(ethers)
 );
 
+const buildGroupPasswordHash = (password) => computeGroupPasswordHash({ password, sbtAddress: '' });
+
 const signGroupMintAuthorization = async ({ password, sbtAddress, recipientAddress }) => {
-  const tmpWallet = deriveGroupPasswordWallet(password);
+  const tmpWallet = deriveGroupPasswordWallet({ password, sbtAddress: '' });
   const messageHash = ethers.utils.solidityKeccak256(['address', 'address'], [sbtAddress, recipientAddress]);
   return tmpWallet.signMessage(ethers.utils.arrayify(messageHash));
 };
