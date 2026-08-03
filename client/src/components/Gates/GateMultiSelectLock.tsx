@@ -284,7 +284,6 @@ const GateMultiSelectLock = ({
               </div>
             );
           })}
-          {!options.length && <div className={styles.empty}>{`No ${t('gatesLower')} configured.`}</div>}
         </div>
       ) : null}
     </div>

@@ -61,6 +61,30 @@ describe('GateMultiSelectLock', () => {
     expect(onToggleOpen).toHaveBeenCalledWith(true);
   });
 
+  it('keeps the picker closed when no gate options are configured', () => {
+    const onToggleOpen = jest.fn();
+
+    render(
+      <GateMultiSelectLock
+        gateOptions={[]}
+        selectedGateIds={[]}
+        onChangeSelectedGateIds={jest.fn()}
+        open={true}
+        onToggleOpen={onToggleOpen}
+        disabled={false}
+        showDots={false}
+      />,
+    );
+
+    const lockButton = screen.getByTestId(E2E_TESTIDS.GATE_LOCK_BUTTON);
+    expect(lockButton).toHaveAttribute('aria-label', 'No access rule available');
+    expect(lockButton).not.toHaveAttribute('aria-expanded');
+    expect(screen.queryByTestId(E2E_TESTIDS.GATE_LOCK_POPOVER)).not.toBeInTheDocument();
+
+    fireEvent.click(lockButton);
+    expect(onToggleOpen).not.toHaveBeenCalled();
+  });
+
   it('uses the current aria-label contract for unlocked and locked states', () => {
     const { rerender } = render(
       <GateMultiSelectLock
