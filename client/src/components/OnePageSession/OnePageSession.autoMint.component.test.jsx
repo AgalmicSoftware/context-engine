@@ -20,7 +20,6 @@ const mockPolisReport = jest.fn();
 const mockSBTsPage = jest.fn();
 const mockDebateMap = jest.fn();
 const mockRiskMatrix = jest.fn();
-const mockDebateSelector = jest.fn();
 const mockDemoAnalysisWorkspace = jest.fn();
 const originalFetch = global.fetch;
 const fullCrossCorpusPayload = JSON.parse(
@@ -143,11 +142,6 @@ jest.mock('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace', () => ({
     return <div data-testid="demo-analysis-workspace-view">Demo Analysis</div>;
   },
 }));
-jest.mock('../DemoViews/DebateHUD/DebateSelector', () => (props) => {
-  mockDebateSelector(props);
-  return <div data-testid="debate-selector">Debate Selector</div>;
-});
-
 describe('OnePageSession auto-mint queue', () => {
   afterEach(() => {
     jest.useRealTimers();
