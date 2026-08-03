@@ -112,6 +112,16 @@ function git(rootDir, args) {
   }).trim();
 }
 
+function createCommitOnBranch(rootDir, branchName) {
+  git(rootDir, ['config', 'user.name', 'Test User']);
+  git(rootDir, ['config', 'user.email', '[redacted-email]']);
+  git(rootDir, ['checkout', '--quiet', '-b', branchName]);
+  writeFile(rootDir, 'fixture.txt', 'fixture\n');
+  git(rootDir, ['add', 'fixture.txt']);
+  git(rootDir, ['commit', '--quiet', '-m', 'fixture']);
+  return git(rootDir, ['rev-parse', 'HEAD']);
+}
+
 test('pre-push guard blocks dev pushes to the public origin', () => {
   withHookFixture((rootDir) => {
     const result = runHook(rootDir, pushLine({
@@ -135,6 +145,58 @@ test('pre-push guard allows main pushes to the public origin', () => {
 
     assert.equal(result.status, 0);
     assert.equal(result.stderr, '');
+  });
+});
+
+test('pre-push guard resolves HEAD and @ before authorizing a public push', () => {
+  for (const localRef of ['HEAD', '@']) {
+    withHookFixture((rootDir) => {
+      const localSha = createCommitOnBranch(rootDir, 'dev');
+      const result = runHook(rootDir, pushLine({
+        localRef,
+        localSha,
+        remoteRef: 'refs/heads/main',
+      }));
+
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, new RegExp('Rejected ref: ' + localRef.replace('@', '\\@')));
+    });
+
+    withHookFixture((rootDir) => {
+      const localSha = createCommitOnBranch(rootDir, 'main');
+      const result = runHook(rootDir, pushLine({
+        localRef,
+        localSha,
+        remoteRef: 'refs/heads/main',
+      }));
+
+      assert.equal(result.status, 0);
+      assert.equal(result.stderr, '');
+    });
+  }
+});
+
+test('pre-push guard rejects raw object and detached HEAD sources', () => {
+  withHookFixture((rootDir) => {
+    const localSha = createCommitOnBranch(rootDir, 'main');
+    const rawResult = runHook(rootDir, pushLine({
+      localRef: localSha,
+      localSha,
+      remoteRef: 'refs/heads/main',
+    }));
+
+    assert.notEqual(rawResult.status, 0);
+    assert.match(rawResult.stderr, new RegExp('Rejected ref: ' + localSha));
+
+    git(rootDir, ['checkout', '--quiet', '--detach', localSha]);
+    const detachedResult = runHook(rootDir, pushLine({
+      localRef: 'HEAD',
+      localSha,
+      remoteRef: 'refs/heads/main',
+    }));
+
+    assert.notEqual(detachedResult.status, 0);
+    assert.match(detachedResult.stderr, /Rejected ref: HEAD/);
   });
 });
 

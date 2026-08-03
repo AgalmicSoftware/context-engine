@@ -66,13 +66,18 @@ while read -r local_ref local_sha remote_ref remote_sha; do
       ;;
   esac
 
+  resolved_local_ref="$local_ref"
   case "$local_ref" in
-    refs/heads/*|refs/tags/*)
-      if ! is_allowed_public_ref "$local_ref"; then
-        blocked_refs+=("$local_ref")
-      fi
+    refs/*)
+      ;;
+    *)
+      resolved_local_ref="$(git rev-parse --symbolic-full-name "$local_ref" 2>/dev/null || true)"
       ;;
   esac
+
+  if ! is_allowed_public_ref "$resolved_local_ref"; then
+    blocked_refs+=("$local_ref")
+  fi
 done
 
 if [ "${#blocked_refs[@]}" -gt 0 ]; then
