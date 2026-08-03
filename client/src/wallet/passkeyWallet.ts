@@ -132,8 +132,6 @@ const normalizeTypedData = (payload: unknown): SignTypedDataPayload => {
 
 const toHexString = (value: unknown): HexString => String(value || '') as HexString;
 
-const isExpired = (expiresAt: number, now = Date.now()): boolean => !!expiresAt && now >= expiresAt;
-
 const isEncryptedWalletRecord = (record: PasskeyWalletRecord): record is EncryptedWalletRecord =>
   record.keyMode !== 'passkey-derived' && 'encryptedPrivateKey' in record;
 
@@ -201,7 +199,7 @@ export class PasskeyEoaWalletClient {
   }
 
   isUnlocked(): boolean {
-    return !!this.activeAddress && !isExpired(this.unlockExpiresAt, this.now());
+    return !!this.activeAddress && this.unlockExpiresAt > this.now();
   }
 
   hasSigner(): boolean {

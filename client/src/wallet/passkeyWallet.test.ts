@@ -440,6 +440,47 @@ describe('PasskeyEoaWalletClient', () => {
     expect(client.getAddress()).toBeNull();
     expect(await storage.read()).toEqual(expect.objectContaining({ evmAddress: ADDRESS }));
   });
+
+  it('keeps the account discoverable without reporting signer readiness after lock or signerless restore', async () => {
+    const storage = createMemoryWalletStorage();
+    const credentials = makeCredentials();
+    const client = new PasskeyEoaWalletClient({
+      config,
+      storage,
+      credentials,
+      sessionClient: makeSessionClient(),
+      sessionClientFactory: () => makeSessionClient(),
+      privateKeyFactory: () => PRIVATE_KEY,
+    });
+
+    await client.createWallet();
+    expect(client.isUnlocked()).toBe(true);
+    expect(client.hasSigner()).toBe(true);
+
+    await client.lock();
+    expect(client.getAddress()).toBe(ADDRESS);
+    expect(client.isUnlocked()).toBe(false);
+    expect(client.hasSigner()).toBe(false);
+    expect(await storage.read()).toEqual(expect.objectContaining({ evmAddress: ADDRESS }));
+
+    const returning = new PasskeyEoaWalletClient({
+      config,
+      storage,
+      credentials,
+      sessionClient: makeSessionClient(),
+      sessionClientFactory: () => makeSessionClient(),
+      privateKeyFactory: () => PRIVATE_KEY,
+    });
+    await expect(returning.restoreSession({ requireSigner: false })).resolves.toBe(ADDRESS);
+    expect(returning.getAddress()).toBe(ADDRESS);
+    expect(returning.isUnlocked()).toBe(false);
+    expect(returning.hasSigner()).toBe(false);
+    expect(credentials.get).not.toHaveBeenCalled();
+
+    await expect(returning.signMessage('unlock me')).resolves.toMatch(/^0x11/);
+    expect(credentials.get).toHaveBeenCalledTimes(1);
+    expect(returning.isUnlocked()).toBe(true);
+  });
 });
 
 describe('soft session policy', () => {
