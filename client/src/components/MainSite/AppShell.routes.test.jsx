@@ -1682,6 +1682,42 @@ describe('AppShell route render smoke', () => {
     expect(screen.getByTestId('mock-compare-addresses')).toHaveAttribute('data-profile-scan-enabled', 'false');
   });
 
+  it('retains on-chain profile enrichment for Worker sessions with an explicit SBT gate', async () => {
+    const hybridProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    hybridProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    hybridProfile.evm.registryChainId = 11155420;
+    hybridProfile.encryption.accessConditions = {
+      match: 'any',
+      conditions: [
+        {
+          kind: 'sbt_onchain',
+          chainId: 11155420,
+          contract: '0x1111111111111111111111111111111111111111',
+          anyOrAll: 'any',
+        },
+      ],
+    };
+    const hybridConfig = buildSessionConfig({
+      slug: 'worker-sbt-session',
+      networkChainId: 11155420,
+      sessionModeProfile: hybridProfile,
+    });
+    const subject = createSubject({
+      path: '/compare',
+      search: '?session=worker-sbt-session',
+      activeSessionSlug: 'worker-sbt-session',
+      sessionConfig: hybridConfig,
+    });
+
+    render(subject.render());
+
+    expect(await screen.findByTestId('mock-compare-addresses')).toHaveAttribute(
+      'data-active-session-slug',
+      'worker-sbt-session',
+    );
+    expect(screen.getByTestId('mock-compare-addresses')).toHaveAttribute('data-profile-scan-enabled', 'true');
+  });
+
   it('switches page roots cleanly when navigating between surveys and questions routes', async () => {
     const { rerender } = render(createSubject({ path: '/surveys' }).render());
 
