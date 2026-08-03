@@ -350,7 +350,7 @@ export const mergeUserPageSurveyCacheSource = ({
     const sid = String(sidRaw || '').toLowerCase();
     if (!sid) return;
     if (!combinedSurveys[sid]) {
-      combinedSurveys[sid] = toAnalysisRecord(surveysMap[sidRaw] || surveysMap[sid]);
+      combinedSurveys[sid] = { ...toAnalysisRecord(surveysMap[sidRaw] || surveysMap[sid]) };
     }
     writeUserPageSourceSlug(surveySourceSlugById, sid, slug);
   });
@@ -399,7 +399,7 @@ export const mergeUserPageQuestionCacheSource = ({
     const qid = String(qidRaw || '').toLowerCase();
     if (!qid) return;
     if (!combinedQuestions[qid]) {
-      combinedQuestions[qid] = toAnalysisRecord(questionsMap[qidRaw] || questionsMap[qid]);
+      combinedQuestions[qid] = { ...toAnalysisRecord(questionsMap[qidRaw] || questionsMap[qid]) };
     }
     writeUserPageSourceSlug(questionSourceSlugById, qid, slug);
   });
