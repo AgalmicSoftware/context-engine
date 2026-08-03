@@ -279,11 +279,11 @@ mkdir -p "$STAGING_ROOT"
   cd "$STAGING_ROOT"
   shopt -s dotglob nullglob
   for pattern in "${STRIP_PATTERNS[@]}"; do
-    for path in $pattern; do
+    while IFS= read -r path; do
       if [ -e "$path" ] || [ -L "$path" ]; then
         printf '%s\n' "$path"
       fi
-    done
+    done < <(compgen -G "$pattern" || true)
   done
 ) | sort -u > "$MATCHED_PATHS_FILE"
 
@@ -319,12 +319,12 @@ scrub_public_package_json
   cd "$STAGING_ROOT"
   shopt -s dotglob nullglob
   for pattern in "${STRIP_ASSERT_ABSENT[@]}"; do
-    for path in $pattern; do
+    while IFS= read -r path; do
       if [ -e "$path" ] || [ -L "$path" ]; then
         printf 'Expected stripped path still present in public release copy: %s\n' "$path" >&2
         exit 1
       fi
-    done
+    done < <(compgen -G "$pattern" || true)
   done
 )
 

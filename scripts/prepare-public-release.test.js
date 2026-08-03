@@ -119,6 +119,7 @@ test('prepare-public-release strips private surfaces without publishing an inven
     writeFile(sourceDir, 'AGENTS.md', 'private agent instructions\n');
     writeFile(sourceDir, path.join('ai-discourse-corpus', 'corpuses', '_local_helper.js'), 'local helper script\n');
     writeFile(sourceDir, path.join('.tmp-review', 'review.js'), 'temporary review snapshot\n');
+    writeFile(sourceDir, path.join('Demo Integration Package', 'private.txt'), 'private integration material\n');
     writeFile(sourceDir, 'private-pack.manifest.json', 'tracked root manifest that should be replaced\n');
     writeFile(
       sourceDir,
@@ -246,6 +247,7 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.equal(fs.existsSync(path.join(outputDir, 'AGENTS.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'ai-discourse-corpus', 'corpuses', '_local_helper.js')), false);
     assert.equal(fs.existsSync(path.join(outputDir, '.tmp-review')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'Demo Integration Package')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'outreach-and-applications')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'grant-applications')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'TODO')), false);
