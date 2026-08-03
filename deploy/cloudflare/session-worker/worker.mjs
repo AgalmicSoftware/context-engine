@@ -55334,6 +55334,7 @@ var createGroupProofAddressHashHelpersWithWorkerDeps = ({
 
 // workers/sessionCorsWorker/outboundUrlSafetyBinding.js
 var toStr5 = (value, deps) => typeof deps?.toStr === "function" ? deps.toStr(value) : typeof value === "string" ? value : value == null ? "" : String(value);
+var STRICT_HTTPS_NO_CREDENTIALS_POLICY = "strict-https-no-credentials";
 var normalizeOutboundHostname = (value, deps) => toStr5(value, deps).trim().toLowerCase().replace(/\.+$/, "");
 var stripIpv6HostnameDecorators = (value, deps) => normalizeOutboundHostname(value, deps).replace(/^\[/, "").replace(/\]$/, "").split("%")[0];
 var parseIpv4Octets = (value, deps) => {
@@ -55443,6 +55444,16 @@ var createOutboundUrlSafetyHelpersWithWorkerDeps = ({
     if (hostname === "metadata.google.internal") return true;
     return false;
   };
+  const isBlockedByPolicy = (urlString, policy) => {
+    if (isBlockedOutboundUrl(urlString)) return true;
+    if (policy !== STRICT_HTTPS_NO_CREDENTIALS_POLICY) return false;
+    try {
+      const parsed = new URLWithCtor(urlString);
+      return parsed.protocol !== "https:" || !!parsed.username || !!parsed.password;
+    } catch {
+      return true;
+    }
+  };
   const buildSafeRedirectHeaders = (headersInit) => {
     const safeHeaders = new HeadersCtor();
     if (!headersInit) return safeHeaders;
@@ -55454,7 +55465,11 @@ var createOutboundUrlSafetyHelpersWithWorkerDeps = ({
     return safeHeaders;
   };
   const safeFetch = async (url, options = {}) => {
-    const requestOptions = { ...options, redirect: "manual" };
+    const { outboundUrlPolicy = "", ...fetchOptions } = options;
+    if (isBlockedByPolicy(url, outboundUrlPolicy)) {
+      return { ok: false, error: "Outbound target is not allowed", status: 403 };
+    }
+    const requestOptions = { ...fetchOptions, redirect: "manual" };
     const r = await fetchImpl(url, requestOptions);
     if (r.status < 300 || r.status >= 400) return r;
     const location2 = toStr5(r.headers.get("location"), deps).trim();
@@ -55466,7 +55481,7 @@ var createOutboundUrlSafetyHelpersWithWorkerDeps = ({
         redirectUrl = "";
       }
     }
-    if (!redirectUrl || isBlockedOutboundUrl(redirectUrl)) {
+    if (!redirectUrl || isBlockedByPolicy(redirectUrl, outboundUrlPolicy)) {
       return { ok: false, error: "Redirect to blocked target", status: 403 };
     }
     const redirectOptions = {
@@ -69827,23 +69842,39 @@ var transcribe = async ({
   } = normalizedRequest.payload || {};
   let targetUrl = resolveOpenAiTranscribeUrl({ constants });
   let key = requestApiKey || toTrimmedString13(secrets?.openaiKey, deps);
+  let outboundUrlPolicy = "";
   if (provider === "custom") {
     targetUrl = requestRpcUrl;
+    let parsedTargetUrl;
+    try {
+      parsedTargetUrl = new URL(targetUrl);
+    } catch {
+      return json2?.({ error: "Custom transcription URL target is not allowed" }, 403, baseHeaders);
+    }
+    if (parsedTargetUrl.protocol !== "https:") {
+      return json2?.({ error: "Custom transcription URL must use HTTPS" }, 403, baseHeaders);
+    }
+    if (parsedTargetUrl.username || parsedTargetUrl.password) {
+      return json2?.({ error: "Custom transcription URL must not contain credentials" }, 403, baseHeaders);
+    }
     if (deps?.isBlockedOutboundUrl?.(targetUrl)) {
       return json2?.({ error: "Custom transcription URL target is not allowed" }, 403, baseHeaders);
     }
     key = requestApiKey;
+    outboundUrlPolicy = STRICT_HTTPS_NO_CREDENTIALS_POLICY;
   }
   if (provider !== "custom" && !key) {
     return json2?.({ error: "Server misconfigured: openaiKey is missing." }, 401, baseHeaders);
   }
   const headers = {};
   if (key) headers.authorization = `Bearer ${key}`;
-  const response2 = await deps?.safeFetch?.(targetUrl, {
+  const fetchOptions = {
     method: "POST",
     headers,
     body: upstreamFormData
-  });
+  };
+  if (outboundUrlPolicy) fetchOptions.outboundUrlPolicy = outboundUrlPolicy;
+  const response2 = await deps?.safeFetch?.(targetUrl, fetchOptions);
   if (!(response2 instanceof Response)) {
     return json2?.({ error: response2?.error }, response2?.status, baseHeaders);
   }

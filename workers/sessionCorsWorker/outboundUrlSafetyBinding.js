@@ -8,6 +8,8 @@ const toStr = (value, deps) => (
         : String(value)
 );
 
+export const STRICT_HTTPS_NO_CREDENTIALS_POLICY = 'strict-https-no-credentials';
+
 const normalizeOutboundHostname = (value, deps) => (
   toStr(value, deps).trim().toLowerCase().replace(/\.+$/, '')
 );
@@ -133,6 +135,17 @@ export const createOutboundUrlSafetyHelpersWithWorkerDeps = ({
     return false;
   };
 
+  const isBlockedByPolicy = (urlString, policy) => {
+    if (isBlockedOutboundUrl(urlString)) return true;
+    if (policy !== STRICT_HTTPS_NO_CREDENTIALS_POLICY) return false;
+    try {
+      const parsed = new URLWithCtor(urlString);
+      return parsed.protocol !== 'https:' || !!parsed.username || !!parsed.password;
+    } catch {
+      return true;
+    }
+  };
+
   const buildSafeRedirectHeaders = (headersInit) => {
     const safeHeaders = new HeadersCtor();
     if (!headersInit) return safeHeaders;
@@ -145,7 +158,11 @@ export const createOutboundUrlSafetyHelpersWithWorkerDeps = ({
   };
 
   const safeFetch = async (url, options = {}) => {
-    const requestOptions = { ...options, redirect: 'manual' };
+    const { outboundUrlPolicy = '', ...fetchOptions } = options;
+    if (isBlockedByPolicy(url, outboundUrlPolicy)) {
+      return { ok: false, error: 'Outbound target is not allowed', status: 403 };
+    }
+    const requestOptions = { ...fetchOptions, redirect: 'manual' };
     const r = await fetchImpl(url, requestOptions);
     if (r.status < 300 || r.status >= 400) return r;
 
@@ -158,7 +175,7 @@ export const createOutboundUrlSafetyHelpersWithWorkerDeps = ({
         redirectUrl = '';
       }
     }
-    if (!redirectUrl || isBlockedOutboundUrl(redirectUrl)) {
+    if (!redirectUrl || isBlockedByPolicy(redirectUrl, outboundUrlPolicy)) {
       return { ok: false, error: 'Redirect to blocked target', status: 403 };
     }
 
