@@ -154,6 +154,11 @@ const getErrorMessage = (error: unknown, fallback = 'Unknown error') =>
     ? (error as { message: string }).message
     : fallback;
 
+const normalizeAutoMintAccount = (account: unknown): string =>
+  String(account || '')
+    .trim()
+    .toLowerCase();
+
 const resolveAutoFeatureBySessionSlug = (metadata: Record<string, unknown> | null | undefined) =>
   metadata?.autoFeatureSBTsBySessionSlug !== undefined
     ? metadata.autoFeatureSBTsBySessionSlug
@@ -1676,11 +1681,10 @@ class OnePageSession extends Component<any, any> {
       return;
     }
     const statuses = { ...(this.state.autoMintStatuses || {}) };
-    const autoMintAccount = String(this.props.account || '')
-      .trim()
-      .toLowerCase();
+    const autoMintAccount = normalizeAutoMintAccount(this.props.account);
+    const autoMintProvider = this.props.provider;
     const targets = this.filterUnconsumedAutoMintTargets(this.state.autoMintTargets || [], autoMintAccount).map(
-      (target: any) => ({ ...target }),
+      (target: any) => ({ ...target, autoMintAccount }),
     );
     const currentSlug = resolveEffectiveSlug(this.props); // use effective slug ('' for general)
     const queuedNameUpdates: Record<string, any> = {};
@@ -1765,8 +1769,11 @@ class OnePageSession extends Component<any, any> {
     for (const t of targets) {
       const sbtAddr = t.sbt;
       const sbtKey = sbtAddr.toLowerCase();
+      const queuedAccount = t.autoMintAccount;
+      const queuedAccountIsCurrent = () =>
+        !!queuedAccount && normalizeAutoMintAccount(this.props.account) === queuedAccount;
 
-      if (this.hasConsumedAutoMintAttempt(sbtAddr, autoMintAccount)) {
+      if (this.hasConsumedAutoMintAttempt(sbtAddr, queuedAccount)) {
         continue;
       }
 
@@ -1806,6 +1813,11 @@ class OnePageSession extends Component<any, any> {
           sbtInfo = await sbtMetadataReadsPort.getSbtMetadata('none', sbtAddr, currentSlug);
         }
 
+        if (!queuedAccountIsCurrent()) {
+          updateStatus(sbtKey, { status: 'info', name: 'Skipped (wallet changed)' });
+          continue;
+        }
+
         // 3. PREFLIGHT CHECKS
         sbtName = getSbtDisplayName(sbtInfo) || 'Group';
         // Queue banner visuals to flush with status updates (batched to reduce render bursts)
@@ -1814,7 +1826,7 @@ class OnePageSession extends Component<any, any> {
         // Check if user already owns this SBT (from local cache; DG-scoped key)
         let alreadyOwned = false;
         try {
-          const acctLower = (this.props.account || '').toLowerCase();
+          const acctLower = queuedAccount;
           if (acctLower) {
             const normalizeAddressCountMap = (value: any = null) => {
               const out: Record<string, any> = {};
@@ -1870,7 +1882,7 @@ class OnePageSession extends Component<any, any> {
         }
 
         if (alreadyOwned) {
-          this.consumeAutoMintAttempt(sbtAddr, autoMintAccount);
+          this.consumeAutoMintAttempt(sbtAddr, queuedAccount);
           updateStatus(sbtKey, { status: 'success', name: `Group Already Joined` });
           this.onSbtMintSuccess(sbtAddr);
           continue; // do not attempt to mint again
@@ -1948,13 +1960,17 @@ class OnePageSession extends Component<any, any> {
       }
 
       // TX PHASE WITH BALANCE GATE
-      const userAddr = this.props.account;
+      const userAddr = queuedAccount;
       try {
-        if (!userAddr) throw new Error(`${t('wallet')} not connected`);
+        if (!userAddr) throw new Error('Wallet not connected');
+        if (!queuedAccountIsCurrent()) {
+          updateStatus(sbtKey, { status: 'info', name: 'Skipped (wallet changed)' });
+          continue;
+        }
 
         // Gate before ANY gas-spending tx
         const hasFundsFirst = await this.waitForSufficientBalance(
-          this.props.provider,
+          autoMintProvider,
           userAddr,
           MIN_BALANCE_WEI,
           WAIT_TIMEOUT_MS,
@@ -1964,9 +1980,13 @@ class OnePageSession extends Component<any, any> {
           updateStatus(sbtKey, { status: 'info', name: 'Skipped (no gas funds arrived in time)' });
           continue;
         }
+        if (!queuedAccountIsCurrent()) {
+          updateStatus(sbtKey, { status: 'info', name: 'Skipped (wallet changed)' });
+          continue;
+        }
 
         if (path === 'public') {
-          await sbtMintExecutionPort.claim(this.props.provider, sbtAddr);
+          await sbtMintExecutionPort.claim(autoMintProvider, sbtAddr);
           this.consumeAutoMintAttempt(sbtAddr, userAddr);
           updateStatus(sbtKey, { status: 'success', name: `Joined: ${sbtName || 'Group'}` });
           this.onSbtMintSuccess(sbtAddr);
@@ -2045,8 +2065,9 @@ class OnePageSession extends Component<any, any> {
               if (!payload) throw new Error('Failed to generate invite');
 
               try {
+                if (!queuedAccountIsCurrent()) throw new Error('Wallet changed during auto-join');
                 await sbtMintExecutionPort.claimWithInvite(
-                  this.props.provider,
+                  autoMintProvider,
                   sbtAddr,
                   String(payload.nonce),
                   String(payload.signature),
@@ -2080,8 +2101,9 @@ class OnePageSession extends Component<any, any> {
               throw lastError;
             }
           } else {
+            if (!queuedAccountIsCurrent()) throw new Error('Wallet changed during auto-join');
             await sbtMintExecutionPort.claimWithInvite(
-              this.props.provider,
+              autoMintProvider,
               sbtAddr,
               String(payload.nonce),
               String(payload.signature),
@@ -2091,7 +2113,7 @@ class OnePageSession extends Component<any, any> {
           updateStatus(sbtKey, { status: 'success', name: `Joined: ${sbtName || 'Group'}` });
           this.onSbtMintSuccess(sbtAddr);
         } else if (path === 'unlimited') {
-          await this.mintUnlimitedSBTWithGroupPassword(sbtAddr, t.gp);
+          await this.mintUnlimitedSBTWithGroupPassword(sbtAddr, t.gp, userAddr, autoMintProvider);
           this.consumeAutoMintAttempt(sbtAddr, userAddr);
           updateStatus(sbtKey, { status: 'success', name: `Joined: ${sbtName || 'Group'}` });
           this.onSbtMintSuccess(sbtAddr);
@@ -2101,7 +2123,9 @@ class OnePageSession extends Component<any, any> {
       } catch (e: any) {
         const msg = (getErrorMessage(e, String(e || '')) || String(e || '')).toLowerCase();
 
-        if (msg.includes('already owns') || msg.includes('already joined') || msg.includes('user already has')) {
+        if (msg.includes('wallet changed during auto-join')) {
+          updateStatus(sbtKey, { status: 'info', name: 'Skipped (wallet changed)' });
+        } else if (msg.includes('already owns') || msg.includes('already joined') || msg.includes('user already has')) {
           // Graceful handling of "already owned" revert
           this.consumeAutoMintAttempt(sbtAddr, userAddr);
           updateStatus(sbtKey, { status: 'success', name: `Group Already Joined` });
@@ -2132,7 +2156,12 @@ class OnePageSession extends Component<any, any> {
   /* =======================
    * Unlimited helper (used by queue and can be used manually)
    * ======================= */
-  async mintUnlimitedSBTWithGroupPassword(sbtAddress: any, groupPassword: any) {
+  async mintUnlimitedSBTWithGroupPassword(
+    sbtAddress: any,
+    groupPassword: any,
+    expectedAccount: any = this.props.account,
+    provider: any = this.props.provider,
+  ) {
     if (!this.props.loginComplete) {
       this.props.toggleLoginModal(true);
       throw new Error(`Please connect your ${t('walletLower')} first.`);
@@ -2142,6 +2171,13 @@ class OnePageSession extends Component<any, any> {
     if (!pw) {
       throw new Error('Group password is required.');
     }
+    const normalizedExpectedAccount = normalizeAutoMintAccount(expectedAccount);
+    const assertExpectedAccountCurrent = () => {
+      if (!normalizedExpectedAccount || normalizeAutoMintAccount(this.props.account) !== normalizedExpectedAccount) {
+        throw new Error('Wallet changed during auto-join');
+      }
+    };
+    assertExpectedAccountCurrent();
 
     const onchain = await sbtMetadataReadsPort.getGroupPasswordHash(
       'none',
@@ -2165,17 +2201,19 @@ class OnePageSession extends Component<any, any> {
     if (!local || local.toLowerCase() !== onchain.toLowerCase()) {
       throw new Error('Password mismatch');
     }
+    assertExpectedAccountCurrent();
 
     this.setState({ mintingStatus: 'pending', lastTransactionType: 'mint' });
 
     const sig = await sbtGroupMintAuthorizationPort.signGroupMintAuthorization({
       password: pw,
       sbtAddress,
-      userAddress: String(this.props.account || ''),
+      userAddress: normalizedExpectedAccount,
       walletScopeSbtAddress,
     });
 
-    const tx = await sbtMintExecutionPort.mintWithGroupSignature(this.props.provider, sbtAddress, String(sig || ''));
+    assertExpectedAccountCurrent();
+    const tx = await sbtMintExecutionPort.mintWithGroupSignature(provider, sbtAddress, String(sig || ''));
 
     this.setState({
       mintingStatus: 'success',
