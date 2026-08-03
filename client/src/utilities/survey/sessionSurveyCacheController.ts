@@ -1115,12 +1115,10 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost 
           const pendingOpts = _surveyInitPending[initRunKey];
           delete _surveyInitPending[initRunKey];
           setTimeout(() => {
-            try {
-              if (!isMounted()) return;
-              initializeSurveyCacheForGroup(slug, pendingOpts || rerunOpts);
-            } catch (e: unknown) {
-              mainSiteLog.warn('MainSite: fallback', e);
-            }
+            if (!isMounted()) return;
+            void initializeSurveyCacheForGroup(slug, pendingOpts || rerunOpts).catch((error: unknown) => {
+              mainSiteLog.warn('Deferred survey cache rerun failed', { slug, error });
+            });
           }, 0);
         }
       };
