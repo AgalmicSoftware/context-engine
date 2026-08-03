@@ -1,12 +1,13 @@
 {
   "schemaVersion": 1,
-  "measuredAt": "2026-07-21",
+  "measuredAt": "2026-08-03",
   "source": "npm --prefix client run test:coverage:full-universe",
   "denominator": "Every tracked executable client/src JS/JSX/TS/TSX production file under the documented exclusion contract.",
   "nonComparableWithLegacyImportedMetric": true,
-  "productionFileCount": 1040,
-  "zeroHitFileCount": 10,
+  "productionFileCount": 1110,
+  "zeroHitFileCount": 11,
   "zeroHitFiles": [
+    "client/src/components/Account/LoginSettingsAiConfigContent.tsx",
     "client/src/components/DemoViews/DemoAnalysis/IndicatorHeatmap.tsx",
     "client/src/components/DemoViews/DemosIndex.tsx",
     "client/src/components/DemoViews/RiskMatrixDemo.tsx",
@@ -19,15 +20,15 @@
     "client/src/wallet/session/sessionWorkerFactory.ts"
   ],
   "measured": {
-    "statements": 77.65,
-    "branches": 62.71,
-    "functions": 79,
-    "lines": 80.48
+    "statements": 78.55,
+    "branches": 63.81,
+    "functions": 79.71,
+    "lines": 81.43
   },
   "global": {
-    "statements": 77.6,
-    "branches": 62.7,
-    "functions": 79,
-    "lines": 80.4
+    "statements": 78.5,
+    "branches": 63.8,
+    "functions": 79.7,
+    "lines": 81.4
   }
 }
