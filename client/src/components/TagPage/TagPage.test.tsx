@@ -899,6 +899,51 @@ describe('TagPage', () => {
     expect(await screen.findByText('Mocked interpretation')).toBeInTheDocument();
   });
 
+  it('keeps an AI interpretation until the scoped question content actually changes', async () => {
+    let edgePrompt = 'What changed?';
+    mockListNamespaceEntriesSync.mockImplementation((namespace) => {
+      if (namespace !== 'questionsCache') return [];
+      return [
+        buildQuestionsEntry({
+          slug: 'edge',
+          questions: {
+            q1: {
+              id: 'q1',
+              prompt: edgePrompt,
+              tags: ['governance'],
+            },
+          },
+        }),
+      ];
+    });
+
+    renderTagPage({ entry: '/tag/governance' });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /summarize discussions/i }));
+    });
+    expect(await screen.findByText('Mocked interpretation')).toBeInTheDocument();
+
+    const cacheSubscriber = mockSubscribeCacheUpdates.mock.calls[0][0];
+    act(() => {
+      cacheSubscriber({ namespace: 'questionsCache', slug: 'alpha', value: { unrelated: true } });
+    });
+    expect(screen.getByText('Mocked interpretation')).toBeInTheDocument();
+
+    act(() => {
+      cacheSubscriber({ namespace: 'questionsCache', slug: 'edge', value: { '11155420': {} } });
+    });
+    expect(screen.getByText('Mocked interpretation')).toBeInTheDocument();
+
+    edgePrompt = 'What materially changed?';
+    act(() => {
+      cacheSubscriber({ namespace: 'questionsCache', slug: 'EDGE', value: { '84532': {} } });
+    });
+
+    expect(screen.getByText('What materially changed?')).toBeInTheDocument();
+    expect(screen.queryByText('Mocked interpretation')).not.toBeInTheDocument();
+  });
+
   it('shows elapsed seconds while AI interpretation is generating', async () => {
     jest.useFakeTimers();
     let nowMs = 1000;
