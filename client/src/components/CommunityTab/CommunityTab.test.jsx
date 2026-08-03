@@ -141,6 +141,38 @@ describe('CommunityTab helpers', () => {
     expect(instance._getSelectedSessionSlugs()).toHaveLength(2);
   });
 
+  it('keeps single-session readiness false when the latest block is unavailable', async () => {
+    const instance = new CommunityTab({ activeSessionSlug: 'edge' });
+    instance._iterScopeCaches = jest.fn(() => [
+      {
+        slug: 'edge',
+        netKey: '84532',
+        surveysCache: { surveysLatestBlock: 10 },
+        questionsCache: { questionsLatestBlock: 10 },
+        sbtCache: { lastBlock: 10 },
+      },
+    ]);
+    jest.spyOn(contractScripts, 'getRelevantBlockWindowForFilter').mockResolvedValue({ toBlock: 0 });
+
+    await expect(instance.checkIfInitialLoadDone()).resolves.toBe(false);
+  });
+
+  it('keeps multi-session readiness false when any latest block is unavailable', async () => {
+    const instance = new CommunityTab({ activeSessionSlug: 'edge' });
+    instance._iterScopeCaches = jest.fn(() =>
+      ['edge', 'alpha'].map((slug) => ({
+        slug,
+        netKey: '84532',
+        surveysCache: { surveysLatestBlock: 10 },
+        questionsCache: { questionsLatestBlock: 10 },
+        sbtCache: { lastBlock: 10 },
+      })),
+    );
+    jest.spyOn(contractScripts, 'getRelevantBlockWindowForFilter').mockResolvedValue({ toBlock: 0 });
+
+    await expect(instance.checkIfInitialLoadDone()).resolves.toBe(false);
+  });
+
   it('uses demo beeswarm data for auto-demo sessions in list scope when caches are empty', () => {
     const priorUrl = window.location.href;
     try {

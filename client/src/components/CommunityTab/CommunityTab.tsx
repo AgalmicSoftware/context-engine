@@ -1058,7 +1058,7 @@ class CommunityTab extends Component<any, any> {
     }
 
     const minLastBlock = Math.min(surveyLastBlock, questionLastBlock, sbtLastBlock);
-    return minLastBlock >= latestBlockNumber;
+    return latestBlockNumber > 0 && minLastBlock >= latestBlockNumber;
   };
 
   _computeNextPollDelayMs = () => {
