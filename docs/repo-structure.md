@@ -37,7 +37,7 @@ Use it for new files, refactors, and cleanup PRs.
 - Preferred component test naming is `<ComponentName>.test.jsx` for JavaScript tests and `<ComponentName>.test.tsx` once the test itself is converted.
 - Prefer purpose-led component names over legacy tab-label placeholders; for example, `client/src/components/MainContent/ToolExplorer.tsx` and `OnboardingWalkthrough.tsx` are clearer than generic `*Tab` filenames.
 - Descriptive test qualifiers are allowed before `.test` when needed: `<ComponentName>.render.test.jsx`, `<ComponentName>.routes.test.jsx`.
-- Cross-workflow reusable UI extracted from feature folders belongs under `client/src/components/Shared/` (for example `client/src/components/Shared/AudioInput/` and `client/src/components/Shared/Json/`).
+- Cross-workflow reusable UI extracted from feature folders belongs under `client/src/components/Shared/` (for example `client/src/components/Shared/AudioInput/`, `BeeswarmPlot/`, and `Json/`).
 - Do not create new lowercase component directories under `client/src/components/`.
 - Avoid adding new files directly under `client/src/components/` unless they are true app-shell entry points or app-shell support modules.
 

@@ -10,7 +10,7 @@ import {
 } from '../../utilities/cache/cacheScripts.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import contractScripts from '../../utilities/web3/chainGateway.js';
-import BeeswarmPlot from '../SurveyTool/BeeswarmPlot';
+import BeeswarmPlot from '../Shared/BeeswarmPlot/BeeswarmPlot';
 import SBTsList from '../SBTs/SBTsList';
 import { POLIS_DEMO_DATA_AUTOLOAD_SLUGS } from '../../variables/appConfig.js';
 
@@ -275,7 +275,7 @@ describe('CommunityTab helpers', () => {
         expect.objectContaining({
           questionId: 'legacy-binary',
           label: 'Legacy binary comment without a type',
-          extremity: 0,
+          value: 0,
           agrees: 1,
           disagrees: 0,
           unsure: 1,
@@ -312,7 +312,7 @@ describe('CommunityTab helpers', () => {
     expect(points).toEqual([
       expect.objectContaining({
         questionId: 'q1',
-        extremity: 1,
+        value: 1,
         agrees: 1,
         disagrees: 1,
         unsure: 1,
@@ -534,7 +534,7 @@ describe('CommunityTab helpers', () => {
       {
         questionId: 'q1',
         label: 'Prompt one',
-        extremity: 0.34,
+        value: 0.34,
         agrees: 2,
         disagrees: 1,
         unsure: 0,
@@ -577,7 +577,7 @@ describe('CommunityTab helpers', () => {
       {
         questionId: 'q-fallback',
         label: 'Fallback prompt',
-        extremity: 0,
+        value: 0,
         agrees: 0,
         disagrees: 0,
         unsure: 0,

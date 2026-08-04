@@ -397,7 +397,6 @@
     "client/src/components/Shared/compactImageClipboard.ts",
     "client/src/components/Sponsor/SponsorPage.tsx",
     "client/src/components/SurveyTool/AdditionalCommentsInlineRow.tsx",
-    "client/src/components/SurveyTool/BeeswarmPlot.tsx",
     "client/src/components/SurveyTool/BinaryChoiceInput.tsx",
     "client/src/components/SurveyTool/BullhornToggleButton.tsx",
     "client/src/components/SurveyTool/ConvictionImportanceLabel.tsx",

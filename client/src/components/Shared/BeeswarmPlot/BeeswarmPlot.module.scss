@@ -32,6 +32,28 @@ $card-bg: tokens.$ce-card-bg;
   backdrop-filter: blur(12px);
 }
 
+.hoverTooltipPinned {
+  pointer-events: auto;
+}
+
+.tooltipClose {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: #f7fbff;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
 .hoverPanel {
   min-height: 70px;
   padding: 12px 14px;
@@ -184,7 +206,6 @@ $card-bg: tokens.$ce-card-bg;
 .axisLabel {
   fill: $muted-text;
   font-family: var(--ce-font-mono);
-  font-size: 13px;
   letter-spacing: 0.02em;
   font-size: 2em;
   opacity: 0.5;

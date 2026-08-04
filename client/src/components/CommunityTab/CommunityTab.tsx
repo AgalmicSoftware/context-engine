@@ -25,7 +25,7 @@ import contractScripts, {
 } from '../../utilities/web3/chainGateway.js';
 import SBTsList from '../SBTs/SBTsList';
 import SBTFilter from '../SBTs/SBTFilter';
-import BeeswarmPlot from '../SurveyTool/BeeswarmPlot';
+import BeeswarmPlot from '../Shared/BeeswarmPlot/BeeswarmPlot';
 import CETooltip from '../Shared/CETooltip';
 
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
@@ -1595,8 +1595,8 @@ class CommunityTab extends Component<any, any> {
       return {
         index: result.commentIndex,
         questionId: String(comment.commentId || result.commentIndex),
-        // BeeswarmPlot expects `extremity`; this is 50/50-split divisiveness, not PCA extremity.
-        extremity: result.divisiveness,
+        // The shared renderer receives a neutral scalar; this consumer defines it as 50/50-split divisiveness.
+        value: result.divisiveness,
         label: String(comment.commentBody || '(No prompt)'),
         agrees: result.agrees,
         disagrees: result.disagrees,
@@ -1718,8 +1718,8 @@ class CommunityTab extends Component<any, any> {
       return {
         index: result.commentIndex,
         questionId,
-        // BeeswarmPlot expects `extremity`; this is 50/50-split divisiveness, not PCA extremity.
-        extremity: result.divisiveness,
+        // The shared renderer receives a neutral scalar; this consumer defines it as 50/50-split divisiveness.
+        value: result.divisiveness,
         label: question.prompt || '(No prompt)',
         agrees: result.agrees,
         disagrees: result.disagrees,

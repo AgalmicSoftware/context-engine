@@ -19,7 +19,7 @@ describe('BeeswarmPlot', () => {
       disagrees: 2,
       unsure: 3,
       total: 12,
-      extremity: 0.15,
+      value: 0.15,
     },
   ];
 
@@ -101,7 +101,7 @@ describe('BeeswarmPlot', () => {
       `${styles.tooltipResponseSegment} ${styles.tooltipResponseSegmentAgree}`,
     );
     expect(resolveTooltipResponseSegmentStyle(3, 12)).toEqual({ width: '25.00%' });
-    expect(resolveTooltipResponseSegmentStyle(3, 0)).toEqual({ width: '300.00%' });
+    expect(resolveTooltipResponseSegmentStyle(3, 0)).toEqual({ width: '100.00%' });
   });
 
   it('repositions right-edge tooltips to the left so the card keeps its full width', () => {
@@ -136,5 +136,31 @@ describe('BeeswarmPlot', () => {
         vertical: 'top',
       }),
     );
+  });
+
+  it('pins point details on click until the close action is used', () => {
+    render(<BeeswarmPlot points={samplePoint} showIdleSummary={false} />);
+    const point = screen.getByTestId('ce-beeswarm-point-0');
+
+    fireEvent.click(point, { clientX: 120, clientY: 90 });
+    fireEvent.mouseLeave(screen.getByTestId('ce-beeswarm-plot'));
+
+    expect(point).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('ce-beeswarm-tooltip')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Close details' }));
+    expect(screen.queryByTestId('ce-beeswarm-tooltip')).not.toBeInTheDocument();
+  });
+
+  it('keeps a pinned detail attached to its stable key when points reorder', () => {
+    const points = [
+      { key: 'first', label: 'First prompt', value: 0.1, total: 1, agrees: 1 },
+      { key: 'second', label: 'Second prompt', value: 0.9, total: 1, disagrees: 1 },
+    ];
+    const { rerender } = render(<BeeswarmPlot points={points} showIdleSummary={false} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Second prompt' }));
+
+    rerender(<BeeswarmPlot points={[points[1], points[0]]} showIdleSummary={false} />);
+
+    expect(screen.getByTestId('ce-beeswarm-tooltip')).toHaveTextContent('Second prompt');
   });
 });
