@@ -1,23 +1,21 @@
 /**
  * @module consensusMath
- * @description Legacy Polis-inspired utilities retained for generic charting helpers.
+ * @description Legacy Polis-inspired utilities retained for embedding and divisiveness helpers.
  *              Live Polis-equivalent report math now lives in `consensusReportMath.ts`.
  *
- * Key exports: beeswarmByExtremity, doUMAP, clusterUMAPPointsKmeans, computeQuestionDivisiveness
+ * Key exports: doUMAP, clusterUMAPPointsKmeans, computeQuestionDivisiveness
  */
 /**************************************************************
  * consensusMath.ts
  *
- * A self-contained utility library for shared chart helpers:
- *  - generic beeswarm layout
+ * A self-contained utility library for shared analysis helpers:
  *  - UMAP and simple clustering experiments
  *  - question divisiveness summaries used by older demos
  *
  * Dependencies:
- *    npm install d3 umap-js ml-kmeans
+ *    npm install umap-js ml-kmeans
  ***************************************************************/
 
-import * as d3 from 'd3';
 import { UMAP } from 'umap-js';
 import { kmeans as Kmeans } from 'ml-kmeans';
 import { mulberry32 } from './seededPrng.js';
@@ -29,13 +27,7 @@ type Point2D = {
   index?: number | string;
   x?: number;
   y?: number;
-  extremity?: number;
   [key: string]: unknown;
-};
-type PositionedPoint2D = Point2D & {
-  index: number;
-  x: number;
-  y: number;
 };
 type KmeansOptions = {
   seed?: number;
@@ -43,59 +35,6 @@ type KmeansOptions = {
 type KmeansResult = {
   clusters: number[];
 };
-type D3LinearScale = {
-  domain(values: [number, number]): {
-    range(values: [number, number]): (value: number) => number;
-  };
-};
-type D3Simulation<T> = {
-  force(name: string, force: unknown): D3Simulation<T>;
-  stop(): D3Simulation<T>;
-  tick(): D3Simulation<T>;
-};
-type D3Facade = {
-  min<T>(values: T[], accessor: (value: T) => number | undefined): number | undefined;
-  max<T>(values: T[], accessor: (value: T) => number | undefined): number | undefined;
-  scaleLinear(): D3LinearScale;
-  forceSimulation<T>(data: T[]): D3Simulation<T>;
-  forceX<T>(accessor: (value: T) => number): unknown & { strength(value: number): unknown };
-  forceY(value: number): unknown & { strength(value: number): unknown };
-  forceCollide(radius: number): unknown;
-};
-
-const d3Runtime = Object(d3) as D3Facade;
-
-/***************************************************************
- * BeeSwarm by x=extremity (example usage)
- ***************************************************************/
-
-export function beeswarmByExtremity(points: Point2D[], width: number, height: number): PositionedPoint2D[] {
-  const minE = d3Runtime.min(points, (d) => d.extremity) ?? 0;
-  const maxE = d3Runtime.max(points, (d) => d.extremity) ?? 1;
-  const xScale = d3Runtime
-    .scaleLinear()
-    .domain([minE, maxE])
-    .range([40, width - 40]);
-  const dataCopy = points.map((d) => ({ ...d }));
-  const centerY = height / 2;
-
-  const sim = d3Runtime
-    .forceSimulation(dataCopy)
-    .force('x', d3Runtime.forceX<Point2D>((d) => xScale(d.extremity ?? 0)).strength(2))
-    .force('y', d3Runtime.forceY(centerY).strength(0.2))
-    .force('collide', d3Runtime.forceCollide(7))
-    .stop();
-
-  for (let i = 0; i < 120; i++) sim.tick();
-
-  return dataCopy.map((point, index) => ({
-    ...point,
-    index: typeof point.index === 'number' ? point.index : index,
-    x: Number(point.x ?? 0),
-    y: Number(point.y ?? centerY),
-  }));
-}
-
 /***************************************************************
  * UMAP
  ***************************************************************/

@@ -28,14 +28,7 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   peekCacheSync: jest.fn(() => ({})),
 }));
 
-jest.mock('../../utilities/survey/polisMath', () => ({
-  beeswarmByExtremity: jest.fn((points = []) =>
-    points.map((point, index) => ({
-      ...point,
-      x: index * 12,
-      y: 24,
-    })),
-  ),
+jest.mock('../../utilities/survey/consensusMath', () => ({
   clusterUMAPPointsKmeans: jest.fn((points = []) => new Array(points.length).fill(0)),
   doUMAP: jest.fn((data = []) => data.map((_, index) => [index, index])),
 }));
@@ -1062,6 +1055,8 @@ describe('PolisReport demo data defaults', () => {
     const { rerender } = render(<PolisReport {...baseReportProps} slug="demo" />);
 
     expect(computePolisCommentStats).not.toHaveBeenCalled();
+    expect(screen.getByTestId('ce-polis-beeswarm-plot')).toBeInTheDocument();
+    expect(screen.getAllByTestId(/^ce-polis-beeswarm-point-/)).toHaveLength(2);
 
     rerender(<PolisReport {...baseReportProps} slug="demo" />);
 

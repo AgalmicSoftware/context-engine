@@ -16,12 +16,6 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 import {
-  beeswarmByExtremity,
-  clusterUMAPPointsKmeans,
-  doUMAP,
-  getCommentBarData,
-} from '../../utilities/survey/polisMath';
-import {
   computePolisCommentStats,
   computePolisConversationMath,
   findRepresentativeQuestions,
@@ -39,6 +33,7 @@ import { createLogger } from 'utilities/logging.js';
 import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { QuestionStanceBar } from '../Shared/QuestionStanceCard';
+import BeeswarmPlot, { type BeeswarmPoint } from '../Shared/BeeswarmPlot/BeeswarmPlot';
 import {
   buildQuestionScanProgressDisplay,
   doesQuestionProgressMatchSlug,
@@ -1564,9 +1559,6 @@ export default function PolisReport({
 
   // PDF capture ref
   const reportRef = useRef<HTMLDivElement | null>(null);
-
-  // Circle hovered
-  const [hoveredCircleIndex, setHoveredCircleIndex] = useState<number | null>(null);
 
   // Error handling
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -3103,12 +3095,19 @@ export default function PolisReport({
         throw memoizedCommentSwarmResult.error;
       }
 
-      const points = memoizedCommentSwarmResult.commentStats.map((item) => {
+      const points: BeeswarmPoint[] = memoizedCommentSwarmResult.commentStats.map((item) => {
+        const questionIndex = item.commentIndex;
+        const questionKey = allQuestions[questionIndex];
+        const label = questionLabels[questionIndex] || `#${questionIndex + 1}`;
+        const prompt = questionPrompts[questionKey] || '(No prompt)';
         return {
+          key: `${questionKey || 'question'}:${questionIndex}`,
           index: item.commentIndex,
-          extremity: item.extremity,
+          value: item.extremity,
+          label: `${label}: ${prompt}`,
           agrees: item.agrees,
           disagrees: item.disagrees,
+          unsure: item.unsure,
           total: item.total,
         };
       });
@@ -3121,79 +3120,60 @@ export default function PolisReport({
         );
       }
 
-      const w = 700;
-      const h = 200;
-      const swarmed = beeswarmByExtremity(points, w, h);
-
       return (
-        // UPDATED: Added outer layout container for scroll buttons
         <div className={styles.swarmLayoutContainer}>
-          <div className={styles.swarmContainer} ref={swarmContainerRef}>
-            <svg width={w} height={h} className={styles.beeswarmSvg}>
-              <line x1={0} y1={h - 10} x2={w} y2={h - 10} stroke="black" />
-              <text x={0} y={h - 15} fontSize="14" fill="black">
-                Consensus
-              </text>
-              <text x={w - 80} y={h - 15} fontSize="14" fill="black">
-                Difference
-              </text>
-
-              {swarmed.map((d: PolisPoint, i: number) => {
-                const cIndex = d.index;
-                const promptKey = allQuestions[cIndex];
-                const label = questionLabels[cIndex] || `#${cIndex + 1}`;
-                const rowVotes = matrix[cIndex] || [];
-                const agrees = rowVotes.filter((v) => v === 1).length;
-                const disagrees = rowVotes.filter((v) => v === -1).length;
-                const unsures = rowVotes.filter((v) => v === 0).length;
-                const prompt = questionPrompts[promptKey] || '(No prompt)';
-
-                const tooltipContent = (
-                  <div>
-                    <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
-                      {label}: {prompt}
-                    </div>
-                    <div style={{ fontSize: '0.85rem', marginBottom: '6px' }}>
-                      <strong>Agree:</strong> {agrees}, <strong>Disagree:</strong> {disagrees}, <strong>Unsure:</strong>{' '}
-                      {unsures}
-                    </div>
-                    <QuestionStanceBar votes={rowVotes} />
+          <BeeswarmPlot
+            points={points}
+            className={styles.reportBeeswarm}
+            width={700}
+            height={200}
+            minPlotWidth={700}
+            pointRadius={5}
+            axisLabels={['Consensus', 'Difference']}
+            ariaLabel="Question consensus and difference beeswarm"
+            testIdPrefix="ce-polis-beeswarm"
+            responsesAvailable={points.length > 0}
+            tooltipsEnabled={enableTooltips}
+            showIdleSummary={false}
+            scrollContainerRef={swarmContainerRef}
+            renderTooltip={(point) => {
+              const cIndex = Number(point.index);
+              const promptKey = allQuestions[cIndex];
+              const label = questionLabels[cIndex] || `#${cIndex + 1}`;
+              const rowVotes = matrix[cIndex] || [];
+              const agrees = rowVotes.filter((v) => v === 1).length;
+              const disagrees = rowVotes.filter((v) => v === -1).length;
+              const unsures = rowVotes.filter((v) => v === 0).length;
+              const prompt = questionPrompts[promptKey] || '(No prompt)';
+              return (
+                <div>
+                  <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                    {label}: {prompt}
                   </div>
-                );
-
-                const circleClass = hoveredCircleIndex === i ? styles.beeswarmCircleHover : styles.beeswarmCircle;
-
-                return (
-                  <g key={i}>
-                    <circle
-                      cx={d.x}
-                      cy={d.y}
-                      r={5}
-                      className={circleClass}
-                      onMouseEnter={() => {
-                        if (enableTooltips) {
-                          cancelTooltipHide();
-                          setHoveredContent(tooltipContent);
-                          setHoveredCircleIndex(i);
-                        }
-                      }}
-                      onMouseLeave={() => {
-                        if (enableTooltips) {
-                          scheduleTooltipHide(450);
-                          setHoveredCircleIndex(null);
-                        }
-                      }}
-                    />
-                    {isPdfModeActive && (
-                      <text x={d.x} y={d.y + 3} textAnchor="middle" fontSize="8" fill="#fff" fontWeight="600">
-                        {i + 1}
-                      </text>
-                    )}
-                  </g>
-                );
-              })}
-            </svg>
-          </div>
+                  <div style={{ fontSize: '0.85rem', marginBottom: '6px' }}>
+                    <strong>Agree:</strong> {agrees}, <strong>Disagree:</strong> {disagrees}, <strong>Unsure:</strong>{' '}
+                    {unsures}
+                  </div>
+                  <QuestionStanceBar votes={rowVotes} />
+                </div>
+              );
+            }}
+            renderPointLabel={(point, index) =>
+              isPdfModeActive ? (
+                <text
+                  x={point.x}
+                  y={Number(point.y) + 3}
+                  textAnchor="middle"
+                  fontSize="8"
+                  fill="#fff"
+                  fontWeight="600"
+                  style={{ pointerEvents: 'none' }}
+                >
+                  {index + 1}
+                </text>
+              ) : null
+            }
+          />
           {isSwarmScrollable && (
             <div className={styles.swarmScrollControls}>
               <button className={styles.scrollButton} onClick={() => handleSwarmScroll('left')} title="Scroll to Start">

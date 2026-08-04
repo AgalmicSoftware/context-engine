@@ -191,29 +191,27 @@ $card-bg: tokens.$ce-card-bg;
   width: 100%;
   min-width: 460px;
   height: auto;
-  // border: 1px solid rgba(255, 255, 255, 0.12);
+  border: var(--ce-beeswarm-border, none);
   border-radius: 16px;
-  // background:
-  //   radial-gradient(circle at top, rgba(77, 255, 164, 0.08), transparent 52%),
-  //   linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+  background: var(--ce-beeswarm-background, transparent);
 }
 
 .axisLine {
-  stroke: rgba(255, 255, 255, 0.28);
+  stroke: var(--ce-beeswarm-axis-color, rgba(255, 255, 255, 0.28));
   stroke-width: 1.5;
 }
 
 .axisLabel {
-  fill: $muted-text;
+  fill: var(--ce-beeswarm-label-color, #{$muted-text});
   font-family: var(--ce-font-mono);
   letter-spacing: 0.02em;
-  font-size: 2em;
+  font-size: var(--ce-beeswarm-axis-label-size, 2em);
   opacity: 0.5;
 }
 
 .point {
-  fill: $clickable-color;
-  stroke: rgba(10, 16, 34, 0.85);
+  fill: var(--ce-beeswarm-point-color, #{$clickable-color});
+  stroke: var(--ce-beeswarm-point-stroke, rgba(10, 16, 34, 0.85));
   stroke-width: 2;
   opacity: 0.9;
   transition:
@@ -223,7 +221,7 @@ $card-bg: tokens.$ce-card-bg;
 }
 
 .pointActive {
-  fill: #ffd166;
+  fill: var(--ce-beeswarm-point-active-color, #ffd166);
   opacity: 1;
 }
 

@@ -45,8 +45,10 @@ type BeeswarmPointKey = string | number;
 
 export type BeeswarmPlotProps = {
   points?: BeeswarmPoint[];
+  className?: string;
   width?: number;
   height?: number;
+  minPlotWidth?: number;
   layoutStrategy?: BeeswarmLayoutStrategy;
   domain?: BeeswarmLayoutDomain;
   xPadding?: number;
@@ -112,8 +114,10 @@ const normalizeBinaryVoteCount = (value: unknown) => {
 
 export default function BeeswarmPlot({
   points = [],
+  className = '',
   width = 700,
   height = 200,
+  minPlotWidth,
   layoutStrategy = 'force',
   domain = 'extent',
   xPadding = 40,
@@ -324,7 +328,12 @@ export default function BeeswarmPlot({
   }
 
   return (
-    <div ref={wrapperRef} className={styles.wrapper} data-testid={`${testIdPrefix}-plot`} onMouseLeave={clearHover}>
+    <div
+      ref={wrapperRef}
+      className={[styles.wrapper, className].filter(Boolean).join(' ')}
+      data-testid={`${testIdPrefix}-plot`}
+      onMouseLeave={clearHover}
+    >
       {activePoint && tooltipsEnabled ? (
         <BeeswarmTooltip
           point={activePoint}
@@ -346,6 +355,7 @@ export default function BeeswarmPlot({
         <svg
           viewBox={`0 0 ${width} ${height}`}
           className={styles.beeswarmSvg}
+          style={minPlotWidth ? { minWidth: minPlotWidth } : undefined}
           role="img"
           aria-label={ariaLabel}
         >

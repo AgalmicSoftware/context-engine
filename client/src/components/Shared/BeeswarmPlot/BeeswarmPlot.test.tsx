@@ -163,4 +163,18 @@ describe('BeeswarmPlot', () => {
 
     expect(screen.getByTestId('ce-beeswarm-tooltip')).toHaveTextContent('Second prompt');
   });
+
+  it('lets consumers theme the wrapper and retain a fixed scrollable plot width', () => {
+    render(
+      <BeeswarmPlot
+        points={samplePoint}
+        className="report-theme"
+        minPlotWidth={700}
+        showIdleSummary={false}
+      />,
+    );
+
+    expect(screen.getByTestId('ce-beeswarm-plot')).toHaveClass('report-theme');
+    expect(screen.getByRole('img', { name: 'Question beeswarm plot' })).toHaveStyle({ minWidth: '700px' });
+  });
 });

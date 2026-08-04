@@ -19,9 +19,9 @@ All notable changes to this project will be documented in this file.
   now share session + chain + contract identity and one count-provenance rule;
   native Worker Groups use the same projection contract with session + group
   identity.
-- Moved the Community question beeswarm onto a reusable renderer with explicit
-  consumer-owned metric/domain labels, named force/stacked layouts, stable-key
-  hover state, and keyboard/click-pinned detail cards.
+- Moved the Community and Polis question beeswarms onto a reusable renderer
+  with explicit consumer-owned metric/domain labels, named force/stacked
+  layouts, stable-key hover state, and keyboard/click-pinned detail cards.
 - Clarified the repository boundary between canonical Worker source,
   Cloudflare-native deployment packages, local bundle output, immutable CI
   bundle releases, and the stripped public-source snapshot. Release docs now

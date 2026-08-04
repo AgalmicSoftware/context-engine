@@ -173,24 +173,14 @@
   height: auto; // Maintain aspect ratio
 }
 
-.swarmContainer {
-  position: relative;
-}
-
-.beeswarmSvg {
-  border: 1px solid #ddd;
-  background: var(--ce-color-white);
-  overflow: scroll;
-}
-
-/* Non-hover circle style */
-.beeswarmCircle {
-  fill: steelblue;
-}
-
-/* Hovered circle style */
-.beeswarmCircleHover {
-  fill: #ff9900;
+.reportBeeswarm {
+  --ce-beeswarm-axis-color: #4b5563;
+  --ce-beeswarm-label-color: #111827;
+  --ce-beeswarm-axis-label-size: 14px;
+  --ce-beeswarm-point-color: steelblue;
+  --ce-beeswarm-point-active-color: #ff9900;
+  --ce-beeswarm-background: var(--ce-color-white);
+  --ce-beeswarm-border: 1px solid #ddd;
 }
 
 /* Tooltip: a bit wider */
@@ -696,20 +686,6 @@
     }
   }
 
-  /*
-   * 2. BeeSwarm chart: Make it horizontally scrollable to address the main request.
-   *    The native scrollbar is hidden because custom scroll buttons are provided.
-   */
-  .swarmContainer {
-    overflow-x: auto;
-    overflow-y: hidden;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none; // For Firefox
-    &::-webkit-scrollbar {
-      display: none; // For Chrome, Safari, etc.
-    }
-  }
-
   .participantAddressLink {
     font-size: 0.95rem;
   }
@@ -866,8 +842,7 @@
     box-sizing: border-box;
   }
 
-  .participantSvg,
-  .beeswarmSvg {
+  .participantSvg {
     border-radius: var(--ce-radius-6);
     border: none;
     background: var(--ce-color-white);
@@ -927,6 +902,11 @@
 
   .scrollButton:hover {
     background: #e1e7ff;
+  }
+
+  .reportBeeswarm {
+    --ce-beeswarm-background: var(--ce-color-white);
+    --ce-beeswarm-border: none;
   }
 
   .analysisNote {
@@ -1110,20 +1090,17 @@
     box-sizing: border-box;
   }
 
-  .participantSvg,
-  .beeswarmSvg {
+  .participantSvg {
     border-radius: var(--ce-radius-6);
     border: 1px solid #2b3446;
     background: #1f2937;
   }
 
-  .participantSvg text,
-  .beeswarmSvg text {
+  .participantSvg text {
     fill: #e5e7eb;
   }
 
-  .participantSvg line,
-  .beeswarmSvg line {
+  .participantSvg line {
     stroke: #9ca3af;
   }
 
@@ -1142,6 +1119,14 @@
     border: 1px solid #1f2937;
     background: #111827;
     box-shadow: 0 6px 14px rgba(3, 6, 14, 0.5);
+  }
+
+  .reportBeeswarm {
+    --ce-beeswarm-axis-color: #9ca3af;
+    --ce-beeswarm-label-color: #e5e7eb;
+    --ce-beeswarm-point-stroke: #0f172a;
+    --ce-beeswarm-background: #1f2937;
+    --ce-beeswarm-border: 1px solid #2b3446;
   }
 
   .participantAddressLink {
