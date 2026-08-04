@@ -20,7 +20,6 @@ import {
   resolveCompareVennNoteStyle,
   resolveCompareVennSbtImageStyle,
   resolveCompareVennSbtRowStyle,
-  resolveCompareVennTooltipHeaderStyle,
   resolveCompareVennTooltipListStyle,
   resolveCompareVennTooltipStyle,
   resolveCompareVennWrapStyle,
@@ -230,10 +229,6 @@ describe('CompareAddresses cache scan helpers', () => {
     expect(resolveCompareVennTooltipStyle({ clientWidth: 500, x: 100, y: 20 })).toEqual({
       left: 80,
       top: 28,
-    });
-    expect(resolveCompareVennTooltipHeaderStyle()).toEqual({
-      fontWeight: 700,
-      marginBottom: 4,
     });
     expect(resolveCompareVennTooltipListStyle()).toEqual({
       listStyle: 'none',

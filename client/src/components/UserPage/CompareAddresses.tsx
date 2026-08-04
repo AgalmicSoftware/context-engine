@@ -7,7 +7,31 @@ import { faPlus, faSpinner, faExternalLinkAlt, faDownload } from '@fortawesome/f
 import styles from './UserPage.module.scss';
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
+import {
+  buildCompareClassName,
+  buildCompareProfileHref,
+  resolveCompareAddressBlockieStyle,
+  resolveCompareAddressPillContentStyle,
+  resolveCompareBookmarksHeaderStyle,
+  resolveCompareBookmarksListStyle,
+  resolveCompareClickableResultItemStyle,
+  resolveCompareCompassLegendStyle,
+  resolveCompareCompassLegendSwatchStyle,
+  resolveCompareCompassScrollStyle,
+  resolveCompareDrillBodyStyle,
+  resolveCompareErrorStyle,
+  resolveCompareLoadingTextStyle,
+  resolveCompareUnsureHeaderStyle,
+  resolveCompareUnsureMoreStyle,
+  resolveCompareUnsurePanelStyle,
+  resolveCompareVennNoteStyle,
+  resolveCompareVennSbtImageStyle,
+  resolveCompareVennSbtRowStyle,
+  resolveCompareVennTooltipListStyle,
+  resolveCompareVennTooltipStyle,
+  resolveCompareVennWrapStyle,
+  resolveCompareVisualSectionStyle,
+} from './compareAddressStyles';
 
 // NEW: blockie data URL generator (tiny, deterministic)
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
@@ -26,18 +50,13 @@ import {
   deriveUserLabels,
   buildUsersFromCaches,
   fallbackBullets,
-  getCompareSbtKey,
-  getCompareSbtLabel,
   pcaLiteCompass,
   computeVennEvidence,
   sanitizeCompass,
   computeOverlapMatrix,
-  encodeStancesForUser,
 } from 'utilities/survey/compareUsers.js';
 
-import { QuestionStanceCard } from '../Shared/QuestionStanceCard';
 import { createLogger } from 'utilities/logging.js';
-import { normalizeArweaveUrl } from 'utilities/arweave/arweaveUrls.js';
 import { listNamespaceEntriesSync, subscribeCacheUpdates } from '../../utilities/cache/cacheScripts.js';
 import { createCacheUpdateCoalescer } from '../../utilities/cache/cacheUpdateCoalescer.js';
 import {
@@ -50,11 +69,11 @@ import {
   selectCompareCacheValues,
 } from './compareSessionRuntime';
 import {
-  buildCompareSbtImageMap,
   buildCompareSbtKeySets,
   buildNicknameByAddressMap,
   type CompareBookmark,
 } from './compareMembershipPresentation';
+import CompareVenn from './CompareVenn';
 
 const accountLog = createLogger('account');
 
@@ -78,7 +97,6 @@ export {
   resolveCompareVennNoteStyle,
   resolveCompareVennSbtImageStyle,
   resolveCompareVennSbtRowStyle,
-  resolveCompareVennTooltipHeaderStyle,
   resolveCompareVennTooltipListStyle,
   resolveCompareVennTooltipStyle,
   resolveCompareVennWrapStyle,
@@ -89,7 +107,6 @@ type CompareQuestionType = 'binary' | 'rating' | 'multichoice' | 'freeform' | 'u
 type CompareDrillTone = 'agree' | 'disagree' | 'unsure' | 'info' | 'muted';
 type CompareSectionKey = 'agree' | 'dis';
 type ComparisonTone = 'agreement' | 'disagreement';
-type VennRegionKey = 'a' | 'b' | 'c' | 'ab' | 'ac' | 'bc' | 'abc';
 type UnknownRecord = Record<string, unknown>;
 type CompareGlobalThis = typeof globalThis & {
   CE_E2E_AI_MOCK?: boolean;
@@ -238,32 +255,6 @@ interface CompareDrillStateEntry {
 
 type CompareDrillStateMap = Record<string, CompareDrillStateEntry>;
 
-type CompareVennQuestionItem = {
-  type: 'question';
-  id: string;
-  option: string | null;
-  optionLabel: string | null;
-  prompt: string;
-  stance?: string;
-};
-
-type CompareVennSbtItem = {
-  type: 'sbt';
-  name: string;
-  image: string | null;
-};
-
-type CompareVennTooltipItem = CompareVennQuestionItem | CompareVennSbtItem;
-
-interface CompareVennTooltipState {
-  open: boolean;
-  key: string;
-  x: number;
-  y: number;
-  items: CompareVennTooltipItem[];
-  more: number;
-}
-
 interface CompareCoalescer {
   schedule: () => boolean;
   cancel: () => void;
@@ -287,24 +278,6 @@ interface CompareNodeBuilderResult {
   score: number;
 }
 
-interface VennProps {
-  sets?: Set<string>[];
-  labels?: string[];
-  users?: CompareUser[] | null;
-  sessionSlug?: string;
-  preCounts?: Partial<Record<VennRegionKey, number>> | null;
-  evidence?: Partial<Record<VennRegionKey, unknown[]>> | null;
-  semantics?: string | null;
-}
-
-interface VennCountProps {
-  x: number;
-  y: number;
-  value: number;
-  regionKey: VennRegionKey;
-  label: string;
-}
-
 interface OpinionCompassProps {
   users?: CompareUser[];
   labels?: string[];
@@ -317,9 +290,6 @@ const isUnknownRecord = (value: unknown): value is UnknownRecord =>
 const toUnknownRecord = (value: unknown): UnknownRecord => (isUnknownRecord(value) ? value : {});
 
 const readRecordProperty = (record: UnknownRecord, key: string): UnknownRecord => toUnknownRecord(record[key]);
-
-const getCompareSbtLabelTyped = getCompareSbtLabel as (entry?: unknown) => string;
-const getCompareSbtKeyTyped = getCompareSbtKey as (entry?: unknown) => string;
 
 export const readDgObjectValues = (name: string, sessionSlug: string = ''): UnknownRecord[] =>
   selectCompareCacheValues(listNamespaceEntriesSync(name, { cloneValues: false }), sessionSlug);
@@ -344,9 +314,6 @@ const getQuestionPrompt = (questionId: string, sessionSlug: string = ''): string
   }
   return 'Unknown Question';
 };
-
-const resolveSbtDisplayNameForCompareEntry = (entry: unknown = null): string => getCompareSbtLabelTyped(entry);
-const resolveSbtCompareKeyForEntry = (entry: unknown = null): string => getCompareSbtKeyTyped(entry);
 
 /* -----------------------------
  * Local light helpers
@@ -1045,6 +1012,10 @@ const CompareAddress = ({
 
   // Derived SBT name sets (fallback for Venn only)
   const sbtSetsMemo = useMemo(() => buildCompareSbtKeySets(currentUsers), [currentUsers]);
+  const vennQuestionCaches = useMemo(
+    () => (currentUsers.length > 0 ? readDgObjectValues('questionsCache', activeSessionSlug) : []),
+    [activeSessionSlug, currentUsers],
+  );
 
   const nicknameByAddress = useMemo(() => buildNicknameByAddressMap(bookmarks), [bookmarks]);
 
@@ -1783,11 +1754,12 @@ const CompareAddress = ({
                       <span style={resolveCompareLoadingTextStyle()}>Loading overlap...</span>
                     </div>
                   ) : (
-                    <Venn2
+                    <CompareVenn
+                      dimension={2}
                       users={currentUsers.slice(0, 2)}
                       sets={sbtSetsMemo.slice(0, 2)}
                       labels={userLabels.slice(0, 2)}
-                      sessionSlug={activeSessionSlug}
+                      questionCaches={vennQuestionCaches}
                       preCounts={vennResult?.counts || null}
                       evidence={vennResult?.evidenceMap || null}
                       semantics={vennResult?.semantics || null}
@@ -1803,11 +1775,12 @@ const CompareAddress = ({
                       <span style={resolveCompareLoadingTextStyle()}>Loading overlap...</span>
                     </div>
                   ) : (
-                    <Venn3
+                    <CompareVenn
+                      dimension={3}
                       users={currentUsers.slice(0, 3)}
                       sets={sbtSetsMemo.slice(0, 3)}
                       labels={userLabels.slice(0, 3)}
-                      sessionSlug={activeSessionSlug}
+                      questionCaches={vennQuestionCaches}
                       preCounts={vennResult?.counts || null}
                       evidence={vennResult?.evidenceMap || null}
                       semantics={vennResult?.semantics || null}
@@ -1937,780 +1910,6 @@ const CompareAddress = ({
     </div>
   );
 };
-
-function Venn2({
-  sets = [],
-  labels = [],
-  users = null,
-  sessionSlug = '',
-  preCounts = null,
-  evidence = null,
-  semantics = null,
-}: VennProps) {
-  const wrapRef = useRef<HTMLDivElement | null>(null);
-  const [tip, setTip] = useState<CompareVennTooltipState>({ open: false, key: '', x: 0, y: 0, items: [], more: 0 });
-  const tooltipIdRef = useRef(`vennTip_${Math.random().toString(36).slice(2)}`);
-  const tipCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const questionPromptMap = useMemo(() => {
-    const m = new Map<string, string>();
-    (Array.isArray(users) ? users : []).forEach((u) => {
-      (Array.isArray(u?.questions) ? u.questions : []).forEach((q: CompareQuestion) => {
-        const qid = String(q?.id || q?.questionId || q?.qId || '').toLowerCase();
-        const prompt = q?.prompt || q?.title || q?.text || '';
-        if (qid && prompt && !m.has(qid)) m.set(qid, String(prompt));
-      });
-    });
-    if (m.size === 0) {
-      try {
-        const questionsCaches = readDgObjectValues('questionsCache', sessionSlug);
-        questionsCaches.forEach((cacheObj) => {
-          if (!cacheObj || typeof cacheObj !== 'object') return;
-          for (const netId in cacheObj) {
-            const qs = readRecordProperty(readRecordProperty(cacheObj, netId), 'questions');
-            for (const id in qs) {
-              const q = toUnknownRecord(qs[id]);
-              const qid = String(q?.id || id || '').toLowerCase();
-              const prompt = q?.prompt;
-              if (qid && prompt && !m.has(qid)) m.set(qid, String(prompt));
-            }
-          }
-        });
-      } catch (e) {
-        void e; /* fallback: agent/e2e mock detection. */
-      }
-    }
-    return m;
-  }, [sessionSlug, users]);
-
-  const sbtImageMap = useMemo(() => buildCompareSbtImageMap(users || []), [users]);
-
-  const encodedStances = useMemo(() => (Array.isArray(users) ? users : []).map(encodeStancesForUser), [users]);
-
-  const keyToIndices = useMemo<Record<'a' | 'b' | 'ab', number[]>>(() => ({ a: [0], b: [1], ab: [0, 1] }), []);
-
-  let counts: Partial<Record<VennRegionKey, number>> | null = null;
-  let mode = 'opinion';
-  if (preCounts && typeof preCounts === 'object') {
-    counts = preCounts;
-  } else {
-    const [A, B] = sets || [];
-    if (!(A && B)) return null;
-    const size = (S?: Set<string>) => (S ? S.size : 0);
-    const inter = (S1: Set<string>, S2: Set<string>) => {
-      let c = 0;
-      S1.forEach((v) => {
-        if (S2.has(v)) c++;
-      });
-      return c;
-    };
-    const ab = inter(A, B);
-    const aOnly = size(A) - ab;
-    const bOnly = size(B) - ab;
-    counts = { a: aOnly, b: bOnly, ab };
-    mode = 'sbt';
-  }
-  const { a = 0, b = 0, ab = 0 } = counts || {};
-
-  const width = 360,
-    height = 200,
-    r = 80;
-  const ax = 140,
-    ay = 100;
-  const bx = 220,
-    by = 100;
-
-  const ev = (evidence || {}) as Partial<Record<VennRegionKey, unknown[]>>;
-  const listFor = (key: VennRegionKey): unknown[] => (Array.isArray(ev[key]) ? ev[key] : []);
-
-  const normalizeStance = (v: unknown): string => {
-    if (v === null || v === undefined) return 'Unsure';
-    if (typeof v === 'number') return v > 0 ? 'Agree' : v < 0 ? 'Disagree' : 'Unsure';
-    if (typeof v === 'boolean') return v ? 'Agree' : 'Disagree';
-    const s = String(v).trim().toLowerCase();
-    if (['1', 'agree', 'strongly agree', 'yes', 'true'].includes(s)) return 'Agree';
-    if (['-1', 'disagree', 'strongly disagree', 'no', 'false'].includes(s)) return 'Disagree';
-    if (['0', 'unsure', 'neutral', 'skip', 'n/a'].includes(s)) return 'Unsure';
-    return 'Unsure';
-  };
-
-  const parseQuestionToken = (raw: unknown): CompareVennQuestionItem | null => {
-    const s = String(raw || '').trim();
-    if (!s) return null;
-    const parts = s.split(' · ');
-    const head = parts[0] ? parts[0].trim() : '';
-    const promptHint = parts.slice(1).join(' · ').trim();
-    const match = head.match(/^(.*)\s*\(([^)]+)\)\s*$/);
-    if (!match) return null;
-    const signRaw = match[2] ? match[2].trim() : '';
-    const signToken = signRaw.replace(/\u2212/g, '-').toLowerCase();
-    const isSign =
-      signToken === '+' ||
-      signToken === '-' ||
-      signToken === '+1' ||
-      signToken === '-1' ||
-      signToken === 'agree' ||
-      signToken === 'disagree' ||
-      signToken === 'unsure' ||
-      signToken === 'neutral';
-    if (!isSign) return null;
-    const tokenPart = match[1] ? match[1].trim() : '';
-    if (!tokenPart) return null;
-    let qid = tokenPart;
-    let optionRaw = '';
-    if (tokenPart.includes('::')) {
-      const bits = tokenPart.split('::');
-      qid = bits.shift() || '';
-      optionRaw = bits.join('::');
-    }
-    const id = String(qid || '').toLowerCase();
-    if (!id) return null;
-    const prompt = questionPromptMap.get(id) || promptHint || '(Question)';
-    const optionLabel = optionRaw ? optionRaw.trim() : '';
-    return {
-      type: 'question',
-      id,
-      option: optionLabel ? optionLabel.toLowerCase() : null,
-      optionLabel: optionLabel || null,
-      prompt,
-    };
-  };
-
-  const parseEvidenceList = (rawList: unknown): CompareVennTooltipItem[] => {
-    const arr = Array.isArray(rawList) ? rawList : [];
-    const out: CompareVennTooltipItem[] = [];
-    for (const item of arr) {
-      if (typeof item === 'string') {
-        if (item.startsWith('question:')) {
-          const parts = item.split(':');
-          const qid = String(parts[1] || '').toLowerCase();
-          const prompt = questionPromptMap.get(qid) || '(Question)';
-          const stance = normalizeStance(parts[2]);
-          out.push({ type: 'question', prompt, stance, id: qid, option: null, optionLabel: null });
-        } else {
-          const parsed = parseQuestionToken(item);
-          if (parsed) {
-            out.push(parsed);
-          } else {
-            const name = item;
-            const info = sbtImageMap.get(String(name)) || null;
-            out.push({ type: 'sbt', name: info?.name || name, image: info?.image || null });
-          }
-        }
-      } else if (item && typeof item === 'object') {
-        const qidMaybe = item.questionId || item.qId || item.id;
-        const sbtNameMaybe = resolveSbtDisplayNameForCompareEntry(item);
-        if (qidMaybe && !sbtNameMaybe) {
-          const qid = String(qidMaybe).toLowerCase();
-          const prompt = item.prompt || questionPromptMap.get(qid) || '(Question)';
-          const stance = normalizeStance(item.stance ?? item.sign ?? item?.answer?.value);
-          const optionLabel = item.option || item.choice || item.optionLabel || '';
-          out.push({
-            type: 'question',
-            prompt,
-            stance,
-            id: qid,
-            option: optionLabel ? String(optionLabel).trim().toLowerCase() : null,
-            optionLabel: optionLabel ? String(optionLabel).trim() : null,
-          });
-        } else if (sbtNameMaybe) {
-          const nm = String(sbtNameMaybe);
-          const look = sbtImageMap.get(resolveSbtCompareKeyForEntry(item) || nm);
-          const image = item.image || item?.sbtInfo?.image || look?.image || null;
-          const pretty = resolveSbtDisplayNameForCompareEntry(item) || look?.name || nm;
-          out.push({ type: 'sbt', name: pretty, image });
-        }
-      }
-    }
-    return out;
-  };
-
-  const regionFallbackSBTs = (key: 'a' | 'b' | 'ab'): CompareVennSbtItem[] => {
-    const [A, B] = sets || [];
-    if (!(A && B)) return [];
-    const toArr = (S?: Set<string>) => Array.from(S || []);
-    const inter = (S1: Set<string>, S2: Set<string>) => {
-      const r = new Set<string>();
-      S1.forEach((v) => {
-        if (S2.has(v)) r.add(v);
-      });
-      return r;
-    };
-    const diff = (S1: Set<string>, S2: Set<string>) => {
-      const r = new Set<string>();
-      S1.forEach((v) => {
-        if (!S2.has(v)) r.add(v);
-      });
-      return r;
-    };
-    let names: string[] = [];
-    if (key === 'a') names = toArr(diff(A, B));
-    else if (key === 'b') names = toArr(diff(B, A));
-    else if (key === 'ab') names = toArr(inter(A, B));
-    return names.map((nm) => {
-      const look = sbtImageMap.get(String(nm));
-      return { type: 'sbt', name: look?.name || nm, image: look?.image || null };
-    });
-  };
-
-  const TOOLTIP_DELAY = 2000;
-  const cancelCloseTip = () => {
-    if (tipCloseTimer.current) {
-      clearTimeout(tipCloseTimer.current);
-      tipCloseTimer.current = null;
-    }
-  };
-  const scheduleCloseTip = () => {
-    cancelCloseTip();
-    tipCloseTimer.current = setTimeout(() => {
-      closeTip();
-    }, TOOLTIP_DELAY);
-  };
-  const openTip = (key: 'a' | 'b' | 'ab', x: number, y: number) => {
-    cancelCloseTip();
-    const raw = listFor(key);
-    const questionItems = parseEvidenceList(raw);
-    const sbtItems = regionFallbackSBTs(key);
-    const items = questionItems.length ? [...questionItems, ...sbtItems] : sbtItems;
-    setTip({ open: true, key, x, y, items, more: 0 });
-  };
-  const closeTip = () => setTip({ open: false, key: '', x: 0, y: 0, items: [], more: 0 });
-
-  const Count = ({ x, y, value, regionKey, label }: VennCountProps) => {
-    const expanded = tip.open && tip.key === regionKey;
-    const venn2RegionKey = regionKey as 'a' | 'b' | 'ab';
-    const handleInteraction = () => openTip(venn2RegionKey, x, y);
-    const hasItems = listFor(regionKey).length > 0 || regionFallbackSBTs(venn2RegionKey).length > 0;
-    return (
-      <g>
-        <text
-          className={styles.vennCount}
-          x={x}
-          y={y}
-          textAnchor="middle"
-          tabIndex={0}
-          role="button"
-          data-region={regionKey}
-          aria-describedby={expanded ? tooltipIdRef.current : undefined}
-          aria-expanded={expanded ? 'true' : 'false'}
-          aria-label={`${label}: ${value}. ${hasItems ? 'Press Enter for details.' : 'No items.'}`}
-          onMouseEnter={handleInteraction}
-          onMouseLeave={scheduleCloseTip}
-          onFocus={handleInteraction}
-          onBlur={scheduleCloseTip}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              handleInteraction();
-            }
-            if (e.key === 'Escape') {
-              e.preventDefault();
-              closeTip();
-            }
-          }}
-        >
-          {value}
-        </text>
-      </g>
-    );
-  };
-
-  return (
-    <div ref={wrapRef} style={resolveCompareVennWrapStyle()}>
-      <svg width={width} height={height} role="img" aria-label="2-set Venn">
-        <defs>
-          <style>{`.vennText{font:12px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;fill:#fff}`}</style>
-        </defs>
-        <circle cx={ax} cy={ay} r={r} fill="rgba(255,255,255,0.12)" />
-        <circle cx={bx} cy={by} r={r} fill="rgba(200,200,255,0.12)" />
-
-        <text className="vennText" x={ax - r + 10} y={ay - r - 6}>
-          {labels[0] || 'A'}
-        </text>
-        <text className="vennText" x={bx + r - 10} y={by - r - 6} textAnchor="end">
-          {labels[1] || 'B'}
-        </text>
-
-        <Count x={ax - 40} y={ay} value={a} regionKey="a" label={`${labels[0] || 'A'} only`} />
-        <Count x={bx + 40} y={ay} value={b} regionKey="b" label={`${labels[1] || 'B'} only`} />
-        <Count x={(ax + bx) / 2} y={ay} value={ab} regionKey="ab" label="Intersection" />
-      </svg>
-
-      {tip.open && (
-        <div
-          id={tooltipIdRef.current}
-          role="tooltip"
-          className={styles.vennTooltip}
-          style={resolveCompareVennTooltipStyle({
-            clientWidth: wrapRef.current?.clientWidth,
-            x: tip.x,
-            y: tip.y,
-          })}
-          onMouseEnter={cancelCloseTip}
-          onMouseLeave={scheduleCloseTip}
-        >
-          <div style={resolveCompareVennTooltipHeaderStyle()}>Intersection details</div>
-          <ul style={resolveCompareVennTooltipListStyle()}>
-            {tip.items.map((item, i) => {
-              const userIndices = keyToIndices[(tip.key || 'a') as keyof typeof keyToIndices] || [];
-              let votes: Array<number | null> = [];
-              if (item.type === 'question' && userIndices.length > 0) {
-                const token = item.option ? `${item.id}::${item.option}` : item.id;
-                votes = userIndices.map((userIndex: number) => {
-                  const cell = encodedStances[userIndex]?.tokens?.get(token);
-                  if (!cell) return null;
-                  if (cell.sign > 0) return 1;
-                  if (cell.sign < 0) return -1;
-                  return 0;
-                });
-              }
-              const label = item.type === 'question' && item.id ? `Q ${shortenQuestionId(item.id)}` : '';
-              const metaLabel = item.type === 'question' && item.optionLabel ? `Option: ${item.optionLabel}` : '';
-
-              return (
-                <li key={i}>
-                  {item.type === 'sbt' && (
-                    <div style={resolveCompareVennSbtRowStyle()}>
-                      {item.image && (
-                        <img
-                          src={normalizeArweaveUrl(item.image, { contextLabel: 'compare_sbt_image' })}
-                          alt=""
-                          width="24"
-                          height="24"
-                          style={resolveCompareVennSbtImageStyle()}
-                        />
-                      )}
-                      <span>{item.name}</span>
-                    </div>
-                  )}
-                  {item.type === 'question' && (
-                    <QuestionStanceCard label={label} prompt={item.prompt} votes={votes} metaLabel={metaLabel} />
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
-
-      <div style={resolveCompareVennNoteStyle()}>
-        {semantics
-          ? semantics
-          : mode === 'opinion'
-            ? 'Counts = opinion-stance overlaps on the same question/token.'
-            : 'Counts = SBT name overlaps across participants (fallback).'}
-      </div>
-    </div>
-  );
-}
-
-function Venn3({
-  sets = [],
-  labels = [],
-  users = null,
-  sessionSlug = '',
-  preCounts = null,
-  evidence = null,
-  semantics = null,
-}: VennProps) {
-  const wrapRef = useRef<HTMLDivElement | null>(null);
-  const [tip, setTip] = useState<CompareVennTooltipState>({ open: false, key: '', x: 0, y: 0, items: [], more: 0 });
-  const tooltipIdRef = useRef(`vennTip_${Math.random().toString(36).slice(2)}`);
-  const tipCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const questionPromptMap = useMemo(() => {
-    const m = new Map<string, string>();
-    (Array.isArray(users) ? users : []).forEach((u) => {
-      (Array.isArray(u?.questions) ? u.questions : []).forEach((q: CompareQuestion) => {
-        const qid = String(q?.id || q?.questionId || q?.qId || '').toLowerCase();
-        const prompt = q?.prompt || q?.title || q?.text || '';
-        if (qid && prompt && !m.has(qid)) m.set(qid, String(prompt));
-      });
-    });
-    if (m.size === 0) {
-      try {
-        const questionsCaches = readDgObjectValues('questionsCache', sessionSlug);
-        questionsCaches.forEach((cacheObj) => {
-          if (!cacheObj || typeof cacheObj !== 'object') return;
-          for (const netId in cacheObj) {
-            const qs = readRecordProperty(readRecordProperty(cacheObj, netId), 'questions');
-            for (const id in qs) {
-              const q = toUnknownRecord(qs[id]);
-              const qid = String(q?.id || id || '').toLowerCase();
-              const prompt = q?.prompt;
-              if (qid && prompt && !m.has(qid)) m.set(qid, String(prompt));
-            }
-          }
-        });
-      } catch (e) {
-        void e; /* fallback: agent/e2e mock detection. */
-      }
-    }
-    return m;
-  }, [sessionSlug, users]);
-
-  const sbtImageMap = useMemo(() => buildCompareSbtImageMap(users || []), [users]);
-
-  const encodedStances = useMemo(() => (Array.isArray(users) ? users : []).map(encodeStancesForUser), [users]);
-
-  const keyToIndices = useMemo<Record<VennRegionKey, number[]>>(
-    () => ({
-      a: [0],
-      b: [1],
-      c: [2],
-      ab: [0, 1],
-      ac: [0, 2],
-      bc: [1, 2],
-      abc: [0, 1, 2],
-    }),
-    [],
-  );
-
-  let counts: Partial<Record<VennRegionKey, number>> | null = null;
-  let mode = 'opinion';
-  if (preCounts && typeof preCounts === 'object') {
-    counts = preCounts;
-  } else {
-    const [A, B, C] = sets || [];
-    if (!(A && B && C)) return null;
-    const size = (S?: Set<string>) => (S ? S.size : 0);
-    const inter = (S1: Set<string>, S2: Set<string>) => {
-      let c = 0;
-      S1.forEach((v) => {
-        if (S2.has(v)) c++;
-      });
-      return c;
-    };
-    const inter3 = (S1: Set<string>, S2: Set<string>, S3: Set<string>) => {
-      let c = 0;
-      S1.forEach((v) => {
-        if (S2.has(v) && S3.has(v)) c++;
-      });
-      return c;
-    };
-    const abc = inter3(A, B, C);
-    const ab = inter(A, B) - abc;
-    const ac = inter(A, C) - abc;
-    const bc = inter(B, C) - abc;
-    const aOnly = size(A) - (ab + ac + abc);
-    const bOnly = size(B) - (ab + bc + abc);
-    const cOnly = size(C) - (ac + bc + abc);
-    counts = { a: aOnly, b: bOnly, c: cOnly, ab, ac, bc, abc };
-    mode = 'sbt';
-  }
-  const { a = 0, b = 0, c = 0, ab = 0, ac = 0, bc = 0, abc = 0 } = counts || {};
-
-  const width = 360,
-    height = 280,
-    r = 80;
-  const ax = 130,
-    ay = 110;
-  const bx = 230,
-    by = 110;
-  const cx = 180,
-    cy = 170;
-
-  const ev = (evidence || {}) as Partial<Record<VennRegionKey, unknown[]>>;
-  const listFor = (key: VennRegionKey): unknown[] => (Array.isArray(ev[key]) ? ev[key] : []);
-
-  const normalizeStance = (v: unknown): string => {
-    if (v === null || v === undefined) return 'Unsure';
-    if (typeof v === 'number') return v > 0 ? 'Agree' : v < 0 ? 'Disagree' : 'Unsure';
-    if (typeof v === 'boolean') return v ? 'Agree' : 'Disagree';
-    const s = String(v).trim().toLowerCase();
-    if (['1', 'agree', 'strongly agree', 'yes', 'true'].includes(s)) return 'Agree';
-    if (['-1', 'disagree', 'strongly disagree', 'no', 'false'].includes(s)) return 'Disagree';
-    if (['0', 'unsure', 'neutral', 'skip', 'n/a'].includes(s)) return 'Unsure';
-    return 'Unsure';
-  };
-
-  const parseQuestionToken = (raw: unknown): CompareVennQuestionItem | null => {
-    const s = String(raw || '').trim();
-    if (!s) return null;
-    const parts = s.split(' · ');
-    const head = parts[0] ? parts[0].trim() : '';
-    const promptHint = parts.slice(1).join(' · ').trim();
-    const match = head.match(/^(.*)\s*\(([^)]+)\)\s*$/);
-    if (!match) return null;
-    const signRaw = match[2] ? match[2].trim() : '';
-    const signToken = signRaw.replace(/\u2212/g, '-').toLowerCase();
-    const isSign =
-      signToken === '+' ||
-      signToken === '-' ||
-      signToken === '+1' ||
-      signToken === '-1' ||
-      signToken === 'agree' ||
-      signToken === 'disagree' ||
-      signToken === 'unsure' ||
-      signToken === 'neutral';
-    if (!isSign) return null;
-    const tokenPart = match[1] ? match[1].trim() : '';
-    if (!tokenPart) return null;
-    let qid = tokenPart;
-    let optionRaw = '';
-    if (tokenPart.includes('::')) {
-      const bits = tokenPart.split('::');
-      qid = bits.shift() || '';
-      optionRaw = bits.join('::');
-    }
-    const id = String(qid || '').toLowerCase();
-    if (!id) return null;
-    const prompt = questionPromptMap.get(id) || promptHint || '(Question)';
-    const optionLabel = optionRaw ? optionRaw.trim() : '';
-    return {
-      type: 'question',
-      id,
-      option: optionLabel ? optionLabel.toLowerCase() : null,
-      optionLabel: optionLabel || null,
-      prompt,
-    };
-  };
-
-  const parseEvidenceList = (rawList: unknown): CompareVennTooltipItem[] => {
-    const arr = Array.isArray(rawList) ? rawList : [];
-    const out: CompareVennTooltipItem[] = [];
-    for (const item of arr) {
-      if (typeof item === 'string') {
-        if (item.startsWith('question:')) {
-          const parts = item.split(':');
-          const qid = String(parts[1] || '').toLowerCase();
-          const prompt = questionPromptMap.get(qid) || '(Question)';
-          const stance = normalizeStance(parts[2]);
-          out.push({ type: 'question', prompt, stance, id: qid, option: null, optionLabel: null });
-        } else {
-          const parsed = parseQuestionToken(item);
-          if (parsed) {
-            out.push(parsed);
-          } else {
-            const name = item;
-            const info = sbtImageMap.get(String(name)) || null;
-            out.push({ type: 'sbt', name: info?.name || name, image: info?.image || null });
-          }
-        }
-      } else if (item && typeof item === 'object') {
-        const qidMaybe = item.questionId || item.qId || item.id;
-        const sbtNameMaybe = resolveSbtDisplayNameForCompareEntry(item);
-        if (qidMaybe && !sbtNameMaybe) {
-          const qid = String(qidMaybe).toLowerCase();
-          const prompt = item.prompt || questionPromptMap.get(qid) || '(Question)';
-          const stance = normalizeStance(item.stance ?? item.sign ?? item?.answer?.value);
-          const optionLabel = item.option || item.choice || item.optionLabel || '';
-          out.push({
-            type: 'question',
-            prompt,
-            stance,
-            id: qid,
-            option: optionLabel ? String(optionLabel).trim().toLowerCase() : null,
-            optionLabel: optionLabel ? String(optionLabel).trim() : null,
-          });
-        } else if (sbtNameMaybe) {
-          const nm = String(sbtNameMaybe);
-          const look = sbtImageMap.get(resolveSbtCompareKeyForEntry(item) || nm);
-          const image = item.image || item?.sbtInfo?.image || look?.image || null;
-          const pretty = resolveSbtDisplayNameForCompareEntry(item) || look?.name || nm;
-          out.push({ type: 'sbt', name: pretty, image });
-        }
-      }
-    }
-    return out;
-  };
-
-  const regionFallbackSBTs = (key: VennRegionKey): CompareVennSbtItem[] => {
-    const [A, B, C] = sets || [];
-    if (!(A && B && C)) return [];
-    const toArr = (S?: Set<string>) => Array.from(S || []);
-    const inter = (S1: Set<string>, S2: Set<string>) => {
-      const r = new Set<string>();
-      S1.forEach((v) => {
-        if (S2.has(v)) r.add(v);
-      });
-      return r;
-    };
-    const inter3 = (S1: Set<string>, S2: Set<string>, S3: Set<string>) => {
-      const r = new Set<string>();
-      S1.forEach((v) => {
-        if (S2.has(v) && S3.has(v)) r.add(v);
-      });
-      return r;
-    };
-    const diff = (S1: Set<string>, S2: Set<string>) => {
-      const r = new Set<string>();
-      S1.forEach((v) => {
-        if (!S2.has(v)) r.add(v);
-      });
-      return r;
-    };
-    let names: string[] = [];
-    if (key === 'a') names = toArr(diff(diff(A, B), C));
-    else if (key === 'b') names = toArr(diff(diff(B, A), C));
-    else if (key === 'c') names = toArr(diff(diff(C, A), B));
-    else if (key === 'ab') names = toArr(diff(inter(A, B), C));
-    else if (key === 'ac') names = toArr(diff(inter(A, C), B));
-    else if (key === 'bc') names = toArr(diff(inter(B, C), A));
-    else if (key === 'abc') names = toArr(inter3(A, B, C));
-    return names.map((nm) => {
-      const look = sbtImageMap.get(String(nm));
-      return { type: 'sbt', name: look?.name || nm, image: look?.image || null };
-    });
-  };
-
-  const TOOLTIP_DELAY = 2000;
-  const cancelCloseTip = () => {
-    if (tipCloseTimer.current) {
-      clearTimeout(tipCloseTimer.current);
-      tipCloseTimer.current = null;
-    }
-  };
-  const scheduleCloseTip = () => {
-    cancelCloseTip();
-    tipCloseTimer.current = setTimeout(() => {
-      closeTip();
-    }, TOOLTIP_DELAY);
-  };
-  const openTip = (key: VennRegionKey, x: number, y: number) => {
-    cancelCloseTip();
-    const raw = listFor(key);
-    const questionItems = parseEvidenceList(raw);
-    const sbtItems = regionFallbackSBTs(key);
-    const items = questionItems.length ? [...questionItems, ...sbtItems] : sbtItems;
-    setTip({ open: true, key, x, y, items, more: 0 });
-  };
-  const closeTip = () => setTip({ open: false, key: '', x: 0, y: 0, items: [], more: 0 });
-
-  const Count = ({ x, y, value, regionKey, label }: VennCountProps) => {
-    const expanded = tip.open && tip.key === regionKey;
-    const handleInteraction = () => openTip(regionKey, x, y);
-    const hasItems = listFor(regionKey).length > 0 || regionFallbackSBTs(regionKey).length > 0;
-    return (
-      <g>
-        <text
-          className={styles.vennCount}
-          x={x}
-          y={y}
-          textAnchor="middle"
-          tabIndex={0}
-          role="button"
-          data-region={regionKey}
-          aria-describedby={expanded ? tooltipIdRef.current : undefined}
-          aria-expanded={expanded ? 'true' : 'false'}
-          aria-label={`${label}: ${value}. ${hasItems ? 'Press Enter for details.' : 'No items.'}`}
-          onMouseEnter={handleInteraction}
-          onMouseLeave={scheduleCloseTip}
-          onFocus={handleInteraction}
-          onBlur={scheduleCloseTip}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              handleInteraction();
-            }
-            if (e.key === 'Escape') {
-              e.preventDefault();
-              closeTip();
-            }
-          }}
-        >
-          {value}
-        </text>
-      </g>
-    );
-  };
-
-  return (
-    <div ref={wrapRef} style={resolveCompareVennWrapStyle()}>
-      <svg width={width} height={height} role="img" aria-label="3-set Venn">
-        <defs>
-          <style>{`.vennText{font:12px system-ui, -apple-system, Segoe UI, Roboto, sans-serif; fill:#fff}`}</style>
-        </defs>
-        <circle cx={ax} cy={ay} r={r} fill="rgba(255,255,255,0.12)" />
-        <circle cx={bx} cy={by} r={r} fill="rgba(200,200,255,0.12)" />
-        <circle cx={cx} cy={cy} r={r} fill="rgba(200,255,200,0.12)" />
-
-        <text className="vennText" x={ax - r} y={ay - r - 6}>
-          {labels[0] || 'A'}
-        </text>
-        <text className="vennText" x={bx + r - 24} y={by - r - 6} textAnchor="end">
-          {labels[1] || 'B'}
-        </text>
-        <text className="vennText" x={cx} y={cy + r + 18} textAnchor="middle">
-          {labels[2] || 'C'}
-        </text>
-
-        <Count x={ax - 35} y={ay} value={a} regionKey="a" label={`${labels[0] || 'A'} only`} />
-        <Count x={bx + 35} y={by} value={b} regionKey="b" label={`${labels[1] || 'B'} only`} />
-        <Count x={cx} y={cy + 10} value={c} regionKey="c" label={`${labels[2] || 'C'} only`} />
-        <Count x={(ax + bx) / 2} y={ay - 8} value={ab} regionKey="ab" label="A & B" />
-        <Count x={(ax + cx) / 2 - 5} y={(ay + cy) / 2 + 4} value={ac} regionKey="ac" label="A & C" />
-        <Count x={(bx + cx) / 2 + 5} y={(by + cy) / 2 + 4} value={bc} regionKey="bc" label="B & C" />
-        <Count x={(ax + bx + cx) / 3} y={(ay + by + cy) / 3 + 2} value={abc} regionKey="abc" label="A & B & C" />
-      </svg>
-
-      {tip.open && (
-        <div
-          id={tooltipIdRef.current}
-          role="tooltip"
-          className={styles.vennTooltip}
-          style={resolveCompareVennTooltipStyle({
-            clientWidth: wrapRef.current?.clientWidth,
-            x: tip.x,
-            y: tip.y,
-          })}
-          onMouseEnter={cancelCloseTip}
-          onMouseLeave={scheduleCloseTip}
-        >
-          <div style={resolveCompareVennTooltipHeaderStyle()}>Intersection details</div>
-          <ul style={resolveCompareVennTooltipListStyle()}>
-            {tip.items.map((item, i) => {
-              const userIndices = keyToIndices[(tip.key || 'a') as keyof typeof keyToIndices] || [];
-              let votes: Array<number | null> = [];
-              if (item.type === 'question' && userIndices.length > 0) {
-                const token = item.option ? `${item.id}::${item.option}` : item.id;
-                votes = userIndices.map((userIndex: number) => {
-                  const cell = encodedStances[userIndex]?.tokens?.get(token);
-                  if (!cell) return null;
-                  if (cell.sign > 0) return 1;
-                  if (cell.sign < 0) return -1;
-                  return 0;
-                });
-              }
-              const label = item.type === 'question' && item.id ? `Q ${shortenQuestionId(item.id)}` : '';
-              const metaLabel = item.type === 'question' && item.optionLabel ? `Option: ${item.optionLabel}` : '';
-
-              return (
-                <li key={i}>
-                  {item.type === 'sbt' && (
-                    <div style={resolveCompareVennSbtRowStyle()}>
-                      {item.image && (
-                        <img
-                          src={normalizeArweaveUrl(item.image, { contextLabel: 'compare_sbt_image' })}
-                          alt=""
-                          width="24"
-                          height="24"
-                          style={resolveCompareVennSbtImageStyle()}
-                        />
-                      )}
-                      <span>{item.name}</span>
-                    </div>
-                  )}
-                  {item.type === 'question' && (
-                    <QuestionStanceCard label={label} prompt={item.prompt} votes={votes} metaLabel={metaLabel} />
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
-
-      <div style={resolveCompareVennNoteStyle()}>
-        {semantics
-          ? semantics
-          : mode === 'opinion'
-            ? 'Counts = opinion-stance overlaps on the same question/token.'
-            : 'Counts = SBT name overlaps across participants (fallback).'}
-      </div>
-    </div>
-  );
-}
 
 export function OpinionCompass2D({ users = [], labels = [], precomputed = null }: OpinionCompassProps) {
   const svgRef = React.useRef<SVGSVGElement | null>(null);

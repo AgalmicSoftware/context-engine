@@ -95,11 +95,6 @@ export const resolveCompareVennTooltipStyle = ({
   };
 };
 
-export const resolveCompareVennTooltipHeaderStyle = (): CSSProperties => ({
-  fontWeight: 700,
-  marginBottom: 4,
-});
-
 export const resolveCompareVennTooltipListStyle = (): CSSProperties => ({
   listStyle: 'none',
   margin: 0,

@@ -12,7 +12,10 @@ All notable changes to this project will be documented in this file.
   fallbacks by slug, await on-chain profile enrichment before analysis, and
   skip chain scans for pure Worker sessions. Independent summary, compass, and
   overlap work now loads concurrently with section-level progress, and compass
-  exports use a descriptive comparison filename.
+  exports use a descriptive comparison filename. Two- and three-participant
+  Venn diagrams now share one deterministic region model, expose keyboard- and
+  click-pinned detail cards with membership images, and keep AI output from
+  overriding region counts or evidence.
 - Clarified the repository boundary between canonical Worker source,
   Cloudflare-native deployment packages, local bundle output, immutable CI
   bundle releases, and the stripped public-source snapshot. Release docs now
