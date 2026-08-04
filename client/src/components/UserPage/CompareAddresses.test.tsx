@@ -285,8 +285,8 @@ describe('CompareAddresses subject routes', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockListNamespaceEntriesSync.mockReturnValue([]);
-    mockRunCompareToolkit.mockImplementation(async (operation: string) =>
-      operation === 'compare' ? { agreements: ['Shared view'], disagreements: [] } : null,
+    mockRunCompareToolkit.mockImplementation(async (...args: unknown[]) =>
+      args[0] === 'compare' ? { agreements: ['Shared view'], disagreements: [] } : null,
     );
   });
 
