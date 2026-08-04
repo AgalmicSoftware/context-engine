@@ -2,16 +2,6 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import ComparisonReport from './ComparisonReport';
 
-const originalResizeObserver = global.ResizeObserver;
-
-class ResizeObserverMock {
-  observe() {}
-
-  disconnect() {}
-
-  unobserve() {}
-}
-
 const comparisonGroups = [
   { segmentKey: 'Era:Modern', name: 'Era: Modern' },
   { segmentKey: 'Era:Industrial', name: 'Era: Industrial' },
@@ -29,14 +19,6 @@ const flatResponses = [
 ];
 
 describe('ComparisonReport', () => {
-  beforeAll(() => {
-    global.ResizeObserver = ResizeObserverMock as typeof ResizeObserver;
-  });
-
-  afterAll(() => {
-    global.ResizeObserver = originalResizeObserver;
-  });
-
   it('renders report cards with candlestick distributions instead of response labels', () => {
     render(
       <ComparisonReport flatResponses={flatResponses} questions={questions} comparisonGroups={comparisonGroups} />,
@@ -52,24 +34,24 @@ describe('ComparisonReport', () => {
     expect(screen.getAllByText(/Agree 90%/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Unsure 30%/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Disagree 60%/i).length).toBeGreaterThan(0);
-    expect(
-      screen.queryByRole('button', { name: /Should advanced AI systems be openly audited/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /Should advanced AI systems be openly audited/i })).toHaveLength(3);
   });
 
   it('renders the beeswarm tooltip response as a styled pill', () => {
-    const { container } = render(
+    render(
       <ComparisonReport flatResponses={flatResponses} questions={questions} comparisonGroups={comparisonGroups} />,
     );
 
-    const firstPoint = container.querySelector('circle');
-    expect(firstPoint).not.toBeNull();
+    const firstPoint = screen.getByRole('button', {
+      name: 'Should advanced AI systems be openly audited?: Agree',
+    });
 
-    fireEvent.mouseEnter(firstPoint as Element);
+    fireEvent.mouseEnter(firstPoint);
 
     const tooltip = screen.getByTestId('demo-analysis-beeswarm-tooltip');
     expect(tooltip.querySelector('[data-testid^="ce-demo-analysis-response-pill-tooltip-"]')).not.toBeNull();
     expect(tooltip).not.toHaveTextContent('Response: "Agree"');
+    expect(screen.getByRole('img', { name: 'Similarity and difference spectrum' })).toBeInTheDocument();
   });
 
   it('supports externally controlled tag filters', () => {

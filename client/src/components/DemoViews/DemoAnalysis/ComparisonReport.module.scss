@@ -374,27 +374,12 @@
   gap: 10px;
 }
 
-.swarmLayoutContainer {
-  width: 100%;
-  padding: 1rem 0;
-  box-sizing: border-box;
-}
-
-.beeswarmSvg {
-  display: block;
-}
-
-.beeswarmCircle {
-  fill: steelblue;
-  transition:
-    fill 0.2s ease-in-out,
-    filter 0.2s ease-in-out;
-  cursor: pointer;
-
-  &:hover {
-    fill: #ff9900;
-    filter: brightness(1.2);
-  }
+.comparisonBeeswarm {
+  --ce-beeswarm-axis-color: #aaa;
+  --ce-beeswarm-label-color: #555;
+  --ce-beeswarm-axis-label-size: 12px;
+  --ce-beeswarm-point-color: steelblue;
+  --ce-beeswarm-point-active-color: #ff9900;
 }
 
 .reportTagFilter {
@@ -445,21 +430,6 @@
     width: 16px;
     height: 16px;
   }
-}
-
-.beeTooltip {
-  position: absolute;
-  background: var(--ce-color-tooltip-bg, #ffffff);
-  border: 1px solid var(--ce-color-tooltip-border, #dee2e6);
-  padding: 0;
-  font-size: 0.9rem;
-  pointer-events: none;
-  z-index: 9999;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-  max-width: 320px;
-  border-radius: var(--ce-radius-8);
-  opacity: 1;
-  color: var(--ce-color-tooltip-text, #212529);
 }
 
 .tooltipContent {
