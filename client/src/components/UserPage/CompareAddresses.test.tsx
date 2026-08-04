@@ -1,5 +1,7 @@
 /** @file CompareAddresses.test.tsx */
-import {
+import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import CompareAddress, {
   buildCompareClassName,
   buildCompareProfileHref,
   readDgObjectValues,
@@ -31,13 +33,20 @@ import {
   buildNicknameByAddressMap,
 } from './compareMembershipPresentation';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
+import { runCompareToolkit } from '../../utilities/ai/aiClient.js';
 
 jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   listNamespaceEntriesSync: jest.fn(() => []),
   subscribeCacheUpdates: jest.fn(() => () => {}),
 }));
+jest.mock('../../utilities/ai/aiClient.js', () => ({
+  runCompareToolkit: jest.fn(async (operation: string) =>
+    operation === 'compare' ? { agreements: ['Shared view'], disagreements: [] } : null,
+  ),
+}));
 
 const mockListNamespaceEntriesSync = cacheScripts.listNamespaceEntriesSync as jest.Mock;
+const mockRunCompareToolkit = runCompareToolkit as jest.Mock;
 const buildNicknameMap = buildNicknameByAddressMap as (entries: Array<Record<string, unknown>>) => Map<string, string>;
 const buildSbtKeySets = buildCompareSbtKeySets as (entries: Array<Record<string, unknown>>) => Set<string>[];
 const buildSbtImageMap = buildCompareSbtImageMap as (
@@ -269,5 +278,33 @@ describe('CompareAddresses cache scan helpers', () => {
     expect(resolveCompareCompassScrollStyle()).toEqual({
       overflowX: 'auto',
     });
+  });
+});
+
+describe('CompareAddresses subject routes', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockListNamespaceEntriesSync.mockReturnValue([]);
+    mockRunCompareToolkit.mockImplementation(async (operation: string) =>
+      operation === 'compare' ? { agreements: ['Shared view'], disagreements: [] } : null,
+    );
+  });
+
+  it('runs a simulated-only route without waiting for session caches', async () => {
+    render(
+      <MemoryRouter
+        initialEntries={[
+          `/compare?subject=${encodeURIComponent('sim:Franklin')}&subject=${encodeURIComponent('sim:FDR')}`,
+        ]}
+      >
+        <Routes>
+          <Route path="/compare" element={<CompareAddress sessionCachesReady={false} />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByLabelText('Benjamin Franklin, shipped simulation')).toBeInTheDocument();
+    expect(screen.getByLabelText('Franklin D. Roosevelt, shipped simulation')).toBeInTheDocument();
+    await waitFor(() => expect(mockRunCompareToolkit).toHaveBeenCalledWith('compare', expect.any(Object)));
   });
 });

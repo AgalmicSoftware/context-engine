@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Collapse } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faSpinner, faExternalLinkAlt, faDownload } from '@fortawesome/free-solid-svg-icons';
+import { faPlus, faSpinner, faDownload } from '@fortawesome/free-solid-svg-icons';
 import styles from './UserPage.module.scss';
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -48,7 +48,6 @@ import {
 import {
   readBookmarksNormalized,
   deriveUserLabels,
-  buildUsersFromCaches,
   fallbackBullets,
   pcaLiteCompass,
   computeVennEvidence,
@@ -61,7 +60,6 @@ import { listNamespaceEntriesSync, subscribeCacheUpdates } from '../../utilities
 import { createCacheUpdateCoalescer } from '../../utilities/cache/cacheUpdateCoalescer.js';
 import {
   COMPARE_GRAPHIC_FILENAME,
-  buildCompareRoutePath,
   resolveCompareSessionSlug,
   resolveCompareRunLabel,
   runCompareSectionTasks,
@@ -74,7 +72,21 @@ import {
   type CompareBookmark,
 } from './compareMembershipPresentation';
 import CompareVenn from './CompareVenn';
-import { resolveCompareRouteSubjects } from './compareSubjectContract';
+import CompareSubjectInputList from './CompareSubjectInputList';
+import CompareSubjectParticipants from './CompareSubjectParticipants';
+import {
+  buildCompareSubjectsRoutePath,
+  compareSubjectsNeedSessionCaches,
+  normalizeCompareSubjects,
+  parseCompareSubject,
+  resolveCompareRouteSubjects,
+  selectScannableCompareSubjectAddresses,
+} from './compareSubjectContract';
+import {
+  analyzeCompareSubjectCompatibility,
+  resolveCompareSubjects,
+  type CompareSubjectCompatibility,
+} from './compareSubjectAdapters';
 
 const accountLog = createLogger('account');
 
@@ -112,7 +124,7 @@ type UnknownRecord = Record<string, unknown>;
 type CompareGlobalThis = typeof globalThis & {
   CE_E2E_AI_MOCK?: boolean;
 };
-type CompareRunComparison = (addresses: string[], options?: { skipNavigate?: boolean }) => Promise<void>;
+type CompareRunComparison = (subjects: string[], options?: { skipNavigate?: boolean }) => Promise<void>;
 
 interface CompareSbt {
   name?: string;
@@ -147,15 +159,12 @@ interface CompareUser {
   sbts?: CompareSbt[];
   questions?: CompareQuestion[];
   surveys?: unknown[];
+  supportsMembership?: boolean;
+  subjectKind?: string;
+  subjectToken?: string;
+  profileHref?: string;
+  provenance?: unknown;
   [key: string]: unknown;
-}
-
-interface CompareUserSummary {
-  address: string;
-  sbtCount: number;
-  questionCount: number;
-  surveyCount: number;
-  sbtNames: string[];
 }
 
 interface CompareQuestionResponse {
@@ -292,6 +301,14 @@ const toUnknownRecord = (value: unknown): UnknownRecord => (isUnknownRecord(valu
 
 const readRecordProperty = (record: UnknownRecord, key: string): UnknownRecord => toUnknownRecord(record[key]);
 
+const EMPTY_SUBJECT_COMPATIBILITY: CompareSubjectCompatibility = {
+  membershipComparable: false,
+  notice: '',
+  opinionComparable: false,
+  sharedQuestionIds: [],
+  summaryComparable: false,
+};
+
 export const readDgObjectValues = (name: string, sessionSlug: string = ''): UnknownRecord[] =>
   selectCompareCacheValues(listNamespaceEntriesSync(name, { cloneValues: false }), sessionSlug);
 
@@ -316,16 +333,6 @@ const getQuestionPrompt = (questionId: string, sessionSlug: string = ''): string
   return 'Unknown Question';
 };
 
-/* -----------------------------
- * Local light helpers
- * ----------------------------- */
-const isValidAddress = (address: string): boolean => {
-  const s = String(address || '').trim();
-  const hex = /^0[xX][0-9a-fA-F]{40}$/.test(s);
-  const ens = s.endsWith('.eth');
-  return hex || ens;
-};
-
 const shortenQuestionId = (qid: string): string => {
   const s = String(qid || '').trim();
   if (!s) return '';
@@ -344,10 +351,7 @@ const normalizeBinaryAnswer = (answerValue: unknown): 1 | 0 | -1 | null => {
   return null;
 };
 
-const getCommonUnsureQuestions = (
-  users: CompareUser[] = [],
-  sessionSlug: string = '',
-): CompareUnsureQuestion[] => {
+const getCommonUnsureQuestions = (users: CompareUser[] = [], sessionSlug: string = ''): CompareUnsureQuestion[] => {
   const arr = Array.isArray(users) ? users : [];
   if (arr.length < 2) return [];
   const count = arr.length;
@@ -509,8 +513,8 @@ const CompareAddress = ({
   const [compassData, setCompassData] = useState<CompareCompassData | null>(null);
   const [vennResult, setVennResult] = useState<CompareVennResult | null>(null);
   const [matrixData, setMatrixData] = useState<CompareMatrixData | null>(null);
-
-  const [userSummaries, setUserSummaries] = useState<CompareUserSummary[]>([]); // per-address assembled data preview
+  const [subjectCompatibility, setSubjectCompatibility] =
+    useState<CompareSubjectCompatibility>(EMPTY_SUBJECT_COMPATIBILITY);
 
   // Dynamic bookmarks that react to cache changes
   const [bookmarks, setBookmarks] = useState<CompareBookmark[]>([]);
@@ -531,7 +535,7 @@ const CompareAddress = ({
   const lastAutoKeyRef = useRef('');
   const deepScanSeenRef = useRef<Set<string>>(new Set());
   const compareRunIdRef = useRef(0);
-  const pendingComparisonRef = useRef<{ addresses: string[]; skipNavigate: boolean } | null>(null);
+  const pendingComparisonRef = useRef<{ subjects: string[]; skipNavigate: boolean } | null>(null);
 
   // Viz mode (Compass-first; Matrix is behind “More visuals”)
   const [vizMode, setVizMode] = useState<'summary' | 'compass' | 'venn' | 'matrix'>('compass');
@@ -552,25 +556,24 @@ const CompareAddress = ({
   const runComparisonRef = useRef<CompareRunComparison | null>(null);
 
   useEffect(() => {
-    const pathAddresses = resolveCompareRouteSubjects({
+    const routeSubjects = resolveCompareRouteSubjects({
       firstSubject: firstAddress,
       pathname: location.pathname,
       search: location.search,
-    })
-      .filter((subject) => subject.kind === 'wallet')
-      .map((subject) => subject.id);
+    });
+    const pathSubjects = routeSubjects.map((subject) => subject.token);
 
-    if (pathAddresses.length > 0) {
-      setCompareAddresses(pathAddresses);
-      const hasTwo = pathAddresses.length > 1;
+    if (pathSubjects.length > 0) {
+      setCompareAddresses(pathSubjects);
+      const hasTwo = pathSubjects.length > 1;
       setShowComparison(hasTwo || location.pathname.includes('&'));
 
-      // Auto-run when URL already has ≥2 addresses
+      // Auto-run when URL already has at least two canonical subjects.
       if (hasTwo) {
-        const key = pathAddresses.map((a) => a.toLowerCase()).join('&');
+        const key = routeSubjects.map((subject) => subject.key).join('&');
         if (key && key !== lastAutoKeyRef.current) {
           lastAutoKeyRef.current = key;
-          runComparisonRef.current?.(pathAddresses, { skipNavigate: true });
+          runComparisonRef.current?.(pathSubjects, { skipNavigate: true });
         }
       }
     } else {
@@ -606,11 +609,12 @@ const CompareAddress = ({
     if (isE2eAutofillDisabled()) return;
     setCompareAddresses((prev) => {
       const accLower = account.toLowerCase();
+      const accountToken = `wallet:${accLower}`;
       const next = Array.isArray(prev) && prev.length > 0 ? [...prev] : [firstAddress || '', ''];
       if (next.length < 2) next.push('');
-      const alreadyHasAccount = next.some((a) => (a || '').toLowerCase() === accLower);
+      const alreadyHasAccount = next.some((value) => parseCompareSubject(value)?.key === accountToken);
       if (!alreadyHasAccount && (next[1] || '') === '') {
-        next[1] = account;
+        next[1] = accountToken;
         return next;
       }
       return prev;
@@ -710,77 +714,74 @@ const CompareAddress = ({
   const onBookmarkClick = (bookmarkAddress: string) => {
     const lower = String(bookmarkAddress || '').toLowerCase();
     if (!lower) return;
+    const bookmarkToken = `wallet:${lower}`;
 
     setCompareAddresses((prev) => {
       const current = Array.isArray(prev) ? [...prev] : [];
-      const exists = current.some((a) => String(a || '').toLowerCase() === lower);
+      const exists = current.some((value) => parseCompareSubject(value)?.key === bookmarkToken);
       if (exists) return prev;
 
       const emptyIdx = current.findIndex((a) => !a || String(a).trim() === '');
       if (emptyIdx > -1) {
         const next = [...current];
-        next[emptyIdx] = bookmarkAddress;
+        next[emptyIdx] = bookmarkToken;
         return next;
       }
-      return [...current, bookmarkAddress];
+      return [...current, bookmarkToken];
     });
   };
 
-  const runComparison = async (addresses: string[], { skipNavigate = false }: { skipNavigate?: boolean } = {}) => {
-    const validAddresses = (addresses || []).map((a) => a.trim()).filter((a) => isValidAddress(a) && a !== '');
+  const runComparison = async (subjectValues: string[], { skipNavigate = false }: { skipNavigate?: boolean } = {}) => {
+    const subjects = normalizeCompareSubjects(subjectValues);
+    const subjectTokens = subjects.map((subject) => subject.token);
+    const runId = ++compareRunIdRef.current;
+    const isStale = () => compareRunIdRef.current !== runId;
 
-    if (validAddresses.length < 2) {
-      setComparisonError('Enter at least two valid Ethereum addresses or ENS names.');
+    if (subjects.length < 2) {
+      pendingComparisonRef.current = null;
+      setLoading(false);
+      setBulletsLoading(false);
+      setCompassLoading(false);
+      setVennLoading(false);
+      setComparisonError('Enter at least two valid subjects (wallet, Worker, or simulated).');
       return;
     }
 
     if (!skipNavigate)
       navigate(
-        buildCompareRoutePath({
-          addresses: validAddresses,
+        buildCompareSubjectsRoutePath({
+          subjects: subjectTokens,
           sessionSlug: activeSessionSlug,
           search: location.search,
         }),
       );
 
-    const hexOnly = validAddresses.filter((a) => /^0x[0-9a-fA-F]{40}$/.test(a));
-    if (hexOnly.length < 2) {
-      setShowComparison(true);
-      setComparisonError('ENS names cannot be resolved in this view; results may be incomplete.');
-    } else {
-      setComparisonError('');
-    }
-
-    const runId = ++compareRunIdRef.current;
-    const isStale = () => compareRunIdRef.current !== runId;
-
-    if (sessionCachesReady === false) {
-      pendingComparisonRef.current = { addresses: validAddresses, skipNavigate };
-      setLoading(true);
-      setShowComparison(true);
-      setComparisonError('');
-      return;
-    }
-    pendingComparisonRef.current = null;
-
+    setComparisonError('');
     setLoading(true);
     setBulletsLoading(true);
     setCompassLoading(true);
     setVennLoading(true);
     setShowComparison(true);
 
-    // Reset UI slices
+    // Clear prior-run slices before either waiting for caches or resolving the new subjects.
     setComparisonResult(null);
     setCompassData(null);
     setVennResult(null);
     setMatrixData(null);
-    setUserSummaries([]);
     setCurrentUsers([]);
+    setSubjectCompatibility(EMPTY_SUBJECT_COMPATIBILITY);
     setDrillState({});
-    setVizMode('compass'); // Compass-first
+    setVizMode('compass');
+
+    if (sessionCachesReady === false && compareSubjectsNeedSessionCaches(subjects)) {
+      pendingComparisonRef.current = { subjects: subjectTokens, skipNavigate };
+      setComparisonError('');
+      return;
+    }
+    pendingComparisonRef.current = null;
 
     const scanFailures = await scanCompareAddressesSequentially({
-      addresses: validAddresses,
+      addresses: selectScannableCompareSubjectAddresses(subjects),
       sessionSlug: activeSessionSlug,
       scanSpecificUserProfile,
       seen: deepScanSeenRef.current,
@@ -795,20 +796,33 @@ const CompareAddress = ({
     const questionsCaches = readDgObjectValues('questionsCache', activeSessionSlug);
     const surveysCaches = readDgObjectValues('surveysCache', activeSessionSlug);
 
-    // Assemble deterministic user payloads strictly from caches (2–10 supported) via pure utility
-    const users = buildUsersFromCaches(validAddresses, sbtCaches, questionsCaches, surveysCaches, { sessionSlug: activeSessionSlug });
+    // Normalize cache-backed and simulated subjects into one comparison payload contract.
+    const resolution = resolveCompareSubjects({
+      questionsCaches,
+      sbtCaches,
+      sessionSlug: activeSessionSlug,
+      subjects: subjectTokens,
+      surveysCaches,
+    });
+    const users = resolution.users;
+    if (users.length < 2) {
+      if (!isStale()) {
+        setComparisonError(
+          resolution.errors.map((error) => error.message).join(' ') || 'Fewer than two subjects resolved.',
+        );
+        setBulletsLoading(false);
+        setCompassLoading(false);
+        setVennLoading(false);
+        setLoading(false);
+      }
+      return;
+    }
+    const compatibility = analyzeCompareSubjectCompatibility(users);
+    setSubjectCompatibility(compatibility);
+    if (resolution.errors.length > 0) {
+      setComparisonError(resolution.errors.map((error) => error.message).join(' '));
+    }
     setCurrentUsers(users);
-
-    // Lightweight per-user summary chips
-    setUserSummaries(
-      users.map((u) => ({
-        address: u.address,
-        sbtCount: (u.sbts || []).length,
-        questionCount: (u.questions || []).length,
-        surveyCount: (u.surveys || []).length,
-        sbtNames: (u.sbts || []).map((s) => s.name).slice(0, 8),
-      })),
-    );
 
     // Guard viz modes
     const n = users.length;
@@ -821,6 +835,13 @@ const CompareAddress = ({
     const addrOrder = users.map((u) => u.address);
 
     const bulletsTask = async () => {
+      if (!compatibility.summaryComparable) {
+        if (!isStale()) {
+          setComparisonResult({ agreements: [], disagreements: [] });
+          setBulletsLoading(false);
+        }
+        return;
+      }
       try {
         const bulletsRaw = await runCompareToolkit('compare', { users, ...aiScope });
         const bullets = normalizeCompareBullets(bulletsRaw, fallbackBullets(users));
@@ -840,6 +861,13 @@ const CompareAddress = ({
     };
 
     const compassTask = async () => {
+      if (!compatibility.opinionComparable) {
+        if (!isStale()) {
+          setCompassData(null);
+          setCompassLoading(false);
+        }
+        return;
+      }
       try {
         let compass = null;
         try {
@@ -858,6 +886,13 @@ const CompareAddress = ({
     };
 
     const vennTask = async () => {
+      if (!compatibility.summaryComparable) {
+        if (!isStale()) {
+          setVennResult(null);
+          setVennLoading(false);
+        }
+        return;
+      }
       try {
         if (users.length === 2 || users.length === 3) {
           let venn = null;
@@ -891,7 +926,7 @@ const CompareAddress = ({
     const pending = pendingComparisonRef.current;
     if (!pending) return;
     pendingComparisonRef.current = null;
-    void runComparisonRef.current?.(pending.addresses, { skipNavigate: pending.skipNavigate });
+    void runComparisonRef.current?.(pending.subjects, { skipNavigate: pending.skipNavigate });
   }, [sessionCachesReady]);
 
   // If user toggles “More visuals” after initial run and we don't have a matrix yet,
@@ -926,10 +961,12 @@ const CompareAddress = ({
   };
 
   const renderInputOrYouPill = (address: string, index: number) => {
-    const isSelf = !!account && !!address && address.toLowerCase() === account.toLowerCase();
+    const parsedSubject = parseCompareSubject(address);
+    const walletId = parsedSubject?.kind === 'wallet' ? parsedSubject.id : '';
+    const isSelf = !!account && !!walletId && walletId.toLowerCase() === account.toLowerCase();
     if (isSelf) {
-      const short = getShortenedAddress(address, false);
-      const blockieUrl = generateBlockieDataUrl(String(address || '').toLowerCase(), 8, 4);
+      const short = getShortenedAddress(walletId, false);
+      const blockieUrl = generateBlockieDataUrl(walletId.toLowerCase(), 8, 4);
       const title = `You (${short})`;
       return (
         <div className={styles.youPill} title={title} aria-label={title}>
@@ -950,7 +987,7 @@ const CompareAddress = ({
             type="button"
             className={styles.youPillClear}
             onClick={() => clearAddressAt(index)}
-            aria-label="Clear this address"
+            aria-label="Clear this subject"
           >
             ×
           </button>
@@ -961,15 +998,15 @@ const CompareAddress = ({
     // Nickname pill (bookmarked user with nickname)
     const nickname =
       nicknameByAddress.get(
-        String(address || '')
+        String(walletId || '')
           .trim()
           .toLowerCase(),
       ) || '';
 
     if (nickname) {
-      const shortened = String(getShortenedAddress(address, false) || '').replace('...', '…');
+      const shortened = String(getShortenedAddress(walletId, false) || '').replace('...', '…');
       const title = `${nickname} (${shortened})`;
-      const blockieUrl = generateBlockieDataUrl(String(address || '').toLowerCase(), 8, 4);
+      const blockieUrl = generateBlockieDataUrl(walletId.toLowerCase(), 8, 4);
       return (
         <div className={styles.youPill} title={title} aria-label={title}>
           <span style={resolveCompareAddressPillContentStyle()}>
@@ -989,7 +1026,7 @@ const CompareAddress = ({
             type="button"
             className={styles.youPillClear}
             onClick={() => clearAddressAt(index)}
-            aria-label="Clear this address"
+            aria-label="Clear this subject"
           >
             ×
           </button>
@@ -1003,7 +1040,7 @@ const CompareAddress = ({
         data-testid={
           index === 0 ? E2E_TESTIDS.COMPARE_ADDRESS_A : index === 1 ? E2E_TESTIDS.COMPARE_ADDRESS_B : undefined
         }
-        placeholder="Enter Ethereum address / ENS"
+        placeholder="wallet:0x…, worker:…, or sim:…"
         value={address}
         onChange={(e) => handleCompareAddressChange(index, e)}
       />
@@ -1575,14 +1612,18 @@ const CompareAddress = ({
 
   // Visualization capability flags
   const participantsCount = currentUsers.length;
-  const canShowVenn = participantsCount === 2 || participantsCount === 3;
+  const canShowVenn = (participantsCount === 2 || participantsCount === 3) && subjectCompatibility.summaryComparable;
   const canShowMatrix = participantsCount >= 2 && participantsCount <= 10;
 
   useEffect(() => {
     if (vizMode === 'venn' && !canShowVenn) setVizMode('summary');
     if (vizMode === 'matrix' && !canShowMatrix) setVizMode('summary');
-    if (vizMode === 'compass' && !(participantsCount >= 2 && participantsCount <= 10)) setVizMode('summary');
-  }, [canShowMatrix, canShowVenn, participantsCount, vizMode]);
+    if (
+      vizMode === 'compass' &&
+      (!(participantsCount >= 2 && participantsCount <= 10) || !subjectCompatibility.opinionComparable)
+    )
+      setVizMode('summary');
+  }, [canShowMatrix, canShowVenn, participantsCount, subjectCompatibility.opinionComparable, vizMode]);
 
   return (
     <div className={styles.compareSection}>
@@ -1626,30 +1667,18 @@ const CompareAddress = ({
         </div>
       )}
 
-      <div className={styles.addrInputsContainer}>
-        {compareAddresses.map((address, index) => (
-          <div key={index} className={styles.addressInput}>
-            {renderInputOrYouPill(address, index)}
-          </div>
-        ))}
-      </div>
-
-      <div className={styles.addAddressRow}>
-        <button
-          type="button"
-          className={styles.addAddressBtn}
-          onClick={addCompareAddress}
-          data-testid={E2E_TESTIDS.COMPARE_ADD_ADDRESS}
-        >
-          <FontAwesomeIcon icon={faPlus} /> Add Address
-        </button>
-      </div>
+      <CompareSubjectInputList
+        onAddSubject={addCompareAddress}
+        renderSubjectInput={renderInputOrYouPill}
+        subjectValues={compareAddresses}
+      />
 
       <button onClick={performComparison} disabled={loading} data-testid={E2E_TESTIDS.COMPARE_RUN}>
         {loading ? (
           <>
             <FontAwesomeIcon icon={faSpinner} spin />
-            &nbsp;{resolveCompareRunLabel(sessionCachesReady)}
+            &nbsp;
+            {pendingComparisonRef.current ? resolveCompareRunLabel(sessionCachesReady) : 'Comparing subjects...'}
           </>
         ) : (
           'Compare Views & Activity'
@@ -1665,57 +1694,12 @@ const CompareAddress = ({
       {/* RESULTS */}
       <Collapse isOpen={showComparison}>
         <div className={styles.comparisonSummary} data-testid={E2E_TESTIDS.COMPARE_RESULT}>
-          {/* Participants bar */}
-          {/* <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 8,
-              alignItems: 'center',
-              marginBottom: 8
-            }}
-            role="list"
-            aria-label="Participants"
-          >
-            {(currentUsers || []).map((u, i) => {
-              const addr = String(u?.address || '');
-              const label = userLabels[i] || `User ${i + 1}`;
-              return (
-                <div
-                  key={addr || i}
-                  className={styles.resultBadge}
-                  role="listitem"
-                  aria-label={`Participant ${label}`}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-                >
-                  <span
-                    aria-hidden="true"
-                    style={{
-                      display: 'inline-block',
-                      width: 10,
-                      height: 10,
-                      borderRadius: 5,
-                      background: `hsl(${(i * 50) % 360}, 70%, 50%)`,
-                      marginRight: 2
-                    }}
-                  />
-                  <span>{label}</span>
-                  {addr && (
-                    <a
-                      href={buildCompareProfileHref(addr, activeSessionSlug)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={`Open profile for ${label}`}
-                      title="Open user profile"
-                      style={{ display: 'inline-flex', alignItems: 'center', marginLeft: 6 }}
-                    >
-                      <FontAwesomeIcon icon={faExternalLinkAlt} />
-                    </a>
-                  )}
-                </div>
-              );
-            })}
-          </div> */}
+          {subjectCompatibility.notice && (
+            <div className={styles.placeholderNote} role="status">
+              {subjectCompatibility.notice}
+            </div>
+          )}
+          <CompareSubjectParticipants activeSessionSlug={activeSessionSlug} labels={userLabels} users={currentUsers} />
 
           {/* Visuals + Bullets in responsive two-column split */}
           <div className={styles.compareSplit} aria-live="polite">
@@ -1736,17 +1720,21 @@ const CompareAddress = ({
                     <FontAwesomeIcon icon={faSpinner} spin />
                     <span>Loading chart...</span>
                   </div>
-                ) : (
+                ) : subjectCompatibility.opinionComparable ? (
                   <OpinionCompass2D
                     key={(currentUsers || []).map((u) => u.address).join(',')}
                     users={currentUsers}
                     labels={userLabels}
                     precomputed={compassData}
                   />
+                ) : (
+                  <div className={styles.placeholderNote}>
+                    Opinion compass unavailable: these subjects have no shared canonical question IDs.
+                  </div>
                 )}
               </div>
 
-              {participantsCount === 2 && (
+              {canShowVenn && participantsCount === 2 && (
                 <div style={resolveCompareVisualSectionStyle()}>
                   {vennLoading ? (
                     <div className={styles.placeholderNote}>
@@ -1767,7 +1755,7 @@ const CompareAddress = ({
                   )}
                 </div>
               )}
-              {participantsCount === 3 && (
+              {canShowVenn && participantsCount === 3 && (
                 <div style={resolveCompareVisualSectionStyle()}>
                   {vennLoading ? (
                     <div className={styles.placeholderNote}>

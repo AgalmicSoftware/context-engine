@@ -39,7 +39,7 @@ const normalizeSubjectId = (kind: CompareSubjectKind, rawId: unknown): string =>
   return id;
 };
 
-const parseCompareSubject = (rawToken: unknown, { allowLegacyWallet = true } = {}): CompareSubject | null => {
+export const parseCompareSubject = (rawToken: unknown, { allowLegacyWallet = true } = {}): CompareSubject | null => {
   const value = String(rawToken || '').trim();
   if (!value) return null;
   const match = value.match(SUBJECT_PREFIX_RE);
@@ -57,7 +57,7 @@ const parseCompareSubject = (rawToken: unknown, { allowLegacyWallet = true } = {
   };
 };
 
-const normalizeCompareSubjects = (values: unknown[] = []): CompareSubject[] => {
+export const normalizeCompareSubjects = (values: unknown[] = []): CompareSubject[] => {
   const seen = new Set<string>();
   const subjects: CompareSubject[] = [];
   (Array.isArray(values) ? values : []).forEach((value) => {
@@ -67,6 +67,31 @@ const normalizeCompareSubjects = (values: unknown[] = []): CompareSubject[] => {
     subjects.push(subject);
   });
   return subjects;
+};
+
+export const compareSubjectsNeedSessionCaches = (subjects: CompareSubject[] = []): boolean =>
+  subjects.some((subject) => subject.kind !== 'sim');
+
+const readAddressBackedWorkerId = (workerId: unknown): string => {
+  const match = String(workerId || '').match(/^(?:evm_address|passkey_eoa|external_wallet):(0x[0-9a-fA-F]{40})$/i);
+  return match?.[1]?.toLowerCase() || '';
+};
+
+export const selectScannableCompareSubjectAddresses = (subjects: CompareSubject[] = []): string[] => {
+  const seen = new Set<string>();
+  const addresses: string[] = [];
+  subjects.forEach((subject) => {
+    const address =
+      subject.kind === 'wallet' && WALLET_ID_RE.test(subject.id)
+        ? subject.id.toLowerCase()
+        : subject.kind === 'worker'
+          ? readAddressBackedWorkerId(subject.id)
+          : '';
+    if (!address || seen.has(address)) return;
+    seen.add(address);
+    addresses.push(address);
+  });
+  return addresses;
 };
 
 const readCompareSubjectsFromSearch = (search: unknown = ''): CompareSubject[] => {

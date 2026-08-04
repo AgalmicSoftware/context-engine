@@ -1,6 +1,9 @@
 import {
   buildCompareSubjectsRoutePath,
+  compareSubjectsNeedSessionCaches,
+  normalizeCompareSubjects,
   resolveCompareRouteSubjects,
+  selectScannableCompareSubjectAddresses,
 } from './compareSubjectContract';
 
 describe('compare subject route contract', () => {
@@ -47,10 +50,9 @@ describe('compare subject route contract', () => {
 
   it('prefers repeated canonical query subjects over the legacy address path', () => {
     const search = `?subject=${encodeURIComponent('sim:Franklin')}&subject=${encodeURIComponent(`wallet:${addressA}`)}`;
-    expect(resolveCompareRouteSubjects({ pathname: `/compare/${addressB}`, search }).map((subject) => subject.token)).toEqual([
-      'sim:Franklin',
-      `wallet:${addressA.toLowerCase()}`,
-    ]);
+    expect(
+      resolveCompareRouteSubjects({ pathname: `/compare/${addressB}`, search }).map((subject) => subject.token),
+    ).toEqual(['sim:Franklin', `wallet:${addressA.toLowerCase()}`]);
   });
 
   it('keeps the legacy address path as a backward-compatible entrypoint', () => {
@@ -71,4 +73,16 @@ describe('compare subject route contract', () => {
     );
   });
 
+  it('only waits for caches or deep-scans subjects that need session-backed evidence', () => {
+    const subjects = normalizeCompareSubjects([
+      'sim:Franklin',
+      `wallet:${addressA}`,
+      `worker:evm_address:${addressB}`,
+      'worker:telegram:123',
+    ]);
+
+    expect(compareSubjectsNeedSessionCaches(normalizeCompareSubjects(['sim:Franklin', 'sim:FDR']))).toBe(false);
+    expect(compareSubjectsNeedSessionCaches(subjects)).toBe(true);
+    expect(selectScannableCompareSubjectAddresses(subjects)).toEqual([addressA.toLowerCase(), addressB.toLowerCase()]);
+  });
 });

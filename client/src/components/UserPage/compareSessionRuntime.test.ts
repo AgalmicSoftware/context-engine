@@ -1,6 +1,5 @@
 import {
   COMPARE_GRAPHIC_FILENAME,
-  buildCompareRoutePath,
   resolveCompareSessionSlug,
   resolveCompareRunLabel,
   runCompareSectionTasks,
@@ -19,20 +18,6 @@ describe('compare session runtime', () => {
     ).toBe('Worker-Session');
     expect(resolveCompareSessionSlug({ pathname: '/compare/a&b', search: '?session=CloudFlare' })).toBe('CloudFlare');
     expect(resolveCompareSessionSlug({ pathname: '/session/OnChain', search: '' })).toBe('OnChain');
-  });
-
-  it('keeps the active session and existing safe query state in comparison URLs', () => {
-    const addressA = `0x${'a'.repeat(40)}`;
-    const addressB = `0x${'b'.repeat(40)}`;
-    expect(
-      buildCompareRoutePath({
-        addresses: [addressA, addressB],
-        sessionSlug: 'Worker-Session',
-        search: '?agent=1',
-      }),
-    ).toBe(
-      `/compare?agent=1&subject=${encodeURIComponent(`wallet:${addressA}`)}&subject=${encodeURIComponent(`wallet:${addressB}`)}&session=Worker-Session`,
-    );
   });
 
   it('selects only the active session cache when a session is resolved', () => {

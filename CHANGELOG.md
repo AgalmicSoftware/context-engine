@@ -20,7 +20,11 @@ All notable changes to this project will be documented in this file.
   native Worker Groups use the same projection contract with session + group
   identity. Canonical compare URLs now use repeated `subject=` parameters with
   explicit `wallet:`, `worker:`, and `sim:` tokens; legacy address-path links
-  normalize through the same route contract.
+  normalize through the same route contract. Wallet and Worker responders now
+  resolve from the active session projection while shipped simulated personas
+  use stable corpus question IDs; the UI names each source and session, skips
+  chain/cache waiting for simulation-only comparisons, and suppresses opinion
+  or membership sections when their evidence is not canonically compatible.
 - Moved the Community, Polis, and demographic-comparison question beeswarms
   onto a reusable renderer with explicit consumer-owned metric/domain labels,
   named force/stacked layouts, stable-key hover state, and

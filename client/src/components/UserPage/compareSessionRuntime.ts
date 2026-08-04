@@ -1,5 +1,4 @@
 import { normalizeSessionSlug, resolveSessionSlugFromPathname } from '../../utilities/session/sessionNaming.js';
-import { buildCompareSubjectsRoutePath } from './compareSubjectContract';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -11,12 +10,6 @@ type CompareCacheEntry = {
 type ResolveCompareSessionSlugOptions = {
   activeSessionSlug?: unknown;
   pathname?: unknown;
-  search?: unknown;
-};
-
-type BuildCompareRoutePathOptions = {
-  addresses?: unknown[];
-  sessionSlug?: unknown;
   search?: unknown;
 };
 
@@ -69,18 +62,6 @@ export const resolveCompareSessionSlug = ({
   }
 
   return normalizeSessionSlug(resolveSessionSlugFromPathname(pathname) || '');
-};
-
-export const buildCompareRoutePath = ({
-  addresses = [],
-  sessionSlug = '',
-  search = '',
-}: BuildCompareRoutePathOptions = {}): string => {
-  return buildCompareSubjectsRoutePath({
-    search,
-    sessionSlug,
-    subjects: Array.isArray(addresses) ? addresses : [],
-  });
 };
 
 export const selectCompareCacheValues = (

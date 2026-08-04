@@ -1097,6 +1097,10 @@ export function readBookmarksNormalized(rawJson: unknown): BookmarkEntry[] {
 export function deriveUserLabels(users: CompareUser[] = [], bookmarks: Array<Partial<BookmarkEntry>> = []): string[] {
   const map = new Map((bookmarks || []).map((b) => [String(b.addressLower || '').toLowerCase(), b.label]));
   return (users || []).map(
-    (u, i) => map.get(String(u?.address || '').toLowerCase()) || shortenPlain(u?.address || '') || `User ${i + 1}`,
+    (u, i) =>
+      map.get(String(u?.address || '').toLowerCase()) ||
+      String(u?.label || '').trim() ||
+      shortenPlain(u?.address || '') ||
+      `User ${i + 1}`,
   );
 }
