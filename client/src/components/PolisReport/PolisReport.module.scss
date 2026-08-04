@@ -215,16 +215,6 @@
   font-size: 0.78rem;
 }
 
-.polisBoxPlotContainer {
-  display: inline-block;
-  margin-left: 10px;
-}
-
-.polisBoxPlotSvg {
-  display: block;
-  border: var(--ce-color-black) solid 0.5px;
-}
-
 /* The .pdfIgnore class is hidden when generating the PDF */
 .pdfIgnore {
   display: block;
@@ -939,10 +929,6 @@
     background: #e1e7ff;
   }
 
-  .polisBoxPlotSvg {
-    border: 1px solid #e4e9f7;
-  }
-
   .analysisNote {
     color: #4a5a84;
   }
@@ -1195,10 +1181,6 @@
 
   .scrollButton:hover {
     background: #2b3648;
-  }
-
-  .polisBoxPlotSvg {
-    border: 1px solid #2b3446;
   }
 
   .analysisNote {

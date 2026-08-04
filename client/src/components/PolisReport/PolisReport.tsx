@@ -38,8 +38,7 @@ import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
 import { createLogger } from 'utilities/logging.js';
 import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
-import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
-import { isResponseAllowedForSessionSlug } from '../../utilities/session/responseSessionScope.js';
+import { QuestionStanceBar } from '../Shared/QuestionStanceCard';
 import {
   buildQuestionScanProgressDisplay,
   doesQuestionProgressMatchSlug,
@@ -53,10 +52,55 @@ import { canonicalizeLegacySessionAlias } from '../../utilities/session/sessionD
  **************************************************************/
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
 import {
-  getHistoricalFigureAvatarOrBlockie,
-  getHistoricalFigureBlockie,
-} from 'utilities/ui/historicalFigureAvatars.js';
-import { createLogger } from 'utilities/logging.js';
+  DEFAULT_EXPLORATORY_CLUSTER_COUNT,
+  DEFAULT_POLIS_DEMO_DATA,
+  OPINION_GROUPS_TOOLTIP_TEXT,
+  PARTICIPANTS_GRAPH_TOOLTIP_TEXT,
+  REPORT_DEFAULT_EMBEDDING_LABEL,
+  REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT,
+  analyzeClusterOpinionsTyped,
+  applyFilterStateToAggregator,
+  buildClusterAnalysisDataKey,
+  buildPolisDemoDatasetsBySlug,
+  buildPolisReportPdfFilename,
+  buildPrecomputedDemoClusterState,
+  buildRatingMatrixFromDemo,
+  buildRatingMatrixFromRealData,
+  clusterUMAPPointsKmeansTyped,
+  d3Report,
+  doUMAPTyped,
+  formatBlockchainNetworkLabel,
+  formatSuperscriptNumber,
+  getErrorMessage,
+  getPolisDemoDatasetForSlug as getPolisDemoDatasetForSlugRuntime,
+  getPolisHistoricalParticipantAvatar,
+  getPolisHistoricalParticipantBlockie,
+  getRenderableParticipantList,
+  getUTCDataTimestamp,
+  resolveExploratoryClusterCount,
+  resolveJsPdfConstructor,
+  shouldAutoEnablePolisDemoData,
+} from './polisReportRuntime';
+export {
+  OPINION_GROUPS_TOOLTIP_TEXT,
+  PARTICIPANTS_GRAPH_TOOLTIP_TEXT,
+  REPORT_DEFAULT_EMBEDDING_LABEL,
+  REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT,
+  applyFilterStateToAggregator,
+  buildClusterAnalysisDataKey,
+  buildPolisReportPdfFilename,
+  buildPrecomputedDemoClusterState,
+  buildRatingMatrixFromDemo,
+  buildRatingMatrixFromRealData,
+  formatBlockchainNetworkLabel,
+  getPolisHistoricalParticipantAvatar,
+  getRenderableParticipantList,
+  normalizePolisBinaryVote,
+  resolveExploratoryClusterCount,
+  resolveJsPdfConstructor,
+  resolvePrecomputedClusterDifference,
+  shouldAutoEnablePolisDemoData,
+} from './polisReportRuntime';
 
 const surveyLog = createLogger('surveys');
 
@@ -2294,7 +2338,7 @@ export default function PolisReport({
               <strong>Agree:</strong> {agrees} / <strong>Disagree:</strong> {disagrees} / <strong>Unsure:</strong>{' '}
               {unsures} / (Total: {total})
             </span>
-            <PolisBoxPlot votes={votes} />
+            <QuestionStanceBar votes={votes} />
           </div>
         </div>
       );
@@ -2615,7 +2659,7 @@ export default function PolisReport({
                   : '(difference from the overall conversation is unavailable)'}
               </small>
               <div style={{ marginTop: '4px' }}>
-                <PolisBoxPlot votes={clusterVotes} />
+                <QuestionStanceBar votes={clusterVotes} />
               </div>
               {/* Compare all other clusters */}
               <div style={{ marginTop: '6px', marginBottom: '6px' }}>
@@ -2653,7 +2697,7 @@ export default function PolisReport({
                         >
                           Cluster {cl}
                         </div>
-                        <PolisBoxPlot votes={otherClusterVotes} />
+                        <QuestionStanceBar votes={otherClusterVotes} />
                       </div>
                     );
                   })}
@@ -3009,7 +3053,7 @@ export default function PolisReport({
                         <strong>Agree:</strong> {agrees}, <strong>Disagree:</strong> {disagrees},{' '}
                         <strong>Unsure:</strong> {unsures}, <strong>No Resp:</strong> {noresps}
                       </div>
-                      <PolisBoxPlot votes={rowVotes} />
+                      <QuestionStanceBar votes={rowVotes} />
                     </div>
                   );
 
@@ -3113,7 +3157,7 @@ export default function PolisReport({
                       <strong>Agree:</strong> {agrees}, <strong>Disagree:</strong> {disagrees}, <strong>Unsure:</strong>{' '}
                       {unsures}
                     </div>
-                    <PolisBoxPlot votes={rowVotes} />
+                    <QuestionStanceBar votes={rowVotes} />
                   </div>
                 );
 

@@ -35,7 +35,7 @@ import {
   encodeStancesForUser,
 } from 'utilities/survey/compareUsers.js';
 
-import { PolisQuestionHoverCard } from '../PolisReport/PolisReport';
+import { QuestionStanceCard } from '../Shared/QuestionStanceCard';
 import { createLogger } from 'utilities/logging.js';
 import { normalizeArweaveUrl } from 'utilities/arweave/arweaveUrls.js';
 import { listNamespaceEntriesSync, subscribeCacheUpdates } from '../../utilities/cache/cacheScripts.js';
@@ -2284,7 +2284,7 @@ function Venn2({
                     </div>
                   )}
                   {item.type === 'question' && (
-                    <PolisQuestionHoverCard label={label} prompt={item.prompt} votes={votes} metaLabel={metaLabel} />
+                    <QuestionStanceCard label={label} prompt={item.prompt} votes={votes} metaLabel={metaLabel} />
                   )}
                 </li>
               );
@@ -2692,7 +2692,7 @@ function Venn3({
                     </div>
                   )}
                   {item.type === 'question' && (
-                    <PolisQuestionHoverCard label={label} prompt={item.prompt} votes={votes} metaLabel={metaLabel} />
+                    <QuestionStanceCard label={label} prompt={item.prompt} votes={votes} metaLabel={metaLabel} />
                   )}
                 </li>
               );
