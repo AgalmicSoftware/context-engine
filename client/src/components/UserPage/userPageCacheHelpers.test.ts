@@ -102,7 +102,6 @@ import {
   getActiveUserPageChainNode,
   getPrioritizedUserPageChainNodes,
   getPrioritizedUserPageNetworkCacheNodes,
-  getUserPageOwnershipCountMaps,
   getUserPageGateResourceKeysToCheck,
   getUserPageErrorMessage,
   hasDisplayableUserPageResponsePayload,
@@ -140,7 +139,6 @@ import {
   readUserPageCacheSourcePresence,
   readUserPageCacheSourceSnapshot,
   readUserPageNamespaceSourceEntries,
-  readUserPageOwnershipCount,
   readUserPageAnalysisCacheEntry,
   readUserPageDirectNetworkCacheBucket,
   readUserPageNetworkCache,
@@ -156,7 +154,6 @@ import {
   resolveUserPageAnalyzeButtonDisplayState,
   resolveUserPageAvatarDisplayState,
   resolveUserPageBlockieSeed,
-  hasMeaningfulUserPageOwnershipCounts,
   resolveUserPageBookmarkButtonDisplayState,
   resolveUserPageBookmarkNickname,
   resolveUserPageBookmarkStatus,
@@ -282,37 +279,6 @@ describe('userPageCacheHelpers', () => {
     });
   });
 
-  it('reads user-page ownership count maps for viewer ownership signals', () => {
-    const entry = {
-      countsLoaded: false,
-      mintedCountByAddress: {
-        '0xabc': 2,
-      },
-      burnedCountByAddress: {
-        '0xabc': 1,
-      },
-    };
-
-    expect(getUserPageOwnershipCountMaps(entry)).toEqual({
-      mintedCountMap: { '0xabc': 2 },
-      burnedCountMap: { '0xabc': 1 },
-    });
-    expect(hasMeaningfulUserPageOwnershipCounts(entry, '0xABC')).toBe(true);
-    expect(
-      hasMeaningfulUserPageOwnershipCounts(
-        {
-          countsLoaded: true,
-          mintedCountByAddress: {},
-        },
-        '',
-      ),
-    ).toBe(true);
-    expect(hasMeaningfulUserPageOwnershipCounts({}, '0xabc')).toBe(false);
-    expect(readUserPageOwnershipCount({ '0xabc': '3' }, '0xABC')).toBe(3);
-    expect(readUserPageOwnershipCount({ '0xabc': -2 }, '0xABC')).toBe(0);
-    expect(readUserPageOwnershipCount(null, '0xABC')).toBe(0);
-  });
-
   it('applies user-page ownership signals from count maps to aggregate sets', () => {
     const mintedAggregate = {
       mintedSet: new Set<string>(),
@@ -345,6 +311,22 @@ describe('userPageCacheHelpers', () => {
     );
     expect(burnedAggregate.mintedSet.has('0xabc')).toBe(false);
     expect(burnedAggregate.burnedSet.has('0xabc')).toBe(true);
+
+    const authoritativeEmptyAggregate = {
+      mintedSet: new Set<string>(['0xabc']),
+      burnedSet: new Set<string>(['0xabc']),
+    };
+    applyUserPageOwnershipSignal(
+      authoritativeEmptyAggregate,
+      {
+        countsLoaded: true,
+        mintedCountByAddress: {},
+        burnedCountByAddress: {},
+      },
+      '0xABC',
+    );
+    expect(authoritativeEmptyAggregate.mintedSet.has('0xabc')).toBe(false);
+    expect(authoritativeEmptyAggregate.burnedSet.has('0xabc')).toBe(false);
 
     const legacyAggregate = {
       mintedSet: new Set<string>(['0xabc']),

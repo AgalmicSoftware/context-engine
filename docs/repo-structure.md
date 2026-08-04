@@ -43,6 +43,9 @@ Use it for new files, refactors, and cleanup PRs.
 
 ## 3. Non-Component Modules
 
+- Cross-feature domain contracts, ports, and pure projections belong under
+  `client/src/domains/<domain>/`; runtime primitives and broadly reusable
+  implementation helpers belong under `client/src/utilities/<domain>/`.
 - Utilities, helpers, adapters, config modules, and data loaders use camelCase filenames.
 - This applies under `client/src/utilities/` and to helper-only files that live beside a component.
 - Utility directory buckets are lowercase by domain: `ai/`, `crypto/`, `session/`, `web3/`, etc.

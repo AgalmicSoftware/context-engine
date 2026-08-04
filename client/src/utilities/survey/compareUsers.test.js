@@ -183,7 +183,7 @@ describe('buildUsersFromCaches', () => {
       expect.objectContaining({
         name: '[encrypted]',
         address: '0xSbt1',
-        compareKey: '0xsbt1',
+        compareKey: 'sbt_onchain:general:84532:0xsbt1',
       }),
     ]);
   });
@@ -223,7 +223,10 @@ describe('buildUsersFromCaches', () => {
       [],
     );
 
-    expect(sbtNameSets(users).map((set) => Array.from(set))).toEqual([['0xsbt1'], ['0xsbt2']]);
+    expect(sbtNameSets(users).map((set) => Array.from(set))).toEqual([
+      ['sbt_onchain:general:84532:0xsbt1'],
+      ['sbt_onchain:general:84532:0xsbt2'],
+    ]);
     expect(fallbackBullets(users).agreements).toEqual([]);
   });
 
@@ -279,7 +282,7 @@ describe('buildUsersFromCaches', () => {
     expect(users[0].sbts).toEqual([expect.objectContaining({ name: 'Alpha', address: '0xSbt1' })]);
   });
 
-  it('ignores checkpoint-backed partial holder counts until a full scan completes', () => {
+  it('uses checkpoint-backed partial counts only when the compared subject is present', () => {
     const users = buildUsersFromCaches(
       ['0xUser1'],
       [
@@ -310,7 +313,79 @@ describe('buildUsersFromCaches', () => {
     );
 
     expect(users).toHaveLength(1);
+    expect(users[0].sbts).toEqual([expect.objectContaining({ name: 'Alpha', address: '0xSbt1' })]);
+  });
+
+  it('lets completed empty count maps override older legacy ownership hints', () => {
+    const users = buildUsersFromCaches(
+      ['0xUser1'],
+      [
+        {
+          84532: {
+            sbtList: {
+              '0xsbt1': {
+                sbtAddress: '0xSbt1',
+                sbtInfo: { name: 'Alpha' },
+                mintedAddresses: ['0xUser1'],
+              },
+            },
+          },
+        },
+        {
+          84532: {
+            sbtList: {
+              '0xsbt1': {
+                sbtAddress: '0xSbt1',
+                sbtInfo: { name: 'Alpha' },
+                countsLoaded: true,
+                mintedCountByAddress: {},
+                burnedCountByAddress: {},
+              },
+            },
+          },
+        },
+      ],
+      [],
+      [],
+    );
+
     expect(users[0].sbts).toEqual([]);
+  });
+
+  it('keeps same-address memberships on different chains distinct', () => {
+    const users = buildUsersFromCaches(
+      ['0xUser1', '0xUser2'],
+      [
+        {
+          11155420: {
+            sbtList: {
+              '0xsbt1': {
+                sbtAddress: '0xSbt1',
+                sbtInfo: { name: 'Alpha' },
+                mintedAddresses: ['0xUser1'],
+              },
+            },
+          },
+          84532: {
+            sbtList: {
+              '0xsbt1': {
+                sbtAddress: '0xSbt1',
+                sbtInfo: { name: 'Alpha' },
+                mintedAddresses: ['0xUser2'],
+              },
+            },
+          },
+        },
+      ],
+      [],
+      [],
+      { sessionSlug: 'alpha' },
+    );
+
+    const keys = users.map((user) => Array.from(sbtNameSets([user])[0]));
+    expect(keys[0][0]).toContain(':11155420:');
+    expect(keys[1][0]).toContain(':84532:');
+    expect(fallbackBullets(users).agreements).toEqual([]);
   });
 });
 
@@ -318,6 +393,9 @@ describe('compare user pure helpers', () => {
   it('normalizes SBT labels, keys, shortened addresses, and address validity', () => {
     expect(getCompareSbtLabel({ sbtInfo: { name: '  Alpha Ring  ' } })).toBe('Alpha Ring');
     expect(getCompareSbtKey({ sbtInfo: { name: 'Alpha Ring' } })).toBe('alpha ring');
+    expect(getCompareSbtKey({ compareKey: 'Canonical:Membership', name: 'Alpha Ring' })).toBe(
+      'canonical:membership',
+    );
     expect(getCompareSbtKey({ name: '[encrypted]', address: ADDRESS_A })).toBe(ADDRESS_A);
     expect(shortenPlain('0x1234567890abcdef1234567890abcdef1234abcd')).toBe('0x1234\u2026abcd');
     expect(shortenPlain('not-an-address')).toBe('not-an-address');

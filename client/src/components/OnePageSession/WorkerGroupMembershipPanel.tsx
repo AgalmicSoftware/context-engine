@@ -24,6 +24,14 @@ import WorkerGroupImage from '../Shared/WorkerGroupImage';
 import sbtPageStyles from '../SBTs/SBTPage.module.scss';
 import SbtPageRelevantInfo from '../SBTs/SbtPageRelevantInfo';
 import sbtsPageStyles from '../SBTs/SBTsPage.module.scss';
+import WorkerGroupCard from './WorkerGroupCard';
+import { resolveWorkerGroupJoinWindowDisplay } from './workerGroupDisplayHelpers';
+import { reconcileConfirmedWorkerGroupMembership } from './workerGroupMembershipProjection';
+import {
+  buildWorkerGroupMembershipIdentity,
+  projectWorkerGroupMembership,
+  projectWorkerGroupMemberships,
+} from '../../domains/membership/membershipProjection';
 import styles from './OnePageSession.module.scss';
 
 export type WorkerGroupMembershipPanelProps = {
@@ -693,12 +701,24 @@ const WorkerGroupMembershipPanel = ({
     };
   }, [refreshNonce, reload, selectedGroupId, targetKey]);
 
-  const membershipIds = useMemo(
-    () => new Set(overview.memberships.map((membership) => membership.group.groupId)),
-    [overview.memberships],
+  const membershipIdentityKeys = useMemo(
+    () => new Set(projectWorkerGroupMemberships(overview.memberships, sessionSlug).map(({ identity }) => identity.key)),
+    [overview.memberships, sessionSlug],
   );
-  const availableGroups = overview.groups.filter((group) => !membershipIds.has(group.groupId));
-  const selectedMembership = overview.memberships.find((membership) => membership.group.groupId === selectedGroupId);
+  const availableGroups = overview.groups.filter(
+    (group) =>
+      !membershipIdentityKeys.has(
+        buildWorkerGroupMembershipIdentity({ groupId: group.groupId, sessionSlug: group.sessionSlug || sessionSlug }).key,
+      ),
+  );
+  const displayedAvailableGroups = membershipsOnly ? [] : availableGroups;
+  const selectedMembershipIdentity = buildWorkerGroupMembershipIdentity({ groupId: selectedGroupId, sessionSlug });
+  const selectedMembership = selectedGroupId
+    ? overview.memberships.find(
+        (membership) =>
+          projectWorkerGroupMembership({ membership, sessionSlug })?.identity.key === selectedMembershipIdentity.key,
+      )
+    : undefined;
   const selectedGroup = selectedMembership?.group || availableGroups.find((group) => group.groupId === selectedGroupId);
   const canViewSelectedGroupMembers = Boolean(
     workerToken &&

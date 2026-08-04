@@ -64,6 +64,8 @@ late-binding behavior.
 ## Current Domain Homes
 
 - `client/src/domains/chain/`: chain scan read ports backed by `contractScripts`.
+- `client/src/domains/membership/`: canonical session-scoped SBT and Worker
+  Group membership identity, provenance, and projection.
 - `client/src/domains/profiles/`: profile scan ports backed by `contractScripts`.
 - `client/src/domains/sbts/`: SBT metadata reads, mint execution, group mint
   authorization, admin ops, ownership reads, and event-stream ports backed by

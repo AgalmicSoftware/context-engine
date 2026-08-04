@@ -796,7 +796,7 @@ const CompareAddress = ({
     const surveysCaches = readDgObjectValues('surveysCache', activeSessionSlug);
 
     // Assemble deterministic user payloads strictly from caches (2–10 supported) via pure utility
-    const users = buildUsersFromCaches(validAddresses, sbtCaches, questionsCaches, surveysCaches);
+    const users = buildUsersFromCaches(validAddresses, sbtCaches, questionsCaches, surveysCaches, { sessionSlug: activeSessionSlug });
     setCurrentUsers(users);
 
     // Lightweight per-user summary chips
