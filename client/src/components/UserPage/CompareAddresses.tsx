@@ -49,6 +49,12 @@ import {
   scanCompareAddressesSequentially,
   selectCompareCacheValues,
 } from './compareSessionRuntime';
+import {
+  buildCompareSbtImageMap,
+  buildCompareSbtKeySets,
+  buildNicknameByAddressMap,
+  type CompareBookmark,
+} from './compareMembershipPresentation';
 
 const accountLog = createLogger('account');
 
@@ -89,14 +95,6 @@ type CompareGlobalThis = typeof globalThis & {
   CE_E2E_AI_MOCK?: boolean;
 };
 type CompareRunComparison = (addresses: string[], options?: { skipNavigate?: boolean }) => Promise<void>;
-
-interface CompareBookmark {
-  address?: string;
-  addressLower?: string;
-  nickname?: string;
-  label?: string;
-  [key: string]: unknown;
-}
 
 interface CompareSbt {
   name?: string;
@@ -326,19 +324,6 @@ const getCompareSbtKeyTyped = getCompareSbtKey as (entry?: unknown) => string;
 export const readDgObjectValues = (name: string, sessionSlug: string = ''): UnknownRecord[] =>
   selectCompareCacheValues(listNamespaceEntriesSync(name, { cloneValues: false }), sessionSlug);
 
-export const buildNicknameByAddressMap = (bookmarks: CompareBookmark[] = []): Map<string, string> => {
-  const map = new Map<string, string>();
-  (Array.isArray(bookmarks) ? bookmarks : []).forEach((entry) => {
-    const lower = String(entry?.addressLower || entry?.address || '')
-      .toLowerCase()
-      .trim();
-    const nickname = typeof entry?.nickname === 'string' ? entry.nickname.trim() : '';
-    if (!lower || !nickname || map.has(lower)) return;
-    map.set(lower, nickname);
-  });
-  return map;
-};
-
 // NEW HELPERS FOR VENN TOOLTIPS (updated to scan all group-scoped caches)
 const getQuestionPrompt = (questionId: string, sessionSlug: string = ''): string => {
   try {
@@ -534,32 +519,6 @@ const buildQuestionEntries = (
     });
   });
   return Array.from(map.values());
-};
-
-export const buildCompareSbtKeySets = (users: CompareUser[] = []): Set<string>[] =>
-  (users || []).map((u) => {
-    const set = new Set<string>();
-    (u?.sbts || []).forEach((s: CompareSbt) => {
-      const key = resolveSbtCompareKeyForEntry(s);
-      if (key) set.add(key);
-    });
-    return set;
-  });
-
-export const buildCompareSbtImageMap = (
-  users: CompareUser[] = [],
-): Map<string, { name: string; image: string | null }> => {
-  const m = new Map<string, { name: string; image: string | null }>();
-  (Array.isArray(users) ? users : []).forEach((u) => {
-    (Array.isArray(u?.sbts) ? u.sbts : []).forEach((s: CompareSbt) => {
-      const key = resolveSbtCompareKeyForEntry(s);
-      if (!key) return;
-      const image = s?.image || s?.sbtInfo?.image || s?.imageUrl || null;
-      const prettyName = resolveSbtDisplayNameForCompareEntry(s) || key;
-      if (!m.has(key)) m.set(key, { name: prettyName, image: image || null });
-    });
-  });
-  return m;
 };
 
 const CompareAddress = ({

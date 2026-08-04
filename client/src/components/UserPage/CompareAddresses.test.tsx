@@ -1,10 +1,7 @@
 /** @file CompareAddresses.test.tsx */
 import {
-  buildCompareSbtImageMap,
-  buildCompareSbtKeySets,
   buildCompareClassName,
   buildCompareProfileHref,
-  buildNicknameByAddressMap,
   readDgObjectValues,
   resolveCompareAddressBlockieStyle,
   resolveCompareAddressPillContentStyle,
@@ -29,6 +26,11 @@ import {
   resolveCompareVennWrapStyle,
   resolveCompareVisualSectionStyle,
 } from './CompareAddresses';
+import {
+  buildCompareSbtImageMap,
+  buildCompareSbtKeySets,
+  buildNicknameByAddressMap,
+} from './compareMembershipPresentation';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 
 jest.mock('../../utilities/cache/cacheScripts.js', () => ({
