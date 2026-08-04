@@ -30,7 +30,9 @@ All notable changes to this project will be documented in this file.
 - Moved the Community, Polis, and demographic-comparison question beeswarms
   onto a reusable renderer with explicit consumer-owned metric/domain labels,
   named force/stacked layouts, stable-key hover state, and
-  keyboard/click-pinned detail cards.
+  keyboard/click-pinned detail cards. Community's live and demo paths also
+  share one result-to-point projection so their counts and fallbacks cannot
+  drift.
 - Clarified the repository boundary between canonical Worker source,
   Cloudflare-native deployment packages, local bundle output, immutable CI
   bundle releases, and the stripped public-source snapshot. Release docs now

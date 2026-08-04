@@ -49,6 +49,7 @@ import { t } from '../../utilities/ui/terminology.js';
 import { POLIS_DEMO_DATA_AUTOLOAD_SLUGS } from '../../variables/appConfig.js';
 import { getPolisDemoDatasetForSlug } from '../PolisReport/PolisReport';
 import { persistCommunitySbtHolderHydrationResults } from './communitySbtHolderHydrationCache.js';
+import { buildCommunityBeeswarmPointsFromResults } from './communityBeeswarmPoints';
 
 const uiLog = createLogger('ui');
 const COMMUNITY_BEESWARM_DEMO_SLUG = 'demo';
@@ -1584,25 +1585,13 @@ class CommunityTab extends Component<any, any> {
       });
     });
 
-    return computeQuestionDivisiveness(ratingMatrix).map((result: any) => {
-      const comment = (binaryComments[result.commentIndex] || {}) as {
-        commentId?: unknown;
-        commentBody?: unknown;
-      };
-      const rowVotes = Array.isArray(ratingMatrix[result.commentIndex]) ? ratingMatrix[result.commentIndex] : [];
-      const unsure = rowVotes.filter((vote: any) => vote === 0).length;
-      const total = result.agrees + result.disagrees + unsure;
-      return {
-        index: result.commentIndex,
-        questionId: String(comment.commentId || result.commentIndex),
-        // The shared renderer receives a neutral scalar; this consumer defines it as 50/50-split divisiveness.
-        value: result.divisiveness,
-        label: String(comment.commentBody || '(No prompt)'),
-        agrees: result.agrees,
-        disagrees: result.disagrees,
-        unsure,
-        total,
-      };
+    return buildCommunityBeeswarmPointsFromResults({
+      questions: binaryComments.map((comment: any, index: number) => ({
+        label: String(comment?.commentBody || '(No prompt)'),
+        questionId: String(comment?.commentId || index),
+      })),
+      ratingMatrix,
+      results: computeQuestionDivisiveness(ratingMatrix),
     });
   };
 
@@ -1709,23 +1698,13 @@ class CommunityTab extends Component<any, any> {
       });
     });
 
-    return computeQuestionDivisiveness(ratingMatrix).map((result: any) => {
-      const questionId = binaryQuestionIds[result.commentIndex];
-      const question = questionMap.get(questionId) || {};
-      const rowVotes = Array.isArray(ratingMatrix[result.commentIndex]) ? ratingMatrix[result.commentIndex] : [];
-      const unsure = rowVotes.filter((vote: any) => vote === 0).length;
-      const total = result.agrees + result.disagrees + unsure;
-      return {
-        index: result.commentIndex,
+    return buildCommunityBeeswarmPointsFromResults({
+      questions: binaryQuestionIds.map((questionId: any) => ({
+        label: questionMap.get(questionId)?.prompt || '(No prompt)',
         questionId,
-        // The shared renderer receives a neutral scalar; this consumer defines it as 50/50-split divisiveness.
-        value: result.divisiveness,
-        label: question.prompt || '(No prompt)',
-        agrees: result.agrees,
-        disagrees: result.disagrees,
-        unsure,
-        total,
-      };
+      })),
+      ratingMatrix,
+      results: computeQuestionDivisiveness(ratingMatrix),
     });
   };
 
