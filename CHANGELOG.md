@@ -25,6 +25,8 @@ All notable changes to this project will be documented in this file.
   use stable corpus question IDs; the UI names each source and session, skips
   chain/cache waiting for simulation-only comparisons, and suppresses opinion
   or membership sections when their evidence is not canonically compatible.
+  Related simulated-persona cards now offer a canonical compare action while
+  retaining their existing profile links.
 - Moved the Community, Polis, and demographic-comparison question beeswarms
   onto a reusable renderer with explicit consumer-owned metric/domain labels,
   named force/stacked layouts, stable-key hover state, and

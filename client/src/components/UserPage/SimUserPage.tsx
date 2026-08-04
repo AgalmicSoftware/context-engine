@@ -11,13 +11,13 @@ import {
   getHistoricalFigureAvatarOrBlockie,
   getHistoricalFigureBlockie,
 } from '../../utilities/ui/historicalFigureAvatars.js';
-import { buildAtlasNodeRoute, buildPublicRoute, readWindowLocationPath } from '../../utilities/ui/publicUrl.js';
+import { buildAtlasNodeRoute, readWindowLocationPath } from '../../utilities/ui/publicUrl.js';
 import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse';
+import SimRelatedFigure from './SimRelatedFigure';
 import {
   buildSimFullProfileModalStatePatch,
   buildSimUserInfoStatePatch,
   buildSimUserPageRootClassName,
-  buildSimUserRelatedScoreClassName,
   buildSimUserVoteIndicatorClassName,
   resolveSimUserStanceMarkerStyle,
 } from './simUserPageHelpers';
@@ -451,23 +451,17 @@ class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
                     {allies.length > 0 && (
                       <div className={styles.relatedGroup}>
                         <h3 className={styles.relatedLabel}>Most Agreement</h3>
-                        {allies.map((a, i) => {
+                        {allies.map((a) => {
                           const allyInfo = historicalFiguresData.find((f) => f.username === a.username);
-                          const allyAvatar = getHistoricalFigureAvatarOrBlockie(a.username, {
-                            preferBlockie: false,
-                            fallbackSeed: a.username,
-                          });
                           return (
-                            <a key={i} href={buildPublicRoute(`/su/${a.username}`)} className={styles.relatedFigure}>
-                              <img
-                                src={allyAvatar}
-                                alt={a.username}
-                                className={styles.relatedAvatar}
-                                onError={(event) => this.handleHistoricalAvatarError(event, a.username, a.username)}
-                              />
-                              <span className={styles.relatedName}>{allyInfo?.name || a.username}</span>
-                              <span className={styles.relatedScore}>+{a.agree}</span>
-                            </a>
+                            <SimRelatedFigure
+                              key={a.username}
+                              currentDisplayName={userInfo.name}
+                              currentUsername={userInfo.username}
+                              displayName={allyInfo?.name || a.username}
+                              score={`+${a.agree}`}
+                              username={a.username}
+                            />
                           );
                         })}
                       </div>
@@ -475,30 +469,18 @@ class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
                     {opponents.length > 0 && (
                       <div className={styles.relatedGroup}>
                         <h3 className={styles.relatedLabel}>Most Disagreement</h3>
-                        {opponents.map((o, i) => {
+                        {opponents.map((o) => {
                           const oppInfo = historicalFiguresData.find((f) => f.username === o.username);
-                          const oppAvatar = getHistoricalFigureAvatarOrBlockie(o.username, {
-                            preferBlockie: false,
-                            fallbackSeed: o.username,
-                          });
                           return (
-                            <a key={i} href={buildPublicRoute(`/su/${o.username}`)} className={styles.relatedFigure}>
-                              <img
-                                src={oppAvatar}
-                                alt={o.username}
-                                className={styles.relatedAvatar}
-                                onError={(event) => this.handleHistoricalAvatarError(event, o.username, o.username)}
-                              />
-                              <span className={styles.relatedName}>{oppInfo?.name || o.username}</span>
-                              <span
-                                className={buildSimUserRelatedScoreClassName({
-                                  baseClassName: styles.relatedScore,
-                                  disagreeClassName: styles.disagree,
-                                })}
-                              >
-                                {o.disagree}
-                              </span>
-                            </a>
+                            <SimRelatedFigure
+                              key={o.username}
+                              currentDisplayName={userInfo.name}
+                              currentUsername={userInfo.username}
+                              displayName={oppInfo?.name || o.username}
+                              score={String(o.disagree)}
+                              tone="disagree"
+                              username={o.username}
+                            />
                           );
                         })}
                       </div>

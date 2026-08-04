@@ -623,8 +623,16 @@ $warning: #ffd166;
   letter-spacing: 0.06em;
 }
 
+.relatedFigureRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .relatedFigure {
   display: flex;
+  flex: 1;
+  min-width: 0;
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
@@ -635,6 +643,25 @@ $warning: #ffd166;
 
   &:hover {
     background: rgba(255, 255, 255, 0.06);
+    color: white;
+    text-decoration: none;
+  }
+}
+
+.relatedCompareLink {
+  flex-shrink: 0;
+  padding: 6px 8px;
+  border: 1px solid rgba(77, 255, 164, 0.45);
+  border-radius: var(--ce-radius-8);
+  color: var(--ce-color-accent);
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-decoration: none;
+
+  &:hover,
+  &:focus-visible {
+    background: rgba(77, 255, 164, 0.12);
+    border-color: var(--ce-color-accent);
     color: white;
     text-decoration: none;
   }

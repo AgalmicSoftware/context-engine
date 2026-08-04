@@ -120,6 +120,12 @@ describe('SimUserPage', () => {
         /^\/ce\/su\//.test(link.getAttribute('href') || ''),
       );
       expect(profileLinks.length).toBeGreaterThan(0);
+
+      const compareLinks = screen.getAllByRole('link', { name: /^Compare Benjamin Franklin with / });
+      expect(compareLinks.length).toBeGreaterThan(0);
+      compareLinks.forEach((link) => {
+        expect(link.getAttribute('href')).toMatch(/^\/ce\/compare\?subject=sim%3AFranklin&subject=sim%3A[^&]+$/);
+      });
     } finally {
       window.history.replaceState({}, '', priorUrl);
       if (previousPublicUrl === undefined) delete mutableEnv.PUBLIC_URL;
@@ -141,6 +147,21 @@ describe('SimUserPage', () => {
       expect(toDataURL).toHaveBeenCalledWith('image/png');
     } finally {
       createElementSpy.mockRestore();
+    }
+  });
+
+  it('preserves explicit session context in simulated comparison links', async () => {
+    const priorUrl = window.location.href;
+    try {
+      window.history.replaceState({}, '', '/su/Franklin?session=Worker-Session');
+      render(<SimUserPage simUsername="Franklin" />);
+
+      const compareLinks = await screen.findAllByRole('link', { name: /^Compare Benjamin Franklin with / });
+      expect(compareLinks[0].getAttribute('href')).toMatch(
+        /^\/compare\?subject=sim%3AFranklin&subject=sim%3A[^&]+&session=Worker-Session$/,
+      );
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
     }
   });
 
