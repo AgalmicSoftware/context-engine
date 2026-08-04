@@ -18,7 +18,9 @@ All notable changes to this project will be documented in this file.
   overriding region counts or evidence. SBT comparison and profile ownership
   now share session + chain + contract identity and one count-provenance rule;
   native Worker Groups use the same projection contract with session + group
-  identity.
+  identity. Canonical compare URLs now use repeated `subject=` parameters with
+  explicit `wallet:`, `worker:`, and `sim:` tokens; legacy address-path links
+  normalize through the same route contract.
 - Moved the Community, Polis, and demographic-comparison question beeswarms
   onto a reusable renderer with explicit consumer-owned metric/domain labels,
   named force/stacked layouts, stable-key hover state, and

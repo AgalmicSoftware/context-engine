@@ -74,6 +74,7 @@ import {
   type CompareBookmark,
 } from './compareMembershipPresentation';
 import CompareVenn from './CompareVenn';
+import { resolveCompareRouteSubjects } from './compareSubjectContract';
 
 const accountLog = createLogger('account');
 
@@ -551,16 +552,15 @@ const CompareAddress = ({
   const runComparisonRef = useRef<CompareRunComparison | null>(null);
 
   useEffect(() => {
-    // Extract addresses from the URL or use firstAddress
-    const pathPart = location.pathname.split('/compare/')[1];
-    const pathAddresses = pathPart
-      ? pathPart
-          .split('&')
-          .map((s) => s.trim())
-          .filter(Boolean)
-      : null;
+    const pathAddresses = resolveCompareRouteSubjects({
+      firstSubject: firstAddress,
+      pathname: location.pathname,
+      search: location.search,
+    })
+      .filter((subject) => subject.kind === 'wallet')
+      .map((subject) => subject.id);
 
-    if (pathAddresses && pathAddresses.length > 0) {
+    if (pathAddresses.length > 0) {
       setCompareAddresses(pathAddresses);
       const hasTwo = pathAddresses.length > 1;
       setShowComparison(hasTwo || location.pathname.includes('&'));
@@ -577,7 +577,7 @@ const CompareAddress = ({
       setCompareAddresses([firstAddress || '', '']);
       setShowComparison(false);
     }
-  }, [firstAddress, location.pathname]);
+  }, [firstAddress, location.pathname, location.search]);
 
   const isE2eAutofillDisabled = React.useCallback(() => {
     try {

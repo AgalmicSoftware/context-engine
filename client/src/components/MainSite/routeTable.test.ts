@@ -46,6 +46,8 @@ describe('MainSite route table', () => {
     ['/groups/new/', 'sbtCreate', {}],
     [`/sbt/${ADDRESS}`, 'sbtDetail', { sbtAddress: ADDRESS }],
     ['/group/public-reviewers', 'sbtsList', { sbtAddress: null }],
+    ['/compare?subject=sim%3AFranklin&subject=sim%3AFDR', 'compare', {}],
+    [`/compare/${ADDRESS}&0x${'2'.repeat(40)}?session=edge`, 'compare', {}],
     [`/u/${ADDRESS}`, 'userProfile', {}],
     ['/admin', 'admin', {}],
     ['/sponsor', 'sponsor', {}],

@@ -22,13 +22,17 @@ describe('compare session runtime', () => {
   });
 
   it('keeps the active session and existing safe query state in comparison URLs', () => {
+    const addressA = `0x${'a'.repeat(40)}`;
+    const addressB = `0x${'b'.repeat(40)}`;
     expect(
       buildCompareRoutePath({
-        addresses: ['0xabc', '0xdef'],
+        addresses: [addressA, addressB],
         sessionSlug: 'Worker-Session',
         search: '?agent=1',
       }),
-    ).toBe('/compare/0xabc&0xdef?agent=1&session=Worker-Session');
+    ).toBe(
+      `/compare?agent=1&subject=${encodeURIComponent(`wallet:${addressA}`)}&subject=${encodeURIComponent(`wallet:${addressB}`)}&session=Worker-Session`,
+    );
   });
 
   it('selects only the active session cache when a session is resolved', () => {

@@ -112,7 +112,7 @@ const routeDefinitions: RouteDefinition[] = [
   },
   {
     key: 'compare',
-    match: ({ fullPath }) => fullPath === '/compare' || fullPath === '/compare/' || fullPath.startsWith('/compare/'),
+    match: ({ pathWithoutQuery }) => isOnOrWithinRoutePath(pathWithoutQuery, '/compare'),
   },
   {
     key: 'surveysOrQuestionsList',
