@@ -895,6 +895,67 @@ test('stale duplicate member removal cannot release the same durable capacity tw
 	assert.equal((await overflow.json()).reason, 'worker_group_member_cap_exceeded');
 });
 
+test('failed member removal restores durable membership for retry', async () => {
+	const kv = createWorkerGroupKv();
+	const env = {
+		CE_WORKER_GROUPS_KV: kv,
+		CE_WORKER_GROUPS_BOOTSTRAP: 'fresh-template-v2',
+	};
+	const actorPrincipal = {
+		kind: 'evm_address',
+		address: '0x0000000000000000000000000000000000000abc',
+	};
+	const member = { kind: 'telegram', principalId: 'member-a' };
+	const coordinator = new SessionWriteCoordinator(createTransactionalState().state, env);
+	const mutate = (operation, overrides = {}) =>
+		coordinator.fetch(
+			createCoordinatorRequest('/worker-groups/mutate', {
+				slug: 'session-a',
+				operation,
+				groupId: 'reviewers',
+				actorPrincipal,
+				...overrides,
+			}),
+		);
+	assert.equal(
+		(
+			await mutate('create', {
+				input: {
+					groupId: 'reviewers',
+					label: 'Reviewers',
+					joinMode: 'admin_add',
+					memberVisibility: 'members',
+				},
+			})
+		).status,
+		200,
+	);
+	assert.equal((await mutate('add-member', { principal: member })).status, 200);
+
+	const memberKey = [...kv.values.keys()].find(
+		(key) => key.startsWith('ce-worker-group-member:session-a:') && key.includes(':reviewers:'),
+	);
+	assert.ok(memberKey);
+	const memberProjection = kv.values.get(memberKey);
+	kv.values.delete(memberKey);
+
+	const failedRemoval = await mutate('remove-member', { principal: member });
+	assert.equal(failedRemoval.status, 404);
+	assert.equal((await failedRemoval.json()).reason, 'worker_group_member_not_found');
+
+	const memberships = await coordinator.fetch(
+		createCoordinatorRequest('/worker-groups/memberships', {
+			slug: 'session-a',
+			principal: member,
+		}),
+	);
+	assert.equal(memberships.status, 200);
+	assert.deepEqual((await memberships.json()).groups.map(({ groupId }) => groupId), ['reviewers']);
+
+	kv.values.set(memberKey, memberProjection);
+	assert.equal((await mutate('remove-member', { principal: member })).status, 200);
+});
+
 test('Durable Object authorization denies stale KV membership after remove and delete', async () => {
 	const kv = createWorkerGroupKv();
 	const env = installWorkerGroupCoordinatorBinding({

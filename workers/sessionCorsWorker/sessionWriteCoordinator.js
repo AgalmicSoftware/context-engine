@@ -653,6 +653,17 @@ export class SessionWriteCoordinator {
     });
   }
 
+  async rollbackWorkerGroupMemberRemoval({ memberKey }) {
+    await this.state.storage.transaction(async (transaction) => {
+      const memberState = await transaction.get(memberKey);
+      if (memberState?.state !== 'removing') return;
+      await transaction.put(memberKey, {
+        version: 2,
+        state: 'active',
+      });
+    });
+  }
+
   async releaseWorkerGroupMemberSlot({ groupId, memberKey }) {
     await this.state.storage.transaction(async (transaction) => {
       const groupKey = workerGroupCapacityGroupKey(groupId);
@@ -1059,6 +1070,11 @@ export class SessionWriteCoordinator {
           await this.rollbackWorkerGroupMemberSlot({
             groupId: mutation.groupId,
             memberKey: memberReservation.memberKey,
+          });
+        }
+        if (removalReservation?.ok) {
+          await this.rollbackWorkerGroupMemberRemoval({
+            memberKey: removalReservation.memberKey,
           });
         }
         return jsonResponse(result, result.status || 400);

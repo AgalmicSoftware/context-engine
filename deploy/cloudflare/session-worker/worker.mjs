@@ -65301,6 +65301,16 @@ var SessionWriteCoordinator = class {
       return { ok: true, memberKey: memberKey2 };
     });
   }
+  async rollbackWorkerGroupMemberRemoval({ memberKey: memberKey2 }) {
+    await this.state.storage.transaction(async (transaction) => {
+      const memberState = await transaction.get(memberKey2);
+      if (memberState?.state !== "removing") return;
+      await transaction.put(memberKey2, {
+        version: 2,
+        state: "active"
+      });
+    });
+  }
   async releaseWorkerGroupMemberSlot({ groupId, memberKey: memberKey2 }) {
     await this.state.storage.transaction(async (transaction) => {
       const groupKey2 = workerGroupCapacityGroupKey(groupId);
@@ -65666,6 +65676,11 @@ var SessionWriteCoordinator = class {
           await this.rollbackWorkerGroupMemberSlot({
             groupId: mutation.groupId,
             memberKey: memberReservation.memberKey
+          });
+        }
+        if (removalReservation?.ok) {
+          await this.rollbackWorkerGroupMemberRemoval({
+            memberKey: removalReservation.memberKey
           });
         }
         return jsonResponse2(result, result.status || 400);
