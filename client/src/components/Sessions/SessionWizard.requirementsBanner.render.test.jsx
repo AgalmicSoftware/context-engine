@@ -156,7 +156,7 @@ describe('SessionWizard new-session requirements banner', () => {
     expect(screen.queryByText('OP Sepolia ETH for on-chain registration')).not.toBeInTheDocument();
   });
 
-  it('keeps decentralized Worker requirements visible after applying a resource-only sponsored bundle', async () => {
+  it('covers decentralized Worker requirements only when sponsored auto-deploy is ready', async () => {
     window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id');
 
     renderSessionWizard({
@@ -170,6 +170,14 @@ describe('SessionWizard new-session requirements banner', () => {
     );
     expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
     expect(screen.getByText(/compatible Session Worker/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+      target: { value: 'Sponsored decentralized session' },
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: /to create a session you'll need:/i })).not.toBeInTheDocument();
+    });
   });
 
   it('hides Cloudflare requirements when a sponsored bundle covers setup requirements', async () => {

@@ -197,7 +197,7 @@ describe('sessionWizardRequirementsDisplay', () => {
     });
   });
 
-  it('keeps the decentralized Worker requirement visible until a compatible runtime is attached', () => {
+  it('keeps the decentralized Worker requirement visible until a runtime is attached or deploy-ready', () => {
     const baseInput = {
       currentWorkerSecrets: {
         openaiKey: 'provider-secret',
@@ -205,7 +205,10 @@ describe('sessionWizardRequirementsDisplay', () => {
       },
       hasSponsoredBundleLink: true,
       isNewSessionWizardRoute: true,
-      normalizedAppliedSponsoredBundle: { faucetGrantToken: 'funding-grant' },
+      normalizedAppliedSponsoredBundle: {
+        faucetGrantToken: 'funding-grant',
+        deployGrantToken: 'raw-deploy-grant',
+      },
       sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
       sponsoredBundleStatus: { tone: 'success' },
     };
@@ -221,6 +224,18 @@ describe('sessionWizardRequirementsDisplay', () => {
       resolveSessionWizardNewSessionRequirementsDisplayState({
         ...baseInput,
         hasCompatibleWorkerRuntime: true,
+      }),
+    ).toMatchObject({
+      hasNewSessionDeployRequirementCovered: true,
+      showNewSessionRequirementsBanner: false,
+      sponsoredBundleCoversNewSessionRequirements: true,
+      sponsoredBundleOwnsNewSessionEntryFlow: true,
+    });
+
+    expect(
+      resolveSessionWizardNewSessionRequirementsDisplayState({
+        ...baseInput,
+        canUseSponsoredAutoDeployNow: true,
       }),
     ).toMatchObject({
       hasNewSessionDeployRequirementCovered: true,

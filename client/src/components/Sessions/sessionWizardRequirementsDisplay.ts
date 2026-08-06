@@ -5,6 +5,7 @@ import { resolveSessionWizardResourceSecretFields } from './sessionWizardResourc
 type SessionWizardRecord = Record<string, unknown>;
 
 type ResolveSessionWizardNewSessionRequirementsDisplayStateArgs = {
+  canUseSponsoredAutoDeployNow?: unknown;
   cloudflareWorkerSbtGateMode?: unknown;
   currentWorkerSecrets?: SessionWizardRecord | null;
   hasCompatibleWorkerRuntime?: unknown;
@@ -40,6 +41,7 @@ type SessionWizardNewSessionRequirementsDisplayState = {
 const toRequirementString = (value: unknown): string => String(value ?? '');
 
 export const resolveSessionWizardNewSessionRequirementsDisplayState = ({
+  canUseSponsoredAutoDeployNow = false,
   cloudflareWorkerSbtGateMode = false,
   currentWorkerSecrets = null,
   hasCompatibleWorkerRuntime = false,
@@ -89,7 +91,7 @@ export const resolveSessionWizardNewSessionRequirementsDisplayState = ({
   );
   const requiresSessionWorker = modeRequirements.requiredRequirementIds.includes('sessionWorker');
   const hasNewSessionDeployRequirementCovered = requiresSessionWorker
-    ? !!hasCompatibleWorkerRuntime
+    ? !!hasCompatibleWorkerRuntime || !!canUseSponsoredAutoDeployNow
     : (modeRequirements.selected && !requiresCloudflareDeploy) ||
       !!toRequirementString(normalizedAppliedSponsoredBundle?.deployGrantToken).trim();
   const sponsoredBundleCoversNewSessionRequirements =

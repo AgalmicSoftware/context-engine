@@ -4418,6 +4418,7 @@ const SessionWizard = ({
     requiredRequirementIds,
     showNewSessionRequirementsBanner,
   } = resolveSessionWizardNewSessionRequirementsDisplayState({
+      canUseSponsoredAutoDeployNow,
       cloudflareWorkerSbtGateMode,
       currentWorkerSecrets,
       hasCompatibleWorkerRuntime: publishUiPlan.publishReadiness.canUploadMetadataNow,
