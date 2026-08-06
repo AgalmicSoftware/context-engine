@@ -1369,6 +1369,27 @@ describe('AppShell route render smoke', () => {
     subject.componentWillUnmount();
   });
 
+  it('does not fall back to session storage when local storage is unavailable', async () => {
+    const subject = stubMainSiteMountSideEffects(createSubject({ path: '/', firstVisit: true }));
+    const replaceStateSpy = jest.spyOn(window.history, 'replaceState');
+    const localStorageGetterSpy = jest.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
+      throw new Error('localStorage unavailable');
+    });
+
+    try {
+      await act(async () => {
+        await subject.componentDidMount();
+      });
+
+      expect(replaceStateSpy).not.toHaveBeenCalledWith({}, '', '/about');
+      expect(window.location.pathname).toBe('/');
+      expect(window.sessionStorage.getItem(FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY)).toBeNull();
+    } finally {
+      localStorageGetterSpy.mockRestore();
+      subject.componentWillUnmount();
+    }
+  });
+
   it('preserves cached direct session loads and later refreshes', async () => {
     const subject = stubMainSiteMountSideEffects(
       createSubject({
