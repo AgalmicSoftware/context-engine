@@ -1049,11 +1049,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     try {
       return window.localStorage;
     } catch (_) {
-      try {
-        return window.sessionStorage;
-      } catch (__) {
-        return null;
-      }
+      return null;
     }
   };
 
@@ -2361,14 +2357,14 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       const aboutRedirectTarget = this.getTemporaryInitialLoadAboutRedirectTarget(currentPath);
       if (
         aboutRedirectTarget?.path &&
-        this.normalizeRoutePath(currentPath) !== aboutRedirectTarget.path
+        this.normalizeRoutePath(currentPath) !== aboutRedirectTarget.path &&
+        this.consumeOneTimeFirstVisitRootRedirect()
       ) {
         window.history.replaceState(
           {},
           '',
           buildPublicUrl(aboutRedirectTarget.path, window.location.search || '', window.location.hash || ''),
         );
-        this.consumeOneTimeFirstVisitRootRedirect();
         didRedirectInitialLoadToAbout = true;
       }
     }

@@ -256,6 +256,34 @@ describe('sessionFallbackRedirect', () => {
       expect(shouldForceOneTimeFirstVisitRootRedirect(null)).toBe(false);
       expect(consumeOneTimeFirstVisitRootRedirect(null)).toBe(false);
     });
+
+    it('requires the primary marker to be readable after writing it', () => {
+      const storage = {
+        getItem: jest.fn((_key: string) => null),
+        setItem: jest.fn(),
+      };
+
+      expect(consumeOneTimeFirstVisitRootRedirect(storage)).toBe(false);
+      expect(storage.getItem).toHaveBeenCalledWith(FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY);
+    });
+
+    it('keeps legacy onboarding updates best effort after primary persistence', () => {
+      const values = new Map<string, string>();
+      const storage = {
+        getItem: jest.fn((key: string) => values.get(key) || null),
+        setItem: jest.fn((key: string, value: string) => {
+          if (key === 'firstVisit') throw new Error('legacy storage blocked');
+          values.set(key, value);
+        }),
+      };
+
+      expect(
+        consumeOneTimeFirstVisitRootRedirect(storage, {
+          firstVisitStorageKey: 'firstVisit',
+        }),
+      ).toBe(true);
+      expect(values.get(FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY)).toBe('true');
+    });
   });
 
   describe('getSessionFallbackRedirectStorageKey', () => {

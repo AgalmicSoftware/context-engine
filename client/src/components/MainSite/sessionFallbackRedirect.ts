@@ -181,13 +181,17 @@ export const consumeOneTimeFirstVisitRootRedirect = (
 
   try {
     storage.setItem(FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY, 'true');
-    if (deps.firstVisitStorageKey) {
-      storage.setItem(deps.firstVisitStorageKey, 'false');
-    }
-    return true;
+    if (storage.getItem(FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY) !== 'true') return false;
   } catch (_) {
     return false;
   }
+
+  if (deps.firstVisitStorageKey) {
+    try {
+      storage.setItem(deps.firstVisitStorageKey, 'false');
+    } catch (_) {}
+  }
+  return true;
 };
 
 export const getSessionFallbackRedirectStorageKey = (

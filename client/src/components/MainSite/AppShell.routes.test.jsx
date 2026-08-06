@@ -1294,6 +1294,81 @@ describe('AppShell route render smoke', () => {
     subject.componentWillUnmount();
   });
 
+  it('persists and reads the primary marker before replacing the root URL', async () => {
+    const subject = stubMainSiteMountSideEffects(createSubject({ path: '/', firstVisit: true }));
+    const order = [];
+    const values = new Map();
+    const storage = {
+      getItem: jest.fn((key) => values.get(key) || null),
+      setItem: jest.fn((key, value) => {
+        order.push(`set:${key}`);
+        values.set(key, value);
+      }),
+    };
+    subject.getFirstVisitRootRedirectStorage = jest.fn(() => storage);
+    const originalReplaceState = window.history.replaceState.bind(window.history);
+    const replaceStateSpy = jest.spyOn(window.history, 'replaceState').mockImplementation((...args) => {
+      order.push('replace');
+      return originalReplaceState(...args);
+    });
+
+    await act(async () => {
+      await subject.componentDidMount();
+    });
+
+    expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/about');
+    expect(order.indexOf(`set:${FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY}`)).toBeLessThan(
+      order.indexOf('replace'),
+    );
+    expect(storage.getItem).toHaveBeenCalledWith(FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY);
+    subject.componentWillUnmount();
+
+    const refreshedSubject = stubMainSiteMountSideEffects(createSubject({ path: '/', firstVisit: true }));
+    refreshedSubject.getFirstVisitRootRedirectStorage = jest.fn(() => storage);
+    replaceStateSpy.mockClear();
+
+    await act(async () => {
+      await refreshedSubject.componentDidMount();
+    });
+
+    expect(replaceStateSpy).not.toHaveBeenCalledWith({}, '', '/about');
+    expect(window.location.pathname).toBe('/');
+    refreshedSubject.componentWillUnmount();
+  });
+
+  it('skips the root redirect when durable storage is readable but unwritable', async () => {
+    const subject = stubMainSiteMountSideEffects(createSubject({ path: '/', firstVisit: true }));
+    subject.getFirstVisitRootRedirectStorage = jest.fn(() => ({
+      getItem: jest.fn(() => null),
+      setItem: jest.fn(() => {
+        throw new Error('storage blocked');
+      }),
+    }));
+    const replaceStateSpy = jest.spyOn(window.history, 'replaceState');
+
+    await act(async () => {
+      await subject.componentDidMount();
+    });
+
+    expect(replaceStateSpy).not.toHaveBeenCalledWith({}, '', '/about');
+    expect(window.location.pathname).toBe('/');
+    subject.componentWillUnmount();
+  });
+
+  it('skips the root redirect when durable storage is unavailable', async () => {
+    const subject = stubMainSiteMountSideEffects(createSubject({ path: '/', firstVisit: true }));
+    subject.getFirstVisitRootRedirectStorage = jest.fn(() => null);
+    const replaceStateSpy = jest.spyOn(window.history, 'replaceState');
+
+    await act(async () => {
+      await subject.componentDidMount();
+    });
+
+    expect(replaceStateSpy).not.toHaveBeenCalledWith({}, '', '/about');
+    expect(window.location.pathname).toBe('/');
+    subject.componentWillUnmount();
+  });
+
   it('preserves cached direct session loads and later refreshes', async () => {
     const subject = stubMainSiteMountSideEffects(
       createSubject({
