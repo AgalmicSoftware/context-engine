@@ -210,3 +210,11 @@ test('release guidance documents staging version and ratchet floors', () => {
   );
   assert.match(guide, /If public `main` has advanced beyond the prior staging tip/);
 });
+
+test('release guidance documents public tag provenance checks', () => {
+  const guide = fs.readFileSync(new URL('../docs/releasing.md', import.meta.url), 'utf8');
+
+  assert.match(guide, /queries the protected remote for public tag\s+refs/);
+  assert.match(guide, /fails closed when public tag history is unavailable/);
+  assert.match(guide, /A local-only tag\s+does not prove that a source commit is public/);
+});
