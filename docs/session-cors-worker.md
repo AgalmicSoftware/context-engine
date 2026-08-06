@@ -810,8 +810,11 @@ Implemented routes:
   It returns only redacted, session-visible group metadata. The request must
   include the exact session slug header and canonical session ID. With a Worker
   credential, `GET` remains the authenticated member route and additionally
-  returns member-visible groups for the caller. Authenticated `POST` remains
-  supported. `groupCreationPolicy` does not affect discovery.
+  returns member-visible groups for the caller. Authenticated participant and
+  Admin lists include the coordinator's current `memberCount` only after the
+  caller passes that group's visibility check; unsigned discovery never
+  includes it. Authenticated `POST` remains supported. `groupCreationPolicy`
+  does not affect discovery.
 - `GET|POST /groups/my-memberships`: authenticated self view. A principal can
   always see its own memberships. The complete set comes from the Durable
   Object, while KV supplies the required readable projection. Each row includes
@@ -843,9 +846,10 @@ The client presents a selected Worker Group with the same high-level detail
 hierarchy as an on-chain SBT where the concepts apply: **Stats**, **Actions**,
 and **More**. Worker-native terms remain explicit. Stats show the member limit
 and a live join-deadline countdown (or an infinity icon/no deadline). The
-current member count comes from an authenticated self-membership or an
-authorized member-list response. When the configured visibility permits it, a
-user icon opens the same style of member browser used for on-chain SBT holders.
+current member count comes from an authenticated permission-visible group list,
+self-membership, or authorized member-list response. When the configured
+visibility permits it, a user icon opens the same style of member browser used
+for on-chain SBT holders.
 Actions use Join/Leave rather than Mint/Burn. More renders the group's
 validated public document references and tags. Contract address, network, gas,
 transaction, and burn controls are never synthesized for a Worker-native

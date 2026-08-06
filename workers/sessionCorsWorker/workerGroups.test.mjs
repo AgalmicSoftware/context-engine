@@ -179,6 +179,7 @@ test('public Worker Group discovery follows the public ungated mode independentl
 			assert.equal(value.slug, 'session-a');
 			assert.equal(value.admin, false);
 			assert.equal(value.actorPrincipalResult, undefined);
+			assert.equal(value.includeMemberCount, false);
 			assert.equal(value.expectedGroupCount, 1);
 			return {
 				ok: true,
@@ -1607,6 +1608,32 @@ test('session-visible leave returns the retained group and authoritative count',
 	assert.equal(response.body.memberCount, 0);
 	assert.equal(response.body.group.groupId, 'visible-leave');
 	assert.equal(response.body.group.memberVisibility, 'session');
+
+	const listResponse = await workerGroupsRoute({
+		path: '/groups/list',
+		method: 'GET',
+		request: new Request('https://worker.example/groups/list'),
+		env,
+		slug: 'session-a',
+		requesterAddress: member.address,
+		authScopes: {},
+		baseHeaders: {},
+		deps: { json },
+	});
+	assert.equal(listResponse.status, 200);
+	assert.equal(listResponse.body.groups[0].groupId, 'visible-leave');
+	assert.equal(listResponse.body.groups[0].memberCount, 0);
+
+	const publicListResponse = await dispatchPublicWorkerGroupListRequest({
+		request: new Request(`https://worker.example/groups/list?sessionId=${sessionId}`),
+		config: publicWorkerGroupConfig(),
+		env,
+		slug: 'session-a',
+		baseHeaders: {},
+		deps: { json },
+	});
+	assert.equal(publicListResponse.status, 200);
+	assert.equal(Object.hasOwn(publicListResponse.body.groups[0], 'memberCount'), false);
 });
 
 test('participant member lists enforce the configured identity visibility and redact storage internals', async () => {
@@ -2250,6 +2277,7 @@ test('participant and admin group lists use authoritative activity and visibilit
 	);
 	assert.equal(adminResponse.body.groups[0].joinMode, 'admin_add');
 	assert.equal(adminResponse.body.groups[0].memberVisibility, 'admin_only');
+	assert.equal(adminResponse.body.groups[0].memberCount, 0);
 });
 
 test('admin member listing stays below the KV operation ceiling and returns a cursor', async () => {

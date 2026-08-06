@@ -51,6 +51,7 @@ describe('worker group ports', () => {
                 label: 'Public reviewers',
                 joinMode: 'open',
                 memberVisibility: 'session',
+                memberCount: 37,
               },
             ],
           }),
@@ -58,19 +59,19 @@ describe('worker group ports', () => {
         ),
     );
 
-    await expect(
-      loadPublicWorkerGroups({
-        workerUrl: `${WORKER_URL}/`,
-        sessionId: SESSION_ID,
-        sessionSlug: SESSION_SLUG,
-        fetchImpl,
-      }),
-    ).resolves.toEqual([
+    const groups = await loadPublicWorkerGroups({
+      workerUrl: `${WORKER_URL}/`,
+      sessionId: SESSION_ID,
+      sessionSlug: SESSION_SLUG,
+      fetchImpl,
+    });
+    expect(groups).toEqual([
       expect.objectContaining({
         groupId: 'public-reviewers',
         label: 'Public reviewers',
       }),
     ]);
+    expect(groups[0]).not.toHaveProperty('memberCount');
 
     expect(fetchImpl).toHaveBeenCalledWith(`${WORKER_URL}/groups/list?sessionId=${encodeURIComponent(SESSION_ID)}`, {
       method: 'GET',
@@ -99,6 +100,7 @@ describe('worker group ports', () => {
                 imageUrl: 'https://ar-io.dev/reviewers-image',
                 joinMode: 'open',
                 memberVisibility: 'session',
+                memberCount: 7,
               },
             ],
           }),
@@ -143,6 +145,7 @@ describe('worker group ports', () => {
           groupId: 'reviewers',
           label: 'Reviewers',
           imageUrl: 'https://ar-io.dev/reviewers-image',
+          memberCount: 7,
         },
       ],
       memberships: [{ group: { groupId: 'members', memberVisibility: 'admin_only' }, memberCount: 3 }],
@@ -166,6 +169,93 @@ describe('worker group ports', () => {
         headers: { Authorization: `Bearer ${WORKER_TOKEN}` },
       }),
     );
+  });
+
+  it.each(['7', 1.5])('rejects malformed authenticated group count %p', async (memberCount) => {
+    const fetchImpl = jest.fn(async (input: RequestInfo | URL) => {
+      const pathname = new URL(String(input)).pathname;
+      const body = pathname.endsWith('/groups/list')
+        ? {
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: SESSION_SLUG,
+            groups: [
+              {
+                groupId: 'reviewers',
+                sessionSlug: SESSION_SLUG,
+                label: 'Reviewers',
+                joinMode: 'open',
+                memberVisibility: 'session',
+                memberCount,
+              },
+            ],
+          }
+        : {
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: SESSION_SLUG,
+            memberships: [],
+          };
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+
+    await expect(
+      loadWorkerGroupOverview({
+        workerUrl: WORKER_URL,
+        credentialToken: WORKER_TOKEN,
+        sessionId: SESSION_ID,
+        sessionSlug: SESSION_SLUG,
+        fetchImpl,
+      }),
+    ).rejects.toMatchObject({ message: 'worker_group_response_member_count_invalid' });
+  });
+
+  it.each(['3', 1.5])('rejects malformed self-membership count %p', async (memberCount) => {
+    const fetchImpl = jest.fn(async (input: RequestInfo | URL) => {
+      const pathname = new URL(String(input)).pathname;
+      const body = pathname.endsWith('/groups/list')
+        ? {
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: SESSION_SLUG,
+            groups: [],
+          }
+        : {
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: SESSION_SLUG,
+            memberships: [
+              {
+                group: {
+                  groupId: 'members',
+                  sessionSlug: SESSION_SLUG,
+                  label: 'Members',
+                  joinMode: 'admin_add',
+                  memberVisibility: 'members',
+                },
+                member: { sessionSlug: SESSION_SLUG, principalKey: 'evm:0xabc' },
+                memberCount,
+              },
+            ],
+          };
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+
+    await expect(
+      loadWorkerGroupOverview({
+        workerUrl: WORKER_URL,
+        credentialToken: WORKER_TOKEN,
+        sessionId: SESSION_ID,
+        sessionSlug: SESSION_SLUG,
+        fetchImpl,
+      }),
+    ).rejects.toMatchObject({ message: 'worker_group_response_member_count_invalid' });
   });
 
   it('loads a permission-visible member page without exposing storage keys or mutation actors', async () => {

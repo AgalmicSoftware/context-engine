@@ -879,17 +879,36 @@ describe('WorkerGroupMembershipPanel', () => {
         );
       }
       return new Response(
-        JSON.stringify({ ok: true, sessionId: SESSION_ID, sessionSlug: 'alpha', groups: [group] }),
+        JSON.stringify({
+          ok: true,
+          sessionId: SESSION_ID,
+          sessionSlug: 'alpha',
+          groups: [{ ...group, memberCount: joined ? 1 : 0 }],
+        }),
         { status: 200, headers: { 'content-type': 'application/json' } },
       );
     });
 
-    const first = render(<WorkerGroupMembershipPanel envelope={envelope} fetchImpl={fetchImpl as typeof fetch} />);
+    const first = render(
+      <WorkerGroupMembershipPanel
+        envelope={envelope}
+        fetchImpl={fetchImpl as typeof fetch}
+        selectedGroupId={group.groupId}
+      />,
+    );
     expect(await screen.findByRole('button', { name: 'Leave Remount reviewers' })).toBeInTheDocument();
+    expect(screen.getByText('Members:').parentElement).toHaveTextContent(/^Members:1 \/$/);
     first.unmount();
     joined = false;
-    render(<WorkerGroupMembershipPanel envelope={envelope} fetchImpl={fetchImpl as typeof fetch} />);
+    render(
+      <WorkerGroupMembershipPanel
+        envelope={envelope}
+        fetchImpl={fetchImpl as typeof fetch}
+        selectedGroupId={group.groupId}
+      />,
+    );
     expect(await screen.findByRole('button', { name: 'Join Remount reviewers' })).toBeInTheDocument();
+    expect(screen.getByText('Members:').parentElement).toHaveTextContent(/^Members:0 \/$/);
     expect(membershipReadCount).toBe(2);
   });
 

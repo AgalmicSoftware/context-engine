@@ -62050,7 +62050,15 @@ var removeWorkerGroupMember = async ({ env, slug, sessionId, groupId, principal,
     principal: normalized.principal
   };
 };
-var listWorkerGroups = async ({ env, slug, sessionId, actorPrincipalResult, admin = false, expectedGroupCount } = {}) => {
+var listWorkerGroups = async ({
+  env,
+  slug,
+  sessionId,
+  actorPrincipalResult,
+  admin = false,
+  includeMemberCount = false,
+  expectedGroupCount
+} = {}) => {
   const store = resolveWorkerGroupStore(env);
   if (!store) return { ok: false, status: 501, reason: "worker_group_store_not_configured" };
   const authoritativeGroupCount = Number(expectedGroupCount);
@@ -62106,13 +62114,12 @@ var listWorkerGroups = async ({ env, slug, sessionId, actorPrincipalResult, admi
       joinMode: authority.joinMode,
       memberVisibility: authority.memberVisibility
     };
-    if (admin || authority.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION) {
-      visible.push(redactGroupForMember(authoritativeGroup));
-      continue;
-    }
-    if (authority.isMember && authority.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.MEMBERS) {
-      visible.push(redactGroupForMember(authoritativeGroup));
-    }
+    const mayViewGroup = admin || authority.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION || authority.isMember && authority.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.MEMBERS;
+    if (!mayViewGroup) continue;
+    visible.push({
+      ...redactGroupForMember(authoritativeGroup),
+      ...includeMemberCount ? { memberCount: authority.memberCount } : {}
+    });
   }
   return { ok: true, store: store.kind, groups: visible };
 };
@@ -62544,6 +62551,7 @@ var dispatchPublicWorkerGroupListRequest = async ({ request, config, env, slug, 
       slug,
       sessionId: sessionIdentity.sessionId,
       admin: false,
+      includeMemberCount: false,
       expectedGroupCount: ready.meta?.groupCount
     });
   } catch {
@@ -62709,6 +62717,7 @@ var dispatchAdminWorkerGroupRequest = async ({ action, body, config, env, slug, 
         sessionId: sessionIdentity.sessionId,
         actorPrincipalResult: actor,
         admin: true,
+        includeMemberCount: true,
         expectedGroupCount: ready.meta?.groupCount
       });
     } catch {
@@ -62901,6 +62910,7 @@ var workerGroupsRoute = async ({
         sessionId: sessionIdentity.sessionId,
         actorPrincipalResult: actor,
         admin: false,
+        includeMemberCount: true,
         expectedGroupCount: ready.meta?.groupCount
       });
     } catch {
