@@ -45,6 +45,26 @@ test('repo test wiring invariants hold', () => {
   assert.deepEqual(verifyTestWiring(), []);
 });
 
+test('Worker provenance checkouts include complete public history and tags', () => {
+  const repoRoot = path.resolve(__dirname, '..');
+  for (const [relativePath, resolveStep] of [
+    ['.github/workflows/ci.yml', '- name: Resolve private-to-public replay provenance'],
+    ['.github/workflows/publish-worker-bundles.yml', '- name: Resolve checked-out replay provenance'],
+    ['.github/workflows/promote-worker-bundles.yml', '- name: Resolve checked-out replay provenance'],
+  ]) {
+    const workflow = fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
+    const resolveIndex = workflow.indexOf(resolveStep);
+    const checkoutIndex = workflow.lastIndexOf('- name: Checkout', resolveIndex);
+    assert.notEqual(resolveIndex, -1, `${relativePath} must resolve Worker provenance`);
+    assert.notEqual(checkoutIndex, -1, `${relativePath} must check out the resolved source`);
+    assert.match(
+      workflow.slice(checkoutIndex, resolveIndex),
+      /fetch-depth: 0/,
+      `${relativePath} must fetch complete public history before resolving provenance`,
+    );
+  }
+});
+
 test('agent bridge tests are reachable through root CI and the workers job', () => {
   const rootDir = path.resolve(__dirname, '..');
   const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));

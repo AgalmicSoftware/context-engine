@@ -292,7 +292,7 @@ function assertPrivateSourceIsNotPublic(rootDir, privateSourceCommit, replayComm
     `commit ${replayCommit} CE-Private-Source must identify a commit`,
   );
 
-  const publicRefs = new Set([candidateCommit, ...fetchedPublicHistoryRefs(rootDir)]);
+  const publicRefs = new Set([replayCommit, candidateCommit, ...fetchedPublicHistoryRefs(rootDir)]);
   assert(
     ![...publicRefs].some((ref) => commitIsReachableFrom(rootDir, privateSourceCommit, ref)),
     `commit ${replayCommit} CE-Private-Source must not point to public history`,
@@ -353,30 +353,33 @@ export function resolveSourceProvenance({ rootDir, commit }) {
   assert(resolvedCommit === commit, 'source commit did not resolve exactly');
   const sourceTree = git(rootDir, ['rev-parse', `${commit}^{tree}`]);
   const parentLine = git(rootDir, ['rev-list', '--parents', '-n', '1', commit]).split(/\s+/);
+  const parents = parentLine.slice(1);
+  assert(
+    parents.length <= 2,
+    `source commit ${commit} must have at most one parent or exactly two merge parents`,
+  );
 
-  let publicReplayCommit = commit;
-  let privateSourceCommit = resolvePrivateSourceReference({
-    publicCommit: commit,
-    trailer: privateSourceTrailer(rootDir, commit),
-  });
-  if (!privateSourceCommit && parentLine.length > 2) {
-    const mergeParents = parentLine.slice(1).reverse();
-    for (const parent of mergeParents) {
-      const parentPrivateSource = resolvePrivateSourceReference({
-        publicCommit: parent,
-        trailer: privateSourceTrailer(rootDir, parent),
-      });
-      if (parentPrivateSource) {
-        publicReplayCommit = parent;
-        privateSourceCommit = parentPrivateSource;
-        break;
-      }
-    }
+  const isMainMerge = parents.length === 2;
+  const publicReplayCommit = isMainMerge ? parents[1] : commit;
+  if (isMainMerge) {
+    assert(
+      commitIsReachableFrom(rootDir, parents[0], publicReplayCommit),
+      `source merge ${commit} candidate must descend from its first parent`,
+    );
+    assert(
+      sourceTree === git(rootDir, ['rev-parse', `${publicReplayCommit}^{tree}`]),
+      `source merge ${commit} tree must match its candidate tree`,
+    );
   }
+
+  const privateSourceCommit = resolvePrivateSourceReference({
+    publicCommit: publicReplayCommit,
+    trailer: privateSourceTrailer(rootDir, publicReplayCommit),
+  });
 
   assertSha(privateSourceCommit, 'CE-Private-Source trailer');
   assertSha(publicReplayCommit, 'public replay commit');
-  execFileSync('git', ['merge-base', '--is-ancestor', publicReplayCommit, commit], { cwd: rootDir, stdio: 'ignore' });
+  assertPrivateSourceIsNotPublic(rootDir, privateSourceCommit, publicReplayCommit, commit);
   return { sourceCommit: commit, sourceTree, privateSourceCommit, publicReplayCommit };
 }
 

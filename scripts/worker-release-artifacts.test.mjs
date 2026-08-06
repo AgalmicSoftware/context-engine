@@ -38,6 +38,28 @@ function publicReplayFixture() {
   return { rootDir, git, baseCommit, candidateCommit };
 }
 
+function sourceProvenanceFixture(prefix = 'ce-worker-source-') {
+  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  const git = (args) => execFileSync('git', args, { cwd: rootDir, encoding: 'utf8' }).trim();
+  git(['init', '-b', 'main']);
+  git(['config', 'user.name', 'Test']);
+  git(['config', 'user.email', '[redacted-email]']);
+  fs.writeFileSync(path.join(rootDir, 'base.txt'), 'base\n');
+  git(['add', 'base.txt']);
+  git(['commit', '-m', 'base']);
+  return { rootDir, git, baseCommit: git(['rev-parse', 'HEAD']) };
+}
+
+function createUnreferencedSourceCommit(git, parent, subject) {
+  return git(['commit-tree', git(['write-tree']), '-p', parent, '-m', subject]);
+}
+
+function messageWithSource(subject, privateSourceCommit = '') {
+  return privateSourceCommit
+    ? `${subject}\n\nCE-Private-Source: ${privateSourceCommit}`
+    : subject;
+}
+
 function fixture() {
   const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-worker-release-'));
   const distDir = path.join(rootDir, 'dist');
@@ -334,27 +356,215 @@ test('public replay range rejects tag-only public commits as private-source prov
   }
 });
 
-test('source provenance resolves the replay trailer from a fast-forward or merge tip', () => {
-  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-worker-source-'));
-  const git = (args) => execFileSync('git', args, { cwd: rootDir, encoding: 'utf8' }).trim();
-  git(['init', '-b', 'main']);
-  git(['config', 'user.name', 'Test']);
-  git(['config', 'user.email', '[redacted-email]']);
-  fs.writeFileSync(path.join(rootDir, 'file.txt'), 'base\n');
-  git(['add', 'file.txt']);
-  git(['commit', '-m', 'base']);
-  git(['switch', '-c', 'release-staging']);
-  fs.appendFileSync(path.join(rootDir, 'file.txt'), 'replay\n');
-  git(['commit', '-am', `public replay\n\nCE-Private-Source: ${SHA_C}`]);
-  const replayCommit = git(['rev-parse', 'HEAD']);
-  git(['switch', 'main']);
-  git(['merge', '--no-ff', 'release-staging', '-m', 'merge public replay']);
-  const mergeCommit = git(['rev-parse', 'HEAD']);
+test('source provenance resolves a linear replay from its own trailer', () => {
+  const { rootDir, git, baseCommit } = sourceProvenanceFixture();
+  try {
+    const privateSourceCommit = createUnreferencedSourceCommit(git, baseCommit, 'private linear source');
+    fs.writeFileSync(path.join(rootDir, 'replay.txt'), 'replay\n');
+    git(['add', 'replay.txt']);
+    git(['commit', '-m', messageWithSource('public replay', privateSourceCommit)]);
+    const replayCommit = git(['rev-parse', 'HEAD']);
 
-  const resolved = resolveSourceProvenance({ rootDir, commit: mergeCommit });
-  assert.equal(resolved.publicReplayCommit, replayCommit);
-  assert.equal(resolved.privateSourceCommit, SHA_C);
-  assert.match(resolved.sourceTree, /^[a-f0-9]{40}$/);
+    assert.deepEqual(resolveSourceProvenance({ rootDir, commit: replayCommit }), {
+      sourceCommit: replayCommit,
+      sourceTree: git(['rev-parse', `${replayCommit}^{tree}`]),
+      privateSourceCommit,
+      publicReplayCommit: replayCommit,
+    });
+  } finally {
+    fs.rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+test('source provenance binds a two-parent main merge only to its second parent', () => {
+  const { rootDir, git, baseCommit } = sourceProvenanceFixture();
+  try {
+    const firstParentSource = createUnreferencedSourceCommit(git, baseCommit, 'private first-parent source');
+    const candidateSource = createUnreferencedSourceCommit(git, baseCommit, 'private candidate source');
+    const mergeSource = createUnreferencedSourceCommit(git, baseCommit, 'private merge source');
+    fs.writeFileSync(path.join(rootDir, 'main.txt'), 'main\n');
+    git(['add', 'main.txt']);
+    git(['commit', '-m', messageWithSource('main update', firstParentSource)]);
+    git(['switch', '-c', 'release-staging']);
+    fs.writeFileSync(path.join(rootDir, 'candidate.txt'), 'candidate\n');
+    git(['add', 'candidate.txt']);
+    git(['commit', '-m', messageWithSource('public replay', candidateSource)]);
+    const candidateCommit = git(['rev-parse', 'HEAD']);
+    git(['switch', 'main']);
+    git(['merge', '--no-ff', 'release-staging', '-m', messageWithSource('merge public replay', mergeSource)]);
+    const mergeCommit = git(['rev-parse', 'HEAD']);
+
+    assert.deepEqual(resolveSourceProvenance({ rootDir, commit: mergeCommit }), {
+      sourceCommit: mergeCommit,
+      sourceTree: git(['rev-parse', `${mergeCommit}^{tree}`]),
+      privateSourceCommit: candidateSource,
+      publicReplayCommit: candidateCommit,
+    });
+  } finally {
+    fs.rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+test('source provenance never substitutes merge or first-parent provenance for a missing candidate mapping', () => {
+  for (const mergeHasTrailer of [false, true]) {
+    const { rootDir, git, baseCommit } = sourceProvenanceFixture();
+    try {
+      const firstParentSource = createUnreferencedSourceCommit(git, baseCommit, 'private first-parent source');
+      const mergeSource = createUnreferencedSourceCommit(git, baseCommit, 'private merge source');
+      fs.writeFileSync(path.join(rootDir, 'main.txt'), 'main\n');
+      git(['add', 'main.txt']);
+      git(['commit', '-m', messageWithSource('main update', firstParentSource)]);
+      git(['switch', '-c', 'release-staging']);
+      fs.writeFileSync(path.join(rootDir, 'candidate.txt'), 'candidate\n');
+      git(['add', 'candidate.txt']);
+      git(['commit', '-m', 'candidate without provenance']);
+      git(['switch', 'main']);
+      git([
+        'merge',
+        '--no-ff',
+        'release-staging',
+        '-m',
+        messageWithSource('merge public replay', mergeHasTrailer ? mergeSource : ''),
+      ]);
+      const mergeCommit = git(['rev-parse', 'HEAD']);
+
+      assert.throws(
+        () => resolveSourceProvenance({ rootDir, commit: mergeCommit }),
+        /CE-Private-Source trailer/,
+      );
+    } finally {
+      fs.rmSync(rootDir, { recursive: true, force: true });
+    }
+  }
+});
+
+test('source provenance rejects public candidate history and tag-only commits as private sources', () => {
+  for (const sourceKind of ['candidate-history', 'main-history', 'tag-only']) {
+    const { rootDir, git, baseCommit } = sourceProvenanceFixture();
+    try {
+      fs.writeFileSync(path.join(rootDir, 'main.txt'), 'main\n');
+      git(['add', 'main.txt']);
+      git(['commit', '-m', 'main update']);
+      const mainParent = git(['rev-parse', 'HEAD']);
+      git(['switch', '-c', 'release-staging']);
+
+      let selectedSource = mainParent;
+      if (sourceKind === 'candidate-history') {
+        const candidateHistorySource = createUnreferencedSourceCommit(git, mainParent, 'private prior source');
+        fs.writeFileSync(path.join(rootDir, 'prior.txt'), 'prior candidate\n');
+        git(['add', 'prior.txt']);
+        git(['commit', '-m', messageWithSource('prior public replay', candidateHistorySource)]);
+        selectedSource = git(['rev-parse', 'HEAD']);
+      } else if (sourceKind === 'tag-only') {
+        selectedSource = git(['commit-tree', git(['write-tree']), '-m', 'tag-only public source']);
+        git(['tag', 'published-source', selectedSource]);
+      }
+
+      fs.writeFileSync(path.join(rootDir, 'candidate.txt'), 'candidate\n');
+      git(['add', 'candidate.txt']);
+      git(['commit', '-m', messageWithSource('public replay', selectedSource)]);
+      git(['switch', 'main']);
+      git(['merge', '--no-ff', 'release-staging', '-m', 'merge public replay']);
+      const mergeCommit = git(['rev-parse', 'HEAD']);
+
+      assert.throws(
+        () => resolveSourceProvenance({ rootDir, commit: mergeCommit }),
+        /CE-Private-Source must not point to public history/,
+        sourceKind,
+      );
+    } finally {
+      fs.rmSync(rootDir, { recursive: true, force: true });
+    }
+  }
+});
+
+test('source provenance rejects a stale candidate that is not descended from the first parent', () => {
+  const { rootDir, git, baseCommit } = sourceProvenanceFixture();
+  try {
+    const candidateSource = createUnreferencedSourceCommit(git, baseCommit, 'private candidate source');
+    git(['switch', '-c', 'release-staging']);
+    fs.writeFileSync(path.join(rootDir, 'candidate.txt'), 'candidate\n');
+    git(['add', 'candidate.txt']);
+    git(['commit', '-m', messageWithSource('public replay', candidateSource)]);
+    git(['switch', 'main']);
+    fs.writeFileSync(path.join(rootDir, 'main.txt'), 'main advanced\n');
+    git(['add', 'main.txt']);
+    git(['commit', '-m', 'advance main']);
+    git(['merge', '--no-ff', 'release-staging', '-m', 'merge stale public replay']);
+    const mergeCommit = git(['rev-parse', 'HEAD']);
+
+    assert.throws(
+      () => resolveSourceProvenance({ rootDir, commit: mergeCommit }),
+      /candidate must descend from its first parent/,
+    );
+  } finally {
+    fs.rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+test('source provenance rejects merge trees that differ from the direct candidate', () => {
+  const { rootDir, git, baseCommit } = sourceProvenanceFixture();
+  try {
+    const candidateSource = createUnreferencedSourceCommit(git, baseCommit, 'private candidate source');
+    git(['switch', '-c', 'release-staging']);
+    fs.writeFileSync(path.join(rootDir, 'candidate.txt'), 'candidate\n');
+    git(['add', 'candidate.txt']);
+    git(['commit', '-m', messageWithSource('public replay', candidateSource)]);
+    const candidateCommit = git(['rev-parse', 'HEAD']);
+    git(['switch', 'main']);
+    fs.writeFileSync(path.join(rootDir, 'merge-only.txt'), 'unattributed merge bytes\n');
+    git(['add', 'merge-only.txt']);
+    const mergeCommit = git([
+      'commit-tree',
+      git(['write-tree']),
+      '-p',
+      baseCommit,
+      '-p',
+      candidateCommit,
+      '-m',
+      'synthetic main merge',
+    ]);
+
+    assert.throws(
+      () => resolveSourceProvenance({ rootDir, commit: mergeCommit }),
+      /tree must match its candidate tree/,
+    );
+  } finally {
+    fs.rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+test('source provenance rejects octopus merge tips', () => {
+  const { rootDir, git, baseCommit } = sourceProvenanceFixture();
+  try {
+    const candidateSource = createUnreferencedSourceCommit(git, baseCommit, 'private candidate source');
+    git(['switch', '-c', 'release-staging']);
+    fs.writeFileSync(path.join(rootDir, 'candidate.txt'), 'candidate\n');
+    git(['add', 'candidate.txt']);
+    git(['commit', '-m', messageWithSource('public replay', candidateSource)]);
+    const candidateCommit = git(['rev-parse', 'HEAD']);
+    git(['switch', 'main']);
+    const thirdParent = git(['commit-tree', git(['write-tree']), '-p', baseCommit, '-m', 'third parent']);
+    const octopusCommit = git([
+      'commit-tree',
+      git(['rev-parse', `${candidateCommit}^{tree}`]),
+      '-p',
+      baseCommit,
+      '-p',
+      candidateCommit,
+      '-p',
+      thirdParent,
+      '-m',
+      'octopus main merge',
+    ]);
+
+    assert.throws(
+      () => resolveSourceProvenance({ rootDir, commit: octopusCommit }),
+      /one parent or exactly two merge parents/,
+    );
+  } finally {
+    fs.rmSync(rootDir, { recursive: true, force: true });
+  }
 });
 
 test('source provenance recognizes only the audited PR 30 trailerless release mapping', () => {
