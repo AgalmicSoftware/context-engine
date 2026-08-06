@@ -130,6 +130,71 @@ is_commit_in_fetched_public_history() {
   return 1
 }
 
+PUBLIC_REMOTE_TAG_REFS=""
+PUBLIC_REMOTE_TAGS_AVAILABLE=0
+PUBLIC_REMOTE_TAGS_LOADED=0
+PUBLIC_TAG_HISTORY_ERROR=""
+collect_remote_public_tags() {
+  local origin_url
+
+  if [ "$PUBLIC_REMOTE_TAGS_LOADED" -eq 1 ]; then
+    if [ "$PUBLIC_REMOTE_TAGS_AVAILABLE" -eq 1 ]; then
+      return 0
+    fi
+    return 1
+  fi
+
+  PUBLIC_REMOTE_TAGS_LOADED=1
+  PUBLIC_REMOTE_TAG_REFS=""
+  PUBLIC_TAG_HISTORY_ERROR=""
+  if PUBLIC_REMOTE_TAG_REFS="$(git ls-remote --refs --tags "$REMOTE_NAME" 2>/dev/null)"; then
+    PUBLIC_REMOTE_TAGS_AVAILABLE=1
+    return 0
+  fi
+
+  if [ "$REMOTE_NAME" != "origin" ] && is_canonical_public_repository_url "$REMOTE_URL"; then
+    origin_url="$(git remote get-url origin 2>/dev/null || true)"
+    if is_canonical_public_repository_url "$origin_url" &&
+      PUBLIC_REMOTE_TAG_REFS="$(git ls-remote --refs --tags origin 2>/dev/null)"; then
+      PUBLIC_REMOTE_TAGS_AVAILABLE=1
+      return 0
+    fi
+  fi
+
+  if [ -n "$REMOTE_URL" ] &&
+    PUBLIC_REMOTE_TAG_REFS="$(git ls-remote --refs --tags "$REMOTE_URL" 2>/dev/null)"; then
+    PUBLIC_REMOTE_TAGS_AVAILABLE=1
+    return 0
+  fi
+
+  PUBLIC_TAG_HISTORY_ERROR="public tag history is unavailable"
+  return 1
+}
+
+is_commit_in_fetched_public_provenance() {
+  local commit_sha="$1"
+  local remote_tag_ref
+  local remote_tag_sha
+
+  if is_commit_in_fetched_public_history "$commit_sha"; then
+    return 0
+  fi
+
+  if ! collect_remote_public_tags; then
+    return 2
+  fi
+
+  while read -r remote_tag_sha remote_tag_ref; do
+    [ -n "$remote_tag_ref" ] || continue
+    if [ "$(git cat-file -t "$remote_tag_sha" 2>/dev/null || true)" = "commit" ] &&
+      git merge-base --is-ancestor "$commit_sha" "$remote_tag_sha" 2>/dev/null; then
+      return 0
+    fi
+  done <<< "$PUBLIC_REMOTE_TAG_REFS"
+
+  return 1
+}
+
 PUBLIC_TAG_ERROR=""
 validate_public_tag() {
   local tag_sha="$1"
@@ -224,6 +289,7 @@ validate_public_branch() {
   local author_email
   local committer_name
   local committer_email
+  local provenance_status
 
   PUBLIC_BRANCH_ERROR=""
   resolved_candidate="$(git rev-parse --verify "${candidate_sha}^{commit}" 2>/dev/null || true)"
@@ -323,10 +389,19 @@ validate_public_branch() {
       PUBLIC_BRANCH_ERROR="commit $replay_commit CE-Private-Source commit is unavailable"
       return 1
     fi
-    if git merge-base --is-ancestor "$source_sha" "$candidate_sha" 2>/dev/null ||
-      is_commit_in_fetched_public_history "$source_sha"; then
+    if git merge-base --is-ancestor "$source_sha" "$candidate_sha" 2>/dev/null; then
       PUBLIC_BRANCH_ERROR="commit $replay_commit CE-Private-Source must not point to public history"
       return 1
+    fi
+    if is_commit_in_fetched_public_provenance "$source_sha"; then
+      PUBLIC_BRANCH_ERROR="commit $replay_commit CE-Private-Source must not point to public history"
+      return 1
+    else
+      provenance_status="$?"
+      if [ "$provenance_status" -eq 2 ]; then
+        PUBLIC_BRANCH_ERROR="commit $replay_commit CE-Private-Source $PUBLIC_TAG_HISTORY_ERROR"
+        return 1
+      fi
     fi
   done < <(git rev-list --reverse "${base_sha}..${candidate_sha}")
 

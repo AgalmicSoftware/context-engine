@@ -393,6 +393,10 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
     'release-staging pull request head fetch',
   );
   expectWorkflowContains(
+    'git fetch --force --tags origin',
+    'release-staging public tag history fetch',
+  );
+  expectWorkflowContains(
     '--candidate-ref "$release_candidate_ref"',
     'release-staging explicit candidate ref',
   );

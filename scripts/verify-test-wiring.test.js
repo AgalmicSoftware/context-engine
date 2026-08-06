@@ -66,7 +66,7 @@ test('release-staging PR verification uses the fetched PR head instead of merge 
   );
   assert.match(
     workflow,
-    /verify-replay-range\s+\\\s+--base-ref origin\/main\s+\\\s+--candidate-ref "\$release_candidate_ref"/,
+    /git fetch --force --tags origin\s+node scripts\/worker-release-artifacts\.mjs verify-replay-range\s+\\\s+--base-ref origin\/main\s+\\\s+--candidate-ref "\$release_candidate_ref"/,
   );
   assert.match(
     workflow,
@@ -163,6 +163,7 @@ test('public-release style copies without .git still pass wiring checks', () => 
         '            release_candidate_ref="$RELEASE_PR_HEAD_SHA"',
         '            git fetch --no-tags --depth=1 origin "$release_candidate_ref"',
         '          fi',
+        '          git fetch --force --tags origin',
         '          node scripts/worker-release-artifacts.mjs verify-replay-range --candidate-ref "$release_candidate_ref"',
         '          verify_args=(verify-ref --candidate-ref "$release_candidate_ref" --baseline-ref origin/main)',
         '          if [ "$RELEASE_EVENT_NAME" = "push" ] && [ "$RELEASE_PUSH_BEFORE_SHA" != "$ZERO_OID" ]; then',

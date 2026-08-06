@@ -113,6 +113,7 @@ jobs:
             release_candidate_ref="$RELEASE_PR_HEAD_SHA"
             git fetch --no-tags --depth=1 origin "$release_candidate_ref"
           fi
+          git fetch --force --tags origin
           node scripts/worker-release-artifacts.mjs verify-replay-range \
             --base-ref origin/main \
             --candidate-ref "$release_candidate_ref"

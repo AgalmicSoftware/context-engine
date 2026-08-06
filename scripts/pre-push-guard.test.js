@@ -23,6 +23,9 @@ function writeFile(rootDir, relativePath, contents) {
 function setupHookFixture() {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-pre-push-guard-'));
   execFileSync('git', ['init', '--quiet'], { cwd: tempDir });
+  const publicRemote = path.join(tempDir, '.git', 'public-remote.git');
+  execFileSync('git', ['init', '--bare', '--quiet', publicRemote]);
+  execFileSync('git', ['remote', 'add', 'origin', publicRemote], { cwd: tempDir });
   writeFile(
     tempDir,
     path.join('.githooks', 'pre-push'),
@@ -485,6 +488,72 @@ test('pre-push guard rejects public commits as private-source provenance', () =>
   });
 });
 
+test('pre-push guard rejects remotely published tag-only private-source provenance', () => {
+  withHookFixture((rootDir) => {
+    const { candidateSha, privateSourceSha } = createVersionedCandidate(rootDir, '0.1.1');
+    git(rootDir, ['tag', 'published-source', privateSourceSha]);
+    const publicRemote = git(rootDir, ['remote', 'get-url', 'origin']);
+    git(rootDir, ['push', '--quiet', 'origin', 'refs/tags/published-source']);
+    git(rootDir, ['tag', '--delete', 'published-source']);
+    git(rootDir, ['fetch', '--quiet', '--tags', 'origin']);
+    assert.equal(git(rootDir, [
+      'for-each-ref',
+      '--contains',
+      privateSourceSha,
+      '--format=%(refname)',
+      'refs/heads/*',
+      'refs/remotes/*',
+    ]), '');
+    assert.equal(git(rootDir, ['rev-parse', 'refs/tags/published-source']), privateSourceSha);
+    git(rootDir, ['branch', '-M', 'release-staging']);
+
+    const result = runHook(rootDir, pushLine({
+      localRef: 'refs/heads/release-staging',
+      localSha: candidateSha,
+      remoteRef: 'refs/heads/release-staging',
+    }), 'origin', publicRemote);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /CE-Private-Source must not point to public history/);
+  });
+});
+
+test('pre-push guard keeps a local-only source tag private', () => {
+  withHookFixture((rootDir) => {
+    const { candidateSha, privateSourceSha } = createVersionedCandidate(rootDir, '0.1.1');
+    git(rootDir, ['tag', 'private-source', privateSourceSha]);
+    const publicRemote = git(rootDir, ['remote', 'get-url', 'origin']);
+    git(rootDir, ['branch', '-M', 'release-staging']);
+
+    const result = runHook(rootDir, pushLine({
+      localRef: 'refs/heads/release-staging',
+      localSha: candidateSha,
+      remoteRef: 'refs/heads/release-staging',
+    }), 'origin', publicRemote);
+
+    assert.equal(result.status, 0);
+    assert.match(result.stderr, /release version verified: 0\.1\.1/);
+  });
+});
+
+test('pre-push guard fails closed when public tag history is unavailable', () => {
+  withHookFixture((rootDir) => {
+    const { candidateSha } = createVersionedCandidate(rootDir, '0.1.1');
+    const unavailableRemote = path.join(rootDir, 'unavailable-public-remote.git');
+    git(rootDir, ['remote', 'set-url', 'origin', unavailableRemote]);
+    git(rootDir, ['branch', '-M', 'release-staging']);
+
+    const result = runHook(rootDir, pushLine({
+      localRef: 'refs/heads/release-staging',
+      localSha: candidateSha,
+      remoteRef: 'refs/heads/release-staging',
+    }), 'origin', unavailableRemote);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /public tag history is unavailable/);
+  });
+});
+
 test('pre-push guard allows lightweight tags of fetched public commits', () => {
   withHookFixture((rootDir) => {
     const { mainSha } = createVersionedCandidate(rootDir, '0.1.1');
@@ -767,7 +836,7 @@ test('pre-push guard blocks a public alias when its main baseline has no verifie
 test('pre-push guard compares a public alias to a verified same-repository origin baseline', () => {
   withHookFixture((rootDir) => {
     const { candidateSha } = createVersionedCandidate(rootDir, '0.1.0');
-    git(rootDir, ['remote', 'add', 'origin', '[redacted-email]-agalmic:AgalmicSoftware/context-engine.git']);
+    git(rootDir, ['remote', 'set-url', 'origin', '[redacted-email]-agalmic:AgalmicSoftware/context-engine.git']);
     const result = runHook(rootDir, pushLine({
       localRef: 'refs/heads/release-staging',
       localSha: candidateSha,
@@ -791,7 +860,7 @@ test('pre-push guard rejects an alias candidate that omits a newer public main',
     const newerMainSha = git(rootDir, ['rev-parse', 'HEAD']);
     git(rootDir, ['update-ref', 'refs/remotes/origin/main', newerMainSha]);
     git(rootDir, ['update-ref', 'refs/remotes/public-alias/main', mainSha]);
-    git(rootDir, ['remote', 'add', 'origin', '[redacted-email]-agalmic:AgalmicSoftware/context-engine.git']);
+    git(rootDir, ['remote', 'set-url', 'origin', '[redacted-email]-agalmic:AgalmicSoftware/context-engine.git']);
     git(rootDir, ['checkout', '--quiet', candidateBranch]);
     git(rootDir, ['branch', '-M', 'release-staging']);
 
@@ -814,7 +883,7 @@ test('pre-push guard rejects an alias candidate that omits a newer public main',
 test('pre-push guard enforces release floors through case-variant public aliases', () => {
   withHookFixture((rootDir) => {
     const { candidateSha } = createVersionedCandidate(rootDir, '0.1.0');
-    git(rootDir, ['remote', 'add', 'origin', '[redacted-email]:agalmicsoftware/context-engine.git']);
+    git(rootDir, ['remote', 'set-url', 'origin', '[redacted-email]:agalmicsoftware/context-engine.git']);
     const result = runHook(
       rootDir,
       pushLine({

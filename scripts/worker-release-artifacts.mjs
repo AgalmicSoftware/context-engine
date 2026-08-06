@@ -267,6 +267,7 @@ function fetchedPublicHistoryRefs(rootDir) {
     'refs/heads/release-staging*',
     'refs/remotes/*/main',
     'refs/remotes/*/release-staging*',
+    'refs/tags/*',
   ]).split(/\s+/).filter(Boolean);
 }
 

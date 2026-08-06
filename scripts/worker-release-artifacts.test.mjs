@@ -307,6 +307,33 @@ test('public replay range rejects public commits as private-source provenance', 
   }
 });
 
+test('public replay range rejects tag-only public commits as private-source provenance', () => {
+  const { rootDir, git, baseCommit } = publicReplayFixture();
+  try {
+    const sourceTree = git(['write-tree']);
+    const tagOnlySource = git(['commit-tree', sourceTree, '-p', baseCommit, '-m', 'published source']);
+    git(['tag', 'published-source', tagOnlySource]);
+    git(['commit', '--amend', '-m', 'public replay', '-m', `CE-Private-Source: ${tagOnlySource}`]);
+    const candidateCommit = git(['rev-parse', 'HEAD']);
+    assert.equal(git([
+      'for-each-ref',
+      '--contains',
+      tagOnlySource,
+      '--format=%(refname)',
+      'refs/heads/*',
+      'refs/remotes/*',
+    ]), '');
+    assert.equal(git(['rev-parse', 'refs/tags/published-source']), tagOnlySource);
+
+    assert.throws(
+      () => verifyPublicReplayRange({ rootDir, baseRef: baseCommit, candidateRef: candidateCommit }),
+      /CE-Private-Source must not point to public history/,
+    );
+  } finally {
+    fs.rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
 test('source provenance resolves the replay trailer from a fast-forward or merge tip', () => {
   const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-worker-source-'));
   const git = (args) => execFileSync('git', args, { cwd: rootDir, encoding: 'utf8' }).trim();
