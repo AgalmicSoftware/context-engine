@@ -15,7 +15,7 @@ import buildPhotoAnalysisPrompt from '../../prompts/photoAnalysisPrompt.js';
 import { questionSelectionPrompt } from '../../prompts/questionSelectionPrompt.js';
 import buildUserAnalysisPrompt from '../../prompts/userAnalysisPrompt.js';
 // CSS
-import styles from './ContractPage.module.scss';
+import styles from './DocsPage.module.scss';
 //
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faExpand, faCaretDown, faCaretUp, faCopy, faCheck } from '@fortawesome/free-solid-svg-icons';
@@ -23,7 +23,7 @@ import { deserializeFilterState } from '../../utilities/survey/filterStateUtils.
 import { notify } from '../../utilities/ui/notify.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildPublicRoute, stripPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
-import { resolveContractPageActiveSession, resolveContractPageReferrerSlug } from './contractPageSessionResolution.js';
+import { resolveDocsPageActiveSession, resolveDocsPageReferrerSlug } from './docsPageSessionResolution.js';
 import ContractViewer, { type ContractViewerContract } from './ContractViewer';
 import { normalizeContractKeyParam } from './contractMetadata.js';
 import { buildContractViewerContracts } from './contractViewerUtils.js';
@@ -31,7 +31,7 @@ import { sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import { buildPublicContractSourceUrl } from '../../variables/publicRepoMetadata.js';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 
-type ContractPageProps = {
+type DocsPageProps = {
   activeSessionSlug?: string;
   reduxActiveSessionSlug?: string;
 };
@@ -58,7 +58,7 @@ const buildContractsForViewer = buildContractViewerContracts as (options?: {
   includeCustomSBT?: boolean;
 }) => ContractViewerContract[];
 
-export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: ContractPageProps) => {
+export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPageProps) => {
   // Parse potential slug/key from URL: /contracts/:slugOrKey
   const path = stripPublicUrlBasePath((typeof window !== 'undefined' ? window.location.pathname : '') || '');
   const search = (typeof window !== 'undefined' ? window.location.search : '') || '';
@@ -69,12 +69,12 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: Cont
   const deepLinkedContractKey = normalizeContractKeyParam(searchParams.get('contract') || '');
 
   // Fallback: derive slug from referrer (covers full-page reload from /session/:slug)
-  const referrerSlug = resolveContractPageReferrerSlug(
+  const referrerSlug = resolveDocsPageReferrerSlug(
     (typeof document !== 'undefined' ? document.referrer : '') || '',
   );
 
   // Resolve session by URL first, then ?session, then routed/Redux context, then referrer, else default "general"
-  const activeSession = resolveContractPageActiveSession({
+  const activeSession = resolveDocsPageActiveSession({
     urlSlugLike,
     querySessionRaw,
     activeSessionSlug,
@@ -591,4 +591,4 @@ const mapStateToProps = (state: { sessionState?: { activeSessionSlug?: string } 
   reduxActiveSessionSlug: state.sessionState?.activeSessionSlug || '',
 });
 
-export default connect(mapStateToProps)(ContractPage);
+export default connect(mapStateToProps)(DocsPage);

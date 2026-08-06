@@ -5,7 +5,7 @@ import {
   getSessionWizardContractModalTriggerTestId,
   getSessionWizardContractRowTestId,
   getSessionWizardContractTooltipTestId,
-} from '../ContractPage/contractMetadata.js';
+} from '../DocsPage/contractMetadata.js';
 import SessionWizardContractsField from './SessionWizardContractsField';
 
 describe('SessionWizardContractsField', () => {

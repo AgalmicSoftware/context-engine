@@ -11,7 +11,7 @@ import {
   getContractViewerSourceTestId,
   normalizeContractKeyParam,
 } from './contractMetadata.js';
-import styles from './ContractPage.module.scss';
+import styles from './DocsPage.module.scss';
 
 type ContractAddressEntry = {
   address: string;

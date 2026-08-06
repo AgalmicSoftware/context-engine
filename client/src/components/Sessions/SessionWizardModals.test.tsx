@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import SessionWizardModals from './SessionWizardModals';
 import type { SessionWizardModalsProps } from './SessionWizardModals';
-import { WIZARD_CONTRACT_MODAL_TESTID } from '../ContractPage/contractMetadata.js';
+import { WIZARD_CONTRACT_MODAL_TESTID } from '../DocsPage/contractMetadata.js';
 
 type MockCreateSbtGroupProps = {
   sessionSlug?: string;
@@ -50,7 +50,7 @@ jest.mock('../SBTs/CreateSBTGroup', () => ({
   )),
 }));
 
-jest.mock('../ContractPage/ContractViewer', () => ({
+jest.mock('../DocsPage/ContractViewer', () => ({
   __esModule: true,
   default: jest.fn(({ contracts = [], renderSourceHeaderActions }: MockContractViewerProps) => (
     <div data-testid="mock-contract-viewer">

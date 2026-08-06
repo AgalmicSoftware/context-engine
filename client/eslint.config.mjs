@@ -45,7 +45,7 @@ const typedCommunityTabComponentFiles = ['src/components/CommunityTab/**/*.{ts,t
 const typedPolisReportComponentFiles = ['src/components/PolisReport/**/*.{ts,tsx}'];
 const typedDebateMapComponentFiles = ['src/components/DebateMap/**/*.{ts,tsx}'];
 const typedNavbarComponentFiles = ['src/components/Navbar/**/*.{ts,tsx}'];
-const typedContractPageComponentFiles = ['src/components/ContractPage/**/*.{ts,tsx}'];
+const typedDocsPageComponentFiles = ['src/components/DocsPage/**/*.{ts,tsx}'];
 const typedOnePageSessionComponentFiles = ['src/components/OnePageSession/**/*.{ts,tsx}'];
 const typedTagPageComponentFiles = ['src/components/TagPage/**/*.{ts,tsx}'];
 const typedDocumentLibraryComponentFiles = ['src/components/DocumentLibrary/**/*.{ts,tsx}'];
@@ -384,7 +384,7 @@ export default [
     },
   },
   {
-    files: typedContractPageComponentFiles,
+    files: typedDocsPageComponentFiles,
     languageOptions: sharedLanguageOptions,
     plugins: reactPlugins,
     settings: reactSettings,

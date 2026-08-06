@@ -9,7 +9,7 @@ import {
   getSessionWizardContractModalTriggerTestId,
   getSessionWizardContractRowTestId,
   getSessionWizardContractTooltipTestId,
-} from '../ContractPage/contractMetadata.js';
+} from '../DocsPage/contractMetadata.js';
 import ContractsSection from './ContractsSection';
 import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
 import { formatContractLabel } from './sessionWizardCoreUtils';

@@ -4,8 +4,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './SessionWizard.module.scss';
-import ContractViewer, { type ContractViewerContract } from '../ContractPage/ContractViewer';
-import { WIZARD_CONTRACT_MODAL_TESTID } from '../ContractPage/contractMetadata.js';
+import ContractViewer, { type ContractViewerContract } from '../DocsPage/ContractViewer';
+import { WIZARD_CONTRACT_MODAL_TESTID } from '../DocsPage/contractMetadata.js';
 
 type ContractViewerModalState = {
   open?: boolean;

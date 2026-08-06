@@ -257,7 +257,7 @@ import {
   DebateMap as DebateMapRaw,
   BookmarksPage as BookmarksPageRaw,
   CompareAddresses as CompareAddressesRaw,
-  ContractPage as ContractPageRaw,
+  DocsPage as DocsPageRaw,
   DemosIndex as DemosIndexRaw,
   OnePageSession as OnePageSessionRaw,
   RiskMatrixDemo as RiskMatrixDemoRaw,
@@ -332,7 +332,7 @@ const AgentPage = asMainSiteRouteComponent(AgentPageRaw);
 const DebateMap = asMainSiteRouteComponent(DebateMapRaw);
 const BookmarksPage = asMainSiteRouteComponent(BookmarksPageRaw);
 const CompareAddresses = asMainSiteRouteComponent(CompareAddressesRaw);
-const ContractPage = asMainSiteRouteComponent(ContractPageRaw);
+const DocsPage = asMainSiteRouteComponent(DocsPageRaw);
 const DemosIndex = asMainSiteRouteComponent(DemosIndexRaw);
 const OnePageSession = asMainSiteRouteComponent(OnePageSessionRaw);
 const RiskMatrixDemo = asMainSiteRouteComponent(RiskMatrixDemoRaw);

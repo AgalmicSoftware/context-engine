@@ -11,14 +11,14 @@ type SessionConfigLike = {
 type ResolveBySlug = ((slug: string) => SessionConfigLike | null | undefined) | null | undefined;
 type GetDefaultSessionConfig = (() => SessionConfigLike | null | undefined) | null | undefined;
 
-type ResolveContractPageSessionConfigOptions = {
+type ResolveDocsPageSessionConfigOptions = {
   allowGeneral?: boolean;
   resolveBySlug?: ResolveBySlug;
   resolveDemoBySlug?: ResolveBySlug;
   getDefaultSessionConfig?: GetDefaultSessionConfig;
 };
 
-type ResolveContractPageActiveSessionOptions = {
+type ResolveDocsPageActiveSessionOptions = {
   urlSlugLike?: unknown;
   querySessionRaw?: unknown;
   activeSessionSlug?: unknown;
@@ -37,14 +37,14 @@ const resolveBySlugReader = (resolveBySlug: ResolveBySlug): ResolveBySlug =>
       }
     : null;
 
-export const resolveContractPageSessionConfig = (
+export const resolveDocsPageSessionConfig = (
   slugLike: unknown,
   {
     allowGeneral = false,
     resolveBySlug,
     resolveDemoBySlug,
     getDefaultSessionConfig,
-  }: ResolveContractPageSessionConfigOptions = {},
+  }: ResolveDocsPageSessionConfigOptions = {},
 ): SessionConfigLike | null => {
   const sessionSlug = canonicalizeSessionSlug(slugLike);
   if (!sessionSlug && !allowGeneral) return null;
@@ -66,7 +66,7 @@ export const resolveContractPageSessionConfig = (
   return readDemoBySlug ? (readDemoBySlug(resolved.sessionSlug || sessionSlug) ?? null) : null;
 };
 
-export const resolveContractPageReferrerSlug = (referrer: unknown = ''): string => {
+export const resolveDocsPageReferrerSlug = (referrer: unknown = ''): string => {
   const value = toStr(referrer).trim();
   if (!value) return '';
 
@@ -77,7 +77,7 @@ export const resolveContractPageReferrerSlug = (referrer: unknown = ''): string 
   }
 };
 
-export const resolveContractPageActiveSession = ({
+export const resolveDocsPageActiveSession = ({
   urlSlugLike,
   querySessionRaw,
   activeSessionSlug,
@@ -86,7 +86,7 @@ export const resolveContractPageActiveSession = ({
   resolveBySlug,
   resolveDemoBySlug,
   getDefaultSessionConfig,
-}: ResolveContractPageActiveSessionOptions = {}): SessionConfigLike | null => {
+}: ResolveDocsPageActiveSessionOptions = {}): SessionConfigLike | null => {
   let cachedDefaultSessionConfig: SessionConfigLike | null | undefined;
   const readDefaultSessionConfig = (): SessionConfigLike | null => {
     if (typeof getDefaultSessionConfig !== 'function') return null;
@@ -97,9 +97,9 @@ export const resolveContractPageActiveSession = ({
   };
   const resolveSessionConfig = (
     slugLike: unknown,
-    options: Pick<ResolveContractPageSessionConfigOptions, 'allowGeneral'> = {},
+    options: Pick<ResolveDocsPageSessionConfigOptions, 'allowGeneral'> = {},
   ): SessionConfigLike | null =>
-    resolveContractPageSessionConfig(slugLike, {
+    resolveDocsPageSessionConfig(slugLike, {
       ...options,
       resolveBySlug,
       resolveDemoBySlug,

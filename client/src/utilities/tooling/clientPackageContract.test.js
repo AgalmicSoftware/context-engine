@@ -64,7 +64,7 @@ describe('client package modernization contract', () => {
     expect(eslintConfig).toContain("const typedDebateMapComponentFiles = ['src/components/DebateMap/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedNavbarComponentFiles = ['src/components/Navbar/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain(
-      "const typedContractPageComponentFiles = ['src/components/ContractPage/**/*.{ts,tsx}']",
+      "const typedDocsPageComponentFiles = ['src/components/DocsPage/**/*.{ts,tsx}']",
     );
     expect(eslintConfig).toContain(
       "const typedOnePageSessionComponentFiles = ['src/components/OnePageSession/**/*.{ts,tsx}']",
@@ -120,6 +120,10 @@ describe('client package modernization contract', () => {
   it('keeps Vite output and entry wiring canonical', () => {
     const viteConfig = readClientFile('vite.config.mjs');
     const viteIndex = readClientFile('index.html');
+    const viteEntry = readClientFile('src/viteEntry.ts');
+    const appEntry = readClientFile('src/index.tsx');
+    const legacyOutputCleaner = readClientFile('scripts/clean-legacy-vite-output.mjs');
+    const contractSourceLoader = readClientFile('src/components/DocsPage/contractSourceLoader.ts');
 
     expect(viteConfig).toContain("outDir: path.resolve(__dirname, 'build')");
     expect(viteConfig).toContain("manifest: 'vite-bundle-manifest.json'");
@@ -270,8 +274,8 @@ describe('client package modernization contract', () => {
     [
       'src/components/DebateMap/DebateMap.tsx',
       'src/components/SurveyTool/CreateQuestionsAndSurveys.tsx',
-      'src/components/ContractPage/contractSourceLoader.ts',
-      'src/utilities/web3/contractScripts.ts',
+      'src/components/DocsPage/contractSourceLoader.ts',
+      'src/utilities/web3/chainGateway.ts',
     ].forEach((relativePath) => {
       expect(readClientFile(relativePath)).not.toMatch(/\brequire\(/);
     });
@@ -367,7 +371,7 @@ describe('client package modernization contract', () => {
     expect(eslintConfig).toContain("const typedDebateMapComponentFiles = ['src/components/DebateMap/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedNavbarComponentFiles = ['src/components/Navbar/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain(
-      "const typedContractPageComponentFiles = ['src/components/ContractPage/**/*.{ts,tsx}']",
+      "const typedDocsPageComponentFiles = ['src/components/DocsPage/**/*.{ts,tsx}']",
     );
     expect(eslintConfig).toContain("'react-hooks': reactHooksPlugin");
     expect(eslintConfig).not.toContain("import importPlugin from 'eslint-plugin-import'");

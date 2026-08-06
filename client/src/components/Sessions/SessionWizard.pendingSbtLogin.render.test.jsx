@@ -11,8 +11,8 @@ import {
   getSessionWizardContractModalTriggerTestId,
   getSessionWizardContractTooltipTestId,
   WIZARD_CONTRACT_MODAL_TESTID,
-} from '../ContractPage/contractMetadata.js';
-import { buildContractViewerContracts } from '../ContractPage/contractViewerUtils.js';
+} from '../DocsPage/contractMetadata.js';
+import { buildContractViewerContracts } from '../DocsPage/contractViewerUtils.js';
 
 const mockRegisterSessionOnChain = jest.fn();
 const mockFetchSessionFromRegistry = jest.fn();
@@ -160,7 +160,7 @@ jest.mock('../Shared/Json/JsonControls', () => ({
   JsonPanel: () => null,
   JsonButtonRow: () => null,
 }));
-jest.mock('../ContractPage/contractViewerUtils.js', () => ({
+jest.mock('../DocsPage/contractViewerUtils.js', () => ({
   buildContractViewerContracts: jest.fn(),
 }));
 

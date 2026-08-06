@@ -12,8 +12,8 @@ import {
   getSessionWizardContractModalTriggerTestId,
   getSessionWizardContractTooltipTestId,
   WIZARD_CONTRACT_MODAL_TESTID,
-} from '../ContractPage/contractMetadata.js';
-import { buildContractViewerContracts } from '../ContractPage/contractViewerUtils.js';
+} from '../DocsPage/contractMetadata.js';
+import { buildContractViewerContracts } from '../DocsPage/contractViewerUtils.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
@@ -178,7 +178,7 @@ jest.mock('../Shared/Json/JsonControls', () => ({
   JsonPanel: () => null,
   JsonButtonRow: () => null,
 }));
-jest.mock('../ContractPage/contractViewerUtils.js', () => ({
+jest.mock('../DocsPage/contractViewerUtils.js', () => ({
   buildContractViewerContracts: jest.fn(),
 }));
 

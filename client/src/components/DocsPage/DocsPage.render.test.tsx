@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
-import { ContractPage } from './ContractPage';
+import { DocsPage } from './DocsPage';
 import { buildContractsPageHref, getContractViewerSourceTestId } from './contractMetadata.js';
 import { buildContractViewerContracts } from './contractViewerUtils.js';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
@@ -27,7 +27,7 @@ jest.mock('./contractViewerUtils.js', () => ({
 
 const mockBuildContractViewerContracts = buildContractViewerContracts as jest.Mock;
 
-describe('ContractPage contract deep links', () => {
+describe('DocsPage contract deep links', () => {
   const originalPublicUrl = process.env.PUBLIC_URL;
   const sessionConfig = {
     slug: 'session-alpha',
@@ -141,7 +141,7 @@ describe('ContractPage contract deep links', () => {
     window.HTMLElement.prototype.scrollIntoView = scrollSpy;
 
     try {
-      render(<ContractPage activeSessionSlug="session-alpha" reduxActiveSessionSlug="" />);
+      render(<DocsPage activeSessionSlug="session-alpha" reduxActiveSessionSlug="" />);
 
       const contractsToggle = await screen.findByRole('button', { name: /smart contracts/i });
       expect(contractsToggle).toHaveAttribute('aria-expanded', 'true');
@@ -170,7 +170,7 @@ describe('ContractPage contract deep links', () => {
       }),
     ).toBe('/ce/contracts?contract=surveys&session=session-alpha');
 
-    render(<ContractPage activeSessionSlug="session-alpha" reduxActiveSessionSlug="" />);
+    render(<DocsPage activeSessionSlug="session-alpha" reduxActiveSessionSlug="" />);
 
     await waitFor(() => {
       expect(window.location.pathname).toBe('/ce/contracts');
@@ -195,7 +195,7 @@ describe('ContractPage contract deep links', () => {
     window.history.pushState({}, '', '/contracts?session=demo-sh');
     mockGetSessionConfigBySlug.mockImplementation((slug = '') => (slug === 'demo-sh' ? workerSessionConfig : null));
 
-    render(<ContractPage activeSessionSlug="demo-sh" reduxActiveSessionSlug="" />);
+    render(<DocsPage activeSessionSlug="demo-sh" reduxActiveSessionSlug="" />);
 
     expect(await screen.findByTestId('ce-contracts-advanced-external-notice')).toHaveTextContent(
       /Advanced\/external on-chain tools/i,

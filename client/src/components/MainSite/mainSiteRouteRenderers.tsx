@@ -80,7 +80,7 @@ import {
   DebateMap as DebateMapRaw,
   BookmarksPage as BookmarksPageRaw,
   CompareAddresses as CompareAddressesRaw,
-  ContractPage as ContractPageRaw,
+  DocsPage as DocsPageRaw,
   DemosIndex as DemosIndexRaw,
   OnePageSession as OnePageSessionRaw,
   RiskMatrixDemo as RiskMatrixDemoRaw,
@@ -138,7 +138,7 @@ const AgentPage = asMainSiteRouteComponent(AgentPageRaw);
 const DebateMap = asMainSiteRouteComponent(DebateMapRaw);
 const BookmarksPage = asMainSiteRouteComponent(BookmarksPageRaw);
 const CompareAddresses = asMainSiteRouteComponent(CompareAddressesRaw);
-const ContractPage = asMainSiteRouteComponent(ContractPageRaw);
+const DocsPage = asMainSiteRouteComponent(DocsPageRaw);
 const DemosIndex = asMainSiteRouteComponent(DemosIndexRaw);
 const OnePageSession = asMainSiteRouteComponent(OnePageSessionRaw);
 const RiskMatrixDemo = asMainSiteRouteComponent(RiskMatrixDemoRaw);
@@ -303,7 +303,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
       <Suspense fallback={<LazyFallback label="Loading Contracts..." />}>
         <RouteErrorBoundary resetKey={fullPath}>
           <div data-testid={E2E_TESTIDS.PAGE_CONTRACTS_ROOT}>
-            <ContractPage activeSessionSlug={defaultSlug} />
+            <DocsPage activeSessionSlug={defaultSlug} />
           </div>
         </RouteErrorBoundary>
       </Suspense>

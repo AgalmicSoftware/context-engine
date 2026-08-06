@@ -1,10 +1,10 @@
 import {
-  resolveContractPageActiveSession,
-  resolveContractPageReferrerSlug,
-  resolveContractPageSessionConfig,
-} from './contractPageSessionResolution.js';
+  resolveDocsPageActiveSession,
+  resolveDocsPageReferrerSlug,
+  resolveDocsPageSessionConfig,
+} from './docsPageSessionResolution.js';
 
-describe('ContractPage session resolution', () => {
+describe('DocsPage session resolution', () => {
   const sessionConfigs = {
     '': { slug: '', sessionName: 'Context Engine' },
     rxc: { slug: 'rxc', sessionName: 'Debate' },
@@ -32,7 +32,7 @@ describe('ContractPage session resolution', () => {
     const { resolveBySlug, resolveDemoBySlug, getDefaultSessionConfig } = createReaders();
 
     expect(
-      resolveContractPageSessionConfig('general', {
+      resolveDocsPageSessionConfig('general', {
         allowGeneral: true,
         resolveBySlug,
         resolveDemoBySlug,
@@ -46,7 +46,7 @@ describe('ContractPage session resolution', () => {
     const { resolveBySlug, resolveDemoBySlug, getDefaultSessionConfig } = createReaders();
 
     expect(
-      resolveContractPageSessionConfig('missing-session-slug', {
+      resolveDocsPageSessionConfig('missing-session-slug', {
         resolveBySlug,
         resolveDemoBySlug,
         getDefaultSessionConfig,
@@ -59,7 +59,7 @@ describe('ContractPage session resolution', () => {
     const { resolveBySlug, resolveDemoBySlug, getDefaultSessionConfig } = createReaders();
 
     expect(
-      resolveContractPageSessionConfig('general', {
+      resolveDocsPageSessionConfig('general', {
         resolveBySlug,
         resolveDemoBySlug,
         getDefaultSessionConfig,
@@ -67,7 +67,7 @@ describe('ContractPage session resolution', () => {
     ).toBeNull();
 
     expect(
-      resolveContractPageSessionConfig('general', {
+      resolveDocsPageSessionConfig('general', {
         allowGeneral: true,
         resolveBySlug: jest.fn(() => null),
         resolveDemoBySlug,
@@ -84,7 +84,7 @@ describe('ContractPage session resolution', () => {
     });
 
     expect(
-      resolveContractPageSessionConfig('rxc', {
+      resolveDocsPageSessionConfig('rxc', {
         resolveBySlug,
         resolveDemoBySlug,
         getDefaultSessionConfig,
@@ -95,11 +95,11 @@ describe('ContractPage session resolution', () => {
     expect(getDefaultSessionConfig).not.toHaveBeenCalled();
   });
 
-  it('preserves ContractPage source precedence while skipping unresolved higher-priority slugs', () => {
+  it('preserves DocsPage source precedence while skipping unresolved higher-priority slugs', () => {
     const { resolveBySlug, resolveDemoBySlug, getDefaultSessionConfig } = createReaders();
 
     expect(
-      resolveContractPageActiveSession({
+      resolveDocsPageActiveSession({
         urlSlugLike: 'missing-session-slug',
         querySessionRaw: 'rxc',
         activeSessionSlug: 'route',
@@ -112,7 +112,7 @@ describe('ContractPage session resolution', () => {
     ).toBe(sessionConfigs.rxc);
 
     expect(
-      resolveContractPageActiveSession({
+      resolveDocsPageActiveSession({
         urlSlugLike: 'edge',
         querySessionRaw: 'rxc',
         activeSessionSlug: 'route',
@@ -129,7 +129,7 @@ describe('ContractPage session resolution', () => {
     const { resolveBySlug, resolveDemoBySlug, getDefaultSessionConfig } = createReaders();
 
     expect(
-      resolveContractPageActiveSession({
+      resolveDocsPageActiveSession({
         urlSlugLike: undefined,
         querySessionRaw: null,
         activeSessionSlug: 'rxc',
@@ -156,7 +156,7 @@ describe('ContractPage session resolution', () => {
     });
 
     expect(
-      resolveContractPageActiveSession({
+      resolveDocsPageActiveSession({
         urlSlugLike: 'edge',
         querySessionRaw: 'route',
         activeSessionSlug: 'redux',
@@ -171,7 +171,7 @@ describe('ContractPage session resolution', () => {
   });
 
   it('preserves explicit referrer session slugs from session URLs', () => {
-    expect(resolveContractPageReferrerSlug('https://contextengine.example.test/session/DEBATE?foo=1')).toBe('DEBATE');
-    expect(resolveContractPageReferrerSlug('')).toBe('');
+    expect(resolveDocsPageReferrerSlug('https://contextengine.example.test/session/DEBATE?foo=1')).toBe('DEBATE');
+    expect(resolveDocsPageReferrerSlug('')).toBe('');
   });
 });

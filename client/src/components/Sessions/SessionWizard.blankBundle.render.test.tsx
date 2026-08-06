@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { buildContractViewerContracts } from '../ContractPage/contractViewerUtils.js';
+import { buildContractViewerContracts } from '../DocsPage/contractViewerUtils.js';
 
 const mockTestAdminAddress = '0x00000000000000000000000000000000000000aa';
 const TEST_ADMIN_ADDRESS = mockTestAdminAddress;
@@ -62,7 +62,7 @@ jest.mock('../Shared/Json/JsonControls', () => ({
   JsonPanel: () => null,
   JsonButtonRow: () => null,
 }));
-jest.mock('../ContractPage/contractViewerUtils.js', () => ({
+jest.mock('../DocsPage/contractViewerUtils.js', () => ({
   buildContractViewerContracts: jest.fn(),
 }));
 
