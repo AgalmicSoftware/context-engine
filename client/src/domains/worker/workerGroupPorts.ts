@@ -519,9 +519,13 @@ export const loadWorkerGroupOverview = async ({
       fetchImpl,
     }),
   ]);
+  const memberships = normalizeMemberships(membershipsPayload.memberships, expectedSessionSlug);
+  const membershipGroupIds = new Set(memberships.map(({ group }) => group.groupId));
   return {
-    groups: normalizeGroups(groupsPayload.groups, expectedSessionSlug, true),
-    memberships: normalizeMemberships(membershipsPayload.memberships, expectedSessionSlug),
+    groups: normalizeGroups(groupsPayload.groups, expectedSessionSlug, true).filter(
+      (group) => group.memberVisibility === 'session' || membershipGroupIds.has(group.groupId),
+    ),
+    memberships,
   };
 };
 

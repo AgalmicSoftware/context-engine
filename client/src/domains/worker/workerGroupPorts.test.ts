@@ -171,6 +171,77 @@ describe('worker group ports', () => {
     );
   });
 
+  it('discards unmatched restricted groups while preserving session discovery', async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: SESSION_SLUG,
+            groups: [
+              {
+                groupId: 'public-reviewers',
+                sessionSlug: SESSION_SLUG,
+                label: 'Public reviewers',
+                joinMode: 'open',
+                memberVisibility: 'session',
+                memberCount: 9,
+              },
+              {
+                groupId: 'stale-members',
+                sessionSlug: SESSION_SLUG,
+                label: 'Stale members',
+                joinMode: 'admin_add',
+                memberVisibility: 'members',
+                memberCount: 4,
+              },
+              {
+                groupId: 'stale-admin',
+                sessionSlug: SESSION_SLUG,
+                label: 'Stale admin',
+                joinMode: 'admin_add',
+                memberVisibility: 'admin_only',
+                memberCount: 1,
+              },
+            ],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: SESSION_SLUG,
+            memberships: [],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      );
+
+    await expect(
+      loadWorkerGroupOverview({
+        workerUrl: WORKER_URL,
+        credentialToken: WORKER_TOKEN,
+        sessionId: SESSION_ID,
+        sessionSlug: SESSION_SLUG,
+        fetchImpl,
+      }),
+    ).resolves.toEqual({
+      groups: [
+        expect.objectContaining({
+          groupId: 'public-reviewers',
+          memberVisibility: 'session',
+          memberCount: 9,
+        }),
+      ],
+      memberships: [],
+    });
+  });
+
   it.each(['7', 1.5])('rejects malformed authenticated group count %p', async (memberCount) => {
     const fetchImpl = jest.fn(async (input: RequestInfo | URL) => {
       const pathname = new URL(String(input)).pathname;
