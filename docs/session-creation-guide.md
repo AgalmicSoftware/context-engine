@@ -749,15 +749,27 @@ Minimal setup:
    binding = "GROUP_KV"
    id = "<cloudflare-kv-namespace-id>"
 
+   [durable_objects]
+   bindings = [
+     { name = "CE_SESSION_COORDINATOR", class_name = "SessionWriteCoordinator" },
+   ]
+
+   [[migrations]]
+   tag = "ce-session-write-coordinator-v1"
+   new_sqlite_classes = ["SessionWriteCoordinator"]
+
    [vars]
    DEFAULT_SESSION_SLUG = ""
+   BOOTSTRAP_ADMIN_ADDRESS = "<public-admin-address-from-wizard>"
    DEPLOY_HELPER_ENABLED = "false"
    ```
 
-3. Add the required secret:
+3. Add the two required secrets. Use independent, high-entropy values and do
+   not commit them to `wrangler.toml`:
 
    ```bash
    npx wrangler secret put TOKEN_HMAC_SECRET
+   npx wrangler secret put CE_STORAGE_ENVELOPE_KEK
    ```
 
 4. Deploy:
@@ -769,7 +781,15 @@ Minimal setup:
 Operational notes:
 
 - `GROUP_KV` is required
-- `TOKEN_HMAC_SECRET` is required
+- `CE_SESSION_COORDINATOR` and the `ce-session-write-coordinator-v1` SQLite
+  migration are required; signed config writes fail closed without them
+- `TOKEN_HMAC_SECRET` and `CE_STORAGE_ENVELOPE_KEK` are separate required
+  Worker secrets
+- A new `/new` session must bind `BOOTSTRAP_ADMIN_ADDRESS` to the public admin
+  address shown by the wizard before the first signed config write. Omit this
+  binding only when an existing registry session and the Worker's configured
+  registry/RPC can attest the exact session ID and that the signer and requested
+  config admin are that session's on-chain admin.
 - Leave `DEFAULT_SESSION_SLUG` empty for a multi-tenant worker, or set it to a specific session slug for a single-tenant worker
 - After deploy, paste the resulting worker URL back into the wizard before publishing
 
