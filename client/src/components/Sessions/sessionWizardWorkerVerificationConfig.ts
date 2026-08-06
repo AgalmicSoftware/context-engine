@@ -29,9 +29,7 @@ export const buildSessionWizardWorkerVerificationConfig = ({
   const resolvedAllowOrigins = Array.isArray(allowOrigins) ? allowOrigins : [];
   const resolvedAdminAddress =
     adminAddress == null
-      ? resolvedRuntime.loginComplete === false
-        ? ''
-        : toStr(resolvedRuntime.account || resolvedRuntime.resolvedAdminAddress).trim()
+      ? toStr(resolvedRuntime.account || resolvedRuntime.resolvedAdminAddress).trim()
       : toStr(adminAddress).trim();
   const config = buildSessionWizardWorkerConfigPayload({
     slug: toStr(resolvedDraft.slug).trim(),

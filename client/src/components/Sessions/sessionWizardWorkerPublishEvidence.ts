@@ -60,8 +60,9 @@ const buildPublishInputFingerprint = ({
         workerSecrets,
         proof: proof || null,
         runtime: {
-          account: toStr(runtime.account).trim().toLowerCase(),
-          resolvedAdminAddress: toStr(runtime.resolvedAdminAddress).trim().toLowerCase(),
+          adminAddress: toStr(runtime.account || runtime.resolvedAdminAddress)
+            .trim()
+            .toLowerCase(),
           deployComplete: runtime.deployComplete === true,
           deployWorkerUrl: normalizeSessionWizardWorkerUrl(runtime.deployWorkerUrl),
           embeddedDeployHelperEnabled: runtime.embeddedDeployHelperEnabled,

@@ -208,6 +208,49 @@ describe('sessionWizardWorkerPublishEvidence', () => {
     ).toEqual(expect.objectContaining({ verified: true }));
   });
 
+  it('preserves verified evidence after logout when the resolved admin is unchanged', () => {
+    const connectedRuntime = {
+      ...runtime,
+      loginComplete: true,
+      resolvedAdminAddress: runtime.account,
+    };
+    const connectedConfig = buildSessionWizardWorkerVerificationConfig({
+      runtime: connectedRuntime,
+      workerUrl,
+    });
+    const connectedProof = buildSessionWizardWorkerRequirementProof({
+      workerUrl,
+      sessionSlug: connectedRuntime.draft.slug,
+      sessionId,
+      sessionModeProfile,
+      sessionAi: ai,
+      workerAllowOrigins: connectedRuntime.workerAllowOrigins,
+      workerSecrets,
+      workerConfig: connectedConfig,
+    });
+    const connectedEvidence = resolveSessionWizardWorkerPublishEvidence({
+      runtime: connectedRuntime,
+      proof: connectedProof,
+      workerSecrets,
+      deployComplete: true,
+      deployWorkerUrl: workerUrl,
+    });
+    const loggedOutEvidence = resolveSessionWizardWorkerPublishEvidence({
+      runtime: {
+        ...connectedRuntime,
+        account: '',
+        loginComplete: false,
+      },
+      proof: connectedProof,
+      workerSecrets,
+      deployComplete: true,
+      deployWorkerUrl: workerUrl,
+    });
+
+    expect(loggedOutEvidence).toEqual(expect.objectContaining({ verified: true }));
+    expect(matchesSessionWizardWorkerPublishEvidence(connectedEvidence, loggedOutEvidence)).toBe(true);
+  });
+
   it.each([
     ['secret', { workerSecrets: { openaiKey: 'sk-edited' } }],
     [
