@@ -59,13 +59,34 @@ origins.
 - Native deploy does not use a Context Engine deploy helper, Cloudflare API token, OAuth token, or local agent. The legacy helper path remains an explicit fallback.
 - A full shared multi-session worker product is planned but not yet shipped.
 
-Worker source and distribution surfaces:
+### Source, template, local-build, and release boundaries
 
-- Canonical `sessionCorsWorker` source tree: `workers/sessionCorsWorker/`
-- Native Cloudflare deployment package: `deploy/cloudflare/session-worker/`
-- Public `sessionCorsWorker` source tree: `https://github.com/AgalmicSoftware/context-engine/tree/main/workers/sessionCorsWorker`
-- `sessionCorsWorker` release bundle asset: `https://github.com/AgalmicSoftware/context-engine/releases/latest/download/sessionCorsWorker.bundle.js`
-- Deploy-helper source tree: `https://github.com/AgalmicSoftware/context-engine/tree/main/workers/deploy-helper`
+These surfaces contain related bytes but serve different consumers. They are
+not competing copies of the Worker:
+
+| Surface | Role | Git status | Use or edit policy |
+| --- | --- | --- | --- |
+| `workers/sessionCorsWorker/` | Canonical modular source and tests | Tracked | Make Session Worker implementation changes here. |
+| `deploy/cloudflare/session-worker/` | Self-contained native Deploy to Cloudflare template generated from the canonical source | Tracked | Cloudflare clones this Git subdirectory at an exact public commit. Maintain its README/config inputs, but do not hand-edit `worker.mjs` or `template-manifest.json`. |
+| `dist/sessionCorsWorker.bundle.js` | Repo-local bundle produced by `npm run worker:bundle` | Generated and untracked | Use for local verification or a one-off manual upload fallback. |
+| GitHub Release `sessionCorsWorker.bundle.js` | Immutable, checksummed downloadable bundle | Published release asset | Use for deploy-helper or manual dashboard deployment; it does not contain or replace the native Git template. |
+
+The native deploy button requires a public Git repository or isolated
+subdirectory, so the package under `deploy/` must exist in the repository. The
+release bundle is intentionally a different distribution channel for flows
+that accept a JavaScript upload or URL.
+
+Public links:
+
+- Canonical Session Worker source: `https://github.com/AgalmicSoftware/context-engine/tree/main/workers/sessionCorsWorker`
+- Native Cloudflare template: `https://github.com/AgalmicSoftware/context-engine/tree/main/deploy/cloudflare/session-worker`
+- Latest promoted release bundle: `https://github.com/AgalmicSoftware/context-engine/releases/latest/download/sessionCorsWorker.bundle.js`
+- Deploy-helper source: `https://github.com/AgalmicSoftware/context-engine/tree/main/workers/deploy-helper`
+
+`workers/deploy-helper/` and `workers/agentBridgeWorker/` are separate Worker
+services with different runtime responsibilities. They are not alternate
+Session Worker source trees.
+
 - Canonical CI publishes each successful public-branch bundle set as an
   immutable, commit-addressed GitHub release without moving `latest`.
   `.github/workflows/promote-worker-bundles.yml` separately verifies an

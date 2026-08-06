@@ -799,7 +799,10 @@ later, separately self-host the legacy deploy-helper described in
 
 ### Manual Cloudflare dashboard upload
 
-Use this when you want to avoid Wrangler and upload the worker bundle manually.
+This is separate from the native Deploy to Cloudflare flow above. Native deploy
+clones the checked-in `deploy/cloudflare/session-worker/` template; manual
+deploy uploads only a generated Worker bundle. Use this manual path when you
+want to avoid Wrangler and the native Git-template flow.
 
 Recommended source files:
 

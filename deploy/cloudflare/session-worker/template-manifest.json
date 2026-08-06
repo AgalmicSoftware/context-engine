@@ -21,13 +21,13 @@
       "sha256": "5f8fec95e46a641e06c4c1b056e9dadec21efe19195ee2525f8fb5100bed8edb"
     },
     "README.md": {
-      "bytes": 2312,
-      "sha256": "aa5b0d1e723bcd896a5657e688d34e3473ff393046c3569fd0ca7c5530044437"
+      "bytes": 3376,
+      "sha256": "5a20aee17c1ebb178e519ede68675051459342388f14d814e2189e12f999e8c0"
     },
     "LICENSE": {
       "bytes": 1089,
       "sha256": "3a7bf27cdcf1e7cb60dbdd248ed9514c2c8d579ba1fba90700b158307c6311d1"
     }
   },
-  "packageSha256": "bff60c72e7d54859eedf799d37d7dbd090c9cc88c96e51cbb0e5c3323768c9d8"
+  "packageSha256": "956323e2447b4b07c1bb7cbe535071ba7380696430536307c9a37af9b483cc95"
 }
