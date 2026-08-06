@@ -540,7 +540,15 @@ export class SessionWriteCoordinator {
         active: false,
         joinMode: 'admin_add',
       });
-      return { ok: true };
+      return { ok: true, prior: state };
+    });
+  }
+
+  async rollbackWorkerGroupDelete({ groupId, prior }) {
+    await this.state.storage.transaction(async (transaction) => {
+      const key = workerGroupCapacityGroupKey(groupId);
+      const state = await transaction.get(key);
+      if (state?.phase === 'deleting') await transaction.put(key, prior);
     });
   }
 
@@ -936,6 +944,7 @@ export class SessionWriteCoordinator {
       let groupReservation = null;
       let memberReservation = null;
       let updateReservation = null;
+      let deleteReservation = null;
       let removalReservation = null;
       let principalDigest = '';
       let activeGroup = null;
@@ -994,8 +1003,8 @@ export class SessionWriteCoordinator {
             return jsonResponse(updateReservation, updateReservation.status || 404);
           }
         } else if (mutation.operation === 'delete') {
-          const deleting = await this.beginWorkerGroupDelete(mutation.groupId);
-          if (!deleting.ok) return jsonResponse(deleting, deleting.status || 404);
+          deleteReservation = await this.beginWorkerGroupDelete(mutation.groupId);
+          if (!deleteReservation.ok) return jsonResponse(deleteReservation, deleteReservation.status || 404);
         }
       }
       if (mutation.operation === 'add-member' || mutation.operation === 'join') {
@@ -1064,6 +1073,12 @@ export class SessionWriteCoordinator {
           await this.rollbackWorkerGroupUpdate({
             groupId: mutation.groupId,
             prior: updateReservation.prior,
+          });
+        }
+        if (deleteReservation?.ok) {
+          await this.rollbackWorkerGroupDelete({
+            groupId: mutation.groupId,
+            prior: deleteReservation.prior,
           });
         }
         if (memberReservation?.reserved) {

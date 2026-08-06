@@ -956,6 +956,72 @@ test('failed member removal restores durable membership for retry', async () => 
 	assert.equal((await mutate('remove-member', { principal: member })).status, 200);
 });
 
+test('failed group delete restores durable capacity for retry', async () => {
+	const kv = createWorkerGroupKv();
+	const env = {
+		CE_WORKER_GROUPS_KV: kv,
+		CE_WORKER_GROUPS_BOOTSTRAP: 'fresh-template-v2',
+		CE_WORKER_GROUP_MAX_GROUPS_PER_SESSION: '1',
+	};
+	const actorPrincipal = {
+		kind: 'evm_address',
+		address: '0x0000000000000000000000000000000000000abc',
+	};
+	const { state, store } = createTransactionalState();
+	const coordinator = new SessionWriteCoordinator(state, env);
+	const mutate = (operation, overrides = {}) =>
+		coordinator.fetch(
+			createCoordinatorRequest('/worker-groups/mutate', {
+				slug: 'session-a',
+				operation,
+				groupId: 'reviewers',
+				actorPrincipal,
+				...overrides,
+			}),
+		);
+
+	assert.equal(
+		(
+			await mutate('create', {
+				input: {
+					groupId: 'reviewers',
+					label: 'Reviewers',
+					joinMode: 'admin_add',
+					memberVisibility: 'members',
+				},
+			})
+		).status,
+		200,
+	);
+	const groupProjectionKey = [...kv.values.keys()].find(
+		(key) => key.startsWith('ce-worker-group:session-a:') && key.endsWith(':reviewers'),
+	);
+	assert.ok(groupProjectionKey);
+	const groupProjection = kv.values.get(groupProjectionKey);
+	kv.values.delete(groupProjectionKey);
+
+	const failedDelete = await mutate('delete');
+	assert.equal(failedDelete.status, 404);
+	assert.equal((await failedDelete.json()).reason, 'worker_group_not_found');
+	assert.equal(store.get('worker-group-capacity-group-v3:reviewers')?.phase, 'active');
+
+	kv.values.set(groupProjectionKey, groupProjection);
+	assert.equal((await mutate('delete')).status, 200);
+	assert.equal(
+		(
+			await mutate('create', {
+				input: {
+					groupId: 'replacement',
+					label: 'Replacement',
+					joinMode: 'admin_add',
+					memberVisibility: 'members',
+				},
+			})
+		).status,
+		200,
+	);
+});
+
 test('Durable Object authorization denies stale KV membership after remove and delete', async () => {
 	const kv = createWorkerGroupKv();
 	const env = installWorkerGroupCoordinatorBinding({
