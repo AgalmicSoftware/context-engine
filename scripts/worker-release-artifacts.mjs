@@ -28,6 +28,10 @@ export const WORKER_ARTIFACTS = Object.freeze([
   Object.freeze({ kind: 'agent-bridge-worker', file: 'agentBridgeWorker.bundle.js' }),
 ]);
 
+const PUBLIC_PII_SCANNER = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  'verify-public-release-pii.sh',
+);
 const SHA_PATTERN = /^[a-f0-9]{40}$/;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 const SAFE_REF_PATTERN = /^refs\/heads\/[A-Za-z0-9._/-]+$/;
@@ -336,6 +340,22 @@ export function verifyPublicReplayRange({ rootDir, baseRef, candidateRef }) {
       `commit ${replayCommit} lacks one valid CE-Private-Source trailer`,
     );
     assertPrivateSourceIsNotPublic(rootDir, privateSourceCommit, replayCommit, candidateCommit);
+  }
+
+  try {
+    execFileSync(
+      'bash',
+      [PUBLIC_PII_SCANNER, '--git-range', rootDir, baseCommit, candidateCommit],
+      {
+        cwd: rootDir,
+        encoding: 'utf8',
+        maxBuffer: 4 * 1024 * 1024,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    );
+  } catch (error) {
+    const detail = String(error?.stderr || error?.message || '').trim();
+    throw new Error(detail || 'public release PII scan failed');
   }
 
   return { baseCommit, candidateCommit, replayCommitCount: replayCommits.length };

@@ -290,6 +290,9 @@ validate_public_branch() {
   local committer_name
   local committer_email
   local provenance_status
+  local public_pii_scanner
+  local public_repo_root
+  local replay_scan_base_sha
 
   PUBLIC_BRANCH_ERROR=""
   resolved_candidate="$(git rev-parse --verify "${candidate_sha}^{commit}" 2>/dev/null || true)"
@@ -342,6 +345,7 @@ validate_public_branch() {
     PUBLIC_BRANCH_ERROR="candidate is not descended from fetched public main"
     return 1
   fi
+  replay_scan_base_sha="$base_sha"
 
   if [ "$remote_sha" != "$ZERO_OID" ]; then
     resolved_remote="$(git rev-parse --verify "${remote_sha}^{commit}" 2>/dev/null || true)"
@@ -407,6 +411,13 @@ validate_public_branch() {
 
   if find_non_public_ref_overlap "$candidate_sha" "$base_sha" "$pushed_local_ref"; then
     PUBLIC_BRANCH_ERROR="candidate commit is also reachable from non-public ref $PUBLIC_BRANCH_PRIVATE_REF"
+    return 1
+  fi
+
+  public_repo_root="$(git rev-parse --show-toplevel)"
+  public_pii_scanner="$public_repo_root/scripts/verify-public-release-pii.sh"
+  if ! bash "$public_pii_scanner" --git-range "$public_repo_root" "$replay_scan_base_sha" "$candidate_sha" >&2; then
+    PUBLIC_BRANCH_ERROR="candidate replay history failed the public release PII scan"
     return 1
   fi
 

@@ -9,6 +9,7 @@ const { execFileSync, spawnSync } = require('node:child_process');
 
 const PRE_PUSH_SOURCE_PATH = path.join(__dirname, '..', '.githooks', 'pre-push');
 const RELEASE_VERSION_SOURCE_PATH = path.join(__dirname, 'release-version.mjs');
+const PUBLIC_PII_SCANNER_SOURCE_PATH = path.join(__dirname, 'verify-public-release-pii.sh');
 const PUBLIC_GIT_NAME = 'Agalmic';
 const PUBLIC_GIT_EMAIL = 'agalmicsoftware@protonmail.com';
 const NON_ZERO_SHA = '1111111111111111111111111111111111111111';
@@ -35,6 +36,11 @@ function setupHookFixture() {
     tempDir,
     path.join('scripts', 'release-version.mjs'),
     fs.readFileSync(RELEASE_VERSION_SOURCE_PATH, 'utf8'),
+  );
+  writeFile(
+    tempDir,
+    path.join('scripts', 'verify-public-release-pii.sh'),
+    fs.readFileSync(PUBLIC_PII_SCANNER_SOURCE_PATH, 'utf8'),
   );
   fs.chmodSync(path.join(tempDir, '.githooks', 'pre-push'), 0o755);
   return tempDir;
@@ -731,6 +737,48 @@ test('pre-push guard allows a same-version follow-up to an existing release cand
 
     assert.equal(result.status, 0);
     assert.match(result.stderr, /release version verified: 0\.1\.1/);
+  });
+});
+
+test('pre-push guard rejects PII added and removed within staging history', () => {
+  withHookFixture((rootDir) => {
+    const { candidateSha } = createVersionedCandidate(rootDir, '0.1.1');
+    writeFile(rootDir, 'transient-leak.txt', `Contact owner${'@'}example.test\n`);
+    git(rootDir, ['add', 'transient-leak.txt']);
+    let privateSourceSha = createPrivateSourceCommit(rootDir, candidateSha);
+    git(rootDir, [
+      'commit',
+      '--quiet',
+      '-m',
+      'add temporary release note',
+      '-m',
+      `CE-Private-Source: ${privateSourceSha}`,
+    ]);
+    const leakCommit = git(rootDir, ['rev-parse', 'HEAD']);
+    git(rootDir, ['rm', '--quiet', 'transient-leak.txt']);
+    privateSourceSha = createPrivateSourceCommit(rootDir, leakCommit);
+    git(rootDir, [
+      'commit',
+      '--quiet',
+      '-m',
+      'remove temporary release note',
+      '-m',
+      `CE-Private-Source: ${privateSourceSha}`,
+    ]);
+    const finalSha = git(rootDir, ['rev-parse', 'HEAD']);
+    git(rootDir, ['branch', '-M', 'release-staging']);
+
+    assert.equal(git(rootDir, ['ls-tree', '-r', '--name-only', finalSha, '--', 'transient-leak.txt']), '');
+    const result = runHook(rootDir, pushLine({
+      localRef: 'refs/heads/release-staging',
+      localSha: finalSha,
+      remoteRef: 'refs/heads/release-staging',
+      remoteSha: leakCommit,
+    }));
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /public release PII scan/);
+    assert.match(result.stderr, /FAIL email: transient-leak\.txt:1/);
   });
 });
 

@@ -1,15 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-TARGET_DIR="${1:-release-public}"
-
-node - "$TARGET_DIR" <<'NODE'
+node - "$@" <<'NODE'
 'use strict';
 
+const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const targetDir = path.resolve(process.argv[2] || 'release-public');
+const args = process.argv.slice(2);
+const gitRangeMode = args[0] === '--git-range';
+if ((gitRangeMode && args.length !== 4) || (!gitRangeMode && args.length > 1)) {
+  console.error('usage: verify-public-release-pii.sh [directory]');
+  console.error('   or: verify-public-release-pii.sh --git-range <repo> <base> <candidate>');
+  process.exit(2);
+}
+const targetDir = path.resolve(gitRangeMode ? args[1] : (args[0] || 'release-public'));
 const skipDirs = new Set([
   '.git',
   'node_modules',
@@ -198,24 +204,117 @@ function scanTextFile(relativePath, text, findings, warnings) {
   });
 }
 
-if (!fs.existsSync(targetDir) || !fs.statSync(targetDir).isDirectory()) {
-  console.error(`public release PII scan target is not a directory: ${targetDir}`);
-  process.exit(2);
+function scanBuffer(relativePath, buffer, findings, warnings) {
+  if (isProbablyBinary(buffer)) return false;
+  scanTextFile(relativePath, buffer.toString('utf8'), findings, warnings);
+  return true;
+}
+
+function gitBuffer(repoDir, gitArgs) {
+  return execFileSync('git', gitArgs, {
+    cwd: repoDir,
+    encoding: 'buffer',
+    maxBuffer: 64 * 1024 * 1024,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+}
+
+function gitText(repoDir, gitArgs) {
+  return gitBuffer(repoDir, gitArgs).toString('utf8').trim();
+}
+
+function resolveCommit(repoDir, ref, label) {
+  const commit = gitText(repoDir, ['rev-parse', '--verify', `${ref}^{commit}`]);
+  if (!/^[a-f0-9]{40}$/.test(commit)) throw new Error(`${label} did not resolve to a commit`);
+  return commit;
+}
+
+function scanDirectory(rootDir, findings, warnings) {
+  if (!fs.existsSync(rootDir) || !fs.statSync(rootDir).isDirectory()) {
+    throw new Error(`scan target is not a directory: ${rootDir}`);
+  }
+
+  let scannedFiles = 0;
+  for (const absolutePath of walkFiles(rootDir)) {
+    const buffer = fs.lstatSync(absolutePath).isSymbolicLink()
+      ? Buffer.from(fs.readlinkSync(absolutePath))
+      : fs.readFileSync(absolutePath);
+    const relativePath = toPosix(path.relative(rootDir, absolutePath));
+    if (scanBuffer(relativePath, buffer, findings, warnings)) scannedFiles += 1;
+  }
+  return scannedFiles;
+}
+
+function scanGitRange(repoDir, baseRef, candidateRef, findings, warnings) {
+  const baseCommit = resolveCommit(repoDir, baseRef, 'Git range base');
+  const candidateCommit = resolveCommit(repoDir, candidateRef, 'Git range candidate');
+  try {
+    execFileSync('git', ['merge-base', '--is-ancestor', baseCommit, candidateCommit], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+  } catch (_) {
+    throw new Error('Git range candidate is not descended from its base');
+  }
+
+  const commits = gitText(repoDir, ['rev-list', '--reverse', `${baseCommit}..${candidateCommit}`])
+    .split(/\s+/)
+    .filter(Boolean);
+  let scannedFiles = 0;
+
+  for (const commit of commits) {
+    const parents = gitText(repoDir, ['rev-list', '--parents', '-n', '1', commit])
+      .split(/\s+/)
+      .slice(1);
+    if (parents.length !== 1) throw new Error(`commit ${commit} is not a linear public replay`);
+
+    const message = gitBuffer(repoDir, ['show', '-s', '--format=%B', commit]);
+    if (scanBuffer(`.git-commit-messages/${commit}.txt`, message, findings, warnings)) {
+      scannedFiles += 1;
+    }
+
+    const changedPaths = gitBuffer(repoDir, [
+      'diff-tree',
+      '--no-commit-id',
+      '--name-only',
+      '-r',
+      '-z',
+      '--no-renames',
+      '--diff-filter=ACMRTUXB',
+      parents[0],
+      commit,
+    ]).toString('utf8').split('\0').filter(Boolean);
+
+    for (const relativePath of changedPaths) {
+      const objectSpec = `${commit}:${relativePath}`;
+      const objectType = gitText(repoDir, ['cat-file', '-t', objectSpec]);
+      if (objectType !== 'blob') {
+        addFinding(findings, 'unsupported-tree-entry', relativePath, 1, objectType);
+        continue;
+      }
+      const buffer = gitBuffer(repoDir, ['cat-file', 'blob', objectSpec]);
+      if (scanBuffer(toPosix(relativePath), buffer, findings, warnings)) scannedFiles += 1;
+    }
+  }
+
+  return { scannedFiles, baseCommit, candidateCommit };
 }
 
 const findings = [];
 const warnings = [];
-let scannedFiles = 0;
-
-for (const absolutePath of walkFiles(targetDir)) {
-  const buffer = fs.lstatSync(absolutePath).isSymbolicLink()
-    ? Buffer.from(fs.readlinkSync(absolutePath))
-    : fs.readFileSync(absolutePath);
-  if (isProbablyBinary(buffer)) continue;
-
-  const relativePath = toPosix(path.relative(targetDir, absolutePath));
-  scanTextFile(relativePath, buffer.toString('utf8'), findings, warnings);
-  scannedFiles += 1;
+let scanResult;
+let scanLabel;
+try {
+  if (gitRangeMode) {
+    scanResult = scanGitRange(targetDir, args[2], args[3], findings, warnings);
+    scanLabel = `${scanResult.baseCommit}..${scanResult.candidateCommit}`;
+  } else {
+    scanResult = { scannedFiles: scanDirectory(targetDir, findings, warnings) };
+    scanLabel = targetDir;
+  }
+} catch (error) {
+  console.error(`public release PII scan could not inspect ${targetDir}: ${error.message}`);
+  process.exit(2);
 }
 
 if (warnings.length > 0) {
@@ -232,7 +331,7 @@ if (warnings.length > 0) {
 }
 
 if (findings.length > 0) {
-  console.error(`public release PII scan failed for ${targetDir}`);
+  console.error(`public release PII scan failed for ${scanLabel}`);
   findings.slice(0, 100).forEach((finding) => {
     console.error(`FAIL ${finding.kind}: ${finding.file}:${finding.line}: ${finding.detail}`);
   });
@@ -243,7 +342,7 @@ if (findings.length > 0) {
 }
 
 console.log(
-  `public release PII scan passed (${scannedFiles} text files scanned, `
+  `public release PII scan passed (${scanResult.scannedFiles} text files scanned, `
   + `${warnings.length} bare 0x warning(s))`,
 );
 NODE

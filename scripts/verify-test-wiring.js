@@ -471,6 +471,8 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
     '/scripts/run-ci-gates.test.mjs @AgalmicSoftware',
     '/scripts/worker-release-artifacts.mjs @AgalmicSoftware',
     '/scripts/worker-release-artifacts.test.mjs @AgalmicSoftware',
+    '/scripts/verify-public-release-pii.sh @AgalmicSoftware',
+    '/scripts/verify-public-release-pii.test.js @AgalmicSoftware',
     '/scripts/sync-public-history.sh @AgalmicSoftware',
     '/scripts/client-boundaries-baseline.json @AgalmicSoftware',
     '/scripts/type-debt-baseline.json @AgalmicSoftware',

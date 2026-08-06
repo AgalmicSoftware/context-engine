@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { spawnSync } = require('node:child_process');
+const { execFileSync, spawnSync } = require('node:child_process');
 
 const SCANNER_PATH = path.join(__dirname, 'verify-public-release-pii.sh');
 
@@ -26,6 +26,21 @@ function withFixture(run) {
 
 function runScanner(targetDir) {
   return spawnSync('bash', [SCANNER_PATH, targetDir], {
+    cwd: path.resolve(__dirname, '..'),
+    encoding: 'utf8',
+  });
+}
+
+function git(rootDir, args) {
+  return execFileSync('git', args, {
+    cwd: rootDir,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim();
+}
+
+function runGitRangeScanner(rootDir, baseRef, candidateRef) {
+  return spawnSync('bash', [SCANNER_PATH, '--git-range', rootDir, baseRef, candidateRef], {
     cwd: path.resolve(__dirname, '..'),
     encoding: 'utf8',
   });
@@ -137,5 +152,40 @@ test('verify-public-release-pii scans broken symlink targets', () => {
     assert.equal(result.status, 1);
     assert.match(result.stderr, /FAIL home-path: client\/src\/unsafe-link:1/);
     assert.match(result.stderr, /FAIL secret-assignment: client\/src\/unsafe-link:1/);
+  });
+});
+
+test('verify-public-release-pii scans transient Git history and commit messages', () => {
+  withFixture((rootDir) => {
+    git(rootDir, ['init', '--quiet', '-b', 'main']);
+    git(rootDir, ['config', 'user.name', 'Agalmic']);
+    git(rootDir, ['config', 'user.email', 'agalmicsoftware@protonmail.com']);
+    writeFile(rootDir, 'README.md', '# Public fixture\n');
+    git(rootDir, ['add', 'README.md']);
+    git(rootDir, ['commit', '--quiet', '-m', 'base']);
+    const baseCommit = git(rootDir, ['rev-parse', 'HEAD']);
+
+    writeFile(rootDir, 'docs/transient-leak.md', `Contact owner${'@'}example.test\n`);
+    const linkPath = path.join(rootDir, 'client', 'src', 'transient-link');
+    fs.mkdirSync(path.dirname(linkPath), { recursive: true });
+    fs.symlinkSync(`/${'Us'}ers/example/private-release-note`, linkPath);
+    git(rootDir, ['add', 'docs/transient-leak.md', 'client/src/transient-link']);
+    git(rootDir, [
+      'commit',
+      '--quiet',
+      '-m',
+      `temporary note from /${'Us'}ers/example/context-engine`,
+    ]);
+    git(rootDir, ['rm', '--quiet', 'docs/transient-leak.md', 'client/src/transient-link']);
+    git(rootDir, ['commit', '--quiet', '-m', 'remove temporary files']);
+    const candidateCommit = git(rootDir, ['rev-parse', 'HEAD']);
+
+    assert.equal(git(rootDir, ['ls-tree', '-r', '--name-only', candidateCommit]), 'README.md');
+    const result = runGitRangeScanner(rootDir, baseCommit, candidateCommit);
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /FAIL email: docs\/transient-leak\.md:1/);
+    assert.match(result.stderr, /FAIL home-path: client\/src\/transient-link:1/);
+    assert.match(result.stderr, /FAIL home-path: \.git-commit-messages\/[a-f0-9]{40}\.txt:1/);
   });
 });

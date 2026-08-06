@@ -356,6 +356,26 @@ test('public replay range rejects tag-only public commits as private-source prov
   }
 });
 
+test('public replay range rejects PII added and removed before the candidate tip', () => {
+  const { rootDir, git, baseCommit } = publicReplayFixture();
+  try {
+    fs.writeFileSync(path.join(rootDir, 'transient-leak.txt'), 'Contact [redacted-email]\n');
+    git(['add', 'transient-leak.txt']);
+    git(['commit', '-m', messageWithSource('add temporary release note', SHA_C)]);
+    git(['rm', 'transient-leak.txt']);
+    git(['commit', '-m', messageWithSource('remove temporary release note', SHA_C)]);
+    const candidateCommit = git(['rev-parse', 'HEAD']);
+
+    assert.equal(git(['ls-tree', '-r', '--name-only', candidateCommit, '--', 'transient-leak.txt']), '');
+    assert.throws(
+      () => verifyPublicReplayRange({ rootDir, baseRef: baseCommit, candidateRef: candidateCommit }),
+      /public release PII scan failed/,
+    );
+  } finally {
+    fs.rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
 test('source provenance resolves a linear replay from its own trailer', () => {
   const { rootDir, git, baseCommit } = sourceProvenanceFixture();
   try {
