@@ -7,6 +7,7 @@ export LANG=C
 PUBLIC_GIT_NAME="Agalmic"
 PUBLIC_GIT_EMAIL="agalmicsoftware@protonmail.com"
 DEFAULT_BRANCH_NAME="release-staging"
+ZERO_OID="0000000000000000000000000000000000000000"
 
 usage() {
   cat <<'EOF'
@@ -119,7 +120,7 @@ REPLAYED_COUNT=0
 SKIPPED_COUNT=0
 LATEST_REPLAYED_SOURCE_COMMIT=""
 REMOTE_BRANCH_EXISTS=0
-REMOTE_BRANCH_SHA=""
+REMOTE_BRANCH_SHA="$ZERO_OID"
 RELEASE_VERSION=""
 RELEASE_IMPACT=""
 RELEASE_CHANGED_PATHS_FILE=""
@@ -1155,9 +1156,6 @@ if [ "$AUTO_PUSH" -eq 1 ]; then
   printf 'Pushed: yes\n'
 else
   printf 'Pushed: no\n'
-  if [ "$REMOTE_BRANCH_EXISTS" -eq 1 ]; then
-    printf 'To push: git push --force-with-lease -u origin %s\n' "$TARGET_BRANCH"
-  else
-    printf 'To push: git push -u origin %s\n' "$TARGET_BRANCH"
-  fi
+  printf 'To push: git push --force-with-lease=refs/heads/%s:%s -u origin %s\n' \
+    "$TARGET_BRANCH" "$REMOTE_BRANCH_SHA" "$TARGET_BRANCH"
 fi

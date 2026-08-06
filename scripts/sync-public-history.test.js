@@ -18,6 +18,7 @@ const RELEASE_VERSION_SOURCE_PATH = path.join(__dirname, 'release-version.mjs');
 const PRIVATE_BRANCH_GUARD_INSTALLER_SOURCE_PATH = path.join(__dirname, 'install-private-branch-guard.sh');
 const PRE_PUSH_HOOK_SOURCE_PATH = path.join(__dirname, '..', '.githooks', 'pre-push');
 const TEST_TMP_ROOT = path.join(__dirname, '.tmp-sync-public-history-tests');
+const ZERO_OID = '0'.repeat(40);
 
 function writeFile(rootDir, relativePath, contents) {
   const absolutePath = path.join(rootDir, relativePath);
@@ -371,6 +372,9 @@ test('sync-public-history accepts a target base from the fetched public target h
       git(sourceDir, ['merge-base', '--is-ancestor', priorRelease, 'release-candidate']),
       '',
     );
+    assert.ok(result.stdout.includes(
+      `To push: git push --force-with-lease=refs/heads/release-candidate:${priorRelease} -u origin release-candidate`,
+    ));
   });
 });
 
@@ -480,7 +484,9 @@ test('sync-public-history replays public commits, skips private-only commits, an
     assert.match(result.stdout, /Skipped commits: 2/);
     assert.match(result.stdout, /Release impact suggestion: patch/);
     assert.match(result.stdout, /Release version: 0\.1\.1/);
-    assert.match(result.stdout, /To push: git push -u origin release-staging/);
+    assert.ok(result.stdout.includes(
+      `To push: git push --force-with-lease=refs/heads/release-staging:${ZERO_OID} -u origin release-staging`,
+    ));
 
     const tempDir = parseSummaryValue(result.stdout, 'Temp dir');
     assert.ok(tempDir);
