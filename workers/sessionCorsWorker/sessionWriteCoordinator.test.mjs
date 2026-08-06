@@ -50,6 +50,8 @@ const createTransactionalState = () => {
 				get: async (key) => store.get(key),
 				put: async (key, value) => store.set(key, structuredClone(value)),
 				delete: async (key) => store.delete(key),
+				list: async ({ prefix = '' } = {}) =>
+					new Map([...store].filter(([key]) => key.startsWith(prefix))),
 			},
 		},
 		store,
@@ -249,6 +251,53 @@ test('SessionWriteCoordinator admits exactly one concurrent group create at cap 
 	assert.equal([...kv.values.keys()].filter((key) => key.startsWith('ce-worker-group-index:')).length, 1);
 	const storedGroup = JSON.parse(kv.values.get([...kv.values.keys()].find((key) => key.startsWith('ce-worker-group:session-a:'))));
 	assert.equal(storedGroup.sessionId, workerSessionId);
+});
+
+test('SessionWriteCoordinator rejects address-shaped create ids before reservation', async () => {
+	const kv = createWorkerGroupKv();
+	const env = {
+		CE_WORKER_GROUPS_KV: kv,
+		CE_WORKER_GROUPS_BOOTSTRAP: 'fresh-template-v2',
+		CE_WORKER_GROUP_MAX_GROUPS_PER_SESSION: '1',
+	};
+	const { state, store } = createTransactionalState();
+	const coordinator = new SessionWriteCoordinator(state, env);
+	const actorPrincipal = {
+		kind: 'evm_address',
+		address: '0x0000000000000000000000000000000000000abc',
+	};
+	const response = await coordinator.fetch(
+		createCoordinatorRequest('/worker-groups/mutate', {
+			slug: 'session-a',
+			operation: 'create',
+			input: {
+				groupId: '0x1234567890abcdef1234567890abcdef12345678',
+				label: 'Address shaped',
+				joinMode: 'admin_add',
+				memberVisibility: 'members',
+			},
+			actorPrincipal,
+		}),
+	);
+	assert.equal(response.status, 400);
+	assert.equal((await response.json()).reason, 'invalid_worker_group_id');
+	assert.equal(store.size, 0);
+	assert.equal(kv.values.size, 0);
+
+	const validResponse = await coordinator.fetch(
+		createCoordinatorRequest('/worker-groups/mutate', {
+			slug: 'session-a',
+			operation: 'create',
+			input: {
+				groupId: 'valid-after-rejection',
+				label: 'Valid after rejection',
+				joinMode: 'admin_add',
+				memberVisibility: 'members',
+			},
+			actorPrincipal,
+		}),
+	);
+	assert.equal(validResponse.status, 200);
 });
 
 test('SessionWriteCoordinator rejects a replacement identity before touching same-slug group state', async () => {

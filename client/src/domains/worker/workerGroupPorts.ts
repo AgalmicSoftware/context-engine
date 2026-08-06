@@ -20,6 +20,7 @@ export type WorkerGroup = {
   adminAddress?: string;
   joinMode: WorkerGroupJoinMode;
   memberVisibility: WorkerGroupMemberVisibility;
+  memberCount?: number;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -165,6 +166,7 @@ const SAFE_LOCAL_WORKER_GROUP_REASONS = new Set([
   'worker_group_request_failed',
   'worker_group_response_cursor_invalid',
   'worker_group_response_group_invalid',
+  'worker_group_response_group_visibility_invalid',
   'worker_group_response_member_count_invalid',
   'worker_group_response_member_invalid',
   'worker_group_response_session_identity_mismatch',
@@ -612,8 +614,14 @@ export const joinWorkerGroup = async ({
     fetchImpl,
   }).then((payload) => {
     const group = normalizeGroup(payload.group, expectedSessionSlug);
-    if (!group) throw new WorkerGroupRequestError('worker_group_response_group_invalid');
-    return { ...payload, group };
+    if (!group || group.groupId !== toStringValue(groupId)) {
+      throw new WorkerGroupRequestError('worker_group_response_group_invalid');
+    }
+    const memberCount = Number(payload.memberCount);
+    if (!Number.isSafeInteger(memberCount) || memberCount < 0) {
+      throw new WorkerGroupRequestError('worker_group_response_member_count_invalid');
+    }
+    return { ...payload, group: { ...group, memberCount }, memberCount };
   });
 };
 
@@ -648,7 +656,24 @@ export const leaveWorkerGroup = async ({
     if (toStringValue(payload.groupId) !== expectedGroupId) {
       throw new WorkerGroupRequestError('worker_group_response_group_invalid');
     }
-    return payload;
+    const hasGroup = payload.group != null;
+    const hasMemberCount = Object.prototype.hasOwnProperty.call(payload, 'memberCount');
+    if (!hasGroup) {
+      if (hasMemberCount) throw new WorkerGroupRequestError('worker_group_response_group_invalid');
+      return payload;
+    }
+    const group = normalizeGroup(payload.group, expectedSessionSlug);
+    if (!group || group.groupId !== expectedGroupId) {
+      throw new WorkerGroupRequestError('worker_group_response_group_invalid');
+    }
+    if (group.memberVisibility !== 'session') {
+      throw new WorkerGroupRequestError('worker_group_response_group_visibility_invalid');
+    }
+    const memberCount = Number(payload.memberCount);
+    if (!Number.isSafeInteger(memberCount) || memberCount < 0) {
+      throw new WorkerGroupRequestError('worker_group_response_member_count_invalid');
+    }
+    return { ...payload, group: { ...group, memberCount }, memberCount };
   });
 };
 

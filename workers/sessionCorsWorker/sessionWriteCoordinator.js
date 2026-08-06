@@ -22,6 +22,7 @@ import {
 import {
   createWorkerGroupId,
   executeWorkerGroupMutation,
+  isAddressShapedWorkerGroupId,
   normalizeWorkerGroupId,
   normalizeWorkerGroupPrincipal,
   resolveWorkerGroupBootstrap,
@@ -839,8 +840,75 @@ export class SessionWriteCoordinator {
     });
   }
 
+  executeWorkerGroupMemberships(payload) {
+    return this.serializeWorkerGroupOperation(async () => {
+      const slug = normalizeSessionSlug(payload?.slug);
+      const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
+      const principal = normalizeWorkerGroupPrincipal(payload?.principal);
+      if (!slug || !sessionId || !principal.ok) {
+        return jsonResponse({ ok: false, status: 400, reason: 'worker_group_memberships_invalid' }, 400);
+      }
+      const initialized = await this.initializeWorkerGroupCapacity(slug, sessionId);
+      if (!initialized.ok) return jsonResponse(initialized, initialized.status || 503);
+      const entries = await this.state.storage.list({ prefix: WORKER_GROUP_CAPACITY_GROUP_PREFIX });
+      if (!(entries instanceof Map)) {
+        return jsonResponse({ ok: false, status: 503, reason: 'worker_group_capacity_state_unavailable' }, 503);
+      }
+      const activeGroups = [];
+      for (const [key, state] of entries) {
+        const encodedGroupId = String(key).slice(WORKER_GROUP_CAPACITY_GROUP_PREFIX.length);
+        let groupId = '';
+        try {
+          groupId = normalizeWorkerGroupId(decodeURIComponent(encodedGroupId));
+        } catch {
+          groupId = '';
+        }
+        if (!groupId || workerGroupCapacityGroupKey(groupId) !== key) {
+          return jsonResponse({ ok: false, status: 503, reason: 'worker_group_capacity_state_unavailable' }, 503);
+        }
+        if (state?.version === 2 && state.phase === 'active' && state.active === true) {
+          activeGroups.push({ groupId, state });
+        }
+      }
+      if (activeGroups.length !== Number(initialized.meta?.groupCount)) {
+        return jsonResponse({ ok: false, status: 503, reason: 'worker_group_capacity_state_unavailable' }, 503);
+      }
+      const principalDigest = await sha256Hex(`worker-group-member:${principal.key}`);
+      const groups = [];
+      for (const { groupId, state } of activeGroups.sort((left, right) => left.groupId.localeCompare(right.groupId))) {
+        const memberKey = workerGroupCapacityMemberKey({
+          groupId,
+          generation: Math.max(1, Number(state.generation || 0)),
+          principalDigest,
+        });
+        const member = await this.state.storage.get(memberKey);
+        if (member?.state !== 'active') continue;
+        const memberCount = Number(state.memberCount);
+        if (!Number.isSafeInteger(memberCount) || memberCount < 0) {
+          return jsonResponse({ ok: false, status: 503, reason: 'worker_group_capacity_state_unavailable' }, 503);
+        }
+        groups.push({
+          groupId,
+          joinMode: state.joinMode,
+          memberVisibility: state.memberVisibility,
+          memberCount,
+        });
+      }
+      return jsonResponse(
+        { ok: true, status: 200, store: 'durable_object', principal: principal.principal, groups },
+        200,
+      );
+    });
+  }
+
   async executeWorkerGroupMutation(payload) {
     return this.serializeWorkerGroupOperation(async () => {
+      if (
+        toTrimmedString(payload?.operation).toLowerCase() === 'create' &&
+        isAddressShapedWorkerGroupId(payload?.input?.groupId)
+      ) {
+        return jsonResponse({ ok: false, status: 400, reason: 'invalid_worker_group_id' }, 400);
+      }
       const mutation = normalizeWorkerGroupMutation(payload);
       if (!mutation) {
         return jsonResponse({
@@ -1018,6 +1086,23 @@ export class SessionWriteCoordinator {
           sessionId: mutation.sessionId,
           groupId: mutation.groupId,
         });
+      }
+      if (mutation.operation === 'add-member' || mutation.operation === 'join' || mutation.operation === 'remove-member') {
+        const postMutationGroup = await this.getActiveWorkerGroupCapacity(mutation.groupId);
+        const memberCount = Number(postMutationGroup?.state?.memberCount);
+        if (!postMutationGroup.ok || !Number.isSafeInteger(memberCount) || memberCount < 0) {
+          return jsonResponse({ ok: false, status: 503, reason: 'worker_group_capacity_state_unavailable' }, 503);
+        }
+        result = {
+          ...result,
+          group: {
+            ...(result.group || {}),
+            groupId: mutation.groupId,
+            joinMode: postMutationGroup.state.joinMode,
+            memberVisibility: postMutationGroup.state.memberVisibility,
+          },
+          memberCount,
+        };
       }
       return jsonResponse(result, 200);
     });
@@ -1651,6 +1736,9 @@ export class SessionWriteCoordinator {
     }
     if (url.pathname === '/worker-groups/catalog') {
       return this.executeWorkerGroupCatalog(payload);
+    }
+    if (url.pathname === '/worker-groups/memberships') {
+      return this.executeWorkerGroupMemberships(payload);
     }
     if (url.pathname === '/worker-groups/mutate') {
       return this.executeWorkerGroupMutation(payload);

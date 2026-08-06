@@ -303,6 +303,8 @@ const installCoordinatorBinding = (env) => {
 							get: async (key) => values.get(key),
 							put: async (key, value) => values.set(key, structuredClone(value)),
 							delete: async (key) => values.delete(key),
+							list: async ({ prefix = '' } = {}) =>
+								new Map([...values].filter(([key]) => key.startsWith(prefix))),
 							transaction,
 						},
 					},
@@ -1110,6 +1112,175 @@ test('worker groups operate on storage index KV without a D1 binding', async () 
 	assert.equal(memberships.memberships[0].memberCount, 1);
 });
 
+test('membership discovery uses the coordinator when the KV principal index is empty', async () => {
+	const kv = createMockKv();
+	const env = installCoordinatorBinding({ CE_WORKER_GROUPS_KV: kv });
+	await executeCoordinatedWorkerGroupMutation({
+		env,
+		slug: 'session-a',
+		operation: 'create',
+		input: { groupId: 'index-lag', label: 'Index lag', joinMode: 'admin_add', memberVisibility: 'members' },
+		actorPrincipal: actor,
+	});
+	await executeCoordinatedWorkerGroupMutation({
+		env,
+		slug: 'session-a',
+		operation: 'add-member',
+		groupId: 'index-lag',
+		principal: member,
+		actorPrincipal: actor,
+	});
+	const principalIndexKey = [...kv.store.keys()].find((key) => key.startsWith('ce-worker-group-principal:'));
+	assert.ok(principalIndexKey);
+	await kv.delete(principalIndexKey);
+
+	const memberships = await listWorkerGroupMemberships({
+		env,
+		slug: 'session-a',
+		sessionId,
+		principal: member,
+	});
+
+	assert.equal(memberships.ok, true);
+	assert.deepEqual(memberships.memberships.map((entry) => entry.group.groupId), ['index-lag']);
+	assert.equal(memberships.memberships[0].memberCount, 1);
+});
+
+test('stale positive KV rows cannot resurrect a removed membership', async () => {
+	const kv = createMockKv();
+	const env = installCoordinatorBinding({ CE_WORKER_GROUPS_KV: kv });
+	await executeCoordinatedWorkerGroupMutation({
+		env,
+		slug: 'session-a',
+		operation: 'create',
+		input: { groupId: 'stale-positive', label: 'Stale positive', joinMode: 'admin_add', memberVisibility: 'members' },
+		actorPrincipal: actor,
+	});
+	await executeCoordinatedWorkerGroupMutation({
+		env,
+		slug: 'session-a',
+		operation: 'add-member',
+		groupId: 'stale-positive',
+		principal: member,
+		actorPrincipal: actor,
+	});
+	const memberKey = [...kv.store.keys()].find(
+		(key) => key.startsWith('ce-worker-group-member:') && key.includes(':stale-positive:'),
+	);
+	const principalIndexKey = [...kv.store.keys()].find(
+		(key) => key.startsWith('ce-worker-group-principal:') && key.endsWith(':stale-positive'),
+	);
+	assert.ok(memberKey);
+	assert.ok(principalIndexKey);
+	const staleMember = kv.store.get(memberKey);
+	const staleIndex = kv.store.get(principalIndexKey);
+	const removed = await executeCoordinatedWorkerGroupMutation({
+		env,
+		slug: 'session-a',
+		operation: 'remove-member',
+		groupId: 'stale-positive',
+		principal: member,
+		actorPrincipal: actor,
+	});
+	assert.equal(removed.ok, true);
+	await kv.put(memberKey, staleMember);
+	await kv.put(principalIndexKey, staleIndex);
+
+	const memberships = await listWorkerGroupMemberships({
+		env,
+		slug: 'session-a',
+		sessionId,
+		principal: member,
+	});
+	assert.equal(memberships.ok, true);
+	assert.deepEqual(memberships.memberships, []);
+});
+
+test('membership discovery fails when an authoritative membership lacks a KV projection', async () => {
+	for (const missingProjection of ['group', 'member']) {
+		const kv = createMockKv();
+		const env = installCoordinatorBinding({ CE_WORKER_GROUPS_KV: kv });
+		await executeCoordinatedWorkerGroupMutation({
+			env,
+			slug: 'session-a',
+			operation: 'create',
+			input: {
+				groupId: `missing-${missingProjection}`,
+				label: `Missing ${missingProjection}`,
+				joinMode: 'admin_add',
+				memberVisibility: 'members',
+			},
+			actorPrincipal: actor,
+		});
+		await executeCoordinatedWorkerGroupMutation({
+			env,
+			slug: 'session-a',
+			operation: 'add-member',
+			groupId: `missing-${missingProjection}`,
+			principal: member,
+			actorPrincipal: actor,
+		});
+		const projectionKey = [...kv.store.keys()].find((key) =>
+			missingProjection === 'group'
+				? key.startsWith('ce-worker-group:') && key.endsWith(`:missing-${missingProjection}`)
+				: key.startsWith('ce-worker-group-member:') && key.includes(`:missing-${missingProjection}:`),
+		);
+		assert.ok(projectionKey, missingProjection);
+		await kv.delete(projectionKey);
+
+		const memberships = await listWorkerGroupMemberships({
+			env,
+			slug: 'session-a',
+			sessionId,
+			principal: member,
+		});
+		assert.equal(memberships.ok, false, missingProjection);
+		assert.equal(memberships.status, 503, missingProjection);
+		assert.equal(memberships.reason, 'worker_group_projection_unavailable', missingProjection);
+	}
+});
+
+test('new address-shaped group ids are rejected without tightening legacy reads', async () => {
+	const addressGroupId = '0x1234567890abcdef1234567890abcdef12345678';
+	const freshKv = createMockKv();
+	const rejected = await createWorkerGroup({
+		env: { CE_WORKER_GROUPS_KV: freshKv },
+		slug: 'session-a',
+		input: { groupId: addressGroupId, label: 'Address shaped', joinMode: 'open', memberVisibility: 'session' },
+		actorPrincipal: actor,
+	});
+	assert.equal(rejected.ok, false);
+	assert.equal(rejected.reason, 'invalid_worker_group_id');
+	assert.equal(freshKv.store.size, 0);
+
+	const legacyKv = createMockKv();
+	const sessionKey = Buffer.from(sessionId.slice(2), 'hex').toString('base64url');
+	const groupKey = `ce-worker-group:session-a:${sessionKey}:${addressGroupId}`;
+	const indexKey = `ce-worker-group-index:session-a:${sessionKey}:${addressGroupId}`;
+	const legacyGroup = {
+		groupId: addressGroupId,
+		sessionSlug: 'session-a',
+		sessionId,
+		label: 'Legacy address group',
+		joinMode: 'open',
+		memberVisibility: 'session',
+		createdAt: '2026-01-01T00:00:00.000Z',
+		updatedAt: '2026-01-01T00:00:00.000Z',
+	};
+	await legacyKv.put(groupKey, JSON.stringify(legacyGroup));
+	await legacyKv.put(indexKey, addressGroupId);
+	const updated = await updateWorkerGroup({
+		env: { CE_WORKER_GROUPS_KV: legacyKv },
+		slug: 'session-a',
+		sessionId,
+		groupId: addressGroupId,
+		input: { label: 'Legacy address group updated' },
+		actorPrincipal: actor,
+	});
+	assert.equal(updated.ok, true);
+	assert.equal(updated.group.groupId, addressGroupId);
+});
+
 test('worker groups ignore session-worker D1 bindings and keep KV authoritative', async () => {
 	const d1BindingNames = ['CE_WORKER_GROUPS_D1', 'CE_STORAGE_AUDIT_D1', 'STORAGE_AUDIT_D1', 'D1', 'DB'];
 
@@ -1337,6 +1508,7 @@ test('member routes respect visibility and open join mode', async () => {
 	assert.equal(joinResponse.status, 200);
 	assert.equal(joinResponse.body.sessionSlug, 'session-a');
 	assert.equal(joinResponse.body.sessionId, sessionId);
+	assert.equal(joinResponse.body.memberCount, 1);
 
 	const memberships = await listWorkerGroupMemberships({
 		env,
@@ -1374,6 +1546,8 @@ test('member routes respect visibility and open join mode', async () => {
 	assert.equal(leaveResponse.body.sessionId, sessionId);
 	assert.equal(leaveResponse.body.groupId, 'open-review');
 	assert.equal(leaveResponse.body.principal.address, member.address);
+	assert.equal(Object.hasOwn(leaveResponse.body, 'group'), false);
+	assert.equal(Object.hasOwn(leaveResponse.body, 'memberCount'), false);
 
 	const membershipsAfterLeave = await listWorkerGroupMemberships({
 		env,
@@ -1392,6 +1566,47 @@ test('member routes respect visibility and open join mode', async () => {
 	});
 	assert.equal(actorMemberships.ok, true);
 	assert.deepEqual(actorMemberships.memberships, []);
+});
+
+test('session-visible leave returns the retained group and authoritative count', async () => {
+	const kv = createMockKv();
+	const env = installCoordinatorBinding({ CE_WORKER_GROUPS_KV: kv });
+	await executeCoordinatedWorkerGroupMutation({
+		env,
+		slug: 'session-a',
+		operation: 'create',
+		input: { groupId: 'visible-leave', label: 'Visible leave', joinMode: 'open', memberVisibility: 'session' },
+		actorPrincipal: actor,
+	});
+	await executeCoordinatedWorkerGroupMutation({
+		env,
+		slug: 'session-a',
+		operation: 'join',
+		groupId: 'visible-leave',
+		principal: member,
+		actorPrincipal: member,
+	});
+
+	const response = await workerGroupsRoute({
+		path: '/groups/leave',
+		method: 'POST',
+		request: new Request('https://worker.example/groups/leave', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ groupId: 'visible-leave' }),
+		}),
+		env,
+		slug: 'session-a',
+		requesterAddress: member.address,
+		authScopes: {},
+		baseHeaders: {},
+		deps: { json },
+	});
+
+	assert.equal(response.status, 200);
+	assert.equal(response.body.memberCount, 0);
+	assert.equal(response.body.group.groupId, 'visible-leave');
+	assert.equal(response.body.group.memberVisibility, 'session');
 });
 
 test('participant member lists enforce the configured identity visibility and redact storage internals', async () => {

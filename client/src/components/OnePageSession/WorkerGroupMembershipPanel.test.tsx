@@ -507,6 +507,7 @@ describe('WorkerGroupMembershipPanel', () => {
               joinMode: 'open',
               memberVisibility: 'session',
             },
+            memberCount: 4,
           }),
           {
             status: 200,
@@ -523,6 +524,14 @@ describe('WorkerGroupMembershipPanel', () => {
             sessionId: SESSION_ID,
             sessionSlug: 'alpha',
             groupId: 'open-reviewers',
+            group: {
+              groupId: 'open-reviewers',
+              sessionSlug: 'alpha',
+              label: 'Open reviewers',
+              joinMode: 'open',
+              memberVisibility: 'session',
+            },
+            memberCount: 3,
             principal: {
               kind: 'evm_address',
               address: '0x00000000000000000000000000000000000000aa',
@@ -639,6 +648,7 @@ describe('WorkerGroupMembershipPanel', () => {
             sessionId: SESSION_ID,
             sessionSlug: 'alpha',
             group,
+            memberCount: 8,
           }),
           { status: 200, headers: { 'content-type': 'application/json' } },
         );
@@ -650,6 +660,8 @@ describe('WorkerGroupMembershipPanel', () => {
             sessionId: SESSION_ID,
             sessionSlug: 'alpha',
             groupId: group.groupId,
+            group,
+            memberCount: 7,
           }),
           { status: 200, headers: { 'content-type': 'application/json' } },
         );
@@ -717,6 +729,7 @@ describe('WorkerGroupMembershipPanel', () => {
             sessionId: SESSION_ID,
             sessionSlug: 'alpha',
             group,
+            memberCount: 1,
           }),
           { status: 200, headers: { 'content-type': 'application/json' } },
         );

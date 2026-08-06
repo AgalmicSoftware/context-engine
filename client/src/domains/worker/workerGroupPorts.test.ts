@@ -323,6 +323,7 @@ describe('worker group ports', () => {
               joinMode: 'open',
               memberVisibility: 'session',
             },
+            memberCount: 1,
           }),
           {
             status: 200,
@@ -411,7 +412,7 @@ describe('worker group ports', () => {
         groupId: 'reviewers',
         fetchImpl: successfulFetch,
       }),
-    ).resolves.toMatchObject({ ok: true, group: { groupId: 'reviewers' } });
+    ).resolves.toMatchObject({ ok: true, group: { groupId: 'reviewers' }, memberCount: 1 });
     expect(successfulFetch).toHaveBeenCalledWith(`${WORKER_URL}/groups/join`, {
       method: 'POST',
       cache: 'no-store',
@@ -476,6 +477,116 @@ describe('worker group ports', () => {
       },
       body: JSON.stringify({ groupId: 'reviewers', sessionId: SESSION_ID }),
     });
+
+    const visibleLeaveFetch = jest.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: SESSION_SLUG,
+            groupId: 'reviewers',
+            group: {
+              groupId: 'reviewers',
+              sessionSlug: SESSION_SLUG,
+              label: 'Reviewers',
+              joinMode: 'open',
+              memberVisibility: 'session',
+            },
+            memberCount: 0,
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+    );
+    await expect(
+      leaveWorkerGroup({
+        workerUrl: WORKER_URL,
+        credentialToken: WORKER_TOKEN,
+        sessionId: SESSION_ID,
+        sessionSlug: SESSION_SLUG,
+        groupId: 'reviewers',
+        fetchImpl: visibleLeaveFetch,
+      }),
+    ).resolves.toMatchObject({ group: { groupId: 'reviewers', memberVisibility: 'session' }, memberCount: 0 });
+  });
+
+  it.each([
+    [
+      'join count',
+      joinWorkerGroup,
+      {
+        group: {
+          groupId: 'reviewers',
+          sessionSlug: SESSION_SLUG,
+          label: 'Reviewers',
+          joinMode: 'open',
+          memberVisibility: 'session',
+        },
+        memberCount: 1.5,
+      },
+      'worker_group_response_member_count_invalid',
+    ],
+    [
+      'join group id',
+      joinWorkerGroup,
+      {
+        group: {
+          groupId: 'other',
+          sessionSlug: SESSION_SLUG,
+          label: 'Other',
+          joinMode: 'open',
+          memberVisibility: 'session',
+        },
+        memberCount: 1,
+      },
+      'worker_group_response_group_invalid',
+    ],
+    [
+      'leave visibility',
+      leaveWorkerGroup,
+      {
+        groupId: 'reviewers',
+        group: {
+          groupId: 'reviewers',
+          sessionSlug: SESSION_SLUG,
+          label: 'Reviewers',
+          joinMode: 'open',
+          memberVisibility: 'members',
+        },
+        memberCount: 0,
+      },
+      'worker_group_response_group_visibility_invalid',
+    ],
+    [
+      'leave count without retained group',
+      leaveWorkerGroup,
+      { groupId: 'reviewers', memberCount: 0 },
+      'worker_group_response_group_invalid',
+    ],
+  ])('rejects an inexact %s mutation response', async (_name, operation, response, reason) => {
+    const fetchImpl = jest.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: SESSION_SLUG,
+            ...response,
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+    );
+
+    await expect(
+      operation({
+        workerUrl: WORKER_URL,
+        credentialToken: WORKER_TOKEN,
+        sessionId: SESSION_ID,
+        sessionSlug: SESSION_SLUG,
+        groupId: 'reviewers',
+        fetchImpl,
+      }),
+    ).rejects.toMatchObject({ message: reason });
   });
 
   it('creates a participant group through the bearer-authenticated session route', async () => {

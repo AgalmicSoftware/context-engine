@@ -60933,6 +60933,7 @@ var normalizeWorkerGroupId = (value) => {
   if (!/^[a-z0-9][a-z0-9._-]*$/.test(normalized)) return "";
   return normalized;
 };
+var isAddressShapedWorkerGroupId = (value) => /^0x[0-9a-f]{40}$/i.test(trim2(value));
 var encodedPrincipalKeyPart = (value) => btoa(trim2(value || "id")).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "") || "id";
 var canonicalSessionIdKeyPart = (value) => {
   const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: value });
@@ -61866,7 +61867,6 @@ var redactGroupForMember = (group) => ({
   createdAt: group.createdAt,
   updatedAt: group.updatedAt
 });
-var isDefinitiveWorkerGroupMembershipMiss = (result) => Number(result?.status) === 403 && result?.reason === "worker_group_membership_denied" || Number(result?.status) === 404 && result?.reason === "worker_group_not_found";
 var normalizeWorkerGroupMembershipFailure = (result) => ({
   ...result && typeof result === "object" ? result : {},
   ok: false,
@@ -61881,6 +61881,10 @@ var createWorkerGroup = async ({ env, slug, sessionId, input, actorPrincipal, ca
   if (!canonicalSlug || !canonicalSessionId) {
     return { ok: false, status: 400, reason: "worker_group_session_identity_invalid" };
   }
+  const requestedGroupId = trim2(input?.groupId);
+  if (requestedGroupId && isAddressShapedWorkerGroupId(requestedGroupId)) {
+    return { ok: false, status: 400, reason: "invalid_worker_group_id" };
+  }
   if (!capacityAuthorized) {
     const caps = resolveWorkerGroupCaps(env);
     const existingGroups = await listGroupRecords({
@@ -61894,7 +61898,6 @@ var createWorkerGroup = async ({ env, slug, sessionId, input, actorPrincipal, ca
   }
   const normalized = normalizeGroupPatch({ input, actorPrincipal, deps });
   if (!normalized.ok) return normalized;
-  const requestedGroupId = trim2(input?.groupId);
   const groupId = requestedGroupId ? normalizeWorkerGroupId(requestedGroupId) : createWorkerGroupId(deps);
   if (!groupId) return { ok: false, status: 400, reason: "invalid_worker_group_id" };
   const existing = await readGroupRecord({
@@ -62043,6 +62046,7 @@ var removeWorkerGroupMember = async ({ env, slug, sessionId, groupId, principal,
     ok: true,
     store: store.kind,
     groupId: normalizeWorkerGroupId(groupId),
+    group: redactGroupForMember(group),
     principal: normalized.principal
   };
 };
@@ -62218,41 +62222,58 @@ var listWorkerGroupMemberships = async ({ env, slug, sessionId, principal, deps 
   if (!store) return { ok: false, status: 501, reason: "worker_group_store_not_configured" };
   const normalized = normalizeWorkerGroupPrincipal(principal, deps);
   if (!normalized.ok) return { ok: false, status: 400, reason: normalized.reason };
-  const rows = await listMembershipRecords({
-    store,
+  const authority = await (deps.readCoordinatedWorkerGroupMemberships || readCoordinatedWorkerGroupMemberships)({
+    env,
     slug,
     sessionId,
-    principalKey: normalized.key
+    principal: normalized.principal
   });
+  if (!authority.ok) return normalizeWorkerGroupMembershipFailure(authority);
+  if (!Array.isArray(authority.groups)) return normalizeWorkerGroupMembershipFailure();
   const memberships = [];
-  for (const row of rows) {
-    const authoritativeMembership = await isWorkerGroupMember({
-      env,
-      slug,
-      sessionId,
-      groupId: row.groupId,
-      principal: normalized.principal
-    });
-    if (!authoritativeMembership.ok) {
-      if (isDefinitiveWorkerGroupMembershipMiss(authoritativeMembership)) continue;
-      return normalizeWorkerGroupMembershipFailure(authoritativeMembership);
-    }
-    const authoritativeGroup = authoritativeMembership.group;
+  const seenGroupIds = /* @__PURE__ */ new Set();
+  for (const authoritativeGroup of authority.groups) {
+    const authoritativeGroupId = normalizeWorkerGroupId(authoritativeGroup?.groupId);
     const authoritativeJoinMode = trim2(authoritativeGroup?.joinMode).toLowerCase();
     const authoritativeVisibility = trim2(authoritativeGroup?.memberVisibility).toLowerCase();
     const authoritativeMemberCount = Number(authoritativeGroup?.memberCount);
-    if (normalizeWorkerGroupId(authoritativeGroup?.groupId) !== normalizeWorkerGroupId(row.groupId) || !IMPLEMENTED_JOIN_MODES.has(authoritativeJoinMode) || !Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(authoritativeVisibility) || !Number.isSafeInteger(authoritativeMemberCount) || authoritativeMemberCount < 0) {
+    if (!authoritativeGroupId || seenGroupIds.has(authoritativeGroupId) || !IMPLEMENTED_JOIN_MODES.has(authoritativeJoinMode) || !Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(authoritativeVisibility) || !Number.isSafeInteger(authoritativeMemberCount) || authoritativeMemberCount < 0) {
       return normalizeWorkerGroupMembershipFailure();
     }
-    const group = await readGroupRecord({ store, slug, sessionId, groupId: row.groupId });
-    if (!group || group.deletedAt) continue;
+    seenGroupIds.add(authoritativeGroupId);
+    const group = await readGroupRecord({ store, slug, sessionId, groupId: authoritativeGroupId });
+    const member = await readMembershipRecord({
+      store,
+      slug,
+      sessionId,
+      groupId: authoritativeGroupId,
+      principalKey: normalized.key
+    });
+    if (!group || group.deletedAt || !member || member.removedAt) {
+      return normalizeWorkerGroupMembershipFailure({
+        status: 503,
+        reason: "worker_group_projection_unavailable"
+      });
+    }
+    try {
+      const canonicalIndexKey = memberIndexKey({
+        slug,
+        sessionId,
+        principalKey: normalized.key,
+        groupId: authoritativeGroupId
+      });
+      if (await store.store.get(canonicalIndexKey) !== authoritativeGroupId) {
+        await store.store.put(canonicalIndexKey, authoritativeGroupId);
+      }
+    } catch {
+    }
     memberships.push({
       group: redactGroupForMember({
         ...group,
         joinMode: authoritativeJoinMode,
         memberVisibility: authoritativeVisibility
       }),
-      member: row,
+      member,
       memberCount: authoritativeMemberCount
     });
   }
@@ -62400,6 +62421,13 @@ var readCoordinatedWorkerGroupCatalog = async ({ env, slug, sessionId, groupIds,
     groupIds,
     ...principal ? { principal } : {}
   }
+});
+var readCoordinatedWorkerGroupMemberships = async ({ env, slug, sessionId, principal } = {}) => callWorkerGroupCoordinator({
+  env,
+  slug,
+  sessionId,
+  path: "/worker-groups/memberships",
+  payload: { principal }
 });
 var isWorkerGroupMember = async ({ env, slug, sessionId, groupId, principal, requesterAddress, authScopes, deps = {} } = {}) => {
   const normalized = principal ? normalizeWorkerGroupPrincipal(principal, deps) : resolveWorkerGroupPrincipal({ requesterAddress, authScopes, deps });
@@ -62931,6 +62959,9 @@ var workerGroupsRoute = async ({
       actorPrincipal: actor.principal
     });
     if (!result.ok) return routeError(deps, result, baseHeaders);
+    if (!Number.isSafeInteger(result.memberCount) || result.memberCount < 0) {
+      return routeError(deps, { status: 503, reason: "worker_group_projection_unavailable" }, baseHeaders);
+    }
     return jsonResponse(
       deps,
       {
@@ -62938,7 +62969,8 @@ var workerGroupsRoute = async ({
         ...sessionIdentity,
         store: result.store,
         group: result.group,
-        member: result.member
+        member: result.member,
+        memberCount: result.memberCount
       },
       200,
       baseHeaders
@@ -62958,6 +62990,10 @@ var workerGroupsRoute = async ({
       actorPrincipal: actor.principal
     });
     if (!result.ok) return routeError(deps, result, baseHeaders);
+    if (!Number.isSafeInteger(result.memberCount) || result.memberCount < 0) {
+      return routeError(deps, { status: 503, reason: "worker_group_projection_unavailable" }, baseHeaders);
+    }
+    const retainGroup = result.group?.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION;
     return jsonResponse(
       deps,
       {
@@ -62965,7 +63001,8 @@ var workerGroupsRoute = async ({
         ...sessionIdentity,
         store: result.store,
         groupId: result.groupId,
-        principal: result.principal
+        principal: result.principal,
+        ...retainGroup ? { group: result.group, memberCount: result.memberCount } : {}
       },
       200,
       baseHeaders
@@ -65415,8 +65452,71 @@ var SessionWriteCoordinator = class {
       }, 200);
     });
   }
+  executeWorkerGroupMemberships(payload) {
+    return this.serializeWorkerGroupOperation(async () => {
+      const slug = normalizeSessionSlug(payload?.slug);
+      const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
+      const principal = normalizeWorkerGroupPrincipal(payload?.principal);
+      if (!slug || !sessionId || !principal.ok) {
+        return jsonResponse2({ ok: false, status: 400, reason: "worker_group_memberships_invalid" }, 400);
+      }
+      const initialized = await this.initializeWorkerGroupCapacity(slug, sessionId);
+      if (!initialized.ok) return jsonResponse2(initialized, initialized.status || 503);
+      const entries = await this.state.storage.list({ prefix: WORKER_GROUP_CAPACITY_GROUP_PREFIX });
+      if (!(entries instanceof Map)) {
+        return jsonResponse2({ ok: false, status: 503, reason: "worker_group_capacity_state_unavailable" }, 503);
+      }
+      const activeGroups = [];
+      for (const [key, state] of entries) {
+        const encodedGroupId = String(key).slice(WORKER_GROUP_CAPACITY_GROUP_PREFIX.length);
+        let groupId = "";
+        try {
+          groupId = normalizeWorkerGroupId(decodeURIComponent(encodedGroupId));
+        } catch {
+          groupId = "";
+        }
+        if (!groupId || workerGroupCapacityGroupKey(groupId) !== key) {
+          return jsonResponse2({ ok: false, status: 503, reason: "worker_group_capacity_state_unavailable" }, 503);
+        }
+        if (state?.version === 2 && state.phase === "active" && state.active === true) {
+          activeGroups.push({ groupId, state });
+        }
+      }
+      if (activeGroups.length !== Number(initialized.meta?.groupCount)) {
+        return jsonResponse2({ ok: false, status: 503, reason: "worker_group_capacity_state_unavailable" }, 503);
+      }
+      const principalDigest = await sha256Hex2(`worker-group-member:${principal.key}`);
+      const groups = [];
+      for (const { groupId, state } of activeGroups.sort((left, right) => left.groupId.localeCompare(right.groupId))) {
+        const memberKey2 = workerGroupCapacityMemberKey({
+          groupId,
+          generation: Math.max(1, Number(state.generation || 0)),
+          principalDigest
+        });
+        const member = await this.state.storage.get(memberKey2);
+        if (member?.state !== "active") continue;
+        const memberCount = Number(state.memberCount);
+        if (!Number.isSafeInteger(memberCount) || memberCount < 0) {
+          return jsonResponse2({ ok: false, status: 503, reason: "worker_group_capacity_state_unavailable" }, 503);
+        }
+        groups.push({
+          groupId,
+          joinMode: state.joinMode,
+          memberVisibility: state.memberVisibility,
+          memberCount
+        });
+      }
+      return jsonResponse2(
+        { ok: true, status: 200, store: "durable_object", principal: principal.principal, groups },
+        200
+      );
+    });
+  }
   async executeWorkerGroupMutation(payload) {
     return this.serializeWorkerGroupOperation(async () => {
+      if (toTrimmedString9(payload?.operation).toLowerCase() === "create" && isAddressShapedWorkerGroupId(payload?.input?.groupId)) {
+        return jsonResponse2({ ok: false, status: 400, reason: "invalid_worker_group_id" }, 400);
+      }
       const mutation = normalizeWorkerGroupMutation(payload);
       if (!mutation) {
         return jsonResponse2({
@@ -65582,6 +65682,23 @@ var SessionWriteCoordinator = class {
           sessionId: mutation.sessionId,
           groupId: mutation.groupId
         });
+      }
+      if (mutation.operation === "add-member" || mutation.operation === "join" || mutation.operation === "remove-member") {
+        const postMutationGroup = await this.getActiveWorkerGroupCapacity(mutation.groupId);
+        const memberCount = Number(postMutationGroup?.state?.memberCount);
+        if (!postMutationGroup.ok || !Number.isSafeInteger(memberCount) || memberCount < 0) {
+          return jsonResponse2({ ok: false, status: 503, reason: "worker_group_capacity_state_unavailable" }, 503);
+        }
+        result = {
+          ...result,
+          group: {
+            ...result.group || {},
+            groupId: mutation.groupId,
+            joinMode: postMutationGroup.state.joinMode,
+            memberVisibility: postMutationGroup.state.memberVisibility
+          },
+          memberCount
+        };
       }
       return jsonResponse2(result, 200);
     });
@@ -66128,6 +66245,9 @@ var SessionWriteCoordinator = class {
     }
     if (url.pathname === "/worker-groups/catalog") {
       return this.executeWorkerGroupCatalog(payload);
+    }
+    if (url.pathname === "/worker-groups/memberships") {
+      return this.executeWorkerGroupMemberships(payload);
     }
     if (url.pathname === "/worker-groups/mutate") {
       return this.executeWorkerGroupMutation(payload);
