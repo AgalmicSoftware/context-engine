@@ -2,6 +2,9 @@ import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities
 import { verifyNativeSessionWorker } from './sessionWizardNativeWorkerVerification';
 import type { SessionWizardWorkerDeployRuntime } from './hooks/useSessionWizardWorkerDeploy';
 
+type VerifyNativeSessionWorkerInput = Parameters<typeof verifyNativeSessionWorker>[0];
+type SignTypedAdminAction = VerifyNativeSessionWorkerInput['signTypedAdminAction'];
+
 describe('verifyNativeSessionWorker', () => {
   const originalFetch = global.fetch;
 
@@ -138,7 +141,7 @@ describe('verifyNativeSessionWorker', () => {
 
   it('attaches a decentralized Worker through signed config and secret acceptance', async () => {
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
-    const fetchMock = jest.fn(async (input: RequestInfo | URL) => {
+    const fetchMock = jest.fn<Promise<Response>, [RequestInfo | URL, RequestInit?]>(async (input) => {
       const url = String(input);
       if (url.endsWith('/admin/set-config') || url.endsWith('/admin/set-secrets')) {
         return new Response(JSON.stringify({ ok: true }), {
@@ -151,10 +154,12 @@ describe('verifyNativeSessionWorker', () => {
     global.fetch = fetchMock as typeof fetch;
     const updateDeploymentState = jest.fn();
     const updateDraftValue = jest.fn();
-    const signTypedAdminAction = jest.fn(async () => ({
-      address: '0x00000000000000000000000000000000000000aa',
-      signature: '0xsigned',
-    }));
+    const signTypedAdminAction = jest.fn<ReturnType<SignTypedAdminAction>, Parameters<SignTypedAdminAction>>(
+      async () => ({
+        address: '0x00000000000000000000000000000000000000aa',
+        signature: '0xsigned',
+      }),
+    );
 
     await expect(
       verifyNativeSessionWorker({
@@ -209,7 +214,7 @@ describe('verifyNativeSessionWorker', () => {
 
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/session-config'))).toBe(false);
     expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/deploy'))).toBe(false);
-    const configSignInput = signTypedAdminAction.mock.calls.find(([input]) => input.action === 'set-config')?.[0];
+    const configSignInput = signTypedAdminAction.mock.calls.find(([input]) => input?.action === 'set-config')?.[0];
     expect(configSignInput?.body?.config?.rpcUrl).toBe('https://public-rpc.registry.example.test');
     expect(configSignInput?.body?.config?.rpcUrlsByChainId?.['11155420']).toEqual(
       expect.arrayContaining(['https://public-rpc.registry.example.test']),
@@ -408,7 +413,7 @@ describe('verifyNativeSessionWorker', () => {
       }),
     ).rejects.toThrow(/settings changed while Worker verification was in progress/i);
 
-    expect(runtimeRef.current.draft.corsWorkerUrl).toBe(replacementWorkerUrl);
+    expect(runtimeRef.current.draft?.corsWorkerUrl).toBe(replacementWorkerUrl);
     expect(updateDraftValue).not.toHaveBeenCalled();
     expect(updateDeploymentState).not.toHaveBeenCalledWith(expect.objectContaining({ deployComplete: true }));
   });

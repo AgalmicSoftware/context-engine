@@ -96,7 +96,7 @@ describe('sessionWizardSecrets', () => {
         sessionSlug: 'test-5',
       });
     const postSecrets = jest.fn(async () => ({}));
-    const wait = jest.fn(async () => undefined);
+    const wait = jest.fn(async (_ms: number) => undefined);
 
     const result = await syncWorkerSecretsAfterDeploy({
       workerUrl: 'https://worker.example',
@@ -123,7 +123,7 @@ describe('sessionWizardSecrets', () => {
       .mockRejectedValueOnce(new Error('Admin authorization failed.'))
       .mockResolvedValueOnce({ address: '0xabc', signature: 'sig' });
     const postSecrets = jest.fn(async () => ({}));
-    const wait = jest.fn(async () => undefined);
+    const wait = jest.fn(async (_ms: number) => undefined);
 
     const result = await syncWorkerSecretsAfterDeploy({
       workerUrl: 'https://worker.example',
@@ -144,8 +144,11 @@ describe('sessionWizardSecrets', () => {
   });
 
   test('syncWorkerSecretsAfterDeploy binds canonical secret writes to the session ID', async () => {
-    const signAdminAction = jest.fn(async () => ({ address: '0xabc', signature: 'sig' }));
-    const postSecrets = jest.fn(async () => ({}));
+    const signAdminAction = jest.fn(async (_input: Record<string, unknown>) => ({
+      address: '0xabc',
+      signature: 'sig',
+    }));
+    const postSecrets = jest.fn(async (_input: Record<string, unknown>) => ({}));
     const sessionId = '0x12121212121212121212121212121212';
 
     const result = await syncWorkerSecretsAfterDeploy({
@@ -240,7 +243,7 @@ describe('sessionWizardSecrets', () => {
       .fn()
       .mockRejectedValueOnce(new Error('Admin authorization failed.'))
       .mockResolvedValueOnce({});
-    const ensureSessionConfig = jest.fn(async () => ({}));
+    const ensureSessionConfig = jest.fn(async (_input: { workerUrl: string; slug: string; account: string }) => ({}));
 
     const result = await syncWorkerSecretsAfterDeploy({
       workerUrl: 'https://worker.example',
@@ -261,7 +264,7 @@ describe('sessionWizardSecrets', () => {
   });
 
   test('syncWorkerConfigAfterPartialDeploy reseeds config for partial deploy responses', async () => {
-    const ensureSessionConfig = jest.fn(async () => ({}));
+    const ensureSessionConfig = jest.fn(async (_input: { workerUrl: string; slug: string; account: string }) => ({}));
 
     const result = await syncWorkerConfigAfterPartialDeploy({
       deployResponse: {

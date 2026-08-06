@@ -45,7 +45,12 @@ const buildHookOptions = () => ({
   updateDeploymentState: jest.fn(),
   clearSelectedBundleFile: jest.fn(),
   clearCachedWorkerSecretsAfterDeploy: jest.fn(),
-  verifyPublicWorkerDeployment: jest.fn(async ({ workerUrl }: { workerUrl: unknown }) => ({
+  verifyPublicWorkerDeployment: jest.fn(async ({
+    workerUrl,
+  }: {
+    workerUrl: unknown;
+    config?: Record<string, unknown>;
+  }) => ({
     workerOrigin: String(workerUrl),
     configRevision: 'test-verification',
     publicConfig: {},

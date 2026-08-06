@@ -120,13 +120,16 @@ describe('sessionWizardWorkerPublishEvidence', () => {
       },
     ],
   ])('invalidates readiness after a verified %s changes', (_label, overrides) => {
+    const baseline = {
+      runtime,
+      proof,
+      workerSecrets,
+      deployComplete: true,
+      deployWorkerUrl: workerUrl,
+    };
     expect(
       resolveSessionWizardWorkerPublishEvidence({
-        runtime,
-        proof,
-        workerSecrets,
-        deployComplete: true,
-        deployWorkerUrl: workerUrl,
+        ...baseline,
         ...overrides,
       }),
     ).toEqual(expect.objectContaining({ verified: false, reason: 'worker-config-changed' }));
@@ -234,13 +237,16 @@ describe('sessionWizardWorkerPublishEvidence', () => {
       },
     ],
   ])('rejects a live %s edit against the deployment proof', (_label, overrides) => {
+    const baseline = {
+      runtime,
+      proof,
+      workerSecrets,
+      deployComplete: true,
+      deployWorkerUrl: workerUrl,
+    };
     expect(
       resolveSessionWizardWorkerPublishEvidence({
-        runtime,
-        proof,
-        workerSecrets,
-        deployComplete: true,
-        deployWorkerUrl: workerUrl,
+        ...baseline,
         ...overrides,
       }),
     ).toEqual(expect.objectContaining({ verified: false }));
