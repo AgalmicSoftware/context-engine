@@ -27,6 +27,16 @@ test('session Worker docs keep immutable publication separate from latest promot
   assert.doesNotMatch(workerDoc, /publish-worker-bundles\.yml[^\n]*(?:marks|marked)[^\n]*latest/i);
 });
 
+test('session creation docs align mode-specific deployment inputs', () => {
+  const creationDoc = read('docs/session-creation-guide.md');
+
+  assert.match(
+    creationDoc,
+    /\| Cloudflare API token[^\n]*Agent Session Wrapped[^\n]*explicit legacy deploy-helper fallback[^\n]*not the native default/,
+  );
+  assert.match(creationDoc, /\| AI provider key[^\n]*every reachable `\/new` profile/);
+});
+
 test('session Worker docs define group authority, counts, and id compatibility', () => {
   const workerDoc = read('docs/session-cors-worker.md');
 
