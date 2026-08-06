@@ -37,6 +37,7 @@ const E2E_TESTIDS = Object.freeze({
   PAGE_COMPARE_ROOT: 'ce-page-compare-root',
   PAGE_BOOKMARKS_ROOT: 'ce-page-bookmarks-root',
   PAGE_DOCS_ROOT: 'ce-page-docs-root',
+  DOCS_SESSION_CONTEXT: 'ce-docs-session-context',
   PAGE_ABOUT_ROOT: 'ce-page-about-root',
   PAGE_POSTS_ROOT: 'ce-page-posts-root',
   PAGE_ADMIN_ROOT: 'ce-page-admin-root',

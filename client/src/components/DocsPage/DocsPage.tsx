@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { connect } from 'react-redux';
-import { base64urlToBase64, base64urlToHex, hexToBase64url } from '../../domains/storage/arweaveEncoding.js';
 import {
   getDemoSessionConfigBySlug,
+  getSessionChainLabel,
   getSessionConfigBySlug,
   getSessionConfigBySlugOrDefault,
 } from '../../domains/sessions/sessionConfig.js'; // smart contract info: addresses & content
@@ -19,14 +19,15 @@ import styles from './DocsPage.module.scss';
 //
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faExpand, faCaretDown, faCaretUp, faCopy, faCheck } from '@fortawesome/free-solid-svg-icons';
-import { deserializeFilterState } from '../../utilities/survey/filterStateUtils.js'; // Added import
 import { notify } from '../../utilities/ui/notify.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildPublicRoute, stripPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
+import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 import { resolveDocsPageActiveSession, resolveDocsPageReferrerSlug } from './docsPageSessionResolution.js';
 import ContractViewer, { type ContractViewerContract } from './ContractViewer';
 import { normalizeContractKeyParam } from './contractMetadata.js';
 import { buildContractViewerContracts } from './contractViewerUtils.js';
+import { DOCS_PAGE_COPY, FAQ_ITEMS, GUIDE_TOPICS, QUICKSTART_STEPS } from './docsContent.js';
 import { sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import { buildPublicContractSourceUrl } from '../../variables/publicRepoMetadata.js';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
@@ -49,6 +50,43 @@ type PromptItem = {
   title: string;
   file: string;
   content: string;
+};
+
+type DocsSectionProps = {
+  children: React.ReactNode;
+  contentClassName?: string;
+  defaultOpen?: boolean;
+  id: string;
+  title: string;
+};
+
+const DocsSection = ({ children, contentClassName = '', defaultOpen = false, id, title }: DocsSectionProps) => {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  const contentId = `docs-section-${id}`;
+
+  return (
+    <section className={styles.docsSection}>
+      <button
+        type="button"
+        className={styles.docsSectionToggle}
+        onClick={() => setIsOpen((open) => !open)}
+        aria-expanded={isOpen}
+        aria-controls={contentId}
+      >
+        <span className={styles.docsSectionToggleLabel}>{title}</span>
+        <FontAwesomeIcon
+          icon={isOpen ? faCaretUp : faCaretDown}
+          className={styles.docsSectionToggleIcon}
+          aria-hidden="true"
+        />
+      </button>
+      {isOpen ? (
+        <div id={contentId} className={`${styles.docsSectionContent} ${contentClassName}`.trim()}>
+          {children}
+        </div>
+      ) : null}
+    </section>
+  );
 };
 
 const buildContractsForViewer = buildContractViewerContracts as (options?: {
@@ -194,13 +232,19 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
     [clusterAnalysisPromptDisplay, compareToolkitPromptDisplay, photoAnalysisPromptDisplay, userAnalysisPromptDisplay],
   );
 
-  const sessionNetworkChainId = contributesSessionContracts ? activeSession?.networkChainId : undefined;
-  const contracts = useMemo(() => {
-    const sessionContracts =
+  const sessionContracts = useMemo<SessionContractsMap>(
+    () =>
       contributesSessionContracts && activeSession?.contracts && typeof activeSession.contracts === 'object'
         ? (activeSession.contracts as SessionContractsMap)
-        : {};
-    const firstContract = Object.values(sessionContracts)[0] || null;
+        : {},
+    [activeSession?.contracts, contributesSessionContracts],
+  );
+  const firstContract = Object.values(sessionContracts)[0] || null;
+  const sessionNetworkChainId = contributesSessionContracts ? activeSession?.networkChainId : undefined;
+  const resolvedChainId =
+    Number(sessionNetworkChainId || firstContract?.chainId || DEFAULT_CHAIN_ID) || Number(DEFAULT_CHAIN_ID);
+  const sessionLabel = String(activeSession?.sessionName || canonicalSlug || 'Default (general)');
+  const contracts = useMemo(() => {
     const chainId = Number(sessionNetworkChainId || firstContract?.chainId || 0) || undefined;
     return buildContractsForViewer({
       sessionContracts,
@@ -222,24 +266,11 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
           }
         : contract,
     );
-  }, [activeSession?.contracts, contributesSessionContracts, sessionNetworkChainId]);
+  }, [contributesSessionContracts, firstContract?.chainId, sessionContracts, sessionNetworkChainId]);
 
-  const [bytes32Input, setBytes32Input] = useState('');
-  const [base64urlInput, setBase64urlInput] = useState('');
-  const [base64urlOutput, setBase64urlOutput] = useState('');
-  const [bytes32Output, setBytes32Output] = useState('');
-  const [base64Output, setBase64Output] = useState('');
-  const [utilsOpen, setUtilsOpen] = useState(true);
-  const [promptsOpen, setPromptsOpen] = useState(false);
-  const [jsonOpen, setJsonOpen] = useState(false);
   const [openPromptItems, setOpenPromptItems] = useState<Record<string, boolean>>({});
   const [copiedPromptKey, setCopiedPromptKey] = useState('');
-  const [copiedJson, setCopiedJson] = useState(false);
   const copyResetTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
-
-  // New state variables for filter deserialization utility
-  const [filterUrlInput, setFilterUrlInput] = useState('');
-  const [deserializedFilterObjectOutput, setDeserializedFilterObjectOutput] = useState('');
 
   useEffect(
     () => () => {
@@ -261,35 +292,6 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
       Math.max(0, Number(delayMs) || 0),
     );
     timers.set(key, timeoutId);
-  };
-
-  const handleBytes32ToBase64url = () => {
-    setBase64urlOutput(hexToBase64url(bytes32Input));
-  };
-
-  const handleBase64urlToBytes32 = () => {
-    setBytes32Output(base64urlToHex(base64urlInput));
-  };
-
-  const handleBase64urlToBase64 = () => {
-    setBase64Output(base64urlToBase64(base64urlInput));
-  };
-
-  // New handler function for deserializing filter URL/param
-  const handleDeserializeFilterUrl = () => {
-    let serializedParam = filterUrlInput;
-    if (filterUrlInput.includes('/results/')) {
-      const parts = filterUrlInput.split('/results/');
-      serializedParam = parts.pop() || ''; // Get the last part, or empty string if pop returns undefined
-    }
-    // Remove query parameters if present
-    if (serializedParam.includes('?')) {
-      serializedParam = serializedParam.split('?')[0];
-    }
-
-    const deserializedObject = deserializeFilterState(serializedParam);
-    const jsonOutput = JSON.stringify(deserializedObject, null, 2);
-    setDeserializedFilterObjectOutput(jsonOutput);
   };
 
   const handleCopyPrompt = (promptKey: string, content: string) => {
@@ -345,48 +347,56 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
     return parts;
   };
 
-  const jsonBundleText = useMemo(
-    () =>
-      JSON.stringify(
-        {
-          contracts: contracts
-            .filter((contract) => contract.source)
-            .map((contract) => ({
-              key: contract.key,
-              name: contract.name,
-              file: contract.sourceFile || '',
-              source: contract.source || '',
-            })),
-          prompts: promptItems.map((prompt) => ({
-            id: prompt.id,
-            title: prompt.title,
-            file: prompt.file,
-            content: prompt.content || '',
-          })),
-        },
-        null,
-        2,
-      ),
-    [contracts, promptItems],
-  );
-
-  const handleCopyJsonBundle = () => {
-    if (!jsonBundleText || typeof navigator === 'undefined' || !navigator.clipboard?.writeText) return;
-    navigator.clipboard
-      .writeText(jsonBundleText)
-      .then(() => {
-        notify.success('Copied to clipboard');
-        setCopiedJson(true);
-        scheduleCopyReset('copiedJsonBundle', () => setCopiedJson(false));
-      })
-      .catch((e) => {
-        void e;
-        notify.warn('Copy failed');
-      });
-  };
-
   return (
-    <div className={styles.contractPage} data-testid={E2E_TESTIDS.PAGE_DOCS_ROOT}>
+    <div className={styles.docsPage} data-testid={E2E_TESTIDS.PAGE_DOCS_ROOT}>
+      <header className={styles.docsHeader}>
+        <h1>{DOCS_PAGE_COPY.title}</h1>
+        <p>{DOCS_PAGE_COPY.introduction}</p>
+      </header>
+
+      <DocsSection id="quickstart" title="Quickstart" defaultOpen>
+        <ol className={styles.quickstartList}>
+          {QUICKSTART_STEPS.map((step) => (
+            <li key={step.id} className={styles.quickstartStep}>
+              <h2>{step.title}</h2>
+              <p>{step.body}</p>
+              {step.linkHref ? (
+                <a href={buildPublicRoute(step.linkHref)} className={styles.docsInlineLink}>
+                  Open {step.linkHref}
+                </a>
+              ) : null}
+            </li>
+          ))}
+        </ol>
+      </DocsSection>
+
+      <DocsSection id="session-options" title="Session options guide">
+        <div className={styles.guideTopics}>
+          {GUIDE_TOPICS.map((topic) => (
+            <article key={topic.id} className={styles.guideTopic}>
+              <h2>{topic.title}</h2>
+              <p>{topic.summary}</p>
+              <ul>
+                {topic.points.map((point) => (
+                  <li key={point}>{point}</li>
+                ))}
+              </ul>
+            </article>
+          ))}
+        </div>
+      </DocsSection>
+
+      <DocsSection id="faq" title="FAQ">
+        <div className={styles.faqItems}>
+          {FAQ_ITEMS.map((item) => (
+            <article key={item.id} className={styles.faqItem}>
+              <h2>{item.question}</h2>
+              <p>{item.answer}</p>
+            </article>
+          ))}
+        </div>
+      </DocsSection>
+
       {!contributesSessionContracts ? (
         <aside
           className={styles.advancedExternalNotice}
@@ -407,6 +417,15 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
           )}
         </aside>
       ) : null}
+      <div className={styles.sessionContext} data-testid={E2E_TESTIDS.DOCS_SESSION_CONTEXT}>
+        <span>
+          <strong>Session:</strong> {sessionLabel}
+        </span>
+        <span aria-hidden="true">{' · '}</span>
+        <span>
+          <strong>Chain:</strong> {getSessionChainLabel(resolvedChainId)}
+        </span>
+      </div>
       <ContractViewer
         contracts={contracts}
         autoOpenContractKey={deepLinkedContractKey}
@@ -427,163 +446,49 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
           );
         }}
       />
-      <div className={styles.promptsSection}>
-        <button
-          type="button"
-          className={styles.promptsToggle}
-          onClick={() => setPromptsOpen((prev) => !prev)}
-          aria-expanded={promptsOpen}
-          aria-controls="contract-prompts"
-        >
-          <span className={styles.promptsToggleLabel}>Prompts</span>
-          <span className={styles.promptsToggleIcon}>
-            <FontAwesomeIcon icon={promptsOpen ? faCaretUp : faCaretDown} />
-          </span>
-        </button>
-        {promptsOpen && (
-          <div id="contract-prompts" className={styles.promptsContent}>
-            {promptItems.map((prompt) => {
-              const isOpen = !!openPromptItems[prompt.id];
-              return (
-                <div key={prompt.id} className={`${styles.promptWindow} ${isOpen ? styles.promptWindowOpen : ''}`}>
-                  <div
-                    className={styles.promptHeader}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => handlePromptToggle(prompt.id)}
-                    onKeyDown={(event) => handlePromptKeyDown(event, prompt.id)}
-                    aria-expanded={isOpen}
-                    aria-controls={`prompt-${prompt.id}`}
-                  >
-                    <div className={styles.promptTitle}>
-                      <span>{prompt.title}</span>
-                      <span className={styles.promptFile}>{prompt.file}</span>
-                    </div>
-                    <div className={styles.promptHeaderActions}>
-                      <button
-                        type="button"
-                        className={`${styles.copyButton} ${copiedPromptKey === prompt.id ? styles.copyButtonSuccess : ''}`}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          handleCopyPrompt(prompt.id, prompt.content);
-                        }}
-                        aria-label="Copy prompt"
-                        title="Copy prompt"
-                      >
-                        <FontAwesomeIcon icon={copiedPromptKey === prompt.id ? faCheck : faCopy} />
-                      </button>
-                      <FontAwesomeIcon icon={isOpen ? faCaretUp : faCaretDown} className={styles.promptToggleIcon} />
-                    </div>
-                  </div>
-                  {isOpen && (
-                    <pre id={`prompt-${prompt.id}`} className={styles.promptBlock}>
-                      {highlightPromptVariables(prompt.content || '(Prompt unavailable)')}
-                    </pre>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-      <div className={styles.jsonSection}>
-        <button
-          type="button"
-          className={styles.jsonToggle}
-          onClick={() => setJsonOpen((prev) => !prev)}
-          aria-expanded={jsonOpen}
-          aria-controls="contracts-json"
-        >
-          <span className={styles.jsonToggleLabel}>.json Bundle</span>
-          <span className={styles.jsonToggleIcon}>
-            <FontAwesomeIcon icon={jsonOpen ? faCaretUp : faCaretDown} />
-          </span>
-        </button>
-        {jsonOpen && (
-          <div id="contracts-json" className={styles.jsonContent}>
-            <div className={styles.jsonHeader}>
-              <span>Prompts + Smart Contracts</span>
-              <button
-                type="button"
-                className={`${styles.copyButton} ${copiedJson ? styles.copyButtonSuccess : ''}`}
-                onClick={handleCopyJsonBundle}
-                aria-label="Copy JSON bundle"
-                title="Copy JSON bundle"
+      <DocsSection id="prompts" title="Prompts" contentClassName={styles.promptsContent}>
+        {promptItems.map((prompt) => {
+          const isOpen = !!openPromptItems[prompt.id];
+          return (
+            <div key={prompt.id} className={`${styles.promptWindow} ${isOpen ? styles.promptWindowOpen : ''}`}>
+              <div
+                className={styles.promptHeader}
+                role="button"
+                tabIndex={0}
+                onClick={() => handlePromptToggle(prompt.id)}
+                onKeyDown={(event) => handlePromptKeyDown(event, prompt.id)}
+                aria-expanded={isOpen}
+                aria-controls={`prompt-${prompt.id}`}
               >
-                <FontAwesomeIcon icon={copiedJson ? faCheck : faCopy} />
-              </button>
-            </div>
-            <pre className={styles.jsonBlock}>{jsonBundleText}</pre>
-          </div>
-        )}
-      </div>
-      <div className={styles.converterSection}>
-        <button
-          type="button"
-          className={styles.utilsToggle}
-          onClick={() => setUtilsOpen((prev) => !prev)}
-          aria-expanded={utilsOpen}
-          aria-controls="contract-utils"
-        >
-          <span className={styles.utilsToggleLabel}>Utils</span>
-          <span className={styles.utilsToggleIcon}>
-            <FontAwesomeIcon icon={utilsOpen ? faCaretUp : faCaretDown} />
-          </span>
-        </button>
-        {utilsOpen && (
-          <div id="contract-utils" className={styles.utilsContent}>
-            <div className={styles.converterSectionUtil}>
-              <div className={styles.converterRow}>
-                <input
-                  type="text"
-                  value={base64urlInput}
-                  onChange={(e) => setBase64urlInput(e.target.value)}
-                  placeholder="Enter Base64url"
-                />
-                <button onClick={handleBase64urlToBytes32}>Convert to Bytes32</button>
+                <div className={styles.promptTitle}>
+                  <span>{prompt.title}</span>
+                  <span className={styles.promptFile}>{prompt.file}</span>
+                </div>
+                <div className={styles.promptHeaderActions}>
+                  <button
+                    type="button"
+                    className={`${styles.copyButton} ${copiedPromptKey === prompt.id ? styles.copyButtonSuccess : ''}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handleCopyPrompt(prompt.id, prompt.content);
+                    }}
+                    aria-label="Copy prompt"
+                    title="Copy prompt"
+                  >
+                    <FontAwesomeIcon icon={copiedPromptKey === prompt.id ? faCheck : faCopy} />
+                  </button>
+                  <FontAwesomeIcon icon={isOpen ? faCaretUp : faCaretDown} className={styles.promptToggleIcon} />
+                </div>
               </div>
-              <div className={styles.utilsOutputLine}>Output: {bytes32Output}</div>
+              {isOpen ? (
+                <pre id={`prompt-${prompt.id}`} className={styles.promptBlock}>
+                  {highlightPromptVariables(prompt.content || '(Prompt unavailable)')}
+                </pre>
+              ) : null}
             </div>
-            <div className={styles.converterSectionUtil}>
-              <div className={styles.converterRow}>
-                <input
-                  type="text"
-                  value={bytes32Input}
-                  onChange={(e) => setBytes32Input(e.target.value)}
-                  placeholder="Enter bytes32"
-                />
-                <button onClick={handleBytes32ToBase64url}>Convert to Base64url</button>
-              </div>
-              <div className={styles.utilsOutputLine}>Output: {base64urlOutput}</div>
-            </div>
-            <div className={styles.converterSectionUtil}>
-              <div className={styles.converterRow}>
-                <input
-                  type="text"
-                  value={base64urlInput} // Re-using base64urlInput for this example, consider renaming if it's confusing
-                  onChange={(e) => setBase64urlInput(e.target.value)}
-                  placeholder="Enter Base64url"
-                />
-                <button onClick={handleBase64urlToBase64}>Convert to Base64</button>
-              </div>
-              <div className={styles.utilsOutputLine}>Output: {base64Output}</div>
-            </div>
-            {/* New utility section for deserializing filter URL/param */}
-            <div className={styles.converterSectionUtil}>
-              <div className={styles.converterRow}>
-                <input
-                  type="text"
-                  value={filterUrlInput}
-                  onChange={(e) => setFilterUrlInput(e.target.value)}
-                  placeholder="Enter Filter URL or Serialized Parameter"
-                />
-                <button onClick={handleDeserializeFilterUrl}>Deserialize Filter State</button>
-              </div>
-              <pre className={styles.utilsOutput}>{deserializedFilterObjectOutput}</pre>
-            </div>
-          </div>
-        )}
-      </div>
+          );
+        })}
+      </DocsSection>
     </div>
   );
 };

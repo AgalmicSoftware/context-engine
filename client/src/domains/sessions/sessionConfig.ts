@@ -29,3 +29,5 @@ export const getAllSessionSlugs = (options: { includeEmpty?: boolean } = {}): st
   contractScripts.getAllSessionSlugs(options) as string[];
 
 export const getSessionChainId = (slug: unknown): number | null => contractScripts.getSessionChainId(slug);
+
+export const getSessionChainLabel = (chainId: unknown): string => contractScripts.getChainLabelById(chainId);

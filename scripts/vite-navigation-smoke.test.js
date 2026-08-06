@@ -4,6 +4,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  DEFAULT_ROUTES,
+  DEFAULT_ROUTE_TEXT,
   compactSmokeSummary,
   isAllowedConsoleIssue,
   isAllowedFailedRequest,
@@ -14,6 +16,13 @@ const {
   routeUrl,
   summarizeFailures,
 } = require('./vite-navigation-smoke');
+
+test('default navigation smoke covers Docs and its legacy contracts alias', () => {
+  assert.ok(DEFAULT_ROUTES.includes('/docs'));
+  assert.ok(DEFAULT_ROUTES.includes('/contracts'));
+  assert.deepEqual(DEFAULT_ROUTE_TEXT['/docs'], ['Docs']);
+  assert.deepEqual(DEFAULT_ROUTE_TEXT['/contracts'], ['Docs']);
+});
 
 test('normalizeBaseUrl keeps the app origin and removes path/search/hash drift', () => {
   assert.equal(normalizeBaseUrl('http://localhost:3000/foo?bar=baz#hash'), 'http://localhost:3000');
@@ -58,6 +67,23 @@ test('console allowlist permits known dependency warnings but not app exceptions
   assert.equal(isAllowedConsoleIssue({ type: 'error', text: 'Warning: defaultProps warning' }), true);
   assert.equal(isAllowedConsoleIssue({ type: 'error', text: 'Failed to load resource: net::ERR_CONNECTION_REFUSED' }), true);
   assert.equal(isAllowedConsoleIssue({ type: 'error', text: 'TypeError: Cannot read properties of undefined' }), false);
+});
+
+test('console allowlist mirrors the failed-request exception for the optional local chain', () => {
+  assert.equal(
+    isAllowedConsoleIssue({
+      type: 'error',
+      text: "Access to fetch at 'http://127.0.0.1:8545/' from origin 'http://127.0.0.1:4173' has been blocked by CORS policy: No access control header.",
+    }),
+    true,
+  );
+  assert.equal(
+    isAllowedConsoleIssue({
+      type: 'error',
+      text: "Access to fetch at 'http://127.0.0.1:4173/api' from origin 'http://127.0.0.1:4173' has been blocked by CORS policy",
+    }),
+    false,
+  );
 });
 
 test('summarizeFailures catches Vite-sensitive render, style, and asset failures', () => {

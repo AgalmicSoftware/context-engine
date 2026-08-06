@@ -8,6 +8,7 @@ const DEFAULT_ROUTES = Object.freeze([
   '/session/pe4',
   '/admin',
   '/about',
+  '/docs',
   '/contracts',
 ]);
 const DEFAULT_ROUTE_TEXT = Object.freeze({
@@ -15,7 +16,8 @@ const DEFAULT_ROUTE_TEXT = Object.freeze({
   '/session/pe4': ['Session'],
   '/admin': ['Session Admin'],
   '/about': ['Context Engine'],
-  '/contracts': ['Contract'],
+  '/docs': ['Docs'],
+  '/contracts': ['Docs'],
 });
 const DEFAULT_LAYOUT_PROBE_SELECTORS = Object.freeze([
   '[data-testid="ce-survey-submit"]',
@@ -86,7 +88,10 @@ function isAllowedConsoleIssue(issue) {
 
   return (
     issue.text.startsWith('Warning: ') ||
-    issue.text.startsWith('Failed to load resource:')
+    issue.text.startsWith('Failed to load resource:') ||
+    /^Access to fetch at 'http:\/\/(?:127\.0\.0\.1|localhost):8545\/' .* has been blocked by CORS policy:/.test(
+      issue.text,
+    )
   );
 }
 

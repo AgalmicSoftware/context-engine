@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { DocsPage } from './DocsPage';
 import { buildDocsContractsHref, getContractViewerSourceTestId } from './contractMetadata.js';
 import { buildContractViewerContracts } from './contractViewerUtils.js';
@@ -11,14 +11,11 @@ const mockGetSessionConfigBySlugOrDefault = jest.fn();
 
 jest.mock('../../utilities/web3/chainGateway.js', () => ({
   __esModule: true,
-  default: {
-    hexToBase64url: jest.fn(() => ''),
-    base64urlToHex: jest.fn(() => ''),
-    base64urlToBase64: jest.fn(() => ''),
-  },
   getSessionConfigBySlug: (...args: any[]) => mockGetSessionConfigBySlug(...args),
   getDemoSessionConfigBySlug: (...args: any[]) => mockGetDemoSessionConfigBySlug(...args),
   getSessionConfigBySlugOrDefault: (...args: any[]) => mockGetSessionConfigBySlugOrDefault(...args),
+  getChainLabelById: (chainId: unknown) =>
+    Number(chainId) === 84532 ? 'Base Sepolia (84532)' : `Chain ${String(chainId)}`,
 }));
 
 jest.mock('./contractViewerUtils.js', () => ({
@@ -133,6 +130,27 @@ describe('DocsPage contract deep links', () => {
         return entries;
       },
     );
+  });
+
+  it('renders the user guide, session context, and no longer exposes the bundle or converters', async () => {
+    render(<DocsPage activeSessionSlug="session-alpha" reduxActiveSessionSlug="" />);
+
+    expect(screen.getByTestId('ce-page-docs-root')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Docs' })).toBeInTheDocument();
+
+    const quickstartToggle = screen.getByRole('button', { name: 'Quickstart' });
+    expect(quickstartToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('heading', { name: 'Open a session' })).toBeInTheDocument();
+    fireEvent.click(quickstartToggle);
+    expect(quickstartToggle).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(quickstartToggle);
+    expect(screen.getByRole('heading', { name: 'Open a session' })).toBeInTheDocument();
+
+    expect(await screen.findByTestId('ce-docs-session-context')).toHaveTextContent(
+      'Session: Session Alpha · Chain: Base Sepolia (84532)',
+    );
+    expect(screen.queryByRole('button', { name: /\.json bundle/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^utils$/i })).not.toBeInTheDocument();
   });
 
   it('opens the matching contract source and scrolls it into view when a contract query param is present', async () => {
