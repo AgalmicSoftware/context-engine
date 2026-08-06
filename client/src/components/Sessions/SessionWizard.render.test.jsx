@@ -1036,8 +1036,8 @@ describe('SessionWizard rendered validation', () => {
     fireEvent.change(slugInput, {
       target: { value: 'duplicate-session' },
     });
-    await deployVerifiedWorkerForCurrentDraft();
     await createPendingFeaturedDraft();
+    await deployVerifiedWorkerForCurrentDraft();
 
     fireEvent.click(screen.getByText('Publish').closest('button'));
     const publishButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
