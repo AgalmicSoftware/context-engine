@@ -107,6 +107,57 @@ EOF
   });
 });
 
+test('verifyPublicReleaseSurface ignores a source file that vanishes after traversal', () => {
+  withPublicFixture((rootDir) => {
+    const transientPath = path.join(rootDir, 'scripts', '.tmp-history', 'review-snapshot.js');
+    writeFile(rootDir, path.relative(rootDir, transientPath), "import '../../contextEngine-cc/private.js';\n");
+    const originalReadFileSync = fs.readFileSync;
+    let removedTransientFile = false;
+    fs.readFileSync = function readFileSyncWithRemoval(filePath, ...args) {
+      if (!removedTransientFile && path.resolve(String(filePath)) === transientPath) {
+        removedTransientFile = true;
+        fs.rmSync(transientPath);
+      }
+      return originalReadFileSync.call(this, filePath, ...args);
+    };
+
+    try {
+      assert.deepEqual(verifyPublicReleaseSurface(rootDir), {
+        findings: [],
+        scannedFiles: 0,
+      });
+    } finally {
+      fs.readFileSync = originalReadFileSync;
+    }
+    assert.equal(removedTransientFile, true);
+  });
+});
+
+test('verifyPublicReleaseSurface preserves non-vanishing filesystem errors', () => {
+  withPublicFixture((rootDir) => {
+    const stablePath = path.join(rootDir, 'client', 'src', 'stable.js');
+    writeFile(rootDir, path.relative(rootDir, stablePath), 'export const stable = true;\n');
+    const originalReadFileSync = fs.readFileSync;
+    fs.readFileSync = function readFileSyncWithError(filePath, ...args) {
+      if (path.resolve(String(filePath)) === stablePath) {
+        const error = new Error('stable file cannot be read');
+        error.code = 'EACCES';
+        throw error;
+      }
+      return originalReadFileSync.call(this, filePath, ...args);
+    };
+
+    try {
+      assert.throws(
+        () => verifyPublicReleaseSurface(rootDir),
+        (error) => error?.code === 'EACCES' && /stable file cannot be read/.test(error.message),
+      );
+    } finally {
+      fs.readFileSync = originalReadFileSync;
+    }
+  });
+});
+
 test('verify-public-release-surface CLI exits nonzero for stripped imports', () => {
   withPublicFixture((rootDir) => {
     const strippedImport = '../../contextEngine-cc/lib/litChipotleActionCatalog.mjs';
