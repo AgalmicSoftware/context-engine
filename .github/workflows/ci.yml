@@ -66,7 +66,7 @@ jobs:
           BASELINE_PUSH_BEFORE_SHA: ${{ github.event.before }}
         run: |
           set -euo pipefail
-          git fetch --no-tags --depth=1 origin main
+          git fetch --no-tags origin main
           node scripts/resolve-baseline-monotonicity-base.mjs --github-output "$GITHUB_OUTPUT"
 
       - name: Check baseline monotonicity
@@ -107,11 +107,11 @@ jobs:
           ZERO_OID: 0000000000000000000000000000000000000000
         run: |
           set -euo pipefail
-          git fetch --no-tags --depth=1 origin main
+          git fetch --no-tags origin main
           release_candidate_ref=HEAD
           if [ "$RELEASE_EVENT_NAME" = "pull_request" ]; then
             release_candidate_ref="$RELEASE_PR_HEAD_SHA"
-            git fetch --no-tags --depth=1 origin "$release_candidate_ref"
+            git fetch --no-tags origin "$release_candidate_ref"
           fi
           git fetch --force --tags origin
           node scripts/worker-release-artifacts.mjs verify-replay-range \
@@ -119,7 +119,7 @@ jobs:
             --candidate-ref "$release_candidate_ref"
           verify_args=(verify-ref --candidate-ref "$release_candidate_ref" --baseline-ref origin/main)
           if [ "$RELEASE_EVENT_NAME" = "push" ] && [ "$RELEASE_PUSH_BEFORE_SHA" != "$ZERO_OID" ]; then
-            git fetch --no-tags --depth=1 origin "$RELEASE_PUSH_BEFORE_SHA"
+            git fetch --no-tags origin "$RELEASE_PUSH_BEFORE_SHA"
             verify_args+=(--minimum-ref "$RELEASE_PUSH_BEFORE_SHA")
           fi
           node scripts/release-version.mjs "${verify_args[@]}"

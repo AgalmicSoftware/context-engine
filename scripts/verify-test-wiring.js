@@ -389,8 +389,12 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
     'release-staging pull request candidate selection',
   );
   expectWorkflowContains(
-    'git fetch --no-tags --depth=1 origin "$release_candidate_ref"',
+    'git fetch --no-tags origin "$release_candidate_ref"',
     'release-staging pull request head fetch',
+  );
+  expectWorkflowOmits(
+    'git fetch --no-tags --depth=1',
+    'release verification fetches that discard existing history',
   );
   expectWorkflowContains(
     'git fetch --force --tags origin',
@@ -409,7 +413,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
     'release-staging nonzero previous push guard',
   );
   expectWorkflowContains(
-    'git fetch --no-tags --depth=1 origin "$RELEASE_PUSH_BEFORE_SHA"',
+    'git fetch --no-tags origin "$RELEASE_PUSH_BEFORE_SHA"',
     'release-staging previous push object fetch',
   );
   expectWorkflowContains(

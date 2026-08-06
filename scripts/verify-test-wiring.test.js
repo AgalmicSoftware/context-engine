@@ -2,6 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { execFileSync, spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -22,6 +23,22 @@ function withTempRepo(run) {
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
+}
+
+function git(rootDir, args) {
+  return execFileSync('git', args, {
+    cwd: rootDir,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim();
+}
+
+function gitExitCode(rootDir, args) {
+  return spawnSync('git', args, {
+    cwd: rootDir,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).status;
 }
 
 test('repo test wiring invariants hold', () => {
@@ -62,7 +79,7 @@ test('release-staging PR verification uses the fetched PR head instead of merge 
   );
   assert.match(
     workflow,
-    /release_candidate_ref=HEAD\s+if \[ "\$RELEASE_EVENT_NAME" = "pull_request" \]; then\s+release_candidate_ref="\$RELEASE_PR_HEAD_SHA"\s+git fetch --no-tags --depth=1 origin "\$release_candidate_ref"\s+fi/,
+    /release_candidate_ref=HEAD\s+if \[ "\$RELEASE_EVENT_NAME" = "pull_request" \]; then\s+release_candidate_ref="\$RELEASE_PR_HEAD_SHA"\s+git fetch --no-tags origin "\$release_candidate_ref"\s+fi/,
   );
   assert.match(
     workflow,
@@ -72,6 +89,88 @@ test('release-staging PR verification uses the fetched PR head instead of merge 
     workflow,
     /verify_args=\(verify-ref --candidate-ref "\$release_candidate_ref" --baseline-ref origin\/main\)/,
   );
+});
+
+test('release workflow fetches preserve public ancestry for exact release refs', () => {
+  const repoRoot = path.resolve(__dirname, '..');
+  const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows/ci.yml'), 'utf8');
+  const fetchCommands = Array.from(
+    workflow.matchAll(/^\s*(git fetch --no-tags[^\r\n]+)$/gm),
+    (match) => match[1].trim(),
+  );
+
+  assert.equal(fetchCommands.length, 4, 'expected every release no-tags fetch command');
+
+  withTempRepo((rootDir) => {
+    const originDir = path.join(rootDir, 'origin.git');
+    const sourceDir = path.join(rootDir, 'source');
+    const checkoutDir = path.join(rootDir, 'checkout');
+    fs.mkdirSync(sourceDir, { recursive: true });
+
+    git(rootDir, ['init', '--bare', originDir]);
+    git(sourceDir, ['init']);
+    git(sourceDir, ['config', 'user.name', 'Release Fixture']);
+    git(sourceDir, ['config', 'user.email', '[redacted-email]']);
+    git(sourceDir, ['branch', '-M', 'main']);
+
+    writeFile(sourceDir, 'public.txt', 'initial public release\n');
+    git(sourceDir, ['add', 'public.txt']);
+    git(sourceDir, ['commit', '-m', 'initial public release']);
+    const olderPublicSha = git(sourceDir, ['rev-parse', 'HEAD']);
+
+    writeFile(sourceDir, 'public.txt', 'current public release\n');
+    git(sourceDir, ['add', 'public.txt']);
+    git(sourceDir, ['commit', '-m', 'advance public main']);
+    const mainSha = git(sourceDir, ['rev-parse', 'HEAD']);
+
+    git(sourceDir, ['switch', '-c', 'release-staging']);
+    writeFile(sourceDir, 'candidate.txt', 'previous staging candidate\n');
+    git(sourceDir, ['add', 'candidate.txt']);
+    git(sourceDir, ['commit', '-m', 'prepare staging candidate']);
+    const previousStagingSha = git(sourceDir, ['rev-parse', 'HEAD']);
+
+    writeFile(sourceDir, 'candidate.txt', 'current staging candidate\n');
+    git(sourceDir, ['add', 'candidate.txt']);
+    git(sourceDir, ['commit', '-m', 'advance staging candidate']);
+    const releaseCandidateSha = git(sourceDir, ['rev-parse', 'HEAD']);
+
+    git(sourceDir, ['remote', 'add', 'origin', originDir]);
+    git(sourceDir, ['push', 'origin', 'main', 'release-staging']);
+    git(rootDir, ['--git-dir', originDir, 'symbolic-ref', 'HEAD', 'refs/heads/main']);
+    git(rootDir, ['clone', '--no-local', originDir, checkoutDir]);
+
+    assert.equal(git(checkoutDir, ['rev-parse', 'origin/main']), mainSha);
+    assert.equal(git(checkoutDir, ['rev-parse', '--is-shallow-repository']), 'false');
+
+    for (const command of fetchCommands) {
+      const expanded = command
+        .replace('"$release_candidate_ref"', releaseCandidateSha)
+        .replace('"$RELEASE_PUSH_BEFORE_SHA"', previousStagingSha);
+      const [executable, ...args] = expanded.split(/\s+/);
+      assert.equal(executable, 'git');
+      assert.doesNotMatch(expanded, /\$/);
+      git(checkoutDir, args);
+    }
+
+    assert.deepEqual(
+      {
+        isShallow: git(checkoutDir, ['rev-parse', '--is-shallow-repository']),
+        mainRemainsAncestor: gitExitCode(
+          checkoutDir,
+          ['merge-base', '--is-ancestor', 'origin/main', releaseCandidateSha],
+        ),
+        olderPublicRemainsAncestor: gitExitCode(
+          checkoutDir,
+          ['merge-base', '--is-ancestor', olderPublicSha, releaseCandidateSha],
+        ),
+      },
+      {
+        isShallow: 'false',
+        mainRemainsAncestor: 0,
+        olderPublicRemainsAncestor: 0,
+      },
+    );
+  });
 });
 
 test('agent bridge runner skips cleanly when a public artifact omits the worker', () => {
@@ -145,7 +244,9 @@ test('public-release style copies without .git still pass wiring checks', () => 
         '        with:',
         '          fetch-depth: 0',
         '      - run: node scripts/resolve-baseline-growth-approval.mjs',
-        '      - run: node scripts/resolve-baseline-monotonicity-base.mjs',
+        '      - run: |',
+        '          git fetch --no-tags origin main',
+        '          node scripts/resolve-baseline-monotonicity-base.mjs',
         '      - env:',
         '          BASELINE_MONOTONICITY_BASE: ${{ steps.baseline-monotonicity-base.outputs.base_sha }}',
         '          BASELINE_MONOTONICITY_APPROVED: ${{ steps.baseline-growth-approval.outputs.approved }}',
@@ -158,16 +259,17 @@ test('public-release style copies without .git still pass wiring checks', () => 
         '          RELEASE_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}',
         '          RELEASE_PUSH_BEFORE_SHA: ${{ github.event.before }}',
         '        run: |',
+        '          git fetch --no-tags origin main',
         '          release_candidate_ref=HEAD',
         '          if [ "$RELEASE_EVENT_NAME" = "pull_request" ]; then',
         '            release_candidate_ref="$RELEASE_PR_HEAD_SHA"',
-        '            git fetch --no-tags --depth=1 origin "$release_candidate_ref"',
+        '            git fetch --no-tags origin "$release_candidate_ref"',
         '          fi',
         '          git fetch --force --tags origin',
         '          node scripts/worker-release-artifacts.mjs verify-replay-range --candidate-ref "$release_candidate_ref"',
         '          verify_args=(verify-ref --candidate-ref "$release_candidate_ref" --baseline-ref origin/main)',
         '          if [ "$RELEASE_EVENT_NAME" = "push" ] && [ "$RELEASE_PUSH_BEFORE_SHA" != "$ZERO_OID" ]; then',
-        '            git fetch --no-tags --depth=1 origin "$RELEASE_PUSH_BEFORE_SHA"',
+        '            git fetch --no-tags origin "$RELEASE_PUSH_BEFORE_SHA"',
         '            verify_args+=(--minimum-ref "$RELEASE_PUSH_BEFORE_SHA")',
         '          fi',
         '          node scripts/release-version.mjs "${verify_args[@]}"',
