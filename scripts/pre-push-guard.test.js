@@ -284,6 +284,37 @@ test('pre-push guard blocks release-staging versions that do not advance public 
   });
 });
 
+test('pre-push guard blocks a public alias when its main baseline has no verified fallback', () => {
+  withHookFixture((rootDir) => {
+    const { candidateSha } = createVersionedCandidate(rootDir, '0.1.1');
+    const result = runHook(rootDir, pushLine({
+      localRef: 'refs/heads/release-staging',
+      localSha: candidateSha,
+      remoteRef: 'refs/heads/release-staging',
+    }), 'public-alias');
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /public main baseline is unavailable/i);
+    assert.match(result.stderr, /git fetch public-alias main:refs\/remotes\/public-alias\/main/);
+  });
+});
+
+test('pre-push guard compares a public alias to a verified same-repository origin baseline', () => {
+  withHookFixture((rootDir) => {
+    const { candidateSha } = createVersionedCandidate(rootDir, '0.1.0');
+    git(rootDir, ['remote', 'add', 'origin', '[redacted-email]-agalmic:AgalmicSoftware/context-engine.git']);
+    const result = runHook(rootDir, pushLine({
+      localRef: 'refs/heads/release-staging',
+      localSha: candidateSha,
+      remoteRef: 'refs/heads/release-staging',
+    }), 'public-alias');
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Candidate version 0\.1\.0 must be greater than refs\/remotes\/origin\/main/);
+    assert.match(result.stderr, /Blocked release-staging push/);
+  });
+});
+
 test('pre-push guard blocks mismatched release version surfaces', () => {
   withHookFixture((rootDir) => {
     const { candidateSha } = createVersionedCandidate(rootDir, '0.1.1', '0.1.2');

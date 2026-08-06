@@ -21,7 +21,17 @@ should_protect_remote() {
   return 1
 }
 
-is_protected_branch_ref() {
+is_canonical_public_repository_url() {
+  case "${1:-}" in
+    *:AgalmicSoftware/context-engine|*:AgalmicSoftware/context-engine.git|*/AgalmicSoftware/context-engine|*/AgalmicSoftware/context-engine.git)
+      return 0
+      ;;
+  esac
+
+  return 1
+}
+
+is_allowed_public_ref() {
   local ref_name="$1"
 
   case "$ref_name" in
@@ -105,10 +115,30 @@ for index in "${!release_candidate_shas[@]}"; do
     verify_args+=(--baseline-ref "$baseline_sha")
   fi
 
-  main_ref="refs/remotes/${REMOTE_NAME}/main"
-  if git rev-parse --verify --quiet "${main_ref}^{commit}" >/dev/null; then
-    verify_args+=(--baseline-ref "$main_ref")
+  main_refs=()
+  target_main_ref="refs/remotes/${REMOTE_NAME}/main"
+  if git rev-parse --verify --quiet "${target_main_ref}^{commit}" >/dev/null; then
+    main_refs+=("$target_main_ref")
   fi
+
+  if [ "$REMOTE_NAME" != "origin" ] && is_canonical_public_repository_url "$REMOTE_URL"; then
+    origin_url="$(git remote get-url origin 2>/dev/null || true)"
+    origin_main_ref="refs/remotes/origin/main"
+    if is_canonical_public_repository_url "$origin_url" &&
+      git rev-parse --verify --quiet "${origin_main_ref}^{commit}" >/dev/null; then
+      main_refs+=("$origin_main_ref")
+    fi
+  fi
+
+  if [ "${#main_refs[@]}" -eq 0 ]; then
+    printf 'Blocked release-staging push: public main baseline is unavailable.\n' >&2
+    printf 'Fetch it before retrying: git fetch %s main:refs/remotes/%s/main\n' "$REMOTE_NAME" "$REMOTE_NAME" >&2
+    exit 1
+  fi
+
+  for main_ref in "${main_refs[@]}"; do
+    verify_args+=(--baseline-ref "$main_ref")
+  done
 
   if ! node "$repo_root/scripts/release-version.mjs" "${verify_args[@]}" >&2; then
     printf 'Blocked release-staging push: public application version verification failed.\n' >&2
