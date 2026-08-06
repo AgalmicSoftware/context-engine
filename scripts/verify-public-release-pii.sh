@@ -62,7 +62,7 @@ function walkFiles(rootDir) {
         walk(absolutePath);
         continue;
       }
-      if (entry.isFile()) files.push(absolutePath);
+      if (entry.isFile() || entry.isSymbolicLink()) files.push(absolutePath);
     }
   }
 
@@ -208,7 +208,9 @@ const warnings = [];
 let scannedFiles = 0;
 
 for (const absolutePath of walkFiles(targetDir)) {
-  const buffer = fs.readFileSync(absolutePath);
+  const buffer = fs.lstatSync(absolutePath).isSymbolicLink()
+    ? Buffer.from(fs.readlinkSync(absolutePath))
+    : fs.readFileSync(absolutePath);
   if (isProbablyBinary(buffer)) continue;
 
   const relativePath = toPosix(path.relative(targetDir, absolutePath));

@@ -124,3 +124,18 @@ test('verify-public-release-pii fails emails, home paths, secrets, PEMs, and pri
     assert.match(result.stderr, /FAIL hex-private-key: docs\/leak\.md:5/);
   });
 });
+
+test('verify-public-release-pii scans broken symlink targets', () => {
+  withFixture((rootDir) => {
+    const linkPath = path.join(rootDir, 'client', 'src', 'unsafe-link');
+    const unsafeTarget = `/${'Us'}ers/example/${['provider', 'api', 'token'].join('_')}='${['live', 'credential', 'material', 'must', 'not', 'ship'].join('-')}'`;
+    fs.mkdirSync(path.dirname(linkPath), { recursive: true });
+    fs.symlinkSync(unsafeTarget, linkPath);
+
+    const result = runScanner(rootDir);
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /FAIL home-path: client\/src\/unsafe-link:1/);
+    assert.match(result.stderr, /FAIL secret-assignment: client\/src\/unsafe-link:1/);
+  });
+});

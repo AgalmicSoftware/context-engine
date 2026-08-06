@@ -559,12 +559,14 @@ verify_public_replay_pii() {
   rm -rf "$surface_root"
   mkdir -p "$surface_root"
   while IFS= read -r -d '' relative_path; do
-    [ -f "$TEMP_CLONE/$relative_path" ] || continue
+    if [ ! -f "$TEMP_CLONE/$relative_path" ] && [ ! -L "$TEMP_CLONE/$relative_path" ]; then
+      continue
+    fi
     relative_dir="${relative_path%/*}"
     if [ "$relative_dir" != "$relative_path" ]; then
       mkdir -p "$surface_root/$relative_dir"
     fi
-    cp "$TEMP_CLONE/$relative_path" "$surface_root/$relative_path"
+    cp -P "$TEMP_CLONE/$relative_path" "$surface_root/$relative_path"
   done < <(git -C "$TEMP_CLONE" diff --cached --no-renames --diff-filter=ACMT --name-only -z)
   cp "$message_file" "$surface_root/commit-message.txt"
 

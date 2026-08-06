@@ -828,6 +828,39 @@ test('sync-public-history rejects a secret in a retained replay message', () => 
   });
 });
 
+test('sync-public-history rejects an unsafe symlink added and deleted from public history', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const publicLinkPath = path.join('client', 'src', 'transient-link');
+    const absoluteLinkPath = path.join(sourceDir, publicLinkPath);
+    const unsafeTarget = `/${'Us'}ers/example/${['provider', 'api', 'token'].join('_')}='${['live', 'credential', 'material', 'must', 'not', 'ship'].join('-')}'`;
+    fs.mkdirSync(path.dirname(absoluteLinkPath), { recursive: true });
+    fs.symlinkSync(unsafeTarget, absoluteLinkPath);
+    commitAll(sourceDir, 'Add temporary public symlink', {
+      authorDate: '2025-01-05T11:12:13Z',
+      committerDate: '2025-01-05T11:12:13Z',
+    });
+    fs.unlinkSync(absoluteLinkPath);
+    commitAll(sourceDir, 'Remove temporary public symlink', {
+      authorDate: '2025-01-05T12:13:14Z',
+      committerDate: '2025-01-05T12:13:14Z',
+    });
+
+    const result = runSyncScript(sourceDir, ['--push', 'release-staging']);
+
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /Scanning public replay commit for PII\/secrets/);
+    assert.match(result.stderr, /public release PII scan failed/);
+    assert.match(result.stderr, /client\/src\/transient-link/);
+
+    const remoteCheck = spawnSync('git', ['ls-remote', '--heads', 'origin', 'release-staging'], {
+      cwd: sourceDir,
+      encoding: 'utf8',
+    });
+    assert.equal(remoteCheck.status, 0);
+    assert.equal(remoteCheck.stdout.trim(), '');
+  });
+});
+
 test('sync-public-history rejects public Node test failures before pushing', () => {
   withSourceRepo(({ sourceDir }) => {
     writeFile(
