@@ -204,6 +204,9 @@ test('release guidance documents staging version and ratchet floors', () => {
 
   assert.match(guide, /greater than public `main`/);
   assert.match(guide, /equal to the previous staging version/);
-  assert.match(guide, /Fast-forward staging pushes compare ratchets to their prior tip/);
-  assert.match(guide, /New or replayed staging histories compare ratchets to public `main`/);
+  assert.match(
+    guide,
+    /Staging pushes compare ratchets to their prior tip only when public `main` is an\s+ancestor of that tip/,
+  );
+  assert.match(guide, /If public `main` has advanced beyond the prior staging tip/);
 });
