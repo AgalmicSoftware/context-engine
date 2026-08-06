@@ -27,6 +27,7 @@ import sbtsPageStyles from '../SBTs/SBTsPage.module.scss';
 import WorkerGroupCard from './WorkerGroupCard';
 import { resolveWorkerGroupJoinWindowDisplay } from './workerGroupDisplayHelpers';
 import { reconcileConfirmedWorkerGroupMembership } from './workerGroupMembershipProjection';
+import { useWorkerGroupMembershipMutations } from './useWorkerGroupMembershipMutations';
 import {
   buildWorkerGroupMembershipIdentity,
   projectWorkerGroupMembership,
@@ -605,29 +606,24 @@ const WorkerGroupMembershipPanel = ({
   const targetKeyRef = useRef(targetKey);
   targetKeyRef.current = targetKey;
   const requestIdRef = useRef(0);
-  const mutationIdRef = useRef(0);
   const memberListRequestIdRef = useRef(0);
   const [viewState, setViewState] = useState<WorkerGroupViewState>(() => emptyViewState(targetKey));
   const [memberListState, setMemberListState] = useState<WorkerGroupMemberListState>(() =>
     emptyMemberListState(targetKey),
   );
-  const [membershipActionState, setMembershipActionState] = useState<{
-    targetKey: string;
-    groupId: string;
-    action: '' | 'join' | 'leave';
-  }>({ targetKey, groupId: '', action: '' });
+  const {
+    membershipActions,
+    beginMembershipMutation,
+    finishMembershipMutation,
+    isMembershipMutationCurrent,
+  } = useWorkerGroupMembershipMutations(targetKey);
   const [membershipStatusState, setMembershipStatusState] = useState({ targetKey, status: '' });
   const [shareState, setShareState] = useState({ targetKey, status: '' });
   const activeViewState = viewState.targetKey === targetKey ? viewState : emptyViewState(targetKey);
   const overview = activeViewState.overview;
   const status = activeViewState.status;
   const error = activeViewState.error;
-  const membershipAction =
-    membershipActionState.targetKey === targetKey
-      ? membershipActionState
-      : { targetKey, groupId: '', action: '' as const };
-  const membershipStatus =
-    membershipStatusState.targetKey === targetKey ? membershipStatusState.status : '';
+  const membershipStatus = membershipStatusState.targetKey === targetKey ? membershipStatusState.status : '';
   const shareStatus = shareState.targetKey === targetKey ? shareState.status : '';
   const activeMemberListState =
     memberListState.targetKey === targetKey
@@ -689,14 +685,12 @@ const WorkerGroupMembershipPanel = ({
   }, [anonymousDiscoveryActive, canReadGroups, fetchImpl, sessionId, sessionSlug, targetKey, workerToken, workerUrl]);
 
   useEffect(() => {
-    setMembershipActionState({ targetKey, groupId: '', action: '' });
     setMembershipStatusState({ targetKey, status: '' });
     setShareState({ targetKey, status: '' });
     setMemberListState(emptyMemberListState(targetKey, selectedGroupId));
     void reload();
     return () => {
       requestIdRef.current += 1;
-      mutationIdRef.current += 1;
       memberListRequestIdRef.current += 1;
     };
   }, [refreshNonce, reload, selectedGroupId, targetKey]);
@@ -868,9 +862,7 @@ const WorkerGroupMembershipPanel = ({
   };
   const handleJoin = async (group: WorkerGroup) => {
     const mutationTargetKey = targetKey;
-    const mutationId = mutationIdRef.current + 1;
-    mutationIdRef.current = mutationId;
-    setMembershipActionState({ targetKey: mutationTargetKey, groupId: group.groupId, action: 'join' });
+    const mutation = beginMembershipMutation(group.groupId, 'join');
     setMembershipStatusState({ targetKey: mutationTargetKey, status: '' });
     setViewState((current) => ({
       ...(current.targetKey === mutationTargetKey ? current : emptyViewState(mutationTargetKey)),
@@ -885,7 +877,7 @@ const WorkerGroupMembershipPanel = ({
         groupId: group.groupId,
         fetchImpl,
       });
-      if (targetKeyRef.current !== mutationTargetKey || mutationIdRef.current !== mutationId) return;
+      if (!isMembershipMutationCurrent(mutation)) return;
       requestIdRef.current += 1;
       setMembershipStatusState({ targetKey: mutationTargetKey, status: `Joined ${group.label}.` });
       memberListRequestIdRef.current += 1;
@@ -898,23 +890,19 @@ const WorkerGroupMembershipPanel = ({
         retainGroup: true,
       });
     } catch (joinError) {
-      if (targetKeyRef.current !== mutationTargetKey || mutationIdRef.current !== mutationId) return;
+      if (!isMembershipMutationCurrent(mutation)) return;
       setViewState((current) => ({
         ...(current.targetKey === mutationTargetKey ? current : emptyViewState(mutationTargetKey)),
         status: 'error',
         error: joinError instanceof Error ? joinError.message : 'worker_group_join_failed',
       }));
     } finally {
-      if (targetKeyRef.current === mutationTargetKey && mutationIdRef.current === mutationId) {
-        setMembershipActionState({ targetKey: mutationTargetKey, groupId: '', action: '' });
-      }
+      finishMembershipMutation(mutation);
     }
   };
   const handleLeave = async (group: WorkerGroup) => {
     const mutationTargetKey = targetKey;
-    const mutationId = mutationIdRef.current + 1;
-    mutationIdRef.current = mutationId;
-    setMembershipActionState({ targetKey: mutationTargetKey, groupId: group.groupId, action: 'leave' });
+    const mutation = beginMembershipMutation(group.groupId, 'leave');
     setMembershipStatusState({ targetKey: mutationTargetKey, status: '' });
     setViewState((current) => ({
       ...(current.targetKey === mutationTargetKey ? current : emptyViewState(mutationTargetKey)),
@@ -929,7 +917,7 @@ const WorkerGroupMembershipPanel = ({
         groupId: group.groupId,
         fetchImpl,
       });
-      if (targetKeyRef.current !== mutationTargetKey || mutationIdRef.current !== mutationId) return;
+      if (!isMembershipMutationCurrent(mutation)) return;
       requestIdRef.current += 1;
       setMembershipStatusState({ targetKey: mutationTargetKey, status: `Left ${group.label}.` });
       memberListRequestIdRef.current += 1;
@@ -943,16 +931,14 @@ const WorkerGroupMembershipPanel = ({
         retainGroup: Boolean(retainedGroup),
       });
     } catch (leaveError) {
-      if (targetKeyRef.current !== mutationTargetKey || mutationIdRef.current !== mutationId) return;
+      if (!isMembershipMutationCurrent(mutation)) return;
       setViewState((current) => ({
         ...(current.targetKey === mutationTargetKey ? current : emptyViewState(mutationTargetKey)),
         status: 'error',
         error: leaveError instanceof Error ? leaveError.message : 'worker_group_leave_failed',
       }));
     } finally {
-      if (targetKeyRef.current === mutationTargetKey && mutationIdRef.current === mutationId) {
-        setMembershipActionState({ targetKey: mutationTargetKey, groupId: '', action: '' });
-      }
+      finishMembershipMutation(mutation);
     }
   };
   const copyGroupLink = async (groupId: string) => {
@@ -982,8 +968,9 @@ const WorkerGroupMembershipPanel = ({
     window.open(link.toString(), '_blank', 'noopener,noreferrer');
   };
   const renderMembershipAction = (group: WorkerGroup, isMember: boolean) => {
+    const membershipAction = membershipActions.get(group.groupId) || '';
     if (isMember) {
-      const isLeaving = membershipAction.groupId === group.groupId && membershipAction.action === 'leave';
+      const isLeaving = membershipAction === 'leave';
       return (
         <button
           type="button"
@@ -1001,7 +988,7 @@ const WorkerGroupMembershipPanel = ({
       return <span className={styles.workerGroupCardInactiveStatus}>Join period ended</span>;
     }
     if (group.joinMode === 'open' && workerToken) {
-      const isJoining = membershipAction.groupId === group.groupId && membershipAction.action === 'join';
+      const isJoining = membershipAction === 'join';
       return (
         <button
           type="button"

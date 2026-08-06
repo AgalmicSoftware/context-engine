@@ -719,6 +719,104 @@ describe('WorkerGroupMembershipPanel', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(4);
   });
 
+  it('reconciles out-of-order join and leave results for different cards', async () => {
+    const joinResult = createResponseDeferred();
+    const leaveResult = createResponseDeferred();
+    const joiningGroup = {
+      groupId: 'joining-reviewers',
+      sessionSlug: 'alpha',
+      label: 'Joining reviewers',
+      joinMode: 'open',
+      memberVisibility: 'session',
+    };
+    const leavingGroup = {
+      groupId: 'leaving-reviewers',
+      sessionSlug: 'alpha',
+      label: 'Leaving reviewers',
+      joinMode: 'open',
+      memberVisibility: 'session',
+    };
+    const response = (body: unknown) =>
+      new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+    const fetchImpl = jest.fn(async (input: RequestInfo | URL) => {
+      const pathname = new URL(String(input)).pathname;
+      if (pathname.endsWith('/groups/join')) return joinResult.promise;
+      if (pathname.endsWith('/groups/leave')) return leaveResult.promise;
+      if (pathname.endsWith('/groups/my-memberships')) {
+        return response({
+          ok: true,
+          sessionId: SESSION_ID,
+          sessionSlug: 'alpha',
+          memberships: [
+            {
+              group: leavingGroup,
+              member: { groupId: leavingGroup.groupId, sessionSlug: 'alpha' },
+              memberCount: 5,
+            },
+          ],
+        });
+      }
+      return response({
+        ok: true,
+        sessionId: SESSION_ID,
+        sessionSlug: 'alpha',
+        groups: [
+          { ...joiningGroup, memberCount: 2 },
+          { ...leavingGroup, memberCount: 5 },
+        ],
+      });
+    });
+
+    render(
+      <WorkerGroupMembershipPanel
+        envelope={envelope}
+        fetchImpl={fetchImpl as typeof fetch}
+        showDescriptions={false}
+        showListHeader={false}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Join Joining reviewers' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Leave Leaving reviewers' }));
+
+    expect(screen.getByRole('button', { name: 'Join Joining reviewers' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Leave Leaving reviewers' })).toBeDisabled();
+
+    await act(async () => {
+      leaveResult.resolve(
+        response({
+          ok: true,
+          sessionId: SESSION_ID,
+          sessionSlug: 'alpha',
+          groupId: leavingGroup.groupId,
+          group: leavingGroup,
+          memberCount: 4,
+        }),
+      );
+      await Promise.resolve();
+    });
+
+    expect(screen.getByRole('button', { name: 'Join Joining reviewers' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Join Leaving reviewers' })).toBeInTheDocument();
+
+    await act(async () => {
+      joinResult.resolve(
+        response({
+          ok: true,
+          sessionId: SESSION_ID,
+          sessionSlug: 'alpha',
+          group: joiningGroup,
+          memberCount: 3,
+        }),
+      );
+      await Promise.resolve();
+    });
+
+    expect(screen.getByRole('button', { name: 'Leave Joining reviewers' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Join Leaving reviewers' })).toBeInTheDocument();
+    expect(fetchImpl).toHaveBeenCalledTimes(4);
+  });
+
   it('does not let an older collection refresh overwrite confirmed join or leave state', async () => {
     let joined = false;
     let nextGroupRead: ReturnType<typeof createResponseDeferred> | null = null;
