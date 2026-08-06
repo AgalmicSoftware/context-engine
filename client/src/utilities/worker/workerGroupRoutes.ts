@@ -2,6 +2,7 @@ import { canonicalizeSessionSlug } from '../session/canonicalSessionContext.js';
 import { buildPublicRoute, stripPublicUrlBasePath } from '../ui/publicUrl.js';
 
 const WORKER_GROUP_HASH_PREFIX = '#group-';
+const ADDRESS_SHAPED_WORKER_GROUP_ID_RE = /^0x[0-9a-f]{40}$/i;
 
 const normalizeListRoot = (rootPath: unknown): string => {
   const normalized = String(rootPath || '/groups')
@@ -21,14 +22,18 @@ export const buildWorkerGroupsPath = ({
 }): string => {
   const slug = canonicalizeSessionSlug(sessionSlug);
   const normalizedGroupId = String(groupId || '').trim();
-  const path = normalizedGroupId
+  const usesLegacyHashRoute = ADDRESS_SHAPED_WORKER_GROUP_ID_RE.test(normalizedGroupId);
+  const path = normalizedGroupId && !usesLegacyHashRoute
     ? buildPublicRoute(`/group/${encodeURIComponent(normalizedGroupId)}`)
     : buildPublicRoute(normalizeListRoot(rootPath));
-  if (!slug) return path;
+  const hash = usesLegacyHashRoute
+    ? `${WORKER_GROUP_HASH_PREFIX}${encodeURIComponent(normalizedGroupId)}`
+    : '';
+  if (!slug) return `${path}${hash}`;
 
   const params = new URLSearchParams();
   params.set('sessionName', slug);
-  return `${path}?${params.toString()}`;
+  return `${path}?${params.toString()}${hash}`;
 };
 
 export const readWorkerGroupIdFromHash = (hash: unknown): string => {

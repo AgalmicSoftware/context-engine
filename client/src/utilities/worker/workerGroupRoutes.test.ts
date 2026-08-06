@@ -5,6 +5,8 @@ import {
 } from './workerGroupRoutes';
 
 describe('workerGroupRoutes', () => {
+  const legacyAddressGroupId = '0x1234567890abcdef1234567890abcdef12345678';
+
   it('builds a query-scoped list route and a path-scoped detail route', () => {
     expect(buildWorkerGroupsPath({ sessionSlug: ' Demo-SH ' })).toBe('/groups?sessionName=Demo-SH');
     expect(
@@ -23,11 +25,26 @@ describe('workerGroupRoutes', () => {
       expect(buildWorkerGroupsPath({ groupId: 'reviewers', sessionSlug: 'alpha' })).toBe(
         '/ce/group/reviewers?sessionName=alpha',
       );
+      expect(buildWorkerGroupsPath({ groupId: legacyAddressGroupId, sessionSlug: 'alpha' })).toBe(
+        `/ce/groups?sessionName=alpha#group-${legacyAddressGroupId}`,
+      );
       expect(readWorkerGroupIdFromPath('/ce/group/reviewers')).toBe('reviewers');
     } finally {
       if (originalPublicUrl === undefined) delete process.env.PUBLIC_URL;
       else process.env.PUBLIC_URL = originalPublicUrl;
     }
+  });
+
+  it('keeps legacy address-shaped Worker group ids out of SBT detail paths', () => {
+    expect(buildWorkerGroupsPath({ groupId: legacyAddressGroupId, sessionSlug: 'demo-sh' })).toBe(
+      `/groups?sessionName=demo-sh#group-${legacyAddressGroupId}`,
+    );
+    expect(buildWorkerGroupsPath({ groupId: legacyAddressGroupId, sessionSlug: '' })).toBe(
+      `/groups#group-${legacyAddressGroupId}`,
+    );
+    expect(buildWorkerGroupsPath({ groupId: legacyAddressGroupId, rootPath: '/sbts', sessionSlug: 'demo-sh' })).toBe(
+      `/sbts?sessionName=demo-sh#group-${legacyAddressGroupId}`,
+    );
   });
 
   it('reads only canonical Worker Group fragments', () => {
