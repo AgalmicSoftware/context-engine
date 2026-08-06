@@ -7,6 +7,7 @@ import {
 
 const createDeps = (overrides: Partial<AutoHashPersistenceDeps> = {}): AutoHashPersistenceDeps => ({
   getActiveSlug: () => 'alpha',
+  getLocationHash: () => '',
   getLocationSearch: () => '',
   getLocationPathname: () => '/session/alpha',
   sessionStorageGet: jest.fn(() => null),
@@ -74,6 +75,18 @@ describe('manageAutoHashPersistence', () => {
     expect(deps.sessionStorageGet).toHaveBeenCalledWith('dg:autoHash:alpha');
     expect(deps.replaceState).toHaveBeenCalledWith('/session/alpha?auto2=1&ref=abc');
     expect(deps.log).toHaveBeenCalledWith('[MainSite] Restoring persisted auto-query:', 'auto2=1&ref=abc');
+  });
+
+  it('preserves the current hash when restoring a saved query', () => {
+    const deps = createDeps({
+      getLocationPathname: () => '/about',
+      getLocationHash: () => '#overview',
+      sessionStorageGet: jest.fn(() => 'auto=1'),
+    });
+
+    manageAutoHashPersistence(deps);
+
+    expect(deps.replaceState).toHaveBeenCalledWith('/about?auto=1#overview');
   });
 
   it('sanitizes a legacy saved credential query before restoring or logging it', () => {

@@ -1253,6 +1253,24 @@ describe('AppShell route render smoke', () => {
     subject.componentWillUnmount();
   });
 
+  it('keeps the root hash when saved auto intent is restored after the about redirect', async () => {
+    const subject = createSubject({ path: '/', firstVisit: true });
+    const manageAutoHashPersistence = subject.manageAutoHashPersistence.bind(subject);
+    stubMainSiteMountSideEffects(subject);
+    subject.manageAutoHashPersistence = manageAutoHashPersistence;
+    window.sessionStorage.setItem('dg:autoHash:edge', 'auto=1');
+    window.history.replaceState({}, '', '/#overview');
+
+    await act(async () => {
+      await subject.componentDidMount();
+    });
+
+    expect(window.location.pathname).toBe('/about');
+    expect(window.location.search).toBe('?auto=1');
+    expect(window.location.hash).toBe('#overview');
+    subject.componentWillUnmount();
+  });
+
   it('redirects a cached root load to the about page', async () => {
     localStorage.setItem(FIRST_VISIT_STORAGE_KEY, 'false');
     const subject = stubMainSiteMountSideEffects(

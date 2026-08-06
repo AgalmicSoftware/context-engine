@@ -3205,6 +3205,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
   manageAutoHashPersistence = () => {
     manageAutoHashPersistenceFn({
       getActiveSlug: () => this.getActiveSessionSlug() || '',
+      getLocationHash: () => window.location.hash || '',
       getLocationSearch: () => window.location.search || '',
       getLocationPathname: () => window.location.pathname || '',
       sessionStorageGet: (key) => sessionStorage.getItem(key),

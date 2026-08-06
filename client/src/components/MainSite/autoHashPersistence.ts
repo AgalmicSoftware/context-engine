@@ -1,5 +1,6 @@
 export interface AutoHashPersistenceDeps {
   getActiveSlug: () => string;
+  getLocationHash: () => string;
   getLocationSearch: () => string;
   getLocationPathname: () => string;
   sessionStorageGet: (key: string) => string | null;
@@ -71,7 +72,7 @@ export function manageAutoHashPersistence(deps: AutoHashPersistenceDeps): void {
       deps.sessionStorageSet(key, safeQuery);
     }
     deps.log('[MainSite] Restoring persisted auto-query:', safeQuery);
-    deps.replaceState(`${deps.getLocationPathname()}?${safeQuery}`);
+    deps.replaceState(`${deps.getLocationPathname()}?${safeQuery}${deps.getLocationHash()}`);
   } catch (error) {
     deps.warn('[MainSite] manageAutoHashPersistence error:', error);
   }
