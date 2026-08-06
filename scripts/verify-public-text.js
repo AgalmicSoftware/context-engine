@@ -20,6 +20,7 @@ const EXEMPT_PATHS = new Set([
   'scripts/verify-public-assets.test.js',
   'scripts/verify-public-docs.js',
   'scripts/verify-public-docs.test.js',
+  'scripts/verify-public-release-pii.sh',
   'scripts/verify-public-release-surface.test.js',
   'scripts/verify-public-text.js',
   'scripts/verify-public-text.test.js',

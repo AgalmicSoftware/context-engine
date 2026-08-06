@@ -55,6 +55,21 @@ test('verifyPublicText permits release guard files to encode forbidden patterns'
   });
 });
 
+test('verifyPublicText permits the replay PII guard to encode forbidden patterns', () => {
+  withFixture((rootDir) => {
+    writeFile(
+      rootDir,
+      'scripts/verify-public-release-pii.sh',
+      "const privateReplayTokens = ['contextEngine-cc', 'TODO/'];\n",
+    );
+    writeFile(rootDir, 'README.md', '# Public\n');
+
+    const result = verifyPublicText(rootDir);
+    assert.deepEqual(result.findings, []);
+    assert.equal(result.scannedFiles, 1);
+  });
+});
+
 test('verifyPublicText does not confuse public domains with local agent settings paths', () => {
   withFixture((rootDir) => {
     writeFile(rootDir, 'sources.json', '{"url":"https://platform.claude.com/docs"}\n');
