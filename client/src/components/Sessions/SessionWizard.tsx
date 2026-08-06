@@ -870,12 +870,20 @@ const SessionWizard = ({
     setBundleFile,
     buildProvisionedSponsoredContextState,
   });
-  const getWorkerPublishEvidence = () =>
-    resolveSessionWizardWorkerPublishEvidence({
-      runtime: workerDeployRuntimeRef.current,
-      workerSecrets: getCurrentWorkerSecrets(),
-      defaultWorkerUrl: getSessionWizardDefaultWorkerUrl(),
-    });
+  const getWorkerPublishEvidence = () => {
+    try {
+      return resolveSessionWizardWorkerPublishEvidence({
+        runtime: workerDeployRuntimeRef.current,
+        workerSecrets: getCurrentWorkerSecrets(),
+        defaultWorkerUrl: getSessionWizardDefaultWorkerUrl(),
+      });
+    } catch {
+      // Draft edits can make a previously verified profile unreachable. Treat
+      // that as missing evidence so render stays mounted and publish's live
+      // profile validation can report the actionable failure before effects.
+      return null;
+    }
+  };
   const sessionModeRequirements = resolveSessionWizardModeRequirements(draft.sessionModeProfile as SessionModeProfile, {
     hasPendingSbtDrafts: hasUndeployedPendingSbtDrafts,
   });
