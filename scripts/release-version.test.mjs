@@ -37,7 +37,9 @@ const packageLock = (name, version) => `${JSON.stringify({
 test('stable SemVer comparison and patch increments are deterministic', () => {
   assert.equal(compareVersions('0.1.9', '0.1.10'), -1);
   assert.equal(compareVersions('1.0.0', '0.99.99'), 1);
+  assert.equal(compareVersions('0.0.9007199254740992', '0.0.9007199254740993'), -1);
   assert.equal(incrementPatch('0.1.9'), '0.1.10');
+  assert.equal(incrementPatch('0.0.9007199254740992'), '0.0.9007199254740993');
   assert.throws(() => incrementPatch('0.1.0-beta.1'), /stable MAJOR\.MINOR\.PATCH/);
 });
 
@@ -155,6 +157,43 @@ test('verify-ref fails when a supplied release floor cannot be resolved', () => 
       assert.notEqual(result.status, 0, `${option} unexpectedly passed`);
       assert.match(result.stderr, /Release version ref was not found/);
     }
+  } finally {
+    fs.rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+test('verify-ref rejects an exact SemVer downgrade beyond the safe integer range', () => {
+  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-release-large-version-'));
+  try {
+    fs.mkdirSync(path.join(rootDir, 'client'), { recursive: true });
+    fs.writeFileSync(path.join(rootDir, 'package.json'), packageJson('contextEngine', '0.0.9007199254740993'));
+    fs.writeFileSync(path.join(rootDir, 'package-lock.json'), packageLock('contextEngine', '0.0.9007199254740993'));
+    fs.writeFileSync(path.join(rootDir, 'client', 'package.json'), packageJson('client', '0.0.9007199254740993'));
+    fs.writeFileSync(path.join(rootDir, 'client', 'package-lock.json'), packageLock('client', '0.0.9007199254740993'));
+    git(rootDir, ['init', '--quiet']);
+    git(rootDir, ['config', 'user.name', 'Release Tester']);
+    git(rootDir, ['config', 'user.email', '[redacted-email]']);
+    git(rootDir, ['add', 'package.json', 'package-lock.json', 'client/package.json', 'client/package-lock.json']);
+    git(rootDir, ['commit', '--quiet', '-m', 'minimum']);
+    const minimumRef = git(rootDir, ['rev-parse', 'HEAD']);
+
+    writeVersionSurfaces(rootDir, '0.0.9007199254740992');
+    git(rootDir, ['add', 'package.json', 'package-lock.json', 'client/package.json', 'client/package-lock.json']);
+    git(rootDir, ['commit', '--quiet', '-m', 'candidate']);
+
+    const result = spawnSync(process.execPath, [
+      SCRIPT_PATH,
+      'verify-ref',
+      '--repo-root',
+      rootDir,
+      '--candidate-ref',
+      'HEAD',
+      '--minimum-ref',
+      minimumRef,
+    ], { encoding: 'utf8' });
+
+    assert.notEqual(result.status, 0, 'unsafe large-version downgrade unexpectedly passed');
+    assert.match(result.stderr, /must not be lower/);
   } finally {
     fs.rmSync(rootDir, { recursive: true, force: true });
   }
