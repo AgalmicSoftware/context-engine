@@ -47,7 +47,6 @@ import { getChainById, getSessionRegistryChainIds } from '../../variables/chains
 import { sessionRegistryReadsPort } from '../../domains/sessions/registry/sessionRegistryReadPorts.js';
 import { normalizeSessionMediaUrl } from '../../domains/sessions/sessionMediaUrls.js';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
-import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import { derivePrimarySessionSlugFromList } from '../../utilities/session/globalSessionState.js';
 import {
   createInitialProfileScanReport,
@@ -1040,9 +1039,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
   getTemporaryInitialLoadAboutRedirectTarget = (pathIn: unknown = '') =>
     getTemporaryInitialLoadAboutRedirectTargetFn({
       isFirstVisitRootRedirectEnabled: this.isFirstVisitRootRedirectEnabled,
-      isTemporaryInitialLoadAboutRedirectSessionSlug: (slug: string) => isDemoSessionSlug(slug),
       normalizeRoutePath: (value: unknown) => this.normalizeRoutePath(String(value || '')),
-      normalizeSessionSlug,
       pathIn,
     });
 
@@ -2362,12 +2359,8 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     if (typeof window !== 'undefined' && this.shouldForceOneTimeFirstVisitRootRedirect()) {
       const currentPath = window.location.pathname || this.props.path || '';
       const aboutRedirectTarget = this.getTemporaryInitialLoadAboutRedirectTarget(currentPath);
-      const shouldRedirectForPersistedCache = aboutRedirectTarget?.requiresPersistedCache
-        ? !!(aboutRedirectTarget.cacheSlug && (await this.hasPersistedManagedCacheData(aboutRedirectTarget.cacheSlug)))
-        : true;
       if (
         aboutRedirectTarget?.path &&
-        shouldRedirectForPersistedCache &&
         this.normalizeRoutePath(currentPath) !== aboutRedirectTarget.path
       ) {
         window.history.replaceState(

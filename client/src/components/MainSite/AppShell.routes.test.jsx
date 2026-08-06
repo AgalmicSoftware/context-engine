@@ -1213,6 +1213,7 @@ describe('AppShell route render smoke', () => {
   it('redirects a first-visit root load to the about page', async () => {
     const subject = createSubject({
       path: '/',
+      search: '?from=launch#overview',
       firstVisit: true,
     });
     const replaceStateSpy = jest.spyOn(window.history, 'replaceState');
@@ -1240,8 +1241,10 @@ describe('AppShell route render smoke', () => {
       await subject.componentDidMount();
     });
 
-    expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/about');
+    expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/about?from=launch#overview');
     expect(window.location.pathname).toBe('/about');
+    expect(window.location.search).toBe('?from=launch');
+    expect(window.location.hash).toBe('#overview');
     expect(localStorage.getItem(FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY)).toBe('true');
 
     render(<MemoryRouter initialEntries={['/about']}>{subject.render()}</MemoryRouter>);
@@ -1291,7 +1294,7 @@ describe('AppShell route render smoke', () => {
     subject.componentWillUnmount();
   });
 
-  it('redirects one cached session load to about and disarms later refreshes', async () => {
+  it('preserves cached direct session loads and later refreshes', async () => {
     const subject = stubMainSiteMountSideEffects(
       createSubject({
         path: '/session/demo-1',
@@ -1299,16 +1302,16 @@ describe('AppShell route render smoke', () => {
       }),
     );
     subject.hasPersistedManagedCacheData = jest.fn(async (slug) => slug === 'demo-1');
+    subject.reloadWindowLocation = jest.fn();
     const replaceStateSpy = jest.spyOn(window.history, 'replaceState');
 
     await act(async () => {
       await subject.componentDidMount();
     });
 
-    expect(subject.hasPersistedManagedCacheData).toHaveBeenCalledWith('demo-1');
-    expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/about');
-    expect(window.location.pathname).toBe('/about');
-    expect(localStorage.getItem(FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY)).toBe('true');
+    expect(replaceStateSpy).not.toHaveBeenCalledWith({}, '', '/about');
+    expect(window.location.pathname).toBe('/session/demo-1');
+    expect(localStorage.getItem(FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY)).toBeNull();
     subject.componentWillUnmount();
 
     window.history.replaceState({}, '', '/session/demo-1');
@@ -1325,7 +1328,6 @@ describe('AppShell route render smoke', () => {
       await refreshedSubject.componentDidMount();
     });
 
-    expect(refreshedSubject.hasPersistedManagedCacheData).not.toHaveBeenCalled();
     expect(replaceStateSpy).not.toHaveBeenCalledWith({}, '', '/about');
     expect(window.location.pathname).toBe('/session/demo-1');
     refreshedSubject.componentWillUnmount();
@@ -1345,7 +1347,6 @@ describe('AppShell route render smoke', () => {
       await subject.componentDidMount();
     });
 
-    expect(subject.hasPersistedManagedCacheData).toHaveBeenCalledWith('demo-1');
     expect(replaceStateSpy).not.toHaveBeenCalledWith({}, '', '/about');
     expect(window.location.pathname).toBe('/session/demo-1');
     subject.componentWillUnmount();
