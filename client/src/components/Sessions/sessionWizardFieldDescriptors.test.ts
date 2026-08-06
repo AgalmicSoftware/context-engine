@@ -13,6 +13,7 @@ const pureWorkerPolicy: SessionWizardModeFieldPolicy = {
   showSessionEndsAt: true,
   showWorkerGroupDefaults: true,
   showSbtDefaults: false,
+  showAgentSessionWrapped: false,
   visibleContractKeys: [],
 };
 
@@ -97,7 +98,7 @@ describe('sessionWizardFieldDescriptors', () => {
   });
 
   it('keeps capability-hidden fields hidden even when guided controls force rendering', () => {
-    for (const key of ['contracts', 'blockLimits', 'faucet', 'defaultSbtTags']) {
+    for (const key of ['contracts', 'blockLimits', 'faucet', 'defaultSbtTags', 'agentSessionWrapped']) {
       expect(
         shouldHideSessionWizardField({
           forceShow: true,
