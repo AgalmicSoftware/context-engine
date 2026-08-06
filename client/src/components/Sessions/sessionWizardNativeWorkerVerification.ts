@@ -72,6 +72,11 @@ export const verifyNativeSessionWorker = async ({
     throw new Error('The Worker URL must be verified against the current session slug.');
   }
   if (!workerUrl) throw new Error('Paste a valid HTTPS Session Worker origin before verification.');
+  if (currentDraft.sessionModeProfile?.surfaces?.agentHttp === true) {
+    throw new Error(
+      'Agent Session Wrapped requires the legacy/manual deploy-helper flow; native Cloudflare dashboard verification cannot provision its dedicated Bridge.',
+    );
+  }
   if (!modeRequirements.isWorkerCanonical) {
     throw new Error('Native Cloudflare verification is available only for worker-canonical sessions.');
   }

@@ -121,10 +121,11 @@ export const resolveSessionWizardModeRequirements = (
   const requiredRequirementIds: SessionWizardRequirementId[] = [];
   if (usesCloudflare) {
     requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.CLOUDFLARE_ACCOUNT);
-  } else if (usesAgentSessionWrapped) {
-    requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.CLOUDFLARE_API_TOKEN);
   } else if (usesWorkerRuntime) {
     requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.SESSION_WORKER);
+  }
+  if (usesAgentSessionWrapped) {
+    requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.CLOUDFLARE_API_TOKEN);
   }
   requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.AI_PROVIDER_KEY);
   if (requiresArweave) requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.ARWEAVE_JWK);
@@ -146,18 +147,19 @@ export const resolveSessionWizardModeRequirements = (
   const presetKeyChips = usesCloudflare
     ? [
         'Cloudflare account',
+        ...(usesAgentSessionWrapped ? ['Request-only Cloudflare API token'] : []),
         'AI provider key',
         ...(requiresRpc ? ['RPC URL/key'] : []),
         ...(requiresLit ? ['Lit API key'] : []),
       ]
-    : usesAgentSessionWrapped
-      ? [
-          'Request-only Cloudflare API token',
-          'AI provider key',
-          ...(requiresRpc ? ['RPC URL/key'] : []),
-          ...(requiresLit ? ['Lit API key'] : []),
-        ]
-      : ['AI provider key', 'Arweave wallet/JWK', 'RPC URL/key', 'Lit API key if encryption is enabled'];
+    : [
+        ...(usesWorkerRuntime ? ['Compatible Session Worker'] : []),
+        ...(usesAgentSessionWrapped ? ['Request-only Cloudflare API token'] : []),
+        'AI provider key',
+        'Arweave wallet/JWK',
+        'RPC URL/key',
+        'Lit API key if encryption is enabled',
+      ];
 
   return {
     selected: true,

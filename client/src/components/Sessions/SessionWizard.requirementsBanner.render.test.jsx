@@ -56,6 +56,24 @@ describe('SessionWizard new-session requirements banner', () => {
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_TOKEN_ONBOARDING_LINK)).not.toBeInTheDocument();
   });
 
+  it('adds the Wrapped token without replacing the Cloudflare account or AI key', async () => {
+    window.history.replaceState({}, '', '/session/new');
+
+    renderSessionWizard();
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    await selectCloudflarePreset();
+    enableAdvancedMode();
+    fireEvent.click(screen.getByRole('button', { name: 'Worker deployment & secrets' }));
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Agent Session Wrapped' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_TOKEN_ONBOARDING_LINK)).toBeInTheDocument();
+    });
+    expect(screen.getByRole('link', { name: 'Cloudflare account' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'AI provider key' })).toBeInTheDocument();
+  });
+
   it('renders the decentralized requirements copy and contact link on /session/new', async () => {
     window.history.replaceState({}, '', '/session/new');
 

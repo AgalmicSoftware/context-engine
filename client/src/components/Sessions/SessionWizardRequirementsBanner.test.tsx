@@ -61,17 +61,21 @@ describe('SessionWizardRequirementsBanner', () => {
     expect(screen.getByText('Anvil ETH for on-chain registration')).toBeInTheDocument();
   });
 
-  it('renders exactly the two profile-derived Cloudflare requirements without not-required notices', () => {
+  it('renders the Wrapped token in addition to the native Cloudflare requirements', () => {
     render(
       <SessionWizardRequirementsBanner
         cloudflareTokenSlug="onboarding-demo"
         fundingRequirementLabel="OP Sepolia ETH"
         onDismiss={jest.fn()}
-        requiredRequirementIds={['cloudflareApiToken', 'aiProviderKey']}
+        requiredRequirementIds={['cloudflareAccount', 'cloudflareApiToken', 'aiProviderKey']}
       />,
     );
 
-    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
+    expect(screen.getByRole('link', { name: 'Cloudflare account' })).toHaveAttribute(
+      'href',
+      SESSION_WIZARD_REQUIREMENT_LINKS.cloudflareAccount,
+    );
     const cloudflareTokenLink = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_TOKEN_ONBOARDING_LINK);
     expect(cloudflareTokenLink).toHaveAccessibleName('Cloudflare API token');
     expect(cloudflareTokenLink).toHaveAttribute('target', '_blank');

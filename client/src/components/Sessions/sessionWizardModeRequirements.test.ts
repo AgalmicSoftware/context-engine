@@ -135,6 +135,13 @@ describe('sessionWizardModeRequirements', () => {
       expect.objectContaining({
         isWorkerCanonical: false,
         usesWorkerRuntime: true,
+        presetKeyChips: [
+          'Compatible Session Worker',
+          'AI provider key',
+          'Arweave wallet/JWK',
+          'RPC URL/key',
+          'Lit API key if encryption is enabled',
+        ],
         requiredRequirementIds: ['sessionWorker', 'aiProviderKey', 'arweaveJwk', 'rpc', 'wallet', 'funding'],
         requiresArweave: true,
         requiresRpc: true,
@@ -164,15 +171,49 @@ describe('sessionWizardModeRequirements', () => {
     });
   });
 
-  it('adds the request-only Cloudflare token requirement when registry-canonical Wrapped is enabled', () => {
+  it('adds the Wrapped token without replacing Cloudflare account requirements', () => {
+    const profile = cloudflareProfile();
+    profile.preset = 'custom';
+    profile.surfaces.agentHttp = true;
+
+    const requirements = resolveSessionWizardModeRequirements(profile);
+
+    expect(requirements.requiredRequirementIds).toEqual([
+      'cloudflareAccount',
+      'cloudflareApiToken',
+      'aiProviderKey',
+    ]);
+    expect(requirements.presetKeyChips).toEqual([
+      'Cloudflare account',
+      'Request-only Cloudflare API token',
+      'AI provider key',
+    ]);
+  });
+
+  it('adds the Wrapped token without replacing decentralized requirements', () => {
     const profile = decentralizedProfile();
     profile.preset = 'custom';
     profile.surfaces.agentHttp = true;
 
     const requirements = resolveSessionWizardModeRequirements(profile);
 
-    expect(requirements.requiredRequirementIds).toContain('cloudflareApiToken');
-    expect(requirements.presetKeyChips[0]).toBe('Request-only Cloudflare API token');
+    expect(requirements.requiredRequirementIds).toEqual([
+      'sessionWorker',
+      'cloudflareApiToken',
+      'aiProviderKey',
+      'arweaveJwk',
+      'rpc',
+      'wallet',
+      'funding',
+    ]);
+    expect(requirements.presetKeyChips).toEqual([
+      'Compatible Session Worker',
+      'Request-only Cloudflare API token',
+      'AI provider key',
+      'Arweave wallet/JWK',
+      'RPC URL/key',
+      'Lit API key if encryption is enabled',
+    ]);
   });
 
   it('returns an unselected descriptor instead of inventing legacy requirements', () => {
