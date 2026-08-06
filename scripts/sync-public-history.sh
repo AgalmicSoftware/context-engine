@@ -22,7 +22,8 @@ Options:
   --source-base <rev>
                Replay commits after this source revision instead of origin/main
   --target-base <rev>
-               Start the public target branch from this revision instead of origin/main
+               Start from a revision already in public main or in the fetched
+               public target branch after main
   --allow-diverged-source
                Allow a source branch that does not contain origin/main by
                replaying patch-new non-merge commits from git cherry
@@ -106,6 +107,7 @@ TARGET_BRANCH="$DEFAULT_BRANCH_NAME"
 SOURCE_BRANCH="dev"
 SOURCE_BASE_REF=""
 TARGET_BASE_REF=""
+TARGET_BASE_SHA=""
 DRY_RUN=0
 AUTO_PUSH=0
 EXPLICIT_FORCE_WITH_LEASE=0
@@ -680,9 +682,9 @@ collect_source_release_evidence() {
 }
 
 collect_replayed_release_evidence() {
-  git -C "$TEMP_CLONE" diff --name-only "$TARGET_BASE..$TARGET_BRANCH" \
+  git -C "$TEMP_CLONE" diff --name-only "$TARGET_BASE_SHA..$TARGET_BRANCH" \
     | sort -u > "$RELEASE_CHANGED_PATHS_FILE"
-  git -C "$TEMP_CLONE" log --format='%s' "$TARGET_BASE..$TARGET_BRANCH" \
+  git -C "$TEMP_CLONE" log --format='%s' "$TARGET_BASE_SHA..$TARGET_BRANCH" \
     > "$RELEASE_SUBJECTS_FILE"
 }
 
@@ -893,7 +895,7 @@ if ! git -C "$REPO_ROOT" rev-parse --verify --quiet "$SOURCE_BASE^{commit}" >/de
   fail "Source base revision was not found: $SOURCE_BASE" 1
 fi
 
-if ! git -C "$REPO_ROOT" rev-parse --verify --quiet "$TARGET_BASE^{commit}" >/dev/null; then
+if ! TARGET_BASE_SHA=$(git -C "$REPO_ROOT" rev-parse --verify --quiet "$TARGET_BASE^{commit}"); then
   fail "Target base revision was not found: $TARGET_BASE" 1
 fi
 
@@ -975,7 +977,19 @@ if git -C "$TEMP_CLONE" ls-remote --exit-code --heads origin "$TARGET_BRANCH" >/
     "refs/heads/$TARGET_BRANCH:refs/remotes/origin/$TARGET_BRANCH"
 fi
 
-git -C "$TEMP_CLONE" checkout --quiet -B "$TARGET_BRANCH" "$TARGET_BASE"
+TARGET_BASE_IS_PUBLIC=0
+if git -C "$TEMP_CLONE" merge-base --is-ancestor "$TARGET_BASE_SHA" origin/main >/dev/null 2>&1; then
+  TARGET_BASE_IS_PUBLIC=1
+elif [ "$REMOTE_BRANCH_EXISTS" -eq 1 ] &&
+  git -C "$TEMP_CLONE" merge-base --is-ancestor origin/main "$TARGET_BASE_SHA" >/dev/null 2>&1 &&
+  git -C "$TEMP_CLONE" merge-base --is-ancestor "$TARGET_BASE_SHA" "origin/$TARGET_BRANCH" >/dev/null 2>&1; then
+  TARGET_BASE_IS_PUBLIC=1
+fi
+if [ "$TARGET_BASE_IS_PUBLIC" -ne 1 ]; then
+  fail "Target base $TARGET_BASE is not contained in public history for origin/main or origin/$TARGET_BRANCH." 1
+fi
+
+git -C "$TEMP_CLONE" checkout --quiet -B "$TARGET_BRANCH" "$TARGET_BASE_SHA"
 log_info "Prepared temp branch $TARGET_BRANCH from $TARGET_BASE."
 
 if [ "$DRY_RUN" -eq 1 ]; then
@@ -1085,7 +1099,8 @@ else
   exit 2
 fi
 
-offending_identities=$(author_audit_output)
+offending_identities=$(git -C "$TEMP_CLONE" log --format='%H %an <%ae> | %cn <%ce>' "$TARGET_BASE_SHA..$TARGET_BRANCH" \
+  | grep -Fv "$PUBLIC_GIT_NAME <$PUBLIC_GIT_EMAIL> | $PUBLIC_GIT_NAME <$PUBLIC_GIT_EMAIL>" || true)
 if [ -n "$offending_identities" ]; then
   log_error "Identity audit failed; offending commits:"
   printf '%s\n' "$offending_identities" >&2

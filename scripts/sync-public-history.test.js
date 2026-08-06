@@ -331,6 +331,49 @@ test('sync-public-history accepts an explicit source branch', () => {
   });
 });
 
+test('sync-public-history rejects a private target base before creating a candidate', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const privateTarget = git(sourceDir, ['rev-parse', 'dev~1']).trim();
+    assert.match(git(sourceDir, ['ls-tree', '-r', '--name-only', privateTarget]), /^TODO\//m);
+
+    const result = runSyncScript(sourceDir, [
+      '--target-base',
+      privateTarget,
+      'release-candidate',
+    ]);
+
+    assert.equal(result.status, 1, syncFailureMessage(result));
+    assert.match(result.stderr, new RegExp(`Target base ${privateTarget} is not contained in public history`));
+    assert.equal(git(sourceDir, ['branch', '--list', 'release-candidate']).trim(), '');
+  });
+});
+
+test('sync-public-history accepts a target base from the fetched public target history', () => {
+  withSourceRepo(({ sourceDir }) => {
+    git(sourceDir, ['checkout', '--quiet', '-b', 'prior-release', 'main']);
+    writeFile(sourceDir, 'release-follow-up.txt', 'public staging follow-up\n');
+    commitAll(sourceDir, 'Prior public staging change', {
+      authorDate: '2025-01-02T00:00:00Z',
+      committerDate: '2025-01-02T00:00:00Z',
+    });
+    const priorRelease = git(sourceDir, ['rev-parse', 'HEAD']).trim();
+    git(sourceDir, ['push', '--quiet', 'origin', 'HEAD:release-candidate']);
+    git(sourceDir, ['checkout', '--quiet', 'dev']);
+
+    const result = runSyncScript(sourceDir, [
+      '--target-base',
+      priorRelease,
+      'release-candidate',
+    ]);
+
+    assert.equal(result.status, 0, syncFailureMessage(result));
+    assert.equal(
+      git(sourceDir, ['merge-base', '--is-ancestor', priorRelease, 'release-candidate']),
+      '',
+    );
+  });
+});
+
 test('sync-public-history can replay patch-new commits from a source branch diverged from main', () => {
   withSourceRepo(({ sourceDir }) => {
     git(sourceDir, ['checkout', '--quiet', 'main']);
