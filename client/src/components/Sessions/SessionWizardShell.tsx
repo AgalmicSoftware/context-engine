@@ -104,6 +104,7 @@ export type SessionWizardShellProps = {
   newSessionFundingRequirementHref: IntroStatusRailProps['fundingRequirementHref'];
   newSessionFundingRequirementLabel: IntroStatusRailProps['fundingRequirementLabel'];
   newSessionRequiresLitCredential: IntroStatusRailProps['newSessionRequiresLitCredential'];
+  newSessionRequiredAiProviderKeyLabels: IntroStatusRailProps['requiredAiProviderKeyLabels'];
   newSessionRequiredRequirementIds: IntroStatusRailProps['requiredRequirementIds'];
   normalizeSbtSelection: WizardModalsProps['normalizeSbtSelection'];
   normalModeBundleHelpText: WorkerPanelProps['normalModeBundleHelpText'];
@@ -274,6 +275,7 @@ const SessionWizardShell = ({
   newSessionFundingRequirementHref,
   newSessionFundingRequirementLabel,
   newSessionRequiresLitCredential,
+  newSessionRequiredAiProviderKeyLabels,
   newSessionRequiredRequirementIds,
   normalizeSbtSelection,
   normalModeBundleHelpText,
@@ -441,6 +443,7 @@ const SessionWizardShell = ({
         onRetrySponsoredBundle={onRetrySponsoredBundle}
         onSponsoredBundleKeyChange={onSponsoredBundleKeyChange}
         onSubmitSponsoredBundleKey={onSubmitSponsoredBundleKey}
+        requiredAiProviderKeyLabels={newSessionRequiredAiProviderKeyLabels}
         requiredRequirementIds={newSessionRequiredRequirementIds}
         showNewSessionRequirementsBanner={showNewSessionRequirementsBanner}
         showNormalModeRail

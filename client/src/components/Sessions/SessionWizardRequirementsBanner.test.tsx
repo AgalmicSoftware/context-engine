@@ -61,12 +61,27 @@ describe('SessionWizardRequirementsBanner', () => {
     expect(screen.getByText('Anvil ETH for on-chain registration')).toBeInTheDocument();
   });
 
+  it('renders exact resolved AI provider labels without an OpenAI-only link', () => {
+    render(
+      <SessionWizardRequirementsBanner
+        fundingRequirementLabel="OP Sepolia ETH"
+        onDismiss={jest.fn()}
+        requiredAiProviderKeyLabels={['Anthropic key', 'OpenRouter key', 'OpenAI key']}
+        requiredRequirementIds={['aiProviderKey']}
+      />,
+    );
+
+    expect(screen.getByText(/Anthropic key, OpenRouter key, OpenAI key/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /AI provider key|OpenAI API key/i })).not.toBeInTheDocument();
+  });
+
   it('renders the Wrapped token in addition to the native Cloudflare requirements', () => {
     render(
       <SessionWizardRequirementsBanner
         cloudflareTokenSlug="onboarding-demo"
         fundingRequirementLabel="OP Sepolia ETH"
         onDismiss={jest.fn()}
+        requiredAiProviderKeyLabels={['OpenAI key']}
         requiredRequirementIds={['cloudflareAccount', 'cloudflareApiToken', 'aiProviderKey']}
       />,
     );
@@ -102,7 +117,8 @@ describe('SessionWizardRequirementsBanner', () => {
       'href',
       'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/session-cors-worker.md#api-token-setup-and-handling',
     );
-    expect(screen.getByRole('link', { name: 'AI provider key' })).toBeInTheDocument();
+    expect(screen.getByText('OpenAI key for text and transcription')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /AI provider key|OpenAI API key/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/Arweave|Lit|RPC|wallet|faucet|funding|gas/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/not required/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/turnkey tool/i)).not.toBeInTheDocument();

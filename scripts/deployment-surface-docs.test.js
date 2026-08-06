@@ -35,6 +35,8 @@ test('session creation docs align mode-specific deployment inputs', () => {
     /\| Cloudflare API token[^\n]*Agent Session Wrapped[^\n]*explicit legacy deploy-helper fallback[^\n]*not the native default/,
   );
   assert.match(creationDoc, /\| AI provider key[^\n]*every reachable `\/new` profile/);
+  assert.match(creationDoc, /key for every provider used by the selected fast,\s+thinking,\s+and\s+transcription models/i);
+  assert.doesNotMatch(creationDoc, /changes which single provider key is required/i);
 });
 
 test('session Worker docs define group authority, counts, and id compatibility', () => {

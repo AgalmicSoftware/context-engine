@@ -28,6 +28,7 @@ type SessionWizardNewSessionRequirementsDisplayState = {
   hasNewSessionLitRequirementCovered: boolean;
   isNewSessionBannerDismissedForCurrentContext: boolean;
   newSessionRequiresLitCredential: boolean;
+  requiredAiProviderKeyLabels: string[];
   requiredRequirementIds: SessionWizardRequirementId[];
   shouldRespectPersistedNewSessionBannerDismissal: boolean;
   showNewSessionRequirementsBanner: boolean;
@@ -61,8 +62,11 @@ export const resolveSessionWizardNewSessionRequirementsDisplayState = ({
   const hasAnyAiProviderKey = ['openaiKey', 'anthropicKey', 'openrouterKey'].some(
     (key) => !!toRequirementString(currentWorkerSecrets?.[key]).trim(),
   );
+  const requiredAiProviderKeyFields = modeRequirements.selected
+    ? resolveSessionWizardResourceSecretFields('ai', sessionAi)
+    : [];
   const hasNewSessionAiRequirementCovered = modeRequirements.selected
-    ? resolveSessionWizardResourceSecretFields('ai', sessionAi).every(
+    ? requiredAiProviderKeyFields.every(
         (field) => !!toRequirementString(currentWorkerSecrets?.[field.key]).trim(),
       )
     : hasAnyAiProviderKey;
@@ -115,6 +119,7 @@ export const resolveSessionWizardNewSessionRequirementsDisplayState = ({
     hasNewSessionLitRequirementCovered,
     isNewSessionBannerDismissedForCurrentContext,
     newSessionRequiresLitCredential,
+    requiredAiProviderKeyLabels: requiredAiProviderKeyFields.map((field) => field.label),
     requiredRequirementIds: modeRequirements.requiredRequirementIds,
     shouldRespectPersistedNewSessionBannerDismissal,
     showNewSessionRequirementsBanner,

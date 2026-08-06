@@ -190,6 +190,7 @@ describe('sessionWizardRequirementsDisplay', () => {
       }),
     ).toMatchObject({
       hasNewSessionAiRequirementCovered: false,
+      requiredAiProviderKeyLabels: ['Anthropic key', 'OpenRouter key', 'OpenAI key'],
       showNewSessionRequirementsBanner: true,
       sponsoredBundleCoversNewSessionRequirements: false,
       sponsoredBundleOwnsNewSessionEntryFlow: false,

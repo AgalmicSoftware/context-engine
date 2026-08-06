@@ -25,6 +25,7 @@ type SessionWizardRequirementsBannerProps = {
   fundingRequirementLabel: string;
   newSessionRequiresLitCredential?: boolean;
   onDismiss: () => void;
+  requiredAiProviderKeyLabels?: readonly string[];
   requiredRequirementIds?: readonly SessionWizardRequirementId[];
 };
 
@@ -35,6 +36,7 @@ const SessionWizardRequirementsBanner = ({
   fundingRequirementLabel,
   newSessionRequiresLitCredential = true,
   onDismiss,
+  requiredAiProviderKeyLabels = [],
   requiredRequirementIds,
 }: SessionWizardRequirementsBannerProps): React.ReactElement => {
   const hasResolvedRequirements = Array.isArray(requiredRequirementIds);
@@ -112,15 +114,25 @@ const SessionWizardRequirementsBanner = ({
           ) : null}
           {requires('aiProviderKey') ? (
             <li>
-              <a
-                href={SESSION_WIZARD_REQUIREMENT_LINKS.openaiApiKey}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={styles.newSessionBannerLink}
-              >
-                {hasResolvedRequirements ? 'AI provider key' : 'OpenAI API key'}
-              </a>{' '}
-              for text and transcription
+              {hasResolvedRequirements ? (
+                requiredAiProviderKeyLabels.length ? (
+                  requiredAiProviderKeyLabels.join(', ')
+                ) : (
+                  'AI provider key'
+                )
+              ) : (
+                <>
+                  <a
+                    href={SESSION_WIZARD_REQUIREMENT_LINKS.openaiApiKey}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={styles.newSessionBannerLink}
+                  >
+                    OpenAI API key
+                  </a>
+                </>
+              )}
+              {' '}for text and transcription
             </li>
           ) : null}
           {requires('lit') ? (

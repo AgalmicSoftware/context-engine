@@ -11,6 +11,7 @@ import {
   NEW_SESSION_BANNER_DISMISSED_KEY,
   resetSessionWizardWorkerPanelTestState,
 } from './SessionWizard.workerPanel.testUtils';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 const expectSponsoredStatusText = async (expectedText) => {
   await waitFor(() => {
@@ -71,7 +72,36 @@ describe('SessionWizard new-session requirements banner', () => {
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_TOKEN_ONBOARDING_LINK)).toBeInTheDocument();
     });
     expect(screen.getByRole('link', { name: 'Cloudflare account' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'AI provider key' })).toBeInTheDocument();
+    expect(screen.getByText('OpenAI key for text and transcription')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /AI provider key|OpenAI API key/i })).not.toBeInTheDocument();
+  });
+
+  it('shows every selected AI provider key without linking resolved requirements to OpenAI', async () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    sessionStorage.setItem(
+      'ce:sessionWizardDraft:v1',
+      JSON.stringify({
+        draft: {
+          ai: {
+            models: {
+              fast: { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929' },
+              thinking: { provider: 'openrouter', model: 'openrouter/test-model' },
+              transcription: { provider: 'openai', model: 'whisper-1' },
+            },
+          },
+          sessionModeProfile: profile,
+          storageProfile: { backend: 'cloudflare' },
+        },
+      }),
+    );
+    window.history.replaceState({}, '', '/session/new');
+
+    renderSessionWizard();
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    expect(screen.getByText(/Anthropic key, OpenRouter key, OpenAI key/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /AI provider key|OpenAI API key/i })).not.toBeInTheDocument();
   });
 
   it('renders the decentralized requirements copy and contact link on /session/new', async () => {
@@ -81,11 +111,8 @@ describe('SessionWizard new-session requirements banner', () => {
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
 
-    expect(screen.getByRole('link', { name: 'OpenAI API key' })).toHaveAttribute(
-      'href',
-      'https://platform.openai.com/api-keys',
-    );
-    expect(screen.getByText(/for text and transcription/i)).toBeInTheDocument();
+    expect(screen.getByText('OpenAI key for text and transcription')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /AI provider key|OpenAI API key/i })).not.toBeInTheDocument();
     expect(screen.getByText(/compatible Session Worker provides the web runtime/i)).toHaveTextContent(
       'the EVM registry and Arweave remain canonical',
     );

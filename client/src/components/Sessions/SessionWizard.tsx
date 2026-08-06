@@ -4405,8 +4405,12 @@ const SessionWizard = ({
   const normalizedAppliedSponsoredBundle = sponsoredBundlePublishAdapter.normalizeSparseSponsoredBundlePayload(
     sponsoredBundleAppliedBundleRef.current,
   );
-  const { newSessionRequiresLitCredential, requiredRequirementIds, showNewSessionRequirementsBanner } =
-    resolveSessionWizardNewSessionRequirementsDisplayState({
+  const {
+    newSessionRequiresLitCredential,
+    requiredAiProviderKeyLabels,
+    requiredRequirementIds,
+    showNewSessionRequirementsBanner,
+  } = resolveSessionWizardNewSessionRequirementsDisplayState({
       cloudflareWorkerSbtGateMode,
       currentWorkerSecrets,
       hasCompatibleWorkerRuntime: publishUiPlan.publishReadiness.canUploadMetadataNow,
@@ -4746,6 +4750,8 @@ const SessionWizard = ({
       newSessionFundingRequirementHref={newSessionFundingRequirementHref}
       newSessionFundingRequirementLabel={newSessionFundingRequirementLabel}
       newSessionRequiresLitCredential={newSessionRequiresLitCredential}
+      newSessionRequiredAiProviderKeyLabels={requiredAiProviderKeyLabels}
+      newSessionRequiredRequirementIds={requiredRequirementIds}
       normalModeBundleHelpText={normalModeBundleHelpText}
       normalModeBundleUrl={normalModeBundleUrl}
       normalModeBundleUrlOverride={normalModeBundleUrlOverride}
