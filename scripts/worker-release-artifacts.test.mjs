@@ -276,6 +276,37 @@ test('public replay range verification rejects identity and trailer drift', () =
   }
 });
 
+test('public replay range rejects public commits as private-source provenance', () => {
+  {
+    const { rootDir, git, baseCommit } = publicReplayFixture();
+    try {
+      git(['commit', '--amend', '-m', 'public replay', '-m', `CE-Private-Source: ${baseCommit}`]);
+      const candidateCommit = git(['rev-parse', 'HEAD']);
+      assert.throws(
+        () => verifyPublicReplayRange({ rootDir, baseRef: baseCommit, candidateRef: candidateCommit }),
+        /CE-Private-Source must not point to public history/,
+      );
+    } finally {
+      fs.rmSync(rootDir, { recursive: true, force: true });
+    }
+  }
+
+  {
+    const { rootDir, git, baseCommit, candidateCommit } = publicReplayFixture();
+    try {
+      fs.appendFileSync(path.join(rootDir, 'file.txt'), 'follow-up\n');
+      git(['commit', '-am', `public follow-up\n\nCE-Private-Source: ${candidateCommit}`]);
+      const followUpCommit = git(['rev-parse', 'HEAD']);
+      assert.throws(
+        () => verifyPublicReplayRange({ rootDir, baseRef: baseCommit, candidateRef: followUpCommit }),
+        /CE-Private-Source must not point to public history/,
+      );
+    } finally {
+      fs.rmSync(rootDir, { recursive: true, force: true });
+    }
+  }
+});
+
 test('source provenance resolves the replay trailer from a fast-forward or merge tip', () => {
   const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-worker-source-'));
   const git = (args) => execFileSync('git', args, { cwd: rootDir, encoding: 'utf8' }).trim();

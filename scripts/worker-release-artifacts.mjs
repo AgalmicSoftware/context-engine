@@ -247,6 +247,57 @@ function privateSourceTrailer(rootDir, commit) {
   return git(rootDir, ['show', '-s', '--format=%(trailers:key=CE-Private-Source,valueonly)', commit]);
 }
 
+function commitIsReachableFrom(rootDir, commit, ref) {
+  try {
+    execFileSync('git', ['merge-base', '--is-ancestor', commit, ref], {
+      cwd: rootDir,
+      stdio: 'ignore',
+    });
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+function fetchedPublicHistoryRefs(rootDir) {
+  return git(rootDir, [
+    'for-each-ref',
+    '--format=%(refname)',
+    'refs/heads/main',
+    'refs/heads/release-staging*',
+    'refs/remotes/*/main',
+    'refs/remotes/*/release-staging*',
+  ]).split(/\s+/).filter(Boolean);
+}
+
+function assertPrivateSourceIsNotPublic(rootDir, privateSourceCommit, replayCommit, candidateCommit) {
+  assert(
+    privateSourceCommit !== replayCommit && privateSourceCommit !== candidateCommit,
+    `commit ${replayCommit} CE-Private-Source must not point to public history`,
+  );
+
+  let resolvedSourceCommit = '';
+  try {
+    resolvedSourceCommit = execFileSync(
+      'git',
+      ['rev-parse', '--verify', `${privateSourceCommit}^{commit}`],
+      { cwd: rootDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
+    ).trim();
+  } catch (_) {
+    return;
+  }
+  assert(
+    resolvedSourceCommit === privateSourceCommit,
+    `commit ${replayCommit} CE-Private-Source must identify a commit`,
+  );
+
+  const publicRefs = new Set([candidateCommit, ...fetchedPublicHistoryRefs(rootDir)]);
+  assert(
+    ![...publicRefs].some((ref) => commitIsReachableFrom(rootDir, privateSourceCommit, ref)),
+    `commit ${replayCommit} CE-Private-Source must not point to public history`,
+  );
+}
+
 export function verifyPublicReplayRange({ rootDir, baseRef, candidateRef }) {
   const baseCommit = git(rootDir, ['rev-parse', '--verify', `${baseRef}^{commit}`]);
   const candidateCommit = git(rootDir, ['rev-parse', '--verify', `${candidateRef}^{commit}`]);
@@ -278,10 +329,12 @@ export function verifyPublicReplayRange({ rootDir, baseRef, candidateRef }) {
         committerEmail === PUBLIC_GIT_EMAIL,
       `commit ${replayCommit} lacks the required public replay author and committer identity`,
     );
+    const privateSourceCommit = privateSourceTrailer(rootDir, replayCommit);
     assert(
-      SHA_PATTERN.test(privateSourceTrailer(rootDir, replayCommit)),
+      SHA_PATTERN.test(privateSourceCommit),
       `commit ${replayCommit} lacks one valid CE-Private-Source trailer`,
     );
+    assertPrivateSourceIsNotPublic(rootDir, privateSourceCommit, replayCommit, candidateCommit);
   }
 
   return { baseCommit, candidateCommit, replayCommitCount: replayCommits.length };

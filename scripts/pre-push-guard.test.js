@@ -102,22 +102,24 @@ function createVersionedCandidate(rootDir, candidateVersion, clientVersion = can
   const mainSha = git(rootDir, ['rev-parse', 'HEAD']);
   git(rootDir, ['update-ref', 'refs/remotes/origin/main', mainSha]);
 
-  git(rootDir, ['config', 'user.name', PUBLIC_GIT_NAME]);
-  git(rootDir, ['config', 'user.email', PUBLIC_GIT_EMAIL]);
   writeVersionSurfaces(rootDir, candidateVersion, clientVersion);
   writeFile(rootDir, 'candidate.txt', `${candidateVersion}\n`);
   git(rootDir, ['add', '-A']);
+  const privateSourceSha = createPrivateSourceCommit(rootDir, mainSha);
+  git(rootDir, ['config', 'user.name', PUBLIC_GIT_NAME]);
+  git(rootDir, ['config', 'user.email', PUBLIC_GIT_EMAIL]);
   git(rootDir, [
     'commit',
     '--quiet',
     '-m',
     'candidate',
     '-m',
-    `CE-Private-Source: ${mainSha}`,
+    `CE-Private-Source: ${privateSourceSha}`,
   ]);
   return {
     mainSha,
     candidateSha: git(rootDir, ['rev-parse', 'HEAD']),
+    privateSourceSha,
   };
 }
 
@@ -153,6 +155,11 @@ function git(rootDir, args) {
     cwd: rootDir,
     encoding: 'utf8',
   }).trim();
+}
+
+function createPrivateSourceCommit(rootDir, parentSha) {
+  const sourceTree = git(rootDir, ['write-tree']);
+  return git(rootDir, ['commit-tree', sourceTree, '-p', parentSha, '-m', 'private source']);
 }
 
 function createCommitOnBranch(rootDir, branchName) {
@@ -309,13 +316,14 @@ test('pre-push guard blocks linear staging commits retained by a private ref', (
     const { candidateSha } = createVersionedCandidate(rootDir, '0.1.1');
     writeFile(rootDir, 'private-only.txt', 'must not become reachable\n');
     git(rootDir, ['add', 'private-only.txt']);
+    const privateSourceSha = createPrivateSourceCommit(rootDir, candidateSha);
     git(rootDir, [
       'commit',
       '--quiet',
       '-m',
       'private follow-up',
       '-m',
-      `CE-Private-Source: ${candidateSha}`,
+      `CE-Private-Source: ${privateSourceSha}`,
     ]);
     const privateSha = git(rootDir, ['rev-parse', 'HEAD']);
     git(rootDir, ['branch', '-M', 'dev']);
@@ -422,6 +430,58 @@ test('pre-push guard requires each private-source trailer to resolve to a commit
 
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /CE-Private-Source commit is unavailable/);
+  });
+});
+
+test('pre-push guard rejects public commits as private-source provenance', () => {
+  withHookFixture((rootDir) => {
+    const { mainSha } = createVersionedCandidate(rootDir, '0.1.1');
+    git(rootDir, [
+      'commit',
+      '--quiet',
+      '--amend',
+      '-m',
+      'candidate',
+      '-m',
+      `CE-Private-Source: ${mainSha}`,
+    ]);
+    const candidateSha = git(rootDir, ['rev-parse', 'HEAD']);
+    git(rootDir, ['branch', '-M', 'release-staging']);
+
+    const result = runHook(rootDir, pushLine({
+      localRef: 'refs/heads/release-staging',
+      localSha: candidateSha,
+      remoteRef: 'refs/heads/release-staging',
+    }));
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /CE-Private-Source must not point to public history/);
+  });
+
+  withHookFixture((rootDir) => {
+    const { candidateSha } = createVersionedCandidate(rootDir, '0.1.1');
+    writeFile(rootDir, 'follow-up.txt', 'release candidate fix\n');
+    git(rootDir, ['add', 'follow-up.txt']);
+    git(rootDir, [
+      'commit',
+      '--quiet',
+      '-m',
+      'follow-up',
+      '-m',
+      `CE-Private-Source: ${candidateSha}`,
+    ]);
+    const followUpSha = git(rootDir, ['rev-parse', 'HEAD']);
+    git(rootDir, ['branch', '-M', 'release-staging']);
+
+    const result = runHook(rootDir, pushLine({
+      localRef: 'refs/heads/release-staging',
+      localSha: followUpSha,
+      remoteRef: 'refs/heads/release-staging',
+      remoteSha: candidateSha,
+    }));
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /CE-Private-Source must not point to public history/);
   });
 });
 
@@ -582,13 +642,14 @@ test('pre-push guard allows a same-version follow-up to an existing release cand
     const { candidateSha } = createVersionedCandidate(rootDir, '0.1.1');
     writeFile(rootDir, 'follow-up.txt', 'release candidate fix\n');
     git(rootDir, ['add', '-A']);
+    const privateSourceSha = createPrivateSourceCommit(rootDir, candidateSha);
     git(rootDir, [
       'commit',
       '--quiet',
       '-m',
       'follow-up',
       '-m',
-      `CE-Private-Source: ${candidateSha}`,
+      `CE-Private-Source: ${privateSourceSha}`,
     ]);
     const followUpSha = git(rootDir, ['rev-parse', 'HEAD']);
     git(rootDir, ['branch', '-M', 'release-staging']);
@@ -612,13 +673,14 @@ test('pre-push guard validates rewritten staging from public main', () => {
     writeVersionSurfaces(rootDir, '0.1.1');
     writeFile(rootDir, 'old-candidate.txt', 'old candidate\n');
     git(rootDir, ['add', '-A']);
+    const privateSourceSha = createPrivateSourceCommit(rootDir, mainSha);
     git(rootDir, [
       'commit',
       '--quiet',
       '-m',
       'old candidate',
       '-m',
-      `CE-Private-Source: ${mainSha}`,
+      `CE-Private-Source: ${privateSourceSha}`,
     ]);
     const oldCandidateSha = git(rootDir, ['rev-parse', 'HEAD']);
     git(rootDir, ['update-ref', 'refs/remotes/origin/release-staging', oldCandidateSha]);
