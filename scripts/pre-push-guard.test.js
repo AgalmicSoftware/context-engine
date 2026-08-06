@@ -141,10 +141,19 @@ test('pre-push guard blocks dev pushes to the public origin', () => {
   });
 });
 
-for (const remoteUrl of [
+const PUBLIC_REMOTE_URLS = [
   'https://github.com/agalmicsoftware/context-engine.git',
+  'https://[redacted-email]/AgalmicSoftware/context-engine.git',
+  'https://[redacted-email]:443/AgalmicSoftware/context-engine.git',
   '[redacted-email]:agalmicsoftware/context-engine.git',
-]) {
+  'github.com:AgalmicSoftware/context-engine.git',
+  'ssh://[redacted-email]:22/AgalmicSoftware/context-engine.git',
+  'git+ssh://[redacted-email]/AgalmicSoftware/context-engine.git',
+  'ssh+git://[redacted-email]/AgalmicSoftware/context-engine.git',
+  'git://github.com:9418/AgalmicSoftware/context-engine.git',
+];
+
+for (const remoteUrl of PUBLIC_REMOTE_URLS) {
   test(`pre-push guard blocks dev pushes through case-variant public alias ${remoteUrl}`, () => {
     withHookFixture((rootDir) => {
       const result = runHook(
@@ -159,6 +168,33 @@ for (const remoteUrl of [
 
       assert.notEqual(result.status, 0);
       assert.match(result.stderr, /Blocked push to public Context Engine remote public-alias\./);
+    });
+  });
+}
+
+for (const remoteUrl of [
+  'https://github.com.evil/AgalmicSoftware/context-engine.git',
+  'https://github.com/AgalmicSoftware/context-engine-archive.git',
+  'https://github.com/Other/context-engine.git',
+  'ssh://[redacted-email]/AgalmicSoftware/context-engine.git',
+  '[redacted-email]:AgalmicSoftware/context-engine.git.evil',
+  'https://github.com.evil/[redacted-email]/AgalmicSoftware/context-engine.git',
+  'https://github.com/AgalmicSoftware/context-engine.git?mirror=1',
+]) {
+  test(`pre-push guard ignores non-public lookalike ${remoteUrl}`, () => {
+    withHookFixture((rootDir) => {
+      const result = runHook(
+        rootDir,
+        pushLine({
+          localRef: 'refs/heads/dev',
+          remoteRef: 'refs/heads/dev',
+        }),
+        'private-alias',
+        remoteUrl,
+      );
+
+      assert.equal(result.status, 0);
+      assert.equal(result.stderr, '');
     });
   });
 }

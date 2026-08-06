@@ -7,17 +7,61 @@ ZERO_OID="0000000000000000000000000000000000000000"
 
 is_canonical_public_repository_url() {
   local normalized_url
+  local scheme
+  local remainder
+  local authority
+  local host
+  local repository_path
 
   normalized_url="$(printf '%s' "${1:-}" | LC_ALL=C tr '[:upper:]' '[:lower:]')"
   normalized_url="${normalized_url%/}"
   case "$normalized_url" in
-    https://github.com/agalmicsoftware/context-engine|https://github.com/agalmicsoftware/context-engine.git|\
-    http://github.com/agalmicsoftware/context-engine|http://github.com/agalmicsoftware/context-engine.git|\
-    git://github.com/agalmicsoftware/context-engine|git://github.com/agalmicsoftware/context-engine.git|\
-    [redacted-email]:agalmicsoftware/context-engine|[redacted-email]:agalmicsoftware/context-engine.git|\
-    [redacted-email]-agalmic:agalmicsoftware/context-engine|[redacted-email]-agalmic:agalmicsoftware/context-engine.git|\
-    ssh://[redacted-email]/agalmicsoftware/context-engine|ssh://[redacted-email]/agalmicsoftware/context-engine.git|\
-    ssh://[redacted-email]-agalmic/agalmicsoftware/context-engine|ssh://[redacted-email]-agalmic/agalmicsoftware/context-engine.git)
+    *://*)
+      scheme="${normalized_url%%://*}"
+      remainder="${normalized_url#*://}"
+      case "$remainder" in
+        */*)
+          authority="${remainder%%/*}"
+          repository_path="${remainder#*/}"
+          ;;
+        *)
+          return 1
+          ;;
+      esac
+      host="${authority##*@}"
+      case "$scheme:$host" in
+        https:github.com|https:github.com:443|\
+        http:github.com|http:github.com:80|\
+        git:github.com|git:github.com:9418|\
+        ssh:github.com|ssh:github.com:22|\
+        git+ssh:github.com|git+ssh:github.com:22|\
+        ssh+git:github.com|ssh+git:github.com:22|\
+        ssh:github.com-agalmic|git+ssh:github.com-agalmic|ssh+git:github.com-agalmic)
+          ;;
+        *)
+          return 1
+          ;;
+      esac
+      ;;
+    *:*)
+      authority="${normalized_url%%:*}"
+      repository_path="${normalized_url#*:}"
+      host="${authority##*@}"
+      case "$host" in
+        github.com|github.com-agalmic)
+          ;;
+        *)
+          return 1
+          ;;
+      esac
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+
+  case "$repository_path" in
+    agalmicsoftware/context-engine|agalmicsoftware/context-engine.git)
       return 0
       ;;
   esac
