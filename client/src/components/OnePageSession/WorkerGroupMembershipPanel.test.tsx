@@ -8,6 +8,14 @@ import WorkerGroupMembershipPanel, {
 const SESSION_ID = '0x11111111111111111111111111111111';
 const OTHER_SESSION_ID = '0x22222222222222222222222222222222';
 
+const createResponseDeferred = () => {
+  let resolve!: (response: Response) => void;
+  const promise = new Promise<Response>((nextResolve) => {
+    resolve = nextResolve;
+  });
+  return { promise, resolve };
+};
+
 const envelope: AgentClientLoginEnvelope = {
   v: 2,
   sessionId: SESSION_ID,
@@ -709,6 +717,119 @@ describe('WorkerGroupMembershipPanel', () => {
     expect(await screen.findByRole('button', { name: 'Join Open reviewers' })).toHaveTextContent(/^Join$/);
     expect(membershipReadCount).toBe(1);
     expect(fetchImpl).toHaveBeenCalledTimes(4);
+  });
+
+  it('does not let an older collection refresh overwrite confirmed join or leave state', async () => {
+    let joined = false;
+    let nextGroupRead: ReturnType<typeof createResponseDeferred> | null = null;
+    let nextMembershipRead: ReturnType<typeof createResponseDeferred> | null = null;
+    const group = {
+      groupId: 'racing-reviewers',
+      sessionSlug: 'alpha',
+      label: 'Racing reviewers',
+      joinMode: 'open',
+      memberVisibility: 'session',
+    };
+    const response = (body: unknown) =>
+      new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+    const groupsResponse = (memberCount: number) =>
+      response({
+        ok: true,
+        sessionId: SESSION_ID,
+        sessionSlug: 'alpha',
+        groups: [{ ...group, memberCount }],
+      });
+    const membershipsResponse = (isMember: boolean, memberCount: number) =>
+      response({
+        ok: true,
+        sessionId: SESSION_ID,
+        sessionSlug: 'alpha',
+        memberships: isMember
+          ? [{ group, member: { groupId: group.groupId, sessionSlug: 'alpha' }, memberCount }]
+          : [],
+      });
+    const fetchImpl = jest.fn(async (input: RequestInfo | URL) => {
+      const pathname = new URL(String(input)).pathname;
+      if (pathname.endsWith('/groups/join')) {
+        joined = true;
+        return response({ ok: true, sessionId: SESSION_ID, sessionSlug: 'alpha', group, memberCount: 8 });
+      }
+      if (pathname.endsWith('/groups/leave')) {
+        joined = false;
+        return response({
+          ok: true,
+          sessionId: SESSION_ID,
+          sessionSlug: 'alpha',
+          groupId: group.groupId,
+          group,
+          memberCount: 7,
+        });
+      }
+      if (pathname.endsWith('/groups/my-memberships')) {
+        if (nextMembershipRead) {
+          const pending = nextMembershipRead;
+          nextMembershipRead = null;
+          return pending.promise;
+        }
+        return membershipsResponse(joined, joined ? 8 : 7);
+      }
+      if (nextGroupRead) {
+        const pending = nextGroupRead;
+        nextGroupRead = null;
+        return pending.promise;
+      }
+      return groupsResponse(joined ? 8 : 7);
+    });
+    const renderPanel = (refreshNonce: number) => (
+      <WorkerGroupMembershipPanel
+        envelope={envelope}
+        fetchImpl={fetchImpl as typeof fetch}
+        refreshNonce={refreshNonce}
+        selectedGroupId={group.groupId}
+      />
+    );
+    const rendered = render(renderPanel(0));
+
+    expect(await screen.findByRole('button', { name: 'Join Racing reviewers' })).toBeInTheDocument();
+
+    const stalePreJoinGroups = createResponseDeferred();
+    const stalePreJoinMemberships = createResponseDeferred();
+    nextGroupRead = stalePreJoinGroups;
+    nextMembershipRead = stalePreJoinMemberships;
+    rendered.rerender(renderPanel(1));
+    await waitFor(() => expect(nextGroupRead).toBeNull());
+    await waitFor(() => expect(nextMembershipRead).toBeNull());
+    fireEvent.click(screen.getByRole('button', { name: 'Join Racing reviewers' }));
+    expect(await screen.findByRole('button', { name: 'Leave Racing reviewers' })).toBeInTheDocument();
+    expect(screen.getByText('Members:').parentElement).toHaveTextContent(/^Members:8 \/$/);
+
+    await act(async () => {
+      stalePreJoinGroups.resolve(groupsResponse(7));
+      stalePreJoinMemberships.resolve(membershipsResponse(false, 7));
+      await Promise.resolve();
+    });
+    expect(screen.getByRole('button', { name: 'Leave Racing reviewers' })).toBeInTheDocument();
+    expect(screen.getByText('Members:').parentElement).toHaveTextContent(/^Members:8 \/$/);
+
+    const stalePreLeaveGroups = createResponseDeferred();
+    const stalePreLeaveMemberships = createResponseDeferred();
+    nextGroupRead = stalePreLeaveGroups;
+    nextMembershipRead = stalePreLeaveMemberships;
+    rendered.rerender(renderPanel(2));
+    await waitFor(() => expect(nextGroupRead).toBeNull());
+    await waitFor(() => expect(nextMembershipRead).toBeNull());
+    fireEvent.click(screen.getByRole('button', { name: 'Leave Racing reviewers' }));
+    expect(await screen.findByRole('button', { name: 'Join Racing reviewers' })).toBeInTheDocument();
+    expect(screen.getByText('Members:').parentElement).toHaveTextContent(/^Members:7 \/$/);
+
+    await act(async () => {
+      stalePreLeaveGroups.resolve(groupsResponse(8));
+      stalePreLeaveMemberships.resolve(membershipsResponse(true, 8));
+      await Promise.resolve();
+    });
+    expect(screen.getByRole('button', { name: 'Join Racing reviewers' })).toBeInTheDocument();
+    expect(screen.getByText('Members:').parentElement).toHaveTextContent(/^Members:7 \/$/);
+    expect(fetchImpl).toHaveBeenCalledTimes(8);
   });
 
   it('uses mutation counts and retains a session-visible detail after leave', async () => {

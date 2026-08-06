@@ -836,7 +836,6 @@ const WorkerGroupMembershipPanel = ({
     if (!activeMemberListState.nextCursor || activeMemberListState.status === 'loading') return;
     void loadSelectedGroupMembers({ cursor: activeMemberListState.nextCursor, append: true });
   };
-
   const applyConfirmedMembership = ({
     mutationTargetKey,
     group,
@@ -867,7 +866,6 @@ const WorkerGroupMembershipPanel = ({
       };
     });
   };
-
   const handleJoin = async (group: WorkerGroup) => {
     const mutationTargetKey = targetKey;
     const mutationId = mutationIdRef.current + 1;
@@ -888,6 +886,7 @@ const WorkerGroupMembershipPanel = ({
         fetchImpl,
       });
       if (targetKeyRef.current !== mutationTargetKey || mutationIdRef.current !== mutationId) return;
+      requestIdRef.current += 1;
       setMembershipStatusState({ targetKey: mutationTargetKey, status: `Joined ${group.label}.` });
       memberListRequestIdRef.current += 1;
       setMemberListState(emptyMemberListState(mutationTargetKey, group.groupId));
@@ -931,6 +930,7 @@ const WorkerGroupMembershipPanel = ({
         fetchImpl,
       });
       if (targetKeyRef.current !== mutationTargetKey || mutationIdRef.current !== mutationId) return;
+      requestIdRef.current += 1;
       setMembershipStatusState({ targetKey: mutationTargetKey, status: `Left ${group.label}.` });
       memberListRequestIdRef.current += 1;
       setMemberListState(emptyMemberListState(mutationTargetKey, group.groupId));
