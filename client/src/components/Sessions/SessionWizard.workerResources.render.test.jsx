@@ -1,6 +1,7 @@
 import {
   E2E_TESTIDS,
   act,
+  deployVerifiedWorkerForCurrentDraft,
   ethers,
   fireEvent,
   getWizardResourceCard,
@@ -147,10 +148,7 @@ describe('SessionWizard worker resource rendering', () => {
           sessionName: 'Unrepresentable All Gates',
           slug: 'unrepresentable-all-gates',
           networkChainId: 11155420,
-          corsWorkerUrl: 'https://worker.example.test',
         },
-        deployComplete: true,
-        deployWorkerUrl: 'https://worker.example.test',
         encryptionGates: [
           {
             id: 'gate-all-a',
@@ -175,6 +173,9 @@ describe('SessionWizard worker resource rendering', () => {
     );
 
     renderLoggedInSessionWizard();
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    await selectTrustlessPublicPreset();
+    await deployVerifiedWorkerForCurrentDraft();
     enableAdvancedMode();
 
     const publishButton = await openPublishSection();

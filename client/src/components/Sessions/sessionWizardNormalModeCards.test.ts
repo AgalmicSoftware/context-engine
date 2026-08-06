@@ -149,6 +149,21 @@ describe('sessionWizardNormalModeCards', () => {
         'Publish uses the Session Worker runtime, uploads metadata to Arweave, and registers on-chain.',
       );
     });
+
+    it('keeps a proofless required custom Worker pending', () => {
+      const workerCard = buildNormalModeCards({
+        ...baseCardsInput,
+        normalModeRequiresCustomWorker: true,
+        deployVerifiedInUi: false,
+      }).find((card) => card.key === 'worker');
+
+      expect(workerCard).toEqual(
+        expect.objectContaining({
+          summary: 'Worker URL saved; deploy or reverify it before publishing.',
+          tone: 'pending',
+        }),
+      );
+    });
   });
 
   describe('buildNormalModePublishSummary', () => {
@@ -206,6 +221,14 @@ describe('sessionWizardNormalModeCards', () => {
         buildNormalModePublishSummary({
           ...basePublishSummaryInput,
           normalModeRequiresCustomWorker: true,
+        }).find((item) => item.label === 'Worker')?.value,
+      ).toBe('Custom worker awaiting verification');
+
+      expect(
+        buildNormalModePublishSummary({
+          ...basePublishSummaryInput,
+          normalModeRequiresCustomWorker: true,
+          deployVerifiedInUi: true,
         }).find((item) => item.label === 'Worker')?.value,
       ).toBe('Custom worker ready');
 

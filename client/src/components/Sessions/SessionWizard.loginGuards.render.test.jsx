@@ -1,6 +1,9 @@
 import {
   E2E_TESTIDS,
+  TEST_ADMIN_ADDRESS,
+  deployVerifiedWorkerForCurrentDraft,
   fireEvent,
+  rerenderSessionWizard,
   renderSessionWizard,
   resetSessionWizardWorkerPanelTestState,
   screen,
@@ -12,15 +15,6 @@ describe('SessionWizard login guard rendering', () => {
   beforeEach(resetSessionWizardWorkerPanelTestState);
 
   it('prompts for login instead of attempting publish when publish is available but no wallet is connected', async () => {
-    const workerUrl = 'https://worker.example.test';
-    sessionStorage.setItem(
-      'ce:sessionWizardDraft:v1',
-      JSON.stringify({
-        draft: { corsWorkerUrl: workerUrl },
-        deployComplete: true,
-        deployWorkerUrl: workerUrl,
-      }),
-    );
     const { cryptoUtils } = require('../../utilities/crypto/cryptography.js');
     const originalGetProvider = cryptoUtils._getProvider.getMockImplementation();
     const providerRequest = jest.fn(async ({ method }) => {
@@ -37,17 +31,23 @@ describe('SessionWizard login guard rendering', () => {
     }));
     const toggleLoginModal = jest.fn();
     try {
-      renderSessionWizard({
-        account: '',
-        loginComplete: false,
+      const view = renderSessionWizard({
+        account: TEST_ADMIN_ADDRESS,
+        loginComplete: true,
         toggleLoginModal,
       });
-      enableAdvancedMode();
 
       const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
       fireEvent.change(sessionNameInput, {
         target: { value: 'Login Required Publish Session' },
       });
+      await deployVerifiedWorkerForCurrentDraft();
+      rerenderSessionWizard(view, {
+        account: '',
+        loginComplete: false,
+        toggleLoginModal,
+      });
+      enableAdvancedMode();
 
       fireEvent.click(screen.getByRole('button', { name: /^Publish$/i }));
       fireEvent.click(screen.getByLabelText('Advanced publish settings'));

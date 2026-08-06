@@ -2,6 +2,7 @@ import {
   E2E_TESTIDS,
   act,
   createPendingFeaturedDraft,
+  deployVerifiedWorkerForCurrentDraft,
   fireEvent,
   mockCreateSBT,
   mockFetchSessionFromRegistry,
@@ -11,6 +12,7 @@ import {
   renderLoggedInSessionWizard,
   resetSessionWizardWorkerPanelTestState,
   screen,
+  selectNormalModeCard,
   waitFor,
   within,
   enableAdvancedMode,
@@ -28,22 +30,6 @@ const chooseCustomWorkerWithoutDeploy = async () => {
 const openPublishSection = async () => {
   fireEvent.click(screen.getByText('Publish').closest('button'));
   return screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
-};
-
-const seedVerifiedWorkerCache = (workerUrl = 'https://worker.example.test', overrides = {}) => {
-  const draft = {
-    corsWorkerUrl: workerUrl,
-    ...(overrides.draft || {}),
-  };
-  sessionStorage.setItem(
-    'ce:sessionWizardDraft:v1',
-    JSON.stringify({
-      ...overrides,
-      draft,
-      deployComplete: true,
-      deployWorkerUrl: workerUrl,
-    }),
-  );
 };
 
 const seedVerifiedWorkerCache = (workerUrl = 'https://worker.example.test', overrides = {}) => {
@@ -136,12 +122,9 @@ describe('SessionWizard publish boundary rendering', () => {
         draft: {
           sessionName: 'Live profile revalidation session',
           slug: 'live-profile-revalidation-session',
-          corsWorkerUrl: 'https://worker.example.test',
           sessionModeProfile: profile,
           storageProfile: { backend: 'arweave' },
         },
-        deployComplete: true,
-        deployWorkerUrl: 'https://worker.example.test',
       }),
     );
     let publishStarted = false;
@@ -152,6 +135,7 @@ describe('SessionWizard publish boundary rendering', () => {
     mockSessionExists.mockImplementation(async () => (publishStarted ? duplicateCheck : false));
 
     renderLoggedInSessionWizard();
+    await deployVerifiedWorkerForCurrentDraft();
     enableAdvancedMode();
     const publishButton = await openPublishSection();
     fireEvent.click(screen.getByLabelText('Advanced publish settings'));
@@ -203,14 +187,13 @@ describe('SessionWizard publish boundary rendering', () => {
   });
 
   it('lets manual metadata satisfy publish readiness with a compatible worker', async () => {
-    seedVerifiedWorkerCache();
     renderLoggedInSessionWizard();
-    enableAdvancedMode();
 
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
       target: { value: 'Manual Metadata Publish Boundary Session' },
     });
-    await chooseCustomWorkerWithoutDeploy();
+    await deployVerifiedWorkerForCurrentDraft();
+    enableAdvancedMode();
 
     const publishButton = await openPublishSection();
     await waitFor(() => {
@@ -272,14 +255,13 @@ describe('SessionWizard publish boundary rendering', () => {
     });
     mockRegisterSessionOnChain.mockImplementation(async () => registerPromise);
 
-    seedVerifiedWorkerCache();
     renderLoggedInSessionWizard();
-    enableAdvancedMode();
 
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
       target: { value: 'Manual Metadata Progress Boundary Session' },
     });
-    await chooseCustomWorkerWithoutDeploy();
+    await deployVerifiedWorkerForCurrentDraft();
+    enableAdvancedMode();
 
     const publishButton = await openPublishSection();
     fireEvent.click(screen.getByLabelText('Advanced publish settings'));
@@ -306,8 +288,9 @@ describe('SessionWizard publish boundary rendering', () => {
       await registerPromise;
     });
     await waitFor(() => {
-      expect(publishButton).not.toBeDisabled();
+      expect(progressCard).toHaveTextContent('Done');
     });
+    expect(publishButton).toBeDisabled();
   });
 
   it('ignores same-tick publish re-entry while registration is already in flight', async () => {
@@ -318,14 +301,13 @@ describe('SessionWizard publish boundary rendering', () => {
     });
     mockRegisterSessionOnChain.mockImplementation(async () => registerPromise);
 
-    seedVerifiedWorkerCache();
     renderLoggedInSessionWizard();
-    enableAdvancedMode();
 
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
       target: { value: 'Manual Metadata Reentry Boundary Session' },
     });
-    await chooseCustomWorkerWithoutDeploy();
+    await deployVerifiedWorkerForCurrentDraft();
+    enableAdvancedMode();
 
     const publishButton = await openPublishSection();
     fireEvent.click(screen.getByLabelText('Advanced publish settings'));
@@ -349,8 +331,9 @@ describe('SessionWizard publish boundary rendering', () => {
       await registerPromise;
     });
     await waitFor(() => {
-      expect(publishButton).not.toBeDisabled();
+      expect(screen.getByTestId('ce-wizard-publish-progress')).toHaveTextContent('Done');
     });
+    expect(publishButton).toBeDisabled();
   });
 
   it('keeps stale legacy shared residue isolated from tab autosave after decentralized completion', async () => {
@@ -361,13 +344,12 @@ describe('SessionWizard publish boundary rendering', () => {
     });
     mockRegisterSessionOnChain.mockImplementation(async () => registerPromise);
 
-    seedVerifiedWorkerCache();
     renderLoggedInSessionWizard();
-    enableAdvancedMode();
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
       target: { value: 'Published Tab Session' },
     });
-    await chooseCustomWorkerWithoutDeploy();
+    await deployVerifiedWorkerForCurrentDraft();
+    enableAdvancedMode();
     const publishButton = await openPublishSection();
     fireEvent.click(screen.getByLabelText('Advanced publish settings'));
     fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
@@ -400,6 +382,7 @@ describe('SessionWizard publish boundary rendering', () => {
       expect(nextTabDraft.sessionId).not.toBe(publishedSessionId);
     });
 
+    selectNormalModeCard('Session Details');
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
       target: { value: 'Next Tab Session' },
     });
@@ -674,14 +657,13 @@ describe('SessionWizard publish boundary rendering', () => {
       return { txs: [{ action: 'createSession', hash: '0xregister-final' }] };
     });
 
-    seedVerifiedWorkerCache();
     renderLoggedInSessionWizard();
-    enableAdvancedMode();
 
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
       target: { value: 'Manual Metadata Register Boundary Session' },
     });
-    await chooseCustomWorkerWithoutDeploy();
+    await deployVerifiedWorkerForCurrentDraft();
+    enableAdvancedMode();
 
     const publishButton = await openPublishSection();
     await waitFor(() => {
@@ -773,21 +755,14 @@ describe('SessionWizard publish boundary rendering', () => {
       arweaveJwk: '{"kty":"ephemeral-test-key"}',
       source: 'memory',
     });
-    seedVerifiedWorkerCache('https://worker.example.test', {
-      persistWorkerSecrets: false,
-      workerSecretsEnabled: false,
-      workerSecrets: {
-        arweaveJwk: '{"kty":"cached"}',
-      },
-    });
-
     try {
       renderLoggedInSessionWizard();
-      enableAdvancedMode();
 
       fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
         target: { value: 'Uploaded Metadata Register Boundary Session' },
       });
+      await deployVerifiedWorkerForCurrentDraft();
+      enableAdvancedMode();
 
       const publishButton = await openPublishSection();
       await waitFor(() => {
@@ -869,9 +844,6 @@ describe('SessionWizard publish boundary rendering', () => {
       arweaveJwk: '{"kty":"ephemeral-header-test-key"}',
       source: 'memory',
     });
-    seedVerifiedWorkerCache('https://worker.example.test', {
-      workerSecretsEnabled: false,
-    });
     mockRegisterSessionOnChain.mockResolvedValue({ txs: [] });
 
     try {
@@ -880,6 +852,8 @@ describe('SessionWizard publish boundary rendering', () => {
       fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
         target: { value: 'Header Upload Boundary Session' },
       });
+      await deployVerifiedWorkerForCurrentDraft();
+      selectNormalModeCard('Session Details');
       const imageBar = screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_INLINE_BAR);
       fireEvent.click(within(imageBar).getByRole('button', { name: 'Upload image' }));
       const fileInput = imageBar.querySelector('input[type="file"]');
@@ -942,18 +916,18 @@ describe('SessionWizard publish boundary rendering', () => {
 
   it('blocks cached secret field gates before metadata upload', async () => {
     const { arweaveClient } = require('../../utilities/arweave/arweaveClient.js');
-    seedVerifiedWorkerCache('https://worker.example.test', {
-      encryptedFieldGates: {
-        'arweave.jwk': 'gate-1',
-      },
-    });
+    sessionStorage.setItem(
+      'ce:sessionWizardDraft:v1',
+      JSON.stringify({ encryptedFieldGates: { 'arweave.jwk': 'gate-1' } }),
+    );
 
     renderLoggedInSessionWizard();
-    enableAdvancedMode();
 
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
       target: { value: 'Secret Gate Boundary Session' },
     });
+    await deployVerifiedWorkerForCurrentDraft();
+    enableAdvancedMode();
 
     const publishButton = await openPublishSection();
     await waitFor(() => {
@@ -1019,16 +993,13 @@ describe('SessionWizard publish boundary rendering', () => {
       arweaveJwk: '{"kty":"ephemeral-failure-test-key"}',
       source: 'memory',
     });
-    seedVerifiedWorkerCache('https://worker.example.test', {
-      workerSecretsEnabled: false,
-    });
-
     renderLoggedInSessionWizard();
-    enableAdvancedMode();
 
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
       target: { value: 'Upload Failure Boundary Session' },
     });
+    await deployVerifiedWorkerForCurrentDraft();
+    enableAdvancedMode();
 
     const publishButton = await openPublishSection();
     await waitFor(() => {

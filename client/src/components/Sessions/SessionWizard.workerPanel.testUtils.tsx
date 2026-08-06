@@ -34,6 +34,7 @@ const mockTestAdminAddress = '0x00000000000000000000000000000000000000aa';
 const TEST_ADMIN_ADDRESS = mockTestAdminAddress;
 const NEW_SESSION_BANNER_DISMISSED_KEY = 'ce_new_session_banner_dismissed';
 const ORIGINAL_PUBLIC_URL = process.env.PUBLIC_URL;
+const ORIGINAL_FETCH = global.fetch;
 const mockSelectorSourceFactory = '0x538A48BC439A36D2A86e63114DCD9c429d2ddEcA';
 const mockSelectorSourceStartBlock = 30297069;
 const buildMockSponsoredBundleEnvelope = () =>
@@ -344,6 +345,11 @@ const renderLoggedInSessionWizard = (props = {}) =>
     toggleLoginModal: jest.fn(),
     ...props,
   });
+const rerenderSessionWizard = (
+  view: ReturnType<typeof render>,
+  props: Omit<React.ComponentProps<typeof SessionWizard>, 'network'> = {},
+) =>
+  view.rerender(<SessionWizard network={{ id: 84532 }} {...props} />);
 const getWizardResourceCard = (resourceKey) =>
   screen
     .getAllByTestId(E2E_TESTIDS.WIZARD_RESOURCE_CARD)
@@ -434,6 +440,64 @@ const createPublicWorkerVerificationResponder = () => {
     return null;
   };
 };
+const installVerifiedWorkerDeploymentFetch = (workerUrl = 'https://worker.example.test') => {
+  const respondToPublicWorkerVerification = createPublicWorkerVerificationResponder();
+  const fetchMock = jest.fn(async (url, options = {}) => {
+    const normalizedUrl = String(url);
+    if (normalizedUrl.endsWith('/deploy')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ok: true,
+          workerUrl,
+          writesSessionConfig: true,
+          writesSessionSecrets: false,
+        }),
+      };
+    }
+    if (normalizedUrl.endsWith('/auth/nonce')) {
+      return { ok: true, status: 200, json: async () => ({ nonce: 'wizard-admin-nonce' }) };
+    }
+    const publicVerificationResponse = respondToPublicWorkerVerification(normalizedUrl, options);
+    if (publicVerificationResponse) return publicVerificationResponse;
+    return { ok: true, status: 200, json: async () => ({ ok: true }) };
+  });
+  Object.defineProperty(global, 'fetch', {
+    configurable: true,
+    writable: true,
+    value: fetchMock,
+  });
+  return fetchMock;
+};
+const deployVerifiedWorkerForCurrentDraft = async ({
+  workerUrl = 'https://worker.example.test',
+  openaiKey = 'sk-render-test',
+  arweaveJwk = '{"kty":"RSA","n":"render-test"}',
+} = {}) => {
+  const fetchMock = installVerifiedWorkerDeploymentFetch(workerUrl);
+  const customizeButton = screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED);
+  if (customizeButton?.getAttribute('aria-pressed') === 'true') fireEvent.click(customizeButton);
+  selectNormalModeCard('Worker');
+
+  const tokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
+  const reactPropsKey = Object.keys(tokenInput).find((key) => key.startsWith('__reactProps$'));
+  if (!reactPropsKey) throw new Error('Cloudflare token input does not expose React change props.');
+  const reactProps = Reflect.get(tokenInput, reactPropsKey) as {
+    onChange: (event: { target: { value: string } }) => void;
+  };
+  act(() => reactProps.onChange({ target: { value: 'cf-render-test-token' } }));
+  fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
+    target: { value: openaiKey },
+  });
+  const arweaveInput = screen.queryByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK);
+  if (arweaveInput) fireEvent.change(arweaveInput, { target: { value: arweaveJwk } });
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
+  await waitFor(() => {
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Worker deployed.');
+  });
+  return fetchMock;
+};
 const getMockSelectorById = (selectorId) =>
   screen
     .queryAllByTestId('mock-wizard-sbt-selector')
@@ -499,6 +563,7 @@ const resetSessionWizardWorkerPanelTestState = () => {
     process.env.PUBLIC_URL = ORIGINAL_PUBLIC_URL;
   }
   window.history.replaceState({}, '', '/');
+  global.fetch = ORIGINAL_FETCH;
   localStorage.clear();
   sessionStorage.clear();
   buildContractViewerContracts.mockImplementation(({ sessionContracts = {} } = {}) =>
@@ -592,10 +657,13 @@ export {
   createTooltipStore,
   renderSessionWizardWithTooltipStore,
   renderLoggedInSessionWizard,
+  rerenderSessionWizard,
   getWizardResourceCard,
   enableAdvancedMode,
   selectNormalModeCard,
   createPublicWorkerVerificationResponder,
+  installVerifiedWorkerDeploymentFetch,
+  deployVerifiedWorkerForCurrentDraft,
   getMockSelectorById,
   expectSelectorAddresses,
   openAdvancedMoreOptions,
