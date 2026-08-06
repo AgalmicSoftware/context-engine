@@ -376,6 +376,29 @@ test('public replay range rejects PII added and removed before the candidate tip
   }
 });
 
+test('public replay range rejects private planning tokens in replay messages', () => {
+  const { rootDir, git, baseCommit } = publicReplayFixture();
+  try {
+    const planningId = `${'PR'}${'D'} 123`;
+    git([
+      'commit',
+      '--amend',
+      '-m',
+      `public replay\n\nReferences ${planningId}.`,
+      '-m',
+      `CE-Private-Source: ${SHA_C}`,
+    ]);
+    const candidateCommit = git(['rev-parse', 'HEAD']);
+
+    assert.throws(
+      () => verifyPublicReplayRange({ rootDir, baseRef: baseCommit, candidateRef: candidateCommit }),
+      /public release PII scan failed/,
+    );
+  } finally {
+    fs.rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
 test('source provenance resolves a linear replay from its own trailer', () => {
   const { rootDir, git, baseCommit } = sourceProvenanceFixture();
   try {

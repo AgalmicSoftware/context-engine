@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-node - "$@" <<'NODE'
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+CE_PUBLIC_RELEASE_STRIP_PATTERNS="$SCRIPT_DIR/lib/public-release-strip-patterns.sh" node - "$@" <<'NODE'
 'use strict';
 
 const { execFileSync } = require('node:child_process');
@@ -38,9 +39,65 @@ const allowedGeneratedWorkerEmails = new Set([
   ['rfe', 'rm.rs'].join('@'),
   ['me', 'ricmoo.com'].join('@'),
 ]);
+const privateCommitMessageTokens = [
+  'contextEngine-cc',
+  'docs/agent-native',
+  'agent-native',
+  'client/public/skill.md',
+  'scripts/e2e',
+  'scripts/lib/e2e',
+  'scripts/test-',
+  'scripts/seed-',
+  'artifacts/',
+  '.claude',
+  '.codex',
+  'CLAUDE.md',
+  'AGENTS.md',
+  'release-staging',
+  'private branch',
+  'dev branch',
+  'OpenClaw',
+  'TODO/',
+].map((token) => token.toLowerCase());
+const privatePlanningIdRe = /\bprds?\s*(?:[#:_-]\s*)?\d+\b/i;
 
 function toPosix(relativePath) {
   return relativePath.split(path.sep).join('/');
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[|\\{}()[\]^$+?.]/g, '\\$&');
+}
+
+function globToRegExp(pattern) {
+  let source = '';
+  for (const char of pattern) {
+    source += char === '*' ? '.*' : char === '?' ? '.' : escapeRegExp(char);
+  }
+  return new RegExp(`^${source}$`);
+}
+
+function loadPrivateReleasePathMatcher() {
+  const helperPath = path.resolve(String(process.env.CE_PUBLIC_RELEASE_STRIP_PATTERNS || ''));
+  if (!fs.existsSync(helperPath)) {
+    throw new Error(`public release strip-pattern helper is missing: ${helperPath}`);
+  }
+  const output = execFileSync(
+    'bash',
+    ['-c', 'source "$1"; ce_public_release_strip_patterns', 'bash', helperPath],
+    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+  const patterns = output.split(/\r?\n/).map((entry) => toPosix(entry.trim())).filter(Boolean);
+  const compiled = patterns.map((pattern) => ({
+    pattern,
+    regexp: /[*?]/.test(pattern) ? globToRegExp(pattern) : null,
+  }));
+  return (relativePath) => {
+    const normalized = toPosix(relativePath).replace(/^\.\//, '').replace(/\/+/g, '/');
+    return compiled.find(({ pattern, regexp }) => (
+      regexp ? regexp.test(normalized) : normalized === pattern || normalized.startsWith(`${pattern}/`)
+    ))?.pattern || '';
+  };
 }
 
 function isProbablyBinary(buffer) {
@@ -210,6 +267,17 @@ function scanBuffer(relativePath, buffer, findings, warnings) {
   return true;
 }
 
+function scanPrivateCommitMessage(relativePath, text, findings) {
+  text.split(/\r?\n/).forEach((line, index) => {
+    const normalized = line.toLowerCase();
+    if (privateCommitMessageTokens.some((token) => normalized.includes(token))) {
+      addFinding(findings, 'private-commit-message', relativePath, index + 1, 'private release token');
+    } else if (privatePlanningIdRe.test(line)) {
+      addFinding(findings, 'private-commit-message', relativePath, index + 1, 'internal planning identifier');
+    }
+  });
+}
+
 function gitBuffer(repoDir, gitArgs) {
   return execFileSync('git', gitArgs, {
     cwd: repoDir,
@@ -260,6 +328,7 @@ function scanGitRange(repoDir, baseRef, candidateRef, findings, warnings) {
   const commits = gitText(repoDir, ['rev-list', '--reverse', `${baseCommit}..${candidateCommit}`])
     .split(/\s+/)
     .filter(Boolean);
+  const privateReleasePath = loadPrivateReleasePathMatcher();
   let scannedFiles = 0;
 
   for (const commit of commits) {
@@ -268,10 +337,12 @@ function scanGitRange(repoDir, baseRef, candidateRef, findings, warnings) {
       .slice(1);
     if (parents.length !== 1) throw new Error(`commit ${commit} is not a linear public replay`);
 
+    const messagePath = `.git-commit-messages/${commit}.txt`;
     const message = gitBuffer(repoDir, ['show', '-s', '--format=%B', commit]);
-    if (scanBuffer(`.git-commit-messages/${commit}.txt`, message, findings, warnings)) {
+    if (scanBuffer(messagePath, message, findings, warnings)) {
       scannedFiles += 1;
     }
+    scanPrivateCommitMessage(messagePath, message.toString('utf8'), findings);
 
     const changedPaths = gitBuffer(repoDir, [
       'diff-tree',
@@ -286,6 +357,10 @@ function scanGitRange(repoDir, baseRef, candidateRef, findings, warnings) {
     ]).toString('utf8').split('\0').filter(Boolean);
 
     for (const relativePath of changedPaths) {
+      const privatePattern = privateReleasePath(relativePath);
+      if (privatePattern) {
+        addFinding(findings, 'private-release-path', toPosix(relativePath), 1, `matched ${privatePattern}`);
+      }
       const objectSpec = `${commit}:${relativePath}`;
       const objectType = gitText(repoDir, ['cat-file', '-t', objectSpec]);
       if (objectType !== 'blob') {

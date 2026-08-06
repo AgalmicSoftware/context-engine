@@ -189,3 +189,34 @@ test('verify-public-release-pii scans transient Git history and commit messages'
     assert.match(result.stderr, /FAIL home-path: \.git-commit-messages\/[a-f0-9]{40}\.txt:1/);
   });
 });
+
+test('verify-public-release-pii rejects private planning tokens in Git commit messages', () => {
+  withFixture((rootDir) => {
+    git(rootDir, ['init', '--quiet', '-b', 'main']);
+    git(rootDir, ['config', 'user.name', 'Agalmic']);
+    git(rootDir, ['config', 'user.email', 'agalmicsoftware@protonmail.com']);
+    writeFile(rootDir, 'README.md', '# Public fixture\n');
+    git(rootDir, ['add', 'README.md']);
+    git(rootDir, ['commit', '--quiet', '-m', 'base']);
+    const baseCommit = git(rootDir, ['rev-parse', 'HEAD']);
+
+    const privatePath = path.join(`${'TO'}${'DO'}`, 'private-note.md');
+    writeFile(rootDir, 'public-change.txt', 'public change\n');
+    writeFile(rootDir, privatePath, 'private planning note\n');
+    git(rootDir, ['add', 'public-change.txt', privatePath]);
+    const planningId = `${'PR'}${'D'} 123`;
+    git(rootDir, ['commit', '--quiet', '-m', `public change\n\nReferences ${planningId}.`]);
+    git(rootDir, ['rm', '--quiet', privatePath]);
+    git(rootDir, ['commit', '--quiet', '-m', 'remove private planning note']);
+    const candidateCommit = git(rootDir, ['rev-parse', 'HEAD']);
+    assert.equal(git(rootDir, ['ls-tree', '-r', '--name-only', candidateCommit, '--', privatePath]), '');
+    const result = runGitRangeScanner(rootDir, baseCommit, candidateCommit);
+
+    assert.equal(result.status, 1);
+    assert.match(
+      result.stderr,
+      /FAIL private-commit-message: \.git-commit-messages\/[a-f0-9]{40}\.txt:3: internal planning identifier/,
+    );
+    assert.match(result.stderr, /FAIL private-release-path: TODO\/private-note\.md:1: matched TODO/);
+  });
+});

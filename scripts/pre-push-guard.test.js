@@ -10,6 +10,7 @@ const { execFileSync, spawnSync } = require('node:child_process');
 const PRE_PUSH_SOURCE_PATH = path.join(__dirname, '..', '.githooks', 'pre-push');
 const RELEASE_VERSION_SOURCE_PATH = path.join(__dirname, 'release-version.mjs');
 const PUBLIC_PII_SCANNER_SOURCE_PATH = path.join(__dirname, 'verify-public-release-pii.sh');
+const PUBLIC_STRIP_PATTERNS_SOURCE_PATH = path.join(__dirname, 'lib', 'public-release-strip-patterns.sh');
 const PUBLIC_GIT_NAME = 'Agalmic';
 const PUBLIC_GIT_EMAIL = 'agalmicsoftware@protonmail.com';
 const NON_ZERO_SHA = '1111111111111111111111111111111111111111';
@@ -41,6 +42,11 @@ function setupHookFixture() {
     tempDir,
     path.join('scripts', 'verify-public-release-pii.sh'),
     fs.readFileSync(PUBLIC_PII_SCANNER_SOURCE_PATH, 'utf8'),
+  );
+  writeFile(
+    tempDir,
+    path.join('scripts', 'lib', 'public-release-strip-patterns.sh'),
+    fs.readFileSync(PUBLIC_STRIP_PATTERNS_SOURCE_PATH, 'utf8'),
   );
   fs.chmodSync(path.join(tempDir, '.githooks', 'pre-push'), 0o755);
   return tempDir;
@@ -779,6 +785,32 @@ test('pre-push guard rejects PII added and removed within staging history', () =
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /public release PII scan/);
     assert.match(result.stderr, /FAIL email: transient-leak\.txt:1/);
+  });
+});
+
+test('pre-push guard rejects private planning tokens in staging messages', () => {
+  withHookFixture((rootDir) => {
+    const { privateSourceSha } = createVersionedCandidate(rootDir, '0.1.1');
+    const planningId = `${'PR'}${'D'} 123`;
+    git(rootDir, [
+      'commit',
+      '--quiet',
+      '--amend',
+      '-m',
+      `candidate\n\nReferences ${planningId}.`,
+      '-m',
+      `CE-Private-Source: ${privateSourceSha}`,
+    ]);
+    const candidateSha = git(rootDir, ['rev-parse', 'HEAD']);
+    git(rootDir, ['branch', '-M', 'release-staging']);
+    const result = runHook(rootDir, pushLine({
+      localRef: 'refs/heads/release-staging',
+      localSha: candidateSha,
+      remoteRef: 'refs/heads/release-staging',
+    }));
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /FAIL private-commit-message/);
   });
 });
 

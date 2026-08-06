@@ -178,6 +178,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/verify-public-docs.test.js');
   expectFile('scripts/verify-public-release-pii.sh');
   expectFile('scripts/verify-public-release-pii.test.js');
+  expectFile('scripts/lib/public-release-strip-patterns.sh');
   expectFile('scripts/verify-public-assets.js');
   expectFile('scripts/verify-public-assets.test.js');
   expectFile('scripts/verify-public-text.js');
@@ -473,6 +474,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
     '/scripts/worker-release-artifacts.test.mjs @AgalmicSoftware',
     '/scripts/verify-public-release-pii.sh @AgalmicSoftware',
     '/scripts/verify-public-release-pii.test.js @AgalmicSoftware',
+    '/scripts/lib/public-release-strip-patterns.sh @AgalmicSoftware',
     '/scripts/sync-public-history.sh @AgalmicSoftware',
     '/scripts/client-boundaries-baseline.json @AgalmicSoftware',
     '/scripts/type-debt-baseline.json @AgalmicSoftware',
