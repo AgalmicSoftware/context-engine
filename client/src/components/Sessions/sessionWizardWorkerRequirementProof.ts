@@ -158,6 +158,9 @@ export const resolveSessionWizardWorkerSecretSelection = ({
   const secrets = workerSecrets && typeof workerSecrets === 'object' ? (workerSecrets as AnyRecord) : {};
   const fallbackFields = new Set(normalizeFieldList(fallbackRequiredSecretFields));
   const selectedAiSecretFields = resolveSessionWizardResourceSecretFields('ai', sessionAi).map((field) => field.key);
+  const includeFaucetPrivateKey =
+    requirements.requiresFunding &&
+    (!!toStr(secrets.faucetPrivateKey).trim() || fallbackFields.has('faucetPrivateKey'));
   const requiredSecretFields = requirements.usesWorkerRuntime
     ? uniqueFieldList([
         ...selectedAiSecretFields,
@@ -175,6 +178,7 @@ export const resolveSessionWizardWorkerSecretSelection = ({
               ...RPC_SECRET_FIELDS.filter((field) => fallbackFields.has(field)),
             ])
           : []),
+        ...(includeFaucetPrivateKey ? ['faucetPrivateKey'] : []),
       ])
     : [];
   const selectedSecrets = requirements.usesWorkerRuntime

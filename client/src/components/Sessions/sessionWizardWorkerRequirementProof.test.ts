@@ -1,6 +1,7 @@
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 import {
   buildSessionWizardWorkerRequirementProof,
+  resolveSessionWizardWorkerSecretSelection,
   resolveSessionWizardWorkerRequirementReadiness,
 } from './sessionWizardWorkerRequirementProof';
 
@@ -42,6 +43,106 @@ const resolveReadiness = (overrides: Record<string, unknown> = {}) =>
   });
 
 describe('sessionWizardWorkerRequirementProof', () => {
+  it('selects a present faucet key only for profiles that expose transaction funding', () => {
+    const decentralizedProfile = cloneSessionModePreset(
+      SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED,
+    );
+    const secrets = {
+      openaiKey: 'sk-verified-openai',
+      faucetPrivateKey: 'faucet-test-secret',
+    };
+
+    expect(
+      resolveSessionWizardWorkerSecretSelection({
+        sessionModeProfile: decentralizedProfile,
+        sessionAi: ai,
+        workerSecrets: secrets,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        requiredSecretFields: ['openaiKey', 'faucetPrivateKey'],
+        selectedSecrets: secrets,
+      }),
+    );
+    expect(
+      resolveSessionWizardWorkerSecretSelection({
+        sessionModeProfile: decentralizedProfile,
+        sessionAi: ai,
+        workerSecrets: workerSecrets,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        requiredSecretFields: ['openaiKey'],
+        selectedSecrets: workerSecrets,
+      }),
+    );
+    expect(
+      resolveSessionWizardWorkerSecretSelection({
+        sessionModeProfile: profile,
+        sessionAi: ai,
+        workerSecrets: secrets,
+        fallbackRequiredSecretFields: ['openaiKey', 'faucetPrivateKey'],
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        requiredSecretFields: ['openaiKey'],
+        selectedSecrets: workerSecrets,
+      }),
+    );
+  });
+
+  it('binds a selected faucet key into decentralized Worker readiness', () => {
+    const decentralizedProfile = cloneSessionModePreset(
+      SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED,
+    );
+    const decentralizedSecrets = {
+      openaiKey: 'sk-verified-openai',
+      faucetPrivateKey: 'faucet-test-secret',
+    };
+    const proof = buildSessionWizardWorkerRequirementProof({
+      workerUrl,
+      sessionSlug,
+      sessionId,
+      sessionModeProfile: decentralizedProfile,
+      sessionAi: ai,
+      workerSecrets: decentralizedSecrets,
+    });
+
+    expect(
+      resolveSessionWizardWorkerRequirementReadiness({
+        proof,
+        workerUrl,
+        sessionSlug,
+        sessionId,
+        sessionModeProfile: decentralizedProfile,
+        sessionAi: ai,
+        workerSecrets: decentralizedSecrets,
+      }),
+    ).toEqual(expect.objectContaining({ verified: true }));
+    expect(
+      resolveSessionWizardWorkerRequirementReadiness({
+        proof,
+        workerUrl,
+        sessionSlug,
+        sessionId,
+        sessionModeProfile: decentralizedProfile,
+        sessionAi: ai,
+        workerSecrets: { openaiKey: decentralizedSecrets.openaiKey },
+      }),
+    ).toEqual(expect.objectContaining({ verified: false, reason: 'secret-values-changed' }));
+    expect(
+      resolveSessionWizardWorkerRequirementReadiness({
+        proof,
+        workerUrl,
+        sessionSlug,
+        sessionId,
+        sessionModeProfile: decentralizedProfile,
+        sessionAi: ai,
+        workerSecrets: { ...decentralizedSecrets, faucetPrivateKey: 'edited-faucet-test-secret' },
+      }),
+    ).toEqual(expect.objectContaining({ verified: false, reason: 'secret-values-changed' }));
+  });
+
   it('keeps an unchanged verified deployment requirement snapshot publish-ready', () => {
     expect(resolveReadiness()).toEqual(expect.objectContaining({ verified: true, reason: '' }));
   });

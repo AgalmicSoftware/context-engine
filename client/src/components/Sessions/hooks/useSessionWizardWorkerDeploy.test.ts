@@ -858,7 +858,7 @@ describe('useSessionWizardWorkerDeploy', () => {
     options.getCurrentWorkerSecrets.mockReturnValue({
       openaiKey: 'sk-decentralized-runtime',
       anthropicKey: 'must-not-send',
-      faucetPrivateKey: 'must-not-send',
+      faucetPrivateKey: 'faucet-test-secret',
     });
     const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
 
@@ -876,7 +876,7 @@ describe('useSessionWizardWorkerDeploy', () => {
         ok: true,
         deployComplete: false,
         requiredWorkerSecretsReady: false,
-        requiredWorkerSecretFields: ['openaiKey'],
+        requiredWorkerSecretFields: ['openaiKey', 'faucetPrivateKey'],
         workerRequirementProof: null,
       }),
     );
@@ -885,14 +885,20 @@ describe('useSessionWizardWorkerDeploy', () => {
         ok: true,
         deployComplete: true,
         requiredWorkerSecretsReady: true,
-        requiredWorkerSecretFields: ['openaiKey'],
+        requiredWorkerSecretFields: ['openaiKey', 'faucetPrivateKey'],
         workerRequirementProof: expect.objectContaining({ version: 1 }),
       }),
     );
     expect(deployBodies).toHaveLength(2);
     expect(deployBodies.map((body) => body.secrets)).toEqual([
-      { openaiKey: 'sk-decentralized-runtime' },
-      { openaiKey: 'sk-decentralized-runtime' },
+      {
+        openaiKey: 'sk-decentralized-runtime',
+        faucetPrivateKey: 'faucet-test-secret',
+      },
+      {
+        openaiKey: 'sk-decentralized-runtime',
+        faucetPrivateKey: 'faucet-test-secret',
+      },
     ]);
     expect(JSON.stringify(deployBodies)).not.toContain('must-not-send');
     expect(secretsSyncCalls).toBe(2);
