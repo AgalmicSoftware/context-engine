@@ -91,9 +91,77 @@ is_allowed_public_ref() {
   return 1
 }
 
-if [ "${CE_ALLOW_PRIVATE_BRANCH_PUSH:-0}" = "1" ]; then
-  exit 0
-fi
+is_commit_in_remote_public_history() {
+  local commit_sha="$1"
+  local remote_name="$2"
+  local public_ref
+
+  while IFS= read -r public_ref; do
+    [ -n "$public_ref" ] || continue
+    if git merge-base --is-ancestor "$commit_sha" "$public_ref" 2>/dev/null; then
+      return 0
+    fi
+  done < <(git for-each-ref \
+    --format='%(refname)' \
+    "refs/remotes/${remote_name}/main" \
+    "refs/remotes/${remote_name}/release-staging*")
+
+  return 1
+}
+
+is_commit_in_fetched_public_history() {
+  local commit_sha="$1"
+  local origin_url
+
+  if is_commit_in_remote_public_history "$commit_sha" "$REMOTE_NAME"; then
+    return 0
+  fi
+
+  if [ "$REMOTE_NAME" != "origin" ] && is_canonical_public_repository_url "$REMOTE_URL"; then
+    origin_url="$(git remote get-url origin 2>/dev/null || true)"
+    if is_canonical_public_repository_url "$origin_url" &&
+      is_commit_in_remote_public_history "$commit_sha" origin; then
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
+PUBLIC_TAG_ERROR=""
+validate_public_tag() {
+  local tag_sha="$1"
+  local object_type
+
+  PUBLIC_TAG_ERROR=""
+  object_type="$(git cat-file -t "$tag_sha" 2>/dev/null || true)"
+  if [ "$object_type" != "commit" ]; then
+    PUBLIC_TAG_ERROR="lightweight tags are required"
+    return 1
+  fi
+
+  if ! is_commit_in_fetched_public_history "$tag_sha"; then
+    PUBLIC_TAG_ERROR="target is not reachable from fetched public history"
+    return 1
+  fi
+
+  return 0
+}
+
+consume_push_override() {
+  local git_dir
+  local override_path
+
+  git_dir="$(git rev-parse --git-dir 2>/dev/null || true)"
+  [ -n "$git_dir" ] || return 1
+
+  override_path="$git_dir/CE_PUSH_OVERRIDE"
+  [ -f "$override_path" ] || return 1
+
+  rm -f "$override_path"
+  printf 'warning: consumed one-time CE push override for %s.\n' "${REMOTE_NAME:-remote}" >&2
+  return 0
+}
 
 if ! should_protect_remote; then
   exit 0
@@ -102,6 +170,8 @@ fi
 blocked_refs=()
 release_candidate_shas=()
 release_baseline_shas=()
+tag_candidate_refs=()
+tag_candidate_shas=()
 
 while read -r local_ref local_sha remote_ref remote_sha; do
   [ -n "${local_ref:-}" ] || continue
@@ -121,6 +191,10 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     refs/heads/release-staging*)
       release_candidate_shas+=("$local_sha")
       release_baseline_shas+=("$remote_sha")
+      ;;
+    refs/tags/*)
+      tag_candidate_refs+=("$remote_ref")
+      tag_candidate_shas+=("$local_sha")
       ;;
   esac
 
@@ -148,6 +222,20 @@ if [ "${#blocked_refs[@]}" -gt 0 ]; then
   printf 'Rejected ref: %s\n' "${blocked_refs[0]}" >&2
   exit 1
 fi
+
+for index in "${!tag_candidate_refs[@]}"; do
+  tag_ref="${tag_candidate_refs[$index]}"
+  tag_sha="${tag_candidate_shas[$index]}"
+  if ! validate_public_tag "$tag_sha"; then
+    if consume_push_override; then
+      exit 0
+    fi
+
+    printf 'Blocked public tag %s: %s.\n' "$tag_ref" "$PUBLIC_TAG_ERROR" >&2
+    printf 'Fetch public main and release-staging refs before retrying.\n' >&2
+    exit 1
+  fi
+done
 
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 for index in "${!release_candidate_shas[@]}"; do

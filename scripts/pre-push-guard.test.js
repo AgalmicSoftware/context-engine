@@ -211,6 +211,70 @@ test('pre-push guard allows main pushes to the public origin', () => {
   });
 });
 
+test('pre-push guard allows lightweight tags of fetched public commits', () => {
+  withHookFixture((rootDir) => {
+    const { mainSha } = createVersionedCandidate(rootDir, '0.1.1');
+    git(rootDir, ['tag', 'public-snapshot', mainSha]);
+    const result = runHook(rootDir, pushLine({
+      localRef: 'refs/tags/public-snapshot',
+      localSha: mainSha,
+      remoteRef: 'refs/tags/public-snapshot',
+    }));
+
+    assert.equal(result.status, 0);
+    assert.equal(result.stderr, '');
+  });
+});
+
+test('pre-push guard recognizes fetched suffixed staging history', () => {
+  withHookFixture((rootDir) => {
+    const { candidateSha } = createVersionedCandidate(rootDir, '0.1.1');
+    git(rootDir, ['update-ref', 'refs/remotes/origin/release-staging-refresh', candidateSha]);
+    git(rootDir, ['tag', 'candidate-snapshot', candidateSha]);
+    const result = runHook(rootDir, pushLine({
+      localRef: 'refs/tags/candidate-snapshot',
+      localSha: candidateSha,
+      remoteRef: 'refs/tags/candidate-snapshot',
+    }));
+
+    assert.equal(result.status, 0);
+    assert.equal(result.stderr, '');
+  });
+});
+
+test('pre-push guard blocks tags that expose private commits', () => {
+  withHookFixture((rootDir) => {
+    const { candidateSha } = createVersionedCandidate(rootDir, '0.1.1');
+    git(rootDir, ['tag', 'private-snapshot', candidateSha]);
+    const result = runHook(rootDir, pushLine({
+      localRef: 'refs/tags/private-snapshot',
+      localSha: candidateSha,
+      remoteRef: 'refs/tags/private-snapshot',
+    }));
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Blocked public tag refs\/tags\/private-snapshot/);
+    assert.match(result.stderr, /not reachable from fetched public history/);
+  });
+});
+
+test('pre-push guard blocks annotated public tags without an override', () => {
+  withHookFixture((rootDir) => {
+    const { mainSha } = createVersionedCandidate(rootDir, '0.1.1');
+    git(rootDir, ['tag', '-a', 'annotated-snapshot', '-m', 'release snapshot', mainSha]);
+    const tagSha = git(rootDir, ['rev-parse', 'refs/tags/annotated-snapshot']);
+    const result = runHook(rootDir, pushLine({
+      localRef: 'refs/tags/annotated-snapshot',
+      localSha: tagSha,
+      remoteRef: 'refs/tags/annotated-snapshot',
+    }));
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Blocked public tag refs\/tags\/annotated-snapshot/);
+    assert.match(result.stderr, /lightweight tags are required/);
+  });
+});
+
 test('pre-push guard resolves HEAD and @ before authorizing a public push', () => {
   for (const localRef of ['HEAD', '@']) {
     withHookFixture((rootDir) => {
