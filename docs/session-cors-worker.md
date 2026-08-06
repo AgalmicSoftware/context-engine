@@ -707,6 +707,15 @@ and envelope-audit bindings are never group stores, so adding an unrelated
 database cannot switch group authority away from existing KV state. Membership
 rows are keyed by normalized principals and are not embedded in group objects.
 Rows that lack or conflict with the live canonical session ID are not adopted.
+When a create request does not supply an ID, the Worker uses server-side
+`crypto.randomUUID()` when available and otherwise uses a secure generated
+non-address fallback. A newly supplied ID shaped as `0x` plus 40 hexadecimal
+characters is rejected at the create boundary before coordinator reservation or
+KV writes. This is intentionally create-only compatibility: legacy
+address-shaped IDs remain readable and continue to work for gates, joins,
+updates, deletes, membership keys, and shared links. Non-address custom IDs
+accepted by the existing Admin interface also remain supported; UUID is the
+default, not a global format requirement.
 
 Every externally reachable group or membership mutation is serialized by the
 `CE_SESSION_COORDINATOR` object named from the exact normalized session slug and
@@ -745,6 +754,15 @@ never falls back to direct KV mutation. Read routes require ready coordination
 and return `503` when an indexed KV record is unavailable or malformed, or when
 coordinator authorization fails mid-read, instead of presenting a false empty
 or partial state.
+
+`/groups/my-memberships` derives the complete active membership set from the
+Durable Object. KV principal indexes may be repaired or used as lookup hints,
+but they cannot prove that the set is empty, and stale positive index or member
+rows cannot resurrect coordinator-removed membership. For every membership the
+coordinator does report, the Worker requires the exact KV group and member
+projection before returning readable metadata. If either required projection
+is absent, it returns 503 with reason `worker_group_projection_unavailable`
+rather than a false empty or partial result.
 
 An admin-signed `groups/reconcile-empty` action can repair only the narrow case
 where a matching coordinator was previously marked `legacy_locked`, the
@@ -794,7 +812,10 @@ Implemented routes:
   credential, `GET` remains the authenticated member route and additionally
   returns member-visible groups for the caller. Authenticated `POST` remains
   supported. `groupCreationPolicy` does not affect discovery.
-- `GET|POST /groups/my-memberships`: authenticated self view. A principal can always see its own memberships. Each row includes the active `memberCount` for that group without exposing the other principals.
+- `GET|POST /groups/my-memberships`: authenticated self view. A principal can
+  always see its own memberships. The complete set comes from the Durable
+  Object, while KV supplies the required readable projection. Each row includes
+  the active `memberCount` for that group without exposing the other principals.
 - `GET|POST /groups/members`: authenticated, cursor-paginated member identity
   view. `memberVisibility: "session"` allows any authenticated session
   principal; `"members"` requires an active membership in that Group; and
@@ -808,10 +829,15 @@ Implemented routes:
   from the authenticated principal.
 - `POST /groups/join`: authenticated self-join for `joinMode: "open"` groups
   only, before `joinEndsAt` and while the per-group and deployment-wide member
-  limits have capacity.
+  limits have capacity. Join returns the coordinator's post-mutation
+  `memberCount` with the joined group so the client can reconcile that card
+  without reloading the collection.
 - `POST /groups/leave`: authenticated self-removal from any current membership.
   The Worker derives the principal from the bearer credential and ignores any
-  caller-supplied principal, so a participant cannot remove another member.
+  caller-supplied principal, so a participant cannot remove another member. A
+  session-visible leave returns the retained group and post-mutation count;
+  restricted leave for `members` or `admin_only` visibility omits both group
+  metadata and count once the caller is no longer permitted to see them.
 
 The client presents a selected Worker Group with the same high-level detail
 hierarchy as an on-chain SBT where the concepts apply: **Stats**, **Actions**,

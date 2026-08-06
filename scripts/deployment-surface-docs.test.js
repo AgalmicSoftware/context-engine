@@ -26,3 +26,16 @@ test('session Worker docs keep immutable publication separate from latest promot
   assert.match(workerDoc, /promote-worker-bundles\.yml[^\n]*re-verifies/);
   assert.doesNotMatch(workerDoc, /publish-worker-bundles\.yml[^\n]*(?:marks|marked)[^\n]*latest/i);
 });
+
+test('session Worker docs define group authority, counts, and id compatibility', () => {
+  const workerDoc = read('docs/session-cors-worker.md');
+
+  assert.match(workerDoc, /complete active membership set[\s\S]*Durable Object/);
+  assert.match(workerDoc, /principal indexes[\s\S]*cannot prove that the set is empty/);
+  assert.match(workerDoc, /503 with reason `worker_group_projection_unavailable`/);
+  assert.match(workerDoc, /`crypto\.randomUUID\(\)`/);
+  assert.match(workerDoc, /`0x` plus 40 hexadecimal\s+characters/);
+  assert.match(workerDoc, /legacy\s+address-shaped IDs remain readable/);
+  assert.match(workerDoc, /Join returns the coordinator's post-mutation\s+`memberCount`/);
+  assert.match(workerDoc, /session-visible leave[\s\S]*restricted leave/);
+});
