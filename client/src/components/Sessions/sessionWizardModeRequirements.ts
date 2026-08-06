@@ -24,6 +24,7 @@ export type SessionWizardModeRequirements = {
   authorityMode: string;
   isWorkerCanonical: boolean;
   usesWorkerRuntime: boolean;
+  usesAgentSessionWrapped: boolean;
   presetKeyChips: string[];
   requiredRequirementIds: SessionWizardRequirementId[];
   requiredWorkerSecretFields: string[];
@@ -55,6 +56,7 @@ const emptyRequirements = (): SessionWizardModeRequirements => ({
   authorityMode: '',
   isWorkerCanonical: false,
   usesWorkerRuntime: false,
+  usesAgentSessionWrapped: false,
   presetKeyChips: [],
   requiredRequirementIds: [],
   requiredWorkerSecretFields: [],
@@ -166,6 +168,7 @@ export const resolveSessionWizardModeRequirements = (
     authorityMode,
     isWorkerCanonical,
     usesWorkerRuntime,
+    usesAgentSessionWrapped,
     presetKeyChips,
     requiredRequirementIds,
     requiredWorkerSecretFields,

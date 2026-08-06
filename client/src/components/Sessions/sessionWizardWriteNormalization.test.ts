@@ -70,6 +70,10 @@ describe('sessionWizardWriteNormalization', () => {
           chainId: DEFAULT_CONFIG_CHAIN_ID,
         },
       },
+      agentSessionWrapped: {
+        enabled: true,
+        bridgeUrl: 'https://wrapped.example.test',
+      },
     };
     const buildMetadataPayload = buildSessionWizardMetadataPayloadBuilder({
       allEncryptionGates: [],
@@ -106,6 +110,7 @@ describe('sessionWizardWriteNormalization', () => {
 
     expect(outboundArweaveMetadata).not.toHaveProperty('sessionEndsAt');
     expect(outboundArweaveMetadata).not.toHaveProperty('defaultGroupTags');
+    expect(outboundArweaveMetadata).not.toHaveProperty('agentSessionWrapped');
     expect(outboundArweaveMetadata).toEqual(
       expect.objectContaining({
         defaultSbtTags: 'on-chain-group-defaults',
@@ -121,6 +126,7 @@ describe('sessionWizardWriteNormalization', () => {
     );
     expect(outboundWorkerConfig).not.toHaveProperty('sessionEndsAt');
     expect(outboundWorkerConfig).not.toHaveProperty('defaultGroupTags');
+    expect(outboundWorkerConfig).not.toHaveProperty('agentSessionWrapped');
     expect(outboundWorkerConfig).not.toHaveProperty('defaultSbtTags');
     expect(outboundWorkerConfig).not.toHaveProperty('defaultFeaturedSBTs');
     expect(outboundWorkerConfig).not.toHaveProperty('autoFeatureSBTsBySessionSlug');

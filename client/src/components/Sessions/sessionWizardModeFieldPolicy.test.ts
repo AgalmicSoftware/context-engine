@@ -22,6 +22,7 @@ describe('sessionWizardModeFieldPolicy', () => {
       'defaultSbtTags',
       'defaultFeaturedSBTs',
       'autoFeatureSBTsBySessionSlug',
+      'agentSessionWrapped',
     ]);
     const payload = Object.fromEntries(SESSION_WIZARD_MODE_POLICY_FIELD_KEYS.map((key) => [key, 'stale']));
 
@@ -70,6 +71,7 @@ describe('sessionWizardModeFieldPolicy', () => {
       showSessionEndsAt: true,
       showWorkerGroupDefaults: true,
       showSbtDefaults: false,
+      showAgentSessionWrapped: false,
       visibleContractKeys: [],
     });
   });
@@ -99,6 +101,7 @@ describe('sessionWizardModeFieldPolicy', () => {
       showSessionEndsAt: true,
       showWorkerGroupDefaults: true,
       showSbtDefaults: true,
+      showAgentSessionWrapped: false,
       visibleContractKeys: ['sbtFactory'],
     });
   });
@@ -114,7 +117,32 @@ describe('sessionWizardModeFieldPolicy', () => {
       showSessionEndsAt: false,
       showWorkerGroupDefaults: false,
       showSbtDefaults: true,
+      showAgentSessionWrapped: false,
       visibleContractKeys: ['surveys', 'sbtFactory', 'sessionRegistry'],
+    });
+  });
+
+  it('retains the Wrapped capability only when the final profile enables its surface', () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    profile.surfaces.agentHttp = true;
+    const payload = {
+      agentSessionWrapped: {
+        enabled: true,
+        bridgeUrl: 'https://wrapped.example.test',
+      },
+    };
+
+    expect(
+      applySessionWizardModeFieldPolicyToPayload(
+        payload,
+        resolveSessionWizardModeFieldPolicy(resolveSessionWizardModeRequirements(profile)),
+      ),
+    ).toEqual({
+      agentSessionWrapped: {
+        enabled: true,
+        bridgeUrl: 'https://wrapped.example.test',
+      },
     });
   });
 });

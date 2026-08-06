@@ -8,6 +8,7 @@ export type SessionWizardModeFieldPolicy = {
   showSessionEndsAt: boolean;
   showWorkerGroupDefaults: boolean;
   showSbtDefaults: boolean;
+  showAgentSessionWrapped: boolean;
   visibleContractKeys: SessionWizardContractFieldKey[];
 };
 
@@ -20,6 +21,7 @@ export const SESSION_WIZARD_MODE_POLICY_FIELD_KEYS = Object.freeze([
   'defaultSbtTags',
   'defaultFeaturedSBTs',
   'autoFeatureSBTsBySessionSlug',
+  'agentSessionWrapped',
 ] as const);
 
 type SessionWizardModePolicyPayload = Record<string, unknown>;
@@ -30,6 +32,7 @@ const LEGACY_FIELD_POLICY: SessionWizardModeFieldPolicy = {
   showSessionEndsAt: false,
   showWorkerGroupDefaults: false,
   showSbtDefaults: true,
+  showAgentSessionWrapped: true,
   visibleContractKeys: ['surveys', 'sbtFactory', 'sessionRegistry'],
 };
 
@@ -46,6 +49,7 @@ export const resolveSessionWizardModeFieldPolicy = (
       showSessionEndsAt: true,
       showWorkerGroupDefaults: true,
       showSbtDefaults: usesOnChainSbt,
+      showAgentSessionWrapped: requirements.usesAgentSessionWrapped,
       visibleContractKeys: usesOnChainSbt ? ['sbtFactory'] : [],
     };
   }
@@ -53,6 +57,7 @@ export const resolveSessionWizardModeFieldPolicy = (
   return {
     ...LEGACY_FIELD_POLICY,
     showSessionEndsAt: false,
+    showAgentSessionWrapped: requirements.usesAgentSessionWrapped,
   };
 };
 
@@ -66,6 +71,7 @@ export const isSessionWizardModeHiddenTopLevelField = (
   if (key === 'sessionEndsAt') return !policy.showSessionEndsAt;
   if (key === 'contracts') return policy.visibleContractKeys.length === 0;
   if (key === 'defaultGroupTags') return !policy.showWorkerGroupDefaults;
+  if (key === 'agentSessionWrapped') return !policy.showAgentSessionWrapped;
   if (key === 'defaultSbtTags' || key === 'defaultFeaturedSBTs' || key === 'autoFeatureSBTsBySessionSlug') {
     return !policy.showSbtDefaults;
   }
