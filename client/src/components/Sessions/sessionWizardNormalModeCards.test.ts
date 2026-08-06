@@ -31,6 +31,7 @@ const baseCardsInput: NormalModeCardsInput = {
     uploadBlockedReason: 'Upload is blocked.',
   },
   isWorkerCanonical: false,
+  usesWorkerRuntime: true,
   deployPendingSbts: true,
   t,
 };
@@ -47,6 +48,7 @@ const basePublishSummaryInput: NormalModePublishSummaryInput = {
   deployVerifiedInUi: false,
   pendingDraftCount: 0,
   isWorkerCanonical: false,
+  usesWorkerRuntime: true,
   deployPendingSbts: true,
   t,
 };
@@ -86,7 +88,7 @@ describe('sessionWizardNormalModeCards', () => {
 
       expect(publishCard).toEqual(
         expect.objectContaining({
-          summary: 'Review the setup and deploy when ready.',
+          summary: 'Publish uses the Session Worker runtime, uploads metadata to Arweave, and registers on-chain.',
           tone: 'ready',
         }),
       );
@@ -127,6 +129,26 @@ describe('sessionWizardNormalModeCards', () => {
         'Deploy saves and verifies canonical config in the Session Worker.',
       );
       expect(cards.find((card) => card.key === 'worker')?.title).toBe('Session Worker');
+    });
+
+    it('keeps decentralized authority canonical while naming its required runtime', () => {
+      const cards = buildNormalModeCards({
+        ...baseCardsInput,
+        publishReadiness: {
+          ...baseCardsInput.publishReadiness,
+          canPublishNow: true,
+        },
+      });
+
+      expect(cards.find((card) => card.key === 'worker')).toEqual(
+        expect.objectContaining({
+          title: 'Session Worker',
+          summary: 'Using the shared default Session Worker; the EVM registry and Arweave remain canonical.',
+        }),
+      );
+      expect(cards.find((card) => card.key === 'publish')?.summary).toBe(
+        'Publish uses the Session Worker runtime, uploads metadata to Arweave, and registers on-chain.',
+      );
     });
   });
 

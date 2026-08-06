@@ -128,10 +128,13 @@ describe('SessionWizardRequirementsBanner', () => {
         fundingRequirementHref={SESSION_WIZARD_REQUIREMENT_LINKS.optimismSepoliaFaucet}
         fundingRequirementLabel="OP Sepolia ETH"
         onDismiss={jest.fn()}
-        requiredRequirementIds={['aiProviderKey', 'arweaveJwk', 'rpc', 'wallet', 'funding']}
+        requiredRequirementIds={['sessionWorker', 'aiProviderKey', 'arweaveJwk', 'rpc', 'wallet', 'funding']}
       />,
     );
 
+    expect(screen.getByText(/compatible Session Worker/i)).toHaveTextContent(
+      'A compatible Session Worker provides the web runtime; the EVM registry and Arweave remain canonical.',
+    );
     expect(screen.getByRole('link', { name: 'Arweave wallet (JWK)' })).toBeInTheDocument();
     expect(screen.getByText(/RPC URL or provider key/i)).toBeInTheDocument();
     expect(screen.getByText(/connected wallet/i)).toBeInTheDocument();
@@ -145,7 +148,7 @@ describe('SessionWizardRequirementsBanner', () => {
         fundingRequirementHref={SESSION_WIZARD_REQUIREMENT_LINKS.optimismSepoliaFaucet}
         fundingRequirementLabel="OP Sepolia ETH"
         onDismiss={jest.fn()}
-        requiredRequirementIds={['aiProviderKey', 'arweaveJwk', 'rpc', 'wallet', 'funding', 'lit']}
+        requiredRequirementIds={['sessionWorker', 'aiProviderKey', 'arweaveJwk', 'rpc', 'wallet', 'funding', 'lit']}
       />,
     );
     expect(screen.getByRole('link', { name: 'Lit API key' })).toBeInTheDocument();

@@ -4446,6 +4446,7 @@ const SessionWizard = ({
     canUseSponsoredAutoDeployNow,
     publishReadiness: publishUiPlan.publishReadiness,
     isWorkerCanonical: sessionModeRequirements.isWorkerCanonical,
+    usesWorkerRuntime: sessionModeRequirements.usesWorkerRuntime,
     deployPendingSbts: sessionModeRequirements.publish.deployPendingSbts,
     t,
   });

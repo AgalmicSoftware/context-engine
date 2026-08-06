@@ -16,6 +16,7 @@ describe('sessionWizardModeRequirements', () => {
       expect.objectContaining({
         authorityMode: 'worker_canonical',
         isWorkerCanonical: true,
+        usesWorkerRuntime: true,
         presetKeyChips: ['Cloudflare account', 'AI provider key'],
         requiredRequirementIds: ['cloudflareAccount', 'aiProviderKey'],
         requiredWorkerSecretFields: ['openaiKey'],
@@ -133,6 +134,8 @@ describe('sessionWizardModeRequirements', () => {
     expect(plain).toEqual(
       expect.objectContaining({
         isWorkerCanonical: false,
+        usesWorkerRuntime: true,
+        requiredRequirementIds: ['sessionWorker', 'aiProviderKey', 'arweaveJwk', 'rpc', 'wallet', 'funding'],
         requiresArweave: true,
         requiresRpc: true,
         requiresFunding: true,

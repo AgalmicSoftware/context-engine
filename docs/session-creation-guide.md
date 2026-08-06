@@ -13,6 +13,13 @@ Related docs:
 
 ## What a New Session Needs
 
+The first `/new` screen presents the two implemented setup paths as large cards
+with their required inputs. After a creator chooses one, the cards collapse to
+the compact Hosting selector in the wizard header so the profile can still be
+changed. The Fast & Cheap card summarizes its inputs as
+`Cloudflare login / AI API Key`. The decentralized card includes a compatible
+Session Worker alongside its AI, Arweave, RPC, and testnet-gas inputs.
+
 For the default `Fast & Cheap (Cloudflare)` preset, the user needs a Cloudflare
 account and one API key for the selected AI provider. The native deploy button
 runs in Cloudflare and does not ask for a Cloudflare API token, OAuth token,
@@ -33,7 +40,7 @@ Use this matrix when choosing a non-default profile:
 | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------- |
 | Passkey account                                            | Supplies the admin identity and signs worker or on-chain actions                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Yes; the default path creates it in the app                                  | No                                                                    |
 | OP Sepolia ETH                                             | Pays registry/SBT transactions                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Decentralized or other on-chain profiles only                                | Partially                                                             |
-| Cloudflare Worker                                          | Hosts worker-canonical config, auth, AI, storage, fetch, and optional faucet routes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Yes for Cloudflare profiles                                                  | Yes, if the sponsor gives you a deploy-ready bundle                   |
+| Session Worker                                             | Hosts the web runtime. For Cloudflare profiles it also owns canonical config, auth, AI, storage, fetch, and optional faucet routes. For decentralized profiles it assists the web runtime while the EVM registry and Arweave remain canonical.                                                                                                                                                                                                                                                                                                                             | Yes for every reachable `/new` profile                                       | Yes, if the sponsor gives you a deploy-ready bundle                   |
 | Cloudflare API token                                       | Used only by the legacy deploy-helper fallback                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | No for the native default                                                    | Indirectly, through the separate legacy short-lived deploy-grant path |
 | AI provider key                                            | Powers AI generation, chat, and transcription routes for the selected provider                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Yes for the default preset                                                   | Yes                                                                   |
 | Arweave JWK                                                | Pays for Arweave metadata/payload uploads                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Decentralized or explicitly Arweave-backed profiles only                     | Yes                                                                   |
@@ -50,7 +57,7 @@ Important:
   testnet gas; it is not part of the default path.
 - Selecting Lit keeps the existing Lit credential and chain/RPC requirements.
   Selecting the decentralized preset keeps the existing Arweave, registry,
-  wallet-transaction, and gas requirements.
+  wallet-transaction, gas, and compatible Session Worker requirements.
 - Secrets live in the worker's secrets store or encrypted sponsored bundles,
   never in public Worker config or Arweave session metadata.
 
@@ -253,9 +260,11 @@ separate Continue action for a new selection:
   banner lists exactly the Cloudflare API token and one AI-provider key. It does
   not ask for Arweave, Lit, RPC, funding, faucet, or gas inputs.
 - `Trustless & Public (Decentralized)` compiles to the public Arweave +
-  EVM-registry session shape. Its requirements banner lists the Arweave
-  wallet/JWK, RPC URL/key, AI provider key, and optional Lit key needed when
-  encryption is enabled.
+  EVM-registry session shape. Its requirements banner lists a compatible
+  Session Worker for the web runtime, the Arweave wallet/JWK, RPC URL/key, AI
+  provider key, and optional Lit key needed when encryption is enabled. The
+  Worker assists the browser runtime; the EVM registry and Arweave remain the
+  canonical authority and metadata store.
 
 The validated version-1 profile, rather than legacy top-level fields, determines
 which capabilities are reachable:
@@ -267,7 +276,7 @@ which capabilities are reachable:
 | Custom Cloudflare, Worker envelope         | Session Worker + Cloudflare; `encryption: "worker_envelope"` | Passkey + **Native Worker Groups**                                                                 | None unless an explicit `sbt_onchain` condition is added                              |
 | Custom Cloudflare + explicit `sbt_onchain` | Session Worker + Cloudflare; Worker envelope                 | Passkey + **Native Worker Groups**; SBT conditions are separate **Advanced on-chain access gates** | Positive chain ID and RPC; wallet/gas only when `/new` must create an SBT             |
 | Custom Cloudflare + Lit                    | Session Worker + Cloudflare; `encryption: "lit"`             | Passkey + **Native Worker Groups**                                                                 | Positive chain ID, RPC, and Lit credential; this does not make the registry canonical |
-| Trustless or custom Arweave                | EVM registry + Arweave; `encryption: "none"` or `"lit"`      | Wallet with passkey support + on-chain SBT Groups                                                  | Chain/RPC, registry transactions, gas, and Arweave; Lit also needs its credential     |
+| Trustless or custom Arweave                | EVM registry + Arweave; Session Worker-assisted web runtime; `encryption: "none"` or `"lit"` | Wallet with passkey support + on-chain SBT Groups                                 | Compatible Session Worker, chain/RPC, registry transactions, gas, and Arweave; Lit also needs its credential |
 
 Telegram, Mini App, Agent Session Wrapped, result-visibility, and export choices
 do not change that ownership split. Mini App requires Telegram. Profiles marked
@@ -497,8 +506,9 @@ Common combinations:
 - Worker/Lit hybrid:
   - Cloudflare account, AI provider key, RPC, and Lit credential
 - Decentralized session:
-  - Arweave JWK, RPC, wallet/registry transaction funding, AI provider key, and
-    Lit credential only when Lit encryption is selected
+  - compatible Session Worker, Arweave JWK, RPC, wallet/registry transaction
+    funding, AI provider key, and Lit credential only when Lit encryption is
+    selected
 - Session created from a sponsored bundle:
   - the profile's signing identity: passkey for a pure Worker session, or wallet
     plus passkey support for a registry session

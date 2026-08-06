@@ -23,7 +23,12 @@ describe('SessionModeProfileField', () => {
     expect(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByText('Cloudflare login / AI API Key')).toBeInTheDocument();
-    expect(screen.getByText('AI API Key / Arweave wallet / RPC URL / EVM testnet gas')).toBeInTheDocument();
+    expect(
+      screen.getByText('Compatible Session Worker / AI API Key / Arweave wallet / RPC URL / EVM testnet gas'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Use a Session Worker for the web runtime while the EVM registry and Arweave stay canonical.'),
+    ).toBeInTheDocument();
     expect(screen.queryByText('Recommended')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /advanced options/i })).not.toBeInTheDocument();
     const selector = screen.getByRole('radiogroup', { name: 'Session hosting profile' });

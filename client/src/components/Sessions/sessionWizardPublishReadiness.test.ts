@@ -145,6 +145,40 @@ describe('resolveSessionWizardPublishReadiness', () => {
     );
   });
 
+  it('requires a compatible Session Worker for decentralized publication', () => {
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+
+    expect(
+      resolveSessionWizardPublishReadiness({
+        ...baseInput,
+        resolvedWorkerBaseUrl: '',
+        usesDefaultWorkerUrl: false,
+        manualMetadataUrl: `ar://${txId}`,
+        sessionModeProfile,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        canUploadMetadataNow: false,
+        hasManualMetadata: true,
+        canPublishNow: false,
+        readinessKind: 'blocked',
+      }),
+    );
+
+    expect(
+      resolveSessionWizardPublishReadiness({
+        ...baseInput,
+        sessionModeProfile,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        canUploadMetadataNow: true,
+        canPublishNow: true,
+        readinessKind: 'worker-upload',
+      }),
+    );
+  });
+
   it('keeps custom-worker metadata upload blocked while metadata fallbacks allow publish readiness', () => {
     expect(
       resolveSessionWizardPublishReadiness({

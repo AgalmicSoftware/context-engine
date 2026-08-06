@@ -68,10 +68,10 @@ describe('SessionWizard new-session requirements banner', () => {
       'https://platform.openai.com/api-keys',
     );
     expect(screen.getByText(/for text and transcription/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Lit API key' })).toHaveAttribute(
-      'href',
-      'https://developer.litprotocol.com/management/api_keys',
+    expect(screen.getByText(/compatible Session Worker provides the web runtime/i)).toHaveTextContent(
+      'the EVM registry and Arweave remain canonical',
     );
+    expect(screen.queryByRole('link', { name: 'Lit API key' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Arweave wallet (JWK)' })).toHaveAttribute(
       'href',
       'https://docs.arweave.org/developers/wallets/arweave-wallet',

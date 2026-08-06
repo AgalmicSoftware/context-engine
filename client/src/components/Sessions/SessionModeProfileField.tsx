@@ -42,8 +42,8 @@ const HOSTING_PRESETS = [
     ariaLabel: 'Decentralized',
     entryLabel: 'Trustless & Public',
     entryProvider: 'Decentralized',
-    entryDescription: 'Publish session authority on-chain and store public data with Arweave.',
-    entryRequirements: 'AI API Key / Arweave wallet / RPC URL / EVM testnet gas',
+    entryDescription: 'Use a Session Worker for the web runtime while the EVM registry and Arweave stay canonical.',
+    entryRequirements: 'Compatible Session Worker / AI API Key / Arweave wallet / RPC URL / EVM testnet gas',
   },
 ] as const;
 
