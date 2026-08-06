@@ -1,6 +1,6 @@
 # Plan: Convert `/contracts` → `/docs` (user-facing docs page)
 
-Status: **planned 2026-07-21 — not yet implemented.** Plan authored against `dev` (verify current tip before starting; the ContractPage module differs ~500 lines from `main`).
+Status: **implemented 2026-08-06.** Originally planned against `dev`; retained as the implementation record for the `/contracts` compatibility migration.
 
 ## Context
 

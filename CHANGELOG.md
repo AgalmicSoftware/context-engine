@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Replaced the `/contracts` utility reference with a user-facing `/docs` page
+  containing a quickstart, session-options guide, and FAQ. The page retains
+  session-aware smart-contract source and AI prompt references, shows the
+  resolved session and chain, and removes the JSON bundle and byte-conversion
+  UI. Existing `/contracts` paths permanently rewrite to `/docs` while
+  preserving deep-link paths, queries, hashes, and deployment base paths.
 - Made address comparison session-aware across legacy registry, pure
   Cloudflare, and hybrid session profiles. Compare routes now preserve the
   active session, wait for its canonical caches, isolate cache and prompt

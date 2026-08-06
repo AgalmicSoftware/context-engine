@@ -186,11 +186,12 @@ roll back workers, contracts, or externally stored session data.
 
 When hosting the app under a subpath, set `PUBLIC_URL` to that mount path before
 building, for example `PUBLIC_URL=/ce npm run build`. Internal session,
-question/results, contract, and group routes strip that configured base before
+question/results, docs, and group routes strip that configured base before
 matching app routes and reapply it when generating links, so deep links such as
-`/ce/session/demo/questions`, `/ce/contracts`, and `/ce/groups` stay inside the
-mounted app. The SPA fallback must also be scoped to the same deployed base path
-by the hosting platform.
+`/ce/session/demo/questions`, `/ce/docs`, and `/ce/groups` stay inside the
+mounted app. Legacy `/ce/contracts` deep links are rewritten to `/ce/docs`
+without dropping their path suffix, query, or hash. The SPA fallback must also
+be scoped to the same deployed base path by the hosting platform.
 
 Set browser cache headers so search-result clicks and fresh navigations
 revalidate the deployed files after each deploy. For manual drag-and-drop

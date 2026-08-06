@@ -92,7 +92,9 @@ Core routes:
 - `/atlas` and `/tag/...`: Debate map / AI Policy Atlas demo surface.
 - `/matrix`: Risk matrix demo view.
 - `/demos`: Demo sessions launcher (`/agent` also exists as a dev-only route).
-- `/contracts`: Contract source viewer page.
+- `/docs`: User-facing quickstart, session-options guide, FAQ, and session-aware
+  smart-contract and AI-prompt reference. Legacy `/contracts` links redirect
+  here without dropping their path suffix, query, or hash.
 - `/:0x...`: Address-based user profile page (activity, responses, comparisons).
 - `/u/:address`: Alias for the address-based user profile page.
 - `/su/:username`: Simulated historical-user profile view used by demo/atlas surfaces.

@@ -71,13 +71,13 @@ emitted asset.
 Command:
 
 ```bash
-SMOKE_ROUTES=/session/pe4,/about,/contracts npm run -s test:e2e:smoke
+SMOKE_ROUTES=/session/pe4,/about,/docs,/contracts npm run -s test:e2e:smoke
 ```
 
-Result: passed with no page errors, unexpected failed requests, unexpected
-console issues, missing text, or layout issues. The broader default smoke still
-reports pre-existing probe/environment failures for `/session/demo` text and
-external Base RPC CORS on `/admin`.
+The route set checks both the canonical Docs page and the legacy `/contracts`
+redirect. A passing run has no page errors, unexpected failed requests,
+unexpected console issues, missing text, or layout issues. The broader default
+smoke can still expose environment-sensitive session or admin dependencies.
 
 ## Temporary AppShell Exception
 

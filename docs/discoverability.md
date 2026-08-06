@@ -50,8 +50,9 @@ If the default public branch changes, update:
    - `curl -s https://contextengine.sh/ | rg "AgalmicSoftware/context-engine|discoverability.html|llms.txt"`
 6. Confirm the sitemap is live:
    - `curl -s https://contextengine.sh/sitemap.xml`
-7. Keep SPA-only routes such as `/about` and `/contracts` out of the static
-   sitemap until they have distinct raw-HTML or prerendered metadata.
+7. Keep SPA-only routes such as `/about` and `/docs` out of the static sitemap
+   until they have distinct raw-HTML or prerendered metadata. The legacy
+   `/contracts` alias redirects to `/docs` and is not a separate crawl target.
 
 ## Anthropic / AI Tool Note
 
