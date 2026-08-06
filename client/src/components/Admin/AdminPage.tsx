@@ -128,45 +128,18 @@ import {
   resolveAutoFeatureBySessionSlug,
   shouldShowInlineResourceSummary,
 } from './adminPageMetadataDraftHelpers';
+import {
+  asAdminSessionConfig,
+  type AdminDecryptedFieldMap,
+  type AdminMetadataBlockLimitsDraft,
+  type AdminOpenSecretCards,
+  type AdminPageProps,
+  type AdminSecretKeySet,
+  type AdminSecrets,
+  type AdminSessionConfigLike,
+} from './adminPageRuntimeTypes';
 
 const log = createLogger('general');
-
-type AdminSecrets = Record<string, string>;
-type AdminSecretKeySet = Set<string>;
-type AdminOpenSecretCards = Record<string, boolean>;
-type AdminDecryptedFieldEntry = {
-  value?: unknown;
-  status?: string;
-  encryptedAvailable?: boolean;
-  envelope?: unknown;
-  [key: string]: unknown;
-};
-type AdminDecryptedFieldMap = Record<string, AdminDecryptedFieldEntry>;
-type AdminMetadataBlockLimitsDraft = {
-  start: string;
-  end: string;
-};
-type AdminSessionConfigLike = {
-  sessionName?: unknown;
-  sessionId?: unknown;
-  networkChainId?: unknown;
-  __registry?: Record<string, unknown>;
-  [key: string]: unknown;
-};
-type AdminPageProps = {
-  account?: string;
-  provider?: string;
-  network?: {
-    id?: unknown;
-    chainId?: unknown;
-  } | null;
-  toggleLoginModal?: (payload?: unknown) => unknown;
-  loginComplete?: boolean;
-  ensureLightSbtUniverse?: () => unknown;
-  initialSessionId?: unknown;
-  initialRegistryChainId?: unknown;
-  initialSessionConfig?: unknown;
-};
 
 export const __adminPageTestUtils = {
   applyAdminMetadataDraft,
@@ -178,10 +151,7 @@ export const __adminPageTestUtils = {
   getSessionReadRpcConfig,
 };
 
-const asAdminSessionConfig = (value: unknown): AdminSessionConfigLike =>
-  value && typeof value === 'object' && !Array.isArray(value) ? (value as AdminSessionConfigLike) : {};
-
-const AdminPage = ({
+const AdminPageRuntime = ({
   account,
   provider,
   network,
@@ -602,7 +572,7 @@ const AdminPage = ({
     return match ? asAdminSessionConfig(match[1]) : null;
   }, [availableSessions, selectedSlug]);
   const adminCapabilityRoute = useMemo(() => resolveAdminCapabilityRoute(selectedConfig), [selectedConfig]);
-  const { sessionCapabilities, selectedWorkerSessionId } = adminCapabilityRoute;
+  const { sessionCapabilities, selectedWorkerSessionId, signedWorkerSessionId } = adminCapabilityRoute;
   const effectiveWorkerCorsState = useMemo(() => {
     if (!selectedConfig) return { origins: [], reported: false };
     const cachedWorkerConfig: any =
@@ -1109,7 +1079,8 @@ const AdminPage = ({
       return adminWorkerPorts.adminAuth.buildSignedAdminActionAuth({
         action,
         slug,
-        sessionId: selectedWorkerSessionId || undefined,
+        sessionId: signedWorkerSessionId || undefined,
+        sessionAuthorityMode: sessionCapabilities.authorityMode || undefined,
         body,
         workerUrl: baseUrl,
         context: {
@@ -1126,7 +1097,8 @@ const AdminPage = ({
       selectedConfig,
       selectedConfigWorkerUrl,
       selectedSlug,
-      selectedWorkerSessionId,
+      sessionCapabilities.authorityMode,
+      signedWorkerSessionId,
       toggleLoginModal,
       workerUrl,
     ],

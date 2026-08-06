@@ -45,6 +45,7 @@ type SessionWizardShellRenderInfoTooltip = (options: {
 
 export type SessionWizardShellProps = {
   account: WizardModalsProps['account'];
+  allowNativeWorkerVerification: WorkerPanelProps['allowNativeWorkerVerification'];
   activeCreateSbtTargetGate: EncryptionPanelBoundaryProps['activeCreateSbtTargetGate'];
   activeCreateSbtTargetGateId: EncryptionPanelBoundaryProps['activeCreateSbtTargetGateId'];
   activeNormalModeIndex: IntroStatusRailProps['activeNormalModeIndex'];
@@ -71,6 +72,7 @@ export type SessionWizardShellProps = {
   deployForm: WorkerPanelProps['deployForm'];
   deployHelperUrl: WorkerPanelProps['deployHelperUrl'];
   deployStatusDisplayState: WorkerPanelProps['deployStatusDisplayState'];
+  deployVerifiedInUi?: WorkerPanelProps['deployVerifiedInUi'];
   deployWorkerUrl: WorkerPanelProps['deployWorkerUrl'];
   displayedWorkerUrl: WorkerPanelProps['displayedWorkerUrl'];
   draft: SessionWizardShellDraft;
@@ -216,6 +218,7 @@ export type SessionWizardShellProps = {
 
 const SessionWizardShell = ({
   account,
+  allowNativeWorkerVerification,
   activeCreateSbtTargetGate,
   activeCreateSbtTargetGateId,
   activeNormalModeIndex,
@@ -242,6 +245,7 @@ const SessionWizardShell = ({
   deployForm,
   deployHelperUrl,
   deployStatusDisplayState,
+  deployVerifiedInUi,
   deployWorkerUrl,
   displayedWorkerUrl,
   draft,
@@ -508,6 +512,7 @@ const SessionWizardShell = ({
 
         {(!isNormalMode || (showNormalModeWorkerStep && !collapsedSections.worker)) && (
           <WorkerPanel
+            allowNativeWorkerVerification={allowNativeWorkerVerification}
             isNormalMode={isNormalMode}
             t={t}
             renderSessionWizardInfoTooltip={renderSessionWizardInfoTooltip}
@@ -522,6 +527,7 @@ const SessionWizardShell = ({
             draft={draft}
             deployWorkerUrl={deployWorkerUrl}
             deployComplete={deployComplete}
+            deployVerifiedInUi={deployVerifiedInUi}
             workerSecretsEnabled={workerSecretsEnabled}
             setWorkerSecretsEnabled={setWorkerSecretsEnabled}
             clearWorkerSecretFields={clearWorkerSecretFields}

@@ -828,6 +828,104 @@ describe('workerAuth bootstrap admin signing', () => {
     );
   });
 
+  it('does not require Worker-canonical nonce identity for a registry config write', async () => {
+    global.fetch = jest.fn(async () => jsonResp(200, { nonce: 'nonce-registry-1' }));
+
+    await expect(
+      buildSignedAdminActionAuth({
+        action: 'set-config',
+        slug: 'edge',
+        body: {
+          sessionSlug: 'edge',
+          sessionId: CANONICAL_SESSION_ID,
+          config: {
+            sessionId: CANONICAL_SESSION_ID,
+            sessionModeProfile: { authority: { mode: 'evm_registry_canonical' } },
+          },
+        },
+        workerUrl: 'https://worker.example',
+        context: {
+          account: TEST_ADDRESS,
+          providerLike: 'wagmi',
+          chainId: 84532,
+        },
+      }),
+    ).resolves.toEqual(expect.objectContaining({ nonce: 'nonce-registry-1', signature: '0xtyped-signed' }));
+
+    expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual({
+      address: TEST_ADDRESS,
+      sessionSlug: 'edge',
+      adminAction: true,
+    });
+  });
+
+  it('uses explicit registry authority for a group action with a top-level session ID', async () => {
+    global.fetch = jest.fn(async () => jsonResp(200, { nonce: 'nonce-registry-groups-1' }));
+
+    await expect(
+      buildSignedAdminActionAuth({
+        action: 'groups/list',
+        slug: 'edge',
+        sessionId: CANONICAL_SESSION_ID,
+        sessionAuthorityMode: 'evm_registry_canonical',
+        body: { sessionId: CANONICAL_SESSION_ID },
+        workerUrl: 'https://worker.example',
+        context: {
+          account: TEST_ADDRESS,
+          providerLike: 'wagmi',
+          chainId: 84532,
+        },
+      }),
+    ).resolves.toEqual(expect.objectContaining({ nonce: 'nonce-registry-groups-1', signature: '0xtyped-signed' }));
+
+    expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual({
+      address: TEST_ADDRESS,
+      sessionSlug: 'edge',
+      adminAction: true,
+    });
+  });
+
+  it('requests explicit identity bootstrap for the first Worker-canonical config write', async () => {
+    const sessionId = '0x12121212121212121212121212121212';
+    global.fetch = jest.fn(async () =>
+      jsonResp(200, {
+        nonce: 'nonce-worker-bootstrap-1',
+        sessionSlug: 'edge',
+        sessionId,
+        bootstrapWorkerCanonicalIdentity: true,
+      }),
+    );
+
+    await expect(
+      buildSignedAdminActionAuth({
+        action: 'set-config',
+        slug: 'edge',
+        body: {
+          sessionSlug: 'edge',
+          sessionId,
+          config: {
+            sessionId,
+            sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+          },
+        },
+        workerUrl: 'https://worker.example',
+        context: {
+          account: TEST_ADDRESS,
+          providerLike: 'wagmi',
+          chainId: 84532,
+        },
+      }),
+    ).resolves.toEqual(expect.objectContaining({ nonce: 'nonce-worker-bootstrap-1', signature: '0xtyped-signed' }));
+
+    expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual({
+      address: TEST_ADDRESS,
+      sessionSlug: 'edge',
+      sessionId,
+      adminAction: true,
+      bootstrapWorkerCanonicalIdentity: true,
+    });
+  });
+
   it('binds Worker-canonical admin nonces to the exact session identity', async () => {
     const { ethers } = require('ethers');
     const { cryptoUtils } = require('../crypto/cryptography.js');
@@ -847,6 +945,7 @@ describe('workerAuth bootstrap admin signing', () => {
         action: 'groups/list',
         slug: 'edge',
         sessionId,
+        sessionAuthorityMode: 'worker_canonical',
         nonce: 'slug-only-stale-nonce',
         body: { sessionId },
         workerUrl: 'https://worker.example',
@@ -885,8 +984,12 @@ describe('workerAuth bootstrap admin signing', () => {
       buildSignedAdminActionAuth({
         action: 'groups/list',
         slug: 'edge',
-        sessionId,
-        body: { sessionId },
+        body: {
+          config: {
+            sessionId,
+            sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+          },
+        },
         workerUrl: 'https://worker.example',
         context: {
           account: TEST_ADDRESS,

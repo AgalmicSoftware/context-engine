@@ -58977,6 +58977,24 @@ var resolveDeploymentAccountId = async ({
   }
   return lookup;
 };
+var validateDeployHelperPublicConfigInputs = (body = {}) => {
+  if (body?.deploymentKind === AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND) return "";
+  const allowOriginsInput = Array.isArray(body?.allowOrigins) ? body.allowOrigins : [];
+  if (allowOriginsInput.some((origin) => toStr13(origin).includes("*"))) {
+    return "Worker CORS allowlists must contain exact origins.";
+  }
+  const customRpcUrl = toStr13(body?.secrets?.customRpcUrl).trim();
+  if (!customRpcUrl) return "";
+  const workerCanonicalRequest = toStr13(body?.sessionModeProfile?.authority?.mode).trim().toLowerCase() === "worker_canonical";
+  if (workerCanonicalRequest) return "";
+  const rpcUrlsByChainId = body?.rpcUrlsByChainId && typeof body.rpcUrlsByChainId === "object" ? body.rpcUrlsByChainId : {};
+  const publicRpcUrls = [
+    body?.rpcUrl,
+    ...Object.values(rpcUrlsByChainId).flatMap((value) => Array.isArray(value) ? value : [value]),
+    body?.faucet?.rpcUrl
+  ].map((value) => toStr13(value).trim()).filter(Boolean);
+  return publicRpcUrls.includes(customRpcUrl) ? "The custom RPC secret must not be duplicated into public config." : "";
+};
 var executeDeployHelperRequestCore = async ({
   body,
   env,
@@ -59045,6 +59063,10 @@ var executeDeployHelperRequestCore = async ({
       error: "Missing bundleText or bundleUrl (set WORKER_BUNDLE_URL or pass bundleUrl)."
     });
   }
+  const allowOriginsInput = Array.isArray(body?.allowOrigins) ? body.allowOrigins : [];
+  const rpcUrl = toStr13(body?.rpcUrl).trim();
+  const rpcUrlsByChainId = body?.rpcUrlsByChainId && typeof body.rpcUrlsByChainId === "object" ? body.rpcUrlsByChainId : {};
+  const faucetInput = body?.faucet && typeof body.faucet === "object" ? body.faucet : {};
   const rawStorageProfile = body?.storageProfile ?? body?.storageBackend ?? null;
   const modeValidation = validateDeploymentModeValues(body);
   if (!modeValidation.ok) {
@@ -59180,15 +59202,11 @@ var executeDeployHelperRequestCore = async ({
     });
   }
   const anticipatedWorkerUrl = `https://${workerName}.${accountSubdomain.subdomain}.workers.dev/`;
-  const rpcUrl = toStr13(body?.rpcUrl).trim();
-  const rpcUrlsByChainId = body?.rpcUrlsByChainId && typeof body.rpcUrlsByChainId === "object" ? body.rpcUrlsByChainId : {};
-  const allowOriginsInput = Array.isArray(body?.allowOrigins) ? body.allowOrigins : [];
   const allowOrigins = normalizeAllowList(
     allowOriginsInput.length ? allowOriginsInput : [requestOrigin]
   );
   const limits = sanitizeWorkerConfigOpenSubtree(body?.limits || {});
   const scopes = sanitizeWorkerConfigOpenSubtree(body?.scopes || {});
-  const faucetInput = body?.faucet && typeof body.faucet === "object" ? body.faucet : {};
   const faucet2 = {
     rpcUrl: toStr13(faucetInput.rpcUrl).trim() || DEFAULT_FAUCET_RPC_URL,
     amountEth: toStr13(faucetInput.amountEth).trim() || DEFAULT_FAUCET_AMOUNT_ETH,
@@ -60168,6 +60186,10 @@ var resolveDeploymentBundleProvenance = async ({ body = {}, env = {}, fetchImpl 
   return { ok: true, body: resolvedBody };
 };
 var executeDeployHelperRequest = async (options = {}) => {
+  const publicConfigValidationError = validateDeployHelperPublicConfigInputs(options?.body);
+  if (publicConfigValidationError) {
+    return buildFailure(400, { error: publicConfigValidationError });
+  }
   const provenance = await resolveDeploymentBundleProvenance({
     body: options?.body,
     env: options?.env,
@@ -60612,6 +60634,7 @@ var selectResourceGateKeysForScopes = (resourceKeys, requestedScopes) => {
 // workers/sessionCorsWorker/sessionConfigMutation.js
 var WORKER_CANONICAL_PUBLICATION_REVISION_KEY = "workerCanonicalPublicationRevision";
 var WORKER_GROUPS_BOOTSTRAP_KEY = "workerGroupsBootstrap";
+var REGISTRY_CANONICAL_AUTHORITY_MODES = /* @__PURE__ */ new Set(["evm_registry_canonical", "registry_canonical"]);
 var WORKER_CANONICAL_SET_CONFIG_KEYS = /* @__PURE__ */ new Set([
   "slug",
   "sessionId",
@@ -60653,6 +60676,7 @@ var WORKER_CANONICAL_SET_CONFIG_KEYS = /* @__PURE__ */ new Set([
 var toTrimmedString6 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
 var hasOwn3 = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
 var validGroupCreationPolicy = (config) => !hasOwn3(config, "groupCreationPolicy") || config?.groupCreationPolicy === "admin_only" || config?.groupCreationPolicy === "participants";
+var validAllowOrigins = (config) => !hasOwn3(config, "allowOrigins") || !Array.isArray(config?.allowOrigins) || config.allowOrigins.every((origin) => typeof origin !== "string" || !origin.includes("*"));
 var getWorkerAuthorityMode = (config) => toTrimmedString6(
   config?.sessionModeProfile?.authority?.mode
 ).toLowerCase();
@@ -60722,10 +60746,11 @@ var resolveCanonicalSessionIdentity = (config) => {
     value: uniqueValues.size === 1 ? [...uniqueValues][0] : ""
   };
 };
-var resolveCanonicalWorkerSessionIdHex = (config) => {
+var resolveSessionConfigSessionIdHex = (config) => {
   const identity = resolveCanonicalSessionIdentity(config);
   return !identity.invalid && identity.value ? `0x${identity.value}` : "";
 };
+var resolveCanonicalWorkerSessionIdHex = resolveSessionConfigSessionIdHex;
 var normalizeConfigRevision = (value) => {
   if (typeof value !== "string" || value !== value.trim()) return "";
   return /^[a-z0-9._:-]{1,128}$/i.test(value) ? value : "";
@@ -60741,6 +60766,13 @@ var changesInitializedWorkerCanonicalIdentity = ({ existingConfig, mergedConfig 
     const existingValue = toTrimmedString6(existingConfig?.[key]);
     return !!existingValue && toTrimmedString6(mergedConfig?.[key]) !== existingValue;
   });
+};
+var changesInitializedRegistryCanonicalIdentity = ({ existingConfig, mergedConfig } = {}) => {
+  if (!REGISTRY_CANONICAL_AUTHORITY_MODES.has(getWorkerAuthorityMode(existingConfig))) return false;
+  const existingSessionIdentity = resolveCanonicalSessionIdentity(existingConfig);
+  const mergedSessionIdentity = resolveCanonicalSessionIdentity(mergedConfig);
+  if (existingSessionIdentity.invalid || mergedSessionIdentity.invalid) return true;
+  return !!existingSessionIdentity.value && mergedSessionIdentity.value !== existingSessionIdentity.value;
 };
 var resolveWorkerCanonicalPublicationWrite = ({
   existingConfig,
@@ -60805,6 +60837,9 @@ var applySessionConfigMutation = ({ existingConfig, mutation, slug } = {}) => {
     if (findForbiddenWorkerConfigSecretPath(incomingConfig)) {
       return { ok: false, status: 400, error: "Secret-like values are not allowed in public session config fields." };
     }
+    if (!validAllowOrigins(incomingConfig)) {
+      return { ok: false, status: 400, error: "Worker CORS allowlists must contain exact origins." };
+    }
     if (!validGroupCreationPolicy(incomingConfig)) {
       return { ok: false, status: 400, error: "Invalid group creation policy." };
     }
@@ -60843,6 +60878,9 @@ var applySessionConfigMutation = ({ existingConfig, mutation, slug } = {}) => {
   if (findForbiddenWorkerConfigSecretPath(mergedConfig)) {
     return { ok: false, status: 400, error: "Secret-like values are not allowed in public session config fields." };
   }
+  if (!validAllowOrigins(mergedConfig)) {
+    return { ok: false, status: 400, error: "Worker CORS allowlists must contain exact origins." };
+  }
   if (!validGroupCreationPolicy(mergedConfig)) {
     return { ok: false, status: 400, error: "Invalid group creation policy." };
   }
@@ -60866,6 +60904,13 @@ var applySessionConfigMutation = ({ existingConfig, mutation, slug } = {}) => {
       ok: false,
       status: 409,
       error: "Worker-canonical session identity cannot be changed after initialization."
+    };
+  }
+  if (changesInitializedRegistryCanonicalIdentity({ existingConfig: authorityExisting, mergedConfig })) {
+    return {
+      ok: false,
+      status: 409,
+      error: "Registry-canonical session identity cannot be changed after initialization."
     };
   }
   const publicationWrite = resolveWorkerCanonicalPublicationWrite({
@@ -66762,9 +66807,18 @@ var validateBootstrapAdmin = async ({
     return false;
   }
   try {
+    const incomingConfig2 = body?.config && typeof body.config === "object" ? body.config : {};
+    const hasIncomingSessionId = ["sessionId", "sessionIdHex"].some(
+      (key) => Object.prototype.hasOwnProperty.call(incomingConfig2, key) && deps?.toStr?.(incomingConfig2[key]).trim()
+    );
+    if (hasIncomingSessionId) {
+      const requestedSessionId = resolveSessionConfigSessionIdHex(incomingConfig2);
+      const onChainSessionId = resolveSessionConfigSessionIdHex({ sessionId: tupleRead?.tuple?.[7] });
+      if (!requestedSessionId || requestedSessionId !== onChainSessionId) return false;
+    }
     const onChainAdmin = deps?.toStr?.(tupleRead?.tuple?.[4] || "").trim();
     if (!onChainAdmin || !deps?.isAddress?.(onChainAdmin)) return false;
-    return onChainAdmin.toLowerCase() === address.toLowerCase();
+    return requestedAdminMatches && onChainAdmin.toLowerCase() === address.toLowerCase();
   } catch {
     return false;
   }
@@ -74903,6 +74957,17 @@ var dispatchAuthNonceRequest = async ({
   ).trim().toLowerCase() === "worker_canonical";
   const sessionId = resolveCanonicalWorkerSessionIdHex(corsState.config);
   const requestedSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: body?.sessionId });
+  const bootstrapWorkerCanonicalIdentity = body?.bootstrapWorkerCanonicalIdentity === true;
+  const bootstrappingWorkerCanonicalIdentity = bootstrapWorkerCanonicalIdentity && !corsState.config;
+  if (bootstrapWorkerCanonicalIdentity && !allowTrustedAdminAuthOrigin) {
+    return deps?.json?.({ error: "Worker identity bootstrap requires an admin action." }, 400, headers);
+  }
+  if (bootstrapWorkerCanonicalIdentity && corsState.config && !workerCanonical) {
+    return deps?.json?.({ error: "Worker identity bootstrap is unavailable after initialization." }, 409, headers);
+  }
+  if (bootstrappingWorkerCanonicalIdentity && !requestedSessionId) {
+    return deps?.json?.({ error: "Worker bootstrap session identity is invalid." }, 400, headers);
+  }
   if (workerCanonical && !sessionId) {
     return deps?.json?.({ error: "Worker session identity is invalid." }, 500, headers);
   }
@@ -74944,9 +75009,11 @@ var dispatchAuthNonceRequest = async ({
       headers
     );
   }
+  const responseSessionId = workerCanonical ? sessionId : bootstrappingWorkerCanonicalIdentity ? requestedSessionId : "";
   return deps?.json?.({
     nonce,
-    ...workerCanonical ? { sessionSlug: targetSlug, sessionId } : {}
+    ...responseSessionId ? { sessionSlug: targetSlug, sessionId: responseSessionId } : {},
+    ...bootstrappingWorkerCanonicalIdentity ? { bootstrapWorkerCanonicalIdentity: true } : {}
   }, 200, headers);
 };
 
@@ -75796,6 +75863,10 @@ var dispatchSponsoredBootstrapRedeem = async ({
       deploymentRequestId,
       configRevision
     };
+    const publicConfigValidationError = validateDeployHelperPublicConfigInputs(effectiveDeployPayload);
+    if (publicConfigValidationError) {
+      return buildGrantErrorResponse(deps, headers, 400, publicConfigValidationError);
+    }
     const sensitiveValues = buildSponsoredSensitiveValues({
       body,
       grantRecord,

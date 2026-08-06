@@ -38,25 +38,49 @@ export const resolveWorkerAuthSessionId = (sessionConfig: unknown): string => {
 export const resolveAdminActionSessionId = ({
   body,
   providedSessionId,
+  sessionAuthorityMode,
 }: {
   body: UnknownRecord;
   providedSessionId?: unknown;
+  sessionAuthorityMode?: unknown;
 }): string => {
+  const explicitAuthorityMode = toStr(sessionAuthorityMode).trim().toLowerCase();
+  if (explicitAuthorityMode && explicitAuthorityMode !== 'worker_canonical') return '';
   const config = asRecord(body.config);
   const hasProvidedId =
     providedSessionId !== undefined && providedSessionId !== null && toStr(providedSessionId).trim() !== '';
+  const profile = asRecord(config.sessionModeProfile);
+  const authority = asRecord(profile.authority);
+  const configAuthorityMode = toStr(authority.mode).trim().toLowerCase();
+  const bodyIdentityEligible = !configAuthorityMode || configAuthorityMode === 'worker_canonical';
   const hasBodyId =
-    Object.prototype.hasOwnProperty.call(body, 'sessionId') ||
-    Object.prototype.hasOwnProperty.call(body, 'sessionIdHex');
+    bodyIdentityEligible &&
+    (Object.prototype.hasOwnProperty.call(body, 'sessionId') ||
+      Object.prototype.hasOwnProperty.call(body, 'sessionIdHex'));
   const hasConfigId =
-    Object.prototype.hasOwnProperty.call(config, 'sessionId') ||
-    Object.prototype.hasOwnProperty.call(config, 'sessionIdHex');
+    bodyIdentityEligible &&
+    (Object.prototype.hasOwnProperty.call(config, 'sessionId') ||
+      Object.prototype.hasOwnProperty.call(config, 'sessionIdHex'));
   const source = hasProvidedId ? { sessionId: providedSessionId } : hasBodyId ? body : hasConfigId ? config : {};
   const sessionId = resolveWorkerCanonicalSessionIdHex(source);
   if ((hasProvidedId || hasBodyId || hasConfigId) && !sessionId) {
     throw new Error('Worker session identity is invalid.');
   }
   return sessionId;
+};
+
+export const shouldBootstrapWorkerCanonicalIdentity = ({
+  action,
+  body,
+}: {
+  action: unknown;
+  body: UnknownRecord;
+}): boolean => {
+  if (toStr(action).trim().toLowerCase() !== 'set-config') return false;
+  const config = asRecord(body.config);
+  const profile = asRecord(config.sessionModeProfile);
+  const authority = asRecord(profile.authority);
+  return toStr(authority.mode).trim().toLowerCase() === 'worker_canonical';
 };
 
 export const assertWorkerAuthResponseIdentity = (

@@ -52,6 +52,7 @@ import {
   bindWorkerAuthRequestIdentity,
   resolveAdminActionSessionId,
   resolveWorkerAuthSessionId,
+  shouldBootstrapWorkerCanonicalIdentity,
   type WorkerLoginResponse,
 } from './workerAuthSessionIdentity.js';
 import {
@@ -120,6 +121,7 @@ type AdminActionAuthOptions = {
   context?: unknown;
   nonce?: unknown;
   sessionId?: unknown;
+  sessionAuthorityMode?: unknown;
   slug?: unknown;
   workerUrl?: unknown;
 };
@@ -643,6 +645,7 @@ export const buildSignedAdminActionAuth = async ({
   context,
   nonce: providedNonce,
   sessionId: providedSessionId,
+  sessionAuthorityMode,
 }: AdminActionAuthOptions = {}) => {
   const actionName = toStr(action).trim().toLowerCase();
   if (!actionName) throw new Error('Admin action is required.');
@@ -659,7 +662,13 @@ export const buildSignedAdminActionAuth = async ({
 
   const targetSlug = normalizeSessionSlug(slug);
   const actionBody = body && typeof body === 'object' ? (body as UnknownRecord) : {};
-  const exactSessionId = resolveAdminActionSessionId({ body: actionBody, providedSessionId });
+  const exactSessionId = resolveAdminActionSessionId({
+    body: actionBody,
+    providedSessionId,
+    sessionAuthorityMode,
+  });
+  const bootstrapWorkerCanonicalIdentity =
+    !!exactSessionId && shouldBootstrapWorkerCanonicalIdentity({ action: actionName, body: actionBody });
   const audience = resolveAdminActionAudience(resolvedWorkerUrl);
   if (!audience) {
     throw new Error('Unable to resolve admin audience.');
@@ -679,6 +688,7 @@ export const buildSignedAdminActionAuth = async ({
         sessionSlug: targetSlug,
         ...(exactSessionId ? { sessionId: exactSessionId } : {}),
         adminAction: true,
+        ...(bootstrapWorkerCanonicalIdentity ? { bootstrapWorkerCanonicalIdentity: true } : {}),
       }),
     });
     const nonceData = await nonceResp.json().catch(() => ({}));

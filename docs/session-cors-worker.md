@@ -107,6 +107,41 @@ For the default `Fast & Cheap (Cloudflare)` preset:
    signed initial session configuration write. No Cloudflare credential
    crosses a Context Engine-operated origin.
 
+An eligible decentralized preset can instead paste and attach an existing
+compatible Session Worker without generating replacement setup values. The
+wizard validates the exact slug, 16-byte session ID, admin, Worker origin,
+selected runtime profile, RPC URL/map, and a non-empty browser allowlist that
+contains the current UI origin before signing. Origins must be exact; `*` and
+wildcard hosts are rejected because runtime CORS matching is exact. The wizard
+then signs `POST /admin/set-config` and requires the coordinator-backed write to return
+`{ "ok": true }` before delivering required secrets or recording readiness.
+If KV has not exposed the accepted config yet, signed secret delivery retries
+on the same bounded visibility horizon as canonical config readback. Changing
+the connected admin or any public Worker config input—including the profile,
+group-creation policy, limits, registry/chain values, AI assignments, required
+secrets, session identity, or normalized browser allowlist—invalidates
+readiness and requires another verification. A Custom RPC URL stored as a
+Worker secret remains only in the encrypted secret write; public config keeps
+the distinct browser-visible RPC fallback.
+It does not call public `/session-config` for this path: that discovery route
+remains Worker-canonical-only, while the EVM registry and Arweave remain
+authoritative for the decentralized session. Browser CORS acceptance proves
+reachability, not Worker-canonical discovery authority. Lit and Agent Session
+Wrapped profiles retain the manual deploy-helper/bootstrap path.
+
+The signed registry config keeps its session ID immutable once initialized.
+When an unbound Worker authorizes first configuration from the registry, a
+supplied ID must also match the registry tuple, and the requested config admin,
+signer, and on-chain admin must be the same address; legacy config without an ID
+may still initialize it once. A newly deployed Worker can instead bootstrap
+before registration through its deployment-bound `BOOTSTRAP_ADMIN_ADDRESS`, so
+the binding and exact signed config protect that pre-registration handoff.
+Fresh Worker-canonical setup requests an explicit identity-bootstrap nonce. A
+Worker may echo that requested nonzero 16-byte ID only while no session config
+exists; after initialization, nonce identity is derived exclusively from the
+persisted Worker-canonical config, and non-canonical configs reject bootstrap
+identity nominations.
+
 The initial and signed follow-up config writes use the selected capability
 profile as an allowlist. Pure Worker-canonical sessions keep generic session
 defaults (`defaultTags`, `defaultGroupTags`, `questionsGenPrompt`, and
@@ -344,7 +379,9 @@ Worker-canonical discovery:
 - A fresh browser requests `GET <worker-origin>/session-config` with the
   matching `X-Session-Slug`. The route exists only for persisted `worker_canonical`
   profiles, applies the session CORS allowlist, and returns `Cache-Control:
-  no-store` plus `Vary: Origin, X-Session-Slug` on success and failures.
+no-store` plus `Vary: Origin, X-Session-Slug` on success and failures.
+- A decentralized setup may use the same Worker runtime after a signed admin
+  config write, but it never uses this route for discovery or verification.
 - The public response contains the canonical identity/content, authority,
   storage, model, CORS, and limits fields needed to hydrate the app. Recursive
   redaction removes provider keys/credentials, authorization headers, RPC and
@@ -1037,8 +1074,8 @@ Runtime:
     - `authzEpoch` is server-managed. New deployments start at `1`; effective
       signed `set-config` writes increment it, while rejected and idempotent
       writes do not. Callers cannot set it directly.
-    - `allowOrigins` accepts legacy comma/newline-delimited strings but is stored/read as a trimmed array.
-    - saving an empty `allowOrigins` list is intentional and means "open CORS" for that session (no allowlist).
+    - `allowOrigins` accepts legacy comma/newline-delimited strings but is stored/read as a trimmed array. New config mutations reject `*` and wildcard hosts because runtime CORS matching requires exact origins.
+    - saving an empty `allowOrigins` list is intentional and means "open CORS" for that session (no allowlist). The `/new` native verification path refuses an empty list for new or attached Workers so clearing the field cannot accidentally publish an unrestricted CORS policy.
     - if a `slug` field is present in the config payload, the authenticated request slug / KV key remains authoritative and overwrites mismatched values.
     - `/admin/set-config` preserves existing `limits` / `scopes` object branches when malformed non-object patches are sent, instead of letting those branches degrade into corrupted shapes.
     - writes fail closed when open config subtrees contain secret-like keys,
@@ -1476,10 +1513,10 @@ modules under `workers/sessionCorsWorker/`. Key boundary files:
 
 Bootstrap configuration fails closed unless deployment has bound
 `BOOTSTRAP_ADMIN_ADDRESS` to the signer or an existing registry session proves
-the signer is its on-chain admin. An unconfigured worker and an unregistered
-registry slug have no first-signer claim path. Worker-canonical deployment
-therefore stages the admin binding and canonical config before making the
-Worker reachable.
+the signer is its on-chain admin and the signed config requests that same admin.
+An unconfigured worker and an unregistered registry slug have no first-signer
+claim path. Worker-canonical deployment therefore stages the admin binding and
+canonical config before making the Worker reachable.
 
 1. `POST /auth/nonce` body:
    `{ address, sessionSlug, sessionId }` for `worker_canonical`; registry
@@ -2020,6 +2057,12 @@ Scripts: Edit` and `Workers KV Storage: Edit`; the Durable Object module
   recovered before either runtime binding exists, retry replaces only the
   unreachable ciphertext with encrypted empty state, installs a new KEK, and
   requires signed post-deploy secret sync. Existing KEK bindings are preserved.
+- Fresh deploys reject wildcard CORS entries before contacting Cloudflare. A
+  sponsored redemption applies the same validation before reserving its one-shot
+  grant, so corrected input can still use the grant. For registry-backed
+  profiles, deploys also reject any exact Custom RPC secret value duplicated
+  into the public RPC URL, RPC map, or faucet config; the secret must remain in
+  the encrypted session-secret record.
 - Every fresh deploy treats the requested worker name as a readable prefix. An
   idempotent request derives a stable physical suffix and KV title marker from
   `deploymentRequestId`; a legacy request without that ID receives a random

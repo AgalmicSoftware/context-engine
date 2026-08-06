@@ -24,6 +24,7 @@ const createBody = (overrides = {}) => ({
   config: {
     adminAddress: '0xabc123',
     registryChainId: 84532,
+    sessionId: '0x11111111111111111111111111111111',
     ...(overrides.config || {}),
   },
 });
@@ -130,7 +131,7 @@ test('validateBootstrapAdmin fails closed when the on-chain session existence ch
   assert.equal(result, false);
 });
 
-test('validateBootstrapAdmin requires the on-chain admin once the session exists', async () => {
+test('validateBootstrapAdmin requires the requested admin and signer to match the on-chain admin', async () => {
   const calls = [];
   let sessionChainAttestationCache;
 
@@ -156,7 +157,10 @@ test('validateBootstrapAdmin requires the on-chain admin once the session exists
       },
       readSessionBySlugOnChain: async (value) => {
         calls.push(value);
-        return { ok: true, tuple: ['', 0, '', '', '0xabc123'] };
+        return {
+          ok: true,
+          tuple: ['', 0, '', '', '0xabc123', 0, 0, '0x11111111111111111111111111111111'],
+        };
       },
     }),
   });
@@ -168,6 +172,48 @@ test('validateBootstrapAdmin requires the on-chain admin once the session exists
     expectedChainId: 84532,
     chainAttestationCache: sessionChainAttestationCache,
   }]);
+  assert.equal(result, false);
+});
+
+test('validateBootstrapAdmin rejects a registry tuple for another session identity', async () => {
+  const result = await validateBootstrapAdmin({
+    env: {
+      REGISTRY_ADDRESS: '0x999999',
+      RPC_URL: 'https://rpc.example',
+    },
+    slug: 'session-a',
+    address: '0xabc123',
+    body: createBody(),
+    deps: createDeps({
+      readSessionExistsOnChain: async () => ({ exists: true, rpcUrl: 'https://rpc.example' }),
+      readSessionBySlugOnChain: async () => ({
+        ok: true,
+        tuple: ['', 0, '', '', '0xabc123', 0, 0, '0x22222222222222222222222222222222'],
+      }),
+    }),
+  });
+
+  assert.equal(result, false);
+});
+
+test('validateBootstrapAdmin preserves legacy registry bootstrap without a supplied session identity', async () => {
+  const result = await validateBootstrapAdmin({
+    env: {
+      REGISTRY_ADDRESS: '0x999999',
+      RPC_URL: 'https://rpc.example',
+    },
+    slug: 'session-a',
+    address: '0xabc123',
+    body: createBody({ config: { sessionId: undefined } }),
+    deps: createDeps({
+      readSessionExistsOnChain: async () => ({ exists: true, rpcUrl: 'https://rpc.example' }),
+      readSessionBySlugOnChain: async () => ({
+        ok: true,
+        tuple: ['', 0, '', '', '0xabc123', 0, 0, '0x22222222222222222222222222222222'],
+      }),
+    }),
+  });
+
   assert.equal(result, true);
 });
 

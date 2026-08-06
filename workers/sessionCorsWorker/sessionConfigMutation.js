@@ -16,6 +16,7 @@ import {
 
 const WORKER_CANONICAL_PUBLICATION_REVISION_KEY = 'workerCanonicalPublicationRevision';
 const WORKER_GROUPS_BOOTSTRAP_KEY = 'workerGroupsBootstrap';
+const REGISTRY_CANONICAL_AUTHORITY_MODES = new Set(['evm_registry_canonical', 'registry_canonical']);
 const WORKER_CANONICAL_SET_CONFIG_KEYS = new Set([
   'slug',
   'sessionId',
@@ -68,6 +69,10 @@ const validGroupCreationPolicy = (config) =>
   !hasOwn(config, 'groupCreationPolicy') ||
   config?.groupCreationPolicy === 'admin_only' ||
   config?.groupCreationPolicy === 'participants';
+const validAllowOrigins = (config) =>
+  !hasOwn(config, 'allowOrigins') ||
+  !Array.isArray(config?.allowOrigins) ||
+  config.allowOrigins.every((origin) => typeof origin !== 'string' || !origin.includes('*'));
 
 const getWorkerAuthorityMode = (config) => toTrimmedString(
   config?.sessionModeProfile?.authority?.mode,
@@ -150,10 +155,12 @@ const resolveCanonicalSessionIdentity = (config) => {
   };
 };
 
-export const resolveCanonicalWorkerSessionIdHex = (config) => {
+export const resolveSessionConfigSessionIdHex = (config) => {
   const identity = resolveCanonicalSessionIdentity(config);
   return !identity.invalid && identity.value ? `0x${identity.value}` : '';
 };
+
+export const resolveCanonicalWorkerSessionIdHex = resolveSessionConfigSessionIdHex;
 
 const normalizeConfigRevision = (value) => {
   if (typeof value !== 'string' || value !== value.trim()) return '';
@@ -173,6 +180,14 @@ const changesInitializedWorkerCanonicalIdentity = ({ existingConfig, mergedConfi
     const existingValue = toTrimmedString(existingConfig?.[key]);
     return !!existingValue && toTrimmedString(mergedConfig?.[key]) !== existingValue;
   });
+};
+
+const changesInitializedRegistryCanonicalIdentity = ({ existingConfig, mergedConfig } = {}) => {
+  if (!REGISTRY_CANONICAL_AUTHORITY_MODES.has(getWorkerAuthorityMode(existingConfig))) return false;
+  const existingSessionIdentity = resolveCanonicalSessionIdentity(existingConfig);
+  const mergedSessionIdentity = resolveCanonicalSessionIdentity(mergedConfig);
+  if (existingSessionIdentity.invalid || mergedSessionIdentity.invalid) return true;
+  return !!existingSessionIdentity.value && mergedSessionIdentity.value !== existingSessionIdentity.value;
 };
 
 const resolveWorkerCanonicalPublicationWrite = ({
@@ -241,6 +256,9 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
     if (findForbiddenWorkerConfigSecretPath(incomingConfig)) {
       return { ok: false, status: 400, error: 'Secret-like values are not allowed in public session config fields.' };
     }
+    if (!validAllowOrigins(incomingConfig)) {
+      return { ok: false, status: 400, error: 'Worker CORS allowlists must contain exact origins.' };
+    }
     if (!validGroupCreationPolicy(incomingConfig)) {
       return { ok: false, status: 400, error: 'Invalid group creation policy.' };
     }
@@ -292,6 +310,9 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
   if (findForbiddenWorkerConfigSecretPath(mergedConfig)) {
     return { ok: false, status: 400, error: 'Secret-like values are not allowed in public session config fields.' };
   }
+  if (!validAllowOrigins(mergedConfig)) {
+    return { ok: false, status: 400, error: 'Worker CORS allowlists must contain exact origins.' };
+  }
   if (!validGroupCreationPolicy(mergedConfig)) {
     return { ok: false, status: 400, error: 'Invalid group creation policy.' };
   }
@@ -316,6 +337,13 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
       ok: false,
       status: 409,
       error: 'Worker-canonical session identity cannot be changed after initialization.',
+    };
+  }
+  if (changesInitializedRegistryCanonicalIdentity({ existingConfig: authorityExisting, mergedConfig })) {
+    return {
+      ok: false,
+      status: 409,
+      error: 'Registry-canonical session identity cannot be changed after initialization.',
     };
   }
   const publicationWrite = resolveWorkerCanonicalPublicationWrite({

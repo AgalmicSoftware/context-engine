@@ -85,6 +85,7 @@ export const syncWorkerSecretsAfterDeploy = async ({
   workerUrl = '',
   account = '',
   slug = '',
+  sessionId = '',
   deploySecrets = {},
   signAdminAction,
   postSecrets,
@@ -96,12 +97,13 @@ export const syncWorkerSecretsAfterDeploy = async ({
   workerUrl?: string;
   account?: string;
   slug?: string;
+  sessionId?: string;
   deploySecrets?: WorkerSecretsLike | null;
   signAdminAction?: AsyncShellCallback;
   postSecrets?: AsyncShellCallback;
   ensureSessionConfig?: AsyncShellCallback;
   helperWritesSecrets?: boolean;
-  retryDelaysMs?: number[];
+  retryDelaysMs?: readonly number[];
   wait?: (ms: number) => Promise<void>;
 } = {}): Promise<WorkerSecretSyncResult> => {
   const secrets = deploySecrets && typeof deploySecrets === 'object' ? deploySecrets : {};
@@ -144,6 +146,7 @@ export const syncWorkerSecretsAfterDeploy = async ({
     try {
       const requestBody: AnyRecord = {
         sessionSlug: slug,
+        ...(toStr(sessionId).trim() ? { sessionId: toStr(sessionId).trim() } : {}),
         secrets,
       };
       const auth =
@@ -171,7 +174,7 @@ export const syncWorkerSecretsAfterDeploy = async ({
           lastErr = configErr;
         }
       }
-      if (attempt < delays.length && isTransientSecretsSyncError(err)) {
+      if (attempt < delays.length && (isTransientSecretsSyncError(err) || isSecretsSyncConfigBootstrapError(err))) {
         const delayMs = Number(delays[attempt] || 0);
         if (delayMs > 0) {
           await wait(delayMs);

@@ -22,6 +22,7 @@ export type DraftLike = AnyRecord & {
 
 export type SessionWizardWorkerDeployRuntime = {
   account?: string;
+  resolvedAdminAddress?: string;
   provider?: AnyRecord | null;
   network?: NetworkLike | null;
   loginComplete?: boolean;
@@ -36,6 +37,7 @@ export type SessionWizardWorkerDeployRuntime = {
   forceManualBundleFile?: boolean;
   normalModeBundleUrlOverride?: string;
   workerSecretsEnabled?: boolean;
+  workerAllowOrigins?: string;
   workerLimitPerWallet?: string | number;
   embeddedDeployHelperEnabled?: boolean;
   deployHelperUrl?: string;

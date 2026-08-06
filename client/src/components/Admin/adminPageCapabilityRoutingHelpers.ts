@@ -13,6 +13,7 @@ const asRecord = (value: unknown): Record<string, unknown> =>
 export type AdminCapabilityRoute = {
   sessionCapabilities: SessionCapabilityProjection;
   selectedWorkerSessionId: string;
+  signedWorkerSessionId: string;
   showAdminWorkerGroups: boolean;
   workerGroupsPanelTitle: string;
   workerGroupsPanelDescription: string;
@@ -20,6 +21,7 @@ export type AdminCapabilityRoute = {
 
 export const resolveAdminCapabilityRoute = (sessionConfig: SessionConfigLike): AdminCapabilityRoute => {
   const sessionCapabilities = resolveSessionCapabilityProjection(sessionConfig);
+  const selectedWorkerSessionId = resolveWorkerCanonicalSessionIdHex(sessionConfig);
   const profile = asRecord(asRecord(sessionConfig).sessionModeProfile);
   const profileSurfaces = asRecord(profile.surfaces);
   const agentSessionWrappedCapability = normalizeAgentSessionWrappedCapability(
@@ -32,7 +34,8 @@ export const resolveAdminCapabilityRoute = (sessionConfig: SessionConfigLike): A
 
   return {
     sessionCapabilities,
-    selectedWorkerSessionId: resolveWorkerCanonicalSessionIdHex(sessionConfig),
+    selectedWorkerSessionId,
+    signedWorkerSessionId: sessionCapabilities.isWorkerCanonical ? selectedWorkerSessionId : '',
     showAdminWorkerGroups,
     workerGroupsPanelTitle: sessionCapabilities.usesWorkerGroups
       ? 'Native Worker Groups'

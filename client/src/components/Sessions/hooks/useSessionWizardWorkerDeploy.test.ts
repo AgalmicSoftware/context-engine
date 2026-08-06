@@ -2,6 +2,12 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { cryptoUtils } from '../../../utilities/crypto/cryptography.js';
 import { INVALID_SESSION_SLUG_FORMAT_ERROR } from '../sessionWizardSlugValidation';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../../utilities/session/sessionModeProfile';
+import { readSessionWorkerConfigCache } from '../../../utilities/session/sessionWorkerConfigCache.js';
+import { buildSessionWizardPublishExecutionPlan } from '../sessionWizardPublishFlow';
+import { resolveSessionWizardPublishReadiness } from '../sessionWizardPublishReadiness';
+import { resolveSessionWizardWorkerRequirementReadiness } from '../sessionWizardWorkerRequirementProof';
+import { resolveSessionWizardWorkerPublishEvidence } from '../sessionWizardWorkerPublishEvidence';
+import { buildSessionWizardWorkerVerificationConfig } from '../sessionWizardWorkerVerificationConfig';
 import useSessionWizardWorkerDeploy, { type SessionWizardWorkerDeployRuntime } from './useSessionWizardWorkerDeploy';
 import type { WorkerSecretsLike } from '../../shellTypes';
 
@@ -165,7 +171,7 @@ describe('useSessionWizardWorkerDeploy', () => {
       },
     } as SessionWizardWorkerDeployRuntime;
     options.getCurrentWorkerSecrets.mockReturnValue({ openaiKey: 'native-ai-secret' });
-    (options.parseAllowOriginsInput as jest.Mock).mockReturnValue(['https://contextengine.sh']);
+    (options.parseAllowOriginsInput as jest.Mock).mockReturnValue([window.location.origin]);
     options.signTypedAdminAction.mockResolvedValue({
       address: '0x00000000000000000000000000000000000000aa',
       signature: '0xsigned',
@@ -223,9 +229,12 @@ describe('useSessionWizardWorkerDeploy', () => {
     expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/deploy'))).toBe(false);
     expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/session-config'))).toHaveLength(2);
     const secretsCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/admin/set-secrets'));
-    expect(JSON.parse(String(secretsCall?.[1]?.body || '{}')).secrets).toEqual({
-      openaiKey: 'native-ai-secret',
-    });
+    expect(JSON.parse(String(secretsCall?.[1]?.body || '{}'))).toEqual(
+      expect.objectContaining({
+        sessionId: '0x00000000000000000000000000000001',
+        secrets: { openaiKey: 'native-ai-secret' },
+      }),
+    );
     expect(options.updateDeploymentState).toHaveBeenCalledWith(
       expect.objectContaining({
         deployComplete: true,
@@ -381,7 +390,7 @@ describe('useSessionWizardWorkerDeploy', () => {
     expect(deployResult).toEqual(
       expect.objectContaining({
         ok: false,
-        error: expect.stringMatching(/public config readback.*browser-origin verification.*pending/i),
+        error: expect.stringMatching(/signed config acceptance.*browser-origin verification.*pending/i),
       }),
     );
     expect(options.updateDeploymentState).not.toHaveBeenCalledWith(
@@ -425,8 +434,17 @@ describe('useSessionWizardWorkerDeploy', () => {
     profile.surfaces.agentHttp = true;
     options.refs.runtimeRef.current.draft = {
       ...options.refs.runtimeRef.current.draft,
+      ai: {
+        models: {
+          fast: { provider: 'openai' },
+          thinking: { provider: 'openai' },
+          transcription: { provider: 'openai' },
+        },
+      },
       sessionModeProfile: profile,
     };
+    options.refs.runtimeRef.current.workerSecretsEnabled = true;
+    options.getCurrentWorkerSecrets.mockReturnValue({ openaiKey: 'sk-agent-runtime' });
     const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
 
     let deployResult: Record<string, unknown> = {};
@@ -444,6 +462,12 @@ describe('useSessionWizardWorkerDeploy', () => {
     );
     expect(options.updateDraftValue).toHaveBeenCalledWith(['agentSessionWrapped'], capability);
     expect(JSON.stringify(deployBodies[0])).not.toContain('TELEGRAM_');
+    expect(
+      resolveSessionWizardWorkerPublishEvidence({
+        runtime: options.refs.runtimeRef.current,
+        workerSecrets: options.getCurrentWorkerSecrets(),
+      }),
+    ).toEqual(expect.objectContaining({ verified: true }));
   });
 
   it('skips a concurrent worker deploy while the first deploy is still resolving', async () => {
@@ -844,6 +868,12 @@ describe('useSessionWizardWorkerDeploy', () => {
       ...options.refs.runtimeRef.current,
       draft: {
         slug: 'decentralized-secret-recovery',
+        networkChainId: 11155420,
+        rpc: {
+          providers: {
+            path: { rpcUrl: 'https://public-rpc.example.test' },
+          },
+        },
         sessionModeProfile,
         ai: {
           models: {
@@ -858,6 +888,7 @@ describe('useSessionWizardWorkerDeploy', () => {
     options.getCurrentWorkerSecrets.mockReturnValue({
       openaiKey: 'sk-decentralized-runtime',
       anthropicKey: 'must-not-send',
+      customRpcUrl: 'https://private-rpc.example.test',
       faucetPrivateKey: 'faucet-test-secret',
     });
     const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
@@ -876,7 +907,7 @@ describe('useSessionWizardWorkerDeploy', () => {
         ok: true,
         deployComplete: false,
         requiredWorkerSecretsReady: false,
-        requiredWorkerSecretFields: ['openaiKey', 'faucetPrivateKey'],
+        requiredWorkerSecretFields: ['openaiKey', 'customRpcUrl', 'faucetPrivateKey'],
         workerRequirementProof: null,
       }),
     );
@@ -885,7 +916,7 @@ describe('useSessionWizardWorkerDeploy', () => {
         ok: true,
         deployComplete: true,
         requiredWorkerSecretsReady: true,
-        requiredWorkerSecretFields: ['openaiKey', 'faucetPrivateKey'],
+        requiredWorkerSecretFields: ['openaiKey', 'customRpcUrl', 'faucetPrivateKey'],
         workerRequirementProof: expect.objectContaining({ version: 1 }),
       }),
     );
@@ -893,13 +924,38 @@ describe('useSessionWizardWorkerDeploy', () => {
     expect(deployBodies.map((body) => body.secrets)).toEqual([
       {
         openaiKey: 'sk-decentralized-runtime',
+        customRpcUrl: 'https://private-rpc.example.test',
         faucetPrivateKey: 'faucet-test-secret',
       },
       {
         openaiKey: 'sk-decentralized-runtime',
+        customRpcUrl: 'https://private-rpc.example.test',
         faucetPrivateKey: 'faucet-test-secret',
       },
     ]);
+    deployBodies.forEach(({ secrets: _secrets, ...publicDeployBody }) => {
+      expect(JSON.stringify(publicDeployBody)).not.toContain('private-rpc.example.test');
+      expect(publicDeployBody).toEqual(
+        expect.objectContaining({
+          rpcUrl: 'https://public-rpc.example.test',
+          rpcUrlsByChainId: expect.objectContaining({
+            '11155420': expect.arrayContaining(['https://public-rpc.example.test']),
+          }),
+          faucet: expect.objectContaining({ rpcUrl: 'https://public-rpc.example.test' }),
+        }),
+      );
+    });
+    const verifiedConfig = options.verifyPublicWorkerDeployment.mock.calls.at(-1)?.[0]?.config;
+    expect(JSON.stringify(verifiedConfig)).not.toContain('private-rpc.example.test');
+    expect(verifiedConfig).toEqual(
+      expect.objectContaining({
+        rpcUrl: 'https://public-rpc.example.test',
+        rpcUrlsByChainId: expect.objectContaining({
+          '11155420': expect.arrayContaining(['https://public-rpc.example.test']),
+        }),
+        faucet: expect.objectContaining({ rpcUrl: 'https://public-rpc.example.test' }),
+      }),
+    );
     expect(JSON.stringify(deployBodies)).not.toContain('must-not-send');
     expect(secretsSyncCalls).toBe(2);
     expect(
@@ -1219,6 +1275,10 @@ describe('useSessionWizardWorkerDeploy', () => {
       sessionAi: options.refs.runtimeRef.current.draft?.ai,
       workerSecrets: { openaiKey: 'sk-ai' },
       workerSecretsEnabled: true,
+      workerConfig: buildSessionWizardWorkerVerificationConfig({
+        runtime: options.refs.runtimeRef.current,
+        workerUrl: deployResult.workerUrl,
+      }),
     };
     expect(resolveSessionWizardWorkerRequirementReadiness(proofInput).verified).toBe(true);
     expect(

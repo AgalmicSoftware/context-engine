@@ -12,7 +12,7 @@ import { normalizeWorkerUrl as normalizeWorkerAuthUrl } from '../../utilities/wo
 import { toStr } from '../../utilities/shared/primitives.js';
 import { PUBLIC_GITHUB_BRANCH, PUBLIC_REPO_URL } from '../../variables/publicRepoMetadata.js';
 import type { SessionWizardDeployStatusDisplayState } from './sessionWizardDeployErrors';
-import type { WorkerCanonicalSessionBootstrap } from '../../utilities/session/sessionWorkerDiscovery';
+import type { SessionWizardVerifiedWorkerConnection } from './sessionWizardNativeWorkerVerification';
 import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
 import type { SessionWizardRenderField } from './sessionWizardFieldDescriptors';
 
@@ -34,6 +34,7 @@ type DeployForm = {
 };
 
 export type WorkerPanelProps = {
+  allowNativeWorkerVerification?: boolean;
   isNormalMode: boolean;
   t?: (key: string) => string;
   renderSessionWizardInfoTooltip?: (props: {
@@ -54,6 +55,7 @@ export type WorkerPanelProps = {
   draft?: DraftState;
   deployWorkerUrl?: string;
   deployComplete: boolean;
+  deployVerifiedInUi?: boolean;
   workerSecretsEnabled: boolean;
   setWorkerSecretsEnabled: (value: boolean) => void;
   clearWorkerSecretFields: () => void;
@@ -95,11 +97,12 @@ export type WorkerPanelProps = {
   renderField: SessionWizardRenderField;
   workerUrlAutoFilled: boolean;
   sessionModeProfileWorkerControl?: React.ReactNode;
-  onNativeWorkerVerified?: (bootstrap: WorkerCanonicalSessionBootstrap) => void;
+  onNativeWorkerVerified?: (bootstrap: SessionWizardVerifiedWorkerConnection) => void;
   verifyNativeWorker?: WorkerDeploySectionProps['verifyNativeWorker'];
 };
 
 const WorkerPanel = ({
+  allowNativeWorkerVerification = false,
   isNormalMode,
   t,
   renderSessionWizardInfoTooltip,
@@ -114,6 +117,7 @@ const WorkerPanel = ({
   draft = {},
   deployWorkerUrl,
   deployComplete,
+  deployVerifiedInUi,
   workerSecretsEnabled,
   setWorkerSecretsEnabled,
   clearWorkerSecretFields,
@@ -264,6 +268,7 @@ const WorkerPanel = ({
             defaultAllowedOrigins={defaultAllowedOrigins}
           />
           <WorkerDeploySection
+            allowNativeWorkerVerification={allowNativeWorkerVerification}
             isNormalMode={isNormalMode}
             renderInfoTooltip={renderInfoTooltip}
             workerMode={workerMode}
@@ -295,6 +300,7 @@ const WorkerPanel = ({
             setDeployForm={setDeployForm}
             handleDeployWorker={handleDeployWorker}
             deployStatusDisplayState={deployStatusDisplayState}
+            deployVerifiedInUi={deployVerifiedInUi}
             displayedWorkerUrl={displayedWorkerUrl}
             onNativeWorkerVerified={onNativeWorkerVerified}
             verifyNativeWorker={verifyNativeWorker}

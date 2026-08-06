@@ -485,8 +485,10 @@ When opened from a Worker-native session, they are labelled
 
 ### 3. Worker deploy and secrets
 
-The default wizard deploys a worker before publishing the canonical session
-config.
+Every reachable hosting profile uses a Session Worker for the web runtime. The
+default wizard guides the creator through deploying a new Worker or, for an
+eligible decentralized profile, attaching an existing compatible Worker before
+publication. Registry and Arweave remain canonical for decentralized sessions.
 
 In the default native handoff you provide:
 
@@ -526,8 +528,13 @@ What happens during deploy:
 - It fetches the account `workers.dev` subdomain and creates/changes it only when explicitly needed
 - It returns the final worker URL
 - The wizard auto-fills `corsWorkerUrl`
-- The wizard signs the canonical config with the passkey-derived EOA, persists
-  it, and verifies `/session-config` before it reports success.
+- The wizard signs the config with the selected profile's session admin account
+  or wallet and persists it.
+  Worker-canonical profiles must also verify public `/session-config` readback.
+  Decentralized profiles instead require the signed `/admin/set-config` write
+  to confirm acceptance; they do not turn the Worker into discovery authority.
+  An initialized registry-canonical Worker cannot be reassigned to another
+  session ID.
 - A custom Worker is publish-ready only while that verified deployment still
   matches the selected Worker identity, the complete canonical session-mode
   profile, each effective AI provider/model assignment, and every required
@@ -541,8 +548,9 @@ What happens during deploy:
   again. The shared default Worker and a deploy-ready sponsored flow keep their
   separate readiness paths.
 - Worker config persistence captures one immutable draft/identity/secrets
-  snapshot. After the signed write and `/session-config` readback, the wizard
-  compares the live publish inputs and rebuilt canonical config with that exact
+  snapshot. After the signed write and the profile-appropriate verification
+  (public canonical readback or decentralized signed-write acceptance), the
+  wizard compares the live publish inputs and rebuilt config with that exact
   snapshot, then repeats that comparison immediately before writing settlement
   markers or clearing the cache. Any edit made before settlement stops the flow
   and leaves the draft intact for an explicit retry; an unchanged publish settles
@@ -652,21 +660,37 @@ This is the default path exposed in `/new`.
 
 High-level flow:
 
-1. Click the onboarding banner's `Cloudflare API token` link. Cloudflare opens
-   the token form with the two required permissions prefilled. Restrict Account
-   Resources to the intended account, create the token, copy its generated
-   value, and paste it into the Worker step with one AI-provider key. Normal
-   mode automatically derives the worker name and uses the GitHub-hosted
-   `sessionCorsWorker.bundle.js` release asset.
-2. Click `Deploy worker`
-3. Wait for the helper to create an isolated physical worker, persist its
-   canonical config, and return the `workers.dev` URL
-4. If the helper cannot fetch the release asset, keep the default GitHub release URL and either paste a direct bundle URL override or run `nvm use 20 && npm run worker:bundle` and upload `dist/sessionCorsWorker.bundle.js`
-5. Publish only after the wizard verifies the public config readback
+1. Generate setup values for a new Worker, or paste an existing compatible
+   Worker URL when the selected decentralized profile is eligible for direct
+   attachment.
+2. Copy the session slug, public admin address, `TOKEN_HMAC_SECRET`, and
+   `CE_STORAGE_ENVELOPE_KEK` with the adjacent copy controls.
+3. Open the immutable Cloudflare deployment package, paste those values into
+   Cloudflare, and complete the dashboard deployment.
+4. Return to the still-open Context Engine tab and paste the resulting
+   `workers.dev` URL.
+5. Select `Verify Session Worker`. Context Engine checks Worker reachability,
+   a non-empty CORS allowlist containing the current browser origin, and the
+   exact session identity. CORS entries must be exact origins; wildcards are
+   rejected. Registry-backed attachment also writes the selected public RPC
+   URL/map and retries private secret delivery while the accepted config
+   becomes visible.
+   Worker-canonical profiles require public canonical-config readback;
+   decentralized profiles require signed config acceptance while their EVM
+   registry and Arweave records remain canonical. Registry attachment requires
+   the connected signer, requested Worker admin, and on-chain session admin to
+   match.
 
-The first-party wizard does not ask for an account ID. During deploy, the helper
-discovers exactly one visible Cloudflare account using the API token and stops on
-zero or multiple accounts.
+The runtime secrets remain in the current tab and Cloudflare's encrypted
+Worker-secret store. They are not placed in the deployment URL, logs, analytics
+payloads, or a Context Engine-controlled origin. There is no automatic callback
+from Cloudflare, so keep the wizard tab open and return to it manually.
+
+The native return step supports the default Worker-envelope mode, eligible
+decentralized attachment, and optional on-chain SBT checks. Advanced Lit and
+Agent Session Wrapped profiles use the labeled manual bootstrap fallback because
+their Lit action or dedicated Bridge provisioning is not part of the native
+return step.
 
 Reference: [session-cors-worker.md](session-cors-worker.md)
 
@@ -914,7 +938,7 @@ Why this matters:
 
 Check both CORS and SIWE assumptions:
 
-- `allowOrigins` in the worker config must include the exact browser origin you are using
+- `allowOrigins` must be non-empty and include the exact browser origin you are using; `*` and wildcard hosts are unsupported, while an empty list means open CORS at runtime and is rejected by native `/new` verification
 - the SIWE message domain must match the request URI host
 - the active passkey-derived EOA or connected wallet must match the configured
   session admin for signed admin actions

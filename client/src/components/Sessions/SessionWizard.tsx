@@ -4105,6 +4105,7 @@ const SessionWizard = ({
 
   workerDeployRuntimeRef.current = {
     account,
+    resolvedAdminAddress: toStr(resolvedWalletAccountRef.current || account).trim(),
     provider,
     network,
     loginComplete,
@@ -4119,6 +4120,7 @@ const SessionWizard = ({
     forceManualBundleFile,
     normalModeBundleUrlOverride,
     workerSecretsEnabled,
+    workerAllowOrigins,
     workerLimitPerWallet,
     embeddedDeployHelperEnabled,
     deployHelperUrl,
@@ -4320,7 +4322,13 @@ const SessionWizard = ({
     ? ''
     : toStr(draft.corsWorkerUrl).trim() || visibleConfiguredWorkerUrl;
   const showSharedWorkerChoice = !normalModeRequiresCustomWorker;
-  const showWorkerUrlField = customWorkerSelected && (deployVerifiedInUi || sessionModeRequirements.isWorkerCanonical);
+  const showWorkerUrlField =
+    customWorkerSelected && (deployVerifiedInUi || sessionModeRequirements.usesWorkerRuntime);
+  const allowNativeWorkerVerification =
+    sessionModeRequirements.selected &&
+    sessionModeRequirements.usesWorkerRuntime &&
+    !sessionModeRequirements.requiresLit &&
+    !sessionModeRequirements.usesAgentSessionWrapped;
   const { deployWorkerMatchesConfiguredUrl, usesDefaultWorkerUrl, workerUrlSource } =
     resolveSessionWizardWorkerUrlSourceState({
       defaultWorkerUrl,
@@ -4718,6 +4726,7 @@ const SessionWizard = ({
   return (
     <SessionWizardShell
       account={account}
+      allowNativeWorkerVerification={allowNativeWorkerVerification}
       activeCreateSbtTargetGate={activeCreateSbtTargetGate}
       activeCreateSbtTargetGateId={activeCreateSbtTargetGateId}
       activeNormalModeIndex={activeNormalModeIndex}
@@ -4744,6 +4753,7 @@ const SessionWizard = ({
       deployForm={deployForm}
       deployHelperUrl={deployHelperUrl}
       deployStatusDisplayState={deployStatusDisplayState}
+      deployVerifiedInUi={deployVerifiedInUi}
       deployWorkerUrl={deployWorkerUrl}
       displayedWorkerUrl={displayedWorkerUrl}
       draft={draft}

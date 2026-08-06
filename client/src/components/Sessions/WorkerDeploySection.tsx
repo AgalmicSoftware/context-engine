@@ -5,16 +5,10 @@ import styles from './SessionWizard.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { CLOUDFLARE_NATIVE_DEPLOY_URL } from '../../variables/publicDeploymentConfig.js';
 import { createCloudflareNativeSetupSecrets } from '../../utilities/worker/cloudflareNativeDeploy.js';
-import type {
-  fetchWorkerCanonicalSessionBootstrap,
-  WorkerCanonicalSessionBootstrap,
-} from '../../utilities/session/sessionWorkerDiscovery';
-import {
-  buildCloudflareTokenTemplateUrl,
-  CLOUDFLARE_TOKEN_SETUP_GUIDE_URL,
-} from './cloudflareTokenTemplate.js';
+import { buildCloudflareTokenTemplateUrl, CLOUDFLARE_TOKEN_SETUP_GUIDE_URL } from './cloudflareTokenTemplate.js';
 import type { SessionWizardDeployStatusDisplayState } from './sessionWizardDeployErrors';
 import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
+import type { SessionWizardVerifiedWorkerConnection } from './sessionWizardNativeWorkerVerification';
 
 type RenderInfoTooltip = (props: {
   id?: string;
@@ -62,6 +56,7 @@ const buildNativeVerificationIdentity = ({
   })}`;
 
 export type WorkerDeploySectionProps = {
+  allowNativeWorkerVerification?: boolean;
   isNormalMode: boolean;
   renderInfoTooltip?: RenderInfoTooltip;
   workerMode: string;
@@ -94,12 +89,17 @@ export type WorkerDeploySectionProps = {
   setDeployForm: React.Dispatch<React.SetStateAction<DeployForm>>;
   handleDeployWorker: () => void;
   deployStatusDisplayState: SessionWizardDeployStatusDisplayState;
+  deployVerifiedInUi?: boolean;
   displayedWorkerUrl?: string;
-  onNativeWorkerVerified?: (bootstrap: WorkerCanonicalSessionBootstrap) => void;
-  verifyNativeWorker?: typeof fetchWorkerCanonicalSessionBootstrap;
+  onNativeWorkerVerified?: (bootstrap: SessionWizardVerifiedWorkerConnection) => void;
+  verifyNativeWorker?: (input: {
+    sessionSlug: string;
+    workerQueryValue: unknown;
+  }) => Promise<SessionWizardVerifiedWorkerConnection>;
 };
 
 const WorkerDeploySection = ({
+  allowNativeWorkerVerification = false,
   isNormalMode,
   renderInfoTooltip,
   workerMode,
@@ -132,6 +132,7 @@ const WorkerDeploySection = ({
   setDeployForm,
   handleDeployWorker,
   deployStatusDisplayState,
+  deployVerifiedInUi,
   displayedWorkerUrl = '',
   onNativeWorkerVerified,
   verifyNativeWorker,
@@ -162,7 +163,8 @@ const WorkerDeploySection = ({
     accountId: deployForm.accountId,
     slug: cloudflareTokenSlug,
   });
-  const nativeDeployUrl = String(cloudflareNativeDeployUrl || '').trim();
+  const nativeVerificationEnabled = allowNativeWorkerVerification === true;
+  const nativeDeployUrl = nativeVerificationEnabled ? String(cloudflareNativeDeployUrl || '').trim() : '';
   const nativeSessionSlug = String(cloudflareTokenSlug || '').trim();
   const nativeAdminAddress = String(deployForm.adminAddress || account || '').trim();
   const nativeSetupIdentity = buildNativeSetupIdentity({
@@ -176,10 +178,17 @@ const WorkerDeploySection = ({
   });
   const previousNativeSetupIdentityRef = React.useRef(nativeSetupIdentity);
   const previousNativeVerificationIdentityRef = React.useRef(nativeVerificationIdentity);
+  const previousDeployVerifiedInUiRef = React.useRef(deployVerifiedInUi);
   const currentNativeVerificationIdentityRef = React.useRef(nativeVerificationIdentity);
   currentNativeVerificationIdentityRef.current = nativeVerificationIdentity;
   const currentNativeSetupSecrets = nativeSetupSecretsIdentity === nativeSetupIdentity ? nativeSetupSecrets : null;
   const nativeDeployReady = !!(nativeDeployUrl && currentNativeSetupSecrets && nativeSessionSlug && nativeAdminAddress);
+  const nativeAttachmentReady = !!(
+    nativeVerificationEnabled &&
+    nativeSessionSlug &&
+    nativeAdminAddress &&
+    normalizeNativeWorkerOrigin(displayedWorkerUrl)
+  );
   const nativeVerificationIsCurrent =
     nativeProgress === 'verified' && verifiedNativeIdentity === nativeVerificationIdentity;
 
@@ -207,6 +216,19 @@ const WorkerDeploySection = ({
         : '',
     );
   }, [currentNativeSetupSecrets, nativeSetupIdentity, nativeVerificationIdentity]);
+
+  React.useEffect(() => {
+    const wasVerifiedInUi = previousDeployVerifiedInUiRef.current;
+    previousDeployVerifiedInUiRef.current = deployVerifiedInUi;
+    if (wasVerifiedInUi !== true || deployVerifiedInUi !== false) return;
+
+    setVerifiedNativeIdentity('');
+    setCopiedNativeField('');
+    setNativeProgress(currentNativeSetupSecrets ? 'generated' : '');
+    setNativeStatus(
+      'Session requirements changed. Verify this exact Worker configuration before deploying the session.',
+    );
+  }, [currentNativeSetupSecrets, deployVerifiedInUi]);
 
   const generateNativeSetupSecrets = () => {
     try {
@@ -247,7 +269,7 @@ const WorkerDeploySection = ({
     setNativeProgress('verifying');
     setVerifiedNativeIdentity('');
     setNativeStatus(
-      'Writing required session config and AI secrets, then verifying Worker reachability, browser origin access, and canonical config readback…',
+      'Writing required session config and AI secrets, then verifying signed config acceptance, Worker reachability, and browser-origin access…',
     );
     const requestedIdentity = nativeVerificationIdentity;
     try {
@@ -269,7 +291,11 @@ const WorkerDeploySection = ({
       }
       setVerifiedNativeIdentity(requestedIdentity);
       setNativeProgress('verified');
-      setNativeStatus(`Session Worker verified at revision ${bootstrap.configRevision}. You can deploy the session.`);
+      setNativeStatus(
+        bootstrap.configRevision
+          ? `Session Worker verified at revision ${bootstrap.configRevision}. You can deploy the session.`
+          : 'Session Worker verified. You can deploy the session.',
+      );
       onNativeWorkerVerified?.(bootstrap);
     } catch (error) {
       if (currentNativeVerificationIdentityRef.current !== requestedIdentity) return;
@@ -316,25 +342,28 @@ const WorkerDeploySection = ({
 
   return (
     <>
-      {nativeDeployUrl && (
+      {nativeVerificationEnabled && (
         <section className={styles.cloudflareNativeDeployCard} aria-labelledby="ce-cloudflare-native-deploy-title">
           <div>
             <h3 id="ce-cloudflare-native-deploy-title" className={styles.cloudflareNativeDeployTitle}>
-              Deploy the full Session Worker in your Cloudflare account
+              Deploy or attach a Session Worker
             </h3>
             <p className={styles.helperText}>
-              This is the default self-hosted path. Cloudflare creates and owns the Worker, KV namespace, and Durable
-              Object. No Cloudflare API token, Context Engine deploy helper, OAuth grant, or installed agent is used.
+              Deploy the full Worker into your Cloudflare account, or paste an existing compatible Worker URL and
+              verify it. No Cloudflare API token, Context Engine deploy helper, OAuth grant, or installed agent is
+              used by this path.
             </p>
           </div>
-          <Button
-            type="button"
-            className={styles.secondaryButton}
-            data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_GENERATE}
-            onClick={generateNativeSetupSecrets}
-          >
-            {currentNativeSetupSecrets ? 'Replace setup values' : 'Generate setup values'}
-          </Button>
+          {nativeDeployUrl ? (
+            <Button
+              type="button"
+              className={styles.secondaryButton}
+              data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_GENERATE}
+              onClick={generateNativeSetupSecrets}
+            >
+              {currentNativeSetupSecrets ? 'Replace setup values' : 'Generate setup values'}
+            </Button>
+          ) : null}
           {currentNativeSetupSecrets && (
             <>
               <ol data-testid="ce-wizard-cloudflare-native-checklist">
@@ -342,7 +371,7 @@ const WorkerDeploySection = ({
                 <li>Open Cloudflare and complete the dashboard deployment in the new tab.</li>
                 <li>Return here and paste the resulting workers.dev URL into the Worker URL field.</li>
                 <li>
-                  Sign the initial config and AI-secret write, then verify canonical readback and browser-origin access.
+                  Sign the initial config and AI-secret write, then verify the exact Worker and browser-origin access.
                 </li>
               </ol>
               <div className={styles.cloudflareNativeDeployGrid}>
@@ -374,7 +403,7 @@ const WorkerDeploySection = ({
             <div className={styles.errorText}>Enter the session slug before opening Cloudflare.</div>
           )}
           {currentNativeSetupSecrets && !nativeAdminAddress && (
-            <div className={styles.errorText}>Log in with the session admin passkey before opening Cloudflare.</div>
+            <div className={styles.errorText}>Connect or sign in as the session admin before opening Cloudflare.</div>
           )}
           {nativeDeployReady && (
             <a
@@ -392,11 +421,11 @@ const WorkerDeploySection = ({
             </a>
           )}
           <div className={styles.helperText}>
-            Paste the four values above into Cloudflare. The two 64-character values are independent Session Worker
-            runtime secrets, not Cloudflare credentials; they stay only in this tab and Cloudflare&apos;s encrypted
-            Worker-secret store. After deployment, paste the resulting workers.dev URL into the Worker URL field.
+            {currentNativeSetupSecrets
+              ? 'Paste the four values above into Cloudflare. The two 64-character values are independent Session Worker runtime secrets, not Cloudflare credentials; they stay only in this tab and Cloudflare\'s encrypted Worker-secret store. After deployment, paste the resulting workers.dev URL into the Worker URL field.'
+              : 'Already have a compatible Session Worker? Paste its URL into the Worker URL field and verify it without generating replacement setup values.'}
           </div>
-          {currentNativeSetupSecrets ? (
+          {currentNativeSetupSecrets || nativeAttachmentReady ? (
             <Button
               type="button"
               className={styles.secondaryButton}

@@ -255,6 +255,45 @@ describe('sessionWizardWorkerRequirementProof', () => {
     );
   });
 
+  it('invalidates readiness when the verified Worker allowlist changes', () => {
+    const verifiedOrigins = ['https://app.example.test', 'https://admin.example.test'];
+    const proof = buildSessionWizardWorkerRequirementProof({
+      workerUrl,
+      sessionSlug,
+      sessionId,
+      sessionModeProfile: profile,
+      sessionAi: ai,
+      workerAllowOrigins: verifiedOrigins,
+      workerSecrets,
+      requiredSecretFields: ['openaiKey'],
+    });
+
+    expect(
+      resolveSessionWizardWorkerRequirementReadiness({
+        proof,
+        workerUrl,
+        sessionSlug,
+        sessionId,
+        sessionModeProfile: profile,
+        sessionAi: ai,
+        workerAllowOrigins: [...verifiedOrigins].reverse(),
+        workerSecrets,
+      }),
+    ).toEqual(expect.objectContaining({ verified: true }));
+    expect(
+      resolveSessionWizardWorkerRequirementReadiness({
+        proof,
+        workerUrl,
+        sessionSlug,
+        sessionId,
+        sessionModeProfile: profile,
+        sessionAi: ai,
+        workerAllowOrigins: ['https://other.example.test'],
+        workerSecrets,
+      }),
+    ).toEqual(expect.objectContaining({ verified: false, reason: 'requirements-changed' }));
+  });
+
   it('invalidates readiness when the selected profile adds Lit and RPC requirements', () => {
     const litProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     litProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
@@ -284,6 +323,60 @@ describe('sessionWizardWorkerRequirementProof', () => {
     expect(resolveReadiness(override)).toEqual(
       expect.objectContaining({ verified: false, reason: 'worker-identity-changed' }),
     );
+  });
+
+  it('binds unknown public config fields while ignoring only server-managed state', () => {
+    const workerConfig = {
+      slug: sessionSlug,
+      adminAddress: '0x00000000000000000000000000000000000000aa',
+      futureAuthorizationPolicy: { enabled: true },
+    };
+    const proof = buildSessionWizardWorkerRequirementProof({
+      workerUrl,
+      sessionSlug,
+      sessionId,
+      sessionModeProfile: profile,
+      sessionAi: ai,
+      workerSecrets,
+      workerConfig: {
+        ...workerConfig,
+        authzEpoch: 1,
+        configRevision: 'draft-revision',
+        workerCanonicalPublicationRevision: 'published-revision',
+        workerGroupsBootstrap: { state: 'fresh_empty' },
+      },
+    });
+    const readinessInput = {
+      proof,
+      workerUrl,
+      sessionSlug,
+      sessionId,
+      sessionModeProfile: profile,
+      sessionAi: ai,
+      workerSecrets,
+    };
+
+    expect(
+      resolveSessionWizardWorkerRequirementReadiness({
+        ...readinessInput,
+        workerConfig: {
+          ...workerConfig,
+          authzEpoch: 9,
+          configRevision: 'other-draft-revision',
+          workerCanonicalPublicationRevision: 'other-published-revision',
+          workerGroupsBootstrap: { state: 'migrated' },
+        },
+      }),
+    ).toEqual(expect.objectContaining({ verified: true }));
+    expect(
+      resolveSessionWizardWorkerRequirementReadiness({
+        ...readinessInput,
+        workerConfig: {
+          ...workerConfig,
+          futureAuthorizationPolicy: { enabled: false },
+        },
+      }),
+    ).toEqual(expect.objectContaining({ verified: false, reason: 'worker-config-changed' }));
   });
 
   it('allows a live remote-managed bootstrap field to be absent but still rejects an override', () => {

@@ -1,25 +1,35 @@
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 import { verifySessionWizardWorkerPublicDeployment } from './sessionWizardWorkerPublicVerification';
 
 const SESSION_ID = '0x00000000000000000000000000000001';
 const ADMIN = '0x00000000000000000000000000000000000000aa';
+const WORKER_URL = 'https://worker.example.test';
+const BROWSER_ORIGIN = 'https://app.example.test';
+
+const buildRegistryWorkerConfig = (overrides: Record<string, unknown> = {}) => ({
+  slug: 'registry-session',
+  sessionId: SESSION_ID,
+  adminAddress: ADMIN,
+  corsWorkerUrl: WORKER_URL,
+  allowOrigins: [BROWSER_ORIGIN],
+  sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
+  ...overrides,
+});
 
 describe('verifySessionWizardWorkerPublicDeployment', () => {
-  it('writes and reads a legacy/registry Worker through credentialless browser-origin requests', async () => {
-    const config = {
-      slug: 'registry-session',
-      sessionId: SESSION_ID,
-      corsWorkerUrl: 'https://worker.example.test',
-      allowOrigins: ['https://app.example.test'],
-    };
-    const fetchImpl = jest
-      .fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ config }), { status: 200 }));
-    const signAdminAction = jest.fn(async () => ({ address: ADMIN, signature: '0xsigned' }));
+  it('accepts the exact signed registry config without using Worker-canonical discovery', async () => {
+    const config = buildRegistryWorkerConfig();
+    const fetchImpl = jest.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    const signAdminAction = jest.fn(async () => ({
+      address: ADMIN,
+      signature: '0xsigned',
+      sessionSlug: 'must-not-override-the-signed-body',
+      config: { slug: 'must-not-override-the-signed-body' },
+    }));
 
     await expect(
       verifySessionWizardWorkerPublicDeployment({
-        workerUrl: 'https://worker.example.test',
+        workerUrl: WORKER_URL,
         slug: 'registry-session',
         sessionId: SESSION_ID,
         adminAddress: ADMIN,
@@ -27,85 +37,165 @@ describe('verifySessionWizardWorkerPublicDeployment', () => {
         isWorkerCanonical: false,
         signAdminAction,
         fetchImpl,
-        browserOrigin: 'https://app.example.test',
+        browserOrigin: BROWSER_ORIGIN,
       }),
-    ).resolves.toEqual(
-      expect.objectContaining({
-        workerOrigin: 'https://worker.example.test',
-        publicConfig: config,
-      }),
-    );
+    ).resolves.toEqual({
+      workerOrigin: WORKER_URL,
+      configRevision: '',
+      publicConfig: config,
+    });
 
-    expect(fetchImpl).toHaveBeenNthCalledWith(
-      2,
-      'https://worker.example.test/session-config?slug=registry-session',
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(fetchImpl).toHaveBeenCalledWith(
+      `${WORKER_URL}/admin/set-config`,
       expect.objectContaining({
-        method: 'GET',
+        method: 'POST',
         credentials: 'omit',
         redirect: 'error',
       }),
     );
+    const requestBody = JSON.parse(String(fetchImpl.mock.calls[0][1]?.body || '{}'));
+    expect(requestBody).toEqual(
+      expect.objectContaining({
+        sessionSlug: 'registry-session',
+        adminAddress: ADMIN,
+        config,
+        signature: '0xsigned',
+      }),
+    );
+    expect(JSON.stringify(fetchImpl.mock.calls)).not.toContain('/session-config');
   });
 
   it.each([
+    ['slug', { slug: 'other-session' }, /prepared Worker config.*session slug/i],
+    ['session ID', { sessionId: '0x00000000000000000000000000000002' }, /prepared Worker config.*session ID/i],
     [
-      'slug',
-      {
-        slug: 'other-session',
-        sessionId: SESSION_ID,
-        corsWorkerUrl: 'https://worker.example.test',
-        allowOrigins: ['https://app.example.test'],
-      },
-      /another session slug/i,
+      'admin address',
+      { adminAddress: '0x00000000000000000000000000000000000000bb' },
+      /prepared Worker config.*admin/i,
+    ],
+    ['Worker origin', { corsWorkerUrl: 'https://other-worker.example.test' }, /prepared Worker config.*origin/i],
+    ['browser origin', { allowOrigins: ['https://other-app.example.test'] }, /current browser origin/i],
+    ['empty browser allowlist', { allowOrigins: [] }, /must allow the current browser origin/i],
+    ['wildcard browser allowlist', { allowOrigins: ['*'] }, /exact browser origins/i],
+    ['wildcard host allowlist', { allowOrigins: ['https://*.example.test'] }, /exact browser origins/i],
+    [
+      'authority profile',
+      { sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE) },
+      /must not claim a Worker-canonical or non-runtime profile/i,
     ],
     [
-      'session ID',
-      {
-        slug: 'registry-session',
-        sessionId: '0x00000000000000000000000000000002',
-        corsWorkerUrl: 'https://worker.example.test',
-        allowOrigins: ['https://app.example.test'],
-      },
-      /another session ID/i,
+      'missing authority profile',
+      { sessionModeProfile: {} },
+      /must claim a selected non-Worker-canonical runtime profile/i,
     ],
-    [
-      'Worker origin',
-      {
-        slug: 'registry-session',
-        sessionId: SESSION_ID,
-        corsWorkerUrl: 'https://other-worker.example.test',
-        allowOrigins: ['https://app.example.test'],
-      },
-      /another Worker origin/i,
-    ],
-    [
-      'browser origin',
-      {
-        slug: 'registry-session',
-        sessionId: SESSION_ID,
-        corsWorkerUrl: 'https://worker.example.test',
-        allowOrigins: ['https://other-app.example.test'],
-      },
-      /current browser origin/i,
-    ],
-  ])('rejects a mismatched public %s readback', async (_label, publicConfig, expectedError) => {
-    const fetchImpl = jest
-      .fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ config: publicConfig }), { status: 200 }));
+  ])('rejects a mismatched prepared public %s before signing or transport', async (_label, overrides, expectedError) => {
+    const fetchImpl = jest.fn();
+    const signAdminAction = jest.fn(async () => ({ address: ADMIN, signature: '0xsigned' }));
 
     await expect(
       verifySessionWizardWorkerPublicDeployment({
-        workerUrl: 'https://worker.example.test',
+        workerUrl: WORKER_URL,
         slug: 'registry-session',
         sessionId: SESSION_ID,
         adminAddress: ADMIN,
-        config: publicConfig,
+        config: buildRegistryWorkerConfig(overrides),
+        isWorkerCanonical: false,
+        signAdminAction,
+        fetchImpl,
+        browserOrigin: BROWSER_ORIGIN,
+      }),
+    ).rejects.toThrow(expectedError);
+
+    expect(signAdminAction).not.toHaveBeenCalled();
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when config transport returns success without signed-write acceptance', async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ ok: false, error: 'projection pending' }), { status: 200 }));
+
+    await expect(
+      verifySessionWizardWorkerPublicDeployment({
+        workerUrl: WORKER_URL,
+        slug: 'registry-session',
+        sessionId: SESSION_ID,
+        adminAddress: ADMIN,
+        config: buildRegistryWorkerConfig(),
         isWorkerCanonical: false,
         signAdminAction: async () => ({ address: ADMIN, signature: '0xsigned' }),
         fetchImpl,
-        browserOrigin: 'https://app.example.test',
+        browserOrigin: BROWSER_ORIGIN,
       }),
-    ).rejects.toThrow(expectedError);
+    ).rejects.toThrow(/did not confirm acceptance/i);
+  });
+
+  it('rejects an empty Worker-canonical browser allowlist before signing', async () => {
+    const signAdminAction = jest.fn(async () => ({ address: ADMIN, signature: '0xsigned' }));
+    const fetchImpl = jest.fn();
+
+    await expect(
+      verifySessionWizardWorkerPublicDeployment({
+        workerUrl: WORKER_URL,
+        slug: 'registry-session',
+        sessionId: SESSION_ID,
+        adminAddress: ADMIN,
+        config: buildRegistryWorkerConfig({
+          allowOrigins: [],
+          sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        }),
+        isWorkerCanonical: true,
+        signAdminAction,
+        fetchImpl,
+        browserOrigin: BROWSER_ORIGIN,
+      }),
+    ).rejects.toThrow(/must allow the current browser origin/i);
+
+    expect(signAdminAction).not.toHaveBeenCalled();
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('rejects a malformed signer result before transport', async () => {
+    const fetchImpl = jest.fn();
+
+    await expect(
+      verifySessionWizardWorkerPublicDeployment({
+        workerUrl: WORKER_URL,
+        slug: 'registry-session',
+        sessionId: SESSION_ID,
+        adminAddress: ADMIN,
+        config: buildRegistryWorkerConfig(),
+        isWorkerCanonical: false,
+        signAdminAction: async () => null as unknown as Record<string, unknown>,
+        fetchImpl,
+        browserOrigin: BROWSER_ORIGIN,
+      }),
+    ).rejects.toThrow(/invalid authorization payload/i);
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('rejects a signer that does not match the session admin before transport', async () => {
+    const fetchImpl = jest.fn();
+
+    await expect(
+      verifySessionWizardWorkerPublicDeployment({
+        workerUrl: WORKER_URL,
+        slug: 'registry-session',
+        sessionId: SESSION_ID,
+        adminAddress: ADMIN,
+        config: buildRegistryWorkerConfig(),
+        isWorkerCanonical: false,
+        signAdminAction: async () => ({
+          address: '0x00000000000000000000000000000000000000bb',
+          signature: '0xsigned',
+        }),
+        fetchImpl,
+        browserOrigin: BROWSER_ORIGIN,
+      }),
+    ).rejects.toThrow(/signer.*session admin/i);
+
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 });

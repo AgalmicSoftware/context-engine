@@ -1,4 +1,5 @@
 import { resolveRegistryChainId } from './chainIdNormalization.js';
+import { resolveSessionConfigSessionIdHex } from './sessionConfigMutation.js';
 
 const resolveBootstrapAdminAddress = (body = {}, deps) => {
   const incoming = body?.config && typeof body.config === 'object' ? body.config : null;
@@ -75,9 +76,21 @@ export const validateBootstrapAdmin = async ({
   }
 
   try {
+    const incomingConfig = body?.config && typeof body.config === 'object' ? body.config : {};
+    const hasIncomingSessionId = ['sessionId', 'sessionIdHex'].some(
+      (key) => Object.prototype.hasOwnProperty.call(incomingConfig, key) && deps?.toStr?.(incomingConfig[key]).trim(),
+    );
+    if (hasIncomingSessionId) {
+      const requestedSessionId = resolveSessionConfigSessionIdHex(incomingConfig);
+      const onChainSessionId = resolveSessionConfigSessionIdHex({ sessionId: tupleRead?.tuple?.[7] });
+      if (!requestedSessionId || requestedSessionId !== onChainSessionId) return false;
+    }
     const onChainAdmin = deps?.toStr?.(tupleRead?.tuple?.[4] || '').trim();
     if (!onChainAdmin || !deps?.isAddress?.(onChainAdmin)) return false;
-    return onChainAdmin.toLowerCase() === address.toLowerCase();
+    return (
+      requestedAdminMatches &&
+      onChainAdmin.toLowerCase() === address.toLowerCase()
+    );
   } catch {
     return false;
   }

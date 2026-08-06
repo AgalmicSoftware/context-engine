@@ -62,8 +62,18 @@ import {
   verifySessionWizardWorkerPublicDeployment,
 } from '../sessionWizardWorkerPublicVerification';
 import { postSessionWizardLitBootstrap } from '../sessionWizardWorkerDeployRequests';
-import type { AnyRecord, ChainIdLike, NetworkLike, WorkerSecretSyncResult, WorkerSecretsLike } from '../../shellTypes';
-import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
+import {
+  resolveSessionWizardWorkerFaucetConfigFromDraft,
+  resolveSessionWizardWorkerRpcUrlFromDraft,
+  resolveSessionWizardWorkerRpcUrlMapFromDraft,
+} from '../sessionWizardWorkerRuntimeSupport';
+import type { AnyRecord, WorkerSecretSyncResult, WorkerSecretsLike } from '../../shellTypes';
+import type {
+  DeployFormLike,
+  SessionWizardWorkerDeployRuntime,
+  SessionWizardWorkerDeployStateUpdate,
+  UseSessionWizardWorkerDeployOptions,
+} from './useSessionWizardWorkerDeploy.types';
 
 type DeployFormLike = AnyRecord & {
   apiToken?: string;
@@ -164,8 +174,6 @@ const useSessionWizardWorkerDeploy = ({
   applyWorkerSecretsUpdate = () => undefined,
   getMissingWorkerSecretsForDeploy = () => [],
   resolveWorkerBaseUrl = () => '',
-  resolveWorkerRpcUrl = () => '',
-  resolveWorkerRpcUrlMap = () => ({}),
   resolveWorkerFaucetConfig = () => ({}),
   parseAllowOriginsInput = () => [],
   signTypedAdminAction = async () => ({}),
@@ -198,6 +206,12 @@ const useSessionWizardWorkerDeploy = ({
     }
 
     if (resolvedAddress) {
+      if (runtimeRef?.current) {
+        runtimeRef.current = {
+          ...runtimeRef.current,
+          resolvedAdminAddress: resolvedAddress,
+        };
+      }
       if (resolvedWalletAccountRef) {
         resolvedWalletAccountRef.current = resolvedAddress;
       }
@@ -369,14 +383,26 @@ const useSessionWizardWorkerDeploy = ({
           registryAddress: toStr(runtime.registryAddress).trim(),
           registryChainId: Number(runtime.registryChainId || currentDraft.networkChainId || 0) || 0,
           adminAddress: resolvedAdmin,
-          rpcUrl: resolveWorkerRpcUrl(),
-          rpcUrlsByChainId: resolveWorkerRpcUrlMap(),
+          rpcUrl: resolveSessionWizardWorkerRpcUrlFromDraft({
+            draft: currentDraft,
+            registryChainId: runtime.registryChainId,
+            networkId: runtime.network?.id,
+          }),
+          rpcUrlsByChainId: resolveSessionWizardWorkerRpcUrlMapFromDraft({
+            draft: currentDraft,
+            registryChainId: runtime.registryChainId,
+            networkId: runtime.network?.id,
+          }),
           allowOrigins: parseAllowOriginsInput(),
           limits: Number(runtime.workerLimitPerWallet || 0)
             ? { perWalletPerDay: Number(runtime.workerLimitPerWallet) }
             : {},
           scopes: {},
-          faucet: resolveWorkerFaucetConfig(),
+          faucet: resolveSessionWizardWorkerFaucetConfigFromDraft({
+            draft: currentDraft,
+            registryChainId: runtime.registryChainId,
+            networkId: runtime.network?.id,
+          }),
           embeddedDeployHelperEnabled: runtime.embeddedDeployHelperEnabled,
         };
         const agentSessionWrappedDeployment = resolveSessionWizardAgentSessionWrappedDeployment({
@@ -399,7 +425,7 @@ const useSessionWizardWorkerDeploy = ({
           networkChainId: runtime.network?.id,
           sessionId: toStr(runtime.sessionId || '').trim(),
           latestChainBlock: runtime.latestChainBlock,
-          resolveWorkerFaucetConfig,
+          resolveWorkerFaucetConfig: () => payload.faucet,
         });
         [
           'sessionId', 'sessionName', 'sessionInfo', 'sessionHeaderImg',
@@ -541,7 +567,7 @@ const useSessionWizardWorkerDeploy = ({
             sessionId: toStr(runtime.sessionId || '').trim(),
             latestChainBlock: runtime.latestChainBlock,
             workerUrl: resolvedDeployWorkerUrl,
-            resolveWorkerFaucetConfig,
+            resolveWorkerFaucetConfig: () => payload.faucet,
           }),
           corsWorkerUrl: resolvedDeployWorkerUrl,
           ...(agentSessionWrapped ? { agentSessionWrapped } : {}),
@@ -849,10 +875,12 @@ const useSessionWizardWorkerDeploy = ({
                 sessionId: runtime.sessionId || runtime.sessionIdHex,
                 sessionModeProfile: currentDraft.sessionModeProfile,
                 sessionAi: currentDraft.ai,
+                workerAllowOrigins: workerConfigPayload?.allowOrigins,
                 workerSecrets: deploySecrets,
                 requiredSecretFields: requiredWorkerSecretFields,
                 remoteManagedSecretFields: litBootstrapStatus?.synced === true ? ['litAccountApiKey'] : [],
                 litRuntimeConfig: workerConfigPayload?.litCredentials,
+                workerConfig: workerConfigPayload,
               })
             : null;
         // A Worker-backed deploy is publish-safe only when the exact remote
@@ -906,6 +934,15 @@ const useSessionWizardWorkerDeploy = ({
         const litDeployStatus = withLitProvisionSyncStatus(
           withLitBootstrapSyncStatus(baseDeployStatus, litBootstrapStatus),
           litProvisionStatus,
+        );
+        publishVerifiedRuntime(
+          runtimeRef,
+          currentDraft,
+          resolvedDeployWorkerUrl,
+          displayWorkerUrl,
+          publishSafeDeployComplete,
+          workerRequirementProof,
+          agentSessionWrapped ? { agentSessionWrapped } : {},
         );
         updateDeploymentState({
           deployWorkerUrl: displayWorkerUrl,
@@ -962,9 +999,6 @@ const useSessionWizardWorkerDeploy = ({
       getMissingWorkerSecretsForDeploy,
       parseAllowOriginsInput,
       resolveConnectedAdminAddress,
-      resolveWorkerFaucetConfig,
-      resolveWorkerRpcUrl,
-      resolveWorkerRpcUrlMap,
       runtimeRef,
       signTypedAdminAction,
       sponsoredBundleAppliedBundleRef,

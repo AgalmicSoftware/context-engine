@@ -236,6 +236,110 @@ test('dispatchAuthNonceRequest rejects missing or stale canonical session ids be
   }
 });
 
+test('dispatchAuthNonceRequest echoes an explicit canonical identity only while config is uninitialized', async () => {
+  const result = await dispatchAuthNonceRequest({
+    request: {
+      json: async () => createNonceBody({
+        adminAction: true,
+        sessionId: workerSessionId,
+        bootstrapWorkerCanonicalIdentity: true,
+      }),
+      headers: new Headers({ Origin: 'http://localhost:3000' }),
+    },
+    env: { GROUP_KV: {} },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    deps: createNonceDeps({
+      resolveExistingSessionCors: async () => ({
+        ok: true,
+        headers: { 'Access-Control-Allow-Origin': 'http://localhost:3000' },
+        config: null,
+      }),
+      buildNonce: () => 'nonce-worker-bootstrap',
+    }),
+  });
+
+  assert.deepEqual(result, {
+    body: {
+      nonce: 'nonce-worker-bootstrap',
+      sessionSlug: 'session-a',
+      sessionId: workerSessionId,
+      bootstrapWorkerCanonicalIdentity: true,
+    },
+    status: 200,
+    headers: { 'Access-Control-Allow-Origin': 'http://localhost:3000' },
+  });
+});
+
+test('dispatchAuthNonceRequest rejects invalid or initialized identity bootstrap nominations before nonce work', async () => {
+  for (const scenario of [
+    {
+      label: 'missing bootstrap identity',
+      body: { adminAction: true, bootstrapWorkerCanonicalIdentity: true },
+      config: null,
+      status: 400,
+      error: 'Worker bootstrap session identity is invalid.',
+    },
+    {
+      label: 'all-zero bootstrap identity',
+      body: {
+        adminAction: true,
+        sessionId: '0x00000000000000000000000000000000',
+        bootstrapWorkerCanonicalIdentity: true,
+      },
+      config: null,
+      status: 400,
+      error: 'Worker bootstrap session identity is invalid.',
+    },
+    {
+      label: 'initialized registry config',
+      body: {
+        adminAction: true,
+        sessionId: workerSessionId,
+        bootstrapWorkerCanonicalIdentity: true,
+      },
+      config: {
+        sessionId: workerSessionId,
+        sessionModeProfile: { authority: { mode: 'evm_registry_canonical' } },
+      },
+      status: 409,
+      error: 'Worker identity bootstrap is unavailable after initialization.',
+    },
+  ]) {
+    let rateLimitCalled = false;
+    let issueNonceCalled = false;
+    const result = await dispatchAuthNonceRequest({
+      request: {
+        json: async () => createNonceBody(scenario.body),
+        headers: new Headers({ Origin: 'http://localhost:3000' }),
+      },
+      env: { GROUP_KV: {} },
+      baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+      slug: '',
+      deps: createNonceDeps({
+        resolveExistingSessionCors: async () => ({
+          ok: true,
+          headers: { 'Access-Control-Allow-Origin': 'http://localhost:3000' },
+          config: scenario.config,
+        }),
+        checkNonceRateLimit: async () => {
+          rateLimitCalled = true;
+          return { ok: true };
+        },
+        issueNonce: async () => {
+          issueNonceCalled = true;
+          return { ok: true };
+        },
+      }),
+    });
+
+    assert.equal(result.status, scenario.status, scenario.label);
+    assert.deepEqual(result.body, { error: scenario.error }, scenario.label);
+    assert.equal(rateLimitCalled, false, scenario.label);
+    assert.equal(issueNonceCalled, false, scenario.label);
+  }
+});
+
 test('dispatchAuthNonceRequest applies nonce rate limits before nonce creation', async () => {
   let buildNonceCalled = false;
 
