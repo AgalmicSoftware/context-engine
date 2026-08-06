@@ -196,7 +196,7 @@ const useSessionWizardWorkerSecretsController = ({
     (secretsSnapshot = getCurrentWorkerSecrets()) => {
       const modeRequirements = resolveSessionWizardModeRequirements(draft?.sessionModeProfile);
       const missing = [];
-      if (modeRequirements.isWorkerCanonical) {
+      if (modeRequirements.selected) {
         resolveSessionWizardResourceSecretFields('ai', draft?.ai).forEach((field) => {
           if (!toStr(secretsSnapshot?.[field.key]).trim()) missing.push(field.label);
         });
