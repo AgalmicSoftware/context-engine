@@ -61,3 +61,13 @@ test('route docs preserve legacy address-shaped Worker group links', () => {
     );
   }
 });
+
+test('first-visit redirect configuration describes root-only eligibility', () => {
+  const appConfig = read('client/src/variables/appConfig.ts');
+  const flagContract = appConfig.match(
+    /\/\/[^\n]*\nexport const CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED = readPublicBoolEnv\(/,
+  )?.[0] || '';
+
+  assert.match(flagContract, /initial normalized root document load/);
+  assert.doesNotMatch(flagContract, /cached-session|session document/i);
+});
