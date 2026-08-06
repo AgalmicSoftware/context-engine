@@ -4277,13 +4277,20 @@ const SessionWizard = ({
   const defaultWorkerUrl = normalizeWorkerUrl(getSessionWizardDefaultWorkerUrl());
   const deployedWorkerUrl = normalizeWorkerUrl(toStr(deployWorkerUrl).trim());
   const normalModeRequiresCustomWorker = isNormalMode && !NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED;
-  const { deployVerifiedInUi, effectiveConfiguredWorkerUrl } = resolveSessionWizardWorkerVerificationUiState({
-    configuredWorkerUrl,
-    deployWorkerUrl: deployedWorkerUrl,
-    defaultWorkerUrl,
-    deployComplete,
-    normalModeRequiresCustomWorker,
-  });
+  const { deployVerifiedInUi: deployIdentityVerifiedInUi, effectiveConfiguredWorkerUrl } =
+    resolveSessionWizardWorkerVerificationUiState({
+      configuredWorkerUrl,
+      deployWorkerUrl: deployedWorkerUrl,
+      defaultWorkerUrl,
+      deployComplete,
+      normalModeRequiresCustomWorker,
+    });
+  const currentWorkerSecrets = getCurrentWorkerSecrets();
+  const deployRequirementsVerified = workerRequirementProof
+    ? getWorkerPublishEvidence()?.verified === true
+    : !sessionModeRequirements.usesWorkerRuntime;
+  // Derive current publish authority from the selected worker, profile, provider, and secrets.
+  const deployVerifiedInUi = deployIdentityVerifiedInUi && deployRequirementsVerified;
   const customWorkerSelected = normalModeRequiresCustomWorker || workerMode !== 'default';
   const hideNormalModeDefaultWorkerUrl =
     normalModeRequiresCustomWorker &&

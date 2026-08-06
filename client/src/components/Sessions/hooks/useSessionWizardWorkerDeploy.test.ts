@@ -808,6 +808,104 @@ describe('useSessionWizardWorkerDeploy', () => {
     expect(options.updateDeploymentState).toHaveBeenCalledWith(expect.objectContaining({ deployComplete: true }));
   });
 
+  it('keeps decentralized deploy incomplete until required Worker secrets are delivered', async () => {
+    const deployBodies: Record<string, unknown>[] = [];
+    let secretsSyncCalls = 0;
+    global.fetch = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/deploy')) {
+        deployBodies.push(JSON.parse(String(init?.body || '{}')));
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://decentralized-worker.example.test',
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        } as Response;
+      }
+      if (normalizedUrl.endsWith('/admin/set-secrets')) {
+        secretsSyncCalls += 1;
+        return secretsSyncCalls === 1
+          ? ({
+              ok: false,
+              status: 503,
+              json: async () => ({ error: 'Required session secret sync was rejected.' }),
+            } as Response)
+          : ({ ok: true, status: 200, json: async () => ({ ok: true }) } as Response);
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+    });
+    const options = buildDeployHookOptions();
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+    options.refs.runtimeRef.current = {
+      ...options.refs.runtimeRef.current,
+      draft: {
+        slug: 'decentralized-secret-recovery',
+        sessionModeProfile,
+        ai: {
+          models: {
+            fast: { provider: 'openai' },
+            thinking: { provider: 'openai' },
+            transcription: { provider: 'openai' },
+          },
+        },
+      },
+      workerSecretsEnabled: true,
+    } as SessionWizardWorkerDeployRuntime;
+    options.getCurrentWorkerSecrets.mockReturnValue({
+      openaiKey: 'sk-decentralized-runtime',
+      anthropicKey: 'must-not-send',
+      faucetPrivateKey: 'must-not-send',
+    });
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+
+    let failedResult: Record<string, unknown> = {};
+    let deliveredResult: Record<string, unknown> = {};
+    await act(async () => {
+      failedResult = await result.current.handleDeployWorker();
+    });
+    await act(async () => {
+      deliveredResult = await result.current.handleDeployWorker();
+    });
+
+    expect(failedResult).toEqual(
+      expect.objectContaining({
+        ok: true,
+        deployComplete: false,
+        requiredWorkerSecretsReady: false,
+        requiredWorkerSecretFields: ['openaiKey'],
+        workerRequirementProof: null,
+      }),
+    );
+    expect(deliveredResult).toEqual(
+      expect.objectContaining({
+        ok: true,
+        deployComplete: true,
+        requiredWorkerSecretsReady: true,
+        requiredWorkerSecretFields: ['openaiKey'],
+        workerRequirementProof: expect.objectContaining({ version: 1 }),
+      }),
+    );
+    expect(deployBodies).toHaveLength(2);
+    expect(deployBodies.map((body) => body.secrets)).toEqual([
+      { openaiKey: 'sk-decentralized-runtime' },
+      { openaiKey: 'sk-decentralized-runtime' },
+    ]);
+    expect(JSON.stringify(deployBodies)).not.toContain('must-not-send');
+    expect(secretsSyncCalls).toBe(2);
+    expect(
+      resolveSessionWizardWorkerPublishEvidence({
+        runtime: options.refs.runtimeRef.current,
+        workerSecrets: options.getCurrentWorkerSecrets(),
+      }),
+    ).toEqual(expect.objectContaining({ verified: true, workerUrl: 'https://decentralized-worker.example.test' }));
+    expect(options.updateDeploymentState).toHaveBeenCalledWith(expect.objectContaining({ deployComplete: false }));
+    expect(options.updateDeploymentState).toHaveBeenCalledWith(expect.objectContaining({ deployComplete: true }));
+  });
+
   it('does not cache a 200 partial deploy when signed config recovery fails', async () => {
     global.fetch = jest.fn(async (url: RequestInfo | URL) => {
       const normalizedUrl = String(url);

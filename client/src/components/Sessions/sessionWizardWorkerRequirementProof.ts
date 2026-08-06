@@ -158,7 +158,7 @@ export const resolveSessionWizardWorkerSecretSelection = ({
   const secrets = workerSecrets && typeof workerSecrets === 'object' ? (workerSecrets as AnyRecord) : {};
   const fallbackFields = new Set(normalizeFieldList(fallbackRequiredSecretFields));
   const selectedAiSecretFields = resolveSessionWizardResourceSecretFields('ai', sessionAi).map((field) => field.key);
-  const requiredSecretFields = requirements.isWorkerCanonical
+  const requiredSecretFields = requirements.usesWorkerRuntime
     ? uniqueFieldList([
         ...selectedAiSecretFields,
         ...(requirements.requiresArweave && (toStr(secrets.arweaveJwk).trim() || fallbackFields.has('arweaveJwk'))
@@ -177,7 +177,7 @@ export const resolveSessionWizardWorkerSecretSelection = ({
           : []),
       ])
     : [];
-  const selectedSecrets = requirements.isWorkerCanonical
+  const selectedSecrets = requirements.usesWorkerRuntime
     ? requiredSecretFields.reduce<Record<string, string>>((result, field) => {
         const value = toStr(secrets[field]).trim();
         if (value) result[field] = value;
@@ -255,7 +255,7 @@ export const buildSessionWizardWorkerRequirementProof = ({
     fallbackRequiredSecretFields: requiredSecretFields,
   });
   const normalizedRequiredFields = normalizeFieldList(requiredSecretFields || selection.requiredSecretFields);
-  if (!selection.requirements.isWorkerCanonical) return null;
+  if (!selection.requirements.usesWorkerRuntime) return null;
   const secretValues = workerSecrets && typeof workerSecrets === 'object' ? (workerSecrets as AnyRecord) : {};
   const secretValueFingerprints = normalizedRequiredFields.reduce<Record<string, string>>((result, field) => {
     const value = toStr(secretValues[field]).trim();

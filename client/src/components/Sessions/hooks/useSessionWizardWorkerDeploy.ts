@@ -842,7 +842,7 @@ const useSessionWizardWorkerDeploy = ({
         // ID then resumes signed sync without provisioning a second worker.
         const remoteWorkerReady = requiredWorkerSecretsReady;
         const workerRequirementProof =
-          remoteWorkerReady && modeRequirements.isWorkerCanonical
+          remoteWorkerReady && modeRequirements.usesWorkerRuntime
             ? buildSessionWizardWorkerRequirementProof({
                 workerUrl: resolvedDeployWorkerUrl,
                 sessionSlug: slug,
@@ -855,10 +855,10 @@ const useSessionWizardWorkerDeploy = ({
                 litRuntimeConfig: workerConfigPayload?.litCredentials,
               })
             : null;
-        // A worker-canonical deploy is publish-safe only when the exact remote
+        // A Worker-backed deploy is publish-safe only when the exact remote
         // secret/requirement evidence can be compared against later edits.
         const publishSafeDeployComplete =
-          remoteWorkerReady && (!modeRequirements.isWorkerCanonical || !!workerRequirementProof);
+          remoteWorkerReady && (!modeRequirements.usesWorkerRuntime || !!workerRequirementProof);
         if (publishSafeDeployComplete && litBootstrapStatus?.synced === true) {
           // Keep bootstrap authority through every post-deploy write. Clearing it
           // earlier makes a failed AI/RPC secret sync impossible to resume safely.
