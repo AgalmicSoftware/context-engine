@@ -141,6 +141,7 @@ test('public-release style copies without .git still pass wiring checks', () => 
         '            verify_args+=(--minimum-ref "$RELEASE_PUSH_BEFORE_SHA")',
         '          fi',
         '          node scripts/release-version.mjs "${verify_args[@]}"',
+        '      - run: node scripts/worker-release-artifacts.mjs verify-replay-range',
         '      - uses: actions/upload-artifact@1111111111111111111111111111111111111111',
         '        with:',
         '          name: worker-bundle-candidate-${{ github.sha }}',
