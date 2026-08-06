@@ -297,12 +297,12 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     );
   },
 
-  _renderContractsRoute: (ctx: RouteRenderCtx) => {
+  _renderDocsRoute: (ctx: RouteRenderCtx) => {
     const { fullPath, defaultSlug } = ctx;
     return (
-      <Suspense fallback={<LazyFallback label="Loading Contracts..." />}>
+      <Suspense fallback={<LazyFallback label="Loading Docs..." />}>
         <RouteErrorBoundary resetKey={fullPath}>
-          <div data-testid={E2E_TESTIDS.PAGE_CONTRACTS_ROOT}>
+          <div>
             <DocsPage activeSessionSlug={defaultSlug} />
           </div>
         </RouteErrorBoundary>
@@ -1248,13 +1248,13 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
       isAddress: ethers.utils.isAddress,
       surveyIDFromPath,
     });
+    if (routeMatch.canonicalPath && typeof window !== 'undefined') {
+      window.history.replaceState({}, '', `${buildPublicRoute(routeMatch.canonicalPath)}${searchStr}${hashStr}`);
+    }
     const isWizardRoute = routeMatch.key === 'wizard';
     const shouldBypassCacheHydrationWait = routeMatch.shouldBypassCacheHydrationWait;
     const isKnownRoutePrefix = routeMatch.isKnownRoutePrefix;
     if (isWizardRoute) {
-      if (routeMatch.canonicalPath && typeof window !== 'undefined') {
-        window.history.replaceState({}, '', `${buildPublicRoute(routeMatch.canonicalPath)}${searchStr}${hashStr}`);
-      }
       return (
         <Suspense fallback={<LazyFallback label="Loading Session Wizard..." />}>
           <RouteErrorBoundary resetKey={fullPath}>
@@ -1363,7 +1363,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
         posts: renderPostsRoute,
         demos: () => host._renderDemosRoute(),
         matrix: () => host._renderMatrixRoute(),
-        contracts: () => host._renderContractsRoute(ctx),
+        docs: () => host._renderDocsRoute(ctx),
         admin: () => host._renderAdminRoute(ctx),
         sponsor: () => host._renderSponsorRoute(ctx),
         agent: () => host._renderAgentRoute(),

@@ -92,9 +92,14 @@ const stripConfiguredPublicBasePath = (pathname = ''): string => {
   return normalizedPath;
 };
 
-const isContractsPath = (pathname = ''): boolean => {
+const isDocsPath = (pathname = ''): boolean => {
   const routePath = stripConfiguredPublicBasePath(pathname).toLowerCase();
-  return routePath.startsWith('/contracts');
+  return (
+    routePath === '/docs' ||
+    routePath.startsWith('/docs/') ||
+    routePath === '/contracts' ||
+    routePath.startsWith('/contracts/')
+  );
 };
 
 const isSessionWizardPath = (pathname = ''): boolean => {
@@ -134,7 +139,7 @@ const buildCanonicalSearch = (search: unknown, pathname = ''): string => {
   setCanonicalParam('responder', ['responder']);
   setCanonicalParam('demo', ['demo']);
 
-  if (isContractsPath(pathname)) {
+  if (isDocsPath(pathname)) {
     setCanonicalParam('contract', ['contract']);
   }
 

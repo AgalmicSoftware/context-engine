@@ -29,7 +29,7 @@ export const KNOWN_ROUTE_PREFIXES = new Set([
   'posts',
   'demos',
   'matrix',
-  'contracts',
+  'contracts', // Permanent legacy alias for /docs.
   'admin',
   'sponsor',
   'agent',

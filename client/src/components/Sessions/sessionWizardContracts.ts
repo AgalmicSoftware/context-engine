@@ -5,7 +5,7 @@ import {
   getSessionRegistryChains,
 } from '../../variables/chains.js';
 import { toStr } from '../../utilities/shared/primitives.js';
-import { buildContractsPageHref } from '../DocsPage/contractMetadata.js';
+import { buildDocsContractsHref } from '../DocsPage/contractMetadata.js';
 import { buildContractViewerContracts } from '../DocsPage/contractViewerUtils.js';
 import type {
   ChainIdLike,
@@ -149,7 +149,7 @@ export const resolveSessionWizardContractViewerPlan = ({
   const selectedContractSessionSlug = toStr(
     selectorSourceSessionSlug || activeSessionSlug || resolvedActiveSessionSlug || '',
   ).trim();
-  const selectedContractHref = buildContractsPageHref({
+  const selectedContractHref = buildDocsContractsHref({
     contractKey: selectedContract?.key || '',
     sessionSlug: selectedContractSessionSlug,
   });

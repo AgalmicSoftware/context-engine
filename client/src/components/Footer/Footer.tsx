@@ -37,7 +37,7 @@ class Footer extends React.Component<FooterProps> {
 
   clickedContributorsLink = () => {};
 
-  clickedContractsLink = () => {};
+  clickedDocsLink = () => {};
 
   render() {
     return (
@@ -88,12 +88,12 @@ class Footer extends React.Component<FooterProps> {
                 </li> */}
               <li>
                 <NavLink
-                  href={buildPublicRoute('/contracts')}
+                  href={buildPublicRoute('/docs')}
                   target=""
-                  onClick={this.clickedContractsLink}
+                  onClick={this.clickedDocsLink}
                   className={`ml-1 ${styles.footerLink}`}
                 >
-                  CONTRACTS
+                  DOCS
                 </NavLink>
               </li>
               {/* <li>

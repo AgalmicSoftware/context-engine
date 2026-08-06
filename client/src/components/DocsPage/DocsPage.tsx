@@ -59,19 +59,20 @@ const buildContractsForViewer = buildContractViewerContracts as (options?: {
 }) => ContractViewerContract[];
 
 export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPageProps) => {
-  // Parse potential slug/key from URL: /contracts/:slugOrKey
+  // Parse potential slug/key from URL: /docs/:slugOrKey (or the legacy /contracts alias).
   const path = stripPublicUrlBasePath((typeof window !== 'undefined' ? window.location.pathname : '') || '');
   const search = (typeof window !== 'undefined' ? window.location.search : '') || '';
   const parts = path.split('/').filter(Boolean);
-  const urlSlugLike = parts[0] === 'contracts' && parts.length > 1 ? parts[1] : undefined;
+  const urlSlugLike = (parts[0] === 'docs' || parts[0] === 'contracts') && parts.length > 1 ? parts[1] : undefined;
   const searchParams = new URLSearchParams(search);
-  const querySessionRaw = searchParams.get('session') || undefined;
+  const hasExplicitSessionQuery = ['session', 'sessionSlug', 's'].some((key) => searchParams.has(key));
+  const querySessionRaw = searchParams.has('session')
+    ? searchParams.get('session') || ''
+    : searchParams.get('sessionSlug') || searchParams.get('s') || undefined;
   const deepLinkedContractKey = normalizeContractKeyParam(searchParams.get('contract') || '');
 
   // Fallback: derive slug from referrer (covers full-page reload from /session/:slug)
-  const referrerSlug = resolveDocsPageReferrerSlug(
-    (typeof document !== 'undefined' ? document.referrer : '') || '',
-  );
+  const referrerSlug = resolveDocsPageReferrerSlug((typeof document !== 'undefined' ? document.referrer : '') || '');
 
   // Resolve session by URL first, then ?session, then routed/Redux context, then referrer, else default "general"
   const activeSession = resolveDocsPageActiveSession({
@@ -89,16 +90,16 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
   const sessionCapabilities = useMemo(() => resolveSessionCapabilityProjection(activeSession), [activeSession]);
   const contributesSessionContracts = sessionCapabilities.usesChainMetadata;
 
-  // Sync generic /contracts URLs to ?session= while preserving unrelated search params.
+  // Sync generic docs URLs to /docs?session= while preserving unrelated search params.
   useEffect(() => {
     if (typeof window === 'undefined' || urlSlugLike !== undefined) return;
 
     const nextUrl = new URL(window.location.href);
     let changed = false;
 
-    const contractsPath = buildPublicRoute('/contracts');
-    if (nextUrl.pathname !== contractsPath) {
-      nextUrl.pathname = contractsPath;
+    const docsPath = buildPublicRoute('/docs');
+    if (nextUrl.pathname !== docsPath) {
+      nextUrl.pathname = docsPath;
       changed = true;
     }
 
@@ -111,12 +112,12 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
       changed = true;
     }
 
-    if (canonicalSlug) {
+    if (hasExplicitSessionQuery && canonicalSlug) {
       if (nextUrl.searchParams.get('session') !== canonicalSlug) {
         nextUrl.searchParams.set('session', canonicalSlug);
         changed = true;
       }
-    } else if (nextUrl.searchParams.has('session')) {
+    } else if (hasExplicitSessionQuery && nextUrl.searchParams.has('session')) {
       nextUrl.searchParams.delete('session');
       changed = true;
     }
@@ -124,7 +125,7 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
     if (changed) {
       window.history.replaceState(null, '', `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`);
     }
-  }, [urlSlugLike, canonicalSlug]);
+  }, [urlSlugLike, canonicalSlug, hasExplicitSessionQuery]);
 
   const clusterAnalysisPromptDisplay = buildClusterAnalysisPrompt(
     {
@@ -385,7 +386,7 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
   };
 
   return (
-    <div className={styles.contractPage} data-testid={E2E_TESTIDS.PAGE_CONTRACTS_ROOT}>
+    <div className={styles.contractPage} data-testid={E2E_TESTIDS.PAGE_DOCS_ROOT}>
       {!contributesSessionContracts ? (
         <aside
           className={styles.advancedExternalNotice}

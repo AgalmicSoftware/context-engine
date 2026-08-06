@@ -88,7 +88,10 @@ describe('publicPageHead', () => {
     ).toBe('https://contextengine.xyz/question/0xabc?sessionId=0xsessionid&responder=0xdeadbeef');
   });
 
-  it('preserves contract deep-link params while dropping unrelated query strings', () => {
+  it('preserves docs contract deep-link params before and after the legacy redirect', () => {
+    expect(
+      buildCanonicalPublicUrl(new URL('https://contextengine.xyz/docs?session=edge&contract=surveys&ref=welcome')),
+    ).toBe('https://contextengine.xyz/docs?session=edge&contract=surveys');
     expect(
       buildCanonicalPublicUrl(new URL('https://contextengine.xyz/contracts?session=edge&contract=surveys&ref=welcome')),
     ).toBe('https://contextengine.xyz/contracts?session=edge&contract=surveys');
@@ -115,11 +118,14 @@ describe('publicPageHead', () => {
     ).toBe('https://contextengine.xyz/sponsor?sessionId=edge-session-id&chainId=registry-11155420');
   });
 
-  it('keeps route-defining params for PUBLIC_URL-prefixed contracts and wizard routes', () => {
+  it('keeps route-defining params for PUBLIC_URL-prefixed docs aliases and wizard routes', () => {
     const priorPublicUrl = env.PUBLIC_URL;
     env.PUBLIC_URL = '/ce/';
 
     try {
+      expect(
+        buildCanonicalPublicUrl(new URL('https://contextengine.xyz/ce/docs?session=edge&contract=surveys&ref=welcome')),
+      ).toBe('https://contextengine.xyz/ce/docs?session=edge&contract=surveys');
       expect(
         buildCanonicalPublicUrl(
           new URL('https://contextengine.xyz/ce/contracts?session=edge&contract=surveys&ref=welcome'),

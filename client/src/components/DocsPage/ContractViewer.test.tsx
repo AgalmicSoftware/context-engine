@@ -23,16 +23,16 @@ describe('ContractViewer compact variant', () => {
           },
         ]}
         onClose={jest.fn()}
-        renderSourceHeaderActions={() => <a href="/contracts?contract=surveys">Open full Contracts page</a>}
+        renderSourceHeaderActions={() => <a href="/docs?contract=surveys">Open Surveys in Docs</a>}
       />,
     );
 
     expect(screen.queryByTestId(CONTRACT_VIEWER_TOGGLE_TESTID)).not.toBeInTheDocument();
     expect(screen.getByTestId(getContractViewerCardTestId('surveys'))).toBeInTheDocument();
     expect(screen.getByTestId(getContractViewerSourceTestId('surveys'))).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /open full contracts page/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /open surveys in docs/i })).toHaveAttribute(
       'href',
-      '/contracts?contract=surveys',
+      '/docs?contract=surveys',
     );
     expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
   });

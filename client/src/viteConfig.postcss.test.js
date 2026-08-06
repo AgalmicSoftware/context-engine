@@ -33,6 +33,14 @@ describe('vite PostCSS compatibility', () => {
     expect(config).toContain('writePostSocialPreviewHtml({ buildDir: outputDir, postsDir })');
   });
 
+  it('keeps PUBLIC_URL on the process.env expression replaced by Vite', () => {
+    const publicUrlSource = fs.readFileSync(path.join(clientRoot, 'src', 'utilities', 'ui', 'publicUrl.ts'), 'utf8');
+
+    expect(publicUrlSource).toContain('const BUNDLED_PUBLIC_URL_PROCESS: ProcWithEnv = { env: process.env };');
+    expect(publicUrlSource).toContain('proc: ProcWithEnv = BUNDLED_PUBLIC_URL_PROCESS');
+    expect(publicUrlSource).not.toContain("typeof process !== 'undefined' ? process : undefined");
+  });
+
   it('writes crawler-facing post HTML with the header as a large social image', () => {
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-post-social-preview-'));
     const buildDir = path.join(tempRoot, 'build');

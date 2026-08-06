@@ -22,7 +22,7 @@ export type MainSiteRouteKey =
   | 'posts'
   | 'demos'
   | 'matrix'
-  | 'contracts'
+  | 'docs'
   | 'admin'
   | 'sponsor'
   | 'agent'
@@ -163,8 +163,13 @@ const routeDefinitions: RouteDefinition[] = [
     match: ({ fullPath }) => fullPath === '/matrix',
   },
   {
-    key: 'contracts',
-    match: ({ fullPath }) => fullPath === '/contracts' || fullPath.startsWith('/contracts/'),
+    key: 'docs',
+    match: ({ pathWithoutQuery }) =>
+      isOnOrWithinRoutePath(pathWithoutQuery, '/docs') || isOnOrWithinRoutePath(pathWithoutQuery, '/contracts'),
+    canonicalPath: ({ pathWithoutQuery }) =>
+      isOnOrWithinRoutePath(pathWithoutQuery, '/contracts')
+        ? pathWithoutQuery.replace(/^\/contracts(?=\/|$)/, '/docs')
+        : undefined,
   },
   {
     key: 'admin',
@@ -184,7 +189,10 @@ const routeDefinitions: RouteDefinition[] = [
   },
 ];
 
-export const MAIN_SITE_ROUTE_DEFINITIONS = routeDefinitions.map(({ key }) => ({ key }));
+export const MAIN_SITE_ROUTE_DEFINITIONS = routeDefinitions.map(({ key, canonicalPath }) => ({
+  key,
+  hasCanonicalPath: typeof canonicalPath === 'function',
+}));
 
 export function resolveMainSiteRouteMatch({
   fullPath,

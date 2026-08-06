@@ -87,7 +87,7 @@ describe('sessionWizardContracts', () => {
 
     expect(plan.resolvedChainId).toBe(84532);
     expect(plan.selectedContract?.key).toBe('surveys');
-    expect(plan.selectedContractHref).toBe('/contracts?contract=surveys&session=source-session');
+    expect(plan.selectedContractHref).toBe('/docs?contract=surveys&session=source-session');
     expect(plan.selectedContractSessionSlug).toBe('source-session');
     expect(plan.contracts.map((contract) => contract.key)).toEqual(['surveys', 'sbtFactory', 'sessionRegistry']);
   });
@@ -107,7 +107,7 @@ describe('sessionWizardContracts', () => {
     expect(registryContract?.addresses?.[0]?.address).toBe(defaults.sessionRegistry);
     expect(plan.contracts.some((contract) => contract.key === 'customSBT')).toBe(false);
     expect(plan.selectedContract?.key).toBe('sessionRegistry');
-    expect(plan.selectedContractHref).toBe('/contracts?contract=sessionRegistry&session=active-session');
+    expect(plan.selectedContractHref).toBe('/docs?contract=sessionRegistry&session=active-session');
   });
 
   test('contract viewer plan falls back to the resolved active session slug', () => {
@@ -121,7 +121,7 @@ describe('sessionWizardContracts', () => {
     });
 
     expect(plan.selectedContract).toBeNull();
-    expect(plan.selectedContractHref).toBe('/contracts?session=resolved-session');
+    expect(plan.selectedContractHref).toBe('/docs?session=resolved-session');
     expect(plan.selectedContractSessionSlug).toBe('resolved-session');
   });
 });

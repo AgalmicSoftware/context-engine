@@ -43,8 +43,8 @@ const SessionWizardContractViewerModal = ({
               target="_blank"
               rel="noopener noreferrer"
               className={styles.contractViewerFullPageLink}
-              aria-label={`Open full Contracts page for ${contract.name}`}
-              title={`Open full Contracts page for ${contract.name}`}
+              aria-label={`Open ${contract.name} in Docs`}
+              title={`Open ${contract.name} in Docs`}
               data-testid="ce-wizard-contract-modal-full-link"
             >
               <FontAwesomeIcon icon={faExternalLinkAlt} />

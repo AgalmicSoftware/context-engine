@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { DocsPage } from './DocsPage';
-import { buildContractsPageHref, getContractViewerSourceTestId } from './contractMetadata.js';
+import { buildDocsContractsHref, getContractViewerSourceTestId } from './contractMetadata.js';
 import { buildContractViewerContracts } from './contractViewerUtils.js';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
@@ -64,7 +64,7 @@ describe('DocsPage contract deep links', () => {
     } else {
       process.env.PUBLIC_URL = originalPublicUrl;
     }
-    window.history.pushState({}, '', '/contracts?contract=sessionRegistry');
+    window.history.pushState({}, '', '/docs?contract=sessionRegistry');
     mockGetSessionConfigBySlug.mockImplementation((slug = '') => (slug === 'session-alpha' ? sessionConfig : null));
     mockGetDemoSessionConfigBySlug.mockReturnValue(null);
     mockGetSessionConfigBySlugOrDefault.mockReturnValue(generalSessionConfig);
@@ -164,19 +164,33 @@ describe('DocsPage contract deep links', () => {
     window.history.pushState({}, '', '/ce/contracts?contract=surveys&sessionSlug=session-alpha#source');
 
     expect(
-      buildContractsPageHref({
+      buildDocsContractsHref({
         contractKey: 'surveys',
         sessionSlug: 'session-alpha',
       }),
-    ).toBe('/ce/contracts?contract=surveys&session=session-alpha');
+    ).toBe('/ce/docs?contract=surveys&session=session-alpha');
 
     render(<DocsPage activeSessionSlug="session-alpha" reduxActiveSessionSlug="" />);
 
     await waitFor(() => {
-      expect(window.location.pathname).toBe('/ce/contracts');
+      expect(window.location.pathname).toBe('/ce/docs');
       expect(window.location.search).toBe('?contract=surveys&session=session-alpha');
       expect(window.location.hash).toBe('#source');
     });
+  });
+
+  it('does not inject ambient session state into a contract-only legacy deep link', async () => {
+    process.env.PUBLIC_URL = '/ce/';
+    window.history.pushState({}, '', '/ce/contracts?contract=surveys#source');
+
+    render(<DocsPage activeSessionSlug="session-alpha" reduxActiveSessionSlug="" />);
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/ce/docs');
+      expect(window.location.search).toBe('?contract=surveys');
+      expect(window.location.hash).toBe('#source');
+    });
+    expect(await screen.findByTestId(getContractViewerSourceTestId('surveys'))).toBeInTheDocument();
   });
 
   it('keeps a Worker session legacy chain and contracts out of the global Advanced viewer', async () => {
@@ -192,7 +206,7 @@ describe('DocsPage contract deep links', () => {
       },
       sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
     };
-    window.history.pushState({}, '', '/contracts?session=demo-sh');
+    window.history.pushState({}, '', '/docs?session=demo-sh');
     mockGetSessionConfigBySlug.mockImplementation((slug = '') => (slug === 'demo-sh' ? workerSessionConfig : null));
 
     render(<DocsPage activeSessionSlug="demo-sh" reduxActiveSessionSlug="" />);
@@ -211,5 +225,17 @@ describe('DocsPage contract deep links', () => {
     });
     expect(screen.queryByText('Session Registry')).not.toBeInTheDocument();
     expect(screen.getByText('Custom SBT (Template)')).toBeInTheDocument();
+  });
+
+  it('redirects the legacy contracts route to docs without losing its deep link', async () => {
+    window.history.pushState({}, '', '/contracts?contract=surveys&session=session-alpha#source');
+
+    render(<DocsPage activeSessionSlug="session-alpha" reduxActiveSessionSlug="" />);
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/docs');
+      expect(window.location.search).toBe('?contract=surveys&session=session-alpha');
+      expect(window.location.hash).toBe('#source');
+    });
   });
 });

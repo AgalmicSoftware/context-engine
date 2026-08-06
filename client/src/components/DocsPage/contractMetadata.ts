@@ -53,8 +53,16 @@ export const getSessionWizardContractTooltipTestId = (contractKey = ''): string 
 export const getSessionWizardContractModalTriggerTestId = (contractKey = ''): string =>
   `ce-wizard-contract-modal-trigger-${contractKey}`;
 
-export const buildContractsPageHref = ({ contractKey = '', sessionSlug = '' }: any = {}): string => {
-  const normalizedContractKey = normalizeContractKeyParam(contractKey);
+type DocsContractsHrefOptions = {
+  contractKey?: unknown;
+  sessionSlug?: unknown;
+};
+
+export const buildDocsContractsHref = ({
+  contractKey = '',
+  sessionSlug = '',
+}: DocsContractsHrefOptions = {}): string => {
+  const normalizedContractKey = normalizeContractKeyParam(toStr(contractKey));
   const normalizedSessionSlug = toStr(sessionSlug).trim();
   const searchParams = new URLSearchParams();
 
@@ -62,5 +70,5 @@ export const buildContractsPageHref = ({ contractKey = '', sessionSlug = '' }: a
   if (normalizedSessionSlug) searchParams.set('session', normalizedSessionSlug);
 
   const query = searchParams.toString();
-  return buildPublicRoute(query ? `/contracts?${query}` : '/contracts');
+  return buildPublicRoute(query ? `/docs?${query}` : '/docs');
 };

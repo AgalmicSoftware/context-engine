@@ -98,7 +98,7 @@ const buildProps = (overrides: Partial<SessionWizardModalsProps> = {}): SessionW
   contractViewerModalState: { open: false },
   selectedWizardContract: null,
   closeContractViewerModal: jest.fn(),
-  selectedWizardContractHref: '/contracts?contract=surveys',
+  selectedWizardContractHref: '/docs?contract=surveys',
   sessionHeaderPreviewModalOpen: false,
   onCloseSessionHeaderPreviewModal: jest.fn(),
   sessionHeaderPreviewSrc: '',
@@ -146,13 +146,10 @@ describe('SessionWizardModals', () => {
 
     expect(screen.getByTestId(WIZARD_CONTRACT_MODAL_TESTID)).toBeInTheDocument();
     expect(screen.getByTestId('mock-contract-viewer')).toBeInTheDocument();
-    expect(screen.getByTestId('ce-wizard-contract-modal-full-link')).toHaveAttribute(
-      'href',
-      '/contracts?contract=surveys',
-    );
+    expect(screen.getByTestId('ce-wizard-contract-modal-full-link')).toHaveAttribute('href', '/docs?contract=surveys');
     expect(screen.getByTestId('ce-wizard-contract-modal-full-link')).toHaveAttribute(
       'aria-label',
-      'Open full Contracts page for Surveys',
+      'Open Surveys in Docs',
     );
   });
 

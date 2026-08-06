@@ -628,7 +628,7 @@ describe('SessionWizard rendered validation', () => {
 
     expect(within(modal).getByTestId('ce-wizard-contract-modal-full-link')).toHaveAttribute(
       'href',
-      '/contracts?contract=sessionRegistry&session=session-alpha',
+      '/docs?contract=sessionRegistry&session=session-alpha',
     );
     expect(within(modal).getByTestId('ce-wizard-contract-modal-full-link')).toHaveAttribute(
       'rel',

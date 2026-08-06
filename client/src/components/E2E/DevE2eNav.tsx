@@ -79,7 +79,7 @@ export default function DevE2eNav() {
     { testId: E2E_TESTIDS.NAV_SBTS, to: sbtsListPath(), label: 'SBTs' },
     { testId: E2E_TESTIDS.NAV_COMPARE, to: '/compare/', label: 'Compare' },
     { testId: E2E_TESTIDS.NAV_BOOKMARKS, to: '/bookmarks', label: 'Bookmarks' },
-    { testId: E2E_TESTIDS.NAV_CONTRACTS, to: '/contracts', label: 'Contracts' },
+    { testId: E2E_TESTIDS.NAV_DOCS, to: '/docs', label: 'Docs' },
     { testId: E2E_TESTIDS.NAV_ABOUT, to: '/about', label: 'About' },
     { testId: E2E_TESTIDS.NAV_ADMIN, to: '/admin', label: 'Admin' },
     { testId: E2E_TESTIDS.NAV_SESSION, to: `/session/${encodedSession}`, label: 'Session' },

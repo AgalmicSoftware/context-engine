@@ -48,13 +48,7 @@ describe('Footer', () => {
     const { container } = renderFooter();
     const navItems = Array.from(container.querySelectorAll('nav li'));
 
-    expect(navItems.map((item) => item.textContent?.trim())).toEqual([
-      'NEW',
-      'ABOUT',
-      'POSTS',
-      'SETTINGS',
-      'CONTRACTS',
-    ]);
+    expect(navItems.map((item) => item.textContent?.trim())).toEqual(['NEW', 'ABOUT', 'POSTS', 'SETTINGS', 'DOCS']);
     expect(screen.getByRole('link', { name: 'POSTS' })).toHaveAttribute('href', '/posts');
   });
 
@@ -67,7 +61,7 @@ describe('Footer', () => {
       expect(screen.getByRole('link', { name: 'NEW' })).toHaveAttribute('href', '/ce/new');
       expect(screen.getByRole('link', { name: 'ABOUT' })).toHaveAttribute('href', '/ce/about');
       expect(screen.getByRole('link', { name: 'POSTS' })).toHaveAttribute('href', '/ce/posts');
-      expect(screen.getByRole('link', { name: 'CONTRACTS' })).toHaveAttribute('href', '/ce/contracts');
+      expect(screen.getByRole('link', { name: 'DOCS' })).toHaveAttribute('href', '/ce/docs');
       expect(screen.getByTestId('ce-footer-link-github')).toHaveAttribute(
         'href',
         'https://github.com/AgalmicSoftware/context-engine',
