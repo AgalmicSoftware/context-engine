@@ -70,8 +70,5 @@ export const buildSessionWizardWorkerVerificationConfig = ({
       }),
     workerSecrets,
   });
-  if (resolvedDraft.agentSessionWrapped && typeof resolvedDraft.agentSessionWrapped === 'object') {
-    config.agentSessionWrapped = JSON.parse(JSON.stringify(resolvedDraft.agentSessionWrapped));
-  }
   return config;
 };

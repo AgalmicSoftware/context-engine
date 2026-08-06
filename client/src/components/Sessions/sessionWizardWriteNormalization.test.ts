@@ -20,6 +20,7 @@ import {
 import { resolveSessionWizardEnabledWorkerSecrets } from './sessionWizardWorkerSecretSupport';
 import { buildSessionWizardDefaultTemplate } from './sessionWizardDraftState';
 import { buildSessionWizardMetadataPayloadBuilder } from './sessionWizardMetadataPayloadBuilder';
+import { buildSessionWizardWorkerVerificationConfig } from './sessionWizardWorkerVerificationConfig';
 
 const DEFAULT_CONFIG_CHAIN_ID = DEFAULT_CHAIN_ID;
 
@@ -107,6 +108,14 @@ describe('sessionWizardWriteNormalization', () => {
       workerUrl: 'https://worker.example',
       getContractDefaults: () => ({}),
     });
+    const outboundVerificationConfig = buildSessionWizardWorkerVerificationConfig({
+      runtime: {
+        account: '',
+        draft,
+        registryChainId: DEFAULT_CONFIG_CHAIN_ID,
+      },
+      workerUrl: 'https://worker.example',
+    });
 
     expect(outboundArweaveMetadata).not.toHaveProperty('sessionEndsAt');
     expect(outboundArweaveMetadata).not.toHaveProperty('defaultGroupTags');
@@ -127,6 +136,7 @@ describe('sessionWizardWriteNormalization', () => {
     expect(outboundWorkerConfig).not.toHaveProperty('sessionEndsAt');
     expect(outboundWorkerConfig).not.toHaveProperty('defaultGroupTags');
     expect(outboundWorkerConfig).not.toHaveProperty('agentSessionWrapped');
+    expect(outboundVerificationConfig).not.toHaveProperty('agentSessionWrapped');
     expect(outboundWorkerConfig).not.toHaveProperty('defaultSbtTags');
     expect(outboundWorkerConfig).not.toHaveProperty('defaultFeaturedSBTs');
     expect(outboundWorkerConfig).not.toHaveProperty('autoFeatureSBTsBySessionSlug');
@@ -141,6 +151,27 @@ describe('sessionWizardWriteNormalization', () => {
         }),
       }),
     );
+  });
+
+  test('keeps Wrapped capability evidence when the selected profile enables agent HTTP', () => {
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    sessionModeProfile.surfaces.agentHttp = true;
+    const agentSessionWrapped = {
+      enabled: true,
+      bridgeUrl: 'https://wrapped.example.test',
+    };
+
+    expect(
+      buildSessionWizardWorkerVerificationConfig({
+        draft: {
+          slug: 'wrapped-boundary',
+          sessionModeProfile,
+          agentSessionWrapped,
+        },
+        workerUrl: 'https://worker.example',
+      }),
+    ).toEqual(expect.objectContaining({ agentSessionWrapped }));
   });
 
   test('filters stale hidden-field gates before outbound metadata encryption', async () => {
