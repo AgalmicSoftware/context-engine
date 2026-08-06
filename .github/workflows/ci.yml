@@ -102,15 +102,21 @@ jobs:
         if: ${{ startsWith(github.ref_name, 'release-staging') || startsWith(github.head_ref, 'release-staging') }}
         env:
           RELEASE_EVENT_NAME: ${{ github.event_name }}
+          RELEASE_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           RELEASE_PUSH_BEFORE_SHA: ${{ github.event.before }}
           ZERO_OID: 0000000000000000000000000000000000000000
         run: |
           set -euo pipefail
           git fetch --no-tags --depth=1 origin main
+          release_candidate_ref=HEAD
+          if [ "$RELEASE_EVENT_NAME" = "pull_request" ]; then
+            release_candidate_ref="$RELEASE_PR_HEAD_SHA"
+            git fetch --no-tags --depth=1 origin "$release_candidate_ref"
+          fi
           node scripts/worker-release-artifacts.mjs verify-replay-range \
             --base-ref origin/main \
-            --candidate-ref HEAD
-          verify_args=(verify-ref --candidate-ref HEAD --baseline-ref origin/main)
+            --candidate-ref "$release_candidate_ref"
+          verify_args=(verify-ref --candidate-ref "$release_candidate_ref" --baseline-ref origin/main)
           if [ "$RELEASE_EVENT_NAME" = "push" ] && [ "$RELEASE_PUSH_BEFORE_SHA" != "$ZERO_OID" ]; then
             git fetch --no-tags --depth=1 origin "$RELEASE_PUSH_BEFORE_SHA"
             verify_args+=(--minimum-ref "$RELEASE_PUSH_BEFORE_SHA")

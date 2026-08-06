@@ -373,8 +373,32 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
     'release-staging previous push SHA',
   );
   expectWorkflowContains(
+    'RELEASE_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}',
+    'release-staging pull request head SHA',
+  );
+  expectWorkflowContains(
     'RELEASE_EVENT_NAME: ${{ github.event_name }}',
     'release-staging push event discriminator',
+  );
+  expectWorkflowContains(
+    'if [ "$RELEASE_EVENT_NAME" = "pull_request" ]; then',
+    'release-staging pull request event discriminator',
+  );
+  expectWorkflowContains(
+    'release_candidate_ref="$RELEASE_PR_HEAD_SHA"',
+    'release-staging pull request candidate selection',
+  );
+  expectWorkflowContains(
+    'git fetch --no-tags --depth=1 origin "$release_candidate_ref"',
+    'release-staging pull request head fetch',
+  );
+  expectWorkflowContains(
+    '--candidate-ref "$release_candidate_ref"',
+    'release-staging explicit candidate ref',
+  );
+  expectWorkflowOmits(
+    '--candidate-ref HEAD',
+    'synthetic pull request merge candidate',
   );
   expectWorkflowContains(
     'if [ "$RELEASE_EVENT_NAME" = "push" ] && [ "$RELEASE_PUSH_BEFORE_SHA" != "$ZERO_OID" ]; then',

@@ -219,6 +219,27 @@ test('public replay range verification accepts the exact public identity and one
   }
 });
 
+test('public replay range rejects a synthetic merge but accepts its explicit head', () => {
+  const { rootDir, git, baseCommit, candidateCommit } = publicReplayFixture();
+  try {
+    git(['branch', 'release-staging', candidateCommit]);
+    git(['switch', '-c', 'synthetic-merge', baseCommit]);
+    git(['merge', '--no-ff', 'release-staging', '-m', 'synthetic pull request merge']);
+    const mergeCommit = git(['rev-parse', 'HEAD']);
+
+    assert.deepEqual(
+      verifyPublicReplayRange({ rootDir, baseRef: baseCommit, candidateRef: candidateCommit }),
+      { baseCommit, candidateCommit, replayCommitCount: 1 },
+    );
+    assert.throws(
+      () => verifyPublicReplayRange({ rootDir, baseRef: baseCommit, candidateRef: mergeCommit }),
+      /not a linear public replay/,
+    );
+  } finally {
+    fs.rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
 test('public replay range verification rejects identity and trailer drift', () => {
   {
     const { rootDir, git, baseCommit } = publicReplayFixture();

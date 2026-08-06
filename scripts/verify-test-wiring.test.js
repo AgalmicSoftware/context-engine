@@ -52,6 +52,28 @@ test('E2E preview readiness retries stay quiet but the final probe remains diagn
   assert.match(workflow, /curl -fsS "\$BASE_URL" >\/dev\/null\s+npm run ci:gate -- e2e-smoke/);
 });
 
+test('release-staging PR verification uses the fetched PR head instead of merge HEAD', () => {
+  const rootDir = path.resolve(__dirname, '..');
+  const workflow = fs.readFileSync(path.join(rootDir, '.github/workflows/ci.yml'), 'utf8');
+
+  assert.match(
+    workflow,
+    /RELEASE_PR_HEAD_SHA: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/,
+  );
+  assert.match(
+    workflow,
+    /release_candidate_ref=HEAD\s+if \[ "\$RELEASE_EVENT_NAME" = "pull_request" \]; then\s+release_candidate_ref="\$RELEASE_PR_HEAD_SHA"\s+git fetch --no-tags --depth=1 origin "\$release_candidate_ref"\s+fi/,
+  );
+  assert.match(
+    workflow,
+    /verify-replay-range\s+\\\s+--base-ref origin\/main\s+\\\s+--candidate-ref "\$release_candidate_ref"/,
+  );
+  assert.match(
+    workflow,
+    /verify_args=\(verify-ref --candidate-ref "\$release_candidate_ref" --baseline-ref origin\/main\)/,
+  );
+});
+
 test('agent bridge runner skips cleanly when a public artifact omits the worker', () => {
   const { runAgentBridgeWorkerTests } = require('./run-agent-bridge-worker-tests');
 
@@ -133,15 +155,21 @@ test('public-release style copies without .git still pass wiring checks', () => 
         '      - run: node scripts/worker-release-artifacts.mjs stage',
         '      - env:',
         '          RELEASE_EVENT_NAME: ${{ github.event_name }}',
+        '          RELEASE_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}',
         '          RELEASE_PUSH_BEFORE_SHA: ${{ github.event.before }}',
         '        run: |',
-        '          verify_args=(verify-ref --candidate-ref HEAD --baseline-ref origin/main)',
+        '          release_candidate_ref=HEAD',
+        '          if [ "$RELEASE_EVENT_NAME" = "pull_request" ]; then',
+        '            release_candidate_ref="$RELEASE_PR_HEAD_SHA"',
+        '            git fetch --no-tags --depth=1 origin "$release_candidate_ref"',
+        '          fi',
+        '          node scripts/worker-release-artifacts.mjs verify-replay-range --candidate-ref "$release_candidate_ref"',
+        '          verify_args=(verify-ref --candidate-ref "$release_candidate_ref" --baseline-ref origin/main)',
         '          if [ "$RELEASE_EVENT_NAME" = "push" ] && [ "$RELEASE_PUSH_BEFORE_SHA" != "$ZERO_OID" ]; then',
         '            git fetch --no-tags --depth=1 origin "$RELEASE_PUSH_BEFORE_SHA"',
         '            verify_args+=(--minimum-ref "$RELEASE_PUSH_BEFORE_SHA")',
         '          fi',
         '          node scripts/release-version.mjs "${verify_args[@]}"',
-        '      - run: node scripts/worker-release-artifacts.mjs verify-replay-range',
         '      - uses: actions/upload-artifact@1111111111111111111111111111111111111111',
         '        with:',
         '          name: worker-bundle-candidate-${{ github.sha }}',
