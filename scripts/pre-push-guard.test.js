@@ -51,13 +51,18 @@ function gitDir(rootDir) {
   }).trim();
 }
 
-function runHook(rootDir, input, remoteName = 'origin') {
+function runHook(
+  rootDir,
+  input,
+  remoteName = 'origin',
+  remoteUrl = '[redacted-email]-agalmic:AgalmicSoftware/context-engine.git',
+) {
   return spawnSync(
     'bash',
     [
       path.join(rootDir, '.githooks', 'pre-push'),
       remoteName,
-      '[redacted-email]-agalmic:AgalmicSoftware/context-engine.git',
+      remoteUrl,
     ],
     {
       cwd: rootDir,
@@ -135,6 +140,28 @@ test('pre-push guard blocks dev pushes to the public origin', () => {
     assert.doesNotMatch(result.stderr, /CE_PUSH_OVERRIDE|CE_ALLOW_PRIVATE_BRANCH_PUSH/);
   });
 });
+
+for (const remoteUrl of [
+  'https://github.com/agalmicsoftware/context-engine.git',
+  '[redacted-email]:agalmicsoftware/context-engine.git',
+]) {
+  test(`pre-push guard blocks dev pushes through case-variant public alias ${remoteUrl}`, () => {
+    withHookFixture((rootDir) => {
+      const result = runHook(
+        rootDir,
+        pushLine({
+          localRef: 'refs/heads/dev',
+          remoteRef: 'refs/heads/dev',
+        }),
+        'public-alias',
+        remoteUrl,
+      );
+
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /Blocked push to public Context Engine remote public-alias\./);
+    });
+  });
+}
 
 test('pre-push guard allows main pushes to the public origin', () => {
   withHookFixture((rootDir) => {
@@ -312,6 +339,26 @@ test('pre-push guard compares a public alias to a verified same-repository origi
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /Candidate version 0\.1\.0 must be greater than refs\/remotes\/origin\/main/);
     assert.match(result.stderr, /Blocked release-staging push/);
+  });
+});
+
+test('pre-push guard enforces release floors through case-variant public aliases', () => {
+  withHookFixture((rootDir) => {
+    const { candidateSha } = createVersionedCandidate(rootDir, '0.1.0');
+    git(rootDir, ['remote', 'add', 'origin', '[redacted-email]:agalmicsoftware/context-engine.git']);
+    const result = runHook(
+      rootDir,
+      pushLine({
+        localRef: 'refs/heads/release-staging',
+        localSha: candidateSha,
+        remoteRef: 'refs/heads/release-staging',
+      }),
+      'public-alias',
+      'https://github.com/agalmicsoftware/context-engine.git',
+    );
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Candidate version 0\.1\.0 must be greater than refs\/remotes\/origin\/main/);
   });
 });
 

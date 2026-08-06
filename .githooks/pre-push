@@ -5,15 +5,19 @@ REMOTE_NAME="${1:-}"
 REMOTE_URL="${2:-}"
 ZERO_OID="0000000000000000000000000000000000000000"
 
-should_protect_remote() {
-  case "$REMOTE_NAME" in
-    origin)
-      return 0
-      ;;
-  esac
+is_canonical_public_repository_url() {
+  local normalized_url
 
-  case "$REMOTE_URL" in
-    *AgalmicSoftware/context-engine*)
+  normalized_url="$(printf '%s' "${1:-}" | LC_ALL=C tr '[:upper:]' '[:lower:]')"
+  normalized_url="${normalized_url%/}"
+  case "$normalized_url" in
+    https://github.com/agalmicsoftware/context-engine|https://github.com/agalmicsoftware/context-engine.git|\
+    http://github.com/agalmicsoftware/context-engine|http://github.com/agalmicsoftware/context-engine.git|\
+    git://github.com/agalmicsoftware/context-engine|git://github.com/agalmicsoftware/context-engine.git|\
+    [redacted-email]:agalmicsoftware/context-engine|[redacted-email]:agalmicsoftware/context-engine.git|\
+    [redacted-email]-agalmic:agalmicsoftware/context-engine|[redacted-email]-agalmic:agalmicsoftware/context-engine.git|\
+    ssh://[redacted-email]/agalmicsoftware/context-engine|ssh://[redacted-email]/agalmicsoftware/context-engine.git|\
+    ssh://[redacted-email]-agalmic/agalmicsoftware/context-engine|ssh://[redacted-email]-agalmic/agalmicsoftware/context-engine.git)
       return 0
       ;;
   esac
@@ -21,14 +25,14 @@ should_protect_remote() {
   return 1
 }
 
-is_canonical_public_repository_url() {
-  case "${1:-}" in
-    *:AgalmicSoftware/context-engine|*:AgalmicSoftware/context-engine.git|*/AgalmicSoftware/context-engine|*/AgalmicSoftware/context-engine.git)
+should_protect_remote() {
+  case "$REMOTE_NAME" in
+    origin)
       return 0
       ;;
   esac
 
-  return 1
+  is_canonical_public_repository_url "$REMOTE_URL"
 }
 
 is_allowed_public_ref() {
