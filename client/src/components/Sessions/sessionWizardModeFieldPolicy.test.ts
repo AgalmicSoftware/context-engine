@@ -32,6 +32,37 @@ describe('sessionWizardModeFieldPolicy', () => {
       });
   });
 
+  it('strips hidden mode fields from encrypted metadata sidecars', () => {
+    const requirements = resolveSessionWizardModeRequirements(
+      cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
+    );
+    const payload = {
+      sessionEndsAt: '2099-01-02T03:04:00Z',
+      defaultGroupTags: 'worker-only-group-defaults',
+      encryptedFields: {
+        sessionEndsAt: { ciphertext: 'stale-session-end' },
+        defaultGroupTags: { ciphertext: 'stale-group-tags' },
+        sessionInfo: { ciphertext: 'allowed-session-info' },
+      },
+      encryptedFieldGates: {
+        sessionEndsAt: 'gate-stale',
+        defaultGroupTags: 'gate-stale',
+        sessionInfo: 'gate-current',
+      },
+    };
+
+    expect(
+      applySessionWizardModeFieldPolicyToPayload(payload, resolveSessionWizardModeFieldPolicy(requirements)),
+    ).toEqual({
+      encryptedFields: {
+        sessionInfo: { ciphertext: 'allowed-session-info' },
+      },
+      encryptedFieldGates: {
+        sessionInfo: 'gate-current',
+      },
+    });
+  });
+
   it('shows Worker timing and Group defaults without chain-only controls for pure Cloudflare', () => {
     expect(resolveSessionWizardModeFieldPolicy(cloudflareRequirements())).toEqual({
       showBlockLimits: false,

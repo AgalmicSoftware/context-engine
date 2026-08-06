@@ -96,5 +96,18 @@ export const applySessionWizardModeFieldPolicyToPayload = <T extends SessionWiza
     }
   }
 
+  (['encryptedFields', 'encryptedFieldGates'] as const).forEach((sidecarKey) => {
+    const sidecar = mutablePayload[sidecarKey];
+    if (!sidecar || typeof sidecar !== 'object' || Array.isArray(sidecar)) return;
+    Object.keys(sidecar).forEach((fieldPath) => {
+      const [rootKey, contractKey] = fieldPath.split('.');
+      const hidden =
+        rootKey === 'contracts'
+          ? !contractKey || !policy.visibleContractKeys.includes(contractKey as SessionWizardContractFieldKey)
+          : isSessionWizardModeHiddenTopLevelField(rootKey, policy);
+      if (hidden) delete (sidecar as SessionWizardModePolicyPayload)[fieldPath];
+    });
+  });
+
   return payload;
 };

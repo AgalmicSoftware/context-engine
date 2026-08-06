@@ -4,6 +4,7 @@ import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 jest.mock('../../utilities/crypto/cryptography.js', () => ({
   cryptoUtils: {
     _getProvider: jest.fn((providerLike) => providerLike || null),
+    encryptEnvelopeValue: jest.fn(),
   },
 }));
 
@@ -134,6 +135,56 @@ describe('sessionWizardWriteNormalization', () => {
         }),
       }),
     );
+  });
+
+  test('filters stale hidden-field gates before outbound metadata encryption', async () => {
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+    const staleGate = {
+      id: 'gate-stale-worker-field',
+      label: 'Stale Worker field gate',
+      mode: 'any',
+      sbts: [{ address: '0x0000000000000000000000000000000000000001' }],
+    };
+    const buildMetadataPayload = buildSessionWizardMetadataPayloadBuilder({
+      allEncryptionGates: [staleGate],
+      buildSessionWizardPublishArweaveUploadOptions: async () => ({}),
+      buildSponsoredFlagFields: () => ({}),
+      defaultGateId: '',
+      draft: {
+        slug: 'decentralized-gate-boundary',
+        sessionName: 'Decentralized Gate Boundary',
+        sessionModeProfile,
+        networkChainId: DEFAULT_CONFIG_CHAIN_ID,
+        blockLimits: { start: 100, end: 120 },
+        sessionEndsAt: '2099-01-02T03:04:00Z',
+        defaultGroupTags: 'worker-only-group-defaults',
+      },
+      encryptedFieldGates: {
+        sessionEndsAt: staleGate.id,
+        defaultGroupTags: staleGate.id,
+      },
+      gateSelections: {},
+      getCurrentWorkerSecrets: () => ({}),
+      getGateById: (gateId) => (gateId === staleGate.id ? staleGate : null),
+      latestChainBlock: 500,
+      registryChainId: DEFAULT_CONFIG_CHAIN_ID,
+      resolveWorkerBaseUrl: () => 'https://worker.example',
+      resolvedWalletAccountRef: { current: '' },
+      sessionHeaderMode: 'url',
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      setSessionHeaderStatus: jest.fn(),
+      workerSecretsEnabled: true,
+    });
+
+    const { metadata } = await buildMetadataPayload();
+
+    expect(cryptoUtils.encryptEnvelopeValue).not.toHaveBeenCalled();
+    expect(metadata).not.toHaveProperty('sessionEndsAt');
+    expect(metadata).not.toHaveProperty('defaultGroupTags');
+    expect(metadata).not.toHaveProperty('encryptedFields.sessionEndsAt');
+    expect(metadata).not.toHaveProperty('encryptedFields.defaultGroupTags');
+    expect(metadata).not.toHaveProperty('encryptedFieldGates.sessionEndsAt');
+    expect(metadata).not.toHaveProperty('encryptedFieldGates.defaultGroupTags');
   });
 
   test('sanitizeSessionWizardMetadataPayload strips worker-only fields from Arweave metadata', () => {
