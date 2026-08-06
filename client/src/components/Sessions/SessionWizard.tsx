@@ -4383,21 +4383,6 @@ const SessionWizard = ({
     hasSponsoredBundleLink,
     newSessionBannerDismissalContextKey,
   });
-  const normalizedAppliedSponsoredBundle = sponsoredBundlePublishAdapter.normalizeSparseSponsoredBundlePayload(
-    sponsoredBundleAppliedBundleRef.current,
-  );
-  const { newSessionRequiresLitCredential, showNewSessionRequirementsBanner } =
-    resolveSessionWizardNewSessionRequirementsDisplayState({
-      cloudflareWorkerSbtGateMode,
-      currentWorkerSecrets,
-      hasSponsoredBundleLink,
-      isNewSessionWizardRoute,
-      newSessionBannerDismissalContextKey,
-      newSessionBannerDismissedContext,
-      normalizedAppliedSponsoredBundle,
-      persistedNewSessionBannerDismissed,
-      sponsoredBundleStatus,
-    });
   const publishUiPlan = resolveSessionWizardPublishReducerUiPlan({
     state: sessionPublishState,
     resolvedWorkerBaseUrl,
@@ -4417,6 +4402,25 @@ const SessionWizard = ({
     sbtsLabel: t('sbts'),
     sessionModeProfile: draft.sessionModeProfile as SessionModeProfile,
   });
+  const normalizedAppliedSponsoredBundle = sponsoredBundlePublishAdapter.normalizeSparseSponsoredBundlePayload(
+    sponsoredBundleAppliedBundleRef.current,
+  );
+  const { newSessionRequiresLitCredential, requiredRequirementIds, showNewSessionRequirementsBanner } =
+    resolveSessionWizardNewSessionRequirementsDisplayState({
+      cloudflareWorkerSbtGateMode,
+      currentWorkerSecrets,
+      hasCompatibleWorkerRuntime: publishUiPlan.publishReadiness.canUploadMetadataNow,
+      hasPendingSbtDrafts: hasUndeployedPendingSbtDrafts,
+      hasSponsoredBundleLink,
+      isNewSessionWizardRoute,
+      newSessionBannerDismissalContextKey,
+      newSessionBannerDismissedContext,
+      normalizedAppliedSponsoredBundle,
+      persistedNewSessionBannerDismissed,
+      sessionAi: draft.ai,
+      sessionModeProfile: draft.sessionModeProfile,
+      sponsoredBundleStatus,
+    });
   const {
     publishProgressDisplayState: { publishStep },
   } = publishUiPlan;

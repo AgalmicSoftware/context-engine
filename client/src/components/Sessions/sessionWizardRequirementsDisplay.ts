@@ -7,6 +7,7 @@ type SessionWizardRecord = Record<string, unknown>;
 type ResolveSessionWizardNewSessionRequirementsDisplayStateArgs = {
   cloudflareWorkerSbtGateMode?: unknown;
   currentWorkerSecrets?: SessionWizardRecord | null;
+  hasCompatibleWorkerRuntime?: unknown;
   hasPendingSbtDrafts?: unknown;
   hasSponsoredBundleLink?: unknown;
   isNewSessionWizardRoute?: unknown;
@@ -40,6 +41,7 @@ const toRequirementString = (value: unknown): string => String(value ?? '');
 export const resolveSessionWizardNewSessionRequirementsDisplayState = ({
   cloudflareWorkerSbtGateMode = false,
   currentWorkerSecrets = null,
+  hasCompatibleWorkerRuntime = false,
   hasPendingSbtDrafts = false,
   hasSponsoredBundleLink = false,
   isNewSessionWizardRoute = false,
@@ -81,9 +83,11 @@ export const resolveSessionWizardNewSessionRequirementsDisplayState = ({
   const requiresCloudflareDeploy = modeRequirements.requiredRequirementIds.some(
     (requirementId) => requirementId === 'cloudflareAccount' || requirementId === 'cloudflareApiToken',
   );
-  const hasNewSessionDeployRequirementCovered =
-    (modeRequirements.selected && !requiresCloudflareDeploy) ||
-    !!toRequirementString(normalizedAppliedSponsoredBundle?.deployGrantToken).trim();
+  const requiresSessionWorker = modeRequirements.requiredRequirementIds.includes('sessionWorker');
+  const hasNewSessionDeployRequirementCovered = requiresSessionWorker
+    ? !!hasCompatibleWorkerRuntime
+    : (modeRequirements.selected && !requiresCloudflareDeploy) ||
+      !!toRequirementString(normalizedAppliedSponsoredBundle?.deployGrantToken).trim();
   const sponsoredBundleCoversNewSessionRequirements =
     sponsoredBundleStatusTone === 'success' &&
     hasNewSessionAiRequirementCovered &&

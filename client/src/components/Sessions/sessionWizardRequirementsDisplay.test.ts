@@ -195,4 +195,37 @@ describe('sessionWizardRequirementsDisplay', () => {
       sponsoredBundleOwnsNewSessionEntryFlow: false,
     });
   });
+
+  it('keeps the decentralized Worker requirement visible until a compatible runtime is attached', () => {
+    const baseInput = {
+      currentWorkerSecrets: {
+        openaiKey: 'provider-secret',
+        arweaveJwk: '{"kty":"RSA"}',
+      },
+      hasSponsoredBundleLink: true,
+      isNewSessionWizardRoute: true,
+      normalizedAppliedSponsoredBundle: { faucetGrantToken: 'funding-grant' },
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
+      sponsoredBundleStatus: { tone: 'success' },
+    };
+
+    expect(resolveSessionWizardNewSessionRequirementsDisplayState(baseInput)).toMatchObject({
+      hasNewSessionDeployRequirementCovered: false,
+      showNewSessionRequirementsBanner: true,
+      sponsoredBundleCoversNewSessionRequirements: false,
+      sponsoredBundleOwnsNewSessionEntryFlow: false,
+    });
+
+    expect(
+      resolveSessionWizardNewSessionRequirementsDisplayState({
+        ...baseInput,
+        hasCompatibleWorkerRuntime: true,
+      }),
+    ).toMatchObject({
+      hasNewSessionDeployRequirementCovered: true,
+      showNewSessionRequirementsBanner: false,
+      sponsoredBundleCoversNewSessionRequirements: true,
+      sponsoredBundleOwnsNewSessionEntryFlow: true,
+    });
+  });
 });

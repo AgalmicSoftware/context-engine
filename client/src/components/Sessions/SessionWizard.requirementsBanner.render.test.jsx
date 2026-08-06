@@ -129,7 +129,7 @@ describe('SessionWizard new-session requirements banner', () => {
     expect(screen.queryByText('OP Sepolia ETH for on-chain registration')).not.toBeInTheDocument();
   });
 
-  it('does not show the new-session requirements banner when a sponsored bundle covers setup requirements', async () => {
+  it('keeps decentralized Worker requirements visible after applying a resource-only sponsored bundle', async () => {
     window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id');
 
     renderSessionWizard({
@@ -138,6 +138,23 @@ describe('SessionWizard new-session requirements banner', () => {
     });
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    await expectSponsoredStatusText(
+      'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit API key, deploy access.',
+    );
+    expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
+    expect(screen.getByText(/compatible Session Worker/i)).toBeInTheDocument();
+  });
+
+  it('hides Cloudflare requirements when a sponsored bundle covers setup requirements', async () => {
+    window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id');
+
+    renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor-tx-id',
+      initialSponsoredBundleKey: 'sponsor-secret',
+    });
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    await selectCloudflarePreset();
     await expectSponsoredStatusText(
       'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit API key, deploy access.',
     );
