@@ -107,6 +107,9 @@ jobs:
         run: |
           set -euo pipefail
           git fetch --no-tags --depth=1 origin main
+          node scripts/worker-release-artifacts.mjs verify-replay-range \
+            --base-ref origin/main \
+            --candidate-ref HEAD
           verify_args=(verify-ref --candidate-ref HEAD --baseline-ref origin/main)
           if [ "$RELEASE_EVENT_NAME" = "push" ] && [ "$RELEASE_PUSH_BEFORE_SHA" != "$ZERO_OID" ]; then
             git fetch --no-tags --depth=1 origin "$RELEASE_PUSH_BEFORE_SHA"

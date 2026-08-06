@@ -9,6 +9,8 @@ const { execFileSync, spawnSync } = require('node:child_process');
 
 const PRE_PUSH_SOURCE_PATH = path.join(__dirname, '..', '.githooks', 'pre-push');
 const RELEASE_VERSION_SOURCE_PATH = path.join(__dirname, 'release-version.mjs');
+const PUBLIC_GIT_NAME = 'Agalmic';
+const PUBLIC_GIT_EMAIL = 'agalmicsoftware@protonmail.com';
 const NON_ZERO_SHA = '1111111111111111111111111111111111111111';
 const ZERO_SHA = '0000000000000000000000000000000000000000';
 
@@ -100,6 +102,8 @@ function createVersionedCandidate(rootDir, candidateVersion, clientVersion = can
   const mainSha = git(rootDir, ['rev-parse', 'HEAD']);
   git(rootDir, ['update-ref', 'refs/remotes/origin/main', mainSha]);
 
+  git(rootDir, ['config', 'user.name', PUBLIC_GIT_NAME]);
+  git(rootDir, ['config', 'user.email', PUBLIC_GIT_EMAIL]);
   writeVersionSurfaces(rootDir, candidateVersion, clientVersion);
   writeFile(rootDir, 'candidate.txt', `${candidateVersion}\n`);
   git(rootDir, ['add', '-A']);
@@ -345,6 +349,79 @@ test('pre-push guard requires provenance on every new staging commit', () => {
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /Blocked public branch refs\/heads\/release-staging/);
     assert.match(result.stderr, /valid CE-Private-Source trailer/);
+  });
+});
+
+test('pre-push guard requires the public replay author and committer identity', () => {
+  withHookFixture((rootDir) => {
+    createVersionedCandidate(rootDir, '0.1.1');
+    git(rootDir, [
+      'commit',
+      '--quiet',
+      '--amend',
+      '--no-edit',
+      '--author',
+      'Private Person <[redacted-email]>',
+    ]);
+    const candidateSha = git(rootDir, ['rev-parse', 'HEAD']);
+    git(rootDir, ['branch', '-M', 'release-staging']);
+    const result = runHook(rootDir, pushLine({
+      localRef: 'refs/heads/release-staging',
+      localSha: candidateSha,
+      remoteRef: 'refs/heads/release-staging',
+    }));
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /public replay author and committer identity/);
+  });
+
+  withHookFixture((rootDir) => {
+    createVersionedCandidate(rootDir, '0.1.1');
+    git(rootDir, ['config', 'user.name', 'Private Person']);
+    git(rootDir, ['config', 'user.email', '[redacted-email]']);
+    git(rootDir, [
+      'commit',
+      '--quiet',
+      '--amend',
+      '--no-edit',
+      '--author',
+      `${PUBLIC_GIT_NAME} <${PUBLIC_GIT_EMAIL}>`,
+    ]);
+    const candidateSha = git(rootDir, ['rev-parse', 'HEAD']);
+    git(rootDir, ['branch', '-M', 'release-staging']);
+    const result = runHook(rootDir, pushLine({
+      localRef: 'refs/heads/release-staging',
+      localSha: candidateSha,
+      remoteRef: 'refs/heads/release-staging',
+    }));
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /public replay author and committer identity/);
+  });
+});
+
+test('pre-push guard requires each private-source trailer to resolve to a commit', () => {
+  withHookFixture((rootDir) => {
+    createVersionedCandidate(rootDir, '0.1.1');
+    git(rootDir, [
+      'commit',
+      '--quiet',
+      '--amend',
+      '-m',
+      'candidate',
+      '-m',
+      `CE-Private-Source: ${NON_ZERO_SHA}`,
+    ]);
+    const candidateSha = git(rootDir, ['rev-parse', 'HEAD']);
+    git(rootDir, ['branch', '-M', 'release-staging']);
+    const result = runHook(rootDir, pushLine({
+      localRef: 'refs/heads/release-staging',
+      localSha: candidateSha,
+      remoteRef: 'refs/heads/release-staging',
+    }));
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /CE-Private-Source commit is unavailable/);
   });
 });
 
@@ -638,6 +715,37 @@ test('pre-push guard compares a public alias to a verified same-repository origi
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /Candidate version 0\.1\.0 must be greater than refs\/remotes\/origin\/main/);
     assert.match(result.stderr, /Blocked release-staging push/);
+  });
+});
+
+test('pre-push guard rejects an alias candidate that omits a newer public main', () => {
+  withHookFixture((rootDir) => {
+    const { mainSha, candidateSha } = createVersionedCandidate(rootDir, '0.1.1');
+    const candidateBranch = git(rootDir, ['symbolic-ref', '--short', 'HEAD']);
+    git(rootDir, ['checkout', '--quiet', '-b', 'newer-public-main', mainSha]);
+    writeFile(rootDir, 'newer-main.txt', 'newer public main\n');
+    git(rootDir, ['add', 'newer-main.txt']);
+    git(rootDir, ['commit', '--quiet', '-m', 'newer public main']);
+    const newerMainSha = git(rootDir, ['rev-parse', 'HEAD']);
+    git(rootDir, ['update-ref', 'refs/remotes/origin/main', newerMainSha]);
+    git(rootDir, ['update-ref', 'refs/remotes/public-alias/main', mainSha]);
+    git(rootDir, ['remote', 'add', 'origin', '[redacted-email]-agalmic:AgalmicSoftware/context-engine.git']);
+    git(rootDir, ['checkout', '--quiet', candidateBranch]);
+    git(rootDir, ['branch', '-M', 'release-staging']);
+
+    const result = runHook(
+      rootDir,
+      pushLine({
+        localRef: 'refs/heads/release-staging',
+        localSha: candidateSha,
+        remoteRef: 'refs/heads/release-staging',
+      }),
+      'public-alias',
+      'https://github.com/AgalmicSoftware/context-engine.git',
+    );
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /candidate is not descended from fetched public main/);
   });
 });
 

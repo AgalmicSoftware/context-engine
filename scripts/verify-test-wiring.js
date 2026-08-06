@@ -392,11 +392,12 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
     'node scripts/release-version.mjs "${verify_args[@]}"',
     'release-staging version advancement verification',
   );
-  expectWorkflowContains('run: npm run verify:public-release-surface', '"npm run verify:public-release-surface"');
-  expectWorkflowContains('run: npm run verify:public-assets', '"npm run verify:public-assets"');
-  expectWorkflowContains('run: npm run verify:public-text', '"npm run verify:public-text"');
-  expectWorkflowContains('run: npm run worker:bundle', '"npm run worker:bundle"');
-  expectWorkflowContains('run: npm run verify:worker-bundle', '"npm run verify:worker-bundle"');
+  expectWorkflowContains(
+    'node scripts/worker-release-artifacts.mjs verify-replay-range',
+    'release-staging replay identity and provenance verification',
+  );
+  expectWorkflowOmits('BASELINE_MONOTONICITY_ALLOW_TEXT', 'author-controlled baseline approval text');
+  expectWorkflowOmits('--allow-text', 'author-controlled baseline approval option');
   expectWorkflowContains('run: npm --prefix client run build', '"npm --prefix client run build"');
   expectWorkflowContains('run: npm run ci:gate -- contracts', 'the manifest-backed contracts gate');
   expectWorkflowContains('run: npm run ci:gate -- client', 'the manifest-backed client gate');

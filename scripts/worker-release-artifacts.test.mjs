@@ -14,12 +14,29 @@ import {
   resolveSourceProvenance,
   stageWorkerArtifacts,
   validateSuccessfulCiRun,
+  verifyPublicReplayRange,
   verifyWorkerReleaseArtifact,
 } from './worker-release-artifacts.mjs';
 
 const SHA_A = 'a'.repeat(40);
 const SHA_B = 'b'.repeat(40);
 const SHA_C = 'c'.repeat(40);
+
+function publicReplayFixture() {
+  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-public-replay-'));
+  const git = (args) => execFileSync('git', args, { cwd: rootDir, encoding: 'utf8' }).trim();
+  git(['init', '-b', 'main']);
+  git(['config', 'user.name', 'Agalmic']);
+  git(['config', 'user.email', 'agalmicsoftware@protonmail.com']);
+  fs.writeFileSync(path.join(rootDir, 'file.txt'), 'base\n');
+  git(['add', 'file.txt']);
+  git(['commit', '-m', 'base']);
+  const baseCommit = git(['rev-parse', 'HEAD']);
+  fs.appendFileSync(path.join(rootDir, 'file.txt'), 'replay\n');
+  git(['commit', '-am', `public replay\n\nCE-Private-Source: ${SHA_C}`]);
+  const candidateCommit = git(['rev-parse', 'HEAD']);
+  return { rootDir, git, baseCommit, candidateCommit };
+}
 
 function fixture() {
   const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-worker-release-'));
@@ -188,6 +205,54 @@ test('stable promotion retains current and previous rollback targets across reru
     previousCommit: SHA_A,
   });
   assert.throws(() => planStablePromotion({ targetCommit: 'main', currentCommit: '', previousCommit: '' }));
+});
+
+test('public replay range verification accepts the exact public identity and one source trailer', () => {
+  const { rootDir, baseCommit, candidateCommit } = publicReplayFixture();
+  try {
+    assert.deepEqual(
+      verifyPublicReplayRange({ rootDir, baseRef: baseCommit, candidateRef: candidateCommit }),
+      { baseCommit, candidateCommit, replayCommitCount: 1 },
+    );
+  } finally {
+    fs.rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+test('public replay range verification rejects identity and trailer drift', () => {
+  {
+    const { rootDir, git, baseCommit } = publicReplayFixture();
+    try {
+      git([
+        'commit',
+        '--amend',
+        '--no-edit',
+        '--author',
+        'Private Person <[redacted-email]>',
+      ]);
+      const candidateCommit = git(['rev-parse', 'HEAD']);
+      assert.throws(
+        () => verifyPublicReplayRange({ rootDir, baseRef: baseCommit, candidateRef: candidateCommit }),
+        /public replay author and committer identity/,
+      );
+    } finally {
+      fs.rmSync(rootDir, { recursive: true, force: true });
+    }
+  }
+
+  {
+    const { rootDir, git, baseCommit } = publicReplayFixture();
+    try {
+      git(['commit', '--amend', '-m', 'public replay', '-m', 'CE-Private-Source: not-a-sha']);
+      const candidateCommit = git(['rev-parse', 'HEAD']);
+      assert.throws(
+        () => verifyPublicReplayRange({ rootDir, baseRef: baseCommit, candidateRef: candidateCommit }),
+        /one valid CE-Private-Source trailer/,
+      );
+    } finally {
+      fs.rmSync(rootDir, { recursive: true, force: true });
+    }
+  }
 });
 
 test('source provenance resolves the replay trailer from a fast-forward or merge tip', () => {

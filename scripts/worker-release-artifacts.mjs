@@ -31,6 +31,8 @@ export const WORKER_ARTIFACTS = Object.freeze([
 const SHA_PATTERN = /^[a-f0-9]{40}$/;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 const SAFE_REF_PATTERN = /^refs\/heads\/[A-Za-z0-9._/-]+$/;
+const PUBLIC_GIT_NAME = 'Agalmic';
+const PUBLIC_GIT_EMAIL = 'agalmicsoftware@protonmail.com';
 const LEGACY_PUBLIC_SOURCE_MAPPINGS = Object.freeze({
   // PR #30 was prepared from this audited private source immediately before
   // CE-Private-Source trailers became mandatory for Worker artifact CI. A
@@ -245,6 +247,46 @@ function privateSourceTrailer(rootDir, commit) {
   return git(rootDir, ['show', '-s', '--format=%(trailers:key=CE-Private-Source,valueonly)', commit]);
 }
 
+export function verifyPublicReplayRange({ rootDir, baseRef, candidateRef }) {
+  const baseCommit = git(rootDir, ['rev-parse', '--verify', `${baseRef}^{commit}`]);
+  const candidateCommit = git(rootDir, ['rev-parse', '--verify', `${candidateRef}^{commit}`]);
+  assertSha(baseCommit, 'public replay base commit');
+  assertSha(candidateCommit, 'public replay candidate commit');
+  try {
+    execFileSync('git', ['merge-base', '--is-ancestor', baseCommit, candidateCommit], {
+      cwd: rootDir,
+      stdio: 'ignore',
+    });
+  } catch (_) {
+    throw new Error('public replay candidate is not descended from its public main baseline');
+  }
+
+  const replayCommits = git(rootDir, ['rev-list', '--reverse', `${baseCommit}..${candidateCommit}`])
+    .split(/\s+/)
+    .filter(Boolean);
+  for (const replayCommit of replayCommits) {
+    const parentLine = git(rootDir, ['rev-list', '--parents', '-n', '1', replayCommit]).split(/\s+/);
+    assert(parentLine.length === 2, `commit ${replayCommit} is not a linear public replay`);
+    const authorName = git(rootDir, ['show', '-s', '--format=%an', replayCommit]);
+    const authorEmail = git(rootDir, ['show', '-s', '--format=%ae', replayCommit]);
+    const committerName = git(rootDir, ['show', '-s', '--format=%cn', replayCommit]);
+    const committerEmail = git(rootDir, ['show', '-s', '--format=%ce', replayCommit]);
+    assert(
+      authorName === PUBLIC_GIT_NAME &&
+        authorEmail === PUBLIC_GIT_EMAIL &&
+        committerName === PUBLIC_GIT_NAME &&
+        committerEmail === PUBLIC_GIT_EMAIL,
+      `commit ${replayCommit} lacks the required public replay author and committer identity`,
+    );
+    assert(
+      SHA_PATTERN.test(privateSourceTrailer(rootDir, replayCommit)),
+      `commit ${replayCommit} lacks one valid CE-Private-Source trailer`,
+    );
+  }
+
+  return { baseCommit, candidateCommit, replayCommitCount: replayCommits.length };
+}
+
 export function resolvePrivateSourceReference({ publicCommit, trailer }) {
   const explicitTrailer = String(trailer || '').trim();
   if (explicitTrailer) return explicitTrailer;
@@ -354,6 +396,16 @@ function runCli(argv) {
     requireArgs(values, ['commit', 'github-output']);
     const result = resolveSourceProvenance({ rootDir, commit: values.commit });
     writeGithubOutputs(result, values['github-output']);
+    return;
+  }
+  if (command === 'verify-replay-range') {
+    requireArgs(values, ['base-ref', 'candidate-ref']);
+    const result = verifyPublicReplayRange({
+      rootDir,
+      baseRef: values['base-ref'],
+      candidateRef: values['candidate-ref'],
+    });
+    console.log(`public replay history verified (${result.replayCommitCount} commits)`);
     return;
   }
   if (command === 'validate-run') {

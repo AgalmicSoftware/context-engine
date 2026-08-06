@@ -4,6 +4,8 @@ set -euo pipefail
 REMOTE_NAME="${1:-}"
 REMOTE_URL="${2:-}"
 ZERO_OID="0000000000000000000000000000000000000000"
+PUBLIC_GIT_NAME="Agalmic"
+PUBLIC_GIT_EMAIL="agalmicsoftware@protonmail.com"
 
 is_canonical_public_repository_url() {
   local normalized_url
@@ -212,9 +214,16 @@ validate_public_branch() {
   local resolved_candidate
   local resolved_remote
   local base_sha
+  local public_main_ref
+  local public_main_sha
   local merge_sha
   local replay_commit
   local source_sha
+  local resolved_source_sha
+  local author_name
+  local author_email
+  local committer_name
+  local committer_email
 
   PUBLIC_BRANCH_ERROR=""
   resolved_candidate="$(git rev-parse --verify "${candidate_sha}^{commit}" 2>/dev/null || true)"
@@ -252,14 +261,30 @@ validate_public_branch() {
     return 1
   fi
 
-  base_sha="$(git rev-parse "${PUBLIC_MAIN_REFS[0]}^{commit}")"
+  base_sha=""
+  for public_main_ref in "${PUBLIC_MAIN_REFS[@]}"; do
+    public_main_sha="$(git rev-parse "${public_main_ref}^{commit}")"
+    if [ -z "$base_sha" ] || git merge-base --is-ancestor "$base_sha" "$public_main_sha" 2>/dev/null; then
+      base_sha="$public_main_sha"
+    elif ! git merge-base --is-ancestor "$public_main_sha" "$base_sha" 2>/dev/null; then
+      PUBLIC_BRANCH_ERROR="fetched public main refs have diverged"
+      return 1
+    fi
+  done
+
+  if ! git merge-base --is-ancestor "$base_sha" "$candidate_sha" 2>/dev/null; then
+    PUBLIC_BRANCH_ERROR="candidate is not descended from fetched public main"
+    return 1
+  fi
+
   if [ "$remote_sha" != "$ZERO_OID" ]; then
     resolved_remote="$(git rev-parse --verify "${remote_sha}^{commit}" 2>/dev/null || true)"
     if [ "$resolved_remote" != "$remote_sha" ]; then
       PUBLIC_BRANCH_ERROR="existing staging commit is unavailable"
       return 1
     fi
-    if git merge-base --is-ancestor "$remote_sha" "$candidate_sha" 2>/dev/null; then
+    if git merge-base --is-ancestor "$base_sha" "$remote_sha" 2>/dev/null &&
+      git merge-base --is-ancestor "$remote_sha" "$candidate_sha" 2>/dev/null; then
       base_sha="$remote_sha"
     fi
   fi
@@ -277,9 +302,25 @@ validate_public_branch() {
 
   while IFS= read -r replay_commit; do
     [ -n "$replay_commit" ] || continue
+    author_name="$(git show -s --format='%an' "$replay_commit")"
+    author_email="$(git show -s --format='%ae' "$replay_commit")"
+    committer_name="$(git show -s --format='%cn' "$replay_commit")"
+    committer_email="$(git show -s --format='%ce' "$replay_commit")"
+    if [ "$author_name" != "$PUBLIC_GIT_NAME" ] ||
+      [ "$author_email" != "$PUBLIC_GIT_EMAIL" ] ||
+      [ "$committer_name" != "$PUBLIC_GIT_NAME" ] ||
+      [ "$committer_email" != "$PUBLIC_GIT_EMAIL" ]; then
+      PUBLIC_BRANCH_ERROR="commit $replay_commit lacks the required public replay author and committer identity"
+      return 1
+    fi
     source_sha="$(git show -s --format='%(trailers:key=CE-Private-Source,valueonly)' "$replay_commit")"
     if ! [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]]; then
       PUBLIC_BRANCH_ERROR="commit $replay_commit lacks one valid CE-Private-Source trailer"
+      return 1
+    fi
+    resolved_source_sha="$(git rev-parse --verify "${source_sha}^{commit}" 2>/dev/null || true)"
+    if [ "$resolved_source_sha" != "$source_sha" ]; then
+      PUBLIC_BRANCH_ERROR="commit $replay_commit CE-Private-Source commit is unavailable"
       return 1
     fi
   done < <(git rev-list --reverse "${base_sha}..${candidate_sha}")
