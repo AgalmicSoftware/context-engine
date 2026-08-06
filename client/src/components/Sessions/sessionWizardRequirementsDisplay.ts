@@ -56,9 +56,20 @@ export const resolveSessionWizardNewSessionRequirementsDisplayState = ({
     { hasPendingSbtDrafts: !!hasPendingSbtDrafts },
   );
   const sponsoredBundleStatusTone = toRequirementString(sponsoredBundleStatus?.tone).trim().toLowerCase();
-  const hasNewSessionAiRequirementCovered = !!toRequirementString(currentWorkerSecrets?.openaiKey).trim();
-  const hasNewSessionArweaveRequirementCovered = !!toRequirementString(currentWorkerSecrets?.arweaveJwk).trim();
-  const newSessionRequiresLitCredential = !cloudflareWorkerSbtGateMode;
+  const hasAnyAiProviderKey = ['openaiKey', 'anthropicKey', 'openrouterKey'].some(
+    (key) => !!toRequirementString(currentWorkerSecrets?.[key]).trim(),
+  );
+  const hasNewSessionAiRequirementCovered = modeRequirements.selected
+    ? resolveSessionWizardResourceSecretFields('ai', sessionAi).every(
+        (field) => !!toRequirementString(currentWorkerSecrets?.[field.key]).trim(),
+      )
+    : hasAnyAiProviderKey;
+  const hasNewSessionArweaveRequirementCovered =
+    (modeRequirements.selected && !modeRequirements.requiresArweave) ||
+    !!toRequirementString(currentWorkerSecrets?.arweaveJwk).trim();
+  const newSessionRequiresLitCredential = modeRequirements.selected
+    ? modeRequirements.requiresLit
+    : !cloudflareWorkerSbtGateMode;
   const hasNewSessionLitRequirementCovered =
     !newSessionRequiresLitCredential || !!toRequirementString(currentWorkerSecrets?.litAccountApiKey).trim();
   const hasNewSessionFundingRequirementCovered =

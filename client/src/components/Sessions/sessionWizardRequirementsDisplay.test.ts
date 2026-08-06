@@ -167,4 +167,32 @@ describe('sessionWizardRequirementsDisplay', () => {
       sponsoredBundleCoversNewSessionRequirements: true,
     });
   });
+
+  it('keeps decentralized mixed-provider requirements visible until every selected key is present', () => {
+    expect(
+      resolveSessionWizardNewSessionRequirementsDisplayState({
+        currentWorkerSecrets: {
+          openaiKey: 'transcription-secret',
+          arweaveJwk: '{"kty":"RSA"}',
+        },
+        hasSponsoredBundleLink: true,
+        isNewSessionWizardRoute: true,
+        normalizedAppliedSponsoredBundle: { faucetGrantToken: 'funding-grant' },
+        sessionAi: {
+          models: {
+            fast: { provider: 'anthropic' },
+            thinking: { provider: 'openrouter' },
+            transcription: { provider: 'openai' },
+          },
+        },
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
+        sponsoredBundleStatus: { tone: 'success' },
+      }),
+    ).toMatchObject({
+      hasNewSessionAiRequirementCovered: false,
+      showNewSessionRequirementsBanner: true,
+      sponsoredBundleCoversNewSessionRequirements: false,
+      sponsoredBundleOwnsNewSessionEntryFlow: false,
+    });
+  });
 });
