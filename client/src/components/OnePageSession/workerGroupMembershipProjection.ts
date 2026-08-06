@@ -7,12 +7,16 @@ import {
 export const reconcileConfirmedWorkerGroupMembership = ({
   overview,
   group,
+  memberCount,
   isMember,
+  retainGroup,
   sessionSlug,
 }: {
   overview: WorkerGroupOverview;
   group: WorkerGroup;
+  memberCount?: number;
   isMember: boolean;
+  retainGroup: boolean;
   sessionSlug: string;
 }): WorkerGroupOverview => {
   const targetIdentity = buildWorkerGroupMembershipIdentity({
@@ -26,10 +30,14 @@ export const reconcileConfirmedWorkerGroupMembership = ({
     }).key === targetIdentity.key;
   const membershipMatches = (membership: WorkerGroupOverview['memberships'][number]) =>
     projectWorkerGroupMembership({ membership, sessionSlug })?.identity.key === targetIdentity.key;
+  const projectedGroup =
+    Number.isSafeInteger(memberCount) && Number(memberCount) >= 0 ? { ...group, memberCount } : group;
   const hasGroup = overview.groups.some(groupMatches);
-  const groups = hasGroup
-    ? overview.groups.map((candidate) => (groupMatches(candidate) ? group : candidate))
-    : [...overview.groups, group];
+  const groups = retainGroup
+    ? hasGroup
+      ? overview.groups.map((candidate) => (groupMatches(candidate) ? projectedGroup : candidate))
+      : [...overview.groups, projectedGroup]
+    : overview.groups.filter((candidate) => !groupMatches(candidate));
   const existingMembership = overview.memberships.find(membershipMatches);
 
   if (!isMember) {
@@ -43,16 +51,19 @@ export const reconcileConfirmedWorkerGroupMembership = ({
     groups,
     memberships: existingMembership
       ? overview.memberships.map((membership) =>
-          membershipMatches(membership) ? { ...membership, group } : membership,
+          membershipMatches(membership)
+            ? { ...membership, group: projectedGroup, ...(memberCount === undefined ? {} : { memberCount }) }
+            : membership,
         )
       : [
           ...overview.memberships,
           {
-            group,
+            group: projectedGroup,
             member: {
               groupId: group.groupId,
               sessionSlug,
             },
+            ...(memberCount === undefined ? {} : { memberCount }),
           },
         ],
   };

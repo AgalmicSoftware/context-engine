@@ -840,11 +840,15 @@ const WorkerGroupMembershipPanel = ({
   const applyConfirmedMembership = ({
     mutationTargetKey,
     group,
+    memberCount,
     isMember,
+    retainGroup,
   }: {
     mutationTargetKey: string;
     group: WorkerGroup;
+    memberCount?: number;
     isMember: boolean;
+    retainGroup: boolean;
   }) => {
     setViewState((current) => {
       if (current.targetKey !== mutationTargetKey) return current;
@@ -853,7 +857,9 @@ const WorkerGroupMembershipPanel = ({
         overview: reconcileConfirmedWorkerGroupMembership({
           overview: current.overview,
           group,
+          memberCount,
           isMember,
+          retainGroup,
           sessionSlug,
         }),
         status: 'ready',
@@ -873,7 +879,7 @@ const WorkerGroupMembershipPanel = ({
       error: '',
     }));
     try {
-      await joinWorkerGroup({
+      const result = await joinWorkerGroup({
         workerUrl,
         credentialToken: workerToken,
         sessionId,
@@ -885,7 +891,13 @@ const WorkerGroupMembershipPanel = ({
       setMembershipStatusState({ targetKey: mutationTargetKey, status: `Joined ${group.label}.` });
       memberListRequestIdRef.current += 1;
       setMemberListState(emptyMemberListState(mutationTargetKey, group.groupId));
-      applyConfirmedMembership({ mutationTargetKey, group, isMember: true });
+      applyConfirmedMembership({
+        mutationTargetKey,
+        group: result.group as WorkerGroup,
+        memberCount: Number(result.memberCount),
+        isMember: true,
+        retainGroup: true,
+      });
     } catch (joinError) {
       if (targetKeyRef.current !== mutationTargetKey || mutationIdRef.current !== mutationId) return;
       setViewState((current) => ({
@@ -910,7 +922,7 @@ const WorkerGroupMembershipPanel = ({
       error: '',
     }));
     try {
-      await leaveWorkerGroup({
+      const result = await leaveWorkerGroup({
         workerUrl,
         credentialToken: workerToken,
         sessionId,
@@ -922,7 +934,14 @@ const WorkerGroupMembershipPanel = ({
       setMembershipStatusState({ targetKey: mutationTargetKey, status: `Left ${group.label}.` });
       memberListRequestIdRef.current += 1;
       setMemberListState(emptyMemberListState(mutationTargetKey, group.groupId));
-      applyConfirmedMembership({ mutationTargetKey, group, isMember: false });
+      const retainedGroup = result.group as WorkerGroup | undefined;
+      applyConfirmedMembership({
+        mutationTargetKey,
+        group: retainedGroup || group,
+        ...(retainedGroup ? { memberCount: Number(result.memberCount) } : {}),
+        isMember: false,
+        retainGroup: Boolean(retainedGroup),
+      });
     } catch (leaveError) {
       if (targetKeyRef.current !== mutationTargetKey || mutationIdRef.current !== mutationId) return;
       setViewState((current) => ({
@@ -1042,7 +1061,7 @@ const WorkerGroupMembershipPanel = ({
             sessionSlug={sessionSlug}
             workerToken={workerToken}
             workerUrl={workerUrl}
-            memberCount={activeMemberListState.memberCount ?? selectedMembership?.memberCount}
+            memberCount={activeMemberListState.memberCount ?? selectedMembership?.memberCount ?? selectedGroup.memberCount}
             onCloseMembers={handleCloseMembers}
             onLoadMoreMembers={handleLoadMoreMembers}
             onOpenMembers={handleOpenMembers}

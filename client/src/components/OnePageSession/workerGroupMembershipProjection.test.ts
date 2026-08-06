@@ -20,6 +20,7 @@ describe('reconcileConfirmedWorkerGroupMembership', () => {
       overview,
       group: refreshedGroup,
       isMember: true,
+      retainGroup: true,
       sessionSlug: 'alpha',
     });
     expect(joined.groups).toEqual([refreshedGroup]);
@@ -30,9 +31,59 @@ describe('reconcileConfirmedWorkerGroupMembership', () => {
       overview: joined,
       group: refreshedGroup,
       isMember: false,
+      retainGroup: true,
       sessionSlug: 'alpha',
     });
     expect(left.groups).toEqual([refreshedGroup]);
     expect(left.memberships).toEqual([]);
+  });
+
+  it('preserves the authoritative count returned by join', () => {
+    const next = reconcileConfirmedWorkerGroupMembership({
+      overview: { groups: [existingGroup], memberships: [] },
+      group: refreshedGroup,
+      memberCount: 6,
+      isMember: true,
+      retainGroup: true,
+      sessionSlug: 'alpha',
+    });
+
+    expect(next.groups).toEqual([expect.objectContaining({ groupId: 'reviewers', memberCount: 6 })]);
+    expect(next.memberships).toEqual([
+      expect.objectContaining({
+        group: expect.objectContaining({ groupId: 'reviewers', memberCount: 6 }),
+        memberCount: 6,
+      }),
+    ]);
+  });
+
+  it('retains only a session-visible group and count after leave', () => {
+    const next = reconcileConfirmedWorkerGroupMembership({
+      overview,
+      group: refreshedGroup,
+      memberCount: 4,
+      isMember: false,
+      retainGroup: true,
+      sessionSlug: 'alpha',
+    });
+
+    expect(next.memberships).toEqual([]);
+    expect(next.groups).toEqual([expect.objectContaining({ groupId: 'reviewers', memberCount: 4 })]);
+  });
+
+  it('removes restricted group and membership state after leave', () => {
+    const restrictedGroup = { ...refreshedGroup, memberVisibility: 'members' as const };
+    const next = reconcileConfirmedWorkerGroupMembership({
+      overview: {
+        groups: [restrictedGroup],
+        memberships: [{ group: restrictedGroup, member: { groupId: 'Reviewers', sessionSlug: 'Alpha' } }],
+      },
+      group: restrictedGroup,
+      isMember: false,
+      retainGroup: false,
+      sessionSlug: 'alpha',
+    });
+
+    expect(next).toEqual({ groups: [], memberships: [] });
   });
 });
