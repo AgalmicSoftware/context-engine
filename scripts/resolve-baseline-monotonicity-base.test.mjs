@@ -62,6 +62,24 @@ test('fast-forward release-staging pushes compare against their previous tip', (
   });
 });
 
+test('staging pushes use newer public main when the previous tip is already behind it', () => {
+  withTempRepo(({ repoDir }) => {
+    const previousStagingSha = commitFixture(repoDir, 'staging', 'staging');
+    const currentMainSha = commitFixture(repoDir, 'main', 'current main');
+    git(repoDir, ['update-ref', 'refs/remotes/origin/main', currentMainSha]);
+    commitFixture(repoDir, 'candidate', 'candidate');
+
+    const resolved = resolveBaselineMonotonicitySha({
+      repoDir,
+      eventName: 'push',
+      refName: 'release-staging',
+      pushBeforeSha: previousStagingSha,
+    });
+
+    assert.equal(resolved, currentMainSha);
+  });
+});
+
 test('rewritten release-staging pushes compare against public main', () => {
   withTempRepo(({ repoDir, baseSha }) => {
     git(repoDir, ['switch', '--quiet', '-c', 'previous-staging']);

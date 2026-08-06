@@ -51,12 +51,15 @@ export const resolveBaselineMonotonicitySha = ({
     && FULL_COMMIT_SHA_RE.test(pushBeforeSha)
   ) {
     try {
+      execFileSync('git', ['-C', repoDir, 'merge-base', '--is-ancestor', baseRef, pushBeforeSha], {
+        stdio: 'ignore',
+      });
       execFileSync('git', ['-C', repoDir, 'merge-base', '--is-ancestor', pushBeforeSha, 'HEAD'], {
         stdio: 'ignore',
       });
       baseRef = pushBeforeSha;
     } catch {
-      // New, replayed, or unavailable staging history compares to public main.
+      // New, stale, replayed, or unavailable staging history compares to public main.
     }
   }
   let baseSha = '';
