@@ -768,6 +768,66 @@ test('sync-public-history rejects a runner secret added and deleted after the Ag
   });
 });
 
+test('sync-public-history rejects a public secret added and deleted outside Agent Bridge', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const unsafeToken = ['live', 'credential', 'material', 'must', 'not', 'ship'].join('-');
+    const publicConfigPath = path.join('client', 'src', 'transient-config.js');
+    writeFile(sourceDir, publicConfigPath, `const provider_api_token = '${unsafeToken}';\n`);
+    commitAll(sourceDir, 'Add temporary public credential', {
+      authorDate: '2025-01-05T08:09:10Z',
+      committerDate: '2025-01-05T08:09:10Z',
+    });
+    fs.rmSync(path.join(sourceDir, publicConfigPath));
+    commitAll(sourceDir, 'Remove temporary public credential', {
+      authorDate: '2025-01-05T09:10:11Z',
+      committerDate: '2025-01-05T09:10:11Z',
+    });
+
+    const result = runSyncScript(sourceDir, ['--push', 'release-staging']);
+
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /Scanning public replay commit for PII\/secrets/);
+    assert.match(result.stderr, /public release PII scan failed/);
+    assert.match(result.stderr, /client\/src\/transient-config\.js/);
+
+    const remoteCheck = spawnSync('git', ['ls-remote', '--heads', 'origin', 'release-staging'], {
+      cwd: sourceDir,
+      encoding: 'utf8',
+    });
+    assert.equal(remoteCheck.status, 0);
+    assert.equal(remoteCheck.stdout.trim(), '');
+  });
+});
+
+test('sync-public-history rejects a secret in a retained replay message', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const unsafeToken = ['live', 'credential', 'material', 'must', 'not', 'ship'].join('-');
+    writeFile(sourceDir, path.join('client', 'src', 'safe-config.js'), 'export const enabled = true;\n');
+    commitAll(
+      sourceDir,
+      `Add safe public config\n\nprovider_api_token = '${unsafeToken}'\n`,
+      {
+        authorDate: '2025-01-05T10:11:12Z',
+        committerDate: '2025-01-05T10:11:12Z',
+      },
+    );
+
+    const result = runSyncScript(sourceDir, ['--push', 'release-staging']);
+
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /Scanning public replay commit for PII\/secrets/);
+    assert.match(result.stderr, /public release PII scan failed/);
+    assert.match(result.stderr, /commit-message\.txt/);
+
+    const remoteCheck = spawnSync('git', ['ls-remote', '--heads', 'origin', 'release-staging'], {
+      cwd: sourceDir,
+      encoding: 'utf8',
+    });
+    assert.equal(remoteCheck.status, 0);
+    assert.equal(remoteCheck.stdout.trim(), '');
+  });
+});
+
 test('sync-public-history rejects public Node test failures before pushing', () => {
   withSourceRepo(({ sourceDir }) => {
     writeFile(

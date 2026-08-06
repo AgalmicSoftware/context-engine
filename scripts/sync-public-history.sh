@@ -543,6 +543,39 @@ verify_public_text() {
   node "$verifier" "$TEMP_CLONE" >&2
 }
 
+verify_public_replay_pii() {
+  local commit_sha="$1"
+  local message_file="$2"
+  local verifier="$REPO_ROOT/scripts/verify-public-release-pii.sh"
+  local surface_root="$TMP_ROOT/public-replay-delta"
+  local relative_path
+  local relative_dir
+  local scan_status=0
+
+  if [ ! -f "$verifier" ]; then
+    fail "Public replay PII verifier was not found: scripts/verify-public-release-pii.sh" 2
+  fi
+
+  rm -rf "$surface_root"
+  mkdir -p "$surface_root"
+  while IFS= read -r -d '' relative_path; do
+    [ -f "$TEMP_CLONE/$relative_path" ] || continue
+    relative_dir="${relative_path%/*}"
+    if [ "$relative_dir" != "$relative_path" ]; then
+      mkdir -p "$surface_root/$relative_dir"
+    fi
+    cp "$TEMP_CLONE/$relative_path" "$surface_root/$relative_path"
+  done < <(git -C "$TEMP_CLONE" diff --cached --no-renames --diff-filter=ACMT --name-only -z)
+  cp "$message_file" "$surface_root/commit-message.txt"
+
+  # Scan every retained replay delta before its commit is created. A credential
+  # added and deleted by later commits must never become reachable publicly.
+  log_info "Scanning public replay commit for PII/secrets: $commit_sha"
+  bash "$verifier" "$surface_root" >&2 || scan_status=$?
+  rm -rf "$surface_root"
+  return "$scan_status"
+}
+
 verify_agent_bridge_public_replay_pii() {
   local commit_sha="$1"
   local verifier="$REPO_ROOT/scripts/verify-public-release-pii.sh"
@@ -1061,6 +1094,10 @@ for commit_sha in "${COMMITS[@]}"; do
 
   ensure_public_replay_message "$commit_sha" "$subject" "$message_file"
   bind_public_replay_to_source "$commit_sha" "$message_file"
+
+  if ! verify_public_replay_pii "$commit_sha" "$message_file"; then
+    exit 2
+  fi
 
   GIT_AUTHOR_NAME="$PUBLIC_GIT_NAME" \
   GIT_AUTHOR_EMAIL="$PUBLIC_GIT_EMAIL" \
