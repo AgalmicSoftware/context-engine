@@ -112,9 +112,11 @@ All notable changes to this project will be documented in this file.
   separately as Advanced access, Worker-native creation stays scoped to the
   active session, and registry-backed sessions retain the SBT flow. Native
   Group card bodies now open the full SBT-style detail layout in a new tab;
-  canonical list links use `/groups?sessionName=<slug>` and detail links use
-  `/group/<groupId>?sessionName=<slug>`, while legacy `/groups/:slug` and
-  hash-scoped detail links silently normalize to the canonical routes.
+      canonical list links use `/groups?sessionName=<slug>` and non-address
+      Worker detail links use `/group/<groupId>?sessionName=<slug>`. Legacy
+      `/groups/:slug` links normalize to those routes, while address-shaped
+      Worker IDs remain at `/groups?sessionName=<slug>#group-<groupId>` so
+      `/group/<address>` stays reserved for SBT detail.
   Full detail translates SBT stats into member capacity and a live join
   deadline, exposes member counts and identities only through authenticated
   visibility-aware responses, and renders the Group's public document

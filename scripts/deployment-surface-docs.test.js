@@ -49,3 +49,15 @@ test('session Worker docs define group authority, counts, and id compatibility',
   assert.match(workerDoc, /Join returns the coordinator's post-mutation\s+`memberCount`/);
   assert.match(workerDoc, /session-visible leave[\s\S]*restricted leave/);
 });
+
+test('route docs preserve legacy address-shaped Worker group links', () => {
+  for (const relativePath of ['CHANGELOG.md', 'docs/MainSite.MAP.md', 'docs/e2e-testid-api.md']) {
+    const routeDoc = read(relativePath);
+    assert.match(routeDoc, /non-address[\s\S]{0,160}Worker[\s\S]{0,160}`\/group\/<groupId>/i, relativePath);
+    assert.match(
+      routeDoc,
+      /address-shaped[\s\S]{0,160}Worker[\s\S]{0,160}`\/groups\?sessionName=<slug>#group-<groupId>`/i,
+      relativePath,
+    );
+  }
+});
