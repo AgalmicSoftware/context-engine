@@ -136,9 +136,12 @@ describe('SessionWizard publish boundary rendering', () => {
         draft: {
           sessionName: 'Live profile revalidation session',
           slug: 'live-profile-revalidation-session',
+          corsWorkerUrl: 'https://worker.example.test',
           sessionModeProfile: profile,
           storageProfile: { backend: 'arweave' },
         },
+        deployComplete: true,
+        deployWorkerUrl: 'https://worker.example.test',
       }),
     );
     let publishStarted = false;
@@ -199,7 +202,8 @@ describe('SessionWizard publish boundary rendering', () => {
     expect(arweaveClient.uploadDataToArweave).not.toHaveBeenCalled();
   });
 
-  it('lets manual metadata satisfy publish readiness without firing from settings controls', async () => {
+  it('lets manual metadata satisfy publish readiness with a compatible worker', async () => {
+    seedVerifiedWorkerCache();
     renderLoggedInSessionWizard();
     enableAdvancedMode();
 
@@ -210,7 +214,7 @@ describe('SessionWizard publish boundary rendering', () => {
 
     const publishButton = await openPublishSection();
     await waitFor(() => {
-      expect(publishButton).toBeDisabled();
+      expect(publishButton).not.toBeDisabled();
     });
 
     fireEvent.click(screen.getByLabelText('Advanced publish settings'));
@@ -268,6 +272,7 @@ describe('SessionWizard publish boundary rendering', () => {
     });
     mockRegisterSessionOnChain.mockImplementation(async () => registerPromise);
 
+    seedVerifiedWorkerCache();
     renderLoggedInSessionWizard();
     enableAdvancedMode();
 
@@ -313,6 +318,7 @@ describe('SessionWizard publish boundary rendering', () => {
     });
     mockRegisterSessionOnChain.mockImplementation(async () => registerPromise);
 
+    seedVerifiedWorkerCache();
     renderLoggedInSessionWizard();
     enableAdvancedMode();
 
@@ -355,6 +361,7 @@ describe('SessionWizard publish boundary rendering', () => {
     });
     mockRegisterSessionOnChain.mockImplementation(async () => registerPromise);
 
+    seedVerifiedWorkerCache();
     renderLoggedInSessionWizard();
     enableAdvancedMode();
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
@@ -667,6 +674,7 @@ describe('SessionWizard publish boundary rendering', () => {
       return { txs: [{ action: 'createSession', hash: '0xregister-final' }] };
     });
 
+    seedVerifiedWorkerCache();
     renderLoggedInSessionWizard();
     enableAdvancedMode();
 
@@ -677,7 +685,7 @@ describe('SessionWizard publish boundary rendering', () => {
 
     const publishButton = await openPublishSection();
     await waitFor(() => {
-      expect(publishButton).toBeDisabled();
+      expect(publishButton).not.toBeDisabled();
     });
 
     fireEvent.click(screen.getByLabelText('Advanced publish settings'));

@@ -12,6 +12,15 @@ describe('SessionWizard login guard rendering', () => {
   beforeEach(resetSessionWizardWorkerPanelTestState);
 
   it('prompts for login instead of attempting publish when publish is available but no wallet is connected', async () => {
+    const workerUrl = 'https://worker.example.test';
+    sessionStorage.setItem(
+      'ce:sessionWizardDraft:v1',
+      JSON.stringify({
+        draft: { corsWorkerUrl: workerUrl },
+        deployComplete: true,
+        deployWorkerUrl: workerUrl,
+      }),
+    );
     const { cryptoUtils } = require('../../utilities/crypto/cryptography.js');
     const originalGetProvider = cryptoUtils._getProvider.getMockImplementation();
     const providerRequest = jest.fn(async ({ method }) => {

@@ -334,7 +334,7 @@ describe('SessionWizard blank bundle render regression', () => {
     });
 
     await selectDecentralizedProfile();
-    fireEvent.click(screen.getByRole('button', { name: /step \d+: worker/i }));
+    fireEvent.click(screen.getByRole('button', { name: /step \d+: session worker/i }));
 
     const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
     setControlledInputValue(cloudflareTokenInput, 'cf-test-token');
@@ -418,7 +418,7 @@ describe('SessionWizard blank bundle render regression', () => {
     });
 
     await selectDecentralizedProfile();
-    fireEvent.click(screen.getByRole('button', { name: /step \d+: worker/i }));
+    fireEvent.click(screen.getByRole('button', { name: /step \d+: session worker/i }));
 
     const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
     setControlledInputValue(cloudflareTokenInput, 'cf-test-token');
@@ -530,7 +530,7 @@ describe('SessionWizard blank bundle render regression', () => {
     });
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
-    fireEvent.click(await screen.findByRole('button', { name: /step \d+: worker/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /step \d+: session worker/i }));
 
     await waitFor(() => {
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveValue('');

@@ -147,7 +147,10 @@ describe('SessionWizard worker resource rendering', () => {
           sessionName: 'Unrepresentable All Gates',
           slug: 'unrepresentable-all-gates',
           networkChainId: 11155420,
+          corsWorkerUrl: 'https://worker.example.test',
         },
+        deployComplete: true,
+        deployWorkerUrl: 'https://worker.example.test',
         encryptionGates: [
           {
             id: 'gate-all-a',

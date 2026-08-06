@@ -976,6 +976,15 @@ describe('SessionWizard rendered validation', () => {
     const { arweaveScripts } = require('../../utilities/arweave/arweaveScripts.js');
     let publishClicked = false;
     mockSessionExists.mockImplementation(async () => publishClicked);
+    const workerUrl = 'https://worker.example.test';
+    sessionStorage.setItem(
+      'ce:sessionWizardDraft:v1',
+      JSON.stringify({
+        draft: { corsWorkerUrl: workerUrl },
+        deployComplete: true,
+        deployWorkerUrl: workerUrl,
+      }),
+    );
 
     renderLoggedInSessionWizard();
     selectCloudflarePreset();

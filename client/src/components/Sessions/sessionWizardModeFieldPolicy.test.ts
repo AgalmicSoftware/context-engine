@@ -1,8 +1,9 @@
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 import {
-  SESSION_MODE_PRESET_IDS,
-  cloneSessionModePreset,
-} from '../../utilities/session/sessionModeProfile';
-import { resolveSessionWizardModeFieldPolicy } from './sessionWizardModeFieldPolicy';
+  SESSION_WIZARD_MODE_POLICY_FIELD_KEYS,
+  applySessionWizardModeFieldPolicyToPayload,
+  resolveSessionWizardModeFieldPolicy,
+} from './sessionWizardModeFieldPolicy';
 import { resolveSessionWizardModeRequirements } from './sessionWizardModeRequirements';
 
 const cloudflareRequirements = () =>
@@ -11,6 +12,26 @@ const cloudflareRequirements = () =>
   );
 
 describe('sessionWizardModeFieldPolicy', () => {
+  it('enumerates and strips every policy-governed field that is hidden by the final profile', () => {
+    expect(SESSION_WIZARD_MODE_POLICY_FIELD_KEYS).toEqual([
+      'blockLimits',
+      'faucet',
+      'sessionEndsAt',
+      'contracts',
+      'defaultGroupTags',
+      'defaultSbtTags',
+      'defaultFeaturedSBTs',
+      'autoFeatureSBTsBySessionSlug',
+    ]);
+    const payload = Object.fromEntries(SESSION_WIZARD_MODE_POLICY_FIELD_KEYS.map((key) => [key, 'stale']));
+
+    expect(applySessionWizardModeFieldPolicyToPayload(payload, resolveSessionWizardModeFieldPolicy(cloudflareRequirements())))
+      .toEqual({
+        sessionEndsAt: 'stale',
+        defaultGroupTags: 'stale',
+      });
+  });
+
   it('shows Worker timing and Group defaults without chain-only controls for pure Cloudflare', () => {
     expect(resolveSessionWizardModeFieldPolicy(cloudflareRequirements())).toEqual({
       showBlockLimits: false,

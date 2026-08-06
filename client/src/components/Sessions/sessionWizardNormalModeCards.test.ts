@@ -48,7 +48,6 @@ const basePublishSummaryInput: NormalModePublishSummaryInput = {
   deployVerifiedInUi: false,
   pendingDraftCount: 0,
   isWorkerCanonical: false,
-  usesWorkerRuntime: true,
   deployPendingSbts: true,
   t,
 };
