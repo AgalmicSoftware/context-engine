@@ -86,7 +86,7 @@ export const AUTHORITY_MATRIX = deepFreeze<AuthorityMatrix>({
     mustNotOverride: [AUTHORITY_SOURCES.BROWSER],
   },
   workerConfig: {
-    fields: ['corsWorkerUrl', 'allowOrigins', 'limits', 'rpcEndpoint', 'litCredentials'],
+    fields: ['corsWorkerUrl', 'allowOrigins', 'limits', 'rpcEndpoint', 'litCredentials', 'workerAuthority'],
     authoritativeSource: AUTHORITY_SOURCES.WORKER_KV,
     allowedFallbacks: [],
     mustNotOverride: [

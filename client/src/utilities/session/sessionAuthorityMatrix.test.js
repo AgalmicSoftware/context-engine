@@ -48,6 +48,10 @@ describe('sessionAuthorityMatrix', () => {
     expect(AUTHORITY_MATRIX.secrets.fields).toEqual(expect.arrayContaining(['litAccountApiKey', 'litUsageApiKey']));
   });
 
+  it('classifies worker authorization policy as Worker config', () => {
+    expect(AUTHORITY_MATRIX.workerConfig.fields).toContain('workerAuthority');
+  });
+
   it('switches identity, metadata, gates, and slug authority to worker KV only for worker-canonical mode', () => {
     expect(Object.isFrozen(WORKER_CANONICAL_AUTHORITY_MATRIX)).toBe(true);
     expect(resolveSessionAuthorityGroup('identity', 'worker_canonical')).toEqual(

@@ -101,6 +101,7 @@ export interface SessionWorkerConfig extends UnknownRecord {
   rpcEndpoint: string;
   embeddedDeployHelperEnabled?: boolean;
   litCredentials?: UnknownRecord;
+  workerAuthority?: UnknownRecord;
 }
 
 export interface SessionWorkerConfigFieldPresence {

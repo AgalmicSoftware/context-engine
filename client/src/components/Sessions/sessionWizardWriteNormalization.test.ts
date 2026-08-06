@@ -45,6 +45,11 @@ describe('sessionWizardWriteNormalization', () => {
         defaultSbtTags: 'on-chain-group-defaults',
         defaultFeaturedSBTs: ['0x0000000000000000000000000000000000000001'],
         autoFeatureSBTsBySessionSlug: false,
+        workerAuthority: {
+          version: 1,
+          participantScopes: ['ai', 'storage'],
+          anonymousScopes: [],
+        },
       }),
     ],
   ])('allowlists mode fields in outbound payloads for a %s', async (_label, makeDraft) => {
@@ -120,6 +125,7 @@ describe('sessionWizardWriteNormalization', () => {
     expect(outboundArweaveMetadata).not.toHaveProperty('sessionEndsAt');
     expect(outboundArweaveMetadata).not.toHaveProperty('defaultGroupTags');
     expect(outboundArweaveMetadata).not.toHaveProperty('agentSessionWrapped');
+    expect(outboundArweaveMetadata).not.toHaveProperty('workerAuthority');
     expect(outboundArweaveMetadata).toEqual(
       expect.objectContaining({
         defaultSbtTags: 'on-chain-group-defaults',
@@ -136,7 +142,9 @@ describe('sessionWizardWriteNormalization', () => {
     expect(outboundWorkerConfig).not.toHaveProperty('sessionEndsAt');
     expect(outboundWorkerConfig).not.toHaveProperty('defaultGroupTags');
     expect(outboundWorkerConfig).not.toHaveProperty('agentSessionWrapped');
+    expect(outboundWorkerConfig).not.toHaveProperty('workerAuthority');
     expect(outboundVerificationConfig).not.toHaveProperty('agentSessionWrapped');
+    expect(outboundVerificationConfig).not.toHaveProperty('workerAuthority');
     expect(outboundWorkerConfig).not.toHaveProperty('defaultSbtTags');
     expect(outboundWorkerConfig).not.toHaveProperty('defaultFeaturedSBTs');
     expect(outboundWorkerConfig).not.toHaveProperty('autoFeatureSBTsBySessionSlug');
