@@ -6,6 +6,7 @@ on:
       - master
       - main
       - 'release-staging*'
+      - 'release-staging/**'
   pull_request:
     branches:
       - master

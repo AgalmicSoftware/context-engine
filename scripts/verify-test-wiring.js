@@ -364,6 +364,10 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectWorkflowContains('BASELINE_MONOTONICITY_APPROVED:', 'verified baseline growth approval output');
   expectWorkflowContains('--require-base-sha', 'fail-closed baseline SHA requirement');
   expectWorkflowContains('fetch-depth: 0', 'complete history checkout for baseline comparison');
+  expectWorkflowContains(
+    "- 'release-staging/**'",
+    'nested release-staging push trigger',
+  );
   expectWorkflowContains('node scripts/check-baseline-monotonicity.mjs', '"node scripts/check-baseline-monotonicity.mjs"');
   expectWorkflowContains('run: npm run lint', '"npm run lint"');
   expectWorkflowContains('run: npm run typecheck:client', '"npm run typecheck:client"');

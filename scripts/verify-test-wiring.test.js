@@ -91,6 +91,13 @@ test('release-staging PR verification uses the fetched PR head instead of merge 
   );
 });
 
+test('release workflow runs for nested release-staging branches', () => {
+  const rootDir = path.resolve(__dirname, '..');
+  const workflow = fs.readFileSync(path.join(rootDir, '.github/workflows/ci.yml'), 'utf8');
+
+  assert.match(workflow, /- 'release-staging\/\*\*'/);
+});
+
 test('release workflow fetches preserve public ancestry for exact release refs', () => {
   const repoRoot = path.resolve(__dirname, '..');
   const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows/ci.yml'), 'utf8');
@@ -237,6 +244,10 @@ test('public-release style copies without .git still pass wiring checks', () => 
       rootDir,
       '.github/workflows/ci.yml',
       [
+        'on:',
+        '  push:',
+        '    branches:',
+        "      - 'release-staging/**'",
         'jobs:',
         '  wiring-and-release:',
         '    steps:',
