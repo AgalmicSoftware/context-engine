@@ -87,7 +87,7 @@ const FIELD_TOOLTIPS: Record<string, string> = {
   sessionModeProfile:
     'The session mode profile controls authority, storage, identity, authorization, encryption, surfaces, results, and export behavior.',
   corsWorkerUrl: 'Base URL for the worker (AI, transcription, Arweave uploads, faucet).',
-  sessionHeader: 'The banner image for this session. Paste an image URL or upload a file.',
+  sessionHeader: 'The banner image for this session. Use an image URL; Arweave-backed sessions can also upload a file.',
   sessionEndsAt:
     'Optional end time for this Cloudflare session. After this timestamp, participant writes stop while existing groups and results remain readable.',
   storageProfile: 'Advanced: choose the session-owned storage profile for documents, context, and media payloads.',

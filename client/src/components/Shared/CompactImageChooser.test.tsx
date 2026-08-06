@@ -44,4 +44,20 @@ describe('CompactImageChooser', () => {
     expect(screen.getByText('Images can be encrypted.')).toBeInTheDocument();
     expect(screen.getByAltText('Image preview')).toHaveAttribute('src', 'https://example.test/preview.png');
   });
+
+  it('keeps URL and paste controls while hiding file controls', () => {
+    const { container } = render(
+      <CompactImageChooser
+        showUploadControl={false}
+        showUrlInput
+        onToggleUrlMode={() => {}}
+        onPaste={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'URL' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Paste' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Upload image' })).not.toBeInTheDocument();
+    expect(container.querySelector('input[type="file"]')).toBeNull();
+  });
 });

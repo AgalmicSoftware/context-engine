@@ -104,4 +104,30 @@ describe('SessionHeaderField', () => {
 
     expect(onClear).toHaveBeenCalledTimes(1);
   });
+
+  it('renders URL-only controls when file upload is unavailable', () => {
+    const advanced = renderSessionHeaderField({
+      allowFileUpload: false,
+      sessionHeaderMode: 'upload',
+    });
+
+    expect(screen.queryByLabelText('Upload file')).not.toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_URL)).toHaveValue(
+      'https://example.test/header.png',
+    );
+    expect(advanced.container.querySelector('input[type="file"]')).toBeNull();
+    advanced.unmount();
+
+    const compact = renderSessionHeaderField({
+      allowFileUpload: false,
+      compact: true,
+      compactSessionHeaderMode: 'url',
+      sessionHeaderMode: 'upload',
+    });
+
+    expect(screen.getByRole('button', { name: 'URL' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Paste' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Upload image' })).not.toBeInTheDocument();
+    expect(compact.container.querySelector('input[type="file"]')).toBeNull();
+  });
 });

@@ -349,7 +349,7 @@ Enter the core session metadata:
 - session ID
 - network/contract defaults for chain-backed profiles
 - `blockLimits.start` for chain-scanned profiles
-- optional session header image
+- optional session header image URL; Arweave-backed sessions can also upload the image file with their metadata
 
 AI configuration also lives in the session metadata draft:
 

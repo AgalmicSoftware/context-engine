@@ -876,33 +876,6 @@ const SessionWizard = ({
       workerSecrets: getCurrentWorkerSecrets(),
       defaultWorkerUrl: getSessionWizardDefaultWorkerUrl(),
     });
-  }, []);
-  const DEFAULT_ALLOWED_ORIGINS = buildSessionWizardDefaultAllowedOrigins().join('\n');
-  const [workerAllowOrigins, setWorkerAllowOrigins] = useState(DEFAULT_ALLOWED_ORIGINS);
-  const [workerLimitPerWallet, setWorkerLimitPerWallet] = useState('');
-  const [sessionHeaderMode, setSessionHeaderMode] = useState('url');
-  const [compactSessionHeaderMode, setCompactSessionHeaderMode] = useState('idle');
-  const [sessionHeaderFile, setSessionHeaderFile] = useState<File | null>(null);
-  const [sessionHeaderPreviewUrl, setSessionHeaderPreviewUrl] = useState('');
-  const sessionHeaderPreviewUrlRef = useRef(sessionHeaderPreviewUrl);
-  sessionHeaderPreviewUrlRef.current = sessionHeaderPreviewUrl;
-  const [sessionHeaderPreviewModalOpen, setSessionHeaderPreviewModalOpen] = useState(false);
-  const [sessionHeaderUploadStatus, setSessionHeaderUploadStatus] = useState('');
-  const [sessionHeaderUploadStatusTone, setSessionHeaderUploadStatusTone] = useState<SessionHeaderUploadStatusTone>('default');
-  const [showPromptPreview, setShowPromptPreview] = useState(false);
-  const [metadataObjectCollapsed, setMetadataObjectCollapsed] = useState<MetadataObjectCollapsedState>({
-    contracts: true,
-    faucet: true,
-    ai: true,
-    lit: true,
-    storageProfile: true,
-  });
-  const workerResourceKeys = useMemo(() => getSessionWizardWorkerResourceKeys(), []);
-  const normalizedDraftStorageProfile = useMemo(
-    () => normalizeSessionStorageProfileConfig(draft?.storageProfile),
-    [draft?.storageProfile],
-  );
-  const cloudflareWorkerSbtGateMode = isWorkerSbtGateCloudflareStorageProfile(normalizedDraftStorageProfile);
   const sessionModeRequirements = resolveSessionWizardModeRequirements(draft.sessionModeProfile as SessionModeProfile, {
     hasPendingSbtDrafts: hasUndeployedPendingSbtDrafts,
   });
@@ -910,6 +883,51 @@ const SessionWizard = ({
     () => resolveSessionWizardModeFieldPolicy(sessionModeRequirements),
     [sessionModeRequirements],
   );
+  const allowSessionHeaderFileUpload =
+    !sessionModeRequirements.selected || sessionModeRequirements.publish.uploadMetadata;
+  const {
+    sessionHeaderMode,
+    setSessionHeaderMode,
+    compactSessionHeaderMode,
+    setCompactSessionHeaderMode,
+    sessionHeaderFile,
+    setSessionHeaderFile,
+    sessionHeaderPreviewSrc,
+    sessionHeaderPreviewModalOpen,
+    setSessionHeaderPreviewModalOpen,
+    sessionHeaderUploadStatus,
+    sessionHeaderUploadStatusTone,
+    setSessionHeaderStatus,
+    handlePasteSessionHeaderFromClipboard,
+    handleClearSessionHeaderPreview,
+  } = useSessionHeaderPreview({
+    allowFileUpload: allowSessionHeaderFileUpload,
+    draftSessionHeader: draft?.sessionHeader,
+    updateDraftSessionHeader: (value) => updateDraftValue(['sessionHeader'], value),
+  });
+  const {
+    wizardDisplaySettingsOpen,
+    setWizardDisplaySettingsOpen,
+    moreOptionsOpen,
+    setMoreOptionsOpen,
+    showJsonPreview,
+    setShowJsonPreview,
+    showPromptPreview,
+    setShowPromptPreview,
+    metadataObjectCollapsed,
+    setMetadataObjectCollapsed,
+    collapsedSections,
+    setCollapsedSections,
+  } = useSessionWizardChromeState({
+    wizardMode,
+    hasSponsoredBundleLink,
+  });
+  const workerResourceKeys = useMemo(() => getSessionWizardWorkerResourceKeys(), []);
+  const normalizedDraftStorageProfile = useMemo(
+    () => normalizeSessionStorageProfileConfig(draft?.storageProfile),
+    [draft?.storageProfile],
+  );
+  const cloudflareWorkerSbtGateMode = isWorkerSbtGateCloudflareStorageProfile(normalizedDraftStorageProfile);
   const workerSlugAvailabilityUrl = normalizeBaseUrl(toStr(draft.corsWorkerUrl).trim());
   const checkWorkerSessionSlugExists = useCallback(
     async ({ slug }: SessionSlugExistsArgs): Promise<boolean> =>
@@ -4192,6 +4210,7 @@ const SessionWizard = ({
   );
 
   const renderField = buildSessionWizardDraftFieldRenderer({
+    allowSessionHeaderFileUpload,
     blockLimitDuration,
     blockLimitUnit,
     compactSessionHeaderInputRef,

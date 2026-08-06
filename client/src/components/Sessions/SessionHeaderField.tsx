@@ -13,6 +13,7 @@ type CompactSessionHeaderMode = 'idle' | 'url' | string;
 type UploadStatusTone = React.ComponentProps<typeof CompactImageChooser>['statusTone'];
 
 export type SessionHeaderFieldProps = {
+  allowFileUpload?: boolean;
   compact?: boolean;
   value?: string | null;
   sessionHeaderMode: SessionHeaderMode;
@@ -35,6 +36,7 @@ export type SessionHeaderFieldProps = {
 };
 
 const SessionHeaderField = ({
+  allowFileUpload = true,
   compact = false,
   value,
   sessionHeaderMode,
@@ -66,7 +68,8 @@ const SessionHeaderField = ({
         pasteButtonTestId={E2E_TESTIDS.WIZARD_SESSION_HEADER_PASTE}
         urlInputTestId={E2E_TESTIDS.WIZARD_SESSION_HEADER_URL}
         isUrlMode={compactSessionHeaderMode === 'url'}
-        isUploadMode={sessionHeaderMode === 'upload'}
+        isUploadMode={allowFileUpload && sessionHeaderMode === 'upload'}
+        showUploadControl={allowFileUpload}
         showUrlInput={compactSessionHeaderMode === 'url'}
         urlValue={value == null ? '' : value}
         onUrlChange={onCompactUrlChange || onUrlChange}
@@ -95,17 +98,19 @@ const SessionHeaderField = ({
           <Input type="radio" name="sessionHeaderMode" checked={sessionHeaderMode === 'url'} onChange={onUseUrlMode} />
           Use URL
         </Label>
-        <Label className={styles.workerRadio}>
-          <Input
-            type="radio"
-            name="sessionHeaderMode"
-            checked={sessionHeaderMode === 'upload'}
-            onChange={onUseUploadMode}
-          />
-          Upload file
-        </Label>
+        {allowFileUpload ? (
+          <Label className={styles.workerRadio}>
+            <Input
+              type="radio"
+              name="sessionHeaderMode"
+              checked={sessionHeaderMode === 'upload'}
+              onChange={onUseUploadMode}
+            />
+            Upload file
+          </Label>
+        ) : null}
       </div>
-      {sessionHeaderMode === 'url' ? (
+      {sessionHeaderMode === 'url' || !allowFileUpload ? (
         <Input
           value={value == null ? '' : value}
           onChange={onUrlChange}

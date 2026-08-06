@@ -67,6 +67,7 @@ export type SessionWizardDraftFieldRenderer = (
 ) => ReactNode;
 
 type SessionWizardDraftFieldRendererOptions = {
+  allowSessionHeaderFileUpload: boolean;
   blockLimitDuration: number | string;
   blockLimitUnit: string;
   compactSessionHeaderInputRef: MutableRefObject<HTMLInputElement | null>;
@@ -139,6 +140,7 @@ type SessionWizardDraftFieldRendererOptions = {
 const pathKey = (path: string[]): string => path.join('.');
 
 export const buildSessionWizardDraftFieldRenderer = ({
+  allowSessionHeaderFileUpload,
   blockLimitDuration,
   blockLimitUnit,
   compactSessionHeaderInputRef,
@@ -597,6 +599,7 @@ export const buildSessionWizardDraftFieldRenderer = ({
             labelPrefix={<FontAwesomeIcon icon={faImage} className={styles.compactSessionHeaderIcon} />}
           >
             <SessionHeaderField
+              allowFileUpload={allowSessionHeaderFileUpload}
               compact
               value={draft?.sessionHeader}
               sessionHeaderMode={sessionHeaderMode}
@@ -637,6 +640,7 @@ export const buildSessionWizardDraftFieldRenderer = ({
       return (
         <LockableFieldFrame key={keyString} {...fieldFrameProps}>
           <SessionHeaderField
+            allowFileUpload={allowSessionHeaderFileUpload}
             value={value == null ? null : toStr(value)}
             sessionHeaderMode={sessionHeaderMode}
             compactSessionHeaderMode={compactSessionHeaderMode}

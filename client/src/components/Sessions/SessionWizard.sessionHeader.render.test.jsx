@@ -8,6 +8,7 @@ import {
   within,
   resetSessionWizardWorkerPanelTestState,
 } from './SessionWizard.workerPanel.testUtils';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 describe('SessionWizard session header image controls', () => {
   beforeEach(resetSessionWizardWorkerPanelTestState);
@@ -21,6 +22,84 @@ describe('SessionWizard session header image controls', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_URL_TOGGLE));
 
     expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_URL)).toBeInTheDocument();
+  });
+
+  it('offers URL and paste without file upload for Worker-canonical sessions', async () => {
+    sessionStorage.setItem(
+      'ce:sessionWizardDraft:v1',
+      JSON.stringify({
+        draft: {
+          sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+          storageProfile: { backend: 'cloudflare' },
+        },
+      }),
+    );
+
+    renderSessionWizard();
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    const imageBar = screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_INLINE_BAR);
+    expect(within(imageBar).getByRole('button', { name: 'URL' })).toBeInTheDocument();
+    expect(within(imageBar).getByRole('button', { name: 'Paste' })).toBeInTheDocument();
+    expect(within(imageBar).queryByRole('button', { name: 'Upload image' })).not.toBeInTheDocument();
+    expect(imageBar.querySelector('input[type="file"]')).toBeNull();
+  });
+
+  it('discards an Arweave file preview when switching to a URL-only profile', async () => {
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+    URL.createObjectURL = jest.fn(() => 'blob:transient-session-header');
+    URL.revokeObjectURL = jest.fn();
+    sessionStorage.setItem(
+      'ce:sessionWizardDraft:v1',
+      JSON.stringify({
+        draft: {
+          sessionHeader: 'https://images.example.test/persisted-header.png',
+          sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
+          storageProfile: { backend: 'arweave' },
+        },
+      }),
+    );
+
+    try {
+      renderSessionWizard();
+
+      await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+      const imageBar = screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_INLINE_BAR);
+      fireEvent.click(within(imageBar).getByRole('button', { name: 'Upload image' }));
+      const fileInput = imageBar.querySelector('input[type="file"]');
+      expect(fileInput).toBeTruthy();
+      fireEvent.change(fileInput, {
+        target: { files: [new File(['header'], 'header.png', { type: 'image/png' })] },
+      });
+      await waitFor(() => {
+        expect(screen.getByRole('img', { name: 'Session header preview' })).toHaveAttribute(
+          'src',
+          'blob:transient-session-header',
+        );
+      });
+
+      const originalConfirm = window.confirm;
+      window.confirm = jest.fn(() => true);
+      try {
+        fireEvent.click(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare'));
+      } finally {
+        window.confirm = originalConfirm;
+      }
+
+      await waitFor(() => {
+        expect(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).toHaveAttribute('aria-checked', 'true');
+        expect(within(imageBar).queryByRole('button', { name: 'Upload image' })).not.toBeInTheDocument();
+        expect(screen.getByRole('img', { name: 'Session header preview' })).toHaveAttribute(
+          'src',
+          'https://images.example.test/persisted-header.png',
+        );
+      });
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:transient-session-header');
+    } finally {
+      URL.createObjectURL = originalCreateObjectURL;
+      URL.revokeObjectURL = originalRevokeObjectURL;
+    }
   });
 
   it('keeps the image title row outside the stylized image control section in normal mode', async () => {
