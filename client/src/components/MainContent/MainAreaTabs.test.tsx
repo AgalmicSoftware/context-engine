@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import MainAreaTabs, { MAIN_AREA_TABS } from './MainAreaTabs';
 
 const mockToolExplorer = jest.fn();
@@ -103,6 +103,49 @@ describe('MainAreaTabs', () => {
     render(<MainAreaTabs {...createProps({ focusedTab: MAIN_AREA_TABS.WELCOME })} />);
 
     expect(await screen.findByTestId('mock-onboarding-walkthrough')).toBeInTheDocument();
+  });
+
+  it('notifies the parent exactly once for a user tab click', async () => {
+    const changeFocusedTab = jest.fn();
+    render(<MainAreaTabs {...createProps({ changeFocusedTab })} />);
+    await screen.findByTestId('mock-tool-explorer');
+
+    fireEvent.click(screen.getByText('Stats'));
+
+    expect(changeFocusedTab).toHaveBeenCalledTimes(1);
+    expect(changeFocusedTab).toHaveBeenCalledWith(MAIN_AREA_TABS.COMMUNITY);
+  });
+
+  it('mounts external tab changes without callback echo and retains lazy tab history', async () => {
+    const changeFocusedTab = jest.fn();
+    const { rerender } = render(<MainAreaTabs {...createProps({ changeFocusedTab })} />);
+    expect(await screen.findByTestId('mock-tool-explorer')).toBeInTheDocument();
+    changeFocusedTab.mockClear();
+
+    rerender(
+      <MainAreaTabs
+        {...createProps({
+          focusedTab: MAIN_AREA_TABS.WELCOME,
+          changeFocusedTab,
+        })}
+      />,
+    );
+
+    expect(await screen.findByTestId('mock-onboarding-walkthrough')).toBeInTheDocument();
+    expect(screen.getByTestId('mock-tool-explorer')).toBeInTheDocument();
+    expect(changeFocusedTab).not.toHaveBeenCalled();
+  });
+
+  it('accepts an externally supplied unknown tab without callback echo', async () => {
+    const changeFocusedTab = jest.fn();
+    const { rerender } = render(<MainAreaTabs {...createProps({ changeFocusedTab })} />);
+    expect(await screen.findByTestId('mock-tool-explorer')).toBeInTheDocument();
+    changeFocusedTab.mockClear();
+
+    rerender(<MainAreaTabs {...createProps({ focusedTab: 99, changeFocusedTab })} />);
+
+    expect(changeFocusedTab).not.toHaveBeenCalled();
+    expect(screen.getByTestId('mock-tool-explorer')).toBeInTheDocument();
   });
 
   it('preserves stale removed tab ids without normalizing them to the Tools tab on mount', () => {

@@ -31,9 +31,6 @@ const MAIN_AREA_TAB_TITLES = Object.freeze({
   [MAIN_AREA_TABS.TOOLS]: 'Tools',
   [MAIN_AREA_TABS.WELCOME]: 'Welcome',
 } as Record<number, string>);
-const getTabTitle = (tabIndex: number | null | undefined) =>
-  tabIndex == null ? '' : MAIN_AREA_TAB_TITLES[tabIndex] || '';
-
 type MainAreaTabsProps = {
   focusedTab: number;
   changeFocusedTab: (tabIndex: number) => void;
@@ -63,24 +60,16 @@ type MainAreaTabsProps = {
 };
 
 type MainAreaTabsState = {
-  tabChangesSinceRefresh: number;
-  currentTabIndex: number | null;
-  currentTabTitle: string;
   mountedTabs: Record<number, boolean>;
 };
 
 class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
   state: MainAreaTabsState = {
-    tabChangesSinceRefresh: 0,
-    currentTabIndex: null,
-    currentTabTitle: '',
     mountedTabs: {},
   };
 
   componentDidMount() {
     this.setState((prevState) => ({
-      currentTabTitle: getTabTitle(this.props.focusedTab),
-      currentTabIndex: this.props.focusedTab,
       mountedTabs: {
         ...(prevState.mountedTabs || {}),
         [this.props.focusedTab]: true,
@@ -92,21 +81,21 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
     return true;
   }
 
-  componentDidUpdate() {
-    // Detect tab changes from outside the component (e.g. footer links)
-    if (this.props.focusedTab !== this.state.currentTabIndex) {
-      this.changeTabs(this.props.focusedTab);
+  componentDidUpdate(prevProps: MainAreaTabsProps) {
+    if (this.props.focusedTab !== prevProps.focusedTab) {
+      this.setState((prevState) => ({
+        mountedTabs: {
+          ...(prevState.mountedTabs || {}),
+          [this.props.focusedTab]: true,
+        },
+      }));
     }
   }
 
   changeTabs = (nextTabIndex: number) => {
-    const nextTabTitle = getTabTitle(nextTabIndex);
     this.props.changeFocusedTab(nextTabIndex);
 
     this.setState((prevState) => ({
-      tabChangesSinceRefresh: prevState.tabChangesSinceRefresh + 1,
-      currentTabTitle: nextTabTitle,
-      currentTabIndex: nextTabIndex,
       mountedTabs: {
         ...(prevState.mountedTabs || {}),
         [nextTabIndex]: true,
@@ -172,7 +161,7 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
             </Nav>
           </CardHeader>
           <CardBody className={styles.mainAreaCardBody}>
-            <TabContent className="tab-space" activeTab={'link' + this.state.currentTabIndex}>
+            <TabContent className="tab-space" activeTab={'link' + this.props.focusedTab}>
               <TabPane tabId={'link' + MAIN_AREA_TABS.COMMUNITY}>
                 {this.state.mountedTabs[MAIN_AREA_TABS.COMMUNITY] ? (
                   <Suspense fallback={<LazyFallback label="Loading..." />}>
