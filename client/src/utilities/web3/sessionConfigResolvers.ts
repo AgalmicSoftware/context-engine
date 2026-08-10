@@ -5,9 +5,9 @@
 
 import { USE_ONCHAIN_SESSION_REGISTRY } from '../../variables/appConfig.js';
 import { getChainById } from '../../variables/chains.js';
-import { canonicalizeSessionSlug, resolveSessionConfigFromSources } from '../session/canonicalSessionContext.js';
+import { resolveSessionConfigFromSources } from '../session/canonicalSessionContext.js';
 import { normalizeSessionNaming } from '../session/sessionMetadata.js';
-import { resolveSessionConfigAliases } from '../session/sessionNaming.js';
+import { normalizeSessionSlug, resolveSessionConfigAliases } from '../session/sessionNaming.js';
 import {
   getAllDemoSessionConfigs,
   getDefaultSessionConfig as getDemoDefaultSessionConfig,
@@ -163,9 +163,7 @@ export function resolveDemoSessionBySlug(
 }
 
 // --- Tiny helpers: session config & lists + chain label (additive) ---
-export function normalizeSessionSlug(rawSlug: unknown): string {
-  return canonicalizeSessionSlug(rawSlug);
-}
+export { normalizeSessionSlug };
 
 // Session-first aliases (legacy group naming remains supported).
 // Legacy alias removed — function is now normalizeSessionSlug directly.
