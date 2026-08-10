@@ -102,6 +102,7 @@ describe('SimUserPage', () => {
     ).toBeInTheDocument();
     expect(screen.queryByText(/^Question 1$/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/^Binary$/i)).not.toBeInTheDocument();
+    expect(screen.getByText('Related Figures').querySelector('svg')).toBeNull();
     expect(screen.getByText(figure.biggestHope)).toBeInTheDocument();
     expect(screen.getByAltText(figure.name).getAttribute('src')).toMatch(
       /^(\/historical-avatars\/|https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/)/,

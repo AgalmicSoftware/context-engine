@@ -2,7 +2,7 @@
 import React, { Component } from 'react';
 import styles from './SimUserPage.module.scss';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faExclamationTriangle, faQuoteLeft, faArrowUp, faArrowDown, faUsers } from '@fortawesome/free-solid-svg-icons';
+import { faExclamationTriangle, faQuoteLeft, faArrowUp, faArrowDown } from '@fortawesome/free-solid-svg-icons';
 import { UncontrolledTooltip, Modal, ModalHeader, ModalBody } from 'reactstrap';
 import historicalFigures from '../../variables/demo/historical_figure_users.json';
 import atlasData from '../../variables/demo/historical_figures_tree_qs_and_votes.json';
@@ -447,9 +447,7 @@ class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
                 {/* Related Figures */}
                 {(allies.length > 0 || opponents.length > 0) && (
                   <div className={styles.relatedSection}>
-                    <span className={styles.sectionEyebrow}>
-                      <FontAwesomeIcon icon={faUsers} /> Related Figures
-                    </span>
+                    <span className={styles.sectionEyebrow}>Related Figures</span>
                     {allies.length > 0 && (
                       <div className={styles.relatedGroup}>
                         <h3 className={styles.relatedLabel}>Most Agreement</h3>
