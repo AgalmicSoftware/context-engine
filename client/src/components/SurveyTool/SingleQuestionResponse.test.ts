@@ -105,6 +105,25 @@ describe('SingleQuestionResponse style contracts', () => {
 });
 
 describe('SingleQuestionResponse card actions', () => {
+  it('can hide the mini expansion control without changing its default behavior', () => {
+    const question = {
+      prompt: 'Simulated question prompt',
+      type: 'freeform',
+    };
+    const response = {
+      answer: {
+        value: 'Simulated answer value',
+        encrypted: false,
+      },
+    };
+
+    const defaultTree = createSubject({ mode: 'mini', question, response }).render();
+    const staticTree = createSubject({ mode: 'mini', question, response, showMiniExpand: false }).render();
+
+    expect(findElement(defaultTree, (node) => nodeHasClassName(node, styles.miniExpandButton))).not.toBeNull();
+    expect(findElement(staticTree, (node) => nodeHasClassName(node, styles.miniExpandButton))).toBeNull();
+  });
+
   it('omits dead bookmark and page-link controls for synthetic questions without ids', () => {
     const subject = createSubject({
       mode: 'mini',

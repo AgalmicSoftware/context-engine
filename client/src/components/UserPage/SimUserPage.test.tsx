@@ -22,6 +22,7 @@ type TestHistoricalFigure = {
 
 type MockSingleQuestionResponseProps = {
   mode?: string;
+  showMiniExpand?: boolean;
   question?: {
     prompt?: string;
     type?: string;
@@ -40,7 +41,12 @@ jest.mock('../SurveyTool/SingleQuestionResponse', () => (props: MockSingleQuesti
   const answerText = Array.isArray(rawValue) ? rawValue.join(' | ') : String(rawValue ?? '');
 
   return (
-    <div data-testid="sim-question-card" data-mode={props.mode} data-type={props.question?.type || ''}>
+    <div
+      data-testid="sim-question-card"
+      data-mode={props.mode}
+      data-show-mini-expand={String(props.showMiniExpand)}
+      data-type={props.question?.type || ''}
+    >
       <span>{props.question?.prompt}</span>
       <span>{answerText}</span>
     </div>
@@ -86,6 +92,7 @@ describe('SimUserPage', () => {
     const responseCards = screen.getAllByTestId('sim-question-card');
     expect(responseCards).toHaveLength(figure.questions.length);
     expect(responseCards[0]).toHaveAttribute('data-mode', 'mini');
+    expect(responseCards[0]).toHaveAttribute('data-show-mini-expand', 'false');
     expect(responseCards[0]).toHaveAttribute('data-type', figure.questions[0].questionType);
 
     expect(screen.getByText(figure.questions[0].question)).toBeInTheDocument();

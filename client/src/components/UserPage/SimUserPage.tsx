@@ -96,6 +96,7 @@ type SingleQuestionResponseProps = SimQuestionCardData & {
   isOwnResponse: boolean;
   mode: string;
   showImportance: boolean;
+  showMiniExpand: boolean;
   onDecryptQuestion: () => void;
 };
 
@@ -267,6 +268,7 @@ class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
         isOwnResponse={false}
         mode={mode}
         showImportance={false}
+        showMiniExpand={false}
         onDecryptQuestion={() => {}}
       />
     );

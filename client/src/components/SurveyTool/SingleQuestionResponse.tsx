@@ -152,6 +152,7 @@ type SingleQuestionResponseProps = SingleQuestionRecord & {
   sessionConfig?: unknown;
   sessionSlug?: unknown;
   showImportance?: unknown;
+  showMiniExpand?: boolean;
   stackCompactDecryptCta?: boolean;
   storeCache?: SingleQuestionRecord | null;
   userHeldSBTs?: unknown;
@@ -252,6 +253,7 @@ export const resolveSingleQuestionRatingBarStyle = (ratingFillPercent: unknown):
  *   - mode: "fullscreen" | "mini" (applies to single-person response display)
  *   - aggregatorResponseMode: boolean. If true, we show aggregated stats for allResponses.
  *   - showImportance: boolean (whether to show importance slider UI in single-person mode)
+ *   - showMiniExpand: boolean. Set false for compact cards with no additional detail to reveal.
  *   - onDecryptQuestion(questionId, fieldToDecrypt): function to decrypt (only relevant if single-person mode)
  *   - onReloadQuestionPrompt(questionId): function to force prompt metadata/decrypt refresh
  *   - canDecryptOtherResponses: boolean. When true and viewer satisfies the session response gate,
@@ -1023,6 +1025,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
       isOwnResponse,
       mode,
       showImportance,
+      showMiniExpand = true,
       responderAddress,
       questionOnly,
       compactEncryptedAnswerCta = false,
@@ -1279,9 +1282,11 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
                   wrapMaskedPromptLabel(<span className={styles.miniPromptAbbrev}>{promptLabel}</span>)
                 )}
               </div>
-              <Button className={styles.miniExpandButton} onClick={this.toggleMiniExpand}>
-                {miniExpanded ? <FontAwesomeIcon icon={faChevronUp} /> : <FontAwesomeIcon icon={faChevronDown} />}
-              </Button>
+              {showMiniExpand && (
+                <Button className={styles.miniExpandButton} onClick={this.toggleMiniExpand}>
+                  {miniExpanded ? <FontAwesomeIcon icon={faChevronUp} /> : <FontAwesomeIcon icon={faChevronDown} />}
+                </Button>
+              )}
             </div>
           )}
 
