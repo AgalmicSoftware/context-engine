@@ -30,6 +30,15 @@
     box-shadow: var(--ce-shadow-pressed);
   }
 
+  // Presentation surfaces can retain button semantics and keyboard focus
+  // without inheriting the active app theme's raised-control chrome.
+  [data-ce-control-appearance='frameless'],
+  [data-ce-control-appearance='frameless']:active {
+    appearance: none;
+    border: 0;
+    box-shadow: none;
+  }
+
   input,
   select,
   textarea,

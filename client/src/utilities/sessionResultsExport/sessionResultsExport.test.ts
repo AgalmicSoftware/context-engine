@@ -163,7 +163,9 @@ describe('sessionResultsExport utilities', () => {
           questions: [
             {
               id: 'q1',
+              options: [],
               prompt: 'Prompt <b>unsafe</b>',
+              tags: [],
               type: 'freeform',
               responseCount: 1,
             },
@@ -195,7 +197,7 @@ describe('sessionResultsExport utilities', () => {
       exportedBy: { address: '0x9999999999999999999999999999999999999999' },
       sections: {
         report: {
-          questions: [{ id: 'q1', prompt: 'Only report?', responseCount: 1, type: 'binary' }],
+          questions: [{ id: 'q1', options: [], prompt: 'Only report?', responseCount: 1, tags: [], type: 'binary' }],
         },
       },
     });
@@ -229,7 +231,7 @@ describe('sessionResultsExport utilities', () => {
         } as never,
         sections: {
           report: {
-            questions: [{ id: 'q1', prompt: 'Same report?', responseCount: 1, type: 'binary' }],
+            questions: [{ id: 'q1', options: [], prompt: 'Same report?', responseCount: 1, tags: [], type: 'binary' }],
           },
         },
       });

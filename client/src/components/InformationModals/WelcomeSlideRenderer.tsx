@@ -71,6 +71,7 @@ const WelcomeSlideRenderer = ({
         className={mediaButtonClassName}
         style={EXPLAINER_BUTTON_STYLE}
         data-testid="ce-welcome-slide-media"
+        data-ce-control-appearance="frameless"
         data-slide-key={currentSlide.key}
         data-slide-layout={slideLayout}
         onClick={onSlideClick || undefined}

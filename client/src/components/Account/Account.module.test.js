@@ -22,10 +22,24 @@ describe('Account.module.scss modal account layout guards', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'Account.module.scss'), 'utf8');
 
     expect(scss).toMatch(
-      /#loginModalCard\s*{[\s\S]*?:global\(\.card-header\)\s*{[\s\S]*?position:\s*relative;[\s\S]*?padding-right:\s*4\.25rem;/,
+      /#loginModalCard\s*{[\s\S]*?margin-top:\s*0;[\s\S]*?:global\(\.card-header\)\s*{[\s\S]*?position:\s*relative;[\s\S]*?padding-right:\s*4\.25rem;/,
     );
     expect(scss).toMatch(
-      /:global\(\.modal-login \.close\)\s*(?:,[^{]*?)?\s*{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*1rem;[\s\S]*?right:\s*1rem;[\s\S]*?background:\s*transparent;[\s\S]*?opacity:\s*0\.5;/,
+      /:global\(\.modal-login \.close\)\s*(?:,[^{]*?)?\s*{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*1rem;[\s\S]*?right:\s*1rem;[\s\S]*?background:\s*transparent;[\s\S]*?color:\s*var\(--ce-titlebar-text\);[\s\S]*?opacity:\s*0\.85;/,
+    );
+  });
+
+  it('uses matched semantic surfaces for the login title and passkey explanation', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'Account.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /\.Web3SettingsModalTitle\s*{[\s\S]*?color:\s*var\(--ce-titlebar-text\);[\s\S]*?opacity:\s*1;/,
+    );
+    expect(scss).toMatch(
+      /\.accountWarningMessage\s*{[\s\S]*?background:\s*var\(--ce-surface-sunken\);[\s\S]*?border-color:\s*var\(--ce-border-inset\);[\s\S]*?color:\s*var\(--ce-panel-text\);[\s\S]*?box-shadow:\s*var\(--ce-shadow-pressed\);/,
+    );
+    expect(scss).not.toMatch(
+      /\.accountWarningMessage\s*{[\s\S]*?background:\s*var\(--ce-overlay-base\);[\s\S]*?color:\s*var\(--ce-status-info-text\);/,
     );
   });
 

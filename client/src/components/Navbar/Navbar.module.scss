@@ -304,13 +304,15 @@
 }
 
 #mainLogo {
-  opacity: 0.4;
-  mix-blend-mode: luminosity;
+  opacity: var(--ce-brand-logo-opacity);
+  mix-blend-mode: var(--ce-brand-logo-blend-mode);
+  filter: var(--ce-brand-logo-filter);
 }
 
 #mainLogoLoggedIn {
-  opacity: 0.4;
-  mix-blend-mode: luminosity;
+  opacity: var(--ce-brand-logo-opacity);
+  mix-blend-mode: var(--ce-brand-logo-blend-mode);
+  filter: var(--ce-brand-logo-filter);
 }
 
 .logoHomeLink {

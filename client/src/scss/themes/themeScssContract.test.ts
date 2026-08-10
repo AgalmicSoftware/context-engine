@@ -6,6 +6,7 @@ describe('runtime SCSS theme contract', () => {
   const scssDir = path.resolve(__dirname, '..', '..');
   const tokenOnlyStylesheets = [
     'components/Footer/Footer.module.scss',
+    'components/DocsPage/DocsPage.module.scss',
     'components/MainContent/MainContent.module.scss',
     'components/MainSite/AppShell.module.scss',
     'components/Navbar/Navbar.module.scss',
@@ -15,6 +16,11 @@ describe('runtime SCSS theme contract', () => {
   const colorLiteralPattern = /#[0-9a-f]{3,8}\b|\b(?:rgb|rgba|hsl|hsla)\([^)]*\)/i;
   const migratedLegacyPalettePattern =
     /#(?:fff(?:fff)?|e14eca|1d8cf8|ff8d72|00f2c3|fd5d93|212529|3358f4|ff6491|ba54f5|0098f0|ec250d|adb5bd|344675|f4f5f7|6c757d|525f7f|e9ecef|1f2251|32325d|f8f9fa)\b/i;
+  const findScssFiles = (directory: string): string[] =>
+    fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+      const entryPath = path.join(directory, entry.name);
+      return entry.isDirectory() ? findScssFiles(entryPath) : entry.name.endsWith('.scss') ? [entryPath] : [];
+    });
 
   test('compiles all bundled themes through the exact contract', () => {
     const result = sass.compile(path.resolve(scssDir, 'assets/css/contextEngine.scss'), {
@@ -27,6 +33,10 @@ describe('runtime SCSS theme contract', () => {
     expect(result.css).toContain('--ce-canvas: #008080');
     expect(result.css).toContain('--ce-border-raised: #ffffff #404040 #404040 #ffffff');
     expect(result.css).toContain('--ce-action-submit: #000080');
+    expect(result.css).toContain('--ce-nav-tab-inactive: #c0c0c0');
+    expect(result.css).toContain('--ce-response-agree-bg: #c0e0c0');
+    expect(result.css).toContain('--ce-data-viz-point: #000080');
+    expect(result.css).toContain('--ce-brand-logo-blend-mode: screen');
     expect(result.css).toContain('--ce-shadow-neumorphic-dark: #404040');
     expect(result.css).toContain('--ce-color-primary: var(--ce-action-primary)');
   });
@@ -34,6 +44,12 @@ describe('runtime SCSS theme contract', () => {
   test.each(['_context-engine.scss', '_classic-95.scss'])('%s remains a values-only theme definition', (filename) => {
     const source = fs.readFileSync(path.resolve(__dirname, filename), 'utf8');
     expect(source).not.toMatch(/(?:^|\n)\s*(?::root|\.[a-z]|#[a-z]|\[[^\]]+\])[^\n]*\{/i);
+  });
+
+  test('component styles contain no theme-ID selectors', () => {
+    findScssFiles(path.resolve(scssDir, 'components')).forEach((filename) => {
+      expect(fs.readFileSync(filename, 'utf8')).not.toContain('data-ce-theme');
+    });
   });
 
   test.each(tokenOnlyStylesheets)('%s contains no raw color literals', (filename) => {
@@ -44,6 +60,7 @@ describe('runtime SCSS theme contract', () => {
   test('the legacy global stylesheet does not reintroduce migrated palette literals', () => {
     const source = fs.readFileSync(path.resolve(scssDir, 'assets/css/contextEngine.scss'), 'utf8');
     expect(source).not.toMatch(migratedLegacyPalettePattern);
+    expect(source).toContain('color: var(--ce-nav-tab-inactive);');
   });
 
   test('the Session Wizard resolves shared primitives from the runtime theme', () => {

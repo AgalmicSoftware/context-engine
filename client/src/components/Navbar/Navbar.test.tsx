@@ -172,4 +172,14 @@ describe('Navbar logo navigation', () => {
       /#accountSection,\s*#accountSectionLoggedIn\s*\{[\s\S]*display:\s*flex;[\s\S]*justify-content:\s*flex-end;[\s\S]*margin-left:\s*auto;/,
     );
   });
+
+  it('renders both navbar logo variants through the app-theme brand contract', () => {
+    expect(navbarStylesheet).toMatch(
+      /#mainLogo\s*{[\s\S]*?opacity:\s*var\(--ce-brand-logo-opacity\);[\s\S]*?mix-blend-mode:\s*var\(--ce-brand-logo-blend-mode\);[\s\S]*?filter:\s*var\(--ce-brand-logo-filter\);/,
+    );
+    expect(navbarStylesheet).toMatch(
+      /#mainLogoLoggedIn\s*{[\s\S]*?opacity:\s*var\(--ce-brand-logo-opacity\);[\s\S]*?mix-blend-mode:\s*var\(--ce-brand-logo-blend-mode\);[\s\S]*?filter:\s*var\(--ce-brand-logo-filter\);/,
+    );
+    expect(navbarStylesheet).not.toContain('data-ce-theme');
+  });
 });

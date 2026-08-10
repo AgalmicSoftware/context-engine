@@ -1855,9 +1855,9 @@ h1 {
   letter-spacing: 6px;
   text-transform: uppercase;
   font-weight: 600;
-  color: var(--ce-status-info-text);
+  color: var(--ce-titlebar-text);
   font-size: 2.5em;
-  opacity: 0.5;
+  opacity: 1;
 }
 
 .Web3SettingsModalSubtitle {
@@ -3337,8 +3337,10 @@ h1 {
 
 .accountWarningMessage {
   max-width: 100%;
-  background: var(--ce-overlay-base);
-  border: none;
+  background: var(--ce-surface-sunken);
+  border-color: var(--ce-border-inset);
+  border-style: solid;
+  border-width: var(--ce-border-control-width);
   border-radius: var(--ce-radius-10);
   padding: 14px 16px;
   margin-bottom: 14px;
@@ -3346,12 +3348,10 @@ h1 {
   font-size: 1.25rem;
   overflow-wrap: anywhere;
   word-break: break-word;
-  color: var(--ce-status-info-text);
+  color: var(--ce-panel-text);
   width: 100%;
   max-width: 560px;
-  box-shadow:
-    0 10px 18px color-mix(in srgb, var(--ce-overlay-base) 30%, transparent),
-    inset 0 0 0 1px color-mix(in srgb, var(--ce-status-info) 12%, transparent);
+  box-shadow: var(--ce-shadow-pressed);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
 }
@@ -3403,7 +3403,7 @@ h1 {
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .accountWarningMessage {
-    background: color-mix(in srgb, var(--ce-overlay-base) 86%, transparent);
+    background: var(--ce-surface-sunken);
   }
 }
 
@@ -3477,9 +3477,9 @@ h1 {
   background-color: transparent !important;
   border: 0;
   box-shadow: none;
-  color: var(--ce-color-white);
+  color: var(--ce-titlebar-text);
   text-shadow: none;
-  opacity: 0.5;
+  opacity: 0.85;
   line-height: 1;
   transition: opacity 0.2s ease;
 }
@@ -3490,7 +3490,7 @@ h1 {
 :global(.modal-login .btn-close:focus) {
   background: transparent;
   background-color: transparent !important;
-  opacity: 0.8;
+  opacity: 1;
 }
 
 :global(.modal.modal-login) .web3ModalDialog {
@@ -3514,6 +3514,7 @@ h1 {
   position: relative;
   z-index: 2101;
   overflow: hidden;
+  margin-top: 0;
 
   :global(.card-header) {
     position: relative;

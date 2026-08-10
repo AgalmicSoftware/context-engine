@@ -1,18 +1,27 @@
 .docsPage {
-  --retro-blue-50: var(--ce-status-info-text);
-  --retro-blue-100: var(--ce-status-info-text);
-  --retro-blue-200: var(--ce-status-info-text);
-  --retro-blue-300: var(--ce-status-info-text);
-  --retro-blue-500: var(--ce-status-info);
-  --retro-ink: var(--ce-status-info);
-  --retro-ink-soft: var(--ce-status-info);
+  --docs-titlebar-bg: var(--ce-titlebar-bg);
+  --docs-titlebar-text: var(--ce-titlebar-text);
+  --docs-surface: var(--ce-surface-raised);
+  --docs-surface-alt: var(--ce-surface);
+  --docs-document: var(--ce-document-surface);
+  --docs-document-text: var(--ce-document-text);
+  --docs-document-muted: var(--ce-document-text-muted);
+  --docs-panel-text: var(--ce-panel-text);
+  --docs-panel-muted: var(--ce-panel-text-muted);
+  --docs-border: var(--ce-border-strong);
+  --docs-document-border: var(--ce-document-border-strong);
+  --docs-link: var(--ce-link);
+  --docs-control: var(--ce-control-face);
+  --docs-control-text: var(--ce-control-text);
+  --docs-code-bg: var(--ce-overlay-base);
+  --docs-code-text: var(--ce-overlay-text);
 
   padding: 24px;
   text-align: left;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  color: var(--retro-ink);
+  color: var(--docs-panel-text);
 
   @media (max-width: 640px) {
     padding: 16px;
@@ -21,14 +30,14 @@
 
 .docsHeader {
   padding: 20px 22px;
-  border: 2px solid var(--retro-blue-300);
+  border: var(--ce-border-control-width) solid var(--docs-border);
   border-radius: var(--ce-radius-10);
-  background: linear-gradient(135deg, var(--retro-blue-50), var(--retro-blue-100));
-  box-shadow: 4px 4px 0 color-mix(in srgb, var(--ce-status-info) 35%, transparent);
+  background: var(--docs-titlebar-bg);
+  box-shadow: var(--ce-shadow-raised);
 
   h1 {
     margin: 0;
-    color: var(--retro-ink);
+    color: var(--docs-titlebar-text);
     font-size: clamp(2rem, 5vw, 3.4rem);
     line-height: 1;
     letter-spacing: -0.03em;
@@ -37,17 +46,17 @@
   p {
     max-width: 760px;
     margin: 12px 0 0;
-    color: var(--retro-ink-soft);
+    color: var(--docs-titlebar-text);
     font-size: 1rem;
     line-height: 1.65;
   }
 }
 
 .docsSection {
-  border: 2px solid var(--retro-blue-300);
+  border: var(--ce-border-control-width) solid var(--docs-border);
   border-radius: var(--ce-radius-10);
-  background: var(--retro-blue-50);
-  box-shadow: 4px 4px 0 color-mix(in srgb, var(--ce-status-info) 35%, transparent);
+  background: var(--docs-surface);
+  box-shadow: var(--ce-shadow-raised);
   overflow: hidden;
 }
 
@@ -59,9 +68,9 @@
   gap: 16px;
   padding: 14px 16px;
   border: 0;
-  border-bottom: 2px solid var(--retro-blue-300);
-  background: linear-gradient(90deg, var(--retro-blue-100), var(--retro-blue-200));
-  color: var(--retro-ink);
+  border-bottom: var(--ce-border-control-width) solid var(--docs-border);
+  background: var(--docs-titlebar-bg);
+  color: var(--docs-titlebar-text);
   cursor: pointer;
   font-family: var(--ce-font-button);
   font-weight: 700;
@@ -69,11 +78,11 @@
 }
 
 .docsSectionToggle:hover {
-  background: linear-gradient(90deg, var(--retro-blue-200), var(--retro-blue-300));
+  background: var(--ce-action-primary-hover);
 }
 
 .docsSectionToggle:focus-visible {
-  outline: 3px solid var(--ce-color-info);
+  outline: 3px solid var(--ce-focus-ring);
   outline-offset: -4px;
 }
 
@@ -85,13 +94,13 @@
 
 .docsSectionToggleIcon {
   flex: 0 0 auto;
-  color: var(--ce-status-info);
+  color: var(--docs-titlebar-text);
   font-size: 1.2rem;
 }
 
 .docsSectionContent {
   padding: 18px;
-  background: linear-gradient(135deg, var(--ce-status-info-text), var(--ce-status-info-text));
+  background: var(--docs-surface);
 }
 
 .quickstartList {
@@ -107,10 +116,10 @@
 .quickstartStep {
   min-width: 0;
   padding: 16px;
-  border: 2px solid var(--retro-blue-200);
+  border: var(--ce-border-control-width) solid var(--docs-document-border);
   border-radius: var(--ce-radius-8);
-  background: var(--ce-color-white);
-  box-shadow: 3px 3px 0 var(--ce-status-info-text);
+  background: var(--docs-document);
+  box-shadow: var(--ce-shadow-raised);
   counter-increment: quickstart;
 
   h2 {
@@ -118,7 +127,7 @@
     align-items: center;
     gap: 10px;
     margin: 0;
-    color: var(--retro-ink);
+    color: var(--docs-document-text);
     font-size: 1rem;
     line-height: 1.35;
   }
@@ -132,15 +141,15 @@
     height: 28px;
     flex: 0 0 28px;
     border-radius: var(--ce-radius-pill);
-    background: var(--ce-status-info);
-    color: var(--ce-color-white);
+    background: var(--ce-action-primary);
+    color: var(--ce-action-primary-text);
     font-family: var(--ce-font-mono);
     font-size: 0.84rem;
   }
 
   p {
     margin: 10px 0 0;
-    color: var(--retro-ink-soft);
+    color: var(--docs-document-muted);
     line-height: 1.6;
   }
 }
@@ -148,7 +157,7 @@
 .docsInlineLink {
   display: inline-flex;
   margin-top: 12px;
-  color: var(--ce-status-info);
+  color: var(--docs-link);
   font-weight: 700;
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -164,28 +173,28 @@
 .guideTopic,
 .faqItem {
   padding: 16px;
-  border: 2px solid var(--retro-blue-200);
+  border: var(--ce-border-control-width) solid var(--docs-document-border);
   border-radius: var(--ce-radius-8);
-  background: var(--ce-color-white);
-  box-shadow: 3px 3px 0 var(--ce-status-info-text);
+  background: var(--docs-document);
+  box-shadow: var(--ce-shadow-raised);
 
   h2 {
     margin: 0;
-    color: var(--retro-ink);
+    color: var(--docs-document-text);
     font-size: 1rem;
     line-height: 1.4;
   }
 
   p {
     margin: 10px 0 0;
-    color: var(--retro-ink-soft);
+    color: var(--docs-document-muted);
     line-height: 1.6;
   }
 
   ul {
     margin: 12px 0 0 20px;
     padding: 0;
-    color: var(--retro-ink-soft);
+    color: var(--docs-document-muted);
   }
 
   li + li {
@@ -199,10 +208,10 @@
   flex-wrap: wrap;
   gap: 8px;
   padding: 10px 14px;
-  border: 2px solid var(--retro-blue-300);
+  border: var(--ce-border-control-width) solid var(--docs-border);
   border-radius: var(--ce-radius-8);
-  background: var(--retro-blue-100);
-  color: var(--retro-ink);
+  background: var(--docs-surface);
+  color: var(--docs-panel-text);
   font-family: var(--ce-font-mono);
   font-size: 0.9rem;
 }
@@ -212,10 +221,10 @@
   flex-direction: column;
   gap: 4px;
   padding: 12px 14px;
-  border: 2px solid var(--retro-blue-300);
+  border: var(--ce-border-control-width) solid var(--docs-border);
   border-radius: var(--ce-radius-8);
-  background: var(--retro-blue-100);
-  color: var(--retro-ink);
+  background: var(--docs-surface);
+  color: var(--docs-panel-text);
 
   strong {
     letter-spacing: 0.04em;
@@ -223,10 +232,10 @@
 }
 
 .contractsSection {
-  border: 2px solid var(--retro-blue-300);
+  border: var(--ce-border-control-width) solid var(--docs-border);
   border-radius: var(--ce-radius-10);
-  background: var(--retro-blue-50);
-  box-shadow: 4px 4px 0 color-mix(in srgb, var(--ce-status-info) 35%, transparent);
+  background: var(--docs-surface);
+  box-shadow: var(--ce-shadow-raised);
   overflow: hidden;
 }
 
@@ -235,19 +244,19 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: linear-gradient(90deg, var(--ce-status-info), var(--ce-status-info-text));
+  background: var(--docs-titlebar-bg);
   border: none;
-  color: var(--ce-document-surface);
+  color: var(--docs-titlebar-text);
   font-weight: 700;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   padding: 14px 16px;
   cursor: pointer;
-  border-bottom: 2px solid var(--retro-blue-300);
+  border-bottom: var(--ce-border-control-width) solid var(--docs-border);
 }
 
 .contractsToggle:focus-visible {
-  outline: 2px dashed var(--ce-document-surface);
+  outline: 2px dashed var(--docs-titlebar-text);
   outline-offset: 2px;
 }
 
@@ -264,34 +273,34 @@
   flex-direction: column;
   gap: 12px;
   padding: 16px;
-  background: linear-gradient(135deg, var(--ce-status-info-text), var(--ce-status-info-text));
+  background: var(--docs-surface);
 }
 
 .contractList {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 14px;
-  border: 2px solid color-mix(in srgb, var(--ce-status-info-text) 80%, transparent);
+  border: var(--ce-border-control-width) solid var(--docs-border);
   border-radius: var(--ce-radius-10);
   padding: 18px;
-  background: linear-gradient(135deg, var(--ce-status-info-text), var(--ce-status-info-text));
+  background: var(--docs-surface-alt);
   box-shadow:
-    inset 2px 2px 0 var(--ce-color-white),
-    inset -2px -2px 0 var(--ce-status-info-text);
+    inset 1px 1px 0 var(--ce-edge-shadow),
+    inset -1px -1px 0 var(--ce-edge-highlight);
 }
 
 .contractCard {
-  border: 2px solid var(--retro-blue-300);
+  border: var(--ce-border-control-width) solid var(--docs-document-border);
   padding: 14px 16px;
-  background: var(--retro-blue-50);
+  background: var(--docs-document);
   border-radius: var(--ce-radius-8);
-  color: var(--retro-ink);
+  color: var(--docs-document-text);
   width: 100%;
   text-align: left;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  box-shadow: 4px 4px 0 var(--retro-blue-300);
+  box-shadow: var(--ce-shadow-raised);
   cursor: pointer;
   transition:
     transform 0.15s ease,
@@ -300,15 +309,15 @@
 }
 
 .contractCard:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--ce-status-info) 60%, transparent);
+  outline: 2px solid var(--ce-focus-ring);
   outline-offset: 3px;
 }
 
 .contractCardOpen {
-  border-color: var(--ce-status-info);
+  border-color: var(--ce-action-primary);
   box-shadow:
-    6px 6px 0 color-mix(in srgb, var(--ce-status-info) 35%, transparent),
-    inset 0 0 0 1px color-mix(in srgb, var(--ce-status-info) 20%, transparent);
+    var(--ce-shadow-raised),
+    inset 0 0 0 1px var(--ce-action-primary);
   transform: translateY(-1px);
 }
 
@@ -317,14 +326,14 @@
   font-weight: 700;
   font-size: 0.9rem;
   letter-spacing: 0.08em;
-  color: var(--ce-document-surface);
-  background: linear-gradient(90deg, var(--ce-status-info), var(--ce-status-info));
+  color: var(--docs-titlebar-text);
+  background: var(--docs-titlebar-bg);
   padding: 6px 10px;
-  border: 2px solid var(--ce-status-info);
+  border: var(--ce-border-control-width) solid var(--docs-border);
   border-radius: var(--ce-radius-6);
   box-shadow:
-    inset 2px 2px 0 color-mix(in srgb, var(--ce-text-inverse) 60%, transparent),
-    inset -2px -2px 0 color-mix(in srgb, var(--ce-overlay-surface) 20%, transparent);
+    inset 1px 1px 0 var(--ce-edge-highlight),
+    inset -1px -1px 0 var(--ce-edge-shadow);
 }
 
 .contractHeader {
@@ -336,7 +345,7 @@
 
   a {
     text-decoration: none;
-    color: var(--retro-ink);
+    color: var(--docs-link);
     font-weight: 600;
   }
 
@@ -350,28 +359,28 @@
   align-items: center;
   gap: 6px;
   font-size: 0.85rem;
-  color: var(--retro-ink-soft);
+  color: var(--docs-document-muted);
 }
 
 .testnetLabel {
   font-weight: 700;
-  color: var(--ce-status-info);
+  color: var(--ce-action-primary);
 }
 
 .contractDetails {
-  color: var(--retro-ink);
+  color: var(--docs-document-text);
   font-size: 0.9rem;
 
   ul {
     list-style-type: disc;
     margin: 8px 0 0 18px;
     padding: 0;
-    color: var(--retro-ink-soft);
+    color: var(--docs-document-muted);
   }
 
   li {
     margin: 4px 0;
-    color: var(--retro-ink-soft);
+    color: var(--docs-document-muted);
   }
 }
 
@@ -386,8 +395,8 @@
   justify-content: space-between;
   padding: 6px 10px;
   border-radius: var(--ce-radius-6);
-  border: 1px dashed color-mix(in srgb, var(--ce-status-info) 40%, transparent);
-  color: var(--retro-ink-soft);
+  border: 1px dashed var(--ce-action-primary);
+  color: var(--docs-document-muted);
   font-size: 1rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -397,18 +406,18 @@
 .contractToggleIcon {
   font-size: 1.15rem;
   font-weight: 900;
-  color: var(--ce-status-info);
+  color: var(--ce-action-primary);
 }
 
 .backButton {
-  border: 2px solid var(--ce-status-info);
-  background: linear-gradient(145deg, var(--ce-status-info-text), var(--ce-status-info-text));
-  color: var(--ce-status-info);
+  border: var(--ce-border-control-width) solid var(--docs-border);
+  background: var(--docs-control);
+  color: var(--docs-control-text);
   padding: 6px 12px;
   border-radius: var(--ce-radius-6);
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 2px 2px 0 var(--ce-status-info-text);
+  box-shadow: var(--ce-shadow-raised);
   transition:
     transform 0.15s ease,
     box-shadow 0.15s ease;
@@ -420,7 +429,7 @@
 
 .backButton:active {
   transform: translateY(1px);
-  box-shadow: 1px 1px 0 var(--ce-status-info-text);
+  box-shadow: var(--ce-shadow-pressed);
 }
 
 .contractSources {
@@ -434,10 +443,10 @@
 }
 
 .contractSourceWindow {
-  border: 2px solid var(--retro-blue-300);
+  border: var(--ce-border-control-width) solid var(--docs-document-border);
   border-radius: var(--ce-radius-10);
-  background: var(--retro-blue-50);
-  box-shadow: 6px 6px 0 color-mix(in srgb, var(--ce-status-info) 35%, transparent);
+  background: var(--docs-document);
+  box-shadow: var(--ce-shadow-raised);
   overflow: hidden;
 }
 
@@ -453,9 +462,9 @@
   flex-wrap: wrap;
   gap: 12px;
   padding: 8px 12px;
-  background: linear-gradient(90deg, var(--ce-status-info), var(--ce-status-info-text));
-  border-bottom: 2px solid var(--retro-blue-300);
-  color: var(--ce-overlay-surface);
+  background: var(--docs-titlebar-bg);
+  border-bottom: var(--ce-border-control-width) solid var(--docs-border);
+  color: var(--docs-titlebar-text);
   font-weight: 700;
 }
 
@@ -475,11 +484,11 @@
   width: 12px;
   height: 12px;
   border-radius: var(--ce-radius-2);
-  border: 2px solid var(--ce-status-info);
-  background: var(--ce-document-surface);
+  border: var(--ce-border-control-width) solid var(--docs-border);
+  background: var(--docs-control);
   box-shadow:
-    inset 1px 1px 0 color-mix(in srgb, var(--ce-text-inverse) 90%, transparent),
-    inset -1px -1px 0 color-mix(in srgb, var(--ce-status-info) 20%, transparent);
+    inset 1px 1px 0 var(--ce-edge-highlight),
+    inset -1px -1px 0 var(--ce-edge-shadow);
 }
 
 .contractSourceTitle {
@@ -502,18 +511,18 @@
 
 .contractSourceFile {
   font-weight: 600;
-  color: var(--ce-status-info);
-  background: color-mix(in srgb, var(--ce-text-inverse) 70%, transparent);
+  color: var(--docs-control-text);
+  background: var(--docs-control);
   padding: 2px 8px;
   border-radius: var(--ce-radius-4);
-  border: 1px solid color-mix(in srgb, var(--ce-status-info) 30%, transparent);
+  border: 1px solid var(--docs-border);
 }
 
 .codeBlock {
   margin: 0;
   padding: 16px;
-  background: var(--ce-status-info-text);
-  color: var(--ce-overlay-surface);
+  background: var(--docs-code-bg);
+  color: var(--docs-code-text);
   font-family: var(--ce-font-mono);
   font-size: 0.85rem;
   line-height: 1.6;
@@ -521,8 +530,8 @@
   max-height: 70vh;
   tab-size: 2;
   box-shadow:
-    inset 2px 2px 0 var(--ce-color-white),
-    inset -2px -2px 0 var(--ce-status-info-text);
+    inset 1px 1px 0 var(--ce-edge-shadow),
+    inset -1px -1px 0 var(--ce-edge-highlight);
   user-select: text;
   cursor: text;
 }
@@ -559,17 +568,17 @@
 }
 
 .contractEmptyState {
-  border: 2px dashed color-mix(in srgb, var(--ce-status-info) 35%, transparent);
+  border: var(--ce-border-control-width) dashed var(--docs-document-border);
   border-radius: var(--ce-radius-8);
   padding: 16px;
-  color: var(--retro-ink-soft);
-  background: color-mix(in srgb, var(--ce-text-inverse) 40%, transparent);
+  color: var(--docs-document-muted);
+  background: var(--docs-document);
 }
 
 .sourceActionLink {
-  border: 2px solid color-mix(in srgb, var(--ce-status-info) 55%, transparent);
-  background: color-mix(in srgb, var(--ce-text-inverse) 82%, transparent);
-  color: var(--ce-status-info);
+  border: var(--ce-border-control-width) solid var(--docs-border);
+  background: var(--docs-control);
+  color: var(--docs-control-text);
   padding: 4px 10px;
   border-radius: var(--ce-radius-6);
   font-weight: 700;
@@ -577,7 +586,7 @@
   align-items: center;
   gap: 8px;
   text-decoration: none;
-  box-shadow: 2px 2px 0 color-mix(in srgb, var(--ce-status-info-text) 70%, transparent);
+  box-shadow: var(--ce-shadow-raised);
   transition:
     transform 0.15s ease,
     box-shadow 0.15s ease;
@@ -590,7 +599,7 @@
 
 .sourceActionLink:active {
   transform: translateY(1px);
-  box-shadow: 1px 1px 0 color-mix(in srgb, var(--ce-status-info-text) 70%, transparent);
+  box-shadow: var(--ce-shadow-pressed);
 }
 
 .promptsContent {
@@ -598,14 +607,14 @@
   flex-direction: column;
   gap: 12px;
   padding: 16px;
-  background: linear-gradient(135deg, var(--ce-status-info-text), var(--ce-status-info-text));
+  background: var(--docs-surface);
 }
 
 .promptWindow {
-  border: 2px solid var(--retro-blue-200);
+  border: var(--ce-border-control-width) solid var(--docs-document-border);
   border-radius: var(--ce-radius-8);
-  background: var(--ce-color-white);
-  box-shadow: 3px 3px 0 var(--ce-status-info-text);
+  background: var(--docs-document);
+  box-shadow: var(--ce-shadow-raised);
   overflow: hidden;
 }
 
@@ -614,14 +623,14 @@
   align-items: center;
   gap: 12px;
   padding: 8px 12px;
-  background: var(--ce-status-info-text);
-  border-bottom: 2px solid var(--retro-blue-200);
+  background: var(--docs-titlebar-bg);
+  border-bottom: var(--ce-border-control-width) solid var(--docs-border);
   cursor: pointer;
   user-select: none;
 }
 
 .promptHeader:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--ce-status-info) 60%, transparent);
+  outline: 2px solid var(--ce-focus-ring);
   outline-offset: 2px;
 }
 
@@ -631,7 +640,7 @@
   flex-wrap: wrap;
   gap: 10px;
   font-weight: 700;
-  color: var(--ce-status-info);
+  color: var(--docs-titlebar-text);
   flex: 1 1 auto;
 }
 
@@ -643,23 +652,23 @@
 
 .promptToggleIcon {
   font-size: 1.15rem;
-  color: var(--ce-status-info);
+  color: var(--docs-titlebar-text);
 }
 
 .promptFile {
   font-weight: 600;
-  color: var(--ce-status-info);
-  background: color-mix(in srgb, var(--ce-text-inverse) 90%, transparent);
+  color: var(--docs-control-text);
+  background: var(--docs-control);
   padding: 2px 8px;
   border-radius: var(--ce-radius-4);
-  border: 1px solid color-mix(in srgb, var(--ce-status-info) 25%, transparent);
+  border: 1px solid var(--docs-border);
 }
 
 .promptBlock {
   margin: 0;
   padding: 14px;
-  background: var(--ce-document-surface);
-  color: var(--ce-overlay-surface);
+  background: var(--docs-code-bg);
+  color: var(--docs-code-text);
   font-family: var(--ce-font-mono);
   font-size: 0.82rem;
   line-height: 1.6;
@@ -671,24 +680,24 @@
 }
 
 .promptWindowOpen {
-  border-color: color-mix(in srgb, var(--ce-status-info) 80%, transparent);
+  border-color: var(--ce-action-primary);
 }
 
 .promptVar {
   display: inline-block;
   padding: 2px 6px;
   border-radius: var(--ce-radius-4);
-  background: color-mix(in srgb, var(--ce-status-warning-text) 60%, transparent);
-  color: var(--ce-status-warning);
-  border: 1px solid color-mix(in srgb, var(--ce-status-warning) 25%, transparent);
+  background: var(--ce-status-warning-soft);
+  color: var(--ce-status-warning-text);
+  border: 1px solid var(--ce-status-warning-text);
   font-weight: 700;
   font-family: var(--ce-font-mono);
 }
 
 .copyButton {
-  border: 2px solid var(--ce-status-info);
-  background: linear-gradient(145deg, var(--ce-status-info-text), var(--ce-status-info-text));
-  color: var(--ce-status-info);
+  border: var(--ce-border-control-width) solid var(--docs-border);
+  background: var(--docs-control);
+  color: var(--docs-control-text);
   padding: 4px 10px;
   border-radius: var(--ce-radius-6);
   font-weight: 700;
@@ -697,7 +706,7 @@
   align-items: center;
   justify-content: center;
   line-height: 1;
-  box-shadow: 2px 2px 0 var(--ce-status-info-text);
+  box-shadow: var(--ce-shadow-raised);
   transition:
     transform 0.15s ease,
     box-shadow 0.15s ease;
@@ -709,24 +718,24 @@
 
 .copyButton:active {
   transform: translateY(1px);
-  box-shadow: 1px 1px 0 var(--ce-status-info-text);
+  box-shadow: var(--ce-shadow-pressed);
 }
 
 .copyButtonSuccess {
   border-color: var(--ce-status-success);
-  background: var(--ce-status-success-text);
-  color: var(--ce-status-success);
+  background: var(--ce-status-success-soft);
+  color: var(--ce-status-success-text);
 }
 
 .collapseButton {
-  border: 2px solid color-mix(in srgb, var(--ce-status-info) 45%, transparent);
-  background: color-mix(in srgb, var(--ce-text-inverse) 70%, transparent);
-  color: var(--ce-status-info);
+  border: var(--ce-border-control-width) solid var(--docs-border);
+  background: var(--docs-control);
+  color: var(--docs-control-text);
   padding: 4px 10px;
   border-radius: var(--ce-radius-6);
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 2px 2px 0 color-mix(in srgb, var(--ce-status-info-text) 70%, transparent);
+  box-shadow: var(--ce-shadow-raised);
   transition:
     transform 0.15s ease,
     box-shadow 0.15s ease;
@@ -738,7 +747,7 @@
 
 .collapseButton:active {
   transform: translateY(1px);
-  box-shadow: 1px 1px 0 color-mix(in srgb, var(--ce-status-info-text) 70%, transparent);
+  box-shadow: var(--ce-shadow-pressed);
 }
 
 @media (max-width: 640px) {

@@ -92,30 +92,46 @@ Components consume meanings, not palette values. The two bundled theme maps
 may therefore change color, typography, geometry, borders, elevation, and
 control states without component selectors in a theme file.
 
-| Family | Representative tokens | Intended use |
-| --- | --- | --- |
-| Canvas and surfaces | `--ce-canvas`, `--ce-surface-*`, `--ce-card-*` | page, raised, sunken, and card chrome |
-| Documents | `--ce-document-*` | readable light/document-style content |
-| Panel and overlay copy | `--ce-panel-text*`, `--ce-overlay-text*` | foregrounds paired with panel or overlay surfaces |
-| Controls | `--ce-control-*`, `--ce-input-*`, `--ce-titlebar-*` | inputs, buttons, disabled states, and title bars |
-| Actions and status | `--ce-action-*`, `--ce-status-*`, `--ce-link` | interactive, validation, risk, and state semantics |
-| Data series | `--ce-data-series-1` through `--ce-data-series-8` | categorical charts and visualizations |
-| Edges and elevation | `--ce-border-*`, `--ce-edge-*`, `--ce-shadow-*` | flat, raised, inset, pressed, and submit states |
-| Geometry | `--ce-radius-*`, `--ce-border-control-width`, `--ce-control-padding-*` | theme-selectable shape and control density |
-| Typography | `--ce-font-*`, `--ce-font-button-weight` | body, UI, mono, and control typography |
+| Family                 | Representative tokens                                                         | Intended use                                                                   |
+| ---------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Canvas and surfaces    | `--ce-canvas`, `--ce-surface-*`, `--ce-card-*`                                | page, raised, sunken, and card chrome                                          |
+| Documents              | `--ce-document-*`                                                             | readable light/document-style content                                          |
+| Panel and overlay copy | `--ce-panel-text*`, `--ce-overlay-text*`                                      | foregrounds paired with panel or overlay surfaces                              |
+| Controls               | `--ce-control-*`, `--ce-input-*`, `--ce-titlebar-*`, `--ce-nav-tab-inactive`  | inputs, buttons, disabled states, title bars, and inactive title-bar tab icons |
+| Actions and status     | `--ce-action-*`, `--ce-status-*`, `--ce-link`                                 | interactive, validation, risk, and state semantics                             |
+| Data series            | `--ce-data-series-1` through `--ce-data-series-8`                             | categorical charts and visualizations                                          |
+| Response states        | `--ce-response-agree-*`, `--ce-response-unsure-*`, `--ce-response-disagree-*` | readable vote-state badges on the active tooltip surface                       |
+| Data visualization     | `--ce-data-viz-*`                                                             | plot surfaces, axes, labels, points, active points, and point strokes          |
+| Brand media            | `--ce-brand-logo-*`                                                           | theme-specific logo opacity, blending, and filter treatment                    |
+| Edges and elevation    | `--ce-border-*`, `--ce-edge-*`, `--ce-shadow-*`                               | flat, raised, inset, pressed, and submit states                                |
+| Geometry               | `--ce-radius-*`, `--ce-border-control-width`, `--ce-control-padding-*`        | theme-selectable shape and control density                                     |
+| Typography             | `--ce-font-*`, `--ce-font-button-weight`                                      | body, UI, mono, and control typography                                         |
 
 The legacy `--ce-color-*` aliases remain only for source compatibility and
 resolve through the active semantic contract. New code uses `--ce-*` semantic
 tokens directly.
 
+Component styles must not branch on `data-ce-theme`. If a visual needs to vary,
+extend the exact semantic contract and consume the new token generically. The
+SCSS contract test recursively enforces that rule. Semantic buttons which act
+as full-frame presentation surfaces use
+`data-ce-control-appearance="frameless"`; the shared recipe removes only raised
+chrome and preserves normal focus-visible treatment.
+
+The Docs route follows the same pairings end to end: page and section headers
+use `--ce-titlebar-*`, prose cards use `--ce-document-*`, controls use
+`--ce-control-*`, and source/prompt readers use `--ce-overlay-*`. Keep those
+foreground/background pairs together so every bundled theme remains readable;
+the app-theme Playwright smoke checks the rendered Docs pairs at 4.5:1.
+
 ## Typography
 
-| Token | `context-engine` | `classic-95` |
-| --- | --- | --- |
-| `--ce-font-body` | Poppins fallback stack | Tahoma/MS Sans Serif fallback stack |
-| `--ce-font-ui` | Open Sans fallback stack | Tahoma/MS Sans Serif fallback stack |
-| `--ce-font-mono` | system monospace fallback stack | Courier New fallback stack |
-| `--ce-font-button-weight` | `600` | `400` |
+| Token                     | `context-engine`                | `classic-95`                        |
+| ------------------------- | ------------------------------- | ----------------------------------- |
+| `--ce-font-body`          | Poppins fallback stack          | Tahoma/MS Sans Serif fallback stack |
+| `--ce-font-ui`            | Open Sans fallback stack        | Tahoma/MS Sans Serif fallback stack |
+| `--ce-font-mono`          | system monospace fallback stack | Courier New fallback stack          |
+| `--ce-font-button-weight` | `600`                           | `400`                               |
 
 Guideline:
 
@@ -128,24 +144,24 @@ Guideline:
 
 Spacing tokens in `client/src/scss/_variables.scss`:
 
-| Token | Value |
-| --- | --- |
-| `$ce-space-1` | `4px` |
-| `$ce-space-2` | `8px` |
+| Token         | Value  |
+| ------------- | ------ |
+| `$ce-space-1` | `4px`  |
+| `$ce-space-2` | `8px`  |
 | `$ce-space-3` | `12px` |
 | `$ce-space-4` | `16px` |
 | `$ce-space-5` | `24px` |
 
 Radius tokens:
 
-| Token | Value | Runtime Token |
-| --- | --- | --- |
-| `$ce-radius-sm` | `4px` | `--ce-radius-4` |
-| `$ce-radius-md` | `8px` | `--ce-radius-8` |
-| `$ce-radius-lg` | `12px` | `--ce-radius-12` |
-| n/a | `6px` | `--ce-radius-6` |
-| n/a | `10px` | `--ce-radius-10` |
-| n/a | `999px` | `--ce-radius-pill` |
+| Token           | Value   | Runtime Token      |
+| --------------- | ------- | ------------------ |
+| `$ce-radius-sm` | `4px`   | `--ce-radius-4`    |
+| `$ce-radius-md` | `8px`   | `--ce-radius-8`    |
+| `$ce-radius-lg` | `12px`  | `--ce-radius-12`   |
+| n/a             | `6px`   | `--ce-radius-6`    |
+| n/a             | `10px`  | `--ce-radius-10`   |
+| n/a             | `999px` | `--ce-radius-pill` |
 
 Guideline: component rules use runtime radius tokens. In `classic-95`, every
 non-round radius slot resolves to square geometry; `context-engine` retains its
@@ -241,7 +257,9 @@ npm run format:check
 npm run build
 ```
 
-The runtime Playwright smoke covers `/about`, `/session/new`, `/docs`, `/demos`,
-and a not-found route at desktop and mobile widths. It boots `classic-95`,
-switches to `context-engine` without reload, and verifies palette, typography,
-geometry, modal chrome, Session Wizard preview scope, and horizontal overflow.
+The runtime Playwright smoke covers the home Welcome/Login and Community Stats
+surfaces, `/about`, `/session/new`, `/docs`, `/demos`, and a not-found route at
+desktop and mobile widths. It boots `classic-95`, switches to `context-engine`
+without reload, and verifies palette, typography, geometry, modal chrome,
+Session Wizard preview scope, Community Stats/tooltip contrast and data spread,
+and horizontal overflow.

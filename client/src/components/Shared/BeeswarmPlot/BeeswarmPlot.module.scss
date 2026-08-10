@@ -1,4 +1,3 @@
-$clickable-color: var(--ce-action-accent);
 $muted-text: var(--ce-panel-text-muted);
 $card-bg: var(--ce-card-bg);
 
@@ -16,23 +15,14 @@ $card-bg: var(--ce-card-bg);
 .hoverTooltip {
   position: absolute;
   z-index: 4;
+  box-sizing: border-box;
   width: min(520px, calc(100vw - 56px));
   max-width: calc(100vw - 56px);
   padding: 24px 28px 22px;
-  border: 1px solid var(--ce-color-tooltip-border, color-mix(in srgb, var(--ce-text-inverse) 18%, transparent));
+  border: 1px solid var(--ce-tooltip-border);
   border-radius: var(--ce-radius-28);
-  background:
-    radial-gradient(
-      circle at top left,
-      color-mix(in srgb, var(--ce-action-accent) 12%, transparent) 0%,
-      transparent 42%
-    ),
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--ce-overlay-base) 98.5%, transparent) 0%,
-      color-mix(in srgb, var(--ce-overlay-base) 99%, transparent) 100%
-    );
-  color: var(--ce-color-tooltip-text, var(--ce-document-surface));
+  background: var(--ce-tooltip-bg);
+  color: var(--ce-tooltip-text);
   box-shadow: 0 22px 48px color-mix(in srgb, var(--ce-compat-dark) 40%, transparent);
   pointer-events: none;
   backdrop-filter: blur(12px);
@@ -52,10 +42,10 @@ $card-bg: var(--ce-card-bg);
   width: 30px;
   height: 30px;
   padding: 0;
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
+  border: 1px solid var(--ce-tooltip-border);
   border-radius: var(--ce-radius-round);
-  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
-  color: var(--ce-document-surface);
+  background: color-mix(in srgb, var(--ce-tooltip-text) 8%, var(--ce-tooltip-bg));
+  color: var(--ce-tooltip-text);
   font-size: 1.2rem;
   cursor: pointer;
 }
@@ -63,18 +53,14 @@ $card-bg: var(--ce-card-bg);
 .hoverPanel {
   min-height: 70px;
   padding: 12px 14px;
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
+  border: 1px solid var(--ce-tooltip-border);
   border-radius: var(--ce-radius-12);
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--ce-overlay-surface) 82%, transparent) 0%,
-    color-mix(in srgb, var(--ce-overlay-surface) 62%, transparent) 100%
-  );
+  background: var(--ce-tooltip-bg);
 }
 
 .hoverLabel {
   margin: 0 0 6px;
-  color: var(--ce-document-surface);
+  color: var(--ce-tooltip-text);
   font-size: 0.95rem;
   font-weight: 600;
   line-height: 1.45;
@@ -82,7 +68,7 @@ $card-bg: var(--ce-card-bg);
 
 .hoverMeta {
   margin: 0;
-  color: $muted-text;
+  color: var(--ce-tooltip-muted);
   font-family: var(--ce-font-mono);
   font-size: 0.8rem;
   line-height: 1.4;
@@ -90,7 +76,7 @@ $card-bg: var(--ce-card-bg);
 
 .tooltipPrompt {
   margin: 0 0 16px;
-  color: var(--ce-document-surface);
+  color: var(--ce-tooltip-text);
   font-size: clamp(1.12rem, 0.98rem + 0.72vw, 1.62rem);
   font-weight: 700;
   line-height: 1.18;
@@ -121,21 +107,21 @@ $card-bg: var(--ce-card-bg);
 }
 
 .tooltipStatAgree {
-  background: color-mix(in srgb, var(--ce-action-accent) 16%, transparent);
-  border-color: color-mix(in srgb, var(--ce-action-accent) 30%, transparent);
-  color: var(--ce-status-success-text);
+  background: var(--ce-response-agree-bg);
+  border-color: var(--ce-response-agree-border);
+  color: var(--ce-response-agree-text);
 }
 
 .tooltipStatDisagree {
-  background: color-mix(in srgb, var(--ce-status-error) 15%, transparent);
-  border-color: color-mix(in srgb, var(--ce-status-error) 28%, transparent);
-  color: var(--ce-status-danger-text);
+  background: var(--ce-response-disagree-bg);
+  border-color: var(--ce-response-disagree-border);
+  color: var(--ce-response-disagree-text);
 }
 
 .tooltipStatUnsure {
-  background: color-mix(in srgb, var(--ce-status-warning) 14%, transparent);
-  border-color: color-mix(in srgb, var(--ce-status-warning) 30%, transparent);
-  color: var(--ce-status-warning-text);
+  background: var(--ce-response-unsure-bg);
+  border-color: var(--ce-response-unsure-border);
+  color: var(--ce-response-unsure-text);
 }
 
 .tooltipResponseWrap {
@@ -148,10 +134,10 @@ $card-bg: var(--ce-card-bg);
   width: 100%;
   height: 24px;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-tooltip-text) 36%, var(--ce-tooltip-bg));
   border-radius: var(--ce-radius-pill);
-  background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
+  background: color-mix(in srgb, var(--ce-tooltip-text) 8%, var(--ce-tooltip-bg));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ce-tooltip-text) 10%, transparent);
 }
 
 .tooltipResponseSegment {
@@ -185,7 +171,7 @@ $card-bg: var(--ce-card-bg);
 }
 
 .tooltipResponseFooter {
-  color: color-mix(in srgb, var(--ce-control-text) 80%, transparent);
+  color: var(--ce-tooltip-muted);
   font-family: var(--ce-font-mono);
   font-size: 0.82rem;
   font-weight: 600;
@@ -196,7 +182,7 @@ $card-bg: var(--ce-card-bg);
 .metaDivider {
   display: inline-block;
   margin: 0 8px;
-  color: color-mix(in srgb, var(--ce-text-inverse) 30%, transparent);
+  color: var(--ce-tooltip-muted);
 }
 
 .svgShell {
@@ -213,27 +199,27 @@ $card-bg: var(--ce-card-bg);
   width: 100%;
   min-width: 460px;
   height: auto;
-  border: var(--ce-beeswarm-border, none);
+  border: var(--ce-beeswarm-border, var(--ce-data-viz-border));
   border-radius: var(--ce-radius-16);
-  background: var(--ce-beeswarm-background, transparent);
+  background: var(--ce-beeswarm-background, var(--ce-data-viz-surface));
 }
 
 .axisLine {
-  stroke: var(--ce-beeswarm-axis-color, color-mix(in srgb, var(--ce-text-inverse) 28%, transparent));
+  stroke: var(--ce-beeswarm-axis-color, var(--ce-data-viz-axis));
   stroke-width: 1.5;
 }
 
 .axisLabel {
-  fill: var(--ce-beeswarm-label-color, #{$muted-text});
+  fill: var(--ce-beeswarm-label-color, var(--ce-data-viz-label));
   font-family: var(--ce-font-mono);
   letter-spacing: 0.02em;
   font-size: var(--ce-beeswarm-axis-label-size, 2em);
-  opacity: 0.5;
+  opacity: var(--ce-beeswarm-label-opacity, var(--ce-data-viz-label-opacity));
 }
 
 .point {
-  fill: var(--ce-beeswarm-point-color, #{$clickable-color});
-  stroke: var(--ce-beeswarm-point-stroke, color-mix(in srgb, var(--ce-overlay-surface) 85%, transparent));
+  fill: var(--ce-beeswarm-point-color, var(--ce-data-viz-point));
+  stroke: var(--ce-beeswarm-point-stroke, var(--ce-data-viz-point-stroke));
   stroke-width: 2;
   opacity: 0.9;
   transition:
@@ -243,7 +229,7 @@ $card-bg: var(--ce-card-bg);
 }
 
 .pointActive {
-  fill: var(--ce-beeswarm-point-active-color, var(--ce-status-warning-text));
+  fill: var(--ce-beeswarm-point-active-color, var(--ce-data-viz-point-active));
   opacity: 1;
 }
 
@@ -272,8 +258,8 @@ $card-bg: var(--ce-card-bg);
 
 @media (max-width: 768px) {
   .hoverTooltip {
-    width: min(360px, calc(100vw - 32px));
-    max-width: calc(100vw - 32px);
+    width: min(360px, calc(100% - 24px));
+    max-width: calc(100% - 24px);
     padding: 20px 20px 18px;
     border-radius: var(--ce-radius-22);
   }

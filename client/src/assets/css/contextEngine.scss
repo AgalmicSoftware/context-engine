@@ -6151,7 +6151,7 @@ a.active.nav-link i {
 }
 
 .nav-tabs > .nav-item > .nav-link {
-  color: color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
+  color: var(--ce-nav-tab-inactive);
   border-radius: var(--ce-radius-0);
 }
 

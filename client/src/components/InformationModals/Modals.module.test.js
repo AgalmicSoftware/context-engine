@@ -68,4 +68,15 @@ describe('Modals contrast styles', () => {
     );
     expect(scss).not.toMatch(/\.welcomeSlideImageAudience\s*\{[\s\S]*?mask-image:/);
   });
+
+  it('delegates the welcome media target chrome to the shared frameless control recipe', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'Modals.module.scss'), 'utf8');
+    const recipes = fs.readFileSync(path.resolve(__dirname, '../../scss/themes/_recipes.scss'), 'utf8');
+
+    expect(scss).not.toContain('data-ce-theme');
+    expect(recipes).toMatch(
+      /\[data-ce-control-appearance='frameless'\],[\s\S]*?\[data-ce-control-appearance='frameless'\]:active\s*\{[\s\S]*?appearance:\s*none;[\s\S]*?border:\s*0;[\s\S]*?box-shadow:\s*none;/,
+    );
+    expect(recipes).not.toMatch(/\[data-ce-control-appearance='frameless'\][^}]*outline:\s*none/);
+  });
 });

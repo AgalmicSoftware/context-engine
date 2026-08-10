@@ -118,6 +118,19 @@ describe('bundled app-theme contrast', () => {
     textPairs.forEach(([foreground, background, backdrop]) =>
       assertContrast(values, foreground, background, 4.5, backdrop),
     );
+    [
+      ['response-agree-text', 'response-agree-bg'],
+      ['response-unsure-text', 'response-unsure-bg'],
+      ['response-disagree-text', 'response-disagree-bg'],
+    ].forEach(([foreground, background]) => assertContrast(values, foreground, background, 4.5, 'tooltip-bg'));
+    assertContrast(values, 'data-viz-label', 'data-viz-surface', 4.5, 'surface');
+    assertContrast(values, 'data-viz-point', 'data-viz-surface', 3, 'surface');
+    assertContrast(values, 'data-viz-point-active', 'data-viz-surface', 3, 'surface');
     assertContrast(values, 'focus-ring', 'surface', 3, 'canvas');
+  });
+
+  test('classic-95 keeps inactive title-bar tab icons visibly distinct', () => {
+    const values = themeValues(css, 'classic-95');
+    assertContrast(values, 'nav-tab-inactive', 'titlebar-bg', 3, 'canvas');
   });
 });

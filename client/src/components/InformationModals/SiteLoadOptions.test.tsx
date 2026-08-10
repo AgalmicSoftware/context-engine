@@ -71,6 +71,7 @@ describe('SiteLoadOptions', () => {
     expect(greetingImage).toHaveClass('welcomeSlideImageIntro');
     expect(greetingButton).toHaveClass('welcomeSlideMediaButton');
     expect(greetingButton).not.toHaveClass('welcomeSlideMediaButtonCentered');
+    expect(greetingButton).toHaveAttribute('data-ce-control-appearance', 'frameless');
     expect(greetingButton).toHaveAttribute('data-slide-layout', 'flushBottom');
     expect(greetingImage).toHaveAttribute('data-slide-layout', 'flushBottom');
   });
@@ -88,6 +89,7 @@ describe('SiteLoadOptions', () => {
     expect(robotImage).toBeInTheDocument();
     expect(robotImage).toHaveClass('welcomeSlideImageToolkit');
     expect(robotButton).toHaveClass('welcomeSlideMediaButtonCentered');
+    expect(robotButton).toHaveAttribute('data-ce-control-appearance', 'frameless');
     expect(robotButton).toHaveAttribute('data-slide-layout', 'centered');
     expect(robotImage).toHaveAttribute('data-slide-layout', 'centered');
     expect(bulletListContainer).toHaveClass('isTitlelessBulletList');

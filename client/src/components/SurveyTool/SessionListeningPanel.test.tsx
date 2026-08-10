@@ -6,6 +6,9 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { generateQuestionsFromListeningTranscript } from './sessionListeningQuestions';
 import { readThemeToken, subscribeThemeChanges } from '../../utilities/ui/themeRuntime';
 
+const mockReadThemeToken = readThemeToken as jest.MockedFunction<typeof readThemeToken>;
+const mockSubscribeThemeChanges = subscribeThemeChanges as jest.MockedFunction<typeof subscribeThemeChanges>;
+
 jest.mock('../../utilities/audio/useRollingTranscriptionRecorder', () => ({
   useRollingTranscriptionRecorder: jest.fn(),
 }));
@@ -16,7 +19,7 @@ jest.mock('./sessionListeningQuestions', () => ({
 }));
 
 jest.mock('../../utilities/ui/themeRuntime', () => ({
-  readThemeToken: jest.fn((_token: string, fallback: string) => fallback),
+  readThemeToken: jest.fn((...args: unknown[]) => (typeof args[1] === 'string' ? args[1] : '')),
   subscribeThemeChanges: jest.fn(() => jest.fn()),
 }));
 
@@ -54,8 +57,8 @@ const buildRecorder = (overrides: Record<string, unknown> = {}) => ({
 describe('SessionListeningPanel', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (readThemeToken as jest.Mock).mockImplementation((_token: string, fallback: string) => fallback);
-    (subscribeThemeChanges as jest.Mock).mockImplementation(() => jest.fn());
+    mockReadThemeToken.mockImplementation((_token, fallback = '') => fallback);
+    mockSubscribeThemeChanges.mockImplementation(() => jest.fn());
   });
 
   afterEach(() => {
@@ -82,8 +85,8 @@ describe('SessionListeningPanel', () => {
       buildRecorder({ isRecording: true, status: 'recording' }),
     );
     let onThemeChange: (() => void) | undefined;
-    (subscribeThemeChanges as jest.Mock).mockImplementation((listener: () => void) => {
-      onThemeChange = listener;
+    mockSubscribeThemeChanges.mockImplementation((listener) => {
+      onThemeChange = () => listener({ id: 'context-engine', source: 'user' });
       return jest.fn();
     });
 
@@ -93,7 +96,7 @@ describe('SessionListeningPanel', () => {
     expect(readThemeToken).toHaveBeenCalledWith('ce-action-primary', 'Highlight');
     expect(subscribeThemeChanges).toHaveBeenCalledTimes(1);
 
-    (readThemeToken as jest.Mock).mockClear();
+    mockReadThemeToken.mockClear();
     act(() => onThemeChange?.());
     expect(readThemeToken).toHaveBeenCalledWith('ce-control-face', 'Canvas');
     expect(readThemeToken).toHaveBeenCalledWith('ce-action-primary', 'Highlight');

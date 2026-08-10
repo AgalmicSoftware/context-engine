@@ -74,6 +74,8 @@ type RafEntry = {
 
 const mockUseWhisper = useWhisper as unknown as UseWhisperMock;
 const mockRequestAiRewrite = requestAiRewrite as unknown as RequestAiRewriteMock;
+const mockReadThemeToken = readThemeToken as jest.MockedFunction<typeof readThemeToken>;
+const mockSubscribeThemeChanges = subscribeThemeChanges as jest.MockedFunction<typeof subscribeThemeChanges>;
 const actGlobal = globalThis as typeof globalThis & {
   IS_REACT_ACT_ENVIRONMENT?: boolean;
 };
@@ -93,7 +95,7 @@ jest.mock('../../../utilities/useWhisper', () => {
 });
 
 jest.mock('../../../utilities/ui/themeRuntime', () => ({
-  readThemeToken: jest.fn((_token: string, fallback: string) => fallback),
+  readThemeToken: jest.fn((...args: unknown[]) => (typeof args[1] === 'string' ? args[1] : '')),
   subscribeThemeChanges: jest.fn(() => jest.fn()),
 }));
 
@@ -176,8 +178,8 @@ describe('AudioInput', () => {
     mockUseWhisper.mockReturnValue(buildWhisperState());
     mockRequestAiRewrite.mockReset();
     mockRequestAiRewrite.mockResolvedValue('rewritten');
-    (readThemeToken as jest.Mock).mockImplementation((_token: string, fallback: string) => fallback);
-    (subscribeThemeChanges as jest.Mock).mockImplementation(() => jest.fn());
+    mockReadThemeToken.mockImplementation((_token, fallback = '') => fallback);
+    mockSubscribeThemeChanges.mockImplementation(() => jest.fn());
     rafQueue = [];
     rafId = 0;
     requestAnimationFrameSpy = jest.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
