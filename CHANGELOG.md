@@ -7,8 +7,12 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - Added a named runtime SCSS app-theme contract with user/deployment precedence,
-  pre-paint initialization, an opt-in Settings selector, and a bundled
-  `classic-95` proof theme. Session metadata cannot select an app theme.
+  pre-paint initialization, a default-on Settings selector, and bundled
+  `context-engine` and `classic-95` themes. The complete client presentation
+  surface now consumes semantic runtime color, typography, geometry, border,
+  elevation, and control-state tokens; a zero-baseline source gate prevents
+  raw presentation colors outside narrowly owned theme, export, QR/bitmap, and
+  deterministic avatar sources. Session metadata cannot select an app theme.
 - Added **Session colors** to the Session Wizard with the curated
   `context-engine`, `ocean`, and `amber` schemes, immediate preview, exact
   `appearance.colorSchemeId` persistence across Worker/Arweave paths, scoped

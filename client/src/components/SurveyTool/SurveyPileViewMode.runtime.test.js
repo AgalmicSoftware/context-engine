@@ -780,8 +780,8 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(nodeHasClassName(filterButton, 'actionButtonActive')).toBe(true);
     expect(filterButton.props.style).toEqual(
       expect.objectContaining({
-        color: '#4cd964',
-        borderColor: '#4cd964',
+        color: 'var(--ce-status-success)',
+        borderColor: 'var(--ce-status-success)',
         opacity: 0.75,
       }),
     );

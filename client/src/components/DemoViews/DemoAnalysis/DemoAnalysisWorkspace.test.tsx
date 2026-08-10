@@ -56,15 +56,18 @@ describe('DemoAnalysisWorkspace', () => {
   it('keeps the selected question banner readable on the light breakdown surface', () => {
     const scssPath = path.join(__dirname, 'DemoAnalysisWorkspace.module.scss');
     const scss = fs.readFileSync(scssPath, 'utf8');
+    const promptBlock = scss.match(/\.selectedQuestionCardPrompt\s*{[\s\S]*?^}/m)?.[0] || '';
 
     expect(scss).toMatch(
-      /\.selectedQuestionFrame\s*{[\s\S]*background:\s*linear-gradient\(145deg,\s*#f8fbff 0%,\s*#edf4ff 100%\);/,
+      /\.selectedQuestionFrame\s*{[\s\S]*background:\s*linear-gradient\(145deg,\s*var\(--ce-document-surface\) 0%,\s*var\(--ce-status-info-text\) 100%\);/,
     );
-    expect(scss).toMatch(/\.selectedQuestionFrame\s*{[\s\S]*border:\s*1px solid rgba\(15,\s*94,\s*199,\s*0\.14\);/);
+    expect(scss).toMatch(
+      /\.selectedQuestionFrame\s*{[\s\S]*border:\s*1px solid color-mix\(in srgb,\s*var\(--ce-status-info\) 14%,\s*transparent\);/,
+    );
     expect(scss).toMatch(/\.selectedQuestionCard\s*{[\s\S]*background:\s*transparent !important;/);
-    expect(scss).toMatch(/\.selectedQuestionCardPrompt\s*{[\s\S]*color:\s*#1f2733 !important;/);
-    expect(scss).toMatch(/\.selectedQuestionTension\s*{[\s\S]*color:\s*#364252;/);
-    expect(scss).not.toMatch(/\.selectedQuestionCardPrompt\s*{[\s\S]*color:\s*#f8fbff;/);
+    expect(scss).toMatch(/\.selectedQuestionCardPrompt\s*{[\s\S]*color:\s*var\(--ce-document-text\) !important;/);
+    expect(scss).toMatch(/\.selectedQuestionTension\s*{[\s\S]*color:\s*var\(--ce-document-text-muted\);/);
+    expect(promptBlock).not.toContain('var(--ce-document-surface)');
   });
 
   it('starts with empty map and question breakdown states until a question is selected', () => {

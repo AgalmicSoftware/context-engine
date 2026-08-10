@@ -21,7 +21,7 @@ import styles from './SurveyTool.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { SHOW_PILE_HOLOGRAM_TOGGLE } from './surveyToolRuntimeSupport.js';
 
-const ACTIVE_GREEN = '#4cd964';
+const ACTIVE_GREEN = 'var(--ce-status-success)';
 
 type VoidHandler = () => void;
 

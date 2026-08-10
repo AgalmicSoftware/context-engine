@@ -4,9 +4,9 @@
   font-family: var(--ce-font-body);
   font-size: 1rem;
   line-height: 1.6;
-  color: #1a1a1a;
+  color: var(--ce-document-text);
   /* Light overall background (slightly tinted) so it doesn't conflict with main site color */
-  // background-color: rgba(145, 112, 222, 0.08);
+  // background-color: color-mix(in srgb, var(--ce-data-series-2) 8%, transparent);
   padding: 20px;
   padding-top: 0px !important;
 }
@@ -14,12 +14,8 @@
 /* Top header/branding area */
 .brandingSection {
   /* Lighter violet background so logo is visible */
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--ce-session-chrome) 32%, transparent),
-    transparent 72%
-  );
-  border: 0px solid #bfa0f4;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ce-session-chrome) 32%, transparent), transparent 72%);
+  border: 0px solid var(--ce-data-series-2);
   border-radius: var(--ce-radius-8);
   // padding: 20px;
   padding: 0px !important;
@@ -70,10 +66,10 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  border: 1px solid rgba(42, 109, 244, 0.24);
+  border: 1px solid color-mix(in srgb, var(--ce-status-info) 24%, transparent);
   border-radius: var(--ce-radius-8);
-  background: #f6f9ff;
-  color: #172033;
+  background: var(--ce-status-info-text);
+  color: var(--ce-overlay-surface);
   font-size: 1rem;
   line-height: 1.5;
 }
@@ -123,16 +119,16 @@
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  border: 1px solid rgba(148, 163, 184, 0.32);
+  border: 1px solid color-mix(in srgb, var(--ce-status-info) 32%, transparent);
   border-radius: var(--ce-radius-8);
-  background: rgba(15, 23, 42, 0.72);
-  color: #e2e8f0;
+  background: color-mix(in srgb, var(--ce-document-text) 72%, transparent);
+  color: var(--ce-document-border);
   padding: 10px 12px;
 }
 
 .telegramAuthIndicator {
   font-size: 0.92rem;
-  color: #cbd5e1;
+  color: var(--ce-document-border);
 }
 
 .telegramTabs {
@@ -152,9 +148,9 @@
   gap: 8px;
   border-radius: var(--ce-radius-6);
   min-height: 36px;
-  border: 1px solid rgba(148, 163, 184, 0.36);
-  background: rgba(15, 23, 42, 0.76);
-  color: #f8fafc;
+  border: 1px solid color-mix(in srgb, var(--ce-status-info) 36%, transparent);
+  background: color-mix(in srgb, var(--ce-document-text) 76%, transparent);
+  color: var(--ce-document-surface);
   padding: 7px 12px;
   font-size: 0.92rem;
   font-weight: 650;
@@ -181,12 +177,12 @@
 
 .telegramSecondaryButton,
 .telegramLogoutButton {
-  background: rgba(30, 41, 59, 0.88);
+  background: color-mix(in srgb, var(--ce-overlay-surface) 88%, transparent);
 }
 
 .telegramTabButtonActive {
-  background: #f8fafc;
-  color: #0f172a;
+  background: var(--ce-document-surface);
+  color: var(--ce-document-text);
 }
 
 .telegramPrimaryButton:disabled,
@@ -197,10 +193,10 @@
 }
 
 .telegramListPanel {
-  border: 1px solid rgba(148, 163, 184, 0.28);
+  border: 1px solid color-mix(in srgb, var(--ce-status-info) 28%, transparent);
   border-radius: var(--ce-radius-8);
-  background: rgba(15, 23, 42, 0.66);
-  color: #f8fafc;
+  background: color-mix(in srgb, var(--ce-document-text) 66%, transparent);
+  color: var(--ce-document-surface);
   padding: 16px;
 }
 
@@ -210,18 +206,18 @@
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 14px;
-  color: #e2e8f0;
+  color: var(--ce-document-border);
   font-weight: 700;
 }
 
 .telegramListEmpty,
 .telegramListError {
-  color: #cbd5e1;
+  color: var(--ce-document-border);
   font-size: 0.95rem;
 }
 
 .telegramListError {
-  color: #fecaca;
+  color: var(--ce-status-danger-text);
   margin-top: 10px;
 }
 
@@ -246,9 +242,9 @@
   gap: 8px;
 
   :global(.card) {
-    background: rgba(2, 6, 23, 0.72);
-    color: #f8fafc;
-    border-color: rgba(148, 163, 184, 0.28);
+    background: color-mix(in srgb, var(--ce-overlay-base) 72%, transparent);
+    color: var(--ce-document-surface);
+    border-color: color-mix(in srgb, var(--ce-status-info) 28%, transparent);
   }
 }
 
@@ -266,10 +262,10 @@
   gap: 12px;
   flex-wrap: wrap;
   padding: 12px 14px;
-  border: 1px solid rgba(148, 163, 184, 0.28);
+  border: 1px solid color-mix(in srgb, var(--ce-status-info) 28%, transparent);
   border-radius: var(--ce-radius-6);
-  background: rgba(15, 23, 42, 0.58);
-  color: #cbd5e1;
+  background: color-mix(in srgb, var(--ce-document-text) 58%, transparent);
+  color: var(--ce-document-border);
   font-size: 0.95rem;
 }
 
@@ -278,7 +274,7 @@
   aspect-ratio: 16 / 9;
   object-fit: cover;
   border-radius: var(--ce-radius-6);
-  border: 1px solid rgba(148, 163, 184, 0.28);
+  border: 1px solid color-mix(in srgb, var(--ce-status-info) 28%, transparent);
 }
 
 .workerGroupsListPanel {
@@ -286,7 +282,7 @@
   padding: 0;
   border: 0;
   background: transparent;
-  color: #f8fafc;
+  color: var(--ce-document-surface);
 }
 
 .workerGroupCardGrid {
@@ -307,7 +303,7 @@
     min-height: 3.75em;
     margin: 4px 0 10px;
     overflow: hidden;
-    color: rgba(244, 247, 255, 0.82);
+    color: color-mix(in srgb, var(--ce-control-text) 82%, transparent);
     font-family: var(--ce-font-body);
     font-size: 0.78rem;
     line-height: 1.25;
@@ -333,7 +329,7 @@
   cursor: pointer;
 
   &:focus-visible {
-    outline: 2px solid #4dffa4;
+    outline: 2px solid var(--ce-action-accent);
     outline-offset: 4px;
   }
 }
@@ -349,7 +345,7 @@
   border: 1px solid transparent;
   border-radius: var(--ce-radius-6);
   background: transparent;
-  color: rgba(244, 247, 255, 0.8);
+  color: color-mix(in srgb, var(--ce-control-text) 80%, transparent);
   cursor: pointer;
   pointer-events: auto;
   transition:
@@ -360,9 +356,9 @@
 
   &:hover,
   &:focus-visible {
-    border-color: rgba(77, 255, 164, 0.5);
-    background: rgba(77, 255, 164, 0.14);
-    color: #4dffa4;
+    border-color: color-mix(in srgb, var(--ce-action-accent) 50%, transparent);
+    background: color-mix(in srgb, var(--ce-action-accent) 14%, transparent);
+    color: var(--ce-action-accent);
     outline: none;
     transform: translateY(-1px);
   }
@@ -416,9 +412,9 @@
   }
 
   &:disabled {
-    border-color: rgba(255, 255, 255, 0.28);
-    background: rgba(226, 232, 240, 0.58);
-    color: #344054;
+    border-color: color-mix(in srgb, var(--ce-text-inverse) 28%, transparent);
+    background: color-mix(in srgb, var(--ce-status-info-text) 58%, transparent);
+    color: var(--ce-status-info);
     cursor: wait;
     box-shadow: none;
     transform: none;
@@ -426,9 +422,9 @@
 }
 
 .workerGroupCardLeaveButton {
-  border: 1px solid rgba(77, 255, 164, 0.42);
-  background: rgba(77, 255, 164, 0.12);
-  color: #b9ffd9;
+  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 42%, transparent);
+  background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
+  color: var(--ce-status-success-text);
   cursor: pointer;
   transition:
     background-color 0.18s ease,
@@ -438,9 +434,9 @@
 
   &:hover,
   &:focus-visible {
-    border-color: #4dffa4;
-    background: rgba(77, 255, 164, 0.2);
-    box-shadow: 0 5px 16px rgba(77, 255, 164, 0.18);
+    border-color: var(--ce-action-accent);
+    background: color-mix(in srgb, var(--ce-action-accent) 20%, transparent);
+    box-shadow: 0 5px 16px color-mix(in srgb, var(--ce-action-accent) 18%, transparent);
     outline: none;
     transform: translateY(-1px);
   }
@@ -454,15 +450,15 @@
 }
 
 .workerGroupCardMemberStatus {
-  border: 1px solid rgba(77, 255, 164, 0.42);
-  background: rgba(77, 255, 164, 0.12);
-  color: #b9ffd9;
+  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 42%, transparent);
+  background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
+  color: var(--ce-status-success-text);
 }
 
 .workerGroupCardInactiveStatus {
-  border: 1px solid rgba(148, 163, 184, 0.32);
-  background: rgba(15, 23, 42, 0.72);
-  color: #e2e8f0;
+  border: 1px solid color-mix(in srgb, var(--ce-status-info) 32%, transparent);
+  background: color-mix(in srgb, var(--ce-document-text) 72%, transparent);
+  color: var(--ce-document-border);
 }
 
 .workerGroupDetailCard {
@@ -473,7 +469,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: rgba(244, 247, 255, 0.84);
+  color: color-mix(in srgb, var(--ce-control-text) 84%, transparent);
   font-size: 0.9rem;
   font-weight: 700;
 }
@@ -486,17 +482,19 @@
 }
 
 .workerGroupDetailStatusDotOpen {
-  background: #00ff9d;
+  background: var(--ce-action-accent);
 }
 
 .workerGroupDetailStatusDotClosed {
-  background: #ff4d4d;
+  background: var(--ce-status-error);
 }
 
 .workerGroupDetailImagePlaceholder {
   width: 100%;
   aspect-ratio: 1;
-  background: radial-gradient(circle at 50% 44%, rgba(77, 255, 164, 0.2), transparent 32%), rgba(15, 23, 42, 0.76);
+  background:
+    radial-gradient(circle at 50% 44%, color-mix(in srgb, var(--ce-action-accent) 20%, transparent), transparent 32%),
+    color-mix(in srgb, var(--ce-document-text) 76%, transparent);
 }
 
 .workerGroupDetailStaticHeader {
@@ -531,13 +529,13 @@
   margin: 20px auto;
   padding: 24px;
   overflow: hidden;
-  border: 1px solid rgba(148, 163, 184, 0.28);
+  border: 1px solid color-mix(in srgb, var(--ce-status-info) 28%, transparent);
   border-radius: var(--ce-radius-10);
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
 
   p {
     margin: 0;
-    color: rgba(244, 247, 255, 0.84);
+    color: color-mix(in srgb, var(--ce-control-text) 84%, transparent);
   }
 }
 
@@ -551,7 +549,7 @@
 }
 
 .telegramSubmitDisabledReason {
-  color: #cbd5e1;
+  color: var(--ce-document-border);
   font-size: 0.88rem;
 }
 
@@ -568,8 +566,8 @@
   align-items: center;
   min-height: 24px;
   border-radius: var(--ce-radius-6);
-  background: rgba(30, 41, 59, 0.88);
-  color: #e2e8f0;
+  background: color-mix(in srgb, var(--ce-overlay-surface) 88%, transparent);
+  color: var(--ce-document-border);
   padding: 2px 8px;
   font-size: 0.78rem;
 }
@@ -585,20 +583,20 @@
   flex-direction: column;
   gap: 6px;
   padding: 0 12px 12px;
-  color: #172033;
+  color: var(--ce-overlay-surface);
   font-size: 0.88rem;
 }
 
 .telegramBucketSelect select {
   min-height: 34px;
-  border: 1px solid rgba(15, 23, 42, 0.22);
+  border: 1px solid color-mix(in srgb, var(--ce-document-text) 22%, transparent);
   border-radius: var(--ce-radius-6);
   padding: 4px 8px;
 }
 
 .telegramReportApprox {
   margin: 0 0 12px;
-  color: #cbd5e1;
+  color: var(--ce-document-border);
   font-size: 0.9rem;
 }
 
@@ -606,8 +604,8 @@
   white-space: pre-wrap;
   overflow-x: auto;
   border-radius: var(--ce-radius-6);
-  background: rgba(2, 6, 23, 0.82);
-  color: #e2e8f0;
+  background: color-mix(in srgb, var(--ce-overlay-base) 82%, transparent);
+  color: var(--ce-document-border);
   padding: 12px;
   font-size: 0.84rem;
   line-height: 1.45;
@@ -685,7 +683,7 @@
     font-size: 1rem;
     /* Increased font size */
     line-height: 1.4;
-    box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.5);
+    box-shadow: 0px 4px 15px color-mix(in srgb, var(--ce-compat-dark) 50%, transparent);
     /* improved shadow for "floating" effect */
     pointer-events: none;
     /* Prevents tooltip from blocking clicks if invisible */
@@ -789,9 +787,9 @@
   max-width: 100%;
   min-width: 0;
   margin-bottom: 20px;
-  margin-top: 20px; // background-color: rgba(168, 116, 255, 0.08);
-  background-color: #5c58a630;
-  border: 0px solid #af95db;
+  margin-top: 20px; // background-color: color-mix(in srgb, var(--ce-data-series-2) 8%, transparent);
+  background-color: color-mix(in srgb, var(--ce-status-info) 18.8%, transparent);
+  border: 0px solid var(--ce-data-series-2);
   padding: 20px;
   border-radius: var(--ce-radius-6);
 }
@@ -816,7 +814,7 @@
   font-size: 2rem;
   margin: 0;
   font-weight: bold;
-  color: rgba(255, 255, 255, 0.75);
+  color: color-mix(in srgb, var(--ce-text-inverse) 75%, transparent);
   flex: 0 1 auto;
   min-width: 0;
   line-height: 1.1;
@@ -849,7 +847,7 @@
   display: block;
   max-width: 100%;
   line-height: 1;
-  color: rgba(255, 255, 255, 0.5);
+  color: color-mix(in srgb, var(--ce-text-inverse) 50%, transparent);
 }
 
 .sectionHeaderSubtitle {
@@ -858,7 +856,7 @@
   font-size: 0.63em;
   line-height: 1.12;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.25);
+  color: color-mix(in srgb, var(--ce-text-inverse) 25%, transparent);
 }
 
 .sectionHeaderTooltip {
@@ -956,19 +954,23 @@
   min-height: 50px;
   min-width: 138px;
   padding: 10px 20px;
-  background: linear-gradient(180deg, rgba(82, 78, 149, 0.72) 0%, rgba(50, 46, 102, 0.9) 100%);
-  color: rgba(255, 255, 255, 0.98);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ce-status-info) 72%, transparent) 0%,
+    color-mix(in srgb, var(--ce-status-info) 90%, transparent) 100%
+  );
+  color: color-mix(in srgb, var(--ce-text-inverse) 98%, transparent);
   font-size: 0.98rem;
   font-weight: 700;
   line-height: 1.05;
   letter-spacing: 0.01em;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
+  border-radius: var(--ce-radius-pill);
   cursor: pointer;
   white-space: nowrap;
   box-shadow:
-    0 10px 24px rgba(11, 13, 34, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    0 10px 24px color-mix(in srgb, var(--ce-overlay-base) 22%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
   transition:
     transform 0.14s ease,
     background 0.18s ease,
@@ -978,13 +980,17 @@
 
   &:hover,
   &:focus-visible {
-    background: linear-gradient(180deg, rgba(100, 95, 176, 0.82) 0%, rgba(63, 58, 127, 0.94) 100%);
-    border-color: rgba(255, 255, 255, 0.36);
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--ce-status-info) 82%, transparent) 0%,
+      color-mix(in srgb, var(--ce-status-info) 94%, transparent) 100%
+    );
+    border-color: color-mix(in srgb, var(--ce-text-inverse) 36%, transparent);
     color: var(--ce-color-white);
     transform: translateY(-1px);
     box-shadow:
-      0 14px 30px rgba(12, 14, 38, 0.28),
-      inset 0 1px 0 rgba(255, 255, 255, 0.12);
+      0 14px 30px color-mix(in srgb, var(--ce-overlay-surface) 28%, transparent),
+      inset 0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
     outline: none;
   }
 }
@@ -1007,17 +1013,17 @@
 .sectionHeaderViewModeButtonActive:focus-visible {
   background: linear-gradient(
     135deg,
-    rgba(77, 255, 164, 0.24) 0%,
-    rgba(94, 137, 255, 0.3) 54%,
-    rgba(255, 255, 255, 0.2) 100%
+    color-mix(in srgb, var(--ce-action-accent) 24%, transparent) 0%,
+    color-mix(in srgb, var(--ce-status-info) 30%, transparent) 54%,
+    color-mix(in srgb, var(--ce-text-inverse) 20%, transparent) 100%
   );
-  border-color: rgba(77, 255, 164, 0.7);
+  border-color: color-mix(in srgb, var(--ce-action-accent) 70%, transparent);
   color: var(--ce-color-white);
   box-shadow:
-    0 0 0 1px rgba(77, 255, 164, 0.28),
-    0 16px 32px rgba(10, 18, 44, 0.36),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.18);
+    0 0 0 1px color-mix(in srgb, var(--ce-action-accent) 28%, transparent),
+    0 16px 32px color-mix(in srgb, var(--ce-overlay-base) 36%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 18%, transparent);
+  text-shadow: 0 1px 10px color-mix(in srgb, var(--ce-compat-dark) 18%, transparent);
   transform: translateY(-1px);
 }
 
@@ -1057,16 +1063,16 @@
   gap: 10px;
   min-height: 54px;
   padding: 12px 20px;
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.92);
+  background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
+  color: color-mix(in srgb, var(--ce-text-inverse) 92%, transparent);
   font-size: 1.08rem;
   font-weight: 700;
   text-transform: uppercase;
   text-decoration: none;
-  border: 1px solid rgba(255, 255, 255, 0.34);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 34%, transparent);
   border-radius: var(--ce-radius-10);
   cursor: pointer;
-  box-shadow: 0 8px 24px rgba(12, 14, 38, 0.18);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--ce-overlay-surface) 18%, transparent);
   transition:
     transform 0.14s ease,
     background 0.18s ease,
@@ -1075,8 +1081,8 @@
 
   &:hover,
   &:focus-visible {
-    background: rgba(255, 255, 255, 0.12);
-    border-color: rgba(255, 255, 255, 0.62);
+    background: color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
+    border-color: color-mix(in srgb, var(--ce-text-inverse) 62%, transparent);
     color: var(--ce-color-white);
     transform: translateY(-1px);
     outline: none;
@@ -1094,9 +1100,9 @@
 
   &:disabled:hover,
   &:disabled:focus-visible {
-    background: rgba(255, 255, 255, 0.04);
-    border-color: rgba(255, 255, 255, 0.34);
-    color: rgba(255, 255, 255, 0.92);
+    background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
+    border-color: color-mix(in srgb, var(--ce-text-inverse) 34%, transparent);
+    color: color-mix(in srgb, var(--ce-text-inverse) 92%, transparent);
     outline: none;
   }
 }
@@ -1115,7 +1121,7 @@
   max-width: 100%;
   min-width: 0;
   overflow-x: auto;
-  background: transparent; // border: 1px solid #bfa0f4;
+  background: transparent; // border: 1px solid var(--ce-data-series-2);
   padding: 15px;
   border-radius: var(--ce-radius-4);
 }
@@ -1146,9 +1152,9 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  border: 1px solid rgba(191, 160, 244, 0.8);
-  background: rgba(58, 53, 110, 0.76);
-  color: rgba(255, 255, 255, 0.92);
+  border: 1px solid color-mix(in srgb, var(--ce-data-series-2) 80%, transparent);
+  background: color-mix(in srgb, var(--ce-status-info) 76%, transparent);
+  color: color-mix(in srgb, var(--ce-text-inverse) 92%, transparent);
   border-radius: var(--ce-radius-pill);
   padding: 14px 22px;
   font-size: 1.35rem;
@@ -1163,8 +1169,8 @@
     border-color 0.18s ease;
   &:hover {
     transform: translateY(-1px);
-    background: rgba(77, 68, 146, 0.84);
-    border-color: rgba(191, 160, 244, 1);
+    background: color-mix(in srgb, var(--ce-status-info) 84%, transparent);
+    border-color: var(--ce-data-series-2);
   }
 
   svg {
@@ -1188,7 +1194,7 @@
   font-size: 2rem;
   line-height: 1.1;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.92);
+  color: color-mix(in srgb, var(--ce-text-inverse) 92%, transparent);
 
   .sectionHeaderText {
     flex-direction: row;
@@ -1198,12 +1204,12 @@
   }
 
   .sectionHeaderTitle {
-    color: rgba(255, 255, 255, 0.86);
+    color: color-mix(in srgb, var(--ce-text-inverse) 86%, transparent);
   }
 
   .sectionHeaderSubtitle {
     font-size: 0.72em;
-    color: rgba(255, 255, 255, 0.5);
+    color: color-mix(in srgb, var(--ce-text-inverse) 50%, transparent);
   }
 }
 
@@ -1228,14 +1234,14 @@
 }
 .groupsSection {
   background: transparent;
-  border: 1px solid #ddd;
+  border: 1px solid var(--ce-border-light);
   padding: 15px;
   border-radius: var(--ce-radius-6);
 }
 .miniSbtArea {
   margin-top: 10px;
-  background: rgba(168, 116, 255, 0.05);
-  border: 1px solid #bfa0f4;
+  background: color-mix(in srgb, var(--ce-data-series-2) 5%, transparent);
+  border: 1px solid var(--ce-data-series-2);
   padding: 10px;
   border-radius: var(--ce-radius-4);
 }
@@ -1247,7 +1253,7 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.35);
+  background: color-mix(in srgb, var(--ce-compat-dark) 35%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1258,9 +1264,9 @@
   border-radius: var(--ce-radius-8);
   padding: 20px;
   width: 320px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--ce-compat-dark) 20%, transparent);
   text-align: center;
-  color: #111;
+  color: var(--ce-document-text);
 }
 
 /* --------------------------------------------
@@ -1269,7 +1275,7 @@
   display: flex;
   flex-direction: column;
   flex-wrap: wrap;
-  background: #00ff1b80;
+  background: color-mix(in srgb, var(--ce-status-success) 50.2%, transparent);
   border-radius: var(--ce-radius-7);
   margin-right: 15px;
   margin-left: 15px;
@@ -1282,8 +1288,8 @@
   border: 1px var(--ce-color-bg) solid;
   border-radius: var(--ce-radius-5);
   box-shadow:
-    5px 5px 12px #0f102a,
-    -5px -5px 12px #1f2258;
+    5px 5px 12px var(--ce-overlay-base),
+    -5px -5px 12px var(--ce-status-info);
 }
 
 .aboutHeader {
@@ -1336,7 +1342,7 @@
   .titleContainer {
     /* FIXED: Replaced opacity with rgba to fix Z-index stacking context issue on mobile */
     /* opacity: 0.5; */
-    color: rgba(255, 255, 255, 0.5);
+    color: color-mix(in srgb, var(--ce-text-inverse) 50%, transparent);
     font-size: 0.9rem;
   }
 
@@ -1382,7 +1388,7 @@
   .sectionHeader .sectionHeaderSubtitle {
     font-size: 0.68em;
     line-height: 1;
-    color: rgba(244, 247, 255, 0.58);
+    color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
   }
 
   .sectionHeaderRow {
@@ -1552,7 +1558,7 @@
   .sectionHeader .sectionHeaderSubtitle {
     font-size: 0.68em;
     line-height: 1;
-    color: rgba(244, 247, 255, 0.58);
+    color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
   }
 
   .sectionHeaderRow {
@@ -1803,33 +1809,33 @@
 
 /* Muted variants mapped to Reactstrap/Bootstrap color prop classes */
 :global(.alert-success).sbtMintStatusItem {
-  background-color: #e6f4ea;
-  border-color: #c9e7d1;
-  color: #20643a;
+  background-color: var(--ce-status-success-text);
+  border-color: var(--ce-status-success-text);
+  color: var(--ce-status-success);
 }
 
 :global(.alert-info).sbtMintStatusItem {
-  background-color: #e8f0fe;
-  border-color: #cdddfc;
-  color: #1f4a89;
+  background-color: var(--ce-status-info-text);
+  border-color: var(--ce-status-info-text);
+  color: var(--ce-status-info);
 }
 
 :global(.alert-danger).sbtMintStatusItem {
-  background-color: #fdecec;
-  border-color: #f5c2c2;
-  color: #7a2b2b;
+  background-color: var(--ce-status-danger-text);
+  border-color: var(--ce-status-danger-text);
+  color: var(--ce-status-error);
 }
 
 :global(.alert-secondary).sbtMintStatusItem {
-  background-color: #f5f7fa;
-  border-color: #dfe5ec;
-  color: #3f4750;
+  background-color: var(--ce-status-info-text);
+  border-color: var(--ce-status-info-text);
+  color: var(--ce-document-text);
 }
 
 :global(.alert-warning).sbtMintStatusItem {
-  background-color: #fff4d6;
-  border-color: #ffe3a3;
-  color: #6f5300;
+  background-color: var(--ce-status-warning-text);
+  border-color: var(--ce-status-warning-text);
+  color: var(--ce-overlay-surface);
 }
 
 #viewAllQuestionsButton {
@@ -1839,7 +1845,7 @@
   padding: 8px 14px;
   border-radius: var(--ce-radius-4);
   background-color: transparent;
-  color: rgb(140 134 134);
+  color: var(--ce-text-muted);
   border: 0px solid var(--ce-color-black);
   cursor: pointer;
   opacity: 0.75;
@@ -1853,7 +1859,7 @@
   top: 50% !important;
   right: 10px !important;
   transform: translateY(-50%) !important;
-  color: #222 !important;
+  color: var(--ce-document-text) !important;
   font-weight: 600 !important;
   font-size: 1.6rem !important;
   line-height: 1 !important;

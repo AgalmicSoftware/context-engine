@@ -884,7 +884,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
             alignItems: 'center',
             justifyContent: 'center',
             height: '50vh',
-            color: 'white',
+            color: 'var(--ce-panel-text)',
           }}
         >
           <h3>Loading Question...</h3>

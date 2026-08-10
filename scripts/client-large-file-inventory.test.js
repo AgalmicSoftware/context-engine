@@ -12,7 +12,7 @@ const LARGE_FILE_GROWTH_TOLERANCE = 25;
 const LARGE_FILE_SHRINK_TOLERANCE = 100;
 
 const LARGE_CLIENT_FILE_BASELINE = Object.freeze({
-  'client/src/components/Account/LoginAndSettingsModal.tsx': 2489,
+  'client/src/components/Account/LoginAndSettingsModal.tsx': 2520,
   'client/src/components/Admin/AdminPage.tsx': 2915,
   'client/src/components/CommunityTab/CommunityTab.tsx': 2137,
   'client/src/components/DebateMap/DebateMap.tsx': 2610,
@@ -24,7 +24,7 @@ const LARGE_CLIENT_FILE_BASELINE = Object.freeze({
   'client/src/components/MainSite/mainSiteProfileScanRuntime.ts': 1503,
   'client/src/components/MainSite/mainSiteRouteRenderers.tsx': 1372,
   'client/src/components/OnePageSession/OnePageSession.tsx': 2497,
-  'client/src/components/PolisReport/PolisReport.tsx': 2787,
+  'client/src/components/PolisReport/PolisReport.tsx': 2848,
   'client/src/components/PolisReport/polisReportRuntime.tsx': 1268,
   'client/src/components/SBTs/CreateSBTGroup.tsx': 4664,
   'client/src/components/SBTs/SBTFilter.tsx': 1398,
@@ -56,7 +56,7 @@ const LARGE_CLIENT_FILE_BASELINE = Object.freeze({
   'client/src/components/SurveyTool/surveyToolDraftState.ts': 1354,
   'client/src/components/SurveyTool/surveyToolHydrationFlow.ts': 2880,
   'client/src/components/TagPage/TagPage.tsx': 1493,
-  'client/src/components/UserPage/CompareAddresses.tsx': 2106,
+  'client/src/components/UserPage/CompareAddresses.tsx': 2164,
   'client/src/components/UserPage/UserPage.tsx': 3848,
   'client/src/components/UserPage/userPageGateHelpers.ts': 1070,
   'client/src/components/UserPage/userPageHelpers.ts': 1481,

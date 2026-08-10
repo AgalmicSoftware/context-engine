@@ -47,15 +47,7 @@ export type VerifiedSessionWizardWorkerConfig = {
 // successful write. Keep the default horizon production-realistic while tests
 // inject bounded zero/small delays through the existing port.
 export const SESSION_WIZARD_WORKER_CONFIG_VISIBILITY_RETRY_DELAYS_MS = Object.freeze([
-  250,
-  500,
-  1_000,
-  2_000,
-  4_000,
-  8_000,
-  12_000,
-  16_000,
-  17_000,
+  250, 500, 1_000, 2_000, 4_000, 8_000, 12_000, 16_000, 17_000,
 ]);
 const RETRYABLE_CONFIG_READ_STATUSES = new Set([404, 408, 425, 429]);
 const isRetryableConfigReadStatus = (status: number): boolean =>

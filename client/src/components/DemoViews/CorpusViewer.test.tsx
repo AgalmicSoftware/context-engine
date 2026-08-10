@@ -208,9 +208,9 @@ describe('CorpusViewer', () => {
       /\.container\s*{[\s\S]*?box-sizing:\s*border-box;[\s\S]*?max-width:\s*100%;[\s\S]*?width:\s*100%;/,
     );
     expect(corpusScss).toMatch(
-      /\.metrCard\s*{[\s\S]*?background:\s*linear-gradient\(180deg,\s*#ffffff 0%,\s*#fbfdff 100%\);/,
+      /\.metrCard\s*{[\s\S]*?background:\s*linear-gradient\(180deg,\s*var\(--ce-text-inverse\) 0%,\s*var\(--ce-status-info-text\) 100%\);/,
     );
-    expect(corpusScss).toMatch(/\.metrCard \.entrySummary\s*{[\s\S]*?color:\s*#4b5563;/);
+    expect(corpusScss).toMatch(/\.metrCard \.entrySummary\s*{[\s\S]*?color:\s*var\(--ce-document-text-muted\);/);
     expect(corpusScss).toMatch(/\.policyMapLens\s*{[\s\S]*?padding:\s*4px 4px 0;/);
     expect(corpusScss).toMatch(/\.policyMapPanel\s*{[\s\S]*?padding:\s*10px 10px 12px;/);
     expect(corpusScss).toMatch(/\.debateMapLink\s*{[\s\S]*?box-sizing:\s*border-box;/);

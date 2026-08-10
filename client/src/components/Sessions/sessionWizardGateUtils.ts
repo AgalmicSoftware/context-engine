@@ -22,7 +22,13 @@ export const DEFAULT_GATE_KEYS = [
   'lit',
 ];
 
-const ENCRYPTION_GATE_COLORS = ['#5affc2', '#5b8cff', '#ffb347', '#ff6bcb', '#ffd166'];
+const ENCRYPTION_GATE_COLORS = [
+  'var(--ce-data-series-1)',
+  'var(--ce-data-series-2)',
+  'var(--ce-data-series-3)',
+  'var(--ce-data-series-4)',
+  'var(--ce-data-series-5)',
+];
 const ONCHAIN_FIELD_PATHS = SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS;
 
 export const buildDefaultGateState = (chainId: ChainIdLike): AnyRecord => {

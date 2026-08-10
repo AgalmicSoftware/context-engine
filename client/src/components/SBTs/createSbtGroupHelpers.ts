@@ -233,7 +233,13 @@ export type {
   ResolveCreateSbtPredictableDeployBaseStateArgs,
 } from './createSbtGroupPredictableDeployHelpers';
 
-const ENCRYPTION_GATE_COLORS = ['#5affc2', '#5b8cff', '#ffb347', '#ff6bcb', '#ffd166'];
+const ENCRYPTION_GATE_COLORS = [
+  'var(--ce-data-series-1)',
+  'var(--ce-data-series-2)',
+  'var(--ce-data-series-3)',
+  'var(--ce-data-series-4)',
+  'var(--ce-data-series-5)',
+];
 
 export type CreateSbtLitGateChainId = number | string | null;
 export type CreateSbtGateBoundary = NonNullable<Parameters<typeof normalizeGateMode>[0]> &
@@ -442,10 +448,10 @@ export const resolveCreateSbtErrorBannerState = ({
     style: {
       margin: '10px 0 16px',
       padding: '10px 12px',
-      border: '1px solid #dc3545',
-      background: '#ffecec',
-      color: '#a4000f',
-      borderRadius: '6px',
+      border: '1px solid var(--ce-status-danger)',
+      background: 'color-mix(in srgb, var(--ce-status-danger) 12%, var(--ce-document-surface))',
+      color: 'var(--ce-status-danger-text)',
+      borderRadius: 'var(--ce-radius-6)',
       fontWeight: 600,
     },
   };

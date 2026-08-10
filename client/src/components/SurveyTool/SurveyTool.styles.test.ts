@@ -10,9 +10,11 @@ describe('SurveyTool styles', () => {
   it('keeps existing-response light-panel CTAs on dark text for readability', () => {
     const scss = readSurveyToolScss();
 
-    expect(scss).toMatch(/#startFreshButton\s*{[^}]*color:\s*#1f2733;/);
-    expect(scss).toMatch(/#exitEditingButton\s*{[^}]*color:\s*#1f2733;/);
-    expect(scss).toMatch(/#exitEditingButton[\s\S]*?&:disabled\s*{[^}]*color:\s*rgba\(31,\s*39,\s*51,\s*0\.5\);/);
+    expect(scss).toMatch(/#startFreshButton\s*{[^}]*color:\s*var\(--ce-document-text\);/);
+    expect(scss).toMatch(/#exitEditingButton\s*{[^}]*color:\s*var\(--ce-document-text\);/);
+    expect(scss).toMatch(
+      /#exitEditingButton[\s\S]*?&:disabled\s*{[^}]*color:\s*color-mix\(in srgb, var\(--ce-overlay-surface\) 50%, transparent\);/,
+    );
     expect(scss).not.toMatch(/#startFreshButton\s*{[^}]*color:\s*var\(--ce-color-white\);/);
     expect(scss).not.toMatch(/#exitEditingButton\s*{[^}]*color:\s*var\(--ce-color-white\);/);
   });
@@ -30,12 +32,12 @@ describe('SurveyTool styles', () => {
   it('keeps the locked-question decrypt CTA readable on the light banner', () => {
     const scss = readSurveyToolScss();
 
-    expect(scss).toMatch(/%decryptCtaOutlineOnLight\s*{[\s\S]*?color:\s*#1f2733\s*!important;/);
+    expect(scss).toMatch(/%decryptCtaOutlineOnLight\s*{[\s\S]*?color:\s*var\(--ce-document-text\)\s*!important;/);
     expect(scss).toMatch(
-      /%decryptCtaOutlineOnLight\s*{[\s\S]*?&:hover:not\(:disabled\),[\s\S]*?color:\s*#111722\s*!important;/,
+      /%decryptCtaOutlineOnLight\s*{[\s\S]*?&:hover:not\(:disabled\),[\s\S]*?color:\s*var\(--ce-document-text\)\s*!important;/,
     );
     expect(scss).toMatch(
-      /%decryptCtaOutlineOnLight\s*{[\s\S]*?&:disabled\s*{[\s\S]*?color:\s*rgba\(31,\s*39,\s*51,\s*0\.52\)\s*!important;/,
+      /%decryptCtaOutlineOnLight\s*{[\s\S]*?&:disabled\s*{[\s\S]*?color:\s*color-mix\(in srgb, var\(--ce-overlay-surface\) 52%, transparent\)\s*!important;/,
     );
     expect(scss).toMatch(/\.lockedQuestionsDecryptButton\s*{\s*@extend\s+%decryptCtaOutlineOnLight;/);
     expect(scss).not.toMatch(/\.lockedQuestionsDecryptButton\s*{\s*@extend\s+%decryptCtaOutline;/);
@@ -66,8 +68,12 @@ describe('SurveyTool styles', () => {
     const pileCardIconsBlock = scss.match(/\.pileCardIcons\s*{[^}]*}/)?.[0] || '';
 
     expect(pileCardIconsBlock).not.toMatch(/opacity\s*:/);
-    expect(scss).toMatch(/\.pileLockButtonMenuOpen\s*{[\s\S]*?background:\s*rgba\(5,\s*10,\s*24,\s*0\.78\);/);
-    expect(scss).toMatch(/\.pileLockAudiencePopover\s*{[\s\S]*?background:\s*rgba\(11,\s*15,\s*28,\s*0\.8\);/);
+    expect(scss).toMatch(
+      /\.pileLockButtonMenuOpen\s*{[\s\S]*?background:\s*color-mix\(in srgb, var\(--ce-overlay-base\) 78%, transparent\);/,
+    );
+    expect(scss).toMatch(
+      /\.pileLockAudiencePopover\s*{[\s\S]*?background:\s*color-mix\(in srgb, var\(--ce-overlay-base\) 80%, transparent\);/,
+    );
     expect(scss).toMatch(/\.pileLockAudiencePopover\s*{[\s\S]*?opacity:\s*0\.8;/);
   });
 
@@ -79,7 +85,7 @@ describe('SurveyTool styles', () => {
       /#surveyFooter\.singleQuestionSubmitFooter\s*{[\s\S]*?position:\s*static;[\s\S]*?align-self:\s*center;[\s\S]*?width:\s*min\(360px,\s*100%\);[\s\S]*?margin:\s*18px auto 0;[\s\S]*?display:\s*flex;/,
     );
     expect(sharedCta).toMatch(
-      /@mixin final-submit-cta-shell\s*\([\s\S]*?font-family:\s*var\(--ce-font-body\);[\s\S]*?background-color:\s*#2a63ca !important;[\s\S]*?border:\s*1px solid #2a63ca !important;[\s\S]*?background-color:\s*var\(--ce-color-indigo\) !important;[\s\S]*?transform:\s*translateY\(-2px\);[\s\S]*?&:disabled\s*{[\s\S]*?color:\s*rgba\(255,\s*255,\s*255,\s*0\.78\) !important;/,
+      /@mixin final-submit-cta-shell\s*\([\s\S]*?font-family:\s*var\(--ce-font-body\);[\s\S]*?background-color:\s*var\(--ce-action-submit\) !important;[\s\S]*?border:\s*1px solid var\(--ce-action-submit\) !important;[\s\S]*?background-color:\s*var\(--ce-action-submit-hover\) !important;[\s\S]*?transform:\s*translateY\(-2px\);[\s\S]*?&:disabled\s*{[\s\S]*?color:\s*var\(--ce-action-submit-disabled-text\) !important;/,
     );
     expect(sharedCta).toMatch(
       /@mixin final-submit-cta-content\(\$gap: 12px\)\s*{[\s\S]*?display:\s*inline-flex;[\s\S]*?width:\s*100%;[\s\S]*?text-transform:\s*uppercase;/,
@@ -138,7 +144,7 @@ describe('SurveyTool styles', () => {
       /\.pileFooter\s+\.pileSubmitButton\s*{[\s\S]*?width:\s*100%;[\s\S]*?min-height:\s*60px;[\s\S]*?font-size:\s*1\.15rem;/,
     );
     expect(scss).toMatch(
-      /\.pileSubmitSuccessBadge\s*{[\s\S]*?display:\s*inline-flex;[\s\S]*?width:\s*60px;[\s\S]*?height:\s*60px;[\s\S]*?border-radius:\s*50%;/,
+      /\.pileSubmitSuccessBadge\s*{[\s\S]*?display:\s*inline-flex;[\s\S]*?width:\s*60px;[\s\S]*?height:\s*60px;[\s\S]*?border-radius:\s*var\(--ce-radius-round\);/,
     );
     expect(scss).toMatch(/\.pileSubmitButtonTrail\s*{[\s\S]*?display:\s*none;/);
     expect(scss).toMatch(/\.actionButton\.pileActionMenuToggle\s*{[\s\S]*?display:\s*none;/);
@@ -216,7 +222,7 @@ describe('SurveyTool styles', () => {
     const normalizedScss = normalizeScssContract(scss);
 
     expect(normalizedScss).toMatch(
-      /\.pileFooter\s+\.pileSubmitButton\.submitGlow::before\s*{[\s\S]*?background:\s*linear-gradient\(90deg,\s*#fff 40%,\s*transparent 40%\);[\s\S]*?background-size:\s*200% 4px;[\s\S]*?filter:\s*drop-shadow\(0 0 8px #fff\);/,
+      /\.pileFooter\s+\.pileSubmitButton\.submitGlow::before\s*{[\s\S]*?background:\s*linear-gradient\(90deg,\s*var\(--ce-text-inverse\) 40%,\s*transparent 40%\);[\s\S]*?background-size:\s*200% 4px;[\s\S]*?filter:\s*drop-shadow\(0 0 8px var\(--ce-text-inverse\)\);/,
     );
     expect(scss).toMatch(
       /@keyframes beforeLineAnim\s*{[\s\S]*?45%,\s*50%\s*{[\s\S]*?background-position:\s*-100% 0;[\s\S]*?}[\s\S]*?50%,\s*95%\s*{[\s\S]*?transform:\s*scale\(1,\s*-1\);/,
@@ -239,7 +245,7 @@ describe('SurveyTool styles', () => {
       /\.headerSubmitButton\s*{[\s\S]*?position:\s*relative;[\s\S]*?isolation:\s*isolate;[\s\S]*?overflow:\s*visible;/,
     );
     expect(normalizedScss).toMatch(
-      /\.headerSubmitButton\s*{[\s\S]*?&\.submitGlow::before\s*{[\s\S]*?background:\s*linear-gradient\(90deg,\s*#fff 40%,\s*transparent 40%\);[\s\S]*?background-size:\s*200% 4px;[\s\S]*?filter:\s*drop-shadow\(0 0 8px #fff\);[\s\S]*?pointer-events:\s*none;/,
+      /\.headerSubmitButton\s*{[\s\S]*?&\.submitGlow::before\s*{[\s\S]*?background:\s*linear-gradient\(90deg,\s*var\(--ce-text-inverse\) 40%,\s*transparent 40%\);[\s\S]*?background-size:\s*200% 4px;[\s\S]*?filter:\s*drop-shadow\(0 0 8px var\(--ce-text-inverse\)\);[\s\S]*?pointer-events:\s*none;/,
     );
     expect(scss).toMatch(
       /\.headerSubmitButton\s*{[\s\S]*?&\.submitGlow::before\s*{[\s\S]*?animation:\s*beforeLineAnim 5\.4s linear infinite;/,
@@ -290,28 +296,28 @@ describe('SurveyTool styles', () => {
     const normalizedListeningCreateWrap = normalizeScssContract(listeningCreateWrap);
 
     expect(normalizedListeningCreateWrap).toMatch(
-      /:global\(\[class\*='createSurveyContainer'\]\)\s*{[\s\S]*?background:\s*#edf2f7\s*!important;[\s\S]*?color:\s*#18243a\s*!important;/,
+      /:global\(\[class\*='createSurveyContainer'\]\)\s*{[\s\S]*?background:\s*var\(--ce-document-surface\)\s*!important;[\s\S]*?color:\s*var\(--ce-document-text\)\s*!important;/,
     );
     expect(normalizedListeningCreateWrap).toMatch(
-      /:global\(\[class\*='questionPromptInput'\]\),[\s\S]*?background:\s*#fff\s*!important;[\s\S]*?color:\s*#18243a\s*!important;/,
+      /:global\(\[class\*='questionPromptInput'\]\),[\s\S]*?background:\s*var\(--ce-text-inverse\)\s*!important;[\s\S]*?color:\s*var\(--ce-document-text\)\s*!important;/,
     );
     expect(normalizedListeningCreateWrap).toMatch(
-      /:global\(\[class\*='questionContainer'\]\),[\s\S]*?background:\s*#fff\s*!important;[\s\S]*?color:\s*#18243a\s*!important;/,
+      /:global\(\[class\*='questionContainer'\]\),[\s\S]*?background:\s*var\(--ce-text-inverse\)\s*!important;[\s\S]*?color:\s*var\(--ce-document-text\)\s*!important;/,
     );
     expect(normalizedListeningCreateWrap).toMatch(
-      /:global\(\[class\*='toggleLabel'\]\),[\s\S]*?color:\s*#18243a\s*!important;[\s\S]*?opacity:\s*1\s*!important;/,
+      /:global\(\[class\*='toggleLabel'\]\),[\s\S]*?color:\s*var\(--ce-document-text\)\s*!important;[\s\S]*?opacity:\s*1\s*!important;/,
     );
     expect(normalizedListeningCreateWrap).toMatch(
-      /:global\(\[class\*='typeButton'\]\)\s*{[\s\S]*?background:\s*#f8fafc\s*!important;[\s\S]*?color:\s*#18243a\s*!important;/,
+      /:global\(\[class\*='typeButton'\]\)\s*{[\s\S]*?background:\s*var\(--ce-document-surface\)\s*!important;[\s\S]*?color:\s*var\(--ce-document-text\)\s*!important;/,
     );
     expect(normalizedListeningCreateWrap).toMatch(
-      /:global\(\[class\*='removeQuestionButton'\]\),[\s\S]*?background:\s*#fff\s*!important;[\s\S]*?color:\s*#18243a\s*!important;/,
+      /:global\(\[class\*='removeQuestionButton'\]\),[\s\S]*?background:\s*var\(--ce-text-inverse\)\s*!important;[\s\S]*?color:\s*var\(--ce-document-text\)\s*!important;/,
     );
     expect(normalizedListeningCreateWrap).toMatch(
-      /:global\(\[class\*='tagInputField'\]\)\s*{[\s\S]*?color:\s*#18243a\s*!important;/,
+      /:global\(\[class\*='tagInputField'\]\)\s*{[\s\S]*?color:\s*var\(--ce-document-text\)\s*!important;/,
     );
     expect(normalizedListeningCreateWrap).toMatch(
-      /:global\(\[class\*='filterBubble'\]\)\s*{[\s\S]*?background:\s*#dff7ea\s*!important;[\s\S]*?color:\s*#123a2d\s*!important;/,
+      /:global\(\[class\*='filterBubble'\]\)\s*{[\s\S]*?background:\s*var\(--ce-status-success-text\)\s*!important;[\s\S]*?color:\s*var\(--ce-overlay-surface\)\s*!important;/,
     );
   });
 
@@ -337,17 +343,17 @@ describe('SurveyTool styles', () => {
     const scss = readSurveyToolScss();
 
     expect(scss).toMatch(
-      /\.sessionListeningRecordButton\s*{[\s\S]*?width:\s*132px;[\s\S]*?height:\s*132px;[\s\S]*?border-radius:\s*50% !important;/,
+      /\.sessionListeningRecordButton\s*{[\s\S]*?width:\s*132px;[\s\S]*?height:\s*132px;[\s\S]*?border-radius:\s*var\(--ce-radius-round\) !important;/,
     );
     expect(scss).toMatch(
-      /\.sessionListeningActiveRecorder\s*{[\s\S]*?display:\s*flex;[\s\S]*?gap:\s*10px;[\s\S]*?background-color:\s*#f9f9f9;/,
+      /\.sessionListeningActiveRecorder\s*{[\s\S]*?display:\s*flex;[\s\S]*?gap:\s*10px;[\s\S]*?background-color:\s*var\(--ce-document-surface\);/,
     );
     expect(scss).toMatch(
-      /\.sessionListeningWaveformShell\s*{[\s\S]*?height:\s*80px;[\s\S]*?border:\s*2px inset #808080;[\s\S]*?background-color:\s*#c0c0c0;/,
+      /\.sessionListeningWaveformShell\s*{[\s\S]*?height:\s*80px;[\s\S]*?border:\s*2px inset var\(--ce-document-text-muted\);[\s\S]*?background-color:\s*var\(--ce-border-light\);/,
     );
     expect(scss).toMatch(/\.sessionListeningWaveformCanvas\s*{[\s\S]*?image-rendering:\s*pixelated;/);
     expect(scss).toMatch(
-      /\.sessionListeningAudioButton\s*{[\s\S]*?width:\s*61px;[\s\S]*?height:\s*61px;[\s\S]*?background:\s*linear-gradient\(#dfdfdf,\s*#ffffff\);/,
+      /\.sessionListeningAudioButton\s*{[\s\S]*?width:\s*61px;[\s\S]*?height:\s*61px;[\s\S]*?background:\s*linear-gradient\(var\(--ce-document-border\),\s*var\(--ce-text-inverse\)\);/,
     );
     expect(scss).not.toMatch(/\.sessionListeningPrimary\s*{/);
     expect(scss).not.toMatch(/\.sessionListeningControls\s*{/);
@@ -360,7 +366,7 @@ describe('SurveyTool styles', () => {
       /\.sessionListeningTranscriptButton\s*{[\s\S]*?display:\s*inline-flex;[\s\S]*?border-radius:\s*var\(--ce-radius-pill\);[\s\S]*?cursor:\s*pointer;/,
     );
     expect(scss).toMatch(
-      /\.sessionListeningTranscriptDetails\s*{[\s\S]*?background:\s*#fff;[\s\S]*?overflow:\s*hidden;/,
+      /\.sessionListeningTranscriptDetails\s*{[\s\S]*?background:\s*var\(--ce-text-inverse\);[\s\S]*?overflow:\s*hidden;/,
     );
     expect(scss).toMatch(/\.sessionListeningTranscriptShell\s*{[\s\S]*?position:\s*relative;/);
     expect(scss).toMatch(/\.sessionListeningTranscript\s*{[\s\S]*?padding:\s*10px 42px 10px 12px;/);
@@ -393,8 +399,12 @@ describe('SurveyTool styles', () => {
     expect(scss).toMatch(
       /\.singleQuestionJsonToggle\s*{[\s\S]*?font-family:\s*inherit;[\s\S]*?font-size:\s*0\.95rem;[\s\S]*?letter-spacing:\s*0\.06em;[\s\S]*?opacity:\s*0\.5;/,
     );
-    expect(scss).toMatch(/\.singleQuestionJsonToggleQuestion\s*{[\s\S]*?rgba\(94,\s*114,\s*228,\s*0\.12\)/);
-    expect(scss).toMatch(/\.singleQuestionJsonToggleResponse\s*{[\s\S]*?rgba\(77,\s*255,\s*164,\s*0\.1\)/);
+    expect(scss).toMatch(
+      /\.singleQuestionJsonToggleQuestion\s*{[\s\S]*?color-mix\(in srgb, var\(--ce-compat-indigo\) 12%, transparent\)/,
+    );
+    expect(scss).toMatch(
+      /\.singleQuestionJsonToggleResponse\s*{[\s\S]*?color-mix\(in srgb, var\(--ce-action-accent\) 10%, transparent\)/,
+    );
     expect(scss).toMatch(/#answerSurveyButton\s*{[\s\S]*?font-family:\s*inherit;/);
     expect(scss).toMatch(/\.viewAddressHeadingSuffix\s*{[\s\S]*?margin-left:\s*0\.35rem;/);
   });

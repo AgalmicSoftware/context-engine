@@ -194,7 +194,7 @@ describe('createSbtGroupHelpers state patch helpers', () => {
     ).toBe('field-section token-meta-card');
     expect(resolveCreateSbtTooltipIconStyle()).toEqual({ opacity: 0.5 });
     expect(resolveCreateSbtActionIconStyle()).toEqual({ marginRight: '5px' });
-    expect(resolveCreateSbtFailureIconStyle()).toEqual({ color: 'red' });
+    expect(resolveCreateSbtFailureIconStyle()).toEqual({ color: 'var(--ce-status-danger-text)' });
     expect(resolveCreateSbtShareableTooltipIconStyle()).toEqual({
       opacity: 0.5,
       marginLeft: '8px',

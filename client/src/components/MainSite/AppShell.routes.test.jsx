@@ -1038,9 +1038,7 @@ describe('AppShell route render smoke', () => {
 
     const view = render(subject.render());
 
-    expect(screen.getByTestId('ce-worker-canonical-bootstrap-status')).toHaveTextContent(
-      'Loading worker session',
-    );
+    expect(screen.getByTestId('ce-worker-canonical-bootstrap-status')).toHaveTextContent('Loading worker session');
     expect(mockNavbar.mock.calls.at(-1)?.[0]?.sessionConfig).toBeNull();
     await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(subject.state.sessionPathResolutionNonce).toBeGreaterThan(0));

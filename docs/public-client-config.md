@@ -21,12 +21,11 @@ Supported values currently come from `client/src/scss/themes/registry.json`:
 CSS. It is embedded into the document for the pre-paint bootstrap, so changing
 it requires a rebuild/redeploy.
 
-`REACT_APP_CE_THEME_SELECTOR_ENABLED` defaults to `false`. Setting it to
-`true` exposes the bundled app-theme selector in Settings; the selected ID is
-stored locally and restored before first paint. Enable the control only after
-the deployment's route/accessibility matrix passes. Session color schemes are
-a separate `appearance.colorSchemeId` metadata contract and never select an
-app theme.
+`REACT_APP_CE_THEME_SELECTOR_ENABLED` defaults to `true`, exposing the bundled
+app-theme selector in Settings. Set it to `false` only when a deployment
+intentionally hides user theme selection. The selected ID is stored locally
+and restored before first paint. Session color schemes are a separate
+`appearance.colorSchemeId` metadata contract and never select an app theme.
 
 ## Session Wrapped Capability Record
 

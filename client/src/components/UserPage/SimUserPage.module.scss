@@ -1,19 +1,17 @@
 /* @file SimUserPage.module.scss */
-@use 'sass:color';
-@use 'scss/variables' as tokens;
 @use '../UserPage/UserPage.module.scss' as *;
 
-$surface-bg: tokens.$ce-panel-bg;
-$panel-bg: tokens.$ce-card-bg;
-$panel-border: tokens.$ce-card-border;
-$panel-shadow: tokens.$ce-card-shadow;
-$raised-card-bg: #24264d;
-$raised-card-border: rgba(255, 255, 255, 0.12);
-$accent: tokens.$ce-clickable;
-$body-text: rgba(255, 255, 255, 0.92);
-$soft-text: rgba(244, 247, 255, 0.82);
-$muted-text: tokens.$ce-muted-text;
-$warning: #ffd166;
+$surface-bg: var(--ce-surface-sunken);
+$panel-bg: var(--ce-card-bg);
+$panel-border: var(--ce-card-border);
+$panel-shadow: var(--ce-card-shadow);
+$raised-card-bg: var(--ce-surface-alt);
+$raised-card-border: color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
+$accent: var(--ce-action-accent);
+$body-text: var(--ce-panel-text);
+$soft-text: var(--ce-panel-text-muted);
+$muted-text: var(--ce-panel-text-muted);
+$warning: var(--ce-status-warning-text);
 
 .simUserPage {
   @extend .userPage;
@@ -83,8 +81,8 @@ $warning: #ffd166;
   height: 84px;
   border-radius: var(--ce-radius-round);
   object-fit: cover;
-  background-color: #5e72e4;
-  border: 2px solid rgba(255, 255, 255, 0.18);
+  background-color: var(--ce-compat-indigo);
+  border: 2px solid color-mix(in srgb, var(--ce-text-inverse) 18%, transparent);
   box-shadow: $panel-shadow;
 }
 
@@ -93,7 +91,7 @@ $warning: #ffd166;
   align-items: center;
   gap: 10px;
   margin: 0;
-  color: white;
+  color: var(--ce-text-inverse);
   font-size: clamp(1.85rem, 4vw, 2.35rem);
   letter-spacing: -0.02em;
   line-height: 1.1;
@@ -141,7 +139,7 @@ $warning: #ffd166;
 
   h2 {
     margin: 12px 0 0;
-    color: white;
+    color: var(--ce-text-inverse);
     font-size: 1.35rem;
     line-height: 1.2;
   }
@@ -152,8 +150,8 @@ $warning: #ffd166;
   align-items: center;
   padding: 4px 10px;
   border-radius: var(--ce-radius-pill);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
   color: $muted-text;
   font-size: 0.76rem;
   font-weight: 700;
@@ -193,7 +191,11 @@ $warning: #ffd166;
     bottom: 0;
     left: 0;
     width: 4px;
-    background: linear-gradient(180deg, rgba(77, 255, 164, 0.95) 0%, rgba(91, 140, 255, 0.75) 100%);
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--ce-action-accent) 95%, transparent) 0%,
+      color-mix(in srgb, var(--ce-data-series-1) 75%, transparent) 100%
+    );
   }
 }
 
@@ -223,7 +225,7 @@ $warning: #ffd166;
 .extraInfo {
   h3 {
     margin: 0 0 14px;
-    color: white;
+    color: var(--ce-text-inverse);
   }
 }
 
@@ -251,8 +253,8 @@ $warning: #ffd166;
 }
 
 .debate {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
   border-radius: var(--ce-radius-8);
   padding: 8px 10px;
   color: $body-text;
@@ -267,33 +269,33 @@ $warning: #ffd166;
     width: 100%;
     padding: 10px 12px;
     margin-bottom: 10px;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
     border-radius: var(--ce-radius-10);
-    color: white;
+    color: var(--ce-text-inverse);
 
     &::placeholder {
-      color: rgba(244, 247, 255, 0.45);
+      color: color-mix(in srgb, var(--ce-control-text) 45%, transparent);
     }
   }
 
   button {
-    background: #e1e4ea;
-    color: #0d1117;
-    border: 1px solid #cfd5de;
+    background: var(--ce-document-border);
+    color: var(--ce-document-text);
+    border: 1px solid var(--ce-document-border);
     border-radius: var(--ce-radius-10);
     padding: 10px 16px;
     font-weight: 700;
-    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+    box-shadow: 0 8px 18px color-mix(in srgb, var(--ce-compat-dark) 18%, transparent);
     transition:
       background 0.18s ease,
       transform 0.06s ease,
       box-shadow 0.2s ease;
 
     &:hover {
-      background: color.adjust(#e1e4ea, $lightness: -4%);
+      background: color-mix(in srgb, var(--ce-document-border) 96%, var(--ce-compat-dark));
       transform: translateY(-1px);
-      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.22);
+      box-shadow: 0 12px 24px color-mix(in srgb, var(--ce-compat-dark) 22%, transparent);
     }
   }
 }
@@ -306,8 +308,8 @@ $warning: #ffd166;
 
 .modalHeader {
   background: $surface-bg;
-  color: white;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--ce-text-inverse);
+  border-bottom: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
 }
 
 .modalBody {
@@ -323,7 +325,7 @@ $warning: #ffd166;
 .modalAdvice {
   h3 {
     margin: 0 0 14px;
-    color: white;
+    color: var(--ce-text-inverse);
   }
 }
 
@@ -345,7 +347,11 @@ $warning: #ffd166;
   flex: 1 1 50%;
   min-width: 0;
   padding: 28px 24px;
-  background: linear-gradient(135deg, rgba(77, 255, 164, 0.06) 0%, rgba(91, 140, 255, 0.06) 100%);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--ce-action-accent) 6%, transparent) 0%,
+    color-mix(in srgb, var(--ce-data-series-1) 6%, transparent) 100%
+  );
   border: 1px solid $panel-border;
   border-radius: var(--ce-radius-14);
   box-shadow: $panel-shadow;
@@ -362,8 +368,8 @@ $warning: #ffd166;
   height: 96px;
   border-radius: var(--ce-radius-round);
   object-fit: cover;
-  border: 3px solid rgba(77, 255, 164, 0.3);
-  box-shadow: 0 0 20px rgba(77, 255, 164, 0.1);
+  border: 3px solid color-mix(in srgb, var(--ce-action-accent) 30%, transparent);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--ce-action-accent) 10%, transparent);
   flex-shrink: 0;
 }
 
@@ -382,9 +388,9 @@ $warning: #ffd166;
   display: inline-flex;
   padding: 3px 10px;
   border-radius: var(--ce-radius-pill);
-  background: rgba(91, 140, 255, 0.15);
-  border: 1px solid rgba(91, 140, 255, 0.25);
-  color: #93b4ff;
+  background: color-mix(in srgb, var(--ce-data-series-1) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-data-series-1) 25%, transparent);
+  color: var(--ce-status-info-text);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -393,7 +399,7 @@ $warning: #ffd166;
 
 .heroName {
   margin: 0 0 8px;
-  color: white;
+  color: var(--ce-text-inverse);
   font-size: clamp(1.8rem, 4vw, 2.4rem);
   font-weight: 800;
   letter-spacing: -0.02em;
@@ -417,9 +423,9 @@ $warning: #ffd166;
   justify-content: center;
   min-width: 0;
   padding: 24px 28px 24px 32px;
-  background: rgba(255, 255, 255, 0.03);
+  background: color-mix(in srgb, var(--ce-text-inverse) 3%, transparent);
   border-left: 4px solid $accent;
-  border-radius: 0 var(--ce-radius-14) var(--ce-radius-14) 0;
+  border-radius: var(--ce-radius-0) var(--ce-radius-14) var(--ce-radius-14) var(--ce-radius-0);
   box-shadow: $panel-shadow;
 }
 
@@ -427,7 +433,7 @@ $warning: #ffd166;
   position: absolute;
   top: 16px;
   left: 10px;
-  color: rgba(77, 255, 164, 0.25);
+  color: color-mix(in srgb, var(--ce-action-accent) 25%, transparent);
   font-size: 1.2rem;
 }
 
@@ -498,8 +504,8 @@ $warning: #ffd166;
 .stanceTrack {
   flex: 1;
   height: 6px;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 3px;
+  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+  border-radius: var(--ce-radius-3);
   position: relative;
 }
 
@@ -511,7 +517,7 @@ $warning: #ffd166;
   height: 14px;
   background: $accent;
   border-radius: var(--ce-radius-round);
-  box-shadow: 0 0 8px rgba(77, 255, 164, 0.4);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--ce-action-accent) 40%, transparent);
   transition: left 0.3s ease;
 }
 
@@ -526,7 +532,7 @@ $warning: #ffd166;
 
   h2 {
     margin: 12px 0 0;
-    color: white;
+    color: var(--ce-text-inverse);
     font-size: 1.35rem;
     line-height: 1.2;
   }
@@ -556,7 +562,7 @@ $warning: #ffd166;
 
   &:hover,
   &:focus-visible {
-    background: rgba(255, 255, 255, 0.08);
+    background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
     transform: translateX(4px);
     text-decoration: none;
   }
@@ -565,7 +571,7 @@ $warning: #ffd166;
   &:focus-visible .nodeName,
   &:hover .positionLinkIcon,
   &:focus-visible .positionLinkIcon {
-    color: white;
+    color: var(--ce-text-inverse);
   }
 }
 
@@ -582,7 +588,7 @@ $warning: #ffd166;
   }
 
   &.negative {
-    color: #ff6b72;
+    color: var(--ce-status-error);
   }
 }
 
@@ -642,8 +648,8 @@ $warning: #ffd166;
   transition: background 0.15s ease;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.06);
-    color: white;
+    background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
+    color: var(--ce-text-inverse);
     text-decoration: none;
   }
 }
@@ -651,7 +657,7 @@ $warning: #ffd166;
 .relatedCompareLink {
   flex-shrink: 0;
   padding: 6px 8px;
-  border: 1px solid rgba(77, 255, 164, 0.45);
+  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 45%, transparent);
   border-radius: var(--ce-radius-8);
   color: var(--ce-color-accent);
   font-size: 0.76rem;
@@ -660,9 +666,9 @@ $warning: #ffd166;
 
   &:hover,
   &:focus-visible {
-    background: rgba(77, 255, 164, 0.12);
+    background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
     border-color: var(--ce-color-accent);
-    color: white;
+    color: var(--ce-text-inverse);
     text-decoration: none;
   }
 }
@@ -687,7 +693,7 @@ $warning: #ffd166;
   color: var(--ce-color-accent);
 
   &.disagree {
-    color: #ff6b72;
+    color: var(--ce-status-error);
   }
 }
 

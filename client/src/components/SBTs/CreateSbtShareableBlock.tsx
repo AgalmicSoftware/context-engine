@@ -3,6 +3,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck, faClipboard, faCopy, faDownload, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import { QRCodeSVG } from 'qrcode.react';
 
+import { FIXED_MEDIA_DARK, FIXED_MEDIA_LIGHT } from '../../utilities/ui/fixedMediaColors';
 import CETooltip from '../Shared/CETooltip';
 import {
   resolveCreateSbtCopyActionDisplayState,
@@ -89,8 +90,8 @@ export const CreateSbtShareableBlock = ({
             id={qrId}
             value={url}
             size={64}
-            bgColor="#ffffff"
-            fgColor="#000000"
+            bgColor={FIXED_MEDIA_LIGHT}
+            fgColor={FIXED_MEDIA_DARK}
             level="L"
             includeMargin={false}
           />
@@ -99,8 +100,8 @@ export const CreateSbtShareableBlock = ({
               id={highResQrId}
               value={url}
               size={1024}
-              bgColor="#ffffff"
-              fgColor="#000000"
+              bgColor={FIXED_MEDIA_LIGHT}
+              fgColor={FIXED_MEDIA_DARK}
               level="L"
               includeMargin={true}
             />

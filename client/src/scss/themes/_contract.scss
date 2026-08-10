@@ -15,6 +15,12 @@ $required-theme-tokens: (
   surface-sunken,
   surface-light,
   surface-subtle,
+  document-canvas,
+  document-surface,
+  document-text,
+  document-text-muted,
+  document-border,
+  document-border-strong,
   text,
   text-muted,
   text-inverse,
@@ -27,6 +33,11 @@ $required-theme-tokens: (
   tooltip-text,
   tooltip-muted,
   tooltip-border,
+  overlay-base,
+  overlay-surface,
+  overlay-surface-alt,
+  overlay-text,
+  overlay-text-muted,
   card-bg,
   card-border,
   card-shadow,
@@ -40,6 +51,12 @@ $required-theme-tokens: (
   action-accent,
   action-accent-hover,
   action-accent-text,
+  action-submit,
+  action-submit-hover,
+  action-submit-text,
+  action-submit-disabled-bg,
+  action-submit-disabled-border,
+  action-submit-disabled-text,
   link,
   status-info,
   status-success,
@@ -47,11 +64,23 @@ $required-theme-tokens: (
   status-warning,
   status-danger,
   status-error,
+  status-info-text,
+  status-success-text,
+  status-warning-text,
+  status-danger-text,
   status-info-soft,
   status-success-soft,
   status-success-soft-hover,
   status-warning-soft,
   status-warning-soft-hover,
+  data-series-1,
+  data-series-2,
+  data-series-3,
+  data-series-4,
+  data-series-5,
+  data-series-6,
+  data-series-7,
+  data-series-8,
   control-face,
   control-text,
   control-disabled-bg,
@@ -74,6 +103,10 @@ $required-theme-tokens: (
   border-inset,
   shadow-raised,
   shadow-pressed,
+  shadow-neumorphic-dark,
+  shadow-neumorphic-light,
+  shadow-submit,
+  shadow-submit-hover,
   border-control-width,
   control-padding-y,
   control-padding-x,
@@ -90,7 +123,13 @@ $required-theme-tokens: (
   radius-14,
   radius-15,
   radius-16,
+  radius-18,
   radius-20,
+  radius-22,
+  radius-24,
+  radius-28,
+  radius-30,
+  radius-50,
   radius-pill,
   radius-round,
   compat-orange,
@@ -175,7 +214,7 @@ $required-theme-tokens: (
     --green: var(--ce-status-success);
     --teal: var(--ce-compat-bootstrap-teal);
     --cyan: var(--ce-compat-bootstrap-cyan);
-    --white: #ffffff;
+    --white: var(--ce-text-inverse);
     --gray: var(--ce-text-muted);
     --gray-dark: var(--ce-compat-bootstrap-gray-dark);
     --light: var(--ce-compat-bootstrap-light);
@@ -188,11 +227,11 @@ $required-theme-tokens: (
     --danger: var(--ce-status-danger);
     --dark: var(--ce-compat-dark);
     --default: var(--ce-compat-bootstrap-default);
-    --neutral: #ffffff;
-    --darker: #000000;
+    --neutral: var(--ce-text-inverse);
+    --darker: var(--ce-overlay-base);
 
-    --ce-color-white: #ffffff;
-    --ce-color-black: #000000;
+    --ce-color-white: var(--ce-text-inverse);
+    --ce-color-black: var(--ce-overlay-base);
     --ce-color-text: var(--ce-text);
     --ce-color-text-muted: var(--ce-text-muted);
     --ce-color-bg: var(--ce-canvas);

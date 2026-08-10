@@ -5,6 +5,7 @@ import type { Root } from 'react-dom/client';
 import AudioInput from './AudioInput';
 import { requestAiRewrite } from '../../../utilities/ai/aiClient';
 import { useWhisper, RECORDING_STATUS } from '../../../utilities/useWhisper';
+import { readThemeToken, subscribeThemeChanges } from '../../../utilities/ui/themeRuntime';
 
 type LastRecording = {
   blob: Blob | null;
@@ -91,6 +92,11 @@ jest.mock('../../../utilities/useWhisper', () => {
   return { ...actual, useWhisper: jest.fn() };
 });
 
+jest.mock('../../../utilities/ui/themeRuntime', () => ({
+  readThemeToken: jest.fn((_token: string, fallback: string) => fallback),
+  subscribeThemeChanges: jest.fn(() => jest.fn()),
+}));
+
 const buildWhisperState = (overrides: Partial<WhisperState> = {}): WhisperState => ({
   status: RECORDING_STATUS.READY,
   isRecording: false,
@@ -170,6 +176,8 @@ describe('AudioInput', () => {
     mockUseWhisper.mockReturnValue(buildWhisperState());
     mockRequestAiRewrite.mockReset();
     mockRequestAiRewrite.mockResolvedValue('rewritten');
+    (readThemeToken as jest.Mock).mockImplementation((_token: string, fallback: string) => fallback);
+    (subscribeThemeChanges as jest.Mock).mockImplementation(() => jest.fn());
     rafQueue = [];
     rafId = 0;
     requestAnimationFrameSpy = jest.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
@@ -456,6 +464,9 @@ describe('AudioInput', () => {
     expect(fakeAudioContext.createMediaStreamSource).toHaveBeenCalledTimes(1);
     expect(sourceNode.connect).toHaveBeenCalledWith(analyser);
     expect(requestAnimationFrameSpy.mock.calls.length).toBeGreaterThan(rafCallsBeforeRefs);
+    expect(readThemeToken).toHaveBeenCalledWith('ce-control-face', 'Canvas');
+    expect(readThemeToken).toHaveBeenCalledWith('ce-action-primary', 'Highlight');
+    expect(subscribeThemeChanges).toHaveBeenCalled();
   });
 
   it('skips duplicate same-text parent updates', () => {

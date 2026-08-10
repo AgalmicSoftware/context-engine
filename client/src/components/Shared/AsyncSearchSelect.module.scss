@@ -1,13 +1,13 @@
 .wrapper {
-  --ce-async-select-text-color: #000000;
-  --ce-async-select-placeholder-color: #666666;
-  --ce-async-select-control-bg: #ffffff;
-  --ce-async-select-control-border: rgba(0, 0, 0, 0.1);
-  --ce-async-select-menu-bg: #ffffff;
-  --ce-async-select-option-focused: #f1f3f6;
-  --ce-async-select-option-selected: #e2e6ee;
-  --ce-async-select-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
-  --ce-async-select-border-hover: rgba(0, 0, 0, 0.25);
+  --ce-async-select-text-color: var(--ce-compat-dark);
+  --ce-async-select-placeholder-color: var(--ce-text-muted);
+  --ce-async-select-control-bg: var(--ce-text-inverse);
+  --ce-async-select-control-border: color-mix(in srgb, var(--ce-compat-dark) 10%, transparent);
+  --ce-async-select-menu-bg: var(--ce-text-inverse);
+  --ce-async-select-option-focused: var(--ce-document-surface);
+  --ce-async-select-option-selected: var(--ce-document-border);
+  --ce-async-select-shadow: 0 6px 18px color-mix(in srgb, var(--ce-compat-dark) 12%, transparent);
+  --ce-async-select-border-hover: color-mix(in srgb, var(--ce-compat-dark) 25%, transparent);
 
   position: relative;
   display: block;
@@ -17,14 +17,14 @@
 
   &[data-ce-async-select-variant='admin'],
   &[data-ce-async-select-variant='create'] {
-    --ce-async-select-text-color: #f4f7ff;
-    --ce-async-select-placeholder-color: rgba(244, 247, 255, 0.45);
-    --ce-async-select-control-bg: rgba(8, 10, 26, 0.65);
-    --ce-async-select-control-border: rgba(255, 255, 255, 0.16);
-    --ce-async-select-menu-bg: #0f1233;
-    --ce-async-select-option-focused: rgba(77, 255, 164, 0.18);
-    --ce-async-select-option-selected: rgba(77, 255, 164, 0.28);
-    --ce-async-select-border-hover: rgba(255, 255, 255, 0.3);
+    --ce-async-select-text-color: var(--ce-control-text);
+    --ce-async-select-placeholder-color: color-mix(in srgb, var(--ce-control-text) 45%, transparent);
+    --ce-async-select-control-bg: color-mix(in srgb, var(--ce-overlay-base) 65%, transparent);
+    --ce-async-select-control-border: color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
+    --ce-async-select-menu-bg: var(--ce-overlay-surface);
+    --ce-async-select-option-focused: color-mix(in srgb, var(--ce-action-accent) 18%, transparent);
+    --ce-async-select-option-selected: color-mix(in srgb, var(--ce-action-accent) 28%, transparent);
+    --ce-async-select-border-hover: color-mix(in srgb, var(--ce-text-inverse) 30%, transparent);
   }
 }
 
@@ -39,8 +39,8 @@
   background: var(--ce-async-select-control-bg);
   color: var(--ce-async-select-text-color);
   border: 1px solid var(--ce-async-select-control-border);
-  border-radius: 4px;
-  box-shadow: 0 1px 2px rgba(15, 18, 51, 0.06);
+  border-radius: var(--ce-radius-4);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ce-overlay-surface) 6%, transparent);
   cursor: pointer;
   text-align: left;
   line-height: 1.4;
@@ -54,7 +54,7 @@
 
   &:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px rgba(77, 255, 164, 0.22);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ce-action-accent) 22%, transparent);
   }
 
   &:disabled {
@@ -94,7 +94,7 @@
   background: var(--ce-async-select-menu-bg);
   color: var(--ce-async-select-text-color);
   border: 1px solid var(--ce-async-select-control-border);
-  border-radius: 4px;
+  border-radius: var(--ce-radius-4);
   box-shadow: var(--ce-async-select-shadow);
   overflow: hidden;
 }
@@ -109,7 +109,7 @@
   width: 100%;
   padding: 6px 8px;
   border: 1px solid var(--ce-async-select-control-border);
-  border-radius: 4px;
+  border-radius: var(--ce-radius-4);
   background: var(--ce-async-select-control-bg);
   color: var(--ce-async-select-text-color);
   font-size: 13px;

@@ -10,8 +10,8 @@
   border-radius: var(--ce-radius-8);
   background: var(--ce-color-bg);
   box-shadow:
-    -5px 5px 10px #10122e,
-    5px -5px 10px #1e2155;
+    -5px 5px 10px var(--ce-shadow-neumorphic-dark),
+    5px -5px 10px var(--ce-shadow-neumorphic-light);
 }
 
 @media (min-width: 769px) and (max-width: 1366px) {

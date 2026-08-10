@@ -492,10 +492,10 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
     const opacity = 0.35 + ratio * 0.55;
 
     if (value > 0) {
-      return `rgba(50, 255, 140, ${opacity})`;
+      return `color-mix(in srgb, var(--ce-status-success) ${opacity * 100}%, transparent)`;
     }
 
-    return `rgba(255, 80, 90, ${opacity})`;
+    return `color-mix(in srgb, var(--ce-status-danger) ${opacity * 100}%, transparent)`;
   };
 
   renderMainGrid = () => {

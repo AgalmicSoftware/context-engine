@@ -103,9 +103,9 @@ export default function DevE2eNav() {
         left: 10,
         padding: '10px 12px',
         borderRadius: 10,
-        background: 'rgba(0,0,0,0.72)',
-        border: '1px solid rgba(255,255,255,0.18)',
-        color: '#fff',
+        background: 'color-mix(in srgb, var(--ce-overlay-base) 72%, transparent)',
+        border: '1px solid var(--ce-border-strong)',
+        color: 'var(--ce-panel-text)',
         maxWidth: 260,
         fontFamily:
           'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
@@ -126,12 +126,12 @@ export default function DevE2eNav() {
             to={item.to}
             data-testid={item.testId}
             style={{
-              color: '#fff',
+              color: 'var(--ce-panel-text)',
               textDecoration: 'none',
               padding: '6px 8px',
               borderRadius: 8,
-              background: 'rgba(255,255,255,0.08)',
-              border: '1px solid rgba(255,255,255,0.10)',
+              background: 'var(--ce-input-bg)',
+              border: '1px solid var(--ce-input-border)',
             }}
           >
             {item.label}

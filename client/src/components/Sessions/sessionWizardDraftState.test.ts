@@ -76,9 +76,9 @@ describe('sessionWizardDraftState', () => {
       }).appearance,
     ).toEqual({ colorSchemeId: 'amber' });
 
-    expect(
-      normalizeSessionWizardDraftShape({ appearance: { colorSchemeId: '../custom.scss' } }).appearance,
-    ).toEqual({ colorSchemeId: 'context-engine' });
+    expect(normalizeSessionWizardDraftShape({ appearance: { colorSchemeId: '../custom.scss' } }).appearance).toEqual({
+      colorSchemeId: 'context-engine',
+    });
   });
 
   it('normalizes cached legacy Telegram drafts into the profile without rewriting legacy fields', () => {

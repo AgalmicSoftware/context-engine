@@ -1920,7 +1920,17 @@ export function OpinionCompass2D({ users = [], labels = [], precomputed = null }
   const toY = (v: number) => cy - r * Number(v || 0);
   const ticks = [-1, -0.5, 0, 0.5, 1];
 
-  const colorFor = (i: number) => `hsl(${(i * 50) % 360}, 70%, 50%)`;
+  const seriesColors = [
+    'var(--ce-data-series-1)',
+    'var(--ce-data-series-2)',
+    'var(--ce-data-series-3)',
+    'var(--ce-data-series-4)',
+    'var(--ce-data-series-5)',
+    'var(--ce-data-series-6)',
+    'var(--ce-data-series-7)',
+    'var(--ce-data-series-8)',
+  ];
+  const colorFor = (i: number) => seriesColors[i % seriesColors.length];
 
   const addrIdx = new Map((users || []).map((u, i) => [String(u?.address || '').toLowerCase(), i]));
   const pointsOrdered = precomputed.points
@@ -2004,10 +2014,34 @@ export function OpinionCompass2D({ users = [], labels = [], precomputed = null }
           >
             {/* Background quadrants */}
             <rect x="0" y="0" width={width} height={height} fill="transparent" />
-            <rect x={cx} y={cy} width={width - cx} height={height - cy} fill="rgba(255,255,255,0.04)" />
-            <rect x={0} y={cy} width={cx} height={height - cy} fill="rgba(255,255,255,0.04)" />
-            <rect x={0} y={0} width={cx} height={cy} fill="rgba(255,255,255,0.05)" />
-            <rect x={cx} y={0} width={width - cx} height={cy} fill="rgba(255,255,255,0.05)" />
+            <rect
+              x={cx}
+              y={cy}
+              width={width - cx}
+              height={height - cy}
+              fill="color-mix(in srgb, var(--ce-text-inverse) 4%, transparent)"
+            />
+            <rect
+              x={0}
+              y={cy}
+              width={cx}
+              height={height - cy}
+              fill="color-mix(in srgb, var(--ce-text-inverse) 4%, transparent)"
+            />
+            <rect
+              x={0}
+              y={0}
+              width={cx}
+              height={cy}
+              fill="color-mix(in srgb, var(--ce-text-inverse) 5%, transparent)"
+            />
+            <rect
+              x={cx}
+              y={0}
+              width={width - cx}
+              height={cy}
+              fill="color-mix(in srgb, var(--ce-text-inverse) 5%, transparent)"
+            />
 
             {/* Subtle grid */}
             {ticks.map((t) => (
@@ -2017,11 +2051,18 @@ export function OpinionCompass2D({ users = [], labels = [], precomputed = null }
                   y1={cy - r}
                   x2={toX(t)}
                   y2={cy + r}
-                  stroke="rgba(255,255,255,0.12)"
+                  stroke="color-mix(in srgb, var(--ce-text-inverse) 12%, transparent)"
                   strokeWidth="1"
                   strokeDasharray={t === 0 ? '0' : '3,4'}
                 />
-                <text x={toX(t)} y={cy + r + 16} fontSize="11" textAnchor="middle" fill="#fff" opacity="0.8">
+                <text
+                  x={toX(t)}
+                  y={cy + r + 16}
+                  fontSize="11"
+                  textAnchor="middle"
+                  fill="var(--ce-panel-text)"
+                  opacity="0.8"
+                >
                   {t}
                 </text>
               </g>
@@ -2033,22 +2074,43 @@ export function OpinionCompass2D({ users = [], labels = [], precomputed = null }
                   y1={toY(t)}
                   x2={cx + r}
                   y2={toY(t)}
-                  stroke="rgba(255,255,255,0.12)"
+                  stroke="color-mix(in srgb, var(--ce-text-inverse) 12%, transparent)"
                   strokeWidth="1"
                   strokeDasharray={t === 0 ? '0' : '3,4'}
                 />
-                <text x={cx - r - 16} y={toY(t) + 4} fontSize="11" textAnchor="end" fill="#fff" opacity="0.8">
+                <text
+                  x={cx - r - 16}
+                  y={toY(t) + 4}
+                  fontSize="11"
+                  textAnchor="end"
+                  fill="var(--ce-panel-text)"
+                  opacity="0.8"
+                >
                   {t}
                 </text>
               </g>
             ))}
 
             {/* Axes */}
-            <line x1={cx - r} y1={cy} x2={cx + r} y2={cy} stroke="rgba(255,255,255,0.6)" strokeWidth="2" />
-            <line x1={cx} y1={cy - r} x2={cx} y2={cy + r} stroke="rgba(255,255,255,0.6)" strokeWidth="2" />
+            <line
+              x1={cx - r}
+              y1={cy}
+              x2={cx + r}
+              y2={cy}
+              stroke="color-mix(in srgb, var(--ce-text-inverse) 60%, transparent)"
+              strokeWidth="2"
+            />
+            <line
+              x1={cx}
+              y1={cy - r}
+              x2={cx}
+              y2={cy + r}
+              stroke="color-mix(in srgb, var(--ce-text-inverse) 60%, transparent)"
+              strokeWidth="2"
+            />
 
             {/* Axis labels (titles as tooltips) */}
-            <text x={cx + r} y={cy + 30} fontSize="13" textAnchor="end" fill="#fff" opacity="0.95">
+            <text x={cx + r} y={cy + 30} fontSize="13" textAnchor="end" fill="var(--ce-panel-text)" opacity="0.95">
               <title>{xDesc}</title>
               {xLabel}
             </text>
@@ -2057,7 +2119,7 @@ export function OpinionCompass2D({ users = [], labels = [], precomputed = null }
               y={cy - r}
               fontSize="13"
               textAnchor="end"
-              fill="#fff"
+              fill="var(--ce-panel-text)"
               opacity="0.95"
               transform={`rotate(-90 ${cx - 30},${cy - r})`}
             >
@@ -2076,9 +2138,16 @@ export function OpinionCompass2D({ users = [], labels = [], precomputed = null }
               const dy = (i % 3) - 1; // -1,0,1
               return (
                 <g key={`pt-${i}`} aria-label={`${label} at (${p.x.toFixed(2)}, ${p.y.toFixed(2)})`}>
-                  <circle cx={px} cy={py} r="5.5" fill={color} stroke="rgba(255,255,255,0.9)" strokeWidth="1" />
+                  <circle
+                    cx={px}
+                    cy={py}
+                    r="5.5"
+                    fill={color}
+                    stroke="color-mix(in srgb, var(--ce-text-inverse) 90%, transparent)"
+                    strokeWidth="1"
+                  />
                   <title>{`${label} • x=${p.x.toFixed(2)}, y=${p.y.toFixed(2)}`}</title>
-                  <text x={px + dx} y={py + dy * 3} fontSize="12" fill="#fff" opacity="0.95">
+                  <text x={px + dx} y={py + dy * 3} fontSize="12" fill="var(--ce-panel-text)" opacity="0.95">
                     {label}
                   </text>
                 </g>

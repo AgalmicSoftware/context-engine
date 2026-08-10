@@ -211,7 +211,7 @@ describe('CompareAddresses cache scan helpers', () => {
 
   it('resolves compare bookmark row styles consistently', () => {
     expect(resolveCompareBookmarksHeaderStyle()).toEqual({
-      color: 'white',
+      color: 'var(--ce-panel-text)',
       fontWeight: '600',
       marginBottom: '10px',
     });

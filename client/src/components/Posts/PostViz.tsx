@@ -3,7 +3,16 @@ import styles from './PostsPage.module.scss';
 
 type VizRecord = Record<string, unknown>;
 
-const PALETTE = ['#4dffa4', '#7aa7ff', '#ffb347', '#ff6bcb', '#d8f36a', '#9ee7ff'];
+const PALETTE = [
+  'var(--ce-data-series-7)',
+  'var(--ce-data-series-1)',
+  'var(--ce-data-series-5)',
+  'var(--ce-data-series-3)',
+  'var(--ce-data-series-6)',
+  'var(--ce-data-series-8)',
+];
+const BINARY_DOT_COLOR = 'var(--ce-data-series-8)';
+const BINARY_AXIS_COLOR = 'var(--ce-data-series-1)';
 
 const asRecord = (value: unknown): VizRecord | null => (
   !!value && typeof value === 'object' && !Array.isArray(value)
@@ -452,9 +461,105 @@ const BeeswarmViz = ({ spec }: { spec: VizRecord }) => {
 
   return (
     <section className={`${styles.vizCard} ${styles.beeswarmCard}`} aria-label={title}>
-      <div className={styles.vizHeader}>
-        <h3 className={styles.vizTitle}>{title}</h3>
-        {subtitle && <p className={styles.vizSubtitle}>{subtitle}</p>}
+      <VizHeader title={title} subtitle={subtitle} hidden={hideHeader} />
+      <div className={styles.beeswarmViz}>
+        {rows.map((row, rowIndex) => {
+          const placements = buildBeeswarmPlacements(row.values);
+          return (
+            <div key={row.label} className={styles.beeswarmRow}>
+              <div className={styles.beeswarmRowMeta}>
+                <h4>{row.label}</h4>
+                {row.prompt && <p>{row.prompt}</p>}
+              </div>
+              <div className={styles.beeswarmPlot}>
+                <span className={styles.beeswarmAxis} />
+                {ticks.map((tick) => (
+                  <span
+                    key={`${row.label}-${tick}`}
+                    className={styles.beeswarmTick}
+                    style={{ left: `${clamp(((tick - min) / (max - min)) * 100, 0, 100)}%` }}
+                  >
+                    {formatValue(tick, suffix)}
+                  </span>
+                ))}
+                {row.values.map((point, index) => {
+                  const pointKey = `${rowIndex}-${index}`;
+                  const left = clamp(((point.value - min) / (max - min)) * 100, 0, 100);
+                  const placement = placements[index];
+                  const confidenceLabel =
+                    point.confidence > 0 ? `, ${formatValue(point.confidence, '%')} confidence` : '';
+                  const isActive = activeKey === pointKey;
+                  const ringWidth = 1 + (point.confidence / 100) * 3;
+                  const ringOpacity = 0.12 + (point.confidence / 100) * 0.36;
+                  return (
+                    <button
+                      key={`${row.label}-${point.label}-${index}`}
+                      type="button"
+                      className={`${styles.beeswarmDot} ${isActive ? styles.beeswarmDotActive : ''}`}
+                      style={{
+                        left: formatCalcPercentWithPx(left, placement.x),
+                        top: `${placement.top}%`,
+                        backgroundColor: point.color,
+                        opacity: 0.62 + (point.confidence / 100) * 0.34,
+                        boxShadow: `0 7px 20px color-mix(in srgb, var(--ce-compat-dark) 32%, transparent), 0 0 0 ${ringWidth}px color-mix(in srgb, var(--ce-text-inverse) ${ringOpacity * 100}%, transparent)`,
+                      }}
+                      aria-label={`${point.label}: ${formatValue(point.value, suffix)}${confidenceLabel}`}
+                      aria-pressed={pinnedKey === pointKey}
+                      aria-describedby={isActive ? tooltipId : undefined}
+                      onMouseEnter={() => setHoverKey(pointKey)}
+                      onMouseLeave={() => setHoverKey(null)}
+                      onFocus={() => setHoverKey(pointKey)}
+                      onBlur={() => setHoverKey(null)}
+                      onClick={() => setPinnedKey((current) => (current === pointKey ? null : pointKey))}
+                    >
+                      {point.label}
+                    </button>
+                  );
+                })}
+                {row.values.map((point, index) => {
+                  const pointKey = `${rowIndex}-${index}`;
+                  if (activeKey !== pointKey) return null;
+                  const left = clamp(((point.value - min) / (max - min)) * 100, 18, 82);
+                  const placement = placements[index];
+                  const renderBelow = placement.top <= SWARM_TOOLTIP_FLIP_TOP_PERCENT;
+                  const tooltipStyle: TooltipPositionStyle = {
+                    '--post-viz-tooltip-x': `${left}%`,
+                    top: `${placement.top}%`,
+                  };
+                  return (
+                    <div
+                      key={`tooltip-${pointKey}`}
+                      id={tooltipId}
+                      role="tooltip"
+                      className={`${styles.binaryBeeswarmTooltip} ${styles.beeswarmTooltip} ${renderBelow ? styles.beeswarmTooltipBelow : ''} ${isPinned ? styles.binaryBeeswarmTooltipPinned : ''}`}
+                      style={tooltipStyle}
+                    >
+                      {isPinned && (
+                        <button
+                          type="button"
+                          className={styles.binaryBeeswarmTooltipClose}
+                          onClick={clearPin}
+                          aria-label="Close rating details"
+                          data-testid="ce-posts-rating-tooltip-close"
+                        >
+                          &times;
+                        </button>
+                      )}
+                      <strong>
+                        {point.label}: {formatValue(point.value, suffix)}
+                      </strong>
+                      {point.confidence > 0 && <span>Confidence: {formatValue(point.confidence)}/100</span>}
+                      {point.detail && <p>{point.detail}</p>}
+                    </div>
+                  );
+                })}
+              </div>
+              {row.missing.length > 0 && (
+                <p className={styles.beeswarmMissing}>No completed answer: {row.missing.join(', ')}</p>
+              )}
+            </div>
+          );
+        })}
       </div>
       <div className={styles.beeswarmViz}>
         {rows.map((row) => (
@@ -805,12 +910,12 @@ const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
           >
             <defs>
               <radialGradient id={sphereHighlightId} cx="30%" cy="30%" r="68%">
-                <stop offset="0%" stopColor="rgba(255, 255, 255, 0.7)" />
-                <stop offset="36%" stopColor="rgba(255, 255, 255, 0.28)" />
-                <stop offset="72%" stopColor="rgba(255, 255, 255, 0)" />
+                <stop offset="0%" stopColor="color-mix(in srgb, var(--ce-text-inverse) 70%, transparent)" />
+                <stop offset="36%" stopColor="color-mix(in srgb, var(--ce-text-inverse) 28%, transparent)" />
+                <stop offset="72%" stopColor="transparent" />
               </radialGradient>
               <filter id={sphereShadowId} x="-70%" y="-70%" width="240%" height="240%" colorInterpolationFilters="sRGB">
-                <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#000000" floodOpacity="0.34" />
+                <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="var(--ce-compat-dark)" floodOpacity="0.34" />
               </filter>
             </defs>
             {scale.ticks.map((tick) => {

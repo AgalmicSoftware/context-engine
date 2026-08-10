@@ -8,6 +8,7 @@
  */
 
 import { hashSeed, mulberry32 } from '../survey/seededPrng.js';
+import { FIXED_MEDIA_LIGHT } from './fixedMediaColors';
 
 // Tiny PRNG used in existing code (mulberry32)
 export function mulberry32(a: number): () => number {
@@ -47,7 +48,7 @@ export function generateBlockieDataUrl(seed: unknown, cells = 8, scale = 4): str
   const ctx = canvas.getContext('2d');
   if (!ctx) return '';
 
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = FIXED_MEDIA_LIGHT;
   ctx.fillRect(0, 0, size, size);
 
   ctx.fillStyle = `rgb(${r},${g},${b})`;

@@ -5,7 +5,7 @@
 @media (min-width: 0px) and (max-width: 319px) {
   .mainTabsCard {
     min-height: 100%;
-    background: #00000000;
+    background: transparent;
   }
 
   #mainAreaTabs {
@@ -25,7 +25,7 @@
 @media (min-width: 320px) and (max-width: 465px) {
   .mainTabsCard {
     min-height: 100%;
-    background: #00000000;
+    background: transparent;
   }
 
   #mainAreaTabs {
@@ -45,7 +45,7 @@
 @media (min-width: 466px) and (max-width: 768px) {
   .mainTabsCard {
     min-height: 100%;
-    background: #00000000;
+    background: transparent;
     border-radius: var(--ce-radius-7);
     background: transparent;
   }
@@ -73,8 +73,8 @@
     border-radius: var(--ce-radius-7);
     background: var(--ce-color-bg);
     box-shadow:
-      -6px 6px 12px #0f102a,
-      6px -6px 12px #1f2258;
+      -6px 6px 12px var(--ce-shadow-neumorphic-dark),
+      6px -6px 12px var(--ce-shadow-neumorphic-light);
   }
 
   #mainAreaTabs {
@@ -111,8 +111,8 @@
     border-radius: var(--ce-radius-7);
     background: var(--ce-color-bg);
     box-shadow:
-      -6px 6px 12px #0f102a,
-      6px -6px 12px #1f2258;
+      -6px 6px 12px var(--ce-shadow-neumorphic-dark),
+      6px -6px 12px var(--ce-shadow-neumorphic-light);
   }
 
   #mainAreaTabs {
@@ -211,7 +211,7 @@
     text-transform: uppercase;
     font-weight: 600;
     font-size: 0.85em;
-    color: #ffffffcf;
+    color: color-mix(in srgb, var(--ce-text-inverse) 81%, transparent);
     border: none;
     background: var(--ce-color-black);
     justify-self: flex-end;
@@ -291,9 +291,9 @@
     text-transform: uppercase;
     font-weight: 600;
     font-size: 0.85em;
-    color: #000000a6;
+    color: color-mix(in srgb, var(--ce-compat-dark) 65%, transparent);
     border: none;
-    background: #07c0f929;
+    background: color-mix(in srgb, var(--ce-status-info) 16%, transparent);
     justify-self: flex-end;
     align-items: self-end;
     display: flex;
@@ -370,7 +370,7 @@
     text-transform: uppercase;
     font-weight: 600;
     font-size: 1.25em;
-    color: #ffffffcf;
+    color: color-mix(in srgb, var(--ce-text-inverse) 81%, transparent);
     border: none;
     background: var(--ce-color-black);
     justify-self: flex-end;
@@ -408,7 +408,7 @@
   .onboardingTitle {
     align-self: center;
     font-weight: 600;
-    color: #ffffff2e;
+    color: color-mix(in srgb, var(--ce-text-inverse) 18%, transparent);
     text-transform: uppercase;
     margin-bottom: 0px;
     padding-top: 25px;
@@ -431,7 +431,7 @@
     text-transform: uppercase;
     font-weight: 600;
     font-size: 1.75em;
-    color: #ffffffcf;
+    color: color-mix(in srgb, var(--ce-text-inverse) 81%, transparent);
     border: none;
     background: var(--ce-color-black);
     justify-self: flex-end;
@@ -473,7 +473,7 @@
     text-transform: uppercase;
     font-weight: 600;
     font-size: 1.35em;
-    color: #ffffffcf;
+    color: color-mix(in srgb, var(--ce-text-inverse) 81%, transparent);
     border: none;
     background: var(--ce-color-black);
     justify-self: flex-end;
@@ -518,7 +518,7 @@
   .onboardingTitle {
     align-self: flex-start;
     font-weight: 600;
-    color: #ffffff2e;
+    color: color-mix(in srgb, var(--ce-text-inverse) 18%, transparent);
     text-transform: uppercase;
     margin-bottom: 0px;
     padding-left: 35px;
@@ -581,8 +581,8 @@
     font-weight: 600;
     font-size: 1.75em;
     border: none;
-    color: #487dec7a;
-    background: #000000a1;
+    color: color-mix(in srgb, var(--ce-compat-blue) 48%, transparent);
+    background: color-mix(in srgb, var(--ce-compat-dark) 63%, transparent);
     justify-self: flex-end;
     align-items: self-end;
     display: flex;
@@ -608,7 +608,7 @@
   display: flex;
   align-content: center;
   height: var(--ce-main-welcome-frame-height, 100%);
-  background: #0a0a0c7d;
+  background: color-mix(in srgb, var(--ce-compat-dark) 49%, transparent);
 
   .onboardingTitleArea {
     display: flex;
@@ -620,7 +620,7 @@
 
   .onboardingTitle {
     font-weight: 700;
-    color: #ffffff8a;
+    color: color-mix(in srgb, var(--ce-text-inverse) 54%, transparent);
     text-transform: uppercase;
     margin-bottom: 0px;
   }
@@ -643,17 +643,17 @@
     cursor: pointer;
     text-transform: uppercase;
     font-weight: 600;
-    background: #00000082;
-    border: #00000000 solid 1px;
-    color: #8b909294;
+    background: color-mix(in srgb, var(--ce-compat-dark) 51%, transparent);
+    border: transparent solid 1px;
+    color: color-mix(in srgb, var(--ce-text-muted) 58%, transparent);
     filter: opacity(0.3);
   }
 }
 
 .takeSurveyButton {
-  color: #000000a6;
+  color: color-mix(in srgb, var(--ce-compat-dark) 65%, transparent);
   border: none;
-  background: #07c0f929;
+  background: color-mix(in srgb, var(--ce-status-info) 16%, transparent);
 }
 
 #typeformEmbed {

@@ -12,10 +12,7 @@ import styles from './AppThemeSelector.module.scss';
 const AppThemeSelector = (): React.ReactElement => {
   const [preference, setPreference] = React.useState(() => readStoredThemePreference() || '');
 
-  React.useEffect(
-    () => subscribeThemeChanges(() => setPreference(readStoredThemePreference() || '')),
-    [],
-  );
+  React.useEffect(() => subscribeThemeChanges(() => setPreference(readStoredThemePreference() || '')), []);
 
   return (
     <div className={styles.field}>

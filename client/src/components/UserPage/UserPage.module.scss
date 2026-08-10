@@ -1,21 +1,18 @@
 /* @file UserPage.module.scss */
-@use 'sass:color';
-@use 'scss/variables' as tokens;
-
-$user-page-background: tokens.$ce-panel-bg;
-$user-page-text-color: tokens.$ce-white;
-$neumorphism-shadow-dark: #121433;
-$neumorphism-shadow-light: #1c1e4f;
-$stat-item-background: rgba(255, 255, 255, 0.12);
-$clickable-color: tokens.$ce-clickable;
+$user-page-background: var(--ce-surface-sunken);
+$user-page-text-color: var(--ce-panel-text);
+$neumorphism-shadow-dark: var(--ce-shadow-neumorphic-dark);
+$neumorphism-shadow-light: var(--ce-shadow-neumorphic-light);
+$stat-item-background: color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
+$clickable-color: var(--ce-action-accent);
 $button-color: $user-page-text-color;
-$input-background-color: tokens.$ce-input-bg;
-$input-border-color: tokens.$ce-input-border;
-$light-blue: tokens.$ce-indigo;
+$input-background-color: var(--ce-input-bg);
+$input-border-color: var(--ce-input-border);
+$light-blue: var(--ce-compat-indigo);
 
-$card-bg: tokens.$ce-card-bg;
-$card-border: tokens.$ce-card-border;
-$card-shadow: tokens.$ce-card-shadow;
+$card-bg: var(--ce-card-bg);
+$card-border: var(--ce-card-border);
+$card-shadow: var(--ce-card-shadow);
 
 /* NEW: standardized icon size for copy & bookmark */
 $icon-size-standard: 1.25rem;
@@ -59,7 +56,7 @@ $icon-size-standard: 1.25rem;
   /* allow action buttons to sit on a new row */
   gap: 12px;
   margin-bottom: 16px;
-  background: #00c5ff5e;
+  background: color-mix(in srgb, var(--ce-data-series-8) 36.9%, transparent);
   border-radius: var(--ce-radius-10);
 }
 
@@ -107,7 +104,7 @@ $icon-size-standard: 1.25rem;
 .addressLink {
   color: inherit;
   text-decoration: none;
-  border-bottom: 1px dotted rgba(255, 255, 255, 0.28);
+  border-bottom: 1px dotted color-mix(in srgb, var(--ce-text-inverse) 28%, transparent);
   &:hover,
   &:focus {
     color: $clickable-color;
@@ -116,7 +113,7 @@ $icon-size-standard: 1.25rem;
 }
 
 .simulatedBadge {
-  color: yellow;
+  color: var(--ce-status-warning-text);
   margin-left: 10px;
   font-size: 1.5rem;
 }
@@ -240,12 +237,12 @@ $icon-size-standard: 1.25rem;
     cursor: pointer;
     transition: background-color 0.2s ease;
     &:hover {
-      background-color: color.adjust($light-blue, $lightness: -10%);
+      background-color: color-mix(in srgb, var(--ce-compat-indigo) 90%, var(--ce-compat-dark));
     }
   }
 
   .error {
-    color: #ff8383;
+    color: var(--ce-status-error);
     margin-left: 6px;
   }
 }
@@ -266,7 +263,7 @@ $icon-size-standard: 1.25rem;
     border-radius: var(--ce-radius-6);
     min-width: 220px;
     &::placeholder {
-      color: rgba(255, 255, 255, 0.7);
+      color: color-mix(in srgb, var(--ce-text-inverse) 70%, transparent);
       text-transform: none;
     }
   }
@@ -278,7 +275,7 @@ $icon-size-standard: 1.25rem;
     transform: translateY(-50%);
     background: transparent;
     border: 0;
-    color: #9ff0c9;
+    color: var(--ce-status-success-text);
     opacity: 0.9;
     pointer-events: none;
     /* non-clickable per requirements */
@@ -289,7 +286,7 @@ $icon-size-standard: 1.25rem;
 
 /* General error helper (used next to inline username) */
 .error {
-  color: #ff8383;
+  color: var(--ce-status-error);
   margin-left: 6px;
   font-size: 0.95rem;
 }
@@ -311,9 +308,9 @@ $icon-size-standard: 1.25rem;
   padding: 10px 16px;
   font-size: 1rem;
   /* NEUTRAL OPAQUE STYLE (replaces old gradient) */
-  background: #e1e4ea;
-  color: #0d1117;
-  border: 1px solid #cfd5de;
+  background: var(--ce-document-border);
+  color: var(--ce-document-text);
+  border: 1px solid var(--ce-document-border);
   border-radius: var(--ce-radius-10);
   cursor: pointer;
   transition:
@@ -321,21 +318,21 @@ $icon-size-standard: 1.25rem;
     box-shadow 0.2s ease,
     background 0.18s ease,
     border-color 0.18s ease;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--ce-compat-dark) 18%, transparent);
   &:hover {
-    background: #d6dbe3;
-    border-color: #c6ccd6;
+    background: var(--ce-status-info-text);
+    border-color: var(--ce-status-info-text);
     transform: translateY(-1px);
-    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.22);
+    box-shadow: 0 12px 24px color-mix(in srgb, var(--ce-compat-dark) 22%, transparent);
   }
   &:active {
-    background: #cfd5de;
-    border-color: #bcc3cf;
+    background: var(--ce-document-border);
+    border-color: var(--ce-status-info-text);
     transform: translateY(0);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--ce-compat-dark) 18%, transparent);
   }
   &:focus {
-    outline: 2px solid rgba(99, 102, 241, 0.45);
+    outline: 2px solid color-mix(in srgb, var(--ce-data-series-2) 45%, transparent);
     outline-offset: 2px;
   }
   &:disabled {
@@ -418,7 +415,7 @@ $icon-size-standard: 1.25rem;
 .deepScanProgressHeader {
   font-size: 0.76rem;
   font-weight: 700;
-  color: rgba(244, 247, 255, 0.92);
+  color: color-mix(in srgb, var(--ce-control-text) 92%, transparent);
   letter-spacing: 0.01em;
 }
 
@@ -427,7 +424,7 @@ $icon-size-standard: 1.25rem;
   flex-direction: column;
   gap: 4px;
   padding-bottom: 7px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
 
   &:last-child {
     padding-bottom: 0;
@@ -437,34 +434,34 @@ $icon-size-standard: 1.25rem;
 
 .deepScanProgressLabel {
   font-size: 0.75rem;
-  color: rgba(244, 247, 255, 0.8);
+  color: color-mix(in srgb, var(--ce-control-text) 80%, transparent);
   line-height: 1.3;
 }
 
 .deepScanProgressBar {
   width: 100%;
   height: 6px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
+  background: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
+  border-radius: var(--ce-radius-3);
   overflow: hidden;
 }
 
 .deepScanProgressFill {
   height: 100%;
-  background: #5affc2;
-  border-radius: 3px;
+  background: var(--ce-status-success-text);
+  border-radius: var(--ce-radius-3);
   transition: width 0.3s ease;
 }
 
 .deepScanProgressStats {
   font-size: 0.7rem;
-  color: rgba(244, 247, 255, 0.5);
+  color: color-mix(in srgb, var(--ce-control-text) 50%, transparent);
   line-height: 1.25;
 }
 
 .deepScanIndeterminate {
   font-size: 0.7rem;
-  color: rgba(244, 247, 255, 0.65);
+  color: color-mix(in srgb, var(--ce-control-text) 65%, transparent);
   line-height: 1.25;
 }
 
@@ -473,7 +470,7 @@ $icon-size-standard: 1.25rem;
 .questionPreview {
   display: block;
   /* UPDATED: Match .miniQuestionContainer style */
-  background: #24264d;
+  background: var(--ce-surface-alt);
   border-radius: var(--ce-radius-6);
   padding: 12px 16px;
   margin-bottom: 10px;
@@ -482,15 +479,15 @@ $icon-size-standard: 1.25rem;
   transition: all 0.2s ease;
   /* Matched 3D shadow effect */
   box-shadow:
-    -3px 3px 6px #171a3d,
+    -3px 3px 6px var(--ce-surface-sunken),
     3px -3px 6px var(--ce-color-surface-alt);
   &:hover {
     /* Slight lift effect on hover */
     transform: translateY(-2px);
     box-shadow:
-      -4px 4px 8px #171a3d,
+      -4px 4px 8px var(--ce-surface-sunken),
       4px -4px 8px var(--ce-color-surface-alt);
-    background: color.adjust(#24264d, $lightness: 3%);
+    background: color-mix(in srgb, var(--ce-surface-alt) 97%, var(--ce-text-inverse));
   }
 
   .surveyTitle,
@@ -506,7 +503,7 @@ $icon-size-standard: 1.25rem;
   }
   .questionID {
     font-size: 12px;
-    color: #e5e5e5;
+    color: var(--ce-document-border);
   }
 }
 
@@ -536,13 +533,13 @@ $icon-size-standard: 1.25rem;
   input {
     flex: 1;
     padding: 10px 12px;
-    background-color: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.18);
+    background-color: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 18%, transparent);
     color: $user-page-text-color;
     border-radius: var(--ce-radius-10);
     margin-right: 10px;
     &::placeholder {
-      color: rgba(255, 255, 255, 0.5);
+      color: color-mix(in srgb, var(--ce-text-inverse) 50%, transparent);
     }
   }
 
@@ -555,11 +552,11 @@ $icon-size-standard: 1.25rem;
 
 .compareSection > button {
   padding: 10px 16px;
-  background: linear-gradient(180deg, #00d0a9 0%, #00b48e 100%);
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: linear-gradient(180deg, var(--ce-status-success) 0%, var(--ce-status-success) 100%);
+  border: 1px solid color-mix(in srgb, var(--ce-compat-dark) 8%, transparent);
   font-weight: 700;
   text-transform: none;
-  color: #0b1736;
+  color: var(--ce-document-text);
   border-radius: var(--ce-radius-10);
   cursor: pointer;
   transition:
@@ -567,7 +564,7 @@ $icon-size-standard: 1.25rem;
     box-shadow 0.2s ease;
   &:hover {
     transform: translateY(-1px);
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 10px 20px color-mix(in srgb, var(--ce-compat-dark) 25%, transparent);
   }
   &:disabled {
     opacity: 0.7;
@@ -578,8 +575,8 @@ $icon-size-standard: 1.25rem;
 .comparisonSummary {
   margin-top: 10px;
   /* was 12px */
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px dashed rgba(255, 255, 255, 0.18);
+  background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--ce-text-inverse) 18%, transparent);
   padding: 10px;
   /* was 12px */
   border-radius: var(--ce-radius-12);
@@ -592,15 +589,15 @@ $icon-size-standard: 1.25rem;
   gap: 16px;
   .agreementSection,
   .disagreementSection {
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
     border-radius: var(--ce-radius-12);
     padding: 12px 14px;
     h5 {
       margin: 0 0 8px 0;
       font-size: 1.05rem;
       font-weight: 800;
-      color: rgba(255, 255, 255, 0.92);
+      color: color-mix(in srgb, var(--ce-text-inverse) 92%, transparent);
     }
   }
 }
@@ -633,14 +630,14 @@ $icon-size-standard: 1.25rem;
   margin: 4px 6px 0 0;
   padding: 4px 10px;
   border-radius: var(--ce-radius-pill);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 25%, transparent);
+  background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
   font-size: 0.85rem;
   white-space: nowrap;
 }
 
 .comparisonError {
-  color: #ff9ea3;
+  color: var(--ce-status-danger-text);
   font-size: 0.95rem;
 }
 
@@ -653,17 +650,17 @@ $icon-size-standard: 1.25rem;
 
 .modalContent {
   background-color: var(--ce-color-white);
-  color: #111827;
+  color: var(--ce-document-text);
   padding: 18px;
   /* slightly increased for breathing room */
   border-radius: var(--ce-radius-12);
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.24);
+  border: 1px solid var(--ce-document-border);
+  box-shadow: 0 18px 44px color-mix(in srgb, var(--ce-compat-dark) 24%, transparent);
   /* a touch softer, more professional */
 }
 
 .modalHeader {
-  border-bottom: 1px solid #eceff3;
+  border-bottom: 1px solid var(--ce-status-info-text);
   padding-bottom: 10px;
   /* slightly increased to separate header/body */
   margin-bottom: 16px;
@@ -671,7 +668,7 @@ $icon-size-standard: 1.25rem;
     font-size: 1.25rem;
     font-weight: 700;
     margin: 0;
-    color: #1f2937;
+    color: var(--ce-document-border-strong);
     /* slightly darker for contrast */
   }
 
@@ -691,25 +688,25 @@ $icon-size-standard: 1.25rem;
   gap: 10px;
   font-size: 1.25rem;
   font-weight: 700;
-  color: #1f2937;
+  color: var(--ce-document-border-strong);
 }
 
 .analysisCacheStatus {
   margin-top: 4px;
   font-size: 0.8rem;
   font-weight: 600;
-  color: #4b5563;
+  color: var(--ce-document-text-muted);
 }
 
 .refreshIconButton {
   background: none;
   border: 0;
-  color: #6b7280;
+  color: var(--ce-document-text-muted);
   cursor: pointer;
   padding: 2px 4px;
   line-height: 1;
   &:hover {
-    color: #374151;
+    color: var(--ce-document-text-muted);
   }
   &:disabled {
     opacity: 0.4;
@@ -721,27 +718,27 @@ $icon-size-standard: 1.25rem;
   font-size: 0.975rem;
   line-height: 1.6;
   /* improved readability */
-  color: #374151;
+  color: var(--ce-document-text-muted);
 }
 
 /* Inspired by CompareAddresses' agreement/disagreement cards, adapted for light modal */
 .historicalAlignment {
   margin-top: 16px;
   padding: 12px 14px;
-  background: #f9fafb;
+  background: var(--ce-status-info-text);
   /* light card background */
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--ce-document-border);
   border-radius: var(--ce-radius-12);
   h4 {
     margin: 0 0 8px 0;
     font-weight: 700;
-    color: #374151;
+    color: var(--ce-document-text-muted);
     font-size: 1.05rem;
   }
 
   p {
     margin: 4px 0;
-    color: #4b5563;
+    color: var(--ce-document-text-muted);
   }
 }
 
@@ -852,13 +849,13 @@ $icon-size-standard: 1.25rem;
     top: -5px;
     right: -25px;
     font-size: 0.7em;
-    color: #00adb5;
+    color: var(--ce-data-series-8);
   }
 }
 
 .placeholderNote {
   font-style: italic;
-  color: #666;
+  color: var(--ce-text-muted);
   margin-bottom: 15px;
 }
 
@@ -900,14 +897,14 @@ $icon-size-standard: 1.25rem;
 .resultItem {
   margin-bottom: 12px;
   line-height: 1.45;
-  color: rgba(255, 255, 255, 0.92);
+  color: color-mix(in srgb, var(--ce-text-inverse) 92%, transparent);
   font-size: 1.05rem;
   font-weight: 600;
 }
 .resultEmpty {
   margin-bottom: 6px;
   line-height: 1.35;
-  color: rgba(255, 255, 255, 0.7);
+  color: color-mix(in srgb, var(--ce-text-inverse) 70%, transparent);
   font-style: italic;
 }
 
@@ -916,13 +913,13 @@ $icon-size-standard: 1.25rem;
   margin: 4px 6px 0 0;
   padding: 3px 8px;
   border-radius: var(--ce-radius-10);
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  border: 1px solid color-mix(in srgb, var(--ce-compat-dark) 12%, transparent);
   font-size: 0.85rem;
   white-space: nowrap;
 }
 
 .comparisonError {
-  color: #b00020;
+  color: var(--ce-status-danger);
   font-size: 0.95rem;
 }
 
@@ -935,7 +932,7 @@ $icon-size-standard: 1.25rem;
 
 /* Modal helper text */
 .placeholderNote {
-  color: #555;
+  color: var(--ce-text-muted);
 }
 
 /* === New light-touch styles used by CompareAddresses.tsx === */
@@ -953,14 +950,14 @@ $icon-size-standard: 1.25rem;
   align-items: center;
   gap: 6px;
   padding: 6px 10px;
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
   color: $user-page-text-color;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 18%, transparent);
   border-radius: var(--ce-radius-8);
   cursor: pointer;
   font-weight: 600;
   &:hover {
-    background: rgba(255, 255, 255, 0.12);
+    background: color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
   }
 }
 
@@ -971,8 +968,8 @@ $icon-size-standard: 1.25rem;
   gap: 8px;
   width: 100%;
   padding: 10px 12px;
-  background: rgba(77, 255, 164, 0.12);
-  border: 1px solid rgba(77, 255, 164, 0.28);
+  background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 28%, transparent);
   color: $user-page-text-color;
   border-radius: var(--ce-radius-10);
   white-space: nowrap;
@@ -994,7 +991,7 @@ $icon-size-standard: 1.25rem;
 .additionalComment {
   margin: 6px 0 0 6px;
   font-size: 0.95rem;
-  color: #e5e7eb;
+  color: var(--ce-document-border);
   opacity: 0.9;
 }
 
@@ -1032,13 +1029,13 @@ $icon-size-standard: 1.25rem;
   color: inherit;
   cursor: pointer;
   opacity: 0.5;
-  text-decoration: underline dotted rgba(255, 255, 255, 0.35);
+  text-decoration: underline dotted color-mix(in srgb, var(--ce-text-inverse) 35%, transparent);
   &:hover {
     opacity: 0.85;
     text-decoration-color: $light-blue;
   }
   &:focus {
-    outline: 2px solid rgba(99, 102, 241, 0.45);
+    outline: 2px solid color-mix(in srgb, var(--ce-data-series-2) 45%, transparent);
     outline-offset: 2px;
     border-radius: var(--ce-radius-3);
   }
@@ -1052,19 +1049,19 @@ $icon-size-standard: 1.25rem;
   /* bump size from 0.85rem */
   font-weight: 700;
   /* make label pop */
-  background: rgba(255, 255, 255, 0.18);
-  border-color: rgba(255, 255, 255, 0.45);
+  background: color-mix(in srgb, var(--ce-text-inverse) 18%, transparent);
+  border-color: color-mix(in srgb, var(--ce-text-inverse) 45%, transparent);
   color: var(--ce-color-white);
   cursor: pointer;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--ce-compat-dark) 25%, transparent);
   transition:
     background 0.15s ease,
     border-color 0.15s ease,
     transform 0.06s ease;
   &:hover,
   &:focus {
-    background: rgba(255, 255, 255, 0.28);
-    border-color: rgba(255, 255, 255, 0.6);
+    background: color-mix(in srgb, var(--ce-text-inverse) 28%, transparent);
+    border-color: color-mix(in srgb, var(--ce-text-inverse) 60%, transparent);
     outline: none;
     transform: translateY(-1px);
   }
@@ -1078,7 +1075,7 @@ $icon-size-standard: 1.25rem;
 .bookmarkedUsersSection {
   display: flex;
   flex-direction: column;
-  background: #ffff0047;
+  background: color-mix(in srgb, var(--ce-data-series-6) 27.8%, transparent);
   justify-content: flex-end;
   align-items: flex-end;
   width: 100%;
@@ -1096,8 +1093,8 @@ $icon-size-standard: 1.25rem;
   /* Ensure old green text styles don't leak here */
   color: $user-page-text-color;
   /* use theme body color explicitly */
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
   border-radius: var(--ce-radius-10);
   padding: 12px;
   box-shadow: $card-shadow;
@@ -1120,7 +1117,7 @@ $icon-size-standard: 1.25rem;
   margin: 6px 0 0 0;
   padding-left: 14px;
   /* room for left border and elbows */
-  border-left: 2px solid rgba(255, 255, 255, 0.16);
+  border-left: 2px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
   display: block;
   color: inherit;
   /* inherit theme color, not the green resultItem */
@@ -1142,7 +1139,7 @@ $icon-size-standard: 1.25rem;
   }
 
   &:hover {
-    background: rgba(255, 255, 255, 0.04);
+    background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
     border-radius: var(--ce-radius-6);
   }
 }
@@ -1154,7 +1151,7 @@ $icon-size-standard: 1.25rem;
 }
 .drillToggle {
   border: 0;
-  background: rgba(255, 255, 255, 0.1);
+  background: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
   color: inherit;
   width: 20px;
   height: 20px;
@@ -1169,7 +1166,7 @@ $icon-size-standard: 1.25rem;
 }
 .drillToggle:hover,
 .drillToggle:focus {
-  background: rgba(255, 255, 255, 0.2);
+  background: color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
   outline: none;
 }
 .drillTitle {
@@ -1201,9 +1198,9 @@ $icon-size-standard: 1.25rem;
   top: 12px;
   width: 12px;
   height: calc(100% - 12px);
-  border-left: 2px solid rgba(255, 255, 255, 0.16);
-  border-bottom: 2px solid rgba(255, 255, 255, 0.16);
-  border-bottom-left-radius: 6px;
+  border-left: 2px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
+  border-bottom: 2px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
+  border-bottom-left-radius: var(--ce-radius-6);
 }
 
 /* Tiny pills for drilldown tags */
@@ -1213,36 +1210,36 @@ $icon-size-standard: 1.25rem;
   border-radius: var(--ce-radius-pill);
   font-size: 0.75rem;
   line-height: 1;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 28%, transparent);
   color: inherit;
   /* no green leakage */
   vertical-align: middle;
 }
 .drillBadgeAgree {
-  background: rgba(86, 214, 146, 0.18);
-  border-color: rgba(86, 214, 146, 0.55);
-  color: #c8f4d7;
+  background: color-mix(in srgb, var(--ce-status-success) 18%, transparent);
+  border-color: color-mix(in srgb, var(--ce-status-success) 55%, transparent);
+  color: var(--ce-status-success-text);
 }
 .drillBadgeDisagree {
-  background: rgba(255, 115, 115, 0.18);
-  border-color: rgba(255, 115, 115, 0.55);
-  color: #ffd2d2;
+  background: color-mix(in srgb, var(--ce-status-danger-text) 18%, transparent);
+  border-color: color-mix(in srgb, var(--ce-status-danger-text) 55%, transparent);
+  color: var(--ce-status-danger-text);
 }
 .drillBadgeUnsure {
-  background: rgba(255, 206, 86, 0.18);
-  border-color: rgba(255, 206, 86, 0.55);
-  color: #ffe9b0;
+  background: color-mix(in srgb, var(--ce-status-warning) 18%, transparent);
+  border-color: color-mix(in srgb, var(--ce-status-warning) 55%, transparent);
+  color: var(--ce-status-warning-text);
 }
 .drillBadgeInfo {
-  background: rgba(120, 180, 255, 0.16);
-  border-color: rgba(120, 180, 255, 0.45);
-  color: #d4e8ff;
+  background: color-mix(in srgb, var(--ce-status-info-text) 16%, transparent);
+  border-color: color-mix(in srgb, var(--ce-status-info-text) 45%, transparent);
+  color: var(--ce-status-info-text);
 }
 .drillBadgeMuted {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.2);
-  color: rgba(255, 255, 255, 0.75);
+  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+  border-color: color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
+  color: color-mix(in srgb, var(--ce-text-inverse) 75%, transparent);
 }
 .drillParticipants {
   margin-top: 6px;
@@ -1252,7 +1249,7 @@ $icon-size-standard: 1.25rem;
 .drillParticipantRow {
   padding: 6px 8px;
   border-radius: var(--ce-radius-8);
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
 }
 .drillParticipantHeader {
   display: flex;
@@ -1280,7 +1277,7 @@ $icon-size-standard: 1.25rem;
   gap: 6px;
   vertical-align: middle;
   margin-left: 2px;
-  color: rgba(255, 255, 255, 0.8);
+  color: color-mix(in srgb, var(--ce-text-inverse) 80%, transparent);
 }
 /* ====== APPEND-ONLY: Compare visuals hardening ====== */
 
@@ -1319,10 +1316,10 @@ $icon-size-standard: 1.25rem;
     left: 0;
     min-width: var(--first-col-w, 180px);
     width: var(--first-col-w, 180px);
-    background: rgba(0, 0, 0, 0.15);
+    background: color-mix(in srgb, var(--ce-compat-dark) 15%, transparent);
     /* subtle backing so text stays readable */
     color: inherit;
-    box-shadow: 2px 0 0 rgba(255, 255, 255, 0.08);
+    box-shadow: 2px 0 0 color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
     z-index: 1;
   }
 
@@ -1342,10 +1339,10 @@ $icon-size-standard: 1.25rem;
   fill: var(--ce-color-white);
   /* applied to <text> inside SVG */
   cursor: pointer;
-  text-decoration: underline dotted rgba(255, 255, 255, 0.5);
+  text-decoration: underline dotted color-mix(in srgb, var(--ce-text-inverse) 50%, transparent);
   outline: none;
   &:focus {
-    outline: 2px solid rgba(99, 102, 241, 0.45);
+    outline: 2px solid color-mix(in srgb, var(--ce-data-series-2) 45%, transparent);
     outline-offset: 2px;
   }
 }
@@ -1356,8 +1353,8 @@ $icon-size-standard: 1.25rem;
   line-height: 1.4;
   color: inherit;
   /* make sure green list color doesn't bleed */
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px dashed rgba(255, 255, 255, 0.28);
+  background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--ce-text-inverse) 28%, transparent);
   border-radius: var(--ce-radius-8);
   padding: 8px 10px;
 }
@@ -1439,8 +1436,8 @@ $icon-size-standard: 1.25rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 35%, transparent);
+  background: color-mix(in srgb, var(--ce-compat-dark) 35%, transparent);
   border-radius: var(--ce-radius-6);
   cursor: pointer;
   z-index: 2;
@@ -1448,9 +1445,9 @@ $icon-size-standard: 1.25rem;
   opacity: 0.4;
   &:hover,
   &:focus {
-    background: rgba(0, 0, 0, 0.5);
+    background: color-mix(in srgb, var(--ce-compat-dark) 50%, transparent);
     outline: none;
-    border-color: rgba(255, 255, 255, 0.55);
+    border-color: color-mix(in srgb, var(--ce-text-inverse) 55%, transparent);
     opacity: 1;
   }
 }
@@ -1522,7 +1519,7 @@ $icon-size-standard: 1.25rem;
   border: none;
   padding: 0 6px;
   cursor: pointer;
-  color: rgba(244, 247, 255, 0.65);
+  color: color-mix(in srgb, var(--ce-control-text) 65%, transparent);
   font-size: 0.85rem;
   min-width: 24px;
   min-height: 24px;
@@ -1565,7 +1562,7 @@ $icon-size-standard: 1.25rem;
 .surveyDetailRow {
   padding: 4px 12px;
   font-size: 0.85rem;
-  color: rgba(244, 247, 255, 0.65);
+  color: color-mix(in srgb, var(--ce-control-text) 65%, transparent);
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -1574,17 +1571,17 @@ $icon-size-standard: 1.25rem;
 
 .surveyDetailLabel {
   font-weight: 600;
-  color: rgba(244, 247, 255, 0.85);
+  color: color-mix(in srgb, var(--ce-control-text) 85%, transparent);
   margin-right: 4px;
 }
 
 .surveyTag {
   display: inline-block;
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
   border-radius: var(--ce-radius-4);
   padding: 1px 6px;
   font-size: 0.8rem;
-  color: rgba(244, 247, 255, 0.75);
+  color: color-mix(in srgb, var(--ce-control-text) 75%, transparent);
 }
 
 .surveyDocLink {
@@ -1607,7 +1604,7 @@ $icon-size-standard: 1.25rem;
 
 .surveyQuestionItem {
   font-size: 0.82rem;
-  color: rgba(244, 247, 255, 0.78);
+  color: color-mix(in srgb, var(--ce-control-text) 78%, transparent);
   line-height: 1.35;
   padding: 2px 0;
   word-break: break-word;
@@ -1616,7 +1613,7 @@ $icon-size-standard: 1.25rem;
 .surveyQuestionFallbackId {
   font-family: var(--ce-font-mono), monospace;
   font-size: 0.78rem;
-  color: rgba(244, 247, 255, 0.55);
+  color: color-mix(in srgb, var(--ce-control-text) 55%, transparent);
   cursor: help;
 }
 

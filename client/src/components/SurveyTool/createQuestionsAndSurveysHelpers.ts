@@ -191,7 +191,13 @@ export {
   formatAiPromptModelLabel,
 } from './createQuestionsAndSurveysAiDisplayHelpers';
 
-const ENCRYPTION_GATE_COLORS = ['#5affc2', '#5b8cff', '#ffb347', '#ff6bcb', '#ffd166'];
+const ENCRYPTION_GATE_COLORS = [
+  'var(--ce-data-series-1)',
+  'var(--ce-data-series-2)',
+  'var(--ce-data-series-3)',
+  'var(--ce-data-series-4)',
+  'var(--ce-data-series-5)',
+];
 const AUTHORING_GATE_RESOURCE_LABELS: Record<string, string> = Object.freeze({
   default: 'default',
   questionResponses: 'questions',

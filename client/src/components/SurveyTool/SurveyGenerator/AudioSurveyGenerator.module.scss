@@ -1,16 +1,15 @@
 /* client/src/components/SurveyTool/SurveyGenerator/AudioSurveyGenerator.module.scss */
-@use 'scss/variables' as tokens;
 
-$primary-color: #22180c;
-$secondary-color: #006eff;
-$background-color: rgb(22, 33, 62);
-$text-color: tokens.$ce-white;
-$error-color: #ff6b6b;
-$question-background: #16213e;
-$answer-background: rgba(255, 255, 255, 0.1);
-$clickable-color: tokens.$ce-clickable;
-$input-bg: tokens.$ce-input-bg;
-$input-border: tokens.$ce-input-border;
+$primary-color: var(--ce-overlay-base);
+$secondary-color: var(--ce-status-info);
+$background-color: var(--ce-overlay-surface);
+$text-color: var(--ce-overlay-text);
+$error-color: var(--ce-status-error);
+$question-background: var(--ce-overlay-surface);
+$answer-background: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
+$clickable-color: var(--ce-action-accent);
+$input-bg: var(--ce-input-bg);
+$input-border: var(--ce-input-border);
 
 .databaseTool {
   background-color: $background-color;
@@ -42,10 +41,10 @@ $input-border: tokens.$ce-input-border;
     z-index: 3;
     width: min(540px, calc(100vw - 32px));
     padding: 14px;
-    border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    background: rgba(31, 37, 79, 0.98);
-    box-shadow: 0 18px 36px rgba(0, 0, 0, 0.28);
+    border-radius: var(--ce-radius-16);
+    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
+    background: color-mix(in srgb, var(--ce-overlay-surface) 98%, transparent);
+    box-shadow: 0 18px 36px color-mix(in srgb, var(--ce-compat-dark) 28%, transparent);
   }
 
   .sessionSelectorPopoverHeader {
@@ -57,13 +56,13 @@ $input-border: tokens.$ce-input-border;
   }
 
   .sessionSelectorHint {
-    color: rgba(255, 255, 255, 0.72);
+    color: color-mix(in srgb, var(--ce-text-inverse) 72%, transparent);
     font-size: 0.86rem;
   }
 
   .sessionSelectorToggle {
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
+    background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
     color: $text-color;
     border-radius: var(--ce-radius-pill);
     width: 42px;
@@ -74,9 +73,9 @@ $input-border: tokens.$ce-input-border;
   }
 
   .docLibraryLink {
-    color: rgba(255, 255, 255, 0.88);
+    color: color-mix(in srgb, var(--ce-text-inverse) 88%, transparent);
     text-decoration: none;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.22);
+    border-bottom: 1px solid color-mix(in srgb, var(--ce-text-inverse) 22%, transparent);
     padding-bottom: 2px;
   }
 
@@ -101,9 +100,9 @@ $input-border: tokens.$ce-input-border;
     margin: 0;
     padding: 9px 12px;
     border-radius: var(--ce-radius-pill);
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    color: rgba(255, 255, 255, 0.92);
+    background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
+    color: color-mix(in srgb, var(--ce-text-inverse) 92%, transparent);
     font-size: 0.95rem;
     font-weight: 600;
 
@@ -111,7 +110,7 @@ $input-border: tokens.$ce-input-border;
       width: 16px;
       height: 16px;
       margin: 0;
-      accent-color: #4dffa4;
+      accent-color: var(--ce-action-accent);
       cursor: pointer;
     }
   }
@@ -125,9 +124,9 @@ $input-border: tokens.$ce-input-border;
   .viewModeEmptyState {
     padding: 18px;
     border-radius: var(--ce-radius-10);
-    border: 1px dashed rgba(255, 255, 255, 0.16);
-    background: rgba(255, 255, 255, 0.04);
-    color: rgba(255, 255, 255, 0.74);
+    border: 1px dashed color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
+    background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
+    color: color-mix(in srgb, var(--ce-text-inverse) 74%, transparent);
     line-height: 1.6;
   }
 
@@ -205,21 +204,21 @@ $input-border: tokens.$ce-input-border;
   }
 
   .titleInput {
-    background: rgba(255, 255, 255, 0.05) !important;
+    background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent) !important;
     color: var(--ce-color-white) !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 10%, transparent) !important;
     height: 42px;
 
     &::placeholder {
-      color: rgba(255, 255, 255, 0.4);
+      color: color-mix(in srgb, var(--ce-text-inverse) 40%, transparent);
     }
   }
 
   .generateButton {
     padding: 15px;
-    background-color: #2a63ca !important;
+    background-color: var(--ce-action-submit) !important;
     color: $text-color !important;
-    border: 1px solid #2a63ca;
+    border: 1px solid var(--ce-action-submit);
     border-radius: var(--ce-radius-4);
     cursor: pointer;
     font-family: inherit;
@@ -243,13 +242,13 @@ $input-border: tokens.$ce-input-border;
     font-family: inherit;
     font-size: 1.1rem;
     font-weight: 700;
-    border: 1px solid rgba(255, 255, 255, 0.18) !important;
-    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 18%, transparent) !important;
+    background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent) !important;
     color: var(--ce-color-white) !important;
 
     &:hover:not(:disabled) {
-      background: rgba(255, 255, 255, 0.16) !important;
-      border-color: rgba(255, 255, 255, 0.3) !important;
+      background: color-mix(in srgb, var(--ce-text-inverse) 16%, transparent) !important;
+      border-color: color-mix(in srgb, var(--ce-text-inverse) 30%, transparent) !important;
     }
   }
 
@@ -290,10 +289,10 @@ $input-border: tokens.$ce-input-border;
     flex-direction: column;
     gap: 12px;
     padding: 14px;
-    border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    background: rgba(255, 255, 255, 0.06);
-    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.25);
+    border-radius: var(--ce-radius-16);
+    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
+    background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
+    box-shadow: 0 6px 22px color-mix(in srgb, var(--ce-compat-dark) 25%, transparent);
   }
 
   .photoCardTop {
@@ -307,10 +306,10 @@ $input-border: tokens.$ce-input-border;
     width: 104px;
     min-width: 104px;
     height: 92px;
-    border-radius: 12px;
+    border-radius: var(--ce-radius-12);
     overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    background: rgba(9, 14, 32, 0.6);
+    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
+    background: color-mix(in srgb, var(--ce-overlay-base) 60%, transparent);
   }
 
   .photoPreviewImage,
@@ -322,14 +321,14 @@ $input-border: tokens.$ce-input-border;
 
   .photoPreviewImage {
     object-fit: cover;
-    background: rgba(9, 14, 32, 0.85);
+    background: color-mix(in srgb, var(--ce-overlay-base) 85%, transparent);
   }
 
   .photoPreviewFallback {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: rgba(244, 247, 255, 0.7);
+    color: color-mix(in srgb, var(--ce-control-text) 70%, transparent);
     font-size: 1.3rem;
   }
 
@@ -343,7 +342,7 @@ $input-border: tokens.$ce-input-border;
   }
 
   .photoName {
-    color: rgba(244, 247, 255, 0.96);
+    color: color-mix(in srgb, var(--ce-control-text) 96%, transparent);
     font-size: 0.94rem;
     font-weight: 700;
     line-height: 1.45;
@@ -365,35 +364,35 @@ $input-border: tokens.$ce-input-border;
     max-width: 100%;
     padding: 6px 10px;
     border-radius: var(--ce-radius-pill);
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    background: rgba(255, 255, 255, 0.08);
-    color: rgba(244, 247, 255, 0.95);
+    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
+    background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+    color: color-mix(in srgb, var(--ce-control-text) 95%, transparent);
     font-size: 0.76rem;
     font-weight: 700;
     line-height: 1.2;
   }
 
   .photoStatusChipQueued {
-    color: rgba(244, 247, 255, 0.78);
+    color: color-mix(in srgb, var(--ce-control-text) 78%, transparent);
   }
 
   .photoStatusChipLoading {
-    color: #7fe8ff;
-    border-color: rgba(127, 232, 255, 0.36);
-    background: rgba(127, 232, 255, 0.12);
+    color: var(--ce-data-series-8);
+    border-color: color-mix(in srgb, var(--ce-data-series-8) 36%, transparent);
+    background: color-mix(in srgb, var(--ce-data-series-8) 12%, transparent);
   }
 
   .photoStatusChipError {
-    color: #ffd3d3;
-    border-color: rgba(255, 107, 107, 0.44);
-    background: rgba(255, 107, 107, 0.14);
+    color: var(--ce-status-danger-text);
+    border-color: color-mix(in srgb, var(--ce-status-error) 44%, transparent);
+    background: color-mix(in srgb, var(--ce-status-error) 14%, transparent);
   }
 
   .photoStatusToggle {
     cursor: pointer;
-    border-color: rgba(77, 255, 164, 0.4);
-    background: rgba(77, 255, 164, 0.12);
-    color: #d7ffe9;
+    border-color: color-mix(in srgb, var(--ce-action-accent) 40%, transparent);
+    background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
+    color: var(--ce-status-success-text);
     transition:
       background-color 0.18s ease,
       border-color 0.18s ease,
@@ -402,18 +401,18 @@ $input-border: tokens.$ce-input-border;
     &:hover,
     &:focus,
     &:focus-visible {
-      background: rgba(77, 255, 164, 0.2);
-      border-color: rgba(77, 255, 164, 0.58);
-      color: #ffffff;
+      background: color-mix(in srgb, var(--ce-action-accent) 20%, transparent);
+      border-color: color-mix(in srgb, var(--ce-action-accent) 58%, transparent);
+      color: var(--ce-text-inverse);
       text-decoration: none;
-      box-shadow: 0 0 0 2px rgba(77, 255, 164, 0.18);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--ce-action-accent) 18%, transparent);
       outline: none;
     }
   }
 
   .photoErrorText,
   .photoAnalysisBody {
-    border-radius: 12px;
+    border-radius: var(--ce-radius-12);
     padding: 10px 12px;
     font-size: 0.84rem;
     line-height: 1.55;
@@ -422,15 +421,15 @@ $input-border: tokens.$ce-input-border;
   }
 
   .photoErrorText {
-    border: 1px solid rgba(255, 107, 107, 0.3);
-    background: rgba(255, 107, 107, 0.1);
-    color: #ffd7d7;
+    border: 1px solid color-mix(in srgb, var(--ce-status-error) 30%, transparent);
+    background: color-mix(in srgb, var(--ce-status-error) 10%, transparent);
+    color: var(--ce-status-danger-text);
   }
 
   .photoAnalysisBody {
-    border: 1px solid rgba(77, 255, 164, 0.2);
-    background: rgba(9, 14, 32, 0.58);
-    color: rgba(244, 247, 255, 0.92);
+    border: 1px solid color-mix(in srgb, var(--ce-action-accent) 20%, transparent);
+    background: color-mix(in srgb, var(--ce-overlay-base) 58%, transparent);
+    color: color-mix(in srgb, var(--ce-control-text) 92%, transparent);
   }
 
   .photoRemoveBtn {
@@ -442,10 +441,10 @@ $input-border: tokens.$ce-input-border;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 999px;
-    background: rgba(10, 14, 33, 0.72);
-    color: #ffd3d3;
+    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
+    border-radius: var(--ce-radius-pill);
+    background: color-mix(in srgb, var(--ce-overlay-base) 72%, transparent);
+    color: var(--ce-status-danger-text);
     cursor: pointer;
     font-size: 1rem;
     line-height: 1;
@@ -457,11 +456,11 @@ $input-border: tokens.$ce-input-border;
     &:hover,
     &:focus,
     &:focus-visible {
-      background: rgba(255, 107, 107, 0.16);
-      border-color: rgba(255, 107, 107, 0.46);
-      color: #ffffff;
+      background: color-mix(in srgb, var(--ce-status-error) 16%, transparent);
+      border-color: color-mix(in srgb, var(--ce-status-error) 46%, transparent);
+      color: var(--ce-text-inverse);
       outline: none;
-      box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.18);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--ce-status-error) 18%, transparent);
     }
   }
 
@@ -486,9 +485,9 @@ $input-border: tokens.$ce-input-border;
     margin: 0;
     padding: 9px 12px;
     border-radius: var(--ce-radius-pill);
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    color: rgba(255, 255, 255, 0.92);
+    background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
+    color: color-mix(in srgb, var(--ce-text-inverse) 92%, transparent);
     font-size: 0.92rem;
     font-weight: 600;
 
@@ -496,7 +495,7 @@ $input-border: tokens.$ce-input-border;
       width: 16px;
       height: 16px;
       margin: 0;
-      accent-color: #4dffa4;
+      accent-color: var(--ce-action-accent);
       cursor: pointer;
     }
   }
@@ -512,9 +511,9 @@ $input-border: tokens.$ce-input-border;
     gap: 8px;
     min-height: 38px;
     border-radius: var(--ce-radius-6);
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    background: rgba(255, 255, 255, 0.06);
-    color: rgba(255, 255, 255, 0.9);
+    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
+    background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
+    color: color-mix(in srgb, var(--ce-text-inverse) 90%, transparent);
     font-family: inherit;
     font-size: 0.9rem;
     font-weight: 600;
@@ -537,10 +536,10 @@ $input-border: tokens.$ce-input-border;
     display: flex;
     flex-direction: column;
     gap: 8px;
-    border-radius: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    background: rgba(17, 23, 52, 0.98);
-    box-shadow: 0 18px 36px rgba(0, 0, 0, 0.3);
+    border-radius: var(--ce-radius-14);
+    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
+    background: color-mix(in srgb, var(--ce-overlay-surface) 98%, transparent);
+    box-shadow: 0 18px 36px color-mix(in srgb, var(--ce-compat-dark) 30%, transparent);
   }
 
   .docSaveAudienceOption {
@@ -549,19 +548,19 @@ $input-border: tokens.$ce-input-border;
     padding: 8px 12px;
 
     &:hover {
-      background: rgba(255, 255, 255, 0.12);
+      background: color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
     }
 
     &.active {
-      background: rgba(23, 162, 184, 0.18);
-      border-color: rgba(23, 162, 184, 0.6);
-      color: #7fe8ff;
+      background: color-mix(in srgb, var(--ce-data-series-8) 18%, transparent);
+      border-color: color-mix(in srgb, var(--ce-data-series-8) 60%, transparent);
+      color: var(--ce-data-series-8);
     }
   }
 
   .docSaveAudienceNote {
     padding: 2px 4px;
-    color: rgba(255, 255, 255, 0.72);
+    color: color-mix(in srgb, var(--ce-text-inverse) 72%, transparent);
     font-size: 0.82rem;
     line-height: 1.5;
   }
@@ -569,12 +568,12 @@ $input-border: tokens.$ce-input-border;
   .sourceItem {
     display: flex;
     align-items: center;
-    background: rgba(255, 255, 255, 0.05);
+    background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
     padding: 8px 10px;
     margin-bottom: 6px;
     border-radius: var(--ce-radius-4);
     font-size: 0.9em;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
   }
 
   .sourceTypeLabel {
@@ -623,13 +622,13 @@ $input-border: tokens.$ce-input-border;
   .removeSourceBtn {
     background: none;
     border: none;
-    color: #ff6b6b;
+    color: var(--ce-status-error);
     cursor: pointer;
     margin-left: 10px;
     font-size: 1.2em;
     line-height: 1;
     &:hover {
-      color: #ff4c4c;
+      color: var(--ce-status-error);
     }
   }
 
@@ -690,20 +689,20 @@ $input-border: tokens.$ce-input-border;
     height: 38px;
     /* Match standard input height */
     font-size: 0.9rem;
-    background: rgba(255, 255, 255, 0.08) !important;
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent) !important;
+    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 20%, transparent) !important;
     color: var(--ce-color-white) !important;
     &:hover {
-      background: rgba(255, 255, 255, 0.16) !important;
-      border-color: rgba(255, 255, 255, 0.35) !important;
+      background: color-mix(in srgb, var(--ce-text-inverse) 16%, transparent) !important;
+      border-color: color-mix(in srgb, var(--ce-text-inverse) 35%, transparent) !important;
     }
     &:active,
     &:focus,
     &:focus-visible {
-      background: rgba(255, 255, 255, 0.22) !important;
-      border-color: rgba(255, 255, 255, 0.5) !important;
+      background: color-mix(in srgb, var(--ce-text-inverse) 22%, transparent) !important;
+      border-color: color-mix(in srgb, var(--ce-text-inverse) 50%, transparent) !important;
       color: var(--ce-color-white) !important;
-      box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--ce-text-inverse) 25%, transparent);
     }
   }
 
@@ -719,7 +718,7 @@ $input-border: tokens.$ce-input-border;
   .countInlineLabel {
     flex: 0 0 auto;
     opacity: 0.3;
-    color: rgba(244, 247, 255, 0.92);
+    color: color-mix(in srgb, var(--ce-control-text) 92%, transparent);
     font-size: 0.98rem;
     font-weight: 700;
     letter-spacing: 0.04em;
@@ -734,10 +733,14 @@ $input-border: tokens.$ce-input-border;
     min-height: 42px;
     padding: 0 14px;
     border-radius: var(--ce-radius-pill);
-    border: 1px solid rgba(77, 255, 164, 0.42);
-    background: linear-gradient(180deg, rgba(77, 255, 164, 0.12) 0%, rgba(255, 255, 255, 0.04) 100%);
-    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.22);
-    color: rgba(244, 247, 255, 0.96);
+    border: 1px solid color-mix(in srgb, var(--ce-action-accent) 42%, transparent);
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--ce-action-accent) 12%, transparent) 0%,
+      color-mix(in srgb, var(--ce-text-inverse) 4%, transparent) 100%
+    );
+    box-shadow: 0 6px 22px color-mix(in srgb, var(--ce-compat-dark) 22%, transparent);
+    color: color-mix(in srgb, var(--ce-control-text) 96%, transparent);
     font-weight: 800;
     font-size: 1rem;
     letter-spacing: 0.04em;
@@ -757,10 +760,10 @@ $input-border: tokens.$ce-input-border;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 0 !important;
+    border-radius: var(--ce-radius-0) !important;
     border: none !important;
     background: transparent !important;
-    color: rgba(244, 247, 255, 0.92) !important;
+    color: color-mix(in srgb, var(--ce-control-text) 92%, transparent) !important;
     font-size: 1.35rem !important;
     font-weight: 800 !important;
     line-height: 1 !important;
@@ -770,14 +773,14 @@ $input-border: tokens.$ce-input-border;
       transform: translateY(-1px);
       background: transparent !important;
       border: none !important;
-      color: #4dffa4 !important;
+      color: var(--ce-action-accent) !important;
     }
 
     &:focus,
     &:focus-visible {
       background: transparent !important;
       border: none !important;
-      color: #4dffa4 !important;
+      color: var(--ce-action-accent) !important;
       text-decoration: underline;
       text-underline-offset: 0.16em;
       box-shadow: none !important;
@@ -786,7 +789,7 @@ $input-border: tokens.$ce-input-border;
     &:disabled {
       opacity: 0.4;
       cursor: not-allowed;
-      color: rgba(244, 247, 255, 0.38) !important;
+      color: color-mix(in srgb, var(--ce-control-text) 38%, transparent) !important;
       background: transparent !important;
       border: none !important;
       box-shadow: none !important;
@@ -795,14 +798,14 @@ $input-border: tokens.$ce-input-border;
   }
 
   .urlInputField {
-    background: rgba(255, 255, 255, 0.05) !important;
+    background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent) !important;
     color: var(--ce-color-white) !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 10%, transparent) !important;
     padding-right: 40px !important;
     height: 38px;
     /* Force consistent height */
     &::placeholder {
-      color: rgba(255, 255, 255, 0.3);
+      color: color-mix(in srgb, var(--ce-text-inverse) 30%, transparent);
     }
   }
 
@@ -824,7 +827,7 @@ $input-border: tokens.$ce-input-border;
     }
 
     &:disabled {
-      color: rgba(255, 255, 255, 0.2);
+      color: color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
       cursor: not-allowed;
     }
   }
@@ -833,8 +836,8 @@ $input-border: tokens.$ce-input-border;
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
     padding: 0 12px;
     height: 38px;
     /* Match standard input height */
@@ -849,23 +852,23 @@ $input-border: tokens.$ce-input-border;
     white-space: nowrap;
     .checkboxIcon {
       font-size: 1.1em;
-      color: rgba(255, 255, 255, 0.4);
+      color: color-mix(in srgb, var(--ce-text-inverse) 40%, transparent);
       transition: color 0.2s ease;
     }
 
     &:hover {
-      background: rgba(255, 255, 255, 0.1);
+      background: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
       .checkboxIcon {
-        color: rgba(255, 255, 255, 0.8);
+        color: color-mix(in srgb, var(--ce-text-inverse) 80%, transparent);
       }
     }
 
     &.active {
-      background: rgba(23, 162, 184, 0.15);
-      border-color: #17a2b8;
-      color: #17a2b8;
+      background: color-mix(in srgb, var(--ce-data-series-8) 15%, transparent);
+      border-color: var(--ce-status-info);
+      color: var(--ce-status-info);
       .checkboxIcon {
-        color: #17a2b8;
+        color: var(--ce-status-info);
       }
     }
   }
@@ -885,7 +888,7 @@ $input-border: tokens.$ce-input-border;
 
   .encryptionWarning {
     margin-top: 8px;
-    color: #ffb3b3;
+    color: var(--ce-status-danger-text);
     font-size: 0.85rem;
   }
 
@@ -959,9 +962,9 @@ $input-border: tokens.$ce-input-border;
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
     background: transparent;
-    color: rgba(255, 255, 255, 0.5);
+    color: color-mix(in srgb, var(--ce-text-inverse) 50%, transparent);
     border-radius: var(--ce-radius-6);
     padding: 6px 10px;
     font-weight: 700;
@@ -969,7 +972,7 @@ $input-border: tokens.$ce-input-border;
     transition: box-shadow 0.12s ease;
     &:hover {
       background: transparent;
-      color: rgba(255, 255, 255, 0.72);
+      color: color-mix(in srgb, var(--ce-text-inverse) 72%, transparent);
     }
   }
 
@@ -977,10 +980,10 @@ $input-border: tokens.$ce-input-border;
     margin-top: 10px;
     position: relative;
     width: 100%;
-    background-color: rgba(0, 0, 0, 0.3);
+    background-color: color-mix(in srgb, var(--ce-compat-dark) 30%, transparent);
     padding: 15px;
     border-radius: var(--ce-radius-8);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
   }
 
   .aiPromptHeader {
@@ -1000,9 +1003,9 @@ $input-border: tokens.$ce-input-border;
     display: inline-block;
     padding: 2px 6px;
     border-radius: var(--ce-radius-4);
-    background: rgba(255, 247, 230, 0.1);
-    color: #ffd591;
-    border: 1px solid rgba(255, 213, 145, 0.3);
+    background: color-mix(in srgb, var(--ce-status-warning-text) 10%, transparent);
+    color: var(--ce-status-warning-text);
+    border: 1px solid color-mix(in srgb, var(--ce-status-warning-text) 30%, transparent);
     font-weight: 700;
     font-family: var(--ce-font-mono);
   }
@@ -1011,7 +1014,7 @@ $input-border: tokens.$ce-input-border;
     position: absolute;
     top: 8px;
     right: 8px;
-    background: rgba(0, 0, 0, 0.6);
+    background: color-mix(in srgb, var(--ce-compat-dark) 60%, transparent);
     color: var(--ce-color-white);
     border: none;
     border-radius: var(--ce-radius-6);
@@ -1019,11 +1022,11 @@ $input-border: tokens.$ce-input-border;
     cursor: pointer;
     z-index: 2;
     &:hover {
-      background: rgba(0, 0, 0, 0.8);
+      background: color-mix(in srgb, var(--ce-compat-dark) 80%, transparent);
     }
   }
   .aiPromptCopyCornerSuccess {
-    background: #28a745 !important;
+    background: var(--ce-status-success) !important;
   }
 
   .jsonDisplayWrapper {
@@ -1032,7 +1035,7 @@ $input-border: tokens.$ce-input-border;
   }
   .jsonDisplay {
     background: transparent;
-    color: rgba(255, 255, 255, 0.8);
+    color: color-mix(in srgb, var(--ce-text-inverse) 80%, transparent);
     white-space: pre-wrap;
     word-break: break-all;
     font-size: 1.1em;
@@ -1043,9 +1046,9 @@ $input-border: tokens.$ce-input-border;
   .markdownSummary {
     max-width: 90ch;
     margin: 0 auto;
-    background: #f7f7fa;
-    color: #222;
-    border: 1px solid #e2e6ff;
+    background: var(--ce-status-info-text);
+    color: var(--ce-document-text);
+    border: 1px solid var(--ce-status-info-text);
     padding: 12px;
     border-radius: var(--ce-radius-6);
     max-height: 360px;
@@ -1062,7 +1065,7 @@ $input-border: tokens.$ce-input-border;
     border-radius: var(--ce-radius-4);
     cursor: pointer;
     &:hover {
-      background: #222;
+      background: var(--ce-document-text);
     }
   }
 
@@ -1082,8 +1085,8 @@ $input-border: tokens.$ce-input-border;
     flex: 1 1 140px;
     padding: 10px;
     border-radius: var(--ce-radius-8);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
+    background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
     cursor: pointer;
     transition: all 0.2s ease;
     opacity: 0.7;
@@ -1091,15 +1094,15 @@ $input-border: tokens.$ce-input-border;
     min-width: 120px;
     &:hover {
       transform: translateY(-1px);
-      background: rgba(255, 255, 255, 0.08);
+      background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
       opacity: 0.9;
     }
 
     &.active {
       opacity: 1;
       border-color: $clickable-color;
-      background-color: rgba(77, 255, 164, 0.15);
-      box-shadow: 0 0 10px rgba(77, 255, 164, 0.2);
+      background-color: color-mix(in srgb, var(--ce-action-accent) 15%, transparent);
+      box-shadow: 0 0 10px color-mix(in srgb, var(--ce-action-accent) 20%, transparent);
       .typeTitle {
         color: $clickable-color;
       }
@@ -1137,31 +1140,31 @@ $input-border: tokens.$ce-input-border;
     border-radius: var(--ce-radius-12);
     font-weight: 600;
     font-size: 0.6rem;
-    background: rgba(255, 255, 255, 0.1);
+    background: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
     color: var(--ce-color-white);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
   }
   .pillAgree {
-    background: rgba(76, 175, 80, 0.3);
-    color: #81c784;
-    border-color: #4caf50;
+    background: color-mix(in srgb, var(--ce-status-success) 30%, transparent);
+    color: var(--ce-status-success);
+    border-color: var(--ce-status-success);
   }
   .pillDisagree {
-    background: rgba(244, 67, 54, 0.3);
-    color: #e57373;
-    border-color: #f44336;
+    background: color-mix(in srgb, var(--ce-status-error) 30%, transparent);
+    color: var(--ce-status-error);
+    border-color: var(--ce-status-error);
   }
   .pillUnsure {
-    background: rgba(255, 235, 59, 0.2);
-    color: #fff176;
-    border-color: #fdd835;
+    background: color-mix(in srgb, var(--ce-status-warning) 20%, transparent);
+    color: var(--ce-status-warning-text);
+    border-color: var(--ce-status-warning);
   }
 
   .ratingPreviewWrap {
     display: none;
     position: relative;
     height: 8px;
-    background: rgba(255, 255, 255, 0.1);
+    background: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
     border-radius: var(--ce-radius-4);
     width: 100%;
     max-width: 120px;
@@ -1186,17 +1189,17 @@ $input-border: tokens.$ce-input-border;
     transform: translate(-50%, -50%);
     border-radius: var(--ce-radius-round);
     background: var(--ce-color-white);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 1px 3px color-mix(in srgb, var(--ce-compat-dark) 50%, transparent);
   }
 
   .freeformPreview {
     display: none;
     height: 24px;
     width: 100%;
-    border: 1px dashed rgba(255, 255, 255, 0.3);
+    border: 1px dashed color-mix(in srgb, var(--ce-text-inverse) 30%, transparent);
     border-radius: var(--ce-radius-4);
-    background: rgba(0, 0, 0, 0.2);
-    color: rgba(255, 255, 255, 0.5);
+    background: color-mix(in srgb, var(--ce-compat-dark) 20%, transparent);
+    color: color-mix(in srgb, var(--ce-text-inverse) 50%, transparent);
     align-items: center;
     justify-content: center;
     font-weight: 700;

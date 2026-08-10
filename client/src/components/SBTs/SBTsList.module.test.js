@@ -17,10 +17,10 @@ describe('SBTsList module styles', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'SBTsList.module.scss'), 'utf8');
 
     expect(scss).toMatch(
-      /\.sectionTitle\s*{[\s\S]*?font-size:\s*2rem;[\s\S]*?font-family:\s*var\(--ce-font-body\);[\s\S]*?color:\s*rgba\(255,\s*255,\s*255,\s*0\.5\);/,
+      /\.sectionTitle\s*{[\s\S]*?font-size:\s*2rem;[\s\S]*?font-family:\s*var\(--ce-font-body\);[\s\S]*?color:\s*color-mix\(in srgb,\s*var\(--ce-text-inverse\) 50%,\s*transparent\);/,
     );
     expect(scss).toMatch(
-      /\.modalViewContainer\s*{[\s\S]*?\.sectionTitle\s*{[\s\S]*?color:\s*rgba\(255,\s*255,\s*255,\s*0\.5\)\s*!important;/,
+      /\.modalViewContainer\s*{[\s\S]*?\.sectionTitle\s*{[\s\S]*?color:\s*color-mix\(in srgb,\s*var\(--ce-text-inverse\) 50%,\s*transparent\)\s*!important;/,
     );
   });
 

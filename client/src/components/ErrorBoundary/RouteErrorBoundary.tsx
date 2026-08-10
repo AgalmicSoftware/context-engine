@@ -61,23 +61,23 @@ class RouteErrorBoundary extends React.Component<RouteErrorBoundaryProps, RouteE
             style={{
               width: '100%',
               maxWidth: '900px',
-              background: 'rgba(255, 255, 255, 0.06)',
-              color: '#ffffff',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
+              background: 'var(--ce-card-bg)',
+              color: 'var(--ce-panel-text)',
+              border: '1px solid var(--ce-card-border)',
               borderRadius: '12px',
               padding: '20px',
             }}
           >
-            <h3 style={{ margin: '0 0 10px 0', color: '#ffffff' }}>This section encountered an error</h3>
-            <p style={{ margin: '0 0 16px 0', color: 'rgba(244, 247, 255, 0.85)' }}>{this.state.errorMessage}</p>
+            <h3 style={{ margin: '0 0 10px 0', color: 'var(--ce-panel-text)' }}>This section encountered an error</h3>
+            <p style={{ margin: '0 0 16px 0', color: 'var(--ce-panel-text-muted)' }}>{this.state.errorMessage}</p>
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
               <button
                 type="button"
                 onClick={this.handleTryAgain}
                 style={{
-                  background: '#4dffa4',
+                  background: 'var(--ce-action-accent)',
                   border: 'none',
-                  color: '#061016',
+                  color: 'var(--ce-action-accent-text)',
                   fontWeight: 700,
                   borderRadius: '8px',
                   padding: '8px 14px',
@@ -91,8 +91,8 @@ class RouteErrorBoundary extends React.Component<RouteErrorBoundaryProps, RouteE
                 onClick={() => window.history.back()}
                 style={{
                   background: 'transparent',
-                  border: '1px solid rgba(255, 255, 255, 0.35)',
-                  color: '#ffffff',
+                  border: '1px solid var(--ce-border-strong)',
+                  color: 'var(--ce-panel-text)',
                   borderRadius: '8px',
                   padding: '8px 14px',
                   cursor: 'pointer',
@@ -110,11 +110,11 @@ class RouteErrorBoundary extends React.Component<RouteErrorBoundaryProps, RouteE
                   alignItems: 'center',
                   padding: '8px 14px',
                   borderRadius: '8px',
-                  color: '#4dffa4',
+                  color: 'var(--ce-action-accent)',
                   fontWeight: 700,
                   textDecoration: 'none',
-                  border: '1px solid rgba(77, 255, 164, 0.35)',
-                  background: 'rgba(77, 255, 164, 0.08)',
+                  border: '1px solid color-mix(in srgb, var(--ce-action-accent) 35%, transparent)',
+                  background: 'color-mix(in srgb, var(--ce-action-accent) 8%, transparent)',
                 }}
               >
                 Report this issue on GitHub

@@ -230,6 +230,7 @@ describe('PostsPage', () => {
     expect(document.querySelector('script')).not.toBeInTheDocument();
     expect(screen.getByText('Theme distribution')).toBeInTheDocument();
     expect(screen.getByText('Legible disagreement')).toBeInTheDocument();
+    expect(screen.getByText('4')).toHaveStyle({ color: 'var(--ce-data-series-1)' });
     expect(screen.getByText('Ranked interview themes')).toBeInTheDocument();
     expect(screen.getByText('Inspectable decisions')).toBeInTheDocument();
     expect(screen.getByText('I need to know what we agreed to remember.')).toBeInTheDocument();
@@ -242,9 +243,79 @@ describe('PostsPage', () => {
     expect(screen.getByText('P2 - completed')).toBeInTheDocument();
     expect(screen.queryByText(/No completed answer:/)).not.toBeInTheDocument();
     expect(screen.queryByText(/started only/)).not.toBeInTheDocument();
+    expect(screen.getByText('Consensus and Difference')).toBeInTheDocument();
+    const binaryBeeswarmSvg = await screen.findByRole('img', { name: 'Consensus and Difference' });
+    expect(binaryBeeswarmSvg).toBeInTheDocument();
+    expect(screen.getByText('Consensus')).toBeInTheDocument();
+    expect(screen.getByText('Difference')).toBeInTheDocument();
+    expect(screen.queryByText('2-2 split')).not.toBeInTheDocument();
+    expect(screen.queryByText('3-1 split')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Dot color meaning')).not.toBeInTheDocument();
+    expect(binaryBeeswarmSvg.querySelectorAll('circle[fill="var(--ce-data-series-8)"]')).toHaveLength(5);
+    expect(binaryBeeswarmSvg.querySelector('circle[fill="#ff6bcb"]')).not.toBeInTheDocument();
+    expect(binaryBeeswarmSvg.querySelector('circle[fill="#4dffa4"]')).not.toBeInTheDocument();
+    expect(binaryBeeswarmSvg.querySelector('circle[fill="#ffd166"]')).not.toBeInTheDocument();
+    const schedulingDot = Array.from(binaryBeeswarmSvg.querySelectorAll('[aria-label]')).find((element) =>
+      element.getAttribute('aria-label')?.includes('Agents should schedule while I sleep.'),
+    ) as Element;
+    expect(schedulingDot).toBeInTheDocument();
+    expect(schedulingDot.getAttribute('aria-label')).toContain('average confidence: 87%');
+    await userEvent.hover(schedulingDot);
+    const binaryTooltip = await screen.findByRole('tooltip');
+    expect(within(binaryTooltip).getByText('Agents should schedule while I sleep.')).toBeInTheDocument();
+    expect(within(binaryTooltip).getByText('agree 3, disagree 1')).toBeInTheDocument();
+    expect(within(binaryTooltip).queryByText(/Dot color:/)).not.toBeInTheDocument();
+    expect(within(binaryTooltip).getByText('Average confidence: 87%')).toBeInTheDocument();
+    await userEvent.unhover(schedulingDot);
+    await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
     expect(screen.getByText('Other response shapes')).toBeInTheDocument();
-    expect(screen.getByText('Autonomy stance')).toBeInTheDocument();
-    expect(screen.getByText('Personal AI fire alarm')).toBeInTheDocument();
+    expect(screen.queryByText('Source layer')).not.toBeInTheDocument();
+    expect(screen.queryByText('Binary')).not.toBeInTheDocument();
+    expect(screen.queryByText('Freeform')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Metric counts', level: 4 })).not.toBeInTheDocument();
+    const metricPanel = screen.getByText('agent_autofill predictions').closest('article') as HTMLElement;
+    expect(within(metricPanel).getByText('agent_autofill predictions')).toBeInTheDocument();
+    expect(within(metricPanel).getByText('232')).toHaveStyle({ color: '#4dffa4' });
+    expect(screen.queryByLabelText('agent_autofill predictions: 232')).not.toBeInTheDocument();
+    const responseMixPanel = screen.getByText('Response mix').closest('article') as HTMLElement;
+    expect(
+      within(responseMixPanel).getByRole('img', { name: 'Response mix: binary 2, freeform 1' }),
+    ).toBeInTheDocument();
+    expect(within(responseMixPanel).getByText('3 total')).toBeInTheDocument();
+    expect(within(responseMixPanel).getByText('67%')).toBeInTheDocument();
+    expect(within(responseMixPanel).getByText('33%')).toBeInTheDocument();
+    expect(screen.queryByLabelText('binary: 2')).not.toBeInTheDocument();
+    const splitPanel = screen.getByText('Split decision').closest('article') as HTMLElement;
+    const splitBar = within(splitPanel).getByRole('img', { name: 'Split decision: agree 3, disagree 1' });
+    expect(splitBar).toBeInTheDocument();
+    const splitSegments = splitBar.querySelectorAll('span');
+    expect(splitSegments[0]).toHaveStyle({ width: '75%', backgroundColor: 'var(--ce-status-success)' });
+    expect(splitSegments[1]).toHaveStyle({ width: '25%', backgroundColor: 'var(--ce-status-danger)' });
+    expect(within(splitPanel).queryByLabelText('agree: 3')).not.toBeInTheDocument();
+    expect(screen.queryByText('Open-source AI safety')).not.toBeInTheDocument();
+    const questionTitle = screen.getByText(
+      'Open-source AI models are more likely to make the world safer than more dangerous.',
+    );
+    expect(questionTitle.tagName).toBe('H4');
+    const unsureSplitPanel = questionTitle.closest('article') as HTMLElement;
+    expect(within(unsureSplitPanel).queryByText('Open-source AI safety')).not.toBeInTheDocument();
+    expect(
+      within(unsureSplitPanel).queryByText(
+        'Open-source AI models are more likely to make the world safer than more dangerous.',
+        {
+          selector: 'p',
+        },
+      ),
+    ).not.toBeInTheDocument();
+    const unsureSplitBar = within(unsureSplitPanel).getByRole('img', {
+      name: 'Open-source AI models are more likely to make the world safer than more dangerous.: agree 3, unsure 1',
+    });
+    const unsureSplitSegments = unsureSplitBar.querySelectorAll('span');
+    expect(unsureSplitSegments[0]).toHaveStyle({ width: '75%', backgroundColor: 'var(--ce-status-success)' });
+    expect(unsureSplitSegments[1]).toHaveStyle({ width: '25%', backgroundColor: 'var(--ce-status-warning)' });
+    expect(screen.getByText('Would this participant allow scheduling?')).toBeInTheDocument();
+    expect(screen.getByLabelText('human corrections: 0').querySelector('span')).toHaveStyle({ width: '0%' });
+    expect(screen.getByText('In one sentence: what is my personal AI fire alarm?')).toBeInTheDocument();
     expect(screen.getByText('A privacy-line crossing.')).toBeInTheDocument();
     expect(screen.getByText('Respondent notes')).toBeInTheDocument();
     expect(screen.getByText('Show the structure without hiding the source.')).toBeInTheDocument();
@@ -681,7 +752,7 @@ describe('PostsPage', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'PostsPage.module.scss'), 'utf8');
 
     expect(scss).toMatch(
-      /\.tag\s*{[\s\S]*border:\s*1px solid rgba\(77, 255, 164, 0\.36\);[\s\S]*background:\s*rgba\(77, 255, 164, 0\.1\);[\s\S]*color:\s*#4dffa4;/,
+      /\.tag\s*{[\s\S]*border:\s*1px solid color-mix\(in srgb, var\(--ce-action-accent\) 36%, transparent\);[\s\S]*background:\s*color-mix\(in srgb, var\(--ce-action-accent\) 10%, transparent\);[\s\S]*color:\s*var\(--ce-action-accent\);/,
     );
     expect(scss).toMatch(
       /@media \(max-width: 820px\)\s*{[\s\S]*\.postMeta\s*{[\s\S]*flex-wrap:\s*nowrap;[\s\S]*align-items:\s*center;[\s\S]*\.tagList\s*{[\s\S]*width:\s*70%;[\s\S]*max-width:\s*70%;[\s\S]*flex:\s*0 1 70%;[\s\S]*flex-wrap:\s*nowrap;[\s\S]*overflow-x:\s*auto;[\s\S]*\.postDate\s*{[\s\S]*flex:\s*0 0 auto;[\s\S]*margin-left:\s*auto;[\s\S]*text-align:\s*right;/,

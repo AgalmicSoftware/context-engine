@@ -43,6 +43,14 @@
           ]
         },
         {
+          "label": "Check theme presentation literals",
+          "command": "npm",
+          "args": [
+            "run",
+            "theme:literals:check"
+          ]
+        },
+        {
           "label": "Lint client",
           "command": "npm",
           "args": [
@@ -276,6 +284,22 @@
           "args": [
             "run",
             "typecheck:client-tests"
+          ]
+        },
+        {
+          "label": "Check theme presentation literals",
+          "command": "npm",
+          "args": [
+            "run",
+            "theme:literals:check"
+          ]
+        },
+        {
+          "label": "Verify release version surfaces",
+          "command": "npm",
+          "args": [
+            "run",
+            "verify:release-version"
           ]
         },
         {

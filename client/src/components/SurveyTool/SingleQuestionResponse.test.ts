@@ -53,9 +53,9 @@ const nodeHasClassName = (node: TreeNode, className: string): boolean => {
 
 describe('SingleQuestionResponse style contracts', () => {
   it('builds response display classes and inline styles', () => {
-    expect(resolveSingleQuestionBookmarkIconStyle(true, false)).toEqual({ color: 'lightgreen' });
-    expect(resolveSingleQuestionBookmarkIconStyle(false, true)).toEqual({ color: '#ffc107' });
-    expect(resolveSingleQuestionBookmarkIconStyle(false, false)).toEqual({ color: 'white' });
+    expect(resolveSingleQuestionBookmarkIconStyle(true, false)).toEqual({ color: 'var(--ce-status-success-text)' });
+    expect(resolveSingleQuestionBookmarkIconStyle(false, true)).toEqual({ color: 'var(--ce-status-warning)' });
+    expect(resolveSingleQuestionBookmarkIconStyle(false, false)).toEqual({ color: 'var(--ce-panel-text)' });
     expect(buildSingleQuestionMiniPromptButtonClassName(styles)).toBe(
       `${styles.miniPromptAbbrev} ${styles.maskedPromptActionButton}`,
     );
@@ -71,10 +71,12 @@ describe('SingleQuestionResponse style contracts', () => {
     const scss = fs.readFileSync(scssPath, 'utf8');
 
     expect(scss).toMatch(/\.fullscreenQuestionContainer\s*{[\s\S]*?font-family:\s*inherit;/);
-    expect(scss).toMatch(/\.fullscreenQuestionContainer\s*{[\s\S]*?background:\s*rgba\(255,\s*255,\s*255,\s*0\.06\);/);
+    expect(scss).toMatch(
+      /\.fullscreenQuestionContainer\s*{[\s\S]*?background:\s*color-mix\(in srgb, var\(--ce-text-inverse\) 6%, transparent\);/,
+    );
     expect(scss).toMatch(/\.questionTitle\s*{[\s\S]*?font-family:\s*inherit;/);
     expect(scss).toMatch(
-      /\.encryptedResponseText\s*{[\s\S]*?display:\s*inline-flex;[\s\S]*?border-radius:\s*(?:999px|var\(--ce-radius-pill\));[\s\S]*?background:\s*rgba\(255,\s*255,\s*255,\s*0\.08\);/,
+      /\.encryptedResponseText\s*{[\s\S]*?display:\s*inline-flex;[\s\S]*?border-radius:\s*var\(--ce-radius-pill\);[\s\S]*?background:\s*color-mix\(in srgb, var\(--ce-text-inverse\) 8%, transparent\);/,
     );
     expect(scss).not.toMatch(/\.freeformAnswer\s*{[\s\S]*?font-family:\s*var\(--ce-font-mono\);/);
     expect(scss).not.toMatch(/\.encryptedResponseText\s*{[\s\S]*?font-family:\s*var\(--ce-font-mono\);/);

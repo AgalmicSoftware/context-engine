@@ -3,22 +3,24 @@
 /* Container for the question card in "fullscreen" mode */
 .fullscreenQuestionContainer {
   margin-bottom: 20px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: var(--ce-radius-16); // box-shadow: -7px 7px 14px #171a3d, 7px -7px 14px var(--ce-color-surface-alt);
-  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.25) !important;
+  background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
+  border-radius: var(
+    --ce-radius-16
+  ); // box-shadow: -7px 7px 14px var(--ce-surface-sunken), 7px -7px 14px var(--ce-color-surface-alt);
+  box-shadow: 0 6px 22px color-mix(in srgb, var(--ce-compat-dark) 25%, transparent) !important;
   font-family: inherit;
 }
 
 /* Container for the question card in "mini" mode */
 .miniQuestionContainer {
   margin-bottom: 10px;
-  background: #24264d;
+  background: var(--ce-surface-alt);
   /* Slightly darker to differentiate mini from fullscreen */
   border-radius: var(--ce-radius-6);
   /* Matched 3D shadow effect */
   box-shadow:
-    -3px 3px 6px #171a3d,
+    -3px 3px 6px var(--ce-surface-sunken),
     3px -3px 6px var(--ce-color-surface-alt);
   padding: 10px;
   /* Reserve space and anchor for bottom caret */
@@ -112,14 +114,14 @@
 
   &:hover:not(:disabled),
   &:focus:not(:disabled) {
-    background: rgba(77, 255, 164, 0.15) !important;
+    background: color-mix(in srgb, var(--ce-action-accent) 15%, transparent) !important;
     border-color: var(--ce-color-accent) !important;
     color: var(--ce-color-accent) !important;
-    box-shadow: 0 8px 18px rgba(77, 255, 164, 0.22);
+    box-shadow: 0 8px 18px color-mix(in srgb, var(--ce-action-accent) 22%, transparent);
   }
 
   &:focus {
-    outline: 2px solid rgba(77, 255, 164, 0.28);
+    outline: 2px solid color-mix(in srgb, var(--ce-action-accent) 28%, transparent);
     outline-offset: 2px;
   }
 
@@ -165,7 +167,7 @@
 .additionalCommentsLabel {
   font-weight: 700;
   margin-bottom: 8px;
-  color: rgba(255, 255, 255, 0.72);
+  color: color-mix(in srgb, var(--ce-text-inverse) 72%, transparent);
   font-size: 0.9rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -175,8 +177,8 @@
   color: var(--ce-color-white) !important;
   opacity: 0.96;
   line-height: 1.7;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
   border-radius: var(--ce-radius-12);
   padding: 16px 18px;
   font-size: 1.08rem;
@@ -208,8 +210,8 @@
 
 /* freeform answer style */
 .freeformAnswer {
-  background-color: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background-color: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
   border-radius: var(--ce-radius-12);
   padding: 18px 20px;
   color: var(--ce-color-white);
@@ -270,7 +272,7 @@
     justify-content: center;
     margin: 0 0.5rem;
     font-size: 1rem;
-    color: #ddd;
+    color: var(--ce-border-light);
     cursor: pointer;
     padding: 0.5rem 1rem;
     border-radius: var(--ce-radius-4);
@@ -289,7 +291,7 @@
     }
 
     &.agree {
-      background-color: #4caf50;
+      background-color: var(--ce-status-success);
       color: var(--ce-color-white);
       &:before {
         font-weight: 900;
@@ -298,12 +300,12 @@
     }
 
     &.unsure {
-      background-color: #ffeb3b;
+      background-color: var(--ce-status-warning);
       color: var(--ce-color-border);
     }
 
     &.disagree {
-      background-color: #f44336;
+      background-color: var(--ce-status-error);
       color: var(--ce-color-white);
       &:before {
         font-weight: 900;
@@ -352,7 +354,7 @@
 .miniPromptAbbrev {
   font-weight: 600;
   font-size: 1em;
-  color: #ddd;
+  color: var(--ce-border-light);
   opacity: 0.9;
 }
 
@@ -379,12 +381,12 @@
   align-items: center;
   justify-content: center;
   &:hover {
-    color: #ffe680;
+    color: var(--ce-status-warning-text);
   }
 }
 
 .miniAnswer {
-  background-color: rgba(255, 255, 255, 0.15);
+  background-color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
   padding: 8px;
   border-radius: var(--ce-radius-4);
   color: var(--ce-color-white);
@@ -405,20 +407,20 @@
   font-weight: bold;
   font-size: 0.9em;
   cursor: default;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 2px 4px color-mix(in srgb, var(--ce-compat-dark) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
   &.agree {
-    background-color: #4caf50;
+    background-color: var(--ce-status-success);
     color: var(--ce-color-white);
   }
 
   &.unsure {
-    background-color: #ffeb3b;
+    background-color: var(--ce-status-warning);
     color: var(--ce-color-border);
   }
 
   &.disagree {
-    background-color: #f44336;
+    background-color: var(--ce-status-error);
     color: var(--ce-color-white);
   }
 
@@ -431,7 +433,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  background-color: rgba(0, 0, 0, 0.3);
+  background-color: color-mix(in srgb, var(--ce-compat-dark) 30%, transparent);
   border-radius: var(--ce-radius-5);
   padding: 8px 12px;
   width: min(100%, 260px);
@@ -444,7 +446,7 @@
   flex: 1 1 auto;
   min-width: 0;
   height: 10px;
-  background-color: rgba(255, 255, 255, 0.14);
+  background-color: color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
   border-radius: var(--ce-radius-5);
   overflow: hidden;
 }
@@ -469,8 +471,8 @@
   flex-wrap: wrap;
   gap: 8px;
   .choiceItem {
-    background-color: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    background-color: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
     color: var(--ce-color-white);
     padding: 6px 12px;
     border-radius: var(--ce-radius-16);
@@ -580,10 +582,10 @@
   max-width: 100%;
   padding: 0.65rem 1rem;
   border-radius: var(--ce-radius-pill);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
-  color: rgba(255, 255, 255, 0.94) !important;
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
+  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--ce-compat-dark) 16%, transparent);
+  color: color-mix(in srgb, var(--ce-text-inverse) 94%, transparent) !important;
   font-size: 1.08rem;
   font-weight: 600;
   line-height: 1.6;
@@ -653,7 +655,7 @@
 .clickThrough {
   cursor: pointer;
   &:focus {
-    outline: 2px solid rgba(126, 138, 224, 0.7);
+    outline: 2px solid color-mix(in srgb, var(--ce-compat-indigo) 70%, transparent);
     outline-offset: 2px;
   }
 }
@@ -720,7 +722,7 @@
 }
 
 .affordanceBlock {
-  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border: 1px dashed color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
   border-radius: var(--ce-radius-8);
   padding: 8px;
 }
@@ -760,7 +762,7 @@
   padding: 4px;
   line-height: 1;
   &:focus {
-    outline: 2px solid rgba(126, 138, 224, 0.7);
+    outline: 2px solid color-mix(in srgb, var(--ce-compat-indigo) 70%, transparent);
     outline-offset: 2px;
   }
 }

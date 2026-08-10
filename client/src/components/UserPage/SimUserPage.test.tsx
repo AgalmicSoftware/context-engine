@@ -170,8 +170,8 @@ describe('SimUserPage', () => {
     const scss = fs.readFileSync(scssPath, 'utf8');
 
     expect(scss).toMatch(/@extend \.userPage;/);
-    expect(scss).toMatch(/\$accent:\s*(#4dffa4|tokens\.\$ce-clickable);/);
-    expect(scss).toMatch(/\$panel-bg:\s*(rgba\(255,\s*255,\s*255,\s*0\.06\)|tokens\.\$ce-card-bg);/);
+    expect(scss).toMatch(/\$accent:\s*var\(--ce-action-accent\);/);
+    expect(scss).toMatch(/\$panel-bg:\s*var\(--ce-card-bg\);/);
     expect(scss).not.toMatch(/\.questionTypeBadge\s*{/);
     expect(scss).toMatch(/\.highlightedText\s*{[^}]*color:\s*\$body-text;/);
     expect(scss).not.toMatch(/\.highlightedText\s*{[^}]*color:\s*var\(--ce-color-accent\);/);

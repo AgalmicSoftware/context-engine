@@ -1,15 +1,14 @@
 /* @file SessionWizard.module.scss */
 @use 'assets/css/contextEngine.scss' as *;
-@use 'scss/variables' as tokens;
 
-$user-page-text-color: tokens.$ce-panel-text;
-$card-bg: tokens.$ce-card-bg;
-$card-border: tokens.$ce-card-border;
-$card-shadow: tokens.$ce-card-shadow;
-$clickable-color: tokens.$ce-clickable;
-$input-bg: rgba(8, 12, 26, 0.7);
-$input-border: tokens.$ce-input-border-strong;
-$muted-text: tokens.$ce-muted-text;
+$user-page-text-color: var(--ce-panel-text);
+$card-bg: var(--ce-card-bg);
+$card-border: var(--ce-card-border);
+$card-shadow: var(--ce-card-shadow);
+$clickable-color: var(--ce-action-accent);
+$input-bg: var(--ce-input-bg);
+$input-border: var(--ce-input-border-strong);
+$muted-text: var(--ce-panel-text-muted);
 
 .groupWizard {
   padding: 24px;
@@ -27,27 +26,27 @@ $muted-text: tokens.$ce-muted-text;
   }
 
   select {
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
     border-radius: var(--ce-radius-8);
     color: inherit;
     box-shadow: none;
 
     &:focus {
       border-color: $clickable-color;
-      box-shadow: 0 0 0 2px rgba(77, 255, 164, 0.2);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--ce-action-accent) 20%, transparent);
       outline: none;
     }
   }
 
   select option,
   select optgroup {
-    background: #f7f8fb;
-    color: #151927;
+    background: var(--ce-status-info-text);
+    color: var(--ce-overlay-base);
   }
 
   select option:disabled {
-    color: #687080;
+    color: var(--ce-document-text-muted);
   }
 
   input:disabled,
@@ -59,7 +58,7 @@ $muted-text: tokens.$ce-muted-text;
   .form-control:disabled,
   .form-control[readonly],
   .form-control:read-only {
-    background: rgba(8, 12, 26, 0.85);
+    background: color-mix(in srgb, var(--ce-overlay-base) 85%, transparent);
     border-color: $input-border;
     color: $user-page-text-color;
     opacity: 1;
@@ -68,7 +67,7 @@ $muted-text: tokens.$ce-muted-text;
 
   input::placeholder,
   textarea::placeholder {
-    color: rgba(244, 247, 255, 0.45);
+    color: color-mix(in srgb, var(--ce-control-text) 45%, transparent);
   }
 
   input[type='checkbox'],
@@ -78,7 +77,7 @@ $muted-text: tokens.$ce-muted-text;
 }
 
 .readonlyInput {
-  background: rgba(8, 12, 26, 0.85);
+  background: color-mix(in srgb, var(--ce-overlay-base) 85%, transparent);
   color: var(--ce-color-white);
 }
 
@@ -150,7 +149,7 @@ $muted-text: tokens.$ce-muted-text;
 .headerChainLabel {
   font-size: 14px;
   white-space: nowrap;
-  color: rgba(244, 247, 255, 0.65);
+  color: color-mix(in srgb, var(--ce-control-text) 65%, transparent);
 }
 
 .headerChainInput {
@@ -170,16 +169,16 @@ $muted-text: tokens.$ce-muted-text;
   display: flex;
   align-items: flex-end;
   text-align: left;
-  border-radius: 14px;
+  border-radius: var(--ce-radius-14);
   border: 1px solid $card-border;
-  background: #24264d;
+  background: var(--ce-surface-alt);
   color: $user-page-text-color;
   padding: 16px;
   min-height: 116px;
   overflow: hidden;
   box-shadow:
-    -3px 3px 6px #171a3d,
-    3px -3px 6px rgba(255, 255, 255, 0.04);
+    -3px 3px 6px var(--ce-surface-sunken),
+    3px -3px 6px color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
   cursor: pointer;
   transition:
     border-color 0.2s ease,
@@ -187,8 +186,8 @@ $muted-text: tokens.$ce-muted-text;
     transform 0.12s ease;
 
   &:hover {
-    border-color: rgba(255, 255, 255, 0.24);
-    background: #292c58;
+    border-color: color-mix(in srgb, var(--ce-text-inverse) 24%, transparent);
+    background: var(--ce-status-info);
     transform: translateY(-1px);
   }
 }
@@ -200,7 +199,7 @@ $muted-text: tokens.$ce-muted-text;
   font-size: 3.5rem;
   line-height: 1;
   font-weight: 800;
-  color: rgba(255, 255, 255, 0.1);
+  color: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
   pointer-events: none;
 }
 
@@ -222,35 +221,35 @@ $muted-text: tokens.$ce-muted-text;
 .normalModeCardSummary {
   font-size: 0.82rem;
   line-height: 1.4;
-  color: rgba(244, 247, 255, 0.72);
+  color: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
 }
 
 .normalModeCardReady {
-  border-color: rgba(255, 255, 255, 0.18);
+  border-color: color-mix(in srgb, var(--ce-text-inverse) 18%, transparent);
 }
 
 .normalModeCardPending {
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
 }
 
 .normalModeCardNeutral {
-  border-color: rgba(255, 255, 255, 0.14);
+  border-color: color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
 }
 
 .normalModeCardActive {
-  border-color: rgba(77, 255, 164, 0.4);
-  background: rgba(77, 255, 164, 0.08);
-  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.25);
+  border-color: color-mix(in srgb, var(--ce-action-accent) 40%, transparent);
+  background: color-mix(in srgb, var(--ce-action-accent) 8%, transparent);
+  box-shadow: 0 6px 22px color-mix(in srgb, var(--ce-compat-dark) 25%, transparent);
 
   .normalModeCardNumber {
-    color: rgba(77, 255, 164, 0.22);
+    color: color-mix(in srgb, var(--ce-action-accent) 22%, transparent);
   }
 }
 
 .panel {
   background: $card-bg;
   border: 1px solid $card-border;
-  border-radius: 16px;
+  border-radius: var(--ce-radius-16);
   padding: 20px;
   margin-bottom: 18px;
   box-shadow: $card-shadow;
@@ -292,7 +291,7 @@ $muted-text: tokens.$ce-muted-text;
   align-items: center;
   gap: 4px;
   font-family: var(--ce-font-mono);
-  color: rgba(244, 247, 255, 0.65);
+  color: color-mix(in srgb, var(--ce-control-text) 65%, transparent);
   transition: opacity 0.2s ease;
   &:hover {
     opacity: 0.6;
@@ -360,7 +359,7 @@ $muted-text: tokens.$ce-muted-text;
 .gateCard {
   background: $card-bg;
   border: 1px solid $card-border;
-  border-radius: 14px;
+  border-radius: var(--ce-radius-14);
   padding: 14px;
   box-shadow: $card-shadow;
   transition:
@@ -368,7 +367,7 @@ $muted-text: tokens.$ce-muted-text;
     background 0.2s ease;
 
   &:hover {
-    border-color: rgba(255, 255, 255, 0.3);
+    border-color: color-mix(in srgb, var(--ce-text-inverse) 30%, transparent);
   }
 }
 
@@ -451,12 +450,12 @@ $muted-text: tokens.$ce-muted-text;
   display: grid;
   gap: 12px;
   padding: 10px 12px;
-  background: #24264d;
+  background: var(--ce-surface-alt);
   border: 1px solid $card-border;
   border-radius: var(--ce-radius-12);
   box-shadow:
-    -3px 3px 6px #171a3d,
-    3px -3px 6px rgba(255, 255, 255, 0.04);
+    -3px 3px 6px var(--ce-surface-sunken),
+    3px -3px 6px color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
   flex-wrap: wrap;
 
   .helperText {
@@ -480,7 +479,7 @@ $muted-text: tokens.$ce-muted-text;
 
 .compactSessionHeaderIcon {
   font-size: 1rem;
-  color: rgba(244, 247, 255, 0.82);
+  color: color-mix(in srgb, var(--ce-control-text) 82%, transparent);
 }
 
 .compactSessionHeaderLabel {
@@ -498,9 +497,9 @@ $muted-text: tokens.$ce-muted-text;
 }
 
 .compactSessionHeaderModeButton {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.03);
-  color: rgba(244, 247, 255, 0.78);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
+  background: color-mix(in srgb, var(--ce-text-inverse) 3%, transparent);
+  color: color-mix(in srgb, var(--ce-control-text) 78%, transparent);
   border-radius: var(--ce-radius-pill);
   padding: 5px 10px;
   font-size: 11px;
@@ -512,15 +511,15 @@ $muted-text: tokens.$ce-muted-text;
     color 0.2s ease;
 
   &:hover {
-    border-color: rgba(255, 255, 255, 0.24);
+    border-color: color-mix(in srgb, var(--ce-text-inverse) 24%, transparent);
     color: $user-page-text-color;
   }
 }
 
 .compactSessionHeaderUploadButton {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.03);
-  color: rgba(244, 247, 255, 0.78);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
+  background: color-mix(in srgb, var(--ce-text-inverse) 3%, transparent);
+  color: color-mix(in srgb, var(--ce-control-text) 78%, transparent);
   border-radius: var(--ce-radius-pill);
   padding: 5px 9px;
   font-size: 11px;
@@ -531,14 +530,14 @@ $muted-text: tokens.$ce-muted-text;
     color 0.2s ease;
 
   &:hover {
-    border-color: rgba(255, 255, 255, 0.24);
+    border-color: color-mix(in srgb, var(--ce-text-inverse) 24%, transparent);
     color: $user-page-text-color;
   }
 }
 
 .compactSessionHeaderModeButtonActive {
-  border-color: rgba(77, 255, 164, 0.35);
-  background: rgba(77, 255, 164, 0.12);
+  border-color: color-mix(in srgb, var(--ce-action-accent) 35%, transparent);
+  background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
   color: $user-page-text-color;
 }
 
@@ -565,10 +564,16 @@ $muted-text: tokens.$ce-muted-text;
   aspect-ratio: 16 / 9;
   min-height: 208px;
   border-radius: var(--ce-radius-14);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: linear-gradient(180deg, rgba(20, 24, 51, 0.94), rgba(10, 13, 33, 0.92)), rgba(255, 255, 255, 0.03);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--ce-overlay-surface) 94%, transparent),
+      color-mix(in srgb, var(--ce-overlay-base) 92%, transparent)
+    ),
+    color-mix(in srgb, var(--ce-text-inverse) 3%, transparent);
   overflow: hidden;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
 }
 
 .sessionHeaderPreviewSurfaceCompact {
@@ -595,15 +600,15 @@ $muted-text: tokens.$ce-muted-text;
   }
 
   &:hover {
-    border-color: rgba(77, 255, 164, 0.4);
+    border-color: color-mix(in srgb, var(--ce-action-accent) 40%, transparent);
     box-shadow:
-      0 16px 32px rgba(0, 0, 0, 0.28),
-      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      0 16px 32px color-mix(in srgb, var(--ce-compat-dark) 28%, transparent),
+      inset 0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
     transform: translateY(-1px);
   }
 
   &:focus-visible {
-    outline: 2px solid rgba(77, 255, 164, 0.9);
+    outline: 2px solid color-mix(in srgb, var(--ce-action-accent) 90%, transparent);
     outline-offset: 2px;
   }
 }
@@ -615,7 +620,11 @@ $muted-text: tokens.$ce-muted-text;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: linear-gradient(180deg, rgba(7, 10, 27, 0.1), rgba(7, 10, 27, 0.62));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ce-overlay-base) 10%, transparent),
+    color-mix(in srgb, var(--ce-overlay-base) 62%, transparent)
+  );
   color: var(--ce-color-white);
   font-size: 0.85rem;
   font-weight: 700;
@@ -637,9 +646,9 @@ $muted-text: tokens.$ce-muted-text;
   z-index: 2;
   width: 34px;
   height: 34px;
-  border: 1px solid rgba(255, 255, 255, 0.24);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 24%, transparent);
   border-radius: var(--ce-radius-pill);
-  background: rgba(7, 10, 27, 0.72);
+  background: color-mix(in srgb, var(--ce-overlay-base) 72%, transparent);
   color: var(--ce-color-white);
   display: inline-flex;
   align-items: center;
@@ -651,13 +660,13 @@ $muted-text: tokens.$ce-muted-text;
     transform 0.16s ease;
 
   &:hover {
-    background: rgba(30, 36, 76, 0.92);
-    border-color: rgba(77, 255, 164, 0.42);
+    background: color-mix(in srgb, var(--ce-overlay-surface-alt) 92%, transparent);
+    border-color: color-mix(in srgb, var(--ce-action-accent) 42%, transparent);
     transform: translateY(-1px);
   }
 
   &:focus-visible {
-    outline: 2px solid rgba(77, 255, 164, 0.9);
+    outline: 2px solid color-mix(in srgb, var(--ce-action-accent) 90%, transparent);
     outline-offset: 2px;
   }
 }
@@ -677,7 +686,7 @@ $muted-text: tokens.$ce-muted-text;
 
 .generatedSlugValue {
   font-size: 13px;
-  color: rgba(244, 247, 255, 0.88);
+  color: color-mix(in srgb, var(--ce-control-text) 88%, transparent);
 }
 
 .fieldHeader {
@@ -744,8 +753,12 @@ $muted-text: tokens.$ce-muted-text;
   min-height: 46px;
   padding: 11px 20px;
   border-radius: var(--ce-radius-pill);
-  border: 1px solid rgba(77, 255, 164, 0.42);
-  background: linear-gradient(135deg, rgba(77, 255, 164, 0.22), rgba(91, 140, 255, 0.24));
+  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 42%, transparent);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--ce-action-accent) 22%, transparent),
+    color-mix(in srgb, var(--ce-data-series-1) 24%, transparent)
+  );
   color: var(--ce-color-white);
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -757,7 +770,7 @@ $muted-text: tokens.$ce-muted-text;
   justify-content: center;
   gap: 8px;
   white-space: nowrap;
-  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--ce-compat-dark) 20%, transparent);
   transition:
     transform 0.16s ease,
     border-color 0.2s ease,
@@ -768,9 +781,13 @@ $muted-text: tokens.$ce-muted-text;
   &:hover {
     text-decoration: none;
     color: var(--ce-color-white);
-    border-color: rgba(77, 255, 164, 0.62);
-    background: linear-gradient(135deg, rgba(77, 255, 164, 0.3), rgba(91, 140, 255, 0.32));
-    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.24);
+    border-color: color-mix(in srgb, var(--ce-action-accent) 62%, transparent);
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--ce-action-accent) 30%, transparent),
+      color-mix(in srgb, var(--ce-data-series-1) 32%, transparent)
+    );
+    box-shadow: 0 14px 28px color-mix(in srgb, var(--ce-compat-dark) 24%, transparent);
     transform: translateY(-1px);
   }
 
@@ -780,9 +797,13 @@ $muted-text: tokens.$ce-muted-text;
   &:active:focus {
     text-decoration: none;
     color: var(--ce-color-white);
-    border-color: rgba(77, 255, 164, 0.68);
-    background: linear-gradient(135deg, rgba(77, 255, 164, 0.28), rgba(91, 140, 255, 0.3));
-    box-shadow: 0 0 0 3px rgba(77, 255, 164, 0.18);
+    border-color: color-mix(in srgb, var(--ce-action-accent) 68%, transparent);
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--ce-action-accent) 28%, transparent),
+      color-mix(in srgb, var(--ce-data-series-1) 30%, transparent)
+    );
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ce-action-accent) 18%, transparent);
     outline: none;
   }
 }
@@ -830,8 +851,8 @@ $muted-text: tokens.$ce-muted-text;
   gap: 12px;
   padding: 12px 14px;
   border-radius: var(--ce-radius-12);
-  border: 1px solid rgba(91, 140, 255, 0.28);
-  background: rgba(91, 140, 255, 0.08);
+  border: 1px solid color-mix(in srgb, var(--ce-data-series-1) 28%, transparent);
+  background: color-mix(in srgb, var(--ce-data-series-1) 8%, transparent);
 }
 
 .pendingSbtContent {
@@ -847,21 +868,25 @@ $muted-text: tokens.$ce-muted-text;
 
 .pendingSbtStatus {
   font-size: 12px;
-  color: rgba(244, 247, 255, 0.68);
+  color: color-mix(in srgb, var(--ce-control-text) 68%, transparent);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
 .createSbtModal :global(.modal-content) {
   background:
-    radial-gradient(circle at top right, rgba(77, 255, 164, 0.08), transparent 32%),
-    linear-gradient(180deg, rgba(15, 24, 46, 0.98), rgba(10, 14, 29, 0.98));
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 24px;
+    radial-gradient(circle at top right, color-mix(in srgb, var(--ce-action-accent) 8%, transparent), transparent 32%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--ce-overlay-base) 98%, transparent),
+      color-mix(in srgb, var(--ce-overlay-base) 98%, transparent)
+    );
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
+  border-radius: var(--ce-radius-24);
   color: $user-page-text-color;
   box-shadow:
-    0 28px 60px rgba(0, 0, 0, 0.46),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    0 28px 60px color-mix(in srgb, var(--ce-compat-dark) 46%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
   overflow: hidden;
   max-height: calc(100vh - 40px);
   display: flex;
@@ -907,9 +932,9 @@ $muted-text: tokens.$ce-muted-text;
     width: 40px;
     height: 40px;
     border-radius: var(--ce-radius-pill);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    background: rgba(255, 255, 255, 0.05);
-    color: rgba(244, 247, 255, 0.88);
+    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
+    background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
+    color: color-mix(in srgb, var(--ce-control-text) 88%, transparent);
     opacity: 1;
     box-shadow: none;
     text-shadow: none;
@@ -925,8 +950,8 @@ $muted-text: tokens.$ce-muted-text;
 
     &:hover,
     &:focus {
-      background: rgba(77, 255, 164, 0.12);
-      border-color: rgba(77, 255, 164, 0.45);
+      background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
+      border-color: color-mix(in srgb, var(--ce-action-accent) 45%, transparent);
       color: $user-page-text-color;
       transform: translateY(-1px);
       outline: none;
@@ -955,7 +980,7 @@ $muted-text: tokens.$ce-muted-text;
 
   .createSbtModal :global(.modal-content) {
     max-height: calc(100vh - 16px);
-    border-radius: 18px;
+    border-radius: var(--ce-radius-18);
   }
 
   .createSbtModalHeader {
@@ -984,15 +1009,15 @@ $muted-text: tokens.$ce-muted-text;
   text-transform: uppercase;
   padding: 2px 6px;
   border-radius: var(--ce-radius-pill);
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 25%, transparent);
   color: $muted-text;
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
 }
 
 .lockButton {
   border: 0;
   background: transparent;
-  color: rgba(255, 255, 255, 0.6);
+  color: color-mix(in srgb, var(--ce-text-inverse) 60%, transparent);
   font-size: 14px;
   cursor: pointer;
 
@@ -1002,7 +1027,7 @@ $muted-text: tokens.$ce-muted-text;
 }
 
 .locked {
-  color: #5affc2;
+  color: var(--ce-status-success-text);
 }
 
 .objectGroup {
@@ -1010,7 +1035,7 @@ $muted-text: tokens.$ce-muted-text;
   border-radius: var(--ce-radius-12);
   padding: 14px;
   margin-bottom: 12px;
-  background: rgba(0, 0, 0, 0.18);
+  background: color-mix(in srgb, var(--ce-compat-dark) 18%, transparent);
 }
 
 .objectHeader {
@@ -1031,7 +1056,7 @@ $muted-text: tokens.$ce-muted-text;
 .objectTitle {
   font-size: 14px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--ce-panel-text);
 }
 
 .editableControls {
@@ -1155,8 +1180,8 @@ $muted-text: tokens.$ce-muted-text;
 .moreOptionsToggle {
   align-self: flex-start;
   border-radius: var(--ce-radius-8);
-  border: 1px solid rgba(77, 255, 164, 0.3);
-  background: rgba(77, 255, 164, 0.08);
+  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 30%, transparent);
+  background: color-mix(in srgb, var(--ce-action-accent) 8%, transparent);
   color: $user-page-text-color;
   padding: 6px 12px;
   font-weight: 600;
@@ -1166,8 +1191,8 @@ $muted-text: tokens.$ce-muted-text;
     background 0.2s ease;
 
   &:hover {
-    border-color: rgba(77, 255, 164, 0.55);
-    background: rgba(77, 255, 164, 0.16);
+    border-color: color-mix(in srgb, var(--ce-action-accent) 55%, transparent);
+    background: color-mix(in srgb, var(--ce-action-accent) 16%, transparent);
   }
 }
 
@@ -1177,7 +1202,7 @@ $muted-text: tokens.$ce-muted-text;
   padding: 10px 12px;
   border: 1px solid $card-border;
   border-radius: var(--ce-radius-12);
-  background: rgba(0, 0, 0, 0.18);
+  background: color-mix(in srgb, var(--ce-compat-dark) 18%, transparent);
 }
 
 .contractsGrid {
@@ -1215,14 +1240,14 @@ $muted-text: tokens.$ce-muted-text;
 .contractActionButton {
   width: 38px;
   height: 38px;
-  border-color: rgba(77, 255, 164, 0.24);
-  background: rgba(77, 255, 164, 0.08);
+  border-color: color-mix(in srgb, var(--ce-action-accent) 24%, transparent);
+  background: color-mix(in srgb, var(--ce-action-accent) 8%, transparent);
   color: $clickable-color;
 }
 
 .contractActionButton:hover {
-  border-color: rgba(77, 255, 164, 0.4);
-  background: rgba(77, 255, 164, 0.15);
+  border-color: color-mix(in srgb, var(--ce-action-accent) 40%, transparent);
+  background: color-mix(in srgb, var(--ce-action-accent) 15%, transparent);
 }
 
 .contractViewerModal :global(.modal-dialog) {
@@ -1232,13 +1257,17 @@ $muted-text: tokens.$ce-muted-text;
 
 .contractViewerModalContent {
   background:
-    radial-gradient(circle at top right, rgba(77, 255, 164, 0.08), transparent 30%),
-    linear-gradient(180deg, rgba(15, 24, 46, 0.98), rgba(10, 14, 29, 0.98));
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 24px;
+    radial-gradient(circle at top right, color-mix(in srgb, var(--ce-action-accent) 8%, transparent), transparent 30%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--ce-overlay-base) 98%, transparent),
+      color-mix(in srgb, var(--ce-overlay-base) 98%, transparent)
+    );
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
+  border-radius: var(--ce-radius-24);
   box-shadow:
-    0 28px 60px rgba(0, 0, 0, 0.46),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    0 28px 60px color-mix(in srgb, var(--ce-compat-dark) 46%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
   overflow: scroll;
   min-height: min(720px, calc(100vh - 56px));
   max-height: calc(100vh - 40px);
@@ -1259,8 +1288,8 @@ $muted-text: tokens.$ce-muted-text;
   min-height: 38px;
   padding: 6px 12px;
   border-radius: var(--ce-radius-8);
-  border: 1px solid rgba(77, 255, 164, 0.3);
-  background: rgba(77, 255, 164, 0.12);
+  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 30%, transparent);
+  background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
   color: $user-page-text-color;
   text-decoration: none;
   font-size: 0.86rem;
@@ -1269,8 +1298,8 @@ $muted-text: tokens.$ce-muted-text;
 
 .contractViewerFullPageLink:hover {
   text-decoration: none;
-  border-color: rgba(77, 255, 164, 0.45);
-  background: rgba(77, 255, 164, 0.18);
+  border-color: color-mix(in srgb, var(--ce-action-accent) 45%, transparent);
+  background: color-mix(in srgb, var(--ce-action-accent) 18%, transparent);
 }
 
 @media (max-width: 720px) {
@@ -1338,7 +1367,7 @@ $muted-text: tokens.$ce-muted-text;
     width: 100%;
     min-height: calc(100vh - 8px);
     max-height: calc(100vh - 8px);
-    border-radius: 22px 22px 0 0;
+    border-radius: var(--ce-radius-22) var(--ce-radius-22) var(--ce-radius-0) var(--ce-radius-0);
   }
 
   .contractViewerModalBody {
@@ -1407,7 +1436,7 @@ $muted-text: tokens.$ce-muted-text;
   font-size: 16px;
   font-weight: 600;
   letter-spacing: 0.02em;
-  color: rgba(255, 255, 255, 0.92);
+  color: color-mix(in srgb, var(--ce-text-inverse) 92%, transparent);
 }
 
 .contractInput {
@@ -1431,7 +1460,7 @@ $muted-text: tokens.$ce-muted-text;
 }
 
 .errorText {
-  color: #ff8a8a;
+  color: var(--ce-status-danger-text);
   font-size: 12px;
   margin-top: 6px;
 }
@@ -1451,14 +1480,14 @@ $muted-text: tokens.$ce-muted-text;
   padding: 10px;
   border: 1px solid $card-border;
   border-radius: var(--ce-radius-10);
-  background: rgba(0, 0, 0, 0.25);
+  background: color-mix(in srgb, var(--ce-compat-dark) 25%, transparent);
 }
 
 .promptPreviewText {
   margin: 0;
   white-space: pre-wrap;
   font-size: 12px;
-  color: rgba(244, 247, 255, 0.85);
+  color: color-mix(in srgb, var(--ce-control-text) 85%, transparent);
 }
 
 .sessionHeaderPreviewModalContent {
@@ -1479,7 +1508,7 @@ $muted-text: tokens.$ce-muted-text;
     max-width: 100%;
     max-height: 90vh;
     border-radius: var(--ce-radius-10);
-    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+    box-shadow: 0 18px 40px color-mix(in srgb, var(--ce-compat-dark) 45%, transparent);
   }
 }
 
@@ -1514,13 +1543,13 @@ $muted-text: tokens.$ce-muted-text;
   letter-spacing: 0.01em;
   padding: 4px 8px;
   border-radius: var(--ce-radius-pill);
-  border: 1px solid rgba(91, 140, 255, 0.4);
-  background: rgba(91, 140, 255, 0.12);
-  color: rgba(203, 221, 255, 0.95);
+  border: 1px solid color-mix(in srgb, var(--ce-data-series-1) 40%, transparent);
+  background: color-mix(in srgb, var(--ce-data-series-1) 12%, transparent);
+  color: color-mix(in srgb, var(--ce-status-info-text) 95%, transparent);
 }
 
 .secondaryButton {
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
   border: 1px solid $card-border;
   color: $user-page-text-color;
   font-weight: 600;
@@ -1537,8 +1566,8 @@ $muted-text: tokens.$ce-muted-text;
   }
 
   &:hover {
-    border-color: rgba(255, 255, 255, 0.35);
-    background: rgba(255, 255, 255, 0.12);
+    border-color: color-mix(in srgb, var(--ce-text-inverse) 35%, transparent);
+    background: color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
     transform: translateY(-1px);
   }
 
@@ -1546,9 +1575,9 @@ $muted-text: tokens.$ce-muted-text;
   &.btn:disabled,
   &.btn-secondary:disabled,
   &.btn.btn-secondary:disabled {
-    color: rgba(244, 247, 255, 0.55);
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.12);
+    color: color-mix(in srgb, var(--ce-control-text) 55%, transparent);
+    background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
+    border-color: color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
     transform: none;
   }
 
@@ -1594,8 +1623,8 @@ $muted-text: tokens.$ce-muted-text;
 }
 
 .workerModePill {
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
+  background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
   color: $user-page-text-color;
   border-radius: var(--ce-radius-pill);
   padding: 8px 12px;
@@ -1607,25 +1636,25 @@ $muted-text: tokens.$ce-muted-text;
     background 0.2s ease;
 
   &:hover {
-    border-color: rgba(255, 255, 255, 0.28);
-    background: rgba(255, 255, 255, 0.08);
+    border-color: color-mix(in srgb, var(--ce-text-inverse) 28%, transparent);
+    background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
   }
 }
 
 .workerModePillActive {
-  border-color: rgba(77, 255, 164, 0.62) !important;
-  background: rgba(77, 255, 164, 0.16) !important;
-  color: #ffffff !important;
-  box-shadow: inset 0 0 0 1px rgba(77, 255, 164, 0.12);
+  border-color: color-mix(in srgb, var(--ce-action-accent) 62%, transparent) !important;
+  background: color-mix(in srgb, var(--ce-action-accent) 16%, transparent) !important;
+  color: var(--ce-text-inverse) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
 }
 
 .workerModePill:disabled,
 .workerModePill.btn:disabled,
 .workerModePill.btn-secondary:disabled,
 .workerModePill.disabled {
-  border-color: rgba(244, 247, 255, 0.24) !important;
-  background: rgba(244, 247, 255, 0.055) !important;
-  color: rgba(244, 247, 255, 0.72) !important;
+  border-color: color-mix(in srgb, var(--ce-control-text) 24%, transparent) !important;
+  background: color-mix(in srgb, var(--ce-control-text) 5.5%, transparent) !important;
+  color: color-mix(in srgb, var(--ce-control-text) 72%, transparent) !important;
   cursor: not-allowed;
   opacity: 1 !important;
 }
@@ -1671,7 +1700,7 @@ $muted-text: tokens.$ce-muted-text;
   justify-content: center;
   border-radius: var(--ce-radius-8);
   border: 1px solid $card-border;
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
   color: $user-page-text-color;
   cursor: pointer;
   transition:
@@ -1680,8 +1709,8 @@ $muted-text: tokens.$ce-muted-text;
 }
 
 .iconButton:hover {
-  border-color: rgba(255, 255, 255, 0.35);
-  background: rgba(255, 255, 255, 0.12);
+  border-color: color-mix(in srgb, var(--ce-text-inverse) 35%, transparent);
+  background: color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
 }
 
 .workerDeployPanel {
@@ -1689,7 +1718,7 @@ $muted-text: tokens.$ce-muted-text;
   padding: 12px;
   border: 1px solid $card-border;
   border-radius: var(--ce-radius-10);
-  background: rgba(255, 255, 255, 0.03);
+  background: color-mix(in srgb, var(--ce-text-inverse) 3%, transparent);
   display: grid;
   gap: 10px;
 }
@@ -1711,9 +1740,13 @@ $muted-text: tokens.$ce-muted-text;
 .cloudflareNativeDeployCard {
   margin-top: 12px;
   padding: 14px;
-  border: 1px solid rgba(77, 255, 164, 0.34);
+  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 34%, transparent);
   border-radius: var(--ce-radius-10);
-  background: linear-gradient(180deg, rgba(77, 255, 164, 0.08), rgba(255, 255, 255, 0.03));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ce-action-accent) 8%, transparent),
+    color-mix(in srgb, var(--ce-text-inverse) 3%, transparent)
+  );
   display: grid;
   gap: 12px;
 }
@@ -1743,11 +1776,11 @@ $muted-text: tokens.$ce-muted-text;
   min-height: 28px;
   padding: 0 10px;
   border-radius: var(--ce-radius-pill);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+  background: color-mix(in srgb, var(--ce-text-inverse) 3%, transparent);
   font-size: 12px;
   letter-spacing: 0.04em;
-  color: rgba(244, 247, 255, 0.55);
+  color: color-mix(in srgb, var(--ce-control-text) 55%, transparent);
 }
 
 .workerDeployLink {
@@ -1758,7 +1791,7 @@ $muted-text: tokens.$ce-muted-text;
   height: 30px;
   border-radius: var(--ce-radius-pill);
   border: 1px solid $card-border;
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
   color: $user-page-text-color;
   text-decoration: none;
   transition:
@@ -1768,8 +1801,8 @@ $muted-text: tokens.$ce-muted-text;
 }
 
 .workerDeployLink:hover {
-  border-color: rgba(255, 255, 255, 0.35);
-  background: rgba(255, 255, 255, 0.1);
+  border-color: color-mix(in srgb, var(--ce-text-inverse) 35%, transparent);
+  background: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
   color: $clickable-color;
 }
 
@@ -1790,7 +1823,7 @@ $muted-text: tokens.$ce-muted-text;
   padding: 12px;
   border: 1px solid $card-border;
   border-radius: var(--ce-radius-10);
-  background: rgba(255, 255, 255, 0.03);
+  background: color-mix(in srgb, var(--ce-text-inverse) 3%, transparent);
   display: grid;
   gap: 12px;
 }
@@ -1933,7 +1966,7 @@ $muted-text: tokens.$ce-muted-text;
   padding: 12px;
   border: 1px solid $card-border;
   border-radius: var(--ce-radius-10);
-  background: rgba(255, 255, 255, 0.03);
+  background: color-mix(in srgb, var(--ce-text-inverse) 3%, transparent);
   display: grid;
   gap: 10px;
 }
@@ -1949,7 +1982,7 @@ $muted-text: tokens.$ce-muted-text;
   margin: 0;
   font-size: 13px;
   line-height: 1.5;
-  color: rgba(244, 247, 255, 0.88);
+  color: color-mix(in srgb, var(--ce-control-text) 88%, transparent);
 }
 
 .workerLinks {
@@ -1966,7 +1999,7 @@ $muted-text: tokens.$ce-muted-text;
   padding: 8px 12px;
   border: 1px solid $card-border;
   border-radius: var(--ce-radius-pill);
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
   color: $user-page-text-color;
   font-size: 12px;
   font-family: var(--ce-font-mono);
@@ -1980,11 +2013,11 @@ $muted-text: tokens.$ce-muted-text;
 .workerDocLink:hover,
 .workerDocLink:focus,
 .workerDocLink:focus-visible {
-  border-color: rgba(255, 255, 255, 0.35);
-  background: rgba(255, 255, 255, 0.1);
+  border-color: color-mix(in srgb, var(--ce-text-inverse) 35%, transparent);
+  background: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
   color: $clickable-color;
   outline: none;
-  box-shadow: 0 0 0 1px rgba(77, 255, 164, 0.18);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ce-action-accent) 18%, transparent);
 }
 
 .copyStatus {
@@ -1993,7 +2026,7 @@ $muted-text: tokens.$ce-muted-text;
 }
 
 .copyStatusError {
-  color: #ffb4b4;
+  color: var(--ce-status-danger-text);
 }
 
 .gateLabelStatic {
@@ -2023,7 +2056,7 @@ $muted-text: tokens.$ce-muted-text;
   gap: 18px;
   padding: 0;
   border: 0;
-  border-radius: 0;
+  border-radius: var(--ce-radius-0);
   background: transparent;
   box-shadow: none;
 }
@@ -2039,8 +2072,8 @@ $muted-text: tokens.$ce-muted-text;
   gap: 6px;
   padding: 12px 14px;
   border-radius: var(--ce-radius-12);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
+  background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
 }
 
 .publishSummaryLabel {
@@ -2054,7 +2087,7 @@ $muted-text: tokens.$ce-muted-text;
 .publishSummaryValue {
   font-size: 0.98rem;
   line-height: 1.35;
-  color: rgba(244, 247, 255, 0.92);
+  color: color-mix(in srgb, var(--ce-control-text) 92%, transparent);
 }
 
 .publishActionCluster {
@@ -2076,11 +2109,11 @@ $muted-text: tokens.$ce-muted-text;
   align-items: center;
   justify-content: center;
   gap: 14px;
-  background-color: #2a63ca !important;
+  background-color: var(--ce-action-submit) !important;
   background-image: none !important;
   color: var(--ce-color-white) !important;
-  border: 1px solid #2a63ca !important;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--ce-action-submit) !important;
+  box-shadow: 0 4px 6px color-mix(in srgb, var(--ce-compat-dark) 12%, transparent);
   transition:
     transform 0.2s ease,
     opacity 0.2s ease,
@@ -2093,7 +2126,7 @@ $muted-text: tokens.$ce-muted-text;
     color: var(--ce-color-white) !important;
     border-color: var(--ce-color-indigo) !important;
     transform: translateY(-2px);
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.16);
+    box-shadow: 0 6px 12px color-mix(in srgb, var(--ce-compat-dark) 16%, transparent);
   }
 
   &:active,
@@ -2102,13 +2135,13 @@ $muted-text: tokens.$ce-muted-text;
     background-color: var(--ce-color-indigo) !important;
     color: var(--ce-color-white) !important;
     border-color: var(--ce-color-indigo) !important;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.12) !important;
+    box-shadow: 0 4px 6px color-mix(in srgb, var(--ce-compat-dark) 12%, transparent) !important;
   }
 
   &:disabled {
-    background-color: rgba(42, 99, 202, 0.45) !important;
-    color: rgba(255, 255, 255, 0.78) !important;
-    border-color: rgba(42, 99, 202, 0.45) !important;
+    background-color: color-mix(in srgb, var(--ce-status-info) 45%, transparent) !important;
+    color: color-mix(in srgb, var(--ce-text-inverse) 78%, transparent) !important;
+    border-color: color-mix(in srgb, var(--ce-status-info) 45%, transparent) !important;
     box-shadow: none;
     transform: none;
   }
@@ -2118,10 +2151,10 @@ $muted-text: tokens.$ce-muted-text;
   width: auto;
   height: auto;
   padding: 6px;
-  border-radius: 0;
+  border-radius: var(--ce-radius-0);
   border: 0;
   background: transparent;
-  color: rgba(244, 247, 255, 0.84);
+  color: color-mix(in srgb, var(--ce-control-text) 84%, transparent);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2153,7 +2186,7 @@ $muted-text: tokens.$ce-muted-text;
 }
 
 .publishSettingsButtonActive {
-  color: rgba(77, 255, 164, 0.95);
+  color: color-mix(in srgb, var(--ce-action-accent) 95%, transparent);
 }
 
 @media (min-width: 721px) and (max-width: 980px) {
@@ -2163,7 +2196,7 @@ $muted-text: tokens.$ce-muted-text;
 }
 
 .actionButton {
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
   border: 1px solid $card-border;
   color: $user-page-text-color;
   font-weight: 600;
@@ -2181,7 +2214,7 @@ $muted-text: tokens.$ce-muted-text;
   }
 
   &:hover {
-    border-color: rgba(255, 255, 255, 0.35);
+    border-color: color-mix(in srgb, var(--ce-text-inverse) 35%, transparent);
     transform: translateY(-1px);
   }
 
@@ -2200,9 +2233,9 @@ $muted-text: tokens.$ce-muted-text;
   &.btn:disabled,
   &.btn-secondary:disabled,
   &.btn-primary:disabled {
-    color: rgba(244, 247, 255, 0.55);
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.12);
+    color: color-mix(in srgb, var(--ce-control-text) 55%, transparent);
+    background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
+    border-color: color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
     transform: none;
   }
 }
@@ -2212,14 +2245,14 @@ $muted-text: tokens.$ce-muted-text;
   border: none;
   color: var(--ce-color-white);
   font-weight: 600;
-  box-shadow: 0 10px 22px rgba(77, 255, 164, 0.25);
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--ce-action-accent) 25%, transparent);
   transition:
     transform 0.1s ease,
     box-shadow 0.2s ease;
 
   &:hover {
     transform: translateY(-1px);
-    box-shadow: 0 14px 26px rgba(77, 255, 164, 0.35);
+    box-shadow: 0 14px 26px color-mix(in srgb, var(--ce-action-accent) 35%, transparent);
   }
 
   &:active,
@@ -2227,12 +2260,12 @@ $muted-text: tokens.$ce-muted-text;
   &:active:focus {
     background: $clickable-color !important;
     color: var(--ce-color-white) !important;
-    box-shadow: 0 10px 22px rgba(77, 255, 164, 0.25) !important;
+    box-shadow: 0 10px 22px color-mix(in srgb, var(--ce-action-accent) 25%, transparent) !important;
   }
 
   &:disabled {
-    background: rgba(77, 255, 164, 0.4);
-    color: rgba(255, 255, 255, 0.7);
+    background: color-mix(in srgb, var(--ce-action-accent) 40%, transparent);
+    color: color-mix(in srgb, var(--ce-text-inverse) 70%, transparent);
     cursor: not-allowed;
     transform: none;
   }
@@ -2259,10 +2292,10 @@ $muted-text: tokens.$ce-muted-text;
 .newSessionBanner {
   margin-bottom: 18px;
   padding: 14px 16px;
-  border: 1px solid rgba(77, 255, 164, 0.24);
-  border-radius: 14px;
-  background: linear-gradient(180deg, rgba(77, 255, 164, 0.08), rgba(255, 255, 255, 0.04)), rgba(255, 255, 255, 0.03);
-  color: rgba(244, 247, 255, 0.92);
+  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 24%, transparent);
+  border-radius: var(--ce-radius-14);
+  background: var(--ce-card-bg);
+  color: var(--ce-panel-text);
   box-shadow: $card-shadow;
 }
 
@@ -2277,7 +2310,7 @@ $muted-text: tokens.$ce-muted-text;
   margin: 0;
   font-size: 1rem;
   line-height: 1.35;
-  color: var(--ce-color-white);
+  color: var(--ce-panel-text);
 }
 
 .newSessionBannerDismissButton {
@@ -2288,8 +2321,8 @@ $muted-text: tokens.$ce-muted-text;
 
   &:focus-visible {
     outline: none;
-    border-color: rgba(77, 255, 164, 0.42);
-    box-shadow: 0 0 0 2px rgba(77, 255, 164, 0.18);
+    border-color: color-mix(in srgb, var(--ce-action-accent) 42%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ce-action-accent) 18%, transparent);
   }
 }
 
@@ -2307,33 +2340,33 @@ $muted-text: tokens.$ce-muted-text;
 
   li {
     line-height: 1.5;
-    color: rgba(244, 247, 255, 0.9);
+    color: var(--ce-panel-text);
   }
 }
 
 .newSessionBannerCopy {
   margin: 0;
   line-height: 1.55;
-  color: rgba(244, 247, 255, 0.78);
+  color: var(--ce-panel-text-muted);
 }
 
 .newSessionBannerLink {
-  color: $clickable-color;
+  color: var(--ce-link);
   text-decoration: underline;
   text-underline-offset: 2px;
 
   &:hover,
   &:focus-visible {
-    color: var(--ce-color-white);
+    color: var(--ce-action-accent-hover);
   }
 }
 
 .sponsoredBundleStatus {
   margin-bottom: 18px;
   padding: 10px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
+  border-radius: var(--ce-radius-12);
+  background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
 }
 
 .sponsoredBundleStatusContent {
@@ -2349,19 +2382,19 @@ $muted-text: tokens.$ce-muted-text;
 }
 
 .sponsoredBundleStatusInfo {
-  color: rgba(244, 247, 255, 0.82);
+  color: color-mix(in srgb, var(--ce-control-text) 82%, transparent);
 }
 
 .sponsoredBundleStatusSuccess {
-  color: #5affc2;
-  border-color: rgba(90, 255, 194, 0.24);
-  background: rgba(90, 255, 194, 0.08);
+  color: var(--ce-status-success-text);
+  border-color: color-mix(in srgb, var(--ce-action-accent) 24%, transparent);
+  background: color-mix(in srgb, var(--ce-action-accent) 8%, transparent);
 }
 
 .sponsoredBundleStatusError {
-  color: #ffd37a;
-  border-color: rgba(255, 211, 122, 0.22);
-  background: rgba(255, 211, 122, 0.08);
+  color: var(--ce-status-warning-text);
+  border-color: color-mix(in srgb, var(--ce-status-warning) 22%, transparent);
+  background: color-mix(in srgb, var(--ce-status-warning) 8%, transparent);
 }
 
 .tooltip {
@@ -2395,9 +2428,9 @@ $muted-text: tokens.$ce-muted-text;
 }
 
 .tooltipTrigger:focus-visible {
-  outline: 2px solid rgba(77, 255, 164, 0.65);
+  outline: 2px solid color-mix(in srgb, var(--ce-action-accent) 65%, transparent);
   outline-offset: 2px;
-  border-radius: 999px;
+  border-radius: var(--ce-radius-pill);
 }
 
 .tooltipBubble {
@@ -2407,7 +2440,7 @@ $muted-text: tokens.$ce-muted-text;
     background: var(--ce-color-tooltip-bg) !important;
     color: var(--ce-color-tooltip-text) !important;
     border: 1px solid var(--ce-color-tooltip-border) !important;
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+    box-shadow: 0 10px 24px color-mix(in srgb, var(--ce-compat-dark) 35%, transparent);
     padding: 8px 10px;
     font-size: 0.85rem;
     line-height: 1.2;
@@ -2422,7 +2455,7 @@ $muted-text: tokens.$ce-muted-text;
 }
 
 .encryptionPanel {
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
 }
 
 .encryptionGateList {
@@ -2435,7 +2468,7 @@ $muted-text: tokens.$ce-muted-text;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px dashed rgba(77, 255, 164, 0.3);
+  border: 2px dashed color-mix(in srgb, var(--ce-action-accent) 30%, transparent);
   border-radius: var(--ce-radius-10);
   background: transparent;
   opacity: 0.4;
@@ -2456,10 +2489,10 @@ $muted-text: tokens.$ce-muted-text;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px dashed rgba(77, 255, 164, 0.3);
-  border-radius: 16px;
+  border: 2px dashed color-mix(in srgb, var(--ce-action-accent) 30%, transparent);
+  border-radius: var(--ce-radius-16);
   background: transparent;
-  color: rgba(244, 247, 255, 0.76);
+  color: color-mix(in srgb, var(--ce-control-text) 76%, transparent);
   cursor: pointer;
   transition:
     border-color 0.2s ease,
@@ -2468,9 +2501,9 @@ $muted-text: tokens.$ce-muted-text;
   font-size: 1.2rem;
 
   &:hover {
-    border-color: rgba(77, 255, 164, 0.5);
+    border-color: color-mix(in srgb, var(--ce-action-accent) 50%, transparent);
     color: $user-page-text-color;
-    background: rgba(77, 255, 164, 0.05);
+    background: color-mix(in srgb, var(--ce-action-accent) 5%, transparent);
   }
 }
 
@@ -2478,7 +2511,7 @@ $muted-text: tokens.$ce-muted-text;
   border: 1px solid $card-border;
   border-radius: var(--ce-radius-12);
   padding: 12px;
-  background: rgba(0, 0, 0, 0.18);
+  background: color-mix(in srgb, var(--ce-compat-dark) 18%, transparent);
 }
 
 .encryptionGateHeader {
@@ -2519,13 +2552,13 @@ $muted-text: tokens.$ce-muted-text;
     background 0.15s ease;
 
   &:hover {
-    color: rgba(255, 255, 255, 0.85);
+    color: color-mix(in srgb, var(--ce-text-inverse) 85%, transparent);
   }
 }
 
 .gateModeActive {
   color: $clickable-color;
-  background: rgba(77, 255, 164, 0.12);
+  background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
 }
 
 .gateModeSeparator {
@@ -2538,7 +2571,7 @@ $muted-text: tokens.$ce-muted-text;
   width: 10px;
   height: 10px;
   border-radius: var(--ce-radius-pill);
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
 }
 
 .defaultGateControl {
@@ -2563,12 +2596,12 @@ $muted-text: tokens.$ce-muted-text;
 .gateRemoveButton {
   border: none;
   background: transparent;
-  color: rgba(255, 255, 255, 0.5);
+  color: color-mix(in srgb, var(--ce-text-inverse) 50%, transparent);
   cursor: pointer;
   margin-left: auto;
 
   &:hover {
-    color: #ff9b9b;
+    color: var(--ce-status-danger-text);
   }
 }
 
@@ -2579,10 +2612,16 @@ $muted-text: tokens.$ce-muted-text;
 .publishProgressCard {
   margin-top: 22px;
   padding: 14px 16px 16px;
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03)), rgba(7, 12, 28, 0.42);
-  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.2);
+  border-radius: var(--ce-radius-18);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--ce-text-inverse) 6%, transparent),
+      color-mix(in srgb, var(--ce-text-inverse) 3%, transparent)
+    ),
+    color-mix(in srgb, var(--ce-overlay-base) 42%, transparent);
+  box-shadow: 0 14px 28px color-mix(in srgb, var(--ce-compat-dark) 20%, transparent);
 }
 
 .publishProgressHeader {
@@ -2604,13 +2643,13 @@ $muted-text: tokens.$ce-muted-text;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(244, 247, 255, 0.62);
+  color: color-mix(in srgb, var(--ce-control-text) 62%, transparent);
 }
 
 .publishProgressStage {
   font-size: 1rem;
   line-height: 1.25;
-  color: rgba(244, 247, 255, 0.96);
+  color: color-mix(in srgb, var(--ce-control-text) 96%, transparent);
 }
 
 .publishProgressPercent {
@@ -2625,21 +2664,25 @@ $muted-text: tokens.$ce-muted-text;
   position: relative;
   width: 100%;
   height: 12px;
-  border-radius: 999px;
+  border-radius: var(--ce-radius-pill);
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.32);
+  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+  box-shadow: inset 0 1px 3px color-mix(in srgb, var(--ce-compat-dark) 32%, transparent);
 }
 
 .publishProgressFill {
   position: absolute;
   inset: 0 auto 0 0;
   border-radius: inherit;
-  background: linear-gradient(90deg, rgba(77, 255, 164, 0.86), rgba(91, 140, 255, 0.9));
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--ce-action-accent) 86%, transparent),
+    color-mix(in srgb, var(--ce-data-series-1) 90%, transparent)
+  );
   box-shadow:
-    0 0 18px rgba(77, 255, 164, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    0 0 18px color-mix(in srgb, var(--ce-action-accent) 18%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 25%, transparent);
   transition: width 0.32s ease;
 }
 
@@ -2663,7 +2706,7 @@ $muted-text: tokens.$ce-muted-text;
   left: 12%;
   right: 12%;
   height: 2px;
-  background: rgba(255, 255, 255, 0.1);
+  background: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
   z-index: 0;
 }
 
@@ -2677,7 +2720,7 @@ $muted-text: tokens.$ce-muted-text;
   font-family: var(--ce-font-mono);
   font-size: 0.9rem;
   font-weight: 600;
-  color: rgba(244, 247, 255, 0.4);
+  color: color-mix(in srgb, var(--ce-control-text) 40%, transparent);
   background: transparent;
 
   span {
@@ -2695,7 +2738,7 @@ $muted-text: tokens.$ce-muted-text;
 }
 
 .stepActive {
-  color: rgba(244, 247, 255, 0.9);
+  color: color-mix(in srgb, var(--ce-control-text) 90%, transparent);
 
   svg {
     color: $clickable-color;
@@ -2746,7 +2789,7 @@ $muted-text: tokens.$ce-muted-text;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: rgba(143, 255, 196, 0.76);
+  color: color-mix(in srgb, var(--ce-status-success-text) 76%, transparent);
   font-size: 0.82rem;
   line-height: 1;
   transition:
@@ -2755,19 +2798,19 @@ $muted-text: tokens.$ce-muted-text;
 
   &:hover,
   &:focus-visible {
-    color: #ffffff;
+    color: var(--ce-text-inverse);
     transform: translateY(-1px);
   }
 
   &:focus-visible {
-    outline: 2px solid #8fffc4;
+    outline: 2px solid var(--ce-action-accent);
     outline-offset: 3px;
     border-radius: var(--ce-radius-round);
   }
 }
 
 .modeProfileEntryEyebrow {
-  color: #8fffc4;
+  color: var(--ce-action-accent);
   font-size: 0.7rem;
   font-weight: 850;
   letter-spacing: 0.11em;
@@ -2787,11 +2830,11 @@ $muted-text: tokens.$ce-muted-text;
   align-items: stretch;
   min-height: 280px;
   padding: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.06);
-  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.25);
-  color: #f4f7ff;
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
+  border-radius: var(--ce-radius-18);
+  background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
+  box-shadow: 0 6px 22px color-mix(in srgb, var(--ce-compat-dark) 25%, transparent);
+  color: var(--ce-control-text);
   cursor: pointer;
   text-align: left;
   transition:
@@ -2803,20 +2846,20 @@ $muted-text: tokens.$ce-muted-text;
 
 .modePresetCard:hover,
 .modePresetCard:focus-visible {
-  border-color: rgba(77, 255, 164, 0.62);
-  background: rgba(77, 255, 164, 0.1);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.32);
+  border-color: color-mix(in srgb, var(--ce-action-accent) 62%, transparent);
+  background: color-mix(in srgb, var(--ce-action-accent) 10%, transparent);
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--ce-compat-dark) 32%, transparent);
   transform: translateY(-2px);
 }
 
 .modePresetCard:focus-visible {
-  outline: 2px solid #8fffc4;
+  outline: 2px solid var(--ce-action-accent);
   outline-offset: 3px;
 }
 
 .modePresetCardSelected {
-  border-color: rgba(77, 255, 164, 0.72);
-  background: rgba(77, 255, 164, 0.12);
+  border-color: color-mix(in srgb, var(--ce-action-accent) 72%, transparent);
+  background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
 }
 
 .modePresetCardHeader {
@@ -2835,7 +2878,7 @@ $muted-text: tokens.$ce-muted-text;
 }
 
 .modePresetCardTitle {
-  color: #ffffff;
+  color: var(--ce-text-inverse);
   font-size: 1.35rem;
   font-weight: 850;
   line-height: 1.2;
@@ -2843,7 +2886,7 @@ $muted-text: tokens.$ce-muted-text;
 
 .modePresetCardProvider {
   margin-top: 5px;
-  color: #8fffc4;
+  color: var(--ce-action-accent);
   font-size: 0.8rem;
   font-weight: 800;
   letter-spacing: 0.06em;
@@ -2852,7 +2895,7 @@ $muted-text: tokens.$ce-muted-text;
 
 .modePresetCardDescription {
   margin-top: 24px;
-  color: rgba(244, 247, 255, 0.78);
+  color: color-mix(in srgb, var(--ce-control-text) 78%, transparent);
   font-size: 0.9rem;
   line-height: 1.55;
 }
@@ -2862,11 +2905,11 @@ $muted-text: tokens.$ce-muted-text;
   gap: 7px;
   margin-top: auto;
   padding-top: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
 }
 
 .modePresetCardRequirementsLabel {
-  color: rgba(244, 247, 255, 0.62);
+  color: color-mix(in srgb, var(--ce-control-text) 62%, transparent);
   font-size: 0.65rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -2874,7 +2917,7 @@ $muted-text: tokens.$ce-muted-text;
 }
 
 .modePresetCardRequirementsValue {
-  color: #ffffff;
+  color: var(--ce-text-inverse);
   font-size: 0.9rem;
   font-weight: 750;
   line-height: 1.45;
@@ -2891,9 +2934,9 @@ $muted-text: tokens.$ce-muted-text;
   overflow-x: auto;
   overscroll-behavior-inline: contain;
   padding: 3px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
   border-radius: var(--ce-radius-pill);
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
 }
 
 .modePresetButton {
@@ -2907,7 +2950,7 @@ $muted-text: tokens.$ce-muted-text;
   border: 1px solid transparent;
   border-radius: var(--ce-radius-pill);
   background: transparent;
-  color: rgba(244, 247, 255, 0.78);
+  color: color-mix(in srgb, var(--ce-control-text) 78%, transparent);
   cursor: pointer;
   font-size: 0.72rem;
   font-weight: 750;
@@ -2920,27 +2963,27 @@ $muted-text: tokens.$ce-muted-text;
 
 .modePresetButton:hover,
 .modePresetButton:focus-visible {
-  border-color: rgba(77, 255, 164, 0.42);
-  background: rgba(77, 255, 164, 0.1);
-  color: #ffffff;
+  border-color: color-mix(in srgb, var(--ce-action-accent) 42%, transparent);
+  background: color-mix(in srgb, var(--ce-action-accent) 10%, transparent);
+  color: var(--ce-text-inverse);
 }
 
 .modePresetButton:focus-visible {
-  outline: 2px solid #8fffc4;
+  outline: 2px solid var(--ce-action-accent);
   outline-offset: 2px;
 }
 
 .modePresetButtonSelected {
-  border-color: rgba(77, 255, 164, 0.52);
-  background: rgba(77, 255, 164, 0.14);
-  color: #ffffff;
+  border-color: color-mix(in srgb, var(--ce-action-accent) 52%, transparent);
+  background: color-mix(in srgb, var(--ce-action-accent) 14%, transparent);
+  color: var(--ce-text-inverse);
 }
 
 .modePresetButtonDisabled,
 .modePresetButtonDisabled:hover {
   border-color: transparent;
   background: transparent;
-  color: rgba(244, 247, 255, 0.46);
+  color: color-mix(in srgb, var(--ce-control-text) 46%, transparent);
   cursor: not-allowed;
 }
 
@@ -2956,8 +2999,8 @@ $muted-text: tokens.$ce-muted-text;
 }
 
 .modePresetSoon {
-  border: 1px solid rgba(244, 247, 255, 0.18);
-  color: rgba(244, 247, 255, 0.52);
+  border: 1px solid color-mix(in srgb, var(--ce-control-text) 18%, transparent);
+  color: color-mix(in srgb, var(--ce-control-text) 52%, transparent);
 }
 
 .modeProfilePanel .moreOptionsToggle {
@@ -2970,16 +3013,16 @@ $muted-text: tokens.$ce-muted-text;
 }
 
 .modeProfilePanel .moreOptionsToggleActive {
-  border-color: rgba(77, 255, 164, 0.62);
-  background: rgba(77, 255, 164, 0.18);
-  color: #ffffff;
+  border-color: color-mix(in srgb, var(--ce-action-accent) 62%, transparent);
+  background: color-mix(in srgb, var(--ce-action-accent) 18%, transparent);
+  color: var(--ce-text-inverse);
 }
 
 .modeSavedProfile {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  color: rgba(244, 247, 255, 0.76);
+  color: color-mix(in srgb, var(--ce-control-text) 76%, transparent);
   font-size: 0.7rem;
   white-space: nowrap;
 
@@ -3003,18 +3046,18 @@ $muted-text: tokens.$ce-muted-text;
   gap: 16px;
   margin-bottom: 18px;
   padding: 18px;
-  border: 1px solid rgba(122, 255, 203, 0.24);
+  border: 1px solid color-mix(in srgb, var(--ce-status-success-text) 24%, transparent);
   border-radius: var(--ce-radius-lg);
-  background: rgba(77, 255, 164, 0.045);
+  background: color-mix(in srgb, var(--ce-action-accent) 4.5%, transparent);
 }
 
 .modeSectionEmpty {
   margin-bottom: 18px;
   padding: 14px 16px;
-  border: 1px solid rgba(255, 215, 130, 0.32);
+  border: 1px solid color-mix(in srgb, var(--ce-status-warning) 32%, transparent);
   border-radius: var(--ce-radius-10);
-  color: #ffe2a6;
-  background: rgba(255, 215, 130, 0.06);
+  color: var(--ce-status-warning-text);
+  background: color-mix(in srgb, var(--ce-status-warning) 6%, transparent);
 }
 
 .modeSectionHeading {
@@ -3027,12 +3070,12 @@ $muted-text: tokens.$ce-muted-text;
   }
 
   h3 {
-    color: #ffffff;
+    color: var(--ce-text-inverse);
     font-size: 1rem;
   }
 
   p {
-    color: rgba(244, 247, 255, 0.72);
+    color: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
     font-size: 0.82rem;
   }
 }
@@ -3046,7 +3089,7 @@ $muted-text: tokens.$ce-muted-text;
 
 .modeAdvancedLabel {
   font-weight: 700;
-  color: rgba(244, 247, 255, 0.84);
+  color: color-mix(in srgb, var(--ce-control-text) 84%, transparent);
   padding-top: 7px;
 }
 
@@ -3066,7 +3109,7 @@ $muted-text: tokens.$ce-muted-text;
   gap: 5px;
   margin: 0;
   padding-left: 1.15rem;
-  color: rgba(244, 247, 255, 0.76);
+  color: color-mix(in srgb, var(--ce-control-text) 76%, transparent);
   font-size: 0.82rem;
 }
 
@@ -3074,7 +3117,7 @@ $muted-text: tokens.$ce-muted-text;
   display: grid;
   gap: 6px;
   margin: 0;
-  color: rgba(244, 247, 255, 0.84);
+  color: color-mix(in srgb, var(--ce-control-text) 84%, transparent);
   font-weight: 700;
 }
 
@@ -3082,9 +3125,9 @@ $muted-text: tokens.$ce-muted-text;
   display: grid;
   gap: 10px;
   padding: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
   border-radius: var(--ce-radius-10);
-  background: rgba(7, 12, 28, 0.42);
+  background: color-mix(in srgb, var(--ce-overlay-base) 42%, transparent);
 }
 
 .modeRuleHeader {
@@ -3101,16 +3144,16 @@ $muted-text: tokens.$ce-muted-text;
   justify-content: center;
   width: 32px;
   height: 32px;
-  border: 1px solid rgba(255, 155, 155, 0.24);
+  border: 1px solid color-mix(in srgb, var(--ce-status-error) 24%, transparent);
   border-radius: var(--ce-radius-round);
-  background: rgba(255, 155, 155, 0.06);
-  color: #ffb2b2;
+  background: color-mix(in srgb, var(--ce-status-error) 6%, transparent);
+  color: var(--ce-status-danger-text);
   cursor: pointer;
 
   &:hover,
   &:focus-visible {
-    border-color: rgba(255, 155, 155, 0.56);
-    background: rgba(255, 155, 155, 0.14);
+    border-color: color-mix(in srgb, var(--ce-status-error) 56%, transparent);
+    background: color-mix(in srgb, var(--ce-status-error) 14%, transparent);
   }
 }
 
@@ -3129,10 +3172,10 @@ $muted-text: tokens.$ce-muted-text;
   min-height: 48px;
   margin: 0;
   padding: 10px 12px;
-  border: 1px solid rgba(244, 247, 255, 0.18);
+  border: 1px solid color-mix(in srgb, var(--ce-control-text) 18%, transparent);
   border-radius: var(--ce-radius-10);
-  background: rgba(8, 12, 26, 0.26);
-  color: rgba(244, 247, 255, 0.9);
+  background: color-mix(in srgb, var(--ce-overlay-base) 26%, transparent);
+  color: color-mix(in srgb, var(--ce-control-text) 90%, transparent);
   line-height: 1.3;
 
   > input[type='checkbox'] {
@@ -3159,7 +3202,7 @@ $muted-text: tokens.$ce-muted-text;
 .modeValidationList {
   display: grid;
   gap: 4px;
-  color: #ffd782;
+  color: var(--ce-status-warning-text);
   font-size: 0.88rem;
 }
 

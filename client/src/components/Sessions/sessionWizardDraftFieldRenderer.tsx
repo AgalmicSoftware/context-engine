@@ -728,7 +728,7 @@ export const buildSessionWizardDraftFieldRenderer = ({
               {!privateSlugMode && slugAvailability.status === 'available' && (
                 <FontAwesomeIcon
                   icon={faCheck}
-                  style={{ marginLeft: 6, color: '#4dffa4', fontSize: 12 }}
+                  style={{ marginLeft: 6, color: 'var(--ce-status-success-text)', fontSize: 12 }}
                   title="Slug available"
                   data-testid={E2E_TESTIDS.WIZARD_SLUG_AVAILABLE}
                 />
@@ -736,7 +736,7 @@ export const buildSessionWizardDraftFieldRenderer = ({
               {!privateSlugMode && slugAvailability.status === 'taken' && (
                 <FontAwesomeIcon
                   icon={faExclamationCircle}
-                  style={{ marginLeft: 6, color: '#ffcc7b', fontSize: 12 }}
+                  style={{ marginLeft: 6, color: 'var(--ce-status-warning-text)', fontSize: 12 }}
                   title="Slug already taken"
                   data-testid={E2E_TESTIDS.WIZARD_SLUG_TAKEN}
                 />

@@ -32,16 +32,18 @@ chart consumers. Session metadata is not an app-theme resolution layer. Those
 consumers must call `readThemeToken()` and subscribe with
 `subscribeThemeChanges()` instead of maintaining a JavaScript palette.
 
-The Settings selector is implemented behind
-`REACT_APP_CE_THEME_SELECTOR_ENABLED=false`. Enable it only after that
-deployment's required route, responsive, and accessibility matrix passes.
+The Settings selector is enabled by default. Set
+`REACT_APP_CE_THEME_SELECTOR_ENABLED=false` only when a deployment intentionally
+hides user theme selection. The preference remains restricted to the bundled
+registry and cannot load CSS, URLs, or arbitrary token maps.
 
 ## Adding A Bundled Theme
 
 1. Add a values-only SCSS definition beside the existing theme files.
 2. Add one metadata entry to `registry.json`.
 3. Include the definition once in `themes/_index.scss`.
-4. Run the SCSS contract test, client build, route matrix, and contrast checks.
+4. Run the SCSS contract and contrast tests, the literal gate, the client build,
+   and the route/viewports Playwright matrix documented below.
 
 Every definition must supply exactly the keys in `_contract.scss`. Theme files
 must not target component selectors. If several components need new behavior,
@@ -84,46 +86,43 @@ documented session accents and chrome and is stored as
 Standalone HTML/PDF result exports remain fixed-light and do not read app or
 session appearance state.
 
-## Color Palette
+## Semantic Token Families
 
-| Token | Value | Notes |
+Components consume meanings, not palette values. The two bundled theme maps
+may therefore change color, typography, geometry, borders, elevation, and
+control states without component selectors in a theme file.
+
+| Family | Representative tokens | Intended use |
 | --- | --- | --- |
-| `--ce-color-primary` / `$ce-primary` | `#e14eca` | primary brand accent |
-| `--ce-color-accent` / `$ce-clickable` | `#4dffa4` | interactive accent, active state, highlight |
-| `--ce-color-info` / `$ce-info` | `#1d8cf8` | info / utility blue |
-| `--ce-color-success` / `$ce-success` | `#2dce89` | positive status |
-| `--ce-color-warning` / `$ce-warning` | `#ff8d72` | warning accent |
-| `--ce-color-error` / `$ce-error` | `#ff4757` | error accent |
-| `--ce-color-dark` / `$ce-dark` | `#212529` | dark text on light surfaces |
-| `--ce-color-white` / `$ce-white` | `#ffffff` | high-contrast text and white surfaces |
-| `--ce-color-panel-bg` / `$ce-panel-bg` | `#171941` | deep panel / page background |
-| `--ce-color-panel-text` / `$ce-panel-text` | `#f4f7ff` | elevated panel copy |
-| `--ce-color-panel-text-muted` / `$ce-muted-text` | `rgba(244, 247, 255, 0.65)` | secondary panel copy |
-| `--ce-color-card-bg` / `$ce-card-bg` | `rgba(255, 255, 255, 0.06)` | glass card surface |
-| `--ce-color-card-border` / `$ce-card-border` | `rgba(255, 255, 255, 0.14)` | glass card border |
-| `--ce-color-input-bg` / `$ce-input-bg` | `rgba(255, 255, 255, 0.08)` | default input fill |
-| `--ce-color-input-border` / `$ce-input-border` | `rgba(255, 255, 255, 0.16)` | default input border |
-| `--ce-color-input-border-strong` / `$ce-input-border-strong` | `rgba(255, 255, 255, 0.18)` | stronger input border |
+| Canvas and surfaces | `--ce-canvas`, `--ce-surface-*`, `--ce-card-*` | page, raised, sunken, and card chrome |
+| Documents | `--ce-document-*` | readable light/document-style content |
+| Panel and overlay copy | `--ce-panel-text*`, `--ce-overlay-text*` | foregrounds paired with panel or overlay surfaces |
+| Controls | `--ce-control-*`, `--ce-input-*`, `--ce-titlebar-*` | inputs, buttons, disabled states, and title bars |
+| Actions and status | `--ce-action-*`, `--ce-status-*`, `--ce-link` | interactive, validation, risk, and state semantics |
+| Data series | `--ce-data-series-1` through `--ce-data-series-8` | categorical charts and visualizations |
+| Edges and elevation | `--ce-border-*`, `--ce-edge-*`, `--ce-shadow-*` | flat, raised, inset, pressed, and submit states |
+| Geometry | `--ce-radius-*`, `--ce-border-control-width`, `--ce-control-padding-*` | theme-selectable shape and control density |
+| Typography | `--ce-font-*`, `--ce-font-button-weight` | body, UI, mono, and control typography |
 
-Shared shadow:
-
-| Token | Value | Notes |
-| --- | --- | --- |
-| `--ce-shadow-card` / `$ce-card-shadow` | `0 6px 22px rgba(0, 0, 0, 0.25)` | default elevated card shadow |
+The legacy `--ce-color-*` aliases remain only for source compatibility and
+resolve through the active semantic contract. New code uses `--ce-*` semantic
+tokens directly.
 
 ## Typography
 
-| Token | Value | Usage |
+| Token | `context-engine` | `classic-95` |
 | --- | --- | --- |
-| `--ce-font-body` / `$ce-font-body` | `'Poppins', sans-serif` | general body copy |
-| `--ce-font-mono` / `$ce-font-mono` | `ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace` | ids, metadata, code-like UI |
-| `--ce-font-button` / `$ce-font-button` | `'Poppins', sans-serif` | interactive controls |
-| `$ce-font-button-weight` | `600` | default button emphasis |
+| `--ce-font-body` | Poppins fallback stack | Tahoma/MS Sans Serif fallback stack |
+| `--ce-font-ui` | Open Sans fallback stack | Tahoma/MS Sans Serif fallback stack |
+| `--ce-font-mono` | system monospace fallback stack | Courier New fallback stack |
+| `--ce-font-button-weight` | `600` | `400` |
 
 Guideline:
 
 - Use `var(--ce-font-body)` or `var(--ce-font-mono)` directly in component rules.
-- Use the Sass font tokens when a file already depends on `@use "scss/variables"`.
+- Sass font values in `_variables.scss` seed the default theme only. Component
+  rules use runtime variables so changing `data-ce-theme` repaints without a
+  reload.
 
 ## Spacing And Radius
 
@@ -148,10 +147,10 @@ Radius tokens:
 | n/a | `10px` | `--ce-radius-10` |
 | n/a | `999px` | `--ce-radius-pill` |
 
-Guideline:
-
-- Prefer the existing runtime radius tokens (`var(--ce-radius-*)`) in component rules.
-- Use the Sass aliases for documentation or when a shared literal is needed before runtime.
+Guideline: component rules use runtime radius tokens. In `classic-95`, every
+non-round radius slot resolves to square geometry; `context-engine` retains its
+rounded scale. Sass radius values seed the default map and are not a component
+theme API.
 
 ## Button Patterns
 
@@ -205,14 +204,44 @@ Final submit / create CTA:
 
 Use this shared blue CTA family for actual end-of-flow create and submit actions such as survey submission, survey creation, and SBT creation. Keep launcher/open-panel buttons on their existing primary or secondary treatments instead of reusing this pattern.
 
-## Usage Rules
+## Literal Ownership And Usage Rules
 
-- Do not introduce new hardcoded theme-semantic colors. Run
-  `npm run theme:literals:check`; its per-file baseline can only stay level or
-  move down. App-theme definitions and the session-color-scheme SCSS owner are
-  excluded because they are the approved raw value sources.
-- Do not replace one-off contextual colors unless they recur and map cleanly to an existing token.
-- Keep fixed QR, export, chain/network, and categorical data colors only when
-  their semantics require stability, and document the reason near the value.
-- JSX/SVG/canvas/chart presentation colors use the runtime adapter. Do not add
-  a second TypeScript palette.
+- Do not introduce hardcoded theme-semantic colors. The baseline is zero.
+- The exact raw-value owners are the two bundled app-theme maps, the bundled
+  session-scheme map, the deterministic fixed-light standalone export, the
+  fixed-media QR/bitmap constants, and the deterministic blockie generator.
+  The checker has no directory-wide or ad hoc exception mechanism.
+- Fixed QR/bitmap colors are intentionally independent of app appearance for
+  scanning and copied-image determinism. Standalone HTML/PDF exports remain
+  fixed-light. Blockie colors are deterministic generated identity data, not
+  interface chrome.
+- JSX, SVG, canvas, maps, and chart presentation colors read the same runtime
+  tokens as SCSS and subscribe to `ce:theme-change` when they retain pixels. Do
+  not add a second TypeScript palette.
+
+## Verification
+
+From the repository root:
+
+```bash
+npm run theme:literals:check
+npm run ai:test-theme:runtime
+npm run ai:test-session:color-schemes
+```
+
+From `client/`:
+
+```bash
+npm test -- --watchAll=false --runTestsByPath \
+  src/scss/themes/themeScssContract.test.ts \
+  src/scss/themes/themeContrast.test.ts
+npm run typecheck
+npm run lint
+npm run format:check
+npm run build
+```
+
+The runtime Playwright smoke covers `/about`, `/session/new`, `/docs`, `/demos`,
+and a not-found route at desktop and mobile widths. It boots `classic-95`,
+switches to `context-engine` without reload, and verifies palette, typography,
+geometry, modal chrome, Session Wizard preview scope, and horizontal overflow.

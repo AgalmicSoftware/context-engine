@@ -117,7 +117,7 @@ describe('createQuestionsAndSurveysHelpers gate and tag normalizers', () => {
   });
 
   it('assigns stable colors for gate identifiers', () => {
-    expect(stableGateColor('')).toBe('#5affc2');
+    expect(stableGateColor('')).toBe('var(--ce-data-series-1)');
     expect(stableGateColor('gate-a')).toBe(stableGateColor('gate-a'));
   });
 });

@@ -4,7 +4,7 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(6, 12, 24, 0.78);
+  background: color-mix(in srgb, var(--ce-overlay-base) 78%, transparent);
   backdrop-filter: blur(12px);
   z-index: 2100;
   display: flex;
@@ -17,8 +17,8 @@
   width: min(92vw, 1480px);
   height: min(92vh, 1180px);
   min-height: 680px;
-  box-shadow: 0 26px 80px rgba(0, 0, 0, 0.45);
-  border-radius: 6px;
+  box-shadow: 0 26px 80px color-mix(in srgb, var(--ce-compat-dark) 45%, transparent);
+  border-radius: var(--ce-radius-6);
   padding: 3px;
   overflow: hidden;
 }
@@ -29,15 +29,15 @@
   --modal-panel-pad-bottom: 76px;
   background: linear-gradient(
     118deg,
-    rgba(145, 121, 73, 0.9) 0%,
-    rgba(128, 133, 74, 0.9) 34%,
-    rgba(107, 137, 77, 0.9) 68%,
-    rgba(79, 123, 77, 0.92) 100%
+    color-mix(in srgb, var(--ce-status-warning) 90%, transparent) 0%,
+    color-mix(in srgb, var(--ce-data-series-6) 90%, transparent) 34%,
+    color-mix(in srgb, var(--ce-data-series-6) 90%, transparent) 68%,
+    color-mix(in srgb, var(--ce-status-success) 92%, transparent) 100%
   );
   background-size: 165% 165%;
   background-position: 12% 30%;
   animation: modalGradientDrift 17s ease-in-out infinite alternate;
-  border-radius: 4px;
+  border-radius: var(--ce-radius-4);
   padding: var(--modal-panel-pad-top) var(--modal-panel-pad-x) var(--modal-panel-pad-bottom);
   overflow: hidden;
   position: relative;
@@ -48,9 +48,9 @@
 .panel[data-slide-key='intro'] {
   background: linear-gradient(
     118deg,
-    rgba(135, 117, 66, 0.92) 0%,
-    rgba(126, 130, 72, 0.92) 46%,
-    rgba(101, 128, 76, 0.92) 100%
+    color-mix(in srgb, var(--ce-status-warning) 92%, transparent) 0%,
+    color-mix(in srgb, var(--ce-data-series-6) 92%, transparent) 46%,
+    color-mix(in srgb, var(--ce-data-series-6) 92%, transparent) 100%
   );
 }
 
@@ -59,9 +59,17 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at 12% 18%, rgba(255, 209, 122, 0.12), transparent 30%),
-    radial-gradient(circle at 85% 16%, rgba(138, 255, 200, 0.1), transparent 28%),
-    linear-gradient(150deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0) 36%);
+    radial-gradient(
+      circle at 12% 18%,
+      color-mix(in srgb, var(--ce-status-warning-text) 12%, transparent),
+      transparent 30%
+    ),
+    radial-gradient(
+      circle at 85% 16%,
+      color-mix(in srgb, var(--ce-status-success-text) 10%, transparent),
+      transparent 28%
+    ),
+    linear-gradient(150deg, color-mix(in srgb, var(--ce-text-inverse) 4%, transparent), transparent 36%);
   background-size: 170% 170%;
   background-position: 0% 0%;
   animation: modalGradientDrift 19s ease-in-out infinite alternate;
@@ -71,8 +79,12 @@
 
 .panel[data-slide-key='intro']::before {
   background:
-    radial-gradient(circle at 70% 16%, rgba(170, 255, 210, 0.08), transparent 24%),
-    linear-gradient(145deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0) 42%);
+    radial-gradient(
+      circle at 70% 16%,
+      color-mix(in srgb, var(--ce-status-success-text) 8%, transparent),
+      transparent 24%
+    ),
+    linear-gradient(145deg, color-mix(in srgb, var(--ce-text-inverse) 3.5%, transparent), transparent 42%);
   opacity: 0.68;
 }
 
@@ -81,8 +93,12 @@
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 18%),
-    linear-gradient(180deg, rgba(3, 9, 18, 0.03), rgba(3, 9, 18, 0.12));
+    linear-gradient(180deg, color-mix(in srgb, var(--ce-text-inverse) 2%, transparent), transparent 18%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--ce-overlay-base) 3%, transparent),
+      color-mix(in srgb, var(--ce-overlay-base) 12%, transparent)
+    );
   pointer-events: none;
 }
 
@@ -121,7 +137,7 @@
 .onboardingTitle {
   margin: 0;
   font-weight: 800;
-  color: rgba(255, 255, 255, 0.72);
+  color: color-mix(in srgb, var(--ce-text-inverse) 72%, transparent);
   text-transform: uppercase;
   letter-spacing: 0;
   font-size: clamp(4.75rem, 6.2vw, 7.6rem);
@@ -274,7 +290,7 @@
 }
 
 .bulletTrailing {
-  color: rgba(255, 255, 255, 0.7);
+  color: color-mix(in srgb, var(--ce-text-inverse) 70%, transparent);
 }
 
 .onboardingControls {
@@ -308,7 +324,7 @@
 
 .controlSlotPlaceholder {
   pointer-events: none;
-  background: rgba(139, 183, 150, 0.28);
+  background: color-mix(in srgb, var(--ce-status-success) 28%, transparent);
   backdrop-filter: saturate(120%);
 }
 
@@ -322,9 +338,9 @@
   text-transform: uppercase;
   font-weight: 600;
   font-size: 1.35em;
-  color: rgba(16, 43, 35, 0.82);
+  color: color-mix(in srgb, var(--ce-overlay-base) 82%, transparent);
   border: none;
-  background: rgba(139, 183, 150, 0.42);
+  background: color-mix(in srgb, var(--ce-status-success) 42%, transparent);
   backdrop-filter: saturate(120%);
   display: flex;
   flex-direction: column;
@@ -353,18 +369,18 @@
   font-weight: 700;
   font-size: 1rem;
   letter-spacing: 0.08em;
-  background: rgba(0, 0, 0, 0.48);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.72);
-  border-radius: 999px;
+  background: color-mix(in srgb, var(--ce-compat-dark) 48%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+  color: color-mix(in srgb, var(--ce-text-inverse) 72%, transparent);
+  border-radius: var(--ce-radius-pill);
   cursor: pointer;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--ce-compat-dark) 22%, transparent);
 }
 
 .skipButton:hover,
 .skipButton:focus {
   opacity: 0.84;
-  background: rgba(0, 0, 0, 0.58);
+  background: color-mix(in srgb, var(--ce-compat-dark) 58%, transparent);
   color: var(--ce-color-panel-text);
 }
 
@@ -372,7 +388,7 @@
   width: 100%;
   height: 100%;
   min-height: 100%;
-  background: rgba(0, 0, 0, 0.18);
+  background: color-mix(in srgb, var(--ce-compat-dark) 18%, transparent);
 }
 
 @keyframes modalGradientDrift {
@@ -469,8 +485,8 @@
   .takeSurveyButton {
     width: 100%;
     font-size: 1.1em;
-    background: rgba(139, 183, 150, 0.42);
-    color: rgba(16, 43, 35, 0.82);
+    background: color-mix(in srgb, var(--ce-status-success) 42%, transparent);
+    color: color-mix(in srgb, var(--ce-overlay-base) 82%, transparent);
   }
 
   .skipButton {
@@ -484,7 +500,7 @@
   .arrowPlaceholder {
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.32);
+    background: color-mix(in srgb, var(--ce-compat-dark) 32%, transparent);
   }
 }
 

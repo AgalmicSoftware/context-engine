@@ -218,7 +218,11 @@ export const resolveSingleQuestionBookmarkIconStyle = (
   bookmarkSuccess: unknown,
   isBookmarked: unknown,
 ): React.CSSProperties => ({
-  color: bookmarkSuccess ? 'lightgreen' : isBookmarked ? '#ffc107' : 'white',
+  color: bookmarkSuccess
+    ? 'var(--ce-status-success-text)'
+    : isBookmarked
+      ? 'var(--ce-status-warning)'
+      : 'var(--ce-panel-text)',
 });
 
 export const buildSingleQuestionMiniPromptButtonClassName = (styleMap: Record<string, string>) =>

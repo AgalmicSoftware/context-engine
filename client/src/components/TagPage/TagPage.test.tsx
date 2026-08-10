@@ -1148,7 +1148,9 @@ describe('TagModal', () => {
     expect(scss).toMatch(
       /\.tagModalContent\s*{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;[\s\S]*flex-wrap:\s*nowrap;[\s\S]*height:\s*100%;[\s\S]*position:\s*relative;/,
     );
-    expect(scss).toMatch(/\.tagModalBackdrop\s*{[\s\S]*background:\s*rgba\(3,\s*5,\s*18,\s*0\.08\) !important;/);
+    expect(scss).toMatch(
+      /\.tagModalBackdrop\s*{[\s\S]*background:\s*color-mix\(in srgb,\s*var\(--ce-overlay-base\) 8%,\s*transparent\) !important;/,
+    );
     expect(scss).toMatch(
       /\.tagModalHeaderBar\s*{[\s\S]*display:\s*flex;[\s\S]*width:\s*100%;[\s\S]*justify-content:\s*space-between;[\s\S]*position:\s*relative;/,
     );
@@ -1156,7 +1158,7 @@ describe('TagModal', () => {
       /\.tagModalHeaderActions\s*{[\s\S]*display:\s*inline-flex;[\s\S]*align-items:\s*center;[\s\S]*gap:\s*10px;/,
     );
     expect(scss).toMatch(
-      /\.tagModalChromeButton\s*{[\s\S]*border-radius:\s*999px;[\s\S]*width:\s*2\.4rem;[\s\S]*height:\s*2\.4rem;/,
+      /\.tagModalChromeButton\s*{[\s\S]*border-radius:\s*var\(--ce-radius-pill\);[\s\S]*width:\s*2\.4rem;[\s\S]*height:\s*2\.4rem;/,
     );
     expect(scss).toMatch(
       /\.tagModalChromePopover\s*{[\s\S]*position:\s*absolute;[\s\S]*top:\s*calc\(100% \+ 10px\);[\s\S]*right:\s*0;/,
@@ -1185,19 +1187,19 @@ describe('TagModal', () => {
     expect(jsx).not.toMatch(/<ModalHeader\b/);
   });
 
-  it('uses the fullscreen tag route blue palette for the modal shell', () => {
+  it('uses the runtime theme palette for the fullscreen modal shell', () => {
     const scssPath = path.join(__dirname, 'TagPage.module.scss');
     const scss = fs.readFileSync(scssPath, 'utf8');
 
-    expect(scss).toMatch(/\$tag-route-bg:\s*#20204e;/);
+    expect(scss).toMatch(/\$tag-route-bg:\s*var\(--ce-canvas\);/);
     expect(scss).toMatch(
-      /\.tagModalContent\s*{[\s\S]*radial-gradient\(circle at top right,\s*rgba\(\$tag-route-accent,\s*0\.18\),\s*transparent 34%\),[\s\S]*linear-gradient\(180deg,\s*rgba\(\$tag-route-bg,\s*0\.985\),\s*rgba\(\$tag-route-bg-deep,\s*0\.985\)\);[\s\S]*background-color:\s*\$tag-route-bg;/,
+      /\.tagModalContent\s*{[\s\S]*radial-gradient\(circle at top right,\s*color-mix\(in srgb,\s*var\(--ce-status-info\) 18%,\s*transparent\),\s*transparent 34%\),[\s\S]*linear-gradient\([\s\S]*color-mix\(in srgb,\s*var\(--ce-canvas\) 98\.5%,\s*transparent\),[\s\S]*color-mix\(in srgb,\s*var\(--ce-surface-sunken\) 98\.5%,\s*transparent\)[\s\S]*\);/,
     );
     expect(scss).toMatch(
-      /\.tagModalHeaderBar\s*{[\s\S]*linear-gradient\(180deg,\s*rgba\(\$tag-route-accent-alt,\s*0\.16\),\s*rgba\(\$tag-route-bg,\s*0\.1\)\),/,
+      /\.tagModalHeaderBar\s*{[\s\S]*linear-gradient\([\s\S]*color-mix\(in srgb,\s*var\(--ce-compat-indigo\) 16%,\s*transparent\),[\s\S]*color-mix\(in srgb,\s*var\(--ce-canvas\) 10%,\s*transparent\)[\s\S]*\),/,
     );
     expect(scss).toMatch(
-      /\.tagModalChromePopover\s*{[\s\S]*linear-gradient\(180deg,\s*rgba\(\$tag-route-accent-alt,\s*0\.14\),\s*rgba\(\$tag-route-bg-deep,\s*0\.14\)\),[\s\S]*rgba\(\$tag-route-bg,\s*0\.98\);/,
+      /\.tagModalChromePopover\s*{[\s\S]*linear-gradient\([\s\S]*color-mix\(in srgb,\s*var\(--ce-compat-indigo\) 14%,\s*transparent\),[\s\S]*color-mix\(in srgb,\s*var\(--ce-surface-sunken\) 14%,\s*transparent\)[\s\S]*\),[\s\S]*color-mix\(in srgb,\s*var\(--ce-canvas\) 98%,\s*transparent\);/,
     );
   });
 });

@@ -28,6 +28,7 @@ import { getChainById } from '../../variables/chains.js';
 import styles from './PolisReport.module.scss';
 import { QRCodeSVG } from 'qrcode.react';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { FIXED_MEDIA_DARK, FIXED_MEDIA_LIGHT } from '../../utilities/ui/fixedMediaColors';
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
 import { createLogger } from 'utilities/logging.js';
 import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
@@ -98,1221 +99,18 @@ export {
 } from './polisReportRuntime';
 
 const surveyLog = createLogger('surveys');
-
-type UnknownRecord = Record<string, unknown>;
-type StringMap = Record<string, string>;
-type NumberMap = Record<string, number>;
-type BooleanMap = Record<string, boolean>;
-type ConcretePolisVote = -1 | 0 | 1;
-type PolisVote = ConcretePolisVote | null;
-type RatingMatrix = PolisVote[][];
-type EmbeddingChoice = 'UMAP' | 'SVD' | 'POLIS';
-
-interface PolisResponseRow extends UnknownRecord {
-  responder?: string | null;
-  questionId?: string | null;
-  response?: string | null;
-}
-
-type PolisQuestionResponses = Record<string, PolisResponseRow[]>;
-
-interface PolisQuestionMeta extends UnknownRecord {
-  tags?: unknown[];
-  type?: unknown;
-  creator?: unknown;
-}
-
-interface PolisSbtEntry extends UnknownRecord {
-  name?: string;
-  address?: string;
-  mintedAddresses?: string[];
-  burnedAddresses?: string[];
-  mintedCountByAddress?: unknown;
-  burnedCountByAddress?: unknown;
-  countsLoaded?: boolean;
-  countsScanCheckpoint?: unknown;
-}
-
-interface PolisSbtSelection extends UnknownRecord {
-  name?: string;
-  address: string;
-}
-
-interface PolisSbtFilter extends UnknownRecord {
-  selectedSBTGroupsResponder?: PolisSbtSelection[];
-  excludedSBTGroupsResponder?: PolisSbtSelection[];
-  selectedSBTGroupsCreator?: PolisSbtSelection[];
-  excludedSBTGroupsCreator?: PolisSbtSelection[];
-  selectedSBTGroups?: PolisSbtSelection[];
-  excludedSBTGroups?: PolisSbtSelection[];
-}
-
-interface PolisFilterState extends UnknownRecord {
-  selectedTags?: unknown[];
-  tag?: string;
-  tags?: string | unknown[];
-  includeTags?: string | unknown[];
-  questionTypes?: unknown[];
-  sbtFilter?: PolisSbtFilter | null;
-  topQuestions?: {
-    count?: unknown;
-    by?: unknown;
-  };
-  onlyVerifiedHumans?: boolean;
-}
-
-interface PolisStats {
-  nParticipants: number;
-  nComments: number;
-  totalVotes: number;
-  votesPerVoterAvg: number;
-}
-
-interface PolisPoint extends UnknownRecord {
-  x: number;
-  y: number;
-  index: number;
-}
-
-interface PolisRepresentativeQuestion extends UnknownRecord {
-  label: string;
-  questionIndex: number;
-  prompt: string;
-  difference: number;
-  repfulFor?: string;
-}
-
-type PolisRepQuestionsMap = Record<string, PolisRepresentativeQuestion[]>;
-
-interface PolisClusterAnalysisResult {
-  short: string;
-  long: string;
-  name?: string;
-}
-
-type PolisAnalysisCacheByCluster = Record<string, PolisClusterAnalysisResult>;
-type PolisAnalysisCacheByKey = Record<string, PolisAnalysisCacheByCluster>;
-type PolisAnalysisErrorsByKey = Record<string, StringMap>;
-
-interface PrecomputedDemoClusterState {
-  clusterCount: number;
-  clusterAssignments: number[];
-  repQuestions: PolisRepQuestionsMap;
-  clusterCollapseState: BooleanMap;
-  analysisCacheByClusterIndex: PolisAnalysisCacheByCluster;
-  commentStats?: PolisCommentStat[];
-}
-
-interface PolisCommentStat extends UnknownRecord {
-  commentIndex: number;
-  extremity: number;
-  agrees: number;
-  disagrees: number;
-  unsure?: number;
-  total: number;
-}
-
-interface RatingMatrixBuildResult {
-  matrix: RatingMatrix | null;
-  responders: string[];
-  questions: string[];
-  promptsMap: StringMap;
-  displayNamesMap?: StringMap;
-}
-
-interface PolisReportProps {
-  [key: string]: unknown;
-  questionResponses?: PolisQuestionResponses | UnknownRecord | null;
-  network?: UnknownRecord | null;
-  disclaimersActive?: boolean;
-  sbtFilterString?: string;
-  filterState?: PolisFilterState | null;
-  sessionName?: unknown;
-  sessionHeader?: unknown;
-  sessionInfo?: unknown;
-  onePageDemo?: boolean;
-  demoMode?: boolean;
-  demoDataFirstLoad?: boolean;
-  demoDataBySlug?: unknown;
-  miniMode?: boolean;
-  isQuestionCacheReady?: boolean;
-  isResponsesCacheReady?: boolean;
-  questionScanProgress?: UnknownRecord | null;
-  questionResponsesNonce?: number;
-  networkChainId?: number | string | null;
-  slug?: string;
-  sessionSlug?: string;
-}
-
-type DoUMAPFn = (data: number[][], nNeighbors: number, randomSeed: number) => [number, number][];
-type ClusterPointsFn = (points: PolisPoint[], clusterCount: number, randomSeed: number) => number[];
-type AnalyzeClusterOpinionsFn = (
-  payload: UnknownRecord,
-  allClustersData: UnknownRecord,
-  options: { sessionSlug: string },
-) => Promise<Partial<PolisClusterAnalysisResult>>;
-
-type D3LinearScale = {
-  domain(values: [number, number]): {
-    range(values: [number, number]): (value: number) => number;
-  };
-};
-
-type D3ReportApi = {
-  scaleOrdinal(range: readonly string[]): (value: string | number) => string;
-  schemeCategory10: readonly string[];
-  polygonHull(points: [number, number][]): [number, number][] | null;
-  min(values: number[]): number | undefined;
-  max(values: number[]): number | undefined;
-  scaleLinear(): D3LinearScale;
-  line(): (points: [number, number][]) => string | null;
-};
-
-type JsPdfDocument = {
-  internal: {
-    pageSize: {
-      getWidth(): number;
-      getHeight(): number;
-    };
-  };
-  addImage(...args: unknown[]): void;
-  addPage(): void;
-  save(filename: string): void;
-};
-
-type JsPdfConstructor = new (...args: unknown[]) => JsPdfDocument;
-
-const d3Report = d3 as unknown as D3ReportApi;
-const doUMAPTyped = doUMAP as unknown as DoUMAPFn;
-const clusterUMAPPointsKmeansTyped = clusterUMAPPointsKmeans as unknown as ClusterPointsFn;
-const analyzeClusterOpinionsTyped = analyzeClusterOpinions as unknown as AnalyzeClusterOpinionsFn;
-const asRecord = (value: unknown): UnknownRecord =>
-  value && typeof value === 'object' ? (value as UnknownRecord) : {};
-const getErrorMessage = (error: unknown, fallback = 'Unknown error') => {
-  if (
-    error &&
-    typeof error === 'object' &&
-    'message' in error &&
-    typeof error.message === 'string' &&
-    error.message.trim()
-  ) {
-    return error.message;
-  }
-  return fallback;
-};
-
-export const sanitizePolisReportPdfNamePart = (value: unknown): string =>
-  String(value ?? '')
-    .trim()
-    .replace(/\s+/g, '_')
-    .replace(/[^a-zA-Z0-9._-]+/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^[_.,-]+|[_.,-]+$/g, '')
-    .slice(0, 80);
-
-export const buildPolisReportPdfFilename = (sessionName: unknown, now: Date = new Date()): string => {
-  const sessionPart = sanitizePolisReportPdfNamePart(sessionName);
-  const timestamp = now.toISOString().replace(/[:.-]/g, '_');
-  return `contextEngine_report${sessionPart ? `_${sessionPart}` : ''}_${timestamp}.pdf`;
-};
-
-export const resolveJsPdfConstructor = (module: unknown): JsPdfConstructor => {
-  const record = module && typeof module === 'object' ? (module as UnknownRecord) : {};
-  const defaultExport = record.default;
-  if (typeof defaultExport === 'function') return defaultExport as JsPdfConstructor;
-  if (typeof record.jsPDF === 'function') return record.jsPDF as JsPdfConstructor;
-  if (defaultExport && typeof defaultExport === 'object') {
-    const defaultRecord = defaultExport as UnknownRecord;
-    if (typeof defaultRecord.jsPDF === 'function') return defaultRecord.jsPDF as JsPdfConstructor;
-  }
-  throw new Error('jsPDF constructor is unavailable');
-};
-
-/**************************************************************
- * Helper: parse JSON safely
- **************************************************************/
-function safeJsonParse(str: unknown): UnknownRecord | null {
-  if (!str) return null;
-  try {
-    const parsed = JSON.parse(String(str));
-    return parsed && typeof parsed === 'object' ? (parsed as UnknownRecord) : null;
-  } catch (e) {
-    return null;
-  }
-}
-
-const isPolisDemoFixturePayload = (value: UnknownRecord | null | undefined): boolean =>
-  !!value && value.source === 'demo-polis-data';
-
-export function normalizePolisBinaryVote(value: unknown): ConcretePolisVote | null {
-  if (value === 1) return 1;
-  if (value === -1) return -1;
-  if (value === 0) return 0;
-  if (value === true) return 1;
-  if (value === false) return -1;
-
-  const normalized = String(value ?? '')
-    .trim()
-    .toLowerCase();
-  if (!normalized) return null;
-  if (
-    normalized === 'agree' ||
-    normalized === 'yes' ||
-    normalized === 'y' ||
-    normalized === 'true' ||
-    normalized === '1'
-  ) {
-    return 1;
-  }
-  if (
-    normalized === 'disagree' ||
-    normalized === 'no' ||
-    normalized === 'n' ||
-    normalized === 'false' ||
-    normalized === '-1'
-  ) {
-    return -1;
-  }
-  if (
-    normalized === 'unsure' ||
-    normalized === 'unknown' ||
-    normalized === 'maybe' ||
-    normalized === 'neutral' ||
-    normalized === '0'
-  ) {
-    return 0;
-  }
-  return null;
-}
-
-const DEFAULT_POLIS_DEMO_DATA = demoData;
-const DEFAULT_EXPLORATORY_CLUSTER_COUNT = 3;
-const POLIS_DEMO_CLUSTER_ANALYSIS_VERSION = 2;
-// Registry-backed demo pages can reuse the shared Context corpus fixture while
-// their question/response storage migrates independently.
-const BUILT_IN_POLIS_DEMO_DATASETS_BY_SLUG = Object.freeze(
-  (Array.isArray(CE_DEMO_SESSION_SLUGS) ? CE_DEMO_SESSION_SLUGS : ['demo']).reduce<Record<string, unknown>>(
-    (acc, rawSlug) => {
-      const slug = normalizeSessionSlug(rawSlug);
-      if (slug) acc[slug] = DEFAULT_POLIS_DEMO_DATA;
-      return acc;
-    },
-    { demo: DEFAULT_POLIS_DEMO_DATA },
-  ),
-);
-
-function buildPolisDemoDatasetsBySlug(demoDataBySlug: unknown = null) {
-  const out: Record<string, unknown> = { ...BUILT_IN_POLIS_DEMO_DATASETS_BY_SLUG };
-  if (!demoDataBySlug || typeof demoDataBySlug !== 'object' || Array.isArray(demoDataBySlug)) {
-    return out;
-  }
-  Object.entries(demoDataBySlug).forEach(([rawSlug, value]) => {
-    const slug = normalizeSessionSlug(rawSlug);
-    if (!slug || !value || typeof value !== 'object') return;
-    out[slug] = value;
-  });
-  return out;
-}
-
-function resolvePolisDemoDatasetsBySlug(options: { datasetsBySlug?: unknown; demoDataBySlug?: unknown } = {}) {
-  if (options?.datasetsBySlug && typeof options.datasetsBySlug === 'object' && !Array.isArray(options.datasetsBySlug)) {
-    return options.datasetsBySlug as Record<string, unknown>;
-  }
-  return buildPolisDemoDatasetsBySlug(options?.demoDataBySlug);
-}
-
-const resolvePolisReadSlugs = (baseSlug: unknown = '') => {
-  const normalizedBaseSlug = normalizeSessionSlug(baseSlug);
-  return [normalizedBaseSlug];
-};
-
-const POLIS_DEMO_AUTOLOAD_SLUG_SET = new Set<string>(
-  Array.isArray(POLIS_DEMO_DATA_AUTOLOAD_SLUGS)
-    ? POLIS_DEMO_DATA_AUTOLOAD_SLUGS.map((slug: unknown) => normalizeSessionSlug(slug))
-    : [],
-);
-
-export function getPolisHistoricalParticipantAvatar(displayName: unknown = '', fallbackSeed: unknown = '') {
-  const normalizedDisplayName = String(displayName || '').trim();
-  if (!normalizedDisplayName) return '';
-  return getHistoricalFigureAvatarOrBlockie(normalizedDisplayName, {
-    preferBlockie: false,
-    fallbackSeed: normalizedDisplayName || String(fallbackSeed || ''),
-  });
-}
-
-export function getPolisHistoricalParticipantBlockie(displayName: unknown = '', fallbackSeed: unknown = '') {
-  const normalizedDisplayName = String(displayName || '').trim();
-  if (!normalizedDisplayName) return generateBlockieDataUrl(String(fallbackSeed || '').toLowerCase(), 8, 4);
-  return getHistoricalFigureBlockie(normalizedDisplayName, {
-    fallbackSeed: normalizedDisplayName || String(fallbackSeed || ''),
-  });
-}
-
-const SUPERSCRIPT_DIGITS = Object.freeze({
-  0: '⁰',
-  1: '¹',
-  2: '²',
-  3: '³',
-  4: '⁴',
-  5: '⁵',
-  6: '⁶',
-  7: '⁷',
-  8: '⁸',
-  9: '⁹',
-});
-
-function formatSuperscriptNumber(value: unknown) {
-  return String(value ?? '')
-    .split('')
-    .map((char) => SUPERSCRIPT_DIGITS[char] || char)
-    .join('');
-}
-
-export function hasPolisDemoDatasetForSlug(
-  slugIn: unknown = '',
-  options: { datasetsBySlug?: unknown; demoDataBySlug?: unknown } = {},
-) {
-  const datasetsBySlug = resolvePolisDemoDatasetsBySlug(options);
-  const slug = normalizeSessionSlug(slugIn);
-  if (!slug) return false;
-  return Object.prototype.hasOwnProperty.call(datasetsBySlug, slug);
-}
-
-export function getPolisDemoDatasetForSlug(
-  slugIn: unknown = '',
-  options: { datasetsBySlug?: unknown; demoDataBySlug?: unknown; allowFallback?: boolean } = {},
-) {
-  const datasetsBySlug = resolvePolisDemoDatasetsBySlug(options);
-  const allowFallback = options?.allowFallback !== false;
-  const slug = normalizeSessionSlug(slugIn);
-  if (slug && Object.prototype.hasOwnProperty.call(datasetsBySlug, slug)) return datasetsBySlug[slug];
-  return allowFallback ? DEFAULT_POLIS_DEMO_DATA : null;
-}
-
-export function shouldAutoEnablePolisDemoData(
-  input: {
-    slug?: unknown;
-    sessionSlug?: unknown;
-    demoDataFirstLoad?: boolean;
-    datasetsBySlug?: unknown;
-    demoDataBySlug?: unknown;
-  } = {},
-) {
-  const slug = normalizeSessionSlug(input?.slug ?? input?.sessionSlug ?? '');
-  if (input?.demoDataFirstLoad) {
-    return slug === 'demo' || hasPolisDemoDatasetForSlug(slug, input);
-  }
-  return POLIS_DEMO_AUTOLOAD_SLUG_SET.has(slug) && hasPolisDemoDatasetForSlug(slug, input);
-}
-
-export function buildClusterAnalysisDataKey({
-  activeClusterAssignments = [],
-  activeClusterCount = 0,
-  activeRepQuestions = {},
-  embeddingChoice = '',
-  useDemoData = false,
-  questionResponsesNonce = 0,
-  questionPrompts = {},
-  allQuestions = [],
-}: {
-  activeClusterAssignments?: number[];
-  activeClusterCount?: number;
-  activeRepQuestions?: PolisRepQuestionsMap;
-  embeddingChoice?: string;
-  useDemoData?: boolean;
-  questionResponsesNonce?: number;
-  questionPrompts?: StringMap;
-  allQuestions?: string[];
-} = {}) {
-  const assignmentHash = (Array.isArray(activeClusterAssignments) ? activeClusterAssignments : []).reduce(
-    (acc, val) => {
-      return (acc * 31 + (val + 1)) % 1000000007;
-    },
-    7,
-  );
-  const promptEntries = Object.entries(questionPrompts || {});
-  let promptsHash = 0;
-  promptEntries.forEach(([key, value]) => {
-    const text = `${key}:${value || ''}`;
-    for (let i = 0; i < text.length; i += 31) {
-      promptsHash = (promptsHash * 33 + text.charCodeAt(i)) % 1000000007;
-    }
-  });
-  const questionCount = allQuestions?.length || 0;
-  const repCount = Object.keys(activeRepQuestions || {}).length;
-  // Demo-mode analysis derives from the fixed fixture, so upstream response
-  // nonce churn should not invalidate the visible cluster-analysis cache.
-  const nonce = useDemoData ? 0 : (questionResponsesNonce ?? 0);
-
-  return `${embeddingChoice}-${activeClusterCount}-${nonce}-${questionCount}-${promptEntries.length}-${repCount}-${assignmentHash}-${promptsHash}`;
-}
-
-/**************************************************************
- * Helper: applyFilterStateToAggregator
- * Filters the aggregator BEFORE building the rating matrix.
- * - questionResponses: { [qId]: Array<{ responder, questionId, response }> }
- * - network: chain object (uses network.id to read caches)
- * - filterState: QuestionFilter state from parent (see types in prompt)
- *
- * Returns a pruned aggregator with only filtered question IDs and
- * per-question filtered response arrays.
- *
- * Notes:
- *  - If caches are missing/partial, we skip that filter step gracefully.
- *  - We DO NOT read demo mode here; caller bypasses filtering when demo is on.
- **************************************************************/
-export function applyFilterStateToAggregator(
-  questionResponses: PolisQuestionResponses | UnknownRecord | null | undefined,
-  network: UnknownRecord | null | undefined,
-  filterState: PolisFilterState | null | undefined,
-  sessionSlug: unknown,
-): PolisQuestionResponses {
-  if (!questionResponses || typeof questionResponses !== 'object') return {};
-
-  const netId = network?.id != null ? String(network.id) : null;
-
-  // Resolve group slug (optional param -> URL path fallback)
-  const resolveSlug = () => {
-    if (typeof sessionSlug === 'string') {
-      return canonicalizeLegacySessionAlias(sessionSlug);
-    }
-    try {
-      const p =
-        typeof window !== 'undefined' && window.location && window.location.pathname ? window.location.pathname : '';
-      if (p.startsWith('/session/')) {
-        const s = (p.split('/').filter(Boolean)[1] || '').trim();
-        if (!s) return '';
-        return canonicalizeLegacySessionAlias(s);
-      }
-    } catch (e) {
-      surveyLog.warn('PolisReport: fallback', e);
-    }
-    return ''; // default to general
-  };
-  const slug = resolveSlug();
-  const readSlugs = resolvePolisReadSlugs(slug);
-
-  // Safe cache reads (group-aware dg:* keys)
-  const qMap: Record<string, PolisQuestionMeta> = {};
-  const sbtList: Record<string, PolisSbtEntry> = {};
-  readSlugs.forEach((readSlug) => {
-    const qParsed = peekCacheSync('questionsCache', readSlug, { clone: false });
-    const sParsed = peekCacheSync('sbtCache', readSlug, { clone: false });
-    const qCache = (qParsed || null) as Record<string, { questions?: Record<string, PolisQuestionMeta> }> | null;
-    const sCache = (sParsed || null) as Record<string, { sbtList?: Record<string, PolisSbtEntry> }> | null;
-    const scopedQuestions = netId && qCache && qCache[netId] && qCache[netId].questions ? qCache[netId].questions : {};
-    const scopedSbtList = netId && sCache && sCache[netId] && sCache[netId].sbtList ? sCache[netId].sbtList : {};
-
-    Object.keys(scopedQuestions).forEach((questionId) => {
-      const lowerQuestionId = String(questionId || '').toLowerCase();
-      if (!lowerQuestionId || Object.prototype.hasOwnProperty.call(qMap, lowerQuestionId)) return;
-      qMap[lowerQuestionId] = scopedQuestions[questionId];
-    });
-    Object.assign(sbtList, scopedSbtList);
-  });
-
-  // ---- Build combined tag set (lowercased) ----
-  const combinedTagSet = new Set<string>();
-  if (Array.isArray(filterState?.selectedTags)) {
-    filterState.selectedTags
-      .map((t) => String(t).trim().toLowerCase())
-      .filter(Boolean)
-      .forEach((t) => combinedTagSet.add(t));
-  }
-  // ---- NEW: accept additional tag filter shapes (comma-strings or arrays) ----
-  if (typeof filterState?.tag === 'string' && filterState.tag.trim() !== '') {
-    filterState.tag
-      .split(',')
-      .map((t) => t.trim().toLowerCase())
-      .filter(Boolean)
-      .forEach((t) => combinedTagSet.add(t));
-  }
-  if (Array.isArray(filterState?.tags)) {
-    filterState.tags
-      .map((t) => String(t).trim().toLowerCase())
-      .filter(Boolean)
-      .forEach((t) => combinedTagSet.add(t));
-  }
-  if (typeof filterState?.tags === 'string' && filterState.tags.trim() !== '') {
-    filterState.tags
-      .split(',')
-      .map((t) => t.trim().toLowerCase())
-      .filter(Boolean)
-      .forEach((t) => combinedTagSet.add(t));
-  }
-  if (Array.isArray(filterState?.includeTags)) {
-    filterState.includeTags
-      .map((t) => String(t).trim().toLowerCase())
-      .filter(Boolean)
-      .forEach((t) => combinedTagSet.add(t));
-  }
-  if (typeof filterState?.includeTags === 'string' && filterState.includeTags.trim() !== '') {
-    filterState.includeTags
-      .split(',')
-      .map((t) => t.trim().toLowerCase())
-      .filter(Boolean)
-      .forEach((t) => combinedTagSet.add(t));
-  }
-
-  // ---- Question types set (lowercased) ----
-  const typesSet = new Set<string>(
-    Array.isArray(filterState?.questionTypes) ? filterState.questionTypes.map((s) => String(s).toLowerCase()) : [],
-  );
-
-  // ---- SBT helpers ----
-  const sbtFilter = filterState?.sbtFilter || null;
-  const toLowerAddr = (x: unknown) =>
-    (x && typeof x === 'object' && 'address' in x ? String(x.address).toLowerCase() : '').trim();
-  const normalizeAddressCountMap = (value: unknown = null): NumberMap => {
-    const out: NumberMap = {};
-    Object.entries(value && typeof value === 'object' ? value : {}).forEach(([addrRaw, countRaw]) => {
-      const addr = String(addrRaw || '')
-        .toLowerCase()
-        .trim();
-      if (!addr) return;
-      const count = Math.max(0, Math.floor(Number(countRaw || 0)));
-      if (count <= 0) return;
-      out[addr] = count;
-    });
-    return out;
-  };
-
-  function isAddrInSbt(sbtAddrLower: string, personLower: string) {
-    if (!sbtAddrLower || !personLower) return false;
-    const entry = sbtList[sbtAddrLower];
-    if (!entry) return false;
-    const checkpointBackedPartialCounts =
-      entry?.countsLoaded !== true && !!entry?.countsScanCheckpoint && typeof entry.countsScanCheckpoint === 'object';
-    const mintedCountMap = normalizeAddressCountMap(entry.mintedCountByAddress);
-    const burnedCountMap = normalizeAddressCountMap(entry.burnedCountByAddress);
-    if (
-      !checkpointBackedPartialCounts &&
-      (Object.keys(mintedCountMap).length > 0 || Object.keys(burnedCountMap).length > 0)
-    ) {
-      return Number(mintedCountMap[personLower] || 0) > Number(burnedCountMap[personLower] || 0);
-    }
-    if (checkpointBackedPartialCounts) return false;
-    const minted = Array.isArray(entry.mintedAddresses) ? entry.mintedAddresses : [];
-    const burned = Array.isArray(entry.burnedAddresses) ? entry.burnedAddresses : [];
-    const inMinted = minted.includes(personLower);
-    const inBurned = burned.includes(personLower);
-    return inMinted && !inBurned;
-  }
-
-  function isMemberOfAny(personLower: string, groupListLower: string[]) {
-    if (!personLower || !Array.isArray(groupListLower) || groupListLower.length === 0) return false;
-    for (const g of groupListLower) {
-      if (!g) continue;
-      if (isAddrInSbt(g, personLower)) return true;
-    }
-    return false;
-  }
-
-  // Responder SBT lists (new + legacy)
-  const incResponderGroupsLower = [
-    ...(Array.isArray(sbtFilter?.selectedSBTGroupsResponder) ? sbtFilter.selectedSBTGroupsResponder : []),
-    ...(Array.isArray(sbtFilter?.selectedSBTGroups) ? sbtFilter.selectedSBTGroups : []),
-  ]
-    .map(toLowerAddr)
-    .filter(Boolean);
-
-  const excResponderGroupsLower = [
-    ...(Array.isArray(sbtFilter?.excludedSBTGroupsResponder) ? sbtFilter.excludedSBTGroupsResponder : []),
-    ...(Array.isArray(sbtFilter?.excludedSBTGroups) ? sbtFilter.excludedSBTGroups : []),
-  ]
-    .map(toLowerAddr)
-    .filter(Boolean);
-
-  // Creator SBT lists (new only)
-  const incCreatorGroupsLower = Array.isArray(sbtFilter?.selectedSBTGroupsCreator)
-    ? sbtFilter.selectedSBTGroupsCreator.map(toLowerAddr).filter(Boolean)
-    : [];
-  const excCreatorGroupsLower = Array.isArray(sbtFilter?.excludedSBTGroupsCreator)
-    ? sbtFilter.excludedSBTGroupsCreator.map(toLowerAddr).filter(Boolean)
-    : [];
-
-  // --- Build filtered aggregator ---
-  let filteredAgg: PolisQuestionResponses = {};
-
-  Object.entries(questionResponses).forEach(([qId, arr]) => {
-    const qIdLower = String(qId || '').toLowerCase();
-
-    // Question metadata (may be missing)
-    const qMeta = qMap[qIdLower] || null;
-    const qTagsLower = Array.isArray(qMeta?.tags) ? qMeta.tags.map((t) => String(t).toLowerCase()) : null;
-    const qTypeLower = qMeta?.type ? String(qMeta.type).toLowerCase() : null;
-    const creatorLower = qMeta?.creator ? String(qMeta.creator).toLowerCase() : null;
-
-    // 1) Tags: if we have tags in cache AND combined set is non-empty, require intersection.
-    if (combinedTagSet.size > 0 && Array.isArray(qTagsLower) && qTagsLower.length > 0) {
-      const hasAny = qTagsLower.some((t) => combinedTagSet.has(t));
-      if (!hasAny) return; // skip this question
-    }
-    // If tags missing from cache, skip gating (graceful).
-
-    // 2) Types: if provided AND we know the type, require it to match; if unknown type, skip gating.
-    if (typesSet.size > 0 && qTypeLower && !typesSet.has(qTypeLower)) {
-      return;
-    }
-
-    // 3) Creator SBT rules: gate entire question
-    if (incCreatorGroupsLower.length > 0) {
-      // If creator unknown, skip gating (do NOT drop due to cache miss).
-      if (creatorLower) {
-        const ok = isMemberOfAny(creatorLower, incCreatorGroupsLower);
-        if (!ok) return;
-      }
-    }
-    if (excCreatorGroupsLower.length > 0) {
-      if (creatorLower) {
-        const bad = isMemberOfAny(creatorLower, excCreatorGroupsLower);
-        if (bad) return;
-      }
-    }
-
-    // 4) Responder SBT rules: filter per-response
-    const nextArr: PolisResponseRow[] = [];
-    const originalArr = Array.isArray(arr) ? (arr as PolisResponseRow[]) : [];
-    for (const respObj of originalArr) {
-      const responderLower = respObj?.responder ? String(respObj.responder).toLowerCase() : '';
-      if (!responderLower) continue;
-
-      // Inclusion lists (union): if present, responder must be in at least one
-      if (incResponderGroupsLower.length > 0) {
-        if (!isMemberOfAny(responderLower, incResponderGroupsLower)) {
-          continue;
-        }
-      }
-      // Exclusion lists (union): drop if responder is in any excluded group
-      if (excResponderGroupsLower.length > 0) {
-        if (isMemberOfAny(responderLower, excResponderGroupsLower)) {
-          continue;
-        }
-      }
-      nextArr.push(respObj);
-    }
-
-    if (nextArr.length > 0) {
-      filteredAgg[qId] = nextArr;
-    }
-  });
-
-  // 5) Top questions (after the above)
-  const top = filterState?.topQuestions;
-  const topCount = Number(top?.count || 0);
-  const topBy =
-    top?.by === 'responses' ? 'responses' : top?.by === 'conviction' || top?.by === 'importance' ? 'importance' : null;
-
-  if (topBy && topCount > 0) {
-    const scored = Object.entries(filteredAgg).map(([qId, arr]) => {
-      let score = 0;
-      for (const r of arr) {
-        const parsed = safeJsonParse(r?.response);
-        if (!parsed) continue;
-        if (isPolisDemoFixturePayload(parsed)) continue;
-        // We only consider binary answers here to align with rating-matrix & spec
-        if (parsed.type !== 'binary') continue;
-        const answer = asRecord(parsed.answer);
-        if (answer.encrypted) continue;
-
-        if (topBy === 'responses') {
-          if (normalizePolisBinaryVote(answer.value) !== null) {
-            score += 1;
-          }
-        } else {
-          const imp = Number(parsed?.conviction ?? parsed?.importance ?? 0);
-          if (!Number.isNaN(imp)) score += imp;
-        }
-      }
-      return { qId, score };
-    });
-
-    // Sort descending by score
-    scored.sort((a, b) => b.score - a.score);
-
-    const keep = scored.slice(0, Math.min(topCount, scored.length)).map((s) => s.qId);
-    const keepSet = new Set(keep);
-
-    const limited: PolisQuestionResponses = {};
-    Object.keys(filteredAgg).forEach((qid) => {
-      if (keepSet.has(qid)) limited[qid] = filteredAgg[qid];
-    });
-    filteredAgg = limited;
-  }
-
-  // onlyVerifiedHumans: If true but no SBT constraints exist, no-op per spec.
-  // (If there is already an SBT include list for humans, it's already applied above.)
-
-  return filteredAgg;
-}
-
-/***************************************************************
- * PolisBoxPlot
- * Distinguishes:
- *   - green (Agree => 1)
- *   - yellow (Unsure => 0)
- *   - red (Disagree => -1)
- *
- * NOTE: Non-answers (null/undefined) are ignored in both counts
- * and width calculations; no "white" segment is rendered.
- ***************************************************************/
-function PolisBoxPlot({ votes }: { votes: Array<number | null | undefined> }) {
-  // Keep only concrete answers
-  const concreteVotes = Array.isArray(votes)
-    ? votes.filter((v): v is ConcretePolisVote => v === 1 || v === 0 || v === -1)
-    : [];
-
-  const totalConcrete = concreteVotes.length;
-
-  const agrees = concreteVotes.filter((v) => v === 1).length;
-  const disagrees = concreteVotes.filter((v) => v === -1).length;
-  const unsures = concreteVotes.filter((v) => v === 0).length;
-
-  // Dimensions for the mini bar
-  const svgWidth = 200;
-  const svgHeight = 30;
-
-  // Avoid division by zero; if no concrete votes, render only the frame
-  const denom = totalConcrete > 0 ? totalConcrete : 1;
-
-  // Convert counts to pixel widths using only concrete answers
-  const fractionAgree = (agrees / denom) * svgWidth;
-  const fractionUnsure = (unsures / denom) * svgWidth;
-  const fractionDisagree = (disagrees / denom) * svgWidth;
-
-  let currentX = 0;
-
-  return (
-    <div className={styles.polisBoxPlotContainer}>
-      <svg width={svgWidth} height={svgHeight} className={styles.polisBoxPlotSvg}>
-        <rect x={0} y={0} width={svgWidth} height={svgHeight} fill="none" stroke="#000" strokeWidth={1} />
-
-        {/* Only draw segments if there's at least one concrete answer */}
-        {totalConcrete > 0 && (
-          <>
-            <rect x={currentX} y={0} width={fractionAgree} height={svgHeight} fill="green" />
-            {fractionAgree > 0 && (currentX += fractionAgree)}
-
-            <rect x={currentX} y={0} width={fractionUnsure} height={svgHeight} fill="yellow" />
-            {fractionUnsure > 0 && (currentX += fractionUnsure)}
-
-            <rect x={currentX} y={0} width={fractionDisagree} height={svgHeight} fill="red" />
-          </>
-        )}
-      </svg>
-    </div>
-  );
-}
-
-function PolisQuestionHoverCard({
-  label,
-  prompt,
-  votes = [],
-  metaLabel = '',
-}: {
-  label?: string;
-  prompt?: string;
-  votes?: Array<number | null | undefined>;
-  metaLabel?: string;
-}) {
-  const concreteVotes = Array.isArray(votes)
-    ? votes.filter((v): v is ConcretePolisVote => v === 1 || v === 0 || v === -1)
-    : [];
-
-  const agrees = concreteVotes.filter((v) => v === 1).length;
-  const disagrees = concreteVotes.filter((v) => v === -1).length;
-  const unsures = concreteVotes.filter((v) => v === 0).length;
-
-  return (
-    <div>
-      <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
-        {label ? `${label}: ` : ''}
-        {prompt || '(No prompt)'}
-      </div>
-      {metaLabel ? <div style={{ fontSize: '0.78rem', marginBottom: '6px', opacity: 0.85 }}>{metaLabel}</div> : null}
-      {concreteVotes.length === 0 ? (
-        <div style={{ fontSize: '0.85rem', opacity: 0.8 }}>No responses in this comparison.</div>
-      ) : (
-        <div className={styles.questionVoteRow}>
-          <span style={{ fontSize: '0.85rem', marginRight: '8px' }}>
-            <strong>Agree:</strong> {agrees} / <strong>Disagree:</strong> {disagrees} / <strong>Unsure:</strong>{' '}
-            {unsures}
-          </span>
-          <PolisBoxPlot votes={concreteVotes} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-/***************************************************************
- * Build rating matrix from real or from the included demo
- *
- * We only consider question responses of type 'binary'.
- *   That means we only parse if r.response has { type: 'binary' } and
- *   answer { value: 'Agree' | 'Disagree' | 'Unsure' }, including
- *   legacy yes/no/0/1 encodings from older response payloads.
- ***************************************************************/
-function isPolisRealRowAllowedForSession(
-  row: PolisResponseRow,
-  parsedResponse: UnknownRecord | null,
-  sessionSlug: unknown = '',
-): boolean {
-  return (
-    isResponseAllowedForSessionSlug(row, sessionSlug) && isResponseAllowedForSessionSlug(parsedResponse, sessionSlug)
-  );
-}
-
-export function buildRatingMatrixFromRealData(
-  realQR: PolisQuestionResponses | UnknownRecord,
-  options: { sessionSlug?: unknown } = {},
-): RatingMatrixBuildResult {
-  if (!realQR || typeof realQR !== 'object') {
-    return { matrix: null, responders: [], questions: [], promptsMap: {} };
-  }
-  const sessionSlug = options.sessionSlug || '';
-
-  // Collect binary questions deterministically and gather prompts
-  const participantsSet = new Set<string>();
-  const binaryQuestions: Array<{ qId: string; prompt: string }> = [];
-  const promptsMap: StringMap = {};
-
-  Object.entries(realQR).forEach(([qId, arr]) => {
-    if (!Array.isArray(arr) || arr.length === 0) return;
-
-    // Find the first parsed response with a declared type to decide if it's binary
-    let firstType: unknown = null;
-    let firstPrompt: unknown = null;
-    for (const r of arr) {
-      const parsed = safeJsonParse(r?.response);
-      if (isPolisDemoFixturePayload(parsed)) continue;
-      if (!isPolisRealRowAllowedForSession(r, parsed, sessionSlug)) continue;
-      if (parsed && typeof parsed === 'object' && parsed.type) {
-        firstType = parsed.type;
-        firstPrompt = parsed.prompt || '(No prompt)';
-        break;
-      }
-    }
-    if (firstType !== 'binary') return; // we only include binary questions
-
-    binaryQuestions.push({ qId, prompt: String(firstPrompt || '(No prompt)') });
-    promptsMap[qId] = String(firstPrompt || '(No prompt)');
-
-    // Gather participants who answered this (binary) question
-    for (const r of arr) {
-      const parsed = safeJsonParse(r?.response);
-      if (isPolisDemoFixturePayload(parsed)) continue;
-      if (!isPolisRealRowAllowedForSession(r, parsed, sessionSlug)) continue;
-      if (r?.responder) {
-        participantsSet.add(String(r.responder).toLowerCase());
-      }
-    }
-  });
-
-  // No usable questions or participants => bail out
-  if (binaryQuestions.length === 0 || participantsSet.size === 0) {
-    return { matrix: null, responders: [], questions: [], promptsMap: {} };
-  }
-
-  // Deterministic ordering
-  const questionsSorted = binaryQuestions.map(({ qId }) => qId).sort((a, b) => String(a).localeCompare(String(b)));
-
-  const respondersSorted = Array.from(participantsSet).sort((a, b) => String(a).localeCompare(String(b)));
-
-  // Build index maps
-  const questionIndexMap: NumberMap = {};
-  questionsSorted.forEach((qId, idx) => {
-    questionIndexMap[qId] = idx;
-  });
-
-  const participantIndexMap: NumberMap = {};
-  respondersSorted.forEach((addr, idx) => {
-    participantIndexMap[addr] = idx;
-  });
-
-  // Initialize matrix [nQuestions x nParticipants] with nulls
-  const numQ = questionsSorted.length;
-  const numP = respondersSorted.length;
-  const matrix: RatingMatrix = Array.from({ length: numQ }, () => Array(numP).fill(null));
-
-  // Fill matrix with -1 / 0 / 1 for Disagree / Unsure / Agree
-  questionsSorted.forEach((qId) => {
-    const rowIndex = questionIndexMap[qId];
-    const arr = Array.isArray(realQR[qId]) ? (realQR[qId] as PolisResponseRow[]) : [];
-    for (const r of arr) {
-      const parsed = safeJsonParse(r?.response);
-      if (!parsed || parsed.type !== 'binary') continue;
-      if (isPolisDemoFixturePayload(parsed)) continue;
-      if (!isPolisRealRowAllowedForSession(r, parsed, sessionSlug)) continue;
-      const answer = asRecord(parsed.answer);
-      if (answer.encrypted) continue;
-
-      const val: PolisVote = normalizePolisBinaryVote(answer.value);
-
-      const pIdx = participantIndexMap[String(r?.responder || '').toLowerCase()];
-      if (pIdx !== undefined) {
-        matrix[rowIndex][pIdx] = val;
-      }
-    }
-  });
-
-  return {
-    matrix,
-    responders: respondersSorted,
-    questions: questionsSorted,
-    promptsMap,
-  };
-}
-
-export function buildRatingMatrixFromDemo(demoDataSource: unknown = DEFAULT_POLIS_DEMO_DATA): RatingMatrixBuildResult {
-  const demoRecord = demoDataSource && typeof demoDataSource === 'object' ? (demoDataSource as UnknownRecord) : {};
-  const commentsArr = Array.isArray(demoRecord.comments) ? (demoRecord.comments as UnknownRecord[]) : [];
-  const participantsArr = Array.isArray(demoRecord.participantsVotes)
-    ? (demoRecord.participantsVotes as UnknownRecord[])
-    : [];
-
-  if (!commentsArr.length || !participantsArr.length) {
-    return { matrix: null, responders: [], questions: [], promptsMap: {}, displayNamesMap: {} };
-  }
-
-  const binaryComments = commentsArr.filter((c) => {
-    const t = String(c?.type || '')
-      .trim()
-      .toLowerCase();
-    return !t || t === 'binary';
-  });
-  const binaryOriginalIndices: number[] = [];
-  commentsArr.forEach((c, i) => {
-    const t = String(c?.type || '')
-      .trim()
-      .toLowerCase();
-    if (!t || t === 'binary') binaryOriginalIndices.push(i);
-  });
-
-  const promptsMap: StringMap = {};
-  const questionList: string[] = [];
-  binaryComments.forEach((comment) => {
-    const commentId = String(comment.commentId || '');
-    questionList.push(commentId);
-    promptsMap[commentId] = String(comment.commentBody || '(No prompt)');
-  });
-
-  const participantsSet = new Set<string>();
-  participantsArr.forEach((p) => {
-    participantsSet.add(String(p.participant || ''));
-  });
-
-  const participantArray = Array.from(participantsSet);
-  const participantIndexMap: NumberMap = {};
-  participantArray.forEach((addr, i) => {
-    participantIndexMap[addr] = i;
-  });
-
-  // Build display names map from xid field (e.g. historical figure usernames)
-  const displayNamesMap: StringMap = {};
-  participantsArr.forEach((p) => {
-    if (p.xid && p.participant) {
-      displayNamesMap[String(p.participant)] = String(p.xid);
-    }
-  });
-
-  const numC = binaryComments.length;
-  const numP = participantArray.length;
-  const matrix: RatingMatrix = [];
-  for (let i = 0; i < numC; i++) {
-    matrix.push(new Array(numP).fill(null));
-  }
-
-  participantsArr.forEach((p) => {
-    const pIdx = participantIndexMap[String(p.participant || '')];
-    if (pIdx === undefined) return;
-    const vs = p.votes && typeof p.votes === 'object' ? (p.votes as UnknownRecord) : {};
-    binaryOriginalIndices.forEach((origIdx, filteredIdx) => {
-      const val = vs[String(origIdx)];
-      if ((val === 1 || val === 0 || val === -1 || val === null) && filteredIdx < numC) {
-        matrix[filteredIdx][pIdx] = val;
-      }
-    });
-  });
-
-  return {
-    matrix,
-    responders: participantArray,
-    questions: questionList,
-    promptsMap,
-    displayNamesMap,
-  };
-}
-
-export const resolvePrecomputedClusterDifference = (
-  differenceFromData: unknown,
-  clusterAgreeRate: unknown,
-  overallAgreeRate: unknown,
-): number => {
-  const difference = Number(differenceFromData);
-  if (Number.isFinite(difference)) return difference;
-  const clusterRate = Number(clusterAgreeRate);
-  const overallRate = Number(overallAgreeRate);
-  if (!Number.isFinite(clusterRate) || !Number.isFinite(overallRate)) return 0;
-  return +Math.abs(clusterRate - overallRate).toFixed(1);
-};
-
-export const resolveExploratoryClusterCount = ({
-  activeClusterCount = 0,
-  manualClusterCountValue = null,
-}: {
-  activeClusterCount?: unknown;
-  manualClusterCountValue?: unknown;
-} = {}): number => {
-  const count = Number(activeClusterCount || 0);
-  const safeCount = Number.isFinite(count) ? count : 0;
-  return manualClusterCountValue !== null ? Math.max(safeCount, 2) : safeCount;
-};
-
-export function buildPrecomputedDemoClusterState(
-  demoDataSource: unknown = DEFAULT_POLIS_DEMO_DATA,
-): PrecomputedDemoClusterState | null {
-  const demoRecord = demoDataSource && typeof demoDataSource === 'object' ? (demoDataSource as UnknownRecord) : {};
-  if (Number(demoRecord.clusterAnalysisVersion) !== POLIS_DEMO_CLUSTER_ANALYSIS_VERSION) {
-    return null;
-  }
-  const clusterAnalysis = Array.isArray(demoRecord.clusterAnalysis)
-    ? (demoRecord.clusterAnalysis as UnknownRecord[])
-    : [];
-  const participantsArr = Array.isArray(demoRecord.participantsVotes)
-    ? (demoRecord.participantsVotes as UnknownRecord[])
-    : [];
-
-  if (!clusterAnalysis.length || !participantsArr.length) return null;
-
-  const participantOrder: string[] = [];
-  const participantGroupIdByAddress: NumberMap = {};
-  participantsArr.forEach((participant) => {
-    const address = String(participant?.participant || '').trim();
-    const groupId = Number(participant?.groupId);
-    if (!address || !Number.isInteger(groupId)) return;
-    if (Object.prototype.hasOwnProperty.call(participantGroupIdByAddress, address)) return;
-    participantGroupIdByAddress[address] = groupId;
-    participantOrder.push(address);
-  });
-
-  const uniqueGroupIds = Array.from(
-    new Set(
-      participantOrder
-        .map((address) => participantGroupIdByAddress[address])
-        .filter((groupId) => Number.isInteger(groupId)),
-    ),
-  ).sort((a, b) => a - b);
-
-  if (!uniqueGroupIds.length || uniqueGroupIds.length !== clusterAnalysis.length) return null;
-
-  const clusterIndexByGroupId = new Map(uniqueGroupIds.map((groupId, index) => [groupId, index]));
-  const clusterAssignmentsMaybe = participantOrder.map((address) =>
-    clusterIndexByGroupId.get(participantGroupIdByAddress[address]),
-  );
-  if (clusterAssignmentsMaybe.some((clusterIndex) => !Number.isInteger(clusterIndex))) return null;
-  const clusterAssignments = clusterAssignmentsMaybe as number[];
-
-  const repQuestions: PolisRepQuestionsMap = {};
-  const clusterCollapseState: BooleanMap = {};
-  const analysisCacheByClusterIndex: PolisAnalysisCacheByCluster = {};
-
-  clusterAnalysis.forEach((cluster, clusterIndex) => {
-    const topStatements = Array.isArray(cluster?.topStatements) ? (cluster.topStatements as UnknownRecord[]) : [];
-    repQuestions[clusterIndex] = topStatements
-      .map((statement): PolisRepresentativeQuestion | null => {
-        const questionIndex = Number(statement?.questionIndex);
-        if (!Number.isInteger(questionIndex) || questionIndex < 0) return null;
-        const difference = resolvePrecomputedClusterDifference(
-          statement?.differenceScore,
-          asRecord(statement?.cluster).agreeRate,
-          asRecord(statement?.overall).agreeRate,
-        );
-
-        return {
-          label: String(statement?.label || `#${questionIndex + 1}`),
-          questionIndex,
-          prompt: String(statement?.prompt || ''),
-          difference,
-        };
-      })
-      .filter((statement): statement is PolisRepresentativeQuestion => !!statement);
-
-    clusterCollapseState[clusterIndex] = true;
-
-    const participantCount = Number(cluster?.participantCount);
-    const topLabels = repQuestions[clusterIndex].map((statement) => statement.label);
-    const details: string[] = [];
-    if (Number.isFinite(participantCount) && participantCount > 0) {
-      details.push(`${participantCount} demo participants.`);
-    }
-    if (topLabels.length) {
-      details.push(`Most distinctive questions: ${topLabels.join(', ')}.`);
-    }
-
-    analysisCacheByClusterIndex[clusterIndex] = {
-      name: String(cluster?.clusterLabel || `Cluster ${clusterIndex}`),
-      short: String(cluster?.characteristics || '').trim(),
-      long: details.join(' ').trim(),
-    };
-  });
-
-  return {
-    clusterCount: uniqueGroupIds.length,
-    clusterAssignments,
-    repQuestions,
-    clusterCollapseState,
-    analysisCacheByClusterIndex,
-  };
-}
-
-export function getRenderableParticipantList(responders: unknown[] = [], displayNames: StringMap = {}) {
-  const isEth = (value: unknown) => typeof value === 'string' && /^0x[0-9a-fA-F]{40}$/.test(value);
-  const hasDisplayNames = !!(displayNames && Object.keys(displayNames).length > 0);
-  const unique = Array.from(new Set(Array.isArray(responders) ? responders : []))
-    .filter((addr) => {
-      const displayName = displayNames?.[String(addr)];
-      return !!displayName || isEth(addr);
-    })
-    .map((addr) => String(addr));
-
-  if (!hasDisplayNames) {
-    unique.sort();
-  }
-
-  return unique;
-}
-
-export function formatBlockchainNetworkLabel(network: UnknownRecord | null = null, fallbackChainId: unknown = null) {
-  const networkChainId = Number(network?.id ?? network?.chainId ?? network?.networkChainId ?? 0) || 0;
-  const chainId = Number(fallbackChainId ?? networkChainId ?? 0) || 0;
-  const chain = chainId ? getChainById(chainId) : null;
-  const shouldUseWalletName = !!networkChainId && networkChainId === chainId;
-  const name = shouldUseWalletName
-    ? String(network?.name || '').trim() || String(chain?.name || '').trim()
-    : String(chain?.name || '').trim() || String(network?.name || '').trim();
-  if (name && chainId) return `${name} (${chainId})`;
-  if (name) return name;
-  if (chainId) return `Chain ${chainId}`;
-  return 'Unknown';
-}
-
-function getLastBlock() {
-  return '20608649';
-}
-
-function getUTCDataTimestamp() {
-  const now = new Date();
-  return now.toISOString().replace('T', ' ').split('.')[0] + ' UTC';
-}
-
-export const REPORT_DEFAULT_EMBEDDING_LABEL = 'Polis Auto';
-export const PARTICIPANTS_GRAPH_TOOLTIP_TEXT = `This diagram opens in UMAP with 3 groups. Switch to SVD/PCA for the PCA view, or ${REPORT_DEFAULT_EMBEDDING_LABEL} for the report's Polis-inspired automatic grouping.`;
-export const REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT =
-  "Polis Auto uses Context Engine's Polis-inspired automatic grouping. It keeps the report's PCA-based participant layout and auto-selects opinion groups from that layout. UMAP and SVD/PCA are exploratory views where you can override K manually. This is Polis-inspired analysis inside Context Engine, not an official Polis/Pol.is integration or endorsement.";
-export const OPINION_GROUPS_TOOLTIP_TEXT =
-  "Leave K on auto to use Polis Auto's automatic grouping, or set K manually when exploring UMAP or SVD/PCA layouts.";
+const POLIS_CLUSTER_COLORS = [
+  'var(--ce-data-series-1)',
+  'var(--ce-data-series-2)',
+  'var(--ce-data-series-3)',
+  'var(--ce-data-series-4)',
+  'var(--ce-data-series-5)',
+  'var(--ce-data-series-6)',
+  'var(--ce-data-series-7)',
+  'var(--ce-data-series-8)',
+];
+export const getPolisDemoDatasetForSlug = (...args: Parameters<typeof getPolisDemoDatasetForSlugRuntime>) =>
+  getPolisDemoDatasetForSlugRuntime(...args);
 
 /***************************************************************
  * The main PolisReport component
@@ -2223,7 +1021,7 @@ export default function PolisReport({
       const canvas = await html2canvas(input, {
         scale: 2,
         useCORS: true,
-        backgroundColor: '#ffffff',
+        backgroundColor: FIXED_MEDIA_LIGHT,
         scrollX: 0,
         scrollY: -window.scrollY,
         windowWidth: input.scrollWidth,
@@ -2317,7 +1115,7 @@ export default function PolisReport({
           key={i}
           style={{
             marginBottom: '6px',
-            borderBottom: '1px solid #ddd',
+            borderBottom: '1px solid var(--ce-document-border)',
             paddingBottom: '6px',
           }}
         >
@@ -2617,7 +1415,7 @@ export default function PolisReport({
     }
     const arr = activeRepQuestions[clusterIndex].slice(0, 3);
     const uniqueClusters = Array.from(new Set(activeClusterAssignments)).sort((a, b) => a - b);
-    const colorScale = d3Report.scaleOrdinal(d3Report.schemeCategory10);
+    const colorScale = d3Report.scaleOrdinal(POLIS_CLUSTER_COLORS);
 
     return (
       <div style={{ marginTop: '6px' }}>
@@ -2640,12 +1438,12 @@ export default function PolisReport({
               style={{
                 marginLeft: '20px',
                 marginBottom: '8px',
-                borderLeft: '2px solid #ccc',
+                borderLeft: '2px solid var(--ce-document-border)',
                 paddingLeft: '8px',
               }}
             >
               <strong>{rq.label}</strong>: {questionPrompt} <br />
-              <small style={{ color: '#666' }}>
+              <small style={{ color: 'var(--ce-document-text-muted)' }}>
                 {hasRepresentativeDifference
                   ? `(${rq.repfulFor === 'disagree' ? 'disagreement' : 'agreement'} rate differs from the overall conversation by ${(representativeDifference * 100).toFixed(1)} percentage points)`
                   : '(difference from the overall conversation is unavailable)'}
@@ -2732,7 +1530,7 @@ export default function PolisReport({
   function renderClusterLegend() {
     if (!activeClusterAssignments || !activeClusterAssignments.length) return null;
     const uniqueClusters = Array.from(new Set(activeClusterAssignments)).sort((a, b) => a - b);
-    const colorScale = d3Report.scaleOrdinal(d3Report.schemeCategory10);
+    const colorScale = d3Report.scaleOrdinal(POLIS_CLUSTER_COLORS);
 
     const cacheForKey = analysisCacheByKey[currentAnalysisKey] || {};
     const errorsForKey = analysisErrorsByKey[currentAnalysisKey] || {};
@@ -2779,7 +1577,7 @@ export default function PolisReport({
                 key={c}
                 style={{
                   marginBottom: '8px',
-                  border: '1px dashed #ccc',
+                  border: '1px dashed var(--ce-document-border)',
                   padding: '6px',
                 }}
               >
@@ -2858,7 +1656,10 @@ export default function PolisReport({
 
       if (!pointsToUse || !pointsToUse.length) {
         return (
-          <p className={styles.hiddenInPdf} style={{ fontStyle: 'italic', marginLeft: '10px', color: 'red' }}>
+          <p
+            className={styles.hiddenInPdf}
+            style={{ fontStyle: 'italic', marginLeft: '10px', color: 'var(--ce-status-danger-text)' }}
+          >
             (Not enough participant data to plot.)
           </p>
         );
@@ -2886,7 +1687,7 @@ export default function PolisReport({
         .range([h / 2 - pad, -(h / 2 - pad)]);
 
       const hulls = buildClusterHulls(pointsToUse, activeClusterAssignments);
-      const colorScale = d3Report.scaleOrdinal(d3Report.schemeCategory10);
+      const colorScale = d3Report.scaleOrdinal(POLIS_CLUSTER_COLORS);
 
       const centerX = w / 2;
       const centerY = h / 2;
@@ -2904,16 +1705,45 @@ export default function PolisReport({
             <g transform={`translate(${centerX}, ${centerY})`}>
               {showRadialAxes && (
                 <g>
-                  <circle strokeWidth={1} stroke="rgb(230,230,230)" fill="rgb(248,248,248)" r={Math.min(w, h) / 2.3} />
-                  <circle strokeWidth={1} stroke="rgb(230,230,230)" fill="rgb(245,245,245)" r={Math.min(w, h) / 4} />
-                  <circle strokeWidth={1} stroke="rgb(230,230,230)" fill="rgb(248,248,248)" r={Math.min(w, h) / 8} />
+                  <circle
+                    strokeWidth={1}
+                    stroke="var(--ce-document-border)"
+                    fill="var(--ce-document-surface)"
+                    r={Math.min(w, h) / 2.3}
+                  />
+                  <circle
+                    strokeWidth={1}
+                    stroke="var(--ce-document-border)"
+                    fill="var(--ce-document-canvas)"
+                    r={Math.min(w, h) / 4}
+                  />
+                  <circle
+                    strokeWidth={1}
+                    stroke="var(--ce-document-border)"
+                    fill="var(--ce-document-surface)"
+                    r={Math.min(w, h) / 8}
+                  />
                 </g>
               )}
 
               {showAxes && (
                 <g>
-                  <line x1={-(w / 2) + pad} y1={0} x2={w / 2 - pad} y2={0} stroke="black" strokeWidth={1} />
-                  <line x1={0} y1={-(h / 2) + pad} x2={0} y2={h / 2 - pad} stroke="black" strokeWidth={1} />
+                  <line
+                    x1={-(w / 2) + pad}
+                    y1={0}
+                    x2={w / 2 - pad}
+                    y2={0}
+                    stroke="var(--ce-document-text)"
+                    strokeWidth={1}
+                  />
+                  <line
+                    x1={0}
+                    y1={-(h / 2) + pad}
+                    x2={0}
+                    y2={h / 2 - pad}
+                    stroke="var(--ce-document-text)"
+                    strokeWidth={1}
+                  />
                 </g>
               )}
 
@@ -3008,13 +1838,20 @@ export default function PolisReport({
                       />
                       {/* Participant index label for PDF export only */}
                       {isPdfModeActive && (
-                        <text x={px} y={py + 3} textAnchor="middle" fontSize="8" fill="#fff" fontWeight="600">
+                        <text
+                          x={px}
+                          y={py + 3}
+                          textAnchor="middle"
+                          fontSize="8"
+                          fill={FIXED_MEDIA_LIGHT}
+                          fontWeight="600"
+                        >
                           {d.index + 1}
                         </text>
                       )}
                       {/* Optional text labels below points when not miniMode */}
                       {!miniMode && textShort && (
-                        <text x={px} y={py + 14} textAnchor="middle" fontSize="9" fill="#333">
+                        <text x={px} y={py + 14} textAnchor="middle" fontSize="9" fill="var(--ce-document-text)">
                           {textShort}
                         </text>
                       )}
@@ -3055,7 +1892,7 @@ export default function PolisReport({
                       cx={px}
                       cy={py}
                       r={3}
-                      fill="#000"
+                      fill="var(--ce-document-text)"
                       onMouseEnter={() => {
                         if (enableTooltips) {
                           cancelTooltipHide();
@@ -3072,7 +1909,9 @@ export default function PolisReport({
       );
     } catch (err: unknown) {
       return (
-        <p style={{ color: 'red', marginLeft: '10px' }}>Error rendering participant graph: {getErrorMessage(err)}</p>
+        <p style={{ color: 'var(--ce-status-danger-text)', marginLeft: '10px' }}>
+          Error rendering participant graph: {getErrorMessage(err)}
+        </p>
       );
     }
   }
@@ -3165,7 +2004,7 @@ export default function PolisReport({
                   y={Number(point.y) + 3}
                   textAnchor="middle"
                   fontSize="8"
-                  fill="#fff"
+                  fill={FIXED_MEDIA_LIGHT}
                   fontWeight="600"
                   style={{ pointerEvents: 'none' }}
                 >
@@ -3187,7 +2026,11 @@ export default function PolisReport({
         </div>
       );
     } catch (err: unknown) {
-      return <p style={{ color: 'red', marginLeft: '10px' }}>Error rendering Bee Swarm: {getErrorMessage(err)}</p>;
+      return (
+        <p style={{ color: 'var(--ce-status-danger-text)', marginLeft: '10px' }}>
+          Error rendering Bee Swarm: {getErrorMessage(err)}
+        </p>
+      );
     }
   }
 
@@ -3370,7 +2213,7 @@ export default function PolisReport({
               display: 'inline-flex',
               alignItems: 'center',
               gap: '6px',
-              color: 'rgba(244,247,255,0.72)',
+              color: 'var(--ce-panel-text-muted)',
               fontSize: '0.9rem',
             }}
           >
@@ -3520,7 +2363,9 @@ export default function PolisReport({
         )}
 
         {errorMessage && (
-          <div style={{ color: 'red', marginBottom: '10px', fontWeight: 'bold' }}>Error: {errorMessage}</div>
+          <div style={{ color: 'var(--ce-status-danger-text)', marginBottom: '10px', fontWeight: 'bold' }}>
+            Error: {errorMessage}
+          </div>
         )}
 
         {isLoading ? (
@@ -3574,7 +2419,10 @@ export default function PolisReport({
                 <div className={styles.pdfIgnore} style={{ textAlign: 'right', flex: '1' }}>
                   {statsOpen ? 'Hide' : 'Show'}
                   {!statsOpen && (
-                    <span className={styles.showWhenPdf} style={{ marginLeft: '10px', color: '#555' }}>
+                    <span
+                      className={styles.showWhenPdf}
+                      style={{ marginLeft: '10px', color: 'var(--ce-document-text-muted)' }}
+                    >
                       (Omitted)
                     </span>
                   )}
@@ -3667,7 +2515,10 @@ export default function PolisReport({
                 <div className={styles.pdfIgnore} style={{ textAlign: 'right', flex: '1' }}>
                   {beeswarmOpen ? 'Hide' : 'Show'}
                   {!beeswarmOpen && (
-                    <span className={styles.showWhenPdf} style={{ marginLeft: '10px', color: '#555' }}>
+                    <span
+                      className={styles.showWhenPdf}
+                      style={{ marginLeft: '10px', color: 'var(--ce-document-text-muted)' }}
+                    >
                       (Omitted)
                     </span>
                   )}
@@ -3696,7 +2547,10 @@ export default function PolisReport({
                 <div className={styles.pdfIgnore} style={{ textAlign: 'right', flex: '1' }}>
                   {participantsGraphOpen ? 'Hide' : 'Show'}
                   {!participantsGraphOpen && (
-                    <span className={styles.showWhenPdf} style={{ marginLeft: '10px', color: '#555' }}>
+                    <span
+                      className={styles.showWhenPdf}
+                      style={{ marginLeft: '10px', color: 'var(--ce-document-text-muted)' }}
+                    >
                       (Omitted)
                     </span>
                   )}
@@ -3886,7 +2740,10 @@ export default function PolisReport({
                 <div className={styles.pdfIgnore} style={{ textAlign: 'right', flex: '1' }}>
                   {allQuestionsOpen ? 'Hide' : 'Show'}
                   {!allQuestionsOpen && (
-                    <span className={styles.showWhenPdf} style={{ marginLeft: '10px', color: '#555' }}>
+                    <span
+                      className={styles.showWhenPdf}
+                      style={{ marginLeft: '10px', color: 'var(--ce-document-text-muted)' }}
+                    >
                       (Omitted)
                     </span>
                   )}
@@ -3912,7 +2769,10 @@ export default function PolisReport({
                 <div className={styles.pdfIgnore} style={{ textAlign: 'right', flex: '1' }}>
                   {participantsListOpen ? 'Hide' : 'Show'}
                   {!participantsListOpen && (
-                    <span className={styles.showWhenPdf} style={{ marginLeft: '10px', color: '#555' }}>
+                    <span
+                      className={styles.showWhenPdf}
+                      style={{ marginLeft: '10px', color: 'var(--ce-document-text-muted)' }}
+                    >
                       (Omitted)
                     </span>
                   )}
@@ -3938,8 +2798,8 @@ export default function PolisReport({
                   <QRCodeSVG
                     value={liveReportUrl}
                     size={128}
-                    bgColor="#ffffff"
-                    fgColor="#000000"
+                    bgColor={FIXED_MEDIA_LIGHT}
+                    fgColor={FIXED_MEDIA_DARK}
                     level="Q"
                     includeMargin={true}
                   />

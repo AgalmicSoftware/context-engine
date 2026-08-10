@@ -16,7 +16,9 @@ describe('SessionColorSchemeField', () => {
       'Ocean',
       'Amber',
     ]);
-    expect(screen.getByText('Choose the accent colors used for this session. This does not change your app theme.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Choose the accent colors used for this session. This does not change your app theme.'),
+    ).toBeInTheDocument();
 
     fireEvent.change(picker, { target: { value: 'ocean' } });
     expect(onChange).toHaveBeenCalledWith({ colorSchemeId: 'ocean' });

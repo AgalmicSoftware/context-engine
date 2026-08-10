@@ -35,7 +35,7 @@ export const DEFAULT_DEMO_SURFACE_MODE = readPublicBoolEnv('REACT_APP_CE_DEMO_SU
 export const CE_DEFAULT_THEME = readPublicEnv('REACT_APP_CE_DEFAULT_THEME', 'context-engine');
 // Opt-in exposure gate. Keep false until the deployment's route and
 // accessibility matrix has passed for every bundled app theme.
-export const CE_THEME_SELECTOR_ENABLED = readPublicBoolEnv('REACT_APP_CE_THEME_SELECTOR_ENABLED', false);
+export const CE_THEME_SELECTOR_ENABLED = readPublicBoolEnv('REACT_APP_CE_THEME_SELECTOR_ENABLED', true);
 // MetaMask/RainbowKit is excluded from the default passkey-only client bundle.
 // Deployments that need browser-wallet login must opt in at build time.
 export const CE_ENABLE_METAMASK_CONNECTOR = readPublicBoolEnv('REACT_APP_CE_ENABLE_METAMASK_CONNECTOR', false);

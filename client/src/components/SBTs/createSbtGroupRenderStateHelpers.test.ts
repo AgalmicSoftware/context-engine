@@ -258,7 +258,7 @@ describe('createSbtGroupRenderStateHelpers', () => {
         sbtAddress: '0xAbC',
       }),
     ).toEqual({
-      iconStyle: { color: '#ffe082' },
+      iconStyle: { color: 'var(--ce-status-warning-text)' },
       isBookmarked: true,
     });
     expect(

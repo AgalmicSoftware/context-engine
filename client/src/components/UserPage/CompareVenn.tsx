@@ -40,8 +40,8 @@ const VENN_GEOMETRY: Record<CompareVennDimension, VennGeometry> = {
     width: 360,
     height: 200,
     circles: [
-      { cx: 140, cy: 100, radius: 80, fill: 'rgba(255,255,255,0.12)' },
-      { cx: 220, cy: 100, radius: 80, fill: 'rgba(200,200,255,0.12)' },
+      { cx: 140, cy: 100, radius: 80, fill: 'color-mix(in srgb, var(--ce-data-series-1) 12%, transparent)' },
+      { cx: 220, cy: 100, radius: 80, fill: 'color-mix(in srgb, var(--ce-data-series-2) 12%, transparent)' },
     ],
     labels: [
       { x: 70, y: 14 },
@@ -61,9 +61,9 @@ const VENN_GEOMETRY: Record<CompareVennDimension, VennGeometry> = {
     width: 360,
     height: 280,
     circles: [
-      { cx: 130, cy: 110, radius: 80, fill: 'rgba(255,255,255,0.12)' },
-      { cx: 230, cy: 110, radius: 80, fill: 'rgba(200,200,255,0.12)' },
-      { cx: 180, cy: 170, radius: 80, fill: 'rgba(200,255,200,0.12)' },
+      { cx: 130, cy: 110, radius: 80, fill: 'color-mix(in srgb, var(--ce-data-series-1) 12%, transparent)' },
+      { cx: 230, cy: 110, radius: 80, fill: 'color-mix(in srgb, var(--ce-data-series-2) 12%, transparent)' },
+      { cx: 180, cy: 170, radius: 80, fill: 'color-mix(in srgb, var(--ce-data-series-7) 12%, transparent)' },
     ],
     labels: [
       { x: 50, y: 24 },
@@ -127,7 +127,7 @@ export default function CompareVenn(props: CompareVennProps) {
         aria-label={`${model.dimension}-participant comparison Venn diagram`}
       >
         <defs>
-          <style>{`.vennText{font:12px system-ui, -apple-system, Segoe UI, Roboto, sans-serif; fill:#fff}`}</style>
+          <style>{`.vennText{font:12px var(--ce-font-ui); fill:var(--ce-panel-text)}`}</style>
         </defs>
         {geometry.circles.map((circle, index) => (
           <circle
@@ -214,7 +214,12 @@ export default function CompareVenn(props: CompareVennProps) {
           <div className={styles.detailsHeader}>
             <span>{activeRegion.label} details</span>
             {effectivePinnedKey ? (
-              <button type="button" className={styles.closeButton} onClick={closeDetails} aria-label="Close Venn details">
+              <button
+                type="button"
+                className={styles.closeButton}
+                onClick={closeDetails}
+                aria-label="Close Venn details"
+              >
                 ×
               </button>
             ) : null}

@@ -4,9 +4,7 @@ import styles from './QuestionStanceCard.module.scss';
 
 export type QuestionStanceVote = -1 | 0 | 1;
 
-export const selectConcreteQuestionStances = (
-  votes: Array<number | null | undefined> = [],
-): QuestionStanceVote[] =>
+export const selectConcreteQuestionStances = (votes: Array<number | null | undefined> = []): QuestionStanceVote[] =>
   (Array.isArray(votes) ? votes : []).filter(
     (vote): vote is QuestionStanceVote => vote === 1 || vote === 0 || vote === -1,
   );
@@ -35,9 +33,15 @@ export function QuestionStanceBar({ votes = [] }: { votes?: Array<number | null 
         <rect x={0} y={0} width={width} height={height} fill="none" stroke="currentColor" strokeWidth={1} />
         {concreteVotes.length > 0 ? (
           <>
-            <rect x={0} y={0} width={agreeWidth} height={height} fill="green" />
-            <rect x={agreeWidth} y={0} width={unsureWidth} height={height} fill="yellow" />
-            <rect x={agreeWidth + unsureWidth} y={0} width={disagreeWidth} height={height} fill="red" />
+            <rect x={0} y={0} width={agreeWidth} height={height} fill="var(--ce-status-success)" />
+            <rect x={agreeWidth} y={0} width={unsureWidth} height={height} fill="var(--ce-status-warning)" />
+            <rect
+              x={agreeWidth + unsureWidth}
+              y={0}
+              width={disagreeWidth}
+              height={height}
+              fill="var(--ce-status-danger)"
+            />
           </>
         ) : null}
       </svg>

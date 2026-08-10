@@ -3,18 +3,18 @@ import type { CSSProperties } from 'react';
 type CreateSurveyStyleMap = Record<string, string>;
 
 export const CREATE_SURVEY_TYPE_PREVIEW_BOX_STYLE: CSSProperties = {
-  border: '1px dashed #b0c4ff',
+  border: '1px dashed var(--ce-border-light)',
   padding: 10,
-  borderRadius: 6,
+  borderRadius: 'var(--ce-radius-6)',
   marginTop: 6,
-  background: '#f6f8ff',
+  background: 'var(--ce-document-surface)',
 };
 
 export const CREATE_SURVEY_TYPE_PREVIEW_PILL_STYLE: CSSProperties = {
   display: 'inline-block',
   padding: '3px 8px',
-  border: '1px solid #ccd',
-  borderRadius: 12,
+  border: '1px solid var(--ce-document-border)',
+  borderRadius: 'var(--ce-radius-12)',
   marginRight: 6,
   marginTop: 4,
 };
@@ -26,16 +26,16 @@ export const CREATE_SURVEY_TYPE_PREVIEW_HEADING_STYLE: CSSProperties = {
 
 export const CREATE_SURVEY_RATING_PREVIEW_TRACK_STYLE: CSSProperties = {
   height: 6,
-  background: '#d9e1ff',
-  borderRadius: 4,
+  background: 'var(--ce-document-border)',
+  borderRadius: 'var(--ce-radius-4)',
   width: 240,
 };
 
 export const CREATE_SURVEY_FREEFORM_PREVIEW_STYLE: CSSProperties = {
   height: 34,
-  border: '1px solid #ccd',
-  background: '#fff',
-  borderRadius: 4,
+  border: '1px solid var(--ce-document-border)',
+  background: 'var(--ce-document-canvas)',
+  borderRadius: 'var(--ce-radius-4)',
 };
 
 export const buildCreateSurveyTypePillClassName = (
@@ -55,7 +55,7 @@ export const CREATE_SURVEY_UPLOADED_QUESTION_LINK_STYLE: CSSProperties = {
   marginLeft: '10px',
   marginRight: '5px',
   textDecoration: 'none',
-  color: '#007bff',
+  color: 'var(--ce-link)',
 };
 
 export const CREATE_SURVEY_SMALL_ICON_BUTTON_STYLE: CSSProperties = {
@@ -78,11 +78,11 @@ export const resolveCreateSurveyProgressFillStyle = (progress: unknown): CSSProp
 });
 
 export const resolveCreateSurveyQuestionBookmarkStyle = (bookmarked: unknown): CSSProperties => ({
-  color: bookmarked ? '#ffc107' : undefined,
+  color: bookmarked ? 'var(--ce-status-warning)' : undefined,
 });
 
 export const resolveCreateSurveyBookmarkSurveyStyle = (bookmarked: unknown): CSSProperties => ({
-  color: bookmarked ? '#ffe082' : undefined,
+  color: bookmarked ? 'var(--ce-status-warning-text)' : undefined,
 });
 
 export const buildCreateSurveyActionLinkClassName = (styleMap: CreateSurveyStyleMap): string =>
@@ -90,12 +90,12 @@ export const buildCreateSurveyActionLinkClassName = (styleMap: CreateSurveyStyle
 
 export const CREATE_SURVEY_TOGGLE_KNOB_QUESTION_STYLE: CSSProperties = {
   left: '31px',
-  backgroundColor: '#4caf50',
+  backgroundColor: 'var(--ce-status-success)',
 };
 
 export const CREATE_SURVEY_TOGGLE_KNOB_SURVEY_STYLE: CSSProperties = {
   left: '1px',
-  backgroundColor: '#fff',
+  backgroundColor: 'var(--ce-control-face)',
 };
 
 export const CREATE_SURVEY_TRAILING_TOGGLE_LABEL_STYLE: CSSProperties = {

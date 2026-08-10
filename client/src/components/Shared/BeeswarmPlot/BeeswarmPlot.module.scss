@@ -1,8 +1,6 @@
-@use 'scss/variables' as tokens;
-
-$clickable-color: tokens.$ce-clickable;
-$muted-text: tokens.$ce-muted-text;
-$card-bg: tokens.$ce-card-bg;
+$clickable-color: var(--ce-action-accent);
+$muted-text: var(--ce-panel-text-muted);
+$card-bg: var(--ce-card-bg);
 
 .wrapper {
   position: relative;
@@ -21,13 +19,21 @@ $card-bg: tokens.$ce-card-bg;
   width: min(520px, calc(100vw - 56px));
   max-width: calc(100vw - 56px);
   padding: 24px 28px 22px;
-  border: 1px solid var(--ce-color-tooltip-border, rgba(255, 255, 255, 0.18));
-  border-radius: 28px;
+  border: 1px solid var(--ce-color-tooltip-border, color-mix(in srgb, var(--ce-text-inverse) 18%, transparent));
+  border-radius: var(--ce-radius-28);
   background:
-    radial-gradient(circle at top left, rgba(77, 255, 164, 0.12) 0%, rgba(77, 255, 164, 0) 42%),
-    linear-gradient(180deg, rgba(4, 12, 38, 0.985) 0%, rgba(2, 8, 28, 0.99) 100%);
-  color: var(--ce-color-tooltip-text, #f7fbff);
-  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.4);
+    radial-gradient(
+      circle at top left,
+      color-mix(in srgb, var(--ce-action-accent) 12%, transparent) 0%,
+      transparent 42%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--ce-overlay-base) 98.5%, transparent) 0%,
+      color-mix(in srgb, var(--ce-overlay-base) 99%, transparent) 100%
+    );
+  color: var(--ce-color-tooltip-text, var(--ce-document-surface));
+  box-shadow: 0 22px 48px color-mix(in srgb, var(--ce-compat-dark) 40%, transparent);
   pointer-events: none;
   backdrop-filter: blur(12px);
 }
@@ -46,10 +52,10 @@ $card-bg: tokens.$ce-card-bg;
   width: 30px;
   height: 30px;
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
-  color: #f7fbff;
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
+  border-radius: var(--ce-radius-round);
+  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+  color: var(--ce-document-surface);
   font-size: 1.2rem;
   cursor: pointer;
 }
@@ -57,14 +63,18 @@ $card-bg: tokens.$ce-card-bg;
 .hoverPanel {
   min-height: 70px;
   padding: 12px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
   border-radius: var(--ce-radius-12);
-  background: linear-gradient(180deg, rgba(9, 15, 34, 0.82) 0%, rgba(9, 15, 34, 0.62) 100%);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ce-overlay-surface) 82%, transparent) 0%,
+    color-mix(in srgb, var(--ce-overlay-surface) 62%, transparent) 100%
+  );
 }
 
 .hoverLabel {
   margin: 0 0 6px;
-  color: #f7fbff;
+  color: var(--ce-document-surface);
   font-size: 0.95rem;
   font-weight: 600;
   line-height: 1.45;
@@ -80,7 +90,7 @@ $card-bg: tokens.$ce-card-bg;
 
 .tooltipPrompt {
   margin: 0 0 16px;
-  color: #f7fbff;
+  color: var(--ce-document-surface);
   font-size: clamp(1.12rem, 0.98rem + 0.72vw, 1.62rem);
   font-weight: 700;
   line-height: 1.18;
@@ -106,26 +116,26 @@ $card-bg: tokens.$ce-card-bg;
   line-height: 1;
   letter-spacing: 0.01em;
   border: 1px solid transparent;
-  background: rgba(255, 255, 255, 0.05);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
 }
 
 .tooltipStatAgree {
-  background: rgba(90, 255, 194, 0.16);
-  border-color: rgba(90, 255, 194, 0.3);
-  color: #5affc2;
+  background: color-mix(in srgb, var(--ce-action-accent) 16%, transparent);
+  border-color: color-mix(in srgb, var(--ce-action-accent) 30%, transparent);
+  color: var(--ce-status-success-text);
 }
 
 .tooltipStatDisagree {
-  background: rgba(255, 107, 107, 0.15);
-  border-color: rgba(255, 107, 107, 0.28);
-  color: #ff8f8f;
+  background: color-mix(in srgb, var(--ce-status-error) 15%, transparent);
+  border-color: color-mix(in srgb, var(--ce-status-error) 28%, transparent);
+  color: var(--ce-status-danger-text);
 }
 
 .tooltipStatUnsure {
-  background: rgba(255, 209, 102, 0.14);
-  border-color: rgba(255, 209, 102, 0.3);
-  color: #ffd889;
+  background: color-mix(in srgb, var(--ce-status-warning) 14%, transparent);
+  border-color: color-mix(in srgb, var(--ce-status-warning) 30%, transparent);
+  color: var(--ce-status-warning-text);
 }
 
 .tooltipResponseWrap {
@@ -138,10 +148,10 @@ $card-bg: tokens.$ce-card-bg;
   width: 100%;
   height: 24px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
   border-radius: var(--ce-radius-pill);
-  background: rgba(255, 255, 255, 0.05);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
 }
 
 .tooltipResponseSegment {
@@ -151,19 +161,31 @@ $card-bg: tokens.$ce-card-bg;
 }
 
 .tooltipResponseSegmentAgree {
-  background: linear-gradient(90deg, rgba(90, 255, 194, 0.92), rgba(55, 220, 167, 0.98));
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--ce-action-accent) 92%, transparent),
+    color-mix(in srgb, var(--ce-status-success) 98%, transparent)
+  );
 }
 
 .tooltipResponseSegmentUnsure {
-  background: linear-gradient(90deg, rgba(255, 209, 102, 0.92), rgba(255, 184, 77, 0.98));
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--ce-status-warning) 92%, transparent),
+    color-mix(in srgb, var(--ce-data-series-5) 98%, transparent)
+  );
 }
 
 .tooltipResponseSegmentDisagree {
-  background: linear-gradient(90deg, rgba(255, 143, 143, 0.92), rgba(255, 107, 107, 0.98));
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--ce-status-error) 92%, transparent),
+    color-mix(in srgb, var(--ce-status-error) 98%, transparent)
+  );
 }
 
 .tooltipResponseFooter {
-  color: rgba(244, 247, 255, 0.8);
+  color: color-mix(in srgb, var(--ce-control-text) 80%, transparent);
   font-family: var(--ce-font-mono);
   font-size: 0.82rem;
   font-weight: 600;
@@ -174,7 +196,7 @@ $card-bg: tokens.$ce-card-bg;
 .metaDivider {
   display: inline-block;
   margin: 0 8px;
-  color: rgba(255, 255, 255, 0.3);
+  color: color-mix(in srgb, var(--ce-text-inverse) 30%, transparent);
 }
 
 .svgShell {
@@ -192,12 +214,12 @@ $card-bg: tokens.$ce-card-bg;
   min-width: 460px;
   height: auto;
   border: var(--ce-beeswarm-border, none);
-  border-radius: 16px;
+  border-radius: var(--ce-radius-16);
   background: var(--ce-beeswarm-background, transparent);
 }
 
 .axisLine {
-  stroke: var(--ce-beeswarm-axis-color, rgba(255, 255, 255, 0.28));
+  stroke: var(--ce-beeswarm-axis-color, color-mix(in srgb, var(--ce-text-inverse) 28%, transparent));
   stroke-width: 1.5;
 }
 
@@ -211,7 +233,7 @@ $card-bg: tokens.$ce-card-bg;
 
 .point {
   fill: var(--ce-beeswarm-point-color, #{$clickable-color});
-  stroke: var(--ce-beeswarm-point-stroke, rgba(10, 16, 34, 0.85));
+  stroke: var(--ce-beeswarm-point-stroke, color-mix(in srgb, var(--ce-overlay-surface) 85%, transparent));
   stroke-width: 2;
   opacity: 0.9;
   transition:
@@ -221,7 +243,7 @@ $card-bg: tokens.$ce-card-bg;
 }
 
 .pointActive {
-  fill: var(--ce-beeswarm-point-active-color, #ffd166);
+  fill: var(--ce-beeswarm-point-active-color, var(--ce-status-warning-text));
   opacity: 1;
 }
 
@@ -240,8 +262,8 @@ $card-bg: tokens.$ce-card-bg;
   justify-content: center;
   min-height: 180px;
   padding: 20px 24px;
-  border: 1px dashed rgba(255, 255, 255, 0.18);
-  border-radius: 14px;
+  border: 1px dashed color-mix(in srgb, var(--ce-text-inverse) 18%, transparent);
+  border-radius: var(--ce-radius-14);
   background: $card-bg;
   color: $muted-text;
   font-family: var(--ce-font-mono);
@@ -253,7 +275,7 @@ $card-bg: tokens.$ce-card-bg;
     width: min(360px, calc(100vw - 32px));
     max-width: calc(100vw - 32px);
     padding: 20px 20px 18px;
-    border-radius: 22px;
+    border-radius: var(--ce-radius-22);
   }
 
   .beeswarmSvg {

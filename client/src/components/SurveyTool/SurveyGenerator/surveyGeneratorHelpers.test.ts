@@ -101,9 +101,9 @@ describe('surveyGeneratorHelpers', () => {
     const toggleBlock = scss.match(/\.aiPromptToggleBtn\s*{[\s\S]*?^\s*}/m)?.[0] || '';
 
     expect(toggleBlock).toMatch(/background:\s*transparent;/);
-    expect(toggleBlock).toMatch(/color:\s*rgba\(255,\s*255,\s*255,\s*0\.5\);/);
+    expect(toggleBlock).toMatch(/color:\s*color-mix\(in srgb,\s*var\(--ce-text-inverse\) 50%,\s*transparent\);/);
     expect(toggleBlock).toMatch(
-      /&:hover\s*{[\s\S]*?background:\s*transparent;[\s\S]*?color:\s*rgba\(255,\s*255,\s*255,\s*0\.72\);/,
+      /&:hover\s*{[\s\S]*?background:\s*transparent;[\s\S]*?color:\s*color-mix\(in srgb,\s*var\(--ce-text-inverse\) 72%,\s*transparent\);/,
     );
   });
 

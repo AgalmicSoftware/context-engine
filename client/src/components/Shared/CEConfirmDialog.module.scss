@@ -4,86 +4,86 @@
 
 .content {
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 8px;
-  background: #171941;
-  color: #f8fbff;
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.34);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-surface-sunken);
+  color: var(--ce-document-surface);
+  box-shadow: 0 18px 44px color-mix(in srgb, var(--ce-compat-dark) 34%, transparent);
 }
 
 .header {
   align-items: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
-  color: #ffffff;
+  border-bottom: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
+  color: var(--ce-text-inverse);
   font-family: var(--ce-font-mono, monospace);
   font-weight: 700;
   line-height: 1.25;
 
   :global(.close) {
-    color: #ffffff;
+    color: var(--ce-text-inverse);
     opacity: 0.86;
     text-shadow: none;
 
     &:hover,
     &:focus {
-      color: #ffffff;
+      color: var(--ce-text-inverse);
       opacity: 1;
     }
   }
 }
 
 .body {
-  color: rgba(244, 247, 255, 0.86);
+  color: color-mix(in srgb, var(--ce-control-text) 86%, transparent);
   font-size: 0.96rem;
   line-height: 1.5;
 }
 
 .footer {
   gap: 0.5rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  border-top: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
 }
 
 .cancelButton,
 .confirmButton {
   min-width: 104px;
-  border-radius: 6px;
+  border-radius: var(--ce-radius-6);
   font-weight: 700;
 }
 
 .cancelButton {
-  color: #f8fbff;
-  border-color: rgba(244, 247, 255, 0.62);
+  color: var(--ce-document-surface);
+  border-color: color-mix(in srgb, var(--ce-control-text) 62%, transparent);
 
   &:hover,
   &:focus {
-    color: #171941;
-    background: #f8fbff;
-    border-color: #f8fbff;
+    color: var(--ce-surface-sunken);
+    background: var(--ce-document-surface);
+    border-color: var(--ce-document-surface);
   }
 }
 
 .confirmButton {
-  color: #0c1f18;
-  border-color: #4dffa4;
-  background: #4dffa4;
+  color: var(--ce-action-accent-text);
+  border-color: var(--ce-action-accent);
+  background: var(--ce-action-accent);
 
   &:hover,
   &:focus {
-    color: #07140f;
-    border-color: #7dffbd;
-    background: #7dffbd;
+    color: var(--ce-action-accent-text);
+    border-color: var(--ce-status-success-text);
+    background: var(--ce-status-success-text);
   }
 }
 
 .dangerButton {
-  color: #ffffff;
-  border-color: #d94848;
-  background: #d94848;
+  color: var(--ce-text-inverse);
+  border-color: var(--ce-status-error);
+  background: var(--ce-status-error);
 
   &:hover,
   &:focus {
-    color: #ffffff;
-    border-color: #f06464;
-    background: #f06464;
+    color: var(--ce-text-inverse);
+    border-color: var(--ce-status-error);
+    background: var(--ce-status-error);
   }
 }

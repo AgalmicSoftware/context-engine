@@ -1,15 +1,15 @@
 .wrapper {
-  --ce-cms-control-bg: #ffffff;
-  --ce-cms-control-fg: #212529;
-  --ce-cms-control-border: rgba(0, 0, 0, 0.15);
-  --ce-cms-control-border-hover: rgba(0, 0, 0, 0.3);
-  --ce-cms-placeholder-fg: #6c757d;
-  --ce-cms-menu-bg: #ffffff;
-  --ce-cms-menu-fg: #212529;
-  --ce-cms-menu-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
-  --ce-cms-row-hover-bg: rgba(0, 0, 0, 0.05);
-  --ce-cms-row-checked-bg: rgba(13, 110, 253, 0.1);
-  --ce-cms-row-focus-outline: rgba(13, 110, 253, 0.4);
+  --ce-cms-control-bg: var(--ce-text-inverse);
+  --ce-cms-control-fg: var(--ce-compat-dark);
+  --ce-cms-control-border: color-mix(in srgb, var(--ce-compat-dark) 15%, transparent);
+  --ce-cms-control-border-hover: color-mix(in srgb, var(--ce-compat-dark) 30%, transparent);
+  --ce-cms-placeholder-fg: var(--ce-text-muted);
+  --ce-cms-menu-bg: var(--ce-text-inverse);
+  --ce-cms-menu-fg: var(--ce-compat-dark);
+  --ce-cms-menu-shadow: 0 6px 18px color-mix(in srgb, var(--ce-compat-dark) 12%, transparent);
+  --ce-cms-row-hover-bg: color-mix(in srgb, var(--ce-compat-dark) 5%, transparent);
+  --ce-cms-row-checked-bg: color-mix(in srgb, var(--ce-status-info) 10%, transparent);
+  --ce-cms-row-focus-outline: color-mix(in srgb, var(--ce-status-info) 40%, transparent);
 
   position: relative;
   display: block;
@@ -36,7 +36,7 @@
   background: var(--ce-cms-control-bg);
   color: var(--ce-cms-control-fg);
   border: 1px solid var(--ce-cms-control-border);
-  border-radius: 4px;
+  border-radius: var(--ce-radius-4);
   cursor: pointer;
   text-align: left;
   line-height: 1.4;
@@ -81,7 +81,7 @@
   color: var(--ce-cms-placeholder-fg);
   background: var(--ce-cms-control-bg);
   border: 1px solid var(--ce-cms-control-border);
-  border-radius: 4px;
+  border-radius: var(--ce-radius-4);
   cursor: pointer;
 
   &:hover {
@@ -117,7 +117,7 @@
   background: var(--ce-cms-menu-bg);
   color: var(--ce-cms-menu-fg);
   border: 1px solid var(--ce-cms-control-border);
-  border-radius: 4px;
+  border-radius: var(--ce-radius-4);
   box-shadow: var(--ce-cms-menu-shadow);
   overflow: hidden;
 }
@@ -132,7 +132,7 @@
   width: 100%;
   padding: 6px 8px;
   border: 1px solid var(--ce-cms-control-border);
-  border-radius: 3px;
+  border-radius: var(--ce-radius-3);
   background: var(--ce-cms-control-bg);
   color: var(--ce-cms-control-fg);
   font-size: 13px;

@@ -133,7 +133,7 @@ describe('sbtPageFullViewDisplayHelpers', () => {
       }),
     ).toBe('section-header rounded-header');
     expect(resolveSbtPageBookmarkButtonDisplayState({ bookmarked: true })).toEqual({
-      iconStyle: { color: '#FFD700' },
+      iconStyle: { color: 'var(--ce-status-warning)' },
     });
     expect(resolveSbtPageBookmarkButtonDisplayState({ bookmarked: false })).toEqual({
       iconStyle: { color: undefined },
@@ -141,7 +141,7 @@ describe('sbtPageFullViewDisplayHelpers', () => {
     expect(resolveSbtPageInteractiveCursorStyle()).toEqual({ cursor: 'pointer' });
     expect(resolveSbtPageQuestionIconStyle()).toEqual({
       marginLeft: '5px',
-      color: '#00ff9d',
+      color: 'var(--ce-action-accent)',
       cursor: 'pointer',
       opacity: 0.5,
     });

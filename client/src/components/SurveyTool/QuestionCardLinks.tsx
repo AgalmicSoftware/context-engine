@@ -31,7 +31,7 @@ export const buildQuestionCardBookmarkClassName = ({
     .join(' ');
 
 export const resolveQuestionCardBookmarkIconStyle = (isQuestionBookmarked: unknown = false): React.CSSProperties => ({
-  color: isQuestionBookmarked ? '#ffc107' : 'white',
+  color: isQuestionBookmarked ? 'var(--ce-status-warning)' : 'var(--ce-panel-text)',
 });
 
 const QuestionCardLinks = ({

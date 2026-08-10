@@ -207,7 +207,7 @@ export const renderUnresolvedMainSiteSessionId = (
         alignItems: 'center',
         justifyContent: 'center',
         height: '50vh',
-        color: 'rgba(244,247,255,0.65)',
+        color: 'var(--ce-panel-text-muted)',
       }}
     >
       <h3>Session Not Found</h3>
@@ -249,7 +249,7 @@ export const renderMissingMainSiteSessionConfig = ({
         alignItems: 'center',
         justifyContent: 'center',
         height: '50vh',
-        color: 'rgba(244,247,255,0.65)',
+        color: 'var(--ce-panel-text-muted)',
       }}
     >
       <h3>Session Not Found</h3>

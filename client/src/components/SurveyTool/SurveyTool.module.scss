@@ -15,7 +15,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   padding: 20px;
   border-radius: var(--ce-radius-8);
   box-shadow:
-    -7px 7px 14px #171a3d,
+    -7px 7px 14px var(--ce-surface-sunken),
     7px -7px 14px var(--ce-color-surface-alt);
 }
 
@@ -24,7 +24,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  background: rgba(137, 159, 219, 0.3);
+  background: color-mix(in srgb, var(--ce-status-info) 30%, transparent);
   padding: 15px;
   border-radius: var(--ce-radius-10);
   margin-left: 10px;
@@ -70,7 +70,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   .dropdown-menu {
     background: var(--ce-color-surface);
     .dropdown-item {
-      color: rgba(255, 255, 255, 0.25);
+      color: color-mix(in srgb, var(--ce-text-inverse) 25%, transparent);
       &:hover {
         background: var(--ce-color-surface-alt);
       }
@@ -158,7 +158,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     background: var(--ce-color-surface);
     border-radius: var(--ce-radius-8);
     box-shadow:
-      -7px 7px 14px #171a3d,
+      -7px 7px 14px var(--ce-surface-sunken),
       7px -7px 14px var(--ce-color-surface-alt);
     .card-body {
       h5 {
@@ -168,7 +168,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
       }
 
       label {
-        color: rgba(255, 255, 255, 0.25);
+        color: color-mix(in srgb, var(--ce-text-inverse) 25%, transparent);
         font-weight: 600;
         margin-bottom: 10px;
       }
@@ -231,7 +231,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
       text-transform: uppercase;
       font-weight: 600;
       &:hover {
-        background: #272b6500;
+        background: transparent;
       }
     }
   }
@@ -257,8 +257,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   border-radius: var(--ce-radius-0);
   background: var(--ce-color-bg);
   box-shadow:
-    5px 5px 10px #0d0e24,
-    -5px -5px 10px #21245e;
+    5px 5px 10px var(--ce-overlay-base),
+    -5px -5px 10px var(--ce-status-info);
   background-color: transparent;
   padding: 15px;
   margin-top: 10px;
@@ -355,11 +355,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     }
 
     &:hover {
-      background-color: #f0f0f0;
+      background-color: var(--ce-surface-subtle);
     }
 
     &.agree {
-      background-color: #4caf50;
+      background-color: var(--ce-status-success);
       color: var(--ce-color-white);
       &:before {
         font-weight: 900;
@@ -368,11 +368,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     }
 
     &.unsure {
-      background-color: #ffeb3b;
+      background-color: var(--ce-status-warning);
     }
 
     &.disagree {
-      background-color: #f44336;
+      background-color: var(--ce-status-error);
       color: var(--ce-color-white);
       &:before {
         font-weight: 900;
@@ -393,9 +393,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   align-items: center;
   padding: 10px 15px;
   margin: 5px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
   border-radius: var(--ce-radius-5);
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
   color: var(--ce-color-white);
   cursor: pointer;
   transition: background-color 0.2s ease;
@@ -407,7 +407,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 
   &:hover {
-    background-color: rgba(255, 255, 255, 0.2);
+    background-color: color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
   }
 
   &.selected {
@@ -451,8 +451,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     $font-weight: 600,
     $border-radius: var(--ce-radius-10),
     $letter-spacing: 0.03em,
-    $box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18),
-    $hover-box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24)
+    $box-shadow: var(--ce-shadow-submit),
+    $hover-box-shadow: var(--ce-shadow-submit-hover)
   );
   text-transform: uppercase;
   opacity: 1;
@@ -507,17 +507,17 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   width: 36px;
   height: 36px;
   opacity: 0.72;
-  color: rgba(255, 255, 255, 0.92);
-  background: rgba(255, 255, 255, 0.08);
+  color: color-mix(in srgb, var(--ce-text-inverse) 92%, transparent);
+  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
   border-radius: var(--ce-radius-pill);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--ce-compat-dark) 22%, transparent);
   font-size: 1.1rem;
 
   &:hover,
   &:focus {
     opacity: 1;
     color: var(--ce-color-white);
-    background: rgba(255, 255, 255, 0.14);
+    background: color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
   }
 }
 
@@ -525,7 +525,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #4cd964;
+  color: var(--ce-status-success);
   font-size: 1.25rem;
 }
 
@@ -713,10 +713,10 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .fullQuestionCard {
   background: var(--ce-color-surface);
   border-radius: var(--ce-radius-16);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
   box-shadow:
-    6px 6px 14px rgba(13, 16, 44, 0.55),
-    -6px -6px 14px rgba(55, 60, 120, 0.28);
+    6px 6px 14px color-mix(in srgb, var(--ce-overlay-base) 55%, transparent),
+    -6px -6px 14px color-mix(in srgb, var(--ce-status-info) 28%, transparent);
   margin-bottom: 24px;
 }
 
@@ -788,11 +788,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .singleQuestionReadPage {
   .fullQuestionCard {
     margin-bottom: 28px;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
+    background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
     box-shadow:
-      0 6px 22px rgba(0, 0, 0, 0.25),
-      inset 0 1px 0 rgba(255, 255, 255, 0.03);
+      0 6px 22px color-mix(in srgb, var(--ce-compat-dark) 25%, transparent),
+      inset 0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 3%, transparent);
   }
 
   .fullQuestionBody {
@@ -820,7 +820,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     border: none;
     background: transparent;
     box-shadow: none;
-    color: rgba(255, 255, 255, 0.94);
+    color: color-mix(in srgb, var(--ce-text-inverse) 94%, transparent);
     font-family: inherit;
     font-size: 1.6875rem;
     font-weight: 600;
@@ -833,9 +833,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     margin: 24px auto 0;
     padding: 28px 18px;
     border-radius: var(--ce-radius-12);
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.18);
+    background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
+    box-shadow: 0 6px 22px color-mix(in srgb, var(--ce-compat-dark) 18%, transparent);
     font-family: var(--ce-font-mono);
     font-size: 1.65rem;
   }
@@ -853,9 +853,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   gap: 10px;
   padding: 12px 14px;
   border-radius: var(--ce-radius-12);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(0, 0, 0, 0.22);
-  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
+  background: color-mix(in srgb, var(--ce-compat-dark) 22%, transparent);
+  color: color-mix(in srgb, var(--ce-text-inverse) 90%, transparent);
   font-weight: 600;
 }
 
@@ -892,7 +892,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .gatedPromptTooltipIcon {
   margin-left: 6px;
   font-size: 0.9em;
-  color: rgba(255, 255, 255, 0.94);
+  color: color-mix(in srgb, var(--ce-text-inverse) 94%, transparent);
   opacity: 0.5 !important;
 }
 
@@ -902,10 +902,14 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   margin: 18px 0;
   padding: 18px 18px 16px;
   border-radius: var(--ce-radius-12);
-  border: 1px solid rgba(124, 151, 212, 0.45);
-  background: linear-gradient(140deg, rgba(248, 251, 255, 0.97) 0%, rgba(234, 242, 255, 0.97) 100%);
-  color: #1d2742;
-  box-shadow: 0 10px 20px rgba(43, 69, 121, 0.16);
+  border: 1px solid color-mix(in srgb, var(--ce-status-info) 45%, transparent);
+  background: linear-gradient(
+    140deg,
+    color-mix(in srgb, var(--ce-status-info-text) 97%, transparent) 0%,
+    color-mix(in srgb, var(--ce-status-info-text) 97%, transparent) 100%
+  );
+  color: var(--ce-overlay-surface);
+  box-shadow: 0 10px 20px color-mix(in srgb, var(--ce-status-info) 16%, transparent);
 }
 
 .lockedQuestionsBackdrop {
@@ -914,7 +918,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   top: 8px;
   font-size: 4.25rem;
   line-height: 1;
-  color: rgba(63, 89, 140, 0.12);
+  color: color-mix(in srgb, var(--ce-status-info) 12%, transparent);
   pointer-events: none;
 }
 
@@ -943,11 +947,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   margin: 0;
   font-size: 0.92rem;
   line-height: 1.5;
-  color: rgba(29, 39, 66, 0.76);
+  color: color-mix(in srgb, var(--ce-overlay-surface) 76%, transparent);
 }
 
 .lockedSbtInlineLink {
-  color: #1f315f;
+  color: var(--ce-status-info);
   font-weight: 700;
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -957,8 +961,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   &:hover,
   &:focus {
-    color: #3158b9;
-    text-decoration-color: #3158b9;
+    color: var(--ce-status-info);
+    text-decoration-color: var(--ce-status-info);
   }
 }
 
@@ -980,14 +984,14 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   &:hover:not(:disabled),
   &:focus:not(:disabled) {
-    background: rgba(77, 255, 164, 0.15) !important;
+    background: color-mix(in srgb, var(--ce-action-accent) 15%, transparent) !important;
     border-color: var(--ce-color-accent) !important;
     color: var(--ce-color-accent) !important;
-    box-shadow: 0 0 8px rgba(77, 255, 164, 0.35);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--ce-action-accent) 35%, transparent);
   }
 
   &:focus {
-    outline: 2px solid rgba(77, 255, 164, 0.28);
+    outline: 2px solid color-mix(in srgb, var(--ce-action-accent) 28%, transparent);
     outline-offset: 2px;
   }
 
@@ -999,10 +1003,10 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 %decryptCtaOutlineOnLight {
-  background: rgba(255, 255, 255, 0.72) !important;
-  border: 1px solid rgba(31, 39, 51, 0.3) !important;
-  color: #1f2733 !important;
-  box-shadow: 0 4px 12px rgba(22, 31, 54, 0.08);
+  background: color-mix(in srgb, var(--ce-text-inverse) 72%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--ce-overlay-surface) 30%, transparent) !important;
+  color: var(--ce-document-text) !important;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--ce-overlay-surface) 8%, transparent);
   transition:
     background-color 0.18s ease,
     border-color 0.18s ease,
@@ -1011,23 +1015,23 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   &:hover:not(:disabled),
   &:focus:not(:disabled) {
-    background: rgba(255, 255, 255, 0.92) !important;
-    border-color: rgba(31, 39, 51, 0.6) !important;
-    color: #111722 !important;
+    background: color-mix(in srgb, var(--ce-text-inverse) 92%, transparent) !important;
+    border-color: color-mix(in srgb, var(--ce-overlay-surface) 60%, transparent) !important;
+    color: var(--ce-document-text) !important;
     box-shadow:
-      0 0 0 3px rgba(77, 255, 164, 0.12),
-      0 8px 18px rgba(22, 31, 54, 0.12);
+      0 0 0 3px color-mix(in srgb, var(--ce-action-accent) 12%, transparent),
+      0 8px 18px color-mix(in srgb, var(--ce-overlay-surface) 12%, transparent);
   }
 
   &:focus {
-    outline: 2px solid rgba(31, 39, 51, 0.2);
+    outline: 2px solid color-mix(in srgb, var(--ce-overlay-surface) 20%, transparent);
     outline-offset: 2px;
   }
 
   &:disabled {
-    background: rgba(255, 255, 255, 0.52) !important;
-    border-color: rgba(31, 39, 51, 0.18) !important;
-    color: rgba(31, 39, 51, 0.52) !important;
+    background: color-mix(in srgb, var(--ce-text-inverse) 52%, transparent) !important;
+    border-color: color-mix(in srgb, var(--ce-overlay-surface) 18%, transparent) !important;
+    color: color-mix(in srgb, var(--ce-overlay-surface) 52%, transparent) !important;
     box-shadow: none;
     cursor: not-allowed;
     opacity: 1;
@@ -1055,7 +1059,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   bottom: 6px;
   border: none;
   background: transparent;
-  color: rgba(39, 56, 98, 0.7);
+  color: color-mix(in srgb, var(--ce-status-info) 70%, transparent);
   cursor: pointer;
   padding: 6px;
   line-height: 1;
@@ -1063,7 +1067,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     color 0.2s ease,
     transform 0.2s ease;
   &:hover:not(:disabled) {
-    color: #3158b9;
+    color: var(--ce-status-info);
     transform: translateY(-1px);
   }
   &:disabled {
@@ -1074,7 +1078,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 .lockedQuestionsDetails {
   margin-top: 12px;
-  border-top: 1px solid rgba(73, 103, 171, 0.2);
+  border-top: 1px solid color-mix(in srgb, var(--ce-status-info) 20%, transparent);
   padding-top: 12px;
   display: flex;
   flex-direction: column;
@@ -1085,13 +1089,13 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   margin: 0;
   font-size: 0.92rem;
   line-height: 1.5;
-  color: rgba(29, 39, 66, 0.82);
+  color: color-mix(in srgb, var(--ce-overlay-surface) 82%, transparent);
 }
 
 .lockedGateDetailCard {
-  border: 1px solid rgba(74, 106, 176, 0.2);
+  border: 1px solid color-mix(in srgb, var(--ce-status-info) 20%, transparent);
   border-radius: var(--ce-radius-10);
-  background: rgba(255, 255, 255, 0.74);
+  background: color-mix(in srgb, var(--ce-text-inverse) 74%, transparent);
   padding: 10px;
 }
 
@@ -1125,20 +1129,20 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   display: flex;
   align-items: center;
   gap: 8px;
-  border: 1px solid rgba(76, 107, 176, 0.24);
+  border: 1px solid color-mix(in srgb, var(--ce-status-info) 24%, transparent);
   border-radius: var(--ce-radius-8);
-  background: rgba(255, 255, 255, 0.94);
-  color: #1f315f;
+  background: color-mix(in srgb, var(--ce-text-inverse) 94%, transparent);
+  color: var(--ce-status-info);
   padding: 9px 10px;
   text-decoration: none;
   transition:
     border-color 0.18s ease,
     transform 0.14s ease;
   &:hover {
-    border-color: rgba(70, 110, 206, 0.55);
+    border-color: color-mix(in srgb, var(--ce-status-info) 55%, transparent);
     transform: translateY(-1px);
-    box-shadow: 0 6px 12px rgba(59, 85, 142, 0.2);
-    color: #1f315f;
+    box-shadow: 0 6px 12px color-mix(in srgb, var(--ce-status-info) 20%, transparent);
+    color: var(--ce-status-info);
   }
 }
 
@@ -1163,27 +1167,31 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .lockedQuestionsBannerOnDark {
   width: 100%;
   margin: 0;
-  border-color: rgba(112, 145, 227, 0.36);
-  background: linear-gradient(150deg, rgba(23, 27, 66, 0.98) 0%, rgba(31, 37, 90, 0.96) 100%);
-  color: #f6f8ff;
-  box-shadow: 0 14px 30px rgba(4, 8, 27, 0.32);
+  border-color: color-mix(in srgb, var(--ce-status-info) 36%, transparent);
+  background: linear-gradient(
+    150deg,
+    color-mix(in srgb, var(--ce-overlay-surface) 98%, transparent) 0%,
+    color-mix(in srgb, var(--ce-status-info) 96%, transparent) 100%
+  );
+  color: var(--ce-document-surface);
+  box-shadow: 0 14px 30px color-mix(in srgb, var(--ce-overlay-base) 32%, transparent);
 }
 
 .lockedQuestionsBannerOnDark .lockedQuestionsBackdrop {
-  color: rgba(201, 217, 255, 0.08);
+  color: color-mix(in srgb, var(--ce-status-info-text) 8%, transparent);
 }
 
 .lockedQuestionsBannerOnDark .lockedQuestionsSubtext {
-  color: rgba(229, 235, 255, 0.78);
+  color: color-mix(in srgb, var(--ce-status-info-text) 78%, transparent);
 }
 
 .lockedQuestionsBannerOnDark .lockedSbtInlineLink {
-  color: #89ffd0;
+  color: var(--ce-status-success-text);
 
   &:hover,
   &:focus {
-    color: #b3ffe2;
-    text-decoration-color: #b3ffe2;
+    color: var(--ce-status-success-text);
+    text-decoration-color: var(--ce-status-success-text);
   }
 }
 
@@ -1195,35 +1203,35 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   &:hover:not(:disabled),
   &:focus:not(:disabled) {
-    background: rgba(77, 255, 164, 0.14) !important;
+    background: color-mix(in srgb, var(--ce-action-accent) 14%, transparent) !important;
     border-color: var(--ce-color-accent) !important;
     color: var(--ce-color-accent) !important;
-    box-shadow: 0 0 0 3px rgba(77, 255, 164, 0.12);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
   }
 
   &:focus {
-    outline: 2px solid rgba(77, 255, 164, 0.24);
+    outline: 2px solid color-mix(in srgb, var(--ce-action-accent) 24%, transparent);
     outline-offset: 2px;
   }
 
   &:disabled {
     background: transparent !important;
-    border-color: rgba(77, 255, 164, 0.35) !important;
-    color: rgba(77, 255, 164, 0.45) !important;
+    border-color: color-mix(in srgb, var(--ce-action-accent) 35%, transparent) !important;
+    color: color-mix(in srgb, var(--ce-action-accent) 45%, transparent) !important;
   }
 }
 
 .lockedQuestionsBannerOnDark .lockedQuestionsDetails {
-  border-top-color: rgba(216, 226, 255, 0.12);
+  border-top-color: color-mix(in srgb, var(--ce-status-info-text) 12%, transparent);
 }
 
 .lockedQuestionsBannerOnDark .lockedQuestionsGenericMessage {
-  color: rgba(238, 242, 255, 0.86);
+  color: color-mix(in srgb, var(--ce-status-info-text) 86%, transparent);
 }
 
 .lockedQuestionsBannerOnDark .lockedGateDetailCard {
-  border-color: rgba(179, 194, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
+  border-color: color-mix(in srgb, var(--ce-status-info-text) 14%, transparent);
+  background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
 }
 
 .lockedQuestionsBannerOnDark .lockedGateDetailCount {
@@ -1231,25 +1239,25 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .lockedQuestionsBannerOnDark .lockedSbtCard {
-  border-color: rgba(215, 224, 255, 0.14);
-  background: rgba(255, 255, 255, 0.08);
-  color: #f3f7ff;
+  border-color: color-mix(in srgb, var(--ce-status-info-text) 14%, transparent);
+  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+  color: var(--ce-status-info-text);
 
   &:hover {
-    border-color: rgba(77, 255, 164, 0.38);
-    box-shadow: 0 8px 16px rgba(3, 8, 28, 0.24);
-    color: #f9fbff;
+    border-color: color-mix(in srgb, var(--ce-action-accent) 38%, transparent);
+    box-shadow: 0 8px 16px color-mix(in srgb, var(--ce-overlay-base) 24%, transparent);
+    color: var(--ce-status-info-text);
   }
 }
 
 .lockedQuestionsBannerOnDark .lockedSbtMeta,
 .lockedQuestionsBannerOnDark .lockedSbtLinkIcon,
 .lockedQuestionsBannerOnDark .lockedQuestionsCaretButton {
-  color: rgba(220, 229, 255, 0.74);
+  color: color-mix(in srgb, var(--ce-status-info-text) 74%, transparent);
 }
 
 .lockedQuestionsBannerOnDark .lockedQuestionsCaretButton:hover:not(:disabled) {
-  color: #89ffd0;
+  color: var(--ce-status-success-text);
 }
 
 .gatedEmptyPanelShell {
@@ -1268,7 +1276,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   font-size: 0.98rem;
   line-height: 1.6;
   text-align: center;
-  color: rgba(245, 247, 255, 0.82);
+  color: color-mix(in srgb, var(--ce-status-info-text) 82%, transparent);
 }
 
 .promptTitleBlock {
@@ -1337,7 +1345,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .fullQuestionComments {
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1390,7 +1398,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   padding: 12px 18px;
   border-radius: var(--ce-radius-10);
   opacity: 0.5;
-  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 6px 22px color-mix(in srgb, var(--ce-compat-dark) 18%, transparent);
   transition:
     transform 0.18s ease,
     background-color 0.18s ease,
@@ -1406,28 +1414,28 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .singleQuestionJsonToggleQuestion {
-  background: rgba(94, 114, 228, 0.12);
-  border: 1px solid rgba(94, 114, 228, 0.35);
-  color: rgba(168, 183, 255, 0.94);
+  background: color-mix(in srgb, var(--ce-compat-indigo) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-compat-indigo) 35%, transparent);
+  color: color-mix(in srgb, var(--ce-status-info-text) 94%, transparent);
 
   &:hover,
   &:focus {
-    background: rgba(94, 114, 228, 0.2);
-    border-color: rgba(120, 142, 255, 0.58);
-    color: #dbe4ff;
+    background: color-mix(in srgb, var(--ce-compat-indigo) 20%, transparent);
+    border-color: color-mix(in srgb, var(--ce-status-info-text) 58%, transparent);
+    color: var(--ce-status-info-text);
   }
 }
 
 .singleQuestionJsonToggleResponse {
-  background: rgba(77, 255, 164, 0.1);
-  border: 1px solid rgba(77, 255, 164, 0.3);
-  color: rgba(169, 255, 213, 0.94);
+  background: color-mix(in srgb, var(--ce-action-accent) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 30%, transparent);
+  color: color-mix(in srgb, var(--ce-status-success-text) 94%, transparent);
 
   &:hover,
   &:focus {
-    background: rgba(77, 255, 164, 0.16);
-    border-color: rgba(77, 255, 164, 0.5);
-    color: #e2fff1;
+    background: color-mix(in srgb, var(--ce-action-accent) 16%, transparent);
+    border-color: color-mix(in srgb, var(--ce-action-accent) 50%, transparent);
+    color: var(--ce-status-success-text);
   }
 }
 
@@ -1491,11 +1499,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   flex-direction: row-reverse;
   justify-content: space-evenly;
   align-items: center;
-  background-color: #00048080;
-  border-top-right-radius: 5px;
-  border-bottom-right-radius: 5px;
-  border-bottom-left-radius: 0px;
-  border-top-left-radius: 0px;
+  background-color: color-mix(in srgb, var(--ce-status-info) 50%, transparent);
+  border-top-right-radius: var(--ce-radius-5);
+  border-bottom-right-radius: var(--ce-radius-5);
+  border-bottom-left-radius: var(--ce-radius-0);
+  border-top-left-radius: var(--ce-radius-0);
   cursor: crosshair;
 }
 
@@ -1594,7 +1602,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     background: var(--ce-color-tooltip-bg) !important;
     color: var(--ce-color-tooltip-text) !important;
     border: 1px solid var(--ce-color-tooltip-border) !important;
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 10px 24px color-mix(in srgb, var(--ce-compat-dark) 25%, transparent);
     padding: 8px 10px;
     font-size: 0.85rem;
     line-height: 1.2;
@@ -1662,14 +1670,14 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   align-items: center;
   justify-content: center;
   border-radius: var(--ce-radius-pill);
-  background: rgba(20, 25, 52, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: color-mix(in srgb, var(--ce-overlay-surface) 95%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 35%, transparent);
 }
 
 #clearFilterIcon {
   display: unset !important;
   font-size: 0.75em;
-  color: #ff6976 !important;
+  color: var(--ce-status-error) !important;
   margin: 0 !important;
 }
 
@@ -1699,8 +1707,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .headerSubmitButton {
-  background-color: #2a63ca;
-  border: 1px solid #2a63ca;
+  background-color: var(--ce-action-submit);
+  border: 1px solid var(--ce-action-submit);
   color: var(--ce-color-white);
   font-weight: 700;
   font-size: 1.6em;
@@ -1727,16 +1735,16 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   &.submitGlow::before {
     position: absolute;
     content: '';
-    background: linear-gradient(90deg, #fff 40%, transparent 40%);
+    background: linear-gradient(90deg, var(--ce-text-inverse) 40%, transparent 40%);
     top: -5px;
     bottom: -5px;
     left: -5px;
     right: -5px;
     z-index: 2;
-    border-radius: calc(var(--ce-radius-10) + 5px);
+    border-radius: calc(var(--ce-radius-10) + var(--ce-radius-5));
     background-size: 200% 4px;
     background-repeat: no-repeat;
-    filter: drop-shadow(0 0 8px #fff);
+    filter: drop-shadow(0 0 8px var(--ce-text-inverse));
     background-position: 80% 0;
     animation: beforeLineAnim 5.4s linear infinite;
     pointer-events: none;
@@ -1892,14 +1900,14 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .surveyItemSpinner {
-  color: rgba(31, 39, 51, 0.72);
+  color: color-mix(in srgb, var(--ce-overlay-surface) 72%, transparent);
 }
 
 .surveyItemDocLink {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #1f2733;
+  color: var(--ce-document-text);
   opacity: 0.72;
   text-decoration: none;
   transition:
@@ -1908,7 +1916,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   &:hover,
   &:focus {
-    color: #0b57d0;
+    color: var(--ce-status-info);
     opacity: 1;
   }
 }
@@ -1927,7 +1935,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   &:hover,
   &:focus {
-    color: #86ffd0;
+    color: var(--ce-status-success-text);
     opacity: 1;
   }
 }
@@ -1969,7 +1977,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   width: 100%;
   height: 8px;
   border-radius: var(--ce-radius-pill);
-  background: rgba(255, 255, 255, 0.14);
+  background: color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
   overflow: hidden;
 }
 
@@ -1977,14 +1985,14 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   height: 100%;
   width: 0%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #2cc3ff 0%, #62ffbf 100%);
+  background: linear-gradient(90deg, var(--ce-status-info) 0%, var(--ce-status-success) 100%);
   transition: width 0.25s ease;
 }
 
 /* Response display styles (used in SurveyQuestions when viewing answers) */
 .freeformAnswer {
   font-style: italic;
-  background-color: rgba(255, 255, 255, 0.15);
+  background-color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
   border-radius: var(--ce-radius-5);
   padding: 15px;
   color: var(--ce-color-white);
@@ -1996,7 +2004,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .ratingAnswer {
   display: flex;
   align-items: center;
-  background-color: rgba(255, 255, 255, 0.15);
+  background-color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
   border-radius: var(--ce-radius-5);
   padding: 10px;
   color: var(--ce-color-white);
@@ -2017,7 +2025,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  background-color: rgba(255, 255, 255, 0.15);
+  background-color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
   border-radius: var(--ce-radius-5);
   padding: 10px;
   color: var(--ce-color-white);
@@ -2032,7 +2040,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .binaryAnswer {
-  background-color: rgba(255, 255, 255, 0.15);
+  background-color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
   border-radius: var(--ce-radius-5);
   padding: 10px;
   color: var(--ce-color-white);
@@ -2075,7 +2083,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .copyJsonButton:hover {
-  color: green;
+  color: var(--ce-status-success-text);
 }
 
 /* Styles for the existing user response notice */
@@ -2086,20 +2094,20 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   width: min(760px, calc(100% - 30px));
   margin-bottom: 20px;
   margin-top: 20px;
-  background-color: rgba(255, 255, 255, 0.9);
+  background-color: color-mix(in srgb, var(--ce-text-inverse) 90%, transparent);
   border-radius: var(--ce-radius-8);
-  border: 1px solid rgba(206, 212, 218, 0.95);
+  border: 1px solid color-mix(in srgb, var(--ce-document-border) 95%, transparent);
   padding: 18px 20px;
   border-radius: var(--ce-radius-10);
   margin-left: 15px;
   margin-right: 15px;
   font-size: 1.05rem;
-  box-shadow: 0 10px 24px rgba(9, 14, 28, 0.16);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--ce-overlay-base) 16%, transparent);
 }
 
 .userResponseNoticeTitle {
   font-size: clamp(1.4rem, 2vw, 2rem);
-  color: #495057;
+  color: var(--ce-document-text-muted);
   margin: 0 0 14px;
   font-weight: 700;
 }
@@ -2118,9 +2126,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   width: 42px;
   height: 42px;
   border-radius: var(--ce-radius-8);
-  border: 1px solid rgba(73, 83, 99, 0.3);
-  color: #1f2733;
-  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid color-mix(in srgb, var(--ce-status-info) 30%, transparent);
+  color: var(--ce-document-text);
+  background: color-mix(in srgb, var(--ce-text-inverse) 55%, transparent);
   transition:
     background-color 0.18s ease,
     border-color 0.18s ease,
@@ -2128,9 +2136,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   &:hover,
   &:focus {
-    color: #111722;
-    background: rgba(255, 255, 255, 0.88);
-    border-color: rgba(31, 39, 51, 0.65);
+    color: var(--ce-document-text);
+    background: color-mix(in srgb, var(--ce-text-inverse) 88%, transparent);
+    border-color: color-mix(in srgb, var(--ce-overlay-surface) 65%, transparent);
     outline: none;
   }
 }
@@ -2164,19 +2172,19 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 #startFreshButton {
-  background-color: rgba(255, 255, 255, 0.82);
-  border: 1px solid #28a745;
-  color: #1f2733;
+  background-color: color-mix(in srgb, var(--ce-text-inverse) 82%, transparent);
+  border: 1px solid var(--ce-status-success);
+  color: var(--ce-document-text);
   &:hover {
-    background-color: rgba(255, 255, 255, 0.95);
-    border-color: #1f8a3b;
-    color: #111722;
-    box-shadow: 0 0 0 1px rgba(31, 138, 59, 0.15);
+    background-color: color-mix(in srgb, var(--ce-text-inverse) 95%, transparent);
+    border-color: var(--ce-status-success);
+    color: var(--ce-document-text);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--ce-status-success) 15%, transparent);
   }
   &:disabled {
-    background-color: rgba(255, 255, 255, 0.6);
-    border-color: rgba(40, 167, 69, 0.45);
-    color: rgba(31, 39, 51, 0.52);
+    background-color: color-mix(in srgb, var(--ce-text-inverse) 60%, transparent);
+    border-color: color-mix(in srgb, var(--ce-status-success) 45%, transparent);
+    color: color-mix(in srgb, var(--ce-overlay-surface) 52%, transparent);
   }
 }
 
@@ -2187,24 +2195,24 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 #editButton {
-  background-color: #ffc107;
-  border-color: #ffc107;
+  background-color: var(--ce-status-warning);
+  border-color: var(--ce-status-warning);
   color: var(--ce-color-dark);
   &:hover {
-    background-color: #e0a800;
-    border-color: #d39e00;
+    background-color: var(--ce-status-warning);
+    border-color: var(--ce-status-warning);
   }
 }
 
 #viewAnswersButton,
 #answerSurveyButton {
   /* Combined as they serve similar toggle purpose */
-  background-color: #17a2b8;
-  border-color: #17a2b8;
+  background-color: var(--ce-status-info);
+  border-color: var(--ce-status-info);
   color: var(--ce-color-white);
   &:hover {
-    background-color: #138496;
-    border-color: #117a8b;
+    background-color: var(--ce-data-series-8);
+    border-color: var(--ce-data-series-8);
   }
 }
 
@@ -2221,46 +2229,46 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   line-height: 1.05;
   letter-spacing: -0.02em;
   text-transform: none;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(77, 255, 164, 0.35);
+  background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 35%, transparent);
   border-radius: var(--ce-radius-10);
-  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 6px 22px color-mix(in srgb, var(--ce-compat-dark) 25%, transparent);
   min-height: 72px;
   padding: 18px 24px;
   /* Different color to distinguish */
   &:hover,
   &:focus {
-    background: rgba(77, 255, 164, 0.12);
-    border-color: rgba(77, 255, 164, 0.6);
+    background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
+    border-color: color-mix(in srgb, var(--ce-action-accent) 60%, transparent);
     color: var(--ce-color-white);
     transform: translateY(-1px);
   }
 }
 
 #updateResponseButton {
-  background-color: #007bff;
-  border-color: #007bff;
+  background-color: var(--ce-status-info);
+  border-color: var(--ce-status-info);
   color: var(--ce-color-white);
   &:hover {
-    background-color: #0056b3;
-    border-color: #004085;
+    background-color: var(--ce-status-info);
+    border-color: var(--ce-status-info);
   }
 }
 
 #exitEditingButton {
-  background-color: rgba(255, 255, 255, 0.72);
-  border-color: rgba(73, 83, 99, 0.55);
-  color: #1f2733;
+  background-color: color-mix(in srgb, var(--ce-text-inverse) 72%, transparent);
+  border-color: color-mix(in srgb, var(--ce-status-info) 55%, transparent);
+  color: var(--ce-document-text);
   &:hover {
-    background-color: rgba(255, 255, 255, 0.9);
-    border-color: rgba(31, 39, 51, 0.8);
-    color: #111722;
-    box-shadow: 0 0 0 1px rgba(31, 39, 51, 0.15);
+    background-color: color-mix(in srgb, var(--ce-text-inverse) 90%, transparent);
+    border-color: color-mix(in srgb, var(--ce-overlay-surface) 80%, transparent);
+    color: var(--ce-document-text);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--ce-overlay-surface) 15%, transparent);
   }
   &:disabled {
-    background-color: rgba(255, 255, 255, 0.58);
-    border-color: rgba(73, 83, 99, 0.35);
-    color: rgba(31, 39, 51, 0.5);
+    background-color: color-mix(in srgb, var(--ce-text-inverse) 58%, transparent);
+    border-color: color-mix(in srgb, var(--ce-status-info) 35%, transparent);
+    color: color-mix(in srgb, var(--ce-overlay-surface) 50%, transparent);
   }
 }
 
@@ -2293,7 +2301,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   justify-content: center;
   margin-top: 10px;
   font-weight: 600;
-  color: grey;
+  color: var(--ce-text-muted);
   opacity: 0.75;
 }
 
@@ -2329,7 +2337,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     padding-top: 12px;
     /* Add some vertical padding for wrapped text */
     padding-bottom: 12px;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    border-bottom: 1px solid color-mix(in srgb, var(--ce-compat-dark) 10%, transparent);
     /* Visual separation */
 
     &:last-child {
@@ -2385,7 +2393,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   align-items: center;
   justify-content: center;
   padding: 5px;
-  color: rgba(255, 255, 255, 0.72);
+  color: color-mix(in srgb, var(--ce-text-inverse) 72%, transparent);
   font-size: 0.9em;
   opacity: 0.9;
 }
@@ -2394,7 +2402,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .iconButton,
 .pileIconButton {
   background: transparent;
-  color: rgba(255, 255, 255, 0.72);
+  color: color-mix(in srgb, var(--ce-text-inverse) 72%, transparent);
   opacity: 0.35;
   border: none;
   cursor: pointer;
@@ -2418,11 +2426,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 .commentButton,
 .lockButton {
-  color: rgba(255, 255, 255, 0.8);
+  color: color-mix(in srgb, var(--ce-text-inverse) 80%, transparent);
 }
 
 .pileLockButton {
-  border-radius: 999px;
+  border-radius: var(--ce-radius-pill);
   padding: 6px;
   transition:
     opacity 0.2s ease,
@@ -2433,11 +2441,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 .pileLockButtonMenuOpen {
   opacity: 1 !important;
-  color: rgba(226, 240, 233, 0.92) !important;
-  background: rgba(5, 10, 24, 0.78);
+  color: color-mix(in srgb, var(--ce-status-success-text) 92%, transparent) !important;
+  background: color-mix(in srgb, var(--ce-overlay-base) 78%, transparent);
   box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.08),
-    0 8px 18px rgba(0, 0, 0, 0.28);
+    0 0 0 1px color-mix(in srgb, var(--ce-text-inverse) 8%, transparent),
+    0 8px 18px color-mix(in srgb, var(--ce-compat-dark) 28%, transparent);
 }
 
 .lockAudienceContainer {
@@ -2455,9 +2463,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   max-width: min(320px, calc(100vw - 24px));
   padding: 10px 12px;
   border-radius: var(--ce-radius-10);
-  background: rgba(11, 15, 28, 0.94);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
+  background: color-mix(in srgb, var(--ce-overlay-base) 94%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--ce-compat-dark) 35%, transparent);
   z-index: 6;
   display: flex;
   flex-direction: column;
@@ -2466,7 +2474,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .pileLockAudiencePopover {
-  background: rgba(11, 15, 28, 0.8);
+  background: color-mix(in srgb, var(--ce-overlay-base) 80%, transparent);
   backdrop-filter: blur(10px);
 
   .convictionToggleLine,
@@ -2590,11 +2598,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   max-width: 360px;
   max-height: calc(100vh - 32px);
   margin: 0;
-  border: 1px solid rgba(210, 218, 232, 0.9);
+  border: 1px solid color-mix(in srgb, var(--ce-status-info-text) 90%, transparent);
   border-radius: var(--ce-radius-8);
-  background: #f8fafc;
-  color: #18243a;
-  box-shadow: 0 18px 36px rgba(6, 12, 30, 0.2);
+  background: var(--ce-document-surface);
+  color: var(--ce-document-text);
+  box-shadow: 0 18px 36px color-mix(in srgb, var(--ce-overlay-base) 20%, transparent);
   padding: 12px;
   display: flex;
   flex-direction: column;
@@ -2627,14 +2635,14 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   min-width: 0;
   font-size: 0.92rem;
   font-weight: 800;
-  color: #152033;
+  color: var(--ce-overlay-surface);
 }
 
 .sessionListeningClose {
-  border: 1px solid rgba(32, 45, 71, 0.16);
+  border: 1px solid color-mix(in srgb, var(--ce-overlay-surface) 16%, transparent);
   border-radius: var(--ce-radius-8);
-  background: #fff;
-  color: #253654;
+  background: var(--ce-text-inverse);
+  color: var(--ce-status-info);
   width: 34px;
   height: 34px;
   display: inline-flex;
@@ -2644,8 +2652,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .sessionListeningClose:hover:not(:disabled) {
-  border-color: rgba(42, 80, 160, 0.35);
-  color: #193d8f;
+  border-color: color-mix(in srgb, var(--ce-status-info) 35%, transparent);
+  color: var(--ce-status-info);
 }
 
 .sessionListeningGenerate {
@@ -2667,17 +2675,17 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .sessionListeningRecordButton {
   width: 132px;
   height: 132px;
-  border-radius: 50% !important;
-  border: 2px solid rgba(22, 114, 85, 0.5) !important;
-  background: #167255 !important;
-  color: #fff !important;
+  border-radius: var(--ce-radius-round) !important;
+  border: 2px solid color-mix(in srgb, var(--ce-status-success) 50%, transparent) !important;
+  background: var(--ce-status-success) !important;
+  color: var(--ce-text-inverse) !important;
   display: inline-flex !important;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 6px;
   padding: 14px !important;
-  box-shadow: 0 14px 28px rgba(11, 80, 62, 0.25);
+  box-shadow: 0 14px 28px color-mix(in srgb, var(--ce-overlay-surface) 25%, transparent);
   font-weight: 900 !important;
   line-height: 1.1;
   transition:
@@ -2687,11 +2695,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   &:hover:not(:disabled),
   &:focus:not(:disabled) {
-    background: #0f7f5a !important;
-    border-color: rgba(22, 114, 85, 0.72) !important;
-    color: #fff !important;
+    background: var(--ce-status-success) !important;
+    border-color: color-mix(in srgb, var(--ce-status-success) 72%, transparent) !important;
+    color: var(--ce-text-inverse) !important;
     transform: translateY(-1px);
-    box-shadow: 0 18px 34px rgba(11, 80, 62, 0.32);
+    box-shadow: 0 18px 34px color-mix(in srgb, var(--ce-overlay-surface) 32%, transparent);
   }
 
   &:disabled {
@@ -2716,9 +2724,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   gap: 10px;
   width: 100%;
   padding: 10px;
-  border: 1px solid rgba(32, 45, 71, 0.14);
+  border: 1px solid color-mix(in srgb, var(--ce-overlay-surface) 14%, transparent);
   border-radius: var(--ce-radius-8);
-  background-color: #f9f9f9;
+  background-color: var(--ce-document-surface);
   box-sizing: border-box;
 }
 
@@ -2729,8 +2737,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   min-width: 0;
   height: 80px;
   padding: 5px;
-  border: 2px inset #808080;
-  background-color: #c0c0c0;
+  border: 2px inset var(--ce-document-text-muted);
+  background-color: var(--ce-border-light);
   box-sizing: border-box;
 }
 
@@ -2738,7 +2746,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   display: block;
   width: 100%;
   height: 100%;
-  background-color: #c0c0c0;
+  background-color: var(--ce-border-light);
   image-rendering: pixelated;
   image-rendering: -moz-crisp-edges;
   image-rendering: crisp-edges;
@@ -2753,22 +2761,22 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   align-items: center;
   gap: 6px;
   padding: 4px 8px;
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 28%, transparent);
   border-radius: var(--ce-radius-12);
-  background: rgba(0, 0, 0, 0.58);
-  color: #fff;
+  background: color-mix(in srgb, var(--ce-compat-dark) 58%, transparent);
+  color: var(--ce-text-inverse);
   font-size: 0.82rem;
   font-weight: 800;
   line-height: 1.2;
 }
 
 .sessionListeningTimerDot {
-  color: #ff4d4f;
+  color: var(--ce-status-error);
   font-size: 0.62rem;
 }
 
 .sessionListeningTimerDotPaused {
-  color: #d6d9df;
+  color: var(--ce-document-border);
   font-size: 0.62rem;
 }
 
@@ -2786,12 +2794,12 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   width: 61px;
   height: 61px;
   padding: 5px 8px;
-  border: 2px solid #9a9a9a;
-  background: linear-gradient(#dfdfdf, #ffffff);
-  color: #000;
+  border: 2px solid var(--ce-text-muted);
+  background: linear-gradient(var(--ce-document-border), var(--ce-text-inverse));
+  color: var(--ce-compat-dark);
   box-shadow:
-    1px 1px 0 #fff,
-    -1px -1px 0 #777;
+    1px 1px 0 var(--ce-text-inverse),
+    -1px -1px 0 var(--ce-text-muted);
   font-size: 1.3em;
   line-height: 1;
   cursor: pointer;
@@ -2800,28 +2808,28 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   justify-content: center;
 
   &:active:not(:disabled) {
-    background: #c2c2c2;
+    background: var(--ce-document-border);
     box-shadow:
-      inset 1px 1px 0 #fff,
-      inset -1px -1px 0 #777;
+      inset 1px 1px 0 var(--ce-text-inverse),
+      inset -1px -1px 0 var(--ce-text-muted);
   }
 
   &:focus-visible {
-    outline: 2px solid #174ea6;
+    outline: 2px solid var(--ce-status-info);
     outline-offset: 2px;
   }
 
   &:disabled {
-    border-color: #aaa;
-    background: #d0d0d0;
-    color: #777;
+    border-color: var(--ce-text-muted);
+    background: var(--ce-document-border);
+    color: var(--ce-text-muted);
     box-shadow: none;
     cursor: not-allowed;
   }
 }
 
 .sessionListeningStopButton {
-  color: #e11900;
+  color: var(--ce-status-error);
 }
 
 .sessionListeningSrOnly {
@@ -2837,9 +2845,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .sessionListeningGenerate {
-  background: #167255 !important;
-  border-color: #167255 !important;
-  color: #fff !important;
+  background: var(--ce-status-success) !important;
+  border-color: var(--ce-status-success) !important;
+  color: var(--ce-text-inverse) !important;
 }
 
 .sessionListeningMeta {
@@ -2847,15 +2855,15 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
-  color: rgba(24, 36, 58, 0.72);
+  color: color-mix(in srgb, var(--ce-overlay-surface) 72%, transparent);
   font-size: 0.82rem;
   font-weight: 700;
 }
 
 .sessionListeningMeta span {
-  border: 1px solid rgba(32, 45, 71, 0.12);
+  border: 1px solid color-mix(in srgb, var(--ce-overlay-surface) 12%, transparent);
   border-radius: var(--ce-radius-pill);
-  background: #fff;
+  background: var(--ce-text-inverse);
   padding: 3px 8px;
 }
 
@@ -2863,10 +2871,10 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: 1px solid rgba(32, 45, 71, 0.14);
+  border: 1px solid color-mix(in srgb, var(--ce-overlay-surface) 14%, transparent);
   border-radius: var(--ce-radius-pill);
-  background: #fff;
-  color: #18243a;
+  background: var(--ce-text-inverse);
+  color: var(--ce-document-text);
   padding: 3px 8px;
   font: inherit;
   font-weight: 800;
@@ -2874,30 +2882,30 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .sessionListeningTranscriptButton span:last-child {
-  color: rgba(24, 36, 58, 0.62);
+  color: color-mix(in srgb, var(--ce-overlay-surface) 62%, transparent);
   font-size: 0.78rem;
   font-weight: 700;
 }
 
 .sessionListeningTranscriptButton:hover,
 .sessionListeningTranscriptButton:focus-visible {
-  border-color: rgba(42, 80, 160, 0.34);
-  color: #193d8f;
+  border-color: color-mix(in srgb, var(--ce-status-info) 34%, transparent);
+  color: var(--ce-status-info);
 }
 
 .sessionListeningError {
-  border: 1px solid rgba(191, 64, 64, 0.24);
+  border: 1px solid color-mix(in srgb, var(--ce-status-error) 24%, transparent);
   border-radius: var(--ce-radius-8);
-  background: #fff1f1;
-  color: #8a1f1f;
+  background: var(--ce-status-danger-text);
+  color: var(--ce-status-error);
   padding: 8px 10px;
   font-size: 0.86rem;
 }
 
 .sessionListeningTranscriptDetails {
-  border: 1px solid rgba(32, 45, 71, 0.14);
+  border: 1px solid color-mix(in srgb, var(--ce-overlay-surface) 14%, transparent);
   border-radius: var(--ce-radius-8);
-  background: #fff;
+  background: var(--ce-text-inverse);
   overflow: hidden;
 }
 
@@ -2912,16 +2920,16 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   max-height: 360px;
   resize: vertical;
   overflow: auto;
-  border: 1px solid rgba(32, 45, 71, 0.16);
+  border: 1px solid color-mix(in srgb, var(--ce-overlay-surface) 16%, transparent);
   border-radius: var(--ce-radius-8);
-  background: #fff;
-  color: #18243a;
+  background: var(--ce-text-inverse);
+  color: var(--ce-document-text);
   padding: 10px 42px 10px 12px;
   line-height: 1.45;
 }
 
 .sessionListeningTranscript::placeholder {
-  color: rgba(24, 36, 58, 0.48);
+  color: color-mix(in srgb, var(--ce-overlay-surface) 48%, transparent);
 }
 
 .sessionListeningClearTranscript {
@@ -2930,10 +2938,10 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   right: 18px;
   width: 28px;
   height: 28px;
-  border: 1px solid rgba(32, 45, 71, 0.16);
+  border: 1px solid color-mix(in srgb, var(--ce-overlay-surface) 16%, transparent);
   border-radius: var(--ce-radius-6);
-  background: rgba(248, 250, 252, 0.96);
-  color: #253654;
+  background: color-mix(in srgb, var(--ce-status-info-text) 96%, transparent);
+  color: var(--ce-status-info);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2941,8 +2949,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .sessionListeningClearTranscript:hover:not(:disabled) {
-  border-color: rgba(191, 64, 64, 0.35);
-  color: #8a1f1f;
+  border-color: color-mix(in srgb, var(--ce-status-error) 35%, transparent);
+  color: var(--ce-status-error);
 }
 
 .sessionListeningClearTranscript:disabled {
@@ -2951,25 +2959,25 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .sessionListeningCreateWrap {
-  border-top: 1px solid rgba(32, 45, 71, 0.12);
+  border-top: 1px solid color-mix(in srgb, var(--ce-overlay-surface) 12%, transparent);
   padding-top: 12px;
 
   :global([class*='createSurveyContainer']) {
-    background: #edf2f7 !important;
-    border-color: rgba(32, 45, 71, 0.14) !important;
-    color: #18243a !important;
-    box-shadow: 0 16px 32px rgba(6, 12, 30, 0.14) !important;
+    background: var(--ce-document-surface) !important;
+    border-color: color-mix(in srgb, var(--ce-overlay-surface) 14%, transparent) !important;
+    color: var(--ce-document-text) !important;
+    box-shadow: 0 16px 32px color-mix(in srgb, var(--ce-overlay-base) 14%, transparent) !important;
   }
 
   h3,
   h4,
   label,
   strong {
-    color: #18243a !important;
+    color: var(--ce-document-text) !important;
   }
 
   :global([class*='modeHeader']) {
-    border-bottom-color: rgba(32, 45, 71, 0.14) !important;
+    border-bottom-color: color-mix(in srgb, var(--ce-overlay-surface) 14%, transparent) !important;
   }
 
   :global([class*='toggleLabel']),
@@ -2981,7 +2989,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   :global([class*='questionId']),
   :global([class*='surveyIdPreview']),
   :global([class*='aiPromptMeta']) {
-    color: #18243a !important;
+    color: var(--ce-document-text) !important;
     opacity: 1 !important;
   }
 
@@ -2991,83 +2999,83 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   :global([class*='optionInput']),
   :global([class*='questionTypeSelect']),
   :global([class*='associatedSurveyInput']) {
-    background: #fff !important;
-    border-color: rgba(32, 45, 71, 0.18) !important;
-    color: #18243a !important;
-    box-shadow: 0 3px 10px rgba(6, 12, 30, 0.08) !important;
+    background: var(--ce-text-inverse) !important;
+    border-color: color-mix(in srgb, var(--ce-overlay-surface) 18%, transparent) !important;
+    color: var(--ce-document-text) !important;
+    box-shadow: 0 3px 10px color-mix(in srgb, var(--ce-overlay-base) 8%, transparent) !important;
 
     &::placeholder {
-      color: rgba(24, 36, 58, 0.5) !important;
+      color: color-mix(in srgb, var(--ce-overlay-surface) 50%, transparent) !important;
     }
   }
 
   :global([class*='questionContainer']),
   :global([class*='typeSelectorBlock']) {
-    background: #fff !important;
-    border-color: rgba(32, 45, 71, 0.14) !important;
-    color: #18243a !important;
-    box-shadow: 0 10px 22px rgba(6, 12, 30, 0.12) !important;
+    background: var(--ce-text-inverse) !important;
+    border-color: color-mix(in srgb, var(--ce-overlay-surface) 14%, transparent) !important;
+    color: var(--ce-document-text) !important;
+    box-shadow: 0 10px 22px color-mix(in srgb, var(--ce-overlay-base) 12%, transparent) !important;
   }
 
   :global([class*='step']) {
-    color: rgba(24, 36, 58, 0.72) !important;
+    color: color-mix(in srgb, var(--ce-overlay-surface) 72%, transparent) !important;
 
     span,
     svg {
-      background: #edf2f7 !important;
+      background: var(--ce-document-surface) !important;
       color: inherit !important;
-      box-shadow: 0 0 0 8px #edf2f7 !important;
+      box-shadow: 0 0 0 8px var(--ce-document-surface) !important;
     }
   }
 
   :global([class*='stepCompleted']) {
-    color: #167255 !important;
+    color: var(--ce-status-success) !important;
   }
 
   :global([class*='questionTypeText']),
   :global([class*='typeSelectorLabel']),
   :global([class*='typeTitle']) {
-    color: #167255 !important;
+    color: var(--ce-status-success) !important;
     opacity: 1 !important;
   }
 
   :global([class*='typeButton']) {
-    background: #f8fafc !important;
-    border-color: rgba(32, 45, 71, 0.18) !important;
-    color: #18243a !important;
+    background: var(--ce-document-surface) !important;
+    border-color: color-mix(in srgb, var(--ce-overlay-surface) 18%, transparent) !important;
+    color: var(--ce-document-text) !important;
     opacity: 1 !important;
-    box-shadow: 0 3px 10px rgba(6, 12, 30, 0.08) !important;
+    box-shadow: 0 3px 10px color-mix(in srgb, var(--ce-overlay-base) 8%, transparent) !important;
   }
 
   :global([class*='pill']) {
-    background: #e8eef7 !important;
-    border-color: rgba(32, 45, 71, 0.18) !important;
-    color: #18243a !important;
+    background: var(--ce-status-info-text) !important;
+    border-color: color-mix(in srgb, var(--ce-overlay-surface) 18%, transparent) !important;
+    color: var(--ce-document-text) !important;
   }
 
   :global([class*='pillAgree']) {
-    background: #dff7ea !important;
-    border-color: rgba(22, 114, 85, 0.35) !important;
-    color: #123a2d !important;
+    background: var(--ce-status-success-text) !important;
+    border-color: color-mix(in srgb, var(--ce-status-success) 35%, transparent) !important;
+    color: var(--ce-overlay-surface) !important;
   }
 
   :global([class*='pillDisagree']) {
-    background: #ffe3e3 !important;
-    border-color: rgba(191, 64, 64, 0.32) !important;
-    color: #7f1d1d !important;
+    background: var(--ce-status-danger-text) !important;
+    border-color: color-mix(in srgb, var(--ce-status-error) 32%, transparent) !important;
+    color: var(--ce-status-error) !important;
   }
 
   :global([class*='pillUnsure']) {
-    background: #fff4cc !important;
-    border-color: rgba(161, 106, 0, 0.34) !important;
-    color: #5f4200 !important;
+    background: var(--ce-status-warning-text) !important;
+    border-color: color-mix(in srgb, var(--ce-status-warning) 34%, transparent) !important;
+    color: var(--ce-overlay-surface) !important;
   }
 
   :global([class*='freeformPreview']),
   :global([class*='ratingPreviewWrap']) {
-    background: #e8eef7 !important;
-    border-color: rgba(32, 45, 71, 0.22) !important;
-    color: rgba(24, 36, 58, 0.72) !important;
+    background: var(--ce-status-info-text) !important;
+    border-color: color-mix(in srgb, var(--ce-overlay-surface) 22%, transparent) !important;
+    color: color-mix(in srgb, var(--ce-overlay-surface) 72%, transparent) !important;
   }
 
   :global([class*='modeSwitchButton']),
@@ -3077,57 +3085,57 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   :global([class*='addTagButton']),
   :global([class*='magicTagButton']),
   :global([class*='clearFormButton']) {
-    background: #fff !important;
-    border: 1px solid rgba(32, 45, 71, 0.2) !important;
-    color: #18243a !important;
+    background: var(--ce-text-inverse) !important;
+    border: 1px solid color-mix(in srgb, var(--ce-overlay-surface) 20%, transparent) !important;
+    color: var(--ce-document-text) !important;
   }
 
   :global([class*='removeQuestionButton']):hover,
   :global([class*='removeOptionButton']):hover {
-    background: #ffe3e3 !important;
-    border-color: rgba(191, 64, 64, 0.35) !important;
-    color: #7f1d1d !important;
+    background: var(--ce-status-danger-text) !important;
+    border-color: color-mix(in srgb, var(--ce-status-error) 35%, transparent) !important;
+    color: var(--ce-status-error) !important;
   }
 
   :global([class*='addOptionButton']):hover,
   :global([class*='addTagButton']):hover,
   :global([class*='magicTagButton']):hover {
-    background: #dff7ea !important;
-    border-color: rgba(22, 114, 85, 0.35) !important;
-    color: #123a2d !important;
+    background: var(--ce-status-success-text) !important;
+    border-color: color-mix(in srgb, var(--ce-status-success) 35%, transparent) !important;
+    color: var(--ce-overlay-surface) !important;
   }
 
   :global([class*='tagInputGroup']) {
-    background: #fff !important;
-    border-color: rgba(32, 45, 71, 0.18) !important;
+    background: var(--ce-text-inverse) !important;
+    border-color: color-mix(in srgb, var(--ce-overlay-surface) 18%, transparent) !important;
   }
 
   :global([class*='tagInputField']) {
-    color: #18243a !important;
+    color: var(--ce-document-text) !important;
 
     &::placeholder {
-      color: rgba(24, 36, 58, 0.5) !important;
+      color: color-mix(in srgb, var(--ce-overlay-surface) 50%, transparent) !important;
     }
   }
 
   :global([class*='filterBubble']) {
-    background: #dff7ea !important;
-    border-color: rgba(22, 114, 85, 0.35) !important;
-    color: #123a2d !important;
+    background: var(--ce-status-success-text) !important;
+    border-color: color-mix(in srgb, var(--ce-status-success) 35%, transparent) !important;
+    color: var(--ce-overlay-surface) !important;
   }
 
   :global([class*='removeIcon']) {
-    color: #123a2d !important;
+    color: var(--ce-overlay-surface) !important;
   }
 
   :global([class*='jsonDisplay']) {
-    background: #fff !important;
-    border-color: rgba(32, 45, 71, 0.14) !important;
-    color: #18243a !important;
+    background: var(--ce-text-inverse) !important;
+    border-color: color-mix(in srgb, var(--ce-overlay-surface) 14%, transparent) !important;
+    color: var(--ce-document-text) !important;
   }
 
   :global([class*='buttonContent']) {
-    color: #fff !important;
+    color: var(--ce-text-inverse) !important;
   }
 }
 
@@ -3188,8 +3196,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   border-radius: var(--ce-radius-20);
   background: var(--ce-color-surface);
   box-shadow:
-    7px 7px 14px #131532,
-    -7px -7px 14px #2b2f70;
+    7px 7px 14px var(--ce-overlay-surface),
+    -7px -7px 14px var(--ce-status-info);
   transition: transform 0.3s ease;
   overflow: visible;
 }
@@ -3207,7 +3215,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   gap: 15px;
   font-size: 1.2rem;
   border-radius: var(--ce-radius-20);
-  background: rgba(31, 34, 81, 0.5);
+  background: color-mix(in srgb, var(--ce-overlay-surface) 50%, transparent);
 }
 
 .pileLoadingHeadline {
@@ -3239,7 +3247,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   width: 100%;
   height: 8px;
   border-radius: var(--ce-radius-pill);
-  background: rgba(255, 255, 255, 0.14);
+  background: color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
   overflow: hidden;
 }
 
@@ -3247,7 +3255,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   height: 100%;
   width: 0%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #2cc3ff 0%, #62ffbf 100%);
+  background: linear-gradient(90deg, var(--ce-status-info) 0%, var(--ce-status-success) 100%);
   transition: width 0.25s ease;
 }
 
@@ -3296,9 +3304,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   /* The Elevated 3D Look */
   // background: var(--ce-color-surface);
   // box-shadow:
-  //   7px 7px 14px #131532,
-  //   -7px -7px 14px #2b2f70;
-  border-radius: 50px;
+  //   7px 7px 14px var(--ce-overlay-surface),
+  //   -7px -7px 14px var(--ce-status-info);
+  border-radius: var(--ce-radius-50);
   /* Pill shape */
   padding: 20px 10px;
   /* Padding to frame the arrows/counter */
@@ -3312,7 +3320,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   background: none;
   border: none;
   cursor: pointer;
-  color: rgba(255, 255, 255, 0.8);
+  color: color-mix(in srgb, var(--ce-text-inverse) 80%, transparent);
   /* Higher visibility inside the dark pill */
   transition:
     color 0.2s ease,
@@ -3323,11 +3331,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   &:hover:not(:disabled) {
     color: var(--ce-color-white);
     transform: scale(1.15);
-    filter: drop-shadow(0 0 5px rgba(77, 255, 164, 0.5));
+    filter: drop-shadow(0 0 5px color-mix(in srgb, var(--ce-action-accent) 50%, transparent));
   }
 
   &:disabled {
-    color: rgba(255, 255, 255, 0.1);
+    color: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
     cursor: not-allowed;
   }
 }
@@ -3337,7 +3345,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   color: var(--ce-color-white);
   font-size: 0.9rem;
   font-weight: 700;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 1px 2px color-mix(in srgb, var(--ce-compat-dark) 50%, transparent);
   margin: 5px 0;
   user-select: none;
 }
@@ -3396,7 +3404,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .actionButtonActive {
   opacity: 1;
   color: var(--ce-color-accent);
-  filter: drop-shadow(0 0 6px rgba(77, 255, 164, 0.55));
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--ce-action-accent) 55%, transparent));
 }
 
 .miniSpinnerWrapper {
@@ -3423,15 +3431,20 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   right: 16px;
   width: 42px;
   height: 42px;
-  border: 1px solid rgba(128, 234, 255, 0.34);
+  border: 1px solid color-mix(in srgb, var(--ce-data-series-8) 34%, transparent);
   border-radius: var(--ce-radius-pill);
   background:
-    radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.03) 54%), rgba(8, 26, 70, 0.74);
-  color: #e8fbff;
+    radial-gradient(
+      circle at 30% 28%,
+      color-mix(in srgb, var(--ce-text-inverse) 20%, transparent),
+      color-mix(in srgb, var(--ce-text-inverse) 3%, transparent) 54%
+    ),
+    color-mix(in srgb, var(--ce-overlay-surface) 74%, transparent);
+  color: var(--ce-data-series-8);
   opacity: 0.5;
   box-shadow:
-    0 0 0 1px rgba(44, 195, 255, 0.08),
-    0 16px 32px rgba(1, 11, 28, 0.34);
+    0 0 0 1px color-mix(in srgb, var(--ce-status-info) 8%, transparent),
+    0 16px 32px color-mix(in srgb, var(--ce-overlay-base) 34%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3449,25 +3462,25 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   &:hover,
   &:focus-visible {
     opacity: 1;
-    color: #8ef2ff;
+    color: var(--ce-data-series-8);
     transform: translateY(-1px) scale(1.05);
-    border-color: rgba(142, 242, 255, 0.66);
+    border-color: color-mix(in srgb, var(--ce-data-series-8) 66%, transparent);
     box-shadow:
-      0 0 0 1px rgba(142, 242, 255, 0.18),
-      0 0 28px rgba(84, 222, 255, 0.22),
-      0 16px 32px rgba(1, 11, 28, 0.42);
+      0 0 0 1px color-mix(in srgb, var(--ce-data-series-8) 18%, transparent),
+      0 0 28px color-mix(in srgb, var(--ce-data-series-8) 22%, transparent),
+      0 16px 32px color-mix(in srgb, var(--ce-overlay-base) 42%, transparent);
     outline: none;
   }
 }
 
 .pileHologramToggleActive {
   opacity: 1;
-  color: #8ef2ff;
-  border-color: rgba(142, 242, 255, 0.66);
+  color: var(--ce-data-series-8);
+  border-color: color-mix(in srgb, var(--ce-data-series-8) 66%, transparent);
   box-shadow:
-    0 0 0 1px rgba(142, 242, 255, 0.18),
-    0 0 28px rgba(84, 222, 255, 0.22),
-    0 16px 32px rgba(1, 11, 28, 0.42);
+    0 0 0 1px color-mix(in srgb, var(--ce-data-series-8) 18%, transparent),
+    0 0 28px color-mix(in srgb, var(--ce-data-series-8) 22%, transparent),
+    0 16px 32px color-mix(in srgb, var(--ce-overlay-base) 42%, transparent);
 }
 
 .pileHologramPanel {
@@ -3483,13 +3496,17 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   flex-direction: column;
   justify-content: center;
   background:
-    radial-gradient(circle at 50% 32%, rgba(170, 243, 255, 0.14), transparent 22%),
-    radial-gradient(circle at 50% 66%, rgba(58, 134, 255, 0.18), transparent 44%),
-    linear-gradient(180deg, rgba(4, 18, 88, 0.99) 0%, rgba(2, 10, 58, 0.98) 100%);
-  border: 1px solid rgba(128, 234, 255, 0.2);
+    radial-gradient(circle at 50% 32%, color-mix(in srgb, var(--ce-data-series-8) 14%, transparent), transparent 22%),
+    radial-gradient(circle at 50% 66%, color-mix(in srgb, var(--ce-status-info) 18%, transparent), transparent 44%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--ce-overlay-surface) 99%, transparent) 0%,
+      color-mix(in srgb, var(--ce-overlay-base) 98%, transparent) 100%
+    );
+  border: 1px solid color-mix(in srgb, var(--ce-data-series-8) 20%, transparent);
   box-shadow:
-    0 18px 46px rgba(0, 14, 44, 0.46),
-    inset 0 0 28px rgba(94, 228, 255, 0.08);
+    0 18px 46px color-mix(in srgb, var(--ce-overlay-base) 46%, transparent),
+    inset 0 0 28px color-mix(in srgb, var(--ce-data-series-8) 8%, transparent);
 }
 
 .pileHologramBackdrop,
@@ -3501,16 +3518,20 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 .pileHologramBackdrop {
   background:
-    radial-gradient(circle at 50% 34%, rgba(142, 242, 255, 0.2), transparent 24%),
-    radial-gradient(circle at 50% 78%, rgba(56, 118, 255, 0.16), transparent 34%),
-    linear-gradient(180deg, rgba(126, 227, 255, 0.02) 0%, rgba(126, 227, 255, 0.06) 100%);
+    radial-gradient(circle at 50% 34%, color-mix(in srgb, var(--ce-data-series-8) 20%, transparent), transparent 24%),
+    radial-gradient(circle at 50% 78%, color-mix(in srgb, var(--ce-status-info) 16%, transparent), transparent 34%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--ce-data-series-8) 2%, transparent) 0%,
+      color-mix(in srgb, var(--ce-data-series-8) 6%, transparent) 100%
+    );
 }
 
 .pileHologramScanlines {
   background: repeating-linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.12) 0,
-    rgba(255, 255, 255, 0.12) 1px,
+    color-mix(in srgb, var(--ce-text-inverse) 12%, transparent) 0,
+    color-mix(in srgb, var(--ce-text-inverse) 12%, transparent) 1px,
     transparent 1px,
     transparent 6px
   );
@@ -3532,15 +3553,15 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   position: absolute;
   inset: 50% auto auto 50%;
   transform: translate(-50%, -50%);
-  border-radius: 50%;
+  border-radius: var(--ce-radius-round);
   pointer-events: none;
   width: 396px;
   height: 396px;
   background: radial-gradient(
     circle,
-    rgba(166, 245, 255, 0.18) 0%,
-    rgba(85, 216, 255, 0.08) 40%,
-    rgba(34, 105, 255, 0.02) 64%,
+    color-mix(in srgb, var(--ce-data-series-8) 18%, transparent) 0%,
+    color-mix(in srgb, var(--ce-data-series-8) 8%, transparent) 40%,
+    color-mix(in srgb, var(--ce-status-info) 2%, transparent) 64%,
     transparent 78%
   );
   filter: blur(16px);
@@ -3553,7 +3574,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   display: block;
   width: min(100%, 432px);
   height: auto;
-  filter: drop-shadow(0 0 10px rgba(166, 245, 255, 0.2)) drop-shadow(0 0 26px rgba(70, 204, 255, 0.18));
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--ce-data-series-8) 20%, transparent))
+    drop-shadow(0 0 26px color-mix(in srgb, var(--ce-status-info) 18%, transparent));
 }
 
 .pileHologramFloat {
@@ -3562,7 +3584,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .pileHologramBustFill {
-  stroke: rgba(120, 234, 255, 0.24);
+  stroke: color-mix(in srgb, var(--ce-data-series-8) 24%, transparent);
   stroke-width: 1.05;
   opacity: 0.82;
 }
@@ -3601,12 +3623,12 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .pileHologramHeadOutline {
-  stroke: rgba(154, 245, 255, 0.92);
+  stroke: color-mix(in srgb, var(--ce-data-series-8) 92%, transparent);
   stroke-width: 1.4;
 }
 
 .pileHologramDepthOutline {
-  stroke: rgba(132, 232, 255, 0.34);
+  stroke: color-mix(in srgb, var(--ce-data-series-8) 34%, transparent);
   stroke-width: 1.1;
 }
 
@@ -3615,39 +3637,39 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .pileHologramMeshLine {
-  stroke: rgba(111, 232, 255, 0.8);
+  stroke: color-mix(in srgb, var(--ce-data-series-8) 80%, transparent);
   stroke-width: 0.78;
 }
 
 .pileHologramFeatureLine {
-  stroke: rgba(188, 249, 255, 0.94);
+  stroke: color-mix(in srgb, var(--ce-data-series-8) 94%, transparent);
   stroke-width: 1.18;
 }
 
 .pileHologramContourLine {
-  stroke: rgba(128, 233, 255, 0.58);
+  stroke: color-mix(in srgb, var(--ce-data-series-8) 58%, transparent);
   stroke-width: 0.96;
 }
 
 .pileHologramFeatureSoftLine,
 .pileHologramNeckLine {
-  stroke: rgba(118, 236, 255, 0.72);
+  stroke: color-mix(in srgb, var(--ce-data-series-8) 72%, transparent);
   stroke-width: 1.02;
 }
 
 .pileHologramBrowLine {
-  stroke: rgba(170, 246, 255, 0.7);
+  stroke: color-mix(in srgb, var(--ce-data-series-8) 70%, transparent);
   stroke-width: 0.98;
 }
 
 .pileHologramSmileLine {
-  stroke: rgba(198, 250, 255, 0.9);
+  stroke: color-mix(in srgb, var(--ce-data-series-8) 90%, transparent);
   stroke-width: 1.02;
 }
 
 .pileHologramIrisGlow {
-  fill: rgba(145, 241, 255, 0.22);
-  filter: drop-shadow(0 0 5px rgba(118, 237, 255, 0.28));
+  fill: color-mix(in srgb, var(--ce-data-series-8) 22%, transparent);
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--ce-data-series-8) 28%, transparent));
 }
 
 .pileHologramEyes {
@@ -3656,11 +3678,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .pileHologramPupil {
-  fill: rgba(242, 254, 255, 0.9);
+  fill: color-mix(in srgb, var(--ce-data-series-8) 90%, transparent);
 }
 
 .pileHologramEyeHighlight {
-  fill: rgba(255, 255, 255, 0.82);
+  fill: color-mix(in srgb, var(--ce-text-inverse) 82%, transparent);
 }
 
 .pileHologramPulseDots {
@@ -3668,8 +3690,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .pileHologramPulseDot {
-  fill: rgba(162, 247, 255, 0.88);
-  filter: drop-shadow(0 0 6px rgba(162, 247, 255, 0.68));
+  fill: color-mix(in srgb, var(--ce-data-series-8) 88%, transparent);
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--ce-data-series-8) 68%, transparent));
 }
 
 @keyframes pileHologramFloat {
@@ -4000,12 +4022,12 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     flex-direction: column;
     min-width: 56px;
     padding: 10px 8px;
-    border: 1px solid rgba(255, 255, 255, 0.16);
+    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
     border-radius: var(--ce-radius-14);
-    background: rgba(23, 25, 65, 0.98);
+    background: color-mix(in srgb, var(--ce-overlay-surface) 98%, transparent);
     box-shadow:
-      0 18px 36px rgba(7, 12, 38, 0.42),
-      inset 0 0 0 1px rgba(77, 255, 164, 0.08);
+      0 18px 36px color-mix(in srgb, var(--ce-overlay-base) 42%, transparent),
+      inset 0 0 0 1px color-mix(in srgb, var(--ce-action-accent) 8%, transparent);
   }
 
   .pileActionsMenuEligible:focus-within .pileActionButtonGroup,
@@ -4047,7 +4069,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     order: 3;
     justify-self: end;
     padding: 6px 16px;
-    border-radius: 50px;
+    border-radius: var(--ce-radius-50);
     min-width: auto;
   }
 
@@ -4066,7 +4088,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   .actionButtonActive {
     opacity: 0.75;
-    filter: drop-shadow(0 0 3px rgba(77, 255, 164, 0.35));
+    filter: drop-shadow(0 0 3px color-mix(in srgb, var(--ce-action-accent) 35%, transparent));
   }
 }
 
@@ -4158,7 +4180,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   .actionButtonActive {
     opacity: 0.75;
-    filter: drop-shadow(0 0 3px rgba(77, 255, 164, 0.35));
+    filter: drop-shadow(0 0 3px color-mix(in srgb, var(--ce-action-accent) 35%, transparent));
   }
 }
 
@@ -4175,7 +4197,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   .actionButtonActive {
     opacity: 0.75;
     color: var(--ce-color-accent) !important;
-    filter: drop-shadow(0 0 3px rgba(77, 255, 164, 0.35));
+    filter: drop-shadow(0 0 3px color-mix(in srgb, var(--ce-action-accent) 35%, transparent));
   }
 
   .pileNavArrow:hover:not(:disabled) {
@@ -4342,8 +4364,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     $min-height: 0,
     $font-size: 1rem,
     $border-radius: var(--ce-radius-8),
-    $box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1),
-    $hover-box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15)
+    $box-shadow: var(--ce-shadow-submit),
+    $hover-box-shadow: var(--ce-shadow-submit-hover)
   );
   white-space: nowrap;
   max-width: 300px;
@@ -4361,14 +4383,14 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   font-size: 1.15rem;
   border-radius: var(--ce-radius-16);
   box-shadow:
-    0 14px 30px rgba(7, 14, 38, 0.34),
-    0 0 0 1px rgba(120, 154, 255, 0.18);
+    0 14px 30px color-mix(in srgb, var(--ce-overlay-base) 34%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--ce-status-info-text) 18%, transparent);
 
   &:hover:not(:disabled),
   &:focus:not(:disabled) {
     box-shadow:
-      0 18px 36px rgba(7, 14, 38, 0.4),
-      0 0 0 1px rgba(120, 154, 255, 0.24);
+      0 18px 36px color-mix(in srgb, var(--ce-overlay-base) 40%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--ce-status-info-text) 24%, transparent);
   }
 }
 
@@ -4387,7 +4409,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   display: none;
   align-items: center;
   gap: 1px;
-  color: rgba(255, 255, 255, 0.92);
+  color: color-mix(in srgb, var(--ce-text-inverse) 92%, transparent);
 }
 
 .pileSubmitButtonTrailIcon {
@@ -4412,15 +4434,30 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   justify-content: center;
   width: 60px;
   height: 60px;
-  border-radius: 50%;
+  border-radius: var(--ce-radius-round);
   color: var(--ce-color-white);
   background:
-    radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.03) 48%),
-    linear-gradient(135deg, #59d77d 0%, #39b963 100%);
+    radial-gradient(
+      circle at 30% 28%,
+      color-mix(in srgb, var(--ce-text-inverse) 26%, transparent),
+      color-mix(in srgb, var(--ce-text-inverse) 3%, transparent) 48%
+    ),
+    linear-gradient(135deg, var(--ce-status-success) 0%, var(--ce-status-success) 100%);
   box-shadow:
-    0 14px 30px rgba(6, 44, 18, 0.28),
-    0 0 0 1px rgba(255, 255, 255, 0.18);
+    0 14px 30px color-mix(in srgb, var(--ce-overlay-base) 28%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--ce-text-inverse) 18%, transparent);
   animation: pileSubmitSuccessPop 220ms ease-out;
+
+  &:hover,
+  &:focus {
+    color: var(--ce-color-white);
+    text-decoration: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--ce-text-inverse) 86%, transparent);
+    outline-offset: 3px;
+  }
 }
 
 .pileSubmitSuccessIcon {
@@ -4433,22 +4470,21 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
-@media (min-width: 769px), (max-width: 480px) {
-  .pileFooter .pileSubmitButton.submitGlow::before {
-    position: absolute;
-    content: '';
-    background: linear-gradient(90deg, #fff 40%, transparent 40%);
-    top: -5px;
-    bottom: -5px;
-    left: -5px;
-    right: -5px;
-    z-index: 2;
-    border-radius: calc(var(--ce-radius-16) + 5px);
-    background-size: 200% 4px;
-    background-repeat: no-repeat;
-    filter: drop-shadow(0 0 8px #fff);
-    pointer-events: none;
-  }
+.pileFooter .pileSubmitButton.submitGlow::before {
+  position: absolute;
+  content: '';
+  background: linear-gradient(90deg, var(--ce-text-inverse) 40%, transparent 40%);
+  top: -5px;
+  bottom: -5px;
+  left: -5px;
+  right: -5px;
+  z-index: 2;
+  border-radius: calc(var(--pile-submit-button-radius) + var(--ce-radius-5));
+  background-size: 200% 4px;
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 0 8px var(--ce-text-inverse));
+  pointer-events: none;
+}
 
   .pileFooter .pileSubmitButton.submitGlow::before {
     background-position: 80% 0;
@@ -4537,7 +4573,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   display: inline-flex;
   align-items: center;
   font-size: 1.5rem;
-  color: #4cd964;
+  color: var(--ce-status-success);
 }
 
 .ratingContainer {
@@ -4617,7 +4653,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: 1px solid #d0d7ff;
+  border: 1px solid var(--ce-status-info-text);
   background: var(--ce-color-white);
   color: var(--ce-color-surface);
   border-radius: var(--ce-radius-6);
@@ -4626,7 +4662,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   cursor: pointer;
   transition: transform 0.06s ease;
   &:hover {
-    box-shadow: 0 2px 6px rgba(16, 24, 40, 0.12);
+    box-shadow: 0 2px 6px color-mix(in srgb, var(--ce-overlay-base) 12%, transparent);
     transform: translateY(-1px);
   }
 }
@@ -4650,9 +4686,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .iconGlow {
   color: var(--ce-color-accent) !important;
   text-shadow:
-    0 0 6px rgba(77, 255, 164, 0.85),
-    0 0 12px rgba(77, 255, 164, 0.55);
-  filter: drop-shadow(0 0 2px rgba(77, 255, 164, 0.45));
+    0 0 6px color-mix(in srgb, var(--ce-action-accent) 85%, transparent),
+    0 0 12px color-mix(in srgb, var(--ce-action-accent) 55%, transparent);
+  filter: drop-shadow(0 0 2px color-mix(in srgb, var(--ce-action-accent) 45%, transparent));
 }
 
 /* Tiny helpers for decrypt affordances */
@@ -4666,7 +4702,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   border-radius: var(--ce-radius-8);
   background: transparent;
   /* clear / transparent background */
-  // border: 1px solid rgba(77, 255, 164, 0.35);
+  // border: 1px solid color-mix(in srgb, var(--ce-action-accent) 35%, transparent);
   font-size: 1.2em;
   /* large text */
   font-weight: 700;
@@ -4691,8 +4727,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   font-size: 12px;
   line-height: 1;
   color: var(--ce-color-white);
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
   white-space: nowrap;
   user-select: none;
 }
@@ -4756,7 +4792,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 .convictionToggleButtonActive {
   opacity: 1;
-  text-shadow: 0 0 8px rgba(255, 255, 255, 0.35);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--ce-text-inverse) 35%, transparent);
 }
 
 .convictionToggleDivider {
@@ -4774,7 +4810,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .bullhornButton {
-  color: rgba(255, 255, 255, 0.8);
+  color: color-mix(in srgb, var(--ce-text-inverse) 80%, transparent);
 }
 
 .scanningIndicator {
@@ -4827,13 +4863,13 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 @keyframes headerPulseBlue {
   0% {
-    box-shadow: 0 0 0 rgba(42, 99, 202, 0.3);
+    box-shadow: 0 0 0 color-mix(in srgb, var(--ce-status-info) 30%, transparent);
   }
   50% {
-    box-shadow: 0 0 14px rgba(42, 99, 202, 0.55);
+    box-shadow: 0 0 14px color-mix(in srgb, var(--ce-status-info) 55%, transparent);
   }
   100% {
-    box-shadow: 0 0 0 rgba(42, 99, 202, 0.3);
+    box-shadow: 0 0 0 color-mix(in srgb, var(--ce-status-info) 30%, transparent);
   }
 }
 
@@ -4870,7 +4906,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .viewAddressLink {
   color: inherit;
   text-decoration: none;
-  border-bottom: 1px dotted rgba(255, 255, 255, 0.35);
+  border-bottom: 1px dotted color-mix(in srgb, var(--ce-text-inverse) 35%, transparent);
   transition:
     color 0.2s ease,
     border-color 0.2s ease;
@@ -4878,7 +4914,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   &:hover,
   &:focus {
     color: var(--ce-color-accent);
-    border-color: rgba(77, 255, 164, 0.7);
+    border-color: color-mix(in srgb, var(--ce-action-accent) 70%, transparent);
     outline: none;
   }
 }

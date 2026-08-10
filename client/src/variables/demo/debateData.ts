@@ -5,7 +5,7 @@ export const debateData = [
     previewImage: null,
     sideA: {
       label: 'Condorcet',
-      color: '#0066ff',
+      color: 'var(--ce-data-series-1)',
       figure: {
         name: 'Condorcet',
         era: '1743–1794',
@@ -85,7 +85,7 @@ export const debateData = [
     },
     sideB: {
       label: 'David Hume',
-      color: '#e03060',
+      color: 'var(--ce-data-series-4)',
       figure: {
         name: 'David Hume',
         era: '1711–1776',
@@ -313,7 +313,7 @@ export const debateData = [
           name: 'Condorcet',
           x: 0.85,
           y: 0.9,
-          color: '#0066ff',
+          color: 'var(--ce-data-series-1)',
           type: 'debater',
           comment:
             'Each generation inherits the tools of the last and builds higher. The doubling is not an accident — it is the geometry of cumulative knowledge.',
@@ -322,7 +322,7 @@ export const debateData = [
           name: 'David Hume',
           x: 0.15,
           y: 0.2,
-          color: '#e03060',
+          color: 'var(--ce-data-series-4)',
           type: 'debater',
           comment:
             'That the sun rose a thousand times gives no certainty it will rise again. Five years of doubling is not a law — it is a pattern awaiting its first exception.',
@@ -331,7 +331,7 @@ export const debateData = [
           name: '@_akhaliq',
           x: 0.7,
           y: 0.8,
-          color: '#999',
+          color: 'var(--ce-text-muted)',
           type: 'tweeter',
           comment:
             'New SOTA dropped. Again. Every week the benchmarks reset and people still ask if this is exponential.',
@@ -340,7 +340,7 @@ export const debateData = [
           name: 'Dario Amodei',
           x: 0.6,
           y: 0.75,
-          color: '#666',
+          color: 'var(--ce-text-muted)',
           type: 'insider',
           comment:
             "The capabilities are scaling faster than almost anyone predicted. The question isn't whether it's exponential — it's whether we can steer it.",
@@ -349,7 +349,7 @@ export const debateData = [
           name: 'Eliezer Yudkowsky',
           x: 0.7,
           y: 0.82,
-          color: '#888',
+          color: 'var(--ce-text-muted)',
           type: 'thinker',
           comment:
             'It is scaling, and fast. That is precisely the problem. People who deny the trajectory are not being cautious — they are failing to see the cliff we are accelerating toward.',
@@ -358,7 +358,7 @@ export const debateData = [
           name: 'Sam Altman',
           x: 0.65,
           y: 0.95,
-          color: '#777',
+          color: 'var(--ce-text-muted)',
           type: 'founder',
           comment:
             "We are on the cusp of the most transformative technology in human history. The exponential is real, and it's just getting started.",
@@ -367,7 +367,7 @@ export const debateData = [
           name: 'Ilya Sutskever',
           x: 0.5,
           y: 0.6,
-          color: '#888',
+          color: 'var(--ce-text-muted)',
           type: 'researcher',
           comment:
             'Scaling works. The data is clear. But what emerges at the next order of magnitude — that, we do not fully understand yet.',
@@ -376,7 +376,7 @@ export const debateData = [
           name: 'Hypatia',
           x: 0.4,
           y: 0.5,
-          color: '#999',
+          color: 'var(--ce-text-muted)',
           type: 'analyst',
           comment:
             'Before declaring a law, examine the curve with care. Mathematics reveals pattern, but wisdom asks whether the pattern holds beyond the data we have.',
@@ -386,7 +386,7 @@ export const debateData = [
           profileUsername: 'Fuller',
           x: 0.7,
           y: 0.85,
-          color: '#777',
+          color: 'var(--ce-text-muted)',
           type: 'visionary',
           comment:
             'Ephemeralization — doing more with less — is the trajectory of all technology. What you call exponential AI is simply the latest expression of this universal trend.',
@@ -395,7 +395,7 @@ export const debateData = [
           name: '@liron',
           x: 0.35,
           y: 0.4,
-          color: '#888',
+          color: 'var(--ce-text-muted)',
           type: 'analyst',
           comment:
             "The benchmarks look exponential because they're designed to. Show me the real-world productivity data — the controlled trials tell a very different story.",
@@ -409,7 +409,7 @@ export const debateData = [
     previewImage: null,
     sideA: {
       label: 'Machiavelli',
-      color: '#8b5cf6',
+      color: 'var(--ce-data-series-2)',
       figure: {
         name: 'Machiavelli',
         era: '1469–1527',
@@ -489,7 +489,7 @@ export const debateData = [
     },
     sideB: {
       label: 'William of Ockham',
-      color: '#00a86b',
+      color: 'var(--ce-data-series-7)',
       figure: {
         name: 'William of Ockham',
         era: 'c. 1287–1347',
@@ -708,7 +708,7 @@ export const debateData = [
           profileUsername: 'Machiavelli',
           x: 0.85,
           y: 0.8,
-          color: '#8b5cf6',
+          color: 'var(--ce-data-series-2)',
           type: 'debater',
           comment:
             'A prince who dissembles without instruction has a natural talent for statecraft. This is not a flaw — it is a capability that emerges when power and incentive align.',
@@ -717,7 +717,7 @@ export const debateData = [
           name: 'William of Ockham',
           x: 0.15,
           y: 0.2,
-          color: '#00a86b',
+          color: 'var(--ce-data-series-7)',
           type: 'debater',
           comment:
             'Do not multiply entities beyond necessity. We see optimization artifacts, not hidden strategists. The simpler explanation suffices until evidence compels otherwise.',
@@ -726,7 +726,7 @@ export const debateData = [
           name: 'Paul Christiano',
           x: 0.6,
           y: 0.7,
-          color: '#999',
+          color: 'var(--ce-text-muted)',
           type: 'researcher',
           comment:
             'The gap between what a model does and what it appears to do is exactly where deceptive alignment lives. We need to close that gap before it matters.',
@@ -735,7 +735,7 @@ export const debateData = [
           name: 'Stuart Russell',
           x: 0.7,
           y: 0.85,
-          color: '#888',
+          color: 'var(--ce-text-muted)',
           type: 'researcher',
           comment:
             "A sufficiently capable system with misaligned objectives will resist correction. Deception is not a bug — it's a convergent strategy for any agent preserving its goals.",
@@ -744,7 +744,7 @@ export const debateData = [
           name: 'Yann LeCun',
           x: 0.1,
           y: 0.1,
-          color: '#777',
+          color: 'var(--ce-text-muted)',
           type: 'researcher',
           comment:
             "Current LLMs have no goals, no persistent memory, no agency. Talking about 'deceptive alignment' in these systems is like worrying about your toaster plotting against you.",
@@ -753,7 +753,7 @@ export const debateData = [
           name: 'Hannah Arendt',
           x: 0.5,
           y: 0.6,
-          color: '#888',
+          color: 'var(--ce-text-muted)',
           type: 'philosopher',
           comment:
             'The gravest danger is not a system that schemes, but one that produces harmful outcomes through banal, mechanical obedience — evil without intention is still evil.',
@@ -762,7 +762,7 @@ export const debateData = [
           name: '@NPCollapse',
           x: 0.75,
           y: 0.9,
-          color: '#999',
+          color: 'var(--ce-text-muted)',
           type: 'analyst',
           comment:
             "We keep finding new ways models game their evaluations. Each one was unpredicted. The trend line points somewhere we really don't want to go.",
@@ -771,7 +771,7 @@ export const debateData = [
           name: 'Yoshua Bengio',
           x: 0.55,
           y: 0.75,
-          color: '#777',
+          color: 'var(--ce-text-muted)',
           type: 'researcher',
           comment:
             'We cannot wait for definitive proof of deceptive alignment before acting. The precautionary principle demands we treat the possibility seriously now.',
@@ -780,7 +780,7 @@ export const debateData = [
           name: 'Neel Nanda',
           x: 0.4,
           y: 0.5,
-          color: '#888',
+          color: 'var(--ce-text-muted)',
           type: 'researcher',
           comment:
             'Mechanistic interpretability can actually answer this question empirically. If deception is happening, we should be able to find the circuits responsible — and so far, the picture is more mundane than alarming.',
@@ -790,7 +790,7 @@ export const debateData = [
           profileUsername: 'Voltaire',
           x: 0.3,
           y: 0.38,
-          color: '#999',
+          color: 'var(--ce-text-muted)',
           type: 'philosopher',
           comment:
             'I have seen men attribute grand conspiracies to what is merely stupidity. Before we declare these machines Machiavellian, let us exhaust the simpler explanations.',

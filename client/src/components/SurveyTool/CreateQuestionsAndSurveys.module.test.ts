@@ -12,8 +12,8 @@ describe('CreateQuestionsAndSurveys.module.scss final submit CTA guards', () => 
       /\.createSurveyButton,\s*#submitNewSurveyButton\s*{[\s\S]*?@include\s+finalSubmitCta\.final-submit-cta-shell\([\s\S]*?\);[\s\S]*?position:\s*relative;[\s\S]*?overflow:\s*hidden;/,
     );
     expect(scss).toMatch(/\.buttonProgressFill\s*{[\s\S]*?position:\s*absolute;[\s\S]*?width:\s*0%;/);
-    expect(scss).toMatch(/\.submittingButton\s*{[\s\S]*?border-color:\s*#0d6efd !important;/);
-    expect(scss).toMatch(/\.errorButton\s*{[\s\S]*?background-color:\s*#dc3545 !important;/);
+    expect(scss).toMatch(/\.submittingButton\s*{[\s\S]*?border-color:\s*var\(--ce-status-info\) !important;/);
+    expect(scss).toMatch(/\.errorButton\s*{[\s\S]*?background-color:\s*var\(--ce-status-danger\) !important;/);
   });
 
   it('keeps the final submit content wrapper uppercase and centered', () => {

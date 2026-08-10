@@ -15,7 +15,7 @@ describe('Onboarding overlay welcome slide styles', () => {
     );
     expect(scss).toMatch(/\.controlSlot\s*\{[\s\S]*?min-height:\s*0;[\s\S]*?height:\s*auto;/);
     expect(scss).toMatch(
-      /\.controlSlotPlaceholder\s*\{[\s\S]*?pointer-events:\s*none;[\s\S]*?background:\s*rgba\(139,\s*183,\s*150,\s*0\.28\);/,
+      /\.controlSlotPlaceholder\s*\{[\s\S]*?pointer-events:\s*none;[\s\S]*?background:\s*color-mix\(in srgb,\s*var\(--ce-status-success\) 28%,\s*transparent\);/,
     );
     expect(scss).toMatch(
       /@media \(max-width:\s*760px\)\s*\{[\s\S]*?\.panel\s*\{[\s\S]*?--modal-panel-pad-bottom:\s*158px;/,
@@ -27,7 +27,7 @@ describe('Onboarding overlay welcome slide styles', () => {
       /@media \(max-width:\s*760px\)\s*\{[\s\S]*?\.onboardingControls\s*\{[\s\S]*?width:\s*auto;[\s\S]*?height:\s*76px;[\s\S]*?gap:\s*0;/,
     );
     expect(scss).toMatch(
-      /@media \(max-width:\s*760px\)\s*\{[\s\S]*?\.takeSurveyButton\s*\{[\s\S]*?background:\s*rgba\(139,\s*183,\s*150,\s*0\.42\);[\s\S]*?color:\s*rgba\(16,\s*43,\s*35,\s*0\.82\);/,
+      /@media \(max-width:\s*760px\)\s*\{[\s\S]*?\.takeSurveyButton\s*\{[\s\S]*?background:\s*color-mix\(in srgb,\s*var\(--ce-status-success\) 42%,\s*transparent\);[\s\S]*?color:\s*color-mix\(in srgb,\s*var\(--ce-overlay-base\) 82%,\s*transparent\);/,
     );
     expect(scss).toMatch(/@media \(max-width:\s*760px\)\s*\{[\s\S]*?\.skipButton\s*\{[\s\S]*?bottom:\s*98px;/);
     expect(scss).toMatch(

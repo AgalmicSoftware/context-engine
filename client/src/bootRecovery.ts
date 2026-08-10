@@ -180,10 +180,10 @@ const appendButton = (doc: Document, parent: Element, label: string, onClick: Ev
   button.setAttribute(
     'style',
     [
-      'border:1px solid rgba(147,170,255,0.55)',
+      'border:var(--ce-border-control-width,2px) solid var(--ce-focus-ring,Highlight)',
       'border-radius:10px',
-      'background:#2f67d3',
-      'color:#f6f8ff',
+      'background:var(--ce-action-primary,Highlight)',
+      'color:var(--ce-action-primary-text,HighlightText)',
       'cursor:pointer',
       'font:700 16px/1.2 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
       'padding:14px 18px',
@@ -236,8 +236,8 @@ export const renderBootFailure = (error: unknown, options: BootRecoveryOptions =
       'display:flex',
       'align-items:center',
       'justify-content:center',
-      'background:#202252',
-      'color:#f6f8ff',
+      'background:var(--ce-surface-raised,Canvas)',
+      'color:var(--ce-panel-text,CanvasText)',
       'padding:32px',
       'font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
     ].join(';'),
@@ -249,10 +249,10 @@ export const renderBootFailure = (error: unknown, options: BootRecoveryOptions =
     [
       'max-width:680px',
       'width:100%',
-      'border:1px solid rgba(147,170,255,0.32)',
+      'border:var(--ce-border-control-width,2px) solid var(--ce-border-strong,CanvasText)',
       'border-radius:18px',
-      'background:rgba(33,36,90,0.92)',
-      'box-shadow:0 24px 70px rgba(0,0,0,0.28)',
+      'background:var(--ce-surface-raised,Canvas)',
+      'box-shadow:var(--ce-shadow-raised,none)',
       'padding:32px',
     ].join(';'),
   );
@@ -269,14 +269,14 @@ export const renderBootFailure = (error: unknown, options: BootRecoveryOptions =
     panel,
     'p',
     'Reloading clears cached app data and loads the latest version.',
-    'margin:0 0 20px;color:#d7dbff;font-size:17px;line-height:1.45',
+    'margin:0 0 20px;color:var(--ce-panel-text-muted,CanvasText);font-size:17px;line-height:1.45',
   );
   const countdownNode = appendTextNode(
     doc,
     panel,
     'p',
     '',
-    'margin:0 0 20px;color:#f6f8ff;font-size:15px;font-weight:700;line-height:1.35',
+    'margin:0 0 20px;color:var(--ce-panel-text,CanvasText);font-size:15px;font-weight:700;line-height:1.35',
   );
 
   const actions = doc.createElement('div');

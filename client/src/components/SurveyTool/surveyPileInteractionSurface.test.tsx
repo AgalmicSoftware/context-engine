@@ -178,12 +178,12 @@ describe('surveyPileInteractionSurface', () => {
       transition: 'opacity 0.5s ease-in-out',
     });
     expect(resolvePileFilterButtonStyle(true)).toEqual({
-      color: '#4cd964',
-      borderColor: '#4cd964',
+      color: 'var(--ce-status-success)',
+      borderColor: 'var(--ce-status-success)',
       opacity: 0.75,
     });
     expect(resolvePileFilterButtonStyle(false)).toEqual({});
-    expect(resolvePileFilterIconStyle(true)).toEqual({ color: '#4cd964' });
+    expect(resolvePileFilterIconStyle(true)).toEqual({ color: 'var(--ce-status-success)' });
     expect(resolvePileFilterIconStyle(false)).toEqual({});
     expect(buildPileFilterButtonClassName(styles, true)).toBe(`${styles.actionButton} ${styles.actionButtonActive}`);
     expect(buildPileActionsClassName(styles, true)).toBe(`${styles.pileActions} ${styles.pileActionsMenuEligible}`);

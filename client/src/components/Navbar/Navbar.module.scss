@@ -322,9 +322,9 @@
 }
 
 .logoHomeLink:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline: 2px solid color-mix(in srgb, var(--ce-text-inverse) 85%, transparent);
   outline-offset: 4px;
-  border-radius: 4px;
+  border-radius: var(--ce-radius-4);
 }
 
 #accountSection,
@@ -464,7 +464,7 @@
 
 #walletSettingsButton {
   background-image: none;
-  background-color: #34467500;
+  background-color: transparent;
 }
 
 /* --- AccountDisplay --- */

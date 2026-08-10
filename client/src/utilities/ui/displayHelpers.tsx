@@ -60,7 +60,12 @@ export const getShortenedSurveyID = (
   } else if (surveyIdClickable) {
     const link = customLink ? customLink : '/survey/' + source.toString();
     const displayStringURL = (
-      <NavLink href={link} target="_blank" style={{ padding: '0px', color: 'blue', marginLeft: '5px' }}>
+      <NavLink
+        href={link}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ padding: '0px', color: 'var(--ce-link)', marginLeft: '5px' }}
+      >
         {displayString}
       </NavLink>
     );

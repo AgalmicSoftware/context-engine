@@ -18,9 +18,9 @@ describe('session wizard appearance publication', () => {
   });
 
   test('falls back for missing or invalid ids and removes the superseded theme shape', () => {
-    expect(
-      sanitizeSessionWizardMetadataPayload({ appearance: {} }).appearance,
-    ).toEqual({ colorSchemeId: 'context-engine' });
+    expect(sanitizeSessionWizardMetadataPayload({ appearance: {} }).appearance).toEqual({
+      colorSchemeId: 'context-engine',
+    });
     expect(
       sanitizeSessionWizardMetadataPayload({
         appearance: { colorSchemeId: 'url(https://example.invalid/theme.css)' },

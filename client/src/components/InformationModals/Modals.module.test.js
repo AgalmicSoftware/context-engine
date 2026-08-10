@@ -2,11 +2,11 @@ import fs from 'fs';
 import path from 'path';
 
 describe('Modals contrast styles', () => {
-  it('keeps the white email entry surface on dark text', () => {
+  it('keeps the email entry surface on document text', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'Modals.module.scss'), 'utf8');
 
-    expect(scss).toMatch(/background:\s*var\(--ce-color-white\);\s*color:\s*#1f2733;/);
-    expect(scss).not.toMatch(/background:\s*var\(--ce-color-white\);\s*color:\s*#ffffff;/);
+    expect(scss).toMatch(/background:\s*var\(--ce-color-white\);\s*color:\s*var\(--ce-document-text\);/);
+    expect(scss).not.toMatch(/background:\s*var\(--ce-color-white\);\s*color:\s*var\(--ce-color-white\);/);
   });
 
   it('keeps the intro image bottom-flush while preserving the centered titleless slide hooks', () => {

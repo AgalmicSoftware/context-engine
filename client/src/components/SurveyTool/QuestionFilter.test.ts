@@ -134,7 +134,7 @@ describe('QuestionFilter display helpers', () => {
       alignItems: 'center',
     });
     expect(QUESTION_FILTER_BOOKMARK_FEEDBACK_STYLE).toEqual({
-      color: 'goldenrod',
+      color: 'var(--ce-status-warning-text)',
       fontSize: '0.85em',
       fontStyle: 'italic',
     });
@@ -180,25 +180,25 @@ describe('QuestionFilter display helpers', () => {
     });
     expect(resolveQuestionFilterCopyIconStyle(false, true)).toEqual({
       cursor: 'not-allowed',
-      color: 'green',
+      color: 'var(--ce-status-success-text)',
       fontSize: '1.1em',
       marginRight: '15px',
     });
     expect(resolveQuestionFilterCopyIconStyle(true, false)).toEqual({
       cursor: 'not-allowed',
-      color: '#cccccc',
+      color: 'var(--ce-control-disabled-text)',
       fontSize: '1.1em',
       marginRight: '15px',
     });
     expect(resolveQuestionFilterBookmarkIconStyle(false, true, false)).toEqual({
       cursor: 'pointer',
-      color: 'gold',
+      color: 'var(--ce-status-warning)',
       fontSize: '1.1em',
       marginRight: '8px',
     });
     expect(resolveQuestionFilterBookmarkIconStyle(true, false, false)).toEqual({
       cursor: 'not-allowed',
-      color: '#cccccc',
+      color: 'var(--ce-control-disabled-text)',
       fontSize: '1.1em',
       marginRight: '8px',
     });

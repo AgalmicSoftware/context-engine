@@ -385,7 +385,7 @@ export const resolveCreateSbtCopyActionDisplayState = ({
 };
 
 export const resolveCreateSbtBookmarkActionDisplayState = ({
-  bookmarkedColor = '#ffe082',
+  bookmarkedColor = 'var(--ce-status-warning-text)',
   bookmarkedSbtsSet = null,
   sbtAddress = '',
 }: ResolveCreateSbtBookmarkActionDisplayStateArgs = {}): CreateSbtBookmarkActionDisplayState => {
@@ -393,7 +393,7 @@ export const resolveCreateSbtBookmarkActionDisplayState = ({
   const isBookmarked = bookmarkedSbtsSet instanceof Set && bookmarkedSbtsSet.has(normalizedAddress);
   return {
     iconStyle: {
-      color: isBookmarked ? String(bookmarkedColor || '#ffe082') : undefined,
+      color: isBookmarked ? String(bookmarkedColor || 'var(--ce-status-warning-text)') : undefined,
     },
     isBookmarked,
   };

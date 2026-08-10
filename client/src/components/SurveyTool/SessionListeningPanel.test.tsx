@@ -4,6 +4,7 @@ import SessionListeningPanel from './SessionListeningPanel';
 import { useRollingTranscriptionRecorder } from '../../utilities/audio/useRollingTranscriptionRecorder';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { generateQuestionsFromListeningTranscript } from './sessionListeningQuestions';
+import { readThemeToken, subscribeThemeChanges } from '../../utilities/ui/themeRuntime';
 
 jest.mock('../../utilities/audio/useRollingTranscriptionRecorder', () => ({
   useRollingTranscriptionRecorder: jest.fn(),
@@ -12,6 +13,11 @@ jest.mock('../../utilities/audio/useRollingTranscriptionRecorder', () => ({
 jest.mock('./sessionListeningQuestions', () => ({
   generateQuestionsFromListeningTranscript: jest.fn(),
   LISTENING_QUESTION_COUNT: 5,
+}));
+
+jest.mock('../../utilities/ui/themeRuntime', () => ({
+  readThemeToken: jest.fn((_token: string, fallback: string) => fallback),
+  subscribeThemeChanges: jest.fn(() => jest.fn()),
 }));
 
 jest.mock('./CreateQuestionsAndSurveys', () => (props: any) => (
@@ -48,6 +54,8 @@ const buildRecorder = (overrides: Record<string, unknown> = {}) => ({
 describe('SessionListeningPanel', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (readThemeToken as jest.Mock).mockImplementation((_token: string, fallback: string) => fallback);
+    (subscribeThemeChanges as jest.Mock).mockImplementation(() => jest.fn());
   });
 
   afterEach(() => {
@@ -67,6 +75,28 @@ describe('SessionListeningPanel', () => {
     expect(startRecording).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_START));
     expect(startRecording).toHaveBeenCalledTimes(1);
+  });
+
+  it('resolves and refreshes canvas colors through the app-theme runtime', () => {
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({ isRecording: true, status: 'recording' }),
+    );
+    let onThemeChange: (() => void) | undefined;
+    (subscribeThemeChanges as jest.Mock).mockImplementation((listener: () => void) => {
+      onThemeChange = listener;
+      return jest.fn();
+    });
+
+    render(<SessionListeningPanel sessionSlug="demo" />);
+
+    expect(readThemeToken).toHaveBeenCalledWith('ce-control-face', 'Canvas');
+    expect(readThemeToken).toHaveBeenCalledWith('ce-action-primary', 'Highlight');
+    expect(subscribeThemeChanges).toHaveBeenCalledTimes(1);
+
+    (readThemeToken as jest.Mock).mockClear();
+    act(() => onThemeChange?.());
+    expect(readThemeToken).toHaveBeenCalledWith('ce-control-face', 'Canvas');
+    expect(readThemeToken).toHaveBeenCalledWith('ce-action-primary', 'Highlight');
   });
 
   it('keeps the initial recorder surface focused on the record button', () => {

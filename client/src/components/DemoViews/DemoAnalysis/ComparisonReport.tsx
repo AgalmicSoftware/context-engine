@@ -48,11 +48,12 @@ type AnalysisRow = {
   tags: QuestionTag[];
 };
 
-type ComparisonBeeswarmPoint = SharedBeeswarmPoint & AnalysisRow & {
-  index: number;
-  value: number;
-  primaryTag: QuestionTag | null;
-};
+type ComparisonBeeswarmPoint = SharedBeeswarmPoint &
+  AnalysisRow & {
+    index: number;
+    value: number;
+    primaryTag: QuestionTag | null;
+  };
 
 type QuestionTagsById = Record<string, QuestionTag[]>;
 
@@ -438,9 +439,7 @@ const ComparisonReport = ({
             selectedTagIDs.size > 0 && comparisonPoint.primaryTag
               ? tagColorScale(comparisonPoint.primaryTag.tagID)
               : null;
-          return circleFill
-            ? ({ '--ce-beeswarm-point-color': circleFill } as React.CSSProperties)
-            : undefined;
+          return circleFill ? ({ '--ce-beeswarm-point-color': circleFill } as React.CSSProperties) : undefined;
         }}
       />
     );
@@ -483,8 +482,12 @@ const ComparisonReport = ({
     return (
       <div className={styles.polisReportContainer} data-testid="demo-analysis-empty-state">
         <div style={{ textAlign: 'center', padding: '2rem' }}>
-          <FontAwesomeIcon icon={faInfoCircle} size="2x" style={{ color: '#6c757d', marginBottom: '1rem' }} />
-          <h4 style={{ color: '#343a40' }}>Comparison Report</h4>
+          <FontAwesomeIcon
+            icon={faInfoCircle}
+            size="2x"
+            style={{ color: 'var(--ce-text-muted)', marginBottom: '1rem' }}
+          />
+          <h4 style={{ color: 'var(--ce-text)' }}>Comparison Report</h4>
           <p className={styles.noData}>
             Select two or more demographic groups from the filters above to see a detailed comparison report.
           </p>

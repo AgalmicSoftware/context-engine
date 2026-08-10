@@ -54,17 +54,17 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
 
   it('builds question type preview styles and pill classes', () => {
     expect(CREATE_SURVEY_TYPE_PREVIEW_BOX_STYLE).toEqual({
-      border: '1px dashed #b0c4ff',
+      border: '1px dashed var(--ce-border-light)',
       padding: 10,
-      borderRadius: 6,
+      borderRadius: 'var(--ce-radius-6)',
       marginTop: 6,
-      background: '#f6f8ff',
+      background: 'var(--ce-document-surface)',
     });
     expect(CREATE_SURVEY_TYPE_PREVIEW_PILL_STYLE).toEqual({
       display: 'inline-block',
       padding: '3px 8px',
-      border: '1px solid #ccd',
-      borderRadius: 12,
+      border: '1px solid var(--ce-document-border)',
+      borderRadius: 'var(--ce-radius-12)',
       marginRight: 6,
       marginTop: 4,
     });
@@ -74,15 +74,15 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
     });
     expect(CREATE_SURVEY_RATING_PREVIEW_TRACK_STYLE).toEqual({
       height: 6,
-      background: '#d9e1ff',
-      borderRadius: 4,
+      background: 'var(--ce-document-border)',
+      borderRadius: 'var(--ce-radius-4)',
       width: 240,
     });
     expect(CREATE_SURVEY_FREEFORM_PREVIEW_STYLE).toEqual({
       height: 34,
-      border: '1px solid #ccd',
-      background: '#fff',
-      borderRadius: 4,
+      border: '1px solid var(--ce-document-border)',
+      background: 'var(--ce-document-canvas)',
+      borderRadius: 'var(--ce-radius-4)',
     });
     expect(buildCreateSurveyTypePillClassName(surveyStyles, 'agree')).toBe(
       `${surveyStyles.pill} ${surveyStyles.pillAgree}`,
@@ -98,7 +98,7 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
       marginLeft: '10px',
       marginRight: '5px',
       textDecoration: 'none',
-      color: '#007bff',
+      color: 'var(--ce-link)',
     });
     expect(CREATE_SURVEY_SMALL_ICON_BUTTON_STYLE).toEqual({ padding: '0 5px' });
     expect(CREATE_SURVEY_ACTION_ICON_STYLE).toEqual({ marginRight: '5px' });
@@ -110,20 +110,20 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
     );
     expect(resolveCreateSurveyProgressFillStyle(120)).toEqual({ width: '100%' });
     expect(resolveCreateSurveyProgressFillStyle(-20)).toEqual({ width: '0%' });
-    expect(resolveCreateSurveyQuestionBookmarkStyle(true)).toEqual({ color: '#ffc107' });
+    expect(resolveCreateSurveyQuestionBookmarkStyle(true)).toEqual({ color: 'var(--ce-status-warning)' });
     expect(resolveCreateSurveyQuestionBookmarkStyle(false)).toEqual({ color: undefined });
-    expect(resolveCreateSurveyBookmarkSurveyStyle(true)).toEqual({ color: '#ffe082' });
+    expect(resolveCreateSurveyBookmarkSurveyStyle(true)).toEqual({ color: 'var(--ce-status-warning-text)' });
     expect(resolveCreateSurveyBookmarkSurveyStyle(false)).toEqual({ color: undefined });
     expect(buildCreateSurveyActionLinkClassName(surveyStyles)).toBe(
       `${surveyStyles.actionBtn} ${surveyStyles.actionLink}`,
     );
     expect(CREATE_SURVEY_TOGGLE_KNOB_QUESTION_STYLE).toEqual({
       left: '31px',
-      backgroundColor: '#4caf50',
+      backgroundColor: 'var(--ce-status-success)',
     });
     expect(CREATE_SURVEY_TOGGLE_KNOB_SURVEY_STYLE).toEqual({
       left: '1px',
-      backgroundColor: '#fff',
+      backgroundColor: 'var(--ce-control-face)',
     });
     expect(CREATE_SURVEY_TRAILING_TOGGLE_LABEL_STYLE).toEqual({ marginLeft: '10px' });
     expect(CREATE_SURVEY_HEADER_ICON_STYLE).toEqual({ marginRight: '6px' });

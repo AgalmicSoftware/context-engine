@@ -5,11 +5,17 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const sourceRoot = path.resolve(repoRoot, 'client', 'src');
 const baselinePath = path.resolve(sourceRoot, 'scss', 'themes', 'color-literal-baseline.json');
-const approvedPaletteRoots = [
-  path.resolve(sourceRoot, 'scss', 'themes'),
-  path.resolve(sourceRoot, 'scss', 'session-color-schemes'),
+const approvedLiteralFiles = [
+  path.resolve(sourceRoot, 'scss', 'themes', '_context-engine.scss'),
+  path.resolve(sourceRoot, 'scss', 'themes', '_classic-95.scss'),
+  path.resolve(sourceRoot, 'scss', 'session-color-schemes', '_schemes.scss'),
+  path.resolve(sourceRoot, 'utilities', 'sessionResultsExport', 'sessionResultsExport.ts'),
+  path.resolve(sourceRoot, 'utilities', 'ui', 'fixedMediaColors.ts'),
+  path.resolve(sourceRoot, 'utilities', 'ui', 'blockieAvatars.ts'),
 ];
 const colorLiteralPattern = /#[0-9a-f]{3,8}\b|\b(?:rgb|rgba|hsl|hsla)\([^)]*\)/gi;
+const namedColorPattern =
+  /(?<![-\w])(?:color|background(?:-?color)?|border(?:-?color)?|fill|stroke|shadow|stopColor|floodColor|bgColor|fgColor|fillStyle)\s*[:=]\s*[{'"]*(?:white|black|silver|gray|grey|maroon|red|purple|fuchsia|magenta|green|lime|olive|yellow|navy|blue|teal|aqua|cyan|orange|pink|gold|goldenrod|lightgreen)\b/gi;
 
 const walk = (directory) =>
   fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -21,12 +27,15 @@ const walk = (directory) =>
 export const collectThemeColorLiteralCounts = () =>
   Object.fromEntries(
     walk(sourceRoot)
-      .filter((filename) => /\.(?:css|scss)$/i.test(filename))
-      .filter((filename) => !approvedPaletteRoots.some((root) => filename.startsWith(root + path.sep)))
+      .filter((filename) => /\.(?:css|scss|js|jsx|ts|tsx)$/i.test(filename))
+      .filter((filename) => !/\.(?:test|spec)\.[^.]+$/i.test(filename))
+      .filter((filename) => !approvedLiteralFiles.includes(filename))
       .map((filename) => {
         const relativePath = path.relative(repoRoot, filename).split(path.sep).join('/');
-        const matches = fs.readFileSync(filename, 'utf8').match(colorLiteralPattern) || [];
-        return [relativePath, matches.length];
+        const source = fs.readFileSync(filename, 'utf8');
+        const literalMatches = source.match(colorLiteralPattern) || [];
+        const namedMatches = source.match(namedColorPattern) || [];
+        return [relativePath, literalMatches.length + namedMatches.length];
       })
       .filter(([, count]) => count > 0)
       .sort(([left], [right]) => left.localeCompare(right)),
@@ -38,8 +47,7 @@ if (process.argv.includes('--json')) {
     `${JSON.stringify(
       {
         version: 1,
-        scope:
-          'client/src/**/*.{css,scss}, excluding approved palette owners client/src/scss/themes and client/src/scss/session-color-schemes',
+        scope: 'themeable client/src presentation sources, excluding the documented palette/export/fixed-media owners',
         counts: current,
       },
       null,
@@ -60,7 +68,7 @@ if (increases.length) {
     .map(([filename, count]) => `- ${filename}: ${count} (baseline ${baseline.counts?.[filename] ?? 0})`)
     .join('\n');
   throw new Error(
-    `Theme color-literal ratchet increased. Use semantic --ce-* tokens or document and intentionally update the baseline:\n${details}`,
+    `Theme color-literal ratchet increased. Use semantic --ce-* tokens or add a narrowly documented fixed-output owner:\n${details}`,
   );
 }
 

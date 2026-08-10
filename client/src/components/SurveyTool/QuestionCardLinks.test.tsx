@@ -40,7 +40,7 @@ describe('QuestionCardLinks', () => {
         isQuestionBookmarked: false,
       }),
     ).toBe('base bookmark');
-    expect(resolveQuestionCardBookmarkIconStyle(true)).toEqual({ color: '#ffc107' });
-    expect(resolveQuestionCardBookmarkIconStyle(false)).toEqual({ color: 'white' });
+    expect(resolveQuestionCardBookmarkIconStyle(true)).toEqual({ color: 'var(--ce-status-warning)' });
+    expect(resolveQuestionCardBookmarkIconStyle(false)).toEqual({ color: 'var(--ce-panel-text)' });
   });
 });

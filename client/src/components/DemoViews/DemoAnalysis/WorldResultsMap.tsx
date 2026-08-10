@@ -55,12 +55,12 @@ const GEOJSON_NAME_TO_ISO_A3 = Object.freeze({
 } as Record<string, string>);
 
 const TOP_ANSWER_COLORS = Object.freeze({
-  Agree: '#4dffa4',
-  Unsure: '#ffd166',
-  Disagree: '#ff6b6b',
+  Agree: 'var(--ce-status-success)',
+  Unsure: 'var(--ce-status-warning)',
+  Disagree: 'var(--ce-status-danger)',
 } as Record<string, string>);
 
-const DEFAULT_COUNTRY_FILL = 'rgba(226, 232, 255, 0.08)';
+const DEFAULT_COUNTRY_FILL = 'color-mix(in srgb, var(--ce-panel-text) 8%, transparent)';
 
 type Question = {
   id: string | number;
@@ -155,8 +155,8 @@ const WorldResultsMap = ({
       projectionConfig={{ rotate: [-10, 0, 0], scale: compact ? 147 : 147 }}
       style={{ display: 'block', width: '100%', height: 'auto' }}
     >
-      {compact ? null : <Sphere stroke="#E4E5E6" strokeWidth={0.5} />}
-      {compact ? null : <Graticule stroke="#E4E5E6" strokeWidth={0.5} />}
+      {compact ? null : <Sphere stroke="var(--ce-border-light)" strokeWidth={0.5} />}
+      {compact ? null : <Graticule stroke="var(--ce-border-light)" strokeWidth={0.5} />}
       <Geographies geography={GEO_URL}>
         {({ geographies }: { geographies: GeographyDatum[] }) =>
           geographies.map((geo) => {
@@ -169,7 +169,7 @@ const WorldResultsMap = ({
                 (data && isoCode && data[isoCode]) || (data && data[geo.properties.name]) || null,
                 isoCode,
                 geo,
-              ) || 'rgba(77,255,164,0.35)';
+              ) || 'color-mix(in srgb, var(--ce-action-accent) 35%, transparent)';
             const fill = isLightweightMode
               ? lightweightFill
               : !isInFocus
@@ -177,8 +177,8 @@ const WorldResultsMap = ({
                 : countryData
                   ? TOP_ANSWER_COLORS[countryData.topAnswer] || DEFAULT_COUNTRY_FILL
                   : DEFAULT_COUNTRY_FILL;
-            const hoverFill = compact ? fill : '#F53';
-            const pressedFill = compact ? fill : '#E42';
+            const hoverFill = compact ? fill : 'var(--ce-status-warning)';
+            const pressedFill = compact ? fill : 'var(--ce-status-danger)';
 
             const title = isLightweightMode
               ? geo.properties.name
@@ -190,7 +190,9 @@ const WorldResultsMap = ({
               <Geography
                 key={geo.rsmKey}
                 geography={geo}
-                stroke={compact ? 'rgba(226, 232, 255, 0.32)' : '#FFF'}
+                stroke={
+                  compact ? 'color-mix(in srgb, var(--ce-panel-text) 32%, transparent)' : 'var(--ce-border-light)'
+                }
                 strokeWidth={compact ? 0.45 : 0.7}
                 style={{
                   default: { fill, outline: 'none' },

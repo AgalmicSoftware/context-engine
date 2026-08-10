@@ -1,8 +1,7 @@
-// Shared recipes are the only theme layer allowed to target generic controls.
-// Theme definitions themselves contain values only.
-:root[data-ce-theme='classic-95'] {
-  color-scheme: light;
-
+// Shared recipes target generic controls once; each theme changes their visual
+// grammar by supplying different semantic values. Theme definitions remain
+// values-only and never target component selectors.
+:root[data-ce-theme] {
   body {
     background-color: var(--ce-canvas);
     color: var(--ce-text);
@@ -38,7 +37,7 @@
   .custom-select {
     background-color: var(--ce-input-bg);
     border-color: var(--ce-border-inset);
-    border-radius: var(--ce-radius-0);
+    border-radius: var(--ce-radius-4);
     border-style: solid;
     border-width: var(--ce-border-control-width);
     color: var(--ce-text);
@@ -51,7 +50,7 @@
   .popover {
     background-color: var(--ce-surface-raised);
     border-color: var(--ce-border-raised);
-    border-radius: var(--ce-radius-0);
+    border-radius: var(--ce-radius-8);
     border-style: solid;
     border-width: var(--ce-border-control-width);
     box-shadow: var(--ce-shadow-raised);

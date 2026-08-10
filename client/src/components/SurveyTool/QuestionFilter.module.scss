@@ -1,18 +1,16 @@
 /* @file QuestionFilter.module.scss */
 // Variables for futuristic pastel styling
-@use 'sass:color';
-
-$pastel-bg: #f0faff; // Light pastel background
-$pastel-bg-hover: #e2f0f7;
-$pastel-highlight: #b8f3ff;
-$pastel-border: #80dfee;
-$pastel-exclude: #ffb8c7;
-$pastel-text: #333;
-$pastel-darker: #91cdd9;
+$pastel-bg: var(--ce-document-surface); // Light document surface
+$pastel-bg-hover: var(--ce-status-info-soft);
+$pastel-highlight: var(--ce-status-info-soft);
+$pastel-border: var(--ce-data-series-8);
+$pastel-exclude: var(--ce-status-danger-text);
+$pastel-text: var(--ce-border);
+$pastel-darker: var(--ce-status-info);
 
 // For better contrast on text with pastel backgrounds:
-$heading-color: #2a2a2a;
-$text-color: #444;
+$heading-color: var(--ce-document-text);
+$text-color: var(--ce-border);
 
 // Additional styling
 .questionFilterInline {
@@ -31,7 +29,7 @@ $text-color: #444;
 }
 
 .summaryContainer {
-  background: color.adjust($pastel-bg, $lightness: 3%);
+  background: color-mix(in srgb, var(--ce-document-surface) 97%, var(--ce-text-inverse));
   border: 1px solid $pastel-border;
   padding: 0.75rem;
   border-radius: var(--ce-radius-5);
@@ -45,14 +43,14 @@ $text-color: #444;
 
   .noFiltersMsg {
     font-style: italic;
-    color: #777;
+    color: var(--ce-text-muted);
     font-size: 0.9rem;
     margin-bottom: 0;
   }
 }
 
 .filterSummaryContainer {
-  background: color.adjust($pastel-bg, $lightness: 3%);
+  background: color-mix(in srgb, var(--ce-document-surface) 97%, var(--ce-text-inverse));
   border: 1px solid $pastel-border;
   padding: 0.75rem;
   border-radius: var(--ce-radius-5);
@@ -82,7 +80,7 @@ $text-color: #444;
   justify-content: space-between;
   align-items: center;
   /* margin-top: 1rem; */
-  padding-top: 0; // border-top: 1px solid #80dfee;
+  padding-top: 0; // border-top: 1px solid var(--ce-data-series-8);
   margin-bottom: 1rem;
 }
 
@@ -114,8 +112,8 @@ $text-color: #444;
 
   &:hover,
   &:focus {
-    background: color.adjust($pastel-highlight, $lightness: -5%);
-    border-color: color.adjust($pastel-border, $lightness: -5%);
+    background: color-mix(in srgb, var(--ce-status-info-soft) 95%, var(--ce-compat-dark));
+    border-color: color-mix(in srgb, var(--ce-data-series-8) 95%, var(--ce-compat-dark));
     color: $heading-color;
   }
 
@@ -149,7 +147,7 @@ $text-color: #444;
   font-size: 0.85rem;
   transition: background 0.2s;
   &:hover {
-    background: color.adjust($pastel-highlight, $lightness: -3%);
+    background: color-mix(in srgb, var(--ce-status-info-soft) 97%, var(--ce-compat-dark));
   }
 }
 
@@ -183,7 +181,7 @@ $text-color: #444;
   :global(.btn-close) {
     background: transparent !important;
     border: none !important;
-    color: #000 !important;
+    color: var(--ce-compat-dark) !important;
     opacity: 1 !important;
     box-shadow: none !important;
     position: absolute;
@@ -199,7 +197,7 @@ $text-color: #444;
   }
 
   :global(.close) span {
-    color: #000 !important;
+    color: var(--ce-compat-dark) !important;
     font-size: 1.8rem;
     line-height: 1;
   }
@@ -230,9 +228,9 @@ $text-color: #444;
     align-items: center;
     justify-content: space-between;
     padding: 0.75rem 1rem;
-    background: color.adjust($pastel-bg, $lightness: 3%);
+    background: color-mix(in srgb, var(--ce-document-surface) 97%, var(--ce-text-inverse));
     border: 1px solid $pastel-border;
-    border-radius: 0.375rem;
+    border-radius: var(--ce-radius-6);
     cursor: pointer;
     transition: all 0.2s ease;
     &:hover {
@@ -261,7 +259,7 @@ $text-color: #444;
     align-items: center;
     gap: 6px;
     margin-left: 10px;
-    color: #2f6f64;
+    color: var(--ce-data-series-8);
     font-size: 0.82rem;
     font-weight: 600;
     white-space: nowrap;
@@ -271,7 +269,7 @@ $text-color: #444;
     padding: 1rem;
     border: 1px solid $pastel-border;
     border-top: none;
-    border-radius: 0 0 0.375rem 0.375rem;
+    border-radius: var(--ce-radius-0) var(--ce-radius-0) var(--ce-radius-6) var(--ce-radius-6);
     background: $pastel-bg;
     color: $text-color;
   }
@@ -309,8 +307,8 @@ $text-color: #444;
   min-width: 120px;
   padding: 12px 8px;
   border-radius: var(--ce-radius-10);
-  border: 1.5px solid rgba(0, 0, 0, 0.1);
-  background: rgba(255, 255, 255, 0.7);
+  border: 1.5px solid color-mix(in srgb, var(--ce-compat-dark) 10%, transparent);
+  background: color-mix(in srgb, var(--ce-text-inverse) 70%, transparent);
   color: inherit;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -318,8 +316,8 @@ $text-color: #444;
   font: inherit;
 
   &:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.9);
-    border-color: rgba(0, 0, 0, 0.2);
+    background: color-mix(in srgb, var(--ce-text-inverse) 90%, transparent);
+    border-color: color-mix(in srgb, var(--ce-compat-dark) 20%, transparent);
   }
 
   &:focus-visible {
@@ -336,14 +334,14 @@ $text-color: #444;
 
 .typeButtonActive {
   border-color: var(--ce-color-accent);
-  background: rgba(77, 255, 164, 0.08);
-  box-shadow: 0 0 8px rgba(77, 255, 164, 0.2);
+  background: color-mix(in srgb, var(--ce-action-accent) 8%, transparent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--ce-action-accent) 20%, transparent);
 }
 
 .typeTitle {
   font-size: 0.82rem;
   font-weight: 700;
-  color: #2a2a2a;
+  color: var(--ce-overlay-surface);
   text-align: center;
   margin-bottom: 6px;
 }
@@ -360,27 +358,27 @@ $text-color: #444;
   font-size: 0.6rem;
   padding: 2px 8px;
   border-radius: var(--ce-radius-10);
-  background: rgba(255, 255, 255, 0.5);
-  border: 1px solid rgba(0, 0, 0, 0.15);
-  color: #555;
+  background: color-mix(in srgb, var(--ce-text-inverse) 50%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-compat-dark) 15%, transparent);
+  color: var(--ce-text-muted);
 }
 
 .typePillAgree {
-  background: rgba(76, 175, 80, 0.3);
-  color: #2e7d32;
-  border-color: #4caf50;
+  background: color-mix(in srgb, var(--ce-status-success) 30%, transparent);
+  color: var(--ce-status-success);
+  border-color: var(--ce-status-success);
 }
 
 .typePillDisagree {
-  background: rgba(244, 67, 54, 0.3);
-  color: #c62828;
-  border-color: #f44336;
+  background: color-mix(in srgb, var(--ce-status-error) 30%, transparent);
+  color: var(--ce-status-error);
+  border-color: var(--ce-status-error);
 }
 
 .typePillUnsure {
-  background: rgba(255, 235, 59, 0.2);
-  color: #f9a825;
-  border-color: #fdd835;
+  background: color-mix(in srgb, var(--ce-status-warning) 20%, transparent);
+  color: var(--ce-status-warning);
+  border-color: var(--ce-status-warning);
 }
 
 .ratingPreviewWrap {
@@ -389,7 +387,7 @@ $text-color: #444;
   position: relative;
   width: 80%;
   height: 8px;
-  background: rgba(0, 0, 0, 0.08);
+  background: color-mix(in srgb, var(--ce-compat-dark) 8%, transparent);
   border-radius: var(--ce-radius-4);
   overflow: visible;
 }
@@ -411,10 +409,10 @@ $text-color: #444;
   transform: translate(-50%, -50%);
   width: 12px;
   height: 12px;
-  border-radius: 50%;
-  background: #fff;
+  border-radius: var(--ce-radius-round);
+  background: var(--ce-text-inverse);
   border: 2px solid var(--ce-color-accent);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--ce-compat-dark) 20%, transparent);
 }
 
 .freeformPreview {
@@ -423,10 +421,10 @@ $text-color: #444;
   justify-content: center;
   width: 80%;
   height: 28px;
-  border: 1px dashed rgba(0, 0, 0, 0.15);
+  border: 1px dashed color-mix(in srgb, var(--ce-compat-dark) 15%, transparent);
   border-radius: var(--ce-radius-6);
   font-size: 0.75rem;
-  color: #999;
+  color: var(--ce-text-muted);
 }
 
 .aiFilterInputWrap {
@@ -436,8 +434,8 @@ $text-color: #444;
 
   :global(.audioTextarea),
   :global([class*='audioTextarea']) {
-    color: #333 !important;
-    background: rgba(255, 255, 255, 0.9) !important;
+    color: var(--ce-border) !important;
+    background: color-mix(in srgb, var(--ce-text-inverse) 90%, transparent) !important;
     border-color: $pastel-border !important;
     font-size: 1rem !important;
     min-height: 88px;
@@ -445,18 +443,18 @@ $text-color: #444;
 
   :global(.audioTextarea)::placeholder,
   :global([class*='audioTextarea'])::placeholder {
-    color: #999 !important;
+    color: var(--ce-text-muted) !important;
   }
 
   :global([class*='topControls']) {
     button {
-      color: #555;
+      color: var(--ce-text-muted);
     }
   }
 
   input[type='number'] {
-    color: #333;
-    background: #fff;
+    color: var(--ce-border);
+    background: var(--ce-text-inverse);
     border: 1px solid $pastel-border;
   }
 
@@ -470,10 +468,10 @@ $text-color: #444;
   flex-direction: column;
   gap: 0.6rem;
   padding: 0.8rem 0.9rem;
-  background: rgba(255, 255, 255, 0.74);
-  border: 1px solid rgba(128, 223, 238, 0.95);
+  background: color-mix(in srgb, var(--ce-text-inverse) 74%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-data-series-8) 95%, transparent);
   border-radius: var(--ce-radius-8);
-  box-shadow: 0 8px 20px rgba(145, 205, 217, 0.14);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--ce-data-series-8) 14%, transparent);
 }
 
 .aiActionRow {
@@ -489,8 +487,8 @@ $text-color: #444;
   align-items: center;
   gap: 0.45rem;
   padding: 0.4rem 0.55rem;
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(128, 223, 238, 0.95);
+  background: color-mix(in srgb, var(--ce-text-inverse) 96%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-data-series-8) 95%, transparent);
   border-radius: var(--ce-radius-8);
   flex: 0 0 auto;
 }
@@ -522,13 +520,13 @@ $text-color: #444;
   min-height: 40px;
   padding: 0.62rem 0.9rem;
   border-radius: var(--ce-radius-8);
-  border: 1px solid #171941 !important;
-  background: #171941 !important;
-  color: #fff !important;
+  border: 1px solid var(--ce-surface-sunken) !important;
+  background: var(--ce-surface-sunken) !important;
+  color: var(--ce-text-inverse) !important;
   font-size: 0.95rem;
   font-weight: 600;
   white-space: nowrap;
-  box-shadow: 0 8px 18px rgba(23, 25, 65, 0.18);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--ce-overlay-surface) 18%, transparent);
   transition:
     transform 0.15s ease,
     box-shadow 0.15s ease,
@@ -537,17 +535,17 @@ $text-color: #444;
 
   &:hover,
   &:focus {
-    background: #101230 !important;
-    border-color: #101230 !important;
-    color: #fff !important;
+    background: var(--ce-overlay-surface) !important;
+    border-color: var(--ce-overlay-surface) !important;
+    color: var(--ce-text-inverse) !important;
     transform: translateY(-1px);
-    box-shadow: 0 10px 22px rgba(23, 25, 65, 0.22);
+    box-shadow: 0 10px 22px color-mix(in srgb, var(--ce-overlay-surface) 22%, transparent);
   }
 
   &:disabled {
-    background: #58637d !important;
-    border-color: #58637d !important;
-    color: rgba(255, 255, 255, 0.94) !important;
+    background: var(--ce-status-info) !important;
+    border-color: var(--ce-status-info) !important;
+    color: color-mix(in srgb, var(--ce-text-inverse) 94%, transparent) !important;
     opacity: 1;
     box-shadow: none;
     transform: none;
@@ -587,12 +585,12 @@ $text-color: #444;
 }
 
 .aiHintText {
-  color: #5f6b7b;
+  color: var(--ce-document-text-muted);
   font-style: italic;
 }
 
 .aiErrorText {
-  color: #b02a37;
+  color: var(--ce-status-error);
   font-weight: 500;
 }
 
@@ -600,12 +598,12 @@ $text-color: #444;
   width: 100%;
   padding: 0.75rem;
   border: 1px solid $pastel-border;
-  border-radius: 0.375rem;
+  border-radius: var(--ce-radius-6);
   margin-bottom: 1rem;
   &:focus {
     outline: none;
     border-color: $pastel-darker;
-    box-shadow: 0 0 0 2px rgba($pastel-darker, 0.1);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ce-status-info) 10%, transparent);
   }
 }
 
@@ -614,9 +612,9 @@ $text-color: #444;
   display: inline-flex;
   align-items: center;
   padding: 0.25rem 0.5rem;
-  background: rgba($pastel-highlight, 0.1);
+  background: color-mix(in srgb, var(--ce-status-info-soft) 10%, transparent);
   color: $text-color;
-  border-radius: 1rem;
+  border-radius: var(--ce-radius-16);
   font-size: 0.875rem;
   margin-left: 0.5rem;
 }
@@ -627,7 +625,7 @@ $text-color: #444;
 }
 
 .disabledText {
-  color: gray;
+  color: var(--ce-text-muted);
   font-style: italic;
 }
 
@@ -661,7 +659,7 @@ $text-color: #444;
 }
 
 .tagBubble {
-  background: #c4ffef;
+  background: var(--ce-status-success-text);
   color: $text-color;
   padding: 0.3rem 0.6rem;
   border-radius: var(--ce-radius-15);
@@ -669,12 +667,12 @@ $text-color: #444;
   cursor: pointer;
   transition: background 0.2s ease;
   &:hover {
-    background: color.adjust(#c4ffef, $lightness: -5%);
+    background: color-mix(in srgb, var(--ce-status-success-soft) 95%, var(--ce-compat-dark));
   }
 }
 
 .tagBubbleSelected {
-  background: color.adjust(#c4ffef, $lightness: -10%);
+  background: color-mix(in srgb, var(--ce-status-success-soft) 90%, var(--ce-compat-dark));
   font-weight: 600;
 }
 
@@ -690,7 +688,7 @@ $text-color: #444;
 }
 
 .clearFilterIcon {
-  color: #e53935; // A material red color  margin-left: 8px;
+  color: var(--ce-status-error); // A material red color  margin-left: 8px;
   cursor: pointer;
   transition: transform 0.2s ease;
   &:hover {
@@ -820,7 +818,7 @@ $text-color: #444;
     background: var(--ce-color-tooltip-bg) !important;
     color: var(--ce-color-tooltip-text) !important;
     border: 1px solid var(--ce-color-tooltip-border) !important;
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 10px 24px color-mix(in srgb, var(--ce-compat-dark) 25%, transparent);
     padding: 8px 10px;
     font-size: 0.85rem;
     line-height: 1.2;

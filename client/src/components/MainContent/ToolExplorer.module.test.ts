@@ -24,10 +24,10 @@ describe('ToolExplorer sparse card layout', () => {
 
   it('uses UserPage-style neutral depth and scopes status borders to demo mode', () => {
     expect(scss).toMatch(
-      /\.explorerCol\s*{[\s\S]*?&\.statusBorderEnabled[\s\S]*?border:\s*4px solid rgba\(77,\s*255,\s*164,\s*0\.78\);/,
+      /\.explorerCol\s*{[\s\S]*?&\.statusBorderEnabled[\s\S]*?border:\s*4px solid color-mix\(in srgb,\s*var\(--ce-action-accent\) 78%,\s*transparent\);/,
     );
     expect(scss).toMatch(
-      /\.square\s*{[\s\S]*?border:\s*1px solid rgba\(255,\s*255,\s*255,\s*0\.14\);[\s\S]*?background:\s*#24264d;[\s\S]*?box-shadow:[\s\S]*?#171a3d[\s\S]*?rgba\(59,\s*63,\s*126,\s*0\.72\)/,
+      /\.square\s*{[\s\S]*?border:\s*1px solid color-mix\(in srgb,\s*var\(--ce-text-inverse\) 14%,\s*transparent\);[\s\S]*?background:\s*var\(--ce-surface-alt\);[\s\S]*?box-shadow:[\s\S]*?var\(--ce-surface-sunken\)[\s\S]*?color-mix\(in srgb,\s*var\(--ce-status-info\) 72%,\s*transparent\)/,
     );
     expect(scss).toMatch(/&:hover\s*{[\s\S]*?transform:\s*translateY\(-3px\);/);
   });

@@ -1,6 +1,6 @@
 .polisReportContainer {
-  background-color: #f4f6f9;
-  border: 1px solid #dee2e6;
+  background-color: var(--ce-status-info-text);
+  border: 1px solid var(--ce-document-border);
   border-radius: var(--ce-radius-8);
   padding: 1.5rem;
   font-family: var(--ce-font-body);
@@ -23,11 +23,11 @@
 
   &:hover .mainReportTitle,
   &:focus-visible .mainReportTitle {
-    color: #0f5ec7;
+    color: var(--ce-status-info);
   }
 
   &:focus-visible {
-    outline: 2px solid #0f5ec7;
+    outline: 2px solid var(--ce-status-info);
     outline-offset: 4px;
     border-radius: var(--ce-radius-6);
   }
@@ -40,7 +40,7 @@
 }
 
 .reportSummaryText {
-  color: #5f6f82;
+  color: var(--ce-status-info);
   font-size: 0.98rem;
   font-weight: 500;
   line-height: 1.4;
@@ -49,7 +49,7 @@
 .reportCollapseIcon {
   flex: 0 0 auto;
   margin-top: 0.2rem;
-  color: #34495e;
+  color: var(--ce-status-info);
 }
 
 .reportCollapseBody {
@@ -81,8 +81,8 @@
   margin-top: -0.25rem;
   margin-bottom: 1rem;
   padding: 0.75rem 1rem;
-  background-color: #fefce8;
-  border: 1px solid #fde047;
+  background-color: var(--ce-status-warning-text);
+  border: 1px solid var(--ce-status-warning);
   border-radius: var(--ce-radius-6);
   display: flex;
   align-items: center;
@@ -92,7 +92,7 @@
 
 .legendTitle {
   font-weight: 500;
-  color: #495057;
+  color: var(--ce-document-text-muted);
   margin-right: 10px;
 }
 
@@ -108,17 +108,17 @@
   color: var(--ce-color-white);
   font-size: 0.9rem;
   font-weight: 500;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  text-shadow: 0 1px 1px color-mix(in srgb, var(--ce-compat-dark) 20%, transparent);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ce-compat-dark) 10%, transparent);
 }
 
 .sectionCollapse {
   margin-bottom: 1rem;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--ce-document-border);
   border-radius: var(--ce-radius-8);
   background-color: var(--ce-color-white);
   overflow: hidden;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 4px color-mix(in srgb, var(--ce-compat-dark) 5%, transparent);
 }
 
 .sectionHeaderRow {
@@ -160,7 +160,7 @@
 .analysisListItem {
   padding: 1rem 1.25rem;
   background-color: var(--ce-color-white);
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--ce-document-border);
   border-radius: var(--ce-radius-8);
   display: flex;
   flex-direction: column;
@@ -176,7 +176,7 @@
 
 .responseText {
   font-style: italic;
-  color: #5a6268;
+  color: var(--ce-document-text-muted);
   margin-bottom: 0.75rem;
   text-align: left;
 }
@@ -190,7 +190,7 @@
 }
 
 .responseTextPillLabel {
-  color: #5a6268;
+  color: var(--ce-document-text-muted);
   font-size: 0.86rem;
   font-style: normal;
   font-weight: 600;
@@ -209,25 +209,25 @@
   line-height: 1;
   letter-spacing: 0.01em;
   white-space: nowrap;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
 }
 
 .responsePillAgree {
-  background: rgba(86, 214, 146, 0.16);
-  border-color: rgba(86, 214, 146, 0.4);
-  color: #236c4c;
+  background: color-mix(in srgb, var(--ce-status-success) 16%, transparent);
+  border-color: color-mix(in srgb, var(--ce-status-success) 40%, transparent);
+  color: var(--ce-status-success);
 }
 
 .responsePillUnsure {
-  background: rgba(255, 206, 86, 0.18);
-  border-color: rgba(255, 206, 86, 0.45);
-  color: #886200;
+  background: color-mix(in srgb, var(--ce-status-warning) 18%, transparent);
+  border-color: color-mix(in srgb, var(--ce-status-warning) 45%, transparent);
+  color: var(--ce-status-warning);
 }
 
 .responsePillDisagree {
-  background: rgba(255, 115, 115, 0.15);
-  border-color: rgba(255, 115, 115, 0.4);
-  color: #a43b3b;
+  background: color-mix(in srgb, var(--ce-status-danger-text) 15%, transparent);
+  border-color: color-mix(in srgb, var(--ce-status-danger-text) 40%, transparent);
+  color: var(--ce-status-error);
 }
 
 .analysisDistributionList {
@@ -240,8 +240,8 @@
   display: grid;
   gap: 0.45rem;
   padding: 0.7rem 0.75rem;
-  background: #f8fafc;
-  border: 1px solid #edf1f5;
+  background: var(--ce-document-surface);
+  border: 1px solid var(--ce-status-info-text);
   border-radius: var(--ce-radius-6);
 }
 
@@ -253,14 +253,14 @@
 }
 
 .analysisDistributionTitle {
-  color: #243447;
+  color: var(--ce-overlay-surface);
   font-size: 0.9rem;
   font-weight: 700;
   line-height: 1.25;
 }
 
 .analysisDistributionMeta {
-  color: #65758a;
+  color: var(--ce-status-info);
   font-size: 0.78rem;
   font-weight: 600;
   line-height: 1.25;
@@ -272,7 +272,7 @@
   width: 100%;
   height: 13px;
   overflow: hidden;
-  background: #e6ebf1;
+  background: var(--ce-status-info-text);
   border-radius: var(--ce-radius-pill);
 }
 
@@ -283,22 +283,22 @@
 
 .analysisCandleSegmentAgree,
 .analysisDistributionDot.analysisCandleSegmentAgree {
-  background: linear-gradient(90deg, #168263, #47de8c);
+  background: linear-gradient(90deg, var(--ce-status-success), var(--ce-status-success));
 }
 
 .analysisCandleSegmentUnsure,
 .analysisDistributionDot.analysisCandleSegmentUnsure {
-  background: linear-gradient(90deg, #9b8016, #f5c84e);
+  background: linear-gradient(90deg, var(--ce-status-warning), var(--ce-status-warning));
 }
 
 .analysisCandleSegmentDisagree,
 .analysisDistributionDot.analysisCandleSegmentDisagree {
-  background: linear-gradient(90deg, #96364a, #ff6b6b);
+  background: linear-gradient(90deg, var(--ce-status-error), var(--ce-status-error));
 }
 
 .analysisCandleSegmentOther,
 .analysisDistributionDot.analysisCandleSegmentOther {
-  background: linear-gradient(90deg, #667085, #98a2b3);
+  background: linear-gradient(90deg, var(--ce-document-text-muted), var(--ce-status-info));
 }
 
 .analysisDistributionLegend {
@@ -311,7 +311,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.28rem;
-  color: #3e4b5d;
+  color: var(--ce-status-info);
   font-size: 0.78rem;
   font-weight: 650;
   line-height: 1.2;
@@ -375,11 +375,11 @@
 }
 
 .comparisonBeeswarm {
-  --ce-beeswarm-axis-color: #aaa;
-  --ce-beeswarm-label-color: #555;
+  --ce-beeswarm-axis-color: var(--ce-text-muted);
+  --ce-beeswarm-label-color: var(--ce-text-muted);
   --ce-beeswarm-axis-label-size: 12px;
   --ce-beeswarm-point-color: steelblue;
-  --ce-beeswarm-point-active-color: #ff9900;
+  --ce-beeswarm-point-active-color: var(--ce-status-warning);
 }
 
 .reportTagFilter {
@@ -395,7 +395,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #495057;
+  color: var(--ce-document-text-muted);
   margin: 0 0 12px 0;
   display: flex;
   align-items: center;
@@ -436,7 +436,7 @@
   padding: 12px;
   font-size: 0.9rem;
   line-height: 1.4;
-  color: var(--ce-color-tooltip-text, #212529);
+  color: var(--ce-color-tooltip-text, var(--ce-compat-dark));
 }
 
 .tooltipQuestion {
@@ -446,17 +446,17 @@
 
 .tooltipResponse {
   font-style: italic;
-  color: var(--ce-color-tooltip-muted, #6c757d);
+  color: var(--ce-color-tooltip-muted, var(--ce-text-muted));
   margin-bottom: 8px;
 }
 
 .tooltipTags {
   font-size: 0.85rem;
   font-weight: 500;
-  color: var(--ce-color-tooltip-muted, #6c757d);
+  color: var(--ce-color-tooltip-muted, var(--ce-text-muted));
   margin-bottom: 10px;
   padding-bottom: 8px;
-  border-bottom: 1px solid var(--ce-color-tooltip-border, #dee2e6);
+  border-bottom: 1px solid var(--ce-color-tooltip-border, var(--ce-document-border));
 }
 
 .tooltipBreakdown {
@@ -479,20 +479,20 @@
 .tooltipDot {
   width: 10px;
   height: 10px;
-  border-radius: 50%;
+  border-radius: var(--ce-radius-round);
   margin-right: 8px;
   flex-shrink: 0;
 }
 
 .tooltipGroupName {
   flex-grow: 1;
-  color: var(--ce-color-tooltip-text, #212529);
+  color: var(--ce-color-tooltip-text, var(--ce-compat-dark));
   margin-right: 12px;
 }
 
 .tooltipGroupRate {
   font-weight: 600;
-  color: var(--ce-color-tooltip-text, #212529);
+  color: var(--ce-color-tooltip-text, var(--ce-compat-dark));
 }
 
 .noData {
@@ -510,7 +510,7 @@
 
 .viewMoreButton {
   background-color: var(--ce-color-surface-light);
-  border: 1px solid #dee2e6;
+  border: 1px solid var(--ce-document-border);
   color: var(--ce-color-dark);
   padding: 0.5rem 1rem;
   border-radius: var(--ce-radius-6);
@@ -522,7 +522,7 @@
 
   &:hover {
     background-color: var(--ce-color-light);
-    border-color: #ced4da;
+    border-color: var(--ce-document-border);
   }
 }
 

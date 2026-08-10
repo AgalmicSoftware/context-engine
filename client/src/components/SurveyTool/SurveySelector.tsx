@@ -273,7 +273,7 @@ import {
   resolveAuthoritativeQuestionPoolScope,
 } from './surveyAuthoritativeQuestionPool';
 
-export const SURVEY_SELECTOR_ACTIVE_FILTER_COLOR = '#11c4dcff';
+export const SURVEY_SELECTOR_ACTIVE_FILTER_COLOR = 'var(--ce-data-series-8)';
 
 export const SURVEY_SELECTOR_CREATE_BUTTON_STYLE: React.CSSProperties = {
   marginLeft: '10px',
