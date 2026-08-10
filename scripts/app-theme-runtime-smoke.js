@@ -5,7 +5,12 @@ const { chromium } = require('playwright');
 const { normalizeBaseUrl } = require('./vite-navigation-smoke');
 
 const ROUTE_CASES = Object.freeze([
-  { path: '/', label: 'home Tools cards', requiresStandardToolCards: true },
+  {
+    path: '/',
+    label: 'home Tools cards and footer controls',
+    requiresFooterButtons: true,
+    requiresStandardToolCards: true,
+  },
   {
     path: '/',
     label: 'home welcome and login surfaces',
@@ -99,6 +104,32 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       };
     });
   }
+
+  const footerLink = routeCase.requiresFooterButtons
+    ? page.getByRole('link', { name: 'NEW', exact: true })
+    : null;
+  if (footerLink) {
+    await footerLink.waitFor({ state: 'visible' });
+    await footerLink.scrollIntoViewIfNeeded();
+  }
+  const classicFooterLinkState = footerLink
+    ? await footerLink.evaluate((element) => {
+        const style = window.getComputedStyle(element);
+        return {
+          backgroundColor: style.backgroundColor,
+          borderBottomColor: style.borderBottomColor,
+          borderBottomWidth: style.borderBottomWidth,
+          borderLeftColor: style.borderLeftColor,
+          borderLeftWidth: style.borderLeftWidth,
+          borderRightColor: style.borderRightColor,
+          borderRightWidth: style.borderRightWidth,
+          borderTopColor: style.borderTopColor,
+          borderTopWidth: style.borderTopWidth,
+          boxShadow: style.boxShadow,
+          color: style.color,
+        };
+      })
+    : null;
 
   if (routeCase.requiresReadableSessionSetup) {
     await page.getByTestId('ce-new-preset-fast_cheap_cloudflare').waitFor({ state: 'visible' });
@@ -550,6 +581,19 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         };
       })
     : null;
+  const currentFooterLinkState = footerLink
+    ? await footerLink.evaluate((element) => {
+        const style = window.getComputedStyle(element);
+        return {
+          backgroundColor: style.backgroundColor,
+          borderBottomWidth: style.borderBottomWidth,
+          borderLeftWidth: style.borderLeftWidth,
+          borderRightWidth: style.borderRightWidth,
+          borderTopWidth: style.borderTopWidth,
+          boxShadow: style.boxShadow,
+        };
+      })
+    : null;
   const currentLogoState = routeCase.requiresBrightLogo
     ? await page
         .getByRole('link', { name: 'Context Engine home', exact: true })
@@ -639,6 +683,55 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       /24px 42px/,
       'Context Engine tool-card hover should preserve its existing layered depth',
     );
+  }
+  if (classicFooterLinkState && currentFooterLinkState) {
+    assert.deepEqual(
+      [
+        classicFooterLinkState.borderTopWidth,
+        classicFooterLinkState.borderRightWidth,
+        classicFooterLinkState.borderBottomWidth,
+        classicFooterLinkState.borderLeftWidth,
+      ],
+      ['2px', '2px', '2px', '2px'],
+      'Classic 95 footer links should use the theme control-border width',
+    );
+    assert.deepEqual(
+      [
+        classicFooterLinkState.borderTopColor,
+        classicFooterLinkState.borderRightColor,
+        classicFooterLinkState.borderBottomColor,
+        classicFooterLinkState.borderLeftColor,
+      ],
+      ['rgb(255, 255, 255)', 'rgb(64, 64, 64)', 'rgb(64, 64, 64)', 'rgb(255, 255, 255)'],
+      'Classic 95 footer links should use a standard raised bevel',
+    );
+    assert.equal(
+      classicFooterLinkState.backgroundColor,
+      'rgb(192, 192, 192)',
+      'Classic 95 footer links should use the standard control face',
+    );
+    assert.equal(classicFooterLinkState.color, 'rgb(0, 0, 0)', 'Classic 95 footer links should use readable black text');
+    assert.match(
+      classicFooterLinkState.boxShadow,
+      /1px 1px 0px/,
+      'Classic 95 footer links should use a compact raised shadow',
+    );
+    assert.deepEqual(
+      [
+        currentFooterLinkState.borderTopWidth,
+        currentFooterLinkState.borderRightWidth,
+        currentFooterLinkState.borderBottomWidth,
+        currentFooterLinkState.borderLeftWidth,
+      ],
+      ['0px', '0px', '0px', '0px'],
+      'Context Engine footer links should remain unframed',
+    );
+    assert.equal(
+      currentFooterLinkState.backgroundColor,
+      'rgba(0, 0, 0, 0)',
+      'Context Engine footer links should keep their transparent background',
+    );
+    assert.equal(currentFooterLinkState.boxShadow, 'none', 'Context Engine footer links should remain shadow-free');
   }
   if (sessionSetupContrastState) {
     assert.equal(

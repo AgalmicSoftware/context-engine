@@ -60,6 +60,10 @@ Tool Explorer cards consume `--ce-tool-card-*` chrome tokens. Context Engine
 keeps its layered blue depth treatment; `classic-95` uses a conventional
 raised bevel, compact black shadow, and gray hover face without a colored halo.
 
+Footer navigation consumes `--ce-footer-link-*` chrome tokens. Context Engine
+keeps its unframed links, while `classic-95` presents each route as a gray,
+raised button with a pressed inset state and readable black text.
+
 When the bundled-theme selector is enabled, Settings exposes it as the final
 `Appearance & colors` section both before and after sign-in. This selector
 changes the complete app theme; it is separate from a session's curated color

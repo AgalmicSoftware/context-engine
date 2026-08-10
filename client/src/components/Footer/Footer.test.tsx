@@ -124,4 +124,16 @@ describe('Footer', () => {
       /@media \(min-width:\s*769px\) and \(max-width:\s*1366px\)\s*{[\s\S]*?\.footer\s*{[\s\S]*?nav\s*{[\s\S]*?ul\s*{[\s\S]*?li \.footerLink\s*{[\s\S]*?font-size:\s*1rem;/,
     );
   });
+
+  it('uses theme-owned button chrome for footer navigation links', () => {
+    expect(footerStylesheet).toMatch(
+      /\.footer \.footerLink\s*{[\s\S]*?background:\s*var\(--ce-footer-link-bg\);[\s\S]*?border-color:\s*var\(--ce-footer-link-border\);[\s\S]*?border-width:\s*var\(--ce-footer-link-border-width\);[\s\S]*?box-shadow:\s*var\(--ce-footer-link-shadow\);[\s\S]*?color:\s*var\(--ce-footer-link-text\);/,
+    );
+    expect(footerStylesheet).toMatch(
+      /\.footer \.footerLink:hover,[\s\S]*?\.footer \.footerLink:focus-visible\s*{[\s\S]*?background:\s*var\(--ce-footer-link-hover-bg\);[\s\S]*?box-shadow:\s*var\(--ce-footer-link-hover-shadow\);/,
+    );
+    expect(footerStylesheet).toMatch(
+      /\.footer \.footerLink:active\s*{[\s\S]*?border-color:\s*var\(--ce-footer-link-active-border\);[\s\S]*?box-shadow:\s*var\(--ce-footer-link-active-shadow\);/,
+    );
+  });
 });

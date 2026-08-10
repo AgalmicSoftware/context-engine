@@ -217,6 +217,29 @@
   margin-right: 5px;
 }
 
+.footer .footerLink {
+  background: var(--ce-footer-link-bg);
+  border-color: var(--ce-footer-link-border);
+  border-style: solid;
+  border-width: var(--ce-footer-link-border-width);
+  box-shadow: var(--ce-footer-link-shadow);
+  box-sizing: border-box;
+  color: var(--ce-footer-link-text);
+}
+
+.footer .footerLink:hover,
+.footer .footerLink:focus-visible {
+  background: var(--ce-footer-link-hover-bg);
+  box-shadow: var(--ce-footer-link-hover-shadow);
+  color: var(--ce-footer-link-hover-text);
+  text-decoration: none;
+}
+
+.footer .footerLink:active {
+  border-color: var(--ce-footer-link-active-border);
+  box-shadow: var(--ce-footer-link-active-shadow);
+}
+
 @media (min-width: 1367px) {
   .footer {
     .copyright {
