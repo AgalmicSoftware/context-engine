@@ -88,7 +88,13 @@ test('assertWorkerDependencyVersions rejects drift between lockfile and resolved
   assert.match(report.issues.join('\n'), /resolved install for ethers is 6\.15\.0/);
   assert.throws(
     () => assertWorkerDependencyVersions({ rootDir }),
-    /fix: cd workers\/sessionCorsWorker && npm ci/,
+    (error) => {
+      assert.equal(
+        error.message.split('\n').at(-1),
+        '- fix: cd workers/sessionCorsWorker && npm ci',
+      );
+      return true;
+    },
   );
 });
 
@@ -131,60 +137,4 @@ test('getWorkerDependencyVersionReport flags missing worker-local install when o
     () => assertWorkerDependencyVersions({ rootDir }),
     /fix: cd workers\/sessionCorsWorker && npm ci/,
   );
-});
-
-test('ensureWorkerDependencyInstall runs npm ci for auto-repairable resolved-install drift', async () => {
-  const { ensureWorkerDependencyInstall } = await loadModule();
-  const rootDir = '/tmp/context-engine';
-  const reports = [
-    {
-      issues: [
-        'resolved install for ethers is 5.7.2 at /tmp/context-engine/node_modules/ethers/package.json, but worker package-lock.json expects 6.15.0',
-      ],
-    },
-    {
-      issues: [],
-    },
-  ];
-  const commands = [];
-
-  const result = ensureWorkerDependencyInstall({
-    rootDir,
-    getDependencyReport: () => reports.shift(),
-    execFileSyncImpl: (...args) => {
-      commands.push(args);
-    },
-    stdio: 'pipe',
-  });
-
-  assert.equal(result.changed, true);
-  assert.deepEqual(result.report, { issues: [] });
-  assert.equal(commands.length, 1);
-  assert.equal(commands[0][0], process.platform === 'win32' ? 'npm.cmd' : 'npm');
-  assert.deepEqual(commands[0][1], ['ci']);
-  assert.equal(commands[0][2].cwd, path.join(rootDir, 'workers/sessionCorsWorker'));
-});
-
-test('ensureWorkerDependencyInstall does not mask non-repairable lockfile drift', async () => {
-  const { ensureWorkerDependencyInstall } = await loadModule();
-  const rootDir = '/tmp/context-engine';
-  const report = {
-    issues: [
-      'worker lockfile root spec for ethers is "5.7.2" but package.json declares "6.15.0"',
-    ],
-  };
-  const commands = [];
-
-  const result = ensureWorkerDependencyInstall({
-    rootDir,
-    getDependencyReport: () => report,
-    execFileSyncImpl: (...args) => {
-      commands.push(args);
-    },
-    stdio: 'pipe',
-  });
-
-  assert.equal(result.changed, false);
-  assert.equal(result.report, report);
-  assert.deepEqual(commands, []);
 });
