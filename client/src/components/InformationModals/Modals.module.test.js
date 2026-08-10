@@ -16,7 +16,7 @@ describe('Modals contrast styles', () => {
       /\.welcomeSlideMediaButton\[data-slide-layout='flushBottom'\]\s*\{\s*overflow:\s*hidden;[\s\S]*?align-items:\s*flex-end;/,
     );
     expect(scss).toMatch(
-      /\.welcomeSlideEmbed \.welcomeSlideLayout \.welcomeSlideMediaButton\[data-slide-layout='flushBottom'\]\s*\{[\s\S]*?align-self:\s*stretch;[\s\S]*?height:\s*auto\s*!important;[\s\S]*?align-items:\s*flex-end;/,
+      /\.welcomeSlideEmbed \.welcomeSlideLayout \.welcomeSlideMediaButton\[data-slide-layout='flushBottom'\]\s*\{[\s\S]*?align-self:\s*stretch;[\s\S]*?height:\s*100%\s*!important;[\s\S]*?align-items:\s*flex-end;/,
     );
     expect(scss).toMatch(
       /\.welcomeSlideImageIntro\[data-slide-layout='flushBottom'\]\s*\{[\s\S]*?max-height:\s*none\s*!important;[\s\S]*?object-fit:\s*contain;[\s\S]*?object-position:\s*left bottom;[\s\S]*?transform:\s*translateY\(2\.75%\);/,
@@ -37,6 +37,23 @@ describe('Modals contrast styles', () => {
     expect(scss).not.toMatch(/\.welcomeSlideImageToolkit\s*\{[\s\S]*?transform:\s*translateX\(8%\);/);
     expect(scss).toMatch(
       /@media \(max-width:\s*768px\)\s*{[\s\S]*?\.welcomeSlideImageToolkit\[data-slide-layout='centered'\]\s*\{[\s\S]*?object-position:\s*center center;[\s\S]*?transform:\s*none;/,
+    );
+  });
+
+  it('lets the embedded welcome deck shrink to its viewport-capped frame', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'Modals.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /@media \(min-width:\s*769px\)\s*\{[\s\S]*?\.welcomeSlideEmbed\s*\{[\s\S]*?height:\s*100%;[\s\S]*?min-height:\s*0;/,
+    );
+    expect(scss).toMatch(
+      /\.welcomeSlideFooter\s*\{[\s\S]*?display:\s*flex;[\s\S]*?flex:\s*1 1 auto;[\s\S]*?min-height:\s*0;[\s\S]*?overflow:\s*hidden;/,
+    );
+    expect(scss).toMatch(
+      /\.welcomeSlideEmbed \.welcomeSlideLayout\s*\{[\s\S]*?height:\s*100%;[\s\S]*?min-height:\s*0;[\s\S]*?overflow:\s*hidden;/,
+    );
+    expect(scss).toMatch(
+      /\.welcomeSlideEmbed \.welcomeSlideSidebar\s*\{[\s\S]*?height:\s*100%;[\s\S]*?min-height:\s*0;/,
     );
   });
 

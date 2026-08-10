@@ -1709,7 +1709,7 @@ input[type='radio']:checked:after {
 
 .welcomeSlideEmbed .welcomeSlideLayout .welcomeSlideMediaButton[data-slide-layout='flushBottom'] {
   align-self: stretch;
-  height: auto !important;
+  height: 100% !important;
   overflow: hidden;
   align-items: flex-end;
 }
@@ -1869,4 +1869,38 @@ input[type='radio']:checked:after {
   border-style: solid;
   border-color: transparent;
   border-width: 0px;
+}
+
+@media (min-width: 769px) {
+  .welcomeSlideEmbed {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .welcomeSlideFooter {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .welcomeSlideEmbed .welcomeSlideLayout {
+    flex: 1 1 auto;
+    height: 100%;
+    min-height: 0;
+    margin-top: 0;
+    overflow: hidden;
+  }
+
+  .welcomeSlideEmbed .welcomeSlideSidebar {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .welcomeSlideEmbed .welcomeSlideLayout .welcomeSlideMediaButton,
+  .welcomeSlideEmbed .welcomeSlideLayout .welcomeSlideMediaButtonCentered {
+    height: 100% !important;
+    min-height: 0;
+    max-height: 100%;
+  }
 }

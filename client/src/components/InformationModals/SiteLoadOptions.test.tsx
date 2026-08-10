@@ -66,8 +66,10 @@ describe('SiteLoadOptions', () => {
 
     const greetingImage = screen.getByAltText('Context Engine welcome slide');
     const greetingButton = screen.getByTestId('ce-welcome-slide-media');
+    const greetingFooter = greetingButton.closest('.welcomeSlideFooter');
 
     expect(greetingImage).toBeInTheDocument();
+    expect(greetingFooter).toBeInTheDocument();
     expect(greetingImage).toHaveClass('welcomeSlideImageIntro');
     expect(greetingButton).toHaveClass('welcomeSlideMediaButton');
     expect(greetingButton).not.toHaveClass('welcomeSlideMediaButtonCentered');

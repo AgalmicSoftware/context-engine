@@ -36,6 +36,11 @@ const VIEWPORTS = Object.freeze([
   { name: 'mobile', width: 390, height: 844 },
 ]);
 
+const WELCOME_FIT_VIEWPORTS = Object.freeze([
+  { name: 'compact desktop', width: 1280, height: 720 },
+  { name: 'wide desktop', width: 1904, height: 900 },
+]);
+
 const readThemeState = () => {
   const root = document.documentElement;
   const style = window.getComputedStyle(root);
@@ -1000,28 +1005,74 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   }
 }
 
+async function assertWelcomeFitsViewport(browser, baseUrl, viewport) {
+  const page = await browser.newPage({ viewport: { width: viewport.width, height: viewport.height } });
+  try {
+    await page.addInitScript(() => {
+      window.localStorage.setItem('ce:firstVisitRootAboutRedirectConsumed:v20260618b', 'true');
+      window.localStorage.setItem('ce_onboarding_complete', 'true');
+      window.localStorage.setItem('firstVisit', 'false');
+      window.localStorage.setItem('ce:theme', 'classic-95');
+      window.localStorage.setItem('ce:primarySessionSlug', 'demo-sh');
+      window.localStorage.setItem('ce:selectedSessionScope', 'active');
+    });
+    await page.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForSelector('#root', { state: 'attached', timeout: 15000 });
+    await page.waitForFunction(() => document.querySelector('#root')?.children.length > 0, null, { timeout: 15000 });
+    const welcomeLink = page.getByRole('link', { name: 'Welcome', exact: true });
+    await welcomeLink.waitFor({ state: 'visible', timeout: 30000 });
+    await welcomeLink.click();
+    await page.getByTestId('ce-welcome-slide-media').waitFor({ state: 'visible' });
+
+    const fit = await page.evaluate(() => {
+      const footer = document.querySelector('footer');
+      const footerBottom = footer?.getBoundingClientRect().bottom || 0;
+      return {
+        clientHeight: document.documentElement.clientHeight,
+        footerBottom,
+        scrollHeight: document.documentElement.scrollHeight,
+      };
+    });
+
+    assert.ok(
+      fit.footerBottom <= fit.clientHeight + 1 && fit.scrollHeight <= fit.clientHeight + 1,
+      `Welcome screen should fit the ${viewport.name} viewport; received footer bottom ${fit.footerBottom.toFixed(1)}px, scroll height ${fit.scrollHeight}px, viewport ${fit.clientHeight}px`,
+    );
+  } finally {
+    await page.close();
+  }
+}
+
 async function main() {
   const baseUrl = normalizeBaseUrl(process.env.BASE_URL || 'http://127.0.0.1:3000');
+  const welcomeFitOnly = process.env.WELCOME_FIT_ONLY === '1';
   const browser = await chromium.launch({ headless: true });
 
   try {
-    for (const viewport of VIEWPORTS) {
-      const page = await browser.newPage({ viewport: { width: viewport.width, height: viewport.height } });
-      await page.addInitScript(() => {
-        window.localStorage.setItem('ce:firstVisitRootAboutRedirectConsumed:v20260618b', 'true');
-        window.localStorage.setItem('ce_onboarding_complete', 'true');
-        window.localStorage.setItem('firstVisit', 'false');
-        window.localStorage.setItem('ce:theme', 'classic-95');
-        window.localStorage.setItem('ce:primarySessionSlug', 'demo-sh');
-        window.localStorage.setItem('ce:selectedSessionScope', 'active');
-      });
-      for (const routeCase of ROUTE_CASES) {
-        await inspectRoute(page, baseUrl, routeCase, viewport.name);
+    if (!welcomeFitOnly) {
+      for (const viewport of VIEWPORTS) {
+        const page = await browser.newPage({ viewport: { width: viewport.width, height: viewport.height } });
+        await page.addInitScript(() => {
+          window.localStorage.setItem('ce:firstVisitRootAboutRedirectConsumed:v20260618b', 'true');
+          window.localStorage.setItem('ce_onboarding_complete', 'true');
+          window.localStorage.setItem('firstVisit', 'false');
+          window.localStorage.setItem('ce:theme', 'classic-95');
+          window.localStorage.setItem('ce:primarySessionSlug', 'demo-sh');
+          window.localStorage.setItem('ce:selectedSessionScope', 'active');
+        });
+        for (const routeCase of ROUTE_CASES) {
+          await inspectRoute(page, baseUrl, routeCase, viewport.name);
+        }
+        await page.close();
       }
-      await page.close();
+    }
+    for (const viewport of WELCOME_FIT_VIEWPORTS) {
+      await assertWelcomeFitsViewport(browser, baseUrl, viewport);
     }
     console.log(
-      `App theme runtime Playwright smoke passed (${ROUTE_CASES.length} routes × ${VIEWPORTS.length} viewports).`,
+      welcomeFitOnly
+        ? `Welcome fit Playwright smoke passed (${WELCOME_FIT_VIEWPORTS.length} viewports).`
+        : `App theme runtime Playwright smoke passed (${ROUTE_CASES.length} routes × ${VIEWPORTS.length} viewports).`,
     );
   } finally {
     await browser.close();

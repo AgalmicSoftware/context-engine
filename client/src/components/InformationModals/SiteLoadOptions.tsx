@@ -159,7 +159,7 @@ class SiteLoadOptions extends Component<SiteLoadOptionsProps, SiteLoadOptionsSta
       <>
         <GreetingModal visible={this.state.explainerModalOpen} closeExplainerFunction={this.closeExplainerModal} />
         <div className={styles.welcomeSlideEmbed}>
-          <CardFooter>
+          <CardFooter className={styles.welcomeSlideFooter}>
             <WelcomeSlideRenderer
               slideIndex={this.props.arrowIndex}
               onSlideClick={slideButtonClickHandler}

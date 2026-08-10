@@ -397,16 +397,21 @@
 
 @media (min-width: 769px) and (max-width: 1366px) {
   .onboardingWalkthrough {
+    --ce-main-welcome-frame-height: max(0px, min(600px, calc(100dvh - 400px)));
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
     padding-right: 0px;
     padding-left: 0px;
-    min-height: 600px;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .onboardingInfo {
+    flex: 1 1 auto;
     align-items: center;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .onboardingTitle {
@@ -422,10 +427,12 @@
 
   .onboardingControls {
     display: flex;
+    flex: 0 0 clamp(60px, 10dvh, 100px);
     flex-direction: row;
     justify-content: center;
     background: transparent;
-    min-height: 75px;
+    height: clamp(60px, 10dvh, 100px);
+    min-height: 0;
   }
 
   .takeSurveyButton {
@@ -502,9 +509,9 @@
 
 @media (min-width: 1367px) {
   .onboardingWalkthrough {
-    // Regression guard: the intro artwork grows with deck width. Keep the shared
-    // frame width-driven or that slide will overflow while the others stay shorter.
-    --ce-main-welcome-frame-height: max(540px, 30vw);
+    // Keep the shared frame responsive to deck width without letting a wide,
+    // short viewport push the welcome screen below the fold.
+    --ce-main-welcome-frame-height: max(0px, min(max(380px, 30vw), calc(100dvh - 452px)));
     display: flex;
     flex-direction: row;
     padding-right: 0px;
@@ -514,9 +521,12 @@
   }
 
   .onboardingInfo {
+    flex: 1 1 auto;
     width: 100%;
     align-items: flex-start;
     justify-content: flex-end;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .onboardingTitle {
