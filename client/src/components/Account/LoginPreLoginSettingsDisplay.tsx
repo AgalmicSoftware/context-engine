@@ -2,6 +2,8 @@ import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCog } from '@fortawesome/free-solid-svg-icons';
 import styles from './Account.module.scss';
+import AppThemeSelector from './AppThemeSelector';
+import { CE_THEME_SELECTOR_ENABLED } from '../../variables/appConfig.js';
 
 type LoginSettingsOverview = {
   activeSession: unknown;
@@ -77,13 +79,24 @@ const LoginPreLoginSettingsDisplay = ({
           {renderSettingsOverviewPanel({
             overview,
             networkTooltipId: 'preLoginNetworkInfoTooltipPanel',
-            extraContent: preLoginConfigOpen
-              ? renderStaticSettingsSection({
-                  title: 'Config',
-                  summary: 'Session selection and local AI overrides',
-                  children: renderPreLoginConfigPanel(),
-                })
-              : null,
+            extraContent: (
+              <>
+                {preLoginConfigOpen
+                  ? renderStaticSettingsSection({
+                      title: 'Config',
+                      summary: 'Session selection and local AI overrides',
+                      children: renderPreLoginConfigPanel(),
+                    })
+                  : null}
+                {CE_THEME_SELECTOR_ENABLED
+                  ? renderStaticSettingsSection({
+                      title: 'Appearance & colors',
+                      summary: 'Bundled app themes',
+                      children: <AppThemeSelector />,
+                    })
+                  : null}
+              </>
+            ),
           })}
         </div>
       ) : null}

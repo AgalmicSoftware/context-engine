@@ -34,7 +34,7 @@ const HOSTING_PRESETS = [
     entryLabel: 'Fast & Cheap',
     entryProvider: 'Cloudflare',
     entryDescription: 'Launch a dedicated Session Worker without an on-chain publish step.',
-    entryRequirements: 'Cloudflare login / AI API Key',
+    entryRequirements: ['Cloudflare login', 'AI API key'],
   },
   {
     id: SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED,
@@ -43,7 +43,7 @@ const HOSTING_PRESETS = [
     entryLabel: 'Trustless & Public',
     entryProvider: 'Decentralized',
     entryDescription: 'Use a Session Worker for the web runtime while the EVM registry and Arweave stay canonical.',
-    entryRequirements: 'Compatible Session Worker / AI API Key / Arweave wallet / RPC URL / EVM testnet gas',
+    entryRequirements: ['Compatible Session Worker', 'AI API key', 'Arweave wallet', 'RPC URL', 'EVM testnet gas'],
   },
 ] as const;
 
@@ -152,7 +152,17 @@ const SessionModeProfileField = ({
             <span className={styles.modePresetCardDescription}>{preset.entryDescription}</span>
             <span className={styles.modePresetCardRequirements}>
               <span className={styles.modePresetCardRequirementsLabel}>What you&apos;ll need</span>
-              <span className={styles.modePresetCardRequirementsValue}>{preset.entryRequirements}</span>
+              <span
+                className={styles.modePresetCardRequirementPills}
+                role="list"
+                aria-label={`${preset.entryLabel} requirements`}
+              >
+                {preset.entryRequirements.map((requirement) => (
+                  <span key={requirement} className={styles.modePresetCardRequirementPill} role="listitem">
+                    {requirement}
+                  </span>
+                ))}
+              </span>
             </span>
           </>
         ) : (

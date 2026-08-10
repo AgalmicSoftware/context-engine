@@ -56,6 +56,11 @@ gray raised/inset surfaces, navy title bars, square controls, and system-safe
 Tahoma/MS Sans Serif fallbacks—without copying page markup or proprietary
 assets.
 
+When the bundled-theme selector is enabled, Settings exposes it as the final
+`Appearance & colors` section both before and after sign-in. This selector
+changes the complete app theme; it is separate from a session's curated color
+scheme and does not accept arbitrary color values.
+
 ## Session Color Schemes
 
 App themes and session color schemes are separate contracts. An app theme may

@@ -2700,7 +2700,7 @@ h1 {
 
 .settingsSectionSummary {
   font-size: 0.78rem;
-  color: color-mix(in srgb, var(--ce-document-border) 72%, transparent);
+  color: var(--ce-overlay-text-muted);
 }
 
 .settingsSectionChevron {

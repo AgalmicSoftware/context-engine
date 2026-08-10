@@ -22,10 +22,22 @@ describe('SessionModeProfileField', () => {
     );
     expect(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).toHaveAttribute('aria-checked', 'false');
-    expect(screen.getByText('Cloudflare login / AI API Key')).toBeInTheDocument();
+    const cloudflareRequirements = within(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).getByRole('list', {
+      name: 'Fast & Cheap requirements',
+    });
     expect(
-      screen.getByText('Compatible Session Worker / AI API Key / Arweave wallet / RPC URL / EVM testnet gas'),
-    ).toBeInTheDocument();
+      within(cloudflareRequirements)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['Cloudflare login', 'AI API key']);
+    const decentralizedRequirements = within(
+      screen.getByTestId('ce-new-preset-trustless_public_decentralized'),
+    ).getByRole('list', { name: 'Trustless & Public requirements' });
+    expect(
+      within(decentralizedRequirements)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['Compatible Session Worker', 'AI API key', 'Arweave wallet', 'RPC URL', 'EVM testnet gas']);
     expect(
       screen.getByText('Use a Session Worker for the web runtime while the EVM registry and Arweave stay canonical.'),
     ).toBeInTheDocument();
@@ -56,7 +68,7 @@ describe('SessionModeProfileField', () => {
 
     fireEvent.click(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare'));
 
-    expect(screen.queryByText('Cloudflare login / AI API Key')).not.toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Fast & Cheap requirements' })).not.toBeInTheDocument();
     expect(screen.queryByText('Hosting')).not.toBeInTheDocument();
     expect(screen.queryByText('Recommended')).not.toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Cloudflare' })).toHaveAttribute('aria-checked', 'true');

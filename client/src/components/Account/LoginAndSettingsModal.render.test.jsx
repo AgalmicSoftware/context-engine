@@ -568,6 +568,17 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(screen.queryByRole('button', { name: /Resource keys/i })).not.toBeInTheDocument();
   });
 
+  it('keeps the bundled app colors and theme control as the final signed-in settings section', () => {
+    const subject = buildWrongNetworkSubject({ aiSettingsOpen: true });
+
+    render(subject.getSettingsDisplay());
+
+    const aiConfigSection = screen.getByRole('button', { name: /AI config/i });
+    const appearanceSection = screen.getByRole('button', { name: /Appearance & colors/i });
+    expect(aiConfigSection.compareDocumentPosition(appearanceSection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByTestId('ce-settings-theme')).toHaveAccessibleName('App theme');
+  });
+
   it('preserves PUBLIC_URL when building the active-session link', () => {
     process.env.PUBLIC_URL = '/ce/';
     const subject = buildWrongNetworkSubject();
@@ -691,6 +702,8 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     await openPreLoginSettingsDrawer();
 
     expect(screen.getByTestId('ce-prelogin-settings-panel')).toBeInTheDocument();
+    expect(screen.getByText('Appearance & colors')).toBeInTheDocument();
+    expect(screen.getByTestId('ce-settings-theme')).toHaveAccessibleName('App theme');
     expect(document.getElementById('preLoginTooltipsToggleTooltip')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Explainers On' }));

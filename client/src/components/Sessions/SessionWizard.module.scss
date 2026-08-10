@@ -2789,7 +2789,7 @@ $muted-text: var(--ce-panel-text-muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: color-mix(in srgb, var(--ce-status-success-text) 76%, transparent);
+  color: var(--ce-text-inverse);
   font-size: 0.82rem;
   line-height: 1;
   transition:
@@ -2810,7 +2810,7 @@ $muted-text: var(--ce-panel-text-muted);
 }
 
 .modeProfileEntryEyebrow {
-  color: var(--ce-action-accent);
+  color: var(--ce-text-inverse);
   font-size: 0.7rem;
   font-weight: 850;
   letter-spacing: 0.11em;
@@ -2832,9 +2832,9 @@ $muted-text: var(--ce-panel-text-muted);
   padding: 24px;
   border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
   border-radius: var(--ce-radius-18);
-  background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
+  background: var(--ce-card-bg);
   box-shadow: 0 6px 22px color-mix(in srgb, var(--ce-compat-dark) 25%, transparent);
-  color: var(--ce-control-text);
+  color: var(--ce-panel-text);
   cursor: pointer;
   text-align: left;
   transition:
@@ -2847,7 +2847,7 @@ $muted-text: var(--ce-panel-text-muted);
 .modePresetCard:hover,
 .modePresetCard:focus-visible {
   border-color: color-mix(in srgb, var(--ce-action-accent) 62%, transparent);
-  background: color-mix(in srgb, var(--ce-action-accent) 10%, transparent);
+  background: var(--ce-surface-alt);
   box-shadow: 0 10px 30px color-mix(in srgb, var(--ce-compat-dark) 32%, transparent);
   transform: translateY(-2px);
 }
@@ -2859,7 +2859,7 @@ $muted-text: var(--ce-panel-text-muted);
 
 .modePresetCardSelected {
   border-color: color-mix(in srgb, var(--ce-action-accent) 72%, transparent);
-  background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
+  background: var(--ce-surface-alt);
 }
 
 .modePresetCardHeader {
@@ -2872,13 +2872,12 @@ $muted-text: var(--ce-panel-text-muted);
 .modePresetCardTitle,
 .modePresetCardProvider,
 .modePresetCardDescription,
-.modePresetCardRequirementsLabel,
-.modePresetCardRequirementsValue {
+.modePresetCardRequirementsLabel {
   display: block;
 }
 
 .modePresetCardTitle {
-  color: var(--ce-text-inverse);
+  color: var(--ce-panel-text);
   font-size: 1.35rem;
   font-weight: 850;
   line-height: 1.2;
@@ -2886,7 +2885,7 @@ $muted-text: var(--ce-panel-text-muted);
 
 .modePresetCardProvider {
   margin-top: 5px;
-  color: var(--ce-action-accent);
+  color: var(--ce-panel-text);
   font-size: 0.8rem;
   font-weight: 800;
   letter-spacing: 0.06em;
@@ -2895,7 +2894,7 @@ $muted-text: var(--ce-panel-text-muted);
 
 .modePresetCardDescription {
   margin-top: 24px;
-  color: color-mix(in srgb, var(--ce-control-text) 78%, transparent);
+  color: var(--ce-panel-text);
   font-size: 0.9rem;
   line-height: 1.55;
 }
@@ -2909,18 +2908,31 @@ $muted-text: var(--ce-panel-text-muted);
 }
 
 .modePresetCardRequirementsLabel {
-  color: color-mix(in srgb, var(--ce-control-text) 62%, transparent);
+  color: var(--ce-panel-text);
   font-size: 0.65rem;
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-.modePresetCardRequirementsValue {
-  color: var(--ce-text-inverse);
-  font-size: 0.9rem;
+.modePresetCardRequirementPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.modePresetCardRequirementPill {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 5px 9px;
+  border: 1px solid var(--ce-overlay-text-muted);
+  border-radius: var(--ce-radius-pill);
+  background: var(--ce-overlay-base);
+  color: var(--ce-overlay-text);
+  font-size: 0.78rem;
   font-weight: 750;
-  line-height: 1.45;
+  line-height: 1.25;
 }
 
 .modePresetToggle {

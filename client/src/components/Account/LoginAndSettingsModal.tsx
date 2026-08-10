@@ -2264,14 +2264,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
             networkTooltipId: 'networkInfoTooltipPanel',
             extraContent: (
               <>
-                {CE_THEME_SELECTOR_ENABLED
-                  ? renderSection({
-                      key: 'appTheme',
-                      title: 'Appearance',
-                      summary: 'Bundled app theme',
-                      children: <AppThemeSelector />,
-                    })
-                  : null}
                 {renderSection({
                   key: 'session',
                   title: 'Session',
@@ -2573,78 +2565,18 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
                             useLocalRpc={useLocalRpc}
                             visibleResources={overview.capabilities.settingsResourceKeys}
                           />
-                          <label className={styles.aiSettingsInlineToggle}>
-                            <input
-                              type="checkbox"
-                              checked={useLocalRpc}
-                              onChange={(e: any) => this.handleResourceToggleLocal('rpc', e)}
-                            />
-                            <span>Use local override</span>
-                          </label>
-                          <div className={styles.aiSettingsHint}>
-                            {this.formatResourceSponsorHint({
-                              resourceKey: 'rpc',
-                              resourceLabel: 'RPC',
-                              sponsoredKeys,
-                              sponsorSessions,
-                            })}
-                          </div>
-                        </div>
-
-                        <div className={`${styles.aiSettingsRow} ${styles.aiSettingsRowFull}`}>
-                          <label className={styles.aiSettingsLabel}>Arweave JWK (JSON)</label>
-                          <textarea
-                            className={styles.aiSettingsTextarea}
-                            value={useLocalArweave ? resourceKeys?.arweave?.jwk || '' : ''}
-                            onChange={(e: any) => this.updateResourceKeyField('arweave', 'jwk', e.target.value)}
-                            disabled={!useLocalArweave}
-                            placeholder={
-                              useLocalArweave
-                                ? '{ "kty": "...", ... }'
-                                : sponsoredKeys.arweave
-                                  ? 'Sponsored key configured'
-                                  : 'No sponsored key set'
-                            }
-                          />
-                          <label className={styles.aiSettingsInlineToggle}>
-                            <input
-                              type="checkbox"
-                              checked={useLocalArweave}
-                              onChange={(e: any) => this.handleResourceToggleLocal('arweave', e)}
-                            />
-                            <span>Use local override</span>
-                          </label>
-                          <div className={styles.aiSettingsHint}>
-                            {this.formatResourceSponsorHint({
-                              resourceKey: 'arweave',
-                              resourceLabel: 'Arweave',
-                              sponsoredKeys,
-                              sponsorSessions,
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                      <div className={styles.aiSettingsFooterRow}>
-                        <div className={styles.aiSettingsStatus}>
-                          {this.state.resourceKeysStatus || 'Stored locally; only sent on the request that needs them.'}
-                        </div>
-                        <div className={styles.aiSettingsActions}>
-                          <Button
-                            size="sm"
-                            color="info"
-                            onClick={this.handleSaveResourceKeys}
-                            disabled={!this.state.resourceKeysDirty}
-                          >
-                            Save keys
-                          </Button>
-                          <Button size="sm" color="secondary" outline onClick={this.handleClearResourceKeys}>
-                            Clear keys
-                          </Button>
-                        </div>
-                      </div>
-                    </>
-                  ),
-                })}
+                        </Suspense>
+                      ),
+                    })
+                  : null}
+                {CE_THEME_SELECTOR_ENABLED
+                  ? renderSection({
+                      key: 'appTheme',
+                      title: 'Appearance & colors',
+                      summary: 'Bundled app themes',
+                      children: <AppThemeSelector />,
+                    })
+                  : null}
               </>
             ),
           })}

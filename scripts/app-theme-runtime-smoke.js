@@ -10,10 +10,16 @@ const ROUTE_CASES = Object.freeze([
     label: 'home welcome and login surfaces',
     requiresFramelessWelcome: true,
     requiresReadableLogin: true,
+    requiresPreloginThemeSettings: true,
   },
   { path: '/', label: 'home Community Stats surface', requiresReadableStats: true },
   { path: '/about', label: 'about lazy route', requiresBrightLogo: true },
-  { path: '/session/new', label: 'Session Wizard', requiresSessionColors: true },
+  {
+    path: '/session/new',
+    label: 'Session Wizard',
+    requiresReadableSessionSetup: true,
+    requiresSessionColors: true,
+  },
   { path: '/docs', label: 'docs lazy route', requiresReadableDocs: true },
   { path: '/demos', label: 'demo surface' },
   { path: '/theme-smoke-not-found', label: 'not-found state' },
@@ -55,6 +61,72 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   await page.waitForSelector('#root', { state: 'attached', timeout: 15000 });
   await page.waitForFunction(() => document.querySelector('#root')?.children.length > 0, null, { timeout: 15000 });
 
+  if (routeCase.requiresReadableSessionSetup) {
+    await page.getByTestId('ce-new-preset-fast_cheap_cloudflare').waitFor({ state: 'visible' });
+    await page
+      .locator('[role="listitem"][class*="modePresetCardRequirementPill"]')
+      .first()
+      .waitFor({ state: 'visible' });
+  }
+
+  const sessionSetupContrastState = routeCase.requiresReadableSessionSetup
+    ? await page.evaluate(() => {
+        const parseRgb = (value) => {
+          const channels =
+            String(value || '')
+              .match(/[\d.]+/g)
+              ?.map(Number) || [];
+          if (channels.length < 3) throw new Error(`Unsupported computed color: ${value}`);
+          return channels.slice(0, 3).map((channel) => channel / 255);
+        };
+        const luminance = (value) => {
+          const channels = parseRgb(value).map((channel) =>
+            channel <= 0.03928 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4),
+          );
+          return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+        };
+        const ratio = (foregroundColor, backgroundColor) => {
+          const foregroundLuminance = luminance(foregroundColor);
+          const backgroundLuminance = luminance(backgroundColor);
+          return (
+            (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) /
+            (Math.min(foregroundLuminance, backgroundLuminance) + 0.05)
+          );
+        };
+        const backgroundFor = (element) => {
+          let current = element;
+          while (current) {
+            const background = window.getComputedStyle(current).backgroundColor;
+            const channels =
+              String(background || '')
+                .match(/[\d.]+/g)
+                ?.map(Number) || [];
+            if (channels.length >= 3 && (channels.length < 4 || channels[3] > 0)) return background;
+            current = current.parentElement;
+          }
+          return window.getComputedStyle(document.documentElement).backgroundColor;
+        };
+        const textRatio = (selector) => {
+          const element = document.querySelector(selector);
+          if (!element) return 0;
+          return ratio(window.getComputedStyle(element).color, backgroundFor(element));
+        };
+
+        return {
+          eyebrowRatio: textRatio('[class*="modeProfileEntryEyebrow"]'),
+          providerRatio: textRatio(
+            '[data-testid="ce-new-preset-fast_cheap_cloudflare"] [class*="modePresetCardProvider"]',
+          ),
+          descriptionRatio: textRatio(
+            '[data-testid="ce-new-preset-fast_cheap_cloudflare"] [class*="modePresetCardDescription"]',
+          ),
+          requirementRatio: textRatio('[role="listitem"][class*="modePresetCardRequirementPill"]'),
+          requirementPillCount: document.querySelectorAll('[role="listitem"][class*="modePresetCardRequirementPill"]')
+            .length,
+        };
+      })
+    : null;
+
   if (routeCase.requiresSessionColors) {
     await page.getByTestId('ce-new-preset-fast_cheap_cloudflare').click();
     await page.waitForSelector('[data-testid="ce-wizard-session-color-scheme"]', { timeout: 15000 });
@@ -80,6 +152,12 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   if (routeCase.requiresReadableLogin) {
     await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
     await page.getByText('Account uses a passkey:', { exact: true }).waitFor({ state: 'visible' });
+  }
+
+  if (routeCase.requiresPreloginThemeSettings) {
+    await page.getByRole('button', { name: 'Toggle pre-login settings', exact: true }).click();
+    await page.getByTestId('ce-prelogin-settings-panel').waitFor({ state: 'visible' });
+    await page.getByTestId('ce-settings-theme').waitFor({ state: 'visible' });
   }
 
   if (routeCase.requiresReadableStats) {
@@ -272,6 +350,64 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         };
       })
     : null;
+  const preloginThemeSettingsState = routeCase.requiresPreloginThemeSettings
+    ? await page.evaluate(() => {
+        const parseRgb = (value) => {
+          const channels =
+            String(value || '')
+              .match(/[\d.]+/g)
+              ?.map(Number) || [];
+          if (channels.length < 3) throw new Error(`Unsupported computed color: ${value}`);
+          return channels.slice(0, 3).map((channel) => channel / 255);
+        };
+        const luminance = (value) => {
+          const channels = parseRgb(value).map((channel) =>
+            channel <= 0.03928 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4),
+          );
+          return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+        };
+        const ratio = (foregroundColor, backgroundColor) => {
+          const foregroundLuminance = luminance(foregroundColor);
+          const backgroundLuminance = luminance(backgroundColor);
+          return (
+            (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) /
+            (Math.min(foregroundLuminance, backgroundLuminance) + 0.05)
+          );
+        };
+        const backgroundFor = (element) => {
+          let current = element;
+          while (current) {
+            const background = window.getComputedStyle(current).backgroundColor;
+            const channels =
+              String(background || '')
+                .match(/[\d.]+/g)
+                ?.map(Number) || [];
+            if (channels.length >= 3 && (channels.length < 4 || channels[3] > 0)) return background;
+            current = current.parentElement;
+          }
+          return window.getComputedStyle(document.documentElement).backgroundColor;
+        };
+        const panel = document.querySelector('[data-testid="ce-prelogin-settings-panel"]');
+        const selector = panel?.querySelector('[data-testid="ce-settings-theme"]');
+        const label = panel?.querySelector('label[for="ce-settings-theme-select"]');
+        const hint = selector?.parentElement?.querySelector('div');
+        const sections = Array.from(panel?.querySelectorAll('[class*="settingsSectionCard"]') || []);
+        const appearanceSection = selector?.closest('[class*="settingsSectionCard"]');
+        const summary = appearanceSection?.querySelector('[class*="settingsSectionSummary"]');
+        if (!panel || !selector || !label || !hint || !appearanceSection || !summary) return { missing: true };
+        const selectorStyle = window.getComputedStyle(selector);
+        const labelStyle = window.getComputedStyle(label);
+        const hintStyle = window.getComputedStyle(hint);
+        const summaryStyle = window.getComputedStyle(summary);
+        return {
+          isFinalSection: sections.at(-1) === appearanceSection,
+          labelRatio: ratio(labelStyle.color, backgroundFor(label)),
+          hintRatio: ratio(hintStyle.color, backgroundFor(hint)),
+          summaryRatio: ratio(summaryStyle.color, backgroundFor(summary)),
+          selectorRatio: ratio(selectorStyle.color, backgroundFor(selector)),
+        };
+      })
+    : null;
   const statsContrastState = routeCase.requiresReadableStats
     ? await page.evaluate(() => {
         const parseRgb = (value) => {
@@ -403,6 +539,24 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   if (routeCase.requiresSessionColors) {
     assert.ok(routeState.sessionPreviewAccent, 'Session Wizard preview should expose its scoped accent immediately');
   }
+  if (sessionSetupContrastState) {
+    assert.equal(
+      sessionSetupContrastState.requirementPillCount,
+      7,
+      'Session Setup should render every requirement as an individual pill',
+    );
+    [
+      ['Choose a setup', sessionSetupContrastState.eyebrowRatio],
+      ['Cloudflare provider', sessionSetupContrastState.providerRatio],
+      ['Cloudflare description', sessionSetupContrastState.descriptionRatio],
+      ['setup requirement pill', sessionSetupContrastState.requirementRatio],
+    ].forEach(([label, received]) => {
+      assert.ok(
+        received >= 4.5,
+        `Classic 95 ${label} contrast should be at least 4.5:1; received ${received.toFixed(2)}:1`,
+      );
+    });
+  }
   docsContrastState.forEach(({ label, missing, ratio }) => {
     assert.equal(missing, undefined, `${label} should render in the Classic 95 Docs page`);
     assert.ok(ratio >= 4.5, `${label} should meet 4.5:1 contrast in Classic 95; received ${ratio.toFixed(2)}:1`);
@@ -462,6 +616,34 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     assert.ok(
       loginContrastState.createButtonRatio >= 4.5,
       `Classic 95 passkey button contrast should be at least 4.5:1; received ${loginContrastState.createButtonRatio.toFixed(2)}:1`,
+    );
+  }
+  if (preloginThemeSettingsState) {
+    assert.equal(
+      preloginThemeSettingsState.missing,
+      undefined,
+      'Signed-out Appearance & colors controls should render',
+    );
+    assert.equal(
+      preloginThemeSettingsState.isFinalSection,
+      true,
+      'Appearance & colors should be the final signed-out Settings section',
+    );
+    assert.ok(
+      preloginThemeSettingsState.labelRatio >= 4.5,
+      `Classic 95 App theme label contrast should be at least 4.5:1; received ${preloginThemeSettingsState.labelRatio.toFixed(2)}:1`,
+    );
+    assert.ok(
+      preloginThemeSettingsState.hintRatio >= 4.5,
+      `Classic 95 App theme hint contrast should be at least 4.5:1; received ${preloginThemeSettingsState.hintRatio.toFixed(2)}:1`,
+    );
+    assert.ok(
+      preloginThemeSettingsState.summaryRatio >= 4.5,
+      `Classic 95 Appearance summary contrast should be at least 4.5:1; received ${preloginThemeSettingsState.summaryRatio.toFixed(2)}:1`,
+    );
+    assert.ok(
+      preloginThemeSettingsState.selectorRatio >= 4.5,
+      `Classic 95 App theme selector contrast should be at least 4.5:1; received ${preloginThemeSettingsState.selectorRatio.toFixed(2)}:1`,
     );
   }
   if (statsContrastState) {
