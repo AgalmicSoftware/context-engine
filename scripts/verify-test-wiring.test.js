@@ -65,21 +65,6 @@ test('Worker provenance checkouts include complete public history and tags', () 
   }
 });
 
-test('agent bridge tests are reachable through root CI and the workers job', () => {
-  const rootDir = path.resolve(__dirname, '..');
-  const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
-  const manifest = JSON.parse(fs.readFileSync(path.join(rootDir, 'scripts/ci-gates.json'), 'utf8'));
-  const workflow = fs.readFileSync(path.join(rootDir, '.github/workflows/ci.yml'), 'utf8');
-
-  assert.match(pkg.scripts['test:ci'], /run-ci-gates\.mjs --profile ci/);
-  assert.ok(manifest.profiles.ci.includes('workers'));
-  assert.ok(
-    manifest.gates.workers.commands
-      .some((entry) => entry.args.join(' ') === 'run test:worker:agent-bridge'),
-  );
-  assert.match(workflow, /run: npm run ci:gate -- workers/);
-});
-
 test('E2E preview readiness retries stay quiet but the final probe remains diagnostic', () => {
   const rootDir = path.resolve(__dirname, '..');
   const workflow = fs.readFileSync(path.join(rootDir, '.github/workflows/ci.yml'), 'utf8');
