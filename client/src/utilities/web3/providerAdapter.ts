@@ -1,4 +1,3 @@
-import { chainCurrency, chainHexId, chainHttpRpc, chainHttpRpcNoPath } from '../../variables/chains.js';
 import { getReadProviderForChain, getReadProviderForGroup } from './rpcProviders.js';
 
 type AnyRecord = Record<string, any>;
@@ -31,11 +30,6 @@ type ResolveSignerProviderOptions = {
   injectedProvider?: unknown;
   web3AuthProvider?: unknown;
   passkeyProviderFactory?: () => unknown;
-};
-
-type WalletChainRequestOptions = {
-  chain: AnyRecord;
-  injectedProvider?: AnyRecord | null;
 };
 
 const getWindowLike = (): AnyRecord | null => (typeof window !== 'undefined' ? (window as AnyRecord) : null);
@@ -180,122 +174,4 @@ export const resolveSignerProvider = (options: ResolveSignerProviderOptions = {}
     recoverable: true,
     status: 'unknown-provider',
   };
-};
-
-export const normalizeWalletError = (error: unknown): AdapterResult => {
-  const record = error as AnyRecord;
-  const code = Number(record?.code || 0);
-  const message = errorMessage(error);
-  const lower = message.toLowerCase();
-
-  if (code === 4001 || lower.includes('user rejected') || lower.includes('user denied')) {
-    return {
-      ok: false,
-      error: 'Wallet request was cancelled.',
-      recoverable: true,
-      status: 'user-rejected',
-    };
-  }
-
-  if (code === 4902) {
-    return {
-      ok: false,
-      error: 'Wallet does not know this chain yet.',
-      recoverable: true,
-      status: 'unsupported-chain',
-    };
-  }
-
-  return {
-    ok: false,
-    error: message,
-    recoverable: true,
-    status: 'wallet-error',
-  };
-};
-
-const getChainIdHex = (chain: AnyRecord = {}): string => {
-  const explicit = String(chain.chainIdHex || '').trim();
-  if (explicit.startsWith('0x')) return explicit;
-  const chainIdValue = chain.id ?? chain.chainId ?? explicit;
-  const numericChainId = Number(chainIdValue || 0);
-  if (Number.isFinite(numericChainId) && numericChainId > 0) {
-    return `0x${numericChainId.toString(16)}`;
-  }
-  return chainHexId(chain);
-};
-
-export const addWalletChain = async ({
-  chain,
-  injectedProvider,
-}: WalletChainRequestOptions): Promise<AdapterResult> => {
-  const provider = getInjectedProvider(injectedProvider) as AnyRecord | null;
-  if (!provider || typeof provider.request !== 'function') {
-    return resolveInjectedProvider(provider) as AdapterResult;
-  }
-
-  const chainId = getChainIdHex(chain);
-  if (!chainId || chainId === '0x0') {
-    return {
-      ok: false,
-      error: 'Unsupported chain configuration.',
-      recoverable: true,
-      status: 'unsupported-chain',
-    };
-  }
-
-  const rpcHttp = chainHttpRpcNoPath(chain) || chainHttpRpc(chain);
-  const native = chainCurrency(chain);
-
-  try {
-    await provider.request({
-      method: 'wallet_addEthereumChain',
-      params: [
-        {
-          chainId,
-          chainName: chain.name,
-          nativeCurrency: native,
-          rpcUrls: rpcHttp ? [rpcHttp] : [],
-          blockExplorerUrls: [chain.blockExplorers?.default?.url].filter(Boolean),
-        },
-      ],
-    });
-    return { ok: true, provider, source: 'injected-wallet', status: 'added' };
-  } catch (error) {
-    return normalizeWalletError(error);
-  }
-};
-
-export const switchWalletChain = async ({
-  chain,
-  injectedProvider,
-}: WalletChainRequestOptions): Promise<AdapterResult> => {
-  const provider = getInjectedProvider(injectedProvider) as AnyRecord | null;
-  if (!provider || typeof provider.request !== 'function') {
-    return resolveInjectedProvider(provider) as AdapterResult;
-  }
-
-  const chainId = getChainIdHex(chain);
-  if (!chainId || chainId === '0x0') {
-    return {
-      ok: false,
-      error: 'Unsupported chain configuration.',
-      recoverable: true,
-      status: 'unsupported-chain',
-    };
-  }
-
-  try {
-    await provider.request({
-      method: 'wallet_switchEthereumChain',
-      params: [{ chainId }],
-    });
-    return { ok: true, provider, source: 'injected-wallet', status: 'switched' };
-  } catch (error) {
-    const normalized = normalizeWalletError(error);
-    if (normalized.status === 'unsupported-chain') {
-      return addWalletChain({ chain, injectedProvider: provider });
-    }
-    return normalized;
-  }
 };
