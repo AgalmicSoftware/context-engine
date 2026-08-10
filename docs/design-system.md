@@ -56,6 +56,10 @@ gray raised/inset surfaces, navy title bars, square controls, and system-safe
 Tahoma/MS Sans Serif fallbacks—without copying page markup or proprietary
 assets.
 
+Tool Explorer cards consume `--ce-tool-card-*` chrome tokens. Context Engine
+keeps its layered blue depth treatment; `classic-95` uses a conventional
+raised bevel, compact black shadow, and gray hover face without a colored halo.
+
 When the bundled-theme selector is enabled, Settings exposes it as the final
 `Appearance & colors` section both before and after sign-in. This selector
 changes the complete app theme; it is separate from a session's curated color
@@ -108,7 +112,7 @@ control states without component selectors in a theme file.
 | Response states        | `--ce-response-agree-*`, `--ce-response-unsure-*`, `--ce-response-disagree-*` | readable vote-state badges on the active tooltip surface                       |
 | Data visualization     | `--ce-data-viz-*`                                                             | plot surfaces, axes, labels, points, active points, and point strokes          |
 | Brand media            | `--ce-brand-logo-*`, `--ce-welcome-artwork-*`                                 | theme-specific logo treatment plus a stable branded Welcome backdrop/blending  |
-| Edges and elevation    | `--ce-border-*`, `--ce-edge-*`, `--ce-shadow-*`                               | flat, raised, inset, pressed, and submit states                                |
+| Edges and elevation    | `--ce-border-*`, `--ce-edge-*`, `--ce-shadow-*`, `--ce-tool-card-*`           | flat, raised, inset, pressed, submit, and Tool Explorer card states            |
 | Geometry               | `--ce-radius-*`, `--ce-border-control-width`, `--ce-control-padding-*`        | theme-selectable shape and control density                                     |
 | Typography             | `--ce-font-*`, `--ce-font-button-weight`                                      | body, UI, mono, and control typography                                         |
 

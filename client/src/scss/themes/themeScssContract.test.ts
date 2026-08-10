@@ -42,6 +42,10 @@ describe('runtime SCSS theme contract', () => {
     expect(result.css).toContain('--ce-welcome-artwork-blend-cutout: screen');
     expect(result.css).toContain('--ce-welcome-artwork-backdrop: linear-gradient(90deg, #5b8cff');
     expect(result.css).toContain('--ce-shadow-neumorphic-dark: #404040');
+    expect(result.css).toContain('--ce-tool-card-border: var(--ce-border-raised)');
+    expect(result.css).toContain('--ce-tool-card-shadow: var(--ce-shadow-raised)');
+    expect(result.css).toContain('--ce-tool-card-hover-bg: var(--ce-surface-raised)');
+    expect(result.css).toContain('--ce-tool-card-hover-bg: var(--ce-status-info)');
     expect(result.css).toContain('--ce-color-primary: var(--ce-action-primary)');
   });
 

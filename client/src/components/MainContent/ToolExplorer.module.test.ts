@@ -27,8 +27,10 @@ describe('ToolExplorer sparse card layout', () => {
       /\.explorerCol\s*{[\s\S]*?&\.statusBorderEnabled[\s\S]*?border:\s*4px solid color-mix\(in srgb,\s*var\(--ce-action-accent\) 78%,\s*transparent\);/,
     );
     expect(scss).toMatch(
-      /\.square\s*{[\s\S]*?border:\s*1px solid color-mix\(in srgb,\s*var\(--ce-text-inverse\) 14%,\s*transparent\);[\s\S]*?background:\s*var\(--ce-surface-alt\);[\s\S]*?box-shadow:[\s\S]*?var\(--ce-surface-sunken\)[\s\S]*?color-mix\(in srgb,\s*var\(--ce-status-info\) 72%,\s*transparent\)/,
+      /\.square\s*{[\s\S]*?border-color:\s*var\(--ce-tool-card-border\);[\s\S]*?border-width:\s*var\(--ce-border-control-width\);[\s\S]*?background:\s*var\(--ce-surface-alt\);[\s\S]*?box-shadow:\s*var\(--ce-tool-card-shadow\);/,
     );
-    expect(scss).toMatch(/&:hover\s*{[\s\S]*?transform:\s*translateY\(-3px\);/);
+    expect(scss).toMatch(
+      /&:hover\s*{[\s\S]*?transform:\s*translateY\(-3px\);[\s\S]*?background:\s*var\(--ce-tool-card-hover-bg\);[\s\S]*?box-shadow:\s*var\(--ce-tool-card-shadow-hover\);/,
+    );
   });
 });

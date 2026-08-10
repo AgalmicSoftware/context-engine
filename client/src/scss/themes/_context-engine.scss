@@ -51,6 +51,18 @@ $theme: (
   card-bg: rgba(255, 255, 255, 0.06),
   card-border: rgba(255, 255, 255, 0.14),
   card-shadow: 0 6px 22px rgba(0, 0, 0, 0.25),
+  tool-card-border: color-mix(in srgb, var(--ce-text-inverse) 14%, transparent),
+  tool-card-shadow: (
+    -5px 6px 12px var(--ce-surface-sunken),
+    5px -5px 12px color-mix(in srgb, var(--ce-status-info) 72%, transparent),
+    0 18px 34px color-mix(in srgb, var(--ce-compat-dark) 28%, transparent),
+  ),
+  tool-card-hover-bg: var(--ce-status-info),
+  tool-card-shadow-hover: (
+    -7px 8px 16px var(--ce-surface-sunken),
+    7px -7px 16px color-mix(in srgb, var(--ce-status-info) 78%, transparent),
+    0 24px 42px color-mix(in srgb, var(--ce-compat-dark) 34%, transparent),
+  ),
   input-bg: rgba(255, 255, 255, 0.08),
   input-border: rgba(255, 255, 255, 0.16),
   input-border-strong: rgba(255, 255, 255, 0.18),

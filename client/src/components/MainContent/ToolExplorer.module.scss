@@ -87,12 +87,11 @@
 
   .square {
     border-radius: var(--ce-radius-10);
-    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
+    border-color: var(--ce-tool-card-border);
+    border-style: solid;
+    border-width: var(--ce-border-control-width);
     background: var(--ce-surface-alt);
-    box-shadow:
-      -5px 6px 12px var(--ce-surface-sunken),
-      5px -5px 12px color-mix(in srgb, var(--ce-status-info) 72%, transparent),
-      0 18px 34px color-mix(in srgb, var(--ce-compat-dark) 28%, transparent);
+    box-shadow: var(--ce-tool-card-shadow);
     transition:
       transform 0.2s ease,
       box-shadow 0.2s ease,
@@ -100,11 +99,8 @@
 
     &:hover {
       transform: translateY(-3px);
-      background: var(--ce-status-info);
-      box-shadow:
-        -7px 8px 16px var(--ce-surface-sunken),
-        7px -7px 16px color-mix(in srgb, var(--ce-status-info) 78%, transparent),
-        0 24px 42px color-mix(in srgb, var(--ce-compat-dark) 34%, transparent);
+      background: var(--ce-tool-card-hover-bg);
+      box-shadow: var(--ce-tool-card-shadow-hover);
     }
 
     &.disabled {

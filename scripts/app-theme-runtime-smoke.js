@@ -5,6 +5,7 @@ const { chromium } = require('playwright');
 const { normalizeBaseUrl } = require('./vite-navigation-smoke');
 
 const ROUTE_CASES = Object.freeze([
+  { path: '/', label: 'home Tools cards', requiresStandardToolCards: true },
   {
     path: '/',
     label: 'home welcome and login surfaces',
@@ -60,6 +61,44 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   });
   await page.waitForSelector('#root', { state: 'attached', timeout: 15000 });
   await page.waitForFunction(() => document.querySelector('#root')?.children.length > 0, null, { timeout: 15000 });
+
+  const toolCard = routeCase.requiresStandardToolCards ? page.locator('div[class^="_square_"]').first() : null;
+  if (toolCard) await toolCard.waitFor({ state: 'visible' });
+  const classicToolCardState = toolCard
+    ? {
+        resting: await toolCard.evaluate((element) => {
+          const style = window.getComputedStyle(element);
+          return {
+            backgroundColor: style.backgroundColor,
+            borderBottomColor: style.borderBottomColor,
+            borderBottomWidth: style.borderBottomWidth,
+            borderLeftColor: style.borderLeftColor,
+            borderLeftWidth: style.borderLeftWidth,
+            borderRightColor: style.borderRightColor,
+            borderRightWidth: style.borderRightWidth,
+            borderTopColor: style.borderTopColor,
+            borderTopWidth: style.borderTopWidth,
+            boxShadow: style.boxShadow,
+          };
+        }),
+        hovered: null,
+      }
+    : null;
+  if (toolCard && classicToolCardState) {
+    await toolCard.hover();
+    await page.waitForFunction(
+      () =>
+        window.getComputedStyle(document.querySelector('div[class^="_square_"]')).backgroundColor ===
+        'rgb(192, 192, 192)',
+    );
+    classicToolCardState.hovered = await toolCard.evaluate((element) => {
+      const style = window.getComputedStyle(element);
+      return {
+        backgroundColor: style.backgroundColor,
+        boxShadow: style.boxShadow,
+      };
+    });
+  }
 
   if (routeCase.requiresReadableSessionSetup) {
     await page.getByTestId('ce-new-preset-fast_cheap_cloudflare').waitFor({ state: 'visible' });
@@ -496,6 +535,21 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   });
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   const current = await page.evaluate(readThemeState);
+  if (toolCard) {
+    await page.waitForFunction(() => {
+      const style = window.getComputedStyle(document.querySelector('div[class^="_square_"]'));
+      return style.backgroundColor === 'rgb(29, 140, 248)' && style.boxShadow.includes('24px 42px');
+    });
+  }
+  const currentToolCardState = toolCard
+    ? await toolCard.evaluate((element) => {
+        const style = window.getComputedStyle(element);
+        return {
+          backgroundColor: style.backgroundColor,
+          boxShadow: style.boxShadow,
+        };
+      })
+    : null;
   const currentLogoState = routeCase.requiresBrightLogo
     ? await page
         .getByRole('link', { name: 'Context Engine home', exact: true })
@@ -538,6 +592,53 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   );
   if (routeCase.requiresSessionColors) {
     assert.ok(routeState.sessionPreviewAccent, 'Session Wizard preview should expose its scoped accent immediately');
+  }
+  if (classicToolCardState?.hovered && currentToolCardState) {
+    assert.deepEqual(
+      [
+        classicToolCardState.resting.borderTopWidth,
+        classicToolCardState.resting.borderRightWidth,
+        classicToolCardState.resting.borderBottomWidth,
+        classicToolCardState.resting.borderLeftWidth,
+      ],
+      ['2px', '2px', '2px', '2px'],
+      'Classic 95 tool cards should use the theme control-border width',
+    );
+    assert.deepEqual(
+      [
+        classicToolCardState.resting.borderTopColor,
+        classicToolCardState.resting.borderRightColor,
+        classicToolCardState.resting.borderBottomColor,
+        classicToolCardState.resting.borderLeftColor,
+      ],
+      ['rgb(255, 255, 255)', 'rgb(64, 64, 64)', 'rgb(64, 64, 64)', 'rgb(255, 255, 255)'],
+      'Classic 95 tool cards should use a standard raised bevel',
+    );
+    assert.match(
+      classicToolCardState.resting.boxShadow,
+      /1px 1px 0px/,
+      'Classic 95 tool cards should use a compact raised shadow',
+    );
+    assert.equal(
+      classicToolCardState.hovered.backgroundColor,
+      'rgb(192, 192, 192)',
+      'Classic 95 tool-card hover should remain on the standard control face',
+    );
+    assert.match(
+      classicToolCardState.hovered.boxShadow,
+      /1px 1px 0px/,
+      'Classic 95 tool-card hover should not add a colored halo',
+    );
+    assert.equal(
+      currentToolCardState.backgroundColor,
+      'rgb(29, 140, 248)',
+      'Context Engine tool-card hover should preserve the existing information-blue surface',
+    );
+    assert.match(
+      currentToolCardState.boxShadow,
+      /24px 42px/,
+      'Context Engine tool-card hover should preserve its existing layered depth',
+    );
   }
   if (sessionSetupContrastState) {
     assert.equal(
