@@ -29,6 +29,9 @@ export type DraftState = UnknownRecord &
     sessionInfo?: string;
     sessionHeader?: string;
     sessionHeaderImg?: string;
+    appearance?: {
+      colorSchemeId?: string;
+    };
     slug?: string;
     corsWorkerUrl?: string;
     networkChainId?: string | number;

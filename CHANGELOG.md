@@ -6,6 +6,14 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Added a named runtime SCSS app-theme contract with user/deployment precedence,
+  pre-paint initialization, an opt-in Settings selector, and a bundled
+  `classic-95` proof theme. Session metadata cannot select an app theme.
+- Added **Session colors** to the Session Wizard with the curated
+  `context-engine`, `ocean`, and `amber` schemes, immediate preview, exact
+  `appearance.colorSchemeId` persistence across Worker/Arweave paths, scoped
+  active-session accents, accessibility contrast checks, and fixed-light
+  standalone exports.
 - Replaced the `/contracts` utility reference with a user-facing `/docs` page
   containing a quickstart, session-options guide, and FAQ. The page retains
   session-aware smart-contract source and AI prompt references, shows the

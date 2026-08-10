@@ -1,5 +1,6 @@
 import { normalizeWorkerSessionSlug } from './sessionSlugResolution.js';
 import { trimIfString } from './stringCoercion.js';
+import { normalizeWorkerSessionAppearance } from '../shared/sessionColorSchemeConfig.mjs';
 
 const toStr = (value) => (typeof value === 'string' ? value : value == null ? '' : String(value));
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -78,6 +79,12 @@ export const normalizeWorkerConfigRecord = (raw, { slug } = {}) => {
   if (hasOwn(normalized, 'rpcUrlsByChainId')) {
     normalized.rpcUrlsByChainId = normalizeWorkerRpcUrlsByChainId(normalized.rpcUrlsByChainId);
   }
+  if (hasOwn(normalized, 'appearance')) {
+    const appearance = normalizeWorkerSessionAppearance(normalized.appearance);
+    if (appearance) normalized.appearance = appearance;
+    else delete normalized.appearance;
+  }
+  delete normalized.theme;
   const embeddedDeployHelperEnabledRaw = hasOwn(normalized, 'embeddedDeployHelperEnabled')
     ? normalized.embeddedDeployHelperEnabled
     : (hasOwn(normalized, 'deployHelperEnabled') ? normalized.deployHelperEnabled : undefined);

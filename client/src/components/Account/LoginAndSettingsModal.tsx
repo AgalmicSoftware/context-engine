@@ -57,9 +57,14 @@ import LoginTooltipsToggleControl from './LoginTooltipsToggleControl';
 import LoginPreLoginConfigPanel from './LoginPreLoginConfigPanel';
 import LoginPreLoginSettingsDisplay from './LoginPreLoginSettingsDisplay';
 import LoginDemoSurfaceToggleControl from './LoginDemoSurfaceToggleControl';
+import AppThemeSelector from './AppThemeSelector';
 
 // Smart contract interactions and config
-import { DEFAULT_AUTO_REQUEST_TESTNET_FUNDS, DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
+import {
+  CE_THEME_SELECTOR_ENABLED,
+  DEFAULT_AUTO_REQUEST_TESTNET_FUNDS,
+  DEFAULT_CHAIN_ID,
+} from '../../variables/appConfig.js';
 import contractScripts, {
   getAllSessionSlugs,
   getDemoSessionConfigBySlug,
@@ -376,6 +381,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       aiSettingsStatus: '',
       aiSettingsOpen: false,
       aiSettingsSectionsOpen: {
+        appTheme: true,
         aiConfig: true,
         aiPerTask: false,
         aiAdvanced: false,
@@ -2258,6 +2264,14 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
             networkTooltipId: 'networkInfoTooltipPanel',
             extraContent: (
               <>
+                {CE_THEME_SELECTOR_ENABLED
+                  ? renderSection({
+                      key: 'appTheme',
+                      title: 'Appearance',
+                      summary: 'Bundled app theme',
+                      children: <AppThemeSelector />,
+                    })
+                  : null}
                 {renderSection({
                   key: 'session',
                   title: 'Session',

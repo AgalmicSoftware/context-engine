@@ -14,7 +14,11 @@
 /* Top header/branding area */
 .brandingSection {
   /* Lighter violet background so logo is visible */
-  background-color: transparent;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ce-session-chrome) 32%, transparent),
+    transparent 72%
+  );
   border: 0px solid #bfa0f4;
   border-radius: var(--ce-radius-8);
   // padding: 20px;
@@ -88,7 +92,10 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  color: #f8fafc;
+  border-bottom: 2px solid var(--ce-session-accent);
+  color: var(--ce-session-chrome-contrast);
+  padding: 12px;
+  background: var(--ce-session-chrome);
 }
 
 .telegramHeaderText {
@@ -101,11 +108,11 @@
   margin: 0;
   font-size: 1.7rem;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--ce-session-chrome-contrast);
 }
 
 .telegramHeaderSubtitle {
-  color: rgba(255, 255, 255, 0.72);
+  color: color-mix(in srgb, var(--ce-session-chrome-contrast) 78%, transparent);
   margin: 0;
   max-width: 720px;
 }
@@ -155,8 +162,21 @@
 }
 
 .telegramPrimaryButton {
-  background: #2563eb;
-  border-color: #2563eb;
+  background: var(--ce-session-accent);
+  border-color: var(--ce-session-accent);
+  color: var(--ce-session-accent-contrast);
+
+  &:hover,
+  &:focus-visible {
+    background: var(--ce-session-accent-hover);
+    border-color: var(--ce-session-accent-hover);
+    color: var(--ce-session-accent-contrast);
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--ce-session-focus);
+    outline-offset: 2px;
+  }
 }
 
 .telegramSecondaryButton,
@@ -375,9 +395,9 @@
 }
 
 .workerGroupCardPrimaryButton {
-  border: 1px solid rgba(255, 255, 255, 0.76);
-  background: rgba(255, 255, 255, 0.94);
-  color: #111827;
+  border: 1px solid var(--ce-session-accent);
+  background: var(--ce-session-accent);
+  color: var(--ce-session-accent-contrast);
   cursor: pointer;
   transition:
     background-color 0.18s ease,
@@ -387,10 +407,11 @@
 
   &:hover,
   &:focus-visible {
-    border-color: #4dffa4;
-    background: #ffffff;
-    box-shadow: 0 5px 16px rgba(77, 255, 164, 0.24);
-    outline: none;
+    border-color: var(--ce-session-accent-hover);
+    background: var(--ce-session-accent-hover);
+    box-shadow: 0 5px 16px color-mix(in srgb, var(--ce-session-accent) 28%, transparent);
+    outline: 3px solid var(--ce-session-focus);
+    outline-offset: 2px;
     transform: translateY(-1px);
   }
 
@@ -617,7 +638,7 @@
   align-items: center;
   font-weight: 600;
   /* Keep title muted without dimming tooltip children. */
-  color: rgba(255, 255, 255, 0.45);
+  color: color-mix(in srgb, var(--ce-session-chrome-contrast) 45%, transparent);
   opacity: 0.15;
   margin-bottom: 0px !important;
 }

@@ -275,6 +275,7 @@ test('set-config accepts Worker lifecycle and generic Group defaults', () => {
         defaultGroupTags: 'facilitators,reviewers',
         questionsGenPrompt: 'Prefer concrete tradeoffs.',
         defaultFilterState: { sort: 'recent' },
+        appearance: { colorSchemeId: 'ocean' },
       },
     },
     slug: 'session-a',
@@ -283,6 +284,28 @@ test('set-config accepts Worker lifecycle and generic Group defaults', () => {
   assert.equal(result.ok, true);
   assert.equal(result.config.sessionEndsAt, '2030-01-02T03:04:00Z');
   assert.equal(result.config.defaultGroupTags, 'facilitators,reviewers');
+  assert.deepEqual(result.config.appearance, { colorSchemeId: 'ocean' });
+});
+
+test('set-config rejects unsafe or unregistered session appearance config', () => {
+  for (const appearance of [
+    { colorSchemeId: '../remote.css' },
+    { colorSchemeId: 'classic-95' },
+    { colorSchemeId: 'ocean', stylesheet: 'https://example.invalid/theme.css' },
+    { colorSchemeId: { value: 'ocean' } },
+    { '--ce-session-accent': '#ffffff' },
+  ]) {
+    const result = applySessionConfigMutation({
+      existingConfig: cloneJson(profileBearingConfig),
+      mutation: { kind: 'set-config', incomingConfig: { appearance } },
+      slug: 'session-a',
+    });
+    assert.deepEqual(result, {
+      ok: false,
+      status: 400,
+      error: 'Invalid session appearance config.',
+    });
+  }
 });
 
 test('set-config rejects chain-only and SBT-only fields for pure Worker sessions', () => {

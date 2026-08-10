@@ -428,12 +428,24 @@ const useSessionWizardWorkerDeploy = ({
           resolveWorkerFaucetConfig: () => payload.faucet,
         });
         [
-          'sessionId', 'sessionName', 'sessionInfo', 'sessionHeaderImg',
-          'sessionEndsAt', 'defaultTags', 'defaultGroupTags',
-          'questionsGenPrompt', 'defaultFilterState',
-          'defaultSbtTags', 'defaultFeaturedSBTs', 'autoFeatureSBTsBySessionSlug',
-          'sessionModeProfile', 'workerAuthority', 'groupCreationPolicy',
-          'ai', 'contracts',
+          'sessionId',
+          'sessionName',
+          'sessionInfo',
+          'appearance',
+          'sessionHeaderImg',
+          'sessionEndsAt',
+          'defaultTags',
+          'defaultGroupTags',
+          'questionsGenPrompt',
+          'defaultFilterState',
+          'defaultSbtTags',
+          'defaultFeaturedSBTs',
+          'autoFeatureSBTsBySessionSlug',
+          'sessionModeProfile',
+          'workerAuthority',
+          'groupCreationPolicy',
+          'ai',
+          'contracts',
         ].forEach((key) => {
           if (canonicalSeedConfig[key] !== undefined) payload[key] = canonicalSeedConfig[key];
         });

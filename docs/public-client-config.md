@@ -12,6 +12,22 @@ stays centralized in `client/src/variables/publicDeploymentConfig.ts`.
 - Runtime reader/re-export surface: `client/src/variables/appConfig.ts`
 - Shared env parsing helpers: `client/src/variables/publicEnv.ts`
 
+## Deployment Theme
+
+`REACT_APP_CE_DEFAULT_THEME` selects a bundled theme for a custom frontend.
+Supported values currently come from `client/src/scss/themes/registry.json`:
+`context-engine` (default) and `classic-95`. Unknown values fall back to
+`context-engine`; this setting cannot load a URL, remote stylesheet, or custom
+CSS. It is embedded into the document for the pre-paint bootstrap, so changing
+it requires a rebuild/redeploy.
+
+`REACT_APP_CE_THEME_SELECTOR_ENABLED` defaults to `false`. Setting it to
+`true` exposes the bundled app-theme selector in Settings; the selected ID is
+stored locally and restored before first paint. Enable the control only after
+the deployment's route/accessibility matrix passes. Session color schemes are
+a separate `appearance.colorSchemeId` metadata contract and never select an
+app theme.
+
 ## Session Wrapped Capability Record
 
 Agent Session Wrapped discovery is session-scoped public config, not a

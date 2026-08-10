@@ -344,6 +344,9 @@ Enter the core session metadata:
 
 - `sessionName`
 - `sessionInfo`
+- **Session colors** → **Color scheme**. Choose `Context Engine`, `Ocean`, or
+  `Amber`; the compact preview updates immediately. This controls only
+  documented session accents/chrome and does not change the app theme.
 - slug
   Use lowercase letters, numbers, `_`, or `-`. The reserved aliases `general`, `debate`, and `rxc` are not allowed for new sessions.
 - session ID
@@ -361,11 +364,14 @@ What gets stored where:
 
 - For `worker_canonical`, the session worker stores the sanitized canonical
   identity, text metadata, AI model choices, authority policy, and storage
-  profile in Worker KV. Publish verifies a read-after-write of that config
-  before showing the session URL.
+  profile in Worker KV. This includes exactly one public
+  `appearance.colorSchemeId`, never palette values. Publish verifies a
+  read-after-write of that config before showing the session URL.
 - Decentralized and explicit Arweave-backed profiles keep storing the
   human-readable session config on Arweave: name, description, AI defaults,
-  block limits, contract pointers, featured lists, and any Lit-encrypted fields.
+  block limits, contract pointers, featured lists, the same
+  `appearance.colorSchemeId`, and any Lit-encrypted fields. The EVM registry
+  stores only the metadata pointer; it does not duplicate the scheme ID.
 - The Fast & Cheap preset combines `storageProfile.backend = "cloudflare"`
   with `worker_envelope` encryption and Worker-role/agent-grant access.
   Advanced Cloudflare profiles can add an explicit `sbt_onchain` access
@@ -394,6 +400,9 @@ Important:
   discovery even when the original share URL has been normalized.
 - Chainless worker-canonical profiles do not request testnet faucet funds.
 - The wizard strips secrets and worker-only runtime config out of the Arweave payload before upload.
+- Draft recovery keeps only the stable color-scheme ID. Sponsored setup changes
+  Worker resources without resetting the selected scheme. Missing or invalid
+  IDs use `context-engine`; viewing an older session does not rewrite it.
 
 ### 2. Privacy and access control
 
@@ -606,12 +615,12 @@ propagates no later than that shorter remaining lifetime.
 
 What gets stored where:
 
-| Store | Contents |
-| --- | --- |
-| Worker KV `session:{slug}:config` | canonical worker session identity/content plus public authority, storage, CORS, and limits config; no credentials |
-| Worker KV `session:{slug}:secrets` | OpenAI/Anthropic/OpenRouter keys, Arweave JWK, faucet private key, and other runtime secrets |
-| Arweave metadata | decentralized/Arweave profiles only; no worker secrets |
-| `SessionRegistry` | decentralized/registry profiles only; skipped by `worker_canonical` |
+| Store                              | Contents                                                                                                          |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Worker KV `session:{slug}:config`  | canonical worker session identity/content plus public authority, storage, CORS, limits, and `appearance.colorSchemeId`; no credentials |
+| Worker KV `session:{slug}:secrets` | OpenAI/Anthropic/OpenRouter keys, Arweave JWK, faucet private key, and other runtime secrets                      |
+| Arweave metadata                   | decentralized/Arweave profiles only; includes `appearance.colorSchemeId`, never palettes or worker secrets         |
+| `SessionRegistry`                  | decentralized/registry profiles only; skipped by `worker_canonical`                                               |
 
 ### 4. Registration and publish
 

@@ -1,126 +1,14 @@
 /* @file contextEngine.scss */
-@use '../../scss/variables' as tokens;
+@use '../../scss/themes' as themes;
+@use '../../scss/session-color-schemes/schemes';
 
 #root {
   padding-right: 2%;
   padding-left: 2%;
 }
 
-/* Base baseline styles (subset) */
-:root {
-  --blue: #5e72e4;
-  --indigo: #5603ad;
-  --purple: #8965e0;
-  --pink: #f3a4b5;
-  --red: #f5365c;
-  --orange: #fb6340;
-  --yellow: #ffd600;
-  --green: #2dce89;
-  --teal: #11cdef;
-  --cyan: #2bffc6;
-  --white: #ffffff;
-  --gray: #6c757d;
-  --gray-dark: #32325d;
-  --light: #ced4da;
-  --lighter: #e9ecef;
-  --primary: #e14eca;
-  --secondary: #f4f5f7;
-  --success: #00f2c3;
-  --info: #1d8cf8;
-  --warning: #ff8d72;
-  --danger: #fd5d93;
-  --light: #adb5bd;
-  --dark: #212529;
-  --default: #344675;
-  --white: #ffffff;
-  --neutral: #ffffff;
-  --darker: black;
-  --breakpoint-xs: 0;
-  --breakpoint-sm: 576px;
-  --breakpoint-md: 768px;
-  --breakpoint-lg: 992px;
-  --breakpoint-xl: 1200px;
-  --font-family-sans-serif:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif,
-    'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
-  --font-family-monospace: SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-}
-
-:root {
-  /* CE design tokens */
-  --ce-font-body: #{tokens.$ce-font-body};
-  --ce-font-ui: 'Open Sans', sans-serif;
-  --ce-font-mono: #{tokens.$ce-font-mono};
-  --ce-font-button: #{tokens.$ce-font-button};
-
-  --ce-color-white: #ffffff;
-  --ce-color-black: #000000;
-  --ce-color-text: #525f7f;
-  --ce-color-text-muted: #6c757d;
-  --ce-color-bg: #20204e;
-  --ce-color-surface: #1f2251;
-  --ce-color-surface-alt: #272b65;
-  --ce-color-dark: #{tokens.$ce-dark};
-  --ce-color-light: #e9ecef;
-  --ce-color-surface-light: #f8f9fa;
-  --ce-color-border: #333333;
-  --ce-color-border-light: #cccccc;
-  --ce-color-tooltip-bg: rgba(15, 18, 34, 0.95);
-  --ce-color-tooltip-text: #f4f7ff;
-  --ce-color-tooltip-muted: rgba(244, 247, 255, 0.7);
-  --ce-color-tooltip-border: rgba(255, 255, 255, 0.16);
-  --ce-color-panel-bg: #{tokens.$ce-panel-bg};
-  --ce-color-panel-text: #{tokens.$ce-panel-text};
-  --ce-color-panel-text-muted: #{tokens.$ce-muted-text};
-  --ce-color-card-bg: #{tokens.$ce-card-bg};
-  --ce-color-card-border: #{tokens.$ce-card-border};
-  --ce-shadow-card: #{tokens.$ce-card-shadow};
-  --ce-color-input-bg: #{tokens.$ce-input-bg};
-  --ce-color-input-border: #{tokens.$ce-input-border};
-  --ce-color-input-border-strong: #{tokens.$ce-input-border-strong};
-  --ce-color-error: #{tokens.$ce-error};
-
-  --ce-color-primary: #{tokens.$ce-primary};
-  --ce-color-primary-hover: #c221a9;
-  --ce-color-info: #1d8cf8;
-  --ce-color-success: #2dce89;
-  --ce-color-success-bright: #00f2c3;
-  --ce-color-warning: #ff8d72;
-  --ce-color-danger: #fd5d93;
-  --ce-color-orange: #fb6340;
-  --ce-color-indigo: #5e72e4;
-  --ce-color-indigo-hover: #324cdd;
-  --ce-color-blue: #3358f4;
-  --ce-color-yellow: #ffd600;
-  --ce-color-pink: #ff6491;
-  --ce-color-purple: #ba54f5;
-  --ce-color-cyan: #0098f0;
-  --ce-color-accent: #{tokens.$ce-clickable};
-  --ce-color-accent-hover: #1aff8a;
-  --ce-color-info-soft: #89cff0;
-
-  --ce-color-success-soft: #d4edda;
-  --ce-color-success-soft-hover: #c3e6cb;
-  --ce-color-warning-soft: #fff3cd;
-  --ce-color-warning-soft-hover: #ffeeba;
-
-  --ce-radius-0: 0px;
-  --ce-radius-2: 2px;
-  --ce-radius-3: 3px;
-  --ce-radius-4: #{tokens.$ce-radius-sm};
-  --ce-radius-5: 5px;
-  --ce-radius-6: 6px;
-  --ce-radius-7: 7px;
-  --ce-radius-8: #{tokens.$ce-radius-md};
-  --ce-radius-10: 10px;
-  --ce-radius-12: #{tokens.$ce-radius-lg};
-  --ce-radius-14: 14px;
-  --ce-radius-15: 15px;
-  --ce-radius-16: 16px;
-  --ce-radius-20: 20px;
-  --ce-radius-pill: 999px;
-  --ce-radius-round: 50%;
-}
+/* Named runtime themes and compatibility aliases. */
+@include themes.emit-all-themes();
 
 *,
 *::before,

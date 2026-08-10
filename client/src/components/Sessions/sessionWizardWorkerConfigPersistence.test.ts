@@ -9,16 +9,8 @@ const WORKER_ORIGIN = 'https://session-worker.example.test';
 
 const baseConfig = () => ({
   sessionName: 'Worker Canonical Session',
-  sessionModeProfile: {
-    profileVersion: 1,
-    preset: 'fast_cheap_cloudflare',
-    authority: { mode: 'worker_canonical' },
-    evm: { registryChainId: null },
-    storage: { backend: 'cloudflare' },
-    identity: { default: 'passkey', enabled: ['passkey'] },
-    authorization: { mechanisms: ['worker_roles'] },
-    encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
-  },
+  appearance: { colorSchemeId: 'amber' },
+  sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
   storageProfile: { backend: 'cloudflare' },
   ai: { models: { fast: { provider: 'openai', model: 'gpt-test' } } },
 });
@@ -117,6 +109,7 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
       configRevision: 'revision-1',
       publicConfig: verifiedConfig('revision-1'),
     });
+    expect(result.publicConfig.appearance).toEqual({ colorSchemeId: 'amber' });
   });
 
   it('emits the same deterministic revision from two independent persistence invocations', async () => {
@@ -184,6 +177,7 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
       }),
     );
     expect(config.ai.models.transcription).not.toHaveProperty('rpcUrl');
+    expect(config.appearance).toEqual({ colorSchemeId: 'context-engine' });
 
     await expect(
       persistAndVerifySessionWizardWorkerConfig({

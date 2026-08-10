@@ -124,6 +124,10 @@ What users can do:
 - Open session-scoped question views via `/session/<slug-or-id>/questions` and `/session/<slug-or-id>/questions/results`.
 - Open the session doc library via `/session/<slug-or-id>/docs`.
 - Create a new session via the Session Wizard (`/session/new` or `/new`), including grant-backed sponsored-bundle entry links.
+- Choose a curated **Session colors** scheme with an immediate preview. The
+  session stores only `appearance.colorSchemeId` (`context-engine`, `ocean`, or
+  `amber`); it cannot select an app theme or provide colors, token maps,
+  stylesheets, or CSS.
 
 What the system does:
 - Stores session gates and key operational pointers on-chain in `SessionRegistry` (authoritative for access).

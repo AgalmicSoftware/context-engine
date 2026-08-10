@@ -18,6 +18,7 @@ import FeaturedSbtField, { type FeaturedSbtFieldProps } from './FeaturedSbtField
 import CollapsibleFieldGroup from './CollapsibleFieldGroup';
 import SessionWizardContractsField from './SessionWizardContractsField';
 import SessionWizardStorageProfileMetadataField from './SessionWizardStorageProfileMetadataField';
+import SessionColorSchemeField from './SessionColorSchemeField';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { seedGenPrompt } from '../../prompts/seedGenPrompt.js';
 import { t } from '../../utilities/ui/terminology.js';
@@ -481,6 +482,17 @@ export const buildSessionWizardDraftFieldRenderer = ({
               return next;
             });
           }}
+        />
+      );
+    }
+
+    if (path.length === 0 && key === 'appearance') {
+      const appearanceValue = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+      return (
+        <SessionColorSchemeField
+          key={keyString}
+          value={appearanceValue}
+          onChange={(nextAppearance) => updateDraftValue(['appearance'], nextAppearance)}
         />
       );
     }

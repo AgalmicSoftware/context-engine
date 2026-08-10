@@ -704,6 +704,7 @@ describe('AppShell route render smoke', () => {
     restoreSessionScanGlobals();
     window.history.replaceState({}, '', '/');
     window.sessionStorage.clear();
+    document.documentElement.removeAttribute('data-ce-theme-source');
   });
 
   afterEach(() => {
@@ -954,6 +955,31 @@ describe('AppShell route render smoke', () => {
     expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-question-session-slug', 'demo');
   });
 
+  it('scopes the active session color scheme declaratively and removes it on a non-session route', async () => {
+    document.documentElement.dataset.ceThemeSource = 'deployment';
+    const sessionConfig = buildSessionConfig({
+      slug: 'ocean-session',
+      sessionName: 'Ocean Session',
+      appearance: { colorSchemeId: 'ocean' },
+    });
+    const subject = createSubject({
+      path: '/session/ocean-session',
+      activeSessionSlug: 'ocean-session',
+      sessionConfig,
+    });
+    const view = render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
+    expect(view.container.querySelector('[data-ce-session-color-scope="active"]')).toHaveAttribute(
+      'data-ce-session-color-scheme',
+      'ocean',
+    );
+
+    const homeSubject = createSubject({ path: '/about', activeSessionSlug: 'ocean-session', sessionConfig });
+    view.rerender(homeSubject.render());
+    expect(view.container.querySelector('[data-ce-session-color-scope="active"]')).toBeNull();
+  });
+
   it('fresh-loads an explicit worker-canonical session without registry fallback', async () => {
     const workerOrigin = 'https://worker-session.example.com';
     const workerConfig = {
@@ -1012,7 +1038,7 @@ describe('AppShell route render smoke', () => {
 
     const view = render(subject.render());
 
-    expect(await screen.findByTestId('ce-worker-canonical-bootstrap-status')).toHaveTextContent(
+    expect(screen.getByTestId('ce-worker-canonical-bootstrap-status')).toHaveTextContent(
       'Loading worker session',
     );
     expect(mockNavbar.mock.calls.at(-1)?.[0]?.sessionConfig).toBeNull();

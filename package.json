@@ -25,6 +25,7 @@
     "verify:abi-sync": "forge build && npm run -s abi:check",
     "worker:bundle": "node scripts/worker-bundle.mjs",
     "worker:cloudflare-template": "node scripts/cloudflare-session-template.mjs",
+    "theme:literals:check": "node scripts/check-theme-color-literals.mjs",
     "verify:cloudflare-template": "node scripts/cloudflare-session-template.mjs --check",
     "demo:analysis:generate": "node scripts/generate-demo-analysis-fixture.mjs",
     "demo:sim-answers:reconcile": "node scripts/reconcile-sim-profile-answers.mjs",
@@ -83,8 +84,10 @@
     "ai:mint-test-sbt": "npm run -s ai:node -- scripts/mint-test-sbt.js",
     "ai:mint-test-sbt:dry": "DRY_RUN=1 npm run -s ai:node -- scripts/mint-test-sbt.js",
     "ai:test-nav:smoke": "node scripts/vite-navigation-smoke.js",
+    "ai:test-theme:runtime": "npm run -s ai:node -- scripts/app-theme-runtime-smoke.js",
     "ai:test-nav:smoke:mobile": "PLAYWRIGHT_VIEWPORT=mobile npm run -s ai:test-nav:smoke",
     "ai:test-nav:smoke:firefox": "PLAYWRIGHT_BROWSER=firefox npm run -s ai:test-nav:smoke",
+    "ai:test-session:color-schemes": "npm run -s ai:node -- scripts/session-color-schemes-smoke.js",
     "lint": "cd client && npm run lint",
     "lint:workers": "node scripts/run-workers-lint.js",
     "test:cache-guard": "bash ./scripts/check-managed-cache-localstorage.sh"

@@ -1066,6 +1066,67 @@ $muted-text: tokens.$ce-muted-text;
   gap: 10px;
 }
 
+.sessionColorPreview {
+  overflow: hidden;
+  border: 1px solid var(--ce-session-focus);
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-session-chrome);
+  color: var(--ce-session-chrome-contrast);
+}
+
+.sessionColorPreviewCaption {
+  padding: 8px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--ce-session-chrome-contrast) 28%, transparent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sessionColorPreviewTitle {
+  padding: 10px 12px 4px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.sessionColorPreviewBody {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 12px 12px;
+}
+
+.sessionColorPreviewChip {
+  border: 1px solid var(--ce-session-accent);
+  border-radius: var(--ce-radius-pill);
+  padding: 3px 8px;
+  color: var(--ce-session-chrome-contrast);
+  font-size: 12px;
+}
+
+.sessionColorPreviewText {
+  flex: 1 1 130px;
+  font-size: 12px;
+}
+
+.sessionColorPreviewAction {
+  border-radius: var(--ce-radius-6);
+  background: var(--ce-session-accent);
+  color: var(--ce-session-accent-contrast);
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+@media (forced-colors: active) {
+  .sessionColorPreview,
+  .sessionColorPreviewChip,
+  .sessionColorPreviewAction {
+    forced-color-adjust: auto;
+  }
+}
+
 .subSection {
   border-top: 1px solid $card-border;
   padding-top: 12px;

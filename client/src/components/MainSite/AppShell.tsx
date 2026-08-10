@@ -109,6 +109,7 @@ import {
   startCeRuntimeStats,
   stopCeRuntimeStats,
 } from '../../utilities/ui/uiRuntimeStats.js';
+import SessionColorSchemeScope from './SessionColorSchemeScope';
 
 // withWagmiBridge is a function component (allowed to use hooks from wagmi and RainbowKit).
 // It passes props to this class-component so that this component can use React hooks.
@@ -4180,9 +4181,12 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
   render() {
     const mainViewDisplay = this.getMainView(null);
     const activeRouteSessionConfig = this.getDisplaySessionCfg(this.getSessionSlugFromProps());
+    const effectivePath = this.getEffectiveRoutePath(this.getCurrentPathname());
+    const hasActiveSessionRoute =
+      effectivePath.startsWith('/session/') && this.getSessionTokenFromPath(effectivePath).toLowerCase() !== 'new';
 
     return (
-      <>
+      <SessionColorSchemeScope active={hasActiveSessionRoute} sessionConfig={activeRouteSessionConfig}>
         <OnboardingOverlay />
 
         <Navbar
@@ -4204,7 +4208,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
         {mainViewDisplay}
 
         <Footer toggleLoginModal={this.props.toggleLoginModal} />
-      </>
+      </SessionColorSchemeScope>
     );
   }
 }

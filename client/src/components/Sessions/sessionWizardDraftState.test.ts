@@ -47,6 +47,7 @@ describe('sessionWizardDraftState', () => {
         sessionInfo: '',
         corsWorkerUrl: '',
         defaultSbtTags: expect.any(String),
+        appearance: { colorSchemeId: 'context-engine' },
       }),
     );
     expect(template.ai).toEqual(
@@ -62,6 +63,22 @@ describe('sessionWizardDraftState', () => {
     expect(template.telegramOnly).toBeUndefined();
     expect(template.sessionMode).toBeUndefined();
     expect(template.telegramBridgeEnabled).toBeUndefined();
+  });
+
+  it('preserves a cached color scheme id and normalizes invalid ids without palette values', () => {
+    expect(
+      buildSessionWizardInitialDraftFromCache({
+        cachedWizard: {
+          draft: {
+            appearance: { colorSchemeId: 'amber', stylesheet: 'https://example.invalid/theme.css' },
+          },
+        },
+      }).appearance,
+    ).toEqual({ colorSchemeId: 'amber' });
+
+    expect(
+      normalizeSessionWizardDraftShape({ appearance: { colorSchemeId: '../custom.scss' } }).appearance,
+    ).toEqual({ colorSchemeId: 'context-engine' });
   });
 
   it('normalizes cached legacy Telegram drafts into the profile without rewriting legacy fields', () => {

@@ -17,6 +17,7 @@ jest.mock('./useSponsoredBundleLifecycle', () => ({
 type DraftState = {
   corsWorkerUrl?: string;
   slug?: string;
+  appearance?: { colorSchemeId: string };
 };
 
 type DeployFormState = {
@@ -229,9 +230,16 @@ describe('useSessionWizardSponsoredBundleController', () => {
     });
 
     const updater = setters.setDraft.mock.calls[0][0];
-    expect(updater({ corsWorkerUrl: 'https://old.example', slug: 'demo' })).toEqual({
+    expect(
+      updater({
+        corsWorkerUrl: 'https://old.example',
+        slug: 'demo',
+        appearance: { colorSchemeId: 'amber' },
+      }),
+    ).toEqual({
       corsWorkerUrl: 'https://worker.example',
       slug: 'demo',
+      appearance: { colorSchemeId: 'amber' },
     });
     expect(updater({ corsWorkerUrl: 'https://worker.example', slug: 'demo' })).toEqual({
       corsWorkerUrl: 'https://worker.example',

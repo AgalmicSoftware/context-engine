@@ -60482,6 +60482,17 @@ var executeDeployHelperRequest = async (options = {}) => {
   return safeResult;
 };
 
+// workers/shared/sessionColorSchemeConfig.mjs
+var WORKER_SESSION_COLOR_SCHEME_IDS = Object.freeze(["context-engine", "ocean", "amber"]);
+var ALLOWED_IDS = new Set(WORKER_SESSION_COLOR_SCHEME_IDS);
+var isRecord2 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var normalizeWorkerSessionAppearance = (value) => {
+  if (!isRecord2(value) || Object.keys(value).length !== 1 || !Object.hasOwn(value, "colorSchemeId")) return null;
+  if (typeof value.colorSchemeId !== "string") return null;
+  const colorSchemeId = value.colorSchemeId.trim().toLowerCase();
+  return ALLOWED_IDS.has(colorSchemeId) ? { colorSchemeId } : null;
+};
+
 // workers/sessionCorsWorker/sessionConfigNormalization.js
 var toStr14 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
 var isObj5 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
@@ -60550,6 +60561,12 @@ var normalizeWorkerConfigRecord = (raw, { slug } = {}) => {
   if (hasOwn2(normalized, "rpcUrlsByChainId")) {
     normalized.rpcUrlsByChainId = normalizeWorkerRpcUrlsByChainId(normalized.rpcUrlsByChainId);
   }
+  if (hasOwn2(normalized, "appearance")) {
+    const appearance = normalizeWorkerSessionAppearance(normalized.appearance);
+    if (appearance) normalized.appearance = appearance;
+    else delete normalized.appearance;
+  }
+  delete normalized.theme;
   const embeddedDeployHelperEnabledRaw = hasOwn2(normalized, "embeddedDeployHelperEnabled") ? normalized.embeddedDeployHelperEnabled : hasOwn2(normalized, "deployHelperEnabled") ? normalized.deployHelperEnabled : void 0;
   if (embeddedDeployHelperEnabledRaw !== void 0) {
     const embeddedDeployHelperEnabled = normalizeEmbeddedDeployHelperEnabled2(embeddedDeployHelperEnabledRaw);
@@ -60642,6 +60659,7 @@ var WORKER_CANONICAL_SET_CONFIG_KEYS = /* @__PURE__ */ new Set([
   "configRevision",
   "sessionName",
   "sessionInfo",
+  "appearance",
   "sessionHeaderImg",
   "sessionEndsAt",
   "defaultTags",
@@ -60677,6 +60695,7 @@ var toTrimmedString6 = (value) => typeof value === "string" ? value.trim() : val
 var hasOwn3 = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
 var validGroupCreationPolicy = (config) => !hasOwn3(config, "groupCreationPolicy") || config?.groupCreationPolicy === "admin_only" || config?.groupCreationPolicy === "participants";
 var validAllowOrigins = (config) => !hasOwn3(config, "allowOrigins") || !Array.isArray(config?.allowOrigins) || config.allowOrigins.every((origin) => typeof origin !== "string" || !origin.includes("*"));
+var validAppearanceConfig = (config) => !hasOwn3(config, "appearance") || normalizeWorkerSessionAppearance(config.appearance) !== null;
 var getWorkerAuthorityMode = (config) => toTrimmedString6(
   config?.sessionModeProfile?.authority?.mode
 ).toLowerCase();
@@ -60843,6 +60862,9 @@ var applySessionConfigMutation = ({ existingConfig, mutation, slug } = {}) => {
     if (!validGroupCreationPolicy(incomingConfig)) {
       return { ok: false, status: 400, error: "Invalid group creation policy." };
     }
+    if (!validAppearanceConfig(incomingConfig)) {
+      return { ok: false, status: 400, error: "Invalid session appearance config." };
+    }
     const incomingModeValidation = validateWorkerConfigModeValues(incomingConfig, {
       allowPartialProfileStorage: true
     });
@@ -60883,6 +60905,9 @@ var applySessionConfigMutation = ({ existingConfig, mutation, slug } = {}) => {
   }
   if (!validGroupCreationPolicy(mergedConfig)) {
     return { ok: false, status: 400, error: "Invalid group creation policy." };
+  }
+  if (!validAppearanceConfig(mergedConfig)) {
+    return { ok: false, status: 400, error: "Invalid session appearance config." };
   }
   const mergedModeValidation = validateWorkerConfigModeValues(mergedConfig);
   if (!mergedModeValidation.ok) {

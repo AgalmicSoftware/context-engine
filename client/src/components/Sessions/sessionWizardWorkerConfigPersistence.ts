@@ -68,6 +68,7 @@ const PUBLIC_WORKER_CONFIG_FIELDS = Object.freeze([
   'configRevision',
   'sessionName',
   'sessionInfo',
+  'appearance',
   'sessionHeaderImg',
   'sessionEndsAt',
   'defaultTags',

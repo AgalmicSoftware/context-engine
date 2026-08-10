@@ -46,6 +46,7 @@ const TOP_LEVEL_FIELD_ORDER = [
   'slug',
   'sessionName',
   'sessionInfo',
+  'appearance',
   'sessionModeProfile',
   'sessionHeader',
   'sessionEndsAt',
@@ -90,6 +91,7 @@ const FIELD_TOOLTIPS: Record<string, string> = {
   sessionHeader: 'The banner image for this session. Use an image URL; Arweave-backed sessions can also upload a file.',
   sessionEndsAt:
     'Optional end time for this Cloudflare session. After this timestamp, participant writes stop while existing groups and results remain readable.',
+  appearance: 'Choose one bundled color scheme for this session\'s documented accents and chrome.',
   storageProfile: 'Advanced: choose the session-owned storage profile for documents, context, and media payloads.',
   defaultTags:
     'Suggested tags for AI-assisted question tagging. They guide the model, but they do not limit which questions or surveys appear.',
@@ -125,6 +127,7 @@ const FIELD_LABELS: Record<string, string> = {
   corsWorkerUrl: 'Worker URL',
   sessionHeader: 'Header Image',
   sessionEndsAt: 'Session end time',
+  appearance: 'Session colors',
   storageProfile: 'Session Storage',
   defaultTags: 'Default Tag Suggestions',
   defaultGroupTags: 'Default Group Tags',

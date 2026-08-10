@@ -1,0 +1,71 @@
+// Shared recipes are the only theme layer allowed to target generic controls.
+// Theme definitions themselves contain values only.
+:root[data-ce-theme='classic-95'] {
+  color-scheme: light;
+
+  body {
+    background-color: var(--ce-canvas);
+    color: var(--ce-text);
+  }
+
+  ::selection {
+    background: var(--ce-selection-bg);
+    color: var(--ce-selection-text);
+  }
+
+  button,
+  .btn,
+  [role='button'] {
+    border-color: var(--ce-border-raised);
+    border-radius: var(--ce-radius-4);
+    border-style: solid;
+    border-width: var(--ce-border-control-width);
+    box-shadow: var(--ce-shadow-raised);
+    font-family: var(--ce-font-button);
+  }
+
+  button:active,
+  .btn:active,
+  [role='button']:active {
+    border-color: var(--ce-border-inset);
+    box-shadow: var(--ce-shadow-pressed);
+  }
+
+  input,
+  select,
+  textarea,
+  .form-control,
+  .custom-select {
+    background-color: var(--ce-input-bg);
+    border-color: var(--ce-border-inset);
+    border-radius: var(--ce-radius-0);
+    border-style: solid;
+    border-width: var(--ce-border-control-width);
+    color: var(--ce-text);
+    font-family: var(--ce-font-ui);
+  }
+
+  .card,
+  .modal-content,
+  .dropdown-menu,
+  .popover {
+    background-color: var(--ce-surface-raised);
+    border-color: var(--ce-border-raised);
+    border-radius: var(--ce-radius-0);
+    border-style: solid;
+    border-width: var(--ce-border-control-width);
+    box-shadow: var(--ce-shadow-raised);
+    color: var(--ce-text);
+  }
+
+  .modal-header,
+  .card-header {
+    background: var(--ce-titlebar-bg);
+    color: var(--ce-titlebar-text);
+  }
+
+  :focus-visible {
+    outline: 2px dotted var(--ce-focus-ring);
+    outline-offset: 2px;
+  }
+}

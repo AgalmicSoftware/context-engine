@@ -1,0 +1,15 @@
+{
+  "defaultThemeId": "context-engine",
+  "themes": [
+    {
+      "id": "context-engine",
+      "label": "Context Engine",
+      "colorScheme": "dark"
+    },
+    {
+      "id": "classic-95",
+      "label": "Classic 95",
+      "colorScheme": "light"
+    }
+  ]
+}

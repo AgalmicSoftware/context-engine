@@ -33,12 +33,12 @@
 }
 
 .chipSelected {
-  border-color: rgba(90, 255, 194, 0.75);
-  box-shadow: 0 0 0 1px rgba(90, 255, 194, 0.24);
+  border-color: var(--ce-session-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ce-session-accent) 35%, transparent);
 }
 
 .chipActive {
-  background: rgba(90, 255, 194, 0.12);
+  background: color-mix(in srgb, var(--ce-session-accent) 14%, transparent);
 }
 
 .chipLoaded {
@@ -72,7 +72,7 @@
 }
 
 .chipCheck {
-  color: #5affc2;
+  color: var(--ce-session-accent);
   font-weight: 700;
 }
 

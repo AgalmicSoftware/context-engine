@@ -4,6 +4,7 @@ import {
   findForbiddenWorkerConfigSecretPath,
 } from '../shared/workerSessionConfig.mjs';
 import { validateWorkerConfigModeValues } from '../shared/workerConfigModeValidation.mjs';
+import { normalizeWorkerSessionAppearance } from '../shared/sessionColorSchemeConfig.mjs';
 import {
   mergeWorkerConfigRecords,
   mergeWorkerLimitRecords,
@@ -24,6 +25,7 @@ const WORKER_CANONICAL_SET_CONFIG_KEYS = new Set([
   'configRevision',
   'sessionName',
   'sessionInfo',
+  'appearance',
   'sessionHeaderImg',
   'sessionEndsAt',
   'defaultTags',
@@ -73,6 +75,8 @@ const validAllowOrigins = (config) =>
   !hasOwn(config, 'allowOrigins') ||
   !Array.isArray(config?.allowOrigins) ||
   config.allowOrigins.every((origin) => typeof origin !== 'string' || !origin.includes('*'));
+const validAppearanceConfig = (config) =>
+  !hasOwn(config, 'appearance') || normalizeWorkerSessionAppearance(config.appearance) !== null;
 
 const getWorkerAuthorityMode = (config) => toTrimmedString(
   config?.sessionModeProfile?.authority?.mode,
@@ -262,6 +266,9 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
     if (!validGroupCreationPolicy(incomingConfig)) {
       return { ok: false, status: 400, error: 'Invalid group creation policy.' };
     }
+    if (!validAppearanceConfig(incomingConfig)) {
+      return { ok: false, status: 400, error: 'Invalid session appearance config.' };
+    }
     // A patch may update the profile without resending the already-persisted
     // canonical storage object. The complete merged record below remains
     // strict and is the only record eligible for persistence.
@@ -315,6 +322,9 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
   }
   if (!validGroupCreationPolicy(mergedConfig)) {
     return { ok: false, status: 400, error: 'Invalid group creation policy.' };
+  }
+  if (!validAppearanceConfig(mergedConfig)) {
+    return { ok: false, status: 400, error: 'Invalid session appearance config.' };
   }
   const mergedModeValidation = validateWorkerConfigModeValues(mergedConfig);
   if (!mergedModeValidation.ok) {

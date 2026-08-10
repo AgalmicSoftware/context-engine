@@ -1,13 +1,88 @@
 # Design System
 
-This file documents the shared styling tokens used by component SCSS in `client/src/components/`.
+This file documents the named runtime theme contract used by component SCSS,
+global compatibility styles, and browser-rendered visualizations.
 
 ## Sources Of Truth
 
-- Runtime CSS custom properties live in `client/src/assets/css/contextEngine.scss`.
-- Shared Sass literals live in `client/src/scss/_variables.scss`.
-- Prefer `var(--ce-*)` in component styles when a runtime token already exists.
-- Import `@use "scss/variables" as tokens;` when Sass color math or shared compile-time literals are needed.
+- The exact required-token contract lives in `client/src/scss/themes/_contract.scss`.
+- Named values live in `client/src/scss/themes/_context-engine.scss` and
+  `client/src/scss/themes/_classic-95.scss`.
+- Theme metadata and the closed runtime allowlist live in
+  `client/src/scss/themes/registry.json`.
+- Shared theme-aware control recipes live in `client/src/scss/themes/_recipes.scss`.
+- `client/src/assets/css/contextEngine.scss` emits the theme package and keeps
+  legacy `--ce-color-*` aliases during migration.
+- `client/src/scss/_variables.scss` remains for structural/build-time Sass
+  values. Do not add theme-dependent component values there.
+
+## Runtime Resolution
+
+The document root carries `data-ce-theme` and `data-ce-theme-source`. Resolution
+order is:
+
+1. explicit accessibility/user preference (`ce:theme` in local storage);
+2. deployment default `REACT_APP_CE_DEFAULT_THEME`;
+3. built-in `context-engine`.
+
+`client/public/theme-bootstrap.js` applies user/deployment state before the app
+bundle runs. `client/src/utilities/ui/themeRuntime.ts` validates and persists
+only a bundled app-theme ID and emits `ce:theme-change` for SVG, canvas, and
+chart consumers. Session metadata is not an app-theme resolution layer. Those
+consumers must call `readThemeToken()` and subscribe with
+`subscribeThemeChanges()` instead of maintaining a JavaScript palette.
+
+The Settings selector is implemented behind
+`REACT_APP_CE_THEME_SELECTOR_ENABLED=false`. Enable it only after that
+deployment's required route, responsive, and accessibility matrix passes.
+
+## Adding A Bundled Theme
+
+1. Add a values-only SCSS definition beside the existing theme files.
+2. Add one metadata entry to `registry.json`.
+3. Include the definition once in `themes/_index.scss`.
+4. Run the SCSS contract test, client build, route matrix, and contrast checks.
+
+Every definition must supply exactly the keys in `_contract.scss`. Theme files
+must not target component selectors. If several components need new behavior,
+add a semantic token and a shared recipe. Optional textures and icons must be
+local, size-bounded, and appropriately licensed; operating-system assets and
+fonts must not be copied.
+
+`classic-95` follows the owner's personal-site visual grammar—teal canvas,
+gray raised/inset surfaces, navy title bars, square controls, and system-safe
+Tahoma/MS Sans Serif fallbacks—without copying page markup or proprietary
+assets.
+
+## Session Color Schemes
+
+App themes and session color schemes are separate contracts. An app theme may
+change the complete visual grammar. A session color scheme changes only
+documented session accents and chrome and is stored as
+`appearance.colorSchemeId`.
+
+- The closed ID/label registry and fallback helper live in
+  `client/src/utilities/ui/sessionColorSchemes.ts`.
+- The only first-release IDs are `context-engine`, `ocean`, and `amber`.
+- Bundled values live in
+  `client/src/scss/session-color-schemes/_schemes.scss` and define exactly
+  `--ce-session-accent`, `--ce-session-accent-hover`,
+  `--ce-session-accent-contrast`, `--ce-session-chrome`,
+  `--ce-session-chrome-contrast`, and `--ce-session-focus`.
+- `AppShell` applies the ID on a declarative, `display: contents` scope only
+  while a session route is active. Navigation replaces/removes that node
+  attribute; no session scheme is written to `html` or `body`.
+- An explicit user/accessibility app-theme preference suppresses the session
+  scope. The active app theme's default session slots remain in effect.
+- Current consumers are session header/title chrome, session-specific primary
+  actions, and active/selected session chips. Status, risk, gate, validation,
+  destructive-action, and data-series colors do not use these slots.
+- To add a scheme, add one registry entry and one same-ID SCSS selector, then
+  run the registry/SCSS/Worker parity and contrast tests. Do not add palette
+  values to TypeScript or session metadata.
+
+Standalone HTML/PDF result exports remain fixed-light and do not read app or
+session appearance state.
 
 ## Color Palette
 
@@ -85,10 +160,10 @@ Primary button:
 ```scss
 button {
   font-family: var(--ce-font-button);
-  font-weight: 600;
+  font-weight: var(--ce-font-button-weight);
   border-radius: var(--ce-radius-10);
-  background: var(--ce-color-accent);
-  color: #08111f;
+  background: var(--ce-action-accent);
+  color: var(--ce-action-accent-text);
 }
 ```
 
@@ -99,9 +174,9 @@ button {
   font-family: var(--ce-font-button);
   font-weight: 600;
   border-radius: var(--ce-radius-10);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--ce-color-white);
+  border: var(--ce-border-control-width) solid var(--ce-card-border);
+  background: var(--ce-card-bg);
+  color: var(--ce-panel-text);
 }
 ```
 
@@ -110,8 +185,8 @@ Pill action / status chip:
 ```scss
 .chip {
   border-radius: var(--ce-radius-pill);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--ce-color-panel-text);
+  background: var(--ce-card-bg);
+  color: var(--ce-panel-text);
   font-family: var(--ce-font-mono);
 }
 ```
@@ -132,6 +207,12 @@ Use this shared blue CTA family for actual end-of-flow create and submit actions
 
 ## Usage Rules
 
-- Do not introduce new hardcoded copies of the shared accent, panel text, card surface, card border, or card shadow values.
+- Do not introduce new hardcoded theme-semantic colors. Run
+  `npm run theme:literals:check`; its per-file baseline can only stay level or
+  move down. App-theme definitions and the session-color-scheme SCSS owner are
+  excluded because they are the approved raw value sources.
 - Do not replace one-off contextual colors unless they recur and map cleanly to an existing token.
-- Do not create JSX inline style tokens here; keep this system scoped to SCSS.
+- Keep fixed QR, export, chain/network, and categorical data colors only when
+  their semantics require stability, and document the reason near the value.
+- JSX/SVG/canvas/chart presentation colors use the runtime adapter. Do not add
+  a second TypeScript palette.

@@ -5,11 +5,14 @@ import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv, transformWithEsbuild } from 'vite';
 import { createBundleReportPlugin } from './scripts/bundle-report.mjs';
 import { writePostSocialPreviewHtml } from './scripts/post-social-preview.mjs';
+import { normalizeThemeIdForHtml } from './scripts/theme-registry-core.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const srcDir = path.resolve(__dirname, 'src');
 const publicDir = path.resolve(__dirname, 'public');
 const postsDir = path.resolve(__dirname, '..', 'posts');
+const themeRegistry = JSON.parse(fs.readFileSync(path.resolve(srcDir, 'scss', 'themes', 'registry.json'), 'utf8'));
+const themeIds = Object.freeze(themeRegistry.themes.map(({ id }) => String(id)));
 const headers = {
   'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
   'Cross-Origin-Embedder-Policy': 'unsafe-none',
@@ -19,6 +22,10 @@ const normalizePublicUrlForHtml = (raw) => {
   const value = String(raw || '').trim();
   if (!value || value === '/') return '';
   return value.replace(/\/+$/, '');
+};
+
+export const normalizeDeploymentThemeForHtml = (raw) => {
+  return normalizeThemeIdForHtml(raw, themeRegistry);
 };
 
 const normalizeBase = (raw) => {
@@ -522,7 +529,10 @@ export default defineConfig(({ mode }) => {
       {
         name: 'ce-public-url-html-compatibility',
         transformIndexHtml(html) {
-          return html.replace(/__PUBLIC_URL__/g, normalizePublicUrlForHtml(clientEnv.PUBLIC_URL));
+          return html
+            .replace(/__PUBLIC_URL__/g, normalizePublicUrlForHtml(clientEnv.PUBLIC_URL))
+            .replace(/__CE_DEFAULT_THEME__/g, normalizeDeploymentThemeForHtml(clientEnv.REACT_APP_CE_DEFAULT_THEME))
+            .replace(/__CE_THEME_IDS__/g, themeIds.join(' '));
         },
       },
     ],
