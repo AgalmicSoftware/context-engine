@@ -1,21 +1,25 @@
 import {
-  createAiProviderProxiesWithWorkerDeps as createAiProviderProxiesWithWorkerDepsBoundary,
-} from './aiProviderExecutionBinding.js';
+  proxyAnthropic as proxyAnthropicBoundary,
+  proxyCustomRPC as proxyCustomRPCBoundary,
+  proxyOpenAI as proxyOpenAIBoundary,
+  proxyOpenRouter as proxyOpenRouterBoundary,
+} from './aiProviderExecution.js';
 import {
-  createArweaveUploadWithWorkerDeps as createArweaveUploadWithWorkerDepsBoundary,
-} from './arweaveUploadExecutionBinding.js';
+  arweaveUpload as arweaveUploadBoundary,
+} from './arweaveUploadExecution.js';
 import {
-  createFaucetWithWorkerDeps as createFaucetWithWorkerDepsBoundary,
-} from './faucetExecutionBinding.js';
+  faucet as faucetBoundary,
+} from './faucetExecution.js';
 import {
-  createFetchHelpersWithWorkerDeps as createFetchHelpersWithWorkerDepsBoundary,
-} from './fetchExecutionBinding.js';
+  fetchImage as fetchImageBoundary,
+  fetchUrl as fetchUrlBoundary,
+} from './fetchExecution.js';
 import {
   createVerifyAdminSignatureWithWorkerDeps as createVerifyAdminSignatureWithWorkerDepsBoundary,
 } from './adminSignatureVerificationBinding.js';
 import {
-  createTranscribeWithWorkerDeps as createTranscribeWithWorkerDepsBoundary,
-} from './transcribeExecutionBinding.js';
+  transcribe as transcribeBoundary,
+} from './transcribeExecution.js';
 import {
   storageRoute as storageRouteBoundary,
 } from './storageRouteExecution.js';
@@ -27,23 +31,36 @@ export const createWorkerExecutionServicesWithWorkerDeps = ({
 } = {}) => {
   const workerLog = typeof deps?.log === 'function' ? deps.log : () => {};
 
-  const aiProxies = (
-    deps?.createAiProviderProxiesWithWorkerDeps || createAiProviderProxiesWithWorkerDepsBoundary
-  )({
-    deps: {
-      json: deps?.json,
-      safeFetch: deps?.safeFetch,
-      isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
-    },
-  });
+  const aiDeps = {
+    fetch: deps?.fetch,
+    json: deps?.json,
+    safeFetch: deps?.safeFetch,
+    isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
+  };
+  const aiProxies = {
+    proxyAnthropic: async (value = {}) => proxyAnthropicBoundary({
+      ...value,
+      deps: aiDeps,
+    }),
+    proxyOpenAI: async (value = {}) => proxyOpenAIBoundary({
+      ...value,
+      deps: aiDeps,
+    }),
+    proxyOpenRouter: async (value = {}) => proxyOpenRouterBoundary({
+      ...value,
+      deps: aiDeps,
+    }),
+    proxyCustomRPC: async (value = {}) => proxyCustomRPCBoundary({
+      ...value,
+      deps: aiDeps,
+    }),
+  };
 
-  const transcribe = (
-    deps?.createTranscribeWithWorkerDeps || createTranscribeWithWorkerDepsBoundary
-  )({
+  const transcribe = async (value = {}) => transcribeBoundary({
+    ...value,
     deps: {
       json: deps?.json,
       toStr: deps?.toStr,
-      readTranscribeRequestPayload: deps?.readTranscribeRequestPayload,
       isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
       safeFetch: deps?.safeFetch,
     },
@@ -52,14 +69,11 @@ export const createWorkerExecutionServicesWithWorkerDeps = ({
     },
   });
 
-  const faucet = (
-    deps?.createFaucetWithWorkerDeps || createFaucetWithWorkerDepsBoundary
-  )({
+  const faucet = async (value = {}) => faucetBoundary({
+    ...value,
     deps: {
       json: deps?.json,
       log: workerLog,
-      normalizeFaucetRequest: deps?.normalizeFaucetRequest,
-      validateFaucetEligibilityRequest: deps?.validateFaucetEligibilityRequest,
       Wallet: deps?.Wallet,
       rpcRequest: deps?.rpcRequest,
       toStr: deps?.toStr,
@@ -94,28 +108,31 @@ export const createWorkerExecutionServicesWithWorkerDeps = ({
     },
   });
 
-  const fetchHelpers = (
-    deps?.createFetchHelpersWithWorkerDeps || createFetchHelpersWithWorkerDepsBoundary
-  )({
-    deps: {
-      json: deps?.json,
-      normalizeFetchTargetUrl: deps?.normalizeFetchTargetUrl,
-      isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
-      safeFetch: deps?.safeFetch,
-    },
-  });
+  const fetchDeps = {
+    json: deps?.json,
+    isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
+    safeFetch: deps?.safeFetch,
+  };
+  const fetchHelpers = {
+    fetchImage: async (url, baseHeaders) => fetchImageBoundary({
+      url,
+      baseHeaders,
+      deps: fetchDeps,
+    }),
+    fetchUrl: async (url, baseHeaders) => fetchUrlBoundary({
+      url,
+      baseHeaders,
+      deps: fetchDeps,
+    }),
+  };
 
-  const arweaveUpload = (
-    deps?.createArweaveUploadWithWorkerDeps || createArweaveUploadWithWorkerDepsBoundary
-  )({
+  const arweaveUploadExecution = deps?.arweaveUpload || arweaveUploadBoundary;
+  const arweaveUpload = async (value = {}) => arweaveUploadExecution({
+    ...value,
     deps: {
       json: deps?.json,
       log: workerLog,
       toStr: deps?.toStr,
-      readArweaveUploadRequestPayload: deps?.readArweaveUploadRequestPayload,
-      resolveArweaveUploadJwk: deps?.resolveArweaveUploadJwk,
-      normalizeArweaveCeTags: deps?.normalizeArweaveCeTags,
-      normalizeArweaveAssociationTags: deps?.normalizeArweaveAssociationTags,
       rpcRequest: deps?.rpcRequest,
       callContractFunction: deps?.callContractFunction,
       readSessionBySlugOnChain: deps?.readSessionBySlugOnChain,

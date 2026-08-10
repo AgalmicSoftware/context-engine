@@ -67898,38 +67898,6 @@ var proxyCustomRPC = async ({
   return json2({ completion, raw: data }, 200, baseHeaders);
 };
 
-// workers/sessionCorsWorker/aiProviderExecutionBinding.js
-var createAiProviderProxiesWithWorkerDeps = ({
-  deps
-} = {}) => ({
-  proxyAnthropic: async (value = {}) => (deps?.proxyAnthropic || proxyAnthropic)({
-    ...value,
-    deps: {
-      json: deps?.json
-    }
-  }),
-  proxyOpenAI: async (value = {}) => (deps?.proxyOpenAI || proxyOpenAI)({
-    ...value,
-    deps: {
-      json: deps?.json
-    }
-  }),
-  proxyOpenRouter: async (value = {}) => (deps?.proxyOpenRouter || proxyOpenRouter)({
-    ...value,
-    deps: {
-      json: deps?.json
-    }
-  }),
-  proxyCustomRPC: async (value = {}) => (deps?.proxyCustomRPC || proxyCustomRPC)({
-    ...value,
-    deps: {
-      json: deps?.json,
-      safeFetch: deps?.safeFetch,
-      isBlockedOutboundUrl: deps?.isBlockedOutboundUrl
-    }
-  })
-});
-
 // workers/sessionCorsWorker/arweaveCeTagNormalization.js
 var CE_TAG_PREFIX = "CE-";
 var MAX_CE_TAGS = 32;
@@ -68647,35 +68615,6 @@ var arweaveUpload = async ({
     return json2?.({ error: e?.message || "Arweave upload failed" }, 500, baseHeaders);
   }
 };
-
-// workers/sessionCorsWorker/arweaveUploadExecutionBinding.js
-var createArweaveUploadWithWorkerDeps = ({
-  deps
-} = {}) => (async (value = {}) => (deps?.arweaveUpload || arweaveUpload)({
-  ...value,
-  deps: {
-    json: deps?.json,
-    log: typeof deps?.log === "function" ? deps.log : () => {
-    },
-    toStr: deps?.toStr,
-    readArweaveUploadRequestPayload: deps?.readArweaveUploadRequestPayload,
-    resolveArweaveUploadJwk: deps?.resolveArweaveUploadJwk,
-    normalizeArweaveCeTags: deps?.normalizeArweaveCeTags,
-    normalizeArweaveAssociationTags: deps?.normalizeArweaveAssociationTags,
-    rpcRequest: deps?.rpcRequest,
-    callContractFunction: deps?.callContractFunction,
-    readSessionBySlugOnChain: deps?.readSessionBySlugOnChain,
-    getErc721Interface: deps?.getErc721Interface,
-    getSbtAdminInterface: deps?.getSbtAdminInterface,
-    isAddress: deps?.isAddress,
-    isPositiveBalance: deps?.isPositiveBalance,
-    normalizeSessionIdHex: deps?.normalizeSessionIdHex,
-    resolveRegistryRpcUrls: deps?.resolveRegistryRpcUrls,
-    resolveRpcUrlListForGate: deps?.resolveRpcUrlListForGate,
-    toChainId: deps?.toChainId,
-    toRegistrySessionSlug: deps?.toRegistrySessionSlug
-  }
-}));
 
 // workers/sessionCorsWorker/faucetEligibilityAuthority.js
 var ZERO_BYTES32_FALLBACK3 = `0x${"0".repeat(64)}`;
@@ -69453,53 +69392,6 @@ var faucet = async ({
   );
 };
 
-// workers/sessionCorsWorker/faucetExecutionBinding.js
-var createFaucetWithWorkerDeps = ({
-  deps,
-  constants,
-  defaults
-} = {}) => (async (value = {}) => (deps?.faucet || faucet)({
-  ...value,
-  deps: {
-    json: deps?.json,
-    log: typeof deps?.log === "function" ? deps.log : () => {
-    },
-    normalizeFaucetRequest: deps?.normalizeFaucetRequest,
-    validateFaucetEligibilityRequest: deps?.validateFaucetEligibilityRequest,
-    Wallet: deps?.Wallet,
-    rpcRequest: deps?.rpcRequest,
-    toStr: deps?.toStr,
-    toChainId: deps?.toChainId,
-    toBigInt: deps?.toBigInt,
-    formatEther: deps?.formatEther,
-    maskRpcUrl: deps?.maskRpcUrl,
-    isAddress: deps?.isAddress,
-    parseEther: deps?.parseEther,
-    resolveFaucetRpcUrls: deps?.resolveFaucetRpcUrls,
-    isBytes32Hex: deps?.isBytes32Hex,
-    normalizeAddressLower: deps?.normalizeAddressLower,
-    resolveRegistryRpcUrls: deps?.resolveRegistryRpcUrls,
-    toRegistrySessionSlug: deps?.toRegistrySessionSlug,
-    readSessionExistsOnChain: deps?.readSessionExistsOnChain,
-    readResourceGateOnChain: deps?.readResourceGateOnChain,
-    resolveRpcUrlListForGate: deps?.resolveRpcUrlListForGate,
-    checkSbtGate: deps?.checkSbtGate,
-    findSessionGateForSbt: deps?.findSessionGateForSbt,
-    readSbtFaucetValidationState: deps?.readSbtFaucetValidationState,
-    validateSbtPasswordForFaucet: deps?.validateSbtPasswordForFaucet,
-    verifyGroupSignatureForFaucet: deps?.verifyGroupSignatureForFaucet
-  },
-  constants: {
-    anonymousGateUnavailableError: constants?.anonymousGateUnavailableError,
-    zeroBytes32: constants?.zeroBytes32
-  },
-  defaults: {
-    defaultRpcUrl: defaults?.defaultRpcUrl,
-    defaultAmountEth: defaults?.defaultAmountEth,
-    defaultThresholdEth: defaults?.defaultThresholdEth
-  }
-}));
-
 // workers/sessionCorsWorker/fetchRequestNormalization.js
 var normalizeFetchTargetUrl = ({ url, deps } = {}) => {
   const input = toTrimmedString2(url);
@@ -69640,32 +69532,6 @@ var fetchUrl = async ({
   }
   return json2({ content: stripped, status: "success", contentType: type }, 200, baseHeaders);
 };
-
-// workers/sessionCorsWorker/fetchExecutionBinding.js
-var createFetchHelpersWithWorkerDeps = ({
-  deps
-} = {}) => ({
-  fetchImage: async (url, baseHeaders) => (deps?.fetchImage || fetchImage)({
-    url,
-    baseHeaders,
-    deps: {
-      json: deps?.json,
-      normalizeFetchTargetUrl: deps?.normalizeFetchTargetUrl,
-      isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
-      safeFetch: deps?.safeFetch
-    }
-  }),
-  fetchUrl: async (url, baseHeaders) => (deps?.fetchUrl || fetchUrl)({
-    url,
-    baseHeaders,
-    deps: {
-      json: deps?.json,
-      normalizeFetchTargetUrl: deps?.normalizeFetchTargetUrl,
-      isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
-      safeFetch: deps?.safeFetch
-    }
-  })
-});
 
 // workers/sessionCorsWorker/adminSignatureAuthority.js
 var resolveAdminSignatureAuthority = async ({
@@ -70127,24 +69993,6 @@ var transcribe = async ({
   }
   return json2?.({ text: data?.text || "" }, 200, baseHeaders);
 };
-
-// workers/sessionCorsWorker/transcribeExecutionBinding.js
-var createTranscribeWithWorkerDeps = ({
-  deps,
-  constants
-} = {}) => (async (value = {}) => (deps?.transcribe || transcribe)({
-  ...value,
-  deps: {
-    json: deps?.json,
-    toStr: deps?.toStr,
-    readTranscribeRequestPayload: deps?.readTranscribeRequestPayload,
-    isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
-    safeFetch: deps?.safeFetch
-  },
-  constants: {
-    openAiTranscribeUrl: constants?.openAiTranscribeUrl
-  }
-}));
 
 // workers/sessionCorsWorker/payloadAccessControl.js
 var toStr17 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
@@ -72181,18 +72029,35 @@ var createWorkerExecutionServicesWithWorkerDeps = ({
 } = {}) => {
   const workerLog = typeof deps?.log === "function" ? deps.log : () => {
   };
-  const aiProxies = (deps?.createAiProviderProxiesWithWorkerDeps || createAiProviderProxiesWithWorkerDeps)({
-    deps: {
-      json: deps?.json,
-      safeFetch: deps?.safeFetch,
-      isBlockedOutboundUrl: deps?.isBlockedOutboundUrl
-    }
-  });
-  const transcribe2 = (deps?.createTranscribeWithWorkerDeps || createTranscribeWithWorkerDeps)({
+  const aiDeps = {
+    fetch: deps?.fetch,
+    json: deps?.json,
+    safeFetch: deps?.safeFetch,
+    isBlockedOutboundUrl: deps?.isBlockedOutboundUrl
+  };
+  const aiProxies = {
+    proxyAnthropic: async (value = {}) => proxyAnthropic({
+      ...value,
+      deps: aiDeps
+    }),
+    proxyOpenAI: async (value = {}) => proxyOpenAI({
+      ...value,
+      deps: aiDeps
+    }),
+    proxyOpenRouter: async (value = {}) => proxyOpenRouter({
+      ...value,
+      deps: aiDeps
+    }),
+    proxyCustomRPC: async (value = {}) => proxyCustomRPC({
+      ...value,
+      deps: aiDeps
+    })
+  };
+  const transcribe2 = async (value = {}) => transcribe({
+    ...value,
     deps: {
       json: deps?.json,
       toStr: deps?.toStr,
-      readTranscribeRequestPayload: deps?.readTranscribeRequestPayload,
       isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
       safeFetch: deps?.safeFetch
     },
@@ -72200,12 +72065,11 @@ var createWorkerExecutionServicesWithWorkerDeps = ({
       openAiTranscribeUrl: constants?.openAiTranscribeUrl
     }
   });
-  const faucet2 = (deps?.createFaucetWithWorkerDeps || createFaucetWithWorkerDeps)({
+  const faucet2 = async (value = {}) => faucet({
+    ...value,
     deps: {
       json: deps?.json,
       log: workerLog,
-      normalizeFaucetRequest: deps?.normalizeFaucetRequest,
-      validateFaucetEligibilityRequest: deps?.validateFaucetEligibilityRequest,
       Wallet: deps?.Wallet,
       rpcRequest: deps?.rpcRequest,
       toStr: deps?.toStr,
@@ -72239,23 +72103,30 @@ var createWorkerExecutionServicesWithWorkerDeps = ({
       defaultThresholdEth: defaults?.defaultThresholdEth
     }
   });
-  const fetchHelpers = (deps?.createFetchHelpersWithWorkerDeps || createFetchHelpersWithWorkerDeps)({
-    deps: {
-      json: deps?.json,
-      normalizeFetchTargetUrl: deps?.normalizeFetchTargetUrl,
-      isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
-      safeFetch: deps?.safeFetch
-    }
-  });
-  const arweaveUpload2 = (deps?.createArweaveUploadWithWorkerDeps || createArweaveUploadWithWorkerDeps)({
+  const fetchDeps = {
+    json: deps?.json,
+    isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
+    safeFetch: deps?.safeFetch
+  };
+  const fetchHelpers = {
+    fetchImage: async (url, baseHeaders) => fetchImage({
+      url,
+      baseHeaders,
+      deps: fetchDeps
+    }),
+    fetchUrl: async (url, baseHeaders) => fetchUrl({
+      url,
+      baseHeaders,
+      deps: fetchDeps
+    })
+  };
+  const arweaveUploadExecution = deps?.arweaveUpload || arweaveUpload;
+  const arweaveUpload2 = async (value = {}) => arweaveUploadExecution({
+    ...value,
     deps: {
       json: deps?.json,
       log: workerLog,
       toStr: deps?.toStr,
-      readArweaveUploadRequestPayload: deps?.readArweaveUploadRequestPayload,
-      resolveArweaveUploadJwk: deps?.resolveArweaveUploadJwk,
-      normalizeArweaveCeTags: deps?.normalizeArweaveCeTags,
-      normalizeArweaveAssociationTags: deps?.normalizeArweaveAssociationTags,
       rpcRequest: deps?.rpcRequest,
       callContractFunction: deps?.callContractFunction,
       readSessionBySlugOnChain: deps?.readSessionBySlugOnChain,
@@ -76711,13 +76582,11 @@ var createWorkerRouteRuntimeWithWorkerDeps = ({
   });
   const executionServices = (deps?.createWorkerExecutionServicesWithWorkerDeps || createWorkerExecutionServicesWithWorkerDeps)({
     deps: {
+      fetch: deps?.fetch,
       json: deps?.json,
       safeFetch: deps?.safeFetch,
       isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
       toStr: deps?.toStr,
-      readTranscribeRequestPayload: deps?.readTranscribeRequestPayload,
-      normalizeFaucetRequest: deps?.normalizeFaucetRequest,
-      validateFaucetEligibilityRequest: deps?.validateFaucetEligibilityRequest,
       Wallet: deps?.Wallet,
       rpcRequest: deps?.rpcRequest,
       toChainId: deps?.toChainId,
@@ -76739,11 +76608,6 @@ var createWorkerRouteRuntimeWithWorkerDeps = ({
       readSbtFaucetValidationState: rateLimitFaucetSupport.readSbtFaucetValidationState,
       validateSbtPasswordForFaucet: rateLimitFaucetSupport.validateSbtPasswordForFaucet,
       verifyGroupSignatureForFaucet: deps?.verifyGroupSignatureForFaucet,
-      normalizeFetchTargetUrl: deps?.normalizeFetchTargetUrl,
-      readArweaveUploadRequestPayload: deps?.readArweaveUploadRequestPayload,
-      resolveArweaveUploadJwk: deps?.resolveArweaveUploadJwk,
-      normalizeArweaveCeTags: deps?.normalizeArweaveCeTags,
-      normalizeArweaveAssociationTags: deps?.normalizeArweaveAssociationTags,
       callContractFunction: deps?.callContractFunction,
       readSessionBySlugOnChain: registryLoginBootstrapAdapters.readSessionBySlugOnChain,
       getErc721Interface: deps?.getErc721Interface,
@@ -76922,6 +76786,7 @@ var resolveWorkerRouteRuntimeInput = ({
 } = {}) => ({
   deps: {
     log: deps?.log,
+    fetch: deps?.fetch,
     toStr: deps?.toStr,
     now: deps?.now,
     parseAllowOrigins: deps?.parseAllowOrigins,
@@ -76937,14 +76802,7 @@ var resolveWorkerRouteRuntimeInput = ({
     normalizeRpcUrlList: deps?.normalizeRpcUrlList,
     ...workerLowLevelHelpers || {},
     readTranscribeRequestPayload: deps?.readTranscribeRequestPayload,
-    normalizeFaucetRequest: deps?.normalizeFaucetRequest,
-    validateFaucetEligibilityRequest: deps?.validateFaucetEligibilityRequest,
     Wallet: deps?.ethers?.Wallet,
-    normalizeFetchTargetUrl: deps?.normalizeFetchTargetUrl,
-    readArweaveUploadRequestPayload: deps?.readArweaveUploadRequestPayload,
-    resolveArweaveUploadJwk: deps?.resolveArweaveUploadJwk,
-    normalizeArweaveCeTags: deps?.normalizeArweaveCeTags,
-    normalizeArweaveAssociationTags: deps?.normalizeArweaveAssociationTags,
     normalizeSignedWorkerRequest: deps?.normalizeSignedWorkerRequest,
     resolveWorkerBodySlugContext: deps?.resolveWorkerBodySlugContext,
     validateRecoveredAddressMatchesRequest: deps?.validateRecoveredAddressMatchesRequest,
@@ -78138,13 +77996,6 @@ var resolveWorkerRuntimeDeps = ({
       validateAuthTokenRecord: resolveDep("validateAuthTokenRecord", validateAuthTokenRecord),
       resolveWorkerRequestSlugContext: resolveDep("resolveWorkerRequestSlugContext", resolveWorkerRequestSlugContext),
       readTranscribeRequestPayload: resolveDep("readTranscribeRequestPayload", readTranscribeRequestPayload),
-      normalizeFaucetRequest: resolveDep("normalizeFaucetRequest", normalizeFaucetRequest),
-      validateFaucetEligibilityRequest: resolveDep("validateFaucetEligibilityRequest", validateFaucetEligibilityRequest),
-      normalizeFetchTargetUrl: resolveDep("normalizeFetchTargetUrl", normalizeFetchTargetUrl),
-      readArweaveUploadRequestPayload: resolveDep("readArweaveUploadRequestPayload", readArweaveUploadRequestPayload),
-      resolveArweaveUploadJwk: resolveDep("resolveArweaveUploadJwk", resolveArweaveUploadJwk),
-      normalizeArweaveCeTags: resolveDep("normalizeArweaveCeTags", normalizeArweaveCeTags),
-      normalizeArweaveAssociationTags: resolveDep("normalizeArweaveAssociationTags", normalizeArweaveAssociationTags),
       normalizeSignedWorkerRequest: resolveDep("normalizeSignedWorkerRequest", normalizeSignedWorkerRequest),
       resolveWorkerBodySlugContext: resolveDep("resolveWorkerBodySlugContext", resolveWorkerBodySlugContext),
       validateRecoveredAddressMatchesRequest: resolveDep("validateRecoveredAddressMatchesRequest", validateRecoveredAddressMatchesRequest),

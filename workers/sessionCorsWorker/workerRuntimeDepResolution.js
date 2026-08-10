@@ -28,15 +28,6 @@ import {
   readAuthenticatedActionPayload as readAuthenticatedActionPayloadBoundary,
 } from './authenticatedActionRequestNormalization.js';
 import {
-  normalizeFetchTargetUrl as normalizeFetchTargetUrlBoundary,
-} from './fetchRequestNormalization.js';
-import {
-  validateFaucetEligibilityRequest as validateFaucetEligibilityRequestBoundary,
-} from './faucetEligibilityValidation.js';
-import {
-  normalizeFaucetRequest as normalizeFaucetRequestBoundary,
-} from './faucetRequestNormalization.js';
-import {
   readTranscribeRequestPayload as readTranscribeRequestPayloadBoundary,
 } from './transcribeRequestNormalization.js';
 import {
@@ -103,18 +94,6 @@ import {
   readArweaveBootstrapUploadPayload as readArweaveBootstrapUploadPayloadBoundary,
 } from './arweaveBootstrapNormalization.js';
 import {
-  readArweaveUploadRequestPayload as readArweaveUploadRequestPayloadBoundary,
-} from './arweaveUploadRequestNormalization.js';
-import {
-  resolveArweaveUploadJwk as resolveArweaveUploadJwkBoundary,
-} from './arweaveJwkNormalization.js';
-import {
-  normalizeArweaveAssociationTags as normalizeArweaveAssociationTagsBoundary,
-} from './arweaveAssociationNormalization.js';
-import {
-  normalizeArweaveCeTags as normalizeArweaveCeTagsBoundary,
-} from './arweaveCeTagNormalization.js';
-import {
   mergeRpcUrlLists as mergeRpcUrlListsBoundary,
   normalizeRpcUrlList as normalizeRpcUrlListBoundary,
 } from './rpcUrlListNormalization.js';
@@ -150,13 +129,6 @@ export const resolveWorkerRuntimeDeps = ({
       validateAuthTokenRecord: resolveDep('validateAuthTokenRecord', validateAuthTokenRecordBoundary),
       resolveWorkerRequestSlugContext: resolveDep('resolveWorkerRequestSlugContext', resolveWorkerRequestSlugContextBoundary),
       readTranscribeRequestPayload: resolveDep('readTranscribeRequestPayload', readTranscribeRequestPayloadBoundary),
-      normalizeFaucetRequest: resolveDep('normalizeFaucetRequest', normalizeFaucetRequestBoundary),
-      validateFaucetEligibilityRequest: resolveDep('validateFaucetEligibilityRequest', validateFaucetEligibilityRequestBoundary),
-      normalizeFetchTargetUrl: resolveDep('normalizeFetchTargetUrl', normalizeFetchTargetUrlBoundary),
-      readArweaveUploadRequestPayload: resolveDep('readArweaveUploadRequestPayload', readArweaveUploadRequestPayloadBoundary),
-      resolveArweaveUploadJwk: resolveDep('resolveArweaveUploadJwk', resolveArweaveUploadJwkBoundary),
-      normalizeArweaveCeTags: resolveDep('normalizeArweaveCeTags', normalizeArweaveCeTagsBoundary),
-      normalizeArweaveAssociationTags: resolveDep('normalizeArweaveAssociationTags', normalizeArweaveAssociationTagsBoundary),
       normalizeSignedWorkerRequest: resolveDep('normalizeSignedWorkerRequest', normalizeSignedWorkerRequestBoundary),
       resolveWorkerBodySlugContext: resolveDep('resolveWorkerBodySlugContext', resolveWorkerBodySlugContextBoundary),
       validateRecoveredAddressMatchesRequest: resolveDep('validateRecoveredAddressMatchesRequest', validateRecoveredAddressMatchesRequestBoundary),

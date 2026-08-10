@@ -7,6 +7,7 @@ export const resolveWorkerRouteRuntimeInput = ({
 } = {}) => ({
   deps: {
     log: deps?.log,
+    fetch: deps?.fetch,
     toStr: deps?.toStr,
     now: deps?.now,
     parseAllowOrigins: deps?.parseAllowOrigins,
@@ -22,14 +23,7 @@ export const resolveWorkerRouteRuntimeInput = ({
     normalizeRpcUrlList: deps?.normalizeRpcUrlList,
     ...(workerLowLevelHelpers || {}),
     readTranscribeRequestPayload: deps?.readTranscribeRequestPayload,
-    normalizeFaucetRequest: deps?.normalizeFaucetRequest,
-    validateFaucetEligibilityRequest: deps?.validateFaucetEligibilityRequest,
     Wallet: deps?.ethers?.Wallet,
-    normalizeFetchTargetUrl: deps?.normalizeFetchTargetUrl,
-    readArweaveUploadRequestPayload: deps?.readArweaveUploadRequestPayload,
-    resolveArweaveUploadJwk: deps?.resolveArweaveUploadJwk,
-    normalizeArweaveCeTags: deps?.normalizeArweaveCeTags,
-    normalizeArweaveAssociationTags: deps?.normalizeArweaveAssociationTags,
     normalizeSignedWorkerRequest: deps?.normalizeSignedWorkerRequest,
     resolveWorkerBodySlugContext: deps?.resolveWorkerBodySlugContext,
     validateRecoveredAddressMatchesRequest: deps?.validateRecoveredAddressMatchesRequest,
