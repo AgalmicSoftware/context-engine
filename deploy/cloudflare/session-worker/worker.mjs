@@ -56,10 +56,9 @@ var __privateWrapper = (obj, member, setter, getter) => ({
   }
 });
 
-// client/src/variables/rpcDefaults.js
+// shared/rpcDefaults.cjs
 var require_rpcDefaults = __commonJS({
-  "client/src/variables/rpcDefaults.js"(exports, module) {
-    "use strict";
+  "shared/rpcDefaults.cjs"(exports, module) {
     var toStr21 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
     var normalizeUrl = (value) => toStr21(value).trim();
     var freezeUrlList = (value) => Object.freeze((Array.isArray(value) ? value : [value]).map((entry) => normalizeUrl(entry)).filter(Boolean));

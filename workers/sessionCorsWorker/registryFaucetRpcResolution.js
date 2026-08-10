@@ -1,4 +1,4 @@
-import rpcDefaults from '../../client/src/variables/rpcDefaults.js';
+import rpcDefaults from '../../shared/rpcDefaults.cjs';
 import {
   mergeRpcUrlLists as defaultMergeRpcUrlLists,
   normalizeRpcUrlList as defaultNormalizeRpcUrlList,
