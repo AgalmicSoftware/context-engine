@@ -1,4 +1,10 @@
 import { readInjectedProviderChainId, shouldUseInjectedReadProviderForChain } from './readProviderSelection.js';
+import * as readProviderSelectionModule from './readProviderSelection.js';
+
+it('exports provider selection helpers without a convenience object or default', () => {
+  expect(readProviderSelectionModule).not.toHaveProperty('providerSelectionUtils');
+  expect(readProviderSelectionModule).not.toHaveProperty('default');
+});
 
 describe('readInjectedProviderChainId', () => {
   it('parses hex and decimal injected chain id fields', () => {

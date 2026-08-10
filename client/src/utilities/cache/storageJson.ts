@@ -291,19 +291,3 @@ export const createStorageNamespace = ({
     },
   };
 };
-
-const storageJson: {
-  boundedStringify: typeof boundedStringify;
-  createStorageNamespace: typeof createStorageNamespace;
-  removeKeys: typeof removeKeys;
-  safeJsonRead: typeof safeJsonRead;
-  safeJsonWrite: typeof safeJsonWrite;
-} = {
-  boundedStringify,
-  createStorageNamespace,
-  removeKeys,
-  safeJsonRead,
-  safeJsonWrite,
-};
-
-export default storageJson;

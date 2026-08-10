@@ -121,19 +121,4 @@ export const getGateSbtAddresses: typeof getGateSbtAddressesImpl = (...args) => 
  */
 export const normalizeGateMode: typeof normalizeGateModeImpl = (...args) => normalizeGateModeImpl(...args);
 
-/**
- * Convenience bundle of the sponsored access public helpers.
- */
-export const sponsoredAccessUtils = {
-  getDefaultSponsoredGate,
-  resolveSponsoredGateStateForResource,
-  resolveSponsoredGateForResource,
-  checkSponsoredAccess,
-  readCachedSponsoredAccess,
-  primeSponsoredAccessCheck,
-  getGateSbtAddresses,
-  normalizeGateMode,
-  SPONSORED_GATE_STATES,
-};
-
 export { SPONSORED_GATE_STATES };

@@ -6,6 +6,7 @@ import {
   resolveSponsoredGateForResource,
   resolveSponsoredGateStateForResource,
 } from './sponsoredAccess.js';
+import * as sponsoredAccessModule from './sponsoredAccess.js';
 import contractScripts from './chainGateway.js';
 
 jest.mock('./chainGateway.js', () => ({
@@ -14,6 +15,10 @@ jest.mock('./chainGateway.js', () => ({
     userHasSBT: jest.fn(),
   },
 }));
+
+it('exports sponsored access helpers without an unused convenience object', () => {
+  expect(sponsoredAccessModule).not.toHaveProperty('sponsoredAccessUtils');
+});
 
 const createDeferred = () => {
   let resolve;

@@ -1,4 +1,9 @@
 import { boundedStringify, createStorageNamespace, removeKeys, safeJsonRead, safeJsonWrite } from './storageJson.js';
+import * as storageJsonModule from './storageJson.js';
+
+it('exports storage primitives without a default convenience object', () => {
+  expect(storageJsonModule).not.toHaveProperty('default');
+});
 
 type MemoryStorage = {
   getItem: jest.Mock<string | null, [string]>;
