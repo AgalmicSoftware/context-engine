@@ -27,9 +27,7 @@ import styles from './OnePageSession.module.scss';
 import LazyFallback from '../Shared/LazyFallback';
 
 import {
-  getLegacyEthBalance,
   getNativeBalance,
-  hasLegacyEthBalanceReader,
   hasNativeBalanceReader,
   type SessionBalance,
 } from '../../domains/sessions/sessionBalanceReaders.js';
@@ -1613,8 +1611,7 @@ class OnePageSession extends Component<any, any> {
       if (!address || minBN.isZero()) {
         return true;
       }
-      const readBalance =
-        (hasNativeBalanceReader() && getNativeBalance) || (hasLegacyEthBalanceReader() && getLegacyEthBalance) || null;
+      const readBalance = hasNativeBalanceReader() ? getNativeBalance : null;
       if (!readBalance) {
         return false;
       }

@@ -206,7 +206,7 @@ describe('OnePageSession auto-mint queue', () => {
   const getAutoMintStorageKey = (account, sbtAddress, chainId = 84532) =>
     `autoMint:${String(account || '').toLowerCase()}:${chainId}:${String(sbtAddress || '').toLowerCase()}`;
 
-  it('uses getNativeBalance for auto-mint balance checks when the legacy getETHBalance alias is unavailable', async () => {
+  it('uses getNativeBalance for auto-mint balance checks', async () => {
     const subject = createSubject({
       sessionConfig: {
         ...buildProps().sessionConfig,
@@ -217,17 +217,10 @@ describe('OnePageSession auto-mint queue', () => {
     const nativeBalanceSpy = jest
       .spyOn(contractScripts, 'getNativeBalance')
       .mockResolvedValue(ethers.utils.parseEther('0.1'));
-    const originalLegacyReader = contractScripts.getETHBalance;
+    const ok = await subject.waitForSufficientBalance('mock', account, ethers.utils.parseEther('0.00002'), 50, 1);
 
-    try {
-      delete contractScripts.getETHBalance;
-      const ok = await subject.waitForSufficientBalance('mock', account, ethers.utils.parseEther('0.00002'), 50, 1);
-
-      expect(ok).toBe(true);
-      expect(nativeBalanceSpy).toHaveBeenCalledWith(account, expect.any(String));
-    } finally {
-      contractScripts.getETHBalance = originalLegacyReader;
-    }
+    expect(ok).toBe(true);
+    expect(nativeBalanceSpy).toHaveBeenCalledWith(account, expect.any(String));
   });
 
   it('pins the session slug on auto-mint status links', () => {

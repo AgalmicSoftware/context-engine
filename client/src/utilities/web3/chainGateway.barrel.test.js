@@ -46,6 +46,12 @@ describe('contractScripts compatibility barrel', () => {
     expect(typeof chainGateway.getUserActivity).toBe('function');
   });
 
+  it('exposes only the canonical native balance reader', () => {
+    expect(chainGatewayModule.getNativeBalance).toBe(chainGatewayImpl.getNativeBalance);
+    expect(chainGatewayModule).not.toHaveProperty('getETHBalance');
+    expect(chainGateway).not.toHaveProperty('getETHBalance');
+  });
+
   it('can load through a browser-targeted Vite bundle without CommonJS exports', () => {
     const clientRoot = path.resolve(__dirname, '../../..');
     const tmpDir = fs.mkdtempSync(path.join(clientRoot, '.tmp-contract-scripts-barrel-'));

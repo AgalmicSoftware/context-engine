@@ -1220,8 +1220,6 @@ const contractScripts: any = {
 contractMetadataResolutionHelpers = createChainMetadataResolutionHelpers({
   userHasSBT: (...args: unknown[]) => contractScripts.userHasSBT(...args),
 });
-// Back-compat alias retained for older callers that still use the legacy name.
-(contractScripts as any).getETHBalance = (contractScripts as any).getNativeBalance;
 export const __test__contractScriptsArweaveCache: any = {
   resolveReadContext,
   downloadArweaveTextForGroup,
