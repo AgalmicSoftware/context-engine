@@ -14,7 +14,6 @@ export const BUILD_RECIPE = Object.freeze({
     'npm ci',
     'npm --prefix workers/sessionCorsWorker ci',
     'npm run worker:bundle',
-    'npm run verify:worker-bundle',
   ],
 });
 export const LOCKFILES = Object.freeze([

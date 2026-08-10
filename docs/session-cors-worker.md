@@ -2157,7 +2157,7 @@ worker. Sponsored deploy grants are the separately documented legacy exception.
 - The default deploy-helper bundle URL is the GitHub release asset: `https://github.com/AgalmicSoftware/context-engine/releases/latest/download/sessionCorsWorker.bundle.js`
 - Canonical worker sources live under `workers/sessionCorsWorker/` and `workers/deploy-helper/`.
 - This repo no longer mirrors `.js.txt` worker copies into the client asset tree.
-- Rebuild local fallback bundles with `nvm use 20 && npm run worker:bundle` and verify they match source with `npm run verify:worker-bundle`.
+- Rebuild ignored local fallback bundles with `nvm use 20 && npm run worker:bundle`; verify the tracked Cloudflare-native Session Worker package with `npm run verify:cloudflare-template`.
 - `dist/sessionCorsWorker.bundle.js` and `dist/deployHelper.bundle.js` are generated local/manual fallback bundles for worker upload flows; they are not tracked git artifacts anymore.
 - `.github/workflows/publish-worker-bundles.yml` publishes verified bundle
   bytes as an immutable, commit-addressed release without moving `latest`.

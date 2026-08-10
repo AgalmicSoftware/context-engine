@@ -116,6 +116,11 @@ test('creates and verifies the exact immutable worker artifact structure', () =>
   assert.deepEqual(manifest.artifacts.map(({ kind }) => kind), WORKER_ARTIFACTS.map(({ kind }) => kind));
   assert.equal(manifest.replay.privateSourceCommit, SHA_C);
   assert.equal(manifest.recipe.dependencyLocks.length, LOCKFILES.length);
+  assert.deepEqual(manifest.recipe.commands, [
+    'npm ci',
+    'npm --prefix workers/sessionCorsWorker ci',
+    'npm run worker:bundle',
+  ]);
 });
 
 test('verification rejects changed bundle bytes', () => {

@@ -76,12 +76,12 @@ test('collectNodeTestFiles recursively includes classified root, script, and sha
 test('collectNodeTestFiles tolerates stripped public copies without optional helper directories', () => {
   withTempRepo((rootDir) => {
     writeFile(rootDir, 'tests/root/arweave-metadata-uri.test.js');
-    writeFile(rootDir, 'scripts/verify-worker-bundle-sync.test.js');
+    writeFile(rootDir, 'scripts/example-node.test.js');
 
     const files = collectNodeTestFiles(rootDir);
     assert.deepEqual(files, [
       'tests/root/arweave-metadata-uri.test.js',
-      path.join('scripts', 'verify-worker-bundle-sync.test.js'),
+      path.join('scripts', 'example-node.test.js'),
     ]);
     assert.equal(files.some((entry) => entry.includes('*')), false);
     assert.equal(files.some((entry) => entry.includes(path.join('scripts', 'lib', 'e2e'))), false);
@@ -92,16 +92,16 @@ test('collectNodeTestFiles can filter to git-tracked node tests', () => {
   withTempRepo((rootDir) => {
     execFileSync('git', ['init'], { cwd: rootDir, stdio: 'ignore' });
     writeFile(rootDir, 'tests/root/arweave-metadata-uri.test.js');
-    writeFile(rootDir, 'scripts/verify-worker-bundle-sync.test.js');
+    writeFile(rootDir, 'scripts/example-node.test.js');
     writeFile(rootDir, 'scripts/untracked-local.test.js');
-    execFileSync('git', ['add', 'tests/root/arweave-metadata-uri.test.js', 'scripts/verify-worker-bundle-sync.test.js'], {
+    execFileSync('git', ['add', 'tests/root/arweave-metadata-uri.test.js', 'scripts/example-node.test.js'], {
       cwd: rootDir,
       stdio: 'ignore',
     });
 
     assert.deepEqual(collectNodeTestFiles(rootDir, { trackedOnly: true }), [
       'tests/root/arweave-metadata-uri.test.js',
-      path.join('scripts', 'verify-worker-bundle-sync.test.js'),
+      path.join('scripts', 'example-node.test.js'),
     ]);
   });
 });

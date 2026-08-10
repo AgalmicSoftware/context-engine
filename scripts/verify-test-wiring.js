@@ -170,8 +170,8 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/verify-test-inventory.test.js');
   expectFile('scripts/vite-navigation-smoke.js');
   expectFile('scripts/vite-navigation-smoke.test.js');
-  expectFile('scripts/verify-worker-bundle-sync.mjs');
-  expectFile('scripts/verify-worker-bundle-sync.test.js');
+  expectFileMissing('scripts/verify-worker-bundle-sync.mjs');
+  expectFileMissing('scripts/verify-worker-bundle-sync.test.js');
   expectFile('scripts/verify-public-release-surface.js');
   expectFile('scripts/verify-public-release-surface.test.js');
   expectFile('scripts/verify-public-docs.js');
@@ -242,7 +242,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('typecheck:client-tests', 'scripts/check-client-test-types.mjs');
   expectScriptContains('worker:bundle', 'scripts/worker-bundle.mjs');
   expectScriptContains('deploy-helper:deploy', 'scripts/deploy-helper-deploy.mjs');
-  expectScriptContains('verify:worker-bundle', 'scripts/verify-worker-bundle-sync.mjs');
+  expectScriptMissing('verify:worker-bundle');
   expectScriptContains('verify:public-release-surface', 'scripts/verify-public-release-surface.js');
   expectScriptContains('verify:public-assets', 'scripts/verify-public-assets.js');
   expectScriptContains('verify:public-text', 'scripts/verify-public-text.js');
@@ -295,9 +295,9 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
     'npm run verify:public-release-surface',
     'npm run verify:public-assets',
     'npm run worker:bundle',
-    'npm run verify:worker-bundle',
     'npm --prefix client run build',
   ].forEach((command) => expectGateContains('wiring-and-release', command));
+  expectGateOmits('wiring-and-release', 'npm run verify:worker-bundle');
   expectGateContains('wiring-and-release', 'npm run client:bundle-budget:check');
   expectGateAfter(
     'wiring-and-release',
@@ -331,9 +331,9 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
     'npm run verify:public-release-surface',
     'npm run verify:public-assets',
     'npm run worker:bundle',
-    'npm run verify:worker-bundle',
     'npm --prefix client run build',
   ].forEach((command) => expectGateContains('release', command));
+  expectGateOmits('release', 'npm run verify:worker-bundle');
   expectGateContains('release', 'npm run client:bundle-budget:check');
   expectGateAfter(
     'release',
@@ -488,7 +488,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
       failures.push(`CODEOWNERS must include "${rule}"`);
     }
   });
-  if (/npm run (?:worker:bundle|verify:worker-bundle)/.test(publishWorkflow)) {
+  if (/npm run worker:bundle/.test(publishWorkflow)) {
     failures.push('publish-worker-bundles workflow must consume tested CI bytes without rebuilding');
   }
   if (!publishWorkflow.includes('run: npm run verify:worker-bundle')) {

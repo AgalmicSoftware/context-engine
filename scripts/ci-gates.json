@@ -117,14 +117,6 @@
           ]
         },
         {
-          "label": "Verify worker bundle sync",
-          "command": "npm",
-          "args": [
-            "run",
-            "verify:worker-bundle"
-          ]
-        },
-        {
           "label": "Verify Cloudflare-native Session Worker package",
           "command": "npm",
           "args": [
@@ -332,14 +324,6 @@
           "args": [
             "run",
             "worker:bundle"
-          ]
-        },
-        {
-          "label": "Verify worker bundle sync",
-          "command": "npm",
-          "args": [
-            "run",
-            "verify:worker-bundle"
           ]
         },
         {

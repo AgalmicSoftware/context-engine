@@ -30,7 +30,6 @@
     "demo:sim-answers:reconcile": "node scripts/reconcile-sim-profile-answers.mjs",
     "deploy-helper:deploy": "node scripts/deploy-helper-deploy.mjs",
     "deploy:op-sepolia": "node scripts/deploy-op-sepolia.mjs",
-    "verify:worker-bundle": "node scripts/verify-worker-bundle-sync.mjs",
     "verify:public-release-surface": "node scripts/verify-public-release-surface.js",
     "verify:public-assets": "node scripts/verify-public-assets.js",
     "verify:public-text": "node scripts/verify-public-text.js",
