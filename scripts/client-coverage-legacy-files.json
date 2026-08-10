@@ -483,7 +483,6 @@
     "client/src/components/SurveyTool/createQuestionsAndSurveysDisplayHelpers.ts",
     "client/src/components/SurveyTool/createQuestionsAndSurveysDocumentUrlHelpers.ts",
     "client/src/components/SurveyTool/createQuestionsAndSurveysHelpers.ts",
-    "client/src/components/SurveyTool/createQuestionsAndSurveysLockStateHelpers.ts",
     "client/src/components/SurveyTool/createQuestionsAndSurveysSignatureHelpers.ts",
     "client/src/components/SurveyTool/deferredCommitSliderHelpers.ts",
     "client/src/components/SurveyTool/questionFilterDisplayHelpers.ts",

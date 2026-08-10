@@ -183,10 +183,6 @@ export {
   buildCreateSurveyDocumentUrlsPatch,
 } from './createQuestionsAndSurveysDocumentUrlHelpers';
 export {
-  buildCreateSurveyOpenLockKeyPatch,
-  buildCreateSurveySurveyLockGateIdsPatch,
-} from './createQuestionsAndSurveysLockStateHelpers';
-export {
   buildCreateSurveyAiPromptModelLabelPatch,
   formatAiPromptModelLabel,
 } from './createQuestionsAndSurveysAiDisplayHelpers';
@@ -545,6 +541,14 @@ export const getCreateSurveyValidationError = ({
 
 export const buildCreateSurveyCopySuccessPatch = (stateKey: unknown, copied: unknown) => ({
   [String(stateKey || '')]: !!copied,
+});
+
+export const buildCreateSurveyOpenLockKeyPatch = (openLockKey: unknown = '') => ({
+  openLockKey: String(openLockKey || ''),
+});
+
+export const buildCreateSurveySurveyLockGateIdsPatch = (surveyLockGateIds: unknown) => ({
+  surveyLockGateIds: Array.isArray(surveyLockGateIds) ? surveyLockGateIds : [],
 });
 
 export const buildCreateSurveyFocusTargetPatch = (focusTargetUiKey: unknown = null) => ({
