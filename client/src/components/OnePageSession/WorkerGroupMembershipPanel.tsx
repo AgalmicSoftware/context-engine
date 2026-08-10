@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faInfinity, faLink, faSpinner, faTimes, faUser } from '@fortawesome/free-solid-svg-icons';
+import { faInfinity, faLink, faSpinner, faSyncAlt, faTimes, faUser } from '@fortawesome/free-solid-svg-icons';
 import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 import type { AgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
@@ -1019,7 +1019,6 @@ const WorkerGroupMembershipPanel = ({
   if (!canReadGroups) {
     return (
       <section className={styles.telegramListPanel} data-testid="ce-session-worker-groups">
-        <div className={styles.telegramListHeader}>Groups</div>
         <div className={styles.telegramListEmpty}>Groups are not included in this credential.</div>
       </section>
     );
@@ -1071,10 +1070,15 @@ const WorkerGroupMembershipPanel = ({
   return (
     <section className={styles.workerGroupsListPanel} data-testid="ce-session-worker-groups">
       {showListHeader ? (
-        <div className={styles.telegramListHeader}>
-          <span>Groups</span>
-          <button type="button" className={styles.telegramSecondaryButton} onClick={() => void reload()}>
-            Refresh
+        <div className={`${styles.telegramListHeader} ${styles.workerGroupsListActions}`}>
+          <button
+            type="button"
+            className={styles.telegramIconButton}
+            aria-label="Refresh groups"
+            title="Refresh groups"
+            onClick={() => void reload()}
+          >
+            <FontAwesomeIcon icon={faSyncAlt} />
           </button>
         </div>
       ) : null}

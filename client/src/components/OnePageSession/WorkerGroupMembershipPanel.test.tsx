@@ -115,6 +115,12 @@ describe('WorkerGroupMembershipPanel', () => {
 
     const groupTitle = await screen.findByText('Open reviewers');
     const groupCard = screen.getByRole('article', { name: 'Open reviewers' });
+    const refreshButton = screen.getByRole('button', { name: 'Refresh groups' });
+    expect(screen.queryByText(/^Groups$/)).not.toBeInTheDocument();
+    expect(refreshButton.parentElement).toHaveClass('telegramListHeader', 'workerGroupsListActions');
+    expect(refreshButton).toHaveClass('telegramIconButton');
+    expect(refreshButton).toHaveAttribute('title', 'Refresh groups');
+    expect(refreshButton.querySelector('svg')).not.toBeNull();
     expect(groupTitle).toHaveClass('miniSbtName');
     expect(groupCard).toHaveClass('sbtItem', 'workerGroupCard');
     expect(groupCard.parentElement).toHaveClass('sbtGrid', 'workerGroupCardGrid');

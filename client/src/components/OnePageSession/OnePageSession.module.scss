@@ -209,6 +209,10 @@
   font-weight: 700;
 }
 
+.workerGroupsListActions {
+  justify-content: flex-end;
+}
+
 .telegramListEmpty,
 .telegramListError {
   color: var(--ce-document-border);
