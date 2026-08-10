@@ -53,11 +53,44 @@ describe('Account.module.scss modal account layout guards', () => {
       /\.preferenceToggleButton\[aria-pressed='true'\] \.preferenceToggleThumb\s*{[\s\S]*?background:\s*var\(--ce-action-accent\);[\s\S]*?transform:\s*translateX\(16px\);/,
     );
     expect(scss).toMatch(
-      /\.settingsSessionRoute\s*{[\s\S]*?min-height:\s*44px;[\s\S]*?border-radius:\s*var\(--ce-radius-10\);[\s\S]*?border:\s*1px solid color-mix\(in srgb, var\(--ce-text-inverse\) 36%, transparent\);[\s\S]*?background:\s*transparent;/,
+      /\.settingsSessionRoute\s*{[\s\S]*?min-height:\s*44px;[\s\S]*?border-radius:\s*var\(--ce-radius-10\);[\s\S]*?border-color:\s*var\(--ce-settings-control-border\);[\s\S]*?border-width:\s*var\(--ce-settings-control-border-width\);[\s\S]*?background:\s*var\(--ce-settings-control-bg\);[\s\S]*?opacity:\s*var\(--ce-settings-control-opacity\);/,
     );
     expect(scss).toMatch(
-      /\.sendTestnetFundsButton\.settingsConfigToggleButton,[\s\S]*?\.sendTestnetFundsButton\.preferenceToggleButton\s*{[\s\S]*?border-color:\s*color-mix\(in srgb, var\(--ce-text-inverse\) 36%, transparent\);/,
+      /\.sendTestnetFundsButton\.settingsConfigToggleButton,[\s\S]*?\.sendTestnetFundsButton\.preferenceToggleButton\s*{[\s\S]*?background:\s*var\(--ce-settings-control-bg\);[\s\S]*?border-color:\s*var\(--ce-settings-control-border\);[\s\S]*?opacity:\s*var\(--ce-settings-control-opacity\);/,
     );
+  });
+
+  it('uses theme-owned readable surfaces and text throughout Settings', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'Account.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /\.preLoginSettingsPanel\s*{[\s\S]*?background:\s*var\(--ce-settings-panel-bg\);[\s\S]*?color:\s*var\(--ce-settings-text\);/,
+    );
+    expect(scss).toMatch(
+      /\.aiSettingsPanel\s*{[\s\S]*?background:\s*var\(--ce-settings-panel-bg\);[\s\S]*?color:\s*var\(--ce-settings-text\);/,
+    );
+    expect(scss).toMatch(
+      /\.supportedResourceDetail\s*{[\s\S]*?color:\s*var\(--ce-settings-muted-text\);/,
+    );
+    expect(scss).toMatch(
+      /\.preLoginSettingsInput\s*{[\s\S]*?background:\s*var\(--ce-settings-field-bg\);[\s\S]*?color:\s*var\(--ce-settings-text\);/,
+    );
+    expect(scss).toMatch(
+      /\.settingsSectionCard\s*{[\s\S]*?background:\s*var\(--ce-settings-section-bg\);/,
+    );
+    expect(scss).toMatch(
+      /\.preLoginSettingsActions :global\(\.btn-outline-secondary\)\s*{[\s\S]*?background:\s*var\(--ce-settings-control-bg\);[\s\S]*?color:\s*var\(--ce-settings-control-text\);[\s\S]*?opacity:\s*1;/,
+    );
+    [
+      'preLoginSettingsTitle',
+      'preLoginSettingsLabel',
+      'supportedResourceDetail',
+      'supportedResourceSessionsLabel',
+      'aiSettingsHint',
+      'sessionPillMeta',
+    ].forEach((className) => {
+      expect(scss).toMatch(new RegExp(`\\.${className}\\s*\\{[^}]*color:\\s*var\\(--ce-settings-muted-text\\);`));
+    });
   });
 
   it('wraps settings controls into non-overlapping half rows at medium widths', () => {

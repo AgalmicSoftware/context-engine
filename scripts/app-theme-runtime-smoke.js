@@ -59,6 +59,100 @@ const readThemeState = () => {
   return state;
 };
 
+const auditVisibleTextContrast = (rootSelector) => {
+  const parseColor = (value) => {
+    const channels =
+      String(value || '')
+        .match(/[\d.]+/g)
+        ?.map(Number) || [];
+    if (channels.length < 3) return null;
+    return {
+      r: channels[0],
+      g: channels[1],
+      b: channels[2],
+      a: channels.length >= 4 ? channels[3] : 1,
+    };
+  };
+  const composite = (foreground, background) => {
+    const alpha = foreground.a + background.a * (1 - foreground.a);
+    if (alpha <= 0) return { r: 255, g: 255, b: 255, a: 1 };
+    return {
+      r: (foreground.r * foreground.a + background.r * background.a * (1 - foreground.a)) / alpha,
+      g: (foreground.g * foreground.a + background.g * background.a * (1 - foreground.a)) / alpha,
+      b: (foreground.b * foreground.a + background.b * background.a * (1 - foreground.a)) / alpha,
+      a: alpha,
+    };
+  };
+  const backgroundFor = (element) => {
+    const chain = [];
+    let current = element;
+    while (current) {
+      chain.unshift(current);
+      current = current.parentElement;
+    }
+    return chain.reduce((background, node) => {
+      const color = parseColor(window.getComputedStyle(node).backgroundColor);
+      if (!color) return background;
+      color.a *= Number(window.getComputedStyle(node).opacity || 1);
+      return composite(color, background);
+    }, { r: 255, g: 255, b: 255, a: 1 });
+  };
+  const luminance = ({ r, g, b }) => {
+    const channels = [r, g, b].map((value) => {
+      const channel = value / 255;
+      return channel <= 0.03928 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+  };
+  const root = document.querySelector(rootSelector);
+  if (!root) return { missing: true, failures: [] };
+  const failures = Array.from(root.querySelectorAll('*'))
+    .filter((element) => {
+      const style = window.getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      if (style.display === 'none' || style.visibility === 'hidden' || rect.width <= 0 || rect.height <= 0) return false;
+      if (element.getAttribute('aria-hidden') === 'true') return false;
+      if (element.matches('input, select, textarea')) return true;
+      return Array.from(element.childNodes).some(
+        (node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim(),
+      );
+    })
+    .map((element) => {
+      const style = window.getComputedStyle(element);
+      const background = backgroundFor(element);
+      const color = parseColor(style.color);
+      if (!color) return null;
+      let opacity = 1;
+      let current = element;
+      while (current && root.contains(current)) {
+        opacity *= Number(window.getComputedStyle(current).opacity || 1);
+        current = current.parentElement;
+      }
+      color.a *= opacity;
+      const foreground = composite(color, background);
+      const foregroundLuminance = luminance(foreground);
+      const backgroundLuminance = luminance(background);
+      const ratio =
+        (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) /
+        (Math.min(foregroundLuminance, backgroundLuminance) + 0.05);
+      const text = element.matches('input, select, textarea')
+        ? element.value || element.getAttribute('placeholder') || element.getAttribute('aria-label') || element.tagName
+        : Array.from(element.childNodes)
+            .filter((node) => node.nodeType === Node.TEXT_NODE)
+            .map((node) => node.textContent?.trim())
+            .filter(Boolean)
+            .join(' ');
+      return {
+        ratio,
+        selector: `${element.tagName.toLowerCase()}${element.className ? `.${String(element.className).trim().split(/\s+/).join('.')}` : ''}`,
+        text: String(text).slice(0, 80),
+      };
+    })
+    .filter((entry) => entry && entry.ratio < 4.5)
+    .sort((left, right) => left.ratio - right.ratio);
+  return { failures };
+};
+
 async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   const response = await page.goto(`${baseUrl}${routeCase.path}`, {
     waitUntil: 'domcontentloaded',
@@ -221,6 +315,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
 
   if (routeCase.requiresReadableLogin) {
     await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
+    await page.locator('.modal-login.show').waitFor({ state: 'visible' });
     await page.getByText('Account uses a passkey:', { exact: true }).waitFor({ state: 'visible' });
   }
 
@@ -228,6 +323,8 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     await page.getByRole('button', { name: 'Toggle pre-login settings', exact: true }).click();
     await page.getByTestId('ce-prelogin-settings-panel').waitFor({ state: 'visible' });
     await page.getByTestId('ce-settings-theme').waitFor({ state: 'visible' });
+    await page.getByTestId('ce-prelogin-config-toggle').click();
+    await page.getByTestId('ce-prelogin-config-panel').waitFor({ state: 'visible' });
   }
 
   if (routeCase.requiresReadableStats) {
@@ -477,6 +574,9 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
           selectorRatio: ratio(selectorStyle.color, backgroundFor(selector)),
         };
       })
+    : null;
+  const preloginTextContrastAudit = routeCase.requiresPreloginThemeSettings
+    ? await page.evaluate(auditVisibleTextContrast, '[data-testid="ce-prelogin-settings-panel"]')
     : null;
   const statsContrastState = routeCase.requiresReadableStats
     ? await page.evaluate(() => {
@@ -838,6 +938,14 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     assert.ok(
       preloginThemeSettingsState.selectorRatio >= 4.5,
       `Classic 95 App theme selector contrast should be at least 4.5:1; received ${preloginThemeSettingsState.selectorRatio.toFixed(2)}:1`,
+    );
+  }
+  if (preloginTextContrastAudit) {
+    assert.equal(preloginTextContrastAudit.missing, undefined, 'Signed-out Settings text audit root should render');
+    assert.deepEqual(
+      preloginTextContrastAudit.failures,
+      [],
+      `Classic 95 signed-out Settings text should meet 4.5:1 contrast: ${JSON.stringify(preloginTextContrastAudit.failures.slice(0, 12))}`,
     );
   }
   if (statsContrastState) {

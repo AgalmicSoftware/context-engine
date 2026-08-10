@@ -4,7 +4,7 @@
 }
 
 .label {
-  color: var(--ce-document-surface);
+  color: var(--ce-settings-text);
   font-size: 0.88rem;
   font-weight: 700;
 }
@@ -26,7 +26,7 @@
 }
 
 .hint {
-  color: var(--ce-document-surface);
+  color: var(--ce-settings-muted-text);
   font-size: 0.78rem;
   line-height: 1.45;
 }

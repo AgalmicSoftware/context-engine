@@ -64,6 +64,11 @@ Footer navigation consumes `--ce-footer-link-*` chrome tokens. Context Engine
 keeps its unframed links, while `classic-95` presents each route as a gray,
 raised button with a pressed inset state and readable black text.
 
+Account and Settings surfaces consume `--ce-settings-*` tokens for panel,
+section, field, control, primary-text, muted-text, and placeholder pairings.
+Classic 95 uses gray dialog surfaces, black primary copy, dark-gray secondary
+copy, and white fields; visible Settings text is regression-tested at 4.5:1.
+
 When the bundled-theme selector is enabled, Settings exposes it as the final
 `Appearance & colors` section both before and after sign-in. This selector
 changes the complete app theme; it is separate from a session's curated color

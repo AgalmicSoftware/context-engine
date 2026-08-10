@@ -2001,7 +2001,7 @@ h1 {
   border: none;
   border-radius: var(--ce-radius-pill);
   background: transparent;
-  color: color-mix(in srgb, var(--ce-control-text) 65%, transparent);
+  color: var(--ce-settings-muted-text);
   font-size: 0.95rem;
   cursor: pointer;
   transition:
@@ -2025,8 +2025,11 @@ h1 {
   gap: 12px;
   padding: 14px;
   border-radius: var(--ce-radius-14);
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
-  background: color-mix(in srgb, var(--ce-overlay-surface) 92%, transparent);
+  border-color: var(--ce-settings-border);
+  border-style: solid;
+  border-width: var(--ce-border-control-width);
+  background: var(--ce-settings-panel-bg);
+  color: var(--ce-settings-text);
   text-align: left;
 }
 
@@ -2045,7 +2048,7 @@ h1 {
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: color-mix(in srgb, var(--ce-document-border) 68%, transparent);
+  color: var(--ce-settings-muted-text);
 }
 
 .preLoginSettingsField {
@@ -2058,21 +2061,21 @@ h1 {
   font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: color-mix(in srgb, var(--ce-document-border) 72%, transparent);
+  color: var(--ce-settings-muted-text);
 }
 
 .preLoginSettingsInput {
   width: 100%;
   padding: 10px 12px;
   border-radius: var(--ce-radius-10);
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
-  background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
-  color: var(--ce-document-surface);
+  border: 1px solid var(--ce-settings-border);
+  background: var(--ce-settings-field-bg);
+  color: var(--ce-settings-text);
   font-family: var(--ce-font-mono);
   font-size: 0.84rem;
 
   &::placeholder {
-    color: color-mix(in srgb, var(--ce-document-border) 42%, transparent);
+    color: var(--ce-settings-placeholder-text);
   }
 
   &:focus {
@@ -2085,7 +2088,7 @@ h1 {
 .preLoginSettingsHint {
   font-size: 0.75rem;
   line-height: 1.45;
-  color: color-mix(in srgb, var(--ce-document-border) 68%, transparent);
+  color: var(--ce-settings-muted-text);
 }
 
 .preLoginSettingsActions {
@@ -2094,16 +2097,34 @@ h1 {
   flex-wrap: wrap;
 }
 
+.preLoginSettingsActions :global(.btn-outline-secondary) {
+  background: var(--ce-settings-control-bg);
+  border-color: var(--ce-settings-control-border);
+  border-width: var(--ce-settings-control-border-width);
+  color: var(--ce-settings-control-text);
+  opacity: 1;
+
+  &:hover,
+  &:focus-visible,
+  &:active {
+    background: var(--ce-settings-control-bg);
+    border-color: var(--ce-action-accent);
+    color: var(--ce-settings-control-text);
+  }
+}
+
 .networkSwitchButton {
-  background: transparent;
+  background: var(--ce-settings-control-bg);
   font-weight: 600;
   padding: 15px;
   font-size: 1.15em;
-  color: var(--ce-color-white);
+  color: var(--ce-settings-control-text);
   text-transform: uppercase;
-  border: var(--ce-color-white) 1px solid;
+  border-color: var(--ce-settings-control-border);
+  border-style: solid;
+  border-width: var(--ce-settings-control-border-width);
   border-radius: var(--ce-radius-10);
-  opacity: 0.5;
+  opacity: var(--ce-settings-control-opacity);
   transition:
     opacity 0.3s,
     color 0.3s;
@@ -2132,7 +2153,7 @@ h1 {
 }
 
 .networkLabel {
-  color: var(--ce-color-white);
+  color: var(--ce-settings-text);
   font-size: 1em;
   margin-right: 5px;
 }
@@ -2143,7 +2164,7 @@ h1 {
 
 .infoIcon {
   margin-left: 5px;
-  color: var(--ce-color-white);
+  color: var(--ce-settings-muted-text);
   cursor: pointer;
   opacity: 0.7;
   transition: opacity 0.3s;
@@ -2207,7 +2228,7 @@ h1 {
   max-width: 320px;
   font-size: 0.76rem;
   line-height: 1.45;
-  color: color-mix(in srgb, var(--ce-document-border) 86%, transparent);
+  color: var(--ce-settings-muted-text);
 }
 
 .faucetStatusSuccess {
@@ -2262,8 +2283,11 @@ h1 {
 .sendTestnetFundsButton.settingsConfigToggleButton,
 .sendTestnetFundsButton.preferenceToggleButton {
   min-height: 44px;
-  border-color: color-mix(in srgb, var(--ce-text-inverse) 36%, transparent);
-  opacity: 0.78;
+  background: var(--ce-settings-control-bg);
+  border-color: var(--ce-settings-control-border);
+  border-width: var(--ce-settings-control-border-width);
+  color: var(--ce-settings-control-text);
+  opacity: var(--ce-settings-control-opacity);
   transition:
     border-color 0.18s ease,
     box-shadow 0.18s ease,
@@ -2272,7 +2296,7 @@ h1 {
 
   &:hover,
   &:focus-visible {
-    color: var(--ce-document-surface);
+    color: var(--ce-settings-control-text);
     border-color: color-mix(in srgb, var(--ce-action-accent) 78%, transparent);
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--ce-action-accent) 16%, transparent);
     opacity: 1;
@@ -2286,7 +2310,7 @@ h1 {
 }
 
 .preferenceToggleLabel {
-  color: var(--ce-document-surface);
+  color: var(--ce-settings-text);
 }
 
 .preferenceToggleTrack {
@@ -2329,7 +2353,7 @@ h1 {
 
 .preferenceToggleState {
   min-width: 20px;
-  color: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
+  color: var(--ce-settings-muted-text);
   font-family: var(--ce-font-mono);
   font-size: 0.68rem;
   font-weight: 700;
@@ -2358,9 +2382,11 @@ h1 {
   min-height: 44px;
   padding: 9px 10px 9px 12px;
   border-radius: var(--ce-radius-10);
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 36%, transparent);
-  background: transparent;
-  opacity: 0.78;
+  border-color: var(--ce-settings-control-border);
+  border-style: solid;
+  border-width: var(--ce-settings-control-border-width);
+  background: var(--ce-settings-control-bg);
+  opacity: var(--ce-settings-control-opacity);
   transition:
     border-color 0.18s ease,
     box-shadow 0.18s ease,
@@ -2380,7 +2406,7 @@ h1 {
   justify-content: center;
   padding: 0;
   // background: color-mix(in srgb, var(--ce-status-info) 78%, transparent);
-  color: var(--ce-document-surface);
+  color: var(--ce-settings-text);
   border-radius: var(--ce-radius-8);
   font-family: var(--ce-font-mono);
   font-size: 0.82rem;
@@ -2395,7 +2421,7 @@ h1 {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--ce-document-surface);
+  color: var(--ce-settings-text);
   font-family: var(--ce-font-mono);
   font-size: 0.82rem;
   font-weight: 700;
@@ -2418,7 +2444,7 @@ h1 {
 
   &:hover,
   &:focus-visible {
-    color: var(--ce-document-surface);
+    color: var(--ce-status-info-text);
     background: color-mix(in srgb, var(--ce-status-info) 26%, transparent);
     transform: translateY(-1px);
     outline: none;
@@ -2479,9 +2505,10 @@ h1 {
   gap: 14px;
   width: 100%;
   padding: 16px;
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
+  border: 1px solid var(--ce-settings-border);
   border-radius: var(--ce-radius-18);
-  background: color-mix(in srgb, var(--ce-overlay-surface) 92%, transparent);
+  background: var(--ce-settings-panel-bg);
+  color: var(--ce-settings-text);
   box-shadow: 0 6px 22px color-mix(in srgb, var(--ce-compat-dark) 25%, transparent);
 }
 
@@ -2504,8 +2531,8 @@ h1 {
   min-width: 0;
   padding: 14px;
   border-radius: var(--ce-radius-14);
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
-  background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
+  border: 1px solid var(--ce-settings-border);
+  background: var(--ce-settings-surface-bg);
 }
 
 .supportedResourceHeader {
@@ -2518,13 +2545,13 @@ h1 {
 .supportedResourceName {
   font-size: 1.08rem;
   font-weight: 700;
-  color: var(--ce-document-surface);
+  color: var(--ce-settings-text);
 }
 
 .supportedResourceDetail {
   font-size: 0.8rem;
   line-height: 1.5;
-  color: color-mix(in srgb, var(--ce-document-border) 74%, transparent);
+  color: var(--ce-settings-muted-text);
 }
 
 .supportedResourceSessions {
@@ -2537,7 +2564,7 @@ h1 {
   font-size: 0.66rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: color-mix(in srgb, var(--ce-document-border) 60%, transparent);
+  color: var(--ce-settings-muted-text);
 }
 
 .supportedResourcePrimarySession {
@@ -2622,15 +2649,15 @@ h1 {
   min-width: 0;
   padding: 14px;
   border-radius: var(--ce-radius-14);
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
-  background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
+  border: 1px solid var(--ce-settings-border);
+  background: var(--ce-settings-surface-bg);
 }
 
 .aiSettingsSummaryLabel {
   font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: color-mix(in srgb, var(--ce-document-border) 68%, transparent);
+  color: var(--ce-settings-muted-text);
 }
 
 .aiSettingsSummaryLabelRow {
@@ -2654,19 +2681,19 @@ h1 {
   font-family: var(--ce-font-mono);
   font-size: 0.98rem;
   font-weight: 700;
-  color: var(--ce-document-surface);
+  color: var(--ce-settings-text);
 }
 
 .aiSettingsSummaryDetail {
   font-size: 0.76rem;
   line-height: 1.5;
-  color: color-mix(in srgb, var(--ce-document-border) 72%, transparent);
+  color: var(--ce-settings-muted-text);
 }
 
 .settingsSectionCard {
   border-radius: var(--ce-radius-16);
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
-  background: color-mix(in srgb, var(--ce-overlay-base) 32%, transparent);
+  border: 1px solid var(--ce-settings-border);
+  background: var(--ce-settings-section-bg);
   overflow: hidden;
 }
 
@@ -2679,7 +2706,7 @@ h1 {
   padding: 14px 16px;
   border: none;
   background: transparent;
-  color: var(--ce-document-surface);
+  color: var(--ce-settings-text);
   text-align: left;
 }
 
@@ -2700,12 +2727,12 @@ h1 {
 
 .settingsSectionSummary {
   font-size: 0.78rem;
-  color: var(--ce-overlay-text-muted);
+  color: var(--ce-settings-muted-text);
 }
 
 .settingsSectionChevron {
   margin-top: 2px;
-  color: color-mix(in srgb, var(--ce-document-border) 78%, transparent);
+  color: var(--ce-settings-muted-text);
 }
 
 .settingsSectionBody {
@@ -2719,7 +2746,7 @@ h1 {
 .settingsSectionLead {
   font-size: 0.82rem;
   line-height: 1.55;
-  color: color-mix(in srgb, var(--ce-document-border) 78%, transparent);
+  color: var(--ce-settings-muted-text);
 }
 
 .aiSettingsInlineToggle,
@@ -2731,8 +2758,8 @@ h1 {
   padding: 7px 11px;
   border-radius: var(--ce-radius-pill);
   border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
-  background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
-  color: var(--ce-document-surface);
+  background: var(--ce-settings-surface-bg);
+  color: var(--ce-settings-text);
   font-size: 0.78rem;
   letter-spacing: 0.02em;
 }
@@ -2751,7 +2778,7 @@ h1 {
   padding: 12px;
   border-radius: var(--ce-radius-12);
   border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
-  background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
+  background: var(--ce-settings-surface-bg);
 }
 
 .aiSettingsRowFull {
@@ -2762,16 +2789,16 @@ h1 {
   font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: color-mix(in srgb, var(--ce-document-border) 72%, transparent);
+  color: var(--ce-settings-muted-text);
 }
 
 .aiSettingsInput,
 .aiSettingsSelect,
 .aiSettingsTextarea {
   width: 100%;
-  background: color-mix(in srgb, var(--ce-overlay-base) 72%, transparent);
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 18%, transparent);
-  color: var(--ce-document-surface);
+  background: var(--ce-settings-field-bg);
+  border: 1px solid var(--ce-settings-border);
+  color: var(--ce-settings-text);
   border-radius: var(--ce-radius-10);
   padding: 9px 11px;
   font-size: 0.86rem;
@@ -2793,8 +2820,8 @@ h1 {
 .aiSettingsInput:disabled,
 .aiSettingsSelect:disabled,
 .aiSettingsTextarea:disabled {
-  color: color-mix(in srgb, var(--ce-document-border) 62%, transparent);
-  background: color-mix(in srgb, var(--ce-overlay-base) 40%, transparent);
+  color: var(--ce-settings-muted-text);
+  background: var(--ce-settings-section-bg);
   border-color: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
 }
 
@@ -2818,7 +2845,7 @@ h1 {
   border-radius: var(--ce-radius-12);
   border: 1px solid color-mix(in srgb, var(--ce-action-accent) 24%, transparent);
   background: color-mix(in srgb, var(--ce-action-accent) 8%, transparent);
-  color: var(--ce-document-surface);
+  color: var(--ce-settings-text);
   font-size: 0.8rem;
   line-height: 1.45;
 }
@@ -2831,7 +2858,7 @@ h1 {
   padding: 14px;
   border-radius: var(--ce-radius-14);
   border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
-  background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
+  background: var(--ce-settings-surface-bg);
 }
 
 .aiReasoningButtons {
@@ -2844,8 +2871,8 @@ h1 {
   min-width: 88px;
   border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
   border-radius: var(--ce-radius-pill);
-  background: color-mix(in srgb, var(--ce-overlay-base) 72%, transparent);
-  color: var(--ce-document-surface);
+  background: var(--ce-settings-field-bg);
+  color: var(--ce-settings-text);
   padding: 8px 14px;
   font-size: 0.82rem;
   font-weight: 700;
@@ -2863,14 +2890,15 @@ h1 {
 }
 
 .aiReasoningBtn:disabled {
-  opacity: 0.6;
+  color: var(--ce-settings-muted-text);
+  opacity: 1;
   cursor: not-allowed;
 }
 
 .aiReasoningBtnActive {
   background: var(--ce-color-accent);
   border-color: var(--ce-color-accent);
-  color: var(--ce-document-text);
+  color: var(--ce-action-accent-text);
 }
 
 .aiAdvancedToggle {
@@ -2882,8 +2910,8 @@ h1 {
   padding: 12px 14px;
   border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
   border-radius: var(--ce-radius-12);
-  background: color-mix(in srgb, var(--ce-overlay-base) 36%, transparent);
-  color: var(--ce-document-surface);
+  background: var(--ce-settings-section-bg);
+  color: var(--ce-settings-text);
   font-family: var(--ce-font-ui);
   font-size: 0.84rem;
   font-weight: 700;
@@ -2900,7 +2928,7 @@ h1 {
   padding: 12px;
   border-radius: var(--ce-radius-12);
   border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
-  background: color-mix(in srgb, var(--ce-overlay-base) 36%, transparent);
+  background: var(--ce-settings-section-bg);
 }
 
 .aiSettingsFooterRow {
@@ -2921,18 +2949,18 @@ h1 {
 .aiSettingsStatus {
   font-size: 0.76rem;
   line-height: 1.5;
-  color: color-mix(in srgb, var(--ce-document-border) 76%, transparent);
+  color: var(--ce-settings-muted-text);
 }
 
 .aiSettingsHint {
   font-size: 0.74rem;
   line-height: 1.45;
-  color: color-mix(in srgb, var(--ce-document-border) 64%, transparent);
+  color: var(--ce-settings-muted-text);
 }
 
 .aiSettingsHintStrong {
   font-size: 0.76rem;
-  color: color-mix(in srgb, var(--ce-document-border) 78%, transparent);
+  color: var(--ce-settings-muted-text);
 }
 
 .sponsorshipGrid {
@@ -2949,7 +2977,7 @@ h1 {
   padding: 12px;
   border-radius: var(--ce-radius-12);
   border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
-  background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
+  background: var(--ce-settings-surface-bg);
 }
 
 .sponsorshipCardHeader {
@@ -2962,14 +2990,14 @@ h1 {
 .sponsorshipResourceName {
   font-size: 0.9rem;
   font-weight: 700;
-  color: var(--ce-document-surface);
+  color: var(--ce-settings-text);
 }
 
 .sponsorshipDetail {
   margin-top: 3px;
   font-size: 0.76rem;
   line-height: 1.5;
-  color: color-mix(in srgb, var(--ce-document-border) 68%, transparent);
+  color: var(--ce-settings-muted-text);
 }
 
 .sponsorshipBlock {
@@ -2982,7 +3010,7 @@ h1 {
   font-size: 0.66rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: color-mix(in srgb, var(--ce-document-border) 60%, transparent);
+  color: var(--ce-settings-muted-text);
 }
 
 .sponsorshipGateText {
@@ -3005,8 +3033,8 @@ h1 {
   padding: 6px 10px;
   border-radius: var(--ce-radius-pill);
   border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
-  background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
-  color: var(--ce-document-surface);
+  background: var(--ce-settings-surface-bg);
+  color: var(--ce-settings-text);
   font-size: 0.76rem;
 }
 
@@ -3016,7 +3044,7 @@ h1 {
 }
 
 .sessionPillMeta {
-  color: color-mix(in srgb, var(--ce-document-border) 62%, transparent);
+  color: var(--ce-settings-muted-text);
   font-size: 0.7rem;
 }
 
@@ -3044,7 +3072,7 @@ h1 {
 }
 
 .aiSponsoredStatusmuted {
-  color: color-mix(in srgb, var(--ce-text-inverse) 50%, transparent);
+  color: var(--ce-settings-muted-text);
 }
 
 @media (max-width: 768px) {

@@ -50,6 +50,14 @@ describe('runtime SCSS theme contract', () => {
     expect(result.css).toContain('--ce-footer-link-border: var(--ce-border-raised)');
     expect(result.css).toContain('--ce-footer-link-active-border: var(--ce-border-inset)');
     expect(result.css).toContain('--ce-footer-link-bg: transparent');
+    expect(result.css).toContain('--ce-settings-panel-bg: var(--ce-surface-raised)');
+    expect(result.css).toContain('--ce-settings-surface-bg: var(--ce-surface-subtle)');
+    expect(result.css).toContain('--ce-settings-control-border: var(--ce-border-raised)');
+    expect(result.css).toContain('--ce-settings-control-opacity: 1');
+    expect(result.css).toContain('--ce-settings-text: var(--ce-panel-text)');
+    expect(result.css).toContain(
+      '--ce-settings-panel-bg: color-mix(in srgb, var(--ce-overlay-surface) 92%, transparent)',
+    );
     expect(result.css).toContain('--ce-color-primary: var(--ce-action-primary)');
   });
 
