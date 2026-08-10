@@ -55,7 +55,7 @@ describe('Modals contrast styles', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'Modals.module.scss'), 'utf8');
 
     expect(scss).toMatch(
-      /\.welcomeSlideImageGoals\s*\{[\s\S]*?max-height:\s*100%;[\s\S]*?mix-blend-mode:\s*screen\s*!important;[\s\S]*?opacity:\s*0\.86;/,
+      /\.welcomeSlideImageGoals\s*\{[\s\S]*?max-height:\s*100%;[\s\S]*?mix-blend-mode:\s*var\(--ce-welcome-artwork-blend-cutout\)\s*!important;[\s\S]*?opacity:\s*0\.86;/,
     );
     expect(scss).not.toMatch(/\.welcomeSlideImageGoals\s*\{[\s\S]*?filter:\s*invert\(1\);/);
   });
@@ -64,9 +64,29 @@ describe('Modals contrast styles', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'Modals.module.scss'), 'utf8');
 
     expect(scss).toMatch(
-      /\.welcomeSlideImageAudience\s*\{[\s\S]*?mix-blend-mode:\s*screen\s*!important;[\s\S]*?opacity:\s*1;[\s\S]*?filter:\s*brightness\(1\.08\) saturate\(1\.18\) contrast\(1\.08\);/,
+      /\.welcomeSlideImageAudience\s*\{[\s\S]*?mix-blend-mode:\s*var\(--ce-welcome-artwork-blend-cutout\)\s*!important;[\s\S]*?opacity:\s*1;[\s\S]*?filter:\s*brightness\(1\.08\) saturate\(1\.18\) contrast\(1\.08\);/,
     );
     expect(scss).not.toMatch(/\.welcomeSlideImageAudience\s*\{[\s\S]*?mask-image:/);
+  });
+
+  it('resolves both welcome decks through semantic artwork blend tokens', () => {
+    const embeddedDeck = fs.readFileSync(path.join(__dirname, 'Modals.module.scss'), 'utf8');
+    const overlayDeck = fs.readFileSync(path.resolve(__dirname, '../Onboarding/OnboardingOverlay.module.scss'), 'utf8');
+    const contextTheme = fs.readFileSync(path.resolve(__dirname, '../../scss/themes/_context-engine.scss'), 'utf8');
+    const classicTheme = fs.readFileSync(path.resolve(__dirname, '../../scss/themes/_classic-95.scss'), 'utf8');
+
+    expect(embeddedDeck).toContain('mix-blend-mode: var(--ce-welcome-artwork-blend-soft) !important;');
+    expect(embeddedDeck).toContain('mix-blend-mode: var(--ce-welcome-artwork-blend-intense) !important;');
+    expect(embeddedDeck).toContain('mix-blend-mode: var(--ce-welcome-artwork-blend-cutout) !important;');
+    expect(overlayDeck).toContain('mix-blend-mode: var(--ce-welcome-artwork-blend-soft) !important;');
+    expect(overlayDeck).toContain('mix-blend-mode: var(--ce-welcome-artwork-blend-intense) !important;');
+    expect(overlayDeck).toContain('mix-blend-mode: var(--ce-welcome-artwork-blend-cutout) !important;');
+    expect(contextTheme).toContain('welcome-artwork-blend-soft: lighten,');
+    expect(contextTheme).toContain('welcome-artwork-blend-intense: color-dodge,');
+    expect(contextTheme).toContain('welcome-artwork-blend-cutout: screen,');
+    expect(classicTheme).toContain('welcome-artwork-blend-soft: screen,');
+    expect(classicTheme).toContain('welcome-artwork-blend-intense: screen,');
+    expect(classicTheme).toContain('welcome-artwork-blend-cutout: screen,');
   });
 
   it('delegates the welcome media target chrome to the shared frameless control recipe', () => {

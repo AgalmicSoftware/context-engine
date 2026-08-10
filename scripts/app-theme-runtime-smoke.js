@@ -209,6 +209,15 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         };
       })
     : null;
+  const classicWelcomeImageState = routeCase.requiresFramelessWelcome
+    ? await page.getByTestId('ce-welcome-slide-image').evaluate((element) => {
+        const stage = element.closest('.block-gradient-slow');
+        return {
+          backgroundImage: stage ? window.getComputedStyle(stage).backgroundImage : '',
+          mixBlendMode: window.getComputedStyle(element).mixBlendMode,
+        };
+      })
+    : null;
   const loginContrastState = routeCase.requiresReadableLogin
     ? await page.evaluate(() => {
         const parseRgb = (value) => {
@@ -364,6 +373,15 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
           };
         })
     : null;
+  const currentWelcomeImageState = routeCase.requiresFramelessWelcome
+    ? await page.getByTestId('ce-welcome-slide-image').evaluate((element) => {
+        const stage = element.closest('.block-gradient-slow');
+        return {
+          backgroundImage: stage ? window.getComputedStyle(stage).backgroundImage : '',
+          mixBlendMode: window.getComputedStyle(element).mixBlendMode,
+        };
+      })
+    : null;
 
   assert.equal(response?.status(), 200, `${routeCase.label} should load in ${viewportName}`);
   assert.equal(classic.themeId, 'classic-95', `${routeCase.label} should bootstrap the stored theme`);
@@ -402,6 +420,21 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       'Classic 95 welcome media should not render a frame border',
     );
     assert.equal(welcomeFrameState.boxShadow, 'none', 'Classic 95 welcome media should not render a raised shadow');
+    assert.equal(
+      classicWelcomeImageState?.mixBlendMode,
+      'screen',
+      'Classic 95 welcome artwork should use a brighter palette-safe blend',
+    );
+    assert.equal(
+      currentWelcomeImageState?.mixBlendMode,
+      'lighten',
+      'Context Engine welcome artwork should preserve its original blend',
+    );
+    assert.equal(
+      classicWelcomeImageState?.backgroundImage,
+      currentWelcomeImageState?.backgroundImage,
+      'Welcome artwork should preserve its branded backdrop across app themes',
+    );
   }
   if (loginContrastState) {
     assert.equal(loginContrastState.missing, undefined, 'Classic 95 login contrast surfaces should render');

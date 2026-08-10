@@ -1666,7 +1666,7 @@ input[type='radio']:checked:after {
 .welcomeSlideImageIntro {
   max-width: 95vw;
   align-self: flex-end;
-  mix-blend-mode: lighten !important;
+  mix-blend-mode: var(--ce-welcome-artwork-blend-soft) !important;
   opacity: 0.75;
 }
 
@@ -1674,7 +1674,7 @@ input[type='radio']:checked:after {
   max-height: 40vh;
   max-width: 35vw;
   align-self: flex-end;
-  mix-blend-mode: lighten !important;
+  mix-blend-mode: var(--ce-welcome-artwork-blend-soft) !important;
   opacity: 0.75;
 }
 
@@ -1682,7 +1682,7 @@ input[type='radio']:checked:after {
   max-height: 110%;
   max-width: 130%;
   align-self: flex-end;
-  mix-blend-mode: color-dodge !important;
+  mix-blend-mode: var(--ce-welcome-artwork-blend-intense) !important;
   justify-content: unset !important;
   opacity: 0.8;
 }
@@ -1696,7 +1696,7 @@ input[type='radio']:checked:after {
 .welcomeSlideImageToolkit {
   max-height: 100%;
   max-width: 116%;
-  mix-blend-mode: color-dodge !important;
+  mix-blend-mode: var(--ce-welcome-artwork-blend-intense) !important;
   align-self: center;
   object-position: center center;
   filter: opacity(0.5);
@@ -1764,7 +1764,7 @@ input[type='radio']:checked:after {
 .welcomeSlideImageGoals {
   max-height: 100%;
   max-width: 100%;
-  mix-blend-mode: screen !important;
+  mix-blend-mode: var(--ce-welcome-artwork-blend-cutout) !important;
   align-self: flex-end;
   opacity: 0.86;
 }
@@ -1772,7 +1772,7 @@ input[type='radio']:checked:after {
 .welcomeSlideImageAudience {
   max-height: 140%;
   max-width: 100%;
-  mix-blend-mode: screen !important;
+  mix-blend-mode: var(--ce-welcome-artwork-blend-cutout) !important;
   align-self: flex-end;
   opacity: 1;
   filter: brightness(1.08) saturate(1.18) contrast(1.08);

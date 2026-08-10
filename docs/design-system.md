@@ -102,7 +102,7 @@ control states without component selectors in a theme file.
 | Data series            | `--ce-data-series-1` through `--ce-data-series-8`                             | categorical charts and visualizations                                          |
 | Response states        | `--ce-response-agree-*`, `--ce-response-unsure-*`, `--ce-response-disagree-*` | readable vote-state badges on the active tooltip surface                       |
 | Data visualization     | `--ce-data-viz-*`                                                             | plot surfaces, axes, labels, points, active points, and point strokes          |
-| Brand media            | `--ce-brand-logo-*`                                                           | theme-specific logo opacity, blending, and filter treatment                    |
+| Brand media            | `--ce-brand-logo-*`, `--ce-welcome-artwork-*`                                 | theme-specific logo treatment plus a stable branded Welcome backdrop/blending  |
 | Edges and elevation    | `--ce-border-*`, `--ce-edge-*`, `--ce-shadow-*`                               | flat, raised, inset, pressed, and submit states                                |
 | Geometry               | `--ce-radius-*`, `--ce-border-control-width`, `--ce-control-padding-*`        | theme-selectable shape and control density                                     |
 | Typography             | `--ce-font-*`, `--ce-font-button-weight`                                      | body, UI, mono, and control typography                                         |

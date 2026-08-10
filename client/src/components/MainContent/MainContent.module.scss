@@ -154,6 +154,10 @@
 
 /* --- OnboardingWalkthrough --- */
 
+.welcomeArtworkStage {
+  background-image: var(--ce-welcome-artwork-backdrop);
+}
+
 @media (min-width: 0px) and (max-width: 319px) {
   .onboardingWalkthrough {
     display: flex;

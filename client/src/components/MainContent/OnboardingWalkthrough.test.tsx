@@ -31,6 +31,7 @@ describe('OnboardingWalkthrough', () => {
     const { container } = render(<OnboardingWalkthrough changeTabFunction={changeTabFunction} />);
 
     expect(screen.getByTestId('mock-site-load-options')).toHaveAttribute('data-arrow-index', '0');
+    expect(container.querySelector('.welcomeArtworkStage')).toBeInTheDocument();
     expect(container.querySelector('.onboardingWalkthrough')).toBeInTheDocument();
     expect(container.querySelector('.onboardingInfo')).toBeInTheDocument();
     expect(container.querySelector('.onboardingControls')).toBeInTheDocument();

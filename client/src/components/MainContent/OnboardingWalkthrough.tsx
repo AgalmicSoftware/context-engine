@@ -103,7 +103,7 @@ class OnboardingWalkthrough extends Component<OnboardingWalkthroughProps, Onboar
     const rightButton = this.getRightButton();
 
     return (
-      <div className="block-gradient-slow">
+      <div className={`block-gradient-slow ${styles.welcomeArtworkStage}`}>
         <Container className={styles.onboardingWalkthrough}>
           <div className={styles.onboardingInfo}>
             {onboardingHeadline}

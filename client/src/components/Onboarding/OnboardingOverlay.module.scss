@@ -203,14 +203,14 @@
   object-fit: contain;
   object-position: left bottom;
   transform: translateY(2.75%);
-  mix-blend-mode: lighten;
+  mix-blend-mode: var(--ce-welcome-artwork-blend-soft) !important;
   opacity: 0.75;
 }
 
 .mediaImageToolkit {
   max-height: 100%;
   max-width: 116%;
-  mix-blend-mode: color-dodge !important;
+  mix-blend-mode: var(--ce-welcome-artwork-blend-intense) !important;
   align-self: center;
   object-position: center center;
   filter: opacity(0.5);
@@ -219,7 +219,7 @@
 .mediaImageGoals {
   max-height: 100%;
   max-width: 100%;
-  mix-blend-mode: screen !important;
+  mix-blend-mode: var(--ce-welcome-artwork-blend-cutout) !important;
   align-self: flex-end;
   opacity: 0.86;
 }
@@ -227,7 +227,7 @@
 .mediaImageBuiltToHelp {
   max-height: 140%;
   max-width: 100%;
-  mix-blend-mode: screen !important;
+  mix-blend-mode: var(--ce-welcome-artwork-blend-cutout) !important;
   align-self: flex-end;
   opacity: 1;
   filter: brightness(1.08) saturate(1.18) contrast(1.08);
@@ -237,7 +237,7 @@
   max-height: 110%;
   max-width: 130%;
   align-self: flex-end;
-  mix-blend-mode: color-dodge !important;
+  mix-blend-mode: var(--ce-welcome-artwork-blend-intense) !important;
   opacity: 0.8;
 }
 
@@ -245,7 +245,7 @@
   max-height: 40vh;
   max-width: 35vw;
   align-self: flex-end;
-  mix-blend-mode: lighten;
+  mix-blend-mode: var(--ce-welcome-artwork-blend-soft) !important;
   opacity: 0.75;
 }
 

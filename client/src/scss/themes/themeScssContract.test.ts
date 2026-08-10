@@ -37,6 +37,10 @@ describe('runtime SCSS theme contract', () => {
     expect(result.css).toContain('--ce-response-agree-bg: #c0e0c0');
     expect(result.css).toContain('--ce-data-viz-point: #000080');
     expect(result.css).toContain('--ce-brand-logo-blend-mode: screen');
+    expect(result.css).toContain('--ce-welcome-artwork-blend-soft: screen');
+    expect(result.css).toContain('--ce-welcome-artwork-blend-intense: screen');
+    expect(result.css).toContain('--ce-welcome-artwork-blend-cutout: screen');
+    expect(result.css).toContain('--ce-welcome-artwork-backdrop: linear-gradient(90deg, #5b8cff');
     expect(result.css).toContain('--ce-shadow-neumorphic-dark: #404040');
     expect(result.css).toContain('--ce-color-primary: var(--ce-action-primary)');
   });
