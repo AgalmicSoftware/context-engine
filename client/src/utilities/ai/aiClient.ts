@@ -969,7 +969,7 @@ export async function uploadMarkdownSummaryToArweave(markdown: unknown, opts: un
   if (!md) throw new Error('Cannot upload empty Markdown summary.');
 
   try {
-    const { arweaveClient } = await import('../arweave/arweaveClientLazy.js');
+    const { arweaveClient } = await import('../arweave/arweaveClient.js');
     const { context, preferLocal, sessionConfig, sessionSlug } = buildArweaveKeyRequest(opts);
     const { arweaveJwk, hasArweaveJwk } = readArweaveJwkOption(opts);
     const arweaveKey = hasArweaveJwk
