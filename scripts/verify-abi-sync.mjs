@@ -4,13 +4,9 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ABI_CONTRACTS } from './abi-contracts.mjs';
 
-export const ABI_CONTRACTS = Object.freeze([
-  { artifact: 'SessionRegistry.sol/SessionRegistry.json', abi: 'SESSION_REGISTRY_ABI.json' },
-  { artifact: 'Surveys.sol/Surveys.json', abi: 'SURVEYS_ABI.json' },
-  { artifact: 'CustomSBT.sol/MySBT.json', abi: 'CUSTOM_SBT_ABI.json' },
-  { artifact: 'SBTFactory.sol/SBTFactory.json', abi: 'SBT_FACTORY_ABI.json' },
-]);
+export { ABI_CONTRACTS };
 
 const sha256 = (value) => createHash('sha256').update(value).digest('hex');
 
