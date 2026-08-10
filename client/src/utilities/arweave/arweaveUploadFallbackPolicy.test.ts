@@ -15,6 +15,10 @@ describe('arweaveUploadFallbackPolicy', () => {
   it('normalizes worker endpoint URLs back to the worker base', () => {
     expect(normalizeWorkerBaseUrl('https://worker.example/arweave/upload')).toBe('https://worker.example');
     expect(normalizeWorkerBaseUrl('https://worker.example/prefix/auth/nonce')).toBe('https://worker.example/prefix');
+    expect(normalizeWorkerBaseUrl('https://worker.example/prefix/admin/lit-chipotle-provision')).toBe(
+      'https://worker.example/prefix',
+    );
+    expect(normalizeWorkerBaseUrl('https://worker.example/lit/chipotle-action')).toBe('https://worker.example');
     expect(normalizeWorkerBaseUrl('https://worker.example/prefix')).toBe('https://worker.example/prefix');
   });
 
