@@ -649,6 +649,14 @@ describe('OnePageSession view gating', () => {
     expect(tabletRailBlock).toBeNull();
   });
 
+  it('keeps the outer session branding section visually transparent', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
+    const brandingSectionBlock = extractMediaBlock(scss, '.brandingSection {');
+
+    expect(brandingSectionBlock).toContain('background: transparent;');
+    expect(brandingSectionBlock).not.toContain('linear-gradient');
+  });
+
   it('passes hideEmbeddedDebugUi only to embedded full SurveyPage mode', async () => {
     render(<OnePageSession {...buildProps()} />);
 

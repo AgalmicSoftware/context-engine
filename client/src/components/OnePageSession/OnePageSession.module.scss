@@ -13,8 +13,7 @@
 
 /* Top header/branding area */
 .brandingSection {
-  /* Lighter violet background so logo is visible */
-  background: linear-gradient(180deg, color-mix(in srgb, var(--ce-session-chrome) 32%, transparent), transparent 72%);
+  background: transparent;
   border: 0px solid var(--ce-data-series-2);
   border-radius: var(--ce-radius-8);
   // padding: 20px;
