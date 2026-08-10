@@ -70,6 +70,19 @@ jest.mock('../../utilities/web3/chainGateway.js', () => ({
   normalizeSessionSlug: (...args) => mockNormalizeSessionSlug(...args),
 }));
 
+jest.mock('../../utilities/session/sessionNaming.js', () => {
+  const actual = jest.requireActual<typeof import('../../utilities/session/sessionNaming.js')>(
+    '../../utilities/session/sessionNaming.js',
+  );
+  return {
+    ...actual,
+    normalizeSessionSlug: (value: unknown) =>
+      typeof mockNormalizeSessionSlug === 'function'
+        ? mockNormalizeSessionSlug(value)
+        : actual.normalizeSessionSlug(value),
+  };
+});
+
 jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   listNamespaceEntriesSync: (...args) => mockListNamespaceEntriesSync(...args),
   peekCacheSync: (...args) => mockPeekCacheSync(...args),

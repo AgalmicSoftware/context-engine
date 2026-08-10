@@ -15,6 +15,10 @@ jest.mock('../../utilities/web3/chainGateway.js', () => ({
   },
   getSessionChainId: jest.fn(() => null),
   getSessionSlugByName: jest.fn(() => ''),
+}));
+
+jest.mock('../../utilities/session/sessionNaming.js', () => ({
+  __esModule: true,
   normalizeSessionSlug: jest.fn((value) =>
     String(value || '')
       .trim()

@@ -35,11 +35,15 @@ jest.mock('../web3/chainGateway.js', () => {
     default: defaultExport,
     getAllSessionSlugs: defaultExport.getAllSessionSlugs,
     getReadProviderForSession: defaultExport.getReadProviderForSession,
-    normalizeSessionSlug: jest.fn((s) => String(s || '')),
   };
 });
 
-jest.mock('../../components/MainSite/mainSiteUtils', () => ({
+jest.mock('../session/sessionNaming.js', () => ({
+  __esModule: true,
+  normalizeSessionSlug: jest.fn((s) => String(s || '')),
+}));
+
+jest.mock('../session/mainSiteUtils', () => ({
   __esModule: true,
   emitMainSiteSbtDebug: jest.fn(),
   hasCoreSbtMetadata: jest.fn((info) => {
@@ -90,7 +94,7 @@ jest.mock('../../components/MainSite/progressHelpers', () => ({
 const { createSessionSbtCacheController } = require('./sessionSbtCacheController.js');
 const contractScriptsModule = require('../web3/chainGateway.js');
 const contractScripts = contractScriptsModule.default;
-const { normalizeSessionSlug } = contractScriptsModule;
+const { normalizeSessionSlug } = require('../session/sessionNaming.js');
 const {
   emitMainSiteSbtDebug,
   hasCoreSbtMetadata,

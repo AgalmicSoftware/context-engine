@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import {
   mergeSessionContractMaps,
   normalizeRegistrySessionSlugForWrite,
@@ -8,7 +10,32 @@ import {
   validateRegistrySessionSlugForWrite,
 } from './sessionNaming.js';
 
+const collectSourceFiles = (directory) =>
+  fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) return collectSourceFiles(entryPath);
+    return /\.(?:js|jsx|ts|tsx)$/.test(entry.name) ? [entryPath] : [];
+  });
+
 describe('sessionNaming helpers', () => {
+  it('keeps SBT leaf slug normalization session-owned', () => {
+    const sourceRoots = [
+      path.resolve(__dirname, '../sbt'),
+      path.resolve(__dirname, '../../components/SBTs'),
+    ];
+    const web3SlugImports = sourceRoots
+      .flatMap(collectSourceFiles)
+      .filter((filePath) =>
+        /import[^;]*\bnormalizeSessionSlug\b[^;]*from ['"][^'"]*web3\/chainGateway(?:\.js)?['"]/.test(
+          fs.readFileSync(filePath, 'utf8'),
+        ),
+      )
+      .map((filePath) => path.relative(path.resolve(__dirname, '../..'), filePath))
+      .sort();
+
+    expect(web3SlugImports).toEqual([]);
+  });
+
   it('resolves canonical session aliases from legacy group inputs', () => {
     const cfg = {
       slug: 'test-72',

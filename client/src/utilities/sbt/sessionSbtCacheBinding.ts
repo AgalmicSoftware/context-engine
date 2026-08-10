@@ -1,4 +1,4 @@
-import { normalizeSessionSlug } from '../web3/chainGateway';
+import { normalizeSessionSlug } from '../session/sessionNaming.js';
 
 type SbtCacheRecord = {
   [field: string]: unknown;

@@ -1,4 +1,4 @@
-import { normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
+import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { ethers } from 'ethers';
 import {
   buildSbtPageHolderListSignature,

@@ -82,6 +82,17 @@ jest.mock('../../utilities/web3/contractScripts.js', () => ({
   normalizeSessionSlug: (...args) => mockNormalizeSessionSlug(...args),
 }));
 
+jest.mock('../../utilities/session/sessionNaming.js', () => {
+  const actual = jest.requireActual('../../utilities/session/sessionNaming.js');
+  return {
+    ...actual,
+    normalizeSessionSlug: (...args) =>
+      typeof mockNormalizeSessionSlug === 'function'
+        ? mockNormalizeSessionSlug(...args)
+        : actual.normalizeSessionSlug(...args),
+  };
+});
+
 jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   listNamespaceEntriesSync: (...args) => mockListNamespaceEntriesSync(...args),
   peekCacheSync: (...args) => mockPeekCacheSync(...args),
