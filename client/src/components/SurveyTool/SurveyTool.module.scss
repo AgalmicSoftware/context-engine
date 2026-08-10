@@ -3318,7 +3318,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   font-size: 2rem;
   /* Adjusted to fit nicely in the pill */
   background: none;
-  border: none;
+  border: 0 !important;
+  box-shadow: none !important;
   cursor: pointer;
   color: color-mix(in srgb, var(--ce-text-inverse) 80%, transparent);
   /* Higher visibility inside the dark pill */
@@ -3328,6 +3329,12 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   display: flex;
   align-items: center;
   justify-content: center;
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 3px;
+  }
+
   &:hover:not(:disabled) {
     color: var(--ce-color-white);
     transform: scale(1.15);

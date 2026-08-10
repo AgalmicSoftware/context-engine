@@ -392,6 +392,14 @@ describe('SurveyTool styles', () => {
     );
   });
 
+  it('keeps pile navigation arrows borderless with a visible keyboard focus ring', () => {
+    const scss = readSurveyToolScss();
+
+    expect(scss).toMatch(
+      /\.pileNavArrow\s*{[\s\S]*?border:\s*0 !important;[\s\S]*?box-shadow:\s*none !important;[\s\S]*?&:focus-visible\s*{[\s\S]*?outline:\s*2px solid var\(--ce-focus-ring\);/,
+    );
+  });
+
   it('keeps single-question page chrome on the prior inherited font treatment', () => {
     const scss = readSurveyToolScss();
 
