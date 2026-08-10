@@ -4306,7 +4306,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     flex: 1 1 auto;
     min-height: 0;
     max-height: 100%;
-    max-width: 70%; // so that options are not hidden by side-scroll overflow, they always poke out
   }
 }
 
@@ -4623,30 +4622,97 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   justify-content: flex-start;
   overflow-x: auto;
   overflow-y: hidden;
+  padding: 4px 0 12px;
+  scroll-padding-inline: 4px;
+  scroll-snap-type: x proximity;
+  scrollbar-width: auto;
+  scrollbar-color: var(--ce-action-accent) color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
   -webkit-overflow-scrolling: touch;
+
+  &::-webkit-scrollbar {
+    height: 10px;
+  }
+
+  &::-webkit-scrollbar-track {
+    border-radius: var(--ce-radius-pill);
+    background: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
+  }
+
+  &::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: var(--ce-radius-pill);
+    background: var(--ce-action-accent);
+    background-clip: padding-box;
+  }
 }
 
 .multichoiceQuestionContainer #multiChoice {
-  font-size: 0.8rem;
+  font-size: 1rem;
   flex: 0 0 auto;
   flex-direction: column;
   flex-wrap: wrap;
   justify-content: flex-start;
   align-content: flex-start;
   align-items: flex-start;
+  gap: 14px 18px;
   height: 100%;
   min-height: 100%;
-  width: max-content;
+  // Leave room for the next wrapped column to peek into view as a scroll cue.
+  width: 70%;
+  max-width: 70%;
   max-height: none;
+  padding: 2px 28px 4px 2px;
   overflow: visible;
 }
 
 .multichoiceQuestionContainer #multiChoice .checkboxOptionText {
-  width: auto;
+  width: 100%;
+  max-width: 100%;
+  min-height: 58px;
+  padding: 14px 18px;
+  font-size: 1rem !important;
+  line-height: 1.35;
   align-self: flex-start;
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: break-word;
+  border: 2px solid color-mix(in srgb, var(--ce-text-inverse) 28%, transparent);
+  border-radius: var(--ce-radius-10);
+  background: color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--ce-overlay-base) 18%, transparent);
+  scroll-snap-align: start;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+
+  input[type='checkbox'] {
+    display: block;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  &:hover {
+    border-color: color-mix(in srgb, var(--ce-action-accent) 70%, var(--ce-text-inverse));
+    background: color-mix(in srgb, var(--ce-action-accent) 14%, var(--ce-text-inverse) 8%);
+    box-shadow: 0 7px 18px color-mix(in srgb, var(--ce-overlay-base) 24%, transparent);
+    transform: translateY(-1px);
+  }
+
+  &:focus-within {
+    outline: 3px solid var(--ce-focus-ring);
+    outline-offset: 2px;
+  }
+
+  &.selected {
+    border-color: var(--ce-color-success);
+    background: var(--ce-color-success);
+  }
 }
 
 .aiPromptToggleBtn {

@@ -375,20 +375,20 @@ describe('SurveyTool styles', () => {
     );
   });
 
-  it('keeps pile multichoice options horizontally scrollable while anchoring the first column to the left edge', () => {
+  it('presents pile multichoice options as large, discoverable horizontal-scroll cards', () => {
     const scss = readSurveyToolScss();
 
     expect(scss).toMatch(
-      /\.multichoiceQuestionContainer\s*{[\s\S]*?align-items:\s*flex-start;[\s\S]*?overflow-x:\s*auto;[\s\S]*?overflow-y:\s*hidden;/,
+      /\.multichoiceQuestionContainer\s*{[\s\S]*?align-items:\s*flex-start;[\s\S]*?overflow-x:\s*auto;[\s\S]*?overflow-y:\s*hidden;[\s\S]*?scroll-snap-type:\s*x proximity;[\s\S]*?scrollbar-color:\s*var\(--ce-action-accent\) color-mix\(in srgb, var\(--ce-text-inverse\) 10%, transparent\);/,
     );
     expect(scss).toMatch(
-      /\.multichoiceQuestionContainer #multiChoice\s*{[\s\S]*?flex-direction:\s*column;[\s\S]*?flex-wrap:\s*wrap;[\s\S]*?align-content:\s*flex-start;[\s\S]*?align-items:\s*flex-start;[\s\S]*?width:\s*max-content;/,
+      /\.multichoiceQuestionContainer #multiChoice\s*{[\s\S]*?font-size:\s*1rem;[\s\S]*?flex-direction:\s*column;[\s\S]*?flex-wrap:\s*wrap;[\s\S]*?align-content:\s*flex-start;[\s\S]*?align-items:\s*flex-start;[\s\S]*?width:\s*70%;[\s\S]*?max-width:\s*70%;/,
     );
     expect(scss).toMatch(
-      /\.multichoiceQuestionContainer #multiChoice \.checkboxOptionText\s*{[\s\S]*?width:\s*auto;[\s\S]*?align-self:\s*flex-start;/,
+      /\.multichoiceQuestionContainer #multiChoice \.checkboxOptionText\s*{[\s\S]*?width:\s*100%;[\s\S]*?max-width:\s*100%;[\s\S]*?min-height:\s*58px;[\s\S]*?padding:\s*14px 18px;[\s\S]*?font-size:\s*1rem !important;[\s\S]*?line-height:\s*1\.35;[\s\S]*?scroll-snap-align:\s*start;/,
     );
     expect(scss).toMatch(
-      /@media \(max-width: 480px\)\s*{[\s\S]*?\.multichoiceQuestionContainer #multiChoice\s*{[\s\S]*?max-width:\s*70%;/,
+      /\.multichoiceQuestionContainer #multiChoice \.checkboxOptionText\s*{[\s\S]*?&:focus-within\s*{[\s\S]*?outline:\s*3px solid var\(--ce-focus-ring\);/,
     );
   });
 
