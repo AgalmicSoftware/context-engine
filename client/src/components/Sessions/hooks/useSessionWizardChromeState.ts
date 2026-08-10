@@ -20,8 +20,6 @@ export interface UseSessionWizardChromeStateOptions {
   hasSponsoredBundleLink: boolean;
 }
 
-const NORMAL_SECTION_ORDER = ['metadata', 'encryption', 'worker', 'publish'];
-
 const useSessionWizardChromeState = ({ wizardMode, hasSponsoredBundleLink }: UseSessionWizardChromeStateOptions) => {
   const [wizardDisplaySettingsOpen, setWizardDisplaySettingsOpen] = useState(false);
   const [moreOptionsOpen, setMoreOptionsOpen] = useState(false);
@@ -40,19 +38,6 @@ const useSessionWizardChromeState = ({ wizardMode, hasSponsoredBundleLink }: Use
     metadata: false,
     publish: true,
   }));
-
-  useEffect(() => {
-    if (wizardMode === 'advanced') return;
-    setCollapsedSections((prev) => {
-      const firstOpenSection = NORMAL_SECTION_ORDER.find((key) => prev[key] === false) || 'metadata';
-      return {
-        metadata: firstOpenSection !== 'metadata',
-        encryption: firstOpenSection !== 'encryption',
-        worker: firstOpenSection !== 'worker',
-        publish: firstOpenSection !== 'publish',
-      };
-    });
-  }, [wizardMode]);
 
   useEffect(() => {
     if (!hasSponsoredBundleLink) {
