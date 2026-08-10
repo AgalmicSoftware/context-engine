@@ -1,7 +1,5 @@
 /** @file GreetingModal.tsx */
 import React, { Component } from 'react';
-import { connect } from 'react-redux';
-import { fetchSessionState } from '../../actions/sessionStateActions.js';
 import { createLogger } from '../../utilities/logging';
 
 // CSS and images
@@ -21,45 +19,21 @@ const log = createLogger('ui');
 const buildClassName = (classes: Array<string | false | null | undefined>) => classes.filter(Boolean).join(' ');
 
 type GreetingModalProps = {
-  fetchSessionState: () => void;
-  account?: string | null;
-  provider?: string | null;
   visible?: boolean;
   optOutAndEmailBottom?: boolean;
   closeExplainerFunction: () => void;
 };
 
 type GreetingModalState = {
-  rulesModalOpen: boolean;
   userOptsOutMetrics: boolean;
   emailInput: string;
 };
 
-type RootState = {
-  profile: {
-    account?: string | null;
-    provider?: string | null;
-  };
-};
-
 class GreetingModal extends Component<GreetingModalProps, GreetingModalState> {
   state: GreetingModalState = {
-    rulesModalOpen: false,
     userOptsOutMetrics: false,
     emailInput: '',
   };
-
-  componentDidMount() {
-    this.setState({ rulesModalOpen: !!this.props.visible });
-  }
-
-  componentWillUnmount() {}
-
-  componentDidUpdate(prevProps: GreetingModalProps) {
-    if (this.props.visible !== prevProps.visible) {
-      this.setState({ rulesModalOpen: !!this.props.visible });
-    }
-  }
 
   optOutChanged = () => {
     this.setState({ userOptsOutMetrics: !this.state.userOptsOutMetrics });
@@ -75,8 +49,6 @@ class GreetingModal extends Component<GreetingModalProps, GreetingModalState> {
   };
 
   closeRulesModal = () => {
-    this.setState({ rulesModalOpen: false });
-
     this.props.closeExplainerFunction();
   };
 
@@ -94,7 +66,7 @@ class GreetingModal extends Component<GreetingModalProps, GreetingModalState> {
     const explainModal = (
       <>
         <Modal
-          isOpen={this.state.rulesModalOpen}
+          isOpen={!!this.props.visible}
           modalClassName={buildClassName(['modal-rules transparentModal', modalVisibleClassName])}
         >
           <Card className={styles.rulesModalCard}>
@@ -168,9 +140,4 @@ class GreetingModal extends Component<GreetingModalProps, GreetingModalState> {
   }
 }
 
-const mapStateToProps = (state: RootState) => ({
-  account: state.profile.account,
-  provider: state.profile.provider,
-});
-
-export default connect(mapStateToProps, { fetchSessionState })(GreetingModal);
+export default GreetingModal;

@@ -1,7 +1,5 @@
 import React from 'react';
-import { Provider } from 'react-redux';
-import { createStore } from 'redux';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 
 import GreetingModal from './GreetingModal';
 
@@ -41,24 +39,8 @@ jest.mock('reactstrap', () => {
   };
 });
 
-const buildStore = () =>
-  createStore(
-    (
-      state = {
-        profile: {
-          account: null,
-          provider: null,
-        },
-      },
-    ) => state,
-  );
-
 const renderGreetingModal = (props: Record<string, unknown> = {}) =>
-  render(
-    <Provider store={buildStore()}>
-      <GreetingModal visible closeExplainerFunction={jest.fn()} {...props} />
-    </Provider>,
-  );
+  render(<GreetingModal visible closeExplainerFunction={jest.fn()} {...props} />);
 
 describe('GreetingModal', () => {
   it('replaces the legacy placeholder and ownership copy with neutral updates copy', () => {
@@ -71,5 +53,15 @@ describe('GreetingModal', () => {
     expect(screen.getByPlaceholderText('[redacted-email]')).toBeInTheDocument();
     expect(screen.queryByText(/How to own a % of site/i)).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText(legacyEmailPlaceholder)).not.toBeInTheDocument();
+  });
+
+  it('notifies on close while visibility remains controlled by the prop', () => {
+    const closeExplainerFunction = jest.fn();
+    renderGreetingModal({ closeExplainerFunction });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+    expect(closeExplainerFunction).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/Get updates/i)).toBeInTheDocument();
   });
 });
