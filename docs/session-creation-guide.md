@@ -17,8 +17,11 @@ The first `/new` screen presents the two implemented setup paths as large cards
 with their required inputs. After a creator chooses one, the cards collapse to
 the compact Hosting selector in the wizard header so the profile can still be
 changed. The Fast & Cheap card summarizes its inputs as
-`Cloudflare login / AI API Key`. The decentralized card includes a compatible
-Session Worker alongside its AI, Arweave, RPC, and testnet-gas inputs.
+`Cloudflare account / AI provider key` and explains that session settings and
+responses are stored in Cloudflare without a public-blockchain requirement. The
+decentralized card explains that session data is stored on Arweave while session
+identity is recorded in a public EVM registry; its pills list the AI, Arweave,
+RPC, and testnet-gas inputs without exposing internal runtime terminology.
 
 For the default `Fast & Cheap (Cloudflare)` preset, the user needs a Cloudflare
 account and one API key for the selected AI provider. The native deploy button

@@ -303,6 +303,9 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
           requirementRatio: textRatio('[role="listitem"][class*="modePresetCardRequirementPill"]'),
           requirementPillCount: document.querySelectorAll('[role="listitem"][class*="modePresetCardRequirementPill"]')
             .length,
+          entryCardText: Array.from(document.querySelectorAll('[data-testid^="ce-new-preset-"]'))
+            .map((card) => card.textContent || '')
+            .join(' '),
         };
       })
     : null;
@@ -875,8 +878,13 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   if (sessionSetupContrastState) {
     assert.equal(
       sessionSetupContrastState.requirementPillCount,
-      7,
+      6,
       'Session Setup should render every requirement as an individual pill',
+    );
+    assert.doesNotMatch(
+      sessionSetupContrastState.entryCardText,
+      /worker/i,
+      'Session Setup entry cards should explain storage without internal Worker terminology',
     );
     [
       ['Choose a setup', sessionSetupContrastState.eyebrowRatio],

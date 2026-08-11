@@ -33,8 +33,8 @@ const HOSTING_PRESETS = [
     ariaLabel: 'Cloudflare',
     entryLabel: 'Fast & Cheap',
     entryProvider: 'Cloudflare',
-    entryDescription: 'Launch a dedicated Session Worker without an on-chain publish step.',
-    entryRequirements: ['Cloudflare login', 'AI API key'],
+    entryDescription: 'Session settings and responses are stored in Cloudflare. No public blockchain is required.',
+    entryRequirements: ['Cloudflare account', 'AI provider key'],
   },
   {
     id: SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED,
@@ -42,8 +42,8 @@ const HOSTING_PRESETS = [
     ariaLabel: 'Decentralized',
     entryLabel: 'Trustless & Public',
     entryProvider: 'Decentralized',
-    entryDescription: 'Use a Session Worker for the web runtime while the EVM registry and Arweave stay canonical.',
-    entryRequirements: ['Compatible Session Worker', 'AI API key', 'Arweave wallet', 'RPC URL', 'EVM testnet gas'],
+    entryDescription: 'Session data is stored on Arweave, with session identity recorded in a public EVM registry.',
+    entryRequirements: ['AI provider key', 'Arweave wallet', 'RPC URL', 'EVM testnet gas'],
   },
 ] as const;
 

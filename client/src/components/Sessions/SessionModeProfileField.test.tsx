@@ -29,7 +29,7 @@ describe('SessionModeProfileField', () => {
       within(cloudflareRequirements)
         .getAllByRole('listitem')
         .map((item) => item.textContent),
-    ).toEqual(['Cloudflare login', 'AI API key']);
+    ).toEqual(['Cloudflare account', 'AI provider key']);
     const decentralizedRequirements = within(
       screen.getByTestId('ce-new-preset-trustless_public_decentralized'),
     ).getByRole('list', { name: 'Trustless & Public requirements' });
@@ -37,10 +37,15 @@ describe('SessionModeProfileField', () => {
       within(decentralizedRequirements)
         .getAllByRole('listitem')
         .map((item) => item.textContent),
-    ).toEqual(['Compatible Session Worker', 'AI API key', 'Arweave wallet', 'RPC URL', 'EVM testnet gas']);
+    ).toEqual(['AI provider key', 'Arweave wallet', 'RPC URL', 'EVM testnet gas']);
     expect(
-      screen.getByText('Use a Session Worker for the web runtime while the EVM registry and Arweave stay canonical.'),
+      screen.getByText('Session settings and responses are stored in Cloudflare. No public blockchain is required.'),
     ).toBeInTheDocument();
+    expect(
+      screen.getByText('Session data is stored on Arweave, with session identity recorded in a public EVM registry.'),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).not.toHaveTextContent(/worker/i);
+    expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).not.toHaveTextContent(/worker/i);
     expect(screen.queryByText('Recommended')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /advanced options/i })).not.toBeInTheDocument();
     const selector = screen.getByRole('radiogroup', { name: 'Session hosting profile' });
