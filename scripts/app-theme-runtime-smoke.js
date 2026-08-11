@@ -234,8 +234,8 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   const classicFooterLinkState = footerLink
       ? await footerLink.evaluate((element) => {
         const style = window.getComputedStyle(element);
-        const footer = element.closest('footer');
-        const footerRect = footer?.getBoundingClientRect();
+        const nav = element.closest('nav');
+        const navRect = nav?.getBoundingClientRect();
         const linkRect = element.getBoundingClientRect();
         return {
           backgroundColor: style.backgroundColor,
@@ -249,9 +249,10 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
           borderTopWidth: style.borderTopWidth,
           boxShadow: style.boxShadow,
           color: style.color,
-          footerLeft: footerRect?.left || 0,
           height: linkRect.height,
           left: linkRect.left,
+          navLeft: navRect?.left || 0,
+          navPseudoContent: nav ? window.getComputedStyle(nav, '::before').content : '',
         };
       })
     : null;
@@ -1165,12 +1166,16 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       /1px 1px 0px/,
       'Classic 95 footer links should use a compact raised shadow',
     );
+    assert.ok(
+      classicFooterLinkState.navPseudoContent === 'none' || classicFooterLinkState.navPseudoContent === 'normal',
+      'Classic 95 footer navigation should not render a decorative pseudo-button',
+    );
+    assert.ok(
+      Math.abs(classicFooterLinkState.left - classicFooterLinkState.navLeft) <= 1,
+      'Classic 95 footer navigation should begin with the first real link',
+    );
     if (viewportName !== 'mobile') {
       assert.equal(classicFooterLinkState.height, 32, 'Classic 95 footer links should use compact taskbar height');
-      assert.ok(
-        Math.abs(classicFooterLinkState.left - classicFooterLinkState.footerLeft) <= 1,
-        'Classic 95 footer navigation should start flush with the taskbar',
-      );
     }
     assert.deepEqual(
       [
@@ -1542,13 +1547,16 @@ async function main() {
   const homeTabsOnly = process.argv.includes('--home-tabs-only');
   const questionUtilitiesOnly = process.argv.includes('--question-utilities-only');
   const statsOnly = process.argv.includes('--stats-only');
+  const footerOnly = process.argv.includes('--footer-only');
   const routeCases = homeTabsOnly
     ? ROUTE_CASES.filter((routeCase) => routeCase.requiresSpreadHomeTabs)
     : questionUtilitiesOnly
       ? ROUTE_CASES.filter((routeCase) => routeCase.requiresReadableQuestionUtilities)
       : statsOnly
         ? ROUTE_CASES.filter((routeCase) => routeCase.requiresReadableStats)
-      : ROUTE_CASES;
+        : footerOnly
+          ? ROUTE_CASES.filter((routeCase) => routeCase.requiresFooterButtons)
+          : ROUTE_CASES;
   const browser = await chromium.launch({ headless: true });
 
   try {
@@ -1569,7 +1577,7 @@ async function main() {
         await page.close();
       }
     }
-    if (!homeTabsOnly && !questionUtilitiesOnly && !statsOnly) {
+    if (!homeTabsOnly && !questionUtilitiesOnly && !statsOnly && !footerOnly) {
       for (const viewport of WELCOME_FIT_VIEWPORTS) {
         await assertWelcomeFitsViewport(browser, baseUrl, viewport);
       }
@@ -1583,7 +1591,9 @@ async function main() {
             ? `Classic 95 question utility-control Playwright smoke passed (${VIEWPORTS.length} viewports).`
             : statsOnly
               ? `Classic 95 Community Stats Playwright smoke passed (${VIEWPORTS.length} viewports).`
-          : `App theme runtime Playwright smoke passed (${routeCases.length} routes × ${VIEWPORTS.length} viewports).`,
+              : footerOnly
+                ? `Classic 95 footer Playwright smoke passed (${VIEWPORTS.length} viewports).`
+                : `App theme runtime Playwright smoke passed (${routeCases.length} routes × ${VIEWPORTS.length} viewports).`,
     );
   } finally {
     await browser.close();
