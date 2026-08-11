@@ -25,4 +25,19 @@ describe('Vite theme bootstrap contract', () => {
     expect(bootstrapIndex).toBeLessThan(appIndex);
     expect(html).not.toMatch(/<script[^>]*>\s*\(function bootstrapCeTheme/);
   });
+
+  test('transforms the shared CommonJS password derivation helper for Vite', async () => {
+    const { transformGroupPasswordDerivationCommonJs } = await import(
+      '../scripts/source-commonjs-compatibility.mjs'
+    );
+    const commonJsSource = fs.readFileSync(
+      path.join(clientRoot, 'src', 'utilities', 'crypto', 'groupPasswordDerivation.cjs'),
+      'utf8',
+    );
+    const transformed = transformGroupPasswordDerivationCommonJs(commonJsSource);
+
+    expect(transformed).toContain('export { createGroupPasswordDerivation };');
+    expect(transformed).toContain('export default { createGroupPasswordDerivation };');
+    expect(transformed).not.toContain('module.exports');
+  });
 });

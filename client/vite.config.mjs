@@ -5,12 +5,14 @@ import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv, transformWithEsbuild } from 'vite';
 import { createBundleReportPlugin } from './scripts/bundle-report.mjs';
 import { writePostSocialPreviewHtml } from './scripts/post-social-preview.mjs';
+import { transformGroupPasswordDerivationCommonJs } from './scripts/source-commonjs-compatibility.mjs';
 import { normalizeThemeIdForHtml } from './scripts/theme-registry-core.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const srcDir = path.resolve(__dirname, 'src');
 const publicDir = path.resolve(__dirname, 'public');
 const postsDir = path.resolve(__dirname, '..', 'posts');
+const groupPasswordDerivationCjsPath = path.resolve(srcDir, 'utilities', 'crypto', 'groupPasswordDerivation.cjs');
 const themeRegistry = JSON.parse(fs.readFileSync(path.resolve(srcDir, 'scss', 'themes', 'registry.json'), 'utf8'));
 const themeIds = Object.freeze(themeRegistry.themes.map(({ id }) => String(id)));
 const headers = {
@@ -427,6 +429,19 @@ const jsxInJsCompatibilityPlugin = () => ({
   },
 });
 
+const sourceCommonJsCompatibilityPlugin = () => ({
+  name: 'ce-source-commonjs-compatibility',
+  enforce: 'pre',
+  transform(code, id) {
+    const [filePath] = id.split('?');
+    if (path.resolve(filePath) !== groupPasswordDerivationCjsPath) return null;
+    return {
+      code: transformGroupPasswordDerivationCommonJs(code),
+      map: null,
+    };
+  },
+});
+
 const walletProfileBundleGuardPlugin = (walletRuntimeProfile) => ({
   name: 'ce-wallet-profile-bundle-guard',
   apply: 'build',
@@ -516,6 +531,7 @@ export default defineConfig(({ mode }) => {
       'process.env': JSON.stringify(clientEnv),
     },
     plugins: [
+      sourceCommonJsCompatibilityPlugin(),
       jsxInJsCompatibilityPlugin(),
       react(),
       jsToTsCompatibilityPlugin(),

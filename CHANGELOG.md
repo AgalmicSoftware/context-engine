@@ -22,6 +22,10 @@ All notable changes to this project will be documented in this file.
   Community Stats as a participant/plot split window, session questions as
   compact dialogs, and footer navigation as a taskbar without theme-ID
   selectors in components.
+- Fixed local Vite startup for the shared CommonJS group-password derivation
+  helper. Persistent startup failures now stop after one automatic cache-busted
+  reload, and the recovery heading uses the active panel-text token so the
+  fallback remains readable across themes.
 - Added **Session colors** to the Session Wizard with the curated
   `context-engine`, `ocean`, and `amber` schemes, immediate preview, exact
   `appearance.colorSchemeId` persistence across Worker/Arweave paths, scoped

@@ -1,4 +1,5 @@
 import {
+  clearBootReloadMarker,
   clearBootCaches,
   isStaleChunkLoadError,
   reloadWithCacheBuster,
@@ -35,6 +36,9 @@ describe('bootRecovery', () => {
     expect(document.body).not.toHaveTextContent('stale app chunk');
     expect(document.querySelector('[role="alert"]')).not.toBeNull();
     expect(document.querySelector('[role="alert"]')).toHaveAttribute('data-boot-error', 'stale app chunk');
+    expect(document.querySelector('h1').getAttribute('style')).toContain(
+      'color:var(--ce-panel-text,CanvasText)',
+    );
     expect(document.querySelectorAll('button')).toHaveLength(1);
     expect(document.querySelector('button')).toHaveTextContent('Reload');
 
@@ -91,7 +95,7 @@ describe('bootRecovery', () => {
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
-  it('still auto-reloads the visible fallback when the boot reload URL marker is present', async () => {
+  it('stops automatic reloads when the boot reload URL marker is already present', async () => {
     jest.useFakeTimers();
     const reload = jest.fn();
     const clearCaches = jest.fn().mockResolvedValue(undefined);
@@ -108,12 +112,14 @@ describe('bootRecovery', () => {
       reload,
     });
 
-    expect(document.body).toHaveTextContent('Reloading and clearing cached app data in 3s...');
+    expect(document.body).toHaveTextContent(
+      'Automatic reload stopped because the app is still failing to start. Try Reload after the client is updated.',
+    );
     jest.advanceTimersByTime(3000);
     await Promise.resolve();
 
-    expect(clearCaches).toHaveBeenCalledTimes(1);
-    expect(reload).toHaveBeenCalledTimes(1);
+    expect(clearCaches).not.toHaveBeenCalled();
+    expect(reload).not.toHaveBeenCalled();
   });
 
   it('returns false when there is no root node to recover into', () => {
@@ -137,6 +143,25 @@ describe('bootRecovery', () => {
     expect(assign).toHaveBeenCalledWith('http://localhost:3000/session/demo-1?existing=1&ceBootReload=123456');
 
     Date.now.mockRestore();
+  });
+
+  it('removes the boot reload marker after a successful startup', () => {
+    const state = { route: 'about' };
+    const replaceState = jest.fn();
+    const fakeWindow = {
+      history: { replaceState, state },
+      location: {
+        href: 'http://localhost:3000/about?existing=1&ceBootReload=123456#recognition',
+      },
+    };
+
+    clearBootReloadMarker(fakeWindow);
+
+    expect(replaceState).toHaveBeenCalledWith(
+      state,
+      '',
+      'http://localhost:3000/about?existing=1#recognition',
+    );
   });
 
   it('clears storage and Cache API entries on a best-effort basis', async () => {
