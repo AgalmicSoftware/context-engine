@@ -34,6 +34,13 @@ const ROUTE_CASES = Object.freeze([
   },
   { path: '/docs', label: 'docs lazy route', requiresReadableDocs: true },
   { path: '/demos', label: 'demo surface' },
+  { path: '/session/demo', label: 'session question surface', requiresReadableSessionSurface: true },
+  { path: '/su/CatherineTheGreat', label: 'simulated-user surface', requiresReadableSimUserSurface: true },
+  {
+    path: '/groups?sessionName=demo-sh',
+    label: 'session groups surface',
+    requiresMinimalGroupsSurface: true,
+  },
   { path: '/theme-smoke-not-found', label: 'not-found state' },
 ]);
 
@@ -316,6 +323,22 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     await page.getByTestId('ce-new-preset-fast_cheap_cloudflare').click();
     await page.waitForSelector('[data-testid="ce-wizard-session-color-scheme"]', { timeout: 15000 });
     await page.waitForSelector('[data-testid="ce-wizard-session-color-preview"]', { timeout: 15000 });
+  }
+
+  if (routeCase.requiresReadableSessionSurface) {
+    await page.getByRole('heading', { name: 'Demo Session', exact: true }).waitFor({ state: 'visible' });
+    await page.getByText('Existential risk from AI justifies extraordinary precautions.', { exact: true }).waitFor({
+      state: 'visible',
+    });
+  }
+
+  if (routeCase.requiresReadableSimUserSurface) {
+    await page.getByRole('heading', { name: 'Catherine the Great', exact: true }).waitFor({ state: 'visible' });
+  }
+
+  if (routeCase.requiresMinimalGroupsSurface) {
+    await page.getByTestId('ce-session-worker-groups').waitFor({ state: 'visible' });
+    await page.getByRole('button', { name: 'Refresh groups', exact: true }).waitFor({ state: 'visible' });
   }
 
   if (routeCase.requiresReadableDocs) {
@@ -743,6 +766,67 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         };
       })
     : null;
+  const reportedSurfaceState =
+    routeCase.requiresReadableSessionSurface ||
+    routeCase.requiresReadableSimUserSurface ||
+    routeCase.requiresMinimalGroupsSurface
+      ? await page.evaluate((surface) => {
+          const parseRgb = (value) => {
+            const channels = String(value || '').match(/[\d.]+/g)?.map(Number) || [];
+            if (channels.length < 3) throw new Error(`Unsupported computed color: ${value}`);
+            return channels.slice(0, 3).map((channel) => channel / 255);
+          };
+          const luminance = (value) => {
+            const channels = parseRgb(value).map((channel) =>
+              channel <= 0.03928 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4),
+            );
+            return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+          };
+          const backgroundFor = (element) => {
+            let current = element;
+            while (current) {
+              const background = window.getComputedStyle(current).backgroundColor;
+              const channels = String(background || '').match(/[\d.]+/g)?.map(Number) || [];
+              if (channels.length >= 3 && (channels.length < 4 || channels[3] > 0)) return background;
+              current = current.parentElement;
+            }
+            return window.getComputedStyle(document.documentElement).backgroundColor;
+          };
+          const textRatio = (selector) => {
+            const element = document.querySelector(selector);
+            if (!element) return 0;
+            const foregroundLuminance = luminance(window.getComputedStyle(element).color);
+            const backgroundLuminance = luminance(backgroundFor(element));
+            return (
+              (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) /
+              (Math.min(foregroundLuminance, backgroundLuminance) + 0.05)
+            );
+          };
+
+          if (surface === 'session') {
+            const branding = document.querySelector('[class*="brandingSection"]');
+            return {
+              brandingBackground: branding ? window.getComputedStyle(branding).backgroundColor : '',
+              promptRatio: textRatio('[class*="pileCardHeader"] h4'),
+              sessionTitleRatio: textRatio('[class*="brandingSectionTitle"]'),
+              sectionTitleRatio: textRatio('[class*="sectionHeaderTitle"]'),
+            };
+          }
+          if (surface === 'sim-user') {
+            return {
+              heroNameRatio: textRatio('[class*="heroName"]'),
+              heroBioRatio: textRatio('[class*="heroBio"]'),
+              quoteRatio: textRatio('[class*="featuredQuote"]'),
+            };
+          }
+          const refresh = document.querySelector('button[aria-label="Refresh groups"]');
+          return {
+            hasLegacyListHeading: Boolean(document.querySelector('[class*="telegramListHeader"] span')),
+            refreshHasIcon: Boolean(refresh?.querySelector('svg')),
+            refreshText: refresh?.textContent?.trim() || '',
+          };
+        }, routeCase.requiresReadableSessionSurface ? 'session' : routeCase.requiresReadableSimUserSurface ? 'sim-user' : 'groups')
+      : null;
   const classicLogoState = routeCase.requiresBrightLogo
     ? await page
         .getByRole('link', { name: 'Context Engine home', exact: true })
@@ -1126,6 +1210,40 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         `Classic 95 ${label} contrast should be at least 4.5:1; received ${received.toFixed(2)}:1`,
       );
     });
+  }
+  if (routeCase.requiresReadableSessionSurface) {
+    assert.equal(
+      reportedSurfaceState.brandingBackground,
+      'rgba(0, 0, 0, 0)',
+      'Classic 95 session branding should keep its simplified transparent stage',
+    );
+    [
+      ['session title', reportedSurfaceState.sessionTitleRatio],
+      ['question prompt', reportedSurfaceState.promptRatio],
+      ['lower panel title', reportedSurfaceState.sectionTitleRatio],
+    ].forEach(([label, received]) => {
+      assert.ok(
+        received >= 4.5,
+        `Classic 95 ${label} contrast should be at least 4.5:1; received ${received.toFixed(2)}:1`,
+      );
+    });
+  }
+  if (routeCase.requiresReadableSimUserSurface) {
+    [
+      ['simulated-user name', reportedSurfaceState.heroNameRatio],
+      ['simulated-user biography', reportedSurfaceState.heroBioRatio],
+      ['simulated-user quote', reportedSurfaceState.quoteRatio],
+    ].forEach(([label, received]) => {
+      assert.ok(
+        received >= 4.5,
+        `Classic 95 ${label} contrast should be at least 4.5:1; received ${received.toFixed(2)}:1`,
+      );
+    });
+  }
+  if (routeCase.requiresMinimalGroupsSurface) {
+    assert.equal(reportedSurfaceState.hasLegacyListHeading, false, 'Groups should not restore the redundant list heading');
+    assert.equal(reportedSurfaceState.refreshHasIcon, true, 'Groups refresh should remain an icon control');
+    assert.equal(reportedSurfaceState.refreshText, '', 'Groups refresh should not restore a visible text label');
   }
   if (classicLogoState && currentLogoState) {
     assert.equal(classicLogoState.opacity, '0.74', 'Classic 95 navbar logo should be visibly brighter');

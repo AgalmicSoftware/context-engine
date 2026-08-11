@@ -46,6 +46,17 @@ import {
   resolveSingleQuestionMapFromCacheValue,
   resolvePromptGateTooltipProps,
 } from './singleQuestionResponseHelpers.js';
+import {
+  SINGLE_QUESTION_IMPORTANCE_SLIDER_STYLE,
+  buildSingleQuestionMiniPromptButtonClassName,
+  buildSingleQuestionReadOnlyBinaryClassName,
+  joinClassNames,
+  resolveSingleQuestionBookmarkIconStyle,
+  resolveSingleQuestionRatingBarStyle,
+  shallowEqualSingleQuestionRecord,
+  type SingleQuestionAggregatorClassNames,
+  type SingleQuestionGlobalCacheWindow,
+} from './singleQuestionResponseDisplay';
 
 const questionLog = createLogger('questions');
 
@@ -185,56 +196,7 @@ type SingleQuestionCacheEntry = SingleQuestionRecord & {
   value?: unknown;
 };
 type SingleQuestionQuestionCacheMap = Record<string, unknown>;
-type SingleQuestionAggregatorClassNames = {
-  aggregatorContainerClassName: string;
-  aggregatorParagraphClassName: string;
-  aggregatorFreeformAnswerClassName: string;
-};
 type SingleQuestionWriteCache = (namespace: string, slug: string | undefined, value: unknown) => Promise<unknown>;
-type SingleQuestionGlobalCacheWindow = Window & {
-  __APP_CACHE__?: Record<string, unknown>;
-  __QUESTION_CACHE__?: Record<string, unknown>;
-  __SURVEY_CACHE__?: Record<string, unknown>;
-};
-
-const joinClassNames = (...parts: unknown[]) => parts.filter(Boolean).join(' ');
-
-const shallowEqualSingleQuestionRecord = (
-  left: Record<string, unknown> | null | undefined,
-  right: Record<string, unknown> | null | undefined,
-): boolean => {
-  if (Object.is(left, right)) return true;
-  if (!left || !right) return false;
-  const leftKeys = Object.keys(left);
-  const rightKeys = Object.keys(right);
-  if (leftKeys.length !== rightKeys.length) return false;
-  return leftKeys.every((key) => Object.prototype.hasOwnProperty.call(right, key) && Object.is(left[key], right[key]));
-};
-
-export const SINGLE_QUESTION_IMPORTANCE_SLIDER_STYLE: React.CSSProperties = {
-  width: '200px',
-};
-
-export const resolveSingleQuestionBookmarkIconStyle = (
-  bookmarkSuccess: unknown,
-  isBookmarked: unknown,
-): React.CSSProperties => ({
-  color: bookmarkSuccess
-    ? 'var(--ce-status-success-text)'
-    : isBookmarked
-      ? 'var(--ce-status-warning)'
-      : 'var(--ce-panel-text)',
-});
-
-export const buildSingleQuestionMiniPromptButtonClassName = (styleMap: Record<string, string>) =>
-  `${styleMap.miniPromptAbbrev} ${styleMap.maskedPromptActionButton}`;
-
-export const buildSingleQuestionReadOnlyBinaryClassName = (styleMap: Record<string, string>, optionClassName: string) =>
-  `${styleMap.readOnlyBinary} ${styleMap[optionClassName]}`;
-
-export const resolveSingleQuestionRatingBarStyle = (ratingFillPercent: unknown): React.CSSProperties => ({
-  width: `${ratingFillPercent}%`,
-});
 
 /**
  * SingleQuestionResponse is a component responsible for displaying:

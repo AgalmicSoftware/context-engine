@@ -17,6 +17,13 @@ describe('SurveyTool styles', () => {
     expect(scss).toMatch(/#createSurveyButton\s*{[\s\S]*?opacity:\s*1;/);
   });
 
+  it('keeps pile question prompts readable on theme-provided card surfaces', () => {
+    const scss = readSurveyToolScss();
+
+    expect(scss).toMatch(/#questionTitle\s*{[^}]*color:\s*var\(--ce-panel-text\)\s*!important;/);
+    expect(scss).not.toMatch(/#questionTitle\s*{[^}]*color:\s*var\(--ce-color-white\)\s*!important;/);
+  });
+
   it('keeps existing-response light-panel CTAs on dark text for readability', () => {
     const scss = readSurveyToolScss();
 

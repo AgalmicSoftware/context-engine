@@ -183,5 +183,9 @@ describe('SimUserPage', () => {
     expect(scss).not.toMatch(/\.questionTypeBadge\s*{/);
     expect(scss).toMatch(/\.highlightedText\s*{[^}]*color:\s*\$body-text;/);
     expect(scss).not.toMatch(/\.highlightedText\s*{[^}]*color:\s*var\(--ce-color-accent\);/);
+    expect(scss).toMatch(/\.heroSection\s*{[^}]*background:\s*\$panel-bg;/);
+    expect(scss).toMatch(/\.heroName\s*{[^}]*color:\s*\$body-text;/);
+    expect(scss).toMatch(/\.quoteSection\s*{[^}]*background:\s*\$panel-bg;/);
+    expect(scss).toMatch(/\.eraBadge\s*{[^}]*color:\s*var\(--ce-action-primary-text\);/);
   });
 });

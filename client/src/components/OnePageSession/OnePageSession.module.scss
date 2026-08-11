@@ -34,14 +34,13 @@
   align-items: center;
   justify-content: flex-start;
   gap: 10px;
-  color: var(--ce-color-white);
+  color: var(--ce-session-chrome-contrast);
   text-align: center;
   font-size: 1rem;
   margin-bottom: 5px !important;
   position: relative;
   z-index: 40;
-  transition: opacity 0.4s ease;
-  animation: fadeOutTitle 0.6s ease 5s forwards;
+  transition: opacity 0.2s ease;
 
   &:hover,
   &:focus-within,
@@ -638,9 +637,8 @@
   flex-direction: row;
   align-items: center;
   font-weight: 600;
-  /* Keep title muted without dimming tooltip children. */
-  color: color-mix(in srgb, var(--ce-session-chrome-contrast) 45%, transparent);
-  opacity: 0.15;
+  color: var(--ce-session-chrome-contrast);
+  opacity: 1;
   margin-bottom: 0px !important;
 }
 
@@ -712,16 +710,16 @@
 
     /* Mobile Layout Default: Center on screen/icon (Good for Branding Title) */
     @media only screen and (max-width: 600px) {
-      left: 50%;
-      right: auto;
-      transform: translateX(-50%);
-      text-align: center;
-      width: 280px;
-      max-width: 90vw;
+      left: auto;
+      right: 0;
+      transform: none;
+      text-align: left;
+      width: min(250px, calc(100vw - 32px));
+      max-width: calc(100vw - 32px);
       &::after {
-        left: 50%;
-        right: auto;
-        margin-left: -5px;
+        left: auto;
+        right: 15px;
+        margin-left: 0;
       }
     }
   }
@@ -791,8 +789,8 @@
   min-width: 0;
   margin-bottom: 20px;
   margin-top: 20px; // background-color: color-mix(in srgb, var(--ce-data-series-2) 8%, transparent);
-  background-color: color-mix(in srgb, var(--ce-status-info) 18.8%, transparent);
-  border: 0px solid var(--ce-data-series-2);
+  background-color: var(--ce-card-bg);
+  border: 1px solid var(--ce-card-border);
   padding: 20px;
   border-radius: var(--ce-radius-6);
 }
@@ -817,7 +815,7 @@
   font-size: 2rem;
   margin: 0;
   font-weight: bold;
-  color: color-mix(in srgb, var(--ce-text-inverse) 75%, transparent);
+  color: var(--ce-panel-text);
   flex: 0 1 auto;
   min-width: 0;
   line-height: 1.1;
@@ -850,7 +848,7 @@
   display: block;
   max-width: 100%;
   line-height: 1;
-  color: color-mix(in srgb, var(--ce-text-inverse) 50%, transparent);
+  color: var(--ce-panel-text);
 }
 
 .sectionHeaderSubtitle {
@@ -859,7 +857,7 @@
   font-size: 0.63em;
   line-height: 1.12;
   font-weight: 600;
-  color: color-mix(in srgb, var(--ce-text-inverse) 25%, transparent);
+  color: var(--ce-panel-text-muted);
 }
 
 .sectionHeaderTooltip {
@@ -1207,12 +1205,12 @@
   }
 
   .sectionHeaderTitle {
-    color: color-mix(in srgb, var(--ce-text-inverse) 86%, transparent);
+    color: var(--ce-panel-text);
   }
 
   .sectionHeaderSubtitle {
     font-size: 0.72em;
-    color: color-mix(in srgb, var(--ce-text-inverse) 50%, transparent);
+    color: var(--ce-panel-text-muted);
   }
 }
 
@@ -1343,9 +1341,7 @@
   }
 
   .titleContainer {
-    /* FIXED: Replaced opacity with rgba to fix Z-index stacking context issue on mobile */
-    /* opacity: 0.5; */
-    color: color-mix(in srgb, var(--ce-text-inverse) 50%, transparent);
+    color: var(--ce-session-chrome-contrast);
     font-size: 0.9rem;
   }
 
@@ -1391,7 +1387,7 @@
   .sectionHeader .sectionHeaderSubtitle {
     font-size: 0.68em;
     line-height: 1;
-    color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
+    color: var(--ce-panel-text-muted);
   }
 
   .sectionHeaderRow {
@@ -1561,7 +1557,7 @@
   .sectionHeader .sectionHeaderSubtitle {
     font-size: 0.68em;
     line-height: 1;
-    color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
+    color: var(--ce-panel-text-muted);
   }
 
   .sectionHeaderRow {

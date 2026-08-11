@@ -15,7 +15,9 @@ All notable changes to this project will be documented in this file.
   deterministic avatar sources. Session metadata cannot select an app theme.
   Question authoring now uses explicit paired workspace/control/input tokens;
   Classic 95 renders the generator and its toolbar on readable standard gray
-  surfaces with white fields instead of mixing black controls into navy.
+  surfaces with white fields instead of mixing black controls into navy. The
+  session question, simulated-user, and Groups surfaces now retain readable,
+  minimal gray panels at desktop and mobile widths.
 - Added **Session colors** to the Session Wizard with the curated
   `context-engine`, `ocean`, and `amber` schemes, immediate preview, exact
   `appearance.colorSchemeId` persistence across Worker/Arweave paths, scoped

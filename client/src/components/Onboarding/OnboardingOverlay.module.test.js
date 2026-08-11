@@ -93,7 +93,7 @@ describe('Onboarding overlay welcome slide styles', () => {
 
   it('uses the transparent goals artwork without reintroducing an inverted image rectangle', () => {
     expect(scss).toMatch(
-      /\.mediaImageGoals\s*\{[\s\S]*?mix-blend-mode:\s*screen\s*!important;[\s\S]*?opacity:\s*0\.86;/,
+      /\.mediaImageGoals\s*\{[\s\S]*?mix-blend-mode:\s*var\(--ce-welcome-artwork-blend-cutout\)\s*!important;[\s\S]*?opacity:\s*0\.86;/,
     );
     expect(scss).not.toMatch(/\.mediaImageGoals\s*\{[\s\S]*?filter:\s*invert\(1\);/);
   });
@@ -110,7 +110,7 @@ describe('Onboarding overlay welcome slide styles', () => {
   it('blends the audience slide jpeg with scss only so its source background falls away', () => {
     expect(scss).toMatch(/\.onboardingWalkthrough\s*\{[\s\S]*?position:\s*relative;[\s\S]*?z-index:\s*auto;/);
     expect(scss).toMatch(
-      /\.mediaImageBuiltToHelp\s*\{[\s\S]*?mix-blend-mode:\s*screen\s*!important;[\s\S]*?opacity:\s*1;[\s\S]*?filter:\s*brightness\(1\.08\) saturate\(1\.18\) contrast\(1\.08\);/,
+      /\.mediaImageBuiltToHelp\s*\{[\s\S]*?mix-blend-mode:\s*var\(--ce-welcome-artwork-blend-cutout\)\s*!important;[\s\S]*?opacity:\s*1;[\s\S]*?filter:\s*brightness\(1\.08\) saturate\(1\.18\) contrast\(1\.08\);/,
     );
     expect(scss).not.toMatch(/\.mediaImageBuiltToHelp\s*\{[\s\S]*?mask-image:/);
   });

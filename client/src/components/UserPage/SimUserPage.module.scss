@@ -91,7 +91,7 @@ $warning: var(--ce-status-warning-text);
   align-items: center;
   gap: 10px;
   margin: 0;
-  color: var(--ce-text-inverse);
+  color: $body-text;
   font-size: clamp(1.85rem, 4vw, 2.35rem);
   letter-spacing: -0.02em;
   line-height: 1.1;
@@ -139,7 +139,7 @@ $warning: var(--ce-status-warning-text);
 
   h2 {
     margin: 12px 0 0;
-    color: var(--ce-text-inverse);
+    color: $body-text;
     font-size: 1.35rem;
     line-height: 1.2;
   }
@@ -225,7 +225,7 @@ $warning: var(--ce-status-warning-text);
 .extraInfo {
   h3 {
     margin: 0 0 14px;
-    color: var(--ce-text-inverse);
+    color: $body-text;
   }
 }
 
@@ -272,7 +272,7 @@ $warning: var(--ce-status-warning-text);
     background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
     border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
     border-radius: var(--ce-radius-10);
-    color: var(--ce-text-inverse);
+    color: var(--ce-input-text);
 
     &::placeholder {
       color: color-mix(in srgb, var(--ce-control-text) 45%, transparent);
@@ -308,7 +308,7 @@ $warning: var(--ce-status-warning-text);
 
 .modalHeader {
   background: $surface-bg;
-  color: var(--ce-text-inverse);
+  color: $body-text;
   border-bottom: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
 }
 
@@ -325,7 +325,7 @@ $warning: var(--ce-status-warning-text);
 .modalAdvice {
   h3 {
     margin: 0 0 14px;
-    color: var(--ce-text-inverse);
+    color: $body-text;
   }
 }
 
@@ -347,11 +347,7 @@ $warning: var(--ce-status-warning-text);
   flex: 1 1 50%;
   min-width: 0;
   padding: 28px 24px;
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--ce-action-accent) 6%, transparent) 0%,
-    color-mix(in srgb, var(--ce-data-series-1) 6%, transparent) 100%
-  );
+  background: $panel-bg;
   border: 1px solid $panel-border;
   border-radius: var(--ce-radius-14);
   box-shadow: $panel-shadow;
@@ -388,9 +384,9 @@ $warning: var(--ce-status-warning-text);
   display: inline-flex;
   padding: 3px 10px;
   border-radius: var(--ce-radius-pill);
-  background: color-mix(in srgb, var(--ce-data-series-1) 15%, transparent);
-  border: 1px solid color-mix(in srgb, var(--ce-data-series-1) 25%, transparent);
-  color: var(--ce-status-info-text);
+  background: var(--ce-action-primary);
+  border: 1px solid var(--ce-border-strong);
+  color: var(--ce-action-primary-text);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -399,7 +395,7 @@ $warning: var(--ce-status-warning-text);
 
 .heroName {
   margin: 0 0 8px;
-  color: var(--ce-text-inverse);
+  color: $body-text;
   font-size: clamp(1.8rem, 4vw, 2.4rem);
   font-weight: 800;
   letter-spacing: -0.02em;
@@ -423,7 +419,8 @@ $warning: var(--ce-status-warning-text);
   justify-content: center;
   min-width: 0;
   padding: 24px 28px 24px 32px;
-  background: color-mix(in srgb, var(--ce-text-inverse) 3%, transparent);
+  background: $panel-bg;
+  border: 1px solid $panel-border;
   border-left: 4px solid $accent;
   border-radius: var(--ce-radius-0) var(--ce-radius-14) var(--ce-radius-14) var(--ce-radius-0);
   box-shadow: $panel-shadow;
@@ -532,7 +529,7 @@ $warning: var(--ce-status-warning-text);
 
   h2 {
     margin: 12px 0 0;
-    color: var(--ce-text-inverse);
+    color: $body-text;
     font-size: 1.35rem;
     line-height: 1.2;
   }
@@ -571,7 +568,7 @@ $warning: var(--ce-status-warning-text);
   &:focus-visible .nodeName,
   &:hover .positionLinkIcon,
   &:focus-visible .positionLinkIcon {
-    color: var(--ce-text-inverse);
+    color: $body-text;
   }
 }
 
@@ -649,7 +646,7 @@ $warning: var(--ce-status-warning-text);
 
   &:hover {
     background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
-    color: var(--ce-text-inverse);
+    color: $body-text;
     text-decoration: none;
   }
 }
@@ -668,7 +665,7 @@ $warning: var(--ce-status-warning-text);
   &:focus-visible {
     background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
     border-color: var(--ce-color-accent);
-    color: var(--ce-text-inverse);
+    color: $body-text;
     text-decoration: none;
   }
 }

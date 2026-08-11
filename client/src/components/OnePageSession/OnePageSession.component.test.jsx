@@ -657,6 +657,14 @@ describe('OnePageSession view gating', () => {
     expect(brandingSectionBlock).not.toContain('linear-gradient');
   });
 
+  it('keeps the mobile title tooltip inside the viewport', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
+
+    expect(scss).toContain('width: min(250px, calc(100vw - 32px));');
+    expect(scss).toContain('max-width: calc(100vw - 32px);');
+    expect(scss).toContain('right: 0;');
+  });
+
   it('passes hideEmbeddedDebugUi only to embedded full SurveyPage mode', async () => {
     render(<OnePageSession {...buildProps()} />);
 
@@ -1355,6 +1363,8 @@ describe('OnePageSession view gating', () => {
     expect(sectionContainerBlock).toContain('box-sizing: border-box;');
     expect(sectionContainerBlock).toContain('max-width: 100%;');
     expect(sectionContainerBlock).toContain('min-width: 0;');
+    expect(sectionContainerBlock).toContain('background-color: var(--ce-card-bg);');
+    expect(sectionContainerBlock).toContain('border: 1px solid var(--ce-card-border);');
     expect(sectionHeaderRowBlock).toContain('max-width: 100%;');
     expect(sectionHeaderRowBlock).toContain('min-width: 0;');
     expect(sectionActionsScrollerBlock).toContain('box-sizing: border-box;');
@@ -1374,7 +1384,7 @@ describe('OnePageSession view gating', () => {
     expect(phoneBlock).toContain('.sectionHeader .sectionHeaderSubtitle {');
     expect(phoneBlock).toContain('font-size: 1em;');
     expect(phoneBlock).toContain('font-weight: inherit;');
-    expect(phoneBlock).toContain('color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);');
+    expect(phoneBlock).toContain('color: var(--ce-panel-text-muted);');
     expect(phoneBlock).toContain('.sectionHeader {');
     expect(phoneBlock).toContain('align-items: center;');
     expect(phoneBlock).toContain('.documentsSectionHeaderMeta .sectionHeaderTooltip > svg {');
@@ -1410,7 +1420,7 @@ describe('OnePageSession view gating', () => {
     expect(smallTabletBlock).toContain('.sectionHeader .sectionHeaderSubtitle {');
     expect(smallTabletBlock).toContain('font-size: 1.2em;');
     expect(smallTabletBlock).toContain('font-weight: inherit;');
-    expect(smallTabletBlock).toContain('color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);');
+    expect(smallTabletBlock).toContain('color: var(--ce-panel-text-muted);');
     expect(smallTabletBlock).not.toContain('.documentsSectionHeaderText');
     expect(smallTabletBlock).not.toContain('.documentsSectionHeaderTitleRow');
     expect(smallTabletBlock).not.toContain('.documentsSectionHeaderMain');

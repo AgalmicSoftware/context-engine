@@ -1,10 +1,11 @@
-import SingleQuestionResponse, {
+import SingleQuestionResponse from './SingleQuestionResponse';
+import {
   SINGLE_QUESTION_IMPORTANCE_SLIDER_STYLE,
   buildSingleQuestionMiniPromptButtonClassName,
   buildSingleQuestionReadOnlyBinaryClassName,
   resolveSingleQuestionBookmarkIconStyle,
   resolveSingleQuestionRatingBarStyle,
-} from './SingleQuestionResponse';
+} from './singleQuestionResponseDisplay';
 import styles from './SingleQuestionResponse.module.scss';
 import GateTooltip from '../Gates/GateTooltip';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
