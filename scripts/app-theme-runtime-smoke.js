@@ -1451,6 +1451,21 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       /worker/i,
       'Session Setup entry cards should explain storage without internal Worker terminology',
     );
+    assert.match(
+      sessionSetupContrastState.entryCardText,
+      /EVM RPC URL/,
+      'Session Setup should identify the RPC URL as an EVM requirement',
+    );
+    assert.match(
+      sessionSetupContrastState.entryCardText,
+      /EVM Gas \(TX Fees\)/,
+      'Session Setup should explain that EVM gas pays transaction fees',
+    );
+    assert.doesNotMatch(
+      sessionSetupContrastState.entryCardText,
+      /EVM testnet gas/,
+      'Session Setup should not use the superseded gas label',
+    );
     [
       ['Choose a setup', sessionSetupContrastState.eyebrowRatio],
       ['Cloudflare provider', sessionSetupContrastState.providerRatio],
@@ -1870,6 +1885,7 @@ async function main() {
   const questionUtilitiesOnly = process.argv.includes('--question-utilities-only');
   const statsOnly = process.argv.includes('--stats-only');
   const sessionOnly = process.argv.includes('--session-only');
+  const sessionSetupOnly = process.argv.includes('--session-setup-only');
   const footerOnly = process.argv.includes('--footer-only');
   const toolCardsOnly = process.argv.includes('--tool-cards-only');
   const routeCases = homeTabsOnly
@@ -1880,20 +1896,22 @@ async function main() {
         ? ROUTE_CASES.filter((routeCase) => routeCase.requiresReadableStats)
         : sessionOnly
           ? ROUTE_CASES.filter((routeCase) => routeCase.requiresReadableSessionSurface)
-        : footerOnly
-          ? ROUTE_CASES.filter((routeCase) => routeCase.requiresFooterButtons)
-          : toolCardsOnly
-            ? ROUTE_CASES.filter((routeCase) => routeCase.requiresStandardToolCards)
-            : ROUTE_CASES;
+          : sessionSetupOnly
+            ? ROUTE_CASES.filter((routeCase) => routeCase.requiresReadableSessionSetup)
+            : footerOnly
+              ? ROUTE_CASES.filter((routeCase) => routeCase.requiresFooterButtons)
+              : toolCardsOnly
+                ? ROUTE_CASES.filter((routeCase) => routeCase.requiresStandardToolCards)
+                : ROUTE_CASES;
   const viewports = toolCardsOnly
     ? TOOL_CARD_VIEWPORTS
     : homeTabsOnly
       ? HOME_TAB_VIEWPORTS
-      : footerOnly
-        ? FOOTER_VIEWPORTS
-        : sessionOnly
-          ? SESSION_SURFACE_VIEWPORTS
-        : VIEWPORTS;
+        : footerOnly
+          ? FOOTER_VIEWPORTS
+          : sessionOnly
+            ? SESSION_SURFACE_VIEWPORTS
+            : VIEWPORTS;
   const browser = await chromium.launch({ headless: true });
 
   try {
@@ -1914,7 +1932,15 @@ async function main() {
         await page.close();
       }
     }
-    if (!homeTabsOnly && !questionUtilitiesOnly && !statsOnly && !sessionOnly && !footerOnly && !toolCardsOnly) {
+    if (
+      !homeTabsOnly &&
+      !questionUtilitiesOnly &&
+      !statsOnly &&
+      !sessionOnly &&
+      !sessionSetupOnly &&
+      !footerOnly &&
+      !toolCardsOnly
+    ) {
       for (const viewport of WELCOME_FIT_VIEWPORTS) {
         await assertWelcomeFitsViewport(browser, baseUrl, viewport);
       }
@@ -1930,11 +1956,13 @@ async function main() {
               ? `Classic 95 Community Stats Playwright smoke passed (${VIEWPORTS.length} viewports).`
               : sessionOnly
                 ? `Classic 95 session-surface Playwright smoke passed (${viewports.length} viewports).`
-              : footerOnly
-                ? `Classic 95 footer Playwright smoke passed (${viewports.length} viewports).`
-                : toolCardsOnly
-                  ? `Classic 95 tool-card Playwright smoke passed (${viewports.length} viewports).`
-                  : `App theme runtime Playwright smoke passed (${routeCases.length} routes × ${VIEWPORTS.length} viewports).`,
+                : sessionSetupOnly
+                  ? `Classic 95 Session Setup Playwright smoke passed (${viewports.length} viewports).`
+                  : footerOnly
+                    ? `Classic 95 footer Playwright smoke passed (${viewports.length} viewports).`
+                    : toolCardsOnly
+                      ? `Classic 95 tool-card Playwright smoke passed (${viewports.length} viewports).`
+                      : `App theme runtime Playwright smoke passed (${routeCases.length} routes × ${VIEWPORTS.length} viewports).`,
     );
   } finally {
     await browser.close();

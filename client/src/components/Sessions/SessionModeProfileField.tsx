@@ -43,7 +43,7 @@ const HOSTING_PRESETS = [
     entryLabel: 'Trustless & Public',
     entryProvider: 'Decentralized',
     entryDescription: 'Session data is stored on Arweave, with session identity recorded in a public EVM registry.',
-    entryRequirements: ['AI provider key', 'Arweave wallet', 'RPC URL', 'EVM testnet gas'],
+    entryRequirements: ['AI provider key', 'Arweave wallet', 'EVM RPC URL', 'EVM Gas (TX Fees)'],
   },
 ] as const;
 

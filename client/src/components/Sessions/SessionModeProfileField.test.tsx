@@ -37,7 +37,7 @@ describe('SessionModeProfileField', () => {
       within(decentralizedRequirements)
         .getAllByRole('listitem')
         .map((item) => item.textContent),
-    ).toEqual(['AI provider key', 'Arweave wallet', 'RPC URL', 'EVM testnet gas']);
+    ).toEqual(['AI provider key', 'Arweave wallet', 'EVM RPC URL', 'EVM Gas (TX Fees)']);
     expect(
       screen.getByText('Session settings and responses are stored in Cloudflare. No public blockchain is required.'),
     ).toBeInTheDocument();

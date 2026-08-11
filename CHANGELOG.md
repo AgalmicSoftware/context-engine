@@ -118,7 +118,8 @@ All notable changes to this project will be documented in this file.
 - The native `/new` deployment path now presents an honest Cloudflare dashboard
   checklist with copy controls, return guidance, and Worker URL/CORS/canonical
   config verification before success. Its entry chooser removes redundant
-  infrastructure guidance, identifies decentralized gas as EVM testnet gas,
+  infrastructure guidance, identifies decentralized RPC access and gas as
+  `EVM RPC URL` and `EVM Gas (TX Fees)`,
   and links directly to the README architecture diagram on GitHub. The
   deploy-helper remains a collapsed legacy fallback.
 - Worker route failures now distinguish missing discovery, reachability, CORS,
