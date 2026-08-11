@@ -461,6 +461,15 @@ describe('AboutPage', () => {
     expect(scss).toMatch(/\.heroPrimaryButton\s*{[\s\S]*?font-size:\s*1\.14rem;[\s\S]*?font-weight:\s*700;/);
   });
 
+  it('keeps the About hero flush with the top of its page container', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'AboutPage.module.scss'), 'utf8');
+
+    expect(scss).toMatch(/\.aboutPageContainer\s*{[\s\S]*?padding:\s*0 20px 56px;/);
+    expect(scss).toMatch(
+      /@media \(max-width:\s*640px\)\s*{[\s\S]*?\.aboutPageContainer\s*{[\s\S]*?padding:\s*0 14px 40px;/,
+    );
+  });
+
   it('keeps mobile recognition rows aligned and keeps use-case buttons responsive', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'AboutPage.module.scss'), 'utf8');
 

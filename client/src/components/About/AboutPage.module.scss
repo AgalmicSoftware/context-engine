@@ -18,7 +18,7 @@ $modal-muted: var(--ce-panel-text-muted);
 .aboutPageContainer {
   position: relative;
   overflow: hidden;
-  padding: clamp(24px, 5vw, 56px) 20px 56px;
+  padding: 0 20px 56px;
   color: $text-color;
   font-family: var(--ce-font-mono);
 }
@@ -1278,7 +1278,7 @@ $modal-muted: var(--ce-panel-text-muted);
 
 @media (max-width: 640px) {
   .aboutPageContainer {
-    padding: 20px 14px 40px;
+    padding: 0 14px 40px;
   }
 
   .pageShell {
