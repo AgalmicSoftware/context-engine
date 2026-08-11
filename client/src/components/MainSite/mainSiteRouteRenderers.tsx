@@ -499,7 +499,13 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
   },
 
   _renderHomeRoute: (ctx: RouteRenderCtx) => {
-    const { defaultSlug, defaultSessionNetwork, cacheInitializationError } = ctx;
+    const {
+      defaultSlug,
+      defaultSessionCfg,
+      defaultSessionChainId,
+      defaultSessionNetwork,
+      cacheInitializationError,
+    } = ctx;
     return (
       <div className={styles.main} data-testid={E2E_TESTIDS.PAGE_HOME_ROOT}>
         <MainAreaTabs
@@ -515,13 +521,18 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
           demoMode={host.props.demoMode}
           demoSurfaceMode={host.props.demoSurfaceMode}
           activeSessionSlug={defaultSlug}
+          sessionConfig={defaultSessionCfg}
           network={defaultSessionNetwork}
+          networkChainId={defaultSessionChainId}
           isAllCachesReady={host.state.isAllCachesReady}
           cacheHasLoaded={host.state.cacheHasLoaded}
           sbtCacheRevision={host.state.sbtCacheRevision}
           isSurveyCacheReady={host.state.isSurveyCacheReady}
           isQuestionCacheReady={host.state.isQuestionCacheReady}
+          isResponsesCacheReady={host.state.isResponsesCacheReady}
           isSBTCacheReady={host.state.isSBTCacheReady}
+          questionResponsesNonce={host.state.questionResponsesNonce}
+          questionScanProgress={host.state.questionScanProgress}
           sbtRealtimeCoverageBySlug={host.state.sbtRealtimeCoverageBySlug}
           ensureLightSbtDiscovery={host.ensureLightSbtDiscovery}
           ensureLightSbtUniverse={host.ensureLightSbtUniverse}

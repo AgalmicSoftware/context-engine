@@ -5,7 +5,12 @@ import {
   type BeeswarmLayoutDomain,
   type BeeswarmLayoutStrategy,
 } from './beeswarmLayout';
-import BeeswarmTooltip, { resolveTooltipLayout, TOOLTIP_MARGIN, type TooltipLayout } from './BeeswarmTooltip';
+import BeeswarmTooltip, {
+  resolveTooltipLayout,
+  TOOLTIP_MARGIN,
+  TOOLTIP_OFFSET,
+  type TooltipLayout,
+} from './BeeswarmTooltip';
 export {
   buildBeeswarmTooltipSegmentClassName,
   buildBeeswarmTooltipStatClassName,
@@ -42,6 +47,21 @@ type BeeswarmTooltipEvent = {
 } | null;
 
 type BeeswarmPointKey = string | number;
+
+type BeeswarmTooltipAnchor = {
+  x: number;
+  y: number;
+  offset: number;
+};
+
+type BeeswarmTooltipAnchorInput = {
+  wrapperRect: Pick<DOMRect, 'left' | 'top'>;
+  targetRect?: Pick<DOMRect, 'left' | 'top' | 'width' | 'height'> | null;
+  eventX?: number;
+  eventY?: number;
+  point?: BeeswarmPoint | null;
+  pointRadius?: number;
+};
 
 export type BeeswarmPlotProps = {
   points?: BeeswarmPoint[];
@@ -112,6 +132,37 @@ const normalizeBinaryVoteCount = (value: unknown) => {
   return Number.isFinite(numericValue) ? numericValue : 0;
 };
 
+export const resolveBeeswarmTooltipAnchor = ({
+  wrapperRect,
+  targetRect,
+  eventX,
+  eventY,
+  point,
+  pointRadius = POINT_RADIUS,
+}: BeeswarmTooltipAnchorInput): BeeswarmTooltipAnchor => {
+  if (targetRect && targetRect.width > 0 && targetRect.height > 0) {
+    return {
+      x: targetRect.left - wrapperRect.left + targetRect.width / 2,
+      y: targetRect.top - wrapperRect.top + targetRect.height / 2,
+      offset: Math.max(targetRect.width, targetRect.height) / 2 + TOOLTIP_OFFSET,
+    };
+  }
+
+  if (Number.isFinite(eventX) && Number.isFinite(eventY)) {
+    return {
+      x: Number(eventX) - wrapperRect.left,
+      y: Number(eventY) - wrapperRect.top,
+      offset: pointRadius + TOOLTIP_OFFSET,
+    };
+  }
+
+  return {
+    x: Number(point?.x || 0),
+    y: Number(point?.y || 0),
+    offset: pointRadius + TOOLTIP_OFFSET,
+  };
+};
+
 export default function BeeswarmPlot({
   points = [],
   className = '',
@@ -147,7 +198,11 @@ export default function BeeswarmPlot({
   const [hoveredKey, setHoveredKey] = useState<BeeswarmPointKey | null>(null);
   const [pinnedKey, setPinnedKey] = useState<BeeswarmPointKey | null>(null);
   const [singlePointDeselected, setSinglePointDeselected] = useState(false);
-  const [tooltipAnchor, setTooltipAnchor] = useState({ x: 0, y: 0 });
+  const [tooltipAnchor, setTooltipAnchor] = useState<BeeswarmTooltipAnchor>({
+    x: 0,
+    y: 0,
+    offset: pointRadius + TOOLTIP_OFFSET,
+  });
   const [tooltipLayout, setTooltipLayout] = useState<TooltipLayout>({
     left: TOOLTIP_MARGIN,
     top: TOOLTIP_MARGIN,
@@ -221,31 +276,20 @@ export default function BeeswarmPlot({
     if (!wrapper) return;
     const wrapperRect = wrapper.getBoundingClientRect();
 
-    const eventX = event?.clientX;
-    const eventY = event?.clientY;
-    if (Number.isFinite(eventX) && Number.isFinite(eventY)) {
-      setTooltipAnchor({
-        x: Number(eventX) - wrapperRect.left,
-        y: Number(eventY) - wrapperRect.top,
-      });
-      return;
-    }
-
     const targetRect =
       typeof event?.currentTarget?.getBoundingClientRect === 'function'
         ? event.currentTarget.getBoundingClientRect()
         : null;
-    if (targetRect) {
-      setTooltipAnchor({
-        x: targetRect.left - wrapperRect.left + targetRect.width / 2,
-        y: targetRect.top - wrapperRect.top + targetRect.height,
-      });
-      return;
-    }
-
-    if (point) {
-      setTooltipAnchor({ x: point.x || 0, y: point.y || 0 });
-    }
+    setTooltipAnchor(
+      resolveBeeswarmTooltipAnchor({
+        wrapperRect,
+        targetRect,
+        eventX: event?.clientX,
+        eventY: event?.clientY,
+        point,
+        pointRadius,
+      }),
+    );
   };
 
   useLayoutEffect(() => {
@@ -261,6 +305,7 @@ export default function BeeswarmPlot({
       wrapperHeight: wrapper.clientHeight || height,
       tooltipWidth: tooltip.offsetWidth || 0,
       tooltipHeight: tooltip.offsetHeight || 0,
+      offset: tooltipAnchor.offset,
     });
 
     setTooltipLayout((prev) =>
@@ -271,7 +316,7 @@ export default function BeeswarmPlot({
         ? prev
         : nextLayout,
     );
-  }, [activePoint, height, tooltipAnchor.x, tooltipAnchor.y, width]);
+  }, [activePoint, height, tooltipAnchor.offset, tooltipAnchor.x, tooltipAnchor.y, width]);
 
   const handleHover = (point: BeeswarmPoint, index: number, event: BeeswarmTooltipEvent = null) => {
     setSinglePointDeselected(false);

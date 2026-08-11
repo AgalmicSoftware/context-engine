@@ -117,7 +117,15 @@ describe('ToolExplorer session propagation', () => {
   });
 
   it('passes the inherited active session slug into the embedded SurveyTool', async () => {
-    renderToolExplorer();
+    const sessionConfig = { slug: 'demo', storageProfile: { backend: 'cloudflare' } };
+    const questionScanProgress = { slug: 'demo', phase: 'hydrate', discoveredQuestions: 3 };
+    renderToolExplorer({
+      sessionConfig,
+      networkChainId: 84532,
+      isResponsesCacheReady: true,
+      questionResponsesNonce: 7,
+      questionScanProgress,
+    });
 
     fireEvent.click(screen.getByText('Questions'));
 
@@ -125,6 +133,11 @@ describe('ToolExplorer session propagation', () => {
     expect(mockSurveyTool).toHaveBeenCalledWith(
       expect.objectContaining({
         activeSessionSlug: 'demo',
+        sessionConfig,
+        networkChainId: 84532,
+        isResponsesCacheReady: true,
+        questionResponsesNonce: 7,
+        questionScanProgress,
         preventUrlChange: true,
       }),
     );

@@ -43,16 +43,21 @@ type MainAreaTabsProps = {
   demoSurfaceMode?: unknown;
   provider?: unknown;
   network?: unknown;
+  networkChainId?: unknown;
+  sessionConfig?: unknown;
   account?: string;
   litHooks?: unknown;
   activeSessionSlug?: string;
   loginComplete?: boolean;
   loginInProgress?: boolean;
   isQuestionCacheReady?: boolean;
+  isResponsesCacheReady?: boolean;
   isSurveyCacheReady?: boolean;
   isSBTCacheReady?: boolean;
   sbtCacheRevision?: number;
   sbtRealtimeCoverageBySlug?: unknown;
+  questionResponsesNonce?: unknown;
+  questionScanProgress?: unknown;
   ensureLightSbtDiscovery?: (...args: unknown[]) => unknown;
   ensureLightSbtUniverse?: (...args: unknown[]) => unknown;
 };
@@ -190,14 +195,19 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
                       provider={this.props.provider}
                       litHooks={this.props.litHooks}
                       activeSessionSlug={this.props.activeSessionSlug}
+                      sessionConfig={this.props.sessionConfig}
                       network={this.props.network}
+                      networkChainId={this.props.networkChainId}
                       loginComplete={this.props.loginComplete}
                       loginInProgress={this.props.loginInProgress}
                       demoMode={this.props.demoMode}
                       demoSurfaceMode={this.props.demoSurfaceMode}
                       isQuestionCacheReady={this.props.isQuestionCacheReady}
+                      isResponsesCacheReady={this.props.isResponsesCacheReady}
                       isSurveyCacheReady={this.props.isSurveyCacheReady}
                       isSBTCacheReady={this.props.isSBTCacheReady}
+                      questionResponsesNonce={this.props.questionResponsesNonce}
+                      questionScanProgress={this.props.questionScanProgress}
                     />
                   </Suspense>
                 ) : null}

@@ -27,6 +27,7 @@ import {
 
 const mockAdminPage = jest.fn(() => null);
 const mockNavbar = jest.fn(() => null);
+const mockMainAreaTabs = jest.fn(() => null);
 const mockSponsorPage = jest.fn(() => null);
 const mockSessionWizard = jest.fn(() => null);
 const mockSurveyPage = jest.fn(() => null);
@@ -77,7 +78,10 @@ jest.mock('../Navbar/Navbar', () => ({
     return null;
   },
 }));
-jest.mock('../MainContent/MainAreaTabs', () => () => null);
+jest.mock('../MainContent/MainAreaTabs', () => (props) => {
+  mockMainAreaTabs(props);
+  return null;
+});
 jest.mock('../Onboarding/OnboardingOverlay', () => () => null);
 jest.mock('../Footer/Footer', () => () => null);
 jest.mock('../UserPage/SimUserPage', () => () => null);
@@ -782,6 +786,33 @@ describe('AppShell route render smoke', () => {
         questionScanProgress: null,
       }),
       expect.any(Function),
+    );
+  });
+
+  it('forwards the active session cache context to the home tools explorer', () => {
+    const sessionConfig = {
+      slug: 'edge',
+      sessionName: 'Edge Session',
+      networkChainId: 84532,
+    };
+    const subject = createSubject({ path: '/', activeSessionSlug: 'edge', sessionConfig });
+    subject.state = {
+      ...subject.state,
+      questionResponsesNonce: 7,
+      questionScanProgress: { slug: 'edge', phase: 'hydrate', discoveredQuestions: 3 },
+    };
+
+    render(subject.render());
+
+    expect(mockMainAreaTabs).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        activeSessionSlug: 'edge',
+        sessionConfig,
+        networkChainId: 84532,
+        isResponsesCacheReady: true,
+        questionResponsesNonce: 7,
+        questionScanProgress: subject.state.questionScanProgress,
+      }),
     );
   });
 

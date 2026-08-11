@@ -4,6 +4,7 @@ import BeeswarmPlot, {
   buildBeeswarmTooltipSegmentClassName,
   buildBeeswarmTooltipStatClassName,
   normalizeTooltipVoteBreakdown,
+  resolveBeeswarmTooltipAnchor,
   resolveTooltipLayout,
   resolveTooltipPositionStyle,
   resolveTooltipResponseSegmentStyle,
@@ -136,6 +137,46 @@ describe('BeeswarmPlot', () => {
         vertical: 'top',
       }),
     );
+  });
+
+  it('anchors tooltip spacing outside the hovered dot instead of the mouse position inside it', () => {
+    const anchor = resolveBeeswarmTooltipAnchor({
+      wrapperRect: { left: 20, top: 30 },
+      targetRect: { left: 120, top: 80, width: 20, height: 20 },
+      eventX: 124,
+      eventY: 84,
+      pointRadius: 10,
+    });
+
+    expect(anchor).toEqual({ x: 110, y: 60, offset: 24 });
+    const layout = resolveTooltipLayout({
+      anchorX: anchor.x,
+      anchorY: anchor.y,
+      offset: anchor.offset,
+      wrapperWidth: 420,
+      wrapperHeight: 280,
+      tooltipWidth: 180,
+      tooltipHeight: 100,
+    });
+    expect(layout.left).toBeGreaterThanOrEqual(anchor.x + anchor.offset);
+    expect(layout.top).toBeGreaterThanOrEqual(anchor.y + anchor.offset);
+  });
+
+  it('keeps the dot visible when a compact viewport cannot contain the tooltip on either side', () => {
+    const layout = resolveTooltipLayout({
+      anchorX: 254,
+      anchorY: 49,
+      offset: 22,
+      wrapperWidth: 350,
+      wrapperHeight: 220,
+      tooltipWidth: 310,
+      tooltipHeight: 190,
+    });
+
+    expect(layout.horizontal).toBe('left');
+    expect(layout.vertical).toBe('bottom');
+    expect(layout.left).toBe(12);
+    expect(layout.top).toBe(71);
   });
 
   it('pins point details on click until the close action is used', () => {

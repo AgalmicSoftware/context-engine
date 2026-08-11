@@ -111,18 +111,27 @@ export const resolveTooltipLayout = ({
   const usableWidth = Math.max(wrapperWidth, tooltipWidth + margin * 2);
   const usableHeight = Math.max(wrapperHeight, tooltipHeight + margin * 2);
   const maxLeft = Math.max(margin, usableWidth - tooltipWidth - margin);
-  const maxTop = Math.max(margin, usableHeight - tooltipHeight - margin);
-  let left = anchorX + offset;
-  if (left + tooltipWidth > usableWidth - margin) left = anchorX - tooltipWidth - offset;
-  left = clamp(left, margin, maxLeft);
-  let top = anchorY + offset;
-  if (top + tooltipHeight > usableHeight - margin) top = anchorY - tooltipHeight - offset;
-  top = clamp(top, margin, maxTop);
+  const rightStart = anchorX + offset;
+  const leftStart = anchorX - tooltipWidth - offset;
+  const rightOverflow = Math.max(0, rightStart + tooltipWidth - (usableWidth - margin));
+  const leftOverflow = Math.max(0, margin - leftStart);
+  const placeRight = rightOverflow === 0 || (leftOverflow > 0 && rightOverflow <= leftOverflow);
+  const left = clamp(placeRight ? rightStart : leftStart, margin, maxLeft);
+
+  const belowStart = anchorY + offset;
+  const aboveStart = anchorY - tooltipHeight - offset;
+  const belowOverflow = Math.max(0, belowStart + tooltipHeight - (usableHeight - margin));
+  const aboveOverflow = Math.max(0, margin - aboveStart);
+  const placeBelow = belowOverflow === 0 || (aboveOverflow > 0 && belowOverflow <= aboveOverflow);
+  // When neither vertical side can contain the card, allow it to extend outside
+  // the plot wrapper (which is overflow-visible). Clamping it back into the plot
+  // would cover the point the user is trying to inspect.
+  const top = placeBelow ? belowStart : aboveStart;
   return {
     left,
     top,
-    horizontal: left >= anchorX ? 'right' : 'left',
-    vertical: top >= anchorY ? 'bottom' : 'top',
+    horizontal: placeRight ? 'right' : 'left',
+    vertical: placeBelow ? 'bottom' : 'top',
   };
 };
 

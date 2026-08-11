@@ -36,15 +36,20 @@ const createProps = (overrides: Record<string, unknown> = {}) => ({
   demoSurfaceMode: true,
   provider: {},
   network: { id: 84532 },
+  networkChainId: 84532,
+  sessionConfig: { slug: 'demo', storageProfile: { backend: 'cloudflare' } },
   account: '0x1111111111111111111111111111111111111111',
   loginComplete: false,
   loginInProgress: false,
   activeSessionSlug: 'demo',
   isQuestionCacheReady: true,
+  isResponsesCacheReady: true,
   isSurveyCacheReady: true,
   isSBTCacheReady: true,
   sbtCacheRevision: 0,
   sbtRealtimeCoverageBySlug: {},
+  questionResponsesNonce: 7,
+  questionScanProgress: { slug: 'demo', phase: 'hydrate', discoveredQuestions: 3 },
   ensureLightSbtDiscovery: jest.fn(),
   ensureLightSbtUniverse: jest.fn(),
   ...overrides,
@@ -73,6 +78,23 @@ describe('MainAreaTabs', () => {
     render(<MainAreaTabs {...createProps({ demoSurfaceMode: false })} />);
 
     expect(await screen.findByTestId('mock-tool-explorer')).toHaveAttribute('data-demo-surface-mode', 'false');
+  });
+
+  it('passes the active session cache context through to the embedded explorer', async () => {
+    const props = createProps();
+    render(<MainAreaTabs {...props} />);
+
+    await screen.findByTestId('mock-tool-explorer');
+    expect(mockToolExplorer).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        activeSessionSlug: 'demo',
+        sessionConfig: props.sessionConfig,
+        networkChainId: 84532,
+        isResponsesCacheReady: true,
+        questionResponsesNonce: 7,
+        questionScanProgress: props.questionScanProgress,
+      }),
+    );
   });
 
   it('renders the onboarding walkthrough on the Welcome tab', async () => {

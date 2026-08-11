@@ -388,6 +388,11 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
 
   if (routeCase.requiresReadableAuthoring) {
     await page.getByText('Questions', { exact: true }).click();
+    await page.waitForFunction(
+      () => /Questions\s*\([1-9]\d*\)/.test(document.querySelector('[data-testid="ce-survey-questions-toggle"]')?.textContent || ''),
+      null,
+      { timeout: 15000 },
+    );
     await page.getByTestId('ce-survey-create-toggle').waitFor({ state: 'visible' });
     await page.getByTestId('ce-survey-create-toggle').click();
     await page.getByPlaceholder('Speak or type text here...').waitFor({ state: 'visible' });
@@ -676,11 +681,29 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         const points = Array.from(document.querySelectorAll('[data-testid^="ce-beeswarm-point-"]'));
         const pointXs = points.map((point) => Number(point.getAttribute('cx'))).filter(Number.isFinite);
         const firstPointStyle = points[0] ? window.getComputedStyle(points[0]) : null;
+        const firstPointRect = points[0]?.getBoundingClientRect();
         const svg = document.querySelector('[data-testid="ce-community-beeswarm-section"] svg');
         const tooltip = document.querySelector('[data-testid="ce-beeswarm-tooltip"]');
         const tooltipText = tooltip?.textContent || '';
         const tooltipRect = tooltip?.getBoundingClientRect();
         const tooltipStyle = tooltip ? window.getComputedStyle(tooltip) : null;
+        const tooltipPointGap =
+          tooltipRect && firstPointRect
+            ? tooltipRect.right <= firstPointRect.left
+              ? firstPointRect.left - tooltipRect.right
+              : firstPointRect.right <= tooltipRect.left
+                ? tooltipRect.left - firstPointRect.right
+                : tooltipRect.bottom <= firstPointRect.top
+                  ? firstPointRect.top - tooltipRect.bottom
+                  : firstPointRect.bottom <= tooltipRect.top
+                    ? tooltipRect.top - firstPointRect.bottom
+                    : -Math.min(
+                        tooltipRect.right - firstPointRect.left,
+                        firstPointRect.right - tooltipRect.left,
+                        tooltipRect.bottom - firstPointRect.top,
+                        firstPointRect.bottom - tooltipRect.top,
+                      )
+            : -1;
         return {
           pointCount: points.length,
           pointSpread: pointXs.length ? Math.max(...pointXs) - Math.min(...pointXs) : 0,
@@ -698,6 +721,13 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
           tooltipDisagreeRatio: textRatio('[data-testid="ce-beeswarm-tooltip-disagree"]'),
           tooltipTotalRatio: textRatio('[data-testid="ce-beeswarm-tooltip-total"]'),
           tooltipWidth: tooltipRect?.width || 0,
+          tooltipPointGap,
+          tooltipRect: tooltipRect
+            ? { left: tooltipRect.left, right: tooltipRect.right, top: tooltipRect.top, bottom: tooltipRect.bottom }
+            : null,
+          hoveredPointRect: firstPointRect
+            ? { left: firstPointRect.left, right: firstPointRect.right, top: firstPointRect.top, bottom: firstPointRect.bottom }
+            : null,
           tooltipPointerEvents: tooltipStyle?.pointerEvents || '',
         };
       })
@@ -1167,6 +1197,10 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     assert.ok(
       statsContrastState.tooltipWidth <= 320,
       `Community Stats hover details should stay compact; received ${statsContrastState.tooltipWidth.toFixed(2)}px`,
+    );
+    assert.ok(
+      statsContrastState.tooltipPointGap >= 8,
+      `Community Stats hover details should leave the hovered dot visible; received ${statsContrastState.tooltipPointGap.toFixed(2)}px gap (${JSON.stringify({ tooltip: statsContrastState.tooltipRect, point: statsContrastState.hoveredPointRect })})`,
     );
     assert.equal(
       statsContrastState.tooltipPointerEvents,
