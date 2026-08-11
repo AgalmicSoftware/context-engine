@@ -59,6 +59,7 @@ describe('OnboardingOverlay', () => {
     expect(deck).toHaveAttribute('data-slide-key', 'intro');
     expect(deck).toHaveAttribute('data-slide-layout', 'flushBottom');
     expect(mediaButton).toHaveAttribute('data-slide-layout', 'flushBottom');
+    expect(mediaButton).toHaveAttribute('data-ce-control-appearance', 'frameless');
     expect(greetingImage).toHaveAttribute('data-slide-layout', 'flushBottom');
     expect(controls.className).toContain(styles.onboardingControlsSingleArrow);
     expect(controlSlots).toHaveLength(1);
@@ -101,6 +102,11 @@ describe('OnboardingOverlay', () => {
     expect(bulletContainer.className).toMatch(/titlelessBulletListContainer/);
     expect(controls.className).toContain(styles.onboardingControlsDualArrow);
     expect(controlSlots).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Back' })).toHaveAttribute(
+      'data-ce-control-appearance',
+      'frameless',
+    );
+    expect(nextButton).toHaveAttribute('data-ce-control-appearance', 'frameless');
     expect(screen.getByText(/A toolkit/i)).toBeInTheDocument();
 
     fireEvent.click(nextButton);

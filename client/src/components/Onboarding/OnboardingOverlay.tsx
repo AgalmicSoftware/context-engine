@@ -113,6 +113,7 @@ const OnboardingOverlay = () => {
                   type="button"
                   className={mediaButtonClassName}
                   data-testid="ce-onboarding-media"
+                  data-ce-control-appearance="frameless"
                   data-slide-key={slideKey}
                   data-slide-layout={slideLayout}
                   onClick={slideClickHandler || undefined}
@@ -154,6 +155,7 @@ const OnboardingOverlay = () => {
                   <button
                     type="button"
                     className={styles.takeSurveyButton}
+                    data-ce-control-appearance="frameless"
                     onClick={goToPreviousStep}
                     aria-label="Back"
                   >
@@ -172,6 +174,7 @@ const OnboardingOverlay = () => {
                 <button
                   type="button"
                   className={styles.takeSurveyButton}
+                  data-ce-control-appearance="frameless"
                   onClick={advanceOrComplete}
                   aria-label={isLastSlide ? 'Complete onboarding' : 'Next'}
                 >

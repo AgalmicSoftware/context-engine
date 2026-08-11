@@ -4,6 +4,15 @@ import path from 'path';
 describe('Onboarding overlay welcome slide styles', () => {
   const scss = fs.readFileSync(path.join(__dirname, 'OnboardingOverlay.module.scss'), 'utf8');
 
+  it('uses the main-site Welcome backdrop without duplicate panel paint layers', () => {
+    expect(scss).toMatch(
+      /\.panelFrame\s*{[\s\S]*?background-image:\s*var\(--ce-welcome-artwork-backdrop\);/,
+    );
+    expect(scss).toMatch(/\.panel\s*{[\s\S]*?background:\s*transparent;/);
+    expect(scss).not.toMatch(/\.panel\[data-slide-key='intro'\]\s*{/);
+    expect(scss).not.toMatch(/\.panel::(?:before|after)\s*{/);
+  });
+
   it('moves medium slide arrows below the skip button instead of leaving them in the content flow', () => {
     expect(scss).toMatch(/\.panelFrame\s*\{[\s\S]*?height:\s*min\(92vh,\s*1180px\);[\s\S]*?min-height:\s*680px;/);
     expect(scss).toMatch(/\.panel\s*\{[\s\S]*?--modal-panel-pad-top:\s*24px;[\s\S]*?--modal-panel-pad-bottom:\s*76px;/);
