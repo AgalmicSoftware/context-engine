@@ -281,4 +281,4 @@ surfaces, `/about`, `/session/new`, `/docs`, `/demos`, and a not-found route at
 desktop and mobile widths. It boots `classic-95`, switches to `context-engine`
 without reload, and verifies palette, typography, geometry, modal chrome,
 Session Wizard preview scope, Community Stats/tooltip contrast and data spread,
-and horizontal overflow.
+the shared compact non-blocking beeswarm hover card, and horizontal overflow.

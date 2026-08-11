@@ -643,6 +643,8 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         const svg = document.querySelector('[data-testid="ce-community-beeswarm-section"] svg');
         const tooltip = document.querySelector('[data-testid="ce-beeswarm-tooltip"]');
         const tooltipText = tooltip?.textContent || '';
+        const tooltipRect = tooltip?.getBoundingClientRect();
+        const tooltipStyle = tooltip ? window.getComputedStyle(tooltip) : null;
         return {
           pointCount: points.length,
           pointSpread: pointXs.length ? Math.max(...pointXs) - Math.min(...pointXs) : 0,
@@ -659,6 +661,8 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
           tooltipUnsureRatio: textRatio('[data-testid="ce-beeswarm-tooltip-unsure"]'),
           tooltipDisagreeRatio: textRatio('[data-testid="ce-beeswarm-tooltip-disagree"]'),
           tooltipTotalRatio: textRatio('[data-testid="ce-beeswarm-tooltip-total"]'),
+          tooltipWidth: tooltipRect?.width || 0,
+          tooltipPointerEvents: tooltipStyle?.pointerEvents || '',
         };
       })
     : null;
@@ -993,6 +997,15 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       statsContrastState.hasCountedVotes,
       true,
       'Community Stats hover details should use default-session votes',
+    );
+    assert.ok(
+      statsContrastState.tooltipWidth <= 320,
+      `Community Stats hover details should stay compact; received ${statsContrastState.tooltipWidth.toFixed(2)}px`,
+    );
+    assert.equal(
+      statsContrastState.tooltipPointerEvents,
+      'none',
+      'Community Stats hover details should not block nearby points',
     );
     [
       ['stat icon', statsContrastState.statIconRatio, 3],
