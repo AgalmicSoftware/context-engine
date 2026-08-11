@@ -37,6 +37,10 @@ describe('runtime SCSS theme contract', () => {
     expect(result.css).toContain('--ce-response-agree-bg: #c0e0c0');
     expect(result.css).toContain('--ce-data-viz-point: #000080');
     expect(result.css).toContain('--ce-brand-logo-blend-mode: screen');
+    expect(result.css).toContain('--ce-recognition-logo-backing: transparent');
+    expect(result.css).toContain('--ce-recognition-logo-border: transparent');
+    expect(result.css).toContain('--ce-recognition-logo-backing: var(--ce-status-info-text)');
+    expect(result.css).toContain('--ce-recognition-logo-border: var(--ce-status-info)');
     expect(result.css).toContain('--ce-welcome-artwork-blend-soft: screen');
     expect(result.css).toContain('--ce-welcome-artwork-blend-intense: screen');
     expect(result.css).toContain('--ce-welcome-artwork-blend-cutout: screen');

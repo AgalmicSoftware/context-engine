@@ -507,4 +507,24 @@ describe('AboutPage', () => {
       /@media \(max-width:\s*640px\)\s*{[\s\S]*?\.mobileDemoVideoPlayer\s*{[\s\S]*?min-height:\s*clamp\(220px,\s*62vw,\s*300px\);/,
     );
   });
+
+  it('uses a theme-owned backing so classic recognition logos can remain transparent', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'AboutPage.module.scss'), 'utf8');
+    const themeContract = fs.readFileSync(path.resolve(__dirname, '../../scss/themes/_contract.scss'), 'utf8');
+    const contextTheme = fs.readFileSync(path.resolve(__dirname, '../../scss/themes/_context-engine.scss'), 'utf8');
+    const classicTheme = fs.readFileSync(path.resolve(__dirname, '../../scss/themes/_classic-95.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /\.recognitionLogoEthereum,[\s\S]*?\.recognitionLogoEdge\s*{[\s\S]*?background:\s*color-mix\(in srgb, var\(--ce-recognition-logo-backing\) 96%, transparent\);[\s\S]*?border-color:\s*color-mix\(in srgb, var\(--ce-recognition-logo-border\) 24%, transparent\);/,
+    );
+    expect(scss).toMatch(
+      /\.recognitionLogoPolis\s*{[\s\S]*?background:\s*color-mix\(in srgb, var\(--ce-recognition-logo-backing\) 98%, transparent\);/,
+    );
+    expect(themeContract).toContain('recognition-logo-backing,');
+    expect(themeContract).toContain('recognition-logo-border,');
+    expect(contextTheme).toContain('recognition-logo-backing: var(--ce-status-info-text),');
+    expect(contextTheme).toContain('recognition-logo-border: var(--ce-status-info),');
+    expect(classicTheme).toContain('recognition-logo-backing: transparent,');
+    expect(classicTheme).toContain('recognition-logo-border: transparent,');
+  });
 });

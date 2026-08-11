@@ -19,7 +19,12 @@ const ROUTE_CASES = Object.freeze([
     requiresPreloginThemeSettings: true,
   },
   { path: '/', label: 'home Community Stats surface', requiresReadableStats: true },
-  { path: '/about', label: 'about lazy route', requiresBrightLogo: true },
+  {
+    path: '/about',
+    label: 'about lazy route',
+    requiresBrightLogo: true,
+    requiresTransparentRecognitionLogos: true,
+  },
   {
     path: '/session/new',
     label: 'Session Wizard',
@@ -664,6 +669,12 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
           };
         })
     : null;
+  const classicRecognitionLogoState = routeCase.requiresTransparentRecognitionLogos
+    ? await page.getByTestId('ce-about-recognition-ethereum').locator('img').evaluate((element) => {
+        const style = window.getComputedStyle(element);
+        return { backgroundColor: style.backgroundColor, borderColor: style.borderColor };
+      })
+    : null;
 
   await page.evaluate(() => {
     document.documentElement.dataset.ceTheme = 'context-engine';
@@ -711,6 +722,12 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
             opacity: style.opacity,
           };
         })
+    : null;
+  const currentRecognitionLogoState = routeCase.requiresTransparentRecognitionLogos
+    ? await page.getByTestId('ce-about-recognition-ethereum').locator('img').evaluate((element) => {
+        const style = window.getComputedStyle(element);
+        return { backgroundColor: style.backgroundColor, borderColor: style.borderColor };
+      })
     : null;
   const currentWelcomeImageState = routeCase.requiresFramelessWelcome
     ? await page.getByTestId('ce-welcome-slide-image').evaluate((element) => {
@@ -1001,6 +1018,28 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       currentLogoState.filter,
       'none',
       'Context Engine navbar logo should not inherit the Classic 95 filter',
+    );
+  }
+  if (classicRecognitionLogoState && currentRecognitionLogoState) {
+    assert.equal(
+      /^(?:rgba\(0, 0, 0, 0\)|color\(srgb 0 0 0 \/ 0\))$/.test(classicRecognitionLogoState.backgroundColor),
+      true,
+      `Classic 95 recognition logos should expose their transparent image regions; received ${classicRecognitionLogoState.backgroundColor}`,
+    );
+    assert.equal(
+      /^(?:rgba\(0, 0, 0, 0\)|color\(srgb 0 0 0 \/ 0\))$/.test(classicRecognitionLogoState.borderColor),
+      true,
+      `Classic 95 recognition logos should not retain a blue tile border; received ${classicRecognitionLogoState.borderColor}`,
+    );
+    assert.notEqual(
+      currentRecognitionLogoState.backgroundColor,
+      'rgba(0, 0, 0, 0)',
+      'Context Engine recognition logos should preserve their existing backing',
+    );
+    assert.notEqual(
+      currentRecognitionLogoState.borderColor,
+      'rgba(0, 0, 0, 0)',
+      'Context Engine recognition logos should preserve their existing border',
     );
   }
 }

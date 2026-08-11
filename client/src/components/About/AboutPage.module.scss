@@ -874,8 +874,8 @@ $modal-muted: var(--ce-panel-text-muted);
 .recognitionLogoEthereum,
 .recognitionLogoCip,
 .recognitionLogoEdge {
-  background: color-mix(in srgb, var(--ce-status-info-text) 96%, transparent);
-  border-color: color-mix(in srgb, var(--ce-status-info) 24%, transparent);
+  background: color-mix(in srgb, var(--ce-recognition-logo-backing) 96%, transparent);
+  border-color: color-mix(in srgb, var(--ce-recognition-logo-border) 24%, transparent);
 }
 
 .recognitionLogoEthereum {
@@ -887,8 +887,8 @@ $modal-muted: var(--ce-panel-text-muted);
 }
 
 .recognitionLogoPolis {
-  background: color-mix(in srgb, var(--ce-status-info-text) 98%, transparent);
-  border-color: color-mix(in srgb, var(--ce-status-info) 18%, transparent);
+  background: color-mix(in srgb, var(--ce-recognition-logo-backing) 98%, transparent);
+  border-color: color-mix(in srgb, var(--ce-recognition-logo-border) 18%, transparent);
   padding: 0;
 }
 

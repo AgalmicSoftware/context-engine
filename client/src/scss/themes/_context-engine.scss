@@ -144,6 +144,8 @@ $theme: (
   brand-logo-opacity: 0.4,
   brand-logo-blend-mode: luminosity,
   brand-logo-filter: none,
+  recognition-logo-backing: var(--ce-status-info-text),
+  recognition-logo-border: var(--ce-status-info),
   welcome-artwork-blend-soft: lighten,
   welcome-artwork-blend-intense: color-dodge,
   welcome-artwork-blend-cutout: screen,
