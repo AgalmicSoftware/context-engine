@@ -7,6 +7,16 @@ const readSurveyToolScss = () => fs.readFileSync(path.join(__dirname, 'SurveyToo
 const readFinalSubmitCtaScss = () => fs.readFileSync(path.join(__dirname, '../../scss/_finalSubmitCta.scss'), 'utf8');
 
 describe('SurveyTool styles', () => {
+  it('uses readable authoring controls across the questions toolbar', () => {
+    const scss = readSurveyToolScss();
+
+    expect(scss).toMatch(/#surveysRow\s*{[\s\S]*?background:\s*var\(--ce-authoring-section-bg\);/);
+    expect(scss).toMatch(/#dropdownToggle\s*{[\s\S]*?color:\s*var\(--ce-authoring-control-text\);/);
+    expect(scss).toMatch(/#filterButton\s*{[\s\S]*?background:\s*var\(--ce-authoring-control-bg\);/);
+    expect(scss).toMatch(/#showResultsButton\s*{[\s\S]*?color:\s*var\(--ce-authoring-control-text\);/);
+    expect(scss).toMatch(/#createSurveyButton\s*{[\s\S]*?opacity:\s*1;/);
+  });
+
   it('keeps existing-response light-panel CTAs on dark text for readability', () => {
     const scss = readSurveyToolScss();
 

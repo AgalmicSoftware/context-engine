@@ -96,15 +96,16 @@ describe('surveyGeneratorHelpers', () => {
     expect(buildSurveyGeneratorTypePillClassName(styles, 'disagree')).toBe(`${styles.pill} ${styles.pillDisagree}`);
   });
 
-  it('keeps the AI prompt toggle visually quiet on the dark generator panel', () => {
+  it('uses the theme authoring contract for every always-visible generator control', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'AudioSurveyGenerator.module.scss'), 'utf8');
-    const toggleBlock = scss.match(/\.aiPromptToggleBtn\s*{[\s\S]*?^\s*}/m)?.[0] || '';
 
-    expect(toggleBlock).toMatch(/background:\s*transparent;/);
-    expect(toggleBlock).toMatch(/color:\s*color-mix\(in srgb,\s*var\(--ce-text-inverse\) 50%,\s*transparent\);/);
-    expect(toggleBlock).toMatch(
-      /&:hover\s*{[\s\S]*?background:\s*transparent;[\s\S]*?color:\s*color-mix\(in srgb,\s*var\(--ce-text-inverse\) 72%,\s*transparent\);/,
-    );
+    expect(scss).toMatch(/\$background-color:\s*var\(--ce-authoring-panel-bg\);/);
+    expect(scss).toMatch(/\$text-color:\s*var\(--ce-authoring-panel-text\);/);
+    expect(scss).toMatch(/\$question-background:\s*var\(--ce-authoring-section-bg\);/);
+    expect(scss).toMatch(/\.urlInputField\s*{[\s\S]*?background:\s*var\(--ce-authoring-input-bg\)\s*!important;/);
+    expect(scss).toMatch(/\.typeButton\s*{[\s\S]*?background:\s*var\(--ce-authoring-control-bg\);/);
+    expect(scss).toMatch(/\.countInlineLabel\s*{[\s\S]*?color:\s*var\(--ce-authoring-panel-muted\);/);
+    expect(scss).toMatch(/\.aiPromptToggleBtn\s*{[\s\S]*?color:\s*var\(--ce-authoring-control-text\);/);
   });
 
   it('builds stable additional source ids from a mutable counter ref', () => {

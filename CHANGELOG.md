@@ -13,6 +13,9 @@ All notable changes to this project will be documented in this file.
   elevation, and control-state tokens; a zero-baseline source gate prevents
   raw presentation colors outside narrowly owned theme, export, QR/bitmap, and
   deterministic avatar sources. Session metadata cannot select an app theme.
+  Question authoring now uses explicit paired workspace/control/input tokens;
+  Classic 95 renders the generator and its toolbar on readable standard gray
+  surfaces with white fields instead of mixing black controls into navy.
 - Added **Session colors** to the Session Wizard with the curated
   `context-engine`, `ocean`, and `amber` schemes, immediate preview, exact
   `appearance.colorSchemeId` persistence across Worker/Arweave paths, scoped

@@ -77,6 +77,14 @@ section, field, control, primary-text, muted-text, and placeholder pairings.
 Classic 95 uses gray dialog surfaces, black primary copy, dark-gray secondary
 copy, and white fields; visible Settings text is regression-tested at 4.5:1.
 
+Question and survey creation surfaces consume `--ce-authoring-*` tokens for
+their workspace, sections, controls, fields, primary copy, muted copy, and
+placeholders. Keep these pairings together: Classic 95 uses standard gray
+workspace surfaces, raised gray controls, white fields, and black/dark-gray
+copy instead of placing Windows control text over the navy overlay palette.
+The runtime theme smoke opens the complete question generator on desktop and
+mobile and checks its visible control/text pairs at 4.5:1.
+
 When the bundled-theme selector is enabled, Settings exposes it as the final
 `Appearance & colors` section both before and after sign-in. This selector
 changes the complete app theme; it is separate from a session's curated color
@@ -124,6 +132,7 @@ control states without component selectors in a theme file.
 | Documents              | `--ce-document-*`                                                             | readable light/document-style content                                          |
 | Panel and overlay copy | `--ce-panel-text*`, `--ce-overlay-text*`                                      | foregrounds paired with panel or overlay surfaces                              |
 | Controls               | `--ce-control-*`, `--ce-input-*`, `--ce-titlebar-*`, `--ce-nav-tab-inactive`  | inputs, buttons, disabled states, title bars, and inactive title-bar tab icons |
+| Authoring               | `--ce-authoring-*`                                                           | paired question/survey workspace, section, control, input, and copy colors     |
 | Actions and status     | `--ce-action-*`, `--ce-status-*`, `--ce-link`                                 | interactive, validation, risk, and state semantics                             |
 | Data series            | `--ce-data-series-1` through `--ce-data-series-8`                             | categorical charts and visualizations                                          |
 | Response states        | `--ce-response-agree-*`, `--ce-response-unsure-*`, `--ce-response-disagree-*` | readable vote-state badges on the active tooltip surface                       |

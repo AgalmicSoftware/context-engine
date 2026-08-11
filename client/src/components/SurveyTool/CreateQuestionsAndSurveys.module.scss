@@ -576,12 +576,14 @@ $user-page-background: var(--ce-surface-sunken);
 
 .modeSwitchButton {
   font-weight: 600;
-  opacity: 0.85;
-  background: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
-  color: var(--ce-color-white);
-  border-color: color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
+  opacity: 1;
+  background: var(--ce-authoring-control-bg);
+  color: var(--ce-authoring-control-text);
+  border-color: var(--ce-authoring-control-border);
   &:hover {
-    background: color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
+    background: var(--ce-authoring-control-bg);
+    border-color: var(--ce-action-accent);
+    color: var(--ce-authoring-control-text);
   }
 }
 

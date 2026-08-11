@@ -3,6 +3,14 @@ import path from 'path';
 import { normalizeScssContract } from 'testUtils/scssContractAssertions';
 
 describe('CreateQuestionsAndSurveys.module.scss final submit CTA guards', () => {
+  it('keeps the authoring mode switch readable in every app theme', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'CreateQuestionsAndSurveys.module.scss'), 'utf8');
+
+    expect(scss).toMatch(/\.modeSwitchButton\s*{[\s\S]*?opacity:\s*1;/);
+    expect(scss).toMatch(/\.modeSwitchButton\s*{[\s\S]*?background:\s*var\(--ce-authoring-control-bg\);/);
+    expect(scss).toMatch(/\.modeSwitchButton\s*{[\s\S]*?color:\s*var\(--ce-authoring-control-text\);/);
+  });
+
   it('uses the shared final submit shell while keeping progress and submit states intact', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'CreateQuestionsAndSurveys.module.scss'), 'utf8');
     const normalizedScss = normalizeScssContract(scss);

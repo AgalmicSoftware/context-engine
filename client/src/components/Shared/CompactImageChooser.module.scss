@@ -18,10 +18,10 @@
   justify-content: center;
   min-width: 52px;
   padding: 5px 10px;
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
+  border: 1px solid var(--ce-authoring-control-border);
   border-radius: var(--ce-radius-pill);
-  background: color-mix(in srgb, var(--ce-text-inverse) 3%, transparent);
-  color: color-mix(in srgb, var(--ce-control-text) 78%, transparent);
+  background: var(--ce-authoring-control-bg);
+  color: var(--ce-authoring-control-text);
   font-size: 11px;
   font-weight: 700;
   cursor: pointer;
@@ -32,8 +32,8 @@
     transform 0.16s ease;
 
   &:hover {
-    border-color: color-mix(in srgb, var(--ce-text-inverse) 24%, transparent);
-    color: var(--ce-color-white);
+    border-color: var(--ce-action-accent);
+    color: var(--ce-authoring-control-text);
     transform: translateY(-1px);
   }
 
@@ -50,10 +50,10 @@
 }
 
 .modeButtonActive {
-  border-color: color-mix(in srgb, var(--ce-action-accent) 34%, transparent);
-  background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
-  color: var(--ce-color-white);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ce-action-accent) 8%, transparent);
+  border-color: var(--ce-action-accent);
+  background: var(--ce-authoring-control-bg);
+  color: var(--ce-authoring-control-text);
+  box-shadow: inset 0 0 0 1px var(--ce-action-accent);
 }
 
 .fileInput {
@@ -90,7 +90,7 @@
   min-width: 0;
   max-width: 100%;
   font-size: 0.78rem;
-  color: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
+  color: var(--ce-authoring-control-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -102,7 +102,7 @@
   gap: 8px;
   min-width: 0;
   font-size: 0.82rem;
-  color: color-mix(in srgb, var(--ce-control-text) 82%, transparent);
+  color: var(--ce-authoring-control-text);
 
   svg {
     flex: 0 0 auto;
@@ -114,7 +114,7 @@
 }
 
 .messageLoading {
-  color: color-mix(in srgb, var(--ce-control-text) 86%, transparent);
+  color: var(--ce-authoring-control-text);
 }
 
 .messageError {
@@ -123,7 +123,7 @@
 
 .helpText {
   font-size: 0.8rem;
-  color: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
+  color: var(--ce-authoring-control-muted);
   line-height: 1.5;
 }
 

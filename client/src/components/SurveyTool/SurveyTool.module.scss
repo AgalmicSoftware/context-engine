@@ -24,7 +24,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  background: color-mix(in srgb, var(--ce-status-info) 30%, transparent);
+  background: var(--ce-authoring-section-bg);
+  border: 1px solid var(--ce-authoring-control-border);
   padding: 15px;
   border-radius: var(--ce-radius-10);
   margin-left: 10px;
@@ -83,11 +84,12 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   flex-direction: row;
   align-items: center;
   gap: 10px;
-  background-color: transparent;
+  background-color: var(--ce-authoring-control-bg);
+  color: var(--ce-authoring-control-text);
   font-size: 1.45em;
   background-image: unset;
-  border: 2px var(--ce-color-white) solid;
-  opacity: 0.9;
+  border: var(--ce-border-control-width) solid var(--ce-authoring-control-border);
+  opacity: 1;
   border-radius: var(--ce-radius-10);
 }
 
@@ -1642,17 +1644,17 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   display: flex;
   align-items: center;
   justify-content: center;
-  background: transparent;
+  background: var(--ce-authoring-control-bg);
   font-weight: 600;
   width: 52px;
   min-width: 52px;
   height: 52px;
   padding: 0;
   font-size: 1.5em;
-  color: var(--ce-color-white);
-  border: var(--ce-color-white) 1px solid;
+  color: var(--ce-authoring-control-text);
+  border: var(--ce-border-control-width) solid var(--ce-authoring-control-border);
   border-radius: var(--ce-radius-10);
-  opacity: 0.9;
+  opacity: 1;
 }
 
 #filterIcon {
@@ -1682,28 +1684,28 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 #showResultsButton {
-  background: transparent;
+  background: var(--ce-authoring-control-bg);
   font-weight: 600;
   padding: 10px;
   font-size: 1.5em;
-  color: var(--ce-color-white);
+  color: var(--ce-authoring-control-text);
   text-transform: uppercase;
-  border: var(--ce-color-white) 1px solid;
+  border: var(--ce-border-control-width) solid var(--ce-authoring-control-border);
   border-radius: var(--ce-radius-10);
-  opacity: 0.5;
+  opacity: 1;
 }
 
 #createSurveyButton {
   /* This ID is used in SurveySelector, keep it */
-  background: transparent;
+  background: var(--ce-authoring-control-bg);
   font-weight: 600;
   padding: 10px;
   font-size: 1.5em;
-  color: var(--ce-color-white);
+  color: var(--ce-authoring-control-text);
   text-transform: uppercase;
-  border: var(--ce-color-white) 1px solid;
+  border: var(--ce-border-control-width) solid var(--ce-authoring-control-border);
   border-radius: var(--ce-radius-10);
-  opacity: 0.5;
+  opacity: 1;
 }
 
 .headerSubmitButton {

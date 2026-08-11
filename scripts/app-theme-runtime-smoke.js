@@ -18,6 +18,7 @@ const ROUTE_CASES = Object.freeze([
     requiresReadableLogin: true,
     requiresPreloginThemeSettings: true,
   },
+  { path: '/', label: 'question authoring controls', requiresReadableAuthoring: true },
   { path: '/', label: 'home Community Stats surface', requiresReadableStats: true },
   {
     path: '/about',
@@ -362,6 +363,14 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     await page.getByTestId('ce-beeswarm-tooltip').waitFor({ state: 'visible' });
   }
 
+  if (routeCase.requiresReadableAuthoring) {
+    await page.getByText('Questions', { exact: true }).click();
+    await page.getByTestId('ce-survey-create-toggle').waitFor({ state: 'visible' });
+    await page.getByTestId('ce-survey-create-toggle').click();
+    await page.getByPlaceholder('Speak or type text here...').waitFor({ state: 'visible' });
+    await page.getByTestId('ce-database-image-paste').waitFor({ state: 'visible' });
+  }
+
   const classic = await page.evaluate(readThemeState);
   const routeState = await page.evaluate(() => {
     const root = document.querySelector('#root');
@@ -667,6 +676,70 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
           tooltipTotalRatio: textRatio('[data-testid="ce-beeswarm-tooltip-total"]'),
           tooltipWidth: tooltipRect?.width || 0,
           tooltipPointerEvents: tooltipStyle?.pointerEvents || '',
+        };
+      })
+    : null;
+  const authoringContrastState = routeCase.requiresReadableAuthoring
+    ? await page.evaluate(() => {
+        const parseRgb = (value) => {
+          const channels =
+            String(value || '')
+              .match(/[\d.]+/g)
+              ?.map(Number) || [];
+          if (channels.length < 3) throw new Error(`Unsupported computed color: ${value}`);
+          return channels.slice(0, 3).map((channel) => channel / 255);
+        };
+        const luminance = (value) => {
+          const channels = parseRgb(value).map((channel) =>
+            channel <= 0.03928 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4),
+          );
+          return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+        };
+        const ratio = (foregroundColor, backgroundColor) => {
+          const foregroundLuminance = luminance(foregroundColor);
+          const backgroundLuminance = luminance(backgroundColor);
+          return (
+            (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) /
+            (Math.min(foregroundLuminance, backgroundLuminance) + 0.05)
+          );
+        };
+        const backgroundFor = (element) => {
+          let current = element;
+          while (current) {
+            const background = window.getComputedStyle(current).backgroundColor;
+            const channels =
+              String(background || '')
+                .match(/[\d.]+/g)
+                ?.map(Number) || [];
+            if (channels.length >= 3 && (channels.length < 4 || channels[3] > 0)) return background;
+            current = current.parentElement;
+          }
+          return window.getComputedStyle(document.documentElement).backgroundColor;
+        };
+        const textRatio = (selector) => {
+          const element = document.querySelector(selector);
+          if (!element) return 0;
+          return ratio(window.getComputedStyle(element).color, backgroundFor(element));
+        };
+        const panel = document.querySelector('[class*="databaseTool"]');
+        const section = panel?.querySelector('[class*="formSection"]');
+        return {
+          panelBackground: panel ? window.getComputedStyle(panel).backgroundColor : '',
+          panelText: panel ? window.getComputedStyle(panel).color : '',
+          sectionBackground: section ? window.getComputedStyle(section).backgroundColor : '',
+          samples: [
+            ['questions selector', '[data-testid="ce-survey-questions-toggle"]'],
+            ['filter control', '[data-testid="ce-survey-filter-toggle"]'],
+            ['create control', '[data-testid="ce-survey-create-toggle"]'],
+            ['mode switch', '[data-testid="ce-create-mode-switch"]'],
+            ['content input', 'textarea[placeholder="Speak or type text here..."]'],
+            ['URL input', 'input[placeholder="Add URL"]'],
+            ['paste control', '[data-testid="ce-database-image-paste"]'],
+            ['question type', '[class*="typeTitle"]'],
+            ['question count label', '[class*="countInlineLabel"]'],
+            ['question count', '[class*="countReadout"]'],
+            ['AI prompt toggle', '[class*="aiPromptToggleBtn"]'],
+          ].map(([label, selector]) => ({ label, ratio: textRatio(selector) })),
         };
       })
     : null;
@@ -1032,6 +1105,25 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       assert.ok(
         received >= minimum,
         `Classic 95 ${label} contrast should be at least ${minimum}:1; received ${received.toFixed(2)}:1`,
+      );
+    });
+  }
+  if (authoringContrastState) {
+    assert.equal(
+      authoringContrastState.panelBackground,
+      'rgb(192, 192, 192)',
+      'Classic 95 authoring should use the standard gray workspace instead of the navy overlay',
+    );
+    assert.equal(authoringContrastState.panelText, 'rgb(0, 0, 0)', 'Classic 95 authoring should use black panel text');
+    assert.equal(
+      authoringContrastState.sectionBackground,
+      'rgb(212, 208, 200)',
+      'Classic 95 authoring sections should use the standard Windows surface',
+    );
+    authoringContrastState.samples.forEach(({ label, ratio: received }) => {
+      assert.ok(
+        received >= 4.5,
+        `Classic 95 ${label} contrast should be at least 4.5:1; received ${received.toFixed(2)}:1`,
       );
     });
   }
