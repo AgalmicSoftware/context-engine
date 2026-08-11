@@ -64,6 +64,9 @@ describe('CommunityTab module styles', () => {
       /\.communityTab \.leaderboardItem \.name\s*{[\s\S]*?color:\s*var\(--ce-document-text\) !important;[\s\S]*?opacity:\s*1;/,
     );
     expect(scss).toMatch(
+      /\.communityTab \.leaderboardItem \.name a\s*{[\s\S]*?color:\s*var\(--ce-document-text\) !important;[\s\S]*?opacity:\s*1;/,
+    );
+    expect(scss).toMatch(
       /\.communityTab \.leaderboardItem:hover\s*{[\s\S]*?background:\s*var\(--ce-surface-alt\);[\s\S]*?color:\s*var\(--ce-document-text\);/,
     );
   });

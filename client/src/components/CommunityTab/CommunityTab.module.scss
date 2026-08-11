@@ -483,6 +483,14 @@
     opacity: 1;
   }
 
+  /* Address labels are rendered as Bootstrap nav links. The global nav-link
+   * inverse color is correct on dark navigation, but must not win inside the
+   * light Classic 95 participant list. */
+  .communityTab .leaderboardItem .name a {
+    color: var(--ce-document-text) !important;
+    opacity: 1;
+  }
+
   .communityTab .leaderboardItem:hover {
     border-color: var(--ce-edge-shadow);
     background: var(--ce-surface-alt);

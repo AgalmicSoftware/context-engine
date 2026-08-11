@@ -774,6 +774,9 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         const tooltipText = tooltip?.textContent || '';
         const tooltipRect = tooltip?.getBoundingClientRect();
         const tooltipStyle = tooltip ? window.getComputedStyle(tooltip) : null;
+        const leaderboardName = document.querySelector('[class*="leaderboardItem"] [class*="name"]');
+        const leaderboardText = leaderboardName?.querySelector('a') || leaderboardName;
+        const leaderboardTextRect = leaderboardText?.getBoundingClientRect();
         const tooltipPointGap =
           tooltipRect && firstPointRect
             ? tooltipRect.right <= firstPointRect.left
@@ -798,13 +801,15 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
           statIconRatio: textRatio('[class*="statIcon"]'),
           statCountRatio: textRatio('[class*="statCount"]'),
           statLabelRatio: textRatio('[class*="statLabel"]'),
-          leaderboardRatio: textRatio('[class*="leaderboardItem"] [class*="name"]'),
-          leaderboardTextColor: window.getComputedStyle(
-            document.querySelector('[class*="leaderboardItem"] [class*="name"]'),
-          ).color,
-          leaderboardTextOpacity: Number.parseFloat(
-            window.getComputedStyle(document.querySelector('[class*="leaderboardItem"] [class*="name"]')).opacity,
-          ),
+          leaderboardRatio: leaderboardText
+            ? ratio(window.getComputedStyle(leaderboardText).color, backgroundFor(leaderboardText))
+            : 0,
+          leaderboardTextColor: leaderboardText ? window.getComputedStyle(leaderboardText).color : '',
+          leaderboardTextOpacity: leaderboardText
+            ? Number.parseFloat(window.getComputedStyle(leaderboardText).opacity)
+            : 0,
+          leaderboardTextWidth: leaderboardTextRect?.width || 0,
+          leaderboardTextHeight: leaderboardTextRect?.height || 0,
           axisLabelRatio: textRatio('[data-testid="ce-community-beeswarm-section"] text', 'fill'),
           pointRatio:
             firstPointStyle && svg ? ratio(firstPointStyle.fill, window.getComputedStyle(svg).backgroundColor) : 0,
@@ -1371,6 +1376,10 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       'Classic 95 participant addresses should use readable black text on light rows',
     );
     assert.equal(statsContrastState.leaderboardTextOpacity, 1, 'Classic 95 participant addresses should be fully opaque');
+    assert.ok(
+      statsContrastState.leaderboardTextWidth > 0 && statsContrastState.leaderboardTextHeight > 0,
+      `Classic 95 participant addresses should occupy visible layout space; received ${statsContrastState.leaderboardTextWidth.toFixed(2)}x${statsContrastState.leaderboardTextHeight.toFixed(2)}px`,
+    );
     [
       ['stat icon', statsContrastState.statIconRatio, 3],
       ['stat count', statsContrastState.statCountRatio, 4.5],
