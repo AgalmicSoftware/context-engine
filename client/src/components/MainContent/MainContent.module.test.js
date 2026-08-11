@@ -70,7 +70,10 @@ describe('Main welcome walkthrough styles', () => {
     expect(scss).toMatch(
       /\.mainTabsCardHeader :global\(\.nav-tabs\)\s*{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\);/,
     );
-    expect(scss).toMatch(/\.mainTabsCardHeader :global\(\.nav-item\)\s*{[\s\S]*?width:\s*100%;/);
+    expect(scss).toMatch(
+      /\.mainTabsCardHeader :global\(\.nav-item\)\s*{[\s\S]*?display:\s*flex;[\s\S]*?justify-content:\s*center;[\s\S]*?width:\s*100%;/,
+    );
+    expect(scss).toMatch(/\.mainTabsCardHeader :global\(\.nav-link\.active\)\s*{[\s\S]*?justify-content:\s*center;/);
     expect(scss).not.toMatch(/\.nav-item:has\(\.nav-link\.active\)[\s\S]*?order:\s*-1;/);
   });
 
@@ -79,7 +82,7 @@ describe('Main welcome walkthrough styles', () => {
       /\.mainTabsCardHeader :global\(\.nav-link:not\(\.active\)\)\s*{[\s\S]*?border:\s*0;[\s\S]*?background:\s*transparent;[\s\S]*?box-shadow:\s*none;/,
     );
     expect(scss).toMatch(
-      /\.mainTabsCardHeader :global\(\.nav-link\) \.navTabIcon\s*{[\s\S]*?width:\s*clamp\(1\.25rem,\s*2\.4vw,\s*1\.5rem\);[\s\S]*?height:\s*clamp\(1\.25rem,\s*2\.4vw,\s*1\.5rem\);[\s\S]*?margin-right:\s*0;/,
+      /\.mainTabsCardHeader :global\(\.nav-link\) \.navTabIcon\s*{[\s\S]*?width:\s*clamp\(1\.25rem,\s*2\.4vw,\s*1\.5rem\);[\s\S]*?height:\s*clamp\(1\.25rem,\s*2\.4vw,\s*1\.5rem\);[\s\S]*?margin-right:\s*0\s*!important;/,
     );
   });
 });

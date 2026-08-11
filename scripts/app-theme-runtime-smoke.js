@@ -53,6 +53,8 @@ const VIEWPORTS = Object.freeze([
 
 const TOOL_CARD_VIEWPORTS = Object.freeze([...VIEWPORTS, { name: 'compact', width: 765, height: 799 }]);
 
+const HOME_TAB_VIEWPORTS = Object.freeze([...VIEWPORTS, { name: 'compact window', width: 765, height: 799 }]);
+
 const WELCOME_FIT_VIEWPORTS = Object.freeze([
   { name: 'compact window', width: 765, height: 799 },
   { name: 'compact desktop', width: 1280, height: 720 },
@@ -482,7 +484,20 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
           return rect.left + rect.width / 2;
         })
       : [];
+    const homeTabControlCenters = homeTabs
+      ? Array.from(homeTabs.children).map((item) => {
+          const control = item.querySelector('.nav-link.active > div, .nav-link:not(.active) svg');
+          const rect = control?.getBoundingClientRect();
+          return rect ? rect.left + rect.width / 2 : null;
+        })
+      : [];
     const homeTabGaps = homeTabCenters.slice(1).map((center, index) => center - homeTabCenters[index]);
+    const homeTabControlGaps = homeTabControlCenters
+      .slice(1)
+      .map((center, index) =>
+        center === null || homeTabControlCenters[index] === null ? null : center - homeTabControlCenters[index],
+      )
+      .filter((gap) => gap !== null);
     const inactiveHomeTab = homeTabs?.querySelector('.nav-link:not(.active)');
     const inactiveHomeTabIcon = inactiveHomeTab?.querySelector('svg');
     const inactiveHomeTabStyle = inactiveHomeTab ? window.getComputedStyle(inactiveHomeTab) : null;
@@ -510,6 +525,10 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       overflowElements,
       homeTabCount: homeTabCenters.length,
       homeTabGapRange: homeTabGaps.length ? Math.max(...homeTabGaps) - Math.min(...homeTabGaps) : null,
+      homeTabControlCenters,
+      homeTabControlGapRange: homeTabControlGaps.length
+        ? Math.max(...homeTabControlGaps) - Math.min(...homeTabControlGaps)
+        : null,
       inactiveHomeTabBorderWidths: inactiveHomeTabStyle
         ? [
             inactiveHomeTabStyle.borderTopWidth,
@@ -1100,6 +1119,10 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       routeState.homeTabGapRange !== null && routeState.homeTabGapRange <= 2,
       `Classic 95 home title-bar options should be evenly spaced; received a ${routeState.homeTabGapRange}px gap range`,
     );
+    assert.ok(
+      routeState.homeTabControlGapRange !== null && routeState.homeTabControlGapRange <= 2,
+      `Classic 95 home title-bar icons and active label should be evenly distributed in ${viewportName}; received centers ${JSON.stringify(routeState.homeTabControlCenters)} and a ${routeState.homeTabControlGapRange}px gap range`,
+    );
     assert.deepEqual(
       routeState.inactiveHomeTabBorderWidths,
       ['0px', '0px', '0px', '0px'],
@@ -1664,7 +1687,7 @@ async function main() {
           : toolCardsOnly
             ? ROUTE_CASES.filter((routeCase) => routeCase.requiresStandardToolCards)
             : ROUTE_CASES;
-  const viewports = toolCardsOnly ? TOOL_CARD_VIEWPORTS : VIEWPORTS;
+  const viewports = toolCardsOnly ? TOOL_CARD_VIEWPORTS : homeTabsOnly ? HOME_TAB_VIEWPORTS : VIEWPORTS;
   const browser = await chromium.launch({ headless: true });
 
   try {
@@ -1694,7 +1717,7 @@ async function main() {
       welcomeFitOnly
         ? `Welcome fit Playwright smoke passed (${WELCOME_FIT_VIEWPORTS.length} viewports).`
         : homeTabsOnly
-          ? `Classic 95 home tab-spacing Playwright smoke passed (${VIEWPORTS.length} viewports).`
+          ? `Classic 95 home tab-spacing Playwright smoke passed (${viewports.length} viewports).`
           : questionUtilitiesOnly
             ? `Classic 95 question utility-control Playwright smoke passed (${VIEWPORTS.length} viewports).`
             : statsOnly

@@ -704,6 +704,8 @@
   }
 
   .mainTabsCardHeader :global(.nav-item) {
+    display: flex;
+    justify-content: center;
     width: 100%;
     min-width: 0;
   }
@@ -750,7 +752,7 @@
     width: clamp(1.25rem, 2.4vw, 1.5rem);
     height: clamp(1.25rem, 2.4vw, 1.5rem);
     font-size: clamp(1.25rem, 2.4vw, 1.5rem);
-    margin-right: 0;
+    margin-right: 0 !important;
   }
 
   .mainTabsCardHeader :global(.nav-link > div) {
@@ -758,7 +760,7 @@
   }
 
   .mainTabsCardHeader :global(.nav-link.active) {
-    justify-content: flex-start;
+    justify-content: center;
     width: 100%;
     margin: 0;
     padding: 2px 8px;
