@@ -36,7 +36,7 @@ const ROUTE_CASES = Object.freeze([
   },
   { path: '/docs', label: 'docs lazy route', requiresReadableDocs: true },
   { path: '/demos', label: 'demo surface' },
-  { path: '/session/demo', label: 'session question surface', requiresReadableSessionSurface: true },
+  { path: '/session/demo-sh', label: 'session question surface', requiresReadableSessionSurface: true },
   { path: '/su/CatherineTheGreat', label: 'simulated-user surface', requiresReadableSimUserSurface: true },
   {
     path: '/groups?sessionName=demo-sh',
@@ -56,6 +56,8 @@ const TOOL_CARD_VIEWPORTS = Object.freeze([...VIEWPORTS, { name: 'compact', widt
 const HOME_TAB_VIEWPORTS = Object.freeze([...VIEWPORTS, { name: 'compact window', width: 765, height: 799 }]);
 
 const FOOTER_VIEWPORTS = Object.freeze([...VIEWPORTS, { name: 'compact window', width: 765, height: 799 }]);
+
+const SESSION_SURFACE_VIEWPORTS = Object.freeze([...VIEWPORTS, { name: 'compact window', width: 765, height: 799 }]);
 
 const WELCOME_FIT_VIEWPORTS = Object.freeze([
   { name: 'compact window', width: 765, height: 799 },
@@ -382,7 +384,6 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   }
 
   if (routeCase.requiresReadableSessionSurface) {
-    await page.getByRole('heading', { name: 'Demo Session', exact: true }).waitFor({ state: 'visible' });
     await page.getByText('Existential risk from AI justifies extraordinary precautions.', { exact: true }).waitFor({
       state: 'visible',
     });
@@ -1002,8 +1003,13 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
 
             if (surface === 'session') {
               const branding = document.querySelector('[class*="brandingSection"]');
+              const pileCard = document.querySelector('[class*="pileCardInner"]');
+              const pileCardBody = document.querySelector('[class*="pileCardBody"]');
               return {
                 brandingBackground: branding ? window.getComputedStyle(branding).backgroundColor : '',
+                hasPileWindowTitlebar: Boolean(document.querySelector('[class*="pileWindowTitlebar"]')),
+                pileCardBodyPaddingTop: pileCardBody ? window.getComputedStyle(pileCardBody).paddingTop : '',
+                pileCardMarginTop: pileCard ? window.getComputedStyle(pileCard).marginTop : '',
                 promptRatio: textRatio('[class*="pileCardHeader"] h4'),
                 sessionTitleRatio: textRatio('[class*="brandingSectionTitle"]'),
                 sectionTitleRatio: textRatio('[class*="sectionHeaderTitle"]'),
@@ -1567,6 +1573,21 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   }
   if (routeCase.requiresReadableSessionSurface) {
     assert.equal(
+      reportedSurfaceState.hasPileWindowTitlebar,
+      false,
+      'Classic 95 session questions should rely on the navigation counter instead of a duplicate title bar',
+    );
+    assert.equal(
+      reportedSurfaceState.pileCardMarginTop,
+      '0px',
+      'Classic 95 question cards should reclaim the title-bar gap',
+    );
+    assert.equal(
+      reportedSurfaceState.pileCardBodyPaddingTop,
+      '12px',
+      'Classic 95 question content should begin without reserved title-bar padding',
+    );
+    assert.equal(
       reportedSurfaceState.brandingBackground,
       'rgba(0, 0, 0, 0)',
       'Classic 95 session branding should keep its simplified transparent stage',
@@ -1748,6 +1769,7 @@ async function main() {
   const homeTabsOnly = process.argv.includes('--home-tabs-only');
   const questionUtilitiesOnly = process.argv.includes('--question-utilities-only');
   const statsOnly = process.argv.includes('--stats-only');
+  const sessionOnly = process.argv.includes('--session-only');
   const footerOnly = process.argv.includes('--footer-only');
   const toolCardsOnly = process.argv.includes('--tool-cards-only');
   const routeCases = homeTabsOnly
@@ -1756,6 +1778,8 @@ async function main() {
       ? ROUTE_CASES.filter((routeCase) => routeCase.requiresReadableQuestionUtilities)
       : statsOnly
         ? ROUTE_CASES.filter((routeCase) => routeCase.requiresReadableStats)
+        : sessionOnly
+          ? ROUTE_CASES.filter((routeCase) => routeCase.requiresReadableSessionSurface)
         : footerOnly
           ? ROUTE_CASES.filter((routeCase) => routeCase.requiresFooterButtons)
           : toolCardsOnly
@@ -1767,6 +1791,8 @@ async function main() {
       ? HOME_TAB_VIEWPORTS
       : footerOnly
         ? FOOTER_VIEWPORTS
+        : sessionOnly
+          ? SESSION_SURFACE_VIEWPORTS
         : VIEWPORTS;
   const browser = await chromium.launch({ headless: true });
 
@@ -1788,7 +1814,7 @@ async function main() {
         await page.close();
       }
     }
-    if (!homeTabsOnly && !questionUtilitiesOnly && !statsOnly && !footerOnly && !toolCardsOnly) {
+    if (!homeTabsOnly && !questionUtilitiesOnly && !statsOnly && !sessionOnly && !footerOnly && !toolCardsOnly) {
       for (const viewport of WELCOME_FIT_VIEWPORTS) {
         await assertWelcomeFitsViewport(browser, baseUrl, viewport);
       }
@@ -1802,6 +1828,8 @@ async function main() {
             ? `Classic 95 question utility-control Playwright smoke passed (${VIEWPORTS.length} viewports).`
             : statsOnly
               ? `Classic 95 Community Stats Playwright smoke passed (${VIEWPORTS.length} viewports).`
+              : sessionOnly
+                ? `Classic 95 session-surface Playwright smoke passed (${viewports.length} viewports).`
               : footerOnly
                 ? `Classic 95 footer Playwright smoke passed (${viewports.length} viewports).`
                 : toolCardsOnly

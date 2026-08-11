@@ -328,7 +328,7 @@ describe('surveyPileInteractionSurface', () => {
     expect(treeHasText(tree, 'Loading session data')).toBe(false);
   });
 
-  it('renders a windowed pile deck with controls stacked under the cards', () => {
+  it('renders a pile deck with one progress counter and controls stacked under the cards', () => {
     const renderActiveQuestion = jest.fn((question: PileQuestionLike) => (
       <div data-testid={`active-${question.id}`}>{question.prompt}</div>
     ));
@@ -370,9 +370,10 @@ describe('surveyPileInteractionSurface', () => {
     expect(nodeHasClassName(controlsChildren[2], 'pileNav')).toBe(true);
     expect(findNodeByClassName(tree, 'pileActionMenuToggle')).not.toBeNull();
     expect(findNodeByClassName(tree, 'pileActionButtonGroup')).not.toBeNull();
-    expect(findNodeByClassName(tree, 'pileWindowTitlebar')).not.toBeNull();
-    expect(findNodeByClassName(tree, 'pileWindowClose')).not.toBeNull();
-    expect(treeTextIncludes(tree, 'Question 4 of 6')).toBe(true);
+    expect(findNodeByClassName(tree, 'pileWindowTitlebar')).toBeNull();
+    expect(findNodeByClassName(tree, 'pileWindowClose')).toBeNull();
+    expect(treeTextIncludes(tree, 'Question 4 of 6')).toBe(false);
+    expect(treeTextIncludes(tree, '4 / 6')).toBe(true);
 
     const listeningToggle = findElement(
       tree,

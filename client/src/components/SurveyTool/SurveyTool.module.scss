@@ -4223,11 +4223,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
-.pileWindowTitlebar {
-  display: none;
-}
-
-/* Classic 95 question pile: a single application window with a sunken prompt,
+/* Classic 95 question pile: a compact application window with a sunken prompt,
  * standard command buttons, and a real toolbar made from the existing actions. */
 @container ce-theme style(--ce-layout-profile: desktop-window) {
   .pileInteractionUnit {
@@ -4237,50 +4233,13 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     max-width: calc(100vw - 190px);
   }
 
-  .pileWindowTitlebar {
-    position: absolute;
-    top: 30px;
-    left: 0;
-    z-index: 30;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    height: 34px;
-    padding: 3px 4px 3px 10px;
-    border: 2px solid;
-    border-color: var(--ce-border-raised);
-    background: var(--ce-titlebar-bg);
-    color: var(--ce-titlebar-text);
-    font-family: var(--ce-font-mono);
-    font-size: 0.96rem;
-    font-weight: 700;
-    line-height: 1;
-    box-sizing: border-box;
-  }
-
-  .pileWindowClose {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 26px;
-    height: 24px;
-    border: 2px solid;
-    border-color: var(--ce-border-raised);
-    background: var(--ce-control-face);
-    box-shadow: var(--ce-shadow-raised);
-    color: var(--ce-control-text);
-    font-family: var(--ce-font-ui);
-    font-size: 1.25rem;
-  }
-
   .pileCardContainer {
-    min-height: 430px;
+    min-height: 400px;
   }
 
   .pileCardInner {
-    height: 430px;
-    margin-top: 30px;
+    height: 400px;
+    margin-top: 0;
     overflow: hidden;
     border: 3px solid;
     border-color: var(--ce-border-raised);
@@ -4292,7 +4251,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   .pileCardBody {
     justify-content: flex-start;
     gap: 18px;
-    padding: 54px 28px 18px;
     background: var(--ce-surface-raised);
     color: var(--ce-panel-text);
   }
@@ -4513,10 +4471,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     .pileCardInner {
       min-height: 400px;
       height: 400px;
-    }
-
-    .pileCardBody {
-      padding: 52px 14px 12px;
     }
 
     .pileCardHeader {

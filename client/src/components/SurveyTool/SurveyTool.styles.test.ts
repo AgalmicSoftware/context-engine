@@ -20,7 +20,13 @@ describe('SurveyTool styles', () => {
 
     expect(scss).toContain('@container ce-theme style(--ce-layout-profile: desktop-window)');
     expect(scss).not.toContain('data-ce-theme');
-    expect(scss).toMatch(/\.pileWindowTitlebar\s*{[\s\S]*?background:\s*var\(--ce-titlebar-bg\);/);
+    expect(scss).not.toContain('.pileWindowTitlebar');
+    expect(scss).not.toContain('.pileWindowClose');
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)\s*{[\s\S]*?\.pileCardInner\s*{[\s\S]*?height:\s*400px;[\s\S]*?margin-top:\s*0;/,
+    );
+    expect(scss).not.toContain('padding: 54px 28px 18px;');
+    expect(scss).not.toContain('padding: 52px 14px 12px;');
     expect(scss).toMatch(
       /\.pileCardHeader\s*{[\s\S]*?border-color:\s*var\(--ce-border-inset\);[\s\S]*?background:\s*var\(--ce-document-surface\);/,
     );
