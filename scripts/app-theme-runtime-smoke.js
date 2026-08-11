@@ -31,6 +31,7 @@ const ROUTE_CASES = Object.freeze([
   {
     path: '/session/new',
     label: 'Session Wizard',
+    requiresBottomDockedFooter: true,
     requiresReadableSessionSetup: true,
     requiresSessionColors: true,
   },
@@ -58,6 +59,8 @@ const HOME_TAB_VIEWPORTS = Object.freeze([...VIEWPORTS, { name: 'compact window'
 const FOOTER_VIEWPORTS = Object.freeze([...VIEWPORTS, { name: 'compact window', width: 765, height: 799 }]);
 
 const SESSION_SURFACE_VIEWPORTS = Object.freeze([...VIEWPORTS, { name: 'compact window', width: 765, height: 799 }]);
+
+const SESSION_SETUP_VIEWPORTS = Object.freeze([...VIEWPORTS, { name: 'compact window', width: 765, height: 799 }]);
 
 const WELCOME_FIT_VIEWPORTS = Object.freeze([
   { name: 'compact window', width: 765, height: 799 },
@@ -319,6 +322,20 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
           };
         }),
       }
+    : null;
+  const dockedFooter = routeCase.requiresBottomDockedFooter ? page.locator('footer') : null;
+  if (dockedFooter) await dockedFooter.waitFor({ state: 'visible' });
+  const classicDockedFooterState = dockedFooter
+    ? await dockedFooter.evaluate((element) => {
+        const style = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return {
+          bodyPaddingBottom: window.getComputedStyle(document.body).paddingBottom,
+          bottom: rect.bottom,
+          position: style.position,
+          viewportHeight: window.innerHeight,
+        };
+      })
     : null;
 
   if (routeCase.requiresReadableSessionSetup) {
@@ -1177,6 +1194,12 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         }),
       }
     : null;
+  const currentDockedFooterState = dockedFooter
+    ? await dockedFooter.evaluate((element) => ({
+        bodyPaddingBottom: window.getComputedStyle(document.body).paddingBottom,
+        position: window.getComputedStyle(element).position,
+      }))
+    : null;
   const currentLogoState = routeCase.requiresBrightLogo
     ? await page
         .getByRole('link', { name: 'Context Engine home', exact: true })
@@ -1438,6 +1461,28 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     assert.ok(
       classicFooterBrandState.github.fontSize > currentFooterBrandState.github.fontSize,
       'Classic 95 footer GitHub icon should be larger than the Context Engine icon',
+    );
+  }
+  if (classicDockedFooterState && currentDockedFooterState) {
+    assert.equal(classicDockedFooterState.position, 'fixed', 'Classic 95 should dock the taskbar to the viewport');
+    assert.ok(
+      Math.abs(classicDockedFooterState.bottom - classicDockedFooterState.viewportHeight) <= 1,
+      `Classic 95 footer should touch the viewport bottom; received ${JSON.stringify(classicDockedFooterState)}`,
+    );
+    assert.equal(
+      classicDockedFooterState.bodyPaddingBottom,
+      '42px',
+      'Classic 95 should reserve room for the fixed taskbar',
+    );
+    assert.notEqual(
+      currentDockedFooterState.position,
+      'fixed',
+      'Context Engine should preserve its document-flow footer',
+    );
+    assert.equal(
+      currentDockedFooterState.bodyPaddingBottom,
+      '0px',
+      'Context Engine should not inherit Classic 95 taskbar spacing',
     );
   }
   if (sessionSetupContrastState) {
@@ -1911,7 +1956,9 @@ async function main() {
           ? FOOTER_VIEWPORTS
           : sessionOnly
             ? SESSION_SURFACE_VIEWPORTS
-            : VIEWPORTS;
+            : sessionSetupOnly
+              ? SESSION_SETUP_VIEWPORTS
+              : VIEWPORTS;
   const browser = await chromium.launch({ headless: true });
 
   try {

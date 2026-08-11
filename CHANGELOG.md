@@ -21,7 +21,8 @@ All notable changes to this project will be documented in this file.
   `desktop-window` layout profile now presents Tools as Control Panel applets,
   Community Stats as a participant/plot split window, session questions as
   compact dialogs, and footer navigation as a taskbar without theme-ID
-  selectors in components.
+  selectors in components. The Classic 95 taskbar stays docked to the viewport
+  bottom on short and scrolling pages while reserving space for page content.
 - Fixed local Vite startup for the shared CommonJS group-password derivation
   helper. Persistent startup failures now stop after one automatic cache-busted
   reload, and the recovery heading uses the active panel-text token so the

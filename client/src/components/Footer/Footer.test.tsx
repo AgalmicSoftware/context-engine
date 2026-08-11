@@ -155,12 +155,13 @@ describe('Footer', () => {
     expect(classicTheme).toContain('footer-link-font-size: 0.78rem,');
   });
 
-  it('turns the classic footer into a compact sticky desktop taskbar without a decorative start tile', () => {
+  it('docks the classic footer to the viewport bottom without a decorative start tile', () => {
     expect(footerStylesheet).toContain('@container ce-theme style(--ce-layout-profile: desktop-window)');
     expect(footerStylesheet).not.toContain('data-ce-theme');
     expect(footerStylesheet).toMatch(
-      /\.footer\s*{[\s\S]*?position:\s*sticky;[\s\S]*?bottom:\s*0;[\s\S]*?background:\s*var\(--ce-control-face\);/,
+      /\.footer\s*{[\s\S]*?position:\s*fixed;[\s\S]*?right:\s*2%;[\s\S]*?bottom:\s*0;[\s\S]*?left:\s*2%;[\s\S]*?background:\s*var\(--ce-control-face\);/,
     );
+    expect(footerStylesheet).toMatch(/:global\(body\)\s*{[\s\S]*?padding-bottom:\s*42px;/);
     expect(footerStylesheet).not.toMatch(/\.footer nav::before\s*{/);
   });
 

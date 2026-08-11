@@ -319,17 +319,23 @@
   outline-offset: 3px;
 }
 
-/* Windows-style taskbar for the classic theme. It stays compact and
- * left-aligned at every viewport instead of stretching each item. */
+/* Windows-style taskbar for the classic theme. It stays compact,
+ * viewport-docked, and left-aligned instead of stretching each item. */
 @container ce-theme style(--ce-layout-profile: desktop-window) {
+  :global(body) {
+    padding-bottom: 42px;
+  }
+
   .footer {
-    position: sticky;
+    position: fixed;
+    right: 2%;
     bottom: 0;
+    left: 2%;
     z-index: 1100;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    width: 100%;
+    width: auto;
     min-height: 42px;
     margin: 0;
     padding: 3px 6px;
