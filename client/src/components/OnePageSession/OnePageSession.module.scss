@@ -812,10 +812,11 @@
   flex-wrap: wrap;
   gap: 10px;
   cursor: pointer;
+  font-family: var(--ce-font-body);
   font-size: 2rem;
   margin: 0;
   font-weight: bold;
-  color: var(--ce-panel-text);
+  color: color-mix(in srgb, var(--ce-text-inverse) 75%, transparent);
   flex: 0 1 auto;
   min-width: 0;
   line-height: 1.1;
@@ -848,7 +849,7 @@
   display: block;
   max-width: 100%;
   line-height: 1;
-  color: var(--ce-panel-text);
+  color: color-mix(in srgb, var(--ce-text-inverse) 50%, transparent);
 }
 
 .sectionHeaderSubtitle {
@@ -857,7 +858,7 @@
   font-size: 0.63em;
   line-height: 1.12;
   font-weight: 600;
-  color: var(--ce-panel-text-muted);
+  color: color-mix(in srgb, var(--ce-text-inverse) 25%, transparent);
 }
 
 .sectionHeaderTooltip {
@@ -1387,7 +1388,7 @@
   .sectionHeader .sectionHeaderSubtitle {
     font-size: 0.68em;
     line-height: 1;
-    color: var(--ce-panel-text-muted);
+    color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
   }
 
   .sectionHeaderRow {
@@ -1557,7 +1558,7 @@
   .sectionHeader .sectionHeaderSubtitle {
     font-size: 0.68em;
     line-height: 1;
-    color: var(--ce-panel-text-muted);
+    color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
   }
 
   .sectionHeaderRow {

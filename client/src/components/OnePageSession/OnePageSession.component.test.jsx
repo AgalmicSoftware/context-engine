@@ -1336,6 +1336,31 @@ describe('OnePageSession view gating', () => {
     expect(contextTextWrap.parentElement).toBe(contextHeader);
   });
 
+  it('preserves the original default-theme section header typography hierarchy', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
+    const sectionHeaderBlock = extractMediaBlock(scss, '.sectionHeader {');
+    const sectionHeaderTitleBlock = extractMediaBlock(scss, '.sectionHeaderTitle {');
+    const sectionHeaderSubtitleBlock = extractMediaBlock(scss, '.sectionHeaderSubtitle {');
+
+    expect(sectionHeaderBlock).toContain('font-family: var(--ce-font-body);');
+    expect(sectionHeaderBlock).toContain('font-size: 2rem;');
+    expect(sectionHeaderBlock).toContain('font-weight: bold;');
+    expect(sectionHeaderBlock).toContain(
+      'color: color-mix(in srgb, var(--ce-text-inverse) 75%, transparent);',
+    );
+    expect(sectionHeaderTitleBlock).toContain(
+      'color: color-mix(in srgb, var(--ce-text-inverse) 50%, transparent);',
+    );
+    expect(sectionHeaderSubtitleBlock).toContain('font-size: 0.63em;');
+    expect(sectionHeaderSubtitleBlock).toContain('font-weight: 600;');
+    expect(sectionHeaderSubtitleBlock).toContain(
+      'color: color-mix(in srgb, var(--ce-text-inverse) 25%, transparent);',
+    );
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.sectionsGrid \.sectionHeader\s*{[\s\S]*?font-family:\s*var\(--ce-font-ui\);[\s\S]*?font-size:\s*1rem;/,
+    );
+  });
+
   it('keeps section-card headers inline through 767px without pulling full phone layout onto tablets', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
     const phoneBlock = extractMediaBlock(scss, '@media only screen and (max-width: 600px)', '.onePageDemoContainer');
@@ -1384,7 +1409,9 @@ describe('OnePageSession view gating', () => {
     expect(phoneBlock).toContain('.sectionHeader .sectionHeaderSubtitle {');
     expect(phoneBlock).toContain('font-size: 1em;');
     expect(phoneBlock).toContain('font-weight: inherit;');
-    expect(phoneBlock).toContain('color: var(--ce-panel-text-muted);');
+    expect(phoneBlock).toContain(
+      'color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);',
+    );
     expect(phoneBlock).toContain('.sectionHeader {');
     expect(phoneBlock).toContain('align-items: center;');
     expect(phoneBlock).toContain('.documentsSectionHeaderMeta .sectionHeaderTooltip > svg {');
@@ -1420,7 +1447,9 @@ describe('OnePageSession view gating', () => {
     expect(smallTabletBlock).toContain('.sectionHeader .sectionHeaderSubtitle {');
     expect(smallTabletBlock).toContain('font-size: 1.2em;');
     expect(smallTabletBlock).toContain('font-weight: inherit;');
-    expect(smallTabletBlock).toContain('color: var(--ce-panel-text-muted);');
+    expect(smallTabletBlock).toContain(
+      'color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);',
+    );
     expect(smallTabletBlock).not.toContain('.documentsSectionHeaderText');
     expect(smallTabletBlock).not.toContain('.documentsSectionHeaderTitleRow');
     expect(smallTabletBlock).not.toContain('.documentsSectionHeaderMain');
