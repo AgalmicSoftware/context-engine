@@ -1092,7 +1092,7 @@ async function assertWelcomeFitsViewport(browser, baseUrl, viewport) {
     await page.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForSelector('#root', { state: 'attached', timeout: 15000 });
     await page.waitForFunction(() => document.querySelector('#root')?.children.length > 0, null, { timeout: 15000 });
-    const welcomeLink = page.getByRole('link', { name: 'Welcome', exact: true });
+    const welcomeLink = page.locator('.nav-tabs .nav-link').filter({ hasText: /^\s*Welcome\s*$/i });
     await welcomeLink.waitFor({ state: 'visible', timeout: 30000 });
     await welcomeLink.click();
     await page.getByTestId('ce-welcome-slide-media').waitFor({ state: 'visible' });
