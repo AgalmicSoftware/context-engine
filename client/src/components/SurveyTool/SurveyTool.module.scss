@@ -4461,6 +4461,34 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     text-shadow: none;
   }
 
+  .fullQuestionBody .iconButton,
+  .fullQuestionBody .cardLinkButton {
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: var(--ce-control-text) !important;
+    opacity: 0.82;
+  }
+
+  .fullQuestionBody .iconButton:hover:not(:disabled),
+  .fullQuestionBody .iconButton:focus-visible,
+  .fullQuestionBody .cardLinkButton:hover,
+  .fullQuestionBody .cardLinkButton:focus-visible {
+    color: var(--ce-control-text) !important;
+    opacity: 1;
+  }
+
+  .fullQuestionBody .iconButton:focus-visible,
+  .fullQuestionBody .cardLinkButton:focus-visible {
+    outline: 1px dotted var(--ce-control-text);
+    outline-offset: 2px;
+  }
+
+  .fullQuestionBody .iconButton:disabled {
+    color: var(--ce-control-disabled-text) !important;
+    opacity: 0.58;
+  }
+
   .pileCardFooter .pileIconButton,
   .pileCardFooter .iconButton {
     border: 2px solid;

@@ -29,6 +29,20 @@ describe('SurveyTool styles', () => {
     );
   });
 
+  it('renders classic full-question utility icons without faded button chrome', () => {
+    const scss = readSurveyToolScss();
+
+    expect(scss).toMatch(
+      /\.fullQuestionBody \.iconButton,\s*\.fullQuestionBody \.cardLinkButton\s*{[\s\S]*?border:\s*0 !important;[\s\S]*?background:\s*transparent !important;[\s\S]*?box-shadow:\s*none !important;[\s\S]*?color:\s*var\(--ce-control-text\) !important;[\s\S]*?opacity:\s*0\.82;/,
+    );
+    expect(scss).toMatch(
+      /\.fullQuestionBody \.iconButton:hover:not\(:disabled\),[\s\S]*?\.fullQuestionBody \.cardLinkButton:focus-visible\s*{[\s\S]*?opacity:\s*1;/,
+    );
+    expect(scss).toMatch(
+      /\.fullQuestionBody \.iconButton:disabled\s*{[\s\S]*?color:\s*var\(--ce-control-disabled-text\) !important;[\s\S]*?opacity:\s*0\.58;/,
+    );
+  });
+
   it('uses readable authoring controls across the questions toolbar', () => {
     const scss = readSurveyToolScss();
 

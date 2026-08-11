@@ -20,6 +20,7 @@ const ROUTE_CASES = Object.freeze([
     requiresPreloginThemeSettings: true,
   },
   { path: '/', label: 'question authoring controls', requiresReadableAuthoring: true },
+  { path: '/', label: 'question card utility controls', requiresReadableQuestionUtilities: true },
   { path: '/', label: 'home Community Stats surface', requiresReadableStats: true },
   {
     path: '/about',
@@ -404,7 +405,45 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     await page.getByTestId('ce-database-image-paste').waitFor({ state: 'visible' });
   }
 
+  if (routeCase.requiresReadableQuestionUtilities) {
+    await page.getByText('Questions', { exact: true }).click();
+    await page.getByRole('button', { name: 'Conviction / importance' }).first().waitFor({ state: 'visible' });
+  }
+
   const classic = await page.evaluate(readThemeState);
+  const questionUtilityButton = routeCase.requiresReadableQuestionUtilities
+    ? page.getByRole('button', { name: 'Conviction / importance' }).first()
+    : null;
+  const questionUtilityState = questionUtilityButton
+    ? {
+        resting: await questionUtilityButton.evaluate((element) => {
+          const style = window.getComputedStyle(element);
+          return {
+            backgroundColor: style.backgroundColor,
+            borderWidths: [style.borderTopWidth, style.borderRightWidth, style.borderBottomWidth, style.borderLeftWidth],
+            boxShadow: style.boxShadow,
+            color: style.color,
+            opacity: Number.parseFloat(style.opacity),
+          };
+        }),
+        hoveredOpacity: 0,
+        focusedOutlineStyle: '',
+      }
+    : null;
+  if (questionUtilityButton && questionUtilityState) {
+    await questionUtilityButton.hover();
+    await page.waitForFunction(
+      (element) => Number.parseFloat(window.getComputedStyle(element).opacity) === 1,
+      await questionUtilityButton.elementHandle(),
+    );
+    questionUtilityState.hoveredOpacity = await questionUtilityButton.evaluate((element) =>
+      Number.parseFloat(window.getComputedStyle(element).opacity),
+    );
+    await questionUtilityButton.focus();
+    questionUtilityState.focusedOutlineStyle = await questionUtilityButton.evaluate(
+      (element) => window.getComputedStyle(element).outlineStyle,
+    );
+  }
   const routeState = await page.evaluate(() => {
     const root = document.querySelector('#root');
     const preview = document.querySelector('[data-testid="ce-wizard-session-color-preview"]');
@@ -1014,6 +1053,33 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       `Classic 95 inactive home tab icons should be at least 20px; received ${routeState.inactiveHomeTabIconSize}px`,
     );
   }
+  if (questionUtilityState) {
+    assert.deepEqual(
+      questionUtilityState.resting.borderWidths,
+      ['0px', '0px', '0px', '0px'],
+      'Classic 95 full-question utility icons should not render button borders',
+    );
+    assert.equal(
+      questionUtilityState.resting.backgroundColor,
+      'rgba(0, 0, 0, 0)',
+      'Classic 95 full-question utility icons should use a transparent background',
+    );
+    assert.equal(
+      questionUtilityState.resting.boxShadow,
+      'none',
+      'Classic 95 full-question utility icons should not render a raised shadow',
+    );
+    assert.ok(
+      questionUtilityState.resting.opacity >= 0.8,
+      `Classic 95 full-question utility icons should remain clearly visible; received opacity ${questionUtilityState.resting.opacity}`,
+    );
+    assert.equal(questionUtilityState.hoveredOpacity, 1, 'Classic 95 full-question utility icons should become fully opaque on hover');
+    assert.equal(
+      questionUtilityState.focusedOutlineStyle,
+      'dotted',
+      'Classic 95 full-question utility icons should retain a visible keyboard focus indicator',
+    );
+  }
   if (classicToolCardState?.hovered && currentToolCardState) {
     assert.deepEqual(
       [
@@ -1462,7 +1528,12 @@ async function main() {
   const baseUrl = normalizeBaseUrl(process.env.BASE_URL || 'http://127.0.0.1:3000');
   const welcomeFitOnly = process.env.WELCOME_FIT_ONLY === '1';
   const homeTabsOnly = process.argv.includes('--home-tabs-only');
-  const routeCases = homeTabsOnly ? ROUTE_CASES.filter((routeCase) => routeCase.requiresSpreadHomeTabs) : ROUTE_CASES;
+  const questionUtilitiesOnly = process.argv.includes('--question-utilities-only');
+  const routeCases = homeTabsOnly
+    ? ROUTE_CASES.filter((routeCase) => routeCase.requiresSpreadHomeTabs)
+    : questionUtilitiesOnly
+      ? ROUTE_CASES.filter((routeCase) => routeCase.requiresReadableQuestionUtilities)
+      : ROUTE_CASES;
   const browser = await chromium.launch({ headless: true });
 
   try {
@@ -1483,7 +1554,7 @@ async function main() {
         await page.close();
       }
     }
-    if (!homeTabsOnly) {
+    if (!homeTabsOnly && !questionUtilitiesOnly) {
       for (const viewport of WELCOME_FIT_VIEWPORTS) {
         await assertWelcomeFitsViewport(browser, baseUrl, viewport);
       }
@@ -1493,6 +1564,8 @@ async function main() {
         ? `Welcome fit Playwright smoke passed (${WELCOME_FIT_VIEWPORTS.length} viewports).`
         : homeTabsOnly
           ? `Classic 95 home tab-spacing Playwright smoke passed (${VIEWPORTS.length} viewports).`
+          : questionUtilitiesOnly
+            ? `Classic 95 question utility-control Playwright smoke passed (${VIEWPORTS.length} viewports).`
           : `App theme runtime Playwright smoke passed (${routeCases.length} routes × ${VIEWPORTS.length} viewports).`,
     );
   } finally {
