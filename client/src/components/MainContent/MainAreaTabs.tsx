@@ -125,6 +125,9 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
                 <NavLink
                   className={activeClassName(this.props.focusedTab === MAIN_AREA_TABS.LATEST)}
                   onClick={() => this.changeTabs(MAIN_AREA_TABS.LATEST)}
+                  role="tab"
+                  aria-label={MAIN_AREA_TAB_TITLES[MAIN_AREA_TABS.LATEST]}
+                  aria-selected={this.props.focusedTab === MAIN_AREA_TABS.LATEST}
                 >
                   <FontAwesomeIcon icon={faPlay} className={styles.navTabIcon} />
                   <div id="mainContentTabTitle"> {MAIN_AREA_TAB_TITLES[MAIN_AREA_TABS.LATEST]} </div>
@@ -134,6 +137,9 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
                 <NavLink
                   className={activeClassName(this.props.focusedTab === MAIN_AREA_TABS.COMMUNITY)}
                   onClick={() => this.changeTabs(MAIN_AREA_TABS.COMMUNITY)}
+                  role="tab"
+                  aria-label={MAIN_AREA_TAB_TITLES[MAIN_AREA_TABS.COMMUNITY]}
+                  aria-selected={this.props.focusedTab === MAIN_AREA_TABS.COMMUNITY}
                 >
                   <FontAwesomeIcon icon={faGlobe} className={styles.navTabIcon} />
                   <div id="mainContentTabTitle"> {MAIN_AREA_TAB_TITLES[MAIN_AREA_TABS.COMMUNITY]} </div>
@@ -143,6 +149,9 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
                 <NavLink
                   className={activeClassName(this.props.focusedTab === MAIN_AREA_TABS.TOOLS)}
                   onClick={() => this.changeTabs(MAIN_AREA_TABS.TOOLS)}
+                  role="tab"
+                  aria-label={MAIN_AREA_TAB_TITLES[MAIN_AREA_TABS.TOOLS]}
+                  aria-selected={this.props.focusedTab === MAIN_AREA_TABS.TOOLS}
                 >
                   <FontAwesomeIcon icon={faTools} className={styles.navTabIcon} />
                   <div id="mainContentTabTitle"> {MAIN_AREA_TAB_TITLES[MAIN_AREA_TABS.TOOLS]} </div>
@@ -152,6 +161,9 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
                 <NavLink
                   className={activeClassName(this.props.focusedTab === MAIN_AREA_TABS.WELCOME)}
                   onClick={() => this.changeTabs(MAIN_AREA_TABS.WELCOME)}
+                  role="tab"
+                  aria-label={MAIN_AREA_TAB_TITLES[MAIN_AREA_TABS.WELCOME]}
+                  aria-selected={this.props.focusedTab === MAIN_AREA_TABS.WELCOME}
                 >
                   <FontAwesomeIcon icon={faCompass} className={styles.navTabIcon} />
                   <div id="mainContentTabTitle"> {MAIN_AREA_TAB_TITLES[MAIN_AREA_TABS.WELCOME]} </div>

@@ -70,6 +70,8 @@ describe('MainAreaTabs', () => {
     expect(container.querySelector('.mainTabsCardHeader')).toBeInTheDocument();
     expect(container.querySelector('.mainAreaCardBody')).toBeInTheDocument();
     expect(container.querySelectorAll('.navTabIcon')).toHaveLength(4);
+    expect(screen.getByRole('tab', { name: 'Latest' })).toHaveAttribute('aria-selected', 'false');
+    expect(screen.getByRole('tab', { name: 'Tools' })).toHaveAttribute('aria-selected', 'true');
     expect(await screen.findByTestId('mock-tool-explorer')).toBeInTheDocument();
     expect(screen.getByTestId('mock-tool-explorer')).toHaveAttribute('data-demo-surface-mode', 'true');
   });

@@ -726,6 +726,33 @@
     cursor: pointer;
   }
 
+  .mainTabsCardHeader :global(.nav-link:not(.active)) {
+    width: 40px;
+    min-width: 40px;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    color: var(--ce-titlebar-text);
+  }
+
+  .mainTabsCardHeader :global(.nav-link:not(.active):hover) {
+    background: color-mix(in srgb, var(--ce-titlebar-text) 14%, transparent);
+  }
+
+  .mainTabsCardHeader :global(.nav-link:not(.active):focus-visible) {
+    outline: 1px dotted var(--ce-titlebar-text);
+    outline-offset: -2px;
+    background: color-mix(in srgb, var(--ce-titlebar-text) 14%, transparent);
+  }
+
+  .mainTabsCardHeader :global(.nav-link) .navTabIcon {
+    top: auto;
+    width: clamp(1.25rem, 2.4vw, 1.5rem);
+    height: clamp(1.25rem, 2.4vw, 1.5rem);
+    font-size: clamp(1.25rem, 2.4vw, 1.5rem);
+    margin-right: 0;
+  }
+
   .mainTabsCardHeader :global(.nav-link > div) {
     display: none;
   }

@@ -416,6 +416,10 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         })
       : [];
     const homeTabGaps = homeTabCenters.slice(1).map((center, index) => center - homeTabCenters[index]);
+    const inactiveHomeTab = homeTabs?.querySelector('.nav-link:not(.active)');
+    const inactiveHomeTabIcon = inactiveHomeTab?.querySelector('svg');
+    const inactiveHomeTabStyle = inactiveHomeTab ? window.getComputedStyle(inactiveHomeTab) : null;
+    const inactiveHomeTabIconRect = inactiveHomeTabIcon?.getBoundingClientRect();
     const rootRect = root?.getBoundingClientRect();
     const overflow = Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth);
     const overflowElements = Array.from(document.querySelectorAll('body *'))
@@ -439,6 +443,17 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       overflowElements,
       homeTabCount: homeTabCenters.length,
       homeTabGapRange: homeTabGaps.length ? Math.max(...homeTabGaps) - Math.min(...homeTabGaps) : null,
+      inactiveHomeTabBorderWidths: inactiveHomeTabStyle
+        ? [
+            inactiveHomeTabStyle.borderTopWidth,
+            inactiveHomeTabStyle.borderRightWidth,
+            inactiveHomeTabStyle.borderBottomWidth,
+            inactiveHomeTabStyle.borderLeftWidth,
+          ]
+        : [],
+      inactiveHomeTabBackground: inactiveHomeTabStyle?.backgroundColor || '',
+      inactiveHomeTabBoxShadow: inactiveHomeTabStyle?.boxShadow || '',
+      inactiveHomeTabIconSize: Math.min(inactiveHomeTabIconRect?.width || 0, inactiveHomeTabIconRect?.height || 0),
       sessionPreviewAccent: preview
         ? window.getComputedStyle(preview).getPropertyValue('--ce-session-accent').trim()
         : '',
@@ -982,6 +997,21 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     assert.ok(
       routeState.homeTabGapRange !== null && routeState.homeTabGapRange <= 2,
       `Classic 95 home title-bar options should be evenly spaced; received a ${routeState.homeTabGapRange}px gap range`,
+    );
+    assert.deepEqual(
+      routeState.inactiveHomeTabBorderWidths,
+      ['0px', '0px', '0px', '0px'],
+      'Classic 95 inactive home tab icons should not render button borders',
+    );
+    assert.equal(
+      routeState.inactiveHomeTabBackground,
+      'rgba(0, 0, 0, 0)',
+      'Classic 95 inactive home tab icons should rest on the title-bar background',
+    );
+    assert.equal(routeState.inactiveHomeTabBoxShadow, 'none', 'Classic 95 inactive home tab icons should not be raised');
+    assert.ok(
+      routeState.inactiveHomeTabIconSize >= 20,
+      `Classic 95 inactive home tab icons should be at least 20px; received ${routeState.inactiveHomeTabIconSize}px`,
     );
   }
   if (classicToolCardState?.hovered && currentToolCardState) {

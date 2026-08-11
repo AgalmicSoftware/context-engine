@@ -67,4 +67,13 @@ describe('Main welcome walkthrough styles', () => {
     );
     expect(scss).not.toMatch(/\.nav-item:has\(\.nav-link\.active\)[\s\S]*?order:\s*-1;/);
   });
+
+  it('renders classic inactive tab icons without button borders', () => {
+    expect(scss).toMatch(
+      /\.mainTabsCardHeader :global\(\.nav-link:not\(\.active\)\)\s*{[\s\S]*?border:\s*0;[\s\S]*?background:\s*transparent;[\s\S]*?box-shadow:\s*none;/,
+    );
+    expect(scss).toMatch(
+      /\.mainTabsCardHeader :global\(\.nav-link\) \.navTabIcon\s*{[\s\S]*?width:\s*clamp\(1\.25rem,\s*2\.4vw,\s*1\.5rem\);[\s\S]*?height:\s*clamp\(1\.25rem,\s*2\.4vw,\s*1\.5rem\);[\s\S]*?margin-right:\s*0;/,
+    );
+  });
 });
