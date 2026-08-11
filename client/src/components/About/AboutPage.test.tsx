@@ -346,6 +346,17 @@ describe('AboutPage', () => {
     expect(screen.queryByTestId('ce-about-recognition-radicalxchange')).not.toBeInTheDocument();
   });
 
+  it('keeps every collapsible section header frameless', () => {
+    renderAboutPage();
+
+    ['Functionality', 'Roadmap', 'Recognition'].forEach((name) => {
+      expect(screen.getByRole('button', { name })).toHaveAttribute(
+        'data-ce-control-appearance',
+        'frameless',
+      );
+    });
+  });
+
   it('only treats named recognition individuals as renderable configuration', () => {
     expect(getConfiguredRecognitionIndividuals()).toEqual([]);
     expect(

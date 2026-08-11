@@ -593,6 +593,7 @@ const AboutPage = () => {
             onClick={() => setShowPresent((currentState) => !currentState)}
             onKeyDown={(event) => handleSectionToggleKeyDown(event, setShowPresent)}
             role="button"
+            data-ce-control-appearance="frameless"
             tabIndex={0}
             aria-expanded={showPresent}
           >
@@ -648,6 +649,7 @@ const AboutPage = () => {
             onClick={() => setShowRoadmap((currentState) => !currentState)}
             onKeyDown={(event) => handleSectionToggleKeyDown(event, setShowRoadmap)}
             role="button"
+            data-ce-control-appearance="frameless"
             tabIndex={0}
             aria-expanded={showRoadmap}
           >
@@ -693,6 +695,7 @@ const AboutPage = () => {
             onClick={() => setShowRecognition((currentState) => !currentState)}
             onKeyDown={(event) => handleSectionToggleKeyDown(event, setShowRecognition)}
             role="button"
+            data-ce-control-appearance="frameless"
             tabIndex={0}
             aria-expanded={showRecognition}
           >
