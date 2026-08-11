@@ -4223,8 +4223,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
-/* Classic 95 question pile: a compact application window with a sunken prompt,
- * standard command buttons, and a real toolbar made from the existing actions. */
+/* Classic 95 question pile: a compact application window with a sunken prompt
+ * and readable standalone icon controls around the existing actions. */
 @container ce-theme style(--ce-layout-profile: desktop-window) {
   .pileInteractionUnit {
     --pile-card-width: min(760px, calc(100vw - 190px));
@@ -4345,11 +4345,10 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   .pileControls > .pileActions,
   .pileControls > .pileNav {
     left: calc(100% + var(--pile-desktop-rail-gap));
-    padding: 6px;
-    border: 2px solid;
-    border-color: var(--ce-border-raised);
-    background: var(--ce-control-face);
-    box-shadow: var(--ce-shadow-raised);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
   }
 
   .pileControls > .pileActions {
@@ -4368,11 +4367,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 
   .pileNav {
-    padding: 6px;
+    padding: 0;
   }
 
   .pileActions {
-    padding: 6px;
+    padding: 0;
   }
 
   .pileNavArrow,
@@ -4383,10 +4382,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     width: 40px;
     height: 40px;
     padding: 4px;
-    border: 2px solid !important;
-    border-color: var(--ce-border-raised) !important;
-    background: var(--ce-control-face);
-    box-shadow: var(--ce-shadow-raised) !important;
+    border: 0 !important;
+    background: transparent;
+    box-shadow: none !important;
     color: var(--ce-control-text);
     font-size: 1.15rem;
     opacity: 1;
@@ -4396,15 +4394,17 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   .pileNavArrow:hover:not(:disabled),
   .actionButton:hover {
     transform: none;
-    background: var(--ce-surface-alt);
+    background: transparent;
     color: var(--ce-control-text);
     filter: none;
   }
 
   .pileNavArrow:active:not(:disabled),
   .actionButton:active {
-    border-color: var(--ce-border-inset) !important;
-    box-shadow: var(--ce-shadow-pressed) !important;
+    border: 0 !important;
+    background: transparent;
+    box-shadow: none !important;
+    transform: translateY(1px);
   }
 
   .pileNavArrow:disabled,
@@ -4449,12 +4449,20 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   .pileCardFooter .pileIconButton,
   .pileCardFooter .iconButton {
-    border: 2px solid;
-    border-color: var(--ce-border-raised);
-    background: var(--ce-control-face);
-    box-shadow: var(--ce-shadow-raised);
-    color: var(--ce-control-text);
-    opacity: 1;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: var(--ce-control-text) !important;
+    opacity: 1 !important;
+  }
+
+  .pileNavArrow:focus-visible,
+  .actionButton:focus-visible,
+  .pileActionsMenuEligible .pileActionMenuToggle:focus-visible,
+  .pileCardFooter .pileIconButton:focus-visible,
+  .pileCardFooter .iconButton:focus-visible {
+    outline: 2px dotted var(--ce-control-text);
+    outline-offset: 2px;
   }
 }
 

@@ -1005,6 +1005,24 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
               const branding = document.querySelector('[class*="brandingSection"]');
               const pileCard = document.querySelector('[class*="pileCardInner"]');
               const pileCardBody = document.querySelector('[class*="pileCardBody"]');
+              const iconControlState = (label, selector) => {
+                const element = document.querySelector(selector);
+                if (!element) return { label, exists: false };
+                const style = window.getComputedStyle(element);
+                return {
+                  label,
+                  exists: true,
+                  backgroundColor: style.backgroundColor,
+                  borderWidths: [
+                    style.borderTopWidth,
+                    style.borderRightWidth,
+                    style.borderBottomWidth,
+                    style.borderLeftWidth,
+                  ],
+                  boxShadow: style.boxShadow,
+                  opacity: Number(style.opacity),
+                };
+              };
               return {
                 brandingBackground: branding ? window.getComputedStyle(branding).backgroundColor : '',
                 hasPileWindowTitlebar: Boolean(document.querySelector('[class*="pileWindowTitlebar"]')),
@@ -1013,6 +1031,14 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
                 promptRatio: textRatio('[class*="pileCardHeader"] h4'),
                 sessionTitleRatio: textRatio('[class*="brandingSectionTitle"]'),
                 sectionTitleRatio: textRatio('[class*="sectionHeaderTitle"]'),
+                iconControls: [
+                  iconControlState('question actions', 'button[aria-label="Question actions"]'),
+                  iconControlState('microphone', '[data-testid="ce-session-listening-toggle"]'),
+                  iconControlState('comment', '[data-testid="ce-survey-additional-toggle"]'),
+                  iconControlState('lock', '[data-testid="ce-survey-answer-lock"]'),
+                  iconControlState('previous question', 'button[aria-label="Previous Question"]'),
+                  iconControlState('next question', 'button[aria-label="Next Question"]'),
+                ],
               };
             }
             if (surface === 'sim-user') {
@@ -1592,6 +1618,21 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       'rgba(0, 0, 0, 0)',
       'Classic 95 session branding should keep its simplified transparent stage',
     );
+    reportedSurfaceState.iconControls.forEach((control) => {
+      assert.equal(control.exists, true, `Classic 95 ${control.label} control should be present`);
+      assert.deepEqual(
+        control.borderWidths,
+        ['0px', '0px', '0px', '0px'],
+        `Classic 95 ${control.label} control should not have a persistent button border`,
+      );
+      assert.equal(
+        control.backgroundColor,
+        'rgba(0, 0, 0, 0)',
+        `Classic 95 ${control.label} control should have a transparent background`,
+      );
+      assert.equal(control.boxShadow, 'none', `Classic 95 ${control.label} control should not have a button shadow`);
+      assert.equal(control.opacity, 1, `Classic 95 ${control.label} control should remain fully visible`);
+    });
     [
       ['session title', reportedSurfaceState.sessionTitleRatio],
       ['question prompt', reportedSurfaceState.promptRatio],
