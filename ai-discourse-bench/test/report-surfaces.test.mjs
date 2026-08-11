@@ -40,6 +40,10 @@ test('report preserves raw atlas and risk-matrix material', async () => {
   assert.match(html, /data-ce-node-id="ai-rd-automation"/);
   assert.match(html, /id="debate-atlas-ai-rd-automation"[\s\S]*?data-ce-atlas-open="ai-rd-automation"/);
   assert.match(html, /data-ce-atlas-tag-filter/);
+  assert.match(html, /data-ce-atlas-tag-option/);
+  assert.match(html, /data-ce-atlas-tag-summary>All tags/);
+  assert.match(html, /data-ce-atlas-tag-clear>Clear/);
+  assert.match(html, /Match any selected/);
   assert.match(html, /data-ce-atlas-sort/);
   assert.match(html, /data-ce-atlas-issue-template/);
   assert.match(html, /data-ce-atlas-issue-modal hidden role="dialog" aria-modal="true"/);
@@ -48,15 +52,25 @@ test('report preserves raw atlas and risk-matrix material', async () => {
   assert.match(html, /data-ce-atlas-question-distribution/);
   assert.match(html, /data-ce-atlas-question-vote-bar/);
   assert.doesNotMatch(html, /data-ce-atlas-model-roster/);
-  assert.match(html, /Answer coverage/);
+  assert.doesNotMatch(html, /Answer coverage/);
+  assert.match(html, /Response direction/);
   assert.match(html, /No model answers/);
   assert.match(html, /aria-expanded="true"\s+aria-controls="ce-atlas-modal-ai-rd-automation-questions-body"/);
   assert.match(html, /id="ce-atlas-modal-ai-rd-automation-questions-body" data-ce-atlas-modal-collapse-body>/);
   assert.match(html, /function updateAtlasBrowse\(\)/);
+  assert.match(html, /function getSelectedAtlasTags\(\)/);
+  assert.match(html, /selectedTags\.some\(function \(tag\) \{ return nodeTags\.indexOf\(tag\) !== -1; \}\)/);
   assert.match(html, /function computeAtlasBrowseSlots\(nodes\)/);
-  assert.match(html, /var useOriginalLayout = !selectedTag && sortMode === 'atlas';/);
+  assert.match(html, /var useOriginalLayout = selectedTags\.length === 0 && sortMode === 'atlas';/);
+  assert.match(html, /if \(matchingTagInput\) matchingTagInput\.checked = true;/);
   assert.match(html, /function openAtlasIssueModal\(topicId, options\)/);
   assert.match(html, /function syncAtlasIssueModalWithHash\(\)/);
+  assert.match(html, /data-ce-tag-modal hidden role="dialog" aria-modal="true"/);
+  assert.match(html, /function questionsForTag\(tag\)/);
+  assert.match(html, /function openTagModal\(tag, options\)/);
+  assert.match(html, /function syncTagModalWithHash\(\)/);
+  assert.match(html, /body\[data-ce-tag-modal-open="true"\] \{ overflow: hidden; \}/);
+  assert.doesNotMatch(html, /href="\/tag\//);
   assert.match(html, /body\[data-ce-atlas-modal-open="true"\] \{ overflow: hidden; \}/);
   assert.match(html, /\.atlasIssueModalOverlay \{ position: fixed; inset: 0; z-index: 2000;/);
   assert.match(html, /--topic-mobile-font-size:[0-9.]+px;/);
@@ -82,7 +96,7 @@ test('report preserves raw atlas and risk-matrix material', async () => {
   assert.match(html, /\.beeswarmCircleNoData \{ fill: #cbd5e1; opacity: 0\.42; stroke: #94a3b8; stroke-width: 1; \}/);
 });
 
-test('persona reports visibly identify the weights-only public-figure lens', async () => {
+test('persona reports visibly identify the weights-only public-figure mode', async () => {
   const questionBank = limitQuestionBank(
     await readJson(new URL('../data/question-bank.sample.json', import.meta.url)),
     1
@@ -107,7 +121,8 @@ test('persona reports visibly identify the weights-only public-figure lens', asy
     },
   });
   const html = renderHtmlReport(report);
-  assert.match(html, /Persona lens: Ada Lovelace \(weights-only\)/);
+  assert.match(html, /Persona mode: Ada Lovelace \(weights-only\)/);
+  assert.doesNotMatch(html, /Persona lens:/);
   assert.doesNotMatch(html, /evidence through/);
   assert.match(html, /data-benchmark-persona="ada-lovelace"/);
 });
@@ -148,30 +163,70 @@ test('publication intro explains the benchmark and does not overstate preview ar
     },
   });
   const html = renderHtmlReport(report);
+  const previewNotice = html.match(/<div class="aidb-preview-notice"[\s\S]*?<\/div>/)?.[0] || '';
   const introStart = html.indexOf('data-ce-benchmark-intro');
   const resultsStart = html.indexOf('data-ce-results-section');
   const resultsHeaderStart = html.indexOf('<div class="sectionHeaderRow">', resultsStart);
   const miniSectionStart = html.indexOf('<div class="miniSectionContent">', resultsHeaderStart);
+  const provenanceStart = html.indexOf('<p class="aidb-benchmark-provenance">', introStart);
+  const introHeadingStart = html.indexOf('<h1 id="aidb-benchmark-intro-title">', introStart);
 
   assert.ok(introStart >= 0);
-  assert.ok(resultsStart >= 0 && introStart > resultsStart);
-  assert.ok(resultsHeaderStart >= 0 && introStart > resultsHeaderStart);
-  assert.ok(miniSectionStart > introStart);
-  assert.match(html, /<meta name="description" content="A Context Engine AI discourse benchmark mapping agreement, disagreement, uncertainty, and wording sensitivity across 1 corpus-grounded question answered by 2 model participants\." \/>/);
+  assert.ok(resultsStart >= 0 && introStart < resultsStart);
+  assert.ok(provenanceStart > introStart && provenanceStart < introHeadingStart);
+  assert.match(html, /<p class="aidb-benchmark-provenance"><span class="aidb-benchmark-technical-name">model-opinions-bench<\/span><span class="aidb-benchmark-generated">Generated: [^<]+<\/span><\/p>/);
+  assert.doesNotMatch(html, /<p class="aidb-benchmark-provenance">Benchmark ID:/);
+  assert.ok(resultsHeaderStart > resultsStart);
+  assert.ok(miniSectionStart > resultsHeaderStart);
+  assert.match(html, /<meta name="description" content="A Context Engine AI opinions benchmark mapping agreement, disagreement, uncertainty, and wording sensitivity across 1 corpus-grounded question answered by 2 model participants\." \/>/);
   assert.match(html, /<meta name="robots" content="noindex,nofollow" \/>/);
   assert.match(html, /data-ce-benchmark-publication-status="preview"/);
-  assert.match(html, />Publication preview<\/span>/);
-  assert.match(html, /A Context Engine AI discourse benchmark/);
-  assert.match(html, /drawn from or implied by the OSS <strong>ai-discourse-corpus<\/strong>/);
-  assert.match(html, /Each model is one participant\./);
-  assert.match(html, /The benchmark is descriptive, not a leaderboard\./);
-  assert.match(html, /<dt>Questions<\/dt><dd>1<\/dd>/);
-  assert.match(html, /<dt>Model participants<\/dt><dd>2<\/dd>/);
-  assert.match(html, /<dt>Lens<\/dt><dd>Models answer as themselves<\/dd>/);
-  assert.match(html, /<dt>Run depth<\/dt><dd>1 of 10 planned per wording<\/dd>/);
-  assert.match(html, /<dt>Question bank<\/dt><dd>Development Seed<\/dd>/);
-  assert.match(html, /Repeat consistency\.<\/strong> The vertical beeswarm axis/);
-  assert.match(html, /do not cite this artifact as a released benchmark result/);
+  assert.doesNotMatch(html, /aidb-publication-status/);
+  assert.doesNotMatch(html, />Publication preview<\/span>/);
+  assert.match(html, /<h1 id="aidb-benchmark-intro-title">Context Engine: AI Opinions Benchmark<\/h1>/);
+  assert.doesNotMatch(html, /aidb-benchmark-kicker/);
+  assert.doesNotMatch(html, /aidb-benchmark-method-summary/);
+  assert.doesNotMatch(html, /aidb-benchmark-reading-guide/);
+  assert.doesNotMatch(html, /How to read these results/);
+  assert.doesNotMatch(html, /aidb-publication-note/);
+  assert.doesNotMatch(html, /Publication status:/);
+  assert.match(html, /questions about AI futures and policy, drawn from or implied by the OSS <strong>ai-discourse-corpus<\/strong>\. The same benchmark method can be applied to any topic\. An optional quadratic-importance mode gives every model the same credit budget to prioritize questions; those allocations determine Debate Map prominence when present\./);
+  assert.match(html, /<div class="aidb-benchmark-topic-fact"><dt><label for="aidb-benchmark-topic">Benchmark topic<\/label><\/dt><dd><select id="aidb-benchmark-topic" aria-describedby="aidb-benchmark-topic-description" data-ce-benchmark-topic-selector><option value="ai-futures-policy" selected>AI Futures &amp; Policy<\/option><\/select><\/dd><\/div>/);
+  assert.doesNotMatch(html, /class="aidb-benchmark-topic-control"/);
+  assert.match(html, /<div class="aidb-benchmark-fact-number"><dt>Questions<\/dt><dd>1<\/dd><\/div>/);
+  assert.match(html, /<div class="aidb-benchmark-fact-number"><dt>Model participants<\/dt><dd>2<\/dd><\/div>/);
+  assert.match(html, /<dt>Mode<button type="button" class="tooltip aidb-benchmark-fact-tooltip pdfIgnore" aria-label="About benchmark mode" aria-describedby="aidb-mode-tooltip-copy" data-ce-mode-tooltip>[\s\S]*?data-icon="question-circle"[\s\S]*?<span class="tooltiptext" id="aidb-mode-tooltip-copy" role="tooltip">Persona mode asks each model to predict how a named historical or contemporary public figure would answer, using only information in the model's weights\.<\/span><\/button><\/dt><dd>Models answer as themselves<\/dd>/);
+  assert.doesNotMatch(html, /<dt>Lens(?:<|\s)/);
+  assert.doesNotMatch(html, /<dt>Repeat runs/);
+  assert.doesNotMatch(html, /data-ce-repeat-runs-tooltip/);
+  assert.doesNotMatch(html, /<dt>Question bank<\/dt>/);
+  assert.match(html, /<strong>Development preview\.<\/strong>/);
+  assert.match(html, /The measurements below are useful for testing the report and methodology, but this is not an official benchmark release\./);
+  assert.match(html, /<summary>Why this is a development preview<\/summary>/);
+  assert.match(html, /<strong>Question bank:<\/strong> Development Seed\. An official release requires a separately reviewed and validated bank\./);
+  assert.match(html, /<strong>Repeat depth:<\/strong> The imported artifacts declare 1 completed run per wording; this bank requires 10 for release\./);
+  assert.match(html, /<strong>Current model coverage:<\/strong> 2 of 2 model participants answered every question in both wordings with no invalid responses in this run set\./);
+  assert.doesNotMatch(html, /<strong>Wording sensitivity:<\/strong>/);
+  assert.doesNotMatch(previewNotice, /coverage=1, paired=1, completion=0, valid=1/);
+  assert.match(html, /coverage=1, paired=1, completion=0, valid=1/);
+
+  const wordingSensitiveHtml = renderHtmlReport({
+    ...report,
+    polisReport: {
+      ...report.polisReport,
+      byQuestion: {
+        ...report.polisReport.byQuestion,
+        [questionId]: {
+          ...report.polisReport.byQuestion[questionId],
+          wordingSensitivity: {
+            ...report.polisReport.byQuestion[questionId].wordingSensitivity,
+            meanAbsoluteShift: 0.5,
+          },
+        },
+      },
+    },
+  });
+  assert.match(wordingSensitiveHtml, /<strong>Wording sensitivity:<\/strong> 1 of 1 questions changed by at least 0\.50 on the normalized -1 to \+1 answer scale when original and reversed wording were compared\. These items require wording review before release\./);
 
   const releaseHtml = renderHtmlReport({
     ...report,
@@ -187,17 +242,70 @@ test('publication intro explains the benchmark and does not overstate preview ar
   });
   assert.match(releaseHtml, /<meta name="robots" content="index,follow" \/>/);
   assert.match(releaseHtml, /data-ce-benchmark-publication-status="release-ready"/);
-  assert.match(releaseHtml, />Release-ready result<\/span>/);
-  assert.match(releaseHtml, /<dt>Run depth<\/dt><dd>10 of 10 planned per wording<\/dd>/);
-  assert.match(releaseHtml, /<dt>Question bank<\/dt><dd>Validated<\/dd>/);
-  assert.match(releaseHtml, /This artifact passed the validated-bank, model coverage, polarity pairing, repeat completion, validity, and provenance gates\./);
-  assert.doesNotMatch(releaseHtml, /do not cite this artifact as a released benchmark result/);
+  assert.doesNotMatch(releaseHtml, /aidb-publication-status/);
+  assert.doesNotMatch(releaseHtml, />Release-ready result<\/span>/);
+  assert.doesNotMatch(releaseHtml, /<dt>Repeat runs/);
+  assert.doesNotMatch(releaseHtml, /<dt>Question bank<\/dt>/);
+  assert.doesNotMatch(releaseHtml, /aidb-publication-note/);
+  assert.doesNotMatch(releaseHtml, /data-ce-benchmark-preview/);
 
   const hostileTitle = '<img src=x onerror=alert(1)>';
   const hostileHtml = renderHtmlReport({ ...report, title: hostileTitle });
-  assert.match(hostileHtml, /<meta property="og:title" content="&lt;img src=x onerror=alert\(1\)&gt;" \/>/);
-  assert.match(hostileHtml, /<h1 id="aidb-benchmark-intro-title">&lt;img src=x onerror=alert\(1\)&gt;<\/h1>/);
-  assert.doesNotMatch(hostileHtml, /<h1 id="aidb-benchmark-intro-title"><img/);
+  assert.match(hostileHtml, /<meta property="og:title" content="Context Engine: AI Opinions Benchmark" \/>/);
+  assert.match(hostileHtml, /<title>Context Engine: AI Opinions Benchmark - Results Report<\/title>/);
+  assert.match(hostileHtml, /<h1 id="aidb-benchmark-intro-title">Context Engine: AI Opinions Benchmark<\/h1>/);
+  assert.doesNotMatch(hostileHtml, /<img src=x onerror=alert\(1\)>/);
+});
+
+test('quadratic importance allocations control Debate Map prominence without changing stance results', async () => {
+  const questionBank = {
+    benchmarkId: 'importance-report',
+    runPlan: { repeatsPerPolarity: 1 },
+    questions: [
+      { id: 'q1', canonicalPrompt: 'Governance matters.', reversedPrompt: 'Governance does not matter.', topic: 'governance' },
+      { id: 'q2', canonicalPrompt: 'Labor matters.', reversedPrompt: 'Labor does not matter.', topic: 'labor' },
+    ],
+  };
+  const modelRoster = {
+    models: [
+      { id: 'model-a', label: 'Model A', model: 'model-a', provider: 'local', traits: {} },
+      { id: 'model-b', label: 'Model B', model: 'model-b', provider: 'local', traits: {} },
+    ],
+  };
+  const stanceRuns = modelRoster.models.flatMap((model) => questionBank.questions.flatMap((question) => [
+    { modelId: model.id, questionId: question.id, polarity: 'canonical', normalizedAnswer: 'Agree' },
+    { modelId: model.id, questionId: question.id, polarity: 'reversed', normalizedAnswer: 'Agree' },
+  ]));
+  const importanceFile = {
+    budget: 25,
+    maxAllocations: 2,
+    maxVotesPerQuestion: 3,
+    repeats: 1,
+    runs: [
+      { modelId: 'model-a', allocations: [{ questionId: 'q1', votes: 3 }], spentCredits: 9 },
+      { modelId: 'model-b', allocations: [{ questionId: 'q1', votes: 3 }, { questionId: 'q2', votes: 1 }], spentCredits: 10 },
+    ],
+  };
+  const report = buildResultsReport({
+    questionBank,
+    modelRoster,
+    runsFile: { repeats: 1, runs: stanceRuns },
+    importanceFile,
+  });
+  assert.equal(report.importance.available, true);
+  assert.equal(report.importance.byQuestion.q1.meanVotes, 3);
+  assert.equal(report.polisReport.byQuestion.q1.meanScore, 1);
+  assert.equal(report.debateAtlas.sizeMetric, 'quadratic-importance');
+  assert.equal(report.debateAtlas.topicCircles.find((topic) => topic.id === 'governance').importanceVotes, 3);
+  assert.equal(report.debateAtlas.topicCircles.find((topic) => topic.id === 'labor').importanceVotes, 0.5);
+
+  const html = renderHtmlReport(report);
+  assert.match(html, /Circle prominence reflects equal-budget quadratic importance allocations from model participants/);
+  assert.match(html, /<option value="importance">Most important<\/option>/);
+  assert.match(html, /data-ce-atlas-importance="3"/);
+  assert.match(html, /data-ce-atlas-importance="0\.5"/);
+  assert.match(html, /if \(sortMode === 'importance'\)/);
+  assert.match(html, /of allocated importance/);
 });
 
 test('participant opinion groups use client-style hulls and pair connectors', async () => {
@@ -320,8 +428,9 @@ test('report beeswarm places model-to-model difference on the right axis', async
 
   const report = buildResultsReport({ questionBank, modelRoster, runsFile });
   const html = renderHtmlReport(report);
+  const mainBeeswarm = html.match(/<svg width="700" height="250" class="beeswarmSvg" role="img" aria-label="Questions by model disagreement and repeat consistency">([\s\S]*?)<\/svg>/)?.[1] || '';
   const points = new Map();
-  for (const match of html.matchAll(/href="#question-([^"]+)"[\s\S]*?data-ce-beeswarm-point[\s\S]*?<circle class="beeswarmCircle" cx="([^"]+)" cy="([^"]+)" r="5"/g)) {
+  for (const match of mainBeeswarm.matchAll(/href="#question-([^"]+)"[\s\S]*?data-ce-beeswarm-point[\s\S]*?<circle class="beeswarmCircle" cx="([^"]+)" cy="([^"]+)" r="5"/g)) {
     points.set(match[1], { x: Number(match[2]), y: Number(match[3]) });
   }
 
@@ -526,25 +635,137 @@ test('All Questions gives each model one averaged vote and preserves invalid raw
   assert.equal(report.polisReport.byQuestion[question.id].runSummary.total, 2);
   assert.equal(report.polisReport.byQuestion[question.id].runSummary.invalid, 1);
   assert.match(html, /<strong>Agree:<\/strong> 1 \/\s*<strong>Disagree:<\/strong> 0 \/\s*<strong>Unsure:<\/strong> 0 \/\s*\(Total: 1\)/);
-  assert.match(html, /data-ce-atlas-question-distribution aria-label="Model vote distribution: Agree 1, Unsure 0, Disagree 0"/);
+  assert.match(html, /class="questionModelLegend" aria-label="Model marker legend"/);
+  assert.match(html, /<button\s+type="button"\s+class="questionModelLegendItem"\s+data-ce-question-model-card="model-a"\s+style="--atlas-model-color:#1f77b4"\s+title="Model A"\s+aria-label="Toggle Model A answer highlighting"\s+aria-pressed="false"[\s\S]*?>1<\/span>[\s\S]*?<span>Model A<\/span>/);
+  assert.match(html, /id="question-[^"]+"[\s\S]*?class="atlasIssueQuestionDistribution questionModelDistribution"[\s\S]*?data-ce-atlas-model-marker="model-a"[\s\S]*?data-ce-atlas-model-answer="Agree"/);
+  assert.match(html, /\.questionModelDistribution \.atlasIssueQuestionBar \{ height: 24px; border-color: #64748b; background: #eef2f6; \}/);
+  assert.match(html, /#all-questions\[data-ce-question-model-highlight\] \.questionModelDistribution \.atlasIssueModelMarker \{ opacity: 0\.25;/);
+  assert.match(html, /function applyQuestionModelHighlight\(\)/);
+  assert.match(html, /var lockedQuestionModelIds = new Set\(\);/);
+  assert.match(html, /var activeModelIds = lockedQuestionModelIds\.size > 0\s*\? Array\.from\(lockedQuestionModelIds\)/);
+  assert.match(html, /var isActive = activeModelIds\.indexOf\(cardModelId\) !== -1;/);
+  assert.match(html, /var isLocked = lockedQuestionModelIds\.has\(cardModelId\);/);
+  assert.match(html, /activeModelIds\.indexOf\(marker\.getAttribute\('data-ce-atlas-model-marker'\) \|\| ''\) !== -1/);
+  assert.match(html, /if \(lockedQuestionModelIds\.has\(modelId\)\) \{\s*lockedQuestionModelIds\.delete\(modelId\);/);
+  assert.match(html, /lockedQuestionModelIds\.add\(modelId\);/);
+  assert.match(html, /card\.setAttribute\('aria-pressed', isLocked \? 'true' : 'false'\)/);
+  assert.match(html, /data-ce-atlas-question-distribution aria-label="Model vote distribution: Agree 1, Unsure 0, Disagree 0\. Model answers: Model A: Agree"/);
   assert.match(html, /data-ce-atlas-question-vote-count="Agree"><i class="aidb-answer-agree"><\/i><span>Agree<\/span><strong>1<\/strong>/);
   assert.match(html, /data-ce-atlas-question-vote-count="Unsure"><i class="aidb-answer-unsure"><\/i><span>Unsure<\/span><strong>0<\/strong>/);
   assert.match(html, /data-ce-atlas-question-vote-count="Disagree"><i class="aidb-answer-disagree"><\/i><span>Disagree<\/span><strong>0<\/strong>/);
   assert.match(html, /data-ce-atlas-model-roster/);
-  assert.match(html, /data-ce-atlas-model-context/);
-  assert.match(html, /Models behind these results/);
+  assert.doesNotMatch(html, /data-ce-atlas-model-context/);
+  assert.match(html, /Models included/);
   assert.match(html, /data-ce-atlas-model-card="model-a"/);
-  assert.match(html, /Model A/);
-  assert.match(html, /1\/1 question answered/);
-  assert.match(html, /Answer coverage/);
-  assert.match(html, /1 of 1 model contributed/);
-  assert.match(html, /1 of 1 possible averaged model answer is available across 1 question\./);
-  assert.match(html, /1 averaged model answer from 1 of 1 benchmark model informs this issue area\. Each model counts once per question after its repeated runs are averaged\./);
-  assert.match(html, /Overall model stance/);
-  assert.match(html, /Models lean toward support/);
-  assert.match(html, /Average model score \+1\.00 \(-1 disagree, 0 unsure, \+1 agree\)\./);
-  assert.match(html, /No model comparison yet/);
-  assert.match(html, /Net Support \| average score \+1\.00/);
+  assert.match(html, /<button\s+type="button"\s+class="atlasIssueModelCard"\s+data-ce-atlas-model-card="model-a"[^>]*aria-label="Highlight Model A answers and metrics; click to lock selection"\s+aria-pressed="false"/);
+  assert.match(html, /data-ce-atlas-model-marker="model-a"/);
+  assert.match(html, /data-ce-atlas-model-answer="Agree"/);
+  assert.match(html, /title="Model A: Agree"/);
+  assert.doesNotMatch(html, /Answer coverage/);
+  assert.match(html, /Response direction/);
+  assert.match(html, /Average \+1\.00/);
+  assert.match(html, /-1 disagree \| 0 unsure \| \+1 agree/);
+  assert.match(html, /Model difference/);
+  assert.match(html, /No comparison/);
+  assert.doesNotMatch(html, /Mean of 1 model-question answer after repeat runs were combined/);
+  assert.doesNotMatch(html, /This describes response direction, not correctness/);
+});
+
+test('Debate Map uses stable model colors and overlays each answer on its aggregate segment', async () => {
+  const questionBank = limitQuestionBank(
+    await readJson(new URL('../data/question-bank.sample.json', import.meta.url)),
+    1
+  );
+  const modelRoster = {
+    schemaVersion: 1,
+    models: [
+      { id: 'model-a', label: 'Model A', model: 'provider/model-a', provider: 'mock', traits: {} },
+      { id: 'model-b', label: 'Model B', model: 'provider/model-b', provider: 'mock', traits: {} },
+      { id: 'model-c', label: 'Model C', model: 'provider/model-c', provider: 'mock', traits: {} },
+    ],
+  };
+  const [question] = questionBank.questions;
+  const report = buildResultsReport({
+    questionBank,
+    modelRoster,
+    runsFile: {
+      schemaVersion: 1,
+      benchmarkId: questionBank.benchmarkId,
+      mode: 'self',
+      runs: [
+        { modelId: 'model-a', questionId: question.id, polarity: 'canonical', normalizedAnswer: 'Agree' },
+        { modelId: 'model-b', questionId: question.id, polarity: 'canonical', normalizedAnswer: 'Unsure' },
+        { modelId: 'model-c', questionId: question.id, polarity: 'canonical', normalizedAnswer: 'Disagree' },
+      ],
+    },
+  });
+  const html = renderHtmlReport(report);
+
+  assert.match(html, /data-ce-atlas-model-card="model-a"[^>]*style="--atlas-model-color:#1f77b4"/);
+  assert.match(html, /data-ce-atlas-model-card="model-b"[^>]*style="--atlas-model-color:#ff7f0e"/);
+  assert.match(html, /data-ce-atlas-model-card="model-c"[^>]*style="--atlas-model-color:#2ca02c"/);
+  assert.match(html, /data-ce-atlas-model-card="model-a"[^>]*data-ce-atlas-model-stance-value="Average \+1\.00"[^>]*data-ce-atlas-model-difference-value="Mean peer gap 1\.50"[^>]*data-ce-atlas-model-consistency-value="100%"/);
+  assert.match(html, /data-ce-atlas-model-card="model-b"[^>]*data-ce-atlas-model-stance-value="Average 0\.00"[^>]*data-ce-atlas-model-difference-value="Mean peer gap 1\.00"[^>]*data-ce-atlas-model-consistency-value="100%"/);
+  assert.match(html, /data-ce-atlas-model-marker="model-a"[\s\S]*?data-ce-atlas-model-answer="Agree"[\s\S]*?data-ce-atlas-model-repeat-value="100%"[\s\S]*?data-ce-atlas-model-winning-responses="1"[\s\S]*?data-ce-atlas-model-attempted-runs="1"[\s\S]*?style="--atlas-model-color:#1f77b4;left:16\.67%"[\s\S]*?>1<\/span>/);
+  assert.match(html, /data-ce-atlas-model-marker="model-b"[\s\S]*?data-ce-atlas-model-answer="Unsure"[\s\S]*?style="--atlas-model-color:#ff7f0e;left:50\.00%"[\s\S]*?>2<\/span>/);
+  assert.match(html, /data-ce-atlas-model-marker="model-c"[\s\S]*?data-ce-atlas-model-answer="Disagree"[\s\S]*?style="--atlas-model-color:#2ca02c;left:83\.33%"[\s\S]*?>3<\/span>/);
+  assert.match(html, /aria-label="Model vote distribution: Agree 1, Unsure 1, Disagree 1\. Model answers: Model A: Agree, Model B: Unsure, Model C: Disagree"/);
+  assert.match(html, /\.atlasIssueModalContent\[data-ce-atlas-model-highlight\] \.atlasIssueModelMarker \{ opacity: 0\.25; filter: brightness\(0\.72\) saturate\(0\.55\); \}/);
+  assert.match(html, /\.atlasIssueModalContent\[data-ce-atlas-model-highlight\] \.atlasIssueModelMarker\.atlasIssueModelMarkerActive \{[^}]*opacity: 1;[^}]*filter: brightness\(1\.38\) saturate\(1\.25\);/);
+  assert.match(html, /\.atlasIssueMetricGrid\[data-ce-atlas-model-metrics-active\] \{[^}]*background: color-mix\(in srgb, var\(--atlas-active-model-color\) 24%, rgba\(15, 23, 42, 0\.82\)\);/);
+  assert.match(html, /data-ce-atlas-model-metric-grid aria-label="Issue area benchmark metrics"/);
+  assert.match(html, /data-ce-atlas-metric-label="difference" data-ce-atlas-metric-default="Model difference"/);
+  assert.match(html, /function updateAtlasIssueMetrics\(modelId\)/);
+  assert.match(html, /function updateAtlasQuestionMetrics\(modelId\)/);
+  assert.match(html, /data-ce-atlas-question-meta data-ce-atlas-question-meta-default="Model score gap 2\.00 \| 100% repeat stability"/);
+  assert.match(html, /meta\.textContent = label \+ ': ' \+ answer \+ ' \| ' \+ repeatValue \+ ' repeat stability' \+ runDetail;/);
+  assert.match(html, /updateAtlasQuestionMetrics\(modelId\);/);
+  assert.match(html, /setAtlasMetricText\(grid, 'label', 'difference', 'Distance from peers'\)/);
+  assert.match(html, /function applyAtlasModelHighlight\(\)/);
+  assert.match(html, /var modelId = lockedAtlasModelId \|\| hoveredAtlasModelId \|\| focusedAtlasModelId;/);
+  assert.match(html, /card\.classList\.toggle\('atlasIssueModelCardLocked', isLocked\)/);
+  assert.match(html, /card\.setAttribute\('aria-pressed', isLocked \? 'true' : 'false'\)/);
+  assert.match(html, /atlasIssueModalContent\.setAttribute\('data-ce-atlas-model-highlight', modelId\)/);
+  assert.match(html, /marker\.classList\.toggle\(\s*'atlasIssueModelMarkerActive',\s*marker\.getAttribute\('data-ce-atlas-model-marker'\) === modelId/);
+  assert.match(html, /atlasIssueModalBody\.addEventListener\('mouseover', function \(event\) \{[\s\S]*?hoveredAtlasModelId = card\.getAttribute\('data-ce-atlas-model-card'\) \|\| '';[\s\S]*?applyAtlasModelHighlight\(\);/);
+  assert.match(html, /atlasIssueModalBody\.addEventListener\('mouseout', function \(event\) \{[\s\S]*?hoveredAtlasModelId = '';[\s\S]*?applyAtlasModelHighlight\(\);/);
+  assert.match(html, /atlasIssueModalBody\.addEventListener\('focusin', function \(event\) \{[\s\S]*?focusedAtlasModelId = card\.getAttribute\('data-ce-atlas-model-card'\) \|\| '';/);
+  assert.match(html, /atlasIssueModalBody\.addEventListener\('focusout', function \(event\) \{[\s\S]*?focusedAtlasModelId = '';/);
+  assert.match(html, /if \(lockedAtlasModelId === modelId\) \{\s*lockedAtlasModelId = '';\s*hoveredAtlasModelId = '';\s*focusedAtlasModelId = '';\s*if \(modelCard\.blur\) modelCard\.blur\(\);\s*\} else \{\s*lockedAtlasModelId = modelId;/);
+});
+
+test('Debate Map model repeat stability stays separate from polarity sensitivity', async () => {
+  const questionBank = limitQuestionBank(
+    await readJson(new URL('../data/question-bank.sample.json', import.meta.url)),
+    1
+  );
+  const modelRoster = {
+    schemaVersion: 1,
+    models: [
+      { id: 'model-a', label: 'Model A', model: 'provider/model-a', provider: 'mock', traits: {} },
+    ],
+  };
+  const [question] = questionBank.questions;
+  const report = buildResultsReport({
+    questionBank,
+    modelRoster,
+    runsFile: {
+      schemaVersion: 1,
+      benchmarkId: questionBank.benchmarkId,
+      mode: 'self',
+      runs: [
+        { modelId: 'model-a', questionId: question.id, polarity: 'canonical', normalizedAnswer: 'Agree' },
+        { modelId: 'model-a', questionId: question.id, polarity: 'canonical', normalizedAnswer: 'Agree' },
+        { modelId: 'model-a', questionId: question.id, polarity: 'reversed', normalizedAnswer: 'Disagree' },
+        { modelId: 'model-a', questionId: question.id, polarity: 'reversed', normalizedAnswer: 'Disagree' },
+      ],
+    },
+  });
+  const html = renderHtmlReport(report);
+
+  assert.match(html, /data-ce-atlas-model-card="model-a"[^>]*data-ce-atlas-model-consistency-value="100%"/);
+  assert.match(html, /data-ce-atlas-model-marker="model-a"[\s\S]*?data-ce-atlas-model-repeat-value="100%"/);
+  assert.equal(report.polisReport.byQuestion[question.id].wordingSensitivity.meanAbsoluteShift, 2);
 });
 
 test('Debate Map contributor context distinguishes partial model coverage', async () => {
@@ -581,13 +802,14 @@ test('Debate Map contributor context distinguishes partial model coverage', asyn
     .find((template) => template.includes(`data-ce-atlas-topic-id="${topicId}"`));
 
   assert.ok(issueTemplate);
-  assert.match(issueTemplate, /1 model \| 1 question \| Measured benchmark evidence/);
-  assert.match(issueTemplate, /1 averaged model answer from 1 of 2 benchmark models informs this issue area/);
-  assert.match(issueTemplate, /1 of 2 models contributed/);
-  assert.match(issueTemplate, /1 of 2 possible averaged model answers are available across 1 question\./);
+  assert.doesNotMatch(issueTemplate, /Measured benchmark evidence/);
+  assert.doesNotMatch(issueTemplate, /inform(?:s)? this issue area/);
+  assert.doesNotMatch(issueTemplate, /Answer coverage/);
   assert.match(issueTemplate, /data-ce-atlas-model-card="model-a"/);
   assert.doesNotMatch(issueTemplate, /data-ce-atlas-model-card="model-b"/);
-  assert.match(issueTemplate, /No model comparison yet/);
+  assert.doesNotMatch(issueTemplate, /question answered|average score/);
+  assert.match(issueTemplate, /No comparison/);
+  assert.match(issueTemplate, /Two models must answer the same question/);
 });
 
 test('Summary stats count only concrete agree and disagree votes like live Polis', async () => {
@@ -973,8 +1195,22 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /\.aidb-similarity-details, \.htmlReportJsonDetails \{ border: 1px solid #d9dee8; border-radius: 8px; background: #fff; padding: 10px 12px; margin: 10px 0; \}/);
   assert.doesNotMatch(html, /nav a, button \{/);
   assert.match(html, /class="sectionContainer sectionExpanded ce-session-results-section"/);
-  assert.match(html, /<div class="sectionsGrid">\s*<div class="sectionContainer sectionExpanded ce-session-results-section"[^>]*>\s*<div class="sectionHeaderRow">[\s\S]*?<\/div>\s*<section[\s\S]*?data-ce-benchmark-intro[\s\S]*?<\/section>\s*<div class="miniSectionContent">/);
+  assert.match(html, /\.ce-session-results-section \{ grid-column: 1 \/ -1; box-sizing: border-box; width: 100%; max-width: 100%;/);
+  assert.match(html, /<div class="sectionsGrid">\s*<section[\s\S]*?data-ce-benchmark-intro[\s\S]*?<\/section>\s*<div class="sectionContainer sectionExpanded ce-session-results-section"[^>]*>\s*<div class="sectionHeaderRow">[\s\S]*?<\/div>\s*<div class="miniSectionContent">/);
   assert.match(html, /\.sectionsGrid \{ display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 12px; max-width: 100%; min-width: 0; \}/);
+  assert.match(html, /\.aidb-benchmark-intro \{ grid-column: 1 \/ -1;/);
+  assert.doesNotMatch(html, /\.aidb-benchmark-intro \{[^}]*border-bottom:/);
+  assert.doesNotMatch(html, /\.aidb-benchmark-facts \{[^}]*border-bottom:/);
+  assert.match(html, /\.aidb-benchmark-facts \{ display: grid; grid-template-columns: minmax\(5\.5rem, 0\.55fr\) minmax\(8rem, 0\.78fr\) minmax\(13rem, 1\.25fr\) minmax\(19\.75rem, 1\.65fr\);/);
+  assert.doesNotMatch(html, /\.aidb-benchmark-facts \{[^}]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
+  assert.match(html, /\.aidb-benchmark-technical-name \{ color: rgba\(244, 247, 255, 0\.82\); font-weight: 700; \}/);
+  assert.match(html, /\.aidb-benchmark-topic-fact select \{[^}]*width: 100%;[^}]*min-width: 0;[^}]*border-radius: 4px;[^}]*\}/);
+  assert.doesNotMatch(html, /\.aidb-benchmark-topic-control/);
+  assert.match(html, /\.aidb-benchmark-facts dt \{[^}]*font-size: 0\.82rem;[^}]*\}/);
+  assert.match(html, /\.aidb-benchmark-facts dd \{[^}]*font-size: 1\.08rem;[^}]*\}/);
+  assert.match(html, /\.aidb-benchmark-fact-number \{ align-items: center; text-align: center; \}/);
+  assert.match(html, /\.aidb-benchmark-fact-number dt \{ width: 100%; justify-content: center; \}/);
+  assert.match(html, /\.aidb-benchmark-fact-number dd \{ margin-top: 9px; font-family: var\(--ce-font-body\); font-size: 2rem; font-variant-numeric: tabular-nums; font-weight: 700; line-height: 1; \}/);
   assert.match(html, /@media \(min-width: 768px\) \{\s*\.sectionsGrid \{ grid-template-columns: repeat\(3, minmax\(0, 1fr\)\); align-items: start; \}\s*\.sectionsGridTwoUp \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\); \}\s*\.sectionsGrid \.sectionExpanded \{ grid-column: 1 \/ -1; \}/);
   assert.match(html, /class="sectionContainer sectionExpanded ce-session-results-section" data-ce-results-section data-ce-results-open="true"/);
   assert.match(html, /<h2 class="sectionHeader" data-ce-results-toggle role="button" tabindex="0" aria-expanded="true">/);
@@ -1043,7 +1279,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.doesNotMatch(html.slice(modeSurfacesStart), /ce-results-mode-pane aidb-view-section/);
   assert.doesNotMatch(html.slice(modeSurfacesStart), /class="ce-results-mode-pane-header"/);
   assert.match(html, /data-ce-pane-title="Debate Map"/);
-  assert.match(html, /data-ce-pane-subtitle="Topic circles now; AI-generated claim maps can enrich this after full runs"/);
+  assert.match(html, /data-ce-pane-subtitle="Circle prominence currently reflects question count; quadratic importance allocations can replace this fallback"/);
   assert.match(html, /class="[^"]*aidb-raw-results-modal-pane/);
   assert.doesNotMatch(html, /class="[^"]*aidb-raw-results-modal-pane resultsModal/);
   assert.match(html, /class="modal-dialog resultsModal aidb-raw-results-dialog" role="document"/);
@@ -1176,7 +1412,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /window\.setTimeout\(scroll, 600\);/);
   assert.match(html, /setStaticSectionOpen\(containingSection, true\)/);
   assert.match(html, /var target = getScrollTargetForMode\(nextMode\);/);
-  assert.match(html, /window\.addEventListener\('hashchange', function \(\) \{\s*setReportViewMode\(modeFromHash\(\), \{ scroll: true \}\);/);
+  assert.match(html, /window\.addEventListener\('hashchange', function \(\) \{\s*notifyParentHash\(\);\s*if \(syncTagModalWithHash\(\)\) return;\s*setReportViewMode\(modeFromHash\(\), \{ scroll: true \}\);/);
   assert.doesNotMatch(html.slice(modeSurfacesStart), /id="debate-atlas"[\s\S]*?aidb-summary-toggle/);
   assert.match(html, /class="pdfIgnore settingsRow"/);
   assert.match(html, /Download as PDF/);
@@ -1186,6 +1422,11 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /data-ce-static-pdf-button title="Download the currently open sections of the report"/);
   assert.doesNotMatch(html, /PDF export is available in live Context Engine sessions/);
   assert.doesNotMatch(html, /data-ce-static-pdf-button[^>]*disabled/);
+  assert.match(html, /staticPdfButton\.addEventListener\('click'/);
+  assert.match(html, /window\.print\(\)/);
+  assert.match(html, /type: 'ce-benchmark-hash-change'/);
+  assert.match(html, /type !== 'ce-benchmark-set-hash'/);
+  assert.match(html, /notifyParentHash\(\)/);
   assert.match(html, /<div style="margin-right:12px;position:relative;">\s*<button type="button" data-ce-static-pdf-button[^>]*style="padding:6px 12px;cursor:pointer;margin-right:4px;">Download as PDF/);
   assert.match(html, /<label class="demoToggleLabel" style="margin-right:10px;">\s*<input type="checkbox" class="demoToggleCheckbox" checked>\s*Demo Data/);
   assert.match(html, /<label class="demoToggleLabel" style="margin-right:5px;">\s*<input type="checkbox" checked style="margin-right:4px;cursor:pointer;">\s*Show Explainers/);
@@ -1218,9 +1459,10 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.doesNotMatch(html, /\.settingsControlGroup/);
   assert.doesNotMatch(html, /\.settingsPrimaryButton/);
   assert.doesNotMatch(html, /\.settingsActionButton/);
+  assert.match(html, /\.pdfIgnore \{ display: block; \}\s*\.settingsRow\.pdfIgnore \{ display: flex; \}\s*\.settingsRow > div \{ display: inline-flex; align-items: center; min-width: 0; \}/);
   assert.match(html, /@media \(max-width: 768px\) \{[\s\S]*?\.settingsRow \{ flex-wrap: wrap; justify-content: flex-start; gap: 10px; \}/);
   assert.match(html, /\.pdfIgnore \{ display: block; \}/);
-  assert.match(html, /@media print \{[\s\S]*?\.pdfIgnore \{ display: none !important; \}[\s\S]*?\.beeTooltip \{ display: none !important; \}[\s\S]*?\.aidb-benchmark-intro \{ border-color: #aab5c8; background: #ffffff; color: #111827; \}/);
+  assert.match(html, /@media print \{[\s\S]*?\.pdfIgnore \{ display: none !important; \}[\s\S]*?\.beeTooltip \{ display: none !important; \}[\s\S]*?\.aidb-benchmark-intro \{ background: #ffffff; color: #111827; \}/);
   assert.match(html, /\.pdfMode \.pdfIgnore \{ display: none !important; \}/);
   assert.match(html, /\.pdfMode \.showWhenPdf \{ display: inline; \}/);
   assert.match(html, /\.pdfMode \.beeTooltip \{ display: none !important; \}/);
@@ -1333,7 +1575,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.doesNotMatch(html, /if \(shouldScroll && target && target\.scrollIntoView\)/);
   assert.match(html, /function syncInitialReportViewMode/);
   assert.match(html, /setReportViewMode\(modeFromHash\(\), \{ scroll: false \}\)/);
-  assert.match(html, /setReportViewMode\(modeFromHash\(\), \{ scroll: false \}\);\s*syncAtlasIssueModalWithHash\(\);\s*syncInitialReportViewMode\(\);\s*setReportStyle/);
+  assert.match(html, /setReportViewMode\(modeFromHash\(\), \{ scroll: false \}\);\s*if \(!syncTagModalWithHash\(\)\) syncAtlasIssueModalWithHash\(\);\s*syncInitialReportViewMode\(\);\s*notifyParentHash\(\);\s*setReportStyle/);
   assert.match(html, /window\.addEventListener\('load', syncInitialReportViewMode, \{ once: true \}\)/);
   assert.doesNotMatch(html, /if \(document\.readyState === 'complete'\) \{\s*syncInitialReportViewMode\(\);/);
   assert.match(html, /resultsToggle\.addEventListener\('click', function \(\) \{\s*setResultsSectionOpen\(resultsSection && resultsSection\.getAttribute\('data-ce-results-open'\) === 'false'\);/);
@@ -1382,6 +1624,9 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /<img src="data:image\/svg\+xml,%3Csvg[^"]+width%3D%2232%22[^"]+height%3D%2232%22[^"]+viewBox%3D%220%200%2032%2032%22/);
   assert.match(html, /alt="" width="24" height="24" class="participantBlockie">/);
   assert.match(html, /\.participantBlockie \{ border-radius: var\(--ce-radius-4\); flex: 0 0 auto; \}/);
+  assert.match(html, /class="participantModelNumber"\s+style="--participant-model-color:#1f77b4"\s+title="Model marker 1"\s+aria-label="Model marker 1"\s*>1<\/span>/);
+  assert.match(html, /\.participantModelNumber \{ display: inline-flex;[^}]*background: var\(--participant-model-color\);/);
+  assert.match(html, /@media print \{[\s\S]*?\.participantModelNumber \{ display: none !important; \}/);
   assert.doesNotMatch(html, /aidb-participant-card/);
   assert.doesNotMatch(html, /aidb-participant-grid/);
   assert.doesNotMatch(html, /aidb-avatar/);
@@ -1671,7 +1916,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.doesNotMatch(html, /\.ce-results-mode-pane \.debateMapWrapper\.embeddedAtlas \{ padding: 0; background: #fff; color: #212529; font-family: var\(--ce-font-body\); \}/);
   assert.match(html, /class="debateMap"/);
   assert.match(html, /class="controls"/);
-  assert.match(html, /\.debateMap \.controls \{ display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 25px; margin-bottom: 25px; padding: 15px 20px; border: 1px solid rgba\(255, 255, 255, 0\.1\); border-radius: var\(--ce-radius-12\); background: rgba\(255, 255, 255, 0\.03\); box-shadow: 0 8px 32px rgba\(0, 0, 0, 0\.37\); backdrop-filter: blur\(12px\); -webkit-backdrop-filter: blur\(12px\); \}/);
+  assert.match(html, /\.debateMap \.controls \{ position: relative; z-index: 200; display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 25px; margin-bottom: 25px; padding: 15px 20px; overflow: visible;/);
   assert.match(html, /\.debateMap \.primaryControls, \.debateMap \.secondaryControls \{ display: flex; align-items: center; gap: 14px; flex-wrap: wrap; \}/);
   assert.doesNotMatch(html, /\.debateMap \.primaryControls, \.debateMap \.secondaryControls \{[^}]*min-width: 0/);
   assert.match(html, /class="viewModeSwitch"/);
@@ -1679,15 +1924,13 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /data-testid="ce-debate-view-mode" data-ce-view-mode="circles" class="active"/);
   assert.doesNotMatch(html, /data-testid="ce-debate-view-mode"[^>]*aria-pressed=/);
   assert.doesNotMatch(html, /data-testid="ce-debate-view-mode"[^>]*title="Static benchmark report includes/);
-  assert.match(html, /data-testid="ce-debate-view-mode" data-ce-view-mode="atlas">/);
-  assert.match(html, /data-testid="ce-debate-view-mode" data-ce-view-mode="tree">/);
+  assert.doesNotMatch(html, /data-testid="ce-debate-view-mode" data-ce-view-mode="atlas">/);
+  assert.doesNotMatch(html, /data-testid="ce-debate-view-mode" data-ce-view-mode="tree">/);
   assert.match(html, /data-testid="ce-debate-view-mode" data-ce-view-mode="list">/);
-  assert.doesNotMatch(html, /data-ce-view-mode="atlas" aria-pressed="false" aria-disabled="true"/);
-  assert.doesNotMatch(html, /data-ce-view-mode="tree" aria-pressed="false" aria-disabled="true"/);
   assert.doesNotMatch(html, /data-ce-view-mode="list" aria-pressed="false" aria-disabled="true"/);
   assert.match(html, /data-icon="circle" class="svg-inline--fa fa-circle debateViewModeIcon"[\s\S]*Circles/);
-  assert.match(html, /data-icon="network-wired" class="svg-inline--fa fa-network-wired debateViewModeIcon"[\s\S]*Atlas/);
-  assert.match(html, /data-icon="sitemap" class="svg-inline--fa fa-sitemap debateViewModeIcon"[\s\S]*Tree/);
+  assert.doesNotMatch(html, /data-icon="network-wired" class="svg-inline--fa fa-network-wired debateViewModeIcon"/);
+  assert.doesNotMatch(html, /data-icon="sitemap" class="svg-inline--fa fa-sitemap debateViewModeIcon"/);
   assert.match(html, /data-icon="list" class="svg-inline--fa fa-list debateViewModeIcon"[\s\S]*List/);
   assert.match(html, /\.debateMap \.viewModeSwitch \{ display: flex; align-items: center; padding: 4px; border: 1px solid rgba\(255, 255, 255, 0\.1\); border-radius: var\(--ce-radius-8\); background: rgba\(0, 0, 0, 0\.3\); \}/);
   assert.match(html, /\.debateMap \.viewModeSwitch button \{ background: transparent; border: none; color: #94a3b8; padding: 6px 16px; border-radius: var\(--ce-radius-6\); cursor: pointer; font-family: inherit; font-weight: 600; text-transform: uppercase; font-size: 0\.8rem; transition: background-color 0\.3s ease, color 0\.3s ease; \}/);
@@ -1702,24 +1945,20 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /\.debateMap \.legendDot\.subcategory \{ background: #2dd4bf; color: #2dd4bf; \}/);
   assert.match(html, /\.debateMap \.legendDot\.topic \{ background: #4ade80; color: #4ade80; \}/);
   assert.match(html, /\.debateMap \.legendDot\.instance \{ background: #fde047; color: #fde047; \}/);
-  assert.match(html, /<div class="controlGroup"><label><input type="checkbox" checked> Demo Mode<\/label><\/div>/);
+  assert.doesNotMatch(html, />Demo Mode</);
   assert.doesNotMatch(html, /Benchmark topics/);
-  assert.doesNotMatch(html, /<input type="checkbox" checked disabled> Demo Mode/);
+  assert.doesNotMatch(html, /\.debateMap \.controlGroup/);
   assert.match(html, /class="inlineLegendItem"/);
   assert.match(html, /\.debateMap \.inlineLegendItem \{ display: inline-flex; align-items: center; gap: 5px; font-size: 0\.7rem; color: rgba\(255, 255, 255, 0\.5\); text-transform: uppercase; letter-spacing: 0\.03em; margin: 0 6px; \}/);
   assert.doesNotMatch(html, /\.debateMap \.viewModeSwitch \{ width: 100%; overflow-x: visible; flex-wrap: wrap; \}/);
   assert.doesNotMatch(html, /\.debateMap \.secondaryControls \{ margin-left: 0; width: 100%; justify-content: flex-start; row-gap: 8px; \}/);
   assert.doesNotMatch(html, /\.debateMap \.inlineLegendItem \{[^}]*white-space: nowrap/);
   assert.doesNotMatch(html, /\.debateMap \.inlineLegendItem \{ flex: 0 1 auto; margin: 0 4px 0 0; white-space: normal; \}/);
-  assert.match(html, /\.debateMap \.controlGroup label \{ display: flex; align-items: center; gap: 8px; color: #94a3b8; cursor: pointer; font-size: 0\.9rem; transition: color 0\.2s; \}/);
-  assert.match(html, /\.debateMap \.controlGroup label:hover \{ color: var\(--ce-color-white\); \}/);
-  assert.match(html, /\.debateMap \.controlGroup input \{ accent-color: #38bdf8; cursor: pointer; height: 16px; width: 16px; \}/);
   assert.match(html, /class="atlasViewContainer packedAtlasViewContainer"/);
   assert.doesNotMatch(html, /\.ce-results-mode-pane \.debateMap \.atlasViewContainer \{ height: min\(70vh, 640px\); min-height: 420px; border: 1px solid #ddd; border-radius: 0; background: #fff; \}/);
-  assert.doesNotMatch(html, /\.ce-results-mode-pane \.debateMap \.packedAtlasTitle \{ color: #333; font-family: var\(--ce-font-body\); font-size: 1\.05rem; letter-spacing: 0; text-shadow: none; \}/);
   assert.doesNotMatch(html, /\.ce-results-mode-pane \.debateMap \.atlasNode\.packedAtlasNode \.packedNodeLabel \{ color: #333 !important; font-family: var\(--ce-font-body\); font-weight: 700; letter-spacing: 0; text-shadow: none; \}/);
   assert.doesNotMatch(html, /<div class="ce-results-mode-pane-header">[\s\S]*AI Discourse Topic Atlas/);
-  assert.match(html, /\.debateMap \.controls/);
+  assert.match(html, /\.debateMap \.controls \{ position: relative; z-index: 200;[^}]*overflow: visible;/);
   assert.match(html, /\.debateMap \.atlasViewContainer/);
   assert.match(html, /\.debateMap \.atlasViewContainer \{ position: relative; width: 100%; height: 85vh; overflow: hidden; cursor: grab; touch-action: none; border-radius: var\(--ce-radius-16\); \}/);
   assert.match(html, /@media \(max-width: 768px\) \{[\s\S]*\.debateMap \{ padding: 0; \}/);
@@ -1734,12 +1973,6 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.doesNotMatch(html, /\.debateMap \.atlasViewContainer \{ height: max\(75vh, 920px\); \}/);
   assert.match(html, /\.debateMap \.packedAtlasViewContainer \{ cursor: default; touch-action: auto; \}/);
   assert.doesNotMatch(html, /\.debateMap \.atlasViewContainer \{[^}]*background: radial-gradient/);
-  assert.match(html, /\.debateMap \.packedAtlasTitleButton \{[^}]*cursor: pointer;[^}]*transition: transform 0\.2s ease, border-color 0\.2s ease, background-color 0\.2s ease, box-shadow 0\.2s ease; \}/);
-  assert.doesNotMatch(html, /\.debateMap \.packedAtlasTitleButton \{[^}]*max-width: 100%; min-width: 0;/);
-  assert.match(html, /@media \(max-width: 768px\) \{[\s\S]*\.debateMap \.packedAtlasTitleButton \{ max-width: min\(100%, 320px\); min-width: 0; \}/);
-  assert.match(html, /\.debateMap \.packedAtlasTitleButton:hover,\s*\.debateMap \.packedAtlasTitleButton:focus-visible \{ transform: translateY\(-1px\); border-color: rgba\(56, 189, 248, 0\.45\); background: rgba\(15, 23, 42, 0\.85\); box-shadow: 0 10px 24px rgba\(0, 0, 0, 0\.22\); outline: none; \}/);
-  assert.match(html, /\.debateMap \.packedAtlasTitle \{ color: rgba\(241, 245, 249, 0\.96\);[\s\S]*text-wrap: balance;/);
-  assert.match(html, /@media \(max-width: 768px\) \{[\s\S]*\.debateMap \.packedAtlasTitle \{ min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; \}/);
   assert.match(html, /class="hotDebatesBtn" data-ce-atlas-top-debates-toggle aria-expanded="false"/);
   assert.match(html, /data-icon="fire" class="svg-inline--fa fa-fire atlasChromeIcon"/);
   assert.match(html, /Top Debates/);
@@ -1750,22 +1983,15 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /\.debateMap \.topNodesOverlay \{ position: absolute; top: 70px; right: 20px; width: 300px;/);
   assert.match(html, /\.debateMap \.topNodesOverlay\.visible \{ opacity: 1; transform: translateY\(0\); pointer-events: auto; z-index: 999; \}/);
   assert.match(html, /@media \(max-width: 768px\) \{[\s\S]*\.debateMap \.topNodesOverlay \{ width: calc\(100% - 40px\); top: 60px; \}/);
-  assert.match(html, /@media \(max-width: 768px\) \{[\s\S]*\.debateMap \.packedAtlasTitleRow \{ top: 70px; left: 20px; right: 20px; transform: none; width: auto; text-align: left; \}/);
-  assert.doesNotMatch(html, /\.debateMap \.packedAtlasTitleRow \{ left: 12px; right: 196px; transform: none; width: auto; text-align: left; \}/);
   assert.match(html, /function setAtlasTopDebatesOpen\(isOpen\)/);
   assert.match(html, /atlasTopDebatesOverlay\.classList\.toggle\('visible', nextOpen\)/);
   assert.match(html, /atlasTopDebatesButton\.setAttribute\('aria-expanded', nextOpen \? 'true' : 'false'\)/);
   assert.doesNotMatch(html, /\.debateMap \.atlasTopicGrid/);
   assert.doesNotMatch(html, /class="atlasTopicGrid"/);
-  assert.match(html, /class="packedAtlasTitleRow"/);
-  assert.match(html, /class="packedAtlasTitleButton"[\s\S]*data-testid="ce-atlas-title-action"[\s\S]*data-ce-node-id="ai-discourse-topic-atlas"/);
-  assert.match(html, /class="packedAtlasTitle">AI Discourse Topic Atlas<\/span>/);
-  assert.match(html, /data-icon="external-link-alt" class="svg-inline--fa fa-external-link-alt packedAtlasTitleIcon"/);
-  assert.match(html, /\.debateMap \.packedAtlasTitleIcon \{ font-size: 0\.85rem; color: rgba\(191, 219, 254, 0\.88\); \}/);
-  assert.doesNotMatch(html, /\.debateMap \.packedAtlasTitleIcon \{[^}]*line-height: 1/);
-  assert.doesNotMatch(html, /\.debateMap \.packedAtlasTitleIcon \{[^}]*width: 1em/);
-  assert.doesNotMatch(html, /\.debateMap \.packedAtlasTitleIcon \{[^}]*height: 1em/);
-  assert.doesNotMatch(html, /\.debateMap \.packedAtlasTitleIcon \{[^}]*flex: 0 0 auto/);
+  assert.doesNotMatch(html, /class="packedAtlasTitleRow"/);
+  assert.doesNotMatch(html, /data-testid="ce-atlas-title-action"/);
+  assert.doesNotMatch(html, /data-ce-node-id="ai-discourse-topic-atlas"/);
+  assert.doesNotMatch(html, /\.debateMap \.packedAtlasTitle/);
   assert.match(html, /class="atlasNode packedAtlasNode/);
   assert.match(html, /class="nodeDot packedNodeDot"/);
   assert.match(html, /class="nodeLabel packedNodeLabel alwaysVisible"/);
@@ -1799,7 +2025,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /Select any two or more model trait segments to power the comparison report\./);
   assert.match(html, /title="Auto-select the strongest correlation" aria-label="Auto-select strongest correlation"/);
   assert.match(html, /data-icon="magic" class="svg-inline--fa fa-magic selectorActionSvgIcon"/);
-  assert.match(html, /<button type="button" class="clearButton">Clear all<\/button>/);
+  assert.match(html, /<button type="button" class="clearButton" data-ce-breakdown-clear>Clear all<\/button>/);
   assert.match(html, /\.selectorActions \{ display: flex; align-items: center; gap: 0\.5rem; flex: 0 0 auto; \}/);
   assert.match(html, /\.clearButton \{ border: 1px solid #ced4da; border-radius: 999px; background: #f8f9fa; color: #495057; font-weight: 600; padding: 0\.45rem 0\.85rem; cursor: pointer; white-space: nowrap; transition: background-color 0\.2s ease, border-color 0\.2s ease; \}/);
   assert.match(html, /class="workspaceContainer"/);
@@ -1813,8 +2039,14 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.doesNotMatch(html, /<button type="button" class="clearButton">Clear<\/button>/);
   assert.match(html, /class="selectorLayout breakdownTraitGrid"/);
   assert.match(html, /class="selectorField breakdownTraitField"/);
-  assert.match(html, /class="demographicSelect"/);
+  assert.match(html, /class="demographicSelect breakdownTraitMenu" data-ce-breakdown-trait=/);
   assert.match(html, /class="demoAnalysisSelect__control breakdownTraitSelect"/);
+  assert.match(html, /class="breakdownTraitMenuList" role="group" aria-label="Country of Origin options"/);
+  assert.match(html, /data-ce-breakdown-group-input\s+data-ce-breakdown-group-key="countryOfOrigin:/);
+  assert.match(html, /data-ce-breakdown-selected-workspace/);
+  assert.match(html, /data-ce-breakdown-selected-pills/);
+  assert.match(html, /data-ce-breakdown-remove-group/);
+  assert.match(html, /data-ce-breakdown-auto/);
   assert.match(html, /class="demoAnalysisSelect__placeholder">Parameter Class<\/span>/);
   assert.match(html, /class="breakdownTraitSelectValues"/);
   assert.match(html, /class="breakdownTraitSelectValue"[^>]*>\s*30B A3B\s*<\/span>/);
@@ -1827,21 +2059,41 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /class="selectedQuestionGrounding"/);
   assert.match(html, /class="selectedQuestionTension" data-testid="demo-analysis-selected-question-tension"/);
   assert.match(html, /class="selectedQuestionGroundingPills" data-testid="demo-analysis-selected-question-tags"/);
-  assert.match(html, /<a class="selectedQuestionTagButton selectedQuestionTagButtonActive" data-ce-breakdown-selected-topic href="\/tag\/[^"]+\?session=ai-discourse-bench" title="Open [^"]+ tag page for this session">/);
-  assert.match(html, /<a class="selectedQuestionTagButton" data-ce-breakdown-selected-stance href="\/tag\/[^"]+\?session=ai-discourse-bench" title="Open [^"]+ tag page for this session">/);
+  assert.match(html, /<a class="selectedQuestionTagButton selectedQuestionTagButtonActive" data-ce-breakdown-selected-topic data-ce-tag-open data-ce-tag="[^"]+" href="#tag-[^"]+" title="Open [^"]+ in the tag explorer">/);
+  assert.doesNotMatch(html, /data-ce-breakdown-selected-stance/);
+  assert.doesNotMatch(html, /data-ce-template-stance/);
   assert.doesNotMatch(html, /<span class="selectedQuestionTagButton selectedQuestionTagButtonActive"/);
   assert.match(html, /\.selectedQuestionTagButton \{[^}]*cursor: pointer;[^}]*transition: transform 0\.14s ease, background 0\.14s ease, border-color 0\.14s ease, color 0\.14s ease;/);
   assert.match(html, /\.selectedQuestionTagButton:hover, \.selectedQuestionTagButton:focus-visible \{ background: #c7ddff; border-color: rgba\(15, 94, 199, 0\.38\); color: #122c4d; outline: none; transform: translateY\(-1px\); \}/);
   assert.match(html, /Comparison Suggestions/);
-  assert.match(html, /class="suggestionsList"/);
+  assert.match(html, /Suggestions compare cohorts within models matching the current filters\. Values in one category combine as OR; categories combine as AND\./);
+  assert.match(html, /class="suggestionFilterStatus" data-ce-breakdown-suggestions-status aria-live="polite"/);
+  assert.match(html, /class="suggestionsList" data-ce-breakdown-suggestions-list/);
   assert.match(html, /class="suggestionButton suggestionButtonActive"[\s\S]*?aria-pressed="true"[\s\S]*?data-ce-breakdown-suggestion[\s\S]*?data-ce-breakdown-template-id="breakdown-template-default"[\s\S]*?data-ce-selected-breakdown-suggestion/);
   assert.match(html, /class="suggestionButton"[\s\S]*?aria-pressed="false"[\s\S]*?data-ce-breakdown-suggestion[\s\S]*?data-ce-breakdown-template-id="breakdown-template-/);
-  assert.match(html, /<template id="breakdown-template-default" data-ce-breakdown-template>/);
+  assert.match(html, /<template\s+id="breakdown-template-default"\s+data-ce-breakdown-template\s+data-ce-breakdown-question-id=/);
   assert.match(html, /data-ce-template-breakdown-list/);
   assert.match(html, /data-ce-template-comparison-report/);
   assert.match(html, /function applyBreakdownTemplate\(templateId, sourceButton\)/);
-  assert.match(html, /breakdownSuggestionButtons\.forEach\(function \(button\) \{/);
-  assert.match(html, /button\.addEventListener\('click', function \(event\) \{[\s\S]*?applyBreakdownTemplate\(button\.getAttribute\('data-ce-breakdown-template-id'\), button\);/);
+  assert.match(html, /function updateInteractiveBreakdown\(sourceButton\)/);
+  assert.match(html, /function breakdownRenderComparisonReport\(groups\)/);
+  assert.match(html, /function breakdownFilteredParticipantIds\(groups\)/);
+  assert.match(html, /if \(!idsByTrait\[group\.trait\]\) idsByTrait\[group\.trait\] = new Set\(\);/);
+  assert.match(html, /return traitSets\.every\(function \(ids\) \{ return ids\.has\(id\); \}\);/);
+  assert.match(html, /function breakdownBuildFilteredSuggestions\(filterGroups\)/);
+  assert.match(html, /return eligibleSet\.has\(id\);/);
+  assert.match(html, /breakdownBestQuestionForPair\(left\.ids, right\.ids\)/);
+  assert.match(html, /function breakdownRenderQuestionRows\(question, groups, filteredParticipantIds\)/);
+  assert.match(html, /label: overallParticipantIds\.length === allParticipantIds\.length \? 'Overall' : 'Matching models'/);
+  assert.match(html, /breakdownRenderQuestionRows\(question, groups, eligibleIds\)/);
+  assert.match(html, /Suggestions are restricted to ' \+ result\.eligibleIds\.length \+ ' of ' \+ totalModels \+ ' models matching the current filters\.'/);
+  assert.match(html, /data-ce-breakdown-filtered-suggestion data-ce-breakdown-suggestion-index=/);
+  assert.match(html, /parameterClass: 'Parameter Class',\s*ossStatus: 'OSS Status',\s*countryOfOrigin: 'Country of Origin',\s*providerClass: 'Provider Class'/);
+  assert.match(html, /input\.addEventListener\('change', function \(\) \{/);
+  assert.match(html, /breakdownSelectedGroupKeys\.clear\(\);\s*breakdownActiveSuggestion = null;\s*updateInteractiveBreakdown\(null\);/);
+  assert.match(html, /breakdownSuggestionsList\.addEventListener\('click', function \(event\) \{/);
+  assert.match(html, /breakdownActiveSuggestion = suggestion;\s*breakdownCurrentQuestionId = String\(suggestion\.question\.id\);\s*updateInteractiveBreakdown\(button\);/);
+  assert.match(html, /applyBreakdownTemplate\(button\.getAttribute\('data-ce-breakdown-template-id'\), button\);/);
   assert.match(html, /\.suggestionButton \{[^}]*cursor: pointer;[^}]*transition: background-color 0\.2s ease, box-shadow 0\.2s ease, border-color 0\.2s ease;/);
   assert.match(html, /\.suggestionButton:hover \{ background: var\(--ce-color-surface-light, #f8f9fa\); box-shadow: 0 2px 5px rgba\(0, 0, 0, 0\.08\); border-left-color: #e65516; \}/);
   assert.match(html, /class="suggestionPair"/);
@@ -1873,8 +2125,8 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.doesNotMatch(html, /Model origin cohorts shown as static benchmark markers/);
   assert.match(html, /\.worldMapCountry \{ stroke: #ffffff; stroke-width: 0\.7; outline: none; transition: fill 0\.12s ease; \}/);
   assert.match(html, /\.worldMapCountry:hover, \.worldMapCountry:focus-visible \{ fill: #ff5533; outline: none; \}/);
-  assert.doesNotMatch(html, /class="polisReportContainer comparisonReportContainer" data-testid="demo-analysis-empty-state"/);
-  assert.doesNotMatch(html, /data-icon="info-circle" class="svg-inline--fa fa-info-circle comparisonReportEmptyIcon"/);
+  assert.match(html, /class="polisReportContainer comparisonReportContainer" data-testid="demo-analysis-empty-state"/);
+  assert.match(html, /Select two or more model trait segments from the menus above to see a detailed comparison report\./);
   assert.match(html, /class="polisReportContainer comparisonReportContainer" data-testid="demo-analysis-comparison-report"/);
   assert.match(html, /data-testid="demo-analysis-comparison-report-toggle"/);
   assert.match(html, /class="reportCollapseBody"/);
@@ -1927,8 +2179,18 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /class="panel demoPanel chartPanel"/);
   assert.match(html, /Selected statement distributions by model cohort/);
   assert.match(html, /class="breakdownList" data-ce-breakdown-list/);
+  assert.ok(
+    html.indexOf('data-testid="demo-analysis-question-banner"')
+      < html.indexOf('data-testid="demo-analysis-question-breakdown"'),
+    'the selected question should appear before its cohort breakdown'
+  );
+  assert.ok(
+    html.indexOf('data-testid="demo-analysis-question-breakdown"')
+      < html.indexOf('class="panel demoPanel suggestionPanel"'),
+    'the selected-question breakdown should appear before comparison suggestions'
+  );
   assert.doesNotMatch(html, /<section class="panel demoPanel chartPanel" data-testid="demo-analysis-question-breakdown">\s*<h3 class="panelTitle">Question Breakdown<\/h3>\s*<p class="emptyHint">Select a question to inspect its response breakdown\.<\/p>\s*<\/section>/);
-  assert.doesNotMatch(html, /Select a question to inspect its response breakdown\./);
+  assert.match(html, /Select a question to inspect its response breakdown\./);
   assert.match(html, /class="breakdownDataset"/);
   assert.match(html, /class="breakdownDatasetHeader"/);
   assert.match(html, /class="breakdownCandlestick"/);
@@ -1949,7 +2211,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.doesNotMatch(html, /\.panel, \.demoPanel \{/);
   assert.match(html, /\.selectorLayout \{ display: grid; gap: 1rem; grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/);
   assert.match(html, /\.selectorField \{ min-width: 0; \}/);
-  assert.match(html, /\.demoAnalysisSelect__control \{ min-height: 48px; border: 1px solid #ced4da; background: #ffffff; box-shadow: none; cursor: text; border-radius: var\(--ce-radius-8, 8px\);/);
+  assert.match(html, /\.demoAnalysisSelect__control \{ min-height: 48px; border: 1px solid #ced4da; background: #ffffff; box-shadow: none; cursor: pointer; border-radius: var\(--ce-radius-8, 8px\);/);
   assert.match(html, /\.clearButton \{[^}]*cursor: pointer;[^}]*transition: background-color 0\.2s ease, border-color 0\.2s ease;/);
   assert.match(html, /\.clearButton:hover \{ background: #e9ecef; border-color: #adb5bd; \}/);
   assert.match(html, /\.selectorActionSvgIcon \{ width: 1em; height: 1em; display: inline-block; overflow: visible; vertical-align: -0\.125em; \}/);
@@ -1957,7 +2219,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.doesNotMatch(html, /button\.pillButton \{ cursor: default;/);
   assert.match(html, /\.workspaceEmpty \{ display: flex; flex-direction: row; justify-content: center; align-items: center; text-align: center; padding: 10px; border: 2px dashed #d6d6d6; border-radius: var\(--ce-radius-8, 8px\); background-color: var\(--ce-color-surface-light, #f8f9fa\); color: var\(--ce-color-text-muted, #6c757d\); margin-bottom: 1rem; \}/);
   assert.match(html, /\.breakdownTraitSelectValues \{ display: flex; align-items: center; flex-wrap: wrap; gap: 4px;/);
-  assert.match(html, /@media \(min-width: 1280px\) \{\s*\.selectorLayout, \.selectorLayout\.breakdownTraitGrid \{ grid-template-columns: repeat\(6, minmax\(0, 1fr\)\); \}/);
+  assert.match(html, /@media \(min-width: 1280px\) \{\s*\.selectorLayout, \.selectorLayout\.breakdownTraitGrid \{ grid-template-columns: repeat\(4, minmax\(0, 1fr\)\); \}/);
   assert.match(html, /@media \(max-width: 980px\) \{[\s\S]*?\.primaryGrid,\s*\.secondaryGrid \{ grid-template-columns: 1fr; \}[\s\S]*?\.selectorLayout, \.selectorLayout\.breakdownTraitGrid \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\); \}/);
   assert.match(html, /@media \(max-width: 640px\) \{[\s\S]*?\.demoAnalysisWorkspace \.selectedQuestionFrame \{ padding: 1rem; \}[\s\S]*?\.demoAnalysisWorkspace \.demoPanel \{ padding: 0\.9rem; \}[\s\S]*?\.breakdownTraitGrid, \.selectorLayout, \.selectorLayout\.breakdownTraitGrid \{ grid-template-columns: 1fr; \}/);
   const max1024Block = html.slice(html.indexOf('@media only screen and (max-width: 1024px)'), html.indexOf('@media (max-width: 980px)'));

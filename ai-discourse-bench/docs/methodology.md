@@ -51,12 +51,13 @@ report data. Models without sufficient overlap remain unassigned in both
 modes.
 
 Question points include a winning-response consistency parameter. Within each
-model/question cell, the most frequent normalized response is the winner; the
-parameter is the share of attempted runs across model cells that match those
-within-model winners. Invalid attempts stay in the denominator. This separates
-stable model-to-model disagreement from instability across repeated calls. It
-is descriptive repeat stability, not a calibrated probability that an answer
-is correct and not a population confidence interval.
+model/question/polarity cell, the most frequent normalized response is the
+winner; the parameter is the share of attempted runs across those cells that
+match their within-polarity winners. Invalid attempts stay in the denominator.
+Computing the modes separately for original and reversed wording prevents
+wording sensitivity from being mislabeled as repeat instability. This is
+descriptive repeat stability, not a calibrated probability that an answer is
+correct and not a population confidence interval.
 
 Stance means and pairwise similarity means include deterministic 95% percentile
 bootstrap intervals. The report records the 1,000-iteration method and
@@ -69,6 +70,34 @@ Canonical and normalized-reversed means remain separately available. Wording
 sensitivity reports absolute shift, signed shift, and low/moderate/high bands at
 0.25 and 0.75 points on the -1 to 1 stance scale. Reversal is therefore measured
 as sensitivity rather than described as an automatic bias correction.
+
+## Quadratic Importance
+
+Quadratic importance is an optional, separate measurement phase. Every model
+receives the same fixed credit budget for the complete question bank. Assigning
+`v` importance votes to a question costs `v^2` credits, all votes are
+non-negative integers, and the total squared cost cannot exceed the budget.
+The prompt asks about agenda priority and consequence, not agreement. The
+default response contract is a sparse priority set of at most 10 questions.
+The per-question vote maximum is derived so selecting the maximum number of
+questions can never exceed the budget (`3` votes at the default 100-credit,
+10-question settings). Both caps are recorded in each importance artifact and
+must match when artifacts are merged. To prevent a fixed 200- or 500-question
+listing from favoring early items, every model and repeat receives a
+deterministic hash-shuffled question order. The order method and exact order
+hash are recorded with the artifact and run.
+
+Allocation repeats are nested within a model. The report first averages each
+model's votes per question across its valid allocation runs, treating omitted
+questions as zero, and then averages those model-level values with one equal
+weight per contributing model. A model with extra repeats therefore receives
+no extra influence. Question importance rolls up additively into topic
+importance, which controls Debate Map circle prominence when available.
+
+Importance is not confidence, correctness, stance strength, or participant
+count. It does not alter Agree/Unsure/Disagree aggregates, similarity, opinion
+groups, or release coverage. Reports without an importance artifact retain a
+question-count sizing fallback and state that fallback in the Debate Map.
 
 ## Coverage And Release Status
 
@@ -148,8 +177,9 @@ synthetic seed content.
 
 `data/question-bank.sample.json` is a 200-question development seed. The
 recommended runnable bank is
-`banks/ai-futures/v0.1-candidate/question-bank.json`: 50 selected questions
-across all 20 topics with resolved question-level evidence, source-record
-hashes, a pinned corpus revision, and a bank manifest. It is still a candidate.
-Independent claim support, reversal, and single-axis adjudication must be
-approved before its status can become `validated` or its reports release-ready.
+`banks/ai-futures/v0.2-reviewed-candidate/question-bank.json`: 50 selected
+questions across all 20 topics with resolved question-level evidence,
+source-record hashes, a pinned corpus revision, and an AI-assisted wording
+audit. It is still a candidate. Two independent reviewers must approve claim
+support, reversal, and single-axis adjudication before its status can become
+`validated` or its reports release-ready.

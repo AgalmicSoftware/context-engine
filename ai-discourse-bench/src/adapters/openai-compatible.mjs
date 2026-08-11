@@ -7,7 +7,7 @@ import {
 const trimTrailingSlash = (value) => String(value || '').replace(/\/+$/, '');
 const autoCapabilityCache = new Map();
 
-const ANSWER_JSON_SCHEMA = Object.freeze({
+export const ANSWER_JSON_SCHEMA = Object.freeze({
   name: 'ai_discourse_bench_answer',
   strict: true,
   schema: {
@@ -22,11 +22,14 @@ const ANSWER_JSON_SCHEMA = Object.freeze({
   },
 });
 
-const getProviderConfig = (provider, env = process.env) => {
+export const DEFAULT_ANSWER_SYSTEM_PROMPT = 'You answer benchmark survey questions with strict JSON only.';
+export const ANSWER_REQUEST_CONTRACT_VERSION = 'openai-compatible-answer-v2';
+
+export const getProviderConfig = (provider, env = process.env) => {
   if (provider === 'local') {
     return {
       baseUrl: trimTrailingSlash(env.AIDB_LOCAL_BASE_URL || env.OPENAI_BASE_URL || DEFAULT_LOCAL_BASE_URL),
-      apiKey: env.AIDB_LOCAL_API_KEY || env.OPENAI_API_KEY || 'local',
+      apiKey: env.AIDB_LOCAL_API_KEY || 'local',
       headers: {},
     };
   }
@@ -43,15 +46,19 @@ const getProviderConfig = (provider, env = process.env) => {
   throw new Error(`Unsupported OpenAI-compatible provider: ${provider}`);
 };
 
-const responseFormatFor = (mode) => {
+const responseFormatFor = (mode, responseSchema) => {
   if (mode === 'json_schema' || mode === 'auto') {
-    return { type: 'json_schema', json_schema: ANSWER_JSON_SCHEMA };
+    return { type: 'json_schema', json_schema: responseSchema };
   }
   if (mode === 'json_object') return { type: 'json_object' };
   return null;
 };
 
 const capabilityErrorStatuses = new Set([400, 404, 415, 422]);
+const isStructuredOutputCapabilityError = (status, body) => (
+  capabilityErrorStatuses.has(status)
+  && /(response[_ -]?format|json[_ -]?schema|structured output).{0,120}(unsupported|not supported|unknown|invalid|unavailable)|(?:unsupported|not supported|unknown).{0,120}(response[_ -]?format|json[_ -]?schema|structured output)/i.test(body)
+);
 
 export const callOpenAiCompatibleChat = async ({
   provider,
@@ -62,6 +69,8 @@ export const callOpenAiCompatibleChat = async ({
   timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
   structuredOutput = 'auto',
   providerRouting = null,
+  responseSchema = ANSWER_JSON_SCHEMA,
+  systemPrompt = DEFAULT_ANSWER_SYSTEM_PROMPT,
   env = process.env,
   fetchImpl = fetch,
 }) => {
@@ -70,7 +79,7 @@ export const callOpenAiCompatibleChat = async ({
   }
   const config = getProviderConfig(provider, env);
   if (!config.apiKey) {
-    throw new Error(`${provider} requires an API key. Set OPENROUTER_API_KEY for OpenRouter or AIDB_LOCAL_API_KEY/OPENAI_API_KEY for local servers that require one.`);
+    throw new Error(`${provider} requires an API key. Set OPENROUTER_API_KEY for OpenRouter or AIDB_LOCAL_API_KEY for local servers that require one.`);
   }
   const startedAtMs = Date.now();
   const effectiveProviderRouting = provider === 'openrouter' && providerRouting
@@ -98,12 +107,12 @@ export const callOpenAiCompatibleChat = async ({
           model,
           temperature,
           max_tokens: maxTokens,
-          ...(responseFormatFor(mode) ? { response_format: responseFormatFor(mode) } : {}),
+          ...(responseFormatFor(mode, responseSchema) ? { response_format: responseFormatFor(mode, responseSchema) } : {}),
           ...(effectiveProviderRouting ? { provider: effectiveProviderRouting } : {}),
           messages: [
             {
               role: 'system',
-              content: 'You answer benchmark survey questions with strict JSON only.',
+              content: systemPrompt,
             },
             {
               role: 'user',
@@ -125,20 +134,24 @@ export const callOpenAiCompatibleChat = async ({
   };
 
   let response = await request(usedMode);
+  let responseErrorBody = '';
   if (!response.ok && structuredOutput === 'auto' && ['auto', 'json_schema'].includes(usedMode)
     && capabilityErrorStatuses.has(response.status)) {
-    const body = await response.text().catch(() => '');
-    fallback = { from: 'json_schema', to: 'none', status: response.status, reason: body.slice(0, 500) };
-    autoCapabilityCache.set(cacheKey, 'none');
-    usedMode = 'none';
-    response = await request(usedMode);
+    responseErrorBody = await response.text().catch(() => '');
+    if (isStructuredOutputCapabilityError(response.status, responseErrorBody)) {
+      fallback = { from: 'json_schema', to: 'none', status: response.status, reason: responseErrorBody.slice(0, 500) };
+      usedMode = 'none';
+      response = await request(usedMode);
+      responseErrorBody = '';
+      if (response.ok) autoCapabilityCache.set(cacheKey, 'none');
+    }
   } else if (response.ok && structuredOutput === 'auto' && usedMode === 'auto') {
     autoCapabilityCache.set(cacheKey, 'json_schema');
     usedMode = 'json_schema';
   }
 
   if (!response.ok) {
-    const body = await response.text().catch(() => '');
+    const body = responseErrorBody || await response.text().catch(() => '');
     const requestError = new Error(`${provider} ${model} request failed with HTTP ${response.status}: ${body.slice(0, 500)}`);
     requestError.status = response.status;
     requestError.retryable = response.status === 408 || response.status === 409 || response.status === 429 || response.status >= 500;

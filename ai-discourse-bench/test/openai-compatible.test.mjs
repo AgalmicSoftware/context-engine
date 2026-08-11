@@ -36,6 +36,52 @@ test('local provider targets a local OpenAI-compatible chat endpoint', async () 
   assert.equal(content.metadata.structuredOutput.used, 'json_schema');
 });
 
+test('local provider never forwards an ambient OpenAI cloud key', async () => {
+  let authorization = '';
+  await callOpenAiCompatibleChat({
+    provider: 'local',
+    model: 'local-model',
+    prompt: 'Answer.',
+    env: {
+      AIDB_LOCAL_BASE_URL: 'http://127.0.0.1:11434/v1',
+      OPENAI_API_KEY: 'cloud-secret-that-must-not-leave',
+    },
+    fetchImpl: async (_url, options) => {
+      authorization = options.headers.authorization;
+      return okResponse;
+    },
+  });
+  assert.equal(authorization, 'Bearer local');
+});
+
+test('OpenAI-compatible calls accept task-specific schemas and system prompts', async () => {
+  let body;
+  const responseSchema = {
+    name: 'importance',
+    strict: true,
+    schema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['allocations'],
+      properties: { allocations: { type: 'array', items: { type: 'object' } } },
+    },
+  };
+  await callOpenAiCompatibleChat({
+    provider: 'local',
+    model: 'local-model',
+    prompt: 'Allocate.',
+    responseSchema,
+    systemPrompt: 'Allocate importance with strict JSON only.',
+    env: { AIDB_LOCAL_BASE_URL: 'http://127.0.0.1:11434/v1' },
+    fetchImpl: async (_url, options) => {
+      body = JSON.parse(options.body);
+      return okResponse;
+    },
+  });
+  assert.equal(body.response_format.json_schema.name, 'importance');
+  assert.equal(body.messages[0].content, 'Allocate importance with strict JSON only.');
+});
+
 test('auto structured output falls back only on capability errors and records the downgrade', async () => {
   const bodies = [];
   const result = await callOpenAiCompatibleChat({
@@ -72,6 +118,24 @@ test('auto structured output does not hide authentication or server failures', a
       },
     }),
     (error) => error.status === 401 && error.retryable === false,
+  );
+  assert.equal(calls, 1);
+});
+
+test('auto structured output does not downgrade on unrelated client errors', async () => {
+  let calls = 0;
+  await assert.rejects(
+    callOpenAiCompatibleChat({
+      provider: 'local',
+      model: 'bad-request-model',
+      prompt: 'Answer.',
+      env: { AIDB_LOCAL_BASE_URL: 'http://127.0.0.1:11434/v1' },
+      fetchImpl: async () => {
+        calls += 1;
+        return { ok: false, status: 400, text: async () => 'prompt is too long' };
+      },
+    }),
+    (error) => error.status === 400,
   );
   assert.equal(calls, 1);
 });

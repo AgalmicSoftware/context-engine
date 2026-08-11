@@ -27,3 +27,14 @@ export const writeTextFile = async (filePath, value) => {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   await fs.writeFile(filePath, value);
 };
+
+export const writeTextFileIfMissing = async (filePath, value) => {
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  try {
+    await fs.writeFile(filePath, value, { flag: 'wx' });
+    return true;
+  } catch (error) {
+    if (error?.code === 'EEXIST') return false;
+    throw error;
+  }
+};

@@ -29,7 +29,20 @@ export const buildReportSnapshot = (report = {}, { label = '' } = {}) => {
       mode: report.mode || 'self',
       personaId: report.personaId || null,
     },
-    questions: questions.map((question) => ({ id: question.id, prompt: question.prompt || question.id, topic: question.topic || '' })),
+    questions: questions.map((question) => ({
+      id: question.id,
+      prompt: question.prompt || question.id,
+      reversedPrompt: question.reversedPrompt || '',
+      agreeMeans: question.agreeMeans || '',
+      disagreementAxis: question.disagreementAxis || '',
+      topic: question.topic || '',
+      questionFingerprint: hashJson({
+        prompt: question.prompt || question.id,
+        reversedPrompt: question.reversedPrompt || '',
+        agreeMeans: question.agreeMeans || '',
+        disagreementAxis: question.disagreementAxis || '',
+      }),
+    })),
     models: participants.map((participant) => ({
       id: participant.id,
       label: participant.label || participant.id,
@@ -37,6 +50,14 @@ export const buildReportSnapshot = (report = {}, { label = '' } = {}) => {
       provider: participant.provider || '',
       provenance: participant.provenance || {},
       runtimeProvenance: participant.runtimeProvenance || {},
+      modelFingerprint: hashJson({
+        model: participant.model || participant.id,
+        provider: participant.provider || '',
+        provenance: participant.provenance || {},
+        resolvedModels: participant.runtimeProvenance?.resolvedModels || [],
+        resolvedProviders: participant.runtimeProvenance?.resolvedProviders || [],
+        systemFingerprints: participant.runtimeProvenance?.systemFingerprints || [],
+      }),
       aggregate: participant.summary || null,
       byQuestion: Object.fromEntries(questions.map((question) => {
         const summary = matrix[participant.id]?.[question.id] || null;
@@ -71,10 +92,20 @@ export const compareLongitudinalSnapshots = (baseline = {}, current = {}) => {
   }
   const baselineModels = new Map((baseline.models || []).map((model) => [model.id, model]));
   const currentModels = new Map((current.models || []).map((model) => [model.id, model]));
+  const baselineQuestions = new Map((baseline.questions || []).map((question) => [question.id, question]));
+  const currentQuestions = new Map((current.questions || []).map((question) => [question.id, question]));
+  for (const questionId of [...baselineQuestions.keys()].filter((id) => currentQuestions.has(id))) {
+    if (baselineQuestions.get(questionId).questionFingerprint !== currentQuestions.get(questionId).questionFingerprint) {
+      throw new Error(`snapshot question ${questionId} wording or interpretation changed`);
+    }
+  }
   const commonModelIds = [...baselineModels.keys()].filter((id) => currentModels.has(id)).sort();
   const modelDrift = commonModelIds.map((modelId) => {
     const before = baselineModels.get(modelId);
     const after = currentModels.get(modelId);
+    if (before.modelFingerprint !== after.modelFingerprint) {
+      throw new Error(`snapshot model ${modelId} provenance changed`);
+    }
     const commonQuestionIds = Object.keys(before.byQuestion || {})
       .filter((questionId) => after.byQuestion?.[questionId])
       .filter((questionId) => Number.isFinite(before.byQuestion[questionId]?.meanScore)

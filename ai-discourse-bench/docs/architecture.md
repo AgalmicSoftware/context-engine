@@ -7,9 +7,12 @@ and generated diagrams together under `ai-discourse-bench/`.
 ## Pipeline
 
 1. **Question bank generation**
-   - Use `prompts/question-bank-generator.md` with compact extracts from the
-     OSS `ai-discourse-corpus/`.
-   - Review and prune generated candidates into a versioned question bank.
+   - Give `prompts/question-bank-generator.md` to a repository-aware coding
+     model. It uses context-safe corpus extraction to produce a source-resolved
+     500-question candidate plus generation, rejection, coverage, and human-
+     review artifacts.
+   - Review and adjudicate generated candidates before promoting a versioned
+     question bank from `candidate` to `validated`.
    - Each question has canonical and reversed-polarity wording.
    - `build:candidate-bank` creates a 50-question source-resolved candidate and
      manifest while preserving human review as a release gate.
@@ -25,6 +28,9 @@ and generated diagrams together under `ai-discourse-bench/`.
    - `self`: models answer as themselves.
    - `persona`: weights-only predictions for a named public figure, with no
      supplied evidence, custom profile instruction, or cutoff date.
+   - `quadratic-importance`: a complementary whole-bank allocation pass where
+     every model receives the same credit budget and vote cost is squared. It
+     is stored separately from self/persona stance runs.
 
 4. **Providers**
    - `mock`: deterministic no-network smoke tests.
@@ -47,6 +53,9 @@ and generated diagrams together under `ai-discourse-bench/`.
      topic/compass/risk-scenario overlays.
    - Reports include deterministic bootstrap intervals and explicit signed and
      absolute canonical/reversed wording sensitivity.
+   - Optional importance repeats are averaged within each model before models
+     are equally weighted. Topic rollups then control Debate Map prominence;
+     reports without allocations fall back to question-count sizing.
 
 6. **Rendering target**
    - The report JSON is shaped to render like a Context Engine results report:
@@ -145,10 +154,28 @@ node ./bin/ai-discourse-bench.mjs run \
   --repeats 1
 ```
 
-Persona profiles contain both public-source URLs and dated paraphrased evidence
-summaries. The summaries are embedded into each prompt; URLs are provenance,
-not an assumption that the model can browse. Self and persona artifacts are
-kept in separate compatibility domains and cannot be merged into one report.
+Quadratic importance mode:
+
+```bash
+node ./bin/ai-discourse-bench.mjs run-importance \
+  --provider local \
+  --questions ./data/question-bank.sample.json \
+  --models ./data/model-roster.sample.json \
+  --out ./runs/local-importance-runs.json \
+  --budget 100 \
+  --repeats 1
+```
+
+Attach the resulting artifact with `build-report --importance
+./runs/local-importance-runs.json`. Local and OpenRouter use the same strict
+JSON allocation schema and preserve provider/runtime provenance. Mock mode is
+available for deterministic wiring tests.
+
+Persona profiles identify a public figure by name only. The prompt does not
+inject evidence summaries, custom biographical instructions, source lists, or
+cutoff dates; the track measures how each model interprets the figure from its
+weights. Self and persona artifacts are kept in separate compatibility domains
+and cannot be merged into one report.
 
 Build a report:
 
@@ -195,7 +222,11 @@ node ./bin/ai-discourse-bench.mjs export-ce \
 
 ## Open Decisions
 
-- Final Context Engine route/path for publishing rendered benchmark reports.
+- Context Engine serves published benchmark artifacts through the static,
+  cache-independent `/benchmarks` route. The client loads a versioned manifest
+  and deterministic gzip report artifact from `client/public/benchmark-artifacts/`.
+  `scripts/publish-static-report.mjs` updates both and enforces the report's
+  release gate when invoked with `--release`.
 - Whether OpenRouter model rosters should live in public files or private local
   config.
 - Whether production should store generated analysis overlays beside report

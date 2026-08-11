@@ -1,5 +1,19 @@
-import { ANSWER_VALUES, PROVIDERS } from './config.mjs';
-import { hashJson } from './provenance.mjs';
+import {
+  ANSWER_VALUES,
+  HARNESS_VERSION,
+  PROVIDERS,
+  QUESTION_PROMPT_TEMPLATE_VERSION,
+} from './config.mjs';
+import {
+  buildQuestionPrompt,
+  normalizeAnswer,
+  normalizeForCanonicalPolarity,
+} from './normalize.mjs';
+import {
+  registerCaseFoldedIdentifier,
+  validateSafeIdentifier,
+} from './identifiers.mjs';
+import { hashJson, sha256 } from './provenance.mjs';
 
 const isRecord = (value) => (
   !!value && typeof value === 'object' && !Array.isArray(value)
@@ -37,12 +51,35 @@ export const validateQuestionBank = (questionBank) => {
   if (!isRecord(questionBank)) {
     return ['question bank must be an object'];
   }
-  requireString(errors, questionBank.benchmarkId, 'benchmarkId');
+  validateSafeIdentifier(errors, questionBank.benchmarkId, 'benchmarkId');
   if (questionBank.releaseStatus !== undefined
     && !['development-seed', 'candidate', 'validated'].includes(questionBank.releaseStatus)) {
     errors.push('releaseStatus must be development-seed, candidate, or validated');
   }
   const requiresReleaseMetadata = ['candidate', 'validated'].includes(questionBank.releaseStatus);
+  const validatedBank = questionBank.releaseStatus === 'validated';
+  if (validatedBank) {
+    if (!isRecord(questionBank.reviewPolicy)) {
+      errors.push('reviewPolicy must be an object for validated banks');
+    } else {
+      for (const field of [
+        'humanClaimReviewComplete',
+        'humanReversalReviewComplete',
+        'humanSingleAxisReviewComplete',
+      ]) {
+        if (questionBank.reviewPolicy[field] !== true) {
+          errors.push(`reviewPolicy.${field} must be true for validated banks`);
+        }
+      }
+      if (questionBank.reviewPolicy.releaseBlockedUntilApproved !== false) {
+        errors.push('reviewPolicy.releaseBlockedUntilApproved must be false for validated banks');
+      }
+      if (!Number.isInteger(Number(questionBank.reviewPolicy.minimumIndependentReviewers))
+        || Number(questionBank.reviewPolicy.minimumIndependentReviewers) < 2) {
+        errors.push('reviewPolicy.minimumIndependentReviewers must be at least 2 for validated banks');
+      }
+    }
+  }
   if (requiresReleaseMetadata) {
     requireString(errors, questionBank.track, 'track');
     requireString(errors, questionBank.version, 'version');
@@ -59,6 +96,11 @@ export const validateQuestionBank = (questionBank) => {
     if (!Number.isInteger(Number(questionBank.runPlan.repeatsPerPolarity)) || Number(questionBank.runPlan.repeatsPerPolarity) < 1) {
       errors.push('runPlan.repeatsPerPolarity must be a positive integer');
     }
+    if (questionBank.runPlan.importanceRepeats !== undefined
+      && (!Number.isInteger(Number(questionBank.runPlan.importanceRepeats))
+        || Number(questionBank.runPlan.importanceRepeats) < 1)) {
+      errors.push('runPlan.importanceRepeats must be a positive integer when provided');
+    }
     if (!Array.isArray(questionBank.runPlan.polarities)
       || questionBank.runPlan.polarities.length !== 2
       || !questionBank.runPlan.polarities.includes('canonical')
@@ -74,9 +116,8 @@ export const validateQuestionBank = (questionBank) => {
       errors.push(`${base} must be an object`);
       return;
     }
-    requireString(errors, question.id, `${base}.id`);
-    if (seen.has(question.id)) errors.push(`${base}.id duplicates ${question.id}`);
-    seen.add(question.id);
+    validateSafeIdentifier(errors, question.id, `${base}.id`);
+    registerCaseFoldedIdentifier(errors, seen, question.id, `${base}.id`);
     requireString(errors, question.canonicalPrompt, `${base}.canonicalPrompt`);
     requireString(errors, question.reversedPrompt, `${base}.reversedPrompt`);
     requireString(errors, question.agreeMeans, `${base}.agreeMeans`);
@@ -120,7 +161,7 @@ export const validateQuestionBank = (questionBank) => {
         if (question.review.sourceResolution !== 'resolved') {
           errors.push(`${base}.review.sourceResolution must be resolved`);
         }
-        if (questionBank.releaseStatus === 'validated') {
+        if (validatedBank) {
           for (const field of ['claimSupport', 'reversal', 'singleAxis']) {
             if (question.review[field] !== 'approved') {
               errors.push(`${base}.review.${field} must be approved for validated banks`);
@@ -128,6 +169,42 @@ export const validateQuestionBank = (questionBank) => {
           }
           if (question.review.adjudicationStatus !== 'approved') {
             errors.push(`${base}.review.adjudicationStatus must be approved for validated banks`);
+          }
+          const minimumReviewers = Number(questionBank.reviewPolicy?.minimumIndependentReviewers || 2);
+          const independentReviews = requireArray(
+            errors,
+            question.review.independentReviews,
+            `${base}.review.independentReviews`,
+          );
+          const reviewerIds = new Set();
+          independentReviews.forEach((review, reviewIndex) => {
+            const reviewBase = `${base}.review.independentReviews[${reviewIndex}]`;
+            if (!isRecord(review)) {
+              errors.push(`${reviewBase} must be an object`);
+              return;
+            }
+            requireString(errors, review.reviewerId, `${reviewBase}.reviewerId`);
+            if (reviewerIds.has(review.reviewerId)) {
+              errors.push(`${reviewBase}.reviewerId duplicates ${review.reviewerId}`);
+            }
+            reviewerIds.add(review.reviewerId);
+            for (const field of ['claimSupport', 'reversal', 'singleAxis']) {
+              if (review[field] !== 'approved') {
+                errors.push(`${reviewBase}.${field} must be approved`);
+              }
+            }
+          });
+          if (reviewerIds.size < minimumReviewers) {
+            errors.push(`${base}.review.independentReviews must include at least ${minimumReviewers} distinct reviewers`);
+          }
+          const expectedQuestionHash = hashJson({
+            canonicalPrompt: question.canonicalPrompt,
+            reversedPrompt: question.reversedPrompt,
+            agreeMeans: question.agreeMeans,
+            disagreementAxis: question.disagreementAxis,
+          });
+          if (question.review.questionHash !== expectedQuestionHash) {
+            errors.push(`${base}.review.questionHash must match the reviewed question wording`);
           }
         }
       }
@@ -149,9 +226,8 @@ export const validateModelRoster = (modelRoster) => {
       errors.push(`${base} must be an object`);
       return;
     }
-    requireString(errors, model.id, `${base}.id`);
-    if (seen.has(model.id)) errors.push(`${base}.id duplicates ${model.id}`);
-    seen.add(model.id);
+    validateSafeIdentifier(errors, model.id, `${base}.id`);
+    registerCaseFoldedIdentifier(errors, seen, model.id, `${base}.id`);
     requireString(errors, model.label, `${base}.label`);
     requireString(errors, model.model, `${base}.model`);
     if (!PROVIDERS.includes(model.provider)) {
@@ -243,9 +319,8 @@ export const validatePersonas = (personasFile) => {
       errors.push(`${base} must be an object`);
       return;
     }
-    requireString(errors, persona.id, `${base}.id`);
-    if (seen.has(persona.id)) errors.push(`${base}.id duplicates ${persona.id}`);
-    seen.add(persona.id);
+    validateSafeIdentifier(errors, persona.id, `${base}.id`);
+    registerCaseFoldedIdentifier(errors, seen, persona.id, `${base}.id`);
     requireString(errors, persona.label, `${base}.label`);
     if (persona.publicFigure !== true) {
       errors.push(`${base}.publicFigure must be true for benchmark personas`);
@@ -288,8 +363,8 @@ export const validateRuns = (runsFile, {
       errors.push(`${base} must be an object`);
       return;
     }
-    requireString(errors, run.modelId, `${base}.modelId`);
-    requireString(errors, run.questionId, `${base}.questionId`);
+    validateSafeIdentifier(errors, run.modelId, `${base}.modelId`);
+    validateSafeIdentifier(errors, run.questionId, `${base}.questionId`);
     if (modelIds && !modelIds.has(run.modelId)) {
       errors.push(`${base}.modelId references unknown model ${run.modelId}`);
     }
@@ -361,7 +436,7 @@ export const validateRuns = (runsFile, {
       errors.push(`${base}.repeatIndex must not exceed ${maxRepeatIndex}`);
     }
     if (run.repeatIndex !== undefined) {
-      const coordinate = [run.modelId, run.questionId, run.polarity, run.repeatIndex].join(':');
+      const coordinate = JSON.stringify([run.modelId, run.questionId, run.polarity, run.repeatIndex]);
       if (seenCoordinates.has(coordinate)) errors.push(`${base} duplicates run coordinate ${coordinate}`);
       seenCoordinates.add(coordinate);
     }
@@ -374,6 +449,10 @@ export const validateReleaseRunFile = (runsFile, {
   requiredRepeats,
   questionCount,
   selectedModelsById = null,
+  questionBank = null,
+  expectedHarnessVersion = HARNESS_VERSION,
+  expectedPromptTemplateVersion = QUESTION_PROMPT_TEMPLATE_VERSION,
+  expectedPromptTemplateHash = '',
 } = {}) => {
   const errors = [];
   if (!isRecord(runsFile)) return ['release run file must be an object'];
@@ -396,23 +475,34 @@ export const validateReleaseRunFile = (runsFile, {
   if (questionBankHash && manifest.questionBankHash !== questionBankHash) {
     errors.push('manifest.questionBankHash does not match the selected question bank');
   }
+  if (expectedHarnessVersion && manifest.harnessVersion !== expectedHarnessVersion) {
+    errors.push(`manifest.harnessVersion must equal ${expectedHarnessVersion}`);
+  }
+  if (expectedPromptTemplateVersion && manifest.promptTemplateVersion !== expectedPromptTemplateVersion) {
+    errors.push(`manifest.promptTemplateVersion must equal ${expectedPromptTemplateVersion}`);
+  }
+  if (expectedPromptTemplateHash && manifest.promptTemplateHash !== expectedPromptTemplateHash) {
+    errors.push('manifest.promptTemplateHash does not match the current question prompt template');
+  }
   if (!Number.isInteger(Number(manifest.repeats)) || Number(manifest.repeats) !== Number(requiredRepeats)) {
     errors.push(`manifest.repeats must equal the required ${requiredRepeats}`);
   }
   const runs = Array.isArray(runsFile.runs) ? runsFile.runs : [];
+  const questionsById = new Map((questionBank?.questions || []).map((question) => [question.id, question]));
   const manifestModels = requireArray(errors, manifest.models, 'manifest.models');
   const manifestModelsById = new Map();
+  const manifestModelIds = new Set();
   manifestModels.forEach((model, index) => {
     if (!isRecord(model)) {
       errors.push(`manifest.models[${index}] must be an object`);
       return;
     }
-    requireString(errors, model.id, `manifest.models[${index}].id`);
+    validateSafeIdentifier(errors, model.id, `manifest.models[${index}].id`);
     requireString(errors, model.model, `manifest.models[${index}].model`);
     if (!PROVIDERS.includes(model.provider)) {
       errors.push(`manifest.models[${index}].provider must be one of ${PROVIDERS.join(', ')}`);
     }
-    if (manifestModelsById.has(model.id)) errors.push(`manifest.models[${index}].id duplicates ${model.id}`);
+    registerCaseFoldedIdentifier(errors, manifestModelIds, model.id, `manifest.models[${index}].id`);
     manifestModelsById.set(model.id, model);
     if (selectedModelsById) {
       const selected = selectedModelsById.get(model.id);
@@ -466,6 +556,29 @@ export const validateReleaseRunFile = (runsFile, {
     && Number(manifest.expectedRuns) !== calculatedExpectedRuns) {
     errors.push(`manifest.expectedRuns must equal ${calculatedExpectedRuns} for its models and question bank`);
   }
+  if ((runsFile.mode || 'self') !== (manifest.mode || 'self')) {
+    errors.push('runs file mode does not match manifest.mode');
+  }
+  if ((runsFile.personaId || null) !== (manifest.personaId || null)) {
+    errors.push('runs file personaId does not match manifest.personaId');
+  }
+  if ((manifest.mode || 'self') === 'self') {
+    if (manifest.personaId || manifest.personaProfile || manifest.personaProfileHash) {
+      errors.push('self-mode manifest must not include persona identity');
+    }
+  } else if ((manifest.mode || 'self') === 'persona') {
+    if (!manifest.personaId || !isRecord(manifest.personaProfile)) {
+      errors.push('persona-mode manifest must include personaId and personaProfile');
+    } else if (manifest.personaProfile.id !== manifest.personaId) {
+      errors.push('manifest.personaProfile.id must match manifest.personaId');
+    }
+    if (manifest.personaProfileHash !== hashJson(manifest.personaProfile)) {
+      errors.push('manifest.personaProfileHash must match manifest.personaProfile');
+    }
+  } else {
+    errors.push('manifest.mode must be self or persona');
+  }
+  const deploymentIdentitiesByModel = new Map();
   runs.forEach((run, index) => {
     const model = manifestModelsById.get(run?.modelId);
     if (!model) {
@@ -474,6 +587,12 @@ export const validateReleaseRunFile = (runsFile, {
     }
     if (run.model !== model.model) errors.push(`runs[${index}].model does not match manifest.models`);
     if (run.provider !== model.provider) errors.push(`runs[${index}].provider does not match manifest.models`);
+    if ((run.mode || 'self') !== (manifest.mode || 'self')) {
+      errors.push(`runs[${index}].mode does not match manifest.mode`);
+    }
+    if ((run.personaId || null) !== (manifest.personaId || null)) {
+      errors.push(`runs[${index}].personaId does not match manifest.personaId`);
+    }
     if (isRecord(run.generation)) {
       const generationMatches = Number(run.generation.temperature) === Number(model.temperature ?? 0.2)
         && Number(run.generation.maxTokens) === Number(model.maxTokens ?? 220)
@@ -485,6 +604,58 @@ export const validateReleaseRunFile = (runsFile, {
     if (isRecord(run.modelProvenance)
       && hashJson(run.modelProvenance) !== hashJson(model.provenance || {})) {
       errors.push(`runs[${index}].modelProvenance does not match manifest.models`);
+    }
+    const metadata = run.responseMetadata || {};
+    const resolvedProvider = String(metadata.resolvedProvider || metadata.provider || run.provider || '').trim();
+    const resolvedModel = String(metadata.resolvedModel || run.model || '').trim();
+    const systemFingerprint = String(metadata.systemFingerprint || '').trim();
+    const endpoint = String(metadata.endpoint || '').trim();
+    if (!deploymentIdentitiesByModel.has(run.modelId)) {
+      deploymentIdentitiesByModel.set(run.modelId, {
+        providers: new Set(), models: new Set(), fingerprints: new Set(), endpoints: new Set(),
+      });
+    }
+    const deploymentIdentity = deploymentIdentitiesByModel.get(run.modelId);
+    if (resolvedProvider) deploymentIdentity.providers.add(resolvedProvider);
+    if (resolvedModel) deploymentIdentity.models.add(resolvedModel);
+    if (systemFingerprint) deploymentIdentity.fingerprints.add(systemFingerprint);
+    if (endpoint) deploymentIdentity.endpoints.add(endpoint);
+    if (resolvedProvider && resolvedProvider !== run.provider) {
+      errors.push(`runs[${index}] resolved provider does not match its declared provider`);
+    }
+    if (resolvedModel && resolvedModel !== run.model) {
+      errors.push(`runs[${index}] resolved model does not match its declared model`);
+    }
+    if (questionBank) {
+      const question = questionsById.get(run.questionId);
+      if (!question) {
+        errors.push(`runs[${index}].questionId is absent from the selected question bank`);
+      } else {
+        const parsedRawAnswer = normalizeAnswer(run.rawAnswer);
+        const expectedNormalizedAnswer = normalizeForCanonicalPolarity(parsedRawAnswer, run.polarity);
+        if (!parsedRawAnswer) {
+          errors.push(`runs[${index}].rawAnswer must be Agree, Unsure, or Disagree for release`);
+        } else if (run.normalizedAnswer !== expectedNormalizedAnswer) {
+          errors.push(`runs[${index}].normalizedAnswer does not match rawAnswer and polarity`);
+        }
+        const expectedPromptHash = sha256(buildQuestionPrompt({
+          question,
+          mode: manifest.mode || run.mode || 'self',
+          persona: manifest.personaProfile || null,
+          polarity: run.polarity,
+        }));
+        if (run.promptHash !== expectedPromptHash) {
+          errors.push(`runs[${index}].promptHash does not match the selected question and prompt template`);
+        }
+      }
+    }
+  });
+  deploymentIdentitiesByModel.forEach((identity, modelId) => {
+    if (identity.providers.size > 1
+      || identity.models.size > 1
+      || identity.fingerprints.size > 1
+      || identity.endpoints.size > 1) {
+      errors.push(`model ${modelId} resolved to multiple deployment identities`);
     }
   });
   return errors;

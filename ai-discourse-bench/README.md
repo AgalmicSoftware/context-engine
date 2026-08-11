@@ -23,14 +23,17 @@ coverage, release, persona, and analysis-provenance rules.
   country of origin, and provider class.
 - Weights-only persona mode, where models predict how a named public historical
   or contemporary figure would answer using only knowledge in model weights.
+- Optional quadratic importance allocation, where every model receives the same
+  credit budget and pays `votes^2` to prioritize questions. These allocations
+  control Debate Map prominence without changing stance results.
 
 ## Result Views
 
-- **Publication introduction:** a persistent benchmark explainer identifies the
-  OSS corpus basis, model-as-participant unit of analysis, polarity/repeat
-  method, run depth, question-bank status, and whether the artifact passed the
-  release gates. Preview reports are marked `noindex` and cannot present
-  themselves as released benchmark results.
+- **Publication introduction:** a persistent Context Engine: AI Opinions Benchmark
+  explainer above Results identifies the OSS corpus basis, current topic, run
+  counts, response mode, and repeat depth. The current selector contains the AI
+  Futures & Policy track; the report contract supports additional topic-specific
+  banks without changing the Results views. Preview reports are marked `noindex`.
 - **Polis report:** question-level and model-level agreement/disagreement,
   including a beeswarm-style consensus/difference view.
 - **Participant graph:** models as participant nodes positioned by opinion
@@ -70,23 +73,27 @@ from the corpus-grounded topic packs with:
 npm run generate:questions
 ```
 
-The recommended runnable bank is the source-resolved 50-question candidate:
+The recommended runnable bank is the source-resolved, AI-audited 50-question
+candidate:
 
 ```bash
 npm run build:candidate-bank
+npm run build:reviewed-candidate-bank
 ```
 
-This writes `banks/ai-futures/v0.1-candidate/question-bank.json` plus a manifest
-that pins the bank hash, corpus revision, and source-file hashes. It covers all
-20 topics and every question resolves to concrete evidence in the OSS corpus.
-It remains `candidate`, not `validated`, until independent claim, reversal, and
-single-axis review is complete.
+The second command writes
+`banks/ai-futures/v0.2-reviewed-candidate/question-bank.json`, its manifest,
+and an item-level audit. The bank covers all 20 topics and every question
+resolves to concrete evidence in the OSS corpus. The AI-assisted audit accepted
+42 wording pairs and revised 8. It remains `candidate`, not `validated`, until
+two independent reviewers approve claim support, reversal quality, and
+single-axis status.
 
 Before launching calls, inspect the experiment plan:
 
 ```bash
 node ./bin/ai-discourse-bench.mjs plan-run \
-  --questions ./banks/ai-futures/v0.1-candidate/question-bank.json \
+  --questions ./banks/ai-futures/v0.2-reviewed-candidate/question-bank.json \
   --models ./data/model-roster.sample.json \
   --repeats 10
 ```
@@ -103,7 +110,7 @@ Run against an OpenAI-compatible local server:
 AIDB_LOCAL_BASE_URL=http://127.0.0.1:8000/v1 \
 node ./bin/ai-discourse-bench.mjs run \
   --provider local \
-  --questions ./banks/ai-futures/v0.1-candidate/question-bank.json \
+  --questions ./banks/ai-futures/v0.2-reviewed-candidate/question-bank.json \
   --models ./data/model-roster.sample.json \
   --out ./runs/local-self-runs.json \
   --repeats 10 \
@@ -116,12 +123,17 @@ The runner writes a JSONL checkpoint beside the output. Re-run the same command
 with `--resume` after an interruption; deterministic run ids prevent completed
 model/question/polarity/repeat cells from being launched again.
 
+`data/model-roster.local-environment.json` records the five local model
+participants used by the checked-in development preview, including quantization
+and runtime provenance but no machine paths or credentials. Use it as the
+combined roster when rebuilding the five-model report.
+
 Run the 50-question candidate bank with 10 canonical runs and 10 reversed runs
 per model:
 
 ```bash
 AIDB_LOCAL_BASE_URL=http://127.0.0.1:8000/v1 \
-AIDB_QUESTION_BANK=./banks/ai-futures/v0.1-candidate/question-bank.json \
+AIDB_QUESTION_BANK=./banks/ai-futures/v0.2-reviewed-candidate/question-bank.json \
 AIDB_LOCAL_MODELS="llama3.1:8b|Llama 3.1 8B|8B|open-weights|US,qwen2.5:14b|Qwen 2.5 14B|14B|open-weights|China" \
 npm run local:full
 ```
@@ -145,6 +157,28 @@ AIDB_LIMIT_QUESTIONS=5 AIDB_REPEATS=1 AIDB_MAX_TOKENS=700 npm run local:full
 
 `local:full` also accepts `AIDB_CONCURRENCY`, `AIDB_MAX_ATTEMPTS`,
 `AIDB_SCHEDULE_SEED`, and `AIDB_RESUME=1`.
+
+After aggregating a report, generate a response-based question audit with:
+
+```bash
+npm run evaluate:questions -- \
+  --report ./results/environment-seed200-five-local-r10-report.json \
+  --reviewed-bank ./banks/ai-futures/v0.2-reviewed-candidate/question-bank.json \
+  --out ./results/environment-seed200-five-local-r10-question-evaluation.json \
+  --csv ./results/environment-seed200-five-local-r10-question-evaluation.csv
+```
+
+The audit separates reliability problems (coverage, invalid responses, repeat
+stability, and wording sensitivity) from useful consensus and useful
+between-model disagreement. It also reports the bank-wide raw agreement gap
+between canonical and reversed wording to expose directional framing or
+acquiescence effects, and flags reversal pairs with unusually low content-word
+overlap or risky negation scope for direct adjudication. Its recommendations
+are triage inputs for human review, not automatic inclusion or exclusion
+decisions. The JSON records a deterministic hash of the aggregate report and,
+when `--reviewed-bank` is supplied, both outputs distinguish the AI-reviewed
+candidate slice from deferred development questions. Every question remains
+pending independent human adjudication until the bank review gate is complete.
 
 Model roster entries may set `structuredOutput` to `auto`, `json_schema`,
 `json_object`, or `none`. `auto` tries the strict answer schema and falls back
@@ -227,6 +261,39 @@ or downstream analysis tools. A separate source-grounded calibration track is
 deferred; it should use a distinct mode and must not be mixed with weights-only
 persona results.
 
+## Quadratic Importance Mode
+
+Importance is a complementary pass over the question bank, not another stance
+label. Each model receives a fixed credit budget and assigns positive integer
+votes to selected questions. A question receiving `v` votes costs `v^2`
+credits, so concentrated priority is deliberately expensive.
+
+```bash
+node ./bin/ai-discourse-bench.mjs run-importance \
+  --provider local \
+  --questions ./banks/ai-futures/v0.2-reviewed-candidate/question-bank.json \
+  --models ./data/model-roster.sample.json \
+  --out ./runs/local-importance-runs.json \
+  --budget 100 \
+  --max-allocations 10 \
+  --repeats 1
+```
+
+The command supports `mock`, `local`, and `openrouter`, plus the same
+checkpoint, retry, concurrency, and `--resume` behavior as stance runs. One
+allocation covers the whole bank, so its repeat count is configured separately
+from the canonical/reversed stance depth. Repeats are averaged within each
+model first; models then receive equal weight in question and topic importance.
+Each model and allocation repeat receives a deterministic hash-shuffled question
+order, recorded in provenance, so fixed bank order does not systematically favor
+early questions.
+Allocations are sparse by default: a model may prioritize at most 10 questions.
+The per-question vote maximum is derived from the budget and allocation cap
+(`3` votes for the default 100-credit/10-question method), so every
+schema-valid allocation is guaranteed to remain within the quadratic budget.
+This keeps the budget legible and the structured response bounded.
+Use `--max-allocations` to change that cap for a separately identified run.
+
 ## Generate a Report
 
 ```bash
@@ -234,8 +301,14 @@ node ./bin/ai-discourse-bench.mjs build-report \
   --questions ./data/question-bank.sample.json \
   --models ./data/model-roster.sample.json \
   --runs ./runs/mock-self-runs.json \
+  --importance ./runs/mock-importance-runs.json \
   --out ./results/mock-self-report.json
 ```
+
+`--importance` is optional and accepts comma-separated model-specific
+artifacts. When present, Debate Map circle size and its `Most important` sort
+use the aggregated allocations. Without it, circle size falls back to the
+number of questions in each topic.
 
 Add `--release` only for a publishable artifact. The command then fails unless
 every model clears the coverage, polarity-pairing, repeat-completion,
@@ -243,6 +316,27 @@ valid-output, non-fixture-provider, validated-bank, and run-manifest gates.
 Reports built without the flag remain usable previews and display integrity
 warnings in the HTML. The checked-in development seed bank is intentionally
 preview-only until the deferred bank-validation work is complete.
+
+### Publish To The Context Engine Route
+
+The Context Engine client serves benchmark artifacts at `/benchmarks`. Publish
+a built report into the client artifact directory with:
+
+```bash
+npm run publish:static -- \
+  --html ./results/local-self-report.html \
+  --report ./results/local-self-report.json \
+  --out-dir ../client/public/benchmark-artifacts \
+  --id ai-futures-policy-v0-1 \
+  --title "AI Futures & Policy" \
+  --topic "AI Futures & Policy"
+```
+
+This writes a deterministic gzip artifact and updates the route manifest. A
+preview report remains visibly marked `development-preview`. Add `--release`
+for an official artifact; the publisher then refuses to write unless the report
+declares `integrity.releaseReady: true`. API keys and raw provider responses are
+never part of the route artifact.
 
 Build one report from multiple separately-run local/OpenRouter model artifacts:
 
@@ -295,7 +389,7 @@ node ./bin/ai-discourse-bench.mjs export-ce-native \
 
 `ce_benchmark_results_dataset` preserves repeated-answer distributions,
 uncertainty intervals, wording sensitivity, similarity details, model
-provenance, graph inputs, and integrity state. Its schema is
+provenance, graph inputs, quadratic importance, Debate Map inputs, and integrity state. Its schema is
 `schemas/ce-benchmark-results-v1.schema.json`; this is the preferred substrate
 for eventual native Context Engine rendering.
 
@@ -437,11 +531,10 @@ mobile-wrapping controls so the view buttons and inline legend stay inside the
 pane. On narrow screens, the static atlas title pill drops below the live Top Debates
 control and truncates long titles instead of overlapping it, while packed topic circles use generated
 desktop and mobile layout diameters instead of a fixed benchmark-only miniature scale. The static
-artifact exposes the live DebateMap view-mode hooks but only includes the
-generated Circles view plus any second-pass compass panels without adding
-standalone-only hover titles or disabled ARIA states to the live-style mode
-buttons; Atlas, Tree, and
-List remain live-session interactions.
+artifact exposes the live DebateMap view-mode hooks for Circles and List, plus
+any second-pass compass panels, without adding standalone-only hover titles or
+disabled ARIA states to the live-style mode buttons. Atlas and Tree remain
+live-session interactions and are omitted from the static report.
 Circles and Top Debates entries open the same backdrop modal used for issue
 analysis. Its header, tags, collapsible sections, close behavior, narrow-screen
 floating close control, and question rows follow the live DebateMap modal
@@ -449,9 +542,9 @@ vocabulary. Each linked question includes a participant-weighted Agree, Unsure,
 and Disagree count plus a stacked model-vote bar; repeated runs do not give one
 model extra weight. The question list is expanded when the modal opens, while
 analysis sections render only when real overlay content exists. The issue
-overview names every model contributing valid answers, shows each model's topic
-coverage and average stance, and explains aggregate stance, between-model
-difference, and repeat stability in plain language. Tag and sort
+overview names every model contributing valid answers and explains aggregate
+response direction, between-model difference, and repeat stability in plain
+language. Tag and sort
 controls re-pack the visible circles, and stable
 `#debate-atlas-<topic-id>` hashes reopen the matching modal.
 Breakdown uses the live DemoAnalysis-style order: a Compare Demographics
@@ -460,16 +553,19 @@ world-results map, then a separate question-breakdown chart and
 ComparisonReport-style collapse body. The static artifact opens with the
 strongest available suggestion selected so the selected-question banner, country
 map, cohort distributions, and comparison report are populated immediately.
-Suggestion buttons apply pre-rendered templates so the selected statement,
-model-cohort pills, distribution rows, and comparison report update in-place
-without React. The comparison report's similarity-and-difference spectrum uses
+Suggestion buttons and the Parameter Class, OSS Status, Country of Origin, and
+Provider Class menus update the selected statement, model-cohort pills,
+distribution rows, map, and comparison report in-place without React or network
+requests. Remove, Clear all, and automatic-pair actions use the same embedded
+snapshot, so the report remains one static HTML artifact. The comparison report's similarity-and-difference spectrum uses
 the same question-level beeswarm interaction as the main report: cohort
 difference runs left to right, repeat consistency runs bottom to top, and every
 point exposes the question and response details on hover or keyboard focus.
 The selector action controls preserve their live pill shape on
 narrow viewports so button labels do not wrap into stacked text. Field-like
-selector controls use the live DemoAnalysis breakpoints: six columns at 1280px
-and wider, two columns at 980px and narrower, and one column at 640px and
+selector controls use the live DemoAnalysis breakpoints adapted to the four
+benchmark traits: four columns at 1280px and wider, two columns at 980px and
+narrower, and one column at 640px and
 narrower. Risk Matrix uses a static embedded RiskMatrix-style grid,
 selector/subgrid controls, and scenario-card shell. The live ten-category CE
 matrix (`Safety`, `Capabilities`, `Governance`, `Open Source`, `Labor`,
@@ -496,15 +592,17 @@ scrolls instead of shrinking the Include column.
 
 ## Question Bank Prompt
 
-The Claude-ready prompt lives at:
+The coding-model handoff prompt lives at:
 
 ```text
 prompts/question-bank-generator.md
 ```
 
-It asks for a large candidate bank grounded in the OSS AI discourse corpus and
-Agent Village Wrapped material, with canonical and reversed wording for each
-question.
+It asks a repository-aware model to derive and rank exactly 500 source-resolved
+candidate questions from the OSS AI discourse corpus. The prompt reserves
+substantial coverage for norms governing human use of AI agents, requires
+canonical and reversed wording, and produces provenance, coverage, rejection,
+and human-review artifacts without treating generation as validation.
 
 The second-pass analysis overlay prompt lives at:
 

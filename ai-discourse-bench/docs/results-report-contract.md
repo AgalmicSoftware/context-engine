@@ -3,30 +3,50 @@
 ## Publication Introduction
 
 The standalone artifact begins with a persistent, full-width benchmark
-introduction inside the Results section but outside its collapsible body. It
-must remain visible when Results View is closed, sit immediately below the
-Results header/navigation row for report-mode deep links, and state from report
-data rather than hard-coded run claims:
+introduction immediately before the Results section. It must remain visible
+when Results View is closed and state from report data rather than hard-coded
+run claims:
 
-- that this is a Context Engine AI discourse benchmark grounded in questions
-  drawn from or implied by the OSS `ai-discourse-corpus`;
-- that one model is one participant and repeated canonical/reversed responses
-  are nested observations averaged within model/question cells;
-- question count, model count, self/persona lens, declared versus planned repeat
-  depth, question-bank release status, benchmark id, and generation time; and
-- that the benchmark is descriptive rather than a leaderboard or factual
-  correctness score.
+- the public title `Context Engine: AI Opinions Benchmark`;
+- that the current edition is grounded in AI futures and policy questions drawn
+  from or implied by the OSS `ai-discourse-corpus`, while the same benchmark
+  method can be applied to other topics;
+- that an optional equal-budget quadratic-importance pass can prioritize
+  questions and determine Debate Map prominence;
+- a top-left `model-opinions-bench` technical identifier followed by the
+  generation time; and
+- an accessible topic selector with `AI Futures & Policy` as the only current
+  option, providing the stable UI contract for future topic-specific banks; and
+- question count, model count, and self/persona mode. Completed-run depth stays
+  in the development-preview notice and report integrity data rather than
+  displacing the topic selector.
 
-Preview artifacts must visibly say that they are exploratory, use
-`noindex,nofollow`, and must not claim to be released benchmark results.
+The summary facts use larger values than their labels, with stronger count
+typography for Questions and Model participants. They remain four columns on
+wide screens, two columns on tablets, and one column on narrow mobile screens.
+The introduction and fact grid have no bottom divider; the fact grid retains
+its top and vertical rules so the summary remains legible.
+
+Preview artifacts use `noindex,nofollow`.
 Release-ready wording and `index,follow` are allowed only when
 `integrity.releaseReady` is true. The head includes matching description and
 Open Graph metadata for hosted publication. The introduction is part of print
 output and uses a light print treatment.
 
+Non-release reports show a neutral Development preview notice. Its visible
+details translate structured bank, repeat, fixture-provider, and model coverage
+fields into reader-facing language; raw integrity warnings remain available in
+the report JSON and Raw Results. The notice disappears only when
+`integrity.releaseReady` is true.
+
 `build-report` writes a JSON object with Context Engine-style result surfaces.
 It accepts a single run file/roster or comma-separated `--runs` and `--models`
-paths for compatible model-specific benchmark runs. Report schema version 2
+paths for compatible model-specific benchmark runs. Optional comma-separated
+`--importance` artifacts add a separately aggregated `importance` object;
+they do not become stance runs or affect stance release coverage. Importance
+artifacts record `budget`, `maxAllocations`, and `maxVotesPerQuestion`; merged
+artifacts must match on all three fields so reports never combine different
+allocation methods. Report schema version 2
 records aggregation semantics, run manifests, participant coverage, integrity
 warnings, and `preview` or `release-ready` status. `--release` rejects a report
 that does not satisfy the release gates.
@@ -97,7 +117,9 @@ details class, then wraps those blocks in a static HTML-report export surface
 with responsive section availability rows, warning/info messages, and
 separate collapsible JSON payloads for the report snapshot, Context Engine
 import payload, and aggregate raw material. Provider-level run records remain in
-the separate run artifact.
+the separate run artifact. The native Context Engine export preserves
+`importance`, `debateAtlas`, and `riskMatrix` so the `/benchmarks` route can
+render the same prominence and analysis inputs without reconstructing them.
 Packed Debate Map labels use a generated mobile font-size variable rather than
 the standalone-only `overflow-wrap:anywhere` fallback, so narrow side-window
 views preserve word boundaries like the live DebateMap module.
@@ -129,7 +151,9 @@ live inline left margin, and the settings row follows the live spacing with
 inline wrapper/button/label margins plus the real
 `settingsRow`, `demoToggleLabel`, `demoToggleCheckbox`, and `reportStyleSelect`
 classes, including the live `pdfIgnore settingsRow` class order, rather than
-introducing benchmark-only helper classes for the controls.
+introducing benchmark-only helper classes for the controls. When opened, the
+settings controls remain distributed in one horizontal flex row where space is
+available and wrap only at the existing `768px` responsive breakpoint.
 The live binary-response note is rendered between the branding header and the
 first report section so the standalone artifact has the same Report-mode chrome
 as `PolisReport`.
@@ -176,7 +200,8 @@ export instead of as extra visible or hidden mode panes.
 - `similarityMatrix`: pairwise distributional similarity over shared questions.
 - `similarityEdges`: graph-friendly similarity/difference edges with overlap.
 - `winningResponseConsistency`: the share of attempted runs matching each
-  model/question cell's modal normalized answer, pooled at question level.
+  model/question/polarity cell's modal normalized answer, pooled at question
+  level so wording sensitivity is measured separately.
 - stance and similarity summaries include deterministic 95% bootstrap
   intervals; polarity summaries include signed and absolute wording sensitivity.
 
@@ -269,7 +294,8 @@ lossy because model/question means are discretized.
 `schemas/ce-benchmark-results-v1.schema.json`. It preserves model participants,
 declared and observed provenance, statements, complete model/question summary
 distributions, uncertainty intervals, wording sensitivity, similarity details,
-coverage, graph inputs, breakdowns, and integrity state. This lossless contract
+coverage, graph inputs, breakdowns, quadratic importance, Debate Map inputs,
+Risk Matrix inputs, and integrity state. This lossless contract
 is the preferred substrate for eventual native Context Engine rendering.
 
 `snapshot-report` creates a content-addressed longitudinal snapshot from the
@@ -341,11 +367,21 @@ a comparison-report shell with the live report-collapse body wrapper. The
 initial standalone state preselects the strongest available comparison so the
 selected-question banner, country map, cohort distributions, and comparison
 report are populated immediately, while suggestion clicks update those surfaces
-in-place. The selector grid uses field-like
+in-place. Topic and response-direction tags use report-local `#tag-...` links;
+clicking one opens a client-style Tag Explorer modal instead of navigating to a
+Context Engine SPA route. The modal lists matching benchmark questions with
+one-model-one-vote distributions, supports keyboard focus trapping and Escape
+or backdrop close, and reopens from its hash under static hosting. The selector
+grid uses field-like
 `DemographicSelector` controls rather than expanded cohort cards, and follows
-the live DemoAnalysis breakpoints: six columns at 1280px and wider, two columns
-at 980px and narrower, and one column at 640px and narrower. The static CSS
-keeps the direct DemoAnalysis class rules for `workspace`, `primaryGrid`,
+the live DemoAnalysis breakpoints adapted to the four benchmark traits: four
+columns at 1280px and wider, two columns
+at 980px and narrower, and one column at 640px and narrower. These controls are
+operable in the standalone artifact: checking cohorts updates the selected
+chips, question distributions, world map, and comparison report from the
+embedded snapshot. Remove, Clear all, and automatic-pair actions run entirely
+in the browser, so the exported HTML remains a self-contained static file. The
+static CSS keeps the direct DemoAnalysis class rules for `workspace`, `primaryGrid`,
 `secondaryGrid`, `panel`, `panelTitle`, and `panelMeta`, with `demoAnalysis*`
 aliases only where the standalone markup needs an additional stable hook. Once a question is selected, the map is
 a self-contained benchmark-origin cohort map generated from the same
@@ -384,11 +420,17 @@ DemoAnalysis empty-state treatment to `.demoAnalysisWorkspace` or
 ## Debate Atlas
 
 `debateAtlas` contains deterministic topic circles derived from question topics.
-That is the fallback view. If the report is re-rendered with an
+Question-count sizing is the fallback view. When `importance.available` is
+true, topic circles include `importanceVotes`, `importanceShare`, and
+`importanceModelCount`; their `sizeMetric` is `quadratic-importance`, circle
+diameter follows model-allocated importance, and the browser exposes a `Most
+important` sort. Stance color and stance summaries remain independent of size.
+If the report is re-rendered with an
 `ai_discourse_bench_analysis_overlay`, `analysisOverlay.debateAtlas.topicCircles`
 replace the deterministic circles, and
 `analysisOverlay.debateAtlas.compasses` render as DebateMap-style collapsible
-compass panels below the packed topic map.
+compass panels below the packed topic map. Matching overlay topic ids inherit
+measured importance fields unless the overlay explicitly supplies replacements.
 
 Every rendered topic also has an issue-area record. The deterministic fallback
 derives its tags, linked questions, mean stance, mean model difference, and
@@ -421,10 +463,10 @@ Agree, Unsure, and Disagree counts with a stacked model-vote bar, preserving the
 one-model-one-vote report aggregation even when models have different repeat
 counts. Questions are expanded by default; generated analysis sections appear
 only when the overlay provides content, with no empty analysis placeholder. The
-overview must name models with valid answers, report their linked-question
-coverage and average stance, and pair aggregate values with plain-language
-definitions of the score, between-model difference, and repeat-stability
-scales. The modal closes from its close control,
+overview must list the models with valid answers without attaching per-model
+coverage or average-score summaries. Aggregate values pair with plain-language
+definitions of response direction, between-model difference, and
+repeat-stability scales. The modal closes from its close control,
 backdrop, or Escape key, traps keyboard focus while open, restores focus on
 close, and uses the live floating close control on narrow screens. Tag filtering
 and sort controls deterministically re-pack visible topics so differently sized

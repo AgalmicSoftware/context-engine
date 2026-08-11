@@ -60,6 +60,7 @@ test('runner retries transport failures, records attempts, and emits a reproduci
   assert.deepEqual(result.manifest.models[0].provenance, {});
   assert.ok(result.runs.some((run) => run.attempts.length === 2));
   assert.ok(result.runs.every((run) => run.promptHash.length === 64));
+  assert.ok(result.runs.every((run) => run.requestContractHash.length === 64));
   assert.ok(result.runs.every((run) => run.generation.structuredOutput === 'auto'));
   const report = buildResultsReport({ questionBank, modelRoster, runsFile: result });
   assert.deepEqual(report.participants[0].runtimeProvenance.resolvedModels, ['model-a']);
@@ -114,6 +115,41 @@ test('runner resumes deterministic compatible successful runs without calling th
   assert.equal(calls, 0);
   assert.equal(resumed.resumedRuns, 2);
   assert.deepEqual(resumed.runs.map((run) => run.runId), first.runs.map((run) => run.runId));
+});
+
+test('runner does not reuse rows across schedule or local endpoint contracts', async () => {
+  const originalEndpoint = process.env.AIDB_LOCAL_BASE_URL;
+  try {
+    process.env.AIDB_LOCAL_BASE_URL = 'http://127.0.0.1:8000/v1';
+    const first = await runBenchmark({
+      questionBank,
+      modelRoster,
+      repeats: 1,
+      maxAttempts: 1,
+      scheduleSeed: 'seed-a',
+      callModelImpl: async () => ({ content: '{"answer":"Agree"}', metadata: {} }),
+    });
+    process.env.AIDB_LOCAL_BASE_URL = 'http://127.0.0.1:8011/v1';
+    let calls = 0;
+    const resumed = await runBenchmark({
+      questionBank,
+      modelRoster,
+      repeats: 1,
+      maxAttempts: 1,
+      scheduleSeed: 'seed-b',
+      existingRuns: first.runs,
+      callModelImpl: async () => {
+        calls += 1;
+        return { content: '{"answer":"Agree"}', metadata: {} };
+      },
+    });
+    assert.equal(calls, 2);
+    assert.equal(resumed.resumedRuns, 0);
+    assert.notEqual(first.runs[0].requestContractHash, resumed.runs[0].requestContractHash);
+  } finally {
+    if (originalEndpoint === undefined) delete process.env.AIDB_LOCAL_BASE_URL;
+    else process.env.AIDB_LOCAL_BASE_URL = originalEndpoint;
+  }
 });
 
 test('runner reruns failed, invalid, and prompt or generation-mismatched checkpoint records', async () => {

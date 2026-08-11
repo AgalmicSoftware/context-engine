@@ -10,6 +10,7 @@ const DEFAULT_ROUTES = Object.freeze([
   '/about',
   '/docs',
   '/contracts',
+  '/benchmarks',
 ]);
 const DEFAULT_ROUTE_TEXT = Object.freeze({
   '/session/demo': ['Session'],
@@ -18,6 +19,7 @@ const DEFAULT_ROUTE_TEXT = Object.freeze({
   '/about': ['Context Engine'],
   '/docs': ['Docs'],
   '/contracts': ['Docs'],
+  '/benchmarks': ['AI Opinions Benchmark'],
 });
 const DEFAULT_LAYOUT_PROBE_SELECTORS = Object.freeze([
   '[data-testid="ce-survey-submit"]',

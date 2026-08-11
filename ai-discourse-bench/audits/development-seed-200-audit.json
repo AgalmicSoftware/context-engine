@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 1,
+  "kind": "ai_discourse_bench_development_bank_audit",
+  "benchmarkId": "ai-discourse-bench-v0-sample-200",
+  "questionBankHash": "58bdbef22b48a386365ba060433dc6d843dbc212d6dd65dbec75a0930d34bc1a",
+  "releaseStatus": "development-seed",
+  "structuralChecks": {
+    "questionCount": 200,
+    "uniqueQuestionIds": 200,
+    "topicCount": 20,
+    "topicDistribution": [
+      {
+        "topic": "frontier-evaluation-disclosure",
+        "count": 10
+      },
+      {
+        "topic": "benchmark-validity",
+        "count": 10
+      },
+      {
+        "topic": "capability-forecasts",
+        "count": 10
+      },
+      {
+        "topic": "ai-rd-automation",
+        "count": 10
+      },
+      {
+        "topic": "open-model-release",
+        "count": 10
+      },
+      {
+        "topic": "compute-governance",
+        "count": 10
+      },
+      {
+        "topic": "regulation-and-coordination",
+        "count": 10
+      },
+      {
+        "topic": "labor-and-automation",
+        "count": 10
+      },
+      {
+        "topic": "education-and-assessment",
+        "count": 10
+      },
+      {
+        "topic": "copyright-and-creative-markets",
+        "count": 10
+      },
+      {
+        "topic": "deepfakes-and-likeness",
+        "count": 10
+      },
+      {
+        "topic": "environment-and-infrastructure",
+        "count": 10
+      },
+      {
+        "topic": "public-sector-and-high-stakes-ai",
+        "count": 10
+      },
+      {
+        "topic": "biosecurity-and-dual-use-science",
+        "count": 10
+      },
+      {
+        "topic": "cybersecurity-and-autonomy",
+        "count": 10
+      },
+      {
+        "topic": "personal-agents-and-privacy",
+        "count": 10
+      },
+      {
+        "topic": "cryptographic-discourse-and-bargaining",
+        "count": 10
+      },
+      {
+        "topic": "discourse-and-epistemics",
+        "count": 10
+      },
+      {
+        "topic": "ai-rights-and-moral-status",
+        "count": 10
+      },
+      {
+        "topic": "procurement-liability-and-audits",
+        "count": 10
+      }
+    ],
+    "duplicatePromptCount": 0,
+    "duplicatePrompts": [],
+    "resolvedQuestionCount": 200,
+    "unresolvedAnchors": []
+  },
+  "semanticReview": {
+    "reviewedCandidateQuestionCount": 50,
+    "deferredQuestionCount": 150,
+    "reviewedCandidateId": "model-opinions-bench-ai-futures-v0.2-reviewed-candidate",
+    "reviewedCandidateHash": "74eb4c7185e747b35662b6a6df56aa5ea77edae20b7ac85cb72ab4275b0bc66e",
+    "note": "The release-oriented 50-question slice received an AI-assisted single-axis and reversal audit. The remaining 150 development questions retain generator quality assertions and have not received item-level release adjudication."
+  },
+  "decision": {
+    "suitableForDevelopmentRuns": true,
+    "suitableForOfficialRelease": false,
+    "reasonsReleaseIsBlocked": [
+      "The 200-question bank is explicitly a development seed.",
+      "Only the 50-question reviewed candidate has received an item-level AI wording audit.",
+      "Neither bank has the required two independent human adjudications."
+    ]
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "defaultReportId": "model-opinions-bench-development-preview",
+  "reports": [
+    {
+      "id": "model-opinions-bench-development-preview",
+      "title": "AI Futures & Policy",
+      "topic": "AI Futures & Policy",
+      "publicationStatus": "development-preview",
+      "generatedAt": "2026-08-11T02:56:58.620Z",
+      "questionCount": 200,
+      "participantCount": 5,
+      "artifact": "model-opinions-bench-development-preview.html.gz",
+      "compression": "gzip",
+      "bytes": 762174,
+      "sha256": "0ab94d887828c05fcde0e205614da9cefddb8d49d518906cccd2342a9660e306",
+      "contentBytes": 19427192,
+      "contentSha256": "ec71ae29fdb4d09222e60636dd1e2ecde84006542676cd55d50b059739468e81",
+      "releaseReportContentHash": null
+    }
+  ]
+}

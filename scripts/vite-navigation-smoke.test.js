@@ -21,11 +21,13 @@ const {
   summarizeFailures,
 } = require('./vite-navigation-smoke');
 
-test('default navigation smoke covers Docs and its legacy contracts alias', () => {
+test('default navigation smoke covers Docs, its legacy contracts alias, and benchmarks', () => {
   assert.ok(DEFAULT_ROUTES.includes('/docs'));
   assert.ok(DEFAULT_ROUTES.includes('/contracts'));
+  assert.ok(DEFAULT_ROUTES.includes('/benchmarks'));
   assert.deepEqual(DEFAULT_ROUTE_TEXT['/docs'], ['Docs']);
   assert.deepEqual(DEFAULT_ROUTE_TEXT['/contracts'], ['Docs']);
+  assert.deepEqual(DEFAULT_ROUTE_TEXT['/benchmarks'], ['AI Opinions Benchmark']);
 });
 
 test('normalizeBaseUrl keeps the app origin and removes path/search/hash drift', () => {

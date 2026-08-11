@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { HARNESS_VERSION, QUESTION_PROMPT_TEMPLATE_VERSION } from '../src/config.mjs';
 import { mergeRunsFiles } from '../src/report-inputs.mjs';
 import { buildResultsReport } from '../src/scoring.mjs';
 import { validateModelRoster, validateReleaseRunFile, validateRuns } from '../src/schema.mjs';
@@ -60,7 +61,7 @@ test('distributional similarity distinguishes oscillation from consistent uncert
   assert.equal(report.polisReport.byModelQuestion['model-a'].q1.meanScore, 0);
   assert.equal(report.polisReport.byModelQuestion['model-b'].q1.meanScore, 0);
   assert.deepEqual(report.polisReport.byQuestion.q1.winningResponseConsistency, {
-    method: 'pooled-within-model-modal-share',
+    method: 'pooled-within-model-polarity-modal-share',
     rate: 0.75,
     winningResponses: 30,
     attemptedRuns: 40,
@@ -82,6 +83,26 @@ test('distributional similarity distinguishes oscillation from consistent uncert
     iterations: 1000,
     method: 'deterministic-percentile-bootstrap',
   });
+});
+
+test('repeat stability is measured within wording polarity instead of conflating wording sensitivity', () => {
+  const questionBank = {
+    benchmarkId: 'bench',
+    runPlan: { repeatsPerPolarity: 2 },
+    questions: [question('q1')],
+  };
+  const modelRoster = { models: [model('model-a')] };
+  const runs = [
+    { modelId: 'model-a', questionId: 'q1', polarity: 'canonical', normalizedAnswer: 'Agree' },
+    { modelId: 'model-a', questionId: 'q1', polarity: 'canonical', normalizedAnswer: 'Agree' },
+    { modelId: 'model-a', questionId: 'q1', polarity: 'reversed', normalizedAnswer: 'Disagree' },
+    { modelId: 'model-a', questionId: 'q1', polarity: 'reversed', normalizedAnswer: 'Disagree' },
+  ];
+
+  const report = buildResultsReport({ questionBank, modelRoster, runsFile: { repeats: 2, runs } });
+
+  assert.equal(report.polisReport.byQuestion.q1.winningResponseConsistency.rate, 1);
+  assert.equal(report.polisReport.byQuestion.q1.wordingSensitivity.meanAbsoluteShift, 2);
 });
 
 test('report exposes deterministic uncertainty and canonical-versus-reversed sensitivity', () => {
@@ -139,7 +160,7 @@ test('release eligibility rejects fixture and incomplete participants', () => {
   assert.equal(report.integrity.releaseReady, false);
   assert.equal(report.integrity.coverageByModel['real-model'].coverageRate, 0.5);
   assert.equal(report.integrity.coverageByModel['stub-model'].fixtureProvider, true);
-  assert.equal(report.participantGraph.nodes.find((entry) => entry.id === 'real-model').coverage.eligibleForSimilarity, true);
+  assert.equal(report.participantGraph.nodes.find((entry) => entry.id === 'real-model').coverage.eligibleForSimilarity, false);
 });
 
 test('release eligibility enforces bank repeats and detects provider overrides', () => {
@@ -269,11 +290,11 @@ test('release provenance rejects missing, incomplete, or mismatched manifests', 
 test('release provenance binds provider and model identity to the manifest', () => {
   const manifest = {
     kind: 'ai_discourse_bench_run_manifest',
-    harnessVersion: '0.2.0',
+    harnessVersion: HARNESS_VERSION,
     harnessCommit: 'a'.repeat(40),
     questionBankHash: 'b'.repeat(64),
     modelRosterHash: 'c'.repeat(64),
-    promptTemplateVersion: 'v1',
+    promptTemplateVersion: QUESTION_PROMPT_TEMPLATE_VERSION,
     promptTemplateHash: 'd'.repeat(64),
     scheduleSeed: 'seed',
     repeats: 1,
@@ -318,6 +339,70 @@ test('release provenance binds provider and model identity to the manifest', () 
   const routedErrors = validateReleaseRunFile({ manifest: routedManifest, runs: routedRuns }, options);
   assert.ok(routedErrors.some((error) => error.includes('generation does not match manifest.models')));
   assert.ok(routedErrors.some((error) => error.includes('modelProvenance does not match manifest.models')));
+
+  const servedIdentityErrors = validateReleaseRunFile({
+    manifest,
+    runs: [
+      { ...runs[0], responseMetadata: { resolvedProvider: 'local', resolvedModel: 'different-model' } },
+      runs[1],
+    ],
+  }, options);
+  assert.ok(servedIdentityErrors.some((error) => error.includes('resolved model does not match')));
+});
+
+test('release provenance prevents self responses from being relabeled as persona responses', () => {
+  const manifest = {
+    kind: 'ai_discourse_bench_run_manifest',
+    harnessVersion: HARNESS_VERSION,
+    harnessCommit: 'a'.repeat(40),
+    questionBankHash: 'b'.repeat(64),
+    modelRosterHash: 'c'.repeat(64),
+    promptTemplateVersion: QUESTION_PROMPT_TEMPLATE_VERSION,
+    promptTemplateHash: 'd'.repeat(64),
+    scheduleSeed: 'seed',
+    mode: 'self',
+    personaId: null,
+    personaProfile: null,
+    personaProfileHash: null,
+    repeats: 1,
+    expectedRuns: 2,
+    completedRuns: 2,
+    models: [{ id: 'model-a', model: 'provider/model-a', provider: 'local' }],
+  };
+  const runs = ['canonical', 'reversed'].map((polarity) => ({
+    mode: 'persona', personaId: 'historical-figure', modelId: 'model-a',
+    model: 'provider/model-a', provider: 'local', polarity,
+  }));
+  const errors = validateReleaseRunFile({
+    mode: 'persona',
+    personaId: 'historical-figure',
+    manifest,
+    runs,
+  }, { questionBankHash: 'b'.repeat(64), requiredRepeats: 1, questionCount: 1 });
+  assert.ok(errors.some((error) => error.includes('runs file mode does not match')));
+  assert.ok(errors.some((error) => error.includes('personaId does not match manifest')));
+  assert.ok(errors.some((error) => error.includes('runs[0].mode does not match')));
+});
+
+test('unsafe and case-colliding model identifiers are rejected before report construction', () => {
+  const errors = validateModelRoster({
+    models: [
+      model('Model-A'),
+      model('model-a'),
+      model('__proto__'),
+      model('model:unsafe'),
+    ],
+  });
+  assert.ok(errors.some((error) => error.includes('after case normalization')));
+  assert.ok(errors.filter((error) => error.includes('must start and end')).length >= 2);
+  assert.throws(
+    () => buildResultsReport({
+      questionBank: { benchmarkId: 'bench', runPlan: { repeatsPerPolarity: 1 }, questions: [question('q1')] },
+      modelRoster: { models: [model('__proto__')] },
+      runsFile: { runs: [] },
+    }),
+    /unsafe identifier/,
+  );
 });
 
 test('release provenance binds manifest models to the selected report roster', () => {
@@ -327,11 +412,11 @@ test('release provenance binds manifest models to the selected report roster', (
   };
   const manifest = {
     kind: 'ai_discourse_bench_run_manifest',
-    harnessVersion: '0.2.0',
+    harnessVersion: HARNESS_VERSION,
     harnessCommit: 'a'.repeat(40),
     questionBankHash: 'b'.repeat(64),
     modelRosterHash: 'c'.repeat(64),
-    promptTemplateVersion: 'v1',
+    promptTemplateVersion: QUESTION_PROMPT_TEMPLATE_VERSION,
     promptTemplateHash: 'd'.repeat(64),
     scheduleSeed: 'seed',
     repeats: 1,

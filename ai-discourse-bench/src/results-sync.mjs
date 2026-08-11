@@ -17,8 +17,19 @@ export const RESULTS_SYNC_SOURCE_FILES = Object.freeze([
   'client/src/components/MainContent/RiskMatrix.module.scss',
   'client/src/components/DemoViews/DemoAnalysis/DemoAnalysisWorkspace.tsx',
   'client/src/components/DemoViews/DemoAnalysis/DemoAnalysisWorkspace.module.scss',
+  'client/src/components/DemoViews/DemoAnalysis/ComparisonReport.tsx',
+  'client/src/components/DemoViews/DemoAnalysis/ComparisonReport.module.scss',
+  'client/src/components/DemoViews/DemoAnalysis/ComparisonSuggestions.tsx',
+  'client/src/components/DemoViews/DemoAnalysis/DemographicSelector.tsx',
+  'client/src/components/DemoViews/DemoAnalysis/QuestionBreakdownChart.tsx',
   'client/src/components/DemoViews/DemoAnalysis/WorldResultsMap.tsx',
+  'client/src/components/SurveyTool/QuestionTagDropdown.tsx',
+  'client/src/components/SurveyTool/QuestionTagDropdown.module.scss',
+  'client/src/components/SurveyTool/SingleQuestionResponse.tsx',
+  'client/src/components/SurveyTool/SingleQuestionResponse.module.scss',
   'client/src/components/SurveyTool/SurveyResults.module.scss',
+  'client/src/utilities/demo/demoAnalysisAdapter.ts',
+  'client/src/utilities/demo/demoAnalysisMath.ts',
 ]);
 
 export const defaultSyncPaths = () => {

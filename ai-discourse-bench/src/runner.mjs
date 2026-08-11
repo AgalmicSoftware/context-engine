@@ -6,13 +6,25 @@ import {
   DEFAULT_RETRY_BASE_DELAY_MS,
 } from './config.mjs';
 import { callMockModel } from './adapters/mock.mjs';
-import { callOpenAiCompatibleChat } from './adapters/openai-compatible.mjs';
+import {
+  ANSWER_JSON_SCHEMA,
+  ANSWER_REQUEST_CONTRACT_VERSION,
+  DEFAULT_ANSWER_SYSTEM_PROMPT,
+  callOpenAiCompatibleChat,
+  getProviderConfig,
+} from './adapters/openai-compatible.mjs';
 import {
   buildQuestionPrompt,
   normalizeForCanonicalPolarity,
   parseModelAnswer,
 } from './normalize.mjs';
-import { buildRunManifest, hashJson, sha256 } from './provenance.mjs';
+import {
+  buildRunManifest,
+  hashJson,
+  hashRunResumeContract,
+  sha256,
+} from './provenance.mjs';
+import { assertSafeUniqueIdentifiers } from './identifiers.mjs';
 
 const nowIso = () => new Date().toISOString();
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -106,6 +118,32 @@ const normalizeModelResponse = (response) => (
 
 const shouldRetry = (error) => error?.retryable !== false;
 
+const assertConsistentDeployments = (runs) => {
+  const identitiesByModel = new Map();
+  runs.forEach((run) => {
+    const metadata = run?.responseMetadata || {};
+    if (!identitiesByModel.has(run.modelId)) {
+      identitiesByModel.set(run.modelId, {
+        providers: new Set(), models: new Set(), fingerprints: new Set(), endpoints: new Set(),
+      });
+    }
+    const identity = identitiesByModel.get(run.modelId);
+    const provider = String(metadata.resolvedProvider || metadata.provider || run?.provider || '').trim();
+    const model = String(metadata.resolvedModel || run?.model || '').trim();
+    const fingerprint = String(metadata.systemFingerprint || '').trim();
+    const endpoint = String(metadata.endpoint || '').trim();
+    if (provider) identity.providers.add(provider);
+    if (model) identity.models.add(model);
+    if (fingerprint) identity.fingerprints.add(fingerprint);
+    if (endpoint) identity.endpoints.add(endpoint);
+  });
+  identitiesByModel.forEach((identity, modelId) => {
+    if (identity.providers.size > 1 || identity.models.size > 1 || identity.fingerprints.size > 1 || identity.endpoints.size > 1) {
+      throw new Error(`model ${modelId} resolved to multiple deployment identities; start a new run artifact instead of resuming`);
+    }
+  });
+};
+
 export const runBenchmark = async ({
   questionBank,
   modelRoster,
@@ -141,6 +179,10 @@ export const runBenchmark = async ({
   if (!Number.isFinite(retryBaseDelayMs) || retryBaseDelayMs < 0) {
     throw new Error('retryBaseDelayMs must be a non-negative number');
   }
+  assertSafeUniqueIdentifiers([questionBank.benchmarkId], 'question bank');
+  assertSafeUniqueIdentifiers((questionBank.questions || []).map((question) => question.id), 'question bank');
+  assertSafeUniqueIdentifiers((modelRoster.models || []).map((model) => model.id), 'model roster');
+  if (persona) assertSafeUniqueIdentifiers([persona.id], 'persona');
 
   const startedAt = nowIso();
   const effectiveScheduleSeed = scheduleSeed || [
@@ -161,7 +203,20 @@ export const runBenchmark = async ({
     scheduleSeed: effectiveScheduleSeed,
     startedAt,
     promptTemplateHash: sha256(buildQuestionPrompt.toString()),
+    requestContract: {
+      version: ANSWER_REQUEST_CONTRACT_VERSION,
+      systemPromptHash: sha256(DEFAULT_ANSWER_SYSTEM_PROMPT),
+      responseSchemaHash: hashJson(ANSWER_JSON_SCHEMA),
+      endpointsByModel: Object.fromEntries(modelRoster.models.map((modelEntry) => {
+        const provider = providerOverride || modelEntry.provider;
+        const endpoint = ['local', 'openrouter'].includes(provider)
+          ? getProviderConfig(provider).baseUrl
+          : null;
+        return [modelEntry.id, endpoint];
+      })),
+    },
   });
+  const resumeContractHash = hashRunResumeContract(manifest);
   const tasks = shuffled(buildTasks({
     questionBank,
     modelRoster,
@@ -188,6 +243,11 @@ export const runBenchmark = async ({
     };
     return run.runId === task.runId
       && run.promptHash === sha256(buildPromptForTask(task))
+      && run.requestContractHash === hashJson({
+        resumeContractHash,
+        runId: task.runId,
+        promptHash: sha256(buildPromptForTask(task)),
+      })
       && run.model === task.modelEntry.model
       && run.provider === expectedProvider
       && Number(run.generation?.temperature) === Number(expectedGeneration.temperature)
@@ -259,6 +319,7 @@ export const runBenchmark = async ({
     }
 
     const normalizedAnswer = normalizeForCanonicalPolarity(parsed.answer, task.polarity);
+    const promptHash = sha256(prompt);
     return {
       schemaVersion: DEFAULT_OUTPUT_SCHEMA_VERSION,
       benchmarkId: questionBank.benchmarkId,
@@ -271,7 +332,8 @@ export const runBenchmark = async ({
       questionId: task.question.id,
       polarity: task.polarity,
       repeatIndex: task.repeatIndex,
-      promptHash: sha256(prompt),
+      promptHash,
+      requestContractHash: hashJson({ resumeContractHash, runId: task.runId, promptHash }),
       generation: {
         temperature: task.modelEntry.temperature ?? 0.2,
         maxTokens: task.modelEntry.maxTokens ?? 220,
@@ -314,6 +376,7 @@ export const runBenchmark = async ({
   const runs = Array.from(runsById.values())
     .filter((run) => expectedRunIds.has(run.runId))
     .sort((left, right) => left.runId.localeCompare(right.runId));
+  assertConsistentDeployments(runs);
   const completedAt = nowIso();
 
   return {

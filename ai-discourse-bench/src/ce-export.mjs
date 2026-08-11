@@ -63,7 +63,7 @@ export const buildContextEnginePolisExport = (report) => {
   return {
     schemaVersion: 1,
     kind: 'ce_polis_question_responses_export',
-    generatedAt: new Date().toISOString(),
+    generatedAt: report.generatedAt || new Date().toISOString(),
     benchmarkId: report.benchmarkId || '',
     title: report.title || 'AI Discourse Bench Report',
     mode: report.mode || 'self',

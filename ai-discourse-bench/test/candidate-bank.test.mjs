@@ -39,6 +39,9 @@ test('candidate bank is source-resolved, balanced, and explicitly not validated'
       const resolved = resolveCorpusRecord(evidenceIndex, evidence.corpus, evidence.idOrUrl);
       assert.ok(resolved, `${question.id} resolves ${evidence.corpus}:${evidence.idOrUrl}`);
       assert.equal(evidence.sourceRecordHash, hashJson(resolved.record));
+      assert.equal(evidence.evidenceScope, 'source-record-resolution-only');
+      assert.equal(evidence.relatedDisagreementAxis, question.disagreementAxis);
+      assert.equal(Object.hasOwn(evidence, 'supports'), false);
       assert.ok(
         evidence.url || evidence.supportingRecords.some((record) => record.url),
         `${question.id} has a concrete source URL`,

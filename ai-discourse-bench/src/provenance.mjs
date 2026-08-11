@@ -26,7 +26,7 @@ export const sha256 = (value) => createHash('sha256')
 
 export const hashJson = (value) => sha256(stableStringify(value));
 
-const detectHarnessCommit = () => {
+export const detectHarnessCommit = () => {
   try {
     const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
     const packageStatus = execFileSync('git', ['status', '--porcelain', '--', '.'], {
@@ -57,6 +57,7 @@ export const buildRunManifest = ({
   scheduleSeed,
   startedAt,
   promptTemplateHash = '',
+  requestContract = null,
   harnessCommit = process.env.AIDB_HARNESS_COMMIT || detectHarnessCommit(),
 }) => ({
   schemaVersion: 1,
@@ -68,6 +69,7 @@ export const buildRunManifest = ({
   modelRosterHash: hashJson(modelRoster),
   promptTemplateVersion: QUESTION_PROMPT_TEMPLATE_VERSION,
   promptTemplateHash: promptTemplateHash || sha256(QUESTION_PROMPT_TEMPLATE_VERSION),
+  requestContract,
   mode,
   personaId: persona?.id || null,
   personaProfileHash: persona ? hashJson(persona) : null,
@@ -109,4 +111,86 @@ export const buildReportFingerprint = (report = {}) => hashJson({
   questions: report.questions || [],
   participants: report.participants || [],
   polisReport: report.polisReport || {},
+  participantGraph: report.participantGraph || {},
+  statistics: report.statistics || {},
+  importance: report.importance || {},
+  debateAtlas: report.debateAtlas || {},
+  riskMatrix: report.riskMatrix || {},
+  rawMaterial: report.rawMaterial || {},
+  integrity: report.integrity || {},
 });
+
+export const hashReleaseReportContent = (report = {}) => {
+  const { releaseValidationReceipt: _receipt, ...content } = report;
+  return hashJson(content);
+};
+
+export const hashRunResumeContract = (manifest = {}) => hashJson({
+  harnessVersion: manifest.harnessVersion || null,
+  harnessCommit: manifest.harnessCommit || null,
+  benchmarkId: manifest.benchmarkId || null,
+  questionBankHash: manifest.questionBankHash || null,
+  modelRosterHash: manifest.modelRosterHash || null,
+  promptTemplateVersion: manifest.promptTemplateVersion || null,
+  promptTemplateHash: manifest.promptTemplateHash || null,
+  requestContract: manifest.requestContract || null,
+  mode: manifest.mode || 'self',
+  personaId: manifest.personaId || null,
+  personaProfileHash: manifest.personaProfileHash || null,
+  providerOverride: manifest.providerOverride || null,
+  repeats: manifest.repeats || null,
+  polarities: manifest.polarities || [],
+  maxAttempts: manifest.maxAttempts || null,
+  scheduleSeed: manifest.scheduleSeed || null,
+  models: manifest.models || [],
+});
+
+export const buildReleaseValidationReceipt = ({
+  report,
+  questionBank,
+  modelRoster,
+  runsFiles = [],
+  importanceFiles = [],
+  validatedAt = new Date().toISOString(),
+}) => ({
+  schemaVersion: 1,
+  kind: 'ai_discourse_bench_release_validation_receipt',
+  validatedAt,
+  reportContentHash: hashReleaseReportContent(report),
+  questionBankHash: hashJson(questionBank),
+  modelRosterHash: hashJson(modelRoster),
+  runManifestHashes: runsFiles.map((file) => hashJson(file?.manifest || null)),
+  importanceManifestHashes: importanceFiles.map((file) => hashJson(file?.manifest || null)),
+  checks: [
+    'validated-question-bank',
+    'release-run-provenance',
+    'raw-answer-normalization',
+    'complete-repeat-coverage',
+    ...(importanceFiles.length ? ['release-importance-provenance'] : []),
+  ],
+});
+
+export const validateReleaseValidationReceipt = (report = {}) => {
+  const receipt = report.releaseValidationReceipt;
+  if (!receipt || typeof receipt !== 'object' || Array.isArray(receipt)) {
+    return ['releaseValidationReceipt must be present for official publication'];
+  }
+  const errors = [];
+  if (receipt.kind !== 'ai_discourse_bench_release_validation_receipt') {
+    errors.push('releaseValidationReceipt.kind is invalid');
+  }
+  if (!/^[a-f0-9]{64}$/i.test(String(receipt.reportContentHash || ''))) {
+    errors.push('releaseValidationReceipt.reportContentHash must be a SHA-256 hex digest');
+  } else if (receipt.reportContentHash !== hashReleaseReportContent(report)) {
+    errors.push('releaseValidationReceipt.reportContentHash does not match the report');
+  }
+  for (const field of ['questionBankHash', 'modelRosterHash']) {
+    if (!/^[a-f0-9]{64}$/i.test(String(receipt[field] || ''))) {
+      errors.push(`releaseValidationReceipt.${field} must be a SHA-256 hex digest`);
+    }
+  }
+  if (!Array.isArray(receipt.runManifestHashes) || receipt.runManifestHashes.length === 0) {
+    errors.push('releaseValidationReceipt.runManifestHashes must include at least one manifest');
+  }
+  return errors;
+};

@@ -46,6 +46,7 @@ const E2E_TESTIDS = Object.freeze({
   DOCS_CONTRACT_SESSION_SELECTOR: 'ce-docs-contract-session-selector',
   PAGE_ABOUT_ROOT: 'ce-page-about-root',
   PAGE_POSTS_ROOT: 'ce-page-posts-root',
+  PAGE_BENCHMARKS_ROOT: 'ce-page-benchmarks-root',
   PAGE_ADMIN_ROOT: 'ce-page-admin-root',
   PAGE_SPONSOR_ROOT: 'ce-page-sponsor-root',
   PAGE_SESSION_ROOT: 'ce-page-session-root',

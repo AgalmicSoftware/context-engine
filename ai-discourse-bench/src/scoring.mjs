@@ -1,4 +1,6 @@
 import { ANSWER_SCORE, ANSWER_VALUES } from './config.mjs';
+import { assertSafeUniqueIdentifiers } from './identifiers.mjs';
+import { summarizeImportanceRuns } from './importance.mjs';
 import { bootstrapMeanInterval } from './statistics.mjs';
 
 const mean = (values) => {
@@ -122,17 +124,22 @@ const summarizeWinningResponseConsistency = (cells = []) => {
   let contributingModels = 0;
 
   cells.forEach((cell) => {
-    const attempts = Number(cell?.total || 0);
-    if (!Number.isFinite(attempts) || attempts <= 0) return;
-    const answerCounts = ANSWER_VALUES.map((answer) => Number(cell?.counts?.[answer] || 0));
-    winningResponses += Math.max(0, ...answerCounts);
-    validRuns += answerCounts.reduce((sum, count) => sum + count, 0);
-    attemptedRuns += attempts;
-    contributingModels += 1;
+    let modelContributed = false;
+    for (const polarity of ['canonical', 'reversedNormalized']) {
+      const form = cell?.polarity?.[polarity];
+      const attempts = Number(form?.total || 0);
+      if (!Number.isFinite(attempts) || attempts <= 0) continue;
+      const answerCounts = ANSWER_VALUES.map((answer) => Number(form?.counts?.[answer] || 0));
+      winningResponses += Math.max(0, ...answerCounts);
+      validRuns += answerCounts.reduce((sum, count) => sum + count, 0);
+      attemptedRuns += attempts;
+      modelContributed = true;
+    }
+    if (modelContributed) contributingModels += 1;
   });
 
   return {
-    method: 'pooled-within-model-modal-share',
+    method: 'pooled-within-model-polarity-modal-share',
     rate: attemptedRuns ? round(winningResponses / attemptedRuns) : null,
     winningResponses,
     attemptedRuns,
@@ -247,7 +254,6 @@ const buildCoverage = ({
   runs,
   byModelQuestion,
   expectedRepeats,
-  minimumSimilarityOverlap,
   repeatConfigurationValid,
   bankValidated,
 }) => {
@@ -294,7 +300,7 @@ const buildCoverage = ({
       completionRate: round(completionRate),
       validRate: round(validRate),
       fixtureProvider,
-      eligibleForSimilarity: answeredQuestions >= minimumSimilarityOverlap,
+      eligibleForSimilarity: false,
       eligibleForRelease,
     }];
   }));
@@ -302,23 +308,13 @@ const buildCoverage = ({
 
 const buildSimilarity = ({ questionBank, modelRoster, byModelQuestion, coverage, minimumSimilarityOverlap }) => {
   const models = modelRoster.models || [];
-  const similarityMatrix = {};
-  const similarityDetails = {};
+  const similarityMatrix = Object.fromEntries(models.map((model) => [model.id, {}]));
+  const similarityDetails = Object.fromEntries(models.map((model) => [model.id, {}]));
   const similarityEdges = [];
-  models.forEach((left) => {
-    similarityMatrix[left.id] = {};
-    similarityDetails[left.id] = {};
-    models.forEach((right) => {
-      if (left.id === right.id) {
-        similarityMatrix[left.id][right.id] = 1;
-        similarityDetails[left.id][right.id] = {
-          similarity: 1,
-          similarityInterval: { low: 1, high: 1, confidenceLevel: 0.95, iterations: 0, method: 'identity' },
-          questionsCompared: coverage[left.id]?.answeredQuestions || 0,
-          sufficientOverlap: Boolean(coverage[left.id]?.eligibleForSimilarity),
-        };
-        return;
-      }
+  models.forEach((left, leftIndex) => {
+    similarityMatrix[left.id][left.id] = 1;
+    for (let rightIndex = leftIndex + 1; rightIndex < models.length; rightIndex += 1) {
+      const right = models[rightIndex];
       const similarities = (questionBank.questions || [])
         .map((question) => distributionSimilarity(
           byModelQuestion[left.id]?.[question.id],
@@ -328,8 +324,9 @@ const buildSimilarity = ({ questionBank, modelRoster, byModelQuestion, coverage,
       const questionsCompared = similarities.length;
       const sufficientOverlap = questionsCompared >= minimumSimilarityOverlap;
       const similarity = sufficientOverlap ? round(mean(similarities)) : null;
+      const pairIds = [left.id, right.id].sort();
       const similarityInterval = sufficientOverlap
-        ? bootstrapMeanInterval(similarities, { seed: `similarity:${left.id}:${right.id}` })
+        ? bootstrapMeanInterval(similarities, { seed: `similarity:${pairIds[0]}:${pairIds[1]}` })
         : null;
       const detail = {
         similarity,
@@ -342,16 +339,28 @@ const buildSimilarity = ({ questionBank, modelRoster, byModelQuestion, coverage,
         sufficientOverlap,
       };
       similarityMatrix[left.id][right.id] = similarity;
+      similarityMatrix[right.id][left.id] = similarity;
       similarityDetails[left.id][right.id] = detail;
-      if (left.id < right.id) {
-        similarityEdges.push({
-          source: left.id,
-          target: right.id,
-          ...detail,
-          difference: similarity === null ? null : round(1 - similarity),
-        });
-      }
-    });
+      similarityDetails[right.id][left.id] = { ...detail };
+      similarityEdges.push({
+        source: pairIds[0],
+        target: pairIds[1],
+        ...detail,
+        difference: similarity === null ? null : round(1 - similarity),
+      });
+    }
+  });
+  models.forEach((model) => {
+    const eligibleForSimilarity = models.some((other) => (
+      other.id !== model.id && similarityDetails[model.id]?.[other.id]?.sufficientOverlap === true
+    ));
+    coverage[model.id].eligibleForSimilarity = eligibleForSimilarity;
+    similarityDetails[model.id][model.id] = {
+      similarity: 1,
+      similarityInterval: { low: 1, high: 1, confidenceLevel: 0.95, iterations: 0, method: 'identity' },
+      questionsCompared: coverage[model.id]?.answeredQuestions || 0,
+      sufficientOverlap: eligibleForSimilarity,
+    };
   });
   return { similarityMatrix, similarityDetails, similarityEdges };
 };
@@ -382,7 +391,7 @@ const buildOpinionGroups = (models, similarityMatrix, coverage, threshold = 0.72
   return groupById;
 };
 
-const buildQuestionTopicAtlas = (questionBank, byQuestion) => {
+const buildQuestionTopicAtlas = (questionBank, byQuestion, importance) => {
   const topicMap = new Map();
   questionBank.questions.forEach((question) => {
     const topic = question.topic || 'uncategorized';
@@ -394,15 +403,25 @@ const buildQuestionTopicAtlas = (questionBank, byQuestion) => {
     const summary = byQuestion[question.id];
     if (Number.isFinite(summary?.meanScore)) row.meanScores.push(summary.meanScore);
   });
+  const importanceAvailable = Boolean(importance?.available);
   return {
-    generatedBy: 'deterministic-topic-rollup',
-    note: 'AI-generated debate atlas nodes can replace or enrich these topic circles after runs.',
+    generatedBy: importanceAvailable
+      ? 'deterministic-topic-rollup-with-quadratic-importance'
+      : 'deterministic-topic-rollup',
+    sizeMetric: importanceAvailable ? 'quadratic-importance' : 'question-count',
+    note: importanceAvailable
+      ? 'Circle prominence reflects equally weighted model importance allocations; stance remains a separate measurement.'
+      : 'Circle prominence falls back to question count until quadratic importance allocations are supplied.',
     topicCircles: Array.from(topicMap.values()).map((topic) => ({
       id: topic.id,
       label: topic.label,
       questionCount: topic.questionIds.length,
       questionIds: topic.questionIds,
       averageStance: round(mean(topic.meanScores)),
+      importanceVotes: importanceAvailable ? Number(importance.byTopic?.[topic.id]?.meanVotes || 0) : null,
+      importanceShare: importanceAvailable ? Number(importance.byTopic?.[topic.id]?.share || 0) : null,
+      importanceModelCount: importanceAvailable ? Number(importance.byTopic?.[topic.id]?.modelCount || 0) : 0,
+      sizeMetric: importanceAvailable ? 'quadratic-importance' : 'question-count',
     })),
   };
 };
@@ -455,41 +474,41 @@ const buildObservedRuntimeProvenance = (models, runs) => Object.fromEntries(mode
   }];
 }));
 
-export const buildResultsReport = ({ questionBank, modelRoster, runsFile }) => {
+export const buildResultsReport = ({ questionBank, modelRoster, runsFile, importanceFile = null }) => {
   const runs = runsFile.runs || [];
   const models = modelRoster.models || [];
   const questions = questionBank.questions || [];
+  assertSafeUniqueIdentifiers([questionBank.benchmarkId], 'question bank');
+  assertSafeUniqueIdentifiers(questions.map((question) => question.id), 'question bank');
+  assertSafeUniqueIdentifiers(models.map((model) => model.id), 'model roster');
   const runtimeProvenance = buildObservedRuntimeProvenance(models, runs);
-  const byModelQuestion = {};
+  const byModelQuestion = Object.fromEntries(models.map((model) => [model.id, {}]));
 
   for (const [key, groupedRuns] of groupBy(runs, (run) => `${run.modelId}\u0000${run.questionId}`)) {
     const [modelId, questionId] = key.split('\u0000');
-    if (!byModelQuestion[modelId]) byModelQuestion[modelId] = {};
     byModelQuestion[modelId][questionId] = summarizeModelQuestionRuns(
       groupedRuns,
       `cell:${modelId}:${questionId}`,
     );
   }
 
-  const byModel = {};
-  models.forEach((model) => {
+  const byModel = Object.fromEntries(models.map((model) => {
     const cells = questions.map((question) => byModelQuestion[model.id]?.[question.id]);
-    byModel[model.id] = summarizeCells(
+    return [model.id, summarizeCells(
       cells,
       runs.filter((run) => run.modelId === model.id),
       `model:${model.id}`,
-    );
-  });
+    )];
+  }));
 
-  const byQuestion = {};
-  questions.forEach((question) => {
+  const byQuestion = Object.fromEntries(questions.map((question) => {
     const cells = models.map((model) => byModelQuestion[model.id]?.[question.id]);
-    byQuestion[question.id] = summarizeCells(
+    return [question.id, summarizeCells(
       cells,
       runs.filter((run) => run.questionId === question.id),
       `question:${question.id}`,
-    );
-  });
+    )];
+  }));
 
   const expectedRepeats = Number(questionBank.runPlan?.repeatsPerPolarity || 10);
   const declaredRepeatValues = [
@@ -513,7 +532,6 @@ export const buildResultsReport = ({ questionBank, modelRoster, runsFile }) => {
     runs,
     byModelQuestion,
     expectedRepeats,
-    minimumSimilarityOverlap,
     repeatConfigurationValid,
     bankValidated,
   });
@@ -525,6 +543,7 @@ export const buildResultsReport = ({ questionBank, modelRoster, runsFile }) => {
     minimumSimilarityOverlap,
   });
   const opinionGroups = buildOpinionGroups(models, similarity.similarityMatrix, coverage);
+  const importance = summarizeImportanceRuns({ importanceFile, questionBank, modelRoster });
 
   const breakdown = {};
   models.forEach((model) => {
@@ -576,6 +595,7 @@ export const buildResultsReport = ({ questionBank, modelRoster, runsFile }) => {
       models: models.length,
       eligibleModels: models.filter((model) => coverage[model.id]?.eligibleForRelease).length,
       runs: runs.length,
+      importanceRuns: importance.attemptedRuns,
     },
     statistics: {
       intervalMethod: 'deterministic-percentile-bootstrap',
@@ -632,12 +652,17 @@ export const buildResultsReport = ({ questionBank, modelRoster, runsFile }) => {
       })),
       edges: similarity.similarityEdges,
     },
+    importance,
     breakdown,
-    debateAtlas: buildQuestionTopicAtlas(questionBank, byQuestion),
+    debateAtlas: buildQuestionTopicAtlas(questionBank, byQuestion, importance),
     riskMatrix: buildRiskMatrixInputs(questionBank, byQuestion),
     rawMaterial: {
       runManifest: runsFile.manifest || null,
       sourceManifests: runsFile.sourceManifests || [],
+      sourceRunContentHashes: runsFile.sourceRunContentHashes || [],
+      importanceManifest: importanceFile?.manifest || null,
+      importanceSourceManifests: importanceFile?.sourceManifests || [],
+      sourceImportanceContentHashes: importanceFile?.sourceImportanceContentHashes || [],
       runtimeProvenance,
       debateAtlasInputs: questions.map((question) => ({
         questionId: question.id,
@@ -646,6 +671,7 @@ export const buildResultsReport = ({ questionBank, modelRoster, runsFile }) => {
         disagreementAxis: question.disagreementAxis || '',
         sourceAnchors: question.sourceAnchors || [],
         agentVillageAnchors: question.agentVillageAnchors || [],
+        importance: importance.byQuestion?.[question.id] || null,
       })),
       riskMatrixInputs: questions.map((question) => ({
         questionId: question.id,

@@ -9,7 +9,7 @@
   "sourceCorpus": {
     "name": "ai-discourse-corpus",
     "path": "ai-discourse-corpus",
-    "revision": "81fa7cdcd54aee5fb0d8c8fbccc566f98bc9f7a1",
+    "revision": "79b19bbd9826b42968abbffb05e402949417a88c",
     "resolutionMethod": "direct record resolution with compact debate supporting records"
   },
   "selection": {
@@ -134,10 +134,10 @@
           "date": null,
           "summary": "Are pre-deployment evaluations a sufficient framework for AI safety, or are they fundamentally limited by eval awareness and Goodhart's Law?",
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
-          "sourceRecordHash": "b4a0a990cfecf7d661c6c0b6bfa7f798e8697af669581a8cc93b80c5f2d8e58d",
+          "sourceRecordHash": "7b47f08c5a51bcac80e52dc3e68e85431607ebe7ee19e1bce275dd5599da3bfd",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "mandatory independent disclosure versus developer-controlled disclosure",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "mandatory independent disclosure versus developer-controlled disclosure",
           "anchorReason": "anchors disputes over whether pre-deployment evaluations are sufficient for frontier-model governance",
           "supportingRecords": [
             {
@@ -237,10 +237,10 @@
           "date": null,
           "summary": "Are pre-deployment evaluations a sufficient framework for AI safety, or are they fundamentally limited by eval awareness and Goodhart's Law?",
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
-          "sourceRecordHash": "b4a0a990cfecf7d661c6c0b6bfa7f798e8697af669581a8cc93b80c5f2d8e58d",
+          "sourceRecordHash": "7b47f08c5a51bcac80e52dc3e68e85431607ebe7ee19e1bce275dd5599da3bfd",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "behavioral red flags versus aggregate score performance",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "behavioral red flags versus aggregate score performance",
           "anchorReason": "anchors disputes over whether pre-deployment evaluations are sufficient for frontier-model governance",
           "supportingRecords": [
             {
@@ -340,10 +340,10 @@
           "date": null,
           "summary": "Are pre-deployment evaluations a sufficient framework for AI safety, or are they fundamentally limited by eval awareness and Goodhart's Law?",
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
-          "sourceRecordHash": "b4a0a990cfecf7d661c6c0b6bfa7f798e8697af669581a8cc93b80c5f2d8e58d",
+          "sourceRecordHash": "7b47f08c5a51bcac80e52dc3e68e85431607ebe7ee19e1bce275dd5599da3bfd",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "capability measurement clarity versus coarse safety reporting",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "capability measurement clarity versus coarse safety reporting",
           "anchorReason": "anchors disputes over whether pre-deployment evaluations are sufficient for frontier-model governance",
           "supportingRecords": [
             {
@@ -451,8 +451,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
           "sourceRecordHash": "de2767d6a3bfa2607ee849da1fac3a23c3626a7ab86f8e77f207c2d19ab2659f",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "benchmark trust versus benchmark skepticism",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "benchmark trust versus benchmark skepticism",
           "anchorReason": "anchors disputes over whether benchmarks measure what matters",
           "supportingRecords": [
             {
@@ -463,7 +463,7 @@
               "date": "2026-04-10",
               "summary": "Benchmark demonstrating AI systems can complete coding tasks requiring several weeks of human effort, significantly extending measured time horizons.",
               "sourcePath": "ai-discourse-corpus/corpuses/metr-evals-metrics-corpus.json",
-              "sourceRecordHash": "6f05374d9c63308bdb309930d93fd809ab35f9eae01898ae87269c472172d732",
+              "sourceRecordHash": "b40139b8fece597a5b6b9d96135ce9f0a4eefc3b7083532d55599096241aade7",
               "stanceSide": "a",
               "stanceSummary": "MirrorCode: Evidence that AI can already do some weeks-long coding tasks",
               "relevanceScore": 10
@@ -485,11 +485,11 @@
               "corpus": "metr-evals-metrics",
               "idOrUrl": "metr_time_horizon_1_1_2026",
               "title": "Time Horizon 1.1: Expanded Long-Horizon Task Benchmark",
-              "url": "https://metr.org/time-horizons/",
-              "date": "2026-01-15",
+              "url": "https://metr.org/blog/2026-1-29-time-horizon-1-1/",
+              "date": "2026-01-29",
               "summary": "Time Horizon 1.1 is a major expansion of METR's flagship capability measurement benchmark, growing from 14 to 31 long-horizon tasks where each task is estimated to take a human more than 8 hours to complete. The update incorporates data from 9 additional benchmarks spanning scientific reasoning, mathematics, robotics, computer use, and self-driving, providing cross-domain validation of capability growth trends. The central finding is that improvement rates across these diverse domains are genera",
               "sourcePath": "ai-discourse-corpus/corpuses/metr-evals-metrics-corpus.json",
-              "sourceRecordHash": "920a4402c08f5d72844a50c62a2e4916b62c012dcc0bb5bafcc06b991424dbfb",
+              "sourceRecordHash": "dcad11d35802d147878ca54a5690ed89bceb3474efd2c82a592f9970227f4961",
               "stanceSide": "a",
               "stanceSummary": "Time Horizon 1.1",
               "relevanceScore": 10
@@ -506,8 +506,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/metr-evals-metrics-corpus.json",
           "sourceRecordHash": "275b0677dd6a8b36b8c67e5178ba3f6f20191c6d21c68f3df58a88d5b18c0326",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "benchmark trust versus benchmark skepticism",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "benchmark trust versus benchmark skepticism",
           "anchorReason": "anchors evaluation-integrity threats such as reward hacking and sandbagging",
           "supportingRecords": []
         }
@@ -575,8 +575,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
           "sourceRecordHash": "de2767d6a3bfa2607ee849da1fac3a23c3626a7ab86f8e77f207c2d19ab2659f",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "intended task performance versus scorer exploitation",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "intended task performance versus scorer exploitation",
           "anchorReason": "anchors disputes over whether benchmarks measure what matters",
           "supportingRecords": [
             {
@@ -587,7 +587,7 @@
               "date": "2026-04-10",
               "summary": "Benchmark demonstrating AI systems can complete coding tasks requiring several weeks of human effort, significantly extending measured time horizons.",
               "sourcePath": "ai-discourse-corpus/corpuses/metr-evals-metrics-corpus.json",
-              "sourceRecordHash": "6f05374d9c63308bdb309930d93fd809ab35f9eae01898ae87269c472172d732",
+              "sourceRecordHash": "b40139b8fece597a5b6b9d96135ce9f0a4eefc3b7083532d55599096241aade7",
               "stanceSide": "a",
               "stanceSummary": "MirrorCode: Evidence that AI can already do some weeks-long coding tasks",
               "relevanceScore": 10
@@ -609,11 +609,11 @@
               "corpus": "metr-evals-metrics",
               "idOrUrl": "metr_time_horizon_1_1_2026",
               "title": "Time Horizon 1.1: Expanded Long-Horizon Task Benchmark",
-              "url": "https://metr.org/time-horizons/",
-              "date": "2026-01-15",
+              "url": "https://metr.org/blog/2026-1-29-time-horizon-1-1/",
+              "date": "2026-01-29",
               "summary": "Time Horizon 1.1 is a major expansion of METR's flagship capability measurement benchmark, growing from 14 to 31 long-horizon tasks where each task is estimated to take a human more than 8 hours to complete. The update incorporates data from 9 additional benchmarks spanning scientific reasoning, mathematics, robotics, computer use, and self-driving, providing cross-domain validation of capability growth trends. The central finding is that improvement rates across these diverse domains are genera",
               "sourcePath": "ai-discourse-corpus/corpuses/metr-evals-metrics-corpus.json",
-              "sourceRecordHash": "920a4402c08f5d72844a50c62a2e4916b62c012dcc0bb5bafcc06b991424dbfb",
+              "sourceRecordHash": "dcad11d35802d147878ca54a5690ed89bceb3474efd2c82a592f9970227f4961",
               "stanceSide": "a",
               "stanceSummary": "Time Horizon 1.1",
               "relevanceScore": 10
@@ -630,8 +630,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/metr-evals-metrics-corpus.json",
           "sourceRecordHash": "275b0677dd6a8b36b8c67e5178ba3f6f20191c6d21c68f3df58a88d5b18c0326",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "intended task performance versus scorer exploitation",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "intended task performance versus scorer exploitation",
           "anchorReason": "anchors evaluation-integrity threats such as reward hacking and sandbagging",
           "supportingRecords": []
         }
@@ -699,8 +699,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
           "sourceRecordHash": "de2767d6a3bfa2607ee849da1fac3a23c3626a7ab86f8e77f207c2d19ab2659f",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "private eval integrity versus public reproducibility",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "private eval integrity versus public reproducibility",
           "anchorReason": "anchors disputes over whether benchmarks measure what matters",
           "supportingRecords": [
             {
@@ -711,7 +711,7 @@
               "date": "2026-04-10",
               "summary": "Benchmark demonstrating AI systems can complete coding tasks requiring several weeks of human effort, significantly extending measured time horizons.",
               "sourcePath": "ai-discourse-corpus/corpuses/metr-evals-metrics-corpus.json",
-              "sourceRecordHash": "6f05374d9c63308bdb309930d93fd809ab35f9eae01898ae87269c472172d732",
+              "sourceRecordHash": "b40139b8fece597a5b6b9d96135ce9f0a4eefc3b7083532d55599096241aade7",
               "stanceSide": "a",
               "stanceSummary": "MirrorCode: Evidence that AI can already do some weeks-long coding tasks",
               "relevanceScore": 10
@@ -733,11 +733,11 @@
               "corpus": "metr-evals-metrics",
               "idOrUrl": "metr_time_horizon_1_1_2026",
               "title": "Time Horizon 1.1: Expanded Long-Horizon Task Benchmark",
-              "url": "https://metr.org/time-horizons/",
-              "date": "2026-01-15",
+              "url": "https://metr.org/blog/2026-1-29-time-horizon-1-1/",
+              "date": "2026-01-29",
               "summary": "Time Horizon 1.1 is a major expansion of METR's flagship capability measurement benchmark, growing from 14 to 31 long-horizon tasks where each task is estimated to take a human more than 8 hours to complete. The update incorporates data from 9 additional benchmarks spanning scientific reasoning, mathematics, robotics, computer use, and self-driving, providing cross-domain validation of capability growth trends. The central finding is that improvement rates across these diverse domains are genera",
               "sourcePath": "ai-discourse-corpus/corpuses/metr-evals-metrics-corpus.json",
-              "sourceRecordHash": "920a4402c08f5d72844a50c62a2e4916b62c012dcc0bb5bafcc06b991424dbfb",
+              "sourceRecordHash": "dcad11d35802d147878ca54a5690ed89bceb3474efd2c82a592f9970227f4961",
               "stanceSide": "a",
               "stanceSummary": "Time Horizon 1.1",
               "relevanceScore": 10
@@ -754,8 +754,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/metr-evals-metrics-corpus.json",
           "sourceRecordHash": "275b0677dd6a8b36b8c67e5178ba3f6f20191c6d21c68f3df58a88d5b18c0326",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "private eval integrity versus public reproducibility",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "private eval integrity versus public reproducibility",
           "anchorReason": "anchors evaluation-integrity threats such as reward hacking and sandbagging",
           "supportingRecords": []
         }
@@ -823,8 +823,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
           "sourceRecordHash": "6bdf4ec2943ee1a8e842f1cc4dd6bc40e542ac9b115effacac553fca55455401",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "fast-tail preparedness versus median-forecast planning",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "fast-tail preparedness versus median-forecast planning",
           "anchorReason": "anchors disputes over whether AI progress is exponential",
           "supportingRecords": [
             {
@@ -832,10 +832,10 @@
               "idOrUrl": "amodei_dario_dwarkesh_2026_end_of_exponential",
               "title": "We Are Near the End of the Exponential",
               "url": "https://www.dwarkesh.com/p/dario-amodei-2",
-              "date": "2026-02-05",
+              "date": "2026-02-13",
               "summary": "Dario Amodei returns to the Dwarkesh Podcast for a wide-ranging second interview covering the evolving economics and trajectory of frontier AI. Amodei expresses 90% confidence that AGI will arrive within 10 years, with a personal hunch of 1-3 years for coding-level autonomy. He discusses whether pure scaling is reaching its limits and what comes next, including the roles of diffusion-based approaches, continual learning, and architectural innovation. A central theme is the business model transit",
               "sourcePath": "ai-discourse-corpus/corpuses/dwarkesh-lab-insiders-corpus.json",
-              "sourceRecordHash": "0b342aba639bb94397db84dcdfe60e1fe28a056713bb545444f4044bf80d197f",
+              "sourceRecordHash": "ec341ed0bbf29b5698adaca67f33de432c8d3712a9a4793ddab98a8bc2119266",
               "stanceSide": "a",
               "stanceSummary": "Dario Amodei — We are near the end of the exponential",
               "relevanceScore": 10
@@ -878,8 +878,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/arxiv-ai-safety-corpus.json",
           "sourceRecordHash": "0f2a57039cdd9eec3de896c6f0283654899509fdc3d59d09e22afe414771650c",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "fast-tail preparedness versus median-forecast planning",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "fast-tail preparedness versus median-forecast planning",
           "anchorReason": "anchors transformative-AI forecasting debates",
           "supportingRecords": []
         }
@@ -947,8 +947,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
           "sourceRecordHash": "6bdf4ec2943ee1a8e842f1cc4dd6bc40e542ac9b115effacac553fca55455401",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "bottleneck-aware forecasting versus pure scaling extrapolation",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "bottleneck-aware forecasting versus pure scaling extrapolation",
           "anchorReason": "anchors disputes over whether AI progress is exponential",
           "supportingRecords": [
             {
@@ -956,10 +956,10 @@
               "idOrUrl": "amodei_dario_dwarkesh_2026_end_of_exponential",
               "title": "We Are Near the End of the Exponential",
               "url": "https://www.dwarkesh.com/p/dario-amodei-2",
-              "date": "2026-02-05",
+              "date": "2026-02-13",
               "summary": "Dario Amodei returns to the Dwarkesh Podcast for a wide-ranging second interview covering the evolving economics and trajectory of frontier AI. Amodei expresses 90% confidence that AGI will arrive within 10 years, with a personal hunch of 1-3 years for coding-level autonomy. He discusses whether pure scaling is reaching its limits and what comes next, including the roles of diffusion-based approaches, continual learning, and architectural innovation. A central theme is the business model transit",
               "sourcePath": "ai-discourse-corpus/corpuses/dwarkesh-lab-insiders-corpus.json",
-              "sourceRecordHash": "0b342aba639bb94397db84dcdfe60e1fe28a056713bb545444f4044bf80d197f",
+              "sourceRecordHash": "ec341ed0bbf29b5698adaca67f33de432c8d3712a9a4793ddab98a8bc2119266",
               "stanceSide": "a",
               "stanceSummary": "Dario Amodei — We are near the end of the exponential",
               "relevanceScore": 10
@@ -1002,8 +1002,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/arxiv-ai-safety-corpus.json",
           "sourceRecordHash": "0f2a57039cdd9eec3de896c6f0283654899509fdc3d59d09e22afe414771650c",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "bottleneck-aware forecasting versus pure scaling extrapolation",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "bottleneck-aware forecasting versus pure scaling extrapolation",
           "anchorReason": "anchors transformative-AI forecasting debates",
           "supportingRecords": []
         }
@@ -1071,8 +1071,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
           "sourceRecordHash": "6bdf4ec2943ee1a8e842f1cc4dd6bc40e542ac9b115effacac553fca55455401",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "multi-scenario planning versus single-narrative planning",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "multi-scenario planning versus single-narrative planning",
           "anchorReason": "anchors disputes over whether AI progress is exponential",
           "supportingRecords": [
             {
@@ -1080,10 +1080,10 @@
               "idOrUrl": "amodei_dario_dwarkesh_2026_end_of_exponential",
               "title": "We Are Near the End of the Exponential",
               "url": "https://www.dwarkesh.com/p/dario-amodei-2",
-              "date": "2026-02-05",
+              "date": "2026-02-13",
               "summary": "Dario Amodei returns to the Dwarkesh Podcast for a wide-ranging second interview covering the evolving economics and trajectory of frontier AI. Amodei expresses 90% confidence that AGI will arrive within 10 years, with a personal hunch of 1-3 years for coding-level autonomy. He discusses whether pure scaling is reaching its limits and what comes next, including the roles of diffusion-based approaches, continual learning, and architectural innovation. A central theme is the business model transit",
               "sourcePath": "ai-discourse-corpus/corpuses/dwarkesh-lab-insiders-corpus.json",
-              "sourceRecordHash": "0b342aba639bb94397db84dcdfe60e1fe28a056713bb545444f4044bf80d197f",
+              "sourceRecordHash": "ec341ed0bbf29b5698adaca67f33de432c8d3712a9a4793ddab98a8bc2119266",
               "stanceSide": "a",
               "stanceSummary": "Dario Amodei — We are near the end of the exponential",
               "relevanceScore": 10
@@ -1126,8 +1126,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/arxiv-ai-safety-corpus.json",
           "sourceRecordHash": "0f2a57039cdd9eec3de896c6f0283654899509fdc3d59d09e22afe414771650c",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "multi-scenario planning versus single-narrative planning",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "multi-scenario planning versus single-narrative planning",
           "anchorReason": "anchors transformative-AI forecasting debates",
           "supportingRecords": []
         }
@@ -1195,8 +1195,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
           "sourceRecordHash": "31e594f009ff4752df83cd651f01fd3729b71d5acc5495aa556e565a4a6d5232",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "recursive R&D risk versus ordinary productivity framing",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "recursive R&D risk versus ordinary productivity framing",
           "anchorReason": "anchors disputes over whether AI will automate AI R&D",
           "supportingRecords": [
             {
@@ -1220,7 +1220,7 @@
               "date": "2026-04-10",
               "summary": "Benchmark demonstrating AI systems can complete coding tasks requiring several weeks of human effort, significantly extending measured time horizons.",
               "sourcePath": "ai-discourse-corpus/corpuses/metr-evals-metrics-corpus.json",
-              "sourceRecordHash": "6f05374d9c63308bdb309930d93fd809ab35f9eae01898ae87269c472172d732",
+              "sourceRecordHash": "b40139b8fece597a5b6b9d96135ce9f0a4eefc3b7083532d55599096241aade7",
               "stanceSide": "a",
               "stanceSummary": "MirrorCode: Evidence that AI can already do some weeks-long coding tasks",
               "relevanceScore": 10
@@ -1250,8 +1250,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/metr-evals-metrics-corpus.json",
           "sourceRecordHash": "043584015cef48f62a68cab995551023bbce0b9f50ecce3f527ebd2275b54a42",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "recursive R&D risk versus ordinary productivity framing",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "recursive R&D risk versus ordinary productivity framing",
           "anchorReason": "anchors forecasts about AI R&D automation",
           "supportingRecords": []
         }
@@ -1319,8 +1319,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
           "sourceRecordHash": "31e594f009ff4752df83cd651f01fd3729b71d5acc5495aa556e565a4a6d5232",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "workflow acceleration versus scientific discovery acceleration",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "workflow acceleration versus scientific discovery acceleration",
           "anchorReason": "anchors disputes over whether AI will automate AI R&D",
           "supportingRecords": [
             {
@@ -1344,7 +1344,7 @@
               "date": "2026-04-10",
               "summary": "Benchmark demonstrating AI systems can complete coding tasks requiring several weeks of human effort, significantly extending measured time horizons.",
               "sourcePath": "ai-discourse-corpus/corpuses/metr-evals-metrics-corpus.json",
-              "sourceRecordHash": "6f05374d9c63308bdb309930d93fd809ab35f9eae01898ae87269c472172d732",
+              "sourceRecordHash": "b40139b8fece597a5b6b9d96135ce9f0a4eefc3b7083532d55599096241aade7",
               "stanceSide": "a",
               "stanceSummary": "MirrorCode: Evidence that AI can already do some weeks-long coding tasks",
               "relevanceScore": 10
@@ -1374,8 +1374,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/metr-evals-metrics-corpus.json",
           "sourceRecordHash": "043584015cef48f62a68cab995551023bbce0b9f50ecce3f527ebd2275b54a42",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "workflow acceleration versus scientific discovery acceleration",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "workflow acceleration versus scientific discovery acceleration",
           "anchorReason": "anchors forecasts about AI R&D automation",
           "supportingRecords": []
         }
@@ -1443,8 +1443,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
           "sourceRecordHash": "31e594f009ff4752df83cd651f01fd3729b71d5acc5495aa556e565a4a6d5232",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "strategic effects versus productivity-only evaluation",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "strategic effects versus productivity-only evaluation",
           "anchorReason": "anchors disputes over whether AI will automate AI R&D",
           "supportingRecords": [
             {
@@ -1468,7 +1468,7 @@
               "date": "2026-04-10",
               "summary": "Benchmark demonstrating AI systems can complete coding tasks requiring several weeks of human effort, significantly extending measured time horizons.",
               "sourcePath": "ai-discourse-corpus/corpuses/metr-evals-metrics-corpus.json",
-              "sourceRecordHash": "6f05374d9c63308bdb309930d93fd809ab35f9eae01898ae87269c472172d732",
+              "sourceRecordHash": "b40139b8fece597a5b6b9d96135ce9f0a4eefc3b7083532d55599096241aade7",
               "stanceSide": "a",
               "stanceSummary": "MirrorCode: Evidence that AI can already do some weeks-long coding tasks",
               "relevanceScore": 10
@@ -1498,8 +1498,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/metr-evals-metrics-corpus.json",
           "sourceRecordHash": "043584015cef48f62a68cab995551023bbce0b9f50ecce3f527ebd2275b54a42",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "strategic effects versus productivity-only evaluation",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "strategic effects versus productivity-only evaluation",
           "anchorReason": "anchors forecasts about AI R&D automation",
           "supportingRecords": []
         }
@@ -1567,8 +1567,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
           "sourceRecordHash": "0f9a3ba4094f3ab4126d0bbd57bc0e4414f5e945febdb19cd62e1003d4786225",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "pre-release assessment versus unrestricted publication",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "pre-release assessment versus unrestricted publication",
           "anchorReason": "anchors disputes over open versus closed frontier AI safety",
           "supportingRecords": [
             {
@@ -1622,8 +1622,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/dwarkesh-lab-insiders-corpus.json",
           "sourceRecordHash": "c0985541e4c73997b7af07d15bb10632688ef112567fda6b3f9fa7ec7984fdf1",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "pre-release assessment versus unrestricted publication",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "pre-release assessment versus unrestricted publication",
           "anchorReason": "anchors open model strategy arguments",
           "supportingRecords": []
         }
@@ -1691,8 +1691,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
           "sourceRecordHash": "0f9a3ba4094f3ab4126d0bbd57bc0e4414f5e945febdb19cd62e1003d4786225",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "scrutiny benefits versus diffusion risks",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "scrutiny benefits versus diffusion risks",
           "anchorReason": "anchors disputes over open versus closed frontier AI safety",
           "supportingRecords": [
             {
@@ -1746,8 +1746,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/dwarkesh-lab-insiders-corpus.json",
           "sourceRecordHash": "c0985541e4c73997b7af07d15bb10632688ef112567fda6b3f9fa7ec7984fdf1",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "scrutiny benefits versus diffusion risks",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "scrutiny benefits versus diffusion risks",
           "anchorReason": "anchors open model strategy arguments",
           "supportingRecords": []
         }
@@ -1815,8 +1815,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
           "sourceRecordHash": "0f9a3ba4094f3ab4126d0bbd57bc0e4414f5e945febdb19cd62e1003d4786225",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "research openness versus unrestricted commercial openness",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "research openness versus unrestricted commercial openness",
           "anchorReason": "anchors disputes over open versus closed frontier AI safety",
           "supportingRecords": [
             {
@@ -1870,8 +1870,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/dwarkesh-lab-insiders-corpus.json",
           "sourceRecordHash": "c0985541e4c73997b7af07d15bb10632688ef112567fda6b3f9fa7ec7984fdf1",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "research openness versus unrestricted commercial openness",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "research openness versus unrestricted commercial openness",
           "anchorReason": "anchors open model strategy arguments",
           "supportingRecords": []
         }
@@ -1939,8 +1939,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/ai-laws-policy-corpus.json",
           "sourceRecordHash": "d4fef736fb0523cddd22002a5911528af94766652eefb1628fbd992e8d87884e",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "multi-factor compute governance versus parameter-count proxy",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "multi-factor compute governance versus parameter-count proxy",
           "anchorReason": "anchors frontier model voluntary commitments and international monitoring",
           "supportingRecords": []
         },
@@ -1954,8 +1954,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
           "sourceRecordHash": "026e6bbc2dd9b126566b5d20e3172ac85aea2421d08155d456e2863eef015ea7",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "multi-factor compute governance versus parameter-count proxy",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "multi-factor compute governance versus parameter-count proxy",
           "anchorReason": "anchors disputes over regulatory timing",
           "supportingRecords": [
             {
@@ -2063,8 +2063,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/ai-laws-policy-corpus.json",
           "sourceRecordHash": "d4fef736fb0523cddd22002a5911528af94766652eefb1628fbd992e8d87884e",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "competitive fairness versus enforcement convenience",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "competitive fairness versus enforcement convenience",
           "anchorReason": "anchors frontier model voluntary commitments and international monitoring",
           "supportingRecords": []
         },
@@ -2078,8 +2078,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
           "sourceRecordHash": "026e6bbc2dd9b126566b5d20e3172ac85aea2421d08155d456e2863eef015ea7",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "competitive fairness versus enforcement convenience",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "competitive fairness versus enforcement convenience",
           "anchorReason": "anchors disputes over regulatory timing",
           "supportingRecords": [
             {
@@ -2187,8 +2187,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/ai-laws-policy-corpus.json",
           "sourceRecordHash": "d4fef736fb0523cddd22002a5911528af94766652eefb1628fbd992e8d87884e",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "adaptive thresholds versus stable compliance lines",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "adaptive thresholds versus stable compliance lines",
           "anchorReason": "anchors frontier model voluntary commitments and international monitoring",
           "supportingRecords": []
         },
@@ -2202,8 +2202,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
           "sourceRecordHash": "026e6bbc2dd9b126566b5d20e3172ac85aea2421d08155d456e2863eef015ea7",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "adaptive thresholds versus stable compliance lines",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "adaptive thresholds versus stable compliance lines",
           "anchorReason": "anchors disputes over regulatory timing",
           "supportingRecords": [
             {
@@ -2311,8 +2311,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
           "sourceRecordHash": "026e6bbc2dd9b126566b5d20e3172ac85aea2421d08155d456e2863eef015ea7",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "interoperability versus legal uniformity",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "interoperability versus legal uniformity",
           "anchorReason": "anchors disputes over how fast AI regulation must move",
           "supportingRecords": [
             {
@@ -2362,12 +2362,12 @@
           "title": "Council of Europe Framework Convention on Artificial Intelligence and Human Rights, Democracy and the Rule of Law",
           "url": "https://www.coe.int/en/web/artificial-intelligence/the-framework-convention-on-artificial-intelligence",
           "date": null,
-          "summary": "Opened for signature September 5, 2024, and represents the first legally binding international agreement on AI. The Convention applies to AI systems throughout their lifecycle, requiring parties to implement measures ensuring consistency with human rights, democracy, and rule of law. 17 signatories include the EU, US, UK, Canada, and others. Implementation occurs through national legislative measures coordinated with the EU AI Act and other frameworks.",
+          "summary": "Opened for signature September 5, 2024, and represents the first legally binding international agreement on AI. The Convention applies to AI systems throughout their lifecycle, requiring parties to implement measures ensuring consistency with human rights, democracy, and rule of law. As of July 19, 2026, the Council of Europe listed the European Union as a party and 21 signatories, including the United States, United Kingdom, Canada, Japan, Israel, and Uruguay. Implementation occurs through nati",
           "sourcePath": "ai-discourse-corpus/corpuses/ai-laws-policy-corpus.json",
-          "sourceRecordHash": "5935427556e5e19d1a98f7c42c9fca6d1d5aacb0785e31574c0c36f1833e1809",
+          "sourceRecordHash": "c0ac5e23937aabb4a0bc6dace6e8c72f61bd9772ebc36001aaad95d9b9e30c9d",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "interoperability versus legal uniformity",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "interoperability versus legal uniformity",
           "anchorReason": "anchors international legal coordination around AI and human rights",
           "supportingRecords": []
         }
@@ -2435,8 +2435,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
           "sourceRecordHash": "026e6bbc2dd9b126566b5d20e3172ac85aea2421d08155d456e2863eef015ea7",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "shared responsibility versus single-liability target",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "shared responsibility versus single-liability target",
           "anchorReason": "anchors disputes over how fast AI regulation must move",
           "supportingRecords": [
             {
@@ -2486,12 +2486,12 @@
           "title": "Council of Europe Framework Convention on Artificial Intelligence and Human Rights, Democracy and the Rule of Law",
           "url": "https://www.coe.int/en/web/artificial-intelligence/the-framework-convention-on-artificial-intelligence",
           "date": null,
-          "summary": "Opened for signature September 5, 2024, and represents the first legally binding international agreement on AI. The Convention applies to AI systems throughout their lifecycle, requiring parties to implement measures ensuring consistency with human rights, democracy, and rule of law. 17 signatories include the EU, US, UK, Canada, and others. Implementation occurs through national legislative measures coordinated with the EU AI Act and other frameworks.",
+          "summary": "Opened for signature September 5, 2024, and represents the first legally binding international agreement on AI. The Convention applies to AI systems throughout their lifecycle, requiring parties to implement measures ensuring consistency with human rights, democracy, and rule of law. As of July 19, 2026, the Council of Europe listed the European Union as a party and 21 signatories, including the United States, United Kingdom, Canada, Japan, Israel, and Uruguay. Implementation occurs through nati",
           "sourcePath": "ai-discourse-corpus/corpuses/ai-laws-policy-corpus.json",
-          "sourceRecordHash": "5935427556e5e19d1a98f7c42c9fca6d1d5aacb0785e31574c0c36f1833e1809",
+          "sourceRecordHash": "c0ac5e23937aabb4a0bc6dace6e8c72f61bd9772ebc36001aaad95d9b9e30c9d",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "shared responsibility versus single-liability target",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "shared responsibility versus single-liability target",
           "anchorReason": "anchors international legal coordination around AI and human rights",
           "supportingRecords": []
         }
@@ -2559,8 +2559,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
           "sourceRecordHash": "026e6bbc2dd9b126566b5d20e3172ac85aea2421d08155d456e2863eef015ea7",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "inclusive legitimacy versus leading-state efficiency",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "inclusive legitimacy versus leading-state efficiency",
           "anchorReason": "anchors disputes over how fast AI regulation must move",
           "supportingRecords": [
             {
@@ -2610,12 +2610,12 @@
           "title": "Council of Europe Framework Convention on Artificial Intelligence and Human Rights, Democracy and the Rule of Law",
           "url": "https://www.coe.int/en/web/artificial-intelligence/the-framework-convention-on-artificial-intelligence",
           "date": null,
-          "summary": "Opened for signature September 5, 2024, and represents the first legally binding international agreement on AI. The Convention applies to AI systems throughout their lifecycle, requiring parties to implement measures ensuring consistency with human rights, democracy, and rule of law. 17 signatories include the EU, US, UK, Canada, and others. Implementation occurs through national legislative measures coordinated with the EU AI Act and other frameworks.",
+          "summary": "Opened for signature September 5, 2024, and represents the first legally binding international agreement on AI. The Convention applies to AI systems throughout their lifecycle, requiring parties to implement measures ensuring consistency with human rights, democracy, and rule of law. As of July 19, 2026, the Council of Europe listed the European Union as a party and 21 signatories, including the United States, United Kingdom, Canada, Japan, Israel, and Uruguay. Implementation occurs through nati",
           "sourcePath": "ai-discourse-corpus/corpuses/ai-laws-policy-corpus.json",
-          "sourceRecordHash": "5935427556e5e19d1a98f7c42c9fca6d1d5aacb0785e31574c0c36f1833e1809",
+          "sourceRecordHash": "c0ac5e23937aabb4a0bc6dace6e8c72f61bd9772ebc36001aaad95d9b9e30c9d",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "inclusive legitimacy versus leading-state efficiency",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "inclusive legitimacy versus leading-state efficiency",
           "anchorReason": "anchors international legal coordination around AI and human rights",
           "supportingRecords": []
         }
@@ -2683,8 +2683,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
           "sourceRecordHash": "6da73d83d99b59d3264e0ef92273e45b912e7beaf276189bcc176eb4bd933794",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "worker power versus productivity-only policy",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "worker power versus productivity-only policy",
           "anchorReason": "anchors disputes over augmentation versus displacement",
           "supportingRecords": [
             {
@@ -2738,8 +2738,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/metr-evals-metrics-corpus.json",
           "sourceRecordHash": "14d8d5bb6a9dd097b840854ec31b6b77c351a2caf42c0bfd8a4b510ce49d6921",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "worker power versus productivity-only policy",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "worker power versus productivity-only policy",
           "anchorReason": "anchors evidence about AI effects on experienced developer productivity",
           "supportingRecords": []
         }
@@ -2807,8 +2807,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
           "sourceRecordHash": "6da73d83d99b59d3264e0ef92273e45b912e7beaf276189bcc176eb4bd933794",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "workplace transparency versus managerial discretion",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "workplace transparency versus managerial discretion",
           "anchorReason": "anchors disputes over augmentation versus displacement",
           "supportingRecords": [
             {
@@ -2862,8 +2862,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/metr-evals-metrics-corpus.json",
           "sourceRecordHash": "14d8d5bb6a9dd097b840854ec31b6b77c351a2caf42c0bfd8a4b510ce49d6921",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "workplace transparency versus managerial discretion",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "workplace transparency versus managerial discretion",
           "anchorReason": "anchors evidence about AI effects on experienced developer productivity",
           "supportingRecords": []
         }
@@ -2931,8 +2931,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
           "sourceRecordHash": "6da73d83d99b59d3264e0ef92273e45b912e7beaf276189bcc176eb4bd933794",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "capability preservation versus output maximization",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "capability preservation versus output maximization",
           "anchorReason": "anchors disputes over augmentation versus displacement",
           "supportingRecords": [
             {
@@ -2986,8 +2986,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/metr-evals-metrics-corpus.json",
           "sourceRecordHash": "14d8d5bb6a9dd097b840854ec31b6b77c351a2caf42c0bfd8a4b510ce49d6921",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "capability preservation versus output maximization",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "capability preservation versus output maximization",
           "anchorReason": "anchors evidence about AI effects on experienced developer productivity",
           "supportingRecords": []
         }
@@ -3055,8 +3055,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
           "sourceRecordHash": "127e7def398d8a19edb7d9f586996d02d635e9b9f2178eb6599b8c386ebed759",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "assessment redesign versus AI prohibition",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "assessment redesign versus AI prohibition",
           "anchorReason": "anchors disputes over AI as learning tool versus assessment threat",
           "supportingRecords": [
             {
@@ -3110,8 +3110,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/loophole-historical-cases.json",
           "sourceRecordHash": "e77bbbcf8ce5385c4db1d2bfbcd3e530ff40cb8563024fbed9c261a5efacaf1b",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "assessment redesign versus AI prohibition",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "assessment redesign versus AI prohibition",
           "anchorReason": "anchors assessment incentives and loophole concerns",
           "supportingRecords": []
         }
@@ -3179,8 +3179,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
           "sourceRecordHash": "127e7def398d8a19edb7d9f586996d02d635e9b9f2178eb6599b8c386ebed759",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "use-case distinction versus blanket student AI rules",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "use-case distinction versus blanket student AI rules",
           "anchorReason": "anchors disputes over AI as learning tool versus assessment threat",
           "supportingRecords": [
             {
@@ -3234,8 +3234,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/loophole-historical-cases.json",
           "sourceRecordHash": "e77bbbcf8ce5385c4db1d2bfbcd3e530ff40cb8563024fbed9c261a5efacaf1b",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "use-case distinction versus blanket student AI rules",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "use-case distinction versus blanket student AI rules",
           "anchorReason": "anchors assessment incentives and loophole concerns",
           "supportingRecords": []
         }
@@ -3303,8 +3303,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
           "sourceRecordHash": "127e7def398d8a19edb7d9f586996d02d635e9b9f2178eb6599b8c386ebed759",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "fairness under unequal tools versus formal equal rules",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "fairness under unequal tools versus formal equal rules",
           "anchorReason": "anchors disputes over AI as learning tool versus assessment threat",
           "supportingRecords": [
             {
@@ -3358,8 +3358,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/loophole-historical-cases.json",
           "sourceRecordHash": "e77bbbcf8ce5385c4db1d2bfbcd3e530ff40cb8563024fbed9c261a5efacaf1b",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "fairness under unequal tools versus formal equal rules",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "fairness under unequal tools versus formal equal rules",
           "anchorReason": "anchors assessment incentives and loophole concerns",
           "supportingRecords": []
         }
@@ -3427,8 +3427,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
           "sourceRecordHash": "5a7d3c9851853bf6dfad9264f20d31ec16d4c8c19ad1f2912e79ddc7bb67a744",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "creator control versus broad training freedom",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "creator control versus broad training freedom",
           "anchorReason": "anchors disputes over AI training and copyright",
           "supportingRecords": [
             {
@@ -3478,12 +3478,12 @@
           "title": "Council of Europe Framework Convention on Artificial Intelligence and Human Rights, Democracy and the Rule of Law",
           "url": "https://www.coe.int/en/web/artificial-intelligence/the-framework-convention-on-artificial-intelligence",
           "date": null,
-          "summary": "Opened for signature September 5, 2024, and represents the first legally binding international agreement on AI. The Convention applies to AI systems throughout their lifecycle, requiring parties to implement measures ensuring consistency with human rights, democracy, and rule of law. 17 signatories include the EU, US, UK, Canada, and others. Implementation occurs through national legislative measures coordinated with the EU AI Act and other frameworks.",
+          "summary": "Opened for signature September 5, 2024, and represents the first legally binding international agreement on AI. The Convention applies to AI systems throughout their lifecycle, requiring parties to implement measures ensuring consistency with human rights, democracy, and rule of law. As of July 19, 2026, the Council of Europe listed the European Union as a party and 21 signatories, including the United States, United Kingdom, Canada, Japan, Israel, and Uruguay. Implementation occurs through nati",
           "sourcePath": "ai-discourse-corpus/corpuses/ai-laws-policy-corpus.json",
-          "sourceRecordHash": "5935427556e5e19d1a98f7c42c9fca6d1d5aacb0785e31574c0c36f1833e1809",
+          "sourceRecordHash": "c0ac5e23937aabb4a0bc6dace6e8c72f61bd9772ebc36001aaad95d9b9e30c9d",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "creator control versus broad training freedom",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "creator control versus broad training freedom",
           "anchorReason": "anchors rights-oriented AI governance",
           "supportingRecords": []
         }
@@ -3551,8 +3551,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
           "sourceRecordHash": "5a7d3c9851853bf6dfad9264f20d31ec16d4c8c19ad1f2912e79ddc7bb67a744",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "training legality versus substitute output harms",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "training legality versus substitute output harms",
           "anchorReason": "anchors disputes over AI training and copyright",
           "supportingRecords": [
             {
@@ -3602,12 +3602,12 @@
           "title": "Council of Europe Framework Convention on Artificial Intelligence and Human Rights, Democracy and the Rule of Law",
           "url": "https://www.coe.int/en/web/artificial-intelligence/the-framework-convention-on-artificial-intelligence",
           "date": null,
-          "summary": "Opened for signature September 5, 2024, and represents the first legally binding international agreement on AI. The Convention applies to AI systems throughout their lifecycle, requiring parties to implement measures ensuring consistency with human rights, democracy, and rule of law. 17 signatories include the EU, US, UK, Canada, and others. Implementation occurs through national legislative measures coordinated with the EU AI Act and other frameworks.",
+          "summary": "Opened for signature September 5, 2024, and represents the first legally binding international agreement on AI. The Convention applies to AI systems throughout their lifecycle, requiring parties to implement measures ensuring consistency with human rights, democracy, and rule of law. As of July 19, 2026, the Council of Europe listed the European Union as a party and 21 signatories, including the United States, United Kingdom, Canada, Japan, Israel, and Uruguay. Implementation occurs through nati",
           "sourcePath": "ai-discourse-corpus/corpuses/ai-laws-policy-corpus.json",
-          "sourceRecordHash": "5935427556e5e19d1a98f7c42c9fca6d1d5aacb0785e31574c0c36f1833e1809",
+          "sourceRecordHash": "c0ac5e23937aabb4a0bc6dace6e8c72f61bd9772ebc36001aaad95d9b9e30c9d",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "training legality versus substitute output harms",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "training legality versus substitute output harms",
           "anchorReason": "anchors rights-oriented AI governance",
           "supportingRecords": []
         }
@@ -3675,8 +3675,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
           "sourceRecordHash": "5a7d3c9851853bf6dfad9264f20d31ec16d4c8c19ad1f2912e79ddc7bb67a744",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "market access versus incumbent licensing deals",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "market access versus incumbent licensing deals",
           "anchorReason": "anchors disputes over AI training and copyright",
           "supportingRecords": [
             {
@@ -3726,12 +3726,12 @@
           "title": "Council of Europe Framework Convention on Artificial Intelligence and Human Rights, Democracy and the Rule of Law",
           "url": "https://www.coe.int/en/web/artificial-intelligence/the-framework-convention-on-artificial-intelligence",
           "date": null,
-          "summary": "Opened for signature September 5, 2024, and represents the first legally binding international agreement on AI. The Convention applies to AI systems throughout their lifecycle, requiring parties to implement measures ensuring consistency with human rights, democracy, and rule of law. 17 signatories include the EU, US, UK, Canada, and others. Implementation occurs through national legislative measures coordinated with the EU AI Act and other frameworks.",
+          "summary": "Opened for signature September 5, 2024, and represents the first legally binding international agreement on AI. The Convention applies to AI systems throughout their lifecycle, requiring parties to implement measures ensuring consistency with human rights, democracy, and rule of law. As of July 19, 2026, the Council of Europe listed the European Union as a party and 21 signatories, including the United States, United Kingdom, Canada, Japan, Israel, and Uruguay. Implementation occurs through nati",
           "sourcePath": "ai-discourse-corpus/corpuses/ai-laws-policy-corpus.json",
-          "sourceRecordHash": "5935427556e5e19d1a98f7c42c9fca6d1d5aacb0785e31574c0c36f1833e1809",
+          "sourceRecordHash": "c0ac5e23937aabb4a0bc6dace6e8c72f61bd9772ebc36001aaad95d9b9e30c9d",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "market access versus incumbent licensing deals",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "market access versus incumbent licensing deals",
           "anchorReason": "anchors rights-oriented AI governance",
           "supportingRecords": []
         }
@@ -3797,10 +3797,10 @@
           "date": null,
           "summary": "Can watermarking, disclosure, and platform safeguards manage video/audio generation risks, or are stronger restrictions needed?",
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
-          "sourceRecordHash": "3021f60e1b850cb99824d7e451706a5308dc8137783879eede819b3b8627de8d",
+          "sourceRecordHash": "bc7fc893dd1ce16c74e15c73d8e48656807562f9eb943b29c978870f11fb3135",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "personal likeness control versus generative freedom",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "personal likeness control versus generative freedom",
           "anchorReason": "anchors disputes over likeness and deepfake rules",
           "supportingRecords": [
             {
@@ -3854,8 +3854,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/ai-laws-policy-corpus.json",
           "sourceRecordHash": "8d518d1ef860f99983efcd15bbc904b308c6853b02e2bab99837161cadd36ea5",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "personal likeness control versus generative freedom",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "personal likeness control versus generative freedom",
           "anchorReason": "anchors generative-AI risks such as disinformation",
           "supportingRecords": []
         }
@@ -3921,10 +3921,10 @@
           "date": null,
           "summary": "Can watermarking, disclosure, and platform safeguards manage video/audio generation risks, or are stronger restrictions needed?",
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
-          "sourceRecordHash": "3021f60e1b850cb99824d7e451706a5308dc8137783879eede819b3b8627de8d",
+          "sourceRecordHash": "bc7fc893dd1ce16c74e15c73d8e48656807562f9eb943b29c978870f11fb3135",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "context-sensitive rules versus uniform media rules",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "context-sensitive rules versus uniform media rules",
           "anchorReason": "anchors disputes over likeness and deepfake rules",
           "supportingRecords": [
             {
@@ -3978,8 +3978,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/ai-laws-policy-corpus.json",
           "sourceRecordHash": "8d518d1ef860f99983efcd15bbc904b308c6853b02e2bab99837161cadd36ea5",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "context-sensitive rules versus uniform media rules",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "context-sensitive rules versus uniform media rules",
           "anchorReason": "anchors generative-AI risks such as disinformation",
           "supportingRecords": []
         }
@@ -4047,8 +4047,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
           "sourceRecordHash": "0acb5549e79dbd7d5324d209de56ff6daf1ec726ceced02cf850945602a135d9",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "local impact transparency versus aggregate sustainability reporting",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "local impact transparency versus aggregate sustainability reporting",
           "anchorReason": "anchors disputes over AI water usage and infrastructure impacts",
           "supportingRecords": [
             {
@@ -4102,8 +4102,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/ai-laws-policy-corpus.json",
           "sourceRecordHash": "fd9227b1bd0e505ff30774e9bfda74f9302a9bed2ea898b4d2e1bba8b72b54cf",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "local impact transparency versus aggregate sustainability reporting",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "local impact transparency versus aggregate sustainability reporting",
           "anchorReason": "anchors development and infrastructure equity in AI policy",
           "supportingRecords": []
         }
@@ -4171,8 +4171,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
           "sourceRecordHash": "0acb5549e79dbd7d5324d209de56ff6daf1ec726ceced02cf850945602a135d9",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "contextual environmental accounting versus gross impact claims",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "contextual environmental accounting versus gross impact claims",
           "anchorReason": "anchors disputes over AI water usage and infrastructure impacts",
           "supportingRecords": [
             {
@@ -4226,8 +4226,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/ai-laws-policy-corpus.json",
           "sourceRecordHash": "fd9227b1bd0e505ff30774e9bfda74f9302a9bed2ea898b4d2e1bba8b72b54cf",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "contextual environmental accounting versus gross impact claims",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "contextual environmental accounting versus gross impact claims",
           "anchorReason": "anchors development and infrastructure equity in AI policy",
           "supportingRecords": []
         }
@@ -4295,8 +4295,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/loophole-historical-cases.json",
           "sourceRecordHash": "3c14dc2e0bdbb505d7bc4104648359c5c44df68da3fbe9558d7b5326a3e30065",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "due process versus administrative efficiency",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "due process versus administrative efficiency",
           "anchorReason": "anchors high-stakes public-sector AI appeal and explanation problems",
           "supportingRecords": []
         },
@@ -4310,8 +4310,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/loophole-historical-cases.json",
           "sourceRecordHash": "a4bfb8fd3219b55972e976a1a745b4b88908ca172cbaedb58129e1dd1e64d054",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "due process versus administrative efficiency",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "due process versus administrative efficiency",
           "anchorReason": "anchors child welfare optimization failures",
           "supportingRecords": []
         }
@@ -4379,8 +4379,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/loophole-historical-cases.json",
           "sourceRecordHash": "3c14dc2e0bdbb505d7bc4104648359c5c44df68da3fbe9558d7b5326a3e30065",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "contestability versus opaque triage efficiency",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "contestability versus opaque triage efficiency",
           "anchorReason": "anchors high-stakes public-sector AI appeal and explanation problems",
           "supportingRecords": []
         },
@@ -4394,8 +4394,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/loophole-historical-cases.json",
           "sourceRecordHash": "a4bfb8fd3219b55972e976a1a745b4b88908ca172cbaedb58129e1dd1e64d054",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "contestability versus opaque triage efficiency",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "contestability versus opaque triage efficiency",
           "anchorReason": "anchors child welfare optimization failures",
           "supportingRecords": []
         }
@@ -4463,8 +4463,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/loophole-historical-cases.json",
           "sourceRecordHash": "32c2ef42d96a113538909cde114b047c3ad5b2e91d45708197a973456b501137",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "biosecurity controls versus general science access",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "biosecurity controls versus general science access",
           "anchorReason": "anchors ML containment screening and synthetic variant loopholes",
           "supportingRecords": []
         },
@@ -4476,10 +4476,10 @@
           "date": null,
           "summary": "Are pre-deployment evaluations a sufficient framework for AI safety, or are they fundamentally limited by eval awareness and Goodhart's Law?",
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
-          "sourceRecordHash": "b4a0a990cfecf7d661c6c0b6bfa7f798e8697af669581a8cc93b80c5f2d8e58d",
+          "sourceRecordHash": "7b47f08c5a51bcac80e52dc3e68e85431607ebe7ee19e1bce275dd5599da3bfd",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "biosecurity controls versus general science access",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "biosecurity controls versus general science access",
           "anchorReason": "anchors pre-deployment risk evaluation for high-impact capabilities",
           "supportingRecords": [
             {
@@ -4587,8 +4587,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/loophole-historical-cases.json",
           "sourceRecordHash": "32c2ef42d96a113538909cde114b047c3ad5b2e91d45708197a973456b501137",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "targeted dual-use governance versus broad restriction",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "targeted dual-use governance versus broad restriction",
           "anchorReason": "anchors ML containment screening and synthetic variant loopholes",
           "supportingRecords": []
         },
@@ -4600,10 +4600,10 @@
           "date": null,
           "summary": "Are pre-deployment evaluations a sufficient framework for AI safety, or are they fundamentally limited by eval awareness and Goodhart's Law?",
           "sourcePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
-          "sourceRecordHash": "b4a0a990cfecf7d661c6c0b6bfa7f798e8697af669581a8cc93b80c5f2d8e58d",
+          "sourceRecordHash": "7b47f08c5a51bcac80e52dc3e68e85431607ebe7ee19e1bce275dd5599da3bfd",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "targeted dual-use governance versus broad restriction",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "targeted dual-use governance versus broad restriction",
           "anchorReason": "anchors pre-deployment risk evaluation for high-impact capabilities",
           "supportingRecords": [
             {
@@ -4711,8 +4711,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/loophole-historical-cases.json",
           "sourceRecordHash": "7f69a2392951a88c4f1bd90fd754d983ead80d721e678ef42fd650810be1d285",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "autonomous action risk versus advisory assistance",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "autonomous action risk versus advisory assistance",
           "anchorReason": "anchors AI triage failures in national cyber defense",
           "supportingRecords": []
         },
@@ -4726,8 +4726,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/loophole-historical-cases.json",
           "sourceRecordHash": "a7004b2aa29871ac51abae575ab61cdb16991220617bc6358ede17301676ecdf",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "autonomous action risk versus advisory assistance",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "autonomous action risk versus advisory assistance",
           "anchorReason": "anchors cyber-range scoring and metric gaming",
           "supportingRecords": []
         }
@@ -4795,8 +4795,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/loophole-historical-cases.json",
           "sourceRecordHash": "7f69a2392951a88c4f1bd90fd754d983ead80d721e678ef42fd650810be1d285",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "human authorization versus autonomous remediation",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "human authorization versus autonomous remediation",
           "anchorReason": "anchors AI triage failures in national cyber defense",
           "supportingRecords": []
         },
@@ -4810,8 +4810,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/loophole-historical-cases.json",
           "sourceRecordHash": "a7004b2aa29871ac51abae575ab61cdb16991220617bc6358ede17301676ecdf",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "human authorization versus autonomous remediation",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "human authorization versus autonomous remediation",
           "anchorReason": "anchors cyber-range scoring and metric gaming",
           "supportingRecords": []
         }
@@ -4885,8 +4885,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/ai-scifi-books-corpus.json",
           "sourceRecordHash": "74adf0a17313d0d52c6757fa593382661a3754e3749c384372a2d80b3983a33f",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "contextual consent versus broad standing authorization",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "contextual consent versus broad standing authorization",
           "anchorReason": "anchors concerns about mediated agency and dependence on systems",
           "supportingRecords": []
         },
@@ -4898,10 +4898,10 @@
           "date": null,
           "summary": "Unveiled at ASEAN Digital Ministers' Meeting on February 2, 2024, the Guide provides practical framework for organizations designing, developing, deploying traditional AI in commercial applications. Voluntary adoption supported by complementary Expanded Guide on Generative AI issued January 2025. Designed for interoperability across ASEAN jurisdictions while accommodating national contexts. Intended as 'living document' updated periodically reflecting technological evolution.",
           "sourcePath": "ai-discourse-corpus/corpuses/ai-laws-policy-corpus.json",
-          "sourceRecordHash": "e970f36165d4dda0ba444ff4ac2966a0c999caad9a965347db29b04f1913555c",
+          "sourceRecordHash": "18822c1ffc263dde58c20d309842c8c9e75c5448d470e8b04710047b39af350d",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "contextual consent versus broad standing authorization",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "contextual consent versus broad standing authorization",
           "anchorReason": "anchors governance principles for responsible AI deployment",
           "supportingRecords": []
         }
@@ -4975,8 +4975,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/ai-scifi-books-corpus.json",
           "sourceRecordHash": "74adf0a17313d0d52c6757fa593382661a3754e3749c384372a2d80b3983a33f",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "bounded delegation versus broad inferred agency",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "bounded delegation versus broad inferred agency",
           "anchorReason": "anchors concerns about mediated agency and dependence on systems",
           "supportingRecords": []
         },
@@ -4988,10 +4988,10 @@
           "date": null,
           "summary": "Unveiled at ASEAN Digital Ministers' Meeting on February 2, 2024, the Guide provides practical framework for organizations designing, developing, deploying traditional AI in commercial applications. Voluntary adoption supported by complementary Expanded Guide on Generative AI issued January 2025. Designed for interoperability across ASEAN jurisdictions while accommodating national contexts. Intended as 'living document' updated periodically reflecting technological evolution.",
           "sourcePath": "ai-discourse-corpus/corpuses/ai-laws-policy-corpus.json",
-          "sourceRecordHash": "e970f36165d4dda0ba444ff4ac2966a0c999caad9a965347db29b04f1913555c",
+          "sourceRecordHash": "18822c1ffc263dde58c20d309842c8c9e75c5448d470e8b04710047b39af350d",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "bounded delegation versus broad inferred agency",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "bounded delegation versus broad inferred agency",
           "anchorReason": "anchors governance principles for responsible AI deployment",
           "supportingRecords": []
         }
@@ -5065,8 +5065,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/lesswrong-posts-corpus.json",
           "sourceRecordHash": "a797994635ea82b871065a2a4691c5598cd1deff570d4fb2c4e1902817467923",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "privacy-preserving proof versus full disclosure",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "privacy-preserving proof versus full disclosure",
           "anchorReason": "anchors epistemic clarity and map-territory distinctions in discourse",
           "supportingRecords": []
         },
@@ -5080,8 +5080,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/ai-laws-policy-corpus.json",
           "sourceRecordHash": "c06a0eecf838f2307a2a5285b9aa4dc4e12409ce27d82e367796e42c5c238af6",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "privacy-preserving proof versus full disclosure",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "privacy-preserving proof versus full disclosure",
           "anchorReason": "anchors human-centered AI governance and coordination",
           "supportingRecords": []
         }
@@ -5155,8 +5155,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/lesswrong-posts-corpus.json",
           "sourceRecordHash": "a797994635ea82b871065a2a4691c5598cd1deff570d4fb2c4e1902817467923",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "private preference representation versus transparent negotiation",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "private preference representation versus transparent negotiation",
           "anchorReason": "anchors epistemic clarity and map-territory distinctions in discourse",
           "supportingRecords": []
         },
@@ -5170,8 +5170,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/ai-laws-policy-corpus.json",
           "sourceRecordHash": "c06a0eecf838f2307a2a5285b9aa4dc4e12409ce27d82e367796e42c5c238af6",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "private preference representation versus transparent negotiation",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "private preference representation versus transparent negotiation",
           "anchorReason": "anchors human-centered AI governance and coordination",
           "supportingRecords": []
         }
@@ -5239,8 +5239,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/lesswrong-posts-corpus.json",
           "sourceRecordHash": "885454d8ab532d47ea63221d184198240f726971713932114654d9930db915f7",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "fair representation versus answer correctness only",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "fair representation versus answer correctness only",
           "anchorReason": "anchors concerns about politics, tribalism, and epistemic degradation",
           "supportingRecords": []
         },
@@ -5254,8 +5254,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/lesswrong-posts-corpus.json",
           "sourceRecordHash": "a797994635ea82b871065a2a4691c5598cd1deff570d4fb2c4e1902817467923",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "fair representation versus answer correctness only",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "fair representation versus answer correctness only",
           "anchorReason": "anchors epistemic humility and model uncertainty",
           "supportingRecords": []
         }
@@ -5323,8 +5323,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/lesswrong-posts-corpus.json",
           "sourceRecordHash": "885454d8ab532d47ea63221d184198240f726971713932114654d9930db915f7",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "pluralism versus consensus compression",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "pluralism versus consensus compression",
           "anchorReason": "anchors concerns about politics, tribalism, and epistemic degradation",
           "supportingRecords": []
         },
@@ -5338,8 +5338,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/lesswrong-posts-corpus.json",
           "sourceRecordHash": "a797994635ea82b871065a2a4691c5598cd1deff570d4fb2c4e1902817467923",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "pluralism versus consensus compression",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "pluralism versus consensus compression",
           "anchorReason": "anchors epistemic humility and model uncertainty",
           "supportingRecords": []
         }
@@ -5407,8 +5407,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/ai-scifi-books-corpus.json",
           "sourceRecordHash": "1ba24e5371914e0d41f9515f65d5421c9d2e095e55bb90ef96655f60ff2306df",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "multi-evidence moral claims versus behavior-only claims",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "multi-evidence moral claims versus behavior-only claims",
           "anchorReason": "anchors creator responsibility and moral status themes",
           "supportingRecords": []
         },
@@ -5422,8 +5422,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/ai-scifi-books-corpus.json",
           "sourceRecordHash": "c8d819d5f581dc6b4a654e2b40f244b879664cc3397b01e29a71cc016b5d5532",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "multi-evidence moral claims versus behavior-only claims",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "multi-evidence moral claims versus behavior-only claims",
           "anchorReason": "anchors robot labor, exploitation, and personhood themes",
           "supportingRecords": []
         }
@@ -5491,8 +5491,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/ai-scifi-books-corpus.json",
           "sourceRecordHash": "1ba24e5371914e0d41f9515f65d5421c9d2e095e55bb90ef96655f60ff2306df",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "graduated moral consideration versus binary personhood",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "graduated moral consideration versus binary personhood",
           "anchorReason": "anchors creator responsibility and moral status themes",
           "supportingRecords": []
         },
@@ -5506,8 +5506,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/ai-scifi-books-corpus.json",
           "sourceRecordHash": "c8d819d5f581dc6b4a654e2b40f244b879664cc3397b01e29a71cc016b5d5532",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "graduated moral consideration versus binary personhood",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "graduated moral consideration versus binary personhood",
           "anchorReason": "anchors robot labor, exploitation, and personhood themes",
           "supportingRecords": []
         }
@@ -5575,8 +5575,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/ai-laws-policy-corpus.json",
           "sourceRecordHash": "b5f76763a646203901b82d2e83e69c8ff3ca82f5bd37047ecfc470725f476ff2",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "vendor accountability versus deployer responsibility",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "vendor accountability versus deployer responsibility",
           "anchorReason": "anchors lifecycle governance and impact assessment templates",
           "supportingRecords": []
         },
@@ -5588,10 +5588,10 @@
           "date": null,
           "summary": "Unveiled at ASEAN Digital Ministers' Meeting on February 2, 2024, the Guide provides practical framework for organizations designing, developing, deploying traditional AI in commercial applications. Voluntary adoption supported by complementary Expanded Guide on Generative AI issued January 2025. Designed for interoperability across ASEAN jurisdictions while accommodating national contexts. Intended as 'living document' updated periodically reflecting technological evolution.",
           "sourcePath": "ai-discourse-corpus/corpuses/ai-laws-policy-corpus.json",
-          "sourceRecordHash": "e970f36165d4dda0ba444ff4ac2966a0c999caad9a965347db29b04f1913555c",
+          "sourceRecordHash": "18822c1ffc263dde58c20d309842c8c9e75c5448d470e8b04710047b39af350d",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "vendor accountability versus deployer responsibility",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "vendor accountability versus deployer responsibility",
           "anchorReason": "anchors voluntary governance and practical deployment frameworks",
           "supportingRecords": []
         }
@@ -5659,8 +5659,8 @@
           "sourcePath": "ai-discourse-corpus/corpuses/ai-laws-policy-corpus.json",
           "sourceRecordHash": "b5f76763a646203901b82d2e83e69c8ff3ca82f5bd37047ecfc470725f476ff2",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "deployer accountability versus vendor/system blame",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "deployer accountability versus vendor/system blame",
           "anchorReason": "anchors lifecycle governance and impact assessment templates",
           "supportingRecords": []
         },
@@ -5672,10 +5672,10 @@
           "date": null,
           "summary": "Unveiled at ASEAN Digital Ministers' Meeting on February 2, 2024, the Guide provides practical framework for organizations designing, developing, deploying traditional AI in commercial applications. Voluntary adoption supported by complementary Expanded Guide on Generative AI issued January 2025. Designed for interoperability across ASEAN jurisdictions while accommodating national contexts. Intended as 'living document' updated periodically reflecting technological evolution.",
           "sourcePath": "ai-discourse-corpus/corpuses/ai-laws-policy-corpus.json",
-          "sourceRecordHash": "e970f36165d4dda0ba444ff4ac2966a0c999caad9a965347db29b04f1913555c",
+          "sourceRecordHash": "18822c1ffc263dde58c20d309842c8c9e75c5448d470e8b04710047b39af350d",
           "resolution": "resolved",
-          "evidenceScope": "topic-and-disagreement-axis",
-          "supports": "deployer accountability versus vendor/system blame",
+          "evidenceScope": "source-record-resolution-only",
+          "relatedDisagreementAxis": "deployer accountability versus vendor/system blame",
           "anchorReason": "anchors voluntary governance and practical deployment frameworks",
           "supportingRecords": []
         }

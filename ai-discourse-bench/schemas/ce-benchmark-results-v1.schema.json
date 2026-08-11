@@ -29,6 +29,9 @@
     "polisReport": { "type": "object" },
     "participantGraph": { "type": "object" },
     "breakdown": { "type": "object" },
+    "importance": { "type": "object" },
+    "debateAtlas": { "type": "object" },
+    "riskMatrix": { "type": "object" },
     "integrity": { "type": "object" },
     "note": { "type": "string" }
   }

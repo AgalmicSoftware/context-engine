@@ -92,6 +92,12 @@ For testing, run modes, and deeper setup:
 
 The top-level [`ai-discourse-corpus/`](ai-discourse-corpus/) directory contains reusable JSON sub-corpuses curated from AI policy, safety, governance, science fiction, practitioner interviews, evaluation work, debates, and enriched social-media discussion. Rights for that directory are described separately in [ai-discourse-corpus/LICENSE.md](ai-discourse-corpus/LICENSE.md): no ownership is claimed over upstream source material, and project-authored annotations are dedicated under CC0.
 
+## AI Opinions Benchmark
+
+The top-level [`ai-discourse-bench/`](ai-discourse-bench/) package turns source-grounded question banks into repeated, polarity-reversed model runs and static Context Engine results reports. The client serves its bundled report index at [`/benchmarks`](http://localhost:3000/benchmarks), where each model is treated as one participant and the report exposes agreement, disagreement, repeat stability, opinion groups, and model-trait comparisons.
+
+Bundled reports declare their publication status. Development previews are useful for inspecting the method and interface, but a released result additionally requires a reviewed question bank, the configured repeats for both original and reversed wording, and complete valid model coverage. See the [benchmark README](ai-discourse-bench/README.md) and [methodology](ai-discourse-bench/docs/methodology.md) for local-model, OpenRouter, question-bank, and release-gate details.
+
 ## Scaling
 
 The default public deployment supports hundreds to low thousands of concurrent participants per session. For larger deployments, see [docs/scaling.md](docs/scaling.md).
@@ -111,6 +117,7 @@ The default public deployment supports hundreds to low thousands of concurrent p
 - Session registry and gate model: [docs/session-registry.md](docs/session-registry.md)
 - Scaling reference: [docs/scaling.md](docs/scaling.md)
 - Public roadmap: [ROADMAP.md](ROADMAP.md)
+- AI Opinions Benchmark: [ai-discourse-bench/README.md](ai-discourse-bench/README.md)
 
 ## Licensing
 

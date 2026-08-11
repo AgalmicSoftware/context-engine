@@ -6,6 +6,8 @@ Use it for new files, refactors, and cleanup PRs.
 ## 1. Root Layout
 
 - `client/` holds the React SPA, frontend assets, and frontend-adjacent tests.
+- `ai-discourse-bench/` holds the standalone benchmark harness, question banks,
+  report generator, release validation, and benchmark-specific documentation.
 - `workers/` holds Cloudflare Worker source and worker-specific support files.
 - `deploy/` holds reviewed, installable deployment packages generated from
   canonical source. It is separate from `workers/` source, untracked `dist/`

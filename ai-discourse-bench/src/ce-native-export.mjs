@@ -7,7 +7,7 @@ export const buildContextEngineBenchmarkDataset = (report = {}) => {
   return {
     schemaVersion: 1,
     kind: 'ce_benchmark_results_dataset',
-    generatedAt: new Date().toISOString(),
+    generatedAt: report.generatedAt || new Date().toISOString(),
     sourceReport: {
       benchmarkId: report.benchmarkId || '',
       reportGeneratedAt: report.generatedAt || null,
@@ -50,6 +50,9 @@ export const buildContextEngineBenchmarkDataset = (report = {}) => {
     },
     participantGraph: report.participantGraph || {},
     breakdown: report.breakdown || {},
+    importance: report.importance || { available: false },
+    debateAtlas: report.debateAtlas || {},
+    riskMatrix: report.riskMatrix || {},
     integrity: report.integrity || {},
     note: 'Lossless benchmark result contract for native Context Engine rendering. Unlike ce_polis_question_responses_export, repeated-response distributions are not discretized.',
   };

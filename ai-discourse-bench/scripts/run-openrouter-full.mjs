@@ -31,7 +31,7 @@ const mode = process.env.AIDB_MODE || 'self';
 if (!['self', 'persona'].includes(mode)) throw new Error('AIDB_MODE must be self or persona');
 if (!process.env.OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY is required for openrouter:full');
 
-const questionBankPath = process.env.AIDB_QUESTION_BANK || './banks/ai-futures/v0.1-candidate/question-bank.json';
+const questionBankPath = process.env.AIDB_QUESTION_BANK || './banks/ai-futures/v0.2-reviewed-candidate/question-bank.json';
 const modelRosterPath = process.env.AIDB_MODEL_ROSTER || './data/model-roster.openrouter.sample.json';
 const personasPath = process.env.AIDB_PERSONAS || './data/personas.sample.json';
 const personaId = mode === 'persona' ? String(process.env.AIDB_PERSONA || '').trim() : '';

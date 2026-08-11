@@ -115,8 +115,8 @@ export const resolveQuestionEvidence = (index, question) => (question.sourceAnch
   return {
     ...compact,
     resolution: 'resolved',
-    evidenceScope: 'topic-and-disagreement-axis',
-    supports: question.disagreementAxis,
+    evidenceScope: 'source-record-resolution-only',
+    relatedDisagreementAxis: question.disagreementAxis,
     anchorReason: anchor.reason || '',
     supportingRecords: compact.corpus === 'cross-corpus'
       ? supportingRecordsForDebate(index, resolved.record)

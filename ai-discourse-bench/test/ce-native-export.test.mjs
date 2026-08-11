@@ -30,6 +30,8 @@ test('native Context Engine export preserves response distributions and uncertai
       similarityEdges: [],
     },
     integrity: { releaseReady: false },
+    importance: { available: true, byQuestion: { q1: { meanVotes: 3 } } },
+    debateAtlas: { sizeMetric: 'quadratic-importance' },
   };
 
   const dataset = buildContextEngineBenchmarkDataset(report);
@@ -37,5 +39,7 @@ test('native Context Engine export preserves response distributions and uncertai
   assert.equal(dataset.responses.length, 1);
   assert.deepEqual(dataset.responses[0].summary, summary);
   assert.deepEqual(dataset.participants[0].provenance, { modelRevision: 'rev-1' });
+  assert.equal(dataset.importance.byQuestion.q1.meanVotes, 3);
+  assert.equal(dataset.debateAtlas.sizeMetric, 'quadratic-importance');
   assert.match(dataset.note, /not discretized/);
 });

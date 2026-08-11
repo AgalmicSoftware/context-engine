@@ -11,12 +11,18 @@ import { buildContextEnginePolisExport } from './ce-export.mjs';
 import { attachAnalysisOverlay, buildSecondPassAnalysisInput } from './analysis-export.mjs';
 import {
   DEFAULT_CONCURRENCY,
+  DEFAULT_IMPORTANCE_BUDGET,
+  DEFAULT_IMPORTANCE_MAX_ALLOCATIONS,
+  DEFAULT_IMPORTANCE_REPEATS,
   DEFAULT_MAX_ATTEMPTS,
   DEFAULT_REPEATS,
+  HARNESS_VERSION,
   PROVIDERS,
+  QUESTION_PROMPT_TEMPLATE_VERSION,
 } from './config.mjs';
 import {
   limitQuestionBank,
+  mergeImportanceRunFiles,
   mergeModelRosters,
   mergeRunsFiles,
   parseInputFileList,
@@ -30,8 +36,18 @@ import {
   validateRuns,
 } from './schema.mjs';
 import { runBenchmark } from './runner.mjs';
+import {
+  runImportanceBenchmark,
+  validateImportanceRuns,
+  validateReleaseImportanceFile,
+} from './importance.mjs';
 import { buildResultsReport } from './scoring.mjs';
-import { hashJson } from './provenance.mjs';
+import {
+  buildReleaseValidationReceipt,
+  hashJson,
+  sha256,
+} from './provenance.mjs';
+import { buildQuestionPrompt } from './normalize.mjs';
 import { buildExperimentPlan } from './experiment-plan.mjs';
 import { buildContextEngineBenchmarkDataset } from './ce-native-export.mjs';
 import { buildReportSnapshot, compareLongitudinalSnapshots } from './longitudinal.mjs';
@@ -40,7 +56,8 @@ const usage = `Usage:
   ai-discourse-bench validate --questions <file> --models <file> [--personas <file>]
   ai-discourse-bench plan-run --questions <file> --models <file> [--out <file>] [--provider mock|local|openrouter] [--mode self|persona] [--persona <id>] [--personas <file>] [--repeats <n>] [--limit-questions <n>]
   ai-discourse-bench run --questions <file> --models <file> --out <file> [--provider mock|local|openrouter] [--mode self|persona] [--persona <id>] [--personas <file>] [--repeats <n>] [--concurrency <n>] [--max-attempts <n>] [--resume] [--checkpoint <file.jsonl>]
-  ai-discourse-bench build-report --questions <file> --models <file[,file...]> --runs <file[,file...]> --out <file> [--limit-questions <n>] [--release]
+  ai-discourse-bench run-importance --questions <file> --models <file> --out <file> [--provider mock|local|openrouter] [--budget <credits>] [--max-allocations <n>] [--repeats <n>] [--concurrency <n>] [--max-attempts <n>] [--resume] [--checkpoint <file.jsonl>]
+  ai-discourse-bench build-report --questions <file> --models <file[,file...]> --runs <file[,file...]> --out <file> [--importance <file[,file...]>] [--limit-questions <n>] [--release]
   ai-discourse-bench render-report --report <file> --out <file.html> [--analysis <overlay.json>]
   ai-discourse-bench export-ce --report <file> --out <file.json>
   ai-discourse-bench export-ce-native --report <file> --out <file.json>
@@ -155,6 +172,47 @@ const commandRun = async (args) => {
   console.log(`wrote ${result.runs.length} runs to ${args.out} (${result.resumedRuns} resumed; checkpoint ${checkpointPath})`);
 };
 
+const commandRunImportance = async (args) => {
+  if (!args.out) throw new Error(`Missing --out\n${usage}`);
+  const provider = args.provider || '';
+  if (provider && !PROVIDERS.includes(provider)) {
+    throw new Error(`--provider must be one of ${PROVIDERS.join(', ')}`);
+  }
+  const budget = parsePositiveInt(args.budget, DEFAULT_IMPORTANCE_BUDGET, '--budget');
+  const maxAllocations = parsePositiveInt(
+    args['max-allocations'],
+    DEFAULT_IMPORTANCE_MAX_ALLOCATIONS,
+    '--max-allocations',
+  );
+  const repeats = parsePositiveInt(args.repeats, DEFAULT_IMPORTANCE_REPEATS, '--repeats');
+  const concurrency = parsePositiveInt(args.concurrency, DEFAULT_CONCURRENCY, '--concurrency');
+  const maxAttempts = parsePositiveInt(args['max-attempts'], DEFAULT_MAX_ATTEMPTS, '--max-attempts');
+  const inputs = await readInputs(args);
+  const checkpointPath = args.checkpoint || `${args.out}.jsonl`;
+  const priorOutput = args.resume ? await readJsonFileIfExists(args.out, { runs: [] }) : { runs: [] };
+  const checkpointRuns = args.resume ? await readCheckpointRuns(checkpointPath) : [];
+  const checkpointWriter = await createCheckpointWriter(checkpointPath, { reset: !args.resume });
+  const result = await runImportanceBenchmark({
+    questionBank: inputs.questionBank,
+    modelRoster: inputs.modelRoster,
+    providerOverride: provider,
+    budget,
+    maxAllocations,
+    repeats,
+    concurrency,
+    maxAttempts,
+    existingRuns: [...(priorOutput?.runs || []), ...checkpointRuns],
+    onRun: checkpointWriter,
+  });
+  throwIfErrors('importance runs', validateImportanceRuns(result, {
+    modelIds: new Set(inputs.modelRoster.models.map((model) => model.id)),
+    questionIds: new Set(inputs.questionBank.questions.map((question) => question.id)),
+    benchmarkId: inputs.questionBank.benchmarkId,
+  }));
+  await writeJsonFile(args.out, result);
+  console.log(`wrote ${result.runs.length} quadratic-importance runs to ${args.out} (${result.resumedRuns} resumed; checkpoint ${checkpointPath})`);
+};
+
 const commandPlanRun = async (args) => {
   const provider = args.provider || '';
   if (provider && !PROVIDERS.includes(provider)) {
@@ -200,6 +258,10 @@ const commandBuildReport = async (args) => {
         requiredRepeats: questionBank.runPlan?.repeatsPerPolarity,
         questionCount: questionBank.questions?.length,
         selectedModelsById: new Map(modelRoster.models.map((model) => [model.id, model])),
+        questionBank,
+        expectedHarnessVersion: HARNESS_VERSION,
+        expectedPromptTemplateVersion: QUESTION_PROMPT_TEMPLATE_VERSION,
+        expectedPromptTemplateHash: sha256(buildQuestionPrompt.toString()),
       }));
     });
   }
@@ -215,9 +277,46 @@ const commandBuildReport = async (args) => {
     mode: runsFile.mode || 'self',
     personaId: runsFile.personaId || null,
   }));
-  const report = buildResultsReport({ questionBank, modelRoster, runsFile });
+  let importanceFile = null;
+  let importanceFiles = [];
+  if (args.importance) {
+    const importancePaths = parseInputFileList(args.importance);
+    importanceFiles = await Promise.all(importancePaths.map((importancePath) => readJsonFile(importancePath)));
+    if (args.release) {
+      importanceFiles.forEach((file, index) => {
+        const manifestModelIds = new Set((file.manifest?.models || []).map((model) => model.id));
+        const releaseRoster = {
+          ...modelRoster,
+          models: modelRoster.models.filter((model) => manifestModelIds.has(model.id)),
+        };
+        throwIfErrors(`release importance file ${importancePaths[index]}`, validateReleaseImportanceFile(file, {
+          questionBank,
+          modelRoster: releaseRoster,
+          requiredRepeats: Number(
+            questionBank.runPlan?.importanceRepeats ?? DEFAULT_IMPORTANCE_REPEATS,
+          ),
+        }));
+      });
+    }
+    importanceFile = mergeImportanceRunFiles(importanceFiles);
+    throwIfErrors('importance runs', validateImportanceRuns(importanceFile, {
+      modelIds: new Set(modelRoster.models.map((model) => model.id)),
+      questionIds: new Set(questionBank.questions.map((question) => question.id)),
+      benchmarkId: questionBank.benchmarkId,
+    }));
+  }
+  const report = buildResultsReport({ questionBank, modelRoster, runsFile, importanceFile });
   if (args.release && !report.integrity.releaseReady) {
     throw new Error(`release report integrity failed:\n- ${report.integrity.warnings.join('\n- ')}`);
+  }
+  if (args.release) {
+    report.releaseValidationReceipt = buildReleaseValidationReceipt({
+      report,
+      questionBank,
+      modelRoster,
+      runsFiles,
+      importanceFiles,
+    });
   }
   await writeJsonFile(args.out, report);
   console.log(`wrote report to ${args.out}`);
@@ -284,6 +383,8 @@ export const runCli = async (argv) => {
       return commandValidate(args);
     case 'run':
       return commandRun(args);
+    case 'run-importance':
+      return commandRunImportance(args);
     case 'plan-run':
       return commandPlanRun(args);
     case 'build-report':

@@ -159,7 +159,7 @@ export const buildSecondPassAnalysisInput = (report = {}) => {
   return {
     schemaVersion: 1,
     kind: 'ai_discourse_bench_second_pass_analysis_input',
-    generatedAt: new Date().toISOString(),
+    generatedAt: report.generatedAt || new Date().toISOString(),
     benchmarkId: report.benchmarkId || null,
     inputReportHash,
     title: report.title || 'AI Discourse Benchmark',

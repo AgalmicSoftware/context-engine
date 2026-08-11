@@ -4132,6 +4132,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
   _renderBookmarksRoute = this._routeRenderers._renderBookmarksRoute;
   _renderAboutRoute = this._routeRenderers._renderAboutRoute;
   _renderDemosRoute = this._routeRenderers._renderDemosRoute;
+  _renderBenchmarksRoute = this._routeRenderers._renderBenchmarksRoute;
   _renderMatrixRoute = this._routeRenderers._renderMatrixRoute;
   _renderAgentRoute = this._routeRenderers._renderAgentRoute;
   _renderSimUserRoute = this._routeRenderers._renderSimUserRoute;
