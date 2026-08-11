@@ -34,13 +34,15 @@ describe('ToolExplorer sparse card layout', () => {
     );
   });
 
-  it('replaces classic theme artwork with compact Control Panel applets', () => {
+  it('incorporates the bundled artwork into compact classic Control Panel applets', () => {
     expect(scss).toContain('@container ce-theme style(--ce-layout-profile: desktop-window)');
     expect(scss).not.toContain('data-ce-theme');
-    expect(scss).toMatch(/\.backgroundImage\s*{\s*display:\s*none;/);
-    expect(scss).toMatch(/\.classicToolIcon\s*{[\s\S]*?display:\s*block;[\s\S]*?width:\s*54px;/);
     expect(scss).toMatch(
-      /\.explorerCol \.square,[\s\S]*?height:\s*210px;[\s\S]*?background:\s*var\(--ce-control-face\);[\s\S]*?box-shadow:\s*var\(--ce-shadow-raised\);/,
+      /\.backgroundImage\s*{[\s\S]*?display:\s*block;[\s\S]*?position:\s*relative;[\s\S]*?height:\s*124px;[\s\S]*?background-size:\s*cover;/,
+    );
+    expect(scss).toMatch(/\.classicToolIcon\s*{\s*display:\s*none;/);
+    expect(scss).toMatch(
+      /\.explorerCol \.square,[\s\S]*?height:\s*248px;[\s\S]*?background:\s*var\(--ce-control-face\);[\s\S]*?box-shadow:\s*var\(--ce-shadow-raised\);/,
     );
   });
 });

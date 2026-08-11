@@ -373,13 +373,16 @@ describe('ToolExplorer session propagation', () => {
     });
   });
 
-  it('keeps the three live tools identifiable when classic mode replaces their artwork', () => {
+  it('keeps the three live tools identifiable and supplies their bundled artwork for classic mode', () => {
     const { container } = renderToolExplorer({ demoSurfaceMode: false });
 
     expect(screen.getByText('Create and explore questions.')).toBeInTheDocument();
     expect(screen.getByText('Organize and manage groups.')).toBeInTheDocument();
     expect(screen.getByText('Analyze and explore context.')).toBeInTheDocument();
     expect(container.querySelectorAll(`.${styles.classicToolIcon}`)).toHaveLength(3);
+    const artwork = Array.from(container.querySelectorAll<HTMLElement>(`.${styles.backgroundImage}`));
+    expect(artwork).toHaveLength(3);
+    artwork.forEach((image) => expect(image.style.backgroundImage).toContain('url('));
   });
 
   it('enables live and future status borders only while demo mode is on', () => {

@@ -615,9 +615,9 @@
   display: none;
 }
 
-/* The classic theme intentionally replaces photographic launch cards with
- * compact Control Panel-style applets. The data and click targets stay the
- * same; this only changes their visual grammar. */
+/* The classic theme presents the bundled launch artwork as inset Control
+ * Panel thumbnails. The data and click targets stay the same; only their
+ * visual grammar changes. */
 @container ce-theme style(--ce-layout-profile: desktop-window) {
   .legendContainer {
     display: none;
@@ -654,12 +654,12 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 12px;
+    justify-content: flex-start;
+    gap: 8px;
     width: 100%;
-    height: 210px;
-    min-height: 210px;
-    padding: 20px 16px;
+    height: 248px;
+    min-height: 248px;
+    padding: 12px;
     overflow: visible;
     border: 2px solid;
     border-color: var(--ce-border-raised);
@@ -690,23 +690,24 @@
   }
 
   .backgroundImage {
-    display: none;
+    display: block;
+    position: relative;
+    top: auto;
+    left: auto;
+    flex: 0 0 124px;
+    width: 100%;
+    height: 124px;
+    border: 2px solid;
+    border-color: var(--ce-border-inset);
+    border-radius: 0;
+    background-position: center;
+    background-size: cover;
+    box-shadow: var(--ce-shadow-pressed);
+    transform: none;
   }
 
   .classicToolIcon {
-    display: block;
-    width: 54px;
-    height: 54px;
-    color: var(--ce-status-info);
-    filter: drop-shadow(1px 1px 0 var(--ce-edge-shadow));
-  }
-
-  .explorerCol:nth-child(2) .classicToolIcon {
-    color: var(--ce-status-success);
-  }
-
-  .explorerCol:nth-child(3) .classicToolIcon {
-    color: var(--ce-compat-blue);
+    display: none;
   }
 
   .squareText,
@@ -790,15 +791,15 @@
 
     .explorerCol .square,
     .explorerColSparse .square {
-      height: 142px;
-      min-height: 142px;
-      padding: 12px;
+      height: 196px;
+      min-height: 196px;
+      padding: 8px;
       gap: 7px;
     }
 
-    .classicToolIcon {
-      width: 36px;
-      height: 36px;
+    .backgroundImage {
+      flex-basis: 84px;
+      height: 84px;
     }
 
     .squareText {

@@ -51,6 +51,11 @@ const VIEWPORTS = Object.freeze([
   { name: 'mobile', width: 390, height: 844 },
 ]);
 
+const TOOL_CARD_VIEWPORTS = Object.freeze([
+  ...VIEWPORTS,
+  { name: 'compact', width: 765, height: 799 },
+]);
+
 const WELCOME_FIT_VIEWPORTS = Object.freeze([
   { name: 'compact desktop', width: 1280, height: 720 },
   { name: 'wide desktop', width: 1904, height: 900 },
@@ -207,6 +212,18 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         }),
         hovered: null,
       }
+    : null;
+  const classicToolArtworkState = toolCard
+    ? await page.locator('div[class*="_backgroundImage_"]').evaluateAll((elements) =>
+        elements.map((element) => {
+          const style = window.getComputedStyle(element);
+          return {
+            backgroundImage: style.backgroundImage,
+            display: style.display,
+            height: element.getBoundingClientRect().height,
+          };
+        }),
+      )
     : null;
   if (toolCard && classicToolCardState) {
     await toolCard.hover();
@@ -1088,6 +1105,16 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     );
   }
   if (classicToolCardState?.hovered && currentToolCardState) {
+    assert.equal(classicToolArtworkState?.length, 3, 'Classic 95 should render artwork for all three live tool cards');
+    classicToolArtworkState?.forEach((artwork) => {
+      assert.equal(artwork.display, 'block', 'Classic 95 tool artwork should remain visible');
+      assert.match(artwork.backgroundImage, /^url\(/, 'Classic 95 tool artwork should use its bundled image');
+      assert.equal(
+        artwork.height,
+        viewportName === 'mobile' ? 84 : 124,
+        'Classic 95 tool artwork should use the compact theme thumbnail height',
+      );
+    });
     assert.deepEqual(
       [
         classicToolCardState.resting.borderTopWidth,
@@ -1548,6 +1575,7 @@ async function main() {
   const questionUtilitiesOnly = process.argv.includes('--question-utilities-only');
   const statsOnly = process.argv.includes('--stats-only');
   const footerOnly = process.argv.includes('--footer-only');
+  const toolCardsOnly = process.argv.includes('--tool-cards-only');
   const routeCases = homeTabsOnly
     ? ROUTE_CASES.filter((routeCase) => routeCase.requiresSpreadHomeTabs)
     : questionUtilitiesOnly
@@ -1556,12 +1584,15 @@ async function main() {
         ? ROUTE_CASES.filter((routeCase) => routeCase.requiresReadableStats)
         : footerOnly
           ? ROUTE_CASES.filter((routeCase) => routeCase.requiresFooterButtons)
-          : ROUTE_CASES;
+          : toolCardsOnly
+            ? ROUTE_CASES.filter((routeCase) => routeCase.requiresStandardToolCards)
+            : ROUTE_CASES;
+  const viewports = toolCardsOnly ? TOOL_CARD_VIEWPORTS : VIEWPORTS;
   const browser = await chromium.launch({ headless: true });
 
   try {
     if (!welcomeFitOnly) {
-      for (const viewport of VIEWPORTS) {
+      for (const viewport of viewports) {
         const page = await browser.newPage({ viewport: { width: viewport.width, height: viewport.height } });
         await page.addInitScript(() => {
           window.localStorage.setItem('ce:firstVisitRootAboutRedirectConsumed:v20260618b', 'true');
@@ -1577,7 +1608,7 @@ async function main() {
         await page.close();
       }
     }
-    if (!homeTabsOnly && !questionUtilitiesOnly && !statsOnly && !footerOnly) {
+    if (!homeTabsOnly && !questionUtilitiesOnly && !statsOnly && !footerOnly && !toolCardsOnly) {
       for (const viewport of WELCOME_FIT_VIEWPORTS) {
         await assertWelcomeFitsViewport(browser, baseUrl, viewport);
       }
@@ -1593,7 +1624,9 @@ async function main() {
               ? `Classic 95 Community Stats Playwright smoke passed (${VIEWPORTS.length} viewports).`
               : footerOnly
                 ? `Classic 95 footer Playwright smoke passed (${VIEWPORTS.length} viewports).`
-                : `App theme runtime Playwright smoke passed (${routeCases.length} routes × ${VIEWPORTS.length} viewports).`,
+                : toolCardsOnly
+                  ? `Classic 95 tool-card Playwright smoke passed (${viewports.length} viewports).`
+                  : `App theme runtime Playwright smoke passed (${routeCases.length} routes × ${VIEWPORTS.length} viewports).`,
     );
   } finally {
     await browser.close();
