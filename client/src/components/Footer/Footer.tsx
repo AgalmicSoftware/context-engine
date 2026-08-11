@@ -111,7 +111,7 @@ class Footer extends React.Component<FooterProps> {
           <div className={styles.copyright}>
             <span className="copyright-link" data-testid="ce-footer-brand-attribution">
               <span className={styles.copyrightContent}>
-                <span>Software by Agalmic</span>
+                <span className={styles.copyrightText}>Software by Agalmic</span>
                 <a
                   href={PUBLIC_REPO_URL}
                   target="_blank"

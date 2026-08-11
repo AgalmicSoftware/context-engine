@@ -7,10 +7,10 @@ const { normalizeBaseUrl } = require('./vite-navigation-smoke');
 const ROUTE_CASES = Object.freeze([
   {
     path: '/',
-    label: 'home Tools cards and footer controls',
-    requiresFooterButtons: true,
+    label: 'home Tools cards',
     requiresStandardToolCards: true,
   },
+  { path: '/', label: 'home footer controls', requiresFooterButtons: true },
   { path: '/', label: 'home title-bar tab spacing', requiresSpreadHomeTabs: true },
   {
     path: '/',
@@ -54,6 +54,8 @@ const VIEWPORTS = Object.freeze([
 const TOOL_CARD_VIEWPORTS = Object.freeze([...VIEWPORTS, { name: 'compact', width: 765, height: 799 }]);
 
 const HOME_TAB_VIEWPORTS = Object.freeze([...VIEWPORTS, { name: 'compact window', width: 765, height: 799 }]);
+
+const FOOTER_VIEWPORTS = Object.freeze([...VIEWPORTS, { name: 'compact window', width: 765, height: 799 }]);
 
 const WELCOME_FIT_VIEWPORTS = Object.freeze([
   { name: 'compact window', width: 765, height: 799 },
@@ -276,6 +278,32 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
           navPseudoContent: nav ? window.getComputedStyle(nav, '::before').content : '',
         };
       })
+    : null;
+  const footerAttributionText = routeCase.requiresFooterButtons
+    ? page.getByText('Software by Agalmic', { exact: true })
+    : null;
+  const footerGithubLink = routeCase.requiresFooterButtons ? page.getByTestId('ce-footer-link-github') : null;
+  const classicFooterBrandState = footerAttributionText && footerGithubLink
+    ? {
+        text: await footerAttributionText.evaluate((element) => {
+          const style = window.getComputedStyle(element);
+          const rect = element.getBoundingClientRect();
+          return {
+            display: style.display,
+            height: rect.height,
+            width: rect.width,
+          };
+        }),
+        github: await footerGithubLink.evaluate((element) => {
+          const style = window.getComputedStyle(element);
+          const rect = element.getBoundingClientRect();
+          return {
+            fontSize: Number.parseFloat(style.fontSize),
+            height: rect.height,
+            width: rect.width,
+          };
+        }),
+      }
     : null;
 
   if (routeCase.requiresReadableSessionSetup) {
@@ -1059,6 +1087,28 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         };
       })
     : null;
+  const currentFooterBrandState = footerAttributionText && footerGithubLink
+    ? {
+        text: await footerAttributionText.evaluate((element) => {
+          const style = window.getComputedStyle(element);
+          const rect = element.getBoundingClientRect();
+          return {
+            display: style.display,
+            height: rect.height,
+            width: rect.width,
+          };
+        }),
+        github: await footerGithubLink.evaluate((element) => {
+          const style = window.getComputedStyle(element);
+          const rect = element.getBoundingClientRect();
+          return {
+            fontSize: Number.parseFloat(style.fontSize),
+            height: rect.height,
+            width: rect.width,
+          };
+        }),
+      }
+    : null;
   const currentLogoState = routeCase.requiresBrightLogo
     ? await page
         .getByRole('link', { name: 'Context Engine home', exact: true })
@@ -1294,6 +1344,30 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       'Context Engine footer links should keep their transparent background',
     );
     assert.equal(currentFooterLinkState.boxShadow, 'none', 'Context Engine footer links should remain shadow-free');
+  }
+  if (classicFooterBrandState && currentFooterBrandState) {
+    assert.equal(
+      classicFooterBrandState.text.display,
+      'none',
+      'Classic 95 should replace the footer attribution wording with the GitHub icon',
+    );
+    assert.ok(
+      classicFooterBrandState.github.width >= 24 && classicFooterBrandState.github.height >= 24,
+      `Classic 95 footer GitHub icon should be at least 24px; received ${JSON.stringify(classicFooterBrandState.github)}`,
+    );
+    assert.notEqual(
+      currentFooterBrandState.text.display,
+      'none',
+      'Context Engine should preserve the footer attribution wording',
+    );
+    assert.ok(
+      currentFooterBrandState.text.width > 0 && currentFooterBrandState.text.height > 0,
+      'Context Engine footer attribution wording should remain visible',
+    );
+    assert.ok(
+      classicFooterBrandState.github.fontSize > currentFooterBrandState.github.fontSize,
+      'Classic 95 footer GitHub icon should be larger than the Context Engine icon',
+    );
   }
   if (sessionSetupContrastState) {
     assert.equal(
@@ -1687,7 +1761,13 @@ async function main() {
           : toolCardsOnly
             ? ROUTE_CASES.filter((routeCase) => routeCase.requiresStandardToolCards)
             : ROUTE_CASES;
-  const viewports = toolCardsOnly ? TOOL_CARD_VIEWPORTS : homeTabsOnly ? HOME_TAB_VIEWPORTS : VIEWPORTS;
+  const viewports = toolCardsOnly
+    ? TOOL_CARD_VIEWPORTS
+    : homeTabsOnly
+      ? HOME_TAB_VIEWPORTS
+      : footerOnly
+        ? FOOTER_VIEWPORTS
+        : VIEWPORTS;
   const browser = await chromium.launch({ headless: true });
 
   try {
@@ -1723,7 +1803,7 @@ async function main() {
             : statsOnly
               ? `Classic 95 Community Stats Playwright smoke passed (${VIEWPORTS.length} viewports).`
               : footerOnly
-                ? `Classic 95 footer Playwright smoke passed (${VIEWPORTS.length} viewports).`
+                ? `Classic 95 footer Playwright smoke passed (${viewports.length} viewports).`
                 : toolCardsOnly
                   ? `Classic 95 tool-card Playwright smoke passed (${viewports.length} viewports).`
                   : `App theme runtime Playwright smoke passed (${routeCases.length} routes × ${VIEWPORTS.length} viewports).`,

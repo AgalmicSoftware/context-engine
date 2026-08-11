@@ -163,4 +163,14 @@ describe('Footer', () => {
     );
     expect(footerStylesheet).not.toMatch(/\.footer nav::before\s*{/);
   });
+
+  it('reduces classic footer branding to a larger GitHub icon without changing the default attribution', () => {
+    expect(footerStylesheet).toMatch(
+      /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)\s*{[\s\S]*?\.copyrightText\s*{[\s\S]*?display:\s*none;/,
+    );
+    expect(footerStylesheet).toMatch(
+      /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)\s*{[\s\S]*?\.githubLink\s*{[\s\S]*?font-size:\s*1\.5rem;[\s\S]*?opacity:\s*1;/,
+    );
+    expect(footerStylesheet).not.toMatch(/^\.copyrightText\s*{[\s\S]*?display:\s*none;/m);
+  });
 });

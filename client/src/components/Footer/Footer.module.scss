@@ -403,6 +403,37 @@
     color: var(--ce-control-text);
     font-size: 0.75rem;
   }
+
+  .footer .copyright {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    margin-left: auto;
+    padding: 0 4px;
+  }
+
+  .footer .copyrightContent {
+    gap: 0;
+    flex-wrap: nowrap;
+  }
+
+  .copyrightText {
+    display: none;
+  }
+
+  .footer .githubLink {
+    width: 28px;
+    height: 28px;
+    color: var(--ce-control-text);
+    font-size: 1.5rem;
+    opacity: 1;
+  }
+
+  .footer .githubLink:hover,
+  .footer .githubLink:focus {
+    color: var(--ce-control-text);
+    transform: none;
+  }
 }
 
 @media (max-width: 640px) {
@@ -423,7 +454,8 @@
     }
 
     .footer .copyright {
-      display: none;
+      display: flex;
+      margin-left: 4px;
     }
   }
 }
