@@ -2472,7 +2472,7 @@ const renderPileResponseInput = (
             step={1}
             value={ratingValue}
             onChange={(val: any, event: any) =>
-              engine.handleAnswerPile(question.id, val, engine.getSliderPersistOptions(event))
+              engine.handleAnswerPile(question.id, val, buildSliderPersistOptions(event))
             }
             onChangeComplete={engine.flushDraftPersistAfterSliderChange}
             disabled={engine.state.isSubmitting}
@@ -2523,7 +2523,7 @@ const renderPileSliderSection = (
       importanceValue={importanceValue}
       isSubmitting={engine.state.isSubmitting}
       onChange={(value: any, event: any) =>
-        engine.handleConvictionImportanceChange(0, questionId, sliderMode, value, engine.getSliderPersistOptions(event))
+        engine.handleConvictionImportanceChange(0, questionId, sliderMode, value, buildSliderPersistOptions(event))
       }
       onChangeComplete={engine.flushDraftPersistAfterSliderChange}
       onSelectMode={(nextMode: any) => {

@@ -240,6 +240,26 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(screen.getByRole('checkbox', { name: 'Session memory' })).toBeInTheDocument();
   });
 
+  it('updates a pile rating through the shared slider persistence helper', async () => {
+    renderPile({
+      questionPool: [{ id: 'rating-q1', type: 'rating', prompt: 'Rate this from zero to ten' }],
+      cacheHasLoaded: false,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: false,
+      isSBTCacheReady: false,
+      isSurveyCacheReady: false,
+    });
+
+    expect(await screen.findByText('Rate this from zero to ten')).toBeInTheDocument();
+    const slider = screen.getByRole('slider');
+    expect(slider).toHaveValue('0');
+
+    fireEvent.change(slider, { target: { value: '7' } });
+
+    await waitFor(() => expect(slider).toHaveValue('7'));
+    expect(screen.getByText('7')).toBeInTheDocument();
+  });
+
   it('advances pile navigation while early questionPool questions are visible', async () => {
     renderPile({
       questionPool: [
