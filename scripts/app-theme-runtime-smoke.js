@@ -68,6 +68,7 @@ const readThemeState = () => {
   const state = {
     themeId: root.dataset.ceTheme || '',
     themeSource: root.dataset.ceThemeSource || '',
+    layoutProfile: style.getPropertyValue('--ce-layout-profile').trim(),
     canvas: style.getPropertyValue('--ce-canvas').trim().toLowerCase(),
     radius4: style.getPropertyValue('--ce-radius-4').trim(),
     fontBody: style.getPropertyValue('--ce-font-body').trim().toLowerCase(),
@@ -943,10 +944,12 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   assert.equal(response?.status(), 200, `${routeCase.label} should load in ${viewportName}`);
   assert.equal(classic.themeId, 'classic-95', `${routeCase.label} should bootstrap the stored theme`);
   assert.equal(classic.themeSource, 'user', `${routeCase.label} should preserve user-theme precedence`);
+  assert.equal(classic.layoutProfile, 'desktop-window', `${routeCase.label} should receive the desktop layout profile`);
   assert.equal(classic.canvas, '#008080', `${routeCase.label} should receive the Classic 95 palette`);
   assert.equal(classic.radius4, '0', `${routeCase.label} should receive square Classic 95 geometry`);
   assert.match(classic.fontBody, /tahoma/, `${routeCase.label} should receive Classic 95 typography`);
   assert.equal(current.themeId, 'context-engine', `${routeCase.label} should switch without a reload`);
+  assert.equal(current.layoutProfile, 'standard-app', `${routeCase.label} should restore the default layout profile`);
   assert.equal(current.canvas, '#20204e', `${routeCase.label} should repaint to the Context Engine palette`);
   assert.equal(current.radius4, '4px', `${routeCase.label} should repaint rounded geometry`);
   assert.match(current.fontBody, /poppins/, `${routeCase.label} should repaint typography`);

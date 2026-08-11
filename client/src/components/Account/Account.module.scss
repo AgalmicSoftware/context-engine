@@ -3905,3 +3905,79 @@ body.w3a-silent iframe[class^='walletIframe-'] {
     transform: none !important;
   }
 }
+
+.classicLoginKey {
+  display: none;
+}
+
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  .navConnectContainer {
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-end;
+    height: auto;
+    margin: 0;
+  }
+
+  .navConnectButton {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-width: 150px !important;
+    min-height: 46px !important;
+    padding: 7px 16px !important;
+    border: 2px solid !important;
+    border-color: var(--ce-border-raised) !important;
+    background: var(--ce-control-face) !important;
+    box-shadow: var(--ce-shadow-raised) !important;
+    color: var(--ce-control-text) !important;
+  }
+
+  .navConnectButton:hover,
+  .navConnectButton:focus-visible {
+    background: var(--ce-surface-alt) !important;
+    color: var(--ce-control-text) !important;
+  }
+
+  .navConnectButton:active {
+    border-color: var(--ce-border-inset) !important;
+    box-shadow: var(--ce-shadow-pressed) !important;
+  }
+
+  .classicLoginKey {
+    display: block;
+    color: var(--ce-status-warning);
+    font-size: 1.2rem;
+    filter: drop-shadow(1px 1px 0 var(--ce-edge-dark));
+  }
+
+  .loginPromptText {
+    margin: 0;
+    padding: 0;
+    color: var(--ce-control-text);
+    font-family: var(--ce-font-mono);
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .loginIcons {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  @container ce-theme style(--ce-layout-profile: desktop-window) {
+    .navConnectButton {
+      min-width: 116px !important;
+      min-height: 40px !important;
+      padding: 6px 10px !important;
+    }
+
+    .loginPromptText {
+      font-size: 0.88rem;
+    }
+  }
+}

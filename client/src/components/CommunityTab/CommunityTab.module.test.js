@@ -41,4 +41,16 @@ describe('CommunityTab module styles', () => {
     );
     expect(scss).not.toMatch(/:global\(\.modal-header\)\s*{[\s\S]*?:global\(\.close\)/);
   });
+
+  it('uses the classic split-pane statistics window without changing the default layout', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'CommunityTab.module.scss'), 'utf8');
+
+    expect(scss).toContain('@container ce-theme style(--ce-layout-profile: desktop-window)');
+    expect(scss).not.toContain('data-ce-theme');
+    expect(scss).toMatch(/\.communityTab \.leaderboardSection\s*{[\s\S]*?flex:\s*0 0 28%;/);
+    expect(scss).toMatch(/\.communityTab \.statsGrid\s*{[\s\S]*?grid-template-columns:\s*repeat\(4,/);
+    expect(scss).toMatch(
+      /\.communityTab \.beeswarmSection\s*{[\s\S]*?background:\s*var\(--ce-data-viz-surface\);/,
+    );
+  });
 });

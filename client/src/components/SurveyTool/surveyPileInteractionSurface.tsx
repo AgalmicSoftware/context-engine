@@ -570,6 +570,14 @@ export const renderPileInteractionSurface = ({
   handleNext,
 }: PileInteractionSurfaceProps): React.ReactElement => (
   <div className={styles.pileInteractionUnit}>
+    <div className={styles.pileWindowTitlebar} aria-hidden="true">
+      <span>
+        {pileQuestions.length > 0
+          ? `Question ${Math.min(activePileIndex + 1, pileQuestions.length)} of ${pileQuestions.length}`
+          : 'Question'}
+      </span>
+      <span className={styles.pileWindowClose}>×</span>
+    </div>
     {SHOW_PILE_HOLOGRAM_TOGGLE && (
       <button
         type="button"

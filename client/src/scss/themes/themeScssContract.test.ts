@@ -31,6 +31,8 @@ describe('runtime SCSS theme contract', () => {
     expect(result.css).toContain(':root[data-ce-theme=context-engine]');
     expect(result.css).toContain(':root[data-ce-theme=classic-95]');
     expect(result.css).toContain('--ce-canvas: #008080');
+    expect(result.css).toContain('--ce-layout-profile: standard-app');
+    expect(result.css).toContain('--ce-layout-profile: desktop-window');
     expect(result.css).toContain('--ce-border-raised: #ffffff #404040 #404040 #ffffff');
     expect(result.css).toContain('--ce-action-submit: #000080');
     expect(result.css).toContain('--ce-nav-tab-inactive: #c0c0c0');
@@ -76,6 +78,11 @@ describe('runtime SCSS theme contract', () => {
     findScssFiles(path.resolve(scssDir, 'components')).forEach((filename) => {
       expect(fs.readFileSync(filename, 'utf8')).not.toContain('data-ce-theme');
     });
+  });
+
+  test('the document root exposes the semantic theme style-query container', () => {
+    const source = fs.readFileSync(path.resolve(scssDir, 'assets/css/contextEngine.scss'), 'utf8');
+    expect(source).toMatch(/html\s*{[\s\S]*?container-name:\s*ce-theme;/);
   });
 
   test.each(tokenOnlyStylesheets)('%s contains no raw color literals', (filename) => {

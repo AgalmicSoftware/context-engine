@@ -4223,6 +4223,319 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
+.pileWindowTitlebar {
+  display: none;
+}
+
+/* Classic 95 question pile: a single application window with a sunken prompt,
+ * standard command buttons, and a real toolbar made from the existing actions. */
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  .pileInteractionUnit {
+    --pile-card-width: min(760px, calc(100vw - 190px));
+    --pile-desktop-rail-gap: 28px;
+    width: var(--pile-card-width);
+    max-width: calc(100vw - 190px);
+  }
+
+  .pileWindowTitlebar {
+    position: absolute;
+    top: 30px;
+    left: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    height: 34px;
+    padding: 3px 4px 3px 10px;
+    border: 2px solid;
+    border-color: var(--ce-border-raised);
+    background: var(--ce-titlebar-bg);
+    color: var(--ce-titlebar-text);
+    font-family: var(--ce-font-mono);
+    font-size: 0.96rem;
+    font-weight: 700;
+    line-height: 1;
+    box-sizing: border-box;
+  }
+
+  .pileWindowClose {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 24px;
+    border: 2px solid;
+    border-color: var(--ce-border-raised);
+    background: var(--ce-control-face);
+    box-shadow: var(--ce-shadow-raised);
+    color: var(--ce-control-text);
+    font-family: var(--ce-font-ui);
+    font-size: 1.25rem;
+  }
+
+  .pileCardContainer {
+    min-height: 430px;
+  }
+
+  .pileCardInner {
+    height: 430px;
+    margin-top: 30px;
+    overflow: hidden;
+    border: 3px solid;
+    border-color: var(--ce-border-raised);
+    background: var(--ce-surface-raised);
+    box-shadow: 2px 2px 0 var(--ce-edge-dark);
+    transition: none;
+  }
+
+  .pileCardBody {
+    justify-content: flex-start;
+    gap: 18px;
+    padding: 54px 28px 18px;
+    background: var(--ce-surface-raised);
+    color: var(--ce-panel-text);
+  }
+
+  .pileCardHeader {
+    display: flex;
+    align-items: flex-start;
+    min-height: 176px;
+    margin: 0;
+    padding: 16px 18px;
+    overflow: auto;
+    border: 2px solid;
+    border-color: var(--ce-border-inset);
+    background: var(--ce-document-surface);
+    color: var(--ce-document-text);
+    font-family: var(--ce-font-mono);
+  }
+
+  .pileCardHeader,
+  .pileCardHeader * {
+    color: var(--ce-document-text) !important;
+  }
+
+  .pileCardMainContent {
+    justify-content: center;
+    padding: 0;
+  }
+
+  #binaryChoice {
+    gap: 28px;
+    margin: 0;
+  }
+
+  #binaryChoice .radioOptionText {
+    position: relative;
+    min-width: 150px;
+    min-height: 48px;
+    margin: 0;
+    padding: 8px 16px 8px 42px;
+    border: 2px solid;
+    border-color: var(--ce-border-raised);
+    background: var(--ce-control-face);
+    box-shadow: var(--ce-shadow-raised);
+    color: var(--ce-control-text);
+    font-size: 1rem;
+    font-style: normal;
+    font-weight: 400;
+    transition: none;
+  }
+
+  #binaryChoice .radioOptionText::before {
+    content: '';
+    position: absolute;
+    left: 14px;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--ce-document-border-strong);
+    background: var(--ce-status-info);
+    box-sizing: border-box;
+  }
+
+  #binaryChoice .radioOptionText.agree,
+  #binaryChoice .radioOptionText.unsure,
+  #binaryChoice .radioOptionText.disagree {
+    background: var(--ce-control-face);
+    color: var(--ce-control-text);
+  }
+
+  #binaryChoice .radioOptionText.agree::before {
+    background: var(--ce-status-success);
+  }
+
+  #binaryChoice .radioOptionText.unsure::before {
+    background: var(--ce-status-warning);
+  }
+
+  #binaryChoice .radioOptionText.disagree::before {
+    background: var(--ce-status-error);
+  }
+
+  #binaryChoice .radioOptionText:hover {
+    background: var(--ce-surface-alt);
+  }
+
+  #binaryChoice .radioOptionText.selected {
+    border-color: var(--ce-border-inset);
+    box-shadow: var(--ce-shadow-pressed);
+    font-style: normal;
+    font-weight: 700;
+  }
+
+  .pileControls > .pileActions,
+  .pileControls > .pileNav {
+    left: calc(100% + var(--pile-desktop-rail-gap));
+    padding: 6px;
+    border: 2px solid;
+    border-color: var(--ce-border-raised);
+    background: var(--ce-control-face);
+    box-shadow: var(--ce-shadow-raised);
+  }
+
+  .pileControls > .pileActions {
+    top: 52%;
+  }
+
+  .pileControls > .pileNav {
+    top: 52%;
+  }
+
+  .pileNav,
+  .pileActions,
+  .pileActionButtonGroup {
+    gap: 7px;
+    min-width: 52px;
+  }
+
+  .pileNav {
+    padding: 6px;
+  }
+
+  .pileActions {
+    padding: 6px;
+  }
+
+  .pileNavArrow,
+  .actionButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 4px;
+    border: 2px solid !important;
+    border-color: var(--ce-border-raised) !important;
+    background: var(--ce-control-face);
+    box-shadow: var(--ce-shadow-raised) !important;
+    color: var(--ce-control-text);
+    font-size: 1.15rem;
+    opacity: 1;
+    transition: none;
+  }
+
+  .pileNavArrow:hover:not(:disabled),
+  .actionButton:hover {
+    transform: none;
+    background: var(--ce-surface-alt);
+    color: var(--ce-control-text);
+    filter: none;
+  }
+
+  .pileNavArrow:active:not(:disabled),
+  .actionButton:active {
+    border-color: var(--ce-border-inset) !important;
+    box-shadow: var(--ce-shadow-pressed) !important;
+  }
+
+  .pileNavArrow:disabled,
+  .actionButton:disabled {
+    color: var(--ce-control-disabled-text);
+    opacity: 1;
+  }
+
+  .pileNavCounterText {
+    color: var(--ce-control-text);
+    font-size: 0.72rem;
+    text-shadow: none;
+  }
+
+  .pileCardFooter .pileIconButton,
+  .pileCardFooter .iconButton {
+    border: 2px solid;
+    border-color: var(--ce-border-raised);
+    background: var(--ce-control-face);
+    box-shadow: var(--ce-shadow-raised);
+    color: var(--ce-control-text);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 640px) {
+  @container ce-theme style(--ce-layout-profile: desktop-window) {
+    .pileInteractionUnit {
+      --pile-card-width: calc(100vw - 24px);
+      flex-direction: column;
+      width: var(--pile-card-width);
+      max-width: var(--pile-card-width);
+    }
+
+    .pileCardContainer,
+    .pileCardInner {
+      min-height: 400px;
+      height: 400px;
+    }
+
+    .pileCardBody {
+      padding: 52px 14px 12px;
+    }
+
+    .pileCardHeader {
+      min-height: 150px;
+      padding: 12px;
+    }
+
+    #binaryChoice {
+      gap: 8px;
+    }
+
+    #binaryChoice .radioOptionText {
+      min-width: 0;
+      min-height: 42px;
+      padding: 7px 10px 7px 32px;
+      font-size: 0.82rem;
+    }
+
+    #binaryChoice .radioOptionText::before {
+      left: 9px;
+      width: 13px;
+      height: 13px;
+    }
+
+    .pileControls {
+      position: static;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .pileControls > .pileActions,
+    .pileControls > .pileNav {
+      position: static;
+      flex-direction: row;
+      width: auto;
+      transform: none;
+    }
+
+    .pileActionButtonGroup {
+      flex-direction: row;
+    }
+  }
+}
+
 /* Card Stacking Logic (unchanged) */
 .pileCard {
   position: absolute;

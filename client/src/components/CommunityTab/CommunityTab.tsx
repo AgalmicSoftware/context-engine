@@ -2087,11 +2087,13 @@ class CommunityTab extends Component<any, any> {
 
   render() {
     const { showModal, modalTitle, loadingSbtsCreated, stats, initialLoadDone } = this.state;
+    const participantCount = this.getMemoizedLeaderboardData().length;
 
     return (
       <div className={styles.communityTab}>
         <div className={styles.leaderboardSection}>
           <div className={styles.leaderboardTopBar}>
+            <h2 className={styles.leaderboardTitle}>Participants ({participantCount})</h2>
             <div className={styles.headerActionsRight}>{this.renderLeaderboardControls()}</div>
           </div>
           <div className={styles.content}>

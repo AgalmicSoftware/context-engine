@@ -318,3 +318,137 @@
   outline: 2px solid color-mix(in srgb, var(--ce-action-accent) 65%, transparent);
   outline-offset: 3px;
 }
+
+/* Windows-style taskbar for the classic theme. It stays compact and
+ * left-aligned at every viewport instead of stretching each item. */
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  .footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 1100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: 42px;
+    margin: 0;
+    padding: 3px 6px;
+    border: 2px solid;
+    border-color: var(--ce-border-raised);
+    background: var(--ce-control-face);
+    box-sizing: border-box;
+  }
+
+  .footer nav {
+    display: flex;
+    align-items: center;
+    width: auto;
+    min-width: 0;
+  }
+
+  .footer nav::before {
+    content: '';
+    flex: 0 0 34px;
+    width: 34px;
+    height: 32px;
+    margin-right: 5px;
+    border: 2px solid;
+    border-color: var(--ce-border-raised);
+    background:
+      linear-gradient(90deg, transparent 45%, var(--ce-control-face) 45% 55%, transparent 55%),
+      linear-gradient(transparent 45%, var(--ce-control-face) 45% 55%, transparent 55%),
+      conic-gradient(
+        from 0deg at 50% 50%,
+        var(--ce-status-info) 0 25%,
+        var(--ce-status-success) 0 50%,
+        var(--ce-status-warning) 0 75%,
+        var(--ce-status-error) 0
+      );
+    background-origin: content-box;
+    background-clip: content-box;
+    box-shadow: var(--ce-shadow-raised);
+    padding: 7px;
+    box-sizing: border-box;
+  }
+
+  .footer nav ul {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    grid-template-columns: none;
+    gap: 4px;
+    width: auto;
+    margin: 0;
+    padding: 0;
+  }
+
+  .footer nav ul li {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 0;
+  }
+
+  .footer nav ul li .footerLink {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    min-width: 82px;
+    min-height: 32px;
+    margin: 0 !important;
+    padding: 0 12px;
+    border: 2px solid;
+    border-color: var(--ce-border-raised);
+    background: var(--ce-control-face);
+    box-shadow: var(--ce-shadow-raised);
+    color: var(--ce-control-text);
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .footer nav ul li .footerLink:hover,
+  .footer nav ul li .footerLink:focus-visible {
+    border-color: var(--ce-border-raised);
+    background: var(--ce-surface-alt);
+    box-shadow: var(--ce-shadow-raised);
+    color: var(--ce-control-text);
+  }
+
+  .footer nav ul li .footerLink:active {
+    border-color: var(--ce-border-inset);
+    box-shadow: var(--ce-shadow-pressed);
+  }
+
+  .footer .copyright,
+  .footer .copyrightContent,
+  .footer .githubLink {
+    color: var(--ce-control-text);
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 640px) {
+  @container ce-theme style(--ce-layout-profile: desktop-window) {
+    .footer {
+      overflow-x: auto;
+      justify-content: flex-start;
+    }
+
+    .footer nav ul {
+      flex-wrap: nowrap;
+    }
+
+    .footer nav ul li .footerLink {
+      min-width: 66px;
+      padding: 0 8px;
+      font-size: 0.7rem;
+    }
+
+    .footer .copyright {
+      display: none;
+    }
+  }
+}

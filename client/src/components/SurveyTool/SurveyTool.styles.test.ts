@@ -7,6 +7,20 @@ const readSurveyToolScss = () => fs.readFileSync(path.join(__dirname, 'SurveyToo
 const readFinalSubmitCtaScss = () => fs.readFileSync(path.join(__dirname, '../../scss/_finalSubmitCta.scss'), 'utf8');
 
 describe('SurveyTool styles', () => {
+  it('renders classic pile questions as compact desktop dialogs', () => {
+    const scss = readSurveyToolScss();
+
+    expect(scss).toContain('@container ce-theme style(--ce-layout-profile: desktop-window)');
+    expect(scss).not.toContain('data-ce-theme');
+    expect(scss).toMatch(/\.pileWindowTitlebar\s*{[\s\S]*?background:\s*var\(--ce-titlebar-bg\);/);
+    expect(scss).toMatch(
+      /\.pileCardHeader\s*{[\s\S]*?border-color:\s*var\(--ce-border-inset\);[\s\S]*?background:\s*var\(--ce-document-surface\);/,
+    );
+    expect(scss).toMatch(
+      /#binaryChoice \.radioOptionText\s*{[\s\S]*?background:\s*var\(--ce-control-face\);[\s\S]*?box-shadow:\s*var\(--ce-shadow-raised\);/,
+    );
+  });
+
   it('uses readable authoring controls across the questions toolbar', () => {
     const scss = readSurveyToolScss();
 

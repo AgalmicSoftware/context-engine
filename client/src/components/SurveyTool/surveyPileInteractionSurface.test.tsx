@@ -370,6 +370,9 @@ describe('surveyPileInteractionSurface', () => {
     expect(nodeHasClassName(controlsChildren[2], 'pileNav')).toBe(true);
     expect(findNodeByClassName(tree, 'pileActionMenuToggle')).not.toBeNull();
     expect(findNodeByClassName(tree, 'pileActionButtonGroup')).not.toBeNull();
+    expect(findNodeByClassName(tree, 'pileWindowTitlebar')).not.toBeNull();
+    expect(findNodeByClassName(tree, 'pileWindowClose')).not.toBeNull();
+    expect(treeTextIncludes(tree, 'Question 4 of 6')).toBe(true);
 
     const listeningToggle = findElement(
       tree,

@@ -48,4 +48,13 @@ describe('Main welcome walkthrough styles', () => {
     expect(desktopScss).not.toMatch(/width:\s*30%;/);
     expect(baseScss).not.toMatch(/\.onboardingControls\s*\{[\s\S]*?display:\s*flex;/);
   });
+
+  it('renders the classic home surface as a centered desktop window', () => {
+    expect(scss).toContain('@container ce-theme style(--ce-layout-profile: desktop-window)');
+    expect(scss).not.toContain('data-ce-theme');
+    expect(scss).toMatch(
+      /\.mainTabsCard\s*{[\s\S]*?border:\s*3px solid;[\s\S]*?background:\s*var\(--ce-surface-raised\);[\s\S]*?box-shadow:\s*2px 2px 0 var\(--ce-edge-dark\);/,
+    );
+    expect(scss).toMatch(/\.mainTabsCardHeader\s*{[\s\S]*?background:\s*var\(--ce-titlebar-bg\);/);
+  });
 });

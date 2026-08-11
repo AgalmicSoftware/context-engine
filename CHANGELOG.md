@@ -17,7 +17,11 @@ All notable changes to this project will be documented in this file.
   Classic 95 renders the generator and its toolbar on readable standard gray
   surfaces with white fields instead of mixing black controls into navy. The
   session question, simulated-user, and Groups surfaces now retain readable,
-  minimal gray panels at desktop and mobile widths.
+  minimal gray panels at desktop and mobile widths. Its semantic
+  `desktop-window` layout profile now presents Tools as Control Panel applets,
+  Community Stats as a participant/plot split window, session questions as
+  compact dialogs, and footer navigation as a taskbar without theme-ID
+  selectors in components.
 - Added **Session colors** to the Session Wizard with the curated
   `context-engine`, `ocean`, and `amber` schemes, immediate preview, exact
   `appearance.colorSchemeId` persistence across Worker/Arweave paths, scoped

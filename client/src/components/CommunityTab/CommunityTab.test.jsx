@@ -476,7 +476,7 @@ describe('CommunityTab helpers', () => {
     expect(modalNode.props.scrollable).toBe(true);
   });
 
-  it('omits the leaderboard and statistics section headings for a minimal community layout', () => {
+  it('keeps the default layout minimal while exposing the classic participant window label', () => {
     const instance = new CommunityTab({ activeSessionSlug: 'demo' });
     const tree = instance.render();
     const headings = collectTreeNodes(tree, (node) => node?.type === 'h2');
@@ -484,6 +484,9 @@ describe('CommunityTab helpers', () => {
 
     expect(headingText).not.toContain('Leaderboard');
     expect(headingText).not.toContain('Statistics');
+    expect(headingText).toEqual(
+      expect.arrayContaining([expect.stringMatching(/^Participants \(\d+\)$/)]),
+    );
   });
 
   it('renders survey links with session query suffix in modal content', () => {

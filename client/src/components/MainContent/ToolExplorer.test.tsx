@@ -373,6 +373,15 @@ describe('ToolExplorer session propagation', () => {
     });
   });
 
+  it('keeps the three live tools identifiable when classic mode replaces their artwork', () => {
+    const { container } = renderToolExplorer({ demoSurfaceMode: false });
+
+    expect(screen.getByText('Create and explore questions.')).toBeInTheDocument();
+    expect(screen.getByText('Organize and manage groups.')).toBeInTheDocument();
+    expect(screen.getByText('Analyze and explore context.')).toBeInTheDocument();
+    expect(container.querySelectorAll(`.${styles.classicToolIcon}`)).toHaveLength(3);
+  });
+
   it('enables live and future status borders only while demo mode is on', () => {
     const { container } = renderToolExplorer({ demoSurfaceMode: true });
     const explorerCols = Array.from(container.querySelectorAll(`.${styles.explorerCol}`));

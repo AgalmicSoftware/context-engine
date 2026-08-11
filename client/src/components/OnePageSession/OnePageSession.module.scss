@@ -1906,3 +1906,100 @@
     margin-top: 60px;
   }
 }
+
+/* Classic session shell: keep the question window visually primary and render
+ * Groups, Context, and Results as compact desktop task buttons below it. */
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  .onePageDemoContainer {
+    min-height: calc(100vh - 196px);
+    padding: 0 clamp(12px, 3vw, 42px) 48px;
+    color: var(--ce-panel-text);
+  }
+
+  .brandingSection {
+    overflow: visible;
+  }
+
+  .titleContainer {
+    display: none;
+  }
+
+  .sectionsGrid,
+  .sectionsGridTwoUp {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: stretch;
+    gap: 8px;
+    margin-top: 34px;
+  }
+
+  .sectionsGrid .sectionContainer {
+    min-height: 72px;
+    margin: 0;
+    padding: 8px;
+    border: 2px solid;
+    border-color: var(--ce-border-raised);
+    background: var(--ce-control-face);
+    box-shadow: var(--ce-shadow-raised);
+  }
+
+  .sectionsGrid .sectionHeaderRow {
+    align-items: center;
+    min-height: 52px;
+  }
+
+  .sectionsGrid .sectionHeader {
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 52px;
+    padding: 5px 10px;
+    color: var(--ce-control-text);
+    font-family: var(--ce-font-ui);
+    font-size: 1rem;
+    line-height: 1.1;
+  }
+
+  .sectionsGrid .sectionHeaderTitle,
+  .sectionsGrid .sectionHeaderSubtitle,
+  .sectionsGrid .sectionToggleIcon {
+    color: var(--ce-control-text);
+  }
+
+  .sectionsGrid .sectionHeaderTitle {
+    font-size: 1.08rem;
+  }
+
+  .sectionsGrid .sectionHeaderSubtitle {
+    font-size: 0.76rem;
+    font-weight: 400;
+  }
+
+  .sectionsGrid .sectionExpanded {
+    grid-column: 1 / -1;
+    min-height: 0;
+  }
+
+  .miniSectionContent {
+    margin-top: 8px;
+    padding: 10px;
+    border: 2px solid;
+    border-color: var(--ce-border-inset);
+    background: var(--ce-surface-raised);
+    color: var(--ce-panel-text);
+  }
+}
+
+@media (max-width: 640px) {
+  @container ce-theme style(--ce-layout-profile: desktop-window) {
+    .onePageDemoContainer {
+      min-height: 0;
+      padding: 0 6px 18px;
+    }
+
+    .sectionsGrid,
+    .sectionsGridTwoUp {
+      grid-template-columns: 1fr;
+      margin-top: 18px;
+    }
+  }
+}

@@ -199,3 +199,11 @@
     animation: none;
   }
 }
+
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  .main {
+    align-items: center;
+    justify-content: center;
+    margin-top: 0;
+  }
+}

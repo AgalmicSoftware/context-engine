@@ -33,4 +33,14 @@ describe('ToolExplorer sparse card layout', () => {
       /&:hover\s*{[\s\S]*?transform:\s*translateY\(-3px\);[\s\S]*?background:\s*var\(--ce-tool-card-hover-bg\);[\s\S]*?box-shadow:\s*var\(--ce-tool-card-shadow-hover\);/,
     );
   });
+
+  it('replaces classic theme artwork with compact Control Panel applets', () => {
+    expect(scss).toContain('@container ce-theme style(--ce-layout-profile: desktop-window)');
+    expect(scss).not.toContain('data-ce-theme');
+    expect(scss).toMatch(/\.backgroundImage\s*{\s*display:\s*none;/);
+    expect(scss).toMatch(/\.classicToolIcon\s*{[\s\S]*?display:\s*block;[\s\S]*?width:\s*54px;/);
+    expect(scss).toMatch(
+      /\.explorerCol \.square,[\s\S]*?height:\s*210px;[\s\S]*?background:\s*var\(--ce-control-face\);[\s\S]*?box-shadow:\s*var\(--ce-shadow-raised\);/,
+    );
+  });
 });

@@ -54,6 +54,11 @@
     margin-bottom: 10px;
   }
 
+  .leaderboardTitle {
+    display: none;
+    margin: 0;
+  }
+
   .rightSection {
     flex: 1;
     display: flex;
@@ -394,6 +399,193 @@
 
     .statsHeader {
       align-items: center;
+    }
+  }
+}
+
+/* Classic 95 presents Community as a dense Statistics utility: a participant
+ * list on the left and the summary/plot workspace on the right. */
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  .communityTab {
+    height: 500px;
+    gap: 0;
+    margin: 0;
+    overflow: hidden;
+    border: 2px solid;
+    border-color: var(--ce-border-inset);
+    background: var(--ce-surface-raised);
+    color: var(--ce-panel-text);
+  }
+
+  .communityTab .leaderboardSection {
+    flex: 0 0 28%;
+    min-width: 230px;
+    padding: 0;
+    border: 0;
+    border-right: 2px solid var(--ce-edge-shadow);
+    background: var(--ce-surface-raised);
+  }
+
+  .communityTab .leaderboardTopBar {
+    align-items: center;
+    min-height: 44px;
+    margin: 0;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--ce-edge-shadow);
+    background: var(--ce-surface-alt);
+  }
+
+  .communityTab .leaderboardTitle {
+    display: block;
+    color: var(--ce-panel-text);
+    font-family: var(--ce-font-ui);
+    font-size: 0.98rem;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .communityTab .sessionSelectorToggle {
+    width: 30px;
+    height: 30px;
+    border: 2px solid;
+    border-color: var(--ce-border-raised);
+    background: var(--ce-control-face);
+    box-shadow: var(--ce-shadow-raised);
+    color: var(--ce-control-text);
+    opacity: 1;
+    transition: none;
+  }
+
+  .communityTab .sessionSelectorToggle:hover,
+  .communityTab .sessionSelectorToggle:focus {
+    transform: none;
+    background: var(--ce-surface-alt);
+  }
+
+  .communityTab .content {
+    padding: 0 8px 8px;
+    background: var(--ce-surface-raised);
+  }
+
+  .communityTab .leaderboardItem {
+    min-height: 64px;
+    margin: 0;
+    padding: 8px 10px;
+    border: 0;
+    border-bottom: 1px solid var(--ce-edge-shadow);
+    background: var(--ce-surface-light);
+    color: var(--ce-panel-text);
+    transition: none;
+  }
+
+  .communityTab .leaderboardItem:hover {
+    border-color: var(--ce-edge-shadow);
+    background: var(--ce-surface-alt);
+  }
+
+  .communityTab .avatar {
+    width: 38px;
+    height: 38px;
+    border: 1px solid var(--ce-border-strong);
+  }
+
+  .communityTab .rightSection {
+    flex: 1 1 auto;
+    min-width: 0;
+    background: var(--ce-surface-raised);
+  }
+
+  .communityTab .statsSection {
+    flex: 0 0 112px;
+    min-height: 112px;
+    padding: 10px 14px;
+    border-bottom: 2px solid var(--ce-edge-shadow);
+    background: var(--ce-surface-raised);
+  }
+
+  .communityTab .statsHeader {
+    min-height: 0;
+  }
+
+  .communityTab .statsGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0;
+    height: 90px;
+    border: 2px solid;
+    border-color: var(--ce-border-inset);
+    background: var(--ce-surface-alt);
+  }
+
+  .communityTab .statItem {
+    justify-content: center;
+    padding: 8px;
+    border: 0;
+    color: var(--ce-panel-text);
+    transition: none;
+  }
+
+  .communityTab .statItem + .statItem {
+    border-left: 1px solid var(--ce-edge-shadow);
+  }
+
+  .communityTab .statItem:hover {
+    transform: none;
+    border-color: var(--ce-edge-shadow);
+    background: var(--ce-surface-light);
+  }
+
+  .communityTab .statIcon {
+    display: none;
+  }
+
+  .communityTab .statCount {
+    margin: 2px 0;
+    color: var(--ce-panel-text);
+    font-size: 1.65rem;
+    line-height: 1;
+  }
+
+  .communityTab .statLabel {
+    color: var(--ce-panel-text);
+    font-size: 0.8rem;
+    font-weight: 700;
+    order: -1;
+  }
+
+  .communityTab .beeswarmSection {
+    flex: 1 1 auto;
+    min-height: 0;
+    margin: 12px 14px 14px;
+    padding: 10px;
+    border: 2px solid var(--ce-document-border-strong);
+    background: var(--ce-data-viz-surface);
+  }
+}
+
+@media (max-width: 768px) {
+  @container ce-theme style(--ce-layout-profile: desktop-window) {
+    .communityTab {
+      height: auto;
+      overflow: visible;
+    }
+
+    .communityTab .leaderboardSection {
+      min-width: 0;
+      border-right: 0;
+      border-top: 2px solid var(--ce-edge-shadow);
+    }
+
+    .communityTab .statsGrid {
+      height: auto;
+      min-height: 92px;
+    }
+
+    .communityTab .statCount {
+      font-size: 1.25rem;
+    }
+
+    .communityTab .beeswarmSection {
+      min-height: 240px;
     }
   }
 }

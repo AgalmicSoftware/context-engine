@@ -51,6 +51,16 @@ add a semantic token and a shared recipe. Optional textures and icons must be
 local, size-bounded, and appropriately licensed; operating-system assets and
 fonts must not be copied.
 
+The `--ce-layout-profile` contract token is the structural counterpart to the
+palette and control tokens. The document root is the named `ce-theme` style
+container, so components that genuinely change layout use
+`@container ce-theme style(--ce-layout-profile: …)` instead of naming an app
+theme ID. The `standard-app` profile keeps the existing application layout;
+the `desktop-window` profile provides the compact window grammar used by the home
+window, Control Panel applets, Statistics split pane, question dialog, login
+control, and bottom taskbar. Keep ordinary color, spacing, and control changes
+on their narrower semantic tokens rather than adding structural queries.
+
 `classic-95` follows the owner's personal-site visual grammar—teal canvas,
 gray raised/inset surfaces, navy title bars, square controls, and system-safe
 Tahoma/MS Sans Serif fallbacks—without copying page markup or proprietary
