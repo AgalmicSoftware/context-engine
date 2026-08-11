@@ -66,6 +66,23 @@ describe('SurveyTool styles', () => {
     );
   });
 
+  it('keeps classic conviction sliders and lock-audience choices borderless and readable', () => {
+    const scss = readSurveyToolScss();
+
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)\s*{[\s\S]*?\.pileCardFooter \.importanceSlider\s*{[\s\S]*?border:\s*0 !important;[\s\S]*?background:\s*transparent !important;[\s\S]*?opacity:\s*1;/,
+    );
+    expect(scss).toMatch(
+      /\.pileCardFooter \.convictionToggleLine,\s*\.pileLockAudiencePopover \.convictionToggleLine\s*{[\s\S]*?border:\s*0 !important;[\s\S]*?background:\s*transparent !important;[\s\S]*?box-shadow:\s*none !important;[\s\S]*?opacity:\s*1;/,
+    );
+    expect(scss).toMatch(
+      /\.pileCardFooter \.convictionSlider\s*{[\s\S]*?background:\s*var\(--ce-input-bg\);[\s\S]*?opacity:\s*1;/,
+    );
+    expect(scss).toMatch(
+      /\.pileLockAudiencePopover\s*{[\s\S]*?border:\s*0 !important;[\s\S]*?background:\s*var\(--ce-surface-raised\);[\s\S]*?box-shadow:\s*none !important;[\s\S]*?color:\s*var\(--ce-control-text\);[\s\S]*?backdrop-filter:\s*none;/,
+    );
+  });
+
   it('uses readable authoring controls across the questions toolbar', () => {
     const scss = readSurveyToolScss();
 

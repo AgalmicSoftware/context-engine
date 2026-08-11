@@ -92,6 +92,50 @@ describe('surveyQuestionsPromptMetadataRuntime', () => {
     expect(runtime._getEffectiveDraftSlug()).toBe('survey-survey-1');
   });
 
+  it('keeps the session-shell Worker config when building voice input props', () => {
+    const sessionConfig = {
+      slug: 'demo-sh',
+      corsWorkerUrl: 'https://demo-sh-worker.example',
+    };
+    const resolveDraftSessionContext = jest.fn(() => ({
+      sessionSlug: 'demo-sh',
+      sessionConfig,
+    }));
+    const resolveExplicitSessionContext = jest.fn(() => ({
+      sessionSlug: 'demo-sh',
+      sessionConfig: null,
+    }));
+    const context = createContext({
+      propsRef: {
+        current: {
+          account: '0xabc',
+          network: { id: 11155420 },
+          provider: 'browser',
+          sessionConfig,
+          sessionSlug: 'demo-sh',
+          sessionSlugPinned: true,
+        },
+      },
+      resolveDraftSessionContext,
+      resolveEffectiveSlug: jest.fn(() => 'demo-sh'),
+      resolveExplicitSessionContext,
+    });
+
+    const runtime = createSurveyQuestionsPromptMetadataRuntime(context);
+
+    expect(runtime.getAudioInputWorkerProps()).toEqual({
+      sessionSlug: 'demo-sh',
+      sessionConfig,
+      context: {
+        account: '0xabc',
+        providerLike: 'browser',
+        chainId: 11155420,
+      },
+    });
+    expect(resolveDraftSessionContext).toHaveBeenCalledWith(context.propsRef.current, 'demo-sh');
+    expect(resolveExplicitSessionContext).not.toHaveBeenCalled();
+  });
+
   it('orders candidate slugs without duplicates and applies tag modal updates', () => {
     const context = createContext();
     const runtime = createSurveyQuestionsPromptMetadataRuntime(context);
