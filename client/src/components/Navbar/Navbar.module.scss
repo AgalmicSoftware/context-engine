@@ -353,15 +353,6 @@
     padding: 0;
   }
 
-  #mainLogo,
-  #mainLogoLoggedIn {
-    width: 108px;
-    max-width: 108px;
-    min-height: 0;
-    height: 76px;
-    object-fit: contain;
-  }
-
   #accountSection,
   #accountSectionLoggedIn {
     width: auto;
@@ -375,13 +366,6 @@
     #navbarContainerLoggedIn {
       min-height: 82px;
       padding: 10px 12px;
-    }
-
-    #mainLogo,
-    #mainLogoLoggedIn {
-      width: 76px;
-      max-width: 76px;
-      height: 58px;
     }
   }
 }

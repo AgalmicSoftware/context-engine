@@ -201,6 +201,19 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     await page.locator('[role="tablist"]').waitFor({ state: 'visible', timeout: 15000 });
   }
 
+  const readSessionHeaderGeometry = async () => {
+    const logo = page.getByRole('link', { name: 'Context Engine home', exact: true }).locator('img');
+    const login = page.getByRole('button', { name: 'LOG IN', exact: true });
+    await logo.waitFor({ state: 'visible' });
+    await login.waitFor({ state: 'visible' });
+    const readBox = (locator) =>
+      locator.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return { height: rect.height, width: rect.width };
+      });
+    return { logo: await readBox(logo), login: await readBox(login) };
+  };
+
   const toolCard = routeCase.requiresStandardToolCards ? page.locator('div[class^="_square_"]').first() : null;
   if (toolCard) await toolCard.waitFor({ state: 'visible' });
   const classicToolCardState = toolCard
@@ -1084,6 +1097,9 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
           return { backgroundColor: style.backgroundColor, borderColor: style.borderColor };
         })
     : null;
+  const classicSessionHeaderGeometry = routeCase.requiresReadableSessionSurface
+    ? await readSessionHeaderGeometry()
+    : null;
 
   await page.evaluate(() => {
     document.documentElement.dataset.ceTheme = 'context-engine';
@@ -1162,6 +1178,9 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
           const style = window.getComputedStyle(element);
           return { backgroundColor: style.backgroundColor, borderColor: style.borderColor };
         })
+    : null;
+  const currentSessionHeaderGeometry = routeCase.requiresReadableSessionSurface
+    ? await readSessionHeaderGeometry()
     : null;
   const currentWelcomeImageState = routeCase.requiresFramelessWelcome
     ? await page.getByTestId('ce-welcome-slide-image').evaluate((element) => {
@@ -1598,6 +1617,16 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     });
   }
   if (routeCase.requiresReadableSessionSurface) {
+    const assertMatchingBox = (classicBox, currentBox, label) => {
+      ['height', 'width'].forEach((dimension) => {
+        assert.ok(
+          Math.abs(classicBox[dimension] - currentBox[dimension]) <= 0.5,
+          `Classic 95 ${label} ${dimension} should match Context Engine in ${viewportName}; received ${classicBox[dimension]}px versus ${currentBox[dimension]}px`,
+        );
+      });
+    };
+    assertMatchingBox(classicSessionHeaderGeometry.logo, currentSessionHeaderGeometry.logo, 'session logo');
+    assertMatchingBox(classicSessionHeaderGeometry.login, currentSessionHeaderGeometry.login, 'session login button');
     assert.equal(
       reportedSurfaceState.hasPileWindowTitlebar,
       false,

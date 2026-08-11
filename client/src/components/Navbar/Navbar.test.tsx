@@ -182,4 +182,14 @@ describe('Navbar logo navigation', () => {
     );
     expect(navbarStylesheet).not.toContain('data-ce-theme');
   });
+
+  it('keeps classic logo geometry on the shared responsive breakpoints', () => {
+    expect(navbarStylesheet).toMatch(
+      /@media \(min-width:\s*466px\) and \(max-width:\s*768px\)[\s\S]*?#mainLogo\s*{[\s\S]*?max-width:\s*156px;[\s\S]*?min-height:\s*75px;/,
+    );
+    expect(navbarStylesheet).not.toContain('width: 108px;');
+    expect(navbarStylesheet).not.toContain('height: 76px;');
+    expect(navbarStylesheet).not.toContain('width: 76px;');
+    expect(navbarStylesheet).not.toContain('height: 58px;');
+  });
 });

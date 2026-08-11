@@ -3925,9 +3925,6 @@ body.w3a-silent iframe[class^='walletIframe-'] {
     align-items: center;
     justify-content: center;
     gap: 10px;
-    min-width: 150px !important;
-    min-height: 46px !important;
-    padding: 7px 16px !important;
     border: 2px solid !important;
     border-color: var(--ce-border-raised) !important;
     background: var(--ce-control-face) !important;
@@ -3958,26 +3955,11 @@ body.w3a-silent iframe[class^='walletIframe-'] {
     padding: 0;
     color: var(--ce-control-text);
     font-family: var(--ce-font-mono);
-    font-size: 1rem;
     font-weight: 700;
     line-height: 1;
   }
 
   .loginIcons {
     display: none;
-  }
-}
-
-@media (max-width: 640px) {
-  @container ce-theme style(--ce-layout-profile: desktop-window) {
-    .navConnectButton {
-      min-width: 116px !important;
-      min-height: 40px !important;
-      padding: 6px 10px !important;
-    }
-
-    .loginPromptText {
-      font-size: 0.88rem;
-    }
   }
 }
