@@ -1075,6 +1075,26 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
               : 'groups',
         )
       : null;
+  const classicQuestionsSectionState = routeCase.requiresReadableSessionSurface
+    ? await (async () => {
+        await page.getByTestId('ce-survey-view-all').click();
+        await page.getByTestId('ce-session-questions-full-header').waitFor({ state: 'visible' });
+        return page.locator('[class*="questionsSectionContainer"]').evaluate((element) => {
+          const style = window.getComputedStyle(element);
+          return {
+            backgroundColor: style.backgroundColor,
+            borderWidths: [
+              style.borderTopWidth,
+              style.borderRightWidth,
+              style.borderBottomWidth,
+              style.borderLeftWidth,
+            ],
+            boxShadow: style.boxShadow,
+            padding: style.padding,
+          };
+        });
+      })()
+    : null;
   const classicLogoState = routeCase.requiresBrightLogo
     ? await page
         .getByRole('link', { name: 'Context Engine home', exact: true })
@@ -1627,6 +1647,16 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     };
     assertMatchingBox(classicSessionHeaderGeometry.logo, currentSessionHeaderGeometry.logo, 'session logo');
     assertMatchingBox(classicSessionHeaderGeometry.login, currentSessionHeaderGeometry.login, 'session login button');
+    assert.deepEqual(
+      classicQuestionsSectionState,
+      {
+        backgroundColor: 'rgba(0, 0, 0, 0)',
+        borderWidths: ['0px', '0px', '0px', '0px'],
+        boxShadow: 'none',
+        padding: '0px',
+      },
+      'Classic 95 Questions explorer should not render an exterior shell',
+    );
     assert.equal(
       reportedSurfaceState.hasPileWindowTitlebar,
       false,

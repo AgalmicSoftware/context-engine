@@ -1926,6 +1926,14 @@
     display: none;
   }
 
+  .questionsSectionContainer {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
   .sectionsGrid,
   .sectionsGridTwoUp {
     grid-template-columns: repeat(3, minmax(0, 1fr));

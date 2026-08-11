@@ -1371,6 +1371,27 @@ describe('OnePageSession view gating', () => {
     );
   });
 
+  it('flattens only the Classic 95 Questions explorer outer shell', async () => {
+    render(<OnePageSession {...buildProps()} />);
+
+    fireEvent.click(await screen.findByTestId('pile-view-all'));
+    const questionsExplorer = await screen.findByTestId('survey-page-full');
+    const questionsSection = questionsExplorer.closest(`.${styles.sectionContainer}`);
+    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
+    const classicShell = extractMediaBlock(
+      scss,
+      '@container ce-theme style(--ce-layout-profile: desktop-window)',
+      '.questionsSectionContainer {',
+    );
+
+    expect(questionsSection).toHaveClass(styles.questionsSectionContainer);
+    expect(classicShell).toContain('background: transparent;');
+    expect(classicShell).toContain('border: 0;');
+    expect(classicShell).toContain('border-radius: 0;');
+    expect(classicShell).toContain('box-shadow: none;');
+    expect(classicShell).toContain('padding: 0;');
+  });
+
   it('keeps section-card headers inline through 767px without pulling full phone layout onto tablets', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
     const phoneBlock = extractMediaBlock(scss, '@media only screen and (max-width: 600px)', '.onePageDemoContainer');
