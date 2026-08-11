@@ -60,9 +60,10 @@ Tool Explorer cards consume `--ce-tool-card-*` chrome tokens. Context Engine
 keeps its layered blue depth treatment; `classic-95` uses a conventional
 raised bevel, compact black shadow, and gray hover face without a colored halo.
 
-Footer navigation consumes `--ce-footer-link-*` chrome tokens. Context Engine
-keeps its unframed links, while `classic-95` presents each route as a gray,
-raised button with a pressed inset state and readable black text.
+Footer navigation consumes `--ce-footer-bar-*`, `--ce-footer-link-*`, and
+`--ce-footer-copyright-*` tokens. Context Engine keeps its unframed spacing,
+while `classic-95` presents a compact, left-aligned gray taskbar with raised
+route buttons, pressed inset states, and readable black text.
 
 Account and Settings surfaces consume `--ce-settings-*` tokens for panel,
 section, field, control, primary-text, muted-text, and placeholder pairings.

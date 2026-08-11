@@ -51,6 +51,8 @@ describe('runtime SCSS theme contract', () => {
     expect(result.css).toContain('--ce-tool-card-hover-bg: var(--ce-surface-raised)');
     expect(result.css).toContain('--ce-tool-card-hover-bg: var(--ce-status-info)');
     expect(result.css).toContain('--ce-footer-link-bg: var(--ce-control-face)');
+    expect(result.css).toContain('--ce-footer-bar-bg: var(--ce-control-face)');
+    expect(result.css).toContain('--ce-footer-link-height: 32px');
     expect(result.css).toContain('--ce-footer-link-border: var(--ce-border-raised)');
     expect(result.css).toContain('--ce-footer-link-active-border: var(--ce-border-inset)');
     expect(result.css).toContain('--ce-footer-link-bg: transparent');

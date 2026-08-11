@@ -217,8 +217,11 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     await footerLink.scrollIntoViewIfNeeded();
   }
   const classicFooterLinkState = footerLink
-    ? await footerLink.evaluate((element) => {
+      ? await footerLink.evaluate((element) => {
         const style = window.getComputedStyle(element);
+        const footer = element.closest('footer');
+        const footerRect = footer?.getBoundingClientRect();
+        const linkRect = element.getBoundingClientRect();
         return {
           backgroundColor: style.backgroundColor,
           borderBottomColor: style.borderBottomColor,
@@ -231,6 +234,9 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
           borderTopWidth: style.borderTopWidth,
           boxShadow: style.boxShadow,
           color: style.color,
+          footerLeft: footerRect?.left || 0,
+          height: linkRect.height,
+          left: linkRect.left,
         };
       })
     : null;
@@ -838,6 +844,13 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       /1px 1px 0px/,
       'Classic 95 footer links should use a compact raised shadow',
     );
+    if (viewportName !== 'mobile') {
+      assert.equal(classicFooterLinkState.height, 32, 'Classic 95 footer links should use compact taskbar height');
+      assert.ok(
+        Math.abs(classicFooterLinkState.left - classicFooterLinkState.footerLeft) <= 1,
+        'Classic 95 footer navigation should start flush with the taskbar',
+      );
+    }
     assert.deepEqual(
       [
         currentFooterLinkState.borderTopWidth,

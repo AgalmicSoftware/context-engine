@@ -104,15 +104,15 @@ describe('Footer', () => {
     });
   });
 
-  it('uses larger footer text in the full-screen layout', () => {
+  it('uses theme-owned footer text density in the full-screen layout', () => {
     expect(footerStylesheet).toMatch(
-      /@media \(min-width:\s*1367px\)\s*{[\s\S]*?\.footer\s*{[\s\S]*?\.copyright\s*{[\s\S]*?font-size:\s*1\.18rem;/,
+      /@media \(min-width:\s*1367px\)\s*{[\s\S]*?\.footer\s*{[\s\S]*?\.copyright\s*{[\s\S]*?font-size:\s*var\(--ce-footer-copyright-font-size-wide\);/,
     );
     expect(footerStylesheet).toMatch(
-      /@media \(min-width:\s*1367px\)\s*{[\s\S]*?\.footer\s*{[\s\S]*?nav\s*{[\s\S]*?ul\s*{[\s\S]*?li \.footerLink\s*{[\s\S]*?font-size:\s*1\.18rem;/,
+      /@media \(min-width:\s*1367px\)\s*{[\s\S]*?\.footer\s*{[\s\S]*?nav\s*{[\s\S]*?ul\s*{[\s\S]*?li \.footerLink\s*{[\s\S]*?font-size:\s*var\(--ce-footer-link-font-size-wide\);/,
     );
     expect(footerStylesheet).toMatch(
-      /@media \(min-width:\s*1367px\)\s*{[\s\S]*?\.footerLink\s*{[\s\S]*?font-size:\s*1\.18rem;/,
+      /@media \(min-width:\s*1367px\)\s*{[\s\S]*?\.footerLink\s*{[\s\S]*?font-size:\s*var\(--ce-footer-link-font-size-wide\);/,
     );
   });
 
@@ -121,7 +121,7 @@ describe('Footer', () => {
       /@media \(min-width:\s*769px\) and \(max-width:\s*1366px\)\s*{[\s\S]*?\.footer\s*{[\s\S]*?\.copyright\s*{[\s\S]*?font-family:\s*inherit;/,
     );
     expect(footerStylesheet).toMatch(
-      /@media \(min-width:\s*769px\) and \(max-width:\s*1366px\)\s*{[\s\S]*?\.footer\s*{[\s\S]*?nav\s*{[\s\S]*?ul\s*{[\s\S]*?li \.footerLink\s*{[\s\S]*?font-size:\s*1rem;/,
+      /@media \(min-width:\s*769px\) and \(max-width:\s*1366px\)\s*{[\s\S]*?\.footer\s*{[\s\S]*?nav\s*{[\s\S]*?ul\s*{[\s\S]*?li \.footerLink\s*{[\s\S]*?font-size:\s*var\(--ce-footer-link-font-size\);/,
     );
   });
 
@@ -135,5 +135,23 @@ describe('Footer', () => {
     expect(footerStylesheet).toMatch(
       /\.footer \.footerLink:active\s*{[\s\S]*?border-color:\s*var\(--ce-footer-link-active-border\);[\s\S]*?box-shadow:\s*var\(--ce-footer-link-active-shadow\);/,
     );
+  });
+
+  it('uses theme-owned desktop taskbar density and left alignment', () => {
+    const themeContract = fs.readFileSync(path.resolve(__dirname, '../../scss/themes/_contract.scss'), 'utf8');
+    const contextTheme = fs.readFileSync(path.resolve(__dirname, '../../scss/themes/_context-engine.scss'), 'utf8');
+    const classicTheme = fs.readFileSync(path.resolve(__dirname, '../../scss/themes/_classic-95.scss'), 'utf8');
+
+    expect(footerStylesheet).toMatch(
+      /@media \(min-width:\s*769px\) and \(max-width:\s*1366px\)\s*{[\s\S]*?\.footer\s*{[\s\S]*?padding:\s*var\(--ce-footer-bar-padding\);[\s\S]*?nav\s*{[\s\S]*?ul\s*{[\s\S]*?display:\s*flex;[\s\S]*?gap:\s*var\(--ce-footer-link-gap\);[\s\S]*?line-height:\s*1;[\s\S]*?li \.footerLink\s*{[\s\S]*?min-height:\s*var\(--ce-footer-link-height\);[\s\S]*?margin:\s*0 var\(--ce-footer-link-margin-x\) !important;[\s\S]*?padding:\s*0 var\(--ce-footer-link-padding-x\);/,
+    );
+    expect(themeContract).toContain('footer-bar-padding,');
+    expect(themeContract).toContain('footer-link-height,');
+    expect(contextTheme).toContain('footer-bar-padding: 0 1.5em,');
+    expect(contextTheme).toContain('footer-link-height: 50px,');
+    expect(classicTheme).toContain('footer-bar-padding: 2px 0,');
+    expect(classicTheme).toContain('footer-link-height: 32px,');
+    expect(classicTheme).toContain('footer-link-margin-x: 0,');
+    expect(classicTheme).toContain('footer-link-font-size: 0.78rem,');
   });
 });
