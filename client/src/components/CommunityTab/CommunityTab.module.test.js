@@ -53,4 +53,18 @@ describe('CommunityTab module styles', () => {
       /\.communityTab \.beeswarmSection\s*{[\s\S]*?background:\s*var\(--ce-data-viz-surface\);/,
     );
   });
+
+  it('keeps classic participant addresses readable on light rows', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'CommunityTab.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /\.communityTab \.leaderboardItem\s*{[\s\S]*?background:\s*var\(--ce-surface-light\);[\s\S]*?color:\s*var\(--ce-document-text\);/,
+    );
+    expect(scss).toMatch(
+      /\.communityTab \.leaderboardItem \.name\s*{[\s\S]*?color:\s*var\(--ce-document-text\) !important;[\s\S]*?opacity:\s*1;/,
+    );
+    expect(scss).toMatch(
+      /\.communityTab \.leaderboardItem:hover\s*{[\s\S]*?background:\s*var\(--ce-surface-alt\);[\s\S]*?color:\s*var\(--ce-document-text\);/,
+    );
+  });
 });

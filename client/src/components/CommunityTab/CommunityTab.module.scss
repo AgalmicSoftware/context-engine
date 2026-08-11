@@ -474,13 +474,19 @@
     border: 0;
     border-bottom: 1px solid var(--ce-edge-shadow);
     background: var(--ce-surface-light);
-    color: var(--ce-panel-text);
+    color: var(--ce-document-text);
     transition: none;
+  }
+
+  .communityTab .leaderboardItem .name {
+    color: var(--ce-document-text) !important;
+    opacity: 1;
   }
 
   .communityTab .leaderboardItem:hover {
     border-color: var(--ce-edge-shadow);
     background: var(--ce-surface-alt);
+    color: var(--ce-document-text);
   }
 
   .communityTab .avatar {

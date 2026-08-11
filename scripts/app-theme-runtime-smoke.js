@@ -780,7 +780,13 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
           statIconRatio: textRatio('[class*="statIcon"]'),
           statCountRatio: textRatio('[class*="statCount"]'),
           statLabelRatio: textRatio('[class*="statLabel"]'),
-          leaderboardRatio: textRatio('[class*="leaderboardItem"]'),
+          leaderboardRatio: textRatio('[class*="leaderboardItem"] [class*="name"]'),
+          leaderboardTextColor: window.getComputedStyle(
+            document.querySelector('[class*="leaderboardItem"] [class*="name"]'),
+          ).color,
+          leaderboardTextOpacity: Number.parseFloat(
+            window.getComputedStyle(document.querySelector('[class*="leaderboardItem"] [class*="name"]')).opacity,
+          ),
           axisLabelRatio: textRatio('[data-testid="ce-community-beeswarm-section"] text', 'fill'),
           pointRatio:
             firstPointStyle && svg ? ratio(firstPointStyle.fill, window.getComputedStyle(svg).backgroundColor) : 0,
@@ -1327,6 +1333,12 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       'none',
       'Community Stats hover details should not block nearby points',
     );
+    assert.equal(
+      statsContrastState.leaderboardTextColor,
+      'rgb(0, 0, 0)',
+      'Classic 95 participant addresses should use readable black text on light rows',
+    );
+    assert.equal(statsContrastState.leaderboardTextOpacity, 1, 'Classic 95 participant addresses should be fully opaque');
     [
       ['stat icon', statsContrastState.statIconRatio, 3],
       ['stat count', statsContrastState.statCountRatio, 4.5],
@@ -1529,10 +1541,13 @@ async function main() {
   const welcomeFitOnly = process.env.WELCOME_FIT_ONLY === '1';
   const homeTabsOnly = process.argv.includes('--home-tabs-only');
   const questionUtilitiesOnly = process.argv.includes('--question-utilities-only');
+  const statsOnly = process.argv.includes('--stats-only');
   const routeCases = homeTabsOnly
     ? ROUTE_CASES.filter((routeCase) => routeCase.requiresSpreadHomeTabs)
     : questionUtilitiesOnly
       ? ROUTE_CASES.filter((routeCase) => routeCase.requiresReadableQuestionUtilities)
+      : statsOnly
+        ? ROUTE_CASES.filter((routeCase) => routeCase.requiresReadableStats)
       : ROUTE_CASES;
   const browser = await chromium.launch({ headless: true });
 
@@ -1554,7 +1569,7 @@ async function main() {
         await page.close();
       }
     }
-    if (!homeTabsOnly && !questionUtilitiesOnly) {
+    if (!homeTabsOnly && !questionUtilitiesOnly && !statsOnly) {
       for (const viewport of WELCOME_FIT_VIEWPORTS) {
         await assertWelcomeFitsViewport(browser, baseUrl, viewport);
       }
@@ -1566,6 +1581,8 @@ async function main() {
           ? `Classic 95 home tab-spacing Playwright smoke passed (${VIEWPORTS.length} viewports).`
           : questionUtilitiesOnly
             ? `Classic 95 question utility-control Playwright smoke passed (${VIEWPORTS.length} viewports).`
+            : statsOnly
+              ? `Classic 95 Community Stats Playwright smoke passed (${VIEWPORTS.length} viewports).`
           : `App theme runtime Playwright smoke passed (${routeCases.length} routes × ${VIEWPORTS.length} viewports).`,
     );
   } finally {
