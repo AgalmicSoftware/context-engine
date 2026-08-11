@@ -60,10 +60,8 @@ class OnboardingWalkthrough extends Component<OnboardingWalkthroughProps, Onboar
     const title = getWelcomeSlide(this.state.arrowIndex)?.title || '';
 
     return title ? (
-      <div className={styles.onboardingInfo}>
-        <div className={styles.onboardingTitleArea}>
-          <h2 className={styles.onboardingTitle}>{title}</h2>
-        </div>
+      <div className={styles.onboardingTitleArea}>
+        <h2 className={styles.onboardingTitle}>{title}</h2>
       </div>
     ) : null;
   };

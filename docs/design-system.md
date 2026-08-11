@@ -65,6 +65,13 @@ Footer navigation consumes `--ce-footer-bar-*`, `--ce-footer-link-*`, and
 while `classic-95` presents a compact, left-aligned gray taskbar with raised
 route buttons, pressed inset states, and readable black text.
 
+The embedded Welcome deck keeps navigation in a compact bottom strip at every
+desktop width so the title, artwork, and copy remain inside one viewport-capped
+frame, including wide/short displays. Non-intro artwork consumes the
+`--ce-welcome-artwork-detail-*` tokens: Context Engine retains the original
+presentation while Classic 95 uses a quiet grayscale, low-opacity illustration
+treatment so the accessible HTML heading and bullet copy stay primary.
+
 Account and Settings surfaces consume `--ce-settings-*` tokens for panel,
 section, field, control, primary-text, muted-text, and placeholder pairings.
 Classic 95 uses gray dialog surfaces, black primary copy, dark-gray secondary
@@ -282,3 +289,6 @@ desktop and mobile widths. It boots `classic-95`, switches to `context-engine`
 without reload, and verifies palette, typography, geometry, modal chrome,
 Session Wizard preview scope, Community Stats/tooltip contrast and data spread,
 the shared compact non-blocking beeswarm hover card, and horizontal overflow.
+Welcome geometry is also checked at compact, wide, and ultra-wide/short desktop
+sizes so content, artwork, and the bottom controls cannot overlap or escape the
+frame.

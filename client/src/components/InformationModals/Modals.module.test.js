@@ -72,7 +72,7 @@ describe('Modals contrast styles', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'Modals.module.scss'), 'utf8');
 
     expect(scss).toMatch(
-      /\.welcomeSlideImageGoals\s*\{[\s\S]*?max-height:\s*100%;[\s\S]*?mix-blend-mode:\s*var\(--ce-welcome-artwork-blend-cutout\)\s*!important;[\s\S]*?opacity:\s*0\.86;/,
+      /\.welcomeSlideImageGoals\s*\{[\s\S]*?max-height:\s*100%;[\s\S]*?mix-blend-mode:\s*var\(--ce-welcome-artwork-blend-cutout\)\s*!important;[\s\S]*?opacity:\s*calc\(0\.86 \* var\(--ce-welcome-artwork-detail-opacity-scale\)\);/,
     );
     expect(scss).not.toMatch(/\.welcomeSlideImageGoals\s*\{[\s\S]*?filter:\s*invert\(1\);/);
   });
@@ -81,7 +81,7 @@ describe('Modals contrast styles', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'Modals.module.scss'), 'utf8');
 
     expect(scss).toMatch(
-      /\.welcomeSlideImageAudience\s*\{[\s\S]*?mix-blend-mode:\s*var\(--ce-welcome-artwork-blend-cutout\)\s*!important;[\s\S]*?opacity:\s*1;[\s\S]*?filter:\s*brightness\(1\.08\) saturate\(1\.18\) contrast\(1\.08\);/,
+      /\.welcomeSlideImageAudience\s*\{[\s\S]*?mix-blend-mode:\s*var\(--ce-welcome-artwork-blend-cutout\)\s*!important;[\s\S]*?opacity:\s*var\(--ce-welcome-artwork-detail-opacity-scale\);[\s\S]*?filter:\s*brightness\(1\.08\) saturate\(1\.18\) contrast\(1\.08\) var\(--ce-welcome-artwork-detail-filter\);/,
     );
     expect(scss).not.toMatch(/\.welcomeSlideImageAudience\s*\{[\s\S]*?mask-image:/);
   });
@@ -104,6 +104,16 @@ describe('Modals contrast styles', () => {
     expect(classicTheme).toContain('welcome-artwork-blend-soft: screen,');
     expect(classicTheme).toContain('welcome-artwork-blend-intense: screen,');
     expect(classicTheme).toContain('welcome-artwork-blend-cutout: screen,');
+    expect(contextTheme).toContain('welcome-artwork-detail-opacity-scale: 1,');
+    expect(contextTheme).toContain('welcome-artwork-detail-filter: grayscale(0) contrast(1),');
+    expect(classicTheme).toContain('welcome-artwork-detail-opacity-scale: 0.3,');
+    expect(classicTheme).toContain('welcome-artwork-detail-filter: grayscale(1) contrast(1.08),');
+    expect(embeddedDeck).toMatch(
+      /\.welcomeSlideImageCollaborators\s*\{[\s\S]*?opacity:\s*calc\(0\.75 \* var\(--ce-welcome-artwork-detail-opacity-scale\)\);[\s\S]*?filter:\s*var\(--ce-welcome-artwork-detail-filter\);/,
+    );
+    expect(embeddedDeck).toMatch(
+      /\.welcomeSlideEmbed \.welcomeSlideLayout \.welcomeSlideImage\s*\{[\s\S]*?max-height:\s*100%\s*!important;[\s\S]*?object-fit:\s*contain;/,
+    );
   });
 
   it('delegates the welcome media target chrome to the shared frameless control recipe', () => {

@@ -168,6 +168,8 @@ $theme: (
   welcome-artwork-blend-soft: screen,
   welcome-artwork-blend-intense: screen,
   welcome-artwork-blend-cutout: screen,
+  welcome-artwork-detail-opacity-scale: 0.3,
+  welcome-artwork-detail-filter: grayscale(1) contrast(1.08),
   welcome-artwork-backdrop: linear-gradient(
       90deg,
       #5b8cff,

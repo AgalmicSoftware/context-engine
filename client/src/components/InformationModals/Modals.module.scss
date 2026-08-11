@@ -1617,6 +1617,15 @@ input[type='radio']:checked:after {
 
   .welcomeSlideBulletItems {
     align-self: center;
+    margin-top: 0;
+    margin-bottom: 0;
+    font-size: clamp(14px, 1.35vw, 18px);
+  }
+
+  .welcomeSlideBulletText {
+    margin: 0 0 6px;
+    padding: 3px 8px;
+    line-height: 1.2;
   }
 }
 
@@ -1627,6 +1636,15 @@ input[type='radio']:checked:after {
 
   .welcomeSlideBulletItems {
     align-self: center;
+    margin-top: 0;
+    margin-bottom: 0;
+    font-size: clamp(16px, 1.1vw, 21px);
+  }
+
+  .welcomeSlideBulletText {
+    margin: 0 0 8px;
+    padding: 4px 10px;
+    line-height: 1.25;
   }
 
   .welcomeSlideImageIntro {
@@ -1675,7 +1693,8 @@ input[type='radio']:checked:after {
   max-width: 35vw;
   align-self: flex-end;
   mix-blend-mode: var(--ce-welcome-artwork-blend-soft) !important;
-  opacity: 0.75;
+  opacity: calc(0.75 * var(--ce-welcome-artwork-detail-opacity-scale));
+  filter: var(--ce-welcome-artwork-detail-filter);
 }
 
 .welcomeSlideImageMotivation {
@@ -1684,7 +1703,8 @@ input[type='radio']:checked:after {
   align-self: flex-end;
   mix-blend-mode: var(--ce-welcome-artwork-blend-intense) !important;
   justify-content: unset !important;
-  opacity: 0.8;
+  opacity: calc(0.8 * var(--ce-welcome-artwork-detail-opacity-scale));
+  filter: var(--ce-welcome-artwork-detail-filter);
 }
 
 .welcomeSlideImageLegacy {
@@ -1699,7 +1719,8 @@ input[type='radio']:checked:after {
   mix-blend-mode: var(--ce-welcome-artwork-blend-intense) !important;
   align-self: center;
   object-position: center center;
-  filter: opacity(0.5);
+  opacity: calc(0.5 * var(--ce-welcome-artwork-detail-opacity-scale));
+  filter: var(--ce-welcome-artwork-detail-filter);
 }
 
 .welcomeSlideMediaButton[data-slide-layout='flushBottom'] {
@@ -1766,7 +1787,8 @@ input[type='radio']:checked:after {
   max-width: 100%;
   mix-blend-mode: var(--ce-welcome-artwork-blend-cutout) !important;
   align-self: flex-end;
-  opacity: 0.86;
+  opacity: calc(0.86 * var(--ce-welcome-artwork-detail-opacity-scale));
+  filter: var(--ce-welcome-artwork-detail-filter);
 }
 
 .welcomeSlideImageAudience {
@@ -1774,8 +1796,8 @@ input[type='radio']:checked:after {
   max-width: 100%;
   mix-blend-mode: var(--ce-welcome-artwork-blend-cutout) !important;
   align-self: flex-end;
-  opacity: 1;
-  filter: brightness(1.08) saturate(1.18) contrast(1.08);
+  opacity: var(--ce-welcome-artwork-detail-opacity-scale);
+  filter: brightness(1.08) saturate(1.18) contrast(1.08) var(--ce-welcome-artwork-detail-filter);
 }
 
 .welcomeSlideImageAudienceBlend {
@@ -1902,5 +1924,11 @@ input[type='radio']:checked:after {
     height: 100% !important;
     min-height: 0;
     max-height: 100%;
+  }
+
+  .welcomeSlideEmbed .welcomeSlideLayout .welcomeSlideImage {
+    max-height: 100% !important;
+    max-width: 100%;
+    object-fit: contain;
   }
 }

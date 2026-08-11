@@ -44,6 +44,7 @@ const VIEWPORTS = Object.freeze([
 const WELCOME_FIT_VIEWPORTS = Object.freeze([
   { name: 'compact desktop', width: 1280, height: 720 },
   { name: 'wide desktop', width: 1904, height: 900 },
+  { name: 'ultra-wide short desktop', width: 2048, height: 876 },
 ]);
 
 const readThemeState = () => {
@@ -1096,14 +1097,36 @@ async function assertWelcomeFitsViewport(browser, baseUrl, viewport) {
     await welcomeLink.waitFor({ state: 'visible', timeout: 30000 });
     await welcomeLink.click();
     await page.getByTestId('ce-welcome-slide-media').waitFor({ state: 'visible' });
+    const nextSlideButton = page.locator(
+      '[class*="onboardingControls"] > button[class*="takeSurveyButton"]',
+    );
+    for (let slideIndex = 1; slideIndex < 6; slideIndex += 1) {
+      await nextSlideButton.click();
+    }
+    await page.waitForFunction(
+      () => document.querySelector('[data-testid="ce-welcome-slide-media"]')?.dataset.slideKey === 'looking-for',
+    );
 
     const fit = await page.evaluate(() => {
       const footer = document.querySelector('footer');
+      const walkthrough = document.querySelector('[class*="onboardingWalkthrough"]');
+      const info = walkthrough?.querySelector(':scope > [class*="onboardingInfo"]');
+      const controls = walkthrough?.querySelector(':scope > [class*="onboardingControls"]');
+      const title = info?.querySelector('[class*="onboardingTitle"]');
+      const slideLayout = info?.querySelector('[class*="welcomeSlideLayout"]');
+      const slideImage = info?.querySelector('[data-testid="ce-welcome-slide-image"]');
+      const rect = (element) => element?.getBoundingClientRect() || null;
       const footerBottom = footer?.getBoundingClientRect().bottom || 0;
       return {
         clientHeight: document.documentElement.clientHeight,
         footerBottom,
         scrollHeight: document.documentElement.scrollHeight,
+        walkthrough: rect(walkthrough),
+        info: rect(info),
+        controls: rect(controls),
+        title: rect(title),
+        slideLayout: rect(slideLayout),
+        slideImage: rect(slideImage),
       };
     });
 
@@ -1111,6 +1134,27 @@ async function assertWelcomeFitsViewport(browser, baseUrl, viewport) {
       fit.footerBottom <= fit.clientHeight + 1 && fit.scrollHeight <= fit.clientHeight + 1,
       `Welcome screen should fit the ${viewport.name} viewport; received footer bottom ${fit.footerBottom.toFixed(1)}px, scroll height ${fit.scrollHeight}px, viewport ${fit.clientHeight}px`,
     );
+    assert.ok(fit.walkthrough && fit.info && fit.controls, `${viewport.name} welcome geometry should render`);
+    assert.ok(
+      fit.info.top >= fit.walkthrough.top - 1 && fit.info.bottom <= fit.controls.top + 1,
+      `${viewport.name} welcome content should remain above its controls`,
+    );
+    assert.ok(
+      fit.controls.left <= fit.walkthrough.left + 1 && fit.controls.right >= fit.walkthrough.right - 1,
+      `${viewport.name} welcome controls should span the bottom edge`,
+    );
+    if (fit.title && fit.slideLayout) {
+      assert.ok(
+        fit.title.bottom <= fit.slideLayout.top + 1,
+        `${viewport.name} welcome title should not overlap the slide artwork`,
+      );
+    }
+    if (fit.slideImage && fit.slideLayout) {
+      assert.ok(
+        fit.slideImage.top >= fit.slideLayout.top - 1 && fit.slideImage.bottom <= fit.slideLayout.bottom + 1,
+        `${viewport.name} welcome artwork should remain inside its slide panel`,
+      );
+    }
   } finally {
     await page.close();
   }

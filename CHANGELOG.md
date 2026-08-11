@@ -311,10 +311,12 @@ All notable changes to this project will be documented in this file.
   full-screen width and viewport height while retaining compact mobile sizing.
 - Replaced the default Tools image-card status frame with UserPage-style 3D
   depth, keeping live/future borders visible only while demo mode is enabled.
-- Split the desktop main-screen welcome controls into equal-height rows and
-  aligned their rail to the slide edges without changing session welcome slides.
-- Stabilized the desktop main-screen welcome carousel at one responsive frame
-  height so advancing between slides no longer resizes the card.
+- Moved desktop main-screen Welcome controls into a compact bottom strip and
+  kept titles, artwork, and copy within one viewport-capped frame, including
+  ultra-wide/short displays, without changing session welcome slides.
+- Added theme-owned Welcome artwork detail controls so Classic 95 can present
+  legacy slide images as quiet grayscale illustrations while Context Engine
+  preserves its original treatment.
 - Added the agent bridge worker and its test runner to the public release
   surface, with public-safe setup examples and artifact-level PII verification.
 

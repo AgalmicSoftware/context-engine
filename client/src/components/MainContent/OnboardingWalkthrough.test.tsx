@@ -47,6 +47,8 @@ describe('OnboardingWalkthrough', () => {
     expect(screen.getByText('Goals')).toBeInTheDocument();
     expect(container.querySelector('.onboardingTitleArea')).toBeInTheDocument();
     expect(container.querySelector('.onboardingTitle')).toBeInTheDocument();
+    expect(container.querySelectorAll('.onboardingInfo')).toHaveLength(1);
+    expect(container.querySelector('.onboardingInfo > .onboardingTitleArea')).toBeInTheDocument();
 
     fireEvent.click(screen.getByText('Advance slide'));
     fireEvent.click(screen.getByText('Advance slide'));
