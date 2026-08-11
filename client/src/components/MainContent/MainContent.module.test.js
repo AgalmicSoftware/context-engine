@@ -57,4 +57,14 @@ describe('Main welcome walkthrough styles', () => {
     );
     expect(scss).toMatch(/\.mainTabsCardHeader\s*{[\s\S]*?background:\s*var\(--ce-titlebar-bg\);/);
   });
+
+  it('spreads the classic home tabs evenly across the title bar', () => {
+    expect(scss).toMatch(
+      /\.mainTabsCardHeader :global\(\.nav-tabs\)\s*{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\);/,
+    );
+    expect(scss).toMatch(
+      /\.mainTabsCardHeader :global\(\.nav-item\)\s*{[\s\S]*?width:\s*100%;/,
+    );
+    expect(scss).not.toMatch(/\.nav-item:has\(\.nav-link\.active\)[\s\S]*?order:\s*-1;/);
+  });
 });

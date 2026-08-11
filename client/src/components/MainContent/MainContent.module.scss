@@ -694,7 +694,8 @@
   }
 
   .mainTabsCardHeader :global(.nav-tabs) {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     align-items: center;
     gap: 3px;
     min-height: 28px;
@@ -703,17 +704,8 @@
   }
 
   .mainTabsCardHeader :global(.nav-item) {
-    flex: 0 0 28px;
-    width: 28px;
-    order: 1;
-  }
-
-  .mainTabsCardHeader :global(.nav-item:has(.nav-link.active)) {
-    flex: 1 1 auto;
-    width: auto;
+    width: 100%;
     min-width: 0;
-    margin-right: auto;
-    order: -1;
   }
 
   .mainTabsCardHeader :global(.nav-link) {
@@ -724,7 +716,7 @@
     min-width: 28px;
     height: 26px;
     min-height: 26px;
-    margin: 0;
+    margin: 0 auto;
     padding: 2px;
     border: 2px solid;
     border-color: var(--ce-border-raised);
@@ -741,6 +733,7 @@
   .mainTabsCardHeader :global(.nav-link.active) {
     justify-content: flex-start;
     width: 100%;
+    margin: 0;
     padding: 2px 8px;
     border: 0;
     background: transparent;

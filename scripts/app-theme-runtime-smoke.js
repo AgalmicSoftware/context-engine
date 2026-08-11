@@ -11,6 +11,7 @@ const ROUTE_CASES = Object.freeze([
     requiresFooterButtons: true,
     requiresStandardToolCards: true,
   },
+  { path: '/', label: 'home title-bar tab spacing', requiresSpreadHomeTabs: true },
   {
     path: '/',
     label: 'home welcome and login surfaces',
@@ -180,6 +181,9 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   });
   await page.waitForSelector('#root', { state: 'attached', timeout: 15000 });
   await page.waitForFunction(() => document.querySelector('#root')?.children.length > 0, null, { timeout: 15000 });
+  if (routeCase.requiresSpreadHomeTabs) {
+    await page.locator('[role="tablist"]').waitFor({ state: 'visible', timeout: 15000 });
+  }
 
   const toolCard = routeCase.requiresStandardToolCards ? page.locator('div[class^="_square_"]').first() : null;
   if (toolCard) await toolCard.waitFor({ state: 'visible' });
@@ -404,6 +408,14 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   const routeState = await page.evaluate(() => {
     const root = document.querySelector('#root');
     const preview = document.querySelector('[data-testid="ce-wizard-session-color-preview"]');
+    const homeTabs = document.querySelector('[role="tablist"]');
+    const homeTabCenters = homeTabs
+      ? Array.from(homeTabs.children).map((item) => {
+          const rect = item.getBoundingClientRect();
+          return rect.left + rect.width / 2;
+        })
+      : [];
+    const homeTabGaps = homeTabCenters.slice(1).map((center, index) => center - homeTabCenters[index]);
     const rootRect = root?.getBoundingClientRect();
     const overflow = Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth);
     const overflowElements = Array.from(document.querySelectorAll('body *'))
@@ -425,6 +437,8 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       rootWidth: rootRect?.width || 0,
       overflow,
       overflowElements,
+      homeTabCount: homeTabCenters.length,
+      homeTabGapRange: homeTabGaps.length ? Math.max(...homeTabGaps) - Math.min(...homeTabGaps) : null,
       sessionPreviewAccent: preview
         ? window.getComputedStyle(preview).getPropertyValue('--ce-session-accent').trim()
         : '',
@@ -963,6 +977,13 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   if (routeCase.requiresSessionColors) {
     assert.ok(routeState.sessionPreviewAccent, 'Session Wizard preview should expose its scoped accent immediately');
   }
+  if (routeCase.requiresSpreadHomeTabs) {
+    assert.equal(routeState.homeTabCount, 4, 'Classic 95 home title bar should expose all four tab options');
+    assert.ok(
+      routeState.homeTabGapRange !== null && routeState.homeTabGapRange <= 2,
+      `Classic 95 home title-bar options should be evenly spaced; received a ${routeState.homeTabGapRange}px gap range`,
+    );
+  }
   if (classicToolCardState?.hovered && currentToolCardState) {
     assert.deepEqual(
       [
@@ -1410,6 +1431,8 @@ async function assertWelcomeFitsViewport(browser, baseUrl, viewport) {
 async function main() {
   const baseUrl = normalizeBaseUrl(process.env.BASE_URL || 'http://127.0.0.1:3000');
   const welcomeFitOnly = process.env.WELCOME_FIT_ONLY === '1';
+  const homeTabsOnly = process.argv.includes('--home-tabs-only');
+  const routeCases = homeTabsOnly ? ROUTE_CASES.filter((routeCase) => routeCase.requiresSpreadHomeTabs) : ROUTE_CASES;
   const browser = await chromium.launch({ headless: true });
 
   try {
@@ -1424,19 +1447,23 @@ async function main() {
           window.localStorage.setItem('ce:primarySessionSlug', 'demo-sh');
           window.localStorage.setItem('ce:selectedSessionScope', 'active');
         });
-        for (const routeCase of ROUTE_CASES) {
+        for (const routeCase of routeCases) {
           await inspectRoute(page, baseUrl, routeCase, viewport.name);
         }
         await page.close();
       }
     }
-    for (const viewport of WELCOME_FIT_VIEWPORTS) {
-      await assertWelcomeFitsViewport(browser, baseUrl, viewport);
+    if (!homeTabsOnly) {
+      for (const viewport of WELCOME_FIT_VIEWPORTS) {
+        await assertWelcomeFitsViewport(browser, baseUrl, viewport);
+      }
     }
     console.log(
       welcomeFitOnly
         ? `Welcome fit Playwright smoke passed (${WELCOME_FIT_VIEWPORTS.length} viewports).`
-        : `App theme runtime Playwright smoke passed (${ROUTE_CASES.length} routes × ${VIEWPORTS.length} viewports).`,
+        : homeTabsOnly
+          ? `Classic 95 home tab-spacing Playwright smoke passed (${VIEWPORTS.length} viewports).`
+          : `App theme runtime Playwright smoke passed (${routeCases.length} routes × ${VIEWPORTS.length} viewports).`,
     );
   } finally {
     await browser.close();
