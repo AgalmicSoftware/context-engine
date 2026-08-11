@@ -37,6 +37,9 @@ describe('runtime SCSS theme contract', () => {
     expect(result.css).toContain('--ce-action-submit: #000080');
     expect(result.css).toContain('--ce-nav-tab-inactive: #c0c0c0');
     expect(result.css).toContain('--ce-response-agree-bg: #c0e0c0');
+    expect(result.css).toContain('--ce-binary-choice-agree-bg: #4caf50');
+    expect(result.css).toContain('--ce-binary-choice-unsure-bg: #ffeb3b');
+    expect(result.css).toContain('--ce-binary-choice-disagree-bg: #f44336');
     expect(result.css).toContain('--ce-data-viz-point: #000080');
     expect(result.css).toContain('--ce-brand-logo-blend-mode: screen');
     expect(result.css).toContain('--ce-recognition-logo-backing: transparent');

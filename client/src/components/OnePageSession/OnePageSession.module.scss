@@ -40,7 +40,8 @@
   margin-bottom: 5px !important;
   position: relative;
   z-index: 40;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.4s ease;
+  animation: fadeOutTitle 0.6s ease 5s forwards;
 
   &:hover,
   &:focus-within,

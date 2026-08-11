@@ -7,6 +7,14 @@ const readSurveyToolScss = () => fs.readFileSync(path.join(__dirname, 'SurveyToo
 const readFinalSubmitCtaScss = () => fs.readFileSync(path.join(__dirname, '../../scss/_finalSubmitCta.scss'), 'utf8');
 
 describe('SurveyTool styles', () => {
+  it('keeps binary responses on their dedicated green, yellow, and red theme palette', () => {
+    const scss = readSurveyToolScss();
+
+    expect(scss).toMatch(/&\.agree\s*{[\s\S]*?background-color:\s*var\(--ce-binary-choice-agree-bg\);/);
+    expect(scss).toMatch(/&\.unsure\s*{[\s\S]*?background-color:\s*var\(--ce-binary-choice-unsure-bg\);/);
+    expect(scss).toMatch(/&\.disagree\s*{[\s\S]*?background-color:\s*var\(--ce-binary-choice-disagree-bg\);/);
+  });
+
   it('renders classic pile questions as compact desktop dialogs', () => {
     const scss = readSurveyToolScss();
 

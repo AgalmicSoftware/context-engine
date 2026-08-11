@@ -621,7 +621,17 @@ describe('OnePageSession view gating', () => {
     expect(titleContainer).not.toHaveClass(styles.titleContainerWithPileSubmitRail);
   });
 
-  it('limits the pile submit rail title offset to phone widths where the rail is absolute', () => {
+  it('fades the session title after five seconds and restores it on interaction', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
+    const titleBlock = extractMediaBlock(scss, '.titleContainer {');
+
+    expect(titleBlock).toContain('transition: opacity 0.4s ease;');
+    expect(titleBlock).toContain('animation: fadeOutTitle 0.6s ease 5s forwards;');
+    expect(titleBlock).toMatch(/&:hover,[\s\S]*?&:focus-within,[\s\S]*?&:active\s*{[\s\S]*?animation:\s*none;[\s\S]*?opacity:\s*1;/);
+    expect(scss).toMatch(/@keyframes fadeOutTitle\s*{[\s\S]*?opacity:\s*0;/);
+  });
+
+  it('keeps phone pile titles unshifted while preserving top-rail title offsets elsewhere', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
     const phoneRailBlock = extractMediaBlock(
       scss,

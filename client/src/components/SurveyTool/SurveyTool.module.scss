@@ -361,7 +361,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     }
 
     &.agree {
-      background-color: var(--ce-status-success);
+      background-color: var(--ce-binary-choice-agree-bg);
       color: var(--ce-color-white);
       &:before {
         font-weight: 900;
@@ -370,11 +370,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     }
 
     &.unsure {
-      background-color: var(--ce-status-warning);
+      background-color: var(--ce-binary-choice-unsure-bg);
     }
 
     &.disagree {
-      background-color: var(--ce-status-error);
+      background-color: var(--ce-binary-choice-disagree-bg);
       color: var(--ce-color-white);
       &:before {
         font-weight: 900;
@@ -4362,15 +4362,15 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 
   #binaryChoice .radioOptionText.agree::before {
-    background: var(--ce-status-success);
+    background: var(--ce-binary-choice-agree-bg);
   }
 
   #binaryChoice .radioOptionText.unsure::before {
-    background: var(--ce-status-warning);
+    background: var(--ce-binary-choice-unsure-bg);
   }
 
   #binaryChoice .radioOptionText.disagree::before {
-    background: var(--ce-status-error);
+    background: var(--ce-binary-choice-disagree-bg);
   }
 
   #binaryChoice .radioOptionText:hover {
