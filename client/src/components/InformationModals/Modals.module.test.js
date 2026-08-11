@@ -57,6 +57,21 @@ describe('Modals contrast styles', () => {
     );
   });
 
+  it('fills the Classic 95 fixed window at compact widths without changing the fluid deck', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'Modals.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-welcome-slide-mode: fixed-window\)\s*{[\s\S]*?\.welcomeSlideEmbed\s*{[\s\S]*?height:\s*100%;[\s\S]*?min-height:\s*0;[\s\S]*?overflow:\s*hidden;/,
+    );
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-welcome-slide-mode: fixed-window\)\s*{[\s\S]*?\.welcomeSlideFooter\s*{[\s\S]*?display:\s*flex;[\s\S]*?height:\s*100%;[\s\S]*?overflow:\s*hidden;/,
+    );
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-welcome-slide-mode: fixed-window\)\s*{[\s\S]*?\.welcomeSlideImageIntro\[data-slide-layout='flushBottom'\]\s*{\s*transform:\s*none;/,
+    );
+    expect(scss).not.toContain('@container ce-theme style(--ce-welcome-slide-mode: fluid)');
+  });
+
   it('keeps the desktop right sidebar visible even when its inner content is empty', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'Modals.module.scss'), 'utf8');
 

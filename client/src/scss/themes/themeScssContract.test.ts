@@ -33,6 +33,8 @@ describe('runtime SCSS theme contract', () => {
     expect(result.css).toContain('--ce-canvas: #008080');
     expect(result.css).toContain('--ce-layout-profile: standard-app');
     expect(result.css).toContain('--ce-layout-profile: desktop-window');
+    expect(result.css).toContain('--ce-welcome-slide-mode: fluid');
+    expect(result.css).toContain('--ce-welcome-slide-mode: fixed-window');
     expect(result.css).toContain('--ce-border-raised: #ffffff #404040 #404040 #ffffff');
     expect(result.css).toContain('--ce-action-submit: #000080');
     expect(result.css).toContain('--ce-nav-tab-inactive: #c0c0c0');

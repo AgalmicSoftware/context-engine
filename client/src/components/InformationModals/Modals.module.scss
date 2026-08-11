@@ -1932,3 +1932,53 @@ input[type='radio']:checked:after {
     object-fit: contain;
   }
 }
+
+/* The Classic 95 deck behaves like a fixed-size window at every viewport.
+ * These rules deliberately sit behind a theme capability so the default deck
+ * keeps its original responsive flow. */
+@container ce-theme style(--ce-welcome-slide-mode: fixed-window) {
+  .welcomeSlideEmbed {
+    flex: 1 1 auto;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .welcomeSlideFooter {
+    display: flex;
+    flex: 1 1 auto;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .welcomeSlideEmbed .welcomeSlideLayout {
+    flex: 1 1 auto;
+    height: 100%;
+    min-height: 0;
+    margin-top: 0;
+    overflow: hidden;
+  }
+
+  .welcomeSlideEmbed .welcomeSlideSidebar {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .welcomeSlideEmbed .welcomeSlideLayout .welcomeSlideMediaButton,
+  .welcomeSlideEmbed .welcomeSlideLayout .welcomeSlideMediaButtonCentered {
+    height: 100% !important;
+    min-height: 0;
+    max-height: 100%;
+  }
+
+  .welcomeSlideEmbed .welcomeSlideLayout .welcomeSlideImage {
+    max-height: 100% !important;
+    max-width: 100%;
+    object-fit: contain;
+  }
+
+  .welcomeSlideImageIntro[data-slide-layout='flushBottom'] {
+    transform: none;
+  }
+}

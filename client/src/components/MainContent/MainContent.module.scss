@@ -789,6 +789,50 @@
   }
 }
 
+/* Classic window decks keep their title bar and arrow strip in one stable
+ * position while the artwork and copy resize inside the remaining pane. The
+ * standard Context Engine theme retains its existing content-driven layout. */
+@container ce-theme style(--ce-welcome-slide-mode: fixed-window) {
+  .onboardingWalkthrough {
+    --ce-classic-welcome-frame-height: var(--ce-main-welcome-frame-height, clamp(340px, 48dvh, 440px));
+    --ce-classic-welcome-controls-height: clamp(56px, 9dvh, 75px);
+    box-sizing: border-box;
+    height: var(--ce-classic-welcome-frame-height);
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .onboardingInfo {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .onboardingControls {
+    flex: 0 0 var(--ce-classic-welcome-controls-height);
+    width: 100%;
+    height: var(--ce-classic-welcome-controls-height);
+    min-height: var(--ce-classic-welcome-controls-height);
+  }
+
+  .onboardingControls > .sidebarOpen,
+  .onboardingControls > .openSidebarButton,
+  .onboardingControls > .takeSurveyButton {
+    height: 100%;
+    min-height: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  @container ce-theme style(--ce-welcome-slide-mode: fixed-window) {
+    .mainAreaTabsAlt,
+    #mainAreaTabs {
+      flex-basis: auto;
+    }
+  }
+}
+
 @media (max-width: 640px) {
   @container ce-theme style(--ce-layout-profile: desktop-window) {
     .mainAreaTabsAlt,

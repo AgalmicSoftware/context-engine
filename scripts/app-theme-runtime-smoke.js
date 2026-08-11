@@ -51,16 +51,16 @@ const VIEWPORTS = Object.freeze([
   { name: 'mobile', width: 390, height: 844 },
 ]);
 
-const TOOL_CARD_VIEWPORTS = Object.freeze([
-  ...VIEWPORTS,
-  { name: 'compact', width: 765, height: 799 },
-]);
+const TOOL_CARD_VIEWPORTS = Object.freeze([...VIEWPORTS, { name: 'compact', width: 765, height: 799 }]);
 
 const WELCOME_FIT_VIEWPORTS = Object.freeze([
+  { name: 'compact window', width: 765, height: 799 },
   { name: 'compact desktop', width: 1280, height: 720 },
   { name: 'wide desktop', width: 1904, height: 900 },
   { name: 'ultra-wide short desktop', width: 2048, height: 876 },
 ]);
+
+const WELCOME_SLIDE_KEYS = Object.freeze(['intro', 'toolkit', 'goals', 'built-to-help', 'because', 'looking-for']);
 
 const readThemeState = () => {
   const root = document.documentElement;
@@ -117,12 +117,15 @@ const auditVisibleTextContrast = (rootSelector) => {
       chain.unshift(current);
       current = current.parentElement;
     }
-    return chain.reduce((background, node) => {
-      const color = parseColor(window.getComputedStyle(node).backgroundColor);
-      if (!color) return background;
-      color.a *= Number(window.getComputedStyle(node).opacity || 1);
-      return composite(color, background);
-    }, { r: 255, g: 255, b: 255, a: 1 });
+    return chain.reduce(
+      (background, node) => {
+        const color = parseColor(window.getComputedStyle(node).backgroundColor);
+        if (!color) return background;
+        color.a *= Number(window.getComputedStyle(node).opacity || 1);
+        return composite(color, background);
+      },
+      { r: 255, g: 255, b: 255, a: 1 },
+    );
   };
   const luminance = ({ r, g, b }) => {
     const channels = [r, g, b].map((value) => {
@@ -137,7 +140,8 @@ const auditVisibleTextContrast = (rootSelector) => {
     .filter((element) => {
       const style = window.getComputedStyle(element);
       const rect = element.getBoundingClientRect();
-      if (style.display === 'none' || style.visibility === 'hidden' || rect.width <= 0 || rect.height <= 0) return false;
+      if (style.display === 'none' || style.visibility === 'hidden' || rect.width <= 0 || rect.height <= 0)
+        return false;
       if (element.getAttribute('aria-hidden') === 'true') return false;
       if (element.matches('input, select, textarea')) return true;
       return Array.from(element.childNodes).some(
@@ -241,15 +245,13 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     });
   }
 
-  const footerLink = routeCase.requiresFooterButtons
-    ? page.getByRole('link', { name: 'NEW', exact: true })
-    : null;
+  const footerLink = routeCase.requiresFooterButtons ? page.getByRole('link', { name: 'NEW', exact: true }) : null;
   if (footerLink) {
     await footerLink.waitFor({ state: 'visible' });
     await footerLink.scrollIntoViewIfNeeded();
   }
   const classicFooterLinkState = footerLink
-      ? await footerLink.evaluate((element) => {
+    ? await footerLink.evaluate((element) => {
         const style = window.getComputedStyle(element);
         const nav = element.closest('nav');
         const navRect = nav?.getBoundingClientRect();
@@ -413,7 +415,10 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   if (routeCase.requiresReadableAuthoring) {
     await page.getByText('Questions', { exact: true }).click();
     await page.waitForFunction(
-      () => /Questions\s*\([1-9]\d*\)/.test(document.querySelector('[data-testid="ce-survey-questions-toggle"]')?.textContent || ''),
+      () =>
+        /Questions\s*\([1-9]\d*\)/.test(
+          document.querySelector('[data-testid="ce-survey-questions-toggle"]')?.textContent || '',
+        ),
       null,
       { timeout: 15000 },
     );
@@ -438,7 +443,12 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
           const style = window.getComputedStyle(element);
           return {
             backgroundColor: style.backgroundColor,
-            borderWidths: [style.borderTopWidth, style.borderRightWidth, style.borderBottomWidth, style.borderLeftWidth],
+            borderWidths: [
+              style.borderTopWidth,
+              style.borderRightWidth,
+              style.borderBottomWidth,
+              style.borderLeftWidth,
+            ],
             boxShadow: style.boxShadow,
             color: style.color,
             opacity: Number.parseFloat(style.opacity),
@@ -824,7 +834,12 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
             ? { left: tooltipRect.left, right: tooltipRect.right, top: tooltipRect.top, bottom: tooltipRect.bottom }
             : null,
           hoveredPointRect: firstPointRect
-            ? { left: firstPointRect.left, right: firstPointRect.right, top: firstPointRect.top, bottom: firstPointRect.bottom }
+            ? {
+                left: firstPointRect.left,
+                right: firstPointRect.right,
+                top: firstPointRect.top,
+                bottom: firstPointRect.bottom,
+              }
             : null,
           tooltipPointerEvents: tooltipStyle?.pointerEvents || '',
         };
@@ -898,62 +913,75 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     routeCase.requiresReadableSessionSurface ||
     routeCase.requiresReadableSimUserSurface ||
     routeCase.requiresMinimalGroupsSurface
-      ? await page.evaluate((surface) => {
-          const parseRgb = (value) => {
-            const channels = String(value || '').match(/[\d.]+/g)?.map(Number) || [];
-            if (channels.length < 3) throw new Error(`Unsupported computed color: ${value}`);
-            return channels.slice(0, 3).map((channel) => channel / 255);
-          };
-          const luminance = (value) => {
-            const channels = parseRgb(value).map((channel) =>
-              channel <= 0.03928 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4),
-            );
-            return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
-          };
-          const backgroundFor = (element) => {
-            let current = element;
-            while (current) {
-              const background = window.getComputedStyle(current).backgroundColor;
-              const channels = String(background || '').match(/[\d.]+/g)?.map(Number) || [];
-              if (channels.length >= 3 && (channels.length < 4 || channels[3] > 0)) return background;
-              current = current.parentElement;
-            }
-            return window.getComputedStyle(document.documentElement).backgroundColor;
-          };
-          const textRatio = (selector) => {
-            const element = document.querySelector(selector);
-            if (!element) return 0;
-            const foregroundLuminance = luminance(window.getComputedStyle(element).color);
-            const backgroundLuminance = luminance(backgroundFor(element));
-            return (
-              (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) /
-              (Math.min(foregroundLuminance, backgroundLuminance) + 0.05)
-            );
-          };
+      ? await page.evaluate(
+          (surface) => {
+            const parseRgb = (value) => {
+              const channels =
+                String(value || '')
+                  .match(/[\d.]+/g)
+                  ?.map(Number) || [];
+              if (channels.length < 3) throw new Error(`Unsupported computed color: ${value}`);
+              return channels.slice(0, 3).map((channel) => channel / 255);
+            };
+            const luminance = (value) => {
+              const channels = parseRgb(value).map((channel) =>
+                channel <= 0.03928 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4),
+              );
+              return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+            };
+            const backgroundFor = (element) => {
+              let current = element;
+              while (current) {
+                const background = window.getComputedStyle(current).backgroundColor;
+                const channels =
+                  String(background || '')
+                    .match(/[\d.]+/g)
+                    ?.map(Number) || [];
+                if (channels.length >= 3 && (channels.length < 4 || channels[3] > 0)) return background;
+                current = current.parentElement;
+              }
+              return window.getComputedStyle(document.documentElement).backgroundColor;
+            };
+            const textRatio = (selector) => {
+              const element = document.querySelector(selector);
+              if (!element) return 0;
+              const foregroundLuminance = luminance(window.getComputedStyle(element).color);
+              const backgroundLuminance = luminance(backgroundFor(element));
+              return (
+                (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) /
+                (Math.min(foregroundLuminance, backgroundLuminance) + 0.05)
+              );
+            };
 
-          if (surface === 'session') {
-            const branding = document.querySelector('[class*="brandingSection"]');
+            if (surface === 'session') {
+              const branding = document.querySelector('[class*="brandingSection"]');
+              return {
+                brandingBackground: branding ? window.getComputedStyle(branding).backgroundColor : '',
+                promptRatio: textRatio('[class*="pileCardHeader"] h4'),
+                sessionTitleRatio: textRatio('[class*="brandingSectionTitle"]'),
+                sectionTitleRatio: textRatio('[class*="sectionHeaderTitle"]'),
+              };
+            }
+            if (surface === 'sim-user') {
+              return {
+                heroNameRatio: textRatio('[class*="heroName"]'),
+                heroBioRatio: textRatio('[class*="heroBio"]'),
+                quoteRatio: textRatio('[class*="featuredQuote"]'),
+              };
+            }
+            const refresh = document.querySelector('button[aria-label="Refresh groups"]');
             return {
-              brandingBackground: branding ? window.getComputedStyle(branding).backgroundColor : '',
-              promptRatio: textRatio('[class*="pileCardHeader"] h4'),
-              sessionTitleRatio: textRatio('[class*="brandingSectionTitle"]'),
-              sectionTitleRatio: textRatio('[class*="sectionHeaderTitle"]'),
+              hasLegacyListHeading: Boolean(document.querySelector('[class*="telegramListHeader"] span')),
+              refreshHasIcon: Boolean(refresh?.querySelector('svg')),
+              refreshText: refresh?.textContent?.trim() || '',
             };
-          }
-          if (surface === 'sim-user') {
-            return {
-              heroNameRatio: textRatio('[class*="heroName"]'),
-              heroBioRatio: textRatio('[class*="heroBio"]'),
-              quoteRatio: textRatio('[class*="featuredQuote"]'),
-            };
-          }
-          const refresh = document.querySelector('button[aria-label="Refresh groups"]');
-          return {
-            hasLegacyListHeading: Boolean(document.querySelector('[class*="telegramListHeader"] span')),
-            refreshHasIcon: Boolean(refresh?.querySelector('svg')),
-            refreshText: refresh?.textContent?.trim() || '',
-          };
-        }, routeCase.requiresReadableSessionSurface ? 'session' : routeCase.requiresReadableSimUserSurface ? 'sim-user' : 'groups')
+          },
+          routeCase.requiresReadableSessionSurface
+            ? 'session'
+            : routeCase.requiresReadableSimUserSurface
+              ? 'sim-user'
+              : 'groups',
+        )
       : null;
   const classicLogoState = routeCase.requiresBrightLogo
     ? await page
@@ -969,10 +997,13 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         })
     : null;
   const classicRecognitionLogoState = routeCase.requiresTransparentRecognitionLogos
-    ? await page.getByTestId('ce-about-recognition-ethereum').locator('img').evaluate((element) => {
-        const style = window.getComputedStyle(element);
-        return { backgroundColor: style.backgroundColor, borderColor: style.borderColor };
-      })
+    ? await page
+        .getByTestId('ce-about-recognition-ethereum')
+        .locator('img')
+        .evaluate((element) => {
+          const style = window.getComputedStyle(element);
+          return { backgroundColor: style.backgroundColor, borderColor: style.borderColor };
+        })
     : null;
 
   await page.evaluate(() => {
@@ -1023,10 +1054,13 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         })
     : null;
   const currentRecognitionLogoState = routeCase.requiresTransparentRecognitionLogos
-    ? await page.getByTestId('ce-about-recognition-ethereum').locator('img').evaluate((element) => {
-        const style = window.getComputedStyle(element);
-        return { backgroundColor: style.backgroundColor, borderColor: style.borderColor };
-      })
+    ? await page
+        .getByTestId('ce-about-recognition-ethereum')
+        .locator('img')
+        .evaluate((element) => {
+          const style = window.getComputedStyle(element);
+          return { backgroundColor: style.backgroundColor, borderColor: style.borderColor };
+        })
     : null;
   const currentWelcomeImageState = routeCase.requiresFramelessWelcome
     ? await page.getByTestId('ce-welcome-slide-image').evaluate((element) => {
@@ -1076,7 +1110,11 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       'rgba(0, 0, 0, 0)',
       'Classic 95 inactive home tab icons should rest on the title-bar background',
     );
-    assert.equal(routeState.inactiveHomeTabBoxShadow, 'none', 'Classic 95 inactive home tab icons should not be raised');
+    assert.equal(
+      routeState.inactiveHomeTabBoxShadow,
+      'none',
+      'Classic 95 inactive home tab icons should not be raised',
+    );
     assert.ok(
       routeState.inactiveHomeTabIconSize >= 20,
       `Classic 95 inactive home tab icons should be at least 20px; received ${routeState.inactiveHomeTabIconSize}px`,
@@ -1102,7 +1140,11 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       questionUtilityState.resting.opacity >= 0.8,
       `Classic 95 full-question utility icons should remain clearly visible; received opacity ${questionUtilityState.resting.opacity}`,
     );
-    assert.equal(questionUtilityState.hoveredOpacity, 1, 'Classic 95 full-question utility icons should become fully opaque on hover');
+    assert.equal(
+      questionUtilityState.hoveredOpacity,
+      1,
+      'Classic 95 full-question utility icons should become fully opaque on hover',
+    );
     assert.equal(
       questionUtilityState.focusedOutlineStyle,
       'dotted',
@@ -1192,7 +1234,11 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       'rgb(192, 192, 192)',
       'Classic 95 footer links should use the standard control face',
     );
-    assert.equal(classicFooterLinkState.color, 'rgb(0, 0, 0)', 'Classic 95 footer links should use readable black text');
+    assert.equal(
+      classicFooterLinkState.color,
+      'rgb(0, 0, 0)',
+      'Classic 95 footer links should use readable black text',
+    );
     assert.match(
       classicFooterLinkState.boxShadow,
       /1px 1px 0px/,
@@ -1375,7 +1421,11 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       'rgb(0, 0, 0)',
       'Classic 95 participant addresses should use readable black text on light rows',
     );
-    assert.equal(statsContrastState.leaderboardTextOpacity, 1, 'Classic 95 participant addresses should be fully opaque');
+    assert.equal(
+      statsContrastState.leaderboardTextOpacity,
+      1,
+      'Classic 95 participant addresses should be fully opaque',
+    );
     assert.ok(
       statsContrastState.leaderboardTextWidth > 0 && statsContrastState.leaderboardTextHeight > 0,
       `Classic 95 participant addresses should occupy visible layout space; received ${statsContrastState.leaderboardTextWidth.toFixed(2)}x${statsContrastState.leaderboardTextHeight.toFixed(2)}px`,
@@ -1448,7 +1498,11 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     });
   }
   if (routeCase.requiresMinimalGroupsSurface) {
-    assert.equal(reportedSurfaceState.hasLegacyListHeading, false, 'Groups should not restore the redundant list heading');
+    assert.equal(
+      reportedSurfaceState.hasLegacyListHeading,
+      false,
+      'Groups should not restore the redundant list heading',
+    );
     assert.equal(reportedSurfaceState.refreshHasIcon, true, 'Groups refresh should remain an icon control');
     assert.equal(reportedSurfaceState.refreshText, '', 'Groups refresh should not restore a visible text label');
   }
@@ -1514,64 +1568,78 @@ async function assertWelcomeFitsViewport(browser, baseUrl, viewport) {
     await welcomeLink.waitFor({ state: 'visible', timeout: 30000 });
     await welcomeLink.click();
     await page.getByTestId('ce-welcome-slide-media').waitFor({ state: 'visible' });
-    const nextSlideButton = page.locator(
-      '[class*="onboardingControls"] > button[class*="takeSurveyButton"]',
-    );
-    for (let slideIndex = 1; slideIndex < 6; slideIndex += 1) {
-      await nextSlideButton.click();
+    const nextSlideButton = page.locator('[class*="onboardingControls"] > button[class*="takeSurveyButton"]');
+    const slideFits = [];
+    for (let slideIndex = 0; slideIndex < WELCOME_SLIDE_KEYS.length; slideIndex += 1) {
+      const expectedSlideKey = WELCOME_SLIDE_KEYS[slideIndex];
+      await page.waitForFunction(
+        (slideKey) => document.querySelector('[data-testid="ce-welcome-slide-media"]')?.dataset.slideKey === slideKey,
+        expectedSlideKey,
+      );
+      slideFits.push(
+        await page.evaluate(() => {
+          const footer = document.querySelector('footer');
+          const walkthrough = document.querySelector('[class*="onboardingWalkthrough"]');
+          const info = walkthrough?.querySelector(':scope > [class*="onboardingInfo"]');
+          const controls = walkthrough?.querySelector(':scope > [class*="onboardingControls"]');
+          const title = info?.querySelector('[class*="onboardingTitle"]');
+          const slideLayout = info?.querySelector('[class*="welcomeSlideLayout"]');
+          const slideImage = info?.querySelector('[data-testid="ce-welcome-slide-image"]');
+          const slideKey = info?.querySelector('[data-testid="ce-welcome-slide-media"]')?.dataset.slideKey || '';
+          const rect = (element) => element?.getBoundingClientRect() || null;
+          const footerBottom = footer?.getBoundingClientRect().bottom || 0;
+          return {
+            slideKey,
+            clientHeight: document.documentElement.clientHeight,
+            footerBottom,
+            scrollHeight: document.documentElement.scrollHeight,
+            walkthrough: rect(walkthrough),
+            info: rect(info),
+            controls: rect(controls),
+            title: rect(title),
+            slideLayout: rect(slideLayout),
+            slideImage: rect(slideImage),
+          };
+        }),
+      );
+      if (slideIndex < WELCOME_SLIDE_KEYS.length - 1) await nextSlideButton.click();
     }
-    await page.waitForFunction(
-      () => document.querySelector('[data-testid="ce-welcome-slide-media"]')?.dataset.slideKey === 'looking-for',
-    );
 
-    const fit = await page.evaluate(() => {
-      const footer = document.querySelector('footer');
-      const walkthrough = document.querySelector('[class*="onboardingWalkthrough"]');
-      const info = walkthrough?.querySelector(':scope > [class*="onboardingInfo"]');
-      const controls = walkthrough?.querySelector(':scope > [class*="onboardingControls"]');
-      const title = info?.querySelector('[class*="onboardingTitle"]');
-      const slideLayout = info?.querySelector('[class*="welcomeSlideLayout"]');
-      const slideImage = info?.querySelector('[data-testid="ce-welcome-slide-image"]');
-      const rect = (element) => element?.getBoundingClientRect() || null;
-      const footerBottom = footer?.getBoundingClientRect().bottom || 0;
-      return {
-        clientHeight: document.documentElement.clientHeight,
-        footerBottom,
-        scrollHeight: document.documentElement.scrollHeight,
-        walkthrough: rect(walkthrough),
-        info: rect(info),
-        controls: rect(controls),
-        title: rect(title),
-        slideLayout: rect(slideLayout),
-        slideImage: rect(slideImage),
-      };
+    const firstFit = slideFits[0];
+    slideFits.forEach((fit) => {
+      const slideLabel = `${viewport.name} ${fit.slideKey} welcome slide`;
+      assert.ok(
+        fit.footerBottom <= fit.clientHeight + 1 && fit.scrollHeight <= fit.clientHeight + 1,
+        `${slideLabel} should fit the viewport; received footer bottom ${fit.footerBottom.toFixed(1)}px, scroll height ${fit.scrollHeight}px, viewport ${fit.clientHeight}px`,
+      );
+      assert.ok(fit.walkthrough && fit.info && fit.controls, `${slideLabel} geometry should render`);
+      assert.ok(
+        fit.info.top >= fit.walkthrough.top - 1 && fit.info.bottom <= fit.controls.top + 1,
+        `${slideLabel} content should remain above its controls`,
+      );
+      assert.ok(
+        fit.controls.left <= fit.walkthrough.left + 1 && fit.controls.right >= fit.walkthrough.right - 1,
+        `${slideLabel} controls should span the bottom edge`,
+      );
+      assert.ok(
+        Math.abs(fit.walkthrough.height - firstFit.walkthrough.height) <= 1 &&
+          Math.abs(fit.controls.top - firstFit.controls.top) <= 1 &&
+          Math.abs(fit.controls.height - firstFit.controls.height) <= 1,
+        `${slideLabel} should keep the same window and arrow-strip geometry as the first slide`,
+      );
+      if (fit.title && fit.slideLayout) {
+        assert.ok(
+          fit.title.bottom <= fit.slideLayout.top + 1,
+          `${slideLabel} title should not overlap the slide artwork`,
+        );
+      }
+      if (fit.slideImage && fit.slideLayout) {
+        assert.ok(
+          fit.slideImage.top >= fit.slideLayout.top - 1 && fit.slideImage.bottom <= fit.slideLayout.bottom + 1,
+          `${slideLabel} artwork should remain inside its slide panel`,
+        );
+      }
     });
-
-    assert.ok(
-      fit.footerBottom <= fit.clientHeight + 1 && fit.scrollHeight <= fit.clientHeight + 1,
-      `Welcome screen should fit the ${viewport.name} viewport; received footer bottom ${fit.footerBottom.toFixed(1)}px, scroll height ${fit.scrollHeight}px, viewport ${fit.clientHeight}px`,
-    );
-    assert.ok(fit.walkthrough && fit.info && fit.controls, `${viewport.name} welcome geometry should render`);
-    assert.ok(
-      fit.info.top >= fit.walkthrough.top - 1 && fit.info.bottom <= fit.controls.top + 1,
-      `${viewport.name} welcome content should remain above its controls`,
-    );
-    assert.ok(
-      fit.controls.left <= fit.walkthrough.left + 1 && fit.controls.right >= fit.walkthrough.right - 1,
-      `${viewport.name} welcome controls should span the bottom edge`,
-    );
-    if (fit.title && fit.slideLayout) {
-      assert.ok(
-        fit.title.bottom <= fit.slideLayout.top + 1,
-        `${viewport.name} welcome title should not overlap the slide artwork`,
-      );
-    }
-    if (fit.slideImage && fit.slideLayout) {
-      assert.ok(
-        fit.slideImage.top >= fit.slideLayout.top - 1 && fit.slideImage.bottom <= fit.slideLayout.bottom + 1,
-        `${viewport.name} welcome artwork should remain inside its slide panel`,
-      );
-    }
   } finally {
     await page.close();
   }
@@ -1579,7 +1647,7 @@ async function assertWelcomeFitsViewport(browser, baseUrl, viewport) {
 
 async function main() {
   const baseUrl = normalizeBaseUrl(process.env.BASE_URL || 'http://127.0.0.1:3000');
-  const welcomeFitOnly = process.env.WELCOME_FIT_ONLY === '1';
+  const welcomeFitOnly = process.env.WELCOME_FIT_ONLY === '1' || process.argv.includes('--welcome-fit-only');
   const homeTabsOnly = process.argv.includes('--home-tabs-only');
   const questionUtilitiesOnly = process.argv.includes('--question-utilities-only');
   const statsOnly = process.argv.includes('--stats-only');

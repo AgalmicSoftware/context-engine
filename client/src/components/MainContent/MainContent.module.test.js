@@ -14,9 +14,7 @@ describe('Main welcome walkthrough styles', () => {
   const baseScss = scss.slice(baseStart, baseEnd);
 
   it('keeps every desktop welcome slide on one viewport-capped responsive frame height', () => {
-    expect(compactDesktopScss).toContain(
-      '--ce-main-welcome-frame-height: max(0px, min(600px, calc(100dvh - 400px)));',
-    );
+    expect(compactDesktopScss).toContain('--ce-main-welcome-frame-height: max(0px, min(600px, calc(100dvh - 400px)));');
     expect(compactDesktopScss).not.toMatch(/min-height:\s*600px;/);
     expect(desktopScss).toContain(
       '--ce-main-welcome-frame-height: max(0px, min(max(380px, 30vw), calc(100dvh - 452px)));',
@@ -25,12 +23,8 @@ describe('Main welcome walkthrough styles', () => {
   });
 
   it('keeps compact desktop controls from growing beyond their allocated strip', () => {
-    expect(compactDesktopScss).toMatch(
-      /\.onboardingControls\s*\{[\s\S]*?height:\s*clamp\(60px,\s*10dvh,\s*100px\);/,
-    );
-    expect(compactDesktopScss).toMatch(
-      /\.takeSurveyButton\s*\{[\s\S]*?height:\s*100%;[\s\S]*?flex-direction:\s*row;/,
-    );
+    expect(compactDesktopScss).toMatch(/\.onboardingControls\s*\{[\s\S]*?height:\s*clamp\(60px,\s*10dvh,\s*100px\);/);
+    expect(compactDesktopScss).toMatch(/\.takeSurveyButton\s*\{[\s\S]*?height:\s*100%;[\s\S]*?flex-direction:\s*row;/);
     expect(compactDesktopScss).not.toMatch(/\.takeSurveyButton\s*\{[\s\S]*?height:\s*100px;/);
   });
 
@@ -58,13 +52,25 @@ describe('Main welcome walkthrough styles', () => {
     expect(scss).toMatch(/\.mainTabsCardHeader\s*{[\s\S]*?background:\s*var\(--ce-titlebar-bg\);/);
   });
 
+  it('keeps Classic 95 welcome arrows on one fixed window frame without changing the default deck', () => {
+    expect(scss).toContain('@container ce-theme style(--ce-welcome-slide-mode: fixed-window)');
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-welcome-slide-mode: fixed-window\)\s*{[\s\S]*?--ce-classic-welcome-frame-height:\s*var\([\s\S]*?--ce-main-welcome-frame-height,[\s\S]*?clamp\(340px,\s*48dvh,\s*440px\)[\s\S]*?height:\s*var\(--ce-classic-welcome-frame-height\);[\s\S]*?overflow:\s*hidden;/,
+    );
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-welcome-slide-mode: fixed-window\)\s*{[\s\S]*?\.onboardingControls\s*{[\s\S]*?flex:\s*0 0 var\(--ce-classic-welcome-controls-height\);[\s\S]*?height:\s*var\(--ce-classic-welcome-controls-height\);/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width:\s*768px\)\s*{\s*@container ce-theme style\(--ce-welcome-slide-mode: fixed-window\)\s*{[\s\S]*?\.mainAreaTabsAlt,[\s\S]*?#mainAreaTabs\s*{\s*flex-basis:\s*auto;/,
+    );
+    expect(scss).not.toContain('@container ce-theme style(--ce-welcome-slide-mode: fluid)');
+  });
+
   it('spreads the classic home tabs evenly across the title bar', () => {
     expect(scss).toMatch(
       /\.mainTabsCardHeader :global\(\.nav-tabs\)\s*{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\);/,
     );
-    expect(scss).toMatch(
-      /\.mainTabsCardHeader :global\(\.nav-item\)\s*{[\s\S]*?width:\s*100%;/,
-    );
+    expect(scss).toMatch(/\.mainTabsCardHeader :global\(\.nav-item\)\s*{[\s\S]*?width:\s*100%;/);
     expect(scss).not.toMatch(/\.nav-item:has\(\.nav-link\.active\)[\s\S]*?order:\s*-1;/);
   });
 
