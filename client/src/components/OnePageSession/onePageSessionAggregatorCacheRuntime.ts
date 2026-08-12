@@ -40,7 +40,7 @@ type OnePageSessionAggregatorCacheBuildParams = {
   readQuestionsCache: (slug: string) => any;
   resolveQuestionPool: (displaySlug: string, questionSourceSlug: string) => Array<Record<string, unknown>>;
   workerCacheIdentity: WorkerCanonicalCacheIdentity | null;
-  writeQuestionsCache: (slug: string, cache: any) => void;
+  writeQuestionsCache: (slug: string, cache: unknown) => void;
 };
 
 export type OnePageSessionAggregatorCacheBuildResult = {
@@ -200,8 +200,8 @@ export const scopeAggregatorNetworkNodeToQuestionPool = (
 };
 
 export const mergeAggregatorResultRows = (
-  target: Record<string, any[]> = {},
-  source: any = {},
+  target: AggregatorResultMap = {},
+  source: AggregatorResultMap = {},
   { sourceWinsResponderCollisions = false }: { sourceWinsResponderCollisions?: boolean } = {},
 ) => {
   const nextTarget = target && typeof target === 'object' ? target : {};
@@ -217,15 +217,15 @@ export const mergeAggregatorResultRows = (
     if (sourceWinsResponderCollisions) {
       const sourceResponders = new Set(
         rows
-          .map((row: any) => String(row?.responder || '').trim().toLowerCase())
+          .map((row) => String(row?.responder || '').trim().toLowerCase())
           .filter(Boolean),
       );
       nextTarget[qid] = nextTarget[qid].filter(
-        (row: any) => !sourceResponders.has(String(row?.responder || '').trim().toLowerCase()),
+        (row) => !sourceResponders.has(String(row?.responder || '').trim().toLowerCase()),
       );
     }
-    const seenRows = new Set(nextTarget[qid].map((row: any) => `${row?.responder || ''}|${row?.response || ''}`));
-    rows.forEach((row: any) => {
+    const seenRows = new Set(nextTarget[qid].map((row) => `${row?.responder || ''}|${row?.response || ''}`));
+    rows.forEach((row) => {
       const key = `${row?.responder || ''}|${row?.response || ''}`;
       if (seenRows.has(key)) return;
       seenRows.add(key);
