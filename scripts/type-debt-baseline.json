@@ -77,12 +77,12 @@
   ],
   "counts": {
     "tsNocheck": 0,
-    "colonAny": 921,
+    "colonAny": 918,
     "asAny": 76,
     "asUnknownAs": 44,
     "promiseAny": 2,
     "arrayAny": 0,
-    "recordAny": 44,
+    "recordAny": 42,
     "aliasAny": 3,
     "mapSetAny": 4
   }
