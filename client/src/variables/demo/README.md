@@ -80,9 +80,11 @@ npm run demo:2:generate
 Generation is deterministic, so unchanged inputs must produce no diff. The
 dataset registry in `utilities/demo/demoPolisDatasets.ts` keeps the legacy demo
 slugs on `demo_polis_data.json`, gives only `demo-2` the generated override,
-and excludes `demo-2` from analysis until a matching analysis fixture exists.
-Worker URLs and AI credentials remain operational session configuration and
-must never be stored in these fixtures.
+and excludes `demo-2` from the legacy Breakdown overlay until a matching
+Breakdown fixture exists. Its generated Polis data already carries the three
+authored opinion-group summaries used in Polis Auto mode. Worker URLs and AI
+credentials remain operational session configuration and must never be stored
+in these fixtures.
 
 `demo-2` is currently a direct-route preview with `temporary: true` and no
 Worker URL. `demo-sh` therefore remains the first/default public demo. Before
