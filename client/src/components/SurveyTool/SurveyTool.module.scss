@@ -4539,6 +4539,90 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
+/* Once the question controls move below the card, Classic 95 no longer needs
+ * the desktop side-rail reserve. Keep every action visible in a compact
+ * toolbar so pointer focus cannot open a menu over the lower session panels. */
+@media (max-width: 768px) {
+  @container ce-theme style(--ce-layout-profile: desktop-window) {
+    .pileInteractionUnit {
+      --pile-card-width: min(720px, calc(100vw - 76px));
+      width: var(--pile-card-width);
+      max-width: var(--pile-card-width);
+    }
+
+    .pileControls {
+      position: static;
+      display: grid;
+      grid-template-columns: auto minmax(180px, 1fr) auto;
+      grid-template-areas: "actions footer nav";
+      align-items: center;
+      width: 100%;
+      margin-top: 14px;
+      padding: 0;
+      gap: 8px;
+      overflow: visible;
+    }
+
+    .pileControls > .pileActions,
+    .pileControls > .pileNav {
+      position: static;
+      top: auto;
+      left: auto;
+      width: auto;
+      transform: none;
+      min-width: 0;
+      padding: 4px 6px;
+      border: 2px solid;
+      border-color: var(--ce-border-raised);
+      background: var(--ce-control-face);
+      box-shadow: var(--ce-shadow-raised);
+      color: var(--ce-control-text);
+    }
+
+    .pileActions {
+      grid-area: actions;
+      flex-direction: row;
+      justify-content: center;
+    }
+
+    .pileActionsMenuEligible .pileActionMenuToggle {
+      display: none;
+    }
+
+    .pileActionsMenuEligible .pileActionButtonGroup,
+    .pileActionsMenuEligible:focus-within .pileActionButtonGroup,
+    .pileActionsMenuEligible:hover .pileActionButtonGroup {
+      position: static;
+      display: flex;
+      flex-direction: row;
+      min-width: 0;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .pileActionsMenuEligible .pileActionButtonGroup .actionButton {
+      width: 42px;
+      height: 42px;
+      color: var(--ce-control-text);
+      opacity: 1;
+    }
+
+    .pileFooter {
+      grid-area: footer;
+      width: auto;
+      margin-right: 0;
+    }
+
+    .pileNav {
+      grid-area: nav;
+      flex-direction: row;
+      justify-content: center;
+    }
+  }
+}
+
 @media (max-width: 640px) {
   @container ce-theme style(--ce-layout-profile: desktop-window) {
     .pileInteractionUnit {
@@ -4578,23 +4662,42 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
     .pileControls {
       position: static;
-      display: flex;
-      align-items: flex-start;
-      justify-content: center;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas:
+        "footer nav"
+        "actions actions";
+      align-items: center;
+      justify-content: stretch;
+      width: 100%;
       gap: 8px;
       margin-top: 8px;
     }
 
-    .pileControls > .pileActions,
+    .pileControls > .pileActions {
+      position: static;
+      grid-area: actions;
+      flex-direction: row;
+      justify-self: stretch;
+      width: 100%;
+      transform: none;
+    }
+
     .pileControls > .pileNav {
       position: static;
+      grid-area: nav;
       flex-direction: row;
       width: auto;
       transform: none;
     }
 
+    .pileFooter {
+      grid-area: footer;
+    }
+
     .pileActionButtonGroup {
       flex-direction: row;
+      justify-content: center;
     }
   }
 }

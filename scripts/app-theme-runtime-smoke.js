@@ -1115,6 +1115,12 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
               const branding = document.querySelector('[class*="brandingSection"]');
               const pileCard = document.querySelector('[class*="pileCardInner"]');
               const pileCardBody = document.querySelector('[class*="pileCardBody"]');
+              const actionMenuToggle = document.querySelector('button[aria-label="Question actions"]');
+              const pileActions = actionMenuToggle?.parentElement;
+              const actionButtonGroup = pileActions?.querySelector('[class*="pileActionButtonGroup"]');
+              const pileControls = pileActions?.parentElement;
+              const pileNav = pileControls?.querySelector('[class*="pileNav"]');
+              const sectionsGrid = document.querySelector('[class*="sectionsGrid"]');
               const iconControlState = (label, selector) => {
                 const element = document.querySelector(selector);
                 if (!element) return { label, exists: false };
@@ -1141,6 +1147,41 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
                 promptRatio: textRatio('[class*="pileCardHeader"] h4'),
                 sessionTitleRatio: textRatio('[class*="brandingSectionTitle"]'),
                 sectionTitleRatio: textRatio('[class*="sectionHeaderTitle"]'),
+                compactControls: {
+                  viewportWidth: window.innerWidth,
+                  actionMenuToggleDisplay: actionMenuToggle
+                    ? window.getComputedStyle(actionMenuToggle).display
+                    : '',
+                  actionGroupDisplay: actionButtonGroup ? window.getComputedStyle(actionButtonGroup).display : '',
+                  actionGroupPosition: actionButtonGroup ? window.getComputedStyle(actionButtonGroup).position : '',
+                  actionGroupDirection: actionButtonGroup
+                    ? window.getComputedStyle(actionButtonGroup).flexDirection
+                    : '',
+                  actionsBackground: pileActions ? window.getComputedStyle(pileActions).backgroundColor : '',
+                  navBackground: pileNav ? window.getComputedStyle(pileNav).backgroundColor : '',
+                  controlsBottom: pileControls?.getBoundingClientRect().bottom || 0,
+                  panelsTop: sectionsGrid?.getBoundingClientRect().top || 0,
+                  panelBounds: sectionsGrid
+                    ? Array.from(sectionsGrid.children).map((panel) => {
+                        const rect = panel.getBoundingClientRect();
+                        return { left: rect.left, right: rect.right };
+                      })
+                    : [],
+                  actionButtons: actionButtonGroup
+                    ? Array.from(actionButtonGroup.querySelectorAll('button')).map((button) => {
+                        const rect = button.getBoundingClientRect();
+                        const style = window.getComputedStyle(button);
+                        return {
+                          display: style.display,
+                          color: style.color,
+                          height: rect.height,
+                          opacity: Number(style.opacity),
+                          pointerEvents: style.pointerEvents,
+                          width: rect.width,
+                        };
+                      })
+                    : [],
+                },
                 iconControls: [
                   iconControlState('question actions', 'button[aria-label="Question actions"]'),
                   iconControlState('microphone', '[data-testid="ce-session-listening-toggle"]'),
@@ -1930,6 +1971,51 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       assert.equal(control.boxShadow, 'none', `Classic 95 ${control.label} control should not have a button shadow`);
       assert.equal(control.opacity, 1, `Classic 95 ${control.label} control should remain fully visible`);
     });
+    if (viewportName === 'compact window') {
+      const compactControls = reportedSurfaceState.compactControls;
+      assert.equal(
+        compactControls.actionMenuToggleDisplay,
+        'none',
+        'Compact Classic 95 should not use the hover-only question-actions menu',
+      );
+      assert.equal(compactControls.actionGroupDisplay, 'flex', 'Compact Classic 95 actions should remain visible');
+      assert.equal(compactControls.actionGroupPosition, 'static', 'Compact Classic 95 actions should stay in flow');
+      assert.equal(compactControls.actionGroupDirection, 'row', 'Compact Classic 95 actions should form a toolbar');
+      assert.equal(
+        compactControls.actionsBackground,
+        'rgb(192, 192, 192)',
+        'Compact Classic 95 actions should use the standard high-contrast control face',
+      );
+      assert.equal(
+        compactControls.navBackground,
+        'rgb(192, 192, 192)',
+        'Compact Classic 95 navigation should use the standard high-contrast control face',
+      );
+      assert.ok(
+        compactControls.controlsBottom <= compactControls.panelsTop,
+        `Compact Classic 95 controls should not cover lower panels; received ${compactControls.controlsBottom}px versus ${compactControls.panelsTop}px`,
+      );
+      compactControls.panelBounds.forEach(({ left, right }, index) => {
+        assert.ok(left >= 0, `Compact Classic 95 panel ${index + 1} should remain inside the left viewport edge`);
+        assert.ok(
+          right <= compactControls.viewportWidth,
+          `Compact Classic 95 panel ${index + 1} should remain inside the right viewport edge; received ${right}px`,
+        );
+      });
+      assert.ok(compactControls.actionButtons.length >= 3, 'Compact Classic 95 should expose its action toolbar');
+      compactControls.actionButtons.forEach((button, index) => {
+        assert.notEqual(button.display, 'none', `Compact Classic 95 action ${index + 1} should be visible`);
+        assert.ok(button.width >= 40, `Compact Classic 95 action ${index + 1} should have a usable width`);
+        assert.ok(button.height >= 40, `Compact Classic 95 action ${index + 1} should have a usable height`);
+        assert.equal(button.color, 'rgb(0, 0, 0)', `Compact Classic 95 action ${index + 1} should be black`);
+        assert.equal(button.opacity, 1, `Compact Classic 95 action ${index + 1} should be fully opaque`);
+        assert.notEqual(
+          button.pointerEvents,
+          'none',
+          `Compact Classic 95 action ${index + 1} should accept pointer input`,
+        );
+      });
+    }
     [
       ['session title', reportedSurfaceState.sessionTitleRatio],
       ['question prompt', reportedSurfaceState.promptRatio],
