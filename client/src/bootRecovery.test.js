@@ -36,9 +36,7 @@ describe('bootRecovery', () => {
     expect(document.body).not.toHaveTextContent('stale app chunk');
     expect(document.querySelector('[role="alert"]')).not.toBeNull();
     expect(document.querySelector('[role="alert"]')).toHaveAttribute('data-boot-error', 'stale app chunk');
-    expect(document.querySelector('h1').getAttribute('style')).toContain(
-      'color:var(--ce-panel-text,CanvasText)',
-    );
+    expect(document.querySelector('h1')).toHaveAttribute('style', expect.stringContaining('color:#f6f8ff'));
     expect(document.querySelectorAll('button')).toHaveLength(1);
     expect(document.querySelector('button')).toHaveTextContent('Reload');
 
@@ -95,7 +93,7 @@ describe('bootRecovery', () => {
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
-  it('stops automatic reloads when the boot reload URL marker is already present', async () => {
+  it('stops automatic retries when the boot reload URL marker is already present', async () => {
     jest.useFakeTimers();
     const reload = jest.fn();
     const clearCaches = jest.fn().mockResolvedValue(undefined);
@@ -113,7 +111,7 @@ describe('bootRecovery', () => {
     });
 
     expect(document.body).toHaveTextContent(
-      'Automatic reload stopped because the app is still failing to start. Try Reload after the client is updated.',
+      'Automatic reload paused after the previous attempt. Fix the startup issue, then select Reload.',
     );
     jest.advanceTimersByTime(3000);
     await Promise.resolve();

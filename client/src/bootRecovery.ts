@@ -225,7 +225,10 @@ export const renderBootFailure = (error: unknown, options: BootRecoveryOptions =
   const reloadParam = options.reloadParam || BOOT_RELOAD_PARAM;
   const reload = options.reload || (() => reloadWithCacheBuster(win, reloadParam));
   const clearCaches = options.clearCaches || (() => clearBootCaches(win));
-  const autoReloadDelayMs = typeof options.autoRefreshDelayMs === 'number' ? options.autoRefreshDelayMs : 3000;
+  const requestedAutoReloadDelayMs =
+    typeof options.autoRefreshDelayMs === 'number' ? options.autoRefreshDelayMs : 3000;
+  const automaticReloadPaused = hasReloadParam(win, reloadParam);
+  const autoReloadDelayMs = automaticReloadPaused ? -1 : requestedAutoReloadDelayMs;
   let refreshStarted = false;
   const refresh = async (button: HTMLButtonElement | null) => {
     if (refreshStarted) return;
@@ -281,7 +284,7 @@ export const renderBootFailure = (error: unknown, options: BootRecoveryOptions =
     panel,
     'h1',
     'A new version of Context Engine is available',
-    'margin:0 0 14px;color:var(--ce-panel-text,CanvasText);font-size:28px;line-height:1.15;font-weight:800',
+    'margin:0 0 14px;color:#f6f8ff;font-size:28px;line-height:1.15;font-weight:800',
   );
   appendTextNode(
     doc,
@@ -294,8 +297,10 @@ export const renderBootFailure = (error: unknown, options: BootRecoveryOptions =
     doc,
     panel,
     'p',
-    '',
-    'margin:0 0 20px;color:var(--ce-panel-text,CanvasText);font-size:15px;font-weight:700;line-height:1.35',
+    automaticReloadPaused
+      ? 'Automatic reload paused after the previous attempt. Fix the startup issue, then select Reload.'
+      : '',
+    'margin:0 0 20px;color:#f6f8ff;font-size:15px;font-weight:700;line-height:1.35',
   );
 
   const actions = doc.createElement('div');
