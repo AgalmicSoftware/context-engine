@@ -545,6 +545,15 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
 
   const classicPileControlState = routeCase.requiresReadableSessionSurface
     ? await (async () => {
+        const footerIcons = await page.locator('[class*="pileCardFooter"] button').evaluateAll((buttons) =>
+          buttons.map((button) => {
+            const style = window.getComputedStyle(button);
+            return {
+              ariaLabel: button.getAttribute('aria-label') || '',
+              opacity: Number(style.opacity),
+            };
+          }),
+        );
         const convictionButton = page.getByRole('button', { name: 'Conviction / importance' }).first();
         await convictionButton.click();
         const sliderPanel = page.locator('[class*="pileCardFooter"] [class*="importanceSlider"]').first();
@@ -595,7 +604,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
           };
         });
         await lockButton.click();
-        return { conviction, lockAudience };
+        return { conviction, footerIcons, lockAudience };
       })()
     : null;
 
@@ -2067,6 +2076,15 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       'none',
       'Classic 95 lock menu should not add an exterior shadow',
     );
+    assert.equal(classicPileControlState.footerIcons.length, 3, 'Classic 95 question cards should expose three footer icons');
+    classicPileControlState.footerIcons.forEach((control) => {
+      assert.equal(
+        control.opacity,
+        0.5,
+        `Classic 95 ${control.ariaLabel || 'question footer'} icon should rest at 50% opacity`,
+      );
+    });
+    const dimmedPileFooterControls = new Set(['comment', 'lock']);
     reportedSurfaceState.iconControls.forEach((control) => {
       assert.equal(control.exists, true, `Classic 95 ${control.label} control should be present`);
       assert.deepEqual(
@@ -2080,7 +2098,14 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         `Classic 95 ${control.label} control should have a transparent background`,
       );
       assert.equal(control.boxShadow, 'none', `Classic 95 ${control.label} control should not have a button shadow`);
-      assert.equal(control.opacity, 1, `Classic 95 ${control.label} control should remain fully visible`);
+      if (dimmedPileFooterControls.has(control.label)) {
+        assert.ok(
+          control.opacity >= 0.5 && control.opacity <= 1,
+          `Classic 95 ${control.label} control should remain within its 50%-to-active opacity transition`,
+        );
+      } else {
+        assert.equal(control.opacity, 1, `Classic 95 ${control.label} control should remain fully visible`);
+      }
     });
     if (viewportName === 'compact window') {
       const compactControls = reportedSurfaceState.compactControls;

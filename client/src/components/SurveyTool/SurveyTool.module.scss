@@ -4453,6 +4453,15 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     background: transparent !important;
     box-shadow: none !important;
     color: var(--ce-control-text) !important;
+    opacity: 0.5 !important;
+  }
+
+  .pileCardFooter .pileIconButton:hover:not(:disabled),
+  .pileCardFooter .pileIconButton:focus-visible,
+  .pileCardFooter .iconButton:hover:not(:disabled),
+  .pileCardFooter .iconButton:focus-visible,
+  .pileCardFooter .iconButtonActive,
+  .pileCardFooter .pileLockButtonMenuOpen {
     opacity: 1 !important;
   }
 

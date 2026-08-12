@@ -59,7 +59,10 @@ describe('SurveyTool styles', () => {
       /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)\s*{[\s\S]*?\.pileNavArrow,\s*\.actionButton\s*{[\s\S]*?border:\s*0 !important;[\s\S]*?background:\s*transparent;[\s\S]*?box-shadow:\s*none !important;[\s\S]*?opacity:\s*1;/,
     );
     expect(scss).toMatch(
-      /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)\s*{[\s\S]*?\.pileCardFooter \.pileIconButton,\s*\.pileCardFooter \.iconButton\s*{[\s\S]*?border:\s*0 !important;[\s\S]*?background:\s*transparent !important;[\s\S]*?box-shadow:\s*none !important;[\s\S]*?opacity:\s*1 !important;/,
+      /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)\s*{[\s\S]*?\.pileCardFooter \.pileIconButton,\s*\.pileCardFooter \.iconButton\s*{[\s\S]*?border:\s*0 !important;[\s\S]*?background:\s*transparent !important;[\s\S]*?box-shadow:\s*none !important;[\s\S]*?opacity:\s*0\.5 !important;/,
+    );
+    expect(scss).toMatch(
+      /\.pileCardFooter \.pileIconButton:hover:not\(:disabled\),[\s\S]*?\.pileCardFooter \.pileLockButtonMenuOpen\s*{[\s\S]*?opacity:\s*1 !important;/,
     );
     expect(scss).toMatch(
       /\.pileNavArrow:focus-visible,[\s\S]*?\.pileCardFooter \.iconButton:focus-visible\s*{[\s\S]*?outline:\s*2px dotted var\(--ce-control-text\);[\s\S]*?outline-offset:\s*2px;/,
