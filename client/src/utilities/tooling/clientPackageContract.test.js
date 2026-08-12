@@ -230,9 +230,8 @@ describe('client package modernization contract', () => {
       expect(pkg.devDependencies[name]).toBeDefined();
       expect(viteConfig).toContain(`/node_modules/${name}/`);
     });
-    expect(viteConfig).toContain(
-      "include: ['buffer', 'process/browser', 'utilities/crypto/groupPasswordDerivation.cjs']",
-    );
+    expect(viteConfig).toContain("'utilities/crypto/groupPasswordDerivation.cjs'");
+    expect(viteConfig).toContain("'@ce-shared/rpcDefaults.cjs'");
     expect(viteConfig).toContain('find: /^buffer$/');
     expect(viteConfig).toContain('find: /^node:buffer$/');
     expect(viteConfig).toContain("path.resolve(__dirname, 'node_modules', 'buffer', 'index.js')");

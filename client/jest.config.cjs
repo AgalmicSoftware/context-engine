@@ -42,6 +42,7 @@ module.exports = {
   },
   transformIgnorePatterns: [nodeModulesPattern],
   moduleNameMapper: {
+    '^@ce-shared\/(.*)$': '<rootDir>/../shared/$1',
     '^.+\\.module\\.(css|sass|scss)$': 'identity-obj-proxy',
     '^.+\\.(css|sass|scss)$': 'identity-obj-proxy',
     '^.+\\.(bmp|gif|jpg|jpeg|png|svg|webp|avif|ico|mp4|webm|wav|mp3|m4a|aac|oga|txt|html)$':

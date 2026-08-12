@@ -560,7 +560,10 @@ export default defineConfig(({ mode }) => {
         { find: 'components', replacement: path.resolve(srcDir, 'components') },
         { find: 'utilities', replacement: path.resolve(srcDir, 'utilities') },
         { find: 'variables', replacement: path.resolve(srcDir, 'variables') },
-        { find: /^@metamask\/superstruct$/, replacement: path.resolve(srcDir, 'shims', 'metamask-superstruct.js') },
+        { find: '@ce-shared', replacement: path.resolve(__dirname, '..', 'shared') },
+        { find: /^buffer$/, replacement: path.resolve(__dirname, 'node_modules', 'buffer', 'index.js') },
+        { find: /^node:buffer$/, replacement: path.resolve(__dirname, 'node_modules', 'buffer', 'index.js') },
+        { find: /^@metamask\/superstruct$/, replacement: path.resolve(srcDir, 'shims', 'metamask-superstruct.ts') },
         { find: /^zod-validation-error$/, replacement: path.resolve(__dirname, 'node_modules', 'zod-validation-error', 'dist', 'index.js') },
         { find: /^worker_threads$/, replacement: path.resolve(srcDir, 'shims', 'node-worker-threads.js') },
         { find: /^node:worker_threads$/, replacement: path.resolve(srcDir, 'shims', 'node-worker-threads.js') },
@@ -598,7 +601,12 @@ export default defineConfig(({ mode }) => {
           '.js': 'jsx',
         },
       },
-      include: ['buffer', 'process/browser', 'utilities/crypto/groupPasswordDerivation.cjs'],
+      include: [
+        'buffer',
+        'process/browser',
+        'utilities/crypto/groupPasswordDerivation.cjs',
+        '@ce-shared/rpcDefaults.cjs',
+      ],
     },
   };
 });

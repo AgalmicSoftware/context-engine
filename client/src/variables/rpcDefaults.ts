@@ -1,4 +1,4 @@
-import canonicalRpcDefaults from '../../../shared/rpcDefaults.cjs';
+import canonicalRpcDefaults from '@ce-shared/rpcDefaults.cjs';
 
 type ChainIdInput = unknown;
 type RpcUrlMap = Record<string, unknown>;
