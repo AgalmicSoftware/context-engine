@@ -1219,7 +1219,6 @@ const renderInteractiveQuestionBeeswarmPoint = ({
     aria-label="${escapeHtml(`${questionId}: ${prompt} (${statusLabel}; ${consistencyLabel})`)}"
   >
     <circle class="${escapeHtml(circleClassName)}" cx="${escapeHtml(x)}" cy="${escapeHtml(y)}" r="${escapeHtml(radius)}" />
-    <title>${escapeHtml(`${questionId}: ${prompt} (${statusLabel}; ${consistencyLabel})`)}</title>
   </a>`;
 };
 
@@ -6420,8 +6419,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
             'data-question-winning-response-consistency="' + escapeText(breakdownScore(row.consistency.rate)) + '" data-question-winning-responses="' + escapeText(row.consistency.winningResponses) + '" data-question-attempted-runs="' + escapeText(row.consistency.attemptedRuns) + '" data-question-contributing-models="' + escapeText(row.consistency.contributingModels) + '" ' +
             'aria-label="' + escapeText(row.question.id + ': ' + prompt + ' (' + valid + ' modeled responses)') + '">' +
               '<circle class="beeswarmCircle" cx="' + escapeText(x) + '" cy="' + escapeText(y) + '" r="5"></circle>' +
-              '<title>' + escapeText(row.question.id + ': ' + prompt) + '</title>' +
-          '</a>';
+            '</a>';
         }).join('');
         var grid = [1, 0.75, 0.5, 0.25, 0].map(function (rate) {
           var y = plotBottom - rate * (plotBottom - plotTop);

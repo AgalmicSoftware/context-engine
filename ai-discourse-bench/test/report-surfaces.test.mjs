@@ -453,6 +453,8 @@ test('report beeswarm places model-to-model difference on the right axis', async
   assert.match(html, /data-question-difference-label="Model disagreement"/);
   assert.match(html, /var differenceLabel = point\.dataset\.questionDifferenceLabel \|\| 'Model disagreement';/);
   assert.doesNotMatch(html, /<strong>Model difference:<\/strong>/);
+  assert.doesNotMatch(mainBeeswarm, /<title>/);
+  assert.match(mainBeeswarm, /aria-label="[^"]+repeat consistency\)"/);
 });
 
 test('report beeswarm collision-packs repeated metric pairs into reachable points', async () => {
@@ -603,6 +605,8 @@ test('Breakdown comparison beeswarm plots cohort difference against repeat consi
   assert.match(chart, /class="beeswarmAxisTitle"[^>]*>Repeat consistency<\/text>/);
   assert.match(chart, /<text class="beeswarmAxisLabel" x="62" y="232">Similarity<\/text>/);
   assert.match(chart, /<text class="beeswarmAxisLabel" x="680" y="232" text-anchor="end">Difference<\/text>/);
+  assert.doesNotMatch(chart, /<title>/);
+  assert.match(chart, /aria-label="[^"]+modeled responses; [^"]+repeat consistency\)"/);
 });
 
 test('All Questions gives each model one averaged vote and preserves invalid raw runs separately', async () => {
