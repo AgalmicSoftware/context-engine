@@ -1187,6 +1187,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
                           const caretRect = caret.getBoundingClientRect();
                           const titleRect = title.getBoundingClientRect();
                           const subtitleRect = subtitle.getBoundingClientRect();
+                          const subtitleStyle = window.getComputedStyle(subtitle);
                           return {
                             caretTop: caretRect.top,
                             titleTop: titleRect.top,
@@ -1194,6 +1195,8 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
                             titleLeft: titleRect.left,
                             subtitleTop: subtitleRect.top,
                             subtitleLeft: subtitleRect.left,
+                            subtitleFontSize: subtitleStyle.fontSize,
+                            subtitleOpacity: Number(subtitleStyle.opacity),
                           };
                         })
                         .filter(Boolean)
@@ -2082,6 +2085,16 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         assert.ok(
           Math.abs(header.subtitleLeft - header.titleLeft) <= 1,
           `Compact Classic 95 section ${index + 1} title and subtitle should share a left edge; received ${JSON.stringify(header)}`,
+        );
+        assert.equal(
+          header.subtitleFontSize,
+          '16px',
+          `Compact Classic 95 section ${index + 1} subtitle should remain legible; received ${JSON.stringify(header)}`,
+        );
+        assert.equal(
+          header.subtitleOpacity,
+          0.5,
+          `Compact Classic 95 section ${index + 1} subtitle should remain visibly secondary; received ${JSON.stringify(header)}`,
         );
       });
       assert.ok(compactControls.actionButtons.length >= 3, 'Compact Classic 95 should expose its action toolbar');

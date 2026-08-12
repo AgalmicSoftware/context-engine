@@ -1503,6 +1503,9 @@ describe('OnePageSession view gating', () => {
     expect(classicSmallTabletBlock).toContain('align-items: flex-start;');
     expect(classicSmallTabletBlock).toContain('flex-wrap: nowrap;');
     expect(classicSmallTabletBlock).toContain('gap: 3px;');
+    expect(classicSmallTabletBlock).toContain('.sectionsGrid .sectionHeaderSubtitle {');
+    expect(classicSmallTabletBlock).toContain('font-size: 1rem;');
+    expect(classicSmallTabletBlock).toContain('opacity: 0.5;');
     expect(tabletBlock).toContain('.pileHeaderRow {');
     expect(tabletBlock).toContain('flex-wrap: nowrap;');
     expect(tabletBlock).toContain('.pileHeaderTitleWrap {');

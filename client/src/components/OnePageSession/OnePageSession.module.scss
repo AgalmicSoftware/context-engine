@@ -2028,5 +2028,10 @@
       flex-wrap: nowrap;
       gap: 3px;
     }
+
+    .sectionsGrid .sectionHeaderSubtitle {
+      font-size: 1rem;
+      opacity: 0.5;
+    }
   }
 }
