@@ -434,10 +434,13 @@ describe('SBTSelector scoped options', () => {
     const groupListsSpy = jest
       .spyOn(contractScriptsUtils, 'getSessionLists')
       .mockReturnValue({ featured_SBTs_LIST: [], ignored_SBTs_LIST: [] });
-    const writeSpy = jest.spyOn(cacheScriptsUtils, 'writeCache').mockImplementation(async (_namespace, slug, value) => {
-      cacheStore[slug] = value;
-      return value;
-    });
+    const writeSpy = jest
+      .spyOn(cacheScriptsUtils, 'updateCacheAtomic')
+      .mockImplementation(async (_namespace, slug, updater) => {
+        const value = await updater(cacheStore[slug] || null);
+        cacheStore[slug] = value;
+        return value;
+      });
     const discoverSpy = jest
       .spyOn(contractScriptsUtils.default, 'getAllSbtAddressesCached')
       .mockImplementation(async (_provider, _cfg, options = {}) => {
@@ -566,10 +569,13 @@ describe('SBTSelector scoped options', () => {
     const groupListsSpy = jest
       .spyOn(contractScriptsUtils, 'getSessionLists')
       .mockReturnValue({ featured_SBTs_LIST: [], ignored_SBTs_LIST: [] });
-    const writeSpy = jest.spyOn(cacheScriptsUtils, 'writeCache').mockImplementation(async (_namespace, slug, value) => {
-      cacheStore[slug] = value;
-      return value;
-    });
+    const writeSpy = jest
+      .spyOn(cacheScriptsUtils, 'updateCacheAtomic')
+      .mockImplementation(async (_namespace, slug, updater) => {
+        const value = await updater(cacheStore[slug] || null);
+        cacheStore[slug] = value;
+        return value;
+      });
     const discoverSpy = jest
       .spyOn(contractScriptsUtils.default, 'getAllSbtAddressesCached')
       .mockImplementation(async (_provider, _cfg, options = {}) => {

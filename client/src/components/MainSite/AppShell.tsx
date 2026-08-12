@@ -608,6 +608,57 @@ type MainSiteProfileScanControllerBootstrap = SessionProfileScanController & {
 const isMainSiteRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object';
 
+class MainSiteCachePersistenceError extends Error {}
+
+const updateMainSiteSurveyCacheAtomic = async <TValue = MainSiteSurveyMetadataCache,>(
+  slug: string,
+  updater: (current: TValue | null) => TValue | Promise<TValue>,
+): Promise<TValue> => {
+  try {
+    const updated = await updateCacheAtomic<TValue>('surveysCache', slug, updater);
+    if (updated === null) throw new Error('managed survey cache namespace unavailable');
+    return updated;
+  } catch (error: unknown) {
+    if (error instanceof MainSiteCachePersistenceError) throw error;
+    throw new MainSiteCachePersistenceError(
+      `Failed to persist surveys cache for ${slug}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+};
+
+const updateMainSiteQuestionCacheAtomic = async <TValue = MainSiteQuestionMetadataCache,>(
+  slug: string,
+  updater: (current: TValue | null) => TValue | Promise<TValue>,
+): Promise<TValue> => {
+  try {
+    const updated = await updateCacheAtomic<TValue>('questionsCache', slug, updater);
+    if (updated === null) throw new Error('managed question cache namespace unavailable');
+    return updated;
+  } catch (error: unknown) {
+    if (error instanceof MainSiteCachePersistenceError) throw error;
+    throw new MainSiteCachePersistenceError(
+      `Failed to persist questions cache for ${slug}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+};
+
+const updateMainSiteCacheAtomic = async <TValue,>(
+  namespace: 'sbtCache' | 'userCache',
+  slug: string,
+  updater: (current: TValue | null) => TValue | Promise<TValue>,
+): Promise<TValue> => {
+  try {
+    const updated = await updateCacheAtomic<TValue>(namespace, slug, updater);
+    if (updated === null) throw new Error(`managed ${namespace} namespace unavailable`);
+    return updated;
+  } catch (error: unknown) {
+    if (error instanceof MainSiteCachePersistenceError) throw error;
+    throw new MainSiteCachePersistenceError(
+      `Failed to persist ${namespace} for ${slug}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+};
+
 const hasMainSiteRegistryIdentity = (sessionConfig: MainSiteSessionConfigLike | null | undefined): boolean => {
   if (!isMainSiteRecord(sessionConfig)) return false;
   const registry = isMainSiteRecord(sessionConfig.__registry) ? sessionConfig.__registry : {};
@@ -758,6 +809,8 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     dgRead: (name: unknown, slug: unknown, opts?: unknown) =>
       this.DG.read(name as string, slug as string, isMainSiteRecord(opts) ? opts : undefined),
     dgWrite: (name: unknown, slug: unknown, value: unknown) => this.DG.write(name as string, slug as string, value),
+    updateSbtCacheAtomic: (slug: string, updater) => updateMainSiteCacheAtomic('sbtCache', slug, updater),
+    updateUserCacheAtomic: (slug: string, updater) => updateMainSiteCacheAtomic('userCache', slug, updater),
     dgKey: (name: unknown, slug: unknown) => this.DG.key(name as string, slug as string),
     getActiveSessionSlug: () => this.getActiveSessionSlug(),
     getSessionCfg: (slug: string) => this.getCacheSessionCfg(slug),

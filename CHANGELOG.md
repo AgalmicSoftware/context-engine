@@ -6,32 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Added a named runtime SCSS app-theme contract with user/deployment precedence,
-  pre-paint initialization, a default-on Settings selector, and bundled
-  `context-engine` and `classic-95` themes. The complete client presentation
-  surface now consumes semantic runtime color, typography, geometry, border,
-  elevation, and control-state tokens; a zero-baseline source gate prevents
-  raw presentation colors outside narrowly owned theme, export, QR/bitmap, and
-  deterministic avatar sources. Session metadata cannot select an app theme.
-  Question authoring now uses explicit paired workspace/control/input tokens;
-  Classic 95 renders the generator and its toolbar on readable standard gray
-  surfaces with white fields instead of mixing black controls into navy. The
-  session question, simulated-user, and Groups surfaces now retain readable,
-  minimal gray panels at desktop and mobile widths. Its semantic
-  `desktop-window` layout profile now presents Tools as Control Panel applets,
-  Community Stats as a participant/plot split window, session questions as
-  compact dialogs, and footer navigation as a taskbar without theme-ID
-  selectors in components. The Classic 95 taskbar stays docked to the viewport
-  bottom on short and scrolling pages while reserving space for page content.
-- Fixed local Vite startup for the shared CommonJS group-password derivation
-  helper. Persistent startup failures now stop after one automatic cache-busted
-  reload, and the recovery heading uses the active panel-text token so the
-  fallback remains readable across themes.
-- Added **Session colors** to the Session Wizard with the curated
-  `context-engine`, `ocean`, and `amber` schemes, immediate preview, exact
-  `appearance.colorSchemeId` persistence across Worker/Arweave paths, scoped
-  active-session accents, accessibility contrast checks, and fixed-light
-  standalone exports.
+- Made SBT and related holder-cache writes atomic across discovery, detail
+  hydration, profile scans, filters, selectors, and realtime events. Delayed
+  scans now preserve newer activity, unrelated networks, and concurrent user
+  responses, and readiness is published only after persistence succeeds.
 - Replaced the `/contracts` utility reference with a user-facing `/docs` page
   containing a quickstart, session-options guide, and FAQ. The page retains
   AI prompt references and a contract deployment explorer that waits for an

@@ -16,6 +16,14 @@ import {
   resolveProfileScanAttemptedCoverageSlugs,
 } from '../../utilities/session/profileScanReportHelpers.js';
 import { createLogger } from 'utilities/logging.js';
+import { updateCacheAtomic } from '../../utilities/cache/cacheScripts.js';
+import { mergeSbtActivityCacheEntryMetadata } from '../../utilities/sbt/sbtActivityCacheEntry.js';
+import {
+  buildMainSiteProfileQuestionResponseKey,
+  buildMainSiteProfileSurveyResponseKey,
+  mergeMainSiteProfileRows,
+  mergeMainSiteProfileUserCache,
+} from './mainSiteProfileCacheMerge.js';
 
 type MainSiteProfileScanHost = AppShell;
 type MainSiteMutableMetadata = Record<string, unknown> & {
@@ -138,9 +146,9 @@ type MainSiteProfileScanSbt = Record<string, unknown> & {
 };
 type MainSiteSbtCacheEntry = MainSiteMutableMetadata & {
   sbtAddress?: string;
-  sbtInfo?: Record<string, unknown>;
+  sbtInfo?: Record<string, unknown> | null;
   mintedAddresses?: string[];
-  blockNumber?: number;
+  blockNumber?: number | null;
 };
 type MainSiteSbtMetadataCache = Record<string, MainSiteSbtNetworkCache | undefined>;
 type MainSiteSbtNetworkCache = {
@@ -175,13 +183,6 @@ type MainSiteQuestionNetworkCache = {
   arweaveTxFailureCache?: Record<string, unknown>;
   [key: string]: unknown;
 };
-type MainSiteProfileResponseRecency = {
-  bn: number;
-  txi: number;
-  li: number;
-  ts: number;
-};
-
 const mainSiteLog = createLogger('mainSite');
 
 const isMainSitePresent = <T>(value: T | null | undefined): value is T => value !== null && value !== undefined;
@@ -913,116 +914,28 @@ export const runMainSiteScanSpecificUserProfile = async (
 
           chainEntry.data.sbts = Array.from(existingSbtMap.values());
 
-          // Append other activity arrays with dedupe.
-          const dedupById = (
-            oldArr: MainSiteProfileActivityEntry[] = [],
-            newArr: MainSiteProfileActivityEntry[] = [],
-          ): MainSiteProfileActivityEntry[] => {
-            const map = new Map<string, MainSiteProfileActivityEntry>();
-            oldArr.forEach((i) => map.set(String(i.id || JSON.stringify(i)), i));
-            newArr.forEach((i) => map.set(String(i.id || JSON.stringify(i)), i));
-            return Array.from(map.values());
-          };
+          chainEntry.data.createdSurveys = mergeMainSiteProfileRows(
+            chainEntry.data.createdSurveys,
+            activity.createdSurveys,
+            (item) => String(item.id || JSON.stringify(item)),
+          );
+          chainEntry.data.createdQuestions = mergeMainSiteProfileRows(
+            chainEntry.data.createdQuestions,
+            activity.createdQuestions,
+            (item) => String(item.id || JSON.stringify(item)),
+          );
 
-          const buildFallbackMergeKey = (item: MainSiteProfileActivityEntry) => {
-            try {
-              return `__fallback__${JSON.stringify(item)}`;
-            } catch (_) {
-              return `__fallback__${String(item || '')}`;
-            }
-          };
-          const readResponseRecency = (item: MainSiteProfileActivityEntry): MainSiteProfileResponseRecency => {
-            const row = item && typeof item === 'object' ? item : {};
-            return {
-              bn: Number(row.blockNumber ?? row.bn ?? 0) || 0,
-              txi: Number(row.transactionIndex ?? row.txIndex ?? row.txi ?? 0) || 0,
-              li: Number(row.logIndex ?? row.li ?? 0) || 0,
-              ts: Number(row.timestamp ?? row.ts ?? 0) || 0,
-            };
-          };
-          const compareResponseRecency = (
-            incoming: MainSiteProfileResponseRecency,
-            existing: MainSiteProfileResponseRecency,
-          ) => {
-            if (incoming.bn > existing.bn) return 1;
-            if (incoming.bn < existing.bn) return -1;
-            if (incoming.txi > existing.txi) return 1;
-            if (incoming.txi < existing.txi) return -1;
-            if (incoming.li > existing.li) return 1;
-            if (incoming.li < existing.li) return -1;
-            if (incoming.ts > existing.ts) return 1;
-            if (incoming.ts < existing.ts) return -1;
-            return 0;
-          };
-          const upsertByStableResponseKey = (
-            oldArr: MainSiteProfileActivityEntry[] = [],
-            newArr: MainSiteProfileActivityEntry[] = [],
-            buildKey: (item: MainSiteProfileActivityEntry) => string,
-            opts: Record<string, unknown> = {},
-          ): MainSiteProfileActivityEntry[] => {
-            const preferNewerByRecency = !!(opts && opts.preferNewerByRecency);
-            const map = new Map<string, MainSiteProfileActivityEntry>();
-            const mergeOne = (item: MainSiteProfileActivityEntry, preferIncomingOnTie = false) => {
-              if (item == null) return;
-              const key = buildKey(item) || buildFallbackMergeKey(item);
-              if (!map.has(key)) {
-                map.set(key, item);
-                return;
-              }
-              if (!preferNewerByRecency) {
-                if (preferIncomingOnTie) map.set(key, item);
-                return;
-              }
-              const existing = map.get(key);
-              if (!existing) {
-                map.set(key, item);
-                return;
-              }
-              const cmp = compareResponseRecency(readResponseRecency(item), readResponseRecency(existing));
-              if (cmp > 0 || (cmp === 0 && preferIncomingOnTie)) {
-                map.set(key, item);
-              }
-            };
-            oldArr.forEach((item) => mergeOne(item, false));
-            // Latest scan rows can replace equal-recency rows to preserve fresh payload fields.
-            newArr.forEach((item) => mergeOne(item, true));
-            return Array.from(map.values());
-          };
-          const buildSurveyResponseKey = (item: MainSiteProfileActivityEntry) => {
-            const surveyId = String(item?.surveyId || item?.surveyID || item?.id || '')
-              .trim()
-              .toLowerCase();
-            const responder = String(item?.responder || '')
-              .trim()
-              .toLowerCase();
-            if (!surveyId || !responder) return '';
-            return `${surveyId}|${responder}`;
-          };
-          const buildQuestionResponseKey = (item: MainSiteProfileActivityEntry) => {
-            const questionId = String(item?.questionId || item?.id || '')
-              .trim()
-              .toLowerCase();
-            const responder = String(item?.responder || '')
-              .trim()
-              .toLowerCase();
-            if (!questionId || !responder) return '';
-            return `${questionId}|${responder}`;
-          };
-
-          chainEntry.data.createdSurveys = dedupById(chainEntry.data.createdSurveys, activity.createdSurveys);
-          chainEntry.data.createdQuestions = dedupById(chainEntry.data.createdQuestions, activity.createdQuestions);
-
-          chainEntry.data.surveyResponses = upsertByStableResponseKey(
+          chainEntry.data.surveyResponses = mergeMainSiteProfileRows(
             chainEntry.data.surveyResponses,
             activity.surveyResponses,
-            buildSurveyResponseKey,
-            { preferNewerByRecency: true },
+            buildMainSiteProfileSurveyResponseKey,
+            true,
           );
-          chainEntry.data.questionResponses = upsertByStableResponseKey(
+          chainEntry.data.questionResponses = mergeMainSiteProfileRows(
             chainEntry.data.questionResponses,
             activity.questionResponses,
-            buildQuestionResponseKey,
-            { preferNewerByRecency: true },
+            buildMainSiteProfileQuestionResponseKey,
+            true,
           );
         }
 
@@ -1074,9 +987,14 @@ export const runMainSiteScanSpecificUserProfile = async (
           pushUnique(report.scannedSlugs, slug);
         }
 
-        // Write back to persistent storage (User -> Chain -> Data)
-        userCache[targetLower][netKey] = chainEntry;
-        host.DG.write('userCache', slug, userCache);
+        // Persist only this user/chain node so concurrent response writers survive the profile scan.
+        await updateCacheAtomic<MainSiteProfileUserCache>('userCache', slug, (currentIn) =>
+          mergeMainSiteProfileUserCache(currentIn, {
+            chainEntry,
+            netKey,
+            targetLower,
+          }) as MainSiteProfileUserCache,
+        );
 
         if (!hasNewData) return;
 
@@ -1087,26 +1005,31 @@ export const runMainSiteScanSpecificUserProfile = async (
 
         // 1. Update SBT Cache
         if (sbts.length > 0) {
-          // Re-read cache immediately before merge to avoid race with ensureLightSbtUniverse
-          let sbtCache = (host.DG.read('sbtCache', slug) || {}) as MainSiteSbtMetadataCache;
-          if (!sbtCache[netKey]) sbtCache[netKey] = { sbtList: {}, lastBlock: 0 };
-          const sbtNet = sbtCache[netKey] as MainSiteSbtNetworkCache;
-
-          sbts.forEach((item) => {
-            const addrLower = String(item.sbtAddress || '').toLowerCase();
-            if (!addrLower) return;
-            const existing = sbtNet.sbtList[addrLower] || {};
-
-            sbtNet.sbtList[addrLower] = {
-              ...existing,
-              sbtAddress: item.sbtAddress,
-              sbtInfo: { ...(existing.sbtInfo || {}), ...(item.sbtInfo || {}) },
-              mintedAddresses: [...new Set([...(existing.mintedAddresses || []), targetLower])],
-              slug: slug,
-              blockNumber: currentBlock,
-            };
+          await updateCacheAtomic<MainSiteSbtMetadataCache>('sbtCache', slug, (currentIn) => {
+            const sbtCache = currentIn && typeof currentIn === 'object' ? { ...currentIn } : {};
+            const currentNet = (
+              sbtCache[netKey] && typeof sbtCache[netKey] === 'object' ? sbtCache[netKey] : { sbtList: {} }
+            ) as MainSiteSbtNetworkCache;
+            const sbtNet = {
+              ...currentNet,
+              sbtList: { ...(currentNet.sbtList || {}) },
+            } as MainSiteSbtNetworkCache;
+            sbtCache[netKey] = sbtNet;
+            sbts.forEach((item) => {
+              const addrLower = String(item.sbtAddress || '').toLowerCase();
+              if (!addrLower) return;
+              const existing = sbtNet.sbtList[addrLower] || {};
+              const merged = mergeSbtActivityCacheEntryMetadata(existing, {
+                sbtAddress: item.sbtAddress,
+                sbtInfo: item.sbtInfo || null,
+                slug,
+                blockNumber: currentBlock,
+              });
+              merged.mintedAddresses = [...new Set([...(merged.mintedAddresses || []), targetLower])];
+              sbtNet.sbtList[addrLower] = { ...merged };
+            });
+            return sbtCache;
           });
-          host.DG.write('sbtCache', slug, sbtCache);
         }
 
         // 2. Update Surveys Cache

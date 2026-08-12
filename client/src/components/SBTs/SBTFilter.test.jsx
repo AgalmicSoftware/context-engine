@@ -26,10 +26,19 @@ jest.mock('../../utilities/session/sessionNaming.js', () => ({
   ),
 }));
 
-jest.mock('../../utilities/cache/cacheScripts.js', () => ({
-  peekCacheSync: jest.fn(),
-  writeCache: jest.fn(() => Promise.resolve(true)),
-}));
+jest.mock('../../utilities/cache/cacheScripts.js', () => {
+  const peekCacheSync = jest.fn();
+  const writeCache = jest.fn(() => Promise.resolve(true));
+  return {
+    peekCacheSync,
+    writeCache,
+    updateCacheAtomic: jest.fn(async (namespace, slug, updater) => {
+      const next = await updater(peekCacheSync(namespace, slug));
+      await writeCache(namespace, slug, next);
+      return next;
+    }),
+  };
+});
 
 const createSubject = (props = {}, stateOverrides = {}) => {
   const mergedProps = {

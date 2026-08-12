@@ -822,7 +822,6 @@
     "client/src/utilities/query/useSessionRegistryReads.ts",
     "client/src/utilities/sbt/sbtActivityCacheEntry.ts",
     "client/src/utilities/sbt/sbtCacheEntryHelpers.ts",
-    "client/src/utilities/sbt/sbtCacheWriteContract.ts",
     "client/src/utilities/sbt/sbtCountHelpers.ts",
     "client/src/utilities/sbt/sbtCountsCheckpointContract.ts",
     "client/src/utilities/sbt/sbtCreateFormCache.ts",

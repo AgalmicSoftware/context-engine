@@ -17,6 +17,7 @@ export type {
 
 type CacheRecord = Record<string, unknown>;
 type SetStateArg = CacheRecord | ((prev: CacheRecord) => CacheRecord | null) | null;
+type CacheUpdater = (current: CacheRecord | null) => CacheRecord | Promise<CacheRecord>;
 
 export interface SbtDiscoveryOptions extends CacheRecord {
   force?: boolean;
@@ -40,6 +41,8 @@ export interface SessionSbtCacheHost {
   dgKey?: (...args: unknown[]) => unknown;
   dgRead?: (...args: unknown[]) => unknown;
   dgWrite?: (...args: unknown[]) => unknown;
+  updateSbtCacheAtomic: (slug: string, updater: CacheUpdater) => Promise<unknown>;
+  updateUserCacheAtomic: (slug: string, updater: CacheUpdater) => Promise<unknown>;
   getAccount?: () => string | null | undefined;
   getActiveSessionSlug?: () => string | null | undefined;
   getCurrentPath?: () => string | null | undefined;

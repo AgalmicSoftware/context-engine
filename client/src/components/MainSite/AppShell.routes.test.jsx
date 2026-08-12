@@ -3409,6 +3409,30 @@ describe('AppShell route render smoke', () => {
     });
     subject._mounted = true;
     const dg = attachDgStore(subject);
+    updateCacheAtomic.mockImplementation(async (namespace, slug, updater) => {
+      let current = dg.read(namespace, slug);
+      if (namespace === 'userCache' && slug === 'edge') {
+        current = {
+          ...(current || {}),
+          [target.toLowerCase()]: {
+            ...(current?.[target.toLowerCase()] || {}),
+            84532: {
+              ...(current?.[target.toLowerCase()]?.['84532'] || {}),
+              data: {
+                sbts: [],
+                createdSurveys: [],
+                createdQuestions: [],
+                surveyResponses: [],
+                questionResponses: [{ id: 'concurrent-response', responder: target, blockNumber: 126 }],
+              },
+            },
+          },
+        };
+      }
+      const next = await updater(current);
+      dg.write(namespace, slug, next);
+      return next;
+    });
     subject.getUserProfileAllSessionsScanMode = jest.fn(() => ({
       legacyAllSessions: false,
       useAllSessionsSbtScan: false,
@@ -3487,6 +3511,9 @@ describe('AppShell route render smoke', () => {
     );
     expect(dg.read('userCache', 'edge')?.[target.toLowerCase()]?.['84532']?.data?.sbts).toEqual([
       expect.objectContaining({ sbtAddress }),
+    ]);
+    expect(dg.read('userCache', 'edge')?.[target.toLowerCase()]?.['84532']?.data?.questionResponses).toEqual([
+      expect.objectContaining({ id: 'concurrent-response', blockNumber: 126 }),
     ]);
     expect(dg.read('sbtCache', 'edge')?.['84532']?.sbtList?.[sbtAddress.toLowerCase()]).toEqual(
       expect.objectContaining({
@@ -3998,6 +4025,14 @@ describe('AppShell single-SBT counts checkpoints', () => {
         cacheState = JSON.parse(JSON.stringify(value));
       }
       return value;
+    });
+    updateCacheAtomic.mockImplementation(async (namespace, slug, updater) => {
+      const current = namespace === 'sbtCache' && slug === 'edge' ? cacheState : null;
+      const next = await updater(JSON.parse(JSON.stringify(current)));
+      if (namespace === 'sbtCache' && slug === 'edge') {
+        cacheState = JSON.parse(JSON.stringify(next));
+      }
+      return next;
     });
 
     contractScripts.getSbtMintBurnCountsByAddress
