@@ -14,6 +14,7 @@ const {
   normalizeRoutes,
   resolveViewport,
   routeUrl,
+  runRouteProbe,
   summarizeFailures,
 } = require('./vite-navigation-smoke');
 
@@ -51,6 +52,38 @@ test('normalizeLayoutProbeSelectors keeps default browser layout checks and acce
 
 test('routeUrl joins normalized app URLs and routes', () => {
   assert.equal(routeUrl('http://127.0.0.1:3000', '/session/demo'), 'http://127.0.0.1:3000/session/demo');
+});
+
+test('runRouteProbe normalizes reported failures and fails closed on probe errors', async () => {
+  const page = { marker: 'page' };
+  const context = { route: '/session/demo-2' };
+
+  assert.deepEqual(
+    await runRouteProbe(page, async (receivedPage, receivedContext) => {
+      assert.equal(receivedPage, page);
+      assert.equal(receivedContext, context);
+      return [' missing Breakdown guard ', '', null];
+    }, context),
+    ['missing Breakdown guard'],
+  );
+  assert.deepEqual(
+    await runRouteProbe(page, async () => {
+      throw new Error('results did not hydrate');
+    }, context),
+    ['results did not hydrate'],
+  );
+  assert.deepEqual(await runRouteProbe(page, null, context), []);
+});
+
+test('session smoke markers survive both resolving and loaded pe4 shell states', () => {
+  const expectedText = DEFAULT_ROUTE_TEXT['/session/pe4'];
+  const resolvingState = 'LOG IN Resolving pe4 Session... Questions – Answer or Add Groups – Join or Create Results – View or Save';
+  const loadedState = 'LOG IN pe4 Loading... 0s 0 / 0 Groups Join or Create Results View';
+
+  assert.deepEqual(expectedText, ['Groups', 'Results']);
+  assert.deepEqual(findMissingExpectedText(resolvingState, expectedText), []);
+  assert.deepEqual(findMissingExpectedText(loadedState, expectedText), []);
+  assert.deepEqual(findMissingExpectedText('LOG IN pe4 Groups Join or Create', expectedText), ['Results']);
 });
 
 test('failed local chain probes are allowed without masking same-origin asset failures', () => {
@@ -103,6 +136,7 @@ test('summarizeFailures catches Vite-sensitive render, style, and asset failures
       }],
       unexpectedConsoleIssues: [{ type: 'error', text: 'TypeError: boom' }],
       pageErrors: ['ReferenceError: boom'],
+      routeProbeFailures: ['results did not hydrate'],
       layoutIssues: ['ce-survey-submit: visible text appears clipped'],
     },
   ]);
@@ -116,6 +150,7 @@ test('summarizeFailures catches Vite-sensitive render, style, and asset failures
     '/session/demo: failed script http://127.0.0.1:3000/src/main.tsx (net::ERR_FAILED)',
     '/session/demo: console error: TypeError: boom',
     '/session/demo: page error: ReferenceError: boom',
+    '/session/demo: route probe: results did not hydrate',
     '/session/demo: layout issue: ce-survey-submit: visible text appears clipped',
   ]);
 });
@@ -137,6 +172,7 @@ test('compactSmokeSummary keeps success output focused on route health', () => {
       unexpectedFailedRequests: [],
       unexpectedConsoleIssues: [],
       pageErrors: [],
+      routeProbeFailures: [],
       layoutIssues: [],
       missingText: [],
     }],
@@ -155,6 +191,7 @@ test('compactSmokeSummary keeps success output focused on route health', () => {
       unexpectedFailedRequests: 0,
       unexpectedConsoleIssues: 0,
       pageErrors: 0,
+      routeProbeFailures: 0,
       layoutIssues: 0,
       missingText: [],
     }],
