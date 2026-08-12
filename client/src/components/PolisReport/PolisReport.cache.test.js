@@ -702,16 +702,20 @@ describe('PolisReport demo data defaults', () => {
     ).toBe(true);
   });
 
-  it('maps demo session slugs to the shared Context demo corpus fixture', () => {
+  it('keeps legacy demo datasets shared while demo-2 uses its typed fixture', () => {
     expect(getPolisDemoDatasetForSlug('demo-1', { allowFallback: false })).toBe(
       getPolisDemoDatasetForSlug('demo', { allowFallback: false }),
     );
     expect(getPolisDemoDatasetForSlug('demo-3', { allowFallback: false })).toBe(
       getPolisDemoDatasetForSlug('demo', { allowFallback: false }),
     );
-    expect(getPolisDemoDatasetForSlug('demo-2', { allowFallback: false })).toBe(
+    expect(getPolisDemoDatasetForSlug('demo-sh', { allowFallback: false })).toBe(
       getPolisDemoDatasetForSlug('demo', { allowFallback: false }),
     );
+    const demo2Dataset = getPolisDemoDatasetForSlug('demo-2', { allowFallback: false });
+    expect(demo2Dataset).not.toBe(getPolisDemoDatasetForSlug('demo', { allowFallback: false }));
+    expect(demo2Dataset?.comments).toHaveLength(40);
+    expect(demo2Dataset?.clusterAnalysis).toHaveLength(3);
   });
 
   it('shows the demo data toggle as enabled by default for the demo slug', () => {

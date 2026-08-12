@@ -10,6 +10,7 @@ import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { isResponseAllowedForSessionSlug } from '../../utilities/session/responseSessionScope.js';
 import { canonicalizeLegacySessionAlias } from '../../utilities/session/sessionDemoCompat.js';
+import { resolveDemoPolisDataset } from '../../utilities/demo/demoPolisDatasets';
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
 import {
   getHistoricalFigureAvatarOrBlockie,
@@ -346,7 +347,7 @@ const BUILT_IN_POLIS_DEMO_DATASETS_BY_SLUG = Object.freeze(
   (Array.isArray(CE_DEMO_SESSION_SLUGS) ? CE_DEMO_SESSION_SLUGS : ['demo']).reduce<Record<string, unknown>>(
     (acc, rawSlug) => {
       const slug = normalizeSessionSlug(rawSlug);
-      if (slug) acc[slug] = DEFAULT_POLIS_DEMO_DATA;
+      if (slug) acc[slug] = resolveDemoPolisDataset(slug, DEFAULT_POLIS_DEMO_DATA);
       return acc;
     },
     { demo: DEFAULT_POLIS_DEMO_DATA },
