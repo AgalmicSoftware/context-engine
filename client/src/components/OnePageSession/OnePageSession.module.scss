@@ -2035,6 +2035,21 @@
     background: var(--ce-surface-raised);
     color: var(--ce-panel-text);
   }
+
+  // Keep the copy-link affordance on each group card as a bare icon. The
+  // shared Classic 95 button recipe otherwise adds a raised frame here even
+  // though the card overlay already provides the control's visual context.
+  .workerGroupCardLinkButton,
+  .workerGroupCardLinkButton:active {
+    border: 0 !important;
+    background: transparent;
+    box-shadow: none !important;
+  }
+
+  .workerGroupCardLinkButton:focus-visible {
+    outline: 2px dotted var(--ce-focus-ring);
+    outline-offset: 2px;
+  }
 }
 
 @media (max-width: 640px) {

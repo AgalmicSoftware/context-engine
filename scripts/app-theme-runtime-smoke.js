@@ -419,6 +419,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   }
 
   let classicReportClusterColors = null;
+  let classicGroupLinkState = null;
   if (routeCase.requiresReadableSessionSurface) {
     await page.getByText('Existential risk from AI justifies extraordinary precautions.', { exact: true }).waitFor({
       state: 'visible',
@@ -428,6 +429,24 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     classicReportClusterColors = await page
       .locator('svg[class*="clusterSwatchSvg"] circle')
       .evaluateAll((circles) => circles.map((circle) => circle.getAttribute('fill')));
+    await page.getByRole('heading', { name: /^Groups Join or Create$/ }).click();
+    const groupLinkButton = page.getByRole('button', { name: /^Copy .* group link$/ }).first();
+    await groupLinkButton.waitFor({
+      state: 'visible',
+      timeout: 15000,
+    });
+    classicGroupLinkState = await groupLinkButton.evaluate((element) => {
+      const style = window.getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      return {
+        backgroundColor: style.backgroundColor,
+        borderWidths: [style.borderTopWidth, style.borderRightWidth, style.borderBottomWidth, style.borderLeftWidth],
+        boxShadow: style.boxShadow,
+        height: rect.height,
+        width: rect.width,
+      };
+    });
+    await page.getByRole('heading', { name: /^Groups Join or Create$/ }).click();
   }
 
   const classicDocumentEndFooterState = routeCase.requiresDocumentEndFooter
@@ -1932,6 +1951,19 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       originalReportClusterColors,
       'Context Engine should preserve the original D3 opinion-group palette',
     );
+    assert.deepEqual(
+      classicGroupLinkState.borderWidths,
+      ['0px', '0px', '0px', '0px'],
+      'Classic 95 group-card link controls should not render a persistent border',
+    );
+    assert.equal(
+      classicGroupLinkState.backgroundColor,
+      'rgba(0, 0, 0, 0)',
+      'Classic 95 group-card link controls should keep a transparent background',
+    );
+    assert.equal(classicGroupLinkState.boxShadow, 'none', 'Classic 95 group-card link controls should not be raised');
+    assert.ok(classicGroupLinkState.width >= 28, 'Classic 95 group-card link controls should preserve their click width');
+    assert.ok(classicGroupLinkState.height >= 28, 'Classic 95 group-card link controls should preserve their click height');
     const assertMatchingBox = (classicBox, currentBox, label) => {
       ['height', 'width'].forEach((dimension) => {
         assert.ok(

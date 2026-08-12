@@ -1392,6 +1392,24 @@ describe('OnePageSession view gating', () => {
     expect(classicShell).toContain('padding: 0;');
   });
 
+  it('keeps Classic 95 group-card link controls frameless without changing the default control recipe', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
+    const defaultLinkControl = extractMediaBlock(scss, '.workerGroupCardLinkButton {');
+    const classicTheme = extractMediaBlock(
+      scss,
+      '@container ce-theme style(--ce-layout-profile: desktop-window)',
+      '.workerGroupCardLinkButton,',
+    );
+
+    expect(defaultLinkControl).toContain('border: 1px solid transparent;');
+    expect(classicTheme).toMatch(
+      /\.workerGroupCardLinkButton,\s*\.workerGroupCardLinkButton:active\s*{[\s\S]*?border:\s*0 !important;[\s\S]*?background:\s*transparent;[\s\S]*?box-shadow:\s*none !important;/,
+    );
+    expect(classicTheme).toMatch(
+      /\.workerGroupCardLinkButton:focus-visible\s*{[\s\S]*?outline:\s*2px dotted var\(--ce-focus-ring\);/,
+    );
+  });
+
   it('keeps section-card headers inline through 767px without pulling full phone layout onto tablets', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
     const phoneBlock = extractMediaBlock(scss, '@media only screen and (max-width: 600px)', '.onePageDemoContainer');
