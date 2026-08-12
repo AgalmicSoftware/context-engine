@@ -1,6 +1,7 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { STALE_CHUNK_RELOAD_STORAGE_KEY } from '../../bootRecovery.js';
 import { AppShell, appShellDispatchActions } from './AppShell';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import contractScripts from '../../utilities/web3/chainGateway.js';
@@ -732,6 +733,121 @@ describe('AppShell route render smoke', () => {
     window.sessionStorage.clear();
   });
 
+  it('clears stale-chunk recovery state after a synchronous primary route commits', async () => {
+    const subject = createSubject({ path: '/', search: '?ceChunkReload=123&keep=1' });
+    window.sessionStorage.setItem(STALE_CHUNK_RELOAD_STORAGE_KEY, 'true');
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_HOME_ROOT)).toBeInTheDocument();
+    await waitFor(() => expect(window.sessionStorage.getItem(STALE_CHUNK_RELOAD_STORAGE_KEY)).toBeNull());
+    expect(window.location.search).toBe('?keep=1');
+  });
+
+  it('preserves stale-chunk recovery state on the cache initialization placeholder', () => {
+    const subject = createSubject({ path: '/questions', search: '?ceChunkReload=123&keep=1' });
+    subject.state = {
+      ...subject.state,
+      isCacheManagerReady: false,
+    };
+    window.sessionStorage.setItem(STALE_CHUNK_RELOAD_STORAGE_KEY, 'true');
+
+    render(subject.render());
+
+    expect(window.sessionStorage.getItem(STALE_CHUNK_RELOAD_STORAGE_KEY)).toBe('true');
+    expect(window.location.search).toBe('?ceChunkReload=123&keep=1');
+  });
+
+  it('preserves stale-chunk recovery state while an explicit session ID is resolving', async () => {
+    const subject = createSubject({
+      path: `/session/${SESSION_ID}`,
+      search: '?ceChunkReload=123&keep=1',
+      sessionConfig: null,
+    });
+    subject.resolveSessionSlugFromPathToken = jest.fn(() => '');
+    subject.resolveSessionPathId = jest.fn();
+    subject._sessionPathResolver.getIdStatus = jest.fn(() => ({
+      hasAttempted: true,
+      isPending: true,
+      retryCount: 0,
+      lastErrorTs: null,
+    }));
+    window.sessionStorage.setItem(STALE_CHUNK_RELOAD_STORAGE_KEY, 'true');
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.SESSION_LOADING_SKELETON)).toBeInTheDocument();
+    expect(window.sessionStorage.getItem(STALE_CHUNK_RELOAD_STORAGE_KEY)).toBe('true');
+    expect(window.location.search).toBe('?ceChunkReload=123&keep=1');
+  });
+
+  it('clears stale-chunk recovery state after explicit session ID resolution is exhausted', async () => {
+    const subject = createSubject({
+      path: `/session/${SESSION_ID}`,
+      search: '?ceChunkReload=123&keep=1',
+      sessionConfig: null,
+    });
+    subject.resolveSessionSlugFromPathToken = jest.fn(() => '');
+    subject.resolveSessionPathId = jest.fn();
+    subject._sessionPathResolver.getIdStatus = jest.fn(() => ({
+      hasAttempted: true,
+      isPending: false,
+      retryCount: 0,
+      lastErrorTs: null,
+    }));
+    window.sessionStorage.setItem(STALE_CHUNK_RELOAD_STORAGE_KEY, 'true');
+
+    render(subject.render());
+
+    expect(await screen.findByRole('heading', { name: 'Session Not Found' })).toBeInTheDocument();
+    await waitFor(() => expect(window.sessionStorage.getItem(STALE_CHUNK_RELOAD_STORAGE_KEY)).toBeNull());
+    expect(window.location.search).toBe('?keep=1');
+  });
+
+  it('preserves stale-chunk recovery state while a session slug is resolving', async () => {
+    const subject = createSubject({
+      path: '/session/missing-session',
+      search: '?ceChunkReload=123&keep=1',
+      sessionConfig: null,
+    });
+    subject.resolveSessionPathSlug = jest.fn();
+    subject._sessionPathResolver.getSlugStatus = jest.fn(() => ({
+      hasAttempted: false,
+      isPending: false,
+      retryCount: 0,
+      lastErrorTs: null,
+    }));
+    window.sessionStorage.setItem(STALE_CHUNK_RELOAD_STORAGE_KEY, 'true');
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.SESSION_LOADING_SKELETON)).toBeInTheDocument();
+    expect(window.sessionStorage.getItem(STALE_CHUNK_RELOAD_STORAGE_KEY)).toBe('true');
+    expect(window.location.search).toBe('?ceChunkReload=123&keep=1');
+  });
+
+  it('clears stale-chunk recovery state after session slug resolution is exhausted', async () => {
+    const subject = createSubject({
+      path: '/session/missing-session',
+      search: '?ceChunkReload=123&keep=1',
+      sessionConfig: null,
+    });
+    subject.resolveSessionPathSlug = jest.fn();
+    subject._sessionPathResolver.getSlugStatus = jest.fn(() => ({
+      hasAttempted: true,
+      isPending: false,
+      retryCount: 0,
+      lastErrorTs: null,
+    }));
+    window.sessionStorage.setItem(STALE_CHUNK_RELOAD_STORAGE_KEY, 'true');
+
+    render(subject.render());
+
+    expect(await screen.findByRole('heading', { name: 'Session Not Found' })).toBeInTheDocument();
+    await waitFor(() => expect(window.sessionStorage.getItem(STALE_CHUNK_RELOAD_STORAGE_KEY)).toBeNull());
+    expect(window.location.search).toBe('?keep=1');
+  });
+
   it('seeds built-in demo questions into canonical live-result buckets without scanning blocks', () => {
     const subject = createSubject({
       path: '/session/demo',
@@ -1257,10 +1373,12 @@ describe('AppShell route render smoke', () => {
       sessionConfig: null,
     });
     subject.resolveSessionPathSlug = jest.fn();
+    window.sessionStorage.setItem(STALE_CHUNK_RELOAD_STORAGE_KEY, 'true');
 
     render(subject.render());
 
     expect(await screen.findByRole('alert')).toHaveTextContent('must appear exactly once');
+    await waitFor(() => expect(window.sessionStorage.getItem(STALE_CHUNK_RELOAD_STORAGE_KEY)).toBeNull());
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(subject.resolveSessionPathSlug).not.toHaveBeenCalled();
   });
@@ -3165,10 +3283,12 @@ describe('AppShell route render smoke', () => {
         ),
       },
     });
+    window.sessionStorage.setItem(STALE_CHUNK_RELOAD_STORAGE_KEY, 'true');
 
     render(subject.render());
 
     expect(await screen.findByRole('heading', { name: 'Survey Not Found' })).toBeInTheDocument();
+    await waitFor(() => expect(window.sessionStorage.getItem(STALE_CHUNK_RELOAD_STORAGE_KEY)).toBeNull());
     expect(screen.queryByTestId('mock-survey-page')).not.toBeInTheDocument();
     expect(subject.queueSurveyGroupScan).not.toHaveBeenCalled();
   });
@@ -3208,12 +3328,14 @@ describe('AppShell route render smoke', () => {
         },
       },
     });
+    window.sessionStorage.setItem(STALE_CHUNK_RELOAD_STORAGE_KEY, 'true');
 
     render(subject.render());
 
     expect(await screen.findByRole('heading', { name: 'Loading Survey Metadata...' })).toBeInTheDocument();
     expect(screen.getByText('Loading surveys for session "demo-sh"...')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Survey Not Found' })).not.toBeInTheDocument();
+    expect(window.sessionStorage.getItem(STALE_CHUNK_RELOAD_STORAGE_KEY)).toBe('true');
     expect(subject.queueSurveyGroupScan).not.toHaveBeenCalled();
   });
 
@@ -3253,10 +3375,12 @@ describe('AppShell route render smoke', () => {
         },
       },
     });
+    window.sessionStorage.setItem(STALE_CHUNK_RELOAD_STORAGE_KEY, 'true');
 
     render(subject.render());
 
     expect(await screen.findByRole('heading', { name: 'Survey Metadata Load Error' })).toBeInTheDocument();
+    await waitFor(() => expect(window.sessionStorage.getItem(STALE_CHUNK_RELOAD_STORAGE_KEY)).toBeNull());
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 
     await waitFor(() =>

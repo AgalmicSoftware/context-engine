@@ -1,6 +1,7 @@
 import {
   clearBootReloadMarker,
   clearBootCaches,
+  clearStaleChunkReloadMarker,
   isStaleChunkLoadError,
   reloadWithCacheBuster,
   recoverFromStaleChunkLoadError,
@@ -19,7 +20,7 @@ describe('bootRecovery', () => {
     jest.useRealTimers();
   });
 
-  it('clears successful boot recovery markers without dropping other URL or history state', () => {
+  it('clears only the entry-module boot marker without dropping other recovery state', () => {
     const replaceState = jest.fn();
     const removeItem = jest.fn();
     const historyState = { idx: 2, usr: { from: 'docs' } };
@@ -32,12 +33,30 @@ describe('bootRecovery', () => {
     };
 
     expect(clearBootReloadMarker(fakeWindow)).toBe(true);
-    expect(replaceState).toHaveBeenCalledWith(historyState, '', '/ce/docs?session=alpha#guide');
+    expect(replaceState).toHaveBeenCalledWith(historyState, '', '/ce/docs?ceChunkReload=456&session=alpha#guide');
+    expect(removeItem).not.toHaveBeenCalled();
+    expect(fakeWindow.sessionStorage.clear).not.toHaveBeenCalled();
+  });
+
+  it('clears stale-chunk recovery state only after a primary route commits', () => {
+    const replaceState = jest.fn();
+    const removeItem = jest.fn();
+    const historyState = { idx: 2 };
+    const fakeWindow = {
+      history: { replaceState, state: historyState },
+      location: {
+        href: 'https://contextengine.example.test/docs?ceBootReload=123&ceChunkReload=456&session=alpha#guide',
+      },
+      sessionStorage: { clear: jest.fn(), removeItem },
+    };
+
+    expect(clearStaleChunkReloadMarker(fakeWindow)).toBe(true);
+    expect(replaceState).toHaveBeenCalledWith(historyState, '', '/docs?ceBootReload=123&session=alpha#guide');
     expect(removeItem).toHaveBeenCalledWith('ce:staleChunkReloadAttempted:v20260618b');
     expect(fakeWindow.sessionStorage.clear).not.toHaveBeenCalled();
   });
 
-  it('clears only the stale-chunk sentinel when no recovery URL marker is present', () => {
+  it('clears only the stale-chunk sentinel when its URL marker is absent', () => {
     const replaceState = jest.fn();
     const removeItem = jest.fn();
     const fakeWindow = {
@@ -46,7 +65,7 @@ describe('bootRecovery', () => {
       sessionStorage: { clear: jest.fn(), removeItem },
     };
 
-    expect(clearBootReloadMarker(fakeWindow)).toBe(false);
+    expect(clearStaleChunkReloadMarker(fakeWindow)).toBe(false);
     expect(replaceState).not.toHaveBeenCalled();
     expect(removeItem).toHaveBeenCalledWith('ce:staleChunkReloadAttempted:v20260618b');
     expect(fakeWindow.sessionStorage.clear).not.toHaveBeenCalled();

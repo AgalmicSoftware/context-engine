@@ -1,7 +1,7 @@
 import { updateCacheAtomic } from '../../utilities/cache/cacheScripts.js';
 import { mergeSbtActivityCacheEntryCounts } from '../../utilities/sbt/sbtActivityCacheEntry.js';
 
-type CommunitySbtCacheEntry = Record<string, unknown> & {
+type CommunitySbtCacheEntry = {
   blockNumber?: unknown;
   burnedAddresses?: unknown;
   burnedCountByAddress?: unknown;
@@ -71,7 +71,7 @@ export const persistCommunitySbtHolderHydrationResults = async ({
           ? Math.floor(Number(res.counts?.scannedToBlock))
           : null,
         countsScanCheckpoint: null,
-      }) as unknown as CommunitySbtCacheEntry;
+      });
     });
 
     nextCache[netKey] = {

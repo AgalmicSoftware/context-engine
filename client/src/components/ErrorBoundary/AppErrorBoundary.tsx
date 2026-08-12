@@ -1,5 +1,6 @@
 import React from 'react';
 import { PUBLIC_REPO_NEW_ISSUE_URL } from '../../variables/publicRepoMetadata.js';
+import { recoverFromStaleChunkLoadError } from '../../bootRecovery.js';
 
 type AppErrorBoundaryProps = {
   children?: React.ReactNode;
@@ -28,6 +29,7 @@ class AppErrorBoundary extends React.Component<AppErrorBoundaryProps, AppErrorBo
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('AppErrorBoundary caught an error:', error, errorInfo && errorInfo.componentStack);
+    recoverFromStaleChunkLoadError(error);
   }
 
   render() {

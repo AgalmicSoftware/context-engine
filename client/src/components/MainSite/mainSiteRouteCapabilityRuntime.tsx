@@ -1,4 +1,5 @@
 import React from 'react';
+import { BootRecoveryReady } from '../ErrorBoundary/InitialRouteBoundary';
 import { normalizeSessionSlug } from '../../domains/sessions/sessionConfig.js';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import {
@@ -71,12 +72,15 @@ export const renderWorkerSurveyMetadataStatus = ({
   if (!workerCanonical || !surveyMissing) return null;
   if (cacheError) {
     return (
-      <MainSiteRouteStatusView
-        heading="Survey Metadata Load Error"
-        message={<>Survey metadata for session &quot;{sessionSlug}&quot; could not be loaded.</>}
-        actionLabel="Retry"
-        onAction={onRetry}
-      />
+      <>
+        <MainSiteRouteStatusView
+          heading="Survey Metadata Load Error"
+          message={<>Survey metadata for session &quot;{sessionSlug}&quot; could not be loaded.</>}
+          actionLabel="Retry"
+          onAction={onRetry}
+        />
+        <BootRecoveryReady />
+      </>
     );
   }
   if (cacheReady) return null;
@@ -182,26 +186,32 @@ export const renderMainSiteSurveyResolutionStatus = ({
     const message =
       String(host.state.scanErrorMessage || '').trim() || 'Survey metadata was found but could not be loaded.';
     return (
-      <MainSiteRouteStatusView
-        heading="Survey Load Error"
-        message={message}
-        actionLabel="Retry"
-        onAction={() =>
-          host.setState({ scanErrorFor: null, scanErrorMessage: '', scanFailedFor: null }, () =>
-            host.queueSurveyGroupScan(surveyId, { hintedSlug: host.getSurveyRouteSessionSlugHint() }),
-          )
-        }
-      />
+      <>
+        <MainSiteRouteStatusView
+          heading="Survey Load Error"
+          message={message}
+          actionLabel="Retry"
+          onAction={() =>
+            host.setState({ scanErrorFor: null, scanErrorMessage: '', scanFailedFor: null }, () =>
+              host.queueSurveyGroupScan(surveyId, { hintedSlug: host.getSurveyRouteSessionSlugHint() }),
+            )
+          }
+        />
+        <BootRecoveryReady />
+      </>
     );
   }
   if (hasFailed || (surveyMissing && !allowRegistryScan)) {
     return (
-      <MainSiteRouteStatusView
-        heading="Survey Not Found"
-        message="This survey ID does not exist in any known session."
-        actionLabel="Go Back"
-        onAction={() => window.history.back()}
-      />
+      <>
+        <MainSiteRouteStatusView
+          heading="Survey Not Found"
+          message="This survey ID does not exist in any known session."
+          actionLabel="Go Back"
+          onAction={() => window.history.back()}
+        />
+        <BootRecoveryReady />
+      </>
     );
   }
   return null;

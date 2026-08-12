@@ -63,9 +63,7 @@ describe('client package modernization contract', () => {
     );
     expect(eslintConfig).toContain("const typedDebateMapComponentFiles = ['src/components/DebateMap/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedNavbarComponentFiles = ['src/components/Navbar/**/*.{ts,tsx}']");
-    expect(eslintConfig).toContain(
-      "const typedDocsPageComponentFiles = ['src/components/DocsPage/**/*.{ts,tsx}']",
-    );
+    expect(eslintConfig).toContain("const typedDocsPageComponentFiles = ['src/components/DocsPage/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain(
       "const typedOnePageSessionComponentFiles = ['src/components/OnePageSession/**/*.{ts,tsx}']",
     );
@@ -122,6 +120,7 @@ describe('client package modernization contract', () => {
     const viteIndex = readClientFile('index.html');
     const viteEntry = readClientFile('src/viteEntry.ts');
     const appEntry = readClientFile('src/index.tsx');
+    const initialRouteBoundary = readClientFile('src/components/ErrorBoundary/InitialRouteBoundary.tsx');
     const legacyOutputCleaner = readClientFile('scripts/clean-legacy-vite-output.mjs');
     const contractSourceLoader = readClientFile('src/components/DocsPage/contractSourceLoader.ts');
 
@@ -141,6 +140,8 @@ describe('client package modernization contract', () => {
     expect(viteEntry).toContain("import 'assets/css/contextEngine.scss';");
     expect(viteEntry).toContain("import('./index')");
     expect(viteEntry).toContain('clearBootReloadMarker();');
+    expect(viteEntry).not.toContain('clearStaleChunkReloadMarker');
+    expect(initialRouteBoundary).toContain('clearStaleChunkReloadMarker();');
     expect(appEntry).not.toContain("import 'assets/css/contextEngine.scss';");
     expect(legacyOutputCleaner).toContain("const legacyOutputDirs = ['build-vite', 'vite-build']");
     expect(legacyOutputCleaner).toContain('fs.rmSync(targetDir, { recursive: true, force: true })');
@@ -375,9 +376,7 @@ describe('client package modernization contract', () => {
     );
     expect(eslintConfig).toContain("const typedDebateMapComponentFiles = ['src/components/DebateMap/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedNavbarComponentFiles = ['src/components/Navbar/**/*.{ts,tsx}']");
-    expect(eslintConfig).toContain(
-      "const typedDocsPageComponentFiles = ['src/components/DocsPage/**/*.{ts,tsx}']",
-    );
+    expect(eslintConfig).toContain("const typedDocsPageComponentFiles = ['src/components/DocsPage/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("'react-hooks': reactHooksPlugin");
     expect(eslintConfig).not.toContain("import importPlugin from 'eslint-plugin-import'");
     expect(eslintConfig).not.toContain("import prettierPlugin from 'eslint-plugin-prettier'");

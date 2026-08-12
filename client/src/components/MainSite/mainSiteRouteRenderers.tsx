@@ -1,10 +1,10 @@
-import React, { Suspense } from 'react';
+import React from 'react';
 import { ethers } from 'ethers';
 import stylesRaw from './AppShell.module.scss';
 import MainAreaTabsRaw from '../MainContent/MainAreaTabs';
 import RightSideRaw from '../RightSidebar/RightSide';
 import LazyFallbackRaw from '../Shared/LazyFallback';
-import RouteErrorBoundaryRaw from '../ErrorBoundary/RouteErrorBoundary';
+import InitialRouteBoundaryRaw from '../ErrorBoundary/InitialRouteBoundary';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
@@ -129,7 +129,7 @@ const asMainSiteRouteComponent = (component: unknown): MainSiteRouteComponent =>
 const MainAreaTabs = asMainSiteRouteComponent(MainAreaTabsRaw);
 const RightSide = asMainSiteRouteComponent(RightSideRaw);
 const LazyFallback = asMainSiteRouteComponent(LazyFallbackRaw);
-const RouteErrorBoundary = asMainSiteRouteComponent(RouteErrorBoundaryRaw);
+const InitialRouteBoundary = asMainSiteRouteComponent(InitialRouteBoundaryRaw);
 const ExperimentalStub = asMainSiteRouteComponent(ExperimentalStubRaw);
 const NotFoundRoute = asMainSiteRouteComponent(NotFoundRouteRaw);
 const AboutPage = asMainSiteRouteComponent(AboutPageRaw);
@@ -155,112 +155,116 @@ const UserPage = asMainSiteRouteComponent(UserPageRaw);
 
 export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) => ({
   workerCanonicalRoutes: getWorkerCanonicalRouteController(host),
-  _renderDebateRoute: (fullPath: string) => <ExperimentalStub featureName="Debate view" path={fullPath} />,
+  _renderDebateRoute: (fullPath: string) => (
+    <InitialRouteBoundary resetKey={fullPath}>
+      <ExperimentalStub featureName="Debate view" path={fullPath} />
+    </InitialRouteBoundary>
+  ),
 
   _renderBookmarksRoute: () => (
-    <Suspense fallback={<LazyFallback label="Loading Bookmarks..." />}>
+    <InitialRouteBoundary fallback={<LazyFallback label="Loading Bookmarks..." />}>
       <div data-testid={E2E_TESTIDS.PAGE_BOOKMARKS_ROOT}>
         <BookmarksPage />
       </div>
-    </Suspense>
+    </InitialRouteBoundary>
   ),
 
   _renderAboutRoute: () => (
-    <Suspense fallback={<LazyFallback label="Loading..." />}>
+    <InitialRouteBoundary fallback={<LazyFallback label="Loading..." />}>
       <div data-testid={E2E_TESTIDS.PAGE_ABOUT_ROOT}>
         <AboutPage />
       </div>
-    </Suspense>
+    </InitialRouteBoundary>
   ),
 
   _renderDemosRoute: () => (
-    <Suspense fallback={<div />}>
+    <InitialRouteBoundary fallback={<div />}>
       <DemosIndex />
-    </Suspense>
+    </InitialRouteBoundary>
   ),
 
   _renderMatrixRoute: () => (
-    <Suspense fallback={<LazyFallback label="Loading..." />}>
+    <InitialRouteBoundary fallback={<LazyFallback label="Loading..." />}>
       <div data-testid={E2E_TESTIDS.PAGE_MATRIX_ROOT}>
         <RiskMatrixDemo />
       </div>
-    </Suspense>
+    </InitialRouteBoundary>
   ),
 
   _renderAgentRoute: () => {
     if (process.env.NODE_ENV === 'production') {
-      return <div>Page not found or invalid path.</div>;
+      return (
+        <InitialRouteBoundary>
+          <div>Page not found or invalid path.</div>
+        </InitialRouteBoundary>
+      );
     }
     return (
-      <Suspense fallback={<LazyFallback label="Loading Agent..." />}>
+      <InitialRouteBoundary fallback={<LazyFallback label="Loading Agent..." />}>
         <div data-testid={E2E_TESTIDS.PAGE_AGENT_ROOT}>
           <AgentPage />
         </div>
-      </Suspense>
+      </InitialRouteBoundary>
     );
   },
 
   _renderSimUserRoute: (fullPath: string, defaultSessionNetwork: MainSiteRouteNetwork) => {
     const simUsername = fullPath.slice(4);
     return (
-      <Suspense fallback={<LazyFallback label="Loading profile..." minHeight="40vh" />}>
+      <InitialRouteBoundary fallback={<LazyFallback label="Loading profile..." minHeight="40vh" />} resetKey={fullPath}>
         <SimulatedUserPage simUsername={simUsername} provider={host.props.provider} network={defaultSessionNetwork} />
-      </Suspense>
+      </InitialRouteBoundary>
     );
   },
 
   _renderAtlasRoute: (ctx: RouteRenderCtx) => {
     const { fullPath, defaultSlug, defaultSessionNetwork, routeDemoMode } = ctx;
     return (
-      <Suspense fallback={<LazyFallback label="Loading Atlas..." />}>
-        <RouteErrorBoundary resetKey={fullPath}>
-          <div data-testid={E2E_TESTIDS.PAGE_ATLAS_ROOT}>
-            <DebateMap
-              // Pass necessary context props
-              account={host.props.account}
-              provider={host.props.provider}
-              network={defaultSessionNetwork}
-              litHooks={host.state.litHooks}
-              toggleLoginModal={host.props.toggleLoginModal}
-              loginComplete={host.props.loginComplete}
-              activeSessionSlug={defaultSlug}
+      <InitialRouteBoundary fallback={<LazyFallback label="Loading Atlas..." />} resetKey={fullPath}>
+        <div data-testid={E2E_TESTIDS.PAGE_ATLAS_ROOT}>
+          <DebateMap
+            // Pass necessary context props
+            account={host.props.account}
+            provider={host.props.provider}
+            network={defaultSessionNetwork}
+            litHooks={host.state.litHooks}
+            toggleLoginModal={host.props.toggleLoginModal}
+            loginComplete={host.props.loginComplete}
+            activeSessionSlug={defaultSlug}
 
-              // Pass Cache props
-              isSBTCacheReady={host.state.isSBTCacheReady}
-              isSurveyCacheReady={host.state.isSurveyCacheReady}
-              isQuestionCacheReady={host.state.isQuestionCacheReady}
-              sbtCacheRevision={host.state.sbtCacheRevision}
-              questionResponsesNonce={host.state.questionResponsesNonce}
-              questionScanProgress={host.state.questionScanProgress}
+            // Pass Cache props
+            isSBTCacheReady={host.state.isSBTCacheReady}
+            isSurveyCacheReady={host.state.isSurveyCacheReady}
+            isQuestionCacheReady={host.state.isQuestionCacheReady}
+            sbtCacheRevision={host.state.sbtCacheRevision}
+            questionResponsesNonce={host.state.questionResponsesNonce}
+            questionScanProgress={host.state.questionScanProgress}
 
-              // Pass Data Refresh functions
-              refreshSbtData={host.refreshSbtData}
-              refreshQuestionMetadata={host.refreshQuestionMetadata}
-              refreshQuestionResponses={host.refreshQuestionResponses}
+            // Pass Data Refresh functions
+            refreshSbtData={host.refreshSbtData}
+            refreshQuestionMetadata={host.refreshQuestionMetadata}
+            refreshQuestionResponses={host.refreshQuestionResponses}
 
-              // Demo/Config props
-              demoMode={routeDemoMode}
-            />
-          </div>
-        </RouteErrorBoundary>
-      </Suspense>
+            // Demo/Config props
+            demoMode={routeDemoMode}
+          />
+        </div>
+      </InitialRouteBoundary>
     );
   },
 
   _renderTagRoute: (ctx: RouteRenderCtx) => {
     const { fullPath, defaultSlug, defaultSessionNetwork } = ctx;
     return (
-      <Suspense fallback={<LazyFallback label="Loading Tags..." />}>
-        <RouteErrorBoundary resetKey={fullPath}>
-          <TagPage
-            path={fullPath}
-            activeSessionSlug={defaultSlug}
-            network={defaultSessionNetwork}
-            isQuestionCacheReady={host.state.isQuestionCacheReady}
-            questionResponsesNonce={host.state.questionResponsesNonce}
-          />
-        </RouteErrorBoundary>
-      </Suspense>
+      <InitialRouteBoundary fallback={<LazyFallback label="Loading Tags..." />} resetKey={fullPath}>
+        <TagPage
+          path={fullPath}
+          activeSessionSlug={defaultSlug}
+          network={defaultSessionNetwork}
+          isQuestionCacheReady={host.state.isQuestionCacheReady}
+          questionResponsesNonce={host.state.questionResponsesNonce}
+        />
+      </InitialRouteBoundary>
     );
   },
 
@@ -281,32 +285,28 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
       compareCapabilityContext.capabilities.source === 'missing' ||
       compareCapabilityContext.capabilities.usesOnChainSbt;
     return (
-      <Suspense fallback={<LazyFallback label="Loading..." />}>
-        <RouteErrorBoundary resetKey={fullPath}>
-          <div data-testid={E2E_TESTIDS.PAGE_COMPARE_ROOT}>
-            <CompareAddresses
-              activeSessionSlug={defaultSlug}
-              firstAddress={firstAddress}
-              account={host.props.account}
-              sessionCachesReady={!!host.state.isAllCachesReady}
-              scanSpecificUserProfile={onChainProfileEnabled ? host.scanSpecificUserProfile : undefined}
-            />
-          </div>
-        </RouteErrorBoundary>
-      </Suspense>
+      <InitialRouteBoundary fallback={<LazyFallback label="Loading..." />} resetKey={fullPath}>
+        <div data-testid={E2E_TESTIDS.PAGE_COMPARE_ROOT}>
+          <CompareAddresses
+            activeSessionSlug={defaultSlug}
+            firstAddress={firstAddress}
+            account={host.props.account}
+            sessionCachesReady={!!host.state.isAllCachesReady}
+            scanSpecificUserProfile={onChainProfileEnabled ? host.scanSpecificUserProfile : undefined}
+          />
+        </div>
+      </InitialRouteBoundary>
     );
   },
 
   _renderDocsRoute: (ctx: RouteRenderCtx) => {
     const { fullPath, defaultSlug } = ctx;
     return (
-      <Suspense fallback={<LazyFallback label="Loading Docs..." />}>
-        <RouteErrorBoundary resetKey={fullPath}>
-          <div>
-            <DocsPage activeSessionSlug={defaultSlug} />
-          </div>
-        </RouteErrorBoundary>
-      </Suspense>
+      <InitialRouteBoundary fallback={<LazyFallback label="Loading Docs..." />} resetKey={fullPath}>
+        <div>
+          <DocsPage activeSessionSlug={defaultSlug} />
+        </div>
+      </InitialRouteBoundary>
     );
   },
 
@@ -319,44 +319,40 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
       renderWorkerCanonicalRouteBootstrap(workerRoute, workerCanonicalRoutes);
     if (workerInterruption) return workerInterruption;
     return (
-      <Suspense fallback={<LazyFallback label="Loading Admin..." />}>
-        <RouteErrorBoundary resetKey={fullPath}>
-          <div data-testid={E2E_TESTIDS.PAGE_ADMIN_ROOT}>
-            <AdminPage
-              account={host.props.account}
-              provider={host.props.provider}
-              network={host.props.network}
-              toggleLoginModal={host.props.toggleLoginModal}
-              loginComplete={host.props.loginComplete}
-              ensureLightSbtUniverse={host.ensureLightSbtUniverse}
-              initialSessionId={requestedSessionId}
-              initialRegistryChainId={requestedChainId}
-              initialSessionConfig={workerRoute.sessionConfig}
-            />
-          </div>
-        </RouteErrorBoundary>
-      </Suspense>
+      <InitialRouteBoundary fallback={<LazyFallback label="Loading Admin..." />} resetKey={fullPath}>
+        <div data-testid={E2E_TESTIDS.PAGE_ADMIN_ROOT}>
+          <AdminPage
+            account={host.props.account}
+            provider={host.props.provider}
+            network={host.props.network}
+            toggleLoginModal={host.props.toggleLoginModal}
+            loginComplete={host.props.loginComplete}
+            ensureLightSbtUniverse={host.ensureLightSbtUniverse}
+            initialSessionId={requestedSessionId}
+            initialRegistryChainId={requestedChainId}
+            initialSessionConfig={workerRoute.sessionConfig}
+          />
+        </div>
+      </InitialRouteBoundary>
     );
   },
 
   _renderSponsorRoute: (ctx: RouteRenderCtx) => {
     const { fullPath, requestedSessionId, requestedChainId } = ctx;
     return (
-      <Suspense fallback={<LazyFallback label="Loading Sponsor..." />}>
-        <RouteErrorBoundary resetKey={fullPath}>
-          <div data-testid={E2E_TESTIDS.PAGE_SPONSOR_ROOT}>
-            <SponsorPage
-              account={host.props.account}
-              provider={host.props.provider}
-              network={host.props.network}
-              toggleLoginModal={host.props.toggleLoginModal}
-              loginComplete={host.props.loginComplete}
-              initialSessionId={requestedSessionId}
-              initialRegistryChainId={requestedChainId}
-            />
-          </div>
-        </RouteErrorBoundary>
-      </Suspense>
+      <InitialRouteBoundary fallback={<LazyFallback label="Loading Sponsor..." />} resetKey={fullPath}>
+        <div data-testid={E2E_TESTIDS.PAGE_SPONSOR_ROOT}>
+          <SponsorPage
+            account={host.props.account}
+            provider={host.props.provider}
+            network={host.props.network}
+            toggleLoginModal={host.props.toggleLoginModal}
+            loginComplete={host.props.loginComplete}
+            initialSessionId={requestedSessionId}
+            initialRegistryChainId={requestedChainId}
+          />
+        </div>
+      </InitialRouteBoundary>
     );
   },
 
@@ -367,35 +363,33 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     const allSessionsMode = !routeSessionSlug;
     const routeSessionConfig = routeSessionSlug ? host.getDisplaySessionCfg(routeSessionSlug) : null;
     return (
-      <Suspense fallback={<LazyFallback label={`Loading ${t('sbts')}...`} />}>
-        <RouteErrorBoundary resetKey={fullPath}>
-          <div data-testid={E2E_TESTIDS.PAGE_SBTS_ROOT}>
-            <SBTsPage
-              provider={host.props.provider}
-              account={host.props.account}
-              litHooks={host.state.litHooks}
-              network={defaultSessionNetwork}
-              modalView={true}
-              loginComplete={host.props.loginComplete}
-              toggleLoginModal={host.props.toggleLoginModal}
-              miniaturized={false}
-              sessionSlug={routeSessionSlug || undefined}
-              sessionConfig={routeSessionConfig}
-              workerGroupId={workerGroupId || undefined}
-              allSessionsMode={allSessionsMode}
-              isSBTCacheReady={host.state.isSBTCacheReady}
-              sbtCacheRevision={host.state.sbtCacheRevision}
-              refreshSbtData={host.refreshSbtData}
-              latestBlockNumber={host.state.latestBlockNumber}
-              sbtScanProgressBySlug={host.state.sbtScanProgressBySlug}
-              sbtRealtimeCoverageBySlug={host.state.sbtRealtimeCoverageBySlug}
-              ensureLightSbtDiscovery={host.ensureLightSbtDiscovery}
-              ensureLightSbtUniverse={host.ensureLightSbtUniverse}
-              refreshSessionUniverseRegistryCache={host.refreshSessionUniverseRegistryCache}
-            />
-          </div>
-        </RouteErrorBoundary>
-      </Suspense>
+      <InitialRouteBoundary fallback={<LazyFallback label={`Loading ${t('sbts')}...`} />} resetKey={fullPath}>
+        <div data-testid={E2E_TESTIDS.PAGE_SBTS_ROOT}>
+          <SBTsPage
+            provider={host.props.provider}
+            account={host.props.account}
+            litHooks={host.state.litHooks}
+            network={defaultSessionNetwork}
+            modalView={true}
+            loginComplete={host.props.loginComplete}
+            toggleLoginModal={host.props.toggleLoginModal}
+            miniaturized={false}
+            sessionSlug={routeSessionSlug || undefined}
+            sessionConfig={routeSessionConfig}
+            workerGroupId={workerGroupId || undefined}
+            allSessionsMode={allSessionsMode}
+            isSBTCacheReady={host.state.isSBTCacheReady}
+            sbtCacheRevision={host.state.sbtCacheRevision}
+            refreshSbtData={host.refreshSbtData}
+            latestBlockNumber={host.state.latestBlockNumber}
+            sbtScanProgressBySlug={host.state.sbtScanProgressBySlug}
+            sbtRealtimeCoverageBySlug={host.state.sbtRealtimeCoverageBySlug}
+            ensureLightSbtDiscovery={host.ensureLightSbtDiscovery}
+            ensureLightSbtUniverse={host.ensureLightSbtUniverse}
+            refreshSessionUniverseRegistryCache={host.refreshSessionUniverseRegistryCache}
+          />
+        </div>
+      </InitialRouteBoundary>
     );
   },
 
@@ -425,32 +419,30 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
         : initialDetailSlug;
     const resolvedDetailNetwork = host.getSessionNetwork(resolvedDetailSlug) || defaultSessionNetwork;
     return (
-      <Suspense fallback={<LazyFallback label={`Loading ${t('sbt')}...`} />}>
-        <RouteErrorBoundary resetKey={fullPath}>
-          <div data-testid={E2E_TESTIDS.PAGE_SBT_ROOT}>
-            <SBTPage
-              SBTAddress={sbtAddress}
-              sbtMintPassword={sbtPassword}
-              toggleLoginModal={host.props.toggleLoginModal}
-              account={host.props.account}
-              provider={host.props.provider}
-              litHooks={host.state.litHooks}
-              loginComplete={host.props.loginComplete}
-              loginInProgress={host.props.loginInProgress}
-              network={resolvedDetailNetwork}
-              chains={host.props.wagmiChainOptions}
-              blockNumber={host.props.wagmiBlocknumber}
-              isSBTCacheReady={host.state.isSBTCacheReady}
-              sbtCacheRevision={host.state.sbtCacheRevision}
-              sessionSlug={resolvedDetailSlug}
-              refreshSbtData={host.refreshSbtData}
-              sbtScanInProgress={host.readFlag('sbt:fullScanInProgress', resolvedDetailSlug)}
-              sbtScanPending={host.readFlag('sbt:deferredFullScanNeeded', resolvedDetailSlug)}
-              sbtScanProgress={host.state.sbtScanProgressBySlug?.[resolvedDetailSlug] || null}
-            />
-          </div>
-        </RouteErrorBoundary>
-      </Suspense>
+      <InitialRouteBoundary fallback={<LazyFallback label={`Loading ${t('sbt')}...`} />} resetKey={fullPath}>
+        <div data-testid={E2E_TESTIDS.PAGE_SBT_ROOT}>
+          <SBTPage
+            SBTAddress={sbtAddress}
+            sbtMintPassword={sbtPassword}
+            toggleLoginModal={host.props.toggleLoginModal}
+            account={host.props.account}
+            provider={host.props.provider}
+            litHooks={host.state.litHooks}
+            loginComplete={host.props.loginComplete}
+            loginInProgress={host.props.loginInProgress}
+            network={resolvedDetailNetwork}
+            chains={host.props.wagmiChainOptions}
+            blockNumber={host.props.wagmiBlocknumber}
+            isSBTCacheReady={host.state.isSBTCacheReady}
+            sbtCacheRevision={host.state.sbtCacheRevision}
+            sessionSlug={resolvedDetailSlug}
+            refreshSbtData={host.refreshSbtData}
+            sbtScanInProgress={host.readFlag('sbt:fullScanInProgress', resolvedDetailSlug)}
+            sbtScanPending={host.readFlag('sbt:deferredFullScanNeeded', resolvedDetailSlug)}
+            sbtScanProgress={host.state.sbtScanProgressBySlug?.[resolvedDetailSlug] || null}
+          />
+        </div>
+      </InitialRouteBoundary>
     );
   },
 
@@ -470,31 +462,29 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     const defaultTab = profileSearchParams.get('tab');
 
     return (
-      <Suspense fallback={<LazyFallback label="Loading Profile..." />}>
-        <RouteErrorBoundary resetKey={fullPath}>
-          <UserPage
-            viewAddress={viewAddress}
-            account={host.props.account}
-            address={host.props.address}
-            provider={host.props.provider}
-            network={onChainProfileEnabled ? defaultSessionNetwork : null}
-            activeSessionSlug={defaultSlug}
-            sessionConfig={profileSessionConfig}
-            onChainProfileEnabled={onChainProfileEnabled}
-            sbtCacheRevision={host.state.sbtCacheRevision}
-            questionResponsesNonce={host.state.questionResponsesNonce}
-            defaultTab={defaultTab}
-            isSBTCacheReady={!!host.state.isSBTCacheReady}
-            isSurveyCacheReady={!!host.state.isSurveyCacheReady}
-            isQuestionCacheReady={!!host.state.isQuestionCacheReady}
-            isResponsesCacheReady={!!host.state.isResponsesCacheReady}
-            isAllCachesReady={!!host.state.isAllCachesReady}
-            cacheHasLoaded={!!host.state.cacheHasLoaded}
-            latestBlockNumber={host.state.latestBlockNumber}
-            scanSpecificUserProfile={onChainProfileEnabled ? host.scanSpecificUserProfilePriority : undefined}
-          />
-        </RouteErrorBoundary>
-      </Suspense>
+      <InitialRouteBoundary fallback={<LazyFallback label="Loading Profile..." />} resetKey={fullPath}>
+        <UserPage
+          viewAddress={viewAddress}
+          account={host.props.account}
+          address={host.props.address}
+          provider={host.props.provider}
+          network={onChainProfileEnabled ? defaultSessionNetwork : null}
+          activeSessionSlug={defaultSlug}
+          sessionConfig={profileSessionConfig}
+          onChainProfileEnabled={onChainProfileEnabled}
+          sbtCacheRevision={host.state.sbtCacheRevision}
+          questionResponsesNonce={host.state.questionResponsesNonce}
+          defaultTab={defaultTab}
+          isSBTCacheReady={!!host.state.isSBTCacheReady}
+          isSurveyCacheReady={!!host.state.isSurveyCacheReady}
+          isQuestionCacheReady={!!host.state.isQuestionCacheReady}
+          isResponsesCacheReady={!!host.state.isResponsesCacheReady}
+          isAllCachesReady={!!host.state.isAllCachesReady}
+          cacheHasLoaded={!!host.state.cacheHasLoaded}
+          latestBlockNumber={host.state.latestBlockNumber}
+          scanSpecificUserProfile={onChainProfileEnabled ? host.scanSpecificUserProfilePriority : undefined}
+        />
+      </InitialRouteBoundary>
     );
   },
 
@@ -507,39 +497,36 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
       cacheInitializationError,
     } = ctx;
     return (
-      <div className={styles.main} data-testid={E2E_TESTIDS.PAGE_HOME_ROOT}>
-        <MainAreaTabs
-          changeFocusedTab={host.props.changeFocusedTab}
-          toggleLoginModal={host.props.toggleLoginModal}
-          toggleDemoMode={host.props.toggleDemoMode}
-          account={host.props.account}
-          provider={host.props.provider}
-          litHooks={host.state.litHooks}
-          focusedTab={host.props.focusedTab}
-          loginComplete={host.props.loginComplete}
-          loginInProgress={host.props.loginInProgress}
-          demoMode={host.props.demoMode}
-          demoSurfaceMode={host.props.demoSurfaceMode}
-          activeSessionSlug={defaultSlug}
-          sessionConfig={defaultSessionCfg}
-          network={defaultSessionNetwork}
-          networkChainId={defaultSessionChainId}
-          isAllCachesReady={host.state.isAllCachesReady}
-          cacheHasLoaded={host.state.cacheHasLoaded}
-          sbtCacheRevision={host.state.sbtCacheRevision}
-          isSurveyCacheReady={host.state.isSurveyCacheReady}
-          isQuestionCacheReady={host.state.isQuestionCacheReady}
-          isResponsesCacheReady={host.state.isResponsesCacheReady}
-          isSBTCacheReady={host.state.isSBTCacheReady}
-          questionResponsesNonce={host.state.questionResponsesNonce}
-          questionScanProgress={host.state.questionScanProgress}
-          sbtRealtimeCoverageBySlug={host.state.sbtRealtimeCoverageBySlug}
-          ensureLightSbtDiscovery={host.ensureLightSbtDiscovery}
-          ensureLightSbtUniverse={host.ensureLightSbtUniverse}
-          cacheInitializationError={cacheInitializationError}
-        />
-        <RightSide />
-      </div>
+      <InitialRouteBoundary fallback={<LazyFallback label="Loading..." />}>
+        <div className={styles.main} data-testid={E2E_TESTIDS.PAGE_HOME_ROOT}>
+          <MainAreaTabs
+            changeFocusedTab={host.props.changeFocusedTab}
+            toggleLoginModal={host.props.toggleLoginModal}
+            toggleDemoMode={host.props.toggleDemoMode}
+            account={host.props.account}
+            provider={host.props.provider}
+            litHooks={host.state.litHooks}
+            focusedTab={host.props.focusedTab}
+            loginComplete={host.props.loginComplete}
+            loginInProgress={host.props.loginInProgress}
+            demoMode={host.props.demoMode}
+            demoSurfaceMode={host.props.demoSurfaceMode}
+            activeSessionSlug={defaultSlug}
+            network={defaultSessionNetwork}
+            isAllCachesReady={host.state.isAllCachesReady}
+            cacheHasLoaded={host.state.cacheHasLoaded}
+            sbtCacheRevision={host.state.sbtCacheRevision}
+            isSurveyCacheReady={host.state.isSurveyCacheReady}
+            isQuestionCacheReady={host.state.isQuestionCacheReady}
+            isSBTCacheReady={host.state.isSBTCacheReady}
+            sbtRealtimeCoverageBySlug={host.state.sbtRealtimeCoverageBySlug}
+            ensureLightSbtDiscovery={host.ensureLightSbtDiscovery}
+            ensureLightSbtUniverse={host.ensureLightSbtUniverse}
+            cacheInitializationError={cacheInitializationError}
+          />
+          <RightSide />
+        </div>
+      </InitialRouteBoundary>
     );
   },
 
@@ -609,7 +596,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     }
 
     return (
-      <Suspense fallback={<LazyFallback label="Loading..." />}>
+      <InitialRouteBoundary fallback={<LazyFallback label="Loading..." />} resetKey={fullPath}>
         <div data-testid={E2E_TESTIDS.PAGE_SURVEYS_ROOT}>
           <SurveyPage
             key={`${effectiveSlug}-${sidLower}`} // Force remount if slug changes
@@ -648,7 +635,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
             defaultFeaturedSBTs={cfg?.defaultFeaturedSBTs || []}
           />
         </div>
-      </Suspense>
+      </InitialRouteBoundary>
     );
   },
 
@@ -819,41 +806,39 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     const surveyCacheViewProps = composeMainSiteSurveyCacheViewProps(host.state);
 
     return (
-      <Suspense fallback={<LazyFallback label="Loading..." />}>
-        <RouteErrorBoundary resetKey={fullPath}>
-          <div data-testid={pageRootTestId}>
-            <SurveyPage
-              surveyID={surveyID}
-              displayAnswerMode={displayAnswerMode}
-              viewAddress={viewResponseAddress}
-              {...authViewProps}
-              network={effectivePageNetwork}
-              networkChainId={effectivePageChainId}
-              activeSessionSlug={effectivePageSlug}
-              sessionSlug={isQuestionsListRoute ? effectivePageSlug : undefined}
-              sessionSlugPinned={questionRouteSession.sessionSlugPinned}
-              sessionConfig={effectivePageSessionCfg}
-              ensureLightSbtUniverse={host.ensureLightSbtUniverse}
-              {...surveyCacheViewProps}
-              refreshSurveyResponsesByID={pageRefreshSurveyResponsesByID}
-              refreshQuestionMetadata={pageRefreshQuestionMetadata}
-              refreshQuestionResponses={pageRefreshQuestionResponses}
-              autoOpenResults={autoOpenResults}
-              filterState={parsedFilterStateFromUrl}
-              refreshSbtData={pageRefreshSbtData}
-              scanForSurveyGroup={host.scanForSurveyGroup}
-              cacheInitializationError={cacheInitializationError}
-              litHooks={host.state.litHooks}
-              defaultTags={effectivePageSessionCfg?.defaultTags}
-              defaultSbtTags={effectivePageSessionCfg?.defaultSbtTags}
-              defaultFilterState={effectivePageSessionCfg?.defaultFilterState}
-              defaultFeaturedSBTs={effectivePageSessionCfg?.defaultFeaturedSBTs || []}
-              contracts={effectivePageSessionCfg?.contracts || {}}
-              blockLimits={effectivePageSessionCfg?.blockLimits || { start: null, end: null }}
-            />
-          </div>
-        </RouteErrorBoundary>
-      </Suspense>
+      <InitialRouteBoundary fallback={<LazyFallback label="Loading..." />} resetKey={fullPath}>
+        <div data-testid={pageRootTestId}>
+          <SurveyPage
+            surveyID={surveyID}
+            displayAnswerMode={displayAnswerMode}
+            viewAddress={viewResponseAddress}
+            {...authViewProps}
+            network={effectivePageNetwork}
+            networkChainId={effectivePageChainId}
+            activeSessionSlug={effectivePageSlug}
+            sessionSlug={isQuestionsListRoute ? effectivePageSlug : undefined}
+            sessionSlugPinned={questionRouteSession.sessionSlugPinned}
+            sessionConfig={effectivePageSessionCfg}
+            ensureLightSbtUniverse={host.ensureLightSbtUniverse}
+            {...surveyCacheViewProps}
+            refreshSurveyResponsesByID={pageRefreshSurveyResponsesByID}
+            refreshQuestionMetadata={pageRefreshQuestionMetadata}
+            refreshQuestionResponses={pageRefreshQuestionResponses}
+            autoOpenResults={autoOpenResults}
+            filterState={parsedFilterStateFromUrl}
+            refreshSbtData={pageRefreshSbtData}
+            scanForSurveyGroup={host.scanForSurveyGroup}
+            cacheInitializationError={cacheInitializationError}
+            litHooks={host.state.litHooks}
+            defaultTags={effectivePageSessionCfg?.defaultTags}
+            defaultSbtTags={effectivePageSessionCfg?.defaultSbtTags}
+            defaultFilterState={effectivePageSessionCfg?.defaultFilterState}
+            defaultFeaturedSBTs={effectivePageSessionCfg?.defaultFeaturedSBTs || []}
+            contracts={effectivePageSessionCfg?.contracts || {}}
+            blockLimits={effectivePageSessionCfg?.blockLimits || { start: null, end: null }}
+          />
+        </div>
+      </InitialRouteBoundary>
     );
   },
 
@@ -939,7 +924,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     const authViewProps = composeMainSiteAuthViewProps(host.props);
     const questionCacheViewProps = composeMainSiteQuestionCacheViewProps(host.state);
     return (
-      <Suspense fallback={<LazyFallback label="Loading Question..." />}>
+      <InitialRouteBoundary fallback={<LazyFallback label="Loading Question..." />} resetKey={fullPath}>
         <div data-testid={E2E_TESTIDS.PAGE_QUESTIONS_ROOT}>
           <SurveyTool
             key={`${effectiveQuestionSlug}-${String(questionID || '').toLowerCase()}-${String(responderAddress || '').toLowerCase()}`}
@@ -983,7 +968,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
             defaultFeaturedSBTs={questionSessionCfg?.defaultFeaturedSBTs || []}
           />
         </div>
-      </Suspense>
+      </InitialRouteBoundary>
     );
   },
 
@@ -1085,7 +1070,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
         fallbackNetwork: host.getSessionNetwork(resolvedSlug) || defaultSessionNetwork,
       });
       return (
-        <Suspense fallback={<LazyFallback label="Loading Docs..." />}>
+        <InitialRouteBoundary fallback={<LazyFallback label="Loading Docs..." />} resetKey={fullPath}>
           <div data-testid={E2E_TESTIDS.PAGE_SESSION_DOCS_ROOT}>
             <SessionDocumentsPage
               provider={host.props.provider}
@@ -1101,7 +1086,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
               workerOrigin={workerOrigin}
             />
           </div>
-        </Suspense>
+        </InitialRouteBoundary>
       );
     }
 
@@ -1170,49 +1155,47 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     });
 
     return (
-      <Suspense fallback={<LazyFallback label="Loading Session..." />}>
-        <RouteErrorBoundary resetKey={host.props.path}>
-          <div data-testid={E2E_TESTIDS.PAGE_SESSION_ROOT}>
-            <OnePageSession
-              slug={effectiveSessionConfig.slug || slug}
-              sessionName={resolvedSessionName}
-              sessionHeader={resolvedSessionHeader}
-              sessionInfo={resolvedSessionInfo}
-              sessionConfig={effectiveSessionConfig}
-              defaultTags={effectiveSessionConfig.defaultTags}
-              defaultSbtTags={effectiveSessionConfig.defaultSbtTags}
-              defaultFilterState={effectiveSessionConfig.defaultFilterState}
-              defaultFeaturedSBTs={effectiveSessionConfig.defaultFeaturedSBTs || []}
-              contracts={effectiveSessionConfig.contracts || {}}
-              blockLimits={effectiveSessionConfig.blockLimits || { start: null, end: null }}
-              networkChainId={effectiveSessionConfig.networkChainId}
-              questionsGenPrompt={effectiveSessionConfig.questionsGenPrompt}
-              {...walletViewProps}
-              network={sessionNetwork}
-              {...loginViewProps}
-              {...sessionCacheViewProps}
-              refreshSurveyResponsesByID={refreshSessionRouteSurveyResponsesByID}
-              refreshQuestionMetadata={refreshSessionRouteQuestionMetadata}
-              refreshQuestionResponses={refreshSessionRouteQuestionResponses}
-              questionSessionSlug={sessionRouteSourceSlug}
-              refreshSbtData={host.refreshSbtData}
-              ensureLightSbtDiscovery={host.ensureLightSbtDiscovery}
-              ensureLightSbtUniverse={host.ensureLightSbtUniverse}
-              sbtScanProgressBySlug={host.state.sbtScanProgressBySlug}
-              sbtRealtimeCoverageBySlug={host.state.sbtRealtimeCoverageBySlug}
-              cacheInitializationError={cacheInitializationError}
-              autoFeatureSBTsBySessionSlug={
-                effectiveSessionConfig?.autoFeatureSBTsBySessionSlug !== undefined
-                  ? effectiveSessionConfig.autoFeatureSBTsBySessionSlug
-                  : effectiveSessionConfig?.autoFeatureSBTsWithFeaturedSbtTags
-              }
-              routeQuestionsOpen={isQuestionsRoute}
-              routeAutoOpenResults={isQuestionResultsRoute}
-              litHooks={host.state.litHooks}
-            />
-          </div>
-        </RouteErrorBoundary>
-      </Suspense>
+      <InitialRouteBoundary fallback={<LazyFallback label="Loading Session..." />} resetKey={host.props.path}>
+        <div data-testid={E2E_TESTIDS.PAGE_SESSION_ROOT}>
+          <OnePageSession
+            slug={effectiveSessionConfig.slug || slug}
+            sessionName={resolvedSessionName}
+            sessionHeader={resolvedSessionHeader}
+            sessionInfo={resolvedSessionInfo}
+            sessionConfig={effectiveSessionConfig}
+            defaultTags={effectiveSessionConfig.defaultTags}
+            defaultSbtTags={effectiveSessionConfig.defaultSbtTags}
+            defaultFilterState={effectiveSessionConfig.defaultFilterState}
+            defaultFeaturedSBTs={effectiveSessionConfig.defaultFeaturedSBTs || []}
+            contracts={effectiveSessionConfig.contracts || {}}
+            blockLimits={effectiveSessionConfig.blockLimits || { start: null, end: null }}
+            networkChainId={effectiveSessionConfig.networkChainId}
+            questionsGenPrompt={effectiveSessionConfig.questionsGenPrompt}
+            {...walletViewProps}
+            network={sessionNetwork}
+            {...loginViewProps}
+            {...sessionCacheViewProps}
+            refreshSurveyResponsesByID={refreshSessionRouteSurveyResponsesByID}
+            refreshQuestionMetadata={refreshSessionRouteQuestionMetadata}
+            refreshQuestionResponses={refreshSessionRouteQuestionResponses}
+            questionSessionSlug={sessionRouteSourceSlug}
+            refreshSbtData={host.refreshSbtData}
+            ensureLightSbtDiscovery={host.ensureLightSbtDiscovery}
+            ensureLightSbtUniverse={host.ensureLightSbtUniverse}
+            sbtScanProgressBySlug={host.state.sbtScanProgressBySlug}
+            sbtRealtimeCoverageBySlug={host.state.sbtRealtimeCoverageBySlug}
+            cacheInitializationError={cacheInitializationError}
+            autoFeatureSBTsBySessionSlug={
+              effectiveSessionConfig?.autoFeatureSBTsBySessionSlug !== undefined
+                ? effectiveSessionConfig.autoFeatureSBTsBySessionSlug
+                : effectiveSessionConfig?.autoFeatureSBTsWithFeaturedSbtTags
+            }
+            routeQuestionsOpen={isQuestionsRoute}
+            routeAutoOpenResults={isQuestionResultsRoute}
+            litHooks={host.state.litHooks}
+          />
+        </div>
+      </InitialRouteBoundary>
     );
   },
 
@@ -1267,27 +1250,25 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     const isKnownRoutePrefix = routeMatch.isKnownRoutePrefix;
     if (isWizardRoute) {
       return (
-        <Suspense fallback={<LazyFallback label="Loading Session Wizard..." />}>
-          <RouteErrorBoundary resetKey={fullPath}>
-            <div data-testid={E2E_TESTIDS.PAGE_SESSION_WIZARD_ROOT}>
-              <SessionWizard
-                account={host.props.account}
-                provider={host.props.provider}
-                network={defaultSessionNetwork}
-                activeSessionSlug={defaultSlug}
-                ensureLightSbtUniverse={host.ensureLightSbtUniverse}
-                sbtCacheRevision={host.state.sbtCacheRevision}
-                toggleLoginModal={host.props.toggleLoginModal}
-                loginComplete={host.props.loginComplete}
-                loginInProgress={host.props.loginInProgress}
-                initialSessionId={requestedSessionId}
-                initialRegistryChainId={requestedChainId}
-                initialSponsoredBundleId={requestedSponsoredBundleId}
-                initialSponsoredBundleKey={requestedSponsoredBundleKey}
-              />
-            </div>
-          </RouteErrorBoundary>
-        </Suspense>
+        <InitialRouteBoundary fallback={<LazyFallback label="Loading Session Wizard..." />} resetKey={fullPath}>
+          <div data-testid={E2E_TESTIDS.PAGE_SESSION_WIZARD_ROOT}>
+            <SessionWizard
+              account={host.props.account}
+              provider={host.props.provider}
+              network={defaultSessionNetwork}
+              activeSessionSlug={defaultSlug}
+              ensureLightSbtUniverse={host.ensureLightSbtUniverse}
+              sbtCacheRevision={host.state.sbtCacheRevision}
+              toggleLoginModal={host.props.toggleLoginModal}
+              loginComplete={host.props.loginComplete}
+              loginInProgress={host.props.loginInProgress}
+              initialSessionId={requestedSessionId}
+              initialRegistryChainId={requestedChainId}
+              initialSponsoredBundleId={requestedSponsoredBundleId}
+              initialSponsoredBundleKey={requestedSponsoredBundleKey}
+            />
+          </div>
+        </InitialRouteBoundary>
       );
     }
 
@@ -1380,7 +1361,11 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
         agent: () => host._renderAgentRoute(),
         session: () => host._renderSessionRoute(ctx),
       },
-      renderNotFound: (path: string) => <NotFoundRoute path={path} />,
+      renderNotFound: (path: string) => (
+        <InitialRouteBoundary resetKey={path}>
+          <NotFoundRoute path={path} />
+        </InitialRouteBoundary>
+      ),
     });
   },
 });

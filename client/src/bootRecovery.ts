@@ -153,29 +153,29 @@ export const clearBootReloadMarker = (
   win: BootWindow = globalThis.window,
   reloadParam = BOOT_RELOAD_PARAM,
 ): boolean => {
-  if (reloadParam === BOOT_RELOAD_PARAM) {
-    try {
-      win?.sessionStorage?.removeItem?.(STALE_CHUNK_RELOAD_STORAGE_KEY);
-    } catch {
-      // Successful boot cleanup is best-effort when storage is unavailable.
-    }
-  }
-
   if (!win?.location || !win.history?.replaceState) return false;
 
   try {
     const url = new URL(win.location.href);
-    const reloadParams =
-      reloadParam === BOOT_RELOAD_PARAM
-        ? [BOOT_RELOAD_PARAM, STALE_CHUNK_RELOAD_PARAM]
-        : [reloadParam];
-    if (!reloadParams.some((param) => url.searchParams.has(param))) return false;
-    reloadParams.forEach((param) => url.searchParams.delete(param));
+    if (!url.searchParams.has(reloadParam)) return false;
+    url.searchParams.delete(reloadParam);
     win.history.replaceState(win.history.state ?? null, '', `${url.pathname}${url.search}${url.hash}`);
     return true;
   } catch {
     return false;
   }
+};
+
+export const clearStaleChunkReloadMarker = (win: BootWindow = globalThis.window): boolean => {
+  // Regression guard: this loop sentinel must survive until a primary route commits;
+  // clearing it at entry-module load lets a still-stale lazy chunk reload forever.
+  try {
+    win?.sessionStorage?.removeItem?.(STALE_CHUNK_RELOAD_STORAGE_KEY);
+  } catch {
+    // Successful route cleanup is best-effort when storage is unavailable.
+  }
+
+  return clearBootReloadMarker(win, STALE_CHUNK_RELOAD_PARAM);
 };
 
 export const recoverFromStaleChunkLoadError = (error: unknown, options: BootRecoveryOptions = {}): boolean => {
@@ -257,8 +257,7 @@ export const renderBootFailure = (error: unknown, options: BootRecoveryOptions =
   const reloadParam = options.reloadParam || BOOT_RELOAD_PARAM;
   const reload = options.reload || (() => reloadWithCacheBuster(win, reloadParam));
   const clearCaches = options.clearCaches || (() => clearBootCaches(win));
-  const requestedAutoReloadDelayMs =
-    typeof options.autoRefreshDelayMs === 'number' ? options.autoRefreshDelayMs : 3000;
+  const requestedAutoReloadDelayMs = typeof options.autoRefreshDelayMs === 'number' ? options.autoRefreshDelayMs : 3000;
   const automaticReloadPaused = hasReloadParam(win, reloadParam);
   const autoReloadDelayMs = automaticReloadPaused ? -1 : requestedAutoReloadDelayMs;
   let refreshStarted = false;
