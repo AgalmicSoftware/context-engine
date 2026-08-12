@@ -25,8 +25,9 @@ export const LEGACY_DEMO_POLL_OPTIONS = Object.freeze([
   'Affected communities',
 ]);
 
-// The checked-in analysis fixture is derived from the legacy demo dataset.
-// demo-2 remains excluded until it has a matching analysis fixture.
+// The checked-in Breakdown fixture is derived from the legacy demo dataset.
+// demo-2's Polis cluster summaries are separate; keep Breakdown hidden until
+// demo-2 has a matching Breakdown fixture.
 const DEMO_ANALYSIS_FIXTURE_SLUGS = Object.freeze([
   'demo',
   'demo-1',
