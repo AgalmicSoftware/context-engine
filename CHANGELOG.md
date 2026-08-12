@@ -6,6 +6,19 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Added `/session/demo-2` as a fixture-backed preview of “Living With
+  Artificial Minds”: 40 typed questions, 62 unique simulated participants,
+  deterministic generated responses, and a three-cluster Polis report.
+  Poll choices, rating bounds, freeform answers, and stable question IDs now
+  agree across the session, report, and question-results surfaces. Simulated
+  rows are display-only and live responses win collisions. `demo-sh` remains
+  the public default until a dedicated demo-2 Worker, canonical question seed,
+  and Worker-held AI key pass live voice/AI verification; no credential is
+  stored in the preview config or fixture data.
+- Corrected the legacy demo fixture so every poll carries its own choices,
+  binary tallies match the checked-in votes, and tri-state sentiment is never
+  presented as a poll, rating, or freeform answer. Direct Debate Map issue
+  links now close back to the Atlas index when no safe return target exists.
 - Made SBT and related holder-cache writes atomic across discovery, detail
   hydration, profile scans, filters, selectors, and realtime events. Delayed
   scans now preserve newer activity, unrelated networks, and concurrent user

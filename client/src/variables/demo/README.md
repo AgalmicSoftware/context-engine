@@ -84,6 +84,14 @@ and excludes `demo-2` from analysis until a matching analysis fixture exists.
 Worker URLs and AI credentials remain operational session configuration and
 must never be stored in these fixtures.
 
+`demo-2` is currently a direct-route preview with `temporary: true` and no
+Worker URL. `demo-sh` therefore remains the first/default public demo. Before
+promotion, operators must deploy a dedicated worker-canonical demo-2 session,
+seed the same 40 derived question IDs, store the provider credential only as
+the Worker session secret `openaiKey`, and verify real AI plus transcription
+without a request-supplied key. The demo-sh Worker must not be reused as the
+demo-2 authority.
+
 ## Conceptual Data Pipeline
 
 This is the logical relationship between the core demo fixtures. It describes how the datasets build on each other; it is not an automated build graph by itself.
