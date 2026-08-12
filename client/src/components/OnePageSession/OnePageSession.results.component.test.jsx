@@ -767,6 +767,27 @@ describe('OnePageSession results routing', () => {
     });
   });
 
+  it('hides Breakdown for demo-2 and falls back to Report when a stale analysis mode carries over', async () => {
+    const props = buildProps();
+    const view = render(
+      <OnePageSession {...props} slug="demo-sh" sessionConfig={{ ...props.sessionConfig, slug: 'demo-sh' }} />,
+    );
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+    fireEvent.click(await screen.findByRole('button', { name: /^Breakdown$/i }));
+    expect(await screen.findByTestId('demo-analysis-workspace-view')).toBeInTheDocument();
+
+    view.rerender(
+      <OnePageSession {...props} slug="demo-2" sessionConfig={{ ...props.sessionConfig, slug: 'demo-2' }} />,
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /^Breakdown$/i })).not.toBeInTheDocument();
+      expect(screen.queryByTestId('demo-analysis-workspace-view')).not.toBeInTheDocument();
+      expect(screen.getByTestId('polis-report')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: /^Report$/i })).toHaveAttribute('aria-pressed', 'true');
+  });
+
   it('uses a report-style icon for the polis results mode switcher', async () => {
     const baseProps = buildProps();
 

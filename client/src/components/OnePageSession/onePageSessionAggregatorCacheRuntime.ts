@@ -6,8 +6,50 @@ import {
 import {
   resolveWorkerCanonicalCacheIdentity,
   type WorkerCanonicalCacheIdentity,
+  workerCanonicalCacheIdentityMatches,
+  withWorkerCanonicalCacheIdentity,
 } from '../../utilities/survey/workerCanonicalCacheIdentity';
+import {
+  hasSimulatedDemoResponses,
+  resolveDemoPolisDataset,
+} from '../../utilities/demo/demoPolisDatasets';
+import { getDemoFixtureQuestionIdsByIndex } from '../../utilities/session/demoSessionQuestionFixtures.js';
+import { buildPolisDemoSurveyResultsAggregatorData } from '../SurveyTool/surveyPolisDemoResultsData';
+import {
+  buildAggregatorFromLocalCache,
+  computeAggregatorDataSignature,
+  computeAggregatorQuestionMetadataSignature,
+  computeAggregatorSourceSnapshotSignature,
+} from './onePageSessionAggregator';
 import { normalizeOnePageSessionSlug } from './onePageSessionTelegramController';
+
+type AggregatorResultRow = {
+  responder: string;
+  questionId: string;
+  response: string;
+};
+
+type AggregatorResultMap = Record<string, AggregatorResultRow[]>;
+
+type OnePageSessionAggregatorCacheBuildParams = {
+  cacheScope: string;
+  displaySlug: string;
+  isQuestionCacheReady: boolean;
+  parseMemo?: Map<string, unknown> | null;
+  questionSourceSlug: string;
+  readQuestionsCache: (slug: string) => any;
+  resolveQuestionPool: (displaySlug: string, questionSourceSlug: string) => Array<Record<string, unknown>>;
+  workerCacheIdentity: WorkerCanonicalCacheIdentity | null;
+  writeQuestionsCache: (slug: string, cache: any) => void;
+};
+
+export type OnePageSessionAggregatorCacheBuildResult = {
+  map: AggregatorResultMap;
+  signature: string;
+  sourceSignature: string;
+};
+
+const demoFixtureAggregatorRowsBySlug = new Map<string, AggregatorResultMap>();
 
 const hasOwn = (value: unknown, key: string) =>
   !!value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, key);
@@ -57,9 +99,41 @@ export const getUniqueAggregatorCandidateSlugs = (...slugs: unknown[]) => {
 export const shouldUseBuiltInDemoAggregatorFallback = (displaySlug: unknown = '', questionSourceSlug: unknown = '') => {
   const normalizedDisplaySlug = normalizeOnePageSessionSlug(displaySlug);
   const normalizedQuestionSourceSlug = normalizeOnePageSessionSlug(questionSourceSlug);
+  if (
+    normalizedDisplaySlug === 'demo' &&
+    (normalizedQuestionSourceSlug === '' || normalizedQuestionSourceSlug === 'demo')
+  ) {
+    return true;
+  }
   return (
-    normalizedDisplaySlug === 'demo' && (normalizedQuestionSourceSlug === '' || normalizedQuestionSourceSlug === 'demo')
+    hasSimulatedDemoResponses(normalizedDisplaySlug) &&
+    (normalizedQuestionSourceSlug === '' || normalizedQuestionSourceSlug === normalizedDisplaySlug)
   );
+};
+
+export const buildDemoFixtureAggregatorRows = (
+  displaySlugIn: unknown = '',
+  questionSourceSlugIn: unknown = displaySlugIn,
+): AggregatorResultMap | null => {
+  const displaySlug = normalizeOnePageSessionSlug(displaySlugIn);
+  const questionSourceSlug = normalizeOnePageSessionSlug(questionSourceSlugIn);
+  if (
+    !hasSimulatedDemoResponses(displaySlug) ||
+    (questionSourceSlug !== '' && questionSourceSlug !== displaySlug)
+  ) {
+    return null;
+  }
+
+  if (!demoFixtureAggregatorRowsBySlug.has(displaySlug)) {
+    demoFixtureAggregatorRowsBySlug.set(
+      displaySlug,
+      buildPolisDemoSurveyResultsAggregatorData(resolveDemoPolisDataset(displaySlug), {
+        sessionSlug: displaySlug,
+        questionIdsByIndex: getDemoFixtureQuestionIdsByIndex(displaySlug),
+      }),
+    );
+  }
+  return demoFixtureAggregatorRowsBySlug.get(displaySlug) || null;
 };
 
 export const buildAggregatorFallbackQuestions = (
@@ -125,7 +199,11 @@ export const scopeAggregatorNetworkNodeToQuestionPool = (
   };
 };
 
-export const mergeAggregatorResultRows = (target: Record<string, any[]> = {}, source: any = {}) => {
+export const mergeAggregatorResultRows = (
+  target: Record<string, any[]> = {},
+  source: any = {},
+  { sourceWinsResponderCollisions = false }: { sourceWinsResponderCollisions?: boolean } = {},
+) => {
   const nextTarget = target && typeof target === 'object' ? target : {};
   if (!source || typeof source !== 'object') return nextTarget;
 
@@ -136,6 +214,16 @@ export const mergeAggregatorResultRows = (target: Record<string, any[]> = {}, so
       return;
     }
     nextTarget[qid] = Array.isArray(nextTarget[qid]) ? nextTarget[qid] : [];
+    if (sourceWinsResponderCollisions) {
+      const sourceResponders = new Set(
+        rows
+          .map((row: any) => String(row?.responder || '').trim().toLowerCase())
+          .filter(Boolean),
+      );
+      nextTarget[qid] = nextTarget[qid].filter(
+        (row: any) => !sourceResponders.has(String(row?.responder || '').trim().toLowerCase()),
+      );
+    }
     const seenRows = new Set(nextTarget[qid].map((row: any) => `${row?.responder || ''}|${row?.response || ''}`));
     rows.forEach((row: any) => {
       const key = `${row?.responder || ''}|${row?.response || ''}`;
@@ -146,4 +234,104 @@ export const mergeAggregatorResultRows = (target: Record<string, any[]> = {}, so
   });
 
   return nextTarget;
+};
+
+export const buildOnePageSessionAggregatorCacheResult = ({
+  cacheScope,
+  displaySlug,
+  isQuestionCacheReady,
+  parseMemo = null,
+  questionSourceSlug,
+  readQuestionsCache,
+  resolveQuestionPool,
+  workerCacheIdentity,
+  writeQuestionsCache,
+}: OnePageSessionAggregatorCacheBuildParams): OnePageSessionAggregatorCacheBuildResult => {
+  const useDemoFallback = shouldUseBuiltInDemoAggregatorFallback(displaySlug, questionSourceSlug);
+  const fixtureRows = useDemoFallback ? buildDemoFixtureAggregatorRows(displaySlug, questionSourceSlug) : null;
+  const fixtureSignature = fixtureRows ? computeAggregatorDataSignature(fixtureRows) : '';
+  const sourcePrefix = `${displaySlug}|${questionSourceSlug}|${cacheScope}|${workerCacheIdentity?.key || ''}`;
+  const emptyResult = (reason: string): OnePageSessionAggregatorCacheBuildResult => ({
+    map: {},
+    signature: '0:0:0',
+    sourceSignature: `${sourcePrefix}|${reason}`,
+  });
+
+  if (!cacheScope || (!isQuestionCacheReady && !useDemoFallback)) {
+    return fixtureRows
+      ? { map: fixtureRows, signature: fixtureSignature, sourceSignature: `${sourcePrefix}|fixture:${fixtureSignature}` }
+      : emptyResult('not-ready');
+  }
+  if (cacheScope === 'worker' && !workerCacheIdentity) return emptyResult('invalid-worker-identity');
+
+  const aggregateMap: AggregatorResultMap = {};
+  const sourceSigParts: string[] = [];
+  const questionPool = useDemoFallback ? resolveQuestionPool(displaySlug, questionSourceSlug) : [];
+  const authoritativePool =
+    questionPool.length > 0 ? questionPool : Object.keys(fixtureRows || {}).map((id) => ({ id }));
+  let sawCandidateCache = false;
+  let sawNetworkCache = false;
+
+  if (fixtureRows) {
+    mergeAggregatorResultRows(aggregateMap, fixtureRows);
+    sourceSigParts.push(`fixture:${fixtureSignature}`);
+  }
+
+  for (const slug of useDemoFallback
+    ? getUniqueAggregatorCandidateSlugs(displaySlug)
+    : [normalizeOnePageSessionSlug(questionSourceSlug)]) {
+    let questionsCache = readQuestionsCache(slug) || {};
+    if (!questionsCache || typeof questionsCache !== 'object') questionsCache = {};
+    if (Object.keys(questionsCache).length === 0) {
+      sourceSigParts.push(`${slug || '__general__'}:empty-cache`);
+      continue;
+    }
+    sawCandidateCache = true;
+
+    const networkNode = questionsCache[cacheScope];
+    if (!networkNode) {
+      sourceSigParts.push(`${slug || '__general__'}:missing-net`);
+      continue;
+    }
+    if (workerCacheIdentity && !workerCanonicalCacheIdentityMatches(networkNode, workerCacheIdentity)) {
+      sourceSigParts.push(`${slug || '__general__'}:worker-identity-mismatch`);
+      continue;
+    }
+    sawNetworkCache = true;
+
+    const fallbackQuestions = buildAggregatorFallbackQuestions(authoritativePool, slug);
+    const networkNodeForAggregation = useDemoFallback
+      ? scopeAggregatorNetworkNodeToQuestionPool(networkNode, fallbackQuestions, slug)
+      : networkNode;
+    sourceSigParts.push(
+      [
+        slug || '__general__',
+        computeAggregatorSourceSnapshotSignature(networkNodeForAggregation.questionResponses || {}),
+        computeAggregatorQuestionMetadataSignature(networkNodeForAggregation.questions || {}),
+      ].join(':'),
+    );
+
+    const { map, dirty } = buildAggregatorFromLocalCache(networkNodeForAggregation, {
+      parseMemo,
+      sessionSlug: slug,
+    });
+    // Regression guard: fixture rows are display-only; live rows must win same-responder collisions without persistence.
+    mergeAggregatorResultRows(aggregateMap, map, { sourceWinsResponderCollisions: !!fixtureRows });
+    if (dirty) {
+      if (workerCacheIdentity) {
+        questionsCache[cacheScope] = withWorkerCanonicalCacheIdentity(networkNode, workerCacheIdentity);
+      }
+      writeQuestionsCache(slug, questionsCache);
+    }
+  }
+
+  if (!sawCandidateCache && !fixtureRows) return emptyResult('empty-cache');
+  if (!sawNetworkCache && !fixtureRows) {
+    return emptyResult(sourceSigParts.join('|') || 'missing-net');
+  }
+  return {
+    map: aggregateMap,
+    signature: computeAggregatorDataSignature(aggregateMap),
+    sourceSignature: `${sourcePrefix}|${sourceSigParts.join('|')}`,
+  };
 };

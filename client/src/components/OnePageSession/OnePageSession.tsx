@@ -74,7 +74,6 @@ import {
 import {
   buildAggregatorFromLocalCache,
   computeAggregatorDataSignature,
-  computeAggregatorQuestionMetadataSignature,
   computeAggregatorSourceSnapshotSignature,
 } from './onePageSessionAggregator';
 import OnePageSessionAutoMintAlerts from './OnePageSessionAutoMintAlerts';
@@ -117,17 +116,9 @@ import {
 } from './onePageSessionAutoMintRuntime';
 import { resolveOnePageSessionNetworkRuntime, sessionAllowsLitRuntime } from './onePageSessionCapabilityRuntime';
 import {
-  workerCanonicalCacheIdentityMatches,
-  withWorkerCanonicalCacheIdentity,
-} from '../../utilities/survey/workerCanonicalCacheIdentity';
-import {
-  buildAggregatorFallbackQuestions,
-  getUniqueAggregatorCandidateSlugs,
-  mergeAggregatorResultRows,
+  buildOnePageSessionAggregatorCacheResult,
   resolveOnePageSessionSurveySlug,
   resolveOnePageSessionWorkerCacheIdentity,
-  scopeAggregatorNetworkNodeToQuestionPool,
-  shouldUseBuiltInDemoAggregatorFallback,
 } from './onePageSessionAggregatorCacheRuntime';
 
 const demoLog = createLogger('demo');
@@ -1064,121 +1055,30 @@ class OnePageSession extends Component<any, any> {
       const questionSourceSlug = resolveOnePageSessionSurveySlug(this.props);
       const cacheScope = resolveOnePageSessionAggregatorCacheScope(this.props);
       const workerCacheIdentity = resolveOnePageSessionWorkerCacheIdentity(this.props, cacheScope);
-      const useBuiltInDemoFallback = shouldUseBuiltInDemoAggregatorFallback(displaySlug, questionSourceSlug);
-      const canBuildFromLocalCache = !!cacheScope && (this.props.isQuestionCacheReady || useBuiltInDemoFallback);
-
-      if (canBuildFromLocalCache) {
-        const netIdStr = cacheScope;
-        if (netIdStr === 'worker' && !workerCacheIdentity) {
-          applyAggregatorData({}, '0:0:0', `${displaySlug}|${questionSourceSlug}|${netIdStr}|invalid-worker-identity`);
+      try {
+        const result = buildOnePageSessionAggregatorCacheResult({
+          cacheScope,
+          displaySlug,
+          isQuestionCacheReady: !!this.props.isQuestionCacheReady,
+          parseMemo: this._aggregatorResponseParseMemo,
+          questionSourceSlug,
+          readQuestionsCache: (candidateSlug) => peekCacheSync('questionsCache', candidateSlug),
+          resolveQuestionPool: (candidateDisplaySlug, candidateSourceSlug) =>
+            resolvePolisDemoQuestionPool({ displaySlug: candidateDisplaySlug, sourceSlug: candidateSourceSlug }),
+          workerCacheIdentity,
+          writeQuestionsCache: (candidateSlug, cache) => void writeCache('questionsCache', candidateSlug, cache),
+        });
+        if (result.sourceSignature === this._aggregatorSourceSigKey) {
+          bumpPerfCounter('aggregatorSourceSkips');
           return;
         }
-        try {
-          const candidateSlugs = useBuiltInDemoFallback
-            ? getUniqueAggregatorCandidateSlugs(displaySlug)
-            : [normalizeOnePageSessionSlug(questionSourceSlug)];
-          const demoQuestionPool = useBuiltInDemoFallback
-            ? resolvePolisDemoQuestionPool({
-                displaySlug,
-                sourceSlug: questionSourceSlug,
-              })
-            : [];
-          const aggregateMap: Record<string, any[]> = {};
-          const sourceSigParts: string[] = [];
-          let sawCandidateCache = false;
-          let sawNetworkCache = false;
-
-          for (const slug of candidateSlugs) {
-            let qCache = peekCacheSync('questionsCache', slug, { clone: false }) || {};
-            if (!qCache || typeof qCache !== 'object') qCache = {};
-            if (Object.keys(qCache).length === 0) {
-              sourceSigParts.push(`${slug || '__general__'}:empty-cache`);
-              continue;
-            }
-            sawCandidateCache = true;
-
-            const networkNode = qCache[netIdStr];
-            if (!networkNode) {
-              sourceSigParts.push(`${slug || '__general__'}:missing-net`);
-              continue;
-            }
-            if (workerCacheIdentity && !workerCanonicalCacheIdentityMatches(networkNode, workerCacheIdentity)) {
-              sourceSigParts.push(`${slug || '__general__'}:worker-identity-mismatch`);
-              continue;
-            }
-            sawNetworkCache = true;
-
-            const fallbackQuestions = buildAggregatorFallbackQuestions(demoQuestionPool, slug);
-            const networkNodeForAggregation = useBuiltInDemoFallback
-              ? scopeAggregatorNetworkNodeToQuestionPool(networkNode, fallbackQuestions, slug)
-              : networkNode;
-
-            sourceSigParts.push(
-              [
-                slug || '__general__',
-                computeAggregatorSourceSnapshotSignature(networkNodeForAggregation.questionResponses || {}),
-                computeAggregatorQuestionMetadataSignature(networkNodeForAggregation.questions || {}),
-              ].join(':'),
-            );
-
-            const { map, dirty } = buildAggregatorFromLocalCache(networkNodeForAggregation, {
-              parseMemo: this._aggregatorResponseParseMemo,
-              sessionSlug: slug,
-            });
-            mergeAggregatorResultRows(aggregateMap, map);
-            if (dirty) {
-              if (workerCacheIdentity) {
-                qCache[netIdStr] = withWorkerCanonicalCacheIdentity(
-                  networkNode,
-                  workerCacheIdentity,
-                ) as typeof networkNode;
-              }
-              void writeCache('questionsCache', slug, qCache);
-            }
-          }
-
-          if (!sawCandidateCache) {
-            applyAggregatorData(
-              {},
-              '0:0:0',
-              `${displaySlug}|${questionSourceSlug}|${netIdStr}|${workerCacheIdentity?.key || ''}|empty-cache`,
-            );
-            return;
-          }
-
-          if (!sawNetworkCache) {
-            applyAggregatorData(
-              {},
-              '0:0:0',
-              `${displaySlug}|${questionSourceSlug}|${netIdStr}|${
-                workerCacheIdentity?.key || ''
-              }|${sourceSigParts.join('|') || 'missing-net'}`,
-            );
-            return;
-          }
-
-          const sourceSigKey = `${displaySlug}|${questionSourceSlug}|${netIdStr}|${
-            workerCacheIdentity?.key || ''
-          }|${sourceSigParts.join('|')}`;
-          if (sourceSigKey === this._aggregatorSourceSigKey) {
-            bumpPerfCounter('aggregatorSourceSkips');
-            return;
-          }
-          applyAggregatorData(aggregateMap, computeAggregatorDataSignature(aggregateMap), sourceSigKey);
-        } catch (err) {
-          demoLog.error('Error building aggregator in OnePageSession:', err);
-          applyAggregatorData(
-            {},
-            '0:0:0',
-            `${displaySlug}|${questionSourceSlug}|${netIdStr}|${workerCacheIdentity?.key || ''}|error`,
-          );
-        }
-      } else {
-        const netIdStr = cacheScope;
+        applyAggregatorData(result.map, result.signature, result.sourceSignature);
+      } catch (err) {
+        demoLog.error('Error building aggregator in OnePageSession:', err);
         applyAggregatorData(
           {},
           '0:0:0',
-          `${displaySlug}|${questionSourceSlug}|${netIdStr}|${workerCacheIdentity?.key || ''}|not-ready`,
+          `${displaySlug}|${questionSourceSlug}|${cacheScope}|${workerCacheIdentity?.key || ''}|error`,
         );
       }
     });
