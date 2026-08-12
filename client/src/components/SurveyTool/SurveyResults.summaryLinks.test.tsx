@@ -1,28 +1,22 @@
 import React from 'react';
-import fs from 'fs';
-import path from 'path';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { renderToStaticMarkup } from 'react-dom/server';
-import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
-import ConnectedSurveyResults, {
-  SURVEY_RESULTS_CLICKABLE_ICON_STYLE,
-  SURVEY_RESULTS_DOCUMENT_LINK_ICON_STYLE,
-  SURVEY_RESULTS_METADATA_MISSING_STYLE,
-  SURVEY_RESULTS_MINI_BAR_SPINNER_STYLE,
-  SURVEY_RESULTS_MINI_PROGRESS_STYLE,
-  SURVEY_RESULTS_SORTABLE_HEADER_STYLE,
-  SURVEY_RESULTS_SURVEY_BOOKMARK_STYLE,
-  SURVEY_RESULTS_SYNC_REMAINING_SPINNER_STYLE,
-  SURVEY_RESULTS_TABLE_BOOKMARK_STYLE,
-  SURVEY_RESULTS_TABLE_CELL_STYLE,
-  SURVEY_RESULTS_TRAILING_LABEL_STYLE,
-  buildSurveyResultsAggregatorPanelClassName,
-  buildSurveyResultsMultichoiceOptionClassName,
-  countQuestionModeResponses,
-  hasAnyCountableSurveyAnswer,
-  resolveSurveyResultsSyncDetailsStyle,
-  resolveSurveyResultsToggleKnobStyle,
-} from './SurveyResults';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import * as cacheScriptsModule from '../../utilities/cache/cacheScripts.js';
+import contractScriptsDefault from '../../utilities/web3/chainGateway.js';
+import {
+  SurveyResultsFreeformAggregatorSummary,
+  SurveyResultsMultichoiceAggregatorSummary,
+} from './SurveyResultsAggregatorSummaries';
+import SurveyResultsFilterSummary from './SurveyResultsFilterSummary';
+import { renderSurveyResultsSyncStatusPanel } from './SurveyResultsPanels';
+import { buildSurveyResultsDemoViewPlan } from './surveyResultsRenderSurface';
+import { countSurveyResultsViewableResponses } from './SurveyResultsQuestionSummary';
+import SurveyResultsQuestionSummaryCard from './SurveyResultsQuestionSummaryCard';
+import {
+  buildSurveyResultsFreeformSummaryModel,
+  buildSurveyResultsMultichoiceSummaryModel,
+  resolveSurveyResultsSummaryQuestionType,
+} from './surveyResultsSummaryModels';
+import { renderSurveyResults } from './surveyResultsTestHarness';
 import styles from './SurveyResults.module.scss';
 import * as cacheScriptsModule from '../../utilities/cache/cacheScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
@@ -976,15 +970,38 @@ describe('SurveyResults demo results views', () => {
       viewMode: 'questions',
     };
 
-    const demoThreeTree = demoThreeSubject.render();
-    const demoThreeHeader = findElement(
-      demoThreeTree,
-      (element) => element?.type === SurveyResultsModalHeader
-    );
-    const demoThreeMarkup = renderToStaticMarkup(demoThreeHeader);
+    const demoOneNav = await screen.findByTestId('ce-surveyresults-demo-view-nav');
+    expect(within(demoOneNav).getByText('Report')).toBeInTheDocument();
+    expect(within(demoOneNav).getByText('Breakdown')).toBeInTheDocument();
 
-    expect(demoThreeMarkup).toContain('ce-surveyresults-demo-view-nav');
-    expect(demoThreeMarkup).toContain('Breakdown');
+    await act(async () => {
+      view.rerenderSurveyResults({ sessionSlug: 'demo-2', activeSessionSlug: 'demo-2' });
+      await Promise.resolve();
+    });
+
+    const demoTwoNav = await screen.findByTestId('ce-surveyresults-demo-view-nav');
+    expect(within(demoTwoNav).getByText('Report')).toBeInTheDocument();
+    expect(within(demoTwoNav).getByText('Atlas')).toBeInTheDocument();
+    expect(within(demoTwoNav).getByText('Risk Matrix')).toBeInTheDocument();
+    expect(within(demoTwoNav).queryByText('Breakdown')).toBeNull();
+  });
+
+  it('coerces a stale demo-2 breakdown request back to the raw question results', () => {
+    expect(
+      buildSurveyResultsDemoViewPlan({
+        isDemoQuestionResults: true,
+        requestedViewMode: 'breakdown',
+        slug: 'demo-2',
+      }),
+    ).toEqual({
+      demoResultsViewMode: 'raw',
+      demoResultsViewOptions: [
+        { key: 'report', label: 'Report' },
+        { key: 'atlas', label: 'Atlas' },
+        { key: 'riskMatrix', label: 'Risk Matrix' },
+      ],
+      isDemoAlternateResultsView: false,
+    });
   });
 
   it('switches the demo modal surface from the top bar buttons and maps report to Polis', async () => {

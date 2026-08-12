@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { getShortenedSurveyID } from 'utilities/ui/displayHelpers.js';
+import { hasDemoAnalysisFixture } from '../../utilities/demo/demoPolisDatasets.js';
 import {
   SurveyResultsLockedResponsesBanner,
   SurveyResultsLockedResponsesToggle,
@@ -31,6 +32,38 @@ type SurveyResultsLockedResponsesModel = SurveyResultsLockedResponsesPanelProps[
 type SurveyResultsDemoViewOption = {
   key: string;
   label: string;
+};
+
+type SurveyResultsDemoViewPlan = {
+  demoResultsViewMode: string;
+  demoResultsViewOptions: SurveyResultsDemoViewOption[];
+  isDemoAlternateResultsView: boolean;
+};
+
+export const buildSurveyResultsDemoViewPlan = ({
+  isDemoQuestionResults,
+  requestedViewMode,
+  slug,
+}: {
+  isDemoQuestionResults: boolean;
+  requestedViewMode?: unknown;
+  slug: unknown;
+}): SurveyResultsDemoViewPlan => {
+  const showBreakdown = hasDemoAnalysisFixture(slug);
+  const requestedView = isDemoQuestionResults ? String(requestedViewMode || 'raw') : 'raw';
+  const demoResultsViewMode = requestedView === 'breakdown' && !showBreakdown ? 'raw' : requestedView;
+  return {
+    demoResultsViewMode,
+    demoResultsViewOptions: isDemoQuestionResults
+      ? [
+          { key: 'report', label: 'Report' },
+          { key: 'atlas', label: 'Atlas' },
+          ...(showBreakdown ? [{ key: 'breakdown', label: 'Breakdown' }] : []),
+          { key: 'riskMatrix', label: 'Risk Matrix' },
+        ]
+      : [],
+    isDemoAlternateResultsView: isDemoQuestionResults && demoResultsViewMode !== 'raw',
+  };
 };
 
 export type SurveyResultsRenderSurfaceDisplayStyles = {
@@ -190,16 +223,12 @@ export const renderSurveyResultsRenderSurface = ({
   const questionModeEntries = viewMode === 'questions' ? aggregatorEntries : [];
   const surveyIdAbbreviation = currentSurveyId ? getShortenedSurveyID(currentSurveyId, false, null, false) : null;
   const isDemoQuestionResults = getIsDemoQuestionResultsContext();
-  const demoResultsViewMode = isDemoQuestionResults ? state.demoResultsViewMode || 'raw' : 'raw';
-  const isDemoAlternateResultsView = isDemoQuestionResults && demoResultsViewMode !== 'raw';
-  const demoResultsViewOptions: SurveyResultsDemoViewOption[] = isDemoQuestionResults
-    ? [
-        { key: 'report', label: 'Report' },
-        { key: 'atlas', label: 'Atlas' },
-        { key: 'breakdown', label: 'Breakdown' },
-        { key: 'riskMatrix', label: 'Risk Matrix' },
-      ]
-    : [];
+  const { demoResultsViewMode, demoResultsViewOptions, isDemoAlternateResultsView } =
+    buildSurveyResultsDemoViewPlan({
+      isDemoQuestionResults,
+      requestedViewMode: state.demoResultsViewMode,
+      slug,
+    });
   const cacheControllerSnapshot = buildSurveyResultsCacheControllerSnapshot({
     activeSessionSlug: slug,
     aggregatorEntriesCount,
