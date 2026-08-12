@@ -64,11 +64,13 @@ export const buildContractViewerContracts = ({
   sessionContracts = {},
   chainId = null,
   includeSessionRegistry = true,
+  includeAdvancedSourceTemplates = false,
   includeCustomSBT = true,
 }: {
   sessionContracts?: SessionContractsLike | null;
   chainId?: ChainIdLike;
   includeSessionRegistry?: boolean;
+  includeAdvancedSourceTemplates?: boolean;
   includeCustomSBT?: boolean;
 } = {}): ContractViewerContractLike[] => {
   const sourceDefinitions = getContractSourceDefinitions() as Record<string, AnyRecord>;
@@ -114,16 +116,26 @@ export const buildContractViewerContracts = ({
     }
   }
 
-  if (includeCustomSBT && !entries.some((entry) => entry.key === 'customSBT')) {
-    const sourceDefinition = sourceDefinitions.customSBT || {};
+  const appendSourceOnlyContract = (contractKey: string) => {
+    if (entries.some((entry) => entry.key === contractKey)) return;
+    const sourceDefinition = sourceDefinitions[contractKey] || {};
     entries.push({
-      key: 'customSBT',
-      name: getContractDisplayName('customSBT'),
+      key: contractKey,
+      name: getContractDisplayName(contractKey),
       addresses: [],
-      explainer: getContractExplainer('customSBT'),
-      sourceFile: sourceDefinition.file || getContractSourceFileName('customSBT'),
+      explainer: getContractExplainer(contractKey),
+      sourceFile: sourceDefinition.file || getContractSourceFileName(contractKey),
       source: sourceDefinition.source || '',
     });
+  };
+
+  if (includeAdvancedSourceTemplates) {
+    appendSourceOnlyContract('surveys');
+    appendSourceOnlyContract('sbtFactory');
+  }
+
+  if (includeCustomSBT) {
+    appendSourceOnlyContract('customSBT');
   }
 
   return entries;

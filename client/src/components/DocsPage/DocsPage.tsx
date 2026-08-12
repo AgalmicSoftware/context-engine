@@ -93,6 +93,7 @@ const buildContractsForViewer = buildContractViewerContracts as (options?: {
   sessionContracts?: SessionContractsMap;
   chainId?: number;
   includeSessionRegistry?: boolean;
+  includeAdvancedSourceTemplates?: boolean;
   includeCustomSBT?: boolean;
 }) => ContractViewerContract[];
 
@@ -250,6 +251,7 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
       sessionContracts,
       chainId,
       includeSessionRegistry: contributesSessionContracts,
+      includeAdvancedSourceTemplates: true,
       includeCustomSBT: true,
     }).map((contract) =>
       contract.key === 'sbtFactory'

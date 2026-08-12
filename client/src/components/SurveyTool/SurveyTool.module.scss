@@ -4463,7 +4463,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     background: transparent !important;
     box-shadow: none !important;
     color: var(--ce-control-text);
-    opacity: 1;
+    opacity: 1 !important;
   }
 
   .pileCardFooter .importanceText,
@@ -4472,6 +4472,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   .pileLockAudiencePopover .lockAudienceMeta,
   .pileLockAudiencePopover .lockAudienceGateDetailItem {
     color: var(--ce-control-text) !important;
+    opacity: 1 !important;
   }
 
   .pileCardFooter .convictionToggleLine,

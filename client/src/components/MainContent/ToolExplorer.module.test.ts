@@ -44,5 +44,8 @@ describe('ToolExplorer sparse card layout', () => {
     expect(scss).toMatch(
       /\.explorerCol \.square,[\s\S]*?height:\s*248px;[\s\S]*?background:\s*var\(--ce-control-face\);[\s\S]*?box-shadow:\s*var\(--ce-shadow-raised\);/,
     );
+    expect(scss).toMatch(
+      /\.explorerCol \.square:hover,[\s\S]*?\.explorerColSparse \.square:focus-within\s*{[\s\S]*?background:\s*var\(--ce-control-face\);[\s\S]*?box-shadow:\s*var\(--ce-shadow-raised\);/,
+    );
   });
 });

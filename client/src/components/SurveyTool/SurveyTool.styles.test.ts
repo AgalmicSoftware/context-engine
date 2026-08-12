@@ -70,7 +70,10 @@ describe('SurveyTool styles', () => {
     const scss = readSurveyToolScss();
 
     expect(scss).toMatch(
-      /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)\s*{[\s\S]*?\.pileCardFooter \.importanceSlider\s*{[\s\S]*?border:\s*0 !important;[\s\S]*?background:\s*transparent !important;[\s\S]*?opacity:\s*1;/,
+      /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)\s*{[\s\S]*?\.pileCardFooter \.importanceSlider\s*{[\s\S]*?border:\s*0 !important;[\s\S]*?background:\s*transparent !important;[\s\S]*?opacity:\s*1 !important;/,
+    );
+    expect(scss).toMatch(
+      /\.pileCardFooter \.importanceText,[\s\S]*?\.pileLockAudiencePopover \.lockAudienceGateDetailItem\s*{[\s\S]*?color:\s*var\(--ce-control-text\) !important;[\s\S]*?opacity:\s*1 !important;/,
     );
     expect(scss).toMatch(
       /\.pileCardFooter \.convictionToggleLine,\s*\.pileLockAudiencePopover \.convictionToggleLine\s*{[\s\S]*?border:\s*0 !important;[\s\S]*?background:\s*transparent !important;[\s\S]*?box-shadow:\s*none !important;[\s\S]*?opacity:\s*1;/,

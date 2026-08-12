@@ -429,6 +429,9 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   }
 
   if (routeCase.requiresReadableDocs) {
+    await page.getByTestId('ce-contract-viewer-card-surveys').waitFor({ state: 'visible' });
+    await page.getByTestId('ce-contract-viewer-card-sbtFactory').waitFor({ state: 'visible' });
+    await page.getByTestId('ce-contract-viewer-card-customSBT').waitFor({ state: 'visible' });
     await page.getByRole('button', { name: 'Prompts', exact: true }).click();
     const firstPrompt = page.locator('#docs-section-prompts [role="button"][aria-controls^="prompt-"]').first();
     await firstPrompt.click();
@@ -493,6 +496,62 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     await page.getByText('Questions', { exact: true }).click();
     await page.getByRole('button', { name: 'Conviction / importance' }).first().waitFor({ state: 'visible' });
   }
+
+  const classicPileControlState = routeCase.requiresReadableSessionSurface
+    ? await (async () => {
+        const convictionButton = page.getByRole('button', { name: 'Conviction / importance' }).first();
+        await convictionButton.click();
+        const sliderPanel = page.locator('[class*="pileCardFooter"] [class*="importanceSlider"]').first();
+        await sliderPanel.waitFor({ state: 'visible' });
+        const conviction = await sliderPanel.evaluate((element) => {
+          const style = window.getComputedStyle(element);
+          const label = element.querySelector('[class*="importanceText"]');
+          const slider = element.querySelector('[class*="convictionSlider"]');
+          const labelStyle = label ? window.getComputedStyle(label) : null;
+          const sliderStyle = slider ? window.getComputedStyle(slider) : null;
+          return {
+            backgroundColor: style.backgroundColor,
+            borderWidths: [style.borderTopWidth, style.borderRightWidth, style.borderBottomWidth, style.borderLeftWidth],
+            boxShadow: style.boxShadow,
+            color: style.color,
+            opacity: Number(style.opacity),
+            labelColor: labelStyle?.color || '',
+            labelOpacity: Number(labelStyle?.opacity || 0),
+            sliderBackground: sliderStyle?.backgroundColor || '',
+            sliderOpacity: Number(sliderStyle?.opacity || 0),
+          };
+        });
+
+        const lockButton = page.getByTestId('ce-survey-answer-lock').first();
+        await lockButton.click();
+        const onlyMeButton = page.getByTestId('ce-survey-lock-audience-self').first();
+        await onlyMeButton.waitFor({ state: 'visible' });
+        const lockAudience = await onlyMeButton.evaluate((element) => {
+          const style = window.getComputedStyle(element);
+          const popover = element.closest('[class*="pileLockAudiencePopover"]');
+          const popoverStyle = popover ? window.getComputedStyle(popover) : null;
+          return {
+            backgroundColor: style.backgroundColor,
+            borderWidths: [style.borderTopWidth, style.borderRightWidth, style.borderBottomWidth, style.borderLeftWidth],
+            boxShadow: style.boxShadow,
+            color: style.color,
+            opacity: Number(style.opacity),
+            popoverBackground: popoverStyle?.backgroundColor || '',
+            popoverBorderWidths: popoverStyle
+              ? [
+                  popoverStyle.borderTopWidth,
+                  popoverStyle.borderRightWidth,
+                  popoverStyle.borderBottomWidth,
+                  popoverStyle.borderLeftWidth,
+                ]
+              : [],
+            popoverBoxShadow: popoverStyle?.boxShadow || '',
+          };
+        });
+        await lockButton.click();
+        return { conviction, lockAudience };
+      })()
+    : null;
 
   const classic = await page.evaluate(readThemeState);
   const questionUtilityButton = routeCase.requiresReadableQuestionUtilities
@@ -1736,6 +1795,65 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       reportedSurfaceState.brandingBackground,
       'rgba(0, 0, 0, 0)',
       'Classic 95 session branding should keep its simplified transparent stage',
+    );
+    assert.deepEqual(
+      classicPileControlState.conviction.borderWidths,
+      ['0px', '0px', '0px', '0px'],
+      'Classic 95 conviction/importance controls should not have an exterior border',
+    );
+    assert.equal(
+      classicPileControlState.conviction.backgroundColor,
+      'rgba(0, 0, 0, 0)',
+      'Classic 95 conviction/importance controls should use the card surface directly',
+    );
+    assert.equal(
+      classicPileControlState.conviction.boxShadow,
+      'none',
+      'Classic 95 conviction/importance controls should not add an exterior shadow',
+    );
+    assert.equal(classicPileControlState.conviction.opacity, 1, 'Classic 95 slider controls should be fully opaque');
+    assert.equal(
+      classicPileControlState.conviction.labelColor,
+      'rgb(0, 0, 0)',
+      'Classic 95 conviction/importance labels should use readable black text',
+    );
+    assert.equal(
+      classicPileControlState.conviction.labelOpacity,
+      1,
+      'Classic 95 conviction/importance labels should be fully opaque',
+    );
+    assert.equal(
+      classicPileControlState.conviction.sliderOpacity,
+      1,
+      'Classic 95 conviction/importance sliders should be fully opaque',
+    );
+    assert.notEqual(
+      classicPileControlState.conviction.sliderBackground,
+      'rgba(0, 0, 0, 0)',
+      'Classic 95 conviction/importance sliders should retain a visible track',
+    );
+    assert.deepEqual(
+      classicPileControlState.lockAudience.borderWidths,
+      ['0px', '0px', '0px', '0px'],
+      'Classic 95 Only me option should not have an exterior border',
+    );
+    assert.equal(
+      classicPileControlState.lockAudience.backgroundColor,
+      'rgba(0, 0, 0, 0)',
+      'Classic 95 Only me option should use the lock menu surface directly',
+    );
+    assert.equal(classicPileControlState.lockAudience.boxShadow, 'none', 'Classic 95 Only me option should be flat');
+    assert.equal(classicPileControlState.lockAudience.color, 'rgb(0, 0, 0)', 'Classic 95 Only me text should be black');
+    assert.equal(classicPileControlState.lockAudience.opacity, 1, 'Classic 95 Only me option should be fully opaque');
+    assert.deepEqual(
+      classicPileControlState.lockAudience.popoverBorderWidths,
+      ['0px', '0px', '0px', '0px'],
+      'Classic 95 lock menu should not have an exterior border',
+    );
+    assert.equal(
+      classicPileControlState.lockAudience.popoverBoxShadow,
+      'none',
+      'Classic 95 lock menu should not add an exterior shadow',
     );
     reportedSurfaceState.iconControls.forEach((control) => {
       assert.equal(control.exists, true, `Classic 95 ${control.label} control should be present`);

@@ -674,7 +674,10 @@
     width: min(1080px, calc(100% - 32px));
     max-width: 1080px;
     min-height: 0;
-    margin: clamp(18px, 5vh, 64px) auto 28px;
+    // Keep the window clear of the fixed 42px Classic taskbar at compact
+    // desktop heights. The prior 28px tail margin made the document 11px
+    // taller than a 720px viewport even though the slide itself already fit.
+    margin: clamp(18px, 5vh, 64px) auto 16px;
   }
 
   .mainTabsCard {

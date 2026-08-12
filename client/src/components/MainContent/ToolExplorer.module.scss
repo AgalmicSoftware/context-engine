@@ -676,7 +676,7 @@
   .explorerColSparse .square:focus-within {
     transform: none;
     border-color: var(--ce-border-raised);
-    background: var(--ce-surface-alt);
+    background: var(--ce-control-face);
     box-shadow: var(--ce-shadow-raised);
     outline: 1px dotted var(--ce-focus-ring);
     outline-offset: -7px;

@@ -69,6 +69,7 @@ describe('DocsPage contract deep links', () => {
       ({
         sessionContracts = {},
         includeSessionRegistry = true,
+        includeAdvancedSourceTemplates = false,
         includeCustomSBT = true,
         chainId = 84532,
       }: any = {}) => {
@@ -114,6 +115,29 @@ describe('DocsPage contract deep links', () => {
               },
             ],
           });
+        }
+
+        if (includeAdvancedSourceTemplates) {
+          if (!entries.some(({ key }) => key === 'surveys')) {
+            entries.push({
+              key: 'surveys',
+              name: 'Questions and Surveys',
+              explainer: 'Explainer for surveys',
+              sourceFile: 'Surveys.sol',
+              source: 'contract surveys {}',
+              addresses: [],
+            });
+          }
+          if (!entries.some(({ key }) => key === 'sbtFactory')) {
+            entries.push({
+              key: 'sbtFactory',
+              name: 'SBT Factory',
+              explainer: 'Explainer for sbtFactory',
+              sourceFile: 'SBTFactory.sol',
+              source: 'contract sbtFactory {}',
+              addresses: [],
+            });
+          }
         }
 
         if (includeCustomSBT) {
@@ -239,9 +263,12 @@ describe('DocsPage contract deep links', () => {
       sessionContracts: {},
       chainId: undefined,
       includeSessionRegistry: false,
+      includeAdvancedSourceTemplates: true,
       includeCustomSBT: true,
     });
     expect(screen.queryByText('Session Registry')).not.toBeInTheDocument();
+    expect(screen.getByText('Questions and Surveys')).toBeInTheDocument();
+    expect(screen.getByText('SBT Factory')).toBeInTheDocument();
     expect(screen.getByText('Custom SBT (Template)')).toBeInTheDocument();
   });
 
