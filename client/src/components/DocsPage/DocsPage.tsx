@@ -43,6 +43,7 @@ import { DOCS_PAGE_COPY, FAQ_ITEMS, GUIDE_TOPICS, QUICKSTART_STEPS } from './doc
 import { sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import { PUBLIC_REPO_URL, buildPublicContractSourceUrl } from '../../variables/publicRepoMetadata.js';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
+import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
 
 type DocsPageProps = {
   activeSessionSlug?: string;
@@ -139,15 +140,31 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
     getDefaultSessionConfig: () => getSessionConfigBySlugOrDefault(''),
   });
 
-  const canonicalSlug = activeSession?.slug || ''; // '' means general
   const hasExplicitContractSession = urlSlugLike !== undefined || hasExplicitSessionQuery;
+  const explicitContractSessionRaw =
+    urlSlugLike !== undefined ? urlSlugLike : hasExplicitSessionQuery ? querySessionRaw || '' : null;
+  const explicitContractSessionConfig =
+    explicitContractSessionRaw === null
+      ? null
+      : resolveDocsPageSessionConfig(explicitContractSessionRaw, {
+          allowGeneral: true,
+          resolveBySlug: getSessionConfigBySlug,
+          resolveDemoBySlug: (slug: string) => getDemoSessionConfigBySlug(slug, { allowDemoFallback: true }),
+          getDefaultSessionConfig: () => getSessionConfigBySlugOrDefault(''),
+        });
+  const explicitContractSessionSlug =
+    explicitContractSessionRaw === null
+      ? null
+      : explicitContractSessionConfig?.slug !== undefined
+        ? String(explicitContractSessionConfig.slug || '')
+        : canonicalizeSessionSlug(explicitContractSessionRaw);
   const [selectedContractSessionSlug, setSelectedContractSessionSlug] = useState<string | null>(() =>
-    hasExplicitContractSession ? canonicalSlug : null,
+    hasExplicitContractSession ? explicitContractSessionSlug : null,
   );
 
   useEffect(() => {
-    setSelectedContractSessionSlug(hasExplicitContractSession ? canonicalSlug : null);
-  }, [canonicalSlug, hasExplicitContractSession]);
+    setSelectedContractSessionSlug(hasExplicitContractSession ? explicitContractSessionSlug : null);
+  }, [explicitContractSessionSlug, hasExplicitContractSession]);
 
   const selectedSession = useMemo(
     () =>
@@ -187,12 +204,13 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
     };
 
     if (selectedContractSessionSlug !== null) pushOption(selectedContractSessionSlug);
+    pushOption(activeSession?.slug);
     pushOption(activeSessionSlug);
     pushOption(reduxActiveSessionSlug);
     pushOption('');
     getAllSessionSlugs({ includeEmpty: true }).forEach(pushOption);
     return Array.from(options.values());
-  }, [activeSessionSlug, reduxActiveSessionSlug, selectedContractSessionSlug]);
+  }, [activeSession?.slug, activeSessionSlug, reduxActiveSessionSlug, selectedContractSessionSlug]);
 
   const selectedContractSessionValue =
     selectedContractSessionSlug === null
@@ -221,9 +239,9 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
       changed = true;
     }
 
-    if (hasExplicitSessionQuery && canonicalSlug) {
-      if (nextUrl.searchParams.get('session') !== canonicalSlug) {
-        nextUrl.searchParams.set('session', canonicalSlug);
+    if (hasExplicitSessionQuery && explicitContractSessionSlug) {
+      if (nextUrl.searchParams.get('session') !== explicitContractSessionSlug) {
+        nextUrl.searchParams.set('session', explicitContractSessionSlug);
         changed = true;
       }
     } else if (hasExplicitSessionQuery && nextUrl.searchParams.has('session')) {
@@ -234,7 +252,7 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
     if (changed) {
       window.history.replaceState(null, '', `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`);
     }
-  }, [urlSlugLike, canonicalSlug, hasExplicitSessionQuery]);
+  }, [urlSlugLike, explicitContractSessionSlug, hasExplicitSessionQuery]);
 
   const clusterAnalysisPromptDisplay = buildClusterAnalysisPrompt(
     {

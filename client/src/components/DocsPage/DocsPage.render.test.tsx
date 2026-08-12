@@ -312,6 +312,28 @@ describe('DocsPage contract deep links', () => {
     expect(screen.queryByRole('button', { name: /smart contracts/i })).not.toBeInTheDocument();
   });
 
+  it('keeps an unresolved explicit query session instead of borrowing ambient contract authority', () => {
+    window.history.pushState({}, '', '/docs?session=missing-session&contract=surveys');
+
+    render(<DocsPage activeSessionSlug="session-alpha" reduxActiveSessionSlug="" />);
+
+    expect(screen.getByRole('combobox', { name: 'Session' })).toHaveValue('missing-session');
+    expect(screen.getByText('Session details are unavailable for this selection.')).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-docs-session-context')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /smart contracts/i })).not.toBeInTheDocument();
+    expect(window.location.search).toBe('?session=missing-session&contract=surveys');
+  });
+
+  it('keeps an unresolved explicit path session instead of borrowing ambient contract authority', () => {
+    window.history.pushState({}, '', '/docs/missing-path-session');
+
+    render(<DocsPage activeSessionSlug="session-alpha" reduxActiveSessionSlug="" />);
+
+    expect(screen.getByRole('combobox', { name: 'Session' })).toHaveValue('missing-path-session');
+    expect(screen.getByText('Session details are unavailable for this selection.')).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-docs-session-context')).not.toBeInTheDocument();
+  });
+
   it('keeps a Worker session legacy chain and contracts out of the global Advanced viewer', async () => {
     const workerSessionConfig = {
       slug: 'demo-sh',
