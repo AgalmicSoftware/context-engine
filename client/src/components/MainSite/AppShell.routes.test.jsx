@@ -3561,6 +3561,108 @@ describe('AppShell route render smoke', () => {
     );
   });
 
+  it('keeps a profile scan retryable when atomic cache persistence fails', async () => {
+    const target = '0x00000000000000000000000000000000000000af';
+    const sbtAddress = '0x00000000000000000000000000000000000000cf';
+    const sessionConfig = buildSessionConfig({ blockLimits: { start: 100, end: null } });
+    const subject = createSubject({
+      path: `/u/${target}`,
+      activeSessionSlug: 'edge',
+      sessionConfig,
+    });
+    subject._mounted = true;
+    subject.state = {
+      ...subject.state,
+      isSBTCacheReady: false,
+      isSurveyCacheReady: false,
+      isQuestionCacheReady: false,
+      isResponsesCacheReady: false,
+      sbtCacheRevision: 0,
+      questionResponsesNonce: 0,
+    };
+    attachDgStore(subject);
+    updateCacheAtomic.mockImplementation(async (namespace, _slug, updater) => {
+      if (namespace === 'userCache') return updater(null);
+      throw new Error('IndexedDB unavailable');
+    });
+    subject.getUserProfileAllSessionsScanMode = jest.fn(() => ({
+      legacyAllSessions: false,
+      useAllSessionsSbtScan: false,
+      useAllSessionsSurveyActivityScan: false,
+      useAllSessionsQuestionActivityScan: false,
+      useAllSessionsActivityScan: false,
+      useAllSessionsScan: false,
+    }));
+    subject.getProfileScanScopeContext = jest.fn(() => ({
+      scope: 'active',
+      list: [],
+      activeSlug: 'edge',
+      activeSlugFromRoute: true,
+    }));
+    subject.ensureRegistryHydratedForProfileScan = jest.fn(async () => null);
+    subject.resolveProfileDeepScanPlan = jest.fn(() => ({
+      slugs: ['edge'],
+      usedAllSessions: false,
+      coverageComplete: true,
+      coverageReason: '',
+      registryEntryCount: 1,
+      rawAllSlugCount: 1,
+      activeChainSlugCount: 1,
+      scopedFallbackSlugCount: 0,
+      relevantSlugs: ['edge'],
+      prioritizedGeneralFirst: false,
+      scanOrdering: 'active',
+    }));
+    subject.readProfileScanStepTimeoutMs = jest.fn(() => 5000);
+    subject.readProfileScanSbtBurstSize = jest.fn(() => 1);
+    subject.readProfileScanActivityLookbackBlocks = jest.fn(() => 0);
+    subject.emitProfileScanColdDiag = jest.fn();
+    subject.emitProfileScanTelemetry = jest.fn();
+    subject.scheduleProfileScanRetryAfterRegistryHydration = jest.fn();
+    subject.queueLocalRevisionUpdate = jest.fn();
+    subject.setState.mockClear();
+    contractScripts.getLatestBlockNumber.mockResolvedValue(125);
+    contractScripts.getSBTsForUser.mockResolvedValue({
+      data: [{ sbtAddress, sbtInfo: { name: 'Unpersisted badge' } }],
+      hadError: false,
+    });
+    contractScripts.getUserActivity.mockResolvedValue({
+      data: {
+        createdSurveys: [],
+        createdQuestions: [],
+        surveyResponses: [],
+        questionResponses: [],
+      },
+      hadError: false,
+    });
+
+    const report = await subject.scanSpecificUserProfile(target);
+
+    expect(report).toMatchObject({
+      anyNewData: false,
+      coverageComplete: false,
+      coverageReason: 'cache-persistence-failed',
+      hadRpcErrors: false,
+      scannedSlugs: [],
+      failedSlugs: ['edge'],
+      failedActivitySlugs: ['edge'],
+    });
+    expect(subject.scheduleProfileScanRetryAfterRegistryHydration).toHaveBeenCalledWith(
+      target,
+      'cache-persistence-failed',
+    );
+    expect(subject.queueLocalRevisionUpdate).not.toHaveBeenCalled();
+    expect(subject.setState).not.toHaveBeenCalled();
+    expect(subject.state).toMatchObject({
+      isSBTCacheReady: false,
+      isSurveyCacheReady: false,
+      isQuestionCacheReady: false,
+      isResponsesCacheReady: false,
+      sbtCacheRevision: 0,
+      questionResponsesNonce: 0,
+    });
+  });
+
   it('reconciles survey events into survey and question caches without dropping arweave branches', async () => {
     const surveyId = `0x${'3'.repeat(64)}`;
     const questionId = `0x${'4'.repeat(64)}`;

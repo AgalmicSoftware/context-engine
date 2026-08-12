@@ -216,6 +216,25 @@ export const createSessionSbtCacheController = (host = {}) => {
     contractScripts: eventStreamsPort,
   });
   const removeSbtRealtimeListenersForGroup = sbtRealtimeListenerCleanupController.removeSbtRealtimeListenersForGroup;
+  const realtimeEventRetryTimers = new Set();
+  let realtimeEventRetryGeneration = 0;
+  const dispatchSbtRealtimeEventForGroup = (slug, event, attempt = 0, generation = realtimeEventRetryGeneration) => {
+    void Promise.resolve(onNewSbtEventDetectedForGroup(slug, event)).catch((error) => {
+      mainSiteLog.error('[SBT realtime] Event handler failed:', { slug, event, attempt, error });
+      // A late rejection from an old listener lifetime must not recreate retry
+      // timers after destroy has cleared that lifetime's pending work.
+      if (generation !== realtimeEventRetryGeneration) return;
+      if (attempt >= 2) return;
+      const timer = setTimeout(
+        () => {
+          realtimeEventRetryTimers.delete(timer);
+          dispatchSbtRealtimeEventForGroup(slug, event, attempt + 1, generation);
+        },
+        250 * (attempt + 1),
+      );
+      realtimeEventRetryTimers.add(timer);
+    });
+  };
 
   const ensureSessionRouteSbtDiscovery = (slugIn) => {
     const pathname = getEffectiveRoutePath(getCurrentPath());
@@ -1692,7 +1711,7 @@ export const createSessionSbtCacheController = (host = {}) => {
     try {
       // Ensure we’re not double‑subscribed on this group’s chain
       if (shouldSkipSessionScanForSlug(slug, 'startSbtEventListenerForGroup')) return;
-      eventStreamsPort.listenForSBTEvents('none', (e) => onNewSbtEventDetectedForGroup(slug, e), slug);
+      eventStreamsPort.listenForSBTEvents('none', (e) => dispatchSbtRealtimeEventForGroup(slug, e), slug);
 
       const networkID = String(getSessionChainId(slug) || '');
       if (!networkID) {
@@ -1756,7 +1775,7 @@ export const createSessionSbtCacheController = (host = {}) => {
       eventStreamsPort.listenForSBTInstanceEvents(
         'none',
         instanceListenerPlan.addresses,
-        (e) => onNewSbtEventDetectedForGroup(slug, e),
+        (e) => dispatchSbtRealtimeEventForGroup(slug, e),
         slug,
       );
       setSbtRealtimeCoverageForGroup(slug, true);
@@ -1781,7 +1800,7 @@ export const createSessionSbtCacheController = (host = {}) => {
       .filter(Boolean);
     if (!slug || addresses.length === 0) return false;
 
-    eventStreamsPort.listenForSBTInstanceEvents('none', addresses, (e) => onNewSbtEventDetectedForGroup(slug, e), slug);
+    eventStreamsPort.listenForSBTInstanceEvents('none', addresses, (e) => dispatchSbtRealtimeEventForGroup(slug, e), slug);
     return true;
   };
 
@@ -1822,26 +1841,18 @@ export const createSessionSbtCacheController = (host = {}) => {
     }
     if (!networkCache.sbtList) networkCache.sbtList = {};
 
-    const overallLastBlockProcessedByNetwork = Number(networkCache.lastBlock) || 0;
     const cursorGuard = getSbtRealtimeEventCursorGuard({
       eventBlockNumber,
       transactionIndex: event?.transactionIndex,
       logIndex: event?.logIndex,
       lastRealtimeEventCursor: networkCache.lastRealtimeEventCursor,
-      overallLastBlockProcessedByNetwork,
+      recentRealtimeEventCursors: networkCache.recentRealtimeEventCursors,
     });
     const { eventCursor, lastRealtimeCursor } = cursorGuard;
     if (cursorGuard.reason === 'cursor') {
-      mainSiteLog.log('Skipping older or already processed ordered SBT event in onNewSbtEventDetectedForGroup.', {
+      mainSiteLog.log('Skipping already processed SBT event in onNewSbtEventDetectedForGroup.', {
         eventCursor,
         lastRealtimeCursor,
-      });
-      return;
-    }
-    if (cursorGuard.reason === 'block') {
-      mainSiteLog.log('Skipping older or already processed SBT event in onNewSbtEventDetectedForGroup.', {
-        eventBlockNumber,
-        overallLastBlockProcessedByNetwork,
       });
       return;
     }
@@ -1883,20 +1894,17 @@ export const createSessionSbtCacheController = (host = {}) => {
 
       const sbtInfo = await contractScripts.getSbtMetadata('none', sbtAddressOriginalCase, slug);
       if (!sbtInfo) {
-        mainSiteLog.error(
-          `Failed to fetch metadata for new SBT ${sbtAddressOriginalCase} in onSbtCreatedDetectedForGroup. SBT will not be added to cache for this event.`,
-        );
-        return;
+        throw new Error(`Failed to fetch metadata for new SBT ${sbtAddressOriginalCase}.`);
       }
 
       let applied = false;
       await updateSbtNetworkCacheAtomic(slug, networkID, initialLastBlockSBT, (freshNetwork) => {
-        // Regression guard: evaluate the cursor against the atomic snapshot;
-        // a pre-queue guard can admit an older event that lost the race.
+        // Regression guard: dedupe exact events against the atomic snapshot;
+        // ordering callbacks by completion time drops distinct slower events.
         const cursorGuard = getSbtRealtimeEventCursorGuard({
           eventBlockNumber,
           lastRealtimeEventCursor: freshNetwork.lastRealtimeEventCursor,
-          overallLastBlockProcessedByNetwork: Number(freshNetwork.lastBlock) || 0,
+          recentRealtimeEventCursors: freshNetwork.recentRealtimeEventCursors,
           transactionIndex: eventCursor?.transactionIndex,
           logIndex: eventCursor?.logIndex,
         });
@@ -1922,6 +1930,7 @@ export const createSessionSbtCacheController = (host = {}) => {
       });
     } catch (error) {
       mainSiteLog.error(`Error handling SBTCreated event for ${sbtAddressOriginalCase}:`, error);
+      throw error;
     }
   };
 
@@ -1989,10 +1998,7 @@ export const createSessionSbtCacheController = (host = {}) => {
       try {
         const sbtInfo = await contractScripts.getSbtMetadata('none', sbtAddressOriginalCase, slug);
         if (!sbtInfo) {
-          mainSiteLog.error(
-            `Failed to get metadata for SBT: ${sbtAddressOriginalCase} during SBTActivity event. Skipping update for this event.`,
-          );
-          return;
+          throw new Error(`Failed to get metadata for SBT ${sbtAddressOriginalCase} during SBTActivity event.`);
         }
         fetchedSbtInfo = sbtInfo;
       } catch (e) {
@@ -2000,7 +2006,7 @@ export const createSessionSbtCacheController = (host = {}) => {
           `Error fetching metadata for uncached SBT ${sbtAddressOriginalCase} on SBTActivity event:`,
           e,
         );
-        return;
+        throw e;
       }
     }
 
@@ -2011,7 +2017,7 @@ export const createSessionSbtCacheController = (host = {}) => {
       const cursorGuard = getSbtRealtimeEventCursorGuard({
         eventBlockNumber,
         lastRealtimeEventCursor: freshNetwork.lastRealtimeEventCursor,
-        overallLastBlockProcessedByNetwork: Number(freshNetwork.lastBlock) || 0,
+        recentRealtimeEventCursors: freshNetwork.recentRealtimeEventCursors,
         transactionIndex: eventCursor?.transactionIndex,
         logIndex: eventCursor?.logIndex,
       });
@@ -2059,6 +2065,9 @@ export const createSessionSbtCacheController = (host = {}) => {
 
   const destroy = () => {
     sbtLiveProgressController.destroy();
+    realtimeEventRetryGeneration += 1;
+    realtimeEventRetryTimers.forEach((timer) => clearTimeout(timer));
+    realtimeEventRetryTimers.clear();
     _sessionRouteLightDiscoveryInFlight = {};
     _lightSbtDiscoveryInFlight = {};
   };

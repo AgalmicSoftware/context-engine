@@ -1,7 +1,7 @@
 const { getSbtRealtimeEventCursorGuard } = require('./sbtRealtimeEventCursorGuard.js');
 
 describe('getSbtRealtimeEventCursorGuard', () => {
-  it('skips when the ordered event cursor is older than the last processed cursor', () => {
+  it('allows a distinct older event because listener callbacks may finish out of order', () => {
     expect(
       getSbtRealtimeEventCursorGuard({
         eventBlockNumber: 10,
@@ -12,11 +12,10 @@ describe('getSbtRealtimeEventCursorGuard', () => {
           transactionIndex: 1,
           logIndex: 2,
         },
-        overallLastBlockProcessedByNetwork: 9,
       }),
     ).toMatchObject({
-      reason: 'cursor',
-      shouldSkip: true,
+      reason: '',
+      shouldSkip: false,
       eventCursor: {
         blockNumber: 10,
         transactionIndex: 1,
@@ -30,16 +29,29 @@ describe('getSbtRealtimeEventCursorGuard', () => {
     });
   });
 
-  it('skips when the event block is older than the network waterline', () => {
+  it('does not treat the discovery watermark as realtime activity coverage', () => {
     expect(
       getSbtRealtimeEventCursorGuard({
         eventBlockNumber: 8,
+        // Kept as an unknown legacy option to prove it cannot gate the event.
         overallLastBlockProcessedByNetwork: 9,
       }),
     ).toMatchObject({
-      eventBlockNumber: 8,
-      overallLastBlockProcessedByNetwork: 9,
-      reason: 'block',
+      reason: '',
+      shouldSkip: false,
+    });
+  });
+
+  it('skips only an exact cursor already recorded in the bounded dedupe window', () => {
+    expect(
+      getSbtRealtimeEventCursorGuard({
+        eventBlockNumber: 8,
+        transactionIndex: 1,
+        logIndex: 2,
+        recentRealtimeEventCursors: [{ blockNumber: 8, transactionIndex: 1, logIndex: 2 }],
+      }),
+    ).toMatchObject({
+      reason: 'cursor',
       shouldSkip: true,
     });
   });
@@ -55,7 +67,6 @@ describe('getSbtRealtimeEventCursorGuard', () => {
           transactionIndex: 9,
           logIndex: 9,
         },
-        overallLastBlockProcessedByNetwork: 12,
       }),
     ).toMatchObject({
       reason: '',

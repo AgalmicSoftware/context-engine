@@ -977,7 +977,11 @@ export const createSessionProfileScanController = (host: SessionProfileScanHost)
     const targetLower = target.toLowerCase();
     if (_profileScanRetryAfterRegistry.has(targetLower)) return;
     const run = _registryBootstrapPromise;
-    const waitForBootstrap = run ? Promise.resolve(run).catch(() => null) : Promise.resolve(null);
+    // Without bootstrap work, yield one task so the failing scan can leave its
+    // in-flight map; a microtask retry would coalesce back into that same run.
+    const waitForBootstrap = run
+      ? Promise.resolve(run).catch(() => null)
+      : new Promise<null>((resolve) => setTimeout(() => resolve(null), 0));
     const waitForHydration = !!run;
 
     _profileScanRetryAfterRegistry.add(targetLower);

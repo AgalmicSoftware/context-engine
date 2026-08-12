@@ -1,4 +1,5 @@
 import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
+import { mergeSbtActivityCacheEntryCounts } from '../../utilities/sbt/sbtActivityCacheEntry.js';
 import {
   asSelectedSbtEntry,
   buildSbtFilterStateSignature,
@@ -435,10 +436,9 @@ export const buildSbtFilterSbtEntryCachePatch = ({
       ...netCache,
       sbtList: {
         ...sbtList,
-        [addressKey]: {
-          ...currentEntry,
-          ...asCacheObject(entryPatch),
-        },
+        // Regression guard: a holder scan is only a snapshot through its block;
+        // merge it monotonically so realtime activity and newer checkpoints survive.
+        [addressKey]: mergeSbtActivityCacheEntryCounts(currentEntry, asCacheObject(entryPatch)),
       },
     },
   };

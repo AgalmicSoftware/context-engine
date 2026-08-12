@@ -473,27 +473,7 @@ class CommunityTab extends Component<any, any> {
         }),
       );
 
-      let changed = false;
-      results.forEach((res: any) => {
-        if (!res || res.countsOk === false) return;
-        const existing = sbtList[res.lower] || {};
-        sbtList[res.lower] = {
-          ...existing,
-          sbtAddress: existing.sbtAddress || res.addr,
-          mintedAddresses: res.mintedAddresses,
-          burnedAddresses: res.burnedAddresses,
-          countsLoaded: true,
-          mintedCountByAddress: res.counts?.mintedCountByAddress || existing.mintedCountByAddress || {},
-          burnedCountByAddress: res.counts?.burnedCountByAddress || existing.burnedCountByAddress || {},
-          mintedEventCount: res.counts?.mintedEventCount || existing.mintedEventCount || 0,
-          burnedEventCount: res.counts?.burnedEventCount || existing.burnedEventCount || 0,
-          blockNumber: Number.isFinite(Number(res.counts?.scannedToBlock))
-            ? Math.floor(Number(res.counts.scannedToBlock))
-            : existing.blockNumber,
-          countsScanCheckpoint: null,
-        };
-        changed = true;
-      });
+      const changed = results.some((res: any) => !!res && res.countsOk !== false);
 
       if (changed) {
         await persistCommunitySbtHolderHydrationResults({ slug, netKey, results });

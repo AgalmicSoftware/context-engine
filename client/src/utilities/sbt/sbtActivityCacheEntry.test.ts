@@ -3,6 +3,7 @@ import {
   buildSbtActivityCacheEntry,
   hydrateSbtActivityCacheEntry,
   isSbtActivityCacheEntry,
+  mergeSbtActivityCacheEntryCounts,
   SBT_ACTIVITY_CACHE_ENTRY_SCHEMA_VERSION,
 } from './sbtActivityCacheEntry.js';
 
@@ -149,5 +150,103 @@ describe('sbtActivityCacheEntry', () => {
     expect(updated.blockNumber).toBe(14);
     expect(updated.countsLoaded).toBe(false);
     expect(updated.schemaVersion).toBe(SBT_ACTIVITY_CACHE_ENTRY_SCHEMA_VERSION);
+  });
+
+  it('does not finalize a stale scan behind a newer partial checkpoint', () => {
+    const merged = mergeSbtActivityCacheEntryCounts(
+      {
+        blockNumber: 105,
+        countsLoaded: false,
+        countsScanCheckpoint: { phase: 'activity', blockNumber: 110 },
+        mintedAddresses: ['0xholder'],
+        mintedCountByAddress: { '0xholder': 2 },
+        mintedEventCount: 2,
+      },
+      {
+        blockNumber: 100,
+        countsLoaded: true,
+        countsScanCheckpoint: null,
+        mintedAddresses: ['0xholder'],
+        mintedCountByAddress: { '0xholder': 1 },
+        mintedEventCount: 1,
+      },
+    );
+
+    expect(merged).toMatchObject({
+      blockNumber: 105,
+      countsLoaded: false,
+      countsScanCheckpoint: { phase: 'activity', blockNumber: 110 },
+      mintedCountByAddress: { '0xholder': 2 },
+      mintedEventCount: 2,
+    });
+  });
+
+  it('does not finalize a stale scan behind newer activity when no checkpoint exists', () => {
+    const merged = mergeSbtActivityCacheEntryCounts(
+      {
+        blockNumber: 120,
+        countsLoaded: false,
+        mintedCountByAddress: { '0xholder': 2 },
+        mintedEventCount: 2,
+      },
+      {
+        blockNumber: 100,
+        countsLoaded: true,
+        mintedCountByAddress: { '0xholder': 1 },
+        mintedEventCount: 1,
+      },
+    );
+
+    expect(merged).toMatchObject({
+      blockNumber: 120,
+      countsLoaded: false,
+      mintedCountByAddress: { '0xholder': 2 },
+      mintedEventCount: 2,
+    });
+  });
+
+  it('keeps the newest checkpoint when partial scans finish out of order', () => {
+    const merged = mergeSbtActivityCacheEntryCounts(
+      {
+        blockNumber: 105,
+        countsLoaded: false,
+        countsScanCheckpoint: { phase: 'activity', blockNumber: 110 },
+      },
+      {
+        blockNumber: 100,
+        countsLoaded: false,
+        countsScanCheckpoint: { phase: 'activity', blockNumber: 100 },
+      },
+    );
+
+    expect(merged).toMatchObject({
+      blockNumber: 105,
+      countsLoaded: false,
+      countsScanCheckpoint: { phase: 'activity', blockNumber: 110 },
+    });
+  });
+
+  it('finalizes a scan that covers the latest partial checkpoint', () => {
+    const merged = mergeSbtActivityCacheEntryCounts(
+      {
+        blockNumber: 105,
+        countsLoaded: false,
+        countsScanCheckpoint: { phase: 'activity', blockNumber: 110 },
+      },
+      {
+        blockNumber: 115,
+        countsLoaded: true,
+        mintedCountByAddress: { '0xholder': 1 },
+        mintedEventCount: 1,
+      },
+    );
+
+    expect(merged).toMatchObject({
+      blockNumber: 115,
+      countsLoaded: true,
+      countsScanCheckpoint: null,
+      mintedCountByAddress: { '0xholder': 1 },
+      mintedEventCount: 1,
+    });
   });
 });

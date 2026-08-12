@@ -75,6 +75,20 @@ const unionAddresses = (left: unknown, right: unknown): string[] =>
     ),
   );
 
+const readCheckpointBlock = (value: unknown): number =>
+  Number(value && typeof value === 'object' ? (value as { blockNumber?: unknown }).blockNumber : NaN);
+
+const selectNewestCheckpoint = (currentCheckpoint: unknown, scanCheckpoint: unknown): unknown => {
+  const currentBlock = readCheckpointBlock(currentCheckpoint);
+  const scanBlock = readCheckpointBlock(scanCheckpoint);
+  if (Number.isFinite(currentBlock) && Number.isFinite(scanBlock)) {
+    return scanBlock > currentBlock ? scanCheckpoint : currentCheckpoint;
+  }
+  if (Number.isFinite(currentBlock)) return currentCheckpoint;
+  if (Number.isFinite(scanBlock)) return scanCheckpoint;
+  return scanCheckpoint || currentCheckpoint || null;
+};
+
 const ensureMutableCountMap = (value: unknown): SbtCountMap => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
   return value as SbtCountMap;
@@ -150,13 +164,18 @@ export const mergeSbtActivityCacheEntryCounts = (currentIn: unknown, scanIn: unk
     .map((value) => Number(value))
     .filter(Number.isFinite);
   const blockNumber = blockCandidates.length > 0 ? Math.max(...blockCandidates) : null;
-  const checkpointBlock = Number(
-    current.countsScanCheckpoint && typeof current.countsScanCheckpoint === 'object'
-      ? (current.countsScanCheckpoint as { blockNumber?: unknown }).blockNumber
-      : NaN,
+  const checkpointBlock = readCheckpointBlock(current.countsScanCheckpoint);
+  const currentBlock = Number(current.blockNumber);
+  const scanBlock = Number(scan.blockNumber);
+  const freshnessFloor = Math.max(
+    0,
+    Number.isFinite(currentBlock) ? currentBlock : 0,
+    Number.isFinite(checkpointBlock) ? checkpointBlock : 0,
   );
-  const scanFinalized = scan.countsLoaded === true;
-  const canClearCheckpoint = scanFinalized && (!Number.isFinite(checkpointBlock) || Number(scan.blockNumber) >= checkpointBlock);
+  const scanCoversCurrentActivity =
+    freshnessFloor === 0 || (Number.isFinite(scanBlock) && scanBlock >= freshnessFloor);
+  const scanFinalized = scan.countsLoaded === true && scanCoversCurrentActivity;
+  const newestCheckpoint = selectNewestCheckpoint(current.countsScanCheckpoint, scan.countsScanCheckpoint);
 
   return hydrateSbtActivityCacheEntry({
     ...current,
@@ -173,9 +192,7 @@ export const mergeSbtActivityCacheEntryCounts = (currentIn: unknown, scanIn: unk
     mintedEventCount,
     burnedEventCount,
     countsLoaded: current.countsLoaded === true || scanFinalized,
-    countsScanCheckpoint: canClearCheckpoint
-      ? null
-      : scan.countsScanCheckpoint || current.countsScanCheckpoint || null,
+    countsScanCheckpoint: scanFinalized ? null : newestCheckpoint,
     historySummary:
       buildSbtHistorySummaryFromCounts({
         mintedCountByAddress,

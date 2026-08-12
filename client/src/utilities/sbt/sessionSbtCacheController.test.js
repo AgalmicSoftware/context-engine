@@ -1655,6 +1655,168 @@ describe('createSessionSbtCacheController', () => {
     });
   });
 
+  describe('realtime event persistence', () => {
+    it('keeps distinct activity events that finish out of order behind a discovery watermark', async () => {
+      const olderMetadata = createDeferred();
+      const host = createMockHost({
+        initialStorage: {
+          sbtCache: {
+            alpha: {
+              11155420: { lastBlock: 100, sbtList: {} },
+            },
+          },
+        },
+      });
+      const controller = createSessionSbtCacheController(host);
+      contractScripts.getSbtMetadata
+        .mockReturnValueOnce(olderMetadata.promise)
+        .mockResolvedValueOnce(createCompleteSbtMetadata({ name: 'Newer event SBT' }));
+
+      const olderRun = controller.onSbtActivityDetectedForGroup(
+        'alpha',
+        '0xOlderSbt',
+        '0xOlderHolder',
+        false,
+        10,
+        { blockNumber: 10, transactionIndex: 0, logIndex: 1 },
+      );
+      const newerRun = controller.onSbtActivityDetectedForGroup(
+        'alpha',
+        '0xNewerSbt',
+        '0xNewerHolder',
+        false,
+        11,
+        { blockNumber: 11, transactionIndex: 0, logIndex: 1 },
+      );
+
+      await newerRun;
+      olderMetadata.resolve(createCompleteSbtMetadata({ name: 'Older event SBT' }));
+      await olderRun;
+
+      const networkCache = host.getStored('sbtCache', 'alpha')[11155420];
+      expect(networkCache.lastBlock).toBe(100);
+      expect(networkCache.lastRealtimeEventCursor).toEqual({ blockNumber: 11, transactionIndex: 0, logIndex: 1 });
+      expect(networkCache.recentRealtimeEventCursors).toEqual(
+        expect.arrayContaining([
+          { blockNumber: 10, transactionIndex: 0, logIndex: 1 },
+          { blockNumber: 11, transactionIndex: 0, logIndex: 1 },
+        ]),
+      );
+      expect(networkCache.sbtList).toEqual(
+        expect.objectContaining({
+          '0xoldersbt': expect.objectContaining({ mintedCountByAddress: { '0xolderholder': 1 } }),
+          '0xnewersbt': expect.objectContaining({ mintedCountByAddress: { '0xnewerholder': 1 } }),
+        }),
+      );
+    });
+
+    it('handles a rejected listener write and retries the same event', async () => {
+      const eventStreamsPort = {
+        listenForSBTEvents: jest.fn(),
+        removeSBTEventListener: jest.fn(),
+        listenForSurveyEvents: jest.fn(),
+        removeSurveyEventsListener: jest.fn(),
+        listenForSBTInstanceEvents: jest.fn(),
+        removeSBTInstanceEventsListener: jest.fn(),
+      };
+      const host = createMockHost({
+        sbtEventStreamsPort: eventStreamsPort,
+        initialStorage: {
+          sbtCache: {
+            alpha: {
+              11155420: {
+                lastBlock: 9,
+                sbtList: {
+                  '0xsbt': {
+                    sbtAddress: '0xSBT',
+                    sbtInfo: createCompleteSbtMetadata(),
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      const defaultAtomicWrite = host.updateSbtCacheAtomic.getMockImplementation();
+      const retryCompleted = createDeferred();
+      host.updateSbtCacheAtomic
+        .mockRejectedValueOnce(new Error('IndexedDB temporarily unavailable'))
+        .mockImplementation(async (...args) => {
+          const result = await defaultAtomicWrite(...args);
+          retryCompleted.resolve();
+          return result;
+        });
+      const controller = createSessionSbtCacheController(host);
+      controller.startSbtEventListenerForGroup('alpha');
+      const listener = eventStreamsPort.listenForSBTInstanceEvents.mock.calls[0][2];
+
+      expect(
+        listener({
+          address: '0xSBT',
+          args: { account: '0xHolder', burned: false },
+          blockNumber: 10,
+          transactionIndex: 0,
+          logIndex: 1,
+          eventSignature: 'SBTActivity(address,uint256,bool)',
+        }),
+      ).toBeUndefined();
+      await retryCompleted.promise;
+
+      expect(host.updateSbtCacheAtomic).toHaveBeenCalledTimes(2);
+      expect(host.getStored('sbtCache', 'alpha')[11155420].sbtList['0xsbt']).toMatchObject({
+        mintedCountByAddress: { '0xholder': 1 },
+        mintedEventCount: 1,
+      });
+      controller.destroy();
+    });
+
+    it('does not resurrect listener retries when an in-flight write rejects after destroy', async () => {
+      const eventStreamsPort = {
+        listenForSBTEvents: jest.fn(),
+        removeSBTEventListener: jest.fn(),
+        listenForSurveyEvents: jest.fn(),
+        removeSurveyEventsListener: jest.fn(),
+        listenForSBTInstanceEvents: jest.fn(),
+        removeSBTInstanceEventsListener: jest.fn(),
+      };
+      const writeDeferred = createDeferred();
+      const host = createMockHost({
+        sbtEventStreamsPort: eventStreamsPort,
+        initialStorage: {
+          sbtCache: {
+            alpha: {
+              11155420: {
+                lastBlock: 9,
+                sbtList: { '0xsbt': { sbtAddress: '0xSBT', sbtInfo: createCompleteSbtMetadata() } },
+              },
+            },
+          },
+        },
+      });
+      host.updateSbtCacheAtomic.mockReturnValueOnce(writeDeferred.promise);
+      const controller = createSessionSbtCacheController(host);
+      controller.startSbtEventListenerForGroup('alpha');
+      const listener = eventStreamsPort.listenForSBTInstanceEvents.mock.calls[0][2];
+
+      listener({
+        address: '0xSBT',
+        args: { account: '0xHolder', burned: false },
+        blockNumber: 10,
+        transactionIndex: 0,
+        logIndex: 1,
+        eventSignature: 'SBTActivity(address,uint256,bool)',
+      });
+      await waitForMockCall(host.updateSbtCacheAtomic);
+
+      controller.destroy();
+      jest.useFakeTimers();
+      writeDeferred.reject(new Error('write failed after teardown'));
+      await jest.advanceTimersByTimeAsync(300);
+
+      expect(host.updateSbtCacheAtomic).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('destroy', () => {
     it('clears progress token state so later updates are ignored', () => {
       const controller = createSessionSbtCacheController(createMockHost());

@@ -1013,12 +1013,14 @@ describe('createSessionProfileScanController', () => {
       expect(host.scanSpecificUserProfile).toHaveBeenCalledTimes(1);
     });
 
-    it('fires the scan immediately when no bootstrap is in flight', async () => {
+    it('defers a retry past the current in-flight scan when no bootstrap is in flight', async () => {
       const host = makeHost();
       const controller = createSessionProfileScanController(host);
 
       controller.scheduleProfileScanRetryAfterRegistryHydration(VALID_RETRY_ADDRESS, 'immediate');
 
+      expect(host.scanSpecificUserProfile).not.toHaveBeenCalled();
+      await flushMicrotasks();
       expect(host.scanSpecificUserProfile).not.toHaveBeenCalled();
 
       await waitForProfileScanCalls(host, 1);

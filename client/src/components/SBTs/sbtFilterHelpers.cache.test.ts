@@ -13,7 +13,7 @@ import {
 
 describe('sbtFilterHelpers cache helpers', () => {
   it('reads filter cache buckets and merges local questions through injected cache readers', () => {
-    const readCache = jest.fn((namespace: string, slug: string) => ({
+    const readCache = jest.fn((namespace: string, slug: string, _options?: { clone?: boolean }) => ({
       namespace,
       slug,
       84532: {
@@ -67,24 +67,23 @@ describe('sbtFilterHelpers cache helpers', () => {
       },
     };
 
-    expect(
-      buildSbtFilterSbtEntryCachePatch({
-        rawCache,
-        netKey: 84532,
-        sbtAddress: '0xabc',
-        entryPatch: {
-          countsLoaded: true,
-          mintedAddresses: ['0x2'],
-        },
-      }),
-    ).toEqual({
+    const patched = buildSbtFilterSbtEntryCachePatch({
+      rawCache,
+      netKey: 84532,
+      sbtAddress: '0xabc',
+      entryPatch: {
+        countsLoaded: true,
+        mintedAddresses: ['0x2'],
+      },
+    });
+    expect(patched).toMatchObject({
       untouched: true,
       '84532': {
         otherNetValue: 'keep',
         sbtList: {
           '0xabc': {
             name: 'Old',
-            mintedAddresses: ['0x2'],
+            mintedAddresses: ['0x1', '0x2'],
             countsLoaded: true,
           },
           '0xdef': {
@@ -104,6 +103,47 @@ describe('sbtFilterHelpers cache helpers', () => {
     ).toBeNull();
   });
 
+  it('preserves realtime counts and a newer checkpoint when a stale holder scan finishes', () => {
+    const patched = buildSbtFilterSbtEntryCachePatch({
+      rawCache: {
+        '84532': {
+          sbtList: {
+            '0xabc': {
+              blockNumber: 105,
+              countsLoaded: false,
+              countsScanCheckpoint: { blockNumber: 110, phase: 'activity' },
+              mintedAddresses: ['0xholder'],
+              mintedCountByAddress: { '0xholder': 2 },
+              mintedEventCount: 2,
+            },
+          },
+        },
+      },
+      netKey: 84532,
+      sbtAddress: '0xabc',
+      entryPatch: {
+        blockNumber: 100,
+        countsLoaded: true,
+        countsScanCheckpoint: null,
+        mintedAddresses: ['0xholder'],
+        mintedCountByAddress: { '0xholder': 1 },
+        mintedEventCount: 1,
+      },
+    });
+
+    expect(patched?.['84532']).toMatchObject({
+      sbtList: {
+        '0xabc': {
+          blockNumber: 105,
+          countsLoaded: false,
+          countsScanCheckpoint: { blockNumber: 110, phase: 'activity' },
+          mintedCountByAddress: { '0xholder': 2 },
+          mintedEventCount: 2,
+        },
+      },
+    });
+  });
+
   it('memoizes SBT cache reads by slug and resolves net buckets from the memo', () => {
     const rawCache = {
       '84532': {
@@ -113,7 +153,7 @@ describe('sbtFilterHelpers cache helpers', () => {
       },
     };
     const cacheBySlug = new Map<string, Record<string, unknown>>();
-    const readSbtCacheBySlug = jest.fn(() => rawCache);
+    const readSbtCacheBySlug = jest.fn((_slug?: unknown) => rawCache);
 
     const first = readMemoizedSbtFilterSbtCacheBySlug({
       cacheBySlug,

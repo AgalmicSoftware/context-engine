@@ -5,7 +5,7 @@ interface SbtRealtimeEventCursorGuardOptions {
   eventBlockNumber?: unknown;
   lastRealtimeEventCursor?: unknown;
   logIndex?: unknown;
-  overallLastBlockProcessedByNetwork?: unknown;
+  recentRealtimeEventCursors?: unknown;
   transactionIndex?: unknown;
 }
 
@@ -13,8 +13,7 @@ interface SbtRealtimeEventCursorGuardResult {
   eventBlockNumber?: unknown;
   eventCursor: SbtRealtimeEventCursor | null;
   lastRealtimeCursor: SbtRealtimeEventCursor | null;
-  overallLastBlockProcessedByNetwork?: unknown;
-  reason: 'cursor' | 'block' | '';
+  reason: 'cursor' | '';
   shouldSkip: boolean;
 }
 
@@ -22,7 +21,7 @@ export const getSbtRealtimeEventCursorGuard = ({
   eventBlockNumber = 0,
   lastRealtimeEventCursor = null,
   logIndex = undefined,
-  overallLastBlockProcessedByNetwork = 0,
+  recentRealtimeEventCursors = [],
   transactionIndex = undefined,
 }: SbtRealtimeEventCursorGuardOptions = {}): SbtRealtimeEventCursorGuardResult => {
   const eventCursor = normalizeSbtRealtimeEventCursor({
@@ -31,23 +30,19 @@ export const getSbtRealtimeEventCursorGuard = ({
     logIndex,
   });
   const lastRealtimeCursor = normalizeSbtRealtimeEventCursor(lastRealtimeEventCursor);
+  const recentCursors = Array.isArray(recentRealtimeEventCursors)
+    ? recentRealtimeEventCursors.map(normalizeSbtRealtimeEventCursor).filter(Boolean)
+    : [];
 
-  if (lastRealtimeCursor && eventCursor && compareSbtRealtimeEventCursor(eventCursor, lastRealtimeCursor) <= 0) {
+  if (
+    eventCursor &&
+    ((lastRealtimeCursor && compareSbtRealtimeEventCursor(eventCursor, lastRealtimeCursor) === 0) ||
+      recentCursors.some((cursor) => compareSbtRealtimeEventCursor(eventCursor, cursor) === 0))
+  ) {
     return {
       eventCursor,
       lastRealtimeCursor,
       reason: 'cursor',
-      shouldSkip: true,
-    };
-  }
-
-  if ((eventBlockNumber as number) < (overallLastBlockProcessedByNetwork as number)) {
-    return {
-      eventBlockNumber,
-      eventCursor,
-      lastRealtimeCursor,
-      overallLastBlockProcessedByNetwork,
-      reason: 'block',
       shouldSkip: true,
     };
   }

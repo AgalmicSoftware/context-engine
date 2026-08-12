@@ -189,6 +189,27 @@ const isMainSitePresent = <T>(value: T | null | undefined): value is T => value 
 
 const readMainSiteErrorMessage = (error: unknown): unknown => (error instanceof Error ? error.message : error);
 
+const isMainSiteProfilePersistenceFailure = (error: unknown): boolean =>
+  !!error && typeof error === 'object' && (error as { cachePersistenceFailed?: unknown }).cachePersistenceFailed === true;
+
+const persistMainSiteProfileCacheAtomic = async <TValue,>(
+  namespace: 'sbtCache' | 'userCache',
+  slug: string,
+  updater: (current: TValue | null) => TValue | Promise<TValue>,
+): Promise<TValue> => {
+  try {
+    const persisted = await updateCacheAtomic<TValue>(namespace, slug, updater);
+    if (persisted === null) throw new Error(`managed ${namespace} namespace unavailable`);
+    return persisted;
+  } catch (error) {
+    const failure = new Error(
+      `Failed to persist ${namespace} for ${slug}: ${error instanceof Error ? error.message : String(error)}`,
+    ) as Error & { cachePersistenceFailed?: boolean };
+    failure.cachePersistenceFailed = true;
+    throw failure;
+  }
+};
+
 const getMainSiteRuntimeGlobal = () =>
   globalThis as typeof globalThis & { __CE_PROFILE_SCAN_LAST_EVENT_SUMMARY__?: unknown };
 
@@ -371,6 +392,7 @@ export const runMainSiteScanSpecificUserProfile = async (
     });
 
     let newDataWritten = false; // track whether anything new was written to caches
+    let hadPersistenceFailure = false;
 
     const scanOneSlug = async (slug: string) => {
       const slugStartedAt = Date.now();
@@ -881,10 +903,6 @@ export const runMainSiteScanSpecificUserProfile = async (
           activity.surveyResponses.length > 0 ||
           activity.questionResponses.length > 0;
 
-        if (hasNewData) {
-          newDataWritten = true;
-        }
-
         // C. Update user cache (append delta with dedup)
         if (hasNewData) {
           // Ensure data object exists
@@ -983,12 +1001,8 @@ export const runMainSiteScanSpecificUserProfile = async (
           }
         }
 
-        if (!sbtHadRpcError && !activityHadRpcError && attemptedCoverageSlugSet.has(normalizedSlug)) {
-          pushUnique(report.scannedSlugs, slug);
-        }
-
         // Persist only this user/chain node so concurrent response writers survive the profile scan.
-        await updateCacheAtomic<MainSiteProfileUserCache>('userCache', slug, (currentIn) =>
+        await persistMainSiteProfileCacheAtomic<MainSiteProfileUserCache>('userCache', slug, (currentIn) =>
           mergeMainSiteProfileUserCache(currentIn, {
             chainEntry,
             netKey,
@@ -996,7 +1010,12 @@ export const runMainSiteScanSpecificUserProfile = async (
           }) as MainSiteProfileUserCache,
         );
 
-        if (!hasNewData) return;
+        if (!hasNewData) {
+          if (!sbtHadRpcError && !activityHadRpcError && attemptedCoverageSlugSet.has(normalizedSlug)) {
+            pushUnique(report.scannedSlugs, slug);
+          }
+          return;
+        }
 
         // D. Sync global caches (update UI)
         const metadataGroupRef = report.useAllSessionsActivityScan
@@ -1005,7 +1024,7 @@ export const runMainSiteScanSpecificUserProfile = async (
 
         // 1. Update SBT Cache
         if (sbts.length > 0) {
-          await updateCacheAtomic<MainSiteSbtMetadataCache>('sbtCache', slug, (currentIn) => {
+          await persistMainSiteProfileCacheAtomic<MainSiteSbtMetadataCache>('sbtCache', slug, (currentIn) => {
             const sbtCache = currentIn && typeof currentIn === 'object' ? { ...currentIn } : {};
             const currentNet = (
               sbtCache[netKey] && typeof sbtCache[netKey] === 'object' ? sbtCache[netKey] : { sbtList: {} }
@@ -1249,6 +1268,13 @@ export const runMainSiteScanSpecificUserProfile = async (
           host.DG.write('questionsCache', slug, qCache);
         }
 
+        // Only publish scan success after every cache write for this slug completed.
+        // Marking it earlier suppresses retries when persistence fails mid-scan.
+        newDataWritten = true;
+        if (!sbtHadRpcError && !activityHadRpcError && attemptedCoverageSlugSet.has(normalizedSlug)) {
+          pushUnique(report.scannedSlugs, slug);
+        }
+
         // Stream updates into UI as each slug finishes so profile sections can populate incrementally.
         host.queueLocalRevisionUpdate({
           needsSbtRevision: sbts.length > 0,
@@ -1259,7 +1285,11 @@ export const runMainSiteScanSpecificUserProfile = async (
             activity.questionResponses.length > 0,
         });
       } catch (err) {
-        report.hadRpcErrors = true;
+        if (isMainSiteProfilePersistenceFailure(err)) {
+          hadPersistenceFailure = true;
+        } else {
+          report.hadRpcErrors = true;
+        }
         pushUnique(report.failedSlugs, slug);
         pushUnique(report.failedActivitySlugs, slug);
         host.emitProfileScanTelemetry('slug-error', {
@@ -1319,7 +1349,14 @@ export const runMainSiteScanSpecificUserProfile = async (
           : totalActivityFailure
             ? 'activity-failure-all-slugs'
             : 'sbt-failure-all-slugs';
-      report.hadRpcErrors = true;
+      if (!hadPersistenceFailure) {
+        report.hadRpcErrors = true;
+        host.scheduleProfileScanRetryAfterRegistryHydration(target, report.coverageReason);
+      }
+    }
+    if (hadPersistenceFailure) {
+      report.coverageComplete = false;
+      report.coverageReason = 'cache-persistence-failed';
       host.scheduleProfileScanRetryAfterRegistryHydration(target, report.coverageReason);
     }
     const unresolvedListScopeChainIds =
@@ -1329,7 +1366,7 @@ export const runMainSiteScanSpecificUserProfile = async (
       report.attemptedSlugs.every(
         (slug: string) => String(report.skippedSlugReasons[String(slug || '')] || '') === 'missing-chain-id',
       );
-    if (unresolvedListScopeChainIds) {
+    if (unresolvedListScopeChainIds && !hadPersistenceFailure) {
       const registryRecoverableFailure = !!(
         registryStatus?.timedOut ||
         registryStatus?.hadLoadErrors ||
@@ -1401,7 +1438,7 @@ export const runMainSiteScanSpecificUserProfile = async (
     mainSiteLog.log(`[DeepSearch] Completed. Triggering UI update.`, report);
 
     // Force UI update by bumping revisions ONLY if something actually changed
-    if (host._mounted) {
+    if (host._mounted && !hadPersistenceFailure) {
       host.setState((prev: MainSiteState) => ({
         sbtCacheRevision: newDataWritten ? prev.sbtCacheRevision + 1 : prev.sbtCacheRevision,
         questionResponsesNonce: newDataWritten ? prev.questionResponsesNonce + 1 : prev.questionResponsesNonce,
