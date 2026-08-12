@@ -2013,3 +2013,20 @@
     }
   }
 }
+
+/* At compact-window widths, keep every Classic 95 section task button on the
+ * same two-line hierarchy: caret + title, then the subtitle below the title. */
+@media only screen and (min-width: 601px) and (max-width: 767px) {
+  @container ce-theme style(--ce-layout-profile: desktop-window) {
+    .sectionsGrid .sectionHeader {
+      align-items: flex-start;
+    }
+
+    .sectionsGrid .sectionHeaderText {
+      flex-direction: column;
+      align-items: flex-start;
+      flex-wrap: nowrap;
+      gap: 3px;
+    }
+  }
+}

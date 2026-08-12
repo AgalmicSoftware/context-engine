@@ -1400,6 +1400,11 @@ describe('OnePageSession view gating', () => {
       '@media only screen and (min-width: 601px) and (max-width: 767px)',
       '.sectionHeader {',
     );
+    const classicSmallTabletBlock = extractMediaBlock(
+      scss,
+      '@media only screen and (min-width: 601px) and (max-width: 767px)',
+      '@container ce-theme style(--ce-layout-profile: desktop-window)',
+    );
     const tabletBlock = extractMediaBlock(
       scss,
       '@media only screen and (min-width: 768px) and (max-width: 1024px)',
@@ -1491,6 +1496,13 @@ describe('OnePageSession view gating', () => {
     expect(smallTabletBlock).toContain('width: auto;');
     expect(smallTabletBlock).toContain('font-size: clamp(1.35rem, 4.2vw, 1.75rem);');
     expect(smallTabletBlock).not.toContain('.sectionContainer');
+    expect(classicSmallTabletBlock).toContain('.sectionsGrid .sectionHeader {');
+    expect(classicSmallTabletBlock).toContain('align-items: flex-start;');
+    expect(classicSmallTabletBlock).toContain('.sectionsGrid .sectionHeaderText {');
+    expect(classicSmallTabletBlock).toContain('flex-direction: column;');
+    expect(classicSmallTabletBlock).toContain('align-items: flex-start;');
+    expect(classicSmallTabletBlock).toContain('flex-wrap: nowrap;');
+    expect(classicSmallTabletBlock).toContain('gap: 3px;');
     expect(tabletBlock).toContain('.pileHeaderRow {');
     expect(tabletBlock).toContain('flex-wrap: nowrap;');
     expect(tabletBlock).toContain('.pileHeaderTitleWrap {');

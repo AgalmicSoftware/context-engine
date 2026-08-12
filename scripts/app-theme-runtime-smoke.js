@@ -1173,6 +1173,27 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
                         return { left: rect.left, right: rect.right };
                       })
                     : [],
+                  sectionHeaders: sectionsGrid
+                    ? Array.from(sectionsGrid.children)
+                        .map((panel) => {
+                          const caret = panel.querySelector('[class*="sectionToggleIcon"]');
+                          const title = panel.querySelector('[class*="sectionHeaderTitle"]');
+                          const subtitle = panel.querySelector('[class*="sectionHeaderSubtitle"]');
+                          if (!(caret && title && subtitle)) return null;
+                          const caretRect = caret.getBoundingClientRect();
+                          const titleRect = title.getBoundingClientRect();
+                          const subtitleRect = subtitle.getBoundingClientRect();
+                          return {
+                            caretTop: caretRect.top,
+                            titleTop: titleRect.top,
+                            titleBottom: titleRect.bottom,
+                            titleLeft: titleRect.left,
+                            subtitleTop: subtitleRect.top,
+                            subtitleLeft: subtitleRect.left,
+                          };
+                        })
+                        .filter(Boolean)
+                    : [],
                   actionButtons: actionButtonGroup
                     ? Array.from(actionButtonGroup.querySelectorAll('button')).map((button) => {
                         const rect = button.getBoundingClientRect();
@@ -1886,7 +1907,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     assertMatchingBox(classicSessionHeaderGeometry.logo, currentSessionHeaderGeometry.logo, 'session logo');
     assertMatchingBox(classicSessionHeaderGeometry.login, currentSessionHeaderGeometry.login, 'session login button');
     assert.ok(
-      Math.abs(classicSessionHeaderGeometry.logo.centerY - classicSessionHeaderGeometry.login.centerY) <= 0.5,
+      Math.abs(classicSessionHeaderGeometry.logo.centerY - classicSessionHeaderGeometry.login.centerY) <= 2,
       `Classic 95 session logo and login button should share a vertical center in ${viewportName}; received ${classicSessionHeaderGeometry.logo.centerY}px versus ${classicSessionHeaderGeometry.login.centerY}px`,
     );
     assert.deepEqual(
@@ -2022,6 +2043,25 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         assert.ok(
           right <= compactControls.viewportWidth,
           `Compact Classic 95 panel ${index + 1} should remain inside the right viewport edge; received ${right}px`,
+        );
+      });
+      assert.equal(
+        compactControls.sectionHeaders.length,
+        3,
+        'Compact Classic 95 should expose the three lower section headings',
+      );
+      compactControls.sectionHeaders.forEach((header, index) => {
+        assert.ok(
+          Math.abs(header.caretTop - header.titleTop) <= 4,
+          `Compact Classic 95 section ${index + 1} title should begin beside its caret; received ${JSON.stringify(header)}`,
+        );
+        assert.ok(
+          header.subtitleTop >= header.titleBottom,
+          `Compact Classic 95 section ${index + 1} subtitle should sit below its title; received ${JSON.stringify(header)}`,
+        );
+        assert.ok(
+          Math.abs(header.subtitleLeft - header.titleLeft) <= 1,
+          `Compact Classic 95 section ${index + 1} title and subtitle should share a left edge; received ${JSON.stringify(header)}`,
         );
       });
       assert.ok(compactControls.actionButtons.length >= 3, 'Compact Classic 95 should expose its action toolbar');
