@@ -1514,6 +1514,21 @@ describe('OnePageSession view gating', () => {
     expect(scss).toMatch(
       /@media only screen and \(min-width:\s*768px\) and \(max-width:\s*1024px\)\s*{[\s\S]*?\.sectionHeader \.sectionHeaderText\s*{[\s\S]*?flex-direction:\s*column;[\s\S]*?align-items:\s*flex-start;/,
     );
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.sectionsGrid \.sectionExpanded \.sectionHeaderRow\s*{[\s\S]*?align-items:\s*center;[\s\S]*?gap:\s*8px 12px;/,
+    );
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.sectionsGrid \.sectionExpanded \.sectionHeader\s*{[\s\S]*?flex:\s*1 1 180px;[\s\S]*?width:\s*auto;/,
+    );
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.sectionsGrid \.sectionExpanded \.sectionHeaderActionsScroller\s*{[\s\S]*?flex:\s*0 0 auto;[\s\S]*?width:\s*auto;[\s\S]*?max-width:\s*100%;[\s\S]*?padding-left:\s*0;/,
+    );
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.sectionsGrid \.sectionExpanded \.resultsModeActionsScroller\s*{[\s\S]*?flex:\s*1 1 260px;[\s\S]*?width:\s*auto;[\s\S]*?min-width:\s*0;/,
+    );
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.sectionsGrid \.sectionExpanded \.resultsModeActions\s*{[\s\S]*?display:\s*flex;[\s\S]*?min-width:\s*max-content;/,
+    );
   });
 
   it('shows groups header actions only while expanded and drives embedded create state from the header', async () => {

@@ -1127,6 +1127,13 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
               const pileControls = pileActions?.parentElement;
               const pileNav = pileControls?.querySelector('[class*="pileNav"]');
               const sectionsGrid = document.querySelector('[class*="sectionsGrid"]');
+              const expandedSection = sectionsGrid?.querySelector('[class*="sectionExpanded"]');
+              const expandedHeaderRow = expandedSection?.querySelector('[class*="sectionHeaderRow"]');
+              const expandedHeader = expandedHeaderRow?.querySelector('h2');
+              const expandedActionsScroller = expandedHeaderRow?.querySelector(
+                '[class*="sectionHeaderActionsScroller"]',
+              );
+              const expandedActions = expandedActionsScroller?.querySelector('[class*="sectionHeaderActions"]');
               const iconControlState = (label, selector) => {
                 const element = document.querySelector(selector);
                 if (!element) return { label, exists: false };
@@ -1171,6 +1178,16 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
                   navBoxShadow: pileNav ? window.getComputedStyle(pileNav).boxShadow : '',
                   controlsBottom: pileControls?.getBoundingClientRect().bottom || 0,
                   panelsTop: sectionsGrid?.getBoundingClientRect().top || 0,
+                  expandedHeaderLayout:
+                    expandedHeaderRow && expandedHeader && expandedActionsScroller && expandedActions
+                      ? {
+                          rowHeight: expandedHeaderRow.getBoundingClientRect().height,
+                          headerTop: expandedHeader.getBoundingClientRect().top,
+                          actionsTop: expandedActionsScroller.getBoundingClientRect().top,
+                          actionsDisplay: window.getComputedStyle(expandedActions).display,
+                          actionsOverflowX: window.getComputedStyle(expandedActionsScroller).overflowX,
+                        }
+                      : null,
                   panelBounds: sectionsGrid
                     ? Array.from(sectionsGrid.children).map((panel) => {
                         const rect = panel.getBoundingClientRect();
@@ -2060,6 +2077,30 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       assert.ok(
         compactControls.controlsBottom <= compactControls.panelsTop,
         `Compact Classic 95 controls should not cover lower panels; received ${compactControls.controlsBottom}px versus ${compactControls.panelsTop}px`,
+      );
+      assert.ok(
+        compactControls.expandedHeaderLayout,
+        'Compact Classic 95 should expose its expanded lower-section header layout',
+      );
+      assert.ok(
+        Math.abs(
+          compactControls.expandedHeaderLayout.headerTop - compactControls.expandedHeaderLayout.actionsTop,
+        ) <= 8,
+        `Compact Classic 95 expanded-section actions should stay inline when they fit; received ${JSON.stringify(compactControls.expandedHeaderLayout)}`,
+      );
+      assert.ok(
+        compactControls.expandedHeaderLayout.rowHeight <= 64,
+        `Compact Classic 95 expanded-section headers should not waste a second row; received ${JSON.stringify(compactControls.expandedHeaderLayout)}`,
+      );
+      assert.equal(
+        compactControls.expandedHeaderLayout.actionsDisplay,
+        'flex',
+        'Compact Classic 95 expanded-section actions should remain a horizontal strip',
+      );
+      assert.equal(
+        compactControls.expandedHeaderLayout.actionsOverflowX,
+        'auto',
+        'Compact Classic 95 expanded-section actions should scroll only when they cannot fit',
       );
       compactControls.panelBounds.forEach(({ left, right }, index) => {
         assert.ok(left >= 0, `Compact Classic 95 panel ${index + 1} should remain inside the left viewport edge`);

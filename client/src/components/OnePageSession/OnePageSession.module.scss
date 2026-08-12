@@ -1989,6 +1989,44 @@
     min-height: 0;
   }
 
+  .sectionsGrid .sectionExpanded .sectionHeaderRow {
+    align-items: center;
+    gap: 8px 12px;
+  }
+
+  .sectionsGrid .sectionExpanded .sectionHeader {
+    flex: 1 1 180px;
+    width: auto;
+  }
+
+  .sectionsGrid .sectionExpanded .sectionHeaderActionsScroller {
+    flex: 0 0 auto;
+    width: auto;
+    max-width: 100%;
+    padding-left: 0;
+  }
+
+  .sectionsGrid .sectionExpanded .resultsModeActionsScroller {
+    flex: 1 1 260px;
+    width: auto;
+    min-width: 0;
+    padding: 6px 0;
+  }
+
+  .sectionsGrid .sectionExpanded .resultsModeActions {
+    display: flex;
+    width: auto;
+    min-width: max-content;
+    gap: 8px;
+  }
+
+  .sectionsGrid .sectionExpanded .resultsModeActions .sectionHeaderViewModeButton {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 132px;
+    white-space: nowrap;
+  }
+
   .miniSectionContent {
     margin-top: 8px;
     padding: 10px;
