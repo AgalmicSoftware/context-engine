@@ -2,7 +2,12 @@ import { ethers } from 'ethers';
 
 import demoSessions from '../../variables/demo/demo_sessions.json';
 import demo1OnchainQuestionIds from '../../variables/demo/demo_1_onchain_question_ids.json';
-import { getTemporaryDemoSessionQuestionFixtures } from './demoSessionQuestionFixtures.js';
+import demo2PolisData from '../../variables/demo/demo_2_polis_data.json';
+import {
+  getDemoFixtureQuestionIdsByIndex,
+  getTemporaryDemoSessionQuestionFixtures,
+} from './demoSessionQuestionFixtures.js';
+import { classifySessionModeProfileSupport } from './sessionModeProfile';
 
 describe('getTemporaryDemoSessionQuestionFixtures', () => {
   it('maps the demo polis comments to temporary demo-1 question metadata', () => {
@@ -128,5 +133,94 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
         questionCount: 42,
       },
     });
+  });
+
+  it('seeds all 40 typed demo-2 questions with deterministic fixture ids', () => {
+    const questions = getTemporaryDemoSessionQuestionFixtures('demo-2', {
+      sessionName: 'Living With Artificial Minds',
+      demoCompatibilitySeed: { temporary: true },
+    });
+    const comments = demo2PolisData.comments as Array<{ commentId: string; type: string }>;
+    const typeCounts = questions.reduce<Record<string, number>>((counts, question) => {
+      counts[String(question.type)] = (counts[String(question.type)] || 0) + 1;
+      return counts;
+    }, {});
+
+    expect(questions).toHaveLength(40);
+    expect(typeCounts).toEqual({ binary: 27, rating: 5, multichoice: 4, freeform: 4 });
+    expect(questions.map((question) => question.id)).toEqual(
+      comments.map((comment) => ethers.utils.id(`demo-2:${comment.commentId}`)),
+    );
+    expect(questions[0]).toMatchObject({
+      sessionName: 'Living With Artificial Minds',
+      sessionSlug: 'demo-2',
+      temporaryDemoSeed: true,
+      cloudflareDemoSeed: false,
+      demoFixture: {
+        sourceSessionSlug: 'demo-2',
+        fixtureFile: 'client/src/variables/demo/demo_2_polis_data.json',
+        onchainQuestionIdsFile: '',
+      },
+    });
+    expect(getDemoFixtureQuestionIdsByIndex('demo-2')).toEqual(
+      questions.map((question) => question.id.toLowerCase()),
+    );
+  });
+
+  it('keeps the checked-in demo-2 config on the fixture-only preview path', () => {
+    const config = (demoSessions as Record<string, any>)['demo-2'];
+    const questions = getTemporaryDemoSessionQuestionFixtures('demo-2', config);
+
+    expect(questions).toHaveLength(40);
+    expect(config).toMatchObject({
+      slug: 'demo-2',
+      corsWorkerUrl: '',
+      demoCompatibilitySeed: {
+        temporary: true,
+        questionCount: 40,
+      },
+    });
+    expect(config.demoCompatibilitySeed.workerCanonical).toBeUndefined();
+    expect(questions[0]).toMatchObject({ temporaryDemoSeed: true, cloudflareDemoSeed: false });
+  });
+
+  it('preserves each demo-2 poll choice list and rating scale', () => {
+    const questions = getTemporaryDemoSessionQuestionFixtures('demo-2');
+    const comments = demo2PolisData.comments as Array<{
+      options?: string[];
+      scale?: { min: number; max: number };
+      type: string;
+    }>;
+    const pollQuestions = questions.filter((question) => question.type === 'multichoice');
+    const ratingQuestions = questions.filter((question) => question.type === 'rating');
+
+    expect(pollQuestions.map((question) => question.options)).toEqual(
+      comments.filter((comment) => comment.type === 'poll').map((comment) => comment.options),
+    );
+    expect(new Set(pollQuestions.map((question) => JSON.stringify(question.options))).size).toBe(4);
+    expect(ratingQuestions.map((question) => question.scale)).toEqual(
+      comments.filter((comment) => comment.type === 'rating').map((comment) => comment.scale),
+    );
+  });
+
+  it('derives canonical-worker behavior from the seed config for every fixture slug', () => {
+    const questions = getTemporaryDemoSessionQuestionFixtures('demo-2', {
+      demoCompatibilitySeed: { temporary: false, workerCanonical: true },
+    });
+
+    expect(questions).toHaveLength(40);
+    questions.forEach((question) => {
+      expect(question).toMatchObject({
+        temporaryDemoSeed: false,
+        cloudflareDemoSeed: true,
+        demoFixture: { workerCanonical: true },
+      });
+    });
+  });
+
+  it('keeps legacy fixture ids stable across demo-1 and demo-sh', () => {
+    expect(getDemoFixtureQuestionIdsByIndex('demo-1')).toEqual(demo1OnchainQuestionIds);
+    expect(getDemoFixtureQuestionIdsByIndex('demo-sh')).toEqual(demo1OnchainQuestionIds);
+    expect(getDemoFixtureQuestionIdsByIndex('demo')).toEqual([]);
   });
 });
