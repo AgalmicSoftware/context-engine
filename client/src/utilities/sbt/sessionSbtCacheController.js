@@ -1891,6 +1891,8 @@ export const createSessionSbtCacheController = (host = {}) => {
 
       let applied = false;
       await updateSbtNetworkCacheAtomic(slug, networkID, initialLastBlockSBT, (freshNetwork) => {
+        // Regression guard: evaluate the cursor against the atomic snapshot;
+        // a pre-queue guard can admit an older event that lost the race.
         const cursorGuard = getSbtRealtimeEventCursorGuard({
           eventBlockNumber,
           lastRealtimeEventCursor: freshNetwork.lastRealtimeEventCursor,
@@ -2004,6 +2006,8 @@ export const createSessionSbtCacheController = (host = {}) => {
 
     let applied = false;
     await updateSbtNetworkCacheAtomic(slug, networkID, initialLastBlockSBT, (freshNetwork) => {
+      // Regression guard: discovery lastBlock is not a realtime cursor. Keep
+      // event ordering separate so future discovery ranges are not skipped.
       const cursorGuard = getSbtRealtimeEventCursorGuard({
         eventBlockNumber,
         lastRealtimeEventCursor: freshNetwork.lastRealtimeEventCursor,

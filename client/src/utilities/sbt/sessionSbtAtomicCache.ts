@@ -65,6 +65,8 @@ export const createSessionSbtAtomicCacheWriter = ({
     callPort(host.updateSbtCacheAtomic, 'sbtCache', slug, updater);
   const updateUserCacheAtomic = (slug: string, updater: CacheUpdater) =>
     callPort(host.updateUserCacheAtomic, 'userCache', slug, updater);
+  // Regression guard: mutate the latest queued snapshot by network. Feeding a
+  // previously-read whole cache here erases concurrent realtime or scan work.
   const updateSbtNetworkCacheAtomic = (
     slug: string,
     networkID: string,
@@ -132,6 +134,8 @@ export const createSessionSbtCheckpointWriteQueue = <T>({
   let pending: T | null = null;
   let lastWriteMs = 0;
   let chain: Promise<unknown> = Promise.resolve();
+  // Regression guard: checkpoint writes must remain ordered and awaitable;
+  // fire-and-forget writes can land after the final entry and make scans rewind.
   const flush = ({ force = false } = {}) => {
     if (pending === null) return chain;
     const nowMs = Date.now();
