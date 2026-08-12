@@ -2300,6 +2300,38 @@ describe('AppShell route render smoke', () => {
     expect(subject.resolveSessionPathSlug).not.toHaveBeenCalled();
   });
 
+  it('initializes canonical Worker caches under the config slug behind /session/demo', async () => {
+    const demoConfig = buildSessionConfig({
+      slug: 'demo-sh',
+      sessionId: '0xb822b3eca85bdc35cf83cb947bceb6b2',
+      sessionName: 'Demo Session',
+      __registry: undefined,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    });
+    const subject = createSubject({
+      path: '/session/demo',
+      activeSessionSlug: 'demo-sh',
+      sessionConfig: null,
+    });
+    subject.getCacheSessionCfg = jest.fn(() => demoConfig);
+    subject.startCacheReinitRun = jest.fn(() => 1);
+    subject.isCacheReinitRunActive = jest.fn(() => true);
+    subject.initializeQuestionCacheForGroup = jest.fn(async () => undefined);
+    subject.fetchQuestionResponsesChunkedForGroup = jest.fn(async () => undefined);
+    subject.initializeSurveyCacheForGroup = jest.fn(async () => undefined);
+    subject.initializeSbtCacheForGroup = jest.fn(async () => undefined);
+    subject.startSbtEventListenerForGroup = jest.fn();
+    subject.setReadinessStateIfChanged = jest.fn();
+    subject.checkAllCachesReady = jest.fn();
+
+    await expect(subject.initializeWorkerCanonicalCachesForGroup('demo')).resolves.toBe(true);
+
+    expect(subject.getCacheSessionCfg).toHaveBeenCalledWith('demo');
+    expect(subject.initializeQuestionCacheForGroup).toHaveBeenCalledWith('demo-sh');
+    expect(subject.fetchQuestionResponsesChunkedForGroup).toHaveBeenCalledWith('demo-sh');
+    expect(subject.initializeSurveyCacheForGroup).toHaveBeenCalledWith('demo-sh');
+  });
+
   it('uses registry-backed /session/demo metadata instead of the placeholder display fallback', async () => {
     const registryConfig = buildSessionConfig({
       slug: 'demo',

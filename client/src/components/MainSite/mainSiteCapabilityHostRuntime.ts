@@ -72,6 +72,11 @@ export const initializeMainSiteWorkerCanonicalCachesForGroup = async (
   const sessionConfig = host.getCacheSessionCfg(slug);
   const projection = resolveSessionCapabilityProjection(sessionConfig);
   if (!projection.profileValid || !projection.isWorkerCanonical) return false;
+  const configuredSlug = normalizeSessionSlug(sessionConfig?.slug ?? '');
+  // A public route alias may resolve to a different canonical Worker session.
+  // Cache/storage calls must use the config-owned slug so exact authority checks
+  // cannot write under the alias bucket or reject an otherwise valid session.
+  const cacheSlug = configuredSlug || slug;
 
   const cacheReinitRunToken = host.startCacheReinitRun();
   const isCurrent = () => host.isCacheReinitRunActive(cacheReinitRunToken);
@@ -93,7 +98,7 @@ export const initializeMainSiteWorkerCanonicalCachesForGroup = async (
     await initializeMainSiteWorkerCanonicalCaches({
       host,
       sessionConfig,
-      sessionSlug: slug,
+      sessionSlug: cacheSlug,
       isCurrent,
     });
     if (isCurrent()) host.checkAllCachesReady();
