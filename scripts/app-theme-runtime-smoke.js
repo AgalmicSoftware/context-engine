@@ -1164,7 +1164,11 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
                     ? window.getComputedStyle(actionButtonGroup).flexDirection
                     : '',
                   actionsBackground: pileActions ? window.getComputedStyle(pileActions).backgroundColor : '',
+                  actionsBorderWidth: pileActions ? window.getComputedStyle(pileActions).borderTopWidth : '',
+                  actionsBoxShadow: pileActions ? window.getComputedStyle(pileActions).boxShadow : '',
                   navBackground: pileNav ? window.getComputedStyle(pileNav).backgroundColor : '',
+                  navBorderWidth: pileNav ? window.getComputedStyle(pileNav).borderTopWidth : '',
+                  navBoxShadow: pileNav ? window.getComputedStyle(pileNav).boxShadow : '',
                   controlsBottom: pileControls?.getBoundingClientRect().bottom || 0,
                   panelsTop: sectionsGrid?.getBoundingClientRect().top || 0,
                   panelBounds: sectionsGrid
@@ -1204,6 +1208,18 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
                           height: rect.height,
                           opacity: Number(style.opacity),
                           pointerEvents: style.pointerEvents,
+                          width: rect.width,
+                        };
+                      })
+                    : [],
+                  navButtons: pileNav
+                    ? Array.from(pileNav.querySelectorAll('button')).map((button) => {
+                        const rect = button.getBoundingClientRect();
+                        const style = window.getComputedStyle(button);
+                        return {
+                          color: style.color,
+                          height: rect.height,
+                          opacity: Number(style.opacity),
                           width: rect.width,
                         };
                       })
@@ -2026,14 +2042,18 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       assert.equal(compactControls.actionGroupDirection, 'row', 'Compact Classic 95 actions should form a toolbar');
       assert.equal(
         compactControls.actionsBackground,
-        'rgb(192, 192, 192)',
-        'Compact Classic 95 actions should use the standard high-contrast control face',
+        'rgba(0, 0, 0, 0)',
+        'Compact Classic 95 actions should sit directly on the session background',
       );
+      assert.equal(compactControls.actionsBorderWidth, '0px', 'Compact Classic 95 actions should not have a rail border');
+      assert.equal(compactControls.actionsBoxShadow, 'none', 'Compact Classic 95 actions should not have a rail shadow');
       assert.equal(
         compactControls.navBackground,
-        'rgb(192, 192, 192)',
-        'Compact Classic 95 navigation should use the standard high-contrast control face',
+        'rgba(0, 0, 0, 0)',
+        'Compact Classic 95 navigation should sit directly on the session background',
       );
+      assert.equal(compactControls.navBorderWidth, '0px', 'Compact Classic 95 navigation should not have a rail border');
+      assert.equal(compactControls.navBoxShadow, 'none', 'Compact Classic 95 navigation should not have a rail shadow');
       assert.ok(
         compactControls.controlsBottom <= compactControls.panelsTop,
         `Compact Classic 95 controls should not cover lower panels; received ${compactControls.controlsBottom}px versus ${compactControls.panelsTop}px`,
@@ -2069,12 +2089,25 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         assert.notEqual(button.display, 'none', `Compact Classic 95 action ${index + 1} should be visible`);
         assert.ok(button.width >= 40, `Compact Classic 95 action ${index + 1} should have a usable width`);
         assert.ok(button.height >= 40, `Compact Classic 95 action ${index + 1} should have a usable height`);
-        assert.equal(button.color, 'rgb(0, 0, 0)', `Compact Classic 95 action ${index + 1} should be black`);
-        assert.equal(button.opacity, 1, `Compact Classic 95 action ${index + 1} should be fully opaque`);
+        assert.equal(button.color, 'rgb(255, 255, 255)', `Compact Classic 95 action ${index + 1} should be white`);
+        assert.ok(
+          button.opacity >= 0.5,
+          `Compact Classic 95 action ${index + 1} should remain legible; received opacity ${button.opacity}`,
+        );
         assert.notEqual(
           button.pointerEvents,
           'none',
           `Compact Classic 95 action ${index + 1} should accept pointer input`,
+        );
+      });
+      assert.equal(compactControls.navButtons.length, 2, 'Compact Classic 95 should expose both navigation arrows');
+      compactControls.navButtons.forEach((button, index) => {
+        assert.ok(button.width >= 40, `Compact Classic 95 navigation ${index + 1} should have a usable width`);
+        assert.ok(button.height >= 40, `Compact Classic 95 navigation ${index + 1} should have a usable height`);
+        assert.equal(button.color, 'rgb(255, 255, 255)', `Compact Classic 95 navigation ${index + 1} should be white`);
+        assert.ok(
+          button.opacity >= 0.5,
+          `Compact Classic 95 navigation ${index + 1} should remain legible; received opacity ${button.opacity}`,
         );
       });
     }

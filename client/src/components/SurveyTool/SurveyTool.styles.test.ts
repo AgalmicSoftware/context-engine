@@ -82,7 +82,13 @@ describe('SurveyTool styles', () => {
       /\.pileActionsMenuEligible \.pileActionButtonGroup,[\s\S]*?\.pileActionsMenuEligible:hover \.pileActionButtonGroup\s*{[\s\S]*?position:\s*static;[\s\S]*?display:\s*flex;[\s\S]*?flex-direction:\s*row;[\s\S]*?background:\s*transparent;[\s\S]*?box-shadow:\s*none;/,
     );
     expect(scss).toMatch(
-      /@media \(max-width: 768px\)\s*{\s*@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.pileControls > \.pileActions,\s*\.pileControls > \.pileNav\s*{[\s\S]*?background:\s*var\(--ce-control-face\);[\s\S]*?color:\s*var\(--ce-control-text\);/,
+      /@media \(max-width: 768px\)\s*{\s*@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.pileControls > \.pileActions,\s*\.pileControls > \.pileNav\s*{[\s\S]*?border:\s*0;[\s\S]*?background:\s*transparent;[\s\S]*?box-shadow:\s*none;[\s\S]*?color:\s*var\(--ce-color-white\);/,
+    );
+    expect(scss).toMatch(
+      /\.pileActions \.pileActionButtonGroup \.actionButton\s*{[\s\S]*?color:\s*var\(--ce-color-white\);[\s\S]*?opacity:\s*1;/,
+    );
+    expect(scss).toMatch(
+      /\.pileNav \.pileNavArrow,\s*\.pileNav \.pileNavCounterText\s*{[\s\S]*?color:\s*var\(--ce-color-white\);/,
     );
   });
 

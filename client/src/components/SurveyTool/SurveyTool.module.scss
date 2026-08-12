@@ -4572,11 +4572,10 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
       transform: none;
       min-width: 0;
       padding: 4px 6px;
-      border: 2px solid;
-      border-color: var(--ce-border-raised);
-      background: var(--ce-control-face);
-      box-shadow: var(--ce-shadow-raised);
-      color: var(--ce-control-text);
+      border: 0;
+      background: transparent;
+      box-shadow: none;
+      color: var(--ce-color-white);
     }
 
     .pileActions {
@@ -4602,10 +4601,28 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
       box-shadow: none;
     }
 
-    .pileActionsMenuEligible .pileActionButtonGroup .actionButton {
+    .pileActions .pileActionButtonGroup .actionButton {
       width: 42px;
       height: 42px;
-      color: var(--ce-control-text);
+      color: var(--ce-color-white);
+      opacity: 1;
+    }
+
+    .pileActions .pileActionButtonGroup .actionButton:hover:not(:disabled),
+    .pileActions .pileActionButtonGroup .actionButton:focus-visible,
+    .pileNav .pileNavArrow:hover:not(:disabled),
+    .pileNav .pileNavArrow:focus-visible {
+      color: var(--ce-color-white);
+    }
+
+    .pileNav .pileNavArrow,
+    .pileNav .pileNavCounterText {
+      color: var(--ce-color-white);
+    }
+
+    .pileActions .pileActionButtonGroup .actionButton:disabled,
+    .pileNav .pileNavArrow:disabled {
+      color: var(--ce-color-white);
       opacity: 1;
     }
 
