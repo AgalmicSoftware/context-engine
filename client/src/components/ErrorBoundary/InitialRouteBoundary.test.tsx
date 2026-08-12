@@ -20,8 +20,8 @@ const createDeferredModule = (): DeferredModule => {
 };
 
 describe('InitialRouteBoundary', () => {
-  let clearSpy: jest.SpyInstance;
-  let consoleSpy: jest.SpyInstance;
+  let clearSpy: jest.SpiedFunction<typeof bootRecovery.clearStaleChunkReloadMarker>;
+  let consoleSpy: jest.SpiedFunction<typeof console.error>;
 
   beforeEach(() => {
     clearSpy = jest.spyOn(bootRecovery, 'clearStaleChunkReloadMarker').mockReturnValue(true);
