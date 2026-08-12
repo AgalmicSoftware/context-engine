@@ -13,6 +13,7 @@ const DEMO_DIR = path.join(__dirname, '..', 'client', 'src', 'variables', 'demo'
 const QUESTION_SET_PATH = path.join(DEMO_DIR, 'demo_2_question_set.json');
 const STANCES_PATH = path.join(DEMO_DIR, 'demo_2_persona_stances.json');
 const COMMITTED_FIXTURE_PATH = path.join(DEMO_DIR, 'demo_2_polis_data.json');
+const COMMITTED_QUESTION_SEED_PATH = path.join(DEMO_DIR, 'demo_2_question_seed.json');
 
 const readJson = (filePath) => JSON.parse(fs.readFileSync(filePath, 'utf8'));
 
@@ -35,13 +36,35 @@ function withTempDir(callback) {
 test('regenerating from committed inputs is a byte-identical no-op', () => {
   withTempDir((tempDir) => {
     const outputPath = path.join(tempDir, 'out.json');
-    const result = runGenerator({ DEMO2_OUTPUT_PATH: outputPath });
+    const questionSeedOutputPath = path.join(tempDir, 'question-seed.json');
+    const result = runGenerator({
+      DEMO2_OUTPUT_PATH: outputPath,
+      DEMO2_QUESTION_SEED_OUTPUT_PATH: questionSeedOutputPath,
+    });
     assert.equal(result.status, 0, result.stderr);
     assert.equal(
       fs.readFileSync(outputPath, 'utf8'),
       fs.readFileSync(COMMITTED_FIXTURE_PATH, 'utf8')
     );
+    assert.equal(
+      fs.readFileSync(questionSeedOutputPath, 'utf8'),
+      fs.readFileSync(COMMITTED_QUESTION_SEED_PATH, 'utf8')
+    );
   });
+});
+
+test('compact question seed is the exact session and comments projection', () => {
+  const fixture = readJson(COMMITTED_FIXTURE_PATH);
+  const questionSeed = readJson(COMMITTED_QUESTION_SEED_PATH);
+
+  assert.deepEqual(Object.keys(questionSeed), ['session', 'comments']);
+  assert.deepEqual(questionSeed, {
+    session: fixture.session,
+    comments: fixture.comments,
+  });
+  assert.equal(questionSeed.comments.length, 40);
+  assert.equal('participantsVotes' in questionSeed, false);
+  assert.equal('clusterAnalysis' in questionSeed, false);
 });
 
 function runWithCorruptedQuestionSet(tempDir, mutate) {
@@ -50,11 +73,13 @@ function runWithCorruptedQuestionSet(tempDir, mutate) {
   const corruptPath = path.join(tempDir, 'question_set.json');
   fs.writeFileSync(corruptPath, JSON.stringify(questionSet));
   const outputPath = path.join(tempDir, 'out.json');
+  const questionSeedOutputPath = path.join(tempDir, 'question-seed.json');
   const result = runGenerator({
     DEMO2_QUESTION_SET_PATH: corruptPath,
     DEMO2_OUTPUT_PATH: outputPath,
+    DEMO2_QUESTION_SEED_OUTPUT_PATH: questionSeedOutputPath,
   });
-  return { result, outputPath };
+  return { result, outputPath, questionSeedOutputPath };
 }
 
 function runWithCorruptedStances(tempDir, mutate) {
@@ -63,22 +88,25 @@ function runWithCorruptedStances(tempDir, mutate) {
   const corruptPath = path.join(tempDir, 'stances.json');
   fs.writeFileSync(corruptPath, JSON.stringify(stances));
   const outputPath = path.join(tempDir, 'out.json');
+  const questionSeedOutputPath = path.join(tempDir, 'question-seed.json');
   const result = runGenerator({
     DEMO2_STANCES_PATH: corruptPath,
     DEMO2_OUTPUT_PATH: outputPath,
+    DEMO2_QUESTION_SEED_OUTPUT_PATH: questionSeedOutputPath,
   });
-  return { result, outputPath };
+  return { result, outputPath, questionSeedOutputPath };
 }
 
 test('fails closed on an empty rating scale without writing output', () => {
   withTempDir((tempDir) => {
-    const { result, outputPath } = runWithCorruptedQuestionSet(tempDir, (questionSet) => {
+    const { result, outputPath, questionSeedOutputPath } = runWithCorruptedQuestionSet(tempDir, (questionSet) => {
       const rating = questionSet.questions.find((question) => question.type === 'rating');
       rating.scale = {};
     });
     assert.equal(result.status, 1);
     assert.match(result.stderr, /scale\.min/);
     assert.equal(fs.existsSync(outputPath), false);
+    assert.equal(fs.existsSync(questionSeedOutputPath), false);
   });
 });
 
@@ -155,13 +183,16 @@ test('fails closed when distinct xids resolve to a duplicate address', () => {
     const corruptLegacyPath = path.join(tempDir, 'legacy_polis.json');
     fs.writeFileSync(corruptLegacyPath, JSON.stringify(legacyPolis));
     const outputPath = path.join(tempDir, 'out.json');
+    const questionSeedOutputPath = path.join(tempDir, 'question-seed.json');
     const result = runGenerator({
       DEMO2_LEGACY_POLIS_PATH: corruptLegacyPath,
       DEMO2_OUTPUT_PATH: outputPath,
+      DEMO2_QUESTION_SEED_OUTPUT_PATH: questionSeedOutputPath,
     });
     assert.equal(result.status, 1);
     assert.match(result.stderr, /resolves to an address already used/);
     assert.equal(fs.existsSync(outputPath), false);
+    assert.equal(fs.existsSync(questionSeedOutputPath), false);
   });
 });
 

@@ -1,5 +1,5 @@
 import demoPolisData from '../../variables/demo/demo_polis_data.json';
-import { LEGACY_DEMO_POLL_OPTIONS } from '../../utilities/demo/demoPolisDatasets';
+import { LEGACY_DEMO_POLL_OPTIONS } from '../../utilities/demo/demoQuestionSemantics';
 import {
   buildPolisDemoQuestionPool,
   resolvePolisDemoQuestionPool,

@@ -149,7 +149,7 @@ describe('client package modernization contract', () => {
     expect(contractSourceLoader).not.toContain('!!raw-loader!');
   });
 
-  it('keeps Vite vendor chunk policy explicit', () => {
+  it('keeps Vite manual chunk policy explicit', () => {
     const viteConfig = readClientFile('vite.config.mjs');
     const expectedVendorChunks = [
       'vendor-react',
@@ -168,6 +168,7 @@ describe('client package modernization contract', () => {
       'vendor-ui',
       'vendor-polyfills',
       'vendor-misc',
+      'demo-2-question-seed',
     ];
 
     expect(viteConfig).toContain('export const resolveManualChunk');
@@ -181,6 +182,7 @@ describe('client package modernization contract', () => {
     expect(viteConfig).not.toContain("'/node_modules/poseidon-lite/constants/4.js'");
     expect(viteConfig).not.toContain("'/node_modules/poseidon-lite/constants/16.js'");
     expect(viteConfig).not.toContain('vendor-lit');
+    expect(viteConfig).toContain("'/src/variables/demo/demo_2_question_seed.json'");
     expect(viteConfig).toContain("'/node_modules/hash.js/'");
     expect(viteConfig).toContain("'/node_modules/inherits/'");
     expect(viteConfig).toContain("'/node_modules/minimalistic-assert/'");

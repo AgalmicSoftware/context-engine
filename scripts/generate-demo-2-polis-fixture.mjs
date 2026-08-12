@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// Generates client/src/variables/demo/demo_2_polis_data.json from the
+// Generates the full demo-2 Polis data and its compact question seed from the
 // hand-authored demo-2 sources:
 //   - demo_2_question_set.json     (questions, categories, loadings, options, scales)
 //   - demo_2_persona_stances.json  (62 personas: cluster, stance axes, freeform answers)
@@ -29,6 +29,8 @@ const LEGACY_POLIS_PATH = process.env.DEMO2_LEGACY_POLIS_PATH
   || path.join(demoDir, 'demo_polis_data.json');
 const OUTPUT_PATH = process.env.DEMO2_OUTPUT_PATH
   || path.join(demoDir, 'demo_2_polis_data.json');
+const QUESTION_SEED_OUTPUT_PATH = process.env.DEMO2_QUESTION_SEED_OUTPUT_PATH
+  || path.join(demoDir, 'demo_2_question_seed.json');
 
 const readJson = (filePath) => JSON.parse(fs.readFileSync(filePath, 'utf8'));
 
@@ -441,7 +443,13 @@ const fixture = {
   clusterAnalysisVersion: 2,
 };
 
+const questionSeed = {
+  session: fixture.session,
+  comments: fixture.comments,
+};
+
 fs.writeFileSync(OUTPUT_PATH, `${JSON.stringify(fixture, null, 2)}\n`);
+fs.writeFileSync(QUESTION_SEED_OUTPUT_PATH, `${JSON.stringify(questionSeed, null, 2)}\n`);
 
 // --- summary ---------------------------------------------------------------
 
@@ -453,6 +461,7 @@ const typedResponses = participants.reduce((sum, row) => sum + Object.keys(row.r
 const groupSizes = clusters.map((cluster) => participants.filter((row) => row.groupId === cluster.id).length);
 
 console.log(`demo-2 fixture written to ${path.relative(repoRoot, OUTPUT_PATH)}`);
+console.log(`  compact question seed: ${path.relative(repoRoot, QUESTION_SEED_OUTPUT_PATH)}`);
 console.log(`  questions: ${questions.length} (${questions.filter((q) => q.type === 'binary').length} binary, `
   + `${questions.filter((q) => q.type === 'poll').length} poll, `
   + `${questions.filter((q) => q.type === 'rating').length} rating, `

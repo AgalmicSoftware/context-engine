@@ -1,6 +1,6 @@
 import demoPolisData from '../../variables/demo/demo_polis_data.json';
 import demo2PolisData from '../../variables/demo/demo_2_polis_data.json';
-import { LEGACY_DEMO_POLL_OPTIONS } from '../../utilities/demo/demoPolisDatasets';
+import { LEGACY_DEMO_POLL_OPTIONS } from '../../utilities/demo/demoQuestionSemantics';
 import { getDemoFixtureQuestionIdsByIndex } from '../../utilities/session/demoSessionQuestionFixtures.js';
 import {
   buildPolisDemoSurveyResultsAggregatorData,

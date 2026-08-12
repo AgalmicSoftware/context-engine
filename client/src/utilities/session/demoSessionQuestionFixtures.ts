@@ -1,9 +1,9 @@
 import { ethers } from 'ethers';
 
 import demo1OnchainQuestionIds from '../../variables/demo/demo_1_onchain_question_ids.json';
-import demo2PolisData from '../../variables/demo/demo_2_polis_data.json';
-import demoPolisData from '../../variables/demo/demo_polis_data.json';
-import { LEGACY_DEMO_POLL_OPTIONS } from '../demo/demoPolisDatasets';
+import { comments as demo2QuestionComments } from '../../variables/demo/demo_2_question_seed.json';
+import { comments as legacyDemoQuestionComments } from '../../variables/demo/demo_polis_data.json';
+import { LEGACY_DEMO_POLL_OPTIONS } from '../demo/demoQuestionSemantics';
 import { normalizeSessionSlug } from './sessionNaming.js';
 
 type DemoComment = Record<string, unknown>;
@@ -15,7 +15,7 @@ type DemoQuestion = Record<string, unknown> & {
 };
 
 type DemoFixtureRegistryEntry = {
-  data: Record<string, unknown>;
+  comments: DemoComment[];
   fixtureFile: string;
   onchainQuestionIds: unknown[];
   onchainQuestionIdsFile: string;
@@ -25,7 +25,7 @@ type DemoFixtureRegistryEntry = {
 const ZERO_SURVEY_ID = '0x0000000000000000000000000000000000000000000000000000000000000000';
 const legacyQuestionIds = Array.isArray(demo1OnchainQuestionIds) ? demo1OnchainQuestionIds : [];
 const LEGACY_DEMO_FIXTURE: DemoFixtureRegistryEntry = {
-  data: demoPolisData as Record<string, unknown>,
+  comments: Array.isArray(legacyDemoQuestionComments) ? legacyDemoQuestionComments : [],
   fixtureFile: 'client/src/variables/demo/demo_polis_data.json',
   onchainQuestionIds: legacyQuestionIds,
   onchainQuestionIdsFile: 'client/src/variables/demo/demo_1_onchain_question_ids.json',
@@ -35,8 +35,10 @@ const LEGACY_DEMO_FIXTURE: DemoFixtureRegistryEntry = {
 const DEMO_FIXTURES_BY_SLUG: Readonly<Record<string, DemoFixtureRegistryEntry>> = Object.freeze({
   'demo-1': LEGACY_DEMO_FIXTURE,
   'demo-2': {
-    data: demo2PolisData as Record<string, unknown>,
-    fixtureFile: 'client/src/variables/demo/demo_2_polis_data.json',
+    // Regression guard: AppShell only needs question rows; importing the full
+    // participant/analysis fixture here pushes the route shell over its budget.
+    comments: Array.isArray(demo2QuestionComments) ? demo2QuestionComments : [],
+    fixtureFile: 'client/src/variables/demo/demo_2_question_seed.json',
     onchainQuestionIds: [],
     onchainQuestionIdsFile: '',
     sourceSessionSlug: 'demo-2',
@@ -144,8 +146,7 @@ export const getDemoFixtureQuestionIdsByIndex = (slugIn: unknown): string[] => {
   const slug = normalizeSessionSlug(slugIn);
   const fixture = DEMO_FIXTURES_BY_SLUG[slug];
   if (!fixture) return [];
-  const comments = Array.isArray(fixture.data.comments) ? (fixture.data.comments as DemoComment[]) : [];
-  return comments.map((comment, index) => {
+  return fixture.comments.map((comment, index) => {
     const canonicalQuestionId = String(fixture.onchainQuestionIds[index] || '')
       .trim()
       .toLowerCase();
@@ -168,8 +169,7 @@ export const getTemporaryDemoSessionQuestionFixtures = (
   if (seedConfig.temporary === false && !workerCanonical) {
     return [];
   }
-  const comments = Array.isArray(fixture.data.comments) ? (fixture.data.comments as DemoComment[]) : [];
-  return comments
+  return fixture.comments
     .map((comment, index) =>
       buildDemoQuestionFromComment(
         fixture,

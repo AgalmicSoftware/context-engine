@@ -238,6 +238,11 @@ const manualChunkGroups = [
 
 export const resolveManualChunk = (id) => {
   const normalizedId = String(id || '').split(path.sep).join('/');
+  // Keep the synchronous question seed cacheable without folding it back into
+  // AppShell; the full demo-2 results fixture remains owned by lazy consumers.
+  if (normalizedId.includes('/src/variables/demo/demo_2_question_seed.json')) {
+    return 'demo-2-question-seed';
+  }
   if (!normalizedId.includes('/node_modules/')) return undefined;
 
   const group = manualChunkGroups.find(({ patterns }) => (

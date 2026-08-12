@@ -2,8 +2,8 @@ import { ethers } from 'ethers';
 
 import demoSessions from '../../variables/demo/demo_sessions.json';
 import demo1OnchainQuestionIds from '../../variables/demo/demo_1_onchain_question_ids.json';
-import demo2PolisData from '../../variables/demo/demo_2_polis_data.json';
-import { LEGACY_DEMO_POLL_OPTIONS } from '../demo/demoPolisDatasets';
+import demo2QuestionSeed from '../../variables/demo/demo_2_question_seed.json';
+import { LEGACY_DEMO_POLL_OPTIONS } from '../demo/demoQuestionSemantics';
 import {
   getDemoFixtureQuestionIdsByIndex,
   getTemporaryDemoSessionQuestionFixtures,
@@ -132,7 +132,7 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
       sessionName: 'Living With Artificial Minds',
       demoCompatibilitySeed: { temporary: true },
     });
-    const comments = demo2PolisData.comments as Array<{ commentId: string; type: string }>;
+    const comments = demo2QuestionSeed.comments as Array<{ commentId: string; type: string }>;
     const typeCounts = questions.reduce<Record<string, number>>((counts, question) => {
       counts[String(question.type)] = (counts[String(question.type)] || 0) + 1;
       return counts;
@@ -150,7 +150,7 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
       cloudflareDemoSeed: false,
       demoFixture: {
         sourceSessionSlug: 'demo-2',
-        fixtureFile: 'client/src/variables/demo/demo_2_polis_data.json',
+        fixtureFile: 'client/src/variables/demo/demo_2_question_seed.json',
         onchainQuestionIdsFile: '',
       },
     });
@@ -169,6 +169,7 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
       corsWorkerUrl: '',
       demoCompatibilitySeed: {
         temporary: true,
+        questionFixture: 'client/src/variables/demo/demo_2_question_seed.json#comments',
         questionCount: 40,
       },
     });
@@ -178,7 +179,7 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
 
   it('preserves each demo-2 poll choice list and rating scale', () => {
     const questions = getTemporaryDemoSessionQuestionFixtures('demo-2');
-    const comments = demo2PolisData.comments as Array<{
+    const comments = demo2QuestionSeed.comments as Array<{
       options?: string[];
       scale?: { min: number; max: number };
       type: string;

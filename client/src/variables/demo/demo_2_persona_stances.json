@@ -1,5 +1,5 @@
 {
-  "description": "Hand-authored persona stance model for the demo-2 session. Each persona reuses an existing xid from demo_polis_data.json (addresses, avatars, and demographics stay consistent). Axes are in [-1, 1]; scripts/generate-demo-2-polis-fixture.mjs derives deterministic votes from axes x question loadings. Freeform answers are hand-written in the figure's voice.",
+  "description": "Hand-authored persona stance model for the demo-2 session. Each persona reuses an existing xid from demo_polis_data.json (addresses, avatars, and demographics stay consistent). Axes are in [-1, 1]; scripts/generate-demo-2-polis-fixture.mjs derives deterministic votes from axes x question loadings and emits both the compact question seed and full Polis fixture. Freeform answers are hand-written in the figure's voice.",
   "axes": ["techOptimism", "regulationSupport", "egalitarianism", "humanPrimacy"],
   "clusters": [
     {

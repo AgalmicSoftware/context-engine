@@ -70,7 +70,7 @@
       "seededOn": "2026-08-12",
       "sessionSlug": "demo-2",
       "sourceSessionSlug": "demo-2",
-      "questionFixture": "client/src/variables/demo/demo_2_polis_data.json#comments",
+      "questionFixture": "client/src/variables/demo/demo_2_question_seed.json#comments",
       "questionCount": 40,
       "questionIdStrategy": "derive with ethers.utils.id(\"demo-2:\" + commentId); the persistent Worker seed must use the same IDs",
       "featuredSbtCount": 0,

@@ -1,5 +1,5 @@
 {
-  "description": "Hand-authored source question set for the demo-2 session. scripts/generate-demo-2-polis-fixture.mjs combines this file with demo_2_persona_stances.json to emit demo_2_polis_data.json. Loadings/bias are generation-time metadata and are stripped from the generated fixture.",
+  "description": "Hand-authored source question set for the demo-2 session. scripts/generate-demo-2-polis-fixture.mjs combines this file with demo_2_persona_stances.json to emit demo_2_question_seed.json and demo_2_polis_data.json. Loadings/bias are generation-time metadata and are stripped from the generated fixtures.",
   "session": {
     "slug": "demo-2",
     "title": "Living With Artificial Minds",
