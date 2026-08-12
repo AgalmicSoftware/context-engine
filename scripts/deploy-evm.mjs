@@ -84,10 +84,24 @@ export const assertDeploymentChain = async ({ provider, expectedChainId }) => {
   return network;
 };
 
-const run = (command, args, extraEnv = {}) => {
+export const buildForgeDeploymentInvocation = ({
+  rpcUrl,
+  privateKey,
+  inheritedEnv = process.env,
+}) => ({
+  command: 'forge',
+  args: ['script', 'foundry/script/DeployAll.s.sol', '--tc', 'DeployAll', '--broadcast'],
+  env: {
+    ...inheritedEnv,
+    PRIVATE_KEY: privateKey,
+    ETH_RPC_URL: rpcUrl,
+  },
+});
+
+const run = (command, args, childEnv = process.env) => {
   const result = spawnSync(command, args, {
     cwd: ROOT,
-    env: { ...process.env, ...extraEnv },
+    env: childEnv,
     stdio: 'inherit',
   });
   if (result.status !== 0) {
@@ -122,9 +136,8 @@ export const deployEvmContracts = async ({
     predicted,
   }, null, 2));
 
-  run('forge', ['script', 'foundry/script/DeployAll.s.sol', '--tc', 'DeployAll', '--rpc-url', rpcUrl, '--broadcast'], {
-    PRIVATE_KEY: privateKey,
-  });
+  const forgeInvocation = buildForgeDeploymentInvocation({ rpcUrl, privateKey });
+  run(forgeInvocation.command, forgeInvocation.args, forgeInvocation.env);
 
   const postNonce = await provider.getTransactionCount(wallet.address, 'pending');
   if (postNonce < nonce + 3) {

@@ -4,6 +4,7 @@ import fs from 'node:fs';
 
 import {
   assertDeploymentChain,
+  buildForgeDeploymentInvocation,
   resolveDeploymentTarget,
 } from './deploy-evm.mjs';
 
@@ -55,4 +56,28 @@ test('deployment status output does not include the RPC URL', () => {
   assert.equal(statusBlocks.length, 2);
   statusBlocks.forEach((block) => assert.doesNotMatch(block, /rpcUrl/));
   assert.doesNotMatch(source, /args\.join/);
+});
+
+test('Forge receives the RPC URL only through its inherited child environment', () => {
+  const rpcUrl = 'https://rpc.example.test/project-token-fixture';
+  const privateKey = 'private-key-fixture';
+  const inheritedEnv = { PATH: '/fixture/bin', KEEP_ME: 'yes' };
+  const invocation = buildForgeDeploymentInvocation({ rpcUrl, privateKey, inheritedEnv });
+
+  assert.equal(invocation.command, 'forge');
+  assert.deepEqual(invocation.args, [
+    'script',
+    'foundry/script/DeployAll.s.sol',
+    '--tc',
+    'DeployAll',
+    '--broadcast',
+  ]);
+  assert.equal(invocation.args.includes('--rpc-url'), false);
+  assert.equal(invocation.args.some((value) => value.includes(rpcUrl)), false);
+  assert.deepEqual(invocation.env, {
+    PATH: '/fixture/bin',
+    KEEP_ME: 'yes',
+    PRIVATE_KEY: privateKey,
+    ETH_RPC_URL: rpcUrl,
+  });
 });
