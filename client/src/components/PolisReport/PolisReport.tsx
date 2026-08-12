@@ -99,16 +99,7 @@ export {
 } from './polisReportRuntime';
 
 const surveyLog = createLogger('surveys');
-const POLIS_CLUSTER_COLORS = [
-  'var(--ce-data-series-1)',
-  'var(--ce-data-series-2)',
-  'var(--ce-data-series-3)',
-  'var(--ce-data-series-4)',
-  'var(--ce-data-series-5)',
-  'var(--ce-data-series-6)',
-  'var(--ce-data-series-7)',
-  'var(--ce-data-series-8)',
-];
+export const POLIS_CLUSTER_COLORS = d3Report.schemeCategory10;
 export const getPolisDemoDatasetForSlug = (...args: Parameters<typeof getPolisDemoDatasetForSlugRuntime>) =>
   getPolisDemoDatasetForSlugRuntime(...args);
 

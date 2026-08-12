@@ -14,11 +14,13 @@ import PolisReport, {
   normalizePolisBinaryVote,
   OPINION_GROUPS_TOOLTIP_TEXT,
   PARTICIPANTS_GRAPH_TOOLTIP_TEXT,
+  POLIS_CLUSTER_COLORS,
   REPORT_DEFAULT_EMBEDDING_LABEL,
   REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT,
   resolveJsPdfConstructor,
   shouldAutoEnablePolisDemoData,
 } from './PolisReport';
+import { d3Report } from './polisReportRuntime';
 import { computePolisCommentStats, computePolisConversationMath } from '../../utilities/survey/consensusReportMath.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
@@ -127,6 +129,13 @@ const openSettingsRow = () => {
   const btn = screen.queryByLabelText('Show report settings');
   if (btn) fireEvent.click(btn);
 };
+
+describe('PolisReport report palette', () => {
+  it('keeps opinion-group colors on the original D3 categorical palette', () => {
+    expect(POLIS_CLUSTER_COLORS).toBe(d3Report.schemeCategory10);
+    expect(POLIS_CLUSTER_COLORS).not.toEqual(expect.arrayContaining([expect.stringContaining('--ce-data-series-')]));
+  });
+});
 
 describe('PolisReport cache read options', () => {
   beforeEach(() => {

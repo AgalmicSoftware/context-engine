@@ -418,10 +418,16 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     await page.waitForSelector('[data-testid="ce-wizard-session-color-preview"]', { timeout: 15000 });
   }
 
+  let classicReportClusterColors = null;
   if (routeCase.requiresReadableSessionSurface) {
     await page.getByText('Existential risk from AI justifies extraordinary precautions.', { exact: true }).waitFor({
       state: 'visible',
     });
+    await page.getByTestId('ce-session-results-toggle').click();
+    await page.waitForSelector('svg[class*="clusterSwatchSvg"] circle', { timeout: 15000 });
+    classicReportClusterColors = await page
+      .locator('svg[class*="clusterSwatchSvg"] circle')
+      .evaluateAll((circles) => circles.map((circle) => circle.getAttribute('fill')));
   }
 
   const classicDocumentEndFooterState = routeCase.requiresDocumentEndFooter
@@ -1346,6 +1352,11 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   const currentSessionHeaderGeometry = routeCase.requiresReadableSessionSurface
     ? await readSessionHeaderGeometry()
     : null;
+  const currentReportClusterColors = routeCase.requiresReadableSessionSurface
+    ? await page
+        .locator('svg[class*="clusterSwatchSvg"] circle')
+        .evaluateAll((circles) => circles.map((circle) => circle.getAttribute('fill')))
+    : null;
   const currentDocumentEndFooterState = routeCase.requiresDocumentEndFooter
     ? await page.locator('footer').evaluate((element) => ({
         placement: element.getAttribute('data-ce-footer-placement'),
@@ -1853,6 +1864,17 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     });
   }
   if (routeCase.requiresReadableSessionSurface) {
+    const originalReportClusterColors = ['#1f77b4', '#ff7f0e', '#2ca02c'];
+    assert.deepEqual(
+      classicReportClusterColors,
+      originalReportClusterColors,
+      'Classic 95 should preserve the original D3 opinion-group palette',
+    );
+    assert.deepEqual(
+      currentReportClusterColors,
+      originalReportClusterColors,
+      'Context Engine should preserve the original D3 opinion-group palette',
+    );
     const assertMatchingBox = (classicBox, currentBox, label) => {
       ['height', 'width'].forEach((dimension) => {
         assert.ok(
