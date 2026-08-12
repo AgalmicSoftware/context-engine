@@ -32,7 +32,7 @@
 
 import { Buffer } from 'buffer';
 import { ethers, utils } from 'ethers';
-import groupPasswordDerivation from './groupPasswordDerivation.cjs';
+import groupPasswordDerivation from 'utilities/crypto/groupPasswordDerivation.cjs';
 import { createLogger } from '../logging';
 import { perfDebugDecryptEnvelope } from '../web3/rpcDebugStats.js';
 

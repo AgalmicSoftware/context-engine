@@ -598,7 +598,7 @@ export default defineConfig(({ mode }) => {
           '.js': 'jsx',
         },
       },
-      include: ['buffer', 'process/browser'],
+      include: ['buffer', 'process/browser', 'utilities/crypto/groupPasswordDerivation.cjs'],
     },
   };
 });

@@ -41,6 +41,19 @@ describe('vite PostCSS compatibility', () => {
     expect(publicUrlSource).not.toContain("typeof process !== 'undefined' ? process : undefined");
   });
 
+  it('pre-bundles the shared CommonJS group-password module for browser startup', () => {
+    const config = fs.readFileSync(path.join(clientRoot, 'vite.config.mjs'), 'utf8');
+    const cryptographySource = fs.readFileSync(
+      path.join(clientRoot, 'src', 'utilities', 'crypto', 'cryptography.ts'),
+      'utf8',
+    );
+
+    expect(config).toContain("'utilities/crypto/groupPasswordDerivation.cjs'");
+    expect(cryptographySource).toContain(
+      "from 'utilities/crypto/groupPasswordDerivation.cjs'",
+    );
+  });
+
   it('writes crawler-facing post HTML with the header as a large social image', () => {
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-post-social-preview-'));
     const buildDir = path.join(tempRoot, 'build');
