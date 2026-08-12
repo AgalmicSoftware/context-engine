@@ -334,18 +334,17 @@ SPA fallback concept, but their redirect config syntax differs.
   - Stored `ce:demoSurfaceMode` localStorage preferences win over this setting.
   - This only takes effect on fresh installs or when no stored preference exists.
 
-- `REACT_APP_CE_DEMO_SESSION_SLUGS=demo-1,demo-3,demo-2,demo`
+- `REACT_APP_CE_DEMO_SESSION_SLUGS=demo-sh,demo-1,demo-3,demo-2,demo`
   - Sets the ordered list of session slugs that receive public demo-session affordances.
   - The first slug is used by the About-page Demo CTA when no explicit list-scoped session is selected.
-  - These slugs also reuse the bundled Context Polis fixture unless a caller provides a per-slug `demoDataBySlug` dataset.
-  - Temporary June 17, 2026 migration note: `demo-1` points the public demo CTA
-    at a live SessionRegistry session seeded with copied Context fixture
-    questions and featured SBT metadata. `demo_sessions.json` also carries a
-    display-only `demo-1` fallback so the route can mount when live registry
-    metadata is slow. Worker URL, faucet sponsorship, and gate authority stay in
-    SessionRegistry plus Worker KV, not in the demo fixture. Remove both
-    compatibility entries after the Cloudflare-backed demo question/response
-    storage replaces the Arweave/on-chain copy.
+  - `demo`, `demo-1`, `demo-3`, and `demo-sh` reuse the bundled legacy Context
+    Polis fixture. `demo-2` uses its own 40-question generated dataset.
+  - `demo-sh` is the current first/default public demo and has a dedicated
+    worker-canonical Session Worker. `demo-2` is a direct-route preview with an
+    empty Worker URL and `temporary: true`; keep it behind `demo-sh` until its
+    dedicated Worker, canonical question seed, and Worker-held AI key pass live
+    voice and AI verification. Never store provider credentials in this public
+    list or in `demo_sessions.json`.
 
 - `REACT_APP_CE_ENABLE_METAMASK_CONNECTOR=false`
   - Selects the browser-wallet profile at build time. The default `false` profile is passkey-only: the login screen has no MetaMask button, and the emitted browser bundle excludes RainbowKit, WalletConnect, the MetaMask connector, and the MetaMask login asset.
@@ -389,7 +388,7 @@ SPA fallback concept, but their redirect config syntax differs.
 
 - `REACT_APP_CE_SESSION_SCAN_SLUGS=slug-a,slug-b`
   - Sets the default list-scope session slugs.
-  - The repo default is the active public demo slug, currently `demo-1`.
+  - The repo default is the active public demo slug, currently `demo-sh`.
 
 - `REACT_APP_CE_USER_PROFILE_SCAN_ALL_SESSIONS=false`
   - Legacy broad override for per-user deep scans.
