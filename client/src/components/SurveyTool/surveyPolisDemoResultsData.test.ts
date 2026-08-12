@@ -7,11 +7,19 @@ import {
 const countQuestionResponses = (questionResponses: Record<string, Record<string, unknown>>): number =>
   Object.values(questionResponses).reduce((sum, responders) => sum + Object.keys(responders || {}).length, 0);
 
+const binaryCommentIndexes = new Set(
+  demoPolisData.comments
+    .map((comment, index) => ({ index, type: String(comment.type) }))
+    .filter(({ type }) => type === 'binary')
+    .map(({ index }) => index),
+);
+
 describe('surveyPolisDemoResultsData', () => {
   it('normalizes the canonical Polis demo comments and votes into question-results cache data', () => {
     const data = buildPolisDemoSurveyResultsNetworkData();
     const expectedVoteCount = demoPolisData.participantsVotes.reduce(
-      (sum, participant) => sum + Object.keys(participant.votes || {}).length,
+      (sum, participant) =>
+        sum + Object.keys(participant.votes || {}).filter((voteIndex) => binaryCommentIndexes.has(Number(voteIndex))).length,
       0,
     );
 
@@ -49,6 +57,35 @@ describe('surveyPolisDemoResultsData', () => {
     expect(['Agree', 'Unsure', 'Disagree']).toContain(
       (firstQuestionResponses[0] as { answer?: { value?: unknown } })?.answer?.value,
     );
+  });
+
+  it('does not reinterpret tri-state sentiment as typed answers', () => {
+    const data = buildPolisDemoSurveyResultsNetworkData();
+
+    demoPolisData.comments.forEach((comment) => {
+      const questionId = String(comment.commentId).toLowerCase();
+      const question = data.questions[questionId] as Record<string, unknown>;
+      const commentType = String(comment.type);
+
+      if (commentType === 'binary') {
+        expect(question).toMatchObject({
+          type: 'binary',
+          options: ['Agree', 'Unsure', 'Disagree'],
+        });
+        return;
+      }
+
+      expect(Object.keys(data.questionResponses[questionId] || {})).toHaveLength(0);
+      if (commentType === 'poll') {
+        expect(question).toMatchObject({
+          type: 'multichoice',
+          options: (comment as { options?: string[] }).options,
+        });
+      } else {
+        expect(['rating', 'freeform']).toContain(question.type);
+        expect(question.options).toBeUndefined();
+      }
+    });
   });
 
   it('stamps an explicit session slug when callers need a non-default demo bucket', () => {
@@ -91,7 +128,7 @@ describe('surveyPolisDemoResultsData', () => {
     const firstQuestionId = String(demoPolisData.comments[0].commentId).toLowerCase();
     const firstRows = aggregator[firstQuestionId] || [];
 
-    expect(Object.keys(aggregator)).toHaveLength(42);
+    expect(Object.keys(aggregator)).toHaveLength(binaryCommentIndexes.size);
     expect(firstRows.length).toBeGreaterThan(0);
     expect(firstRows[0]).toEqual(
       expect.objectContaining({

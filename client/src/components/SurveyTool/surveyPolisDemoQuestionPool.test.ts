@@ -23,6 +23,32 @@ describe('surveyPolisDemoQuestionPool', () => {
     );
   });
 
+  it('preserves typed question metadata and each poll\'s own choices', () => {
+    const pool = buildPolisDemoQuestionPool();
+    const comments = demoPolisData.comments as Array<{
+      type: string;
+      options?: string[];
+    }>;
+
+    comments.forEach((comment, index) => {
+      const question = pool[index];
+      if (comment.type === 'poll') {
+        expect(question).toMatchObject({
+          type: 'multichoice',
+          options: comment.options,
+          singleSelect: true,
+        });
+        expect(new Set(question.options?.map((option) => option.toLowerCase())).size).toBe(
+          question.options?.length,
+        );
+        expect(question.options?.length).toBeGreaterThanOrEqual(2);
+      } else {
+        expect(question.type).toBe(comment.type);
+        expect(question.options).toBeUndefined();
+      }
+    });
+  });
+
   it('only resolves the built-in fixture for the display demo route backed by the default source', () => {
     expect(
       shouldUseBuiltInPolisDemoQuestionPool({

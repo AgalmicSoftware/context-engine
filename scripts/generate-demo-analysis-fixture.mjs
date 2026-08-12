@@ -37,7 +37,296 @@ export const TREE_AGREE_THRESHOLD = 2;
 export const TREE_DISAGREE_THRESHOLD = -2;
 export const SEMANTIC_TREE_NODE_IDS_BY_QUESTION_ID = Object.freeze({});
 
-const readJson = (filePath) => JSON.parse(fs.readFileSync(filePath, 'utf8'));
+const HASH_SEED = 2166136261 >>> 0;
+const HASH_DIVISOR = 0xffffffff;
+const UTC_WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const UTC_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+const clampNumber = (value, min, max) => Math.min(max, Math.max(min, value));
+const padUtcTime = (value) => String(Number(value) || 0).padStart(2, '0');
+
+const formatDemoUtcDateTime = (timestamp) => {
+  const date = new Date(Number(timestamp));
+  if (Number.isNaN(date.getTime())) return '';
+
+  return [
+    UTC_WEEKDAYS[date.getUTCDay()],
+    UTC_MONTHS[date.getUTCMonth()],
+    padUtcTime(date.getUTCDate()),
+    `${padUtcTime(date.getUTCHours())}:${padUtcTime(date.getUTCMinutes())}:${padUtcTime(date.getUTCSeconds())}`,
+    'UTC',
+    date.getUTCFullYear(),
+  ].join(' ');
+};
+
+const normalizeSourceTag = (value = '') => {
+  const trimmed = String(value || '').trim().toLowerCase();
+  if (!trimmed) return '';
+  if (trimmed === 'sci-fi' || trimmed === 'scifi') return 'scifi';
+  if (trimmed === 'lesswrong') return 'lesswrong';
+  return trimmed;
+};
+
+const readSourceTags = (comment = {}) => String(comment?.sources || '')
+  .split(',')
+  .map((source) => normalizeSourceTag(source))
+  .filter(Boolean);
+
+const hashStringToUint32 = (value = '') => {
+  let hash = HASH_SEED;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+};
+
+const hashToUnitInterval = (value = '') => hashStringToUint32(value) / HASH_DIVISOR;
+
+const buildSyntheticParticipantAddress = (participant = {}, profileId = '') => {
+  const seed = `${participant.participant || participant.xid || 'participant'}::${profileId}`;
+  let hex = '';
+  for (let index = 0; index < 5; index += 1) {
+    hex += hashStringToUint32(`${seed}::${index}`).toString(16).padStart(8, '0');
+  }
+  return `0x${hex.slice(0, 40)}`;
+};
+
+const stepVoteToward = (currentVote, targetVote) => {
+  const current = normalizePolisVote(currentVote);
+  const target = normalizePolisVote(targetVote);
+  if (target === null) return current;
+  if (current === null) return target;
+  if (current === target) return current;
+  return current + Math.sign(target - current);
+};
+
+const buildQuestionSignalSummary = (participantsVotes = [], comments = []) => (
+  (Array.isArray(comments) ? comments : []).map((comment, index) => {
+    const counts = new Map([
+      [-1, 0],
+      [0, 0],
+      [1, 0],
+    ]);
+    let total = 0;
+
+    (Array.isArray(participantsVotes) ? participantsVotes : []).forEach((participant) => {
+      const vote = normalizePolisVote(participant?.votes?.[String(index)]);
+      if (vote === null) return;
+      counts.set(vote, Number(counts.get(vote) || 0) + 1);
+      total += 1;
+    });
+
+    const sortedCounts = [...counts.entries()].sort((left, right) => {
+      if (right[1] !== left[1]) return right[1] - left[1];
+      return right[0] - left[0];
+    });
+    const majorityVote = total > 0
+      ? resolveQuestionMajorityVote(counts)
+      : 0;
+    const majorityRate = total > 0 ? Number(sortedCounts[0]?.[1] || 0) / total : 0;
+
+    return {
+      questionKey: String(index),
+      questionType: String(comment?.type || '').trim().toLowerCase(),
+      sourceTags: readSourceTags(comment),
+      majorityVote,
+      majorityRate,
+      totalVotes: total,
+    };
+  })
+);
+
+export const resolveQuestionMajorityVote = (counts = new Map()) => {
+  const sortedCounts = [...counts.entries()].sort((left, right) => {
+    if (right[1] !== left[1]) return right[1] - left[1];
+    return right[0] - left[0];
+  });
+  const topCount = Number(sortedCounts[0]?.[1] || 0);
+  if (topCount <= 0) return 0;
+
+  const tiedTopVotes = sortedCounts
+    .filter(([, count]) => count === topCount)
+    .map(([vote]) => normalizePolisVote(vote))
+    .filter((vote) => vote !== null);
+
+  return tiedTopVotes.length === 1 ? tiedTopVotes[0] : 0;
+};
+
+const getQuestionBias = (
+  questionSignal = {},
+  syntheticParticipantConfig = SYNTHETIC_PARTICIPANT_CONFIG
+) => {
+  const sourceWeights = syntheticParticipantConfig?.sourceMutationWeights || {};
+  const typeWeights = syntheticParticipantConfig?.typeMutationWeights || {};
+  const sourceTags = Array.isArray(questionSignal?.sourceTags) ? questionSignal.sourceTags : [];
+  const sourceBias = sourceTags.length > 0
+    ? sourceTags.reduce(
+      (sum, sourceTag) => sum + Number(sourceWeights[normalizeSourceTag(sourceTag)] || 0),
+      0
+    ) / sourceTags.length
+    : 0;
+  const typeBias = Number(typeWeights[String(questionSignal?.questionType || '').trim().toLowerCase()] || 0);
+  return sourceBias + typeBias;
+};
+
+const chooseTargetVote = ({
+  questionSignal = {},
+  profile = {},
+  syntheticParticipantConfig = SYNTHETIC_PARTICIPANT_CONFIG,
+  seed = '',
+}) => {
+  const weights = profile?.targetModeWeights || {};
+  let majorityWeight = Number(weights.majority || 0);
+  let unsureWeight = Number(weights.unsure || 0);
+  const confidenceThreshold = Number(syntheticParticipantConfig?.majorityConfidenceThreshold || 0);
+
+  if (questionSignal?.majorityRate < confidenceThreshold) {
+    majorityWeight *= 0.55;
+    unsureWeight += 0.15;
+  }
+
+  const totalWeight = Math.max(majorityWeight + unsureWeight, Number.EPSILON);
+  const pick = hashToUnitInterval(`${seed}::target-mode`);
+  const selectedMode = pick < (majorityWeight / totalWeight) ? 'majority' : 'unsure';
+
+  return selectedMode === 'majority'
+    ? normalizePolisVote(questionSignal?.majorityVote)
+    : 0;
+};
+
+const buildSyntheticParticipantRows = ({
+  baseParticipantsVotes = [],
+  comments = [],
+  syntheticParticipantConfig = SYNTHETIC_PARTICIPANT_CONFIG,
+  mappedQuestionIds = new Set(),
+}) => {
+  const variantProfiles = Array.isArray(syntheticParticipantConfig?.variantProfiles)
+    ? syntheticParticipantConfig.variantProfiles
+    : [];
+  if (variantProfiles.length === 0 || !Array.isArray(baseParticipantsVotes) || baseParticipantsVotes.length === 0) {
+    return [];
+  }
+
+  const questionSignals = buildQuestionSignalSummary(baseParticipantsVotes, comments);
+  const questionSignalByKey = new Map(
+    questionSignals.map((questionSignal) => [questionSignal.questionKey, questionSignal])
+  );
+
+  return baseParticipantsVotes.flatMap((participant) => variantProfiles.map((profile, variantIndex) => {
+    const votes = {};
+
+    (Array.isArray(comments) ? comments : []).forEach((comment, questionIndex) => {
+      const questionKey = String(questionIndex);
+      const questionSignal = questionSignalByKey.get(questionKey) || {
+        questionKey,
+        questionType: String(comment?.type || '').trim().toLowerCase(),
+        sourceTags: readSourceTags(comment),
+        majorityVote: 0,
+        majorityRate: 0,
+      };
+      const bias = getQuestionBias(questionSignal, syntheticParticipantConfig);
+      const isMappedQuestion = mappedQuestionIds.has(questionKey);
+      const mappedMultiplier = Number(
+        syntheticParticipantConfig?.mappedQuestionMutationMultiplier ?? 1
+      );
+      const baseVote = normalizePolisVote(participant?.votes?.[questionKey]);
+      const seedPrefix = [
+        participant?.participant || participant?.xid || 'participant',
+        profile?.id || `variant-${variantIndex}`,
+        questionKey,
+        comment?.nodeId || '',
+      ].join('::');
+
+      const mutationRate = clampNumber(
+        (Number(profile?.mutationRate || 0) + bias) * (isMappedQuestion ? mappedMultiplier : 1),
+        0,
+        0.85
+      );
+      const missingVoteFillRate = clampNumber(
+        Number(profile?.missingVoteFillRate || 0) + (bias * 0.75),
+        0,
+        0.95
+      );
+      const dropVoteRate = clampNumber(Number(profile?.dropVoteRate || 0), 0, 0.4);
+      const targetVote = chooseTargetVote({
+        questionSignal,
+        profile,
+        syntheticParticipantConfig,
+        seed: seedPrefix,
+      });
+
+      if (baseVote === null) {
+        if (hashToUnitInterval(`${seedPrefix}::fill`) < missingVoteFillRate && targetVote !== null) {
+          votes[questionKey] = targetVote;
+        }
+        return;
+      }
+
+      let nextVote = baseVote;
+      if (hashToUnitInterval(`${seedPrefix}::mutate`) < mutationRate) {
+        nextVote = stepVoteToward(baseVote, targetVote);
+      }
+      if (hashToUnitInterval(`${seedPrefix}::drop`) < dropVoteRate) {
+        return;
+      }
+      votes[questionKey] = nextVote;
+    });
+
+    const normalizedVotes = Object.values(votes).map((value) => Number(value));
+
+    return {
+      participant: buildSyntheticParticipantAddress(participant, `${profile?.id || variantIndex}`),
+      xid: String(participant?.xid || '').trim(),
+      groupId: Number(participant?.groupId ?? 0),
+      profileId: String(profile?.id || `variant-${variantIndex}`).trim(),
+      profileLabel: String(profile?.label || profile?.id || `Variant ${variantIndex + 1}`).trim(),
+      profileConfidence: String(profile?.confidence || 'Medium').trim(),
+      profileRationale: String(profile?.rationale || '').trim(),
+      profileSourceType: 'synthetic_variant',
+      profileParentXid: String(participant?.xid || '').trim(),
+      nVotes: normalizedVotes.length,
+      nAgree: normalizedVotes.filter((value) => value === 1).length,
+      nDisagree: normalizedVotes.filter((value) => value === -1).length,
+      votes,
+    };
+  }));
+};
+
+const applyCommentOverrides = (
+  comment = {},
+  questionKey = '',
+  questionOverridesByQuestion = QUESTION_OVERRIDES_BY_QUESTION_ID
+) => {
+  const override = questionOverridesByQuestion?.[questionKey];
+  if (!override || typeof override !== 'object') return comment;
+  const normalizedOverride = {
+    ...override,
+  };
+  if (
+    !normalizedOverride.sources &&
+    Array.isArray(normalizedOverride.sourceTags) &&
+    normalizedOverride.sourceTags.length > 0
+  ) {
+    normalizedOverride.sources = normalizedOverride.sourceTags.join(', ');
+  }
+  if (!normalizedOverride.key_tension && normalizedOverride.keyTension) {
+    normalizedOverride.key_tension = normalizedOverride.keyTension;
+  }
+  delete normalizedOverride.sourceTags;
+  delete normalizedOverride.keyTension;
+  const overriddenComment = {
+    ...comment,
+    ...normalizedOverride,
+  };
+  // A breakdown override can turn a poll into a binary statement. Do not
+  // retain choices that no longer describe the overridden question.
+  const overriddenType = String(overriddenComment?.type || '').trim().toLowerCase();
+  if (overriddenType !== 'poll' && overriddenType !== 'multichoice' && !override.options) {
+    delete overriddenComment.options;
+  }
+  return overriddenComment;
+};
 
 const normalizePolisVote = (value) => {
   const numericValue = Number(value);

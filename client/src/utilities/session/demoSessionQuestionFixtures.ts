@@ -15,14 +15,6 @@ type DemoQuestion = Record<string, unknown> & {
 const TEMPORARY_DEMO_QUESTION_SLUG = 'demo-1';
 const CLOUDFLARE_DEMO_QUESTION_SLUG = 'demo-sh';
 const ZERO_SURVEY_ID = '0x0000000000000000000000000000000000000000000000000000000000000000';
-const POLL_OPTIONS = [
-  'Technical researchers',
-  'AI developers and labs',
-  'Governments and regulators',
-  'The general public',
-  'Affected communities',
-];
-
 const uniqueStrings = (values: unknown[]): string[] => {
   const out: string[] = [];
   const seen = new Set<string>();
@@ -36,6 +28,9 @@ const uniqueStrings = (values: unknown[]): string[] => {
   });
   return out;
 };
+
+const readCommentPollOptions = (comment: DemoComment): string[] =>
+  uniqueStrings(Array.isArray(comment.options) ? comment.options : []);
 
 const splitSources = (value: unknown): string[] =>
   String(value || '')
@@ -104,7 +99,7 @@ const buildDemoQuestionFromComment = (
     },
   };
   if (type === 'multichoice') {
-    question.options = POLL_OPTIONS;
+    question.options = readCommentPollOptions(comment);
     question.singleSelect = true;
   }
   return question;

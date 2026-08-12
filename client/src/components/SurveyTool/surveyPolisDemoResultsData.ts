@@ -44,19 +44,26 @@ export const buildPolisDemoSurveyResultsNetworkData = (
 
   const questions: Record<string, SurveyResultsQuestionRecord> = {};
   const questionIdsByVoteIndex: Record<number, string> = {};
+  const binaryVoteIndexes = new Set<number>();
 
   questionPool.forEach((question, index) => {
     const questionId = normalizeQuestionId(question.id);
     if (!questionId) return;
     const sourceComment = comments[index] || {};
+    const questionType = question.type || 'binary';
     questionIdsByVoteIndex[index] = questionId;
+    if (questionType === 'binary') binaryVoteIndexes.add(index);
+    const pollOptions = Array.isArray(question.options)
+      ? question.options.map((option) => readString(option)).filter(Boolean)
+      : [];
     questions[questionId] = {
       ...question,
       id: questionId,
       prompt: question.prompt,
-      type: question.type || 'binary',
-      questionType: question.type || 'binary',
-      options: ['Agree', 'Unsure', 'Disagree'],
+      type: questionType,
+      questionType,
+      ...(questionType === 'binary' ? { options: ['Agree', 'Unsure', 'Disagree'] } : {}),
+      ...(questionType === 'multichoice' && pollOptions.length ? { options: pollOptions } : {}),
       sessionSlug: normalizedSessionSlug,
       sessionSlugExplicit: true,
       source: 'demo-polis-data',
@@ -78,6 +85,9 @@ export const buildPolisDemoSurveyResultsNetworkData = (
     Object.keys(votes).forEach((voteIndexKey) => {
       const voteIndex = Number(voteIndexKey);
       if (!Number.isInteger(voteIndex)) return;
+      // The legacy vote matrix contains tri-state sentiment for every prompt.
+      // It is an answer only for binary questions, never a poll pick, rating, or freeform response.
+      if (!binaryVoteIndexes.has(voteIndex)) return;
       const questionId = questionIdsByVoteIndex[voteIndex];
       if (!questionId) return;
       const answerValue = resolvePolisVoteAnswer(votes[voteIndexKey]);

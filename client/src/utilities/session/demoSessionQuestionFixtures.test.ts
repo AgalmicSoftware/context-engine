@@ -34,15 +34,40 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
     );
   });
 
-  it('converts poll comments to single-select multichoice questions', () => {
+  it('exposes only source-derived tags in the demo-1 question filter', () => {
     const questions = getTemporaryDemoSessionQuestionFixtures('demo-1');
-    const pollQuestion = questions.find(
+    const tags = new Set(questions.flatMap((question) => (question.tags as string[]) || []));
+
+    expect(tags).not.toContain('demo-fixture');
+    expect(tags).not.toContain('context-corpus');
+    expect(questions[0].tags).toEqual([
+      'binary',
+      'EXISTENTIAL RISK & SAFETY FOUNDATIONS',
+      'tweets',
+      'arxiv',
+      'LessWrong',
+      'insiders',
+      'laws',
+    ]);
+  });
+
+  it('converts polls to single-select questions with distinct source choices', () => {
+    const questions = getTemporaryDemoSessionQuestionFixtures('demo-1');
+    const pollQuestions = questions.filter(
       (question) => (question.demoFixture as { fixtureType?: unknown } | undefined)?.fixtureType === 'poll',
     );
 
-    expect(pollQuestion).toMatchObject({
-      type: 'multichoice',
-      singleSelect: true,
+    expect(pollQuestions).toHaveLength(5);
+    pollQuestions.forEach((pollQuestion) => {
+      expect(pollQuestion).toMatchObject({ type: 'multichoice', singleSelect: true });
+      expect((pollQuestion.options as string[]).length).toBeGreaterThanOrEqual(2);
+      expect(new Set((pollQuestion.options as string[]).map((option) => option.toLowerCase())).size).toBe(
+        (pollQuestion.options as string[]).length,
+      );
+    });
+
+    expect(pollQuestions[0]).toMatchObject({
+      prompt: 'Who should most influence AI development decisions?',
       options: [
         'Technical researchers',
         'AI developers and labs',
@@ -51,6 +76,10 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
         'Affected communities',
       ],
     });
+    expect(new Set(pollQuestions.map((question) => JSON.stringify(question.options))).size).toBe(5);
+    expect(
+      pollQuestions.find((question) => String(question.prompt).startsWith('When will AGI arrive'))?.options,
+    ).toEqual(['Before 2030', '2030–2040', '2040–2060', 'After 2060', 'Never']);
   });
 
   it('does not seed other slugs or explicitly disabled demo sessions', () => {
