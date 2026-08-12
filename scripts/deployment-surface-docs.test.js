@@ -73,3 +73,12 @@ test('first-visit redirect configuration describes root-only eligibility', () =>
   assert.match(flagContract, /initial normalized root document load/);
   assert.doesNotMatch(flagContract, /cached-session|session document/i);
 });
+
+test('chain-neutral deployment docs keep deployment separate from supported-chain policy', () => {
+  const foundryDoc = read('foundry/script/README.md');
+  const packageJson = JSON.parse(read('package.json'));
+
+  assert.equal(packageJson.scripts['deploy:evm'], 'node scripts/deploy-evm.mjs');
+  assert.match(foundryDoc, /npm run deploy:evm/);
+  assert.match(foundryDoc, /does not update the client contract\s+manifest or make the target chain supported/i);
+});

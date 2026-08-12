@@ -3,9 +3,31 @@ import assert from 'node:assert/strict';
 import { ethers } from 'ethers';
 
 import {
+  deployOpSepoliaContracts,
   predictDeploymentAddresses,
   readDeploymentPreflight,
 } from './deploy-op-sepolia.mjs';
+
+test('deployOpSepoliaContracts pins the chain while honoring OP-specific RPC precedence', async () => {
+  const calls = [];
+  const result = await deployOpSepoliaContracts({
+    env: {
+      EVM_CHAIN_ID: '1',
+      EVM_RPC_URL: 'https://generic.example/rpc',
+      OP_SEPOLIA_RPC_URL: 'https://op.example/rpc',
+    },
+    deploy: async (options) => {
+      calls.push(options);
+      return 'ok';
+    },
+  });
+
+  assert.equal(result, 'ok');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].env.EVM_CHAIN_ID, '11155420');
+  assert.equal(calls[0].env.EVM_RPC_URL, 'https://op.example/rpc');
+  assert.match(calls[0].defaultKeyPath, /\.keys\/deployer-op-sepolia\.key$/);
+});
 
 test('readDeploymentPreflight uses the pending nonce for address prediction', async () => {
   const calls = [];

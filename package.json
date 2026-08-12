@@ -29,6 +29,7 @@
     "demo:analysis:generate": "node scripts/generate-demo-analysis-fixture.mjs",
     "demo:sim-answers:reconcile": "node scripts/reconcile-sim-profile-answers.mjs",
     "deploy-helper:deploy": "node scripts/deploy-helper-deploy.mjs",
+    "deploy:evm": "node scripts/deploy-evm.mjs",
     "deploy:op-sepolia": "node scripts/deploy-op-sepolia.mjs",
     "verify:public-release-surface": "node scripts/verify-public-release-surface.js",
     "verify:public-assets": "node scripts/verify-public-assets.js",
