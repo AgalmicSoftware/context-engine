@@ -3213,9 +3213,7 @@ const DebateMap = ({
       onModalClose();
       return;
     }
-    if (modalReturnTo) {
-      navigate(modalReturnTo, { replace: true });
-    }
+    navigate(modalReturnTo || buildPublicRoute('/atlas'), { replace: true });
   }, [modalReturnTo, navigate, onModalClose]);
 
   const handleBookmark = useCallback((id: string) => {

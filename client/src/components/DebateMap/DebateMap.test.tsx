@@ -1130,7 +1130,7 @@ describe('DebateMap', () => {
     expect(screen.queryByText(getHistoricalCaseForNode(privacyAndSurveillanceNodeId).title)).not.toBeInTheDocument();
   });
 
-  it('copies atlas deep links with PUBLIC_URL and demo mode preserved', async () => {
+  it('copies atlas deep links with PUBLIC_URL and demo mode preserved without the return target', async () => {
     const previousPublicUrl = mutableEnv.PUBLIC_URL;
     const previousClipboard = navigator.clipboard;
     const writeText = jest.fn().mockResolvedValue(undefined);
@@ -1142,7 +1142,11 @@ describe('DebateMap', () => {
 
     try {
       render(
-        <MemoryRouter initialEntries={['/atlas/0x1110000000000000000000000000000000000000000000000000000000000000']}>
+        <MemoryRouter
+          initialEntries={[
+            '/atlas/0x1110000000000000000000000000000000000000000000000000000000000000?returnTo=%2Fsu%2FFranklin',
+          ]}
+        >
           <Routes>
             <Route
               path="/atlas/:nodeId"
@@ -1267,6 +1271,44 @@ describe('DebateMap', () => {
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('/su/Franklin?tab=atlas#positions', { replace: true });
     });
+  });
+
+  it.each([
+    ['has no return target', ''],
+    ['has an unsafe return target', '?returnTo=https%3A%2F%2Fevil.example%2Fsteal'],
+  ])('returns to the atlas index when a deep-linked modal %s', async (_case, search) => {
+    mockNavigate.mockClear();
+
+    render(
+      <MemoryRouter
+        initialEntries={[
+          `/atlas/0x1110000000000000000000000000000000000000000000000000000000000000${search}`,
+        ]}
+      >
+        <Routes>
+          <Route
+            path="/atlas/:nodeId"
+            element={
+              <DebateMapComponent
+                account=""
+                provider=""
+                network={{ id: 84532 }}
+                activeSessionSlug=""
+                toggleLoginModal={jest.fn()}
+                demoMode={true}
+              />
+            }
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByTitle('Close'));
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/atlas', { replace: true });
+    });
+    expect(mockNavigate).not.toHaveBeenCalledWith(-1);
   });
 
   it('resets atlas modal scroll position when switching to a different requested node', async () => {
