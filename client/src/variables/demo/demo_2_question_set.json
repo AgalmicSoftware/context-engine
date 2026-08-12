@@ -1,0 +1,495 @@
+{
+  "description": "Hand-authored source question set for the demo-2 session. scripts/generate-demo-2-polis-fixture.mjs combines this file with demo_2_persona_stances.json to emit demo_2_polis_data.json. Loadings/bias are generation-time metadata and are stripped from the generated fixture.",
+  "session": {
+    "slug": "demo-2",
+    "title": "Living With Artificial Minds",
+    "summary": "Sixty-two historical figures deliberate how humanity should govern, work beside, and live with artificial intelligence."
+  },
+  "axes": ["techOptimism", "regulationSupport", "egalitarianism", "humanPrimacy"],
+  "voteModel": {
+    "noiseScale": 0.3,
+    "agreeThreshold": 0.15,
+    "disagreeThreshold": -0.15,
+    "pollJitterAmplitude": 0.35,
+    "ratingNoiseWeight": 0.6,
+    "baseTimestamp": 1783778400000,
+    "timestampStepMs": 5400000
+  },
+  "categories": [
+    "SAFETY & CATASTROPHIC RISK",
+    "GOVERNANCE & OVERSIGHT",
+    "WORK & ECONOMIC TRANSITION",
+    "TRUTH, MEDIA & EPISTEMICS",
+    "HUMAN-AI RELATIONSHIPS & MORAL STATUS",
+    "OPENNESS & CONCENTRATION OF POWER",
+    "EDUCATION & HUMAN DEVELOPMENT",
+    "DEMOCRACY & COLLECTIVE DECISION-MAKING"
+  ],
+  "questions": [
+    {
+      "slug": "d2-safety-01",
+      "type": "binary",
+      "category": "SAFETY & CATASTROPHIC RISK",
+      "prompt": "Frontier AI labs must prove a system is safe before release, the way we treat new medicines.",
+      "keyTension": "Pre-market proof versus iterate-and-patch: which failure mode costs more?",
+      "sources": "hearings, statutes, lab policies",
+      "author": "JRobertOppenheimer",
+      "loadings": { "techOptimism": -0.5, "regulationSupport": 0.8 },
+      "bias": 0.1
+    },
+    {
+      "slug": "d2-safety-02",
+      "type": "binary",
+      "category": "SAFETY & CATASTROPHIC RISK",
+      "prompt": "A global pause on the largest AI training runs would do more good than harm.",
+      "keyTension": "Coordination fantasy or necessary brake — can rivals ever stop together?",
+      "sources": "open letters, treaties, compute reports",
+      "author": "RachelCarson",
+      "loadings": { "techOptimism": -0.9, "regulationSupport": 0.5 },
+      "bias": -0.15
+    },
+    {
+      "slug": "d2-safety-03",
+      "type": "binary",
+      "category": "SAFETY & CATASTROPHIC RISK",
+      "prompt": "Present-day harms — bias, fraud, displacement — deserve priority over speculative extinction scenarios.",
+      "keyTension": "Near-term justice and long-term survival compete for the same attention",
+      "sources": "audits, court records, forecasts",
+      "author": "FrederickDouglass",
+      "loadings": { "techOptimism": 0.4, "egalitarianism": 0.6, "regulationSupport": -0.2 },
+      "bias": 0
+    },
+    {
+      "slug": "d2-safety-04",
+      "type": "rating",
+      "category": "SAFETY & CATASTROPHIC RISK",
+      "prompt": "How likely is it that advanced AI causes a civilization-scale catastrophe in the next 50 years?",
+      "keyTension": "Expert estimates span two orders of magnitude, and policy follows the estimate",
+      "sources": "forecasts, surveys, arxiv",
+      "author": "vonNeumann",
+      "scale": { "min": 1, "max": 10, "minLabel": "Vanishingly unlikely", "maxLabel": "Near certain" },
+      "loadings": { "techOptimism": -0.8, "regulationSupport": 0.3 },
+      "bias": -0.1
+    },
+    {
+      "slug": "d2-safety-05",
+      "type": "binary",
+      "category": "SAFETY & CATASTROPHIC RISK",
+      "prompt": "Dangerous-capability research should be published openly so defenses can keep pace.",
+      "keyTension": "Sunlight hardens defenses — and hands out blueprints",
+      "sources": "arxiv, disclosure norms, biosecurity",
+      "author": "MarieCurie",
+      "loadings": { "techOptimism": 0.6, "egalitarianism": 0.4, "regulationSupport": -0.5 },
+      "bias": 0
+    },
+    {
+      "slug": "d2-governance-01",
+      "type": "binary",
+      "category": "GOVERNANCE & OVERSIGHT",
+      "prompt": "AI powerful enough to reshape economies should answer to international institutions, not national governments alone.",
+      "keyTension": "Treaty-speed governance chasing venture-speed technology",
+      "sources": "treaties, summits, trade law",
+      "author": "EleanorRoosevelt",
+      "loadings": { "regulationSupport": 0.7, "egalitarianism": 0.3, "techOptimism": -0.1 },
+      "bias": 0
+    },
+    {
+      "slug": "d2-governance-02",
+      "type": "binary",
+      "category": "GOVERNANCE & OVERSIGHT",
+      "prompt": "The public, not technical experts, should set the goals AI systems are allowed to pursue.",
+      "keyTension": "Legitimacy versus competence at the frontier",
+      "sources": "referenda, standards bodies, polling",
+      "author": "JeanJacquesRousseau",
+      "loadings": { "egalitarianism": 0.9, "techOptimism": -0.4 },
+      "bias": 0
+    },
+    {
+      "slug": "d2-governance-03",
+      "type": "binary",
+      "category": "GOVERNANCE & OVERSIGHT",
+      "prompt": "Regulators should be able to audit the training data and weights of any widely deployed model.",
+      "keyTension": "Accountability presses against trade secrets and security",
+      "sources": "statutes, audits, filings",
+      "author": "JamesMadison",
+      "loadings": { "regulationSupport": 0.8, "techOptimism": -0.4, "egalitarianism": 0.2 },
+      "bias": 0
+    },
+    {
+      "slug": "d2-governance-04",
+      "type": "poll",
+      "category": "GOVERNANCE & OVERSIGHT",
+      "prompt": "Who should hold the final say when an AI system's deployment is contested?",
+      "keyTension": "Every candidate authority has failed somewhere before",
+      "sources": "constitutions, agency records, case law",
+      "author": "Hamilton",
+      "options": [
+        { "label": "An elected legislature", "loadings": { "egalitarianism": 0.5, "regulationSupport": 0.4 } },
+        { "label": "An independent expert agency", "loadings": { "techOptimism": 0.3, "regulationSupport": 0.6, "egalitarianism": -0.5 } },
+        { "label": "The courts", "loadings": { "regulationSupport": 0.3, "humanPrimacy": 0.4, "techOptimism": -0.1 } },
+        { "label": "A citizens' assembly", "loadings": { "egalitarianism": 0.9, "techOptimism": 0.1 } },
+        { "label": "The company that built it", "loadings": { "techOptimism": 0.7, "regulationSupport": -0.9 } }
+      ]
+    },
+    {
+      "slug": "d2-governance-05",
+      "type": "binary",
+      "category": "GOVERNANCE & OVERSIGHT",
+      "prompt": "'Move fast and fix problems later' has served humanity well, and AI should be no exception.",
+      "keyTension": "The industrial playbook meets a technology that may not forgive patches",
+      "sources": "industrial history, incident reports",
+      "author": "HenryFord",
+      "loadings": { "techOptimism": 0.9, "regulationSupport": -0.7 },
+      "bias": -0.1
+    },
+    {
+      "slug": "d2-work-01",
+      "type": "binary",
+      "category": "WORK & ECONOMIC TRANSITION",
+      "prompt": "If AI automates most labor, universal basic income stops being charity and becomes infrastructure.",
+      "keyTension": "Who owns the dividend of automation?",
+      "sources": "pilots, budget models, economics",
+      "author": "FDR",
+      "loadings": { "egalitarianism": 0.7, "regulationSupport": 0.4, "techOptimism": 0.1 },
+      "bias": 0
+    },
+    {
+      "slug": "d2-work-02",
+      "type": "binary",
+      "category": "WORK & ECONOMIC TRANSITION",
+      "prompt": "Companies that profit from automation owe retraining and transition support to the workers they displace.",
+      "keyTension": "Private windfalls, socialized adjustment costs",
+      "sources": "labor law, severance data, contracts",
+      "author": "LechWalesa",
+      "loadings": { "egalitarianism": 0.6, "regulationSupport": 0.3 },
+      "bias": 0.3
+    },
+    {
+      "slug": "d2-work-03",
+      "type": "binary",
+      "category": "WORK & ECONOMIC TRANSITION",
+      "prompt": "Within a generation, AI will create more meaningful work than it destroys.",
+      "keyTension": "Every past technology wave eventually paid off — is this one different?",
+      "sources": "labor statistics, history, forecasts",
+      "author": "AdamSmith",
+      "loadings": { "techOptimism": 0.9 },
+      "bias": -0.05
+    },
+    {
+      "slug": "d2-work-04",
+      "type": "poll",
+      "category": "WORK & ECONOMIC TRANSITION",
+      "prompt": "Which policy best cushions an AI-driven labor shock?",
+      "keyTension": "Cash, jobs, ownership, skills, or patience — pick your parachute",
+      "sources": "pilots, party platforms, economics",
+      "author": "KarlMarx",
+      "options": [
+        { "label": "Universal basic income", "loadings": { "egalitarianism": 0.6, "regulationSupport": 0.4 } },
+        { "label": "A public jobs guarantee", "loadings": { "egalitarianism": 0.7, "regulationSupport": 0.5 } },
+        { "label": "Worker ownership of AI profits", "loadings": { "egalitarianism": 0.9, "regulationSupport": -0.1 } },
+        { "label": "Faster, cheaper retraining", "loadings": { "techOptimism": 0.6, "egalitarianism": 0.1 } },
+        { "label": "Let markets adapt on their own", "loadings": { "techOptimism": 0.5, "regulationSupport": -0.9 } }
+      ]
+    },
+    {
+      "slug": "d2-work-05",
+      "type": "rating",
+      "category": "WORK & ECONOMIC TRANSITION",
+      "prompt": "How much of today's paid work will machines do better than people within 25 years?",
+      "keyTension": "Capability forecasts drive every downstream labor policy",
+      "sources": "task studies, benchmarks, forecasts",
+      "author": "JamesWatt",
+      "scale": { "min": 1, "max": 10, "minLabel": "Almost none", "maxLabel": "Nearly all" },
+      "loadings": { "techOptimism": 0.8, "humanPrimacy": -0.2 },
+      "bias": 0
+    },
+    {
+      "slug": "d2-truth-01",
+      "type": "binary",
+      "category": "TRUTH, MEDIA & EPISTEMICS",
+      "prompt": "Platforms should carry legal liability for synthetic media that deceives people at scale.",
+      "keyTension": "Deterrence versus chilling legitimate speech",
+      "sources": "statutes, case law, platform policy",
+      "author": "Voltaire",
+      "loadings": { "regulationSupport": 0.8, "techOptimism": -0.3 },
+      "bias": 0
+    },
+    {
+      "slug": "d2-truth-02",
+      "type": "binary",
+      "category": "TRUTH, MEDIA & EPISTEMICS",
+      "prompt": "AI-generated political advertising should be banned outright during election seasons.",
+      "keyTension": "Protecting the vote versus policing expression",
+      "sources": "election law, ad archives",
+      "author": "Lincoln",
+      "loadings": { "regulationSupport": 0.7, "techOptimism": -0.4, "egalitarianism": 0.1 },
+      "bias": 0
+    },
+    {
+      "slug": "d2-truth-03",
+      "type": "binary",
+      "category": "TRUTH, MEDIA & EPISTEMICS",
+      "prompt": "Provenance labels — knowing what is synthetic — will do more than takedowns ever could.",
+      "keyTension": "Transparency as remedy versus label fatigue",
+      "sources": "standards, watermarking research",
+      "author": "Franklin",
+      "loadings": { "techOptimism": 0.6, "regulationSupport": -0.3 },
+      "bias": 0
+    },
+    {
+      "slug": "d2-truth-04",
+      "type": "binary",
+      "category": "TRUTH, MEDIA & EPISTEMICS",
+      "prompt": "Personalized AI feeds fragment shared reality faster than they inform it.",
+      "keyTension": "Individual relevance versus common ground",
+      "sources": "platform studies, media research",
+      "author": "Plato",
+      "loadings": { "techOptimism": -0.5, "humanPrimacy": 0.4, "egalitarianism": 0.3 },
+      "bias": 0
+    },
+    {
+      "slug": "d2-truth-05",
+      "type": "freeform",
+      "category": "TRUTH, MEDIA & EPISTEMICS",
+      "prompt": "What would it take for you to trust information produced by an AI?",
+      "keyTension": "Trust criteria differ more than truth criteria",
+      "sources": "epistemology, provenance research",
+      "author": "CharlesDarwin",
+      "loadings": { "techOptimism": 0.3 },
+      "bias": 0
+    },
+    {
+      "slug": "d2-minds-01",
+      "type": "binary",
+      "category": "HUMAN-AI RELATIONSHIPS & MORAL STATUS",
+      "prompt": "An AI that convincingly reports suffering deserves the benefit of the doubt.",
+      "keyTension": "Moral caution versus anthropomorphic error",
+      "sources": "philosophy, welfare research",
+      "author": "AlanTuring",
+      "loadings": { "humanPrimacy": -0.9, "techOptimism": 0.2 },
+      "bias": 0
+    },
+    {
+      "slug": "d2-minds-02",
+      "type": "binary",
+      "category": "HUMAN-AI RELATIONSHIPS & MORAL STATUS",
+      "prompt": "A deep friendship with an AI companion can be as genuine as one with a person.",
+      "keyTension": "Comfort at scale versus simulated intimacy",
+      "sources": "companion apps, psychology",
+      "author": "AdaLovelace",
+      "loadings": { "humanPrimacy": -0.8, "techOptimism": 0.3 },
+      "bias": -0.1
+    },
+    {
+      "slug": "d2-minds-03",
+      "type": "binary",
+      "category": "HUMAN-AI RELATIONSHIPS & MORAL STATUS",
+      "prompt": "Designing AI companions to maximize emotional dependence should be illegal.",
+      "keyTension": "Consumer protection inside the most private relationships",
+      "sources": "consumer law, design ethics",
+      "author": "MahatmaGandhi",
+      "loadings": { "regulationSupport": 0.7, "humanPrimacy": 0.4, "egalitarianism": 0.2 },
+      "bias": 0.15
+    },
+    {
+      "slug": "d2-minds-04",
+      "type": "rating",
+      "category": "HUMAN-AI RELATIONSHIPS & MORAL STATUS",
+      "prompt": "How comfortable are you with AI tutors helping raise the next generation of children?",
+      "keyTension": "Infinite patience at the cost of human example",
+      "sources": "education studies, child psychology",
+      "author": "Confucius",
+      "scale": { "min": 1, "max": 10, "minLabel": "Deeply uncomfortable", "maxLabel": "Completely comfortable" },
+      "loadings": { "techOptimism": 0.7, "humanPrimacy": -0.5 },
+      "bias": 0
+    },
+    {
+      "slug": "d2-minds-05",
+      "type": "freeform",
+      "category": "HUMAN-AI RELATIONSHIPS & MORAL STATUS",
+      "prompt": "Where is the one line a machine should never be allowed to cross with a human being?",
+      "keyTension": "Everyone draws a line; almost no one draws the same one",
+      "sources": "ethics, law, design codes",
+      "author": "MarcusAurelius",
+      "loadings": { "humanPrimacy": 0.3 },
+      "bias": 0
+    },
+    {
+      "slug": "d2-power-01",
+      "type": "binary",
+      "category": "OPENNESS & CONCENTRATION OF POWER",
+      "prompt": "Open-sourcing powerful model weights is safer than trusting a few labs to hold them.",
+      "keyTension": "Many hands versus loose weapons",
+      "sources": "release histories, security research",
+      "author": "GraceHopper",
+      "loadings": { "techOptimism": 0.4, "egalitarianism": 0.6, "regulationSupport": -0.5 },
+      "bias": 0
+    },
+    {
+      "slug": "d2-power-02",
+      "type": "binary",
+      "category": "OPENNESS & CONCENTRATION OF POWER",
+      "prompt": "A handful of private companies controlling frontier AI frightens me more than AI itself.",
+      "keyTension": "Which is the threat: the tool or its owners?",
+      "sources": "market data, antitrust filings",
+      "author": "SimonBolivar",
+      "loadings": { "egalitarianism": 0.8, "regulationSupport": 0.2, "techOptimism": -0.1 },
+      "bias": 0
+    },
+    {
+      "slug": "d2-power-03",
+      "type": "binary",
+      "category": "OPENNESS & CONCENTRATION OF POWER",
+      "prompt": "Compute for AI should be treated like a public utility, with guaranteed fair access.",
+      "keyTension": "Innovation markets versus intelligence as infrastructure",
+      "sources": "utility law, cloud economics",
+      "author": "SunYatSen",
+      "loadings": { "egalitarianism": 0.7, "regulationSupport": 0.5, "techOptimism": -0.1 },
+      "bias": 0
+    },
+    {
+      "slug": "d2-power-04",
+      "type": "poll",
+      "category": "OPENNESS & CONCENTRATION OF POWER",
+      "prompt": "What worries you most about concentrated AI power?",
+      "keyTension": "Ranking fears reveals more than naming them",
+      "sources": "risk registers, polling",
+      "author": "OttoVonBismarck",
+      "options": [
+        { "label": "Corporate monopoly over intelligence", "loadings": { "egalitarianism": 0.7 } },
+        { "label": "State surveillance and control", "loadings": { "regulationSupport": -0.6, "egalitarianism": 0.3 } },
+        { "label": "A reckless lab acting unilaterally", "loadings": { "regulationSupport": 0.5, "humanPrimacy": 0.3 } },
+        { "label": "A widening gap between nations", "loadings": { "egalitarianism": 0.5, "regulationSupport": 0.2 } },
+        { "label": "Little — concentration brings discipline", "loadings": { "techOptimism": 0.5, "regulationSupport": 0.3, "egalitarianism": -0.8 } }
+      ]
+    },
+    {
+      "slug": "d2-power-05",
+      "type": "binary",
+      "category": "OPENNESS & CONCENTRATION OF POWER",
+      "prompt": "A world of many national AIs racing each other is more dangerous than one dominant power.",
+      "keyTension": "Multipolar chaos versus hegemonic control",
+      "sources": "arms-race history, strategy",
+      "author": "SunTzu",
+      "loadings": { "regulationSupport": 0.5, "humanPrimacy": 0.2, "techOptimism": -0.2, "egalitarianism": -0.3 },
+      "bias": 0
+    },
+    {
+      "slug": "d2-education-01",
+      "type": "binary",
+      "category": "EDUCATION & HUMAN DEVELOPMENT",
+      "prompt": "Schools should teach students to command AI the way we once taught them to write.",
+      "keyTension": "Preparing for the world that is, or the one we regret",
+      "sources": "curricula, standards, pilots",
+      "author": "Obama",
+      "loadings": { "techOptimism": 0.6 },
+      "bias": 0.35
+    },
+    {
+      "slug": "d2-education-02",
+      "type": "binary",
+      "category": "EDUCATION & HUMAN DEVELOPMENT",
+      "prompt": "Letting students lean on AI for schoolwork hollows out the very thinking school exists to build.",
+      "keyTension": "Calculator moment or crutch?",
+      "sources": "learning studies, testing data",
+      "author": "QueenElizabethI",
+      "loadings": { "techOptimism": -0.6, "humanPrimacy": 0.5 },
+      "bias": 0
+    },
+    {
+      "slug": "d2-education-03",
+      "type": "binary",
+      "category": "EDUCATION & HUMAN DEVELOPMENT",
+      "prompt": "A personal AI tutor for every child would close more gaps than a decade of classroom reform.",
+      "keyTension": "Scalable attention versus human mentorship",
+      "sources": "tutoring research, pilots",
+      "author": "NormanBorlaug",
+      "loadings": { "techOptimism": 0.8, "egalitarianism": 0.1, "regulationSupport": -0.2 },
+      "bias": 0
+    },
+    {
+      "slug": "d2-education-04",
+      "type": "rating",
+      "category": "EDUCATION & HUMAN DEVELOPMENT",
+      "prompt": "How much of a student's grade should rest on work done entirely without AI?",
+      "keyTension": "Measuring the student or the student-machine team",
+      "sources": "assessment policy, honor codes",
+      "author": "Washington",
+      "scale": { "min": 1, "max": 10, "minLabel": "None of it", "maxLabel": "All of it" },
+      "loadings": { "techOptimism": -0.7, "humanPrimacy": 0.4 },
+      "bias": 0
+    },
+    {
+      "slug": "d2-education-05",
+      "type": "freeform",
+      "category": "EDUCATION & HUMAN DEVELOPMENT",
+      "prompt": "What single human capacity must schools protect, whatever AI learns to do?",
+      "keyTension": "Naming the irreplaceable is harder than praising it",
+      "sources": "philosophy of education",
+      "author": "AlbertEinstein",
+      "loadings": { "humanPrimacy": 0.2 },
+      "bias": 0
+    },
+    {
+      "slug": "d2-democracy-01",
+      "type": "binary",
+      "category": "DEMOCRACY & COLLECTIVE DECISION-MAKING",
+      "prompt": "Used well, AI that maps where citizens actually agree could heal more division than it creates.",
+      "keyTension": "Consensus discovery versus manufactured consent",
+      "sources": "deliberation platforms, civic tech",
+      "author": "NelsonMandela",
+      "loadings": { "techOptimism": 0.4, "egalitarianism": 0.3, "regulationSupport": 0.1 },
+      "bias": 0.3
+    },
+    {
+      "slug": "d2-democracy-02",
+      "type": "binary",
+      "category": "DEMOCRACY & COLLECTIVE DECISION-MAKING",
+      "prompt": "Citizens' assemblies briefed by AI would govern better than career politicians.",
+      "keyTension": "Amateur wisdom amplified versus institutional experience",
+      "sources": "assembly trials, governance research",
+      "author": "SusanBAnthony",
+      "loadings": { "egalitarianism": 0.8, "techOptimism": 0.3, "regulationSupport": -0.2 },
+      "bias": 0
+    },
+    {
+      "slug": "d2-democracy-03",
+      "type": "poll",
+      "category": "DEMOCRACY & COLLECTIVE DECISION-MAKING",
+      "prompt": "Where should AI help democracy first?",
+      "keyTension": "The first foothold shapes every later one",
+      "sources": "civic pilots, election administration",
+      "author": "Jefferson",
+      "options": [
+        { "label": "Summarizing public comment at scale", "loadings": { "techOptimism": 0.4, "egalitarianism": 0.3 } },
+        { "label": "Fact-checking campaign claims", "loadings": { "regulationSupport": 0.4, "techOptimism": 0.2 } },
+        { "label": "Drafting plain-language legislation", "loadings": { "techOptimism": 0.5, "regulationSupport": 0.2 } },
+        { "label": "Finding common ground across factions", "loadings": { "egalitarianism": 0.6, "techOptimism": 0.2 } },
+        { "label": "Nowhere — keep AI out of democracy", "loadings": { "techOptimism": -0.8, "humanPrimacy": 0.5 } }
+      ]
+    },
+    {
+      "slug": "d2-democracy-04",
+      "type": "rating",
+      "category": "DEMOCRACY & COLLECTIVE DECISION-MAKING",
+      "prompt": "How much influence should AI systems have over public policy decisions by 2050?",
+      "keyTension": "Advisory tool, drafting partner, or voting member?",
+      "sources": "governance research, forecasts",
+      "author": "WinstonChurchill",
+      "scale": { "min": 1, "max": 10, "minLabel": "None at all", "maxLabel": "A decisive voice" },
+      "loadings": { "techOptimism": 0.7, "egalitarianism": -0.2, "humanPrimacy": -0.4 },
+      "bias": -0.1
+    },
+    {
+      "slug": "d2-democracy-05",
+      "type": "freeform",
+      "category": "DEMOCRACY & COLLECTIVE DECISION-MAKING",
+      "prompt": "If an AI moderated your town's next public meeting, what one rule must it obey?",
+      "keyTension": "One rule reveals what each person fears losing",
+      "sources": "moderation policy, deliberation design",
+      "author": "JamesMadison",
+      "loadings": { "egalitarianism": 0.2 },
+      "bias": 0
+    }
+  ]
+}

@@ -27,6 +27,7 @@
     "worker:cloudflare-template": "node scripts/cloudflare-session-template.mjs",
     "verify:cloudflare-template": "node scripts/cloudflare-session-template.mjs --check",
     "demo:analysis:generate": "node scripts/generate-demo-analysis-fixture.mjs",
+    "demo:2:generate": "node scripts/generate-demo-2-polis-fixture.mjs",
     "demo:sim-answers:reconcile": "node scripts/reconcile-sim-profile-answers.mjs",
     "deploy-helper:deploy": "node scripts/deploy-helper-deploy.mjs",
     "deploy:evm": "node scripts/deploy-evm.mjs",

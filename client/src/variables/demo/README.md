@@ -16,6 +16,9 @@ This directory contains demo and fixture data for the Context Engine survey plat
 | [`historical_figures_tree_qs_and_votes.json`](./historical_figures_tree_qs_and_votes.json) | Debate-oriented dataset for 66 figures with tree-structured questions, in-character comments, and vote stances. Used by debate tree and political compass views. |
 | [`demo_polis_data.json`](./demo_polis_data.json) | Polis-format clustering dataset with participants, vote arrays, and group assignments. Used by the demo analysis adapter and Polis report surfaces. |
 | [`demo_1_onchain_question_ids.json`](./demo_1_onchain_question_ids.json) | Stable IDs for the 42 Context corpus questions shared by legacy `demo-1` and Cloudflare-canonical `demo-sh`. |
+| [`demo_2_question_set.json`](./demo_2_question_set.json) | Source set for the 40-question `demo-2` session, including binary, poll, rating, and freeform prompts. |
+| [`demo_2_persona_stances.json`](./demo_2_persona_stances.json) | Source stance model for 62 demo personas across three clusters. |
+| [`demo_2_polis_data.json`](./demo_2_polis_data.json) | Generated `demo-2` Polis fixture with deterministic votes, typed responses, and cluster analysis. Do not edit by hand. |
 | [`demo_analysis_data.json`](./demo_analysis_data.json) | Dedicated breakdown-tab analysis fixture. Uses the canonical 42 questions and seeded historical-figure personas, then expands them with deterministic synthetic responses so the breakdown view has richer comparison density without hardcoding question content in the generator. Participant rows now also carry explicit profile metadata so the UI can distinguish baseline historical personas from modeled variants. |
 | [`demo_analysis_generation_config.json`](./demo_analysis_generation_config.json) | Corpus-backed curation config for the breakdown fixture generator. Keeps vetted question-to-node mappings, selected statement overrides, and deterministic synthetic-response settings in demo data, not in the generator script. Variant profiles include labels, rationale, and confidence so modeled rows stay inspectable. |
 | [`demo_sessions.json`](./demo_sessions.json) | Demo session definitions keyed by slug with metadata and worker configuration. Used by session resolution code and worker/cors proxy tests. |
@@ -64,6 +67,22 @@ The question fixture supplies an immediate client rendering of the same
 stable IDs and prompts stored in `demo-sh` KV. These rows are marked
 `cloudflareDemoSeed`, not `temporaryDemoSeed`. `demo-1` remains in the fixture
 as a temporary compatibility route while links migrate.
+
+## Regenerating The Demo-2 Fixture
+
+Edit `demo_2_question_set.json` or `demo_2_persona_stances.json`, then regenerate
+the derived Polis fixture from the repository root:
+
+```bash
+npm run demo:2:generate
+```
+
+Generation is deterministic, so unchanged inputs must produce no diff. The
+dataset registry in `utilities/demo/demoPolisDatasets.ts` keeps the legacy demo
+slugs on `demo_polis_data.json`, gives only `demo-2` the generated override,
+and excludes `demo-2` from analysis until a matching analysis fixture exists.
+Worker URLs and AI credentials remain operational session configuration and
+must never be stored in these fixtures.
 
 ## Conceptual Data Pipeline
 
