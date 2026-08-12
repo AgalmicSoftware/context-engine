@@ -5,6 +5,7 @@ export const STALE_CHUNK_RELOAD_STORAGE_KEY = 'ce:staleChunkReloadAttempted:v202
 type BootStorage = {
   clear?: () => void;
   getItem?: (key: string) => string | null;
+  removeItem?: (key: string) => void;
   setItem?: (key: string, value: string) => void;
 };
 
@@ -21,6 +22,7 @@ type BootLocation = {
 
 type BootHistory = {
   replaceState?: (data: unknown, unused: string, url?: string | URL | null) => void;
+  state?: unknown;
 };
 
 type BootWindow = {
@@ -151,13 +153,25 @@ export const clearBootReloadMarker = (
   win: BootWindow = globalThis.window,
   reloadParam = BOOT_RELOAD_PARAM,
 ): boolean => {
+  if (reloadParam === BOOT_RELOAD_PARAM) {
+    try {
+      win?.sessionStorage?.removeItem?.(STALE_CHUNK_RELOAD_STORAGE_KEY);
+    } catch {
+      // Successful boot cleanup is best-effort when storage is unavailable.
+    }
+  }
+
   if (!win?.location || !win.history?.replaceState) return false;
 
   try {
     const url = new URL(win.location.href);
-    if (!url.searchParams.has(reloadParam)) return false;
-    url.searchParams.delete(reloadParam);
-    win.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+    const reloadParams =
+      reloadParam === BOOT_RELOAD_PARAM
+        ? [BOOT_RELOAD_PARAM, STALE_CHUNK_RELOAD_PARAM]
+        : [reloadParam];
+    if (!reloadParams.some((param) => url.searchParams.has(param))) return false;
+    reloadParams.forEach((param) => url.searchParams.delete(param));
+    win.history.replaceState(win.history.state ?? null, '', `${url.pathname}${url.search}${url.hash}`);
     return true;
   } catch {
     return false;

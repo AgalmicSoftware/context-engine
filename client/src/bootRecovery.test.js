@@ -19,28 +19,37 @@ describe('bootRecovery', () => {
     jest.useRealTimers();
   });
 
-  it('clears the boot reload marker after a successful startup without dropping other URL state', () => {
+  it('clears successful boot recovery markers without dropping other URL or history state', () => {
     const replaceState = jest.fn();
+    const removeItem = jest.fn();
+    const historyState = { idx: 2, usr: { from: 'docs' } };
     const fakeWindow = {
-      history: { replaceState },
+      history: { replaceState, state: historyState },
       location: {
-        href: 'https://contextengine.example.test/ce/docs?ceBootReload=123&session=alpha#guide',
+        href: 'https://contextengine.example.test/ce/docs?ceBootReload=123&ceChunkReload=456&session=alpha#guide',
       },
+      sessionStorage: { clear: jest.fn(), removeItem },
     };
 
     expect(clearBootReloadMarker(fakeWindow)).toBe(true);
-    expect(replaceState).toHaveBeenCalledWith(null, '', '/ce/docs?session=alpha#guide');
+    expect(replaceState).toHaveBeenCalledWith(historyState, '', '/ce/docs?session=alpha#guide');
+    expect(removeItem).toHaveBeenCalledWith('ce:staleChunkReloadAttempted:v20260618b');
+    expect(fakeWindow.sessionStorage.clear).not.toHaveBeenCalled();
   });
 
-  it('leaves the URL unchanged when no boot reload marker is present', () => {
+  it('clears only the stale-chunk sentinel when no recovery URL marker is present', () => {
     const replaceState = jest.fn();
+    const removeItem = jest.fn();
     const fakeWindow = {
       history: { replaceState },
       location: { href: 'https://contextengine.example.test/docs?session=alpha' },
+      sessionStorage: { clear: jest.fn(), removeItem },
     };
 
     expect(clearBootReloadMarker(fakeWindow)).toBe(false);
     expect(replaceState).not.toHaveBeenCalled();
+    expect(removeItem).toHaveBeenCalledWith('ce:staleChunkReloadAttempted:v20260618b');
+    expect(fakeWindow.sessionStorage.clear).not.toHaveBeenCalled();
   });
 
   it('renders a visible startup failure instead of leaving the root blank', async () => {
@@ -240,6 +249,7 @@ describe('bootRecovery', () => {
     const reload = jest.fn();
     const storage = {
       getItem: jest.fn(() => 'true'),
+      removeItem: jest.fn(),
       setItem: jest.fn(),
     };
     const fakeWindow = {
@@ -258,6 +268,7 @@ describe('bootRecovery', () => {
     ).toBe(false);
 
     expect(storage.setItem).not.toHaveBeenCalled();
+    expect(storage.removeItem).not.toHaveBeenCalled();
     expect(reload).not.toHaveBeenCalled();
   });
 });
