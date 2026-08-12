@@ -17,6 +17,7 @@ const {
   runRouteProbe,
   summarizeFailures,
 } = require('./vite-navigation-smoke');
+const { dismissOnboardingIfPresent } = require('./test-session-demo.ui');
 
 test('default navigation smoke covers Docs and its legacy contracts alias', () => {
   assert.ok(DEFAULT_ROUTES.includes('/docs'));
@@ -73,6 +74,37 @@ test('runRouteProbe normalizes reported failures and fails closed on probe error
     ['results did not hydrate'],
   );
   assert.deepEqual(await runRouteProbe(page, null, context), []);
+});
+
+test('demo results probe dismisses first-run onboarding before clicking covered controls', async () => {
+  const calls = [];
+  const overlay = {
+    count: async () => 1,
+    getByRole: (role, options) => {
+      assert.equal(role, 'button');
+      assert.match('Skip', options.name);
+      return { click: async () => calls.push('skip') };
+    },
+    waitFor: async (options) => calls.push(`wait:${options.state}:${options.timeout}`),
+  };
+
+  await dismissOnboardingIfPresent({ getByTestId: () => overlay }, { timeoutMs: 1234 });
+
+  assert.deepEqual(calls, ['skip', 'wait:detached:1234']);
+});
+
+test('demo results probe leaves an already-complete onboarding state untouched', async () => {
+  let lookedForSkip = false;
+  const overlay = {
+    count: async () => 0,
+    getByRole: () => {
+      lookedForSkip = true;
+    },
+  };
+
+  await dismissOnboardingIfPresent({ getByTestId: () => overlay }, { timeoutMs: 1234 });
+
+  assert.equal(lookedForSkip, false);
 });
 
 test('session smoke markers survive both resolving and loaded pe4 shell states', () => {
