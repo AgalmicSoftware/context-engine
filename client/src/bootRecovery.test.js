@@ -19,6 +19,30 @@ describe('bootRecovery', () => {
     jest.useRealTimers();
   });
 
+  it('clears the boot reload marker after a successful startup without dropping other URL state', () => {
+    const replaceState = jest.fn();
+    const fakeWindow = {
+      history: { replaceState },
+      location: {
+        href: 'https://contextengine.example.test/ce/docs?ceBootReload=123&session=alpha#guide',
+      },
+    };
+
+    expect(clearBootReloadMarker(fakeWindow)).toBe(true);
+    expect(replaceState).toHaveBeenCalledWith(null, '', '/ce/docs?session=alpha#guide');
+  });
+
+  it('leaves the URL unchanged when no boot reload marker is present', () => {
+    const replaceState = jest.fn();
+    const fakeWindow = {
+      history: { replaceState },
+      location: { href: 'https://contextengine.example.test/docs?session=alpha' },
+    };
+
+    expect(clearBootReloadMarker(fakeWindow)).toBe(false);
+    expect(replaceState).not.toHaveBeenCalled();
+  });
+
   it('renders a visible startup failure instead of leaving the root blank', async () => {
     const reload = jest.fn();
     const clearCaches = jest.fn().mockResolvedValue(undefined);

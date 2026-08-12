@@ -19,12 +19,13 @@ type BootLocation = {
   reload?: () => void;
 };
 
+type BootHistory = {
+  replaceState?: (data: unknown, unused: string, url?: string | URL | null) => void;
+};
+
 type BootWindow = {
   caches?: BootCacheApi;
-  history?: {
-    replaceState?: (data: unknown, unused: string, url?: string | URL | null) => void;
-    state?: unknown;
-  };
+  history?: BootHistory;
   localStorage?: BootStorage;
   location?: BootLocation;
   sessionStorage?: BootStorage;
@@ -141,6 +142,23 @@ export const clearBootReloadMarker = (
 const hasReloadParam = (win: BootWindow, reloadParam: string): boolean => {
   try {
     return win.location ? new URL(win.location.href).searchParams.has(reloadParam) : false;
+  } catch {
+    return false;
+  }
+};
+
+export const clearBootReloadMarker = (
+  win: BootWindow = globalThis.window,
+  reloadParam = BOOT_RELOAD_PARAM,
+): boolean => {
+  if (!win?.location || !win.history?.replaceState) return false;
+
+  try {
+    const url = new URL(win.location.href);
+    if (!url.searchParams.has(reloadParam)) return false;
+    url.searchParams.delete(reloadParam);
+    win.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+    return true;
   } catch {
     return false;
   }

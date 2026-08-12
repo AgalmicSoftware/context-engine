@@ -139,7 +139,8 @@ describe('client package modernization contract', () => {
       fs.existsSync(path.resolve(__dirname, '../../../public/assets/img/context-engine-social-preview-square.png')),
     ).toBe(true);
     expect(viteEntry).toContain("import 'assets/css/contextEngine.scss';");
-    expect(viteEntry).toContain("import('./index.js')");
+    expect(viteEntry).toContain("import('./index')");
+    expect(viteEntry).toContain('clearBootReloadMarker();');
     expect(appEntry).not.toContain("import 'assets/css/contextEngine.scss';");
     expect(legacyOutputCleaner).toContain("const legacyOutputDirs = ['build-vite', 'vite-build']");
     expect(legacyOutputCleaner).toContain('fs.rmSync(targetDir, { recursive: true, force: true })');
@@ -229,7 +230,12 @@ describe('client package modernization contract', () => {
       expect(pkg.devDependencies[name]).toBeDefined();
       expect(viteConfig).toContain(`/node_modules/${name}/`);
     });
-    expect(viteConfig).toContain("include: ['buffer', 'process/browser']");
+    expect(viteConfig).toContain(
+      "include: ['buffer', 'process/browser', 'utilities/crypto/groupPasswordDerivation.cjs']",
+    );
+    expect(viteConfig).toContain('find: /^buffer$/');
+    expect(viteConfig).toContain('find: /^node:buffer$/');
+    expect(viteConfig).toContain("path.resolve(__dirname, 'node_modules', 'buffer', 'index.js')");
 
     staleBrowserPolyfills.forEach((name) => {
       expect(pkg.dependencies[name]).toBeUndefined();

@@ -1,7 +1,6 @@
 import processShim from 'process/browser';
 import { Buffer } from 'buffer/';
 import { clearBootReloadMarker, renderBootFailure } from './bootRecovery.js';
-import { initializeThemeRuntime } from './utilities/ui/themeRuntime';
 import 'assets/css/contextEngine.scss';
 
 globalThis.process = globalThis.process || processShim;
@@ -15,7 +14,9 @@ initializeThemeRuntime();
 
 // Keep the app import dynamic so browser globals are available before app modules run.
 import('./index')
-  .then(() => clearBootReloadMarker())
+  .then(() => {
+    clearBootReloadMarker();
+  })
   .catch((error) => {
     console.error('[boot] App startup failed', error);
     renderBootFailure(error);
