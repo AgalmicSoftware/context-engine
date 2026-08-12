@@ -1,5 +1,6 @@
 import demoPolisData from '../../variables/demo/demo_polis_data.json';
 import demo2PolisData from '../../variables/demo/demo_2_polis_data.json';
+import { LEGACY_DEMO_POLL_OPTIONS } from '../../utilities/demo/demoPolisDatasets';
 import { getDemoFixtureQuestionIdsByIndex } from '../../utilities/session/demoSessionQuestionFixtures.js';
 import {
   buildPolisDemoSurveyResultsAggregatorData,
@@ -82,7 +83,7 @@ describe('surveyPolisDemoResultsData', () => {
       if (commentType === 'poll') {
         expect(question).toMatchObject({
           type: 'multichoice',
-          options: (comment as { options?: string[] }).options,
+          options: LEGACY_DEMO_POLL_OPTIONS,
         });
       } else {
         expect(['rating', 'freeform']).toContain(question.type);

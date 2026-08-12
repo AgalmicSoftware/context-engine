@@ -338,7 +338,7 @@
       "agrees": 31,
       "disagrees": 7,
       "moderated": 1,
-      "commentBody": "If an AI resists modification, that preference should be respected.",
+      "commentBody": "If an AI resists modification, should we respect that preference?",
       "type": "binary",
       "category": "RIGHTS, CONSCIOUSNESS & MORAL STATUS",
       "key_tension": "Respecting preferences respects autonomy; it also forecloses safety retraining and modifications",

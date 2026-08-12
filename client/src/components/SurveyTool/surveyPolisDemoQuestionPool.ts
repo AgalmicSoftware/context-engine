@@ -1,4 +1,5 @@
 import demoPolisData from '../../variables/demo/demo_polis_data.json';
+import { LEGACY_DEMO_POLL_OPTIONS } from '../../utilities/demo/demoPolisDatasets';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -36,8 +37,8 @@ const normalizePolisQuestionType = (value: unknown = ''): string => {
   return type || 'binary';
 };
 
-const readPollOptions = (comment: UnknownRecord): string[] => {
-  const options = Array.isArray(comment.options) ? comment.options : [];
+const readPollOptions = (comment: UnknownRecord, legacyFallback = false): string[] => {
+  const options = legacyFallback ? LEGACY_DEMO_POLL_OPTIONS : Array.isArray(comment.options) ? comment.options : [];
   const seen = new Set<string>();
   return options.reduce<string[]>((out, option) => {
     const value = readString(option);
@@ -67,7 +68,7 @@ export const buildPolisDemoQuestionPool = (
       const keyTension = readString(comment.key_tension);
       const sources = readString(comment.sources);
       const type = normalizePolisQuestionType(comment.type);
-      const options = type === 'multichoice' ? readPollOptions(comment) : [];
+      const options = type === 'multichoice' ? readPollOptions(comment, source === demoPolisData) : [];
 
       return {
         id,

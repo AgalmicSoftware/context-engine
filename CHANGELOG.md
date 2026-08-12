@@ -15,10 +15,11 @@ All notable changes to this project will be documented in this file.
   the public default until a dedicated demo-2 Worker, canonical question seed,
   and Worker-held AI key pass live voice/AI verification; no credential is
   stored in the preview config or fixture data.
-- Corrected the legacy demo fixture so every poll carries its own choices,
-  binary tallies match the checked-in votes, and tri-state sentiment is never
-  presented as a poll, rating, or freeform answer. Direct Debate Map issue
-  links now close back to the Atlas index when no safe return target exists.
+- Preserved the published `demo-sh` question fixture exactly while preventing
+  tri-state sentiment from being presented as a poll, rating, or freeform
+  answer. Distinct corrected choices for legacy polls remain deferred until a
+  deliberate Worker reseed. Direct Debate Map issue links now close back to the
+  Atlas index when no safe return target exists.
 - Made SBT and related holder-cache writes atomic across discovery, detail
   hydration, profile scans, filters, selectors, and realtime events. Delayed
   scans now preserve newer activity, unrelated networks, and concurrent user

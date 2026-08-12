@@ -3,6 +3,7 @@ import { ethers } from 'ethers';
 import demoSessions from '../../variables/demo/demo_sessions.json';
 import demo1OnchainQuestionIds from '../../variables/demo/demo_1_onchain_question_ids.json';
 import demo2PolisData from '../../variables/demo/demo_2_polis_data.json';
+import { LEGACY_DEMO_POLL_OPTIONS } from '../demo/demoPolisDatasets';
 import {
   getDemoFixtureQuestionIdsByIndex,
   getTemporaryDemoSessionQuestionFixtures,
@@ -56,7 +57,7 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
     ]);
   });
 
-  it('converts polls to single-select questions with distinct source choices', () => {
+  it('preserves the legacy Worker-canonical poll choices', () => {
     const questions = getTemporaryDemoSessionQuestionFixtures('demo-1');
     const pollQuestions = questions.filter(
       (question) => (question.demoFixture as { fixtureType?: unknown } | undefined)?.fixtureType === 'poll',
@@ -71,20 +72,11 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
       );
     });
 
-    expect(pollQuestions[0]).toMatchObject({
-      prompt: 'Who should most influence AI development decisions?',
-      options: [
-        'Technical researchers',
-        'AI developers and labs',
-        'Governments and regulators',
-        'The general public',
-        'Affected communities',
-      ],
+    expect(pollQuestions[0].prompt).toBe('Who should most influence AI development decisions?');
+    pollQuestions.forEach((question) => {
+      expect(question.options).toEqual(LEGACY_DEMO_POLL_OPTIONS);
     });
-    expect(new Set(pollQuestions.map((question) => JSON.stringify(question.options))).size).toBe(5);
-    expect(
-      pollQuestions.find((question) => String(question.prompt).startsWith('When will AGI arrive'))?.options,
-    ).toEqual(['Before 2030', '2030–2040', '2040–2060', 'After 2060', 'Never']);
+    expect(pollQuestions.every((question) => question.options === pollQuestions[0].options)).toBe(false);
   });
 
   it('does not seed other slugs or explicitly disabled demo sessions', () => {

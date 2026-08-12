@@ -1,4 +1,5 @@
 import demoPolisData from '../../variables/demo/demo_polis_data.json';
+import { LEGACY_DEMO_POLL_OPTIONS } from '../../utilities/demo/demoPolisDatasets';
 import {
   buildPolisDemoQuestionPool,
   resolvePolisDemoQuestionPool,
@@ -23,7 +24,7 @@ describe('surveyPolisDemoQuestionPool', () => {
     );
   });
 
-  it('preserves typed question metadata and each poll\'s own choices', () => {
+  it('preserves typed question metadata and the legacy Worker poll choices', () => {
     const pool = buildPolisDemoQuestionPool();
     const comments = demoPolisData.comments as Array<{
       type: string;
@@ -35,7 +36,7 @@ describe('surveyPolisDemoQuestionPool', () => {
       if (comment.type === 'poll') {
         expect(question).toMatchObject({
           type: 'multichoice',
-          options: comment.options,
+          options: LEGACY_DEMO_POLL_OPTIONS,
           singleSelect: true,
         });
         expect(new Set(question.options?.map((option) => option.toLowerCase())).size).toBe(

@@ -3,6 +3,7 @@ import { ethers } from 'ethers';
 import demo1OnchainQuestionIds from '../../variables/demo/demo_1_onchain_question_ids.json';
 import demo2PolisData from '../../variables/demo/demo_2_polis_data.json';
 import demoPolisData from '../../variables/demo/demo_polis_data.json';
+import { LEGACY_DEMO_POLL_OPTIONS } from '../demo/demoPolisDatasets';
 import { normalizeSessionSlug } from './sessionNaming.js';
 
 type DemoComment = Record<string, unknown>;
@@ -57,8 +58,10 @@ const uniqueStrings = (values: unknown[]): string[] => {
   return out;
 };
 
-const readCommentPollOptions = (comment: DemoComment): string[] =>
-  uniqueStrings(Array.isArray(comment.options) ? comment.options : []);
+const readCommentPollOptions = (fixture: DemoFixtureRegistryEntry, comment: DemoComment): string[] =>
+  fixture === LEGACY_DEMO_FIXTURE
+    ? [...LEGACY_DEMO_POLL_OPTIONS]
+    : uniqueStrings(Array.isArray(comment.options) ? comment.options : []);
 
 const splitSources = (value: unknown): string[] =>
   String(value || '')
@@ -128,7 +131,7 @@ const buildDemoQuestionFromComment = (
     },
   };
   if (type === 'multichoice') {
-    question.options = readCommentPollOptions(comment);
+    question.options = readCommentPollOptions(fixture, comment);
     question.singleSelect = true;
   }
   if (type === 'rating' && comment.scale && typeof comment.scale === 'object' && !Array.isArray(comment.scale)) {

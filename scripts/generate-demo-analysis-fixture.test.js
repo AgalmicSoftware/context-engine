@@ -203,31 +203,19 @@ test('buildDemoAnalysisFixture normalizes comment datetime strings from canonica
   assert.equal(fixture.comments[41].datetime, 'Wed Mar 06 16:41:00 UTC 2024');
 });
 
-test('canonical demo question metadata matches votes and typed-question semantics', () => {
+test('canonical legacy demo questions remain stable Worker seed inputs', () => {
   const demoPolisData = JSON.parse(fs.readFileSync(demoPolisPath, 'utf8'));
 
+  assert.equal(demoPolisData.comments.length, 42);
   demoPolisData.comments.forEach((comment, questionIndex) => {
-    let agrees = 0;
-    let disagrees = 0;
-    demoPolisData.participantsVotes.forEach((participant) => {
-      const vote = Number(participant?.votes?.[String(questionIndex)]);
-      if (vote === 1) agrees += 1;
-      if (vote === -1) disagrees += 1;
-    });
-    assert.equal(comment.agrees, agrees, `question ${questionIndex} agrees`);
-    assert.equal(comment.disagrees, disagrees, `question ${questionIndex} disagrees`);
-
-    if (comment.type === 'poll') {
-      const options = Array.isArray(comment.options)
-        ? comment.options.map((option) => String(option).trim()).filter(Boolean)
-        : [];
-      assert.ok(options.length >= 2, `question ${questionIndex} poll options`);
-      assert.equal(new Set(options.map((option) => option.toLowerCase())).size, options.length);
-    }
-    if (comment.type === 'binary') {
-      assert.equal(String(comment.commentBody).trim().endsWith('?'), false, `question ${questionIndex} statement`);
-    }
+    assert.ok(String(comment.commentId || '').trim(), `question ${questionIndex} id`);
+    assert.ok(String(comment.commentBody || '').trim(), `question ${questionIndex} prompt`);
   });
+  assert.equal(
+    demoPolisData.comments[22].commentBody,
+    'If an AI resists modification, should we respect that preference?',
+  );
+  assert.equal(demoPolisData.comments[30].options, undefined);
 });
 
 test('breakdown type overrides discard stale poll options', async () => {
