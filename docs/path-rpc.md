@@ -14,7 +14,8 @@ For scan-scope, profile deep-scan, and RPC guardrail flags, see
   - client read-provider ordering (`client/src/variables/chains.ts`, `client/src/utilities/web3/contractScripts.impl.ts`)
   - worker/session RPC overrides (`workers/sessionCorsWorker/worker.js`, Session Wizard/Admin worker config payloads)
 
-Built-in anonymous RPC defaults live in `client/src/variables/rpcDefaults.js`.
+Built-in anonymous RPC defaults live in `shared/rpcDefaults.cjs`; the client
+`rpcDefaults.js` and `.ts` modules are runtime adapters.
 
 ## Current client defaults
 
@@ -50,7 +51,8 @@ When `CE_RPC_PROVIDER_MODE="infura_only"` and a paid override is configured for 
 of those chains, that chain uses only the configured paid RPC while other chains
 keep their normal PATH/public fallback order.
 
-Those fallback URLs come from `client/src/variables/rpcDefaults.js`.
+Those fallback URLs come from `shared/rpcDefaults.cjs` through the client
+runtime adapters.
 
 ## Important bootstrap exception
 
@@ -160,7 +162,7 @@ If the exact worker RPC matters, inspect the generated payload or set it explici
 
 ## Default Pocket endpoints used by the app
 
-These are the built-in PATH defaults in `client/src/variables/rpcDefaults.js`:
+These are the built-in PATH defaults in `shared/rpcDefaults.cjs`:
 
 - Ethereum Mainnet (1): `https://eth.api.pocket.network`
 - Optimism (10): `https://op.api.pocket.network`

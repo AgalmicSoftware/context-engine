@@ -292,8 +292,10 @@ SPA fallback concept, but their redirect config syntax differs.
 
 ## RPC Defaults
 
-- Canonical anonymous RPC defaults now live in `client/src/variables/rpcDefaults.js`.
-  That manifest is shared by the client runtime, Node scripts, and worker fallbacks.
+- Canonical anonymous RPC defaults live in `shared/rpcDefaults.cjs`. The
+  `client/src/variables/rpcDefaults.js` and `.ts` modules are thin CommonJS and
+  Vite adapters; Node scripts and worker fallbacks consume the same shared
+  manifest.
 - Session-sponsored RPC is not an anonymous default. For Survey contract reads,
   browser-visible session `rpcUrl` / `rpcUrlsByChainId` values are used only
   when the on-chain `rpc` gate is open or the current wallet already has a
