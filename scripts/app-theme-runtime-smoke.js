@@ -212,7 +212,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     const readBox = (locator) =>
       locator.evaluate((element) => {
         const rect = element.getBoundingClientRect();
-        return { height: rect.height, width: rect.width };
+        return { centerY: rect.top + rect.height / 2, height: rect.height, width: rect.width };
       });
     return { logo: await readBox(logo), login: await readBox(login) };
   };
@@ -1766,6 +1766,10 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     };
     assertMatchingBox(classicSessionHeaderGeometry.logo, currentSessionHeaderGeometry.logo, 'session logo');
     assertMatchingBox(classicSessionHeaderGeometry.login, currentSessionHeaderGeometry.login, 'session login button');
+    assert.ok(
+      Math.abs(classicSessionHeaderGeometry.logo.centerY - classicSessionHeaderGeometry.login.centerY) <= 0.5,
+      `Classic 95 session logo and login button should share a vertical center in ${viewportName}; received ${classicSessionHeaderGeometry.logo.centerY}px versus ${classicSessionHeaderGeometry.login.centerY}px`,
+    );
     assert.deepEqual(
       classicQuestionsSectionState,
       {

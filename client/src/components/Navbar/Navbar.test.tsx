@@ -192,4 +192,10 @@ describe('Navbar logo navigation', () => {
     expect(navbarStylesheet).not.toContain('width: 76px;');
     expect(navbarStylesheet).not.toContain('height: 58px;');
   });
+
+  it('vertically centers classic desktop-window account controls with the logo', () => {
+    expect(navbarStylesheet).toMatch(
+      /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)\s*{[\s\S]*?#navbarContainer,\s*#navbarContainerLoggedIn\s*{[\s\S]*?align-items:\s*center;/,
+    );
+  });
 });
