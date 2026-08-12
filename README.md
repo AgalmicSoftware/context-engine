@@ -8,7 +8,7 @@
 
 **Live demo:** [contextengine.sh](https://contextengine.sh)
 
-Context Engine is a decision-memory system for groups, organizations, and AI agents.
+Context Engine is a toolkit for AI-enhanced deliberation, decision-making, and negotiation in large groups. It supports public and private questions and responses, AI-assisted input and analysis, permanent records, and cryptographic access control. It allows for no-code deployment of [Soulbound Tokens](https://www.radicalxchange.org/wiki/social-identity/) for Groups. Designed for use cases such as public discourse, organizational decision-making, preference-related dataset creation, and turning stakeholder feedback into company-specific AI evaluations.
 
 It helps teams capture the context behind important decisions: assumptions, predictions, tradeoffs, confidence levels, disagreement, and outcomes. Instead of losing that context across meetings, chats, documents, and slide decks, Context Engine turns it into a structured record that humans and AI agents can revisit later.
 
@@ -80,6 +80,7 @@ For testing, run modes, and deeper setup:
 - Question generation from file, URL, or text input
 - Voice-to-text input
 - Summaries and analysis of survey results and response clusters
+- Export deliberation snapshots and consensus statistics as evaluation / preference datasets for AI benchmarking and training
 - OpenAI, Anthropic, OpenRouter, and custom provider paths
 
 ### User and Deployer UX: Passkey Sign-On

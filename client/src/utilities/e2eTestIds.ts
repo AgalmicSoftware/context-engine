@@ -38,6 +38,7 @@ export const E2E_TESTIDS = Object.freeze({
   PAGE_BOOKMARKS_ROOT: 'ce-page-bookmarks-root',
   PAGE_DOCS_ROOT: 'ce-page-docs-root',
   DOCS_SESSION_CONTEXT: 'ce-docs-session-context',
+  DOCS_CONTRACT_SESSION_SELECTOR: 'ce-docs-contract-session-selector',
   PAGE_ABOUT_ROOT: 'ce-page-about-root',
   PAGE_POSTS_ROOT: 'ce-page-posts-root',
   PAGE_ADMIN_ROOT: 'ce-page-admin-root',
@@ -108,8 +109,6 @@ export const E2E_TESTIDS = Object.freeze({
   SESSION_WORKER_PARTICIPANT_GROUP_LABEL: 'ce-session-worker-participant-group-label',
   SESSION_WORKER_PARTICIPANT_GROUP_SUBMIT: 'ce-session-worker-participant-group-submit',
   SURVEY_FILTER_TOGGLE: 'ce-survey-filter-toggle',
-  CONTRACTS_ADVANCED_EXTERNAL_NOTICE: 'ce-contracts-advanced-external-notice',
-
   // Wallet display (for E2E assertions)
   WALLET_DISPLAY: 'ce-wallet-display',
 

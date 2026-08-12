@@ -1,10 +1,15 @@
 import { t } from '../../utilities/ui/terminology.js';
 
+export type QuickstartLink = Readonly<{
+  href: string;
+  label: string;
+}>;
+
 export type QuickstartStep = Readonly<{
   id: string;
   title: string;
   body: string;
-  linkHref?: string;
+  links?: readonly QuickstartLink[];
 }>;
 
 export type GuideTopic = Readonly<{
@@ -20,7 +25,13 @@ export type FaqItem = Readonly<{
   answer: string;
 }>;
 
-const freezeQuickstartStep = (step: QuickstartStep): QuickstartStep => Object.freeze(step);
+const freezeQuickstartStep = (step: QuickstartStep): QuickstartStep => {
+  if (!step.links) return Object.freeze(step);
+  return Object.freeze({
+    ...step,
+    links: Object.freeze(step.links.map((link) => Object.freeze(link))),
+  });
+};
 const freezeGuideTopic = (topic: GuideTopic): GuideTopic =>
   Object.freeze({ ...topic, points: Object.freeze([...topic.points]) });
 const freezeFaqItem = (item: FaqItem): FaqItem => Object.freeze(item);
@@ -35,9 +46,12 @@ export const QUICKSTART_STEPS: readonly QuickstartStep[] = Object.freeze(
   [
     {
       id: 'open-session',
-      title: 'Open a session',
-      body: 'Follow a shared session link or replace <slug> in /session/<slug> with the session you want to join.',
-      linkHref: '/session/general',
+      title: 'Open or create a session',
+      body: 'Follow a shared session link, replace `<slug>` in `/session/<slug>` with the session you want to join, or create a session of your own.',
+      links: [
+        { href: '/session/general', label: 'Open /session/general' },
+        { href: '/session/new', label: 'Create a session' },
+      ],
     },
     {
       id: 'create-passkey-wallet',
@@ -73,7 +87,7 @@ export const GUIDE_TOPICS: readonly GuideTopic[] = Object.freeze(
       id: 'network',
       title: 'Chain and network',
       summary:
-        'Chain-backed sessions declare networkChainId and use that network for contracts and access checks. OP Sepolia is the default testnet; pure Worker sessions can be chain-free.',
+        'Chain-backed sessions declare `networkChainId` and use that network for contracts and access checks. OP Sepolia is the default testnet; pure Worker sessions can be chain-free.',
       points: [
         'The session context below shows the resolved chain for the documentation you are viewing.',
         'Contract addresses are session-specific and can differ between networks.',
@@ -82,9 +96,9 @@ export const GUIDE_TOPICS: readonly GuideTopic[] = Object.freeze(
     {
       id: 'access-gates',
       title: 'Access gates',
-      summary: `Chain-backed sessions can require one or more ${t('sbtFull')}s for a resource, using Any or All matching. SessionRegistry is authoritative for those on-chain gates.`,
+      summary: `Chain-backed sessions can require one or more ${t('sbtFull')}s for a resource, using Any or All matching. \`SessionRegistry\` is authoritative for those on-chain gates.`,
       points: [
-        'Supported resource keys are default, questionResponses, surveyResponses, docUploads, docUrls, ai, arweave, rpc, txGas, and lit.',
+        'Supported resource keys are `default`, `questionResponses`, `surveyResponses`, `docUploads`, `docUrls`, `ai`, `arweave`, `rpc`, `txGas`, and `lit`.',
         'Pure Worker sessions use their Worker roles and native Groups instead of inventing on-chain gate authority.',
       ],
     },
@@ -105,17 +119,17 @@ export const GUIDE_TOPICS: readonly GuideTopic[] = Object.freeze(
         'A session Worker can proxy resources that need protected credentials, including AI, transcription, RPC, testnet gas, Arweave, fetch, and Lit operations.',
       points: [
         'Resource access can be scoped by the session policy instead of exposing provider secrets to the browser.',
-        'The /sponsor flow creates grant-backed bundles that can prefill eligible setup resources for a new session.',
+        'The `/sponsor` flow creates grant-backed bundles that can prefill eligible setup resources for a new session.',
       ],
     },
     {
       id: 'document-library',
       title: 'Session document library',
       summary:
-        'Open /session/<slug>/docs to browse a session library. Depending on the profile, records are backed by Arweave or by private Worker-managed storage references.',
+        'Open `/session/<slug>/docs` to browse a session library. Depending on the profile, records are backed by Arweave or by private Worker-managed storage references.',
       points: [
         'Arweave libraries can store plaintext or Lit-encrypted files and link records.',
-        'The docUploads gate can supply the default encrypted audience; private “only me” saves use the connected wallet.',
+        'The `docUploads` gate can supply the default encrypted audience; private “only me” saves use the connected wallet.',
       ],
     },
     {
@@ -132,9 +146,9 @@ export const GUIDE_TOPICS: readonly GuideTopic[] = Object.freeze(
       id: 'limits-listening',
       title: 'Block limits and listening mode',
       summary:
-        'Chain-scanned sessions use blockLimits to bound discovery. Worker-canonical sessions can instead use sessionEndsAt to close participant mutations while preserving allowed reads and admin recovery.',
+        'Chain-scanned sessions use `blockLimits` to bound discovery. Worker-canonical sessions can instead use `sessionEndsAt` to close participant mutations while preserving allowed reads and admin recovery.',
       points: [
-        'Listening mode opens with ?mode=listening and starts recording only after you press Record.',
+        'Listening mode opens with `?mode=listening` and starts recording only after you press Record.',
         'Audio is transcribed in rolling three-minute segments and stitched into a transcript for draft question suggestions.',
       ],
     },

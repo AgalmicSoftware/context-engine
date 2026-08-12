@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { connect } from 'react-redux';
 import {
+  getAllSessionSlugs,
   getDemoSessionConfigBySlug,
   getSessionChainLabel,
   getSessionConfigBySlug,
@@ -18,18 +19,29 @@ import buildUserAnalysisPrompt from '../../prompts/userAnalysisPrompt.js';
 import styles from './DocsPage.module.scss';
 //
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faExpand, faCaretDown, faCaretUp, faCopy, faCheck } from '@fortawesome/free-solid-svg-icons';
+import { faGithub } from '@fortawesome/free-brands-svg-icons';
+import {
+  faCaretDown,
+  faCaretUp,
+  faCheck,
+  faCopy,
+  faExpand,
+} from '@fortawesome/free-solid-svg-icons';
 import { notify } from '../../utilities/ui/notify.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildPublicRoute, stripPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
-import { resolveDocsPageActiveSession, resolveDocsPageReferrerSlug } from './docsPageSessionResolution.js';
+import {
+  resolveDocsPageActiveSession,
+  resolveDocsPageReferrerSlug,
+  resolveDocsPageSessionConfig,
+} from './docsPageSessionResolution.js';
 import ContractViewer, { type ContractViewerContract } from './ContractViewer';
 import { normalizeContractKeyParam } from './contractMetadata.js';
 import { buildContractViewerContracts } from './contractViewerUtils.js';
 import { DOCS_PAGE_COPY, FAQ_ITEMS, GUIDE_TOPICS, QUICKSTART_STEPS } from './docsContent.js';
 import { sbtsListPath, t } from '../../utilities/ui/terminology.js';
-import { buildPublicContractSourceUrl } from '../../variables/publicRepoMetadata.js';
+import { PUBLIC_REPO_URL, buildPublicContractSourceUrl } from '../../variables/publicRepoMetadata.js';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 
 type DocsPageProps = {
@@ -59,6 +71,8 @@ type DocsSectionProps = {
   id: string;
   title: string;
 };
+
+const DOCS_GENERAL_SESSION_SELECT_VALUE = '__general__';
 
 const DocsSection = ({ children, contentClassName = '', defaultOpen = false, id, title }: DocsSectionProps) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
@@ -126,8 +140,64 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
   });
 
   const canonicalSlug = activeSession?.slug || ''; // '' means general
-  const sessionCapabilities = useMemo(() => resolveSessionCapabilityProjection(activeSession), [activeSession]);
+  const hasExplicitContractSession = urlSlugLike !== undefined || hasExplicitSessionQuery;
+  const [selectedContractSessionSlug, setSelectedContractSessionSlug] = useState<string | null>(() =>
+    hasExplicitContractSession ? canonicalSlug : null,
+  );
+
+  useEffect(() => {
+    setSelectedContractSessionSlug(hasExplicitContractSession ? canonicalSlug : null);
+  }, [canonicalSlug, hasExplicitContractSession]);
+
+  const selectedSession = useMemo(
+    () =>
+      selectedContractSessionSlug === null
+        ? null
+        : resolveDocsPageSessionConfig(selectedContractSessionSlug, {
+            allowGeneral: true,
+            resolveBySlug: getSessionConfigBySlug,
+            resolveDemoBySlug: (slug: string) => getDemoSessionConfigBySlug(slug, { allowDemoFallback: true }),
+            getDefaultSessionConfig: () => getSessionConfigBySlugOrDefault(''),
+          }),
+    [selectedContractSessionSlug],
+  );
+  const sessionCapabilities = useMemo(() => resolveSessionCapabilityProjection(selectedSession), [selectedSession]);
   const contributesSessionContracts = sessionCapabilities.usesChainMetadata;
+
+  const contractSessionOptions = useMemo(() => {
+    const options = new Map<string, { label: string; slug: string; value: string }>();
+    const pushOption = (slugIn: unknown = '') => {
+      const slug = String(slugIn || '').trim();
+      if (options.has(slug)) return;
+      const config =
+        getSessionConfigBySlug(slug) ||
+        getDemoSessionConfigBySlug(slug, { allowDemoFallback: true }) ||
+        (!slug ? getSessionConfigBySlugOrDefault('') : null);
+      const sessionName = String(config?.sessionName || '').trim();
+      const slugLabel = slug || 'General';
+      const label =
+        sessionName && sessionName.toLowerCase() !== slugLabel.toLowerCase()
+          ? `${sessionName} (${slugLabel})`
+          : sessionName || slugLabel;
+      options.set(slug, {
+        slug,
+        label,
+        value: slug || DOCS_GENERAL_SESSION_SELECT_VALUE,
+      });
+    };
+
+    if (selectedContractSessionSlug !== null) pushOption(selectedContractSessionSlug);
+    pushOption(activeSessionSlug);
+    pushOption(reduxActiveSessionSlug);
+    pushOption('');
+    getAllSessionSlugs({ includeEmpty: true }).forEach(pushOption);
+    return Array.from(options.values());
+  }, [activeSessionSlug, reduxActiveSessionSlug, selectedContractSessionSlug]);
+
+  const selectedContractSessionValue =
+    selectedContractSessionSlug === null
+      ? ''
+      : selectedContractSessionSlug || DOCS_GENERAL_SESSION_SELECT_VALUE;
 
   // Sync generic docs URLs to /docs?session= while preserving unrelated search params.
   useEffect(() => {
@@ -235,24 +305,28 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
 
   const sessionContracts = useMemo<SessionContractsMap>(
     () =>
-      contributesSessionContracts && activeSession?.contracts && typeof activeSession.contracts === 'object'
-        ? (activeSession.contracts as SessionContractsMap)
+      contributesSessionContracts && selectedSession?.contracts && typeof selectedSession.contracts === 'object'
+        ? (selectedSession.contracts as SessionContractsMap)
         : {},
-    [activeSession?.contracts, contributesSessionContracts],
+    [contributesSessionContracts, selectedSession?.contracts],
   );
   const firstContract = Object.values(sessionContracts)[0] || null;
-  const sessionNetworkChainId = contributesSessionContracts ? activeSession?.networkChainId : undefined;
+  const sessionNetworkChainId = contributesSessionContracts ? selectedSession?.networkChainId : undefined;
   const resolvedChainId =
     Number(sessionNetworkChainId || firstContract?.chainId || DEFAULT_CHAIN_ID) || Number(DEFAULT_CHAIN_ID);
-  const sessionLabel = String(activeSession?.sessionName || canonicalSlug || 'Default (general)');
+  const resolvedChainLabel = contributesSessionContracts
+    ? getSessionChainLabel(resolvedChainId)
+    : 'Not used by this session';
+  const sessionLabel = String(
+    selectedSession?.sessionName || selectedContractSessionSlug || 'Default (general)',
+  );
   const contracts = useMemo(() => {
     const chainId = Number(sessionNetworkChainId || firstContract?.chainId || 0) || undefined;
     return buildContractsForViewer({
       sessionContracts,
       chainId,
       includeSessionRegistry: contributesSessionContracts,
-      includeAdvancedSourceTemplates: true,
-      includeCustomSBT: true,
+      includeCustomSBT: false,
     }).map((contract) =>
       contract.key === 'sbtFactory'
         ? {
@@ -349,10 +423,45 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
     return parts;
   };
 
+  const renderDocsInlineCode = (str: string): React.ReactNode => {
+    const text = String(str || '');
+    const re = /`([^`\n]+)`/g;
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = re.exec(text)) !== null) {
+      if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
+      parts.push(
+        <code key={match.index} className={styles.docsInlineCode}>
+          {match[1]}
+        </code>,
+      );
+      lastIndex = re.lastIndex;
+    }
+
+    if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+    return parts;
+  };
+
   return (
     <div className={styles.docsPage} data-testid={E2E_TESTIDS.PAGE_DOCS_ROOT}>
       <header className={styles.docsHeader}>
-        <h1>{DOCS_PAGE_COPY.title}</h1>
+        <div className={styles.docsHeaderTitleRow}>
+          <h1>{DOCS_PAGE_COPY.title}</h1>
+          <nav className={styles.docsGithubLinks} aria-label="Project links on GitHub">
+            <a
+              href={PUBLIC_REPO_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={styles.docsGithubLink}
+              aria-label="View Context Engine repository on GitHub"
+              title="Repository"
+            >
+              <FontAwesomeIcon icon={faGithub} aria-hidden="true" />
+            </a>
+          </nav>
+        </div>
         <p>{DOCS_PAGE_COPY.introduction}</p>
       </header>
 
@@ -361,11 +470,15 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
           {QUICKSTART_STEPS.map((step) => (
             <li key={step.id} className={styles.quickstartStep}>
               <h2>{step.title}</h2>
-              <p>{step.body}</p>
-              {step.linkHref ? (
-                <a href={buildPublicRoute(step.linkHref)} className={styles.docsInlineLink}>
-                  Open {step.linkHref}
-                </a>
+              <p>{renderDocsInlineCode(step.body)}</p>
+              {step.links?.length ? (
+                <div className={styles.docsInlineLinks}>
+                  {step.links.map((link) => (
+                    <a key={link.href} href={buildPublicRoute(link.href)} className={styles.docsInlineLink}>
+                      {link.label}
+                    </a>
+                  ))}
+                </div>
               ) : null}
             </li>
           ))}
@@ -377,10 +490,10 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
           {GUIDE_TOPICS.map((topic) => (
             <article key={topic.id} className={styles.guideTopic}>
               <h2>{topic.title}</h2>
-              <p>{topic.summary}</p>
+              <p>{renderDocsInlineCode(topic.summary)}</p>
               <ul>
                 {topic.points.map((point) => (
-                  <li key={point}>{point}</li>
+                  <li key={point}>{renderDocsInlineCode(point)}</li>
                 ))}
               </ul>
             </article>
@@ -393,61 +506,12 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
           {FAQ_ITEMS.map((item) => (
             <article key={item.id} className={styles.faqItem}>
               <h2>{item.question}</h2>
-              <p>{item.answer}</p>
+              <p>{renderDocsInlineCode(item.answer)}</p>
             </article>
           ))}
         </div>
       </DocsSection>
 
-      {!contributesSessionContracts ? (
-        <aside
-          className={styles.advancedExternalNotice}
-          data-testid={E2E_TESTIDS.CONTRACTS_ADVANCED_EXTERNAL_NOTICE}
-          aria-label="Advanced external on-chain tools"
-        >
-          <strong>Advanced/external on-chain tools</strong>
-          {sessionCapabilities.usesWorkerGroups ? (
-            <span>
-              These global contract references are optional and are not part of this session&apos;s Worker-native Groups
-              or authority.
-            </span>
-          ) : (
-            <span>
-              These global contract references are optional and are not inferred as part of this session&apos;s
-              authority.
-            </span>
-          )}
-        </aside>
-      ) : null}
-      <div className={styles.sessionContext} data-testid={E2E_TESTIDS.DOCS_SESSION_CONTEXT}>
-        <span>
-          <strong>Session:</strong> {sessionLabel}
-        </span>
-        <span aria-hidden="true">{' · '}</span>
-        <span>
-          <strong>Chain:</strong> {getSessionChainLabel(resolvedChainId)}
-        </span>
-      </div>
-      <ContractViewer
-        contracts={contracts}
-        autoOpenContractKey={deepLinkedContractKey}
-        renderSourceHeaderActions={(contract) => {
-          const sourceUrl = buildPublicContractSourceUrl(contract?.sourceFile || '');
-          if (!sourceUrl) return null;
-
-          return (
-            <a
-              href={sourceUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={styles.sourceActionLink}
-              data-testid={`ce-contract-view-source-${contract.key}`}
-            >
-              View Source
-            </a>
-          );
-        }}
-      />
       <DocsSection id="prompts" title="Prompts" contentClassName={styles.promptsContent}>
         {promptItems.map((prompt) => {
           const isOpen = !!openPromptItems[prompt.id];
@@ -491,6 +555,78 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
           );
         })}
       </DocsSection>
+
+      <section className={styles.contractSessionExplorer} aria-labelledby="docs-contract-session-title">
+        <div className={styles.contractSessionExplorerHeader}>
+          <h2 id="docs-contract-session-title">Contract deployment details</h2>
+          <p>Choose a session to view its contract deployment details.</p>
+        </div>
+        <div className={styles.contractSessionControl}>
+          <label htmlFor="docs-contract-session-select">Session</label>
+          <select
+            id="docs-contract-session-select"
+            value={selectedContractSessionValue}
+            onChange={(event) => {
+              const nextValue = event.target.value;
+              setSelectedContractSessionSlug(
+                nextValue === DOCS_GENERAL_SESSION_SELECT_VALUE ? '' : nextValue || null,
+              );
+            }}
+            data-testid={E2E_TESTIDS.DOCS_CONTRACT_SESSION_SELECTOR}
+          >
+            <option value="">Choose a session…</option>
+            {contractSessionOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {selectedSession ? (
+          <div className={styles.contractSessionDetails}>
+            <div className={styles.sessionContext} data-testid={E2E_TESTIDS.DOCS_SESSION_CONTEXT}>
+              <span>
+                <strong>Session:</strong> {sessionLabel}
+              </span>
+              <span aria-hidden="true">{' · '}</span>
+              <span>
+                <strong>Chain:</strong> {resolvedChainLabel}
+              </span>
+            </div>
+            {contracts.length ? (
+              <ContractViewer
+                contracts={contracts}
+                autoOpenContractKey={deepLinkedContractKey}
+                renderSourceHeaderActions={(contract) => {
+                  const sourceUrl = buildPublicContractSourceUrl(contract?.sourceFile || '');
+                  if (!sourceUrl) return null;
+
+                  return (
+                    <a
+                      href={sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={styles.sourceActionLink}
+                      data-testid={`ce-contract-view-source-${contract.key}`}
+                    >
+                      View Source
+                    </a>
+                  );
+                }}
+              />
+            ) : (
+              <div className={styles.contractSessionEmptyState} role="status">
+                No contract addresses are published for this session.
+              </div>
+            )}
+          </div>
+        ) : selectedContractSessionSlug !== null ? (
+          <div className={styles.contractSessionEmptyState} role="status">
+            Session details are unavailable for this selection.
+          </div>
+        ) : null}
+      </section>
     </div>
   );
 };

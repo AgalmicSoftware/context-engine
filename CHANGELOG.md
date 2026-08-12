@@ -34,10 +34,17 @@ All notable changes to this project will be documented in this file.
   standalone exports.
 - Replaced the `/contracts` utility reference with a user-facing `/docs` page
   containing a quickstart, session-options guide, and FAQ. The page retains
-  session-aware smart-contract source and AI prompt references, shows the
-  resolved session and chain, and removes the JSON bundle and byte-conversion
-  UI. Existing `/contracts` paths permanently rewrite to `/docs` while
-  preserving deep-link paths, queries, hashes, and deployment base paths.
+  AI prompt references and a contract deployment explorer that waits for an
+  explicit session selection before showing its chain and published contract
+  addresses; sessions without published addresses show an empty state instead
+  of global template contracts. The page removes the JSON bundle and
+  byte-conversion UI. Existing `/contracts` paths permanently rewrite to
+  `/docs` while preserving deep-link paths, queries, hashes, and deployment
+  base paths.
+- Added a repository link to the Docs header. Refreshed the public `llms.txt`
+  agent summary with the
+  current deployment profiles, authoritative architecture references, and safe
+  automation guidance.
 - Made address comparison session-aware across legacy registry, pure
   Cloudflare, and hybrid session profiles. Compare routes now preserve the
   active session, wait for its canonical caches, isolate cache and prompt
