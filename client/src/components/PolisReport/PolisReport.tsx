@@ -49,7 +49,6 @@ import { canonicalizeLegacySessionAlias } from '../../utilities/session/sessionD
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
 import {
   DEFAULT_EXPLORATORY_CLUSTER_COUNT,
-  DEFAULT_POLIS_DEMO_DATA,
   OPINION_GROUPS_TOOLTIP_TEXT,
   PARTICIPANTS_GRAPH_TOOLTIP_TEXT,
   REPORT_DEFAULT_EMBEDDING_LABEL,
@@ -162,6 +161,10 @@ export default function PolisReport({
   const activeDemoData = useMemo(
     () => getPolisDemoDatasetForSlug(activeReportSlug, { datasetsBySlug: resolvedDemoDataBySlug }),
     [activeReportSlug, resolvedDemoDataBySlug],
+  );
+  const trustedBuiltInDemoData = useMemo(
+    () => getPolisDemoDatasetForSlug(activeReportSlug, { allowFallback: false }),
+    [activeReportSlug],
   );
   // Keep the canonical built-in demo aligned with other demo datasets by
   // starting in the shared exploratory UMAP view instead of special-casing
@@ -423,14 +426,13 @@ export default function PolisReport({
     const parsed = parseInt(manualClusterCount, 10);
     return Number.isFinite(parsed) && parsed >= 2 ? parsed : null;
   }, [manualClusterCount]);
-  // Only built-in demo-session slugs that reuse the shared corpus fixture may
-  // auto-hydrate precomputed cluster summaries. Custom per-slug fixtures still
-  // stay on the normal computed/AI path.
+  // Only the exact built-in dataset object may hydrate authored summaries.
+  // Caller overrides stay on the normal computed/AI path even for demo slugs.
   const shouldUsePrecomputedDemoClusters = !!(
     precomputedDemoClusterState &&
     isDemoSessionSlug(activeReportSlug) &&
     effectiveUseDemoData &&
-    activeDemoData === DEFAULT_POLIS_DEMO_DATA &&
+    activeDemoData === trustedBuiltInDemoData &&
     embeddingChoice === 'POLIS' &&
     manualClusterCountValue === null
   );

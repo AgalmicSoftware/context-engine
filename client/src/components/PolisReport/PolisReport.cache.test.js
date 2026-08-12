@@ -847,6 +847,19 @@ describe('PolisReport demo data defaults', () => {
     });
   });
 
+  it('hydrates demo-2 authored cluster labels after switching to Polis Auto', async () => {
+    render(<PolisReport {...baseReportProps} slug="demo-2" />);
+
+    fireEvent.change(screen.getByDisplayValue('UMAP'), { target: { value: 'POLIS' } });
+
+    await waitFor(() => {
+      expect(screen.getByText('Cluster 0: Builders & Engineers')).toBeInTheDocument();
+      expect(screen.getByText('Cluster 1: Precautionary Stewards')).toBeInTheDocument();
+      expect(screen.getByText('Cluster 2: Democratic Humanists')).toBeInTheDocument();
+      expect(screen.getAllByTestId(E2E_TESTIDS.POLIS_CLUSTER_ANALYSIS)).toHaveLength(3);
+    });
+  });
+
   it('ignores questionResponsesNonce churn in the demo-mode cluster-analysis cache key', () => {
     const sharedArgs = {
       activeClusterAssignments: [0, 1, 1, 0],
