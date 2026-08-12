@@ -74,6 +74,7 @@ type DocsSectionProps = {
 };
 
 const DOCS_GENERAL_SESSION_SELECT_VALUE = '__general__';
+const DOCS_GENERAL_SESSION_QUERY_VALUE = 'general';
 
 const DocsSection = ({ children, contentClassName = '', defaultOpen = false, id, title }: DocsSectionProps) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
@@ -239,14 +240,12 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
       changed = true;
     }
 
-    if (hasExplicitSessionQuery && explicitContractSessionSlug) {
-      if (nextUrl.searchParams.get('session') !== explicitContractSessionSlug) {
-        nextUrl.searchParams.set('session', explicitContractSessionSlug);
+    if (hasExplicitSessionQuery) {
+      const sessionQueryValue = explicitContractSessionSlug || DOCS_GENERAL_SESSION_QUERY_VALUE;
+      if (nextUrl.searchParams.get('session') !== sessionQueryValue) {
+        nextUrl.searchParams.set('session', sessionQueryValue);
         changed = true;
       }
-    } else if (hasExplicitSessionQuery && nextUrl.searchParams.has('session')) {
-      nextUrl.searchParams.delete('session');
-      changed = true;
     }
 
     if (changed) {

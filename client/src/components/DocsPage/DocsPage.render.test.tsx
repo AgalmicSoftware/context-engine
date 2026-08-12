@@ -50,6 +50,7 @@ describe('DocsPage contract deep links', () => {
     slug: '',
     sessionName: 'Context Engine',
     networkChainId: 84532,
+    sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
     contracts: {
       surveys: {
         address: '0x3333333333333333333333333333333333333333',
@@ -322,6 +323,32 @@ describe('DocsPage contract deep links', () => {
     expect(screen.queryByTestId('ce-docs-session-context')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /smart contracts/i })).not.toBeInTheDocument();
     expect(window.location.search).toBe('?session=missing-session&contract=surveys');
+  });
+
+  it('keeps an explicit General session selected after URL synchronization and rerenders', async () => {
+    window.history.pushState({}, '', '/docs?session=general&contract=surveys#source');
+
+    const { rerender } = render(<DocsPage activeSessionSlug="session-alpha" reduxActiveSessionSlug="" />);
+
+    await waitFor(() => {
+      expect(window.location.search).toBe('?session=general&contract=surveys');
+      expect(screen.getByRole('combobox', { name: 'Session' })).toHaveValue('__general__');
+      expect(screen.getByTestId('ce-docs-session-context')).toHaveTextContent('Session: Context Engine');
+    });
+
+    rerender(<DocsPage activeSessionSlug="session-alpha" reduxActiveSessionSlug="session-alpha" />);
+
+    await waitFor(() => {
+      expect(window.location.search).toBe('?session=general&contract=surveys');
+      expect(screen.getByRole('combobox', { name: 'Session' })).toHaveValue('__general__');
+      expect(screen.getByTestId('ce-docs-session-context')).toHaveTextContent('Session: Context Engine');
+    });
+    expect(mockBuildContractViewerContracts).toHaveBeenLastCalledWith({
+      sessionContracts: generalSessionConfig.contracts,
+      chainId: 84532,
+      includeSessionRegistry: true,
+      includeCustomSBT: false,
+    });
   });
 
   it('keeps an unresolved explicit path session instead of borrowing ambient contract authority', () => {
