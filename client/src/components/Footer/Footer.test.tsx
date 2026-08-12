@@ -8,6 +8,7 @@ import { createStore } from 'redux';
 import { render, screen } from '@testing-library/react';
 
 import Footer from './Footer';
+import styles from './Footer.module.scss';
 
 jest.mock('../../actions/sessionStateActions.js', () => ({
   changeFocusedTab: jest.fn(() => ({ type: 'CHANGE_FOCUSED_TAB' })),
@@ -26,10 +27,10 @@ const buildStore = () =>
     ) => state,
   );
 
-const renderFooter = () =>
+const renderFooter = ({ flowAtDocumentEnd = false }: { flowAtDocumentEnd?: boolean } = {}) =>
   render(
     <Provider store={buildStore()}>
-      <Footer />
+      <Footer flowAtDocumentEnd={flowAtDocumentEnd} />
     </Provider>,
   );
 const footerStylesheet = fs.readFileSync(path.join(__dirname, 'Footer.module.scss'), 'utf8');
@@ -163,6 +164,20 @@ describe('Footer', () => {
     );
     expect(footerStylesheet).toMatch(/:global\(body\)\s*{[\s\S]*?padding-bottom:\s*42px;/);
     expect(footerStylesheet).not.toMatch(/\.footer nav::before\s*{/);
+  });
+
+  it('places the session footer at the document end without reserving fixed-taskbar space', () => {
+    const { container } = renderFooter({ flowAtDocumentEnd: true });
+    const footer = container.querySelector('footer');
+
+    expect(footer).toHaveAttribute('data-ce-footer-placement', 'document-end');
+    expect(footer).toHaveClass(styles.footerDocumentEnd);
+    expect(footerStylesheet).toMatch(
+      /:global\(body\):has\(\.footerDocumentEnd\)\s*{[\s\S]*?padding-bottom:\s*0;/,
+    );
+    expect(footerStylesheet).toMatch(
+      /\.footer\.footerDocumentEnd\s*{[\s\S]*?position:\s*static;[\s\S]*?bottom:\s*auto;[\s\S]*?z-index:\s*auto;[\s\S]*?width:\s*96%;[\s\S]*?margin:\s*18px 2% 0;/,
+    );
   });
 
   it('reduces classic footer branding to a larger GitHub icon without changing the default attribution', () => {

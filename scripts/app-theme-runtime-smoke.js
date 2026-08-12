@@ -37,7 +37,12 @@ const ROUTE_CASES = Object.freeze([
   },
   { path: '/docs', label: 'docs lazy route', requiresReadableDocs: true },
   { path: '/demos', label: 'demo surface' },
-  { path: '/session/demo-sh', label: 'session question surface', requiresReadableSessionSurface: true },
+  {
+    path: '/session/demo-sh',
+    label: 'session question surface',
+    requiresDocumentEndFooter: true,
+    requiresReadableSessionSurface: true,
+  },
   { path: '/su/CatherineTheGreat', label: 'simulated-user surface', requiresReadableSimUserSurface: true },
   {
     path: '/groups?sessionName=demo-sh',
@@ -418,6 +423,22 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       state: 'visible',
     });
   }
+
+  const classicDocumentEndFooterState = routeCase.requiresDocumentEndFooter
+    ? await page.locator('footer').evaluate((element) => {
+        const style = window.getComputedStyle(element);
+        const footerRect = element.getBoundingClientRect();
+        const sections = document.querySelector('[class*="sectionsGrid"]');
+        const sectionsRect = sections?.getBoundingClientRect();
+        return {
+          bodyPaddingBottom: window.getComputedStyle(document.body).paddingBottom,
+          footerTop: footerRect.top,
+          placement: element.getAttribute('data-ce-footer-placement'),
+          position: style.position,
+          sectionsBottom: sectionsRect?.bottom || 0,
+        };
+      })
+    : null;
 
   if (routeCase.requiresReadableSimUserSurface) {
     await page.getByRole('heading', { name: 'Catherine the Great', exact: true }).waitFor({ state: 'visible' });
@@ -1284,6 +1305,12 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   const currentSessionHeaderGeometry = routeCase.requiresReadableSessionSurface
     ? await readSessionHeaderGeometry()
     : null;
+  const currentDocumentEndFooterState = routeCase.requiresDocumentEndFooter
+    ? await page.locator('footer').evaluate((element) => ({
+        placement: element.getAttribute('data-ce-footer-placement'),
+        position: window.getComputedStyle(element).position,
+      }))
+    : null;
   const currentWelcomeImageState = routeCase.requiresFramelessWelcome
     ? await page.getByTestId('ce-welcome-slide-image').evaluate((element) => {
         const stage = element.closest('.block-gradient-slow');
@@ -1542,6 +1569,35 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       currentDockedFooterState.bodyPaddingBottom,
       '0px',
       'Context Engine should not inherit Classic 95 taskbar spacing',
+    );
+  }
+  if (classicDocumentEndFooterState && currentDocumentEndFooterState) {
+    assert.deepEqual(
+      {
+        bodyPaddingBottom: classicDocumentEndFooterState.bodyPaddingBottom,
+        placement: classicDocumentEndFooterState.placement,
+        position: classicDocumentEndFooterState.position,
+      },
+      {
+        bodyPaddingBottom: '0px',
+        placement: 'document-end',
+        position: 'static',
+      },
+      'Classic 95 session footer should remain in document flow without fixed-taskbar spacing',
+    );
+    assert.ok(
+      classicDocumentEndFooterState.footerTop >= classicDocumentEndFooterState.sectionsBottom - 1,
+      `Classic 95 session footer should follow the lower session panels without overlap; received ${JSON.stringify(classicDocumentEndFooterState)}`,
+    );
+    assert.equal(
+      currentDocumentEndFooterState.placement,
+      'document-end',
+      'Context Engine session footer should preserve the session-only document placement',
+    );
+    assert.notEqual(
+      currentDocumentEndFooterState.position,
+      'fixed',
+      'Context Engine session footer should remain in document flow',
     );
   }
   if (sessionSetupContrastState) {

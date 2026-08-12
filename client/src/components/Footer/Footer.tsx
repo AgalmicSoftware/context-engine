@@ -19,6 +19,7 @@ type FooterProps = {
   changeFocusedTab: (tab: number) => void;
   toggleLoginModal: (isOpen: boolean) => void;
   focusedTab?: number;
+  flowAtDocumentEnd?: boolean;
   loginModalToggled?: boolean;
 };
 
@@ -40,9 +41,16 @@ class Footer extends React.Component<FooterProps> {
   clickedDocsLink = () => {};
 
   render() {
+    const footerPlacement = this.props.flowAtDocumentEnd ? 'document-end' : 'theme-default';
+
     return (
       <>
-        <footer className={`footer footer-simple ${styles.footer}`}>
+        <footer
+          className={`footer footer-simple ${styles.footer} ${
+            this.props.flowAtDocumentEnd ? styles.footerDocumentEnd : ''
+          }`}
+          data-ce-footer-placement={footerPlacement}
+        >
           <nav>
             <ul>
               <li>

@@ -4207,7 +4207,10 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
 
         {mainViewDisplay}
 
-        <Footer toggleLoginModal={this.props.toggleLoginModal} />
+        <Footer
+          toggleLoginModal={this.props.toggleLoginModal}
+          flowAtDocumentEnd={hasActiveSessionRoute}
+        />
       </SessionColorSchemeScope>
     );
   }

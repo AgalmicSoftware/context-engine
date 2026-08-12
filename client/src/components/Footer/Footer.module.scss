@@ -319,8 +319,9 @@
   outline-offset: 3px;
 }
 
-/* Windows-style taskbar for the classic theme. It stays compact,
- * viewport-docked, and left-aligned instead of stretching each item. */
+/* Windows-style taskbar for the classic theme. It stays compact and
+ * left-aligned. Session routes place it after the session controls so it
+ * cannot obscure the Groups / Context / Results panels. */
 @container ce-theme style(--ce-layout-profile: desktop-window) {
   :global(body) {
     padding-bottom: 42px;
@@ -343,6 +344,20 @@
     border-color: var(--ce-border-raised);
     background: var(--ce-control-face);
     box-sizing: border-box;
+  }
+
+  :global(body):has(.footerDocumentEnd) {
+    padding-bottom: 0;
+  }
+
+  .footer.footerDocumentEnd {
+    position: static;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    z-index: auto;
+    width: 96%;
+    margin: 18px 2% 0;
   }
 
   .footer nav {
