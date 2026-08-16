@@ -39,11 +39,7 @@
     border-right: 1px solid var(--ce-color-border-light);
     display: flex;
     flex-direction: column;
-    background: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--ce-panel-text) 8%, transparent) 0%,
-      color-mix(in srgb, var(--ce-panel-text) 4%, transparent) 100%
-    );
+    background: transparent;
   }
 
   .leaderboardTopBar {
@@ -92,15 +88,11 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
-    background: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--ce-panel-text) 8%, transparent) 0%,
-      color-mix(in srgb, var(--ce-panel-text) 4%, transparent) 100%
-    );
   }
 
   .statsSection {
     border-bottom: 1px solid var(--ce-color-border-light);
+    background: transparent;
   }
 
   .beeswarmSection {
@@ -193,7 +185,7 @@
     display: flex;
     align-items: center;
     padding: 10px;
-    background: var(--ce-surface-alt);
+    background: transparent;
     border: 1px solid transparent;
     border-radius: var(--ce-radius-5);
     cursor: pointer;
@@ -573,6 +565,16 @@
     padding: 10px;
     border: 2px solid var(--ce-document-border-strong);
     background: var(--ce-data-viz-surface);
+  }
+
+  /* The shared plot wrapper intentionally fills its host so tooltips have a
+   * stable positioning surface. Center its flow content here so short and
+   * narrow Classic 95 windows distribute the remaining vertical space around
+   * the chart instead of leaving it all below the axis. */
+  .communityTab .beeswarmPlot {
+    flex: 1 1 auto;
+    min-height: 0;
+    justify-content: center;
   }
 }
 

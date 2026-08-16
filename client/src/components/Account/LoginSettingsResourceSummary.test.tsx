@@ -30,7 +30,6 @@ describe('LoginSettingsResourceSummary', () => {
     render(
       <LoginSettingsSupportedResourceCard
         activeSession={{ isActive: true, label: 'General', slug: '', slugLabel: 'general' }}
-        activeSponsorSession={null}
         card={{
           key: 'rpc',
           title: 'RPC',
@@ -48,8 +47,9 @@ describe('LoginSettingsResourceSummary', () => {
 
     const card = screen.getByText('RPC').closest('div');
     expect(screen.getByText('Not sponsored')).toBeInTheDocument();
-    expect(screen.getByText('No active-session RPC sponsor.')).toBeInTheDocument();
-    expect(screen.getByText('not configured here')).toBeInTheDocument();
+    const activeSessionDetail = screen.getByText('No active-session RPC sponsor.');
+    expect(activeSessionDetail.parentElement).toHaveTextContent('General No active-session RPC sponsor.');
+    expect(screen.queryByText('not configured here')).not.toBeInTheDocument();
     expect(screen.queryByText('Edge')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Show other RPC sponsor sessions' }));

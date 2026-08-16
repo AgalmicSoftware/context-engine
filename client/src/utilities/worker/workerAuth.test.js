@@ -1149,6 +1149,40 @@ describe('workerAuth fetchWorkerWithAuth', () => {
     expect(headers.get('Authorization')).toBeNull();
   });
 
+  it('returns an anonymous denial without opening an interactive authentication flow when anonymous-only is required', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResp(403, {
+          error: 'Anonymous access denied: AI/transcribe require open default+ai gates or a request apiKey.',
+        }),
+      )
+      .mockResolvedValueOnce(jsonResp(200, { nonce: 'nonce-should-not-be-requested' }))
+      .mockResolvedValueOnce(
+        jsonResp(200, { token: 'token-should-not-be-requested', exp: Math.floor(Date.now() / 1000) + 3600 }),
+      )
+      .mockResolvedValueOnce(jsonResp(200, { ok: true }));
+
+    const response = await fetchWorkerWithAuth(
+      'https://worker.example/transcribe',
+      { method: 'POST', body: new FormData() },
+      {
+        sessionSlug: 'demo-sh',
+        preferAnonymous: true,
+        anonymousOnly: true,
+        context: {
+          account: TEST_ADDRESS,
+          providerLike: 'wagmi',
+          chainId: 84532,
+        },
+      },
+    );
+
+    expect(response.status).toBe(403);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(mockProviderRequest).not.toHaveBeenCalled();
+  });
+
   it('retries anonymous request without X-Anonymous-Client-Id only after compatibility probe', async () => {
     global.fetch = jest
       .fn()

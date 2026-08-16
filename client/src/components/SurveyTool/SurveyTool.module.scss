@@ -40,6 +40,10 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   gap: 10px;
 }
 
+#surveysRow.embeddedSessionToolbar {
+  margin-top: 0;
+}
+
 #surveysDropdown {
   display: flex;
   flex-direction: row;
@@ -1822,6 +1826,36 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     flex-direction: row;
     grid-gap: 15px;
     gap: 15px;
+    justify-content: center;
+  }
+}
+
+@media (min-width: 601px) and (max-width: 768px) {
+  #surveysRow {
+    justify-content: space-between;
+  }
+
+  #surveysRow.embeddedSessionToolbar {
+    box-sizing: border-box;
+    width: calc(100% + 70px);
+    margin-left: -35px;
+    margin-right: -35px;
+    padding-left: 10px;
+    padding-right: 10px;
+    column-gap: 8px;
+
+    .headerSubmitButton {
+      margin-left: 0;
+    }
+  }
+
+  #createSurveyButton {
+    margin-left: 0 !important;
+  }
+}
+
+@media (min-width: 601px) and (max-width: 730px) {
+  #surveysRow.embeddedSessionToolbar {
     justify-content: center;
   }
 }
@@ -4266,12 +4300,18 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     border-color: var(--ce-border-inset);
     background: var(--ce-document-surface);
     color: var(--ce-document-text);
-    font-family: var(--ce-font-mono);
+    font-family: var(--ce-font-body);
   }
 
   .pileCardHeader,
   .pileCardHeader * {
     color: var(--ce-document-text) !important;
+  }
+
+  .pileCardHeader #questionTitle {
+    font-family: var(--ce-font-body);
+    font-weight: 400;
+    letter-spacing: normal;
   }
 
   .pileCardMainContent {
@@ -4345,18 +4385,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   .pileControls > .pileActions,
   .pileControls > .pileNav {
     left: calc(100% + var(--pile-desktop-rail-gap));
+    top: 44%;
     padding: 0;
     border: 0;
     background: transparent;
     box-shadow: none;
-  }
-
-  .pileControls > .pileActions {
-    top: 52%;
-  }
-
-  .pileControls > .pileNav {
-    top: 52%;
   }
 
   .pileNav,
@@ -4379,14 +4412,14 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 40px;
-    height: 40px;
+    width: 48px;
+    height: 48px;
     padding: 4px;
     border: 0 !important;
     background: transparent;
     box-shadow: none !important;
-    color: var(--ce-control-text);
-    font-size: 1.15rem;
+    color: var(--ce-color-white) !important;
+    font-size: 2rem;
     opacity: 1;
     transition: none;
   }
@@ -4395,7 +4428,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   .actionButton:hover {
     transform: none;
     background: transparent;
-    color: var(--ce-control-text);
+    color: var(--ce-color-white) !important;
     filter: none;
   }
 
@@ -4409,12 +4442,12 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   .pileNavArrow:disabled,
   .actionButton:disabled {
-    color: var(--ce-control-disabled-text);
-    opacity: 1;
+    color: var(--ce-color-white) !important;
+    opacity: 0.5;
   }
 
   .pileNavCounterText {
-    color: var(--ce-control-text);
+    color: var(--ce-color-white);
     font-size: 0.72rem;
     text-shadow: none;
   }
@@ -4425,7 +4458,18 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     background: transparent !important;
     box-shadow: none !important;
     color: var(--ce-control-text) !important;
-    opacity: 0.82;
+    opacity: 0.5 !important;
+  }
+
+  .fullQuestionBody .iconButtonActive {
+    opacity: 0.5 !important;
+  }
+
+  .fullQuestionBody .iconButton svg,
+  .fullQuestionBody .cardLinkButton svg {
+    color: currentColor !important;
+    filter: none !important;
+    text-shadow: none !important;
   }
 
   .fullQuestionBody .iconButton:hover:not(:disabled),
@@ -4433,7 +4477,14 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   .fullQuestionBody .cardLinkButton:hover,
   .fullQuestionBody .cardLinkButton:focus-visible {
     color: var(--ce-control-text) !important;
-    opacity: 1;
+    opacity: 1 !important;
+  }
+
+  .fullQuestionBody .fullQuestionBookmarkButtonActive,
+  .fullQuestionBody .fullQuestionBookmarkButtonActive:hover,
+  .fullQuestionBody .fullQuestionBookmarkButtonActive:focus-visible {
+    color: var(--ce-status-warning) !important;
+    opacity: 1 !important;
   }
 
   .fullQuestionBody .iconButton:focus-visible,
@@ -4465,6 +4516,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     opacity: 1 !important;
   }
 
+  .fullQuestionFooter .importanceSlider,
   .pileCardFooter .importanceSlider {
     width: 220px;
     margin: 0;
@@ -4475,17 +4527,21 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     opacity: 1 !important;
   }
 
+  .fullQuestionFooter .importanceText,
+  .fullQuestionFooter .convictionToggleLine,
   .pileCardFooter .importanceText,
   .pileCardFooter .convictionToggleLine,
-  .pileLockAudiencePopover .convictionToggleLine,
-  .pileLockAudiencePopover .lockAudienceMeta,
-  .pileLockAudiencePopover .lockAudienceGateDetailItem {
+  .lockAudiencePopover .convictionToggleLine,
+  .lockAudiencePopover .lockAudienceMeta,
+  .lockAudiencePopover .lockAudienceGateDetailItem,
+  .lockAudiencePopover .lockAudienceCaretButton {
     color: var(--ce-control-text) !important;
     opacity: 1 !important;
   }
 
+  .fullQuestionFooter .convictionToggleLine,
   .pileCardFooter .convictionToggleLine,
-  .pileLockAudiencePopover .convictionToggleLine {
+  .lockAudiencePopover .convictionToggleLine {
     padding: 1px 0 !important;
     border: 0 !important;
     background: transparent !important;
@@ -4493,17 +4549,21 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     opacity: 1;
   }
 
+  .fullQuestionFooter .convictionToggleLine:hover,
+  .fullQuestionFooter .convictionToggleLine:focus-visible,
+  .fullQuestionFooter .convictionToggleButtonActive,
   .pileCardFooter .convictionToggleLine:hover,
   .pileCardFooter .convictionToggleLine:focus-visible,
   .pileCardFooter .convictionToggleButtonActive,
-  .pileLockAudiencePopover .convictionToggleLine:hover,
-  .pileLockAudiencePopover .convictionToggleLine:focus-visible,
-  .pileLockAudiencePopover .convictionToggleButtonActive {
+  .lockAudiencePopover .convictionToggleLine:hover,
+  .lockAudiencePopover .convictionToggleLine:focus-visible,
+  .lockAudiencePopover .convictionToggleButtonActive {
     color: var(--ce-control-text) !important;
     opacity: 1;
     text-shadow: none;
   }
 
+  .fullQuestionFooter .convictionSlider,
   .pileCardFooter .convictionSlider {
     margin: 9px 0 0 12px;
     border: 0 !important;
@@ -4512,11 +4572,13 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     opacity: 1;
   }
 
+  .fullQuestionFooter .convictionSlider :global(.rangeslider__fill),
   .pileCardFooter .convictionSlider :global(.rangeslider__fill) {
     background: var(--ce-status-info);
     box-shadow: none;
   }
 
+  .fullQuestionFooter .convictionSlider :global(.rangeslider__handle),
   .pileCardFooter .convictionSlider :global(.rangeslider__handle) {
     border: 2px solid !important;
     border-color: var(--ce-border-raised) !important;
@@ -4524,22 +4586,27 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     box-shadow: var(--ce-shadow-raised);
   }
 
-  .pileLockAudiencePopover {
-    border: 0 !important;
+  .lockAudiencePopover {
+    border: var(--ce-border-control-width) solid !important;
+    border-color: var(--ce-border-raised) !important;
     border-radius: 0;
     background: var(--ce-surface-raised);
-    box-shadow: none !important;
+    box-shadow: var(--ce-shadow-raised) !important;
     color: var(--ce-control-text);
     backdrop-filter: none;
   }
 
-  .pileLockAudiencePopover .lockAudienceMeta,
-  .pileLockAudiencePopover .lockAudienceGateDetailItem {
+  .lockAudiencePopover .lockAudienceMeta,
+  .lockAudiencePopover .lockAudienceGateDetailItem {
     opacity: 1;
   }
 
   .pileNavArrow:focus-visible,
-  .actionButton:focus-visible,
+  .actionButton:focus-visible {
+    outline: 2px dotted var(--ce-color-white);
+    outline-offset: 2px;
+  }
+
   .pileActionsMenuEligible .pileActionMenuToggle:focus-visible,
   .pileCardFooter .pileIconButton:focus-visible,
   .pileCardFooter .iconButton:focus-visible {
@@ -4611,9 +4678,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     }
 
     .pileActions .pileActionButtonGroup .actionButton {
-      width: 42px;
-      height: 42px;
-      color: var(--ce-color-white);
+      width: 48px;
+      height: 48px;
+      color: var(--ce-color-white) !important;
       opacity: 1;
     }
 
@@ -4621,18 +4688,18 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     .pileActions .pileActionButtonGroup .actionButton:focus-visible,
     .pileNav .pileNavArrow:hover:not(:disabled),
     .pileNav .pileNavArrow:focus-visible {
-      color: var(--ce-color-white);
+      color: var(--ce-color-white) !important;
     }
 
     .pileNav .pileNavArrow,
     .pileNav .pileNavCounterText {
-      color: var(--ce-color-white);
+      color: var(--ce-color-white) !important;
     }
 
     .pileActions .pileActionButtonGroup .actionButton:disabled,
     .pileNav .pileNavArrow:disabled {
-      color: var(--ce-color-white);
-      opacity: 1;
+      color: var(--ce-color-white) !important;
+      opacity: 0.5;
     }
 
     .pileFooter {
@@ -4854,6 +4921,33 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   align-items: center;
   gap: 15px;
   overflow: visible;
+}
+
+.pileCardFooter .pileIconButton,
+.pileCardFooter .iconButton {
+  -webkit-appearance: none;
+  appearance: none;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 6px;
+}
+
+.pileCardFooter .pileIconButton:hover:not(:disabled),
+.pileCardFooter .iconButton:hover:not(:disabled),
+.pileCardFooter .pileIconButton:active,
+.pileCardFooter .iconButton:active,
+.pileCardFooter .pileIconButton:focus:not(:focus-visible),
+.pileCardFooter .iconButton:focus:not(:focus-visible) {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.pileCardFooter .pileIconButton:focus-visible,
+.pileCardFooter .iconButton:focus-visible {
+  outline: 2px solid var(--ce-focus-ring);
+  outline-offset: 2px;
 }
 
 .pileCommentsRow {

@@ -6,6 +6,7 @@ export interface CeThemeMetadata {
   id: CeThemeId;
   label: string;
   colorScheme: 'dark' | 'light';
+  layoutProfile?: 'standard-app' | 'desktop-window';
 }
 
 export const DEFAULT_CE_THEME_ID = registry.defaultThemeId as CeThemeId;

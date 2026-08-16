@@ -728,7 +728,12 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
       );
     }
 
-    if (usesWorkerNativeCreate && onSbtsRoute && activeWorkerSessionSlug) {
+    const shouldRenderWorkerGroupsPanel =
+      usesWorkerNativeCreate &&
+      !!activeWorkerSessionSlug &&
+      (onSbtsRoute || this.props.embeddedWorkerGroups === true);
+
+    if (shouldRenderWorkerGroupsPanel) {
       return (
         <div>
           {!hideMiniActionRow ? (

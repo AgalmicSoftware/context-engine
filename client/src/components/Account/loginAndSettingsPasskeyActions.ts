@@ -11,7 +11,7 @@ export type LoginPasskeyWalletPort = {
   getPasskeyWalletChain?: () => unknown;
   isMissingPasskeyWalletRecordError?: (error: unknown) => boolean;
   setPasskeyWalletChain: (chain: unknown) => void;
-  unlockPasskeyWallet: () => Promise<unknown>;
+  unlockPasskeyWallet: (options?: { selectCredential?: boolean }) => Promise<unknown>;
 };
 
 export type LoginPasskeyActionsDeps = {
@@ -140,7 +140,7 @@ export const createLoginPasskeyActions = (deps: LoginPasskeyActionsDeps): LoginP
       }),
     handlePasskeyWalletSignIn: () =>
       runPasskeyWalletAction({
-        action: deps.passkeyWallet.unlockPasskeyWallet,
+        action: () => deps.passkeyWallet.unlockPasskeyWallet({ selectCredential: true }),
         mode: 'sign-in',
       }),
     syncPasskeyWalletChain,

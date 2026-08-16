@@ -108,6 +108,39 @@ describe('surveyGeneratorHelpers', () => {
     expect(scss).toMatch(/\.aiPromptToggleBtn\s*{[\s\S]*?color:\s*var\(--ce-authoring-control-text\);/);
   });
 
+  it('uses semantic theme tokens for the AI prompt preview', () => {
+    const scss = fs.readFileSync(
+      path.join(__dirname, 'AudioSurveyGenerator.module.scss'),
+      'utf8',
+    );
+    const classic95Theme = fs.readFileSync(
+      path.join(__dirname, '../../../scss/themes/_classic-95.scss'),
+      'utf8',
+    );
+
+    expect(scss).toMatch(
+      /\.aiPromptWrapper\s*\{[\s\S]*?background:\s*var\(--ce-authoring-prompt-bg\);[\s\S]*?color:\s*var\(--ce-authoring-prompt-text\);/,
+    );
+    expect(scss).toMatch(
+      /\.aiPromptHeader\s*\{[\s\S]*?color:\s*var\(--ce-authoring-prompt-heading\);/,
+    );
+    expect(scss).toMatch(
+      /\.aiPromptMeta\s*\{[\s\S]*?opacity:\s*var\(--ce-authoring-prompt-meta-opacity\);[\s\S]*?color:\s*var\(--ce-authoring-prompt-meta\);/,
+    );
+    expect(scss).toMatch(
+      /\.aiVar\s*\{[\s\S]*?background:\s*var\(--ce-authoring-prompt-variable-bg\);[\s\S]*?color:\s*var\(--ce-authoring-prompt-variable-text\);/,
+    );
+    expect(scss).toMatch(
+      /\.jsonDisplay\s*\{[\s\S]*?color:\s*var\(--ce-authoring-prompt-json-text\);/,
+    );
+    expect(scss).not.toContain('@container ce-theme style(--ce-layout-profile: desktop-window)');
+    expect(classic95Theme).toMatch(/authoring-prompt-bg:\s*#ffffff,/);
+    expect(classic95Theme).toMatch(/authoring-prompt-text:\s*#000000,/);
+    expect(classic95Theme).toMatch(/authoring-prompt-heading:\s*#000080,/);
+    expect(classic95Theme).toMatch(/authoring-prompt-variable-bg:\s*#ffffc0,/);
+    expect(classic95Theme).toMatch(/authoring-prompt-variable-text:\s*#604000,/);
+  });
+
   it('builds stable additional source ids from a mutable counter ref', () => {
     const ref = { current: 7 };
 

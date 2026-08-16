@@ -54,6 +54,7 @@ const createContext = (overrides: SurveyQuestionsLegacyRecord = {}) => ({
   hasMeaningfulFieldValue: jest.fn((field) => !!field?.value),
   inst: {
     _a: null,
+    _audioInputWorkerPropsMemo: null,
     _getEffectiveDraftSlug: jest.fn(() => 'edge'),
     _q: new Map(),
   },
@@ -238,5 +239,41 @@ describe('surveyQuestionsQuestionDisplayRuntime', () => {
 
     expect(getAudioInputWorkerProps).toHaveBeenCalledTimes(2);
     expect(nextInput.props.audioInputWorkerProps).toBe(secondWorkerProps);
+  });
+
+  it('preserves equivalent audio worker props so unchanged response inputs remain memoized', () => {
+    const sessionConfig = { slug: 'edge' };
+    const createWorkerProps = (account = '0xabc') => ({
+      context: { account, chainId: 11155420, providerLike: 'https://rpc.example' },
+      sessionConfig,
+      sessionSlug: 'edge',
+    });
+    const getAudioInputWorkerProps = jest
+      .fn()
+      .mockImplementationOnce(() => createWorkerProps())
+      .mockImplementationOnce(() => createWorkerProps())
+      .mockImplementationOnce(() => createWorkerProps('0xdef'));
+    const runtime = createSurveyQuestionsQuestionDisplayRuntime(createContext({ getAudioInputWorkerProps }));
+    const renderInput = () =>
+      runtime.renderFullQuestionResponseInput({
+        question: { id: 'q1', type: 'binary' },
+        qIndex: 0,
+        surveyIndex: 0,
+        answer: { value: '' },
+      });
+
+    runtime.beginQuestionDisplayRender();
+    const firstInput = renderInput();
+    runtime.beginQuestionDisplayRender();
+    const equivalentInput = renderInput();
+
+    expect(getAudioInputWorkerProps).toHaveBeenCalledTimes(2);
+    expect(equivalentInput.props.audioInputWorkerProps).toBe(firstInput.props.audioInputWorkerProps);
+
+    runtime.beginQuestionDisplayRender();
+    const changedAccountInput = renderInput();
+
+    expect(changedAccountInput.props.audioInputWorkerProps).not.toBe(firstInput.props.audioInputWorkerProps);
+    expect(changedAccountInput.props.audioInputWorkerProps.context.account).toBe('0xdef');
   });
 });

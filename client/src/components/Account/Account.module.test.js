@@ -43,6 +43,16 @@ describe('Account.module.scss modal account layout guards', () => {
     );
   });
 
+  it('uses a solid login-card surface without a decorative gradient overlay', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'Account.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /#loginModalCard\s*{[\s\S]*?position:\s*relative;[\s\S]*?background:\s*var\(--ce-surface\);/,
+    );
+    expect(scss).not.toMatch(/#loginModalCard::after\s*{/);
+    expect(scss).not.toMatch(/#loginModalCard::before\s*{/);
+  });
+
   it('styles preference controls as switches and keeps the session summary in the config control family', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'Account.module.scss'), 'utf8');
 
@@ -107,6 +117,23 @@ describe('Account.module.scss modal account layout guards', () => {
     );
     expect(scss).toMatch(
       /@media \(min-width:\s*769px\) and \(max-width:\s*1023px\)[\s\S]*?\.tooltipsToggleButton\s*{[\s\S]*?flex:\s*1 1 auto;[\s\S]*?width:\s*auto;[\s\S]*?min-width:\s*0;[\s\S]*?justify-content:\s*center;/,
+    );
+  });
+
+  it('keeps the pre-login Session summary outside a centered, wrapping settings row', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'Account.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /\.preLoginSettingsTopRow\s*{[\s\S]*?justify-content:\s*space-between;/,
+    );
+    expect(scss).toMatch(
+      /\.preLoginSessionSummary\s*{[\s\S]*?display:\s*flex;[\s\S]*?flex:\s*1 1 auto;[\s\S]*?justify-content:\s*center;/,
+    );
+    expect(scss).toMatch(
+      /@media \(min-width:\s*540px\)\s*{[\s\S]*?\.preLoginSettingsControlRow\s*{[\s\S]*?flex-wrap:\s*wrap;[\s\S]*?justify-content:\s*center;/,
+    );
+    expect(scss).toMatch(
+      /@media \(min-width:\s*540px\)[\s\S]*?\.preLoginSettingsControlRow > \*\s*{[\s\S]*?flex:\s*1 1 220px;[\s\S]*?min-width:\s*min\(100%, 220px\);[\s\S]*?max-width:\s*300px;/,
     );
   });
 });

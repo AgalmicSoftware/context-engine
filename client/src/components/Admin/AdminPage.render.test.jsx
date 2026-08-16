@@ -19,6 +19,7 @@ const AGENT_SESSION_WRAPPED_CAPABILITY = {
 
 const buildSessionConfig = (overrides = {}) => ({
   slug: 'edge',
+  sessionId: '0x55555555555555555555555555555555',
   sessionName: 'Edge Session',
   corsWorkerUrl: 'https://worker.example.test',
   networkChainId: 84532,
@@ -723,6 +724,7 @@ describe('AdminPage rendered interactions', () => {
       message: 'rendered-byte-exact-siwe-message',
       signature: '0xrendered-siwe-signature',
       sessionSlug: 'edge',
+      sessionId: '0x55555555555555555555555555555555',
     });
     expect(mockBuildSiweMessage).toHaveBeenCalledWith({
       address: ADMIN_ADDRESS,

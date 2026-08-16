@@ -9,9 +9,9 @@ and can be disabled at build time with:
 REACT_APP_CE_ABOUT_POSTS_ENABLED=false
 ```
 
-When enabled, `/about` shows a `Posts` header link. If `posts/manifest.json`
-cannot be loaded, `/posts` shows a quiet unavailable state and the rest of the
-app continues normally.
+The footer is the persistent navigation entry for Posts; the About hero does
+not duplicate that link. If `posts/manifest.json` cannot be loaded, `/posts`
+shows a quiet unavailable state and the rest of the app continues normally.
 
 ## Authoring
 

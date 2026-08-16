@@ -973,6 +973,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       const sessionSlug = this.getWorkerAuthSessionSlug();
       await getWorkerSessionToken({
         sessionSlug,
+        sessionConfig: this.getDisplaySessionConfig(sessionSlug),
         context: {
           account: this.props.account,
           providerLike: this.props.provider || 'wagmi',
@@ -1595,6 +1596,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     tooltipPlacement = 'top',
     containerClassName = '',
     rowClassName = '',
+    showSession = true,
   }: any = {}) =>
     LoginSettingsControlRow({
       activeSession,
@@ -1611,6 +1613,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       demoControl: this.renderDemoSurfaceToggleControl(),
       containerClassName,
       rowClassName,
+      showSession,
       sessionHref: buildSettingsSessionHref(activeSession.slug),
     });
 
@@ -2100,7 +2103,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
   renderSupportedResourceCard = (card: any) => {
     const activeSession = card?.activeSession || this.getSessionDescriptor(this.getActiveSessionSlug());
-    const activeSponsorSession = card?.activeSponsorSession || null;
     const extraSessions = Array.isArray(card?.otherSponsorSessions)
       ? card.otherSponsorSessions
       : Array.isArray(card?.sessions)
@@ -2113,7 +2115,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       <LoginSettingsSupportedResourceCard
         key={card.key}
         activeSession={activeSession}
-        activeSponsorSession={activeSponsorSession}
         card={card}
         extraSessions={extraSessions}
         extrasExpanded={extrasExpanded}
@@ -2573,7 +2574,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
                   ? renderSection({
                       key: 'appTheme',
                       title: 'Appearance & colors',
-                      summary: 'Bundled app themes',
+                      summary: '',
                       children: <AppThemeSelector />,
                     })
                   : null}

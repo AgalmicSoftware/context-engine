@@ -452,6 +452,11 @@ Legacy/default worker URL:
 - `client/src/utilities/session/sessionWorkerAvailability.ts` now also owns the shared "default session must ignore `demoSessions.general` as worker authority in on-chain mode" rule, so sync UI reads and async `corsProxy` resolution both fall back to `CLOUDFLARE_CORS_WORKER_URL` on the same contract.
 - `client/src/utilities/worker/corsProxy.js` also now reuses the shared default/general fallback worker URL selector from `sessionWorkerAvailability.ts`, so the sync and async default-session worker URL paths stay on the same fallback contract.
 - Worker auth now defaults to no silent demo-session fallback in on-chain mode; explicit demo/off-chain callers must opt in when resolving worker URLs for login.
+- Browser transcription uploads use anonymous-only worker transport. They can
+  use worker-managed transcription credentials or an explicitly supplied
+  request key when the route policy allows it, but an anonymous denial is
+  returned to the recorder and never escalates into an interactive wallet or
+  passkey signature.
 - **Stage-B fail-closed strictness (2026-03-12):** All security-sensitive callers — Arweave uploads (`arweaveClient.js`), AI requests (`aiClient.js`), transcription (`useWhisper.ts`), faucet (`contractHelpers.ts`), image fetch (`imageFetchClient.ts`), session-config resolution (`contractScripts.impl.ts`, `resourceKeys.ts`, `aiSettings.ts`), and the canonical resolver (`canonicalSessionContext.ts`) — now require explicit `allowDemoFallback: true` opt-in to use demo session fixtures when the on-chain registry is active. The CORS proxy demo-fallback policy (`defaultCorsProxyAllowDemoFallback`) is also tightened to match auth defaults. `getSessionConfigBySlugOrDefault` returns `null` for unknown non-general slugs instead of silently mapping them to the general default config.
 - In on-chain registry mode, worker auth/cors proxy no longer treat `demoSessions.general`
   as an implicit worker authority for the default session; the shared fallback is used instead.
@@ -1088,6 +1093,11 @@ Runtime:
   - `workerAuthority.version: 1` is required for worker-canonical login and
     anonymous scope evaluation. Session existence is the presence of this
     persisted canonical config; it does not require a registry record.
+  - `workerAuthority.anonymousScopes` is the worker-canonical public-access
+    switch. Adding `ai` and/or `transcribe` allows those routes to use the
+    worker-managed provider credentials without login; omitting a scope returns
+    a worker-authority-specific `403`. The public `demo-sh` fixture enables
+    `storage`, `ai`, and `transcribe` only.
   - `registryAddress`, chain/RPC, `blockLimits`, contract, Hats, and faucet
     fields remain supported for legacy/decentralized or explicitly chain-backed
     profiles, but the default worker-canonical config omits them.
@@ -1539,6 +1549,12 @@ An unconfigured worker and an unregistered registry slug have no first-signer
 claim path. Worker-canonical deployment therefore stages the admin binding and
 canonical config before making the Worker reachable.
 
+Client callers must keep Worker routing and authentication bound to the same
+resolved session config. In particular, choosing a Worker URL from a config and
+then authenticating by slug alone is invalid for `worker_canonical`: nonce,
+login, and signed admin request bodies must carry that config's canonical
+`sessionId` as well as its `sessionSlug`.
+
 1. `POST /auth/nonce` body:
    `{ address, sessionSlug, sessionId }` for `worker_canonical`; registry
    compatibility may omit `sessionId`.
@@ -1824,8 +1840,9 @@ Signed login/bootstrap requests:
   it preserves the existing `Expected application/json.` / `Invalid JSON.` failures and centralizes trimmed
   `action` extraction for authenticated `POST /` action payloads and authenticated `/ai`.
 - Anonymous AI/transcribe route authority also routes through a shared helper:
-  it preserves route validation, request-`apiKey` bypass precedence, scope override denial, fail-closed
-  on-chain authority checks, and the open `default` + `ai` gate requirement for anonymous access.
+  it preserves route validation, request-`apiKey` bypass precedence, scope override denial, worker-canonical
+  `anonymousScopes` evaluation, fail-closed on-chain authority checks, and the open `default` + `ai` gate
+  requirement for registry-canonical anonymous access.
 - Anonymous rate-identity normalization also routes through a shared helper:
   it preserves the existing Cloudflare-only `CF-Connecting-IP` trust rule, `X-Anonymous-Client-Id`
   lowercasing/validation, and `anon:unknown` fallback used for anonymous rate limiting.

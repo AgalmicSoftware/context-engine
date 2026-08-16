@@ -47,9 +47,9 @@ registry and cannot load CSS, URLs, or arbitrary token maps.
 
 Every definition must supply exactly the keys in `_contract.scss`. Theme files
 must not target component selectors. If several components need new behavior,
-add a semantic token and a shared recipe. Optional textures and icons must be
-local, size-bounded, and appropriately licensed; operating-system assets and
-fonts must not be copied.
+add a semantic token and a shared recipe. Optional textures, icons, and fonts
+must be local, size-bounded, and appropriately licensed; proprietary
+operating-system assets and fonts must not be copied.
 
 The `--ce-layout-profile` contract token is the structural counterpart to the
 palette and control tokens. The document root is the named `ce-theme` style
@@ -62,9 +62,17 @@ control, and bottom taskbar. Keep ordinary color, spacing, and control changes
 on their narrower semantic tokens rather than adding structural queries.
 
 `classic-95` follows the owner's personal-site visual grammar—teal canvas,
-gray raised/inset surfaces, navy title bars, square controls, and system-safe
-Tahoma/MS Sans Serif fallbacks—without copying page markup or proprietary
-assets.
+gray raised/inset surfaces, navy title bars, square controls, and Tahoma-style
+typography—without copying page markup or proprietary assets. Its leading font
+is the locally bundled, LGPL-licensed Wine Tahoma face; native Tahoma, MS Sans
+Serif, Arial, and generic sans-serif remain ordered fallbacks. Code and JSON
+continue to use the separate monospace token.
+
+The About hero follows the same profile without affecting the default theme:
+page copy and actions use bundled Tahoma, the Demo action uses a navy raised
+primary control, and New Session, the resource links, and the icon-only GitHub
+action use standard gray raised controls with pressed and keyboard-focus
+states.
 
 Tool Explorer cards consume `--ce-tool-card-*` chrome tokens. Context Engine
 keeps its layered blue depth treatment; `classic-95` uses a conventional
@@ -72,15 +80,21 @@ raised bevel, compact black shadow, and gray hover face without a colored halo.
 
 Footer navigation consumes `--ce-footer-bar-*`, `--ce-footer-link-*`, and
 `--ce-footer-copyright-*` tokens. Context Engine keeps its unframed spacing,
-while `classic-95` presents a compact, left-aligned gray taskbar with raised
-route buttons, pressed inset states, and readable black text.
+while `classic-95` presents a gray taskbar at the end of the document. Its
+compact, icon-only **Start** button opens an upward Windows-style menu containing
+the five route actions while retaining an accessible text label, and its larger
+GitHub icon stays aligned at the taskbar's right edge. The taskbar is never fixed over page content: long pages reveal it only
+after scrolling to the end, while short pages use the root flex layout to rest
+it against the viewport bottom.
 
 The embedded Welcome deck keeps navigation in a compact bottom strip at every
-desktop width so the title, artwork, and copy remain inside one viewport-capped
-frame, including wide/short displays. Non-intro artwork consumes the
+viewport size. Every slide uses the same viewport-capped frame height, so the
+arrow targets do not move when headings, artwork, or copy change. Non-intro artwork consumes the
 `--ce-welcome-artwork-detail-*` tokens: Context Engine retains the original
-presentation while Classic 95 uses a quiet grayscale, low-opacity illustration
-treatment so the accessible HTML heading and bullet copy stay primary.
+presentation while Classic 95 uses normal image blending, restrained partial
+grayscale, and moderate opacity so the illustrations stay visible without
+competing with the accessible HTML heading and bullet copy. The final Classic
+95 action uses the theme's native control-face and control-text colors.
 
 Account and Settings surfaces consume `--ce-settings-*` tokens for panel,
 section, field, control, primary-text, muted-text, and placeholder pairings.
@@ -98,7 +112,9 @@ mobile and checks its visible control/text pairs at 4.5:1.
 When the bundled-theme selector is enabled, Settings exposes it as the final
 `Appearance & colors` section both before and after sign-in. This selector
 changes the complete app theme; it is separate from a session's curated color
-scheme and does not accept arbitrary color values.
+scheme and does not accept arbitrary color values. Its deployment option reads
+`Deployment theme: <theme label>` for a valid embedded choice, or
+`Deployment theme: default` when that choice cannot be named.
 
 ## Session Color Schemes
 
@@ -173,8 +189,8 @@ the app-theme Playwright smoke checks the rendered Docs pairs at 4.5:1.
 
 | Token                     | `context-engine`                | `classic-95`                        |
 | ------------------------- | ------------------------------- | ----------------------------------- |
-| `--ce-font-body`          | Poppins fallback stack          | Tahoma/MS Sans Serif fallback stack |
-| `--ce-font-ui`            | Open Sans fallback stack        | Tahoma/MS Sans Serif fallback stack |
+| `--ce-font-body`          | Poppins fallback stack          | bundled Wine Tahoma + system fallbacks |
+| `--ce-font-ui`            | Open Sans fallback stack        | bundled Wine Tahoma + system fallbacks |
 | `--ce-font-mono`          | system monospace fallback stack | Courier New fallback stack          |
 | `--ce-font-button-weight` | `600`                           | `400`                               |
 
@@ -309,6 +325,7 @@ widths. It boots `classic-95`, switches to `context-engine`
 without reload, and verifies palette, typography, geometry, modal chrome,
 Session Wizard preview scope, Community Stats/tooltip contrast and data spread,
 the shared compact non-blocking beeswarm hover card, and horizontal overflow.
-Welcome geometry is also checked at compact, wide, and ultra-wide/short desktop
+Welcome geometry and theme-specific artwork/action styling are also checked at
+the 735×803 feedback viewport plus compact, wide, and ultra-wide/short desktop
 sizes so content, artwork, and the bottom controls cannot overlap or escape the
 frame.

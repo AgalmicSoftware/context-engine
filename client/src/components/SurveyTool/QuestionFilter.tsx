@@ -3646,7 +3646,7 @@ class QuestionFilter extends React.Component<any, any> {
               )}
               {bodyContent}
             </ModalBody>
-            <ModalFooter>
+            <ModalFooter className={styles.modalFooter}>
               <Button
                 color="primary"
                 onClick={() => {

@@ -31,4 +31,13 @@ describe('CreateQuestionsAndSurveys.module.scss final submit CTA guards', () => 
       /\.buttonContent\s*{[\s\S]*?@include\s+finalSubmitCta\.final-submit-cta-content\(\$gap:\s*10px\);[\s\S]*?text-transform:\s*uppercase;/,
     );
   });
+
+  it('keeps rating and freeform previews visible through authoring theme tokens', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'CreateQuestionsAndSurveys.module.scss'), 'utf8');
+
+    expect(scss).toMatch(/\.ratingPreview\s*{[\s\S]*?color:\s*var\(--ce-authoring-control-text\);/);
+    expect(scss).toMatch(/\.ratingPreviewWrap\s*{[\s\S]*?background:\s*var\(--ce-authoring-input-bg\);/);
+    expect(scss).toMatch(/\.freeformPreview\s*{[\s\S]*?color:\s*var\(--ce-authoring-input-placeholder\);/);
+    expect(scss).toMatch(/\.freeformPreview\s*{[\s\S]*?opacity:\s*1;/);
+  });
 });

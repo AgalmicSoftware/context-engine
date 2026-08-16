@@ -236,13 +236,15 @@ export function QuestionFilterTagsSection({
               {tagsToDisplay.map((tag) => {
                 const isSelected = selectedTags.includes(tag);
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={tag}
                     className={buildQuestionFilterTagBubbleClassName(styles, isSelected)}
+                    aria-pressed={isSelected}
                     onClick={() => onTagSelection(tag)}
                   >
                     #{tag}
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -323,9 +325,13 @@ export function QuestionFilterQuestionTypesSection({
             aria-pressed={pendingSelectedTypes.includes('rating')}
           >
             <div className={styles.typeTitle}>Rating</div>
-            <div className={styles.ratingPreviewWrap}>
-              <div className={styles.ratingPreviewFill} />
-              <div className={styles.ratingPreviewHandle} />
+            <div className={styles.ratingPreview} aria-hidden="true">
+              <span className={styles.ratingPreviewEndpoint}>1</span>
+              <span className={styles.ratingPreviewWrap}>
+                <span className={styles.ratingPreviewFill} />
+                <span className={styles.ratingPreviewHandle} />
+              </span>
+              <span className={styles.ratingPreviewEndpoint}>10</span>
             </div>
           </button>
 
@@ -337,7 +343,9 @@ export function QuestionFilterQuestionTypesSection({
             aria-pressed={pendingSelectedTypes.includes('freeform')}
           >
             <div className={styles.typeTitle}>Freeform</div>
-            <div className={styles.freeformPreview}>...</div>
+            <div className={styles.freeformPreview} aria-hidden="true">
+              Write an answer...
+            </div>
           </button>
         </div>
       }

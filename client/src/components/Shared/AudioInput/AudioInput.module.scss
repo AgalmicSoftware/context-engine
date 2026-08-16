@@ -47,7 +47,8 @@
 .audioTextarea {
   width: 100%;
   font-size: 1.2em;
-  color: var(--ce-text-muted);
+  color: var(--ce-text);
+  caret-color: var(--ce-text);
   padding: 10px;
   background: color-mix(in srgb, var(--ce-compat-dark) 20%, transparent);
   border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
@@ -60,8 +61,8 @@
 }
 
 .audioTextarea::placeholder {
-  opacity: var(--placeholder-opacity, 1);
-  color: inherit;
+  opacity: 1;
+  color: color-mix(in srgb, var(--ce-text) 72%, transparent);
 }
 
 .audioTextarea:focus,
@@ -92,8 +93,11 @@
 
 /* Microphone button */
 .microphoneButton {
-  background: transparent;
-  border: none;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
   font-size: 30px;
   color: var(--ce-text-muted);
   padding: 10px;
@@ -106,8 +110,17 @@
     opacity 0.2s ease,
     transform 0.2s ease;
   &:hover {
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
     opacity: 0.85;
     color: var(--ce-text-muted);
+  }
+
+  &:active {
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
   }
 
   &:focus-visible {

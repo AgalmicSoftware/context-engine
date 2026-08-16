@@ -74,6 +74,7 @@ export type AdminPrepareSiweLoginInput = {
   workerUrl: string;
   address: string;
   sessionSlug: string;
+  sessionId?: string;
   chainId: number;
   statement?: string;
 };
@@ -168,13 +169,14 @@ export const bindAdminWorkerPorts = ({
         workerUrl,
         address,
         sessionSlug,
+        sessionId,
         chainId,
         statement = 'Sign in to Context Engine.',
       }) => {
         const nonceResp = await fetchImpl()(`${workerUrl}/auth/nonce`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ address, sessionSlug }),
+          body: JSON.stringify({ address, sessionSlug, ...(sessionId ? { sessionId } : {}) }),
         });
         const nonceData = await readResponseJson(nonceResp);
         if (!nonceResp.ok) {

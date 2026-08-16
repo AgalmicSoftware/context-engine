@@ -52,8 +52,16 @@ const QuestionCardLinks = ({
       </span>
     )}
     <button
+      type="button"
       onClick={onBookmarkToggle}
-      className={`${styles.cardLinkButton} ${styles.fullQuestionBookmarkButton} ${isQuestionBookmarked ? styles.fullQuestionBookmarkButtonActive : ''}`}
+      className={buildQuestionCardBookmarkClassName({
+        activeClassName: styles.fullQuestionBookmarkButtonActive,
+        baseClassName: styles.cardLinkButton,
+        bookmarkClassName: styles.fullQuestionBookmarkButton,
+        isQuestionBookmarked,
+      })}
+      aria-label={isQuestionBookmarked ? 'Remove bookmark' : 'Bookmark question'}
+      aria-pressed={isQuestionBookmarked}
       title={isQuestionBookmarked ? 'Remove Bookmark' : 'Bookmark Question'}
     >
       <FontAwesomeIcon icon={faBookmark} style={resolveQuestionCardBookmarkIconStyle(isQuestionBookmarked)} />

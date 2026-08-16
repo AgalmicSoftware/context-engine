@@ -1605,6 +1605,26 @@ input[type='radio']:checked:after {
     font-size: 1.05em !important;
   }
 
+  .welcomeSlideMediaButton[data-slide-key='looking-for'] {
+    flex: 0 1 35%;
+    width: 35%;
+  }
+
+  .welcomeSlideMediaButton[data-slide-key='looking-for'] + .welcomeSlideBulletList {
+    flex: 1 1 65%;
+  }
+
+  .welcomeSlideMediaButton[data-slide-key='looking-for'] + .welcomeSlideBulletList .welcomeSlideBulletItems {
+    margin-block: 0;
+  }
+
+  .welcomeSlideMediaButton[data-slide-key='looking-for'] + .welcomeSlideBulletList .welcomeSlideBulletText {
+    margin: 0 0 6px;
+    padding: 4px 8px;
+    font-size: 0.95em !important;
+    line-height: 1.2;
+  }
+
   .welcomeSlideImageToolkit {
     align-self: center !important;
   }
@@ -1626,6 +1646,26 @@ input[type='radio']:checked:after {
     margin: 0 0 6px;
     padding: 3px 8px;
     line-height: 1.2;
+  }
+
+  .welcomeSlideMediaButton[data-slide-key='looking-for'] {
+    flex: 0 1 35%;
+    width: 35%;
+  }
+
+  .welcomeSlideMediaButton[data-slide-key='looking-for'] + .welcomeSlideBulletList {
+    flex: 1 1 65%;
+  }
+
+  .welcomeSlideMediaButton[data-slide-key='looking-for'] + .welcomeSlideBulletList .welcomeSlideBulletItems {
+    margin-block: 0;
+  }
+
+  .welcomeSlideMediaButton[data-slide-key='looking-for'] + .welcomeSlideBulletList .welcomeSlideBulletText {
+    margin: 0 0 4px;
+    padding: 2px 6px;
+    font-size: 0.95em;
+    line-height: 1.15;
   }
 }
 
@@ -1819,12 +1859,19 @@ input[type='radio']:checked:after {
 
 .welcomeSlideBulletList {
   display: flex;
+  box-sizing: border-box;
   width: 100%;
   height: 100%;
+  min-width: 0;
+  padding-inline-end: clamp(12px, 2vw, 20px);
   justify-content: center;
 }
 
 .welcomeSlideBulletItems {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   font-size: 20px;
   align-self: center;
   display: flex;
@@ -1871,9 +1918,11 @@ input[type='radio']:checked:after {
 }
 
 .welcomeSlideBulletText {
+  max-width: 100%;
   padding: 10px;
   font-size: 1.25em;
   color: var(--ce-color-white);
+  overflow-wrap: break-word;
 }
 
 .welcomeSlideBulletTrailingText {
@@ -1933,9 +1982,8 @@ input[type='radio']:checked:after {
   }
 }
 
-/* The Classic 95 deck behaves like a fixed-size window at every viewport.
- * These rules deliberately sit behind a theme capability so the default deck
- * keeps its original responsive flow. */
+/* Fixed-height decks size every slide to the same pane so navigation does not
+ * move when artwork, headings, or copy change. */
 @container ce-theme style(--ce-welcome-slide-mode: fixed-window) {
   .welcomeSlideEmbed {
     flex: 1 1 auto;

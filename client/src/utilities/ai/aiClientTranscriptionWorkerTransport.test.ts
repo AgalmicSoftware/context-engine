@@ -35,6 +35,10 @@ describe('aiClientTranscriptionWorkerTransport', () => {
       ok: true,
       json: async () => ({ text: 'hello world' }),
     } as Response);
+    const sessionConfig = {
+      slug: 'demo-session',
+      sessionId: '0x88888888888888888888888888888888',
+    };
 
     const text = await uploadAudioForTranscription(
       new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/wav' }),
@@ -42,6 +46,7 @@ describe('aiClientTranscriptionWorkerTransport', () => {
         endpoint: 'https://worker.example/transcribe',
         baseUrl: 'https://worker.example',
         sessionSlug: 'demo-session',
+        sessionConfig,
         transcriptionCfg: {
           provider: 'openai',
           model: 'whisper-1',
@@ -59,8 +64,10 @@ describe('aiClientTranscriptionWorkerTransport', () => {
     expect(authOptions).toEqual(
       expect.objectContaining({
         allowDemoFallback: false,
+        anonymousOnly: true,
         fallbackOnGateUnavailable: true,
         preferAnonymous: true,
+        sessionConfig,
         sessionSlug: 'demo-session',
         workerUrl: 'https://worker.example',
       }),

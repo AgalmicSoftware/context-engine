@@ -86,11 +86,10 @@ describe('SurveyQuestionsTopStrip', () => {
     );
   });
 
-  it('hides the existing-response notice when route display state is not own survey answers', () => {
+  it('offers to edit an existing plaintext response on a standalone question route', () => {
     render(
       <SurveyQuestionsTopStrip
         {...baseProps}
-        displayAnswerMode
         routeViewDisplayState={{
           isOwnResponse: true,
           isSingleQuestionView: true,
@@ -99,7 +98,30 @@ describe('SurveyQuestionsTopStrip', () => {
         }}
         submitDisplayState={{ submittedStateActive: true }}
         userHasResponse
-        userResponseEncrypted
+      />,
+    );
+
+    expect(screen.getByText('Existing response detected')).toBeInTheDocument();
+    const editButton = screen.getByRole('button', { name: 'Edit Response' });
+    expect(editButton).toBeEnabled();
+
+    fireEvent.click(editButton);
+
+    expect(baseProps.onDecryptEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides the standalone existing-response notice while the response is already being edited', () => {
+    render(
+      <SurveyQuestionsTopStrip
+        {...baseProps}
+        isEditing
+        routeViewDisplayState={{
+          isOwnResponse: true,
+          isSingleQuestionView: true,
+          showViewAnswersButton: false,
+          viewAnswersButtonText: '',
+        }}
+        userHasResponse
       />,
     );
 

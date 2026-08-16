@@ -59,3 +59,29 @@
     color: var(--ce-action-accent) !important;
   }
 }
+
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  .toggle {
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: var(--ce-control-text) !important;
+    opacity: 0.5 !important;
+    transform: none;
+  }
+
+  .toggle:hover,
+  .toggle:focus-visible,
+  .toggle[aria-expanded='true'] {
+    background: transparent !important;
+    color: var(--ce-control-text) !important;
+    opacity: 1 !important;
+    box-shadow: none !important;
+    transform: none;
+  }
+
+  .toggle:focus-visible {
+    outline: 1px dotted var(--ce-control-text);
+    outline-offset: 2px;
+  }
+}

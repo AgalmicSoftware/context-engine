@@ -153,6 +153,10 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
         fixtureFile: 'client/src/variables/demo/demo_2_question_seed.json',
         onchainQuestionIdsFile: '',
       },
+      workerAuthority: {
+        version: 1,
+        anonymousScopes: ['storage', 'ai', 'transcribe'],
+      },
     });
     expect(getDemoFixtureQuestionIdsByIndex('demo-2')).toEqual(
       questions.map((question) => question.id.toLowerCase()),

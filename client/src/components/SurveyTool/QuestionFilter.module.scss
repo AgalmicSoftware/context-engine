@@ -381,15 +381,32 @@ $text-color: var(--ce-border);
   border-color: var(--ce-status-warning);
 }
 
-.ratingPreviewWrap {
-  display: flex;
+.ratingPreview {
+  display: grid;
+  grid-template-columns: auto minmax(64px, 1fr) auto;
+  gap: 6px;
   align-items: center;
+  width: min(100%, 180px);
+  color: var(--ce-authoring-control-text);
+}
+
+.ratingPreviewEndpoint {
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.ratingPreviewWrap {
+  display: block;
   position: relative;
-  width: 80%;
+  width: 100%;
+  min-width: 64px;
   height: 8px;
-  background: color-mix(in srgb, var(--ce-compat-dark) 8%, transparent);
+  background: var(--ce-authoring-input-bg);
+  border: 1px solid var(--ce-authoring-input-border);
   border-radius: var(--ce-radius-4);
   overflow: visible;
+  opacity: 1;
 }
 
 .ratingPreviewFill {
@@ -398,7 +415,7 @@ $text-color: var(--ce-border);
   top: 0;
   width: 60%;
   height: 100%;
-  background: var(--ce-color-accent);
+  background: var(--ce-action-accent);
   border-radius: var(--ce-radius-4);
 }
 
@@ -410,21 +427,27 @@ $text-color: var(--ce-border);
   width: 12px;
   height: 12px;
   border-radius: var(--ce-radius-round);
-  background: var(--ce-text-inverse);
-  border: 2px solid var(--ce-color-accent);
-  box-shadow: 0 1px 3px color-mix(in srgb, var(--ce-compat-dark) 20%, transparent);
+  background: var(--ce-authoring-control-bg);
+  border: 2px solid var(--ce-action-accent);
+  box-shadow: var(--ce-edge-shadow);
 }
 
 .freeformPreview {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 80%;
-  height: 28px;
-  border: 1px dashed color-mix(in srgb, var(--ce-compat-dark) 15%, transparent);
+  justify-content: flex-start;
+  width: min(100%, 220px);
+  min-height: 34px;
+  height: auto;
+  padding: 6px 8px;
+  border: 1px solid var(--ce-authoring-input-border);
   border-radius: var(--ce-radius-6);
+  background: var(--ce-authoring-input-bg);
   font-size: 0.75rem;
-  color: var(--ce-text-muted);
+  color: var(--ce-authoring-input-placeholder);
+  line-height: 1.2;
+  text-align: left;
+  opacity: 1;
 }
 
 .aiFilterInputWrap {
@@ -659,15 +682,25 @@ $text-color: var(--ce-border);
 }
 
 .tagBubble {
+  appearance: none;
+  border: 0;
+  box-shadow: none;
   background: var(--ce-status-success-text);
   color: $text-color;
   padding: 0.3rem 0.6rem;
   border-radius: var(--ce-radius-15);
   font-size: 0.85rem;
   cursor: pointer;
+  font: inherit;
+  text-align: left;
   transition: background 0.2s ease;
   &:hover {
     background: color-mix(in srgb, var(--ce-status-success-soft) 95%, var(--ce-compat-dark));
+  }
+
+  &:active {
+    border: 0;
+    box-shadow: none;
   }
 }
 
@@ -829,5 +862,160 @@ $text-color: var(--ce-border);
     border-bottom-color: var(--ce-color-tooltip-bg);
     border-left-color: var(--ce-color-tooltip-bg);
     border-right-color: var(--ce-color-tooltip-bg);
+  }
+}
+
+/* Classic 95 uses the filter as a desktop dialog. Keep these rules local to
+ * that layout profile so the Context Engine theme retains its existing modal. */
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  .modalHeader {
+    border-bottom-color: var(--ce-border-strong);
+    background: var(--ce-titlebar-bg) !important;
+    color: var(--ce-titlebar-text) !important;
+    font-family: var(--ce-font-ui);
+    padding-block: 0.75rem;
+
+    :global(.modal-title) {
+      color: var(--ce-titlebar-text) !important;
+      font-family: var(--ce-font-ui);
+      font-weight: 700;
+    }
+
+    :global(.close),
+    :global(.btn-close) {
+      width: 30px;
+      height: 30px;
+      border: var(--ce-border-control-width) solid !important;
+      border-color: var(--ce-border-raised) !important;
+      background-color: var(--ce-control-face) !important;
+      box-shadow: var(--ce-shadow-raised) !important;
+      color: var(--ce-control-text) !important;
+      opacity: 1 !important;
+    }
+
+    :global(.close) span {
+      color: var(--ce-control-text) !important;
+    }
+
+    :global(.btn-close) {
+      filter: none;
+    }
+  }
+
+  .modalBody {
+    background: var(--ce-surface);
+    color: var(--ce-control-text);
+  }
+
+  .modalFooter {
+    border-top: var(--ce-border-control-width) solid var(--ce-border-strong);
+    background: var(--ce-control-face);
+
+    :global(.btn-primary) {
+      border-color: var(--ce-border-raised) !important;
+      background: var(--ce-action-primary) !important;
+      box-shadow: var(--ce-shadow-raised) !important;
+      color: var(--ce-action-primary-text) !important;
+      font-family: var(--ce-font-ui);
+
+      &:hover,
+      &:focus-visible {
+        background: var(--ce-action-primary-hover) !important;
+        color: var(--ce-action-primary-text) !important;
+      }
+
+      &:active {
+        border-color: var(--ce-border-inset) !important;
+        box-shadow: var(--ce-shadow-pressed) !important;
+      }
+    }
+  }
+
+  .filterSection {
+    .sectionHeader {
+      border-color: var(--ce-border-raised);
+      background: var(--ce-control-face);
+      box-shadow: var(--ce-shadow-raised);
+      color: var(--ce-control-text);
+      font-family: var(--ce-font-ui);
+
+      h3 {
+        color: var(--ce-control-text);
+        font-weight: 700;
+      }
+
+      &:hover {
+        background: var(--ce-surface-alt);
+      }
+    }
+
+    .sectionContent {
+      border-color: var(--ce-border-strong);
+      background: var(--ce-document-surface);
+      color: var(--ce-document-text);
+    }
+  }
+
+  .tagBubble {
+    border: var(--ce-border-control-width) solid;
+    border-color: var(--ce-border-raised);
+    border-radius: var(--ce-radius-0);
+    background: var(--ce-control-face);
+    box-shadow: var(--ce-shadow-raised);
+    color: var(--ce-control-text);
+    font-family: var(--ce-font-ui);
+    line-height: 1.35;
+    transition: none;
+
+    &:hover {
+      background: var(--ce-surface-alt);
+      color: var(--ce-control-text);
+    }
+
+    &:focus,
+    &:focus-visible {
+      outline: 2px dotted var(--ce-focus-ring);
+      outline-offset: 2px;
+    }
+
+    &:active {
+      border-color: var(--ce-border-inset);
+      box-shadow: var(--ce-shadow-pressed);
+    }
+  }
+
+  .tagBubbleSelected,
+  .tagBubble[aria-pressed='true'],
+  .tagBubbleSelected:hover,
+  .tagBubble[aria-pressed='true']:hover,
+  .tagBubble[aria-pressed='true']:focus,
+  .tagBubble[aria-pressed='true']:focus-visible {
+    // The global Classic 95 button recipe carries an important background.
+    // Keep the pressed filter state visibly distinct without affecting other themes.
+    background: var(--ce-selection-bg) !important;
+    background-image: none !important;
+    color: var(--ce-selection-text) !important;
+  }
+
+  .showMoreTagsButton {
+    border: var(--ce-border-control-width) solid !important;
+    border-color: var(--ce-border-raised) !important;
+    background: var(--ce-control-face) !important;
+    box-shadow: var(--ce-shadow-raised) !important;
+    color: var(--ce-control-text) !important;
+    padding: var(--ce-control-padding-y) var(--ce-control-padding-x);
+    text-decoration: none;
+
+    &:hover,
+    &:focus-visible {
+      background: var(--ce-surface-alt) !important;
+      color: var(--ce-control-text) !important;
+      text-decoration: none;
+    }
+
+    &:active {
+      border-color: var(--ce-border-inset) !important;
+      box-shadow: var(--ce-shadow-pressed) !important;
+    }
   }
 }

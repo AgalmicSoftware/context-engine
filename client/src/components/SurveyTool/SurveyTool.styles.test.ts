@@ -35,11 +35,18 @@ describe('SurveyTool styles', () => {
     );
   });
 
-  it('renders classic full-question utility icons without faded button chrome', () => {
+  it('renders classic full-question utility icons as one quiet borderless family', () => {
     const scss = readSurveyToolScss();
 
     expect(scss).toMatch(
-      /\.fullQuestionBody \.iconButton,\s*\.fullQuestionBody \.cardLinkButton\s*{[\s\S]*?border:\s*0 !important;[\s\S]*?background:\s*transparent !important;[\s\S]*?box-shadow:\s*none !important;[\s\S]*?color:\s*var\(--ce-control-text\) !important;[\s\S]*?opacity:\s*0\.82;/,
+      /\.fullQuestionBody \.iconButton,\s*\.fullQuestionBody \.cardLinkButton\s*{[\s\S]*?border:\s*0 !important;[\s\S]*?background:\s*transparent !important;[\s\S]*?box-shadow:\s*none !important;[\s\S]*?color:\s*var\(--ce-control-text\) !important;[\s\S]*?opacity:\s*0\.5 !important;/,
+    );
+    expect(scss).toMatch(/\.fullQuestionBody \.iconButtonActive\s*{[\s\S]*?opacity:\s*0\.5 !important;/);
+    expect(scss).toMatch(
+      /\.fullQuestionBody \.fullQuestionBookmarkButtonActive,\s*\.fullQuestionBody \.fullQuestionBookmarkButtonActive:hover,\s*\.fullQuestionBody \.fullQuestionBookmarkButtonActive:focus-visible\s*{[\s\S]*?color:\s*var\(--ce-status-warning\) !important;[\s\S]*?opacity:\s*1 !important;/,
+    );
+    expect(scss).toMatch(
+      /\.fullQuestionBody \.iconButton svg,\s*\.fullQuestionBody \.cardLinkButton svg\s*{[\s\S]*?color:\s*currentColor !important;[\s\S]*?filter:\s*none !important;[\s\S]*?text-shadow:\s*none !important;/,
     );
     expect(scss).toMatch(
       /\.fullQuestionBody \.iconButton:hover:not\(:disabled\),[\s\S]*?\.fullQuestionBody \.cardLinkButton:focus-visible\s*{[\s\S]*?opacity:\s*1;/,
@@ -69,6 +76,17 @@ describe('SurveyTool styles', () => {
     );
   });
 
+  it('keeps pile-card footer utility controls borderless in every app theme', () => {
+    const scss = readSurveyToolScss();
+
+    expect(scss).toMatch(
+      /\.pileCardFooter \.pileIconButton,\s*\.pileCardFooter \.iconButton\s*\{[\s\S]*?-webkit-appearance:\s*none;[\s\S]*?appearance:\s*none;[\s\S]*?border:\s*0 !important;[\s\S]*?background:\s*transparent !important;[\s\S]*?box-shadow:\s*none !important;/,
+    );
+    expect(scss).toMatch(
+      /\.pileCardFooter \.pileIconButton:focus-visible,\s*\.pileCardFooter \.iconButton:focus-visible\s*\{[\s\S]*?outline:\s*2px solid var\(--ce-focus-ring\);[\s\S]*?outline-offset:\s*2px;/,
+    );
+  });
+
   it('keeps compact Classic 95 question actions visible without covering the lower panels', () => {
     const scss = readSurveyToolScss();
 
@@ -88,30 +106,61 @@ describe('SurveyTool styles', () => {
       /@media \(max-width: 768px\)\s*{\s*@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.pileControls > \.pileActions,\s*\.pileControls > \.pileNav\s*{[\s\S]*?border:\s*0;[\s\S]*?background:\s*transparent;[\s\S]*?box-shadow:\s*none;[\s\S]*?color:\s*var\(--ce-color-white\);/,
     );
     expect(scss).toMatch(
-      /\.pileActions \.pileActionButtonGroup \.actionButton\s*{[\s\S]*?color:\s*var\(--ce-color-white\);[\s\S]*?opacity:\s*1;/,
+      /\.pileActions \.pileActionButtonGroup \.actionButton\s*{[\s\S]*?width:\s*48px;[\s\S]*?height:\s*48px;[\s\S]*?color:\s*var\(--ce-color-white\) !important;[\s\S]*?opacity:\s*1;/,
     );
     expect(scss).toMatch(
-      /\.pileNav \.pileNavArrow,\s*\.pileNav \.pileNavCounterText\s*{[\s\S]*?color:\s*var\(--ce-color-white\);/,
+      /\.pileNav \.pileNavArrow,\s*\.pileNav \.pileNavCounterText\s*{[\s\S]*?color:\s*var\(--ce-color-white\) !important;/,
     );
   });
 
-  it('keeps classic conviction sliders and lock-audience choices borderless and readable', () => {
+  it('keeps the Classic 95 side rail large and white at every viewport width', () => {
+    const scss = readSurveyToolScss();
+
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)\s*{[\s\S]*?\.pileControls > \.pileActions,\s*\.pileControls > \.pileNav\s*{[\s\S]*?top:\s*44%;/,
+    );
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)\s*{[\s\S]*?\.pileNavArrow,\s*\.actionButton\s*{[\s\S]*?width:\s*48px;[\s\S]*?height:\s*48px;[\s\S]*?color:\s*var\(--ce-color-white\) !important;[\s\S]*?font-size:\s*2rem;/,
+    );
+    expect(scss).toMatch(
+      /\.pileNavArrow:disabled,\s*\.actionButton:disabled\s*{[\s\S]*?color:\s*var\(--ce-color-white\) !important;[\s\S]*?opacity:\s*0\.5;/,
+    );
+  });
+
+  it('keeps classic conviction sliders readable and gives the lock-audience popover a raised boundary', () => {
     const scss = readSurveyToolScss();
 
     expect(scss).toMatch(
       /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)\s*{[\s\S]*?\.pileCardFooter \.importanceSlider\s*{[\s\S]*?border:\s*0 !important;[\s\S]*?background:\s*transparent !important;[\s\S]*?opacity:\s*1 !important;/,
     );
     expect(scss).toMatch(
-      /\.pileCardFooter \.importanceText,[\s\S]*?\.pileLockAudiencePopover \.lockAudienceGateDetailItem\s*{[\s\S]*?color:\s*var\(--ce-control-text\) !important;[\s\S]*?opacity:\s*1 !important;/,
+      /\.pileCardFooter \.importanceText,[\s\S]*?\.lockAudiencePopover \.lockAudienceCaretButton\s*{[\s\S]*?color:\s*var\(--ce-control-text\) !important;[\s\S]*?opacity:\s*1 !important;/,
     );
     expect(scss).toMatch(
-      /\.pileCardFooter \.convictionToggleLine,\s*\.pileLockAudiencePopover \.convictionToggleLine\s*{[\s\S]*?border:\s*0 !important;[\s\S]*?background:\s*transparent !important;[\s\S]*?box-shadow:\s*none !important;[\s\S]*?opacity:\s*1;/,
+      /\.pileCardFooter \.convictionToggleLine,\s*\.lockAudiencePopover \.convictionToggleLine\s*{[\s\S]*?border:\s*0 !important;[\s\S]*?background:\s*transparent !important;[\s\S]*?box-shadow:\s*none !important;[\s\S]*?opacity:\s*1;/,
     );
     expect(scss).toMatch(
       /\.pileCardFooter \.convictionSlider\s*{[\s\S]*?background:\s*var\(--ce-input-bg\);[\s\S]*?opacity:\s*1;/,
     );
     expect(scss).toMatch(
-      /\.pileLockAudiencePopover\s*{[\s\S]*?border:\s*0 !important;[\s\S]*?background:\s*var\(--ce-surface-raised\);[\s\S]*?box-shadow:\s*none !important;[\s\S]*?color:\s*var\(--ce-control-text\);[\s\S]*?backdrop-filter:\s*none;/,
+      /\.lockAudiencePopover\s*{[\s\S]*?border:\s*var\(--ce-border-control-width\) solid !important;[\s\S]*?border-color:\s*var\(--ce-border-raised\) !important;[\s\S]*?background:\s*var\(--ce-surface-raised\);[\s\S]*?box-shadow:\s*var\(--ce-shadow-raised\) !important;[\s\S]*?color:\s*var\(--ce-control-text\);[\s\S]*?backdrop-filter:\s*none;/,
+    );
+  });
+
+  it('keeps full-question conviction controls in parity with the classic pile treatment', () => {
+    const scss = readSurveyToolScss();
+
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)\s*\{[\s\S]*?\.fullQuestionFooter \.importanceSlider,[\s\S]*?\.pileCardFooter \.importanceSlider\s*\{[\s\S]*?border:\s*0 !important;[\s\S]*?background:\s*transparent !important;[\s\S]*?opacity:\s*1 !important;/,
+    );
+    expect(scss).toMatch(
+      /\.fullQuestionFooter \.importanceText,[\s\S]*?\.fullQuestionFooter \.convictionToggleLine,[\s\S]*?\.pileCardFooter \.importanceText,[\s\S]*?color:\s*var\(--ce-control-text\) !important;[\s\S]*?opacity:\s*1 !important;/,
+    );
+    expect(scss).toMatch(
+      /\.fullQuestionFooter \.convictionToggleLine,[\s\S]*?\.pileCardFooter \.convictionToggleLine,[\s\S]*?border:\s*0 !important;[\s\S]*?background:\s*transparent !important;[\s\S]*?box-shadow:\s*none !important;/,
+    );
+    expect(scss).toMatch(
+      /\.fullQuestionFooter \.convictionSlider,[\s\S]*?\.pileCardFooter \.convictionSlider\s*\{[\s\S]*?background:\s*var\(--ce-input-bg\);[\s\S]*?opacity:\s*1;/,
     );
   });
 
@@ -119,10 +168,28 @@ describe('SurveyTool styles', () => {
     const scss = readSurveyToolScss();
 
     expect(scss).toMatch(/#surveysRow\s*{[\s\S]*?background:\s*var\(--ce-authoring-section-bg\);/);
+    expect(scss).toMatch(
+      /@media \(min-width:\s*601px\) and \(max-width:\s*768px\)\s*{[\s\S]*?#surveysRow\s*{[^}]*justify-content:\s*space-between;[\s\S]*?#createSurveyButton\s*{[^}]*margin-left:\s*0 !important;/,
+    );
     expect(scss).toMatch(/#dropdownToggle\s*{[\s\S]*?color:\s*var\(--ce-authoring-control-text\);/);
     expect(scss).toMatch(/#filterButton\s*{[\s\S]*?background:\s*var\(--ce-authoring-control-bg\);/);
     expect(scss).toMatch(/#showResultsButton\s*{[\s\S]*?color:\s*var\(--ce-authoring-control-text\);/);
     expect(scss).toMatch(/#createSurveyButton\s*{[\s\S]*?opacity:\s*1;/);
+  });
+
+  it('widens the embedded session toolbar and centers its wrapped controls on tablets', () => {
+    const scss = readSurveyToolScss();
+
+    expect(scss).toMatch(/#surveysRow\.embeddedSessionToolbar\s*{[^}]*margin-top:\s*0;/);
+    expect(scss).toMatch(
+      /@media \(min-width:\s*601px\) and \(max-width:\s*768px\)\s*{[\s\S]*?#surveysRow\.embeddedSessionToolbar\s*{[^}]*box-sizing:\s*border-box;[^}]*width:\s*calc\(100% \+ 70px\);[^}]*margin-left:\s*-35px;[^}]*margin-right:\s*-35px;[^}]*padding-left:\s*10px;[^}]*padding-right:\s*10px;[^}]*column-gap:\s*8px;/,
+    );
+    expect(scss).toMatch(
+      /#surveysRow\.embeddedSessionToolbar\s*{[\s\S]*?\.headerSubmitButton\s*{[^}]*margin-left:\s*0;/,
+    );
+    expect(scss).toMatch(
+      /@media \(min-width:\s*601px\) and \(max-width:\s*730px\)\s*{[\s\S]*?#surveysRow\.embeddedSessionToolbar\s*{[^}]*justify-content:\s*center;/,
+    );
   });
 
   it('keeps pile question prompts readable on theme-provided card surfaces', () => {
@@ -130,6 +197,9 @@ describe('SurveyTool styles', () => {
 
     expect(scss).toMatch(/#questionTitle\s*{[^}]*color:\s*var\(--ce-panel-text\)\s*!important;/);
     expect(scss).not.toMatch(/#questionTitle\s*{[^}]*color:\s*var\(--ce-color-white\)\s*!important;/);
+    expect(scss).toMatch(
+      /\.pileCardHeader #questionTitle\s*{[^}]*font-family:\s*var\(--ce-font-body\);[^}]*font-weight:\s*400;[^}]*letter-spacing:\s*normal;/,
+    );
   });
 
   it('keeps existing-response light-panel CTAs on dark text for readability', () => {
@@ -147,7 +217,9 @@ describe('SurveyTool styles', () => {
   it('removes the old SurveyTool session selector overlay styles', () => {
     const scss = readSurveyToolScss();
 
-    expect(scss).toMatch(/#surveysRow\s*{[\s\S]*z-index:\s*20;/);
+    expect(scss).toMatch(
+      /#surveysRow\s*{[\s\S]*?position:\s*sticky;[\s\S]*?top:\s*10px;[\s\S]*?z-index:\s*20;/,
+    );
     expect(scss).not.toMatch(/\.sessionSelectorTriggerRow\s*{/);
     expect(scss).not.toMatch(/\.sessionSelectorBackdrop\s*{/);
     expect(scss).not.toMatch(/\.sessionSelectorPopover\s*{/);

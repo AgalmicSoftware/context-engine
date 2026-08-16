@@ -52,6 +52,7 @@ const WorkerGroupCard = ({
         <button
           type="button"
           className={styles.workerGroupCardLinkButton}
+          data-ce-control-appearance="frameless"
           onClick={() => void copyGroupLink(group.groupId)}
           aria-label={`Copy ${group.label} group link`}
           title="Copy group link"
@@ -65,7 +66,9 @@ const WorkerGroupCard = ({
         onClick={() => onOpenDetails(group.groupId)}
         aria-label={`Open group details for ${group.label}`}
       >
-        <div className={sbtPageStyles.miniImageContainer}>
+        <div
+          className={`${sbtPageStyles.miniImageContainer} ${styles.workerGroupCardImageContainer}`}
+        >
           {group.imageUrl ? (
             <WorkerGroupImage
               src={group.imageUrl}

@@ -1,12 +1,5 @@
 .field {
-  display: grid;
-  gap: 6px;
-}
-
-.label {
-  color: var(--ce-settings-text);
-  font-size: 0.88rem;
-  font-weight: 700;
+  display: block;
 }
 
 .select {
@@ -23,10 +16,4 @@
     outline: 3px solid var(--ce-focus-ring);
     outline-offset: 2px;
   }
-}
-
-.hint {
-  color: var(--ce-settings-muted-text);
-  font-size: 0.78rem;
-  line-height: 1.45;
 }

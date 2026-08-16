@@ -85,6 +85,7 @@ export const fetchContentFromURL = async (url: unknown, opts: unknown = {}): Pro
       },
       {
         sessionSlug,
+        sessionConfig,
         context: options.context,
         workerUrl: baseUrl,
         allowDemoFallback: defaultStrictAllowDemoFallback(),

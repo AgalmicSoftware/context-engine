@@ -94,7 +94,7 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
     expect(onAnswerChange).toHaveBeenCalledWith('Agree');
   });
 
-  it('routes full-question rating changes through immediate slider handlers', () => {
+  it('buffers full-question rating drag ticks locally and commits the final value once', () => {
     const onDeferredRatingCommit = jest.fn();
     const onRatingChange = jest.fn();
     const onRatingChangeComplete = jest.fn();
@@ -116,12 +116,21 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
     expect(screen.getByText('5')).toBeInTheDocument();
 
     fireEvent.mouseDown(slider);
+    fireEvent.change(slider, { target: { value: '6' } });
+    fireEvent.change(slider, { target: { value: '7' } });
     fireEvent.change(slider, { target: { value: '8' } });
+
+    expect(screen.getByText('8')).toBeInTheDocument();
+    expect(onDeferredRatingCommit).not.toHaveBeenCalled();
+    expect(onRatingChange).not.toHaveBeenCalled();
+    expect(onRatingChangeComplete).not.toHaveBeenCalled();
+
     fireEvent.mouseUp(slider, { currentTarget: { value: '8' } });
 
-    expect(onRatingChange).toHaveBeenCalledWith(8, expect.anything());
-    expect(onRatingChangeComplete).toHaveBeenCalled();
-    expect(onDeferredRatingCommit).not.toHaveBeenCalled();
+    expect(onDeferredRatingCommit).toHaveBeenCalledTimes(1);
+    expect(onDeferredRatingCommit).toHaveBeenCalledWith(8);
+    expect(onRatingChange).not.toHaveBeenCalled();
+    expect(onRatingChangeComplete).not.toHaveBeenCalled();
   });
 
   it('routes single-question rating changes through deferred commits', () => {

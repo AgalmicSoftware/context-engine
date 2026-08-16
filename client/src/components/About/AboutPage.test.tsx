@@ -50,8 +50,8 @@ describe('AboutPage', () => {
       'href',
       'https://github.com/AgalmicSoftware/context-engine/blob/main/whitepaper/whitepaper.md',
     );
-    expect(within(hero).getByTestId('ce-about-link-posts')).toBeVisible();
-    expect(within(hero).getByTestId('ce-about-link-posts')).toHaveAttribute('href', '/posts');
+    expect(within(hero).queryByRole('link', { name: /^Posts$/i })).not.toBeInTheDocument();
+    expect(within(hero).queryByTestId('ce-about-link-posts')).not.toBeInTheDocument();
     expect(within(hero).getByLabelText(/view context engine on github/i)).toBeVisible();
     expect(within(hero).getByTestId('ce-about-link-github')).toHaveAttribute(
       'href',
@@ -136,7 +136,6 @@ describe('AboutPage', () => {
     renderAboutPage();
 
     expect(screen.getByRole('link', { name: /New Session/i })).toHaveAttribute('href', '/ce/new');
-    expect(screen.getByTestId('ce-about-link-posts')).toHaveAttribute('href', '/ce/posts');
   });
 
   it('shows one use-case detail panel at a time', () => {
@@ -470,6 +469,30 @@ describe('AboutPage', () => {
     );
   });
 
+  it('uses bundled Tahoma and distinct Windows 95 controls only for the desktop-window profile', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'AboutPage.module.scss'), 'utf8');
+
+    expect(scss).toContain('@container ce-theme style(--ce-layout-profile: desktop-window)');
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)\s*{[\s\S]*?\.aboutPageContainer\s*{[\s\S]*?font-family:\s*var\(--ce-font-body\);/,
+    );
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)\s*{[\s\S]*?\.heroPrimaryButton,\s*\.tertiaryLink,\s*\.titleRepoLink\s*{[\s\S]*?border:\s*2px solid;[\s\S]*?box-shadow:\s*var\(--ce-shadow-raised\);[\s\S]*?font-family:\s*var\(--ce-font-body\);/,
+    );
+    expect(scss).toMatch(
+      /\.heroPrimaryButton\s*{[\s\S]*?min-width:\s*148px;[\s\S]*?min-height:\s*48px;/,
+    );
+    expect(scss).toMatch(
+      /\.tertiaryLink\s*{[\s\S]*?min-width:\s*108px;[\s\S]*?min-height:\s*34px;/,
+    );
+    expect(scss).toMatch(
+      /\.titleRepoLink\s*{[\s\S]*?width:\s*64px;[\s\S]*?height:\s*44px;[\s\S]*?background:\s*var\(--ce-control-face\);/,
+    );
+    expect(scss).toMatch(
+      /\.heroPrimaryButton:active,[\s\S]*?\.tertiaryLink:active,[\s\S]*?\.titleRepoLink:active\s*{[\s\S]*?box-shadow:\s*var\(--ce-shadow-pressed\);/,
+    );
+  });
+
   it('keeps mobile recognition rows aligned and keeps use-case buttons responsive', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'AboutPage.module.scss'), 'utf8');
 
@@ -485,12 +508,14 @@ describe('AboutPage', () => {
     expect(scss).toMatch(
       /@media \(max-width:\s*640px\)\s*{[\s\S]*?\.useCaseDetailRow\s*{[\s\S]*?flex-direction:\s*column;/,
     );
-    expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*{[\s\S]*?\.toggleHeader\s*{[\s\S]*?flex-wrap:\s*wrap;/);
     expect(scss).toMatch(
-      /@media \(max-width:\s*640px\)\s*{[\s\S]*?\.toggleHeaderAside\s*{[\s\S]*?display:\s*contents;/,
+      /@media \(max-width:\s*640px\)\s*{[\s\S]*?\.toggleHeader\s*{[\s\S]*?flex-wrap:\s*nowrap;[\s\S]*?justify-content:\s*flex-start;/,
     );
     expect(scss).toMatch(
-      /@media \(max-width:\s*640px\)\s*{[\s\S]*?\.recognitionSummary\s*{[\s\S]*?display:\s*flex;[\s\S]*?flex:\s*1 0 100%;/,
+      /@media \(max-width:\s*640px\)\s*{[\s\S]*?\.toggleHeaderAside\s*{[\s\S]*?display:\s*flex;[\s\S]*?flex:\s*1 1 auto;[\s\S]*?margin-left:\s*0;/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width:\s*640px\)\s*{[\s\S]*?\.recognitionSummary\s*{[\s\S]*?display:\s*flex;[\s\S]*?flex:\s*0 1 auto;[\s\S]*?margin-top:\s*0;[\s\S]*?overflow:\s*hidden;/,
     );
     expect(scss).toMatch(
       /@media \(max-width:\s*640px\)\s*{[\s\S]*?\.recognitionSummaryLogo \+ \.recognitionSummaryLogo\s*{[\s\S]*?margin-left:\s*-6px;/,

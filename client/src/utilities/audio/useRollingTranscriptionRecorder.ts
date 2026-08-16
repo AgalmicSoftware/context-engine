@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { transcribeAudio } from '../ai/aiClient.js';
+import { requestPreferredSpeechMicrophone } from './microphoneSelection';
 import {
   DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS,
   RollingTranscriptSegment,
@@ -315,7 +316,7 @@ export const useRollingTranscriptionRecorder = ({
     setErrorMessage('');
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await requestPreferredSpeechMicrophone(navigator.mediaDevices);
       if (!mountedRef.current) {
         stream.getTracks().forEach((track) => track.stop());
         return;

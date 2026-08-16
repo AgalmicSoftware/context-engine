@@ -1082,7 +1082,7 @@ const WorkerGroupMembershipPanel = ({
           </button>
         </div>
       ) : null}
-      {status === 'loading' ? <div className={styles.telegramListEmpty}>Loading access groups…</div> : null}
+      {status === 'loading' ? <div className={styles.telegramListEmpty}>Loading groups…</div> : null}
       {error ? <div className={styles.telegramListEmpty}>{error}</div> : null}
       {membershipStatus ? (
         <div className={styles.telegramReportApprox} role="status">

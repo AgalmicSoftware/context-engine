@@ -491,9 +491,9 @@ For those advanced profiles:
 - The final gate definitions are written on-chain through `SessionRegistry.setResourceGates(...)`
 - Lit-encrypted metadata keeps references to the selected gate IDs, but gate authority itself remains on-chain in `SessionRegistry`
 
-The standalone Create SBT (`/sbts/new`) and Contracts pages remain global on-chain tools.
-When opened from a Worker-native session, they are labelled
-**Advanced/external** and do not change that session's native Groups authority.
+The standalone Create SBT (`/sbts/new`) and global Smart Contracts references
+in Docs remain optional on-chain tools. Opening them from a Worker-native
+session does not add them to that session's native Groups authority.
 
 ### 3. Worker deploy and secrets
 

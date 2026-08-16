@@ -374,6 +374,18 @@ describe('TagPage', () => {
     expect(scss).toMatch(/\.sectionTitle\s*{[\s\S]*?color:\s*\$page-text-color;/);
   });
 
+  it('uses theme-owned high-contrast control colors for related tag chips', () => {
+    const scssPath = path.join(__dirname, 'TagPage.module.scss');
+    const scss = fs.readFileSync(scssPath, 'utf8');
+
+    expect(scss).toMatch(
+      /\.relatedTagButton\s*{[\s\S]*?border-color:\s*var\(--ce-border-raised\);[\s\S]*?background:\s*var\(--ce-control-face\);[\s\S]*?color:\s*var\(--ce-control-text\);/,
+    );
+    expect(scss).toMatch(
+      /\.relatedTagButton\s*{[\s\S]*?&:hover,[\s\S]*?&:focus\s*{[\s\S]*?background:\s*var\(--ce-action-accent\);[\s\S]*?color:\s*var\(--ce-action-accent-text\);/,
+    );
+  });
+
   it('keeps the fullscreen tag modal content shrink-safe so demo cards cannot overflow the viewport width', () => {
     const scssPath = path.join(__dirname, 'TagPage.module.scss');
     const scss = fs.readFileSync(scssPath, 'utf8');

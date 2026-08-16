@@ -52,50 +52,41 @@
   }
 }
 
-.docsHeaderTitleRow {
+.docsTitleRow {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 14px;
   flex-wrap: wrap;
+  gap: 14px;
 }
 
-.docsGithubLinks {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.docsGithubLink {
+.docsRepoLink {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 44px;
   height: 44px;
-  min-height: 44px;
-  padding: 0;
-  border: 2px solid #2b6ea8;
+  border: var(--ce-border-control-width) solid var(--docs-titlebar-text);
   border-radius: var(--ce-radius-pill);
-  background: var(--ce-color-white);
-  color: #174f7d;
+  background: color-mix(in srgb, var(--docs-titlebar-text) 12%, transparent);
+  color: var(--docs-titlebar-text);
+  font-size: 1.45rem;
   text-decoration: none;
-  box-shadow: 2px 2px 0 #c3dced;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    transform 0.15s ease;
 }
 
-.docsGithubLink:hover {
-  background: var(--retro-blue-200);
-  color: #103c60;
-  text-decoration: none;
-}
-
-.docsGithubLink:focus-visible {
-  outline: 3px solid var(--ce-color-info);
+.docsRepoLink:hover,
+.docsRepoLink:focus-visible {
+  background: var(--docs-titlebar-text);
+  color: var(--docs-titlebar-bg);
+  outline: 3px solid var(--ce-focus-ring);
   outline-offset: 3px;
 }
 
-.docsGithubLink svg {
-  flex: 0 0 auto;
-  font-size: 1.15rem;
+.docsRepoLink:active {
+  transform: translateY(1px);
 }
 
 .docsSection {
@@ -355,6 +346,17 @@
   color: var(--docs-panel-text);
   font-family: var(--ce-font-mono);
   font-size: 0.9rem;
+}
+
+.sessionContractsGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  border: var(--ce-border-control-width) solid var(--docs-border);
+  border-radius: var(--ce-radius-10);
+  background: var(--docs-surface-alt);
+  box-shadow: var(--ce-shadow-raised);
 }
 
 .contractsSection {

@@ -45,6 +45,15 @@ describe('WorkerGroupMembershipPanel', () => {
     });
   });
 
+  it('uses concise copy while the group collection is loading', () => {
+    const fetchImpl = jest.fn(() => new Promise<Response>(() => undefined));
+
+    render(<WorkerGroupMembershipPanel envelope={envelope} fetchImpl={fetchImpl as typeof fetch} />);
+
+    expect(screen.getByText('Loading groups…')).toBeInTheDocument();
+    expect(screen.queryByText('Loading access groups…')).not.toBeInTheDocument();
+  });
+
   it('formats active, expired, and unlimited join windows without depending on wall-clock time', () => {
     expect(resolveWorkerGroupJoinWindowDisplay({ nowMs: Date.parse('2026-01-01T00:00:00.000Z') })).toEqual({
       status: 'never',
@@ -616,11 +625,16 @@ describe('WorkerGroupMembershipPanel', () => {
     const groupImage = screen.getByTestId('ce-session-worker-group-image');
     expect(groupImage).toHaveAttribute('src', 'https://ar-io.dev/open-reviewers-image');
     expect(groupImage).toHaveClass('sbtImage');
-    expect(groupImage.parentElement).toHaveClass('miniImageContainer');
+    expect(groupImage.parentElement).toHaveClass(
+      'miniImageContainer',
+      'workerGroupCardImageContainer',
+    );
     expect(screen.getByText('Invited reviewers')).toBeInTheDocument();
     expect(screen.queryByText('Details')).not.toBeInTheDocument();
     expect(screen.queryByText(/contract|network|rpc|gas|mint/i)).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Copy Invited reviewers group link' }));
+    const copyGroupLinkButton = screen.getByRole('button', { name: 'Copy Invited reviewers group link' });
+    expect(copyGroupLinkButton).toHaveAttribute('data-ce-control-appearance', 'frameless');
+    fireEvent.click(copyGroupLinkButton);
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1));
     const copiedGroupLink = new URL(String((navigator.clipboard.writeText as jest.Mock).mock.calls[0][0]));
     expect(copiedGroupLink.pathname).toBe('/group/invited-reviewers');

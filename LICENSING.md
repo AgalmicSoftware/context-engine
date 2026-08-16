@@ -54,6 +54,13 @@ Do not assume a path alone settles the licensing question. Follow the more speci
 
 Third-party dependencies retain their own licenses. Package metadata, lockfiles, vendored notices, and upstream project notices should be checked before redistributing dependency code or bundled artifacts.
 
+The Classic 95 theme bundles Wine Tahoma regular and bold font files under
+`client/src/assets/fonts/classic-95/`. These are the Wine project's
+Tahoma-compatible fonts, copyright Larry Snyder and based on Bitstream Vera
+Sans. They are licensed under `LGPL-2.1-or-later`, independently of the root
+`MPL-2.0` license. The matching license, source files, checksums, and upstream
+provenance are kept in that directory.
+
 ## Third-Party Images And Logos
 
 The repository includes logos and brand images from third-party organizations under `client/src/assets/img/`. These images remain the copyright and/or trademarks of their respective owners and are not covered by the `MPL-2.0`, MIT, or CC0 notices in this repository. They are used here for nominative reference and attribution purposes only and do not imply endorsement or affiliation. If a rights holder requests removal, the relevant assets will be taken down promptly.

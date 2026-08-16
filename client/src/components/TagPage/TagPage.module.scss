@@ -579,10 +579,11 @@ $tag-route-accent-alt: var(--ce-compat-indigo);
   align-items: center;
   justify-content: center;
   padding: 8px 14px;
-  border: 1px dashed color-mix(in srgb, var(--ce-action-accent) 32%, transparent);
+  border: var(--ce-border-control-width) solid;
+  border-color: var(--ce-border-raised);
   border-radius: var(--ce-radius-pill);
-  background: color-mix(in srgb, var(--ce-action-accent) 8%, transparent);
-  color: var(--ce-action-accent);
+  background: var(--ce-control-face);
+  color: var(--ce-control-text);
   font-family: inherit;
   font-size: 0.86rem;
   cursor: pointer;
@@ -593,8 +594,9 @@ $tag-route-accent-alt: var(--ce-compat-indigo);
 
   &:hover,
   &:focus {
-    background: color-mix(in srgb, var(--ce-action-accent) 16%, transparent);
-    border-color: color-mix(in srgb, var(--ce-action-accent) 50%, transparent);
+    background: var(--ce-action-accent);
+    border-color: var(--ce-action-accent);
+    color: var(--ce-action-accent-text);
     transform: translateY(-1px);
   }
 }

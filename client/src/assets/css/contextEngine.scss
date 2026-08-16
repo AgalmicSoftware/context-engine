@@ -2,6 +2,24 @@
 @use '../../scss/themes' as themes;
 @use '../../scss/session-color-schemes/schemes';
 
+/* Locally bundled for deterministic Classic 95 rendering. The files and
+ * license/provenance live together under assets/fonts/classic-95/. */
+@font-face {
+  font-family: 'CE Tahoma';
+  src: url('../fonts/classic-95/wine-tahoma-regular.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'CE Tahoma';
+  src: url('../fonts/classic-95/wine-tahoma-bold.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
 #root {
   padding-right: 2%;
   padding-left: 2%;

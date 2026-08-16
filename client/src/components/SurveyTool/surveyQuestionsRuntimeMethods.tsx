@@ -1240,6 +1240,27 @@ export const createSurveyQuestionsRuntimeMethods = (
       }
 
   const {
+    checkAndHandleStartFresh,
+    getAnsweredQuestionsCount,
+    getSurveyQuestionPoolLoadState,
+    handleBookmarkToggle,
+    initializeSurveyResponseState,
+    loadBookmarks,
+    maybeBlockSubmitUntilQuestionPoolComplete,
+    recalculateEditStats,
+    showTransientSubmitFeedback,
+  } = createSurveyQuestionsProgressRuntime({
+    ...context,
+    buildEmptyResponseFieldState,
+    computeModifiedQuestionsCount,
+    fetchQuestionPool: () => fetchQuestionPool(),
+    getCurrentRenderedQuestionIds,
+    getPendingEditStats: () => getPendingEditStats(),
+    handleStartFresh: () => handleStartFresh(),
+    resolveDiffBaselineSlice,
+  });
+
+  const {
     beginQuestionDisplayRender,
     flushDraftPersistAfterSliderChange,
     getAnswerLockDisplayState,
@@ -1274,6 +1295,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     getAudioInputWorkerProps,
     handleAdditional,
     handleAnswer,
+    handleBookmarkToggle,
     handleConviction,
     handleImportance,
     handleReloadMaskedPrompt,
@@ -1311,37 +1333,30 @@ export const createSurveyQuestionsRuntimeMethods = (
         return canDecrypt;
       })();
 
-  const {
-    checkAndHandleStartFresh,
-    getAnsweredQuestionsCount,
-    getSurveyQuestionPoolLoadState,
-    handleBookmarkToggle,
-    initializeSurveyResponseState,
-    loadBookmarks,
-    maybeBlockSubmitUntilQuestionPoolComplete,
-    recalculateEditStats,
-    showTransientSubmitFeedback,
-  } = createSurveyQuestionsProgressRuntime({
+  const { renderQuestion, renderQuestionAnswer, renderSurveyAnswers } = createSurveyQuestionsRenderRuntime({
     ...context,
-    buildEmptyResponseFieldState,
-    computeModifiedQuestionsCount,
-    fetchQuestionPool: () => fetchQuestionPool(),
-    getCurrentRenderedQuestionIds,
-    getPendingEditStats: () => getPendingEditStats(),
-    handleStartFresh: () => handleStartFresh(),
-    resolveDiffBaselineSlice,
+    getCommentsOpen,
+    getQuestionRenderDisplayState,
+    handleDecryptQuestionAnswer: (
+      questionId: SurveyQuestionsLegacyValue,
+      fieldToDecrypt?: SurveyQuestionsLegacyValue,
+      responseOverride?: SurveyQuestionsLegacyValue,
+    ) => handleDecryptQuestionAnswer(questionId, fieldToDecrypt, responseOverride),
+    handleReloadMaskedPrompt,
+    isQuestionFieldBusy,
+    isQuestionPromptMasked,
+    renderFullQuestionAdditionalInput,
+    renderFullQuestionCardIcons,
+    renderFullQuestionCardShell,
+    renderFullQuestionFooterIcons,
+    renderFullQuestionResponseInput,
+    renderFullQuestionSliderSection,
+    renderQuestionAdditionalLockControl,
+    renderQuestionAnswerLockControl,
+    renderQuestionFieldDecryptControl,
+    renderQuestionMaskedPromptCard,
+    toggleComments,
   });
-
-      return await inst._canDecryptOtherResponsesInFlight;
-    } catch (_: any) {
-      try {
-        setState(buildCanDecryptOtherResponsesState({ status: 'unknown' }));
-      } catch (e: any) {
-        surveyLog.warn('SurveyTool: fallback', e);
-      }
-      return false;
-    }
-  };
 
   const buildCanDecryptOtherResponsesSignature = () => {
     try {
@@ -5413,6 +5428,12 @@ export const createSurveyQuestionsRuntimeMethods = (
   };
 
   async function handleDecryptEdit() {
+    // Plaintext responses are already hydrated into surveysResponseState. Re-enter
+    // edit mode directly instead of running the encrypted-response pipeline.
+    if (!stateRef.current.userResponseEncrypted) {
+      setState(buildEditingResponseModeState());
+      return;
+    }
     const decryptContext: SurveyQuestionsLegacyValue = buildDecryptContextSnapshot();
     const decryptAttemptId: SurveyQuestionsLegacyValue = startSurveyDecryptAttempt();
     setState(buildDecryptEditStartState());

@@ -10,7 +10,6 @@ const ROUTE_CASES = Object.freeze([
     label: 'home Tools cards',
     requiresStandardToolCards: true,
   },
-  { path: '/', label: 'home footer controls', requiresFooterButtons: true },
   { path: '/', label: 'home title-bar tab spacing', requiresSpreadHomeTabs: true },
   {
     path: '/',
@@ -26,6 +25,9 @@ const ROUTE_CASES = Object.freeze([
     path: '/about',
     label: 'about lazy route',
     requiresBrightLogo: true,
+    requiresClassicAboutHeroControls: true,
+    requiresFooterBelowFold: true,
+    requiresFooterButtons: true,
     requiresTransparentRecognitionLogos: true,
   },
   {
@@ -36,6 +38,11 @@ const ROUTE_CASES = Object.freeze([
     requiresSessionColors: true,
   },
   { path: '/docs', label: 'docs lazy route', requiresReadableDocs: true },
+  {
+    path: '/session/demo-sh',
+    label: 'tag related-chip surface',
+    requiresReadableTagRelatedChips: true,
+  },
   { path: '/demos', label: 'demo surface' },
   {
     path: '/session/demo-sh',
@@ -61,18 +68,40 @@ const TOOL_CARD_VIEWPORTS = Object.freeze([...VIEWPORTS, { name: 'compact', widt
 
 const HOME_TAB_VIEWPORTS = Object.freeze([...VIEWPORTS, { name: 'compact window', width: 765, height: 799 }]);
 
-const FOOTER_VIEWPORTS = Object.freeze([...VIEWPORTS, { name: 'compact window', width: 765, height: 799 }]);
+const FEEDBACK_COMPACT_VIEWPORT = Object.freeze({ name: 'feedback compact', width: 630, height: 803 });
+const SESSION_BACK_FEEDBACK_VIEWPORT = Object.freeze({ name: 'session back feedback', width: 735, height: 803 });
+const AUTHORING_FEEDBACK_VIEWPORT = Object.freeze({ name: 'authoring feedback', width: 735, height: 803 });
+const LOGIN_FEEDBACK_VIEWPORT = Object.freeze({ name: 'login feedback', width: 735, height: 803 });
+const DOCS_FEEDBACK_VIEWPORT = Object.freeze({ name: 'docs feedback', width: 735, height: 803 });
 
-const SESSION_SURFACE_VIEWPORTS = Object.freeze([...VIEWPORTS, { name: 'compact window', width: 765, height: 799 }]);
+const FOOTER_VIEWPORTS = Object.freeze([
+  ...VIEWPORTS,
+  FEEDBACK_COMPACT_VIEWPORT,
+  { name: 'compact window', width: 765, height: 799 },
+]);
+
+const SESSION_SURFACE_VIEWPORTS = Object.freeze([
+  ...VIEWPORTS,
+  FEEDBACK_COMPACT_VIEWPORT,
+  SESSION_BACK_FEEDBACK_VIEWPORT,
+  { name: 'compact window', width: 765, height: 799 },
+]);
 
 const SESSION_SETUP_VIEWPORTS = Object.freeze([...VIEWPORTS, { name: 'compact window', width: 765, height: 799 }]);
+const AUTHORING_VIEWPORTS = Object.freeze([...VIEWPORTS, AUTHORING_FEEDBACK_VIEWPORT]);
+const LOGIN_VIEWPORTS = Object.freeze([...VIEWPORTS, LOGIN_FEEDBACK_VIEWPORT]);
+const DOCS_VIEWPORTS = Object.freeze([...VIEWPORTS, DOCS_FEEDBACK_VIEWPORT]);
+const TAG_VIEWPORTS = Object.freeze([...VIEWPORTS, { name: 'tag feedback', width: 735, height: 802 }]);
 
 const WELCOME_FIT_VIEWPORTS = Object.freeze([
+  { name: 'feedback compact window', width: 735, height: 803 },
   { name: 'compact window', width: 765, height: 799 },
   { name: 'compact desktop', width: 1280, height: 720 },
   { name: 'wide desktop', width: 1904, height: 900 },
   { name: 'ultra-wide short desktop', width: 2048, height: 876 },
 ]);
+
+const WELCOME_FIT_THEME_IDS = Object.freeze(['context-engine', 'classic-95']);
 
 const WELCOME_SLIDE_KEYS = Object.freeze(['intro', 'toolkit', 'goals', 'built-to-help', 'because', 'looking-for']);
 
@@ -93,6 +122,7 @@ const readThemeState = () => {
     canvas: style.getPropertyValue('--ce-canvas').trim().toLowerCase(),
     radius4: style.getPropertyValue('--ce-radius-4').trim(),
     fontBody: style.getPropertyValue('--ce-font-body').trim().toLowerCase(),
+    tahomaLoaded: document.fonts.check('16px "CE Tahoma"'),
     modalBackground: probeStyle.backgroundColor,
     modalRadius: probeStyle.borderRadius,
   };
@@ -205,6 +235,35 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   });
   await page.waitForSelector('#root', { state: 'attached', timeout: 15000 });
   await page.waitForFunction(() => document.querySelector('#root')?.children.length > 0, null, { timeout: 15000 });
+  if (routeCase.requiresReadableTagRelatedChips) {
+    const tweets = page.getByRole('button', { name: 'Tweets', exact: true });
+    const skipOnboarding = page.getByRole('button', { name: 'Skip', exact: true });
+    const contextHeading = page.getByRole('heading', { name: 'Context View', exact: true });
+
+    if (await skipOnboarding.isVisible()) await skipOnboarding.click();
+    if (!(await tweets.isVisible())) {
+      await contextHeading.waitFor({ state: 'visible', timeout: 60000 });
+      await contextHeading.click();
+    }
+    await tweets.waitFor({ state: 'visible', timeout: 60000 });
+    await tweets.click();
+    await page.getByRole('button', { name: 'Google', exact: true }).first().click();
+  }
+  const readRelatedTagChipState = async () => {
+    const chip = page.getByRole('button', { name: 'Add Anthropic tag to comparison', exact: true });
+    await chip.waitFor({ state: 'visible', timeout: 60000 });
+    return chip.evaluate((element) => {
+      const style = window.getComputedStyle(element);
+      return {
+        backgroundColor: style.backgroundColor,
+        borderWidths: [style.borderTopWidth, style.borderRightWidth, style.borderBottomWidth, style.borderLeftWidth],
+        color: style.color,
+      };
+    });
+  };
+  if (routeCase.requiresFooterBelowFold) {
+    await page.getByTestId('ce-page-about-root').waitFor({ state: 'visible', timeout: 15000 });
+  }
   if (routeCase.requiresSpreadHomeTabs) {
     await page.locator('[role="tablist"]').waitFor({ state: 'visible', timeout: 15000 });
   }
@@ -221,6 +280,147 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       });
     return { logo: await readBox(logo), login: await readBox(login) };
   };
+
+  const readSessionSectionTypography = async () =>
+    page.locator('div[class*="sectionsGrid"]').first().evaluate((grid) =>
+      Array.from(grid.querySelectorAll('h2'))
+        .map((heading) => {
+          const title = heading.querySelector('[class*="sectionHeaderTitle"]');
+          const subtitle = heading.querySelector('[class*="sectionHeaderSubtitle"]');
+          if (!(title && subtitle)) return null;
+          return {
+            label: `${title.textContent?.trim() || ''} ${subtitle.textContent?.trim() || ''}`.trim(),
+            subtitleFontSize: Number.parseFloat(window.getComputedStyle(subtitle).fontSize),
+            titleFontSize: Number.parseFloat(window.getComputedStyle(title).fontSize),
+          };
+        })
+        .filter(Boolean),
+    );
+
+  const readAuthoringSourceControlGeometry = async () =>
+    page.getByPlaceholder('Add URL').evaluate((input) => {
+      const surface = input.parentElement;
+      const chooser = surface?.querySelector('[data-testid="ce-database-image-chooser"]');
+      const paste = surface?.querySelector('[data-testid="ce-database-image-paste"]');
+      const upload = surface?.querySelector('[data-testid="ce-database-image-upload"]');
+      const add = surface?.querySelector('button[title="Add URL"]');
+      const controls = [input, paste, upload, add].filter(Boolean);
+      const rects = controls.map((element) => element.getBoundingClientRect());
+      const surfaceRect = surface?.getBoundingClientRect();
+      const centers = rects.map((rect) => rect.top + rect.height / 2);
+      return {
+        addIsLast: surface?.lastElementChild === add,
+        chooserInsideSurface: chooser?.parentElement === surface,
+        controlCount: controls.length,
+        centerSpread: centers.length ? Math.max(...centers) - Math.min(...centers) : 0,
+        overflows:
+          !surfaceRect ||
+          rects.some((rect) => rect.left < surfaceRect.left - 1 || rect.right > surfaceRect.right + 1) ||
+          surface.scrollWidth > surface.clientWidth + 1,
+        surfaceHeight: surfaceRect?.height || 0,
+      };
+    });
+
+  const readLoginBackgroundState = async () =>
+    page.locator('.modal-login .card').evaluate((card) => {
+      const body = card.querySelector('.card-body');
+      const cardStyle = window.getComputedStyle(card);
+      const bodyStyle = body ? window.getComputedStyle(body) : null;
+      return {
+        bodyBackgroundImage: bodyStyle?.backgroundImage || '',
+        cardBackgroundColor: cardStyle.backgroundColor,
+        cardBackgroundImage: cardStyle.backgroundImage,
+        overlayBackgroundImage: window.getComputedStyle(card, '::after').backgroundImage,
+      };
+    });
+
+  const readPreloginSettingsControlLayout = async () =>
+    page.getByTestId('ce-prelogin-settings-panel').evaluate((panel) => {
+      const session = document.querySelector('[aria-label^="Active session:"]');
+      const config = panel.querySelector('[data-testid="ce-prelogin-config-toggle"]');
+      const explainers = Array.from(panel.querySelectorAll('button')).find((button) =>
+        button.getAttribute('aria-label')?.startsWith('Explainers '),
+      );
+      const demo = Array.from(panel.querySelectorAll('button')).find((button) =>
+        button.getAttribute('aria-label')?.startsWith('Demo Mode '),
+      );
+      const row = config?.parentElement;
+      const controls = [config, explainers, demo].filter(Boolean);
+      const rects = controls.map((element) => element.getBoundingClientRect());
+      const units = Array.from(row?.children || []);
+      const unitRects = units.map((element) => element.getBoundingClientRect());
+      const centers = rects.map((rect) => rect.top + rect.height / 2);
+      const rowRect = row?.getBoundingClientRect();
+      const visualRows = unitRects.reduce((groups, rect) => {
+        const group = groups.find((candidate) => Math.abs(candidate[0].top - rect.top) <= 2);
+        if (group) group.push(rect);
+        else groups.push([rect]);
+        return groups;
+      }, []);
+      const rowCenter = rowRect ? rowRect.left + rowRect.width / 2 : 0;
+      const panelRect = panel.getBoundingClientRect();
+      const sessionRect = session?.getBoundingClientRect();
+      const authActionBottom = Math.max(
+        ...['ce-passkey-wallet-create', 'ce-passkey-wallet-sign-in'].map(
+          (testId) => document.querySelector(`[data-testid="${testId}"]`)?.getBoundingClientRect().bottom || 0,
+        ),
+      );
+      return {
+        centerSpread: centers.length ? Math.max(...centers) - Math.min(...centers) : 0,
+        controlCount: controls.length,
+        controlWidths: rects.map((rect) => rect.width),
+        contentOverflows: controls.some((element) => element.scrollWidth > element.clientWidth + 1),
+        overflows:
+          !rowRect || unitRects.some((rect) => rect.left < rowRect.left - 1 || rect.right > rowRect.right + 1),
+        rowCenterOffsets: visualRows.map((group) => {
+          const left = Math.min(...group.map((rect) => rect.left));
+          const right = Math.max(...group.map((rect) => rect.right));
+          return Math.abs((left + right) / 2 - rowCenter);
+        }),
+        rowClientWidth: row?.clientWidth || 0,
+        rowCount: visualRows.length,
+        rowScrollWidth: row?.scrollWidth || 0,
+        sessionAbovePanel: Boolean(sessionRect && sessionRect.bottom <= panelRect.top + 1),
+        sessionBelowAuthActions: Boolean(sessionRect && sessionRect.top >= authActionBottom - 1),
+        sessionOutsidePanel: Boolean(session && !panel.contains(session)),
+      };
+    });
+
+  const readAboutHeroControlState = async () =>
+    page.getByTestId('ce-about-hero').evaluate((hero) => {
+      const links = Array.from(hero.querySelectorAll('a'));
+      const findLink = (text) => links.find((link) => link.textContent?.trim() === text);
+      const readControl = (element) => {
+        if (!element) return null;
+        const style = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return {
+          backgroundColor: style.backgroundColor,
+          borderRadius: style.borderRadius,
+          borderWidths: [
+            style.borderTopWidth,
+            style.borderRightWidth,
+            style.borderBottomWidth,
+            style.borderLeftWidth,
+          ],
+          boxShadow: style.boxShadow,
+          color: style.color,
+          fontFamily: style.fontFamily.toLowerCase(),
+          height: rect.height,
+          width: rect.width,
+        };
+      };
+      return {
+        heroFontFamily: window.getComputedStyle(hero).fontFamily.toLowerCase(),
+        linkLabels: links.map((link) => link.textContent?.trim() || ''),
+        demo: readControl(findLink('Demo')),
+        github: readControl(
+          links.find((link) => link.getAttribute('aria-label') === 'View Context Engine on GitHub'),
+        ),
+        newSession: readControl(findLink('New Session')),
+        whitepaper: readControl(findLink('Whitepaper')),
+      };
+    });
 
   const toolCard = routeCase.requiresStandardToolCards ? page.locator('div[class^="_square_"]').first() : null;
   if (toolCard) await toolCard.waitFor({ state: 'visible' });
@@ -272,16 +472,58 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     });
   }
 
-  const footerLink = routeCase.requiresFooterButtons ? page.getByRole('link', { name: 'NEW', exact: true }) : null;
-  if (footerLink) {
+  const footer = routeCase.requiresFooterButtons ? page.locator('footer') : null;
+  const footerStartButton = routeCase.requiresFooterButtons ? page.getByTestId('ce-footer-start-button') : null;
+  const footerStartMenu = routeCase.requiresFooterButtons ? page.getByTestId('ce-footer-start-menu') : null;
+  const footerLink = routeCase.requiresFooterButtons ? page.getByRole('menuitem', { name: 'NEW', exact: true }) : null;
+  let classicFooterInitialState = null;
+  let classicFooterStartState = null;
+  let classicFooterMenuState = null;
+  if (footer && footerStartButton && footerStartMenu && footerLink) {
+    await footer.waitFor({ state: 'attached' });
+    await page.evaluate(() => window.scrollTo(0, 0));
+    classicFooterInitialState = await footer.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        documentHeight: document.documentElement.scrollHeight,
+        footerTop: rect.top,
+        position: window.getComputedStyle(element).position,
+        viewportHeight: window.innerHeight,
+      };
+    });
+    assert.equal(await footerStartMenu.isHidden(), true, 'Classic 95 Start menu should begin closed');
+    await footer.scrollIntoViewIfNeeded();
+    await footerStartButton.waitFor({ state: 'visible' });
+    classicFooterStartState = await footerStartButton.evaluate((element) => {
+      const style = window.getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      return {
+        ariaLabel: element.getAttribute('aria-label'),
+        ariaExpanded: element.getAttribute('aria-expanded'),
+        borderWidths: [style.borderTopWidth, style.borderRightWidth, style.borderBottomWidth, style.borderLeftWidth],
+        boxShadow: style.boxShadow,
+        height: rect.height,
+        left: rect.left,
+        text: element.textContent?.trim() || '',
+        width: rect.width,
+      };
+    });
+    await footerStartButton.click();
+    await footerStartMenu.waitFor({ state: 'visible' });
     await footerLink.waitFor({ state: 'visible' });
-    await footerLink.scrollIntoViewIfNeeded();
+    classicFooterMenuState = await footerStartMenu.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      const footerRect = element.closest('footer')?.getBoundingClientRect();
+      return {
+        bottom: rect.bottom,
+        footerTop: footerRect?.top || 0,
+        left: rect.left,
+      };
+    });
   }
   const classicFooterLinkState = footerLink
     ? await footerLink.evaluate((element) => {
         const style = window.getComputedStyle(element);
-        const nav = element.closest('nav');
-        const navRect = nav?.getBoundingClientRect();
         const linkRect = element.getBoundingClientRect();
         return {
           backgroundColor: style.backgroundColor,
@@ -297,8 +539,6 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
           color: style.color,
           height: linkRect.height,
           left: linkRect.left,
-          navLeft: navRect?.left || 0,
-          navPseudoContent: nav ? window.getComputedStyle(nav, '::before').content : '',
         };
       })
     : null;
@@ -420,6 +660,12 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
 
   let classicReportClusterColors = null;
   let classicGroupLinkState = null;
+  const sessionGroupsToggle = routeCase.requiresReadableSessionSurface
+    ? page.getByTestId('ce-session-groups-toggle')
+    : null;
+  const sessionGroupLinkButton = routeCase.requiresReadableSessionSurface
+    ? page.getByRole('button', { name: /^Copy .* group link$/ }).first()
+    : null;
   if (routeCase.requiresReadableSessionSurface) {
     await page.getByText('Existential risk from AI justifies extraordinary precautions.', { exact: true }).waitFor({
       state: 'visible',
@@ -429,13 +675,12 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     classicReportClusterColors = await page
       .locator('svg[class*="clusterSwatchSvg"] circle')
       .evaluateAll((circles) => circles.map((circle) => circle.getAttribute('fill')));
-    await page.getByRole('heading', { name: /^Groups Join or Create$/ }).click();
-    const groupLinkButton = page.getByRole('button', { name: /^Copy .* group link$/ }).first();
-    await groupLinkButton.waitFor({
+    await sessionGroupsToggle.click();
+    await sessionGroupLinkButton.waitFor({
       state: 'visible',
       timeout: 15000,
     });
-    classicGroupLinkState = await groupLinkButton.evaluate((element) => {
+    classicGroupLinkState = await sessionGroupLinkButton.evaluate((element) => {
       const style = window.getComputedStyle(element);
       const rect = element.getBoundingClientRect();
       return {
@@ -446,7 +691,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         width: rect.width,
       };
     });
-    await page.getByRole('heading', { name: /^Groups Join or Create$/ }).click();
+    await sessionGroupsToggle.click();
   }
 
   const classicDocumentEndFooterState = routeCase.requiresDocumentEndFooter
@@ -499,9 +744,24 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     await page.getByText('Account uses a passkey:', { exact: true }).waitFor({ state: 'visible' });
   }
 
-  if (routeCase.requiresPreloginThemeSettings) {
+  if (routeCase.requiresPreloginControlLayout) {
+    const sessionSummary = page.locator('[aria-label^="Active session:"]').first();
+    await sessionSummary.waitFor({ state: 'visible' });
+    assert.equal(
+      await page.getByTestId('ce-prelogin-settings-panel').count(),
+      0,
+      'Session should render before the settings drawer opens',
+    );
     await page.getByRole('button', { name: 'Toggle pre-login settings', exact: true }).click();
     await page.getByTestId('ce-prelogin-settings-panel').waitFor({ state: 'visible' });
+  }
+
+  if (routeCase.requiresPreloginThemeSettings) {
+    const settingsPanel = page.getByTestId('ce-prelogin-settings-panel');
+    if (!(await settingsPanel.isVisible())) {
+      await page.getByRole('button', { name: 'Toggle pre-login settings', exact: true }).click();
+    }
+    await settingsPanel.waitFor({ state: 'visible' });
     await page.getByTestId('ce-settings-theme').waitFor({ state: 'visible' });
     await page.getByTestId('ce-prelogin-config-toggle').click();
     await page.getByTestId('ce-prelogin-config-panel').waitFor({ state: 'visible' });
@@ -534,13 +794,38 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     );
     await page.getByTestId('ce-survey-create-toggle').waitFor({ state: 'visible' });
     await page.getByTestId('ce-survey-create-toggle').click();
-    await page.getByPlaceholder('Speak or type text here...').waitFor({ state: 'visible' });
+    const authoringTextInput = page.locator('textarea').first();
+    const typesHeading = page.getByRole('heading', { name: 'Types', exact: true });
+    const questionCount = page.getByTestId('ce-database-question-count-value');
+    await authoringTextInput.waitFor({ state: 'visible' });
     await page.getByTestId('ce-database-image-paste').waitFor({ state: 'visible' });
+    assert.equal(await typesHeading.count(), 0, 'Question types should stay hidden while the text box is empty');
+    assert.equal(await questionCount.count(), 0, 'Question count should stay hidden while the text box is empty');
+    await authoringTextInput.fill('Question configuration should appear after text is entered.');
+    await typesHeading.waitFor({ state: 'visible' });
+    await questionCount.waitFor({ state: 'visible' });
+    await authoringTextInput.fill('   ');
+    await page.waitForFunction(
+      () =>
+        !Array.from(document.querySelectorAll('h3')).some((heading) => heading.textContent?.trim() === 'Types') &&
+        !document.querySelector('[data-testid="ce-database-question-count-value"]'),
+    );
+    await authoringTextInput.fill('Question configuration should return when text is entered again.');
+    await typesHeading.waitFor({ state: 'visible' });
+    await questionCount.waitFor({ state: 'visible' });
   }
 
+  let classicRatingInteractionState = null;
   if (routeCase.requiresReadableQuestionUtilities) {
     await page.getByText('Questions', { exact: true }).click();
     await page.getByRole('button', { name: 'Conviction / importance' }).first().waitFor({ state: 'visible' });
+    await page.getByTestId('ce-survey-additional-toggle').first().waitFor({ state: 'visible' });
+    await page.getByRole('button', { name: 'Show question tags' }).first().waitFor({ state: 'visible' });
+    await page
+      .locator('button[title="Bookmark Question"], button[title="Remove Bookmark"]')
+      .first()
+      .waitFor({ state: 'visible' });
+
   }
 
   const classicPileControlState = routeCase.requiresReadableSessionSurface
@@ -608,7 +893,14 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       })()
     : null;
 
+  await page.evaluate(async () => {
+    await document.fonts.load('16px "CE Tahoma"');
+    await document.fonts.ready;
+  });
   const classic = await page.evaluate(readThemeState);
+  const classicAboutHeroControlState = routeCase.requiresClassicAboutHeroControls
+    ? await readAboutHeroControlState()
+    : null;
   const questionUtilityButton = routeCase.requiresReadableQuestionUtilities
     ? page.getByRole('button', { name: 'Conviction / importance' }).first()
     : null;
@@ -633,6 +925,36 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         focusedOutlineStyle: '',
       }
     : null;
+  const classicQuestionIconFamilyState = routeCase.requiresReadableQuestionUtilities
+    ? await Promise.all(
+        [
+          ['comment', page.getByTestId('ce-survey-additional-toggle').first()],
+          ['hashtag', page.getByRole('button', { name: 'Show question tags' }).first()],
+          [
+            'bookmark',
+            page.locator('button[title="Bookmark Question"], button[title="Remove Bookmark"]').first(),
+          ],
+        ].map(async ([label, locator]) => ({
+          label,
+          ...(await locator.evaluate((element) => {
+            const style = window.getComputedStyle(element);
+            return {
+              backgroundColor: style.backgroundColor,
+              borderWidths: [
+                style.borderTopWidth,
+                style.borderRightWidth,
+                style.borderBottomWidth,
+                style.borderLeftWidth,
+              ],
+              boxShadow: style.boxShadow,
+              opacity: Number.parseFloat(style.opacity),
+            };
+          })),
+        })),
+      )
+    : null;
+  let classicFullQuestionConvictionState = null;
+  let classicFullQuestionLockAudienceState = null;
   if (questionUtilityButton && questionUtilityState) {
     await questionUtilityButton.hover();
     await page.waitForFunction(
@@ -646,6 +968,121 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     questionUtilityState.focusedOutlineStyle = await questionUtilityButton.evaluate(
       (element) => window.getComputedStyle(element).outlineStyle,
     );
+    await questionUtilityButton.click();
+    const sliderPanel = page.locator('[class*="fullQuestionFooter"] [class*="importanceSlider"]').first();
+    await sliderPanel.waitFor({ state: 'visible' });
+    classicFullQuestionConvictionState = await sliderPanel.evaluate((element) => {
+      const style = window.getComputedStyle(element);
+      const label = element.querySelector('[class*="importanceText"]');
+      const toggleLine = element.querySelector('[class*="convictionToggleLine"]');
+      const slider = element.querySelector('[class*="convictionSlider"]');
+      const labelStyle = label ? window.getComputedStyle(label) : null;
+      const toggleLineStyle = toggleLine ? window.getComputedStyle(toggleLine) : null;
+      const sliderStyle = slider ? window.getComputedStyle(slider) : null;
+      const sliderRect = slider?.getBoundingClientRect();
+      return {
+        backgroundColor: style.backgroundColor,
+        borderWidths: [style.borderTopWidth, style.borderRightWidth, style.borderBottomWidth, style.borderLeftWidth],
+        boxShadow: style.boxShadow,
+        opacity: Number.parseFloat(style.opacity),
+        labelColor: labelStyle?.color || '',
+        labelOpacity: Number.parseFloat(labelStyle?.opacity || '0'),
+        toggleLineBackground: toggleLineStyle?.backgroundColor || '',
+        toggleLineBorderWidths: toggleLineStyle
+          ? [
+              toggleLineStyle.borderTopWidth,
+              toggleLineStyle.borderRightWidth,
+              toggleLineStyle.borderBottomWidth,
+              toggleLineStyle.borderLeftWidth,
+            ]
+          : [],
+        toggleLineBoxShadow: toggleLineStyle?.boxShadow || '',
+        toggleLineColor: toggleLineStyle?.color || '',
+        toggleLineOpacity: Number.parseFloat(toggleLineStyle?.opacity || '0'),
+        sliderBackground: sliderStyle?.backgroundColor || '',
+        sliderHeight: sliderRect?.height || 0,
+        sliderOpacity: Number.parseFloat(sliderStyle?.opacity || '0'),
+        sliderWidth: sliderRect?.width || 0,
+      };
+    });
+
+    const fullQuestionLockButton = page.getByTestId('ce-survey-answer-lock').first();
+    await fullQuestionLockButton.click();
+    const onlyMeButton = page.getByTestId('ce-survey-lock-audience-self').first();
+    await onlyMeButton.waitFor({ state: 'visible' });
+    classicFullQuestionLockAudienceState = await onlyMeButton.evaluate((element) => {
+      const style = window.getComputedStyle(element);
+      const popover = element.closest('[class*="lockAudiencePopover"]');
+      const popoverStyle = popover ? window.getComputedStyle(popover) : null;
+      return {
+        backgroundColor: style.backgroundColor,
+        borderWidths: [style.borderTopWidth, style.borderRightWidth, style.borderBottomWidth, style.borderLeftWidth],
+        boxShadow: style.boxShadow,
+        color: style.color,
+        opacity: Number.parseFloat(style.opacity),
+        popoverBackground: popoverStyle?.backgroundColor || '',
+        popoverBorderWidths: popoverStyle
+          ? [
+              popoverStyle.borderTopWidth,
+              popoverStyle.borderRightWidth,
+              popoverStyle.borderBottomWidth,
+              popoverStyle.borderLeftWidth,
+            ]
+          : [],
+        popoverBoxShadow: popoverStyle?.boxShadow || '',
+      };
+    });
+    await fullQuestionLockButton.click();
+  }
+  let classicQuestionFilterState = null;
+  if (routeCase.requiresReadableQuestionUtilities) {
+    await page.getByTestId('ce-survey-filter-toggle').first().click();
+    const filterModal = page.getByTestId('ce-question-filter-modal');
+    await filterModal.waitFor({ state: 'visible' });
+    const firstTag = filterModal.locator('button[class*="tagBubble"][aria-pressed="false"]').first();
+    await firstTag.waitFor({ state: 'visible' });
+    const readControlState = (locator) =>
+      locator.evaluate((element) => {
+        const style = window.getComputedStyle(element);
+        return {
+          backgroundColor: style.backgroundColor,
+          borderWidths: [style.borderTopWidth, style.borderRightWidth, style.borderBottomWidth, style.borderLeftWidth],
+          boxShadow: style.boxShadow,
+          color: style.color,
+          className: element.className,
+          outlineStyle: style.outlineStyle,
+        };
+      });
+    const header = filterModal.locator('.modal-header').first();
+    const title = filterModal.locator('.modal-title').first();
+    const applyButton = filterModal.getByRole('button', { name: 'See Questions' });
+    const closeButton = filterModal.locator('.modal-header button').first();
+    const firstTagLabel = (await firstTag.textContent())?.trim() || '';
+    const tagResting = await readControlState(firstTag);
+    await firstTag.focus();
+    const tagFocused = await readControlState(firstTag);
+    await firstTag.click();
+    const selectedTag = filterModal.getByRole('button', { name: firstTagLabel, exact: true });
+    await selectedTag.waitFor({ state: 'visible' });
+    await page.waitForFunction(
+      ({ modalTestId, tagLabel }) =>
+        Array.from(document.querySelectorAll(`[data-testid="${modalTestId}"] button`)).some(
+          (button) => button.textContent?.trim() === tagLabel && button.getAttribute('aria-pressed') === 'true',
+        ),
+      { modalTestId: 'ce-question-filter-modal', tagLabel: firstTagLabel },
+    );
+    const tagSelected = await readControlState(selectedTag);
+    classicQuestionFilterState = {
+      headerBackground: await header.evaluate((element) => window.getComputedStyle(element).backgroundColor),
+      titleColor: await title.evaluate((element) => window.getComputedStyle(element).color),
+      tagResting,
+      tagFocused,
+      tagSelected,
+      applyButton: await readControlState(applyButton),
+      closeButton: await readControlState(closeButton),
+    };
+    await closeButton.click();
+    await filterModal.waitFor({ state: 'hidden' });
   }
   const routeState = await page.evaluate(() => {
     const root = document.querySelector('#root');
@@ -675,6 +1112,10 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     const inactiveHomeTabIcon = inactiveHomeTab?.querySelector('svg');
     const inactiveHomeTabStyle = inactiveHomeTab ? window.getComputedStyle(inactiveHomeTab) : null;
     const inactiveHomeTabIconRect = inactiveHomeTabIcon?.getBoundingClientRect();
+    const homeRouteRoot = document.querySelector('[data-testid="ce-page-home-root"]');
+    const homeWindow = homeTabs?.closest('.card');
+    const homeRouteRootRect = homeRouteRoot?.getBoundingClientRect();
+    const homeWindowRect = homeWindow?.getBoundingClientRect();
     const rootRect = root?.getBoundingClientRect();
     const overflow = Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth);
     const overflowElements = Array.from(document.querySelectorAll('body *'))
@@ -702,6 +1143,8 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       homeTabControlGapRange: homeTabControlGaps.length
         ? Math.max(...homeTabControlGaps) - Math.min(...homeTabControlGaps)
         : null,
+      homeWindowTopGap:
+        homeRouteRootRect && homeWindowRect ? Math.max(0, homeWindowRect.top - homeRouteRootRect.top) : null,
       inactiveHomeTabBorderWidths: inactiveHomeTabStyle
         ? [
             inactiveHomeTabStyle.borderTopWidth,
@@ -763,6 +1206,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
             '[data-testid="ce-page-docs-root"] > header p',
             '[data-testid="ce-page-docs-root"] > header',
           ),
+          sample('Docs GitHub link', '[data-testid="ce-docs-github-link"]'),
           sample('Quickstart title bar', 'button[aria-controls="docs-section-quickstart"]'),
           sample(
             'Quickstart card title',
@@ -787,6 +1231,46 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         ];
       })
     : [];
+  const docsLayoutState = routeCase.requiresReadableDocs
+    ? await page.evaluate(() => {
+        const root = document.querySelector('[data-testid="ce-page-docs-root"]');
+        const prompts = root?.querySelector('button[aria-controls="docs-section-prompts"]');
+        const faq = root?.querySelector('button[aria-controls="docs-section-faq"]');
+        const group = root?.querySelector('[data-testid="ce-docs-session-contracts-group"]');
+        const session = root?.querySelector('[data-testid="ce-docs-session-context"]');
+        const contracts = root?.querySelector('[data-testid="ce-contract-viewer-toggle"]');
+        const heading = root?.querySelector('header h1');
+        const githubLink = root?.querySelector('[data-testid="ce-docs-github-link"]');
+        const loginButton = document.querySelector('[data-testid="ce-account-login-button"]');
+        const loginPrompt = loginButton?.querySelector('h1');
+        const groupStyle = group ? window.getComputedStyle(group) : null;
+        return {
+          hasAdvancedExternalNotice: Boolean(
+            root?.querySelector('[data-testid="ce-contracts-advanced-external-notice"]'),
+          ),
+          promptsTop: prompts?.getBoundingClientRect().top ?? null,
+          faqTop: faq?.getBoundingClientRect().top ?? null,
+          groupTop: group?.getBoundingClientRect().top ?? null,
+          groupContainsSession: Boolean(group && session && group.contains(session)),
+          groupContainsContracts: Boolean(group && contracts && group.contains(contracts)),
+          groupIsLast: root?.lastElementChild === group,
+          githubHref: githubLink?.href ?? '',
+          githubTarget: githubLink?.getAttribute('target') ?? '',
+          githubHasIcon: Boolean(githubLink?.querySelector('svg')),
+          githubSharesTitleRow: Boolean(heading && githubLink && heading.parentElement === githubLink.parentElement),
+          loginIdleIconCount: loginButton?.querySelectorAll('svg').length ?? -1,
+          loginFontFamily: loginPrompt ? window.getComputedStyle(loginPrompt).fontFamily : '',
+          groupBorderWidths: groupStyle
+            ? [
+                groupStyle.borderTopWidth,
+                groupStyle.borderRightWidth,
+                groupStyle.borderBottomWidth,
+                groupStyle.borderLeftWidth,
+              ]
+            : [],
+        };
+      })
+    : null;
   const welcomeFrameState = routeCase.requiresFramelessWelcome
     ? await page.getByTestId('ce-welcome-slide-media').evaluate((element) => {
         const style = window.getComputedStyle(element);
@@ -863,6 +1347,10 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         };
       })
     : null;
+  const classicLoginBackgroundState = routeCase.requiresReadableLogin ? await readLoginBackgroundState() : null;
+  const classicPreloginSettingsControlLayout = routeCase.requiresPreloginControlLayout
+    ? await readPreloginSettingsControlLayout()
+    : null;
   const preloginThemeSettingsState = routeCase.requiresPreloginThemeSettings
     ? await page.evaluate(() => {
         const parseRgb = (value) => {
@@ -902,22 +1390,31 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         };
         const panel = document.querySelector('[data-testid="ce-prelogin-settings-panel"]');
         const selector = panel?.querySelector('[data-testid="ce-settings-theme"]');
-        const label = panel?.querySelector('label[for="ce-settings-theme-select"]');
-        const hint = selector?.parentElement?.querySelector('div');
         const sections = Array.from(panel?.querySelectorAll('[class*="settingsSectionCard"]') || []);
         const appearanceSection = selector?.closest('[class*="settingsSectionCard"]');
         const summary = appearanceSection?.querySelector('[class*="settingsSectionSummary"]');
-        if (!panel || !selector || !label || !hint || !appearanceSection || !summary) return { missing: true };
+        const resourceCards = Array.from(panel?.querySelectorAll('[class*="supportedResourceCard"]') || []);
+        const aiCard = resourceCards.find(
+          (candidate) => candidate.querySelector('[class*="supportedResourceName"]')?.textContent?.trim() === 'AI',
+        );
+        const activeSessionPill = aiCard?.querySelector('[class*="sessionPillActive"]');
+        const sponsorDetail = aiCard?.querySelector('[class*="supportedResourceDetail"]');
+        if (!panel || !selector || !appearanceSection || !aiCard || !activeSessionPill || !sponsorDetail) {
+          return { missing: true };
+        }
         const selectorStyle = window.getComputedStyle(selector);
-        const labelStyle = window.getComputedStyle(label);
-        const hintStyle = window.getComputedStyle(hint);
-        const summaryStyle = window.getComputedStyle(summary);
         return {
+          activeSessionPillText: activeSessionPill.textContent?.trim() || '',
+          accessibleName: selector.getAttribute('aria-label'),
+          defaultOptionText: selector.querySelector('option[value=""]')?.textContent?.trim() || '',
+          hasVisibleHint: appearanceSection.textContent?.includes('Changes the complete app appearance') || false,
+          hasVisibleLabel: Array.from(appearanceSection.querySelectorAll('*')).some(
+            (element) => element.childElementCount === 0 && element.textContent?.trim() === 'App theme',
+          ),
+          hasVisibleSummary: !!summary,
           isFinalSection: sections.at(-1) === appearanceSection,
-          labelRatio: ratio(labelStyle.color, backgroundFor(label)),
-          hintRatio: ratio(hintStyle.color, backgroundFor(hint)),
-          summaryRatio: ratio(summaryStyle.color, backgroundFor(summary)),
           selectorRatio: ratio(selectorStyle.color, backgroundFor(selector)),
+          sponsorDetailInsideActivePill: activeSessionPill.contains(sponsorDetail),
         };
       })
     : null;
@@ -971,7 +1468,10 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         const pointXs = points.map((point) => Number(point.getAttribute('cx'))).filter(Number.isFinite);
         const firstPointStyle = points[0] ? window.getComputedStyle(points[0]) : null;
         const firstPointRect = points[0]?.getBoundingClientRect();
+        const beeswarmSection = document.querySelector('[data-testid="ce-community-beeswarm-section"]');
+        const beeswarmSectionRect = beeswarmSection?.getBoundingClientRect();
         const svg = document.querySelector('[data-testid="ce-community-beeswarm-section"] svg');
+        const svgRect = svg?.getBoundingClientRect();
         const tooltip = document.querySelector('[data-testid="ce-beeswarm-tooltip"]');
         const tooltipText = tooltip?.textContent || '';
         const tooltipRect = tooltip?.getBoundingClientRect();
@@ -999,6 +1499,13 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         return {
           pointCount: points.length,
           pointSpread: pointXs.length ? Math.max(...pointXs) - Math.min(...pointXs) : 0,
+          beeswarmVerticalDelta:
+            beeswarmSectionRect && svgRect
+              ? Math.abs(
+                  (svgRect.top - beeswarmSectionRect.top) -
+                    (beeswarmSectionRect.bottom - svgRect.bottom),
+                )
+              : Number.POSITIVE_INFINITY,
           hasCountedVotes: /Counted\s+[1-9]\d*/i.test(tooltipText),
           statIconRatio: textRatio('[class*="statIcon"]'),
           statCountRatio: textRatio('[class*="statCount"]'),
@@ -1090,7 +1597,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
             ['filter control', '[data-testid="ce-survey-filter-toggle"]'],
             ['create control', '[data-testid="ce-survey-create-toggle"]'],
             ['mode switch', '[data-testid="ce-create-mode-switch"]'],
-            ['content input', 'textarea[placeholder="Speak or type text here..."]'],
+            ['content input', 'textarea[class*="audioTextarea"]'],
             ['URL input', 'input[placeholder="Add URL"]'],
             ['paste control', '[data-testid="ce-database-image-paste"]'],
             ['question type', '[class*="typeTitle"]'],
@@ -1100,6 +1607,9 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
           ].map(([label, selector]) => ({ label, ratio: textRatio(selector) })),
         };
       })
+    : null;
+  const classicAuthoringSourceControlGeometry = routeCase.requiresReadableAuthoring
+    ? await readAuthoringSourceControlGeometry()
     : null;
   const reportedSurfaceState =
     routeCase.requiresReadableSessionSurface ||
@@ -1185,6 +1695,14 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
                 hasPileWindowTitlebar: Boolean(document.querySelector('[class*="pileWindowTitlebar"]')),
                 pileCardBodyPaddingTop: pileCardBody ? window.getComputedStyle(pileCardBody).paddingTop : '',
                 pileCardMarginTop: pileCard ? window.getComputedStyle(pileCard).marginTop : '',
+                promptFontFamily: (() => {
+                  const prompt = document.querySelector('[class*="pileCardHeader"] h4');
+                  return prompt ? window.getComputedStyle(prompt).fontFamily.toLowerCase() : '';
+                })(),
+                promptFontWeight: (() => {
+                  const prompt = document.querySelector('[class*="pileCardHeader"] h4');
+                  return prompt ? window.getComputedStyle(prompt).fontWeight : '';
+                })(),
                 promptRatio: textRatio('[class*="pileCardHeader"] h4'),
                 sessionTitleRatio: textRatio('[class*="brandingSectionTitle"]'),
                 sectionTitleRatio: textRatio('[class*="sectionHeaderTitle"]'),
@@ -1232,16 +1750,21 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
                           const caretRect = caret.getBoundingClientRect();
                           const titleRect = title.getBoundingClientRect();
                           const subtitleRect = subtitle.getBoundingClientRect();
+                          const caretStyle = window.getComputedStyle(caret);
+                          const titleStyle = window.getComputedStyle(title);
                           const subtitleStyle = window.getComputedStyle(subtitle);
                           return {
                             caretTop: caretRect.top,
+                            caretOpacity: Number(caretStyle.opacity),
                             titleTop: titleRect.top,
                             titleBottom: titleRect.bottom,
                             titleLeft: titleRect.left,
+                            titleFontSize: titleStyle.fontSize,
                             subtitleTop: subtitleRect.top,
                             subtitleLeft: subtitleRect.left,
                             subtitleFontSize: subtitleStyle.fontSize,
                             subtitleOpacity: Number(subtitleStyle.opacity),
+                            titleOpacity: Number(titleStyle.opacity),
                           };
                         })
                         .filter(Boolean)
@@ -1272,6 +1795,19 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
                         };
                       })
                     : [],
+                  railButtons: [...(actionButtonGroup?.querySelectorAll('button') || []), ...(pileNav?.querySelectorAll('button') || [])].map(
+                    (button) => {
+                      const rect = button.getBoundingClientRect();
+                      const style = window.getComputedStyle(button);
+                      return {
+                        color: style.color,
+                        fontSize: Number.parseFloat(style.fontSize),
+                        height: rect.height,
+                        opacity: Number(style.opacity),
+                        width: rect.width,
+                      };
+                    },
+                  ),
                 },
                 iconControls: [
                   iconControlState('question actions', 'button[aria-label="Question actions"]'),
@@ -1306,9 +1842,47 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       : null;
   const classicQuestionsSectionState = routeCase.requiresReadableSessionSurface
     ? await (async () => {
-        await page.getByTestId('ce-survey-view-all').click();
-        await page.getByTestId('ce-session-questions-full-header').waitFor({ state: 'visible' });
-        return page.locator('[class*="questionsSectionContainer"]').evaluate((element) => {
+      await page.getByTestId('ce-survey-view-all').click();
+      await page.getByTestId('ce-session-questions-full-header').waitFor({ state: 'visible' });
+
+      const ratingPromptText = "How optimistic are you about AI's impact on humanity? (1-10)";
+      const ratingCard = page
+        .getByText(ratingPromptText, { exact: true })
+        .locator('xpath=ancestor::div[contains(@class, "fullQuestionCard")]')
+        .first();
+      await ratingCard.waitFor({ state: 'visible', timeout: 60000 });
+      const ratingSlider = ratingCard.locator('input[type="range"]').first();
+      await ratingSlider.scrollIntoViewIfNeeded();
+      await ratingSlider.waitFor({ state: 'visible' });
+      const initialValue = Number(await ratingSlider.inputValue());
+      await ratingSlider.evaluate((element) => element.setAttribute('data-ce-runtime-rating-probe', 'true'));
+      const sliderBounds = await ratingSlider.boundingBox();
+      assert.ok(sliderBounds && sliderBounds.width > 0, 'Full-question rating slider should have draggable geometry');
+      const dragFrom = initialValue >= 7 ? 0.8 : 0.2;
+      const dragTo = initialValue >= 7 ? 0.2 : 0.8;
+      await page.mouse.move(sliderBounds.x + sliderBounds.width * dragFrom, sliderBounds.y + sliderBounds.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(sliderBounds.x + sliderBounds.width * dragTo, sliderBounds.y + sliderBounds.height / 2, {
+        steps: 12,
+      });
+      await page.waitForFunction(
+        (initial) => {
+          const slider = document.querySelector('[data-ce-runtime-rating-probe="true"]');
+          return slider instanceof HTMLInputElement && Number(slider.value) !== initial;
+        },
+        initialValue,
+      );
+      const liveValue = Number(await ratingSlider.inputValue());
+      const liveLabel = Number(await ratingCard.locator('[class*="ratingLabelText"]').textContent());
+      await page.mouse.up();
+      classicRatingInteractionState = {
+        initialValue,
+        liveLabel,
+        liveValue,
+        committedValue: Number(await ratingSlider.inputValue()),
+      };
+
+      return page.locator('[class*="questionsSectionContainer"]').evaluate((element) => {
           const style = window.getComputedStyle(element);
           return {
             backgroundColor: style.backgroundColor,
@@ -1349,6 +1923,9 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   const classicSessionHeaderGeometry = routeCase.requiresReadableSessionSurface
     ? await readSessionHeaderGeometry()
     : null;
+  const classicRelatedTagChipState = routeCase.requiresReadableTagRelatedChips
+    ? await readRelatedTagChipState()
+    : null;
 
   await page.evaluate(() => {
     document.documentElement.dataset.ceTheme = 'context-engine';
@@ -1356,6 +1933,13 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   });
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   const current = await page.evaluate(readThemeState);
+  const currentLoginBackgroundState = routeCase.requiresReadableLogin ? await readLoginBackgroundState() : null;
+  const currentPreloginSettingsControlLayout = routeCase.requiresPreloginControlLayout
+    ? await readPreloginSettingsControlLayout()
+    : null;
+  const currentAboutHeroControlState = routeCase.requiresClassicAboutHeroControls
+    ? await readAboutHeroControlState()
+    : null;
   if (toolCard) {
     await page.waitForFunction(() => {
       const style = window.getComputedStyle(document.querySelector('div[class^="_square_"]'));
@@ -1371,8 +1955,12 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         };
       })
     : null;
-  const currentFooterLinkState = footerLink
-    ? await footerLink.evaluate((element) => {
+  const currentFooterLink = routeCase.requiresFooterButtons
+    ? page.getByRole('link', { name: 'NEW', exact: true })
+    : null;
+  if (currentFooterLink) await currentFooterLink.waitFor({ state: 'visible' });
+  const currentFooterLinkState = currentFooterLink
+    ? await currentFooterLink.evaluate((element) => {
         const style = window.getComputedStyle(element);
         return {
           backgroundColor: style.backgroundColor,
@@ -1383,6 +1971,28 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
           boxShadow: style.boxShadow,
         };
       })
+    : null;
+  const currentFooterLayoutState = footerStartMenu
+    ? await footerStartMenu.evaluate((element) => {
+        const menuRect = element.getBoundingClientRect();
+        const links = Array.from(element.querySelectorAll('a'));
+        const linkRects = links.map((link) => link.getBoundingClientRect());
+        const tops = linkRects.map((rect) => rect.top);
+        return {
+          fontSizes: links.map((link) => Number.parseFloat(window.getComputedStyle(link).fontSize)),
+          linkCount: links.length,
+          linkOverflows: links.map((link) => link.scrollWidth > link.clientWidth + 1),
+          menuOverflows: element.scrollWidth > element.clientWidth + 1,
+          outsideMenu: linkRects.some((rect) => rect.left < menuRect.left - 1 || rect.right > menuRect.right + 1),
+          topSpread: tops.length ? Math.max(...tops) - Math.min(...tops) : 0,
+        };
+      })
+    : null;
+  const currentFooterControlState = footerStartButton && footerStartMenu
+    ? {
+        menuVisible: await footerStartMenu.isVisible(),
+        startVisible: await footerStartButton.isVisible(),
+      }
     : null;
   const currentFooterBrandState = footerAttributionText && footerGithubLink
     ? {
@@ -1437,6 +2047,219 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   const currentSessionHeaderGeometry = routeCase.requiresReadableSessionSurface
     ? await readSessionHeaderGeometry()
     : null;
+  const currentSessionSectionTypography = routeCase.requiresReadableSessionSurface
+    ? await readSessionSectionTypography()
+    : null;
+  const currentAuthoringSourceControlGeometry = routeCase.requiresReadableAuthoring
+    ? await readAuthoringSourceControlGeometry()
+    : null;
+  const currentRelatedTagChipState = routeCase.requiresReadableTagRelatedChips
+    ? await (async () => {
+        await page.waitForFunction(() => {
+          const chip = document.querySelector('button[aria-label="Add Anthropic tag to comparison"]');
+          return chip && window.getComputedStyle(chip).backgroundColor === 'rgb(39, 43, 101)';
+        });
+        return readRelatedTagChipState();
+      })()
+    : null;
+  const currentPileBackOpacityState = routeCase.requiresReadableSessionSurface
+    ? await page.getByTestId('ce-session-pile-back').evaluate((element) => ({
+        arrow: Number.parseFloat(window.getComputedStyle(element.querySelector('svg')).opacity),
+        button: Number.parseFloat(window.getComputedStyle(element).opacity),
+        label: Number.parseFloat(window.getComputedStyle(element.querySelector('span')).opacity),
+      }))
+    : null;
+  const currentQuestionsToolbarState =
+    routeCase.requiresReadableSessionSurface && viewportName === 'session back feedback'
+      ? await (async () => {
+          const toolbarPage = await page.context().browser().newPage({ viewport: page.viewportSize() });
+          try {
+            await toolbarPage.addInitScript(() => {
+              window.localStorage.setItem('ce:firstVisitRootAboutRedirectConsumed:v20260618b', 'true');
+              window.localStorage.setItem('ce_onboarding_complete', 'true');
+              window.localStorage.setItem('firstVisit', 'false');
+              window.localStorage.setItem('ce:theme', 'context-engine');
+              window.localStorage.setItem('ce:primarySessionSlug', 'demo-sh');
+              window.localStorage.setItem('ce:selectedSessionScope', 'active');
+            });
+            await toolbarPage.goto(`${baseUrl}/`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+            await toolbarPage.getByText('Questions', { exact: true }).click();
+            const toolbar = toolbarPage.getByTestId('ce-survey-toolbar');
+            await toolbar.waitFor({ state: 'visible', timeout: 15000 });
+            await toolbarPage.waitForFunction(
+              () =>
+                /Questions\s*\([1-9]\d*\)/.test(
+                  document.querySelector('[data-testid="ce-survey-questions-toggle"]')?.textContent || '',
+                ),
+              null,
+              { timeout: 15000 },
+            );
+            const agreeChoice = toolbarPage.locator('label:has(input[type="radio"][value="Agree"])').first();
+            await agreeChoice.waitFor({ state: 'visible', timeout: 15000 });
+            await agreeChoice.click();
+            await toolbarPage.getByTestId('ce-survey-submit').waitFor({ state: 'visible', timeout: 15000 });
+            const layout = await toolbar.evaluate((element) => {
+              const style = window.getComputedStyle(element);
+              const rect = element.getBoundingClientRect();
+              let section = element.parentElement;
+              while (section && Number.parseFloat(window.getComputedStyle(section).borderTopWidth) === 0) {
+                section = section.parentElement;
+              }
+              const sectionRect = section?.getBoundingClientRect();
+              const childRects = Array.from(element.children).map((child) => child.getBoundingClientRect());
+              const contentLeft =
+                rect.left + Number.parseFloat(style.borderLeftWidth) + Number.parseFloat(style.paddingLeft);
+              const contentRight =
+                rect.right - Number.parseFloat(style.borderRightWidth) - Number.parseFloat(style.paddingRight);
+              const centers = childRects.map((childRect) => childRect.top + childRect.height / 2);
+              return {
+                centerSpread: centers.length ? Math.max(...centers) - Math.min(...centers) : 0,
+                childCount: childRects.length,
+                gaps: childRects.slice(1).map((childRect, index) => childRect.left - childRects[index].right),
+                justifyContent: style.justifyContent,
+                leftEdgeGap: childRects.length ? childRects[0].left - contentLeft : 0,
+                overflows: element.scrollWidth > element.clientWidth + 1,
+                rightEdgeGap: childRects.length ? contentRight - childRects[childRects.length - 1].right : 0,
+                topInset: sectionRect ? rect.top - sectionRect.top : Number.POSITIVE_INFINITY,
+                width: rect.width,
+              };
+            });
+            await toolbarPage.setViewportSize({
+              width: 700,
+              height: page.viewportSize()?.height || 802,
+            });
+            const wrapped = await toolbar.evaluate((element) => {
+              const rect = element.getBoundingClientRect();
+              const childRects = Array.from(element.children).map((child) => child.getBoundingClientRect());
+              const submitRect = element.querySelector('[data-testid="ce-survey-submit"]')?.getBoundingClientRect();
+              return {
+                rowCount: new Set(childRects.map((childRect) => Math.round(childRect.top))).size,
+                submitCenterDelta: submitRect
+                  ? Math.abs(submitRect.left + submitRect.width / 2 - (rect.left + rect.width / 2))
+                  : Number.POSITIVE_INFINITY,
+              };
+            });
+            await toolbarPage.setViewportSize(page.viewportSize());
+            const documentTop = await toolbar.evaluate(
+              (element) => element.getBoundingClientRect().top + window.scrollY,
+            );
+            await toolbarPage.waitForFunction(
+              (minimumScrollHeight) => document.documentElement.scrollHeight >= minimumScrollHeight,
+              documentTop + 900 + (page.viewportSize()?.height || 0),
+              { timeout: 15000 },
+            );
+            await toolbarPage.evaluate((scrollTop) => window.scrollTo(0, scrollTop), documentTop + 900);
+            await toolbarPage.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => resolve())));
+            const sticky = await toolbar.evaluate((element) => {
+              const style = window.getComputedStyle(element);
+              const rect = element.getBoundingClientRect();
+              return {
+                bottom: rect.bottom,
+                position: style.position,
+                top: rect.top,
+                viewportHeight: window.innerHeight,
+              };
+            });
+            return { ...layout, sticky, wrapped };
+          } finally {
+            await toolbarPage.close();
+          }
+        })()
+      : null;
+  const classicQuestionsStickyState =
+    routeCase.requiresReadableSessionSurface && viewportName === 'session back feedback'
+      ? await (async () => {
+          const toolbarPage = await page.context().browser().newPage({ viewport: page.viewportSize() });
+          try {
+            await toolbarPage.addInitScript(() => {
+              window.localStorage.setItem('ce:firstVisitRootAboutRedirectConsumed:v20260618b', 'true');
+              window.localStorage.setItem('ce_onboarding_complete', 'true');
+              window.localStorage.setItem('firstVisit', 'false');
+              window.localStorage.setItem('ce:theme', 'classic-95');
+              window.localStorage.setItem('ce:primarySessionSlug', 'demo-sh');
+              window.localStorage.setItem('ce:selectedSessionScope', 'active');
+            });
+            await toolbarPage.goto(`${baseUrl}/`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+            await toolbarPage.getByText('Questions', { exact: true }).click();
+            const toolbar = toolbarPage.getByTestId('ce-survey-toolbar');
+            await toolbar.waitFor({ state: 'visible', timeout: 15000 });
+            await toolbarPage.waitForFunction(
+              () =>
+                /Questions\s*\([1-9]\d*\)/.test(
+                  document.querySelector('[data-testid="ce-survey-questions-toggle"]')?.textContent || '',
+                ),
+              null,
+              { timeout: 15000 },
+            );
+            const agreeChoice = toolbarPage.locator('label:has(input[type="radio"][value="Agree"])').first();
+            await agreeChoice.waitFor({ state: 'visible', timeout: 15000 });
+            const documentTop = await toolbar.evaluate(
+              (element) => element.getBoundingClientRect().top + window.scrollY,
+            );
+            await toolbarPage.waitForFunction(
+              (minimumScrollHeight) => document.documentElement.scrollHeight >= minimumScrollHeight,
+              documentTop + 900 + (page.viewportSize()?.height || 0),
+              { timeout: 15000 },
+            );
+            await toolbarPage.evaluate((scrollTop) => window.scrollTo(0, scrollTop), documentTop + 900);
+            await toolbarPage.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => resolve())));
+            const sticky = await toolbar.evaluate((element) => {
+              const style = window.getComputedStyle(element);
+              const rect = element.getBoundingClientRect();
+              return {
+                bottom: rect.bottom,
+                position: style.position,
+                top: rect.top,
+                viewportHeight: window.innerHeight,
+              };
+            });
+            await agreeChoice.scrollIntoViewIfNeeded();
+            await agreeChoice.click();
+            return {
+              ...sticky,
+              voteChecked: await agreeChoice.locator('input').isChecked(),
+            };
+          } finally {
+            await toolbarPage.close();
+          }
+        })()
+      : null;
+  let currentGroupLinkState = null;
+  if (sessionGroupsToggle && sessionGroupLinkButton) {
+    await sessionGroupsToggle.click();
+    await sessionGroupLinkButton.waitFor({ state: 'visible', timeout: 15000 });
+    const readState = () =>
+      sessionGroupLinkButton.evaluate((element) => {
+        const style = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return {
+          backgroundColor: style.backgroundColor,
+          borderWidths: [style.borderTopWidth, style.borderRightWidth, style.borderBottomWidth, style.borderLeftWidth],
+          boxShadow: style.boxShadow,
+          height: rect.height,
+          outlineStyle: style.outlineStyle,
+          outlineWidth: style.outlineWidth,
+          width: rect.width,
+        };
+      });
+    const resting = await readState();
+    await sessionGroupLinkButton.hover();
+    const hovered = await readState();
+    await sessionGroupLinkButton.evaluate((element) => {
+      const card = element.closest('article');
+      card?.setAttribute('tabindex', '0');
+      card?.focus();
+    });
+    await page.keyboard.press('Tab');
+    assert.equal(
+      await sessionGroupLinkButton.evaluate((element) => document.activeElement === element),
+      true,
+      'Session group-card link control should be reachable by keyboard',
+    );
+    const focused = await readState();
+    await sessionGroupLinkButton.evaluate((element) => element.closest('article')?.removeAttribute('tabindex'));
+    currentGroupLinkState = { focused, hovered, resting };
+  }
   const currentReportClusterColors = routeCase.requiresReadableSessionSurface
     ? await page
         .locator('svg[class*="clusterSwatchSvg"] circle')
@@ -1464,7 +2287,8 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   assert.equal(classic.layoutProfile, 'desktop-window', `${routeCase.label} should receive the desktop layout profile`);
   assert.equal(classic.canvas, '#008080', `${routeCase.label} should receive the Classic 95 palette`);
   assert.equal(classic.radius4, '0', `${routeCase.label} should receive square Classic 95 geometry`);
-  assert.match(classic.fontBody, /tahoma/, `${routeCase.label} should receive Classic 95 typography`);
+  assert.match(classic.fontBody, /ce tahoma/, `${routeCase.label} should receive the bundled Classic 95 typography`);
+  assert.equal(classic.tahomaLoaded, true, `${routeCase.label} should load the local Wine Tahoma face`);
   assert.equal(current.themeId, 'context-engine', `${routeCase.label} should switch without a reload`);
   assert.equal(current.layoutProfile, 'standard-app', `${routeCase.label} should restore the default layout profile`);
   assert.equal(current.canvas, '#20204e', `${routeCase.label} should repaint to the Context Engine palette`);
@@ -1472,6 +2296,97 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   assert.match(current.fontBody, /poppins/, `${routeCase.label} should repaint typography`);
   assert.notEqual(classic.modalBackground, current.modalBackground, `${routeCase.label} modal chrome should repaint`);
   assert.notEqual(classic.modalRadius, current.modalRadius, `${routeCase.label} modal geometry should repaint`);
+  if (classicRelatedTagChipState && currentRelatedTagChipState) {
+    assert.equal(
+      classicRelatedTagChipState.backgroundColor,
+      'rgb(192, 192, 192)',
+      'Classic 95 related tags should use the standard gray control face',
+    );
+    assert.equal(
+      classicRelatedTagChipState.color,
+      'rgb(0, 0, 0)',
+      'Classic 95 related tags should use readable black text',
+    );
+    assert.deepEqual(
+      classicRelatedTagChipState.borderWidths,
+      ['2px', '2px', '2px', '2px'],
+      'Classic 95 related tags should use the theme control border width',
+    );
+    assert.equal(
+      currentRelatedTagChipState.backgroundColor,
+      'rgb(39, 43, 101)',
+      'Context Engine related tags should use the dark control face',
+    );
+    assert.equal(
+      currentRelatedTagChipState.color,
+      'rgb(244, 247, 255)',
+      'Context Engine related tags should use readable light text',
+    );
+  }
+  if (classicAboutHeroControlState && currentAboutHeroControlState) {
+    [classicAboutHeroControlState, currentAboutHeroControlState].forEach((state) => {
+      assert.equal(state.linkLabels.includes('Posts'), false, 'About hero should leave Posts in footer navigation only');
+    });
+    assert.match(
+      classicAboutHeroControlState.heroFontFamily,
+      /ce tahoma/,
+      'Classic 95 About content should use the locally bundled Tahoma face',
+    );
+    [
+      ['Demo', classicAboutHeroControlState.demo],
+      ['GitHub', classicAboutHeroControlState.github],
+      ['New Session', classicAboutHeroControlState.newSession],
+      ['Whitepaper', classicAboutHeroControlState.whitepaper],
+    ].forEach(([label, control]) => {
+      assert.ok(control, `Classic 95 About ${label} control should render`);
+      assert.deepEqual(
+        control.borderWidths,
+        ['2px', '2px', '2px', '2px'],
+        `Classic 95 About ${label} control should use a standard raised border`,
+      );
+      assert.match(control.boxShadow, /1px 1px 0px/, `Classic 95 About ${label} control should be raised`);
+      assert.match(control.fontFamily, /ce tahoma/, `Classic 95 About ${label} control should use bundled Tahoma`);
+    });
+    assert.equal(
+      classicAboutHeroControlState.demo.backgroundColor,
+      'rgb(0, 0, 128)',
+      'Classic 95 About Demo should use the navy primary-action face',
+    );
+    assert.equal(
+      classicAboutHeroControlState.demo.color,
+      'rgb(255, 255, 255)',
+      'Classic 95 About Demo should keep high-contrast white text',
+    );
+    assert.equal(
+      classicAboutHeroControlState.newSession.backgroundColor,
+      'rgb(192, 192, 192)',
+      'Classic 95 About New Session should use the standard gray control face',
+    );
+    assert.ok(classicAboutHeroControlState.demo.height >= 48, 'Classic 95 About primary actions should remain tappable');
+    assert.ok(
+      classicAboutHeroControlState.whitepaper.height >= 34,
+      'Classic 95 About resource actions should remain tappable',
+    );
+    assert.equal(
+      classicAboutHeroControlState.github.backgroundColor,
+      'rgb(192, 192, 192)',
+      'Classic 95 About GitHub action should use the standard gray control face',
+    );
+    assert.ok(
+      classicAboutHeroControlState.github.width > classicAboutHeroControlState.github.height,
+      'Classic 95 About GitHub action should read as a rectangular push button',
+    );
+    assert.notEqual(
+      currentAboutHeroControlState.demo.borderRadius,
+      '0px',
+      'Context Engine About primary actions should preserve their rounded default-theme geometry',
+    );
+    assert.notEqual(
+      currentAboutHeroControlState.heroFontFamily,
+      classicAboutHeroControlState.heroFontFamily,
+      'Context Engine About typography should remain independent from the Classic 95 override',
+    );
+  }
   assert.ok(routeState.rootWidth > 0, `${routeCase.label} should render a visible app root`);
   assert.ok(
     routeState.overflow <= 4,
@@ -1482,6 +2397,10 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   }
   if (routeCase.requiresSpreadHomeTabs) {
     assert.equal(routeState.homeTabCount, 4, 'Classic 95 home title bar should expose all four tab options');
+    assert.ok(
+      routeState.homeWindowTopGap !== null && routeState.homeWindowTopGap <= 24,
+      `Classic 95 home window should use a compact top gap in ${viewportName}; received ${routeState.homeWindowTopGap}px`,
+    );
     assert.ok(
       routeState.homeTabGapRange !== null && routeState.homeTabGapRange <= 2,
       `Classic 95 home title-bar options should be evenly spaced; received a ${routeState.homeTabGapRange}px gap range`,
@@ -1526,9 +2445,10 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       'none',
       'Classic 95 full-question utility icons should not render a raised shadow',
     );
-    assert.ok(
-      questionUtilityState.resting.opacity >= 0.8,
-      `Classic 95 full-question utility icons should remain clearly visible; received opacity ${questionUtilityState.resting.opacity}`,
+    assert.equal(
+      questionUtilityState.resting.opacity,
+      0.5,
+      `Classic 95 full-question utility icons should share the quiet 50% resting treatment; received opacity ${questionUtilityState.resting.opacity}`,
     );
     assert.equal(
       questionUtilityState.hoveredOpacity,
@@ -1541,6 +2461,214 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       'Classic 95 full-question utility icons should retain a visible keyboard focus indicator',
     );
   }
+  if (classicQuestionIconFamilyState) {
+    classicQuestionIconFamilyState.forEach((control) => {
+      assert.deepEqual(
+        control.borderWidths,
+        ['0px', '0px', '0px', '0px'],
+        `Classic 95 ${control.label} icon should not render button borders`,
+      );
+      assert.equal(
+        control.backgroundColor,
+        'rgba(0, 0, 0, 0)',
+        `Classic 95 ${control.label} icon should use a transparent background`,
+      );
+      assert.equal(control.boxShadow, 'none', `Classic 95 ${control.label} icon should not render a raised shadow`);
+      assert.equal(control.opacity, 0.5, `Classic 95 ${control.label} icon should rest at 50% opacity`);
+    });
+  }
+  if (classicRatingInteractionState) {
+    assert.notEqual(
+      classicRatingInteractionState.liveValue,
+      classicRatingInteractionState.initialValue,
+      'Classic 95 full-question rating slider should move during a pointer drag',
+    );
+    assert.equal(
+      classicRatingInteractionState.liveLabel,
+      classicRatingInteractionState.liveValue,
+      'Classic 95 full-question rating label should track the live drag value',
+    );
+    assert.equal(
+      classicRatingInteractionState.committedValue,
+      classicRatingInteractionState.liveValue,
+      'Classic 95 full-question rating slider should preserve the released value',
+    );
+  }
+  if (classicFullQuestionConvictionState) {
+    assert.deepEqual(
+      classicFullQuestionConvictionState.borderWidths,
+      ['0px', '0px', '0px', '0px'],
+      'Classic 95 full-question conviction controls should not render an exterior border',
+    );
+    assert.equal(
+      classicFullQuestionConvictionState.backgroundColor,
+      'rgba(0, 0, 0, 0)',
+      'Classic 95 full-question conviction controls should use the card surface directly',
+    );
+    assert.equal(
+      classicFullQuestionConvictionState.boxShadow,
+      'none',
+      'Classic 95 full-question conviction controls should not render an exterior shadow',
+    );
+    assert.equal(
+      classicFullQuestionConvictionState.opacity,
+      1,
+      'Classic 95 full-question conviction controls should be fully opaque',
+    );
+    assert.equal(
+      classicFullQuestionConvictionState.labelColor,
+      'rgb(0, 0, 0)',
+      'Classic 95 full-question conviction labels should use readable black text',
+    );
+    assert.equal(
+      classicFullQuestionConvictionState.labelOpacity,
+      1,
+      'Classic 95 full-question conviction labels should be fully opaque',
+    );
+    assert.deepEqual(
+      classicFullQuestionConvictionState.toggleLineBorderWidths,
+      ['0px', '0px', '0px', '0px'],
+      'Classic 95 full-question conviction labels should not render individual button borders',
+    );
+    assert.equal(
+      classicFullQuestionConvictionState.toggleLineBackground,
+      'rgba(0, 0, 0, 0)',
+      'Classic 95 full-question conviction labels should use transparent backgrounds',
+    );
+    assert.equal(
+      classicFullQuestionConvictionState.toggleLineBoxShadow,
+      'none',
+      'Classic 95 full-question conviction labels should not render raised shadows',
+    );
+    assert.equal(
+      classicFullQuestionConvictionState.toggleLineColor,
+      'rgb(0, 0, 0)',
+      'Classic 95 full-question conviction values should use readable black text',
+    );
+    assert.equal(
+      classicFullQuestionConvictionState.toggleLineOpacity,
+      1,
+      'Classic 95 full-question conviction values should be fully opaque',
+    );
+    assert.equal(
+      classicFullQuestionConvictionState.sliderOpacity,
+      1,
+      'Classic 95 full-question conviction slider should be fully opaque',
+    );
+    assert.notEqual(
+      classicFullQuestionConvictionState.sliderBackground,
+      'rgba(0, 0, 0, 0)',
+      'Classic 95 full-question conviction slider should retain a visible track',
+    );
+    assert.ok(
+      classicFullQuestionConvictionState.sliderWidth >= 100 && classicFullQuestionConvictionState.sliderHeight >= 8,
+      `Classic 95 full-question conviction slider should remain usable; received ${classicFullQuestionConvictionState.sliderWidth}x${classicFullQuestionConvictionState.sliderHeight}`,
+    );
+  }
+  if (classicFullQuestionLockAudienceState) {
+    assert.deepEqual(
+      classicFullQuestionLockAudienceState.borderWidths,
+      ['0px', '0px', '0px', '0px'],
+      'Classic 95 full-question Only me option should not have an exterior border',
+    );
+    assert.equal(
+      classicFullQuestionLockAudienceState.backgroundColor,
+      'rgba(0, 0, 0, 0)',
+      'Classic 95 full-question Only me option should use the lock menu surface directly',
+    );
+    assert.equal(
+      classicFullQuestionLockAudienceState.boxShadow,
+      'none',
+      'Classic 95 full-question Only me option should be flat',
+    );
+    assert.equal(
+      classicFullQuestionLockAudienceState.color,
+      'rgb(0, 0, 0)',
+      'Classic 95 full-question Only me text should be black',
+    );
+    assert.equal(
+      classicFullQuestionLockAudienceState.opacity,
+      1,
+      'Classic 95 full-question Only me option should be fully opaque',
+    );
+    assert.equal(
+      classicFullQuestionLockAudienceState.popoverBackground,
+      'rgb(192, 192, 192)',
+      'Classic 95 full-question lock menu should use a readable Windows gray surface',
+    );
+    assert.deepEqual(
+      classicFullQuestionLockAudienceState.popoverBorderWidths,
+      ['0px', '0px', '0px', '0px'],
+      'Classic 95 full-question lock menu should not have an exterior border',
+    );
+    assert.equal(
+      classicFullQuestionLockAudienceState.popoverBoxShadow,
+      'none',
+      'Classic 95 full-question lock menu should not add an exterior shadow',
+    );
+  }
+  if (classicQuestionFilterState) {
+    assert.equal(
+      classicQuestionFilterState.headerBackground,
+      'rgb(0, 0, 128)',
+      'Classic 95 question filter should use a navy title bar',
+    );
+    assert.equal(
+      classicQuestionFilterState.titleColor,
+      'rgb(255, 255, 255)',
+      'Classic 95 question filter title should use readable white text',
+    );
+    assert.equal(
+      classicQuestionFilterState.tagResting.backgroundColor,
+      'rgb(192, 192, 192)',
+      'Classic 95 unselected tags should use the standard control face',
+    );
+    assert.equal(
+      classicQuestionFilterState.tagResting.color,
+      'rgb(0, 0, 0)',
+      'Classic 95 unselected tags should use black text',
+    );
+    assert.deepEqual(
+      classicQuestionFilterState.tagResting.borderWidths,
+      ['2px', '2px', '2px', '2px'],
+      'Classic 95 tags should use a standard raised border',
+    );
+    assert.notEqual(
+      classicQuestionFilterState.tagResting.boxShadow,
+      'none',
+      'Classic 95 tags should read as raised controls',
+    );
+    assert.equal(
+      classicQuestionFilterState.tagFocused.outlineStyle,
+      'dotted',
+      'Classic 95 tags should expose a visible keyboard focus ring',
+    );
+    assert.equal(
+      classicQuestionFilterState.tagSelected.backgroundColor,
+      'rgb(0, 0, 128)',
+      'Classic 95 selected tags should use the standard navy selection',
+    );
+    assert.equal(
+      classicQuestionFilterState.tagSelected.color,
+      'rgb(255, 255, 255)',
+      'Classic 95 selected tags should use readable white text',
+    );
+    assert.equal(
+      classicQuestionFilterState.applyButton.backgroundColor,
+      'rgb(0, 0, 128)',
+      'Classic 95 filter action should use the primary navy control',
+    );
+    assert.equal(
+      classicQuestionFilterState.applyButton.color,
+      'rgb(255, 255, 255)',
+      'Classic 95 filter action should use white text',
+    );
+    assert.equal(
+      classicQuestionFilterState.closeButton.backgroundColor,
+      'rgb(192, 192, 192)',
+      'Classic 95 filter close control should use the standard control face',
+    );
+  }
   if (classicToolCardState?.hovered && currentToolCardState) {
     assert.equal(classicToolArtworkState?.length, 3, 'Classic 95 should render artwork for all three live tool cards');
     classicToolArtworkState?.forEach((artwork) => {
@@ -1548,8 +2676,8 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       assert.match(artwork.backgroundImage, /^url\(/, 'Classic 95 tool artwork should use its bundled image');
       assert.equal(
         artwork.height,
-        viewportName === 'mobile' ? 84 : 124,
-        'Classic 95 tool artwork should use the compact theme thumbnail height',
+        viewportName === 'mobile' ? 128 : 124,
+        'Classic 95 tool artwork should use the viewport-specific theme thumbnail height',
       );
     });
     assert.deepEqual(
@@ -1606,45 +2734,21 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         classicFooterLinkState.borderBottomWidth,
         classicFooterLinkState.borderLeftWidth,
       ],
-      ['2px', '2px', '2px', '2px'],
-      'Classic 95 footer links should use the theme control-border width',
-    );
-    assert.deepEqual(
-      [
-        classicFooterLinkState.borderTopColor,
-        classicFooterLinkState.borderRightColor,
-        classicFooterLinkState.borderBottomColor,
-        classicFooterLinkState.borderLeftColor,
-      ],
-      ['rgb(255, 255, 255)', 'rgb(64, 64, 64)', 'rgb(64, 64, 64)', 'rgb(255, 255, 255)'],
-      'Classic 95 footer links should use a standard raised bevel',
+      ['0px', '0px', '0px', '0px'],
+      'Classic 95 Start-menu items should be unframed',
     );
     assert.equal(
       classicFooterLinkState.backgroundColor,
-      'rgb(192, 192, 192)',
-      'Classic 95 footer links should use the standard control face',
+      'rgba(0, 0, 0, 0)',
+      'Classic 95 Start-menu items should rest on the menu surface',
     );
     assert.equal(
       classicFooterLinkState.color,
       'rgb(0, 0, 0)',
-      'Classic 95 footer links should use readable black text',
+      'Classic 95 Start-menu items should use readable black text',
     );
-    assert.match(
-      classicFooterLinkState.boxShadow,
-      /1px 1px 0px/,
-      'Classic 95 footer links should use a compact raised shadow',
-    );
-    assert.ok(
-      classicFooterLinkState.navPseudoContent === 'none' || classicFooterLinkState.navPseudoContent === 'normal',
-      'Classic 95 footer navigation should not render a decorative pseudo-button',
-    );
-    assert.ok(
-      Math.abs(classicFooterLinkState.left - classicFooterLinkState.navLeft) <= 1,
-      'Classic 95 footer navigation should begin with the first real link',
-    );
-    if (viewportName !== 'mobile') {
-      assert.equal(classicFooterLinkState.height, 32, 'Classic 95 footer links should use compact taskbar height');
-    }
+    assert.equal(classicFooterLinkState.boxShadow, 'none', 'Classic 95 Start-menu items should remain shadow-free');
+    assert.ok(classicFooterLinkState.height >= 38, 'Classic 95 Start-menu items should keep accessible targets');
     assert.deepEqual(
       [
         currentFooterLinkState.borderTopWidth,
@@ -1661,6 +2765,55 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       'Context Engine footer links should keep their transparent background',
     );
     assert.equal(currentFooterLinkState.boxShadow, 'none', 'Context Engine footer links should remain shadow-free');
+    if (viewportName === 'feedback compact') {
+      assert.equal(currentFooterLayoutState.linkCount, 5, 'Context Engine footer should preserve all five links');
+      assert.ok(
+        currentFooterLayoutState.fontSizes.every((fontSize) => fontSize >= 14),
+        `Context Engine footer links should use at least 14px type at 630px; received ${JSON.stringify(currentFooterLayoutState.fontSizes)}`,
+      );
+      assert.ok(
+        currentFooterLayoutState.topSpread <= 1,
+        `Context Engine footer links should remain on one row; received ${currentFooterLayoutState.topSpread}px top spread`,
+      );
+      assert.equal(currentFooterLayoutState.menuOverflows, false, 'Context Engine footer menu should not overflow');
+      assert.equal(currentFooterLayoutState.outsideMenu, false, 'Context Engine footer links should stay inside the menu');
+      assert.equal(
+        currentFooterLayoutState.linkOverflows.some(Boolean),
+        false,
+        'Context Engine footer labels should fit inside their links',
+      );
+    }
+  }
+  if (classicFooterInitialState && classicFooterStartState && classicFooterMenuState && currentFooterControlState) {
+    assert.equal(classicFooterInitialState.position, 'relative', 'Classic 95 taskbar should remain in document flow');
+    if (routeCase.requiresFooterBelowFold) {
+      assert.ok(
+        classicFooterInitialState.documentHeight > classicFooterInitialState.viewportHeight &&
+          classicFooterInitialState.footerTop >= classicFooterInitialState.viewportHeight,
+        `Classic 95 footer should remain below the fold until the page end; received ${JSON.stringify(classicFooterInitialState)}`,
+      );
+    }
+    assert.deepEqual(
+      classicFooterStartState.borderWidths,
+      ['2px', '2px', '2px', '2px'],
+      'Classic 95 Start button should use a standard raised border',
+    );
+    assert.match(classicFooterStartState.boxShadow, /1px 1px 0px/, 'Classic 95 Start button should be raised');
+    assert.ok(classicFooterStartState.height >= 32, 'Classic 95 Start button should have an accessible target');
+    assert.ok(classicFooterStartState.width >= 32, 'Classic 95 Start button should have an accessible target width');
+    assert.ok(classicFooterStartState.width < 48, 'Classic 95 Start button should remain a compact icon control');
+    assert.equal(classicFooterStartState.text, '', 'Classic 95 Start button should not render a visible text label');
+    assert.equal(
+      classicFooterStartState.ariaLabel,
+      'Open Start menu',
+      'Classic 95 icon-only Start button should preserve its accessible name',
+    );
+    assert.ok(
+      classicFooterMenuState.bottom <= classicFooterMenuState.footerTop + 1,
+      `Classic 95 Start menu should open above the taskbar; received ${JSON.stringify(classicFooterMenuState)}`,
+    );
+    assert.equal(currentFooterControlState.startVisible, false, 'Context Engine should not expose the Start control');
+    assert.equal(currentFooterControlState.menuVisible, true, 'Context Engine should preserve visible footer navigation');
   }
   if (classicFooterBrandState && currentFooterBrandState) {
     assert.equal(
@@ -1687,15 +2840,15 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     );
   }
   if (classicDockedFooterState && currentDockedFooterState) {
-    assert.equal(classicDockedFooterState.position, 'fixed', 'Classic 95 should dock the taskbar to the viewport');
+    assert.equal(classicDockedFooterState.position, 'relative', 'Classic 95 should keep the taskbar in document flow');
     assert.ok(
       Math.abs(classicDockedFooterState.bottom - classicDockedFooterState.viewportHeight) <= 1,
       `Classic 95 footer should touch the viewport bottom; received ${JSON.stringify(classicDockedFooterState)}`,
     );
     assert.equal(
       classicDockedFooterState.bodyPaddingBottom,
-      '42px',
-      'Classic 95 should reserve room for the fixed taskbar',
+      '0px',
+      'Classic 95 should not reserve fixed-taskbar spacing',
     );
     assert.notEqual(
       currentDockedFooterState.position,
@@ -1718,7 +2871,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       {
         bodyPaddingBottom: '0px',
         placement: 'document-end',
-        position: 'static',
+        position: 'relative',
       },
       'Classic 95 session footer should remain in document flow without fixed-taskbar spacing',
     );
@@ -1779,6 +2932,38 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     assert.equal(missing, undefined, `${label} should render in the Classic 95 Docs page`);
     assert.ok(ratio >= 4.5, `${label} should meet 4.5:1 contrast in Classic 95; received ${ratio.toFixed(2)}:1`);
   });
+  if (docsLayoutState) {
+    assert.equal(docsLayoutState.hasAdvancedExternalNotice, false, 'Docs should not render the external-tools notice');
+    assert.ok(
+      docsLayoutState.promptsTop < docsLayoutState.faqTop,
+      'Docs should place Prompts before FAQ in visual and document order',
+    );
+    assert.ok(
+      docsLayoutState.faqTop < docsLayoutState.groupTop,
+      'Docs should place the session/contracts group below FAQ',
+    );
+    assert.equal(docsLayoutState.groupContainsSession, true, 'Docs should group the session context inside its frame');
+    assert.equal(docsLayoutState.groupContainsContracts, true, 'Docs should group Smart Contracts inside its frame');
+    assert.equal(docsLayoutState.groupIsLast, true, 'Docs should keep the session/contracts group at the page bottom');
+    assert.equal(
+      docsLayoutState.githubHref,
+      'https://github.com/AgalmicSoftware/context-engine',
+      'Docs GitHub action should open the public Context Engine repository',
+    );
+    assert.equal(docsLayoutState.githubTarget, '_blank', 'Docs GitHub action should open in a new tab');
+    assert.equal(docsLayoutState.githubHasIcon, true, 'Docs GitHub action should render its GitHub icon');
+    assert.equal(docsLayoutState.githubSharesTitleRow, true, 'Docs GitHub action should sit beside the Docs title');
+    assert.equal(docsLayoutState.loginIdleIconCount, 0, 'Signed-out Log In should not render a decorative key icon');
+    assert.match(
+      docsLayoutState.loginFontFamily,
+      /ce tahoma/i,
+      'Classic 95 Log In text should use the bundled Tahoma face',
+    );
+    assert.ok(
+      docsLayoutState.groupBorderWidths.every((width) => Number.parseFloat(width) > 0),
+      `Docs session/contracts group should have a visible border; received ${JSON.stringify(docsLayoutState.groupBorderWidths)}`,
+    );
+  }
   if (welcomeFrameState) {
     assert.equal(welcomeFrameState.appearance, 'none', 'Classic 95 welcome media should not use native button chrome');
     assert.deepEqual(
@@ -1794,8 +2979,8 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     assert.equal(welcomeFrameState.boxShadow, 'none', 'Classic 95 welcome media should not render a raised shadow');
     assert.equal(
       classicWelcomeImageState?.mixBlendMode,
-      'screen',
-      'Classic 95 welcome artwork should use a brighter palette-safe blend',
+      'normal',
+      'Classic 95 welcome artwork should preserve image detail without blend-mode washout',
     );
     assert.equal(
       currentWelcomeImageState?.mixBlendMode,
@@ -1836,6 +3021,41 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       `Classic 95 passkey button contrast should be at least 4.5:1; received ${loginContrastState.createButtonRatio.toFixed(2)}:1`,
     );
   }
+  if (classicLoginBackgroundState && currentLoginBackgroundState) {
+    [classicLoginBackgroundState, currentLoginBackgroundState].forEach((state) => {
+      assert.equal(state.cardBackgroundImage, 'none', 'Login card should use a solid background');
+      assert.equal(state.bodyBackgroundImage, 'none', 'Login body should not add a background gradient');
+      assert.equal(state.overlayBackgroundImage, 'none', 'Login card should not render a decorative gradient overlay');
+      assert.notEqual(state.cardBackgroundColor, 'rgba(0, 0, 0, 0)', 'Login card solid background should be opaque');
+    });
+  }
+  if (classicPreloginSettingsControlLayout && currentPreloginSettingsControlLayout) {
+    [classicPreloginSettingsControlLayout, currentPreloginSettingsControlLayout].forEach((layout) => {
+      assert.equal(layout.controlCount, 3, 'Pre-login settings should expose Config, Explainers, and Demo Mode');
+      assert.equal(layout.sessionOutsidePanel, true, 'Active Session should remain outside the settings drawer');
+      assert.equal(layout.sessionAbovePanel, true, 'Active Session should sit below auth actions and above settings');
+      assert.equal(layout.sessionBelowAuthActions, true, 'Active Session should render below Create and Login');
+      assert.equal(
+        layout.overflows,
+        false,
+        `Pre-login settings controls should not overflow their row; received ${JSON.stringify(layout)}`,
+      );
+      assert.equal(
+        layout.contentOverflows,
+        false,
+        `Pre-login settings control labels should not collide or clip; received ${JSON.stringify(layout)}`,
+      );
+      assert.ok(
+        layout.rowCenterOffsets.every((offset) => offset <= 1),
+        `Every pre-login settings row should be centered; received ${JSON.stringify(layout.rowCenterOffsets)}`,
+      );
+      assert.equal(
+        layout.rowCount,
+        viewportName === 'mobile' ? 3 : viewportName === 'login feedback' ? 2 : 1,
+        `Pre-login settings should wrap only when needed in ${viewportName}; received ${JSON.stringify(layout)}`,
+      );
+    });
+  }
   if (preloginThemeSettingsState) {
     assert.equal(
       preloginThemeSettingsState.missing,
@@ -1847,17 +3067,24 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       true,
       'Appearance & colors should be the final signed-out Settings section',
     );
-    assert.ok(
-      preloginThemeSettingsState.labelRatio >= 4.5,
-      `Classic 95 App theme label contrast should be at least 4.5:1; received ${preloginThemeSettingsState.labelRatio.toFixed(2)}:1`,
+    assert.equal(preloginThemeSettingsState.hasVisibleSummary, false, 'Appearance should not show a summary');
+    assert.equal(preloginThemeSettingsState.hasVisibleLabel, false, 'Appearance should not show an App theme label');
+    assert.equal(preloginThemeSettingsState.hasVisibleHint, false, 'Appearance should not show explanatory copy');
+    assert.equal(preloginThemeSettingsState.accessibleName, 'App theme', 'Theme selector should retain its accessible name');
+    assert.equal(
+      preloginThemeSettingsState.defaultOptionText,
+      'Deployment theme: Context Engine',
+      'Theme selector should identify the configured deployment theme',
     );
-    assert.ok(
-      preloginThemeSettingsState.hintRatio >= 4.5,
-      `Classic 95 App theme hint contrast should be at least 4.5:1; received ${preloginThemeSettingsState.hintRatio.toFixed(2)}:1`,
+    assert.equal(
+      preloginThemeSettingsState.sponsorDetailInsideActivePill,
+      true,
+      'Active-session sponsor detail should render inside the named session pill',
     );
-    assert.ok(
-      preloginThemeSettingsState.summaryRatio >= 4.5,
-      `Classic 95 Appearance summary contrast should be at least 4.5:1; received ${preloginThemeSettingsState.summaryRatio.toFixed(2)}:1`,
+    assert.match(
+      preloginThemeSettingsState.activeSessionPillText,
+      /Demo Session\s+No sponsor key is configured for the active session\./,
+      'Active-session pill should combine the session name with its sponsorship status',
     );
     assert.ok(
       preloginThemeSettingsState.selectorRatio >= 4.5,
@@ -1877,6 +3104,10 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     assert.ok(
       statsContrastState.pointSpread >= 200,
       `Community Stats should preserve the default-session consensus cluster; received ${statsContrastState.pointSpread.toFixed(2)}px spread`,
+    );
+    assert.ok(
+      statsContrastState.beeswarmVerticalDelta <= 8,
+      `Classic 95 Community Stats should vertically center the beeswarm plot; received ${statsContrastState.beeswarmVerticalDelta.toFixed(2)}px top/bottom gap delta`,
     );
     assert.equal(
       statsContrastState.hasCountedVotes,
@@ -1947,6 +3178,21 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         `Classic 95 ${label} contrast should be at least 4.5:1; received ${received.toFixed(2)}:1`,
       );
     });
+    [classicAuthoringSourceControlGeometry, currentAuthoringSourceControlGeometry].forEach((geometry) => {
+      assert.ok(geometry, 'Authoring source-control geometry should render in both themes');
+      assert.equal(geometry.controlCount, 4, 'Add URL should include its input, Paste, Upload, and add controls');
+      assert.equal(geometry.chooserInsideSurface, true, 'Paste and Upload should live inside the Add URL field');
+      assert.equal(geometry.addIsLast, true, 'The Add URL submit button should remain the final field control');
+      assert.equal(geometry.overflows, false, 'Add URL controls should stay inside the field at compact widths');
+      assert.ok(
+        geometry.centerSpread <= 1,
+        `Add URL controls should share one row; received ${geometry.centerSpread.toFixed(2)}px center spread`,
+      );
+      assert.ok(
+        geometry.surfaceHeight >= 36 && geometry.surfaceHeight <= 40,
+        `Add URL should remain a compact single field; received ${geometry.surfaceHeight.toFixed(2)}px height`,
+      );
+    });
   }
   if (routeCase.requiresReadableSessionSurface) {
     const originalReportClusterColors = ['#1f77b4', '#ff7f0e', '#2ca02c'];
@@ -1973,6 +3219,126 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     assert.equal(classicGroupLinkState.boxShadow, 'none', 'Classic 95 group-card link controls should not be raised');
     assert.ok(classicGroupLinkState.width >= 28, 'Classic 95 group-card link controls should preserve their click width');
     assert.ok(classicGroupLinkState.height >= 28, 'Classic 95 group-card link controls should preserve their click height');
+    ['resting', 'hovered', 'focused'].forEach((stateName) => {
+      const state = currentGroupLinkState[stateName];
+      assert.deepEqual(
+        state.borderWidths,
+        ['0px', '0px', '0px', '0px'],
+        `Context Engine group-card link control should remain frameless while ${stateName}`,
+      );
+      assert.equal(
+        state.boxShadow,
+        'none',
+        `Context Engine group-card link control should remain shadow-free while ${stateName}`,
+      );
+    });
+    assert.equal(
+      currentGroupLinkState.resting.backgroundColor,
+      'rgba(0, 0, 0, 0)',
+      'Context Engine group-card link control should rest on a transparent background',
+    );
+    assert.ok(currentGroupLinkState.resting.width >= 28, 'Context Engine group-card link control should preserve its click width');
+    assert.ok(currentGroupLinkState.resting.height >= 28, 'Context Engine group-card link control should preserve its click height');
+    assert.notEqual(
+      currentGroupLinkState.focused.outlineStyle,
+      'none',
+      'Context Engine group-card link control should retain a visible keyboard-focus outline',
+    );
+    assert.ok(
+      Number.parseFloat(currentGroupLinkState.focused.outlineWidth) >= 2,
+      'Context Engine group-card link control should retain at least a 2px keyboard-focus outline',
+    );
+    if (viewportName === 'session back feedback') {
+      assert.deepEqual(
+        currentPileBackOpacityState,
+        { arrow: 1, button: 1, label: 0.6 },
+        'Context Engine full-question Back control should use a fully opaque arrow and muted label at 735px',
+      );
+      assert.equal(
+        currentQuestionsToolbarState.justifyContent,
+        'space-between',
+        'Context Engine questions toolbar should maximize spacing at 735px',
+      );
+      assert.equal(
+        currentQuestionsToolbarState.childCount,
+        5,
+        'Context Engine questions toolbar should expose all five controls when a response is pending',
+      );
+      assert.ok(
+        currentQuestionsToolbarState.gaps.every((gap) => gap >= 8),
+        `Context Engine questions toolbar controls should preserve at least 8px gaps; received ${JSON.stringify(currentQuestionsToolbarState.gaps)}`,
+      );
+      assert.ok(
+        Math.abs(currentQuestionsToolbarState.leftEdgeGap) <= 1 &&
+          Math.abs(currentQuestionsToolbarState.rightEdgeGap) <= 1,
+        `Context Engine questions toolbar should distribute controls to both content edges; received ${JSON.stringify(currentQuestionsToolbarState)}`,
+      );
+      assert.ok(
+        currentQuestionsToolbarState.centerSpread <= 1,
+        `Context Engine questions toolbar controls should remain centered on one row; received ${currentQuestionsToolbarState.centerSpread}px center spread`,
+      );
+      assert.ok(
+        currentQuestionsToolbarState.width >= 650,
+        `Context Engine embedded questions toolbar should reclaim the card width at 735px; received ${currentQuestionsToolbarState.width}px`,
+      );
+      assert.ok(
+        currentQuestionsToolbarState.topInset <= 1,
+        `Context Engine embedded questions toolbar should sit against the section top border; received ${currentQuestionsToolbarState.topInset}px inset`,
+      );
+      assert.equal(
+        currentQuestionsToolbarState.overflows,
+        false,
+        'Context Engine questions toolbar should not overflow',
+      );
+      assert.ok(
+        currentQuestionsToolbarState.wrapped.rowCount > 1,
+        'Context Engine questions toolbar should wrap below its single-row fit threshold',
+      );
+      assert.ok(
+        currentQuestionsToolbarState.wrapped.submitCenterDelta <= 1,
+        `Context Engine wrapped Submit control should remain centered; received ${currentQuestionsToolbarState.wrapped.submitCenterDelta}px delta`,
+      );
+      assert.equal(
+        currentQuestionsToolbarState.sticky.position,
+        'sticky',
+        'Context Engine questions toolbar should remain sticky',
+      );
+      assert.ok(
+        Math.abs(currentQuestionsToolbarState.sticky.top - 10) <= 1,
+        `Context Engine questions toolbar should remain pinned 10px from the viewport top; received ${currentQuestionsToolbarState.sticky.top}px`,
+      );
+      assert.ok(
+        currentQuestionsToolbarState.sticky.bottom <= currentQuestionsToolbarState.sticky.viewportHeight,
+        'Context Engine questions toolbar should remain inside the viewport after scrolling',
+      );
+      assert.equal(classicQuestionsStickyState.position, 'sticky', 'Classic 95 questions toolbar should remain sticky');
+      assert.ok(
+        Math.abs(classicQuestionsStickyState.top - 10) <= 1,
+        `Classic 95 questions toolbar should remain pinned 10px from the viewport top; received ${classicQuestionsStickyState.top}px`,
+      );
+      assert.ok(
+        classicQuestionsStickyState.bottom <= classicQuestionsStickyState.viewportHeight,
+        'Classic 95 questions toolbar should remain inside the viewport after scrolling',
+      );
+      assert.equal(
+        classicQuestionsStickyState.voteChecked,
+        true,
+        'Classic 95 binary votes should become selected through the visible question control',
+      );
+    }
+    if (viewportName === 'feedback compact') {
+      assert.equal(
+        currentSessionSectionTypography.length,
+        3,
+        'Context Engine should expose all three expandable session headings at 630px',
+      );
+      currentSessionSectionTypography.forEach((heading) => {
+        assert.ok(
+          Math.abs(heading.titleFontSize - heading.subtitleFontSize) <= 0.1,
+          `Context Engine ${heading.label} should use one font size at 630px; received ${JSON.stringify(heading)}`,
+        );
+      });
+    }
     const assertMatchingBox = (classicBox, currentBox, label) => {
       ['height', 'width'].forEach((dimension) => {
         assert.ok(
@@ -2084,7 +3450,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         `Classic 95 ${control.ariaLabel || 'question footer'} icon should rest at 50% opacity`,
       );
     });
-    const dimmedPileFooterControls = new Set(['comment', 'lock']);
+    const dimmedPileFooterControls = new Set(['comment', 'lock', 'previous question', 'next question']);
     reportedSurfaceState.iconControls.forEach((control) => {
       assert.equal(control.exists, true, `Classic 95 ${control.label} control should be present`);
       assert.deepEqual(
@@ -2106,6 +3472,42 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       } else {
         assert.equal(control.opacity, 1, `Classic 95 ${control.label} control should remain fully visible`);
       }
+    });
+    assert.ok(
+      reportedSurfaceState.compactControls.railButtons.length >= 5,
+      'Classic 95 question rail should expose navigation and action controls',
+    );
+    reportedSurfaceState.compactControls.railButtons.forEach((button, index) => {
+      assert.ok(button.width >= 48, `Classic 95 rail control ${index + 1} should be at least 48px wide`);
+      assert.ok(button.height >= 48, `Classic 95 rail control ${index + 1} should be at least 48px tall`);
+      assert.ok(button.fontSize >= 32, `Classic 95 rail icon ${index + 1} should match the default 2rem glyph size`);
+      assert.equal(button.color, 'rgb(255, 255, 255)', `Classic 95 rail control ${index + 1} should be white`);
+      assert.ok(
+        button.opacity === 1 || button.opacity === 0.5,
+        `Classic 95 rail control ${index + 1} should be fully visible or use the disabled treatment`,
+      );
+    });
+    assert.equal(
+      reportedSurfaceState.compactControls.sectionHeaders.length,
+      3,
+      'Classic 95 should expose the three lower section headings',
+    );
+    reportedSurfaceState.compactControls.sectionHeaders.forEach((header, index) => {
+      assert.equal(
+        header.titleFontSize,
+        '21.6px',
+        `Classic 95 section ${index + 1} title should use the larger task-heading size`,
+      );
+      assert.equal(
+        header.subtitleFontSize,
+        '16px',
+        `Classic 95 section ${index + 1} subtitle should remain legible`,
+      );
+      assert.equal(
+        header.caretOpacity,
+        0.5,
+        `Classic 95 section ${index + 1} caret should use the requested half opacity`,
+      );
     });
     if (viewportName === 'compact window') {
       const compactControls = reportedSurfaceState.compactControls;
@@ -2194,6 +3596,11 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
           0.5,
           `Compact Classic 95 section ${index + 1} subtitle should remain visibly secondary; received ${JSON.stringify(header)}`,
         );
+        assert.equal(
+          header.titleOpacity,
+          0.5,
+          `Compact Classic 95 section ${index + 1} title should use the requested half opacity; received ${JSON.stringify(header)}`,
+        );
       });
       assert.ok(compactControls.actionButtons.length >= 3, 'Compact Classic 95 should expose its action toolbar');
       compactControls.actionButtons.forEach((button, index) => {
@@ -2225,11 +3632,27 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     [
       ['session title', reportedSurfaceState.sessionTitleRatio],
       ['question prompt', reportedSurfaceState.promptRatio],
-      ['lower panel title', reportedSurfaceState.sectionTitleRatio],
     ].forEach(([label, received]) => {
       assert.ok(
         received >= 4.5,
         `Classic 95 ${label} contrast should be at least 4.5:1; received ${received.toFixed(2)}:1`,
+      );
+    });
+    assert.match(
+      reportedSurfaceState.promptFontFamily,
+      /ce tahoma/,
+      'Classic 95 session question prompts should use the bundled Tahoma face',
+    );
+    assert.equal(
+      reportedSurfaceState.promptFontWeight,
+      '400',
+      'Classic 95 session question prompts should use Tahoma regular rather than a synthetic heavy weight',
+    );
+    reportedSurfaceState.compactControls.sectionHeaders.forEach((header, index) => {
+      assert.equal(
+        header.titleOpacity,
+        0.5,
+        `Classic 95 lower-panel title ${index + 1} should use the requested half opacity`,
       );
     });
   }
@@ -2298,17 +3721,17 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   }
 }
 
-async function assertWelcomeFitsViewport(browser, baseUrl, viewport) {
+async function assertWelcomeSlideGeometry(browser, baseUrl, viewport, themeId) {
   const page = await browser.newPage({ viewport: { width: viewport.width, height: viewport.height } });
   try {
-    await page.addInitScript(() => {
+    await page.addInitScript((selectedThemeId) => {
       window.localStorage.setItem('ce:firstVisitRootAboutRedirectConsumed:v20260618b', 'true');
       window.localStorage.setItem('ce_onboarding_complete', 'true');
       window.localStorage.setItem('firstVisit', 'false');
-      window.localStorage.setItem('ce:theme', 'classic-95');
+      window.localStorage.setItem('ce:theme', selectedThemeId);
       window.localStorage.setItem('ce:primarySessionSlug', 'demo-sh');
       window.localStorage.setItem('ce:selectedSessionScope', 'active');
-    });
+    }, themeId);
     await page.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForSelector('#root', { state: 'attached', timeout: 15000 });
     await page.waitForFunction(() => document.querySelector('#root')?.children.length > 0, null, { timeout: 15000 });
@@ -2333,9 +3756,27 @@ async function assertWelcomeFitsViewport(browser, baseUrl, viewport) {
           const title = info?.querySelector('[class*="onboardingTitle"]');
           const slideLayout = info?.querySelector('[class*="welcomeSlideLayout"]');
           const slideImage = info?.querySelector('[data-testid="ce-welcome-slide-image"]');
+          const bulletTexts = [...(info?.querySelectorAll('[class*="welcomeSlideBulletText"]') || [])];
+          const finalAction = controls?.querySelector('button[class*="getStartedButton"]');
           const slideKey = info?.querySelector('[data-testid="ce-welcome-slide-media"]')?.dataset.slideKey || '';
-          const rect = (element) => element?.getBoundingClientRect() || null;
+          const rect = (element) => {
+            const bounds = element?.getBoundingClientRect();
+            return bounds
+              ? {
+                  top: bounds.top,
+                  right: bounds.right,
+                  bottom: bounds.bottom,
+                  left: bounds.left,
+                  width: bounds.width,
+                  height: bounds.height,
+                  documentTop: bounds.top + window.scrollY,
+                  documentBottom: bounds.bottom + window.scrollY,
+                }
+              : null;
+          };
           const footerBottom = footer?.getBoundingClientRect().bottom || 0;
+          const slideImageStyle = slideImage ? window.getComputedStyle(slideImage) : null;
+          const finalActionStyle = finalAction ? window.getComputedStyle(finalAction) : null;
           return {
             slideKey,
             clientHeight: document.documentElement.clientHeight,
@@ -2347,6 +3788,21 @@ async function assertWelcomeFitsViewport(browser, baseUrl, viewport) {
             title: rect(title),
             slideLayout: rect(slideLayout),
             slideImage: rect(slideImage),
+            bulletTexts: bulletTexts.map((element) => ({
+              text: element.textContent?.trim() || '',
+              ...rect(element),
+              clientWidth: element.clientWidth,
+              scrollWidth: element.scrollWidth,
+            })),
+            slideImageBlendMode: slideImageStyle?.mixBlendMode || '',
+            slideImageOpacity: slideImageStyle ? Number.parseFloat(slideImageStyle.opacity) : null,
+            finalAction: finalAction
+              ? {
+                  text: finalAction.textContent?.trim() || '',
+                  backgroundColor: finalActionStyle?.backgroundColor || '',
+                  color: finalActionStyle?.color || '',
+                }
+              : null,
           };
         }),
       );
@@ -2355,14 +3811,17 @@ async function assertWelcomeFitsViewport(browser, baseUrl, viewport) {
 
     const firstFit = slideFits[0];
     slideFits.forEach((fit) => {
-      const slideLabel = `${viewport.name} ${fit.slideKey} welcome slide`;
-      assert.ok(
-        fit.footerBottom <= fit.clientHeight + 1 && fit.scrollHeight <= fit.clientHeight + 1,
-        `${slideLabel} should fit the viewport; received footer bottom ${fit.footerBottom.toFixed(1)}px, scroll height ${fit.scrollHeight}px, viewport ${fit.clientHeight}px`,
-      );
+      const slideLabel = `${themeId} ${viewport.name} ${fit.slideKey} welcome slide`;
+      if (themeId === 'classic-95') {
+        assert.ok(
+          fit.footerBottom <= fit.clientHeight + 1 && fit.scrollHeight <= fit.clientHeight + 1,
+          `${slideLabel} should fit the viewport; received footer bottom ${fit.footerBottom.toFixed(1)}px, scroll height ${fit.scrollHeight}px, viewport ${fit.clientHeight}px`,
+        );
+      }
       assert.ok(fit.walkthrough && fit.info && fit.controls, `${slideLabel} geometry should render`);
       assert.ok(
-        fit.info.top >= fit.walkthrough.top - 1 && fit.info.bottom <= fit.controls.top + 1,
+        fit.info.documentTop >= fit.walkthrough.documentTop - 1 &&
+          fit.info.documentBottom <= fit.controls.documentTop + 1,
         `${slideLabel} content should remain above its controls`,
       );
       assert.ok(
@@ -2371,7 +3830,7 @@ async function assertWelcomeFitsViewport(browser, baseUrl, viewport) {
       );
       assert.ok(
         Math.abs(fit.walkthrough.height - firstFit.walkthrough.height) <= 1 &&
-          Math.abs(fit.controls.top - firstFit.controls.top) <= 1 &&
+          Math.abs(fit.controls.documentTop - firstFit.controls.documentTop) <= 1 &&
           Math.abs(fit.controls.height - firstFit.controls.height) <= 1,
         `${slideLabel} should keep the same window and arrow-strip geometry as the first slide`,
       );
@@ -2387,6 +3846,53 @@ async function assertWelcomeFitsViewport(browser, baseUrl, viewport) {
           `${slideLabel} artwork should remain inside its slide panel`,
         );
       }
+      if (fit.slideKey === 'looking-for') {
+        const ideasBullet = fit.bulletTexts.find((bullet) => bullet.text === 'Ideas for further tools');
+        assert.ok(ideasBullet, `${slideLabel} should render the Ideas bullet`);
+        assert.ok(
+          ideasBullet.right <= fit.slideLayout.right - 10,
+          `${slideLabel} Ideas bullet should keep a right inset; received ${JSON.stringify({ bulletRight: ideasBullet.right, panelRight: fit.slideLayout.right })}`,
+        );
+        fit.bulletTexts.forEach((bullet) => {
+          assert.ok(
+            bullet.scrollWidth <= bullet.clientWidth + 1,
+            `${slideLabel} ${bullet.text} should wrap without horizontal clipping`,
+          );
+          assert.ok(
+            bullet.top >= fit.slideLayout.top + 1 && bullet.bottom <= fit.slideLayout.bottom - 1,
+            `${slideLabel} ${bullet.text} should remain vertically inside the slide panel; received ${JSON.stringify({ bulletTop: bullet.top, bulletBottom: bullet.bottom, panelTop: fit.slideLayout.top, panelBottom: fit.slideLayout.bottom })}`,
+          );
+        });
+        assert.equal(fit.finalAction?.text, 'See Tools', `${slideLabel} should expose the final action`);
+        if (themeId === 'classic-95') {
+          assert.equal(
+            fit.slideImageBlendMode,
+            'normal',
+            `${slideLabel} should preserve illustration detail without blend-mode washout`,
+          );
+          assert.ok(
+            fit.slideImageOpacity >= 0.5,
+            `${slideLabel} artwork should remain visible; received opacity ${fit.slideImageOpacity}`,
+          );
+          assert.equal(
+            fit.finalAction.backgroundColor,
+            'rgb(192, 192, 192)',
+            `${slideLabel} final action should use the Classic control face`,
+          );
+          assert.equal(fit.finalAction.color, 'rgb(0, 0, 0)', `${slideLabel} final action text should be black`);
+        } else {
+          assert.equal(
+            fit.slideImageBlendMode,
+            'lighten',
+            `${slideLabel} should preserve the Context Engine artwork blend`,
+          );
+          assert.notEqual(
+            fit.finalAction.backgroundColor,
+            'rgb(192, 192, 192)',
+            `${slideLabel} should not inherit the Classic control face`,
+          );
+        }
+      }
     });
   } finally {
     await page.close();
@@ -2398,37 +3904,68 @@ async function main() {
   const welcomeFitOnly = process.env.WELCOME_FIT_ONLY === '1' || process.argv.includes('--welcome-fit-only');
   const homeTabsOnly = process.argv.includes('--home-tabs-only');
   const questionUtilitiesOnly = process.argv.includes('--question-utilities-only');
+  const authoringOnly = process.argv.includes('--authoring-only');
+  const loginOnly = process.argv.includes('--login-only');
   const statsOnly = process.argv.includes('--stats-only');
   const sessionOnly = process.argv.includes('--session-only');
   const sessionSetupOnly = process.argv.includes('--session-setup-only');
   const footerOnly = process.argv.includes('--footer-only');
+  const aboutOnly = process.argv.includes('--about-only');
+  const docsOnly = process.argv.includes('--docs-only');
+  const tagOnly = process.argv.includes('--tag-only');
   const toolCardsOnly = process.argv.includes('--tool-cards-only');
-  const routeCases = homeTabsOnly
-    ? ROUTE_CASES.filter((routeCase) => routeCase.requiresSpreadHomeTabs)
-    : questionUtilitiesOnly
-      ? ROUTE_CASES.filter((routeCase) => routeCase.requiresReadableQuestionUtilities)
-      : statsOnly
-        ? ROUTE_CASES.filter((routeCase) => routeCase.requiresReadableStats)
-        : sessionOnly
-          ? ROUTE_CASES.filter((routeCase) => routeCase.requiresReadableSessionSurface)
-          : sessionSetupOnly
-            ? ROUTE_CASES.filter((routeCase) => routeCase.requiresReadableSessionSetup)
-            : footerOnly
-              ? ROUTE_CASES.filter((routeCase) => routeCase.requiresFooterButtons)
-              : toolCardsOnly
-                ? ROUTE_CASES.filter((routeCase) => routeCase.requiresStandardToolCards)
-                : ROUTE_CASES;
-  const viewports = toolCardsOnly
-    ? TOOL_CARD_VIEWPORTS
+  const routeCases = aboutOnly
+    ? ROUTE_CASES.filter((routeCase) => routeCase.requiresClassicAboutHeroControls)
+    : docsOnly
+      ? ROUTE_CASES.filter((routeCase) => routeCase.requiresReadableDocs)
+    : tagOnly
+      ? ROUTE_CASES.filter((routeCase) => routeCase.requiresReadableTagRelatedChips)
+    : homeTabsOnly
+      ? ROUTE_CASES.filter((routeCase) => routeCase.requiresSpreadHomeTabs)
+    : authoringOnly
+      ? ROUTE_CASES.filter((routeCase) => routeCase.requiresReadableAuthoring)
+      : loginOnly
+        ? ROUTE_CASES.filter((routeCase) => routeCase.requiresReadableLogin).map((routeCase) => ({
+            path: routeCase.path,
+            label: 'login modal surface',
+            requiresReadableLogin: true,
+            requiresPreloginControlLayout: true,
+            requiresPreloginThemeSettings: true,
+          }))
+      : questionUtilitiesOnly
+        ? ROUTE_CASES.filter((routeCase) => routeCase.requiresReadableQuestionUtilities)
+        : statsOnly
+          ? ROUTE_CASES.filter((routeCase) => routeCase.requiresReadableStats)
+          : sessionOnly
+            ? ROUTE_CASES.filter((routeCase) => routeCase.requiresReadableSessionSurface)
+            : sessionSetupOnly
+              ? ROUTE_CASES.filter((routeCase) => routeCase.requiresReadableSessionSetup)
+              : footerOnly
+                ? ROUTE_CASES.filter((routeCase) => routeCase.requiresFooterButtons)
+                : toolCardsOnly
+                  ? ROUTE_CASES.filter((routeCase) => routeCase.requiresStandardToolCards)
+                  : ROUTE_CASES;
+  const viewports = aboutOnly
+    ? FOOTER_VIEWPORTS
+    : docsOnly
+      ? DOCS_VIEWPORTS
+    : tagOnly
+      ? TAG_VIEWPORTS
+    : toolCardsOnly
+      ? TOOL_CARD_VIEWPORTS
     : homeTabsOnly
       ? HOME_TAB_VIEWPORTS
-        : footerOnly
-          ? FOOTER_VIEWPORTS
-          : sessionOnly
-            ? SESSION_SURFACE_VIEWPORTS
-            : sessionSetupOnly
-              ? SESSION_SETUP_VIEWPORTS
-              : VIEWPORTS;
+      : authoringOnly
+        ? AUTHORING_VIEWPORTS
+      : loginOnly
+        ? LOGIN_VIEWPORTS
+      : footerOnly
+            ? FOOTER_VIEWPORTS
+            : sessionOnly
+              ? SESSION_SURFACE_VIEWPORTS
+              : sessionSetupOnly
+                ? SESSION_SETUP_VIEWPORTS
+                : VIEWPORTS;
   const browser = await chromium.launch({ headless: true });
 
   try {
@@ -2450,7 +3987,12 @@ async function main() {
       }
     }
     if (
+      !aboutOnly &&
+      !docsOnly &&
+      !tagOnly &&
       !homeTabsOnly &&
+      !authoringOnly &&
+      !loginOnly &&
       !questionUtilitiesOnly &&
       !statsOnly &&
       !sessionOnly &&
@@ -2458,15 +4000,27 @@ async function main() {
       !footerOnly &&
       !toolCardsOnly
     ) {
-      for (const viewport of WELCOME_FIT_VIEWPORTS) {
-        await assertWelcomeFitsViewport(browser, baseUrl, viewport);
+      for (const themeId of WELCOME_FIT_THEME_IDS) {
+        for (const viewport of WELCOME_FIT_VIEWPORTS) {
+          await assertWelcomeSlideGeometry(browser, baseUrl, viewport, themeId);
+        }
       }
     }
     console.log(
       welcomeFitOnly
-        ? `Welcome fit Playwright smoke passed (${WELCOME_FIT_VIEWPORTS.length} viewports).`
+        ? `Welcome fit Playwright smoke passed (${WELCOME_FIT_THEME_IDS.length} themes × ${WELCOME_FIT_VIEWPORTS.length} viewports).`
+        : aboutOnly
+          ? `Classic 95 About hero Playwright smoke passed (${viewports.length} viewports).`
+        : docsOnly
+          ? `Classic 95 Docs structure Playwright smoke passed (${viewports.length} viewports).`
+        : tagOnly
+          ? `Related-tag contrast Playwright smoke passed (${viewports.length} viewports × 2 themes).`
         : homeTabsOnly
           ? `Classic 95 home tab-spacing Playwright smoke passed (${viewports.length} viewports).`
+          : authoringOnly
+            ? `Authoring source-control Playwright smoke passed (${viewports.length} viewports).`
+          : loginOnly
+            ? `Solid login-surface Playwright smoke passed (${viewports.length} viewports).`
           : questionUtilitiesOnly
             ? `Classic 95 question utility-control Playwright smoke passed (${VIEWPORTS.length} viewports).`
             : statsOnly

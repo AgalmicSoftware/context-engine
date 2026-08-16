@@ -5,6 +5,7 @@ import { faCaretDown, faCaretUp } from '@fortawesome/free-solid-svg-icons';
 import styles from './Account.module.scss';
 
 type SessionPillEntry = {
+  detail?: string;
   isActive?: boolean;
   label?: string;
   slug?: string;
@@ -36,10 +37,17 @@ export const LoginSettingsSessionPills = ({
       {sessions.map((sessionEntry) => (
         <span
           key={`${sessionEntry.slug}:${sessionEntry.label}`}
-          className={`${styles.sessionPill} ${sessionEntry.isActive ? styles.sessionPillActive : ''}`}
+          className={`${styles.sessionPill} ${sessionEntry.isActive ? styles.sessionPillActive : ''} ${
+            sessionEntry.detail ? styles.sessionPillWithDetail : ''
+          }`}
         >
           {sessionEntry.label}
-          <span className={styles.sessionPillMeta}>{sessionEntry.isActive ? 'active' : sessionEntry.slugLabel}</span>
+          {' '}
+          <span
+            className={`${styles.sessionPillMeta} ${sessionEntry.detail ? styles.supportedResourceDetail : ''}`}
+          >
+            {sessionEntry.detail || (sessionEntry.isActive ? 'active' : sessionEntry.slugLabel)}
+          </span>
         </span>
       ))}
     </div>
@@ -48,14 +56,12 @@ export const LoginSettingsSessionPills = ({
 
 export const LoginSettingsSupportedResourceCard = ({
   activeSession,
-  activeSponsorSession = null,
   card,
   extraSessions = [],
   extrasExpanded = false,
   onToggleSessions,
 }: {
   activeSession: SessionPillEntry;
-  activeSponsorSession?: SessionPillEntry | null;
   card: SponsoredResourceCard;
   extraSessions?: SessionPillEntry[];
   extrasExpanded?: boolean;
@@ -71,18 +77,10 @@ export const LoginSettingsSupportedResourceCard = ({
           {card.status.label}
         </span>
       </div>
-      <div className={styles.supportedResourceDetail}>{card.status.detail}</div>
       <div className={styles.supportedResourceSessions}>
         <div className={styles.supportedResourceSessionsLabel}>Active session</div>
         <div className={styles.supportedResourcePrimarySession}>
-          <LoginSettingsSessionPills sessions={[activeSession]} />
-          <span
-            className={`${styles.supportedResourceActiveState} ${
-              activeSponsorSession ? styles.supportedResourceActiveStateOn : styles.supportedResourceActiveStateOff
-            }`}
-          >
-            {activeSponsorSession ? 'configured here' : 'not configured here'}
-          </span>
+          <LoginSettingsSessionPills sessions={[{ ...activeSession, detail: card.status.detail, isActive: true }]} />
         </div>
         {extraCount > 0 ? (
           <div className={styles.supportedResourceOtherSessions}>

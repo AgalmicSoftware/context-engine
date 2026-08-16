@@ -168,6 +168,8 @@ describe('ToolExplorer session propagation', () => {
         showCreateGroupExternal: false,
         onCreateGroupToggleExternal: expect.any(Function),
         activeSessionSlug: 'edge',
+        sessionSlug: 'edge',
+        embeddedWorkerGroups: true,
       }),
     );
 

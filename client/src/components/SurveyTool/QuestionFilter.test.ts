@@ -1,5 +1,9 @@
 import { QuestionFilter as QuestionFilterComponent, shouldEnableQuestionFilterSbt } from './QuestionFilter';
-import { QuestionFilterSbtSection } from './QuestionFilterSections';
+import {
+  QuestionFilterQuestionTypesSection,
+  QuestionFilterSbtSection,
+  QuestionFilterTagsSection,
+} from './QuestionFilterSections';
 import {
   QUESTION_FILTER_ACTIONS_STYLE,
   QUESTION_FILTER_BOOKMARK_FEEDBACK_STYLE,
@@ -122,6 +126,61 @@ describe('isFreeformBlankAnswer', () => {
     expect(isFreeformBlankAnswer('freeform', 'response')).toBe(false);
     expect(isFreeformBlankAnswer('freeform', { answer: '   ' })).toBe(false);
     expect(isFreeformBlankAnswer('freeform', { answer: { value: 0 } })).toBe(false);
+  });
+});
+
+describe('QuestionFilterTagsSection', () => {
+  it('exposes tag selections as keyboard-operable toggle buttons', () => {
+    const onTagSelection = jest.fn();
+    const section = QuestionFilterTagsSection({
+      allTagsCount: 2,
+      disabled: false,
+      disabledReason: '',
+      expandedSections: { tags: true },
+      onTagSelection,
+      onToggleSection: jest.fn(),
+      onToggleShowAllTags: jest.fn(),
+      selectedTags: ['safety'],
+      showAllTags: true,
+      tagsToDisplay: ['safety', 'governance'],
+      tooltipId: 'tag-help',
+    });
+    const selectedTag = findElement(
+      section.props.content,
+      (element) => element?.type === 'button' && getNodeText(element) === '#safety',
+    );
+
+    expect(selectedTag).toBeTruthy();
+    expect(selectedTag.props.type).toBe('button');
+    expect(selectedTag.props['aria-pressed']).toBe(true);
+    selectedTag.props.onClick();
+    expect(onTagSelection).toHaveBeenCalledWith('safety');
+  });
+});
+
+describe('QuestionFilterQuestionTypesSection', () => {
+  it('renders recognizable rating and freeform previews', () => {
+    const section = QuestionFilterQuestionTypesSection({
+      disabled: false,
+      expandedSections: { types: true },
+      onToggleSection: jest.fn(),
+      onTypeSelection: jest.fn(),
+      pendingSelectedTypes: [],
+    });
+    const ratingButton = findElement(
+      section.props.content,
+      (element) => element?.type === 'button' && getNodeText(element).includes('Rating'),
+    );
+    const freeformButton = findElement(
+      section.props.content,
+      (element) => element?.type === 'button' && getNodeText(element).includes('Freeform'),
+    );
+
+    expect(ratingButton).toBeTruthy();
+    expect(getNodeText(ratingButton)).toContain('1');
+    expect(getNodeText(ratingButton)).toContain('10');
+    expect(freeformButton).toBeTruthy();
+    expect(getNodeText(freeformButton)).toContain('Write an answer...');
   });
 });
 

@@ -296,6 +296,8 @@ const ToolExplorer = (props: ToolExplorerProps) => {
         ...(expandedToolName === 'Debate Tree' ? { demoMode: demoSurfaceEnabled } : {}),
         ...(showGroupsHeaderActions
           ? {
+              sessionSlug: props.activeSessionSlug,
+              embeddedWorkerGroups: true,
               hideMiniActionRow: true,
               showCreateGroupAboveFeatured: true,
               showCreateGroupExternal: showEmbeddedCreateGroup,

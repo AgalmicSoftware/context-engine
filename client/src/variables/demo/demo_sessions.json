@@ -200,7 +200,9 @@
         "fetch"
       ],
       "anonymousScopes": [
-        "storage"
+        "storage",
+        "ai",
+        "transcribe"
       ]
     },
     "demoCompatibilitySeed": {

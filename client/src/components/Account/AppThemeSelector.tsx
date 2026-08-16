@@ -1,6 +1,6 @@
 import React from 'react';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { CE_THEME_IDS, getThemeMetadata } from '../../utilities/ui/themeRegistry';
+import { CE_THEME_IDS, getThemeMetadata, normalizeThemeId } from '../../utilities/ui/themeRegistry';
 import {
   clearStoredThemePreference,
   readStoredThemePreference,
@@ -11,18 +11,20 @@ import styles from './AppThemeSelector.module.scss';
 
 const AppThemeSelector = (): React.ReactElement => {
   const [preference, setPreference] = React.useState(() => readStoredThemePreference() || '');
+  const deploymentTheme = normalizeThemeId(
+    typeof document === 'undefined' ? null : document.documentElement.dataset.ceDeploymentTheme,
+  );
+  const deploymentThemeLabel = deploymentTheme ? getThemeMetadata(deploymentTheme).label : 'default';
 
   React.useEffect(() => subscribeThemeChanges(() => setPreference(readStoredThemePreference() || '')), []);
 
   return (
     <div className={styles.field}>
-      <label className={styles.label} htmlFor="ce-settings-theme-select">
-        App theme
-      </label>
       <select
         id="ce-settings-theme-select"
         className={styles.select}
         value={preference}
+        aria-label="App theme"
         data-testid={E2E_TESTIDS.SETTINGS_THEME}
         onChange={(event) => {
           const next = event.target.value;
@@ -31,16 +33,13 @@ const AppThemeSelector = (): React.ReactElement => {
           setPreference(readStoredThemePreference() || '');
         }}
       >
-        <option value="">Use deployment default</option>
+        <option value="">Deployment theme: {deploymentThemeLabel}</option>
         {CE_THEME_IDS.map((id) => (
           <option key={id} value={id}>
             {getThemeMetadata(id).label}
           </option>
         ))}
       </select>
-      <div className={styles.hint}>
-        Changes the complete app appearance in this browser. An explicit choice takes precedence over session colors.
-      </div>
     </div>
   );
 };

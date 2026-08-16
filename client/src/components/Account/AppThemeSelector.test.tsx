@@ -11,13 +11,15 @@ describe('AppThemeSelector', () => {
     document.documentElement.dataset.ceThemeSource = 'deployment';
   });
 
-  test('switches only among bundled app themes and can return to the deployment default', () => {
+  test('shows only the selector, names the deployment theme, and can return to that default', () => {
     render(<AppThemeSelector />);
     const select = screen.getByTestId(E2E_TESTIDS.SETTINGS_THEME);
 
     expect(select).toHaveAccessibleName('App theme');
+    expect(screen.queryByText('App theme')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Changes the complete app appearance/i)).not.toBeInTheDocument();
     expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual([
-      'Use deployment default',
+      'Deployment theme: Context Engine',
       'Context Engine',
       'Classic 95',
     ]);
@@ -30,5 +32,13 @@ describe('AppThemeSelector', () => {
     fireEvent.change(select, { target: { value: '' } });
     expect(window.localStorage.getItem(CE_THEME_STORAGE_KEY)).toBeNull();
     expect(document.documentElement.dataset.ceThemeSource).toBe('deployment');
+  });
+
+  test('describes an unavailable deployment choice as the default', () => {
+    delete document.documentElement.dataset.ceDeploymentTheme;
+
+    render(<AppThemeSelector />);
+
+    expect(screen.getAllByRole('option')[0]).toHaveTextContent('Deployment theme: default');
   });
 });

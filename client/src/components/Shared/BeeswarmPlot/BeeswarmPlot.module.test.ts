@@ -29,4 +29,12 @@ describe('BeeswarmPlot module styles', () => {
       /@media \(max-width: 768px\)\s*{[\s\S]*?\.beeswarmSvg\s*{[\s\S]*?min-width:\s*360px;[\s\S]*?}/,
     );
   });
+
+  it('renders the Classic 95 unsure distribution segment as solid yellow', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'BeeswarmPlot.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.tooltipResponseSegmentUnsure\s*{[\s\S]*?background:\s*var\(--ce-status-warning\);/,
+    );
+  });
 });

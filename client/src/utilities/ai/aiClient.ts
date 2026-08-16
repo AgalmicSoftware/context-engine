@@ -289,6 +289,7 @@ export const callAI = async (prompt: unknown, opts: unknown = {}): Promise<strin
       },
       {
         sessionSlug,
+        sessionConfig,
         context,
         workerUrl: baseUrl,
         preferAnonymous: shouldUseAnonymousFirst,

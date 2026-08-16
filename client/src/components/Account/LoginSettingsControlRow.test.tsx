@@ -51,4 +51,19 @@ describe('LoginSettingsControlRow', () => {
     expect(screen.getByRole('button', { name: 'Demo' })).toBeInTheDocument();
     expect(screen.getByText('After')).toBeInTheDocument();
   });
+
+  it('can omit the session summary from a settings-only control row', () => {
+    render(
+      <LoginSettingsControlRow
+        activeSession={{ label: 'General', slug: '' }}
+        showSession={false}
+        tooltipsControl={<button type="button">Explainers</button>}
+        demoControl={<button type="button">Demo</button>}
+      />,
+    );
+
+    expect(screen.queryByText('SESSION')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Explainers' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Demo' })).toBeInTheDocument();
+  });
 });

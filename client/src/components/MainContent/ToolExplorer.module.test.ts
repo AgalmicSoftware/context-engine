@@ -48,4 +48,10 @@ describe('ToolExplorer sparse card layout', () => {
       /\.explorerCol \.square:hover,[\s\S]*?\.explorerColSparse \.square:focus-within\s*{[\s\S]*?background:\s*var\(--ce-control-face\);[\s\S]*?box-shadow:\s*var\(--ce-shadow-raised\);/,
     );
   });
+
+  it('makes the bundled artwork dominant in classic mobile applets', () => {
+    expect(scss).toMatch(
+      /@media \(max-width:\s*640px\)\s*{\s*@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.explorerCol \.square,[\s\S]*?\.explorerColSparse \.square\s*{[\s\S]*?height:\s*232px;[\s\S]*?min-height:\s*232px;[\s\S]*?\.backgroundImage\s*{[\s\S]*?flex-basis:\s*128px;[\s\S]*?height:\s*128px;/,
+    );
+  });
 });

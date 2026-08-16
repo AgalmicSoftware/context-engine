@@ -125,7 +125,7 @@
         li .footerLink {
           align-items: center;
           display: flex;
-          font-size: clamp(1rem, 2.4vw, 1.22rem);
+          font-size: clamp(0.9rem, 2.25vw, 1.08rem);
           font-weight: 700;
           justify-content: center;
           letter-spacing: 0;
@@ -319,103 +319,176 @@
   outline-offset: 3px;
 }
 
-/* Windows-style taskbar for the classic theme. It stays compact and
- * left-aligned. Session routes place it after the session controls so it
- * cannot obscure the Groups / Context / Results panels. */
+/* Windows-style taskbar for the desktop-window layout profile. The taskbar is
+ * the last item in the page flow, so long pages reveal it only at the document
+ * end and short pages still rest it against the viewport bottom. */
 @container ce-theme style(--ce-layout-profile: desktop-window) {
-  :global(body) {
-    padding-bottom: 42px;
+  :global(#root) {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
   }
 
   .footer {
-    position: fixed;
-    right: 2%;
-    bottom: 0;
-    left: 2%;
-    z-index: 1100;
+    position: relative;
+    z-index: 20;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    width: auto;
+    width: 100%;
     min-height: 42px;
-    margin: 0;
+    margin-top: auto;
     padding: 3px 6px;
     border: 2px solid;
     border-color: var(--ce-border-raised);
     background: var(--ce-control-face);
     box-sizing: border-box;
-  }
-
-  :global(body):has(.footerDocumentEnd) {
-    padding-bottom: 0;
+    overflow: visible;
   }
 
   .footer.footerDocumentEnd {
-    position: static;
-    right: auto;
-    bottom: auto;
-    left: auto;
-    z-index: auto;
-    width: 96%;
-    margin: 18px 2% 0;
+    position: relative;
+    width: 100%;
+    margin-top: auto;
   }
 
-  .footer nav {
-    display: flex;
-    align-items: center;
-    width: auto;
-    min-width: 0;
-  }
-
-  .footer nav ul {
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    grid-template-columns: none;
-    gap: 4px;
-    width: auto;
-    margin: 0;
-    padding: 0;
-  }
-
-  .footer nav ul li {
-    flex: 0 0 auto;
-    width: auto;
-    min-width: 0;
-  }
-
-  .footer nav ul li .footerLink {
+  .startButton {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: auto;
-    min-width: 82px;
+    width: 36px;
+    min-width: 36px;
     min-height: 32px;
-    margin: 0 !important;
-    padding: 0 12px;
+    margin: 0;
+    padding: 0;
     border: 2px solid;
     border-color: var(--ce-border-raised);
+    border-radius: 0;
     background: var(--ce-control-face);
     box-shadow: var(--ce-shadow-raised);
     color: var(--ce-control-text);
-    font-size: 0.78rem;
-    font-weight: 700;
+    font: inherit;
     line-height: 1;
-    text-align: center;
-    white-space: nowrap;
   }
 
-  .footer nav ul li .footerLink:hover,
-  .footer nav ul li .footerLink:focus-visible {
+  .startButton[hidden],
+  .footer .startMenu[hidden] {
+    display: none;
+  }
+
+  .startButton:hover,
+  .startButton:focus-visible {
     border-color: var(--ce-border-raised);
     background: var(--ce-surface-alt);
     box-shadow: var(--ce-shadow-raised);
     color: var(--ce-control-text);
   }
 
-  .footer nav ul li .footerLink:active {
+  .startButton[aria-expanded='true'],
+  .startButton:active {
     border-color: var(--ce-border-inset);
     box-shadow: var(--ce-shadow-pressed);
+  }
+
+  .startButton:focus-visible {
+    outline: 1px dotted var(--ce-control-text);
+    outline-offset: -5px;
+  }
+
+  .startIcon {
+    display: grid;
+    grid-template-columns: repeat(2, 7px);
+    grid-template-rows: repeat(2, 7px);
+    gap: 1px;
+    width: 15px;
+    height: 15px;
+    transform: skewY(-5deg);
+  }
+
+  .startIcon span:nth-child(1) {
+    background: var(--ce-status-error);
+  }
+
+  .startIcon span:nth-child(2) {
+    background: var(--ce-status-success-bright);
+  }
+
+  .startIcon span:nth-child(3) {
+    background: var(--ce-data-series-1);
+  }
+
+  .startIcon span:nth-child(4) {
+    background: var(--ce-status-warning);
+  }
+
+  .footer .startMenu {
+    position: absolute;
+    bottom: calc(100% + 3px);
+    left: 3px;
+    z-index: 2;
+    display: none;
+    width: min(250px, calc(100vw - 12px));
+    min-width: 210px;
+    padding: 4px;
+    border: 2px solid;
+    border-color: var(--ce-border-raised);
+    background: var(--ce-control-face);
+    box-shadow: var(--ce-shadow-raised);
+  }
+
+  .footer .startMenuOpen {
+    display: block;
+  }
+
+  .footer .startMenu ul {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    grid-template-columns: none;
+    gap: 1px;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  .footer .startMenu ul li {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .footer .startMenu ul li .footerLink {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    width: 100%;
+    min-width: 0;
+    min-height: 38px;
+    margin: 0 !important;
+    padding: 0 14px;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    color: var(--ce-control-text);
+    font-size: 0.84rem;
+    font-weight: 700;
+    line-height: 1;
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .footer .startMenu ul li .footerLink:hover,
+  .footer .startMenu ul li .footerLink:focus-visible {
+    border: 0;
+    background: var(--ce-titlebar-bg);
+    box-shadow: none;
+    color: var(--ce-titlebar-text);
+    outline: 0;
+  }
+
+  .footer .startMenu ul li .footerLink:active {
+    border: 0;
+    background: var(--ce-titlebar-bg);
+    box-shadow: none;
   }
 
   .footer .copyright,
@@ -459,24 +532,13 @@
 
 @media (max-width: 640px) {
   @container ce-theme style(--ce-layout-profile: desktop-window) {
-    .footer {
-      overflow-x: auto;
-      justify-content: flex-start;
-    }
-
-    .footer nav ul {
-      flex-wrap: nowrap;
-    }
-
-    .footer nav ul li .footerLink {
-      min-width: 66px;
-      padding: 0 8px;
-      font-size: 0.7rem;
+    .footer .startMenu {
+      left: 0;
+      width: min(250px, calc(100vw - 8px));
     }
 
     .footer .copyright {
-      display: flex;
-      margin-left: 4px;
+      margin-left: auto;
     }
   }
 }

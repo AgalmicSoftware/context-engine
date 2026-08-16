@@ -1299,28 +1299,34 @@ $modal-muted: var(--ce-panel-text-muted);
 
   .toggleHeader {
     gap: 8px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+  }
+
+  .toggleHeader .sectionTitle {
+    flex-shrink: 0;
   }
 
   .toggleHeaderAside {
+    display: flex;
+    flex: 1 1 auto;
     gap: 6px;
-    margin-left: auto;
-    display: contents;
+    margin-left: 0;
+    min-width: 0;
   }
 
+  .toggleHeader > .toggleIcon,
   .toggleHeaderAside .toggleIcon {
-    order: 2;
     margin-left: auto;
   }
 
   .recognitionSummary {
-    order: 3;
     display: flex;
-    flex: 1 0 100%;
+    flex: 0 1 auto;
     justify-content: flex-start;
     gap: 0;
-    margin-top: 10px;
-    overflow: visible;
+    margin-top: 0;
+    overflow: hidden;
   }
 
   .recognitionSummaryLogo {
@@ -1491,5 +1497,121 @@ $modal-muted: var(--ce-panel-text-muted);
 @media (max-width: 519px) {
   .useCaseGrid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Classic 95 uses the locally bundled Tahoma face and a deliberately small
+ * set of native-looking raised controls. Keep this after the responsive rules
+ * so the desktop-window profile remains coherent at every viewport size. */
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  .aboutPageContainer {
+    font-family: var(--ce-font-body);
+  }
+
+  .mainTitle,
+  .tagline,
+  .heroActions,
+  .heroLinks {
+    font-family: var(--ce-font-body);
+  }
+
+  .heroActions {
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .heroLinks {
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .heroPrimaryButton,
+  .tertiaryLink,
+  .titleRepoLink {
+    border: 2px solid;
+    border-color: var(--ce-border-raised);
+    border-radius: 0;
+    background: var(--ce-control-face);
+    box-shadow: var(--ce-shadow-raised);
+    color: var(--ce-control-text);
+    font-family: var(--ce-font-body);
+    letter-spacing: 0;
+    text-decoration: none;
+    transform: none;
+    transition: none;
+  }
+
+  .heroPrimaryButton {
+    min-width: 148px;
+    min-height: 48px;
+    padding: 0 22px;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  .heroPrimaryButton.primaryButton {
+    background: var(--ce-titlebar-bg);
+    color: var(--ce-titlebar-text);
+  }
+
+  .tertiaryLink {
+    min-width: 108px;
+    min-height: 34px;
+    padding: 0 14px;
+    font-size: 0.88rem;
+    font-weight: 400;
+  }
+
+  .titleRepoLink {
+    width: 64px;
+    height: 44px;
+    background: var(--ce-control-face);
+    font-size: 1.45rem;
+  }
+
+  .heroPrimaryButton:hover,
+  .heroPrimaryButton:focus-visible,
+  .tertiaryLink:hover,
+  .tertiaryLink:focus-visible,
+  .titleRepoLink:hover,
+  .titleRepoLink:focus-visible {
+    border-color: var(--ce-border-raised);
+    background: var(--ce-surface-alt);
+    box-shadow: var(--ce-shadow-raised);
+    color: var(--ce-control-text);
+    outline: 1px dotted var(--ce-control-text);
+    outline-offset: -5px;
+    transform: none;
+  }
+
+  .heroPrimaryButton.primaryButton:hover,
+  .heroPrimaryButton.primaryButton:focus-visible {
+    background: var(--ce-titlebar-bg);
+    color: var(--ce-titlebar-text);
+    outline-color: var(--ce-titlebar-text);
+  }
+
+  .heroPrimaryButton:active,
+  .tertiaryLink:active,
+  .titleRepoLink:active {
+    border-color: var(--ce-border-inset);
+    box-shadow: var(--ce-shadow-pressed);
+    transform: translate(1px, 1px);
+  }
+
+  @media (max-width: 640px) {
+    .heroActions {
+      flex-direction: row;
+      flex-wrap: wrap;
+    }
+
+    .heroPrimaryButton {
+      flex: 1 1 180px;
+      width: auto;
+    }
+
+    .tertiaryLink {
+      flex: 1 1 108px;
+    }
   }
 }

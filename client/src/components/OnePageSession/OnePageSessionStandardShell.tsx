@@ -400,7 +400,9 @@ export default function OnePageSessionStandardShell({
           className={`${styles.sectionContainer} ${styles.questionsSectionContainer}`}
           ref={questionsSectionRef}
         >
-          <div className={`${styles.miniSectionContent} ${styles.miniSectionContentNoHeader}`}>
+          <div
+            className={`${styles.miniSectionContent} ${styles.miniSectionContentNoHeader} ${styles.questionsSectionContent}`}
+          >
             <Suspense fallback={<LazyFallback label="Loading..." minHeight="20vh" />}>
               <MemoSurveyPage
                 miniMode={true}

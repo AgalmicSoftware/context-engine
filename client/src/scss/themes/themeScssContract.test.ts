@@ -33,8 +33,10 @@ describe('runtime SCSS theme contract', () => {
     expect(result.css).toContain('--ce-canvas: #008080');
     expect(result.css).toContain('--ce-layout-profile: standard-app');
     expect(result.css).toContain('--ce-layout-profile: desktop-window');
-    expect(result.css).toContain('--ce-welcome-slide-mode: fluid');
-    expect(result.css).toContain('--ce-welcome-slide-mode: fixed-window');
+    expect(result.css).toMatch(
+      /:root\[data-ce-theme=context-engine\]\s*{[\s\S]*?--ce-welcome-slide-mode: fixed-window;/,
+    );
+    expect(result.css).toMatch(/:root\[data-ce-theme=classic-95\]\s*{[\s\S]*?--ce-welcome-slide-mode: fixed-window;/);
     expect(result.css).toContain('--ce-border-raised: #ffffff #404040 #404040 #ffffff');
     expect(result.css).toContain('--ce-action-submit: #000080');
     expect(result.css).toContain('--ce-nav-tab-inactive: #c0c0c0');
@@ -48,9 +50,11 @@ describe('runtime SCSS theme contract', () => {
     expect(result.css).toContain('--ce-recognition-logo-border: transparent');
     expect(result.css).toContain('--ce-recognition-logo-backing: var(--ce-status-info-text)');
     expect(result.css).toContain('--ce-recognition-logo-border: var(--ce-status-info)');
-    expect(result.css).toContain('--ce-welcome-artwork-blend-soft: screen');
-    expect(result.css).toContain('--ce-welcome-artwork-blend-intense: screen');
-    expect(result.css).toContain('--ce-welcome-artwork-blend-cutout: screen');
+    expect(result.css).toContain('--ce-welcome-artwork-blend-soft: normal');
+    expect(result.css).toContain('--ce-welcome-artwork-blend-intense: normal');
+    expect(result.css).toContain('--ce-welcome-artwork-blend-cutout: normal');
+    expect(result.css).toContain('--ce-welcome-artwork-detail-opacity-scale: 0.68');
+    expect(result.css).toContain('--ce-welcome-artwork-detail-filter: grayscale(0.35) contrast(1.12)');
     expect(result.css).toContain('--ce-welcome-artwork-backdrop: linear-gradient(90deg, #5b8cff');
     expect(result.css).toContain('--ce-shadow-neumorphic-dark: #404040');
     expect(result.css).toContain('--ce-tool-card-border: var(--ce-border-raised)');
@@ -88,6 +92,31 @@ describe('runtime SCSS theme contract', () => {
   test('the document root exposes the semantic theme style-query container', () => {
     const source = fs.readFileSync(path.resolve(scssDir, 'assets/css/contextEngine.scss'), 'utf8');
     expect(source).toMatch(/html\s*{[\s\S]*?container-name:\s*ce-theme;/);
+  });
+
+  test('Classic 95 self-hosts Tahoma and uses it for session question prompts', () => {
+    const globalSource = fs.readFileSync(path.resolve(scssDir, 'assets/css/contextEngine.scss'), 'utf8');
+    const classicThemeSource = fs.readFileSync(path.resolve(__dirname, '_classic-95.scss'), 'utf8');
+    const surveyToolSource = fs.readFileSync(
+      path.resolve(scssDir, 'components/SurveyTool/SurveyTool.module.scss'),
+      'utf8',
+    );
+    const fontDirectory = path.resolve(scssDir, 'assets/fonts/classic-95');
+
+    expect(globalSource).toMatch(
+      /@font-face\s*{[\s\S]*?font-family:\s*'CE Tahoma';[\s\S]*?wine-tahoma-regular\.ttf/,
+    );
+    expect(globalSource).toMatch(
+      /@font-face\s*{[\s\S]*?font-family:\s*'CE Tahoma';[\s\S]*?wine-tahoma-bold\.ttf/,
+    );
+    expect(classicThemeSource).toMatch(/font-body:\s*\(\s*'CE Tahoma'/);
+    expect(classicThemeSource).toMatch(/font-ui:\s*\(\s*'CE Tahoma'/);
+    expect(classicThemeSource).toMatch(/font-button:\s*\(\s*'CE Tahoma'/);
+    expect(surveyToolSource).toMatch(
+      /@container ce-theme style\(--ce-layout-profile: desktop-window\)[\s\S]*?\.pileCardHeader\s*{[\s\S]*?font-family:\s*var\(--ce-font-body\);/,
+    );
+    expect(fs.existsSync(path.join(fontDirectory, 'wine-tahoma-regular.ttf'))).toBe(true);
+    expect(fs.existsSync(path.join(fontDirectory, 'wine-tahoma-bold.ttf'))).toBe(true);
   });
 
   test.each(tokenOnlyStylesheets)('%s contains no raw color literals', (filename) => {

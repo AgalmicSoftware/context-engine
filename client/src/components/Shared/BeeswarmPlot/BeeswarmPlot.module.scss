@@ -256,6 +256,12 @@ $card-bg: var(--ce-card-bg);
   text-align: center;
 }
 
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  .tooltipResponseSegmentUnsure {
+    background: var(--ce-status-warning);
+  }
+}
+
 @media (max-width: 768px) {
   .hoverTooltip {
     width: min(320px, calc(100% - 24px));

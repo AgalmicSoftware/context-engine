@@ -74,6 +74,7 @@ describe('OnePageSessionGroupsSection authority routing', () => {
     render(<OnePageSessionGroupsSection {...props} />);
 
     expect(screen.getByTestId('worker-groups-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('ce-session-groups-toggle')).toBeInTheDocument();
     expect(screen.getByText('Groups', { selector: 'span' })).toBeInTheDocument();
     expect(screen.queryByText('SBTs', { selector: 'span' })).not.toBeInTheDocument();
     expect(screen.queryByTestId('sbt-groups-page')).not.toBeInTheDocument();

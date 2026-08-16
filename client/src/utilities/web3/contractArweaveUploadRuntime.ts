@@ -18,6 +18,8 @@ type SignerLike = {
 };
 type SessionConfigFields = {
   networkChainId?: unknown;
+  sessionId?: unknown;
+  sessionIdHex?: unknown;
   slug?: unknown;
 };
 type ErrorMessageSource = {
@@ -37,6 +39,7 @@ type BuildArweaveUploadBootstrapAuthResult = {
   address: string;
   message: string;
   signature: string;
+  sessionId?: string;
   sessionSlug: string;
 };
 type RetryOptions = {
@@ -68,6 +71,7 @@ export const buildArweaveUploadBootstrapAuth = async ({
   if (!signerLike) return null;
   const sessionConfigFields = asSessionConfigFields(sessionConfig);
   const slug = normalizeSessionSlug(sessionSlug || sessionConfigFields.slug || '');
+  const sessionId = String(sessionConfigFields.sessionIdHex || sessionConfigFields.sessionId || '').trim();
   let signerAddress = '';
   try {
     signerAddress = await signerLike.getAddress();
@@ -93,6 +97,7 @@ export const buildArweaveUploadBootstrapAuth = async ({
     body: JSON.stringify({
       address: signerAddress,
       sessionSlug: slug,
+      ...(sessionId ? { sessionId } : {}),
     }),
   });
   const nonceData = (await nonceResp.json().catch(() => ({}))) as NonceResponseBody;
@@ -116,6 +121,7 @@ export const buildArweaveUploadBootstrapAuth = async ({
     address: signerAddress,
     message,
     signature,
+    ...(sessionId ? { sessionId } : {}),
     sessionSlug: slug,
   };
 };

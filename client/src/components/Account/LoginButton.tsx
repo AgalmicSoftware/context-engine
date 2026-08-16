@@ -11,7 +11,8 @@ import { Button } from 'reactstrap';
 import '../../assets/css/contextEngine.scss';
 import styles from './Account.module.scss';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faKey, faSpinner } from '@fortawesome/free-solid-svg-icons';
+import { faSpinner } from '@fortawesome/free-solid-svg-icons';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 const log = createLogger('account');
 
@@ -36,8 +37,13 @@ class LoginButton extends Component<LoginButtonProps> {
 
     return (
       <div className={styles.navConnectContainer}>
-        <Button color="none" onClick={this.openLoginModal} className={styles.navConnectButton} disabled={isBusy}>
-          {!isBusy && <FontAwesomeIcon className={styles.classicLoginKey} icon={faKey} aria-hidden="true" />}
+        <Button
+          color="none"
+          onClick={this.openLoginModal}
+          className={styles.navConnectButton}
+          disabled={isBusy}
+          data-testid={E2E_TESTIDS.ACCOUNT_LOGIN_BUTTON}
+        >
           <h1 className={styles.loginPromptText}>
             {isBusy ? <FontAwesomeIcon className={styles.loginIcon} icon={faSpinner} pulse /> : ' LOG IN '}
           </h1>

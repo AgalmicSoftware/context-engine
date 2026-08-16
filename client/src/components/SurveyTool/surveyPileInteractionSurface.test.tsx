@@ -386,6 +386,30 @@ describe('surveyPileInteractionSurface', () => {
     expect(toggleListeningPanel).toHaveBeenCalledTimes(1);
   });
 
+  it('marks every icon-only pile toolbar button as frameless across app themes', () => {
+    const tree = renderPileInteractionSurface({
+      ...buildBaseProps(),
+      pileQuestions: [{ id: 'q1', prompt: 'Q1' }],
+      showClearPendingButton: true,
+    });
+    const controlsNode = findNodeByClassName(tree, 'pileControls');
+    const isIconToolbarButton = (node: unknown): boolean =>
+      isElementNode(node) &&
+      node.type === 'button' &&
+      ['pileActionMenuToggle', 'actionButton', 'pileNavArrow', 'pileIconButton'].some((className) =>
+        nodeHasClassName(node, className),
+      );
+
+    const iconButtonCount = countElements(controlsNode, isIconToolbarButton);
+    const framelessIconButtonCount = countElements(
+      controlsNode,
+      (node) => isIconToolbarButton(node) && isElementNode(node) && node.props['data-ce-control-appearance'] === 'frameless',
+    );
+
+    expect(iconButtonCount).toBe(8);
+    expect(framelessIconButtonCount).toBe(iconButtonCount);
+  });
+
   it('leaves pile actions inline when the submit rail is inactive', () => {
     const tree = renderPileInteractionSurface({
       ...buildBaseProps(),

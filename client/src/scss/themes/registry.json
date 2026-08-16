@@ -4,12 +4,14 @@
     {
       "id": "context-engine",
       "label": "Context Engine",
-      "colorScheme": "dark"
+      "colorScheme": "dark",
+      "layoutProfile": "standard-app"
     },
     {
       "id": "classic-95",
       "label": "Classic 95",
-      "colorScheme": "light"
+      "colorScheme": "light",
+      "layoutProfile": "desktop-window"
     }
   ]
 }

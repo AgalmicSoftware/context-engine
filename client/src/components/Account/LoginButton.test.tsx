@@ -28,9 +28,11 @@ describe('LoginButton', () => {
     );
 
     expect(container.querySelector('.navConnectContainer')).toBeInTheDocument();
+    expect(screen.getByTestId('ce-account-login-button')).toBe(screen.getByRole('button', { name: /log in/i }));
     expect(screen.getByRole('button', { name: /log in/i })).toHaveClass('navConnectButton');
     expect(screen.getByText(/log in/i)).toHaveClass('loginPromptText');
     expect(container.querySelector('.loginIcons')).toBeInTheDocument();
+    expect(container.querySelector('svg')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /log in/i }));
 
@@ -54,8 +56,10 @@ describe('LoginButton', () => {
     expect(launchAccountModal).not.toHaveBeenCalled();
   });
 
-  it('keeps classic login geometry on the shared responsive breakpoints', () => {
-    const classicLoginStyles = accountStylesheet.slice(accountStylesheet.indexOf('.classicLoginKey'));
+  it('keeps classic login geometry and uses the theme button face without a key icon', () => {
+    const classicLoginStyles = accountStylesheet.slice(
+      accountStylesheet.indexOf('@container ce-theme style(--ce-layout-profile: desktop-window)'),
+    );
 
     expect(accountStylesheet).toMatch(
       /@media \(min-width:\s*466px\) and \(max-width:\s*768px\)[\s\S]*?\.navConnectButton\s*{[\s\S]*?min-height:\s*80px !important;/,
@@ -64,6 +68,10 @@ describe('LoginButton', () => {
     expect(classicLoginStyles).not.toContain('min-height: 46px !important;');
     expect(classicLoginStyles).not.toContain('min-width: 116px !important;');
     expect(classicLoginStyles).not.toContain('min-height: 40px !important;');
+    expect(classicLoginStyles).not.toContain('.classicLoginKey');
+    expect(classicLoginStyles).toMatch(
+      /\.loginPromptText\s*\{[\s\S]*?font-family:\s*var\(--ce-font-button\);/,
+    );
     expect(classicLoginStyles).not.toMatch(/\.loginPromptText\s*{[\s\S]*?font-size:\s*(?:1rem|0\.88rem);/);
   });
 });

@@ -103,8 +103,13 @@ describe('arweaveClient.uploadDataToArweave fallback routing', () => {
 
   it('normalizes explicit worker endpoint URLs before upload', async () => {
     fetchWorkerWithAuth.mockResolvedValueOnce(jsonResp(200, { id: 'tx-explicit' }));
+    const sessionConfig = {
+      slug: 'selected',
+      sessionId: '0x22222222222222222222222222222222',
+    };
 
     const txId = await arweaveClient.uploadDataToArweave({ ok: true }, 'json', {
+      sessionConfig,
       sessionSlug: 'selected',
       workerUrl: 'https://selected.worker.example.test/arweave/upload',
     });
@@ -112,6 +117,9 @@ describe('arweaveClient.uploadDataToArweave fallback routing', () => {
     expect(txId).toBe('tx-explicit');
     expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
     expect(String(fetchWorkerWithAuth.mock.calls[0][0])).toBe('https://selected.worker.example.test/arweave/upload');
+    expect(fetchWorkerWithAuth.mock.calls[0][2]).toEqual(
+      expect.objectContaining({ sessionConfig, sessionSlug: 'selected' }),
+    );
     expect(resolveCorsProxyUrl).not.toHaveBeenCalled();
   });
 

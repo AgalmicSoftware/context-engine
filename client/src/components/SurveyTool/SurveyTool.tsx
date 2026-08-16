@@ -409,6 +409,7 @@ const renderSurveyToolContent = ({
         sessionConfig={props.sessionConfig}
         ensureLightSbtUniverse={props.ensureLightSbtUniverse}
         hideEmbeddedDebugUi={props.hideEmbeddedDebugUi}
+        embeddedSessionToolbar={Boolean(props.hideEmbeddedDebugUi && props.sessionSlugPinned)}
       />
       <React.Suspense fallback={null}>
         <SurveyResults

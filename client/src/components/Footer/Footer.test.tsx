@@ -5,10 +5,11 @@ import path from 'path';
 import React from 'react';
 import { Provider } from 'react-redux';
 import { createStore } from 'redux';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 
 import Footer from './Footer';
 import styles from './Footer.module.scss';
+import { applyResolvedTheme } from '../../utilities/ui/themeRuntime';
 
 jest.mock('../../actions/sessionStateActions.js', () => ({
   changeFocusedTab: jest.fn(() => ({ type: 'CHANGE_FOCUSED_TAB' })),
@@ -36,6 +37,10 @@ const renderFooter = ({ flowAtDocumentEnd = false }: { flowAtDocumentEnd?: boole
 const footerStylesheet = fs.readFileSync(path.join(__dirname, 'Footer.module.scss'), 'utf8');
 
 describe('Footer', () => {
+  afterEach(() => {
+    applyResolvedTheme({ id: 'context-engine', source: 'default' });
+  });
+
   it('renders a NEW link to /new', () => {
     renderFooter();
 
@@ -93,10 +98,10 @@ describe('Footer', () => {
 
   it('uses full-width readable footer nav links across the mobile breakpoints', () => {
     [
-      { minWidth: 0, maxWidth: 319, columns: 2, fontSize: 'clamp\\(0\\.9rem, 5\\.4vw, 1\\.08rem\\)' },
-      { minWidth: 320, maxWidth: 465, columns: 4, fontSize: 'clamp\\(0\\.86rem, 3\\.05vw, 1\\.08rem\\)' },
-      { minWidth: 466, maxWidth: 768, columns: 4, fontSize: 'clamp\\(1rem, 2\\.4vw, 1\\.22rem\\)' },
-    ].forEach(({ minWidth, maxWidth, columns, fontSize }) => {
+      { minWidth: 0, maxWidth: 319, fontSize: 'clamp\\(0\\.56rem, 2\\.75vw, 0\\.68rem\\)' },
+      { minWidth: 320, maxWidth: 465, fontSize: 'clamp\\(0\\.62rem, 2\\.45vw, 0\\.78rem\\)' },
+      { minWidth: 466, maxWidth: 768, fontSize: 'clamp\\(0\\.9rem, 2\\.25vw, 1\\.08rem\\)' },
+    ].forEach(({ minWidth, maxWidth, fontSize }) => {
       const breakpointRule = new RegExp(
         `@media \\(min-width: ${minWidth}px\\) and \\(max-width: ${maxWidth}px\\) \\{[\\s\\S]*?\\.footer \\{[\\s\\S]*?nav \\{[\\s\\S]*?width: 100%;[\\s\\S]*?ul \\{[\\s\\S]*?display: grid;[\\s\\S]*?grid-template-columns: repeat\\(${columns}, minmax\\(0, 1fr\\)\\);[\\s\\S]*?justify-content: stretch;[\\s\\S]*?width: 100%;[\\s\\S]*?li \\{[\\s\\S]*?width: 100%;[\\s\\S]*?li \\.footerLink \\{[\\s\\S]*?display: flex;[\\s\\S]*?font-size: ${fontSize};[\\s\\S]*?justify-content: center;[\\s\\S]*?width: 100%;`,
       );
@@ -156,28 +161,70 @@ describe('Footer', () => {
     expect(classicTheme).toContain('footer-link-font-size: 0.78rem,');
   });
 
-  it('docks the classic footer to the viewport bottom without a decorative start tile', () => {
+  it('keeps the classic taskbar at the document end instead of overlaying page content', () => {
     expect(footerStylesheet).toContain('@container ce-theme style(--ce-layout-profile: desktop-window)');
     expect(footerStylesheet).not.toContain('data-ce-theme');
     expect(footerStylesheet).toMatch(
-      /\.footer\s*{[\s\S]*?position:\s*fixed;[\s\S]*?right:\s*2%;[\s\S]*?bottom:\s*0;[\s\S]*?left:\s*2%;[\s\S]*?background:\s*var\(--ce-control-face\);/,
+      /:global\(#root\)\s*{[\s\S]*?display:\s*flex;[\s\S]*?flex-direction:\s*column;[\s\S]*?min-height:\s*100vh;/,
     );
-    expect(footerStylesheet).toMatch(/:global\(body\)\s*{[\s\S]*?padding-bottom:\s*42px;/);
-    expect(footerStylesheet).not.toMatch(/\.footer nav::before\s*{/);
+    expect(footerStylesheet).toMatch(
+      /\.footer\s*{[\s\S]*?position:\s*relative;[\s\S]*?width:\s*100%;[\s\S]*?margin-top:\s*auto;[\s\S]*?background:\s*var\(--ce-control-face\);/,
+    );
+    expect(footerStylesheet).not.toMatch(/@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)[\s\S]*?position:\s*fixed;/);
+    expect(footerStylesheet).not.toMatch(/:global\(body\)\s*{[\s\S]*?padding-bottom:\s*42px;/);
   });
 
-  it('places the session footer at the document end without reserving fixed-taskbar space', () => {
+  it('places the session footer at the document end with the same non-overlaying classic taskbar', () => {
     const { container } = renderFooter({ flowAtDocumentEnd: true });
     const footer = container.querySelector('footer');
 
     expect(footer).toHaveAttribute('data-ce-footer-placement', 'document-end');
     expect(footer).toHaveClass(styles.footerDocumentEnd);
     expect(footerStylesheet).toMatch(
-      /:global\(body\):has\(\.footerDocumentEnd\)\s*{[\s\S]*?padding-bottom:\s*0;/,
+      /\.footer\.footerDocumentEnd\s*{[\s\S]*?position:\s*relative;[\s\S]*?width:\s*100%;[\s\S]*?margin-top:\s*auto;/,
     );
+  });
+
+  it('moves classic footer routes behind an accessible Start menu while preserving default navigation', () => {
+    applyResolvedTheme({ id: 'classic-95', source: 'user' });
+    renderFooter();
+
+    const startButton = screen.getByTestId('ce-footer-start-button');
+    const startMenu = screen.getByTestId('ce-footer-start-menu');
+
+    expect(startButton).toBeVisible();
+    expect(startButton).toHaveAccessibleName('Open Start menu');
+    expect(startButton).not.toHaveTextContent('Start');
+    expect(startButton).toHaveAttribute('aria-expanded', 'false');
+    expect(startMenu).not.toBeVisible();
+
     expect(footerStylesheet).toMatch(
-      /\.footer\.footerDocumentEnd\s*{[\s\S]*?position:\s*static;[\s\S]*?bottom:\s*auto;[\s\S]*?z-index:\s*auto;[\s\S]*?width:\s*96%;[\s\S]*?margin:\s*18px 2% 0;/,
+      /\.startButton\s*{[\s\S]*?width:\s*36px;[\s\S]*?min-width:\s*36px;[\s\S]*?padding:\s*0;/,
     );
+
+    fireEvent.click(startButton);
+
+    expect(startButton).toHaveAttribute('aria-expanded', 'true');
+    expect(startMenu).toBeVisible();
+    expect(screen.getByRole('menuitem', { name: 'NEW' })).toHaveAttribute('href', '/new');
+    expect(screen.getByRole('menuitem', { name: 'ABOUT' })).toHaveAttribute('href', '/about');
+    expect(screen.getByRole('menuitem', { name: 'POSTS' })).toHaveAttribute('href', '/posts');
+    expect(screen.getByRole('menuitem', { name: 'SETTINGS' })).toBeVisible();
+    expect(screen.getByRole('menuitem', { name: 'DOCS' })).toHaveAttribute('href', '/docs');
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(startButton).toHaveAttribute('aria-expanded', 'false');
+    expect(startMenu).not.toBeVisible();
+    expect(startButton).toHaveFocus();
+  });
+
+  it('keeps the default Context Engine footer links visible without exposing the Start control', () => {
+    renderFooter();
+
+    expect(screen.getByTestId('ce-footer-start-button')).not.toBeVisible();
+    expect(screen.getByTestId('ce-footer-start-menu')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'NEW' })).toHaveAttribute('href', '/new');
   });
 
   it('reduces classic footer branding to a larger GitHub icon without changing the default attribution', () => {

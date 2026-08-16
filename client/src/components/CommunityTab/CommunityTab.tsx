@@ -1856,7 +1856,13 @@ class CommunityTab extends Component<any, any> {
     const points = this._getQuestionSwarmPoints();
     return (
       <section className={styles.beeswarmSection} data-testid="ce-community-beeswarm-section">
-        <BeeswarmPlot points={points} domain={COMMUNITY_BEESWARM_DOMAIN} height={220} showIdleSummary={false} />
+        <BeeswarmPlot
+          points={points}
+          className={styles.beeswarmPlot}
+          domain={COMMUNITY_BEESWARM_DOMAIN}
+          height={220}
+          showIdleSummary={false}
+        />
       </section>
     );
   }

@@ -69,6 +69,10 @@ type RestoreOptions = {
   requireSigner?: boolean;
 };
 
+type UnlockOptions = {
+  selectCredential?: boolean;
+};
+
 type PasskeyWalletClientDeps = {
   config?: PasskeyWalletConfig;
   storage?: PasskeyWalletStorage;
@@ -277,20 +281,30 @@ export class PasskeyEoaWalletClient {
     }
   }
 
-  async unlockWallet(): Promise<HexString> {
+  async unlockWallet(options: UnlockOptions = {}): Promise<HexString> {
     this.transitionInProgress = true;
     let privateKey: HexString | null = null;
     try {
       if (this.config.walletKeyMode === 'passkey-derived') {
         const saltBytes = await getPasskeyDerivedPrfSalt(this.config);
+        const selectCredential = options.selectCredential === true;
         const { credential, prfOutput } = await authenticatePasskeyCredential({
           config: this.config,
+          credentialId: selectCredential ? undefined : storedRecord?.credentialId,
           salt: saltBytes,
           credentials: this.credentials,
         });
         const credentialId = bufferToBase64URL(credential.rawId);
+        // Regression guard: a returning wallet must target its saved credential;
+        // omitting allowCredentials reopens the account chooser during mint/sign.
+        if (!selectCredential && storedRecord && credentialId !== storedRecord.credentialId) {
+          throw new Error('Passkey assertion does not match the stored wallet credential.');
+        }
         privateKey = await deriveEoaPrivateKeyFromPrf({ prfOutput, config: this.config });
         const address = getAddressForPrivateKey(privateKey);
+        if (!selectCredential && storedRecord && address.toLowerCase() !== storedRecord.evmAddress.toLowerCase()) {
+          throw new Error('Passkey-derived wallet address does not match stored metadata.');
+        }
         const record = createPasskeyDerivedWalletRecord({
           config: this.config,
           credentialId,
@@ -590,7 +604,8 @@ export const resetPasskeyWalletClientForTests = (client: PasskeyEoaWalletClient 
 export const setPasskeyWalletChain = (chainOrId: unknown): ChainLike => getPasskeyWalletClient().setChain(chainOrId);
 export const getPasskeyWalletChain = (): ChainLike => getPasskeyWalletClient().getChain();
 export const createPasskeyWallet = (): Promise<HexString> => getPasskeyWalletClient().createWallet();
-export const unlockPasskeyWallet = (): Promise<HexString> => getPasskeyWalletClient().unlockWallet();
+export const unlockPasskeyWallet = (options: UnlockOptions = {}): Promise<HexString> =>
+  getPasskeyWalletClient().unlockWallet(options);
 export const restorePasskeyWalletSession = (options: RestoreOptions = {}): Promise<HexString | null> =>
   getPasskeyWalletClient().restoreSession(options);
 export const lockPasskeyWallet = (): Promise<void> => getPasskeyWalletClient().lock();

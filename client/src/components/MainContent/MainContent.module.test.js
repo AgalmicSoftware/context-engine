@@ -47,26 +47,41 @@ describe('Main welcome walkthrough styles', () => {
     expect(scss).toContain('@container ce-theme style(--ce-layout-profile: desktop-window)');
     expect(scss).not.toContain('data-ce-theme');
     expect(scss).toMatch(
-      /\.mainTabsCard\s*{[\s\S]*?border:\s*3px solid;[\s\S]*?background:\s*var\(--ce-surface-raised\);[\s\S]*?box-shadow:\s*2px 2px 0 var\(--ce-edge-dark\);/,
+      /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.mainTabsCard\s*{[\s\S]*?overflow:\s*visible;[\s\S]*?border:\s*3px solid;[\s\S]*?background:\s*var\(--ce-surface-raised\);[\s\S]*?box-shadow:\s*2px 2px 0 var\(--ce-edge-dark\);/,
     );
     expect(scss).toMatch(/\.mainTabsCardHeader\s*{[\s\S]*?background:\s*var\(--ce-titlebar-bg\);/);
     expect(scss).toMatch(
-      /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.mainAreaTabsAlt,[\s\S]*?#mainAreaTabs\s*{[\s\S]*?margin:\s*clamp\(18px,\s*5vh,\s*64px\) auto 16px;/,
+      /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.mainAreaTabsAlt,[\s\S]*?#mainAreaTabs\s*{[\s\S]*?margin:\s*clamp\(12px,\s*2\.5vh,\s*24px\) auto 16px;/,
     );
   });
 
-  it('keeps Classic 95 welcome arrows on one fixed window frame without changing the default deck', () => {
+  it('keeps welcome arrows on one fixed window frame across themes', () => {
     expect(scss).toContain('@container ce-theme style(--ce-welcome-slide-mode: fixed-window)');
     expect(scss).toMatch(
-      /@container ce-theme style\(--ce-welcome-slide-mode: fixed-window\)\s*{[\s\S]*?--ce-classic-welcome-frame-height:\s*var\([\s\S]*?--ce-main-welcome-frame-height,[\s\S]*?clamp\(340px,\s*48dvh,\s*440px\)[\s\S]*?height:\s*var\(--ce-classic-welcome-frame-height\);[\s\S]*?overflow:\s*hidden;/,
+      /@container ce-theme style\(--ce-welcome-slide-mode: fixed-window\)\s*{[\s\S]*?--ce-welcome-frame-height:\s*var\([\s\S]*?--ce-main-welcome-frame-height,[\s\S]*?clamp\(525px,\s*118vw,\s*600px\)[\s\S]*?height:\s*var\(--ce-welcome-frame-height\);[\s\S]*?overflow:\s*hidden;/,
     );
     expect(scss).toMatch(
-      /@container ce-theme style\(--ce-welcome-slide-mode: fixed-window\)\s*{[\s\S]*?\.onboardingControls\s*{[\s\S]*?flex:\s*0 0 var\(--ce-classic-welcome-controls-height\);[\s\S]*?height:\s*var\(--ce-classic-welcome-controls-height\);/,
+      /@container ce-theme style\(--ce-welcome-slide-mode: fixed-window\)\s*{[\s\S]*?\.onboardingControls\s*{[\s\S]*?flex:\s*0 0 var\(--ce-welcome-controls-height\);[\s\S]*?height:\s*var\(--ce-welcome-controls-height\);/,
     );
     expect(scss).toMatch(
       /@media \(max-width:\s*768px\)\s*{\s*@container ce-theme style\(--ce-welcome-slide-mode: fixed-window\)\s*{[\s\S]*?\.mainAreaTabsAlt,[\s\S]*?#mainAreaTabs\s*{\s*flex-basis:\s*auto;/,
     );
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?--ce-welcome-frame-height:\s*var\(--ce-main-welcome-frame-height,\s*clamp\(340px,\s*48dvh,\s*440px\)\);/,
+    );
     expect(scss).not.toContain('@container ce-theme style(--ce-welcome-slide-mode: fluid)');
+  });
+
+  it('renders both classic welcome arrow icons at full-opacity white', () => {
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.onboardingControls \.takeSurveyIcon\s*{[\s\S]*?color:\s*var\(--ce-text-inverse\);[\s\S]*?opacity:\s*1;/,
+    );
+  });
+
+  it('renders the classic final welcome action as a readable native control', () => {
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.onboardingControls > \.getStartedButton\s*{[\s\S]*?background:\s*var\(--ce-control-face\);[\s\S]*?border-color:\s*var\(--ce-border-raised\);[\s\S]*?color:\s*var\(--ce-control-text\);[\s\S]*?filter:\s*none !important;/,
+    );
   });
 
   it('spreads the classic home tabs evenly across the title bar', () => {
@@ -76,7 +91,12 @@ describe('Main welcome walkthrough styles', () => {
     expect(scss).toMatch(
       /\.mainTabsCardHeader :global\(\.nav-item\)\s*{[\s\S]*?display:\s*flex;[\s\S]*?justify-content:\s*center;[\s\S]*?width:\s*100%;/,
     );
-    expect(scss).toMatch(/\.mainTabsCardHeader :global\(\.nav-link\.active\)\s*{[\s\S]*?justify-content:\s*center;/);
+    expect(scss).toMatch(
+      /\.mainTabsCardHeader :global\(\.nav-link\.active\)\s*{[\s\S]*?justify-content:\s*center;[\s\S]*?font-family:\s*var\(--ce-font-ui\);[\s\S]*?font-size:\s*clamp\(0\.75rem,\s*2\.8vw,\s*1rem\);/,
+    );
+    expect(scss).toMatch(
+      /\.mainTabsCardHeader :global\(\.nav-link\.active > div\)\s*{[\s\S]*?max-width:\s*100%;[\s\S]*?font-size:\s*inherit\s*!important;[\s\S]*?white-space:\s*nowrap;/,
+    );
     expect(scss).not.toMatch(/\.nav-item:has\(\.nav-link\.active\)[\s\S]*?order:\s*-1;/);
   });
 

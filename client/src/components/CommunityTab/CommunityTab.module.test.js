@@ -52,6 +52,9 @@ describe('CommunityTab module styles', () => {
     expect(scss).toMatch(
       /\.communityTab \.beeswarmSection\s*{[\s\S]*?background:\s*var\(--ce-data-viz-surface\);/,
     );
+    expect(scss).toMatch(
+      /\.communityTab \.beeswarmPlot\s*{[\s\S]*?flex:\s*1 1 auto;[\s\S]*?min-height:\s*0;[\s\S]*?justify-content:\s*center;/,
+    );
   });
 
   it('keeps classic participant addresses readable on light rows', () => {
@@ -68,6 +71,20 @@ describe('CommunityTab module styles', () => {
     );
     expect(scss).toMatch(
       /\.communityTab \.leaderboardItem:hover\s*{[\s\S]*?background:\s*var\(--ce-surface-alt\);[\s\S]*?color:\s*var\(--ce-document-text\);/,
+    );
+  });
+
+  it('keeps the default stats and participant surfaces transparent', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'CommunityTab.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /^ {2}\.leaderboardSection \{[\s\S]*?^ {4}background:\s*transparent;[\s\S]*?^ {2}\}/m,
+    );
+    expect(scss).toMatch(
+      /^ {2}\.statsSection \{[\s\S]*?^ {4}background:\s*transparent;[\s\S]*?^ {2}\}/m,
+    );
+    expect(scss).toMatch(
+      /^ {2}\.leaderboardItem \{[\s\S]*?^ {4}background:\s*transparent;[\s\S]*?^ {2}\}/m,
     );
   });
 });

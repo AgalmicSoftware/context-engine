@@ -312,6 +312,30 @@ describe('AudioSurveyGenerator photo and extra source handling', () => {
     ).toHaveLength(0);
   });
 
+  it('embeds paste and upload controls at the trailing end of the Add URL field', async () => {
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+      />,
+    );
+
+    const urlInput = container.querySelector('input[placeholder="Add URL"]');
+    const urlControl = urlInput.parentElement;
+    const chooser = container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_IMAGE_CHOOSER}"]`);
+    const pasteButton = container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_IMAGE_PASTE}"]`);
+    const uploadButton = container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_IMAGE_UPLOAD}"]`);
+    const addButton = container.querySelector('button[title="Add URL"]');
+
+    expect(chooser.parentElement).toBe(urlControl);
+    expect(urlControl).toContainElement(pasteButton);
+    expect(urlControl).toContainElement(uploadButton);
+    expect(urlControl.lastElementChild).toBe(addButton);
+  });
+
   it('shows the title field only after an uploaded file source is queued', async () => {
     await renderSubject(
       <AudioSurveyGenerator

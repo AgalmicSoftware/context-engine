@@ -162,26 +162,19 @@ describe('DocsPage contract deep links', () => {
     );
   });
 
-  it('renders the user guide, session context, and no longer exposes the bundle or converters', async () => {
+  it('orders the guide, prompts, FAQ, and grouped session contracts without the external notice', async () => {
     render(<DocsPage activeSessionSlug="session-alpha" reduxActiveSessionSlug="" />);
 
     expect(screen.getByTestId('ce-page-docs-root')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Docs' })).toBeInTheDocument();
-    expect(screen.queryByText('Source & architecture')).not.toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: 'View Context Engine repository on GitHub' }),
-    ).toHaveAttribute('href', 'https://github.com/AgalmicSoftware/context-engine');
-    expect(
-      screen.queryByRole('link', { name: 'View Context Engine architecture on GitHub' }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('link', {
-        name: 'View the Context Engine contributing guide on GitHub',
-      }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('link', { name: 'View the Context Engine whitepaper on GitHub' }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'View Context Engine on GitHub' })).toHaveAttribute(
+      'href',
+      'https://github.com/AgalmicSoftware/context-engine',
+    );
+    expect(screen.getByRole('link', { name: 'View Context Engine on GitHub' })).toHaveAttribute('target', '_blank');
+    expect(screen.getByTestId('ce-docs-github-link')).toBe(
+      screen.getByRole('link', { name: 'View Context Engine on GitHub' }),
+    );
 
     const quickstartToggle = screen.getByRole('button', { name: 'Quickstart' });
     expect(quickstartToggle).toHaveAttribute('aria-expanded', 'true');
@@ -200,33 +193,19 @@ describe('DocsPage contract deep links', () => {
     expect(screen.getByRole('heading', { name: 'Open or create a session' })).toBeInTheDocument();
     expect(screen.getByText('<slug>')).toHaveProperty('tagName', 'CODE');
 
-    const guideToggle = screen.getByRole('button', { name: 'Session options guide' });
-    fireEvent.click(guideToggle);
-    expect(screen.getByText('networkChainId')).toHaveProperty('tagName', 'CODE');
-    expect(screen.getByText('questionResponses')).toHaveProperty('tagName', 'CODE');
-
-    const promptsToggle = screen.getByRole('button', { name: 'Prompts' });
-    const contractSessionSelector = screen.getByRole('combobox', { name: 'Session' });
-    expect(contractSessionSelector).toHaveValue('');
-    expect(screen.getByText('Choose a session to view its contract deployment details.')).toBeInTheDocument();
-    expect(screen.queryByTestId('ce-docs-session-context')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /smart contracts/i })).not.toBeInTheDocument();
-    expect(screen.queryByText(/Advanced\/external on-chain tools/i)).not.toBeInTheDocument();
-    expect(
-      Boolean(
-        promptsToggle.compareDocumentPosition(contractSessionSelector) & Node.DOCUMENT_POSITION_FOLLOWING,
-      ),
-    ).toBe(true);
-
-    fireEvent.change(contractSessionSelector, { target: { value: 'session-alpha' } });
     const sessionContext = await screen.findByTestId('ce-docs-session-context');
-    const contractsToggle = screen.getByRole('button', { name: /smart contracts/i });
     expect(sessionContext).toHaveTextContent(
       'Session: Session Alpha · Chain: Base Sepolia (84532)',
     );
-    expect(
-      Boolean(sessionContext.compareDocumentPosition(contractsToggle) & Node.DOCUMENT_POSITION_FOLLOWING),
-    ).toBe(true);
+    const promptsToggle = screen.getByRole('button', { name: 'Prompts' });
+    const faqToggle = screen.getByRole('button', { name: 'FAQ' });
+    const sessionContractsGroup = screen.getByTestId('ce-docs-session-contracts-group');
+    const contractsToggle = screen.getByRole('button', { name: /smart contracts/i });
+    expect(promptsToggle.compareDocumentPosition(faqToggle) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(faqToggle.compareDocumentPosition(sessionContractsGroup) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(sessionContractsGroup).toContainElement(sessionContext);
+    expect(sessionContractsGroup).toContainElement(contractsToggle);
+    expect(screen.queryByText(/Advanced\/external on-chain tools/i)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /\.json bundle/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^utils$/i })).not.toBeInTheDocument();
   });
@@ -379,11 +358,10 @@ describe('DocsPage contract deep links', () => {
 
     render(<DocsPage activeSessionSlug="demo-sh" reduxActiveSessionSlug="" />);
 
-    expect(screen.getByRole('combobox', { name: 'Session' })).toHaveValue('demo-sh');
     expect(screen.queryByText(/Advanced\/external on-chain tools/i)).not.toBeInTheDocument();
-    expect(await screen.findByTestId('ce-docs-session-context')).toHaveTextContent('Session: Worker Demo');
-    expect(screen.getByText('No contract addresses are published for this session.')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /smart contracts/i })).not.toBeInTheDocument();
+    expect(screen.getByTestId('ce-docs-session-contracts-group')).toContainElement(
+      screen.getByTestId('ce-docs-session-context'),
+    );
     expect(mockBuildContractViewerContracts).toHaveBeenLastCalledWith({
       sessionContracts: {},
       chainId: undefined,

@@ -7,8 +7,7 @@ import { buildFieldEncryptionWorkGroups } from './surveyToolSubmitPrepController
 import { processRatingEnvelopesForSubmit } from './surveyToolRatingEnvelopeSubmitController';
 import { buildAdditionalEncryptionAudienceState, buildAnswerEncryptionAudienceState } from './surveyQuestionsTypes';
 import { buildSurveyResponseStateArray } from './surveyToolHydrationFlow';
-import SurveyQuestionsFullQuestionResponseInput from './SurveyQuestionsFullQuestionResponseInput';
-import FullQuestionRatingInput from './FullQuestionRatingInput';
+import { SurveyQuestionsFullQuestionResponseInput } from './SurveyQuestionsFullQuestionResponseInput';
 import DeferredRatingSlider from './DeferredRatingSlider';
 import FullQuestionRatingInput from './FullQuestionRatingInput';
 import SurveyQuestionsFullQuestionResponseInput from './SurveyQuestionsFullQuestionResponseInput';
@@ -293,111 +292,34 @@ describe('SurveyTool rating encryption controller', () => {
   });
 
   it('clamps full-mode rating answers into the supported slider range and avoids duplicate id styling hooks', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
-    });
+    const withNumericString = renderResponseInput({ answerValue: '8' });
+    expect(withNumericString.type).toBe(DeferredRatingSlider);
+    expect(withNumericString.props.value).toBe(8);
+    expect(withNumericString.props.disabled).toBe(false);
+    expect(typeof withNumericString.props.onCommit).toBe('function');
+    expect(withNumericString.props.id).toBeUndefined();
 
-    const question = {
-      id: 'q1',
-      type: 'rating',
-      question: 'How strongly do you agree?',
-    };
+    const withOverflowValue = renderResponseInput({ answerValue: '18' });
+    expect(withOverflowValue.type).toBe(DeferredRatingSlider);
+    expect(withOverflowValue.props.value).toBe(10);
+    expect(withOverflowValue.props.id).toBeUndefined();
 
-    const withNumericString = {
-      answers: { q1: { value: '8', encrypted: false } },
-      additionalComments: { q1: { value: '', encrypted: false } },
-      importance: {},
-      conviction: {},
-    };
-    let fullQuestionCard = subject.renderQuestion(question, 0, withNumericString);
-    let ratingInput = renderFullQuestionResponseInput(fullQuestionCard);
-    expect(ratingInput.type).toBe(FullQuestionRatingInput);
-    expect(ratingInput.props.value).toBe(8);
-    expect(ratingInput.props.disabled).toBe(false);
-    expect(typeof ratingInput.props.onChange).toBe('function');
-    expect(typeof ratingInput.props.onChangeComplete).toBe('function');
-    expect(renderToStaticMarkup(ratingInput)).toContain('8');
-
-    const withOverflowValue = {
-      answers: { q1: { value: '18', encrypted: false } },
-      additionalComments: { q1: { value: '', encrypted: false } },
-      importance: {},
-      conviction: {},
-    };
-    fullQuestionCard = subject.renderQuestion(question, 0, withOverflowValue);
-    ratingInput = renderFullQuestionResponseInput(fullQuestionCard);
-    expect(ratingInput.type).toBe(FullQuestionRatingInput);
-    expect(ratingInput.props.value).toBe(10);
-    expect(renderToStaticMarkup(ratingInput)).toContain('10');
-
-    const withNonNumericValue = {
-      answers: { q1: { value: 'abc', encrypted: false } },
-      additionalComments: { q1: { value: '', encrypted: false } },
-      importance: {},
-      conviction: {},
-    };
-    fullQuestionCard = subject.renderQuestion(question, 0, withNonNumericValue);
-    ratingInput = renderFullQuestionResponseInput(fullQuestionCard);
-    expect(ratingInput.type).toBe(FullQuestionRatingInput);
-    expect(ratingInput.props.value).toBe(0);
-    expect(renderToStaticMarkup(ratingInput)).toContain('0');
+    const withNonNumericValue = renderResponseInput({ answerValue: 'abc' });
+    expect(withNonNumericValue.type).toBe(DeferredRatingSlider);
+    expect(withNonNumericValue.props.value).toBe(0);
+    expect(withNonNumericValue.props.id).toBeUndefined();
   });
 
-  it('persists keyboard-driven full-mode rating edits immediately', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
+  it('routes full-mode rating commits through the deferred parent update path', () => {
+    const onDeferredRatingCommit = jest.fn();
+    const ratingInput = renderResponseInput({
+      answerValue: 2,
+      onDeferredRatingCommit,
     });
 
-    subject.setState = (next, cb) => {
-      const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
-      subject.state = { ...subject.state, ...(patch || {}) };
-      if (typeof cb === 'function') cb();
-    };
-    subject.scheduleJsonPreviewUpdate = jest.fn();
-    subject.persistDraftSafely = jest.fn();
-    subject.getEffectiveRecipientsForQid = jest.fn(() => []);
-    subject.resolveFieldEncryptionAudience = (field) => field?.encryptionAudience || 'self';
-    subject.isQuestionLockedForResponse = () => false;
+    ratingInput.props.onCommit(6);
 
-    const question = {
-      id: 'q1',
-      type: 'rating',
-      question: 'How strongly do you agree?',
-    };
-
-    subject.state = {
-      ...subject.state,
-      questionPool: [question],
-      pileQuestions: [],
-      surveysResponseState: [
-        {
-          answers: { q1: { value: 2, encrypted: false, encryptionAudience: 'self' } },
-          additionalComments: {},
-          importance: {},
-          conviction: {},
-        },
-      ],
-    };
-
-    const fullQuestionCard = subject.renderQuestion(question, 0, subject.state.surveysResponseState[0]);
-    const ratingInput = renderFullQuestionResponseInput(fullQuestionCard);
-    expect(ratingInput.type).toBe(FullQuestionRatingInput);
-
-    ratingInput.props.onChange(6, { type: 'keydown' });
-
-    expect(subject.state.surveysResponseState[0].answers.q1.value).toBe(6);
-    expect(subject.scheduleJsonPreviewUpdate).toHaveBeenCalledTimes(1);
-    expect(subject.persistDraftSafely).toHaveBeenCalledTimes(1);
+    expect(onDeferredRatingCommit).toHaveBeenCalledWith(6);
   });
 
   it('uses the deferred slider wrapper for single-question rating cards', () => {

@@ -19,6 +19,14 @@ export type SurveyQuestionsSetState = (
 export type SurveyQuestionsTimer = ReturnType<typeof setTimeout>;
 export type SurveyQuestionsTimerRef = SurveyQuestionsTimer | null;
 type SurveyQuestionsRuntimeRecord = Record<string, unknown>;
+type SurveyQuestionsAudioInputWorkerPropsMemo = {
+  value: SurveyQuestionsRuntimeRecord;
+  sessionSlug: unknown;
+  sessionConfig: unknown;
+  account: unknown;
+  providerLike: unknown;
+  chainId: unknown;
+};
 export type SurveyQuestionsDraftParseCache = {
   key?: unknown;
   raw?: unknown;
@@ -171,6 +179,7 @@ export type SurveyQuestionsInstanceFields = {
   _maskedQuestionVisibilityMemoByPool: WeakMap<object, unknown>;
   // These property names survive minification in the SurveyQuestions chunk.
   _a: SurveyQuestionsRuntimeRecord | null;
+  _audioInputWorkerPropsMemo: SurveyQuestionsAudioInputWorkerPropsMemo | null;
   _q: Map<string, SurveyQuestionsRuntimeRecord>;
   _canDecryptOtherResponsesKey: string;
   _canDecryptOtherResponsesInFlight: SurveyQuestionsCanDecryptRun;
@@ -252,6 +261,7 @@ export const createSurveyQuestionsInstanceFields = (): SurveyQuestionsInstanceFi
   _lockedQuestionGateDetailsMemo: { key: '', poolRef: null, poolVersion: 0, value: [] },
   _maskedQuestionVisibilityMemoByPool: new WeakMap(),
   _a: null,
+  _audioInputWorkerPropsMemo: null,
   _q: new Map(),
   _canDecryptOtherResponsesKey: '',
   _canDecryptOtherResponsesInFlight: null,

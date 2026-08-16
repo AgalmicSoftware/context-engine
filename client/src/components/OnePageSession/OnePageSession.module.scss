@@ -37,10 +37,15 @@
   color: var(--ce-session-chrome-contrast);
   text-align: center;
   font-size: 1rem;
-  margin-bottom: 5px !important;
+  max-height: 5rem;
+  margin-bottom: 5px;
+  overflow: hidden;
   position: relative;
   z-index: 40;
-  transition: opacity 0.4s ease;
+  transition:
+    opacity 0.4s ease,
+    max-height 0.4s ease,
+    margin-bottom 0.4s ease;
   animation: fadeOutTitle 0.6s ease 5s forwards;
 
   &:hover,
@@ -48,6 +53,8 @@
   &:active {
     animation: none;
     opacity: 1;
+    max-height: 5rem;
+    margin-bottom: 5px;
   }
 }
 
@@ -296,6 +303,9 @@
 .workerGroupCard {
   box-sizing: border-box;
   align-self: stretch;
+  // The image and Join action already define the interactive card; avoid a
+  // second outline around the session-only group tile.
+  border: 0;
   cursor: default;
 
   // SBTPage's mini card supplies the canonical card, image, title, and status-dot
@@ -357,12 +367,20 @@
     border-color 0.18s ease,
     transform 0.18s ease;
 
-  &:hover,
-  &:focus-visible {
+  &:hover {
     border-color: color-mix(in srgb, var(--ce-action-accent) 50%, transparent);
     background: color-mix(in srgb, var(--ce-action-accent) 14%, transparent);
     color: var(--ce-action-accent);
     outline: none;
+    transform: translateY(-1px);
+  }
+
+  &:focus-visible {
+    border-color: color-mix(in srgb, var(--ce-action-accent) 50%, transparent);
+    background: color-mix(in srgb, var(--ce-action-accent) 14%, transparent);
+    color: var(--ce-action-accent);
+    outline: 2px dotted var(--ce-focus-ring);
+    outline-offset: 2px;
     transform: translateY(-1px);
   }
 }
@@ -619,16 +637,23 @@
   z-index: 41;
 }
 
+@media only screen and (min-width: 769px) and (max-width: 1366px) {
+  .titleContainerWithPileSubmitRail {
+    margin-bottom: 5px;
+    transform: translateY(-40px);
+  }
+}
+
 @media only screen and (max-width: 480px) {
   .titleContainerWithPileSubmitRail {
-    margin-bottom: 5px !important;
-    transform: translateY(-44px);
+    margin-bottom: 5px;
+    transform: none;
   }
 }
 
 @media only screen and (min-width: 1367px) {
   .titleContainerWithPileSubmitRail {
-    margin-bottom: 5px !important;
+    margin-bottom: 5px;
     transform: translateY(-52px);
   }
 }
@@ -639,7 +664,7 @@
   align-items: center;
   font-weight: 600;
   color: var(--ce-session-chrome-contrast);
-  opacity: 1;
+  opacity: 0.5;
   margin-bottom: 0px !important;
 }
 
@@ -794,6 +819,10 @@
   border: 1px solid var(--ce-card-border);
   padding: 20px;
   border-radius: var(--ce-radius-6);
+}
+
+.questionsSectionContainer {
+  padding-top: 0;
 }
 
 .sectionHeaderRow {
@@ -1134,6 +1163,13 @@
   padding-top: 0;
 }
 
+/* The expanded question list grows with the page rather than scrolling here.
+ * Keeping overflow visible prevents this wrapper from capturing the sticky
+ * survey toolbar as a non-scrolling containing block. */
+.questionsSectionContent {
+  overflow: visible;
+}
+
 .pileHeaderRow {
   width: 100%;
   margin-top: 10px;
@@ -1151,7 +1187,7 @@
 }
 
 .pileBackButton {
-  opacity: 0.6;
+  opacity: 1;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -1178,6 +1214,11 @@
 
   svg {
     font-size: 1.25em;
+    opacity: 1;
+  }
+
+  span {
+    opacity: 0.6;
   }
 }
 
@@ -1557,7 +1598,8 @@
   }
 
   .sectionHeader .sectionHeaderSubtitle {
-    font-size: 0.68em;
+    font-size: 1em;
+    font-weight: inherit;
     line-height: 1;
     color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
   }
@@ -1874,6 +1916,8 @@
 @keyframes fadeOutTitle {
   to {
     opacity: 0;
+    max-height: 0.75rem;
+    margin-bottom: 0;
   }
 }
 
@@ -1976,12 +2020,18 @@
   }
 
   .sectionsGrid .sectionHeaderTitle {
-    font-size: 1.08rem;
+    font-size: 1.35rem;
+    opacity: 0.5;
   }
 
   .sectionsGrid .sectionHeaderSubtitle {
-    font-size: 0.76rem;
+    font-size: 1rem;
     font-weight: 400;
+    opacity: 0.5;
+  }
+
+  .sectionsGrid .sectionToggleIcon {
+    opacity: 0.5;
   }
 
   .sectionsGrid .sectionExpanded {
@@ -2049,6 +2099,13 @@
   .workerGroupCardLinkButton:focus-visible {
     outline: 2px dotted var(--ce-focus-ring);
     outline-offset: 2px;
+  }
+
+  // The group card already frames its media; avoid a second nested image frame in Classic 95.
+  .workerGroupCardImageContainer {
+    border: 0 !important;
+    border-radius: 0;
+    box-shadow: none !important;
   }
 }
 

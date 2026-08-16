@@ -1479,10 +1479,12 @@ const AdminPageRuntime = ({
 
     const chainId =
       Number(selectedConfig?.__registry?.chainId || selectedConfig?.networkChainId || network?.id || 1) || 1;
+    const sessionId = toStr(selectedConfig?.sessionIdHex || selectedConfig?.sessionId).trim();
     const { message } = await adminWorkerPorts.siweLogin.prepareSiweLogin({
       workerUrl: baseUrl,
       address: account,
       sessionSlug: slug,
+      sessionId,
       chainId,
       statement: 'Sign in to Context Engine.',
     });
@@ -1493,7 +1495,13 @@ const AdminPageRuntime = ({
     const loginResp = await fetch(`${baseUrl}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ address: account, message, signature, sessionSlug: slug }),
+      body: JSON.stringify({
+        address: account,
+        message,
+        signature,
+        sessionSlug: slug,
+        ...(sessionId ? { sessionId } : {}),
+      }),
     });
     const loginData = await loginResp.json().catch(() => ({}));
     return { loginResp, loginData };
