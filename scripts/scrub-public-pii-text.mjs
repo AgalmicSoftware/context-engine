@@ -30,6 +30,16 @@ const allowedPublicEmails = new Set([
   'contextengine@protonmail.com',
 ]);
 const homePathRe = /(?:^|[\s"'(=:{])((?:\/Users|\/home)\/[A-Za-z0-9._-]+(?:\/[^\s"'`<>\\)]*)?)/g;
+const syntheticScannerFixtureAssignment = [
+  ['provider', 'api', 'token'].join('_'),
+  ['live', 'credential', 'material', 'must', 'not', 'ship'].join('-'),
+].join("='") + "'";
+const syntheticScannerFixtureSource =
+  "${['provider', 'api', 'token'].join('_')}='${['live', 'credential', 'material', 'must', 'not', 'ship'].join('-')}'";
+const syntheticScannerFixturePaths = new Set([
+  'scripts/sync-public-history.test.js',
+  'scripts/verify-public-release-pii.test.js',
+]);
 
 function isProbablyBinary(buffer) {
   if (buffer.includes(0)) return true;
@@ -64,11 +74,18 @@ function scrubFile(absolutePath) {
   if (isProbablyBinary(buffer)) return;
 
   const original = buffer.toString('utf8');
-  const scrubbed = original
+  let scrubbed = original
     .replace(emailRe, (match) =>
       allowedPublicEmails.has(match.toLowerCase()) ? match : '[redacted-email]',
     )
     .replace(homePathRe, (match, homePath) => match.replace(homePath, '/redacted-home'));
+
+  // Two historical scanner regressions embedded a deliberately fake secret as
+  // one literal token. Preserve the runtime negative test while preventing the
+  // fixture itself from becoming a secret-shaped value in public history.
+  if (syntheticScannerFixturePaths.has(relativePath)) {
+    scrubbed = scrubbed.replaceAll(syntheticScannerFixtureAssignment, syntheticScannerFixtureSource);
+  }
 
   if (scrubbed !== original) fs.writeFileSync(absolutePath, scrubbed);
 }

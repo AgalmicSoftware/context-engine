@@ -1039,7 +1039,16 @@ test('sync-public-history can sanitize private tokens in otherwise public replay
     writeFile(sourceDir, 'public-sanitized.txt', 'public change\n');
     const privateCoauthor = ['noreply', 'anthropic.com'].join('@');
     const syntheticEmail = ['private', 'example.com'].join('@');
+    const syntheticSecretAssignment = [
+      ['provider', 'api', 'token'].join('_'),
+      ['live', 'credential', 'material', 'must', 'not', 'ship'].join('-'),
+    ].join("='") + "'";
     writeFile(sourceDir, 'public-synthetic-email.txt', `fixture=${syntheticEmail}\n`);
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'verify-public-release-pii.test.js'),
+      `const unsafeTarget = \`/${'Us'}ers/example/${syntheticSecretAssignment}\`;\n`,
+    );
     commitAll(sourceDir, `Public sanitized change\n\nMentions contextEngine-cc and agent-native follow-up details.\n\nCo-Authored-By: Assistant <${privateCoauthor}>\n`, {
       authorDate: '2025-01-05T06:07:08Z',
       committerDate: '2025-01-05T06:07:08Z',
@@ -1078,6 +1087,12 @@ test('sync-public-history can sanitize private tokens in otherwise public replay
       git(sourceDir, ['show', 'release-candidate:public-synthetic-email.txt']),
       'fixture=[redacted-email]\n',
     );
+    const normalizedScannerFixture = git(sourceDir, [
+      'show',
+      'release-candidate:scripts/verify-public-release-pii.test.js',
+    ]);
+    assert.doesNotMatch(normalizedScannerFixture, new RegExp(syntheticSecretAssignment));
+    assert.match(normalizedScannerFixture, /\['provider', 'api', 'token'\]\.join\('_'\)/);
   });
 });
 
