@@ -77,15 +77,7 @@ Quadratic importance is an optional, separate measurement phase. Every model
 receives the same fixed credit budget for the complete question bank. Assigning
 `v` importance votes to a question costs `v^2` credits, all votes are
 non-negative integers, and the total squared cost cannot exceed the budget.
-The prompt asks about agenda priority and consequence, not agreement. The
-default response contract is a sparse priority set of at most 10 questions.
-The per-question vote maximum is derived so selecting the maximum number of
-questions can never exceed the budget (`3` votes at the default 100-credit,
-10-question settings). Both caps are recorded in each importance artifact and
-must match when artifacts are merged. To prevent a fixed 200- or 500-question
-listing from favoring early items, every model and repeat receives a
-deterministic hash-shuffled question order. The order method and exact order
-hash are recorded with the artifact and run.
+The prompt asks about agenda priority and consequence, not agreement.
 
 Allocation repeats are nested within a model. The report first averages each
 model's votes per question across its valid allocation runs, treating omitted

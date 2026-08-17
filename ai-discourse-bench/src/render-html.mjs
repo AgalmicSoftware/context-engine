@@ -718,7 +718,11 @@ const modelAnswersForQuestion = (report, questionId, participantVisuals = partic
       || (Number(modelSummary.total || 0) > 0 ? 'Invalid' : null);
     if (!answer) return null;
     const visual = participantVisuals.get(participant.id);
-    const { attemptedRuns, winningResponses } = polarityRepeatTotalsForCell(modelSummary);
+    const attemptedRuns = Number(modelSummary.total || 0);
+    const winningResponses = Math.max(
+      0,
+      ...['Agree', 'Unsure', 'Disagree'].map((value) => Number(modelSummary.counts?.[value] || 0)),
+    );
     return {
       id: participant.id,
       label: participant.label || participant.id,
@@ -830,9 +834,13 @@ const normalizeAnalysisIssueAreas = (report, topics = normalizeAnalysisTopicCirc
       });
       const repeatTotals = answeredQuestionIds.reduce((totals, questionId) => {
         const modelSummary = modelQuestions[questionId] || {};
-        const questionTotals = polarityRepeatTotalsForCell(modelSummary);
-        totals.winningResponses += questionTotals.winningResponses;
-        totals.attemptedRuns += questionTotals.attemptedRuns;
+        const attempts = Number(modelSummary.total || 0);
+        if (!Number.isFinite(attempts) || attempts <= 0) return totals;
+        const answerCounts = ['Agree', 'Unsure', 'Disagree'].map((answer) => (
+          Number(modelSummary.counts?.[answer] || 0)
+        ));
+        totals.winningResponses += Math.max(0, ...answerCounts);
+        totals.attemptedRuns += attempts;
         return totals;
       }, { winningResponses: 0, attemptedRuns: 0 });
       return {
@@ -1925,15 +1933,6 @@ const renderIntegrityNotice = (report) => {
         : 'no completed repeat count';
     const expectedRepeats = Number(integrity.expectedRepeatsPerPolarity || 0);
     detailItems.push(`<li><strong>Repeat depth:</strong> The imported artifacts declare ${escapeHtml(declaredLabel)}${expectedRepeats ? `; this bank requires ${escapeHtml(expectedRepeats)} for release` : ''}.</li>`);
-  }
-
-  const highWordingSensitivityThreshold = 0.5;
-  const questionSummaries = Object.values(report.polisReport?.byQuestion || {});
-  const highWordingSensitivityCount = questionSummaries.filter((summary) => (
-    Number(summary?.wordingSensitivity?.meanAbsoluteShift) >= highWordingSensitivityThreshold
-  )).length;
-  if (highWordingSensitivityCount > 0) {
-    detailItems.push(`<li><strong>Wording sensitivity:</strong> ${escapeHtml(highWordingSensitivityCount)} of ${escapeHtml(questionSummaries.length)} questions changed by at least ${escapeHtml(highWordingSensitivityThreshold.toFixed(2))} on the normalized -1 to +1 answer scale when original and reversed wording were compared. These items require wording review before release.</li>`);
   }
 
   const participantLabels = new Map((report.participants || []).map((participant) => (
@@ -5988,7 +5987,6 @@ export const renderHtmlReport = (report) => `<!doctype html>
         var closeButton = tagModal.querySelector('[data-ce-tag-modal-close]');
         if (closeButton && closeButton.focus) closeButton.focus();
         else tagModalContent.focus();
-        notifyParentHash();
         return true;
       }
       function syncTagModalWithHash() {
@@ -6419,7 +6417,8 @@ export const renderHtmlReport = (report) => `<!doctype html>
             'data-question-winning-response-consistency="' + escapeText(breakdownScore(row.consistency.rate)) + '" data-question-winning-responses="' + escapeText(row.consistency.winningResponses) + '" data-question-attempted-runs="' + escapeText(row.consistency.attemptedRuns) + '" data-question-contributing-models="' + escapeText(row.consistency.contributingModels) + '" ' +
             'aria-label="' + escapeText(row.question.id + ': ' + prompt + ' (' + valid + ' modeled responses)') + '">' +
               '<circle class="beeswarmCircle" cx="' + escapeText(x) + '" cy="' + escapeText(y) + '" r="5"></circle>' +
-            '</a>';
+              '<title>' + escapeText(row.question.id + ': ' + prompt) + '</title>' +
+          '</a>';
         }).join('');
         var grid = [1, 0.75, 0.5, 0.25, 0].map(function (rate) {
           var y = plotBottom - rate * (plotBottom - plotTop);
@@ -7098,7 +7097,6 @@ export const renderHtmlReport = (report) => `<!doctype html>
         });
       });
       window.addEventListener('hashchange', function () {
-        notifyParentHash();
         if (syncTagModalWithHash()) return;
         setReportViewMode(modeFromHash(), { scroll: true });
         syncAtlasIssueModalWithHash();

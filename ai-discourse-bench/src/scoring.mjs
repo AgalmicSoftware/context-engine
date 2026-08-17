@@ -1,5 +1,4 @@
 import { ANSWER_SCORE, ANSWER_VALUES } from './config.mjs';
-import { assertSafeUniqueIdentifiers } from './identifiers.mjs';
 import { summarizeImportanceRuns } from './importance.mjs';
 import { bootstrapMeanInterval } from './statistics.mjs';
 
@@ -659,10 +658,8 @@ export const buildResultsReport = ({ questionBank, modelRoster, runsFile, import
     rawMaterial: {
       runManifest: runsFile.manifest || null,
       sourceManifests: runsFile.sourceManifests || [],
-      sourceRunContentHashes: runsFile.sourceRunContentHashes || [],
       importanceManifest: importanceFile?.manifest || null,
       importanceSourceManifests: importanceFile?.sourceManifests || [],
-      sourceImportanceContentHashes: importanceFile?.sourceImportanceContentHashes || [],
       runtimeProvenance,
       debateAtlasInputs: questions.map((question) => ({
         questionId: question.id,

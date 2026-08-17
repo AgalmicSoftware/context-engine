@@ -17,9 +17,9 @@ run claims:
   generation time; and
 - an accessible topic selector with `AI Futures & Policy` as the only current
   option, providing the stable UI contract for future topic-specific banks; and
-- question count, model count, and self/persona mode. Completed-run depth stays
-  in the development-preview notice and report integrity data rather than
-  displacing the topic selector.
+- question count, model count, self/persona mode, and completed runs for each
+  original and reversed wording, with the planned repeat target explained in a
+  tooltip.
 
 The summary facts use larger values than their labels, with stronger count
 typography for Questions and Model participants. They remain four columns on
@@ -43,10 +43,7 @@ the report JSON and Raw Results. The notice disappears only when
 It accepts a single run file/roster or comma-separated `--runs` and `--models`
 paths for compatible model-specific benchmark runs. Optional comma-separated
 `--importance` artifacts add a separately aggregated `importance` object;
-they do not become stance runs or affect stance release coverage. Importance
-artifacts record `budget`, `maxAllocations`, and `maxVotesPerQuestion`; merged
-artifacts must match on all three fields so reports never combine different
-allocation methods. Report schema version 2
+they do not become stance runs or affect stance release coverage. Report schema version 2
 records aggregation semantics, run manifests, participant coverage, integrity
 warnings, and `preview` or `release-ready` status. `--release` rejects a report
 that does not satisfy the release gates.
@@ -118,7 +115,7 @@ with responsive section availability rows, warning/info messages, and
 separate collapsible JSON payloads for the report snapshot, Context Engine
 import payload, and aggregate raw material. Provider-level run records remain in
 the separate run artifact. The native Context Engine export preserves
-`importance`, `debateAtlas`, and `riskMatrix` so the `/benchmarks` route can
+`importance`, `debateAtlas`, and `riskMatrix` so a future `/benchmark` route can
 render the same prominence and analysis inputs without reconstructing them.
 Packed Debate Map labels use a generated mobile font-size variable rather than
 the standalone-only `overflow-wrap:anywhere` fallback, so narrow side-window

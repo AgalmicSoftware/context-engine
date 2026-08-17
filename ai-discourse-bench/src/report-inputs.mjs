@@ -191,3 +191,30 @@ export const mergeImportanceRunFiles = (importanceFiles) => {
     runs,
   };
 };
+
+export const mergeImportanceRunFiles = (importanceFiles) => {
+  const files = importanceFiles || [];
+  const runs = files.flatMap((file) => file.runs || []);
+  const benchmarkIds = uniqueNonEmpty(files.map((file) => file.benchmarkId));
+  const benchmarkFamilies = uniqueNonEmpty(benchmarkIds.map(benchmarkFamilyId));
+  const budgets = uniqueNonEmpty(files.map((file) => file.budget)).map(Number);
+  if (benchmarkFamilies.length > 1) {
+    throw new Error(`importance files use incompatible benchmark families: ${benchmarkIds.join(', ')}`);
+  }
+  if (budgets.length !== 1 || !Number.isInteger(budgets[0]) || budgets[0] < 1) {
+    throw new Error(`importance files must use one positive integer budget; received ${budgets.join(', ') || '(missing)'}`);
+  }
+  return {
+    schemaVersion: 1,
+    kind: 'ai_discourse_bench_importance_runs',
+    benchmarkId: benchmarkFamilies[0] || benchmarkFamilyId(runs[0]?.benchmarkId) || 'ai-discourse-bench',
+    sourceBenchmarkIds: benchmarkIds,
+    mode: 'quadratic-importance',
+    generatedAt: new Date().toISOString(),
+    budget: budgets[0],
+    repeats: Math.max(0, ...files.map((file) => Number(file.repeats || 0)).filter(Number.isFinite)),
+    sourceRunFiles: files.length,
+    sourceManifests: files.map((file) => file.manifest).filter(Boolean),
+    runs,
+  };
+};

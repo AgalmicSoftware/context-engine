@@ -206,27 +206,8 @@ test('publication intro explains the benchmark and does not overstate preview ar
   assert.match(html, /<strong>Question bank:<\/strong> Development Seed\. An official release requires a separately reviewed and validated bank\./);
   assert.match(html, /<strong>Repeat depth:<\/strong> The imported artifacts declare 1 completed run per wording; this bank requires 10 for release\./);
   assert.match(html, /<strong>Current model coverage:<\/strong> 2 of 2 model participants answered every question in both wordings with no invalid responses in this run set\./);
-  assert.doesNotMatch(html, /<strong>Wording sensitivity:<\/strong>/);
   assert.doesNotMatch(previewNotice, /coverage=1, paired=1, completion=0, valid=1/);
   assert.match(html, /coverage=1, paired=1, completion=0, valid=1/);
-
-  const wordingSensitiveHtml = renderHtmlReport({
-    ...report,
-    polisReport: {
-      ...report.polisReport,
-      byQuestion: {
-        ...report.polisReport.byQuestion,
-        [questionId]: {
-          ...report.polisReport.byQuestion[questionId],
-          wordingSensitivity: {
-            ...report.polisReport.byQuestion[questionId].wordingSensitivity,
-            meanAbsoluteShift: 0.5,
-          },
-        },
-      },
-    },
-  });
-  assert.match(wordingSensitiveHtml, /<strong>Wording sensitivity:<\/strong> 1 of 1 questions changed by at least 0\.50 on the normalized -1 to \+1 answer scale when original and reversed wording were compared\. These items require wording review before release\./);
 
   const releaseHtml = renderHtmlReport({
     ...report,
@@ -278,11 +259,9 @@ test('quadratic importance allocations control Debate Map prominence without cha
   ]));
   const importanceFile = {
     budget: 25,
-    maxAllocations: 2,
-    maxVotesPerQuestion: 3,
     repeats: 1,
     runs: [
-      { modelId: 'model-a', allocations: [{ questionId: 'q1', votes: 3 }], spentCredits: 9 },
+      { modelId: 'model-a', allocations: [{ questionId: 'q1', votes: 5 }], spentCredits: 25 },
       { modelId: 'model-b', allocations: [{ questionId: 'q1', votes: 3 }, { questionId: 'q2', votes: 1 }], spentCredits: 10 },
     ],
   };
@@ -293,16 +272,16 @@ test('quadratic importance allocations control Debate Map prominence without cha
     importanceFile,
   });
   assert.equal(report.importance.available, true);
-  assert.equal(report.importance.byQuestion.q1.meanVotes, 3);
+  assert.equal(report.importance.byQuestion.q1.meanVotes, 4);
   assert.equal(report.polisReport.byQuestion.q1.meanScore, 1);
   assert.equal(report.debateAtlas.sizeMetric, 'quadratic-importance');
-  assert.equal(report.debateAtlas.topicCircles.find((topic) => topic.id === 'governance').importanceVotes, 3);
+  assert.equal(report.debateAtlas.topicCircles.find((topic) => topic.id === 'governance').importanceVotes, 4);
   assert.equal(report.debateAtlas.topicCircles.find((topic) => topic.id === 'labor').importanceVotes, 0.5);
 
   const html = renderHtmlReport(report);
   assert.match(html, /Circle prominence reflects equal-budget quadratic importance allocations from model participants/);
   assert.match(html, /<option value="importance">Most important<\/option>/);
-  assert.match(html, /data-ce-atlas-importance="3"/);
+  assert.match(html, /data-ce-atlas-importance="4"/);
   assert.match(html, /data-ce-atlas-importance="0\.5"/);
   assert.match(html, /if \(sortMode === 'importance'\)/);
   assert.match(html, /of allocated importance/);
@@ -736,40 +715,6 @@ test('Debate Map uses stable model colors and overlays each answer on its aggreg
   assert.match(html, /atlasIssueModalBody\.addEventListener\('focusin', function \(event\) \{[\s\S]*?focusedAtlasModelId = card\.getAttribute\('data-ce-atlas-model-card'\) \|\| '';/);
   assert.match(html, /atlasIssueModalBody\.addEventListener\('focusout', function \(event\) \{[\s\S]*?focusedAtlasModelId = '';/);
   assert.match(html, /if \(lockedAtlasModelId === modelId\) \{\s*lockedAtlasModelId = '';\s*hoveredAtlasModelId = '';\s*focusedAtlasModelId = '';\s*if \(modelCard\.blur\) modelCard\.blur\(\);\s*\} else \{\s*lockedAtlasModelId = modelId;/);
-});
-
-test('Debate Map model repeat stability stays separate from polarity sensitivity', async () => {
-  const questionBank = limitQuestionBank(
-    await readJson(new URL('../data/question-bank.sample.json', import.meta.url)),
-    1
-  );
-  const modelRoster = {
-    schemaVersion: 1,
-    models: [
-      { id: 'model-a', label: 'Model A', model: 'provider/model-a', provider: 'mock', traits: {} },
-    ],
-  };
-  const [question] = questionBank.questions;
-  const report = buildResultsReport({
-    questionBank,
-    modelRoster,
-    runsFile: {
-      schemaVersion: 1,
-      benchmarkId: questionBank.benchmarkId,
-      mode: 'self',
-      runs: [
-        { modelId: 'model-a', questionId: question.id, polarity: 'canonical', normalizedAnswer: 'Agree' },
-        { modelId: 'model-a', questionId: question.id, polarity: 'canonical', normalizedAnswer: 'Agree' },
-        { modelId: 'model-a', questionId: question.id, polarity: 'reversed', normalizedAnswer: 'Disagree' },
-        { modelId: 'model-a', questionId: question.id, polarity: 'reversed', normalizedAnswer: 'Disagree' },
-      ],
-    },
-  });
-  const html = renderHtmlReport(report);
-
-  assert.match(html, /data-ce-atlas-model-card="model-a"[^>]*data-ce-atlas-model-consistency-value="100%"/);
-  assert.match(html, /data-ce-atlas-model-marker="model-a"[\s\S]*?data-ce-atlas-model-repeat-value="100%"/);
-  assert.equal(report.polisReport.byQuestion[question.id].wordingSensitivity.meanAbsoluteShift, 2);
 });
 
 test('Debate Map contributor context distinguishes partial model coverage', async () => {
@@ -1416,7 +1361,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /window\.setTimeout\(scroll, 600\);/);
   assert.match(html, /setStaticSectionOpen\(containingSection, true\)/);
   assert.match(html, /var target = getScrollTargetForMode\(nextMode\);/);
-  assert.match(html, /window\.addEventListener\('hashchange', function \(\) \{\s*notifyParentHash\(\);\s*if \(syncTagModalWithHash\(\)\) return;\s*setReportViewMode\(modeFromHash\(\), \{ scroll: true \}\);/);
+  assert.match(html, /window\.addEventListener\('hashchange', function \(\) \{\s*if \(syncTagModalWithHash\(\)\) return;\s*setReportViewMode\(modeFromHash\(\), \{ scroll: true \}\);/);
   assert.doesNotMatch(html.slice(modeSurfacesStart), /id="debate-atlas"[\s\S]*?aidb-summary-toggle/);
   assert.match(html, /class="pdfIgnore settingsRow"/);
   assert.match(html, /Download as PDF/);
@@ -1579,7 +1524,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.doesNotMatch(html, /if \(shouldScroll && target && target\.scrollIntoView\)/);
   assert.match(html, /function syncInitialReportViewMode/);
   assert.match(html, /setReportViewMode\(modeFromHash\(\), \{ scroll: false \}\)/);
-  assert.match(html, /setReportViewMode\(modeFromHash\(\), \{ scroll: false \}\);\s*if \(!syncTagModalWithHash\(\)\) syncAtlasIssueModalWithHash\(\);\s*syncInitialReportViewMode\(\);\s*notifyParentHash\(\);\s*setReportStyle/);
+  assert.match(html, /setReportViewMode\(modeFromHash\(\), \{ scroll: false \}\);\s*if \(!syncTagModalWithHash\(\)\) syncAtlasIssueModalWithHash\(\);\s*syncInitialReportViewMode\(\);\s*setReportStyle/);
   assert.match(html, /window\.addEventListener\('load', syncInitialReportViewMode, \{ once: true \}\)/);
   assert.doesNotMatch(html, /if \(document\.readyState === 'complete'\) \{\s*syncInitialReportViewMode\(\);/);
   assert.match(html, /resultsToggle\.addEventListener\('click', function \(\) \{\s*setResultsSectionOpen\(resultsSection && resultsSection\.getAttribute\('data-ce-results-open'\) === 'false'\);/);

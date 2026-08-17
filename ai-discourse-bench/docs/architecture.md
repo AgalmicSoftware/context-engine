@@ -171,11 +171,10 @@ Attach the resulting artifact with `build-report --importance
 JSON allocation schema and preserve provider/runtime provenance. Mock mode is
 available for deterministic wiring tests.
 
-Persona profiles identify a public figure by name only. The prompt does not
-inject evidence summaries, custom biographical instructions, source lists, or
-cutoff dates; the track measures how each model interprets the figure from its
-weights. Self and persona artifacts are kept in separate compatibility domains
-and cannot be merged into one report.
+Persona profiles contain both public-source URLs and dated paraphrased evidence
+summaries. The summaries are embedded into each prompt; URLs are provenance,
+not an assumption that the model can browse. Self and persona artifacts are
+kept in separate compatibility domains and cannot be merged into one report.
 
 Build a report:
 

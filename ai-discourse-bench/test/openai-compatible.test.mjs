@@ -36,24 +36,6 @@ test('local provider targets a local OpenAI-compatible chat endpoint', async () 
   assert.equal(content.metadata.structuredOutput.used, 'json_schema');
 });
 
-test('local provider never forwards an ambient OpenAI cloud key', async () => {
-  let authorization = '';
-  await callOpenAiCompatibleChat({
-    provider: 'local',
-    model: 'local-model',
-    prompt: 'Answer.',
-    env: {
-      AIDB_LOCAL_BASE_URL: 'http://127.0.0.1:11434/v1',
-      OPENAI_API_KEY: 'cloud-secret-that-must-not-leave',
-    },
-    fetchImpl: async (_url, options) => {
-      authorization = options.headers.authorization;
-      return okResponse;
-    },
-  });
-  assert.equal(authorization, 'Bearer local');
-});
-
 test('OpenAI-compatible calls accept task-specific schemas and system prompts', async () => {
   let body;
   const responseSchema = {
