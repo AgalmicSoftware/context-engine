@@ -33,6 +33,10 @@ const FONT_AWESOME_ICONS = {
     viewBox: '0 0 512 512',
     path: 'M256 8C119.043 8 8 119.083 8 256c0 136.997 111.043 248 248 248s248-111.003 248-248C504 119.083 392.957 8 256 8zm0 110c23.196 0 42 18.804 42 42s-18.804 42-42 42-42-18.804-42-42 18.804-42 42-42zm56 254c0 6.627-5.373 12-12 12h-88c-6.627 0-12-5.373-12-12v-24c0-6.627 5.373-12 12-12h12v-64h-12c-6.627 0-12-5.373-12-12v-24c0-6.627 5.373-12 12-12h64c6.627 0 12 5.373 12 12v100h12c6.627 0 12 5.373 12 12v24z',
   },
+  download: {
+    viewBox: '0 0 512 512',
+    path: 'M216 0h80c13.3 0 24 10.7 24 24v168h87.7c17.8 0 26.7 21.5 14.1 34.1L269.7 378.3c-7.5 7.5-19.8 7.5-27.3 0L90.1 226.1c-12.6-12.6-3.7-34.1 14.1-34.1H192V24c0-13.3 10.7-24 24-24zm296 376v112c0 13.3-10.7 24-24 24H24c-13.3 0-24-10.7-24-24V376c0-13.3 10.7-24 24-24h146.7l49 49c20.1 20.1 52.5 20.1 72.6 0l49-49H488c13.3 0 24 10.7 24 24zm-124 88c0-11-9-20-20-20s-20 9-20 20 9 20 20 20 20-9 20-20zm64 0c0-11-9-20-20-20s-20 9-20 20 9 20 20 20 20-9 20-20z',
+  },
   'external-link-alt': {
     viewBox: '0 0 512 512',
     path: 'M432 320h-32a16 16 0 0 0-16 16v112H64V128h144a16 16 0 0 0 16-16V80a16 16 0 0 0-16-16H48A48 48 0 0 0 0 112v352a48 48 0 0 0 48 48h352a48 48 0 0 0 48-48V336a16 16 0 0 0-16-16zM488 0H360c-21.37 0-32.05 25.91-17 41l35.73 35.73L135 320.37a24 24 0 0 0 0 34L157.67 377a24 24 0 0 0 34 0l243.61-243.68L471 169c15.11 15.11 41 4.41 41-17V24a24 24 0 0 0-24-24z',
@@ -1899,8 +1903,13 @@ const renderBenchmarkIntroduction = (report) => {
     data-ce-benchmark-publication-status="${releaseReady ? 'release-ready' : 'preview'}"
     aria-labelledby="aidb-benchmark-intro-title"
   >
-    <p class="aidb-benchmark-provenance"><span class="aidb-benchmark-technical-name">model-opinions-bench</span><span class="aidb-benchmark-generated">Generated: ${escapeHtml(formatPolisUtcTimestamp(report.generatedAt))}</span></p>
-    <h1 id="aidb-benchmark-intro-title">${escapeHtml(BENCHMARK_PUBLIC_TITLE)}</h1>
+    <div class="aidb-benchmark-heading-row">
+      <div class="aidb-benchmark-heading-copy">
+        <p class="aidb-benchmark-provenance"><span class="aidb-benchmark-technical-name">model-opinions-bench</span><span class="aidb-benchmark-generated">Generated: ${escapeHtml(formatPolisUtcTimestamp(report.generatedAt))}</span></p>
+        <h1 id="aidb-benchmark-intro-title">${escapeHtml(BENCHMARK_PUBLIC_TITLE)}</h1>
+      </div>
+      <button type="button" class="aidb-benchmark-download pdfIgnore" data-ce-benchmark-download title="Download benchmark report" aria-label="Download benchmark report">${renderFontAwesomeIcon('download')}</button>
+    </div>
     <p class="aidb-benchmark-lead" id="aidb-benchmark-topic-description">This edition maps where AI models agree, disagree, remain unsure, and change under reversed wording across questions about AI futures and policy, drawn from or implied by the OSS <strong>ai-discourse-corpus</strong>. The same benchmark method can be applied to any topic. An optional quadratic-importance mode gives every model the same credit budget to prioritize questions; those allocations determine Debate Map prominence when present.</p>
     <dl class="aidb-benchmark-facts" aria-label="Benchmark run summary">
       <div class="aidb-benchmark-fact-number"><dt>Questions</dt><dd>${escapeHtml(report.counts?.questions ?? 0)}</dd></div>
@@ -3613,7 +3622,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
       --panel:#ffffff;
       --agree:#149488;
       --disagree:#e85b43;
-      --unsure:#cbd5e1;
+      --unsure:#ffd166;
       --invalid:#111827;
       --blue:#5e72e4;
       --indigo:#5603ad;
@@ -3802,7 +3811,14 @@ export const renderHtmlReport = (report) => `<!doctype html>
     .sectionExpanded { max-width: 100%; }
     .sectionsGrid { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 12px; max-width: 100%; min-width: 0; }
     .aidb-benchmark-intro { grid-column: 1 / -1; min-width: 0; margin: 0 0 4px; padding: 8px 10px 24px; color: var(--ce-color-panel-text); }
+    .aidb-benchmark-heading-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+    .aidb-benchmark-heading-copy { min-width: 0; }
     .aidb-benchmark-intro h1 { margin: 0; color: #ffffff; font-size: 2rem; line-height: 1.2; overflow-wrap: anywhere; }
+    .aidb-benchmark-download { width: 44px; height: 44px; flex: 0 0 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 1px solid rgba(255, 255, 255, 0.28); border-radius: 50%; color: #f4f7ff; background: rgba(255, 255, 255, 0.07); cursor: pointer; box-shadow: none; }
+    .aidb-benchmark-download:hover,
+    .aidb-benchmark-download:focus-visible { border-color: #4dffa4; color: #0a0e1c; background: #4dffa4; outline: none; }
+    .aidb-benchmark-download:focus-visible { box-shadow: 0 0 0 3px rgba(77, 255, 164, 0.3); }
+    .aidb-benchmark-download svg { width: 18px; height: 18px; }
     .aidb-benchmark-lead { max-width: 82ch; margin: 18px 0 10px; color: #f4f7ff; font-size: 1.05rem; line-height: 1.65; }
     .aidb-benchmark-facts { display: grid; grid-template-columns: minmax(5.5rem, 0.55fr) minmax(8rem, 0.78fr) minmax(13rem, 1.25fr) minmax(19.75rem, 1.65fr); margin: 20px 0 0; border-top: 1px solid rgba(255, 255, 255, 0.13); }
     .aidb-benchmark-facts > div { display: flex; flex-direction: column; justify-content: center; min-width: 0; min-height: 112px; padding: 13px 14px; border-left: 1px solid rgba(255, 255, 255, 0.13); }
@@ -4212,7 +4228,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
     .tagExplorerQuestionBar { display: flex; width: 100%; height: 8px; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: var(--ce-radius-pill); overflow: hidden; background: rgba(255, 255, 255, 0.08); }
     .tagExplorerQuestionBar i { display: block; height: 100%; }
     .tagExplorerAgree { background: #149488; }
-    .tagExplorerUnsure { background: #cbd5e1; }
+    .tagExplorerUnsure { background: var(--unsure); }
     .tagExplorerDisagree { background: #e85b43; }
     .tagExplorerQuestionLegend { display: flex; flex-wrap: wrap; gap: 6px 12px; color: rgba(244, 247, 255, 0.7); font-family: var(--ce-font-mono); font-size: 0.7rem; }
     .tagExplorerEmpty { grid-column: 1 / -1; margin: 0; padding: 20px 0; color: rgba(244, 247, 255, 0.7); }
@@ -5034,6 +5050,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
       var downloadButtons = Array.from(document.querySelectorAll('[data-ce-download-snapshot]'));
       var polisExportButtons = Array.from(document.querySelectorAll('[data-ce-download-polis-export]'));
       var analysisInputButtons = Array.from(document.querySelectorAll('[data-ce-download-analysis-input]'));
+      var benchmarkDownloadButton = document.querySelector('[data-ce-benchmark-download]');
       var staticPdfButton = document.querySelector('[data-ce-static-pdf-button]');
       var exportToggleButtons = Array.from(document.querySelectorAll('[data-ce-export-toggle]'));
       var exportArea = document.getElementById('surveyResultsExportArea');
@@ -5051,6 +5068,8 @@ export const renderHtmlReport = (report) => `<!doctype html>
       var questionExplorer = document.getElementById('all-questions');
       var questionModelLegend = questionExplorer ? questionExplorer.querySelector('.questionModelLegend') : null;
       var beeswarmTooltip = document.querySelector('[data-ce-beeswarm-tooltip]');
+      var benchmarkDownloadUrl = '';
+      var benchmarkDownloadFilename = '';
       function normalizeSharedHash(value) {
         var candidate = String(value || '');
         var hash = candidate.charAt(0) === '#' ? candidate : '#' + candidate;
@@ -5066,11 +5085,62 @@ export const renderHtmlReport = (report) => `<!doctype html>
         }
       }
       window.addEventListener('message', function (event) {
-        if (event.source !== window.parent || !event.data || event.data.type !== 'ce-benchmark-set-hash') return;
+        if (event.source !== window.parent || !event.data) return;
+        if (event.data.type === 'ce-benchmark-config') {
+          var nextDownloadUrl = String(event.data.downloadUrl || '');
+          var nextDownloadFilename = String(event.data.downloadFilename || '');
+          benchmarkDownloadUrl = /^\\/(?:[a-z0-9._~-]+\\/)*benchmark-artifacts\\/[a-z0-9][a-z0-9._-]*$/i.test(nextDownloadUrl)
+            ? nextDownloadUrl
+            : '';
+          benchmarkDownloadFilename = /^[a-z0-9][a-z0-9._-]*$/i.test(nextDownloadFilename) && nextDownloadFilename.indexOf('..') === -1
+            ? nextDownloadFilename
+            : '';
+          return;
+        }
+        if (event.data.type !== 'ce-benchmark-set-hash') return;
         var hash = normalizeSharedHash(event.data.hash);
-        if (!hash || window.location.hash === hash) return;
+        if (!hash) return;
+        if (hash === '#report') {
+          if (window.history && window.history.replaceState) {
+            window.history.replaceState(null, '', hash);
+          } else if (window.location.hash !== hash) {
+            window.location.hash = hash;
+          }
+          setReportViewMode('report', { scroll: false });
+          var benchmarkIntro = document.querySelector('[data-ce-benchmark-intro]');
+          if (benchmarkIntro) scrollToReportViewTarget(benchmarkIntro);
+          return;
+        }
+        if (window.location.hash === hash) return;
         window.location.hash = hash;
       });
+      if (benchmarkDownloadButton) {
+        benchmarkDownloadButton.addEventListener('click', function (event) {
+          event.preventDefault();
+          if (benchmarkDownloadUrl && benchmarkDownloadFilename) {
+            var configuredAnchor = document.createElement('a');
+            configuredAnchor.href = benchmarkDownloadUrl;
+            configuredAnchor.download = benchmarkDownloadFilename;
+            document.body.appendChild(configuredAnchor);
+            configuredAnchor.click();
+            configuredAnchor.remove();
+            return;
+          }
+          if (window.parent !== window) {
+            window.parent.postMessage({ type: 'ce-benchmark-download' }, '*');
+            return;
+          }
+          var standaloneBlob = new Blob([document.documentElement.outerHTML], { type: 'text/html;charset=utf-8' });
+          var standaloneUrl = URL.createObjectURL(standaloneBlob);
+          var standaloneAnchor = document.createElement('a');
+          standaloneAnchor.href = standaloneUrl;
+          standaloneAnchor.download = 'model-opinions-bench-report.html';
+          document.body.appendChild(standaloneAnchor);
+          standaloneAnchor.click();
+          standaloneAnchor.remove();
+          URL.revokeObjectURL(standaloneUrl);
+        });
+      }
       var participantClusterPayloadEl = document.getElementById('ce-ai-discourse-bench-participant-clusters');
       var participantGraph = document.querySelector('[data-ce-participant-graph]');
       var clusterCountInput = document.querySelector('[data-ce-cluster-count-input]');
@@ -7672,7 +7742,12 @@ export const renderHtmlReport = (report) => `<!doctype html>
       });
       function syncInitialReportViewMode() {
         window.setTimeout(function () {
-          setReportViewMode(modeFromHash(), { scroll: true });
+          var initialMode = modeFromHash();
+          setReportViewMode(initialMode, { scroll: initialMode !== 'report' });
+          if (initialMode === 'report') {
+            var benchmarkIntro = document.querySelector('[data-ce-benchmark-intro]');
+            if (benchmarkIntro) scrollToReportViewTarget(benchmarkIntro);
+          }
           if (!syncTagModalWithHash()) syncAtlasIssueModalWithHash();
         }, 0);
       }

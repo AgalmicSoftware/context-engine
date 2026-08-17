@@ -1,6 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faChartBar, faDownload } from '@fortawesome/free-solid-svg-icons';
 import { buildPublicRoute } from '../MainSite/urlUtils.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
@@ -115,6 +113,28 @@ const BenchmarksPage = () => {
       '*',
     );
   }, []);
+  const downloadSelectedArtifact = useCallback(() => {
+    if (!selectedReport || !selectedArtifact.url) return;
+    const anchor = document.createElement('a');
+    anchor.href = selectedArtifact.url;
+    anchor.download = selectedReport.artifact;
+    anchor.rel = 'noopener';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+  }, [selectedArtifact.url, selectedReport]);
+  const initializeReportFrame = useCallback(() => {
+    syncHashToReport();
+    if (!selectedReport || !selectedArtifact.url) return;
+    reportFrameRef.current?.contentWindow?.postMessage(
+      {
+        type: 'ce-benchmark-config',
+        downloadUrl: selectedArtifact.url,
+        downloadFilename: selectedReport.artifact,
+      },
+      '*',
+    );
+  }, [selectedArtifact.url, selectedReport, syncHashToReport]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -172,37 +192,32 @@ const BenchmarksPage = () => {
   }, [selectedArtifact, selectedReport]);
 
   useEffect(() => {
-    const handleReportHashChange = (event: MessageEvent) => {
+    const handleReportMessage = (event: MessageEvent) => {
       if (event.source !== reportFrameRef.current?.contentWindow) return;
+      if (event.data?.type === 'ce-benchmark-download') {
+        downloadSelectedArtifact();
+        return;
+      }
       if (event.data?.type !== 'ce-benchmark-hash-change') return;
       const hash = normalizeBenchmarkHash(event.data.hash);
       if (!hash || window.location.hash === hash) return;
       window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${hash}`);
     };
-    window.addEventListener('message', handleReportHashChange);
-    return () => window.removeEventListener('message', handleReportHashChange);
-  }, []);
+    window.addEventListener('message', handleReportMessage);
+    return () => window.removeEventListener('message', handleReportMessage);
+  }, [downloadSelectedArtifact]);
+
+  const showReportChooser = (manifest?.reports.length || 0) > 1;
 
   return (
     <main className={styles.page} data-testid={E2E_TESTIDS.PAGE_BENCHMARKS_ROOT}>
-      <header className={styles.toolbar}>
-        <div className={styles.identity}>
-          <span className={styles.icon} aria-hidden="true">
-            <FontAwesomeIcon icon={faChartBar} />
-          </span>
-          <div>
-            <p className={styles.eyebrow}>Context Engine benchmarks</p>
-            <h1>AI Opinions Benchmark</h1>
-          </div>
-        </div>
-
-        <div className={styles.controls}>
+      {showReportChooser ? (
+        <div className={styles.reportChooser}>
           <label className={styles.selector}>
-            <span>Report</span>
+            <span>Benchmark report</span>
             <select
               value={selectedId}
               onChange={(event) => setSelectedId(event.target.value)}
-              disabled={!manifest || manifest.reports.length < 2}
               aria-label="Benchmark report"
             >
               {(manifest?.reports || []).map((report) => (
@@ -212,39 +227,13 @@ const BenchmarksPage = () => {
               ))}
             </select>
           </label>
-          {selectedReport ? (
-            <>
-              <span
-                className={selectedReport.publicationStatus === 'released' ? styles.released : styles.preview}
-                data-testid="ce-benchmark-publication-status"
-              >
-                {selectedReport.publicationStatus === 'released' ? 'Released' : 'Development preview'}
-              </span>
-              {selectedArtifact.url ? (
-                <a
-                  className={styles.openArtifact}
-                  href={selectedArtifact.url}
-                  download={selectedReport.artifact}
-                  title="Download compressed benchmark artifact"
-                >
-                  <FontAwesomeIcon icon={faDownload} />
-                  <span className={styles.srOnly}>Download compressed benchmark artifact</span>
-                </a>
-              ) : null}
-            </>
-          ) : null}
-        </div>
-      </header>
-
-      {selectedReport ? (
-        <div className={styles.reportMeta}>
-          <span>{selectedReport.topic}</span>
-          <span>{selectedReport.questionCount} questions</span>
-          <span>{selectedReport.participantCount} model participants</span>
         </div>
       ) : null}
 
-      <section className={styles.reportSurface} aria-busy={loading}>
+      <section
+        className={`${styles.reportSurface} ${showReportChooser ? styles.reportSurfaceWithChooser : ''}`}
+        aria-busy={loading}
+      >
         {loading ? <div className={styles.status}>Loading benchmark report...</div> : null}
         {error ? (
           <div className={styles.error} role="alert">
@@ -260,7 +249,7 @@ const BenchmarksPage = () => {
             title={selectedReport?.title || 'Context Engine benchmark report'}
             srcDoc={reportHtml}
             sandbox="allow-downloads allow-modals allow-popups allow-scripts"
-            onLoad={syncHashToReport}
+            onLoad={initializeReportFrame}
           />
         ) : null}
       </section>

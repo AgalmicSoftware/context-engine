@@ -175,6 +175,13 @@ test('publication intro explains the benchmark and does not overstate preview ar
   assert.ok(resultsStart >= 0 && introStart < resultsStart);
   assert.ok(provenanceStart > introStart && provenanceStart < introHeadingStart);
   assert.match(html, /<p class="aidb-benchmark-provenance"><span class="aidb-benchmark-technical-name">model-opinions-bench<\/span><span class="aidb-benchmark-generated">Generated: [^<]+<\/span><\/p>/);
+  assert.match(html, /<button type="button" class="aidb-benchmark-download pdfIgnore" data-ce-benchmark-download title="Download benchmark report" aria-label="Download benchmark report">[\s\S]*?data-icon="download"[\s\S]*?<\/button>/);
+  assert.match(html, /window\.parent\.postMessage\(\{ type: 'ce-benchmark-download' \}, '\*'\)/);
+  assert.match(html, /event\.data\.type === 'ce-benchmark-config'/);
+  assert.match(html, /if \(hash === '#report'\) \{[\s\S]*?setReportViewMode\('report', \{ scroll: false \}\);[\s\S]*?scrollToReportViewTarget\(benchmarkIntro\);/);
+  assert.match(html, /setReportViewMode\(initialMode, \{ scroll: initialMode !== 'report' \}\);/);
+  assert.match(html, /configuredAnchor\.download = benchmarkDownloadFilename/);
+  assert.match(html, /standaloneAnchor\.download = 'model-opinions-bench-report\.html'/);
   assert.doesNotMatch(html, /<p class="aidb-benchmark-provenance">Benchmark ID:/);
   assert.ok(resultsHeaderStart > resultsStart);
   assert.ok(miniSectionStart > resultsHeaderStart);
@@ -1148,6 +1155,8 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /<div class="sectionsGrid">\s*<section[\s\S]*?data-ce-benchmark-intro[\s\S]*?<\/section>\s*<div class="sectionContainer sectionExpanded ce-session-results-section"[^>]*>\s*<div class="sectionHeaderRow">[\s\S]*?<\/div>\s*<div class="miniSectionContent">/);
   assert.match(html, /\.sectionsGrid \{ display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 12px; max-width: 100%; min-width: 0; \}/);
   assert.match(html, /\.aidb-benchmark-intro \{ grid-column: 1 \/ -1;/);
+  assert.match(html, /\.aidb-benchmark-heading-row \{ display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; \}/);
+  assert.match(html, /\.aidb-benchmark-download \{ width: 44px; height: 44px;/);
   assert.doesNotMatch(html, /\.aidb-benchmark-intro \{[^}]*border-bottom:/);
   assert.doesNotMatch(html, /\.aidb-benchmark-facts \{[^}]*border-bottom:/);
   assert.match(html, /\.aidb-benchmark-facts \{ display: grid; grid-template-columns: minmax\(5\.5rem, 0\.55fr\) minmax\(8rem, 0\.78fr\) minmax\(13rem, 1\.25fr\) minmax\(19\.75rem, 1\.65fr\);/);
@@ -2062,6 +2071,10 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /class="mapLegend" aria-label="Map answer legend"/);
   assert.match(html, /class="legendSwatch" style="background-color:#4dffa4"><\/span>\s*Agree/);
   assert.match(html, /class="legendSwatch" style="background-color:#ffd166"><\/span>\s*Unsure/);
+  assert.match(html, /--unsure:#ffd166;/);
+  assert.match(html, /\.aidb-answer-unsure \{ background: var\(--unsure\); \}/);
+  assert.match(html, /\.tagExplorerUnsure \{ background: var\(--unsure\); \}/);
+  assert.doesNotMatch(html, /--unsure:#cbd5e1;/);
   assert.match(html, /class="legendSwatch" style="background-color:#ff6b6b"><\/span>\s*Disagree/);
   assert.equal((html.match(/data-ce-world-map-country=/g) || []).length, 177);
   assert.match(html, /class="worldMapCountry worldMapCountryHasData"\s*fill="#4dffa4"\s*data-ce-world-map-country="United States of America"/);

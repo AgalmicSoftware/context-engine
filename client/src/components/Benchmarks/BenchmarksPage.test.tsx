@@ -48,9 +48,10 @@ describe('BenchmarksPage', () => {
     render(<BenchmarksPage />);
 
     expect(screen.getByTestId(E2E_TESTIDS.PAGE_BENCHMARKS_ROOT)).toBeInTheDocument();
-    expect(await screen.findByText('Development preview')).toBeInTheDocument();
-    expect(screen.getByText('200 questions')).toBeInTheDocument();
-    expect(screen.getByText('5 model participants')).toBeInTheDocument();
+    expect(screen.queryByText('Context Engine benchmarks')).not.toBeInTheDocument();
+    expect(screen.queryByText('200 questions')).not.toBeInTheDocument();
+    expect(screen.queryByText('5 model participants')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Benchmark report')).not.toBeInTheDocument();
 
     const frame = await screen.findByTestId('ce-benchmark-report-frame');
     expect(frame).toHaveAttribute('srcdoc', expect.stringContaining('Benchmark preview'));
@@ -237,6 +238,14 @@ describe('BenchmarksPage', () => {
       },
       '*',
     );
+    expect(postMessage).toHaveBeenCalledWith(
+      {
+        type: 'ce-benchmark-config',
+        downloadUrl: '/benchmark-artifacts/preview.html',
+        downloadFilename: 'preview.html',
+      },
+      '*',
+    );
 
     window.history.replaceState(null, '', `${window.location.pathname}#risk-matrix`);
     window.dispatchEvent(new HashChangeEvent('hashchange'));
@@ -263,5 +272,36 @@ describe('BenchmarksPage', () => {
       }),
     );
     expect(window.location.hash).toBe('#question-aidb_0001');
+  });
+
+  it('downloads the selected verified artifact when the report header requests it', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(manifest), { status: 200 }))
+      .mockResolvedValueOnce(new Response(previewHtml, { status: 200 }));
+
+    render(<BenchmarksPage />);
+
+    const frame = (await screen.findByTestId('ce-benchmark-report-frame')) as HTMLIFrameElement;
+    const click = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    const createElement = document.createElement.bind(document);
+    let downloadAnchor: HTMLAnchorElement | null = null;
+    jest.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
+      const element = createElement(tagName, options);
+      if (tagName.toLowerCase() === 'a') downloadAnchor = element as HTMLAnchorElement;
+      return element;
+    });
+
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: { type: 'ce-benchmark-download' },
+        source: frame.contentWindow,
+      }),
+    );
+
+    expect(click).toHaveBeenCalledTimes(1);
+    expect(downloadAnchor).not.toBeNull();
+    expect(downloadAnchor?.getAttribute('href')).toBe('/benchmark-artifacts/preview.html');
+    expect(downloadAnchor?.download).toBe('preview.html');
   });
 });

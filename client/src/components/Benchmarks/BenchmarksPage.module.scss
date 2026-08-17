@@ -1,73 +1,17 @@
 .page {
   min-height: 100vh;
-  padding: 16px;
   color: #f4f7ff;
   background: #20204e;
   font-family: var(--ce-font-body);
 }
 
-.toolbar {
-  width: min(1500px, 100%);
-  min-height: 72px;
-  margin: 0 auto;
-  padding: 12px 16px;
+.reportChooser {
+  min-height: 58px;
+  padding: 8px 16px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 6px;
-  background: rgba(39, 43, 101, 0.96);
-}
-
-.identity,
-.controls,
-.reportMeta {
-  display: flex;
-  align-items: center;
-}
-
-.identity {
-  min-width: 0;
-  gap: 12px;
-
-  h1 {
-    margin: 0;
-    color: #fff;
-    font-size: 1.05rem;
-    line-height: 1.2;
-    letter-spacing: 0;
-  }
-}
-
-.icon,
-.openArtifact {
-  width: 42px;
-  height: 42px;
-  flex: 0 0 42px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-}
-
-.icon {
-  color: #0a0e1c;
-  background: #4dffa4;
-}
-
-.eyebrow {
-  margin: 0 0 2px;
-  color: rgba(244, 247, 255, 0.62);
-  font-family: var(--ce-font-mono);
-  font-size: 0.72rem;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-.controls {
   justify-content: flex-end;
-  gap: 10px;
+  background: rgba(39, 43, 101, 0.96);
 }
 
 .selector {
@@ -88,64 +32,17 @@
   }
 }
 
-.preview,
-.released {
-  min-height: 32px;
-  padding: 0 10px;
-  display: inline-flex;
-  align-items: center;
-  border: 1px solid;
-  border-radius: 999px;
-  font-size: 0.74rem;
-  white-space: nowrap;
-}
-
-.preview {
-  color: #ffe08a;
-  border-color: rgba(255, 214, 0, 0.5);
-  background: rgba(255, 214, 0, 0.08);
-}
-
-.released {
-  color: #7fffc0;
-  border-color: rgba(77, 255, 164, 0.44);
-  background: rgba(77, 255, 164, 0.08);
-}
-
-.openArtifact {
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #f4f7ff;
-  background: rgba(255, 255, 255, 0.06);
-  text-decoration: none;
-
-  &:hover,
-  &:focus-visible {
-    color: #0a0e1c;
-    background: #4dffa4;
-  }
-}
-
-.reportMeta {
-  width: min(1500px, 100%);
-  min-height: 36px;
-  margin: 0 auto;
-  padding: 0 16px;
-  gap: 16px;
-  color: rgba(244, 247, 255, 0.62);
-  font-family: var(--ce-font-mono);
-  font-size: 0.72rem;
-}
-
 .reportSurface {
   position: relative;
-  width: min(1500px, 100%);
-  height: calc(100vh - 140px);
+  width: 100%;
+  height: 100vh;
   min-height: 600px;
-  margin: 0 auto;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 6px;
   background: #fff;
+}
+
+.reportSurfaceWithChooser {
+  height: calc(100vh - 58px);
 }
 
 .reportFrame {
@@ -173,32 +70,9 @@
   color: #991b1b;
 }
 
-.srOnly {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
 @media (max-width: 760px) {
-  .page {
+  .reportChooser {
     padding: 8px;
-  }
-
-  .toolbar {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .controls {
-    justify-content: flex-start;
-    flex-wrap: wrap;
   }
 
   .selector {
@@ -210,16 +84,7 @@
     }
   }
 
-  .reportMeta {
-    min-height: 54px;
-    align-items: flex-start;
-    flex-direction: column;
-    justify-content: center;
-    gap: 2px;
-  }
-
   .reportSurface {
-    height: calc(100vh - 245px);
     min-height: 520px;
   }
 }
