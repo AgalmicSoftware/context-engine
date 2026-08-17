@@ -341,10 +341,17 @@ const applyCommentOverrides = (
   }
   delete normalizedOverride.sourceTags;
   delete normalizedOverride.keyTension;
-  return {
+  const overriddenComment = {
     ...comment,
     ...normalizedOverride,
   };
+  // A breakdown override can turn a poll into a binary statement. Do not
+  // retain choices that no longer describe the overridden question.
+  const overriddenType = String(overriddenComment?.type || '').trim().toLowerCase();
+  if (overriddenType !== 'poll' && overriddenType !== 'multichoice' && !override.options) {
+    delete overriddenComment.options;
+  }
+  return overriddenComment;
 };
 
 const normalizePolisVote = (value) => {

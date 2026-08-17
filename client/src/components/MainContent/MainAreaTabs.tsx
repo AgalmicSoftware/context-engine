@@ -31,9 +31,6 @@ const MAIN_AREA_TAB_TITLES = Object.freeze({
   [MAIN_AREA_TABS.TOOLS]: 'Tools',
   [MAIN_AREA_TABS.WELCOME]: 'Welcome',
 } as Record<number, string>);
-const getTabTitle = (tabIndex: number | null | undefined) =>
-  tabIndex == null ? '' : MAIN_AREA_TAB_TITLES[tabIndex] || '';
-
 type MainAreaTabsProps = {
   focusedTab: number;
   changeFocusedTab: (tabIndex: number) => void;
@@ -43,39 +40,36 @@ type MainAreaTabsProps = {
   demoSurfaceMode?: unknown;
   provider?: unknown;
   network?: unknown;
+  networkChainId?: unknown;
+  sessionConfig?: unknown;
   account?: string;
   litHooks?: unknown;
   activeSessionSlug?: string;
   loginComplete?: boolean;
   loginInProgress?: boolean;
   isQuestionCacheReady?: boolean;
+  isResponsesCacheReady?: boolean;
   isSurveyCacheReady?: boolean;
   isSBTCacheReady?: boolean;
   sbtCacheRevision?: number;
   sbtRealtimeCoverageBySlug?: unknown;
+  questionResponsesNonce?: unknown;
+  questionScanProgress?: unknown;
   ensureLightSbtDiscovery?: (...args: unknown[]) => unknown;
   ensureLightSbtUniverse?: (...args: unknown[]) => unknown;
 };
 
 type MainAreaTabsState = {
-  tabChangesSinceRefresh: number;
-  currentTabIndex: number | null;
-  currentTabTitle: string;
   mountedTabs: Record<number, boolean>;
 };
 
 class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
   state: MainAreaTabsState = {
-    tabChangesSinceRefresh: 0,
-    currentTabIndex: null,
-    currentTabTitle: '',
     mountedTabs: {},
   };
 
   componentDidMount() {
     this.setState((prevState) => ({
-      currentTabTitle: getTabTitle(this.props.focusedTab),
-      currentTabIndex: this.props.focusedTab,
       mountedTabs: {
         ...(prevState.mountedTabs || {}),
         [this.props.focusedTab]: true,
@@ -87,21 +81,21 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
     return true;
   }
 
-  componentDidUpdate() {
-    // Detect tab changes from outside the component (e.g. footer links)
-    if (this.props.focusedTab !== this.state.currentTabIndex) {
-      this.changeTabs(this.props.focusedTab);
+  componentDidUpdate(prevProps: MainAreaTabsProps) {
+    if (this.props.focusedTab !== prevProps.focusedTab) {
+      this.setState((prevState) => ({
+        mountedTabs: {
+          ...(prevState.mountedTabs || {}),
+          [this.props.focusedTab]: true,
+        },
+      }));
     }
   }
 
   changeTabs = (nextTabIndex: number) => {
-    const nextTabTitle = getTabTitle(nextTabIndex);
     this.props.changeFocusedTab(nextTabIndex);
 
     this.setState((prevState) => ({
-      tabChangesSinceRefresh: prevState.tabChangesSinceRefresh + 1,
-      currentTabTitle: nextTabTitle,
-      currentTabIndex: nextTabIndex,
       mountedTabs: {
         ...(prevState.mountedTabs || {}),
         [nextTabIndex]: true,
@@ -120,6 +114,9 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
                 <NavLink
                   className={activeClassName(this.props.focusedTab === MAIN_AREA_TABS.LATEST)}
                   onClick={() => this.changeTabs(MAIN_AREA_TABS.LATEST)}
+                  role="tab"
+                  aria-label={MAIN_AREA_TAB_TITLES[MAIN_AREA_TABS.LATEST]}
+                  aria-selected={this.props.focusedTab === MAIN_AREA_TABS.LATEST}
                 >
                   <FontAwesomeIcon icon={faPlay} className={styles.navTabIcon} />
                   <div id="mainContentTabTitle"> {MAIN_AREA_TAB_TITLES[MAIN_AREA_TABS.LATEST]} </div>
@@ -129,6 +126,9 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
                 <NavLink
                   className={activeClassName(this.props.focusedTab === MAIN_AREA_TABS.COMMUNITY)}
                   onClick={() => this.changeTabs(MAIN_AREA_TABS.COMMUNITY)}
+                  role="tab"
+                  aria-label={MAIN_AREA_TAB_TITLES[MAIN_AREA_TABS.COMMUNITY]}
+                  aria-selected={this.props.focusedTab === MAIN_AREA_TABS.COMMUNITY}
                 >
                   <FontAwesomeIcon icon={faGlobe} className={styles.navTabIcon} />
                   <div id="mainContentTabTitle"> {MAIN_AREA_TAB_TITLES[MAIN_AREA_TABS.COMMUNITY]} </div>
@@ -138,6 +138,9 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
                 <NavLink
                   className={activeClassName(this.props.focusedTab === MAIN_AREA_TABS.TOOLS)}
                   onClick={() => this.changeTabs(MAIN_AREA_TABS.TOOLS)}
+                  role="tab"
+                  aria-label={MAIN_AREA_TAB_TITLES[MAIN_AREA_TABS.TOOLS]}
+                  aria-selected={this.props.focusedTab === MAIN_AREA_TABS.TOOLS}
                 >
                   <FontAwesomeIcon icon={faTools} className={styles.navTabIcon} />
                   <div id="mainContentTabTitle"> {MAIN_AREA_TAB_TITLES[MAIN_AREA_TABS.TOOLS]} </div>
@@ -147,6 +150,9 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
                 <NavLink
                   className={activeClassName(this.props.focusedTab === MAIN_AREA_TABS.WELCOME)}
                   onClick={() => this.changeTabs(MAIN_AREA_TABS.WELCOME)}
+                  role="tab"
+                  aria-label={MAIN_AREA_TAB_TITLES[MAIN_AREA_TABS.WELCOME]}
+                  aria-selected={this.props.focusedTab === MAIN_AREA_TABS.WELCOME}
                 >
                   <FontAwesomeIcon icon={faCompass} className={styles.navTabIcon} />
                   <div id="mainContentTabTitle"> {MAIN_AREA_TAB_TITLES[MAIN_AREA_TABS.WELCOME]} </div>
@@ -155,7 +161,7 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
             </Nav>
           </CardHeader>
           <CardBody className={styles.mainAreaCardBody}>
-            <TabContent className="tab-space" activeTab={'link' + this.state.currentTabIndex}>
+            <TabContent className="tab-space" activeTab={'link' + this.props.focusedTab}>
               <TabPane tabId={'link' + MAIN_AREA_TABS.COMMUNITY}>
                 {this.state.mountedTabs[MAIN_AREA_TABS.COMMUNITY] ? (
                   <Suspense fallback={<LazyFallback label="Loading..." />}>
@@ -190,14 +196,19 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
                       provider={this.props.provider}
                       litHooks={this.props.litHooks}
                       activeSessionSlug={this.props.activeSessionSlug}
+                      sessionConfig={this.props.sessionConfig}
                       network={this.props.network}
+                      networkChainId={this.props.networkChainId}
                       loginComplete={this.props.loginComplete}
                       loginInProgress={this.props.loginInProgress}
                       demoMode={this.props.demoMode}
                       demoSurfaceMode={this.props.demoSurfaceMode}
                       isQuestionCacheReady={this.props.isQuestionCacheReady}
+                      isResponsesCacheReady={this.props.isResponsesCacheReady}
                       isSurveyCacheReady={this.props.isSurveyCacheReady}
                       isSBTCacheReady={this.props.isSBTCacheReady}
+                      questionResponsesNonce={this.props.questionResponsesNonce}
+                      questionScanProgress={this.props.questionScanProgress}
                     />
                   </Suspense>
                 ) : null}

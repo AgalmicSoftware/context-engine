@@ -30,7 +30,7 @@ export const MAIN_SITE_ROUTE_VIEW_KEYS: MainSiteRouteViewKey[] = [
   'posts',
   'demos',
   'matrix',
-  'contracts',
+  'docs',
   'admin',
   'sponsor',
   'agent',

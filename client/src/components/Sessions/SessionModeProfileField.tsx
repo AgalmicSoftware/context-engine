@@ -34,8 +34,8 @@ const HOSTING_PRESETS = [
     ariaLabel: 'Cloudflare',
     entryLabel: 'Fast & Cheap',
     entryProvider: 'Cloudflare',
-    entryDescription: 'Launch a dedicated Session Worker without an on-chain publish step.',
-    entryRequirements: 'Cloudflare login / AI API Key',
+    entryDescription: 'Session settings and responses are stored in Cloudflare. No public blockchain is required.',
+    entryRequirements: ['Cloudflare account', 'AI provider key'],
   },
   {
     id: SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED,
@@ -43,8 +43,8 @@ const HOSTING_PRESETS = [
     ariaLabel: 'Decentralized',
     entryLabel: 'Trustless & Public',
     entryProvider: 'Decentralized',
-    entryDescription: 'Publish session authority on-chain and store public data with Arweave.',
-    entryRequirements: 'AI API Key / Arweave wallet / RPC URL / EVM testnet gas',
+    entryDescription: 'Session data is stored on Arweave, with session identity recorded in a public EVM registry.',
+    entryRequirements: ['AI provider key', 'Arweave wallet', 'EVM RPC URL', 'EVM Gas (TX Fees)'],
   },
 ] as const;
 
@@ -156,7 +156,17 @@ const SessionModeProfileField = ({
             <span className={styles.modePresetCardDescription}>{preset.entryDescription}</span>
             <span className={styles.modePresetCardRequirements}>
               <span className={styles.modePresetCardRequirementsLabel}>What you&apos;ll need</span>
-              <span className={styles.modePresetCardRequirementsValue}>{preset.entryRequirements}</span>
+              <span
+                className={styles.modePresetCardRequirementPills}
+                role="list"
+                aria-label={`${preset.entryLabel} requirements`}
+              >
+                {preset.entryRequirements.map((requirement) => (
+                  <span key={requirement} className={styles.modePresetCardRequirementPill} role="listitem">
+                    {requirement}
+                  </span>
+                ))}
+              </span>
             </span>
           </>
         ) : (

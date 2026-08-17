@@ -11,13 +11,7 @@ export const ARWEAVE_DEFAULT_GATEWAY_CANDIDATES = [
   'https://g8way.io',
 ];
 
-export const DOC_LIBRARY_ARWEAVE_GATEWAYS = [
-  'https://ar-io.dev',
-  'https://arweave.net',
-  'https://gateway.irys.xyz',
-  'https://permagate.io',
-  'https://g8way.io',
-];
+export const DOC_LIBRARY_ARWEAVE_GATEWAYS = ARWEAVE_DEFAULT_GATEWAY_CANDIDATES;
 
 export const ARWEAVE_GATEWAY_EXACT_HOSTS = [
   'ar-io.dev',

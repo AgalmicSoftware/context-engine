@@ -186,6 +186,7 @@ describe('AudioSurveyGenerator input and question generation', () => {
       const addButton = container.querySelector('button[title="Add URL"]');
       addButton.click();
     });
+    setAudioInputValue('Question-generation context for the simplified authoring sections.');
 
     const sectionHeadings = Array.from(container.querySelectorAll('h3')).map((node) => node.textContent.trim());
     expect(sectionHeadings).toContain('Types');
@@ -207,12 +208,63 @@ describe('AudioSurveyGenerator input and question generation', () => {
     expect(additionalContextSection.contains(addSourceControls)).toBe(false);
   });
 
+  it('shows question configuration only when the text box has content', () => {
+    act(() => {
+      root.render(
+        <AudioSurveyGenerator provider={{}} network={{}} account="0x123" loginComplete toggleLoginModal={jest.fn()} />,
+      );
+    });
+
+    expect(Array.from(container.querySelectorAll('h3')).some((node) => node.textContent.trim() === 'Types')).toBe(
+      false,
+    );
+    expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}"]`)).toBeNull();
+
+    setAudioInputValue('   ');
+
+    expect(Array.from(container.querySelectorAll('h3')).some((node) => node.textContent.trim() === 'Types')).toBe(
+      false,
+    );
+    expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}"]`)).toBeNull();
+
+    setAudioInputValue('Context that should reveal question configuration.');
+
+    expect(Array.from(container.querySelectorAll('h3')).some((node) => node.textContent.trim() === 'Types')).toBe(true);
+    expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}"]`)).toBeTruthy();
+
+    setAudioInputValue('');
+
+    expect(Array.from(container.querySelectorAll('h3')).some((node) => node.textContent.trim() === 'Types')).toBe(
+      false,
+    );
+    expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}"]`)).toBeNull();
+  });
+
+  it('shows a visual preview for every question type after text is entered', () => {
+    act(() => {
+      root.render(
+        <AudioSurveyGenerator provider={{}} network={{}} account="0x123" loginComplete toggleLoginModal={jest.fn()} />,
+      );
+    });
+    setAudioInputValue('Context that should reveal all question-type previews.');
+
+    const typeCards = Array.from(container.querySelectorAll(`[class*="typeButton"]`));
+    const cardFor = (title) => typeCards.find((card) => card.textContent.includes(title));
+
+    expect(cardFor('Binary').textContent).toContain('Agree');
+    expect(cardFor('Multichoice').textContent).toContain('Opt 1');
+    expect(cardFor('Rating').textContent).toContain('1');
+    expect(cardFor('Rating').textContent).toContain('10');
+    expect(cardFor('Freeform').textContent).toContain('Write an answer...');
+  });
+
   it('shows the question count readout with the default value', () => {
     act(() => {
       root.render(
         <AudioSurveyGenerator provider={{}} network={{}} account="0x123" loginComplete toggleLoginModal={jest.fn()} />,
       );
     });
+    setAudioInputValue('Context that should reveal the default question count.');
 
     expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}"]`).textContent).toBe(
       '10',
@@ -227,6 +279,7 @@ describe('AudioSurveyGenerator input and question generation', () => {
         <AudioSurveyGenerator provider={{}} network={{}} account="0x123" loginComplete toggleLoginModal={jest.fn()} />,
       );
     });
+    setAudioInputValue('Context that should reveal the decrement controls.');
 
     const countValue = () => container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}"]`);
     const decrementButton = container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_DECREMENT}"]`);
@@ -248,6 +301,7 @@ describe('AudioSurveyGenerator input and question generation', () => {
         <AudioSurveyGenerator provider={{}} network={{}} account="0x123" loginComplete toggleLoginModal={jest.fn()} />,
       );
     });
+    setAudioInputValue('Context that should reveal the increment controls.');
 
     const countValue = () => container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}"]`);
     const incrementButton = container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_INCREMENT}"]`);
@@ -275,8 +329,8 @@ describe('AudioSurveyGenerator input and question generation', () => {
       <AudioSurveyGenerator provider={{}} network={{}} account="0x123" loginComplete toggleLoginModal={jest.fn()} />,
     );
 
-    toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_INCREMENT}"]`));
     setAudioInputValue('This database tool content is comfortably longer than fifty characters for generation.');
+    toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_INCREMENT}"]`));
 
     const form = container.querySelector('form');
     await act(async () => {

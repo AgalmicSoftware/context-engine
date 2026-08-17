@@ -1,6 +1,4 @@
 /* @file Account.module.scss */
-@use 'sass:color';
-
 /* --- LoginAndSettingsModal.tsx --- */
 
 @media (min-width: 0px) and (max-width: 319px) {
@@ -78,7 +76,7 @@
     padding-left: 5px;
     padding-right: 5px;
     font-size: 0.9em;
-    color: #236313;
+    color: var(--ce-status-success);
     #faucetLinkAndDetail {
       font-size: 1em;
       align-self: center;
@@ -127,7 +125,7 @@
       flex-direction: row;
       flex-wrap: wrap;
       font-weight: 600;
-      color: #146923;
+      color: var(--ce-status-success);
       margin-bottom: 0;
       padding-left: 10px;
       align-self: center;
@@ -165,7 +163,7 @@
     padding-left: 5px;
     padding-right: 5px;
     font-size: 0.9em;
-    color: #236313;
+    color: var(--ce-status-success);
     #faucetLinkAndDetail {
       font-size: 1em;
       align-self: center;
@@ -214,7 +212,7 @@
       flex-direction: row;
       flex-wrap: wrap;
       font-weight: 600;
-      color: #146923;
+      color: var(--ce-status-success);
       margin-bottom: 0;
       padding-left: 10px;
       align-self: center;
@@ -318,7 +316,7 @@
     padding-left: 5px;
     padding-right: 5px;
     font-size: 0.9em;
-    color: #236313;
+    color: var(--ce-status-success);
     #faucetLinkAndDetail {
       font-size: 1em;
       align-self: center;
@@ -368,7 +366,7 @@
       flex-direction: row;
       flex-wrap: wrap;
       font-weight: 600;
-      color: #146923;
+      color: var(--ce-status-success);
       margin-bottom: 0;
       padding-left: 10px;
       align-self: center;
@@ -404,7 +402,7 @@
     padding-left: 5px;
     padding-right: 5px;
     font-size: 0.9em;
-    color: #236313;
+    color: var(--ce-status-success);
     #faucetLinkAndDetail {
       font-size: 1em;
       align-self: center;
@@ -454,7 +452,7 @@
       flex-direction: row;
       flex-wrap: wrap;
       font-weight: 600;
-      color: #146923;
+      color: var(--ce-status-success);
       margin-bottom: 0;
       padding-left: 10px;
       align-self: center;
@@ -553,7 +551,7 @@
     padding-left: 5px;
     padding-right: 5px;
     font-size: 0.9em;
-    color: #236313;
+    color: var(--ce-status-success);
     #faucetLinkAndDetail {
       font-size: 1.25em;
       align-self: center;
@@ -603,7 +601,7 @@
       flex-direction: row;
       flex-wrap: wrap;
       font-weight: 600;
-      color: #146923;
+      color: var(--ce-status-success);
       margin-bottom: 0;
       padding-left: 10px;
       align-self: center;
@@ -640,7 +638,7 @@
     padding-left: 5px;
     padding-right: 5px;
     font-size: 0.9em;
-    color: #236313;
+    color: var(--ce-status-success);
     #faucetLinkAndDetail {
       font-size: 1.25em;
       align-self: center;
@@ -690,7 +688,7 @@
       flex-direction: row;
       flex-wrap: wrap;
       font-weight: 600;
-      color: #146923;
+      color: var(--ce-status-success);
       margin-bottom: 0;
       padding-left: 10px;
       align-self: center;
@@ -795,7 +793,7 @@
     padding-right: 10px;
     margin-top: 15px;
     font-size: 0.9em;
-    color: #236313;
+    color: var(--ce-status-success);
     #faucetLinkAndDetail {
       font-size: 1.5em;
       align-self: center;
@@ -845,7 +843,7 @@
       flex-direction: row;
       flex-wrap: wrap;
       font-weight: 600;
-      color: #146923;
+      color: var(--ce-status-success);
       margin-bottom: 0;
       padding-left: 10px;
       align-self: center;
@@ -882,7 +880,7 @@
     padding-right: 10px;
     margin-top: 15px;
     font-size: 0.9em;
-    color: #236313;
+    color: var(--ce-status-success);
     #faucetLinkAndDetail {
       font-size: 1.5em;
       align-self: center;
@@ -932,7 +930,7 @@
       flex-direction: row;
       flex-wrap: wrap;
       font-weight: 600;
-      color: #146923;
+      color: var(--ce-status-success);
       margin-bottom: 0;
       padding-left: 10px;
       align-self: center;
@@ -1041,7 +1039,7 @@
     padding-right: 15px;
     margin-top: 20px;
     font-size: 1em;
-    color: #236313;
+    color: var(--ce-status-success);
     #faucetLinkAndDetail {
       font-size: 1.75em;
       align-self: center;
@@ -1091,7 +1089,7 @@
       flex-direction: row;
       flex-wrap: wrap;
       font-weight: 600;
-      color: #146923;
+      color: var(--ce-status-success);
       margin-bottom: 0;
       padding-left: 10px;
       align-self: center;
@@ -1129,7 +1127,7 @@
     padding-right: 15px;
     margin-top: 20px;
     font-size: 1em;
-    color: #236313;
+    color: var(--ce-status-success);
     #faucetLinkAndDetail {
       font-size: 1.75em;
       align-self: center;
@@ -1179,7 +1177,7 @@
       flex-direction: row;
       flex-wrap: wrap;
       font-weight: 600;
-      color: #146923;
+      color: var(--ce-status-success);
       margin-bottom: 0;
       padding-top: 10px;
       padding-bottom: 10px;
@@ -1219,10 +1217,10 @@ h1 {
   flex-direction: column;
   justify-items: center;
   align-items: center;
-  background: #2a63ca !important;
+  background: var(--ce-action-submit) !important;
   box-shadow:
-    -5px 5px 10px #10122e,
-    5px -5px 10px #1e2155 h1 {
+    -5px 5px 10px var(--ce-overlay-surface),
+    5px -5px 10px var(--ce-overlay-surface) h1 {
     margin-bottom: 0px;
     font-weight: 700;
     opacity: 0.8;
@@ -1275,7 +1273,7 @@ h1 {
 
 #betaTesterText {
   font-weight: 700;
-  background-color: color.adjust(#eeff00, $alpha: -0.5);
+  background-color: color-mix(in srgb, var(--ce-data-series-6) 50%, transparent);
 }
 
 #metamaskInstructions {
@@ -1345,16 +1343,16 @@ h1 {
     justify-items: center;
     align-items: center;
     align-content: center;
-    background-color: #f7f1f1d1;
+    background-color: color-mix(in srgb, var(--ce-status-danger-text) 82%, transparent);
     text-transform: uppercase;
     font-weight: 600;
     padding: 6px;
-    border-radius: 2.5px;
+    border-radius: var(--ce-radius-3);
   }
 
   #testnetLinkDetail {
     display: inline;
-    color: #0000004f;
+    color: color-mix(in srgb, var(--ce-compat-dark) 31%, transparent);
     text-transform: uppercase;
     padding-left: 5px;
     font-weight: 600;
@@ -1362,14 +1360,14 @@ h1 {
 
   #rpcURLNotice {
     display: flex;
-    background: #e45f4000;
-    color: #ffffffe0;
+    background: transparent;
+    color: color-mix(in srgb, var(--ce-text-inverse) 88%, transparent);
   }
 
   #rpcURLTitle {
     align-self: flex-start;
     text-transform: uppercase;
-    color: #ffffff85;
+    color: color-mix(in srgb, var(--ce-text-inverse) 52%, transparent);
     padding-bottom: 5px;
   }
 
@@ -1377,8 +1375,8 @@ h1 {
     height: 100%;
     width: 100%;
     display: flex;
-    background: #fb634091;
-    color: #332d2d;
+    background: color-mix(in srgb, var(--ce-status-error) 56.9%, transparent);
+    color: var(--ce-overlay-surface);
     font-weight: 600;
     margin-bottom: 0px;
   }
@@ -1405,7 +1403,7 @@ h1 {
       align-items: center;
       font-weight: 700;
       text-transform: uppercase;
-      color: #0000007a;
+      color: color-mix(in srgb, var(--ce-compat-dark) 48%, transparent);
       background: transparent;
       border: none;
     }
@@ -1456,16 +1454,16 @@ h1 {
     justify-items: center;
     align-items: center;
     align-content: center;
-    background-color: #f7f1f1d1;
+    background-color: color-mix(in srgb, var(--ce-status-danger-text) 82%, transparent);
     text-transform: uppercase;
     font-weight: 600;
     padding: 6px;
-    border-radius: 2.5px;
+    border-radius: var(--ce-radius-3);
   }
 
   #testnetLinkDetail {
     display: inline;
-    color: #0000004f;
+    color: color-mix(in srgb, var(--ce-compat-dark) 31%, transparent);
     text-transform: uppercase;
     padding-left: 5px;
     font-weight: 600;
@@ -1473,22 +1471,22 @@ h1 {
 
   #rpcURLNotice {
     display: flex;
-    background: #e45f4000;
-    color: #ffffffe0;
+    background: transparent;
+    color: color-mix(in srgb, var(--ce-text-inverse) 88%, transparent);
   }
 
   #rpcURLTitle {
     align-self: flex-start;
     text-transform: uppercase;
-    color: #ffffff85;
+    color: color-mix(in srgb, var(--ce-text-inverse) 52%, transparent);
     padding-bottom: 5px;
   }
 
   #rpcURL {
     width: 100%;
     display: flex;
-    background: #16b749;
-    color: #332d2d;
+    background: var(--ce-status-success);
+    color: var(--ce-overlay-surface);
     margin-bottom: 5px;
     font-weight: 600;
     margin-bottom: 0px;
@@ -1498,7 +1496,7 @@ h1 {
     display: flex;
     flex-wrap: wrap;
     font-weight: 600;
-    color: #146923;
+    color: var(--ce-status-success);
     align-self: center;
     line-height: 1.25;
   }
@@ -1517,7 +1515,7 @@ h1 {
     align-items: center;
     font-weight: 700;
     text-transform: uppercase;
-    color: #0000007a;
+    color: color-mix(in srgb, var(--ce-compat-dark) 48%, transparent);
     background: transparent;
     border: none;
   }
@@ -1571,7 +1569,7 @@ h1 {
     flex-direction: row;
     align-items: center;
     justify-content: center;
-    background: #d9791d69;
+    background: color-mix(in srgb, var(--ce-status-warning) 41.2%, transparent);
     padding: 10px 10px 10px 10px;
     margin-right: 10px;
     margin-left: 10px;
@@ -1611,7 +1609,7 @@ h1 {
     flex-direction: row;
     align-items: center;
     justify-content: center;
-    background: #d9791d69;
+    background: color-mix(in srgb, var(--ce-status-warning) 41.2%, transparent);
     padding: 10px 15px 10px 15px;
     margin-right: 10px;
     margin-left: 10px;
@@ -1652,7 +1650,7 @@ h1 {
     flex-direction: row;
     align-items: center;
     justify-content: space-evenly;
-    background: #d9791d69;
+    background: color-mix(in srgb, var(--ce-status-warning) 41.2%, transparent);
     padding: 15px 15px 15px 15px;
     margin-right: 15px;
     margin-left: 15px;
@@ -1692,7 +1690,7 @@ h1 {
     flex-direction: row;
     align-items: center;
     justify-content: center;
-    background: #d9791d69;
+    background: color-mix(in srgb, var(--ce-status-warning) 41.2%, transparent);
     padding: 15px 15px 15px 15px;
     margin-right: 15px;
     margin-left: 15px;
@@ -1734,7 +1732,7 @@ h1 {
     flex-direction: row;
     align-items: center;
     justify-content: center;
-    background: #d9791d69;
+    background: color-mix(in srgb, var(--ce-status-warning) 41.2%, transparent);
     padding: 15px 15px 15px 15px;
     margin-right: 15px;
     margin-left: 15px;
@@ -1844,7 +1842,7 @@ h1 {
 }
 
 #accountModalPanel {
-  background: #a39ce763;
+  background: color-mix(in srgb, var(--ce-status-info-text) 38.8%, transparent);
   border-radius: var(--ce-radius-15);
   position: relative;
   z-index: 3;
@@ -1857,9 +1855,9 @@ h1 {
   letter-spacing: 6px;
   text-transform: uppercase;
   font-weight: 600;
-  color: #9cafff;
+  color: var(--ce-titlebar-text);
   font-size: 2.5em;
-  opacity: 0.5;
+  opacity: 1;
 }
 
 .Web3SettingsModalSubtitle {
@@ -1870,7 +1868,7 @@ h1 {
   letter-spacing: 6px;
   text-transform: uppercase;
   font-weight: 600;
-  color: #9cafff;
+  color: var(--ce-status-info-text);
   font-size: 2.5em;
   opacity: 0.5;
 }
@@ -1892,8 +1890,8 @@ h1 {
   align-items: center;
   padding: 10px;
   margin-bottom: 0px;
-  background: #ed1c1ca6;
-  border: solid 3px #fe0635;
+  background: color-mix(in srgb, var(--ce-status-error) 65.1%, transparent);
+  border: solid 3px var(--ce-status-error);
   border-radius: var(--ce-radius-15);
   font-weight: 525;
   margin-right: 20px;
@@ -1909,7 +1907,7 @@ h1 {
   align-items: center;
   justify-content: center;
   h3 {
-    color: #1d2951;
+    color: var(--ce-overlay-surface);
     text-transform: lowercase;
     font-size: 4em;
     margin-right: 0.5em;
@@ -1917,7 +1915,7 @@ h1 {
   }
 
   #verifyingTXloadingIcon {
-    color: #1d2951;
+    color: var(--ce-overlay-surface);
     font-size: 5em;
   }
 }
@@ -1989,9 +1987,16 @@ h1 {
 .preLoginSettingsTopRow {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 10px;
   width: 100%;
+}
+
+.preLoginSessionSummary {
+  display: flex;
+  flex: 1 1 auto;
+  justify-content: center;
+  min-width: 0;
 }
 
 .preLoginSettingsGear {
@@ -2003,7 +2008,7 @@ h1 {
   border: none;
   border-radius: var(--ce-radius-pill);
   background: transparent;
-  color: rgba(244, 247, 255, 0.65);
+  color: var(--ce-settings-muted-text);
   font-size: 0.95rem;
   cursor: pointer;
   transition:
@@ -2014,7 +2019,7 @@ h1 {
   &:hover,
   &:focus-visible {
     color: var(--ce-color-accent);
-    background: rgba(255, 255, 255, 0.06);
+    background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
     transform: rotate(12deg);
     outline: none;
   }
@@ -2026,15 +2031,23 @@ h1 {
   flex-direction: column;
   gap: 12px;
   padding: 14px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(23, 25, 65, 0.92);
+  border-radius: var(--ce-radius-14);
+  border-color: var(--ce-settings-border);
+  border-style: solid;
+  border-width: var(--ce-border-control-width);
+  background: var(--ce-settings-panel-bg);
+  color: var(--ce-settings-text);
   text-align: left;
 }
 
 .preLoginSettingsSummaryContainer {
   padding: 0;
   margin: 0;
+}
+
+.preLoginSettingsControlRow {
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 .preLoginSettingsConfigPanel {
@@ -2047,7 +2060,7 @@ h1 {
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: rgba(229, 231, 235, 0.68);
+  color: var(--ce-settings-muted-text);
 }
 
 .preLoginSettingsField {
@@ -2060,34 +2073,34 @@ h1 {
   font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: rgba(229, 231, 235, 0.72);
+  color: var(--ce-settings-muted-text);
 }
 
 .preLoginSettingsInput {
   width: 100%;
   padding: 10px 12px;
   border-radius: var(--ce-radius-10);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.04);
-  color: #f8fbff;
+  border: 1px solid var(--ce-settings-border);
+  background: var(--ce-settings-field-bg);
+  color: var(--ce-settings-text);
   font-family: var(--ce-font-mono);
   font-size: 0.84rem;
 
   &::placeholder {
-    color: rgba(229, 231, 235, 0.42);
+    color: var(--ce-settings-placeholder-text);
   }
 
   &:focus {
     outline: none;
-    border-color: rgba(77, 255, 164, 0.72);
-    box-shadow: 0 0 0 2px rgba(77, 255, 164, 0.18);
+    border-color: color-mix(in srgb, var(--ce-action-accent) 72%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ce-action-accent) 18%, transparent);
   }
 }
 
 .preLoginSettingsHint {
   font-size: 0.75rem;
   line-height: 1.45;
-  color: rgba(229, 231, 235, 0.68);
+  color: var(--ce-settings-muted-text);
 }
 
 .preLoginSettingsActions {
@@ -2096,16 +2109,34 @@ h1 {
   flex-wrap: wrap;
 }
 
+.preLoginSettingsActions :global(.btn-outline-secondary) {
+  background: var(--ce-settings-control-bg);
+  border-color: var(--ce-settings-control-border);
+  border-width: var(--ce-settings-control-border-width);
+  color: var(--ce-settings-control-text);
+  opacity: 1;
+
+  &:hover,
+  &:focus-visible,
+  &:active {
+    background: var(--ce-settings-control-bg);
+    border-color: var(--ce-action-accent);
+    color: var(--ce-settings-control-text);
+  }
+}
+
 .networkSwitchButton {
-  background: transparent;
+  background: var(--ce-settings-control-bg);
   font-weight: 600;
   padding: 15px;
   font-size: 1.15em;
-  color: var(--ce-color-white);
+  color: var(--ce-settings-control-text);
   text-transform: uppercase;
-  border: var(--ce-color-white) 1px solid;
+  border-color: var(--ce-settings-control-border);
+  border-style: solid;
+  border-width: var(--ce-settings-control-border-width);
   border-radius: var(--ce-radius-10);
-  opacity: 0.5;
+  opacity: var(--ce-settings-control-opacity);
   transition:
     opacity 0.3s,
     color 0.3s;
@@ -2134,7 +2165,7 @@ h1 {
 }
 
 .networkLabel {
-  color: var(--ce-color-white);
+  color: var(--ce-settings-text);
   font-size: 1em;
   margin-right: 5px;
 }
@@ -2145,7 +2176,7 @@ h1 {
 
 .infoIcon {
   margin-left: 5px;
-  color: var(--ce-color-white);
+  color: var(--ce-settings-muted-text);
   cursor: pointer;
   opacity: 0.7;
   transition: opacity 0.3s;
@@ -2209,28 +2240,28 @@ h1 {
   max-width: 320px;
   font-size: 0.76rem;
   line-height: 1.45;
-  color: rgba(229, 231, 235, 0.86);
+  color: var(--ce-settings-muted-text);
 }
 
 .faucetStatusSuccess {
-  color: #a7ffd0;
+  color: var(--ce-status-success-text);
 }
 
 .faucetStatusError {
-  color: #ffd3d3;
+  color: var(--ce-status-danger-text);
 }
 
 .txLink {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: #9bd0ff;
+  color: var(--ce-status-info-text);
   font-size: 0.8rem;
   text-decoration: none;
 
   &:hover,
   &:focus-visible {
-    color: #d4ebff;
+    color: var(--ce-status-info-text);
     text-decoration: underline;
     outline: none;
   }
@@ -2264,8 +2295,11 @@ h1 {
 .sendTestnetFundsButton.settingsConfigToggleButton,
 .sendTestnetFundsButton.preferenceToggleButton {
   min-height: 44px;
-  border-color: rgba(255, 255, 255, 0.36);
-  opacity: 0.78;
+  background: var(--ce-settings-control-bg);
+  border-color: var(--ce-settings-control-border);
+  border-width: var(--ce-settings-control-border-width);
+  color: var(--ce-settings-control-text);
+  opacity: var(--ce-settings-control-opacity);
   transition:
     border-color 0.18s ease,
     box-shadow 0.18s ease,
@@ -2274,9 +2308,9 @@ h1 {
 
   &:hover,
   &:focus-visible {
-    color: #f8fbff;
-    border-color: rgba(77, 255, 164, 0.78);
-    box-shadow: 0 0 0 2px rgba(77, 255, 164, 0.16);
+    color: var(--ce-settings-control-text);
+    border-color: color-mix(in srgb, var(--ce-action-accent) 78%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ce-action-accent) 16%, transparent);
     opacity: 1;
     outline: none;
   }
@@ -2288,7 +2322,7 @@ h1 {
 }
 
 .preferenceToggleLabel {
-  color: #f8fbff;
+  color: var(--ce-settings-text);
 }
 
 .preferenceToggleTrack {
@@ -2299,9 +2333,9 @@ h1 {
   height: 22px;
   padding: 2px;
   flex: 0 0 auto;
-  border: 1px solid rgba(238, 244, 255, 0.48);
+  border: 1px solid color-mix(in srgb, var(--ce-status-info-text) 48%, transparent);
   border-radius: var(--ce-radius-pill);
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
   transition:
     background-color 0.18s ease,
     border-color 0.18s ease;
@@ -2310,9 +2344,9 @@ h1 {
 .preferenceToggleThumb {
   width: 16px;
   height: 16px;
-  border-radius: 50%;
-  background: rgba(238, 244, 255, 0.82);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.32);
+  border-radius: var(--ce-radius-round);
+  background: color-mix(in srgb, var(--ce-status-info-text) 82%, transparent);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--ce-compat-dark) 32%, transparent);
   transform: translateX(0);
   transition:
     background-color 0.18s ease,
@@ -2320,18 +2354,18 @@ h1 {
 }
 
 .preferenceToggleButton[aria-pressed='true'] .preferenceToggleTrack {
-  border-color: #4dffa4;
-  background: rgba(77, 255, 164, 0.2);
+  border-color: var(--ce-action-accent);
+  background: color-mix(in srgb, var(--ce-action-accent) 20%, transparent);
 }
 
 .preferenceToggleButton[aria-pressed='true'] .preferenceToggleThumb {
-  background: #4dffa4;
+  background: var(--ce-action-accent);
   transform: translateX(16px);
 }
 
 .preferenceToggleState {
   min-width: 20px;
-  color: rgba(244, 247, 255, 0.72);
+  color: var(--ce-settings-muted-text);
   font-family: var(--ce-font-mono);
   font-size: 0.68rem;
   font-weight: 700;
@@ -2360,9 +2394,11 @@ h1 {
   min-height: 44px;
   padding: 9px 10px 9px 12px;
   border-radius: var(--ce-radius-10);
-  border: 1px solid rgba(255, 255, 255, 0.36);
-  background: transparent;
-  opacity: 0.78;
+  border-color: var(--ce-settings-control-border);
+  border-style: solid;
+  border-width: var(--ce-settings-control-border-width);
+  background: var(--ce-settings-control-bg);
+  opacity: var(--ce-settings-control-opacity);
   transition:
     border-color 0.18s ease,
     box-shadow 0.18s ease,
@@ -2370,8 +2406,8 @@ h1 {
 
   &:hover,
   &:focus-within {
-    border-color: rgba(77, 255, 164, 0.78);
-    box-shadow: 0 0 0 2px rgba(77, 255, 164, 0.16);
+    border-color: color-mix(in srgb, var(--ce-action-accent) 78%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ce-action-accent) 16%, transparent);
     opacity: 1;
   }
 }
@@ -2381,9 +2417,9 @@ h1 {
   align-items: center;
   justify-content: center;
   padding: 0;
-  // background: rgba(120, 156, 228, 0.78);
-  color: #eef4ff;
-  border-radius: 8px;
+  // background: color-mix(in srgb, var(--ce-status-info) 78%, transparent);
+  color: var(--ce-settings-text);
+  border-radius: var(--ce-radius-8);
   font-family: var(--ce-font-mono);
   font-size: 0.82rem;
   font-weight: 700;
@@ -2397,7 +2433,7 @@ h1 {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #f8fbff;
+  color: var(--ce-settings-text);
   font-family: var(--ce-font-mono);
   font-size: 0.82rem;
   font-weight: 700;
@@ -2410,9 +2446,9 @@ h1 {
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  border-radius: 6px;
-  color: rgba(238, 244, 255, 0.86);
-  background: rgba(255, 255, 255, 0.08);
+  border-radius: var(--ce-radius-6);
+  color: color-mix(in srgb, var(--ce-status-info-text) 86%, transparent);
+  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
   transition:
     background-color 0.18s ease,
     color 0.18s ease,
@@ -2420,8 +2456,8 @@ h1 {
 
   &:hover,
   &:focus-visible {
-    color: #f8fbff;
-    background: rgba(120, 156, 228, 0.26);
+    color: var(--ce-status-info-text);
+    background: color-mix(in srgb, var(--ce-status-info) 26%, transparent);
     transform: translateY(-1px);
     outline: none;
     text-decoration: none;
@@ -2502,16 +2538,40 @@ h1 {
   }
 }
 
+@media (min-width: 540px) {
+  .preLoginSettingsControlRow {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .preLoginSettingsControlRow > * {
+    flex: 1 1 220px;
+    width: auto;
+    min-width: min(100%, 220px);
+    max-width: 300px;
+    justify-content: center;
+  }
+
+  .preLoginSettingsControlRow .tooltipsToggleButton {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    justify-content: center;
+  }
+}
+
 .aiSettingsPanel {
   display: flex;
   flex-direction: column;
   gap: 14px;
   width: 100%;
   padding: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 18px;
-  background: rgba(23, 25, 65, 0.92);
-  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--ce-settings-border);
+  border-radius: var(--ce-radius-18);
+  background: var(--ce-settings-panel-bg);
+  color: var(--ce-settings-text);
+  box-shadow: 0 6px 22px color-mix(in srgb, var(--ce-compat-dark) 25%, transparent);
 }
 
 .supportedResourcesGrid {
@@ -2532,9 +2592,9 @@ h1 {
   gap: 8px;
   min-width: 0;
   padding: 14px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
+  border-radius: var(--ce-radius-14);
+  border: 1px solid var(--ce-settings-border);
+  background: var(--ce-settings-surface-bg);
 }
 
 .supportedResourceHeader {
@@ -2547,13 +2607,13 @@ h1 {
 .supportedResourceName {
   font-size: 1.08rem;
   font-weight: 700;
-  color: #f8fbff;
+  color: var(--ce-settings-text);
 }
 
 .supportedResourceDetail {
   font-size: 0.8rem;
   line-height: 1.5;
-  color: rgba(229, 231, 235, 0.74);
+  color: var(--ce-settings-muted-text);
 }
 
 .supportedResourceSessions {
@@ -2566,7 +2626,7 @@ h1 {
   font-size: 0.66rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: rgba(229, 231, 235, 0.6);
+  color: var(--ce-settings-muted-text);
 }
 
 .supportedResourcePrimarySession {
@@ -2574,29 +2634,6 @@ h1 {
   flex-direction: column;
   gap: 6px;
   min-width: 0;
-}
-
-.supportedResourceActiveState {
-  width: fit-content;
-  padding: 4px 8px;
-  border-radius: var(--ce-radius-pill);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.supportedResourceActiveStateOn {
-  border-color: rgba(77, 255, 164, 0.5);
-  background: rgba(77, 255, 164, 0.12);
-  color: #98ffc9;
-}
-
-.supportedResourceActiveStateOff {
-  border-color: rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(248, 251, 255, 0.72);
 }
 
 .supportedResourceOtherSessions {
@@ -2618,7 +2655,7 @@ h1 {
   padding: 0;
   border: none;
   background: transparent;
-  color: #7bffb6;
+  color: var(--ce-status-success-text);
   font-size: 0.78rem;
   font-weight: 700;
   cursor: pointer;
@@ -2628,7 +2665,7 @@ h1 {
 
   &:hover,
   &:focus-visible {
-    color: #a7ffd0;
+    color: var(--ce-status-success-text);
     opacity: 1;
     outline: none;
   }
@@ -2650,16 +2687,16 @@ h1 {
   gap: 6px;
   min-width: 0;
   padding: 14px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
+  border-radius: var(--ce-radius-14);
+  border: 1px solid var(--ce-settings-border);
+  background: var(--ce-settings-surface-bg);
 }
 
 .aiSettingsSummaryLabel {
   font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: rgba(229, 231, 235, 0.68);
+  color: var(--ce-settings-muted-text);
 }
 
 .aiSettingsSummaryLabelRow {
@@ -2683,19 +2720,19 @@ h1 {
   font-family: var(--ce-font-mono);
   font-size: 0.98rem;
   font-weight: 700;
-  color: #f8fbff;
+  color: var(--ce-settings-text);
 }
 
 .aiSettingsSummaryDetail {
   font-size: 0.76rem;
   line-height: 1.5;
-  color: rgba(229, 231, 235, 0.72);
+  color: var(--ce-settings-muted-text);
 }
 
 .settingsSectionCard {
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(9, 11, 31, 0.32);
+  border-radius: var(--ce-radius-16);
+  border: 1px solid var(--ce-settings-border);
+  background: var(--ce-settings-section-bg);
   overflow: hidden;
 }
 
@@ -2708,7 +2745,7 @@ h1 {
   padding: 14px 16px;
   border: none;
   background: transparent;
-  color: #f8fbff;
+  color: var(--ce-settings-text);
   text-align: left;
 }
 
@@ -2729,12 +2766,12 @@ h1 {
 
 .settingsSectionSummary {
   font-size: 0.78rem;
-  color: rgba(229, 231, 235, 0.72);
+  color: var(--ce-settings-muted-text);
 }
 
 .settingsSectionChevron {
   margin-top: 2px;
-  color: rgba(229, 231, 235, 0.78);
+  color: var(--ce-settings-muted-text);
 }
 
 .settingsSectionBody {
@@ -2742,13 +2779,13 @@ h1 {
   flex-direction: column;
   gap: 14px;
   padding: 0 16px 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
 }
 
 .settingsSectionLead {
   font-size: 0.82rem;
   line-height: 1.55;
-  color: rgba(229, 231, 235, 0.78);
+  color: var(--ce-settings-muted-text);
 }
 
 .aiSettingsInlineToggle,
@@ -2759,9 +2796,9 @@ h1 {
   width: fit-content;
   padding: 7px 11px;
   border-radius: var(--ce-radius-pill);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.04);
-  color: #f8fbff;
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
+  background: var(--ce-settings-surface-bg);
+  color: var(--ce-settings-text);
   font-size: 0.78rem;
   letter-spacing: 0.02em;
 }
@@ -2779,8 +2816,8 @@ h1 {
   min-width: 0;
   padding: 12px;
   border-radius: var(--ce-radius-12);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
+  background: var(--ce-settings-surface-bg);
 }
 
 .aiSettingsRowFull {
@@ -2791,16 +2828,16 @@ h1 {
   font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: rgba(229, 231, 235, 0.72);
+  color: var(--ce-settings-muted-text);
 }
 
 .aiSettingsInput,
 .aiSettingsSelect,
 .aiSettingsTextarea {
   width: 100%;
-  background: rgba(7, 10, 28, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  color: #f8fbff;
+  background: var(--ce-settings-field-bg);
+  border: 1px solid var(--ce-settings-border);
+  color: var(--ce-settings-text);
   border-radius: var(--ce-radius-10);
   padding: 9px 11px;
   font-size: 0.86rem;
@@ -2815,16 +2852,16 @@ h1 {
 .aiSettingsSelect:focus,
 .aiSettingsTextarea:focus {
   outline: none;
-  border-color: rgba(77, 255, 164, 0.82);
-  box-shadow: 0 0 0 2px rgba(77, 255, 164, 0.14);
+  border-color: color-mix(in srgb, var(--ce-action-accent) 82%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ce-action-accent) 14%, transparent);
 }
 
 .aiSettingsInput:disabled,
 .aiSettingsSelect:disabled,
 .aiSettingsTextarea:disabled {
-  color: rgba(229, 231, 235, 0.62);
-  background: rgba(7, 10, 28, 0.4);
-  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--ce-settings-muted-text);
+  background: var(--ce-settings-section-bg);
+  border-color: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
 }
 
 .aiSettingsTextarea {
@@ -2845,9 +2882,9 @@ h1 {
   flex-wrap: wrap;
   padding: 12px 14px;
   border-radius: var(--ce-radius-12);
-  border: 1px solid rgba(77, 255, 164, 0.24);
-  background: rgba(77, 255, 164, 0.08);
-  color: #f8fbff;
+  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 24%, transparent);
+  background: color-mix(in srgb, var(--ce-action-accent) 8%, transparent);
+  color: var(--ce-settings-text);
   font-size: 0.8rem;
   line-height: 1.45;
 }
@@ -2858,9 +2895,9 @@ h1 {
   flex-direction: column;
   gap: 12px;
   padding: 14px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
+  border-radius: var(--ce-radius-14);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
+  background: var(--ce-settings-surface-bg);
 }
 
 .aiReasoningButtons {
@@ -2871,10 +2908,10 @@ h1 {
 
 .aiReasoningBtn {
   min-width: 88px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
   border-radius: var(--ce-radius-pill);
-  background: rgba(7, 10, 28, 0.72);
-  color: #f8fbff;
+  background: var(--ce-settings-field-bg);
+  color: var(--ce-settings-text);
   padding: 8px 14px;
   font-size: 0.82rem;
   font-weight: 700;
@@ -2887,19 +2924,20 @@ h1 {
 
 .aiReasoningBtn:hover:not(:disabled),
 .aiReasoningBtn:focus-visible:not(:disabled) {
-  border-color: rgba(77, 255, 164, 0.55);
+  border-color: color-mix(in srgb, var(--ce-action-accent) 55%, transparent);
   outline: none;
 }
 
 .aiReasoningBtn:disabled {
-  opacity: 0.6;
+  color: var(--ce-settings-muted-text);
+  opacity: 1;
   cursor: not-allowed;
 }
 
 .aiReasoningBtnActive {
   background: var(--ce-color-accent);
   border-color: var(--ce-color-accent);
-  color: #1f2733;
+  color: var(--ce-action-accent-text);
 }
 
 .aiAdvancedToggle {
@@ -2909,10 +2947,10 @@ h1 {
   justify-content: space-between;
   gap: 10px;
   padding: 12px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
   border-radius: var(--ce-radius-12);
-  background: rgba(9, 11, 31, 0.36);
-  color: #f8fbff;
+  background: var(--ce-settings-section-bg);
+  color: var(--ce-settings-text);
   font-family: var(--ce-font-ui);
   font-size: 0.84rem;
   font-weight: 700;
@@ -2928,8 +2966,8 @@ h1 {
   gap: 12px;
   padding: 12px;
   border-radius: var(--ce-radius-12);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(7, 10, 28, 0.36);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
+  background: var(--ce-settings-section-bg);
 }
 
 .aiSettingsFooterRow {
@@ -2950,18 +2988,18 @@ h1 {
 .aiSettingsStatus {
   font-size: 0.76rem;
   line-height: 1.5;
-  color: rgba(229, 231, 235, 0.76);
+  color: var(--ce-settings-muted-text);
 }
 
 .aiSettingsHint {
   font-size: 0.74rem;
   line-height: 1.45;
-  color: rgba(229, 231, 235, 0.64);
+  color: var(--ce-settings-muted-text);
 }
 
 .aiSettingsHintStrong {
   font-size: 0.76rem;
-  color: rgba(229, 231, 235, 0.78);
+  color: var(--ce-settings-muted-text);
 }
 
 .sponsorshipGrid {
@@ -2977,8 +3015,8 @@ h1 {
   min-width: 0;
   padding: 12px;
   border-radius: var(--ce-radius-12);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
+  background: var(--ce-settings-surface-bg);
 }
 
 .sponsorshipCardHeader {
@@ -2991,14 +3029,14 @@ h1 {
 .sponsorshipResourceName {
   font-size: 0.9rem;
   font-weight: 700;
-  color: #f8fbff;
+  color: var(--ce-settings-text);
 }
 
 .sponsorshipDetail {
   margin-top: 3px;
   font-size: 0.76rem;
   line-height: 1.5;
-  color: rgba(229, 231, 235, 0.68);
+  color: var(--ce-settings-muted-text);
 }
 
 .sponsorshipBlock {
@@ -3011,13 +3049,13 @@ h1 {
   font-size: 0.66rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: rgba(229, 231, 235, 0.6);
+  color: var(--ce-settings-muted-text);
 }
 
 .sponsorshipGateText {
   font-size: 0.78rem;
   line-height: 1.5;
-  color: rgba(248, 251, 255, 0.82);
+  color: color-mix(in srgb, var(--ce-status-info-text) 82%, transparent);
 }
 
 .sessionPills,
@@ -3033,19 +3071,24 @@ h1 {
   gap: 6px;
   padding: 6px 10px;
   border-radius: var(--ce-radius-pill);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.05);
-  color: #f8fbff;
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
+  background: var(--ce-settings-surface-bg);
+  color: var(--ce-settings-text);
   font-size: 0.76rem;
 }
 
 .sessionPillActive {
-  border-color: rgba(77, 255, 164, 0.55);
-  background: rgba(77, 255, 164, 0.12);
+  border-color: color-mix(in srgb, var(--ce-action-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
+}
+
+.sessionPillWithDetail {
+  flex-wrap: wrap;
+  max-width: 100%;
 }
 
 .sessionPillMeta {
-  color: rgba(229, 231, 235, 0.62);
+  color: var(--ce-settings-muted-text);
   font-size: 0.7rem;
 }
 
@@ -3057,7 +3100,7 @@ h1 {
   padding: 4px 10px;
   border-radius: var(--ce-radius-pill);
   border: 1px solid currentColor;
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -3065,15 +3108,15 @@ h1 {
 }
 
 .aiSponsoredStatusok {
-  color: #7bffb6;
+  color: var(--ce-status-success-text);
 }
 
 .aiSponsoredStatuswarn {
-  color: #ffcc7b;
+  color: var(--ce-status-warning-text);
 }
 
 .aiSponsoredStatusmuted {
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--ce-settings-muted-text);
 }
 
 @media (max-width: 768px) {
@@ -3134,15 +3177,15 @@ h1 {
     opacity 0.2s ease-in-out;
   cursor: pointer;
   // Default appearance for post-login
-  color: #ffc107;
+  color: var(--ce-status-warning);
   background-color: transparent;
-  border: 1px solid #ffc107;
+  border: 1px solid var(--ce-status-warning);
   max-width: 200px;
   opacity: 0.1;
   &:hover {
     color: var(--ce-color-dark);
-    background-color: #ffc107;
-    border-color: #e0a800;
+    background-color: var(--ce-status-warning);
+    border-color: var(--ce-status-warning);
     opacity: 1;
   }
 
@@ -3170,15 +3213,15 @@ h1 {
   cursor: pointer;
   margin-bottom: 15px;
   // Default appearance for pre-login
-  color: #ffc107;
+  color: var(--ce-status-warning);
   background-color: transparent;
-  border: 1px solid #ffc107;
+  border: 1px solid var(--ce-status-warning);
   max-width: 200px;
   opacity: 0.1;
   &:hover {
     color: var(--ce-color-dark);
-    background-color: #ffc107;
-    border-color: #e0a800;
+    background-color: var(--ce-status-warning);
+    border-color: var(--ce-status-warning);
     opacity: 1;
   }
 
@@ -3265,7 +3308,7 @@ h1 {
 #torusIframe {
   width: 390px;
   height: 320px;
-  border: #ffffff00;
+  border: transparent;
   border-width: 1px;
   border-radius: var(--ce-radius-20);
   border-style: solid;
@@ -3294,7 +3337,7 @@ h1 {
 
   // Target the text inside the main continue button
   .w3ajs-email-login__button span {
-    color: #555 !important;
+    color: var(--ce-text-muted) !important;
   }
 }
 
@@ -3353,7 +3396,7 @@ h1 {
   align-items: center;
   justify-content: center;
   opacity: 0.7;
-  color: #cfd3e0;
+  color: var(--ce-status-info-text);
   margin-bottom: 12px;
   max-width: 100%;
 }
@@ -3366,8 +3409,10 @@ h1 {
 
 .accountWarningMessage {
   max-width: 100%;
-  background: rgb(15 12 40 / 46%);
-  border: none;
+  background: var(--ce-surface-sunken);
+  border-color: var(--ce-border-inset);
+  border-style: solid;
+  border-width: var(--ce-border-control-width);
   border-radius: var(--ce-radius-10);
   padding: 14px 16px;
   margin-bottom: 14px;
@@ -3375,12 +3420,10 @@ h1 {
   font-size: 1.25rem;
   overflow-wrap: anywhere;
   word-break: break-word;
-  color: #e6e9f2;
+  color: var(--ce-panel-text);
   width: 100%;
   max-width: 560px;
-  box-shadow:
-    0 10px 18px rgba(6, 8, 22, 0.3),
-    inset 0 0 0 1px rgba(120, 140, 190, 0.12);
+  box-shadow: var(--ce-shadow-pressed);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
 }
@@ -3400,12 +3443,12 @@ h1 {
   margin: 4px 0;
   font-weight: 600;
   margin-bottom: 15px;
-  color: #01a6ff;
+  color: var(--ce-status-info);
 }
 
 /* Link styling inside warning message */
 .accountWarningMessage a {
-  color: #a9c4ff;
+  color: var(--ce-status-info-text);
   font-weight: 700;
   text-decoration: underline;
   text-decoration-thickness: 2px;
@@ -3417,7 +3460,7 @@ h1 {
 }
 .accountWarningMessage a:hover,
 .accountWarningMessage a:focus {
-  color: #c1d4ff;
+  color: var(--ce-status-info-text);
 }
 .accountWarningMessage a:focus-visible {
   outline: 2px dotted currentColor;
@@ -3427,12 +3470,12 @@ h1 {
 .accountWarningOkButton {
   min-width: 120px;
   font-weight: 600;
-  background-color: #05a6ff;
+  background-color: var(--ce-status-info);
 }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .accountWarningMessage {
-    background: rgba(12, 16, 40, 0.86);
+    background: var(--ce-surface-sunken);
   }
 }
 
@@ -3467,7 +3510,7 @@ h1 {
 /* Wallet modal fixes: readable label and mobile centering */
 :global(#w3a-modal .w3a-adapter-item > button p.ml-2),
 :global(#w3a-modal .w3a-adapter-item > button p) {
-  color: #111 !important;
+  color: var(--ce-document-text) !important;
 }
 
 @media (max-width: 480px) {
@@ -3506,9 +3549,9 @@ h1 {
   background-color: transparent !important;
   border: 0;
   box-shadow: none;
-  color: var(--ce-color-white);
+  color: var(--ce-titlebar-text);
   text-shadow: none;
-  opacity: 0.5;
+  opacity: 0.85;
   line-height: 1;
   transition: opacity 0.2s ease;
 }
@@ -3519,7 +3562,7 @@ h1 {
 :global(.modal-login .btn-close:focus) {
   background: transparent;
   background-color: transparent !important;
-  opacity: 0.8;
+  opacity: 1;
 }
 
 :global(.modal.modal-login) .web3ModalDialog {
@@ -3543,28 +3586,13 @@ h1 {
   position: relative;
   z-index: 2101;
   overflow: hidden;
+  margin-top: 0;
+  background: var(--ce-surface);
 
   :global(.card-header) {
     position: relative;
     padding-right: 4.25rem;
   }
-}
-
-#loginModalCard::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-}
-
-#loginModalCard::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at 20% 0%, rgba(255, 255, 255, 0.08), transparent 55%);
-  z-index: 0;
-  pointer-events: none;
 }
 
 #loginModalCard > * {
@@ -3578,7 +3606,7 @@ h1 {
   padding: 0;
   margin-top: 8px;
   display: inline-block;
-  color: #cfd3e0;
+  color: var(--ce-status-info-text);
   opacity: 0.5;
   text-decoration: none;
   font-weight: 600;
@@ -3638,80 +3666,84 @@ body.w3a-silent iframe[class^='walletIframe-'] {
   font-size: 1.1em;
   white-space: normal;
   line-height: 1.2;
-  color: #f2f4ff;
-  border: 1px solid rgba(120, 140, 190, 0.22);
+  color: var(--ce-document-surface);
+  border: 1px solid color-mix(in srgb, var(--ce-status-info) 22%, transparent);
   transition:
     transform 0.2s ease,
     border-color 0.2s ease,
     color 0.2s ease,
     opacity 0.2s;
   box-shadow:
-    -3px 3px 6px rgba(8, 12, 36, 0.62),
-    3px -3px 8px rgba(120, 150, 220, 0.22);
+    -3px 3px 6px color-mix(in srgb, var(--ce-overlay-base) 62%, transparent),
+    3px -3px 8px color-mix(in srgb, var(--ce-status-info) 22%, transparent);
   &:hover {
     transform: translateY(-2px);
     box-shadow:
-      -4px 4px 10px rgba(8, 12, 36, 0.68),
-      4px -4px 12px rgba(120, 140, 190, 0.2);
-    border-color: rgba(140, 170, 220, 0.35);
-    color: #f7f9ff;
+      -4px 4px 10px color-mix(in srgb, var(--ce-overlay-base) 68%, transparent),
+      4px -4px 12px color-mix(in srgb, var(--ce-status-info) 20%, transparent);
+    border-color: color-mix(in srgb, var(--ce-status-info) 35%, transparent);
+    color: var(--ce-document-surface);
   }
 
   &:focus,
   &:focus-visible {
-    outline: 2px solid rgba(140, 170, 220, 0.3);
+    outline: 2px solid color-mix(in srgb, var(--ce-status-info) 30%, transparent);
     outline-offset: 2px;
-    border-color: rgba(140, 170, 220, 0.35);
-    color: #f7f9ff;
+    border-color: color-mix(in srgb, var(--ce-status-info) 35%, transparent);
+    color: var(--ce-document-surface);
   }
 
   &:active {
     transform: translateY(1px);
     box-shadow:
-      -1px 1px 4px rgba(8, 12, 36, 0.5),
-      1px -1px 4px rgba(120, 140, 190, 0.15);
-    color: #f7f9ff;
+      -1px 1px 4px color-mix(in srgb, var(--ce-overlay-base) 50%, transparent),
+      1px -1px 4px color-mix(in srgb, var(--ce-status-info) 15%, transparent);
+    color: var(--ce-document-surface);
   }
 }
 
 .passkeyButtonPrimary {
-  background-color: #2b2f55;
-  background-image: linear-gradient(150deg, #2f345e, #1f2344);
-  border-color: rgba(120, 140, 190, 0.22);
-  color: #f2f4ff;
+  background-color: var(--ce-status-info);
+  background-image: linear-gradient(150deg, var(--ce-status-info), var(--ce-overlay-surface));
+  border-color: color-mix(in srgb, var(--ce-status-info) 22%, transparent);
+  color: var(--ce-document-surface);
   box-shadow:
-    -3px 3px 6px rgba(8, 12, 36, 0.62),
-    3px -3px 8px rgba(120, 140, 190, 0.2);
+    -3px 3px 6px color-mix(in srgb, var(--ce-overlay-base) 62%, transparent),
+    3px -3px 8px color-mix(in srgb, var(--ce-status-info) 20%, transparent);
   &:hover {
-    background-color: #323760;
+    background-color: var(--ce-status-info);
     box-shadow:
-      -4px 4px 10px rgba(8, 12, 36, 0.68),
-      4px -4px 12px rgba(120, 140, 190, 0.22);
-    border-color: rgba(140, 170, 220, 0.35);
-    color: #f7f9ff;
+      -4px 4px 10px color-mix(in srgb, var(--ce-overlay-base) 68%, transparent),
+      4px -4px 12px color-mix(in srgb, var(--ce-status-info) 22%, transparent);
+    border-color: color-mix(in srgb, var(--ce-status-info) 35%, transparent);
+    color: var(--ce-document-surface);
   }
 
   &:focus,
   &:active {
-    color: #f7f9ff;
+    color: var(--ce-document-surface);
   }
 }
 
 .passkeyButtonOutline {
-  background-color: rgba(22, 26, 54, 0.6);
-  background-image: linear-gradient(150deg, rgba(36, 42, 84, 0.7), rgba(18, 22, 48, 0.55));
-  border: 1px solid rgba(120, 140, 190, 0.28);
-  color: #f2f4ff;
+  background-color: color-mix(in srgb, var(--ce-overlay-surface) 60%, transparent);
+  background-image: linear-gradient(
+    150deg,
+    color-mix(in srgb, var(--ce-status-info) 70%, transparent),
+    color-mix(in srgb, var(--ce-overlay-surface) 55%, transparent)
+  );
+  border: 1px solid color-mix(in srgb, var(--ce-status-info) 28%, transparent);
+  color: var(--ce-document-surface);
   backdrop-filter: blur(5px);
   &:hover {
-    background-color: rgba(28, 34, 70, 0.72);
-    border-color: rgba(140, 170, 220, 0.4);
-    color: #f7f9ff;
+    background-color: color-mix(in srgb, var(--ce-overlay-surface) 72%, transparent);
+    border-color: color-mix(in srgb, var(--ce-status-info) 40%, transparent);
+    color: var(--ce-document-surface);
   }
 
   &:focus,
   &:active {
-    color: #f7f9ff;
+    color: var(--ce-document-surface);
   }
 }
 
@@ -3720,18 +3752,18 @@ body.w3a-silent iframe[class^='walletIframe-'] {
   margin: 14px auto 0;
   padding: 10px 12px;
   border-radius: var(--ce-radius-8);
-  border: 1px solid rgba(140, 170, 220, 0.28);
-  background: rgba(18, 22, 48, 0.72);
-  color: #f2f4ff;
+  border: 1px solid color-mix(in srgb, var(--ce-status-info) 28%, transparent);
+  background: color-mix(in srgb, var(--ce-overlay-surface) 72%, transparent);
+  color: var(--ce-document-surface);
   font-size: 0.9rem;
   line-height: 1.4;
   text-align: center;
 }
 
 .passkeyWalletStatusError {
-  border-color: rgba(255, 142, 142, 0.42);
-  background: rgba(76, 24, 38, 0.55);
-  color: #ffe8ec;
+  border-color: color-mix(in srgb, var(--ce-status-danger-text) 42%, transparent);
+  background: color-mix(in srgb, var(--ce-overlay-surface) 55%, transparent);
+  color: var(--ce-status-danger-text);
 }
 
 .advancedWalletAccessNotice {
@@ -3739,9 +3771,9 @@ body.w3a-silent iframe[class^='walletIframe-'] {
   margin: 16px auto 0;
   padding: 10px 12px;
   border-radius: var(--ce-radius-8);
-  border: 1px solid rgba(140, 170, 220, 0.28);
-  background: rgba(18, 22, 48, 0.62);
-  color: #f2f4ff;
+  border: 1px solid color-mix(in srgb, var(--ce-status-info) 28%, transparent);
+  background: color-mix(in srgb, var(--ce-overlay-surface) 62%, transparent);
+  color: var(--ce-document-surface);
   font-size: 0.9rem;
   line-height: 1.4;
   text-align: center;
@@ -3757,9 +3789,9 @@ body.w3a-silent iframe[class^='walletIframe-'] {
   margin: 16px auto 0;
   padding: 14px;
   border-radius: var(--ce-radius-8);
-  border: 1px solid rgba(140, 170, 220, 0.28);
-  background: rgba(18, 22, 48, 0.62);
-  color: #f2f4ff;
+  border: 1px solid color-mix(in srgb, var(--ce-status-info) 28%, transparent);
+  background: color-mix(in srgb, var(--ce-overlay-surface) 62%, transparent);
+  color: var(--ce-document-surface);
   text-align: left;
 }
 
@@ -3767,9 +3799,9 @@ body.w3a-silent iframe[class^='walletIframe-'] {
   width: 100%;
   min-height: 38px;
   border-radius: var(--ce-radius-6);
-  border: 1px solid rgba(140, 170, 220, 0.36);
-  background: rgba(36, 42, 84, 0.72);
-  color: #f7f9ff;
+  border: 1px solid color-mix(in srgb, var(--ce-status-info) 36%, transparent);
+  background: color-mix(in srgb, var(--ce-status-info) 72%, transparent);
+  color: var(--ce-document-surface);
   font-weight: 700;
   cursor: pointer;
 }
@@ -3777,13 +3809,13 @@ body.w3a-silent iframe[class^='walletIframe-'] {
 .agentTokenLoginCopy,
 .agentTokenLoginHint {
   margin: 10px 0;
-  color: #d7ddf3;
+  color: var(--ce-status-info-text);
   font-size: 0.88rem;
   line-height: 1.4;
 }
 
 .agentTokenLoginHint {
-  color: #aeb9d8;
+  color: var(--ce-status-info-text);
 }
 
 .agentTokenLoginLabel {
@@ -3791,7 +3823,7 @@ body.w3a-silent iframe[class^='walletIframe-'] {
   flex-direction: column;
   gap: 6px;
   margin: 10px 0;
-  color: #f2f4ff;
+  color: var(--ce-document-surface);
   font-size: 0.9rem;
   font-weight: 650;
 }
@@ -3800,9 +3832,9 @@ body.w3a-silent iframe[class^='walletIframe-'] {
   width: 100%;
   min-height: 40px;
   border-radius: var(--ce-radius-6);
-  border: 1px solid rgba(140, 170, 220, 0.36);
-  background: rgba(8, 12, 36, 0.68);
-  color: #ffffff;
+  border: 1px solid color-mix(in srgb, var(--ce-status-info) 36%, transparent);
+  background: color-mix(in srgb, var(--ce-overlay-base) 68%, transparent);
+  color: var(--ce-text-inverse);
   padding: 8px 10px;
 }
 
@@ -3810,23 +3842,23 @@ body.w3a-silent iframe[class^='walletIframe-'] {
   margin: 8px 0 10px;
   padding: 8px 10px;
   border-radius: var(--ce-radius-6);
-  border: 1px solid rgba(255, 142, 142, 0.42);
-  background: rgba(76, 24, 38, 0.55);
-  color: #ffe8ec;
+  border: 1px solid color-mix(in srgb, var(--ce-status-danger-text) 42%, transparent);
+  background: color-mix(in srgb, var(--ce-overlay-surface) 55%, transparent);
+  color: var(--ce-status-danger-text);
   font-size: 0.88rem;
 }
 
 .cryptoLoginLink {
-  background: rgba(18, 22, 50, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 30px;
+  background: color-mix(in srgb, var(--ce-overlay-surface) 45%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
+  border-radius: var(--ce-radius-30);
   padding: 12px 24px;
   margin: 30px auto 10px auto;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 12px;
-  color: #eef1ff;
+  color: var(--ce-status-info-text);
   text-decoration: none;
   font-weight: 600;
   font-size: 1.2rem;
@@ -3841,27 +3873,27 @@ body.w3a-silent iframe[class^='walletIframe-'] {
   width: 100%;
   max-width: 320px;
   box-shadow:
-    -3px 3px 6px rgba(8, 12, 36, 0.55),
-    3px -3px 8px rgba(120, 150, 220, 0.25);
+    -3px 3px 6px color-mix(in srgb, var(--ce-overlay-base) 55%, transparent),
+    3px -3px 8px color-mix(in srgb, var(--ce-status-info) 25%, transparent);
   backdrop-filter: blur(6px);
   &:hover,
   &:focus {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.4);
-    color: #f7f9ff;
+    background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
+    border-color: color-mix(in srgb, var(--ce-text-inverse) 40%, transparent);
+    color: var(--ce-document-surface);
     text-decoration: none;
     transform: translateY(-1px);
     box-shadow:
-      -5px 5px 10px rgba(8, 12, 36, 0.65),
-      5px -5px 12px rgba(120, 150, 220, 0.3);
+      -5px 5px 10px color-mix(in srgb, var(--ce-overlay-base) 65%, transparent),
+      5px -5px 12px color-mix(in srgb, var(--ce-status-info) 30%, transparent);
   }
 
   &:active {
     transform: translateY(1px);
     opacity: 0.8;
     box-shadow:
-      -2px 2px 6px rgba(8, 12, 36, 0.5),
-      2px -2px 6px rgba(120, 150, 220, 0.2);
+      -2px 2px 6px color-mix(in srgb, var(--ce-overlay-base) 50%, transparent),
+      2px -2px 6px color-mix(in srgb, var(--ce-status-info) 20%, transparent);
   }
 }
 
@@ -3895,5 +3927,52 @@ body.w3a-silent iframe[class^='walletIframe-'] {
   .cryptoLoginLink:hover,
   .cryptoLoginLink:active {
     transform: none !important;
+  }
+}
+
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  .navConnectContainer {
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-end;
+    height: auto;
+    margin: 0;
+  }
+
+  .navConnectButton {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    border: 2px solid !important;
+    border-color: var(--ce-border-raised) !important;
+    background: var(--ce-control-face) !important;
+    box-shadow: var(--ce-shadow-raised) !important;
+    color: var(--ce-control-text) !important;
+  }
+
+  .navConnectButton:hover,
+  .navConnectButton:focus-visible {
+    background: var(--ce-surface-alt) !important;
+    color: var(--ce-control-text) !important;
+  }
+
+  .navConnectButton:active {
+    border-color: var(--ce-border-inset) !important;
+    box-shadow: var(--ce-shadow-pressed) !important;
+  }
+
+  .loginPromptText {
+    margin: 0;
+    padding: 0;
+    color: var(--ce-control-text);
+    font-family: var(--ce-font-button);
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .loginIcons {
+    display: none;
   }
 }

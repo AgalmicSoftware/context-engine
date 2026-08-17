@@ -56,3 +56,21 @@ test('both audit entrypoints resolve the saved report verdict', {
     assert.match(source, /resolve_audit_report_verdict "\$REPORT_FILE"/);
   }
 });
+
+test('full audit entrypoint stays compatible with macOS Bash and exposes help', {
+  skip: !fs.existsSync(path.join(repoRoot, 'scripts/audit-full.sh'))
+    ? 'private audit entrypoint is not included in public release artifacts'
+    : false,
+}, () => {
+  const scriptPath = path.join(repoRoot, 'scripts/audit-full.sh');
+  const source = fs.readFileSync(scriptPath, 'utf8');
+  const help = spawnSync('bash', [scriptPath, '--help'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+
+  assert.doesNotMatch(source, /\b(?:declare|local)\s+-A\b/);
+  assert.equal(help.status, 0, help.stderr || help.stdout);
+  assert.match(help.stdout, /--domain/);
+  assert.match(help.stdout, /worker\|crypto\|client/);
+});

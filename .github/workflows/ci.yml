@@ -6,6 +6,7 @@ on:
       - master
       - main
       - 'release-staging*'
+      - 'release-staging/**'
   pull_request:
     branches:
       - master
@@ -66,7 +67,7 @@ jobs:
           BASELINE_PUSH_BEFORE_SHA: ${{ github.event.before }}
         run: |
           set -euo pipefail
-          git fetch --no-tags --depth=1 origin main
+          git fetch --no-tags origin main
           node scripts/resolve-baseline-monotonicity-base.mjs --github-output "$GITHUB_OUTPUT"
 
       - name: Check baseline monotonicity
@@ -94,9 +95,29 @@ jobs:
 
       - name: Verify release-staging version advancement
         if: ${{ startsWith(github.ref_name, 'release-staging') || startsWith(github.head_ref, 'release-staging') }}
+        env:
+          RELEASE_EVENT_NAME: ${{ github.event_name }}
+          RELEASE_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RELEASE_PUSH_BEFORE_SHA: ${{ github.event.before }}
+          ZERO_OID: 0000000000000000000000000000000000000000
         run: |
-          git fetch --no-tags --depth=1 origin main
-          node scripts/release-version.mjs verify-ref --candidate-ref HEAD --baseline-ref origin/main
+          set -euo pipefail
+          git fetch --no-tags origin main
+          release_candidate_ref=HEAD
+          if [ "$RELEASE_EVENT_NAME" = "pull_request" ]; then
+            release_candidate_ref="$RELEASE_PR_HEAD_SHA"
+            git fetch --no-tags origin "$release_candidate_ref"
+          fi
+          git fetch --force --tags origin
+          node scripts/worker-release-artifacts.mjs verify-replay-range \
+            --base-ref origin/main \
+            --candidate-ref "$release_candidate_ref"
+          verify_args=(verify-ref --candidate-ref "$release_candidate_ref" --baseline-ref origin/main)
+          if [ "$RELEASE_EVENT_NAME" = "push" ] && [ "$RELEASE_PUSH_BEFORE_SHA" != "$ZERO_OID" ]; then
+            git fetch --no-tags origin "$RELEASE_PUSH_BEFORE_SHA"
+            verify_args+=(--minimum-ref "$RELEASE_PUSH_BEFORE_SHA")
+          fi
+          node scripts/release-version.mjs "${verify_args[@]}"
 
       - name: Upload tested Worker bundle candidate
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -313,7 +334,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4

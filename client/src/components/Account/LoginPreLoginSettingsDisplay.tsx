@@ -2,9 +2,16 @@ import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCog } from '@fortawesome/free-solid-svg-icons';
 import styles from './Account.module.scss';
+import AppThemeSelector from './AppThemeSelector';
+import { LoginSettingsSessionSummary } from './LoginSettingsControlRow';
+import { CE_THEME_SELECTOR_ENABLED } from '../../variables/appConfig.js';
+import { buildSettingsSessionHref } from './loginSettingsRouteHelpers';
 
 type LoginSettingsOverview = {
-  activeSession: unknown;
+  activeSession: {
+    label?: string;
+    slug?: string;
+  };
   capabilities: {
     showNetworkControls: boolean;
   };
@@ -44,6 +51,12 @@ const LoginPreLoginSettingsDisplay = ({
   return (
     <div className={styles.preLoginSettingsShell}>
       <div className={styles.preLoginSettingsTopRow}>
+        <div className={styles.preLoginSessionSummary}>
+          <LoginSettingsSessionSummary
+            activeSession={activeSession}
+            sessionHref={buildSettingsSessionHref(activeSession.slug)}
+          />
+        </div>
         <button
           type="button"
           aria-label="Toggle pre-login settings"
@@ -73,17 +86,30 @@ const LoginPreLoginSettingsDisplay = ({
             tooltipsInfoId: 'preLoginTooltipsToggleTooltip',
             tooltipPlacement: 'right',
             containerClassName: styles.preLoginSettingsSummaryContainer,
+            rowClassName: styles.preLoginSettingsControlRow,
+            showSession: false,
           })}
           {renderSettingsOverviewPanel({
             overview,
             networkTooltipId: 'preLoginNetworkInfoTooltipPanel',
-            extraContent: preLoginConfigOpen
-              ? renderStaticSettingsSection({
-                  title: 'Config',
-                  summary: 'Session selection and local AI overrides',
-                  children: renderPreLoginConfigPanel(),
-                })
-              : null,
+            extraContent: (
+              <>
+                {preLoginConfigOpen
+                  ? renderStaticSettingsSection({
+                      title: 'Config',
+                      summary: 'Session selection and local AI overrides',
+                      children: renderPreLoginConfigPanel(),
+                    })
+                  : null}
+                {CE_THEME_SELECTOR_ENABLED
+                  ? renderStaticSettingsSection({
+                      title: 'Appearance & colors',
+                      summary: '',
+                      children: <AppThemeSelector />,
+                    })
+                  : null}
+              </>
+            ),
           })}
         </div>
       ) : null}

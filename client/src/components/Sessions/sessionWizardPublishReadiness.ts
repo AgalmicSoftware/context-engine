@@ -119,8 +119,10 @@ export function resolveSessionWizardPublishReadiness({
   sessionModeProfile = null,
 }: SessionWizardPublishReadinessInput): SessionWizardPublishReadinessDescriptor {
   const modeRequirements = resolveSessionWizardModeRequirements(sessionModeProfile);
-  const canUploadMetadataNow =
-    !!resolvedWorkerBaseUrl && (workerMode === 'default' || (deployVerifiedInUi && deployWorkerMatchesConfiguredUrl));
+  const hasCompatibleWorkerRuntime =
+    !!resolvedWorkerBaseUrl &&
+    ((workerMode === 'default' && usesDefaultWorkerUrl) || (deployVerifiedInUi && deployWorkerMatchesConfiguredUrl));
+  const canUploadMetadataNow = hasCompatibleWorkerRuntime;
   const uploadBlockedReason = !resolvedWorkerBaseUrl
     ? 'Set a worker URL before uploading metadata.'
     : workerMode !== 'default' && !deployVerifiedInUi
@@ -132,30 +134,35 @@ export function resolveSessionWizardPublishReadiness({
   const hasUploadedMetadata = !!normalizeSessionWizardArweaveUri(metadataUrl);
   // Regression guard: a URL only proves where a custom worker lives. It does
   // not prove that post-deploy config and required secrets reached that worker.
-  const canPersistWorkerConfigNow =
-    modeRequirements.isWorkerCanonical &&
-    !!resolvedWorkerBaseUrl &&
-    ((workerMode === 'default' && usesDefaultWorkerUrl) || (deployVerifiedInUi && deployWorkerMatchesConfiguredUrl));
+  const canPersistWorkerConfigNow = modeRequirements.isWorkerCanonical && hasCompatibleWorkerRuntime;
+  const workerRuntimeReady = !modeRequirements.usesWorkerRuntime || hasCompatibleWorkerRuntime;
   const canPublishNow = modeRequirements.isWorkerCanonical
     ? canPersistWorkerConfigNow || canUseSponsoredAutoDeployNow
-    : canUploadMetadataNow || canUseSponsoredAutoDeployNow || hasManualMetadata || hasUploadedMetadata;
+    : modeRequirements.selected
+      ? (workerRuntimeReady && (canUploadMetadataNow || hasManualMetadata || hasUploadedMetadata)) ||
+        canUseSponsoredAutoDeployNow
+      : canUploadMetadataNow || canUseSponsoredAutoDeployNow || hasManualMetadata || hasUploadedMetadata;
   const readinessKind: SessionWizardPublishReadinessKind = modeRequirements.isWorkerCanonical
     ? canPersistWorkerConfigNow
       ? 'worker-config'
       : canUseSponsoredAutoDeployNow
         ? 'sponsored-auto-deploy'
         : 'blocked'
-    : hasManualMetadata
-      ? 'manual-metadata'
-      : hasUploadedMetadata
-        ? 'uploaded-metadata'
-        : canUploadMetadataNow
-          ? 'worker-upload'
-          : canUseSponsoredAutoDeployNow
-            ? 'sponsored-auto-deploy'
-            : 'blocked';
+    : modeRequirements.usesWorkerRuntime && !hasCompatibleWorkerRuntime && !canUseSponsoredAutoDeployNow
+      ? 'blocked'
+      : hasManualMetadata
+        ? 'manual-metadata'
+        : hasUploadedMetadata
+          ? 'uploaded-metadata'
+          : canUploadMetadataNow
+            ? 'worker-upload'
+            : canUseSponsoredAutoDeployNow
+              ? 'sponsored-auto-deploy'
+              : 'blocked';
   const showUploadBlockedReason =
-    !modeRequirements.isWorkerCanonical && !canPublishNow && !hasManualMetadata && !hasUploadedMetadata;
+    !modeRequirements.isWorkerCanonical &&
+    !canPublishNow &&
+    (modeRequirements.usesWorkerRuntime || (!hasManualMetadata && !hasUploadedMetadata));
 
   return {
     canUploadMetadataNow,

@@ -57,7 +57,6 @@ import {
 import AudioInput from '../Shared/AudioInput/AudioInput';
 import QuestionFilter from './QuestionFilter';
 import type { QuestionFilterHandle } from './QuestionFilter';
-import PileHologramAssistant from './PileHologramAssistant';
 import QuestionTagDropdown from './QuestionTagDropdown';
 import SingleQuestionResponse from './SingleQuestionResponse';
 import { JsonButtonRow, JsonIconButton, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
@@ -168,8 +167,6 @@ import {
   EMPTY_QUESTION_POOL,
   DEBUG_PREFILL,
   GATE_SBT_HYDRATION_RETRY_MS,
-  QUESTION_TAG_DROPDOWN_ROW_STYLE,
-  SHOW_PILE_HOLOGRAM_TOGGLE,
   appendExplicitSessionHintToPath,
   applyExistingGroupPrefix,
   areEnvelopesEquivalent,
@@ -273,7 +270,7 @@ import {
   resolveAuthoritativeQuestionPoolScope,
 } from './surveyAuthoritativeQuestionPool';
 
-export const SURVEY_SELECTOR_ACTIVE_FILTER_COLOR = '#11c4dcff';
+export const SURVEY_SELECTOR_ACTIVE_FILTER_COLOR = 'var(--ce-data-series-8)';
 
 export const SURVEY_SELECTOR_CREATE_BUTTON_STYLE: React.CSSProperties = {
   marginLeft: '10px',
@@ -1417,7 +1414,11 @@ export class SurveySelector extends Component<any, any> {
 
     return (
       <div>
-        <div id={styles.surveysRow}>
+        <div
+          id={styles.surveysRow}
+          className={this.props.embeddedSessionToolbar ? styles.embeddedSessionToolbar : undefined}
+          data-testid={E2E_TESTIDS.SURVEY_TOOLBAR}
+        >
           <Dropdown id={styles.surveysDropdown} isOpen={selectorDropdownOpen} toggle={this.toggleSelectorDropdown}>
             <DropdownToggle
               id={styles.dropdownToggle}

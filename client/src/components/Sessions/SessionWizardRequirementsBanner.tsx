@@ -21,6 +21,7 @@ type SessionWizardRequirementsBannerProps = {
   fundingRequirementLabel: string;
   newSessionRequiresLitCredential?: boolean;
   onDismiss: () => void;
+  requiredAiProviderKeyLabels?: readonly string[];
   requiredRequirementIds?: readonly SessionWizardRequirementId[];
 };
 
@@ -30,6 +31,7 @@ const SessionWizardRequirementsBanner = ({
   fundingRequirementLabel,
   newSessionRequiresLitCredential = true,
   onDismiss,
+  requiredAiProviderKeyLabels = [],
   requiredRequirementIds,
 }: SessionWizardRequirementsBannerProps): React.ReactElement => {
   const hasResolvedRequirements = Array.isArray(requiredRequirementIds);
@@ -105,16 +107,31 @@ const SessionWizardRequirementsBanner = ({
               .
             </li>
           ) : null}
+          {hasResolvedRequirements && requires('sessionWorker') ? (
+            <li>
+              A compatible Session Worker provides the web runtime; the EVM registry and Arweave remain canonical.
+            </li>
+          ) : null}
           {requires('aiProviderKey') ? (
             <li>
-              <a
-                href={SESSION_WIZARD_REQUIREMENT_LINKS.openaiApiKey}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={styles.newSessionBannerLink}
-              >
-                {hasResolvedRequirements ? 'AI provider key' : 'OpenAI API key'}
-              </a>{' '}
+              {hasResolvedRequirements ? (
+                requiredAiProviderKeyLabels.length ? (
+                  requiredAiProviderKeyLabels.join(', ')
+                ) : (
+                  'AI provider key'
+                )
+              ) : (
+                <>
+                  <a
+                    href={SESSION_WIZARD_REQUIREMENT_LINKS.openaiApiKey}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={styles.newSessionBannerLink}
+                  >
+                    OpenAI API key
+                  </a>
+                </>
+              )}{' '}
               for text and transcription
             </li>
           ) : null}

@@ -18,6 +18,7 @@ import FeaturedSbtField, { type FeaturedSbtFieldProps } from './FeaturedSbtField
 import CollapsibleFieldGroup from './CollapsibleFieldGroup';
 import SessionWizardContractsField from './SessionWizardContractsField';
 import SessionWizardStorageProfileMetadataField from './SessionWizardStorageProfileMetadataField';
+import SessionColorSchemeField from './SessionColorSchemeField';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { seedGenPrompt } from '../../prompts/seedGenPrompt.js';
 import { t } from '../../utilities/ui/terminology.js';
@@ -67,6 +68,7 @@ export type SessionWizardDraftFieldRenderer = (
 ) => ReactNode;
 
 type SessionWizardDraftFieldRendererOptions = {
+  allowSessionHeaderFileUpload: boolean;
   blockLimitDuration: number | string;
   blockLimitUnit: string;
   compactSessionHeaderInputRef: MutableRefObject<HTMLInputElement | null>;
@@ -139,6 +141,7 @@ type SessionWizardDraftFieldRendererOptions = {
 const pathKey = (path: string[]): string => path.join('.');
 
 export const buildSessionWizardDraftFieldRenderer = ({
+  allowSessionHeaderFileUpload,
   blockLimitDuration,
   blockLimitUnit,
   compactSessionHeaderInputRef,
@@ -483,6 +486,17 @@ export const buildSessionWizardDraftFieldRenderer = ({
       );
     }
 
+    if (path.length === 0 && key === 'appearance') {
+      const appearanceValue = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+      return (
+        <SessionColorSchemeField
+          key={keyString}
+          value={appearanceValue}
+          onChange={(nextAppearance) => updateDraftValue(['appearance'], nextAppearance)}
+        />
+      );
+    }
+
     if (path.length === 0 && key === 'blockLimits') {
       return (
         <BlockLimitsField
@@ -597,6 +611,7 @@ export const buildSessionWizardDraftFieldRenderer = ({
             labelPrefix={<FontAwesomeIcon icon={faImage} className={styles.compactSessionHeaderIcon} />}
           >
             <SessionHeaderField
+              allowFileUpload={allowSessionHeaderFileUpload}
               compact
               value={draft?.sessionHeader}
               sessionHeaderMode={sessionHeaderMode}
@@ -637,6 +652,7 @@ export const buildSessionWizardDraftFieldRenderer = ({
       return (
         <LockableFieldFrame key={keyString} {...fieldFrameProps}>
           <SessionHeaderField
+            allowFileUpload={allowSessionHeaderFileUpload}
             value={value == null ? null : toStr(value)}
             sessionHeaderMode={sessionHeaderMode}
             compactSessionHeaderMode={compactSessionHeaderMode}
@@ -712,7 +728,7 @@ export const buildSessionWizardDraftFieldRenderer = ({
               {!privateSlugMode && slugAvailability.status === 'available' && (
                 <FontAwesomeIcon
                   icon={faCheck}
-                  style={{ marginLeft: 6, color: '#4dffa4', fontSize: 12 }}
+                  style={{ marginLeft: 6, color: 'var(--ce-status-success-text)', fontSize: 12 }}
                   title="Slug available"
                   data-testid={E2E_TESTIDS.WIZARD_SLUG_AVAILABLE}
                 />
@@ -720,7 +736,7 @@ export const buildSessionWizardDraftFieldRenderer = ({
               {!privateSlugMode && slugAvailability.status === 'taken' && (
                 <FontAwesomeIcon
                   icon={faExclamationCircle}
-                  style={{ marginLeft: 6, color: '#ffcc7b', fontSize: 12 }}
+                  style={{ marginLeft: 6, color: 'var(--ce-status-warning-text)', fontSize: 12 }}
                   title="Slug already taken"
                   data-testid={E2E_TESTIDS.WIZARD_SLUG_TAKEN}
                 />

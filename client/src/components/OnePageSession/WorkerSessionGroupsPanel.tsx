@@ -105,8 +105,14 @@ const WorkerSessionGroupsPanel = ({
   const participantGroupCreationEnabled = resolveGroupCreationPolicy(config) === GROUP_CREATION_POLICIES.PARTICIPANTS;
   const allowAnonymousGroupDiscovery = sessionModeAllowsAnonymousWorkerGroupDiscovery(config.sessionModeProfile);
   const chainId = projection.hasOnChainComponent && projection.chainId ? projection.chainId : 1;
-  const shouldAuthenticateOnRender =
-    !allowAnonymousGroupDiscovery || (showCreate && !!normalizedAccount) || (membershipsOnly && !!normalizedAccount);
+  // Public discovery is anonymous only for signed-out visitors. Once an
+  // account is available, authenticate so every route projects that account's
+  // durable Worker memberships instead of reverting joined cards to "Join".
+  const shouldAuthenticateOnRender = !allowAnonymousGroupDiscovery || !!normalizedAccount;
+  const canRenderMemberships =
+    !!workerToken ||
+    (!normalizedAccount && !membershipsOnly && allowAnonymousGroupDiscovery) ||
+    (!!normalizedAccount && authStatus === 'error' && !membershipsOnly && allowAnonymousGroupDiscovery);
 
   const authenticate = useCallback(async () => {
     const requestTargetKey = targetKey;
@@ -359,7 +365,7 @@ const WorkerSessionGroupsPanel = ({
           </button>
         </div>
       ) : null}
-      {workerToken || (!membershipsOnly && allowAnonymousGroupDiscovery) ? (
+      {canRenderMemberships ? (
         <WorkerGroupMembershipPanel
           key={`worker-memberships:${targetKey}`}
           canReadGroups={true}

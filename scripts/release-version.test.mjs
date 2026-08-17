@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import {
   assessReleaseImpact,
@@ -12,6 +14,14 @@ import {
   readVersionSurfaces,
   writeVersionSurfaces,
 } from './release-version.mjs';
+
+const SCRIPT_PATH = fileURLToPath(new URL('./release-version.mjs', import.meta.url));
+
+const git = (repoRoot, args) => execFileSync('git', args, {
+  cwd: repoRoot,
+  encoding: 'utf8',
+  stdio: ['ignore', 'pipe', 'pipe'],
+}).trim();
 
 const packageJson = (name, version) => `${JSON.stringify({ name, version, private: true }, null, 2)}\n`;
 const packageLock = (name, version) => `${JSON.stringify({
@@ -27,7 +37,9 @@ const packageLock = (name, version) => `${JSON.stringify({
 test('stable SemVer comparison and patch increments are deterministic', () => {
   assert.equal(compareVersions('0.1.9', '0.1.10'), -1);
   assert.equal(compareVersions('1.0.0', '0.99.99'), 1);
+  assert.equal(compareVersions('0.0.9007199254740992', '0.0.9007199254740993'), -1);
   assert.equal(incrementPatch('0.1.9'), '0.1.10');
+  assert.equal(incrementPatch('0.0.9007199254740992'), '0.0.9007199254740993');
   assert.throws(() => incrementPatch('0.1.0-beta.1'), /stable MAJOR\.MINOR\.PATCH/);
 });
 
@@ -114,4 +126,102 @@ test('version surfaces are synchronized without changing unrelated metadata', ()
   } finally {
     fs.rmSync(rootDir, { recursive: true, force: true });
   }
+});
+
+test('verify-ref fails when a supplied release floor cannot be resolved', () => {
+  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-release-ref-'));
+  try {
+    fs.mkdirSync(path.join(rootDir, 'client'), { recursive: true });
+    fs.writeFileSync(path.join(rootDir, 'package.json'), packageJson('contextEngine', '0.1.1'));
+    fs.writeFileSync(path.join(rootDir, 'package-lock.json'), packageLock('contextEngine', '0.1.1'));
+    fs.writeFileSync(path.join(rootDir, 'client', 'package.json'), packageJson('client', '0.1.1'));
+    fs.writeFileSync(path.join(rootDir, 'client', 'package-lock.json'), packageLock('client', '0.1.1'));
+    git(rootDir, ['init', '--quiet']);
+    git(rootDir, ['config', 'user.name', 'Release Tester']);
+    git(rootDir, ['config', 'user.email', '[redacted-email]']);
+    git(rootDir, ['add', 'package.json', 'package-lock.json', 'client/package.json', 'client/package-lock.json']);
+    git(rootDir, ['commit', '--quiet', '-m', 'candidate']);
+
+    for (const option of ['--baseline-ref', '--minimum-ref']) {
+      const result = spawnSync(process.execPath, [
+        SCRIPT_PATH,
+        'verify-ref',
+        '--repo-root',
+        rootDir,
+        '--candidate-ref',
+        'HEAD',
+        option,
+        'f'.repeat(40),
+      ], { encoding: 'utf8' });
+
+      assert.notEqual(result.status, 0, `${option} unexpectedly passed`);
+      assert.match(result.stderr, /Release version ref was not found/);
+    }
+  } finally {
+    fs.rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+test('verify-ref rejects an exact SemVer downgrade beyond the safe integer range', () => {
+  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-release-large-version-'));
+  try {
+    fs.mkdirSync(path.join(rootDir, 'client'), { recursive: true });
+    fs.writeFileSync(path.join(rootDir, 'package.json'), packageJson('contextEngine', '0.0.9007199254740993'));
+    fs.writeFileSync(path.join(rootDir, 'package-lock.json'), packageLock('contextEngine', '0.0.9007199254740993'));
+    fs.writeFileSync(path.join(rootDir, 'client', 'package.json'), packageJson('client', '0.0.9007199254740993'));
+    fs.writeFileSync(path.join(rootDir, 'client', 'package-lock.json'), packageLock('client', '0.0.9007199254740993'));
+    git(rootDir, ['init', '--quiet']);
+    git(rootDir, ['config', 'user.name', 'Release Tester']);
+    git(rootDir, ['config', 'user.email', '[redacted-email]']);
+    git(rootDir, ['add', 'package.json', 'package-lock.json', 'client/package.json', 'client/package-lock.json']);
+    git(rootDir, ['commit', '--quiet', '-m', 'minimum']);
+    const minimumRef = git(rootDir, ['rev-parse', 'HEAD']);
+
+    writeVersionSurfaces(rootDir, '0.0.9007199254740992');
+    git(rootDir, ['add', 'package.json', 'package-lock.json', 'client/package.json', 'client/package-lock.json']);
+    git(rootDir, ['commit', '--quiet', '-m', 'candidate']);
+
+    const result = spawnSync(process.execPath, [
+      SCRIPT_PATH,
+      'verify-ref',
+      '--repo-root',
+      rootDir,
+      '--candidate-ref',
+      'HEAD',
+      '--minimum-ref',
+      minimumRef,
+    ], { encoding: 'utf8' });
+
+    assert.notEqual(result.status, 0, 'unsafe large-version downgrade unexpectedly passed');
+    assert.match(result.stderr, /must not be lower/);
+  } finally {
+    fs.rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+const releaseGuideUrl = new URL('../docs/releasing.md', import.meta.url);
+const releaseGuideIsPresent = fs.existsSync(releaseGuideUrl);
+
+test('release guidance documents staging version and ratchet floors', {
+  skip: !releaseGuideIsPresent,
+}, () => {
+  const guide = fs.readFileSync(releaseGuideUrl, 'utf8');
+
+  assert.match(guide, /greater than public `main`/);
+  assert.match(guide, /equal to the previous staging version/);
+  assert.match(
+    guide,
+    /Staging pushes compare ratchets to their prior tip only when public `main` is an\s+ancestor of that tip/,
+  );
+  assert.match(guide, /If public `main` has advanced beyond the prior staging tip/);
+});
+
+test('release guidance documents public tag provenance checks', {
+  skip: !releaseGuideIsPresent,
+}, () => {
+  const guide = fs.readFileSync(releaseGuideUrl, 'utf8');
+
+  assert.match(guide, /queries the protected remote for public tag\s+refs/);
+  assert.match(guide, /fails closed when public tag history is unavailable/);
+  assert.match(guide, /A local-only tag\s+does not prove that a source commit is public/);
 });

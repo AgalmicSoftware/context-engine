@@ -1,5 +1,9 @@
 import { QuestionFilter as QuestionFilterComponent, shouldEnableQuestionFilterSbt } from './QuestionFilter';
-import { QuestionFilterSbtSection } from './QuestionFilterSections';
+import {
+  QuestionFilterQuestionTypesSection,
+  QuestionFilterSbtSection,
+  QuestionFilterTagsSection,
+} from './QuestionFilterSections';
 import {
   QUESTION_FILTER_ACTIONS_STYLE,
   QUESTION_FILTER_BOOKMARK_FEEDBACK_STYLE,
@@ -125,6 +129,61 @@ describe('isFreeformBlankAnswer', () => {
   });
 });
 
+describe('QuestionFilterTagsSection', () => {
+  it('exposes tag selections as keyboard-operable toggle buttons', () => {
+    const onTagSelection = jest.fn();
+    const section = QuestionFilterTagsSection({
+      allTagsCount: 2,
+      disabled: false,
+      disabledReason: '',
+      expandedSections: { tags: true },
+      onTagSelection,
+      onToggleSection: jest.fn(),
+      onToggleShowAllTags: jest.fn(),
+      selectedTags: ['safety'],
+      showAllTags: true,
+      tagsToDisplay: ['safety', 'governance'],
+      tooltipId: 'tag-help',
+    });
+    const selectedTag = findElement(
+      section.props.content,
+      (element) => element?.type === 'button' && getNodeText(element) === '#safety',
+    );
+
+    expect(selectedTag).toBeTruthy();
+    expect(selectedTag.props.type).toBe('button');
+    expect(selectedTag.props['aria-pressed']).toBe(true);
+    selectedTag.props.onClick();
+    expect(onTagSelection).toHaveBeenCalledWith('safety');
+  });
+});
+
+describe('QuestionFilterQuestionTypesSection', () => {
+  it('renders recognizable rating and freeform previews', () => {
+    const section = QuestionFilterQuestionTypesSection({
+      disabled: false,
+      expandedSections: { types: true },
+      onToggleSection: jest.fn(),
+      onTypeSelection: jest.fn(),
+      pendingSelectedTypes: [],
+    });
+    const ratingButton = findElement(
+      section.props.content,
+      (element) => element?.type === 'button' && getNodeText(element).includes('Rating'),
+    );
+    const freeformButton = findElement(
+      section.props.content,
+      (element) => element?.type === 'button' && getNodeText(element).includes('Freeform'),
+    );
+
+    expect(ratingButton).toBeTruthy();
+    expect(getNodeText(ratingButton)).toContain('1');
+    expect(getNodeText(ratingButton)).toContain('10');
+    expect(freeformButton).toBeTruthy();
+    expect(getNodeText(freeformButton)).toContain('Write an answer...');
+  });
+});
+
 describe('QuestionFilter display helpers', () => {
   it('builds section and action icon display state', () => {
     expect(QUESTION_FILTER_ACTIONS_STYLE).toEqual({
@@ -134,7 +193,7 @@ describe('QuestionFilter display helpers', () => {
       alignItems: 'center',
     });
     expect(QUESTION_FILTER_BOOKMARK_FEEDBACK_STYLE).toEqual({
-      color: 'goldenrod',
+      color: 'var(--ce-status-warning-text)',
       fontSize: '0.85em',
       fontStyle: 'italic',
     });
@@ -180,25 +239,25 @@ describe('QuestionFilter display helpers', () => {
     });
     expect(resolveQuestionFilterCopyIconStyle(false, true)).toEqual({
       cursor: 'not-allowed',
-      color: 'green',
+      color: 'var(--ce-status-success-text)',
       fontSize: '1.1em',
       marginRight: '15px',
     });
     expect(resolveQuestionFilterCopyIconStyle(true, false)).toEqual({
       cursor: 'not-allowed',
-      color: '#cccccc',
+      color: 'var(--ce-control-disabled-text)',
       fontSize: '1.1em',
       marginRight: '15px',
     });
     expect(resolveQuestionFilterBookmarkIconStyle(false, true, false)).toEqual({
       cursor: 'pointer',
-      color: 'gold',
+      color: 'var(--ce-status-warning)',
       fontSize: '1.1em',
       marginRight: '8px',
     });
     expect(resolveQuestionFilterBookmarkIconStyle(true, false, false)).toEqual({
       cursor: 'not-allowed',
-      color: '#cccccc',
+      color: 'var(--ce-control-disabled-text)',
       fontSize: '1.1em',
       marginRight: '8px',
     });

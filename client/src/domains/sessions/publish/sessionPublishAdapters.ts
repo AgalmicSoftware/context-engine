@@ -120,6 +120,7 @@ export type WorkerAdminActionAuthInput = {
   action?: string;
   slug?: string;
   sessionId?: string;
+  sessionAuthorityMode?: string;
   body?: PublishRecord;
   workerUrl?: string;
   context?: PublishRecord;

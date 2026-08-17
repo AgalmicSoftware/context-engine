@@ -120,23 +120,23 @@ function PileHologramAssistant() {
               <path d={HEAD_PATH} />
             </clipPath>
             <radialGradient id={FACE_FILL_ID} cx="50%" cy="36%" r="64%">
-              <stop offset="0%" stopColor="#eefcff" stopOpacity="0.34" />
-              <stop offset="46%" stopColor="#7de7ff" stopOpacity="0.14" />
-              <stop offset="100%" stopColor="#1d7dff" stopOpacity="0" />
+              <stop offset="0%" stopColor="var(--ce-status-info-text)" stopOpacity="0.34" />
+              <stop offset="46%" stopColor="var(--ce-status-info-soft)" stopOpacity="0.14" />
+              <stop offset="100%" stopColor="var(--ce-status-info)" stopOpacity="0" />
             </radialGradient>
             <radialGradient id={FACE_GLOW_ID} cx="50%" cy="48%" r="62%">
-              <stop offset="0%" stopColor="#b5f8ff" stopOpacity="0.24" />
-              <stop offset="42%" stopColor="#59d5ff" stopOpacity="0.12" />
-              <stop offset="100%" stopColor="#59d5ff" stopOpacity="0" />
+              <stop offset="0%" stopColor="var(--ce-data-series-8)" stopOpacity="0.24" />
+              <stop offset="42%" stopColor="var(--ce-status-info)" stopOpacity="0.12" />
+              <stop offset="100%" stopColor="var(--ce-status-info)" stopOpacity="0" />
             </radialGradient>
             <radialGradient id={FACE_DEPTH_ID} cx="50%" cy="56%" r="74%">
-              <stop offset="0%" stopColor="#9fe9ff" stopOpacity="0.18" />
-              <stop offset="52%" stopColor="#4fbcff" stopOpacity="0.08" />
-              <stop offset="100%" stopColor="#112d7a" stopOpacity="0" />
+              <stop offset="0%" stopColor="var(--ce-data-series-8)" stopOpacity="0.18" />
+              <stop offset="52%" stopColor="var(--ce-data-series-1)" stopOpacity="0.08" />
+              <stop offset="100%" stopColor="var(--ce-overlay-surface-alt)" stopOpacity="0" />
             </radialGradient>
             <linearGradient id={BUST_FILL_ID} x1="50%" y1="8%" x2="50%" y2="100%">
-              <stop offset="0%" stopColor="#b6f4ff" stopOpacity="0.18" />
-              <stop offset="100%" stopColor="#1e7cff" stopOpacity="0.04" />
+              <stop offset="0%" stopColor="var(--ce-data-series-8)" stopOpacity="0.18" />
+              <stop offset="100%" stopColor="var(--ce-status-info)" stopOpacity="0.04" />
             </linearGradient>
           </defs>
 

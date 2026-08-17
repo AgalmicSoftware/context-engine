@@ -28,9 +28,9 @@ export type ResponsePanelDatum = {
 const RESPONSE_SPLIT_ORDER = ['agree', 'unsure', 'disagree'];
 const RESPONSE_SPLIT_LABELS = new Set(RESPONSE_SPLIT_ORDER);
 const RESPONSE_TONE_COLORS: Record<string, string> = {
-  agree: '#4dffa4',
-  unsure: '#ffd166',
-  disagree: '#ff6bcb',
+  agree: 'var(--ce-status-success)',
+  unsure: 'var(--ce-status-warning)',
+  disagree: 'var(--ce-status-danger)',
 };
 
 const normalizeResponseSplitLabel = (label: string) => label.trim().toLowerCase();
@@ -116,7 +116,7 @@ export const readResponsePanels = (spec: VizRecord, palette: string[]): Response
 export const buildPieGradient = (counts: ResponseCountDatum[]) => {
   const total = counts.reduce((sum, count) => sum + count.value, 0);
   if (total <= 0) {
-    return { total: 0, gradient: 'conic-gradient(rgba(255, 255, 255, 0.16) 0 100%)' };
+    return { total: 0, gradient: 'conic-gradient(var(--ce-input-border) 0 100%)' };
   }
 
   let cursor = 0;

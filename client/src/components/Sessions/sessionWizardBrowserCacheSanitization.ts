@@ -2,6 +2,7 @@ import { deepClone } from './sessionWizardCoreUtils';
 import { stripSessionWizardMetadataSecretFields } from './sessionWizardMetadataPayload';
 import { WORKER_SECRET_CACHE_SAFE_FIELDS } from './sessionWizardWorkerSecretSupport';
 import type { AnyRecord } from '../shellTypes';
+import { normalizeSessionAppearance } from '../../utilities/ui/sessionColorSchemes';
 
 const CACHE_FORBIDDEN_FIELD_NAMES = new Set(
   [
@@ -69,6 +70,10 @@ export const sanitizeSessionWizardDraftForBrowserCache = (value: unknown): AnyRe
   if (Object.prototype.hasOwnProperty.call(next, 'litCredentials')) {
     next.litCredentials = keepPublicLitRuntimeConfig(next.litCredentials);
   }
+  if (Object.prototype.hasOwnProperty.call(next, 'appearance')) {
+    next.appearance = normalizeSessionAppearance(next.appearance);
+  }
+  delete next.theme;
   delete next.secrets;
   delete next.workerSecrets;
   delete next.workerRequirementProof;

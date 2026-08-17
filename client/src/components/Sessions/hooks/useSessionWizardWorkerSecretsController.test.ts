@@ -307,6 +307,41 @@ describe('useSessionWizardWorkerSecretsController', () => {
     expect(result.current.getMissingWorkerSecretsForDeploy()).toEqual(['OpenAI key']);
   });
 
+  it('requires every provider selected by decentralized AI models', () => {
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+    const draft = baseDraft({
+      ai: {
+        models: {
+          fast: { provider: 'anthropic' },
+          thinking: { provider: 'openrouter' },
+          transcription: { provider: 'openai' },
+        },
+      },
+      sessionModeProfile,
+    });
+    const missing = createControllerHarness({
+      draft,
+      workerSecrets: baseWorkerSecrets({
+        openaiKey: 'transcription-secret',
+        arweaveJwk: '{"kty":"RSA"}',
+        customRpcUrl: 'https://rpc.example.test',
+      }),
+    });
+    const complete = createControllerHarness({
+      draft,
+      workerSecrets: baseWorkerSecrets({
+        openaiKey: 'transcription-secret',
+        anthropicKey: 'fast-secret',
+        openrouterKey: 'thinking-secret',
+        arweaveJwk: '{"kty":"RSA"}',
+        customRpcUrl: 'https://rpc.example.test',
+      }),
+    });
+
+    expect(missing.result.current.getMissingWorkerSecretsForDeploy()).toEqual(['Anthropic key', 'OpenRouter key']);
+    expect(complete.result.current.getMissingWorkerSecretsForDeploy()).toEqual([]);
+  });
+
   it('refreshes provider-aware readiness when the selected AI providers change', () => {
     let draft = baseDraft({
       networkChainId: 0,

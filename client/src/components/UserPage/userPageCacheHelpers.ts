@@ -1,4 +1,5 @@
 import { isPlainAnalysisObject, toAnalysisRecord, type UserPageUnknownRecord } from './userPageCoreHelpers';
+import { projectOnchainSbtMembership } from '../../domains/membership/membershipProjection';
 import {
   compareUserPageResponseRecency,
   extractUserPageResponseRecencyWithHints,
@@ -34,10 +35,6 @@ export type UserPageUserChainNode = UserPageUnknownRecord & {
 export type UserPagePrioritizedUserChainNode = {
   chainKey: string;
   node: UserPageUserChainNode;
-};
-export type UserPageOwnershipCountMaps = {
-  mintedCountMap: UserPageUnknownRecord | null;
-  burnedCountMap: UserPageUnknownRecord | null;
 };
 export type UserPageOwnershipSignalAggregate = {
   mintedSet: Set<string>;
@@ -117,32 +114,10 @@ const normalizeUserPageCacheSourceSlug = (slug: unknown): string => {
   return raw === 'general' ? '' : raw;
 };
 
-export const getUserPageOwnershipCountMaps = (entry: unknown = {}): UserPageOwnershipCountMaps => {
-  const entryRecord = toAnalysisRecord(entry);
-  const mintedCountMap = isPlainAnalysisObject(entryRecord.mintedCountByAddress)
-    ? entryRecord.mintedCountByAddress
-    : null;
-  const burnedCountMap = isPlainAnalysisObject(entryRecord.burnedCountByAddress)
-    ? entryRecord.burnedCountByAddress
-    : null;
-  return { mintedCountMap, burnedCountMap };
+const hasMeaningfulUserPageOwnershipCounts = (entry: unknown = {}, addressLower: unknown = ''): boolean => {
+  const projection = projectOnchainSbtMembership({ entry, subjectAddress: addressLower });
+  return projection.provenance === 'complete_counts' || projection.provenance === 'partial_counts';
 };
-
-export const hasMeaningfulUserPageOwnershipCounts = (entry: unknown = {}, addressLower: unknown = ''): boolean => {
-  const entryRecord = toAnalysisRecord(entry);
-  const { mintedCountMap, burnedCountMap } = getUserPageOwnershipCountMaps(entry);
-  if (!mintedCountMap && !burnedCountMap) return false;
-  if (entryRecord.countsLoaded === true) return true;
-  const normalizedAddress = String(addressLower || '').toLowerCase();
-  if (!normalizedAddress) return false;
-  return (
-    Object.prototype.hasOwnProperty.call(mintedCountMap || {}, normalizedAddress) ||
-    Object.prototype.hasOwnProperty.call(burnedCountMap || {}, normalizedAddress)
-  );
-};
-
-export const readUserPageOwnershipCount = (countMap: UserPageUnknownRecord | null, addressLower: unknown): number =>
-  countMap ? Math.max(0, Number(countMap[String(addressLower || '').toLowerCase()] || 0) || 0) : 0;
 
 export const applyUserPageOwnershipSignal = (
   aggEntry: UserPageOwnershipSignalAggregate,
@@ -151,19 +126,17 @@ export const applyUserPageOwnershipSignal = (
 ): void => {
   const addressKey = String(addressLower || '').toLowerCase();
   if (!addressKey) return;
-  const { mintedCountMap, burnedCountMap } = getUserPageOwnershipCountMaps(entry);
-  if (!mintedCountMap && !burnedCountMap) return;
-  if (!hasMeaningfulUserPageOwnershipCounts(entry, addressKey)) return;
-
-  const mintedCount = readUserPageOwnershipCount(mintedCountMap, addressKey);
-  const burnedCount = readUserPageOwnershipCount(burnedCountMap, addressKey);
+  const projection = projectOnchainSbtMembership({ entry, subjectAddress: addressKey });
+  if (projection.provenance !== 'complete_counts' && projection.provenance !== 'partial_counts') return;
   // Regression guard: count maps decide the viewer's current ownership;
   // raw address sets remain bulk history for non-viewer aggregation.
-  if (mintedCount > burnedCount) {
+  if (projection.status === 'member') {
     aggEntry.mintedSet.add(addressKey);
     aggEntry.burnedSet.delete(addressKey);
-  } else if (burnedCount > 0) {
-    aggEntry.burnedSet.add(addressKey);
+  } else {
+    aggEntry.mintedSet.delete(addressKey);
+    if (projection.burnedCount > 0) aggEntry.burnedSet.add(addressKey);
+    else aggEntry.burnedSet.delete(addressKey);
   }
 };
 
@@ -350,7 +323,7 @@ export const mergeUserPageSurveyCacheSource = ({
     const sid = String(sidRaw || '').toLowerCase();
     if (!sid) return;
     if (!combinedSurveys[sid]) {
-      combinedSurveys[sid] = toAnalysisRecord(surveysMap[sidRaw] || surveysMap[sid]);
+      combinedSurveys[sid] = { ...toAnalysisRecord(surveysMap[sidRaw] || surveysMap[sid]) };
     }
     writeUserPageSourceSlug(surveySourceSlugById, sid, slug);
   });
@@ -399,7 +372,7 @@ export const mergeUserPageQuestionCacheSource = ({
     const qid = String(qidRaw || '').toLowerCase();
     if (!qid) return;
     if (!combinedQuestions[qid]) {
-      combinedQuestions[qid] = toAnalysisRecord(questionsMap[qidRaw] || questionsMap[qid]);
+      combinedQuestions[qid] = { ...toAnalysisRecord(questionsMap[qidRaw] || questionsMap[qid]) };
     }
     writeUserPageSourceSlug(questionSourceSlugById, qid, slug);
   });

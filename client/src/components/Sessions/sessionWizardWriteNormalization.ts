@@ -39,6 +39,11 @@ import {
 import { resolveSessionWizardModeRequirements } from './sessionWizardModeRequirements';
 import { normalizeSessionWizardDefaultFeaturedSbtMetadata } from './sessionWizardMetadataPayload';
 import { normalizeSessionWizardEndsAt } from './sessionWizardSessionLifecycle';
+import { normalizeSessionAppearance } from '../../utilities/ui/sessionColorSchemes';
+import {
+  applySessionWizardModeFieldPolicyToPayload,
+  resolveSessionWizardModeFieldPolicy,
+} from './sessionWizardModeFieldPolicy';
 import type {
   AnyRecord,
   ChainIdLike,
@@ -161,6 +166,11 @@ export const sanitizeSessionWizardMetadataPayload = (
   if (!next.sessionInfo) delete next.sessionInfo;
   if (!next.sessionInfoEncrypted) delete next.sessionInfoEncrypted;
 
+  if (Object.prototype.hasOwnProperty.call(next, 'appearance')) {
+    next.appearance = normalizeSessionAppearance(next.appearance);
+  }
+  delete next.theme;
+
   const headerCandidate = trimString(next.sessionHeader || next.sessionHeaderImg);
   if (headerCandidate) {
     next.sessionHeaderImg = headerCandidate;
@@ -220,6 +230,13 @@ export const sanitizeSessionWizardMetadataPayload = (
     next.storageProfile = normalizeSessionStorageProfileConfig(compiled.storageProfile);
   } else if (Object.prototype.hasOwnProperty.call(next, 'storageProfile')) {
     next.storageProfile = normalizeSessionStorageProfileConfig(next.storageProfile);
+  }
+
+  const modeRequirements = resolveSessionWizardModeRequirements(
+    isObj(next.sessionModeProfile) ? (next.sessionModeProfile as SessionModeProfile) : null,
+  );
+  if (modeRequirements.selected) {
+    applySessionWizardModeFieldPolicyToPayload(next, resolveSessionWizardModeFieldPolicy(modeRequirements));
   }
 
   if (isObj(next.faucet)) {
@@ -343,25 +360,30 @@ export const buildSessionWizardWorkerConfigPayload = ({
       deployPayload: resolvedDeployPayload,
     });
   const modeRequirements = resolveSessionWizardModeRequirements(effectiveSessionModeProfile);
+  const modeFieldPolicy = resolveSessionWizardModeFieldPolicy(modeRequirements);
   const isWorkerCanonical = modeRequirements.isWorkerCanonical;
   const usesOnChainSbt = isWorkerCanonical && modeRequirements.publish.deployPendingSbts;
-  const workerAuthority = isObj(resolvedDraft.workerAuthority)
-    ? cloneValue(resolvedDraft.workerAuthority)
-    : isObj(resolvedDeployPayload.workerAuthority)
-      ? cloneValue(resolvedDeployPayload.workerAuthority)
-      : isWorkerCanonical
-        ? {
+  const workerAuthority = isWorkerCanonical
+    ? isObj(resolvedDraft.workerAuthority)
+      ? cloneValue(resolvedDraft.workerAuthority)
+      : isObj(resolvedDeployPayload.workerAuthority)
+        ? cloneValue(resolvedDeployPayload.workerAuthority)
+        : {
             version: 1,
             participantScopes: ['ai', 'transcribe', 'storage', 'groups', 'fetch'],
             anonymousScopes: [],
           }
-        : undefined;
+    : undefined;
+  const publishedAppearance = Object.prototype.hasOwnProperty.call(resolvedDraft, 'appearance')
+    ? normalizeSessionAppearance(resolvedDraft.appearance)
+    : null;
   const next: AnyRecord = {
     slug: trimString(slug),
     adminAddress: trimString(resolvedDeployPayload.adminAddress || account),
     sessionName: trimString(resolvedDraft.sessionName),
     sessionInfo: trimString(resolvedDraft.sessionInfo),
     sessionHeaderImg: trimString(resolvedDraft.sessionHeader || resolvedDraft.sessionHeaderImg),
+    ...(publishedAppearance ? { appearance: publishedAppearance } : {}),
     defaultTags: trimString(resolvedDraft.defaultTags),
     defaultGroupTags: trimString(resolvedDraft.defaultGroupTags),
     questionsGenPrompt: trimString(resolvedDraft.questionsGenPrompt),
@@ -400,6 +422,9 @@ export const buildSessionWizardWorkerConfigPayload = ({
         : buildWorkerLitCredentialsConfig(workerSecrets),
     ...(effectiveSessionModeProfile ? { sessionModeProfile: cloneValue(effectiveSessionModeProfile) } : {}),
     ...(workerAuthority ? { workerAuthority } : {}),
+    ...(isObj(resolvedDraft.agentSessionWrapped)
+      ? { agentSessionWrapped: cloneValue(resolvedDraft.agentSessionWrapped) }
+      : {}),
     storageProfile,
   };
 
@@ -445,5 +470,5 @@ export const buildSessionWizardWorkerConfigPayload = ({
   const sessionIdHex = sessionRegistryUtils.normalizeSessionIdHex(sessionId);
   if (sessionIdHex) next.sessionId = sessionIdHex;
 
-  return next;
+  return modeRequirements.selected ? applySessionWizardModeFieldPolicyToPayload(next, modeFieldPolicy) : next;
 };

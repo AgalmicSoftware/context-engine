@@ -2,8 +2,6 @@ type UnknownRecord = Record<string, unknown>;
 
 export type CompareVennRegionKey = 'a' | 'b' | 'c' | 'ab' | 'ac' | 'bc' | 'abc';
 
-export const COMPARE_VENN_REGION_KEYS: readonly CompareVennRegionKey[] = ['a', 'b', 'c', 'ab', 'ac', 'bc', 'abc'];
-
 export interface CompareBullets {
   agreements: string[];
   disagreements: string[];
@@ -53,22 +51,11 @@ export const mergeCompareVennWithEvidence = (
   fallback: CompareVennResult,
 ): CompareVennResult | null => {
   if (!isRecord(candidate) || !isRecord(candidate.counts)) return null;
-
-  const evidenceMap = isRecord(candidate.evidenceMap) ? candidate.evidenceMap : {};
-  const out: CompareVennResult = {
-    counts: { ...fallback.counts, ...candidate.counts } as CompareVennCounts,
+  return {
+    counts: { ...fallback.counts },
     semantics: (candidate.semantics as string | null | undefined) || fallback.semantics,
-    evidenceMap: { ...fallback.evidenceMap, ...evidenceMap } as CompareVennEvidenceMap,
+    evidenceMap: { ...fallback.evidenceMap },
   };
-
-  for (const key of COMPARE_VENN_REGION_KEYS) {
-    if ((out.counts[key] || 0) > 0 && (!Array.isArray(out.evidenceMap?.[key]) || out.evidenceMap[key]?.length === 0)) {
-      out.evidenceMap = out.evidenceMap || {};
-      out.evidenceMap[key] = fallback.evidenceMap?.[key] || [];
-    }
-  }
-
-  return out;
 };
 
 export const readCompareToolkitTask = (task: unknown): string => String(task || '').toLowerCase();

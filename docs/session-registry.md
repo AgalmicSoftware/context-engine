@@ -41,7 +41,7 @@ The registry migration has several authority boundaries that should stay explici
 | Resource gates (`default`, `questionResponses`, `surveyResponses`, `docUploads`, `docUrls`, `ai`, `arweave`, `rpc`, `txGas`, `lit`) | `SessionRegistry` | None for auth decisions | Arweave metadata can carry UI defaults, but must not override on-chain gate authority. |
 | Faucet eligibility | `SessionRegistry` `txGas` resource gate | Future fallback resources must be explicit, documented, and fail closed | Current low-risk target is `txGas` first, with any broader fallback requiring opt-in semantics and tests. |
 | Registry and contract address discovery | Runtime override / verified discovery, then bundled fallback | Bundled `SESSION_REGISTRY_ADDRESSES` and `SESSION_CONTRACTS_BY_CHAIN` stay as compatibility fallback | Discovery should be observable before it becomes required; stale bundled defaults should not be treated as the permanent source of truth. |
-| Worker config and secrets | Worker KV / worker secret store | Browser-local overrides only for local developer preferences | Worker runtime config is operational, not gate authority. Secrets must not flow through Arweave metadata. |
+| Worker config and secrets | Worker KV / worker secret store | Browser-local overrides only for local developer preferences | Worker runtime config is operational, not gate authority. Public `appearance.colorSchemeId` may be mirrored here; secrets must not flow through Arweave metadata. |
 
 The code-level read-only companion for these rows is
 `client/src/utilities/session/sessionAuthorityMatrix.ts`. Keep this document and
@@ -119,6 +119,9 @@ frontend can rehydrate it easily. Suggested structure:
   "sessionName": "My Group",
   "sessionHeaderImg": "assets/img/header.webp",
   "sessionInfo": "Group description",
+  "appearance": {
+    "colorSchemeId": "ocean"
+  },
   "corsWorkerUrl": "https://contextengine-proxy.<your-sub>.workers.dev/",
   "defaultTags": "example, demo",
   "questionsGenPrompt": "",
@@ -166,6 +169,15 @@ frontend can rehydrate it easily. Suggested structure:
 ```
 
 Notes:
+- `appearance` is optional, backward-compatible presentation metadata and may
+  contain only `colorSchemeId`. New Wizard publications write one of
+  `context-engine`, `ocean`, or `amber`; missing, malformed, and unknown IDs
+  render in memory as `context-engine` without rewriting existing metadata.
+  Palette values, CSS custom-property names, URLs, CSS/SCSS, and app-theme IDs
+  are not accepted. An explicit user/accessibility app theme suppresses session
+  colors. This field is stored in Arweave metadata for decentralized sessions
+  or public Worker config for Worker-canonical sessions; it is not duplicated
+  in `SessionRegistry.setSessionFields`.
 - `defaultTags` is a comma-separated list of tag *suggestions* that are fed into AI tag generation prompts.
   - Questions may use any subset (including all) or none of the default tags.
   - `defaultTags` does **not** filter which questions/surveys are shown; sessions handle scoping.

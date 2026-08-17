@@ -94,11 +94,58 @@ function verifyWorkerTests(rootDir, failures) {
 
 function verifyRootScripts(rootDir, failures) {
   const pkg = readJson(rootDir, 'package.json');
-  verifyPackageScript(pkg, 'test:root:jest', '--testMatch', failures);
-  verifyPackageScript(pkg, 'test:worker:session-cors', 'npm --prefix workers/sessionCorsWorker test', failures);
-  verifyPackageScript(pkg, 'typecheck:client-tests', 'scripts/check-client-test-types.mjs', failures);
+  const scripts = pkg.scripts || {};
+  const requiredScriptFragments = [
+    ['test:contracts', 'SurveysTest'],
+    ['test:contracts', 'CustomSBTTest'],
+    ['test:contracts', 'SessionRegistryTest'],
+    ['test:contracts', 'SurveysFuzzTest'],
+    ['test:contracts', 'CustomSBTFuzzTest'],
+    ['test:contracts', 'SessionRegistryFuzzTest'],
+    ['test:contracts', 'CustomSBTInvariantTest'],
+    ['test:node', 'scripts/run-node-tests.js'],
+    ['test:node:tracked', 'scripts/run-node-tests.js --tracked-only'],
+    ['test:root:jest', '--testMatch'],
+    ['test:worker:session-cors', 'npm --prefix workers/sessionCorsWorker test'],
+    ['test:worker:agent-bridge', 'scripts/run-agent-bridge-worker-tests.js'],
+    ['test:e2e', 'npm run -s test:e2e:smoke'],
+    ['test:e2e:quick', 'npm run -s test:e2e:smoke'],
+    ['test:e2e:smoke', 'npm run -s ai:test-nav:smoke'],
+    ['ai:test-nav:smoke', 'scripts/vite-navigation-smoke.js'],
+    ['test:ci', 'scripts/run-ci-gates.mjs --profile ci'],
+    ['test:wiring', 'scripts/verify-test-inventory.js'],
+    ['tests', 'npm run test:ci'],
+    ['test:client', 'test:coverage:full-universe'],
+    ['test:release:client', 'npm test -- --watchAll=false --runInBand'],
+    ['typecheck:client-tests', 'scripts/check-client-test-types.mjs'],
+    ['coverage-floor:check', 'scripts/check-client-coverage-floors.mjs'],
+  ];
+  requiredScriptFragments.forEach(([scriptName, expectedFragment]) => {
+    verifyPackageScript(pkg, scriptName, expectedFragment, failures);
+  });
   verifyPackageScript(pkg, 'ci:gate', 'scripts/run-ci-gates.mjs --gate', failures);
-  verifyPackageScript(pkg, 'test:ci', 'scripts/run-ci-gates.mjs --profile ci', failures);
+
+  ['verify:release', 'test:release:client', 'test:node:tracked'].forEach((fragment) => {
+    if (String(scripts['test:ci'] || '').includes(fragment)) {
+      failures.push(`package.json scripts.test:ci must not include "${fragment}"`);
+    }
+  });
+
+  const surveysSbtProxyPath = 'client/src/utilities/web3/contractScripts.surveys-sbt.proxy.test.js';
+  const surveysSbtProxyExists = fs.existsSync(path.join(rootDir, surveysSbtProxyPath));
+  if (surveysSbtProxyExists) {
+    verifyPackageScript(pkg, 'test:surveys-sbt', 'src/utilities/web3/contractScripts.surveys-sbt.proxy.test.js', failures);
+    if (!String(scripts.tests || '').includes('npm run test:surveys-sbt')) {
+      failures.push('package.json scripts.tests must include "npm run test:surveys-sbt"');
+    }
+  } else {
+    if (Object.prototype.hasOwnProperty.call(scripts, 'test:surveys-sbt')) {
+      failures.push('package.json must not define scripts.test:surveys-sbt without its classified test file');
+    }
+    if (String(scripts.tests || '').includes('npm run test:surveys-sbt')) {
+      failures.push('package.json scripts.tests must not include "npm run test:surveys-sbt" without its classified test file');
+    }
+  }
 
   const manifestPath = path.join(rootDir, 'scripts', 'ci-gates.json');
   if (!fs.existsSync(manifestPath)) {
@@ -106,28 +153,82 @@ function verifyRootScripts(rootDir, failures) {
   } else {
     const manifest = readJson(rootDir, path.join('scripts', 'ci-gates.json'));
     const ciProfile = manifest?.profiles?.ci || [];
+    const hostedProfile = manifest?.profiles?.hosted || [];
     const gateCommands = (gateName) => (
       (manifest?.gates?.[gateName]?.commands || [])
         .map((entry) => [entry.command, ...(entry.args || [])].join(' '))
     );
-    if (!ciProfile.includes('root-jest')) {
-      failures.push('scripts/ci-gates.json profile "ci" must include "root-jest"');
+    const expectProfileGate = (profileName, profile, gateName) => {
+      if (!profile.includes(gateName)) {
+        failures.push(`scripts/ci-gates.json profile "${profileName}" must include "${gateName}"`);
+      }
+    };
+    const expectGateCommand = (gateName, command) => {
+      if (!gateCommands(gateName).includes(command)) {
+        failures.push(`scripts/ci-gates.json gate "${gateName}" must run ${command.slice('npm run '.length)}`);
+      }
+    };
+
+    ['contracts', 'client', 'root-jest', 'workers', 'cecc-and-node'].forEach((gateName) => {
+      expectProfileGate('ci', ciProfile, gateName);
+    });
+    ['contracts', 'client', 'root-jest', 'workers', 'e2e-smoke', 'cecc-and-node'].forEach((gateName) => {
+      expectProfileGate('hosted', hostedProfile, gateName);
+    });
+    [
+      ['wiring-and-release', 'npm run test:wiring'],
+      ['wiring-and-release', 'npm run typecheck:client-tests'],
+      ['contracts', 'npm run test:contracts'],
+      ['client', 'npm run test:client'],
+      ['client', 'npm run coverage-floor:check'],
+      ['root-jest', 'npm run test:root:jest'],
+      ['workers', 'npm run test:worker:session-cors'],
+      ['workers', 'npm run test:worker:agent-bridge'],
+      ['e2e-smoke', 'npm run test:e2e:smoke'],
+      ['cecc-and-node', 'npm run test:node:tracked'],
+      ['cecc-and-node', 'npm run test:cache-guard'],
+      ['release', 'npm run typecheck:client-tests'],
+      ['release', 'npm run test:node:tracked'],
+      ['release', 'npm run test:release:client'],
+    ].forEach(([gateName, command]) => expectGateCommand(gateName, command));
+    if (gateCommands('cecc-and-node').includes('npm run test:node')) {
+      failures.push('scripts/ci-gates.json gate "cecc-and-node" must not run test:node');
     }
-    if (!ciProfile.includes('workers')) {
-      failures.push('scripts/ci-gates.json profile "ci" must include "workers"');
+    if (Object.prototype.hasOwnProperty.call(pkg.scripts || {}, 'test:cc')) {
+      expectGateCommand('cecc-and-node', 'npm run test:cc');
+    } else if (gateCommands('cecc-and-node').includes('npm run test:cc')) {
+      failures.push('scripts/ci-gates.json gate "cecc-and-node" must not run test:cc');
     }
-    if (!gateCommands('root-jest').includes('npm run test:root:jest')) {
-      failures.push('scripts/ci-gates.json gate "root-jest" must run test:root:jest');
-    }
-    if (!gateCommands('workers').includes('npm run test:worker:session-cors')) {
-      failures.push('scripts/ci-gates.json gate "workers" must run test:worker:session-cors');
-    }
-    if (!gateCommands('wiring-and-release').includes('npm run typecheck:client-tests')) {
-      failures.push('scripts/ci-gates.json gate "wiring-and-release" must run typecheck:client-tests');
-    }
-    if (!gateCommands('release').includes('npm run typecheck:client-tests')) {
-      failures.push('scripts/ci-gates.json gate "release" must run typecheck:client-tests');
-    }
+  }
+
+  const workflowPath = path.join(rootDir, '.github', 'workflows', 'ci.yml');
+  if (!fs.existsSync(workflowPath)) {
+    failures.push('missing .github/workflows/ci.yml');
+  } else {
+    const workflow = fs.readFileSync(workflowPath, 'utf8');
+    [
+      ['contracts', 'run: npm run ci:gate -- contracts'],
+      ['client', 'run: npm run ci:gate -- client'],
+      ['root-jest', 'run: npm run ci:gate -- root-jest'],
+      ['workers', 'run: npm run ci:gate -- workers'],
+      ['e2e-smoke', 'npm run ci:gate -- e2e-smoke'],
+      ['cecc-and-node', 'run: npm run ci:gate -- cecc-and-node'],
+    ].forEach(([label, expected]) => {
+      if (!workflow.includes(expected)) {
+        failures.push(`.github/workflows/ci.yml must reach the ${label} test gate`);
+      }
+    });
+    [
+      ['  test:', 'the final aggregate test job'],
+      ['needs:', 'the aggregate test dependency list'],
+      ['if: ${{ always() }}', 'the always-running aggregate test job'],
+      ['CI_GATE_RESULTS_JSON:', 'the manifest-backed aggregate result map'],
+      ['run: npm run ci:gates:check-hosted', 'the manifest-backed aggregate checker'],
+    ].forEach(([expected, description]) => {
+      if (!workflow.includes(expected)) {
+        failures.push(`.github/workflows/ci.yml must include ${description}`);
+      }
+    });
   }
 
   const rootJestScript = String(pkg?.scripts?.['test:root:jest'] || '');

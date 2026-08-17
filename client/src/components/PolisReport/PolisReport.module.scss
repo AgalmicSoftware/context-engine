@@ -2,17 +2,17 @@
 
 .polisReportContainer {
   margin-top: 20px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--ce-border-light);
   padding: 10px;
   position: relative;
-  background: #fafafa;
+  background: var(--ce-document-surface);
   width: 100%;
   max-width: 100vw;
   overflow-x: scroll;
 }
 
 .reportInner {
-  background: #fff;
+  background: var(--ce-text-inverse);
   padding: 20px;
 }
 
@@ -36,7 +36,7 @@
 
 .demoToggleLabel {
   font-size: 0.9rem;
-  color: #555;
+  color: var(--ce-text-muted);
   cursor: pointer;
 }
 
@@ -47,7 +47,7 @@
 
 .disclaimerBox {
   border: 1px solid var(--ce-color-border-light);
-  background: #ffffe0;
+  background: var(--ce-data-series-6);
   padding: 8px;
   margin-bottom: 12px;
   font-size: 0.9rem;
@@ -55,7 +55,7 @@
 
 .noData {
   font-style: italic;
-  color: #666;
+  color: var(--ce-text-muted);
 }
 
 .loadingState {
@@ -66,11 +66,11 @@
   align-items: center;
   justify-content: center;
   gap: 18px;
-  color: #7b8193;
+  color: var(--ce-text-muted);
 }
 
 .loadingSpinner {
-  color: #7b8193;
+  color: var(--ce-text-muted);
 }
 
 .loadingProgressWrap {
@@ -79,14 +79,14 @@
   flex-direction: column;
   gap: 8px;
   padding: 12px 14px;
-  border: 1px solid rgba(31, 39, 51, 0.12);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  border: 1px solid color-mix(in srgb, var(--ce-overlay-surface) 12%, transparent);
+  border-radius: var(--ce-radius-12);
+  background: color-mix(in srgb, var(--ce-text-inverse) 92%, transparent);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--ce-document-text) 8%, transparent);
 }
 
 .loadingProgressLabel {
-  color: #1f2733;
+  color: var(--ce-document-text);
   font-size: 0.92rem;
   font-weight: 700;
 }
@@ -95,7 +95,7 @@
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  color: rgba(31, 39, 51, 0.78);
+  color: color-mix(in srgb, var(--ce-overlay-surface) 78%, transparent);
   font-size: 0.82rem;
   font-family: var(--ce-font-mono);
 }
@@ -103,15 +103,15 @@
 .loadingProgressBar {
   width: 100%;
   height: 10px;
-  border-radius: 999px;
+  border-radius: var(--ce-radius-pill);
   overflow: hidden;
-  background: rgba(31, 39, 51, 0.12);
+  background: color-mix(in srgb, var(--ce-overlay-surface) 12%, transparent);
 }
 
 .loadingProgressFill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #4dffa4 0%, #5b8cff 100%);
+  background: linear-gradient(90deg, var(--ce-action-accent) 0%, var(--ce-data-series-1) 100%);
   transition: width 180ms ease;
 }
 
@@ -167,30 +167,20 @@
 }
 
 .participantSvg {
-  border: 1px solid #ddd;
+  border: 1px solid var(--ce-border-light);
   background: var(--ce-color-white);
   width: 100%;
   height: auto; // Maintain aspect ratio
 }
 
-.swarmContainer {
-  position: relative;
-}
-
-.beeswarmSvg {
-  border: 1px solid #ddd;
-  background: var(--ce-color-white);
-  overflow: scroll;
-}
-
-/* Non-hover circle style */
-.beeswarmCircle {
-  fill: steelblue;
-}
-
-/* Hovered circle style */
-.beeswarmCircleHover {
-  fill: #ff9900;
+.reportBeeswarm {
+  --ce-beeswarm-axis-color: var(--ce-document-text-muted);
+  --ce-beeswarm-label-color: var(--ce-document-text);
+  --ce-beeswarm-axis-label-size: 14px;
+  --ce-beeswarm-point-color: steelblue;
+  --ce-beeswarm-point-active-color: var(--ce-status-warning);
+  --ce-beeswarm-background: var(--ce-color-white);
+  --ce-beeswarm-border: 1px solid var(--ce-border-light);
 }
 
 /* Tooltip: a bit wider */
@@ -205,7 +195,7 @@
   pointer-events: auto;
   /* CHANGED: allow interaction so hover link is clickable */
   z-index: 999;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--ce-compat-dark) 15%, transparent);
 }
 
 .tooltipPrompt {
@@ -213,16 +203,6 @@
   margin-bottom: 6px;
   color: var(--ce-color-tooltip-muted);
   font-size: 0.78rem;
-}
-
-.polisBoxPlotContainer {
-  display: inline-block;
-  margin-left: 10px;
-}
-
-.polisBoxPlotSvg {
-  display: block;
-  border: var(--ce-color-black) solid 0.5px;
 }
 
 /* The .pdfIgnore class is hidden when generating the PDF */
@@ -272,7 +252,7 @@
 .tooltipIcon {
   display: inline-block;
   margin-left: 4px;
-  color: #555;
+  color: var(--ce-text-muted);
   cursor: help;
 }
 
@@ -282,7 +262,7 @@
 }
 
 .clusterBackgroundRect {
-  fill: rgba(255, 0, 0, 0.2);
+  fill: color-mix(in srgb, var(--ce-status-error) 20%, transparent);
 }
 
 .clusterSectionDiv {
@@ -296,7 +276,7 @@
   flex-direction: row;
   justify-content: space-between;
   align-items: center;
-  background: #8080805e;
+  background: color-mix(in srgb, var(--ce-document-text-muted) 36.9%, transparent);
   padding: 10px;
 }
 
@@ -358,7 +338,7 @@
   display: none;
   margin-top: 18px;
   padding-top: 18px;
-  border-top: 1px solid rgba(15, 23, 42, 0.16);
+  border-top: 1px solid color-mix(in srgb, var(--ce-document-text) 16%, transparent);
   align-items: center;
   gap: 18px;
   color: inherit;
@@ -374,7 +354,7 @@
   align-items: center;
   justify-content: center;
   padding: 8px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
+  border: 1px solid color-mix(in srgb, var(--ce-document-text) 12%, transparent);
   border-radius: var(--ce-radius-6);
   background: var(--ce-color-white);
 }
@@ -411,9 +391,9 @@
 
 /* Toggle button states */
 .toggleButtonActive {
-  background-color: #03a9f4;
+  background-color: var(--ce-status-info);
   color: var(--ce-color-white);
-  border: 1px solid #03a9f4;
+  border: 1px solid var(--ce-status-info);
   padding: 4px 8px;
   cursor: pointer;
   border-radius: var(--ce-radius-4);
@@ -421,9 +401,9 @@
 }
 
 .toggleButtonInactive {
-  background-color: #f0f0f0;
+  background-color: var(--ce-surface-subtle);
   color: var(--ce-color-border);
-  border: 1px solid #999;
+  border: 1px solid var(--ce-text-muted);
   padding: 4px 8px;
   cursor: pointer;
   border-radius: var(--ce-radius-4);
@@ -437,7 +417,7 @@
 .brandingHeader {
   margin-bottom: 20px;
   padding-bottom: 15px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--ce-surface-subtle);
   text-align: center; // Center branding elements
 }
 
@@ -454,7 +434,7 @@
 
 .sessionInfo {
   opacity: 0.5;
-  color: #2429b5;
+  color: var(--ce-status-info);
   margin-top: 5px;
   font-size: 1.15em;
   font-weight: 600;
@@ -485,7 +465,7 @@
 }
 
 .scrollButton {
-  background: #f0f0f0;
+  background: var(--ce-surface-subtle);
   border: 1px solid var(--ce-color-border-light);
   border-radius: var(--ce-radius-round);
   width: 30px;
@@ -496,7 +476,7 @@
   justify-content: center;
   transition: background-color 0.2s;
   &:hover {
-    background: #e0e0e0;
+    background: var(--ce-document-border);
   }
 }
 
@@ -529,7 +509,7 @@
     margin: 0;
   }
   &:focus {
-    outline: 2px solid #03a9f4;
+    outline: 2px solid var(--ce-status-info);
     outline-offset: -1px;
   }
 }
@@ -538,15 +518,15 @@
   width: 30px;
   height: 30px;
   border: none;
-  background-color: #f7f7f7;
+  background-color: var(--ce-document-surface);
   cursor: pointer;
   font-weight: bold;
   font-size: 1.1rem;
   line-height: 1;
-  color: #555;
+  color: var(--ce-text-muted);
   transition: background-color 0.2s;
   &:hover {
-    background-color: #e9e9e9;
+    background-color: var(--ce-document-border);
   }
   &:first-child {
     border-right: 1px solid var(--ce-color-border-light);
@@ -563,9 +543,9 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background-color: #7063f5;
+  background-color: var(--ce-status-info);
   color: var(--ce-color-white);
-  border: 1px solid #5e54e5;
+  border: 1px solid var(--ce-compat-indigo);
   border-radius: var(--ce-radius-4);
   font-weight: 600;
   cursor: pointer;
@@ -578,8 +558,8 @@
 .clusterAnalysis {
   margin-top: 6px;
   padding: 8px;
-  background: #f8f8ff;
-  border: 1px solid #e4e4ff;
+  background: var(--ce-document-surface);
+  border: 1px solid var(--ce-status-info-text);
   border-radius: var(--ce-radius-6);
 }
 
@@ -597,7 +577,7 @@
 .elapsedTimer {
   font-family: var(--ce-font-mono);
   font-size: 0.9rem;
-  color: #555;
+  color: var(--ce-text-muted);
 }
 
 .analysisNote {
@@ -613,7 +593,7 @@
 .clusterAnalysisShort {
   font-weight: 700;
   font-style: italic;
-  color: #222;
+  color: var(--ce-document-text);
 }
 
 .clusterAnalysisLong {
@@ -621,7 +601,7 @@
 }
 
 .clusterAnalysisError {
-  color: #b00020;
+  color: var(--ce-status-danger);
   font-weight: 600;
 }
 
@@ -706,20 +686,6 @@
     }
   }
 
-  /*
-   * 2. BeeSwarm chart: Make it horizontally scrollable to address the main request.
-   *    The native scrollbar is hidden because custom scroll buttons are provided.
-   */
-  .swarmContainer {
-    overflow-x: auto;
-    overflow-y: hidden;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none; // For Firefox
-    &::-webkit-scrollbar {
-      display: none; // For Chrome, Safari, etc.
-    }
-  }
-
   .participantAddressLink {
     font-size: 0.95rem;
   }
@@ -763,18 +729,27 @@
 ========================= */
 .polisReportModern {
   background:
-    radial-gradient(900px 600px at 5% 0%, rgba(122, 160, 255, 0.2), transparent 60%),
-    radial-gradient(700px 500px at 95% 8%, rgba(255, 180, 220, 0.18), transparent 55%), #f4f6ff;
+    radial-gradient(
+      900px 600px at 5% 0%,
+      color-mix(in srgb, var(--ce-status-info-text) 20%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      700px 500px at 95% 8%,
+      color-mix(in srgb, var(--ce-data-series-3) 18%, transparent),
+      transparent 55%
+    ),
+    var(--ce-status-info-text);
   border: none;
   border-radius: var(--ce-radius-6);
-  box-shadow: 0 18px 32px rgba(15, 23, 42, 0.1);
-  color: #1f2a44;
+  box-shadow: 0 18px 32px color-mix(in srgb, var(--ce-document-text) 10%, transparent);
+  color: var(--ce-document-text);
 
   .settingsRow {
-    background: rgba(255, 255, 255, 0.95);
+    background: color-mix(in srgb, var(--ce-text-inverse) 95%, transparent);
     border: none;
     border-radius: var(--ce-radius-6);
-    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--ce-document-text) 8%, transparent);
     justify-content: flex-start;
     gap: 12px;
     flex-wrap: wrap;
@@ -783,45 +758,45 @@
   .heading {
     font-size: 1.55rem;
     letter-spacing: 0.2px;
-    color: #1f2a44;
+    color: var(--ce-document-text);
   }
 
   .orgReportTitle {
-    color: #1f2a44;
+    color: var(--ce-document-text);
   }
 
   .sessionInfo {
-    color: #5a6aa3;
+    color: var(--ce-status-info);
     opacity: 0.9;
   }
 
   .demoToggleLabel {
-    color: #3f4b6b;
+    color: var(--ce-status-info);
   }
 
   .reportStyleSelect {
     background: var(--ce-color-white);
-    color: #1f2a44;
-    border: 1px solid #dbe2f4;
-    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
+    color: var(--ce-document-text);
+    border: 1px solid var(--ce-document-border);
+    box-shadow: 0 4px 10px color-mix(in srgb, var(--ce-document-text) 8%, transparent);
   }
 
   .disclaimerBox {
-    background: #fff8df;
+    background: var(--ce-status-warning-text);
     border: none;
-    color: #6c5a24;
-    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.08);
+    color: var(--ce-status-warning);
+    box-shadow: 0 2px 10px color-mix(in srgb, var(--ce-document-text) 8%, transparent);
   }
 
   .noData {
-    color: #6b7280;
+    color: var(--ce-document-text-muted);
   }
 
   .statsSection {
     background: var(--ce-color-white);
     border: none;
     border-radius: var(--ce-radius-6);
-    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+    box-shadow: 0 8px 18px color-mix(in srgb, var(--ce-document-text) 8%, transparent);
   }
 
   .statsSectionCollapsible {
@@ -830,11 +805,11 @@
 
   .statLabel,
   .statValue {
-    color: #2a3556;
+    color: var(--ce-status-info);
   }
 
   .graphDescriptionText {
-    color: #4a5a84;
+    color: var(--ce-status-info);
     opacity: 0.9;
   }
 
@@ -843,24 +818,24 @@
     border: none;
     border-radius: var(--ce-radius-6);
     padding: 12px 14px;
-    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+    box-shadow: 0 10px 24px color-mix(in srgb, var(--ce-document-text) 8%, transparent);
     box-sizing: border-box;
   }
 
   .sectionHeaderRow {
     padding-bottom: 8px;
-    border-bottom: 1px solid #edf0fb;
+    border-bottom: 1px solid var(--ce-status-info-text);
     margin-bottom: 10px;
   }
 
   .sectionHeader {
     font-weight: 700;
-    color: #1f2a44;
+    color: var(--ce-document-text);
   }
 
   .sectionTitle {
     font-weight: 700;
-    color: #1f2a44;
+    color: var(--ce-document-text);
   }
 
   .graphSection {
@@ -872,19 +847,18 @@
     border: none;
     border-radius: var(--ce-radius-6);
     padding: 12px;
-    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+    box-shadow: 0 10px 20px color-mix(in srgb, var(--ce-document-text) 8%, transparent);
     box-sizing: border-box;
   }
 
-  .participantSvg,
-  .beeswarmSvg {
+  .participantSvg {
     border-radius: var(--ce-radius-6);
     border: none;
     background: var(--ce-color-white);
   }
 
   .participantGraphControls {
-    background: #f6f8ff;
+    background: var(--ce-document-surface);
     border: none;
     border-radius: var(--ce-radius-6);
     padding: 10px 12px;
@@ -897,15 +871,15 @@
   .participantListItem {
     border: none;
     background: var(--ce-color-white);
-    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
+    box-shadow: 0 6px 14px color-mix(in srgb, var(--ce-document-text) 8%, transparent);
   }
 
   .participantAddressLink {
-    color: #2b3758;
+    color: var(--ce-status-info);
   }
 
   .tooltipIcon {
-    color: #5a6aa3;
+    color: var(--ce-status-info);
   }
 
   .footnotesSection,
@@ -915,95 +889,96 @@
   .pdfFooterLabel,
   .pdfFooterLink,
   .footnoteRef {
-    color: #2a3556;
+    color: var(--ce-status-info);
   }
 
   .beeTooltip {
     background: var(--ce-color-white);
     border: none;
-    color: #2b3758;
-    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+    color: var(--ce-status-info);
+    box-shadow: 0 12px 24px color-mix(in srgb, var(--ce-document-text) 12%, transparent);
   }
 
   .tooltipPrompt {
-    color: #6b78a6;
+    color: var(--ce-status-info);
   }
 
   .scrollButton {
-    background: #eef2ff;
+    background: var(--ce-status-info-text);
     border: none;
-    color: #2b3758;
+    color: var(--ce-status-info);
   }
 
   .scrollButton:hover {
-    background: #e1e7ff;
+    background: var(--ce-status-info-text);
   }
 
-  .polisBoxPlotSvg {
-    border: 1px solid #e4e9f7;
+  .reportBeeswarm {
+    --ce-beeswarm-background: var(--ce-color-white);
+    --ce-beeswarm-border: none;
   }
 
   .analysisNote {
-    color: #4a5a84;
+    color: var(--ce-status-info);
   }
 
   .clusterAnalysis {
-    background: #f6f8ff;
+    background: var(--ce-document-surface);
     border: none;
   }
 
   .clusterAnalysisShort {
-    color: #1f2a44;
+    color: var(--ce-document-text);
   }
 
   .clusterAnalysisLong {
-    color: #4a5a84;
+    color: var(--ce-status-info);
   }
 
   .clusterAnalysisError {
-    color: #c0395c;
+    color: var(--ce-data-series-3);
   }
 
   .toggleButtonActive {
-    background-color: #6a7dff;
-    border: 1px solid #6a7dff;
+    background-color: var(--ce-status-info);
+    border: 1px solid var(--ce-status-info);
   }
 
   .toggleButtonInactive {
-    background-color: #eef2ff;
+    background-color: var(--ce-status-info-text);
     border: none;
-    color: #4a5a84;
+    color: var(--ce-status-info);
   }
 
   .pdfFooter {
-    border-top-color: #dbe2f4;
+    border-top-color: var(--ce-document-border);
   }
 
   .pdfFooterQr {
-    border-color: #dbe2f4;
-    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
+    border-color: var(--ce-document-border);
+    box-shadow: 0 6px 14px color-mix(in srgb, var(--ce-document-text) 8%, transparent);
   }
 
   .analyzeClustersBtn {
-    background: #7063f5;
-    border: 1px solid #5e54e5;
-    box-shadow: 0 6px 14px rgba(112, 99, 245, 0.25);
+    background: var(--ce-status-info);
+    border: 1px solid var(--ce-compat-indigo);
+    box-shadow: 0 6px 14px color-mix(in srgb, var(--ce-status-info) 25%, transparent);
     color: var(--ce-color-white);
   }
 
   button {
-    background: #f4f6ff;
-    color: #2b3758;
+    background: var(--ce-status-info-text);
+    color: var(--ce-status-info);
     border: none;
-    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
+    box-shadow: 0 4px 10px color-mix(in srgb, var(--ce-document-text) 8%, transparent);
   }
 
   button:hover {
-    background: #e9edff;
+    background: var(--ce-status-info-text);
   }
 
   input[type='checkbox'] {
-    accent-color: #6a7dff;
+    accent-color: var(--ce-status-info);
   }
 }
 
@@ -1012,19 +987,24 @@
 ========================= */
 .polisReportDark {
   background:
-    radial-gradient(1000px 700px at 5% 0%, rgba(80, 110, 255, 0.18), transparent 60%),
-    radial-gradient(700px 500px at 95% 10%, rgba(120, 90, 200, 0.18), transparent 55%), #0b1020;
-  border: 1px solid #1f2937;
+    radial-gradient(1000px 700px at 5% 0%, color-mix(in srgb, var(--ce-status-info) 18%, transparent), transparent 60%),
+    radial-gradient(
+      700px 500px at 95% 10%,
+      color-mix(in srgb, var(--ce-data-series-2) 18%, transparent),
+      transparent 55%
+    ),
+    var(--ce-overlay-base);
+  border: 1px solid var(--ce-document-border-strong);
   border-radius: var(--ce-radius-6);
-  box-shadow: 0 18px 40px rgba(3, 6, 14, 0.6);
-  color: #e5e7eb;
+  box-shadow: 0 18px 40px color-mix(in srgb, var(--ce-overlay-base) 60%, transparent);
+  color: var(--ce-document-border);
   color-scheme: dark;
 
   .settingsRow {
-    background: #0f172a;
-    border: 1px solid #1f2937;
+    background: var(--ce-document-text);
+    border: 1px solid var(--ce-document-border-strong);
     border-radius: var(--ce-radius-6);
-    box-shadow: 0 10px 24px rgba(3, 6, 14, 0.55);
+    box-shadow: 0 10px 24px color-mix(in srgb, var(--ce-overlay-base) 55%, transparent);
     justify-content: flex-start;
     gap: 12px;
     flex-wrap: wrap;
@@ -1033,43 +1013,43 @@
   .heading {
     font-size: 1.55rem;
     letter-spacing: 0.2px;
-    color: #f3f4f6;
+    color: var(--ce-document-surface);
   }
 
   .orgReportTitle {
-    color: #f3f4f6;
+    color: var(--ce-document-surface);
   }
 
   .sessionInfo {
-    color: #9aa4bf;
+    color: var(--ce-status-info);
     opacity: 0.9;
   }
 
   .demoToggleLabel {
-    color: #c1c7db;
+    color: var(--ce-document-border);
   }
 
   .reportStyleSelect {
-    background: #111827;
-    color: #e5e7eb;
-    border: 1px solid #2b3446;
+    background: var(--ce-document-text);
+    color: var(--ce-document-border);
+    border: 1px solid var(--ce-document-text-muted);
   }
 
   .disclaimerBox {
-    background: rgba(255, 235, 150, 0.12);
-    border: 1px solid rgba(255, 235, 150, 0.3);
-    color: #f3e7bf;
+    background: color-mix(in srgb, var(--ce-status-warning-text) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ce-status-warning-text) 30%, transparent);
+    color: var(--ce-status-warning-text);
   }
 
   .noData {
-    color: #9aa4bf;
+    color: var(--ce-status-info);
   }
 
   .statsSection {
-    background: #0f172a;
-    border: 1px solid #1f2937;
+    background: var(--ce-document-text);
+    border: 1px solid var(--ce-document-border-strong);
     border-radius: var(--ce-radius-6);
-    box-shadow: 0 10px 22px rgba(3, 6, 14, 0.55);
+    box-shadow: 0 10px 22px color-mix(in srgb, var(--ce-overlay-base) 55%, transparent);
   }
 
   .statsSectionCollapsible {
@@ -1078,37 +1058,37 @@
 
   .statLabel,
   .statValue {
-    color: #d1d5db;
+    color: var(--ce-document-border);
   }
 
   .graphDescriptionText {
-    color: #c1c7db;
+    color: var(--ce-document-border);
     opacity: 0.95;
   }
 
   .sectionCollapse {
-    background: #0f172a;
-    border: 1px solid #1f2937;
+    background: var(--ce-document-text);
+    border: 1px solid var(--ce-document-border-strong);
     border-radius: var(--ce-radius-6);
     padding: 12px 14px;
-    box-shadow: 0 12px 26px rgba(3, 6, 14, 0.55);
+    box-shadow: 0 12px 26px color-mix(in srgb, var(--ce-overlay-base) 55%, transparent);
     box-sizing: border-box;
   }
 
   .sectionHeaderRow {
     padding-bottom: 8px;
-    border-bottom: 1px solid #1f2937;
+    border-bottom: 1px solid var(--ce-document-border-strong);
     margin-bottom: 10px;
   }
 
   .sectionHeader {
     font-weight: 700;
-    color: #f3f4f6;
+    color: var(--ce-document-surface);
   }
 
   .sectionTitle {
     font-weight: 700;
-    color: #f3f4f6;
+    color: var(--ce-document-surface);
   }
 
   .graphSection {
@@ -1116,34 +1096,31 @@
   }
 
   .graphItem {
-    background: #0f172a;
-    border: 1px solid #1f2937;
+    background: var(--ce-document-text);
+    border: 1px solid var(--ce-document-border-strong);
     border-radius: var(--ce-radius-6);
     padding: 12px;
-    box-shadow: 0 10px 22px rgba(3, 6, 14, 0.55);
+    box-shadow: 0 10px 22px color-mix(in srgb, var(--ce-overlay-base) 55%, transparent);
     box-sizing: border-box;
   }
 
-  .participantSvg,
-  .beeswarmSvg {
+  .participantSvg {
     border-radius: var(--ce-radius-6);
-    border: 1px solid #2b3446;
-    background: #1f2937;
+    border: 1px solid var(--ce-document-text-muted);
+    background: var(--ce-document-border-strong);
   }
 
-  .participantSvg text,
-  .beeswarmSvg text {
-    fill: #e5e7eb;
+  .participantSvg text {
+    fill: var(--ce-document-border);
   }
 
-  .participantSvg line,
-  .beeswarmSvg line {
-    stroke: #9ca3af;
+  .participantSvg line {
+    stroke: var(--ce-text-muted);
   }
 
   .participantGraphControls {
-    background: #111827;
-    border: 1px solid #1f2937;
+    background: var(--ce-document-text);
+    border: 1px solid var(--ce-document-border-strong);
     border-radius: var(--ce-radius-6);
     padding: 10px 12px;
   }
@@ -1153,17 +1130,25 @@
   }
 
   .participantListItem {
-    border: 1px solid #1f2937;
-    background: #111827;
-    box-shadow: 0 6px 14px rgba(3, 6, 14, 0.5);
+    border: 1px solid var(--ce-document-border-strong);
+    background: var(--ce-document-text);
+    box-shadow: 0 6px 14px color-mix(in srgb, var(--ce-overlay-base) 50%, transparent);
+  }
+
+  .reportBeeswarm {
+    --ce-beeswarm-axis-color: var(--ce-text-muted);
+    --ce-beeswarm-label-color: var(--ce-document-border);
+    --ce-beeswarm-point-stroke: var(--ce-document-text);
+    --ce-beeswarm-background: var(--ce-document-border-strong);
+    --ce-beeswarm-border: 1px solid var(--ce-document-text-muted);
   }
 
   .participantAddressLink {
-    color: #e5e7eb;
+    color: var(--ce-document-border);
   }
 
   .tooltipIcon {
-    color: #a5b4fc;
+    color: var(--ce-status-info-text);
   }
 
   .footnotesSection,
@@ -1173,109 +1158,105 @@
   .pdfFooterLabel,
   .pdfFooterLink,
   .footnoteRef {
-    color: #d1d5db;
+    color: var(--ce-document-border);
   }
 
   .beeTooltip {
-    background: #111827;
-    border: 1px solid #1f2937;
-    color: #e5e7eb;
-    box-shadow: 0 12px 24px rgba(3, 6, 14, 0.6);
+    background: var(--ce-document-text);
+    border: 1px solid var(--ce-document-border-strong);
+    color: var(--ce-document-border);
+    box-shadow: 0 12px 24px color-mix(in srgb, var(--ce-overlay-base) 60%, transparent);
   }
 
   .tooltipPrompt {
-    color: #c1c7db;
+    color: var(--ce-document-border);
   }
 
   .scrollButton {
-    background: #1f2937;
-    border: 1px solid #2b3446;
-    color: #e5e7eb;
+    background: var(--ce-document-border-strong);
+    border: 1px solid var(--ce-document-text-muted);
+    color: var(--ce-document-border);
   }
 
   .scrollButton:hover {
-    background: #2b3648;
-  }
-
-  .polisBoxPlotSvg {
-    border: 1px solid #2b3446;
+    background: var(--ce-overlay-surface);
   }
 
   .analysisNote {
-    color: #c1c7db;
+    color: var(--ce-document-border);
   }
 
   .clusterAnalysis {
-    background: #111827;
-    border: 1px solid #1f2937;
+    background: var(--ce-document-text);
+    border: 1px solid var(--ce-document-border-strong);
   }
 
   .clusterAnalysisShort {
-    color: #f3f4f6;
+    color: var(--ce-document-surface);
   }
 
   .clusterAnalysisLong {
-    color: #c1c7db;
+    color: var(--ce-document-border);
   }
 
   .clusterAnalysisError {
-    color: #fca5a5;
+    color: var(--ce-status-danger-text);
   }
 
   .toggleButtonActive {
-    background-color: #4f6ef7;
-    border: 1px solid #4f6ef7;
+    background-color: var(--ce-status-info);
+    border: 1px solid var(--ce-status-info);
   }
 
   .toggleButtonInactive {
-    background-color: #1f2937;
-    border: 1px solid #2b3446;
-    color: #cbd5f5;
+    background-color: var(--ce-document-border-strong);
+    border: 1px solid var(--ce-document-text-muted);
+    color: var(--ce-status-info-text);
   }
 
   .pdfFooter {
-    border-top-color: rgba(229, 231, 235, 0.18);
+    border-top-color: color-mix(in srgb, var(--ce-document-border) 18%, transparent);
   }
 
   .pdfFooterQr {
-    border-color: #2b3446;
-    box-shadow: 0 6px 14px rgba(3, 6, 14, 0.4);
+    border-color: var(--ce-document-text-muted);
+    box-shadow: 0 6px 14px color-mix(in srgb, var(--ce-overlay-base) 40%, transparent);
   }
 
   .analyzeClustersBtn {
-    background: linear-gradient(135deg, #5b7cff, #4f5fff);
-    border: 1px solid #6b8cff;
-    box-shadow: 0 10px 24px rgba(79, 94, 255, 0.45);
+    background: linear-gradient(135deg, var(--ce-status-info), var(--ce-status-info));
+    border: 1px solid var(--ce-status-info);
+    box-shadow: 0 10px 24px color-mix(in srgb, var(--ce-status-info) 45%, transparent);
   }
 
   button {
-    background: #1f2937;
-    color: #e5e7eb;
-    border: 1px solid #2b3446;
-    box-shadow: 0 8px 18px rgba(3, 6, 14, 0.5);
+    background: var(--ce-document-border-strong);
+    color: var(--ce-document-border);
+    border: 1px solid var(--ce-document-text-muted);
+    box-shadow: 0 8px 18px color-mix(in srgb, var(--ce-overlay-base) 50%, transparent);
   }
 
   button:hover {
-    background: #2b3648;
+    background: var(--ce-overlay-surface);
   }
 
   input[type='checkbox'] {
-    accent-color: #7aa2ff;
+    accent-color: var(--ce-data-series-1);
   }
 }
 
 .reportInnerModern {
-  background: rgba(255, 255, 255, 0.95);
+  background: color-mix(in srgb, var(--ce-text-inverse) 95%, transparent);
   border: none;
   border-radius: var(--ce-radius-6);
   padding: 24px;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--ce-document-text) 8%, transparent);
 }
 
 .reportInnerDark {
-  background: #0b1120;
-  border: 1px solid #1f2937;
+  background: var(--ce-document-text);
+  border: 1px solid var(--ce-document-border-strong);
   border-radius: var(--ce-radius-6);
   padding: 24px;
-  box-shadow: 0 18px 36px rgba(3, 6, 14, 0.6);
+  box-shadow: 0 18px 36px color-mix(in srgb, var(--ce-overlay-base) 60%, transparent);
 }

@@ -16,8 +16,9 @@ and AI tools, plus the fastest post-deploy crawl steps.
     `main` branch source tree, README, AI agent bootstrap doc,
     architecture, and whitepaper.
 - `client/public/llms.txt`
-  - Plain-text summary for AI tools with the canonical repo plus latest-branch
-    document URLs, including the AI agent bootstrap doc.
+  - Plain-text summary for AI tools with the current deployment-profile model,
+    the interactive `/docs` page, the canonical repo, latest-branch reference
+    URLs, and safe automation guidance.
 - `client/public/robots.txt`
   - Allows crawling and points bots to the sitemap.
 - `client/public/sitemap.xml`
@@ -49,8 +50,9 @@ If the default public branch changes, update:
    - `curl -s https://contextengine.sh/ | rg "AgalmicSoftware/context-engine|discoverability.html|llms.txt"`
 6. Confirm the sitemap is live:
    - `curl -s https://contextengine.sh/sitemap.xml`
-7. Keep SPA-only routes such as `/about` and `/contracts` out of the static
-   sitemap until they have distinct raw-HTML or prerendered metadata.
+7. Keep SPA-only routes such as `/about` and `/docs` out of the static sitemap
+   until they have distinct raw-HTML or prerendered metadata. The legacy
+   `/contracts` alias redirects to `/docs` and is not a separate crawl target.
 
 ## Anthropic / AI Tool Note
 
@@ -58,6 +60,25 @@ Public crawlability helps web search and future discovery, but it does not force
 an immediate refresh of every AI cache. If a Claude Project GitHub integration
 is connected, use its manual sync control as well. When exact freshness matters,
 paste the live `main` branch link or the relevant raw document URL directly.
+
+## `llms.txt`, `agents.txt`, and `AGENTS.md`
+
+The production website publishes `/llms.txt` as its concise orientation file
+for language models and browsing agents. That file describes the product,
+current architecture, authoritative references, and safe automation surfaces.
+
+Context Engine does not currently publish `/agents.txt`. Multiple incompatible
+proposals use that filename for action discovery or automated-client policy,
+and the strict-policy IETF Internet-Draft expired in April 2026. Adding an
+ambiguous alias would create a second contract with unclear semantics. Revisit
+this decision if a stable, broadly adopted specification emerges. See the
+[llms.txt proposal](https://llmstxt.org/) and the expired
+[AGENTS.TXT Internet-Draft](https://datatracker.ietf.org/doc/draft-srijal-agents-policy/)
+for the distinction.
+
+Repository `AGENTS.md` files are different again: they contain contributor and
+coding-agent instructions for a checked-out source tree. They are not a website
+discovery manifest and should not be substituted for `/llms.txt`.
 
 ## Runtime vs canonical URLs
 

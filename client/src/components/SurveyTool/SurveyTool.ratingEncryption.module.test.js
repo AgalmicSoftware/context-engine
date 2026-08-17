@@ -7,7 +7,6 @@ import { processRatingEnvelopesForSubmit } from './surveyToolRatingEnvelopeSubmi
 import { buildAdditionalEncryptionAudienceState, buildAnswerEncryptionAudienceState } from './surveyQuestionsTypes';
 import { buildSurveyResponseStateArray } from './surveyToolHydrationFlow';
 import { SurveyQuestionsFullQuestionResponseInput } from './SurveyQuestionsFullQuestionResponseInput';
-import FullQuestionRatingInput from './FullQuestionRatingInput';
 import DeferredRatingSlider from './DeferredRatingSlider';
 
 const buildEmptyResponseFieldState = () => ({
@@ -227,38 +226,33 @@ describe('SurveyTool rating encryption controller', () => {
 
   it('clamps full-mode rating answers into the supported slider range and avoids duplicate id styling hooks', () => {
     const withNumericString = renderResponseInput({ answerValue: '8' });
-    expect(withNumericString.type).toBe(FullQuestionRatingInput);
+    expect(withNumericString.type).toBe(DeferredRatingSlider);
     expect(withNumericString.props.value).toBe(8);
     expect(withNumericString.props.disabled).toBe(false);
-    expect(typeof withNumericString.props.onChange).toBe('function');
-    expect(typeof withNumericString.props.onChangeComplete).toBe('function');
+    expect(typeof withNumericString.props.onCommit).toBe('function');
     expect(withNumericString.props.id).toBeUndefined();
 
     const withOverflowValue = renderResponseInput({ answerValue: '18' });
-    expect(withOverflowValue.type).toBe(FullQuestionRatingInput);
+    expect(withOverflowValue.type).toBe(DeferredRatingSlider);
     expect(withOverflowValue.props.value).toBe(10);
     expect(withOverflowValue.props.id).toBeUndefined();
 
     const withNonNumericValue = renderResponseInput({ answerValue: 'abc' });
-    expect(withNonNumericValue.type).toBe(FullQuestionRatingInput);
+    expect(withNonNumericValue.type).toBe(DeferredRatingSlider);
     expect(withNonNumericValue.props.value).toBe(0);
     expect(withNonNumericValue.props.id).toBeUndefined();
   });
 
-  it('persists keyboard-driven full-mode rating edits immediately', () => {
-    const onRatingChange = jest.fn();
+  it('routes full-mode rating commits through the deferred parent update path', () => {
+    const onDeferredRatingCommit = jest.fn();
     const ratingInput = renderResponseInput({
       answerValue: 2,
-      onRatingChange,
+      onDeferredRatingCommit,
     });
-    const keyboardEvent = { type: 'keydown' };
 
-    ratingInput.props.onChange(6, keyboardEvent);
+    ratingInput.props.onCommit(6);
 
-    expect(onRatingChange).toHaveBeenCalledWith(6, keyboardEvent);
-    // port note: the old class test also observed scheduleJsonPreviewUpdate/persistDraftSafely
-    // after the rating callback; that callback-side effect is covered by the pending-edit
-    // controller tests, while this port keeps the input-level immediate dispatch contract.
+    expect(onDeferredRatingCommit).toHaveBeenCalledWith(6);
   });
 
   it('uses the deferred slider wrapper for single-question rating cards', () => {

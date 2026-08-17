@@ -28,7 +28,7 @@ describe('MainSite route table', () => {
       'posts',
       'demos',
       'matrix',
-      'contracts',
+      'docs',
       'admin',
       'sponsor',
       'agent',
@@ -46,11 +46,17 @@ describe('MainSite route table', () => {
     ['/groups/new/', 'sbtCreate', {}],
     [`/sbt/${ADDRESS}`, 'sbtDetail', { sbtAddress: ADDRESS }],
     ['/group/public-reviewers', 'sbtsList', { sbtAddress: null }],
+    ['/compare?subject=sim%3AFranklin&subject=sim%3AFDR', 'compare', {}],
+    [`/compare/${ADDRESS}&0x${'2'.repeat(40)}?session=edge`, 'compare', {}],
     [`/u/${ADDRESS}`, 'userProfile', {}],
     ['/admin', 'admin', {}],
     ['/sponsor', 'sponsor', {}],
     ['/posts', 'posts', {}],
     ['/posts/first-post', 'posts', {}],
+    ['/docs', 'docs', { canonicalPath: undefined }],
+    ['/docs/pe4', 'docs', { canonicalPath: undefined }],
+    ['/contracts', 'docs', { canonicalPath: '/docs' }],
+    ['/contracts/pe4', 'docs', { canonicalPath: '/docs/pe4' }],
   ])('classifies %s as %s', (fullPath, key, expected) => {
     expect(resolveMainSiteRouteMatch({ fullPath, isAddress })).toEqual(
       expect.objectContaining({
@@ -73,6 +79,24 @@ describe('MainSite route table', () => {
         canonicalPath: undefined,
       }),
     );
+    expect(resolveMainSiteRouteMatch({ fullPath: '/contracts', isAddress })).toEqual(
+      expect.objectContaining({
+        key: 'docs',
+        canonicalPath: '/docs',
+      }),
+    );
+    expect(resolveMainSiteRouteMatch({ fullPath: '/contracts/pe4', isAddress })).toEqual(
+      expect.objectContaining({
+        key: 'docs',
+        canonicalPath: '/docs/pe4',
+      }),
+    );
+    expect(resolveMainSiteRouteMatch({ fullPath: '/docs', isAddress })).toEqual(
+      expect.objectContaining({
+        key: 'docs',
+        canonicalPath: undefined,
+      }),
+    );
     expect(resolveMainSiteRouteMatch({ fullPath: '/groups/edge', isAddress })).toEqual(
       expect.objectContaining({
         key: 'sbtsList',
@@ -91,6 +115,13 @@ describe('MainSite route table', () => {
         sbtAddress: null,
       }),
     );
+  });
+
+  it('limits canonical path rewrites to the wizard and docs definitions', () => {
+    expect(MAIN_SITE_ROUTE_DEFINITIONS.filter((entry) => entry.hasCanonicalPath).map((entry) => entry.key)).toEqual([
+      'wizard',
+      'docs',
+    ]);
   });
 
   it('keeps accepted double-slash SBT address paths on the SBT detail route', () => {

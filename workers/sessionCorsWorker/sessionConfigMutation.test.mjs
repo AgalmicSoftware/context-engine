@@ -51,6 +51,15 @@ const workerModeProfile = {
   },
   export: { scope: 'admin_raw' },
 };
+const registryModeProfile = {
+  ...cloneJson(workerModeProfile),
+  authority: { mode: 'evm_registry_canonical' },
+  evm: { registryChainId: 11155420 },
+  storage: { backend: 'arweave' },
+  identity: { default: 'wallet', enabled: ['wallet', 'passkey'] },
+  authorization: { mechanisms: ['sbt_onchain'] },
+  encryption: { mode: 'none' },
+};
 const canonicalWorkerStorageProfile = {
   backend: 'cloudflare',
   payloadAccessControl: {
@@ -97,6 +106,88 @@ test('set-config does not increment the authorization epoch for an idempotent re
 
   assert.equal(result.ok, true);
   assert.equal(result.config.authzEpoch, 4);
+});
+
+test('set-config rejects wildcard CORS origins that runtime routing cannot honor', () => {
+  for (const allowOrigins of [['*'], ['https://*.example.test']]) {
+    const result = applySessionConfigMutation({
+      existingConfig: {},
+      mutation: { kind: 'set-config', incomingConfig: { ...baseConfig, allowOrigins } },
+      slug: 'session-a',
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.status, 400);
+    assert.match(result.error, /exact origins/i);
+  }
+});
+
+test('set-config preserves an initialized registry session identity', () => {
+  const sessionId = '0x11111111111111111111111111111111';
+  const existingConfig = {
+    ...baseConfig,
+    sessionId,
+    sessionModeProfile: registryModeProfile,
+    storageProfile: { backend: 'arweave' },
+  };
+  const replay = applySessionConfigMutation({
+    existingConfig,
+    mutation: { kind: 'set-config', incomingConfig: { sessionIdHex: sessionId } },
+    slug: 'session-a',
+  });
+  const replacement = applySessionConfigMutation({
+    existingConfig,
+    mutation: {
+      kind: 'set-config',
+      incomingConfig: { sessionId: '0x22222222222222222222222222222222' },
+    },
+    slug: 'session-a',
+  });
+  const { sessionId: _legacySessionId, ...legacyConfig } = existingConfig;
+  const legacyInitialization = applySessionConfigMutation({
+    existingConfig: legacyConfig,
+    mutation: { kind: 'set-config', incomingConfig: { sessionId } },
+    slug: 'session-a',
+  });
+
+  assert.equal(replay.ok, true);
+  assert.deepEqual(replacement, {
+    ok: false,
+    status: 409,
+    error: 'Registry-canonical session identity cannot be changed after initialization.',
+  });
+  assert.equal(legacyInitialization.ok, true);
+  assert.equal(legacyInitialization.config.sessionId, sessionId);
+});
+
+test('set-config preserves legacy registry identity during authority-mode migration', () => {
+  const sessionId = '0x11111111111111111111111111111111';
+  const existingConfig = {
+    ...baseConfig,
+    sessionId,
+    sessionModeProfile: {
+      ...registryModeProfile,
+      authority: { mode: 'registry_canonical' },
+    },
+    storageProfile: { backend: 'arweave' },
+  };
+  const result = applySessionConfigMutation({
+    existingConfig,
+    mutation: {
+      kind: 'set-config',
+      incomingConfig: {
+        sessionId: '0x22222222222222222222222222222222',
+        sessionModeProfile: registryModeProfile,
+      },
+    },
+    slug: 'session-a',
+  });
+
+  assert.deepEqual(result, {
+    ok: false,
+    status: 409,
+    error: 'Registry-canonical session identity cannot be changed after initialization.',
+  });
 });
 
 test('set-config rejects caller-controlled authorization epochs', () => {
@@ -184,6 +275,7 @@ test('set-config accepts Worker lifecycle and generic Group defaults', () => {
         defaultGroupTags: 'facilitators,reviewers',
         questionsGenPrompt: 'Prefer concrete tradeoffs.',
         defaultFilterState: { sort: 'recent' },
+        appearance: { colorSchemeId: 'ocean' },
       },
     },
     slug: 'session-a',
@@ -192,6 +284,28 @@ test('set-config accepts Worker lifecycle and generic Group defaults', () => {
   assert.equal(result.ok, true);
   assert.equal(result.config.sessionEndsAt, '2030-01-02T03:04:00Z');
   assert.equal(result.config.defaultGroupTags, 'facilitators,reviewers');
+  assert.deepEqual(result.config.appearance, { colorSchemeId: 'ocean' });
+});
+
+test('set-config rejects unsafe or unregistered session appearance config', () => {
+  for (const appearance of [
+    { colorSchemeId: '../remote.css' },
+    { colorSchemeId: 'classic-95' },
+    { colorSchemeId: 'ocean', stylesheet: 'https://example.invalid/theme.css' },
+    { colorSchemeId: { value: 'ocean' } },
+    { '--ce-session-accent': '#ffffff' },
+  ]) {
+    const result = applySessionConfigMutation({
+      existingConfig: cloneJson(profileBearingConfig),
+      mutation: { kind: 'set-config', incomingConfig: { appearance } },
+      slug: 'session-a',
+    });
+    assert.deepEqual(result, {
+      ok: false,
+      status: 400,
+      error: 'Invalid session appearance config.',
+    });
+  }
 });
 
 test('set-config rejects chain-only and SBT-only fields for pure Worker sessions', () => {

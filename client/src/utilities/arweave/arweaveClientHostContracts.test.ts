@@ -44,6 +44,7 @@ describe('arweaveClientHostContracts', () => {
         order: 0,
         preferenceRank: 0,
         reason: 'selected-session',
+        sessionConfig: null,
         sessionSlug: 'general',
         workerUrl: 'https://worker.example',
       },

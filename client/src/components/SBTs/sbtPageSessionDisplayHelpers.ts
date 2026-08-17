@@ -1,4 +1,5 @@
-import { getSessionSlugByName, normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
+import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
+import { getSessionSlugByName } from '../../utilities/web3/chainGateway.js';
 
 type SessionSlugPropsLike = Record<string, unknown> & {
   sessionSlug?: unknown;

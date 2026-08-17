@@ -131,13 +131,11 @@ export const createWorkerRouteRuntimeWithWorkerDeps = ({
     createWorkerExecutionServicesWithWorkerDepsBoundary
   )({
     deps: {
+      fetch: deps?.fetch,
       json: deps?.json,
       safeFetch: deps?.safeFetch,
       isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
       toStr: deps?.toStr,
-      readTranscribeRequestPayload: deps?.readTranscribeRequestPayload,
-      normalizeFaucetRequest: deps?.normalizeFaucetRequest,
-      validateFaucetEligibilityRequest: deps?.validateFaucetEligibilityRequest,
       Wallet: deps?.Wallet,
       rpcRequest: deps?.rpcRequest,
       toChainId: deps?.toChainId,
@@ -159,11 +157,6 @@ export const createWorkerRouteRuntimeWithWorkerDeps = ({
       readSbtFaucetValidationState: rateLimitFaucetSupport.readSbtFaucetValidationState,
       validateSbtPasswordForFaucet: rateLimitFaucetSupport.validateSbtPasswordForFaucet,
       verifyGroupSignatureForFaucet: deps?.verifyGroupSignatureForFaucet,
-      normalizeFetchTargetUrl: deps?.normalizeFetchTargetUrl,
-      readArweaveUploadRequestPayload: deps?.readArweaveUploadRequestPayload,
-      resolveArweaveUploadJwk: deps?.resolveArweaveUploadJwk,
-      normalizeArweaveCeTags: deps?.normalizeArweaveCeTags,
-      normalizeArweaveAssociationTags: deps?.normalizeArweaveAssociationTags,
       callContractFunction: deps?.callContractFunction,
       readSessionBySlugOnChain: registryLoginBootstrapAdapters.readSessionBySlugOnChain,
       getErc721Interface: deps?.getErc721Interface,

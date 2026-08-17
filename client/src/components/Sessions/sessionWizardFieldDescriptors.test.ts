@@ -13,6 +13,7 @@ const pureWorkerPolicy: SessionWizardModeFieldPolicy = {
   showSessionEndsAt: true,
   showWorkerGroupDefaults: true,
   showSbtDefaults: false,
+  showAgentSessionWrapped: false,
   visibleContractKeys: [],
 };
 
@@ -23,10 +24,17 @@ describe('sessionWizardFieldDescriptors', () => {
       embeddedDeployHelperEnabled: true,
       extraField: 'custom',
       sessionInfo: 'Details',
+      appearance: { colorSchemeId: 'ocean' },
       slug: 'demo-session',
     });
 
-    expect(orderedEntries.map(([key]) => key)).toEqual(['slug', 'sessionInfo', 'defaultTags', 'extraField']);
+    expect(orderedEntries.map(([key]) => key)).toEqual([
+      'slug',
+      'sessionInfo',
+      'appearance',
+      'defaultTags',
+      'extraField',
+    ]);
   });
 
   it('omits the legacy storage editor when the integrated session profile is present', () => {
@@ -42,6 +50,7 @@ describe('sessionWizardFieldDescriptors', () => {
     const { primaryEntries, moreOptionsEntries } = splitSessionWizardDraftEntries(
       [
         ['sessionName', 'Demo'],
+        ['appearance', { colorSchemeId: 'amber' }],
         ['sessionEndsAt', '2099-01-01T00:00:00.000Z'],
         ['blockLimits', { start: 1, end: 2 }],
         ['defaultTags', 'ai'],
@@ -49,12 +58,13 @@ describe('sessionWizardFieldDescriptors', () => {
       true,
     );
 
-    expect(primaryEntries.map(([key]) => key)).toEqual(['sessionName']);
+    expect(primaryEntries.map(([key]) => key)).toEqual(['sessionName', 'appearance']);
     expect(moreOptionsEntries.map(([key]) => key)).toEqual(['sessionEndsAt', 'blockLimits', 'defaultTags']);
   });
 
   it('resolves labels and tooltips from field descriptors', () => {
     expect(getSessionWizardFieldLabel('sessionName', 'sessionName')).toBe('Session Name');
+    expect(getSessionWizardFieldLabel('appearance', 'appearance')).toBe('Session colors');
     expect(getSessionWizardFieldTooltip(['sessionEndsAt'], '')).toContain('participant writes stop');
   });
 
@@ -97,7 +107,7 @@ describe('sessionWizardFieldDescriptors', () => {
   });
 
   it('keeps capability-hidden fields hidden even when guided controls force rendering', () => {
-    for (const key of ['contracts', 'blockLimits', 'faucet', 'defaultSbtTags']) {
+    for (const key of ['contracts', 'blockLimits', 'faucet', 'defaultSbtTags', 'agentSessionWrapped']) {
       expect(
         shouldHideSessionWizardField({
           forceShow: true,

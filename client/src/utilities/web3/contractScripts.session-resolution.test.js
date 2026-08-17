@@ -9,6 +9,7 @@ import {
   normalizeSessionSlug,
 } from './chainGateway.js';
 import { upsertCachedSessionWorkerConfig } from '../session/sessionWorkerConfigCache.js';
+import { normalizeSessionSlug as normalizeSessionOwnedSlug } from '../session/sessionNaming.js';
 
 const REGISTRY_CACHE_KEY = 'dg:sessionRegistryCache:v1';
 
@@ -22,6 +23,7 @@ describe('contractScripts session resolution helpers', () => {
   });
 
   it('delegates normalizeSessionSlug to the canonical slug rules', () => {
+    expect(normalizeSessionSlug).toBe(normalizeSessionOwnedSlug);
     expect(normalizeSessionSlug('Team A!')).toBe('Team A!');
     expect(normalizeSessionSlug('General')).toBe('');
     expect(normalizeSessionSlug('DEBATE')).toBe('DEBATE');

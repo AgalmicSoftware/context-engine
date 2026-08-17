@@ -14,10 +14,12 @@ const ASSET_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-assets.js
 const TEXT_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-text.js');
 const PII_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-release-pii.sh');
 const PACKAGE_SCRUBBER_SOURCE_PATH = path.join(__dirname, 'scrub-public-package-json.js');
+const PII_SCRUBBER_SOURCE_PATH = path.join(__dirname, 'scrub-public-pii-text.mjs');
 const RELEASE_VERSION_SOURCE_PATH = path.join(__dirname, 'release-version.mjs');
 const PRIVATE_BRANCH_GUARD_INSTALLER_SOURCE_PATH = path.join(__dirname, 'install-private-branch-guard.sh');
 const PRE_PUSH_HOOK_SOURCE_PATH = path.join(__dirname, '..', '.githooks', 'pre-push');
 const TEST_TMP_ROOT = path.join(__dirname, '.tmp-sync-public-history-tests');
+const ZERO_OID = '0'.repeat(40);
 
 function writeFile(rootDir, relativePath, contents) {
   const absolutePath = path.join(rootDir, relativePath);
@@ -69,6 +71,11 @@ function installSyncScriptFixture(sourceDir) {
     sourceDir,
     path.join('scripts', 'scrub-public-package-json.js'),
     fs.readFileSync(PACKAGE_SCRUBBER_SOURCE_PATH, 'utf8'),
+  );
+  writeFile(
+    sourceDir,
+    path.join('scripts', 'scrub-public-pii-text.mjs'),
+    fs.readFileSync(PII_SCRUBBER_SOURCE_PATH, 'utf8'),
   );
   writeFile(
     sourceDir,
@@ -331,6 +338,52 @@ test('sync-public-history accepts an explicit source branch', () => {
   });
 });
 
+test('sync-public-history rejects a private target base before creating a candidate', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const privateTarget = git(sourceDir, ['rev-parse', 'dev~1']).trim();
+    assert.match(git(sourceDir, ['ls-tree', '-r', '--name-only', privateTarget]), /^TODO\//m);
+
+    const result = runSyncScript(sourceDir, [
+      '--target-base',
+      privateTarget,
+      'release-candidate',
+    ]);
+
+    assert.equal(result.status, 1, syncFailureMessage(result));
+    assert.match(result.stderr, new RegExp(`Target base ${privateTarget} is not contained in public history`));
+    assert.equal(git(sourceDir, ['branch', '--list', 'release-candidate']).trim(), '');
+  });
+});
+
+test('sync-public-history accepts a target base from the fetched public target history', () => {
+  withSourceRepo(({ sourceDir }) => {
+    git(sourceDir, ['checkout', '--quiet', '-b', 'prior-release', 'main']);
+    writeFile(sourceDir, 'release-follow-up.txt', 'public staging follow-up\n');
+    commitAll(sourceDir, 'Prior public staging change', {
+      authorDate: '2025-01-02T00:00:00Z',
+      committerDate: '2025-01-02T00:00:00Z',
+    });
+    const priorRelease = git(sourceDir, ['rev-parse', 'HEAD']).trim();
+    git(sourceDir, ['push', '--quiet', 'origin', 'HEAD:release-candidate']);
+    git(sourceDir, ['checkout', '--quiet', 'dev']);
+
+    const result = runSyncScript(sourceDir, [
+      '--target-base',
+      priorRelease,
+      'release-candidate',
+    ]);
+
+    assert.equal(result.status, 0, syncFailureMessage(result));
+    assert.equal(
+      git(sourceDir, ['merge-base', '--is-ancestor', priorRelease, 'release-candidate']),
+      '',
+    );
+    assert.ok(result.stdout.includes(
+      `To push: git push --force-with-lease=refs/heads/release-candidate:${priorRelease} -u origin release-candidate`,
+    ));
+  });
+});
+
 test('sync-public-history can replay patch-new commits from a source branch diverged from main', () => {
   withSourceRepo(({ sourceDir }) => {
     git(sourceDir, ['checkout', '--quiet', 'main']);
@@ -405,6 +458,53 @@ test('sync-public-history resolves replay deletes over public-main edits', () =>
   });
 });
 
+test('sync-public-history resolves large modify-delete conflict sets without racing the index', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const conflictPaths = Array.from(
+      { length: 128 },
+      (_, index) => path.join('conflict-fixtures', `entry-${String(index).padStart(3, '0')}.txt`),
+    );
+
+    git(sourceDir, ['checkout', '--quiet', 'main']);
+    for (const relativePath of conflictPaths) writeFile(sourceDir, relativePath, 'shared base\n');
+    commitAll(sourceDir, 'Add shared conflict fixtures', {
+      authorDate: '2025-01-06T00:00:00Z',
+      committerDate: '2025-01-06T00:00:00Z',
+    });
+    const sharedFixtureCommit = git(sourceDir, ['rev-parse', 'HEAD']).trim();
+    git(sourceDir, ['push', '--quiet', 'origin', 'main']);
+
+    git(sourceDir, ['checkout', '--quiet', 'dev']);
+    git(sourceDir, ['cherry-pick', '--quiet', sharedFixtureCommit]);
+    for (const relativePath of conflictPaths) writeFile(sourceDir, relativePath, 'source update\n');
+    commitAll(sourceDir, 'Update shared conflict fixtures', {
+      authorDate: '2025-01-07T00:00:00Z',
+      committerDate: '2025-01-07T00:00:00Z',
+    });
+
+    git(sourceDir, ['checkout', '--quiet', 'main']);
+    for (const relativePath of conflictPaths) fs.rmSync(path.join(sourceDir, relativePath));
+    commitAll(sourceDir, 'Remove shared conflict fixtures', {
+      authorDate: '2025-01-08T00:00:00Z',
+      committerDate: '2025-01-08T00:00:00Z',
+    });
+    git(sourceDir, ['push', '--quiet', 'origin', 'main']);
+    git(sourceDir, ['checkout', '--quiet', 'dev']);
+
+    const result = runSyncScript(sourceDir, ['--allow-diverged-source', 'release-candidate']);
+
+    assert.equal(result.status, 0, syncFailureMessage(result));
+    assert.match(result.stderr, /Resolved remaining cherry-pick conflicts from source/);
+    for (const relativePath of conflictPaths) {
+      const pathCheck = spawnSync('git', ['cat-file', '-e', `release-candidate:${relativePath}`], {
+        cwd: sourceDir,
+        encoding: 'utf8',
+      });
+      assert.notEqual(pathCheck.status, 0);
+    }
+  });
+});
+
 test('sync-public-history installs the private dev push guard before replaying', () => {
   withSourceRepo(({ sourceDir }) => {
     git(sourceDir, ['branch', '--set-upstream-to=origin/main', 'dev'], { stdio: 'ignore' });
@@ -446,7 +546,9 @@ test('sync-public-history replays public commits, skips private-only commits, an
     assert.match(result.stdout, /Skipped commits: 2/);
     assert.match(result.stdout, /Release impact suggestion: patch/);
     assert.match(result.stdout, /Release version: 0\.1\.1/);
-    assert.match(result.stdout, /To push: git push -u origin release-staging/);
+    assert.ok(result.stdout.includes(
+      `To push: git push --force-with-lease=refs/heads/release-staging:${ZERO_OID} -u origin release-staging`,
+    ));
 
     const tempDir = parseSummaryValue(result.stdout, 'Temp dir');
     assert.ok(tempDir);
@@ -728,6 +830,100 @@ test('sync-public-history rejects a runner secret added and deleted after the Ag
   });
 });
 
+test('sync-public-history rejects a public secret added and deleted outside Agent Bridge', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const unsafeToken = ['live', 'credential', 'material', 'must', 'not', 'ship'].join('-');
+    const publicConfigPath = path.join('client', 'src', 'transient-config.js');
+    writeFile(sourceDir, publicConfigPath, `const provider_api_token = '${unsafeToken}';\n`);
+    commitAll(sourceDir, 'Add temporary public credential', {
+      authorDate: '2025-01-05T08:09:10Z',
+      committerDate: '2025-01-05T08:09:10Z',
+    });
+    fs.rmSync(path.join(sourceDir, publicConfigPath));
+    commitAll(sourceDir, 'Remove temporary public credential', {
+      authorDate: '2025-01-05T09:10:11Z',
+      committerDate: '2025-01-05T09:10:11Z',
+    });
+
+    const result = runSyncScript(sourceDir, ['--push', 'release-staging']);
+
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /Scanning public replay commit for PII\/secrets/);
+    assert.match(result.stderr, /public release PII scan failed/);
+    assert.match(result.stderr, /client\/src\/transient-config\.js/);
+
+    const remoteCheck = spawnSync('git', ['ls-remote', '--heads', 'origin', 'release-staging'], {
+      cwd: sourceDir,
+      encoding: 'utf8',
+    });
+    assert.equal(remoteCheck.status, 0);
+    assert.equal(remoteCheck.stdout.trim(), '');
+  });
+});
+
+test('sync-public-history rejects a secret in a retained replay message', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const unsafeToken = ['live', 'credential', 'material', 'must', 'not', 'ship'].join('-');
+    writeFile(sourceDir, path.join('client', 'src', 'safe-config.js'), 'export const enabled = true;\n');
+    commitAll(
+      sourceDir,
+      `Add safe public config\n\nprovider_api_token = '${unsafeToken}'\n`,
+      {
+        authorDate: '2025-01-05T10:11:12Z',
+        committerDate: '2025-01-05T10:11:12Z',
+      },
+    );
+
+    const result = runSyncScript(sourceDir, ['--push', 'release-staging']);
+
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /Scanning public replay commit for PII\/secrets/);
+    assert.match(result.stderr, /public release PII scan failed/);
+    assert.match(result.stderr, /commit-message\.txt/);
+
+    const remoteCheck = spawnSync('git', ['ls-remote', '--heads', 'origin', 'release-staging'], {
+      cwd: sourceDir,
+      encoding: 'utf8',
+    });
+    assert.equal(remoteCheck.status, 0);
+    assert.equal(remoteCheck.stdout.trim(), '');
+  });
+});
+
+test('sync-public-history rejects an unsafe symlink added and deleted from public history', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const publicLinkPath = path.join('client', 'src', 'transient-link');
+    const absoluteLinkPath = path.join(sourceDir, publicLinkPath);
+    const secretAssignment = `${'provider_api'}_${'token'}='${'live-credential'}-material-must-not-ship'`;
+    const unsafeTarget = `/${'Us'}ers/example/${secretAssignment}`;
+    fs.mkdirSync(path.dirname(absoluteLinkPath), { recursive: true });
+    fs.symlinkSync(unsafeTarget, absoluteLinkPath);
+    commitAll(sourceDir, 'Add temporary public symlink', {
+      authorDate: '2025-01-05T11:12:13Z',
+      committerDate: '2025-01-05T11:12:13Z',
+    });
+    fs.unlinkSync(absoluteLinkPath);
+    commitAll(sourceDir, 'Remove temporary public symlink', {
+      authorDate: '2025-01-05T12:13:14Z',
+      committerDate: '2025-01-05T12:13:14Z',
+    });
+
+    const result = runSyncScript(sourceDir, ['--push', 'release-staging']);
+
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /Scanning public replay commit for PII\/secrets/);
+    assert.match(result.stderr, /public release PII scan failed/);
+    assert.match(result.stderr, /client\/src\/transient-link/);
+
+    const remoteCheck = spawnSync('git', ['ls-remote', '--heads', 'origin', 'release-staging'], {
+      cwd: sourceDir,
+      encoding: 'utf8',
+    });
+    assert.equal(remoteCheck.status, 0);
+    assert.equal(remoteCheck.stdout.trim(), '');
+  });
+});
+
 test('sync-public-history rejects public Node test failures before pushing', () => {
   withSourceRepo(({ sourceDir }) => {
     writeFile(
@@ -850,7 +1046,19 @@ test('sync-public-history rejects replayed commit messages that mention private 
 test('sync-public-history can sanitize private tokens in otherwise public replay messages', () => {
   withSourceRepo(({ sourceDir }) => {
     writeFile(sourceDir, 'public-sanitized.txt', 'public change\n');
-    commitAll(sourceDir, 'Public sanitized change\n\nMentions contextEngine-cc and agent-native follow-up details.\n', {
+    const privateCoauthor = ['noreply', 'anthropic.com'].join('@');
+    const syntheticEmail = ['private', 'example.com'].join('@');
+    const syntheticSecretAssignment = [
+      ['provider', 'api', 'token'].join('_'),
+      ['live', 'credential', 'material', 'must', 'not', 'ship'].join('-'),
+    ].join("='") + "'";
+    writeFile(sourceDir, 'public-synthetic-email.txt', `fixture=${syntheticEmail}\n`);
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'verify-public-release-pii.test.js'),
+      `const unsafeTarget = \`/${'Us'}ers/example/${syntheticSecretAssignment}\`;\n`,
+    );
+    commitAll(sourceDir, `Public sanitized change\n\nMentions contextEngine-cc and agent-native follow-up details.\n\nCo-Authored-By: Assistant <${privateCoauthor}>\n`, {
       authorDate: '2025-01-05T06:07:08Z',
       committerDate: '2025-01-05T06:07:08Z',
     });
@@ -883,6 +1091,17 @@ test('sync-public-history can sanitize private tokens in otherwise public replay
     assert.match(latestMessage, /private integration/);
     assert.doesNotMatch(latestMessage, /contextEngine-cc/i);
     assert.doesNotMatch(latestMessage, /agent-native/i);
+    assert.doesNotMatch(latestMessage, /Co-Authored-By/i);
+    assert.equal(
+      git(sourceDir, ['show', 'release-candidate:public-synthetic-email.txt']),
+      'fixture=[redacted-email]\n',
+    );
+    const normalizedScannerFixture = git(sourceDir, [
+      'show',
+      'release-candidate:scripts/verify-public-release-pii.test.js',
+    ]);
+    assert.doesNotMatch(normalizedScannerFixture, new RegExp(syntheticSecretAssignment));
+    assert.match(normalizedScannerFixture, /\['provider', 'api', 'token'\]\.join\('_'\)/);
   });
 });
 

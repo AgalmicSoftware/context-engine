@@ -37,7 +37,13 @@ type HistoricalFiguresManifest = {
   figures?: DemoFigureLike[];
 };
 
-const FALLBACK_COLORS = Object.freeze(['#5affc2', '#5b8cff', '#ffb347', '#ff6bcb', '#ffd166']);
+const FALLBACK_COLORS = Object.freeze([
+  'var(--ce-data-series-1)',
+  'var(--ce-data-series-2)',
+  'var(--ce-data-series-3)',
+  'var(--ce-data-series-4)',
+  'var(--ce-data-series-5)',
+]);
 
 const IGNORED_INITIAL_TOKENS = new Set([
   'and',

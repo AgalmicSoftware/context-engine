@@ -50,6 +50,8 @@ const createTransactionalState = () => {
 				get: async (key) => store.get(key),
 				put: async (key, value) => store.set(key, structuredClone(value)),
 				delete: async (key) => store.delete(key),
+				list: async ({ prefix = '' } = {}) =>
+					new Map([...store].filter(([key]) => key.startsWith(prefix))),
 			},
 		},
 		store,
@@ -249,6 +251,53 @@ test('SessionWriteCoordinator admits exactly one concurrent group create at cap 
 	assert.equal([...kv.values.keys()].filter((key) => key.startsWith('ce-worker-group-index:')).length, 1);
 	const storedGroup = JSON.parse(kv.values.get([...kv.values.keys()].find((key) => key.startsWith('ce-worker-group:session-a:'))));
 	assert.equal(storedGroup.sessionId, workerSessionId);
+});
+
+test('SessionWriteCoordinator rejects address-shaped create ids before reservation', async () => {
+	const kv = createWorkerGroupKv();
+	const env = {
+		CE_WORKER_GROUPS_KV: kv,
+		CE_WORKER_GROUPS_BOOTSTRAP: 'fresh-template-v2',
+		CE_WORKER_GROUP_MAX_GROUPS_PER_SESSION: '1',
+	};
+	const { state, store } = createTransactionalState();
+	const coordinator = new SessionWriteCoordinator(state, env);
+	const actorPrincipal = {
+		kind: 'evm_address',
+		address: '0x0000000000000000000000000000000000000abc',
+	};
+	const response = await coordinator.fetch(
+		createCoordinatorRequest('/worker-groups/mutate', {
+			slug: 'session-a',
+			operation: 'create',
+			input: {
+				groupId: '0x1234567890abcdef1234567890abcdef12345678',
+				label: 'Address shaped',
+				joinMode: 'admin_add',
+				memberVisibility: 'members',
+			},
+			actorPrincipal,
+		}),
+	);
+	assert.equal(response.status, 400);
+	assert.equal((await response.json()).reason, 'invalid_worker_group_id');
+	assert.equal(store.size, 0);
+	assert.equal(kv.values.size, 0);
+
+	const validResponse = await coordinator.fetch(
+		createCoordinatorRequest('/worker-groups/mutate', {
+			slug: 'session-a',
+			operation: 'create',
+			input: {
+				groupId: 'valid-after-rejection',
+				label: 'Valid after rejection',
+				joinMode: 'admin_add',
+				memberVisibility: 'members',
+			},
+			actorPrincipal,
+		}),
+	);
+	assert.equal(validResponse.status, 200);
 });
 
 test('SessionWriteCoordinator rejects a replacement identity before touching same-slug group state', async () => {
@@ -844,6 +893,133 @@ test('stale duplicate member removal cannot release the same durable capacity tw
 	const overflow = await mutate('add-member', members.d);
 	assert.equal(overflow.status, 409);
 	assert.equal((await overflow.json()).reason, 'worker_group_member_cap_exceeded');
+});
+
+test('failed member removal restores durable membership for retry', async () => {
+	const kv = createWorkerGroupKv();
+	const env = {
+		CE_WORKER_GROUPS_KV: kv,
+		CE_WORKER_GROUPS_BOOTSTRAP: 'fresh-template-v2',
+	};
+	const actorPrincipal = {
+		kind: 'evm_address',
+		address: '0x0000000000000000000000000000000000000abc',
+	};
+	const member = { kind: 'telegram', principalId: 'member-a' };
+	const coordinator = new SessionWriteCoordinator(createTransactionalState().state, env);
+	const mutate = (operation, overrides = {}) =>
+		coordinator.fetch(
+			createCoordinatorRequest('/worker-groups/mutate', {
+				slug: 'session-a',
+				operation,
+				groupId: 'reviewers',
+				actorPrincipal,
+				...overrides,
+			}),
+		);
+	assert.equal(
+		(
+			await mutate('create', {
+				input: {
+					groupId: 'reviewers',
+					label: 'Reviewers',
+					joinMode: 'admin_add',
+					memberVisibility: 'members',
+				},
+			})
+		).status,
+		200,
+	);
+	assert.equal((await mutate('add-member', { principal: member })).status, 200);
+
+	const memberKey = [...kv.values.keys()].find(
+		(key) => key.startsWith('ce-worker-group-member:session-a:') && key.includes(':reviewers:'),
+	);
+	assert.ok(memberKey);
+	const memberProjection = kv.values.get(memberKey);
+	kv.values.delete(memberKey);
+
+	const failedRemoval = await mutate('remove-member', { principal: member });
+	assert.equal(failedRemoval.status, 404);
+	assert.equal((await failedRemoval.json()).reason, 'worker_group_member_not_found');
+
+	const memberships = await coordinator.fetch(
+		createCoordinatorRequest('/worker-groups/memberships', {
+			slug: 'session-a',
+			principal: member,
+		}),
+	);
+	assert.equal(memberships.status, 200);
+	assert.deepEqual((await memberships.json()).groups.map(({ groupId }) => groupId), ['reviewers']);
+
+	kv.values.set(memberKey, memberProjection);
+	assert.equal((await mutate('remove-member', { principal: member })).status, 200);
+});
+
+test('failed group delete restores durable capacity for retry', async () => {
+	const kv = createWorkerGroupKv();
+	const env = {
+		CE_WORKER_GROUPS_KV: kv,
+		CE_WORKER_GROUPS_BOOTSTRAP: 'fresh-template-v2',
+		CE_WORKER_GROUP_MAX_GROUPS_PER_SESSION: '1',
+	};
+	const actorPrincipal = {
+		kind: 'evm_address',
+		address: '0x0000000000000000000000000000000000000abc',
+	};
+	const { state, store } = createTransactionalState();
+	const coordinator = new SessionWriteCoordinator(state, env);
+	const mutate = (operation, overrides = {}) =>
+		coordinator.fetch(
+			createCoordinatorRequest('/worker-groups/mutate', {
+				slug: 'session-a',
+				operation,
+				groupId: 'reviewers',
+				actorPrincipal,
+				...overrides,
+			}),
+		);
+
+	assert.equal(
+		(
+			await mutate('create', {
+				input: {
+					groupId: 'reviewers',
+					label: 'Reviewers',
+					joinMode: 'admin_add',
+					memberVisibility: 'members',
+				},
+			})
+		).status,
+		200,
+	);
+	const groupProjectionKey = [...kv.values.keys()].find(
+		(key) => key.startsWith('ce-worker-group:session-a:') && key.endsWith(':reviewers'),
+	);
+	assert.ok(groupProjectionKey);
+	const groupProjection = kv.values.get(groupProjectionKey);
+	kv.values.delete(groupProjectionKey);
+
+	const failedDelete = await mutate('delete');
+	assert.equal(failedDelete.status, 404);
+	assert.equal((await failedDelete.json()).reason, 'worker_group_not_found');
+	assert.equal(store.get('worker-group-capacity-group-v3:reviewers')?.phase, 'active');
+
+	kv.values.set(groupProjectionKey, groupProjection);
+	assert.equal((await mutate('delete')).status, 200);
+	assert.equal(
+		(
+			await mutate('create', {
+				input: {
+					groupId: 'replacement',
+					label: 'Replacement',
+					joinMode: 'admin_add',
+					memberVisibility: 'members',
+				},
+			})
+		).status,
+		200,
+	);
 });
 
 test('Durable Object authorization denies stale KV membership after remove and delete', async () => {

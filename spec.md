@@ -92,7 +92,10 @@ Core routes:
 - `/atlas` and `/tag/...`: Debate map / AI Policy Atlas demo surface.
 - `/matrix`: Risk matrix demo view.
 - `/demos`: Demo sessions launcher (`/agent` also exists as a dev-only route).
-- `/contracts`: Contract source viewer page.
+- `/docs`: User-facing quickstart, session-options guide, FAQ, AI-prompt
+  reference, and an explicit session selector for published smart-contract
+  deployment details. Legacy `/contracts` links redirect here without dropping
+  their path suffix, query, or hash.
 - `/:0x...`: Address-based user profile page (activity, responses, comparisons).
 - `/u/:address`: Alias for the address-based user profile page.
 - `/su/:username`: Simulated historical-user profile view used by demo/atlas surfaces.
@@ -122,6 +125,10 @@ What users can do:
 - Open session-scoped question views via `/session/<slug-or-id>/questions` and `/session/<slug-or-id>/questions/results`.
 - Open the session doc library via `/session/<slug-or-id>/docs`.
 - Create a new session via the Session Wizard (`/session/new` or `/new`), including grant-backed sponsored-bundle entry links.
+- Choose a curated **Session colors** scheme with an immediate preview. The
+  session stores only `appearance.colorSchemeId` (`context-engine`, `ocean`, or
+  `amber`); it cannot select an app theme or provide colors, token maps,
+  stylesheets, or CSS.
 
 What the system does:
 - Stores session gates and key operational pointers on-chain in `SessionRegistry` (authoritative for access).
@@ -248,6 +255,13 @@ What the system does:
 - Enforces CORS and per-session allowlists.
 - Stores session config and secrets in KV.
 - Requires auth for secret-using endpoints by default, but `POST /ai` and `POST /transcribe` also support anonymous access when the session config allows it.
+- For worker-canonical sessions, `workerAuthority.anonymousScopes` explicitly
+  grants anonymous `ai` and/or `transcribe` access. Browser transcription never
+  escalates an anonymous denial into a wallet or passkey signature prompt.
+- Browser speech capture requests voice-processing constraints and, when the
+  selected input is clearly an iPhone/iPad Continuity microphone, prefers an
+  identifiable built-in computer microphone while preserving other explicit
+  device choices.
 - Supports admin-signed bootstrap paths for `POST /arweave/upload` when no bearer token is present.
 - Supports worker-mediated Lit Chipotle setup and execution through signed admin `lit-chipotle-*` actions and authenticated `/lit/chipotle-action` runtime requests.
 - Supports grant-backed sponsored setup flows via `/sponsor`, `POST /admin/issue-sponsored-grants`, `POST /sponsored/redeem-deploy`, and `POST /sponsored/redeem-faucet`.
@@ -361,7 +375,7 @@ Worker API (selected endpoints):
 - `POST /auth/login`: Verify signature + gates and mint a session token with scopes.
 - `GET /health`: Authenticated health check.
 - `POST /ai`: AI proxy (provider-based); authenticated by default, with anonymous access supported when the session config allows it. Also supports `POST /` with `{ action: "ai", ... }`.
-- `POST /transcribe`: Transcription proxy; authenticated by default, with anonymous access supported when the session config allows it.
+- `POST /transcribe`: Transcription proxy; authenticated by default, with anonymous access supported when the session config allows it (`workerAuthority.anonymousScopes` for worker-canonical sessions).
 - `POST /arweave/upload`: Authenticated Arweave upload (also supports an admin-signed bootstrap path when no auth header).
 - `POST /groups/create`: Authenticated participant Worker-group creation,
   enabled only by `groupCreationPolicy: "participants"` and forced to an open,

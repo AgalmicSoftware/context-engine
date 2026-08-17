@@ -6,8 +6,8 @@
   display: inline-flex;
   align-items: center;
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: rgba(244, 247, 255, 0.8);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
+  color: color-mix(in srgb, var(--ce-control-text) 80%, transparent);
   padding: 6px 12px;
   border-radius: var(--ce-radius-6);
   cursor: pointer;
@@ -18,7 +18,7 @@
     color 0.2s ease;
 
   &:hover {
-    border-color: rgba(77, 255, 164, 0.4);
+    border-color: color-mix(in srgb, var(--ce-action-accent) 40%, transparent);
   }
 }
 
@@ -31,9 +31,9 @@
   position: absolute;
   top: 6px;
   right: 6px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: rgba(244, 247, 255, 0.7);
+  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
+  color: color-mix(in srgb, var(--ce-control-text) 70%, transparent);
   padding: 4px 8px;
   border-radius: var(--ce-radius-4);
   cursor: pointer;
@@ -49,13 +49,13 @@
 
 .jsonPre {
   margin: 0;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--ce-compat-dark) 30%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
   border-radius: var(--ce-radius-8);
   padding: 12px;
   overflow: auto;
   font-size: 0.8rem;
-  color: rgba(244, 247, 255, 0.85);
+  color: color-mix(in srgb, var(--ce-control-text) 85%, transparent);
   white-space: pre-wrap;
   word-break: break-all;
   font-family: var(--ce-font-mono);

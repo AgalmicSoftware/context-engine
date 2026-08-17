@@ -15,12 +15,18 @@
  * ========================= */
 
 import { createLogger } from '../logging.js';
+import {
+  buildOnchainSbtMembershipIdentity,
+  projectOnchainSbtMembership,
+  selectCanonicalMembershipProjection,
+  type CanonicalMembershipIdentity,
+  type CanonicalMembershipProjection,
+} from '../../domains/membership/membershipProjection';
 import { getSbtDisplayName, getSbtMaskedFieldValue } from '../sbt/sbtDisplayNames.js';
 import { RATING_MAX, RATING_MIN } from './ratingValue.js';
 import { hashSeed, mulberry32 } from './seededPrng.js';
 
 type UnknownRecord = Record<string, unknown>;
-type AddressCountMap = Record<string, number>;
 type RegionKey = 'a' | 'b' | 'c' | 'ab' | 'ac' | 'bc' | 'abc';
 type RegionCounts = Record<RegionKey, number>;
 type RegionEvidenceMap = Record<RegionKey, string[]>;
@@ -68,6 +74,10 @@ interface BuiltCompareSbtEntry extends CompareSbtEntry {
   name: string;
   address: string;
   compareKey: string;
+  kind: 'sbt_onchain';
+  membershipKey: string;
+  chainId: string;
+  sessionSlug: string;
 }
 
 export interface BuiltCompareUser extends CompareUser {
@@ -76,6 +86,10 @@ export interface BuiltCompareUser extends CompareUser {
   questions: CompareQuestion[];
   surveys: CompareSurvey[];
 }
+
+export type BuildUsersFromCachesOptions = {
+  sessionSlug?: unknown;
+};
 
 interface StanceToken {
   sign: number;
@@ -116,10 +130,10 @@ type OpinionOverlapRows = Array<Array<-1 | 0 | 1>>;
 type SbtOverlapRows = Array<Array<{ has: boolean }>>;
 
 interface SbtAggregate {
+  identity: CanonicalMembershipIdentity;
   sbtAddress: string;
   sbtInfo: UnknownRecord | null;
-  mintedCounts: AddressCountMap;
-  burnedCounts: AddressCountMap;
+  ownershipByAddress: Record<string, CanonicalMembershipProjection | undefined>;
 }
 
 interface BookmarkEntry {
@@ -142,33 +156,6 @@ const toLower = (s: unknown): string =>
     .toLowerCase()
     .trim();
 const MASKED_SBT_LABEL = getSbtMaskedFieldValue();
-const normalizeAddressCountMap = (value: UnknownRecord | null = null): AddressCountMap => {
-  const out: AddressCountMap = {};
-  Object.entries(value || {}).forEach(([addrRaw, countRaw]) => {
-    const addr = toLower(addrRaw);
-    if (!addr) return;
-    const count = Math.max(0, Math.floor(Number(countRaw || 0)));
-    if (count <= 0) return;
-    out[addr] = count;
-  });
-  return out;
-};
-const seedAddressCountMap = (countMapIn: UnknownRecord | null = null, addresses: unknown[] = []): AddressCountMap => {
-  const out = normalizeAddressCountMap(countMapIn);
-  (Array.isArray(addresses) ? addresses : []).forEach((addrRaw) => {
-    const addr = toLower(addrRaw);
-    if (!addr || Number(out[addr]) > 0) return;
-    out[addr] = 1;
-  });
-  return out;
-};
-const mergeAddressCountMaps = (base: UnknownRecord = {}, delta: UnknownRecord = {}): AddressCountMap => {
-  const out = { ...normalizeAddressCountMap(base) };
-  Object.entries(normalizeAddressCountMap(delta)).forEach(([addr, count]) => {
-    out[addr] = (out[addr] || 0) + count;
-  });
-  return out;
-};
 
 export function getCompareSbtLabel(entry: Partial<CompareSbtEntry> | null = null): string {
   const info = entry?.sbtInfo;
@@ -177,8 +164,10 @@ export function getCompareSbtLabel(entry: Partial<CompareSbtEntry> | null = null
 }
 
 export function getCompareSbtKey(entry: Partial<CompareSbtEntry> | null = null): string {
+  const explicitKey = toLower(entry?.compareKey);
+  if (explicitKey) return explicitKey;
   const label = getCompareSbtLabel(entry);
-  const address = toLower(entry?.compareKey || entry?.address || entry?.sbtAddress || entry?.sbtInfo?.sbtAddress || '');
+  const address = toLower(entry?.address || entry?.sbtAddress || entry?.sbtInfo?.sbtAddress || '');
   if (label === MASKED_SBT_LABEL && address) return address;
   return toLower(label) || address;
 }
@@ -786,12 +775,13 @@ const extractImportance = (obj: unknown): unknown => {
   return cand === '*' || asRecordOrNull(cand)?.encrypted === true ? undefined : cand;
 };
 
-/** buildUsersFromCaches(addresses, sbtCaches, questionsCaches, surveysCaches) – pure aggregation across all groups */
+/** buildUsersFromCaches(addresses, sbtCaches, questionsCaches, surveysCaches, options) – session-scoped aggregation */
 export function buildUsersFromCaches(
   addresses: unknown[] = [],
   sbtCaches: UnknownRecord[] = [],
   questionsCaches: UnknownRecord[] = [],
   surveysCaches: UnknownRecord[] = [],
+  options: BuildUsersFromCachesOptions = {},
 ): BuiltCompareUser[] {
   // Normalize & dedupe addresses (keep order of first occurrence)
   const seen = new Set<string>();
@@ -805,7 +795,7 @@ export function buildUsersFromCaches(
   });
 
   // ---------- Aggregate SBTs across all groups & networks ----------
-  // sbtLower -> { sbtAddress, sbtInfo, mintedCounts, burnedCounts }
+  // Membership identity includes the active session, chain, and contract.
   const sbtAgg: Record<string, SbtAggregate> = {};
   try {
     sbtCaches.forEach((cacheObj) => {
@@ -815,38 +805,39 @@ export function buildUsersFromCaches(
         const list = asRecord(netObj.sbtList);
         Object.keys(list).forEach((addrLowerKey) => {
           const entry = asRecord(list[addrLowerKey]);
-          const key = (addrLowerKey || '').toLowerCase();
+          const contractAddress = String(entry.sbtAddress || addrLowerKey || '').trim();
+          if (!contractAddress) return;
+          const identity = buildOnchainSbtMembershipIdentity({
+            chainId: netKey,
+            contractAddress,
+            sessionSlug: options.sessionSlug,
+          });
+          const key = identity.key;
           const a = sbtAgg[key] || {
-            sbtAddress: String(entry.sbtAddress || key),
+            identity,
+            sbtAddress: contractAddress,
             sbtInfo: null,
-            mintedCounts: {},
-            burnedCounts: {},
+            ownershipByAddress: {},
           };
-          const checkpointBackedPartialCounts =
-            entry?.countsLoaded !== true &&
-            !!entry?.countsScanCheckpoint &&
-            typeof entry.countsScanCheckpoint === 'object';
 
           // Prefer richer sbtInfo (merge shallow)
           const entryInfo = asRecordOrNull(entry.sbtInfo);
           if (entryInfo) a.sbtInfo = a.sbtInfo ? { ...a.sbtInfo, ...entryInfo } : entryInfo;
 
-          if (!checkpointBackedPartialCounts) {
-            a.mintedCounts = mergeAddressCountMaps(
-              a.mintedCounts,
-              seedAddressCountMap(
-                asRecordOrNull(entry.mintedCountByAddress),
-                Array.isArray(entry.mintedAddresses) ? entry.mintedAddresses : [],
-              ),
+          addrs.forEach((address) => {
+            const addressLower = address.toLowerCase();
+            const candidate = projectOnchainSbtMembership({
+              chainId: netKey,
+              contractAddress,
+              entry,
+              sessionSlug: options.sessionSlug,
+              subjectAddress: addressLower,
+            });
+            a.ownershipByAddress[addressLower] = selectCanonicalMembershipProjection(
+              a.ownershipByAddress[addressLower],
+              candidate,
             );
-            a.burnedCounts = mergeAddressCountMaps(
-              a.burnedCounts,
-              seedAddressCountMap(
-                asRecordOrNull(entry.burnedCountByAddress),
-                Array.isArray(entry.burnedAddresses) ? entry.burnedAddresses : [],
-              ),
-            );
-          }
+          });
 
           if (entry.sbtAddress) a.sbtAddress = String(entry.sbtAddress);
           sbtAgg[key] = a;
@@ -938,17 +929,18 @@ export function buildUsersFromCaches(
       const listed = !!displayName;
       if (!listed) return;
       const sbtAddress = e.sbtAddress || key;
-      const mintedCount = Number(e.mintedCounts?.[addrLower] || 0);
-      const burnedCount = Number(e.burnedCounts?.[addrLower] || 0);
-      if (mintedCount > burnedCount) {
+      const ownership = e.ownershipByAddress[addrLower];
+      if (ownership?.status === 'member') {
         sbts.push({
           name: displayName,
           address: sbtAddress,
-          compareKey: getCompareSbtKey({
-            name: displayName,
-            address: sbtAddress,
-            ...(e?.sbtInfo ? { sbtInfo: e.sbtInfo } : {}),
-          }),
+          compareKey: e.identity.key,
+          membershipKey: e.identity.key,
+          kind: 'sbt_onchain',
+          chainId: e.identity.chainId,
+          sessionSlug: e.identity.sessionSlug,
+          ...(e?.sbtInfo ? { sbtInfo: e.sbtInfo } : {}),
+          ...(typeof e?.sbtInfo?.image === 'string' ? { image: e.sbtInfo.image } : {}),
         });
       }
     });
@@ -1105,6 +1097,10 @@ export function readBookmarksNormalized(rawJson: unknown): BookmarkEntry[] {
 export function deriveUserLabels(users: CompareUser[] = [], bookmarks: Array<Partial<BookmarkEntry>> = []): string[] {
   const map = new Map((bookmarks || []).map((b) => [String(b.addressLower || '').toLowerCase(), b.label]));
   return (users || []).map(
-    (u, i) => map.get(String(u?.address || '').toLowerCase()) || shortenPlain(u?.address || '') || `User ${i + 1}`,
+    (u, i) =>
+      map.get(String(u?.address || '').toLowerCase()) ||
+      String(u?.label || '').trim() ||
+      shortenPlain(u?.address || '') ||
+      `User ${i + 1}`,
   );
 }

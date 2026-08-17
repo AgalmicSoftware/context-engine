@@ -175,6 +175,18 @@ describe('sessionParsers', () => {
     });
   });
 
+  it('accepts worker authority only from the Worker config object boundary', () => {
+    const authority = { version: 1, participantScopes: ['ai', 'storage'] };
+    const valid = parseWorkerConfig({ workerAuthority: authority });
+    const invalid = parseWorkerConfig({ workerAuthority: 'participant' });
+
+    expect(valid.ok).toBe(true);
+    expect(valid.config.workerAuthority).toEqual(authority);
+    expect(invalid.ok).toBe(false);
+    expect(invalid.errors).toContain('workerAuthority must be an object.');
+    expect(invalid.config).not.toHaveProperty('workerAuthority');
+  });
+
   it('normalizes protocol-less worker URLs to absolute https bases', () => {
     const parsed = parseWorkerConfig({
       corsWorkerUrl: 'worker.example.com/auth/login',

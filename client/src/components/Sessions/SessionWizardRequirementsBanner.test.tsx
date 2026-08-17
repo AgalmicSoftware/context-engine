@@ -61,17 +61,36 @@ describe('SessionWizardRequirementsBanner', () => {
     expect(screen.getByText('Anvil ETH for on-chain registration')).toBeInTheDocument();
   });
 
-  it('renders exactly the two profile-derived Cloudflare requirements without not-required notices', () => {
+  it('renders exact resolved AI provider labels without an OpenAI-only link', () => {
+    render(
+      <SessionWizardRequirementsBanner
+        fundingRequirementLabel="OP Sepolia ETH"
+        onDismiss={jest.fn()}
+        requiredAiProviderKeyLabels={['Anthropic key', 'OpenRouter key', 'OpenAI key']}
+        requiredRequirementIds={['aiProviderKey']}
+      />,
+    );
+
+    expect(screen.getByText(/Anthropic key, OpenRouter key, OpenAI key/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /AI provider key|OpenAI API key/i })).not.toBeInTheDocument();
+  });
+
+  it('renders the Wrapped token in addition to the native Cloudflare requirements', () => {
     render(
       <SessionWizardRequirementsBanner
         cloudflareTokenSlug="onboarding-demo"
         fundingRequirementLabel="OP Sepolia ETH"
         onDismiss={jest.fn()}
-        requiredRequirementIds={['cloudflareApiToken', 'aiProviderKey']}
+        requiredAiProviderKeyLabels={['OpenAI key']}
+        requiredRequirementIds={['cloudflareAccount', 'cloudflareApiToken', 'aiProviderKey']}
       />,
     );
 
-    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
+    expect(screen.getByRole('link', { name: 'Cloudflare account' })).toHaveAttribute(
+      'href',
+      SESSION_WIZARD_REQUIREMENT_LINKS.cloudflareAccount,
+    );
     const cloudflareTokenLink = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_TOKEN_ONBOARDING_LINK);
     expect(cloudflareTokenLink).toHaveAccessibleName('Cloudflare API token');
     expect(cloudflareTokenLink).toHaveAttribute('target', '_blank');
@@ -100,7 +119,8 @@ describe('SessionWizardRequirementsBanner', () => {
       'href',
       'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/session-cors-worker.md#api-token-setup-and-handling',
     );
-    expect(screen.getByRole('link', { name: 'AI provider key' })).toBeInTheDocument();
+    expect(screen.getByText('OpenAI key for text and transcription')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /AI provider key|OpenAI API key/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/Arweave|Lit|RPC|wallet|faucet|funding|gas/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/not required/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/turnkey tool/i)).not.toBeInTheDocument();
@@ -130,10 +150,13 @@ describe('SessionWizardRequirementsBanner', () => {
         fundingRequirementHref={SESSION_WIZARD_REQUIREMENT_LINKS.optimismSepoliaFaucet}
         fundingRequirementLabel="OP Sepolia ETH"
         onDismiss={jest.fn()}
-        requiredRequirementIds={['aiProviderKey', 'arweaveJwk', 'rpc', 'wallet', 'funding']}
+        requiredRequirementIds={['sessionWorker', 'aiProviderKey', 'arweaveJwk', 'rpc', 'wallet', 'funding']}
       />,
     );
 
+    expect(screen.getByText(/compatible Session Worker/i)).toHaveTextContent(
+      'A compatible Session Worker provides the web runtime; the EVM registry and Arweave remain canonical.',
+    );
     expect(screen.getByRole('link', { name: 'Arweave wallet (JWK)' })).toBeInTheDocument();
     expect(screen.getByText(/RPC URL or provider key/i)).toBeInTheDocument();
     expect(screen.getByText(/connected wallet/i)).toBeInTheDocument();
@@ -147,7 +170,7 @@ describe('SessionWizardRequirementsBanner', () => {
         fundingRequirementHref={SESSION_WIZARD_REQUIREMENT_LINKS.optimismSepoliaFaucet}
         fundingRequirementLabel="OP Sepolia ETH"
         onDismiss={jest.fn()}
-        requiredRequirementIds={['aiProviderKey', 'arweaveJwk', 'rpc', 'wallet', 'funding', 'lit']}
+        requiredRequirementIds={['sessionWorker', 'aiProviderKey', 'arweaveJwk', 'rpc', 'wallet', 'funding', 'lit']}
       />,
     );
     expect(screen.getByRole('link', { name: 'Lit API key' })).toBeInTheDocument();

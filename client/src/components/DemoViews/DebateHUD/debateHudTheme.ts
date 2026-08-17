@@ -11,8 +11,8 @@ export type DebateHudTheme = {
   textLight: string;
   font: string;
   mono: string;
-  radius: number;
-  radiusSm: number;
+  radius: number | string;
+  radiusSm: number | string;
   shadow: string;
   shadowHover: string;
   shadowFloat: string;
@@ -21,52 +21,48 @@ export type DebateHudTheme = {
 };
 
 export const lightTheme: DebateHudTheme = {
-  bg: '#f5f6fa',
-  surface: '#ffffff',
-  surfaceHover: '#fafbff',
-  border: '#e2e5ef',
-  borderLight: '#eef0f6',
-  text: '#1a1d2e',
-  textMuted: '#6b7194',
-  textLight: '#9da3c0',
-  font: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-  mono: "'JetBrains Mono', 'Fira Code', 'SF Mono', monospace",
-  radius: 12,
-  radiusSm: 8,
-  shadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03)',
-  shadowHover: '0 4px 16px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04)',
-  shadowFloat: '0 8px 32px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.04)',
-  accent: '#4f6df5',
-  accentLight: '#eef1ff',
+  bg: 'var(--ce-document-canvas)',
+  surface: 'var(--ce-document-surface)',
+  surfaceHover: 'var(--ce-surface-light)',
+  border: 'var(--ce-document-border)',
+  borderLight: 'var(--ce-border-light)',
+  text: 'var(--ce-document-text)',
+  textMuted: 'var(--ce-document-text-muted)',
+  textLight: 'var(--ce-text-muted)',
+  font: 'var(--ce-font-ui)',
+  mono: 'var(--ce-font-mono)',
+  radius: 'var(--ce-radius-12)',
+  radiusSm: 'var(--ce-radius-8)',
+  shadow: 'var(--ce-shadow-raised)',
+  shadowHover: 'var(--ce-shadow-raised)',
+  shadowFloat: 'var(--ce-card-shadow)',
+  accent: 'var(--ce-action-primary)',
+  accentLight: 'var(--ce-status-info-soft)',
 };
 
 export const darkTheme: DebateHudTheme = {
-  bg: '#0f1117',
-  surface: '#1a1d2e',
-  surfaceHover: '#22263a',
-  border: '#2a2f45',
-  borderLight: '#232840',
-  text: '#e4e6f0',
-  textMuted: '#9da3c0',
-  textLight: '#6b7194',
-  font: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-  mono: "'JetBrains Mono', 'Fira Code', 'SF Mono', monospace",
-  radius: 12,
-  radiusSm: 8,
-  shadow: '0 1px 3px rgba(0,0,0,0.2), 0 4px 12px rgba(0,0,0,0.15)',
-  shadowHover: '0 4px 16px rgba(0,0,0,0.3), 0 1px 4px rgba(0,0,0,0.2)',
-  shadowFloat: '0 8px 32px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.2)',
-  accent: '#6b8aff',
-  accentLight: '#1e2444',
+  bg: 'var(--ce-canvas)',
+  surface: 'var(--ce-surface-raised)',
+  surfaceHover: 'var(--ce-surface-alt)',
+  border: 'var(--ce-border)',
+  borderLight: 'var(--ce-border-light)',
+  text: 'var(--ce-panel-text)',
+  textMuted: 'var(--ce-panel-text-muted)',
+  textLight: 'var(--ce-control-disabled-text)',
+  font: 'var(--ce-font-ui)',
+  mono: 'var(--ce-font-mono)',
+  radius: 'var(--ce-radius-12)',
+  radiusSm: 'var(--ce-radius-8)',
+  shadow: 'var(--ce-shadow-raised)',
+  shadowHover: 'var(--ce-shadow-raised)',
+  shadowFloat: 'var(--ce-card-shadow)',
+  accent: 'var(--ce-action-primary)',
+  accentLight: 'var(--ce-status-info-soft)',
 };
 
 export const ThemeContext = React.createContext<DebateHudTheme>(darkTheme);
 
 export const useTheme = (): DebateHudTheme => React.useContext(ThemeContext) || darkTheme;
 
-export const soften = (hex: string, alpha: number): string => {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-};
+export const soften = (color: string, alpha: number): string =>
+  `color-mix(in srgb, ${color} ${Math.max(0, Math.min(100, alpha * 100))}%, transparent)`;

@@ -22,6 +22,7 @@ export const METADATA_FIELD_ORDER = [
   'slug',
   'sessionName',
   'sessionInfo',
+  'appearance',
   'sessionModeProfile',
   'groupCreationPolicy',
   'sessionHeaderImg',

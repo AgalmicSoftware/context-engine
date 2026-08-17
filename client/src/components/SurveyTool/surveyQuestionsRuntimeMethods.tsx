@@ -73,14 +73,12 @@ export const createSurveyQuestionsRuntimeMethods = (
     ModalBody,
     ModalFooter,
     ModalHeader,
-    PileHologramAssistant,
     QUESTION_TAG_DROPDOWN_ROW_STYLE,
     QuestionCardLinks,
     QuestionDecryptControl,
     QuestionFilter,
     QuestionsDashboard,
     React,
-    SHOW_PILE_HOLOGRAM_TOGGLE,
     SingleQuestionResponse,
     SurveyAudioFieldInput,
     SurveyQuestionTagControl,
@@ -982,6 +980,27 @@ export const createSurveyQuestionsRuntimeMethods = (
   });
 
   const {
+    checkAndHandleStartFresh,
+    getAnsweredQuestionsCount,
+    getSurveyQuestionPoolLoadState,
+    handleBookmarkToggle,
+    initializeSurveyResponseState,
+    loadBookmarks,
+    maybeBlockSubmitUntilQuestionPoolComplete,
+    recalculateEditStats,
+    showTransientSubmitFeedback,
+  } = createSurveyQuestionsProgressRuntime({
+    ...context,
+    buildEmptyResponseFieldState,
+    computeModifiedQuestionsCount,
+    fetchQuestionPool: () => fetchQuestionPool(),
+    getCurrentRenderedQuestionIds,
+    getPendingEditStats: () => getPendingEditStats(),
+    handleStartFresh: () => handleStartFresh(),
+    resolveDiffBaselineSlice,
+  });
+
+  const {
     beginQuestionDisplayRender,
     flushDraftPersistAfterSliderChange,
     getAnswerLockDisplayState,
@@ -1016,6 +1035,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     getAudioInputWorkerProps,
     handleAdditional,
     handleAnswer,
+    handleBookmarkToggle,
     handleConviction,
     handleImportance,
     handleReloadMaskedPrompt,
@@ -1045,27 +1065,6 @@ export const createSurveyQuestionsRuntimeMethods = (
       resolveFieldEncryptionGateId,
       valuesEqual,
     });
-
-  const {
-    checkAndHandleStartFresh,
-    getAnsweredQuestionsCount,
-    getSurveyQuestionPoolLoadState,
-    handleBookmarkToggle,
-    initializeSurveyResponseState,
-    loadBookmarks,
-    maybeBlockSubmitUntilQuestionPoolComplete,
-    recalculateEditStats,
-    showTransientSubmitFeedback,
-  } = createSurveyQuestionsProgressRuntime({
-    ...context,
-    buildEmptyResponseFieldState,
-    computeModifiedQuestionsCount,
-    fetchQuestionPool: () => fetchQuestionPool(),
-    getCurrentRenderedQuestionIds,
-    getPendingEditStats: () => getPendingEditStats(),
-    handleStartFresh: () => handleStartFresh(),
-    resolveDiffBaselineSlice,
-  });
 
   const { renderQuestion, renderQuestionAnswer, renderSurveyAnswers } = createSurveyQuestionsRenderRuntime({
     ...context,
@@ -2024,6 +2023,12 @@ export const createSurveyQuestionsRuntimeMethods = (
   };
 
   async function handleDecryptEdit() {
+    // Plaintext responses are already hydrated into surveysResponseState. Re-enter
+    // edit mode directly instead of running the encrypted-response pipeline.
+    if (!stateRef.current.userResponseEncrypted) {
+      setState(buildEditingResponseModeState());
+      return;
+    }
     const decryptContext: SurveyQuestionsLegacyValue = buildDecryptContextSnapshot();
     const decryptAttemptId: SurveyQuestionsLegacyValue = startSurveyDecryptAttempt();
     setState(buildDecryptEditStartState());

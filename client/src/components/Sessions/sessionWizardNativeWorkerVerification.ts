@@ -1,7 +1,7 @@
 import type { MutableRefObject } from 'react';
 import {
   fetchWorkerCanonicalSessionBootstrap,
-  type WorkerCanonicalSessionBootstrap,
+  normalizeWorkerCanonicalSessionIdHex,
 } from '../../utilities/session/sessionWorkerDiscovery';
 import { toStr } from '../../utilities/shared/primitives.js';
 import type { AnyRecord, WorkerSecretsLike } from '../shellTypes';
@@ -9,10 +9,13 @@ import { buildWorkerSecretsPayload, syncWorkerSecretsAfterDeploy } from './sessi
 import { resolveSessionWizardModeRequirements } from './sessionWizardModeRequirements';
 import {
   buildSessionWizardWorkerRequirementProof,
+  resolveSessionWizardWorkerRequirementReadiness,
   resolveSessionWizardWorkerSecretSelection,
 } from './sessionWizardWorkerRequirementProof';
-import { buildSessionWizardWorkerConfigPayload } from './sessionWizardWriteNormalization.js';
-import { persistAndVerifySessionWizardWorkerConfig } from './sessionWizardWorkerConfigPersistence';
+import { SESSION_WIZARD_WORKER_CONFIG_VISIBILITY_RETRY_DELAYS_MS } from './sessionWizardWorkerConfigPersistence';
+import { parseSessionWizardAllowOriginsInput } from './sessionWizardWorkerRuntimeSupport';
+import { verifySessionWizardWorkerPublicDeployment } from './sessionWizardWorkerPublicVerification';
+import { buildSessionWizardWorkerVerificationConfig } from './sessionWizardWorkerVerificationConfig';
 import { publishVerifiedRuntime } from './sessionWizardWorkerState';
 import {
   normalizeSessionWizardSlug as normalizeSlug,
@@ -43,6 +46,14 @@ type NativeWorkerVerificationArgs = {
   updateDraftValue: (path: string[], value: unknown) => void;
 };
 
+export type SessionWizardVerifiedWorkerConnection = {
+  config: AnyRecord;
+  configRevision: string;
+  sessionId: string;
+  sessionSlug: string;
+  workerOrigin: string;
+};
+
 const readRuntime = (
   runtimeRef?: MutableRefObject<SessionWizardWorkerDeployRuntime | null>,
 ): SessionWizardWorkerDeployRuntime => {
@@ -58,22 +69,30 @@ export const verifyNativeSessionWorker = async ({
   getMissingWorkerSecretsForDeploy,
   parseAllowOriginsInput,
   resolveConnectedAdminAddress,
-  resolveWorkerFaucetConfig,
   signTypedAdminAction,
   updateDeploymentState,
   updateDraftValue,
-}: NativeWorkerVerificationArgs): Promise<WorkerCanonicalSessionBootstrap> => {
+}: NativeWorkerVerificationArgs): Promise<SessionWizardVerifiedWorkerConnection> => {
   const runtime = readRuntime(runtimeRef);
   const currentDraft = runtime.draft && typeof runtime.draft === 'object' ? runtime.draft : {};
   const slug = normalizeSlug(toStr(sessionSlug || currentDraft.slug).trim());
   const workerUrl = normalizeWorkerUrl(workerQueryValue);
+  const initialDraftWorkerUrl = normalizeWorkerUrl(currentDraft.corsWorkerUrl);
   const modeRequirements = resolveSessionWizardModeRequirements(currentDraft.sessionModeProfile);
   if (!slug || slug !== normalizeSlug(currentDraft.slug)) {
     throw new Error('The Worker URL must be verified against the current session slug.');
   }
   if (!workerUrl) throw new Error('Paste a valid HTTPS Session Worker origin before verification.');
-  if (!modeRequirements.isWorkerCanonical) {
-    throw new Error('Native Cloudflare verification is available only for worker-canonical sessions.');
+  if (initialDraftWorkerUrl && initialDraftWorkerUrl !== workerUrl) {
+    throw new Error('The Worker URL must match the current draft Worker URL before verification.');
+  }
+  if (currentDraft.sessionModeProfile?.surfaces?.agentHttp === true) {
+    throw new Error(
+      'Agent Session Wrapped requires the legacy/manual deploy-helper flow; native Cloudflare dashboard verification cannot provision its dedicated Bridge.',
+    );
+  }
+  if (!modeRequirements.selected || !modeRequirements.usesWorkerRuntime) {
+    throw new Error('Native Session Worker verification requires a selected Worker-runtime profile.');
   }
   if (modeRequirements.requiresLit) {
     throw new Error(
@@ -82,11 +101,17 @@ export const verifyNativeSessionWorker = async ({
   }
   if (runtime.loginComplete !== true) {
     if (typeof runtime.toggleLoginModal === 'function') runtime.toggleLoginModal(true);
-    throw new Error('Sign in with the session admin passkey before verifying the Worker.');
+    throw new Error('Connect or sign in as the session admin before verifying the Worker.');
   }
 
   const resolvedAdmin = await resolveConnectedAdminAddress();
-  if (!resolvedAdmin) throw new Error('Sign in with the session admin passkey before verifying the Worker.');
+  if (!resolvedAdmin) throw new Error('Connect or sign in as the session admin before verifying the Worker.');
+  if (runtimeRef?.current) {
+    runtimeRef.current = {
+      ...runtimeRef.current,
+      resolvedAdminAddress: resolvedAdmin,
+    };
+  }
   const currentWorkerSecrets = getCurrentWorkerSecrets();
   if (runtime.workerSecretsEnabled === false) {
     throw new Error('Enable Worker secrets and enter the required AI provider key before verification.');
@@ -104,49 +129,44 @@ export const verifyNativeSessionWorker = async ({
   }
 
   updateDeploymentState({
-    deployStatus: 'Writing and verifying canonical Worker config…',
+    deployStatus: 'Writing and verifying Session Worker config…',
     deployInFlight: true,
     deployComplete: false,
     workerMode: 'custom',
     workerUrlAutoFilled: false,
   });
   try {
-    const workerConfig = buildSessionWizardWorkerConfigPayload({
-      slug,
+    const allowOrigins =
+      runtime.workerAllowOrigins == null
+        ? parseAllowOriginsInput()
+        : parseSessionWizardAllowOriginsInput(runtime.workerAllowOrigins);
+    const workerConfig = buildSessionWizardWorkerVerificationConfig({
+      runtime,
       draft: currentDraft,
-      deployPayload: {
-        adminAddress: resolvedAdmin,
-        allowOrigins: parseAllowOriginsInput(),
-        limits: Number(runtime.workerLimitPerWallet || 0)
-          ? { perWalletPerDay: Number(runtime.workerLimitPerWallet) }
-          : {},
-        scopes: {},
-        embeddedDeployHelperEnabled: runtime.embeddedDeployHelperEnabled,
-      },
-      workerSecrets: currentWorkerSecrets,
-      account: resolvedAdmin,
-      registryAddress: runtime.registryAddress,
-      registryChainId: runtime.registryChainId,
-      networkChainId: currentDraft.networkChainId,
-      sessionId: toStr(runtime.sessionId || runtime.sessionIdHex).trim(),
-      latestChainBlock: runtime.latestChainBlock,
+      adminAddress: resolvedAdmin,
       workerUrl,
-      resolveWorkerFaucetConfig,
+      allowOrigins,
+      workerSecrets: currentWorkerSecrets,
     });
-    await persistAndVerifySessionWizardWorkerConfig({
+    const verifiedConfig = await verifySessionWizardWorkerPublicDeployment({
       workerUrl,
       slug,
       sessionId: runtime.sessionId || runtime.sessionIdHex,
       adminAddress: resolvedAdmin,
       config: workerConfig,
+      isWorkerCanonical: modeRequirements.isWorkerCanonical,
       signAdminAction: (input) => signTypedAdminAction({ ...input, accountOverride: resolvedAdmin }),
     });
     const secretsSyncStatus = await syncWorkerSecretsAfterDeploy({
       workerUrl,
       account: resolvedAdmin,
       slug,
+      sessionId: modeRequirements.isWorkerCanonical
+        ? normalizeWorkerCanonicalSessionIdHex(runtime.sessionId || runtime.sessionIdHex)
+        : '',
       deploySecrets,
       helperWritesSecrets: false,
+      retryDelaysMs: SESSION_WIZARD_WORKER_CONFIG_VISIBILITY_RETRY_DELAYS_MS,
       signAdminAction: ({ targetSlug, workerUrl: targetWorkerUrl, body }) =>
         signTypedAdminAction({
           action: 'set-secrets',
@@ -155,21 +175,20 @@ export const verifyNativeSessionWorker = async ({
           workerUrl: targetWorkerUrl,
           accountOverride: resolvedAdmin,
         }),
-      postSecrets: async ({ auth, secrets, workerUrl: targetWorkerUrl, slug: targetSlug }) => {
+      postSecrets: async ({ auth, body, workerUrl: targetWorkerUrl }) => {
         const response = await fetch(`${targetWorkerUrl}/admin/set-secrets`, {
           method: 'POST',
           credentials: 'omit',
           redirect: 'error',
           headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...auth,
-            sessionSlug: targetSlug,
-            secrets,
-          }),
+          body: JSON.stringify({ ...auth, ...body }),
         });
         const responseBody = await response.json().catch(() => ({}));
         if (!response.ok) {
           throw new Error(responseBody?.error || `Worker secret sync failed (${response.status}).`);
+        }
+        if (responseBody?.ok !== true) {
+          throw new Error('Worker secret write did not confirm acceptance.');
         }
       },
     });
@@ -177,25 +196,75 @@ export const verifyNativeSessionWorker = async ({
       throw new Error(secretsSyncStatus.warning || 'Worker secrets could not be verified.');
     }
 
-    const bootstrap = await fetchWorkerCanonicalSessionBootstrap({
-      sessionSlug: slug,
-      workerQueryValue: workerUrl,
-    });
+    const bootstrap: SessionWizardVerifiedWorkerConnection = modeRequirements.isWorkerCanonical
+      ? await fetchWorkerCanonicalSessionBootstrap({
+          sessionSlug: slug,
+          workerQueryValue: workerUrl,
+        })
+      : {
+          config: verifiedConfig.publicConfig,
+          configRevision: '',
+          sessionId: normalizeWorkerCanonicalSessionIdHex(runtime.sessionId || runtime.sessionIdHex),
+          sessionSlug: slug,
+          workerOrigin: verifiedConfig.workerOrigin,
+        };
     const proof = buildSessionWizardWorkerRequirementProof({
       workerUrl: bootstrap.workerOrigin,
       sessionSlug: slug,
       sessionId: bootstrap.sessionId,
       sessionModeProfile: currentDraft.sessionModeProfile,
       sessionAi: currentDraft.ai,
+      workerAllowOrigins: workerConfig.allowOrigins,
       workerSecrets: currentWorkerSecrets,
       requiredSecretFields,
+      workerConfig,
     });
     if (!proof) throw new Error('Worker requirement verification could not be recorded.');
+
+    const liveRuntime = readRuntime(runtimeRef);
+    const liveDraft = liveRuntime.draft && typeof liveRuntime.draft === 'object' ? liveRuntime.draft : {};
+    const liveDraftWorkerUrl = normalizeWorkerUrl(liveDraft.corsWorkerUrl);
+    const liveAdminAddress = toStr(liveRuntime.account || liveRuntime.resolvedAdminAddress).trim();
+    const liveAllowOrigins =
+      liveRuntime.workerAllowOrigins == null
+        ? parseAllowOriginsInput()
+        : parseSessionWizardAllowOriginsInput(liveRuntime.workerAllowOrigins);
+    const liveWorkerSecrets = getCurrentWorkerSecrets();
+    const liveWorkerConfig = buildSessionWizardWorkerVerificationConfig({
+      runtime: liveRuntime,
+      draft: liveDraft,
+      adminAddress: liveAdminAddress,
+      workerUrl,
+      allowOrigins: liveAllowOrigins,
+      workerSecrets: liveWorkerSecrets,
+    });
+    const liveReadiness = resolveSessionWizardWorkerRequirementReadiness({
+      proof,
+      workerUrl: bootstrap.workerOrigin,
+      sessionSlug: liveDraft.slug,
+      sessionId: liveRuntime.sessionId || liveRuntime.sessionIdHex,
+      sessionModeProfile: liveDraft.sessionModeProfile,
+      sessionAi: liveDraft.ai,
+      workerAllowOrigins: liveAllowOrigins,
+      workerSecrets: liveWorkerSecrets,
+      workerSecretsEnabled: liveRuntime.workerSecretsEnabled !== false,
+      workerConfig: liveWorkerConfig,
+    });
+    if (
+      liveDraftWorkerUrl !== initialDraftWorkerUrl ||
+      liveRuntime.loginComplete !== true ||
+      !liveAdminAddress ||
+      !liveReadiness.verified
+    ) {
+      throw new Error('Session settings changed while Worker verification was in progress. Verify the Worker again.');
+    }
 
     updateDraftValue(['corsWorkerUrl'], bootstrap.workerOrigin);
     publishVerifiedRuntime(runtimeRef, currentDraft, bootstrap.workerOrigin, bootstrap.workerOrigin, true, proof);
     updateDeploymentState({
-      deployStatus: `Session Worker verified at canonical config revision ${bootstrap.configRevision}.`,
+      deployStatus: bootstrap.configRevision
+        ? `Session Worker verified at canonical config revision ${bootstrap.configRevision}.`
+        : 'Session Worker verified.',
       deployComplete: true,
       deployWorkerUrl: bootstrap.workerOrigin,
       workerRequirementProof: proof,

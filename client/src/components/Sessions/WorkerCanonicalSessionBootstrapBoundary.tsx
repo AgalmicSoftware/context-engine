@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
+import { BootRecoveryReady } from '../ErrorBoundary/InitialRouteBoundary';
 import {
   fetchWorkerCanonicalSessionBootstrap,
   describeWorkerSessionBootstrapError,
@@ -189,19 +190,26 @@ const WorkerCanonicalSessionBootstrapBoundary = ({
       }`,
     );
     return (
-      <div role="alert" aria-live="assertive" data-testid="ce-worker-canonical-bootstrap-error">
-        <h3>{viewState.title}</h3>
-        <div>{viewState.message}</div>
-        <div>
-          {viewState.canRetry && (
-            <button type="button" aria-label="Retry worker session" onClick={() => setRetryNonce((value) => value + 1)}>
-              Retry
-            </button>
-          )}
-          <a href={adminHref}>Open Admin</a>
-          <a href={buildPublicRoute('/new')}>Return to session selection</a>
+      <>
+        <div role="alert" aria-live="assertive" data-testid="ce-worker-canonical-bootstrap-error">
+          <h3>{viewState.title}</h3>
+          <div>{viewState.message}</div>
+          <div>
+            {viewState.canRetry && (
+              <button
+                type="button"
+                aria-label="Retry worker session"
+                onClick={() => setRetryNonce((value) => value + 1)}
+              >
+                Retry
+              </button>
+            )}
+            <a href={adminHref}>Open Admin</a>
+            <a href={buildPublicRoute('/new')}>Return to session selection</a>
+          </div>
         </div>
-      </div>
+        <BootRecoveryReady />
+      </>
     );
   }
 

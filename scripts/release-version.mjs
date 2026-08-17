@@ -21,25 +21,24 @@ const parseVersion = (value) => {
   }
   return {
     value: normalized,
-    major: Number(match[1]),
-    minor: Number(match[2]),
-    patch: Number(match[3]),
+    major: BigInt(match[1]),
+    minor: BigInt(match[2]),
+    patch: BigInt(match[3]),
   };
 };
 
 export const compareVersions = (left, right) => {
   const a = parseVersion(left);
   const b = parseVersion(right);
-  return (
-    Math.sign(a.major - b.major)
-    || Math.sign(a.minor - b.minor)
-    || Math.sign(a.patch - b.patch)
-  );
+  if (a.major !== b.major) return a.major < b.major ? -1 : 1;
+  if (a.minor !== b.minor) return a.minor < b.minor ? -1 : 1;
+  if (a.patch !== b.patch) return a.patch < b.patch ? -1 : 1;
+  return 0;
 };
 
 export const incrementPatch = (version) => {
   const parsed = parseVersion(version);
-  return `${parsed.major}.${parsed.minor}.${parsed.patch + 1}`;
+  return `${parsed.major}.${parsed.minor}.${parsed.patch + 1n}`;
 };
 
 const releaseLevelBetween = (baselineVersion, nextVersion) => {
@@ -50,14 +49,14 @@ const releaseLevelBetween = (baselineVersion, nextVersion) => {
   }
 
   if (next.major !== baseline.major) {
-    if (next.major !== baseline.major + 1 || next.minor !== 0 || next.patch !== 0) {
+    if (next.major !== baseline.major + 1n || next.minor !== 0n || next.patch !== 0n) {
       throw new Error('Explicit major releases must increment major once and reset minor and patch to zero');
     }
     return 'major';
   }
 
   if (next.minor !== baseline.minor) {
-    if (next.minor !== baseline.minor + 1 || next.patch !== 0) {
+    if (next.minor !== baseline.minor + 1n || next.patch !== 0n) {
       throw new Error('Explicit minor releases must increment minor once and reset patch to zero');
     }
     return 'minor';
@@ -328,10 +327,10 @@ const verifyCandidateRef = (options) => {
   const repoRoot = path.resolve(options.repo_root || process.cwd());
   const candidate = readVersionAtRef(repoRoot, options.candidate_ref);
   const baselines = options.baselineRefs
-    .filter((ref) => ref && ref !== '0000000000000000000000000000000000000000' && refExists(repoRoot, ref))
+    .filter((ref) => ref && ref !== '0000000000000000000000000000000000000000')
     .map((ref) => ({ ref, version: readVersionAtRef(repoRoot, ref).version }));
   const minimums = options.minimumRefs
-    .filter((ref) => ref && ref !== '0000000000000000000000000000000000000000' && refExists(repoRoot, ref))
+    .filter((ref) => ref && ref !== '0000000000000000000000000000000000000000')
     .map((ref) => ({ ref, version: readVersionAtRef(repoRoot, ref).version }));
 
   for (const baseline of baselines) {

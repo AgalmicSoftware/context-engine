@@ -96,15 +96,39 @@ describe('surveyGeneratorHelpers', () => {
     expect(buildSurveyGeneratorTypePillClassName(styles, 'disagree')).toBe(`${styles.pill} ${styles.pillDisagree}`);
   });
 
-  it('keeps the AI prompt toggle visually quiet on the dark generator panel', () => {
+  it('uses the theme authoring contract for every always-visible generator control', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'AudioSurveyGenerator.module.scss'), 'utf8');
-    const toggleBlock = scss.match(/\.aiPromptToggleBtn\s*{[\s\S]*?^\s*}/m)?.[0] || '';
 
-    expect(toggleBlock).toMatch(/background:\s*transparent;/);
-    expect(toggleBlock).toMatch(/color:\s*rgba\(255,\s*255,\s*255,\s*0\.5\);/);
-    expect(toggleBlock).toMatch(
-      /&:hover\s*{[\s\S]*?background:\s*transparent;[\s\S]*?color:\s*rgba\(255,\s*255,\s*255,\s*0\.72\);/,
+    expect(scss).toMatch(/\$background-color:\s*var\(--ce-authoring-panel-bg\);/);
+    expect(scss).toMatch(/\$text-color:\s*var\(--ce-authoring-panel-text\);/);
+    expect(scss).toMatch(/\$question-background:\s*var\(--ce-authoring-section-bg\);/);
+    expect(scss).toMatch(/\.urlInputField\s*{[\s\S]*?background:\s*var\(--ce-authoring-input-bg\)\s*!important;/);
+    expect(scss).toMatch(/\.typeButton\s*{[\s\S]*?background:\s*var\(--ce-authoring-control-bg\);/);
+    expect(scss).toMatch(/\.countInlineLabel\s*{[\s\S]*?color:\s*var\(--ce-authoring-panel-muted\);/);
+    expect(scss).toMatch(/\.aiPromptToggleBtn\s*{[\s\S]*?color:\s*var\(--ce-authoring-control-text\);/);
+  });
+
+  it('uses semantic theme tokens for the AI prompt preview', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'AudioSurveyGenerator.module.scss'), 'utf8');
+    const classic95Theme = fs.readFileSync(path.join(__dirname, '../../../scss/themes/_classic-95.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /\.aiPromptWrapper\s*\{[\s\S]*?background:\s*var\(--ce-authoring-prompt-bg\);[\s\S]*?color:\s*var\(--ce-authoring-prompt-text\);/,
     );
+    expect(scss).toMatch(/\.aiPromptHeader\s*\{[\s\S]*?color:\s*var\(--ce-authoring-prompt-heading\);/);
+    expect(scss).toMatch(
+      /\.aiPromptMeta\s*\{[\s\S]*?opacity:\s*var\(--ce-authoring-prompt-meta-opacity\);[\s\S]*?color:\s*var\(--ce-authoring-prompt-meta\);/,
+    );
+    expect(scss).toMatch(
+      /\.aiVar\s*\{[\s\S]*?background:\s*var\(--ce-authoring-prompt-variable-bg\);[\s\S]*?color:\s*var\(--ce-authoring-prompt-variable-text\);/,
+    );
+    expect(scss).toMatch(/\.jsonDisplay\s*\{[\s\S]*?color:\s*var\(--ce-authoring-prompt-json-text\);/);
+    expect(scss).not.toContain('@container ce-theme style(--ce-layout-profile: desktop-window)');
+    expect(classic95Theme).toMatch(/authoring-prompt-bg:\s*#ffffff,/);
+    expect(classic95Theme).toMatch(/authoring-prompt-text:\s*#000000,/);
+    expect(classic95Theme).toMatch(/authoring-prompt-heading:\s*#000080,/);
+    expect(classic95Theme).toMatch(/authoring-prompt-variable-bg:\s*#ffffc0,/);
+    expect(classic95Theme).toMatch(/authoring-prompt-variable-text:\s*#604000,/);
   });
 
   it('builds stable additional source ids from a mutable counter ref', () => {

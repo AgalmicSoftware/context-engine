@@ -6,9 +6,25 @@ general automation in `scripts/`.
 
 | Script | Purpose |
 |--------|---------|
+| `DeployAll.s.sol` | Deploy SessionRegistry, Surveys, and SBTFactory to an EVM chain |
 | `DeploySBTFactory.s.sol` | Deploy SBTFactory to testnet/mainnet |
 | `DeploySessionRegistry.s.sol` | Deploy SessionRegistry to testnet/mainnet |
 | `DeployLocal.s.sol` | Local-chain (Anvil) test harness deploy — writes `client/src/variables/local-contracts.json` |
+
+For an explicitly approved EVM target, provide its chain ID, RPC URL, and
+deployer key, then run the chain-neutral wrapper:
+
+```bash
+EVM_CHAIN_ID=<chain-id> \
+EVM_RPC_URL=<rpc-url> \
+EVM_PRIVATE_KEY_PATH=<key-file> \
+npm run deploy:evm
+```
+
+The wrapper verifies the RPC chain ID, previews the three deterministic
+addresses, and runs `DeployAll.s.sol`. It does not update the client contract
+manifest or make the target chain supported; those require separate deployment
+verification and an explicit manifest decision.
 
 Path roles:
 

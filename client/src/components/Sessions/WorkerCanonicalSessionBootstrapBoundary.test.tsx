@@ -1,6 +1,7 @@
 import React from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 
+import { STALE_CHUNK_RELOAD_STORAGE_KEY } from '../../bootRecovery.js';
 import WorkerCanonicalSessionBootstrapBoundary from './WorkerCanonicalSessionBootstrapBoundary';
 import {
   fetchWorkerCanonicalSessionBootstrap,
@@ -81,6 +82,7 @@ describe('WorkerCanonicalSessionBootstrapBoundary', () => {
     mockFetchBootstrap.mockResolvedValue(bootstrap);
     mockUpsertBootstrap.mockReturnValue(cachedResult);
     mockMarkBootstrapVerified.mockReturnValue(true);
+    window.sessionStorage.clear();
   });
 
   it('renders loading state, resolves through discovery, caches without repinning, and reports the bootstrap', async () => {
@@ -88,6 +90,7 @@ describe('WorkerCanonicalSessionBootstrapBoundary', () => {
     const onResolved = jest.fn();
     const pendingBootstrap = deferred<typeof bootstrap>();
     mockFetchBootstrap.mockReturnValueOnce(pendingBootstrap.promise);
+    window.sessionStorage.setItem(STALE_CHUNK_RELOAD_STORAGE_KEY, 'true');
 
     render(
       <WorkerCanonicalSessionBootstrapBoundary
@@ -100,6 +103,7 @@ describe('WorkerCanonicalSessionBootstrapBoundary', () => {
     );
 
     expect(screen.getByRole('status')).toHaveTextContent('Loading worker session…');
+    expect(window.sessionStorage.getItem(STALE_CHUNK_RELOAD_STORAGE_KEY)).toBe('true');
     const discoveryArgs = mockFetchBootstrap.mock.calls[0][0];
     expect(discoveryArgs).toEqual(
       expect.objectContaining({
@@ -391,6 +395,7 @@ describe('WorkerCanonicalSessionBootstrapBoundary', () => {
   it('renders discovery failures as an error without resolving', async () => {
     mockFetchBootstrap.mockRejectedValueOnce(new Error('Worker bootstrap request failed with status 403.'));
     const onResolved = jest.fn();
+    window.sessionStorage.setItem(STALE_CHUNK_RELOAD_STORAGE_KEY, 'true');
 
     render(
       <WorkerCanonicalSessionBootstrapBoundary
@@ -401,6 +406,7 @@ describe('WorkerCanonicalSessionBootstrapBoundary', () => {
     );
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Worker bootstrap request failed with status 403.');
+    await waitFor(() => expect(window.sessionStorage.getItem(STALE_CHUNK_RELOAD_STORAGE_KEY)).toBeNull());
     expect(mockUpsertBootstrap).not.toHaveBeenCalled();
     expect(mockMarkBootstrapVerified).not.toHaveBeenCalled();
     expect(onResolved).not.toHaveBeenCalled();

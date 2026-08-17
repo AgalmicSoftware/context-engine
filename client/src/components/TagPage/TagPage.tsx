@@ -123,6 +123,26 @@ type QuestionSummary = {
   networkId: string;
 };
 
+const buildTagAiContentRevision = (questions: QuestionSummary[]): string =>
+  JSON.stringify(
+    questions
+      .map((question) => ({
+        id: question.id,
+        prompt: question.prompt,
+        type: question.type,
+        options: question.options,
+        arweaveTxId: question.arweaveTxId,
+        responseCount: question.responseCount,
+        sessionSlug: normalizeSessionSlug(question.sessionSlug),
+        networkId: String(question.networkId || ''),
+      }))
+      .sort((left, right) =>
+        [left.sessionSlug, left.networkId, left.id]
+          .join('::')
+          .localeCompare([right.sessionSlug, right.networkId, right.id].join('::')),
+      ),
+  );
+
 type SbtGroupSummary = {
   address: string;
   name: string;
@@ -841,16 +861,6 @@ export const TagPageView = ({
     slugs: [],
     configsBySlug: {},
   };
-  const aiCacheKey = useMemo(
-    () =>
-      [
-        selectedTagsCacheKey,
-        effectiveSingleScopeSlug || effectiveScopeCacheKey,
-        String(cacheVersion || 0),
-        String(questionResponsesNonce || 0),
-      ].join('::'),
-    [cacheVersion, effectiveScopeCacheKey, effectiveSingleScopeSlug, questionResponsesNonce, selectedTagsCacheKey],
-  );
   const scopeSummary = useMemo(
     () =>
       describeScopeSummary({
@@ -905,35 +915,8 @@ export const TagPageView = ({
   }, [location.search, routePinned]);
 
   useEffect(() => {
-    setAiInterpretation(null);
-    setAiError(null);
-    setAiLoading(false);
-    setAiElapsedMs(0);
-    aiStartedAtRef.current = null;
-    aiRequestKeyRef.current = '';
-  }, [selectedTagsCacheKey]);
-
-  useEffect(() => {
     setExpandedDemoEntryKeys({});
   }, [selectedTagsCacheKey]);
-
-  useEffect(() => {
-    setAiInterpretation(null);
-    setAiError(null);
-    setAiLoading(false);
-    setAiElapsedMs(0);
-    aiStartedAtRef.current = null;
-    aiRequestKeyRef.current = '';
-  }, [effectiveScopeCacheKey]);
-
-  useEffect(() => {
-    setAiInterpretation(null);
-    setAiError(null);
-    setAiLoading(false);
-    setAiElapsedMs(0);
-    aiStartedAtRef.current = null;
-    aiRequestKeyRef.current = '';
-  }, [cacheVersion, questionResponsesNonce]);
 
   useEffect(() => {
     if (!aiLoading) return undefined;
@@ -986,6 +969,35 @@ export const TagPageView = ({
     [demoCorpusRecords, isDemoCorpusContext, selectedTags],
   );
   const questions = questionData.questions;
+  const aiContentRevision = useMemo(() => buildTagAiContentRevision(questions), [questions]);
+  const aiNetworkScope = useMemo(
+    () =>
+      Array.from(new Set(questions.map((question) => String(question.networkId || ''))))
+        .sort((left, right) => left.localeCompare(right))
+        .join(','),
+    [questions],
+  );
+  const aiCacheKey = useMemo(
+    () =>
+      [
+        'questionsCache',
+        normalizeSessionSlug(effectiveSingleScopeSlug),
+        aiNetworkScope,
+        selectedTagsCacheKey,
+        aiContentRevision,
+      ].join('::'),
+    [aiContentRevision, aiNetworkScope, effectiveSingleScopeSlug, selectedTagsCacheKey],
+  );
+
+  useEffect(() => {
+    setAiInterpretation(null);
+    setAiError(null);
+    setAiLoading(false);
+    setAiElapsedMs(0);
+    aiStartedAtRef.current = null;
+    aiRequestKeyRef.current = '';
+  }, [aiCacheKey]);
+
   const demoCorpusEntries = demoCorpusData.entries;
   const relatedTags = isDemoCorpusContext ? demoCorpusData.relatedTags : questionData.relatedTags;
   const pickerTags = isDemoCorpusContext ? demoCorpusData.pickerTags : questionData.pickerTags;

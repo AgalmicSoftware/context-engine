@@ -1,5 +1,6 @@
 import sha256 from 'crypto-js/sha256';
 import { toStr } from '../../utilities/shared/primitives.js';
+import { normalizeOriginList } from '../../utilities/urlUtils.js';
 import type { SessionModeProfile } from '../../utilities/session/sessionModeProfile';
 import type { AnyRecord, WorkerSecretsLike } from '../shellTypes';
 import { normalizeAiModels, normalizeAiProvider } from './sessionWizardAiConfig';
@@ -22,11 +23,13 @@ export type SessionWizardWorkerRequirementProof = {
   secretValueFingerprints: Record<string, string>;
   remoteManagedSecretFields: string[];
   litRuntimeFingerprint: string;
+  workerConfigFingerprint?: string;
 };
 
 type RequirementContext = {
   sessionModeProfile?: SessionModeProfile | null;
   sessionAi?: unknown;
+  workerAllowOrigins?: unknown;
 };
 
 type WorkerIdentityInput = {
@@ -46,7 +49,15 @@ type BuildProofInput = RequirementContext &
     requiredSecretFields?: readonly string[];
     remoteManagedSecretFields?: readonly string[];
     litRuntimeConfig?: WorkerSecretsLike | AnyRecord;
+    workerConfig?: unknown;
   };
+
+const SERVER_MANAGED_WORKER_CONFIG_FIELDS = new Set([
+  'authzEpoch',
+  'configRevision',
+  'workerCanonicalPublicationRevision',
+  'workerGroupsBootstrap',
+]);
 
 const canonicalize = (value: unknown): unknown => {
   if (Array.isArray(value)) return value.map(canonicalize);
@@ -77,6 +88,13 @@ const createSecretFingerprintSalt = (): string => {
 const normalizeFieldList = (fields: readonly string[] = []): string[] =>
   Array.from(new Set(fields.map((field) => toStr(field).trim()).filter(Boolean))).sort();
 
+const normalizeWorkerAllowOrigins = (value: unknown): string[] => {
+  const entries = (Array.isArray(value) ? value : toStr(value).split(/[\n,]+/))
+    .map((entry) => toStr(entry).trim())
+    .filter(Boolean);
+  return Array.from(new Set(normalizeOriginList(entries))).sort();
+};
+
 const uniqueFieldList = (fields: readonly string[] = []): string[] =>
   Array.from(new Set(fields.map((field) => toStr(field).trim()).filter(Boolean)));
 
@@ -84,6 +102,30 @@ const normalizeSessionId = (value: unknown): string => {
   const normalized = toStr(value).trim().toLowerCase().replace(/-/g, '');
   if (/^[a-f0-9]{32}$/.test(normalized)) return `0x${normalized}`;
   return /^0x[a-f0-9]{32}$/.test(normalized) ? normalized : '';
+};
+
+const buildWorkerConfigFingerprint = (value: unknown): string => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return '';
+  const source = value as AnyRecord;
+  const normalized = Object.keys(source)
+    .sort()
+    .reduce<AnyRecord>((result, field) => {
+      if (SERVER_MANAGED_WORKER_CONFIG_FIELDS.has(field)) return result;
+      const entry = source[field];
+      if (field === 'adminAddress' || field === 'registryAddress') {
+        result[field] = toStr(entry).trim().toLowerCase();
+      } else if (field === 'sessionId') {
+        result[field] = normalizeSessionId(entry);
+      } else if (field === 'corsWorkerUrl') {
+        result[field] = normalizeSessionWizardWorkerUrl(entry);
+      } else if (field === 'allowOrigins') {
+        result[field] = normalizeWorkerAllowOrigins(entry);
+      } else {
+        result[field] = canonicalize(entry);
+      }
+      return result;
+    }, {});
+  return fingerprint('context-engine:worker-config:v1', normalized);
 };
 
 const normalizeLitRuntimeConfig = (value: unknown): Record<string, string> => {
@@ -127,7 +169,11 @@ const normalizeAiModelAssignments = (value: unknown): Record<string, { provider:
   );
 };
 
-const buildRequirementsFingerprint = ({ sessionModeProfile, sessionAi }: RequirementContext): string => {
+const buildRequirementsFingerprint = ({
+  sessionModeProfile,
+  sessionAi,
+  workerAllowOrigins,
+}: RequirementContext): string => {
   const requirements = resolveSessionWizardModeRequirements(sessionModeProfile);
   const selectedAiSecretFields = resolveSessionWizardResourceSecretFields('ai', sessionAi).map((field) => field.key);
   return fingerprint('context-engine:worker-requirements:v1', {
@@ -138,6 +184,7 @@ const buildRequirementsFingerprint = ({ sessionModeProfile, sessionAi }: Require
     requiresLit: requirements.requiresLit,
     requiresRpc: requirements.requiresRpc,
     selectedAiSecretFields: normalizeFieldList(selectedAiSecretFields),
+    workerAllowOrigins: normalizeWorkerAllowOrigins(workerAllowOrigins),
     // Bind the complete canonical profile and effective provider/model choices.
     // Broad requirement flags alone cannot distinguish edits that reuse the same secrets.
     sessionModeProfile: canonicalize(sessionModeProfile || null),
@@ -151,6 +198,7 @@ const pickPresentFields = (fields: readonly string[], secrets: AnyRecord): strin
 export const resolveSessionWizardWorkerSecretSelection = ({
   sessionModeProfile,
   sessionAi,
+  workerAllowOrigins,
   workerSecrets = {},
   fallbackRequiredSecretFields = [],
 }: SecretSelectionInput = {}) => {
@@ -158,7 +206,10 @@ export const resolveSessionWizardWorkerSecretSelection = ({
   const secrets = workerSecrets && typeof workerSecrets === 'object' ? (workerSecrets as AnyRecord) : {};
   const fallbackFields = new Set(normalizeFieldList(fallbackRequiredSecretFields));
   const selectedAiSecretFields = resolveSessionWizardResourceSecretFields('ai', sessionAi).map((field) => field.key);
-  const requiredSecretFields = requirements.isWorkerCanonical
+  const includeFaucetPrivateKey =
+    requirements.requiresFunding &&
+    (!!toStr(secrets.faucetPrivateKey).trim() || fallbackFields.has('faucetPrivateKey'));
+  const requiredSecretFields = requirements.usesWorkerRuntime
     ? uniqueFieldList([
         ...selectedAiSecretFields,
         ...(requirements.requiresArweave && (toStr(secrets.arweaveJwk).trim() || fallbackFields.has('arweaveJwk'))
@@ -175,9 +226,10 @@ export const resolveSessionWizardWorkerSecretSelection = ({
               ...RPC_SECRET_FIELDS.filter((field) => fallbackFields.has(field)),
             ])
           : []),
+        ...(includeFaucetPrivateKey ? ['faucetPrivateKey'] : []),
       ])
     : [];
-  const selectedSecrets = requirements.isWorkerCanonical
+  const selectedSecrets = requirements.usesWorkerRuntime
     ? requiredSecretFields.reduce<Record<string, string>>((result, field) => {
         const value = toStr(secrets[field]).trim();
         if (value) result[field] = value;
@@ -190,7 +242,7 @@ export const resolveSessionWizardWorkerSecretSelection = ({
       }, {});
   return {
     requirements,
-    requirementsFingerprint: buildRequirementsFingerprint({ sessionModeProfile, sessionAi }),
+    requirementsFingerprint: buildRequirementsFingerprint({ sessionModeProfile, sessionAi, workerAllowOrigins }),
     requiredSecretFields,
     selectedSecrets,
   };
@@ -219,6 +271,8 @@ const normalizeProof = (value: unknown): SessionWizardWorkerRequirementProof | n
   if (Object.keys(secretValueFingerprints).length !== requiredSecretFields.length) return null;
   const litRuntimeFingerprint = toStr(proof.litRuntimeFingerprint).trim();
   if (litRuntimeFingerprint && !FINGERPRINT_PATTERN.test(litRuntimeFingerprint)) return null;
+  const workerConfigFingerprint = toStr(proof.workerConfigFingerprint).trim();
+  if (workerConfigFingerprint && !FINGERPRINT_PATTERN.test(workerConfigFingerprint)) return null;
   const remoteManagedSecretFields = normalizeFieldList(
     Array.isArray(proof.remoteManagedSecretFields) ? (proof.remoteManagedSecretFields as string[]) : [],
   ).filter((field) => requiredSecretFields.includes(field));
@@ -231,6 +285,7 @@ const normalizeProof = (value: unknown): SessionWizardWorkerRequirementProof | n
     secretValueFingerprints,
     remoteManagedSecretFields,
     litRuntimeFingerprint,
+    ...(workerConfigFingerprint ? { workerConfigFingerprint } : {}),
   };
 };
 
@@ -240,10 +295,12 @@ export const buildSessionWizardWorkerRequirementProof = ({
   sessionId,
   sessionModeProfile,
   sessionAi,
+  workerAllowOrigins,
   workerSecrets = {},
   requiredSecretFields,
   remoteManagedSecretFields = [],
   litRuntimeConfig = {},
+  workerConfig,
 }: BuildProofInput = {}): SessionWizardWorkerRequirementProof | null => {
   const workerIdentityFingerprint = buildWorkerIdentityFingerprint({ workerUrl, sessionSlug, sessionId });
   const secretFingerprintSalt = createSecretFingerprintSalt();
@@ -251,11 +308,12 @@ export const buildSessionWizardWorkerRequirementProof = ({
   const selection = resolveSessionWizardWorkerSecretSelection({
     sessionModeProfile,
     sessionAi,
+    workerAllowOrigins,
     workerSecrets,
     fallbackRequiredSecretFields: requiredSecretFields,
   });
   const normalizedRequiredFields = normalizeFieldList(requiredSecretFields || selection.requiredSecretFields);
-  if (!selection.requirements.isWorkerCanonical) return null;
+  if (!selection.requirements.usesWorkerRuntime) return null;
   const secretValues = workerSecrets && typeof workerSecrets === 'object' ? (workerSecrets as AnyRecord) : {};
   const secretValueFingerprints = normalizedRequiredFields.reduce<Record<string, string>>((result, field) => {
     const value = toStr(secretValues[field]).trim();
@@ -284,6 +342,7 @@ export const buildSessionWizardWorkerRequirementProof = ({
     litRuntimeFingerprint: selection.requirements.requiresLit
       ? fingerprint('context-engine:worker-requirement-lit-runtime:v1', normalizedLitRuntime)
       : '',
+    workerConfigFingerprint: buildWorkerConfigFingerprint(workerConfig),
   });
 };
 
@@ -294,8 +353,10 @@ export const resolveSessionWizardWorkerRequirementReadiness = ({
   sessionId,
   sessionModeProfile,
   sessionAi,
+  workerAllowOrigins,
   workerSecrets = {},
   workerSecretsEnabled = true,
+  workerConfig,
 }: BuildProofInput & {
   proof?: unknown;
   workerSecretsEnabled?: boolean;
@@ -308,11 +369,19 @@ export const resolveSessionWizardWorkerRequirementReadiness = ({
   const selection = resolveSessionWizardWorkerSecretSelection({
     sessionModeProfile,
     sessionAi,
+    workerAllowOrigins,
     workerSecrets,
     fallbackRequiredSecretFields: proof.requiredSecretFields,
   });
   if (selection.requirementsFingerprint !== proof.requirementsFingerprint) {
     return { verified: false, reason: 'requirements-changed' };
+  }
+  const currentWorkerConfigFingerprint = buildWorkerConfigFingerprint(workerConfig);
+  if (
+    (proof.workerConfigFingerprint || currentWorkerConfigFingerprint) &&
+    (!proof.workerConfigFingerprint || proof.workerConfigFingerprint !== currentWorkerConfigFingerprint)
+  ) {
+    return { verified: false, reason: 'worker-config-changed' };
   }
   if (
     JSON.stringify(normalizeFieldList(selection.requiredSecretFields)) !== JSON.stringify(proof.requiredSecretFields)

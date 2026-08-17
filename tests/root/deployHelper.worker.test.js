@@ -624,6 +624,53 @@ describe('deploy-helper worker', () => {
     expect(calls).toEqual([manifestUrl, manifestUrl, bundleUrl]);
   });
 
+  it.each([
+    ['literal wildcard', ['*']],
+    ['wildcard host', ['https://*.example.test']],
+  ])('rejects a %s CORS allowlist before any Cloudflare request', async (_label, allowOrigins) => {
+    const fetchMock = jest.fn();
+    global.fetch = fetchMock;
+
+    const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+      apiToken: 'cf-token',
+      deploymentRequestId: 'wildcard-request-001',
+      workerName: 'wildcard-worker',
+      sessionSlug: 'wildcard-session',
+      bundleText: 'export default { fetch() {} };',
+      allowOrigins,
+    }), {}, {});
+    const payload = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(payload.error).toMatch(/exact origins/i);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['primary RPC URL', { rpcUrl: 'https://private-rpc.example.test' }],
+    ['RPC URL map', { rpcUrlsByChainId: { 11155420: ['https://private-rpc.example.test'] } }],
+    ['faucet RPC URL', { faucet: { rpcUrl: 'https://private-rpc.example.test' } }],
+  ])('rejects custom RPC secret overlap in the public %s before any Cloudflare request', async (_label, fields) => {
+    const fetchMock = jest.fn();
+    global.fetch = fetchMock;
+
+    const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+      apiToken: 'cf-token',
+      deploymentRequestId: 'secret-overlap-request-001',
+      workerName: 'secret-overlap-worker',
+      sessionSlug: 'secret-overlap-session',
+      bundleText: 'export default { fetch() {} };',
+      secrets: { customRpcUrl: 'https://private-rpc.example.test' },
+      ...fields,
+    }), {}, {});
+    const payload = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(payload.error).toMatch(/custom RPC secret.*public config/i);
+    expect(JSON.stringify(payload)).not.toContain('private-rpc.example.test');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('normalizes and encrypts worker secrets before writing them to KV during deploy', async () => {
     const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     const fetchMock = makeFetchSequence([
@@ -4498,6 +4545,57 @@ describe('deploy-helper worker', () => {
       source: 'kv',
     });
     expect(response.headers.get('Access-Control-Allow-Origin')).toBe('https://kv.example.test');
+  });
+
+  it('returns a sanitized CORS-safe response when allowlist resolution fails', async () => {
+    const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {}, {
+      headers: {
+        Origin: 'https://allowed.example.test',
+      },
+    }), {
+      ALLOWED_ORIGINS: 'https://allowed.example.test',
+      DEPLOY_HELPER_KV: {
+        get: jest.fn(async () => {
+          throw new Error('secret deployment key deploy-helper:origins unavailable');
+        }),
+      },
+    }, {});
+    const payload = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(payload).toEqual({ error: 'Deploy helper configuration unavailable.' });
+    expect(response.headers.get('Access-Control-Allow-Origin')).toBe('https://allowed.example.test');
+    expect(response.headers.get('Content-Type')).toBe('application/json');
+    expect(JSON.stringify(payload)).not.toContain('secret');
+    expect(JSON.stringify(payload)).not.toContain('deploy-helper:origins');
+  });
+
+  it('sanitizes unexpected request failures after allowlist resolution', async () => {
+    const response = await deployHelperWorker.fetch(makeJsonRequest('/admin/origins', {
+      origins: ['https://next.example.test'],
+    }, {
+      headers: {
+        Authorization: 'Bearer top-secret',
+        Origin: 'https://allowed.example.test',
+      },
+    }), {
+      ADMIN_SECRET: 'top-secret',
+      ALLOWED_ORIGINS: 'https://allowed.example.test',
+      DEPLOY_HELPER_KV: {
+        get: jest.fn(async () => null),
+        put: jest.fn(async () => {
+          throw new Error('secret token could not write deploy-helper:origins');
+        }),
+        delete: jest.fn(async () => {}),
+      },
+    }, {});
+    const payload = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(payload).toEqual({ error: 'Deploy helper request failed.' });
+    expect(response.headers.get('Access-Control-Allow-Origin')).toBe('https://allowed.example.test');
+    expect(JSON.stringify(payload)).not.toContain('secret');
+    expect(JSON.stringify(payload)).not.toContain('deploy-helper:origins');
   });
 
   it('falls back to the localhost-only default origins when no env or KV override is configured', async () => {

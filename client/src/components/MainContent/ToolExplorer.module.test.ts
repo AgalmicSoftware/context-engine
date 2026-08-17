@@ -30,11 +30,34 @@ describe('ToolExplorer sparse card layout', () => {
 
   it('uses UserPage-style neutral depth and scopes status borders to demo mode', () => {
     expect(scss).toMatch(
-      /\.explorerCol\s*{[\s\S]*?&\.statusBorderEnabled[\s\S]*?border:\s*4px solid rgba\(77,\s*255,\s*164,\s*0\.78\);/,
+      /\.explorerCol\s*{[\s\S]*?&\.statusBorderEnabled[\s\S]*?border:\s*4px solid color-mix\(in srgb,\s*var\(--ce-action-accent\) 78%,\s*transparent\);/,
     );
     expect(scss).toMatch(
-      /\.square\s*{[\s\S]*?border:\s*1px solid rgba\(255,\s*255,\s*255,\s*0\.14\);[\s\S]*?background:\s*#24264d;[\s\S]*?box-shadow:[\s\S]*?#171a3d[\s\S]*?rgba\(59,\s*63,\s*126,\s*0\.72\)/,
+      /\.square\s*{[\s\S]*?border-color:\s*var\(--ce-tool-card-border\);[\s\S]*?border-width:\s*var\(--ce-border-control-width\);[\s\S]*?background:\s*var\(--ce-surface-alt\);[\s\S]*?box-shadow:\s*var\(--ce-tool-card-shadow\);/,
     );
-    expect(scss).toMatch(/&:hover\s*{[\s\S]*?transform:\s*translateY\(-3px\);/);
+    expect(scss).toMatch(
+      /&:hover\s*{[\s\S]*?transform:\s*translateY\(-3px\);[\s\S]*?background:\s*var\(--ce-tool-card-hover-bg\);[\s\S]*?box-shadow:\s*var\(--ce-tool-card-shadow-hover\);/,
+    );
+  });
+
+  it('incorporates the bundled artwork into compact classic Control Panel applets', () => {
+    expect(scss).toContain('@container ce-theme style(--ce-layout-profile: desktop-window)');
+    expect(scss).not.toContain('data-ce-theme');
+    expect(scss).toMatch(
+      /\.backgroundImage\s*{[\s\S]*?display:\s*block;[\s\S]*?position:\s*relative;[\s\S]*?height:\s*124px;[\s\S]*?background-size:\s*cover;/,
+    );
+    expect(scss).toMatch(/\.classicToolIcon\s*{\s*display:\s*none;/);
+    expect(scss).toMatch(
+      /\.explorerCol \.square,[\s\S]*?height:\s*248px;[\s\S]*?background:\s*var\(--ce-control-face\);[\s\S]*?box-shadow:\s*var\(--ce-shadow-raised\);/,
+    );
+    expect(scss).toMatch(
+      /\.explorerCol \.square:hover,[\s\S]*?\.explorerColSparse \.square:focus-within\s*{[\s\S]*?background:\s*var\(--ce-control-face\);[\s\S]*?box-shadow:\s*var\(--ce-shadow-raised\);/,
+    );
+  });
+
+  it('makes the bundled artwork dominant in classic mobile applets', () => {
+    expect(scss).toMatch(
+      /@media \(max-width:\s*640px\)\s*{\s*@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.explorerCol \.square,[\s\S]*?\.explorerColSparse \.square\s*{[\s\S]*?height:\s*232px;[\s\S]*?min-height:\s*232px;[\s\S]*?\.backgroundImage\s*{[\s\S]*?flex-basis:\s*128px;[\s\S]*?height:\s*128px;/,
+    );
   });
 });

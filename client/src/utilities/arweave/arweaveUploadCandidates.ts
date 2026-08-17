@@ -16,6 +16,7 @@ type UnknownRecord = Record<string, unknown>;
 type UploadCandidateSource = {
   explicitWorkerUrl: string;
   reason: string;
+  sessionConfig?: unknown;
   slug: string;
 };
 
@@ -26,6 +27,7 @@ export type ArweaveUploadCandidate = {
   order: number;
   preferenceRank: number;
   reason: string;
+  sessionConfig: UnknownRecord | null;
   sessionSlug: string;
   workerUrl: string;
 };
@@ -75,11 +77,13 @@ const compareUploadCandidates = (a: ArweaveUploadCandidate, b: ArweaveUploadCand
 
 export const buildUploadSessionCandidates = async ({
   selectedSessionSlug = '',
+  selectedSessionConfig = null,
   initialWorkerUrl = '',
   context = null,
 }: {
   context?: unknown;
   initialWorkerUrl?: unknown;
+  selectedSessionConfig?: unknown;
   selectedSessionSlug?: unknown;
 } = {}): Promise<ArweaveUploadCandidate[]> => {
   const selectedSlug = normalizeUploadSessionSlug(selectedSessionSlug);
@@ -89,7 +93,12 @@ export const buildUploadSessionCandidates = async ({
   const sharedFallbackWorkerUrl = normalizeWorkerBaseUrl(getSharedFallbackWorkerUrl() || '');
   const orderedSources: UploadCandidateSource[] = [];
   const seenSourceKeys = new Set<string>();
-  const pushSource = ({ slug = '', reason = 'scope-list', explicitWorkerUrl = '' } = {}) => {
+  const pushSource = ({
+    slug = '',
+    reason = 'scope-list',
+    explicitWorkerUrl = '',
+    sessionConfig = null,
+  }: Partial<UploadCandidateSource> = {}) => {
     const normalizedSlug = normalizeUploadSessionSlug(slug || '');
     const normalizedWorkerUrl = normalizeWorkerBaseUrl(explicitWorkerUrl || '');
     const sourceKey = `${normalizedSlug}|${normalizedWorkerUrl}`;
@@ -99,12 +108,14 @@ export const buildUploadSessionCandidates = async ({
       slug: normalizedSlug,
       reason,
       explicitWorkerUrl: normalizedWorkerUrl,
+      sessionConfig,
     });
   };
   pushSource({
     slug: selectedSlug,
     reason: 'selected-session',
     explicitWorkerUrl: normalizedInitialWorker,
+    sessionConfig: selectedSessionConfig,
   });
   if (sponsoredContext) {
     pushSource({
@@ -143,12 +154,13 @@ export const buildUploadSessionCandidates = async ({
     }
     const workerUrl = source.explicitWorkerUrl ? source.explicitWorkerUrl : normalizeWorkerBaseUrl(resolved?.url || '');
     if (!workerUrl) continue;
-    const resolvedSessionConfig = resolved?.session || resolved?.group || null;
+    const resolvedSessionConfig = asRecord(source.sessionConfig || resolved?.session || resolved?.group) || null;
     const gateSummary = classifyUploadGateStatus(resolvedSessionConfig, 'arweave');
     candidates.push({
       sessionSlug: slug,
       workerUrl,
       reason: source.reason || (index === 0 ? 'selected-session' : 'scope-list'),
+      sessionConfig: Object.keys(resolvedSessionConfig).length ? resolvedSessionConfig : null,
       gateStatus: gateSummary.gateStatus,
       preferenceRank: gateSummary.preferenceRank,
       allowsArweaveUpload: gateSummary.allowsArweaveUpload,

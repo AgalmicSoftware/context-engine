@@ -534,7 +534,7 @@ describe('SurveyResults module styles', () => {
     expect(scss).toMatch(/\.resultsModal\s*{[\s\S]*?background-color:\s*var\(--ce-color-white\);/);
     expect(scss).toMatch(/\.modalBody\s*{[\s\S]*?color:\s*var\(--ce-color-black\) !important;/);
     expect(scss).toMatch(
-      /\.surveyDocUrlLink\s*{[\s\S]*?background:\s*rgba\(26,\s*115,\s*232,\s*0\.08\);[\s\S]*?color:\s*#174ea6;/,
+      /\.surveyDocUrlLink\s*{[\s\S]*?background:\s*color-mix\(in srgb,\s*var\(--ce-status-info\) 8%,\s*transparent\);[\s\S]*?color:\s*var\(--ce-status-info\);/,
     );
     expect(scss).toMatch(/\.aggregatorSummaryCard\s*{[\s\S]*?background-color:\s*transparent !important;/);
     expect(scss).not.toMatch(/\.aggregatorSummaryCard\s*{[\s\S]*?background-color:\s*#dce3f7 !important;/);
@@ -542,18 +542,18 @@ describe('SurveyResults module styles', () => {
       /\.aggregatorSummaryCard:not\(:has\(\.surveyResultsResponseCard\)\) \.questionSummaryHeader\s*{[\s\S]*?border-radius:\s*var\(--ce-radius-12\) !important;/,
     );
     expect(scss).toMatch(
-      /\.surveyResultsResponseCard\s*{[\s\S]*?background:\s*rgba\(38,\s*49,\s*116,\s*0\.98\) !important;[\s\S]*?border-top:\s*0 !important;[\s\S]*?border-radius:\s*0 0 var\(--ce-radius-12\) var\(--ce-radius-12\) !important;/,
+      /\.surveyResultsResponseCard\s*{[\s\S]*?background:\s*color-mix\(in srgb,\s*var\(--ce-status-info\) 98%,\s*transparent\) !important;[\s\S]*?border-top:\s*0 !important;[\s\S]*?border-radius:\s*var\(--ce-radius-0\) var\(--ce-radius-0\) var\(--ce-radius-12\) var\(--ce-radius-12\) !important;/,
     );
     expect(scss).toMatch(/\.surveyResultsResponseCardBody\s*{[\s\S]*?padding:\s*0 !important;/);
     expect(scss).toMatch(
-      /\.surveyResultsAggregatorPanel\s*{[\s\S]*?background:\s*transparent !important;[\s\S]*?border:\s*0;[\s\S]*?border-radius:\s*0;/,
+      /\.surveyResultsAggregatorPanel\s*{[\s\S]*?background:\s*transparent !important;[\s\S]*?border:\s*0;[\s\S]*?border-radius:\s*var\(--ce-radius-0\);/,
     );
     expect(scss).toMatch(
-      /\.lockedBanner\s*{[\s\S]*?background:\s*rgba\(23,\s*25,\s*65,\s*0\.96\);[\s\S]*?border-left:\s*4px solid rgba\(77,\s*255,\s*164,\s*0\.7\);[\s\S]*?color:\s*(?:var\(--ce-color-panel-text\)|#f4f7ff);/,
+      /\.lockedBanner\s*{[\s\S]*?background:\s*color-mix\(in srgb,\s*var\(--ce-overlay-surface\) 96%,\s*transparent\);[\s\S]*?border-left:\s*4px solid color-mix\(in srgb,\s*var\(--ce-action-accent\) 70%,\s*transparent\);[\s\S]*?color:\s*var\(--ce-color-panel-text\);/,
     );
     expect(scss).toMatch(/\.lockedBannerCaret\s*{[\s\S]*?margin:\s*8px 0 0 auto;[\s\S]*?padding:\s*0;/);
     expect(scss).toMatch(
-      /\.lockedBannerDetails\s*{[\s\S]*?border-top:\s*1px solid rgba\(255,\s*255,\s*255,\s*0\.12\);/,
+      /\.lockedBannerDetails\s*{[\s\S]*?border-top:\s*1px solid color-mix\(in srgb,\s*var\(--ce-text-inverse\) 12%,\s*transparent\);/,
     );
     expect(scss).not.toMatch(/\.filterSummaryBox\s*{[\s\S]*?background:\s*rgba\(10,\s*14,\s*43,\s*0\.82\);/);
   });
@@ -563,22 +563,22 @@ describe('SurveyResults module styles', () => {
     const scss = fs.readFileSync(scssPath, 'utf8');
     const normalizedScss = normalizeScssContract(scss);
 
-    expect(scss).toMatch(/\.toggleLabel\s*{[\s\S]*?color:\s*#1f2733;/);
-    expect(scss).toMatch(/\.exportAndFilterContainer\s*{[\s\S]*?background:\s*#f3f5f9;/);
+    expect(scss).toMatch(/\.toggleLabel\s*{[\s\S]*?color:\s*var\(--ce-document-text\);/);
+    expect(scss).toMatch(/\.exportAndFilterContainer\s*{[\s\S]*?background:\s*var\(--ce-status-info-text\);/);
     expect(scss).toMatch(
-      /\.questionFilterButton\s*{[\s\S]*?background-color:\s*#1f2733 !important;[\s\S]*?color:\s*#f8fafc !important;/,
+      /\.questionFilterButton\s*{[\s\S]*?background-color:\s*var\(--ce-document-text\) !important;[\s\S]*?color:\s*var\(--ce-document-surface\) !important;/,
     );
-    expect(scss).toMatch(/\.filterSummaryBox\s*{[\s\S]*?color:\s*#4b5563;/);
+    expect(scss).toMatch(/\.filterSummaryBox\s*{[\s\S]*?color:\s*var\(--ce-document-text-muted\);/);
     expect(scss).toMatch(/\.demoResultsAtlasSurface,\s*\.demoResultsRiskMatrixSurface\s*{[\s\S]*?padding:\s*1rem;/);
     expect(scss).toMatch(
-      /\.demoResultsAtlasSurface,\s*\.demoResultsRiskMatrixSurface\s*{[\s\S]*?border:\s*1px solid rgba\(19,\s*34,\s*86,\s*0\.2\);/,
+      /\.demoResultsAtlasSurface,\s*\.demoResultsRiskMatrixSurface\s*{[\s\S]*?border:\s*1px solid color-mix\(in srgb,\s*var\(--ce-overlay-surface\) 20%,\s*transparent\);/,
     );
     expect(normalizedScss).toMatch(
-      /\.demoResultsAtlasSurface\s*{[^}]*background:\s*[^;]*linear-gradient\(180deg,[^;]*rgba\(21,\s*31,\s*74,\s*0\.98\)[^;]*rgba\(8,\s*12,\s*28,\s*0\.995\)[^;]*;/,
+      /\.demoResultsAtlasSurface\s*{[^}]*background:\s*[^;]*linear-gradient\(180deg,[^;]*var\(--ce-overlay-surface\) 98%[^;]*var\(--ce-overlay-base\) 99\.5%[^;]*;/,
     );
     expect(scss).not.toMatch(/\.demoResultsAtlasSurface\s*{[^}]*radial-gradient\(circle at top/);
     expect(normalizedScss).toMatch(
-      /\.demoResultsRiskMatrixSurface\s*{[^}]*background:\s*[^;]*linear-gradient\(180deg,[^;]*rgba\(23,\s*25,\s*65,\s*0\.98\)[^;]*rgba\(9,\s*13,\s*30,\s*0\.995\)[^;]*;/,
+      /\.demoResultsRiskMatrixSurface\s*{[^}]*background:\s*[^;]*linear-gradient\(180deg,[^;]*var\(--ce-overlay-surface\) 98%[^;]*var\(--ce-overlay-base\) 99\.5%[^;]*;/,
     );
   });
 });

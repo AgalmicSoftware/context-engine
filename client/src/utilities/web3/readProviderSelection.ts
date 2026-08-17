@@ -38,10 +38,3 @@ export const shouldUseInjectedReadProviderForChain = ({
   if (normalizedTarget !== LOCAL_CHAIN_ID) return false;
   return readInjectedProviderChainId(injectedProvider) === LOCAL_CHAIN_ID;
 };
-
-export const providerSelectionUtils = {
-  readInjectedProviderChainId,
-  shouldUseInjectedReadProviderForChain,
-};
-
-export default providerSelectionUtils;

@@ -14,6 +14,7 @@ import PolisReport, {
   normalizePolisBinaryVote,
   OPINION_GROUPS_TOOLTIP_TEXT,
   PARTICIPANTS_GRAPH_TOOLTIP_TEXT,
+  POLIS_CLUSTER_COLORS,
   REPORT_DEFAULT_EMBEDDING_LABEL,
   REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT,
   resolveExploratoryClusterCount,
@@ -21,6 +22,7 @@ import PolisReport, {
   resolvePrecomputedClusterDifference,
   shouldAutoEnablePolisDemoData,
 } from './PolisReport';
+import { d3Report } from './polisReportRuntime';
 import { computePolisCommentStats, computePolisConversationMath } from '../../utilities/survey/consensusReportMath.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
@@ -31,13 +33,6 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
 }));
 
 jest.mock('../../utilities/survey/consensusMath', () => ({
-  beeswarmByExtremity: jest.fn((points = []) =>
-    points.map((point, index) => ({
-      ...point,
-      x: index * 12,
-      y: 24,
-    })),
-  ),
   clusterUMAPPointsKmeans: jest.fn((points = []) => new Array(points.length).fill(0)),
   doUMAP: jest.fn((data = []) => data.map((_, index) => [index, index])),
 }));
@@ -137,6 +132,13 @@ const openSettingsRow = () => {
   if (btn) fireEvent.click(btn);
 };
 
+describe('PolisReport report palette', () => {
+  it('keeps opinion-group colors on the original D3 categorical palette', () => {
+    expect(POLIS_CLUSTER_COLORS).toBe(d3Report.schemeCategory10);
+    expect(POLIS_CLUSTER_COLORS).not.toEqual(expect.arrayContaining([expect.stringContaining('--ce-data-series-')]));
+  });
+});
+
 describe('PolisReport cache read options', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -215,8 +217,8 @@ describe('PolisReport cache read options', () => {
     });
   });
 
-  it('falls back to zero for invalid precomputed cluster difference inputs', () => {
-    expect(resolvePrecomputedClusterDifference(undefined, undefined, undefined)).toBe(0);
+  it('keeps invalid precomputed cluster difference inputs unavailable', () => {
+    expect(resolvePrecomputedClusterDifference(undefined, undefined, undefined)).toBeNull();
     expect(resolvePrecomputedClusterDifference(undefined, 70, 40)).toBe(30);
     expect(resolvePrecomputedClusterDifference(12, undefined, undefined)).toBe(12);
   });
@@ -702,16 +704,20 @@ describe('PolisReport demo data defaults', () => {
     ).toBe(true);
   });
 
-  it('maps demo session slugs to the shared Context demo corpus fixture', () => {
+  it('keeps legacy demo datasets shared while demo-2 uses its typed fixture', () => {
     expect(getPolisDemoDatasetForSlug('demo-1', { allowFallback: false })).toBe(
       getPolisDemoDatasetForSlug('demo', { allowFallback: false }),
     );
     expect(getPolisDemoDatasetForSlug('demo-3', { allowFallback: false })).toBe(
       getPolisDemoDatasetForSlug('demo', { allowFallback: false }),
     );
-    expect(getPolisDemoDatasetForSlug('demo-2', { allowFallback: false })).toBe(
+    expect(getPolisDemoDatasetForSlug('demo-sh', { allowFallback: false })).toBe(
       getPolisDemoDatasetForSlug('demo', { allowFallback: false }),
     );
+    const demo2Dataset = getPolisDemoDatasetForSlug('demo-2', { allowFallback: false });
+    expect(demo2Dataset).not.toBe(getPolisDemoDatasetForSlug('demo', { allowFallback: false }));
+    expect(demo2Dataset?.comments).toHaveLength(40);
+    expect(demo2Dataset?.clusterAnalysis).toHaveLength(3);
   });
 
   it('shows the demo data toggle as enabled by default for the demo slug', () => {
@@ -839,6 +845,19 @@ describe('PolisReport demo data defaults', () => {
 
     expect(screen.getByDisplayValue(REPORT_DEFAULT_EMBEDDING_LABEL)).toBeInTheDocument();
     await waitFor(() => {
+      expect(screen.getAllByTestId(E2E_TESTIDS.POLIS_CLUSTER_ANALYSIS)).toHaveLength(3);
+    });
+  });
+
+  it('hydrates demo-2 authored cluster labels after switching to Polis Auto', async () => {
+    render(<PolisReport {...baseReportProps} slug="demo-2" />);
+
+    fireEvent.change(screen.getByDisplayValue('UMAP'), { target: { value: 'POLIS' } });
+
+    await waitFor(() => {
+      expect(screen.getByText('Cluster 0: Builders & Engineers')).toBeInTheDocument();
+      expect(screen.getByText('Cluster 1: Precautionary Stewards')).toBeInTheDocument();
+      expect(screen.getByText('Cluster 2: Democratic Humanists')).toBeInTheDocument();
       expect(screen.getAllByTestId(E2E_TESTIDS.POLIS_CLUSTER_ANALYSIS)).toHaveLength(3);
     });
   });
@@ -1064,6 +1083,8 @@ describe('PolisReport demo data defaults', () => {
     const { rerender } = render(<PolisReport {...baseReportProps} slug="demo" />);
 
     expect(computePolisCommentStats).not.toHaveBeenCalled();
+    expect(screen.getByTestId('ce-polis-beeswarm-plot')).toBeInTheDocument();
+    expect(screen.getAllByTestId(/^ce-polis-beeswarm-point-/)).toHaveLength(2);
 
     rerender(<PolisReport {...baseReportProps} slug="demo" />);
 
@@ -1176,6 +1197,20 @@ describe('PolisReport demo data defaults', () => {
         short: expect.stringMatching(/Safety-minded institutionalists/i),
       }),
     );
+    expect(
+      Object.values(precomputedState.repQuestions)
+        .flat()
+        .every((question) => question.difference === null),
+    ).toBe(true);
+  });
+
+  it('labels missing demo representative differences as unavailable', async () => {
+    render(<PolisReport {...baseReportProps} slug="demo" questionResponses={seededQuestionResponses} />);
+
+    fireEvent.change(screen.getByDisplayValue('UMAP'), { target: { value: 'POLIS' } });
+
+    expect(await screen.findAllByText(/difference from the overall conversation is unavailable/i)).not.toHaveLength(0);
+    expect(screen.queryByText(/by 0\.0 percentage points/i)).not.toBeInTheDocument();
   });
 
   it('skips precomputed cluster analysis when the fixture version does not match', () => {

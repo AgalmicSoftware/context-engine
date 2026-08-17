@@ -43,6 +43,14 @@
           ]
         },
         {
+          "label": "Check theme presentation literals",
+          "command": "npm",
+          "args": [
+            "run",
+            "theme:literals:check"
+          ]
+        },
+        {
           "label": "Lint client",
           "command": "npm",
           "args": [
@@ -114,14 +122,6 @@
           "args": [
             "run",
             "worker:bundle"
-          ]
-        },
-        {
-          "label": "Verify worker bundle sync",
-          "command": "npm",
-          "args": [
-            "run",
-            "verify:worker-bundle"
           ]
         },
         {
@@ -295,6 +295,14 @@
           ]
         },
         {
+          "label": "Check theme presentation literals",
+          "command": "npm",
+          "args": [
+            "run",
+            "theme:literals:check"
+          ]
+        },
+        {
           "label": "Verify release version surfaces",
           "command": "npm",
           "args": [
@@ -340,14 +348,6 @@
           "args": [
             "run",
             "worker:bundle"
-          ]
-        },
-        {
-          "label": "Verify worker bundle sync",
-          "command": "npm",
-          "args": [
-            "run",
-            "verify:worker-bundle"
           ]
         },
         {

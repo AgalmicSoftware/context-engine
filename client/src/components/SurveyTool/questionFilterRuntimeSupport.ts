@@ -180,7 +180,7 @@ export const QUESTION_FILTER_RESPONSE_PARSE_MEMO_MAX = 500;
 export const EMPTY_FILTER_RESPONSES = Object.freeze({});
 
 export const modalStyles = {
-  backgroundColor: 'white',
+  backgroundColor: 'var(--ce-surface-raised)',
   fontSize: '16px',
 };
 

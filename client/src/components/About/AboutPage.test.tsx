@@ -51,8 +51,8 @@ describe('AboutPage', () => {
       'href',
       'https://github.com/AgalmicSoftware/context-engine/blob/main/whitepaper/whitepaper.md',
     );
-    expect(within(hero).getByTestId('ce-about-link-posts')).toBeVisible();
-    expect(within(hero).getByTestId('ce-about-link-posts')).toHaveAttribute('href', '/posts');
+    expect(within(hero).queryByRole('link', { name: /^Posts$/i })).not.toBeInTheDocument();
+    expect(within(hero).queryByTestId('ce-about-link-posts')).not.toBeInTheDocument();
     expect(within(hero).getByLabelText(/view context engine on github/i)).toBeVisible();
     expect(within(hero).getByTestId('ce-about-link-github')).toHaveAttribute(
       'href',
@@ -137,7 +137,6 @@ describe('AboutPage', () => {
     renderAboutPage();
 
     expect(screen.getByRole('link', { name: /New Session/i })).toHaveAttribute('href', '/ce/new');
-    expect(screen.getByTestId('ce-about-link-posts')).toHaveAttribute('href', '/ce/posts');
   });
 
   it('shows one use-case detail panel at a time', () => {
@@ -347,6 +346,14 @@ describe('AboutPage', () => {
     expect(screen.queryByTestId('ce-about-recognition-radicalxchange')).not.toBeInTheDocument();
   });
 
+  it('keeps every collapsible section header frameless', () => {
+    renderAboutPage();
+
+    ['Functionality', 'Roadmap', 'Recognition'].forEach((name) => {
+      expect(screen.getByRole('button', { name })).toHaveAttribute('data-ce-control-appearance', 'frameless');
+    });
+  });
+
   it('only treats named recognition individuals as renderable configuration', () => {
     expect(getConfiguredRecognitionIndividuals()).toEqual([]);
     expect(
@@ -428,25 +435,56 @@ describe('AboutPage', () => {
     const normalizedScss = normalizeScssContract(scss);
 
     expect(scss).toMatch(
-      /\.sectionTitle\s*{[\s\S]*?font-family:\s*var\(--ce-font-body\);[\s\S]*?font-size:\s*clamp\(1\.6rem,\s*4vw,\s*2\.1rem\);[\s\S]*?color:\s*rgba\(255,\s*255,\s*255,\s*0\.5\);/,
+      /\.sectionTitle\s*{[\s\S]*?font-family:\s*var\(--ce-font-body\);[\s\S]*?font-size:\s*clamp\(1\.6rem,\s*4vw,\s*2\.1rem\);[\s\S]*?color:\s*var\(--ce-panel-text-muted\);/,
     );
     expect(scss).not.toMatch(/&:hover\s+\.sectionTitle\s*{[\s\S]*?#4dffa4;/);
     expect(scss).toMatch(
-      /\.useCaseLabel\s*{[\s\S]*?font-family:\s*var\(--ce-font-body\);[\s\S]*?color:\s*rgba\(14,\s*20,\s*39,\s*0\.5\);/,
+      /\.useCaseLabel\s*{[\s\S]*?font-family:\s*var\(--ce-font-body\);[\s\S]*?color:\s*var\(--ce-control-text\);/,
     );
     expect(scss).toMatch(
       /\.featureLabel\s*{[\s\S]*?font-size:\s*clamp\(1\.08rem,\s*1\.6vw,\s*1\.22rem\);[\s\S]*?font-weight:\s*700;/,
     );
     expect(scss).toMatch(
-      /\.featureItem\s*{[\s\S]*?border-radius:\s*16px;[\s\S]*?background:\s*rgba\(255,\s*255,\s*255,\s*0\.05\);/,
+      /\.featureItem\s*{[\s\S]*?border-radius:\s*var\(--ce-radius-16\);[\s\S]*?background:\s*\$card-bg;/,
     );
     expect(scss).toMatch(
       /\.roadmapChecklistItem\s*{[\s\S]*?grid-template-columns:\s*auto minmax\(0,\s*1fr\);[\s\S]*?font-size:\s*0\.98rem;/,
     );
-    expect(normalizedScss).toMatch(/\.roadmapCheck\s*{[\s\S]*?border-radius:\s*999px;[\s\S]*?content:\s*'\\2713';/);
-    expect(scss).toMatch(/\.roadmapChecklistItemPlanned\s*{[\s\S]*?color:\s*rgba\(244,\s*247,\s*255,\s*0\.62\);/);
+    expect(normalizedScss).toMatch(
+      /\.roadmapCheck\s*{[\s\S]*?border-radius:\s*var\(--ce-radius-pill\);[\s\S]*?content:\s*'\\2713';/,
+    );
+    expect(scss).toMatch(/\.roadmapChecklistItemPlanned\s*{[\s\S]*?color:\s*var\(--ce-panel-text-muted\);/);
     expect(scss).toMatch(/\.roadmapChecklistItemPlanned\s+\.roadmapCheck\s*{[\s\S]*?background:\s*transparent;/);
     expect(scss).toMatch(/\.heroPrimaryButton\s*{[\s\S]*?font-size:\s*1\.14rem;[\s\S]*?font-weight:\s*700;/);
+  });
+
+  it('keeps the About hero flush with the top of its page container', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'AboutPage.module.scss'), 'utf8');
+
+    expect(scss).toMatch(/\.aboutPageContainer\s*{[\s\S]*?padding:\s*0 20px 56px;/);
+    expect(scss).toMatch(
+      /@media \(max-width:\s*640px\)\s*{[\s\S]*?\.aboutPageContainer\s*{[\s\S]*?padding:\s*0 14px 40px;/,
+    );
+  });
+
+  it('uses bundled Tahoma and distinct Windows 95 controls only for the desktop-window profile', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'AboutPage.module.scss'), 'utf8');
+
+    expect(scss).toContain('@container ce-theme style(--ce-layout-profile: desktop-window)');
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)\s*{[\s\S]*?\.aboutPageContainer\s*{[\s\S]*?font-family:\s*var\(--ce-font-body\);/,
+    );
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)\s*{[\s\S]*?\.heroPrimaryButton,\s*\.tertiaryLink,\s*\.titleRepoLink\s*{[\s\S]*?border:\s*2px solid;[\s\S]*?box-shadow:\s*var\(--ce-shadow-raised\);[\s\S]*?font-family:\s*var\(--ce-font-body\);/,
+    );
+    expect(scss).toMatch(/\.heroPrimaryButton\s*{[\s\S]*?min-width:\s*148px;[\s\S]*?min-height:\s*48px;/);
+    expect(scss).toMatch(/\.tertiaryLink\s*{[\s\S]*?min-width:\s*108px;[\s\S]*?min-height:\s*34px;/);
+    expect(scss).toMatch(
+      /\.titleRepoLink\s*{[\s\S]*?width:\s*64px;[\s\S]*?height:\s*44px;[\s\S]*?background:\s*var\(--ce-control-face\);/,
+    );
+    expect(scss).toMatch(
+      /\.heroPrimaryButton:active,[\s\S]*?\.tertiaryLink:active,[\s\S]*?\.titleRepoLink:active\s*{[\s\S]*?box-shadow:\s*var\(--ce-shadow-pressed\);/,
+    );
   });
 
   it('keeps mobile recognition rows aligned and keeps use-case buttons responsive', () => {
@@ -464,12 +502,14 @@ describe('AboutPage', () => {
     expect(scss).toMatch(
       /@media \(max-width:\s*640px\)\s*{[\s\S]*?\.useCaseDetailRow\s*{[\s\S]*?flex-direction:\s*column;/,
     );
-    expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*{[\s\S]*?\.toggleHeader\s*{[\s\S]*?flex-wrap:\s*wrap;/);
     expect(scss).toMatch(
-      /@media \(max-width:\s*640px\)\s*{[\s\S]*?\.toggleHeaderAside\s*{[\s\S]*?display:\s*contents;/,
+      /@media \(max-width:\s*640px\)\s*{[\s\S]*?\.toggleHeader\s*{[\s\S]*?flex-wrap:\s*nowrap;[\s\S]*?justify-content:\s*flex-start;/,
     );
     expect(scss).toMatch(
-      /@media \(max-width:\s*640px\)\s*{[\s\S]*?\.recognitionSummary\s*{[\s\S]*?display:\s*flex;[\s\S]*?flex:\s*1 0 100%;/,
+      /@media \(max-width:\s*640px\)\s*{[\s\S]*?\.toggleHeaderAside\s*{[\s\S]*?display:\s*flex;[\s\S]*?flex:\s*1 1 auto;[\s\S]*?margin-left:\s*0;/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width:\s*640px\)\s*{[\s\S]*?\.recognitionSummary\s*{[\s\S]*?display:\s*flex;[\s\S]*?flex:\s*0 1 auto;[\s\S]*?margin-top:\s*0;[\s\S]*?overflow:\s*hidden;/,
     );
     expect(scss).toMatch(
       /@media \(max-width:\s*640px\)\s*{[\s\S]*?\.recognitionSummaryLogo \+ \.recognitionSummaryLogo\s*{[\s\S]*?margin-left:\s*-6px;/,
@@ -505,5 +545,25 @@ describe('AboutPage', () => {
     expect(scss).toMatch(
       /@media \(max-width:\s*640px\)\s*{[\s\S]*?\.mobileDemoVideoPlayer\s*{[\s\S]*?min-height:\s*clamp\(220px,\s*62vw,\s*300px\);/,
     );
+  });
+
+  it('uses a theme-owned backing so classic recognition logos can remain transparent', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'AboutPage.module.scss'), 'utf8');
+    const themeContract = fs.readFileSync(path.resolve(__dirname, '../../scss/themes/_contract.scss'), 'utf8');
+    const contextTheme = fs.readFileSync(path.resolve(__dirname, '../../scss/themes/_context-engine.scss'), 'utf8');
+    const classicTheme = fs.readFileSync(path.resolve(__dirname, '../../scss/themes/_classic-95.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /\.recognitionLogoEthereum,[\s\S]*?\.recognitionLogoEdge\s*{[\s\S]*?background:\s*color-mix\(in srgb, var\(--ce-recognition-logo-backing\) 96%, transparent\);[\s\S]*?border-color:\s*color-mix\(in srgb, var\(--ce-recognition-logo-border\) 24%, transparent\);/,
+    );
+    expect(scss).toMatch(
+      /\.recognitionLogoPolis\s*{[\s\S]*?background:\s*color-mix\(in srgb, var\(--ce-recognition-logo-backing\) 98%, transparent\);/,
+    );
+    expect(themeContract).toContain('recognition-logo-backing,');
+    expect(themeContract).toContain('recognition-logo-border,');
+    expect(contextTheme).toContain('recognition-logo-backing: var(--ce-status-info-text),');
+    expect(contextTheme).toContain('recognition-logo-border: var(--ce-status-info),');
+    expect(classicTheme).toContain('recognition-logo-backing: transparent,');
+    expect(classicTheme).toContain('recognition-logo-border: transparent,');
   });
 });

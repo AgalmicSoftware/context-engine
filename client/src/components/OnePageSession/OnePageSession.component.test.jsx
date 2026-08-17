@@ -23,7 +23,6 @@ const mockPolisReport = jest.fn();
 const mockSBTsPage = jest.fn();
 const mockDebateMap = jest.fn();
 const mockRiskMatrix = jest.fn();
-const mockDebateSelector = jest.fn();
 const mockDemoAnalysisWorkspace = jest.fn();
 const mockWorkerSessionGroupsPanel = jest.fn();
 const originalFetch = global.fetch;
@@ -151,11 +150,6 @@ jest.mock('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace', () => ({
     return <div data-testid="demo-analysis-workspace-view">Demo Analysis</div>;
   },
 }));
-jest.mock('../DemoViews/DebateHUD/DebateSelector', () => (props) => {
-  mockDebateSelector(props);
-  return <div data-testid="debate-selector">Debate Selector</div>;
-});
-
 describe('OnePageSession view gating', () => {
   afterEach(() => {
     jest.useRealTimers();
@@ -455,6 +449,44 @@ describe('OnePageSession view gating', () => {
     expect(subject.isTelegramBackendMode(subject.resolveCurrentSessionConfig(), 'demo')).toBe(false);
   });
 
+  it('clears prior Telegram state before a route-state early return on slug change', () => {
+    const alphaConfig = {
+      ...buildProps().sessionConfig,
+      slug: 'alpha',
+      telegramOnly: true,
+      sessionMode: 'telegram_only',
+    };
+    const subject = createSubject({
+      slug: 'alpha',
+      sessionConfig: alphaConfig,
+      routeQuestionsOpen: false,
+    });
+    subject.state = {
+      ...subject.state,
+      telegramAgentQuestionsStatus: 'ready',
+      telegramAgentQuestions: [{ questionId: 'alpha-question', prompt: 'Old session question' }],
+    };
+    const prevProps = subject.props;
+    const prevState = { ...subject.state };
+    subject.props = {
+      ...prevProps,
+      slug: 'beta',
+      sessionConfig: {
+        ...alphaConfig,
+        slug: 'beta',
+        telegramOnly: false,
+        sessionMode: 'standard',
+      },
+      routeQuestionsOpen: true,
+    };
+
+    subject.componentDidUpdate(prevProps, prevState);
+
+    expect(subject.state.telegramAgentQuestionsStatus).toBe('idle');
+    expect(subject.state.telegramAgentQuestions).toEqual([]);
+    expect(subject.state.showQuestions).toBe(true);
+  });
+
   it('derives scoped Chipotle Lit hooks for embedded survey pages from session config', async () => {
     const litProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     litProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
@@ -592,6 +624,33 @@ describe('OnePageSession view gating', () => {
     expect(titleContainer).not.toHaveClass(styles.titleContainerWithPileSubmitRail);
   });
 
+  it('fades and collapses the session title after five seconds, then restores it on interaction', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
+    const titleBlock = extractMediaBlock(scss, '.titleContainer {');
+
+    expect(titleBlock).toContain('max-height: 5rem;');
+    expect(titleBlock).toContain('overflow: hidden;');
+    expect(titleBlock).toMatch(
+      /transition:\s*[\s\S]*?opacity 0\.4s ease,[\s\S]*?max-height 0\.4s ease,[\s\S]*?margin-bottom 0\.4s ease;/,
+    );
+    expect(titleBlock).toContain('animation: fadeOutTitle 0.6s ease 5s forwards;');
+    expect(titleBlock).toMatch(
+      /&:hover,[\s\S]*?&:focus-within,[\s\S]*?&:active\s*{[\s\S]*?animation:\s*none;[\s\S]*?opacity:\s*1;[\s\S]*?max-height:\s*5rem;[\s\S]*?margin-bottom:\s*5px;/,
+    );
+    expect(scss).toMatch(
+      /@keyframes fadeOutTitle\s*{[\s\S]*?opacity:\s*0;[\s\S]*?max-height:\s*0\.75rem;[\s\S]*?margin-bottom:\s*0;/,
+    );
+  });
+
+  it('renders only the session title text at half opacity', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
+    const titleTextBlock = extractMediaBlock(scss, '.brandingSectionTitle {');
+    const titleContainerBlock = extractMediaBlock(scss, '.titleContainer {');
+
+    expect(titleTextBlock).toContain('opacity: 0.5;');
+    expect(titleContainerBlock).not.toContain('opacity: 0.5;');
+  });
+
   it('keeps phone pile titles unshifted while preserving top-rail title offsets elsewhere', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
     const phoneRailBlock = extractMediaBlock(
@@ -625,6 +684,22 @@ describe('OnePageSession view gating', () => {
     expect(widescreenRailBlock).toContain('.titleContainerWithPileSubmitRail');
     expect(widescreenRailBlock).toContain('transform: translateY(-52px);');
     expect(tabletRailBlock).toBeNull();
+  });
+
+  it('keeps the outer session branding section visually transparent', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
+    const brandingSectionBlock = extractMediaBlock(scss, '.brandingSection {');
+
+    expect(brandingSectionBlock).toContain('background: transparent;');
+    expect(brandingSectionBlock).not.toContain('linear-gradient');
+  });
+
+  it('keeps the mobile title tooltip inside the viewport', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
+
+    expect(scss).toContain('width: min(250px, calc(100vw - 32px));');
+    expect(scss).toContain('max-width: calc(100vw - 32px);');
+    expect(scss).toContain('right: 0;');
   });
 
   it('passes hideEmbeddedDebugUi only to embedded full SurveyPage mode', async () => {
@@ -1247,6 +1322,15 @@ describe('OnePageSession view gating', () => {
     expect(screen.getAllByRole('heading', { name: questionsHeaderName })).toHaveLength(1);
   });
 
+  it('keeps the full-question back arrow fully opaque while the label remains muted', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
+    const backButtonBlock = extractMediaBlock(scss, '.pileBackButton {');
+
+    expect(backButtonBlock).toContain('opacity: 1;');
+    expect(backButtonBlock).toMatch(/svg\s*{[^}]*opacity:\s*1;/);
+    expect(backButtonBlock).toMatch(/span\s*{[^}]*opacity:\s*0\.6;/);
+  });
+
   it('uses a two-up sections grid when only groups and results are visible', async () => {
     const { container } = render(<OnePageSession {...buildProps()} />);
 
@@ -1298,6 +1382,141 @@ describe('OnePageSession view gating', () => {
     expect(contextTextWrap.parentElement).toBe(contextHeader);
   });
 
+  it('keeps both words in compact expandable-section headings at the same size', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
+    const compactSectionHeaderBlock = extractMediaBlock(
+      scss,
+      '@media only screen and (min-width: 601px) and (max-width: 767px)',
+      '.sectionHeader .sectionHeaderSubtitle',
+    );
+
+    expect(compactSectionHeaderBlock).toMatch(/\.sectionHeader \.sectionHeaderSubtitle\s*{[^}]*font-size:\s*1em;/);
+  });
+
+  it('preserves the original default-theme section header typography hierarchy', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
+    const sectionHeaderBlock = extractMediaBlock(scss, '.sectionHeader {');
+    const sectionHeaderTitleBlock = extractMediaBlock(scss, '.sectionHeaderTitle {');
+    const sectionHeaderSubtitleBlock = extractMediaBlock(scss, '.sectionHeaderSubtitle {');
+    const classicThemeBlock = extractMediaBlock(
+      scss,
+      '@container ce-theme style(--ce-layout-profile: desktop-window)',
+      '.sectionsGrid .sectionContainer',
+    );
+
+    expect(sectionHeaderBlock).toContain('font-family: var(--ce-font-body);');
+    expect(sectionHeaderBlock).toContain('font-size: 2rem;');
+    expect(sectionHeaderBlock).toContain('font-weight: bold;');
+    expect(sectionHeaderBlock).toContain('color: color-mix(in srgb, var(--ce-text-inverse) 75%, transparent);');
+    expect(sectionHeaderTitleBlock).toContain('color: color-mix(in srgb, var(--ce-text-inverse) 50%, transparent);');
+    expect(sectionHeaderSubtitleBlock).toContain('font-size: 0.63em;');
+    expect(sectionHeaderSubtitleBlock).toContain('font-weight: 600;');
+    expect(sectionHeaderSubtitleBlock).toContain('color: color-mix(in srgb, var(--ce-text-inverse) 25%, transparent);');
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.sectionsGrid \.sectionHeader\s*{[\s\S]*?font-family:\s*var\(--ce-font-ui\);[\s\S]*?font-size:\s*1rem;/,
+    );
+    expect(classicThemeBlock).toMatch(
+      /\.sectionsGrid \.sectionHeaderTitle\s*{[^}]*font-size:\s*1\.35rem;[^}]*opacity:\s*0\.5;/,
+    );
+    expect(classicThemeBlock).toMatch(
+      /\.sectionsGrid \.sectionHeaderSubtitle\s*{[^}]*font-size:\s*1rem;[^}]*opacity:\s*0\.5;/,
+    );
+    expect(classicThemeBlock).toMatch(/\.sectionsGrid \.sectionToggleIcon\s*{[^}]*opacity:\s*0\.5;/);
+  });
+
+  it('flattens only the Classic 95 Questions explorer outer shell', async () => {
+    render(<OnePageSession {...buildProps()} />);
+
+    fireEvent.click(await screen.findByTestId('pile-view-all'));
+    const questionsExplorer = await screen.findByTestId('survey-page-full');
+    const questionsSection = questionsExplorer.closest(`.${styles.sectionContainer}`);
+    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
+    const classicShell = extractMediaBlock(
+      scss,
+      '@container ce-theme style(--ce-layout-profile: desktop-window)',
+      '.questionsSectionContainer {',
+    );
+
+    expect(questionsSection).toHaveClass(styles.questionsSectionContainer);
+    expect(classicShell).toContain('background: transparent;');
+    expect(classicShell).toContain('border: 0;');
+    expect(classicShell).toContain('border-radius: 0;');
+    expect(classicShell).toContain('box-shadow: none;');
+    expect(classicShell).toContain('padding: 0;');
+  });
+
+  it('keeps expanded Questions overflow visible so its toolbar can stick to the page scroll', async () => {
+    render(<OnePageSession {...buildProps()} />);
+
+    fireEvent.click(await screen.findByTestId('pile-view-all'));
+    const questionsExplorer = await screen.findByTestId('survey-page-full');
+    const questionsContent = questionsExplorer.closest(`.${styles.miniSectionContent}`);
+    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
+    const questionsContentBlock = extractMediaBlock(scss, '.questionsSectionContent {');
+
+    expect(questionsContent).toHaveClass(styles.questionsSectionContent);
+    expect(questionsContentBlock).toContain('overflow: visible;');
+  });
+
+  it('removes the top inset from the expanded Questions section', async () => {
+    render(<OnePageSession {...buildProps()} />);
+
+    fireEvent.click(await screen.findByTestId('pile-view-all'));
+    const questionsExplorer = await screen.findByTestId('survey-page-full');
+    const questionsSection = questionsExplorer.closest(`.${styles.sectionContainer}`);
+    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
+
+    expect(questionsSection).toHaveClass(styles.questionsSectionContainer);
+    expect(scss).toMatch(/\.questionsSectionContainer\s*{[^}]*padding-top:\s*0;/);
+  });
+
+  it('keeps Classic 95 group-card link controls frameless without changing the default control recipe', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
+    const defaultLinkControl = extractMediaBlock(scss, '.workerGroupCardLinkButton {');
+    const classicTheme = extractMediaBlock(
+      scss,
+      '@container ce-theme style(--ce-layout-profile: desktop-window)',
+      '.workerGroupCardLinkButton,',
+    );
+
+    expect(defaultLinkControl).toContain('border: 1px solid transparent;');
+    expect(defaultLinkControl).toMatch(
+      /&:focus-visible\s*{[\s\S]*?outline:\s*2px dotted var\(--ce-focus-ring\);[\s\S]*?outline-offset:\s*2px;/,
+    );
+    expect(classicTheme).toMatch(
+      /\.workerGroupCardLinkButton,\s*\.workerGroupCardLinkButton:active\s*{[\s\S]*?border:\s*0 !important;[\s\S]*?background:\s*transparent;[\s\S]*?box-shadow:\s*none !important;/,
+    );
+    expect(classicTheme).toMatch(
+      /\.workerGroupCardLinkButton:focus-visible\s*{[\s\S]*?outline:\s*2px dotted var\(--ce-focus-ring\);/,
+    );
+  });
+
+  it('removes only the Classic 95 nested group-card image frame', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
+    const sharedSbtScss = fs.readFileSync(path.join(__dirname, '../SBTs/SBTPage.module.scss'), 'utf8');
+    const defaultImageFrame = extractMediaBlock(sharedSbtScss, '.miniImageContainer {');
+    const classicTheme = extractMediaBlock(
+      scss,
+      '@container ce-theme style(--ce-layout-profile: desktop-window)',
+      '.workerGroupCardImageContainer {',
+    );
+
+    expect(defaultImageFrame).toContain('border: 1px solid');
+    expect(classicTheme).toMatch(
+      /\.workerGroupCardImageContainer\s*{[\s\S]*?border:\s*0 !important;[\s\S]*?border-radius:\s*0;[\s\S]*?box-shadow:\s*none !important;/,
+    );
+  });
+
+  it('removes the session group-card outer border without changing shared SBT cards', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
+    const sharedSbtScss = fs.readFileSync(path.join(__dirname, '../SBTs/SBTPage.module.scss'), 'utf8');
+    const workerGroupCard = extractMediaBlock(scss, '.workerGroupCard {');
+    const sharedSbtCard = extractMediaBlock(sharedSbtScss, '.sbtItem {');
+
+    expect(workerGroupCard).toContain('border: 0;');
+    expect(sharedSbtCard).toContain('border: 1px solid $card-border;');
+  });
+
   it('keeps section-card headers inline through 767px without pulling full phone layout onto tablets', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
     const phoneBlock = extractMediaBlock(scss, '@media only screen and (max-width: 600px)', '.onePageDemoContainer');
@@ -1305,6 +1524,11 @@ describe('OnePageSession view gating', () => {
       scss,
       '@media only screen and (min-width: 601px) and (max-width: 767px)',
       '.sectionHeader {',
+    );
+    const classicSmallTabletBlock = extractMediaBlock(
+      scss,
+      '@media only screen and (min-width: 601px) and (max-width: 767px)',
+      '@container ce-theme style(--ce-layout-profile: desktop-window)',
     );
     const tabletBlock = extractMediaBlock(
       scss,
@@ -1325,6 +1549,8 @@ describe('OnePageSession view gating', () => {
     expect(sectionContainerBlock).toContain('box-sizing: border-box;');
     expect(sectionContainerBlock).toContain('max-width: 100%;');
     expect(sectionContainerBlock).toContain('min-width: 0;');
+    expect(sectionContainerBlock).toContain('background-color: var(--ce-card-bg);');
+    expect(sectionContainerBlock).toContain('border: 1px solid var(--ce-card-border);');
     expect(sectionHeaderRowBlock).toContain('max-width: 100%;');
     expect(sectionHeaderRowBlock).toContain('min-width: 0;');
     expect(sectionActionsScrollerBlock).toContain('box-sizing: border-box;');
@@ -1344,7 +1570,7 @@ describe('OnePageSession view gating', () => {
     expect(phoneBlock).toContain('.sectionHeader .sectionHeaderSubtitle {');
     expect(phoneBlock).toContain('font-size: 1em;');
     expect(phoneBlock).toContain('font-weight: inherit;');
-    expect(phoneBlock).toContain('color: rgba(255, 255, 255, 0.15);');
+    expect(phoneBlock).toContain('color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);');
     expect(phoneBlock).toContain('.sectionHeader {');
     expect(phoneBlock).toContain('align-items: center;');
     expect(phoneBlock).not.toContain('.documentsSectionHeaderText');
@@ -1364,9 +1590,9 @@ describe('OnePageSession view gating', () => {
     expect(smallTabletBlock).toContain('align-items: center;');
     expect(smallTabletBlock).toContain('gap: 6px 12px;');
     expect(smallTabletBlock).toContain('.sectionHeader .sectionHeaderSubtitle {');
-    expect(smallTabletBlock).toContain('font-size: 1.2em;');
+    expect(smallTabletBlock).toContain('font-size: 1em;');
     expect(smallTabletBlock).toContain('font-weight: inherit;');
-    expect(smallTabletBlock).toContain('color: rgba(255, 255, 255, 0.15);');
+    expect(smallTabletBlock).toContain('color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);');
     expect(smallTabletBlock).not.toContain('.documentsSectionHeaderText');
     expect(smallTabletBlock).not.toContain('.documentsSectionHeaderTitleRow');
     expect(smallTabletBlock).not.toContain('.documentsSectionHeaderMain');
@@ -1377,6 +1603,16 @@ describe('OnePageSession view gating', () => {
     expect(smallTabletBlock).toContain('width: auto;');
     expect(smallTabletBlock).toContain('font-size: clamp(1.35rem, 4.2vw, 1.75rem);');
     expect(smallTabletBlock).not.toContain('.sectionContainer');
+    expect(classicSmallTabletBlock).toContain('.sectionsGrid .sectionHeader {');
+    expect(classicSmallTabletBlock).toContain('align-items: flex-start;');
+    expect(classicSmallTabletBlock).toContain('.sectionsGrid .sectionHeaderText {');
+    expect(classicSmallTabletBlock).toContain('flex-direction: column;');
+    expect(classicSmallTabletBlock).toContain('align-items: flex-start;');
+    expect(classicSmallTabletBlock).toContain('flex-wrap: nowrap;');
+    expect(classicSmallTabletBlock).toContain('gap: 3px;');
+    expect(classicSmallTabletBlock).toContain('.sectionsGrid .sectionHeaderSubtitle {');
+    expect(classicSmallTabletBlock).toContain('font-size: 1rem;');
+    expect(classicSmallTabletBlock).toContain('opacity: 0.5;');
     expect(tabletBlock).toContain('.pileHeaderRow {');
     expect(tabletBlock).toContain('flex-wrap: nowrap;');
     expect(tabletBlock).toContain('.pileHeaderTitleWrap {');
@@ -1384,6 +1620,21 @@ describe('OnePageSession view gating', () => {
     expect(tabletBlock).toContain('font-size: clamp(1.4rem, 3.2vw, 1.9rem);');
     expect(scss).toMatch(
       /@media only screen and \(min-width:\s*768px\) and \(max-width:\s*1024px\)\s*{[\s\S]*?\.sectionHeader \.sectionHeaderText\s*{[\s\S]*?flex-direction:\s*column;[\s\S]*?align-items:\s*flex-start;/,
+    );
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.sectionsGrid \.sectionExpanded \.sectionHeaderRow\s*{[\s\S]*?align-items:\s*center;[\s\S]*?gap:\s*8px 12px;/,
+    );
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.sectionsGrid \.sectionExpanded \.sectionHeader\s*{[\s\S]*?flex:\s*1 1 180px;[\s\S]*?width:\s*auto;/,
+    );
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.sectionsGrid \.sectionExpanded \.sectionHeaderActionsScroller\s*{[\s\S]*?flex:\s*0 0 auto;[\s\S]*?width:\s*auto;[\s\S]*?max-width:\s*100%;[\s\S]*?padding-left:\s*0;/,
+    );
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.sectionsGrid \.sectionExpanded \.resultsModeActionsScroller\s*{[\s\S]*?flex:\s*1 1 260px;[\s\S]*?width:\s*auto;[\s\S]*?min-width:\s*0;/,
+    );
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.sectionsGrid \.sectionExpanded \.resultsModeActions\s*{[\s\S]*?display:\s*flex;[\s\S]*?min-width:\s*max-content;/,
     );
   });
 

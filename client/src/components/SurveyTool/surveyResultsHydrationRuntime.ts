@@ -17,16 +17,49 @@ import {
   type SurveyResultsAggregateRow,
   type SurveyResultsSurveyResponsePayload,
 } from './surveyResultsHelpers.js';
+import { buildSimulatedDemoResultsNetworkData } from './surveyPolisDemoResultsData.js';
 import { normalizeSurveyResultsQuestionModeCache } from './surveyResultsQuestionModeCacheNormalizationController';
 import { resolveNetBucketReadOnly, unifyAggregatorWithAllQuestionIDs } from './surveyResultsRuntimeHelpers';
 import type { SurveyResultsProps, SurveyResultsState } from './SurveyResults';
 import type {
+  SurveyResultsQuestionRecord,
   SurveyResultsQuestionResponsesByQuestion,
   SurveyResultsQuestionResponsesByResponder,
   SurveyResultsScopedQuestionNetworkData,
 } from './surveyResultsQuestionNetworkReadController';
 
 type SurveyResultsRecord = Record<string, unknown>;
+
+const DEMO_POLIS_DATA_SOURCE = 'demo-polis-data';
+
+const normalizeQuestionModeKey = (value: unknown): string =>
+  String(value || '')
+    .trim()
+    .toLowerCase();
+
+const cloneDisplayRecord = (value: unknown): unknown => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+  const record = value as SurveyResultsRecord;
+  const answer = record.answer;
+  const additional = record.additional;
+  const scale = record.scale;
+  return {
+    ...record,
+    ...(answer && typeof answer === 'object' && !Array.isArray(answer)
+      ? { answer: { ...(answer as SurveyResultsRecord) } }
+      : {}),
+    ...(additional && typeof additional === 'object' && !Array.isArray(additional)
+      ? { additional: { ...(additional as SurveyResultsRecord) } }
+      : {}),
+    ...(scale && typeof scale === 'object' && !Array.isArray(scale)
+      ? { scale: { ...(scale as SurveyResultsRecord) } }
+      : {}),
+    ...(Array.isArray(record.options) ? { options: [...record.options] } : {}),
+  };
+};
+
+const buildFixtureResponseKey = (questionId: unknown, responder: unknown): string =>
+  `${normalizeQuestionModeKey(questionId)}::${normalizeQuestionModeKey(responder)}`;
 
 type SurveyResultsSurveyBucketRecord = SurveyResultsRecord & {
   surveyResponses?: Record<string, SurveyResultsRecord>;
@@ -228,9 +261,47 @@ export const fetchSurveyResultsQuestionModeResponses = async ({
     questions: questionNetCache?.questions || {},
     requiredSessionSlug: normalizeSessionSlug(strictQuestionResponseSlug),
   });
-  const partialQR: SurveyResultsQuestionResponsesByQuestion = normalizedQuestionModeCache.questionResponses;
-  const allQuestions = normalizedQuestionModeCache.questions;
+  // These maps are display-owned copies. Fixture rows are added only after
+  // cache normalization has removed every cache-sourced demo row.
+  const partialQR: SurveyResultsQuestionResponsesByQuestion = Object.fromEntries(
+    Object.entries(normalizedQuestionModeCache.questionResponses).map(([questionId, responders]) => [
+      questionId,
+      { ...(responders || {}) },
+    ]),
+  );
+  const allQuestions = Object.fromEntries(
+    Object.entries(normalizedQuestionModeCache.questions).map(([questionId, question]) => [
+      questionId,
+      cloneDisplayRecord(question),
+    ]),
+  ) as Record<string, SurveyResultsQuestionRecord>;
   const aggregatorMap: Record<string, unknown> = {};
+  const simulatedFixtureResponseKeys = new Set<string>();
+  const simulatedDemoNetworkData = buildSimulatedDemoResultsNetworkData(effectiveSlug);
+
+  if (simulatedDemoNetworkData) {
+    Object.entries(simulatedDemoNetworkData.questions || {}).forEach(([rawQuestionId, question]) => {
+      const questionId = normalizeQuestionModeKey(rawQuestionId || question?.id);
+      if (!questionId || Object.prototype.hasOwnProperty.call(allQuestions, questionId)) return;
+      allQuestions[questionId] = cloneDisplayRecord(question) as SurveyResultsQuestionRecord;
+    });
+
+    Object.entries(simulatedDemoNetworkData.questionResponses || {}).forEach(([rawQuestionId, responders]) => {
+      const questionId = normalizeQuestionModeKey(rawQuestionId);
+      if (!questionId || !responders || typeof responders !== 'object') return;
+      const mergedResponders = { ...(partialQR[questionId] || {}) };
+      const existingResponderIds = new Set(Object.keys(mergedResponders).map(normalizeQuestionModeKey));
+
+      Object.entries(responders).forEach(([rawResponder, response]) => {
+        const responder = normalizeQuestionModeKey(rawResponder);
+        if (!responder || existingResponderIds.has(responder)) return;
+        mergedResponders[responder] = cloneDisplayRecord(response);
+        existingResponderIds.add(responder);
+        simulatedFixtureResponseKeys.add(buildFixtureResponseKey(questionId, responder));
+      });
+      if (Object.keys(mergedResponders).length > 0) partialQR[questionId] = mergedResponders;
+    });
+  }
 
   Object.keys(partialQR).forEach((qId) => {
     const lowerQ = qId.toLowerCase();
@@ -240,7 +311,13 @@ export const fetchSurveyResultsQuestionModeResponses = async ({
     Object.keys(respondersMap).forEach((rAddr) => {
       const rData = respondersMap[rAddr];
       const parsed = ports.parseResponse(rData) as SurveyResultsRecord | null;
-      if (parsed && parsed.source === 'demo-polis-data') return;
+      if (
+        parsed &&
+        parsed.source === DEMO_POLIS_DATA_SOURCE &&
+        !simulatedFixtureResponseKeys.has(buildFixtureResponseKey(lowerQ, rAddr))
+      ) {
+        return;
+      }
       if (parsed) {
         if (!Array.isArray(aggregatorMap[lowerQ])) {
           aggregatorMap[lowerQ] = [];

@@ -2,7 +2,7 @@ import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
 
-import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
+import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import styles from './SBTsList.module.scss';
 
 type ChipLoadingStatus = {

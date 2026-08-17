@@ -1,5 +1,6 @@
 import { ethers } from 'ethers';
 import { cryptoUtils } from './cryptography.js';
+import groupPasswordDerivation from './groupPasswordDerivation.cjs';
 
 const PASSWORD = 'shared-secret';
 const SBT_A = '0x00000000000000000000000000000000000000a1';
@@ -7,6 +8,16 @@ const SBT_B = '0x00000000000000000000000000000000000000b2';
 const USER = '0x00000000000000000000000000000000000000c3';
 
 describe('cryptoUtils group password derivation', () => {
+  it('matches the shared script derivation for zero and address scopes', () => {
+    const sharedDerivation = groupPasswordDerivation.createGroupPasswordDerivation(ethers);
+
+    for (const sbtAddress of ['', SBT_A]) {
+      expect(sharedDerivation.computeGroupPasswordHash({ password: PASSWORD, sbtAddress })).toBe(
+        cryptoUtils.computeGroupPasswordHash({ password: PASSWORD, sbtAddress }),
+      );
+    }
+  });
+
   it('scopes the same password hash by SBT address and falls back to AddressZero when missing', () => {
     const zeroScopedHash = cryptoUtils.computeGroupPasswordHash({ password: PASSWORD });
     const explicitZeroScopedHash = cryptoUtils.computeGroupPasswordHash({

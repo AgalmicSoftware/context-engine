@@ -150,7 +150,7 @@ const GateMultiSelectLock = ({
     showDots && selected.length > 1
       ? selected.slice(0, 4).map((gateId) => {
           const match = options.find((opt) => normalizeId(opt?.id) === gateId);
-          const color = normalizeId(match?.color) || '#888';
+          const color = normalizeId(match?.color) || 'var(--ce-text-muted)';
           return (
             <span
               key={gateId}
@@ -213,7 +213,7 @@ const GateMultiSelectLock = ({
             const gateId = normalizeId(opt?.id);
             if (!gateId) return null;
             const label = toStr(opt?.displayLabel || opt?.badgeLabel || opt?.label || gateId);
-            const color = normalizeId(opt?.color) || '#888';
+            const color = normalizeId(opt?.color) || 'var(--ce-text-muted)';
             const checked = selected.includes(gateId);
             const sbtAddresses = collectSbtAddresses(opt);
             const sbtItems = resolveSbtItems(sbtAddresses, normalizeId(opt?.sourceSessionSlug || opt?.sessionSlug));
@@ -285,7 +285,6 @@ const GateMultiSelectLock = ({
               </div>
             );
           })}
-          {!options.length && <div className={styles.empty}>{`No ${t('gatesLower')} configured.`}</div>}
         </div>
       ) : null}
     </div>

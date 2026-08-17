@@ -1,0 +1,103 @@
+import { normalizeSessionSlug, resolveSessionSlugFromPathname } from '../../utilities/session/sessionNaming.js';
+
+type UnknownRecord = Record<string, unknown>;
+
+type CompareCacheEntry = {
+  slug?: unknown;
+  value?: unknown;
+};
+
+type ResolveCompareSessionSlugOptions = {
+  activeSessionSlug?: unknown;
+  pathname?: unknown;
+  search?: unknown;
+};
+
+type ScanCompareAddressesOptions = {
+  addresses?: unknown[];
+  sessionSlug?: unknown;
+  scanSpecificUserProfile?: ((address: string) => Promise<unknown> | unknown) | null;
+  seen?: Set<string>;
+};
+
+type CompareSectionTask = () => Promise<void> | void;
+
+export type CompareProfileScanFailure = {
+  address: string;
+  error: unknown;
+};
+
+const isUnknownRecord = (value: unknown): value is UnknownRecord =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+export const COMPARE_GRAPHIC_FILENAME = 'contextEngine_comparisonGraphic.png';
+
+export const resolveCompareRunLabel = (sessionCachesReady?: boolean): string =>
+  sessionCachesReady === false ? 'Loading session data…' : 'Comparing';
+
+export const runCompareSectionTasks = (tasks: CompareSectionTask[] = []): Promise<PromiseSettledResult<void>[]> => {
+  const pending = (Array.isArray(tasks) ? tasks : []).map((task) => {
+    try {
+      return Promise.resolve(task());
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  });
+  return Promise.allSettled(pending);
+};
+
+export const resolveCompareSessionSlug = ({
+  activeSessionSlug,
+  pathname = '',
+  search = '',
+}: ResolveCompareSessionSlugOptions = {}): string => {
+  const explicit = normalizeSessionSlug(activeSessionSlug ?? '');
+  if (explicit) return explicit;
+
+  try {
+    const querySlug = normalizeSessionSlug(new URLSearchParams(String(search || '')).get('session') || '');
+    if (querySlug) return querySlug;
+  } catch {
+    // Fall through to the path resolver for malformed or unavailable query state.
+  }
+
+  return normalizeSessionSlug(resolveSessionSlugFromPathname(pathname) || '');
+};
+
+export const selectCompareCacheValues = (
+  entries: CompareCacheEntry[] = [],
+  sessionSlug: unknown = '',
+): UnknownRecord[] => {
+  const normalizedSessionSlug = normalizeSessionSlug(sessionSlug);
+  return (Array.isArray(entries) ? entries : [])
+    .filter((entry) => !normalizedSessionSlug || normalizeSessionSlug(entry?.slug ?? '') === normalizedSessionSlug)
+    .map((entry) => entry?.value)
+    .filter(isUnknownRecord);
+};
+
+export const scanCompareAddressesSequentially = async ({
+  addresses = [],
+  sessionSlug = '',
+  scanSpecificUserProfile,
+  seen = new Set<string>(),
+}: ScanCompareAddressesOptions = {}): Promise<CompareProfileScanFailure[]> => {
+  if (typeof scanSpecificUserProfile !== 'function') return [];
+  const failures: CompareProfileScanFailure[] = [];
+  const normalizedSessionSlug = normalizeSessionSlug(sessionSlug);
+
+  for (const rawAddress of Array.isArray(addresses) ? addresses : []) {
+    const address = String(rawAddress || '').trim();
+    if (!/^0x[0-9a-fA-F]{40}$/.test(address)) continue;
+    const scanKey = `${normalizedSessionSlug}:${address.toLowerCase()}`;
+    if (seen.has(scanKey)) continue;
+    seen.add(scanKey);
+    try {
+      await scanSpecificUserProfile(address);
+    } catch (error) {
+      seen.delete(scanKey);
+      failures.push({ address, error });
+    }
+  }
+
+  return failures;
+};

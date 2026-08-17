@@ -16,6 +16,14 @@ import {
   resolveProfileScanAttemptedCoverageSlugs,
 } from '../../utilities/session/profileScanReportHelpers.js';
 import { createLogger } from 'utilities/logging.js';
+import { updateCacheAtomic } from '../../utilities/cache/cacheScripts.js';
+import { mergeSbtActivityCacheEntryMetadata } from '../../utilities/sbt/sbtActivityCacheEntry.js';
+import {
+  buildMainSiteProfileQuestionResponseKey,
+  buildMainSiteProfileSurveyResponseKey,
+  mergeMainSiteProfileRows,
+  mergeMainSiteProfileUserCache,
+} from './mainSiteProfileCacheMerge.js';
 
 type MainSiteProfileScanHost = AppShell;
 type MainSiteMutableMetadata = Record<string, unknown> & {
@@ -138,9 +146,9 @@ type MainSiteProfileScanSbt = Record<string, unknown> & {
 };
 type MainSiteSbtCacheEntry = MainSiteMutableMetadata & {
   sbtAddress?: string;
-  sbtInfo?: Record<string, unknown>;
+  sbtInfo?: Record<string, unknown> | null;
   mintedAddresses?: string[];
-  blockNumber?: number;
+  blockNumber?: number | null;
 };
 type MainSiteSbtMetadataCache = Record<string, MainSiteSbtNetworkCache | undefined>;
 type MainSiteSbtNetworkCache = {
@@ -175,18 +183,34 @@ type MainSiteQuestionNetworkCache = {
   arweaveTxFailureCache?: Record<string, unknown>;
   [key: string]: unknown;
 };
-type MainSiteProfileResponseRecency = {
-  bn: number;
-  txi: number;
-  li: number;
-  ts: number;
-};
-
 const mainSiteLog = createLogger('mainSite');
 
 const isMainSitePresent = <T>(value: T | null | undefined): value is T => value !== null && value !== undefined;
 
 const readMainSiteErrorMessage = (error: unknown): unknown => (error instanceof Error ? error.message : error);
+
+const isMainSiteProfilePersistenceFailure = (error: unknown): boolean =>
+  !!error &&
+  typeof error === 'object' &&
+  (error as { cachePersistenceFailed?: unknown }).cachePersistenceFailed === true;
+
+const persistMainSiteProfileCacheAtomic = async <TValue>(
+  namespace: 'sbtCache' | 'userCache',
+  slug: string,
+  updater: (current: TValue | null) => TValue | Promise<TValue>,
+): Promise<TValue> => {
+  try {
+    const persisted = await updateCacheAtomic<TValue>(namespace, slug, updater);
+    if (persisted === null) throw new Error(`managed ${namespace} namespace unavailable`);
+    return persisted;
+  } catch (error) {
+    const failure = new Error(
+      `Failed to persist ${namespace} for ${slug}: ${error instanceof Error ? error.message : String(error)}`,
+    ) as Error & { cachePersistenceFailed?: boolean };
+    failure.cachePersistenceFailed = true;
+    throw failure;
+  }
+};
 
 const getMainSiteRuntimeGlobal = () =>
   globalThis as typeof globalThis & { __CE_PROFILE_SCAN_LAST_EVENT_SUMMARY__?: unknown };
@@ -370,6 +394,7 @@ export const runMainSiteScanSpecificUserProfile = async (
     });
 
     let newDataWritten = false; // track whether anything new was written to caches
+    let hadPersistenceFailure = false;
 
     const scanOneSlug = async (slug: string) => {
       const slugStartedAt = Date.now();
@@ -880,10 +905,6 @@ export const runMainSiteScanSpecificUserProfile = async (
           activity.surveyResponses.length > 0 ||
           activity.questionResponses.length > 0;
 
-        if (hasNewData) {
-          newDataWritten = true;
-        }
-
         // C. Update user cache (append delta with dedup)
         if (hasNewData) {
           // Ensure data object exists
@@ -913,116 +934,28 @@ export const runMainSiteScanSpecificUserProfile = async (
 
           chainEntry.data.sbts = Array.from(existingSbtMap.values());
 
-          // Append other activity arrays with dedupe.
-          const dedupById = (
-            oldArr: MainSiteProfileActivityEntry[] = [],
-            newArr: MainSiteProfileActivityEntry[] = [],
-          ): MainSiteProfileActivityEntry[] => {
-            const map = new Map<string, MainSiteProfileActivityEntry>();
-            oldArr.forEach((i) => map.set(String(i.id || JSON.stringify(i)), i));
-            newArr.forEach((i) => map.set(String(i.id || JSON.stringify(i)), i));
-            return Array.from(map.values());
-          };
+          chainEntry.data.createdSurveys = mergeMainSiteProfileRows(
+            chainEntry.data.createdSurveys,
+            activity.createdSurveys,
+            (item) => String(item.id || JSON.stringify(item)),
+          );
+          chainEntry.data.createdQuestions = mergeMainSiteProfileRows(
+            chainEntry.data.createdQuestions,
+            activity.createdQuestions,
+            (item) => String(item.id || JSON.stringify(item)),
+          );
 
-          const buildFallbackMergeKey = (item: MainSiteProfileActivityEntry) => {
-            try {
-              return `__fallback__${JSON.stringify(item)}`;
-            } catch (_) {
-              return `__fallback__${String(item || '')}`;
-            }
-          };
-          const readResponseRecency = (item: MainSiteProfileActivityEntry): MainSiteProfileResponseRecency => {
-            const row = item && typeof item === 'object' ? item : {};
-            return {
-              bn: Number(row.blockNumber ?? row.bn ?? 0) || 0,
-              txi: Number(row.transactionIndex ?? row.txIndex ?? row.txi ?? 0) || 0,
-              li: Number(row.logIndex ?? row.li ?? 0) || 0,
-              ts: Number(row.timestamp ?? row.ts ?? 0) || 0,
-            };
-          };
-          const compareResponseRecency = (
-            incoming: MainSiteProfileResponseRecency,
-            existing: MainSiteProfileResponseRecency,
-          ) => {
-            if (incoming.bn > existing.bn) return 1;
-            if (incoming.bn < existing.bn) return -1;
-            if (incoming.txi > existing.txi) return 1;
-            if (incoming.txi < existing.txi) return -1;
-            if (incoming.li > existing.li) return 1;
-            if (incoming.li < existing.li) return -1;
-            if (incoming.ts > existing.ts) return 1;
-            if (incoming.ts < existing.ts) return -1;
-            return 0;
-          };
-          const upsertByStableResponseKey = (
-            oldArr: MainSiteProfileActivityEntry[] = [],
-            newArr: MainSiteProfileActivityEntry[] = [],
-            buildKey: (item: MainSiteProfileActivityEntry) => string,
-            opts: Record<string, unknown> = {},
-          ): MainSiteProfileActivityEntry[] => {
-            const preferNewerByRecency = !!(opts && opts.preferNewerByRecency);
-            const map = new Map<string, MainSiteProfileActivityEntry>();
-            const mergeOne = (item: MainSiteProfileActivityEntry, preferIncomingOnTie = false) => {
-              if (item == null) return;
-              const key = buildKey(item) || buildFallbackMergeKey(item);
-              if (!map.has(key)) {
-                map.set(key, item);
-                return;
-              }
-              if (!preferNewerByRecency) {
-                if (preferIncomingOnTie) map.set(key, item);
-                return;
-              }
-              const existing = map.get(key);
-              if (!existing) {
-                map.set(key, item);
-                return;
-              }
-              const cmp = compareResponseRecency(readResponseRecency(item), readResponseRecency(existing));
-              if (cmp > 0 || (cmp === 0 && preferIncomingOnTie)) {
-                map.set(key, item);
-              }
-            };
-            oldArr.forEach((item) => mergeOne(item, false));
-            // Latest scan rows can replace equal-recency rows to preserve fresh payload fields.
-            newArr.forEach((item) => mergeOne(item, true));
-            return Array.from(map.values());
-          };
-          const buildSurveyResponseKey = (item: MainSiteProfileActivityEntry) => {
-            const surveyId = String(item?.surveyId || item?.surveyID || item?.id || '')
-              .trim()
-              .toLowerCase();
-            const responder = String(item?.responder || '')
-              .trim()
-              .toLowerCase();
-            if (!surveyId || !responder) return '';
-            return `${surveyId}|${responder}`;
-          };
-          const buildQuestionResponseKey = (item: MainSiteProfileActivityEntry) => {
-            const questionId = String(item?.questionId || item?.id || '')
-              .trim()
-              .toLowerCase();
-            const responder = String(item?.responder || '')
-              .trim()
-              .toLowerCase();
-            if (!questionId || !responder) return '';
-            return `${questionId}|${responder}`;
-          };
-
-          chainEntry.data.createdSurveys = dedupById(chainEntry.data.createdSurveys, activity.createdSurveys);
-          chainEntry.data.createdQuestions = dedupById(chainEntry.data.createdQuestions, activity.createdQuestions);
-
-          chainEntry.data.surveyResponses = upsertByStableResponseKey(
+          chainEntry.data.surveyResponses = mergeMainSiteProfileRows(
             chainEntry.data.surveyResponses,
             activity.surveyResponses,
-            buildSurveyResponseKey,
-            { preferNewerByRecency: true },
+            buildMainSiteProfileSurveyResponseKey,
+            true,
           );
-          chainEntry.data.questionResponses = upsertByStableResponseKey(
+          chainEntry.data.questionResponses = mergeMainSiteProfileRows(
             chainEntry.data.questionResponses,
             activity.questionResponses,
-            buildQuestionResponseKey,
-            { preferNewerByRecency: true },
+            buildMainSiteProfileQuestionResponseKey,
+            true,
           );
         }
 
@@ -1070,15 +1003,24 @@ export const runMainSiteScanSpecificUserProfile = async (
           }
         }
 
-        if (!sbtHadRpcError && !activityHadRpcError && attemptedCoverageSlugSet.has(normalizedSlug)) {
-          pushUnique(report.scannedSlugs, slug);
+        // Persist only this user/chain node so concurrent response writers survive the profile scan.
+        await persistMainSiteProfileCacheAtomic<MainSiteProfileUserCache>(
+          'userCache',
+          slug,
+          (currentIn) =>
+            mergeMainSiteProfileUserCache(currentIn, {
+              chainEntry,
+              netKey,
+              targetLower,
+            }) as MainSiteProfileUserCache,
+        );
+
+        if (!hasNewData) {
+          if (!sbtHadRpcError && !activityHadRpcError && attemptedCoverageSlugSet.has(normalizedSlug)) {
+            pushUnique(report.scannedSlugs, slug);
+          }
+          return;
         }
-
-        // Write back to persistent storage (User -> Chain -> Data)
-        userCache[targetLower][netKey] = chainEntry;
-        host.DG.write('userCache', slug, userCache);
-
-        if (!hasNewData) return;
 
         // D. Sync global caches (update UI)
         const metadataGroupRef = report.useAllSessionsActivityScan
@@ -1087,26 +1029,31 @@ export const runMainSiteScanSpecificUserProfile = async (
 
         // 1. Update SBT Cache
         if (sbts.length > 0) {
-          // Re-read cache immediately before merge to avoid race with ensureLightSbtUniverse
-          let sbtCache = (host.DG.read('sbtCache', slug) || {}) as MainSiteSbtMetadataCache;
-          if (!sbtCache[netKey]) sbtCache[netKey] = { sbtList: {}, lastBlock: 0 };
-          const sbtNet = sbtCache[netKey] as MainSiteSbtNetworkCache;
-
-          sbts.forEach((item) => {
-            const addrLower = String(item.sbtAddress || '').toLowerCase();
-            if (!addrLower) return;
-            const existing = sbtNet.sbtList[addrLower] || {};
-
-            sbtNet.sbtList[addrLower] = {
-              ...existing,
-              sbtAddress: item.sbtAddress,
-              sbtInfo: { ...(existing.sbtInfo || {}), ...(item.sbtInfo || {}) },
-              mintedAddresses: [...new Set([...(existing.mintedAddresses || []), targetLower])],
-              slug: slug,
-              blockNumber: currentBlock,
-            };
+          await persistMainSiteProfileCacheAtomic<MainSiteSbtMetadataCache>('sbtCache', slug, (currentIn) => {
+            const sbtCache = currentIn && typeof currentIn === 'object' ? { ...currentIn } : {};
+            const currentNet = (
+              sbtCache[netKey] && typeof sbtCache[netKey] === 'object' ? sbtCache[netKey] : { sbtList: {} }
+            ) as MainSiteSbtNetworkCache;
+            const sbtNet = {
+              ...currentNet,
+              sbtList: { ...(currentNet.sbtList || {}) },
+            } as MainSiteSbtNetworkCache;
+            sbtCache[netKey] = sbtNet;
+            sbts.forEach((item) => {
+              const addrLower = String(item.sbtAddress || '').toLowerCase();
+              if (!addrLower) return;
+              const existing = sbtNet.sbtList[addrLower] || {};
+              const merged = mergeSbtActivityCacheEntryMetadata(existing, {
+                sbtAddress: item.sbtAddress,
+                sbtInfo: item.sbtInfo || null,
+                slug,
+                blockNumber: currentBlock,
+              });
+              merged.mintedAddresses = [...new Set([...(merged.mintedAddresses || []), targetLower])];
+              sbtNet.sbtList[addrLower] = { ...merged };
+            });
+            return sbtCache;
           });
-          host.DG.write('sbtCache', slug, sbtCache);
         }
 
         // 2. Update Surveys Cache
@@ -1326,6 +1273,13 @@ export const runMainSiteScanSpecificUserProfile = async (
           host.DG.write('questionsCache', slug, qCache);
         }
 
+        // Only publish scan success after every cache write for this slug completed.
+        // Marking it earlier suppresses retries when persistence fails mid-scan.
+        newDataWritten = true;
+        if (!sbtHadRpcError && !activityHadRpcError && attemptedCoverageSlugSet.has(normalizedSlug)) {
+          pushUnique(report.scannedSlugs, slug);
+        }
+
         // Stream updates into UI as each slug finishes so profile sections can populate incrementally.
         host.queueLocalRevisionUpdate({
           needsSbtRevision: sbts.length > 0,
@@ -1336,7 +1290,11 @@ export const runMainSiteScanSpecificUserProfile = async (
             activity.questionResponses.length > 0,
         });
       } catch (err) {
-        report.hadRpcErrors = true;
+        if (isMainSiteProfilePersistenceFailure(err)) {
+          hadPersistenceFailure = true;
+        } else {
+          report.hadRpcErrors = true;
+        }
         pushUnique(report.failedSlugs, slug);
         pushUnique(report.failedActivitySlugs, slug);
         host.emitProfileScanTelemetry('slug-error', {
@@ -1396,7 +1354,14 @@ export const runMainSiteScanSpecificUserProfile = async (
           : totalActivityFailure
             ? 'activity-failure-all-slugs'
             : 'sbt-failure-all-slugs';
-      report.hadRpcErrors = true;
+      if (!hadPersistenceFailure) {
+        report.hadRpcErrors = true;
+        host.scheduleProfileScanRetryAfterRegistryHydration(target, report.coverageReason);
+      }
+    }
+    if (hadPersistenceFailure) {
+      report.coverageComplete = false;
+      report.coverageReason = 'cache-persistence-failed';
       host.scheduleProfileScanRetryAfterRegistryHydration(target, report.coverageReason);
     }
     const unresolvedListScopeChainIds =
@@ -1406,7 +1371,7 @@ export const runMainSiteScanSpecificUserProfile = async (
       report.attemptedSlugs.every(
         (slug: string) => String(report.skippedSlugReasons[String(slug || '')] || '') === 'missing-chain-id',
       );
-    if (unresolvedListScopeChainIds) {
+    if (unresolvedListScopeChainIds && !hadPersistenceFailure) {
       const registryRecoverableFailure = !!(
         registryStatus?.timedOut ||
         registryStatus?.hadLoadErrors ||
@@ -1478,7 +1443,7 @@ export const runMainSiteScanSpecificUserProfile = async (
     mainSiteLog.log(`[DeepSearch] Completed. Triggering UI update.`, report);
 
     // Force UI update by bumping revisions ONLY if something actually changed
-    if (host._mounted) {
+    if (host._mounted && !hadPersistenceFailure) {
       host.setState((prev: MainSiteState) => ({
         sbtCacheRevision: newDataWritten ? prev.sbtCacheRevision + 1 : prev.sbtCacheRevision,
         questionResponsesNonce: newDataWritten ? prev.questionResponsesNonce + 1 : prev.questionResponsesNonce,

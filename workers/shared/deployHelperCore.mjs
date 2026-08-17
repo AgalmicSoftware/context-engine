@@ -1,4 +1,4 @@
-import rpcDefaults from '../../client/src/variables/rpcDefaults.js';
+import rpcDefaults from '../../shared/rpcDefaults.cjs';
 import {
   STORAGE_BACKENDS,
   normalizeStorageBackend,
@@ -1239,6 +1239,30 @@ const resolveDeploymentAccountId = async ({
   return lookup;
 };
 
+export const validateDeployHelperPublicConfigInputs = (body = {}) => {
+  if (body?.deploymentKind === AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND) return '';
+  const allowOriginsInput = Array.isArray(body?.allowOrigins) ? body.allowOrigins : [];
+  if (allowOriginsInput.some((origin) => toStr(origin).includes('*'))) {
+    return 'Worker CORS allowlists must contain exact origins.';
+  }
+  const customRpcUrl = toStr(body?.secrets?.customRpcUrl).trim();
+  if (!customRpcUrl) return '';
+  const workerCanonicalRequest =
+    toStr(body?.sessionModeProfile?.authority?.mode).trim().toLowerCase() === 'worker_canonical';
+  if (workerCanonicalRequest) return '';
+  const rpcUrlsByChainId = (body?.rpcUrlsByChainId && typeof body.rpcUrlsByChainId === 'object')
+    ? body.rpcUrlsByChainId
+    : {};
+  const publicRpcUrls = [
+    body?.rpcUrl,
+    ...Object.values(rpcUrlsByChainId).flatMap((value) => Array.isArray(value) ? value : [value]),
+    body?.faucet?.rpcUrl,
+  ].map((value) => toStr(value).trim()).filter(Boolean);
+  return publicRpcUrls.includes(customRpcUrl)
+    ? 'The custom RPC secret must not be duplicated into public config.'
+    : '';
+};
+
 const executeDeployHelperRequestCore = async ({
   body,
   env,
@@ -1313,6 +1337,13 @@ const executeDeployHelperRequestCore = async ({
       error: 'Missing bundleText or bundleUrl (set WORKER_BUNDLE_URL or pass bundleUrl).',
     });
   }
+
+  const allowOriginsInput = Array.isArray(body?.allowOrigins) ? body.allowOrigins : [];
+  const rpcUrl = toStr(body?.rpcUrl).trim();
+  const rpcUrlsByChainId = (body?.rpcUrlsByChainId && typeof body.rpcUrlsByChainId === 'object')
+    ? body.rpcUrlsByChainId
+    : {};
+  const faucetInput = body?.faucet && typeof body.faucet === 'object' ? body.faucet : {};
 
   const rawStorageProfile = body?.storageProfile ?? body?.storageBackend ?? null;
   const modeValidation = validateDeploymentModeValues(body);
@@ -1477,17 +1508,11 @@ const executeDeployHelperRequestCore = async ({
     });
   }
   const anticipatedWorkerUrl = `https://${workerName}.${accountSubdomain.subdomain}.workers.dev/`;
-  const rpcUrl = toStr(body?.rpcUrl).trim();
-  const rpcUrlsByChainId = (body?.rpcUrlsByChainId && typeof body.rpcUrlsByChainId === 'object')
-    ? body.rpcUrlsByChainId
-    : {};
-  const allowOriginsInput = Array.isArray(body?.allowOrigins) ? body.allowOrigins : [];
   const allowOrigins = normalizeAllowList(
     allowOriginsInput.length ? allowOriginsInput : [requestOrigin]
   );
   const limits = sanitizeWorkerConfigOpenSubtree(body?.limits || {});
   const scopes = sanitizeWorkerConfigOpenSubtree(body?.scopes || {});
-  const faucetInput = body?.faucet && typeof body.faucet === 'object' ? body.faucet : {};
   const faucet = {
     rpcUrl: toStr(faucetInput.rpcUrl).trim() || DEFAULT_FAUCET_RPC_URL,
     amountEth: toStr(faucetInput.amountEth).trim() || DEFAULT_FAUCET_AMOUNT_ETH,
@@ -2677,6 +2702,10 @@ const resolveDeploymentBundleProvenance = async ({ body = {}, env = {}, fetchImp
 };
 
 export const executeDeployHelperRequest = async (options = {}) => {
+  const publicConfigValidationError = validateDeployHelperPublicConfigInputs(options?.body);
+  if (publicConfigValidationError) {
+    return buildFailure(400, { error: publicConfigValidationError });
+  }
   const provenance = await resolveDeploymentBundleProvenance({
     body: options?.body,
     env: options?.env,

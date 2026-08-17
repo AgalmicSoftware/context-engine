@@ -1,12 +1,14 @@
+const mockMainSiteLogger = {
+  log: jest.fn(),
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  debug: jest.fn(),
+};
+
 jest.mock('utilities/logging.js', () => ({
   __esModule: true,
-  createLogger: () => ({
-    log: jest.fn(),
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    debug: jest.fn(),
-  }),
+  createLogger: () => mockMainSiteLogger,
 }));
 
 jest.mock('../web3/chainGateway.js', () => ({
@@ -586,6 +588,34 @@ describe('createSessionSurveyCacheController', () => {
       jest.runOnlyPendingTimers();
 
       expect(contractScripts.getRelevantBlockWindowForFilter.mock.calls.length).toBeGreaterThan(1);
+    });
+
+    it('observes a rejected deferred rerun and remains retryable', async () => {
+      jest.useFakeTimers();
+      const firstWindow = createDeferred();
+      const host = createMockHost();
+      const baseAtomicUpdate = host.updateSurveysCacheAtomic;
+      host.updateSurveysCacheAtomic = jest.fn((...args) => baseAtomicUpdate(...args));
+      contractScripts.getRelevantBlockWindowForFilter
+        .mockReturnValueOnce(firstWindow.promise)
+        .mockResolvedValue({ fromBlock: 4, toBlock: 4 });
+      const controller = createSessionSurveyCacheController(host);
+
+      const firstRun = controller.initializeSurveyCacheForGroup('alpha');
+      controller.initializeSurveyCacheForGroup('alpha', { background: true });
+      firstWindow.resolve({ fromBlock: 2, toBlock: 2 });
+      await firstRun;
+
+      host.updateSurveysCacheAtomic.mockRejectedValueOnce(new Error('deferred persistence failed'));
+      await jest.runOnlyPendingTimersAsync();
+      await Promise.resolve();
+
+      expect(mockMainSiteLogger.warn).toHaveBeenCalledWith(
+        'Deferred survey cache rerun failed',
+        expect.objectContaining({ slug: 'alpha', error: expect.any(Error) }),
+      );
+      expect(controller.isInitInFlight('alpha')).toBe(false);
+      await expect(controller.initializeSurveyCacheForGroup('alpha')).resolves.toBeUndefined();
     });
 
     it('initializes cache structure when no survey cache exists', async () => {

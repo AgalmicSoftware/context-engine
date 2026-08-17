@@ -21,9 +21,16 @@ type TooltipPositionStyle = React.CSSProperties & {
   '--post-viz-tooltip-x'?: string;
 };
 
-const PALETTE = ['#4dffa4', '#7aa7ff', '#ffb347', '#ff6bcb', '#d8f36a', '#9ee7ff'];
-const BINARY_DOT_COLOR = '#9ee7ff';
-const BINARY_AXIS_COLOR = '#7aa7ff';
+const PALETTE = [
+  'var(--ce-data-series-7)',
+  'var(--ce-data-series-1)',
+  'var(--ce-data-series-5)',
+  'var(--ce-data-series-3)',
+  'var(--ce-data-series-6)',
+  'var(--ce-data-series-8)',
+];
+const BINARY_DOT_COLOR = 'var(--ce-data-series-8)';
+const BINARY_AXIS_COLOR = 'var(--ce-data-series-1)';
 
 const asRecord = (value: unknown): VizRecord | null =>
   !!value && typeof value === 'object' && !Array.isArray(value) ? (value as VizRecord) : null;
@@ -260,7 +267,7 @@ const DefaultBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
                         top: `${placement.top}%`,
                         backgroundColor: point.color,
                         opacity: 0.62 + (point.confidence / 100) * 0.34,
-                        boxShadow: `0 7px 20px rgba(0, 0, 0, 0.32), 0 0 0 ${ringWidth}px rgba(255, 255, 255, ${ringOpacity})`,
+                        boxShadow: `0 7px 20px color-mix(in srgb, var(--ce-compat-dark) 32%, transparent), 0 0 0 ${ringWidth}px color-mix(in srgb, var(--ce-text-inverse) ${ringOpacity * 100}%, transparent)`,
                       }}
                       aria-label={`${point.label}: ${formatValue(point.value, suffix)}${confidenceLabel}`}
                       aria-pressed={pinnedKey === pointKey}
@@ -625,12 +632,12 @@ const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
           >
             <defs>
               <radialGradient id={sphereHighlightId} cx="30%" cy="30%" r="68%">
-                <stop offset="0%" stopColor="rgba(255, 255, 255, 0.7)" />
-                <stop offset="36%" stopColor="rgba(255, 255, 255, 0.28)" />
-                <stop offset="72%" stopColor="rgba(255, 255, 255, 0)" />
+                <stop offset="0%" stopColor="color-mix(in srgb, var(--ce-text-inverse) 70%, transparent)" />
+                <stop offset="36%" stopColor="color-mix(in srgb, var(--ce-text-inverse) 28%, transparent)" />
+                <stop offset="72%" stopColor="transparent" />
               </radialGradient>
               <filter id={sphereShadowId} x="-70%" y="-70%" width="240%" height="240%" colorInterpolationFilters="sRGB">
-                <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#000000" floodOpacity="0.34" />
+                <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="var(--ce-compat-dark)" floodOpacity="0.34" />
               </filter>
             </defs>
             {scale.ticks.map((tick) => {

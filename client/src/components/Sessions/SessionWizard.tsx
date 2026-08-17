@@ -718,12 +718,29 @@ const SessionWizard = ({
     setBundleFile,
     buildProvisionedSponsoredContextState,
   });
-  const getWorkerPublishEvidence = () =>
-    resolveSessionWizardWorkerPublishEvidence({
-      runtime: workerDeployRuntimeRef.current,
-      workerSecrets: getCurrentWorkerSecrets(),
-      defaultWorkerUrl: getSessionWizardDefaultWorkerUrl(),
-    });
+  const getWorkerPublishEvidence = () => {
+    try {
+      return resolveSessionWizardWorkerPublishEvidence({
+        runtime: workerDeployRuntimeRef.current,
+        workerSecrets: getCurrentWorkerSecrets(),
+        defaultWorkerUrl: getSessionWizardDefaultWorkerUrl(),
+      });
+    } catch {
+      // Draft edits can make a previously verified profile unreachable. Treat
+      // that as missing evidence so render stays mounted and publish's live
+      // profile validation can report the actionable failure before effects.
+      return null;
+    }
+  };
+  const sessionModeRequirements = resolveSessionWizardModeRequirements(draft.sessionModeProfile as SessionModeProfile, {
+    hasPendingSbtDrafts: hasUndeployedPendingSbtDrafts,
+  });
+  const modeFieldPolicy = useMemo(
+    () => resolveSessionWizardModeFieldPolicy(sessionModeRequirements),
+    [sessionModeRequirements],
+  );
+  const allowSessionHeaderFileUpload =
+    !sessionModeRequirements.selected || sessionModeRequirements.publish.uploadMetadata;
   const {
     sessionHeaderMode,
     setSessionHeaderMode,
@@ -740,6 +757,7 @@ const SessionWizard = ({
     handlePasteSessionHeaderFromClipboard,
     handleClearSessionHeaderPreview,
   } = useSessionHeaderPreview({
+    allowFileUpload: allowSessionHeaderFileUpload,
     draftSessionHeader: draft?.sessionHeader,
     updateDraftSessionHeader: (value) => updateDraftValue(['sessionHeader'], value),
   });
@@ -766,13 +784,6 @@ const SessionWizard = ({
     [draft?.storageProfile],
   );
   const cloudflareWorkerSbtGateMode = isWorkerSbtGateCloudflareStorageProfile(normalizedDraftStorageProfile);
-  const sessionModeRequirements = resolveSessionWizardModeRequirements(draft.sessionModeProfile as SessionModeProfile, {
-    hasPendingSbtDrafts: hasUndeployedPendingSbtDrafts,
-  });
-  const modeFieldPolicy = useMemo(
-    () => resolveSessionWizardModeFieldPolicy(sessionModeRequirements),
-    [sessionModeRequirements],
-  );
   const workerSlugAvailabilityUrl = normalizeBaseUrl(toStr(draft.corsWorkerUrl).trim());
   const checkWorkerSessionSlugExists = useCallback(
     async ({ slug }: SessionSlugExistsArgs): Promise<boolean> =>
@@ -2289,6 +2300,7 @@ const SessionWizard = ({
 
   workerDeployRuntimeRef.current = {
     account,
+    resolvedAdminAddress: toStr(resolvedWalletAccountRef.current || account).trim(),
     provider,
     network,
     loginComplete,
@@ -2303,6 +2315,7 @@ const SessionWizard = ({
     forceManualBundleFile,
     normalModeBundleUrlOverride,
     workerSecretsEnabled,
+    workerAllowOrigins,
     workerLimitPerWallet,
     embeddedDeployHelperEnabled,
     deployHelperUrl,
@@ -2392,6 +2405,7 @@ const SessionWizard = ({
   );
 
   const renderField = buildSessionWizardDraftFieldRenderer({
+    allowSessionHeaderFileUpload,
     blockLimitDuration,
     blockLimitUnit,
     compactSessionHeaderInputRef,
@@ -2488,7 +2502,7 @@ const SessionWizard = ({
   const currentWorkerSecrets = getCurrentWorkerSecrets();
   const deployRequirementsVerified = workerRequirementProof
     ? getWorkerPublishEvidence()?.verified === true
-    : !sessionModeRequirements.isWorkerCanonical;
+    : !sessionModeRequirements.usesWorkerRuntime;
   // Derive current publish authority from the selected worker, profile, provider, and secrets.
   const deployVerifiedInUi = deployIdentityVerifiedInUi && deployRequirementsVerified;
   const customWorkerSelected = normalModeRequiresCustomWorker || workerMode !== 'default';
@@ -2501,7 +2515,12 @@ const SessionWizard = ({
     ? ''
     : toStr(draft.corsWorkerUrl).trim() || visibleConfiguredWorkerUrl;
   const showSharedWorkerChoice = !normalModeRequiresCustomWorker;
-  const showWorkerUrlField = customWorkerSelected && (deployVerifiedInUi || sessionModeRequirements.isWorkerCanonical);
+  const showWorkerUrlField = customWorkerSelected && (deployVerifiedInUi || sessionModeRequirements.usesWorkerRuntime);
+  const allowNativeWorkerVerification =
+    sessionModeRequirements.selected &&
+    sessionModeRequirements.usesWorkerRuntime &&
+    !sessionModeRequirements.requiresLit &&
+    !sessionModeRequirements.usesAgentSessionWrapped;
   const { deployWorkerMatchesConfiguredUrl, usesDefaultWorkerUrl, workerUrlSource } =
     resolveSessionWizardWorkerUrlSourceState({
       defaultWorkerUrl,
@@ -2589,24 +2608,6 @@ const SessionWizard = ({
     hasSponsoredBundleLink,
     newSessionBannerDismissalContextKey,
   });
-  const normalizedAppliedSponsoredBundle = sponsoredBundlePublishAdapter.normalizeSparseSponsoredBundlePayload(
-    sponsoredBundleAppliedBundleRef.current,
-  );
-  const { newSessionRequiresLitCredential, requiredRequirementIds, showNewSessionRequirementsBanner } =
-    resolveSessionWizardNewSessionRequirementsDisplayState({
-      cloudflareWorkerSbtGateMode,
-      currentWorkerSecrets,
-      hasPendingSbtDrafts: hasUndeployedPendingSbtDrafts,
-      hasSponsoredBundleLink,
-      isNewSessionWizardRoute,
-      newSessionBannerDismissalContextKey,
-      newSessionBannerDismissedContext,
-      normalizedAppliedSponsoredBundle,
-      persistedNewSessionBannerDismissed,
-      sessionAi: draft.ai,
-      sessionModeProfile: draft.sessionModeProfile,
-      sponsoredBundleStatus,
-    });
   const publishUiPlan = resolveSessionWizardPublishReducerUiPlan({
     state: sessionPublishState,
     resolvedWorkerBaseUrl,
@@ -2626,6 +2627,30 @@ const SessionWizard = ({
     publishStepElapsedMs,
     sbtsLabel: t('sbts'),
     sessionModeProfile: draft.sessionModeProfile as SessionModeProfile,
+  });
+  const normalizedAppliedSponsoredBundle = sponsoredBundlePublishAdapter.normalizeSparseSponsoredBundlePayload(
+    sponsoredBundleAppliedBundleRef.current,
+  );
+  const {
+    newSessionRequiresLitCredential,
+    requiredAiProviderKeyLabels,
+    requiredRequirementIds,
+    showNewSessionRequirementsBanner,
+  } = resolveSessionWizardNewSessionRequirementsDisplayState({
+    canUseSponsoredAutoDeployNow,
+    cloudflareWorkerSbtGateMode,
+    currentWorkerSecrets,
+    hasCompatibleWorkerRuntime: publishUiPlan.publishReadiness.canUploadMetadataNow,
+    hasPendingSbtDrafts: hasUndeployedPendingSbtDrafts,
+    hasSponsoredBundleLink,
+    isNewSessionWizardRoute,
+    newSessionBannerDismissalContextKey,
+    newSessionBannerDismissedContext,
+    normalizedAppliedSponsoredBundle,
+    persistedNewSessionBannerDismissed,
+    sessionAi: draft.ai,
+    sessionModeProfile: draft.sessionModeProfile,
+    sponsoredBundleStatus,
   });
   const {
     publishProgressDisplayState: { publishStep },
@@ -2656,6 +2681,7 @@ const SessionWizard = ({
     canUseSponsoredAutoDeployNow,
     publishReadiness: publishUiPlan.publishReadiness,
     isWorkerCanonical: sessionModeRequirements.isWorkerCanonical,
+    usesWorkerRuntime: sessionModeRequirements.usesWorkerRuntime,
     deployPendingSbts: sessionModeRequirements.publish.deployPendingSbts,
     publishesPendingSbts: sessionModeRequirements.publish.deployPendingSbts && hasUndeployedPendingSbtDrafts,
     usesLit: sessionModeRequirements.requiresLit,
@@ -2762,6 +2788,7 @@ const SessionWizard = ({
   return (
     <SessionWizardShell
       account={account}
+      allowNativeWorkerVerification={allowNativeWorkerVerification}
       activeCreateSbtTargetGate={activeCreateSbtTargetGate}
       activeCreateSbtTargetGateId={activeCreateSbtTargetGateId}
       activeNormalModeIndex={activeNormalModeIndex}
@@ -2788,6 +2815,7 @@ const SessionWizard = ({
       deployForm={deployForm}
       deployHelperUrl={deployHelperUrl}
       deployStatusDisplayState={deployStatusDisplayState}
+      deployVerifiedInUi={deployVerifiedInUi}
       deployWorkerUrl={deployWorkerUrl}
       displayedWorkerUrl={displayedWorkerUrl}
       draft={draft}
@@ -2821,6 +2849,7 @@ const SessionWizard = ({
       newSessionFundingRequirementHref={newSessionFundingRequirementHref}
       newSessionFundingRequirementLabel={newSessionFundingRequirementLabel}
       newSessionRequiresLitCredential={newSessionRequiresLitCredential}
+      newSessionRequiredAiProviderKeyLabels={requiredAiProviderKeyLabels}
       newSessionRequiredRequirementIds={requiredRequirementIds}
       normalModeBundleHelpText={normalModeBundleHelpText}
       normalModeBundleUrl={normalModeBundleUrl}

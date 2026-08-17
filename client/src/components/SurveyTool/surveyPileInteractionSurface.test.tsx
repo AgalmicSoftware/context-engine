@@ -178,12 +178,12 @@ describe('surveyPileInteractionSurface', () => {
       transition: 'opacity 0.5s ease-in-out',
     });
     expect(resolvePileFilterButtonStyle(true)).toEqual({
-      color: '#4cd964',
-      borderColor: '#4cd964',
+      color: 'var(--ce-status-success)',
+      borderColor: 'var(--ce-status-success)',
       opacity: 0.75,
     });
     expect(resolvePileFilterButtonStyle(false)).toEqual({});
-    expect(resolvePileFilterIconStyle(true)).toEqual({ color: '#4cd964' });
+    expect(resolvePileFilterIconStyle(true)).toEqual({ color: 'var(--ce-status-success)' });
     expect(resolvePileFilterIconStyle(false)).toEqual({});
     expect(buildPileFilterButtonClassName(styles, true)).toBe(`${styles.actionButton} ${styles.actionButtonActive}`);
     expect(buildPileActionsClassName(styles, true)).toBe(`${styles.pileActions} ${styles.pileActionsMenuEligible}`);
@@ -328,7 +328,7 @@ describe('surveyPileInteractionSurface', () => {
     expect(treeHasText(tree, 'Loading session data')).toBe(false);
   });
 
-  it('renders a windowed pile deck with controls stacked under the cards', () => {
+  it('renders a pile deck with one progress counter and controls stacked under the cards', () => {
     const renderActiveQuestion = jest.fn((question: PileQuestionLike) => (
       <div data-testid={`active-${question.id}`}>{question.prompt}</div>
     ));
@@ -370,6 +370,10 @@ describe('surveyPileInteractionSurface', () => {
     expect(nodeHasClassName(controlsChildren[2], 'pileNav')).toBe(true);
     expect(findNodeByClassName(tree, 'pileActionMenuToggle')).not.toBeNull();
     expect(findNodeByClassName(tree, 'pileActionButtonGroup')).not.toBeNull();
+    expect(findNodeByClassName(tree, 'pileWindowTitlebar')).toBeNull();
+    expect(findNodeByClassName(tree, 'pileWindowClose')).toBeNull();
+    expect(treeTextIncludes(tree, 'Question 4 of 6')).toBe(false);
+    expect(treeTextIncludes(tree, '4 / 6')).toBe(true);
 
     const listeningToggle = findElement(
       tree,
@@ -380,6 +384,31 @@ describe('surveyPileInteractionSurface', () => {
     expect(nodeHasClassName(listeningToggle, 'actionButtonActive')).toBe(true);
     (listeningToggle?.props.onClick as () => void)();
     expect(toggleListeningPanel).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks every icon-only pile toolbar button as frameless across app themes', () => {
+    const tree = renderPileInteractionSurface({
+      ...buildBaseProps(),
+      pileQuestions: [{ id: 'q1', prompt: 'Q1' }],
+      showClearPendingButton: true,
+    });
+    const controlsNode = findNodeByClassName(tree, 'pileControls');
+    const isIconToolbarButton = (node: unknown): boolean =>
+      isElementNode(node) &&
+      node.type === 'button' &&
+      ['pileActionMenuToggle', 'actionButton', 'pileNavArrow', 'pileIconButton'].some((className) =>
+        nodeHasClassName(node, className),
+      );
+
+    const iconButtonCount = countElements(controlsNode, isIconToolbarButton);
+    const framelessIconButtonCount = countElements(
+      controlsNode,
+      (node) =>
+        isIconToolbarButton(node) && isElementNode(node) && node.props['data-ce-control-appearance'] === 'frameless',
+    );
+
+    expect(iconButtonCount).toBe(8);
+    expect(framelessIconButtonCount).toBe(iconButtonCount);
   });
 
   it('leaves pile actions inline when the submit rail is inactive', () => {

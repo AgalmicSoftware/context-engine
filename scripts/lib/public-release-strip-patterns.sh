@@ -153,6 +153,7 @@ scripts/audit-diff.sh
 scripts/audit-full.sh
 scripts/dependency-audit-hotspots.test.js
 tests/root/*.private.test.*
+Demo Integration Package
 whitepaper/Slides.pdf
 whitepaper/IdeasMap.md
 ai-discourse-corpus/corpuses/_*.js

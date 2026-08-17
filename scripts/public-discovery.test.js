@@ -20,6 +20,9 @@ const readmeUrl =
   'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/README.md';
 const architectureUrl =
   'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/ARCHITECTURE.md';
+const architectureOverviewUrl =
+  'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/docs/architecture-overview.md';
+const docsUrl = 'https://contextengine.sh/docs';
 const whitepaperUrl =
   'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/whitepaper/whitepaper.md';
 const discoverabilityUrl = 'https://contextengine.sh/discoverability.html';
@@ -81,14 +84,22 @@ test('discoverability assets point to the latest GitHub branch documents', () =>
   assert.match(discoverabilityHtml, toUrlMatcher(repoSourceUrl));
   assert.match(discoverabilityHtml, toUrlMatcher(readmeUrl));
   assert.match(discoverabilityHtml, toUrlMatcher(architectureUrl));
+  assert.match(discoverabilityHtml, toUrlMatcher(architectureOverviewUrl));
+  assert.match(discoverabilityHtml, toUrlMatcher(docsUrl));
   assert.match(discoverabilityHtml, toUrlMatcher(whitepaperUrl));
   assert.match(discoverabilityHtml, toUrlMatcher(llmsUrl));
   assert.match(llmsTxt, toUrlMatcher(repoUrl));
   assert.match(llmsTxt, toUrlMatcher(repoSourceUrl));
   assert.match(llmsTxt, toUrlMatcher(readmeUrl));
   assert.match(llmsTxt, toUrlMatcher(architectureUrl));
+  assert.match(llmsTxt, toUrlMatcher(architectureOverviewUrl));
   assert.match(llmsTxt, toUrlMatcher(whitepaperUrl));
+  assert.match(llmsTxt, toUrlMatcher(docsUrl));
   assert.match(llmsTxt, /Latest branch documents/);
+  assert.match(llmsTxt, /Hosted & Fast/);
+  assert.match(llmsTxt, /Trustless & Slower/);
+  assert.match(llmsTxt, /Company-Operated.*planned/);
+  assert.match(llmsTxt, /EVM and Arweave are profile-specific options, not baseline dependencies/);
 });
 
 test('sitemap only includes raw-html crawlable discovery pages', () => {

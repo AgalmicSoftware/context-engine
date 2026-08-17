@@ -5,8 +5,8 @@
   $font-weight: 700,
   $border-radius: var(--ce-radius-12),
   $letter-spacing: 0.04em,
-  $box-shadow: 0 14px 30px rgba(7, 14, 38, 0.34),
-  $hover-box-shadow: 0 18px 36px rgba(7, 14, 38, 0.4)
+  $box-shadow: var(--ce-shadow-submit),
+  $hover-box-shadow: var(--ce-shadow-submit-hover)
 ) {
   display: inline-flex;
   align-items: center;
@@ -23,10 +23,10 @@
   text-align: center;
   white-space: normal;
   text-decoration: none;
-  color: var(--ce-color-white) !important;
-  background-color: #2a63ca !important;
+  color: var(--ce-action-submit-text) !important;
+  background-color: var(--ce-action-submit) !important;
   background-image: none !important;
-  border: 1px solid #2a63ca !important;
+  border: 1px solid var(--ce-action-submit) !important;
   border-radius: $border-radius;
   box-shadow: $box-shadow;
   transition:
@@ -39,17 +39,17 @@
 
   &:hover:not(:disabled),
   &:focus:not(:disabled) {
-    background-color: var(--ce-color-indigo) !important;
-    border-color: var(--ce-color-indigo) !important;
-    color: var(--ce-color-white) !important;
+    background-color: var(--ce-action-submit-hover) !important;
+    border-color: var(--ce-action-submit-hover) !important;
+    color: var(--ce-action-submit-text) !important;
     transform: translateY(-2px);
     box-shadow: $hover-box-shadow;
   }
 
   &:disabled {
-    background-color: rgba(79, 96, 140, 0.82) !important;
-    border-color: rgba(134, 149, 189, 0.82) !important;
-    color: rgba(255, 255, 255, 0.78) !important;
+    background-color: var(--ce-action-submit-disabled-bg) !important;
+    border-color: var(--ce-action-submit-disabled-border) !important;
+    color: var(--ce-action-submit-disabled-text) !important;
     box-shadow: none;
     cursor: not-allowed;
     transform: none;

@@ -41,6 +41,59 @@
       }
     }
   },
+  "demo-2": {
+    "networkChainId": 11155420,
+    "slug": "demo-2",
+    "sessionName": "Living With Artificial Minds",
+    "sessionInfo": "Preview of a new public demo in which sixty-two historical figures deliberate how humanity should govern, work beside, and live with artificial intelligence.",
+    "sessionHeaderImg": null,
+    "corsWorkerUrl": "",
+    "defaultTags": "demo-fixture,demo-2",
+    "questionsGenPrompt": "",
+    "defaultSbtTags": "",
+    "defaultFilterState": null,
+    "defaultFeaturedSBTs": [],
+    "autoFeatureSBTsBySessionSlug": false,
+    "HIGHLIGHTED_QUESTION_IDS": [],
+    "BLOCKED_QUESTION_IDS": [],
+    "HIGHLIGHTED_SURVEY_IDS": [],
+    "BLOCKED_SURVEY_IDS": [],
+    "ignored_SBTs_LIST": [],
+    "featured_SBTs_LIST": [],
+    "contracts": {},
+    "blockLimits": {
+      "start": null,
+      "end": null
+    },
+    "demoCompatibilitySeed": {
+      "temporary": true,
+      "seededOn": "2026-08-12",
+      "sessionSlug": "demo-2",
+      "sourceSessionSlug": "demo-2",
+      "questionFixture": "client/src/variables/demo/demo_2_question_seed.json#comments",
+      "questionCount": 40,
+      "questionIdStrategy": "derive with ethers.utils.id(\"demo-2:\" + commentId); the persistent Worker seed must use the same IDs",
+      "featuredSbtCount": 0,
+      "removalNote": "Remove the temporary fixture flag after a dedicated demo-2 Worker is seeded and verified."
+    },
+    "ai": {
+      "reasoningEffort": "low",
+      "models": {
+        "fast": {
+          "model": "gpt-4o-mini",
+          "provider": "openai"
+        },
+        "thinking": {
+          "model": "gpt-4o-mini",
+          "provider": "openai"
+        },
+        "transcription": {
+          "provider": "openai",
+          "model": "whisper-1"
+        }
+      }
+    }
+  },
   "demo-sh": {
     "networkChainId": 11155420,
     "slug": "demo-sh",
@@ -158,7 +211,9 @@
         "fetch"
       ],
       "anonymousScopes": [
-        "storage"
+        "storage",
+        "ai",
+        "transcribe"
       ]
     },
     "demoCompatibilitySeed": {

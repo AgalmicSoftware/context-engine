@@ -56,10 +56,9 @@ var __privateWrapper = (obj, member, setter, getter) => ({
   }
 });
 
-// client/src/variables/rpcDefaults.js
+// shared/rpcDefaults.cjs
 var require_rpcDefaults = __commonJS({
-  "client/src/variables/rpcDefaults.js"(exports, module) {
-    "use strict";
+  "shared/rpcDefaults.cjs"(exports, module) {
     var toStr21 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
     var normalizeUrl = (value) => toStr21(value).trim();
     var freezeUrlList = (value) => Object.freeze((Array.isArray(value) ? value : [value]).map((entry) => normalizeUrl(entry)).filter(Boolean));
@@ -55334,6 +55333,7 @@ var createGroupProofAddressHashHelpersWithWorkerDeps = ({
 
 // workers/sessionCorsWorker/outboundUrlSafetyBinding.js
 var toStr5 = (value, deps) => typeof deps?.toStr === "function" ? deps.toStr(value) : typeof value === "string" ? value : value == null ? "" : String(value);
+var STRICT_HTTPS_NO_CREDENTIALS_POLICY = "strict-https-no-credentials";
 var normalizeOutboundHostname = (value, deps) => toStr5(value, deps).trim().toLowerCase().replace(/\.+$/, "");
 var stripIpv6HostnameDecorators = (value, deps) => normalizeOutboundHostname(value, deps).replace(/^\[/, "").replace(/\]$/, "").split("%")[0];
 var parseIpv4Octets = (value, deps) => {
@@ -55443,6 +55443,16 @@ var createOutboundUrlSafetyHelpersWithWorkerDeps = ({
     if (hostname === "metadata.google.internal") return true;
     return false;
   };
+  const isBlockedByPolicy = (urlString, policy) => {
+    if (isBlockedOutboundUrl(urlString)) return true;
+    if (policy !== STRICT_HTTPS_NO_CREDENTIALS_POLICY) return false;
+    try {
+      const parsed = new URLWithCtor(urlString);
+      return parsed.protocol !== "https:" || !!parsed.username || !!parsed.password;
+    } catch {
+      return true;
+    }
+  };
   const buildSafeRedirectHeaders = (headersInit) => {
     const safeHeaders = new HeadersCtor();
     if (!headersInit) return safeHeaders;
@@ -55454,7 +55464,11 @@ var createOutboundUrlSafetyHelpersWithWorkerDeps = ({
     return safeHeaders;
   };
   const safeFetch = async (url, options = {}) => {
-    const requestOptions = { ...options, redirect: "manual" };
+    const { outboundUrlPolicy = "", ...fetchOptions } = options;
+    if (isBlockedByPolicy(url, outboundUrlPolicy)) {
+      return { ok: false, error: "Outbound target is not allowed", status: 403 };
+    }
+    const requestOptions = { ...fetchOptions, redirect: "manual" };
     const r = await fetchImpl(url, requestOptions);
     if (r.status < 300 || r.status >= 400) return r;
     const location2 = toStr5(r.headers.get("location"), deps).trim();
@@ -55466,7 +55480,7 @@ var createOutboundUrlSafetyHelpersWithWorkerDeps = ({
         redirectUrl = "";
       }
     }
-    if (!redirectUrl || isBlockedOutboundUrl(redirectUrl)) {
+    if (!redirectUrl || isBlockedByPolicy(redirectUrl, outboundUrlPolicy)) {
       return { ok: false, error: "Redirect to blocked target", status: 403 };
     }
     const redirectOptions = {
@@ -58962,6 +58976,24 @@ var resolveDeploymentAccountId = async ({
   }
   return lookup;
 };
+var validateDeployHelperPublicConfigInputs = (body = {}) => {
+  if (body?.deploymentKind === AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND) return "";
+  const allowOriginsInput = Array.isArray(body?.allowOrigins) ? body.allowOrigins : [];
+  if (allowOriginsInput.some((origin) => toStr13(origin).includes("*"))) {
+    return "Worker CORS allowlists must contain exact origins.";
+  }
+  const customRpcUrl = toStr13(body?.secrets?.customRpcUrl).trim();
+  if (!customRpcUrl) return "";
+  const workerCanonicalRequest = toStr13(body?.sessionModeProfile?.authority?.mode).trim().toLowerCase() === "worker_canonical";
+  if (workerCanonicalRequest) return "";
+  const rpcUrlsByChainId = body?.rpcUrlsByChainId && typeof body.rpcUrlsByChainId === "object" ? body.rpcUrlsByChainId : {};
+  const publicRpcUrls = [
+    body?.rpcUrl,
+    ...Object.values(rpcUrlsByChainId).flatMap((value) => Array.isArray(value) ? value : [value]),
+    body?.faucet?.rpcUrl
+  ].map((value) => toStr13(value).trim()).filter(Boolean);
+  return publicRpcUrls.includes(customRpcUrl) ? "The custom RPC secret must not be duplicated into public config." : "";
+};
 var executeDeployHelperRequestCore = async ({
   body,
   env,
@@ -59030,6 +59062,10 @@ var executeDeployHelperRequestCore = async ({
       error: "Missing bundleText or bundleUrl (set WORKER_BUNDLE_URL or pass bundleUrl)."
     });
   }
+  const allowOriginsInput = Array.isArray(body?.allowOrigins) ? body.allowOrigins : [];
+  const rpcUrl = toStr13(body?.rpcUrl).trim();
+  const rpcUrlsByChainId = body?.rpcUrlsByChainId && typeof body.rpcUrlsByChainId === "object" ? body.rpcUrlsByChainId : {};
+  const faucetInput = body?.faucet && typeof body.faucet === "object" ? body.faucet : {};
   const rawStorageProfile = body?.storageProfile ?? body?.storageBackend ?? null;
   const modeValidation = validateDeploymentModeValues(body);
   if (!modeValidation.ok) {
@@ -59165,15 +59201,11 @@ var executeDeployHelperRequestCore = async ({
     });
   }
   const anticipatedWorkerUrl = `https://${workerName}.${accountSubdomain.subdomain}.workers.dev/`;
-  const rpcUrl = toStr13(body?.rpcUrl).trim();
-  const rpcUrlsByChainId = body?.rpcUrlsByChainId && typeof body.rpcUrlsByChainId === "object" ? body.rpcUrlsByChainId : {};
-  const allowOriginsInput = Array.isArray(body?.allowOrigins) ? body.allowOrigins : [];
   const allowOrigins = normalizeAllowList(
     allowOriginsInput.length ? allowOriginsInput : [requestOrigin]
   );
   const limits = sanitizeWorkerConfigOpenSubtree(body?.limits || {});
   const scopes = sanitizeWorkerConfigOpenSubtree(body?.scopes || {});
-  const faucetInput = body?.faucet && typeof body.faucet === "object" ? body.faucet : {};
   const faucet2 = {
     rpcUrl: toStr13(faucetInput.rpcUrl).trim() || DEFAULT_FAUCET_RPC_URL,
     amountEth: toStr13(faucetInput.amountEth).trim() || DEFAULT_FAUCET_AMOUNT_ETH,
@@ -60153,6 +60185,10 @@ var resolveDeploymentBundleProvenance = async ({ body = {}, env = {}, fetchImpl 
   return { ok: true, body: resolvedBody };
 };
 var executeDeployHelperRequest = async (options = {}) => {
+  const publicConfigValidationError = validateDeployHelperPublicConfigInputs(options?.body);
+  if (publicConfigValidationError) {
+    return buildFailure(400, { error: publicConfigValidationError });
+  }
   const provenance = await resolveDeploymentBundleProvenance({
     body: options?.body,
     env: options?.env,
@@ -60445,6 +60481,17 @@ var executeDeployHelperRequest = async (options = {}) => {
   return safeResult;
 };
 
+// workers/shared/sessionColorSchemeConfig.mjs
+var WORKER_SESSION_COLOR_SCHEME_IDS = Object.freeze(["context-engine", "ocean", "amber"]);
+var ALLOWED_IDS = new Set(WORKER_SESSION_COLOR_SCHEME_IDS);
+var isRecord2 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var normalizeWorkerSessionAppearance = (value) => {
+  if (!isRecord2(value) || Object.keys(value).length !== 1 || !Object.hasOwn(value, "colorSchemeId")) return null;
+  if (typeof value.colorSchemeId !== "string") return null;
+  const colorSchemeId = value.colorSchemeId.trim().toLowerCase();
+  return ALLOWED_IDS.has(colorSchemeId) ? { colorSchemeId } : null;
+};
+
 // workers/sessionCorsWorker/sessionConfigNormalization.js
 var toStr14 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
 var isObj5 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
@@ -60513,6 +60560,12 @@ var normalizeWorkerConfigRecord = (raw, { slug } = {}) => {
   if (hasOwn2(normalized, "rpcUrlsByChainId")) {
     normalized.rpcUrlsByChainId = normalizeWorkerRpcUrlsByChainId(normalized.rpcUrlsByChainId);
   }
+  if (hasOwn2(normalized, "appearance")) {
+    const appearance = normalizeWorkerSessionAppearance(normalized.appearance);
+    if (appearance) normalized.appearance = appearance;
+    else delete normalized.appearance;
+  }
+  delete normalized.theme;
   const embeddedDeployHelperEnabledRaw = hasOwn2(normalized, "embeddedDeployHelperEnabled") ? normalized.embeddedDeployHelperEnabled : hasOwn2(normalized, "deployHelperEnabled") ? normalized.deployHelperEnabled : void 0;
   if (embeddedDeployHelperEnabledRaw !== void 0) {
     const embeddedDeployHelperEnabled = normalizeEmbeddedDeployHelperEnabled2(embeddedDeployHelperEnabledRaw);
@@ -60597,6 +60650,7 @@ var selectResourceGateKeysForScopes = (resourceKeys, requestedScopes) => {
 // workers/sessionCorsWorker/sessionConfigMutation.js
 var WORKER_CANONICAL_PUBLICATION_REVISION_KEY = "workerCanonicalPublicationRevision";
 var WORKER_GROUPS_BOOTSTRAP_KEY = "workerGroupsBootstrap";
+var REGISTRY_CANONICAL_AUTHORITY_MODES = /* @__PURE__ */ new Set(["evm_registry_canonical", "registry_canonical"]);
 var WORKER_CANONICAL_SET_CONFIG_KEYS = /* @__PURE__ */ new Set([
   "slug",
   "sessionId",
@@ -60604,6 +60658,7 @@ var WORKER_CANONICAL_SET_CONFIG_KEYS = /* @__PURE__ */ new Set([
   "configRevision",
   "sessionName",
   "sessionInfo",
+  "appearance",
   "sessionHeaderImg",
   "sessionEndsAt",
   "defaultTags",
@@ -60638,6 +60693,8 @@ var WORKER_CANONICAL_SET_CONFIG_KEYS = /* @__PURE__ */ new Set([
 var toTrimmedString6 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
 var hasOwn3 = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
 var validGroupCreationPolicy = (config) => !hasOwn3(config, "groupCreationPolicy") || config?.groupCreationPolicy === "admin_only" || config?.groupCreationPolicy === "participants";
+var validAllowOrigins = (config) => !hasOwn3(config, "allowOrigins") || !Array.isArray(config?.allowOrigins) || config.allowOrigins.every((origin) => typeof origin !== "string" || !origin.includes("*"));
+var validAppearanceConfig = (config) => !hasOwn3(config, "appearance") || normalizeWorkerSessionAppearance(config.appearance) !== null;
 var getWorkerAuthorityMode = (config) => toTrimmedString6(
   config?.sessionModeProfile?.authority?.mode
 ).toLowerCase();
@@ -60707,10 +60764,11 @@ var resolveCanonicalSessionIdentity = (config) => {
     value: uniqueValues.size === 1 ? [...uniqueValues][0] : ""
   };
 };
-var resolveCanonicalWorkerSessionIdHex = (config) => {
+var resolveSessionConfigSessionIdHex = (config) => {
   const identity = resolveCanonicalSessionIdentity(config);
   return !identity.invalid && identity.value ? `0x${identity.value}` : "";
 };
+var resolveCanonicalWorkerSessionIdHex = resolveSessionConfigSessionIdHex;
 var normalizeConfigRevision = (value) => {
   if (typeof value !== "string" || value !== value.trim()) return "";
   return /^[a-z0-9._:-]{1,128}$/i.test(value) ? value : "";
@@ -60726,6 +60784,13 @@ var changesInitializedWorkerCanonicalIdentity = ({ existingConfig, mergedConfig 
     const existingValue = toTrimmedString6(existingConfig?.[key]);
     return !!existingValue && toTrimmedString6(mergedConfig?.[key]) !== existingValue;
   });
+};
+var changesInitializedRegistryCanonicalIdentity = ({ existingConfig, mergedConfig } = {}) => {
+  if (!REGISTRY_CANONICAL_AUTHORITY_MODES.has(getWorkerAuthorityMode(existingConfig))) return false;
+  const existingSessionIdentity = resolveCanonicalSessionIdentity(existingConfig);
+  const mergedSessionIdentity = resolveCanonicalSessionIdentity(mergedConfig);
+  if (existingSessionIdentity.invalid || mergedSessionIdentity.invalid) return true;
+  return !!existingSessionIdentity.value && mergedSessionIdentity.value !== existingSessionIdentity.value;
 };
 var resolveWorkerCanonicalPublicationWrite = ({
   existingConfig,
@@ -60790,8 +60855,14 @@ var applySessionConfigMutation = ({ existingConfig, mutation, slug } = {}) => {
     if (findForbiddenWorkerConfigSecretPath(incomingConfig)) {
       return { ok: false, status: 400, error: "Secret-like values are not allowed in public session config fields." };
     }
+    if (!validAllowOrigins(incomingConfig)) {
+      return { ok: false, status: 400, error: "Worker CORS allowlists must contain exact origins." };
+    }
     if (!validGroupCreationPolicy(incomingConfig)) {
       return { ok: false, status: 400, error: "Invalid group creation policy." };
+    }
+    if (!validAppearanceConfig(incomingConfig)) {
+      return { ok: false, status: 400, error: "Invalid session appearance config." };
     }
     const incomingModeValidation = validateWorkerConfigModeValues(incomingConfig, {
       allowPartialProfileStorage: true
@@ -60828,8 +60899,14 @@ var applySessionConfigMutation = ({ existingConfig, mutation, slug } = {}) => {
   if (findForbiddenWorkerConfigSecretPath(mergedConfig)) {
     return { ok: false, status: 400, error: "Secret-like values are not allowed in public session config fields." };
   }
+  if (!validAllowOrigins(mergedConfig)) {
+    return { ok: false, status: 400, error: "Worker CORS allowlists must contain exact origins." };
+  }
   if (!validGroupCreationPolicy(mergedConfig)) {
     return { ok: false, status: 400, error: "Invalid group creation policy." };
+  }
+  if (!validAppearanceConfig(mergedConfig)) {
+    return { ok: false, status: 400, error: "Invalid session appearance config." };
   }
   const mergedModeValidation = validateWorkerConfigModeValues(mergedConfig);
   if (!mergedModeValidation.ok) {
@@ -60851,6 +60928,13 @@ var applySessionConfigMutation = ({ existingConfig, mutation, slug } = {}) => {
       ok: false,
       status: 409,
       error: "Worker-canonical session identity cannot be changed after initialization."
+    };
+  }
+  if (changesInitializedRegistryCanonicalIdentity({ existingConfig: authorityExisting, mergedConfig })) {
+    return {
+      ok: false,
+      status: 409,
+      error: "Registry-canonical session identity cannot be changed after initialization."
     };
   }
   const publicationWrite = resolveWorkerCanonicalPublicationWrite({
@@ -60918,6 +61002,7 @@ var normalizeWorkerGroupId = (value) => {
   if (!/^[a-z0-9][a-z0-9._-]*$/.test(normalized)) return "";
   return normalized;
 };
+var isAddressShapedWorkerGroupId = (value) => /^0x[0-9a-f]{40}$/i.test(trim2(value));
 var encodedPrincipalKeyPart = (value) => btoa(trim2(value || "id")).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "") || "id";
 var canonicalSessionIdKeyPart = (value) => {
   const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: value });
@@ -61851,7 +61936,6 @@ var redactGroupForMember = (group) => ({
   createdAt: group.createdAt,
   updatedAt: group.updatedAt
 });
-var isDefinitiveWorkerGroupMembershipMiss = (result) => Number(result?.status) === 403 && result?.reason === "worker_group_membership_denied" || Number(result?.status) === 404 && result?.reason === "worker_group_not_found";
 var normalizeWorkerGroupMembershipFailure = (result) => ({
   ...result && typeof result === "object" ? result : {},
   ok: false,
@@ -61866,6 +61950,10 @@ var createWorkerGroup = async ({ env, slug, sessionId, input, actorPrincipal, ca
   if (!canonicalSlug || !canonicalSessionId) {
     return { ok: false, status: 400, reason: "worker_group_session_identity_invalid" };
   }
+  const requestedGroupId = trim2(input?.groupId);
+  if (requestedGroupId && isAddressShapedWorkerGroupId(requestedGroupId)) {
+    return { ok: false, status: 400, reason: "invalid_worker_group_id" };
+  }
   if (!capacityAuthorized) {
     const caps = resolveWorkerGroupCaps(env);
     const existingGroups = await listGroupRecords({
@@ -61879,7 +61967,6 @@ var createWorkerGroup = async ({ env, slug, sessionId, input, actorPrincipal, ca
   }
   const normalized = normalizeGroupPatch({ input, actorPrincipal, deps });
   if (!normalized.ok) return normalized;
-  const requestedGroupId = trim2(input?.groupId);
   const groupId = requestedGroupId ? normalizeWorkerGroupId(requestedGroupId) : createWorkerGroupId(deps);
   if (!groupId) return { ok: false, status: 400, reason: "invalid_worker_group_id" };
   const existing = await readGroupRecord({
@@ -62028,10 +62115,19 @@ var removeWorkerGroupMember = async ({ env, slug, sessionId, groupId, principal,
     ok: true,
     store: store.kind,
     groupId: normalizeWorkerGroupId(groupId),
+    group: redactGroupForMember(group),
     principal: normalized.principal
   };
 };
-var listWorkerGroups = async ({ env, slug, sessionId, actorPrincipalResult, admin = false, expectedGroupCount } = {}) => {
+var listWorkerGroups = async ({
+  env,
+  slug,
+  sessionId,
+  actorPrincipalResult,
+  admin = false,
+  includeMemberCount = false,
+  expectedGroupCount
+} = {}) => {
   const store = resolveWorkerGroupStore(env);
   if (!store) return { ok: false, status: 501, reason: "worker_group_store_not_configured" };
   const authoritativeGroupCount = Number(expectedGroupCount);
@@ -62087,13 +62183,12 @@ var listWorkerGroups = async ({ env, slug, sessionId, actorPrincipalResult, admi
       joinMode: authority.joinMode,
       memberVisibility: authority.memberVisibility
     };
-    if (admin || authority.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION) {
-      visible.push(redactGroupForMember(authoritativeGroup));
-      continue;
-    }
-    if (authority.isMember && authority.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.MEMBERS) {
-      visible.push(redactGroupForMember(authoritativeGroup));
-    }
+    const mayViewGroup = admin || authority.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION || authority.isMember && authority.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.MEMBERS;
+    if (!mayViewGroup) continue;
+    visible.push({
+      ...redactGroupForMember(authoritativeGroup),
+      ...includeMemberCount ? { memberCount: authority.memberCount } : {}
+    });
   }
   return { ok: true, store: store.kind, groups: visible };
 };
@@ -62203,41 +62298,58 @@ var listWorkerGroupMemberships = async ({ env, slug, sessionId, principal, deps 
   if (!store) return { ok: false, status: 501, reason: "worker_group_store_not_configured" };
   const normalized = normalizeWorkerGroupPrincipal(principal, deps);
   if (!normalized.ok) return { ok: false, status: 400, reason: normalized.reason };
-  const rows = await listMembershipRecords({
-    store,
+  const authority = await (deps.readCoordinatedWorkerGroupMemberships || readCoordinatedWorkerGroupMemberships)({
+    env,
     slug,
     sessionId,
-    principalKey: normalized.key
+    principal: normalized.principal
   });
+  if (!authority.ok) return normalizeWorkerGroupMembershipFailure(authority);
+  if (!Array.isArray(authority.groups)) return normalizeWorkerGroupMembershipFailure();
   const memberships = [];
-  for (const row of rows) {
-    const authoritativeMembership = await isWorkerGroupMember({
-      env,
-      slug,
-      sessionId,
-      groupId: row.groupId,
-      principal: normalized.principal
-    });
-    if (!authoritativeMembership.ok) {
-      if (isDefinitiveWorkerGroupMembershipMiss(authoritativeMembership)) continue;
-      return normalizeWorkerGroupMembershipFailure(authoritativeMembership);
-    }
-    const authoritativeGroup = authoritativeMembership.group;
+  const seenGroupIds = /* @__PURE__ */ new Set();
+  for (const authoritativeGroup of authority.groups) {
+    const authoritativeGroupId = normalizeWorkerGroupId(authoritativeGroup?.groupId);
     const authoritativeJoinMode = trim2(authoritativeGroup?.joinMode).toLowerCase();
     const authoritativeVisibility = trim2(authoritativeGroup?.memberVisibility).toLowerCase();
     const authoritativeMemberCount = Number(authoritativeGroup?.memberCount);
-    if (normalizeWorkerGroupId(authoritativeGroup?.groupId) !== normalizeWorkerGroupId(row.groupId) || !IMPLEMENTED_JOIN_MODES.has(authoritativeJoinMode) || !Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(authoritativeVisibility) || !Number.isSafeInteger(authoritativeMemberCount) || authoritativeMemberCount < 0) {
+    if (!authoritativeGroupId || seenGroupIds.has(authoritativeGroupId) || !IMPLEMENTED_JOIN_MODES.has(authoritativeJoinMode) || !Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(authoritativeVisibility) || !Number.isSafeInteger(authoritativeMemberCount) || authoritativeMemberCount < 0) {
       return normalizeWorkerGroupMembershipFailure();
     }
-    const group = await readGroupRecord({ store, slug, sessionId, groupId: row.groupId });
-    if (!group || group.deletedAt) continue;
+    seenGroupIds.add(authoritativeGroupId);
+    const group = await readGroupRecord({ store, slug, sessionId, groupId: authoritativeGroupId });
+    const member = await readMembershipRecord({
+      store,
+      slug,
+      sessionId,
+      groupId: authoritativeGroupId,
+      principalKey: normalized.key
+    });
+    if (!group || group.deletedAt || !member || member.removedAt) {
+      return normalizeWorkerGroupMembershipFailure({
+        status: 503,
+        reason: "worker_group_projection_unavailable"
+      });
+    }
+    try {
+      const canonicalIndexKey = memberIndexKey({
+        slug,
+        sessionId,
+        principalKey: normalized.key,
+        groupId: authoritativeGroupId
+      });
+      if (await store.store.get(canonicalIndexKey) !== authoritativeGroupId) {
+        await store.store.put(canonicalIndexKey, authoritativeGroupId);
+      }
+    } catch {
+    }
     memberships.push({
       group: redactGroupForMember({
         ...group,
         joinMode: authoritativeJoinMode,
         memberVisibility: authoritativeVisibility
       }),
-      member: row,
+      member,
       memberCount: authoritativeMemberCount
     });
   }
@@ -62386,6 +62498,13 @@ var readCoordinatedWorkerGroupCatalog = async ({ env, slug, sessionId, groupIds,
     ...principal ? { principal } : {}
   }
 });
+var readCoordinatedWorkerGroupMemberships = async ({ env, slug, sessionId, principal } = {}) => callWorkerGroupCoordinator({
+  env,
+  slug,
+  sessionId,
+  path: "/worker-groups/memberships",
+  payload: { principal }
+});
 var isWorkerGroupMember = async ({ env, slug, sessionId, groupId, principal, requesterAddress, authScopes, deps = {} } = {}) => {
   const normalized = principal ? normalizeWorkerGroupPrincipal(principal, deps) : resolveWorkerGroupPrincipal({ requesterAddress, authScopes, deps });
   const normalizedGroupId = normalizeWorkerGroupId(groupId);
@@ -62501,6 +62620,7 @@ var dispatchPublicWorkerGroupListRequest = async ({ request, config, env, slug, 
       slug,
       sessionId: sessionIdentity.sessionId,
       admin: false,
+      includeMemberCount: false,
       expectedGroupCount: ready.meta?.groupCount
     });
   } catch {
@@ -62666,6 +62786,7 @@ var dispatchAdminWorkerGroupRequest = async ({ action, body, config, env, slug, 
         sessionId: sessionIdentity.sessionId,
         actorPrincipalResult: actor,
         admin: true,
+        includeMemberCount: true,
         expectedGroupCount: ready.meta?.groupCount
       });
     } catch {
@@ -62858,6 +62979,7 @@ var workerGroupsRoute = async ({
         sessionId: sessionIdentity.sessionId,
         actorPrincipalResult: actor,
         admin: false,
+        includeMemberCount: true,
         expectedGroupCount: ready.meta?.groupCount
       });
     } catch {
@@ -62916,6 +63038,9 @@ var workerGroupsRoute = async ({
       actorPrincipal: actor.principal
     });
     if (!result.ok) return routeError(deps, result, baseHeaders);
+    if (!Number.isSafeInteger(result.memberCount) || result.memberCount < 0) {
+      return routeError(deps, { status: 503, reason: "worker_group_projection_unavailable" }, baseHeaders);
+    }
     return jsonResponse(
       deps,
       {
@@ -62923,7 +63048,8 @@ var workerGroupsRoute = async ({
         ...sessionIdentity,
         store: result.store,
         group: result.group,
-        member: result.member
+        member: result.member,
+        memberCount: result.memberCount
       },
       200,
       baseHeaders
@@ -62943,6 +63069,10 @@ var workerGroupsRoute = async ({
       actorPrincipal: actor.principal
     });
     if (!result.ok) return routeError(deps, result, baseHeaders);
+    if (!Number.isSafeInteger(result.memberCount) || result.memberCount < 0) {
+      return routeError(deps, { status: 503, reason: "worker_group_projection_unavailable" }, baseHeaders);
+    }
+    const retainGroup = result.group?.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION;
     return jsonResponse(
       deps,
       {
@@ -62950,7 +63080,8 @@ var workerGroupsRoute = async ({
         ...sessionIdentity,
         store: result.store,
         groupId: result.groupId,
-        principal: result.principal
+        principal: result.principal,
+        ...retainGroup ? { group: result.group, memberCount: result.memberCount } : {}
       },
       200,
       baseHeaders
@@ -63116,7 +63247,7 @@ var evaluateAnonymousRouteAccess = async ({
     return result.ok ? result : {
       ...result,
       status: 403,
-      error: anonymousRouteDeniedError
+      error: `Anonymous access denied: ${scopeKey} is not enabled in workerAuthority.anonymousScopes.`
     };
   }
   if (requestApiKey) {
@@ -65137,7 +65268,14 @@ var SessionWriteCoordinator = class {
         active: false,
         joinMode: "admin_add"
       });
-      return { ok: true };
+      return { ok: true, prior: state };
+    });
+  }
+  async rollbackWorkerGroupDelete({ groupId, prior }) {
+    await this.state.storage.transaction(async (transaction) => {
+      const key = workerGroupCapacityGroupKey(groupId);
+      const state = await transaction.get(key);
+      if (state?.phase === "deleting") await transaction.put(key, prior);
     });
   }
   async reserveWorkerGroupMemberSlot({
@@ -65237,6 +65375,16 @@ var SessionWriteCoordinator = class {
         state: "removing"
       });
       return { ok: true, memberKey: memberKey2 };
+    });
+  }
+  async rollbackWorkerGroupMemberRemoval({ memberKey: memberKey2 }) {
+    await this.state.storage.transaction(async (transaction) => {
+      const memberState = await transaction.get(memberKey2);
+      if (memberState?.state !== "removing") return;
+      await transaction.put(memberKey2, {
+        version: 2,
+        state: "active"
+      });
     });
   }
   async releaseWorkerGroupMemberSlot({ groupId, memberKey: memberKey2 }) {
@@ -65400,8 +65548,71 @@ var SessionWriteCoordinator = class {
       }, 200);
     });
   }
+  executeWorkerGroupMemberships(payload) {
+    return this.serializeWorkerGroupOperation(async () => {
+      const slug = normalizeSessionSlug(payload?.slug);
+      const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
+      const principal = normalizeWorkerGroupPrincipal(payload?.principal);
+      if (!slug || !sessionId || !principal.ok) {
+        return jsonResponse2({ ok: false, status: 400, reason: "worker_group_memberships_invalid" }, 400);
+      }
+      const initialized = await this.initializeWorkerGroupCapacity(slug, sessionId);
+      if (!initialized.ok) return jsonResponse2(initialized, initialized.status || 503);
+      const entries = await this.state.storage.list({ prefix: WORKER_GROUP_CAPACITY_GROUP_PREFIX });
+      if (!(entries instanceof Map)) {
+        return jsonResponse2({ ok: false, status: 503, reason: "worker_group_capacity_state_unavailable" }, 503);
+      }
+      const activeGroups = [];
+      for (const [key, state] of entries) {
+        const encodedGroupId = String(key).slice(WORKER_GROUP_CAPACITY_GROUP_PREFIX.length);
+        let groupId = "";
+        try {
+          groupId = normalizeWorkerGroupId(decodeURIComponent(encodedGroupId));
+        } catch {
+          groupId = "";
+        }
+        if (!groupId || workerGroupCapacityGroupKey(groupId) !== key) {
+          return jsonResponse2({ ok: false, status: 503, reason: "worker_group_capacity_state_unavailable" }, 503);
+        }
+        if (state?.version === 2 && state.phase === "active" && state.active === true) {
+          activeGroups.push({ groupId, state });
+        }
+      }
+      if (activeGroups.length !== Number(initialized.meta?.groupCount)) {
+        return jsonResponse2({ ok: false, status: 503, reason: "worker_group_capacity_state_unavailable" }, 503);
+      }
+      const principalDigest = await sha256Hex2(`worker-group-member:${principal.key}`);
+      const groups = [];
+      for (const { groupId, state } of activeGroups.sort((left, right) => left.groupId.localeCompare(right.groupId))) {
+        const memberKey2 = workerGroupCapacityMemberKey({
+          groupId,
+          generation: Math.max(1, Number(state.generation || 0)),
+          principalDigest
+        });
+        const member = await this.state.storage.get(memberKey2);
+        if (member?.state !== "active") continue;
+        const memberCount = Number(state.memberCount);
+        if (!Number.isSafeInteger(memberCount) || memberCount < 0) {
+          return jsonResponse2({ ok: false, status: 503, reason: "worker_group_capacity_state_unavailable" }, 503);
+        }
+        groups.push({
+          groupId,
+          joinMode: state.joinMode,
+          memberVisibility: state.memberVisibility,
+          memberCount
+        });
+      }
+      return jsonResponse2(
+        { ok: true, status: 200, store: "durable_object", principal: principal.principal, groups },
+        200
+      );
+    });
+  }
   async executeWorkerGroupMutation(payload) {
     return this.serializeWorkerGroupOperation(async () => {
+      if (toTrimmedString9(payload?.operation).toLowerCase() === "create" && isAddressShapedWorkerGroupId(payload?.input?.groupId)) {
+        return jsonResponse2({ ok: false, status: 400, reason: "invalid_worker_group_id" }, 400);
+      }
       const mutation = normalizeWorkerGroupMutation(payload);
       if (!mutation) {
         return jsonResponse2({
@@ -65418,6 +65629,7 @@ var SessionWriteCoordinator = class {
       let groupReservation = null;
       let memberReservation = null;
       let updateReservation = null;
+      let deleteReservation = null;
       let removalReservation = null;
       let principalDigest = "";
       let activeGroup = null;
@@ -65469,8 +65681,8 @@ var SessionWriteCoordinator = class {
             return jsonResponse2(updateReservation, updateReservation.status || 404);
           }
         } else if (mutation.operation === "delete") {
-          const deleting = await this.beginWorkerGroupDelete(mutation.groupId);
-          if (!deleting.ok) return jsonResponse2(deleting, deleting.status || 404);
+          deleteReservation = await this.beginWorkerGroupDelete(mutation.groupId);
+          if (!deleteReservation.ok) return jsonResponse2(deleteReservation, deleteReservation.status || 404);
         }
       }
       if (mutation.operation === "add-member" || mutation.operation === "join") {
@@ -65537,10 +65749,21 @@ var SessionWriteCoordinator = class {
             prior: updateReservation.prior
           });
         }
+        if (deleteReservation?.ok) {
+          await this.rollbackWorkerGroupDelete({
+            groupId: mutation.groupId,
+            prior: deleteReservation.prior
+          });
+        }
         if (memberReservation?.reserved) {
           await this.rollbackWorkerGroupMemberSlot({
             groupId: mutation.groupId,
             memberKey: memberReservation.memberKey
+          });
+        }
+        if (removalReservation?.ok) {
+          await this.rollbackWorkerGroupMemberRemoval({
+            memberKey: removalReservation.memberKey
           });
         }
         return jsonResponse2(result, result.status || 400);
@@ -65567,6 +65790,23 @@ var SessionWriteCoordinator = class {
           sessionId: mutation.sessionId,
           groupId: mutation.groupId
         });
+      }
+      if (mutation.operation === "add-member" || mutation.operation === "join" || mutation.operation === "remove-member") {
+        const postMutationGroup = await this.getActiveWorkerGroupCapacity(mutation.groupId);
+        const memberCount = Number(postMutationGroup?.state?.memberCount);
+        if (!postMutationGroup.ok || !Number.isSafeInteger(memberCount) || memberCount < 0) {
+          return jsonResponse2({ ok: false, status: 503, reason: "worker_group_capacity_state_unavailable" }, 503);
+        }
+        result = {
+          ...result,
+          group: {
+            ...result.group || {},
+            groupId: mutation.groupId,
+            joinMode: postMutationGroup.state.joinMode,
+            memberVisibility: postMutationGroup.state.memberVisibility
+          },
+          memberCount
+        };
       }
       return jsonResponse2(result, 200);
     });
@@ -66114,6 +66354,9 @@ var SessionWriteCoordinator = class {
     if (url.pathname === "/worker-groups/catalog") {
       return this.executeWorkerGroupCatalog(payload);
     }
+    if (url.pathname === "/worker-groups/memberships") {
+      return this.executeWorkerGroupMemberships(payload);
+    }
     if (url.pathname === "/worker-groups/mutate") {
       return this.executeWorkerGroupMutation(payload);
     }
@@ -66588,9 +66831,18 @@ var validateBootstrapAdmin = async ({
     return false;
   }
   try {
+    const incomingConfig2 = body?.config && typeof body.config === "object" ? body.config : {};
+    const hasIncomingSessionId = ["sessionId", "sessionIdHex"].some(
+      (key) => Object.prototype.hasOwnProperty.call(incomingConfig2, key) && deps?.toStr?.(incomingConfig2[key]).trim()
+    );
+    if (hasIncomingSessionId) {
+      const requestedSessionId = resolveSessionConfigSessionIdHex(incomingConfig2);
+      const onChainSessionId = resolveSessionConfigSessionIdHex({ sessionId: tupleRead?.tuple?.[7] });
+      if (!requestedSessionId || requestedSessionId !== onChainSessionId) return false;
+    }
     const onChainAdmin = deps?.toStr?.(tupleRead?.tuple?.[4] || "").trim();
     if (!onChainAdmin || !deps?.isAddress?.(onChainAdmin)) return false;
-    return onChainAdmin.toLowerCase() === address.toLowerCase();
+    return requestedAdminMatches && onChainAdmin.toLowerCase() === address.toLowerCase();
   } catch {
     return false;
   }
@@ -67646,38 +67898,6 @@ var proxyCustomRPC = async ({
   return json2({ completion, raw: data }, 200, baseHeaders);
 };
 
-// workers/sessionCorsWorker/aiProviderExecutionBinding.js
-var createAiProviderProxiesWithWorkerDeps = ({
-  deps
-} = {}) => ({
-  proxyAnthropic: async (value = {}) => (deps?.proxyAnthropic || proxyAnthropic)({
-    ...value,
-    deps: {
-      json: deps?.json
-    }
-  }),
-  proxyOpenAI: async (value = {}) => (deps?.proxyOpenAI || proxyOpenAI)({
-    ...value,
-    deps: {
-      json: deps?.json
-    }
-  }),
-  proxyOpenRouter: async (value = {}) => (deps?.proxyOpenRouter || proxyOpenRouter)({
-    ...value,
-    deps: {
-      json: deps?.json
-    }
-  }),
-  proxyCustomRPC: async (value = {}) => (deps?.proxyCustomRPC || proxyCustomRPC)({
-    ...value,
-    deps: {
-      json: deps?.json,
-      safeFetch: deps?.safeFetch,
-      isBlockedOutboundUrl: deps?.isBlockedOutboundUrl
-    }
-  })
-});
-
 // workers/sessionCorsWorker/arweaveCeTagNormalization.js
 var CE_TAG_PREFIX = "CE-";
 var MAX_CE_TAGS = 32;
@@ -68395,35 +68615,6 @@ var arweaveUpload = async ({
     return json2?.({ error: e?.message || "Arweave upload failed" }, 500, baseHeaders);
   }
 };
-
-// workers/sessionCorsWorker/arweaveUploadExecutionBinding.js
-var createArweaveUploadWithWorkerDeps = ({
-  deps
-} = {}) => (async (value = {}) => (deps?.arweaveUpload || arweaveUpload)({
-  ...value,
-  deps: {
-    json: deps?.json,
-    log: typeof deps?.log === "function" ? deps.log : () => {
-    },
-    toStr: deps?.toStr,
-    readArweaveUploadRequestPayload: deps?.readArweaveUploadRequestPayload,
-    resolveArweaveUploadJwk: deps?.resolveArweaveUploadJwk,
-    normalizeArweaveCeTags: deps?.normalizeArweaveCeTags,
-    normalizeArweaveAssociationTags: deps?.normalizeArweaveAssociationTags,
-    rpcRequest: deps?.rpcRequest,
-    callContractFunction: deps?.callContractFunction,
-    readSessionBySlugOnChain: deps?.readSessionBySlugOnChain,
-    getErc721Interface: deps?.getErc721Interface,
-    getSbtAdminInterface: deps?.getSbtAdminInterface,
-    isAddress: deps?.isAddress,
-    isPositiveBalance: deps?.isPositiveBalance,
-    normalizeSessionIdHex: deps?.normalizeSessionIdHex,
-    resolveRegistryRpcUrls: deps?.resolveRegistryRpcUrls,
-    resolveRpcUrlListForGate: deps?.resolveRpcUrlListForGate,
-    toChainId: deps?.toChainId,
-    toRegistrySessionSlug: deps?.toRegistrySessionSlug
-  }
-}));
 
 // workers/sessionCorsWorker/faucetEligibilityAuthority.js
 var ZERO_BYTES32_FALLBACK3 = `0x${"0".repeat(64)}`;
@@ -69201,53 +69392,6 @@ var faucet = async ({
   );
 };
 
-// workers/sessionCorsWorker/faucetExecutionBinding.js
-var createFaucetWithWorkerDeps = ({
-  deps,
-  constants,
-  defaults
-} = {}) => (async (value = {}) => (deps?.faucet || faucet)({
-  ...value,
-  deps: {
-    json: deps?.json,
-    log: typeof deps?.log === "function" ? deps.log : () => {
-    },
-    normalizeFaucetRequest: deps?.normalizeFaucetRequest,
-    validateFaucetEligibilityRequest: deps?.validateFaucetEligibilityRequest,
-    Wallet: deps?.Wallet,
-    rpcRequest: deps?.rpcRequest,
-    toStr: deps?.toStr,
-    toChainId: deps?.toChainId,
-    toBigInt: deps?.toBigInt,
-    formatEther: deps?.formatEther,
-    maskRpcUrl: deps?.maskRpcUrl,
-    isAddress: deps?.isAddress,
-    parseEther: deps?.parseEther,
-    resolveFaucetRpcUrls: deps?.resolveFaucetRpcUrls,
-    isBytes32Hex: deps?.isBytes32Hex,
-    normalizeAddressLower: deps?.normalizeAddressLower,
-    resolveRegistryRpcUrls: deps?.resolveRegistryRpcUrls,
-    toRegistrySessionSlug: deps?.toRegistrySessionSlug,
-    readSessionExistsOnChain: deps?.readSessionExistsOnChain,
-    readResourceGateOnChain: deps?.readResourceGateOnChain,
-    resolveRpcUrlListForGate: deps?.resolveRpcUrlListForGate,
-    checkSbtGate: deps?.checkSbtGate,
-    findSessionGateForSbt: deps?.findSessionGateForSbt,
-    readSbtFaucetValidationState: deps?.readSbtFaucetValidationState,
-    validateSbtPasswordForFaucet: deps?.validateSbtPasswordForFaucet,
-    verifyGroupSignatureForFaucet: deps?.verifyGroupSignatureForFaucet
-  },
-  constants: {
-    anonymousGateUnavailableError: constants?.anonymousGateUnavailableError,
-    zeroBytes32: constants?.zeroBytes32
-  },
-  defaults: {
-    defaultRpcUrl: defaults?.defaultRpcUrl,
-    defaultAmountEth: defaults?.defaultAmountEth,
-    defaultThresholdEth: defaults?.defaultThresholdEth
-  }
-}));
-
 // workers/sessionCorsWorker/fetchRequestNormalization.js
 var normalizeFetchTargetUrl = ({ url, deps } = {}) => {
   const input = toTrimmedString2(url);
@@ -69388,32 +69532,6 @@ var fetchUrl = async ({
   }
   return json2({ content: stripped, status: "success", contentType: type }, 200, baseHeaders);
 };
-
-// workers/sessionCorsWorker/fetchExecutionBinding.js
-var createFetchHelpersWithWorkerDeps = ({
-  deps
-} = {}) => ({
-  fetchImage: async (url, baseHeaders) => (deps?.fetchImage || fetchImage)({
-    url,
-    baseHeaders,
-    deps: {
-      json: deps?.json,
-      normalizeFetchTargetUrl: deps?.normalizeFetchTargetUrl,
-      isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
-      safeFetch: deps?.safeFetch
-    }
-  }),
-  fetchUrl: async (url, baseHeaders) => (deps?.fetchUrl || fetchUrl)({
-    url,
-    baseHeaders,
-    deps: {
-      json: deps?.json,
-      normalizeFetchTargetUrl: deps?.normalizeFetchTargetUrl,
-      isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
-      safeFetch: deps?.safeFetch
-    }
-  })
-});
 
 // workers/sessionCorsWorker/adminSignatureAuthority.js
 var resolveAdminSignatureAuthority = async ({
@@ -69827,23 +69945,39 @@ var transcribe = async ({
   } = normalizedRequest.payload || {};
   let targetUrl = resolveOpenAiTranscribeUrl({ constants });
   let key = requestApiKey || toTrimmedString13(secrets?.openaiKey, deps);
+  let outboundUrlPolicy = "";
   if (provider === "custom") {
     targetUrl = requestRpcUrl;
+    let parsedTargetUrl;
+    try {
+      parsedTargetUrl = new URL(targetUrl);
+    } catch {
+      return json2?.({ error: "Custom transcription URL target is not allowed" }, 403, baseHeaders);
+    }
+    if (parsedTargetUrl.protocol !== "https:") {
+      return json2?.({ error: "Custom transcription URL must use HTTPS" }, 403, baseHeaders);
+    }
+    if (parsedTargetUrl.username || parsedTargetUrl.password) {
+      return json2?.({ error: "Custom transcription URL must not contain credentials" }, 403, baseHeaders);
+    }
     if (deps?.isBlockedOutboundUrl?.(targetUrl)) {
       return json2?.({ error: "Custom transcription URL target is not allowed" }, 403, baseHeaders);
     }
     key = requestApiKey;
+    outboundUrlPolicy = STRICT_HTTPS_NO_CREDENTIALS_POLICY;
   }
   if (provider !== "custom" && !key) {
     return json2?.({ error: "Server misconfigured: openaiKey is missing." }, 401, baseHeaders);
   }
   const headers = {};
   if (key) headers.authorization = `Bearer ${key}`;
-  const response2 = await deps?.safeFetch?.(targetUrl, {
+  const fetchOptions = {
     method: "POST",
     headers,
     body: upstreamFormData
-  });
+  };
+  if (outboundUrlPolicy) fetchOptions.outboundUrlPolicy = outboundUrlPolicy;
+  const response2 = await deps?.safeFetch?.(targetUrl, fetchOptions);
   if (!(response2 instanceof Response)) {
     return json2?.({ error: response2?.error }, response2?.status, baseHeaders);
   }
@@ -69859,24 +69993,6 @@ var transcribe = async ({
   }
   return json2?.({ text: data?.text || "" }, 200, baseHeaders);
 };
-
-// workers/sessionCorsWorker/transcribeExecutionBinding.js
-var createTranscribeWithWorkerDeps = ({
-  deps,
-  constants
-} = {}) => (async (value = {}) => (deps?.transcribe || transcribe)({
-  ...value,
-  deps: {
-    json: deps?.json,
-    toStr: deps?.toStr,
-    readTranscribeRequestPayload: deps?.readTranscribeRequestPayload,
-    isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
-    safeFetch: deps?.safeFetch
-  },
-  constants: {
-    openAiTranscribeUrl: constants?.openAiTranscribeUrl
-  }
-}));
 
 // workers/sessionCorsWorker/payloadAccessControl.js
 var toStr17 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
@@ -71913,18 +72029,35 @@ var createWorkerExecutionServicesWithWorkerDeps = ({
 } = {}) => {
   const workerLog = typeof deps?.log === "function" ? deps.log : () => {
   };
-  const aiProxies = (deps?.createAiProviderProxiesWithWorkerDeps || createAiProviderProxiesWithWorkerDeps)({
-    deps: {
-      json: deps?.json,
-      safeFetch: deps?.safeFetch,
-      isBlockedOutboundUrl: deps?.isBlockedOutboundUrl
-    }
-  });
-  const transcribe2 = (deps?.createTranscribeWithWorkerDeps || createTranscribeWithWorkerDeps)({
+  const aiDeps = {
+    fetch: deps?.fetch,
+    json: deps?.json,
+    safeFetch: deps?.safeFetch,
+    isBlockedOutboundUrl: deps?.isBlockedOutboundUrl
+  };
+  const aiProxies = {
+    proxyAnthropic: async (value = {}) => proxyAnthropic({
+      ...value,
+      deps: aiDeps
+    }),
+    proxyOpenAI: async (value = {}) => proxyOpenAI({
+      ...value,
+      deps: aiDeps
+    }),
+    proxyOpenRouter: async (value = {}) => proxyOpenRouter({
+      ...value,
+      deps: aiDeps
+    }),
+    proxyCustomRPC: async (value = {}) => proxyCustomRPC({
+      ...value,
+      deps: aiDeps
+    })
+  };
+  const transcribe2 = async (value = {}) => transcribe({
+    ...value,
     deps: {
       json: deps?.json,
       toStr: deps?.toStr,
-      readTranscribeRequestPayload: deps?.readTranscribeRequestPayload,
       isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
       safeFetch: deps?.safeFetch
     },
@@ -71932,12 +72065,11 @@ var createWorkerExecutionServicesWithWorkerDeps = ({
       openAiTranscribeUrl: constants?.openAiTranscribeUrl
     }
   });
-  const faucet2 = (deps?.createFaucetWithWorkerDeps || createFaucetWithWorkerDeps)({
+  const faucet2 = async (value = {}) => faucet({
+    ...value,
     deps: {
       json: deps?.json,
       log: workerLog,
-      normalizeFaucetRequest: deps?.normalizeFaucetRequest,
-      validateFaucetEligibilityRequest: deps?.validateFaucetEligibilityRequest,
       Wallet: deps?.Wallet,
       rpcRequest: deps?.rpcRequest,
       toStr: deps?.toStr,
@@ -71971,23 +72103,30 @@ var createWorkerExecutionServicesWithWorkerDeps = ({
       defaultThresholdEth: defaults?.defaultThresholdEth
     }
   });
-  const fetchHelpers = (deps?.createFetchHelpersWithWorkerDeps || createFetchHelpersWithWorkerDeps)({
-    deps: {
-      json: deps?.json,
-      normalizeFetchTargetUrl: deps?.normalizeFetchTargetUrl,
-      isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
-      safeFetch: deps?.safeFetch
-    }
-  });
-  const arweaveUpload2 = (deps?.createArweaveUploadWithWorkerDeps || createArweaveUploadWithWorkerDeps)({
+  const fetchDeps = {
+    json: deps?.json,
+    isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
+    safeFetch: deps?.safeFetch
+  };
+  const fetchHelpers = {
+    fetchImage: async (url, baseHeaders) => fetchImage({
+      url,
+      baseHeaders,
+      deps: fetchDeps
+    }),
+    fetchUrl: async (url, baseHeaders) => fetchUrl({
+      url,
+      baseHeaders,
+      deps: fetchDeps
+    })
+  };
+  const arweaveUploadExecution = deps?.arweaveUpload || arweaveUpload;
+  const arweaveUpload2 = async (value = {}) => arweaveUploadExecution({
+    ...value,
     deps: {
       json: deps?.json,
       log: workerLog,
       toStr: deps?.toStr,
-      readArweaveUploadRequestPayload: deps?.readArweaveUploadRequestPayload,
-      resolveArweaveUploadJwk: deps?.resolveArweaveUploadJwk,
-      normalizeArweaveCeTags: deps?.normalizeArweaveCeTags,
-      normalizeArweaveAssociationTags: deps?.normalizeArweaveAssociationTags,
       rpcRequest: deps?.rpcRequest,
       callContractFunction: deps?.callContractFunction,
       readSessionBySlugOnChain: deps?.readSessionBySlugOnChain,
@@ -74713,6 +74852,17 @@ var dispatchAuthNonceRequest = async ({
   ).trim().toLowerCase() === "worker_canonical";
   const sessionId = resolveCanonicalWorkerSessionIdHex(corsState.config);
   const requestedSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: body?.sessionId });
+  const bootstrapWorkerCanonicalIdentity = body?.bootstrapWorkerCanonicalIdentity === true;
+  const bootstrappingWorkerCanonicalIdentity = bootstrapWorkerCanonicalIdentity && !corsState.config;
+  if (bootstrapWorkerCanonicalIdentity && !allowTrustedAdminAuthOrigin) {
+    return deps?.json?.({ error: "Worker identity bootstrap requires an admin action." }, 400, headers);
+  }
+  if (bootstrapWorkerCanonicalIdentity && corsState.config && !workerCanonical) {
+    return deps?.json?.({ error: "Worker identity bootstrap is unavailable after initialization." }, 409, headers);
+  }
+  if (bootstrappingWorkerCanonicalIdentity && !requestedSessionId) {
+    return deps?.json?.({ error: "Worker bootstrap session identity is invalid." }, 400, headers);
+  }
   if (workerCanonical && !sessionId) {
     return deps?.json?.({ error: "Worker session identity is invalid." }, 500, headers);
   }
@@ -74754,9 +74904,11 @@ var dispatchAuthNonceRequest = async ({
       headers
     );
   }
+  const responseSessionId = workerCanonical ? sessionId : bootstrappingWorkerCanonicalIdentity ? requestedSessionId : "";
   return deps?.json?.({
     nonce,
-    ...workerCanonical ? { sessionSlug: targetSlug, sessionId } : {}
+    ...responseSessionId ? { sessionSlug: targetSlug, sessionId: responseSessionId } : {},
+    ...bootstrappingWorkerCanonicalIdentity ? { bootstrapWorkerCanonicalIdentity: true } : {}
   }, 200, headers);
 };
 
@@ -75606,6 +75758,10 @@ var dispatchSponsoredBootstrapRedeem = async ({
       deploymentRequestId,
       configRevision
     };
+    const publicConfigValidationError = validateDeployHelperPublicConfigInputs(effectiveDeployPayload);
+    if (publicConfigValidationError) {
+      return buildGrantErrorResponse(deps, headers, 400, publicConfigValidationError);
+    }
     const sensitiveValues = buildSponsoredSensitiveValues({
       body,
       grantRecord,
@@ -76426,13 +76582,11 @@ var createWorkerRouteRuntimeWithWorkerDeps = ({
   });
   const executionServices = (deps?.createWorkerExecutionServicesWithWorkerDeps || createWorkerExecutionServicesWithWorkerDeps)({
     deps: {
+      fetch: deps?.fetch,
       json: deps?.json,
       safeFetch: deps?.safeFetch,
       isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
       toStr: deps?.toStr,
-      readTranscribeRequestPayload: deps?.readTranscribeRequestPayload,
-      normalizeFaucetRequest: deps?.normalizeFaucetRequest,
-      validateFaucetEligibilityRequest: deps?.validateFaucetEligibilityRequest,
       Wallet: deps?.Wallet,
       rpcRequest: deps?.rpcRequest,
       toChainId: deps?.toChainId,
@@ -76454,11 +76608,6 @@ var createWorkerRouteRuntimeWithWorkerDeps = ({
       readSbtFaucetValidationState: rateLimitFaucetSupport.readSbtFaucetValidationState,
       validateSbtPasswordForFaucet: rateLimitFaucetSupport.validateSbtPasswordForFaucet,
       verifyGroupSignatureForFaucet: deps?.verifyGroupSignatureForFaucet,
-      normalizeFetchTargetUrl: deps?.normalizeFetchTargetUrl,
-      readArweaveUploadRequestPayload: deps?.readArweaveUploadRequestPayload,
-      resolveArweaveUploadJwk: deps?.resolveArweaveUploadJwk,
-      normalizeArweaveCeTags: deps?.normalizeArweaveCeTags,
-      normalizeArweaveAssociationTags: deps?.normalizeArweaveAssociationTags,
       callContractFunction: deps?.callContractFunction,
       readSessionBySlugOnChain: registryLoginBootstrapAdapters.readSessionBySlugOnChain,
       getErc721Interface: deps?.getErc721Interface,
@@ -76637,6 +76786,7 @@ var resolveWorkerRouteRuntimeInput = ({
 } = {}) => ({
   deps: {
     log: deps?.log,
+    fetch: deps?.fetch,
     toStr: deps?.toStr,
     now: deps?.now,
     parseAllowOrigins: deps?.parseAllowOrigins,
@@ -76652,14 +76802,7 @@ var resolveWorkerRouteRuntimeInput = ({
     normalizeRpcUrlList: deps?.normalizeRpcUrlList,
     ...workerLowLevelHelpers || {},
     readTranscribeRequestPayload: deps?.readTranscribeRequestPayload,
-    normalizeFaucetRequest: deps?.normalizeFaucetRequest,
-    validateFaucetEligibilityRequest: deps?.validateFaucetEligibilityRequest,
     Wallet: deps?.ethers?.Wallet,
-    normalizeFetchTargetUrl: deps?.normalizeFetchTargetUrl,
-    readArweaveUploadRequestPayload: deps?.readArweaveUploadRequestPayload,
-    resolveArweaveUploadJwk: deps?.resolveArweaveUploadJwk,
-    normalizeArweaveCeTags: deps?.normalizeArweaveCeTags,
-    normalizeArweaveAssociationTags: deps?.normalizeArweaveAssociationTags,
     normalizeSignedWorkerRequest: deps?.normalizeSignedWorkerRequest,
     resolveWorkerBodySlugContext: deps?.resolveWorkerBodySlugContext,
     validateRecoveredAddressMatchesRequest: deps?.validateRecoveredAddressMatchesRequest,
@@ -77853,13 +77996,6 @@ var resolveWorkerRuntimeDeps = ({
       validateAuthTokenRecord: resolveDep("validateAuthTokenRecord", validateAuthTokenRecord),
       resolveWorkerRequestSlugContext: resolveDep("resolveWorkerRequestSlugContext", resolveWorkerRequestSlugContext),
       readTranscribeRequestPayload: resolveDep("readTranscribeRequestPayload", readTranscribeRequestPayload),
-      normalizeFaucetRequest: resolveDep("normalizeFaucetRequest", normalizeFaucetRequest),
-      validateFaucetEligibilityRequest: resolveDep("validateFaucetEligibilityRequest", validateFaucetEligibilityRequest),
-      normalizeFetchTargetUrl: resolveDep("normalizeFetchTargetUrl", normalizeFetchTargetUrl),
-      readArweaveUploadRequestPayload: resolveDep("readArweaveUploadRequestPayload", readArweaveUploadRequestPayload),
-      resolveArweaveUploadJwk: resolveDep("resolveArweaveUploadJwk", resolveArweaveUploadJwk),
-      normalizeArweaveCeTags: resolveDep("normalizeArweaveCeTags", normalizeArweaveCeTags),
-      normalizeArweaveAssociationTags: resolveDep("normalizeArweaveAssociationTags", normalizeArweaveAssociationTags),
       normalizeSignedWorkerRequest: resolveDep("normalizeSignedWorkerRequest", normalizeSignedWorkerRequest),
       resolveWorkerBodySlugContext: resolveDep("resolveWorkerBodySlugContext", resolveWorkerBodySlugContext),
       validateRecoveredAddressMatchesRequest: resolveDep("validateRecoveredAddressMatchesRequest", validateRecoveredAddressMatchesRequest),

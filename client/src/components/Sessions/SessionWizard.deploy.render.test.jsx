@@ -12,9 +12,10 @@ import {
   getSessionWizardContractModalTriggerTestId,
   getSessionWizardContractTooltipTestId,
   WIZARD_CONTRACT_MODAL_TESTID,
-} from '../ContractPage/contractMetadata.js';
-import { buildContractViewerContracts } from '../ContractPage/contractViewerUtils.js';
+} from '../DocsPage/contractMetadata.js';
+import { buildContractViewerContracts } from '../DocsPage/contractViewerUtils.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 const mockRegisterSessionOnChain = jest.fn();
 const mockFetchSessionFromRegistry = jest.fn();
@@ -177,7 +178,7 @@ jest.mock('../Shared/Json/JsonControls', () => ({
   JsonPanel: () => null,
   JsonButtonRow: () => null,
 }));
-jest.mock('../ContractPage/contractViewerUtils.js', () => ({
+jest.mock('../DocsPage/contractViewerUtils.js', () => ({
   buildContractViewerContracts: jest.fn(),
 }));
 
@@ -357,6 +358,26 @@ const getWizardResourceCard = (resourceKey) =>
 const enableAdvancedMode = () => {
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
 };
+const seedDecentralizedProfile = ({ usesLit = false } = {}) => {
+  const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+  if (usesLit) {
+    profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    profile.encryption = { mode: 'lit' };
+    profile.results.visibility = 'participant_aggregate';
+  }
+  const cached = JSON.parse(sessionStorage.getItem('ce:sessionWizardDraft:v1') || '{}');
+  sessionStorage.setItem(
+    'ce:sessionWizardDraft:v1',
+    JSON.stringify({
+      ...cached,
+      draft: {
+        ...(cached.draft || {}),
+        sessionModeProfile: profile,
+        storageProfile: { backend: 'arweave' },
+      },
+    }),
+  );
+};
 const selectNormalModeCard = (label) => {
   fireEvent.click(screen.getByRole('button', { name: new RegExp(label, 'i') }));
 };
@@ -487,6 +508,7 @@ describe('SessionWizard deploy render validation', () => {
         },
       }),
     );
+    seedDecentralizedProfile();
 
     workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => {
       const trimmed = String(value || '').trim();
@@ -558,7 +580,7 @@ describe('SessionWizard deploy render validation', () => {
         target: { value: '{"kty":"RSA","n":"abc"}' },
       });
 
-      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_ACCOUNT_API_KEY)).toBeInTheDocument();
+      expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_ACCOUNT_API_KEY)).not.toBeInTheDocument();
       expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_API_BASE)).not.toBeInTheDocument();
       expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_PRIVATE_KEY)).not.toBeInTheDocument();
 
@@ -635,6 +657,7 @@ describe('SessionWizard deploy render validation', () => {
     });
 
     try {
+      seedDecentralizedProfile({ usesLit: true });
       renderSessionWizard({
         account: TEST_ADMIN_ADDRESS,
         toggleLoginModal: jest.fn(),
@@ -662,7 +685,7 @@ describe('SessionWizard deploy render validation', () => {
       await waitFor(() => {
         expect(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_NAME)).toHaveTextContent('timing-regression-session');
       });
-      expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_WORKER_URL)).not.toBeInTheDocument();
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_URL)).toHaveValue('https://deploy-helper.example.test');
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_EMBEDDED_DEPLOY_HELPER_ENABLED)).toBeChecked();
 
       const deployHelperInput = screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL);
@@ -764,7 +787,7 @@ describe('SessionWizard deploy render validation', () => {
     }
   });
 
-  it('auto-provisions the default Chipotle Lit action after deploy when the wizard has group and PKP config', async () => {
+  it('rejects stale partial Lit runtime instead of auto-provisioning with cached secrets', async () => {
     const originalFetch = global.fetch;
     const workerAuth = require('../../utilities/worker/workerAuth.js');
     const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
@@ -829,6 +852,7 @@ describe('SessionWizard deploy render validation', () => {
           },
         }),
       );
+      seedDecentralizedProfile({ usesLit: true });
       renderSessionWizard({
         account: TEST_ADMIN_ADDRESS,
         toggleLoginModal: jest.fn(),
@@ -869,38 +893,16 @@ describe('SessionWizard deploy render validation', () => {
       fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
         target: { value: '{"kty":"RSA","n":"abc"}' },
       });
-
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
 
       await waitFor(() => {
         expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent(
-          'Lit provisioning note: Lit action auto-provisioned.',
+          'Missing required secrets before deploy: Lit API key or complete Lit runtime credentials',
         );
       });
-
-      expect(workerAuth.buildSignedAdminActionAuth).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: 'lit-chipotle-provision',
-          body: expect.objectContaining({
-            litGroupId: 'ce-session-content-prod',
-            litPkpId: '0x1e5ed88b177bde881bb5e68b338c26c675e8f142',
-          }),
-        }),
-      );
-
-      const provisionCall = global.fetch.mock.calls.find(([url]) =>
-        String(url).endsWith('/admin/lit-chipotle-provision'),
-      );
-      const provisionPayload = JSON.parse(provisionCall[1].body);
-      expect(provisionPayload.actionName).toBe('ce-sbt-gated-crypto-v3');
-
-      const configSyncCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/set-config'));
-      const configSyncPayload = JSON.parse(configSyncCall[1].body);
-      expect(configSyncPayload.config.litCredentials).toEqual(
-        expect.objectContaining({
-          litActionCid: 'QmZPKjGtD4qLZhr17juP8XgUKV1A34Y9GtUUpeJNJ7f2vL',
-          litGroupId: '7',
-        }),
+      expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/deploy'))).toBe(false);
+      expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/admin/lit-chipotle-provision'))).toBe(
+        false,
       );
     } finally {
       global.fetch = originalFetch;
@@ -980,6 +982,7 @@ describe('SessionWizard deploy render validation', () => {
           },
         }),
       );
+      seedDecentralizedProfile({ usesLit: true });
       renderSessionWizard({
         account: TEST_ADMIN_ADDRESS,
         toggleLoginModal: jest.fn(),
@@ -1131,6 +1134,7 @@ describe('SessionWizard deploy render validation', () => {
     });
 
     try {
+      seedDecentralizedProfile();
       renderSessionWizard({
         account: TEST_ADMIN_ADDRESS,
         toggleLoginModal: jest.fn(),
@@ -1232,6 +1236,7 @@ describe('SessionWizard deploy render validation', () => {
     });
 
     try {
+      seedDecentralizedProfile();
       renderSessionWizard({
         account: '',
         loginComplete: true,

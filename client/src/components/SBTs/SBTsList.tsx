@@ -6,8 +6,8 @@ import {
   getSessionConfigBySlug,
   getSessionLists,
   getSessionSlugByName,
-  normalizeSessionSlug,
 } from '../../utilities/web3/chainGateway.js';
+import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import styles from './SBTsList.module.scss';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSpinner, faSync, faTrash, faPlus, faCog } from '@fortawesome/free-solid-svg-icons';

@@ -35,9 +35,13 @@ jest.mock('../web3/chainGateway.js', () => {
     default: defaultExport,
     getAllSessionSlugs: defaultExport.getAllSessionSlugs,
     getReadProviderForSession: defaultExport.getReadProviderForSession,
-    normalizeSessionSlug: jest.fn((s) => String(s || '')),
   };
 });
+
+jest.mock('../session/sessionNaming.js', () => ({
+  __esModule: true,
+  normalizeSessionSlug: jest.fn((s) => String(s || '')),
+}));
 
 jest.mock('../session/mainSiteUtils', () => ({
   __esModule: true,
@@ -90,7 +94,7 @@ jest.mock('../session/mainSiteProgressHelpers', () => ({
 const { createSessionSbtCacheController } = require('./sessionSbtCacheController.js');
 const contractScriptsModule = require('../web3/chainGateway.js');
 const contractScripts = contractScriptsModule.default;
-const { normalizeSessionSlug } = contractScriptsModule;
+const { normalizeSessionSlug } = require('../session/sessionNaming.js');
 const {
   emitMainSiteSbtDebug,
   hasCoreSbtMetadata,
@@ -170,6 +174,14 @@ const createDeferred = () => {
   return { promise, resolve, reject };
 };
 
+const waitForMockCall = async (mockFn, attempts = 40) => {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (mockFn.mock.calls.length > 0) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error('Expected mocked boundary to be called.');
+};
+
 const createMockHost = (overrides = {}) => {
   const { initialState, initialStorage, activeSlug, chainId, sessionScanScope, currentPath, account, ...rest } =
     overrides;
@@ -207,6 +219,20 @@ const createMockHost = (overrides = {}) => {
       if (!storage[key]) storage[key] = {};
       storage[key][slug] = deepClone(value);
       return true;
+    }),
+    updateSbtCacheAtomic: jest.fn(async (slug, updater) => {
+      const current = storage.sbtCache?.[slug] ?? null;
+      const next = await updater(deepClone(current));
+      if (!storage.sbtCache) storage.sbtCache = {};
+      storage.sbtCache[slug] = deepClone(next);
+      return deepClone(next);
+    }),
+    updateUserCacheAtomic: jest.fn(async (slug, updater) => {
+      const current = storage.userCache?.[slug] ?? null;
+      const next = await updater(deepClone(current));
+      if (!storage.userCache) storage.userCache = {};
+      storage.userCache[slug] = deepClone(next);
+      return deepClone(next);
     }),
     getActiveSessionSlug: jest.fn(() => activeSlug || 'alpha'),
     getSessionCfg: jest.fn((slug) => {
@@ -1164,6 +1190,7 @@ describe('createSessionSbtCacheController', () => {
         name: 'Full Scan Holder SBT',
         creationBlock: 10,
       });
+      const countsDeferred = createDeferred();
       const host = createMockHost({
         currentPath: '/dashboard',
         initialStorage: {
@@ -1191,7 +1218,16 @@ describe('createSessionSbtCacheController', () => {
       contractScripts.getRelevantBlockWindowForFilter.mockResolvedValueOnce({ fromBlock: 10, toBlock: 12 });
       contractScripts.getSbtsCreated.mockResolvedValueOnce([{ sbtAddress, creationBlock: 10 }]);
       contractScripts.getSbtMetadata.mockResolvedValueOnce(sbtMetadata);
-      contractScripts.getSbtMintBurnCountsByAddress.mockResolvedValueOnce({
+      contractScripts.getSbtMintBurnCountsByAddress.mockReturnValueOnce(countsDeferred.promise);
+
+      const fullScanRun = controller.initializeSbtCacheForGroup('alpha', { mode: 'full' });
+      await waitForMockCall(contractScripts.getSbtMintBurnCountsByAddress);
+      await host.updateUserCacheAtomic('alpha', (current) => {
+        const next = deepClone(current);
+        next[holder][11155420].data.questionResponses.push({ questionID: 'q-live', response: 'kept' });
+        return next;
+      });
+      countsDeferred.resolve({
         ok: true,
         mintedCountByAddress: {
           [holder]: 1,
@@ -1200,8 +1236,7 @@ describe('createSessionSbtCacheController', () => {
         mintedEventCount: 1,
         burnedEventCount: 0,
       });
-
-      await controller.initializeSbtCacheForGroup('alpha', { mode: 'full' });
+      await fullScanRun;
 
       const storedUserCache = host.getStored('userCache', 'alpha');
       const storedSbtCache = host.getStored('sbtCache', 'alpha');
@@ -1223,6 +1258,9 @@ describe('createSessionSbtCacheController', () => {
           sbtAddress,
           sbtInfo: expect.objectContaining({ name: 'Full Scan Holder SBT' }),
         },
+      ]);
+      expect(storedUserCache[holder][11155420].data.questionResponses).toEqual([
+        { questionID: 'q-live', response: 'kept' },
       ]);
       expect(host.writeFlag).toHaveBeenCalledWith('sbt:fullScanInProgress', 'alpha', false);
     });
@@ -1386,6 +1424,74 @@ describe('createSessionSbtCacheController', () => {
       expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledTimes(1);
     });
 
+    it('preserves concurrent SBT entries and unrelated networks during delayed light hydration', async () => {
+      const hydratedAddress = '0x0000000000000000000000000000000000000a01';
+      const realtimeAddress = '0x0000000000000000000000000000000000000a02';
+      const metadataDeferred = createDeferred();
+      const host = createMockHost({
+        initialStorage: {
+          sbtCache: {
+            alpha: {
+              84532: { lastBlock: 4, sbtList: { preserved: { marker: true } } },
+            },
+          },
+        },
+      });
+      const controller = createSessionSbtCacheController(host);
+      contractScripts.getAllSbtAddressesCached.mockResolvedValueOnce([hydratedAddress]);
+      contractScripts.getSbtMetadata.mockReturnValueOnce(metadataDeferred.promise);
+
+      const hydrationRun = controller.ensureLightSbtDiscovery('alpha');
+      await waitForMockCall(contractScripts.getSbtMetadata);
+      await host.updateSbtCacheAtomic('alpha', (current) => ({
+        ...current,
+        11155420: {
+          ...(current?.[11155420] || {}),
+          lastBlock: 9,
+          sbtList: {
+            ...(current?.[11155420]?.sbtList || {}),
+            [realtimeAddress.toLowerCase()]: {
+              sbtAddress: realtimeAddress,
+              sbtInfo: createCompleteSbtMetadata({ name: 'Realtime SBT' }),
+              blockNumber: 12,
+              mintedCountByAddress: { '0xholder': 1 },
+              mintedEventCount: 1,
+              countsLoaded: true,
+            },
+          },
+        },
+      }));
+      metadataDeferred.resolve(createCompleteSbtMetadata({ name: 'Hydrated SBT' }));
+      await hydrationRun;
+
+      const stored = host.getStored('sbtCache', 'alpha');
+      expect(stored[84532].sbtList.preserved).toEqual({ marker: true });
+      expect(stored[11155420].sbtList).toEqual(
+        expect.objectContaining({
+          [hydratedAddress.toLowerCase()]: expect.objectContaining({
+            sbtInfo: expect.objectContaining({ name: 'Hydrated SBT' }),
+          }),
+          [realtimeAddress.toLowerCase()]: expect.objectContaining({
+            blockNumber: 12,
+            mintedEventCount: 1,
+          }),
+        }),
+      );
+    });
+
+    it('does not publish partial readiness when atomic SBT persistence rejects', async () => {
+      const host = createMockHost({
+        updateSbtCacheAtomic: jest.fn().mockRejectedValue(new Error('IndexedDB unavailable')),
+      });
+      const controller = createSessionSbtCacheController(host);
+
+      await controller.initializeSbtCacheForGroup('alpha', { mode: 'partial' });
+
+      expect(host.getStateSnapshot()).toMatchObject({ isSBTCacheReady: false, sbtCacheRevision: 0 });
+      expect(host.writeFlag).not.toHaveBeenCalledWith('sbt:partialReady', 'alpha', true);
+      expect(host.writeFlag).toHaveBeenCalledWith('sbt:deferredFullScanNeeded', 'alpha', true);
+    });
+
     it('skips instance listener attachment when chain ID is missing', () => {
       const host = createMockHost({ chainId: '' });
       const controller = createSessionSbtCacheController(host);
@@ -1451,6 +1557,76 @@ describe('createSessionSbtCacheController', () => {
   });
 
   describe('refreshSbtDataForGroup', () => {
+    it('preserves newer realtime activity while a delayed count refresh completes', async () => {
+      const countsDeferred = createDeferred();
+      const host = createMockHost({
+        initialStorage: {
+          sbtCache: {
+            alpha: {
+              11155420: {
+                lastBlock: 9,
+                sbtList: {
+                  '0xsbt': {
+                    sbtAddress: '0xSBT',
+                    sbtInfo: createCompleteSbtMetadata({ creationBlock: 10 }),
+                    creationBlock: 10,
+                    blockNumber: 10,
+                    countsLoaded: true,
+                    mintedAddresses: ['0xholder'],
+                    burnedAddresses: [],
+                    mintedCountByAddress: { '0xholder': 1 },
+                    burnedCountByAddress: {},
+                    mintedEventCount: 1,
+                    burnedEventCount: 0,
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      const controller = createSessionSbtCacheController(host);
+      contractScripts.getSbtMintBurnCountsByAddress.mockReturnValueOnce(countsDeferred.promise);
+
+      const refreshRun = controller.refreshSbtDataForGroup('alpha', '0xSBT', {
+        forceCounts: true,
+        countsOnly: true,
+      });
+      await waitForMockCall(contractScripts.getSbtMintBurnCountsByAddress);
+      await host.updateSbtCacheAtomic('alpha', (current) => {
+        const next = deepClone(current);
+        next[11155420].lastRealtimeEventCursor = { blockNumber: 13, transactionIndex: 0, logIndex: 1 };
+        next[11155420].sbtList['0xsbt'] = {
+          ...next[11155420].sbtList['0xsbt'],
+          blockNumber: 13,
+          mintedCountByAddress: { '0xholder': 2 },
+          mintedEventCount: 2,
+        };
+        return next;
+      });
+      countsDeferred.resolve({
+        ok: true,
+        mintedCountByAddress: { '0xholder': 1 },
+        burnedCountByAddress: {},
+        mintedEventCount: 1,
+        burnedEventCount: 0,
+      });
+      await refreshRun;
+
+      expect(host.getStored('sbtCache', 'alpha')[11155420]).toEqual(
+        expect.objectContaining({
+          lastRealtimeEventCursor: { blockNumber: 13, transactionIndex: 0, logIndex: 1 },
+          sbtList: expect.objectContaining({
+            '0xsbt': expect.objectContaining({
+              blockNumber: 13,
+              mintedCountByAddress: { '0xholder': 2 },
+              mintedEventCount: 2,
+            }),
+          }),
+        }),
+      );
+    });
+
     it('writes refreshed count data into the cache on the happy path', async () => {
       const host = createMockHost({
         initialStorage: {
@@ -1513,9 +1689,7 @@ describe('createSessionSbtCacheController', () => {
         }),
       );
       expect(contractScripts.getSbtHistorySummary).not.toHaveBeenCalled();
-      expect(host.dgWrite).toHaveBeenLastCalledWith(
-        'sbtCache',
-        'alpha',
+      expect(host.getStored('sbtCache', 'alpha')).toEqual(
         expect.objectContaining({
           11155420: expect.objectContaining({
             lastBlock: 9,
@@ -1554,6 +1728,162 @@ describe('createSessionSbtCacheController', () => {
           }),
         }),
       );
+    });
+  });
+
+  describe('realtime event persistence', () => {
+    it('keeps distinct activity events that finish out of order behind a discovery watermark', async () => {
+      const olderMetadata = createDeferred();
+      const host = createMockHost({
+        initialStorage: {
+          sbtCache: {
+            alpha: {
+              11155420: { lastBlock: 100, sbtList: {} },
+            },
+          },
+        },
+      });
+      const controller = createSessionSbtCacheController(host);
+      contractScripts.getSbtMetadata
+        .mockReturnValueOnce(olderMetadata.promise)
+        .mockResolvedValueOnce(createCompleteSbtMetadata({ name: 'Newer event SBT' }));
+
+      const olderRun = controller.onSbtActivityDetectedForGroup('alpha', '0xOlderSbt', '0xOlderHolder', false, 10, {
+        blockNumber: 10,
+        transactionIndex: 0,
+        logIndex: 1,
+      });
+      const newerRun = controller.onSbtActivityDetectedForGroup('alpha', '0xNewerSbt', '0xNewerHolder', false, 11, {
+        blockNumber: 11,
+        transactionIndex: 0,
+        logIndex: 1,
+      });
+
+      await newerRun;
+      olderMetadata.resolve(createCompleteSbtMetadata({ name: 'Older event SBT' }));
+      await olderRun;
+
+      const networkCache = host.getStored('sbtCache', 'alpha')[11155420];
+      expect(networkCache.lastBlock).toBe(100);
+      expect(networkCache.lastRealtimeEventCursor).toEqual({ blockNumber: 11, transactionIndex: 0, logIndex: 1 });
+      expect(networkCache.recentRealtimeEventCursors).toEqual(
+        expect.arrayContaining([
+          { blockNumber: 10, transactionIndex: 0, logIndex: 1 },
+          { blockNumber: 11, transactionIndex: 0, logIndex: 1 },
+        ]),
+      );
+      expect(networkCache.sbtList).toEqual(
+        expect.objectContaining({
+          '0xoldersbt': expect.objectContaining({ mintedCountByAddress: { '0xolderholder': 1 } }),
+          '0xnewersbt': expect.objectContaining({ mintedCountByAddress: { '0xnewerholder': 1 } }),
+        }),
+      );
+    });
+
+    it('handles a rejected listener write and retries the same event', async () => {
+      const eventStreamsPort = {
+        listenForSBTEvents: jest.fn(),
+        removeSBTEventListener: jest.fn(),
+        listenForSurveyEvents: jest.fn(),
+        removeSurveyEventsListener: jest.fn(),
+        listenForSBTInstanceEvents: jest.fn(),
+        removeSBTInstanceEventsListener: jest.fn(),
+      };
+      const host = createMockHost({
+        sbtEventStreamsPort: eventStreamsPort,
+        initialStorage: {
+          sbtCache: {
+            alpha: {
+              11155420: {
+                lastBlock: 9,
+                sbtList: {
+                  '0xsbt': {
+                    sbtAddress: '0xSBT',
+                    sbtInfo: createCompleteSbtMetadata(),
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      const defaultAtomicWrite = host.updateSbtCacheAtomic.getMockImplementation();
+      const retryCompleted = createDeferred();
+      host.updateSbtCacheAtomic
+        .mockRejectedValueOnce(new Error('IndexedDB temporarily unavailable'))
+        .mockImplementation(async (...args) => {
+          const result = await defaultAtomicWrite(...args);
+          retryCompleted.resolve();
+          return result;
+        });
+      const controller = createSessionSbtCacheController(host);
+      controller.startSbtEventListenerForGroup('alpha');
+      const listener = eventStreamsPort.listenForSBTInstanceEvents.mock.calls[0][2];
+
+      expect(
+        listener({
+          address: '0xSBT',
+          args: { account: '0xHolder', burned: false },
+          blockNumber: 10,
+          transactionIndex: 0,
+          logIndex: 1,
+          eventSignature: 'SBTActivity(address,uint256,bool)',
+        }),
+      ).toBeUndefined();
+      await retryCompleted.promise;
+
+      expect(host.updateSbtCacheAtomic).toHaveBeenCalledTimes(2);
+      expect(host.getStored('sbtCache', 'alpha')[11155420].sbtList['0xsbt']).toMatchObject({
+        mintedCountByAddress: { '0xholder': 1 },
+        mintedEventCount: 1,
+      });
+      controller.destroy();
+    });
+
+    it('does not resurrect listener retries when an in-flight write rejects after destroy', async () => {
+      const eventStreamsPort = {
+        listenForSBTEvents: jest.fn(),
+        removeSBTEventListener: jest.fn(),
+        listenForSurveyEvents: jest.fn(),
+        removeSurveyEventsListener: jest.fn(),
+        listenForSBTInstanceEvents: jest.fn(),
+        removeSBTInstanceEventsListener: jest.fn(),
+      };
+      const writeDeferred = createDeferred();
+      const host = createMockHost({
+        sbtEventStreamsPort: eventStreamsPort,
+        initialStorage: {
+          sbtCache: {
+            alpha: {
+              11155420: {
+                lastBlock: 9,
+                sbtList: { '0xsbt': { sbtAddress: '0xSBT', sbtInfo: createCompleteSbtMetadata() } },
+              },
+            },
+          },
+        },
+      });
+      host.updateSbtCacheAtomic.mockReturnValueOnce(writeDeferred.promise);
+      const controller = createSessionSbtCacheController(host);
+      controller.startSbtEventListenerForGroup('alpha');
+      const listener = eventStreamsPort.listenForSBTInstanceEvents.mock.calls[0][2];
+
+      listener({
+        address: '0xSBT',
+        args: { account: '0xHolder', burned: false },
+        blockNumber: 10,
+        transactionIndex: 0,
+        logIndex: 1,
+        eventSignature: 'SBTActivity(address,uint256,bool)',
+      });
+      await waitForMockCall(host.updateSbtCacheAtomic);
+
+      controller.destroy();
+      jest.useFakeTimers();
+      writeDeferred.reject(new Error('write failed after teardown'));
+      await jest.advanceTimersByTimeAsync(300);
+
+      expect(host.updateSbtCacheAtomic).toHaveBeenCalledTimes(1);
     });
   });
 

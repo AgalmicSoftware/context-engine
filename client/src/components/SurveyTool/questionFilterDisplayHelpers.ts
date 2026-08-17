@@ -8,7 +8,7 @@ export const QUESTION_FILTER_ACTIONS_STYLE: React.CSSProperties = {
 };
 
 export const QUESTION_FILTER_BOOKMARK_FEEDBACK_STYLE: React.CSSProperties = {
-  color: 'goldenrod',
+  color: 'var(--ce-status-warning-text)',
   fontSize: '0.85em',
   fontStyle: 'italic',
 };
@@ -66,7 +66,11 @@ export const resolveQuestionFilterCopyIconStyle = (
   copiedUrlSuccess: unknown,
 ): React.CSSProperties => ({
   cursor: isDefault || copiedUrlSuccess ? 'not-allowed' : 'pointer',
-  color: copiedUrlSuccess ? 'green' : isDefault ? '#cccccc' : '#6c757d',
+  color: copiedUrlSuccess
+    ? 'var(--ce-status-success-text)'
+    : isDefault
+      ? 'var(--ce-control-disabled-text)'
+      : 'var(--ce-text-muted)',
   fontSize: '1.1em',
   marginRight: '15px',
 });
@@ -77,7 +81,12 @@ export const resolveQuestionFilterBookmarkIconStyle = (
   filterBookmarkedFeedback: unknown,
 ): React.CSSProperties => ({
   cursor: isDefault ? 'not-allowed' : 'pointer',
-  color: isCurrentFilterBookmarked || filterBookmarkedFeedback ? 'gold' : isDefault ? '#cccccc' : '#6c757d',
+  color:
+    isCurrentFilterBookmarked || filterBookmarkedFeedback
+      ? 'var(--ce-status-warning)'
+      : isDefault
+        ? 'var(--ce-control-disabled-text)'
+        : 'var(--ce-text-muted)',
   fontSize: '1.1em',
   marginRight: '8px',
 });

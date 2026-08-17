@@ -7,6 +7,9 @@ const {
   buildPasskeyDerivedWallet,
   toPasskeyEoaSeedRecord,
 } = require('./lib/passkey-derived-wallet');
+const {
+  createGroupPasswordDerivation,
+} = require('../client/src/utilities/crypto/groupPasswordDerivation.cjs');
 
 const DEFAULT_CHAIN_ID = Number(loadClientDefaults()?.defaultChainId || 0);
 const DEFAULT_RPC_URL = getPublicRpcUrls(DEFAULT_CHAIN_ID)[0] || '';
@@ -31,14 +34,7 @@ const normalizeGroupPasswordInput = (raw) => {
   return compact;
 };
 
-const computeGroupPasswordHash = (password) => {
-  const pwHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(password || ''));
-  const salt = ethers.utils.solidityKeccak256(['string'], ['sbt-group-password-v2']);
-  const seed = ethers.utils.solidityKeccak256(['bytes32', 'bytes32'], [pwHash, salt]);
-  const tmpSk = ethers.utils.keccak256(ethers.utils.arrayify(seed));
-  const tmpWallet = new ethers.Wallet(tmpSk);
-  return ethers.utils.solidityKeccak256(['address'], [tmpWallet.address]);
-};
+const { computeGroupPasswordHash } = createGroupPasswordDerivation(ethers);
 
 async function main() {
   const rawIdB64Url = process.env.PASSKEY_RAW_ID_B64URL || DEFAULT_PASSKEY_RAW_ID_B64URL;
@@ -84,9 +80,9 @@ async function main() {
   }
 
   if (groupPassword) {
-    result.groupPassword = groupPassword;
-    result.groupPasswordHex = ethers.utils.hexlify(ethers.utils.toUtf8Bytes(groupPassword));
-    result.groupPasswordHash = computeGroupPasswordHash(groupPassword);
+    result.groupPasswordHash = computeGroupPasswordHash({ password: groupPassword, sbtAddress: '' });
+    result.groupPasswordDerivation = 'sbt-group-password-v3';
+    result.groupPasswordScope = 'zero-address';
   }
 
   console.log(JSON.stringify(result, null, 2));

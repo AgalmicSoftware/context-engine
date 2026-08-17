@@ -70,7 +70,7 @@ export const evaluateAnonymousRouteAccess = async ({
       : {
           ...result,
           status: 403,
-          error: anonymousRouteDeniedError,
+          error: `Anonymous access denied: ${scopeKey} is not enabled in workerAuthority.anonymousScopes.`,
         };
   }
 

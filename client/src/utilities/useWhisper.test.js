@@ -224,6 +224,10 @@ describe('useWhisper', () => {
   it('records and transcribes a session', async () => {
     const onComplete = jest.fn();
     const onStop = jest.fn();
+    const sessionConfig = {
+      sessionSlug: 'demo-sh',
+      sessionId: '0xb822b3eca85bdc35cf83cb947bceb6b2',
+    };
 
     act(() => {
       root.render(
@@ -231,6 +235,8 @@ describe('useWhisper', () => {
           ref={ref}
           options={{
             silenceDetection: false,
+            sessionSlug: 'demo-sh',
+            sessionConfig,
             onTranscriptionComplete: onComplete,
             onRecordingStop: onStop,
           }}
@@ -266,12 +272,64 @@ describe('useWhisper', () => {
     expect(fetchWorkerWithAuth).toHaveBeenCalledWith(
       expect.stringContaining('/transcribe'),
       expect.any(Object),
-      expect.objectContaining({ preferAnonymous: true }),
+      expect.objectContaining({
+        anonymousOnly: true,
+        preferAnonymous: true,
+        sessionConfig,
+        sessionSlug: 'demo-sh',
+      }),
     );
     const requestInit = fetchWorkerWithAuth.mock.calls[0]?.[1] || {};
     const uploadedFile = requestInit.body?.get?.('file');
     expect(uploadedFile?.type).toBe('audio/wav');
     expect(String(uploadedFile?.name || '')).toMatch(/\.wav$/);
+  });
+
+  it('switches from a Continuity microphone to an available built-in computer microphone', async () => {
+    const iphoneTrack = { label: 'iPhone Microphone', stop: jest.fn(), readyState: 'live' };
+    const macTrack = { label: 'MacBook Pro Microphone', stop: jest.fn(), readyState: 'live' };
+    const iphoneStream = {
+      active: true,
+      getAudioTracks: () => [iphoneTrack],
+      getTracks: () => [iphoneTrack],
+    };
+    const macStream = {
+      active: true,
+      getAudioTracks: () => [macTrack],
+      getTracks: () => [macTrack],
+    };
+    const getUserMedia = jest.fn().mockResolvedValueOnce(iphoneStream).mockResolvedValueOnce(macStream);
+    Object.defineProperty(navigator, 'mediaDevices', {
+      value: {
+        getUserMedia,
+        enumerateDevices: jest.fn().mockResolvedValue([
+          { kind: 'audioinput', deviceId: 'continuity-1', label: 'iPhone Microphone' },
+          { kind: 'audioinput', deviceId: 'builtin-1', label: 'MacBook Pro Microphone' },
+        ]),
+      },
+      configurable: true,
+    });
+
+    act(() => {
+      root.render(<WhisperHarness ref={ref} options={{ silenceDetection: false }} />);
+    });
+
+    await act(async () => {
+      await ref.current.startRecording();
+    });
+
+    expect(getUserMedia).toHaveBeenCalledTimes(2);
+    expect(getUserMedia.mock.calls[0][0]).toEqual({
+      audio: expect.objectContaining({
+        autoGainControl: true,
+        echoCancellation: true,
+        noiseSuppression: true,
+      }),
+    });
+    expect(getUserMedia.mock.calls[1][0]).toEqual({
+      audio: expect.objectContaining({ deviceId: { exact: 'builtin-1' } }),
+    });
+    expect(iphoneTrack.stop).toHaveBeenCalledTimes(1);
   });
 
   it('preserves repeated short phrases in final transcripts', async () => {

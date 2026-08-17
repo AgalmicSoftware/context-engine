@@ -106,3 +106,17 @@ test('normalizeWorkerConfigRecord preserves the canonical embedded deploy-helper
     embeddedDeployHelperEnabled: false,
   });
 });
+
+test('normalizeWorkerConfigRecord keeps only an allowlisted exact appearance shape', () => {
+  assert.deepEqual(
+    normalizeWorkerConfigRecord({ appearance: { colorSchemeId: ' AMBER ' } }, { slug: 'alpha' }),
+    { appearance: { colorSchemeId: 'amber' } },
+  );
+  assert.deepEqual(
+    normalizeWorkerConfigRecord(
+      { appearance: { colorSchemeId: 'ocean', stylesheet: 'https://example.invalid/theme.css' } },
+      { slug: 'alpha' },
+    ),
+    {},
+  );
+});

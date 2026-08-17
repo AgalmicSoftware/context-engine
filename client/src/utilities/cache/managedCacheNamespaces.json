@@ -1,0 +1,12 @@
+{
+  "managedNamespaces": [
+    "questionsCache",
+    "surveysCache",
+    "bookmarksCache",
+    "filters",
+    "sbtCache",
+    "userCache",
+    "analysisCache"
+  ],
+  "primaryRouteNamespaces": ["questionsCache", "surveysCache", "sbtCache"]
+}

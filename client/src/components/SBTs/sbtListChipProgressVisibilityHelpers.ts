@@ -1,4 +1,4 @@
-import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
+import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { isSbtListSyntheticNoSessionSlug } from './sbtListSessionUniverseHelpers';
 
 export type SbtListChipProgressBooleanBySlug = Record<string, boolean | undefined>;
@@ -124,7 +124,7 @@ export const buildSbtListChipProgressDisplayPlan = ({
   const style = showProgress
     ? {
         '--ce-chip-progress-width': progressWidth,
-        background: `linear-gradient(90deg, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.62) ${progressWidth}, rgba(0,0,0,0.22) ${progressWidth}, rgba(0,0,0,0.22) 100%)`,
+        background: `linear-gradient(90deg, color-mix(in srgb, var(--ce-edge-dark) 62%, transparent) 0%, color-mix(in srgb, var(--ce-edge-dark) 62%, transparent) ${progressWidth}, color-mix(in srgb, var(--ce-edge-dark) 22%, transparent) ${progressWidth}, color-mix(in srgb, var(--ce-edge-dark) 22%, transparent) 100%)`,
       }
     : undefined;
 

@@ -22,6 +22,7 @@ type TestHistoricalFigure = {
 
 type MockSingleQuestionResponseProps = {
   mode?: string;
+  showMiniExpand?: boolean;
   question?: {
     prompt?: string;
     type?: string;
@@ -40,7 +41,12 @@ jest.mock('../SurveyTool/SingleQuestionResponse', () => (props: MockSingleQuesti
   const answerText = Array.isArray(rawValue) ? rawValue.join(' | ') : String(rawValue ?? '');
 
   return (
-    <div data-testid="sim-question-card" data-mode={props.mode} data-type={props.question?.type || ''}>
+    <div
+      data-testid="sim-question-card"
+      data-mode={props.mode}
+      data-show-mini-expand={String(props.showMiniExpand)}
+      data-type={props.question?.type || ''}
+    >
       <span>{props.question?.prompt}</span>
       <span>{answerText}</span>
     </div>
@@ -86,6 +92,7 @@ describe('SimUserPage', () => {
     const responseCards = screen.getAllByTestId('sim-question-card');
     expect(responseCards).toHaveLength(figure.questions.length);
     expect(responseCards[0]).toHaveAttribute('data-mode', 'mini');
+    expect(responseCards[0]).toHaveAttribute('data-show-mini-expand', 'false');
     expect(responseCards[0]).toHaveAttribute('data-type', figure.questions[0].questionType);
 
     expect(screen.getByText(figure.questions[0].question)).toBeInTheDocument();
@@ -95,6 +102,7 @@ describe('SimUserPage', () => {
     ).toBeInTheDocument();
     expect(screen.queryByText(/^Question 1$/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/^Binary$/i)).not.toBeInTheDocument();
+    expect(screen.getByText('Related Figures').querySelector('svg')).toBeNull();
     expect(screen.getByText(figure.biggestHope)).toBeInTheDocument();
     expect(screen.getByAltText(figure.name).getAttribute('src')).toMatch(
       /^(\/historical-avatars\/|https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/)/,
@@ -120,6 +128,12 @@ describe('SimUserPage', () => {
         /^\/ce\/su\//.test(link.getAttribute('href') || ''),
       );
       expect(profileLinks.length).toBeGreaterThan(0);
+
+      const compareLinks = screen.getAllByRole('link', { name: /^Compare Benjamin Franklin with / });
+      expect(compareLinks.length).toBeGreaterThan(0);
+      compareLinks.forEach((link) => {
+        expect(link.getAttribute('href')).toMatch(/^\/ce\/compare\?subject=sim%3AFranklin&subject=sim%3A[^&]+$/);
+      });
     } finally {
       window.history.replaceState({}, '', priorUrl);
       if (previousPublicUrl === undefined) delete mutableEnv.PUBLIC_URL;
@@ -144,15 +158,34 @@ describe('SimUserPage', () => {
     }
   });
 
+  it('preserves explicit session context in simulated comparison links', async () => {
+    const priorUrl = window.location.href;
+    try {
+      window.history.replaceState({}, '', '/su/Franklin?session=Worker-Session');
+      render(<SimUserPage simUsername="Franklin" />);
+
+      const compareLinks = await screen.findAllByRole('link', { name: /^Compare Benjamin Franklin with / });
+      expect(compareLinks[0].getAttribute('href')).toMatch(
+        /^\/compare\?subject=sim%3AFranklin&subject=sim%3A[^&]+&session=Worker-Session$/,
+      );
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
   it('keeps the simulated-user page on the UserPage contrast palette', () => {
     const scssPath = path.join(__dirname, 'SimUserPage.module.scss');
     const scss = fs.readFileSync(scssPath, 'utf8');
 
     expect(scss).toMatch(/@extend \.userPage;/);
-    expect(scss).toMatch(/\$accent:\s*(#4dffa4|tokens\.\$ce-clickable);/);
-    expect(scss).toMatch(/\$panel-bg:\s*(rgba\(255,\s*255,\s*255,\s*0\.06\)|tokens\.\$ce-card-bg);/);
+    expect(scss).toMatch(/\$accent:\s*var\(--ce-action-accent\);/);
+    expect(scss).toMatch(/\$panel-bg:\s*var\(--ce-card-bg\);/);
     expect(scss).not.toMatch(/\.questionTypeBadge\s*{/);
     expect(scss).toMatch(/\.highlightedText\s*{[^}]*color:\s*\$body-text;/);
     expect(scss).not.toMatch(/\.highlightedText\s*{[^}]*color:\s*var\(--ce-color-accent\);/);
+    expect(scss).toMatch(/\.heroSection\s*{[^}]*background:\s*\$panel-bg;/);
+    expect(scss).toMatch(/\.heroName\s*{[^}]*color:\s*\$body-text;/);
+    expect(scss).toMatch(/\.quoteSection\s*{[^}]*background:\s*\$panel-bg;/);
+    expect(scss).toMatch(/\.eraBadge\s*{[^}]*color:\s*var\(--ce-action-primary-text\);/);
   });
 });

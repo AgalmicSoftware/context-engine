@@ -1,34 +1,32 @@
-@use 'scss/variables' as tokens;
-
-$surface: rgba(255, 255, 255, 0.065);
-$surface-strong: rgba(255, 255, 255, 0.1);
-$border: rgba(255, 255, 255, 0.14);
-$card-bg: tokens.$ce-card-bg;
-$card-border: tokens.$ce-card-border;
-$card-shadow: tokens.$ce-card-shadow;
-$input-bg: tokens.$ce-input-bg;
-$input-border: tokens.$ce-input-border;
-$text: tokens.$ce-white;
-$muted: rgba(244, 247, 255, 0.68);
-$accent: tokens.$ce-clickable;
-$blue: #7aa7ff;
-$link-blue: #9cc9ff;
-$link-blue-hover: #c8ddff;
-$amber: #ffb347;
+$surface: var(--ce-card-bg);
+$surface-strong: var(--ce-surface-raised);
+$border: var(--ce-card-border);
+$card-bg: var(--ce-card-bg);
+$card-border: var(--ce-card-border);
+$card-shadow: var(--ce-card-shadow);
+$input-bg: var(--ce-input-bg);
+$input-border: var(--ce-input-border);
+$text: var(--ce-panel-text);
+$muted: color-mix(in srgb, var(--ce-control-text) 68%, transparent);
+$accent: var(--ce-action-accent);
+$blue: var(--ce-status-info-text);
+$link-blue: var(--ce-status-info-text);
+$link-blue-hover: var(--ce-status-info-text);
+$amber: var(--ce-status-warning);
 $viz-gap-xs: 6px;
 $viz-gap-sm: 8px;
 $viz-gap-md: 10px;
 $viz-gap-lg: 12px;
 $viz-gap-xl: 14px;
 $viz-radius: var(--ce-radius-8);
-$viz-panel-bg: rgba(255, 255, 255, 0.045);
-$viz-panel-bg-strong: rgba(255, 255, 255, 0.06);
-$viz-panel-border: rgba(255, 255, 255, 0.13);
+$viz-panel-bg: var(--ce-card-bg);
+$viz-panel-bg-strong: var(--ce-surface-raised);
+$viz-panel-border: var(--ce-card-border);
 
 .postsPage {
-  --ce-post-font-body: Avenir, 'Avenir Next', 'Helvetica Neue', Arial, sans-serif;
-  --ce-post-font-heading: Futura, 'Futura PT', 'Avenir Next', Avenir, sans-serif;
-  --ce-post-font-ui: Avenir, 'Avenir Next', 'Helvetica Neue', Arial, sans-serif;
+  --ce-post-font-body: var(--ce-font-body);
+  --ce-post-font-heading: var(--ce-font-ui);
+  --ce-post-font-ui: var(--ce-font-ui);
 
   min-height: 70vh;
   padding: 32px 20px 60px;
@@ -73,7 +71,7 @@ $viz-panel-border: rgba(255, 255, 255, 0.13);
 .statusPanel {
   padding: 24px;
   border: 1px solid $border;
-  border-radius: 8px;
+  border-radius: var(--ce-radius-8);
   background: $surface;
 
   h2,
@@ -111,7 +109,7 @@ $viz-panel-border: rgba(255, 255, 255, 0.13);
   gap: 6px;
   padding: 14px;
   border: 1px solid $border;
-  border-radius: 8px;
+  border-radius: var(--ce-radius-8);
   background: $surface;
   color: $text;
   text-align: left;
@@ -129,9 +127,9 @@ $viz-panel-border: rgba(255, 255, 255, 0.13);
 
   &:hover,
   &:focus-visible {
-    border-color: rgba(77, 255, 164, 0.36);
-    background: rgba(77, 255, 164, 0.09);
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.26);
+    border-color: color-mix(in srgb, var(--ce-action-accent) 36%, transparent);
+    background: color-mix(in srgb, var(--ce-action-accent) 9%, transparent);
+    box-shadow: 0 12px 30px color-mix(in srgb, var(--ce-compat-dark) 26%, transparent);
     outline: none;
     transform: translateY(-2px);
   }
@@ -149,8 +147,8 @@ $viz-panel-border: rgba(255, 255, 255, 0.13);
 .postNavMedia {
   width: 100%;
   overflow: hidden;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.055);
+  border-radius: var(--ce-radius-6);
+  background: color-mix(in srgb, var(--ce-text-inverse) 5.5%, transparent);
   aspect-ratio: 16 / 7;
 }
 
@@ -184,7 +182,7 @@ $viz-panel-border: rgba(255, 255, 255, 0.13);
   box-sizing: border-box;
   padding: 34px;
   border: 1px solid $border;
-  border-radius: 8px;
+  border-radius: var(--ce-radius-8);
   background: $surface;
   font-family: var(--ce-post-font-body);
 }
@@ -196,7 +194,7 @@ $viz-panel-border: rgba(255, 255, 255, 0.13);
   align-items: center;
   gap: 8px;
   margin-bottom: 20px;
-  color: rgba(226, 236, 255, 0.94);
+  color: color-mix(in srgb, var(--ce-status-info-text) 94%, transparent);
   font-size: 1.74rem;
   font-weight: 700;
   text-decoration: none;
@@ -218,16 +216,16 @@ $viz-panel-border: rgba(255, 255, 255, 0.13);
   gap: 10px;
   margin-bottom: 24px;
   padding-bottom: 18px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
 }
 
 .postHeroFigure,
 .postImageFigure {
   min-width: 0;
   margin: 0;
-  border: 1px solid rgba(255, 255, 255, 0.13);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 13%, transparent);
+  border-radius: var(--ce-radius-8);
+  background: color-mix(in srgb, var(--ce-text-inverse) 5.5%, transparent);
 }
 
 .postHeroFigure {
@@ -262,7 +260,7 @@ $viz-panel-border: rgba(255, 255, 255, 0.13);
   width: 100%;
   padding: 0;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--ce-radius-7);
   background: transparent;
   cursor: zoom-in;
   transition: filter 0.16s ease;
@@ -272,13 +270,13 @@ $viz-panel-border: rgba(255, 255, 255, 0.13);
   }
 
   &:focus-visible {
-    outline: 2px solid rgba(77, 255, 164, 0.7);
+    outline: 2px solid color-mix(in srgb, var(--ce-action-accent) 70%, transparent);
     outline-offset: 3px;
   }
 }
 
 .postImageButton .postImage {
-  border-radius: 7px;
+  border-radius: var(--ce-radius-7);
 }
 
 .postImageFullscreen {
@@ -291,7 +289,7 @@ $viz-panel-border: rgba(255, 255, 255, 0.13);
   justify-content: center;
   padding: clamp(16px, 4vw, 52px);
   border: 0;
-  background: rgba(5, 7, 22, 0.88);
+  background: color-mix(in srgb, var(--ce-overlay-base) 88%, transparent);
   cursor: zoom-out;
   opacity: 0;
   pointer-events: none;
@@ -313,10 +311,10 @@ $viz-panel-border: rgba(255, 255, 255, 0.13);
   max-width: min(96vw, 1720px);
   max-height: 92vh;
   object-fit: contain;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.04);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 22%, transparent);
+  border-radius: var(--ce-radius-8);
+  background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
+  box-shadow: 0 24px 80px color-mix(in srgb, var(--ce-compat-dark) 50%, transparent);
 }
 
 .postImageCaption {
@@ -361,10 +359,10 @@ $viz-panel-border: rgba(255, 255, 255, 0.13);
   align-items: center;
   min-height: 28px;
   padding: 0 10px;
-  border: 1px solid rgba(77, 255, 164, 0.36);
-  border-radius: 999px;
-  background: rgba(77, 255, 164, 0.1);
-  color: #4dffa4;
+  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 36%, transparent);
+  border-radius: var(--ce-radius-pill);
+  background: color-mix(in srgb, var(--ce-action-accent) 10%, transparent);
+  color: var(--ce-action-accent);
   font-size: 0.88rem;
 }
 
@@ -377,19 +375,19 @@ $viz-panel-border: rgba(255, 255, 255, 0.13);
 .markdownBody {
   display: grid;
   gap: 18px;
-  color: rgba(244, 247, 255, 0.9);
+  color: color-mix(in srgb, var(--ce-control-text) 90%, transparent);
   font-family: var(--ce-post-font-body);
 
   a {
     padding: 0.06em 0.3em;
-    border-radius: 5px;
-    background: rgba(122, 167, 255, 0.16);
+    border-radius: var(--ce-radius-5);
+    background: color-mix(in srgb, var(--ce-status-info-text) 16%, transparent);
     box-decoration-break: clone;
     -webkit-box-decoration-break: clone;
-    box-shadow: inset 0 0 0 1px rgba(122, 167, 255, 0.24);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ce-status-info-text) 24%, transparent);
     color: $link-blue-hover;
     text-decoration: underline;
-    text-decoration-color: rgba(156, 201, 255, 0.34);
+    text-decoration-color: color-mix(in srgb, var(--ce-status-info-text) 34%, transparent);
     text-decoration-thickness: 0.07em;
     text-underline-offset: 0.18em;
     transition:
@@ -403,17 +401,17 @@ $viz-panel-border: rgba(255, 255, 255, 0.13);
     }
 
     &:hover {
-      background: rgba(122, 167, 255, 0.3);
-      box-shadow: inset 0 0 0 1px rgba(156, 201, 255, 0.5);
-      color: #ffffff;
+      background: color-mix(in srgb, var(--ce-status-info-text) 30%, transparent);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ce-status-info-text) 50%, transparent);
+      color: var(--ce-text-inverse);
       text-decoration-color: currentColor;
     }
 
     &:focus-visible {
-      outline: 2px solid rgba(156, 201, 255, 0.65);
+      outline: 2px solid color-mix(in srgb, var(--ce-status-info-text) 65%, transparent);
       outline-offset: 2px;
-      background: rgba(122, 167, 255, 0.3);
-      color: #ffffff;
+      background: color-mix(in srgb, var(--ce-status-info-text) 30%, transparent);
+      color: var(--ce-text-inverse);
     }
 
     &[target='_blank']::after {
@@ -443,7 +441,7 @@ h1.postHeading {
 
 h2.postHeading {
   padding-bottom: 8px;
-  border-bottom: 1px solid rgba(122, 167, 255, 0.18);
+  border-bottom: 1px solid color-mix(in srgb, var(--ce-status-info-text) 18%, transparent);
   font-size: 1.78rem;
 }
 
@@ -459,7 +457,7 @@ h3.postHeading {
 }
 
 .postHeadingSample {
-  color: rgba(244, 247, 255, 0.64);
+  color: color-mix(in srgb, var(--ce-control-text) 64%, transparent);
   font-family: var(--ce-post-font-ui);
   font-size: 0.55em;
   font-weight: 650;
@@ -482,9 +480,9 @@ h3.postHeading {
 
   code {
     padding: 0.1rem 0.28rem;
-    border-radius: 4px;
-    background: rgba(122, 167, 255, 0.14);
-    color: rgba(219, 231, 255, 0.96);
+    border-radius: var(--ce-radius-4);
+    background: color-mix(in srgb, var(--ce-status-info-text) 14%, transparent);
+    color: color-mix(in srgb, var(--ce-status-info-text) 96%, transparent);
   }
 }
 
@@ -501,27 +499,27 @@ h3.postHeading {
 .postBlockquote {
   padding: 14px 18px;
   border-left: 3px solid $accent;
-  border-radius: 0 8px 8px 0;
-  background: rgba(77, 255, 164, 0.08);
-  color: rgba(230, 255, 244, 0.94);
+  border-radius: var(--ce-radius-0) var(--ce-radius-8) var(--ce-radius-8) var(--ce-radius-0);
+  background: color-mix(in srgb, var(--ce-action-accent) 8%, transparent);
+  color: color-mix(in srgb, var(--ce-status-success-text) 94%, transparent);
 }
 
 .postCode {
   overflow-x: auto;
   margin: 0;
   padding: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  background: rgba(4, 7, 18, 0.82);
-  color: rgba(244, 247, 255, 0.9);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
+  border-radius: var(--ce-radius-8);
+  background: color-mix(in srgb, var(--ce-overlay-base) 82%, transparent);
+  color: color-mix(in srgb, var(--ce-control-text) 90%, transparent);
 }
 
 .postDisclosure {
   min-width: 0;
   overflow: hidden;
-  border: 1px solid rgba(122, 167, 255, 0.24);
-  border-radius: 8px;
-  background: rgba(8, 13, 31, 0.48);
+  border: 1px solid color-mix(in srgb, var(--ce-status-info-text) 24%, transparent);
+  border-radius: var(--ce-radius-8);
+  background: color-mix(in srgb, var(--ce-overlay-base) 48%, transparent);
 }
 
 .postDisclosureSummary {
@@ -530,7 +528,7 @@ h3.postHeading {
   justify-content: space-between;
   gap: 16px;
   padding: 14px 16px;
-  background: rgba(122, 167, 255, 0.09);
+  background: color-mix(in srgb, var(--ce-status-info-text) 9%, transparent);
   color: $text;
   cursor: pointer;
   font-family: var(--ce-post-font-ui);
@@ -544,11 +542,11 @@ h3.postHeading {
   }
 
   &:hover {
-    background: rgba(77, 255, 164, 0.08);
+    background: color-mix(in srgb, var(--ce-action-accent) 8%, transparent);
   }
 
   &:focus-visible {
-    outline: 2px solid rgba(77, 255, 164, 0.75);
+    outline: 2px solid color-mix(in srgb, var(--ce-action-accent) 75%, transparent);
     outline-offset: -3px;
   }
 }
@@ -571,7 +569,7 @@ h3.postHeading {
 }
 
 .postDisclosure[open] .postDisclosureSummary {
-  border-bottom: 1px solid rgba(122, 167, 255, 0.16);
+  border-bottom: 1px solid color-mix(in srgb, var(--ce-status-info-text) 16%, transparent);
 }
 
 .postDisclosure[open] .postDisclosureIconClosed {
@@ -602,7 +600,7 @@ h3.postHeading {
 .postRule {
   width: 100%;
   border: 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
 }
 
 .vizCard {
@@ -630,7 +628,7 @@ h3.postHeading {
   padding: $viz-gap-lg $viz-gap-xl;
   border: 1px solid $viz-panel-border;
   border-radius: $viz-radius;
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
   color: $text;
   cursor: pointer;
   font-family: var(--ce-post-font-heading);
@@ -644,13 +642,13 @@ h3.postHeading {
   }
 
   &:focus-visible {
-    outline: 2px solid rgba(77, 255, 164, 0.7);
+    outline: 2px solid color-mix(in srgb, var(--ce-action-accent) 70%, transparent);
     outline-offset: 3px;
   }
 
   &:hover {
-    border-color: rgba(77, 255, 164, 0.3);
-    background: rgba(77, 255, 164, 0.07);
+    border-color: color-mix(in srgb, var(--ce-action-accent) 30%, transparent);
+    background: color-mix(in srgb, var(--ce-action-accent) 7%, transparent);
   }
 }
 
@@ -673,8 +671,8 @@ h3.postHeading {
 }
 
 .vizDisclosure[open] .vizDisclosureSummary {
-  border-bottom-color: rgba(255, 255, 255, 0.08);
-  border-radius: var(--ce-radius-8) var(--ce-radius-8) 0 0;
+  border-bottom-color: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+  border-radius: var(--ce-radius-8) var(--ce-radius-8) var(--ce-radius-0) var(--ce-radius-0);
 }
 
 .vizDisclosure[open] .vizDisclosureIconClosed {
@@ -687,8 +685,8 @@ h3.postHeading {
 
 .vizDisclosure > .vizCard {
   border-top: 0;
-  border-top-left-radius: 0;
-  border-top-right-radius: 0;
+  border-top-left-radius: var(--ce-radius-0);
+  border-top-right-radius: var(--ce-radius-0);
 }
 
 .vizInlineContent {
@@ -704,13 +702,25 @@ h3.postHeading {
 }
 
 .vizGroupDisclosure > .vizDisclosureSummary {
-  background: linear-gradient(90deg, rgba(0, 197, 255, 0.09), rgba(255, 255, 255, 0.045)), $card-bg;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--ce-data-series-8) 9%, transparent),
+      color-mix(in srgb, var(--ce-text-inverse) 4.5%, transparent)
+    ),
+    $card-bg;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--ce-compat-dark) 16%, transparent);
   font-size: 1.05rem;
   font-weight: 700;
 
   &:hover {
-    background: linear-gradient(90deg, rgba(0, 197, 255, 0.2), rgba(77, 255, 164, 0.08)), $card-bg;
+    background:
+      linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--ce-data-series-8) 20%, transparent),
+        color-mix(in srgb, var(--ce-action-accent) 8%, transparent)
+      ),
+      $card-bg;
   }
 }
 
@@ -740,7 +750,7 @@ h3.postHeading {
   > .vizCard + .vizCard {
     margin-top: $viz-gap-xl;
     padding-top: $viz-gap-xl;
-    border-top: 1px solid rgba(255, 255, 255, 0.07);
+    border-top: 1px solid color-mix(in srgb, var(--ce-text-inverse) 7%, transparent);
   }
 }
 
@@ -750,7 +760,7 @@ h3.postHeading {
   gap: $viz-gap-md;
 
   &:focus-visible {
-    outline: 2px solid rgba(77, 255, 164, 0.7);
+    outline: 2px solid color-mix(in srgb, var(--ce-action-accent) 70%, transparent);
     outline-offset: 3px;
   }
 }
@@ -778,7 +788,7 @@ h3.postHeading {
   background: $card-bg;
   color: $accent;
   cursor: pointer;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--ce-compat-dark) 18%, transparent);
   transition:
     transform 0.08s ease,
     border-color 0.16s ease,
@@ -787,22 +797,22 @@ h3.postHeading {
     color 0.16s ease;
 
   &:hover:not(:disabled) {
-    border-color: rgba(77, 255, 164, 0.42);
-    background: rgba(77, 255, 164, 0.12);
-    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.22);
-    color: #ffffff;
+    border-color: color-mix(in srgb, var(--ce-action-accent) 42%, transparent);
+    background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
+    box-shadow: 0 12px 24px color-mix(in srgb, var(--ce-compat-dark) 22%, transparent);
+    color: var(--ce-text-inverse);
     transform: translateY(-1px) scale(1.05);
   }
 
   &:focus-visible {
-    outline: 2px solid rgba(77, 255, 164, 0.76);
+    outline: 2px solid color-mix(in srgb, var(--ce-action-accent) 76%, transparent);
     outline-offset: 3px;
   }
 
   &:disabled {
-    border-color: rgba(244, 247, 255, 0.16);
-    background: rgba(255, 255, 255, 0.045);
-    color: rgba(244, 247, 255, 0.58);
+    border-color: color-mix(in srgb, var(--ce-control-text) 16%, transparent);
+    background: color-mix(in srgb, var(--ce-text-inverse) 4.5%, transparent);
+    color: color-mix(in srgb, var(--ce-control-text) 58%, transparent);
     cursor: not-allowed;
     box-shadow: none;
     opacity: 1;
@@ -811,7 +821,7 @@ h3.postHeading {
 
 .vizCarouselCounter {
   min-width: 44px;
-  color: rgba(244, 247, 255, 0.86);
+  color: color-mix(in srgb, var(--ce-control-text) 86%, transparent);
   font-family: var(--ce-font-mono);
   font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
@@ -860,8 +870,8 @@ h3.postHeading {
 
   > .vizCard {
     position: relative;
-    border-color: rgba(244, 247, 255, 0.14);
-    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
+    border-color: color-mix(in srgb, var(--ce-control-text) 14%, transparent);
+    box-shadow: 0 8px 18px color-mix(in srgb, var(--ce-compat-dark) 20%, transparent);
 
     &::before {
       content: '';
@@ -870,8 +880,8 @@ h3.postHeading {
       right: 1px;
       left: 1px;
       height: 44%;
-      border-radius: calc(#{$viz-radius} - 1px) calc(#{$viz-radius} - 1px) 0 0;
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 30%);
+      border-radius: calc(#{$viz-radius} - 1px) calc(#{$viz-radius} - 1px) var(--ce-radius-0) var(--ce-radius-0);
+      background: linear-gradient(180deg, color-mix(in srgb, var(--ce-text-inverse) 8%, transparent), transparent 30%);
       pointer-events: none;
     }
   }
@@ -886,27 +896,27 @@ h3.postHeading {
     opacity: 1;
 
     > .vizCard {
-      border-color: rgba(77, 255, 164, 0.22);
+      border-color: color-mix(in srgb, var(--ce-action-accent) 22%, transparent);
       box-shadow:
-        0 18px 42px rgba(0, 0, 0, 0.32),
-        0 0 0 1px rgba(77, 255, 164, 0.06),
-        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        0 18px 42px color-mix(in srgb, var(--ce-compat-dark) 32%, transparent),
+        0 0 0 1px color-mix(in srgb, var(--ce-action-accent) 6%, transparent),
+        inset 0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
     }
   }
 
   &:hover > .vizCard {
-    border-color: rgba(77, 255, 164, 0.25);
+    border-color: color-mix(in srgb, var(--ce-action-accent) 25%, transparent);
     box-shadow:
-      0 12px 24px rgba(0, 0, 0, 0.24),
-      inset 0 1px 0 rgba(255, 255, 255, 0.09);
+      0 12px 24px color-mix(in srgb, var(--ce-compat-dark) 24%, transparent),
+      inset 0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 9%, transparent);
   }
 
   &[data-active='true']:hover > .vizCard {
-    border-color: rgba(77, 255, 164, 0.32);
+    border-color: color-mix(in srgb, var(--ce-action-accent) 32%, transparent);
     box-shadow:
-      0 20px 48px rgba(0, 0, 0, 0.34),
-      0 0 0 1px rgba(77, 255, 164, 0.08),
-      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      0 20px 48px color-mix(in srgb, var(--ce-compat-dark) 34%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--ce-action-accent) 8%, transparent),
+      inset 0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
   }
 }
 
@@ -952,11 +962,11 @@ h3.postHeading {
   height: 12px;
   flex: 0 0 auto;
   padding: 0;
-  border: 1px solid rgba(244, 247, 255, 0.34);
-  border-radius: 999px;
-  background: rgba(244, 247, 255, 0.34);
+  border: 1px solid color-mix(in srgb, var(--ce-control-text) 34%, transparent);
+  border-radius: var(--ce-radius-pill);
+  background: color-mix(in srgb, var(--ce-control-text) 34%, transparent);
   cursor: pointer;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--ce-compat-dark) 18%, transparent);
   transition:
     transform 0.08s ease,
     border-color 0.16s ease,
@@ -964,23 +974,23 @@ h3.postHeading {
     box-shadow 0.2s ease;
 
   &:hover {
-    border-color: rgba(77, 255, 164, 0.56);
-    background: rgba(77, 255, 164, 0.56);
-    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.22);
+    border-color: color-mix(in srgb, var(--ce-action-accent) 56%, transparent);
+    background: color-mix(in srgb, var(--ce-action-accent) 56%, transparent);
+    box-shadow: 0 12px 24px color-mix(in srgb, var(--ce-compat-dark) 22%, transparent);
     transform: translateY(-1px);
   }
 
   &:focus-visible {
-    outline: 2px solid rgba(77, 255, 164, 0.76);
+    outline: 2px solid color-mix(in srgb, var(--ce-action-accent) 76%, transparent);
     outline-offset: 3px;
   }
 
   &[aria-current='true'] {
-    border-color: rgba(77, 255, 164, 0.78);
+    border-color: color-mix(in srgb, var(--ce-action-accent) 78%, transparent);
     background: $accent;
     box-shadow:
-      0 0 0 3px rgba(77, 255, 164, 0.25),
-      0 8px 18px rgba(0, 0, 0, 0.18);
+      0 0 0 3px color-mix(in srgb, var(--ce-action-accent) 25%, transparent),
+      0 8px 18px color-mix(in srgb, var(--ce-compat-dark) 18%, transparent);
   }
 }
 
@@ -999,12 +1009,12 @@ h3.postHeading {
 .vizDisclosureNested .vizDisclosureSummary {
   min-height: 42px;
   padding: $viz-gap-md $viz-gap-lg;
-  background: rgba(255, 255, 255, 0.035);
+  background: color-mix(in srgb, var(--ce-text-inverse) 3.5%, transparent);
   font-size: 1rem;
   font-weight: 600;
 
   &:hover {
-    background: rgba(77, 255, 164, 0.06);
+    background: color-mix(in srgb, var(--ce-action-accent) 6%, transparent);
   }
 }
 
@@ -1047,7 +1057,7 @@ h3.postHeading {
   display: flex;
   justify-content: space-between;
   gap: $viz-gap-md;
-  color: rgba(244, 247, 255, 0.94);
+  color: color-mix(in srgb, var(--ce-control-text) 94%, transparent);
   font-size: 0.9rem;
 }
 
@@ -1070,8 +1080,8 @@ h3.postHeading {
 .dot {
   width: 8px;
   height: 8px;
-  border-radius: 999px;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14);
+  border-radius: var(--ce-radius-pill);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
 }
 
 .categoryDetail {
@@ -1098,7 +1108,7 @@ h3.postHeading {
 
 .quoteText {
   margin: 0;
-  color: rgba(244, 247, 255, 0.92);
+  color: color-mix(in srgb, var(--ce-control-text) 92%, transparent);
   font-size: 0.95rem;
   line-height: 1.55;
 }
@@ -1110,7 +1120,13 @@ h3.postHeading {
 }
 
 .rankedThemesCard {
-  background: linear-gradient(180deg, rgba(122, 167, 255, 0.12), rgba(255, 255, 255, 0.055)), $surface;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--ce-status-info-text) 12%, transparent),
+      color-mix(in srgb, var(--ce-text-inverse) 5.5%, transparent)
+    ),
+    $surface;
 }
 
 .rankedThemes {
@@ -1135,11 +1151,11 @@ h3.postHeading {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(77, 255, 164, 0.36);
-  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 36%, transparent);
+  border-radius: var(--ce-radius-pill);
   color: $accent;
   font-weight: 700;
-  background: rgba(77, 255, 164, 0.08);
+  background: color-mix(in srgb, var(--ce-action-accent) 8%, transparent);
 }
 
 .rankedThemeBody {
@@ -1173,7 +1189,7 @@ h3.postHeading {
   position: relative;
   height: 8px;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: var(--ce-radius-pill);
   background: $input-bg;
 }
 
@@ -1185,7 +1201,7 @@ h3.postHeading {
 
 .rankedThemeSummary {
   margin: 0;
-  color: rgba(244, 247, 255, 0.86);
+  color: color-mix(in srgb, var(--ce-control-text) 86%, transparent);
   font-size: 0.94rem;
   line-height: 1.55;
 }
@@ -1193,13 +1209,13 @@ h3.postHeading {
 .rankedThemeQuote {
   margin: 0;
   padding: 12px;
-  border-left: 3px solid rgba(77, 255, 164, 0.48);
-  border-radius: 0 var(--ce-radius-8) var(--ce-radius-8) 0;
-  background: rgba(77, 255, 164, 0.075);
+  border-left: 3px solid color-mix(in srgb, var(--ce-action-accent) 48%, transparent);
+  border-radius: var(--ce-radius-0) var(--ce-radius-8) var(--ce-radius-8) var(--ce-radius-0);
+  background: color-mix(in srgb, var(--ce-action-accent) 7.5%, transparent);
 
   blockquote {
     margin: 0;
-    color: rgba(244, 247, 255, 0.93);
+    color: color-mix(in srgb, var(--ce-control-text) 93%, transparent);
     font-size: 0.92rem;
     line-height: 1.5;
   }
@@ -1213,8 +1229,9 @@ h3.postHeading {
 
 .themeNetworkCard {
   background:
-    radial-gradient(circle at 20% 20%, rgba(77, 255, 164, 0.13), transparent 34%),
-    radial-gradient(circle at 78% 28%, rgba(255, 107, 203, 0.14), transparent 36%), $surface;
+    radial-gradient(circle at 20% 20%, color-mix(in srgb, var(--ce-action-accent) 13%, transparent), transparent 34%),
+    radial-gradient(circle at 78% 28%, color-mix(in srgb, var(--ce-data-series-3) 14%, transparent), transparent 36%),
+    $surface;
 }
 
 .networkFrame {
@@ -1230,19 +1247,19 @@ h3.postHeading {
   min-height: 250px;
   border: 1px solid $input-border;
   border-radius: var(--ce-radius-8);
-  background: rgba(5, 8, 22, 0.54);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--ce-overlay-base) 54%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
 }
 
 .networkLink {
-  stroke: rgba(226, 236, 255, 0.32);
+  stroke: color-mix(in srgb, var(--ce-status-info-text) 32%, transparent);
   stroke-linecap: round;
 }
 
 .networkNode {
-  stroke: rgba(255, 255, 255, 0.55);
+  stroke: color-mix(in srgb, var(--ce-text-inverse) 55%, transparent);
   stroke-width: 0.35;
-  filter: drop-shadow(0 0 4px rgba(77, 255, 164, 0.24));
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--ce-action-accent) 24%, transparent));
 }
 
 .networkNodeShadow,
@@ -1251,7 +1268,7 @@ h3.postHeading {
 }
 
 .networkNodeShadow {
-  fill: rgba(0, 0, 0, 0.28);
+  fill: color-mix(in srgb, var(--ce-compat-dark) 28%, transparent);
   opacity: 0.72;
 }
 
@@ -1260,7 +1277,7 @@ h3.postHeading {
 }
 
 .networkLabel {
-  fill: rgba(244, 247, 255, 0.92);
+  fill: color-mix(in srgb, var(--ce-control-text) 92%, transparent);
   font-family: var(--ce-font-mono);
   font-size: 3px;
   letter-spacing: 0;
@@ -1282,7 +1299,7 @@ h3.postHeading {
   width: 10px;
   height: 10px;
   margin-top: 5px;
-  border-radius: 999px;
+  border-radius: var(--ce-radius-pill);
 }
 
 .networkLegendTitle {
@@ -1313,16 +1330,16 @@ h3.postHeading {
   container-type: inline-size;
   gap: 0;
   overflow: hidden;
-  border-color: rgba(158, 231, 255, 0.18);
-  background: rgba(7, 14, 24, 0.72);
+  border-color: color-mix(in srgb, var(--ce-data-series-8) 18%, transparent);
+  background: color-mix(in srgb, var(--ce-overlay-base) 72%, transparent);
 }
 
 .precisionTable {
   display: grid;
   overflow: hidden;
-  border: 1px solid rgba(158, 231, 255, 0.18);
-  border-radius: 4px;
-  background: rgba(5, 11, 20, 0.36);
+  border: 1px solid color-mix(in srgb, var(--ce-data-series-8) 18%, transparent);
+  border-radius: var(--ce-radius-4);
+  background: color-mix(in srgb, var(--ce-overlay-base) 36%, transparent);
 }
 
 .precisionTableHeader,
@@ -1334,8 +1351,8 @@ h3.postHeading {
 .precisionTableHeader {
   min-height: 46px;
   align-items: center;
-  border-bottom: 1px solid rgba(158, 231, 255, 0.2);
-  color: rgba(244, 247, 255, 0.72);
+  border-bottom: 1px solid color-mix(in srgb, var(--ce-data-series-8) 20%, transparent);
+  color: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
   font-family: var(--ce-font-mono);
   font-size: 0.72rem;
   font-weight: 700;
@@ -1350,7 +1367,7 @@ h3.postHeading {
   }
 
   > span + span {
-    border-left: 1px solid rgba(158, 231, 255, 0.16);
+    border-left: 1px solid color-mix(in srgb, var(--ce-data-series-8) 16%, transparent);
   }
 }
 
@@ -1365,7 +1382,7 @@ h3.postHeading {
 .precisionTableRow {
   position: relative;
   min-height: 116px;
-  border-bottom: 1px solid rgba(158, 231, 255, 0.14);
+  border-bottom: 1px solid color-mix(in srgb, var(--ce-data-series-8) 14%, transparent);
 
   &:last-child {
     border-bottom: 0;
@@ -1378,7 +1395,7 @@ h3.postHeading {
   }
 
   > [role='cell'] {
-    border-left: 1px solid rgba(158, 231, 255, 0.14);
+    border-left: 1px solid color-mix(in srgb, var(--ce-data-series-8) 14%, transparent);
   }
 }
 
@@ -1389,7 +1406,7 @@ h3.postHeading {
 }
 
 .precisionQuestionLabel {
-  color: #ffffff;
+  color: var(--ce-text-inverse);
   font-family: var(--ce-post-font-heading);
   font-size: 0.98rem;
   font-weight: 700;
@@ -1397,7 +1414,7 @@ h3.postHeading {
 }
 
 .precisionQuestionText {
-  color: rgba(244, 247, 255, 0.72);
+  color: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
   font-size: 0.94rem;
   line-height: 1.42;
 }
@@ -1413,7 +1430,7 @@ h3.postHeading {
   right: $viz-gap-lg;
   left: $viz-gap-lg;
   height: 1px;
-  background: rgba(244, 247, 255, 0.34);
+  background: color-mix(in srgb, var(--ce-control-text) 34%, transparent);
 }
 
 .precisionScaleTick {
@@ -1421,7 +1438,7 @@ h3.postHeading {
   top: calc(50% - 12px);
   width: 1px;
   height: 24px;
-  background: rgba(244, 247, 255, 0.18);
+  background: color-mix(in srgb, var(--ce-control-text) 18%, transparent);
 }
 
 .precisionPoint {
@@ -1435,31 +1452,31 @@ h3.postHeading {
   justify-content: center;
   padding: 0;
   transform: translate(-50%, -50%);
-  border: 1px solid rgba(255, 255, 255, 0.72);
-  border-radius: 999px;
-  color: #07101a;
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 72%, transparent);
+  border-radius: var(--ce-radius-pill);
+  color: var(--ce-overlay-base);
   cursor: help;
   font-family: var(--ce-font-mono);
   font-size: 0.58rem;
   font-weight: 800;
   line-height: 1;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.34);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--ce-compat-dark) 34%, transparent);
 
   &:hover,
   &:focus-visible {
     z-index: 2;
-    border-color: #ffffff;
-    outline: 2px solid rgba(158, 231, 255, 0.78);
+    border-color: var(--ce-text-inverse);
+    outline: 2px solid color-mix(in srgb, var(--ce-data-series-8) 78%, transparent);
     outline-offset: 2px;
   }
 }
 
 .precisionPointActive {
   z-index: 3;
-  border-color: #ffffff;
+  border-color: var(--ce-text-inverse);
   box-shadow:
-    0 4px 12px rgba(0, 0, 0, 0.34),
-    0 0 0 2px rgba(158, 231, 255, 0.62);
+    0 4px 12px color-mix(in srgb, var(--ce-compat-dark) 34%, transparent),
+    0 0 0 2px color-mix(in srgb, var(--ce-data-series-8) 62%, transparent);
 }
 
 .precisionTooltip {
@@ -1478,7 +1495,7 @@ h3.postHeading {
   }
 
   span.precisionTooltipConfidence {
-    color: rgba(244, 247, 255, 0.94);
+    color: color-mix(in srgb, var(--ce-control-text) 94%, transparent);
     font-size: 0.84rem;
     font-weight: 700;
     line-height: 1.25;
@@ -1493,7 +1510,7 @@ h3.postHeading {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ffffff;
+  color: var(--ce-text-inverse);
   font-family: var(--ce-font-mono);
   font-size: 0.86rem;
   font-weight: 700;
@@ -1520,7 +1537,7 @@ h3.postHeading {
   .precisionQuestion {
     grid-column: 1 / -1;
     padding-bottom: $viz-gap-md;
-    border-bottom: 1px solid rgba(158, 231, 255, 0.12);
+    border-bottom: 1px solid color-mix(in srgb, var(--ce-data-series-8) 12%, transparent);
   }
 
   .precisionScalePlot {
@@ -1545,7 +1562,7 @@ h3.postHeading {
 .beeswarmRow + .beeswarmRow {
   margin-top: $viz-gap-sm;
   padding-top: $viz-gap-xl;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
 }
 
 .beeswarmRowMeta {
@@ -1583,15 +1600,15 @@ h3.postHeading {
   right: 0;
   top: 50%;
   height: 2px;
-  border-radius: 999px;
-  background: rgba(244, 247, 255, 0.28);
+  border-radius: var(--ce-radius-pill);
+  background: color-mix(in srgb, var(--ce-control-text) 28%, transparent);
 }
 
 .beeswarmTick {
   position: absolute;
   bottom: -2px;
   transform: translateX(-50%);
-  color: rgba(244, 247, 255, 0.72);
+  color: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
   font-family: var(--ce-font-mono);
   font-size: 0.7rem;
   white-space: nowrap;
@@ -1603,7 +1620,7 @@ h3.postHeading {
     bottom: 18px;
     width: 1px;
     height: 28px;
-    background: rgba(255, 255, 255, 0.12);
+    background: color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
   }
 }
 
@@ -1618,17 +1635,17 @@ h3.postHeading {
   justify-content: center;
   padding: 0;
   transform: translate(-50%, -50%);
-  border: 1px solid rgba(255, 255, 255, 0.62);
-  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 62%, transparent);
+  border-radius: var(--ce-radius-pill);
   background-image: none;
-  color: #061018;
+  color: var(--ce-overlay-base);
   cursor: pointer;
   filter: none;
   font-family: var(--ce-font-mono);
   font-size: 0.62rem;
   font-weight: 800;
   line-height: 1;
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
   transition:
     border-color 0.14s ease,
     filter 0.14s ease,
@@ -1640,14 +1657,14 @@ h3.postHeading {
   }
 
   &:focus-visible {
-    outline: 2px solid rgba(77, 255, 164, 0.8);
+    outline: 2px solid color-mix(in srgb, var(--ce-action-accent) 80%, transparent);
     outline-offset: 2px;
   }
 }
 
 .beeswarmDotActive {
   z-index: 2;
-  border-color: #ffffff;
+  border-color: var(--ce-text-inverse);
   opacity: 1 !important;
 }
 
@@ -1673,13 +1690,13 @@ h3.postHeading {
   overflow: visible;
   border: 1px solid $viz-panel-border;
   border-radius: $viz-radius;
-  background: rgba(7, 12, 31, 0.3);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);
+  background: color-mix(in srgb, var(--ce-overlay-base) 30%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 5.5%, transparent);
 }
 
 .binaryBeeswarmAxisBase {
-  stroke: rgba(244, 247, 255, 0.11);
+  stroke: color-mix(in srgb, var(--ce-control-text) 11%, transparent);
   stroke-linecap: round;
   stroke-width: 3;
 }
@@ -1687,28 +1704,28 @@ h3.postHeading {
 .binaryBeeswarmAxis {
   stroke-linecap: round;
   stroke-width: 5;
-  filter: drop-shadow(0 0 10px rgba(77, 255, 164, 0.16));
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--ce-action-accent) 16%, transparent));
 }
 
 .binaryBeeswarmTick {
-  stroke: rgba(244, 247, 255, 0.14);
+  stroke: color-mix(in srgb, var(--ce-control-text) 14%, transparent);
   stroke-width: 1;
 }
 
 .binaryBeeswarmGridline {
-  stroke: rgba(244, 247, 255, 0.09);
+  stroke: color-mix(in srgb, var(--ce-control-text) 9%, transparent);
   stroke-dasharray: 3 5;
   stroke-width: 1;
 }
 
 .binaryBeeswarmYTickLabel {
-  fill: rgba(244, 247, 255, 0.72);
+  fill: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
   font-family: var(--ce-font-mono);
   font-size: 12px;
 }
 
 .binaryBeeswarmYAxisLabel {
-  fill: rgba(244, 247, 255, 0.82);
+  fill: color-mix(in srgb, var(--ce-control-text) 82%, transparent);
   font-family: var(--ce-font-mono);
   font-size: 15px;
   font-weight: 700;
@@ -1717,7 +1734,7 @@ h3.postHeading {
 }
 
 .binaryBeeswarmAxisLabel {
-  fill: rgba(244, 247, 255, 0.86);
+  fill: color-mix(in srgb, var(--ce-control-text) 86%, transparent);
   font-family: var(--ce-font-mono);
   font-size: 16px;
   letter-spacing: 0;
@@ -1735,7 +1752,7 @@ h3.postHeading {
 }
 
 .binaryBeeswarmDot {
-  stroke: rgba(255, 255, 255, 0.66);
+  stroke: color-mix(in srgb, var(--ce-text-inverse) 66%, transparent);
   stroke-width: 1.2;
   transition:
     r 0.14s ease,
@@ -1750,7 +1767,7 @@ h3.postHeading {
 }
 
 .binaryBeeswarmDotShadow {
-  fill: rgba(0, 0, 0, 0.28);
+  fill: color-mix(in srgb, var(--ce-compat-dark) 28%, transparent);
   opacity: 0.34;
 }
 
@@ -1761,9 +1778,9 @@ h3.postHeading {
 .binaryBeeswarmPointActive .binaryBeeswarmDot,
 .binaryBeeswarmPoint:hover .binaryBeeswarmDot {
   r: 10px;
-  stroke: rgba(255, 255, 255, 0.9);
+  stroke: color-mix(in srgb, var(--ce-text-inverse) 90%, transparent);
   stroke-width: 2;
-  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.24));
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--ce-text-inverse) 24%, transparent));
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1791,18 +1808,18 @@ h3.postHeading {
   display: grid;
   gap: 7px;
   padding: 12px 14px;
-  border: 1px solid rgba(77, 255, 164, 0.34);
+  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 34%, transparent);
   border-radius: var(--ce-radius-8);
-  background: rgba(18, 23, 54, 0.96);
+  background: color-mix(in srgb, var(--ce-overlay-surface) 96%, transparent);
   color: $text;
   box-shadow:
-    0 20px 45px rgba(0, 0, 0, 0.34),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    0 20px 45px color-mix(in srgb, var(--ce-compat-dark) 34%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
   pointer-events: none;
   transform: translateY(calc(-100% - 12px));
 
   strong {
-    color: #ffffff;
+    color: var(--ce-text-inverse);
     font-family: var(--ce-post-font-heading);
     font-size: 0.96rem;
     line-height: 1.25;
@@ -1811,7 +1828,7 @@ h3.postHeading {
   p,
   span {
     margin: 0;
-    color: rgba(244, 247, 255, 0.78);
+    color: color-mix(in srgb, var(--ce-control-text) 78%, transparent);
     font-size: 0.78rem;
     line-height: 1.38;
   }
@@ -1827,7 +1844,7 @@ h3.postHeading {
 
 .binaryBeeswarmTooltipPinned {
   padding-right: 34px;
-  border-color: rgba(77, 255, 164, 0.6);
+  border-color: color-mix(in srgb, var(--ce-action-accent) 60%, transparent);
   pointer-events: auto;
 }
 
@@ -1842,19 +1859,19 @@ h3.postHeading {
   align-items: center;
   justify-content: center;
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(244, 247, 255, 0.88);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 24%, transparent);
+  border-radius: var(--ce-radius-pill);
+  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+  color: color-mix(in srgb, var(--ce-control-text) 88%, transparent);
   cursor: pointer;
   font-size: 0.92rem;
   line-height: 1;
 
   &:hover,
   &:focus-visible {
-    border-color: rgba(77, 255, 164, 0.6);
-    background: rgba(77, 255, 164, 0.14);
-    color: #ffffff;
+    border-color: color-mix(in srgb, var(--ce-action-accent) 60%, transparent);
+    background: color-mix(in srgb, var(--ce-action-accent) 14%, transparent);
+    color: var(--ce-text-inverse);
     outline: none;
   }
 }
@@ -1878,9 +1895,9 @@ h3.postHeading {
   width: 100%;
   height: 8px;
   overflow: hidden;
-  border-radius: 999px;
-  background: rgba(7, 12, 31, 0.5);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  border-radius: var(--ce-radius-pill);
+  background: color-mix(in srgb, var(--ce-overlay-base) 50%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
 }
 
 .rankedThemeTrack::after,
@@ -1890,8 +1907,13 @@ h3.postHeading {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.08) 36%, transparent 72%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ce-text-inverse) 28%, transparent),
+    color-mix(in srgb, var(--ce-text-inverse) 8%, transparent) 36%,
+    transparent 72%
+  );
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 34%, transparent);
   pointer-events: none;
 }
 
@@ -1902,7 +1924,7 @@ h3.postHeading {
 
 .binaryBeeswarmHint {
   margin: 0;
-  color: rgba(244, 247, 255, 0.5);
+  color: color-mix(in srgb, var(--ce-control-text) 50%, transparent);
   font-size: 0.74rem;
   line-height: 1.32;
 }
@@ -1922,8 +1944,8 @@ h3.postHeading {
   gap: 2px;
   padding: 2px;
   border: 1px solid $input-border;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.04);
+  border-radius: var(--ce-radius-pill);
+  background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
 }
 
 .vizToggleButton {
@@ -1931,7 +1953,7 @@ h3.postHeading {
   min-height: 40px;
   padding: 4px 10px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--ce-radius-pill);
   background: transparent;
   color: $muted;
   cursor: pointer;
@@ -1948,15 +1970,15 @@ h3.postHeading {
   }
 
   &:focus-visible {
-    outline: 2px solid rgba(77, 255, 164, 0.7);
+    outline: 2px solid color-mix(in srgb, var(--ce-action-accent) 70%, transparent);
     outline-offset: 1px;
   }
 }
 
 .vizToggleButtonActive {
-  background: rgba(122, 167, 255, 0.22);
-  box-shadow: inset 0 0 0 1px rgba(122, 167, 255, 0.4);
-  color: #ffffff;
+  background: color-mix(in srgb, var(--ce-status-info-text) 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ce-status-info-text) 40%, transparent);
+  color: var(--ce-text-inverse);
 }
 
 .vizToolbarLabel {
@@ -1981,12 +2003,12 @@ h3.postHeading {
   padding: $viz-gap-sm $viz-gap-md;
   border: 1px solid $viz-panel-border;
   border-radius: $viz-radius;
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
 }
 
 .binaryListPrompt {
   margin: 0;
-  color: rgba(244, 247, 255, 0.94);
+  color: color-mix(in srgb, var(--ce-control-text) 94%, transparent);
   font-size: 0.86rem;
   line-height: 1.34;
 }
@@ -2043,7 +2065,7 @@ h3.postHeading {
   align-content: start;
   gap: $viz-gap-md;
   padding: $viz-gap-xl 0;
-  border-top: 1px solid rgba(244, 247, 255, 0.1);
+  border-top: 1px solid color-mix(in srgb, var(--ce-control-text) 10%, transparent);
 
   &:first-child {
     padding-top: 0;
@@ -2056,7 +2078,7 @@ h3.postHeading {
   }
 
   h4 {
-    color: #ffffff;
+    color: var(--ce-text-inverse);
     font-family: var(--ce-post-font-heading);
     font-size: 1.04rem;
     line-height: 1.28;
@@ -2064,13 +2086,13 @@ h3.postHeading {
 }
 
 .editorialStatsPrompt {
-  color: rgba(244, 247, 255, 0.68);
+  color: color-mix(in srgb, var(--ce-control-text) 68%, transparent);
   font-size: 0.8rem;
   line-height: 1.4;
 }
 
 .editorialStatsTotal {
-  color: #ffffff;
+  color: var(--ce-text-inverse);
   font-family: var(--ce-font-mono);
   font-size: 1.8rem;
   font-weight: 650;
@@ -2081,9 +2103,9 @@ h3.postHeading {
   display: flex;
   height: 10px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 2px;
-  background: rgba(5, 11, 20, 0.42);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 18%, transparent);
+  border-radius: var(--ce-radius-2);
+  background: color-mix(in srgb, var(--ce-overlay-base) 42%, transparent);
 
   span {
     min-width: 0;
@@ -2104,23 +2126,23 @@ h3.postHeading {
   aspect-ratio: 1;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 18%, transparent);
+  border-radius: var(--ce-radius-round);
 
   &::before {
     content: '';
     position: absolute;
     inset: 22%;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 50%;
-    background: #171941;
+    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
+    border-radius: var(--ce-radius-round);
+    background: var(--ce-surface-sunken);
   }
 
   > span {
     position: relative;
     z-index: 1;
     width: 44px;
-    color: #ffffff;
+    color: var(--ce-text-inverse);
     font-family: var(--ce-font-mono);
     font-size: 0.66rem;
     font-weight: 700;
@@ -2139,7 +2161,7 @@ h3.postHeading {
   gap: 5px;
 
   strong {
-    color: #9ee7ff;
+    color: var(--ce-data-series-8);
     font-family: var(--ce-post-font-heading);
     font-size: 2.35rem;
     font-weight: 650;
@@ -2147,7 +2169,7 @@ h3.postHeading {
   }
 
   span {
-    color: rgba(244, 247, 255, 0.66);
+    color: color-mix(in srgb, var(--ce-control-text) 66%, transparent);
     font-family: var(--ce-font-mono);
     font-size: 0.78rem;
   }
@@ -2167,20 +2189,20 @@ h3.postHeading {
   display: flex;
   justify-content: space-between;
   gap: $viz-gap-sm;
-  color: rgba(244, 247, 255, 0.9);
+  color: color-mix(in srgb, var(--ce-control-text) 90%, transparent);
   font-family: var(--ce-font-mono);
   font-size: 0.94rem;
   line-height: 1.3;
 
   strong {
-    color: #ffffff;
+    color: var(--ce-text-inverse);
   }
 }
 
 .editorialBarTrack {
   height: 5px;
   overflow: hidden;
-  background: rgba(244, 247, 255, 0.12);
+  background: color-mix(in srgb, var(--ce-control-text) 12%, transparent);
 
   span {
     display: block;
@@ -2198,17 +2220,17 @@ h3.postHeading {
   grid-template-columns: 9px minmax(0, 1fr) auto auto;
   gap: 7px;
   align-items: center;
-  color: rgba(244, 247, 255, 0.82);
+  color: color-mix(in srgb, var(--ce-control-text) 82%, transparent);
   font-size: 0.94rem;
   line-height: 1.3;
 
   strong {
-    color: #ffffff;
+    color: var(--ce-text-inverse);
     font-family: var(--ce-font-mono);
   }
 
   > span:last-child {
-    color: rgba(244, 247, 255, 0.58);
+    color: color-mix(in srgb, var(--ce-control-text) 58%, transparent);
     font-family: var(--ce-font-mono);
     font-size: 0.82rem;
   }
@@ -2217,7 +2239,7 @@ h3.postHeading {
 .editorialLegendSwatch {
   width: 8px;
   height: 8px;
-  border-radius: 999px;
+  border-radius: var(--ce-radius-pill);
 }
 
 @container (min-width: 880px) {
@@ -2234,7 +2256,7 @@ h3.postHeading {
     }
 
     + .editorialStatsPanel {
-      border-left: 1px solid rgba(244, 247, 255, 0.1);
+      border-left: 1px solid color-mix(in srgb, var(--ce-control-text) 10%, transparent);
     }
 
     &:last-child {
@@ -2251,8 +2273,8 @@ h3.postHeading {
   margin: 0;
   padding: $viz-gap-xl 0;
   border: 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 0;
+  border-top: 1px solid color-mix(in srgb, var(--ce-text-inverse) 9%, transparent);
+  border-radius: var(--ce-radius-0);
   background: transparent;
 
   h4,
@@ -2276,7 +2298,7 @@ h3.postHeading {
 .responseTypePanel + .responseTypePanel {
   padding: $viz-gap-xl 0;
   border-left: 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  border-top: 1px solid color-mix(in srgb, var(--ce-text-inverse) 9%, transparent);
 }
 
 .responseTypeMultiSelectPanel {
@@ -2298,7 +2320,7 @@ h3.postHeading {
     align-content: center;
     gap: $viz-gap-xs;
     padding: $viz-gap-sm 0;
-    border-top: 1px solid rgba(244, 247, 255, 0.12);
+    border-top: 1px solid color-mix(in srgb, var(--ce-control-text) 12%, transparent);
 
     &:first-child {
       border-top: 0;
@@ -2335,20 +2357,20 @@ h3.postHeading {
   .responseTypePanel + .responseTypePanel {
     padding: 2px $viz-gap-xl $viz-gap-xl;
     border-top: 0;
-    border-left: 1px solid rgba(255, 255, 255, 0.09);
+    border-left: 1px solid color-mix(in srgb, var(--ce-text-inverse) 9%, transparent);
   }
 }
 
 .responseTypePrecisionCard {
   padding-top: $viz-gap-xl;
-  border-top: 1px solid rgba(158, 231, 255, 0.18);
+  border-top: 1px solid color-mix(in srgb, var(--ce-data-series-8) 18%, transparent);
 }
 
 .responseTypePrecisionGrid {
   overflow: hidden;
-  border: 1px solid rgba(158, 231, 255, 0.18);
-  border-radius: 4px;
-  background: rgba(5, 11, 20, 0.28);
+  border: 1px solid color-mix(in srgb, var(--ce-data-series-8) 18%, transparent);
+  border-radius: var(--ce-radius-4);
+  background: color-mix(in srgb, var(--ce-overlay-base) 28%, transparent);
 }
 
 .responseTypePrecisionPanel,
@@ -2370,12 +2392,12 @@ h3.postHeading {
 
   .responseBarTrack {
     height: 4px;
-    border-radius: 0;
-    background: rgba(244, 247, 255, 0.12);
+    border-radius: var(--ce-radius-0);
+    background: color-mix(in srgb, var(--ce-control-text) 12%, transparent);
   }
 
   .responseBarFill {
-    border-radius: 0;
+    border-radius: var(--ce-radius-0);
   }
 
   .responseQuotes {
@@ -2385,9 +2407,9 @@ h3.postHeading {
   .responseQuotes figure {
     position: relative;
     padding: $viz-gap-md $viz-gap-lg;
-    border: 1px solid rgba(158, 231, 255, 0.12);
-    border-radius: 3px;
-    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid color-mix(in srgb, var(--ce-data-series-8) 12%, transparent);
+    border-radius: var(--ce-radius-3);
+    background: color-mix(in srgb, var(--ce-text-inverse) 3.5%, transparent);
   }
 }
 
@@ -2430,7 +2452,7 @@ h3.postHeading {
 }
 
 .responseTypePrecisionPanel + .responseTypePrecisionPanel {
-  border-top: 1px solid rgba(158, 231, 255, 0.16);
+  border-top: 1px solid color-mix(in srgb, var(--ce-data-series-8) 16%, transparent);
 }
 
 @container (min-width: 720px) {
@@ -2443,7 +2465,7 @@ h3.postHeading {
 
   .responseTypePrecisionPanel + .responseTypePrecisionPanel {
     border-top: 0;
-    border-left: 1px solid rgba(158, 231, 255, 0.16);
+    border-left: 1px solid color-mix(in srgb, var(--ce-data-series-8) 16%, transparent);
   }
 }
 
@@ -2467,7 +2489,7 @@ h3.postHeading {
   display: flex;
   justify-content: space-between;
   gap: $viz-gap-sm;
-  color: rgba(244, 247, 255, 0.92);
+  color: color-mix(in srgb, var(--ce-control-text) 92%, transparent);
   font-family: var(--ce-font-mono);
   font-size: 0.9rem;
   font-weight: 600;
@@ -2485,8 +2507,8 @@ h3.postHeading {
   justify-content: space-between;
   gap: $viz-gap-lg;
   padding: $viz-gap-sm 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  color: rgba(244, 247, 255, 0.92);
+  border-bottom: 1px solid color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
+  color: color-mix(in srgb, var(--ce-control-text) 92%, transparent);
   font-family: var(--ce-font-mono);
   font-size: 0.78rem;
   line-height: 1.35;
@@ -2513,28 +2535,28 @@ h3.postHeading {
   width: min(124px, 100%);
   aspect-ratio: 1;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 50%;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 22%, transparent);
+  border-radius: var(--ce-radius-round);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
 
   &::before,
   &::after {
     content: '';
     position: absolute;
-    border-radius: 50%;
+    border-radius: var(--ce-radius-round);
     pointer-events: none;
   }
 
   &::before {
     inset: 24%;
-    border: 1px solid rgba(244, 247, 255, 0.18);
-    background: rgba(18, 23, 54, 0.94);
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05);
+    border: 1px solid color-mix(in srgb, var(--ce-control-text) 18%, transparent);
+    background: color-mix(in srgb, var(--ce-overlay-surface) 94%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
   }
 
   &::after {
     inset: 0;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 44%);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--ce-text-inverse) 12%, transparent), transparent 44%);
   }
 }
 
@@ -2562,7 +2584,7 @@ h3.postHeading {
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: $viz-gap-xs;
   align-items: center;
-  color: rgba(244, 247, 255, 0.92);
+  color: color-mix(in srgb, var(--ce-control-text) 92%, transparent);
   font-family: var(--ce-post-font-ui);
   font-size: 0.94rem;
   line-height: 1.35;
@@ -2588,8 +2610,8 @@ h3.postHeading {
 .responsePieSwatch {
   width: 10px;
   height: 10px;
-  border-radius: 999px;
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08);
+  border-radius: var(--ce-radius-pill);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
 }
 
 .responseSplit {
@@ -2608,10 +2630,10 @@ h3.postHeading {
   align-items: center;
   gap: $viz-gap-xs;
   padding: 4px 7px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.055);
-  color: rgba(244, 247, 255, 0.9);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
+  border-radius: var(--ce-radius-pill);
+  background: color-mix(in srgb, var(--ce-text-inverse) 5.5%, transparent);
+  color: color-mix(in srgb, var(--ce-control-text) 90%, transparent);
   font-family: var(--ce-font-mono);
   font-size: 0.74rem;
   line-height: 1;
@@ -2624,8 +2646,8 @@ h3.postHeading {
 .responseSplitSwatch {
   width: 9px;
   height: 9px;
-  border-radius: 999px;
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08);
+  border-radius: var(--ce-radius-pill);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
 }
 
 .responseSplitBar {
@@ -2634,10 +2656,10 @@ h3.postHeading {
   width: 100%;
   height: 20px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.26);
-  border-radius: 7px;
-  background: rgba(7, 12, 31, 0.32);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 26%, transparent);
+  border-radius: var(--ce-radius-7);
+  background: color-mix(in srgb, var(--ce-overlay-base) 32%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
 }
 
 .responseSplitSegment {
@@ -2649,7 +2671,7 @@ h3.postHeading {
   position: relative;
   height: 6px;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: var(--ce-radius-pill);
   background: $input-bg;
 }
 
@@ -2673,7 +2695,7 @@ h3.postHeading {
 
   blockquote {
     margin: 0;
-    color: rgba(244, 247, 255, 0.96);
+    color: color-mix(in srgb, var(--ce-control-text) 96%, transparent);
     font-size: 0.96rem;
     line-height: 1.46;
   }
@@ -2688,9 +2710,9 @@ h3.postHeading {
 .vizFallback {
   margin: 0;
   padding: 12px;
-  border-radius: 8px;
-  background: rgba(255, 179, 71, 0.1);
-  color: rgba(255, 230, 194, 0.95);
+  border-radius: var(--ce-radius-8);
+  background: color-mix(in srgb, var(--ce-status-warning) 10%, transparent);
+  color: color-mix(in srgb, var(--ce-status-warning-text) 95%, transparent);
 }
 
 @media (max-width: 820px) {
@@ -2813,7 +2835,7 @@ h3.postHeading {
     margin: 0;
     padding: $viz-gap-xl 0;
     border-left: 0;
-    border-top: 1px solid rgba(255, 255, 255, 0.09);
+    border-top: 1px solid color-mix(in srgb, var(--ce-text-inverse) 9%, transparent);
   }
 
   .responseTypePanel:first-child {

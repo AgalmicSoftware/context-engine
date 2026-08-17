@@ -4,6 +4,7 @@ import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 jest.mock('../../utilities/crypto/cryptography.js', () => ({
   cryptoUtils: {
     _getProvider: jest.fn((providerLike) => providerLike || null),
+    encryptEnvelopeValue: jest.fn(),
   },
 }));
 
@@ -17,6 +18,9 @@ import {
   sanitizeSessionWizardMetadataPayload,
 } from './sessionWizardWriteNormalization.js';
 import { resolveSessionWizardEnabledWorkerSecrets } from './sessionWizardWorkerSecretSupport';
+import { buildSessionWizardDefaultTemplate } from './sessionWizardDraftState';
+import { buildSessionWizardMetadataPayloadBuilder } from './sessionWizardMetadataPayloadBuilder';
+import { buildSessionWizardWorkerVerificationConfig } from './sessionWizardWorkerVerificationConfig';
 
 const DEFAULT_CONFIG_CHAIN_ID = DEFAULT_CHAIN_ID;
 
@@ -29,6 +33,203 @@ describe('sessionWizardWriteNormalization', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+  });
+
+  test.each([
+    ['fresh decentralized draft', () => buildSessionWizardDefaultTemplate()],
+    [
+      'Cloudflare/custom draft switched to decentralized',
+      () => ({
+        sessionEndsAt: '2099-01-02T03:04:00Z',
+        defaultGroupTags: 'worker-only-group-defaults',
+        defaultSbtTags: 'on-chain-group-defaults',
+        defaultFeaturedSBTs: ['0x0000000000000000000000000000000000000001'],
+        autoFeatureSBTsBySessionSlug: false,
+        workerAuthority: {
+          version: 1,
+          participantScopes: ['ai', 'storage'],
+          anonymousScopes: [],
+        },
+      }),
+    ],
+  ])('allowlists mode fields in outbound payloads for a %s', async (_label, makeDraft) => {
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+    const draft = {
+      ...makeDraft(),
+      slug: 'decentralized-boundary',
+      sessionName: 'Decentralized Boundary',
+      sessionModeProfile,
+      storageProfile: undefined,
+      networkChainId: DEFAULT_CONFIG_CHAIN_ID,
+      sessionEndsAt: '2099-01-02T03:04:00Z',
+      defaultGroupTags: 'worker-only-group-defaults',
+      defaultSbtTags: 'on-chain-group-defaults',
+      defaultFeaturedSBTs: ['0x0000000000000000000000000000000000000001'],
+      autoFeatureSBTsBySessionSlug: false,
+      blockLimits: { start: 100, end: 120 },
+      faucet: { amountEth: '0.0002', balanceThresholdEth: '0.001' },
+      contracts: {
+        surveys: { address: '0x0000000000000000000000000000000000000010', chainId: DEFAULT_CONFIG_CHAIN_ID },
+        sbtFactory: { address: '0x0000000000000000000000000000000000000020', chainId: DEFAULT_CONFIG_CHAIN_ID },
+        sessionRegistry: {
+          address: '0x0000000000000000000000000000000000000030',
+          chainId: DEFAULT_CONFIG_CHAIN_ID,
+        },
+      },
+      agentSessionWrapped: {
+        enabled: true,
+        bridgeUrl: 'https://wrapped.example.test',
+      },
+    };
+    const buildMetadataPayload = buildSessionWizardMetadataPayloadBuilder({
+      allEncryptionGates: [],
+      buildSessionWizardPublishArweaveUploadOptions: async () => ({}),
+      buildSponsoredFlagFields: () => ({}),
+      defaultGateId: '',
+      draft,
+      encryptedFieldGates: {},
+      gateSelections: {},
+      getCurrentWorkerSecrets: () => ({}),
+      getGateById: () => null,
+      latestChainBlock: 500,
+      registryChainId: DEFAULT_CONFIG_CHAIN_ID,
+      resolveWorkerBaseUrl: () => 'https://worker.example',
+      resolvedWalletAccountRef: { current: '' },
+      sessionHeaderMode: 'url',
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      setSessionHeaderStatus: jest.fn(),
+      workerSecretsEnabled: true,
+    });
+
+    const { metadata: outboundArweaveMetadata } = await buildMetadataPayload();
+    const outboundWorkerConfig = buildSessionWizardWorkerConfigPayload({
+      slug: 'decentralized-boundary',
+      draft,
+      deployPayload: {
+        faucet: { amountEth: '0.0002', balanceThresholdEth: '0.001' },
+      },
+      registryChainId: DEFAULT_CONFIG_CHAIN_ID,
+      latestChainBlock: 500,
+      workerUrl: 'https://worker.example',
+      getContractDefaults: () => ({}),
+    });
+    const outboundVerificationConfig = buildSessionWizardWorkerVerificationConfig({
+      runtime: {
+        account: '',
+        draft,
+        registryChainId: DEFAULT_CONFIG_CHAIN_ID,
+      },
+      workerUrl: 'https://worker.example',
+    });
+
+    expect(outboundArweaveMetadata).not.toHaveProperty('sessionEndsAt');
+    expect(outboundArweaveMetadata).not.toHaveProperty('defaultGroupTags');
+    expect(outboundArweaveMetadata).not.toHaveProperty('agentSessionWrapped');
+    expect(outboundArweaveMetadata).not.toHaveProperty('workerAuthority');
+    expect(outboundArweaveMetadata).toEqual(
+      expect.objectContaining({
+        defaultSbtTags: 'on-chain-group-defaults',
+        defaultFeaturedSBTs: ['0x0000000000000000000000000000000000000001'],
+        autoFeatureSBTsBySessionSlug: false,
+        blockLimits: { start: 100, end: 120 },
+        contracts: expect.objectContaining({
+          surveys: expect.any(Object),
+          sbtFactory: expect.any(Object),
+          sessionRegistry: expect.any(Object),
+        }),
+      }),
+    );
+    expect(outboundWorkerConfig).not.toHaveProperty('sessionEndsAt');
+    expect(outboundWorkerConfig).not.toHaveProperty('defaultGroupTags');
+    expect(outboundWorkerConfig).not.toHaveProperty('agentSessionWrapped');
+    expect(outboundWorkerConfig).not.toHaveProperty('workerAuthority');
+    expect(outboundVerificationConfig).not.toHaveProperty('agentSessionWrapped');
+    expect(outboundVerificationConfig).not.toHaveProperty('workerAuthority');
+    expect(outboundWorkerConfig).not.toHaveProperty('defaultSbtTags');
+    expect(outboundWorkerConfig).not.toHaveProperty('defaultFeaturedSBTs');
+    expect(outboundWorkerConfig).not.toHaveProperty('autoFeatureSBTsBySessionSlug');
+    expect(outboundWorkerConfig).toEqual(
+      expect.objectContaining({
+        blockLimits: { start: 100, end: 120 },
+        faucet: { amountEth: '0.0002', balanceThresholdEth: '0.001' },
+        contracts: expect.objectContaining({
+          surveys: expect.any(Object),
+          sbtFactory: expect.any(Object),
+          sessionRegistry: expect.any(Object),
+        }),
+      }),
+    );
+  });
+
+  test('keeps Wrapped capability evidence when the selected profile enables agent HTTP', () => {
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    sessionModeProfile.surfaces.agentHttp = true;
+    const agentSessionWrapped = {
+      enabled: true,
+      bridgeUrl: 'https://wrapped.example.test',
+    };
+
+    expect(
+      buildSessionWizardWorkerVerificationConfig({
+        draft: {
+          slug: 'wrapped-boundary',
+          sessionModeProfile,
+          agentSessionWrapped,
+        },
+        workerUrl: 'https://worker.example',
+      }),
+    ).toEqual(expect.objectContaining({ agentSessionWrapped }));
+  });
+
+  test('filters stale hidden-field gates before outbound metadata encryption', async () => {
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+    const staleGate = {
+      id: 'gate-stale-worker-field',
+      label: 'Stale Worker field gate',
+      mode: 'any',
+      sbts: [{ address: '0x0000000000000000000000000000000000000001' }],
+    };
+    const buildMetadataPayload = buildSessionWizardMetadataPayloadBuilder({
+      allEncryptionGates: [staleGate],
+      buildSessionWizardPublishArweaveUploadOptions: async () => ({}),
+      buildSponsoredFlagFields: () => ({}),
+      defaultGateId: '',
+      draft: {
+        slug: 'decentralized-gate-boundary',
+        sessionName: 'Decentralized Gate Boundary',
+        sessionModeProfile,
+        networkChainId: DEFAULT_CONFIG_CHAIN_ID,
+        blockLimits: { start: 100, end: 120 },
+        sessionEndsAt: '2099-01-02T03:04:00Z',
+        defaultGroupTags: 'worker-only-group-defaults',
+      },
+      encryptedFieldGates: {
+        sessionEndsAt: staleGate.id,
+        defaultGroupTags: staleGate.id,
+      },
+      gateSelections: {},
+      getCurrentWorkerSecrets: () => ({}),
+      getGateById: (gateId) => (gateId === staleGate.id ? staleGate : null),
+      latestChainBlock: 500,
+      registryChainId: DEFAULT_CONFIG_CHAIN_ID,
+      resolveWorkerBaseUrl: () => 'https://worker.example',
+      resolvedWalletAccountRef: { current: '' },
+      sessionHeaderMode: 'url',
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      setSessionHeaderStatus: jest.fn(),
+      workerSecretsEnabled: true,
+    });
+
+    const { metadata } = await buildMetadataPayload();
+
+    expect(cryptoUtils.encryptEnvelopeValue).not.toHaveBeenCalled();
+    expect(metadata).not.toHaveProperty('sessionEndsAt');
+    expect(metadata).not.toHaveProperty('defaultGroupTags');
+    expect(metadata).not.toHaveProperty('encryptedFields.sessionEndsAt');
+    expect(metadata).not.toHaveProperty('encryptedFields.defaultGroupTags');
+    expect(metadata).not.toHaveProperty('encryptedFieldGates.sessionEndsAt');
+    expect(metadata).not.toHaveProperty('encryptedFieldGates.defaultGroupTags');
   });
 
   test('sanitizeSessionWizardMetadataPayload strips worker-only fields from Arweave metadata', () => {

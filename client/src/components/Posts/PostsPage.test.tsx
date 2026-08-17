@@ -403,7 +403,7 @@ describe('PostsPage', () => {
     expect(screen.getByText('Theme distribution')).toBeInTheDocument();
     expect(screen.queryByText('Toggle')).not.toBeInTheDocument();
     expect(screen.getByText('Legible disagreement')).toBeInTheDocument();
-    expect(screen.getByText('4')).toHaveStyle({ color: '#4dffa4' });
+    expect(screen.getByText('4')).toHaveStyle({ color: 'var(--ce-data-series-1)' });
     expect(screen.getByText('Ranked interview themes')).toBeInTheDocument();
     expect(screen.getByText('Inspectable decisions')).toBeInTheDocument();
     expect(screen.getByText('I need to know what we agreed to remember.')).toBeInTheDocument();
@@ -430,7 +430,7 @@ describe('PostsPage', () => {
     expect(screen.queryByText('2-2 split')).not.toBeInTheDocument();
     expect(screen.queryByText('3-1 split')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Dot color meaning')).not.toBeInTheDocument();
-    expect(binaryBeeswarmSvg.querySelectorAll('circle[fill="#9ee7ff"]')).toHaveLength(5);
+    expect(binaryBeeswarmSvg.querySelectorAll('circle[fill="var(--ce-data-series-8)"]')).toHaveLength(5);
     expect(binaryBeeswarmSvg.querySelector('circle[fill="#ff6bcb"]')).not.toBeInTheDocument();
     expect(binaryBeeswarmSvg.querySelector('circle[fill="#4dffa4"]')).not.toBeInTheDocument();
     expect(binaryBeeswarmSvg.querySelector('circle[fill="#ffd166"]')).not.toBeInTheDocument();
@@ -468,8 +468,8 @@ describe('PostsPage', () => {
     const splitBar = within(splitPanel).getByRole('img', { name: 'Split decision: agree 3, disagree 1' });
     expect(splitBar).toBeInTheDocument();
     const splitSegments = splitBar.querySelectorAll('span');
-    expect(splitSegments[0]).toHaveStyle({ width: '75%', backgroundColor: '#4dffa4' });
-    expect(splitSegments[1]).toHaveStyle({ width: '25%', backgroundColor: '#ff6bcb' });
+    expect(splitSegments[0]).toHaveStyle({ width: '75%', backgroundColor: 'var(--ce-status-success)' });
+    expect(splitSegments[1]).toHaveStyle({ width: '25%', backgroundColor: 'var(--ce-status-danger)' });
     expect(within(splitPanel).queryByLabelText('agree: 3')).not.toBeInTheDocument();
     expect(screen.queryByText('Open-source AI safety')).not.toBeInTheDocument();
     const questionTitle = screen.getByText(
@@ -490,8 +490,8 @@ describe('PostsPage', () => {
       name: 'Open-source AI models are more likely to make the world safer than more dangerous.: agree 3, unsure 1',
     });
     const unsureSplitSegments = unsureSplitBar.querySelectorAll('span');
-    expect(unsureSplitSegments[0]).toHaveStyle({ width: '75%', backgroundColor: '#4dffa4' });
-    expect(unsureSplitSegments[1]).toHaveStyle({ width: '25%', backgroundColor: '#ffd166' });
+    expect(unsureSplitSegments[0]).toHaveStyle({ width: '75%', backgroundColor: 'var(--ce-status-success)' });
+    expect(unsureSplitSegments[1]).toHaveStyle({ width: '25%', backgroundColor: 'var(--ce-status-warning)' });
     expect(screen.getByText('Would this participant allow scheduling?')).toBeInTheDocument();
     expect(screen.getByLabelText('human corrections: 0').querySelector('span')).toHaveStyle({ width: '0%' });
     expect(screen.getByText('In one sentence: what is my personal AI fire alarm?')).toBeInTheDocument();
@@ -941,7 +941,7 @@ describe('PostsPage', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'PostsPage.module.scss'), 'utf8');
 
     expect(scss).toMatch(
-      /\.tag\s*{[\s\S]*border:\s*1px solid rgba\(77, 255, 164, 0\.36\);[\s\S]*background:\s*rgba\(77, 255, 164, 0\.1\);[\s\S]*color:\s*#4dffa4;/,
+      /\.tag\s*{[\s\S]*border:\s*1px solid color-mix\(in srgb, var\(--ce-action-accent\) 36%, transparent\);[\s\S]*background:\s*color-mix\(in srgb, var\(--ce-action-accent\) 10%, transparent\);[\s\S]*color:\s*var\(--ce-action-accent\);/,
     );
     expect(scss).toMatch(
       /@media \(max-width: 820px\)\s*{[\s\S]*\.postMeta\s*{[\s\S]*flex-wrap:\s*nowrap;[\s\S]*align-items:\s*center;[\s\S]*\.tagList\s*{[\s\S]*width:\s*70%;[\s\S]*max-width:\s*70%;[\s\S]*flex:\s*0 1 70%;[\s\S]*flex-wrap:\s*nowrap;[\s\S]*overflow-x:\s*auto;[\s\S]*\.postDate\s*{[\s\S]*flex:\s*0 0 auto;[\s\S]*margin-left:\s*auto;[\s\S]*text-align:\s*right;/,

@@ -103,7 +103,10 @@ describe('aiClient worker auth options', () => {
     });
 
     const sessionSlug = '25bfdea9-35db-4b85-b223-4f06990b24c9';
-    const sessionConfig = { slug: sessionSlug };
+    const sessionConfig = {
+      slug: sessionSlug,
+      sessionId: '0x25bfdea935db4b85b2234f06990b24c9',
+    };
     const out = await callAI('Say ok', {
       sessionSlug,
       sessionConfig,
@@ -124,6 +127,7 @@ describe('aiClient worker auth options', () => {
       'https://worker-25bf.example/ai',
       expect.any(Object),
       expect.objectContaining({
+        sessionConfig,
         sessionSlug,
         workerUrl: 'https://worker-25bf.example',
       }),

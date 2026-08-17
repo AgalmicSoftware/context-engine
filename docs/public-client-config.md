@@ -12,6 +12,21 @@ stays centralized in `client/src/variables/publicDeploymentConfig.ts`.
 - Runtime reader/re-export surface: `client/src/variables/appConfig.ts`
 - Shared env parsing helpers: `client/src/variables/publicEnv.ts`
 
+## Deployment Theme
+
+`REACT_APP_CE_DEFAULT_THEME` selects a bundled theme for a custom frontend.
+Supported values currently come from `client/src/scss/themes/registry.json`:
+`context-engine` (default) and `classic-95`. Unknown values fall back to
+`context-engine`; this setting cannot load a URL, remote stylesheet, or custom
+CSS. It is embedded into the document for the pre-paint bootstrap, so changing
+it requires a rebuild/redeploy.
+
+`REACT_APP_CE_THEME_SELECTOR_ENABLED` defaults to `true`, exposing the bundled
+app-theme selector in Settings. Set it to `false` only when a deployment
+intentionally hides user theme selection. The selected ID is stored locally
+and restored before first paint. Session color schemes are a separate
+`appearance.colorSchemeId` metadata contract and never select an app theme.
+
 ## Session Wrapped Capability Record
 
 Agent Session Wrapped discovery is session-scoped public config, not a
@@ -99,9 +114,9 @@ frontend will actually use.
 
 The public posts route is enabled by default:
 
-- `REACT_APP_CE_ABOUT_POSTS_ENABLED=false` hides the About-page `Posts` link and
-  renders `/posts` as disabled for deployments that do not want the public posts
-  surface.
+- `REACT_APP_CE_ABOUT_POSTS_ENABLED=false` renders `/posts` as disabled for
+  deployments that do not want the public posts surface. Posts remains a footer
+  navigation destination and is not duplicated in the About hero.
 - Authored posts live in the repository root `posts/` directory and are copied
   into the static build output as `/posts/*`. See [`docs/posts.md`](posts.md).
 
@@ -186,11 +201,12 @@ roll back workers, contracts, or externally stored session data.
 
 When hosting the app under a subpath, set `PUBLIC_URL` to that mount path before
 building, for example `PUBLIC_URL=/ce npm run build`. Internal session,
-question/results, contract, and group routes strip that configured base before
+question/results, docs, and group routes strip that configured base before
 matching app routes and reapply it when generating links, so deep links such as
-`/ce/session/demo/questions`, `/ce/contracts`, and `/ce/groups` stay inside the
-mounted app. The SPA fallback must also be scoped to the same deployed base path
-by the hosting platform.
+`/ce/session/demo/questions`, `/ce/docs`, and `/ce/groups` stay inside the
+mounted app. Legacy `/ce/contracts` deep links are rewritten to `/ce/docs`
+without dropping their path suffix, query, or hash. The SPA fallback must also
+be scoped to the same deployed base path by the hosting platform.
 
 Set browser cache headers so search-result clicks and fresh navigations
 revalidate the deployed files after each deploy. For manual drag-and-drop
@@ -276,8 +292,10 @@ SPA fallback concept, but their redirect config syntax differs.
 
 ## RPC Defaults
 
-- Canonical anonymous RPC defaults now live in `client/src/variables/rpcDefaults.js`.
-  That manifest is shared by the client runtime, Node scripts, and worker fallbacks.
+- Canonical anonymous RPC defaults live in `shared/rpcDefaults.cjs`. The
+  `client/src/variables/rpcDefaults.js` and `.ts` modules are thin CommonJS and
+  Vite adapters; Node scripts and worker fallbacks consume the same shared
+  manifest.
 - Session-sponsored RPC is not an anonymous default. For Survey contract reads,
   browser-visible session `rpcUrl` / `rpcUrlsByChainId` values are used only
   when the on-chain `rpc` gate is open or the current wallet already has a
@@ -326,18 +344,17 @@ SPA fallback concept, but their redirect config syntax differs.
   - Stored `ce:demoSurfaceMode` localStorage preferences win over this setting.
   - This only takes effect on fresh installs or when no stored preference exists.
 
-- `REACT_APP_CE_DEMO_SESSION_SLUGS=demo-1,demo-3,demo-2,demo`
+- `REACT_APP_CE_DEMO_SESSION_SLUGS=demo-sh,demo-1,demo-3,demo-2,demo`
   - Sets the ordered list of session slugs that receive public demo-session affordances.
   - The first slug is used by the About-page Demo CTA when no explicit list-scoped session is selected.
-  - These slugs also reuse the bundled Context Polis fixture unless a caller provides a per-slug `demoDataBySlug` dataset.
-  - Temporary June 17, 2026 migration note: `demo-1` points the public demo CTA
-    at a live SessionRegistry session seeded with copied Context fixture
-    questions and featured SBT metadata. `demo_sessions.json` also carries a
-    display-only `demo-1` fallback so the route can mount when live registry
-    metadata is slow. Worker URL, faucet sponsorship, and gate authority stay in
-    SessionRegistry plus Worker KV, not in the demo fixture. Remove both
-    compatibility entries after the Cloudflare-backed demo question/response
-    storage replaces the Arweave/on-chain copy.
+  - `demo`, `demo-1`, `demo-3`, and `demo-sh` reuse the bundled legacy Context
+    Polis fixture. `demo-2` uses its own 40-question generated dataset.
+  - `demo-sh` is the current first/default public demo and has a dedicated
+    worker-canonical Session Worker. `demo-2` is a direct-route preview with an
+    empty Worker URL and `temporary: true`; keep it behind `demo-sh` until its
+    dedicated Worker, canonical question seed, and Worker-held AI key pass live
+    voice and AI verification. Never store provider credentials in this public
+    list or in `demo_sessions.json`.
 
 - `REACT_APP_CE_ENABLE_METAMASK_CONNECTOR=false`
   - Selects the browser-wallet profile at build time. The default `false` profile is passkey-only: the login screen has no MetaMask button, and the emitted browser bundle excludes RainbowKit, WalletConnect, the MetaMask connector, and the MetaMask login asset.
@@ -381,7 +398,7 @@ SPA fallback concept, but their redirect config syntax differs.
 
 - `REACT_APP_CE_SESSION_SCAN_SLUGS=slug-a,slug-b`
   - Sets the default list-scope session slugs.
-  - The repo default is the active public demo slug, currently `demo-1`.
+  - The repo default is the active public demo slug, currently `demo-sh`.
 
 - `REACT_APP_CE_USER_PROFILE_SCAN_ALL_SESSIONS=false`
   - Legacy broad override for per-user deep scans.

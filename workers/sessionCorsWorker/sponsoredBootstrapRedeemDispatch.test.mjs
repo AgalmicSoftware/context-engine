@@ -252,6 +252,64 @@ test('dispatchSponsoredBootstrapRedeem fails closed before deploy when the coord
   assert.doesNotMatch([...store.values()][0], /redeeming|redeemed/);
 });
 
+test('dispatchSponsoredBootstrapRedeem validates deploy config before coordinating the one-shot grant', async () => {
+  const { env } = createKvEnv({
+    type: 'deploy-worker',
+    sourceSessionSlug: 'source-session',
+    sourceConfig: { allowOrigins: ['https://allowed.example.test'] },
+    cloudflareApiToken: 'cf-sponsored-token',
+  }, {
+    DEPLOY_HELPER_ENABLED: '1',
+  });
+  const coordinatedBodies = [];
+  const deps = createDeployDeps({
+    executeCoordinatedSponsoredDeploy: async ({ deployBody }) => {
+      coordinatedBodies.push(deployBody);
+      return {
+        ok: true,
+        status: 200,
+        body: { ok: true, workerUrl: 'https://corrected.example.test' },
+      };
+    },
+  });
+  const grantRequest = {
+    deployGrantToken: 'preflight-grant',
+    deployPayload: {
+      workerName: 'preflight-worker',
+      sessionSlug: 'preflight-session',
+      allowOrigins: ['*'],
+    },
+  };
+
+  const invalid = await dispatchSponsoredBootstrapRedeem({
+    request: createDeployRequest(grantRequest),
+    env,
+    baseHeaders: {},
+    action: 'deploy',
+    deps,
+  });
+  const corrected = await dispatchSponsoredBootstrapRedeem({
+    request: createDeployRequest({
+      ...grantRequest,
+      deployPayload: {
+        ...grantRequest.deployPayload,
+        allowOrigins: ['https://allowed.example.test'],
+      },
+    }),
+    env,
+    baseHeaders: {},
+    action: 'deploy',
+    deps,
+  });
+
+  assert.equal(invalid.status, 400);
+  assert.match(invalid.body.error, /exact origins/i);
+  assert.equal(corrected.status, 200);
+  assert.equal(corrected.body.workerUrl, 'https://corrected.example.test');
+  assert.equal(coordinatedBodies.length, 1);
+  assert.deepEqual(coordinatedBodies[0].allowOrigins, ['https://allowed.example.test']);
+});
+
 test('dispatchSponsoredBootstrapRedeem cannot let a losing concurrent payload replace the winning grant receipt', async () => {
   const { env, store } = createKvEnv({
     type: 'deploy-worker',

@@ -8,6 +8,7 @@ const DEFAULT_ROUTES = Object.freeze([
   '/session/pe4',
   '/admin',
   '/about',
+  '/docs',
   '/contracts',
 ]);
 const DEFAULT_ROUTE_TEXT = Object.freeze({
@@ -15,7 +16,8 @@ const DEFAULT_ROUTE_TEXT = Object.freeze({
   '/session/pe4': ['Groups', 'Results'],
   '/admin': ['Session Admin'],
   '/about': ['Context Engine'],
-  '/contracts': ['Contract'],
+  '/docs': ['Docs'],
+  '/contracts': ['Docs'],
 });
 const DEFAULT_LAYOUT_PROBE_SELECTORS = Object.freeze([
   '[data-testid="ce-survey-submit"]',
@@ -95,7 +97,10 @@ function isAllowedConsoleIssue(issue) {
 
   return (
     issue.text.startsWith('Warning: ') ||
-    issue.text.startsWith('Failed to load resource:')
+    issue.text.startsWith('Failed to load resource:') ||
+    /^Access to fetch at 'http:\/\/(?:127\.0\.0\.1|localhost):8545\/' .* has been blocked by CORS policy:/.test(
+      issue.text,
+    )
   );
 }
 
@@ -107,6 +112,25 @@ function findMissingExpectedText(bodyText, expectedText = []) {
   const normalizedBodyText = String(bodyText || '').toLowerCase();
   return expectedText
     .filter((text) => !normalizedBodyText.includes(String(text).toLowerCase()));
+}
+
+async function runRouteProbe(page, probe, context = {}) {
+  if (typeof probe !== 'function') return [];
+  try {
+    const failures = await probe(page, context);
+    if (!Array.isArray(failures)) return [];
+    return failures.map((failure) => String(failure || '').trim()).filter(Boolean);
+  } catch (error) {
+    return [error instanceof Error ? error.message : String(error || 'route probe failed')];
+  }
+}
+
+async function dismissOnboardingIfPresent(page, { timeoutMs }) {
+  const overlay = page.getByTestId('ce-onboarding-overlay');
+  if ((await overlay.count()) === 0) return;
+
+  await overlay.getByRole('button', { name: /^Skip$/i }).click();
+  await overlay.waitFor({ state: 'detached', timeout: timeoutMs });
 }
 
 async function inspectRoute(browser, baseUrl, route, options = {}) {
@@ -152,6 +176,11 @@ async function inspectRoute(browser, baseUrl, route, options = {}) {
   });
   await page.waitForSelector('#root', { state: 'attached', timeout: options.timeoutMs || 15000 });
   await page.waitForTimeout(options.settleMs || 2500);
+  const routeProbeFailures = await runRouteProbe(page, options.routeProbe, {
+    baseUrl,
+    route,
+    timeoutMs: options.timeoutMs || 15000,
+  });
 
   const layoutProbeSelectors = options.layoutProbeSelectors || normalizeLayoutProbeSelectors();
   const info = await page.evaluate((selectors) => {
@@ -221,6 +250,7 @@ async function inspectRoute(browser, baseUrl, route, options = {}) {
     return {
       title: document.title,
       rootChildren: root ? root.children.length : 0,
+      bodyText,
       bodyTextLength: bodyText.length,
       bodyTextPreview: bodyText.slice(0, 240),
       styleCount: styleTags + linkedStyles.length,
@@ -231,7 +261,7 @@ async function inspectRoute(browser, baseUrl, route, options = {}) {
 
   await page.close();
 
-  const { loadedMediaUrls: rawLoadedMediaUrls, ...reportInfo } = info;
+  const { bodyText, loadedMediaUrls: rawLoadedMediaUrls, ...reportInfo } = info;
   const loadedMediaUrls = Array.isArray(rawLoadedMediaUrls) ? rawLoadedMediaUrls : [];
   const reportableFailedRequests = failedRequests
     .filter((request) => !isExpectedLoadedMediaAbort(request, loadedMediaUrls));
@@ -240,7 +270,7 @@ async function inspectRoute(browser, baseUrl, route, options = {}) {
   const unexpectedConsoleIssues = consoleIssues
     .filter((issue) => !isAllowedConsoleIssue(issue));
   const expectedText = options.expectedText?.[route] || DEFAULT_ROUTE_TEXT[route] || [];
-  const missingText = findMissingExpectedText(reportInfo.bodyTextPreview, expectedText);
+  const missingText = findMissingExpectedText(bodyText, expectedText);
 
   return {
     route,
@@ -253,6 +283,7 @@ async function inspectRoute(browser, baseUrl, route, options = {}) {
     unexpectedConsoleIssues,
     pageErrors,
     missingText,
+    routeProbeFailures,
   };
 }
 
@@ -287,6 +318,9 @@ function summarizeFailures(results) {
     result.pageErrors.forEach((error) => {
       failures.push(`${result.route}: page error: ${error}`);
     });
+    (result.routeProbeFailures || []).forEach((failure) => {
+      failures.push(`${result.route}: route probe: ${failure}`);
+    });
     (result.layoutIssues || []).forEach((issue) => {
       failures.push(`${result.route}: layout issue: ${issue}`);
     });
@@ -311,6 +345,7 @@ function compactSmokeSummary(summary) {
       unexpectedFailedRequests: result.unexpectedFailedRequests.length,
       unexpectedConsoleIssues: result.unexpectedConsoleIssues.length,
       pageErrors: result.pageErrors.length,
+      routeProbeFailures: (result.routeProbeFailures || []).length,
       layoutIssues: (result.layoutIssues || []).length,
       missingText: result.missingText,
     })),
@@ -339,6 +374,7 @@ async function runSmoke(options = {}) {
         timeoutMs: options.timeoutMs,
         viewport,
         layoutProbeSelectors: options.layoutProbeSelectors,
+        routeProbe: options.routeProbes?.[route],
       }));
     }
 
@@ -377,6 +413,7 @@ module.exports = {
   DEFAULT_ROUTES,
   DEFAULT_ROUTE_TEXT,
   compactSmokeSummary,
+  dismissOnboardingIfPresent,
   findMissingExpectedText,
   inspectRoute,
   isAllowedConsoleIssue,
@@ -387,6 +424,7 @@ module.exports = {
   normalizeRoutes,
   resolveViewport,
   routeUrl,
+  runRouteProbe,
   runSmoke,
   summarizeFailures,
 };

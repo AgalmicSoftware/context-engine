@@ -13,7 +13,9 @@ import { bufferToBase64URL } from './passkey/encoding.js';
 const PRIVATE_KEY = '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5' as const;
 const ADDRESS = new ethers.Wallet(PRIVATE_KEY).address as `0x${string}`;
 const RAW_ID = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
+const ALT_RAW_ID = new Uint8Array([8, 7, 6, 5, 4, 3, 2, 1]);
 const PRF_OUTPUT = new Uint8Array(Array.from({ length: 32 }, (_, i) => i + 1)).buffer;
+const ALT_PRF_OUTPUT = new Uint8Array(Array.from({ length: 32 }, (_, i) => 255 - i)).buffer;
 
 const config: PasskeyWalletConfig = {
   rpId: 'localhost',
@@ -37,9 +39,10 @@ const derivedConfig: PasskeyWalletConfig = {
 const makeCredential = ({
   prf = true,
   prfOutput = PRF_OUTPUT,
-}: { prf?: boolean; prfOutput?: ArrayBuffer | null } = {}) =>
+  rawId = RAW_ID,
+}: { prf?: boolean; prfOutput?: ArrayBuffer | null; rawId?: Uint8Array } = {}) =>
   ({
-    rawId: RAW_ID.buffer,
+    rawId: rawId.buffer,
     getClientExtensionResults: () =>
       prf
         ? {
@@ -55,13 +58,15 @@ const makeCredentials = ({
   prf = true,
   createPrfOutput = PRF_OUTPUT,
   getPrfOutput = PRF_OUTPUT,
+  getRawId = RAW_ID,
 }: {
   prf?: boolean;
   createPrfOutput?: ArrayBuffer | null;
   getPrfOutput?: ArrayBuffer | null;
+  getRawId?: Uint8Array;
 } = {}): PasskeyCredentialClient => ({
   create: jest.fn(async () => makeCredential({ prf, prfOutput: createPrfOutput })),
-  get: jest.fn(async () => makeCredential({ prf, prfOutput: getPrfOutput })),
+  get: jest.fn(async () => makeCredential({ prf, prfOutput: getPrfOutput, rawId: getRawId })),
 });
 
 const makeSessionClient = () => {
@@ -272,9 +277,44 @@ describe('PasskeyEoaWalletClient', () => {
     });
 
     await expect(returning.unlockWallet()).resolves.toBe(createdAddress);
-    const request = (returningCredentials.get as jest.Mock).mock.calls[0][0];
-    expect(request.publicKey.allowCredentials).toHaveLength(1);
-    expect(bufferToBase64URL(request.publicKey.allowCredentials[0].id)).toBe(stored?.credentialId);
+    const request = (returningCredentials.get as jest.Mock).mock.calls[0][0] as CredentialRequestOptions;
+    expect(request.publicKey?.allowCredentials).toHaveLength(1);
+    expect(bufferToBase64URL(request.publicKey?.allowCredentials?.[0].id as ArrayBuffer)).toBe(stored?.credentialId);
+  });
+
+  it('invites the platform passkey chooser during explicit login and adopts the selected wallet', async () => {
+    const storage = createMemoryWalletStorage();
+    const first = new PasskeyEoaWalletClient({
+      config: derivedConfig,
+      storage,
+      credentials: makeCredentials(),
+      sessionClient: makeSessionClient(),
+    });
+    const firstAddress = await first.createWallet();
+    await first.disconnect();
+
+    const chooserCredentials = makeCredentials({
+      getPrfOutput: ALT_PRF_OUTPUT,
+      getRawId: ALT_RAW_ID,
+    });
+    const returning = new PasskeyEoaWalletClient({
+      config: derivedConfig,
+      storage,
+      credentials: chooserCredentials,
+      sessionClient: makeSessionClient(),
+    });
+
+    const selectedAddress = await returning.unlockWallet({ selectCredential: true });
+    const request = (chooserCredentials.get as jest.Mock).mock.calls[0][0];
+
+    expect(request.publicKey).not.toHaveProperty('allowCredentials');
+    expect(selectedAddress).not.toBe(firstAddress);
+    expect(await storage.read()).toEqual(
+      expect.objectContaining({
+        credentialId: bufferToBase64URL(ALT_RAW_ID.buffer),
+        evmAddress: selectedAddress,
+      }),
+    );
   });
 
   it('does not persist or log PRF output or derived private keys', async () => {
@@ -466,6 +506,47 @@ describe('PasskeyEoaWalletClient', () => {
     expect(sessionClient.locked).toBe(true);
     expect(client.getAddress()).toBeNull();
     expect(await storage.read()).toEqual(expect.objectContaining({ evmAddress: ADDRESS }));
+  });
+
+  it('keeps the account discoverable without reporting signer readiness after lock or signerless restore', async () => {
+    const storage = createMemoryWalletStorage();
+    const credentials = makeCredentials();
+    const client = new PasskeyEoaWalletClient({
+      config,
+      storage,
+      credentials,
+      sessionClient: makeSessionClient(),
+      sessionClientFactory: () => makeSessionClient(),
+      privateKeyFactory: () => PRIVATE_KEY,
+    });
+
+    await client.createWallet();
+    expect(client.isUnlocked()).toBe(true);
+    expect(client.hasSigner()).toBe(true);
+
+    await client.lock();
+    expect(client.getAddress()).toBe(ADDRESS);
+    expect(client.isUnlocked()).toBe(false);
+    expect(client.hasSigner()).toBe(false);
+    expect(await storage.read()).toEqual(expect.objectContaining({ evmAddress: ADDRESS }));
+
+    const returning = new PasskeyEoaWalletClient({
+      config,
+      storage,
+      credentials,
+      sessionClient: makeSessionClient(),
+      sessionClientFactory: () => makeSessionClient(),
+      privateKeyFactory: () => PRIVATE_KEY,
+    });
+    await expect(returning.restoreSession({ requireSigner: false })).resolves.toBe(ADDRESS);
+    expect(returning.getAddress()).toBe(ADDRESS);
+    expect(returning.isUnlocked()).toBe(false);
+    expect(returning.hasSigner()).toBe(false);
+    expect(credentials.get).not.toHaveBeenCalled();
+
+    await expect(returning.signMessage('unlock me')).resolves.toMatch(/^0x11/);
+    expect(credentials.get).toHaveBeenCalledTimes(1);
+    expect(returning.isUnlocked()).toBe(true);
   });
 });
 

@@ -122,6 +122,59 @@ describe('SurveySelector display guards', () => {
     expect(treeHasText(tree, '60 / 100')).toBe(false);
   });
 
+  it('exposes a stable hook for the questions toolbar', () => {
+    const subject = new SurveySelector({
+      autoOpenResults: false,
+      filterState: {},
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      singleQuestionMode: false,
+      network: { id: 84532 },
+      activeSessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      viewMode: 'questions',
+      showLongLoading: false,
+    };
+
+    const toolbar = findElement(
+      subject.render(),
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_TOOLBAR,
+    );
+
+    expect(toolbar).toBeTruthy();
+    expect(toolbar.props.id).toBe(styles.surveysRow);
+  });
+
+  it('marks the embedded session toolbar for the wider tablet layout', () => {
+    const subject = new SurveySelector({
+      autoOpenResults: false,
+      filterState: {},
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      singleQuestionMode: false,
+      network: { id: 84532 },
+      activeSessionSlug: 'edge',
+      embeddedSessionToolbar: true,
+    });
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      viewMode: 'questions',
+      showLongLoading: false,
+    };
+
+    const toolbar = findElement(
+      subject.render(),
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_TOOLBAR,
+    );
+
+    expect(toolbar).toBeTruthy();
+    expect(nodeHasClassName(toolbar, styles.embeddedSessionToolbar)).toBe(true);
+  });
+
   it('renders the SurveySelector header submit CTA with submitGlow when pending edits exist', () => {
     const subject = new SurveySelector({
       autoOpenResults: false,

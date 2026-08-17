@@ -234,6 +234,7 @@ type ContractHelperDeps = {
     init?: RequestInit,
     opts?: {
       sessionSlug?: string;
+      sessionConfig?: SessionConfigLike | null;
       context?: RequestContext;
       workerUrl?: string;
       allowDemoFallback?: boolean;
@@ -803,6 +804,7 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
             },
             {
               sessionSlug: resolvedSessionSlugForRequest,
+              sessionConfig,
               context,
               workerUrl: baseUrl,
               allowDemoFallback: defaultStrictAllowDemoFallback(),

@@ -5,6 +5,7 @@ import type { Root } from 'react-dom/client';
 import AudioInput from './AudioInput';
 import { requestAiRewrite } from '../../../utilities/ai/aiClient';
 import { useWhisper, RECORDING_STATUS } from '../../../utilities/useWhisper';
+import { readThemeToken, subscribeThemeChanges } from '../../../utilities/ui/themeRuntime';
 
 type LastRecording = {
   blob: Blob | null;
@@ -73,6 +74,8 @@ type RafEntry = {
 
 const mockUseWhisper = useWhisper as unknown as UseWhisperMock;
 const mockRequestAiRewrite = requestAiRewrite as unknown as RequestAiRewriteMock;
+const mockReadThemeToken = readThemeToken as jest.MockedFunction<typeof readThemeToken>;
+const mockSubscribeThemeChanges = subscribeThemeChanges as jest.MockedFunction<typeof subscribeThemeChanges>;
 const actGlobal = globalThis as typeof globalThis & {
   IS_REACT_ACT_ENVIRONMENT?: boolean;
 };
@@ -90,6 +93,11 @@ jest.mock('../../../utilities/useWhisper', () => {
   const actual = jest.requireActual('../../../utilities/useWhisper');
   return { ...actual, useWhisper: jest.fn() };
 });
+
+jest.mock('../../../utilities/ui/themeRuntime', () => ({
+  readThemeToken: jest.fn((...args: unknown[]) => (typeof args[1] === 'string' ? args[1] : '')),
+  subscribeThemeChanges: jest.fn(() => jest.fn()),
+}));
 
 const buildWhisperState = (overrides: Partial<WhisperState> = {}): WhisperState => ({
   status: RECORDING_STATUS.READY,
@@ -170,6 +178,8 @@ describe('AudioInput', () => {
     mockUseWhisper.mockReturnValue(buildWhisperState());
     mockRequestAiRewrite.mockReset();
     mockRequestAiRewrite.mockResolvedValue('rewritten');
+    mockReadThemeToken.mockImplementation((_token, fallback = '') => fallback);
+    mockSubscribeThemeChanges.mockImplementation(() => jest.fn());
     rafQueue = [];
     rafId = 0;
     requestAnimationFrameSpy = jest.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
@@ -456,6 +466,9 @@ describe('AudioInput', () => {
     expect(fakeAudioContext.createMediaStreamSource).toHaveBeenCalledTimes(1);
     expect(sourceNode.connect).toHaveBeenCalledWith(analyser);
     expect(requestAnimationFrameSpy.mock.calls.length).toBeGreaterThan(rafCallsBeforeRefs);
+    expect(readThemeToken).toHaveBeenCalledWith('ce-control-face', 'Canvas');
+    expect(readThemeToken).toHaveBeenCalledWith('ce-action-primary', 'Highlight');
+    expect(subscribeThemeChanges).toHaveBeenCalled();
   });
 
   it('skips duplicate same-text parent updates', () => {

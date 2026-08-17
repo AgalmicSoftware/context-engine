@@ -166,7 +166,7 @@ describe('surveyQuestionsTypes', () => {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      color: 'red',
+      color: 'var(--ce-status-danger-text)',
     });
     expect(
       buildSurveyQuestionsFullLoadingProgressFillStyle({

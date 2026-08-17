@@ -1,4 +1,4 @@
-import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
+import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 
 export type CreateSbtDigestFn = (value: string) => string;
 

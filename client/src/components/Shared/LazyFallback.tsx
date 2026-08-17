@@ -27,9 +27,9 @@ export default function LazyFallback({ label = 'Loading...', subtext = '', minHe
           alignItems: 'center',
           justifyContent: 'center',
           padding: '16px 18px',
-          borderRadius: '8px',
+          borderRadius: 'var(--ce-radius-8)',
           background: 'transparent',
-          color: 'white',
+          color: 'var(--ce-panel-text)',
           textAlign: 'center',
           maxWidth: '560px',
         }}

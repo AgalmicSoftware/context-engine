@@ -1,5 +1,5 @@
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
-import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
+import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 
 export type SBTsPageUnknownRecord = Record<string, unknown>;
 export type SBTsPageMaybeRecord = SBTsPageUnknownRecord | null;

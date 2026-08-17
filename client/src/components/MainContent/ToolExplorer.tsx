@@ -2,7 +2,19 @@
 
 import React, { useEffect, useMemo, useState, Suspense } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCog, faExpand, faEye, faPlus } from '@fortawesome/free-solid-svg-icons';
+import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
+import {
+  faCog,
+  faExclamationTriangle,
+  faExpand,
+  faEye,
+  faLightbulb,
+  faPlus,
+  faProjectDiagram,
+  faQuestionCircle,
+  faSearch,
+  faUsers,
+} from '@fortawesome/free-solid-svg-icons';
 import { createLogger } from '../../utilities/logging';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { hasCachedCreateSbtForm } from '../../utilities/sbt/sbtCreateFormCache.js';
@@ -42,6 +54,7 @@ type ToolComponent = React.ComponentType<any> | React.LazyExoticComponent<React.
 type ToolData = {
   name: string;
   subtext: string;
+  icon: IconDefinition;
   explainText: string;
   image: string;
   headerImage?: string | null;
@@ -75,7 +88,8 @@ const ToolExplorer = (props: ToolExplorerProps) => {
   const exampleData: ToolData[] = [
     {
       name: 'Questions',
-      subtext: 'Opinions and Priorities',
+      subtext: 'Create and explore questions.',
+      icon: faQuestionCircle,
       explainText:
         'Survey and question platform allowing detailed responses, advanced question formats, preference weighing, and group filtering. Responses can be encrypted for privacy and retroactive evaluation by ZK systems (opt-in). Audio input processed by OpenAI – not stored by this app. Responses stored permanently on Arweave',
       image: worldVoteImage,
@@ -86,7 +100,8 @@ const ToolExplorer = (props: ToolExplorerProps) => {
     },
     {
       name: 'Groups',
-      subtext: 'Create and Use',
+      subtext: 'Organize and manage groups.',
+      icon: faUsers,
       explainText:
         'Soulbound tokens (non-transferrable NFTs) enable digital groups to organize and coordinate by representing membership, roles, and permissions on-chain. SBTs can create private spaces for collective action, decision-making, and training custom AI models together, unlocking new possibilities for decentralized governance.',
       image: modelDirectoryImage,
@@ -96,7 +111,8 @@ const ToolExplorer = (props: ToolExplorerProps) => {
     },
     {
       name: 'Context',
-      subtext: 'AI Opinion Database',
+      subtext: 'Analyze and explore context.',
+      icon: faSearch,
       explainText:
         'AI Database Tool ingests URLs or PDFs, generates debate-worthy questions using AI, and allows users to select and add these questions to a debate tree and/or question bank.',
       image: magnifyingGlassImage,
@@ -108,6 +124,7 @@ const ToolExplorer = (props: ToolExplorerProps) => {
     {
       name: 'Debate Tree',
       subtext: 'For efficient discourse',
+      icon: faProjectDiagram,
       explainText:
         'Demo of an interactive version of Deepmind\'s "AI Policy Atlas". Intended to help users structure and navigate complex arguments, and to help AI researchers and policymakers understand and communicate about AI policy issues. Work in progress.',
       image: debateTreeImage,
@@ -119,6 +136,7 @@ const ToolExplorer = (props: ToolExplorerProps) => {
     {
       name: 'Risks',
       subtext: 'Track opps and risks',
+      icon: faExclamationTriangle,
       explainText:
         'A tool for collective "heatmap" tracking of opportunities and risks related to disruptive technologies. Input from other areas of the site could be used to populate and improve this display. Axes could be different, and a 3D version (with subcategories) can be previewed by clicking a row and column',
       image: riskMatrixImage,
@@ -130,6 +148,7 @@ const ToolExplorer = (props: ToolExplorerProps) => {
     {
       name: 'Suggest Tool',
       subtext: 'Fill form',
+      icon: faLightbulb,
       explainText: 'Suggest a tool or plugin which would aid in coordination between AI researchers and/or the public',
       image: plusSignImage,
       headerImage: null,
@@ -146,6 +165,7 @@ const ToolExplorer = (props: ToolExplorerProps) => {
       name: data.name,
       subtext: data.subtext,
       explainText: data.explainText,
+      icon: data.icon,
       image: data.image,
       disabled: data.disabled,
       status: data.status,
@@ -256,14 +276,18 @@ const ToolExplorer = (props: ToolExplorerProps) => {
         provider: props.provider,
         litHooks: props.litHooks,
         activeSessionSlug: props.activeSessionSlug,
-        sessionConfig: getSessionConfigBySlug(props.activeSessionSlug || '') || null,
+        sessionConfig: props.sessionConfig || getSessionConfigBySlug(props.activeSessionSlug || '') || null,
         ensureLightSbtUniverse: props.ensureLightSbtUniverse,
         loginComplete: props.loginComplete,
         toggleLoginModal: props.toggleLoginModal,
         network: props.network,
+        networkChainId: props.networkChainId,
         isSBTCacheReady: props.isSBTCacheReady,
         isSurveyCacheReady: props.isSurveyCacheReady,
         isQuestionCacheReady: props.isQuestionCacheReady,
+        isResponsesCacheReady: props.isResponsesCacheReady,
+        questionResponsesNonce: props.questionResponsesNonce,
+        questionScanProgress: props.questionScanProgress,
         ...(expandedToolName === 'Questions'
           ? {
               preventUrlChange: true,
@@ -272,6 +296,8 @@ const ToolExplorer = (props: ToolExplorerProps) => {
         ...(expandedToolName === 'Debate Tree' ? { demoMode: demoSurfaceEnabled } : {}),
         ...(showGroupsHeaderActions
           ? {
+              sessionSlug: props.activeSessionSlug,
+              embeddedWorkerGroups: true,
               hideMiniActionRow: true,
               showCreateGroupAboveFeatured: true,
               showCreateGroupExternal: showEmbeddedCreateGroup,
@@ -437,6 +463,7 @@ const ToolExplorer = (props: ToolExplorerProps) => {
                 onClick={() => handleClick(Component, data)}
               >
                 <div className={styles.square}>
+                  <FontAwesomeIcon icon={props.icon} className={styles.classicToolIcon} aria-hidden="true" />
                   <div
                     className={styles.backgroundImage}
                     style={{

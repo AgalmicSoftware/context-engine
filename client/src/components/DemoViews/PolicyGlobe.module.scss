@@ -1,7 +1,9 @@
 .globeWrapper {
   align-items: center;
-  background: radial-gradient(circle at top, rgba(77, 255, 164, 0.12), transparent 48%), rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background:
+    radial-gradient(circle at top, color-mix(in srgb, var(--ce-action-accent) 12%, transparent), transparent 48%),
+    color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
   border-radius: var(--ce-radius-12);
   display: flex;
   flex-direction: column;
@@ -13,15 +15,20 @@
 .globe {
   align-items: center;
   background:
-    radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.24), transparent 22%),
-    radial-gradient(circle at 65% 72%, rgba(9, 17, 42, 0.45), transparent 36%),
-    radial-gradient(circle at 50% 50%, rgba(33, 65, 112, 0.92) 0%, rgba(12, 19, 40, 0.98) 68%, rgba(4, 10, 24, 1) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 50%;
+    radial-gradient(circle at 30% 28%, color-mix(in srgb, var(--ce-text-inverse) 24%, transparent), transparent 22%),
+    radial-gradient(circle at 65% 72%, color-mix(in srgb, var(--ce-overlay-base) 45%, transparent), transparent 36%),
+    radial-gradient(
+      circle at 50% 50%,
+      color-mix(in srgb, var(--ce-status-info) 92%, transparent) 0%,
+      color-mix(in srgb, var(--ce-overlay-base) 98%, transparent) 68%,
+      var(--ce-overlay-base) 100%
+    );
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 18%, transparent);
+  border-radius: var(--ce-radius-round);
   box-shadow:
-    inset -18px -18px 36px rgba(0, 0, 0, 0.26),
-    inset 12px 14px 24px rgba(255, 255, 255, 0.05),
-    0 18px 36px rgba(0, 0, 0, 0.28);
+    inset -18px -18px 36px color-mix(in srgb, var(--ce-compat-dark) 26%, transparent),
+    inset 12px 14px 24px color-mix(in srgb, var(--ce-text-inverse) 5%, transparent),
+    0 18px 36px color-mix(in srgb, var(--ce-compat-dark) 28%, transparent);
   display: flex;
   height: 180px;
   justify-content: center;
@@ -33,18 +40,23 @@
 
 .globe::before,
 .globe::after {
-  border-radius: 50%;
+  border-radius: var(--ce-radius-round);
   content: '';
   position: absolute;
 }
 
 .globe::before {
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 9%, transparent);
   inset: 8px;
 }
 
 .globe::after {
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.08), transparent 42%, rgba(255, 255, 255, 0.02));
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--ce-text-inverse) 8%, transparent),
+    transparent 42%,
+    color-mix(in srgb, var(--ce-text-inverse) 2%, transparent)
+  );
   inset: 0;
   opacity: 0.6;
 }
@@ -52,8 +64,8 @@
 .globeRing {
   --ring-transform: rotateX(72deg);
   animation: rotate 28s linear infinite;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
+  border-radius: var(--ce-radius-round);
   inset: 12px;
   position: absolute;
 }
@@ -85,9 +97,9 @@
 }
 
 .dot {
-  border: 2px solid rgba(7, 12, 28, 0.95);
-  border-radius: 50%;
-  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.06);
+  border: 2px solid color-mix(in srgb, var(--ce-overlay-base) 95%, transparent);
+  border-radius: var(--ce-radius-round);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
   height: 8px;
   left: 50%;
   position: absolute;
@@ -97,15 +109,15 @@
 }
 
 .dotGreen {
-  background: #4dffa4;
+  background: var(--ce-action-accent);
 }
 
 .dotAmber {
-  background: #ffb347;
+  background: var(--ce-status-warning);
 }
 
 .dotRose {
-  background: #ff7a9e;
+  background: var(--ce-data-series-3);
 }
 
 .filterRow {
@@ -117,10 +129,10 @@
 
 .filterButton {
   align-items: center;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
   border-radius: var(--ce-radius-pill);
-  color: rgba(244, 247, 255, 0.88);
+  color: color-mix(in srgb, var(--ce-control-text) 88%, transparent);
   cursor: pointer;
   display: inline-flex;
   font-family: var(--ce-font-mono, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace);
@@ -139,36 +151,36 @@
 
 .filterButton:hover,
 .filterButton:focus-visible {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.22);
+  background: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
+  border-color: color-mix(in srgb, var(--ce-text-inverse) 22%, transparent);
   outline: none;
   transform: translateY(-1px);
 }
 
 .filterButtonActive {
-  background: rgba(77, 255, 164, 0.14);
-  border-color: rgba(77, 255, 164, 0.36);
-  color: #4dffa4;
+  background: color-mix(in srgb, var(--ce-action-accent) 14%, transparent);
+  border-color: color-mix(in srgb, var(--ce-action-accent) 36%, transparent);
+  color: var(--ce-action-accent);
 }
 
 .filterButtonLiveOption {
-  border-color: rgba(77, 255, 164, 0.24);
+  border-color: color-mix(in srgb, var(--ce-action-accent) 24%, transparent);
 }
 
 .filterButtonProposedOption {
-  border-color: rgba(255, 179, 71, 0.24);
+  border-color: color-mix(in srgb, var(--ce-status-warning) 24%, transparent);
 }
 
 .filterButtonInactiveOption {
-  border-color: rgba(255, 122, 158, 0.24);
+  border-color: color-mix(in srgb, var(--ce-data-series-3) 24%, transparent);
 }
 
 .filterButtonAllOption {
-  border-color: rgba(226, 232, 255, 0.16);
+  border-color: color-mix(in srgb, var(--ce-status-info-text) 16%, transparent);
 }
 
 .filterSwatch {
-  border-radius: 999px;
+  border-radius: var(--ce-radius-pill);
   display: inline-flex;
   flex: 0 0 10px;
   height: 10px;
@@ -176,24 +188,30 @@
 }
 
 .filterSwatchLive {
-  background: rgba(77, 255, 164, 0.9);
+  background: color-mix(in srgb, var(--ce-action-accent) 90%, transparent);
 }
 
 .filterSwatchProposed {
-  background: rgba(255, 179, 71, 0.9);
+  background: color-mix(in srgb, var(--ce-status-warning) 90%, transparent);
 }
 
 .filterSwatchInactive {
-  background: rgba(255, 122, 158, 0.9);
+  background: color-mix(in srgb, var(--ce-data-series-3) 90%, transparent);
 }
 
 .filterSwatchAll {
-  background: rgba(122, 140, 255, 0.9);
+  background: color-mix(in srgb, var(--ce-status-info-text) 90%, transparent);
 }
 
 .policyCard {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.03)), rgba(9, 16, 34, 0.86);
-  border-color: rgba(77, 255, 164, 0.12);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--ce-text-inverse) 5%, transparent),
+      color-mix(in srgb, var(--ce-text-inverse) 3%, transparent)
+    ),
+    color-mix(in srgb, var(--ce-overlay-base) 86%, transparent);
+  border-color: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
 }
 
 .policyTitleRow {
@@ -230,21 +248,21 @@
 }
 
 .statusLive {
-  background: rgba(77, 255, 164, 0.14);
-  border: 1px solid rgba(77, 255, 164, 0.24);
-  color: #4dffa4;
+  background: color-mix(in srgb, var(--ce-action-accent) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 24%, transparent);
+  color: var(--ce-action-accent);
 }
 
 .statusProposed {
-  background: rgba(255, 179, 71, 0.14);
-  border: 1px solid rgba(255, 179, 71, 0.24);
-  color: #ffb347;
+  background: color-mix(in srgb, var(--ce-status-warning) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-status-warning) 24%, transparent);
+  color: var(--ce-status-warning);
 }
 
 .statusInactive {
-  background: rgba(255, 122, 158, 0.14);
-  border: 1px solid rgba(255, 122, 158, 0.24);
-  color: #ff7a9e;
+  background: color-mix(in srgb, var(--ce-data-series-3) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-data-series-3) 24%, transparent);
+  color: var(--ce-data-series-3);
 }
 
 @keyframes rotate {

@@ -36,6 +36,10 @@ export interface SessionContractRef extends UnknownRecord {
   chainId?: number | string;
 }
 
+export interface SessionAppearance extends UnknownRecord {
+  colorSchemeId?: string;
+}
+
 export type SessionContractsConfig = Record<string, SessionContractRef> & {
   sessionRegistry?: SessionContractRef;
   surveys?: SessionContractRef;
@@ -69,6 +73,7 @@ export interface SessionMetadata extends UnknownRecord {
   faucet?: UnknownRecord;
   ai?: UnknownRecord;
   agentSessionWrapped?: AgentSessionWrappedCapability;
+  appearance?: SessionAppearance;
 }
 
 export interface RegistrySessionDetails extends UnknownRecord {
@@ -101,6 +106,7 @@ export interface SessionWorkerConfig extends UnknownRecord {
   rpcEndpoint: string;
   embeddedDeployHelperEnabled?: boolean;
   litCredentials?: UnknownRecord;
+  workerAuthority?: UnknownRecord;
 }
 
 export interface SessionWorkerConfigFieldPresence {

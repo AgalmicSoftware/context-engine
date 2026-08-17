@@ -1,10 +1,8 @@
-@use 'scss/variables' as tokens;
-
-$card-bg: tokens.$ce-card-bg;
-$card-border: tokens.$ce-card-border;
-$card-shadow: tokens.$ce-card-shadow;
-$clickable-color: tokens.$ce-clickable;
-$muted-text: tokens.$ce-muted-text;
+$card-bg: var(--ce-card-bg);
+$card-border: var(--ce-card-border);
+$card-shadow: var(--ce-card-shadow);
+$clickable-color: var(--ce-action-accent);
+$muted-text: var(--ce-panel-text-muted);
 
 .bookmarksPage {
   width: 92%;
@@ -48,9 +46,9 @@ $muted-text: tokens.$ce-muted-text;
   width: 46px;
   height: 46px;
   border-radius: var(--ce-radius-10);
-  border: 1px solid rgba(77, 255, 164, 0.35);
-  background: rgba(77, 255, 164, 0.12);
-  color: #e7fff4;
+  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 35%, transparent);
+  background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
+  color: var(--ce-status-success-soft);
   font-size: 1.1rem;
   cursor: pointer;
   display: inline-flex;
@@ -61,19 +59,19 @@ $muted-text: tokens.$ce-muted-text;
     box-shadow 0.2s ease,
     border-color 0.2s ease,
     background 0.2s ease;
-  box-shadow: 0 10px 20px rgba(6, 10, 24, 0.25);
+  box-shadow: 0 10px 20px color-mix(in srgb, var(--ce-overlay-base) 25%, transparent);
 }
 
 .refreshButton:hover {
   transform: translateY(-1px);
-  border-color: rgba(77, 255, 164, 0.6);
+  border-color: color-mix(in srgb, var(--ce-action-accent) 60%, transparent);
   background: $clickable-color;
-  color: #0b1736;
-  box-shadow: 0 14px 24px rgba(77, 255, 164, 0.25);
+  color: var(--ce-document-text);
+  box-shadow: 0 14px 24px color-mix(in srgb, var(--ce-action-accent) 25%, transparent);
 }
 
 .refreshButton:focus-visible {
-  outline: 2px solid rgba(77, 255, 164, 0.45);
+  outline: 2px solid color-mix(in srgb, var(--ce-action-accent) 45%, transparent);
   outline-offset: 2px;
 }
 
@@ -129,12 +127,12 @@ $muted-text: tokens.$ce-muted-text;
 }
 
 .summaryCaret {
-  color: rgba(244, 247, 255, 0.7);
+  color: color-mix(in srgb, var(--ce-control-text) 70%, transparent);
 }
 
 .summaryBody {
   display: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
   padding-top: 10px;
 }
 
@@ -143,8 +141,8 @@ $muted-text: tokens.$ce-muted-text;
 }
 
 .emptyBanner {
-  border: 1px dashed rgba(255, 255, 255, 0.2);
-  background: rgba(0, 0, 0, 0.18);
+  border: 1px dashed color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
+  background: color-mix(in srgb, var(--ce-compat-dark) 18%, transparent);
   border-radius: var(--ce-radius-10);
   padding: 12px 16px;
   color: $muted-text;
@@ -165,7 +163,7 @@ $muted-text: tokens.$ce-muted-text;
 }
 
 .listItem {
-  background: rgba(0, 0, 0, 0.2);
+  background: color-mix(in srgb, var(--ce-compat-dark) 20%, transparent);
   border: 1px solid $card-border;
   border-radius: var(--ce-radius-10);
   padding: 10px 12px;
@@ -177,8 +175,8 @@ $muted-text: tokens.$ce-muted-text;
     background 0.2s ease;
 
   &:hover {
-    border-color: rgba(255, 255, 255, 0.28);
-    background: rgba(0, 0, 0, 0.28);
+    border-color: color-mix(in srgb, var(--ce-text-inverse) 28%, transparent);
+    background: color-mix(in srgb, var(--ce-compat-dark) 28%, transparent);
   }
 }
 
@@ -190,7 +188,7 @@ $muted-text: tokens.$ce-muted-text;
 }
 
 .itemLink {
-  color: #d8e9ff;
+  color: var(--ce-status-info-text);
   text-decoration: none;
   font-weight: 600;
 }
@@ -202,7 +200,7 @@ $muted-text: tokens.$ce-muted-text;
 }
 
 .itemLabel {
-  color: #d9e3f8;
+  color: var(--ce-status-info-text);
   font-weight: 600;
 }
 
@@ -210,7 +208,7 @@ $muted-text: tokens.$ce-muted-text;
   font-size: 0.75rem;
   padding: 2px 8px;
   border-radius: var(--ce-radius-pill);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
   color: $muted-text;
   text-transform: uppercase;
 }
@@ -218,7 +216,7 @@ $muted-text: tokens.$ce-muted-text;
 .itemMeta {
   font-family: var(--ce-font-mono, 'SFMono-Regular', Menlo, monospace);
   font-size: 0.85rem;
-  color: rgba(244, 247, 255, 0.6);
+  color: color-mix(in srgb, var(--ce-control-text) 60%, transparent);
   word-break: break-all;
 }
 
@@ -233,34 +231,34 @@ $muted-text: tokens.$ce-muted-text;
   font-size: 0.78rem;
   padding: 4px 8px;
   border-radius: var(--ce-radius-pill);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.06);
-  color: #eef4ff;
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
+  background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
+  color: var(--ce-document-surface);
 }
 
 .chiptag {
-  border-color: rgba(98, 160, 255, 0.4);
-  color: #b8d6ff;
+  border-color: color-mix(in srgb, var(--ce-data-series-1) 40%, transparent);
+  color: var(--ce-status-info-text);
 }
 
 .chipai {
-  border-color: rgba(255, 183, 77, 0.45);
-  color: #ffd9a8;
+  border-color: color-mix(in srgb, var(--ce-data-series-5) 45%, transparent);
+  color: var(--ce-status-warning-text);
 }
 
 .chiptype {
-  border-color: rgba(129, 214, 161, 0.45);
-  color: #bff0d3;
+  border-color: color-mix(in srgb, var(--ce-data-series-7) 45%, transparent);
+  color: var(--ce-status-success-soft);
 }
 
 .chipsbt {
-  border-color: rgba(244, 114, 182, 0.45);
-  color: #f6c0dc;
+  border-color: color-mix(in srgb, var(--ce-data-series-3) 45%, transparent);
+  color: var(--ce-data-series-3);
 }
 
 .chiptop {
-  border-color: rgba(250, 204, 21, 0.5);
-  color: #ffe08a;
+  border-color: color-mix(in srgb, var(--ce-data-series-5) 50%, transparent);
+  color: var(--ce-status-warning-text);
 }
 
 .filterItemHeader {
@@ -272,9 +270,9 @@ $muted-text: tokens.$ce-muted-text;
 
 .filterCopyButton {
   border-radius: var(--ce-radius-8);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.08);
-  color: #d9e3f8;
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
+  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+  color: var(--ce-status-info-text);
   width: 34px;
   height: 34px;
   display: inline-flex;
@@ -288,15 +286,15 @@ $muted-text: tokens.$ce-muted-text;
 }
 
 .filterCopyButton:hover {
-  border-color: rgba(77, 255, 164, 0.55);
-  background: rgba(77, 255, 164, 0.18);
-  color: #0b1736;
+  border-color: color-mix(in srgb, var(--ce-action-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--ce-action-accent) 18%, transparent);
+  color: var(--ce-document-text);
 }
 
 .filterCopyButtonActive {
-  border-color: rgba(77, 255, 164, 0.7);
-  background: rgba(77, 255, 164, 0.28);
-  color: #0b1736;
+  border-color: color-mix(in srgb, var(--ce-action-accent) 70%, transparent);
+  background: color-mix(in srgb, var(--ce-action-accent) 28%, transparent);
+  color: var(--ce-document-text);
 }
 
 @media (max-width: 640px) {

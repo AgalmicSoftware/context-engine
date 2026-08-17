@@ -66,6 +66,11 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => {
     __getSbtCacheStore: () => store,
     readCache: jest.fn(),
     writeCache: jest.fn(),
+    updateCacheAtomic: jest.fn(async (_namespace, slug = '', updater) => {
+      const next = await updater(store[String(slug || '')] || null);
+      store[String(slug || '')] = JSON.parse(JSON.stringify(next));
+      return next;
+    }),
     peekCacheSync: jest.fn((_namespace, slug = '', { clone = true } = {}) => {
       const value = store[String(slug || '')];
       if (!value) return null;
@@ -269,7 +274,7 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
     });
 
     await waitFor(() => {
-      const writtenSlugs = mockedCacheScripts.writeCache.mock.calls.map(([, slug]: any[]) => String(slug || ''));
+      const writtenSlugs = mockedCacheScripts.updateCacheAtomic.mock.calls.map(([, slug]: any[]) => String(slug || ''));
       expect(writtenSlugs).toContain('');
     });
 

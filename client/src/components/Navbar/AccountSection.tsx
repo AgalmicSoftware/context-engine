@@ -1,5 +1,5 @@
 /** @file AccountSection.tsx */
-import React, { Component } from 'react';
+import React, { Component, Suspense } from 'react';
 import { connect } from 'react-redux';
 import { toggleLoginModal } from '../../actions/sessionStateActions.js';
 import type { RootState } from '../../reducers/index.js';
@@ -7,7 +7,6 @@ import type { RootState } from '../../reducers/index.js';
 import styles from './Navbar.module.scss';
 
 import LoginButtonRaw from 'components/Account/LoginButton';
-import LoginAndSettingsModalRaw from '../Account/LoginAndSettingsModal';
 import { AccountDisplayTorus } from './AccountDisplay';
 
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
@@ -30,7 +29,7 @@ type AccountSectionProps = {
 };
 
 const LoginButton = LoginButtonRaw as React.ComponentType<any>;
-const LoginAndSettingsModal = LoginAndSettingsModalRaw as React.ComponentType<any>;
+const LoginAndSettingsModal = React.lazy(() => import('../Account/LoginAndSettingsModal'));
 
 class AccountSection extends Component<AccountSectionProps> {
   state = {};
@@ -77,12 +76,16 @@ class AccountSection extends Component<AccountSectionProps> {
 
     return (
       <>
-        <LoginAndSettingsModal
-          sendTestETH={(amountToSend: unknown) => this.props.sendTestETH?.(amountToSend)}
-          demoMode={this.props.demoMode}
-          toggleDemoMode={(demoModeOn: boolean) => this.props.toggleDemoMode?.(demoModeOn)}
-          sessionConfig={this.props.sessionConfig}
-        />
+        {this.props.loginModalToggled ? (
+          <Suspense fallback={null}>
+            <LoginAndSettingsModal
+              sendTestETH={(amountToSend: unknown) => this.props.sendTestETH?.(amountToSend)}
+              demoMode={this.props.demoMode}
+              toggleDemoMode={(demoModeOn: boolean) => this.props.toggleDemoMode?.(demoModeOn)}
+              sessionConfig={this.props.sessionConfig}
+            />
+          </Suspense>
+        ) : null}
         {topRight}
       </>
     );

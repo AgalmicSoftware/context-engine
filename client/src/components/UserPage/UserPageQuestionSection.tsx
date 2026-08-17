@@ -4,6 +4,7 @@ import { faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons';
 import { Collapse } from 'reactstrap';
 
 import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse';
+import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
 import styles from './UserPage.module.scss';
 
 type SingleQuestionResponseProps = React.ComponentProps<typeof SingleQuestionResponse>;
@@ -50,6 +51,43 @@ type UserPageQuestionSectionProps = {
   responderAddress?: SingleQuestionResponseProps['responderAddress'];
   sbtCacheRevision?: unknown;
 };
+
+const normalizeRowKeyPart = (value: unknown): string =>
+  String(value || '')
+    .trim()
+    .toLowerCase();
+
+const resolveQuestionSessionSlug = (question: UserPageQuestionEntry, activeSessionSlug: unknown): string =>
+  normalizeSessionSlug(question?.sessionSlug || question?.slug || activeSessionSlug || '');
+
+const buildQuestionResponseRowKey = ({
+  activeSessionSlug,
+  question,
+  responderAddress,
+  response,
+}: {
+  activeSessionSlug: unknown;
+  question: UserPageQuestionEntry;
+  responderAddress: unknown;
+  response: SingleQuestionResponseProps['response'];
+}): string => {
+  const responseRecord = response && typeof response === 'object' ? (response as Record<string, unknown>) : {};
+  const responseIdentity =
+    responseRecord.responseId ||
+    responseRecord.id ||
+    responseRecord.responder ||
+    responderAddress ||
+    'profile-response';
+  return [
+    'response',
+    resolveQuestionSessionSlug(question, activeSessionSlug),
+    normalizeRowKeyPart(question.id),
+    normalizeRowKeyPart(responseIdentity),
+  ].join(':');
+};
+
+const buildCreatedQuestionRowKey = (question: UserPageQuestionEntry, activeSessionSlug: unknown): string =>
+  ['created', resolveQuestionSessionSlug(question, activeSessionSlug), normalizeRowKeyPart(question.id)].join(':');
 
 const UserPageQuestionSection = ({
   activeSessionSlug,
@@ -98,11 +136,19 @@ const UserPageQuestionSection = ({
       </h2>
       <Collapse isOpen={questionResponsesSectionToggleState.isOpen}>
         {questionSectionDisplayState.hasQuestionResponses ? (
-          questionResponseEntries.map((question, index: number) => {
+          questionResponseEntries.map((question) => {
             const userResp = detailedQuestionResponseMap[question.id];
             if (!userResp) return null;
             return (
-              <div key={index} className={styles.questionWrapper}>
+              <div
+                key={buildQuestionResponseRowKey({
+                  activeSessionSlug,
+                  question,
+                  responderAddress,
+                  response: userResp,
+                })}
+                className={styles.questionWrapper}
+              >
                 <SingleQuestionResponse
                   question={question}
                   response={userResp}
@@ -150,8 +196,11 @@ const UserPageQuestionSection = ({
       </h2>
       <Collapse isOpen={questionsCreatedSectionToggleState.isOpen}>
         {questionSectionDisplayState.hasCreatedQuestions ? (
-          questionCreationEntries.map((question, index: number) => (
-            <div key={index} className={createdQuestionWrapperClassName}>
+          questionCreationEntries.map((question) => (
+            <div
+              key={buildCreatedQuestionRowKey(question, activeSessionSlug)}
+              className={createdQuestionWrapperClassName}
+            >
               <SingleQuestionResponse
                 question={question}
                 response={null}

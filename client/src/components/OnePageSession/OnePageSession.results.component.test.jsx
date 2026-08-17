@@ -25,7 +25,6 @@ const mockPolisReport = jest.fn();
 const mockSBTsPage = jest.fn();
 const mockDebateMap = jest.fn();
 const mockRiskMatrix = jest.fn();
-const mockDebateSelector = jest.fn();
 const mockDemoAnalysisWorkspace = jest.fn();
 const mockCorpusViewer = jest.fn();
 const originalFetch = global.fetch;
@@ -209,11 +208,6 @@ jest.mock('../DemoViews/CorpusViewer', () => {
     default: MockCorpusViewer,
   };
 });
-jest.mock('../DemoViews/DebateHUD/DebateSelector', () => (props) => {
-  mockDebateSelector(props);
-  return <div data-testid="debate-selector">Debate Selector</div>;
-});
-
 describe('OnePageSession results routing', () => {
   afterEach(() => {
     jest.useRealTimers();
@@ -637,30 +631,6 @@ describe('OnePageSession results routing', () => {
     expect(tabletResultsBlock).toContain('padding: 6px 10px;');
   });
 
-  it('keeps DebateSelector out of debate map mode', async () => {
-    const props = buildProps();
-
-    render(
-      <MemoryRouter initialEntries={['/session/demo']}>
-        <OnePageSession {...props} slug="demo" sessionConfig={{ ...props.sessionConfig, slug: 'demo' }} />
-      </MemoryRouter>,
-    );
-
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /^Debate Map$/i })).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByRole('button', { name: /^Debate Map$/i }));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('ai-policy-atlas')).toBeInTheDocument();
-    });
-
-    expect(screen.queryByTestId('debate-selector')).not.toBeInTheDocument();
-  }, 15000);
-
   it('renders the shared risk matrix view in embedded mode for demo results', async () => {
     const props = buildProps();
 
@@ -800,6 +770,27 @@ describe('OnePageSession results routing', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /^Breakdown$/i })).toBeInTheDocument();
     });
+  });
+
+  it('hides Breakdown for demo-2 and falls back to Report when a stale analysis mode carries over', async () => {
+    const props = buildProps();
+    const view = render(
+      <OnePageSession {...props} slug="demo-sh" sessionConfig={{ ...props.sessionConfig, slug: 'demo-sh' }} />,
+    );
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+    fireEvent.click(await screen.findByRole('button', { name: /^Breakdown$/i }));
+    expect(await screen.findByTestId('demo-analysis-workspace-view')).toBeInTheDocument();
+
+    view.rerender(
+      <OnePageSession {...props} slug="demo-2" sessionConfig={{ ...props.sessionConfig, slug: 'demo-2' }} />,
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /^Breakdown$/i })).not.toBeInTheDocument();
+      expect(screen.queryByTestId('demo-analysis-workspace-view')).not.toBeInTheDocument();
+      expect(screen.getByTestId('polis-report')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: /^Report$/i })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('uses a report-style icon for the polis results mode switcher', async () => {

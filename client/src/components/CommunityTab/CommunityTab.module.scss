@@ -1,8 +1,17 @@
 /* @file CommunityTab.module.scss */
 
 .communityTab {
+  --ce-beeswarm-axis-color: var(--ce-data-viz-axis);
+  --ce-beeswarm-background: var(--ce-data-viz-surface);
+  --ce-beeswarm-border: var(--ce-data-viz-border);
+  --ce-beeswarm-label-color: var(--ce-data-viz-label);
+  --ce-beeswarm-label-opacity: var(--ce-data-viz-label-opacity);
+  --ce-beeswarm-point-active-color: var(--ce-data-viz-point-active);
+  --ce-beeswarm-point-color: var(--ce-data-viz-point);
+  --ce-beeswarm-point-stroke: var(--ce-data-viz-point-stroke);
   display: flex;
   background: var(--ce-color-surface);
+  color: var(--ce-panel-text);
   border-radius: var(--ce-radius-5);
   margin-bottom: 10px;
   height: 500px;
@@ -15,8 +24,7 @@
     font-family: var(--ce-font-mono);
     text-transform: uppercase;
     letter-spacing: 0.14em;
-    color: var(--ce-color-white);
-    opacity: 0.88;
+    color: var(--ce-panel-text);
   }
 
   .content {
@@ -31,7 +39,7 @@
     border-right: 1px solid var(--ce-color-border-light);
     display: flex;
     flex-direction: column;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.04) 100%);
+    background: transparent;
   }
 
   .leaderboardTopBar {
@@ -40,6 +48,11 @@
     justify-content: space-between;
     gap: 12px;
     margin-bottom: 10px;
+  }
+
+  .leaderboardTitle {
+    display: none;
+    margin: 0;
   }
 
   .rightSection {
@@ -65,7 +78,7 @@
 
   .statsHeaderSpinner {
     margin-top: 6px;
-    color: rgba(244, 247, 255, 0.78);
+    color: color-mix(in srgb, var(--ce-control-text) 78%, transparent);
   }
 
   .statsSection,
@@ -75,11 +88,15 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.04) 100%);
   }
 
   .statsSection {
     border-bottom: 1px solid var(--ce-color-border-light);
+    background: transparent;
+  }
+
+  .beeswarmSection {
+    background: var(--ce-data-viz-surface);
   }
 
   .leaderboardHeader {
@@ -87,7 +104,7 @@
     justify-content: space-between;
     padding: 0 10px;
     font-weight: bold;
-    color: var(--ce-color-white);
+    color: var(--ce-panel-text);
   }
 
   .leaderboardControlsWrap {
@@ -103,15 +120,16 @@
     z-index: 3;
     min-width: 220px;
     padding: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.14);
+    border: 1px solid var(--ce-border-strong);
     border-radius: var(--ce-radius-12);
-    background: linear-gradient(180deg, rgba(23, 25, 65, 0.98) 0%, rgba(12, 14, 38, 0.98) 100%);
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+    background: var(--ce-surface-raised);
+    color: var(--ce-panel-text);
+    box-shadow: var(--ce-card-shadow);
   }
 
   .leaderboardControlsTitle {
     margin-bottom: 10px;
-    color: rgba(244, 247, 255, 0.72);
+    color: var(--ce-panel-text-muted);
     font-family: var(--ce-font-mono);
     font-size: 0.72rem;
     letter-spacing: 0.12em;
@@ -126,7 +144,7 @@
   .leaderboardControlLabel {
     display: flex;
     align-items: center;
-    color: var(--ce-color-white);
+    color: var(--ce-panel-text);
     font-size: 0.9em;
     margin: 0;
   }
@@ -141,8 +159,8 @@
     border: none;
     border-radius: var(--ce-radius-pill);
     background: transparent;
-    color: var(--ce-color-white);
-    opacity: 0.5;
+    color: var(--ce-panel-text);
+    opacity: 0.72;
     cursor: pointer;
     transition:
       opacity 0.2s ease,
@@ -152,7 +170,7 @@
     &:hover,
     &:focus {
       opacity: 1;
-      background: rgba(77, 255, 164, 0.12);
+      background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
       outline: none;
       transform: translateY(-1px);
     }
@@ -167,14 +185,16 @@
     display: flex;
     align-items: center;
     padding: 10px;
-    background: rgba(255, 255, 255, 0.1);
+    background: transparent;
+    border: 1px solid transparent;
     border-radius: var(--ce-radius-5);
     cursor: pointer;
     transition: background 0.2s;
-    color: var(--ce-color-white);
+    color: var(--ce-panel-text);
     margin-top: 10px;
     &:hover {
-      background: rgba(255, 255, 255, 0.2);
+      background: var(--ce-surface-raised);
+      border-color: var(--ce-border-light);
     }
   }
 
@@ -192,7 +212,7 @@
   }
 
   .simBadge {
-    color: yellow;
+    color: var(--ce-status-warning-text);
     margin-left: 5px;
     font-size: 0.8em;
   }
@@ -205,10 +225,10 @@
     display: block;
     margin: 15px auto 0;
     padding: 8px 16px;
-    background: rgba(77, 255, 164, 0.14);
-    border: 1px solid rgba(77, 255, 164, 0.32);
+    background: color-mix(in srgb, var(--ce-action-accent) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ce-action-accent) 32%, transparent);
     border-radius: var(--ce-radius-5);
-    color: var(--ce-color-white);
+    color: var(--ce-panel-text);
     cursor: pointer;
     transition:
       background 0.2s,
@@ -216,7 +236,7 @@
     font-size: 0.9em;
     opacity: 0.88;
     &:hover {
-      background: rgba(77, 255, 164, 0.22);
+      background: color-mix(in srgb, var(--ce-action-accent) 22%, transparent);
       opacity: 1;
     }
   }
@@ -236,31 +256,37 @@
     text-align: center;
     cursor: pointer;
     transition: transform 0.2s;
-    color: var(--ce-color-white);
+    padding: 8px 6px;
+    border: 1px solid transparent;
+    color: var(--ce-panel-text);
     &:hover {
       transform: scale(1.05);
+      background: color-mix(in srgb, var(--ce-panel-text) 8%, transparent);
+      border-color: var(--ce-border-light);
     }
   }
 
   .statIcon {
-    opacity: 0.72;
+    color: var(--ce-panel-text);
+    opacity: 1;
   }
 
   .statCount {
     font-size: 1.2em;
     font-weight: bold;
     margin: 5px 0;
+    color: var(--ce-panel-text);
   }
 
   .statLabel {
     font-size: 0.8em;
-    opacity: 0.7;
+    color: var(--ce-panel-text-muted);
   }
 
   .toggleLabel {
     display: flex;
     align-items: center;
-    color: var(--ce-color-white);
+    color: var(--ce-panel-text);
     font-size: 0.9em;
     margin-bottom: 10px;
   }
@@ -271,7 +297,7 @@
 
   .noUsers {
     text-align: center;
-    color: var(--ce-color-white);
+    color: var(--ce-panel-text);
     padding: 20px;
     font-style: italic;
   }
@@ -280,9 +306,9 @@
 .modal {
   .modalHeader {
     position: relative;
-    background-color: #0083d9cc !important;
+    background-color: color-mix(in srgb, var(--ce-status-info) 80%, transparent) !important;
     color: var(--ce-color-white) !important;
-    border-bottom: 1px solid #dee2e6;
+    border-bottom: 1px solid var(--ce-document-border);
     font-size: 1.25em;
     padding: 20px 4.25rem 20px 30px;
 
@@ -330,7 +356,7 @@
   }
 
   .modalBody {
-    background-color: #0083d9cc !important;
+    background-color: color-mix(in srgb, var(--ce-status-info) 80%, transparent) !important;
     color: var(--ce-color-black) !important;
   }
 }
@@ -369,6 +395,217 @@
   }
 }
 
+/* Classic 95 presents Community as a dense Statistics utility: a participant
+ * list on the left and the summary/plot workspace on the right. */
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  .communityTab {
+    height: 500px;
+    gap: 0;
+    margin: 0;
+    overflow: hidden;
+    border: 2px solid;
+    border-color: var(--ce-border-inset);
+    background: var(--ce-surface-raised);
+    color: var(--ce-panel-text);
+  }
+
+  .communityTab .leaderboardSection {
+    flex: 0 0 28%;
+    min-width: 230px;
+    padding: 0;
+    border: 0;
+    border-right: 2px solid var(--ce-edge-shadow);
+    background: var(--ce-surface-raised);
+  }
+
+  .communityTab .leaderboardTopBar {
+    align-items: center;
+    min-height: 44px;
+    margin: 0;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--ce-edge-shadow);
+    background: var(--ce-surface-alt);
+  }
+
+  .communityTab .leaderboardTitle {
+    display: block;
+    color: var(--ce-panel-text);
+    font-family: var(--ce-font-ui);
+    font-size: 0.98rem;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .communityTab .sessionSelectorToggle {
+    width: 30px;
+    height: 30px;
+    border: 2px solid;
+    border-color: var(--ce-border-raised);
+    background: var(--ce-control-face);
+    box-shadow: var(--ce-shadow-raised);
+    color: var(--ce-control-text);
+    opacity: 1;
+    transition: none;
+  }
+
+  .communityTab .sessionSelectorToggle:hover,
+  .communityTab .sessionSelectorToggle:focus {
+    transform: none;
+    background: var(--ce-surface-alt);
+  }
+
+  .communityTab .content {
+    padding: 0 8px 8px;
+    background: var(--ce-surface-raised);
+  }
+
+  .communityTab .leaderboardItem {
+    min-height: 64px;
+    margin: 0;
+    padding: 8px 10px;
+    border: 0;
+    border-bottom: 1px solid var(--ce-edge-shadow);
+    background: var(--ce-surface-light);
+    color: var(--ce-document-text);
+    transition: none;
+  }
+
+  .communityTab .leaderboardItem .name {
+    color: var(--ce-document-text) !important;
+    opacity: 1;
+  }
+
+  /* Address labels are rendered as Bootstrap nav links. The global nav-link
+   * inverse color is correct on dark navigation, but must not win inside the
+   * light Classic 95 participant list. */
+  .communityTab .leaderboardItem .name a {
+    color: var(--ce-document-text) !important;
+    opacity: 1;
+  }
+
+  .communityTab .leaderboardItem:hover {
+    border-color: var(--ce-edge-shadow);
+    background: var(--ce-surface-alt);
+    color: var(--ce-document-text);
+  }
+
+  .communityTab .avatar {
+    width: 38px;
+    height: 38px;
+    border: 1px solid var(--ce-border-strong);
+  }
+
+  .communityTab .rightSection {
+    flex: 1 1 auto;
+    min-width: 0;
+    background: var(--ce-surface-raised);
+  }
+
+  .communityTab .statsSection {
+    flex: 0 0 112px;
+    min-height: 112px;
+    padding: 10px 14px;
+    border-bottom: 2px solid var(--ce-edge-shadow);
+    background: var(--ce-surface-raised);
+  }
+
+  .communityTab .statsHeader {
+    min-height: 0;
+  }
+
+  .communityTab .statsGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0;
+    height: 90px;
+    border: 2px solid;
+    border-color: var(--ce-border-inset);
+    background: var(--ce-surface-alt);
+  }
+
+  .communityTab .statItem {
+    justify-content: center;
+    padding: 8px;
+    border: 0;
+    color: var(--ce-panel-text);
+    transition: none;
+  }
+
+  .communityTab .statItem + .statItem {
+    border-left: 1px solid var(--ce-edge-shadow);
+  }
+
+  .communityTab .statItem:hover {
+    transform: none;
+    border-color: var(--ce-edge-shadow);
+    background: var(--ce-surface-light);
+  }
+
+  .communityTab .statIcon {
+    display: none;
+  }
+
+  .communityTab .statCount {
+    margin: 2px 0;
+    color: var(--ce-panel-text);
+    font-size: 1.65rem;
+    line-height: 1;
+  }
+
+  .communityTab .statLabel {
+    color: var(--ce-panel-text);
+    font-size: 0.8rem;
+    font-weight: 700;
+    order: -1;
+  }
+
+  .communityTab .beeswarmSection {
+    flex: 1 1 auto;
+    min-height: 0;
+    margin: 12px 14px 14px;
+    padding: 10px;
+    border: 2px solid var(--ce-document-border-strong);
+    background: var(--ce-data-viz-surface);
+  }
+
+  /* The shared plot wrapper intentionally fills its host so tooltips have a
+   * stable positioning surface. Center its flow content here so short and
+   * narrow Classic 95 windows distribute the remaining vertical space around
+   * the chart instead of leaving it all below the axis. */
+  .communityTab .beeswarmPlot {
+    flex: 1 1 auto;
+    min-height: 0;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 768px) {
+  @container ce-theme style(--ce-layout-profile: desktop-window) {
+    .communityTab {
+      height: auto;
+      overflow: visible;
+    }
+
+    .communityTab .leaderboardSection {
+      min-width: 0;
+      border-right: 0;
+      border-top: 2px solid var(--ce-edge-shadow);
+    }
+
+    .communityTab .statsGrid {
+      height: auto;
+      min-height: 92px;
+    }
+
+    .communityTab .statCount {
+      font-size: 1.25rem;
+    }
+
+    .communityTab .beeswarmSection {
+      min-height: 240px;
+    }
+  }
+}
+
 .modal {
   max-width: 800px;
   margin: 30px auto;
@@ -380,7 +617,7 @@
     overflow: hidden;
     background: var(--ce-color-white);
     border-radius: var(--ce-radius-12);
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 8px 16px color-mix(in srgb, var(--ce-compat-dark) 10%, transparent);
   }
 
   :global(.modal-body) {
@@ -398,12 +635,12 @@
         display: flex;
         align-items: center;
         padding: 12px;
-        background: #b9164b;
+        background: var(--ce-status-danger);
         border-radius: var(--ce-radius-8);
         color: var(--ce-color-border);
         cursor: pointer;
         &:hover {
-          background: #e0f0ff;
+          background: var(--ce-status-info-text);
         }
       }
     }
@@ -431,7 +668,7 @@
     align-items: center;
     .surveyLink {
       font-size: 18px;
-      color: #1a1a1a;
+      color: var(--ce-document-text);
       text-decoration: none;
       font-weight: 500;
       flex: 1;
@@ -444,7 +681,7 @@
       background: var(--ce-color-light);
       padding: 6px 12px;
       border-radius: var(--ce-radius-16);
-      color: #495057;
+      color: var(--ce-document-text-muted);
       font-size: 14px;
       margin-left: 16px;
     }
@@ -455,9 +692,9 @@
   text-align: center;
   padding: 40px;
   font-size: 18px;
-  color: #1a1a1a;
+  color: var(--ce-document-text);
   a {
-    color: #0066cc;
+    color: var(--ce-status-info);
     text-decoration: none;
     font-weight: 600;
     &:hover {
@@ -479,14 +716,22 @@
 
 .questionsModalPlot {
   padding: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 18%, transparent);
   border-radius: var(--ce-radius-12);
   background:
-    radial-gradient(circle at top left, rgba(77, 255, 164, 0.08) 0%, rgba(77, 255, 164, 0) 34%),
-    linear-gradient(180deg, rgba(10, 16, 38, 0.94) 0%, rgba(5, 10, 25, 0.97) 100%);
+    radial-gradient(
+      circle at top left,
+      color-mix(in srgb, var(--ce-action-accent) 8%, transparent) 0%,
+      transparent 34%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--ce-overlay-surface) 94%, transparent) 0%,
+      color-mix(in srgb, var(--ce-overlay-base) 97%, transparent) 100%
+    );
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 16px 30px rgba(7, 14, 40, 0.24);
+    inset 0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 8%, transparent),
+    0 16px 30px color-mix(in srgb, var(--ce-overlay-base) 24%, transparent);
 }
 
 .questionsModalLink {
@@ -495,9 +740,9 @@
   justify-content: center;
   min-height: 44px;
   padding: 10px 18px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 22%, transparent);
   border-radius: var(--ce-radius-pill);
-  background: rgba(255, 255, 255, 0.14);
+  background: color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
   color: var(--ce-color-white);
   font-weight: 700;
   text-decoration: none;
@@ -508,8 +753,8 @@
 
   &:hover,
   &:focus {
-    background: rgba(77, 255, 164, 0.2);
-    border-color: rgba(77, 255, 164, 0.38);
+    background: color-mix(in srgb, var(--ce-action-accent) 20%, transparent);
+    border-color: color-mix(in srgb, var(--ce-action-accent) 38%, transparent);
     color: var(--ce-color-white);
     text-decoration: none;
     transform: translateY(-1px);
@@ -524,8 +769,8 @@
 
 .userItem {
   padding: 8px 12px;
-  border-bottom: 1px solid #eee;
-  background-color: #f0f8ff;
+  border-bottom: 1px solid var(--ce-surface-subtle);
+  background-color: var(--ce-document-surface);
   color: var(--ce-color-border);
   font-weight: 600;
   border-radius: var(--ce-radius-6);
@@ -533,7 +778,7 @@
   cursor: pointer;
   transition: background-color 0.2s ease;
   &:hover {
-    background-color: #d6eaff;
+    background-color: var(--ce-status-info-text);
   }
 }
 
@@ -542,8 +787,8 @@
   display: inline-block;
   margin-left: 10px;
   font-size: 0.9rem;
-  color: #4a90e2;
-  background-color: #f0f8ff;
+  color: var(--ce-status-info);
+  background-color: var(--ce-document-surface);
   padding: 5px 8px;
   border-radius: var(--ce-radius-5);
   font-weight: bold;
@@ -552,7 +797,7 @@
     color 0.3s ease;
   &:hover {
     color: var(--ce-color-white);
-    background-color: #007aff;
+    background-color: var(--ce-status-info);
     cursor: pointer;
   }
 }
@@ -563,7 +808,7 @@
   font-weight: bold;
   transition: color 0.3s ease;
   &:hover {
-    color: #007aff;
+    color: var(--ce-status-info);
     text-decoration: underline;
   }
 }
@@ -573,14 +818,14 @@
   justify-content: space-between;
   align-items: center;
   padding: 10px 15px;
-  border: 1px solid #eaeaea;
+  border: 1px solid var(--ce-surface-subtle);
   border-radius: var(--ce-radius-8);
   margin-bottom: 10px;
   background-color: var(--ce-color-white);
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 5px color-mix(in srgb, var(--ce-compat-dark) 10%, transparent);
   transition: box-shadow 0.3s ease;
   &:hover {
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 10px color-mix(in srgb, var(--ce-compat-dark) 20%, transparent);
   }
 }
 
@@ -590,18 +835,18 @@
   overflow-y: auto;
   padding-right: 10px;
   scrollbar-width: thin;
-  scrollbar-color: #007aff #f0f0f0;
+  scrollbar-color: var(--ce-status-info) var(--ce-surface-subtle);
   &::-webkit-scrollbar {
     width: 6px;
   }
 
   &::-webkit-scrollbar-thumb {
-    background: #007aff;
+    background: var(--ce-status-info);
     border-radius: var(--ce-radius-3);
   }
 
   &::-webkit-scrollbar-track {
-    background: #f0f0f0;
+    background: var(--ce-surface-subtle);
   }
 }
 

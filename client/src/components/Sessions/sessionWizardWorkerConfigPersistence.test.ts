@@ -18,6 +18,7 @@ const CREDENTIALED_LIT_API_BASE = (() => {
 
 const baseConfig = () => ({
   sessionName: 'Worker Canonical Session',
+  appearance: { colorSchemeId: 'amber' },
   sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
   storageProfile: { backend: 'cloudflare' },
   ai: { models: { fast: { provider: 'openai', model: 'gpt-test' } } },
@@ -120,6 +121,7 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
       configRevision: revision,
       publicConfig: verifiedConfig(revision),
     });
+    expect(result.publicConfig.appearance).toEqual({ colorSchemeId: 'amber' });
   });
 
   it('rejects an unsupported profile before signing or transport', async () => {
@@ -233,6 +235,7 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
       }),
     );
     expect(config.ai.models.transcription).not.toHaveProperty('rpcUrl');
+    expect(config.appearance).toEqual({ colorSchemeId: 'context-engine' });
 
     await expect(
       persistAndVerifySessionWizardWorkerConfig({

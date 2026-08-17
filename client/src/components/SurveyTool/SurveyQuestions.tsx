@@ -35,7 +35,6 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 import QuestionFilter from './QuestionFilter';
-import PileHologramAssistant from './PileHologramAssistant';
 import SurveyQuestionTagControl from './SurveyQuestionTagControl';
 import SingleQuestionResponse from './SingleQuestionResponse';
 import FullQuestionFooterIcons from './FullQuestionFooterIcons';
@@ -217,7 +216,6 @@ import {
   DEBUG_PREFILL,
   GATE_SBT_HYDRATION_RETRY_MS,
   QUESTION_TAG_DROPDOWN_ROW_STYLE,
-  SHOW_PILE_HOLOGRAM_TOGGLE,
   appendExplicitSessionHintToPath,
   applyExistingGroupPrefix,
   areEnvelopesEquivalent,
@@ -1092,14 +1090,12 @@ export const SurveyQuestions = (props: SurveyQuestionsProps): React.ReactElement
     ModalBody,
     ModalFooter,
     ModalHeader,
-    PileHologramAssistant,
     QUESTION_TAG_DROPDOWN_ROW_STYLE,
     QuestionCardLinks,
     QuestionDecryptControl,
     QuestionFilter,
     QuestionsDashboard,
     React,
-    SHOW_PILE_HOLOGRAM_TOGGLE,
     SingleQuestionResponse,
     SurveyAudioFieldInput,
     SurveyQuestionTagControl,

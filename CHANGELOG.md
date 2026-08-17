@@ -6,6 +6,121 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Replaced the Classic 95 beeswarm tooltip's yellow-to-olive Unsure gradient
+  with a solid warning-yellow segment.
+- Kept both Classic 95 Welcome-slide navigation arrows fully opaque and white
+  while preserving the Context Engine theme's existing arrow treatment.
+- Restored editing controls for an account's submitted standalone-question
+  response and made explicit passkey login open the platform chooser when
+  multiple passkey-derived wallets are available; background signing remains
+  pinned to the active credential.
+- Gave the Classic 95 question lock-audience popup a raised Windows-style
+  boundary so it remains distinct from the question card beneath it.
+- Fixed signed-out standalone-question bookmarks so the control updates its
+  pressed/color state immediately and restores the session-scoped bookmark
+  after a reload.
+- Restored the Questions toolbar's viewport-sticky behavior in Classic 95 and
+  kept unchanged response inputs memoized so binary vote selection avoids
+  rebuilding every visible question control.
+- Kept related-tag chips readable in both bundled app themes by using each
+  theme's paired control surface and foreground colors.
+- Reordered Docs so Prompts precedes FAQ, removed the external-tools notice,
+  grouped the bottom session context and Smart Contracts viewer in one frame,
+  and added a public GitHub shortcut beside the title. The signed-out login
+  control is now text-only and uses the active theme's button font.
+- Removed the duplicate Posts link from the About hero while retaining Posts
+  in the persistent footer navigation.
+- Added a named runtime SCSS app-theme contract with user/deployment precedence,
+  pre-paint initialization, a default-on Settings selector, and bundled
+  `context-engine` and `classic-95` themes. The complete client presentation
+  surface now consumes semantic runtime color, typography, geometry, border,
+  elevation, and control-state tokens; a zero-baseline source gate prevents
+  raw presentation colors outside narrowly owned theme, export, QR/bitmap, and
+  deterministic avatar sources. Session metadata cannot select an app theme.
+  Question authoring now uses explicit paired workspace/control/input tokens;
+  Classic 95 renders the generator and its toolbar on readable standard gray
+  surfaces with white fields instead of mixing black controls into navy. The
+  session question, simulated-user, and Groups surfaces now retain readable,
+  minimal gray panels at desktop and mobile widths. Its semantic
+  `desktop-window` layout profile now presents Tools as Control Panel applets,
+  Community Stats as a participant/plot split window, session questions as
+  compact dialogs, and footer navigation as a taskbar without theme-ID
+  selectors in components. The Classic 95 taskbar stays docked to the viewport
+  bottom on short and scrolling pages while reserving space for page content.
+- Fixed local Vite startup for the shared CommonJS group-password derivation
+  helper. Persistent startup failures now stop after one automatic cache-busted
+  reload, and the recovery heading uses the active panel-text token so the
+  fallback remains readable across themes.
+- Added **Session colors** to the Session Wizard with the curated
+  `context-engine`, `ocean`, and `amber` schemes, immediate preview, exact
+  `appearance.colorSchemeId` persistence across Worker/Arweave paths, scoped
+  active-session accents, accessibility contrast checks, and fixed-light
+  standalone exports.
+- Added `/session/demo-2` as a fixture-backed preview of “Living With
+  Artificial Minds”: 40 typed questions, 62 unique simulated participants,
+  deterministic generated responses, and a three-cluster Polis report.
+  Poll choices, rating bounds, freeform answers, and stable question IDs now
+  agree across the session, report, and question-results surfaces. Simulated
+  rows are display-only and live responses win collisions. `demo-sh` remains
+  the public default until a dedicated demo-2 Worker, canonical question seed,
+  and Worker-held AI key pass live voice/AI verification; no credential is
+  stored in the preview config or fixture data.
+- Preserved the published `demo-sh` question fixture exactly while preventing
+  tri-state sentiment from being presented as a poll, rating, or freeform
+  answer. Distinct corrected choices for legacy polls remain deferred until a
+  deliberate Worker reseed. Direct Debate Map issue links now close back to the
+  Atlas index when no safe return target exists.
+- Made SBT and related holder-cache writes atomic across discovery, detail
+  hydration, profile scans, filters, selectors, and realtime events. Delayed
+  scans now preserve newer activity, unrelated networks, and concurrent user
+  responses, and readiness is published only after persistence succeeds.
+- Replaced the `/contracts` utility reference with a user-facing `/docs` page
+  containing a quickstart, session-options guide, and FAQ. The page retains
+  AI prompt references and a contract deployment explorer that waits for an
+  explicit session selection before showing its chain and published contract
+  addresses; sessions without published addresses show an empty state instead
+  of global template contracts. The page removes the JSON bundle and
+  byte-conversion UI. Existing `/contracts` paths permanently rewrite to
+  `/docs` while preserving deep-link paths, queries, hashes, and deployment
+  base paths.
+- Added a repository link to the Docs header. Refreshed the public `llms.txt`
+  agent summary with the
+  current deployment profiles, authoritative architecture references, and safe
+  automation guidance.
+- Made address comparison session-aware across legacy registry, pure
+  Cloudflare, and hybrid session profiles. Compare routes now preserve the
+  active session, wait for its canonical caches, isolate cache and prompt
+  fallbacks by slug, await on-chain profile enrichment before analysis, and
+  skip chain scans for pure Worker sessions. Independent summary, compass, and
+  overlap work now loads concurrently with section-level progress, and compass
+  exports use a descriptive comparison filename. Two- and three-participant
+  Venn diagrams now share one deterministic region model, expose keyboard- and
+  click-pinned detail cards with membership images, and keep AI output from
+  overriding region counts or evidence. SBT comparison and profile ownership
+  now share session + chain + contract identity and one count-provenance rule;
+  native Worker Groups use the same projection contract with session + group
+  identity. Canonical compare URLs now use repeated `subject=` parameters with
+  explicit `wallet:`, `worker:`, and `sim:` tokens; legacy address-path links
+  normalize through the same route contract. Wallet and Worker responders now
+  resolve from the active session projection while shipped simulated personas
+  use stable corpus question IDs; the UI names each source and session, skips
+  chain/cache waiting for simulation-only comparisons, and suppresses opinion
+  or membership sections when their evidence is not canonically compatible.
+  Related simulated-persona cards now offer a canonical compare action while
+  retaining their existing profile links.
+- Moved the Community, Polis, and demographic-comparison question beeswarms
+  onto a reusable renderer with explicit consumer-owned metric/domain labels,
+  named force/stacked layouts, stable-key hover state, and
+  keyboard/click-pinned detail cards. Community's live and demo paths also
+  share one result-to-point projection so their counts and fallbacks cannot
+  drift.
+- Clarified the repository boundary between canonical Worker source,
+  Cloudflare-native deployment packages, local bundle output, immutable CI
+  bundle releases, and the stripped public-source snapshot. Release docs now
+  accurately distinguish immutable bundle publication from the separately
+  approved stable/`latest` promotion workflow. Source-tree public-text checks
+  now scan the same tracked and non-ignored files as the release exporter,
+  avoiding ignored local caches without overlooking untracked release input.
 - Streamlined the client dependency surface by removing eight unused direct
   packages, replacing standalone preview and source-map tools with Vite-native
   preview and a local deterministic bundle report, and loading only the
@@ -53,7 +168,8 @@ All notable changes to this project will be documented in this file.
 - The native `/new` deployment path now presents an honest Cloudflare dashboard
   checklist with copy controls, return guidance, and Worker URL/CORS/canonical
   config verification before success. Its entry chooser removes redundant
-  infrastructure guidance, identifies decentralized gas as EVM testnet gas,
+  infrastructure guidance, identifies decentralized RPC access and gas as
+  `EVM RPC URL` and `EVM Gas (TX Fees)`,
   and links directly to the README architecture diagram on GitHub. The
   deploy-helper remains a collapsed legacy fallback.
 - Worker route failures now distinguish missing discovery, reachability, CORS,
@@ -78,9 +194,11 @@ All notable changes to this project will be documented in this file.
   separately as Advanced access, Worker-native creation stays scoped to the
   active session, and registry-backed sessions retain the SBT flow. Native
   Group card bodies now open the full SBT-style detail layout in a new tab;
-  canonical list links use `/groups?sessionName=<slug>` and detail links use
-  `/group/<groupId>?sessionName=<slug>`, while legacy `/groups/:slug` and
-  hash-scoped detail links silently normalize to the canonical routes.
+      canonical list links use `/groups?sessionName=<slug>` and non-address
+      Worker detail links use `/group/<groupId>?sessionName=<slug>`. Legacy
+      `/groups/:slug` links normalize to those routes, while address-shaped
+      Worker IDs remain at `/groups?sessionName=<slug>#group-<groupId>` so
+      `/group/<address>` stays reserved for SBT detail.
   Full detail translates SBT stats into member capacity and a live join
   deadline, exposes member counts and identities only through authenticated
   visibility-aware responses, and renders the Group's public document
@@ -261,10 +379,12 @@ All notable changes to this project will be documented in this file.
   full-screen width and viewport height while retaining compact mobile sizing.
 - Replaced the default Tools image-card status frame with UserPage-style 3D
   depth, keeping live/future borders visible only while demo mode is enabled.
-- Split the desktop main-screen welcome controls into equal-height rows and
-  aligned their rail to the slide edges without changing session welcome slides.
-- Stabilized the desktop main-screen welcome carousel at one responsive frame
-  height so advancing between slides no longer resizes the card.
+- Moved desktop main-screen Welcome controls into a compact bottom strip and
+  kept titles, artwork, and copy within one viewport-capped frame, including
+  ultra-wide/short displays, without changing session welcome slides.
+- Added theme-owned Welcome artwork detail controls so Classic 95 can present
+  legacy slide images with visible detail and readable native final actions
+  while Context Engine preserves its original treatment.
 - Added the agent bridge worker and its test runner to the public release
   surface, with public-safe setup examples and artifact-level PII verification.
 

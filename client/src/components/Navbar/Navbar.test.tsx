@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { Provider } from 'react-redux';
 import { createStore } from 'redux';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { Navbar } from './Navbar';
 
@@ -152,24 +152,55 @@ describe('Navbar logo navigation', () => {
     expect(screen.queryByTestId('ce-navbar-link-github')).not.toBeInTheDocument();
   });
 
-  it('forwards the active route session config to the account settings modal', () => {
+  it('loads the settings modal only when it opens and forwards the active session config', async () => {
     const sessionConfig = {
       slug: 'worker-session',
       corsWorkerUrl: 'https://worker-session.example',
     };
 
     renderNavbar({ sessionConfig });
+    expect(mockLoginAndSettingsModal).not.toHaveBeenCalled();
 
-    expect(mockLoginAndSettingsModal).toHaveBeenCalledWith(
-      expect.objectContaining({
-        sessionConfig,
-      }),
+    renderNavbar({ sessionConfig }, { sessionState: { loginModalToggled: true } });
+
+    await waitFor(() =>
+      expect(mockLoginAndSettingsModal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionConfig,
+        }),
+      ),
     );
   });
 
   it('keeps the navbar account controls anchored to the right edge after legacy widget removal', () => {
     expect(navbarStylesheet).toMatch(
       /#accountSection,\s*#accountSectionLoggedIn\s*\{[\s\S]*display:\s*flex;[\s\S]*justify-content:\s*flex-end;[\s\S]*margin-left:\s*auto;/,
+    );
+  });
+
+  it('renders both navbar logo variants through the app-theme brand contract', () => {
+    expect(navbarStylesheet).toMatch(
+      /#mainLogo\s*{[\s\S]*?opacity:\s*var\(--ce-brand-logo-opacity\);[\s\S]*?mix-blend-mode:\s*var\(--ce-brand-logo-blend-mode\);[\s\S]*?filter:\s*var\(--ce-brand-logo-filter\);/,
+    );
+    expect(navbarStylesheet).toMatch(
+      /#mainLogoLoggedIn\s*{[\s\S]*?opacity:\s*var\(--ce-brand-logo-opacity\);[\s\S]*?mix-blend-mode:\s*var\(--ce-brand-logo-blend-mode\);[\s\S]*?filter:\s*var\(--ce-brand-logo-filter\);/,
+    );
+    expect(navbarStylesheet).not.toContain('data-ce-theme');
+  });
+
+  it('keeps classic logo geometry on the shared responsive breakpoints', () => {
+    expect(navbarStylesheet).toMatch(
+      /@media \(min-width:\s*466px\) and \(max-width:\s*768px\)[\s\S]*?#mainLogo\s*{[\s\S]*?max-width:\s*156px;[\s\S]*?min-height:\s*75px;/,
+    );
+    expect(navbarStylesheet).not.toContain('width: 108px;');
+    expect(navbarStylesheet).not.toContain('height: 76px;');
+    expect(navbarStylesheet).not.toContain('width: 76px;');
+    expect(navbarStylesheet).not.toContain('height: 58px;');
+  });
+
+  it('vertically centers classic desktop-window account controls with the logo', () => {
+    expect(navbarStylesheet).toMatch(
+      /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)\s*{[\s\S]*?#navbarContainer,\s*#navbarContainerLoggedIn\s*{[\s\S]*?align-items:\s*center;/,
     );
   });
 });

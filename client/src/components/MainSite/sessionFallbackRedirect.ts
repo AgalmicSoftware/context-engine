@@ -5,8 +5,6 @@ export type SessionFallbackRedirectTarget = {
 
 export type FirstVisitRootRedirectTarget = {
   path: string;
-  cacheSlug?: string;
-  requiresPersistedCache?: boolean;
 };
 
 type FirstVisitRootRedirectStorage =
@@ -131,32 +129,20 @@ export const getFirstVisitRootRedirectTarget = (deps: {
   };
 };
 
-const getTemporaryInitialLoadSessionCacheSlug = (
-  normalizedPath: string,
-  normalizeSessionSlug: NormalizeSessionSlugFn,
-): string => {
-  if (!normalizedPath.startsWith('/session/')) return '';
-  const token = normalizedPath.slice('/session/'.length).split('/')[0];
-  return normalizeSessionSlug(token || '');
-};
-
-// Temporary demo-launch guard: root loads go to /about, and cached session
-// document loads may go to /about while stale pages retire.
+// Temporary demo-launch guard: only an initial normalized root document load
+// may go to /about. The caller owns the one-time consumption check so this
+// path matcher stays storage-independent.
 export const isTemporaryInitialLoadAboutRedirectPath = (
   pathIn: unknown,
   deps: { normalizeRoutePath: NormalizeSessionSlugFn },
 ): boolean => {
   const path = deps.normalizeRoutePath(pathIn || '');
-  if (path === '/') return true;
-  if (!path.startsWith('/session/')) return false;
-  return path !== '/session/new' && !path.startsWith('/session/new/');
+  return path === '/';
 };
 
 export const getTemporaryInitialLoadAboutRedirectTarget = (deps: {
   isFirstVisitRootRedirectEnabled: () => boolean;
-  isTemporaryInitialLoadAboutRedirectSessionSlug?: (slug: string) => boolean;
   normalizeRoutePath: NormalizeSessionSlugFn;
-  normalizeSessionSlug: NormalizeSessionSlugFn;
   pathIn: unknown;
 }): FirstVisitRootRedirectTarget | null => {
   if (!deps.isFirstVisitRootRedirectEnabled()) return null;
@@ -167,21 +153,6 @@ export const getTemporaryInitialLoadAboutRedirectTarget = (deps: {
     })
   ) {
     return null;
-  }
-
-  const cacheSlug = getTemporaryInitialLoadSessionCacheSlug(path, deps.normalizeSessionSlug);
-  if (cacheSlug) {
-    if (
-      typeof deps.isTemporaryInitialLoadAboutRedirectSessionSlug === 'function' &&
-      !deps.isTemporaryInitialLoadAboutRedirectSessionSlug(cacheSlug)
-    ) {
-      return null;
-    }
-    return {
-      path: '/about',
-      cacheSlug,
-      requiresPersistedCache: true,
-    };
   }
 
   return {
@@ -210,13 +181,17 @@ export const consumeOneTimeFirstVisitRootRedirect = (
 
   try {
     storage.setItem(FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY, 'true');
-    if (deps.firstVisitStorageKey) {
-      storage.setItem(deps.firstVisitStorageKey, 'false');
-    }
-    return true;
+    if (storage.getItem(FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY) !== 'true') return false;
   } catch (_) {
     return false;
   }
+
+  if (deps.firstVisitStorageKey) {
+    try {
+      storage.setItem(deps.firstVisitStorageKey, 'false');
+    } catch (_) {}
+  }
+  return true;
 };
 
 export const getSessionFallbackRedirectStorageKey = (

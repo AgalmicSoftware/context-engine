@@ -77,11 +77,21 @@ function createStripMatcher(patterns) {
   };
 }
 
+function isVanishedPathError(error) {
+  return !!error && typeof error === 'object' && error.code === 'ENOENT';
+}
+
 function collectSourceFiles(rootDir, isStrippedPath) {
   const files = [];
 
   const walk = (absoluteDir) => {
-    const entries = fs.readdirSync(absoluteDir, { withFileTypes: true });
+    let entries;
+    try {
+      entries = fs.readdirSync(absoluteDir, { withFileTypes: true });
+    } catch (error) {
+      if (absoluteDir !== rootDir && isVanishedPathError(error)) return;
+      throw error;
+    }
     for (const entry of entries) {
       const absolutePath = path.join(absoluteDir, entry.name);
       const relativePath = normalizePublicPath(path.relative(rootDir, absolutePath));
@@ -127,7 +137,13 @@ function resolveRepoSpecifier(rootDir, importerRelativePath, specifier) {
 
 function scanFileForStrippedImports(rootDir, relativePath, isStrippedPath) {
   const absolutePath = path.join(rootDir, relativePath);
-  const text = fs.readFileSync(absolutePath, 'utf8');
+  let text;
+  try {
+    text = fs.readFileSync(absolutePath, 'utf8');
+  } catch (error) {
+    if (isVanishedPathError(error)) return null;
+    throw error;
+  }
   const findings = [];
 
   for (const pattern of SPECIFIER_PATTERNS) {
@@ -160,12 +176,16 @@ function verifyPublicReleaseSurface(rootDir = path.resolve(__dirname, '..'), opt
   const isStrippedPath = createStripMatcher(stripPatterns);
   const sourceFiles = collectSourceFiles(absoluteRoot, isStrippedPath);
   const findings = [];
+  let scannedFiles = 0;
 
   for (const relativePath of sourceFiles) {
-    findings.push(...scanFileForStrippedImports(absoluteRoot, relativePath, isStrippedPath));
+    const fileFindings = scanFileForStrippedImports(absoluteRoot, relativePath, isStrippedPath);
+    if (fileFindings === null) continue;
+    scannedFiles += 1;
+    findings.push(...fileFindings);
   }
 
-  return { findings, scannedFiles: sourceFiles.length };
+  return { findings, scannedFiles };
 }
 
 function formatFindings(findings) {

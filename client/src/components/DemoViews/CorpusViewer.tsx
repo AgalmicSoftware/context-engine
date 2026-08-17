@@ -259,15 +259,15 @@ const buildPolicyMapState = (entries: CorpusEntry[] = []) => {
 const getPolicyMapFill = (status = '', isFallback = false) => {
   switch (status) {
     case 'live':
-      return isFallback ? 'rgba(77,255,164,0.16)' : 'rgba(77,255,164,0.56)';
+      return `color-mix(in srgb, var(--ce-status-success) ${isFallback ? '16%' : '56%'}, transparent)`;
     case 'proposed':
-      return isFallback ? 'rgba(255,179,71,0.16)' : 'rgba(255,179,71,0.56)';
+      return `color-mix(in srgb, var(--ce-status-warning) ${isFallback ? '16%' : '56%'}, transparent)`;
     case 'inactive':
-      return isFallback ? 'rgba(255,122,158,0.16)' : 'rgba(255,122,158,0.52)';
+      return `color-mix(in srgb, var(--ce-status-danger) ${isFallback ? '16%' : '52%'}, transparent)`;
     case 'mixed':
-      return isFallback ? 'rgba(122,140,255,0.16)' : 'rgba(122,140,255,0.52)';
+      return `color-mix(in srgb, var(--ce-data-series-2) ${isFallback ? '16%' : '52%'}, transparent)`;
     default:
-      return 'rgba(226,232,255,0.06)';
+      return 'color-mix(in srgb, var(--ce-panel-text) 6%, transparent)';
   }
 };
 

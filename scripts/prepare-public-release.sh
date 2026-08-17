@@ -116,72 +116,7 @@ scrub_public_pii_text() {
     return 1
   fi
 
-  node - "$STAGING_ROOT" <<'NODE'
-const fs = require('node:fs');
-const path = require('node:path');
-
-const rootDir = path.resolve(process.argv[2]);
-const skipDirs = new Set(['.git', 'node_modules', 'build', 'dist', 'coverage']);
-const byteStableGeneratedFiles = new Set([
-  'deploy/cloudflare/session-worker/worker.mjs',
-]);
-const emailRe = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/ig;
-// Intentionally public addresses that must survive the sweep (e.g. the
-// SECURITY.md vulnerability-reporting contact). Keep in sync with the
-// allowlist in scripts/verify-public-release-pii.sh.
-const allowedPublicEmails = new Set([
-  'agalmicsoftware@protonmail.com',
-  'contextengine@protonmail.com',
-]);
-const homePathRe = /(?:^|[\s"'(=:{])((?:\/Users|\/home)\/[A-Za-z0-9._-]+(?:\/[^\s"'`<>\\)]*)?)/g;
-
-function isProbablyBinary(buffer) {
-  if (buffer.includes(0)) return true;
-  const sampleLength = Math.min(buffer.length, 4096);
-  if (sampleLength === 0) return false;
-
-  let controlBytes = 0;
-  for (let index = 0; index < sampleLength; index += 1) {
-    const byte = buffer[index];
-    if ((byte < 8) || (byte > 13 && byte < 32)) controlBytes += 1;
-  }
-  return controlBytes > Math.max(8, sampleLength * 0.02);
-}
-
-function scrubFile(absolutePath) {
-  const relativePath = path.relative(rootDir, absolutePath).split(path.sep).join('/');
-  // Generated worker bytes are verified against their manifest and source.
-  // Rewriting email-shaped dependency data would invalidate that verification
-  // and can corrupt bundled wordlists, so leave this artifact byte-for-byte intact.
-  if (byteStableGeneratedFiles.has(relativePath)) return;
-
-  const buffer = fs.readFileSync(absolutePath);
-  if (isProbablyBinary(buffer)) return;
-
-  const original = buffer.toString('utf8');
-  const scrubbed = original
-    .replace(emailRe, (match) => (allowedPublicEmails.has(match.toLowerCase()) ? match : '[redacted-email]'))
-    .replace(homePathRe, (match, homePath) => match.replace(homePath, '/redacted-home'));
-
-  if (scrubbed !== original) {
-    fs.writeFileSync(absolutePath, scrubbed);
-  }
-}
-
-function walk(absoluteDir) {
-  for (const entry of fs.readdirSync(absoluteDir, { withFileTypes: true })) {
-    const absolutePath = path.join(absoluteDir, entry.name);
-    if (entry.isDirectory()) {
-      if (skipDirs.has(entry.name)) continue;
-      walk(absolutePath);
-      continue;
-    }
-    if (entry.isFile()) scrubFile(absolutePath);
-  }
-}
-
-walk(rootDir);
-NODE
+  node "$SCRIPT_DIR/scrub-public-pii-text.mjs" "$STAGING_ROOT"
 }
 
 if [ "$OUTPUT_ABS" = "$REPO_ROOT" ]; then
@@ -279,11 +214,11 @@ mkdir -p "$STAGING_ROOT"
   cd "$STAGING_ROOT"
   shopt -s dotglob nullglob
   for pattern in "${STRIP_PATTERNS[@]}"; do
-    for path in $pattern; do
+    while IFS= read -r path; do
       if [ -e "$path" ] || [ -L "$path" ]; then
         printf '%s\n' "$path"
       fi
-    done
+    done < <(compgen -G "$pattern" || true)
   done
 ) | sort -u > "$MATCHED_PATHS_FILE"
 
@@ -320,12 +255,12 @@ scrub_public_pii_text
   cd "$STAGING_ROOT"
   shopt -s dotglob nullglob
   for pattern in "${STRIP_ASSERT_ABSENT[@]}"; do
-    for path in $pattern; do
+    while IFS= read -r path; do
       if [ -e "$path" ] || [ -L "$path" ]; then
         printf 'Expected stripped path still present in public release copy: %s\n' "$path" >&2
         exit 1
       fi
-    done
+    done < <(compgen -G "$pattern" || true)
   done
 )
 

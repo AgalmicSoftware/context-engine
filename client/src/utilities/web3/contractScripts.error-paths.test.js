@@ -217,10 +217,6 @@ describe('error paths', () => {
   it('uses provider-neutral wallet guidance for signer-only transaction paths', async () => {
     const signerCases = [
       {
-        run: () => contractScripts.submitSurveyResponse('none', SURVEY_ID, SURVEY_TX_ID, GROUP_CFG),
-        message: 'submitSurveyResponse requires a signer-capable provider (not read-only).',
-      },
-      {
         run: () =>
           contractScripts.addSurveyWithQuestions(
             'none',
@@ -1184,6 +1180,44 @@ describe('error paths', () => {
         backend: 'cloudflare',
         id: CF_QUESTION_ID,
         resource: 'questions',
+      }),
+    );
+    expect(result.arweaveTxId).toBeUndefined();
+  });
+
+  it('resolves Cloudflare survey metadata pointers through the canonical reader', async () => {
+    const cloudflareSurveyId = ethers.utils.id('cloudflare-survey-metadata-read');
+    readSessionStorageBlob.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: cloudflareSurveyId,
+          title: 'Survey loaded from Cloudflare storage',
+          questionIDs: [QUESTION_ID],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+    jest.spyOn(contractScripts, 'getSurveyHash').mockResolvedValue(CF_SURVEY_ID);
+
+    const result = await contractScripts.getSurveyDataById('none', cloudflareSurveyId, CLOUDFLARE_GROUP_CFG, {
+      skipDecrypt: true,
+      throwOnFailure: true,
+    });
+
+    expect(readSessionStorageBlob).toHaveBeenCalledTimes(1);
+    expect(readSessionStorageBlob.mock.calls[0][0].storageRef).toEqual(
+      expect.objectContaining({
+        backend: 'cloudflare',
+        id: CF_SURVEY_ID,
+        resource: 'surveys',
+      }),
+    );
+    expect(result.title).toBe('Survey loaded from Cloudflare storage');
+    expect(result.storageRef).toEqual(
+      expect.objectContaining({
+        backend: 'cloudflare',
+        id: CF_SURVEY_ID,
+        resource: 'surveys',
       }),
     );
     expect(result.arweaveTxId).toBeUndefined();

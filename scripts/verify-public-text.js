@@ -2,6 +2,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 const { createStripMatcher, loadStripPatterns } = require('./verify-public-release-surface');
 
 const SKIP_DIRS = new Set(['.git', 'node_modules', 'build', 'dist', 'coverage']);
@@ -21,6 +22,7 @@ const EXEMPT_PATHS = new Set([
   'scripts/verify-public-assets.test.js',
   'scripts/verify-public-docs.js',
   'scripts/verify-public-docs.test.js',
+  'scripts/verify-public-release-pii.sh',
   'scripts/verify-public-release-surface.test.js',
   'scripts/verify-public-text.js',
   'scripts/verify-public-text.test.js',
@@ -54,8 +56,47 @@ function isProbablyBinary(buffer) {
   return controlBytes > Math.max(8, sampleLength * 0.02);
 }
 
+function collectGitVisiblePaths(rootDir) {
+  try {
+    const gitTopLevel = execFileSync('git', ['rev-parse', '--show-toplevel'], {
+      cwd: rootDir,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    const canonicalGitTopLevel = fs.realpathSync.native(path.resolve(gitTopLevel));
+    const canonicalRoot = fs.realpathSync.native(path.resolve(rootDir));
+    if (canonicalGitTopLevel !== canonicalRoot) return null;
+
+    return execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], {
+      cwd: rootDir,
+      encoding: 'buffer',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+      .toString('utf8')
+      .split('\0')
+      .filter(Boolean);
+  } catch {
+    return null;
+  }
+}
+
 function collectTextFiles(rootDir, isStrippedPath) {
   const files = [];
+  const gitVisiblePaths = collectGitVisiblePaths(rootDir);
+  if (gitVisiblePaths) {
+    for (const relativePath of gitVisiblePaths) {
+      const normalizedPath = normalizePath(relativePath);
+      if (isStrippedPath(normalizedPath) || EXEMPT_PATHS.has(normalizedPath)) continue;
+      const absolutePath = path.join(rootDir, relativePath);
+      if (!fs.existsSync(absolutePath) || !fs.statSync(absolutePath).isFile()) continue;
+      const buffer = fs.readFileSync(absolutePath);
+      if (!isProbablyBinary(buffer)) {
+        files.push({ absolutePath, relativePath: normalizedPath, text: buffer.toString('utf8') });
+      }
+    }
+    return files.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+  }
+
   const walk = (absoluteDir) => {
     for (const entry of fs.readdirSync(absoluteDir, { withFileTypes: true })) {
       const absolutePath = path.join(absoluteDir, entry.name);

@@ -17,6 +17,7 @@ import {
   buildTelegramAuthFailureState,
   buildTelegramDataResetState,
   clearTelegramEnvelopeMemoryCache,
+  getAgentClientLoginEnvelopeMemoryKey,
   resolveAgentClientLoginIdentityTarget,
   resolveAgentClientLoginEnvelopeFromEvent,
   resolveTelegramResultsAuthFailureReason,
@@ -69,6 +70,7 @@ export type OnePageSessionTelegramActionDeps = {
 export type OnePageSessionTelegramActions = {
   bootstrapTelegramSession: () => void;
   clearTelegramEnvelopeMemoryCache: (sessionSlug?: unknown) => void;
+  disposeTelegramActions: () => void;
   handleAgentClientLoginEvent: (event: CustomEvent<unknown>) => void;
   handleTelegramAuthFailure: (reason?: unknown) => void;
   handleTelegramComponentDidUpdate: (args: { loginJustCompleted: boolean; slugChanged: boolean }) => void;
@@ -115,7 +117,37 @@ export const createOnePageSessionTelegramActions = ({
       sessionSlug: resolveCurrentSessionSlug(),
     });
 
+  type RequestChannel = 'meta' | 'questions' | 'results' | 'submit';
+  type RequestSnapshot = { channel: RequestChannel; generation: number; identityKey: string };
+  const requestGenerations: Record<RequestChannel, number> = {
+    meta: 0,
+    questions: 0,
+    results: 0,
+    submit: 0,
+  };
+  let disposed = false;
+  const resolveCurrentIdentityKey = () => getAgentClientLoginEnvelopeMemoryKey(resolveCurrentIdentityTarget());
+  const beginRequest = (channel: RequestChannel): RequestSnapshot => ({
+    channel,
+    generation: ++requestGenerations[channel],
+    identityKey: resolveCurrentIdentityKey(),
+  });
+  const isRequestCurrent = (snapshot: RequestSnapshot): boolean =>
+    !disposed &&
+    requestGenerations[snapshot.channel] === snapshot.generation &&
+    resolveCurrentIdentityKey() === snapshot.identityKey;
+  const invalidateTelegramRequests = (): void => {
+    (Object.keys(requestGenerations) as RequestChannel[]).forEach((channel) => {
+      requestGenerations[channel] += 1;
+    });
+  };
+  const disposeTelegramActions = (): void => {
+    disposed = true;
+    invalidateTelegramRequests();
+  };
+
   const restoreTelegramEnvelopeFromStorage = (): AgentClientLoginEnvelope | null => {
+    if (disposed) return null;
     const envelope = ports.readStoredEnvelope(resolveCurrentIdentityTarget());
     const state = getState();
     const currentToken = state.telegramClientEnvelope?.bridgeCredential?.token || '';
@@ -127,16 +159,19 @@ export const createOnePageSessionTelegramActions = ({
   };
 
   const loadTelegramSessionMeta = async (): Promise<TelegramSessionMeta | null> => {
+    if (disposed) return null;
     const sessionSlug = resolveCurrentSessionSlug();
     const sessionConfig = resolveCurrentSessionConfig();
     const agentBridgeUrl = resolveTelegramAgentBridgeUrl(sessionConfig);
     if (!sessionSlug || !agentBridgeUrl) return null;
+    const requestSnapshot = beginRequest('meta');
     setState({ telegramSessionMetaStatus: 'loading' });
     try {
       const url = new URL(`${agentBridgeUrl}/api/agent/session-meta`);
       url.searchParams.set('sessionSlug', sessionSlug);
       const response = await ports.fetchImpl(url.toString(), { method: 'GET', cache: 'no-store' });
       const body = (await response.json().catch(() => null)) as TelegramSessionMeta | null;
+      if (!isRequestCurrent(requestSnapshot)) return null;
       if (!response.ok || !body || body.ok === false) {
         setState({ telegramSessionMetaStatus: 'error' });
         return null;
@@ -147,12 +182,15 @@ export const createOnePageSessionTelegramActions = ({
       });
       return body;
     } catch (_) {
+      if (!isRequestCurrent(requestSnapshot)) return null;
       setState({ telegramSessionMetaStatus: 'error' });
       return null;
     }
   };
 
   const handleTelegramAuthFailure = (reason: unknown = ''): void => {
+    if (disposed) return;
+    invalidateTelegramRequests();
     const sessionSlug = resolveCurrentSessionSlug();
     ports.clearStoredEnvelope(resolveCurrentIdentityTarget());
     clearTelegramEnvelopeMemoryCache(sessionSlug);
@@ -160,25 +198,30 @@ export const createOnePageSessionTelegramActions = ({
   };
 
   const handleAgentClientLoginEvent = (event: CustomEvent<unknown>): void => {
+    if (disposed) return;
     const envelope = resolveAgentClientLoginEnvelopeFromEvent(event, resolveCurrentIdentityTarget());
     if (!envelope) return;
+    invalidateTelegramRequests();
     setState({ telegramClientEnvelope: envelope }, () => {
       void loadTelegramAgentData(true);
     });
   };
 
   const loadTelegramAgentQuestions = async (force = false): Promise<unknown> => {
+    if (disposed) return null;
     const sessionConfig = resolveCurrentSessionConfig();
     if (!isTelegramBackendMode(sessionConfig)) return null;
     const state = getState();
     const envelope = state.telegramClientEnvelope || restoreTelegramEnvelopeFromStorage();
     if (!envelope) return null;
     if (!force && state.telegramAgentQuestionsStatus === 'loading') return null;
+    const requestSnapshot = beginRequest('questions');
     setState({ telegramAgentQuestionsStatus: 'loading', telegramQuestionSubmitError: '' });
     const result = await ports.loadQuestions({
       envelope,
       agentBridgeUrl: resolveTelegramAgentBridgeUrl(sessionConfig),
     });
+    if (!isRequestCurrent(requestSnapshot)) return result;
     if (!result.ok) {
       if (ports.isAuthFailure({ status: result.status, reason: result.reason })) {
         handleTelegramAuthFailure(result.reason);
@@ -200,17 +243,20 @@ export const createOnePageSessionTelegramActions = ({
   };
 
   const loadTelegramAgentResults = async (force = false): Promise<TelegramResultsDataset | null> => {
+    if (disposed) return null;
     const sessionConfig = resolveCurrentSessionConfig();
     if (!isTelegramBackendMode(sessionConfig)) return null;
     const state = getState();
     const envelope = state.telegramClientEnvelope || restoreTelegramEnvelopeFromStorage();
     if (!envelope) return null;
     if (!force && state.telegramAgentResultsStatus === 'loading') return null;
+    const requestSnapshot = beginRequest('results');
     setState({ telegramAgentResultsStatus: 'loading' });
     const result = await ports.loadResultsDataset({
       envelope,
       agentBridgeUrl: resolveTelegramAgentBridgeUrl(sessionConfig),
     });
+    if (!isRequestCurrent(requestSnapshot)) return result;
     const authFailureReason = resolveTelegramResultsAuthFailureReason(result);
     if (authFailureReason !== null) {
       handleTelegramAuthFailure(authFailureReason);
@@ -225,6 +271,7 @@ export const createOnePageSessionTelegramActions = ({
   };
 
   const loadTelegramAgentData = (force = false): Promise<unknown[]> => {
+    if (disposed) return Promise.resolve([]);
     void loadTelegramSessionMeta();
     return Promise.all([loadTelegramAgentQuestions(force), loadTelegramAgentResults(force)]);
   };
@@ -233,12 +280,14 @@ export const createOnePageSessionTelegramActions = ({
     question: TelegramAgentQuestion,
     answer: TelegramAnswerInput,
   ): Promise<void> => {
+    if (disposed) return;
     const state = getState();
     const envelope = state.telegramClientEnvelope;
     if (!ports.envelopeAllowsSubmit(envelope, state.telegramSessionMeta)) {
       setState({ telegramQuestionSubmitError: 'Submitting from the client is not enabled for this deployment yet.' });
       return;
     }
+    const requestSnapshot = beginRequest('submit');
     setState({ telegramSubmittingQuestionId: question.questionId, telegramQuestionSubmitError: '' });
     const result = await ports.submitAnswer({
       envelope,
@@ -246,6 +295,7 @@ export const createOnePageSessionTelegramActions = ({
       question,
       answer,
     });
+    if (!isRequestCurrent(requestSnapshot)) return;
     if (!result.ok) {
       if (ports.isAuthFailure({ status: result.status, reason: result.reason })) {
         handleTelegramAuthFailure(result.reason);
@@ -267,6 +317,8 @@ export const createOnePageSessionTelegramActions = ({
   };
 
   const handleTelegramLogout = (): void => {
+    if (disposed) return;
+    invalidateTelegramRequests();
     const sessionSlug = resolveCurrentSessionSlug();
     ports.clearStoredEnvelope(resolveCurrentIdentityTarget());
     clearTelegramEnvelopeMemoryCache(sessionSlug);
@@ -277,6 +329,7 @@ export const createOnePageSessionTelegramActions = ({
   };
 
   const bootstrapTelegramSession = (): void => {
+    if (disposed) return;
     if (!isTelegramBackendMode(resolveCurrentSessionConfig())) return;
     const envelope = restoreTelegramEnvelopeFromStorage();
     if (envelope) {
@@ -293,13 +346,24 @@ export const createOnePageSessionTelegramActions = ({
     loginJustCompleted: boolean;
     slugChanged: boolean;
   }): void => {
+    if (disposed) return;
     const telegramMode = isTelegramBackendMode(resolveCurrentSessionConfig());
-    if (slugChanged && telegramMode) {
-      const envelope = restoreTelegramEnvelopeFromStorage();
-      setState(buildTelegramDataResetState(), () => {
-        if (envelope) void loadTelegramAgentData(true);
-        else void loadTelegramSessionMeta();
-      });
+    if (slugChanged) {
+      invalidateTelegramRequests();
+      const envelope = telegramMode ? ports.readStoredEnvelope(resolveCurrentIdentityTarget()) : null;
+      setState(
+        {
+          ...buildTelegramDataResetState(),
+          telegramClientEnvelope: envelope,
+          telegramSessionMeta: null,
+          telegramSessionMetaStatus: 'idle',
+        },
+        () => {
+          if (!telegramMode || disposed) return;
+          if (envelope) void loadTelegramAgentData(true);
+          else void loadTelegramSessionMeta();
+        },
+      );
     } else if (telegramMode && loginJustCompleted) {
       const envelope = restoreTelegramEnvelopeFromStorage();
       if (envelope) void loadTelegramAgentData(true);
@@ -311,6 +375,7 @@ export const createOnePageSessionTelegramActions = ({
   return {
     bootstrapTelegramSession,
     clearTelegramEnvelopeMemoryCache,
+    disposeTelegramActions,
     handleAgentClientLoginEvent,
     handleTelegramAuthFailure,
     handleTelegramComponentDidUpdate,

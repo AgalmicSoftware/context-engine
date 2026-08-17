@@ -184,3 +184,28 @@ test('createOutboundUrlSafetyHelpersWithWorkerDeps preserves blocked redirect an
     { ok: false, error: 'Too many redirects', status: 403 },
   );
 });
+
+test('safeFetch strict HTTPS policy rejects insecure and credential-bearing redirects', async () => {
+  for (const location of [
+    'http://example.com/insecure',
+    'https://user:[redacted-email]/credentialed',
+  ]) {
+    let callCount = 0;
+    const { safeFetch } = createOutboundUrlSafetyHelpersWithWorkerDeps({
+      deps: {
+        fetch: async () => {
+          callCount += 1;
+          return new Response(null, { status: 302, headers: { location } });
+        },
+      },
+    });
+
+    assert.deepEqual(
+      await safeFetch('https://example.com/start', {
+        outboundUrlPolicy: 'strict-https-no-credentials',
+      }),
+      { ok: false, error: 'Redirect to blocked target', status: 403 },
+    );
+    assert.equal(callCount, 1);
+  }
+});

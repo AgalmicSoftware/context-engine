@@ -1,4 +1,5 @@
 import demoPolisData from '../../variables/demo/demo_polis_data.json';
+import { LEGACY_DEMO_POLL_OPTIONS } from '../../utilities/demo/demoQuestionSemantics';
 import {
   buildPolisDemoQuestionPool,
   resolvePolisDemoQuestionPool,
@@ -21,6 +22,30 @@ describe('surveyPolisDemoQuestionPool', () => {
         nodeId: demoPolisData.comments[0].nodeId,
       }),
     );
+  });
+
+  it('preserves typed question metadata and the legacy Worker poll choices', () => {
+    const pool = buildPolisDemoQuestionPool();
+    const comments = demoPolisData.comments as Array<{
+      type: string;
+      options?: string[];
+    }>;
+
+    comments.forEach((comment, index) => {
+      const question = pool[index];
+      if (comment.type === 'poll') {
+        expect(question).toMatchObject({
+          type: 'multichoice',
+          options: LEGACY_DEMO_POLL_OPTIONS,
+          singleSelect: true,
+        });
+        expect(new Set(question.options?.map((option) => option.toLowerCase())).size).toBe(question.options?.length);
+        expect(question.options?.length).toBeGreaterThanOrEqual(2);
+      } else {
+        expect(question.type).toBe(comment.type);
+        expect(question.options).toBeUndefined();
+      }
+    });
   });
 
   it('only resolves the built-in fixture for the display demo route backed by the default source', () => {

@@ -43,7 +43,25 @@ export const resolveBaselineMonotonicitySha = ({
   repoDir = process.cwd(),
   ...selection
 } = {}) => {
-  const baseRef = selectBaselineMonotonicityRef(selection);
+  let baseRef = selectBaselineMonotonicityRef(selection);
+  const pushBeforeSha = String(selection.pushBeforeSha || '').trim();
+  if (
+    String(selection.eventName || '').trim() === 'push'
+    && String(selection.refName || '').trim().startsWith(RELEASE_STAGING_PREFIX)
+    && FULL_COMMIT_SHA_RE.test(pushBeforeSha)
+  ) {
+    try {
+      execFileSync('git', ['-C', repoDir, 'merge-base', '--is-ancestor', baseRef, pushBeforeSha], {
+        stdio: 'ignore',
+      });
+      execFileSync('git', ['-C', repoDir, 'merge-base', '--is-ancestor', pushBeforeSha, 'HEAD'], {
+        stdio: 'ignore',
+      });
+      baseRef = pushBeforeSha;
+    } catch {
+      // New, stale, replayed, or unavailable staging history compares to public main.
+    }
+  }
   let baseSha = '';
   try {
     baseSha = execFileSync('git', ['-C', repoDir, 'rev-parse', '--verify', `${baseRef}^{commit}`], {

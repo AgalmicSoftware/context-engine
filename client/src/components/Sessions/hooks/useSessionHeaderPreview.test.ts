@@ -187,4 +187,65 @@ describe('useSessionHeaderPreview', () => {
     expect(result.current.sessionHeaderUploadStatusTone).toBe('default');
     expect(updateDraftSessionHeader).toHaveBeenCalledWith('');
   });
+
+  it('discards a local file when the selected profile becomes URL-only', () => {
+    const updateDraftSessionHeader = jest.fn();
+    const { result, rerender } = renderHook(
+      ({ allowFileUpload }) =>
+        useSessionHeaderPreview({
+          allowFileUpload,
+          draftSessionHeader: 'https://example.test/persisted.png',
+          updateDraftSessionHeader,
+        }),
+      { initialProps: { allowFileUpload: true } },
+    );
+    const file = new File(['image'], 'transient.png', { type: 'image/png' });
+
+    act(() => {
+      result.current.setSessionHeaderMode('upload');
+      result.current.setSessionHeaderFile(file);
+      result.current.setSessionHeaderPreviewModalOpen(true);
+      result.current.setSessionHeaderStatus('Uploading header image...', 'loading');
+    });
+    expect(result.current.sessionHeaderPreviewSrc).toBe('blob:session-header-1');
+
+    rerender({ allowFileUpload: false });
+
+    expect(result.current.sessionHeaderMode).toBe('url');
+    expect(result.current.sessionHeaderFile).toBeNull();
+    expect(result.current.sessionHeaderPreviewSrc).toBe('https://example.test/persisted.png');
+    expect(result.current.sessionHeaderPreviewModalOpen).toBe(false);
+    expect(result.current.sessionHeaderUploadStatus).toBe('');
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:session-header-1');
+    expect(updateDraftSessionHeader).not.toHaveBeenCalled();
+
+    rerender({ allowFileUpload: true });
+    expect(result.current.sessionHeaderMode).toBe('url');
+    expect(result.current.sessionHeaderFile).toBeNull();
+  });
+
+  it('rejects pasted image files for URL-only profiles', async () => {
+    const file = new File(['image'], 'paste.png', { type: 'image/png' });
+    const updateDraftSessionHeader = jest.fn();
+    const { result } = renderHook(() =>
+      useSessionHeaderPreview({
+        allowFileUpload: false,
+        draftSessionHeader: '',
+        updateDraftSessionHeader,
+        readClipboard: jest.fn().mockResolvedValue({ kind: 'file', file }),
+      }),
+    );
+
+    await act(async () => {
+      await result.current.handlePasteSessionHeaderFromClipboard();
+    });
+
+    expect(result.current.sessionHeaderMode).toBe('url');
+    expect(result.current.sessionHeaderFile).toBeNull();
+    expect(result.current.sessionHeaderUploadStatus).toBe(
+      'This hosting profile accepts a header image URL, not a local file.',
+    );
+    expect(result.current.sessionHeaderUploadStatusTone).toBe('error');
+    expect(updateDraftSessionHeader).not.toHaveBeenCalled();
+  });
 });

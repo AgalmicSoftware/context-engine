@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import * as d3 from 'd3';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp, faInfoCircle, faTags } from '@fortawesome/free-solid-svg-icons';
-import { beeswarmByExtremity, buildComparisonReportRows } from '../../../utilities/demo/demoAnalysisMath.js';
+import { buildComparisonReportRows } from '../../../utilities/demo/demoAnalysisMath.js';
+import BeeswarmPlot, { type BeeswarmPoint as SharedBeeswarmPoint } from '../../Shared/BeeswarmPlot/BeeswarmPlot';
 import styles from './ComparisonReport.module.scss';
 
 type ComparisonGroup = {
@@ -47,13 +48,12 @@ type AnalysisRow = {
   tags: QuestionTag[];
 };
 
-type BeeswarmPoint = AnalysisRow & {
-  index: number;
-  extremity: number | null;
-  primaryTag: QuestionTag | null;
-  x: number;
-  y: number;
-};
+type ComparisonBeeswarmPoint = SharedBeeswarmPoint &
+  AnalysisRow & {
+    index: number;
+    value: number;
+    primaryTag: QuestionTag | null;
+  };
 
 type QuestionTagsById = Record<string, QuestionTag[]>;
 
@@ -285,21 +285,6 @@ const ComparisonReport = ({
   const [reportOpen, setReportOpen] = useState(true);
   const [showAllTags, setShowAllTags] = useState(false);
   const [internalSelectedTagIDs, setInternalSelectedTagIDs] = useState<Set<string>>(new Set());
-  const [hoveredContent, setHoveredContent] = useState<React.ReactNode | null>(null);
-  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
-  const [swarmWidth, setSwarmWidth] = useState(700);
-
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const swarmContainerRef = useRef<HTMLDivElement | null>(null);
-
-  const handleMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    setTooltipPos({
-      x: event.clientX - rect.left + 15,
-      y: event.clientY - rect.top + 15,
-    });
-  };
 
   const analysisRows = useMemo<AnalysisRow[]>(
     () =>
@@ -370,39 +355,14 @@ const ComparisonReport = ({
         .map((row, index) => ({
           ...row,
           index,
-          extremity: row.divisiveness,
+          key: `${row.questionId}:${row.responseText}`,
+          value: Number(row.divisiveness),
+          label: `${row.questionText}: ${row.responseText}`,
           primaryTag: row.tags.length > 0 ? row.tags[0] : null,
         })),
     }),
     [filteredRows],
   );
-
-  const swarmedData = useMemo(() => {
-    if (!analysisResults.beeswarmData || analysisResults.beeswarmData.length === 0 || swarmWidth <= 0) {
-      return [];
-    }
-    const plotPadding = { left: 20, right: 20, top: 18, bottom: 52 };
-    return beeswarmByExtremity(
-      analysisResults.beeswarmData,
-      Math.max(0, swarmWidth - plotPadding.left - plotPadding.right),
-      160,
-      plotPadding,
-    ) as BeeswarmPoint[];
-  }, [analysisResults.beeswarmData, swarmWidth]);
-
-  useEffect(() => {
-    if (typeof ResizeObserver === 'undefined') return undefined;
-    const currentRef = swarmContainerRef.current;
-    if (!currentRef) return undefined;
-
-    const observer = new ResizeObserver((entries) => {
-      if (entries[0]) {
-        setSwarmWidth(entries[0].contentRect.width > 0 ? entries[0].contentRect.width : 700);
-      }
-    });
-    observer.observe(currentRef);
-    return () => observer.disconnect();
-  }, []);
 
   const selectedTagsForLegend = useMemo(
     () => tagInfo.displayTags.filter((tag) => selectedTagIDs.has(tag.tagID)),
@@ -450,11 +410,11 @@ const ComparisonReport = ({
     if (comparisonGroups.length < 2) {
       return <p className={styles.noData}>Please select at least two demographic groups to compare.</p>;
     }
-    if (!swarmedData || swarmedData.length === 0) {
+    if (!analysisResults.beeswarmData || analysisResults.beeswarmData.length === 0) {
       return <p className={styles.noData}>No data available to generate a beeswarm plot for the current filter.</p>;
     }
 
-    const tooltipForPoint = (point: BeeswarmPoint) => (
+    const tooltipForPoint = (point: ComparisonBeeswarmPoint) => (
       <div className={styles.tooltipContent}>
         <p className={styles.tooltipQuestion}>{point.questionText}</p>
         <ResponseLine responseText={point.responseText} context="tooltip" />
@@ -474,33 +434,35 @@ const ComparisonReport = ({
     );
 
     return (
-      <div className={styles.swarmLayoutContainer} ref={swarmContainerRef}>
-        <svg width={swarmWidth} height={220} className={styles.beeswarmSvg}>
-          <line x1={20} y1={176} x2={Math.max(20, swarmWidth - 20)} y2={176} stroke="#aaa" />
-          <text x={20} y={206} fontSize="12" fill="#555" textAnchor="start">
-            More Similarity
-          </text>
-          <text x={Math.max(20, swarmWidth - 20)} y={206} fontSize="12" fill="#555" textAnchor="end">
-            More Difference
-          </text>
-          {swarmedData.map((point) => {
-            const isFiltered = selectedTagIDs.size > 0;
-            const circleFill = isFiltered && point.primaryTag ? tagColorScale(point.primaryTag.tagID) : null;
-            return (
-              <circle
-                key={`${point.questionId}:${point.responseText}:${point.index}`}
-                cx={point.x}
-                cy={point.y}
-                r={5}
-                className={styles.beeswarmCircle}
-                style={circleFill ? { fill: circleFill } : {}}
-                onMouseEnter={() => setHoveredContent(tooltipForPoint(point))}
-                onMouseLeave={() => setHoveredContent(null)}
-              />
-            );
-          })}
-        </svg>
-      </div>
+      <BeeswarmPlot
+        points={analysisResults.beeswarmData}
+        className={styles.comparisonBeeswarm}
+        width={700}
+        height={220}
+        layoutStrategy="stacked"
+        domain={[0, 1]}
+        xPadding={20}
+        axisXPadding={20}
+        axisBottomPadding={44}
+        centerY={98}
+        layoutYRange={[24, 167]}
+        collisionRadius={6}
+        pointRadius={5}
+        axisLabels={['More Similarity', 'More Difference']}
+        ariaLabel="Similarity and difference spectrum"
+        testIdPrefix="demo-analysis-beeswarm"
+        responsesAvailable={analysisResults.beeswarmData.length > 0}
+        showIdleSummary={false}
+        renderTooltip={(point) => tooltipForPoint(point as ComparisonBeeswarmPoint)}
+        getPointStyle={(point) => {
+          const comparisonPoint = point as ComparisonBeeswarmPoint;
+          const circleFill =
+            selectedTagIDs.size > 0 && comparisonPoint.primaryTag
+              ? tagColorScale(comparisonPoint.primaryTag.tagID)
+              : null;
+          return circleFill ? ({ '--ce-beeswarm-point-color': circleFill } as React.CSSProperties) : undefined;
+        }}
+      />
     );
   };
 
@@ -530,8 +492,12 @@ const ComparisonReport = ({
     return (
       <div className={styles.polisReportContainer} data-testid="demo-analysis-empty-state">
         <div style={{ textAlign: 'center', padding: '2rem' }}>
-          <FontAwesomeIcon icon={faInfoCircle} size="2x" style={{ color: '#6c757d', marginBottom: '1rem' }} />
-          <h4 style={{ color: '#343a40' }}>Comparison Report</h4>
+          <FontAwesomeIcon
+            icon={faInfoCircle}
+            size="2x"
+            style={{ color: 'var(--ce-text-muted)', marginBottom: '1rem' }}
+          />
+          <h4 style={{ color: 'var(--ce-text)' }}>Comparison Report</h4>
           <p className={styles.noData}>
             Select two or more demographic groups from the filters above to see a detailed comparison report.
           </p>
@@ -544,12 +510,7 @@ const ComparisonReport = ({
   const comparisonSummary = `Comparing ${comparisonGroups.map((group) => group.name).join(', ')}`;
 
   return (
-    <div
-      className={styles.polisReportContainer}
-      data-testid="demo-analysis-comparison-report"
-      ref={containerRef}
-      onMouseMove={handleMouseMove}
-    >
+    <div className={styles.polisReportContainer} data-testid="demo-analysis-comparison-report">
       <button
         type="button"
         className={styles.reportCollapseHeader}
@@ -642,16 +603,6 @@ const ComparisonReport = ({
               {renderAnalysisList(analysisResults.topDivergence.slice(0, 5), 'Divergence')}
             </Collapse>
           </div>
-
-          {hoveredContent && (
-            <div
-              className={styles.beeTooltip}
-              data-testid="demo-analysis-beeswarm-tooltip"
-              style={{ left: tooltipPos.x, top: tooltipPos.y }}
-            >
-              {hoveredContent}
-            </div>
-          )}
         </div>
       </Collapse>
     </div>

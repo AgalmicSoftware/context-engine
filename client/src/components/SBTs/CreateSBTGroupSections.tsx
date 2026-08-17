@@ -82,7 +82,7 @@ export const renderCreateSbtMintOptionsSection = ({
   handleMintingEndTimeChange,
   onPredictableAddressToggle,
 }: RenderCreateSbtMintOptionsSectionArgs) => {
-  const calendarStyles = { color: 'black' };
+  const calendarStyles = { color: 'var(--ce-document-text)' };
 
   return (
     <div className={styles.sbtTokenOptions}>

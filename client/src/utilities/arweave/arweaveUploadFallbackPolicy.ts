@@ -1,20 +1,5 @@
 import { normalizeBaseUrl } from '../urlUtils.js';
-
-const WORKER_ENDPOINT_SUFFIXES = [
-  '/auth/nonce',
-  '/auth/login',
-  '/admin/set-config',
-  '/admin/set-secrets',
-  '/admin/set-limits',
-  '/admin/secret-presence',
-  '/transcribe',
-  '/ai',
-  '/arweave/upload',
-  '/fetch_url',
-  '/fetch_image',
-  '/fetch',
-  '/health',
-];
+import { WORKER_ENDPOINT_SUFFIXES } from '../worker/workerUrl.js';
 
 export const normalizeWorkerBaseUrl = (rawUrl: unknown): string => {
   const base = normalizeBaseUrl(rawUrl || '');

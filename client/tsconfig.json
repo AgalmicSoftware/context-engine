@@ -17,6 +17,11 @@
     "moduleResolution": "node",
     "jsx": "react-jsx",
     "baseUrl": "src",
+    "paths": {
+      "@ce-shared/*": [
+        "../../shared/*"
+      ]
+    },
     "types": [
       "node",
       "react",

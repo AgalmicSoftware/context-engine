@@ -1,4 +1,4 @@
-import { normalizeSessionSlug } from '../web3/chainGateway.js';
+import { normalizeSessionSlug } from '../session/sessionNaming.js';
 
 interface SbtRealtimeCoverageState {
   sbtRealtimeCoverageBySlug?: Record<string, unknown>;

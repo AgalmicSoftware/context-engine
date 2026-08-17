@@ -73,6 +73,17 @@ export const dispatchAuthNonceRequest = async ({
   ).trim().toLowerCase() === 'worker_canonical';
   const sessionId = resolveCanonicalWorkerSessionIdHex(corsState.config);
   const requestedSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: body?.sessionId });
+  const bootstrapWorkerCanonicalIdentity = body?.bootstrapWorkerCanonicalIdentity === true;
+  const bootstrappingWorkerCanonicalIdentity = bootstrapWorkerCanonicalIdentity && !corsState.config;
+  if (bootstrapWorkerCanonicalIdentity && !allowTrustedAdminAuthOrigin) {
+    return deps?.json?.({ error: 'Worker identity bootstrap requires an admin action.' }, 400, headers);
+  }
+  if (bootstrapWorkerCanonicalIdentity && corsState.config && !workerCanonical) {
+    return deps?.json?.({ error: 'Worker identity bootstrap is unavailable after initialization.' }, 409, headers);
+  }
+  if (bootstrappingWorkerCanonicalIdentity && !requestedSessionId) {
+    return deps?.json?.({ error: 'Worker bootstrap session identity is invalid.' }, 400, headers);
+  }
   if (workerCanonical && !sessionId) {
     return deps?.json?.({ error: 'Worker session identity is invalid.' }, 500, headers);
   }
@@ -121,8 +132,10 @@ export const dispatchAuthNonceRequest = async ({
     );
   }
 
+  const responseSessionId = workerCanonical ? sessionId : bootstrappingWorkerCanonicalIdentity ? requestedSessionId : '';
   return deps?.json?.({
     nonce,
-    ...(workerCanonical ? { sessionSlug: targetSlug, sessionId } : {}),
+    ...(responseSessionId ? { sessionSlug: targetSlug, sessionId: responseSessionId } : {}),
+    ...(bootstrappingWorkerCanonicalIdentity ? { bootstrapWorkerCanonicalIdentity: true } : {}),
   }, 200, headers);
 };

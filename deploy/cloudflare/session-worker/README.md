@@ -6,6 +6,26 @@ Worker, KV namespace, and Durable Object in the deployer's account. No Context
 Engine deploy helper, Cloudflare API token, OAuth token, or preinstalled agent
 is involved.
 
+## Why this directory exists
+
+This directory is a deployment template, not a second canonical Worker source
+tree and not a GitHub release attachment:
+
+- `workers/sessionCorsWorker/` is the human-maintained implementation and test
+  surface.
+- This directory is the generated, self-contained package consumed by the
+  native Deploy to Cloudflare button. Cloudflare clones the selected Git
+  subdirectory, treats it as the deployed project's root, and reads its
+  `wrangler.jsonc`, package metadata, bundle, and binding descriptions.
+- GitHub Release assets such as `sessionCorsWorker.bundle.js` are the separate
+  download channel used for deploy-helper and manual dashboard uploads.
+- `dist/sessionCorsWorker.bundle.js` is an untracked local build fallback.
+
+The native button therefore needs this package in the public Git tree at an
+immutable commit; a release attachment cannot replace it. Do not edit
+`worker.mjs` or `template-manifest.json` by hand. Change the canonical source
+or the human-maintained template files, then regenerate and verify the package.
+
 Use the immutable-commit Deploy to Cloudflare link supplied by Context Engine.
 The link must name a 40-character public replay commit, not a moving branch.
 

@@ -218,3 +218,33 @@ test('buildDemoAnalysisFixture normalizes comment datetime strings from canonica
   assert.equal(fixture.comments[16].datetime, 'Wed Mar 06 16:16:00 UTC 2024');
   assert.equal(fixture.comments[41].datetime, 'Wed Mar 06 16:41:00 UTC 2024');
 });
+
+test('canonical legacy demo questions remain stable Worker seed inputs', () => {
+  const demoPolisData = JSON.parse(fs.readFileSync(demoPolisPath, 'utf8'));
+
+  assert.equal(demoPolisData.comments.length, 42);
+  demoPolisData.comments.forEach((comment, questionIndex) => {
+    assert.ok(String(comment.commentId || '').trim(), `question ${questionIndex} id`);
+    assert.ok(String(comment.commentBody || '').trim(), `question ${questionIndex} prompt`);
+  });
+  assert.equal(
+    demoPolisData.comments[22].commentBody,
+    'If an AI resists modification, should we respect that preference?',
+  );
+  assert.equal(demoPolisData.comments[30].options, undefined);
+});
+
+test('breakdown type overrides discard stale poll options', async () => {
+  const { buildDemoAnalysisFixture } = await import(generatorModuleUrl);
+  const fixture = buildDemoAnalysisFixture({
+    questionOverridesByQuestion: {
+      30: {
+        type: 'binary',
+        commentBody: 'Public participation should guide AI development.',
+      },
+    },
+  });
+
+  assert.equal(fixture.comments[30].type, 'binary');
+  assert.equal(fixture.comments[30].options, undefined);
+});

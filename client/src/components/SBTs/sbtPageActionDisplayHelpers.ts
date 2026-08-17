@@ -1247,7 +1247,7 @@ export const resolveSbtPageMiniActionStatusDisplayState = ({
 }: ResolveSbtPageMiniActionStatusDisplayStateArgs = {}): SbtPageMiniActionStatusDisplayState => ({
   style: {
     marginTop: '10px',
-    ...(isFailure ? { color: 'red' } : {}),
+    ...(isFailure ? { color: 'var(--ce-status-danger-text)' } : {}),
   },
 });
 

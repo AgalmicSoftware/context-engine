@@ -1,21 +1,19 @@
 /* @file DebateMap.module.scss */
-@use 'sass:color';
-
 /* --- Variables --- */
-$bg-dark: #0b1120;
-$bg-panel: rgba(30, 41, 59, 0.6);
-$primary-glow: #38bdf8;
-$accent-teal: #2dd4bf;
-$accent-green: #4ade80;
-$accent-yellow: #fde047;
-$text-main: #f1f5f9;
-$text-muted: #94a3b8;
-$border-glass: 1px solid rgba(255, 255, 255, 0.1);
-$glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+$bg-dark: var(--ce-document-text);
+$bg-panel: color-mix(in srgb, var(--ce-overlay-surface-alt) 60%, transparent);
+$primary-glow: var(--ce-data-series-8);
+$accent-teal: var(--ce-data-series-8);
+$accent-green: var(--ce-status-success-text);
+$accent-yellow: var(--ce-status-warning);
+$text-main: var(--ce-overlay-text);
+$text-muted: var(--ce-overlay-text-muted);
+$border-glass: 1px solid color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
+$glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transparent);
 
 /* --- Mixins --- */
 @mixin glass-panel {
-  background: rgba(255, 255, 255, 0.03);
+  background: color-mix(in srgb, var(--ce-text-inverse) 3%, transparent);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: $border-glass;
@@ -23,7 +21,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 }
 
 @mixin text-glow {
-  text-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--ce-status-info) 30%, transparent);
 }
 
 /* --- Animations --- */
@@ -39,13 +37,13 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 }
 @keyframes pulse-glow {
   0% {
-    box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.4);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ce-status-info) 40%, transparent);
   }
   70% {
-    box-shadow: 0 0 0 10px rgba(56, 189, 248, 0);
+    box-shadow: 0 0 0 10px transparent;
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(56, 189, 248, 0);
+    box-shadow: 0 0 0 0 transparent;
   }
 }
 
@@ -116,8 +114,8 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     border-radius: var(--ce-radius-round);
     box-shadow: 0 0 8px currentColor;
     &.category {
-      background-color: #3b82f6;
-      color: #3b82f6;
+      background-color: var(--ce-status-info);
+      color: var(--ce-status-info);
     } /* Blue */
     &.subcategory {
       background-color: $accent-teal;
@@ -169,7 +167,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     .atlasLayoutSwitch {
       display: flex;
       align-items: center;
-      background: rgba(0, 0, 0, 0.3);
+      background: color-mix(in srgb, var(--ce-compat-dark) 30%, transparent);
       border-radius: var(--ce-radius-8);
       padding: 4px;
       border: $border-glass;
@@ -192,9 +190,9 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         }
 
         &.active {
-          background: rgba($primary-glow, 0.15);
+          background: color-mix(in srgb, var(--ce-data-series-8) 15%, transparent);
           color: $primary-glow;
-          box-shadow: 0 0 10px rgba($primary-glow, 0.1);
+          box-shadow: 0 0 10px color-mix(in srgb, var(--ce-data-series-8) 10%, transparent);
         }
 
         svg {
@@ -208,7 +206,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         display: inline-block;
         width: 1px;
         height: 18px;
-        background: rgba(255, 255, 255, 0.2);
+        background: color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
         margin: 0 8px;
         vertical-align: middle;
       }
@@ -218,7 +216,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         align-items: center;
         gap: 5px;
         font-size: 0.7rem;
-        color: rgba(255, 255, 255, 0.5);
+        color: color-mix(in srgb, var(--ce-text-inverse) 50%, transparent);
         text-transform: uppercase;
         letter-spacing: 0.03em;
         margin: 0 6px;
@@ -260,7 +258,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       }
 
       select {
-        background: rgba(0, 0, 0, 0.4);
+        background: color-mix(in srgb, var(--ce-compat-dark) 40%, transparent);
         border: $border-glass;
         color: $text-main;
         padding: 5px 10px;
@@ -289,13 +287,13 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       height: 4px;
     }
     &::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.2);
-      border-radius: 2px;
+      background: color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
+      border-radius: var(--ce-radius-2);
     }
 
     .categoryButton {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
+      border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
       color: $text-muted;
       padding: 10px 20px;
       border-radius: var(--ce-radius-8);
@@ -309,16 +307,16 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       font-family: inherit;
       font-weight: 500;
       &:hover {
-        background: rgba(255, 255, 255, 0.1);
+        background: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
         color: var(--ce-color-white);
         transform: translateY(-2px);
       }
 
       &.active {
-        background: rgba($primary-glow, 0.2);
+        background: color-mix(in srgb, var(--ce-data-series-8) 20%, transparent);
         border-color: $primary-glow;
         color: $primary-glow;
-        box-shadow: 0 0 15px rgba($primary-glow, 0.2);
+        box-shadow: 0 0 15px color-mix(in srgb, var(--ce-data-series-8) 20%, transparent);
       }
     }
   }
@@ -336,7 +334,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     height: 85vh;
     border-radius: var(--ce-radius-16);
     // border: $border-glass;
-    // background: radial-gradient(circle at center, #1e293b 0%, #020617 100%);
+    // background: radial-gradient(circle at center, var(--ce-document-text) 0%, var(--ce-overlay-base) 100%);
     overflow: hidden;
     cursor: grab;
     touch-action: none;
@@ -373,9 +371,9 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       align-items: center;
       gap: 10px;
       padding: 6px 13px;
-      border: 1px solid rgba(255, 255, 255, 0.18);
-      border-radius: 999px;
-      background: rgba(11, 17, 32, 0.55);
+      border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 18%, transparent);
+      border-radius: var(--ce-radius-pill);
+      background: color-mix(in srgb, var(--ce-overlay-base) 55%, transparent);
       color: inherit;
       cursor: pointer;
       transition:
@@ -387,26 +385,26 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       &:hover,
       &:focus-visible {
         transform: translateY(-1px);
-        border-color: rgba($primary-glow, 0.45);
-        background: rgba(15, 23, 42, 0.85);
-        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+        border-color: color-mix(in srgb, var(--ce-data-series-8) 45%, transparent);
+        background: color-mix(in srgb, var(--ce-document-text) 85%, transparent);
+        box-shadow: 0 10px 24px color-mix(in srgb, var(--ce-compat-dark) 22%, transparent);
         outline: none;
       }
     }
 
     .packedAtlasTitle {
-      color: rgba(241, 245, 249, 0.96);
+      color: color-mix(in srgb, var(--ce-status-info-text) 96%, transparent);
       font-size: clamp(1rem, 1.5vw, 1.35rem);
       font-weight: 700;
       letter-spacing: 0.03em;
       line-height: 1.2;
       text-wrap: balance;
-      text-shadow: 0 6px 18px rgba(2, 6, 23, 0.45);
+      text-shadow: 0 6px 18px color-mix(in srgb, var(--ce-overlay-base) 45%, transparent);
     }
 
     .packedAtlasTitleIcon {
       font-size: 0.85rem;
-      color: rgba(191, 219, 254, 0.88);
+      color: color-mix(in srgb, var(--ce-status-info-text) 88%, transparent);
     }
 
     .backArrow {
@@ -430,7 +428,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         border-color 0.2s,
         color 0.2s;
       &:hover {
-        background: rgba($primary-glow, 0.2);
+        background: color-mix(in srgb, var(--ce-data-series-8) 20%, transparent);
         border-color: $primary-glow;
         color: var(--ce-color-white);
       }
@@ -458,11 +456,11 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         border-color 0.2s,
         color 0.2s;
       &:hover {
-        background: rgba($primary-glow, 0.2);
+        background: color-mix(in srgb, var(--ce-data-series-8) 20%, transparent);
         border-color: $primary-glow;
         color: var(--ce-color-white);
         transform: translateY(-2px);
-        box-shadow: 0 0 15px rgba($primary-glow, 0.3);
+        box-shadow: 0 0 15px color-mix(in srgb, var(--ce-data-series-8) 30%, transparent);
       }
 
       svg {
@@ -475,8 +473,8 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       top: 70px;
       right: 20px;
       width: 300px;
-      background: rgba(11, 17, 32, 0.95);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: color-mix(in srgb, var(--ce-overlay-base) 95%, transparent);
+      border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
       border-radius: var(--ce-radius-12);
       padding: 20px;
       z-index: 40;
@@ -504,7 +502,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         color: $primary-glow;
         text-transform: uppercase;
         letter-spacing: 1px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        border-bottom: 1px solid color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
         padding-bottom: 10px;
         display: flex;
         justify-content: space-between;
@@ -528,7 +526,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         width: 100%;
         padding: 10px;
         margin-bottom: 8px;
-        background: rgba(255, 255, 255, 0.05);
+        background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
         border-radius: var(--ce-radius-6);
         cursor: pointer;
         text-align: left;
@@ -540,7 +538,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
           background-color 0.2s,
           border-color 0.2s;
         &:hover {
-          background: rgba(255, 255, 255, 0.1);
+          background: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
           border-color: $primary-glow;
           transform: translateX(-5px);
         }
@@ -571,7 +569,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       height: 100%;
       pointer-events: none;
       line {
-        stroke: rgba(255, 255, 255, 0.1);
+        stroke: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
         stroke-width: 1px;
         transition: stroke 0.3s;
       }
@@ -590,7 +588,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       .nodeDot {
         position: relative;
         border-radius: var(--ce-radius-round);
-        background-color: #0b1120;
+        background-color: var(--ce-document-text);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -599,15 +597,15 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
           background-color 0.3s,
           border-color 0.3s,
           color 0.3s;
-        border: 2px solid rgba(255, 255, 255, 0.3);
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+        border: 2px solid color-mix(in srgb, var(--ce-text-inverse) 30%, transparent);
+        box-shadow: 0 0 10px color-mix(in srgb, var(--ce-compat-dark) 20%, transparent);
         svg {
           opacity: 0.9;
           font-size: 1rem;
         }
 
         &.hot {
-          box-shadow: 0 0 15px 2px rgba($accent-yellow, 0.5);
+          box-shadow: 0 0 15px 2px color-mix(in srgb, var(--ce-status-warning) 50%, transparent);
         }
       }
 
@@ -643,8 +641,8 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         z-index: 100 !important;
         .nodeDot {
           transform: scale(1.15);
-          background-color: #1e293b;
-          box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+          background-color: var(--ce-document-text);
+          box-shadow: 0 0 20px color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
         }
         .nodeLabel {
           opacity: 1 !important;
@@ -652,7 +650,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
           font-weight: bold;
           transform: scale(1.2);
           z-index: 101;
-          background: rgba(0, 0, 0, 0.8);
+          background: color-mix(in srgb, var(--ce-compat-dark) 80%, transparent);
           padding: 2px 6px;
           border-radius: var(--ce-radius-4);
         }
@@ -662,10 +660,10 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       &.depthCenter {
         z-index: 50;
         .nodeDot {
-          background: rgba($primary-glow, 0.15);
+          background: color-mix(in srgb, var(--ce-data-series-8) 15%, transparent);
           border: 2px solid $primary-glow;
           color: $primary-glow;
-          box-shadow: 0 0 30px rgba($primary-glow, 0.15);
+          box-shadow: 0 0 30px color-mix(in srgb, var(--ce-data-series-8) 15%, transparent);
         }
         .nodeLabel {
           font-size: 1.1rem;
@@ -678,13 +676,13 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 
       &.depth0 {
         .nodeDot {
-          border-color: #3b82f6;
-          color: #3b82f6;
-          background: rgba(59, 130, 246, 0.05);
+          border-color: var(--ce-status-info);
+          color: var(--ce-status-info);
+          background: color-mix(in srgb, var(--ce-status-info) 5%, transparent);
         }
         .nodeLabel {
           font-size: 1rem;
-          color: #93c5fd;
+          color: var(--ce-status-info-text);
           font-weight: bold;
         }
       }
@@ -699,7 +697,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       &.depth2 {
         .nodeDot {
           border-color: $accent-green;
-          background-color: #0b1120;
+          background-color: var(--ce-document-text);
         }
       }
 
@@ -715,8 +713,8 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
           overflow: hidden;
           border-width: 1.5px;
           box-shadow:
-            inset 0 0 0 1px rgba(255, 255, 255, 0.04),
-            0 8px 24px rgba(0, 0, 0, 0.2);
+            inset 0 0 0 1px color-mix(in srgb, var(--ce-text-inverse) 4%, transparent),
+            0 8px 24px color-mix(in srgb, var(--ce-compat-dark) 20%, transparent);
         }
 
         .packedNodeDot {
@@ -736,17 +734,17 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
           line-height: 1.06;
           padding: 0;
           transform: scale(0.94);
-          text-shadow: 0 2px 10px rgba(11, 17, 32, 0.55);
+          text-shadow: 0 2px 10px color-mix(in srgb, var(--ce-overlay-base) 55%, transparent);
           background: transparent;
-          border-radius: 0;
+          border-radius: var(--ce-radius-0);
           font-weight: 700;
           letter-spacing: 0.02em;
         }
 
         &.depthCenter {
           .packedNodeDot {
-            background: rgba($primary-glow, 0.12);
-            border-color: rgba($primary-glow, 0.55);
+            background: color-mix(in srgb, var(--ce-data-series-8) 12%, transparent);
+            border-color: color-mix(in srgb, var(--ce-data-series-8) 55%, transparent);
           }
           .packedNodeLabel {
             font-size: 1.1rem;
@@ -755,41 +753,41 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 
         &.depth0 {
           .packedNodeDot {
-            background: rgba(59, 130, 246, 0.17);
-            border-color: rgba(147, 197, 253, 0.32);
+            background: color-mix(in srgb, var(--ce-status-info) 17%, transparent);
+            border-color: color-mix(in srgb, var(--ce-status-info-text) 32%, transparent);
           }
           .packedNodeLabel {
-            color: rgba(219, 234, 254, 0.96);
+            color: color-mix(in srgb, var(--ce-status-info-text) 96%, transparent);
           }
         }
 
         &.depth1 {
           .packedNodeDot {
-            background: rgba($accent-teal, 0.16);
-            border-color: rgba($accent-teal, 0.3);
+            background: color-mix(in srgb, var(--ce-data-series-8) 16%, transparent);
+            border-color: color-mix(in srgb, var(--ce-data-series-8) 30%, transparent);
           }
           .packedNodeLabel {
-            color: rgba(204, 251, 241, 0.96);
+            color: color-mix(in srgb, var(--ce-data-series-8) 96%, transparent);
           }
         }
 
         &.depth2 {
           .packedNodeDot {
-            background: rgba($accent-green, 0.14);
-            border-color: rgba($accent-green, 0.28);
+            background: color-mix(in srgb, var(--ce-status-success-text) 14%, transparent);
+            border-color: color-mix(in srgb, var(--ce-status-success-text) 28%, transparent);
           }
           .packedNodeLabel {
-            color: rgba(220, 252, 231, 0.95);
+            color: color-mix(in srgb, var(--ce-status-success-text) 95%, transparent);
           }
         }
 
         &.depth3 {
           .packedNodeDot {
-            background: rgba($accent-yellow, 0.18);
-            border: 1.5px solid rgba($accent-yellow, 0.3);
+            background: color-mix(in srgb, var(--ce-status-warning) 18%, transparent);
+            border: 1.5px solid color-mix(in srgb, var(--ce-status-warning) 30%, transparent);
           }
           .packedNodeLabel {
-            color: rgba(254, 249, 195, 0.95);
+            color: color-mix(in srgb, var(--ce-status-warning-text) 95%, transparent);
           }
         }
 
@@ -813,7 +811,11 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     width: 100%;
     overflow: hidden;
     padding: 24px 10px 32px;
-    background: radial-gradient(circle at center, rgba(30, 41, 59, 0.3) 0%, rgba(11, 17, 32, 0.6) 100%);
+    background: radial-gradient(
+      circle at center,
+      color-mix(in srgb, var(--ce-overlay-surface) 30%, transparent) 0%,
+      color-mix(in srgb, var(--ce-overlay-base) 60%, transparent) 100%
+    );
     border-radius: var(--ce-radius-16);
     border: $border-glass;
     min-height: 70vh;
@@ -826,7 +828,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       width: 8px;
     }
     &::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.2);
+      background: color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
       border-radius: var(--ce-radius-4);
     }
   }
@@ -923,9 +925,9 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       border-color 0.3s;
     margin-bottom: 0;
     &:hover {
-      background: rgba(255, 255, 255, 0.1);
+      background: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
       transform: translateY(-3px);
-      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 10px 20px color-mix(in srgb, var(--ce-compat-dark) 30%, transparent);
       z-index: 20;
       .suggestBtn {
         opacity: 1;
@@ -935,7 +937,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 
     &.collapsed {
       opacity: 0.8;
-      border-bottom: 3px solid rgba(255, 255, 255, 0.2);
+      border-bottom: 3px solid color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
     }
 
     .cardHeader {
@@ -974,7 +976,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     }
 
     &.depth0 {
-      border-top: 2px solid #3b82f6;
+      border-top: 2px solid var(--ce-status-info);
     }
     &.depth1 {
       border-top: 2px solid $accent-teal;
@@ -993,14 +995,14 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       transform: translateX(-50%) scale(0.8);
       width: 20px;
       height: 20px;
-      background: #2563eb;
+      background: var(--ce-status-info);
       color: var(--ce-color-white);
       border-radius: var(--ce-radius-round);
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 0.7rem;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 2px 8px color-mix(in srgb, var(--ce-compat-dark) 50%, transparent);
       opacity: 0;
       transition:
         opacity 0.2s,
@@ -1022,15 +1024,15 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       transform: translateX(-50%) scale(0.8);
       width: 20px;
       height: 20px;
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.3);
+      background: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
+      border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 30%, transparent);
       color: var(--ce-color-white);
       border-radius: var(--ce-radius-round);
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 0.7rem;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 2px 8px color-mix(in srgb, var(--ce-compat-dark) 50%, transparent);
       cursor: pointer;
       z-index: 30;
       transition:
@@ -1038,7 +1040,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         background-color 0.2s,
         border-color 0.2s;
       &:hover {
-        background: rgba(255, 255, 255, 0.3);
+        background: color-mix(in srgb, var(--ce-text-inverse) 30%, transparent);
         transform: translateX(-50%) scale(1.1);
       }
     }
@@ -1058,7 +1060,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       left: 50%;
       width: 1px;
       height: 18px;
-      background: rgba(255, 255, 255, 0.2);
+      background: color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
     }
   }
 
@@ -1081,10 +1083,10 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       height: 1px;
       background: linear-gradient(
         90deg,
-        rgba(255, 255, 255, 0.08) 0%,
-        rgba(255, 255, 255, 0.24) 14%,
-        rgba(255, 255, 255, 0.24) 86%,
-        rgba(255, 255, 255, 0.08) 100%
+        color-mix(in srgb, var(--ce-text-inverse) 8%, transparent) 0%,
+        color-mix(in srgb, var(--ce-text-inverse) 24%, transparent) 14%,
+        color-mix(in srgb, var(--ce-text-inverse) 24%, transparent) 86%,
+        color-mix(in srgb, var(--ce-text-inverse) 8%, transparent) 100%
       );
     }
 
@@ -1099,7 +1101,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         left: 50%;
         width: 1px;
         height: calc(16px + var(--ce-tree-node-stagger, 0px));
-        background: rgba(255, 255, 255, 0.2);
+        background: color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
       }
     }
 
@@ -1126,7 +1128,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       transform 0.2s,
       background-color 0.2s;
     &:hover {
-      background: rgba(255, 255, 255, 0.06);
+      background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
       transform: translateX(5px);
     }
 
@@ -1142,7 +1144,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       }
       .pathButton {
         background: transparent;
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
         color: $text-main;
         padding: 5px 12px;
         border-radius: var(--ce-radius-6);
@@ -1156,30 +1158,30 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         font-weight: 500;
         font-family: inherit;
         &:hover {
-          background: rgba(255, 255, 255, 0.1);
+          background: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
           color: var(--ce-color-white);
-          box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+          box-shadow: 0 0 10px color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
           transform: translateY(-1px);
         }
         &.depth0 {
-          background: rgba(59, 130, 246, 0.25);
-          border-color: #3b82f6;
-          color: #93c5fd;
+          background: color-mix(in srgb, var(--ce-status-info) 25%, transparent);
+          border-color: var(--ce-status-info);
+          color: var(--ce-status-info-text);
         }
         &.depth1 {
-          background: rgba($accent-teal, 0.25);
+          background: color-mix(in srgb, var(--ce-data-series-8) 25%, transparent);
           border-color: $accent-teal;
-          color: color.adjust($accent-teal, $lightness: 10%);
+          color: color-mix(in srgb, var(--ce-data-series-8) 90%, var(--ce-text-inverse));
         }
         &.depth2 {
-          background: rgba($accent-green, 0.25);
+          background: color-mix(in srgb, var(--ce-status-success-text) 25%, transparent);
           border-color: $accent-green;
-          color: color.adjust($accent-green, $lightness: 10%);
+          color: color-mix(in srgb, var(--ce-status-success-text) 90%, var(--ce-text-inverse));
         }
         &.depth3 {
-          background: rgba($accent-yellow, 0.2);
+          background: color-mix(in srgb, var(--ce-status-warning) 20%, transparent);
           border-color: $accent-yellow;
-          color: color.adjust($accent-yellow, $lightness: 10%);
+          color: color-mix(in srgb, var(--ce-status-warning) 90%, var(--ce-text-inverse));
           font-weight: 700;
         }
       }
@@ -1233,7 +1235,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.85);
+    background: color-mix(in srgb, var(--ce-compat-dark) 85%, transparent);
     backdrop-filter: blur(8px);
     z-index: 2000;
     display: flex;
@@ -1245,9 +1247,9 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
   }
 
   .modalContent {
-    background: #111827;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    background: var(--ce-document-text);
+    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
+    box-shadow: 0 25px 50px -12px color-mix(in srgb, var(--ce-compat-dark) 50%, transparent);
     padding: 30px;
     border-radius: var(--ce-radius-12);
     max-width: 800px;
@@ -1262,7 +1264,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       width: 8px;
     }
     &::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.2);
+      background: color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
       border-radius: var(--ce-radius-4);
     }
 
@@ -1277,7 +1279,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       align-items: center;
       margin-bottom: 20px;
       padding-bottom: 15px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      border-bottom: 1px solid color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
       gap: 20px;
       .titleSection {
         flex: 1;
@@ -1304,7 +1306,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
           &:hover {
             opacity: 1;
             color: $primary-glow;
-            background: rgba(255, 255, 255, 0.05);
+            background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
           }
         }
 
@@ -1362,14 +1364,14 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       .voteArrow {
         font-size: 0.9rem;
         cursor: pointer;
-        color: #64748b;
+        color: var(--ce-document-text-muted);
         width: 30px;
         height: 30px;
-        border-radius: 50%;
+        border-radius: var(--ce-radius-round);
         display: flex;
         align-items: center;
         justify-content: center;
-        background: rgba(255, 255, 255, 0.05);
+        background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
         border: 1px solid transparent;
         transition:
           transform 0.2s,
@@ -1377,17 +1379,17 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
           border-color 0.2s,
           color 0.2s;
         &:hover {
-          background: rgba(255, 255, 255, 0.1);
+          background: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
           color: var(--ce-color-white);
           transform: scale(1.1);
         }
         &.up:hover {
-          color: #4ade80;
-          border-color: rgba(74, 222, 128, 0.4);
+          color: var(--ce-status-success-text);
+          border-color: color-mix(in srgb, var(--ce-status-success) 40%, transparent);
         }
         &.down:hover {
-          color: #f87171;
-          border-color: rgba(248, 113, 113, 0.4);
+          color: var(--ce-status-danger-text);
+          border-color: color-mix(in srgb, var(--ce-status-error) 40%, transparent);
         }
       }
 
@@ -1407,8 +1409,8 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
           top: 100%;
           left: 50%;
           transform: translateX(-50%) translateY(5px);
-          background: #0f172a;
-          border: 1px solid #334155;
+          background: var(--ce-document-text);
+          border: 1px solid var(--ce-document-text-muted);
           padding: 4px 8px;
           border-radius: var(--ce-radius-6);
           display: flex;
@@ -1423,21 +1425,21 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
           font-size: 0.75rem;
           font-weight: 700;
           z-index: 50;
-          box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+          box-shadow: 0 4px 10px color-mix(in srgb, var(--ce-compat-dark) 50%, transparent);
           &.visible {
             opacity: 1;
             visibility: visible;
             transform: translateX(-50%) translateY(10px);
           }
           .breakdownUp {
-            color: #4ade80;
+            color: var(--ce-status-success-text);
           }
           .breakdownDivider {
-            color: #475569;
+            color: var(--ce-document-text-muted);
             opacity: 0.5;
           }
           .breakdownDown {
-            color: #f87171;
+            color: var(--ce-status-danger-text);
           }
         }
       }
@@ -1449,7 +1451,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         animation: fadeIn 0.2s ease;
         .voteInput {
           background: var(--ce-color-black);
-          border: 1px solid #334155;
+          border: 1px solid var(--ce-document-text-muted);
           color: var(--ce-color-white);
           padding: 4px 8px;
           border-radius: var(--ce-radius-6);
@@ -1478,24 +1480,24 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
           font-size: 0.8rem;
         }
         &.isUp .confirmBtn {
-          background: #4ade80;
+          background: var(--ce-status-success-text);
           color: var(--ce-color-black);
           &:hover {
-            background: color.adjust(#4ade80, $lightness: 10%);
+            background: color-mix(in srgb, var(--ce-status-success-text) 90%, var(--ce-text-inverse));
           }
         }
         &.isDown .confirmBtn {
-          background: #ef4444;
+          background: var(--ce-status-error);
           color: var(--ce-color-white);
           &:hover {
-            background: color.adjust(#ef4444, $lightness: 10%);
+            background: color-mix(in srgb, var(--ce-status-error) 90%, var(--ce-text-inverse));
           }
         }
         .cancelBtn {
-          background: rgba(255, 255, 255, 0.1);
-          color: #94a3b8;
+          background: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
+          color: var(--ce-text-muted);
           &:hover {
-            background: rgba(255, 255, 255, 0.2);
+            background: color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
             color: var(--ce-color-white);
           }
         }
@@ -1505,7 +1507,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     .lineageDisplay {
       margin-bottom: 20px;
       padding: 10px;
-      background: rgba(255, 255, 255, 0.03);
+      background: color-mix(in srgb, var(--ce-text-inverse) 3%, transparent);
       border-radius: var(--ce-radius-6);
       font-size: 0.9rem;
       color: $text-muted;
@@ -1526,15 +1528,15 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     }
 
     .glassInput {
-      background: rgba(0, 0, 0, 0.3);
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: color-mix(in srgb, var(--ce-compat-dark) 30%, transparent);
+      border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
       color: var(--ce-color-white);
       padding: 10px;
       border-radius: var(--ce-radius-6);
       &:focus {
         outline: none;
         border-color: $primary-glow;
-        box-shadow: 0 0 10px rgba($primary-glow, 0.2);
+        box-shadow: 0 0 10px color-mix(in srgb, var(--ce-data-series-8) 20%, transparent);
       }
     }
 
@@ -1555,10 +1557,10 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
           opacity 0.2s;
       }
       .cancelBtn {
-        background: rgba(255, 255, 255, 0.1);
+        background: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
         color: var(--ce-color-white);
         &:hover {
-          background: rgba(255, 255, 255, 0.2);
+          background: color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
         }
       }
       .submitBtn {
@@ -1584,12 +1586,12 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       .tag {
         font-size: 0.75rem;
         text-transform: uppercase;
-        background: rgba(255, 255, 255, 0.05);
+        background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
         color: $text-muted;
         padding: 4px 10px;
         border-radius: var(
           --ce-radius-20
-        ); // Pill shape for generic tags        border: 1px solid rgba(255,255,255,0.1);
+        ); // Pill shape for generic tags        border: 1px solid color-mix(in srgb, var(--ce-document-surface) 10%, transparent);
         cursor: default; // Default for non-clickable context if needed
         &.clickable {
           cursor: pointer;
@@ -1598,8 +1600,8 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
             border-color 0.2s,
             color 0.2s;
           &:hover {
-            background: rgba(255, 255, 255, 0.15);
-            border-color: rgba(255, 255, 255, 0.3);
+            background: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
+            border-color: color-mix(in srgb, var(--ce-text-inverse) 30%, transparent);
             color: var(--ce-color-white);
           }
         }
@@ -1612,24 +1614,24 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         padding: 4px 10px;
         border-radius: var(--ce-radius-4); // Boxy shape for depth tag        text-transform: uppercase;
         letter-spacing: 1px;
-        color: #0b1120; // Dark text        border: 1px solid transparent;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        color: var(--ce-document-text); // Dark text        border: 1px solid transparent;
+        box-shadow: 0 2px 5px color-mix(in srgb, var(--ce-compat-dark) 20%, transparent);
         // Depth Colors
         &.depth0 {
-          background: #3b82f6;
-          box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+          background: var(--ce-status-info);
+          box-shadow: 0 0 10px color-mix(in srgb, var(--ce-status-info) 30%, transparent);
         }
         &.depth1 {
           background: $accent-teal;
-          box-shadow: 0 0 10px rgba($accent-teal, 0.3);
+          box-shadow: 0 0 10px color-mix(in srgb, var(--ce-data-series-8) 30%, transparent);
         }
         &.depth2 {
           background: $accent-green;
-          box-shadow: 0 0 10px rgba($accent-green, 0.3);
+          box-shadow: 0 0 10px color-mix(in srgb, var(--ce-status-success-text) 30%, transparent);
         }
         &.depth3 {
           background: $accent-yellow;
-          box-shadow: 0 0 10px rgba($accent-yellow, 0.3);
+          box-shadow: 0 0 10px color-mix(in srgb, var(--ce-status-warning) 30%, transparent);
         }
       }
     }
@@ -1645,12 +1647,12 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       align-items: center;
       cursor: pointer;
       padding: 8px 0;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      border-bottom: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
       margin-bottom: 8px;
       user-select: none;
 
       > svg {
-        color: rgba(255, 255, 255, 0.5);
+        color: color-mix(in srgb, var(--ce-text-inverse) 50%, transparent);
         width: 14px;
         margin-right: 6px;
       }
@@ -1658,20 +1660,20 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       > span:first-of-type {
         font-size: 1.1rem;
         font-weight: 600;
-        color: rgba(255, 255, 255, 0.75);
+        color: color-mix(in srgb, var(--ce-text-inverse) 75%, transparent);
       }
     }
 
     .collapseCount {
       font-size: 0.8rem;
-      color: rgba(255, 255, 255, 0.4);
+      color: color-mix(in srgb, var(--ce-text-inverse) 40%, transparent);
       margin-left: 6px;
     }
 
     .collapseToggle {
       margin-left: auto;
       font-size: 0.75rem;
-      color: rgba(255, 255, 255, 0.35);
+      color: color-mix(in srgb, var(--ce-text-inverse) 35%, transparent);
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
@@ -1698,8 +1700,8 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       gap: 10px;
       padding: 12px;
       border-radius: var(--ce-radius-10);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+      background: color-mix(in srgb, var(--ce-text-inverse) 3%, transparent);
 
       > h4 {
         margin: 0;
@@ -1710,8 +1712,8 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       }
 
       &[data-side='pro'] {
-        background: rgba(77, 255, 164, 0.07);
-        border-color: rgba(77, 255, 164, 0.18);
+        background: color-mix(in srgb, var(--ce-action-accent) 7%, transparent);
+        border-color: color-mix(in srgb, var(--ce-action-accent) 18%, transparent);
 
         > h4 {
           color: var(--ce-color-accent);
@@ -1719,11 +1721,11 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       }
 
       &[data-side='con'] {
-        background: rgba(255, 107, 107, 0.06);
-        border-color: rgba(255, 107, 107, 0.16);
+        background: color-mix(in srgb, var(--ce-status-error) 6%, transparent);
+        border-color: color-mix(in srgb, var(--ce-status-error) 16%, transparent);
 
         > h4 {
-          color: #ff7f7f;
+          color: var(--ce-status-danger-text);
         }
       }
     }
@@ -1731,25 +1733,41 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     .argumentCard {
       padding: 8px;
       border-radius: var(--ce-radius-8);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      background: rgba(15, 23, 42, 0.62);
-      box-shadow: 0 10px 22px rgba(0, 0, 0, 0.14);
+      border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+      background: color-mix(in srgb, var(--ce-document-text) 62%, transparent);
+      box-shadow: 0 10px 22px color-mix(in srgb, var(--ce-compat-dark) 14%, transparent);
 
       &[data-side='pro'] {
-        border-color: rgba(77, 255, 164, 0.18);
-        background: linear-gradient(180deg, rgba(77, 255, 164, 0.08) 0%, rgba(15, 23, 42, 0.78) 100%);
+        border-color: color-mix(in srgb, var(--ce-action-accent) 18%, transparent);
+        background: linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--ce-action-accent) 8%, transparent) 0%,
+          color-mix(in srgb, var(--ce-document-text) 78%, transparent) 100%
+        );
 
         .argumentStrength > span {
-          background: linear-gradient(90deg, rgba(77, 255, 164, 0.85) 0%, var(--ce-color-accent) 100%);
+          background: linear-gradient(
+            90deg,
+            color-mix(in srgb, var(--ce-action-accent) 85%, transparent) 0%,
+            var(--ce-color-accent) 100%
+          );
         }
       }
 
       &[data-side='con'] {
-        border-color: rgba(255, 107, 107, 0.16);
-        background: linear-gradient(180deg, rgba(255, 107, 107, 0.07) 0%, rgba(15, 23, 42, 0.78) 100%);
+        border-color: color-mix(in srgb, var(--ce-status-error) 16%, transparent);
+        background: linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--ce-status-error) 7%, transparent) 0%,
+          color-mix(in srgb, var(--ce-document-text) 78%, transparent) 100%
+        );
 
         .argumentStrength > span {
-          background: linear-gradient(90deg, rgba(255, 107, 107, 0.85) 0%, #ff6b6b 100%);
+          background: linear-gradient(
+            90deg,
+            color-mix(in srgb, var(--ce-status-error) 85%, transparent) 0%,
+            var(--ce-status-error) 100%
+          );
         }
       }
     }
@@ -1766,13 +1784,13 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       margin-top: 7px;
       border-radius: var(--ce-radius-pill);
       overflow: hidden;
-      background: rgba(255, 255, 255, 0.08);
+      background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
 
       > span {
         display: block;
         height: 100%;
         border-radius: inherit;
-        box-shadow: 0 0 10px rgba(255, 255, 255, 0.12);
+        box-shadow: 0 0 10px color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
       }
     }
 
@@ -1780,7 +1798,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       margin-top: 7px;
       font-size: 0.72rem;
       line-height: 1.4;
-      color: rgba(148, 163, 184, 0.9);
+      color: color-mix(in srgb, var(--ce-status-info) 90%, transparent);
       font-style: italic;
     }
 
@@ -1791,7 +1809,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       margin-top: 8px;
       margin-left: 10px;
       padding-left: 12px;
-      border-left: 1px solid rgba(255, 255, 255, 0.12);
+      border-left: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
     }
 
     .voterAvatars {
@@ -1805,10 +1823,10 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         height: 16px;
         margin-left: -4px;
         border-radius: var(--ce-radius-4);
-        border: 1px solid rgba(15, 23, 42, 0.9);
-        background: rgba(15, 23, 42, 0.95);
+        border: 1px solid color-mix(in srgb, var(--ce-document-text) 90%, transparent);
+        background: color-mix(in srgb, var(--ce-document-text) 95%, transparent);
         object-fit: cover;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+        box-shadow: 0 2px 6px color-mix(in srgb, var(--ce-compat-dark) 25%, transparent);
       }
 
       img:first-child,
@@ -1836,15 +1854,15 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       padding-bottom: 18px;
 
       .pileCard {
-        background: rgba(255, 255, 255, 0.04);
+        background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
         backdrop-filter: blur(14px);
         -webkit-backdrop-filter: blur(14px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
         border-radius: var(--ce-radius-8);
         padding: 12px 14px;
         box-shadow:
-          0 18px 36px rgba(0, 0, 0, 0.18),
-          0 1px 0 rgba(255, 255, 255, 0.04) inset;
+          0 18px 36px color-mix(in srgb, var(--ce-compat-dark) 18%, transparent),
+          0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 4%, transparent) inset;
       }
 
       .pileCardHeader {
@@ -1878,9 +1896,9 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         img {
           width: 24px;
           height: 24px;
-          border-radius: 7px;
-          border: 1px solid rgba(255, 255, 255, 0.16);
-          background: rgba(255, 255, 255, 0.06);
+          border-radius: var(--ce-radius-7);
+          border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
+          background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
           object-fit: cover;
           flex-shrink: 0;
         }
@@ -1900,8 +1918,8 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         margin-left: auto;
         padding: 7px 12px;
         border-radius: var(--ce-radius-pill);
-        border: 1px solid rgba(255, 255, 255, 0.14);
-        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
+        background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
         color: $text-muted;
         font-size: 0.7rem;
         font-weight: 800;
@@ -1910,27 +1928,27 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         white-space: nowrap;
 
         &[data-type='binary'] {
-          background: rgba($accent-green, 0.16);
-          border-color: rgba($accent-green, 0.34);
-          color: color.adjust($accent-green, $lightness: 10%);
+          background: color-mix(in srgb, var(--ce-status-success-text) 16%, transparent);
+          border-color: color-mix(in srgb, var(--ce-status-success-text) 34%, transparent);
+          color: color-mix(in srgb, var(--ce-status-success-text) 90%, var(--ce-text-inverse));
         }
 
         &[data-type='rating'] {
-          background: rgba($primary-glow, 0.16);
-          border-color: rgba($primary-glow, 0.34);
-          color: color.adjust($primary-glow, $lightness: 12%);
+          background: color-mix(in srgb, var(--ce-data-series-8) 16%, transparent);
+          border-color: color-mix(in srgb, var(--ce-data-series-8) 34%, transparent);
+          color: color-mix(in srgb, var(--ce-data-series-8) 88%, var(--ce-text-inverse));
         }
 
         &[data-type='multichoice'] {
-          background: rgba($accent-yellow, 0.14);
-          border-color: rgba($accent-yellow, 0.34);
-          color: color.adjust($accent-yellow, $lightness: 6%);
+          background: color-mix(in srgb, var(--ce-status-warning) 14%, transparent);
+          border-color: color-mix(in srgb, var(--ce-status-warning) 34%, transparent);
+          color: color-mix(in srgb, var(--ce-status-warning) 94%, var(--ce-text-inverse));
         }
 
         &[data-type='freeform'] {
-          background: rgba($accent-teal, 0.15);
-          border-color: rgba($accent-teal, 0.34);
-          color: color.adjust($accent-teal, $lightness: 12%);
+          background: color-mix(in srgb, var(--ce-data-series-8) 15%, transparent);
+          border-color: color-mix(in srgb, var(--ce-data-series-8) 34%, transparent);
+          color: color-mix(in srgb, var(--ce-data-series-8) 88%, var(--ce-text-inverse));
         }
       }
 
@@ -1950,30 +1968,30 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
           min-width: 110px;
           padding: 6px 14px;
           border-radius: var(--ce-radius-pill);
-          border: 1px solid rgba(255, 255, 255, 0.12);
+          border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
           font-size: 0.8rem;
           font-weight: 700;
           color: var(--ce-color-white);
           letter-spacing: 0.02em;
-          background: rgba(255, 255, 255, 0.05);
+          background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
         }
 
         > span:nth-child(1) {
-          background: rgba($accent-green, 0.16);
-          border-color: rgba($accent-green, 0.3);
-          color: color.adjust($accent-green, $lightness: 8%);
+          background: color-mix(in srgb, var(--ce-status-success-text) 16%, transparent);
+          border-color: color-mix(in srgb, var(--ce-status-success-text) 30%, transparent);
+          color: color-mix(in srgb, var(--ce-status-success-text) 92%, var(--ce-text-inverse));
         }
 
         > span:nth-child(2) {
-          background: rgba($accent-yellow, 0.16);
-          border-color: rgba($accent-yellow, 0.28);
-          color: color.adjust($accent-yellow, $lightness: 6%);
+          background: color-mix(in srgb, var(--ce-status-warning) 16%, transparent);
+          border-color: color-mix(in srgb, var(--ce-status-warning) 28%, transparent);
+          color: color-mix(in srgb, var(--ce-status-warning) 94%, var(--ce-text-inverse));
         }
 
         > span:nth-child(3) {
-          background: rgba(248, 113, 113, 0.15);
-          border-color: rgba(248, 113, 113, 0.28);
-          color: #ff9b9b;
+          background: color-mix(in srgb, var(--ce-status-error) 15%, transparent);
+          border-color: color-mix(in srgb, var(--ce-status-error) 28%, transparent);
+          color: var(--ce-status-danger-text);
         }
       }
 
@@ -1997,10 +2015,14 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
           right: 0;
           height: 8px;
           border-radius: var(--ce-radius-pill);
-          background: linear-gradient(90deg, rgba($primary-glow, 0.92) 0%, rgba($accent-green, 0.92) 100%);
+          background: linear-gradient(
+            90deg,
+            color-mix(in srgb, var(--ce-data-series-8) 92%, transparent) 0%,
+            color-mix(in srgb, var(--ce-status-success-text) 92%, transparent) 100%
+          );
           box-shadow:
-            0 10px 24px rgba(0, 0, 0, 0.18),
-            0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+            0 10px 24px color-mix(in srgb, var(--ce-compat-dark) 18%, transparent),
+            0 0 0 1px color-mix(in srgb, var(--ce-text-inverse) 8%, transparent) inset;
         }
 
         > span {
@@ -2011,14 +2033,14 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
           flex-direction: column;
           align-items: center;
           gap: 4px;
-          color: rgba(241, 245, 249, 0.82);
+          color: color-mix(in srgb, var(--ce-status-info-text) 82%, transparent);
 
           > span:first-child {
             width: 2px;
             height: 8px;
             border-radius: var(--ce-radius-pill);
-            background: rgba(255, 255, 255, 0.78);
-            box-shadow: 0 0 0 2px rgba(11, 17, 32, 0.15);
+            background: color-mix(in srgb, var(--ce-text-inverse) 78%, transparent);
+            box-shadow: 0 0 0 2px color-mix(in srgb, var(--ce-overlay-base) 15%, transparent);
           }
 
           > span:last-child {
@@ -2043,16 +2065,16 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
           gap: 12px;
           padding: 6px 10px;
           border-radius: var(--ce-radius-10);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+          background: color-mix(in srgb, var(--ce-text-inverse) 3%, transparent);
 
           > span:first-child {
             width: 18px;
             height: 18px;
             border-radius: var(--ce-radius-4);
-            border: 1px solid rgba(255, 255, 255, 0.24);
-            background: rgba(11, 17, 32, 0.36);
-            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+            border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 24%, transparent);
+            background: color-mix(in srgb, var(--ce-overlay-base) 36%, transparent);
+            box-shadow: 0 0 0 1px color-mix(in srgb, var(--ce-text-inverse) 3%, transparent) inset;
             flex-shrink: 0;
           }
 
@@ -2080,9 +2102,13 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         min-height: 56px;
         padding: 8px 12px;
         border-radius: var(--ce-radius-12);
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        background: linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0.015) 100%);
-        color: rgba(241, 245, 249, 0.42);
+        border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
+        background: linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--ce-text-inverse) 3.5%, transparent) 0%,
+          color-mix(in srgb, var(--ce-text-inverse) 1.5%, transparent) 100%
+        );
+        color: color-mix(in srgb, var(--ce-status-info-text) 42%, transparent);
         font-size: 0.95rem;
         font-style: italic;
         line-height: 1.5;
@@ -2115,9 +2141,13 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     .historicalCaseCard {
       padding: 14px 16px;
       border-radius: var(--ce-radius-10);
-      border: 1px solid rgba(77, 255, 164, 0.16);
-      background: linear-gradient(180deg, rgba(77, 255, 164, 0.08) 0%, rgba(15, 23, 42, 0.82) 100%);
-      box-shadow: 0 14px 28px rgba(0, 0, 0, 0.18);
+      border: 1px solid color-mix(in srgb, var(--ce-action-accent) 16%, transparent);
+      background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--ce-action-accent) 8%, transparent) 0%,
+        color-mix(in srgb, var(--ce-document-text) 82%, transparent) 100%
+      );
+      box-shadow: 0 14px 28px color-mix(in srgb, var(--ce-compat-dark) 18%, transparent);
     }
 
     .historicalCaseHeader {
@@ -2148,7 +2178,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       margin-top: 6px;
       font-size: 0.76rem;
       line-height: 1.5;
-      color: rgba(226, 232, 240, 0.72);
+      color: color-mix(in srgb, var(--ce-status-info-text) 72%, transparent);
       letter-spacing: 0.04em;
       text-transform: uppercase;
     }
@@ -2156,7 +2186,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     .historicalCaseSummary {
       font-size: 0.95rem;
       line-height: 1.6;
-      color: rgba(241, 245, 249, 0.92);
+      color: color-mix(in srgb, var(--ce-status-info-text) 92%, transparent);
     }
 
     .historicalCaseExpandButton {
@@ -2165,8 +2195,8 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       justify-content: center;
       padding: 7px 12px;
       border-radius: var(--ce-radius-pill);
-      border: 1px solid rgba(77, 255, 164, 0.2);
-      background: rgba(77, 255, 164, 0.08);
+      border: 1px solid color-mix(in srgb, var(--ce-action-accent) 20%, transparent);
+      background: color-mix(in srgb, var(--ce-action-accent) 8%, transparent);
       color: var(--ce-color-accent);
       font-size: 0.75rem;
       font-weight: 700;
@@ -2179,9 +2209,9 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         transform 0.2s;
 
       &:hover {
-        background: rgba(77, 255, 164, 0.16);
-        border-color: rgba(77, 255, 164, 0.34);
-        color: color.adjust($accent-green, $lightness: 8%);
+        background: color-mix(in srgb, var(--ce-action-accent) 16%, transparent);
+        border-color: color-mix(in srgb, var(--ce-action-accent) 34%, transparent);
+        color: color-mix(in srgb, var(--ce-status-success-text) 92%, var(--ce-text-inverse));
         transform: translateY(-1px);
       }
     }
@@ -2193,7 +2223,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       margin-top: 14px;
       padding-top: 14px;
       padding-right: 6px;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      border-top: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
       max-height: min(62vh, 42rem);
       overflow-y: auto;
       overscroll-behavior: contain;
@@ -2203,7 +2233,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       }
 
       &::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.16);
+        background: color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
         border-radius: var(--ce-radius-4);
       }
     }
@@ -2211,14 +2241,14 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     .historicalCaseDetailBlock {
       padding: 12px 14px;
       border-radius: var(--ce-radius-8);
-      background: rgba(15, 23, 42, 0.58);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: color-mix(in srgb, var(--ce-document-text) 58%, transparent);
+      border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
 
       p {
         margin: 0;
         font-size: 0.92rem;
         line-height: 1.6;
-        color: rgba(241, 245, 249, 0.92);
+        color: color-mix(in srgb, var(--ce-status-info-text) 92%, transparent);
       }
     }
 
@@ -2236,14 +2266,14 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       font-weight: 800;
       letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: rgba(77, 255, 164, 0.88);
+      color: color-mix(in srgb, var(--ce-action-accent) 88%, transparent);
     }
 
     .historicalCaseEmptyText {
       margin: 0;
       font-size: 0.88rem;
       line-height: 1.55;
-      color: rgba(148, 163, 184, 0.92);
+      color: color-mix(in srgb, var(--ce-status-info) 92%, transparent);
     }
 
     .historicalCasePrinciplesGrid {
@@ -2255,8 +2285,8 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     .historicalCasePrinciplesCard {
       padding: 12px;
       border-radius: var(--ce-radius-8);
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
+      border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
     }
 
     .historicalCasePrinciplesName {
@@ -2276,7 +2306,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       gap: 8px;
 
       li {
-        color: rgba(241, 245, 249, 0.92);
+        color: color-mix(in srgb, var(--ce-status-info-text) 92%, transparent);
         font-size: 0.88rem;
         line-height: 1.55;
       }
@@ -2295,8 +2325,8 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       align-items: flex-start;
       padding: 10px 12px;
       border-radius: var(--ce-radius-8);
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.06);
+      background: color-mix(in srgb, var(--ce-text-inverse) 3%, transparent);
+      border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
     }
 
     .historicalCaseArticleLabel {
@@ -2305,9 +2335,9 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       justify-content: center;
       padding: 5px 10px;
       border-radius: var(--ce-radius-pill);
-      background: rgba(77, 255, 164, 0.14);
-      border: 1px solid rgba(77, 255, 164, 0.24);
-      color: rgba(77, 255, 164, 0.92);
+      background: color-mix(in srgb, var(--ce-action-accent) 14%, transparent);
+      border: 1px solid color-mix(in srgb, var(--ce-action-accent) 24%, transparent);
+      color: color-mix(in srgb, var(--ce-action-accent) 92%, transparent);
       font-size: 0.72rem;
       font-weight: 800;
       letter-spacing: 0.06em;
@@ -2319,7 +2349,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       min-width: 0;
       font-size: 0.88rem;
       line-height: 1.6;
-      color: rgba(241, 245, 249, 0.92);
+      color: color-mix(in srgb, var(--ce-status-info-text) 92%, transparent);
     }
 
     .historicalCaseExploitGrid {
@@ -2335,18 +2365,26 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       min-width: 0;
       padding: 12px;
       border-radius: var(--ce-radius-8);
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.06);
+      background: color-mix(in srgb, var(--ce-text-inverse) 3%, transparent);
+      border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
     }
 
     .historicalCaseExploitPrimary {
-      background: linear-gradient(180deg, rgba(56, 189, 248, 0.08) 0%, rgba(15, 23, 42, 0.74) 100%);
-      border-color: rgba(56, 189, 248, 0.16);
+      background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--ce-status-info) 8%, transparent) 0%,
+        color-mix(in srgb, var(--ce-document-text) 74%, transparent) 100%
+      );
+      border-color: color-mix(in srgb, var(--ce-status-info) 16%, transparent);
     }
 
     .historicalCaseExploitSecondary {
-      background: linear-gradient(180deg, rgba(253, 224, 71, 0.08) 0%, rgba(15, 23, 42, 0.72) 100%);
-      border-color: rgba(253, 224, 71, 0.16);
+      background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--ce-status-warning) 8%, transparent) 0%,
+        color-mix(in srgb, var(--ce-document-text) 72%, transparent) 100%
+      );
+      border-color: color-mix(in srgb, var(--ce-status-warning) 16%, transparent);
     }
 
     .historicalCaseExploitHeading {
@@ -2354,7 +2392,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       font-weight: 800;
       letter-spacing: 0.06em;
       text-transform: uppercase;
-      color: rgba(255, 164, 77, 0.92);
+      color: color-mix(in srgb, var(--ce-status-warning) 92%, transparent);
     }
 
     .historicalCaseFactList {
@@ -2375,7 +2413,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       line-height: 1.5;
       letter-spacing: 0.05em;
       text-transform: uppercase;
-      color: rgba(148, 163, 184, 0.88);
+      color: color-mix(in srgb, var(--ce-status-info) 88%, transparent);
       font-weight: 700;
     }
 
@@ -2383,7 +2421,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       min-width: 0;
       font-size: 0.87rem;
       line-height: 1.6;
-      color: rgba(241, 245, 249, 0.92);
+      color: color-mix(in srgb, var(--ce-status-info-text) 92%, transparent);
     }
 
     .historicalCasePatchGrid {
@@ -2393,8 +2431,12 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     }
 
     .historicalCasePatchOptionsBlock {
-      background: linear-gradient(180deg, rgba(77, 164, 255, 0.06) 0%, rgba(15, 23, 42, 0.74) 100%);
-      border-color: rgba(77, 164, 255, 0.14);
+      background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--ce-status-info) 6%, transparent) 0%,
+        color-mix(in srgb, var(--ce-document-text) 74%, transparent) 100%
+      );
+      border-color: color-mix(in srgb, var(--ce-status-info) 14%, transparent);
     }
 
     .historicalCasePatchCard {
@@ -2403,21 +2445,25 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       gap: 8px;
       padding: 12px;
       border-radius: var(--ce-radius-8);
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
+      border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
 
       p {
         margin: 0;
         font-size: 0.86rem;
         line-height: 1.55;
-        color: rgba(241, 245, 249, 0.88);
+        color: color-mix(in srgb, var(--ce-status-info-text) 88%, transparent);
       }
     }
 
     .historicalCasePatchCardBest {
-      border-color: rgba(77, 255, 164, 0.34);
-      background: linear-gradient(180deg, rgba(77, 255, 164, 0.12) 0%, rgba(15, 23, 42, 0.82) 100%);
-      box-shadow: 0 12px 22px rgba(0, 0, 0, 0.18);
+      border-color: color-mix(in srgb, var(--ce-action-accent) 34%, transparent);
+      background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--ce-action-accent) 12%, transparent) 0%,
+        color-mix(in srgb, var(--ce-document-text) 82%, transparent) 100%
+      );
+      box-shadow: 0 12px 22px color-mix(in srgb, var(--ce-compat-dark) 18%, transparent);
     }
 
     .historicalCasePatchBadge {
@@ -2426,9 +2472,9 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       align-self: flex-start;
       padding: 5px 9px;
       border-radius: var(--ce-radius-pill);
-      background: rgba(77, 255, 164, 0.16);
-      border: 1px solid rgba(77, 255, 164, 0.28);
-      color: rgba(77, 255, 164, 0.96);
+      background: color-mix(in srgb, var(--ce-action-accent) 16%, transparent);
+      border: 1px solid color-mix(in srgb, var(--ce-action-accent) 28%, transparent);
+      color: color-mix(in srgb, var(--ce-action-accent) 96%, transparent);
       font-size: 0.68rem;
       font-weight: 800;
       letter-spacing: 0.08em;
@@ -2447,9 +2493,9 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       align-items: center;
       padding: 5px 10px;
       border-radius: var(--ce-radius-pill);
-      background: rgba(77, 255, 164, 0.12);
-      border: 1px solid rgba(77, 255, 164, 0.24);
-      color: rgba(77, 255, 164, 0.96);
+      background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
+      border: 1px solid color-mix(in srgb, var(--ce-action-accent) 24%, transparent);
+      color: color-mix(in srgb, var(--ce-action-accent) 96%, transparent);
       font-size: 0.72rem;
       font-weight: 700;
       line-height: 1.45;
@@ -2466,7 +2512,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         font-weight: 800;
         letter-spacing: 0.06em;
         text-transform: uppercase;
-        color: rgba(77, 164, 255, 0.88);
+        color: color-mix(in srgb, var(--ce-status-info) 88%, transparent);
       }
     }
 
@@ -2480,33 +2526,45 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         align-items: center;
         padding: 4px 8px;
         border-radius: var(--ce-radius-pill);
-        background: rgba(77, 164, 255, 0.12);
-        border: 1px solid rgba(77, 164, 255, 0.22);
-        color: rgba(191, 219, 254, 0.96);
+        background: color-mix(in srgb, var(--ce-status-info) 12%, transparent);
+        border: 1px solid color-mix(in srgb, var(--ce-status-info) 22%, transparent);
+        color: color-mix(in srgb, var(--ce-status-info-text) 96%, transparent);
         font-size: 0.72rem;
         font-weight: 700;
       }
     }
 
     .historicalCaseInsightBlock {
-      background: linear-gradient(135deg, rgba(253, 224, 71, 0.1) 0%, rgba(15, 23, 42, 0.78) 100%);
-      border-color: rgba(253, 224, 71, 0.16);
+      background: linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--ce-status-warning) 10%, transparent) 0%,
+        color-mix(in srgb, var(--ce-document-text) 78%, transparent) 100%
+      );
+      border-color: color-mix(in srgb, var(--ce-status-warning) 16%, transparent);
 
       .historicalCaseDetailLabel {
-        color: rgba(253, 224, 71, 0.96);
+        color: color-mix(in srgb, var(--ce-status-warning) 96%, transparent);
       }
     }
 
     .historicalCasePrecedentBlock {
-      background: linear-gradient(180deg, rgba(148, 163, 184, 0.08) 0%, rgba(15, 23, 42, 0.74) 100%);
+      background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--ce-status-info) 8%, transparent) 0%,
+        color-mix(in srgb, var(--ce-document-text) 74%, transparent) 100%
+      );
     }
 
     .historicalCaseDecisionBlock {
-      background: linear-gradient(135deg, rgba(56, 189, 248, 0.12) 0%, rgba(15, 23, 42, 0.8) 100%);
-      border-color: rgba(56, 189, 248, 0.18);
+      background: linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--ce-status-info) 12%, transparent) 0%,
+        color-mix(in srgb, var(--ce-document-text) 80%, transparent) 100%
+      );
+      border-color: color-mix(in srgb, var(--ce-status-info) 18%, transparent);
 
       .historicalCaseDetailLabel {
-        color: rgba(125, 211, 252, 0.96);
+        color: color-mix(in srgb, var(--ce-status-info-text) 96%, transparent);
       }
     }
 
@@ -2521,9 +2579,9 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         align-items: center;
         padding: 5px 10px;
         border-radius: var(--ce-radius-pill);
-        border: 1px solid rgba(77, 255, 164, 0.2);
-        background: rgba(77, 255, 164, 0.1);
-        color: color.adjust($accent-green, $lightness: 6%);
+        border: 1px solid color-mix(in srgb, var(--ce-action-accent) 20%, transparent);
+        background: color-mix(in srgb, var(--ce-action-accent) 10%, transparent);
+        color: color-mix(in srgb, var(--ce-status-success-text) 94%, var(--ce-text-inverse));
         font-size: 0.72rem;
         font-weight: 700;
         letter-spacing: 0.04em;
@@ -2536,8 +2594,8 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       justify-content: center;
       padding: 7px 12px;
       border-radius: var(--ce-radius-pill);
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
+      background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
       color: var(--ce-color-white);
       font-size: 0.75rem;
       font-weight: 700;
@@ -2549,8 +2607,8 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         color 0.2s;
 
       &:hover {
-        background: rgba(77, 255, 164, 0.14);
-        border-color: rgba(77, 255, 164, 0.28);
+        background: color-mix(in srgb, var(--ce-action-accent) 14%, transparent);
+        border-color: color-mix(in srgb, var(--ce-action-accent) 28%, transparent);
         color: var(--ce-color-accent);
       }
     }
@@ -2600,16 +2658,16 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         display: flex;
         gap: 15px;
         margin-bottom: 20px;
-        background: rgba(255, 255, 255, 0.02);
+        background: color-mix(in srgb, var(--ce-text-inverse) 2%, transparent);
         padding: 15px;
         border-radius: var(--ce-radius-8);
         .avatar {
           width: 40px;
           height: 40px;
-          border-radius: 50%;
+          border-radius: var(--ce-radius-round);
           background: var(--ce-color-border);
           flex-shrink: 0;
-          border: 1px solid rgba(255, 255, 255, 0.2);
+          border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
           object-fit: cover;
         }
         .commentContent {
@@ -2621,7 +2679,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
             margin-bottom: 4px;
           }
           .commentText {
-            color: #d1d5db;
+            color: var(--ce-document-border);
             font-size: 0.95rem;
             line-height: 1.5;
           }
@@ -2631,12 +2689,12 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 
     .addCommentSection {
       margin-top: 30px;
-      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      border-top: 1px solid color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
       padding-top: 20px;
       .toggleCommentBtn {
         background: transparent;
         color: $text-muted;
-        border: 1px solid rgba(255, 255, 255, 0.2);
+        border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
         padding: 8px 16px;
         border-radius: var(--ce-radius-6);
         cursor: pointer;
@@ -2708,8 +2766,8 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         position: fixed;
         bottom: 25px;
         right: 25px;
-        background: #1e293b;
-        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: var(--ce-document-text);
+        border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
         color: var(--ce-color-white);
         width: 50px;
         height: 50px;
@@ -2718,7 +2776,7 @@ $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         align-items: center;
         justify-content: center;
         font-size: 1.5rem;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+        box-shadow: 0 4px 15px color-mix(in srgb, var(--ce-compat-dark) 50%, transparent);
         z-index: 2005;
       }
     }

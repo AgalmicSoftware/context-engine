@@ -178,9 +178,9 @@ The worker surface is documented in `docs/session-cors-worker.md`.
 - `workers/deploy-helper/` is a separate helper worker used by `/new` and
   self-hosted deployments to call Cloudflare APIs, create the target worker and
   KV namespace, and seed initial session config/secrets.
-- `scripts/worker-bundle.mjs` bundles `sessionCorsWorker` and `deploy-helper`
-  into `dist/`; `scripts/verify-worker-bundle-sync.mjs` verifies those bundles
-  are in sync with source.
+- `scripts/worker-bundle.mjs` generates ignored local/manual bundles in
+  `dist/`; `scripts/cloudflare-session-template.mjs` separately maintains and
+  verifies byte parity for the tracked Cloudflare-native Session Worker package.
 
 Auth decisions:
 

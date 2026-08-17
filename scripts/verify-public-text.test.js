@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 
 const { scrubPublicPackageJson } = require('./scrub-public-package-json');
 const { verifyPublicText } = require('./verify-public-text');
@@ -55,6 +56,21 @@ test('verifyPublicText permits release guard files to encode forbidden patterns'
       rootDir,
       'scripts/scrub-public-package-json.test.js',
       "const privateRunner = 'scripts/run-contextengine-cc-tests.js';\n",
+    );
+    writeFile(rootDir, 'README.md', '# Public\n');
+
+    const result = verifyPublicText(rootDir);
+    assert.deepEqual(result.findings, []);
+    assert.equal(result.scannedFiles, 1);
+  });
+});
+
+test('verifyPublicText permits the replay PII guard to encode forbidden patterns', () => {
+  withFixture((rootDir) => {
+    writeFile(
+      rootDir,
+      'scripts/verify-public-release-pii.sh',
+      "const privateReplayTokens = ['contextEngine-cc', 'TODO/'];\n",
     );
     writeFile(rootDir, 'README.md', '# Public\n');
 
@@ -125,5 +141,22 @@ test('verifyPublicText still fails on companion references that survive the pack
       { file: 'client/package.json', kind: 'private companion path' },
       { file: 'package.json', kind: 'private companion path' },
     ]);
+  });
+});
+
+test('verifyPublicText matches release export visibility in a git checkout', () => {
+  withFixture((rootDir) => {
+    execFileSync('git', ['init', '--quiet'], { cwd: rootDir });
+    writeFile(rootDir, '.gitignore', '.tmp/\n');
+    writeFile(rootDir, 'README.md', '# Public\n');
+    writeFile(rootDir, '.tmp/ignored.txt', 'contextEngine-cc/private.mjs\n');
+    writeFile(rootDir, 'visible-untracked.json', '{"source":"contextEngine-cc/private.mjs"}\n');
+
+    const { findings } = verifyPublicText(rootDir);
+
+    assert.deepEqual(findings.map(({ file, kind }) => ({ file, kind })), [{
+      file: 'visible-untracked.json',
+      kind: 'private companion path',
+    }]);
   });
 });

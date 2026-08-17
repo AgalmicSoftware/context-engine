@@ -46,6 +46,17 @@ import {
   resolveSingleQuestionMapFromCacheValue,
   resolvePromptGateTooltipProps,
 } from './singleQuestionResponseHelpers.js';
+import {
+  SINGLE_QUESTION_IMPORTANCE_SLIDER_STYLE,
+  buildSingleQuestionMiniPromptButtonClassName,
+  buildSingleQuestionReadOnlyBinaryClassName,
+  joinClassNames,
+  resolveSingleQuestionBookmarkIconStyle,
+  resolveSingleQuestionRatingBarStyle,
+  shallowEqualSingleQuestionRecord,
+  type SingleQuestionAggregatorClassNames,
+  type SingleQuestionGlobalCacheWindow,
+} from './singleQuestionResponseDisplay';
 
 const questionLog = createLogger('questions');
 
@@ -152,6 +163,7 @@ type SingleQuestionResponseProps = SingleQuestionRecord & {
   sessionConfig?: unknown;
   sessionSlug?: unknown;
   showImportance?: unknown;
+  showMiniExpand?: boolean;
   stackCompactDecryptCta?: boolean;
   storeCache?: SingleQuestionRecord | null;
   userHeldSBTs?: unknown;
@@ -184,52 +196,7 @@ type SingleQuestionCacheEntry = SingleQuestionRecord & {
   value?: unknown;
 };
 type SingleQuestionQuestionCacheMap = Record<string, unknown>;
-type SingleQuestionAggregatorClassNames = {
-  aggregatorContainerClassName: string;
-  aggregatorParagraphClassName: string;
-  aggregatorFreeformAnswerClassName: string;
-};
 type SingleQuestionWriteCache = (namespace: string, slug: string | undefined, value: unknown) => Promise<unknown>;
-type SingleQuestionGlobalCacheWindow = Window & {
-  __APP_CACHE__?: Record<string, unknown>;
-  __QUESTION_CACHE__?: Record<string, unknown>;
-  __SURVEY_CACHE__?: Record<string, unknown>;
-};
-
-const joinClassNames = (...parts: unknown[]) => parts.filter(Boolean).join(' ');
-
-const shallowEqualSingleQuestionRecord = (
-  left: Record<string, unknown> | null | undefined,
-  right: Record<string, unknown> | null | undefined,
-): boolean => {
-  if (Object.is(left, right)) return true;
-  if (!left || !right) return false;
-  const leftKeys = Object.keys(left);
-  const rightKeys = Object.keys(right);
-  if (leftKeys.length !== rightKeys.length) return false;
-  return leftKeys.every((key) => Object.prototype.hasOwnProperty.call(right, key) && Object.is(left[key], right[key]));
-};
-
-export const SINGLE_QUESTION_IMPORTANCE_SLIDER_STYLE: React.CSSProperties = {
-  width: '200px',
-};
-
-export const resolveSingleQuestionBookmarkIconStyle = (
-  bookmarkSuccess: unknown,
-  isBookmarked: unknown,
-): React.CSSProperties => ({
-  color: bookmarkSuccess ? 'lightgreen' : isBookmarked ? '#ffc107' : 'white',
-});
-
-export const buildSingleQuestionMiniPromptButtonClassName = (styleMap: Record<string, string>) =>
-  `${styleMap.miniPromptAbbrev} ${styleMap.maskedPromptActionButton}`;
-
-export const buildSingleQuestionReadOnlyBinaryClassName = (styleMap: Record<string, string>, optionClassName: string) =>
-  `${styleMap.readOnlyBinary} ${styleMap[optionClassName]}`;
-
-export const resolveSingleQuestionRatingBarStyle = (ratingFillPercent: unknown): React.CSSProperties => ({
-  width: `${ratingFillPercent}%`,
-});
 
 /**
  * SingleQuestionResponse is a component responsible for displaying:
@@ -248,6 +215,7 @@ export const resolveSingleQuestionRatingBarStyle = (ratingFillPercent: unknown):
  *   - mode: "fullscreen" | "mini" (applies to single-person response display)
  *   - aggregatorResponseMode: boolean. If true, we show aggregated stats for allResponses.
  *   - showImportance: boolean (whether to show importance slider UI in single-person mode)
+ *   - showMiniExpand: boolean. Set false for compact cards with no additional detail to reveal.
  *   - onDecryptQuestion(questionId, fieldToDecrypt): function to decrypt (only relevant if single-person mode)
  *   - onReloadQuestionPrompt(questionId): function to force prompt metadata/decrypt refresh
  *   - canDecryptOtherResponses: boolean. When true and viewer satisfies the session response gate,
@@ -1019,6 +987,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
       isOwnResponse,
       mode,
       showImportance,
+      showMiniExpand = true,
       responderAddress,
       questionOnly,
       compactEncryptedAnswerCta = false,
@@ -1275,9 +1244,11 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
                   wrapMaskedPromptLabel(<span className={styles.miniPromptAbbrev}>{promptLabel}</span>)
                 )}
               </div>
-              <Button className={styles.miniExpandButton} onClick={this.toggleMiniExpand}>
-                {miniExpanded ? <FontAwesomeIcon icon={faChevronUp} /> : <FontAwesomeIcon icon={faChevronDown} />}
-              </Button>
+              {showMiniExpand && (
+                <Button className={styles.miniExpandButton} onClick={this.toggleMiniExpand}>
+                  {miniExpanded ? <FontAwesomeIcon icon={faChevronUp} /> : <FontAwesomeIcon icon={faChevronDown} />}
+                </Button>
+              )}
             </div>
           )}
 

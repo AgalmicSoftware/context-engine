@@ -3,6 +3,7 @@ import {
   getAllSessionSlugs,
   getDemoSessionConfigBySlug,
   getSessionChainId,
+  getSessionChainLabel,
   getSessionConfigBySlug,
   getSessionConfigBySlugOrDefault,
   getSessionSlugByName,
@@ -18,6 +19,7 @@ jest.mock('../../utilities/web3/chainGateway.js', () => ({
   getSessionSlugByName: jest.fn((name) => (name === 'Named Session' ? 'named-session' : null)),
   getAllSessionSlugs: jest.fn(() => ['edge']),
   getSessionChainId: jest.fn(() => 11155420),
+  getChainLabelById: jest.fn((chainId) => `OP Sepolia (${chainId})`),
 }));
 
 const mockedContractScripts = contractScripts as jest.Mocked<typeof contractScripts>;
@@ -38,6 +40,7 @@ describe('sessionConfig domain adapter', () => {
     expect(getSessionSlugByName('Named Session')).toBe('named-session');
     expect(getAllSessionSlugs({ includeEmpty: true })).toEqual(['edge']);
     expect(getSessionChainId('edge')).toBe(11155420);
+    expect(getSessionChainLabel(11155420)).toBe('OP Sepolia (11155420)');
 
     expect(mockedContractScripts.normalizeSessionSlug).toHaveBeenCalledWith('Edge');
     expect(mockedContractScripts.getSessionConfigBySlug).toHaveBeenCalledWith('edge');
@@ -46,15 +49,18 @@ describe('sessionConfig domain adapter', () => {
     expect(mockedContractScripts.getSessionSlugByName).toHaveBeenCalledWith('Named Session');
     expect(mockedContractScripts.getAllSessionSlugs).toHaveBeenCalledWith({ includeEmpty: true });
     expect(mockedContractScripts.getSessionChainId).toHaveBeenCalledWith('edge');
+    expect(mockedContractScripts.getChainLabelById).toHaveBeenCalledWith(11155420);
   });
 
   it('uses the latest contractScripts implementation at call time', () => {
     mockedContractScripts.getSessionConfigBySlug.mockReturnValueOnce({ slug: 'late-bound' });
     mockedContractScripts.getSessionSlugByName.mockReturnValueOnce('late-bound-name');
     mockedContractScripts.getSessionChainId.mockReturnValueOnce(84532);
+    mockedContractScripts.getChainLabelById.mockReturnValueOnce('Base Sepolia (84532)');
 
     expect(getSessionConfigBySlug('edge')).toEqual({ slug: 'late-bound' });
     expect(getSessionSlugByName('Late Bound')).toBe('late-bound-name');
     expect(getSessionChainId('edge')).toBe(84532);
+    expect(getSessionChainLabel(84532)).toBe('Base Sepolia (84532)');
   });
 });

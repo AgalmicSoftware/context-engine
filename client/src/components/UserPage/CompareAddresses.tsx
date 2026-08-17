@@ -3,11 +3,12 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Collapse } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faSpinner, faExternalLinkAlt, faDownload } from '@fortawesome/free-solid-svg-icons';
+import { faPlus, faSpinner, faDownload } from '@fortawesome/free-solid-svg-icons';
 import styles from './UserPage.module.scss';
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
+  buildCompareCompassQuadrants,
   buildCompareClassName,
   buildCompareProfileHref,
   resolveCompareAddressBlockieStyle,
@@ -18,6 +19,7 @@ import {
   resolveCompareCompassLegendStyle,
   resolveCompareCompassLegendSwatchStyle,
   resolveCompareCompassScrollStyle,
+  resolveCompareCompassSeriesColor,
   resolveCompareDrillBodyStyle,
   resolveCompareErrorStyle,
   resolveCompareLoadingTextStyle,
@@ -27,7 +29,6 @@ import {
   resolveCompareVennNoteStyle,
   resolveCompareVennSbtImageStyle,
   resolveCompareVennSbtRowStyle,
-  resolveCompareVennTooltipHeaderStyle,
   resolveCompareVennTooltipListStyle,
   resolveCompareVennTooltipStyle,
   resolveCompareVennWrapStyle,
@@ -49,24 +50,45 @@ import {
 import {
   readBookmarksNormalized,
   deriveUserLabels,
-  buildUsersFromCaches,
   fallbackBullets,
-  getCompareSbtKey,
-  getCompareSbtLabel,
   pcaLiteCompass,
   computeVennEvidence,
   sanitizeCompass,
   computeOverlapMatrix,
-  encodeStancesForUser,
 } from 'utilities/survey/compareUsers.js';
 
-import { PolisQuestionHoverCard } from '../PolisReport/PolisReport';
 import { createLogger } from 'utilities/logging.js';
-import { normalizeArweaveUrl } from 'utilities/arweave/arweaveUrls.js';
-import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { listNamespaceEntriesSync, subscribeCacheUpdates } from '../../utilities/cache/cacheScripts.js';
 import { createCacheUpdateCoalescer } from '../../utilities/cache/cacheUpdateCoalescer.js';
-import { resolveSessionSlugFromPathname } from '../../utilities/session/sessionNaming.js';
+import {
+  COMPARE_GRAPHIC_FILENAME,
+  resolveCompareSessionSlug,
+  resolveCompareRunLabel,
+  runCompareSectionTasks,
+  scanCompareAddressesSequentially,
+  selectCompareCacheValues,
+} from './compareSessionRuntime';
+import {
+  buildCompareSbtKeySets,
+  buildNicknameByAddressMap,
+  type CompareBookmark,
+} from './compareMembershipPresentation';
+import CompareVenn from './CompareVenn';
+import CompareSubjectInputList from './CompareSubjectInputList';
+import CompareSubjectParticipants from './CompareSubjectParticipants';
+import {
+  buildCompareSubjectsRoutePath,
+  compareSubjectsNeedSessionCaches,
+  normalizeCompareSubjects,
+  parseCompareSubject,
+  resolveCompareRouteSubjects,
+  selectScannableCompareSubjectAddresses,
+} from './compareSubjectContract';
+import {
+  analyzeCompareSubjectCompatibility,
+  resolveCompareSubjects,
+  type CompareSubjectCompatibility,
+} from './compareSubjectAdapters';
 
 const accountLog = createLogger('account');
 
@@ -90,7 +112,6 @@ export {
   resolveCompareVennNoteStyle,
   resolveCompareVennSbtImageStyle,
   resolveCompareVennSbtRowStyle,
-  resolveCompareVennTooltipHeaderStyle,
   resolveCompareVennTooltipListStyle,
   resolveCompareVennTooltipStyle,
   resolveCompareVennWrapStyle,
@@ -101,20 +122,11 @@ type CompareQuestionType = 'binary' | 'rating' | 'multichoice' | 'freeform' | 'u
 type CompareDrillTone = 'agree' | 'disagree' | 'unsure' | 'info' | 'muted';
 type CompareSectionKey = 'agree' | 'dis';
 type ComparisonTone = 'agreement' | 'disagreement';
-type VennRegionKey = 'a' | 'b' | 'c' | 'ab' | 'ac' | 'bc' | 'abc';
 type UnknownRecord = Record<string, unknown>;
 type CompareGlobalThis = typeof globalThis & {
   CE_E2E_AI_MOCK?: boolean;
 };
-type CompareRunComparison = (addresses: string[], options?: { skipNavigate?: boolean }) => Promise<void>;
-
-interface CompareBookmark {
-  address?: string;
-  addressLower?: string;
-  nickname?: string;
-  label?: string;
-  [key: string]: unknown;
-}
+type CompareRunComparison = (subjects: string[], options?: { skipNavigate?: boolean }) => Promise<void>;
 
 interface CompareSbt {
   name?: string;
@@ -149,15 +161,12 @@ interface CompareUser {
   sbts?: CompareSbt[];
   questions?: CompareQuestion[];
   surveys?: unknown[];
+  supportsMembership?: boolean;
+  subjectKind?: string;
+  subjectToken?: string;
+  profileHref?: string;
+  provenance?: unknown;
   [key: string]: unknown;
-}
-
-interface CompareUserSummary {
-  address: string;
-  sbtCount: number;
-  questionCount: number;
-  surveyCount: number;
-  sbtNames: string[];
 }
 
 interface CompareQuestionResponse {
@@ -258,32 +267,6 @@ interface CompareDrillStateEntry {
 
 type CompareDrillStateMap = Record<string, CompareDrillStateEntry>;
 
-type CompareVennQuestionItem = {
-  type: 'question';
-  id: string;
-  option: string | null;
-  optionLabel: string | null;
-  prompt: string;
-  stance?: string;
-};
-
-type CompareVennSbtItem = {
-  type: 'sbt';
-  name: string;
-  image: string | null;
-};
-
-type CompareVennTooltipItem = CompareVennQuestionItem | CompareVennSbtItem;
-
-interface CompareVennTooltipState {
-  open: boolean;
-  key: string;
-  x: number;
-  y: number;
-  items: CompareVennTooltipItem[];
-  more: number;
-}
-
 interface CompareCoalescer {
   schedule: () => boolean;
   cancel: () => void;
@@ -292,8 +275,10 @@ interface CompareCoalescer {
 }
 
 interface CompareAddressProps {
+  activeSessionSlug?: string;
   firstAddress?: string;
   account?: string;
+  sessionCachesReady?: boolean;
   scanSpecificUserProfile?: (address: string) => Promise<unknown> | unknown;
 }
 
@@ -303,23 +288,6 @@ interface CompareNodeBuilderResult {
   split: boolean;
   respondedCount: number;
   score: number;
-}
-
-interface VennProps {
-  sets?: Set<string>[];
-  labels?: string[];
-  users?: CompareUser[] | null;
-  preCounts?: Partial<Record<VennRegionKey, number>> | null;
-  evidence?: Partial<Record<VennRegionKey, unknown[]>> | null;
-  semantics?: string | null;
-}
-
-interface VennCountProps {
-  x: number;
-  y: number;
-  value: number;
-  regionKey: VennRegionKey;
-  label: string;
 }
 
 interface OpinionCompassProps {
@@ -335,33 +303,22 @@ const toUnknownRecord = (value: unknown): UnknownRecord => (isUnknownRecord(valu
 
 const readRecordProperty = (record: UnknownRecord, key: string): UnknownRecord => toUnknownRecord(record[key]);
 
-const getCompareSbtLabelTyped = getCompareSbtLabel as (entry?: unknown) => string;
-const getCompareSbtKeyTyped = getCompareSbtKey as (entry?: unknown) => string;
-
-export const readDgObjectValues = (name: string): UnknownRecord[] => {
-  return listNamespaceEntriesSync(name, { cloneValues: false })
-    .map((entry) => entry?.value)
-    .filter(isUnknownRecord);
+const EMPTY_SUBJECT_COMPATIBILITY: CompareSubjectCompatibility = {
+  membershipComparable: false,
+  notice: '',
+  opinionComparable: false,
+  sharedQuestionIds: [],
+  summaryComparable: false,
 };
 
-export const buildNicknameByAddressMap = (bookmarks: CompareBookmark[] = []): Map<string, string> => {
-  const map = new Map<string, string>();
-  (Array.isArray(bookmarks) ? bookmarks : []).forEach((entry) => {
-    const lower = String(entry?.addressLower || entry?.address || '')
-      .toLowerCase()
-      .trim();
-    const nickname = typeof entry?.nickname === 'string' ? entry.nickname.trim() : '';
-    if (!lower || !nickname || map.has(lower)) return;
-    map.set(lower, nickname);
-  });
-  return map;
-};
+export const readDgObjectValues = (name: string, sessionSlug: string = ''): UnknownRecord[] =>
+  selectCompareCacheValues(listNamespaceEntriesSync(name, { cloneValues: false }), sessionSlug);
 
 // NEW HELPERS FOR VENN TOOLTIPS (updated to scan all group-scoped caches)
-const getQuestionPrompt = (questionId: string): string => {
+const getQuestionPrompt = (questionId: string, sessionSlug: string = ''): string => {
   try {
     const qidLower = String(questionId || '').toLowerCase();
-    const questionsCaches = readDgObjectValues('questionsCache');
+    const questionsCaches = readDgObjectValues('questionsCache', sessionSlug);
     for (const cacheObj of questionsCaches) {
       // Read all top-level keys (string or legacy numeric)
       for (const netKey of Object.keys(cacheObj || {})) {
@@ -376,42 +333,6 @@ const getQuestionPrompt = (questionId: string): string => {
     accountLog.error('CompareAddresses: getQuestionPrompt failed:', e);
   }
   return 'Unknown Question';
-};
-
-const getSbtDetails = (sbtName: string): { name: string; image: string | null } => {
-  try {
-    const nameLower = String(sbtName || '').toLowerCase();
-    const sbtCaches = readDgObjectValues('sbtCache');
-    for (const cacheObj of sbtCaches) {
-      for (const netKey of Object.keys(cacheObj || {})) {
-        const list = readRecordProperty(readRecordProperty(cacheObj, netKey), 'sbtList');
-        for (const sbtAddrLower in list) {
-          const entry = toUnknownRecord(list[sbtAddrLower]);
-          const info = toUnknownRecord(entry.sbtInfo);
-          const displayName = String(getSbtDisplayName(info) || '').trim();
-          if (displayName && displayName.toLowerCase() === nameLower) {
-            return { name: displayName, image: typeof info.image === 'string' ? info.image : null };
-          }
-        }
-      }
-    }
-  } catch (e) {
-    accountLog.error('CompareAddresses: getSbtDetails failed:', e);
-  }
-  return { name: sbtName, image: null };
-};
-
-const resolveSbtDisplayNameForCompareEntry = (entry: unknown = null): string => getCompareSbtLabelTyped(entry);
-const resolveSbtCompareKeyForEntry = (entry: unknown = null): string => getCompareSbtKeyTyped(entry);
-
-/* -----------------------------
- * Local light helpers
- * ----------------------------- */
-const isValidAddress = (address: string): boolean => {
-  const s = String(address || '').trim();
-  const hex = /^0[xX][0-9a-fA-F]{40}$/.test(s);
-  const ens = s.endsWith('.eth');
-  return hex || ens;
 };
 
 const shortenQuestionId = (qid: string): string => {
@@ -432,7 +353,7 @@ const normalizeBinaryAnswer = (answerValue: unknown): 1 | 0 | -1 | null => {
   return null;
 };
 
-const getCommonUnsureQuestions = (users: CompareUser[] = []): CompareUnsureQuestion[] => {
+const getCommonUnsureQuestions = (users: CompareUser[] = [], sessionSlug: string = ''): CompareUnsureQuestion[] => {
   const arr = Array.isArray(users) ? users : [];
   if (arr.length < 2) return [];
   const count = arr.length;
@@ -454,11 +375,11 @@ const getCommonUnsureQuestions = (users: CompareUser[] = []): CompareUnsureQuest
 
       const existing = byQid.get(qid) || {
         id: qid,
-        prompt: String(q?.prompt || '').trim() || getQuestionPrompt(qid) || 'Unknown Question',
+        prompt: String(q?.prompt || '').trim() || getQuestionPrompt(qid, sessionSlug) || 'Unknown Question',
         stances: Array(count).fill(null),
       };
       existing.stances[idx] = stance;
-      if (!existing.prompt) existing.prompt = getQuestionPrompt(qid) || 'Unknown Question';
+      if (!existing.prompt) existing.prompt = getQuestionPrompt(qid, sessionSlug) || 'Unknown Question';
       byQid.set(qid, existing);
     });
   });
@@ -537,7 +458,11 @@ const formatRatingValue = (val: unknown, scale: number | null): string => {
   return scale ? `${rounded}/${scale}` : rounded;
 };
 
-const buildQuestionEntries = (users: CompareUser[] = [], labels: string[] = []): CompareQuestionEntry[] => {
+const buildQuestionEntries = (
+  users: CompareUser[] = [],
+  labels: string[] = [],
+  sessionSlug: string = '',
+): CompareQuestionEntry[] => {
   const map = new Map<string, CompareQuestionEntry>();
   (users || []).forEach((u, idx) => {
     const label = String(labels[idx] || getShortenedAddress(u?.address || '', false) || `User ${idx + 1}`);
@@ -545,7 +470,7 @@ const buildQuestionEntries = (users: CompareUser[] = [], labels: string[] = []):
       const qidRaw = q?.id || q?.questionID || q?.questionId || q?.qId;
       if (!qidRaw) return;
       const qidLower = String(qidRaw || '').toLowerCase();
-      const prompt = toCleanText(q?.prompt) || getQuestionPrompt(qidLower) || 'Unknown Question';
+      const prompt = toCleanText(q?.prompt) || getQuestionPrompt(qidLower, sessionSlug) || 'Unknown Question';
       const type = normalizeQuestionType(q?.type || '');
       const entry = map.get(qidLower) || {
         id: qidRaw,
@@ -570,38 +495,19 @@ const buildQuestionEntries = (users: CompareUser[] = [], labels: string[] = []):
   return Array.from(map.values());
 };
 
-export const buildCompareSbtKeySets = (users: CompareUser[] = []): Set<string>[] =>
-  (users || []).map((u) => {
-    const set = new Set<string>();
-    (u?.sbts || []).forEach((s: CompareSbt) => {
-      const key = resolveSbtCompareKeyForEntry(s);
-      if (key) set.add(key);
-    });
-    return set;
-  });
-
-export const buildCompareSbtImageMap = (
-  users: CompareUser[] = [],
-): Map<string, { name: string; image: string | null }> => {
-  const m = new Map<string, { name: string; image: string | null }>();
-  (Array.isArray(users) ? users : []).forEach((u) => {
-    (Array.isArray(u?.sbts) ? u.sbts : []).forEach((s: CompareSbt) => {
-      const key = resolveSbtCompareKeyForEntry(s);
-      if (!key) return;
-      const image = s?.image || s?.sbtInfo?.image || s?.imageUrl || null;
-      const prettyName = resolveSbtDisplayNameForCompareEntry(s) || key;
-      if (!m.has(key)) m.set(key, { name: prettyName, image: image || null });
-    });
-  });
-  return m;
-};
-
-const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: CompareAddressProps) => {
+const CompareAddress = ({
+  activeSessionSlug: activeSessionSlugProp,
+  firstAddress,
+  account,
+  sessionCachesReady,
+  scanSpecificUserProfile,
+}: CompareAddressProps) => {
   const [compareAddresses, setCompareAddresses] = useState<string[]>([]);
   const [showComparison, setShowComparison] = useState(false);
   const [loading, setLoading] = useState(false);
   const [bulletsLoading, setBulletsLoading] = useState(false);
   const [compassLoading, setCompassLoading] = useState(false);
+  const [vennLoading, setVennLoading] = useState(false);
   const [comparisonError, setComparisonError] = useState('');
 
   // Bullets + visuals fed by the unified bundle
@@ -609,8 +515,8 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
   const [compassData, setCompassData] = useState<CompareCompassData | null>(null);
   const [vennResult, setVennResult] = useState<CompareVennResult | null>(null);
   const [matrixData, setMatrixData] = useState<CompareMatrixData | null>(null);
-
-  const [userSummaries, setUserSummaries] = useState<CompareUserSummary[]>([]); // per-address assembled data preview
+  const [subjectCompatibility, setSubjectCompatibility] =
+    useState<CompareSubjectCompatibility>(EMPTY_SUBJECT_COMPATIBILITY);
 
   // Dynamic bookmarks that react to cache changes
   const [bookmarks, setBookmarks] = useState<CompareBookmark[]>([]);
@@ -619,11 +525,19 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
 
   const navigate = useNavigate();
   const location = useLocation();
-  const activeSessionSlug = useMemo(() => resolveSessionSlugFromPathname(location.pathname) || '', [location.pathname]);
+  const activeSessionSlug = useMemo(
+    () =>
+      resolveCompareSessionSlug({
+        activeSessionSlug: activeSessionSlugProp,
+        pathname: location.pathname,
+        search: location.search,
+      }),
+    [activeSessionSlugProp, location.pathname, location.search],
+  );
   const lastAutoKeyRef = useRef('');
-  const deepScanQueueRef = useRef<Promise<void>>(Promise.resolve());
   const deepScanSeenRef = useRef<Set<string>>(new Set());
   const compareRunIdRef = useRef(0);
+  const pendingComparisonRef = useRef<{ subjects: string[]; skipNavigate: boolean } | null>(null);
 
   // Viz mode (Compass-first; Matrix is behind “More visuals”)
   const [vizMode, setVizMode] = useState<'summary' | 'compass' | 'venn' | 'matrix'>('compass');
@@ -644,33 +558,31 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
   const runComparisonRef = useRef<CompareRunComparison | null>(null);
 
   useEffect(() => {
-    // Extract addresses from the URL or use firstAddress
-    const pathPart = location.pathname.split('/compare/')[1];
-    const pathAddresses = pathPart
-      ? pathPart
-          .split('&')
-          .map((s) => s.trim())
-          .filter(Boolean)
-      : null;
+    const routeSubjects = resolveCompareRouteSubjects({
+      firstSubject: firstAddress,
+      pathname: location.pathname,
+      search: location.search,
+    });
+    const pathSubjects = routeSubjects.map((subject) => subject.token);
 
-    if (pathAddresses && pathAddresses.length > 0) {
-      setCompareAddresses(pathAddresses);
-      const hasTwo = pathAddresses.length > 1;
+    if (pathSubjects.length > 0) {
+      setCompareAddresses(pathSubjects);
+      const hasTwo = pathSubjects.length > 1;
       setShowComparison(hasTwo || location.pathname.includes('&'));
 
-      // Auto-run when URL already has ≥2 addresses
+      // Auto-run when URL already has at least two canonical subjects.
       if (hasTwo) {
-        const key = pathAddresses.map((a) => a.toLowerCase()).join('&');
+        const key = routeSubjects.map((subject) => subject.key).join('&');
         if (key && key !== lastAutoKeyRef.current) {
           lastAutoKeyRef.current = key;
-          runComparisonRef.current?.(pathAddresses, { skipNavigate: true });
+          runComparisonRef.current?.(pathSubjects, { skipNavigate: true });
         }
       }
     } else {
       setCompareAddresses([firstAddress || '', '']);
       setShowComparison(false);
     }
-  }, [firstAddress, location.pathname]);
+  }, [firstAddress, location.pathname, location.search]);
 
   const isE2eAutofillDisabled = React.useCallback(() => {
     try {
@@ -699,11 +611,12 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
     if (isE2eAutofillDisabled()) return;
     setCompareAddresses((prev) => {
       const accLower = account.toLowerCase();
+      const accountToken = `wallet:${accLower}`;
       const next = Array.isArray(prev) && prev.length > 0 ? [...prev] : [firstAddress || '', ''];
       if (next.length < 2) next.push('');
-      const alreadyHasAccount = next.some((a) => (a || '').toLowerCase() === accLower);
+      const alreadyHasAccount = next.some((value) => parseCompareSubject(value)?.key === accountToken);
       if (!alreadyHasAccount && (next[1] || '') === '') {
-        next[1] = account;
+        next[1] = accountToken;
         return next;
       }
       return prev;
@@ -803,108 +716,115 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
   const onBookmarkClick = (bookmarkAddress: string) => {
     const lower = String(bookmarkAddress || '').toLowerCase();
     if (!lower) return;
+    const bookmarkToken = `wallet:${lower}`;
 
     setCompareAddresses((prev) => {
       const current = Array.isArray(prev) ? [...prev] : [];
-      const exists = current.some((a) => String(a || '').toLowerCase() === lower);
+      const exists = current.some((value) => parseCompareSubject(value)?.key === bookmarkToken);
       if (exists) return prev;
 
       const emptyIdx = current.findIndex((a) => !a || String(a).trim() === '');
       if (emptyIdx > -1) {
         const next = [...current];
-        next[emptyIdx] = bookmarkAddress;
+        next[emptyIdx] = bookmarkToken;
         return next;
       }
-      return [...current, bookmarkAddress];
+      return [...current, bookmarkToken];
     });
   };
 
-  const enqueueDeepScan = React.useCallback(
-    (addresses: string[] = []) => {
-      if (typeof scanSpecificUserProfile !== 'function') return;
-      const queue: string[] = [];
-      (addresses || []).forEach((addr) => {
-        const raw = String(addr || '').trim();
-        if (!/^0x[0-9a-fA-F]{40}$/.test(raw)) return;
-        const lower = raw.toLowerCase();
-        if (deepScanSeenRef.current.has(lower)) return;
-        deepScanSeenRef.current.add(lower);
-        queue.push(raw);
-      });
-      if (queue.length === 0) return;
-      deepScanQueueRef.current = deepScanQueueRef.current.then(async () => {
-        for (const addr of queue) {
-          try {
-            await scanSpecificUserProfile(addr);
-          } catch (err) {
-            accountLog.warn('[CompareAddresses] deep scan failed:', addr, err);
-          }
-        }
-      });
-    },
-    [scanSpecificUserProfile],
-  );
-
-  const runComparison = async (addresses: string[], { skipNavigate = false }: { skipNavigate?: boolean } = {}) => {
-    const validAddresses = (addresses || []).map((a) => a.trim()).filter((a) => isValidAddress(a) && a !== '');
-
-    if (validAddresses.length < 2) {
-      setComparisonError('Enter at least two valid Ethereum addresses or ENS names.');
-      return;
-    }
-
-    if (!skipNavigate) {
-      const path = `/compare/${validAddresses.join('&')}`;
-      navigate(path);
-    }
-
-    const hexOnly = validAddresses.filter((a) => /^0x[0-9a-fA-F]{40}$/.test(a));
-    if (hexOnly.length < 2) {
-      setShowComparison(true);
-      setComparisonError('ENS names cannot be resolved in this view; results may be incomplete.');
-    } else {
-      setComparisonError('');
-    }
-
-    enqueueDeepScan(validAddresses);
-
+  const runComparison = async (subjectValues: string[], { skipNavigate = false }: { skipNavigate?: boolean } = {}) => {
+    const subjects = normalizeCompareSubjects(subjectValues);
+    const subjectTokens = subjects.map((subject) => subject.token);
     const runId = ++compareRunIdRef.current;
     const isStale = () => compareRunIdRef.current !== runId;
 
+    if (subjects.length < 2) {
+      pendingComparisonRef.current = null;
+      setLoading(false);
+      setBulletsLoading(false);
+      setCompassLoading(false);
+      setVennLoading(false);
+      setComparisonError('Enter at least two valid subjects (wallet, Worker, or simulated).');
+      return;
+    }
+
+    if (!skipNavigate)
+      navigate(
+        buildCompareSubjectsRoutePath({
+          subjects: subjectTokens,
+          sessionSlug: activeSessionSlug,
+          search: location.search,
+        }),
+      );
+
+    setComparisonError('');
     setLoading(true);
     setBulletsLoading(true);
     setCompassLoading(true);
+    setVennLoading(true);
     setShowComparison(true);
 
-    // Reset UI slices
+    // Clear prior-run slices before either waiting for caches or resolving the new subjects.
     setComparisonResult(null);
     setCompassData(null);
     setVennResult(null);
     setMatrixData(null);
-    setUserSummaries([]);
     setCurrentUsers([]);
+    setSubjectCompatibility(EMPTY_SUBJECT_COMPATIBILITY);
     setDrillState({});
-    setVizMode('compass'); // Compass-first
+    setVizMode('compass');
+
+    if (sessionCachesReady === false && compareSubjectsNeedSessionCaches(subjects)) {
+      pendingComparisonRef.current = { subjects: subjectTokens, skipNavigate };
+      setComparisonError('');
+      return;
+    }
+    pendingComparisonRef.current = null;
+
+    const scanFailures = await scanCompareAddressesSequentially({
+      addresses: selectScannableCompareSubjectAddresses(subjects),
+      sessionSlug: activeSessionSlug,
+      scanSpecificUserProfile,
+      seen: deepScanSeenRef.current,
+    });
+    scanFailures.forEach(({ address, error }) => {
+      accountLog.warn('[CompareAddresses] deep scan failed:', address, error);
+    });
+    if (isStale()) return;
 
     // Read caches via component-level helper (side-effect)
-    const sbtCaches = readDgObjectValues('sbtCache');
-    const questionsCaches = readDgObjectValues('questionsCache');
-    const surveysCaches = readDgObjectValues('surveysCache');
+    const sbtCaches = readDgObjectValues('sbtCache', activeSessionSlug);
+    const questionsCaches = readDgObjectValues('questionsCache', activeSessionSlug);
+    const surveysCaches = readDgObjectValues('surveysCache', activeSessionSlug);
 
-    // Assemble deterministic user payloads strictly from caches (2–10 supported) via pure utility
-    const users = buildUsersFromCaches(validAddresses, sbtCaches, questionsCaches, surveysCaches);
+    // Normalize cache-backed and simulated subjects into one comparison payload contract.
+    const resolution = resolveCompareSubjects({
+      questionsCaches,
+      sbtCaches,
+      sessionSlug: activeSessionSlug,
+      subjects: subjectTokens,
+      surveysCaches,
+    });
+    const users = resolution.users;
+    if (users.length < 2) {
+      if (!isStale()) {
+        setComparisonError(
+          resolution.errors.map((error) => error.message).join(' ') || 'Fewer than two subjects resolved.',
+        );
+        setBulletsLoading(false);
+        setCompassLoading(false);
+        setVennLoading(false);
+        setLoading(false);
+      }
+      return;
+    }
+    const compatibility = analyzeCompareSubjectCompatibility(users);
+    setSubjectCompatibility(compatibility);
+    if (resolution.errors.length > 0) {
+      setComparisonError(resolution.errors.map((error) => error.message).join(' '));
+    }
     setCurrentUsers(users);
-
-    // Lightweight per-user summary chips
-    setUserSummaries(
-      users.map((u) => ({
-        address: u.address,
-        sbtCount: (u.sbts || []).length,
-        questionCount: (u.questions || []).length,
-        surveyCount: (u.surveys || []).length,
-        sbtNames: (u.sbts || []).map((s) => s.name).slice(0, 8),
-      })),
-    );
 
     // Guard viz modes
     const n = users.length;
@@ -912,64 +832,104 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
     if (vizMode === 'matrix' && (n < 2 || n > 10)) setVizMode('summary');
     if (n >= 2 && n <= 10) setVizMode('compass');
 
-    // Stage AI calls for faster first content: bullets first, visuals after.
+    // These sections are independent; let each render as soon as its own result is ready.
     const aiScope = activeSessionSlug ? { sessionSlug: activeSessionSlug } : {};
-    try {
-      const bulletsRaw = await runCompareToolkit('compare', { users, ...aiScope });
-      const bullets = normalizeCompareBullets(bulletsRaw, fallbackBullets(users));
-      if (!isStale()) setComparisonResult(bullets);
-    } catch (err) {
-      accountLog.error('compare bullets failed:', err);
-      const fallback = fallbackBullets(users);
-      if (!isStale()) {
-        setComparisonResult({
-          agreements: (fallback.agreements || []).slice(0, 12),
-          disagreements: (fallback.disagreements || []).slice(0, 12),
-        });
-      }
-    } finally {
-      if (!isStale()) setBulletsLoading(false);
-    }
-
-    if (isStale()) return;
-
     const addrOrder = users.map((u) => u.address);
 
-    try {
-      let compass = null;
-      try {
-        const axesRaw = await runCompareToolkit('axes', { users, ...aiScope });
-        compass = axesRaw ? (sanitizeCompass(axesRaw, addrOrder) as CompareCompassData) : null;
-      } catch (err) {
-        accountLog.error('compare axes failed:', err);
-      }
-      if (!compass) {
-        compass = sanitizeCompass(pcaLiteCompass(users), addrOrder) as CompareCompassData;
-      }
-      if (!isStale()) setCompassData(compass);
-    } finally {
-      if (!isStale()) setCompassLoading(false);
-    }
-
-    if (isStale()) return;
-
-    if (users.length === 2 || users.length === 3) {
-      let venn = null;
-      if (users.length === 3) {
-        try {
-          const vennRaw = await runCompareToolkit('venn', { users, ...aiScope });
-          venn = mergeCompareVennWithEvidence(vennRaw, computeVennEvidence(users));
-        } catch (err) {
-          accountLog.error('compare venn failed:', err);
+    const bulletsTask = async () => {
+      if (!compatibility.summaryComparable) {
+        if (!isStale()) {
+          setComparisonResult({ agreements: [], disagreements: [] });
+          setBulletsLoading(false);
         }
+        return;
       }
-      if (!venn) venn = computeVennEvidence(users);
-      if (!isStale()) setVennResult(venn);
-    }
+      try {
+        const bulletsRaw = await runCompareToolkit('compare', { users, ...aiScope });
+        const bullets = normalizeCompareBullets(bulletsRaw, fallbackBullets(users));
+        if (!isStale()) setComparisonResult(bullets);
+      } catch (err) {
+        accountLog.error('compare bullets failed:', err);
+        const fallback = fallbackBullets(users);
+        if (!isStale()) {
+          setComparisonResult({
+            agreements: (fallback.agreements || []).slice(0, 12),
+            disagreements: (fallback.disagreements || []).slice(0, 12),
+          });
+        }
+      } finally {
+        if (!isStale()) setBulletsLoading(false);
+      }
+    };
+
+    const compassTask = async () => {
+      if (!compatibility.opinionComparable) {
+        if (!isStale()) {
+          setCompassData(null);
+          setCompassLoading(false);
+        }
+        return;
+      }
+      try {
+        let compass = null;
+        try {
+          const axesRaw = await runCompareToolkit('axes', { users, ...aiScope });
+          compass = axesRaw ? (sanitizeCompass(axesRaw, addrOrder) as CompareCompassData) : null;
+        } catch (err) {
+          accountLog.error('compare axes failed:', err);
+        }
+        if (!compass) {
+          compass = sanitizeCompass(pcaLiteCompass(users), addrOrder) as CompareCompassData;
+        }
+        if (!isStale()) setCompassData(compass);
+      } finally {
+        if (!isStale()) setCompassLoading(false);
+      }
+    };
+
+    const vennTask = async () => {
+      if (!compatibility.summaryComparable) {
+        if (!isStale()) {
+          setVennResult(null);
+          setVennLoading(false);
+        }
+        return;
+      }
+      try {
+        if (users.length === 2 || users.length === 3) {
+          let venn = null;
+          if (users.length === 3) {
+            try {
+              const vennRaw = await runCompareToolkit('venn', { users, ...aiScope });
+              venn = mergeCompareVennWithEvidence(vennRaw, computeVennEvidence(users));
+            } catch (err) {
+              accountLog.error('compare venn failed:', err);
+            }
+          }
+          if (!venn) venn = computeVennEvidence(users);
+          if (!isStale()) setVennResult(venn);
+        }
+      } finally {
+        if (!isStale()) setVennLoading(false);
+      }
+    };
+
+    const sectionResults = await runCompareSectionTasks([bulletsTask, compassTask, vennTask]);
+    sectionResults.forEach((result) => {
+      if (result.status === 'rejected') accountLog.error('compare section failed:', result.reason);
+    });
 
     if (!isStale()) setLoading(false);
   };
   runComparisonRef.current = runComparison;
+
+  useEffect(() => {
+    if (sessionCachesReady === false) return;
+    const pending = pendingComparisonRef.current;
+    if (!pending) return;
+    pendingComparisonRef.current = null;
+    void runComparisonRef.current?.(pending.subjects, { skipNavigate: pending.skipNavigate });
+  }, [sessionCachesReady]);
 
   // If user toggles “More visuals” after initial run and we don't have a matrix yet,
   // ask just for the matrix using the same users (avoid recomputing others).
@@ -1003,10 +963,12 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
   };
 
   const renderInputOrYouPill = (address: string, index: number) => {
-    const isSelf = !!account && !!address && address.toLowerCase() === account.toLowerCase();
+    const parsedSubject = parseCompareSubject(address);
+    const walletId = parsedSubject?.kind === 'wallet' ? parsedSubject.id : '';
+    const isSelf = !!account && !!walletId && walletId.toLowerCase() === account.toLowerCase();
     if (isSelf) {
-      const short = getShortenedAddress(address, false);
-      const blockieUrl = generateBlockieDataUrl(String(address || '').toLowerCase(), 8, 4);
+      const short = getShortenedAddress(walletId, false);
+      const blockieUrl = generateBlockieDataUrl(walletId.toLowerCase(), 8, 4);
       const title = `You (${short})`;
       return (
         <div className={styles.youPill} title={title} aria-label={title}>
@@ -1027,7 +989,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
             type="button"
             className={styles.youPillClear}
             onClick={() => clearAddressAt(index)}
-            aria-label="Clear this address"
+            aria-label="Clear this subject"
           >
             ×
           </button>
@@ -1038,15 +1000,15 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
     // Nickname pill (bookmarked user with nickname)
     const nickname =
       nicknameByAddress.get(
-        String(address || '')
+        String(walletId || '')
           .trim()
           .toLowerCase(),
       ) || '';
 
     if (nickname) {
-      const shortened = String(getShortenedAddress(address, false) || '').replace('...', '…');
+      const shortened = String(getShortenedAddress(walletId, false) || '').replace('...', '…');
       const title = `${nickname} (${shortened})`;
-      const blockieUrl = generateBlockieDataUrl(String(address || '').toLowerCase(), 8, 4);
+      const blockieUrl = generateBlockieDataUrl(walletId.toLowerCase(), 8, 4);
       return (
         <div className={styles.youPill} title={title} aria-label={title}>
           <span style={resolveCompareAddressPillContentStyle()}>
@@ -1066,7 +1028,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
             type="button"
             className={styles.youPillClear}
             onClick={() => clearAddressAt(index)}
-            aria-label="Clear this address"
+            aria-label="Clear this subject"
           >
             ×
           </button>
@@ -1080,7 +1042,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
         data-testid={
           index === 0 ? E2E_TESTIDS.COMPARE_ADDRESS_A : index === 1 ? E2E_TESTIDS.COMPARE_ADDRESS_B : undefined
         }
-        placeholder="Enter Ethereum address / ENS"
+        placeholder="wallet:0x…, worker:…, or sim:…"
         value={address}
         onChange={(e) => handleCompareAddressChange(index, e)}
       />
@@ -1089,13 +1051,20 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
 
   // Derived SBT name sets (fallback for Venn only)
   const sbtSetsMemo = useMemo(() => buildCompareSbtKeySets(currentUsers), [currentUsers]);
+  const vennQuestionCaches = useMemo(
+    () => (currentUsers.length > 0 ? readDgObjectValues('questionsCache', activeSessionSlug) : []),
+    [activeSessionSlug, currentUsers],
+  );
 
   const nicknameByAddress = useMemo(() => buildNicknameByAddressMap(bookmarks), [bookmarks]);
 
   // Labels (nickname/username/shortened)
   const userLabels = useMemo(() => deriveUserLabels(currentUsers, bookmarks), [currentUsers, bookmarks]);
 
-  const questionEntries = useMemo(() => buildQuestionEntries(currentUsers, userLabels), [currentUsers, userLabels]);
+  const questionEntries = useMemo(
+    () => buildQuestionEntries(currentUsers, userLabels, activeSessionSlug),
+    [activeSessionSlug, currentUsers, userLabels],
+  );
 
   const buildDrillTree = React.useCallback(
     (pointText: string, type: ComparisonTone): CompareDrillTree => {
@@ -1471,7 +1440,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
     if (existing.loading) return;
 
     const hasUnsureHint = /\bunsure\b/i.test(String(pointText || ''));
-    const unsureQuestions = hasUnsureHint ? getCommonUnsureQuestions(currentUsers) : null;
+    const unsureQuestions = hasUnsureHint ? getCommonUnsureQuestions(currentUsers, activeSessionSlug) : null;
     const tree = buildDrillTree(pointText, type);
 
     setDrillState((prev) => ({
@@ -1645,14 +1614,18 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
 
   // Visualization capability flags
   const participantsCount = currentUsers.length;
-  const canShowVenn = participantsCount === 2 || participantsCount === 3;
+  const canShowVenn = (participantsCount === 2 || participantsCount === 3) && subjectCompatibility.summaryComparable;
   const canShowMatrix = participantsCount >= 2 && participantsCount <= 10;
 
   useEffect(() => {
     if (vizMode === 'venn' && !canShowVenn) setVizMode('summary');
     if (vizMode === 'matrix' && !canShowMatrix) setVizMode('summary');
-    if (vizMode === 'compass' && !(participantsCount >= 2 && participantsCount <= 10)) setVizMode('summary');
-  }, [canShowMatrix, canShowVenn, participantsCount, vizMode]);
+    if (
+      vizMode === 'compass' &&
+      (!(participantsCount >= 2 && participantsCount <= 10) || !subjectCompatibility.opinionComparable)
+    )
+      setVizMode('summary');
+  }, [canShowMatrix, canShowVenn, participantsCount, subjectCompatibility.opinionComparable, vizMode]);
 
   return (
     <div className={styles.compareSection}>
@@ -1696,30 +1669,18 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
         </div>
       )}
 
-      <div className={styles.addrInputsContainer}>
-        {compareAddresses.map((address, index) => (
-          <div key={index} className={styles.addressInput}>
-            {renderInputOrYouPill(address, index)}
-          </div>
-        ))}
-      </div>
-
-      <div className={styles.addAddressRow}>
-        <button
-          type="button"
-          className={styles.addAddressBtn}
-          onClick={addCompareAddress}
-          data-testid={E2E_TESTIDS.COMPARE_ADD_ADDRESS}
-        >
-          <FontAwesomeIcon icon={faPlus} /> Add Address
-        </button>
-      </div>
+      <CompareSubjectInputList
+        onAddSubject={addCompareAddress}
+        renderSubjectInput={renderInputOrYouPill}
+        subjectValues={compareAddresses}
+      />
 
       <button onClick={performComparison} disabled={loading} data-testid={E2E_TESTIDS.COMPARE_RUN}>
         {loading ? (
           <>
             <FontAwesomeIcon icon={faSpinner} spin />
-            &nbsp;Comparing
+            &nbsp;
+            {pendingComparisonRef.current ? resolveCompareRunLabel(sessionCachesReady) : 'Comparing subjects...'}
           </>
         ) : (
           'Compare Views & Activity'
@@ -1735,57 +1696,12 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
       {/* RESULTS */}
       <Collapse isOpen={showComparison}>
         <div className={styles.comparisonSummary} data-testid={E2E_TESTIDS.COMPARE_RESULT}>
-          {/* Participants bar */}
-          {/* <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 8,
-              alignItems: 'center',
-              marginBottom: 8
-            }}
-            role="list"
-            aria-label="Participants"
-          >
-            {(currentUsers || []).map((u, i) => {
-              const addr = String(u?.address || '');
-              const label = userLabels[i] || `User ${i + 1}`;
-              return (
-                <div
-                  key={addr || i}
-                  className={styles.resultBadge}
-                  role="listitem"
-                  aria-label={`Participant ${label}`}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-                >
-                  <span
-                    aria-hidden="true"
-                    style={{
-                      display: 'inline-block',
-                      width: 10,
-                      height: 10,
-                      borderRadius: 5,
-                      background: `hsl(${(i * 50) % 360}, 70%, 50%)`,
-                      marginRight: 2
-                    }}
-                  />
-                  <span>{label}</span>
-                  {addr && (
-                    <a
-                      href={buildCompareProfileHref(addr)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={`Open profile for ${label}`}
-                      title="Open user profile"
-                      style={{ display: 'inline-flex', alignItems: 'center', marginLeft: 6 }}
-                    >
-                      <FontAwesomeIcon icon={faExternalLinkAlt} />
-                    </a>
-                  )}
-                </div>
-              );
-            })}
-          </div> */}
+          {subjectCompatibility.notice && (
+            <div className={styles.placeholderNote} role="status">
+              {subjectCompatibility.notice}
+            </div>
+          )}
+          <CompareSubjectParticipants activeSessionSlug={activeSessionSlug} labels={userLabels} users={currentUsers} />
 
           {/* Visuals + Bullets in responsive two-column split */}
           <div className={styles.compareSplit} aria-live="polite">
@@ -1806,38 +1722,60 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
                     <FontAwesomeIcon icon={faSpinner} spin />
                     <span>Loading chart...</span>
                   </div>
-                ) : (
+                ) : subjectCompatibility.opinionComparable ? (
                   <OpinionCompass2D
                     key={(currentUsers || []).map((u) => u.address).join(',')}
                     users={currentUsers}
                     labels={userLabels}
                     precomputed={compassData}
                   />
+                ) : (
+                  <div className={styles.placeholderNote}>
+                    Opinion compass unavailable: these subjects have no shared canonical question IDs.
+                  </div>
                 )}
               </div>
 
-              {participantsCount === 2 && (
+              {canShowVenn && participantsCount === 2 && (
                 <div style={resolveCompareVisualSectionStyle()}>
-                  <Venn2
-                    users={currentUsers.slice(0, 2)} /* NEW: pass users for prompt/image maps */
-                    sets={sbtSetsMemo.slice(0, 2)}
-                    labels={userLabels.slice(0, 2)}
-                    preCounts={vennResult?.counts || null}
-                    evidence={vennResult?.evidenceMap || null}
-                    semantics={vennResult?.semantics || null}
-                  />
+                  {vennLoading ? (
+                    <div className={styles.placeholderNote}>
+                      <FontAwesomeIcon icon={faSpinner} spin />
+                      <span style={resolveCompareLoadingTextStyle()}>Loading overlap...</span>
+                    </div>
+                  ) : (
+                    <CompareVenn
+                      dimension={2}
+                      users={currentUsers.slice(0, 2)}
+                      sets={sbtSetsMemo.slice(0, 2)}
+                      labels={userLabels.slice(0, 2)}
+                      questionCaches={vennQuestionCaches}
+                      preCounts={vennResult?.counts || null}
+                      evidence={vennResult?.evidenceMap || null}
+                      semantics={vennResult?.semantics || null}
+                    />
+                  )}
                 </div>
               )}
-              {participantsCount === 3 && (
+              {canShowVenn && participantsCount === 3 && (
                 <div style={resolveCompareVisualSectionStyle()}>
-                  <Venn3
-                    users={currentUsers.slice(0, 3)} /* opinion-first fallback only */
-                    sets={sbtSetsMemo.slice(0, 3)} /* fallback only */
-                    labels={userLabels.slice(0, 3)}
-                    preCounts={vennResult?.counts || null}
-                    evidence={vennResult?.evidenceMap || null}
-                    semantics={vennResult?.semantics || null}
-                  />
+                  {vennLoading ? (
+                    <div className={styles.placeholderNote}>
+                      <FontAwesomeIcon icon={faSpinner} spin />
+                      <span style={resolveCompareLoadingTextStyle()}>Loading overlap...</span>
+                    </div>
+                  ) : (
+                    <CompareVenn
+                      dimension={3}
+                      users={currentUsers.slice(0, 3)}
+                      sets={sbtSetsMemo.slice(0, 3)}
+                      labels={userLabels.slice(0, 3)}
+                      questionCaches={vennQuestionCaches}
+                      preCounts={vennResult?.counts || null}
+                      evidence={vennResult?.evidenceMap || null}
+                      semantics={vennResult?.semantics || null}
+                    />
+                  )}
                 </div>
               )}
 
@@ -1963,778 +1901,6 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
   );
 };
 
-function Venn2({
-  sets = [],
-  labels = [],
-  users = null,
-  preCounts = null,
-  evidence = null,
-  semantics = null,
-}: VennProps) {
-  const wrapRef = useRef<HTMLDivElement | null>(null);
-  const [tip, setTip] = useState<CompareVennTooltipState>({ open: false, key: '', x: 0, y: 0, items: [], more: 0 });
-  const tooltipIdRef = useRef(`vennTip_${Math.random().toString(36).slice(2)}`);
-  const tipCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const questionPromptMap = useMemo(() => {
-    const m = new Map<string, string>();
-    (Array.isArray(users) ? users : []).forEach((u) => {
-      (Array.isArray(u?.questions) ? u.questions : []).forEach((q: CompareQuestion) => {
-        const qid = String(q?.id || q?.questionId || q?.qId || '').toLowerCase();
-        const prompt = q?.prompt || q?.title || q?.text || '';
-        if (qid && prompt && !m.has(qid)) m.set(qid, String(prompt));
-      });
-    });
-    if (m.size === 0) {
-      try {
-        const questionsCaches = readDgObjectValues('questionsCache');
-        questionsCaches.forEach((cacheObj) => {
-          if (!cacheObj || typeof cacheObj !== 'object') return;
-          for (const netId in cacheObj) {
-            const qs = readRecordProperty(readRecordProperty(cacheObj, netId), 'questions');
-            for (const id in qs) {
-              const q = toUnknownRecord(qs[id]);
-              const qid = String(q?.id || id || '').toLowerCase();
-              const prompt = q?.prompt;
-              if (qid && prompt && !m.has(qid)) m.set(qid, String(prompt));
-            }
-          }
-        });
-      } catch (e) {
-        void e; /* fallback: agent/e2e mock detection. */
-      }
-    }
-    return m;
-  }, [users]);
-
-  const sbtImageMap = useMemo(() => buildCompareSbtImageMap(users || []), [users]);
-
-  const encodedStances = useMemo(() => (Array.isArray(users) ? users : []).map(encodeStancesForUser), [users]);
-
-  const keyToIndices = useMemo<Record<'a' | 'b' | 'ab', number[]>>(() => ({ a: [0], b: [1], ab: [0, 1] }), []);
-
-  let counts: Partial<Record<VennRegionKey, number>> | null = null;
-  let mode = 'opinion';
-  if (preCounts && typeof preCounts === 'object') {
-    counts = preCounts;
-  } else {
-    const [A, B] = sets || [];
-    if (!(A && B)) return null;
-    const size = (S?: Set<string>) => (S ? S.size : 0);
-    const inter = (S1: Set<string>, S2: Set<string>) => {
-      let c = 0;
-      S1.forEach((v) => {
-        if (S2.has(v)) c++;
-      });
-      return c;
-    };
-    const ab = inter(A, B);
-    const aOnly = size(A) - ab;
-    const bOnly = size(B) - ab;
-    counts = { a: aOnly, b: bOnly, ab };
-    mode = 'sbt';
-  }
-  const { a = 0, b = 0, ab = 0 } = counts || {};
-
-  const width = 360,
-    height = 200,
-    r = 80;
-  const ax = 140,
-    ay = 100;
-  const bx = 220,
-    by = 100;
-
-  const ev = (evidence || {}) as Partial<Record<VennRegionKey, unknown[]>>;
-  const listFor = (key: VennRegionKey): unknown[] => (Array.isArray(ev[key]) ? ev[key] : []);
-
-  const normalizeStance = (v: unknown): string => {
-    if (v === null || v === undefined) return 'Unsure';
-    if (typeof v === 'number') return v > 0 ? 'Agree' : v < 0 ? 'Disagree' : 'Unsure';
-    if (typeof v === 'boolean') return v ? 'Agree' : 'Disagree';
-    const s = String(v).trim().toLowerCase();
-    if (['1', 'agree', 'strongly agree', 'yes', 'true'].includes(s)) return 'Agree';
-    if (['-1', 'disagree', 'strongly disagree', 'no', 'false'].includes(s)) return 'Disagree';
-    if (['0', 'unsure', 'neutral', 'skip', 'n/a'].includes(s)) return 'Unsure';
-    return 'Unsure';
-  };
-
-  const parseQuestionToken = (raw: unknown): CompareVennQuestionItem | null => {
-    const s = String(raw || '').trim();
-    if (!s) return null;
-    const parts = s.split(' · ');
-    const head = parts[0] ? parts[0].trim() : '';
-    const promptHint = parts.slice(1).join(' · ').trim();
-    const match = head.match(/^(.*)\s*\(([^)]+)\)\s*$/);
-    if (!match) return null;
-    const signRaw = match[2] ? match[2].trim() : '';
-    const signToken = signRaw.replace(/\u2212/g, '-').toLowerCase();
-    const isSign =
-      signToken === '+' ||
-      signToken === '-' ||
-      signToken === '+1' ||
-      signToken === '-1' ||
-      signToken === 'agree' ||
-      signToken === 'disagree' ||
-      signToken === 'unsure' ||
-      signToken === 'neutral';
-    if (!isSign) return null;
-    const tokenPart = match[1] ? match[1].trim() : '';
-    if (!tokenPart) return null;
-    let qid = tokenPart;
-    let optionRaw = '';
-    if (tokenPart.includes('::')) {
-      const bits = tokenPart.split('::');
-      qid = bits.shift() || '';
-      optionRaw = bits.join('::');
-    }
-    const id = String(qid || '').toLowerCase();
-    if (!id) return null;
-    const prompt = questionPromptMap.get(id) || promptHint || '(Question)';
-    const optionLabel = optionRaw ? optionRaw.trim() : '';
-    return {
-      type: 'question',
-      id,
-      option: optionLabel ? optionLabel.toLowerCase() : null,
-      optionLabel: optionLabel || null,
-      prompt,
-    };
-  };
-
-  const parseEvidenceList = (rawList: unknown): CompareVennTooltipItem[] => {
-    const arr = Array.isArray(rawList) ? rawList : [];
-    const out: CompareVennTooltipItem[] = [];
-    for (const item of arr) {
-      if (typeof item === 'string') {
-        if (item.startsWith('question:')) {
-          const parts = item.split(':');
-          const qid = String(parts[1] || '').toLowerCase();
-          const prompt = questionPromptMap.get(qid) || '(Question)';
-          const stance = normalizeStance(parts[2]);
-          out.push({ type: 'question', prompt, stance, id: qid, option: null, optionLabel: null });
-        } else {
-          const parsed = parseQuestionToken(item);
-          if (parsed) {
-            out.push(parsed);
-          } else {
-            const name = item;
-            const info = sbtImageMap.get(String(name)) || null;
-            out.push({ type: 'sbt', name: info?.name || name, image: info?.image || null });
-          }
-        }
-      } else if (item && typeof item === 'object') {
-        const qidMaybe = item.questionId || item.qId || item.id;
-        const sbtNameMaybe = resolveSbtDisplayNameForCompareEntry(item);
-        if (qidMaybe && !sbtNameMaybe) {
-          const qid = String(qidMaybe).toLowerCase();
-          const prompt = item.prompt || questionPromptMap.get(qid) || '(Question)';
-          const stance = normalizeStance(item.stance ?? item.sign ?? item?.answer?.value);
-          const optionLabel = item.option || item.choice || item.optionLabel || '';
-          out.push({
-            type: 'question',
-            prompt,
-            stance,
-            id: qid,
-            option: optionLabel ? String(optionLabel).trim().toLowerCase() : null,
-            optionLabel: optionLabel ? String(optionLabel).trim() : null,
-          });
-        } else if (sbtNameMaybe) {
-          const nm = String(sbtNameMaybe);
-          const look = sbtImageMap.get(resolveSbtCompareKeyForEntry(item) || nm);
-          const image = item.image || item?.sbtInfo?.image || look?.image || null;
-          const pretty = resolveSbtDisplayNameForCompareEntry(item) || look?.name || nm;
-          out.push({ type: 'sbt', name: pretty, image });
-        }
-      }
-    }
-    return out;
-  };
-
-  const regionFallbackSBTs = (key: 'a' | 'b' | 'ab'): CompareVennSbtItem[] => {
-    const [A, B] = sets || [];
-    if (!(A && B)) return [];
-    const toArr = (S?: Set<string>) => Array.from(S || []);
-    const inter = (S1: Set<string>, S2: Set<string>) => {
-      const r = new Set<string>();
-      S1.forEach((v) => {
-        if (S2.has(v)) r.add(v);
-      });
-      return r;
-    };
-    const diff = (S1: Set<string>, S2: Set<string>) => {
-      const r = new Set<string>();
-      S1.forEach((v) => {
-        if (!S2.has(v)) r.add(v);
-      });
-      return r;
-    };
-    let names: string[] = [];
-    if (key === 'a') names = toArr(diff(A, B));
-    else if (key === 'b') names = toArr(diff(B, A));
-    else if (key === 'ab') names = toArr(inter(A, B));
-    return names.map((nm) => {
-      const look = sbtImageMap.get(String(nm));
-      return { type: 'sbt', name: look?.name || nm, image: look?.image || null };
-    });
-  };
-
-  const TOOLTIP_DELAY = 2000;
-  const cancelCloseTip = () => {
-    if (tipCloseTimer.current) {
-      clearTimeout(tipCloseTimer.current);
-      tipCloseTimer.current = null;
-    }
-  };
-  const scheduleCloseTip = () => {
-    cancelCloseTip();
-    tipCloseTimer.current = setTimeout(() => {
-      closeTip();
-    }, TOOLTIP_DELAY);
-  };
-  const openTip = (key: 'a' | 'b' | 'ab', x: number, y: number) => {
-    cancelCloseTip();
-    const raw = listFor(key);
-    const questionItems = parseEvidenceList(raw);
-    const sbtItems = regionFallbackSBTs(key);
-    const items = questionItems.length ? [...questionItems, ...sbtItems] : sbtItems;
-    setTip({ open: true, key, x, y, items, more: 0 });
-  };
-  const closeTip = () => setTip({ open: false, key: '', x: 0, y: 0, items: [], more: 0 });
-
-  const Count = ({ x, y, value, regionKey, label }: VennCountProps) => {
-    const expanded = tip.open && tip.key === regionKey;
-    const venn2RegionKey = regionKey as 'a' | 'b' | 'ab';
-    const handleInteraction = () => openTip(venn2RegionKey, x, y);
-    const hasItems = listFor(regionKey).length > 0 || regionFallbackSBTs(venn2RegionKey).length > 0;
-    return (
-      <g>
-        <text
-          className={styles.vennCount}
-          x={x}
-          y={y}
-          textAnchor="middle"
-          tabIndex={0}
-          role="button"
-          data-region={regionKey}
-          aria-describedby={expanded ? tooltipIdRef.current : undefined}
-          aria-expanded={expanded ? 'true' : 'false'}
-          aria-label={`${label}: ${value}. ${hasItems ? 'Press Enter for details.' : 'No items.'}`}
-          onMouseEnter={handleInteraction}
-          onMouseLeave={scheduleCloseTip}
-          onFocus={handleInteraction}
-          onBlur={scheduleCloseTip}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              handleInteraction();
-            }
-            if (e.key === 'Escape') {
-              e.preventDefault();
-              closeTip();
-            }
-          }}
-        >
-          {value}
-        </text>
-      </g>
-    );
-  };
-
-  return (
-    <div ref={wrapRef} style={resolveCompareVennWrapStyle()}>
-      <svg width={width} height={height} role="img" aria-label="2-set Venn">
-        <defs>
-          <style>{`.vennText{font:12px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;fill:#fff}`}</style>
-        </defs>
-        <circle cx={ax} cy={ay} r={r} fill="rgba(255,255,255,0.12)" />
-        <circle cx={bx} cy={by} r={r} fill="rgba(200,200,255,0.12)" />
-
-        <text className="vennText" x={ax - r + 10} y={ay - r - 6}>
-          {labels[0] || 'A'}
-        </text>
-        <text className="vennText" x={bx + r - 10} y={by - r - 6} textAnchor="end">
-          {labels[1] || 'B'}
-        </text>
-
-        <Count x={ax - 40} y={ay} value={a} regionKey="a" label={`${labels[0] || 'A'} only`} />
-        <Count x={bx + 40} y={ay} value={b} regionKey="b" label={`${labels[1] || 'B'} only`} />
-        <Count x={(ax + bx) / 2} y={ay} value={ab} regionKey="ab" label="Intersection" />
-      </svg>
-
-      {tip.open && (
-        <div
-          id={tooltipIdRef.current}
-          role="tooltip"
-          className={styles.vennTooltip}
-          style={resolveCompareVennTooltipStyle({
-            clientWidth: wrapRef.current?.clientWidth,
-            x: tip.x,
-            y: tip.y,
-          })}
-          onMouseEnter={cancelCloseTip}
-          onMouseLeave={scheduleCloseTip}
-        >
-          <div style={resolveCompareVennTooltipHeaderStyle()}>Intersection details</div>
-          <ul style={resolveCompareVennTooltipListStyle()}>
-            {tip.items.map((item, i) => {
-              const userIndices = keyToIndices[(tip.key || 'a') as keyof typeof keyToIndices] || [];
-              let votes: Array<number | null> = [];
-              if (item.type === 'question' && userIndices.length > 0) {
-                const token = item.option ? `${item.id}::${item.option}` : item.id;
-                votes = userIndices.map((userIndex: number) => {
-                  const cell = encodedStances[userIndex]?.tokens?.get(token);
-                  if (!cell) return null;
-                  if (cell.sign > 0) return 1;
-                  if (cell.sign < 0) return -1;
-                  return 0;
-                });
-              }
-              const label = item.type === 'question' && item.id ? `Q ${shortenQuestionId(item.id)}` : '';
-              const metaLabel = item.type === 'question' && item.optionLabel ? `Option: ${item.optionLabel}` : '';
-
-              return (
-                <li key={i}>
-                  {item.type === 'sbt' && (
-                    <div style={resolveCompareVennSbtRowStyle()}>
-                      {item.image && (
-                        <img
-                          src={normalizeArweaveUrl(item.image, { contextLabel: 'compare_sbt_image' })}
-                          alt=""
-                          width="24"
-                          height="24"
-                          style={resolveCompareVennSbtImageStyle()}
-                        />
-                      )}
-                      <span>{item.name}</span>
-                    </div>
-                  )}
-                  {item.type === 'question' && (
-                    <PolisQuestionHoverCard label={label} prompt={item.prompt} votes={votes} metaLabel={metaLabel} />
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
-
-      <div style={resolveCompareVennNoteStyle()}>
-        {semantics
-          ? semantics
-          : mode === 'opinion'
-            ? 'Counts = opinion-stance overlaps on the same question/token.'
-            : 'Counts = SBT name overlaps across participants (fallback).'}
-      </div>
-    </div>
-  );
-}
-
-function Venn3({
-  sets = [],
-  labels = [],
-  users = null,
-  preCounts = null,
-  evidence = null,
-  semantics = null,
-}: VennProps) {
-  const wrapRef = useRef<HTMLDivElement | null>(null);
-  const [tip, setTip] = useState<CompareVennTooltipState>({ open: false, key: '', x: 0, y: 0, items: [], more: 0 });
-  const tooltipIdRef = useRef(`vennTip_${Math.random().toString(36).slice(2)}`);
-  const tipCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const questionPromptMap = useMemo(() => {
-    const m = new Map<string, string>();
-    (Array.isArray(users) ? users : []).forEach((u) => {
-      (Array.isArray(u?.questions) ? u.questions : []).forEach((q: CompareQuestion) => {
-        const qid = String(q?.id || q?.questionId || q?.qId || '').toLowerCase();
-        const prompt = q?.prompt || q?.title || q?.text || '';
-        if (qid && prompt && !m.has(qid)) m.set(qid, String(prompt));
-      });
-    });
-    if (m.size === 0) {
-      try {
-        const questionsCaches = readDgObjectValues('questionsCache');
-        questionsCaches.forEach((cacheObj) => {
-          if (!cacheObj || typeof cacheObj !== 'object') return;
-          for (const netId in cacheObj) {
-            const qs = readRecordProperty(readRecordProperty(cacheObj, netId), 'questions');
-            for (const id in qs) {
-              const q = toUnknownRecord(qs[id]);
-              const qid = String(q?.id || id || '').toLowerCase();
-              const prompt = q?.prompt;
-              if (qid && prompt && !m.has(qid)) m.set(qid, String(prompt));
-            }
-          }
-        });
-      } catch (e) {
-        void e; /* fallback: agent/e2e mock detection. */
-      }
-    }
-    return m;
-  }, [users]);
-
-  const sbtImageMap = useMemo(() => buildCompareSbtImageMap(users || []), [users]);
-
-  const encodedStances = useMemo(() => (Array.isArray(users) ? users : []).map(encodeStancesForUser), [users]);
-
-  const keyToIndices = useMemo<Record<VennRegionKey, number[]>>(
-    () => ({
-      a: [0],
-      b: [1],
-      c: [2],
-      ab: [0, 1],
-      ac: [0, 2],
-      bc: [1, 2],
-      abc: [0, 1, 2],
-    }),
-    [],
-  );
-
-  let counts: Partial<Record<VennRegionKey, number>> | null = null;
-  let mode = 'opinion';
-  if (preCounts && typeof preCounts === 'object') {
-    counts = preCounts;
-  } else {
-    const [A, B, C] = sets || [];
-    if (!(A && B && C)) return null;
-    const size = (S?: Set<string>) => (S ? S.size : 0);
-    const inter = (S1: Set<string>, S2: Set<string>) => {
-      let c = 0;
-      S1.forEach((v) => {
-        if (S2.has(v)) c++;
-      });
-      return c;
-    };
-    const inter3 = (S1: Set<string>, S2: Set<string>, S3: Set<string>) => {
-      let c = 0;
-      S1.forEach((v) => {
-        if (S2.has(v) && S3.has(v)) c++;
-      });
-      return c;
-    };
-    const abc = inter3(A, B, C);
-    const ab = inter(A, B) - abc;
-    const ac = inter(A, C) - abc;
-    const bc = inter(B, C) - abc;
-    const aOnly = size(A) - (ab + ac + abc);
-    const bOnly = size(B) - (ab + bc + abc);
-    const cOnly = size(C) - (ac + bc + abc);
-    counts = { a: aOnly, b: bOnly, c: cOnly, ab, ac, bc, abc };
-    mode = 'sbt';
-  }
-  const { a = 0, b = 0, c = 0, ab = 0, ac = 0, bc = 0, abc = 0 } = counts || {};
-
-  const width = 360,
-    height = 280,
-    r = 80;
-  const ax = 130,
-    ay = 110;
-  const bx = 230,
-    by = 110;
-  const cx = 180,
-    cy = 170;
-
-  const ev = (evidence || {}) as Partial<Record<VennRegionKey, unknown[]>>;
-  const listFor = (key: VennRegionKey): unknown[] => (Array.isArray(ev[key]) ? ev[key] : []);
-
-  const normalizeStance = (v: unknown): string => {
-    if (v === null || v === undefined) return 'Unsure';
-    if (typeof v === 'number') return v > 0 ? 'Agree' : v < 0 ? 'Disagree' : 'Unsure';
-    if (typeof v === 'boolean') return v ? 'Agree' : 'Disagree';
-    const s = String(v).trim().toLowerCase();
-    if (['1', 'agree', 'strongly agree', 'yes', 'true'].includes(s)) return 'Agree';
-    if (['-1', 'disagree', 'strongly disagree', 'no', 'false'].includes(s)) return 'Disagree';
-    if (['0', 'unsure', 'neutral', 'skip', 'n/a'].includes(s)) return 'Unsure';
-    return 'Unsure';
-  };
-
-  const parseQuestionToken = (raw: unknown): CompareVennQuestionItem | null => {
-    const s = String(raw || '').trim();
-    if (!s) return null;
-    const parts = s.split(' · ');
-    const head = parts[0] ? parts[0].trim() : '';
-    const promptHint = parts.slice(1).join(' · ').trim();
-    const match = head.match(/^(.*)\s*\(([^)]+)\)\s*$/);
-    if (!match) return null;
-    const signRaw = match[2] ? match[2].trim() : '';
-    const signToken = signRaw.replace(/\u2212/g, '-').toLowerCase();
-    const isSign =
-      signToken === '+' ||
-      signToken === '-' ||
-      signToken === '+1' ||
-      signToken === '-1' ||
-      signToken === 'agree' ||
-      signToken === 'disagree' ||
-      signToken === 'unsure' ||
-      signToken === 'neutral';
-    if (!isSign) return null;
-    const tokenPart = match[1] ? match[1].trim() : '';
-    if (!tokenPart) return null;
-    let qid = tokenPart;
-    let optionRaw = '';
-    if (tokenPart.includes('::')) {
-      const bits = tokenPart.split('::');
-      qid = bits.shift() || '';
-      optionRaw = bits.join('::');
-    }
-    const id = String(qid || '').toLowerCase();
-    if (!id) return null;
-    const prompt = questionPromptMap.get(id) || promptHint || '(Question)';
-    const optionLabel = optionRaw ? optionRaw.trim() : '';
-    return {
-      type: 'question',
-      id,
-      option: optionLabel ? optionLabel.toLowerCase() : null,
-      optionLabel: optionLabel || null,
-      prompt,
-    };
-  };
-
-  const parseEvidenceList = (rawList: unknown): CompareVennTooltipItem[] => {
-    const arr = Array.isArray(rawList) ? rawList : [];
-    const out: CompareVennTooltipItem[] = [];
-    for (const item of arr) {
-      if (typeof item === 'string') {
-        if (item.startsWith('question:')) {
-          const parts = item.split(':');
-          const qid = String(parts[1] || '').toLowerCase();
-          const prompt = questionPromptMap.get(qid) || '(Question)';
-          const stance = normalizeStance(parts[2]);
-          out.push({ type: 'question', prompt, stance, id: qid, option: null, optionLabel: null });
-        } else {
-          const parsed = parseQuestionToken(item);
-          if (parsed) {
-            out.push(parsed);
-          } else {
-            const name = item;
-            const info = sbtImageMap.get(String(name)) || null;
-            out.push({ type: 'sbt', name: info?.name || name, image: info?.image || null });
-          }
-        }
-      } else if (item && typeof item === 'object') {
-        const qidMaybe = item.questionId || item.qId || item.id;
-        const sbtNameMaybe = resolveSbtDisplayNameForCompareEntry(item);
-        if (qidMaybe && !sbtNameMaybe) {
-          const qid = String(qidMaybe).toLowerCase();
-          const prompt = item.prompt || questionPromptMap.get(qid) || '(Question)';
-          const stance = normalizeStance(item.stance ?? item.sign ?? item?.answer?.value);
-          const optionLabel = item.option || item.choice || item.optionLabel || '';
-          out.push({
-            type: 'question',
-            prompt,
-            stance,
-            id: qid,
-            option: optionLabel ? String(optionLabel).trim().toLowerCase() : null,
-            optionLabel: optionLabel ? String(optionLabel).trim() : null,
-          });
-        } else if (sbtNameMaybe) {
-          const nm = String(sbtNameMaybe);
-          const look = sbtImageMap.get(resolveSbtCompareKeyForEntry(item) || nm);
-          const image = item.image || item?.sbtInfo?.image || look?.image || null;
-          const pretty = resolveSbtDisplayNameForCompareEntry(item) || look?.name || nm;
-          out.push({ type: 'sbt', name: pretty, image });
-        }
-      }
-    }
-    return out;
-  };
-
-  const regionFallbackSBTs = (key: VennRegionKey): CompareVennSbtItem[] => {
-    const [A, B, C] = sets || [];
-    if (!(A && B && C)) return [];
-    const toArr = (S?: Set<string>) => Array.from(S || []);
-    const inter = (S1: Set<string>, S2: Set<string>) => {
-      const r = new Set<string>();
-      S1.forEach((v) => {
-        if (S2.has(v)) r.add(v);
-      });
-      return r;
-    };
-    const inter3 = (S1: Set<string>, S2: Set<string>, S3: Set<string>) => {
-      const r = new Set<string>();
-      S1.forEach((v) => {
-        if (S2.has(v) && S3.has(v)) r.add(v);
-      });
-      return r;
-    };
-    const diff = (S1: Set<string>, S2: Set<string>) => {
-      const r = new Set<string>();
-      S1.forEach((v) => {
-        if (!S2.has(v)) r.add(v);
-      });
-      return r;
-    };
-    let names: string[] = [];
-    if (key === 'a') names = toArr(diff(diff(A, B), C));
-    else if (key === 'b') names = toArr(diff(diff(B, A), C));
-    else if (key === 'c') names = toArr(diff(diff(C, A), B));
-    else if (key === 'ab') names = toArr(diff(inter(A, B), C));
-    else if (key === 'ac') names = toArr(diff(inter(A, C), B));
-    else if (key === 'bc') names = toArr(diff(inter(B, C), A));
-    else if (key === 'abc') names = toArr(inter3(A, B, C));
-    return names.map((nm) => {
-      const look = sbtImageMap.get(String(nm));
-      return { type: 'sbt', name: look?.name || nm, image: look?.image || null };
-    });
-  };
-
-  const TOOLTIP_DELAY = 2000;
-  const cancelCloseTip = () => {
-    if (tipCloseTimer.current) {
-      clearTimeout(tipCloseTimer.current);
-      tipCloseTimer.current = null;
-    }
-  };
-  const scheduleCloseTip = () => {
-    cancelCloseTip();
-    tipCloseTimer.current = setTimeout(() => {
-      closeTip();
-    }, TOOLTIP_DELAY);
-  };
-  const openTip = (key: VennRegionKey, x: number, y: number) => {
-    cancelCloseTip();
-    const raw = listFor(key);
-    const questionItems = parseEvidenceList(raw);
-    const sbtItems = regionFallbackSBTs(key);
-    const items = questionItems.length ? [...questionItems, ...sbtItems] : sbtItems;
-    setTip({ open: true, key, x, y, items, more: 0 });
-  };
-  const closeTip = () => setTip({ open: false, key: '', x: 0, y: 0, items: [], more: 0 });
-
-  const Count = ({ x, y, value, regionKey, label }: VennCountProps) => {
-    const expanded = tip.open && tip.key === regionKey;
-    const handleInteraction = () => openTip(regionKey, x, y);
-    const hasItems = listFor(regionKey).length > 0 || regionFallbackSBTs(regionKey).length > 0;
-    return (
-      <g>
-        <text
-          className={styles.vennCount}
-          x={x}
-          y={y}
-          textAnchor="middle"
-          tabIndex={0}
-          role="button"
-          data-region={regionKey}
-          aria-describedby={expanded ? tooltipIdRef.current : undefined}
-          aria-expanded={expanded ? 'true' : 'false'}
-          aria-label={`${label}: ${value}. ${hasItems ? 'Press Enter for details.' : 'No items.'}`}
-          onMouseEnter={handleInteraction}
-          onMouseLeave={scheduleCloseTip}
-          onFocus={handleInteraction}
-          onBlur={scheduleCloseTip}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              handleInteraction();
-            }
-            if (e.key === 'Escape') {
-              e.preventDefault();
-              closeTip();
-            }
-          }}
-        >
-          {value}
-        </text>
-      </g>
-    );
-  };
-
-  return (
-    <div ref={wrapRef} style={resolveCompareVennWrapStyle()}>
-      <svg width={width} height={height} role="img" aria-label="3-set Venn">
-        <defs>
-          <style>{`.vennText{font:12px system-ui, -apple-system, Segoe UI, Roboto, sans-serif; fill:#fff}`}</style>
-        </defs>
-        <circle cx={ax} cy={ay} r={r} fill="rgba(255,255,255,0.12)" />
-        <circle cx={bx} cy={by} r={r} fill="rgba(200,200,255,0.12)" />
-        <circle cx={cx} cy={cy} r={r} fill="rgba(200,255,200,0.12)" />
-
-        <text className="vennText" x={ax - r} y={ay - r - 6}>
-          {labels[0] || 'A'}
-        </text>
-        <text className="vennText" x={bx + r - 24} y={by - r - 6} textAnchor="end">
-          {labels[1] || 'B'}
-        </text>
-        <text className="vennText" x={cx} y={cy + r + 18} textAnchor="middle">
-          {labels[2] || 'C'}
-        </text>
-
-        <Count x={ax - 35} y={ay} value={a} regionKey="a" label={`${labels[0] || 'A'} only`} />
-        <Count x={bx + 35} y={by} value={b} regionKey="b" label={`${labels[1] || 'B'} only`} />
-        <Count x={cx} y={cy + 10} value={c} regionKey="c" label={`${labels[2] || 'C'} only`} />
-        <Count x={(ax + bx) / 2} y={ay - 8} value={ab} regionKey="ab" label="A & B" />
-        <Count x={(ax + cx) / 2 - 5} y={(ay + cy) / 2 + 4} value={ac} regionKey="ac" label="A & C" />
-        <Count x={(bx + cx) / 2 + 5} y={(by + cy) / 2 + 4} value={bc} regionKey="bc" label="B & C" />
-        <Count x={(ax + bx + cx) / 3} y={(ay + by + cy) / 3 + 2} value={abc} regionKey="abc" label="A & B & C" />
-      </svg>
-
-      {tip.open && (
-        <div
-          id={tooltipIdRef.current}
-          role="tooltip"
-          className={styles.vennTooltip}
-          style={resolveCompareVennTooltipStyle({
-            clientWidth: wrapRef.current?.clientWidth,
-            x: tip.x,
-            y: tip.y,
-          })}
-          onMouseEnter={cancelCloseTip}
-          onMouseLeave={scheduleCloseTip}
-        >
-          <div style={resolveCompareVennTooltipHeaderStyle()}>Intersection details</div>
-          <ul style={resolveCompareVennTooltipListStyle()}>
-            {tip.items.map((item, i) => {
-              const userIndices = keyToIndices[(tip.key || 'a') as keyof typeof keyToIndices] || [];
-              let votes: Array<number | null> = [];
-              if (item.type === 'question' && userIndices.length > 0) {
-                const token = item.option ? `${item.id}::${item.option}` : item.id;
-                votes = userIndices.map((userIndex: number) => {
-                  const cell = encodedStances[userIndex]?.tokens?.get(token);
-                  if (!cell) return null;
-                  if (cell.sign > 0) return 1;
-                  if (cell.sign < 0) return -1;
-                  return 0;
-                });
-              }
-              const label = item.type === 'question' && item.id ? `Q ${shortenQuestionId(item.id)}` : '';
-              const metaLabel = item.type === 'question' && item.optionLabel ? `Option: ${item.optionLabel}` : '';
-
-              return (
-                <li key={i}>
-                  {item.type === 'sbt' && (
-                    <div style={resolveCompareVennSbtRowStyle()}>
-                      {item.image && (
-                        <img
-                          src={normalizeArweaveUrl(item.image, { contextLabel: 'compare_sbt_image' })}
-                          alt=""
-                          width="24"
-                          height="24"
-                          style={resolveCompareVennSbtImageStyle()}
-                        />
-                      )}
-                      <span>{item.name}</span>
-                    </div>
-                  )}
-                  {item.type === 'question' && (
-                    <PolisQuestionHoverCard label={label} prompt={item.prompt} votes={votes} metaLabel={metaLabel} />
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
-
-      <div style={resolveCompareVennNoteStyle()}>
-        {semantics
-          ? semantics
-          : mode === 'opinion'
-            ? 'Counts = opinion-stance overlaps on the same question/token.'
-            : 'Counts = SBT name overlaps across participants (fallback).'}
-      </div>
-    </div>
-  );
-}
-
 export function OpinionCompass2D({ users = [], labels = [], precomputed = null }: OpinionCompassProps) {
   const svgRef = React.useRef<SVGSVGElement | null>(null);
 
@@ -2755,8 +1921,8 @@ export function OpinionCompass2D({ users = [], labels = [], precomputed = null }
   const toX = (v: number) => cx + r * Number(v || 0);
   const toY = (v: number) => cy - r * Number(v || 0);
   const ticks = [-1, -0.5, 0, 0.5, 1];
-
-  const colorFor = (i: number) => `hsl(${(i * 50) % 360}, 70%, 50%)`;
+  const quadrants = buildCompareCompassQuadrants({ cx, cy, height, width });
+  const colorFor = resolveCompareCompassSeriesColor;
 
   const addrIdx = new Map((users || []).map((u, i) => [String(u?.address || '').toLowerCase(), i]));
   const pointsOrdered = precomputed.points
@@ -2796,7 +1962,7 @@ export function OpinionCompass2D({ users = [], labels = [], precomputed = null }
       if (!ctx) return;
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       const a = document.createElement('a');
-      a.download = 'compass.png';
+      a.download = COMPARE_GRAPHIC_FILENAME;
       a.href = canvas.toDataURL('image/png');
       a.click();
     };
@@ -2840,10 +2006,13 @@ export function OpinionCompass2D({ users = [], labels = [], precomputed = null }
           >
             {/* Background quadrants */}
             <rect x="0" y="0" width={width} height={height} fill="transparent" />
-            <rect x={cx} y={cy} width={width - cx} height={height - cy} fill="rgba(255,255,255,0.04)" />
-            <rect x={0} y={cy} width={cx} height={height - cy} fill="rgba(255,255,255,0.04)" />
-            <rect x={0} y={0} width={cx} height={cy} fill="rgba(255,255,255,0.05)" />
-            <rect x={cx} y={0} width={width - cx} height={cy} fill="rgba(255,255,255,0.05)" />
+            {quadrants.map(({ intensity, ...rect }, index) => (
+              <rect
+                key={`quadrant-${index}`}
+                {...rect}
+                fill={`color-mix(in srgb, var(--ce-text-inverse) ${intensity}%, transparent)`}
+              />
+            ))}
 
             {/* Subtle grid */}
             {ticks.map((t) => (
@@ -2853,11 +2022,18 @@ export function OpinionCompass2D({ users = [], labels = [], precomputed = null }
                   y1={cy - r}
                   x2={toX(t)}
                   y2={cy + r}
-                  stroke="rgba(255,255,255,0.12)"
+                  stroke="color-mix(in srgb, var(--ce-text-inverse) 12%, transparent)"
                   strokeWidth="1"
                   strokeDasharray={t === 0 ? '0' : '3,4'}
                 />
-                <text x={toX(t)} y={cy + r + 16} fontSize="11" textAnchor="middle" fill="#fff" opacity="0.8">
+                <text
+                  x={toX(t)}
+                  y={cy + r + 16}
+                  fontSize="11"
+                  textAnchor="middle"
+                  fill="var(--ce-panel-text)"
+                  opacity="0.8"
+                >
                   {t}
                 </text>
               </g>
@@ -2869,22 +2045,38 @@ export function OpinionCompass2D({ users = [], labels = [], precomputed = null }
                   y1={toY(t)}
                   x2={cx + r}
                   y2={toY(t)}
-                  stroke="rgba(255,255,255,0.12)"
+                  stroke="color-mix(in srgb, var(--ce-text-inverse) 12%, transparent)"
                   strokeWidth="1"
                   strokeDasharray={t === 0 ? '0' : '3,4'}
                 />
-                <text x={cx - r - 16} y={toY(t) + 4} fontSize="11" textAnchor="end" fill="#fff" opacity="0.8">
+                <text
+                  x={cx - r - 16}
+                  y={toY(t) + 4}
+                  fontSize="11"
+                  textAnchor="end"
+                  fill="var(--ce-panel-text)"
+                  opacity="0.8"
+                >
                   {t}
                 </text>
               </g>
             ))}
 
             {/* Axes */}
-            <line x1={cx - r} y1={cy} x2={cx + r} y2={cy} stroke="rgba(255,255,255,0.6)" strokeWidth="2" />
-            <line x1={cx} y1={cy - r} x2={cx} y2={cy + r} stroke="rgba(255,255,255,0.6)" strokeWidth="2" />
+            {[
+              { x1: cx - r, y1: cy, x2: cx + r, y2: cy },
+              { x1: cx, y1: cy - r, x2: cx, y2: cy + r },
+            ].map((line, index) => (
+              <line
+                key={`axis-${index}`}
+                {...line}
+                stroke="color-mix(in srgb, var(--ce-text-inverse) 60%, transparent)"
+                strokeWidth="2"
+              />
+            ))}
 
             {/* Axis labels (titles as tooltips) */}
-            <text x={cx + r} y={cy + 30} fontSize="13" textAnchor="end" fill="#fff" opacity="0.95">
+            <text x={cx + r} y={cy + 30} fontSize="13" textAnchor="end" fill="var(--ce-panel-text)" opacity="0.95">
               <title>{xDesc}</title>
               {xLabel}
             </text>
@@ -2893,7 +2085,7 @@ export function OpinionCompass2D({ users = [], labels = [], precomputed = null }
               y={cy - r}
               fontSize="13"
               textAnchor="end"
-              fill="#fff"
+              fill="var(--ce-panel-text)"
               opacity="0.95"
               transform={`rotate(-90 ${cx - 30},${cy - r})`}
             >
@@ -2912,9 +2104,16 @@ export function OpinionCompass2D({ users = [], labels = [], precomputed = null }
               const dy = (i % 3) - 1; // -1,0,1
               return (
                 <g key={`pt-${i}`} aria-label={`${label} at (${p.x.toFixed(2)}, ${p.y.toFixed(2)})`}>
-                  <circle cx={px} cy={py} r="5.5" fill={color} stroke="rgba(255,255,255,0.9)" strokeWidth="1" />
+                  <circle
+                    cx={px}
+                    cy={py}
+                    r="5.5"
+                    fill={color}
+                    stroke="color-mix(in srgb, var(--ce-text-inverse) 90%, transparent)"
+                    strokeWidth="1"
+                  />
                   <title>{`${label} • x=${p.x.toFixed(2)}, y=${p.y.toFixed(2)}`}</title>
-                  <text x={px + dx} y={py + dy * 3} fontSize="12" fill="#fff" opacity="0.95">
+                  <text x={px + dx} y={py + dy * 3} fontSize="12" fill="var(--ce-panel-text)" opacity="0.95">
                     {label}
                   </text>
                 </g>

@@ -105,7 +105,13 @@ describe('useRollingTranscriptionRecorder', () => {
       await result.current.startRecording();
     });
 
-    expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith({ audio: true });
+    expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith({
+      audio: expect.objectContaining({
+        autoGainControl: true,
+        echoCancellation: true,
+        noiseSuppression: true,
+      }),
+    });
     expect(instances).toHaveLength(1);
     expect(instances[0].start).toHaveBeenCalledTimes(1);
     expect(result.current.status).toBe('recording');

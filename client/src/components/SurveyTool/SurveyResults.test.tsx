@@ -436,7 +436,7 @@ describe('SurveyResults display helpers', () => {
     expect(SURVEY_RESULTS_CLICKABLE_ICON_STYLE).toEqual({ cursor: 'pointer' });
     expect(SURVEY_RESULTS_METADATA_MISSING_STYLE).toEqual({
       fontStyle: 'italic',
-      color: '#bbb',
+      color: 'var(--ce-text-muted)',
       padding: '1rem',
     });
     expect(SURVEY_RESULTS_TABLE_CELL_STYLE).toEqual({ textAlign: 'center' });
@@ -461,11 +461,11 @@ describe('SurveyResults display helpers', () => {
     expect(resolveSurveyResultsSyncDetailsStyle(false)).toEqual({ display: undefined });
     expect(resolveSurveyResultsToggleKnobStyle(true)).toEqual({
       left: '31px',
-      backgroundColor: '#4caf50',
+      backgroundColor: 'var(--ce-status-success)',
     });
     expect(resolveSurveyResultsToggleKnobStyle(false)).toEqual({
       left: '1px',
-      backgroundColor: '#fff',
+      backgroundColor: 'var(--ce-control-face)',
     });
   });
 });

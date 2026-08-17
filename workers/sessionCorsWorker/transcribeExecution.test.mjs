@@ -100,7 +100,7 @@ test('transcribe preserves custom provider blocked-target rejection before upstr
         payload: {
           provider: 'custom',
           requestApiKey: 'sk-local',
-          requestRpcUrl: 'http://127.0.0.1:8080/transcribe',
+          requestRpcUrl: 'https://127.0.0.1:8080/transcribe',
           upstreamFormData: new FormData(),
         },
       }),
@@ -116,6 +116,96 @@ test('transcribe preserves custom provider blocked-target rejection before upstr
   assert.deepEqual(result, {
     body: { error: 'Custom transcription URL target is not allowed' },
     status: 403,
+    headers: { 'Access-Control-Allow-Origin': '*' },
+  });
+});
+
+test('transcribe rejects malformed, insecure, and credential-bearing custom URLs before fetch', async () => {
+  const cases = [
+    ['not-a-url', 'Custom transcription URL target is not allowed'],
+    ['http://transcribe.example/v1', 'Custom transcription URL must use HTTPS'],
+    [
+      ['https://user:password', 'transcribe.example/v1'].join('@'),
+      'Custom transcription URL must not contain credentials',
+    ],
+  ];
+
+  for (const [requestRpcUrl, expectedError] of cases) {
+    let fetchCalled = false;
+    const result = await transcribe({
+      request: { headers: new Headers() },
+      secrets: {},
+      baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+      deps: {
+        json: createJsonStub(),
+        readTranscribeRequestPayload: async () => ({
+          ok: true,
+          payload: {
+            provider: 'custom',
+            requestApiKey: 'sk-local',
+            requestRpcUrl,
+            upstreamFormData: new FormData(),
+          },
+        }),
+        isBlockedOutboundUrl: () => false,
+        safeFetch: async () => {
+          fetchCalled = true;
+          return new Response();
+        },
+      },
+    });
+
+    assert.equal(fetchCalled, false);
+    assert.deepEqual(result, {
+      body: { error: expectedError },
+      status: 403,
+      headers: { 'Access-Control-Allow-Origin': '*' },
+    });
+  }
+});
+
+test('transcribe applies strict redirect policy to valid custom HTTPS requests', async () => {
+  const upstreamFormData = new FormData();
+  let fetchArgs = null;
+
+  const result = await transcribe({
+    request: { headers: new Headers() },
+    secrets: {},
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    deps: {
+      json: createJsonStub(),
+      readTranscribeRequestPayload: async () => ({
+        ok: true,
+        payload: {
+          provider: 'custom',
+          requestApiKey: 'sk-local',
+          requestRpcUrl: 'https://transcribe.example/v1',
+          upstreamFormData,
+        },
+      }),
+      isBlockedOutboundUrl: () => false,
+      safeFetch: async (...args) => {
+        fetchArgs = args;
+        return new Response(JSON.stringify({ text: 'done' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      },
+    },
+  });
+
+  assert.deepEqual(fetchArgs, [
+    'https://transcribe.example/v1',
+    {
+      method: 'POST',
+      headers: { authorization: 'Bearer sk-local' },
+      body: upstreamFormData,
+      outboundUrlPolicy: 'strict-https-no-credentials',
+    },
+  ]);
+  assert.deepEqual(result, {
+    body: { text: 'done' },
+    status: 200,
     headers: { 'Access-Control-Allow-Origin': '*' },
   });
 });

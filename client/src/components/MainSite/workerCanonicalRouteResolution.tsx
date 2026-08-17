@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { BootRecoveryReady } from '../ErrorBoundary/InitialRouteBoundary';
 import WorkerCanonicalSessionBootstrapBoundary from '../Sessions/WorkerCanonicalSessionBootstrapBoundary';
 import { sessionRegistryReadsPort } from '../../domains/sessions/registry/sessionRegistryReadPorts.js';
 import {
@@ -273,11 +274,14 @@ export const resolveMainSiteSessionRouteForRender = ({
 
 export const renderWorkerCanonicalRouteError = (route: WorkerCanonicalRouteState): React.ReactElement | null =>
   route.kind === 'error' ? (
-    <div role="alert" data-testid="ce-worker-canonical-discovery-error">
-      <h3>Worker discovery record missing or invalid</h3>
-      <p>{route.error}</p>
-      <a href={buildPublicRoute('/new')}>Return to session selection</a>
-    </div>
+    <>
+      <div role="alert" data-testid="ce-worker-canonical-discovery-error">
+        <h3>Worker discovery record missing or invalid</h3>
+        <p>{route.error}</p>
+        <a href={buildPublicRoute('/new')}>Return to session selection</a>
+      </div>
+      <BootRecoveryReady />
+    </>
   ) : null;
 
 export const renderWorkerCanonicalRouteBootstrap = (
@@ -306,19 +310,22 @@ export const renderUnresolvedMainSiteSessionId = (
     return <SessionLoadingSkeleton statusTitle={`Resolving ${unresolvedSessionId} Session...`} />;
   }
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '50vh',
-        color: 'rgba(244,247,255,0.65)',
-      }}
-    >
-      <h3>Session Not Found</h3>
-      <p>No session metadata was found for {unresolvedSessionId}.</p>
-    </div>
+    <>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '50vh',
+          color: 'var(--ce-panel-text-muted)',
+        }}
+      >
+        <h3>Session Not Found</h3>
+        <p>No session metadata was found for {unresolvedSessionId}.</p>
+      </div>
+      <BootRecoveryReady />
+    </>
   );
 };
 
@@ -338,7 +345,14 @@ export const renderMissingMainSiteSessionConfig = ({
   if (sessionConfig) return null;
   const workerBootstrap = renderWorkerCanonicalRouteBootstrap(workerRoute, workerController);
   if (workerBootstrap) return workerBootstrap;
-  if (!slug) return <div>Session not found.</div>;
+  if (!slug) {
+    return (
+      <>
+        <div>Session not found.</div>
+        <BootRecoveryReady />
+      </>
+    );
+  }
 
   const slugStatus = host._sessionPathResolver.getSlugStatus(slug);
   const recentError = !!(slugStatus.lastErrorTs && Date.now() - slugStatus.lastErrorTs < 2 * 60 * 1000);
@@ -348,18 +362,21 @@ export const renderMissingMainSiteSessionConfig = ({
     return <SessionLoadingSkeleton statusTitle={`Resolving ${slug} Session...`} />;
   }
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '50vh',
-        color: 'rgba(244,247,255,0.65)',
-      }}
-    >
-      <h3>Session Not Found</h3>
-      <p>No session metadata was found for {slug}.</p>
-    </div>
+    <>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '50vh',
+          color: 'var(--ce-panel-text-muted)',
+        }}
+      >
+        <h3>Session Not Found</h3>
+        <p>No session metadata was found for {slug}.</p>
+      </div>
+      <BootRecoveryReady />
+    </>
   );
 };

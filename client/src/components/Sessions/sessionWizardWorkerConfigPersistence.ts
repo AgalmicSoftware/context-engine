@@ -49,7 +49,9 @@ export type VerifiedSessionWizardWorkerConfig = {
 // Cloudflare KV may serve a stale or missing value for roughly a minute after a
 // successful write. Keep the default horizon production-realistic while tests
 // inject bounded zero/small delays through the existing port.
-const DEFAULT_RETRY_DELAYS_MS = Object.freeze([250, 500, 1_000, 2_000, 4_000, 8_000, 12_000, 16_000, 17_000]);
+export const SESSION_WIZARD_WORKER_CONFIG_VISIBILITY_RETRY_DELAYS_MS = Object.freeze([
+  250, 500, 1_000, 2_000, 4_000, 8_000, 12_000, 16_000, 17_000,
+]);
 const RETRYABLE_CONFIG_READ_STATUSES = new Set([404, 408, 425, 429]);
 const isRetryableConfigReadStatus = (status: number): boolean =>
   RETRYABLE_CONFIG_READ_STATUSES.has(status) || (status >= 500 && status <= 599);
@@ -61,6 +63,7 @@ const PUBLIC_WORKER_CONFIG_FIELDS = Object.freeze([
   'configRevision',
   'sessionName',
   'sessionInfo',
+  'appearance',
   'sessionHeaderImg',
   'sessionEndsAt',
   'defaultTags',
@@ -363,7 +366,7 @@ export const persistAndVerifySessionWizardWorkerConfig = async ({
   fetchImpl = globalThis.fetch.bind(globalThis),
   configRevision,
   sleep = defaultSleep,
-  retryDelaysMs = DEFAULT_RETRY_DELAYS_MS,
+  retryDelaysMs = SESSION_WIZARD_WORKER_CONFIG_VISIBILITY_RETRY_DELAYS_MS,
   environment,
 }: PersistAndVerifySessionWizardWorkerConfigInput): Promise<VerifiedSessionWizardWorkerConfig> => {
   let workerOrigin = '';
@@ -442,7 +445,7 @@ export const persistAndVerifySessionWizardWorkerConfig = async ({
 
   const delays = Array.isArray(retryDelaysMs)
     ? retryDelaysMs.map((delay) => Math.max(0, Number(delay) || 0))
-    : [...DEFAULT_RETRY_DELAYS_MS];
+    : [...SESSION_WIZARD_WORKER_CONFIG_VISIBILITY_RETRY_DELAYS_MS];
   for (let attempt = 0; attempt <= delays.length; attempt += 1) {
     let readResponse: Response;
     try {

@@ -101,7 +101,6 @@ export const buildSurveyQuestionsFullQuestionResponseInputDescriptor = ({
   answer,
   glowAnswer = false,
   isSubmitting = false,
-  singleQuestionMode = false,
 }: {
   question: SurveyQuestionRecord;
   answer: SurveyAnswerRecord;
@@ -127,7 +126,8 @@ export const buildSurveyQuestionsFullQuestionResponseInputDescriptor = ({
         questionId: question.id,
         ratingValue: getNormalizedUiRatingValue(answer.value),
         disabled,
-        useDeferredRating: !!singleQuestionMode,
+        // Regression guard: keep pointer-drag ticks local; parent updates rebuild the full question list.
+        useDeferredRating: true,
       };
     case 'binary':
       return {

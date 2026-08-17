@@ -13,21 +13,21 @@ type DemoSessionEntry = {
 const demoSessionEntries = demoSessions as Record<string, DemoSessionEntry>;
 
 const cardStyle: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.06)',
-  borderRadius: 12,
+  background: 'var(--ce-card-bg)',
+  borderRadius: 'var(--ce-radius-12)',
   padding: 24,
   marginBottom: 16,
 };
 
 const linkStyle: React.CSSProperties = {
-  color: '#4dffa4',
+  color: 'var(--ce-link)',
   textDecoration: 'none',
   display: 'inline-flex',
   alignItems: 'center',
   padding: '10px 14px',
-  borderRadius: 8,
-  background: 'rgba(255,255,255,0.08)',
-  border: '1px solid rgba(255,255,255,0.12)',
+  borderRadius: 'var(--ce-radius-8)',
+  background: 'var(--ce-input-bg)',
+  border: '1px solid var(--ce-input-border)',
   opacity: 0.85,
 };
 
@@ -37,14 +37,14 @@ const DemosIndex = () => {
 
   return (
     <div style={{ padding: '40px 20px', maxWidth: 960, margin: '0 auto' }}>
-      <h1 style={{ color: '#f4f7ff', marginBottom: 24 }}>Demos</h1>
-      <p style={{ color: 'rgba(244,247,255,0.65)', marginBottom: 32 }}>
+      <h1 style={{ color: 'var(--ce-panel-text)', marginBottom: 24 }}>Demos</h1>
+      <p style={{ color: 'var(--ce-panel-text-muted)', marginBottom: 32 }}>
         Explore previous Context Engine trials and demo sessions.
       </p>
       {demoEntries.map(([key, session]) => (
         <div key={key} style={cardStyle}>
-          <h3 style={{ color: '#f4f7ff', margin: 0 }}>{session.sessionName}</h3>
-          <p style={{ color: 'rgba(244,247,255,0.65)', margin: '8px 0 16px' }}>{session.sessionInfo}</p>
+          <h3 style={{ color: 'var(--ce-panel-text)', margin: 0 }}>{session.sessionName}</h3>
+          <p style={{ color: 'var(--ce-panel-text-muted)', margin: '8px 0 16px' }}>{session.sessionInfo}</p>
           <Link to={`${basePath}/session${session.slug ? `/${session.slug}` : ''}`} style={linkStyle}>
             Try Demo →
           </Link>

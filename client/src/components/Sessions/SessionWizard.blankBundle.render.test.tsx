@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { buildContractViewerContracts } from '../ContractPage/contractViewerUtils.js';
+import { buildContractViewerContracts } from '../DocsPage/contractViewerUtils.js';
 
 const mockTestAdminAddress = '0x00000000000000000000000000000000000000aa';
 const TEST_ADMIN_ADDRESS = mockTestAdminAddress;
@@ -76,7 +76,7 @@ jest.mock('../Shared/Json/JsonControls', () => ({
   JsonPanel: () => null,
   JsonButtonRow: () => null,
 }));
-jest.mock('../ContractPage/contractViewerUtils.js', () => ({
+jest.mock('../DocsPage/contractViewerUtils.js', () => ({
   buildContractViewerContracts: jest.fn(),
 }));
 
@@ -348,7 +348,7 @@ describe('SessionWizard blank bundle render regression', () => {
     });
 
     await selectDecentralizedProfile();
-    fireEvent.click(screen.getByRole('button', { name: /step \d+: worker/i }));
+    fireEvent.click(screen.getByRole('button', { name: /step \d+: session worker/i }));
 
     const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
     setControlledInputValue(cloudflareTokenInput, 'cf-test-token');
@@ -432,7 +432,7 @@ describe('SessionWizard blank bundle render regression', () => {
     });
 
     await selectDecentralizedProfile();
-    fireEvent.click(screen.getByRole('button', { name: /step \d+: worker/i }));
+    fireEvent.click(screen.getByRole('button', { name: /step \d+: session worker/i }));
 
     const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
     setControlledInputValue(cloudflareTokenInput, 'cf-test-token');
@@ -544,7 +544,7 @@ describe('SessionWizard blank bundle render regression', () => {
     });
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
-    fireEvent.click(await screen.findByRole('button', { name: /step \d+: worker/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /step \d+: session worker/i }));
 
     await waitFor(() => {
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveValue('');

@@ -3,6 +3,12 @@ import {
   computeAggregatorSourceSnapshotSignature,
   hasCachedCreateSbtForm,
 } from './OnePageSession';
+import {
+  buildDemoFixtureAggregatorRows,
+  buildOnePageSessionAggregatorCacheResult,
+  mergeAggregatorResultRows,
+  shouldUseBuiltInDemoAggregatorFallback,
+} from './onePageSessionAggregatorCacheRuntime';
 
 describe('OnePageSession helpers', () => {
   beforeEach(() => {
@@ -260,6 +266,109 @@ describe('OnePageSession helpers', () => {
       const second = computeAggregatorSourceSnapshotSignature(questionResponses);
 
       expect(second).not.toBe(first);
+    });
+  });
+
+  describe('demo fixture aggregator support', () => {
+    it('enables only the built-in or correctly scoped simulated demo sources', () => {
+      expect(shouldUseBuiltInDemoAggregatorFallback('demo', '')).toBe(true);
+      expect(shouldUseBuiltInDemoAggregatorFallback('demo', 'demo')).toBe(true);
+      expect(shouldUseBuiltInDemoAggregatorFallback('demo-2', '')).toBe(true);
+      expect(shouldUseBuiltInDemoAggregatorFallback('demo-2', 'demo-2')).toBe(true);
+      expect(shouldUseBuiltInDemoAggregatorFallback('demo-2', 'demo-sh')).toBe(false);
+      expect(shouldUseBuiltInDemoAggregatorFallback('demo-1', 'demo-1')).toBe(false);
+    });
+
+    it('builds typed demo-2 rows with fixture question ids and no rows for other slugs', () => {
+      const rows = buildDemoFixtureAggregatorRows('demo-2', 'demo-2');
+
+      expect(rows).not.toBeNull();
+      expect(Object.keys(rows)).toHaveLength(40);
+      expect(Object.values(rows).flat().length).toBeGreaterThan(1000);
+      expect(
+        Object.values(rows)
+          .flat()
+          .every((row) => JSON.parse(row.response).source === 'demo-polis-data'),
+      ).toBe(true);
+      expect(buildDemoFixtureAggregatorRows('demo-sh', 'demo-sh')).toBeNull();
+      expect(buildDemoFixtureAggregatorRows('demo-2', 'demo-sh')).toBeNull();
+    });
+
+    it('lets live rows replace simulated rows from the same responder only', () => {
+      const target = {
+        q1: [
+          { responder: '0xA', questionId: 'q1', response: 'fixture-a' },
+          { responder: '0xB', questionId: 'q1', response: 'fixture-b' },
+        ],
+      };
+
+      mergeAggregatorResultRows(
+        target,
+        { q1: [{ responder: '0xa', questionId: 'q1', response: 'live-a' }] },
+        { sourceWinsResponderCollisions: true },
+      );
+
+      expect(target.q1).toEqual([
+        { responder: '0xB', questionId: 'q1', response: 'fixture-b' },
+        { responder: '0xa', questionId: 'q1', response: 'live-a' },
+      ]);
+    });
+
+    it('returns demo-2 fixture rows without a cache scope and overlays live cache rows by responder', () => {
+      const fixtureRows = buildDemoFixtureAggregatorRows('demo-2', 'demo-2');
+      const questionId = Object.keys(fixtureRows)[0];
+      const fixtureResponder = fixtureRows[questionId][0].responder;
+      const readQuestionsCache = jest.fn(() => ({
+        84532: {
+          questions: {
+            [questionId]: {
+              id: questionId,
+              type: 'binary',
+              sessionSlug: 'demo-2',
+              sessionSlugExplicit: true,
+            },
+          },
+          questionResponses: {
+            [questionId]: {
+              [fixtureResponder]: {
+                type: 'binary',
+                sessionSlug: 'demo-2',
+                answer: { value: 'Disagree', encrypted: false },
+              },
+            },
+          },
+        },
+      }));
+      const baseParams = {
+        displaySlug: 'demo-2',
+        questionSourceSlug: 'demo-2',
+        parseMemo: new Map(),
+        resolveQuestionPool: () => [],
+        workerCacheIdentity: null,
+        writeQuestionsCache: jest.fn(),
+      };
+
+      const fixtureOnly = buildOnePageSessionAggregatorCacheResult({
+        ...baseParams,
+        cacheScope: '',
+        isQuestionCacheReady: false,
+        readQuestionsCache,
+      });
+      expect(Object.keys(fixtureOnly.map)).toHaveLength(40);
+      expect(readQuestionsCache).not.toHaveBeenCalled();
+
+      const withLiveResponse = buildOnePageSessionAggregatorCacheResult({
+        ...baseParams,
+        cacheScope: '84532',
+        isQuestionCacheReady: true,
+        readQuestionsCache,
+      });
+      const responderRows = withLiveResponse.map[questionId].filter(
+        (row) => row.responder.toLowerCase() === fixtureResponder.toLowerCase(),
+      );
+      expect(responderRows).toHaveLength(1);
+      expect(JSON.parse(responderRows[0].response).answer.value).toBe('Disagree');
+      expect(baseParams.writeQuestionsCache).not.toHaveBeenCalled();
     });
   });
 });

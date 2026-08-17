@@ -639,7 +639,7 @@ describe('sbtPageHelpers status and display helpers', () => {
       style: { marginTop: '10px' },
     });
     expect(resolveSbtPageMiniActionStatusDisplayState({ isFailure: true })).toEqual({
-      style: { marginTop: '10px', color: 'red' },
+      style: { marginTop: '10px', color: 'var(--ce-status-danger-text)' },
     });
     expect(
       buildSbtPageActionButtonClassName({

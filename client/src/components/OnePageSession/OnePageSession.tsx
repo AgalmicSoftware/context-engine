@@ -5,9 +5,7 @@ import { createLitHooks } from '../../utilities/crypto/litProtocol.js';
 import { ethers } from 'ethers';
 
 import {
-  getLegacyEthBalance,
   getNativeBalance,
-  hasLegacyEthBalanceReader,
   hasNativeBalanceReader,
   type SessionBalance,
 } from '../../domains/sessions/sessionBalanceReaders.js';
@@ -39,7 +37,6 @@ import { isTelegramAgentAuthFailure } from '../../utilities/session/telegramAgen
 import {
   buildAggregatorFromLocalCache,
   computeAggregatorDataSignature,
-  computeAggregatorQuestionMetadataSignature,
   computeAggregatorSourceSnapshotSignature,
 } from './onePageSessionAggregator';
 import OnePageSessionTelegramShell from './OnePageSessionTelegramShell';
@@ -81,17 +78,9 @@ import {
 } from './onePageSessionAutoMintRuntime';
 import { resolveOnePageSessionNetworkRuntime, sessionAllowsLitRuntime } from './onePageSessionCapabilityRuntime';
 import {
-  workerCanonicalCacheIdentityMatches,
-  withWorkerCanonicalCacheIdentity,
-} from '../../utilities/survey/workerCanonicalCacheIdentity';
-import {
-  buildAggregatorFallbackQuestions,
-  getUniqueAggregatorCandidateSlugs,
-  mergeAggregatorResultRows,
+  buildOnePageSessionAggregatorCacheResult,
   resolveOnePageSessionSurveySlug,
   resolveOnePageSessionWorkerCacheIdentity,
-  scopeAggregatorNetworkNodeToQuestionPool,
-  shouldUseBuiltInDemoAggregatorFallback,
 } from './onePageSessionAggregatorCacheRuntime';
 
 const demoLog = createLogger('demo');
@@ -123,6 +112,11 @@ const getErrorMessage = (error: unknown, fallback = 'Unknown error') =>
   error && typeof error === 'object' && typeof (error as { message?: unknown }).message === 'string'
     ? (error as { message: string }).message
     : fallback;
+
+const normalizeAutoMintAccount = (account: unknown): string =>
+  String(account || '')
+    .trim()
+    .toLowerCase();
 
 const resolveAutoFeatureBySessionSlug = (metadata: Record<string, unknown> | null | undefined) =>
   metadata?.autoFeatureSBTsBySessionSlug !== undefined
@@ -403,6 +397,7 @@ class OnePageSession extends Component<any, any> {
   }
 
   componentWillUnmount() {
+    this.disposeTelegramActions();
     this._autoMintLegacyCredentialQuery = '';
     window.removeEventListener('ce-agent-client-login', this.handleAgentClientLoginEvent as EventListener);
     if (this._autoOpenResultsTimer) {
@@ -565,6 +560,13 @@ class OnePageSession extends Component<any, any> {
           sessionSlug: nextSlug,
         }),
       );
+    const telegramIdentityChanged = slugChanged || telegramTargetChanged;
+    if (telegramIdentityChanged) {
+      this.handleTelegramComponentDidUpdate({
+        slugChanged: true,
+        loginJustCompleted: !prevProps.loginComplete && this.props.loginComplete,
+      });
+    }
     const prevRouteUiState = resolveOnePageSessionRouteUiState(prevProps);
     const nextRouteUiState = resolveOnePageSessionRouteUiState(this.props);
     const routeUiPatch: Record<string, any> = {};
@@ -691,10 +693,12 @@ class OnePageSession extends Component<any, any> {
       }
     }
 
-    this.handleTelegramComponentDidUpdate({
-      slugChanged: slugChanged || telegramTargetChanged,
-      loginJustCompleted: !prevProps.loginComplete && this.props.loginComplete,
-    });
+    if (!telegramIdentityChanged) {
+      this.handleTelegramComponentDidUpdate({
+        slugChanged: false,
+        loginJustCompleted: !prevProps.loginComplete && this.props.loginComplete,
+      });
+    }
   }
 
   scheduleBuildAggregator(
@@ -822,121 +826,30 @@ class OnePageSession extends Component<any, any> {
       const questionSourceSlug = resolveOnePageSessionSurveySlug(this.props);
       const cacheScope = resolveOnePageSessionAggregatorCacheScope(this.props);
       const workerCacheIdentity = resolveOnePageSessionWorkerCacheIdentity(this.props, cacheScope);
-      const useBuiltInDemoFallback = shouldUseBuiltInDemoAggregatorFallback(displaySlug, questionSourceSlug);
-      const canBuildFromLocalCache = !!cacheScope && (this.props.isQuestionCacheReady || useBuiltInDemoFallback);
-
-      if (canBuildFromLocalCache) {
-        const netIdStr = cacheScope;
-        if (netIdStr === 'worker' && !workerCacheIdentity) {
-          applyAggregatorData({}, '0:0:0', `${displaySlug}|${questionSourceSlug}|${netIdStr}|invalid-worker-identity`);
+      try {
+        const result = buildOnePageSessionAggregatorCacheResult({
+          cacheScope,
+          displaySlug,
+          isQuestionCacheReady: !!this.props.isQuestionCacheReady,
+          parseMemo: this._aggregatorResponseParseMemo,
+          questionSourceSlug,
+          readQuestionsCache: (candidateSlug) => peekCacheSync('questionsCache', candidateSlug),
+          resolveQuestionPool: (candidateDisplaySlug, candidateSourceSlug) =>
+            resolvePolisDemoQuestionPool({ displaySlug: candidateDisplaySlug, sourceSlug: candidateSourceSlug }),
+          workerCacheIdentity,
+          writeQuestionsCache: (candidateSlug, cache) => void writeCache('questionsCache', candidateSlug, cache),
+        });
+        if (result.sourceSignature === this._aggregatorSourceSigKey) {
+          bumpPerfCounter('aggregatorSourceSkips');
           return;
         }
-        try {
-          const candidateSlugs = useBuiltInDemoFallback
-            ? getUniqueAggregatorCandidateSlugs(displaySlug)
-            : [normalizeOnePageSessionSlug(questionSourceSlug)];
-          const demoQuestionPool = useBuiltInDemoFallback
-            ? resolvePolisDemoQuestionPool({
-                displaySlug,
-                sourceSlug: questionSourceSlug,
-              })
-            : [];
-          const aggregateMap: Record<string, any[]> = {};
-          const sourceSigParts: string[] = [];
-          let sawCandidateCache = false;
-          let sawNetworkCache = false;
-
-          for (const slug of candidateSlugs) {
-            let qCache = peekCacheSync('questionsCache', slug) || {};
-            if (!qCache || typeof qCache !== 'object') qCache = {};
-            if (Object.keys(qCache).length === 0) {
-              sourceSigParts.push(`${slug || '__general__'}:empty-cache`);
-              continue;
-            }
-            sawCandidateCache = true;
-
-            const networkNode = qCache[netIdStr];
-            if (!networkNode) {
-              sourceSigParts.push(`${slug || '__general__'}:missing-net`);
-              continue;
-            }
-            if (workerCacheIdentity && !workerCanonicalCacheIdentityMatches(networkNode, workerCacheIdentity)) {
-              sourceSigParts.push(`${slug || '__general__'}:worker-identity-mismatch`);
-              continue;
-            }
-            sawNetworkCache = true;
-
-            const fallbackQuestions = buildAggregatorFallbackQuestions(demoQuestionPool, slug);
-            const networkNodeForAggregation = useBuiltInDemoFallback
-              ? scopeAggregatorNetworkNodeToQuestionPool(networkNode, fallbackQuestions, slug)
-              : networkNode;
-
-            sourceSigParts.push(
-              [
-                slug || '__general__',
-                computeAggregatorSourceSnapshotSignature(networkNodeForAggregation.questionResponses || {}),
-                computeAggregatorQuestionMetadataSignature(networkNodeForAggregation.questions || {}),
-              ].join(':'),
-            );
-
-            const { map, dirty } = buildAggregatorFromLocalCache(networkNodeForAggregation, {
-              parseMemo: this._aggregatorResponseParseMemo,
-              sessionSlug: slug,
-            });
-            mergeAggregatorResultRows(aggregateMap, map);
-            if (dirty) {
-              if (workerCacheIdentity) {
-                qCache[netIdStr] = withWorkerCanonicalCacheIdentity(
-                  networkNode,
-                  workerCacheIdentity,
-                ) as typeof networkNode;
-              }
-              void writeCache('questionsCache', slug, qCache);
-            }
-          }
-
-          if (!sawCandidateCache) {
-            applyAggregatorData(
-              {},
-              '0:0:0',
-              `${displaySlug}|${questionSourceSlug}|${netIdStr}|${workerCacheIdentity?.key || ''}|empty-cache`,
-            );
-            return;
-          }
-
-          if (!sawNetworkCache) {
-            applyAggregatorData(
-              {},
-              '0:0:0',
-              `${displaySlug}|${questionSourceSlug}|${netIdStr}|${
-                workerCacheIdentity?.key || ''
-              }|${sourceSigParts.join('|') || 'missing-net'}`,
-            );
-            return;
-          }
-
-          const sourceSigKey = `${displaySlug}|${questionSourceSlug}|${netIdStr}|${
-            workerCacheIdentity?.key || ''
-          }|${sourceSigParts.join('|')}`;
-          if (sourceSigKey === this._aggregatorSourceSigKey) {
-            bumpPerfCounter('aggregatorSourceSkips');
-            return;
-          }
-          applyAggregatorData(aggregateMap, computeAggregatorDataSignature(aggregateMap), sourceSigKey);
-        } catch (err) {
-          demoLog.error('Error building aggregator in OnePageSession:', err);
-          applyAggregatorData(
-            {},
-            '0:0:0',
-            `${displaySlug}|${questionSourceSlug}|${netIdStr}|${workerCacheIdentity?.key || ''}|error`,
-          );
-        }
-      } else {
-        const netIdStr = cacheScope;
+        applyAggregatorData(result.map, result.signature, result.sourceSignature);
+      } catch (err) {
+        demoLog.error('Error building aggregator in OnePageSession:', err);
         applyAggregatorData(
           {},
           '0:0:0',
-          `${displaySlug}|${questionSourceSlug}|${netIdStr}|${workerCacheIdentity?.key || ''}|not-ready`,
+          `${displaySlug}|${questionSourceSlug}|${cacheScope}|${workerCacheIdentity?.key || ''}|error`,
         );
       }
     });
@@ -1369,8 +1282,7 @@ class OnePageSession extends Component<any, any> {
       if (!address || minBN.isZero()) {
         return true;
       }
-      const readBalance =
-        (hasNativeBalanceReader() && getNativeBalance) || (hasLegacyEthBalanceReader() && getLegacyEthBalance) || null;
+      const readBalance = hasNativeBalanceReader() ? getNativeBalance : null;
       if (!readBalance) {
         return false;
       }
@@ -1437,11 +1349,10 @@ class OnePageSession extends Component<any, any> {
       return;
     }
     const statuses = { ...(this.state.autoMintStatuses || {}) };
-    const autoMintAccount = String(this.props.account || '')
-      .trim()
-      .toLowerCase();
+    const autoMintAccount = normalizeAutoMintAccount(this.props.account);
+    const autoMintProvider = this.props.provider;
     const targets = this.filterUnconsumedAutoMintTargets(this.state.autoMintTargets || [], autoMintAccount).map(
-      (target: any) => ({ ...target }),
+      (target: any) => ({ ...target, autoMintAccount }),
     );
     const currentSlug = resolveEffectiveSlug(this.props); // use effective slug ('' for general)
     const queuedNameUpdates: Record<string, any> = {};
@@ -1526,8 +1437,11 @@ class OnePageSession extends Component<any, any> {
     for (const t of targets) {
       const sbtAddr = t.sbt;
       const sbtKey = sbtAddr.toLowerCase();
+      const queuedAccount = t.autoMintAccount;
+      const queuedAccountIsCurrent = () =>
+        !!queuedAccount && normalizeAutoMintAccount(this.props.account) === queuedAccount;
 
-      if (this.hasConsumedAutoMintAttempt(sbtAddr, autoMintAccount)) {
+      if (this.hasConsumedAutoMintAttempt(sbtAddr, queuedAccount)) {
         continue;
       }
 
@@ -1567,6 +1481,11 @@ class OnePageSession extends Component<any, any> {
           sbtInfo = await sbtMetadataReadsPort.getSbtMetadata('none', sbtAddr, currentSlug);
         }
 
+        if (!queuedAccountIsCurrent()) {
+          updateStatus(sbtKey, { status: 'info', name: 'Skipped (wallet changed)' });
+          continue;
+        }
+
         // 3. PREFLIGHT CHECKS
         sbtName = getSbtDisplayName(sbtInfo) || 'Group';
         // Queue banner visuals to flush with status updates (batched to reduce render bursts)
@@ -1575,7 +1494,7 @@ class OnePageSession extends Component<any, any> {
         // Check if user already owns this SBT (from local cache; DG-scoped key)
         let alreadyOwned = false;
         try {
-          const acctLower = (this.props.account || '').toLowerCase();
+          const acctLower = queuedAccount;
           if (acctLower) {
             const normalizeAddressCountMap = (value: any = null) => {
               const out: Record<string, any> = {};
@@ -1631,7 +1550,7 @@ class OnePageSession extends Component<any, any> {
         }
 
         if (alreadyOwned) {
-          this.consumeAutoMintAttempt(sbtAddr, autoMintAccount);
+          this.consumeAutoMintAttempt(sbtAddr, queuedAccount);
           updateStatus(sbtKey, { status: 'success', name: `Group Already Joined` });
           this.onSbtMintSuccess(sbtAddr);
           continue; // do not attempt to mint again
@@ -1709,13 +1628,17 @@ class OnePageSession extends Component<any, any> {
       }
 
       // TX PHASE WITH BALANCE GATE
-      const userAddr = this.props.account;
+      const userAddr = queuedAccount;
       try {
-        if (!userAddr) throw new Error(`${t('wallet')} not connected`);
+        if (!userAddr) throw new Error('Wallet not connected');
+        if (!queuedAccountIsCurrent()) {
+          updateStatus(sbtKey, { status: 'info', name: 'Skipped (wallet changed)' });
+          continue;
+        }
 
         // Gate before ANY gas-spending tx
         const hasFundsFirst = await this.waitForSufficientBalance(
-          this.props.provider,
+          autoMintProvider,
           userAddr,
           MIN_BALANCE_WEI,
           WAIT_TIMEOUT_MS,
@@ -1725,9 +1648,13 @@ class OnePageSession extends Component<any, any> {
           updateStatus(sbtKey, { status: 'info', name: 'Skipped (no gas funds arrived in time)' });
           continue;
         }
+        if (!queuedAccountIsCurrent()) {
+          updateStatus(sbtKey, { status: 'info', name: 'Skipped (wallet changed)' });
+          continue;
+        }
 
         if (path === 'public') {
-          await sbtMintExecutionPort.claim(this.props.provider, sbtAddr);
+          await sbtMintExecutionPort.claim(autoMintProvider, sbtAddr);
           this.consumeAutoMintAttempt(sbtAddr, userAddr);
           updateStatus(sbtKey, { status: 'success', name: `Joined: ${sbtName || 'Group'}` });
           this.onSbtMintSuccess(sbtAddr);
@@ -1806,8 +1733,9 @@ class OnePageSession extends Component<any, any> {
               if (!payload) throw new Error('Failed to generate invite');
 
               try {
+                if (!queuedAccountIsCurrent()) throw new Error('Wallet changed during auto-join');
                 await sbtMintExecutionPort.claimWithInvite(
-                  this.props.provider,
+                  autoMintProvider,
                   sbtAddr,
                   String(payload.nonce),
                   String(payload.signature),
@@ -1841,8 +1769,9 @@ class OnePageSession extends Component<any, any> {
               throw lastError;
             }
           } else {
+            if (!queuedAccountIsCurrent()) throw new Error('Wallet changed during auto-join');
             await sbtMintExecutionPort.claimWithInvite(
-              this.props.provider,
+              autoMintProvider,
               sbtAddr,
               String(payload.nonce),
               String(payload.signature),
@@ -1852,7 +1781,7 @@ class OnePageSession extends Component<any, any> {
           updateStatus(sbtKey, { status: 'success', name: `Joined: ${sbtName || 'Group'}` });
           this.onSbtMintSuccess(sbtAddr);
         } else if (path === 'unlimited') {
-          await this.mintUnlimitedSBTWithGroupPassword(sbtAddr, t.gp);
+          await this.mintUnlimitedSBTWithGroupPassword(sbtAddr, t.gp, userAddr, autoMintProvider);
           this.consumeAutoMintAttempt(sbtAddr, userAddr);
           updateStatus(sbtKey, { status: 'success', name: `Joined: ${sbtName || 'Group'}` });
           this.onSbtMintSuccess(sbtAddr);
@@ -1862,7 +1791,9 @@ class OnePageSession extends Component<any, any> {
       } catch (e: any) {
         const msg = (getErrorMessage(e, String(e || '')) || String(e || '')).toLowerCase();
 
-        if (msg.includes('already owns') || msg.includes('already joined') || msg.includes('user already has')) {
+        if (msg.includes('wallet changed during auto-join')) {
+          updateStatus(sbtKey, { status: 'info', name: 'Skipped (wallet changed)' });
+        } else if (msg.includes('already owns') || msg.includes('already joined') || msg.includes('user already has')) {
           // Graceful handling of "already owned" revert
           this.consumeAutoMintAttempt(sbtAddr, userAddr);
           updateStatus(sbtKey, { status: 'success', name: `Group Already Joined` });
@@ -1893,7 +1824,12 @@ class OnePageSession extends Component<any, any> {
   /* =======================
    * Unlimited helper (used by queue and can be used manually)
    * ======================= */
-  async mintUnlimitedSBTWithGroupPassword(sbtAddress: any, groupPassword: any) {
+  async mintUnlimitedSBTWithGroupPassword(
+    sbtAddress: any,
+    groupPassword: any,
+    expectedAccount: any = this.props.account,
+    provider: any = this.props.provider,
+  ) {
     if (!this.props.loginComplete) {
       this.props.toggleLoginModal(true);
       throw new Error(`Please connect your ${t('walletLower')} first.`);
@@ -1903,6 +1839,13 @@ class OnePageSession extends Component<any, any> {
     if (!pw) {
       throw new Error('Group password is required.');
     }
+    const normalizedExpectedAccount = normalizeAutoMintAccount(expectedAccount);
+    const assertExpectedAccountCurrent = () => {
+      if (!normalizedExpectedAccount || normalizeAutoMintAccount(this.props.account) !== normalizedExpectedAccount) {
+        throw new Error('Wallet changed during auto-join');
+      }
+    };
+    assertExpectedAccountCurrent();
 
     const onchain = await sbtMetadataReadsPort.getGroupPasswordHash(
       'none',
@@ -1926,17 +1869,19 @@ class OnePageSession extends Component<any, any> {
     if (!local || local.toLowerCase() !== onchain.toLowerCase()) {
       throw new Error('Password mismatch');
     }
+    assertExpectedAccountCurrent();
 
     this.setState({ mintingStatus: 'pending', lastTransactionType: 'mint' });
 
     const sig = await sbtGroupMintAuthorizationPort.signGroupMintAuthorization({
       password: pw,
       sbtAddress,
-      userAddress: String(this.props.account || ''),
+      userAddress: normalizedExpectedAccount,
       walletScopeSbtAddress,
     });
 
-    const tx = await sbtMintExecutionPort.mintWithGroupSignature(this.props.provider, sbtAddress, String(sig || ''));
+    assertExpectedAccountCurrent();
+    const tx = await sbtMintExecutionPort.mintWithGroupSignature(provider, sbtAddress, String(sig || ''));
 
     this.setState({
       mintingStatus: 'success',

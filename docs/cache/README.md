@@ -13,6 +13,12 @@ The app currently manages these namespaces through the shared cache layer:
 - `filters`
 - `sbtCache`
 - `userCache`
+- `analysisCache`
+
+The canonical namespace registry is
+`client/src/utilities/cache/managedCacheNamespaces.json`. Runtime cache APIs,
+the MainSite DG facade, and the direct-localStorage guard all consume that
+registry; a parity test keeps this documentation aligned with it.
 
 Logical key format:
 
@@ -46,8 +52,8 @@ trailing colon.
   canonical cache implementation, and rejects direct managed-cache access in
   dot, bracket, or optional-bracket form unless a dynamic namespace is guarded
   by the maintained managed-cache predicate.
-- Survey and question discovery, response hydration, targeted refreshes, and
-  application event ingestion commit domain deltas through the shared serialized
+- Survey, question, and SBT discovery, response/activity hydration, targeted refreshes,
+  profile/selector enrichment, and application event ingestion commit domain deltas through the shared serialized
   atomic updater. Each updater receives the latest cache value, preserves unrelated
   branches and retry state, and keeps scan watermarks monotonic.
 - Managed cache callers await persistence before publishing readiness, revisions,

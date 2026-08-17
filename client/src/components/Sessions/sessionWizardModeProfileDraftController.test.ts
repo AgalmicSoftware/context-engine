@@ -79,4 +79,20 @@ describe('sessionWizardModeProfileDraftController', () => {
         .groupCreationPolicy,
     ).toBe('participants');
   });
+
+  it('clears a retained Wrapped capability when the selected profile disables that surface', () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+    const next = applySessionModeProfileSelectionToDraft(
+      {
+        agentSessionWrapped: {
+          enabled: true,
+          bridgeUrl: 'https://wrapped.example.test',
+        },
+      },
+      profile,
+      compileSessionModeProfile(profile),
+    );
+
+    expect(next.agentSessionWrapped).toBeUndefined();
+  });
 });

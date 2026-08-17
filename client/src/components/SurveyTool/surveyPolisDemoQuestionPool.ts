@@ -1,4 +1,5 @@
 import demoPolisData from '../../variables/demo/demo_polis_data.json';
+import { LEGACY_DEMO_POLL_OPTIONS } from '../../utilities/demo/demoQuestionSemantics';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -13,6 +14,8 @@ export type PolisDemoQuestionPoolEntry = {
   key_tension?: string;
   sources?: string;
   nodeId?: string;
+  options?: string[];
+  singleSelect?: boolean;
 };
 
 const isRecord = (value: unknown): value is UnknownRecord =>
@@ -30,7 +33,21 @@ const isBuiltInDemoPathname = (value: unknown = ''): boolean => {
 
 const normalizePolisQuestionType = (value: unknown = ''): string => {
   const type = readString(value).toLowerCase();
+  if (type === 'poll') return 'multichoice';
   return type || 'binary';
+};
+
+const readPollOptions = (comment: UnknownRecord, legacyFallback = false): string[] => {
+  const options = legacyFallback ? LEGACY_DEMO_POLL_OPTIONS : Array.isArray(comment.options) ? comment.options : [];
+  const seen = new Set<string>();
+  return options.reduce<string[]>((out, option) => {
+    const value = readString(option);
+    const key = value.toLowerCase();
+    if (!value || seen.has(key)) return out;
+    seen.add(key);
+    out.push(value);
+    return out;
+  }, []);
 };
 
 export const buildPolisDemoQuestionPool = (
@@ -50,11 +67,13 @@ export const buildPolisDemoQuestionPool = (
       const tags = [category, nodeId].filter(Boolean);
       const keyTension = readString(comment.key_tension);
       const sources = readString(comment.sources);
+      const type = normalizePolisQuestionType(comment.type);
+      const options = type === 'multichoice' ? readPollOptions(comment, source === demoPolisData) : [];
 
       return {
         id,
         prompt,
-        type: normalizePolisQuestionType(comment.type),
+        type,
         tags,
         sessionSlug,
         source: 'demo-polis-data',
@@ -62,6 +81,7 @@ export const buildPolisDemoQuestionPool = (
         ...(keyTension ? { key_tension: keyTension } : {}),
         ...(sources ? { sources } : {}),
         ...(nodeId ? { nodeId } : {}),
+        ...(options.length ? { options, singleSelect: true } : {}),
       };
     })
     .filter((question): question is PolisDemoQuestionPoolEntry => !!question);

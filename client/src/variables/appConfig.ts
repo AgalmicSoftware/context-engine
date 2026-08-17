@@ -30,6 +30,12 @@ export const DEFAULT_AUTO_REQUEST_TESTNET_FUNDS = readPublicBoolEnv(
 // stored `ce:demoSurfaceMode` preference in localStorage, that wins;
 // fresh installs / no-storage cases honor this env default.
 export const DEFAULT_DEMO_SURFACE_MODE = readPublicBoolEnv('REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT', false);
+// Bundled runtime theme selected when no explicit user preference is stored.
+// Unknown values fail closed to `context-engine` in the theme registry.
+export const CE_DEFAULT_THEME = readPublicEnv('REACT_APP_CE_DEFAULT_THEME', 'context-engine');
+// Opt-in exposure gate. Keep false until the deployment's route and
+// accessibility matrix has passed for every bundled app theme.
+export const CE_THEME_SELECTOR_ENABLED = readPublicBoolEnv('REACT_APP_CE_THEME_SELECTOR_ENABLED', true);
 // MetaMask/RainbowKit is excluded from the default passkey-only client bundle.
 // Deployments that need browser-wallet login must opt in at build time.
 export const CE_ENABLE_METAMASK_CONNECTOR = readPublicBoolEnv('REACT_APP_CE_ENABLE_METAMASK_CONNECTOR', false);
@@ -89,13 +95,13 @@ export const CE_SESSION_SCAN_SCOPE = readPublicEnv('REACT_APP_CE_SESSION_SCAN_SC
 export const CE_SESSION_SCAN_SLUGS = readPublicListEnv('REACT_APP_CE_SESSION_SCAN_SLUGS', [
   ...DEFAULT_SESSION_SCAN_SLUGS,
 ]); // used when CE_SESSION_SCAN_SCOPE="list" (array of session slugs, use "general" or "" for default; can also use demoSession keys/names when demo-alias toggle is enabled)
-// When true, initial "/" loads auto-open About, and cached session document loads can migrate there.
+// When true, an eligible initial normalized root document load auto-opens About once.
 export const CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED = readPublicBoolEnv(
   'REACT_APP_CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED',
   true,
 );
-// Shows the public /posts route and the About-page Posts link. Root-level
-// posts live under /posts in the repository and are served as static assets.
+// Shows the public /posts route. Root-level posts live under /posts in the
+// repository and are served as static assets; the footer retains its route link.
 export const CE_ABOUT_POSTS_ENABLED = readPublicBoolEnv('REACT_APP_CE_ABOUT_POSTS_ENABLED', true);
 // Profile deep scans (/u/:address and compare) can optionally bypass CE_SESSION_SCAN_SCOPE and scan every known session.
 // Legacy all-session override is off by default; per-resource scan flags below can still enable fanout.

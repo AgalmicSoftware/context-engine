@@ -25,7 +25,7 @@ describe('demoAvatars', () => {
       }),
     );
     expectHistoricalPhotoUrl(avatarInfo.url);
-    expect(avatarInfo.fallbackColor).toMatch(/^#/);
+    expect(avatarInfo.fallbackColor).toMatch(/^var\(--ce-data-series-[1-5]\)$/);
   });
 
   it('resolves policy atlas pseudo addresses to avatar metadata', () => {

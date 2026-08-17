@@ -357,7 +357,7 @@ test('evaluateAnonymousRouteAccess uses worker-canonical anonymous policy withou
   assert.deepEqual(denied, {
     ok: false,
     status: 403,
-    error: constants.anonymousRouteDeniedError,
+    error: 'Anonymous access denied: transcribe is not enabled in workerAuthority.anonymousScopes.',
     reason: 'worker-canonical-anonymous-scope-denied',
     scope: 'transcribe',
   });

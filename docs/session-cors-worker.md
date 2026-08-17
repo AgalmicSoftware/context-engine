@@ -61,13 +61,39 @@ origins.
 - Native deploy does not use a Context Engine deploy helper, Cloudflare API token, OAuth token, or local agent. The legacy helper path remains an explicit fallback.
 - A full shared multi-session worker product is planned but not yet shipped.
 
-Preferred worker sources:
+### Source, template, local-build, and release boundaries
 
-- Native Cloudflare package: `deploy/cloudflare/session-worker/`
-- `sessionCorsWorker` source tree: `https://github.com/AgalmicSoftware/context-engine/tree/main/workers/sessionCorsWorker`
-- `sessionCorsWorker` release bundle asset: `https://github.com/AgalmicSoftware/context-engine/releases/latest/download/sessionCorsWorker.bundle.js`
-- Deploy-helper source tree: `https://github.com/AgalmicSoftware/context-engine/tree/main/workers/deploy-helper`
-- The repo's `.github/workflows/publish-worker-bundles.yml` workflow rebuilds and republishes both bundle assets on every push to `main`/`master`, and it explicitly marks that worker-bundle release as GitHub's latest release so the `releases/latest/download/...` URLs stay current after GitHub Actions is enabled.
+These surfaces contain related bytes but serve different consumers. They are
+not competing copies of the Worker:
+
+| Surface | Role | Git status | Use or edit policy |
+| --- | --- | --- | --- |
+| `workers/sessionCorsWorker/` | Canonical modular source and tests | Tracked | Make Session Worker implementation changes here. |
+| `deploy/cloudflare/session-worker/` | Self-contained native Deploy to Cloudflare template generated from the canonical source | Tracked | Cloudflare clones this Git subdirectory at an exact public commit. Maintain its README/config inputs, but do not hand-edit `worker.mjs` or `template-manifest.json`. |
+| `dist/sessionCorsWorker.bundle.js` | Repo-local bundle produced by `npm run worker:bundle` | Generated and untracked | Use for local verification or a one-off manual upload fallback. |
+| GitHub Release `sessionCorsWorker.bundle.js` | Immutable, checksummed downloadable bundle | Published release asset | Use for deploy-helper or manual dashboard deployment; it does not contain or replace the native Git template. |
+
+The native deploy button requires a public Git repository or isolated
+subdirectory, so the package under `deploy/` must exist in the repository. The
+release bundle is intentionally a different distribution channel for flows
+that accept a JavaScript upload or URL.
+
+Public links:
+
+- Canonical Session Worker source: `https://github.com/AgalmicSoftware/context-engine/tree/main/workers/sessionCorsWorker`
+- Native Cloudflare template: `https://github.com/AgalmicSoftware/context-engine/tree/main/deploy/cloudflare/session-worker`
+- Latest promoted release bundle: `https://github.com/AgalmicSoftware/context-engine/releases/latest/download/sessionCorsWorker.bundle.js`
+- Deploy-helper source: `https://github.com/AgalmicSoftware/context-engine/tree/main/workers/deploy-helper`
+
+`workers/deploy-helper/` and `workers/agentBridgeWorker/` are separate Worker
+services with different runtime responsibilities. They are not alternate
+Session Worker source trees.
+
+- Canonical CI publishes each successful public-branch bundle set as an
+  immutable, commit-addressed GitHub release without moving `latest`.
+  `.github/workflows/promote-worker-bundles.yml` separately verifies an
+  operator-selected release before advancing the protected stable and GitHub
+  `latest` channels used by `releases/latest/download/...` URLs.
 
 ## Deployment modes
 
@@ -103,6 +129,41 @@ For the default `Fast & Cheap (Cloudflare)` preset:
    config identity/readback before it accepts the Worker and performs the
    signed initial session configuration write. No Cloudflare credential
    crosses a Context Engine-operated origin.
+
+An eligible decentralized preset can instead paste and attach an existing
+compatible Session Worker without generating replacement setup values. The
+wizard validates the exact slug, 16-byte session ID, admin, Worker origin,
+selected runtime profile, RPC URL/map, and a non-empty browser allowlist that
+contains the current UI origin before signing. Origins must be exact; `*` and
+wildcard hosts are rejected because runtime CORS matching is exact. The wizard
+then signs `POST /admin/set-config` and requires the coordinator-backed write to return
+`{ "ok": true }` before delivering required secrets or recording readiness.
+If KV has not exposed the accepted config yet, signed secret delivery retries
+on the same bounded visibility horizon as canonical config readback. Changing
+the connected admin or any public Worker config input—including the profile,
+group-creation policy, limits, registry/chain values, AI assignments, required
+secrets, session identity, or normalized browser allowlist—invalidates
+readiness and requires another verification. A Custom RPC URL stored as a
+Worker secret remains only in the encrypted secret write; public config keeps
+the distinct browser-visible RPC fallback.
+It does not call public `/session-config` for this path: that discovery route
+remains Worker-canonical-only, while the EVM registry and Arweave remain
+authoritative for the decentralized session. Browser CORS acceptance proves
+reachability, not Worker-canonical discovery authority. Lit and Agent Session
+Wrapped profiles retain the manual deploy-helper/bootstrap path.
+
+The signed registry config keeps its session ID immutable once initialized.
+When an unbound Worker authorizes first configuration from the registry, a
+supplied ID must also match the registry tuple, and the requested config admin,
+signer, and on-chain admin must be the same address; legacy config without an ID
+may still initialize it once. A newly deployed Worker can instead bootstrap
+before registration through its deployment-bound `BOOTSTRAP_ADMIN_ADDRESS`, so
+the binding and exact signed config protect that pre-registration handoff.
+Fresh Worker-canonical setup requests an explicit identity-bootstrap nonce. A
+Worker may echo that requested nonzero 16-byte ID only while no session config
+exists; after initialization, nonce identity is derived exclusively from the
+persisted Worker-canonical config, and non-canonical configs reject bootstrap
+identity nominations.
 
 The initial and signed follow-up config writes use the selected capability
 profile as an allowlist. Pure Worker-canonical sessions keep generic session
@@ -353,6 +414,8 @@ Worker-canonical discovery:
   matching `X-Session-Slug`. The route exists only for persisted `worker_canonical`
   profiles, applies the session CORS allowlist, and returns `Cache-Control:
 no-store` plus `Vary: Origin, X-Session-Slug` on success and failures.
+- A decentralized setup may use the same Worker runtime after a signed admin
+  config write, but it never uses this route for discovery or verification.
 - The public response contains the canonical identity/content, authority,
   storage, model, CORS, and limits fields needed to hydrate the app. Recursive
   redaction removes provider keys/credentials, authorization headers, RPC and
@@ -403,6 +466,11 @@ Legacy/default worker URL:
 - `client/src/utilities/session/sessionWorkerAvailability.ts` now also owns the shared "default session must ignore `demoSessions.general` as worker authority in on-chain mode" rule, so sync UI reads and async `corsProxy` resolution both fall back to `CLOUDFLARE_CORS_WORKER_URL` on the same contract.
 - `client/src/utilities/worker/corsProxy.ts` also now reuses the shared default/general fallback worker URL selector from `sessionWorkerAvailability.ts`, so the sync and async default-session worker URL paths stay on the same fallback contract.
 - Worker auth now defaults to no silent demo-session fallback in on-chain mode; explicit demo/off-chain callers must opt in when resolving worker URLs for login.
+- Browser transcription uploads use anonymous-only worker transport. They can
+  use worker-managed transcription credentials or an explicitly supplied
+  request key when the route policy allows it, but an anonymous denial is
+  returned to the recorder and never escalates into an interactive wallet or
+  passkey signature.
 - **Stage-B fail-closed strictness (2026-03-12):** All security-sensitive callers — Arweave uploads (`arweaveClient.js`), AI requests (`aiClient.js`), transcription (`useWhisper.ts`), faucet (`contractHelpers.ts`), image fetch (`imageFetchClient.ts`), session-config resolution (`contractScripts.impl.ts`, `resourceKeys.ts`, `aiSettings.ts`), and the canonical resolver (`canonicalSessionContext.ts`) — now require explicit `allowDemoFallback: true` opt-in to use demo session fixtures when the on-chain registry is active. The CORS proxy demo-fallback policy (`defaultCorsProxyAllowDemoFallback`) is also tightened to match auth defaults. `getSessionConfigBySlugOrDefault` returns `null` for unknown non-general slugs instead of silently mapping them to the general default config.
 - In on-chain registry mode, worker auth/cors proxy no longer treat `demoSessions.general`
   as an implicit worker authority for the default session; the shared fallback is used instead.
@@ -723,6 +791,15 @@ and envelope-audit bindings are never group stores, so adding an unrelated
 database cannot switch group authority away from existing KV state. Membership
 rows are keyed by normalized principals and are not embedded in group objects.
 Rows that lack or conflict with the live canonical session ID are not adopted.
+When a create request does not supply an ID, the Worker uses server-side
+`crypto.randomUUID()` when available and otherwise uses a secure generated
+non-address fallback. A newly supplied ID shaped as `0x` plus 40 hexadecimal
+characters is rejected at the create boundary before coordinator reservation or
+KV writes. This is intentionally create-only compatibility: legacy
+address-shaped IDs remain readable and continue to work for gates, joins,
+updates, deletes, membership keys, and shared links. Non-address custom IDs
+accepted by the existing Admin interface also remain supported; UUID is the
+default, not a global format requirement.
 
 Every externally reachable group or membership mutation is serialized by the
 `CE_SESSION_COORDINATOR` object named from the exact normalized session slug and
@@ -761,6 +838,15 @@ never falls back to direct KV mutation. Read routes require ready coordination
 and return `503` when an indexed KV record is unavailable or malformed, or when
 coordinator authorization fails mid-read, instead of presenting a false empty
 or partial state.
+
+`/groups/my-memberships` derives the complete active membership set from the
+Durable Object. KV principal indexes may be repaired or used as lookup hints,
+but they cannot prove that the set is empty, and stale positive index or member
+rows cannot resurrect coordinator-removed membership. For every membership the
+coordinator does report, the Worker requires the exact KV group and member
+projection before returning readable metadata. If either required projection
+is absent, it returns 503 with reason `worker_group_projection_unavailable`
+rather than a false empty or partial result.
 
 An admin-signed `groups/reconcile-empty` action can repair only the narrow case
 where a matching coordinator was previously marked `legacy_locked`, the
@@ -808,9 +894,15 @@ Implemented routes:
   It returns only redacted, session-visible group metadata. The request must
   include the exact session slug header and canonical session ID. With a Worker
   credential, `GET` remains the authenticated member route and additionally
-  returns member-visible groups for the caller. Authenticated `POST` remains
-  supported. `groupCreationPolicy` does not affect discovery.
-- `GET|POST /groups/my-memberships`: authenticated self view. A principal can always see its own memberships. Each row includes the active `memberCount` for that group without exposing the other principals.
+  returns member-visible groups for the caller. Authenticated participant and
+  Admin lists include the coordinator's current `memberCount` only after the
+  caller passes that group's visibility check; unsigned discovery never
+  includes it. Authenticated `POST` remains supported. `groupCreationPolicy`
+  does not affect discovery.
+- `GET|POST /groups/my-memberships`: authenticated self view. A principal can
+  always see its own memberships. The complete set comes from the Durable
+  Object, while KV supplies the required readable projection. Each row includes
+  the active `memberCount` for that group without exposing the other principals.
 - `GET|POST /groups/members`: authenticated, cursor-paginated member identity
   view. `memberVisibility: "session"` allows any authenticated session
   principal; `"members"` requires an active membership in that Group; and
@@ -824,18 +916,24 @@ Implemented routes:
   from the authenticated principal.
 - `POST /groups/join`: authenticated self-join for `joinMode: "open"` groups
   only, before `joinEndsAt` and while the per-group and deployment-wide member
-  limits have capacity.
+  limits have capacity. Join returns the coordinator's post-mutation
+  `memberCount` with the joined group so the client can reconcile that card
+  without reloading the collection.
 - `POST /groups/leave`: authenticated self-removal from any current membership.
   The Worker derives the principal from the bearer credential and ignores any
-  caller-supplied principal, so a participant cannot remove another member.
+  caller-supplied principal, so a participant cannot remove another member. A
+  session-visible leave returns the retained group and post-mutation count;
+  restricted leave for `members` or `admin_only` visibility omits both group
+  metadata and count once the caller is no longer permitted to see them.
 
 The client presents a selected Worker Group with the same high-level detail
 hierarchy as an on-chain SBT where the concepts apply: **Stats**, **Actions**,
 and **More**. Worker-native terms remain explicit. Stats show the member limit
 and a live join-deadline countdown (or an infinity icon/no deadline). The
-current member count comes from an authenticated self-membership or an
-authorized member-list response. When the configured visibility permits it, a
-user icon opens the same style of member browser used for on-chain SBT holders.
+current member count comes from an authenticated permission-visible group list,
+self-membership, or authorized member-list response. When the configured
+visibility permits it, a user icon opens the same style of member browser used
+for on-chain SBT holders.
 Actions use Join/Leave rather than Mint/Burn. More renders the group's
 validated public document references and tags. Contract address, network, gas,
 transaction, and burn controls are never synthesized for a Worker-native
@@ -1022,6 +1120,11 @@ Runtime:
   - `workerAuthority.version: 1` is required for worker-canonical login and
     anonymous scope evaluation. Session existence is the presence of this
     persisted canonical config; it does not require a registry record.
+  - `workerAuthority.anonymousScopes` is the worker-canonical public-access
+    switch. Adding `ai` and/or `transcribe` allows those routes to use the
+    worker-managed provider credentials without login; omitting a scope returns
+    a worker-authority-specific `403`. The public `demo-sh` fixture enables
+    `storage`, `ai`, and `transcribe` only.
   - `registryAddress`, chain/RPC, `blockLimits`, contract, Hats, and faucet
     fields remain supported for legacy/decentralized or explicitly chain-backed
     profiles, but the default worker-canonical config omits them.
@@ -1029,8 +1132,8 @@ Runtime:
     - `authzEpoch` is server-managed. New deployments start at `1`; effective
       signed `set-config` writes increment it, while rejected and idempotent
       writes do not. Callers cannot set it directly.
-    - `allowOrigins` accepts legacy comma/newline-delimited strings but is stored/read as a trimmed array.
-    - saving an empty `allowOrigins` list is intentional and means "open CORS" for that session (no allowlist).
+    - `allowOrigins` accepts legacy comma/newline-delimited strings but is stored/read as a trimmed array. New config mutations reject `*` and wildcard hosts because runtime CORS matching requires exact origins.
+    - saving an empty `allowOrigins` list is intentional and means "open CORS" for that session (no allowlist). The `/new` native verification path refuses an empty list for new or attached Workers so clearing the field cannot accidentally publish an unrestricted CORS policy.
     - if a `slug` field is present in the config payload, the authenticated request slug / KV key remains authoritative and overwrites mismatched values.
     - `/admin/set-config` preserves existing `limits` / `scopes` object branches when malformed non-object patches are sent, instead of letting those branches degrade into corrupted shapes.
     - writes fail closed when open config subtrees contain secret-like keys,
@@ -1185,20 +1288,17 @@ modules under `workers/sessionCorsWorker/`. Key boundary files:
   composition, upload-start/success/error logging, and the
   `transactions.post(...)` fallback error contract for both bootstrap and
   authenticated uploads.
-- Shared Arweave upload execution binding now routes through
-  `workers/sessionCorsWorker/arweaveUploadExecutionBinding.js`,
-  preserving the worker-local logging/json helpers plus the
-  contract/tag/association deps bundle into the extracted Arweave upload
-  execution helper.
+- Worker-local Arweave, transcribe, AI-provider, fetch, and faucet dependencies
+  are assembled centrally by
+  `workers/sessionCorsWorker/workerExecutionServiceBinding.js`. The binding
+  preserves each execution helper's logging, JSON, outbound-request, RPC,
+  contract, and validation dependencies without maintaining one wrapper module
+  per service.
 - Shared transcribe execution now routes through
   `workers/sessionCorsWorker/transcribeExecution.js`, preserving provider
   selection, request-vs-worker key precedence, blocked-custom-url
   rejection, upstream error mapping, and final `{ text }` response
   normalization for authenticated and anonymous transcribe requests.
-- Shared transcribe execution binding now routes through
-  `workers/sessionCorsWorker/transcribeExecutionBinding.js`, preserving the
-  worker-local `safeFetch` / blocked-url / default-URL deps bundle into the
-  extracted transcribe execution helper.
 - Shared AI provider execution now routes through
   `workers/sessionCorsWorker/aiProviderExecution.js`, preserving
   Anthropic/OpenRouter request header/body/error normalization, OpenAI
@@ -1206,25 +1306,12 @@ modules under `workers/sessionCorsWorker/`. Key boundary files:
   custom RPC request-vs-worker `rpcUrl` / key precedence, blocked-target
   rejection, `safeFetch(...)` passthrough, and final `{ completion, raw }`
   response normalization for authenticated and anonymous AI requests.
-- Shared AI provider execution binding now routes through
-  `workers/sessionCorsWorker/aiProviderExecutionBinding.js`, preserving the
-  worker-local JSON response helper plus `safeFetch(...)` / blocked-url deps
-  bundle into the extracted AI provider execution helper.
 - Shared fetch helper execution now routes through
   `workers/sessionCorsWorker/fetchExecution.js`, preserving normalized-target
   failure passthrough, `safeFetch(...)` passthrough handling,
   content-length/status/type validation, HTML stripping, and final
   image/HTML/JSON response normalization for authenticated `fetch_image` and
   `fetch_url` requests.
-- Shared fetch helper execution binding now routes through
-  `workers/sessionCorsWorker/fetchExecutionBinding.js`, preserving the
-  worker-local JSON response helper plus normalized-target / blocked-url /
-  `safeFetch(...)` deps bundle into the extracted fetch execution helper.
-- Shared faucet execution binding now routes through
-  `workers/sessionCorsWorker/faucetExecutionBinding.js`, preserving the
-  worker-local JSON response/logging helpers plus `ethers.Wallet`,
-  RPC/proof-validation deps, and default faucet constants into the
-  extracted faucet execution helper.
 - Shared auth/CORS/admin adapter binding now routes through
   `workers/sessionCorsWorker/authCorsAdminBinding.js`, preserving the
   worker-local CORS deps bundle, existing-session config lookup binding,
@@ -1468,10 +1555,16 @@ modules under `workers/sessionCorsWorker/`. Key boundary files:
 
 Bootstrap configuration fails closed unless deployment has bound
 `BOOTSTRAP_ADMIN_ADDRESS` to the signer or an existing registry session proves
-the signer is its on-chain admin. An unconfigured worker and an unregistered
-registry slug have no first-signer claim path. Worker-canonical deployment
-therefore stages the admin binding and canonical config before making the
-Worker reachable.
+the signer is its on-chain admin and the signed config requests that same admin.
+An unconfigured worker and an unregistered registry slug have no first-signer
+claim path. Worker-canonical deployment therefore stages the admin binding and
+canonical config before making the Worker reachable.
+
+Client callers must keep Worker routing and authentication bound to the same
+resolved session config. In particular, choosing a Worker URL from a config and
+then authenticating by slug alone is invalid for `worker_canonical`: nonce,
+login, and signed admin request bodies must carry that config's canonical
+`sessionId` as well as its `sessionSlug`.
 
 1. `POST /auth/nonce` body:
    `{ address, sessionSlug, sessionId }` for `worker_canonical`; registry
@@ -1759,8 +1852,9 @@ Signed login/bootstrap requests:
   it preserves the existing `Expected application/json.` / `Invalid JSON.` failures and centralizes trimmed
   `action` extraction for authenticated `POST /` action payloads and authenticated `/ai`.
 - Anonymous AI/transcribe route authority also routes through a shared helper:
-  it preserves route validation, request-`apiKey` bypass precedence, scope override denial, fail-closed
-  on-chain authority checks, and the open `default` + `ai` gate requirement for anonymous access.
+  it preserves route validation, request-`apiKey` bypass precedence, scope override denial, worker-canonical
+  `anonymousScopes` evaluation, fail-closed on-chain authority checks, and the open `default` + `ai` gate
+  requirement for registry-canonical anonymous access.
 - Anonymous rate-identity normalization also routes through a shared helper:
   it preserves the existing Cloudflare-only `CF-Connecting-IP` trust rule, `X-Anonymous-Client-Id`
   lowercasing/validation, and `anon:unknown` fallback used for anonymous rate limiting.
@@ -1875,9 +1969,9 @@ Signed login/bootstrap requests:
   - Upstream transcribe execution now also routes through `workers/sessionCorsWorker/transcribeExecution.js`,
     preserving provider selection, blocked custom-target rejection, request-vs-worker key precedence,
     upstream 401/general error mapping, and final `{ text }` response normalization.
-  - The remaining worker-specific transcribe binding now also routes through
-    `workers/sessionCorsWorker/transcribeExecutionBinding.js`, preserving the worker-local
-    `safeFetch` / blocked-url / default-URL deps bundle before the execution helper runs.
+  - Worker-local transcribe dependencies are assembled by
+    `workers/sessionCorsWorker/workerExecutionServiceBinding.js`, preserving the
+    `safeFetch` / blocked-url / default-URL bundle before the execution helper runs.
 - `POST /arweave/upload` (multipart or JSON)
   - Optional override: `arweaveJwk` (JSON string or object).
   - Upload bodies are capped at 25 MB by default. The Worker rejects oversized `Content-Length`, JSON `data`, or multipart file bytes with `413`; set `CE_MAX_UPLOAD_BYTES` to configure the limit.
@@ -1900,9 +1994,9 @@ Signed login/bootstrap requests:
     `workers/sessionCorsWorker/arweaveUploadExecution.js`, preserving module resolution,
     upload-start/success/error logging, tag/association rejection logs, and the `transactions.post(...)`
     fallback error contract while leaving upload behavior unchanged.
-  - The remaining worker-specific authenticated/bootstrap Arweave upload binding now also routes through
-    `workers/sessionCorsWorker/arweaveUploadExecutionBinding.js`, preserving the worker-local logging/json helpers
-    plus the contract/tag/association deps bundle before the execution helper runs.
+  - Worker-local authenticated/bootstrap Arweave dependencies are assembled by
+    `workers/sessionCorsWorker/workerExecutionServiceBinding.js`, preserving the logging/JSON helpers
+    plus the contract/tag/association dependency bundle before the execution helper runs.
   - Authenticated upload parsing is also normalized across JSON and multipart before JWK parsing, tag validation, and upload execution.
   - If request `arweaveJwk` is present, it is authoritative for that upload; malformed overrides fail closed rather than falling back to the worker secret.
   - Optional `tags`:
@@ -2022,6 +2116,12 @@ Scripts: Edit` and `Workers KV Storage: Edit`; the Durable Object module
   recovered before either runtime binding exists, retry replaces only the
   unreachable ciphertext with encrypted empty state, installs a new KEK, and
   requires signed post-deploy secret sync. Existing KEK bindings are preserved.
+- Fresh deploys reject wildcard CORS entries before contacting Cloudflare. A
+  sponsored redemption applies the same validation before reserving its one-shot
+  grant, so corrected input can still use the grant. For registry-backed
+  profiles, deploys also reject any exact Custom RPC secret value duplicated
+  into the public RPC URL, RPC map, or faucet config; the secret must remain in
+  the encrypted session-secret record.
 - Every fresh deploy treats the requested worker name as a readable prefix. An
   idempotent request derives a stable physical suffix and KV title marker from
   `deploymentRequestId`; a legacy request without that ID receives a random
@@ -2094,9 +2194,14 @@ worker. Sponsored deploy grants are the separately documented legacy exception.
 - The default deploy-helper bundle URL is the GitHub release asset: `https://github.com/AgalmicSoftware/context-engine/releases/latest/download/sessionCorsWorker.bundle.js`
 - Canonical worker sources live under `workers/sessionCorsWorker/` and `workers/deploy-helper/`.
 - This repo no longer mirrors `.js.txt` worker copies into the client asset tree.
-- Rebuild local fallback bundles with `nvm use 20 && npm run worker:bundle` and verify they match source with `npm run verify:worker-bundle`.
+- Rebuild ignored local fallback bundles with `nvm use 20 && npm run worker:bundle`; verify the tracked Cloudflare-native Session Worker package with `npm run verify:cloudflare-template`.
 - `dist/sessionCorsWorker.bundle.js` and `dist/deployHelper.bundle.js` are generated local/manual fallback bundles for worker upload flows; they are not tracked git artifacts anymore.
-- GitHub bundle publishing is now automated via `.github/workflows/publish-worker-bundles.yml`. Once Actions are enabled in the GitHub repo, every push to `main`/`master` creates a fresh release containing both bundle assets and explicitly marks that release as latest, which keeps `https://github.com/AgalmicSoftware/context-engine/releases/latest/download/sessionCorsWorker.bundle.js` live.
+- `.github/workflows/publish-worker-bundles.yml` publishes verified bundle
+  bytes as an immutable, commit-addressed release without moving `latest`.
+  After review, `.github/workflows/promote-worker-bundles.yml` re-verifies the
+  selected release, retains the previous rollback ref, and advances the
+  protected stable and GitHub `latest` channels used by
+  `https://github.com/AgalmicSoftware/context-engine/releases/latest/download/sessionCorsWorker.bundle.js`.
 - The worker currently pins `ethers@6.15.0` intentionally. The root app and client remain on `ethers@5.7.2` until the broader client migration is done, so this version split is expected.
 
 ## Future work

@@ -96,7 +96,7 @@ describe('sessionWizardSecrets', () => {
         sessionSlug: 'test-5',
       });
     const postSecrets = jest.fn(async () => ({}));
-    const wait = jest.fn(async () => undefined);
+    const wait = jest.fn(async (_ms: number) => undefined);
 
     const result = await syncWorkerSecretsAfterDeploy({
       workerUrl: 'https://worker.example',
@@ -115,6 +115,73 @@ describe('sessionWizardSecrets', () => {
     expect(wait).toHaveBeenCalledTimes(1);
     expect(wait).toHaveBeenCalledWith(10);
     expect(postSecrets).toHaveBeenCalledTimes(1);
+  });
+
+  test('syncWorkerSecretsAfterDeploy retries while an accepted config becomes visible', async () => {
+    const signAdminAction = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('Admin authorization failed.'))
+      .mockResolvedValueOnce({ address: '0xabc', signature: 'sig' });
+    const postSecrets = jest.fn(async () => ({}));
+    const wait = jest.fn(async (_ms: number) => undefined);
+
+    const result = await syncWorkerSecretsAfterDeploy({
+      workerUrl: 'https://worker.example',
+      account: '0xabc',
+      slug: 'test-5',
+      deploySecrets: { openaiKey: 'sk-test' },
+      signAdminAction,
+      postSecrets,
+      retryDelaysMs: [10],
+      wait,
+      helperWritesSecrets: false,
+    });
+
+    expect(result).toEqual(expect.objectContaining({ synced: true, attempts: 2, warning: '' }));
+    expect(signAdminAction).toHaveBeenCalledTimes(2);
+    expect(wait).toHaveBeenCalledWith(10);
+    expect(postSecrets).toHaveBeenCalledTimes(1);
+  });
+
+  test('syncWorkerSecretsAfterDeploy binds canonical secret writes to the session ID', async () => {
+    const signAdminAction = jest.fn(async (_input: Record<string, unknown>) => ({
+      address: '0xabc',
+      signature: 'sig',
+    }));
+    const postSecrets = jest.fn(async (_input: Record<string, unknown>) => ({}));
+    const sessionId = '0x12121212121212121212121212121212';
+
+    const result = await syncWorkerSecretsAfterDeploy({
+      workerUrl: 'https://worker.example',
+      account: '0xabc',
+      slug: 'test-5',
+      sessionId,
+      deploySecrets: { openaiKey: 'sk-test' },
+      signAdminAction,
+      postSecrets,
+      retryDelaysMs: [],
+      helperWritesSecrets: false,
+    });
+
+    expect(result).toEqual(expect.objectContaining({ synced: true, warning: '' }));
+    expect(signAdminAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: {
+          sessionSlug: 'test-5',
+          sessionId,
+          secrets: { openaiKey: 'sk-test' },
+        },
+      }),
+    );
+    expect(postSecrets).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: {
+          sessionSlug: 'test-5',
+          sessionId,
+          secrets: { openaiKey: 'sk-test' },
+        },
+      }),
+    );
   });
 
   test('syncWorkerSecretsAfterDeploy skips browser sync when helper already wrote secrets', async () => {
@@ -176,7 +243,7 @@ describe('sessionWizardSecrets', () => {
       .fn()
       .mockRejectedValueOnce(new Error('Admin authorization failed.'))
       .mockResolvedValueOnce({});
-    const ensureSessionConfig = jest.fn(async () => ({}));
+    const ensureSessionConfig = jest.fn(async (_input: { workerUrl: string; slug: string; account: string }) => ({}));
 
     const result = await syncWorkerSecretsAfterDeploy({
       workerUrl: 'https://worker.example',
@@ -197,7 +264,7 @@ describe('sessionWizardSecrets', () => {
   });
 
   test('syncWorkerConfigAfterPartialDeploy reseeds config for partial deploy responses', async () => {
-    const ensureSessionConfig = jest.fn(async () => ({}));
+    const ensureSessionConfig = jest.fn(async (_input: { workerUrl: string; slug: string; account: string }) => ({}));
 
     const result = await syncWorkerConfigAfterPartialDeploy({
       deployResponse: {

@@ -15,7 +15,6 @@ import {
   faChevronRight,
 } from '@fortawesome/free-solid-svg-icons';
 
-import { beeswarmByExtremity } from '../../utilities/survey/consensusMath';
 import {
   computePolisCommentStats,
   computePolisConversationMath,
@@ -26,10 +25,13 @@ import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import styles from './PolisReport.module.scss';
 import { QRCodeSVG } from 'qrcode.react';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { FIXED_MEDIA_DARK, FIXED_MEDIA_LIGHT } from '../../utilities/ui/fixedMediaColors';
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
 import { createLogger } from 'utilities/logging.js';
 import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
+import { QuestionStanceBar } from '../Shared/QuestionStanceCard';
+import BeeswarmPlot, { type BeeswarmPoint } from '../Shared/BeeswarmPlot/BeeswarmPlot';
 import {
   buildQuestionScanProgressDisplay,
   doesQuestionProgressMatchSlug,
@@ -56,10 +58,8 @@ import type {
 } from './polisReportRuntime';
 import {
   DEFAULT_EXPLORATORY_CLUSTER_COUNT,
-  DEFAULT_POLIS_DEMO_DATA,
   OPINION_GROUPS_TOOLTIP_TEXT,
   PARTICIPANTS_GRAPH_TOOLTIP_TEXT,
-  PolisBoxPlot,
   REPORT_DEFAULT_EMBEDDING_LABEL,
   REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT,
   analyzeClusterOpinionsTyped,
@@ -85,11 +85,10 @@ import {
   resolveJsPdfConstructor,
   shouldAutoEnablePolisDemoData,
 } from './polisReportRuntime';
+import PolisReportSectionToggleLabel from './PolisReportSectionToggleLabel';
 export {
   OPINION_GROUPS_TOOLTIP_TEXT,
   PARTICIPANTS_GRAPH_TOOLTIP_TEXT,
-  PolisBoxPlot,
-  PolisQuestionHoverCard,
   REPORT_DEFAULT_EMBEDDING_LABEL,
   REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT,
   applyFilterStateToAggregator,
@@ -109,6 +108,7 @@ export {
 } from './polisReportRuntime';
 
 const surveyLog = createLogger('surveys');
+export const POLIS_CLUSTER_COLORS = d3Report.schemeCategory10;
 export const getPolisDemoDatasetForSlug = (...args: Parameters<typeof getPolisDemoDatasetForSlugRuntime>) =>
   getPolisDemoDatasetForSlugRuntime(...args);
 
@@ -171,6 +171,10 @@ export default function PolisReport({
   const activeDemoData = useMemo(
     () => getPolisDemoDatasetForSlug(activeReportSlug, { datasetsBySlug: resolvedDemoDataBySlug }),
     [activeReportSlug, resolvedDemoDataBySlug],
+  );
+  const trustedBuiltInDemoData = useMemo(
+    () => getPolisDemoDatasetForSlug(activeReportSlug, { allowFallback: false }),
+    [activeReportSlug],
   );
   // Keep the canonical built-in demo aligned with other demo datasets by
   // starting in the shared exploratory UMAP view instead of special-casing
@@ -362,9 +366,6 @@ export default function PolisReport({
   // PDF capture ref
   const reportRef = useRef<HTMLDivElement | null>(null);
 
-  // Circle hovered
-  const [hoveredCircleIndex, setHoveredCircleIndex] = useState<number | null>(null);
-
   // Error handling
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -439,14 +440,13 @@ export default function PolisReport({
     const parsed = parseInt(manualClusterCount, 10);
     return Number.isFinite(parsed) && parsed >= 2 ? parsed : null;
   }, [manualClusterCount]);
-  // Only built-in demo-session slugs that reuse the shared corpus fixture may
-  // auto-hydrate precomputed cluster summaries. Custom per-slug fixtures still
-  // stay on the normal computed/AI path.
+  // Only the exact built-in dataset object may hydrate authored summaries.
+  // Caller overrides stay on the normal computed/AI path even for demo slugs.
   const shouldUsePrecomputedDemoClusters = !!(
     precomputedDemoClusterState &&
     isDemoSessionSlug(activeReportSlug) &&
     effectiveUseDemoData &&
-    activeDemoData === DEFAULT_POLIS_DEMO_DATA &&
+    activeDemoData === trustedBuiltInDemoData &&
     embeddingChoice === 'POLIS' &&
     manualClusterCountValue === null
   );
@@ -1028,7 +1028,7 @@ export default function PolisReport({
       const canvas = await html2canvas(input, {
         scale: 2,
         useCORS: true,
-        backgroundColor: '#ffffff',
+        backgroundColor: FIXED_MEDIA_LIGHT,
         scrollX: 0,
         scrollY: -window.scrollY,
         windowWidth: input.scrollWidth,
@@ -1121,7 +1121,7 @@ export default function PolisReport({
           key={i}
           style={{
             marginBottom: '6px',
-            borderBottom: '1px solid #ddd',
+            borderBottom: '1px solid var(--ce-document-border)',
             paddingBottom: '6px',
           }}
         >
@@ -1134,7 +1134,7 @@ export default function PolisReport({
               <strong>Agree:</strong> {agrees} / <strong>Disagree:</strong> {disagrees} / <strong>Unsure:</strong>{' '}
               {unsures} / (Total: {total})
             </span>
-            <PolisBoxPlot votes={votes} />
+            <QuestionStanceBar votes={votes} />
           </div>
         </div>
       );
@@ -1421,13 +1421,16 @@ export default function PolisReport({
     }
     const arr = activeRepQuestions[clusterIndex].slice(0, 3);
     const uniqueClusters = Array.from(new Set(activeClusterAssignments)).sort((a, b) => a - b);
-    const colorScale = d3Report.scaleOrdinal(d3Report.schemeCategory10);
+    const colorScale = d3Report.scaleOrdinal(POLIS_CLUSTER_COLORS);
 
     return (
       <div style={{ marginTop: '6px' }}>
         {arr.map((rq, idx) => {
           const qIndex = rq.questionIndex;
           const questionPrompt = rq.prompt;
+          const representativeDifference = Number(rq.difference);
+          const hasRepresentativeDifference =
+            rq.difference !== null && rq.difference !== undefined && Number.isFinite(representativeDifference);
           const clusterVotes = getVotesForQuestionInCluster(
             qIndex,
             clusterIndex,
@@ -1441,17 +1444,18 @@ export default function PolisReport({
               style={{
                 marginLeft: '20px',
                 marginBottom: '8px',
-                borderLeft: '2px solid #ccc',
+                borderLeft: '2px solid var(--ce-document-border)',
                 paddingLeft: '8px',
               }}
             >
               <strong>{rq.label}</strong>: {questionPrompt} <br />
-              <small style={{ color: '#666' }}>
-                ({rq.repfulFor === 'disagree' ? 'disagreement' : 'agreement'} rate differs from the overall conversation
-                by {(rq.difference * 100).toFixed(1)} percentage points)
+              <small style={{ color: 'var(--ce-document-text-muted)' }}>
+                {hasRepresentativeDifference
+                  ? `(${rq.repfulFor === 'disagree' ? 'disagreement' : 'agreement'} rate differs from the overall conversation by ${(representativeDifference * 100).toFixed(1)} percentage points)`
+                  : '(difference from the overall conversation is unavailable)'}
               </small>
               <div style={{ marginTop: '4px' }}>
-                <PolisBoxPlot votes={clusterVotes} />
+                <QuestionStanceBar votes={clusterVotes} />
               </div>
               {/* Compare all other clusters */}
               <div style={{ marginTop: '6px', marginBottom: '6px' }}>
@@ -1489,7 +1493,7 @@ export default function PolisReport({
                         >
                           Cluster {cl}
                         </div>
-                        <PolisBoxPlot votes={otherClusterVotes} />
+                        <QuestionStanceBar votes={otherClusterVotes} />
                       </div>
                     );
                   })}
@@ -1532,7 +1536,7 @@ export default function PolisReport({
   function renderClusterLegend() {
     if (!activeClusterAssignments || !activeClusterAssignments.length) return null;
     const uniqueClusters = Array.from(new Set(activeClusterAssignments)).sort((a, b) => a - b);
-    const colorScale = d3Report.scaleOrdinal(d3Report.schemeCategory10);
+    const colorScale = d3Report.scaleOrdinal(POLIS_CLUSTER_COLORS);
 
     const cacheForKey = analysisCacheByKey[currentAnalysisKey] || {};
     const errorsForKey = analysisErrorsByKey[currentAnalysisKey] || {};
@@ -1579,7 +1583,7 @@ export default function PolisReport({
                 key={c}
                 style={{
                   marginBottom: '8px',
-                  border: '1px dashed #ccc',
+                  border: '1px dashed var(--ce-document-border)',
                   padding: '6px',
                 }}
               >
@@ -1658,7 +1662,10 @@ export default function PolisReport({
 
       if (!pointsToUse || !pointsToUse.length) {
         return (
-          <p className={styles.hiddenInPdf} style={{ fontStyle: 'italic', marginLeft: '10px', color: 'red' }}>
+          <p
+            className={styles.hiddenInPdf}
+            style={{ fontStyle: 'italic', marginLeft: '10px', color: 'var(--ce-status-danger-text)' }}
+          >
             (Not enough participant data to plot.)
           </p>
         );
@@ -1686,7 +1693,7 @@ export default function PolisReport({
         .range([h / 2 - pad, -(h / 2 - pad)]);
 
       const hulls = buildClusterHulls(pointsToUse, activeClusterAssignments);
-      const colorScale = d3Report.scaleOrdinal(d3Report.schemeCategory10);
+      const colorScale = d3Report.scaleOrdinal(POLIS_CLUSTER_COLORS);
 
       const centerX = w / 2;
       const centerY = h / 2;
@@ -1704,16 +1711,45 @@ export default function PolisReport({
             <g transform={`translate(${centerX}, ${centerY})`}>
               {showRadialAxes && (
                 <g>
-                  <circle strokeWidth={1} stroke="rgb(230,230,230)" fill="rgb(248,248,248)" r={Math.min(w, h) / 2.3} />
-                  <circle strokeWidth={1} stroke="rgb(230,230,230)" fill="rgb(245,245,245)" r={Math.min(w, h) / 4} />
-                  <circle strokeWidth={1} stroke="rgb(230,230,230)" fill="rgb(248,248,248)" r={Math.min(w, h) / 8} />
+                  <circle
+                    strokeWidth={1}
+                    stroke="var(--ce-document-border)"
+                    fill="var(--ce-document-surface)"
+                    r={Math.min(w, h) / 2.3}
+                  />
+                  <circle
+                    strokeWidth={1}
+                    stroke="var(--ce-document-border)"
+                    fill="var(--ce-document-canvas)"
+                    r={Math.min(w, h) / 4}
+                  />
+                  <circle
+                    strokeWidth={1}
+                    stroke="var(--ce-document-border)"
+                    fill="var(--ce-document-surface)"
+                    r={Math.min(w, h) / 8}
+                  />
                 </g>
               )}
 
               {showAxes && (
                 <g>
-                  <line x1={-(w / 2) + pad} y1={0} x2={w / 2 - pad} y2={0} stroke="black" strokeWidth={1} />
-                  <line x1={0} y1={-(h / 2) + pad} x2={0} y2={h / 2 - pad} stroke="black" strokeWidth={1} />
+                  <line
+                    x1={-(w / 2) + pad}
+                    y1={0}
+                    x2={w / 2 - pad}
+                    y2={0}
+                    stroke="var(--ce-document-text)"
+                    strokeWidth={1}
+                  />
+                  <line
+                    x1={0}
+                    y1={-(h / 2) + pad}
+                    x2={0}
+                    y2={h / 2 - pad}
+                    stroke="var(--ce-document-text)"
+                    strokeWidth={1}
+                  />
                 </g>
               )}
 
@@ -1808,13 +1844,20 @@ export default function PolisReport({
                       />
                       {/* Participant index label for PDF export only */}
                       {isPdfModeActive && (
-                        <text x={px} y={py + 3} textAnchor="middle" fontSize="8" fill="#fff" fontWeight="600">
+                        <text
+                          x={px}
+                          y={py + 3}
+                          textAnchor="middle"
+                          fontSize="8"
+                          fill={FIXED_MEDIA_LIGHT}
+                          fontWeight="600"
+                        >
                           {d.index + 1}
                         </text>
                       )}
                       {/* Optional text labels below points when not miniMode */}
                       {!miniMode && textShort && (
-                        <text x={px} y={py + 14} textAnchor="middle" fontSize="9" fill="#333">
+                        <text x={px} y={py + 14} textAnchor="middle" fontSize="9" fill="var(--ce-document-text)">
                           {textShort}
                         </text>
                       )}
@@ -1845,7 +1888,7 @@ export default function PolisReport({
                         <strong>Agree:</strong> {agrees}, <strong>Disagree:</strong> {disagrees},{' '}
                         <strong>Unsure:</strong> {unsures}, <strong>No Resp:</strong> {noresps}
                       </div>
-                      <PolisBoxPlot votes={rowVotes} />
+                      <QuestionStanceBar votes={rowVotes} />
                     </div>
                   );
 
@@ -1855,7 +1898,7 @@ export default function PolisReport({
                       cx={px}
                       cy={py}
                       r={3}
-                      fill="#000"
+                      fill="var(--ce-document-text)"
                       onMouseEnter={() => {
                         if (enableTooltips) {
                           cancelTooltipHide();
@@ -1872,7 +1915,9 @@ export default function PolisReport({
       );
     } catch (err: unknown) {
       return (
-        <p style={{ color: 'red', marginLeft: '10px' }}>Error rendering participant graph: {getErrorMessage(err)}</p>
+        <p style={{ color: 'var(--ce-status-danger-text)', marginLeft: '10px' }}>
+          Error rendering participant graph: {getErrorMessage(err)}
+        </p>
       );
     }
   }
@@ -1895,12 +1940,19 @@ export default function PolisReport({
         throw memoizedCommentSwarmResult.error;
       }
 
-      const points = memoizedCommentSwarmResult.commentStats.map((item) => {
+      const points: BeeswarmPoint[] = memoizedCommentSwarmResult.commentStats.map((item) => {
+        const questionIndex = item.commentIndex;
+        const questionKey = allQuestions[questionIndex];
+        const label = questionLabels[questionIndex] || `#${questionIndex + 1}`;
+        const prompt = questionPrompts[questionKey] || '(No prompt)';
         return {
+          key: `${questionKey || 'question'}:${questionIndex}`,
           index: item.commentIndex,
-          extremity: item.extremity,
+          value: item.extremity,
+          label: `${label}: ${prompt}`,
           agrees: item.agrees,
           disagrees: item.disagrees,
+          unsure: item.unsure,
           total: item.total,
         };
       });
@@ -1913,79 +1965,60 @@ export default function PolisReport({
         );
       }
 
-      const w = 700;
-      const h = 200;
-      const swarmed = beeswarmByExtremity(points, w, h);
-
       return (
-        // UPDATED: Added outer layout container for scroll buttons
         <div className={styles.swarmLayoutContainer}>
-          <div className={styles.swarmContainer} ref={swarmContainerRef}>
-            <svg width={w} height={h} className={styles.beeswarmSvg}>
-              <line x1={0} y1={h - 10} x2={w} y2={h - 10} stroke="black" />
-              <text x={0} y={h - 15} fontSize="14" fill="black">
-                Consensus
-              </text>
-              <text x={w - 80} y={h - 15} fontSize="14" fill="black">
-                Difference
-              </text>
-
-              {swarmed.map((d: PolisPoint, i: number) => {
-                const cIndex = d.index;
-                const promptKey = allQuestions[cIndex];
-                const label = questionLabels[cIndex] || `#${cIndex + 1}`;
-                const rowVotes = matrix[cIndex] || [];
-                const agrees = rowVotes.filter((v) => v === 1).length;
-                const disagrees = rowVotes.filter((v) => v === -1).length;
-                const unsures = rowVotes.filter((v) => v === 0).length;
-                const prompt = questionPrompts[promptKey] || '(No prompt)';
-
-                const tooltipContent = (
-                  <div>
-                    <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
-                      {label}: {prompt}
-                    </div>
-                    <div style={{ fontSize: '0.85rem', marginBottom: '6px' }}>
-                      <strong>Agree:</strong> {agrees}, <strong>Disagree:</strong> {disagrees}, <strong>Unsure:</strong>{' '}
-                      {unsures}
-                    </div>
-                    <PolisBoxPlot votes={rowVotes} />
+          <BeeswarmPlot
+            points={points}
+            className={styles.reportBeeswarm}
+            width={700}
+            height={200}
+            minPlotWidth={700}
+            pointRadius={5}
+            axisLabels={['Consensus', 'Difference']}
+            ariaLabel="Question consensus and difference beeswarm"
+            testIdPrefix="ce-polis-beeswarm"
+            responsesAvailable={points.length > 0}
+            tooltipsEnabled={enableTooltips}
+            showIdleSummary={false}
+            scrollContainerRef={swarmContainerRef}
+            renderTooltip={(point) => {
+              const cIndex = Number(point.index);
+              const promptKey = allQuestions[cIndex];
+              const label = questionLabels[cIndex] || `#${cIndex + 1}`;
+              const rowVotes = matrix[cIndex] || [];
+              const agrees = rowVotes.filter((v) => v === 1).length;
+              const disagrees = rowVotes.filter((v) => v === -1).length;
+              const unsures = rowVotes.filter((v) => v === 0).length;
+              const prompt = questionPrompts[promptKey] || '(No prompt)';
+              return (
+                <div>
+                  <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                    {label}: {prompt}
                   </div>
-                );
-
-                const circleClass = hoveredCircleIndex === i ? styles.beeswarmCircleHover : styles.beeswarmCircle;
-
-                return (
-                  <g key={i}>
-                    <circle
-                      cx={d.x}
-                      cy={d.y}
-                      r={5}
-                      className={circleClass}
-                      onMouseEnter={() => {
-                        if (enableTooltips) {
-                          cancelTooltipHide();
-                          setHoveredContent(tooltipContent);
-                          setHoveredCircleIndex(i);
-                        }
-                      }}
-                      onMouseLeave={() => {
-                        if (enableTooltips) {
-                          scheduleTooltipHide(450);
-                          setHoveredCircleIndex(null);
-                        }
-                      }}
-                    />
-                    {isPdfModeActive && (
-                      <text x={d.x} y={d.y + 3} textAnchor="middle" fontSize="8" fill="#fff" fontWeight="600">
-                        {i + 1}
-                      </text>
-                    )}
-                  </g>
-                );
-              })}
-            </svg>
-          </div>
+                  <div style={{ fontSize: '0.85rem', marginBottom: '6px' }}>
+                    <strong>Agree:</strong> {agrees}, <strong>Disagree:</strong> {disagrees}, <strong>Unsure:</strong>{' '}
+                    {unsures}
+                  </div>
+                  <QuestionStanceBar votes={rowVotes} />
+                </div>
+              );
+            }}
+            renderPointLabel={(point, index) =>
+              isPdfModeActive ? (
+                <text
+                  x={point.x}
+                  y={Number(point.y) + 3}
+                  textAnchor="middle"
+                  fontSize="8"
+                  fill={FIXED_MEDIA_LIGHT}
+                  fontWeight="600"
+                  style={{ pointerEvents: 'none' }}
+                >
+                  {index + 1}
+                </text>
+              ) : null
+            }
+          />
           {isSwarmScrollable && (
             <div className={styles.swarmScrollControls}>
               <button className={styles.scrollButton} onClick={() => handleSwarmScroll('left')} title="Scroll to Start">
@@ -1999,7 +2032,11 @@ export default function PolisReport({
         </div>
       );
     } catch (err: unknown) {
-      return <p style={{ color: 'red', marginLeft: '10px' }}>Error rendering Bee Swarm: {getErrorMessage(err)}</p>;
+      return (
+        <p style={{ color: 'var(--ce-status-danger-text)', marginLeft: '10px' }}>
+          Error rendering Bee Swarm: {getErrorMessage(err)}
+        </p>
+      );
     }
   }
 
@@ -2182,7 +2219,7 @@ export default function PolisReport({
               display: 'inline-flex',
               alignItems: 'center',
               gap: '6px',
-              color: 'rgba(244,247,255,0.72)',
+              color: 'var(--ce-panel-text-muted)',
               fontSize: '0.9rem',
             }}
           >
@@ -2332,7 +2369,9 @@ export default function PolisReport({
         )}
 
         {errorMessage && (
-          <div style={{ color: 'red', marginBottom: '10px', fontWeight: 'bold' }}>Error: {errorMessage}</div>
+          <div style={{ color: 'var(--ce-status-danger-text)', marginBottom: '10px', fontWeight: 'bold' }}>
+            Error: {errorMessage}
+          </div>
         )}
 
         {isLoading ? (
@@ -2384,12 +2423,7 @@ export default function PolisReport({
                   Summary and Statistics
                 </h5>
                 <div className={styles.pdfIgnore} style={{ textAlign: 'right', flex: '1' }}>
-                  {statsOpen ? 'Hide' : 'Show'}
-                  {!statsOpen && (
-                    <span className={styles.showWhenPdf} style={{ marginLeft: '10px', color: '#555' }}>
-                      (Omitted)
-                    </span>
-                  )}
+                  <PolisReportSectionToggleLabel open={statsOpen} />
                 </div>
               </div>
               {statsOpen ? (
@@ -2477,12 +2511,7 @@ export default function PolisReport({
                   Consensus and Difference
                 </h5>
                 <div className={styles.pdfIgnore} style={{ textAlign: 'right', flex: '1' }}>
-                  {beeswarmOpen ? 'Hide' : 'Show'}
-                  {!beeswarmOpen && (
-                    <span className={styles.showWhenPdf} style={{ marginLeft: '10px', color: '#555' }}>
-                      (Omitted)
-                    </span>
-                  )}
+                  <PolisReportSectionToggleLabel open={beeswarmOpen} />
                 </div>
               </div>
               {beeswarmOpen ? <div className={styles.graphSection}>{renderCommentSwarm()}</div> : null}
@@ -2506,12 +2535,7 @@ export default function PolisReport({
                   })}
                 </h5>
                 <div className={styles.pdfIgnore} style={{ textAlign: 'right', flex: '1' }}>
-                  {participantsGraphOpen ? 'Hide' : 'Show'}
-                  {!participantsGraphOpen && (
-                    <span className={styles.showWhenPdf} style={{ marginLeft: '10px', color: '#555' }}>
-                      (Omitted)
-                    </span>
-                  )}
+                  <PolisReportSectionToggleLabel open={participantsGraphOpen} />
                 </div>
               </div>
               {participantsGraphOpen ? (
@@ -2696,12 +2720,7 @@ export default function PolisReport({
                   All Questions
                 </h5>
                 <div className={styles.pdfIgnore} style={{ textAlign: 'right', flex: '1' }}>
-                  {allQuestionsOpen ? 'Hide' : 'Show'}
-                  {!allQuestionsOpen && (
-                    <span className={styles.showWhenPdf} style={{ marginLeft: '10px', color: '#555' }}>
-                      (Omitted)
-                    </span>
-                  )}
+                  <PolisReportSectionToggleLabel open={allQuestionsOpen} />
                 </div>
               </div>
               {allQuestionsOpen ? <>{buildQuestionList()}</> : null}
@@ -2722,12 +2741,7 @@ export default function PolisReport({
                   List of Participants
                 </h5>
                 <div className={styles.pdfIgnore} style={{ textAlign: 'right', flex: '1' }}>
-                  {participantsListOpen ? 'Hide' : 'Show'}
-                  {!participantsListOpen && (
-                    <span className={styles.showWhenPdf} style={{ marginLeft: '10px', color: '#555' }}>
-                      (Omitted)
-                    </span>
-                  )}
+                  <PolisReportSectionToggleLabel open={participantsListOpen} />
                 </div>
               </div>
               {participantsListOpen ? renderParticipantsList() : null}
@@ -2750,8 +2764,8 @@ export default function PolisReport({
                   <QRCodeSVG
                     value={liveReportUrl}
                     size={128}
-                    bgColor="#ffffff"
-                    fgColor="#000000"
+                    bgColor={FIXED_MEDIA_LIGHT}
+                    fgColor={FIXED_MEDIA_DARK}
                     level="Q"
                     includeMargin={true}
                   />

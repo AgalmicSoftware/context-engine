@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { transformSync } = require('esbuild');
+const { buildSync } = require('esbuild');
 
 const ROOT = path.resolve(__dirname, '..');
 const RPC_DEFAULTS_JS_PATH = path.join(ROOT, 'client', 'src', 'variables', 'rpcDefaults.js');
@@ -19,15 +19,17 @@ const requireFresh = (modulePath) => {
 const loadTypescriptRpcDefaults = () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-rpc-defaults-ts-'));
   try {
-    const source = fs.readFileSync(RPC_DEFAULTS_TS_PATH, 'utf8');
-    const output = transformSync(source, {
+    const output = buildSync({
+      entryPoints: [RPC_DEFAULTS_TS_PATH],
+      bundle: true,
       format: 'cjs',
-      loader: 'ts',
+      platform: 'node',
       sourcemap: false,
       target: 'node20',
+      write: false,
     });
     const compiledPath = path.join(tempDir, 'rpcDefaults.cjs');
-    fs.writeFileSync(compiledPath, output.code);
+    fs.writeFileSync(compiledPath, output.outputFiles[0].contents);
     return requireFresh(compiledPath);
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -51,7 +53,7 @@ const collectChainIds = (...modules) => {
   return [...ids].filter((id) => Number.isFinite(id)).sort((a, b) => a - b);
 };
 
-test('rpcDefaults JS and TS twins expose identical supported chain defaults', () => {
+test('rpcDefaults JS and TS adapters expose identical canonical chain defaults', () => {
   const jsDefaults = requireFresh(RPC_DEFAULTS_JS_PATH);
   const tsModule = loadTypescriptRpcDefaults();
   const tsDefaults = tsModule.default || tsModule;

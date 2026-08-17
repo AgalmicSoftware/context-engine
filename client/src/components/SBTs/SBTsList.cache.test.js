@@ -5,7 +5,7 @@ import {
   readSbtListCacheMetaSnapshot as readSbtCacheMetaSnapshot,
 } from './sbtListHelpers';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
-import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
+import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 
 jest.mock('./SBTPage', () => () => null);
 jest.mock('./CreateSBTGroup', () => () => null);
@@ -19,6 +19,10 @@ jest.mock('../../utilities/web3/chainGateway.js', () => ({
   getSessionChainId: jest.fn(() => null),
   getSessionConfigBySlug: jest.fn(() => ({})),
   getSessionLists: jest.fn(() => ({ featured_SBTs_LIST: [], ignored_SBTs_LIST: [] })),
+}));
+
+jest.mock('../../utilities/session/sessionNaming.js', () => ({
+  __esModule: true,
   normalizeSessionSlug: jest.fn((value = '') =>
     String(value || '')
       .trim()

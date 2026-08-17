@@ -92,6 +92,20 @@ Network keys inside cache values are strings such as `"84532"`.
 - `historySummary`: compressed count-only snapshot sourced from `getHistorySummary()` or derived from a full `SBTActivity` scan
 - `countsScanCheckpoint`: resumable single-pass `SBTActivity` checkpoint for holders-modal/history reads
 
+## Write and merge contract
+
+Production writers update `sbtCache` through the managed cache's serialized atomic
+updater. They patch only the touched session, network, and SBT entries; unrelated
+networks and entries must survive concurrent discovery, detail hydration, profile,
+filter, selector, and realtime-event work.
+
+- metadata hydration merges fields without replacing holder counts or activity;
+- count scans merge address counts and event totals monotonically with newer realtime activity;
+- `lastBlock` advances only after a contiguous discovery range persists successfully;
+- realtime events advance `lastRealtimeEventCursor`, not the discovery watermark;
+- a finalized count scan clears a resumable checkpoint only when it covers that checkpoint;
+- readiness flags and cache revisions publish only after the atomic write succeeds.
+
 ## `sbtInfo` expectations
 
 The cache may contain many optional tokenURI fields, but the current code most strongly

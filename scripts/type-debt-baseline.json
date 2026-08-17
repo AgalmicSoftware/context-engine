@@ -13,9 +13,9 @@
     "client/src/actions",
     "client/src/components/About",
     "client/src/components/Agent",
-    "client/src/components/ContractPage",
     "client/src/components/DemoViews/DebateHUD",
     "client/src/components/DemoViews/DemoAnalysis",
+    "client/src/components/DocsPage",
     "client/src/components/DocumentLibrary",
     "client/src/components/E2E",
     "client/src/components/ErrorBoundary",
@@ -77,12 +77,12 @@
   ],
   "counts": {
     "tsNocheck": 0,
-    "colonAny": 927,
-    "asAny": 83,
+    "colonAny": 918,
+    "asAny": 76,
     "asUnknownAs": 44,
     "promiseAny": 2,
     "arrayAny": 0,
-    "recordAny": 44,
+    "recordAny": 42,
     "aliasAny": 3,
     "mapSetAny": 4
   }

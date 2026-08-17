@@ -9,6 +9,14 @@ const test = require('node:test');
 
 const repoRoot = path.resolve(__dirname, '..');
 const guardScript = path.join(repoRoot, 'scripts', 'check-managed-cache-localstorage.sh');
+const managedNamespaceRegistry = path.join(
+  repoRoot,
+  'client',
+  'src',
+  'utilities',
+  'cache',
+  'managedCacheNamespaces.json'
+);
 
 function writeFile(rootDir, relativePath, content) {
   const target = path.join(rootDir, relativePath);
@@ -23,6 +31,11 @@ function withFixtureRepo(run) {
       tempDir,
       'scripts/check-managed-cache-localstorage.sh',
       fs.readFileSync(guardScript, 'utf8')
+    );
+    writeFile(
+      tempDir,
+      'client/src/utilities/cache/managedCacheNamespaces.json',
+      fs.readFileSync(managedNamespaceRegistry, 'utf8')
     );
     return run(tempDir);
   } finally {
@@ -94,6 +107,21 @@ test('cache guard rejects bracket-form managed cache access', () => {
 
     assert.equal(result.status, 1);
     assert.match(result.stdout, /dg:questionsCache:general/);
+  });
+});
+
+test('cache guard rejects direct analysis cache access', () => {
+  withFixtureRepo((rootDir) => {
+    writeFile(
+      rootDir,
+      'client/src/components/UserPage/UserPage.tsx',
+      "localStorage.setItem('dg:analysisCache:edge', '{}');\n"
+    );
+
+    const result = runCacheGuard(rootDir);
+
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /dg:analysisCache:edge/);
   });
 });
 

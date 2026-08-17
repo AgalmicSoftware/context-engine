@@ -31,6 +31,7 @@ describe('OnboardingWalkthrough', () => {
     const { container } = render(<OnboardingWalkthrough changeTabFunction={changeTabFunction} />);
 
     expect(screen.getByTestId('mock-site-load-options')).toHaveAttribute('data-arrow-index', '0');
+    expect(container.querySelector('.welcomeArtworkStage')).toBeInTheDocument();
     expect(container.querySelector('.onboardingWalkthrough')).toBeInTheDocument();
     expect(container.querySelector('.onboardingInfo')).toBeInTheDocument();
     expect(container.querySelector('.onboardingControls')).toBeInTheDocument();
@@ -46,6 +47,8 @@ describe('OnboardingWalkthrough', () => {
     expect(screen.getByText('Goals')).toBeInTheDocument();
     expect(container.querySelector('.onboardingTitleArea')).toBeInTheDocument();
     expect(container.querySelector('.onboardingTitle')).toBeInTheDocument();
+    expect(container.querySelectorAll('.onboardingInfo')).toHaveLength(1);
+    expect(container.querySelector('.onboardingInfo > .onboardingTitleArea')).toBeInTheDocument();
 
     fireEvent.click(screen.getByText('Advance slide'));
     fireEvent.click(screen.getByText('Advance slide'));

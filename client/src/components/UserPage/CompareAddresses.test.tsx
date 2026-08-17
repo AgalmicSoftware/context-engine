@@ -1,10 +1,9 @@
 /** @file CompareAddresses.test.tsx */
-import {
-  buildCompareSbtImageMap,
-  buildCompareSbtKeySets,
+import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import CompareAddress, {
   buildCompareClassName,
   buildCompareProfileHref,
-  buildNicknameByAddressMap,
   readDgObjectValues,
   resolveCompareAddressBlockieStyle,
   resolveCompareAddressPillContentStyle,
@@ -23,26 +22,37 @@ import {
   resolveCompareVennNoteStyle,
   resolveCompareVennSbtImageStyle,
   resolveCompareVennSbtRowStyle,
-  resolveCompareVennTooltipHeaderStyle,
   resolveCompareVennTooltipListStyle,
   resolveCompareVennTooltipStyle,
   resolveCompareVennWrapStyle,
   resolveCompareVisualSectionStyle,
 } from './CompareAddresses';
+import {
+  buildCompareSbtImageMap,
+  buildCompareSbtKeySets,
+  buildNicknameByAddressMap,
+} from './compareMembershipPresentation';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
+import { runCompareToolkit } from '../../utilities/ai/aiClient.js';
 
 jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   listNamespaceEntriesSync: jest.fn(() => []),
   subscribeCacheUpdates: jest.fn(() => () => {}),
 }));
+jest.mock('../../utilities/ai/aiClient.js', () => ({
+  runCompareToolkit: jest.fn(async (operation: string) =>
+    operation === 'compare' ? { agreements: ['Shared view'], disagreements: [] } : null,
+  ),
+}));
 
 const mockListNamespaceEntriesSync = cacheScripts.listNamespaceEntriesSync as jest.Mock;
+const mockRunCompareToolkit = runCompareToolkit as jest.Mock;
 const buildNicknameMap = buildNicknameByAddressMap as (entries: Array<Record<string, unknown>>) => Map<string, string>;
 const buildSbtKeySets = buildCompareSbtKeySets as (entries: Array<Record<string, unknown>>) => Set<string>[];
 const buildSbtImageMap = buildCompareSbtImageMap as (
   entries: Array<Record<string, unknown>>,
 ) => Map<string, { name: string; image: string | null }>;
-const readObjectValues = readDgObjectValues as (namespace: string) => unknown[];
+const readObjectValues = readDgObjectValues as (namespace: string, sessionSlug?: string) => unknown[];
 
 describe('CompareAddresses cache scan helpers', () => {
   beforeEach(() => {
@@ -63,11 +73,21 @@ describe('CompareAddresses cache scan helpers', () => {
     expect(result).toEqual([{ a: 1 }, { b: 2 }]);
   });
 
+  it('reads only the resolved session cache when a session slug is supplied', () => {
+    mockListNamespaceEntriesSync.mockReturnValue([
+      { slug: 'edge', value: { id: 'edge' } },
+      { slug: 'worker', value: { id: 'worker' } },
+    ]);
+
+    expect(readObjectValues('questionsCache', 'worker')).toEqual([{ id: 'worker' }]);
+  });
+
   it('builds compare profile links under the configured PUBLIC_URL base path', () => {
     const previousPublicUrl = process.env.PUBLIC_URL;
     process.env.PUBLIC_URL = '/ce';
     try {
       expect(buildCompareProfileHref('0xabc')).toBe('/ce/u/0xabc');
+      expect(buildCompareProfileHref('0xabc', 'worker-session')).toBe('/ce/u/0xabc?session=worker-session');
       expect(buildCompareProfileHref('')).toBe('');
     } finally {
       if (previousPublicUrl === undefined) {
@@ -191,7 +211,7 @@ describe('CompareAddresses cache scan helpers', () => {
 
   it('resolves compare bookmark row styles consistently', () => {
     expect(resolveCompareBookmarksHeaderStyle()).toEqual({
-      color: 'white',
+      color: 'var(--ce-panel-text)',
       fontWeight: '600',
       marginBottom: '10px',
     });
@@ -218,10 +238,6 @@ describe('CompareAddresses cache scan helpers', () => {
     expect(resolveCompareVennTooltipStyle({ clientWidth: 500, x: 100, y: 20 })).toEqual({
       left: 80,
       top: 28,
-    });
-    expect(resolveCompareVennTooltipHeaderStyle()).toEqual({
-      fontWeight: 700,
-      marginBottom: 4,
     });
     expect(resolveCompareVennTooltipListStyle()).toEqual({
       listStyle: 'none',
@@ -262,5 +278,33 @@ describe('CompareAddresses cache scan helpers', () => {
     expect(resolveCompareCompassScrollStyle()).toEqual({
       overflowX: 'auto',
     });
+  });
+});
+
+describe('CompareAddresses subject routes', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockListNamespaceEntriesSync.mockReturnValue([]);
+    mockRunCompareToolkit.mockImplementation(async (...args: unknown[]) =>
+      args[0] === 'compare' ? { agreements: ['Shared view'], disagreements: [] } : null,
+    );
+  });
+
+  it('runs a simulated-only route without waiting for session caches', async () => {
+    render(
+      <MemoryRouter
+        initialEntries={[
+          `/compare?subject=${encodeURIComponent('sim:Franklin')}&subject=${encodeURIComponent('sim:FDR')}`,
+        ]}
+      >
+        <Routes>
+          <Route path="/compare" element={<CompareAddress sessionCachesReady={false} />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByLabelText('Benjamin Franklin, shipped simulation')).toBeInTheDocument();
+    expect(screen.getByLabelText('Franklin D. Roosevelt, shipped simulation')).toBeInTheDocument();
+    await waitFor(() => expect(mockRunCompareToolkit).toHaveBeenCalledWith('compare', expect.any(Object)));
   });
 });

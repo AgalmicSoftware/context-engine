@@ -71,21 +71,23 @@ emitted asset.
 Command:
 
 ```bash
-SMOKE_ROUTES=/session/pe4,/about,/contracts npm run -s test:e2e:smoke
+SMOKE_ROUTES=/session/pe4,/about,/docs,/contracts npm run -s test:e2e:smoke
 ```
 
-Result: passed with no page errors, unexpected failed requests, unexpected
-console issues, missing text, or layout issues. The broader default smoke still
-reports pre-existing probe/environment failures for `/session/demo` text and
-external Base RPC CORS on `/admin`.
+The route set checks both the canonical Docs page and the legacy `/contracts`
+redirect. A passing run has no page errors, unexpected failed requests,
+unexpected console issues, missing text, or layout issues. The broader default
+smoke can still expose environment-sensitive session or admin dependencies.
 
 ## Temporary AppShell Exception
 
 `AppShell` is now lazy-loaded but remains above the non-vendor chunk cap because
 the shell/controller layer imports chain, cache, session, and profile runtime
-modules synchronously. A previous broad app-level `manualChunks` split produced
-browser initialization-order failures, so further reduction should be designed as
-a controller/provider boundary refactor instead of another manual chunk pass.
+modules synchronously. A previous broad app-level `manualChunks` split of
+executable runtime modules produced browser initialization-order failures. Keep
+runtime and controller reductions behind real lazy boundaries; narrowly
+isolating immutable, side-effect-free fixture data is acceptable only when the
+built import graph, bundle gate, and route smoke prove the split safe.
 
 This is an accepted temporary exception for the current release line. The
 follow-up work is a dedicated AppShell chunk diet: map the current chunk

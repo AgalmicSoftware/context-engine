@@ -304,13 +304,15 @@
 }
 
 #mainLogo {
-  opacity: 0.4;
-  mix-blend-mode: luminosity;
+  opacity: var(--ce-brand-logo-opacity);
+  mix-blend-mode: var(--ce-brand-logo-blend-mode);
+  filter: var(--ce-brand-logo-filter);
 }
 
 #mainLogoLoggedIn {
-  opacity: 0.4;
-  mix-blend-mode: luminosity;
+  opacity: var(--ce-brand-logo-opacity);
+  mix-blend-mode: var(--ce-brand-logo-blend-mode);
+  filter: var(--ce-brand-logo-filter);
 }
 
 .logoHomeLink {
@@ -322,9 +324,9 @@
 }
 
 .logoHomeLink:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline: 2px solid color-mix(in srgb, var(--ce-text-inverse) 85%, transparent);
   outline-offset: 4px;
-  border-radius: 4px;
+  border-radius: var(--ce-radius-4);
 }
 
 #accountSection,
@@ -334,6 +336,38 @@
   justify-content: flex-end;
   gap: 12px;
   margin-left: auto;
+}
+
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  #navbarContainer,
+  #navbarContainerLoggedIn {
+    min-height: 112px;
+    margin: 0;
+    padding: 18px clamp(16px, 3vw, 44px);
+    align-items: center;
+  }
+
+  #navbarLogoCol,
+  #navbarLogoColLoggedIn {
+    width: auto;
+    padding: 0;
+  }
+
+  #accountSection,
+  #accountSectionLoggedIn {
+    width: auto;
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  @container ce-theme style(--ce-layout-profile: desktop-window) {
+    #navbarContainer,
+    #navbarContainerLoggedIn {
+      min-height: 82px;
+      padding: 10px 12px;
+    }
+  }
 }
 
 /* --- AccountSection --- */
@@ -464,7 +498,7 @@
 
 #walletSettingsButton {
   background-image: none;
-  background-color: #34467500;
+  background-color: transparent;
 }
 
 /* --- AccountDisplay --- */

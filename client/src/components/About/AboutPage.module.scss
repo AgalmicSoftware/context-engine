@@ -1,25 +1,24 @@
-@use 'scss/variables' as tokens;
-
-$page-bg: #171941;
-$page-bg-deep: #0a0e1c;
-$text-color: tokens.$ce-white;
-$muted-text: rgba(244, 247, 255, 0.65);
-$accent: #4dffa4;
-$card-bg: rgba(255, 255, 255, 0.06);
-$card-border: rgba(255, 255, 255, 0.14);
-$card-shadow: 0 6px 22px rgba(0, 0, 0, 0.25);
-$tile-text: #0a0e1c;
-$modal-surface-top: #edf6ff;
-$modal-surface-bottom: #cfe1f7;
-$modal-border: rgba(69, 108, 166, 0.26);
-$modal-shadow: 0 28px 56px rgba(5, 18, 42, 0.34);
-$modal-text: #163054;
-$modal-muted: rgba(22, 48, 84, 0.82);
+$page-bg: var(--ce-surface-sunken);
+$page-bg-deep: var(--ce-overlay-base);
+$text-color: var(--ce-panel-text);
+$muted-text: var(--ce-panel-text-muted);
+$accent: var(--ce-action-accent);
+$accent-text: var(--ce-action-accent-text);
+$card-bg: var(--ce-card-bg);
+$card-border: var(--ce-card-border);
+$card-shadow: var(--ce-card-shadow);
+$tile-text: var(--ce-control-text);
+$modal-surface-top: var(--ce-surface-raised);
+$modal-surface-bottom: var(--ce-surface-alt);
+$modal-border: var(--ce-card-border);
+$modal-shadow: var(--ce-card-shadow);
+$modal-text: var(--ce-panel-text);
+$modal-muted: var(--ce-panel-text-muted);
 
 .aboutPageContainer {
   position: relative;
   overflow: hidden;
-  padding: clamp(24px, 5vw, 56px) 20px 56px;
+  padding: 0 20px 56px;
   color: $text-color;
   font-family: var(--ce-font-mono);
 }
@@ -40,9 +39,9 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 .collapsibleSection {
   margin: 20px 0;
   padding: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  background: rgba(92, 88, 166, 0.19);
+  border: 1px solid $card-border;
+  border-radius: var(--ce-radius-16);
+  background: $card-bg;
 }
 
 .hero,
@@ -50,7 +49,7 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 .mediaCard,
 .useCaseDetail {
   border: 1px solid $card-border;
-  border-radius: 20px;
+  border-radius: var(--ce-radius-20);
   background: $card-bg;
   box-shadow: $card-shadow;
 }
@@ -62,8 +61,8 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   grid-template-columns: 1fr auto;
   grid-template-rows: auto;
   background:
-    radial-gradient(circle at top right, rgba(77, 255, 164, 0.1), transparent 34%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
+    radial-gradient(circle at top right, color-mix(in srgb, var(--ce-action-accent) 10%, transparent), transparent 34%),
+    $card-bg;
 }
 
 .heroText {
@@ -110,7 +109,7 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   line-height: 1;
   font-weight: 700;
   letter-spacing: 0.01em;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--ce-panel-text-muted);
 }
 
 .mainTitle {
@@ -133,13 +132,13 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   justify-content: center;
   width: 48px;
   height: 48px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(244, 247, 255, 0.92);
+  border-radius: var(--ce-radius-pill);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
+  background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
+  color: color-mix(in srgb, var(--ce-control-text) 92%, transparent);
   font-size: 1.45rem;
   text-decoration: none;
-  box-shadow: 0 10px 22px rgba(8, 12, 28, 0.2);
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--ce-overlay-base) 20%, transparent);
   transition:
     transform 0.18s ease,
     border-color 0.18s ease,
@@ -150,17 +149,17 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   &:hover,
   &:focus {
     color: $text-color;
-    border-color: rgba(77, 255, 164, 0.34);
-    background: rgba(77, 255, 164, 0.1);
+    border-color: color-mix(in srgb, var(--ce-action-accent) 34%, transparent);
+    background: color-mix(in srgb, var(--ce-action-accent) 10%, transparent);
     transform: translateY(-1px);
-    box-shadow: 0 12px 26px rgba(8, 12, 28, 0.24);
+    box-shadow: 0 12px 26px color-mix(in srgb, var(--ce-overlay-base) 24%, transparent);
   }
 }
 
 .tagline {
   margin: 0;
   max-width: 38rem;
-  color: rgba(244, 247, 255, 0.92);
+  color: color-mix(in srgb, var(--ce-control-text) 92%, transparent);
   font-size: clamp(1rem, 2vw, 1.18rem);
   line-height: 1.45;
 }
@@ -192,7 +191,7 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   justify-content: center;
   min-height: 48px;
   padding: 0 20px;
-  border-radius: 999px;
+  border-radius: var(--ce-radius-pill);
   font-size: 0.92rem;
   letter-spacing: 0.02em;
   border: 1px solid transparent;
@@ -200,35 +199,35 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 
 .primaryButton {
   background: $accent;
-  border-color: rgba(77, 255, 164, 0.42);
-  color: $tile-text;
-  box-shadow: 0 16px 32px rgba(77, 255, 164, 0.16);
+  border-color: color-mix(in srgb, var(--ce-action-accent) 42%, transparent);
+  color: $accent-text;
+  box-shadow: 0 16px 32px color-mix(in srgb, var(--ce-action-accent) 16%, transparent);
 
   &:hover,
   &:focus {
-    color: $tile-text;
+    color: $accent-text;
     transform: translateY(-1px);
-    box-shadow: 0 18px 34px rgba(77, 255, 164, 0.2);
+    box-shadow: 0 18px 34px color-mix(in srgb, var(--ce-action-accent) 20%, transparent);
   }
 }
 
 .secondaryButton {
-  background: rgba(8, 12, 26, 0.42);
-  border-color: rgba(255, 255, 255, 0.16);
-  color: rgba(244, 247, 255, 0.96);
+  background: color-mix(in srgb, var(--ce-overlay-base) 42%, transparent);
+  border-color: color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
+  color: color-mix(in srgb, var(--ce-control-text) 96%, transparent);
   box-shadow:
-    0 16px 28px rgba(4, 8, 20, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    0 16px 28px color-mix(in srgb, var(--ce-overlay-base) 22%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
 
   &:hover,
   &:focus-visible {
     color: $text-color;
-    border-color: rgba(77, 255, 164, 0.34);
-    background: rgba(77, 255, 164, 0.1);
+    border-color: color-mix(in srgb, var(--ce-action-accent) 34%, transparent);
+    background: color-mix(in srgb, var(--ce-action-accent) 10%, transparent);
     transform: translateY(-1px);
     box-shadow:
-      0 18px 32px rgba(4, 8, 20, 0.24),
-      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      0 18px 32px color-mix(in srgb, var(--ce-overlay-base) 24%, transparent),
+      inset 0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
     outline: none;
   }
 }
@@ -247,23 +246,19 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   justify-content: center;
   min-height: 36px;
   padding: 0 14px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(244, 247, 255, 0.9);
+  border-radius: var(--ce-radius-pill);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
+  background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
+  color: color-mix(in srgb, var(--ce-control-text) 90%, transparent);
   font-size: 0.82rem;
 
   &:hover,
   &:focus {
     color: $text-color;
-    border-color: rgba(77, 255, 164, 0.34);
-    background: rgba(77, 255, 164, 0.08);
+    border-color: color-mix(in srgb, var(--ce-action-accent) 34%, transparent);
+    background: color-mix(in srgb, var(--ce-action-accent) 8%, transparent);
     transform: translateY(-1px);
   }
-}
-
-.sectionTitle {
-  color: rgba(244, 247, 255, 0.72);
 }
 
 .toggleHeader {
@@ -292,7 +287,7 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   text-align: center;
   font-size: 3rem;
   line-height: 0.9;
-  color: rgba(244, 247, 255, 0.72);
+  color: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
   margin-left: 10px;
   flex-shrink: 0;
 }
@@ -309,20 +304,24 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 .recognitionSummaryLogo {
   width: 30px;
   height: 30px;
-  border-radius: 10px;
+  border-radius: var(--ce-radius-10);
   flex-shrink: 0;
   object-fit: contain;
   padding: 3px;
-  background: linear-gradient(180deg, rgba(10, 16, 34, 0.96), rgba(6, 10, 24, 0.92));
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 6px 14px rgba(7, 11, 28, 0.24);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ce-overlay-surface) 96%, transparent),
+    color-mix(in srgb, var(--ce-overlay-base) 92%, transparent)
+  );
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--ce-overlay-base) 24%, transparent);
 }
 
 .collapsibleContent {
   margin-top: 16px;
   padding-left: 1rem;
-  border-left: 2px solid rgba(255, 255, 255, 0.1);
-  color: rgba(244, 247, 255, 0.8);
+  border-left: 2px solid color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
+  color: color-mix(in srgb, var(--ce-control-text) 80%, transparent);
 }
 
 .useCaseGrid {
@@ -333,16 +332,21 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 
 .useCaseTile {
   border: none;
-  border-radius: 20px;
+  border-radius: var(--ce-radius-20);
   padding: 16px;
   min-height: 124px;
   color: $tile-text;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--usecase-tone) 28%, var(--ce-control-face)),
+    color-mix(in srgb, var(--usecase-tone) 18%, var(--ce-control-face))
+  );
   font-family: inherit;
   cursor: pointer;
   box-shadow:
-    -7px 7px 14px rgba(23, 26, 61, 0.28),
-    7px -7px 14px rgba(255, 255, 255, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    -7px 7px 14px color-mix(in srgb, var(--ce-overlay-surface) 28%, transparent),
+    7px -7px 14px color-mix(in srgb, var(--ce-text-inverse) 10%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 18%, transparent);
   transition:
     transform 0.18s ease,
     box-shadow 0.18s ease,
@@ -352,9 +356,9 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   &:focus-visible {
     transform: translateY(-3px);
     box-shadow:
-      -9px 9px 18px rgba(18, 22, 54, 0.32),
-      9px -9px 18px rgba(255, 255, 255, 0.12),
-      inset 0 1px 0 rgba(255, 255, 255, 0.24);
+      -9px 9px 18px color-mix(in srgb, var(--ce-overlay-surface) 32%, transparent),
+      9px -9px 18px color-mix(in srgb, var(--ce-text-inverse) 12%, transparent),
+      inset 0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 24%, transparent);
     filter: saturate(1.02);
     outline: none;
   }
@@ -363,9 +367,9 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 .useCaseTileActive {
   transform: translateY(-3px);
   box-shadow:
-    -9px 9px 18px rgba(18, 22, 54, 0.32),
-    9px -9px 18px rgba(255, 255, 255, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.24);
+    -9px 9px 18px color-mix(in srgb, var(--ce-overlay-surface) 32%, transparent),
+    9px -9px 18px color-mix(in srgb, var(--ce-text-inverse) 12%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 24%, transparent);
 }
 
 .useCaseTileContent {
@@ -378,8 +382,8 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 
 .useCaseIcon {
   font-size: 2.5rem;
-  color: var(--usecase-icon-color, #162039);
-  filter: drop-shadow(0 3px 8px rgba(255, 255, 255, 0.14));
+  color: var(--ce-control-text);
+  filter: drop-shadow(0 3px 8px color-mix(in srgb, var(--ce-text-inverse) 14%, transparent));
 }
 
 .useCaseLabel {
@@ -388,32 +392,27 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   font-weight: 600;
   line-height: 1.2;
   letter-spacing: 0.03em;
-  color: rgba(14, 20, 39, 0.5);
+  color: var(--ce-control-text);
 }
 
 .useCaseTileMint {
-  --usecase-icon-color: #0e7a53;
-  background: linear-gradient(135deg, #5affc2 0%, #3de8a8 100%);
+  --usecase-tone: var(--ce-status-success);
 }
 
 .useCaseTileBlue {
-  --usecase-icon-color: #2c54bb;
-  background: linear-gradient(135deg, #5b8cff 0%, #4a6fe0 100%);
+  --usecase-tone: var(--ce-data-series-1);
 }
 
 .useCaseTileOrange {
-  --usecase-icon-color: #a35d18;
-  background: linear-gradient(135deg, #ffb347 0%, #f09030 100%);
+  --usecase-tone: var(--ce-status-warning);
 }
 
 .useCaseTilePink {
-  --usecase-icon-color: #a33972;
-  background: linear-gradient(135deg, #ff6bcb 0%, #e050a8 100%);
+  --usecase-tone: var(--ce-data-series-3);
 }
 
 .useCaseTileGold {
-  --usecase-icon-color: #8f6512;
-  background: linear-gradient(135deg, #ffd166 0%, #f0b830 100%);
+  --usecase-tone: var(--ce-data-series-5);
 }
 
 .useCaseDetail {
@@ -442,26 +441,26 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   text-transform: uppercase;
   line-height: 1.2;
   padding: 10px 14px;
-  border-radius: 12px;
+  border-radius: var(--ce-radius-12);
   white-space: normal;
 }
 
 .useCaseDetailProblemTag {
-  color: rgba(255, 190, 190, 0.98);
-  border: 1px solid rgba(255, 107, 107, 0.38);
-  background: rgba(255, 107, 107, 0.14);
+  color: color-mix(in srgb, var(--ce-status-danger-text) 98%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-status-error) 38%, transparent);
+  background: color-mix(in srgb, var(--ce-status-error) 14%, transparent);
 }
 
 .useCaseDetailSolutionTag {
-  color: rgba(184, 255, 221, 0.98);
-  border: 1px solid rgba(77, 255, 164, 0.38);
-  background: rgba(77, 255, 164, 0.14);
+  color: color-mix(in srgb, var(--ce-status-success-text) 98%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 38%, transparent);
+  background: color-mix(in srgb, var(--ce-action-accent) 14%, transparent);
 }
 
 .useCaseDetailRowText {
   margin: 0;
   max-width: 62ch;
-  color: rgba(244, 247, 255, 0.94);
+  color: color-mix(in srgb, var(--ce-control-text) 94%, transparent);
   font-family: var(--ce-font-body);
   font-size: 1.12rem;
   line-height: 1.65;
@@ -508,7 +507,7 @@ $modal-muted: rgba(22, 48, 84, 0.82);
       content: '—';
       position: absolute;
       left: 0;
-      color: #4dffa4;
+      color: var(--ce-action-accent);
       font-weight: 700;
     }
   }
@@ -525,9 +524,9 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 .featureItem {
   position: relative;
   padding: 18px 18px 18px 22px;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--ce-radius-16);
+  border: 1px solid $card-border;
+  background: $card-bg;
   box-shadow: $card-shadow;
 
   &::before {
@@ -537,7 +536,7 @@ $modal-muted: rgba(22, 48, 84, 0.82);
     top: 16px;
     bottom: 16px;
     width: 4px;
-    border-radius: 999px;
+    border-radius: var(--ce-radius-pill);
     background: $accent;
   }
 }
@@ -545,7 +544,7 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 .featureLabel {
   display: block;
   margin: 0 0 8px;
-  color: rgba(244, 247, 255, 0.98);
+  color: color-mix(in srgb, var(--ce-control-text) 98%, transparent);
   font-family: var(--ce-font-body);
   font-size: clamp(1.08rem, 1.6vw, 1.22rem);
   font-weight: 700;
@@ -554,7 +553,7 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 
 .featureText {
   display: block;
-  color: rgba(244, 247, 255, 0.84);
+  color: color-mix(in srgb, var(--ce-control-text) 84%, transparent);
   font-family: var(--ce-font-body);
   font-size: 1rem;
   line-height: 1.65;
@@ -570,7 +569,7 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 
 .roadmapSectionItem {
   padding: 15px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.085);
+  border-bottom: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8.5%, transparent);
 
   &:first-child {
     padding-top: 0;
@@ -584,7 +583,7 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 
 .roadmapCategory {
   margin: 0 0 8px;
-  color: rgba(244, 247, 255, 0.96);
+  color: color-mix(in srgb, var(--ce-control-text) 96%, transparent);
   font-family: var(--ce-font-body);
   font-size: 0.98rem;
   font-weight: 700;
@@ -604,18 +603,18 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   grid-template-columns: auto minmax(0, 1fr);
   align-items: flex-start;
   gap: 10px;
-  color: rgba(244, 247, 255, 0.76);
+  color: var(--ce-panel-text);
   font-family: var(--ce-font-body);
   font-size: 0.98rem;
   line-height: 1.5;
 }
 
 .roadmapChecklistItemComplete {
-  color: rgba(244, 247, 255, 0.82);
+  color: var(--ce-panel-text);
 }
 
 .roadmapChecklistItemPlanned {
-  color: rgba(244, 247, 255, 0.62);
+  color: var(--ce-panel-text-muted);
 }
 
 .roadmapCheck {
@@ -624,10 +623,10 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   width: 19px;
   height: 19px;
   margin-top: 0.12rem;
-  border: 1px solid rgba(77, 255, 164, 0.42);
-  border-radius: 999px;
-  background: rgba(77, 255, 164, 0.92);
-  color: rgba(8, 14, 19, 0.96);
+  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 42%, transparent);
+  border-radius: var(--ce-radius-pill);
+  background: color-mix(in srgb, var(--ce-action-accent) 92%, transparent);
+  color: color-mix(in srgb, var(--ce-overlay-base) 96%, transparent);
   font-size: 0.74rem;
   font-weight: 900;
   line-height: 1;
@@ -639,7 +638,7 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 }
 
 .roadmapChecklistItemPlanned .roadmapCheck {
-  border-color: rgba(244, 247, 255, 0.28);
+  border-color: color-mix(in srgb, var(--ce-control-text) 28%, transparent);
   background: transparent;
   color: transparent;
 
@@ -665,13 +664,13 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   display: block;
   width: 100%;
   aspect-ratio: 16 / 9;
-  border-radius: 16px;
-  background: rgba(8, 12, 26, 0.88);
-  box-shadow: 0 16px 32px rgba(5, 9, 24, 0.22);
+  border-radius: var(--ce-radius-16);
+  background: color-mix(in srgb, var(--ce-overlay-base) 88%, transparent);
+  box-shadow: 0 16px 32px color-mix(in srgb, var(--ce-overlay-base) 22%, transparent);
 }
 
 .demoVideo {
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
 }
 
 .mobileDemoVideo {
@@ -682,17 +681,17 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 .mobileDemoVideoPlayerWrap {
   position: relative;
   overflow: hidden;
-  border-radius: 16px;
-  background: #050816;
+  border-radius: var(--ce-radius-16);
+  background: var(--ce-overlay-base);
 }
 
 .mobileDemoVideoPlayer {
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
   object-fit: contain;
-  background: #050816;
+  background: var(--ce-overlay-base);
 
   &:focus-visible {
-    outline: 3px solid rgba(77, 255, 164, 0.82);
+    outline: 3px solid color-mix(in srgb, var(--ce-action-accent) 82%, transparent);
     outline-offset: -3px;
   }
 }
@@ -707,12 +706,12 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   display: grid;
   place-items: center;
   background: transparent;
-  color: rgba(244, 247, 255, 0.98);
+  color: color-mix(in srgb, var(--ce-control-text) 98%, transparent);
   cursor: pointer;
   touch-action: manipulation;
 
   &:focus-visible {
-    outline: 3px solid rgba(77, 255, 164, 0.82);
+    outline: 3px solid color-mix(in srgb, var(--ce-action-accent) 82%, transparent);
     outline-offset: -5px;
   }
 }
@@ -720,13 +719,13 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 .mobileDemoVideoPlayIcon {
   width: clamp(62px, 16vw, 92px);
   height: clamp(62px, 16vw, 92px);
-  border-radius: 999px;
+  border-radius: var(--ce-radius-pill);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(5, 8, 22, 0.76);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 18px 34px rgba(3, 6, 18, 0.4);
+  background: color-mix(in srgb, var(--ce-overlay-base) 76%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
+  box-shadow: 0 18px 34px color-mix(in srgb, var(--ce-overlay-base) 40%, transparent);
   font-size: clamp(1.45rem, 5vw, 2.2rem);
 
   svg {
@@ -736,7 +735,7 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 
 .mobileDemoVideoStatus {
   margin: 0;
-  color: rgba(244, 247, 255, 0.78);
+  color: color-mix(in srgb, var(--ce-control-text) 78%, transparent);
   font-size: 0.86rem;
   line-height: 1.4;
   text-align: center;
@@ -748,17 +747,17 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   align-items: center;
   justify-content: center;
   padding: 0 16px;
-  border-radius: 999px;
-  border: 1px solid rgba(77, 255, 164, 0.36);
-  background: rgba(77, 255, 164, 0.96);
-  color: #08111f;
+  border-radius: var(--ce-radius-pill);
+  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 36%, transparent);
+  background: color-mix(in srgb, var(--ce-action-accent) 96%, transparent);
+  color: var(--ce-overlay-base);
   font-weight: 800;
   text-decoration: none;
 
   &:hover,
   &:focus-visible {
-    color: #08111f;
-    background: rgba(105, 255, 184, 1);
+    color: var(--ce-overlay-base);
+    background: var(--ce-status-success);
     outline: none;
   }
 }
@@ -776,7 +775,7 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   width: 100%;
   padding: 0;
   border: 0;
-  border-radius: 0;
+  border-radius: var(--ce-radius-0);
   background: transparent;
   justify-items: stretch;
 }
@@ -793,9 +792,9 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   max-width: 100%;
   min-height: 64px;
   padding: 14px 22px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
+  border-radius: var(--ce-radius-pill);
+  border: 1px solid $card-border;
+  background: $card-bg;
   box-shadow: $card-shadow;
   text-decoration: none;
   color: inherit;
@@ -809,12 +808,12 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 
   &:hover,
   &:focus-visible {
-    border-color: rgba(77, 255, 164, 0.35);
-    background: rgba(77, 255, 164, 0.08);
+    border-color: color-mix(in srgb, var(--ce-action-accent) 35%, transparent);
+    background: color-mix(in srgb, var(--ce-action-accent) 8%, transparent);
     color: inherit;
     text-decoration: none;
     transform: translateY(-1px);
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+    box-shadow: 0 10px 24px color-mix(in srgb, var(--ce-compat-dark) 28%, transparent);
     outline: none;
   }
 }
@@ -823,22 +822,26 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 .recognitionLogoFallback {
   width: 44px;
   height: 44px;
-  border-radius: 14px;
+  border-radius: var(--ce-radius-14);
   flex-shrink: 0;
 }
 
 .recognitionLogo {
   object-fit: contain;
-  background: linear-gradient(180deg, rgba(10, 16, 34, 0.96), rgba(6, 10, 24, 0.92));
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ce-overlay-surface) 96%, transparent),
+    color-mix(in srgb, var(--ce-overlay-base) 92%, transparent)
+  );
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
   padding: 4px;
 }
 
 .recognitionLogoEthereum,
 .recognitionLogoCip,
 .recognitionLogoEdge {
-  background: rgba(235, 244, 255, 0.96);
-  border-color: rgba(94, 126, 178, 0.24);
+  background: color-mix(in srgb, var(--ce-recognition-logo-backing) 96%, transparent);
+  border-color: color-mix(in srgb, var(--ce-recognition-logo-border) 24%, transparent);
 }
 
 .recognitionLogoEthereum {
@@ -850,8 +853,8 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 }
 
 .recognitionLogoPolis {
-  background: rgba(240, 247, 255, 0.98);
-  border-color: rgba(94, 126, 178, 0.18);
+  background: color-mix(in srgb, var(--ce-recognition-logo-backing) 98%, transparent);
+  border-color: color-mix(in srgb, var(--ce-recognition-logo-border) 18%, transparent);
   padding: 0;
 }
 
@@ -864,14 +867,14 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(77, 255, 164, 0.16);
+  background: color-mix(in srgb, var(--ce-action-accent) 16%, transparent);
   color: $accent;
   font-size: 0.92rem;
   font-weight: 700;
 }
 
 .recognitionName {
-  color: rgba(244, 247, 255, 0.95);
+  color: color-mix(in srgb, var(--ce-control-text) 95%, transparent);
   font-size: 1rem;
   font-weight: 700;
   min-width: 0;
@@ -902,7 +905,7 @@ $modal-muted: rgba(22, 48, 84, 0.82);
     background: linear-gradient(180deg, $modal-surface-top 0%, $modal-surface-bottom 100%);
     border: 1px solid $modal-border;
     color: $modal-text;
-    border-radius: 24px;
+    border-radius: var(--ce-radius-24);
     box-shadow: $modal-shadow;
     overflow: hidden;
   }
@@ -913,7 +916,7 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   inset: 0 !important;
   width: 100vw !important;
   height: 100vh !important;
-  background: rgba(3, 5, 18, 0.08) !important;
+  background: color-mix(in srgb, var(--ce-overlay-base) 8%, transparent) !important;
   opacity: 1 !important;
   z-index: 1040 !important;
 }
@@ -921,8 +924,12 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 .recognitionModalHeaderBar {
   align-items: center;
   padding: 18px 20px 14px;
-  border-bottom: 1px solid rgba(48, 88, 147, 0.18);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.52), rgba(255, 255, 255, 0.18));
+  border-bottom: 1px solid color-mix(in srgb, var(--ce-status-info) 18%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ce-text-inverse) 52%, transparent),
+    color-mix(in srgb, var(--ce-text-inverse) 18%, transparent)
+  );
 
   :global(.modal-title) {
     flex: 1 1 auto;
@@ -943,15 +950,19 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   width: 48px;
   height: 48px;
   object-fit: contain;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.76);
-  border: 1px solid rgba(69, 108, 166, 0.2);
+  border-radius: var(--ce-radius-12);
+  background: color-mix(in srgb, var(--ce-text-inverse) 76%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-status-info) 20%, transparent);
   padding: 4px;
 }
 
 .recognitionModalLogo.recognitionLogoRxc {
-  background: linear-gradient(180deg, rgba(10, 16, 34, 0.98), rgba(6, 10, 24, 0.96));
-  border-color: rgba(51, 89, 148, 0.24);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ce-overlay-surface) 98%, transparent),
+    color-mix(in srgb, var(--ce-overlay-base) 96%, transparent)
+  );
+  border-color: color-mix(in srgb, var(--ce-status-info) 24%, transparent);
   padding: 4px;
 }
 
@@ -971,11 +982,11 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   height: 42px;
   padding: 0;
   margin-left: 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(51, 89, 148, 0.24);
-  background: rgba(255, 255, 255, 0.74);
+  border-radius: var(--ce-radius-pill);
+  border: 1px solid color-mix(in srgb, var(--ce-status-info) 24%, transparent);
+  background: color-mix(in srgb, var(--ce-text-inverse) 74%, transparent);
   color: $modal-text;
-  box-shadow: 0 10px 22px rgba(31, 63, 110, 0.16);
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--ce-status-info) 16%, transparent);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -996,11 +1007,11 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 
   &:hover,
   &:focus {
-    background: rgba(255, 255, 255, 0.92);
-    border-color: rgba(41, 84, 144, 0.38);
-    color: #0f2442;
+    background: color-mix(in srgb, var(--ce-text-inverse) 92%, transparent);
+    border-color: color-mix(in srgb, var(--ce-status-info) 38%, transparent);
+    color: var(--ce-overlay-surface);
     transform: translateY(-1px);
-    box-shadow: 0 12px 26px rgba(31, 63, 110, 0.22);
+    box-shadow: 0 12px 26px color-mix(in srgb, var(--ce-status-info) 22%, transparent);
     outline: none;
   }
 }
@@ -1018,9 +1029,9 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   max-width: 100%;
   height: auto;
   margin-top: 1rem;
-  border: 1px solid rgba(69, 108, 166, 0.18);
-  border-radius: 12px;
-  box-shadow: 0 14px 28px rgba(20, 44, 82, 0.16);
+  border: 1px solid color-mix(in srgb, var(--ce-status-info) 18%, transparent);
+  border-radius: var(--ce-radius-12);
+  box-shadow: 0 14px 28px color-mix(in srgb, var(--ce-overlay-surface) 16%, transparent);
 }
 
 .recognitionModalLinks {
@@ -1036,9 +1047,9 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   justify-content: center;
   min-height: 36px;
   padding: 0 14px;
-  border-radius: 999px;
-  border: 1px solid rgba(69, 108, 166, 0.2);
-  background: rgba(255, 255, 255, 0.56);
+  border-radius: var(--ce-radius-pill);
+  border: 1px solid color-mix(in srgb, var(--ce-status-info) 20%, transparent);
+  background: color-mix(in srgb, var(--ce-text-inverse) 56%, transparent);
   color: $modal-text;
   font-size: 0.82rem;
   text-decoration: none;
@@ -1051,11 +1062,11 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 
   &:hover,
   &:focus {
-    color: #0f2442;
-    border-color: rgba(41, 84, 144, 0.34);
-    background: rgba(255, 255, 255, 0.8);
+    color: var(--ce-overlay-surface);
+    border-color: color-mix(in srgb, var(--ce-status-info) 34%, transparent);
+    background: color-mix(in srgb, var(--ce-text-inverse) 80%, transparent);
     transform: translateY(-1px);
-    box-shadow: 0 10px 20px rgba(31, 63, 110, 0.16);
+    box-shadow: 0 10px 20px color-mix(in srgb, var(--ce-status-info) 16%, transparent);
   }
 }
 
@@ -1078,7 +1089,7 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 }
 
 .recognitionDot {
-  color: rgba(244, 247, 255, 0.34);
+  color: color-mix(in srgb, var(--ce-control-text) 34%, transparent);
 }
 
 .recognitionIndividuals {
@@ -1089,7 +1100,7 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 }
 
 .recognitionIndividual {
-  color: rgba(244, 247, 255, 0.86);
+  color: color-mix(in srgb, var(--ce-control-text) 86%, transparent);
 }
 
 .recognitionIndividual a {
@@ -1233,7 +1244,7 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 
 @media (max-width: 640px) {
   .aboutPageContainer {
-    padding: 20px 14px 40px;
+    padding: 0 14px 40px;
   }
 
   .pageShell {
@@ -1244,7 +1255,7 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   .cardSection,
   .mediaCard,
   .useCaseDetail {
-    border-radius: 18px;
+    border-radius: var(--ce-radius-18);
   }
 
   .hero {
@@ -1254,34 +1265,40 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 
   .toggleHeader {
     gap: 8px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+  }
+
+  .toggleHeader .sectionTitle {
+    flex-shrink: 0;
   }
 
   .toggleHeaderAside {
+    display: flex;
+    flex: 1 1 auto;
     gap: 6px;
-    margin-left: auto;
-    display: contents;
+    margin-left: 0;
+    min-width: 0;
   }
 
+  .toggleHeader > .toggleIcon,
   .toggleHeaderAside .toggleIcon {
-    order: 2;
     margin-left: auto;
   }
 
   .recognitionSummary {
-    order: 3;
     display: flex;
-    flex: 1 0 100%;
+    flex: 0 1 auto;
     justify-content: flex-start;
     gap: 0;
-    margin-top: 10px;
-    overflow: visible;
+    margin-top: 0;
+    overflow: hidden;
   }
 
   .recognitionSummaryLogo {
     width: 28px;
     height: 28px;
-    border-radius: 8px;
+    border-radius: var(--ce-radius-8);
     padding: 2px;
   }
 
@@ -1409,7 +1426,7 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 
   .recognitionItem {
     width: 100%;
-    border-radius: 20px;
+    border-radius: var(--ce-radius-20);
     grid-template-columns: 46px minmax(0, 1fr);
     gap: 14px;
     padding: 14px 18px;
@@ -1450,5 +1467,121 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 @media (max-width: 519px) {
   .useCaseGrid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Classic 95 uses the locally bundled Tahoma face and a deliberately small
+ * set of native-looking raised controls. Keep this after the responsive rules
+ * so the desktop-window profile remains coherent at every viewport size. */
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  .aboutPageContainer {
+    font-family: var(--ce-font-body);
+  }
+
+  .mainTitle,
+  .tagline,
+  .heroActions,
+  .heroLinks {
+    font-family: var(--ce-font-body);
+  }
+
+  .heroActions {
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .heroLinks {
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .heroPrimaryButton,
+  .tertiaryLink,
+  .titleRepoLink {
+    border: 2px solid;
+    border-color: var(--ce-border-raised);
+    border-radius: 0;
+    background: var(--ce-control-face);
+    box-shadow: var(--ce-shadow-raised);
+    color: var(--ce-control-text);
+    font-family: var(--ce-font-body);
+    letter-spacing: 0;
+    text-decoration: none;
+    transform: none;
+    transition: none;
+  }
+
+  .heroPrimaryButton {
+    min-width: 148px;
+    min-height: 48px;
+    padding: 0 22px;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  .heroPrimaryButton.primaryButton {
+    background: var(--ce-titlebar-bg);
+    color: var(--ce-titlebar-text);
+  }
+
+  .tertiaryLink {
+    min-width: 108px;
+    min-height: 34px;
+    padding: 0 14px;
+    font-size: 0.88rem;
+    font-weight: 400;
+  }
+
+  .titleRepoLink {
+    width: 64px;
+    height: 44px;
+    background: var(--ce-control-face);
+    font-size: 1.45rem;
+  }
+
+  .heroPrimaryButton:hover,
+  .heroPrimaryButton:focus-visible,
+  .tertiaryLink:hover,
+  .tertiaryLink:focus-visible,
+  .titleRepoLink:hover,
+  .titleRepoLink:focus-visible {
+    border-color: var(--ce-border-raised);
+    background: var(--ce-surface-alt);
+    box-shadow: var(--ce-shadow-raised);
+    color: var(--ce-control-text);
+    outline: 1px dotted var(--ce-control-text);
+    outline-offset: -5px;
+    transform: none;
+  }
+
+  .heroPrimaryButton.primaryButton:hover,
+  .heroPrimaryButton.primaryButton:focus-visible {
+    background: var(--ce-titlebar-bg);
+    color: var(--ce-titlebar-text);
+    outline-color: var(--ce-titlebar-text);
+  }
+
+  .heroPrimaryButton:active,
+  .tertiaryLink:active,
+  .titleRepoLink:active {
+    border-color: var(--ce-border-inset);
+    box-shadow: var(--ce-shadow-pressed);
+    transform: translate(1px, 1px);
+  }
+
+  @media (max-width: 640px) {
+    .heroActions {
+      flex-direction: row;
+      flex-wrap: wrap;
+    }
+
+    .heroPrimaryButton {
+      flex: 1 1 180px;
+      width: auto;
+    }
+
+    .tertiaryLink {
+      flex: 1 1 108px;
+    }
   }
 }

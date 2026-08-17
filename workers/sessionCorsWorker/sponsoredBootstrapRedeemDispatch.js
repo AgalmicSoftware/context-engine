@@ -11,6 +11,7 @@ import {
   normalizeOrigin,
   sha256Hex,
   stableCanonicalSerialize,
+  validateDeployHelperPublicConfigInputs,
 } from '../shared/deployHelperCore.mjs';
 import {
   executeCoordinatedSponsoredDeploy as executeCoordinatedSponsoredDeployBoundary,
@@ -227,6 +228,10 @@ export const dispatchSponsoredBootstrapRedeem = async ({
       deploymentRequestId,
       configRevision,
     };
+    const publicConfigValidationError = validateDeployHelperPublicConfigInputs(effectiveDeployPayload);
+    if (publicConfigValidationError) {
+      return buildGrantErrorResponse(deps, headers, 400, publicConfigValidationError);
+    }
     const sensitiveValues = buildSponsoredSensitiveValues({
       body,
       grantRecord,

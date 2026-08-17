@@ -1,4 +1,4 @@
-import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
+import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { resolveSessionUniverseEntrySlug } from './sbtSessionUniverse.js';
 import type { SbtListHelperItem, SbtListHelperRecord } from './sbtListCardDetailsHelpers';
 

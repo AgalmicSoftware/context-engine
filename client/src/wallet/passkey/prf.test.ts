@@ -1,5 +1,17 @@
 import { bufferToBase64URL } from './encoding.js';
-import { deriveAesGcmKeyFromPrf } from './prf.js';
+import { deriveAesGcmKeyFromPrf, getCredentialPrfOutput, getOptionalCredentialPrfOutput } from './prf.js';
+
+const makeCredentialWithPrfOutput = (byteLength: number) =>
+  ({
+    getClientExtensionResults: () => ({
+      prf: {
+        enabled: true,
+        results: {
+          first: new Uint8Array(byteLength).buffer,
+        },
+      },
+    }),
+  }) as unknown as PublicKeyCredential;
 
 describe('deriveAesGcmKeyFromPrf', () => {
   afterEach(() => {
@@ -40,5 +52,21 @@ describe('deriveAesGcmKeyFromPrf', () => {
     expect(key.type).toBe('secret');
     expect(key.algorithm).toEqual(expect.objectContaining({ name: 'AES-GCM', length: 256 }));
     expect(key.usages).toEqual(['encrypt', 'decrypt']);
+  });
+});
+
+describe('credential PRF output validation', () => {
+  it.each([0, 16, 31, 33])('rejects a non-32-byte PRF output (%i bytes)', (byteLength) => {
+    const credential = makeCredentialWithPrfOutput(byteLength);
+
+    expect(getOptionalCredentialPrfOutput(credential)).toBeNull();
+    expect(() => getCredentialPrfOutput(credential)).toThrow(/PRF is required/i);
+  });
+
+  it('accepts the WebAuthn PRF fixed 32-byte output', () => {
+    const credential = makeCredentialWithPrfOutput(32);
+
+    expect(getOptionalCredentialPrfOutput(credential)).toHaveProperty('byteLength', 32);
+    expect(getCredentialPrfOutput(credential)).toHaveProperty('byteLength', 32);
   });
 });

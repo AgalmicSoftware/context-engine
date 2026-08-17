@@ -8,6 +8,7 @@ const { spawnSync } = require('node:child_process');
 
 const SCRIPT_SOURCE_PATH = path.join(__dirname, 'prepare-public-release.sh');
 const PACKAGE_SCRUBBER_SOURCE_PATH = path.join(__dirname, 'scrub-public-package-json.js');
+const PII_SCRUBBER_SOURCE_PATH = path.join(__dirname, 'scrub-public-pii-text.mjs');
 const HELPER_SOURCE_PATH = path.join(__dirname, 'lib', 'public-release-strip-patterns.sh');
 const SURFACE_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-release-surface.js');
 const DOCS_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-docs.js');
@@ -48,6 +49,11 @@ test('prepare-public-release strips private surfaces without publishing an inven
     );
     writeFile(
       sourceDir,
+      path.join('scripts', 'scrub-public-pii-text.mjs'),
+      fs.readFileSync(PII_SCRUBBER_SOURCE_PATH, 'utf8'),
+    );
+    writeFile(
+      sourceDir,
       path.join('scripts', 'lib', 'public-release-strip-patterns.sh'),
       fs.readFileSync(HELPER_SOURCE_PATH, 'utf8'),
     );
@@ -78,7 +84,15 @@ test('prepare-public-release strips private surfaces without publishing an inven
       'client/src/components/Sessions/sessionWizardUrlSupport.test.ts',
       'client/src/components/Sessions/sessionWizardWorkerConfigPersistence.test.ts',
       'client/src/variables/publicRepoMetadata.ts',
+      'scripts/deployment-surface-docs.test.js',
+      'scripts/install-private-branch-guard.test.js',
+      'scripts/pre-push-guard.test.js',
+      'scripts/release-version.test.mjs',
+      'scripts/vite-navigation-smoke.js',
+      'scripts/vite-navigation-smoke.test.js',
+      'scripts/worker-release-artifacts.test.mjs',
       'workers/sessionCorsWorker/chipotleClient.test.mjs',
+      'workers/sessionCorsWorker/transcribeExecution.test.mjs',
     ]) {
       writeFile(sourceDir, relativePath, fs.readFileSync(path.join(REPO_ROOT, relativePath), 'utf8'));
     }
@@ -121,6 +135,7 @@ test('prepare-public-release strips private surfaces without publishing an inven
     writeFile(sourceDir, 'AGENTS.md', 'private agent instructions\n');
     writeFile(sourceDir, path.join('ai-discourse-corpus', 'corpuses', '_local_helper.js'), 'local helper script\n');
     writeFile(sourceDir, path.join('.tmp-review', 'review.js'), 'temporary review snapshot\n');
+    writeFile(sourceDir, path.join('Demo Integration Package', 'private.txt'), 'private integration material\n');
     writeFile(sourceDir, 'private-pack.manifest.json', 'tracked root manifest that should be replaced\n');
     writeFile(
       sourceDir,
@@ -222,6 +237,31 @@ test('prepare-public-release strips private surfaces without publishing an inven
     );
     assert.match(publicWorkerConfigPersistenceTest, /credential-bearing Lit API base/);
     assert.doesNotMatch(publicWorkerConfigPersistenceTest, /\[redacted-email\]/);
+    const publicTranscribeTest = fs.readFileSync(
+      path.join(outputDir, 'workers/sessionCorsWorker/transcribeExecution.test.mjs'),
+      'utf8',
+    );
+    assert.match(publicTranscribeTest, /\.join\('@'\)/);
+    assert.doesNotMatch(publicTranscribeTest, /\[redacted-email\]/);
+    const publicPrePushTest = fs.readFileSync(
+      path.join(outputDir, 'scripts/pre-push-guard.test.js'),
+      'utf8',
+    );
+    assert.match(publicPrePushTest, /const joinAt =/);
+    assert.doesNotMatch(publicPrePushTest, /\[redacted-email\]/);
+    const publicNavigationTest = fs.readFileSync(
+      path.join(outputDir, 'scripts/vite-navigation-smoke.test.js'),
+      'utf8',
+    );
+    assert.doesNotMatch(publicNavigationTest, /test-session-demo\.ui/);
+    assert.match(
+      fs.readFileSync(path.join(outputDir, 'scripts/deployment-surface-docs.test.js'), 'utf8'),
+      /fs\.existsSync/,
+    );
+    assert.match(
+      fs.readFileSync(path.join(outputDir, 'scripts/release-version.test.mjs'), 'utf8'),
+      /skip: !releaseGuideIsPresent/,
+    );
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(outputDir, 'package.json'), 'utf8')).scripts, {
       test: 'node scripts/run-node-tests.js',
       'test:ci': 'npm run test',
@@ -255,6 +295,7 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.equal(fs.existsSync(path.join(outputDir, 'AGENTS.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'ai-discourse-corpus', 'corpuses', '_local_helper.js')), false);
     assert.equal(fs.existsSync(path.join(outputDir, '.tmp-review')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'Demo Integration Package')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'outreach-and-applications')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'grant-applications')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'TODO')), false);
@@ -304,6 +345,11 @@ test('prepare-public-release fails if private planning paths survive strip rules
       sourceDir,
       path.join('scripts', 'scrub-public-package-json.js'),
       fs.readFileSync(PACKAGE_SCRUBBER_SOURCE_PATH, 'utf8'),
+    );
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'scrub-public-pii-text.mjs'),
+      fs.readFileSync(PII_SCRUBBER_SOURCE_PATH, 'utf8'),
     );
     writeFile(
       sourceDir,

@@ -1,10 +1,10 @@
-jest.mock('../web3/chainGateway.js', () => ({
+jest.mock('../session/sessionNaming.js', () => ({
   __esModule: true,
   normalizeSessionSlug: jest.fn((s) => String(s || '')),
 }));
 
 const { createSbtRealtimeListenerCleanupController } = require('./sbtRealtimeListenerCleanupController.js');
-const { normalizeSessionSlug } = require('../web3/chainGateway.js');
+const { normalizeSessionSlug } = require('../session/sessionNaming.js');
 
 describe('createSbtRealtimeListenerCleanupController', () => {
   beforeEach(() => {

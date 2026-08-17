@@ -21,7 +21,7 @@ import styles from './SurveyTool.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { SHOW_PILE_HOLOGRAM_TOGGLE } from './surveyToolRuntimeSupport.js';
 
-const ACTIVE_GREEN = '#4cd964';
+const ACTIVE_GREEN = 'var(--ce-status-success)';
 
 type VoidHandler = () => void;
 
@@ -253,6 +253,7 @@ const renderPileNavControls = ({
       disabled={pileQuestions.length === 0 || activePileIndex === 0}
       className={styles.pileNavArrow}
       aria-label="Previous Question"
+      data-ce-control-appearance="frameless"
     >
       <FontAwesomeIcon icon={faChevronLeft} />
     </button>
@@ -264,6 +265,7 @@ const renderPileNavControls = ({
       disabled={pileQuestions.length === 0 || activePileIndex === pileQuestions.length - 1}
       className={styles.pileNavArrow}
       aria-label="Next Question"
+      data-ce-control-appearance="frameless"
     >
       <FontAwesomeIcon icon={faChevronRight} />
     </button>
@@ -292,6 +294,7 @@ const renderPileActionControls = ({
         title="Question actions"
         aria-label="Question actions"
         aria-haspopup="menu"
+        data-ce-control-appearance="frameless"
       >
         <FontAwesomeIcon icon={faBars} />
       </button>
@@ -303,6 +306,7 @@ const renderPileActionControls = ({
           style={filterButtonStyle}
           title="Filter Questions"
           data-testid={E2E_TESTIDS.SURVEY_FILTER_TOGGLE}
+          data-ce-control-appearance="frameless"
         >
           <FontAwesomeIcon icon={faFilter} style={filterIconStyle} />
         </button>
@@ -312,6 +316,7 @@ const renderPileActionControls = ({
           className={styles.actionButton}
           title={showCreate ? 'Close Create Interface' : 'Create New Question'}
           data-testid={E2E_TESTIDS.SURVEY_CREATE_TOGGLE_PILE}
+          data-ce-control-appearance="frameless"
         >
           <FontAwesomeIcon icon={showCreate ? faMinus : faPlus} />
         </button>
@@ -322,6 +327,7 @@ const renderPileActionControls = ({
           title={showListeningPanel ? 'Close listening' : 'Open listening'}
           aria-pressed={showListeningPanel}
           data-testid={E2E_TESTIDS.SESSION_LISTENING_TOGGLE}
+          data-ce-control-appearance="frameless"
         >
           <FontAwesomeIcon icon={faMicrophone} />
         </button>
@@ -332,6 +338,7 @@ const renderPileActionControls = ({
             className={styles.actionButton}
             title="View All Questions"
             data-testid={E2E_TESTIDS.SURVEY_VIEW_ALL}
+            data-ce-control-appearance="frameless"
           >
             <FontAwesomeIcon icon={faCaretDown} />
           </button>
@@ -406,6 +413,7 @@ const renderPileFooterControls = ({
         onClick={handleRevertPendingChanges}
         title="Clear changes"
         aria-label="Clear pending changes"
+        data-ce-control-appearance="frameless"
       >
         <FontAwesomeIcon icon={faTimes} />
       </button>

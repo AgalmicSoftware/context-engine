@@ -1,10 +1,11 @@
-import SingleQuestionResponse, {
+import SingleQuestionResponse from './SingleQuestionResponse';
+import {
   SINGLE_QUESTION_IMPORTANCE_SLIDER_STYLE,
   buildSingleQuestionMiniPromptButtonClassName,
   buildSingleQuestionReadOnlyBinaryClassName,
   resolveSingleQuestionBookmarkIconStyle,
   resolveSingleQuestionRatingBarStyle,
-} from './SingleQuestionResponse';
+} from './singleQuestionResponseDisplay';
 import styles from './SingleQuestionResponse.module.scss';
 import GateTooltip from '../Gates/GateTooltip';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
@@ -53,9 +54,9 @@ const nodeHasClassName = (node: TreeNode, className: string): boolean => {
 
 describe('SingleQuestionResponse style contracts', () => {
   it('builds response display classes and inline styles', () => {
-    expect(resolveSingleQuestionBookmarkIconStyle(true, false)).toEqual({ color: 'lightgreen' });
-    expect(resolveSingleQuestionBookmarkIconStyle(false, true)).toEqual({ color: '#ffc107' });
-    expect(resolveSingleQuestionBookmarkIconStyle(false, false)).toEqual({ color: 'white' });
+    expect(resolveSingleQuestionBookmarkIconStyle(true, false)).toEqual({ color: 'var(--ce-status-success-text)' });
+    expect(resolveSingleQuestionBookmarkIconStyle(false, true)).toEqual({ color: 'var(--ce-status-warning)' });
+    expect(resolveSingleQuestionBookmarkIconStyle(false, false)).toEqual({ color: 'var(--ce-panel-text)' });
     expect(buildSingleQuestionMiniPromptButtonClassName(styles)).toBe(
       `${styles.miniPromptAbbrev} ${styles.maskedPromptActionButton}`,
     );
@@ -71,10 +72,12 @@ describe('SingleQuestionResponse style contracts', () => {
     const scss = fs.readFileSync(scssPath, 'utf8');
 
     expect(scss).toMatch(/\.fullscreenQuestionContainer\s*{[\s\S]*?font-family:\s*inherit;/);
-    expect(scss).toMatch(/\.fullscreenQuestionContainer\s*{[\s\S]*?background:\s*rgba\(255,\s*255,\s*255,\s*0\.06\);/);
+    expect(scss).toMatch(
+      /\.fullscreenQuestionContainer\s*{[\s\S]*?background:\s*color-mix\(in srgb, var\(--ce-text-inverse\) 6%, transparent\);/,
+    );
     expect(scss).toMatch(/\.questionTitle\s*{[\s\S]*?font-family:\s*inherit;/);
     expect(scss).toMatch(
-      /\.encryptedResponseText\s*{[\s\S]*?display:\s*inline-flex;[\s\S]*?border-radius:\s*(?:999px|var\(--ce-radius-pill\));[\s\S]*?background:\s*rgba\(255,\s*255,\s*255,\s*0\.08\);/,
+      /\.encryptedResponseText\s*{[\s\S]*?display:\s*inline-flex;[\s\S]*?border-radius:\s*var\(--ce-radius-pill\);[\s\S]*?background:\s*color-mix\(in srgb, var\(--ce-text-inverse\) 8%, transparent\);/,
     );
     expect(scss).not.toMatch(/\.freeformAnswer\s*{[\s\S]*?font-family:\s*var\(--ce-font-mono\);/);
     expect(scss).not.toMatch(/\.encryptedResponseText\s*{[\s\S]*?font-family:\s*var\(--ce-font-mono\);/);
@@ -124,6 +127,25 @@ describe('SingleQuestionResponse render guard', () => {
 });
 
 describe('SingleQuestionResponse card actions', () => {
+  it('can hide the mini expansion control without changing its default behavior', () => {
+    const question = {
+      prompt: 'Simulated question prompt',
+      type: 'freeform',
+    };
+    const response = {
+      answer: {
+        value: 'Simulated answer value',
+        encrypted: false,
+      },
+    };
+
+    const defaultTree = createSubject({ mode: 'mini', question, response }).render();
+    const staticTree = createSubject({ mode: 'mini', question, response, showMiniExpand: false }).render();
+
+    expect(findElement(defaultTree, (node) => nodeHasClassName(node, styles.miniExpandButton))).not.toBeNull();
+    expect(findElement(staticTree, (node) => nodeHasClassName(node, styles.miniExpandButton))).toBeNull();
+  });
+
   it('omits dead bookmark and page-link controls for synthetic questions without ids', () => {
     const subject = createSubject({
       mode: 'mini',

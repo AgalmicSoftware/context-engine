@@ -35,7 +35,7 @@ npm test
 
 npm run lint
 # Run ESLint 9 with the flat config in `eslint.config.mjs`.
-# Includes JS/JSX, `src/utilities/ui`, shared UI, informational UI, MainContent, auxiliary page, shell support, dev/E2E support, Telegram demo setup, gate UI, CommunityTab, PolisReport, DebateMap, Navbar, and ContractPage components.
+# Includes JS/JSX, `src/utilities/ui`, shared UI, informational UI, MainContent, auxiliary page, shell support, dev/E2E support, Telegram demo setup, gate UI, CommunityTab, PolisReport, DebateMap, Navbar, and DocsPage components.
 
 npm start
 # Preview the existing production build locally with Vite.

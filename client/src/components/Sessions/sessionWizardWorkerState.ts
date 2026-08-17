@@ -21,6 +21,7 @@ export const publishVerifiedRuntime = <Runtime extends WorkerDeployRuntimeSnapsh
   displayWorkerUrl: string,
   deployComplete: boolean,
   workerRequirementProof: SessionWizardWorkerRequirementProof | null,
+  verifiedDraftOverlay: Record<string, unknown> = {},
 ): void => {
   if (!runtimeRef || !workerUrl) return;
   // React state setters do not flush inside the awaited deploy callback. Keep
@@ -33,7 +34,7 @@ export const publishVerifiedRuntime = <Runtime extends WorkerDeployRuntimeSnapsh
     deployComplete,
     deployWorkerUrl: displayWorkerUrl,
     workerRequirementProof,
-    draft: { ...draft, corsWorkerUrl: workerUrl },
+    draft: { ...draft, ...verifiedDraftOverlay, corsWorkerUrl: workerUrl },
   } as Runtime;
 };
 

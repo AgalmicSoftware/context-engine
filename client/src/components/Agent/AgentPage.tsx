@@ -162,7 +162,7 @@ export default function AgentPage() {
   };
 
   return (
-    <div style={{ padding: 20, color: '#fff' }}>
+    <div style={{ padding: 20, color: 'var(--ce-panel-text)' }}>
       <h2 style={{ margin: 0, marginBottom: 10 }}>Agent Mode</h2>
       <div style={{ opacity: 0.85, marginBottom: 16, fontSize: 13 }}>
         <div>
@@ -209,9 +209,9 @@ export default function AgentPage() {
             width: '100%',
             padding: 12,
             borderRadius: 10,
-            border: '1px solid rgba(255,255,255,0.18)',
-            background: 'rgba(0,0,0,0.35)',
-            color: '#fff',
+            border: '1px solid var(--ce-input-border-strong)',
+            background: 'var(--ce-input-bg)',
+            color: 'var(--ce-panel-text)',
             fontFamily:
               'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
             fontSize: 12,
@@ -227,9 +227,9 @@ export default function AgentPage() {
             style={{
               padding: '10px 14px',
               borderRadius: 10,
-              border: '1px solid rgba(255,255,255,0.18)',
-              background: 'rgba(255,255,255,0.10)',
-              color: '#fff',
+              border: '1px solid var(--ce-input-border-strong)',
+              background: 'var(--ce-card-bg)',
+              color: 'var(--ce-panel-text)',
               cursor: 'pointer',
               fontWeight: 700,
             }}
@@ -243,9 +243,9 @@ export default function AgentPage() {
             style={{
               padding: '10px 14px',
               borderRadius: 10,
-              border: '1px solid rgba(255,255,255,0.18)',
-              background: 'rgba(255,255,255,0.06)',
-              color: '#fff',
+              border: '1px solid var(--ce-input-border-strong)',
+              background: 'var(--ce-card-bg)',
+              color: 'var(--ce-panel-text)',
               cursor: 'pointer',
               fontWeight: 700,
             }}
@@ -260,9 +260,9 @@ export default function AgentPage() {
             margin: 0,
             padding: 12,
             borderRadius: 10,
-            border: '1px solid rgba(255,255,255,0.18)',
-            background: 'rgba(0,0,0,0.35)',
-            color: '#fff',
+            border: '1px solid var(--ce-input-border-strong)',
+            background: 'var(--ce-input-bg)',
+            color: 'var(--ce-panel-text)',
             fontFamily:
               'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
             fontSize: 12,

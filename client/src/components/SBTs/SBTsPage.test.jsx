@@ -326,6 +326,51 @@ describe('SBTsPage auto-feature flag', () => {
     );
   });
 
+  it('preserves a legacy address-shaped Worker detail hash instead of canonicalizing it as an SBT', () => {
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
+    const legacyAddressGroupId = '0x1234567890abcdef1234567890abcdef12345678';
+    const workerSessionConfig = {
+      slug: 'demo-sh',
+      sessionId: '0xb822b3eca85bdc35cf83cb947bceb6b2',
+      sessionName: 'Demo Session',
+      groupCreationPolicy: 'participants',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    contractScripts.getSessionConfigBySlug.mockReturnValue(null);
+    contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
+    getDemoSessionConfigBySlug.mockImplementation((slug) =>
+      String(slug || '') === 'demo-sh' ? workerSessionConfig : null,
+    );
+    window.history.replaceState({}, '', `/groups?sessionName=demo-sh#group-${legacyAddressGroupId}`);
+
+    render(
+      <SBTsPage
+        provider="wagmi"
+        network={null}
+        account=""
+        loginComplete={false}
+        toggleLoginModal={jest.fn()}
+        isSBTCacheReady={false}
+        sessionSlug="demo-sh"
+        sessionConfig={null}
+      />,
+    );
+
+    expect(window.location.pathname).toBe('/groups');
+    expect(window.location.search).toBe('?sessionName=demo-sh');
+    expect(window.location.hash).toBe(`#group-${legacyAddressGroupId}`);
+    expect(mockWorkerGroupCreate).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        createOnly: false,
+        selectedGroupId: legacyAddressGroupId,
+        sessionConfig: workerSessionConfig,
+        sessionName: 'Demo Session',
+        sessionSlug: 'demo-sh',
+        showCreate: false,
+      }),
+    );
+  });
+
   it('renders the canonical Worker detail route from its path group id and session query', () => {
     const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
     const workerSessionConfig = {
@@ -1055,6 +1100,48 @@ describe('SBTsPage auto-feature flag', () => {
     expect(screen.getByTestId('worker-group-create-panel')).toHaveTextContent('Alpha');
     expect(screen.getByTestId('worker-group-create-panel')).toHaveTextContent('/alpha');
     expect(screen.queryByText(/on-chain|contract address|gas|RPC/i)).not.toBeInTheDocument();
+  });
+
+  it('renders the active Worker session groups when embedded in the home explorer', () => {
+    const workerSessionConfig = {
+      slug: 'demo-sh',
+      groupCreationPolicy: 'participants',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+
+    render(
+      <SBTsPage
+        sbtCacheRevision={0}
+        provider="wagmi"
+        network={{ id: 84532, name: 'Base Sepolia' }}
+        account=""
+        loginComplete={false}
+        toggleLoginModal={jest.fn()}
+        isSBTCacheReady={true}
+        defaultFeaturedSBTs={[]}
+        sessionSlug="demo-sh"
+        activeSessionSlug="demo-sh"
+        sessionConfig={workerSessionConfig}
+        sessionName="Demo Session"
+        sessionInfo="Demo session"
+        hideMiniActionRow={true}
+        embeddedWorkerGroups={true}
+        showCreateGroupExternal={false}
+      />,
+    );
+
+    expect(screen.getByTestId('worker-group-create-panel')).toHaveTextContent('Demo Session');
+    expect(screen.getByTestId('worker-group-create-panel')).toHaveTextContent('/demo-sh');
+    expect(mockWorkerGroupCreate).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        createOnly: false,
+        sessionConfig: workerSessionConfig,
+        sessionSlug: 'demo-sh',
+        showCreate: false,
+      }),
+    );
+    expect(mockSBTsList).not.toHaveBeenCalled();
+    expect(mockSBTPage).not.toHaveBeenCalled();
   });
 
   it('routes an unregistered Worker /groups/:slug list directly to the active Worker session', () => {

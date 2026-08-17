@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import MainAreaTabs, { MAIN_AREA_TABS } from './MainAreaTabs';
 
 const mockToolExplorer = jest.fn();
@@ -36,15 +36,20 @@ const createProps = (overrides: Record<string, unknown> = {}) => ({
   demoSurfaceMode: true,
   provider: {},
   network: { id: 84532 },
+  networkChainId: 84532,
+  sessionConfig: { slug: 'demo', storageProfile: { backend: 'cloudflare' } },
   account: '0x1111111111111111111111111111111111111111',
   loginComplete: false,
   loginInProgress: false,
   activeSessionSlug: 'demo',
   isQuestionCacheReady: true,
+  isResponsesCacheReady: true,
   isSurveyCacheReady: true,
   isSBTCacheReady: true,
   sbtCacheRevision: 0,
   sbtRealtimeCoverageBySlug: {},
+  questionResponsesNonce: 7,
+  questionScanProgress: { slug: 'demo', phase: 'hydrate', discoveredQuestions: 3 },
   ensureLightSbtDiscovery: jest.fn(),
   ensureLightSbtUniverse: jest.fn(),
   ...overrides,
@@ -65,6 +70,8 @@ describe('MainAreaTabs', () => {
     expect(container.querySelector('.mainTabsCardHeader')).toBeInTheDocument();
     expect(container.querySelector('.mainAreaCardBody')).toBeInTheDocument();
     expect(container.querySelectorAll('.navTabIcon')).toHaveLength(4);
+    expect(screen.getByRole('tab', { name: 'Latest' })).toHaveAttribute('aria-selected', 'false');
+    expect(screen.getByRole('tab', { name: 'Tools' })).toHaveAttribute('aria-selected', 'true');
     expect(await screen.findByTestId('mock-tool-explorer')).toBeInTheDocument();
     expect(screen.getByTestId('mock-tool-explorer')).toHaveAttribute('data-demo-surface-mode', 'true');
   });
@@ -75,10 +82,70 @@ describe('MainAreaTabs', () => {
     expect(await screen.findByTestId('mock-tool-explorer')).toHaveAttribute('data-demo-surface-mode', 'false');
   });
 
+  it('passes the active session cache context through to the embedded explorer', async () => {
+    const props = createProps();
+    render(<MainAreaTabs {...props} />);
+
+    await screen.findByTestId('mock-tool-explorer');
+    expect(mockToolExplorer).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        activeSessionSlug: 'demo',
+        sessionConfig: props.sessionConfig,
+        networkChainId: 84532,
+        isResponsesCacheReady: true,
+        questionResponsesNonce: 7,
+        questionScanProgress: props.questionScanProgress,
+      }),
+    );
+  });
+
   it('renders the onboarding walkthrough on the Welcome tab', async () => {
     render(<MainAreaTabs {...createProps({ focusedTab: MAIN_AREA_TABS.WELCOME })} />);
 
     expect(await screen.findByTestId('mock-onboarding-walkthrough')).toBeInTheDocument();
+  });
+
+  it('notifies the parent exactly once for a user tab click', async () => {
+    const changeFocusedTab = jest.fn();
+    render(<MainAreaTabs {...createProps({ changeFocusedTab })} />);
+    await screen.findByTestId('mock-tool-explorer');
+
+    fireEvent.click(screen.getByText('Stats'));
+
+    expect(changeFocusedTab).toHaveBeenCalledTimes(1);
+    expect(changeFocusedTab).toHaveBeenCalledWith(MAIN_AREA_TABS.COMMUNITY);
+  });
+
+  it('mounts external tab changes without callback echo and retains lazy tab history', async () => {
+    const changeFocusedTab = jest.fn();
+    const { rerender } = render(<MainAreaTabs {...createProps({ changeFocusedTab })} />);
+    expect(await screen.findByTestId('mock-tool-explorer')).toBeInTheDocument();
+    changeFocusedTab.mockClear();
+
+    rerender(
+      <MainAreaTabs
+        {...createProps({
+          focusedTab: MAIN_AREA_TABS.WELCOME,
+          changeFocusedTab,
+        })}
+      />,
+    );
+
+    expect(await screen.findByTestId('mock-onboarding-walkthrough')).toBeInTheDocument();
+    expect(screen.getByTestId('mock-tool-explorer')).toBeInTheDocument();
+    expect(changeFocusedTab).not.toHaveBeenCalled();
+  });
+
+  it('accepts an externally supplied unknown tab without callback echo', async () => {
+    const changeFocusedTab = jest.fn();
+    const { rerender } = render(<MainAreaTabs {...createProps({ changeFocusedTab })} />);
+    expect(await screen.findByTestId('mock-tool-explorer')).toBeInTheDocument();
+    changeFocusedTab.mockClear();
+
+    rerender(<MainAreaTabs {...createProps({ focusedTab: 99, changeFocusedTab })} />);
+
+    expect(changeFocusedTab).not.toHaveBeenCalled();
+    expect(screen.getByTestId('mock-tool-explorer')).toBeInTheDocument();
   });
 
   it('preserves stale removed tab ids without normalizing them to the Tools tab on mount', () => {

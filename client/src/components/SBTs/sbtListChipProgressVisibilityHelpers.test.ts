@@ -24,7 +24,7 @@ describe('sbtListChipProgressVisibilityHelpers', () => {
       style: {
         '--ce-chip-progress-width': '6%',
         background:
-          'linear-gradient(90deg, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.62) 6%, rgba(0,0,0,0.22) 6%, rgba(0,0,0,0.22) 100%)',
+          'linear-gradient(90deg, color-mix(in srgb, var(--ce-edge-dark) 62%, transparent) 0%, color-mix(in srgb, var(--ce-edge-dark) 62%, transparent) 6%, color-mix(in srgb, var(--ce-edge-dark) 22%, transparent) 6%, color-mix(in srgb, var(--ce-edge-dark) 22%, transparent) 100%)',
       },
     });
 
@@ -44,7 +44,7 @@ describe('sbtListChipProgressVisibilityHelpers', () => {
       style: {
         '--ce-chip-progress-width': '35%',
         background:
-          'linear-gradient(90deg, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.62) 35%, rgba(0,0,0,0.22) 35%, rgba(0,0,0,0.22) 100%)',
+          'linear-gradient(90deg, color-mix(in srgb, var(--ce-edge-dark) 62%, transparent) 0%, color-mix(in srgb, var(--ce-edge-dark) 62%, transparent) 35%, color-mix(in srgb, var(--ce-edge-dark) 22%, transparent) 35%, color-mix(in srgb, var(--ce-edge-dark) 22%, transparent) 100%)',
       },
     });
 

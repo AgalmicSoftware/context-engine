@@ -21,6 +21,7 @@ import styles from './AudioInput.module.scss';
 import { requestAiRewrite, setVadTrimEnabled } from '../../../utilities/ai/aiClient.js';
 import { useWhisper, RECORDING_STATUS } from '../../../utilities/useWhisper.js';
 import { createLogger } from '../../../utilities/logging.js';
+import { readThemeToken, subscribeThemeChanges } from '../../../utilities/ui/themeRuntime';
 
 const surveyLog = createLogger('surveys');
 const LIVE_CONVERSATION_RECORDER_DISABLED_REASON =
@@ -166,9 +167,21 @@ const AudioInput = ({
   const dataArrayRef = useRef<Uint8Array | null>(null);
   const bufferLenRef = useRef(0);
   const ctx2dRef = useRef<CanvasRenderingContext2D | null>(null);
+  const waveformColorsRef = useRef({ track: 'Canvas', bars: 'Highlight' });
 
   const [downloadsOpen, setDownloadsOpen] = useState(false);
   const isRecorderDisabled = !!recordingDisabled;
+
+  useEffect(() => {
+    const refreshWaveformColors = () => {
+      waveformColorsRef.current = {
+        track: readThemeToken('ce-control-face', 'Canvas'),
+        bars: readThemeToken('ce-action-primary', 'Highlight'),
+      };
+    };
+    refreshWaveformColors();
+    return subscribeThemeChanges(refreshWaveformColors);
+  }, []);
 
   const effectiveSessionSlug = sessionSlug;
   const effectiveSessionConfig = sessionConfig;
@@ -463,12 +476,12 @@ const AudioInput = ({
     const H = canvas.height;
 
     ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = '#c0c0c0'; // track background
+    ctx.fillStyle = waveformColorsRef.current.track;
     ctx.fillRect(0, 0, W, H);
 
     const barWidth = (W / bufferLength) * 2.5;
     let x = 0;
-    ctx.fillStyle = '#000080';
+    ctx.fillStyle = waveformColorsRef.current.bars;
     for (let i = 0; i < bufferLength; i++) {
       const barHeight = Math.min(dataArray[i] / 2, H);
       ctx.fillRect(x, H - barHeight, barWidth, barHeight);
@@ -901,7 +914,7 @@ const AudioInput = ({
               style={{
                 background: 'transparent',
                 border: 'none',
-                color: 'grey',
+                color: 'var(--ce-text-muted)',
                 opacity: 0.7,
                 cursor: 'pointer',
               }}
@@ -989,11 +1002,11 @@ const AudioInput = ({
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
-                background: 'rgba(0,0,0,0.55)',
-                border: '1px solid rgba(255,255,255,0.25)',
-                color: '#fff',
+                background: 'var(--ce-tooltip-bg)',
+                border: 'var(--ce-border-control-width) solid var(--ce-tooltip-border)',
+                color: 'var(--ce-tooltip-text)',
                 padding: '4px 8px',
-                borderRadius: 12,
+                borderRadius: 'var(--ce-radius-12)',
                 fontSize: '0.85rem',
                 zIndex: 2,
                 pointerEvents: 'auto',
@@ -1007,7 +1020,10 @@ const AudioInput = ({
                   aria-atomic="true"
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
                 >
-                  <FontAwesomeIcon icon={faCircle} style={{ color: isPaused ? '#bbb' : '#ff4d4f' }} />
+                  <FontAwesomeIcon
+                    icon={faCircle}
+                    style={{ color: isPaused ? 'var(--ce-control-disabled-text)' : 'var(--ce-status-error)' }}
+                  />
                   {isPaused ? `Paused — ${recordingSeconds}s` : `Recording… ${recordingSeconds}s`}
                 </span>
               )}
@@ -1021,11 +1037,11 @@ const AudioInput = ({
                       aria-label="Resume recording"
                       title="Resume recording"
                       style={{
-                        background: 'rgba(255,255,255,0.15)',
-                        border: '1px solid rgba(255,255,255,0.25)',
-                        color: '#fff',
+                        background: 'var(--ce-control-face)',
+                        border: 'var(--ce-border-control-width) solid var(--ce-border-raised)',
+                        color: 'var(--ce-control-text)',
                         padding: '2px 6px',
-                        borderRadius: 8,
+                        borderRadius: 'var(--ce-radius-8)',
                         lineHeight: 1.2,
                         cursor: 'pointer',
                       }}
@@ -1039,11 +1055,11 @@ const AudioInput = ({
                       aria-label="Pause recording"
                       title="Pause recording"
                       style={{
-                        background: 'rgba(255,255,255,0.15)',
-                        border: '1px solid rgba(255,255,255,0.25)',
-                        color: '#fff',
+                        background: 'var(--ce-control-face)',
+                        border: 'var(--ce-border-control-width) solid var(--ce-border-raised)',
+                        color: 'var(--ce-control-text)',
                         padding: '2px 6px',
-                        borderRadius: 8,
+                        borderRadius: 'var(--ce-radius-8)',
                         lineHeight: 1.2,
                         cursor: 'pointer',
                       }}
@@ -1057,11 +1073,11 @@ const AudioInput = ({
                     aria-label="Stop recording"
                     title="Stop recording"
                     style={{
-                      background: 'rgba(255,255,255,0.15)',
-                      border: '1px solid rgba(255,255,255,0.25)',
-                      color: '#fff',
+                      background: 'var(--ce-control-face)',
+                      border: 'var(--ce-border-control-width) solid var(--ce-border-raised)',
+                      color: 'var(--ce-control-text)',
                       padding: '2px 6px',
-                      borderRadius: 8,
+                      borderRadius: 'var(--ce-radius-8)',
                       lineHeight: 1.2,
                       cursor: 'pointer',
                     }}
@@ -1098,11 +1114,11 @@ const AudioInput = ({
                 title="Downloads"
                 className={styles.downloadToggle}
                 style={{
-                  background: 'rgba(0,0,0,0.55)',
-                  border: '1px solid rgba(255,255,255,0.25)',
-                  color: '#fff',
+                  background: 'var(--ce-tooltip-bg)',
+                  border: 'var(--ce-border-control-width) solid var(--ce-tooltip-border)',
+                  color: 'var(--ce-tooltip-text)',
                   padding: '4px 6px',
-                  borderRadius: 10,
+                  borderRadius: 'var(--ce-radius-10)',
                   lineHeight: 1,
                   cursor: 'pointer',
                   pointerEvents: 'auto',
@@ -1123,11 +1139,11 @@ const AudioInput = ({
                       title={hasRecordingBlob ? 'Download last recording audio' : 'No recording available yet'}
                       className={styles.downloadChoice}
                       style={{
-                        background: 'rgba(0,0,0,0.55)',
-                        border: '1px solid rgba(255,255,255,0.25)',
-                        color: hasRecordingBlob ? '#fff' : '#ccc',
+                        background: 'var(--ce-tooltip-bg)',
+                        border: 'var(--ce-border-control-width) solid var(--ce-tooltip-border)',
+                        color: hasRecordingBlob ? 'var(--ce-tooltip-text)' : 'var(--ce-control-disabled-text)',
                         padding: '2px 6px',
-                        borderRadius: 8,
+                        borderRadius: 'var(--ce-radius-8)',
                         lineHeight: 1.2,
                         cursor: hasRecordingBlob ? 'pointer' : 'not-allowed',
                         opacity: hasRecordingBlob ? 1 : 0.6,
@@ -1143,11 +1159,11 @@ const AudioInput = ({
                     title="Download final transcript"
                     className={styles.downloadChoice}
                     style={{
-                      background: 'rgba(0,0,0,0.55)',
-                      border: '1px solid rgba(255,255,255,0.25)',
-                      color: '#fff',
+                      background: 'var(--ce-tooltip-bg)',
+                      border: 'var(--ce-border-control-width) solid var(--ce-tooltip-border)',
+                      color: 'var(--ce-tooltip-text)',
                       padding: '2px 6px',
-                      borderRadius: 8,
+                      borderRadius: 'var(--ce-radius-8)',
                       lineHeight: 1.2,
                       cursor: 'pointer',
                     }}
@@ -1161,7 +1177,7 @@ const AudioInput = ({
 
           {isProcessingUI && (
             <div className={styles.spinnerOverlay} aria-live="polite" role="status">
-              <FontAwesomeIcon icon={faSpinner} spin size="2x" style={{ color: 'white' }} />
+              <FontAwesomeIcon icon={faSpinner} spin size="2x" style={{ color: 'var(--ce-panel-text)' }} />
               <span className={styles.srOnly}>Processing audio…</span>
             </div>
           )}

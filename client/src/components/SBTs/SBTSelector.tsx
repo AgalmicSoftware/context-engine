@@ -16,15 +16,20 @@ import {
   getSessionConfigBySlugOrDefault,
   getSessionLists,
   getSessionSlugByName,
-  normalizeSessionSlug,
 } from '../../utilities/web3/chainGateway.js';
+import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import {
   loadSessionRegistryCache,
   SESSION_REGISTRY_CACHE_UPDATED_EVENT,
 } from '../../utilities/web3/sessionRegistry.js';
 import { DEFAULT_CHAIN_ID, USE_ONCHAIN_SESSION_REGISTRY } from '../../variables/appConfig.js';
 import { createLogger } from '../../utilities/logging.js';
-import { listNamespaceEntriesSync, readCache, writeCache } from '../../utilities/cache/cacheScripts.js';
+import {
+  listNamespaceEntriesSync,
+  readCache,
+  updateCacheAtomic,
+  writeCache,
+} from '../../utilities/cache/cacheScripts.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
 import { GLOBAL_SESSION_SELECTION_UPDATED_EVENT } from '../../utilities/session/globalSessionState.js';
@@ -36,6 +41,7 @@ import {
   warmSbtDisplayNamesTargeted,
 } from '../../utilities/sbt/sbtDisplayNames.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
+import { mergeSbtActivityCacheEntryMetadata } from '../../utilities/sbt/sbtActivityCacheEntry.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { getCanonicalSessionFeaturedSBTs } from '../../utilities/sbt/sessionFeaturedSBTs.js';
 import { bindSbtSelectorRuntimePorts, isEnsureLightSbtUniverse } from './sbtSelectorRuntimePorts';
@@ -363,7 +369,6 @@ const sbtLogUntyped = sbtSelectorRuntimePorts.logger;
 const hydrateSbtDisplayNameTargetedTyped = sbtSelectorRuntimePorts.hydrateSbtDisplayNameTargeted;
 const warmSbtDisplayNamesTargetedTyped = sbtSelectorRuntimePorts.warmSbtDisplayNamesTargeted;
 const resolveSbtDisplayLabelTyped = sbtSelectorRuntimePorts.resolveSbtDisplayLabel;
-const writeCacheTyped = sbtSelectorRuntimePorts.writeCache;
 const contractScriptsUntyped = sbtSelectorRuntimePorts.contractScripts;
 const ALLOW_DEMO_SESSION_FALLBACK = !USE_ONCHAIN_SESSION_REGISTRY;
 const emitSbtSelectorDebug = createSbtSelectorDebugEmitter(sbtLog, sbtLogUntyped);
@@ -877,11 +882,26 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
   writeCacheContext = async (context: unknown): Promise<void> => {
     const cacheContext = isRecord(context) ? (context as SbtSelectorCacheContext) : null;
     if (!cacheContext || !cacheContext.netKey) return;
-    const netNode = cacheContext.cache[cacheContext.netKey] || { sbtList: {} };
-    cacheContext.cache[cacheContext.netKey] = netNode;
-    netNode.sbtList = cacheContext.sbtList;
-    netNode.nameLookupState = cacheContext.nameLookupState;
-    await writeCacheTyped('sbtCache', cacheContext.slug, cacheContext.cache);
+    const persisted = await updateCacheAtomic<SbtCacheByNet>('sbtCache', cacheContext.slug, (currentIn) => {
+      const next = currentIn && typeof currentIn === 'object' ? { ...currentIn } : ({} as SbtCacheByNet);
+      const currentNet = next[cacheContext.netKey] || { sbtList: {} };
+      const sourceNet = cacheContext.cache[cacheContext.netKey] || { sbtList: {} };
+      const sbtList = { ...(currentNet.sbtList || {}) };
+      Object.entries(cacheContext.sbtList || {}).forEach(([address, entry]) => {
+        sbtList[address] = { ...mergeSbtActivityCacheEntryMetadata(sbtList[address], entry) };
+      });
+      next[cacheContext.netKey] = {
+        ...currentNet,
+        lastBlock: Math.max(Number(currentNet.lastBlock) || 0, Number(sourceNet.lastBlock) || 0),
+        sbtList,
+        nameLookupState: {
+          ...(isRecord(currentNet.nameLookupState) ? currentNet.nameLookupState : {}),
+          ...(cacheContext.nameLookupState || {}),
+        },
+      };
+      return next;
+    });
+    if (persisted) cacheContext.cache = persisted;
   };
 
   buildSbtOptions = ({
@@ -1215,7 +1235,13 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
 
         const persistProgressiveCache = async (): Promise<void> => {
           await mergeLatestCacheState();
-          await writeCacheTyped('sbtCache', resolvedSlug, sbtCache);
+          await this.writeCacheContext({
+            slug: resolvedSlug,
+            netKey,
+            cache: sbtCache,
+            sbtList,
+            nameLookupState,
+          });
           this.scheduleProgressiveOptionsReload({ force: true });
         };
 
@@ -1771,21 +1797,24 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
         sbtLog.error('Error fetching SBT metadata:', error);
       }
       // Update cache even if metadata fetch failed.
-      const sbtCache = await this.readSbtCacheBySlug(resolvedSlug);
       const networkID = this.getSessionNetworkId(resolvedSlug);
       const netKey = String(networkID);
-      const normalizedCache = normalizeSbtCacheForNet(sbtCache, netKey) as SbtCacheByNet;
-      const normalizedNode = normalizedCache[netKey] || { sbtList: {} };
-      normalizedCache[netKey] = normalizedNode;
-      const normalizedSbtList = normalizedNode.sbtList || {};
-      normalizedNode.sbtList = normalizedSbtList;
-      normalizedSbtList[customAddressLower] = {
-        sbtAddress: customAddressLower,
-        sbtInfo,
-        manual: true,
-        slug: resolvedSlug,
-      };
-      await writeCacheTyped('sbtCache', resolvedSlug, normalizedCache);
+      await updateCacheAtomic<SbtCacheByNet>('sbtCache', resolvedSlug, (currentIn) => {
+        const normalizedCache = normalizeSbtCacheForNet(currentIn, netKey) as SbtCacheByNet;
+        const normalizedNode = normalizedCache[netKey] || { sbtList: {} };
+        normalizedCache[netKey] = normalizedNode;
+        const normalizedSbtList = normalizedNode.sbtList || {};
+        normalizedNode.sbtList = normalizedSbtList;
+        normalizedSbtList[customAddressLower] = {
+          ...mergeSbtActivityCacheEntryMetadata(normalizedSbtList[customAddressLower], {
+            sbtAddress: customAddressLower,
+            sbtInfo,
+            manual: true,
+            slug: resolvedSlug,
+          }),
+        };
+        return normalizedCache;
+      });
       const customSBT = buildSbtSelectorCustomSbtSelection({
         address: customAddressLower,
         name: sbtName,

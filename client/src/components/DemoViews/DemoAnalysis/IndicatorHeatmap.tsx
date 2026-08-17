@@ -13,9 +13,9 @@ type IndicatorHeatmapProps = {
 };
 
 const getCellColor = (value: number | null | undefined) => {
-  if (value === null || value === undefined) return 'rgba(255,255,255,0.04)';
+  if (value === null || value === undefined) return 'color-mix(in srgb, var(--ce-panel-text) 4%, transparent)';
   const alpha = Math.max(0.12, Math.min(0.88, Number(value || 0)));
-  return `rgba(91, 140, 255, ${alpha})`;
+  return `color-mix(in srgb, var(--ce-data-series-1) ${alpha * 100}%, transparent)`;
 };
 
 const IndicatorHeatmap = ({ data }: IndicatorHeatmapProps) => {

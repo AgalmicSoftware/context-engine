@@ -49,6 +49,46 @@ export interface ApplySbtActivityCacheEntryUpdateInput {
   eventBlockNumber: number;
 }
 
+const asEntryRecord = (value: unknown): LegacySbtActivityCacheEntry =>
+  value && typeof value === 'object' && !Array.isArray(value) ? { ...(value as LegacySbtActivityCacheEntry) } : {};
+
+const mergeMonotonicCountMaps = (left: unknown, right: unknown): SbtCountMap => {
+  const merged: SbtCountMap = {};
+  for (const source of [left, right]) {
+    if (!source || typeof source !== 'object' || Array.isArray(source)) continue;
+    for (const [address, countIn] of Object.entries(source)) {
+      const addressLower = String(address || '').toLowerCase();
+      const count = Math.max(0, Math.floor(Number(countIn) || 0));
+      if (!addressLower || count <= 0) continue;
+      merged[addressLower] = Math.max(merged[addressLower] || 0, count);
+    }
+  }
+  return merged;
+};
+
+const unionAddresses = (left: unknown, right: unknown): string[] =>
+  Array.from(
+    new Set(
+      [...(Array.isArray(left) ? left : []), ...(Array.isArray(right) ? right : [])]
+        .map((address) => String(address || '').toLowerCase())
+        .filter(Boolean),
+    ),
+  );
+
+const readCheckpointBlock = (value: unknown): number =>
+  Number(value && typeof value === 'object' ? (value as { blockNumber?: unknown }).blockNumber : NaN);
+
+const selectNewestCheckpoint = (currentCheckpoint: unknown, scanCheckpoint: unknown): unknown => {
+  const currentBlock = readCheckpointBlock(currentCheckpoint);
+  const scanBlock = readCheckpointBlock(scanCheckpoint);
+  if (Number.isFinite(currentBlock) && Number.isFinite(scanBlock)) {
+    return scanBlock > currentBlock ? scanCheckpoint : currentCheckpoint;
+  }
+  if (Number.isFinite(currentBlock)) return currentCheckpoint;
+  if (Number.isFinite(scanBlock)) return scanCheckpoint;
+  return scanCheckpoint || currentCheckpoint || null;
+};
+
 const ensureMutableCountMap = (value: unknown): SbtCountMap => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
   return value as SbtCountMap;
@@ -87,6 +127,85 @@ export const buildSbtActivityCacheEntry = ({
   historySummary: { ...EMPTY_HISTORY_SUMMARY },
   countsLoaded: false,
 });
+
+/** Merge metadata without allowing a delayed hydration to erase holder activity. */
+export const mergeSbtActivityCacheEntryMetadata = (currentIn: unknown, patchIn: unknown): SbtActivityCacheEntry => {
+  const current = asEntryRecord(currentIn);
+  const patch = asEntryRecord(patchIn);
+  const currentInfo = current.sbtInfo && typeof current.sbtInfo === 'object' ? current.sbtInfo : null;
+  const patchInfo = patch.sbtInfo && typeof patch.sbtInfo === 'object' ? patch.sbtInfo : null;
+  return hydrateSbtActivityCacheEntry({
+    ...current,
+    ...patch,
+    sbtInfo:
+      currentInfo || patchInfo
+        ? { ...(currentInfo || {}), ...(patchInfo || {}) }
+        : (patch.sbtInfo ?? current.sbtInfo ?? null),
+    blockNumber: Math.max(Number(current.blockNumber) || 0, Number(patch.blockNumber) || 0),
+    mintedAddresses: current.mintedAddresses,
+    burnedAddresses: current.burnedAddresses,
+    mintedCountByAddress: current.mintedCountByAddress,
+    burnedCountByAddress: current.burnedCountByAddress,
+    mintedEventCount: current.mintedEventCount,
+    burnedEventCount: current.burnedEventCount,
+    countsLoaded: current.countsLoaded,
+    countsScanCheckpoint: current.countsScanCheckpoint,
+    historySummary: current.historySummary,
+  }) as SbtActivityCacheEntry;
+};
+
+/** Merge a completed/partial scan monotonically with any newer realtime holder activity. */
+export const mergeSbtActivityCacheEntryCounts = (currentIn: unknown, scanIn: unknown): SbtActivityCacheEntry => {
+  const current = asEntryRecord(currentIn);
+  const scan = asEntryRecord(scanIn);
+  const mintedCountByAddress = mergeMonotonicCountMaps(current.mintedCountByAddress, scan.mintedCountByAddress);
+  const burnedCountByAddress = mergeMonotonicCountMaps(current.burnedCountByAddress, scan.burnedCountByAddress);
+  const mintedEventCount = Math.max(Number(current.mintedEventCount) || 0, Number(scan.mintedEventCount) || 0);
+  const burnedEventCount = Math.max(Number(current.burnedEventCount) || 0, Number(scan.burnedEventCount) || 0);
+  const blockCandidates = [current.blockNumber, scan.blockNumber]
+    .filter((value) => value !== null && value !== undefined)
+    .map((value) => Number(value))
+    .filter(Number.isFinite);
+  const blockNumber = blockCandidates.length > 0 ? Math.max(...blockCandidates) : null;
+  const checkpointBlock = readCheckpointBlock(current.countsScanCheckpoint);
+  const currentBlock = Number(current.blockNumber);
+  const scanBlock = Number(scan.blockNumber);
+  const freshnessFloor = Math.max(
+    0,
+    Number.isFinite(currentBlock) ? currentBlock : 0,
+    Number.isFinite(checkpointBlock) ? checkpointBlock : 0,
+  );
+  const scanCoversCurrentActivity = freshnessFloor === 0 || (Number.isFinite(scanBlock) && scanBlock >= freshnessFloor);
+  const scanFinalized = scan.countsLoaded === true && scanCoversCurrentActivity;
+  const newestCheckpoint = selectNewestCheckpoint(current.countsScanCheckpoint, scan.countsScanCheckpoint);
+
+  return hydrateSbtActivityCacheEntry({
+    ...current,
+    ...scan,
+    sbtInfo: {
+      ...(current.sbtInfo && typeof current.sbtInfo === 'object' ? current.sbtInfo : {}),
+      ...(scan.sbtInfo && typeof scan.sbtInfo === 'object' ? scan.sbtInfo : {}),
+    },
+    blockNumber,
+    mintedAddresses: unionAddresses(current.mintedAddresses, scan.mintedAddresses),
+    burnedAddresses: unionAddresses(current.burnedAddresses, scan.burnedAddresses),
+    mintedCountByAddress,
+    burnedCountByAddress,
+    mintedEventCount,
+    burnedEventCount,
+    countsLoaded: current.countsLoaded === true || scanFinalized,
+    countsScanCheckpoint: scanFinalized ? null : newestCheckpoint,
+    historySummary:
+      buildSbtHistorySummaryFromCounts({
+        mintedCountByAddress,
+        burnedCountByAddress,
+        mintedEventCount,
+        burnedEventCount,
+      }) ||
+      normalizeSbtHistorySummary(scan.historySummary) ||
+      normalizeSbtHistorySummary(current.historySummary),
+  }) as SbtActivityCacheEntry;
+};
 
 export const applySbtActivityCacheEntryUpdate = (
   entry: SbtActivityCacheEntry | LegacySbtActivityCacheEntry,

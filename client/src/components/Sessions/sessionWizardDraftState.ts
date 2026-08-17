@@ -18,6 +18,7 @@ import {
 import { normalizeSessionStorageProfileConfig } from './sessionWizardStorageProfile';
 import { WORKER_SECRET_CACHE_SAFE_FIELDS } from './sessionWizardWorkerSecretSupport';
 import { sanitizeSessionWizardDraftForBrowserCache } from './sessionWizardBrowserCacheSanitization';
+import { normalizeSessionAppearance } from '../../utilities/ui/sessionColorSchemes';
 import {
   classifySessionModeProfileSupport,
   compileSessionModeProfile,
@@ -207,6 +208,11 @@ export const normalizeSessionWizardDraftShape = (draftIn: AnyRecord = {}): AnyRe
   delete draft.sessionStorageProfile;
   delete draft.storage;
 
+  if (Object.prototype.hasOwnProperty.call(draft, 'appearance')) {
+    draft.appearance = normalizeSessionAppearance(draft.appearance);
+  }
+  delete draft.theme;
+
   return normalizeLitMetadataNetwork(draft) as AnyRecord;
 };
 
@@ -218,6 +224,7 @@ export const buildSessionWizardDefaultTemplate = (): AnyRecord => {
   draft.sessionInfo = '';
   draft.sessionHeader = '';
   draft.sessionEndsAt = '';
+  draft.appearance = { colorSchemeId: 'context-engine' };
   delete draft.sessionModeProfile;
   delete draft.telegramOnly;
   delete draft.telegram_only;

@@ -36,8 +36,14 @@ import {
 import { normalizeSessionWizardGateIds as normalizeGateIds } from './sessionWizardResourceGateSupport';
 import { normalizeSbtSelection } from './sessionWizardSbtSelections';
 import { resolveSessionHeaderImageFormat } from './sessionWizardUiSupport';
+import {
+  applySessionWizardModeFieldPolicyToPayload,
+  resolveSessionWizardModeFieldPolicy,
+} from './sessionWizardModeFieldPolicy';
+import { resolveSessionWizardModeRequirements } from './sessionWizardModeRequirements';
 import type { SessionHeaderFileState, SessionHeaderUploadStatusTone } from './hooks/useSessionHeaderPreview';
 import type { ChainIdLike, NetworkLike, WorkerSecretsLike } from '../shellTypes';
+import type { SessionModeProfile } from '../../utilities/session/sessionModeProfile';
 
 type EncryptionGateState = UnknownRecord & {
   id: string;
@@ -363,6 +369,12 @@ export const buildSessionWizardMetadataPayloadBuilder = ({
       draft,
       sessionId,
     });
+    const modeRequirements = resolveSessionWizardModeRequirements(
+      metadata.sessionModeProfile as SessionModeProfile | undefined,
+    );
+    if (modeRequirements.selected) {
+      applySessionWizardModeFieldPolicyToPayload(metadata, resolveSessionWizardModeFieldPolicy(modeRequirements));
+    }
     const authAccount = toStr(signerAccountOverride || resolvedWalletAccountRef.current || account).trim();
     if (sessionHeaderMode === 'upload') {
       if (sessionHeaderFile) {

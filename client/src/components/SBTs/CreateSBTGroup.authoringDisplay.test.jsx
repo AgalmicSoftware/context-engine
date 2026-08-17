@@ -104,7 +104,7 @@ describe('CreateSBTGroup authoring display helpers', () => {
     expect(mintingBlock).not.toMatch(/\n\s*button\s*{/);
     expect(scss).not.toMatch(/\.startFreshBtn\s*{[\s\S]*?@include finalSubmitCta\.final-submit-cta-shell\(/);
     expect(scss).toMatch(
-      /\.startFreshBtn\s*{[\s\S]*?background:\s*transparent;[\s\S]*?border:\s*1px solid rgba\(255,\s*255,\s*255,\s*0\.3\);[\s\S]*?box-shadow:\s*none;/,
+      /\.startFreshBtn\s*{[\s\S]*?background:\s*transparent;[\s\S]*?border:\s*1px solid color-mix\(in srgb,\s*var\(--ce-text-inverse\) 30%,\s*transparent\);[\s\S]*?box-shadow:\s*none;/,
     );
   });
 });

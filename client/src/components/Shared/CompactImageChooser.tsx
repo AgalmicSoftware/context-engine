@@ -10,6 +10,7 @@ type CompactImageChooserProps = {
   className?: string;
   rootTestId?: string;
   showUrlModeButton?: boolean;
+  showUploadControl?: boolean;
   urlButtonTestId?: string;
   pasteButtonTestId?: string;
   uploadButtonTestId?: string;
@@ -62,6 +63,7 @@ const CompactImageChooser = ({
   className = '',
   rootTestId,
   showUrlModeButton = true,
+  showUploadControl = true,
   urlButtonTestId,
   pasteButtonTestId,
   uploadButtonTestId,
@@ -159,27 +161,31 @@ const CompactImageChooser = ({
           >
             Paste
           </button>
-          <button
-            type="button"
-            className={joinClassNames(styles.modeButton, isUploadMode ? styles.modeButtonActive : '')}
-            onClick={onUploadClick}
-            aria-label={uploadAriaLabel}
-            aria-pressed={isUploadMode}
-            disabled={disabled}
-            {...(uploadButtonTestId ? { 'data-testid': uploadButtonTestId } : {})}
-          >
-            Upload
-          </button>
-          <input
-            type="file"
-            accept={accept}
-            multiple={multiple}
-            onChange={onFileChange}
-            ref={fileInputRef}
-            className={styles.fileInput}
-            disabled={disabled}
-            {...(fileInputTestId ? { 'data-testid': fileInputTestId } : {})}
-          />
+          {showUploadControl ? (
+            <>
+              <button
+                type="button"
+                className={joinClassNames(styles.modeButton, isUploadMode ? styles.modeButtonActive : '')}
+                onClick={onUploadClick}
+                aria-label={uploadAriaLabel}
+                aria-pressed={isUploadMode}
+                disabled={disabled}
+                {...(uploadButtonTestId ? { 'data-testid': uploadButtonTestId } : {})}
+              >
+                Upload
+              </button>
+              <input
+                type="file"
+                accept={accept}
+                multiple={multiple}
+                onChange={onFileChange}
+                ref={fileInputRef}
+                className={styles.fileInput}
+                disabled={disabled}
+                {...(fileInputTestId ? { 'data-testid': fileInputTestId } : {})}
+              />
+            </>
+          ) : null}
         </div>
 
         {selectedFileLabel ? (

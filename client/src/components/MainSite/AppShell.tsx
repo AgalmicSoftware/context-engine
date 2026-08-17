@@ -47,7 +47,6 @@ import { getChainById, getSessionRegistryChainIds } from '../../variables/chains
 import { sessionRegistryReadsPort } from '../../domains/sessions/registry/sessionRegistryReadPorts.js';
 import { normalizeSessionMediaUrl } from '../../domains/sessions/sessionMediaUrls.js';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
-import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import { derivePrimarySessionSlugFromList } from '../../utilities/session/globalSessionState.js';
 import {
   createInitialProfileScanReport,
@@ -110,6 +109,7 @@ import {
   startCeRuntimeStats,
   stopCeRuntimeStats,
 } from '../../utilities/ui/uiRuntimeStats.js';
+import SessionColorSchemeScope from './SessionColorSchemeScope';
 
 // withWagmiBridge is a function component (allowed to use hooks from wagmi and RainbowKit).
 // It passes props to this class-component so that this component can use React hooks.
@@ -258,7 +258,7 @@ import {
   DebateMap as DebateMapRaw,
   BookmarksPage as BookmarksPageRaw,
   CompareAddresses as CompareAddressesRaw,
-  ContractPage as ContractPageRaw,
+  DocsPage as DocsPageRaw,
   DemosIndex as DemosIndexRaw,
   OnePageSession as OnePageSessionRaw,
   RiskMatrixDemo as RiskMatrixDemoRaw,
@@ -333,7 +333,7 @@ const AgentPage = asMainSiteRouteComponent(AgentPageRaw);
 const DebateMap = asMainSiteRouteComponent(DebateMapRaw);
 const BookmarksPage = asMainSiteRouteComponent(BookmarksPageRaw);
 const CompareAddresses = asMainSiteRouteComponent(CompareAddressesRaw);
-const ContractPage = asMainSiteRouteComponent(ContractPageRaw);
+const DocsPage = asMainSiteRouteComponent(DocsPageRaw);
 const DemosIndex = asMainSiteRouteComponent(DemosIndexRaw);
 const OnePageSession = asMainSiteRouteComponent(OnePageSessionRaw);
 const RiskMatrixDemo = asMainSiteRouteComponent(RiskMatrixDemoRaw);
@@ -663,6 +663,23 @@ const updateMainSiteQuestionCacheAtomic = async <TValue = MainSiteQuestionMetada
   }
 };
 
+const updateMainSiteCacheAtomic = async <TValue,>(
+  namespace: 'sbtCache' | 'userCache',
+  slug: string,
+  updater: (current: TValue | null) => TValue | Promise<TValue>,
+): Promise<TValue> => {
+  try {
+    const updated = await updateCacheAtomic<TValue>(namespace, slug, updater);
+    if (updated === null) throw new Error(`managed ${namespace} namespace unavailable`);
+    return updated;
+  } catch (error: unknown) {
+    if (error instanceof MainSiteCachePersistenceError) throw error;
+    throw new MainSiteCachePersistenceError(
+      `Failed to persist ${namespace} for ${slug}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+};
+
 const hasMainSiteRegistryIdentity = (sessionConfig: MainSiteSessionConfigLike | null | undefined): boolean => {
   if (!isMainSiteRecord(sessionConfig)) return false;
   const registry = isMainSiteRecord(sessionConfig.__registry) ? sessionConfig.__registry : {};
@@ -813,6 +830,8 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     dgRead: (name: unknown, slug: unknown, opts?: unknown) =>
       this.DG.read(name as string, slug as string, isMainSiteRecord(opts) ? opts : undefined),
     dgWrite: (name: unknown, slug: unknown, value: unknown) => this.DG.write(name as string, slug as string, value),
+    updateSbtCacheAtomic: (slug: string, updater) => updateMainSiteCacheAtomic('sbtCache', slug, updater),
+    updateUserCacheAtomic: (slug: string, updater) => updateMainSiteCacheAtomic('userCache', slug, updater),
     dgKey: (name: unknown, slug: unknown) => this.DG.key(name as string, slug as string),
     getActiveSessionSlug: () => this.getActiveSessionSlug(),
     getSessionCfg: (slug: string) => this.getCacheSessionCfg(slug),
@@ -1102,9 +1121,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
   getTemporaryInitialLoadAboutRedirectTarget = (pathIn: unknown = '') =>
     getTemporaryInitialLoadAboutRedirectTargetFn({
       isFirstVisitRootRedirectEnabled: this.isFirstVisitRootRedirectEnabled,
-      isTemporaryInitialLoadAboutRedirectSessionSlug: (slug: string) => isDemoSessionSlug(slug),
       normalizeRoutePath: (value: unknown) => this.normalizeRoutePath(String(value || '')),
-      normalizeSessionSlug,
       pathIn,
     });
 
@@ -1114,11 +1131,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     try {
       return window.localStorage;
     } catch (_) {
-      try {
-        return window.sessionStorage;
-      } catch (__) {
-        return null;
-      }
+      return null;
     }
   };
 
@@ -2337,16 +2350,13 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     }
     this.redirectLegacyDemoPath();
     let didRedirectInitialLoadToAbout = false;
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && this.shouldForceOneTimeFirstVisitRootRedirect()) {
       const currentPath = window.location.pathname || this.props.path || '';
       const aboutRedirectTarget = this.getTemporaryInitialLoadAboutRedirectTarget(currentPath);
-      const shouldRedirectForPersistedCache = aboutRedirectTarget?.requiresPersistedCache
-        ? !!(aboutRedirectTarget.cacheSlug && (await this.hasPersistedManagedCacheData(aboutRedirectTarget.cacheSlug)))
-        : true;
       if (
         aboutRedirectTarget?.path &&
-        shouldRedirectForPersistedCache &&
-        this.normalizeRoutePath(currentPath) !== aboutRedirectTarget.path
+        this.normalizeRoutePath(currentPath) !== aboutRedirectTarget.path &&
+        this.consumeOneTimeFirstVisitRootRedirect()
       ) {
         window.history.replaceState(
           {},
@@ -3193,6 +3203,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
   manageAutoHashPersistence = () => {
     manageAutoHashPersistenceFn({
       getActiveSlug: () => this.getActiveSessionSlug() || '',
+      getLocationHash: () => window.location.hash || '',
       getLocationSearch: () => window.location.search || '',
       getLocationPathname: () => window.location.pathname || '',
       sessionStorageGet: (key) => sessionStorage.getItem(key),
@@ -4127,7 +4138,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
   _renderAtlasRoute = this._routeRenderers._renderAtlasRoute;
   _renderTagRoute = this._routeRenderers._renderTagRoute;
   _renderCompareRoute = this._routeRenderers._renderCompareRoute;
-  _renderContractsRoute = this._routeRenderers._renderContractsRoute;
+  _renderDocsRoute = this._routeRenderers._renderDocsRoute;
   _renderAdminRoute = this._routeRenderers._renderAdminRoute;
   _renderSponsorRoute = this._routeRenderers._renderSponsorRoute;
   _renderSbtCreateRoute = this._routeRenderers._renderSbtCreateRoute;
@@ -4183,9 +4194,12 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
   render() {
     const mainViewDisplay = this.getMainView(null);
     const activeRouteSessionConfig = this.getDisplaySessionCfg(this.getSessionSlugFromProps());
+    const effectivePath = this.getEffectiveRoutePath(this.getCurrentPathname());
+    const hasActiveSessionRoute =
+      effectivePath.startsWith('/session/') && this.getSessionTokenFromPath(effectivePath).toLowerCase() !== 'new';
 
     return (
-      <>
+      <SessionColorSchemeScope active={hasActiveSessionRoute} sessionConfig={activeRouteSessionConfig}>
         <OnboardingOverlay />
 
         <Navbar
@@ -4206,8 +4220,8 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
 
         {mainViewDisplay}
 
-        <Footer toggleLoginModal={this.props.toggleLoginModal} />
-      </>
+        <Footer toggleLoginModal={this.props.toggleLoginModal} flowAtDocumentEnd={hasActiveSessionRoute} />
+      </SessionColorSchemeScope>
     );
   }
 }

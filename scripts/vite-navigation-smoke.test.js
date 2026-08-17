@@ -4,8 +4,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  DEFAULT_ROUTES,
   DEFAULT_ROUTE_TEXT,
   compactSmokeSummary,
+  dismissOnboardingIfPresent,
   findMissingExpectedText,
   isAllowedConsoleIssue,
   isAllowedFailedRequest,
@@ -15,8 +17,16 @@ const {
   normalizeRoutes,
   resolveViewport,
   routeUrl,
+  runRouteProbe,
   summarizeFailures,
 } = require('./vite-navigation-smoke');
+
+test('default navigation smoke covers Docs and its legacy contracts alias', () => {
+  assert.ok(DEFAULT_ROUTES.includes('/docs'));
+  assert.ok(DEFAULT_ROUTES.includes('/contracts'));
+  assert.deepEqual(DEFAULT_ROUTE_TEXT['/docs'], ['Docs']);
+  assert.deepEqual(DEFAULT_ROUTE_TEXT['/contracts'], ['Docs']);
+});
 
 test('normalizeBaseUrl keeps the app origin and removes path/search/hash drift', () => {
   assert.equal(normalizeBaseUrl('http://localhost:3000/foo?bar=baz#hash'), 'http://localhost:3000');
@@ -45,6 +55,58 @@ test('normalizeLayoutProbeSelectors keeps default browser layout checks and acce
 
 test('routeUrl joins normalized app URLs and routes', () => {
   assert.equal(routeUrl('http://127.0.0.1:3000', '/session/demo'), 'http://127.0.0.1:3000/session/demo');
+});
+
+test('runRouteProbe normalizes reported failures and fails closed on probe errors', async () => {
+  const page = { marker: 'page' };
+  const context = { route: '/session/demo-2' };
+
+  assert.deepEqual(
+    await runRouteProbe(page, async (receivedPage, receivedContext) => {
+      assert.equal(receivedPage, page);
+      assert.equal(receivedContext, context);
+      return [' missing Breakdown guard ', '', null];
+    }, context),
+    ['missing Breakdown guard'],
+  );
+  assert.deepEqual(
+    await runRouteProbe(page, async () => {
+      throw new Error('results did not hydrate');
+    }, context),
+    ['results did not hydrate'],
+  );
+  assert.deepEqual(await runRouteProbe(page, null, context), []);
+});
+
+test('demo results probe dismisses first-run onboarding before clicking covered controls', async () => {
+  const calls = [];
+  const overlay = {
+    count: async () => 1,
+    getByRole: (role, options) => {
+      assert.equal(role, 'button');
+      assert.match('Skip', options.name);
+      return { click: async () => calls.push('skip') };
+    },
+    waitFor: async (options) => calls.push(`wait:${options.state}:${options.timeout}`),
+  };
+
+  await dismissOnboardingIfPresent({ getByTestId: () => overlay }, { timeoutMs: 1234 });
+
+  assert.deepEqual(calls, ['skip', 'wait:detached:1234']);
+});
+
+test('demo results probe leaves an already-complete onboarding state untouched', async () => {
+  let lookedForSkip = false;
+  const overlay = {
+    count: async () => 0,
+    getByRole: () => {
+      lookedForSkip = true;
+    },
+  };
+
+  await dismissOnboardingIfPresent({ getByTestId: () => overlay }, { timeoutMs: 1234 });
+
+  assert.equal(lookedForSkip, false);
 });
 
 test('session smoke markers survive both resolving and loaded pe4 shell states', () => {
@@ -104,6 +166,23 @@ test('console allowlist permits known dependency warnings but not app exceptions
   assert.equal(isAllowedConsoleIssue({ type: 'error', text: 'TypeError: Cannot read properties of undefined' }), false);
 });
 
+test('console allowlist mirrors the failed-request exception for the optional local chain', () => {
+  assert.equal(
+    isAllowedConsoleIssue({
+      type: 'error',
+      text: "Access to fetch at 'http://127.0.0.1:8545/' from origin 'http://127.0.0.1:4173' has been blocked by CORS policy: No access control header.",
+    }),
+    true,
+  );
+  assert.equal(
+    isAllowedConsoleIssue({
+      type: 'error',
+      text: "Access to fetch at 'http://127.0.0.1:4173/api' from origin 'http://127.0.0.1:4173' has been blocked by CORS policy",
+    }),
+    false,
+  );
+});
+
 test('summarizeFailures catches Vite-sensitive render, style, and asset failures', () => {
   const failures = summarizeFailures([
     {
@@ -121,6 +200,7 @@ test('summarizeFailures catches Vite-sensitive render, style, and asset failures
       }],
       unexpectedConsoleIssues: [{ type: 'error', text: 'TypeError: boom' }],
       pageErrors: ['ReferenceError: boom'],
+      routeProbeFailures: ['results did not hydrate'],
       layoutIssues: ['ce-survey-submit: visible text appears clipped'],
     },
   ]);
@@ -134,6 +214,7 @@ test('summarizeFailures catches Vite-sensitive render, style, and asset failures
     '/session/demo: failed script http://127.0.0.1:3000/src/main.tsx (net::ERR_FAILED)',
     '/session/demo: console error: TypeError: boom',
     '/session/demo: page error: ReferenceError: boom',
+    '/session/demo: route probe: results did not hydrate',
     '/session/demo: layout issue: ce-survey-submit: visible text appears clipped',
   ]);
 });
@@ -155,6 +236,7 @@ test('compactSmokeSummary keeps success output focused on route health', () => {
       unexpectedFailedRequests: [],
       unexpectedConsoleIssues: [],
       pageErrors: [],
+      routeProbeFailures: [],
       layoutIssues: [],
       missingText: [],
     }],
@@ -173,6 +255,7 @@ test('compactSmokeSummary keeps success output focused on route health', () => {
       unexpectedFailedRequests: 0,
       unexpectedConsoleIssues: 0,
       pageErrors: 0,
+      routeProbeFailures: 0,
       layoutIssues: 0,
       missingText: [],
     }],

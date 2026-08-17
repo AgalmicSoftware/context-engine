@@ -142,10 +142,16 @@ export const createContractScriptsSurveyPayloadReadMethods = (
       }
       const sId = String(surveyId || '').toLowerCase();
       const { baseKey } = resolveReadContext(groupKeyOrCfg);
+      const cfg = resolveSession(groupKeyOrCfg || '');
+      const storageBackendTag = isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.SURVEYS)
+        ? STORAGE_BACKENDS.CLOUDFLARE
+        : STORAGE_BACKENDS.ARWEAVE;
       const modeTag = buildDecryptModeTag(opts);
       const failureModeTag = buildFailureModeTag(opts);
       const forceArweaveFetch = !!(opts && opts.forceArweaveFetch === true);
-      const inflightKey = `${baseKey}|${sId}|${modeTag}|${failureModeTag}|force:${forceArweaveFetch ? '1' : '0'}`;
+      const inflightKey = `${baseKey}|${sId}|${storageBackendTag}|${modeTag}|${failureModeTag}|force:${
+        forceArweaveFetch ? '1' : '0'
+      }`;
 
       try {
         const result = await runInFlightCoalesced(READ_INFLIGHT.surveyData, inflightKey, async () => {
@@ -154,24 +160,25 @@ export const createContractScriptsSurveyPayloadReadMethods = (
             method: 'this.getSurveyHash',
             params: { surveyId: sId },
           });
-          const arweaveSurveyHash = await this.getSurveyHash(providerName, sId, groupKeyOrCfg, {
+          const payloadPointerId = await this.getSurveyHash(providerName, sId, groupKeyOrCfg, {
             throwOnError: !!(opts && opts.throwOnFailure),
           });
 
-          if (
-            !ARWEAVE_ACTIVE ||
-            !arweaveSurveyHash ||
-            arweaveSurveyHash === arweaveClient.hexToBase64url(ethers.constants.HashZero)
-          ) {
-            if (opts && opts.throwOnFailure && ARWEAVE_ACTIVE) {
+          if (!payloadPointerId || payloadPointerId === arweaveClient.hexToBase64url(ethers.constants.HashZero)) {
+            if (opts && opts.throwOnFailure) {
               throw buildHashUnavailableMetadataError(`Survey hash unavailable for survey ${sId}`, { txId: '' });
             }
             return null;
           }
 
-          const arweaveSurveyData = await downloadArweaveTextForGroup({
-            txId: arweaveSurveyHash,
+          if (!ARWEAVE_ACTIVE && storageBackendTag !== STORAGE_BACKENDS.CLOUDFLARE) {
+            return null;
+          }
+          const storageRead = await readPayloadPointerTextForGroup({
+            pointerId: payloadPointerId,
+            resource: STORAGE_RESOURCE_KEYS.SURVEYS,
             groupKeyOrCfg,
+            cfg,
             arweaveOpts: {
               disableExistencePrecheck: true,
               preflightTxExistence: false,
@@ -184,14 +191,15 @@ export const createContractScriptsSurveyPayloadReadMethods = (
               }),
             },
           });
+          const surveyPayloadText = storageRead?.text;
           let surveyData = null;
           try {
-            surveyData = JSON.parse(arweaveSurveyData);
+            surveyData = JSON.parse(surveyPayloadText as string);
           } catch (parseErr: any) {
             throw await recordTerminalArweaveInvalidFailure({
               groupKeyOrCfg,
-              txId: arweaveSurveyHash,
-              message: `Invalid survey metadata JSON for tx ${arweaveSurveyHash}`,
+              txId: payloadPointerId,
+              message: `Invalid survey metadata JSON for pointer ${payloadPointerId}`,
               cause: parseErr,
             });
           }
@@ -200,7 +208,12 @@ export const createContractScriptsSurveyPayloadReadMethods = (
           if (!skipDecrypt) {
             await deps.contractMetadataResolutionHelpers.maybeDecryptSurveyPayload(surveyData, groupKeyOrCfg, opts);
           }
-          return surveyData;
+          return attachPayloadPointerFields(
+            surveyData,
+            payloadPointerId,
+            STORAGE_RESOURCE_KEYS.SURVEYS,
+            storageRead?.storageRef || null,
+          );
         });
         return cloneJsonSafe(result);
       } catch (error: any) {
@@ -767,77 +780,6 @@ export const createContractScriptsSurveyPayloadReadMethods = (
     // Decrypt masked survey metadata without re-downloading the payload from Arweave.
     async decryptSurveyPayloadInPlace(surveyData: any, groupKeyOrCfg: any = null, opts: any = {}) {
       return deps.contractMetadataResolutionHelpers.maybeDecryptSurveyPayload(surveyData, groupKeyOrCfg, opts);
-    },
-
-    getSurveyData: async function (providerName: any, surveyId: any, groupKeyOrCfg: any = null, opts: any = {}) {
-      const sId = String(surveyId || '').toLowerCase();
-      const { baseKey } = resolveReadContext(groupKeyOrCfg);
-      const modeTag = buildDecryptModeTag(opts);
-      const failureModeTag = buildFailureModeTag(opts);
-      const forceArweaveFetch = !!(opts && opts.forceArweaveFetch === true);
-      const inflightKey = `${baseKey}|${sId}|${modeTag}|${failureModeTag}|force:${forceArweaveFetch ? '1' : '0'}`;
-      try {
-        const result = await runInFlightCoalesced(READ_INFLIGHT.surveyData, inflightKey, async () => {
-          const payloadPointerId = await this.getSurveyHash(providerName, sId, groupKeyOrCfg, {
-            throwOnError: !!(opts && opts.throwOnFailure),
-          });
-          if (!payloadPointerId) {
-            if (opts && opts.throwOnFailure) {
-              throw buildHashUnavailableMetadataError(`Survey hash unavailable for survey ${sId}`, { txId: '' });
-            }
-            return null;
-          }
-          const cfg = resolveSession(groupKeyOrCfg || '');
-          if (!ARWEAVE_ACTIVE && !isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.SURVEYS)) {
-            return null;
-          }
-          const storageRead = await readPayloadPointerTextForGroup({
-            pointerId: payloadPointerId,
-            resource: STORAGE_RESOURCE_KEYS.SURVEYS,
-            groupKeyOrCfg,
-            cfg,
-            arweaveOpts: {
-              disableExistencePrecheck: true,
-              preflightTxExistence: false,
-              forceRetry: forceArweaveFetch,
-              cacheBypass: forceArweaveFetch,
-              bypassFailureCache: forceArweaveFetch,
-              debugContext: buildArweaveDebugContext(groupKeyOrCfg, 'survey_metadata', {
-                fn: 'getSurveyData',
-                surveyId: sId,
-              }),
-            },
-          });
-          const surveyData = storageRead?.text;
-          let parsed = null;
-          try {
-            parsed = JSON.parse(surveyData as string);
-          } catch (parseErr: any) {
-            throw await recordTerminalArweaveInvalidFailure({
-              groupKeyOrCfg,
-              txId: payloadPointerId,
-              message: `Invalid survey JSON for pointer ${payloadPointerId}`,
-              cause: parseErr,
-            });
-          }
-          normalizeSessionNameFields(parsed);
-          const skipDecrypt = !!(opts && (opts.skipDecrypt || opts.decrypt === false));
-          if (!skipDecrypt) {
-            await deps.contractMetadataResolutionHelpers.maybeDecryptSurveyPayload(parsed, groupKeyOrCfg, opts);
-          }
-          return attachPayloadPointerFields(
-            parsed,
-            payloadPointerId,
-            STORAGE_RESOURCE_KEYS.SURVEYS,
-            storageRead?.storageRef || null,
-          );
-        });
-        return cloneJsonSafe(result);
-      } catch (error: any) {
-        logArweaveMetadataFetchFailure({ scope: 'survey', error });
-        if (opts && opts.throwOnFailure) throw error;
-        return null;
-      }
     },
   };
 };

@@ -86,6 +86,7 @@ export const uploadAudioForTranscription = async (
       sessionConfig: transport.sessionConfig,
       context: transport.context,
       workerUrl: transport.baseUrl,
+      anonymousOnly: true,
       preferAnonymous: true,
       fallbackOnGateUnavailable: true,
       allowDemoFallback: defaultStrictAllowDemoFallback(),

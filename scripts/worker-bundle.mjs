@@ -4,7 +4,6 @@ import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import {
   assertWorkerDependencyVersions,
-  ensureWorkerDependencyInstall,
 } from './worker-dependency-guard.mjs';
 
 export const WORKER_BUNDLE_TARGETS = Object.freeze({
@@ -59,7 +58,6 @@ export const normalizeWorkerBundleText = (value) =>
 export const buildWorkerBundles = async ({
   rootDir = process.cwd(),
   targetKeys = Object.keys(WORKER_BUNDLE_TARGETS),
-  ensureWorkerDeps = ensureWorkerDependencyInstall,
   assertWorkerDeps = assertWorkerDependencyVersions,
   esbuildImpl = build,
   mkdirSyncImpl = mkdirSync,
@@ -68,7 +66,6 @@ export const buildWorkerBundles = async ({
 } = {}) => {
   const targets = resolveWorkerBundleTargets({ rootDir, targetKeys });
   if (targets.some((target) => target.enforceWorkerDependencyGuard)) {
-    ensureWorkerDeps({ rootDir, dependencyName: 'ethers' });
     assertWorkerDeps({ rootDir });
   }
 

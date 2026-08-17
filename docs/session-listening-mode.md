@@ -13,6 +13,13 @@ mobile/narrow screens place the recorder below the pile and auto-scroll to it.
 Recording does not start automatically; the user must click Record so browser
 microphone permission is requested from a user gesture.
 
+Microphone capture requests browser speech processing (echo cancellation,
+noise suppression, automatic gain control, and mono audio). The selected
+browser/system input is preserved unless it is clearly an iPhone, iPad, or
+Continuity microphone and an identifiable built-in computer microphone is
+available. In that case the client switches to the local microphone; if the
+replacement cannot be opened, it keeps the already-authorized input.
+
 While recording, the panel switches from the large Record button into the
 HealthBot-style recorder strip: inset waveform, elapsed-time timer, Stop, and
 Pause/Resume controls. Pausing keeps the current recorder session open, stops
@@ -30,6 +37,9 @@ browser can still flush the audio.
   user-visible clip while paused.
 - Recording continues while each completed chunk is sent to the session
   worker `/transcribe` path.
+- Transcription uploads are anonymous-only at the transport layer. A worker
+  denial is surfaced in the recorder instead of escalating into an unexpected
+  wallet or passkey signing prompt.
 - Returned transcripts are stitched in segment order with overlap deduplication.
 - The browser stores only the cumulative transcript and segment status metadata
   in local storage by default.

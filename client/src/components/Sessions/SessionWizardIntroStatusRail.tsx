@@ -19,6 +19,9 @@ type SessionWizardIntroStatusRailProps = {
   onFocusNormalModeSection: (key: string) => void;
   onRetrySponsoredBundle: () => void;
   onSubmitSponsoredBundleKey?: React.ComponentProps<typeof SessionWizardSponsoredStatus>['onSubmitDecryptionKey'];
+  requiredAiProviderKeyLabels?: React.ComponentProps<
+    typeof SessionWizardRequirementsBanner
+  >['requiredAiProviderKeyLabels'];
   requiredRequirementIds?: React.ComponentProps<typeof SessionWizardRequirementsBanner>['requiredRequirementIds'];
   showNewSessionRequirementsBanner: boolean;
   showNormalModeRail?: boolean;
@@ -40,6 +43,7 @@ const SessionWizardIntroStatusRail = ({
   onFocusNormalModeSection,
   onRetrySponsoredBundle,
   onSubmitSponsoredBundleKey,
+  requiredAiProviderKeyLabels,
   requiredRequirementIds,
   showNewSessionRequirementsBanner,
   showNormalModeRail = true,
@@ -54,6 +58,7 @@ const SessionWizardIntroStatusRail = ({
         fundingRequirementLabel={fundingRequirementLabel}
         newSessionRequiresLitCredential={newSessionRequiresLitCredential}
         onDismiss={onDismissRequirements}
+        requiredAiProviderKeyLabels={requiredAiProviderKeyLabels}
         requiredRequirementIds={requiredRequirementIds}
       />
     ) : null}

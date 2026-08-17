@@ -42,7 +42,7 @@ describe('displayHelpers', () => {
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
     expect(link.style.padding).toBe('0px');
-    expect(link.style.color).toBe('blue');
+    expect(link.style.color).toBe('var(--ce-link)');
     expect(link.style.marginLeft).toBe('5px');
     expect(link).toHaveTextContent('');
   });

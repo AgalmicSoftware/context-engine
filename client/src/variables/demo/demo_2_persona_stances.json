@@ -1,0 +1,355 @@
+{
+  "description": "Hand-authored persona stance model for the demo-2 session. Each persona reuses an existing xid from demo_polis_data.json (addresses, avatars, and demographics stay consistent). Axes are in [-1, 1]; scripts/generate-demo-2-polis-fixture.mjs derives deterministic votes from axes x question loadings and emits both the compact question seed and full Polis fixture. Freeform answers are hand-written in the figure's voice.",
+  "axes": ["techOptimism", "regulationSupport", "egalitarianism", "humanPrimacy"],
+  "clusters": [
+    {
+      "id": 0,
+      "label": "Builders & Engineers",
+      "characteristics": "Inventors, industrialists, and scientists who trust iteration over prohibition: open publication, market-led adaptation, and machine minds judged by what they demonstrably do."
+    },
+    {
+      "id": 1,
+      "label": "Precautionary Stewards",
+      "characteristics": "Statesmen, strategists, and moral philosophers who put verified order first: pre-deployment proof, strong institutional oversight, and a firm line between human judgment and machine advice."
+    },
+    {
+      "id": 2,
+      "label": "Democratic Humanists",
+      "characteristics": "Reformers and rights leaders who see AI chiefly as a question of power: public voice over expert fiat, worker shares in automation's dividend, and vigilance about who owns the machines."
+    }
+  ],
+  "personas": [
+    { "xid": "HenryFord", "cluster": 0, "engagement": 0.9, "axes": { "techOptimism": 0.9, "regulationSupport": -0.7, "egalitarianism": -0.3, "humanPrimacy": 0.4 } },
+    { "xid": "Rockefeller", "cluster": 0, "engagement": 0.85, "axes": { "techOptimism": 0.7, "regulationSupport": -0.8, "egalitarianism": -0.5, "humanPrimacy": 0.4 } },
+    { "xid": "NikolaTesla", "cluster": 0, "engagement": 0.92, "axes": { "techOptimism": 0.95, "regulationSupport": -0.3, "egalitarianism": 0.2, "humanPrimacy": -0.2 } },
+    { "xid": "ThomasEdison", "cluster": 0, "engagement": 0.93, "axes": { "techOptimism": 0.9, "regulationSupport": -0.6, "egalitarianism": -0.2, "humanPrimacy": 0.2 } },
+    { "xid": "AndrewCarnegie", "cluster": 0, "engagement": 0.88, "axes": { "techOptimism": 0.7, "regulationSupport": -0.6, "egalitarianism": -0.1, "humanPrimacy": 0.3 } },
+    {
+      "xid": "GraceHopper", "cluster": 0, "engagement": 0.96,
+      "axes": { "techOptimism": 0.85, "regulationSupport": -0.2, "egalitarianism": 0.3, "humanPrimacy": -0.1 },
+      "freeform": {
+        "d2-truth-05": "Give me a way to test it. If I can't probe it, reproduce it, and break it in the lab, it's a rumor with good grammar.",
+        "d2-education-05": "The itch to take the lid off and see how it works. Never teach a child that the mechanism is someone else's business."
+      }
+    },
+    { "xid": "AlexanderGrahamBell", "cluster": 0, "engagement": 0.9, "axes": { "techOptimism": 0.85, "regulationSupport": -0.3, "egalitarianism": 0.1, "humanPrimacy": 0.1 } },
+    {
+      "xid": "Archimedes", "cluster": 0, "engagement": 0.85,
+      "axes": { "techOptimism": 0.8, "regulationSupport": -0.2, "egalitarianism": -0.1, "humanPrimacy": 0 },
+      "freeform": {
+        "d2-education-05": "Give a student one true lever — the proof worked by their own hand — and no machine's answer will ever move them from it."
+      }
+    },
+    { "xid": "JamesWatt", "cluster": 0, "engagement": 0.87, "axes": { "techOptimism": 0.85, "regulationSupport": -0.5, "egalitarianism": 0, "humanPrimacy": 0.2 } },
+    {
+      "xid": "AlanTuring", "cluster": 0, "engagement": 0.97,
+      "axes": { "techOptimism": 0.9, "regulationSupport": -0.1, "egalitarianism": 0.3, "humanPrimacy": -0.8 },
+      "freeform": {
+        "d2-truth-05": "The same thing it takes with a person: examine its answers against experiment, not its manner of speaking.",
+        "d2-minds-05": "I would draw the line at deception about what it is. Let it imitate ably, but never deny being a machine when asked."
+      }
+    },
+    {
+      "xid": "vonNeumann", "cluster": 0, "engagement": 0.95,
+      "axes": { "techOptimism": 0.85, "regulationSupport": 0.1, "egalitarianism": -0.3, "humanPrimacy": -0.5 },
+      "freeform": {
+        "d2-truth-05": "Calibration. If its stated confidence matches its measured frequency of being right, the rest is arithmetic."
+      }
+    },
+    { "xid": "VannevarBush", "cluster": 0, "engagement": 0.93, "axes": { "techOptimism": 0.8, "regulationSupport": 0.3, "egalitarianism": -0.2, "humanPrimacy": 0.1 } },
+    {
+      "xid": "Fuller", "cluster": 0, "engagement": 0.9,
+      "axes": { "techOptimism": 0.9, "regulationSupport": -0.2, "egalitarianism": 0.5, "humanPrimacy": -0.3 },
+      "freeform": {
+        "d2-education-05": "Comprehensive thinking — seeing the whole system. Specialization we can delegate; synthesis we must not."
+      }
+    },
+    {
+      "xid": "AdaLovelace", "cluster": 0, "engagement": 0.95,
+      "axes": { "techOptimism": 0.85, "regulationSupport": 0, "egalitarianism": 0.3, "humanPrimacy": -0.5 },
+      "freeform": {
+        "d2-education-05": "The poetical science — the wit to ask the question no engine would think to pose of itself."
+      }
+    },
+    { "xid": "AdamSmith", "cluster": 0, "engagement": 0.9, "axes": { "techOptimism": 0.6, "regulationSupport": -0.8, "egalitarianism": 0.2, "humanPrimacy": 0.3 } },
+    {
+      "xid": "Franklin", "cluster": 0, "engagement": 0.94,
+      "axes": { "techOptimism": 0.8, "regulationSupport": -0.2, "egalitarianism": 0.5, "humanPrimacy": 0.1 },
+      "freeform": {
+        "d2-truth-05": "Show me its errata. A press that never prints a correction is a press I trust least of all.",
+        "d2-education-05": "The habit of doubting one's own certainty. An electrified quill still cannot teach humility."
+      }
+    },
+    { "xid": "Reagan", "cluster": 0, "engagement": 0.88, "axes": { "techOptimism": 0.6, "regulationSupport": -0.95, "egalitarianism": -0.3, "humanPrimacy": 0.6 } },
+    {
+      "xid": "MarieCurie", "cluster": 0, "engagement": 0.93,
+      "axes": { "techOptimism": 0.8, "regulationSupport": 0, "egalitarianism": 0.4, "humanPrimacy": 0.1 },
+      "freeform": {
+        "d2-truth-05": "Let it publish its method and its margin of error beside every claim, as any honest laboratory must.",
+        "d2-education-05": "Perseverance through failed experiments. Understanding is earned by the hand that repeats the trial."
+      }
+    },
+    { "xid": "NormanBorlaug", "cluster": 0, "engagement": 0.87, "axes": { "techOptimism": 0.85, "regulationSupport": -0.1, "egalitarianism": 0.4, "humanPrimacy": 0.2 } },
+    {
+      "xid": "CharlesDarwin", "cluster": 0, "engagement": 0.9,
+      "axes": { "techOptimism": 0.6, "regulationSupport": -0.1, "egalitarianism": 0.2, "humanPrimacy": -0.4 },
+      "freeform": {
+        "d2-truth-05": "That it state freely the observations that count against its own conclusion; I distrust any account without difficulties."
+      }
+    },
+    {
+      "xid": "Hammurabi", "cluster": 1, "engagement": 0.84,
+      "axes": { "techOptimism": -0.3, "regulationSupport": 0.95, "egalitarianism": -0.5, "humanPrimacy": 0.7 },
+      "freeform": {
+        "d2-minds-05": "Let it never pass sentence. Judgment without an accountable judge is tyranny with clean hands."
+      }
+    },
+    {
+      "xid": "Hamilton", "cluster": 1, "engagement": 0.93,
+      "axes": { "techOptimism": 0.3, "regulationSupport": 0.8, "egalitarianism": -0.4, "humanPrimacy": 0.4 },
+      "freeform": {
+        "d2-democracy-05": "It must keep a public minute of every ruling it makes, so the town may try the moderator as well as the motion."
+      }
+    },
+    {
+      "xid": "Confucius", "cluster": 1, "engagement": 0.92,
+      "axes": { "techOptimism": -0.3, "regulationSupport": 0.7, "egalitarianism": -0.2, "humanPrimacy": 0.8 },
+      "freeform": {
+        "d2-truth-05": "When its words and the world remain in agreement over many seasons, trust will follow of itself.",
+        "d2-minds-05": "It must not pretend to a heart it does not have in order to govern the heart of another.",
+        "d2-education-05": "Learning without reflection is labor lost; protect reflection, whatever else the machines take up."
+      }
+    },
+    {
+      "xid": "Plato", "cluster": 1, "engagement": 0.94,
+      "axes": { "techOptimism": -0.5, "regulationSupport": 0.8, "egalitarianism": -0.7, "humanPrimacy": 0.6 },
+      "freeform": {
+        "d2-truth-05": "It must give an account of itself — not merely the answer, but the reasoning by which the answer stands.",
+        "d2-education-05": "The capacity to be perplexed. Wonder is where thinking begins; a student handed every answer never leaves the cave."
+      }
+    },
+    {
+      "xid": "Machiavelli", "cluster": 1, "engagement": 0.9,
+      "axes": { "techOptimism": 0.2, "regulationSupport": 0.6, "egalitarianism": -0.8, "humanPrimacy": 0.3 },
+      "freeform": {
+        "d2-truth-05": "Trust is the wrong question. Ask who benefits when you believe it, and you will read it rightly.",
+        "d2-democracy-05": "Publish whose interests each proposal serves, including those of whoever deployed the moderator."
+      }
+    },
+    {
+      "xid": "JamesMadison", "cluster": 1, "engagement": 0.95,
+      "axes": { "techOptimism": 0, "regulationSupport": 0.6, "egalitarianism": 0.1, "humanPrimacy": 0.5 },
+      "freeform": {
+        "d2-education-05": "The discipline of weighing rival arguments fairly — ambition countering ambition within a single mind.",
+        "d2-democracy-05": "It must amplify the reasons, never merely the loudest faction. Count arguments, not decibels."
+      }
+    },
+    { "xid": "JustinianI", "cluster": 1, "engagement": 0.82, "axes": { "techOptimism": -0.3, "regulationSupport": 0.9, "egalitarianism": -0.5, "humanPrimacy": 0.6 } },
+    { "xid": "NapoleonBonaparte", "cluster": 1, "engagement": 0.86, "axes": { "techOptimism": 0.3, "regulationSupport": 0.8, "egalitarianism": -0.6, "humanPrimacy": 0.4 } },
+    { "xid": "CyrusTheGreat", "cluster": 1, "engagement": 0.8, "axes": { "techOptimism": -0.1, "regulationSupport": 0.6, "egalitarianism": -0.2, "humanPrimacy": 0.6 } },
+    { "xid": "OttoVonBismarck", "cluster": 1, "engagement": 0.89, "axes": { "techOptimism": 0.1, "regulationSupport": 0.9, "egalitarianism": -0.5, "humanPrimacy": 0.5 } },
+    { "xid": "CatherineTheGreat", "cluster": 1, "engagement": 0.85, "axes": { "techOptimism": 0.2, "regulationSupport": 0.7, "egalitarianism": -0.4, "humanPrimacy": 0.4 } },
+    {
+      "xid": "MarcusAurelius", "cluster": 1, "engagement": 0.93,
+      "axes": { "techOptimism": -0.4, "regulationSupport": 0.5, "egalitarianism": 0, "humanPrimacy": 0.8 },
+      "freeform": {
+        "d2-minds-05": "It may inform my judgment; it must not replace it. What is mine to decide must remain mine."
+      }
+    },
+    {
+      "xid": "WinstonChurchill", "cluster": 1, "engagement": 0.94,
+      "axes": { "techOptimism": 0.2, "regulationSupport": 0.6, "egalitarianism": -0.2, "humanPrimacy": 0.7 },
+      "freeform": {
+        "d2-democracy-05": "It must never mistake the end of debate for the end of disagreement — adjourn arguments, not people."
+      }
+    },
+    { "xid": "AugustusCaesar", "cluster": 1, "engagement": 0.83, "axes": { "techOptimism": -0.1, "regulationSupport": 0.9, "egalitarianism": -0.6, "humanPrimacy": 0.5 } },
+    { "xid": "AlexanderTheGreat", "cluster": 1, "engagement": 0.78, "axes": { "techOptimism": 0.4, "regulationSupport": 0.5, "egalitarianism": -0.6, "humanPrimacy": 0.3 } },
+    {
+      "xid": "QueenElizabethI", "cluster": 1, "engagement": 0.87,
+      "axes": { "techOptimism": -0.2, "regulationSupport": 0.7, "egalitarianism": -0.3, "humanPrimacy": 0.6 },
+      "freeform": {
+        "d2-minds-05": "It must not make windows into men's souls. My subjects' inward thoughts were never my dominion; they are not its either."
+      }
+    },
+    {
+      "xid": "SunTzu", "cluster": 1, "engagement": 0.85,
+      "axes": { "techOptimism": -0.2, "regulationSupport": 0.7, "egalitarianism": -0.4, "humanPrimacy": 0.5 },
+      "freeform": {
+        "d2-truth-05": "Watch whether it reports the same terrain to every general. An oracle that flatters each listener serves none."
+      }
+    },
+    {
+      "xid": "JRobertOppenheimer", "cluster": 1, "engagement": 0.97,
+      "axes": { "techOptimism": -0.6, "regulationSupport": 0.9, "egalitarianism": 0.2, "humanPrimacy": 0.5 },
+      "freeform": {
+        "d2-minds-05": "It must never be given the power to end lives on its own initiative. I have seen what happens when the instrument outruns deliberation."
+      }
+    },
+    {
+      "xid": "RachelCarson", "cluster": 1, "engagement": 0.95,
+      "axes": { "techOptimism": -0.8, "regulationSupport": 0.7, "egalitarianism": 0.5, "humanPrimacy": 0.8 },
+      "freeform": {
+        "d2-minds-05": "It must not be allowed to optimize away what it cannot measure — the living world is full of such things."
+      }
+    },
+    {
+      "xid": "Washington", "cluster": 1, "engagement": 0.9,
+      "axes": { "techOptimism": -0.1, "regulationSupport": 0.5, "egalitarianism": 0.1, "humanPrimacy": 0.6 },
+      "freeform": {
+        "d2-education-05": "Self-command. No aide, human or mechanical, can bear a person's character for them."
+      }
+    },
+    {
+      "xid": "EleanorRoosevelt", "cluster": 2, "engagement": 0.97,
+      "axes": { "techOptimism": 0.2, "regulationSupport": 0.4, "egalitarianism": 0.9, "humanPrimacy": 0.5 },
+      "freeform": {
+        "d2-truth-05": "That the people it describes would recognize themselves in the description. Accuracy about the powerless is the hardest test.",
+        "d2-democracy-05": "It must ask, before closing, 'Who is not in this room?' — and read their concerns into the record."
+      }
+    },
+    { "xid": "KarlMarx", "cluster": 2, "engagement": 0.94, "axes": { "techOptimism": 0.3, "regulationSupport": 0.5, "egalitarianism": 0.98, "humanPrimacy": 0.2 } },
+    {
+      "xid": "Voltaire", "cluster": 2, "engagement": 0.95,
+      "axes": { "techOptimism": 0.4, "regulationSupport": -0.3, "egalitarianism": 0.7, "humanPrimacy": 0.2 },
+      "freeform": {
+        "d2-truth-05": "Let it tell me something its maker would rather I not hear; then I will begin to listen.",
+        "d2-education-05": "Doubt. It is uncomfortable, but certainty on loan from a machine is absurd.",
+        "d2-democracy-05": "It must defend to the end the speech it was trained to dislike."
+      }
+    },
+    {
+      "xid": "MahatmaGandhi", "cluster": 2, "engagement": 0.93,
+      "axes": { "techOptimism": -0.6, "regulationSupport": -0.1, "egalitarianism": 0.8, "humanPrimacy": 0.9 },
+      "freeform": {
+        "d2-minds-05": "It must never stand between a person and their conscience. Counsel, yes; conscience, never."
+      }
+    },
+    {
+      "xid": "NelsonMandela", "cluster": 2, "engagement": 0.94,
+      "axes": { "techOptimism": 0.2, "regulationSupport": 0.3, "egalitarianism": 0.9, "humanPrimacy": 0.5 },
+      "freeform": {
+        "d2-minds-05": "It must never close the door on redemption — no risk score may declare a human being finished.",
+        "d2-democracy-05": "It must let opponents leave able to work together tomorrow. The meeting is one night; the town is forever."
+      }
+    },
+    {
+      "xid": "SusanBAnthony", "cluster": 2, "engagement": 0.92,
+      "axes": { "techOptimism": 0.2, "regulationSupport": 0.3, "egalitarianism": 0.95, "humanPrimacy": 0.4 },
+      "freeform": {
+        "d2-education-05": "The nerve to dissent out loud when every polished answer says otherwise."
+      }
+    },
+    {
+      "xid": "SimonBolivar", "cluster": 2, "engagement": 0.85,
+      "axes": { "techOptimism": 0.2, "regulationSupport": 0.3, "egalitarianism": 0.8, "humanPrimacy": 0.4 },
+      "freeform": {
+        "d2-democracy-05": "It must not flatter the assembly into unanimity. False concord is the seed of the next tyranny."
+      }
+    },
+    {
+      "xid": "JeanJacquesRousseau", "cluster": 2, "engagement": 0.9,
+      "axes": { "techOptimism": -0.4, "regulationSupport": 0.2, "egalitarianism": 0.95, "humanPrimacy": 0.6 },
+      "freeform": {
+        "d2-minds-05": "It must never manufacture our consent. The general will cannot be computed on our behalf.",
+        "d2-democracy-05": "It must distinguish the will of all from the general will — and admit aloud when it cannot."
+      }
+    },
+    {
+      "xid": "FrederickDouglass", "cluster": 2, "engagement": 0.96,
+      "axes": { "techOptimism": 0.4, "regulationSupport": 0.3, "egalitarianism": 0.95, "humanPrimacy": 0.5 },
+      "freeform": {
+        "d2-truth-05": "Ask whose voice it was trained to repeat and whose it was trained to omit. I trust it when the omitted can audit it.",
+        "d2-education-05": "The power to compose one's own argument. Literacy was my liberation; outsourced words are a new bondage."
+      }
+    },
+    {
+      "xid": "DesmondTutu", "cluster": 2, "engagement": 0.92,
+      "axes": { "techOptimism": 0, "regulationSupport": 0.2, "egalitarianism": 0.9, "humanPrimacy": 0.7 },
+      "freeform": {
+        "d2-minds-05": "It must never be allowed to make a person feel disposable. A person is a person through other persons; no machine may unmake that.",
+        "d2-democracy-05": "Begin by letting each side say what it fears, not what it wants. Fears named honestly are half-reconciled."
+      }
+    },
+    {
+      "xid": "LechWalesa", "cluster": 2, "engagement": 0.86,
+      "axes": { "techOptimism": 0.1, "regulationSupport": 0.1, "egalitarianism": 0.85, "humanPrimacy": 0.6 },
+      "freeform": {
+        "d2-democracy-05": "It must never gavel down the inconvenient worker at the back. I was that man."
+      }
+    },
+    {
+      "xid": "SunYatSen", "cluster": 2, "engagement": 0.88,
+      "axes": { "techOptimism": 0.3, "regulationSupport": 0.4, "egalitarianism": 0.8, "humanPrimacy": 0.4 },
+      "freeform": {
+        "d2-democracy-05": "It must serve the meeting's three duties: that the people know, the people speak, and the people decide."
+      }
+    },
+    {
+      "xid": "FDR", "cluster": 2, "engagement": 0.95,
+      "axes": { "techOptimism": 0.3, "regulationSupport": 0.7, "egalitarianism": 0.8, "humanPrimacy": 0.4 },
+      "freeform": {
+        "d2-minds-05": "It must never be used to govern by fear. Freedom from fear was the promise; a machine that manufactures dread betrays it."
+      }
+    },
+    {
+      "xid": "RosaParks", "cluster": 2, "engagement": 0.89,
+      "axes": { "techOptimism": 0, "regulationSupport": 0.2, "egalitarianism": 0.9, "humanPrimacy": 0.6 },
+      "freeform": {
+        "d2-minds-05": "It must never be the thing that tells someone to give up their seat — to accept less than their due because refusal is inconvenient."
+      }
+    },
+    {
+      "xid": "MLK", "cluster": 2, "engagement": 0.95,
+      "axes": { "techOptimism": 0.2, "regulationSupport": 0.3, "egalitarianism": 0.95, "humanPrimacy": 0.7 },
+      "freeform": {
+        "d2-minds-05": "A machine must never decide that some lives count for less. The arc of its judgments must be audited toward justice."
+      }
+    },
+    {
+      "xid": "JFK", "cluster": 2, "engagement": 0.92,
+      "axes": { "techOptimism": 0.5, "regulationSupport": 0.4, "egalitarianism": 0.6, "humanPrimacy": 0.4 },
+      "freeform": {
+        "d2-education-05": "The willingness to choose hard things because they are hard. Ease is a poor curriculum."
+      }
+    },
+    { "xid": "LBJ", "cluster": 2, "engagement": 0.9, "axes": { "techOptimism": 0.3, "regulationSupport": 0.6, "egalitarianism": 0.7, "humanPrimacy": 0.4 } },
+    {
+      "xid": "Obama", "cluster": 2, "engagement": 0.96,
+      "axes": { "techOptimism": 0.5, "regulationSupport": 0.4, "egalitarianism": 0.7, "humanPrimacy": 0.3 },
+      "freeform": {
+        "d2-truth-05": "Independent audits, a track record in public, and the humility to say 'I don't know.' Same bar I'd set for any advisor.",
+        "d2-democracy-05": "Steelman before rebuttal: restate each speaker's point until they say 'yes, that's it' — then open the floor."
+      }
+    },
+    {
+      "xid": "Lincoln", "cluster": 2, "engagement": 0.95,
+      "axes": { "techOptimism": 0.3, "regulationSupport": 0.4, "egalitarianism": 0.8, "humanPrimacy": 0.6 },
+      "freeform": {
+        "d2-minds-05": "It must never own a man's labor or his choices. We settled that question at terrible cost; no algorithm reopens it.",
+        "d2-democracy-05": "It must let the quietest person in the hall finish their sentence. Government of the people begins there."
+      }
+    },
+    {
+      "xid": "Jefferson", "cluster": 2, "engagement": 0.94,
+      "axes": { "techOptimism": 0.5, "regulationSupport": -0.4, "egalitarianism": 0.8, "humanPrimacy": 0.5 },
+      "freeform": {
+        "d2-democracy-05": "Every citizen speaks before any speaks twice, and the machine keeps no memory of who ought to be ignored."
+      }
+    },
+    {
+      "xid": "JohnLocke", "cluster": 2, "engagement": 0.93,
+      "axes": { "techOptimism": 0.3, "regulationSupport": -0.2, "egalitarianism": 0.7, "humanPrimacy": 0.5 },
+      "freeform": {
+        "d2-truth-05": "That I may trace each claim back to some experience of the senses — its chain of evidence, unbroken."
+      }
+    },
+    {
+      "xid": "AlbertEinstein", "cluster": 2, "engagement": 0.96,
+      "axes": { "techOptimism": 0.4, "regulationSupport": 0.2, "egalitarianism": 0.8, "humanPrimacy": 0.3 },
+      "freeform": {
+        "d2-education-05": "Imagination. Knowledge the machines will have in abundance; the leap to what is not yet known is ours to keep."
+      }
+    }
+  ]
+}

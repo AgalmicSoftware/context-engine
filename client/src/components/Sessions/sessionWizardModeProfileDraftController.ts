@@ -91,6 +91,7 @@ export const applySessionModeProfileSelectionToDraft = <Draft extends SessionWiz
   delete next.telegramMode;
   delete next.sessionMode;
   delete next.telegramBridgeEnabled;
+  if (profile.surfaces?.agentHttp !== true) delete next.agentSessionWrapped;
   if (isRecord(next.telegram)) {
     delete next.telegram.only;
     delete next.telegram.mode;

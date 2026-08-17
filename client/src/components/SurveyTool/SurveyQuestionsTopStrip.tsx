@@ -51,11 +51,11 @@ const SurveyQuestionsTopStrip = React.forwardRef<HTMLDivElement, SurveyQuestions
     },
     ref,
   ): React.ReactElement => {
+    const isSingleQuestionView = !!routeViewDisplayState?.isSingleQuestionView;
     const showUserResponseNotice =
       !!userHasResponse &&
       !!routeViewDisplayState?.isOwnResponse &&
-      !routeViewDisplayState?.isSingleQuestionView &&
-      !!displayAnswerMode;
+      (isSingleQuestionView ? !isEditing : !!displayAnswerMode);
 
     return (
       <div ref={ref} className={layoutDisplayState?.topSectionClassName}>
@@ -70,6 +70,7 @@ const SurveyQuestionsTopStrip = React.forwardRef<HTMLDivElement, SurveyQuestions
           isDecrypting={isDecrypting}
           isEditing={isEditing}
           isSubmitting={isSubmitting}
+          isSingleQuestionView={isSingleQuestionView}
           onDecryptEdit={onDecryptEdit}
           onExitEditing={onExitEditing}
           onStartFresh={onStartFresh}

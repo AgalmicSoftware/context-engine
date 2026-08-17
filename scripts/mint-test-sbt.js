@@ -5,6 +5,9 @@ const { nowHumanTag } = require("./lib/common");
 const { normalizeRequiredMetadataUri } = require("./lib/arweave-metadata");
 const { resolveChainDefaults } = require("./lib/network-defaults");
 const { buildPasskeyDerivedWallet } = require("./lib/passkey-derived-wallet");
+const {
+  createGroupPasswordDerivation,
+} = require("../client/src/utilities/crypto/groupPasswordDerivation.cjs");
 
 const DEFAULT_PASSKEY_RAW_ID_B64URL = "AQIDBAUGBwgJCgsMDQ4PEA";
 const DEFAULT_GROUP_PASSWORD = "browserUse";
@@ -57,22 +60,7 @@ const normalizeGroupPasswordInput = (raw) => {
   return compact;
 };
 
-const computeGroupPasswordHash = (password) => {
-  const pwHash = ethers.utils.keccak256(
-    ethers.utils.toUtf8Bytes(password || ""),
-  );
-  const salt = ethers.utils.solidityKeccak256(
-    ["string"],
-    ["sbt-group-password-v2"],
-  );
-  const seed = ethers.utils.solidityKeccak256(
-    ["bytes32", "bytes32"],
-    [pwHash, salt],
-  );
-  const tmpSk = ethers.utils.keccak256(ethers.utils.arrayify(seed));
-  const tmpWallet = new ethers.Wallet(tmpSk);
-  return ethers.utils.solidityKeccak256(["address"], [tmpWallet.address]);
-};
+const { computeGroupPasswordHash } = createGroupPasswordDerivation(ethers);
 
 const parseCreatedAddress = (receipt) => {
   const iface = new ethers.utils.Interface(factoryAbi);
@@ -152,7 +140,10 @@ async function main() {
   const symbol =
     process.env.SBT_SYMBOL ||
     `BUSBT${String(beforeCount.toNumber() + 1).padStart(2, "0")}`;
-  const groupPasswordHash = computeGroupPasswordHash(groupPassword);
+  const groupPasswordHash = computeGroupPasswordHash({
+    password: groupPassword,
+    sbtAddress: "",
+  });
   const createArgs = [
     name,
     symbol,
@@ -180,6 +171,8 @@ async function main() {
     symbol,
     metadataUri: tokenURI,
     groupPasswordHash,
+    groupPasswordDerivation: "sbt-group-password-v3",
+    groupPasswordScope: "zero-address",
     estimatedGas: estimatedGas.toString(),
     gasLimit: gasLimit.toString(),
     gasPrice: gasPrice.toString(),

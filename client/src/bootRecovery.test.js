@@ -1,5 +1,7 @@
 import {
+  clearBootReloadMarker,
   clearBootCaches,
+  clearStaleChunkReloadMarker,
   isStaleChunkLoadError,
   reloadWithCacheBuster,
   recoverFromStaleChunkLoadError,
@@ -16,6 +18,57 @@ describe('bootRecovery', () => {
 
   afterEach(() => {
     jest.useRealTimers();
+  });
+
+  it('clears only the entry-module boot marker without dropping other recovery state', () => {
+    const replaceState = jest.fn();
+    const removeItem = jest.fn();
+    const historyState = { idx: 2, usr: { from: 'docs' } };
+    const fakeWindow = {
+      history: { replaceState, state: historyState },
+      location: {
+        href: 'https://contextengine.example.test/ce/docs?ceBootReload=123&ceChunkReload=456&session=alpha#guide',
+      },
+      sessionStorage: { clear: jest.fn(), removeItem },
+    };
+
+    expect(clearBootReloadMarker(fakeWindow)).toBe(true);
+    expect(replaceState).toHaveBeenCalledWith(historyState, '', '/ce/docs?ceChunkReload=456&session=alpha#guide');
+    expect(removeItem).not.toHaveBeenCalled();
+    expect(fakeWindow.sessionStorage.clear).not.toHaveBeenCalled();
+  });
+
+  it('clears stale-chunk recovery state only after a primary route commits', () => {
+    const replaceState = jest.fn();
+    const removeItem = jest.fn();
+    const historyState = { idx: 2 };
+    const fakeWindow = {
+      history: { replaceState, state: historyState },
+      location: {
+        href: 'https://contextengine.example.test/docs?ceBootReload=123&ceChunkReload=456&session=alpha#guide',
+      },
+      sessionStorage: { clear: jest.fn(), removeItem },
+    };
+
+    expect(clearStaleChunkReloadMarker(fakeWindow)).toBe(true);
+    expect(replaceState).toHaveBeenCalledWith(historyState, '', '/docs?ceBootReload=123&session=alpha#guide');
+    expect(removeItem).toHaveBeenCalledWith('ce:staleChunkReloadAttempted:v20260618b');
+    expect(fakeWindow.sessionStorage.clear).not.toHaveBeenCalled();
+  });
+
+  it('clears only the stale-chunk sentinel when its URL marker is absent', () => {
+    const replaceState = jest.fn();
+    const removeItem = jest.fn();
+    const fakeWindow = {
+      history: { replaceState },
+      location: { href: 'https://contextengine.example.test/docs?session=alpha' },
+      sessionStorage: { clear: jest.fn(), removeItem },
+    };
+
+    expect(clearStaleChunkReloadMarker(fakeWindow)).toBe(false);
+    expect(replaceState).not.toHaveBeenCalled();
+    expect(removeItem).toHaveBeenCalledWith('ce:staleChunkReloadAttempted:v20260618b');
+    expect(fakeWindow.sessionStorage.clear).not.toHaveBeenCalled();
   });
 
   it('renders a visible startup failure instead of leaving the root blank', async () => {
@@ -35,6 +88,10 @@ describe('bootRecovery', () => {
     expect(document.body).not.toHaveTextContent('stale app chunk');
     expect(document.querySelector('[role="alert"]')).not.toBeNull();
     expect(document.querySelector('[role="alert"]')).toHaveAttribute('data-boot-error', 'stale app chunk');
+    expect(document.querySelector('h1')).toHaveAttribute(
+      'style',
+      expect.stringContaining('color:var(--ce-panel-text,CanvasText)'),
+    );
     expect(document.querySelectorAll('button')).toHaveLength(1);
     expect(document.querySelector('button')).toHaveTextContent('Reload');
 
@@ -91,7 +148,7 @@ describe('bootRecovery', () => {
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
-  it('still auto-reloads the visible fallback when the boot reload URL marker is present', async () => {
+  it('stops automatic retries when the boot reload URL marker is already present', async () => {
     jest.useFakeTimers();
     const reload = jest.fn();
     const clearCaches = jest.fn().mockResolvedValue(undefined);
@@ -108,12 +165,14 @@ describe('bootRecovery', () => {
       reload,
     });
 
-    expect(document.body).toHaveTextContent('Reloading and clearing cached app data in 3s...');
+    expect(document.body).toHaveTextContent(
+      'Automatic reload paused after the previous attempt. Fix the startup issue, then select Reload.',
+    );
     jest.advanceTimersByTime(3000);
     await Promise.resolve();
 
-    expect(clearCaches).toHaveBeenCalledTimes(1);
-    expect(reload).toHaveBeenCalledTimes(1);
+    expect(clearCaches).not.toHaveBeenCalled();
+    expect(reload).not.toHaveBeenCalled();
   });
 
   it('returns false when there is no root node to recover into', () => {
@@ -193,6 +252,7 @@ describe('bootRecovery', () => {
     const reload = jest.fn();
     const storage = {
       getItem: jest.fn(() => 'true'),
+      removeItem: jest.fn(),
       setItem: jest.fn(),
     };
     const fakeWindow = {
@@ -211,6 +271,7 @@ describe('bootRecovery', () => {
     ).toBe(false);
 
     expect(storage.setItem).not.toHaveBeenCalled();
+    expect(storage.removeItem).not.toHaveBeenCalled();
     expect(reload).not.toHaveBeenCalled();
   });
 });

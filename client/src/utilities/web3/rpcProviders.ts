@@ -356,7 +356,7 @@ const warmSponsoredSessionRpcAccess = ({
   account?: string;
 } = {}): void => {
   Promise.resolve()
-    .then(() => import('./sponsoredAccessLazy.js'))
+    .then(() => import('./sponsoredAccess.js'))
     .then((mod) =>
       mod?.primeSponsoredAccessCheck?.({
         sessionConfig,

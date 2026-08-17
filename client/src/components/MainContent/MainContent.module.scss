@@ -5,7 +5,7 @@
 @media (min-width: 0px) and (max-width: 319px) {
   .mainTabsCard {
     min-height: 100%;
-    background: #00000000;
+    background: transparent;
   }
 
   #mainAreaTabs {
@@ -25,7 +25,7 @@
 @media (min-width: 320px) and (max-width: 465px) {
   .mainTabsCard {
     min-height: 100%;
-    background: #00000000;
+    background: transparent;
   }
 
   #mainAreaTabs {
@@ -45,7 +45,7 @@
 @media (min-width: 466px) and (max-width: 768px) {
   .mainTabsCard {
     min-height: 100%;
-    background: #00000000;
+    background: transparent;
     border-radius: var(--ce-radius-7);
     background: transparent;
   }
@@ -73,8 +73,8 @@
     border-radius: var(--ce-radius-7);
     background: var(--ce-color-bg);
     box-shadow:
-      -6px 6px 12px #0f102a,
-      6px -6px 12px #1f2258;
+      -6px 6px 12px var(--ce-shadow-neumorphic-dark),
+      6px -6px 12px var(--ce-shadow-neumorphic-light);
   }
 
   #mainAreaTabs {
@@ -113,8 +113,8 @@
     border-radius: var(--ce-radius-7);
     background: var(--ce-color-bg);
     box-shadow:
-      -6px 6px 12px #0f102a,
-      6px -6px 12px #1f2258;
+      -6px 6px 12px var(--ce-shadow-neumorphic-dark),
+      6px -6px 12px var(--ce-shadow-neumorphic-light);
   }
 
   #mainAreaTabs {
@@ -155,6 +155,10 @@
 }
 
 /* --- OnboardingWalkthrough --- */
+
+.welcomeArtworkStage {
+  background-image: var(--ce-welcome-artwork-backdrop);
+}
 
 @media (min-width: 0px) and (max-width: 319px) {
   .onboardingWalkthrough {
@@ -213,7 +217,7 @@
     text-transform: uppercase;
     font-weight: 600;
     font-size: 0.85em;
-    color: #ffffffcf;
+    color: color-mix(in srgb, var(--ce-text-inverse) 81%, transparent);
     border: none;
     background: var(--ce-color-black);
     justify-self: flex-end;
@@ -293,9 +297,9 @@
     text-transform: uppercase;
     font-weight: 600;
     font-size: 0.85em;
-    color: #000000a6;
+    color: color-mix(in srgb, var(--ce-compat-dark) 65%, transparent);
     border: none;
-    background: #07c0f929;
+    background: color-mix(in srgb, var(--ce-status-info) 16%, transparent);
     justify-self: flex-end;
     align-items: self-end;
     display: flex;
@@ -372,7 +376,7 @@
     text-transform: uppercase;
     font-weight: 600;
     font-size: 1.25em;
-    color: #ffffffcf;
+    color: color-mix(in srgb, var(--ce-text-inverse) 81%, transparent);
     border: none;
     background: var(--ce-color-black);
     justify-self: flex-end;
@@ -395,54 +399,42 @@
 
 @media (min-width: 769px) and (max-width: 1366px) {
   .onboardingWalkthrough {
+    --ce-main-welcome-frame-height: max(0px, min(600px, calc(100dvh - 400px)));
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
     padding-right: 0px;
     padding-left: 0px;
-    min-height: 600px;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .onboardingInfo {
+    flex: 1 1 auto;
     align-items: center;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .onboardingTitle {
     align-self: center;
     font-weight: 600;
-    color: #ffffff2e;
+    color: color-mix(in srgb, var(--ce-text-inverse) 18%, transparent);
     text-transform: uppercase;
     margin-bottom: 0px;
-    padding-top: 25px;
-    padding-bottom: 15px;
-    font-size: 3em;
+    padding: clamp(8px, 1.5dvh, 12px) 12px 6px;
+    font-size: clamp(1.75rem, 2.5vw, 2.25rem);
+    line-height: 1;
   }
 
   .onboardingControls {
     display: flex;
+    flex: 0 0 clamp(60px, 10dvh, 100px);
     flex-direction: row;
     justify-content: center;
     background: transparent;
-    min-height: 75px;
-  }
-
-  .takeSurveyButton {
-    height: 80px;
-    padding-top: 5px;
-    padding-bottom: 5px;
-    text-transform: uppercase;
-    font-weight: 600;
-    font-size: 1.75em;
-    color: #ffffffcf;
-    border: none;
-    background: var(--ce-color-black);
-    justify-self: flex-end;
-    align-items: self-end;
-    display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
-    justify-content: center;
-    align-items: center;
+    height: clamp(60px, 10dvh, 100px);
+    min-height: 0;
   }
 
   .openSidebarButton {
@@ -465,28 +457,26 @@
     display: inline-flex;
     margin-left: 5px;
     margin-right: 5px;
-    font-size: 55px;
+    font-size: clamp(28px, 4dvh, 36px);
   }
 
   .takeSurveyButton {
     width: 100%;
+    height: 100%;
     padding-top: 5px;
     padding-bottom: 5px;
     text-transform: uppercase;
     font-weight: 600;
     font-size: 1.35em;
-    color: #ffffffcf;
+    color: color-mix(in srgb, var(--ce-text-inverse) 81%, transparent);
     border: none;
     background: var(--ce-color-black);
     justify-self: flex-end;
-    align-items: self-end;
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
     justify-content: center;
     align-items: center;
-    flex-direction: column;
-    height: 100px;
   }
 
   #feedbackPromptText {
@@ -500,41 +490,54 @@
 
 @media (min-width: 1367px) {
   .onboardingWalkthrough {
-    // Regression guard: the intro artwork grows with deck width. Keep the shared
-    // frame width-driven or that slide will overflow while the others stay shorter.
-    --ce-main-welcome-frame-height: max(540px, 30vw);
+    // A bottom control strip leaves the complete slide visible on wide, short
+    // screens instead of reserving a third of the frame for a vertical rail.
+    --ce-main-welcome-frame-height: max(0px, min(max(380px, 30vw), calc(100dvh - 452px)));
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     padding-right: 0px;
     padding-left: 0px;
-    justify-content: center;
-    align-items: center;
+    justify-content: flex-end;
+    align-items: stretch;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .onboardingInfo {
+    flex: 1 1 auto;
     width: 100%;
-    align-items: flex-start;
-    justify-content: flex-end;
+    align-items: stretch;
+    justify-content: flex-start;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .onboardingTitleArea {
+    flex: 0 0 auto;
+    width: 100%;
+    min-height: 0;
   }
 
   .onboardingTitle {
     align-self: flex-start;
     font-weight: 600;
-    color: #ffffff2e;
+    color: color-mix(in srgb, var(--ce-text-inverse) 18%, transparent);
     text-transform: uppercase;
     margin-bottom: 0px;
-    padding-left: 35px;
-    padding-top: 35px;
-    font-size: 4.25em;
+    padding: clamp(10px, 1.5dvh, 16px) clamp(18px, 2vw, 32px) 6px;
+    font-size: clamp(1.75rem, 2.4vw, 3rem);
+    line-height: 1;
   }
 
   .onboardingWalkthrough .onboardingControls {
     display: grid;
-    grid-template-rows: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    flex: 0 0 clamp(56px, 8dvh, 72px);
     align-self: stretch;
     background: transparent;
-    width: 30%;
-    height: auto;
+    width: 100%;
+    height: clamp(56px, 8dvh, 72px);
+    min-height: 0;
 
     > .sidebarOpen,
     > .openSidebarButton,
@@ -544,11 +547,11 @@
   }
 
   .sidebarOpen {
-    height: auto;
+    height: 100%;
   }
 
   .openSidebarButton {
-    font-size: 1.75em;
+    font-size: 1.1em;
     border-style: solid;
     border-color: transparent;
     border-width: 0px;
@@ -571,7 +574,7 @@
     display: inline-flex;
     margin-left: 5px;
     margin-right: 5px;
-    font-size: 80px;
+    font-size: clamp(28px, 4dvh, 40px);
   }
 
   .takeSurveyButton {
@@ -581,14 +584,14 @@
     padding-bottom: 5px;
     text-transform: uppercase;
     font-weight: 600;
-    font-size: 1.75em;
+    font-size: 1.1em;
     border: none;
-    color: #487dec7a;
-    background: #000000a1;
+    color: color-mix(in srgb, var(--ce-compat-blue) 48%, transparent);
+    background: color-mix(in srgb, var(--ce-compat-dark) 63%, transparent);
     justify-self: flex-end;
     align-items: self-end;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     justify-content: center;
     align-items: center;
   }
@@ -610,7 +613,7 @@
   display: flex;
   align-content: center;
   height: var(--ce-main-welcome-frame-height, 100%);
-  background: #0a0a0c7d;
+  background: color-mix(in srgb, var(--ce-compat-dark) 49%, transparent);
 
   .onboardingTitleArea {
     display: flex;
@@ -622,7 +625,7 @@
 
   .onboardingTitle {
     font-weight: 700;
-    color: #ffffff8a;
+    color: color-mix(in srgb, var(--ce-text-inverse) 54%, transparent);
     text-transform: uppercase;
     margin-bottom: 0px;
   }
@@ -645,20 +648,240 @@
     cursor: pointer;
     text-transform: uppercase;
     font-weight: 600;
-    background: #00000082;
-    border: #00000000 solid 1px;
-    color: #8b909294;
+    background: color-mix(in srgb, var(--ce-compat-dark) 51%, transparent);
+    border: transparent solid 1px;
+    color: color-mix(in srgb, var(--ce-text-muted) 58%, transparent);
     filter: opacity(0.3);
   }
 }
 
 .takeSurveyButton {
-  color: #000000a6;
+  color: color-mix(in srgb, var(--ce-compat-dark) 65%, transparent);
   border: none;
-  background: #07c0f929;
+  background: color-mix(in srgb, var(--ce-status-info) 16%, transparent);
 }
 
 #typeformEmbed {
   height: 0;
   width: 0;
+}
+
+/* Classic 95 turns the home card into a compact desktop window. The inactive
+ * tabs remain usable as title-bar controls, while the active tab becomes the
+ * window title. */
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  .mainAreaTabsAlt,
+  #mainAreaTabs {
+    flex: 0 1 1080px;
+    width: min(1080px, calc(100% - 32px));
+    max-width: 1080px;
+    min-height: 0;
+    // Keep a small visual break below the app header without spending a large
+    // part of compact viewports on empty desktop space.
+    margin: clamp(12px, 2.5vh, 24px) auto 16px;
+  }
+
+  .mainTabsCard {
+    min-height: 0;
+    // SurveyTool owns viewport-sticky controls; clipping this ancestor turns
+    // the whole window into their scroll container and prevents them sticking.
+    overflow: visible;
+    border: 3px solid;
+    border-color: var(--ce-border-raised);
+    background: var(--ce-surface-raised);
+    box-shadow: 2px 2px 0 var(--ce-edge-dark);
+  }
+
+  .mainTabsCardHeader {
+    min-height: 34px;
+    padding: 3px;
+    border: 0;
+    background: var(--ce-titlebar-bg);
+  }
+
+  .mainTabsCardHeader :global(.nav-tabs) {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    align-items: center;
+    gap: 3px;
+    min-height: 28px;
+    margin: 0;
+    border: 0;
+  }
+
+  .mainTabsCardHeader :global(.nav-item) {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .mainTabsCardHeader :global(.nav-link) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    min-width: 28px;
+    height: 26px;
+    min-height: 26px;
+    margin: 0 auto;
+    padding: 2px;
+    border: 2px solid;
+    border-color: var(--ce-border-raised);
+    background: var(--ce-control-face);
+    box-shadow: var(--ce-shadow-raised);
+    color: var(--ce-control-text);
+    cursor: pointer;
+  }
+
+  .mainTabsCardHeader :global(.nav-link:not(.active)) {
+    width: 40px;
+    min-width: 40px;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    color: var(--ce-titlebar-text);
+  }
+
+  .mainTabsCardHeader :global(.nav-link:not(.active):hover) {
+    background: color-mix(in srgb, var(--ce-titlebar-text) 14%, transparent);
+  }
+
+  .mainTabsCardHeader :global(.nav-link:not(.active):focus-visible) {
+    outline: 1px dotted var(--ce-titlebar-text);
+    outline-offset: -2px;
+    background: color-mix(in srgb, var(--ce-titlebar-text) 14%, transparent);
+  }
+
+  .mainTabsCardHeader :global(.nav-link) .navTabIcon {
+    top: auto;
+    width: clamp(1.25rem, 2.4vw, 1.5rem);
+    height: clamp(1.25rem, 2.4vw, 1.5rem);
+    font-size: clamp(1.25rem, 2.4vw, 1.5rem);
+    margin-right: 0 !important;
+  }
+
+  .mainTabsCardHeader :global(.nav-link > div) {
+    display: none;
+  }
+
+  .mainTabsCardHeader :global(.nav-link.active) {
+    justify-content: center;
+    width: 100%;
+    margin: 0;
+    padding: 2px 8px;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    color: var(--ce-titlebar-text);
+    font-family: var(--ce-font-ui);
+    // The legacy global tab rules enlarge the active title at mobile widths.
+    // Keep every Classic 95 window title inside its equal-width grid cell.
+    font-size: clamp(0.75rem, 2.8vw, 1rem);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
+  .mainTabsCardHeader :global(.nav-link.active > div) {
+    display: block;
+    max-width: 100%;
+    font-size: inherit !important;
+    line-height: 1;
+    white-space: nowrap;
+    text-transform: uppercase;
+  }
+
+  .mainTabsCardHeader :global(.nav-link.active) .navTabIcon {
+    display: none;
+  }
+
+  .mainAreaCardBody {
+    min-height: 360px;
+    padding: 22px;
+    border-top: 1px solid var(--ce-edge-shadow);
+    background: var(--ce-surface-raised);
+  }
+}
+
+/* Welcome decks keep their title bar and arrow strip in one stable position
+ * while the artwork and copy resize inside the remaining pane. */
+@container ce-theme style(--ce-welcome-slide-mode: fixed-window) {
+  .onboardingWalkthrough {
+    --ce-welcome-frame-height: var(--ce-main-welcome-frame-height, clamp(525px, 118vw, 600px));
+    --ce-welcome-controls-height: clamp(56px, 9dvh, 75px);
+    box-sizing: border-box;
+    height: var(--ce-welcome-frame-height);
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .onboardingInfo {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .onboardingControls {
+    flex: 0 0 var(--ce-welcome-controls-height);
+    width: 100%;
+    height: var(--ce-welcome-controls-height);
+    min-height: var(--ce-welcome-controls-height);
+  }
+
+  .onboardingControls > .sidebarOpen,
+  .onboardingControls > .openSidebarButton,
+  .onboardingControls > .takeSurveyButton {
+    height: 100%;
+    min-height: 0;
+  }
+}
+
+/* The desktop-window profile keeps its compact mobile window inside the
+ * viewport; the standard app keeps the taller legacy slide canvas. */
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  .onboardingWalkthrough {
+    --ce-welcome-frame-height: var(--ce-main-welcome-frame-height, clamp(340px, 48dvh, 440px));
+  }
+
+  .onboardingControls .takeSurveyIcon {
+    color: var(--ce-text-inverse);
+    opacity: 1;
+  }
+
+  .onboardingControls > .getStartedButton {
+    appearance: none;
+    background: var(--ce-control-face);
+    border: 2px solid;
+    border-color: var(--ce-border-raised);
+    color: var(--ce-control-text);
+    box-shadow: var(--ce-shadow-raised);
+    filter: none !important;
+    opacity: 1;
+    text-shadow: none;
+  }
+}
+
+@media (max-width: 768px) {
+  @container ce-theme style(--ce-welcome-slide-mode: fixed-window) {
+    .mainAreaTabsAlt,
+    #mainAreaTabs {
+      flex-basis: auto;
+    }
+  }
+}
+
+@media (max-width: 640px) {
+  @container ce-theme style(--ce-layout-profile: desktop-window) {
+    .mainAreaTabsAlt,
+    #mainAreaTabs {
+      width: calc(100% - 12px);
+      margin: 10px auto 14px;
+    }
+
+    .mainAreaCardBody {
+      min-height: 0;
+      padding: 10px;
+    }
+  }
 }

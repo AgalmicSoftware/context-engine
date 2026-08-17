@@ -55,39 +55,102 @@ function writeInventoryFixture(rootDir, overrides = {}) {
     },
   });
 
-  writeJson(rootDir, 'package.json', {
+  const packageFixture = {
     scripts: {
+      'test:contracts': 'SurveysTest CustomSBTTest SessionRegistryTest SurveysFuzzTest CustomSBTFuzzTest SessionRegistryFuzzTest CustomSBTInvariantTest',
+      'test:node': 'node scripts/run-node-tests.js',
+      'test:node:tracked': 'node scripts/run-node-tests.js --tracked-only',
       'test:root:jest': `cd client && npm test -- --watchAll=false --runInBand --testMatch ${
         ROOT_JEST_TEST_FILES.map((relativePath) => `'<rootDir>/${path.join('..', relativePath)}'`).join(' ')
       }`,
       'test:worker:session-cors': 'npm --prefix workers/sessionCorsWorker test',
+      'test:worker:agent-bridge': 'node scripts/run-agent-bridge-worker-tests.js',
+      'test:e2e': 'npm run -s test:e2e:smoke',
+      'test:e2e:quick': 'npm run -s test:e2e:smoke',
+      'test:e2e:smoke': 'npm run -s ai:test-nav:smoke',
+      'ai:test-nav:smoke': 'node scripts/vite-navigation-smoke.js',
+      'test:client': 'npm --prefix client run test:coverage:full-universe',
+      'test:release:client': 'cd client && npm test -- --watchAll=false --runInBand',
+      'test:cache-guard': 'bash ./scripts/check-managed-cache-localstorage.sh',
       'typecheck:client-tests': 'node scripts/check-client-test-types.mjs',
+      'coverage-floor:check': 'node scripts/check-client-coverage-floors.mjs',
       'ci:gate': 'node scripts/run-ci-gates.mjs --gate',
       'test:ci': 'node scripts/run-ci-gates.mjs --profile ci',
-      'test:node': 'node scripts/run-node-tests.js',
+      'test:wiring': 'node scripts/verify-test-wiring.js && node scripts/verify-test-inventory.js',
+      tests: 'npm run test:ci',
     },
-    ...(overrides.packageJson || {}),
+  };
+  const packageOverrides = overrides.packageJson || {};
+  writeJson(rootDir, 'package.json', {
+    ...packageFixture,
+    ...packageOverrides,
+    scripts: {
+      ...packageFixture.scripts,
+      ...(packageOverrides.scripts || {}),
+    },
   });
   writeJson(rootDir, 'scripts/ci-gates.json', {
     schemaVersion: 1,
     profiles: {
-      ci: ['root-jest', 'workers'],
+      ci: ['wiring-and-release', 'contracts', 'client', 'root-jest', 'workers', 'cecc-and-node'],
+      hosted: ['wiring-and-release', 'contracts', 'client', 'root-jest', 'workers', 'e2e-smoke', 'cecc-and-node'],
     },
     gates: {
+      contracts: {
+        commands: [{ label: 'contracts', command: 'npm', args: ['run', 'test:contracts'] }],
+      },
+      client: {
+        commands: [
+          { label: 'client', command: 'npm', args: ['run', 'test:client'] },
+          { label: 'coverage', command: 'npm', args: ['run', 'coverage-floor:check'] },
+        ],
+      },
       'root-jest': {
         commands: [{ label: 'root', command: 'npm', args: ['run', 'test:root:jest'] }],
       },
       workers: {
-        commands: [{ label: 'worker', command: 'npm', args: ['run', 'test:worker:session-cors'] }],
+        commands: [
+          { label: 'worker', command: 'npm', args: ['run', 'test:worker:session-cors'] },
+          { label: 'agent', command: 'npm', args: ['run', 'test:worker:agent-bridge'] },
+        ],
       },
       'wiring-and-release': {
-        commands: [{ label: 'types', command: 'npm', args: ['run', 'typecheck:client-tests'] }],
+        commands: [
+          { label: 'wiring', command: 'npm', args: ['run', 'test:wiring'] },
+          { label: 'types', command: 'npm', args: ['run', 'typecheck:client-tests'] },
+        ],
+      },
+      'e2e-smoke': {
+        commands: [{ label: 'e2e', command: 'npm', args: ['run', 'test:e2e:smoke'] }],
+      },
+      'cecc-and-node': {
+        commands: [
+          { label: 'node', command: 'npm', args: ['run', 'test:node:tracked'] },
+          { label: 'cache', command: 'npm', args: ['run', 'test:cache-guard'] },
+        ],
       },
       release: {
-        commands: [{ label: 'types', command: 'npm', args: ['run', 'typecheck:client-tests'] }],
+        commands: [
+          { label: 'types', command: 'npm', args: ['run', 'typecheck:client-tests'] },
+          { label: 'node', command: 'npm', args: ['run', 'test:node:tracked'] },
+          { label: 'client', command: 'npm', args: ['run', 'test:release:client'] },
+        ],
       },
     },
   });
+  writeFile(rootDir, '.github/workflows/ci.yml', [
+    'run: npm run ci:gate -- contracts',
+    'run: npm run ci:gate -- client',
+    'run: npm run ci:gate -- root-jest',
+    'run: npm run ci:gate -- workers',
+    'npm run ci:gate -- e2e-smoke',
+    'run: npm run ci:gate -- cecc-and-node',
+    '  test:',
+    'needs:',
+    'if: ${{ always() }}',
+    'CI_GATE_RESULTS_JSON:',
+    'run: npm run ci:gates:check-hosted',
+  ].join('\n'));
 }
 
 test('repo test inventory invariants hold', () => {
@@ -127,20 +190,38 @@ test('verifyTestInventory flags recursively nested unclassified root tests', () 
   });
 });
 
+test('verifyTestInventory owns canonical test runner and CI-gate reachability', () => {
+  withTempRepo((rootDir) => {
+    writeInventoryFixture(rootDir);
+    const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
+    delete pkg.scripts['test:worker:agent-bridge'];
+    writeJson(rootDir, 'package.json', pkg);
+
+    const manifest = JSON.parse(fs.readFileSync(path.join(rootDir, 'scripts/ci-gates.json'), 'utf8'));
+    manifest.profiles.ci = manifest.profiles.ci.filter((gateName) => gateName !== 'client');
+    manifest.gates.workers.commands = manifest.gates.workers.commands
+      .filter((entry) => entry.args.join(' ') !== 'run test:worker:agent-bridge');
+    writeJson(rootDir, 'scripts/ci-gates.json', manifest);
+    writeFile(rootDir, '.github/workflows/ci.yml', fs.readFileSync(
+      path.join(rootDir, '.github/workflows/ci.yml'),
+      'utf8',
+    ).replace('run: npm run ci:gates:check-hosted', 'run: true'));
+
+    assert.deepEqual(verifyTestInventory(rootDir), [
+      'package.json missing scripts.test:worker:agent-bridge',
+      'scripts/ci-gates.json profile "ci" must include "client"',
+      'scripts/ci-gates.json gate "workers" must run test:worker:agent-bridge',
+      '.github/workflows/ci.yml must include the manifest-backed aggregate checker',
+    ]);
+  });
+});
+
 test('verifyTestInventory rejects root scripts that expose non-public worker paths', () => {
   withTempRepo((rootDir) => {
     writeInventoryFixture(rootDir, {
       packageJson: {
         scripts: {
-          'test:root:jest': `cd client && npm test -- --watchAll=false --runInBand --testMatch ${
-            ROOT_JEST_TEST_FILES.map((relativePath) => `'<rootDir>/${path.join('..', relativePath)}'`).join(' ')
-          }`,
-          'test:worker:session-cors': 'npm --prefix workers/sessionCorsWorker test',
-          'typecheck:client-tests': 'node scripts/check-client-test-types.mjs',
           'test:private-worker': 'node --test workers/privateWorker/*.test.mjs',
-          'ci:gate': 'node scripts/run-ci-gates.mjs --gate',
-          'test:ci': 'node scripts/run-ci-gates.mjs --profile ci',
-          'test:node': 'node scripts/run-node-tests.js',
         },
       },
     });

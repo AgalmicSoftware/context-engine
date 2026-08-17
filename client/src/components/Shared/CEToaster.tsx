@@ -27,10 +27,10 @@ const POSITION_STYLES: Record<ToastPosition, React.CSSProperties> = Object.freez
 });
 
 const KIND_ACCENTS: Record<string, string> = Object.freeze({
-  success: '#2ecf98',
-  error: '#ff7b7b',
-  warn: '#ffbe5c',
-  info: '#6ea8ff',
+  success: 'var(--ce-status-success)',
+  error: 'var(--ce-status-error)',
+  warn: 'var(--ce-status-warning)',
+  info: 'var(--ce-status-info)',
 });
 
 const KIND_ICONS: Record<string, React.ReactNode> = Object.freeze({
@@ -55,7 +55,7 @@ const buildToastStyle = (kind: string, baseStyle: React.CSSProperties = {}): Rea
   pointerEvents: 'auto',
   borderRadius: 12,
   padding: '12px 14px',
-  boxShadow: '0 12px 28px rgba(0, 0, 0, 0.28)',
+  boxShadow: 'var(--ce-shadow-raised)',
   borderLeft: `4px solid ${KIND_ACCENTS[kind] || KIND_ACCENTS.info}`,
   fontSize: '0.95rem',
   lineHeight: 1.45,

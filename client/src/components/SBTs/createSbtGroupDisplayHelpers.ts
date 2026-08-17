@@ -108,7 +108,7 @@ export const resolveCreateSbtActionIconStyle = (): Record<string, string> => ({
 });
 
 export const resolveCreateSbtFailureIconStyle = (): Record<string, string> => ({
-  color: 'red',
+  color: 'var(--ce-status-danger-text)',
 });
 
 export const resolveCreateSbtShareableTooltipIconStyle = (): Record<string, string | number> => ({

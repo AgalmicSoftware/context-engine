@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import ContractsSection from './ContractsSection';
 import type { ContractsSectionProps } from './ContractsSection';
-import { getSessionWizardContractRowTestId } from '../ContractPage/contractMetadata.js';
+import { getSessionWizardContractRowTestId } from '../DocsPage/contractMetadata.js';
 
 const contracts = {
   surveys: { address: '0x111' },

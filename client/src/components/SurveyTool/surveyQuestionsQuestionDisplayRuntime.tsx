@@ -1,4 +1,5 @@
 import type { SurveyQuestionsLegacyRecord, SurveyQuestionsLegacyValue } from './surveyQuestionsTypes.js';
+import { resolveStableSurveyAudioWorkerProps } from './surveyToolRuntimeSupport';
 
 export type SurveyQuestionsQuestionDisplayRuntime = SurveyQuestionsLegacyRecord;
 
@@ -102,7 +103,12 @@ export const createSurveyQuestionsQuestionDisplayRuntime = (
     if (inst._a) {
       return inst._a;
     }
-    inst._a = getAudioInputWorkerProps();
+
+    inst._audioInputWorkerPropsMemo = resolveStableSurveyAudioWorkerProps(
+      inst._audioInputWorkerPropsMemo,
+      getAudioInputWorkerProps(),
+    );
+    inst._a = inst._audioInputWorkerPropsMemo.value;
     return inst._a;
   };
 

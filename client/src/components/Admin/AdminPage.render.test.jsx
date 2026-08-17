@@ -19,6 +19,7 @@ const AGENT_SESSION_WRAPPED_CAPABILITY = {
 
 const buildSessionConfig = (overrides = {}) => ({
   slug: 'edge',
+  sessionId: '0x55555555555555555555555555555555',
   sessionName: 'Edge Session',
   corsWorkerUrl: 'https://worker.example.test',
   networkChainId: 84532,
@@ -346,13 +347,21 @@ describe('AdminPage rendered interactions', () => {
   });
 
   it('labels Worker groups as a separate agent authorization domain for an enabled Wrapped registry session', async () => {
+    const sessionId = '0x1234567890abcdef1234567890abcdef';
     const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
     sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
     sessionModeProfile.surfaces.agentHttp = true;
+    global.fetch = jest.fn(async (url) => ({
+      ok: true,
+      status: 200,
+      json: async () =>
+        String(url).endsWith('/admin/groups/list') ? { sessionId, sessionSlug: 'edge', groups: [] } : { ok: true },
+    }));
     sessionEntries = [
       [
         'edge',
         buildSessionConfig({
+          sessionId,
           sessionModeProfile,
           agentSessionWrapped: AGENT_SESSION_WRAPPED_CAPABILITY,
         }),
@@ -364,6 +373,17 @@ describe('AdminPage rendered interactions', () => {
     const workerGroupsPanel = await screen.findByTestId('ce-admin-worker-groups');
     expect(workerGroupsPanel).toHaveTextContent(/Worker\/agent access groups/i);
     expect(workerGroupsPanel).toHaveTextContent(/separate from registry SBT Groups/i);
+
+    await clickAndSettle(within(workerGroupsPanel).getByRole('button', { name: 'Refresh' }));
+    await waitFor(() => {
+      expect(mockBuildSignedAdminActionAuth).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'groups/list',
+          body: { sessionId },
+          sessionAuthorityMode: 'evm_registry_canonical',
+        }),
+      );
+    });
   });
 
   it('rebinds worker actions across route-only worker session navigation A to B to A', async () => {
@@ -703,6 +723,7 @@ describe('AdminPage rendered interactions', () => {
       message: 'rendered-byte-exact-siwe-message',
       signature: '0xrendered-siwe-signature',
       sessionSlug: 'edge',
+      sessionId: '0x55555555555555555555555555555555',
     });
     expect(mockBuildSiweMessage).toHaveBeenCalledWith({
       address: ADMIN_ADDRESS,

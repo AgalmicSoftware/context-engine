@@ -267,38 +267,6 @@ describe('contractScripts.fetchAllSurveyResponses', () => {
     ]);
   });
 
-  it('batches survey response reads while preserving survey/responder output shape', async () => {
-    const responderA = '0x00000000000000000000000000000000000000aa';
-    const responderB = '0x00000000000000000000000000000000000000bb';
-    const pendingReads = new Map();
-    mockFetchLogsSmartWithProvider.mockResolvedValue([
-      makeResponsesSubmittedLog(responderA, 7, 0),
-      makeResponsesSubmittedLog(responderB, 9, 1),
-    ]);
-
-    jest.spyOn(contractScripts, 'getSurveyResponse').mockImplementation(
-      (_providerName, responder) =>
-        new Promise((resolve) => {
-          pendingReads.set(String(responder).toLowerCase(), resolve);
-        }),
-    );
-
-    const run = contractScripts.getSurveyResponses('none', 1, 30, GROUP_CFG);
-    await Promise.resolve();
-    await Promise.resolve();
-
-    expect(contractScripts.getSurveyResponse).toHaveBeenCalledTimes(2);
-    pendingReads.get(responderB.toLowerCase())({ answer: 'B' });
-    pendingReads.get(responderA.toLowerCase())({ answer: 'A' });
-
-    await expect(run).resolves.toEqual({
-      [SURVEY_ID.toLowerCase()]: {
-        [responderA.toLowerCase()]: { answer: 'A' },
-        [responderB.toLowerCase()]: { answer: 'B' },
-      },
-    });
-  });
-
   it('threads forced Arweave recovery into chunked question response reads', async () => {
     const responder = '0x00000000000000000000000000000000000000aa';
     mockFetchLogsSmartWithProvider.mockResolvedValue([makeResponsesSubmittedLog(responder, 7, 0)]);

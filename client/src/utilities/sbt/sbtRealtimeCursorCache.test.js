@@ -16,6 +16,7 @@ describe('updateSbtRealtimeCursorForNetworkCache', () => {
       transactionIndex: 2,
       logIndex: 3,
     });
+    expect(networkCache.recentRealtimeEventCursors).toEqual([{ blockNumber: 10, transactionIndex: 2, logIndex: 3 }]);
   });
 
   it('updates the cache when the incoming cursor is newer', () => {
@@ -41,7 +42,7 @@ describe('updateSbtRealtimeCursorForNetworkCache', () => {
     });
   });
 
-  it('keeps the cache unchanged when the incoming cursor is stale', () => {
+  it('records a distinct older cursor without moving the high-water cursor backward', () => {
     const previous = {
       blockNumber: 10,
       transactionIndex: 2,
@@ -57,8 +58,20 @@ describe('updateSbtRealtimeCursorForNetworkCache', () => {
         transactionIndex: 2,
         logIndex: 2,
       }),
-    ).toBe(false);
+    ).toBe(true);
     expect(networkCache.lastRealtimeEventCursor).toBe(previous);
+    expect(networkCache.recentRealtimeEventCursors).toEqual([{ blockNumber: 10, transactionIndex: 2, logIndex: 2 }]);
+  });
+
+  it('rejects an exact duplicate from the recent cursor window', () => {
+    const cursor = { blockNumber: 10, transactionIndex: 2, logIndex: 2 };
+    const networkCache = {
+      lastRealtimeEventCursor: { blockNumber: 11, transactionIndex: 0, logIndex: 0 },
+      recentRealtimeEventCursors: [cursor],
+    };
+
+    expect(updateSbtRealtimeCursorForNetworkCache(networkCache, cursor)).toBe(false);
+    expect(networkCache.recentRealtimeEventCursors).toEqual([cursor]);
   });
 
   it('ignores invalid cursors', () => {

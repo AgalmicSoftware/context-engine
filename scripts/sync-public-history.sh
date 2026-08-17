@@ -7,6 +7,7 @@ export LANG=C
 PUBLIC_GIT_NAME="Agalmic"
 PUBLIC_GIT_EMAIL="agalmicsoftware@protonmail.com"
 DEFAULT_BRANCH_NAME="release-staging"
+ZERO_OID="0000000000000000000000000000000000000000"
 
 usage() {
   cat <<'EOF'
@@ -22,7 +23,8 @@ Options:
   --source-base <rev>
                Replay commits after this source revision instead of origin/main
   --target-base <rev>
-               Start the public target branch from this revision instead of origin/main
+               Start from a revision already in public main or in the fetched
+               public target branch after main
   --allow-diverged-source
                Allow a source branch that does not contain origin/main by
                replaying patch-new non-merge commits from git cherry
@@ -106,6 +108,7 @@ TARGET_BRANCH="$DEFAULT_BRANCH_NAME"
 SOURCE_BRANCH="dev"
 SOURCE_BASE_REF=""
 TARGET_BASE_REF=""
+TARGET_BASE_SHA=""
 DRY_RUN=0
 AUTO_PUSH=0
 EXPLICIT_FORCE_WITH_LEASE=0
@@ -117,7 +120,7 @@ REPLAYED_COUNT=0
 SKIPPED_COUNT=0
 LATEST_REPLAYED_SOURCE_COMMIT=""
 REMOTE_BRANCH_EXISTS=0
-REMOTE_BRANCH_SHA=""
+REMOTE_BRANCH_SHA="$ZERO_OID"
 RELEASE_VERSION=""
 RELEASE_IMPACT=""
 RELEASE_CHANGED_PATHS_FILE=""
@@ -251,6 +254,14 @@ for (const [pattern, replacement] of replacements) {
   message = message.replace(pattern, replacement);
 }
 
+// Replay commits have one canonical public author/committer. Historical
+// identity trailers can otherwise re-publish private contributor addresses
+// even after the Git identity itself has been rewritten.
+message = message.replace(
+  /^(?:co-authored-by|signed-off-by|reviewed-by|acked-by|tested-by|reported-by|suggested-by|helped-by):[^\r\n]*<[^>\r\n]*@[^>\r\n]*>\r?\n?/gim,
+  '',
+);
+
 fs.writeFileSync(messagePath, message);
 NODE
 }
@@ -260,16 +271,20 @@ ensure_public_replay_message() {
   local subject="$2"
   local message_file="$3"
   local token
+  local had_private_token=0
 
   if token=$(private_replay_message_token "$message_file"); then
-    if [ "$SANITIZE_PRIVATE_REPLAY_MESSAGES" -eq 1 ]; then
-      sanitize_private_replay_message "$message_file"
-      if ! token=$(private_replay_message_token "$message_file"); then
-        log_info "Sanitized private replay message tokens for $commit_sha | $subject"
-        return 0
-      fi
-    fi
+    had_private_token=1
+  fi
 
+  if [ "$SANITIZE_PRIVATE_REPLAY_MESSAGES" -eq 1 ]; then
+    sanitize_private_replay_message "$message_file"
+    if [ "$had_private_token" -eq 1 ] && ! token=$(private_replay_message_token "$message_file"); then
+      log_info "Sanitized private replay message tokens for $commit_sha | $subject"
+    fi
+  fi
+
+  if token=$(private_replay_message_token "$message_file"); then
     log_error "Refusing to replay $commit_sha | $subject"
     log_error "Commit message mentions private release token: $token"
     log_error "Split the private-only changes into a stripped commit or rewrite the replayed public commit message."
@@ -358,6 +373,7 @@ strip_private_paths_from_clone() {
   local commit_sha="$1"
   local pattern
   local matches=()
+  local changed_paths_file="$TMP_ROOT/public-replay-changed-paths.bin"
 
   (
     cd "$TEMP_CLONE"
@@ -382,6 +398,15 @@ strip_private_paths_from_clone() {
       "$REPO_ROOT/scripts/scrub-public-package-json.js" \
       "$TEMP_CLONE/package.json" \
       "$TMP_ROOT/public-package-source.json"
+
+    # The canonical artifact redacts non-public emails and local home paths.
+    # Apply the same transformation to each changed replay delta so no
+    # intermediate public commit exposes text that the final artifact removes.
+    git diff --cached --name-only -z > "$changed_paths_file"
+    node \
+      "$REPO_ROOT/scripts/scrub-public-pii-text.mjs" \
+      "$TEMP_CLONE" \
+      --paths-file "$changed_paths_file"
 
     git add -A
   )
@@ -472,6 +497,12 @@ resolve_private_cherry_pick_conflicts() {
 resolve_theirs_cherry_pick_conflicts() {
   local path
   local found_conflict=0
+  local conflict_paths_file="$TMP_ROOT/cherry-pick-conflict-paths.txt"
+
+  # Materialize the producer before mutating the index. Streaming `git diff`
+  # through process substitution can leave its index refresh alive long enough
+  # for the first `git rm` in a large conflict set to lose an index.lock race.
+  git -C "$TEMP_CLONE" diff --name-only --diff-filter=U > "$conflict_paths_file"
 
   while IFS= read -r path; do
     [ -n "$path" ] || continue
@@ -480,7 +511,7 @@ resolve_theirs_cherry_pick_conflicts() {
     if git -C "$TEMP_CLONE" ls-files -u -- "$path" | grep -q .; then
       git -C "$TEMP_CLONE" rm -f -- "$path" >/dev/null 2>&1 || return 1
     fi
-  done < <(git -C "$TEMP_CLONE" diff --name-only --diff-filter=U)
+  done < "$conflict_paths_file"
 
   if [ "$found_conflict" -ne 1 ]; then
     return 1
@@ -574,6 +605,41 @@ verify_public_text() {
 
   log_info "Verifying retained public text for private references."
   node "$verifier" "$TEMP_CLONE" >&2
+}
+
+verify_public_replay_pii() {
+  local commit_sha="$1"
+  local message_file="$2"
+  local verifier="$REPO_ROOT/scripts/verify-public-release-pii.sh"
+  local surface_root="$TMP_ROOT/public-replay-delta"
+  local relative_path
+  local relative_dir
+  local scan_status=0
+
+  if [ ! -f "$verifier" ]; then
+    fail "Public replay PII verifier was not found: scripts/verify-public-release-pii.sh" 2
+  fi
+
+  rm -rf "$surface_root"
+  mkdir -p "$surface_root"
+  while IFS= read -r -d '' relative_path; do
+    if [ ! -f "$TEMP_CLONE/$relative_path" ] && [ ! -L "$TEMP_CLONE/$relative_path" ]; then
+      continue
+    fi
+    relative_dir="${relative_path%/*}"
+    if [ "$relative_dir" != "$relative_path" ]; then
+      mkdir -p "$surface_root/$relative_dir"
+    fi
+    cp -P "$TEMP_CLONE/$relative_path" "$surface_root/$relative_path"
+  done < <(git -C "$TEMP_CLONE" diff --cached --no-renames --diff-filter=ACMT --name-only -z)
+  cp "$message_file" "$surface_root/commit-message.txt"
+
+  # Scan every retained replay delta before its commit is created. A credential
+  # added and deleted by later commits must never become reachable publicly.
+  log_info "Scanning public replay commit for PII/secrets: $commit_sha"
+  bash "$verifier" "$surface_root" >&2 || scan_status=$?
+  rm -rf "$surface_root"
+  return "$scan_status"
 }
 
 verify_agent_bridge_public_replay_pii() {
@@ -724,9 +790,9 @@ collect_source_release_evidence() {
 }
 
 collect_replayed_release_evidence() {
-  git -C "$TEMP_CLONE" diff --name-only "$TARGET_BASE..$TARGET_BRANCH" \
+  git -C "$TEMP_CLONE" diff --name-only "$TARGET_BASE_SHA..$TARGET_BRANCH" \
     | sort -u > "$RELEASE_CHANGED_PATHS_FILE"
-  git -C "$TEMP_CLONE" log --format='%s' "$TARGET_BASE..$TARGET_BRANCH" \
+  git -C "$TEMP_CLONE" log --format='%s' "$TARGET_BASE_SHA..$TARGET_BRANCH" \
     > "$RELEASE_SUBJECTS_FILE"
 }
 
@@ -942,7 +1008,7 @@ if ! git -C "$REPO_ROOT" rev-parse --verify --quiet "$SOURCE_BASE^{commit}" >/de
   fail "Source base revision was not found: $SOURCE_BASE" 1
 fi
 
-if ! git -C "$REPO_ROOT" rev-parse --verify --quiet "$TARGET_BASE^{commit}" >/dev/null; then
+if ! TARGET_BASE_SHA=$(git -C "$REPO_ROOT" rev-parse --verify --quiet "$TARGET_BASE^{commit}"); then
   fail "Target base revision was not found: $TARGET_BASE" 1
 fi
 
@@ -1024,7 +1090,19 @@ if git -C "$TEMP_CLONE" ls-remote --exit-code --heads origin "$TARGET_BRANCH" >/
     "refs/heads/$TARGET_BRANCH:refs/remotes/origin/$TARGET_BRANCH"
 fi
 
-git -C "$TEMP_CLONE" checkout --quiet -B "$TARGET_BRANCH" "$TARGET_BASE"
+TARGET_BASE_IS_PUBLIC=0
+if git -C "$TEMP_CLONE" merge-base --is-ancestor "$TARGET_BASE_SHA" origin/main >/dev/null 2>&1; then
+  TARGET_BASE_IS_PUBLIC=1
+elif [ "$REMOTE_BRANCH_EXISTS" -eq 1 ] &&
+  git -C "$TEMP_CLONE" merge-base --is-ancestor origin/main "$TARGET_BASE_SHA" >/dev/null 2>&1 &&
+  git -C "$TEMP_CLONE" merge-base --is-ancestor "$TARGET_BASE_SHA" "origin/$TARGET_BRANCH" >/dev/null 2>&1; then
+  TARGET_BASE_IS_PUBLIC=1
+fi
+if [ "$TARGET_BASE_IS_PUBLIC" -ne 1 ]; then
+  fail "Target base $TARGET_BASE is not contained in public history for origin/main or origin/$TARGET_BRANCH." 1
+fi
+
+git -C "$TEMP_CLONE" checkout --quiet -B "$TARGET_BRANCH" "$TARGET_BASE_SHA"
 log_info "Prepared temp branch $TARGET_BRANCH from $TARGET_BASE."
 
 if [ "$DRY_RUN" -eq 1 ]; then
@@ -1103,6 +1181,10 @@ for commit_sha in "${COMMITS[@]}"; do
   ensure_public_replay_message "$commit_sha" "$subject" "$message_file"
   bind_public_replay_to_source "$commit_sha" "$message_file"
 
+  if ! verify_public_replay_pii "$commit_sha" "$message_file"; then
+    exit 2
+  fi
+
   GIT_AUTHOR_NAME="$PUBLIC_GIT_NAME" \
   GIT_AUTHOR_EMAIL="$PUBLIC_GIT_EMAIL" \
   GIT_AUTHOR_DATE="$author_date" \
@@ -1141,7 +1223,7 @@ else
   exit 2
 fi
 
-offending_identities=$(git -C "$TEMP_CLONE" log --format='%H %an <%ae> | %cn <%ce>' "$TARGET_BASE..$TARGET_BRANCH" \
+offending_identities=$(git -C "$TEMP_CLONE" log --format='%H %an <%ae> | %cn <%ce>' "$TARGET_BASE_SHA..$TARGET_BRANCH" \
   | grep -Fv "$PUBLIC_GIT_NAME <$PUBLIC_GIT_EMAIL> | $PUBLIC_GIT_NAME <$PUBLIC_GIT_EMAIL>" || true)
 if [ -n "$offending_identities" ]; then
   log_error "Identity audit failed; offending commits:"
@@ -1197,9 +1279,6 @@ if [ "$AUTO_PUSH" -eq 1 ]; then
   printf 'Pushed: yes\n'
 else
   printf 'Pushed: no\n'
-  if [ "$REMOTE_BRANCH_EXISTS" -eq 1 ]; then
-    printf 'To push: git push --force-with-lease -u origin %s\n' "$TARGET_BRANCH"
-  else
-    printf 'To push: git push -u origin %s\n' "$TARGET_BRANCH"
-  fi
+  printf 'To push: git push --force-with-lease=refs/heads/%s:%s -u origin %s\n' \
+    "$TARGET_BRANCH" "$REMOTE_BRANCH_SHA" "$TARGET_BRANCH"
 fi

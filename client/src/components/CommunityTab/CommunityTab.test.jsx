@@ -10,7 +10,7 @@ import {
 } from '../../utilities/cache/cacheScripts.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import contractScripts from '../../utilities/web3/chainGateway.js';
-import BeeswarmPlot from '../SurveyTool/BeeswarmPlot';
+import BeeswarmPlot from '../Shared/BeeswarmPlot/BeeswarmPlot';
 import SBTsList from '../SBTs/SBTsList';
 import { POLIS_DEMO_DATA_AUTOLOAD_SLUGS } from '../../variables/appConfig.js';
 
@@ -141,6 +141,38 @@ describe('CommunityTab helpers', () => {
     expect(instance._getSelectedSessionSlugs()).toHaveLength(2);
   });
 
+  it('keeps single-session readiness false when the latest block is unavailable', async () => {
+    const instance = new CommunityTab({ activeSessionSlug: 'edge' });
+    instance._iterScopeCaches = jest.fn(() => [
+      {
+        slug: 'edge',
+        netKey: '84532',
+        surveysCache: { surveysLatestBlock: 10 },
+        questionsCache: { questionsLatestBlock: 10 },
+        sbtCache: { lastBlock: 10 },
+      },
+    ]);
+    jest.spyOn(contractScripts, 'getRelevantBlockWindowForFilter').mockResolvedValue({ toBlock: 0 });
+
+    await expect(instance.checkIfInitialLoadDone()).resolves.toBe(false);
+  });
+
+  it('keeps multi-session readiness false when any latest block is unavailable', async () => {
+    const instance = new CommunityTab({ activeSessionSlug: 'edge' });
+    instance._iterScopeCaches = jest.fn(() =>
+      ['edge', 'alpha'].map((slug) => ({
+        slug,
+        netKey: '84532',
+        surveysCache: { surveysLatestBlock: 10 },
+        questionsCache: { questionsLatestBlock: 10 },
+        sbtCache: { lastBlock: 10 },
+      })),
+    );
+    jest.spyOn(contractScripts, 'getRelevantBlockWindowForFilter').mockResolvedValue({ toBlock: 0 });
+
+    await expect(instance.checkIfInitialLoadDone()).resolves.toBe(false);
+  });
+
   it('uses demo beeswarm data for auto-demo sessions in list scope when caches are empty', () => {
     const priorUrl = window.location.href;
     try {
@@ -173,6 +205,7 @@ describe('CommunityTab helpers', () => {
         }),
       );
       expect(plotNode.props.points).toHaveLength(expectedDemoLabels.length);
+      expect(plotNode.props.domain).toEqual([0, 1]);
       expect(plotNode.props.showIdleSummary).toBe(false);
       expect(plotNode.props.points[0]).toEqual(
         expect.objectContaining({
@@ -184,6 +217,56 @@ describe('CommunityTab helpers', () => {
       localStorage.removeItem('ce:sessionScanScope');
       window.history.replaceState({}, '', priorUrl);
     }
+  });
+
+  it('uses the default demo report votes for an auto-demo alias so the default session keeps its real cluster', () => {
+    const priorUrl = window.location.href;
+    try {
+      localStorage.removeItem('ce:sessionScanScope');
+      globalThis.CE_SESSION_SCAN_SCOPE = 'active';
+      window.history.replaceState({}, '', '/session/demo-sh');
+
+      const instance = new CommunityTab({ activeSessionSlug: null });
+      const points = instance._getQuestionSwarmPoints();
+
+      expect(instance._shouldUseDemoBeeswarmData()).toBe(true);
+      expect(points).toHaveLength(30);
+      expect(points.every((point) => point.total > 0)).toBe(true);
+      expect(points.some((point) => point.agrees > 0 && point.disagrees > 0)).toBe(true);
+      expect(Math.min(...points.map((point) => point.value))).toBeGreaterThanOrEqual(0);
+      expect(Math.max(...points.map((point) => point.value))).toBeLessThanOrEqual(1);
+      expect(new Set(points.map((point) => point.value.toFixed(3))).size).toBeGreaterThan(10);
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it('hydrates an exact zero-response copy of the bundled demo questions without changing real session data', () => {
+    const demoDataset = polisReportModule.getPolisDemoDatasetForSlug('demo');
+    const zeroResponseDemoPoints = demoDataset.comments
+      .filter((comment) => !comment.type || comment.type === 'binary')
+      .map((comment) => ({
+        questionId: comment.commentId,
+        label: comment.commentBody,
+        agrees: 0,
+        disagrees: 0,
+        unsure: 0,
+        total: 0,
+        value: 0,
+      }));
+    const instance = new CommunityTab({ activeSessionSlug: 'edge' });
+    instance._beeswarmPoints = zeroResponseDemoPoints;
+
+    const points = instance._getQuestionSwarmPoints();
+
+    expect(points).toHaveLength(30);
+    expect(points.every((point) => point.total > 0)).toBe(true);
+    expect(points.some((point) => point.agrees > 0 && point.disagrees > 0)).toBe(true);
+
+    instance._beeswarmPoints = [
+      { questionId: 'real-q1', label: 'Real prompt', agrees: 0, disagrees: 0, total: 0, value: 0 },
+    ];
+    expect(instance._getQuestionSwarmPoints()).toEqual(instance._beeswarmPoints);
   });
 
   it('only auto-enables community demo beeswarm data when demo is in the global auto-demo list', () => {
@@ -220,12 +303,14 @@ describe('CommunityTab helpers', () => {
       ],
       participantsVotes: [
         {
+          participant: 'participant-1',
           votes: {
             0: 1,
             1: -1,
           },
         },
         {
+          participant: 'participant-2',
           votes: {
             0: 0,
             1: 1,
@@ -243,7 +328,7 @@ describe('CommunityTab helpers', () => {
         expect.objectContaining({
           questionId: 'legacy-binary',
           label: 'Legacy binary comment without a type',
-          extremity: 0,
+          value: 0,
           agrees: 1,
           disagrees: 0,
           unsure: 1,
@@ -280,7 +365,7 @@ describe('CommunityTab helpers', () => {
     expect(points).toEqual([
       expect.objectContaining({
         questionId: 'q1',
-        extremity: 1,
+        value: 1,
         agrees: 1,
         disagrees: 1,
         unsure: 1,
@@ -391,7 +476,7 @@ describe('CommunityTab helpers', () => {
     expect(modalNode.props.scrollable).toBe(true);
   });
 
-  it('omits the leaderboard and statistics section headings for a minimal community layout', () => {
+  it('keeps the default layout minimal while exposing the classic participant window label', () => {
     const instance = new CommunityTab({ activeSessionSlug: 'demo' });
     const tree = instance.render();
     const headings = collectTreeNodes(tree, (node) => node?.type === 'h2');
@@ -399,6 +484,7 @@ describe('CommunityTab helpers', () => {
 
     expect(headingText).not.toContain('Leaderboard');
     expect(headingText).not.toContain('Statistics');
+    expect(headingText).toEqual(expect.arrayContaining([expect.stringMatching(/^Participants \(\d+\)$/)]));
   });
 
   it('renders survey links with session query suffix in modal content', () => {
@@ -502,7 +588,7 @@ describe('CommunityTab helpers', () => {
       {
         questionId: 'q1',
         label: 'Prompt one',
-        extremity: 0.34,
+        value: 0.34,
         agrees: 2,
         disagrees: 1,
         unsure: 0,
@@ -520,6 +606,7 @@ describe('CommunityTab helpers', () => {
 
     expect(plotNode).toBeTruthy();
     expect(plotNode.props.points).toEqual(instance._beeswarmPoints);
+    expect(plotNode.props.domain).toEqual([0, 1]);
     expect(plotNode.props.height).toBe(240);
     expect(plotNode.props.showIdleSummary).toBe(false);
     expect(anchorNode).toBeTruthy();
@@ -545,7 +632,7 @@ describe('CommunityTab helpers', () => {
       {
         questionId: 'q-fallback',
         label: 'Fallback prompt',
-        extremity: 0,
+        value: 0,
         agrees: 0,
         disagrees: 0,
         unsure: 0,

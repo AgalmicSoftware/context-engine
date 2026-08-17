@@ -64,4 +64,21 @@ describe('Error boundaries', () => {
 
     recoverSpy.mockRestore();
   });
+
+  it('asks the app-wide fallback to recover a stale AppShell chunk without clearing its loop guard', () => {
+    const recoverSpy = jest.spyOn(bootRecovery, 'recoverFromStaleChunkLoadError');
+    window.sessionStorage.setItem(bootRecovery.STALE_CHUNK_RELOAD_STORAGE_KEY, 'true');
+
+    render(
+      <AppErrorBoundary>
+        <StaleChunkThrower />
+      </AppErrorBoundary>,
+    );
+
+    expect(recoverSpy).toHaveBeenCalledWith(expect.any(TypeError));
+    expect(window.sessionStorage.getItem(bootRecovery.STALE_CHUNK_RELOAD_STORAGE_KEY)).toBe('true');
+
+    recoverSpy.mockRestore();
+    window.sessionStorage.removeItem(bootRecovery.STALE_CHUNK_RELOAD_STORAGE_KEY);
+  });
 });

@@ -10,10 +10,9 @@ const loadModule = async () => {
   return import(moduleUrl);
 };
 
-test('buildWorkerBundles bootstraps guarded worker deps before bundling', async () => {
+test('buildWorkerBundles validates guarded worker deps without installing them', async () => {
   const { buildWorkerBundles } = await loadModule();
   const rootDir = '/tmp/context-engine';
-  const ensureCalls = [];
   const assertCalls = [];
   const buildCalls = [];
   const mkdirCalls = [];
@@ -22,8 +21,8 @@ test('buildWorkerBundles bootstraps guarded worker deps before bundling', async 
   const result = await buildWorkerBundles({
     rootDir,
     targetKeys: ['sessionCorsWorker'],
-    ensureWorkerDeps: (options) => {
-      ensureCalls.push(options);
+    ensureWorkerDeps: () => {
+      assert.fail('bundle commands must not install Worker dependencies');
     },
     assertWorkerDeps: (options) => {
       assertCalls.push(options);
@@ -40,7 +39,6 @@ test('buildWorkerBundles bootstraps guarded worker deps before bundling', async 
     },
   });
 
-  assert.deepEqual(ensureCalls, [{ rootDir, dependencyName: 'ethers' }]);
   assert.deepEqual(assertCalls, [{ rootDir }]);
   assert.equal(buildCalls.length, 1);
   assert.deepEqual(buildCalls[0].entryPoints, [
@@ -53,17 +51,13 @@ test('buildWorkerBundles bootstraps guarded worker deps before bundling', async 
   assert.deepEqual(result.map((target) => target.key), ['sessionCorsWorker']);
 });
 
-test('buildWorkerBundles skips worker bootstrap for unguarded bundle targets', async () => {
+test('buildWorkerBundles skips Worker dependency validation for unguarded bundle targets', async () => {
   const { buildWorkerBundles } = await loadModule();
-  const ensureCalls = [];
   const assertCalls = [];
 
   await buildWorkerBundles({
     rootDir: '/tmp/context-engine',
     targetKeys: ['deployHelper'],
-    ensureWorkerDeps: (options) => {
-      ensureCalls.push(options);
-    },
     assertWorkerDeps: (options) => {
       assertCalls.push(options);
     },
@@ -73,7 +67,6 @@ test('buildWorkerBundles skips worker bootstrap for unguarded bundle targets', a
     writeFileSyncImpl: () => {},
   });
 
-  assert.deepEqual(ensureCalls, []);
   assert.deepEqual(assertCalls, []);
 });
 

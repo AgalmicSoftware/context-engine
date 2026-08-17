@@ -15,6 +15,7 @@ import {
   faSquare,
   faCheckSquare,
   faImage,
+  faExclamationCircle,
 } from '@fortawesome/free-solid-svg-icons';
 import { Input, Button, FormGroup, Label } from 'reactstrap';
 import styles from './AudioSurveyGenerator.module.scss';
@@ -1460,6 +1461,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     audioFile,
   });
   const shouldShowGenerateButton = hasGenerateInputContent || (loading && activeAction === 'generate');
+  const shouldShowQuestionConfiguration = toStr(pastedText).trim().length > 0;
   const queuedPhotoSources = useMemo(
     () => additionalSources.filter((source): source is SurveyGeneratorPhotoSource => source?.type === 'photo'),
     [additionalSources],
@@ -1630,6 +1632,24 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
                     onKeyDown={handleUrlKeyDown}
                     className={styles.urlInputField}
                   />
+                  <CompactImageChooser
+                    className={styles.inlineImageChooser}
+                    rootTestId={E2E_TESTIDS.DATABASE_IMAGE_CHOOSER}
+                    pasteButtonTestId={E2E_TESTIDS.DATABASE_IMAGE_PASTE}
+                    uploadButtonTestId={E2E_TESTIDS.DATABASE_IMAGE_UPLOAD}
+                    fileInputTestId={E2E_TESTIDS.DATABASE_IMAGE_FILE_INPUT}
+                    showUrlModeButton={false}
+                    isUrlMode={false}
+                    isUploadMode
+                    showUrlInput={false}
+                    onPaste={handleImagePickerPaste}
+                    onUploadClick={handleImagePickerUploadClick}
+                    onFileChange={handleAdditionalSourceUpload}
+                    fileInputRef={imagePickerInputRef}
+                    accept={SUPPORTED_SOURCE_UPLOAD_ACCEPT}
+                    multiple
+                    uploadAriaLabel="Upload file or image"
+                  />
                   <button
                     type="button"
                     className={styles.internalUrlAddBtn}
@@ -1679,28 +1699,17 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
                 )}
               </div>
 
-              <div className={styles.imageSourceSection}>
-                <CompactImageChooser
-                  className={styles.imageChooser}
-                  rootTestId={E2E_TESTIDS.DATABASE_IMAGE_CHOOSER}
-                  pasteButtonTestId={E2E_TESTIDS.DATABASE_IMAGE_PASTE}
-                  uploadButtonTestId={E2E_TESTIDS.DATABASE_IMAGE_UPLOAD}
-                  fileInputTestId={E2E_TESTIDS.DATABASE_IMAGE_FILE_INPUT}
-                  showUrlModeButton={false}
-                  isUrlMode={false}
-                  isUploadMode
-                  showUrlInput={false}
-                  onPaste={handleImagePickerPaste}
-                  onUploadClick={handleImagePickerUploadClick}
-                  onFileChange={handleAdditionalSourceUpload}
-                  fileInputRef={imagePickerInputRef}
-                  accept={SUPPORTED_SOURCE_UPLOAD_ACCEPT}
-                  multiple
-                  statusText={imagePickerStatusText}
-                  statusTone={imagePickerStatusTone}
-                  uploadAriaLabel="Upload file or image"
-                />
-              </div>
+              {imagePickerStatusText ? (
+                <div
+                  className={`${styles.imagePickerStatus} ${
+                    imagePickerStatusTone === 'error' ? styles.imagePickerStatusError : ''
+                  }`}
+                  role={imagePickerStatusTone === 'error' ? 'alert' : 'status'}
+                >
+                  {imagePickerStatusTone === 'error' ? <FontAwesomeIcon icon={faExclamationCircle} /> : null}
+                  <span>{imagePickerStatusText}</span>
+                </div>
+              ) : null}
 
               {(additionalSources.length > 0 ||
                 shouldShowSaveExtraSourcesControl ||
@@ -1956,93 +1965,103 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
               )}
             </div>
 
-            <div className={styles.formSection}>
-              <h3 className={styles.sectionTitle}>Types</h3>
+            {shouldShowQuestionConfiguration ? (
+              <>
+                <div className={styles.formSection}>
+                  <h3 className={styles.sectionTitle}>Types</h3>
 
-              <div className={styles.questionTypeGrid}>
-                <div
-                  className={buildSurveyGeneratorTypeButtonClassName(styles, questionTypes.binary)}
-                  onClick={() => toggleQuestionType('binary')}
-                >
-                  <div className={styles.typeTitle}>Binary</div>
-                  <div className={styles.typePreviewRow}>
-                    <span className={buildSurveyGeneratorTypePillClassName(styles, 'agree')}>Agree</span>
-                    <span className={buildSurveyGeneratorTypePillClassName(styles, 'unsure')}>Unsure</span>
-                    <span className={buildSurveyGeneratorTypePillClassName(styles, 'disagree')}>Disagree</span>
+                  <div className={styles.questionTypeGrid}>
+                    <div
+                      className={buildSurveyGeneratorTypeButtonClassName(styles, questionTypes.binary)}
+                      onClick={() => toggleQuestionType('binary')}
+                    >
+                      <div className={styles.typeTitle}>Binary</div>
+                      <div className={styles.typePreviewRow}>
+                        <span className={buildSurveyGeneratorTypePillClassName(styles, 'agree')}>Agree</span>
+                        <span className={buildSurveyGeneratorTypePillClassName(styles, 'unsure')}>Unsure</span>
+                        <span className={buildSurveyGeneratorTypePillClassName(styles, 'disagree')}>Disagree</span>
+                      </div>
+                    </div>
+
+                    <div
+                      className={buildSurveyGeneratorTypeButtonClassName(styles, questionTypes.multichoice)}
+                      onClick={() => toggleQuestionType('multichoice')}
+                    >
+                      <div className={styles.typeTitle}>Multichoice</div>
+                      <div className={styles.typePreviewRow}>
+                        <span className={styles.pill}>Opt 1</span>
+                        <span className={styles.pill}>Opt 2</span>
+                        <span className={styles.pill}>Opt 3</span>
+                      </div>
+                    </div>
+
+                    <div
+                      className={buildSurveyGeneratorTypeButtonClassName(styles, questionTypes.rating)}
+                      onClick={() => toggleQuestionType('rating')}
+                    >
+                      <div className={styles.typeTitle}>Rating</div>
+                      <div className={styles.ratingPreview} aria-hidden="true">
+                        <span className={styles.ratingPreviewEndpoint}>1</span>
+                        <span className={styles.ratingPreviewWrap}>
+                          <span className={styles.ratingPreviewFill} />
+                          <span className={styles.ratingPreviewHandle} />
+                        </span>
+                        <span className={styles.ratingPreviewEndpoint}>10</span>
+                      </div>
+                    </div>
+
+                    <div
+                      className={buildSurveyGeneratorTypeButtonClassName(styles, questionTypes.freeform)}
+                      onClick={() => toggleQuestionType('freeform')}
+                    >
+                      <div className={styles.typeTitle}>Freeform</div>
+                      <div className={styles.freeformPreview} aria-hidden="true">
+                        Write an answer...
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div
-                  className={buildSurveyGeneratorTypeButtonClassName(styles, questionTypes.multichoice)}
-                  onClick={() => toggleQuestionType('multichoice')}
-                >
-                  <div className={styles.typeTitle}>Multichoice</div>
-                  <div className={styles.typePreviewRow}>
-                    <span className={styles.pill}>Opt 1</span>
-                    <span className={styles.pill}>Opt 2</span>
-                    <span className={styles.pill}>Opt 3</span>
+                <div className={styles.formSection}>
+                  <div className={styles.countControlRow} role="group" aria-label="Number of questions">
+                    <span className={styles.countInlineLabel} aria-hidden="true">
+                      # Questions
+                    </span>
+                    <div
+                      className={styles.countReadout}
+                      aria-label={`Number of questions: ${count}`}
+                      data-testid={E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}
+                      aria-live="polite"
+                      aria-atomic="true"
+                    >
+                      <span>{count}</span>
+                    </div>
+                    <Button
+                      type="button"
+                      color="secondary"
+                      className={styles.countAdjustButton}
+                      onClick={() => adjustQuestionCount(-QUESTION_COUNT_STEP)}
+                      disabled={count <= MIN_QUESTION_COUNT || loading}
+                      aria-label="Decrease question count"
+                      data-testid={E2E_TESTIDS.DATABASE_QUESTION_COUNT_DECREMENT}
+                    >
+                      -
+                    </Button>
+                    <Button
+                      type="button"
+                      color="secondary"
+                      className={styles.countAdjustButton}
+                      onClick={() => adjustQuestionCount(QUESTION_COUNT_STEP)}
+                      disabled={count >= MAX_QUESTION_COUNT || loading}
+                      aria-label="Increase question count"
+                      data-testid={E2E_TESTIDS.DATABASE_QUESTION_COUNT_INCREMENT}
+                    >
+                      +
+                    </Button>
                   </div>
                 </div>
-
-                <div
-                  className={buildSurveyGeneratorTypeButtonClassName(styles, questionTypes.rating)}
-                  onClick={() => toggleQuestionType('rating')}
-                >
-                  <div className={styles.typeTitle}>Rating</div>
-                  <div className={styles.ratingPreviewWrap}>
-                    <div className={styles.ratingPreviewFill} />
-                    <div className={styles.ratingPreviewHandle} />
-                  </div>
-                </div>
-
-                <div
-                  className={buildSurveyGeneratorTypeButtonClassName(styles, questionTypes.freeform)}
-                  onClick={() => toggleQuestionType('freeform')}
-                >
-                  <div className={styles.typeTitle}>Freeform</div>
-                  <div className={styles.freeformPreview}>...</div>
-                </div>
-              </div>
-            </div>
-
-            <div className={styles.formSection}>
-              <div className={styles.countControlRow} role="group" aria-label="Number of questions">
-                <span className={styles.countInlineLabel} aria-hidden="true">
-                  # Questions
-                </span>
-                <div
-                  className={styles.countReadout}
-                  aria-label={`Number of questions: ${count}`}
-                  data-testid={E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}
-                  aria-live="polite"
-                  aria-atomic="true"
-                >
-                  <span>{count}</span>
-                </div>
-                <Button
-                  type="button"
-                  color="secondary"
-                  className={styles.countAdjustButton}
-                  onClick={() => adjustQuestionCount(-QUESTION_COUNT_STEP)}
-                  disabled={count <= MIN_QUESTION_COUNT || loading}
-                  aria-label="Decrease question count"
-                  data-testid={E2E_TESTIDS.DATABASE_QUESTION_COUNT_DECREMENT}
-                >
-                  -
-                </Button>
-                <Button
-                  type="button"
-                  color="secondary"
-                  className={styles.countAdjustButton}
-                  onClick={() => adjustQuestionCount(QUESTION_COUNT_STEP)}
-                  disabled={count >= MAX_QUESTION_COUNT || loading}
-                  aria-label="Increase question count"
-                  data-testid={E2E_TESTIDS.DATABASE_QUESTION_COUNT_INCREMENT}
-                >
-                  +
-                </Button>
-              </div>
-            </div>
+              </>
+            ) : null}
 
             {shouldShowGenerateButton && (
               <div className={styles.actionRow}>

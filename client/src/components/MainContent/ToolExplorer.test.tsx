@@ -117,7 +117,15 @@ describe('ToolExplorer session propagation', () => {
   });
 
   it('passes the inherited active session slug into the embedded SurveyTool', async () => {
-    renderToolExplorer();
+    const sessionConfig = { slug: 'demo', storageProfile: { backend: 'cloudflare' } };
+    const questionScanProgress = { slug: 'demo', phase: 'hydrate', discoveredQuestions: 3 };
+    renderToolExplorer({
+      sessionConfig,
+      networkChainId: 84532,
+      isResponsesCacheReady: true,
+      questionResponsesNonce: 7,
+      questionScanProgress,
+    });
 
     fireEvent.click(screen.getByText('Questions'));
 
@@ -125,6 +133,11 @@ describe('ToolExplorer session propagation', () => {
     expect(mockSurveyTool).toHaveBeenCalledWith(
       expect.objectContaining({
         activeSessionSlug: 'demo',
+        sessionConfig,
+        networkChainId: 84532,
+        isResponsesCacheReady: true,
+        questionResponsesNonce: 7,
+        questionScanProgress,
         preventUrlChange: true,
       }),
     );
@@ -155,6 +168,8 @@ describe('ToolExplorer session propagation', () => {
         showCreateGroupExternal: false,
         onCreateGroupToggleExternal: expect.any(Function),
         activeSessionSlug: 'edge',
+        sessionSlug: 'edge',
+        embeddedWorkerGroups: true,
       }),
     );
 
@@ -358,6 +373,18 @@ describe('ToolExplorer session propagation', () => {
       expect(col).toHaveClass(styles.explorerColSparse);
       expect(col).not.toHaveClass(styles.statusBorderEnabled);
     });
+  });
+
+  it('keeps the three live tools identifiable and supplies their bundled artwork for classic mode', () => {
+    const { container } = renderToolExplorer({ demoSurfaceMode: false });
+
+    expect(screen.getByText('Create and explore questions.')).toBeInTheDocument();
+    expect(screen.getByText('Organize and manage groups.')).toBeInTheDocument();
+    expect(screen.getByText('Analyze and explore context.')).toBeInTheDocument();
+    expect(container.querySelectorAll(`.${styles.classicToolIcon}`)).toHaveLength(3);
+    const artwork = Array.from(container.querySelectorAll<HTMLElement>(`.${styles.backgroundImage}`));
+    expect(artwork).toHaveLength(3);
+    artwork.forEach((image) => expect(image.style.backgroundImage).toContain('url('));
   });
 
   it('enables live and future status borders only while demo mode is on', () => {

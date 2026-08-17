@@ -2,12 +2,15 @@ import { toStr } from '../shared/primitives.js';
 
 type ProcWithEnv = { env?: Record<string, unknown> } | undefined;
 
+// Keep the direct `process.env` read at module scope. Vite replaces that exact
+// expression with the reviewed public client environment during bundling;
+// retaining the broader `process` object would lose PUBLIC_URL in browsers.
+const BUNDLED_PUBLIC_URL_PROCESS: ProcWithEnv = { env: process.env };
+
 // We currently deploy from the site root, but keep PUBLIC_URL/base-path support
 // so the SPA can still be mounted under a subpath in preview or alternate hosting
 // setups without rewriting every internal route helper.
-export const readPublicUrlBasePath = (
-  proc: ProcWithEnv = (typeof process !== 'undefined' ? process : undefined) as ProcWithEnv,
-): string => {
+export const readPublicUrlBasePath = (proc: ProcWithEnv = BUNDLED_PUBLIC_URL_PROCESS): string => {
   const raw = toStr(proc?.env?.PUBLIC_URL || '').trim();
   if (!raw) return '';
   try {
@@ -19,20 +22,14 @@ export const readPublicUrlBasePath = (
   }
 };
 
-export const buildPublicUrlPath = (
-  pathname = '',
-  proc: ProcWithEnv = (typeof process !== 'undefined' ? process : undefined) as ProcWithEnv,
-): string => {
+export const buildPublicUrlPath = (pathname = '', proc: ProcWithEnv = BUNDLED_PUBLIC_URL_PROCESS): string => {
   const normalizedPath = toStr(pathname).trim();
   if (!normalizedPath) return '';
   const basePath = readPublicUrlBasePath(proc);
   return `${basePath}${normalizedPath}` || normalizedPath;
 };
 
-export const stripPublicUrlBasePath = (
-  pathname = '',
-  proc: ProcWithEnv = (typeof process !== 'undefined' ? process : undefined) as ProcWithEnv,
-): string => {
+export const stripPublicUrlBasePath = (pathname = '', proc: ProcWithEnv = BUNDLED_PUBLIC_URL_PROCESS): string => {
   const rawPath = toStr(pathname).trim();
   const basePath = readPublicUrlBasePath(proc);
   if (!rawPath || !basePath || basePath === '/') return rawPath;
@@ -48,10 +45,7 @@ export const stripPublicUrlBasePath = (
   return rawPath;
 };
 
-export const buildPublicRoute = (
-  pathname = '',
-  proc: ProcWithEnv = (typeof process !== 'undefined' ? process : undefined) as ProcWithEnv,
-): string => {
+export const buildPublicRoute = (pathname = '', proc: ProcWithEnv = BUNDLED_PUBLIC_URL_PROCESS): string => {
   const normalizedPath = toStr(pathname).trim();
   if (!normalizedPath) return readPublicUrlBasePath(proc) || '/';
   return buildPublicUrlPath(normalizedPath, proc) || normalizedPath;
@@ -85,7 +79,7 @@ export const readWindowLocationPath = (
 export const buildAtlasNodeRoute = (
   nodeId = '',
   options: AtlasNodeRouteOptions = {},
-  proc: ProcWithEnv = (typeof process !== 'undefined' ? process : undefined) as ProcWithEnv,
+  proc: ProcWithEnv = BUNDLED_PUBLIC_URL_PROCESS,
 ): string => {
   const normalizedNodeId = toStr(nodeId).trim();
   const baseRoute = buildPublicRoute(normalizedNodeId ? `/atlas/${normalizedNodeId}` : '/atlas', proc);

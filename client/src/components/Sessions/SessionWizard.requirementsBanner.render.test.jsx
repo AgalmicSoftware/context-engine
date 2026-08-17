@@ -11,6 +11,7 @@ import {
   NEW_SESSION_BANNER_DISMISSED_KEY,
   resetSessionWizardWorkerPanelTestState,
 } from './SessionWizard.workerPanel.testUtils';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 const expectSponsoredStatusText = async (expectedText) => {
   await waitFor(() => {
@@ -70,6 +71,53 @@ describe('SessionWizard new-session requirements banner', () => {
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_TOKEN_ONBOARDING_LINK)).not.toBeInTheDocument();
   });
 
+  it('adds the Wrapped token without replacing the Cloudflare account or AI key', async () => {
+    window.history.replaceState({}, '', '/session/new');
+
+    renderSessionWizard();
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    await selectCloudflarePreset();
+    enableAdvancedMode();
+    fireEvent.click(screen.getByRole('button', { name: 'Worker deployment & secrets' }));
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Agent Session Wrapped' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_TOKEN_ONBOARDING_LINK)).toBeInTheDocument();
+    });
+    expect(screen.getByRole('link', { name: 'Cloudflare account' })).toBeInTheDocument();
+    expect(screen.getByText('OpenAI key for text and transcription')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /AI provider key|OpenAI API key/i })).not.toBeInTheDocument();
+  });
+
+  it('shows every selected AI provider key without linking resolved requirements to OpenAI', async () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    sessionStorage.setItem(
+      'ce:sessionWizardDraft:v1',
+      JSON.stringify({
+        draft: {
+          ai: {
+            models: {
+              fast: { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929' },
+              thinking: { provider: 'openrouter', model: 'openrouter/test-model' },
+              transcription: { provider: 'openai', model: 'whisper-1' },
+            },
+          },
+          sessionModeProfile: profile,
+          storageProfile: { backend: 'cloudflare' },
+        },
+      }),
+    );
+    window.history.replaceState({}, '', '/session/new');
+
+    renderSessionWizard();
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    expect(screen.getByText(/Anthropic key, OpenRouter key, OpenAI key/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /AI provider key|OpenAI API key/i })).not.toBeInTheDocument();
+  });
+
   it('renders the decentralized requirements copy and contact link on /session/new', async () => {
     window.history.replaceState({}, '', '/session/new');
 
@@ -77,11 +125,11 @@ describe('SessionWizard new-session requirements banner', () => {
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
 
-    expect(screen.getByRole('link', { name: 'AI provider key' })).toHaveAttribute(
-      'href',
-      'https://platform.openai.com/api-keys',
+    expect(screen.getByText('OpenAI key for text and transcription')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /AI provider key|OpenAI API key/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/compatible Session Worker provides the web runtime/i)).toHaveTextContent(
+      'the EVM registry and Arweave remain canonical',
     );
-    expect(screen.getByText(/for text and transcription/i)).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Lit API key' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Arweave wallet (JWK)' })).toHaveAttribute(
       'href',
@@ -124,7 +172,7 @@ describe('SessionWizard new-session requirements banner', () => {
     expect(screen.queryByText('OP Sepolia ETH for on-chain registration')).not.toBeInTheDocument();
   });
 
-  it('does not show the new-session requirements banner when a sponsored bundle covers setup requirements', async () => {
+  it('covers decentralized Worker requirements only when sponsored auto-deploy is ready', async () => {
     window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id');
 
     renderSessionWizard({
@@ -133,6 +181,31 @@ describe('SessionWizard new-session requirements banner', () => {
     });
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    await expectSponsoredStatusText(
+      'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit API key, deploy access.',
+    );
+    expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
+    expect(screen.getByText(/compatible Session Worker/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+      target: { value: 'Sponsored decentralized session' },
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: /to create a session you'll need:/i })).not.toBeInTheDocument();
+    });
+  });
+
+  it('hides Cloudflare requirements when a sponsored bundle covers setup requirements', async () => {
+    window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id');
+
+    renderSessionWizard({
+      initialSponsoredBundleId: 'sponsor-tx-id',
+      initialSponsoredBundleKey: 'sponsor-secret',
+    });
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    await selectCloudflarePreset();
     await expectSponsoredStatusText(
       'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit API key, deploy access.',
     );

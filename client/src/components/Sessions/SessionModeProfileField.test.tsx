@@ -22,8 +22,30 @@ describe('SessionModeProfileField', () => {
     );
     expect(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).toHaveAttribute('aria-checked', 'false');
-    expect(screen.getByText('Cloudflare login / AI API Key')).toBeInTheDocument();
-    expect(screen.getByText('AI API Key / Arweave wallet / RPC URL / EVM testnet gas')).toBeInTheDocument();
+    const cloudflareRequirements = within(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).getByRole('list', {
+      name: 'Fast & Cheap requirements',
+    });
+    expect(
+      within(cloudflareRequirements)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['Cloudflare account', 'AI provider key']);
+    const decentralizedRequirements = within(
+      screen.getByTestId('ce-new-preset-trustless_public_decentralized'),
+    ).getByRole('list', { name: 'Trustless & Public requirements' });
+    expect(
+      within(decentralizedRequirements)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['AI provider key', 'Arweave wallet', 'EVM RPC URL', 'EVM Gas (TX Fees)']);
+    expect(
+      screen.getByText('Session settings and responses are stored in Cloudflare. No public blockchain is required.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Session data is stored on Arweave, with session identity recorded in a public EVM registry.'),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).not.toHaveTextContent(/worker/i);
+    expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).not.toHaveTextContent(/worker/i);
     expect(screen.queryByText('Recommended')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /advanced options/i })).not.toBeInTheDocument();
     const selector = screen.getByRole('radiogroup', { name: 'Session hosting profile' });
@@ -51,7 +73,7 @@ describe('SessionModeProfileField', () => {
 
     fireEvent.click(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare'));
 
-    expect(screen.queryByText('Cloudflare login / AI API Key')).not.toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Fast & Cheap requirements' })).not.toBeInTheDocument();
     expect(screen.queryByText('Hosting')).not.toBeInTheDocument();
     expect(screen.queryByText('Recommended')).not.toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Cloudflare' })).toHaveAttribute('aria-checked', 'true');

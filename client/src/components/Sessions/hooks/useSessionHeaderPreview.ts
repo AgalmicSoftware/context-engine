@@ -20,12 +20,14 @@ type SessionHeaderClipboardResult =
 type ReadSessionHeaderClipboard = (options: { fileNamePrefix: string }) => Promise<SessionHeaderClipboardResult>;
 
 export interface UseSessionHeaderPreviewOptions {
+  allowFileUpload?: boolean;
   draftSessionHeader?: string | null;
   updateDraftSessionHeader: (value: string | undefined) => void;
   readClipboard?: ReadSessionHeaderClipboard;
 }
 
 const useSessionHeaderPreview = ({
+  allowFileUpload = true,
   draftSessionHeader,
   updateDraftSessionHeader,
   readClipboard = readCompactImageClipboard as ReadSessionHeaderClipboard,
@@ -45,6 +47,14 @@ const useSessionHeaderPreview = ({
     setSessionHeaderUploadStatus(text);
     setSessionHeaderUploadStatusTone(text ? tone : 'default');
   }, []);
+
+  useEffect(() => {
+    if (allowFileUpload) return;
+    setSessionHeaderMode('url');
+    setSessionHeaderFile(null);
+    setSessionHeaderPreviewModalOpen(false);
+    setSessionHeaderStatus('');
+  }, [allowFileUpload, setSessionHeaderStatus]);
 
   useEffect(() => {
     const canCreateObjectUrl = typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function';
@@ -67,13 +77,13 @@ const useSessionHeaderPreview = ({
   }, [sessionHeaderFile]);
 
   const sessionHeaderPreviewSrc = useMemo(() => {
-    if (sessionHeaderMode === 'upload') {
+    if (allowFileUpload && sessionHeaderMode === 'upload') {
       return toStr(sessionHeaderPreviewUrl).trim();
     }
     return normalizeArweaveUrl(draftSessionHeader || '', {
       contextLabel: 'session_wizard_header_preview',
     });
-  }, [draftSessionHeader, sessionHeaderMode, sessionHeaderPreviewUrl]);
+  }, [allowFileUpload, draftSessionHeader, sessionHeaderMode, sessionHeaderPreviewUrl]);
 
   useEffect(() => {
     if (sessionHeaderPreviewSrc) return;
@@ -86,6 +96,10 @@ const useSessionHeaderPreview = ({
     });
 
     if (clipboardResult?.kind === 'file' && clipboardResult.file) {
+      if (!allowFileUpload) {
+        setSessionHeaderStatus('This hosting profile accepts a header image URL, not a local file.', 'error');
+        return;
+      }
       setSessionHeaderMode('upload');
       setCompactSessionHeaderMode('idle');
       setSessionHeaderFile(clipboardResult.file);
@@ -103,7 +117,7 @@ const useSessionHeaderPreview = ({
     }
 
     setSessionHeaderStatus(clipboardResult?.error || 'Clipboard does not contain a supported image or URL.', 'error');
-  }, [readClipboard, setSessionHeaderStatus, updateDraftSessionHeader]);
+  }, [allowFileUpload, readClipboard, setSessionHeaderStatus, updateDraftSessionHeader]);
 
   const handleClearSessionHeaderPreview = useCallback(() => {
     setSessionHeaderPreviewModalOpen(false);
@@ -115,14 +129,14 @@ const useSessionHeaderPreview = ({
   }, [setSessionHeaderStatus, updateDraftSessionHeader]);
 
   return {
-    sessionHeaderMode,
+    sessionHeaderMode: allowFileUpload ? sessionHeaderMode : 'url',
     setSessionHeaderMode,
     compactSessionHeaderMode,
     setCompactSessionHeaderMode,
-    sessionHeaderFile,
+    sessionHeaderFile: allowFileUpload ? sessionHeaderFile : null,
     setSessionHeaderFile,
     sessionHeaderPreviewSrc,
-    sessionHeaderPreviewModalOpen,
+    sessionHeaderPreviewModalOpen: allowFileUpload ? sessionHeaderPreviewModalOpen : false,
     setSessionHeaderPreviewModalOpen,
     sessionHeaderUploadStatus,
     sessionHeaderUploadStatusTone,

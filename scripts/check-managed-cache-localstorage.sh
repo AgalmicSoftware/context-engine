@@ -4,6 +4,17 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
 
+MANAGED_NAMESPACE_REGISTRY="client/src/utilities/cache/managedCacheNamespaces.json"
+if [[ ! -f "${MANAGED_NAMESPACE_REGISTRY}" ]]; then
+  echo "cache-guard: missing canonical managed namespace registry: ${MANAGED_NAMESPACE_REGISTRY}"
+  exit 1
+fi
+MANAGED_NAMESPACE_PATTERN="$(node -e 'const fs = require("node:fs"); const registry = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); process.stdout.write(registry.managedNamespaces.map((name) => String(name).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"));' "${MANAGED_NAMESPACE_REGISTRY}")"
+if [[ -z "${MANAGED_NAMESPACE_PATTERN}" ]]; then
+  echo "cache-guard: canonical managed namespace registry is empty."
+  exit 1
+fi
+
 search_tree() {
   local pattern="$1"
   local root="$2"
@@ -48,7 +59,7 @@ if [[ -z "${RAW_MATCHES}" ]]; then
   exit 0
 fi
 
-VIOLATIONS="$(printf "%s\n" "${RAW_MATCHES}" | filter_matches "dg:(questionsCache|surveysCache|bookmarksCache|filters|sbtCache|userCache):|\\b(bookmarksCache|questionFilterState_questions|questionFilterState_results|bookmarkedFilters)\\b" || true)"
+VIOLATIONS="$(printf "%s\n" "${RAW_MATCHES}" | filter_matches "dg:(${MANAGED_NAMESPACE_PATTERN}):|\\b(bookmarksCache|questionFilterState_questions|questionFilterState_results|bookmarkedFilters)\\b" || true)"
 
 DYNAMIC_VIOLATIONS=""
 CANDIDATE_FILES="$(printf "%s\n" "${RAW_MATCHES}" | cut -d: -f1 | sort -u)"

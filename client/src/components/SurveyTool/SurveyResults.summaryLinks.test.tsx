@@ -8,6 +8,7 @@ import {
 } from './SurveyResultsAggregatorSummaries';
 import SurveyResultsFilterSummary from './SurveyResultsFilterSummary';
 import { renderSurveyResultsSyncStatusPanel } from './SurveyResultsPanels';
+import { buildSurveyResultsDemoViewPlan } from './surveyResultsRenderSurface';
 import { countSurveyResultsViewableResponses } from './SurveyResultsQuestionSummary';
 import SurveyResultsQuestionSummaryCard from './SurveyResultsQuestionSummaryCard';
 import {
@@ -785,6 +786,35 @@ describe('SurveyResults demo results views', () => {
     const demoOneNav = await screen.findByTestId('ce-surveyresults-demo-view-nav');
     expect(within(demoOneNav).getByText('Report')).toBeInTheDocument();
     expect(within(demoOneNav).getByText('Breakdown')).toBeInTheDocument();
+
+    await act(async () => {
+      view.rerenderSurveyResults({ sessionSlug: 'demo-2', activeSessionSlug: 'demo-2' });
+      await Promise.resolve();
+    });
+
+    const demoTwoNav = await screen.findByTestId('ce-surveyresults-demo-view-nav');
+    expect(within(demoTwoNav).getByText('Report')).toBeInTheDocument();
+    expect(within(demoTwoNav).getByText('Atlas')).toBeInTheDocument();
+    expect(within(demoTwoNav).getByText('Risk Matrix')).toBeInTheDocument();
+    expect(within(demoTwoNav).queryByText('Breakdown')).toBeNull();
+  });
+
+  it('coerces a stale demo-2 breakdown request back to the raw question results', () => {
+    expect(
+      buildSurveyResultsDemoViewPlan({
+        isDemoQuestionResults: true,
+        requestedViewMode: 'breakdown',
+        slug: 'demo-2',
+      }),
+    ).toEqual({
+      demoResultsViewMode: 'raw',
+      demoResultsViewOptions: [
+        { key: 'report', label: 'Report' },
+        { key: 'atlas', label: 'Atlas' },
+        { key: 'riskMatrix', label: 'Risk Matrix' },
+      ],
+      isDemoAlternateResultsView: false,
+    });
   });
 
   it('switches the demo modal surface from the top bar buttons and maps report to Polis', async () => {

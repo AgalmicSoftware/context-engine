@@ -17,7 +17,7 @@ export const SessionDocumentsPage = React.lazy(() => import('../DocumentLibrary/
 export const SimulatedUserPage = React.lazy(() => import('../UserPage/SimUserPage'));
 export const UserPage = React.lazy(() => import('../UserPage/UserPage'));
 export const CompareAddresses = React.lazy(() => import('../UserPage/CompareAddresses'));
-export const ContractPage = React.lazy(() => import('../ContractPage/ContractPage'));
+export const DocsPage = React.lazy(() => import('../DocsPage/DocsPage'));
 export const BookmarksPage = React.lazy(() => import('../Bookmarks/BookmarksPage'));
 export const RiskMatrixDemo = React.lazy(() => import('../DemoViews/RiskMatrixDemo'));
 export const AboutPage = React.lazy(() => import('../About/AboutPage'));

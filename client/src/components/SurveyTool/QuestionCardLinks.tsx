@@ -31,7 +31,7 @@ export const buildQuestionCardBookmarkClassName = ({
     .join(' ');
 
 export const resolveQuestionCardBookmarkIconStyle = (isQuestionBookmarked: unknown = false): React.CSSProperties => ({
-  color: isQuestionBookmarked ? '#ffc107' : 'white',
+  color: isQuestionBookmarked ? 'var(--ce-status-warning)' : 'var(--ce-panel-text)',
 });
 
 const QuestionCardLinks = ({
@@ -52,6 +52,7 @@ const QuestionCardLinks = ({
       </span>
     )}
     <button
+      type="button"
       onClick={onBookmarkToggle}
       className={buildQuestionCardBookmarkClassName({
         activeClassName: styles.fullQuestionBookmarkButtonActive,
@@ -59,6 +60,8 @@ const QuestionCardLinks = ({
         bookmarkClassName: styles.fullQuestionBookmarkButton,
         isQuestionBookmarked,
       })}
+      aria-label={isQuestionBookmarked ? 'Remove bookmark' : 'Bookmark question'}
+      aria-pressed={isQuestionBookmarked}
       title={isQuestionBookmarked ? 'Remove Bookmark' : 'Bookmark Question'}
     >
       <FontAwesomeIcon icon={faBookmark} style={resolveQuestionCardBookmarkIconStyle(isQuestionBookmarked)} />

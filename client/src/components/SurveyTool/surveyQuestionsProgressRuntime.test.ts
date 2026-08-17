@@ -96,6 +96,41 @@ describe('surveyQuestionsProgressRuntime', () => {
     });
   });
 
+  it('persists and restores bookmarks for an anonymous visitor', async () => {
+    let persistedBookmarks: { questions: string[] } | null = null;
+    const anonymousContext = createContext({
+      peekCacheSync: jest.fn(() => persistedBookmarks),
+      propsRef: {
+        current: {
+          account: '',
+          isStandalone: true,
+          questionID: 'q-anonymous',
+          questionPool: [{ id: 'q-anonymous' }],
+          singleQuestionMode: true,
+          surveyIndex: 0,
+        },
+      },
+      writeCacheOptimistic: jest.fn((_cacheName, _slug, value) => {
+        persistedBookmarks = value;
+        return Promise.resolve();
+      }),
+    });
+
+    createSurveyQuestionsProgressRuntime(anonymousContext).handleBookmarkToggle('q-anonymous');
+
+    expect(anonymousContext.setState).toHaveBeenCalledWith({ bookmarkedQuestions: new Set(['q-anonymous']) });
+    expect(persistedBookmarks).toEqual({ questions: ['q-anonymous'] });
+
+    const reloadContext = createContext({
+      peekCacheSync: jest.fn(() => persistedBookmarks),
+      propsRef: anonymousContext.propsRef,
+    });
+    await createSurveyQuestionsProgressRuntime(reloadContext).loadBookmarks();
+
+    expect(reloadContext.readCache).not.toHaveBeenCalled();
+    expect(reloadContext.setState).toHaveBeenCalledWith({ bookmarkedQuestions: new Set(['q-anonymous']) });
+  });
+
   it('recalculates edit stats from pending stats and relatches completed clean responses', () => {
     const context = createContext({
       getPendingEditStats: jest.fn(() => ({ encrypted: 0, total: 0 })),

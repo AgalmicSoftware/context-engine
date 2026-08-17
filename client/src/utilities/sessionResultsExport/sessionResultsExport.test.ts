@@ -163,7 +163,9 @@ describe('sessionResultsExport utilities', () => {
           questions: [
             {
               id: 'q1',
+              options: [],
               prompt: 'Prompt <b>unsafe</b>',
+              tags: [],
               type: 'freeform',
               responseCount: 1,
             },
@@ -195,7 +197,7 @@ describe('sessionResultsExport utilities', () => {
       exportedBy: { address: '0x9999999999999999999999999999999999999999' },
       sections: {
         report: {
-          questions: [{ id: 'q1', prompt: 'Only report?', responseCount: 1, type: 'binary' }],
+          questions: [{ id: 'q1', options: [], prompt: 'Only report?', responseCount: 1, tags: [], type: 'binary' }],
         },
       },
     });
@@ -216,6 +218,32 @@ describe('sessionResultsExport utilities', () => {
     expect(html).not.toContain('Download Snapshot JSON');
     expect(html).not.toContain('<h2>Argument Map</h2>');
     expect(html).not.toContain('<h2>Embedded Snapshot JSON</h2>');
+  });
+
+  it('keeps standalone HTML deterministic and fixed-light across session color scheme ids', () => {
+    const build = (colorSchemeId: string) => {
+      const snapshot = buildRedactedSessionResultsSnapshot({
+        exportedAt: '2026-05-25T18:30:00.000Z',
+        session: {
+          slug: 'demo',
+          name: 'Demo Session',
+          appearance: { colorSchemeId },
+        } as never,
+        sections: {
+          report: {
+            questions: [{ id: 'q1', options: [], prompt: 'Same report?', responseCount: 1, tags: [], type: 'binary' }],
+          },
+        },
+      });
+      return renderSessionResultsHtmlReport(snapshot, { format: 'single-html' });
+    };
+
+    const ocean = build('ocean');
+    const amber = build('amber');
+    expect(ocean).toBe(amber);
+    expect(ocean).not.toContain('data-ce-session-color-scheme');
+    expect(ocean).not.toContain('--ce-session-accent');
+    expect(ocean).toContain('background: #f7f8fb');
   });
 
   it('builds AI payloads with synthetic participant IDs and normalizes generated artifacts', () => {

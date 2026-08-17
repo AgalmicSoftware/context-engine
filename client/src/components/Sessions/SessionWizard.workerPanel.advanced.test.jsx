@@ -157,7 +157,7 @@ describe('SessionWizard worker panel rendering', () => {
     });
   });
 
-  it('hides an empty cached worker URL in normal mode until a real worker exists', async () => {
+  it('keeps an empty cached worker URL editable without marking it verified', async () => {
     sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
@@ -174,8 +174,10 @@ describe('SessionWizard worker panel rendering', () => {
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
     selectNormalModeCard('Worker');
 
-    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_WORKER_URL)).not.toBeInTheDocument();
-    expect(screen.getByText('Worker URL appears here after a successful custom worker deploy.')).toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_URL)).toHaveValue('');
+    expect(
+      screen.queryByText('Worker URL appears here after a successful custom worker deploy.'),
+    ).not.toBeInTheDocument();
     await waitFor(() => {
       const cachedRaw = sessionStorage.getItem('ce:sessionWizardDraft:v1') || '{}';
       expect(JSON.parse(cachedRaw).draft.corsWorkerUrl).toBe('');
@@ -199,11 +201,14 @@ describe('SessionWizard worker panel rendering', () => {
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
     selectNormalModeCard('Worker');
 
-    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_WORKER_URL)).not.toBeInTheDocument();
-    expect(screen.getByText('Worker URL appears here after a successful custom worker deploy.')).toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_URL)).toHaveValue('');
+    expect(
+      screen.queryByText('Worker URL appears here after a successful custom worker deploy.'),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Step 3: Session Worker/i })).toHaveClass('normalModeCardPending');
   });
 
-  it('shows the worker URL in normal mode after a worker has been deployed', async () => {
+  it('does not trust a cached deploy URL as verified after reload', async () => {
     const deployedWorkerUrl = 'https://deployed.example.test';
     sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
@@ -221,8 +226,12 @@ describe('SessionWizard worker panel rendering', () => {
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
     selectNormalModeCard('Worker');
 
-    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_WORKER_URL)).toHaveValue(deployedWorkerUrl);
-    expect(screen.queryByRole('button', { name: 'I already have a worker URL' })).not.toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_URL)).toHaveValue(deployedWorkerUrl);
+    expect(
+      screen.queryByText('Worker URL appears here after a successful custom worker deploy.'),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Step 3: Session Worker/i })).toHaveClass('normalModeCardPending');
+    expect(screen.queryByText('Custom worker ready')).not.toBeInTheDocument();
   });
 
   it('keeps the verified worker URL and publish readiness after a normal-mode deploy in /new', async () => {

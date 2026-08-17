@@ -24,7 +24,7 @@ import {
 describe('SessionWizard worker panel rendering', () => {
   beforeEach(resetSessionWizardWorkerPanelTestState);
 
-  it('keeps the normal-mode worker step focused on bring-your-own worker setup while defaulting to the release bundle URL', async () => {
+  it('lets a fresh decentralized session attach its required Worker before deployment', async () => {
     const { WORKER_BUNDLE_URL } = require('../../variables/publicDeploymentConfig.js');
 
     renderSessionWizard();
@@ -49,10 +49,12 @@ describe('SessionWizard worker panel rendering', () => {
     expect(screen.queryByText('Require users to pay for usage')).not.toBeInTheDocument();
     expect(screen.queryByText('Resource gates (on-chain)')).not.toBeInTheDocument();
     expect(screen.queryByText('Worker code (unbundled, copy + paste)')).not.toBeInTheDocument();
-    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_WORKER_URL)).not.toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_URL)).toHaveValue('');
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Reset to default' })).not.toBeInTheDocument();
-    expect(screen.getByText('Worker URL appears here after a successful custom worker deploy.')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Worker URL appears here after a successful custom worker deploy.'),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText('Deploy-helper URL')).not.toBeInTheDocument();
     expect(screen.getByText('Worker bundle URL (release asset)')).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveValue(WORKER_BUNDLE_URL);

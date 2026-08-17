@@ -80,6 +80,7 @@ export type SBTsPageProps = UnknownRecord & {
   onCreateGroupToggleExternal?: () => void;
   showCreateGroupExternal?: boolean;
   hideMiniActionRow?: boolean;
+  embeddedWorkerGroups?: boolean;
   showCreateGroupAboveFeatured?: boolean;
   preferCacheBackedFeaturedCards?: boolean;
   requireExplicitAutoFeatureSessionSlug?: boolean;

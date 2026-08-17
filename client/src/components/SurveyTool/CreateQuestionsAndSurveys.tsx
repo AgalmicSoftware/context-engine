@@ -3111,9 +3111,13 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
             aria-label="Add Rating question"
           >
             <div className={styles.typeTitle}>Rating</div>
-            <div className={styles.ratingPreviewWrap} aria-hidden="true">
-              <div className={styles.ratingPreviewFill} />
-              <div className={styles.ratingPreviewHandle} />
+            <div className={styles.ratingPreview} aria-hidden="true">
+              <span className={styles.ratingPreviewEndpoint}>1</span>
+              <span className={styles.ratingPreviewWrap}>
+                <span className={styles.ratingPreviewFill} />
+                <span className={styles.ratingPreviewHandle} />
+              </span>
+              <span className={styles.ratingPreviewEndpoint}>10</span>
             </div>
           </button>
 
@@ -3139,7 +3143,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           >
             <div className={styles.typeTitle}>Freeform</div>
             <div className={styles.freeformPreview} aria-hidden="true">
-              ...
+              Write an answer...
             </div>
           </button>
         </div>

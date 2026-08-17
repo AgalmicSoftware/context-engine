@@ -59,9 +59,13 @@ describe('aiClientSourceFetch', () => {
       json: async () => ({ content: '<main>Worker content '.repeat(12) + '</main>' }),
     } as Response);
 
+    const sessionConfig = {
+      slug: 'session-one',
+      sessionId: '0x11111111111111111111111111111111',
+    };
     const content = await fetchContentFromURL('https://source.example/page', {
       context: { requestId: 'req-1' },
-      sessionConfig: { slug: 'session-one' },
+      sessionConfig,
       sessionSlug: 'session-one',
     });
 
@@ -69,7 +73,7 @@ describe('aiClientSourceFetch', () => {
     expect(mockedGetCorsProxyUrlOrThrow).toHaveBeenCalledWith(
       expect.objectContaining({
         allowDemoFallback: false,
-        sessionConfig: { slug: 'session-one' },
+        sessionConfig,
         sessionSlug: 'session-one',
       }),
     );
@@ -81,6 +85,7 @@ describe('aiClientSourceFetch', () => {
       }),
       expect.objectContaining({
         allowDemoFallback: false,
+        sessionConfig,
         sessionSlug: 'session-one',
         workerUrl: 'https://worker.example',
       }),

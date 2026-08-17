@@ -1,5 +1,6 @@
 import React from 'react';
 import { PUBLIC_REPO_NEW_ISSUE_URL } from '../../variables/publicRepoMetadata.js';
+import { recoverFromStaleChunkLoadError } from '../../bootRecovery.js';
 
 type AppErrorBoundaryProps = {
   children?: React.ReactNode;
@@ -28,6 +29,7 @@ class AppErrorBoundary extends React.Component<AppErrorBoundaryProps, AppErrorBo
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('AppErrorBoundary caught an error:', error, errorInfo && errorInfo.componentStack);
+    recoverFromStaleChunkLoadError(error);
   }
 
   render() {
@@ -37,8 +39,8 @@ class AppErrorBoundary extends React.Component<AppErrorBoundaryProps, AppErrorBo
           style={{
             minHeight: '100vh',
             width: '100%',
-            background: '#0e111b',
-            color: '#ffffff',
+            background: 'var(--ce-canvas)',
+            color: 'var(--ce-panel-text)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -49,21 +51,21 @@ class AppErrorBoundary extends React.Component<AppErrorBoundaryProps, AppErrorBo
             style={{
               width: '100%',
               maxWidth: '680px',
-              background: 'rgba(255, 255, 255, 0.06)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
+              background: 'var(--ce-card-bg)',
+              border: '1px solid var(--ce-card-border)',
               borderRadius: '14px',
               padding: '28px',
             }}
           >
-            <h2 style={{ margin: '0 0 12px 0', color: '#ffffff' }}>Something went wrong</h2>
-            <p style={{ margin: '0 0 20px 0', color: 'rgba(244, 247, 255, 0.85)' }}>{this.state.errorMessage}</p>
+            <h2 style={{ margin: '0 0 12px 0', color: 'var(--ce-panel-text)' }}>Something went wrong</h2>
+            <p style={{ margin: '0 0 20px 0', color: 'var(--ce-panel-text-muted)' }}>{this.state.errorMessage}</p>
             <button
               type="button"
               onClick={() => window.location.reload()}
               style={{
-                background: '#4dffa4',
+                background: 'var(--ce-action-accent)',
                 border: 'none',
-                color: '#061016',
+                color: 'var(--ce-action-accent-text)',
                 fontWeight: 700,
                 borderRadius: '8px',
                 padding: '10px 16px',
@@ -79,7 +81,7 @@ class AppErrorBoundary extends React.Component<AppErrorBoundaryProps, AppErrorBo
                 rel="noopener noreferrer"
                 data-testid="ce-error-report-github"
                 style={{
-                  color: '#4dffa4',
+                  color: 'var(--ce-action-accent)',
                   fontWeight: 700,
                   textDecoration: 'none',
                 }}

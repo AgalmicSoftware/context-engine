@@ -177,7 +177,7 @@ const PostsPage = ({ enabled = CE_ABOUT_POSTS_ENABLED, fetcher = defaultFetch }:
         {!enabled && (
           <section className={styles.statusPanel} aria-live="polite">
             <h2>Posts are disabled for this deployment.</h2>
-            <p>Enable `REACT_APP_CE_ABOUT_POSTS_ENABLED` to show this page and its About page entry point.</p>
+            <p>Enable `REACT_APP_CE_ABOUT_POSTS_ENABLED` to show this page.</p>
           </section>
         )}
 

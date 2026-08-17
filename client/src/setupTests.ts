@@ -190,6 +190,21 @@ jest.mock('d3', () => {
     return packLayout;
   };
 
+  const forceWithStrength = () => {
+    const force = {
+      strength: jest.fn(() => force),
+    };
+    return force;
+  };
+  const forceSimulation = jest.fn(() => {
+    const simulation = {
+      force: jest.fn(() => simulation),
+      stop: jest.fn(() => simulation),
+      tick: jest.fn(() => simulation),
+    };
+    return simulation;
+  });
+
   return {
     __esModule: true,
     scaleLinear: chain,
@@ -201,6 +216,10 @@ jest.mock('d3', () => {
     schemeCategory10: [],
     schemeTableau10: [],
     color: jest.fn(),
+    forceCollide: jest.fn(() => ({})),
+    forceSimulation,
+    forceX: jest.fn(forceWithStrength),
+    forceY: jest.fn(forceWithStrength),
     hierarchy,
     pack,
   };

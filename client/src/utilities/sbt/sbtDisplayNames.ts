@@ -12,7 +12,7 @@ import {
   peekCacheSync,
   readCache,
   subscribeCacheUpdates,
-  writeCache,
+  updateCacheAtomic,
 } from '../cache/cacheScripts.js';
 import { ENABLE_TARGETED_SBT_METADATA_LOOKUP, USE_ONCHAIN_SESSION_REGISTRY } from '../../variables/appConfig.js';
 import { toStr } from '../shared/primitives.js';
@@ -97,8 +97,6 @@ const asSessionConfigRecord = (value: unknown): SessionConfigRecord | null =>
 
 const asMutableSbtCache = (value: unknown): Record<string, SbtCacheBucket> =>
   isRecord(value) ? (value as Record<string, SbtCacheBucket>) : {};
-
-const writeCacheValue = writeCache as (namespace: string, slug?: string, value?: unknown) => Promise<unknown>;
 
 const NAME_LOOKUP_BASE_DELAY_MS = 30 * 1000;
 const NAME_LOOKUP_MAX_DELAY_MS = 60 * 60 * 1000;
@@ -314,28 +312,30 @@ const persistSbtMetadataToCache = async ({
 
   const slug = sanitizeSlug(preferredSlug || metadata?.slug || '');
   const addressLower = checksum.toLowerCase();
-  const cacheObj = asMutableSbtCache(await readCache('sbtCache', slug));
-  const netKey = resolveSbtDisplayCacheWriteNetKey({
-    cacheObj,
-    addressLower,
-    chainId,
-    info: metadata,
+  let wroteEntry = false;
+  const persisted = await updateCacheAtomic<UnknownRecord>('sbtCache', slug, (currentIn) => {
+    const cacheObj = asMutableSbtCache(currentIn);
+    const netKey = resolveSbtDisplayCacheWriteNetKey({
+      cacheObj,
+      addressLower,
+      chainId,
+      info: metadata,
+    });
+    if (!netKey) return cacheObj;
+
+    const bucket = ensureNetBucket(cacheObj, netKey);
+    if (!bucket) return cacheObj;
+    const existingEntry = resolveEntryFromNetBucket(bucket, addressLower) || {};
+    bucket.sbtList[addressLower] = buildSbtDisplayCacheEntry({
+      existingEntry,
+      checksum,
+      metadata,
+      slug,
+    });
+    wroteEntry = true;
+    return cacheObj;
   });
-
-  if (!netKey) return false;
-
-  const bucket = ensureNetBucket(cacheObj, netKey);
-  if (!bucket) return false;
-
-  const existingEntry = resolveEntryFromNetBucket(bucket, addressLower) || {};
-  bucket.sbtList[addressLower] = buildSbtDisplayCacheEntry({
-    existingEntry,
-    checksum,
-    metadata,
-    slug,
-  });
-
-  return !!(await writeCacheValue('sbtCache', slug, cacheObj));
+  return wroteEntry && persisted !== null;
 };
 
 export const shortenSbtAddressText = (address: unknown) => {

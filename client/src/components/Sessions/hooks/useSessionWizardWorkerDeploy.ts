@@ -78,6 +78,11 @@ import {
   verifySessionWizardWorkerPublicDeployment,
 } from '../sessionWizardWorkerPublicVerification';
 import { postSessionWizardLitBootstrap } from '../sessionWizardWorkerDeployRequests';
+import {
+  resolveSessionWizardWorkerFaucetConfigFromDraft,
+  resolveSessionWizardWorkerRpcUrlFromDraft,
+  resolveSessionWizardWorkerRpcUrlMapFromDraft,
+} from '../sessionWizardWorkerRuntimeSupport';
 import type { AnyRecord, WorkerSecretSyncResult, WorkerSecretsLike } from '../../shellTypes';
 import type {
   DeployFormLike,
@@ -104,8 +109,6 @@ const useSessionWizardWorkerDeploy = ({
   applyWorkerSecretsUpdate = () => undefined,
   getMissingWorkerSecretsForDeploy = () => [],
   resolveWorkerBaseUrl = () => '',
-  resolveWorkerRpcUrl = () => '',
-  resolveWorkerRpcUrlMap = () => ({}),
   resolveWorkerFaucetConfig = () => ({}),
   parseAllowOriginsInput = () => [],
   signTypedAdminAction = async () => ({}),
@@ -139,6 +142,12 @@ const useSessionWizardWorkerDeploy = ({
     }
 
     if (resolvedAddress) {
+      if (runtimeRef?.current) {
+        runtimeRef.current = {
+          ...runtimeRef.current,
+          resolvedAdminAddress: resolvedAddress,
+        };
+      }
       if (resolvedWalletAccountRef) {
         resolvedWalletAccountRef.current = resolvedAddress;
       }
@@ -317,14 +326,26 @@ const useSessionWizardWorkerDeploy = ({
           registryAddress: toStr(runtime.registryAddress).trim(),
           registryChainId: Number(runtime.registryChainId || currentDraft.networkChainId || 0) || 0,
           adminAddress: resolvedAdmin,
-          rpcUrl: resolveWorkerRpcUrl(),
-          rpcUrlsByChainId: resolveWorkerRpcUrlMap(),
+          rpcUrl: resolveSessionWizardWorkerRpcUrlFromDraft({
+            draft: currentDraft,
+            registryChainId: runtime.registryChainId,
+            networkId: runtime.network?.id,
+          }),
+          rpcUrlsByChainId: resolveSessionWizardWorkerRpcUrlMapFromDraft({
+            draft: currentDraft,
+            registryChainId: runtime.registryChainId,
+            networkId: runtime.network?.id,
+          }),
           allowOrigins: parseAllowOriginsInput(),
           limits: Number(runtime.workerLimitPerWallet || 0)
             ? { perWalletPerDay: Number(runtime.workerLimitPerWallet) }
             : {},
           scopes: {},
-          faucet: resolveWorkerFaucetConfig(),
+          faucet: resolveSessionWizardWorkerFaucetConfigFromDraft({
+            draft: currentDraft,
+            registryChainId: runtime.registryChainId,
+            networkId: runtime.network?.id,
+          }),
           embeddedDeployHelperEnabled: runtime.embeddedDeployHelperEnabled,
         };
         const agentSessionWrappedDeployment = resolveSessionWizardAgentSessionWrappedDeployment({
@@ -347,12 +368,13 @@ const useSessionWizardWorkerDeploy = ({
           networkChainId: runtime.network?.id,
           sessionId: toStr(runtime.sessionId || '').trim(),
           latestChainBlock: runtime.latestChainBlock,
-          resolveWorkerFaucetConfig,
+          resolveWorkerFaucetConfig: () => payload.faucet,
         });
         [
           'sessionId',
           'sessionName',
           'sessionInfo',
+          'appearance',
           'sessionHeaderImg',
           'sessionEndsAt',
           'defaultTags',
@@ -509,7 +531,7 @@ const useSessionWizardWorkerDeploy = ({
             sessionId: toStr(runtime.sessionId || '').trim(),
             latestChainBlock: runtime.latestChainBlock,
             workerUrl: resolvedDeployWorkerUrl,
-            resolveWorkerFaucetConfig,
+            resolveWorkerFaucetConfig: () => payload.faucet,
           }),
           corsWorkerUrl: resolvedDeployWorkerUrl,
           ...(agentSessionWrapped ? { agentSessionWrapped } : {}),
@@ -750,23 +772,25 @@ const useSessionWizardWorkerDeploy = ({
         // ID then resumes signed sync without provisioning a second worker.
         const remoteWorkerReady = requiredWorkerSecretsReady;
         const workerRequirementProof =
-          remoteWorkerReady && modeRequirements.isWorkerCanonical
+          remoteWorkerReady && modeRequirements.usesWorkerRuntime
             ? buildSessionWizardWorkerRequirementProof({
                 workerUrl: resolvedDeployWorkerUrl,
                 sessionSlug: slug,
                 sessionId: runtime.sessionId || runtime.sessionIdHex,
                 sessionModeProfile: currentDraft.sessionModeProfile,
                 sessionAi: currentDraft.ai,
+                workerAllowOrigins: workerConfigPayload?.allowOrigins,
                 workerSecrets: deploySecrets,
                 requiredSecretFields: requiredWorkerSecretFields,
                 remoteManagedSecretFields: litBootstrapStatus?.synced === true ? ['litAccountApiKey'] : [],
                 litRuntimeConfig: workerConfigPayload?.litCredentials,
+                workerConfig: workerConfigPayload,
               })
             : null;
-        // A worker-canonical deploy is publish-safe only when the exact remote
+        // A Worker-backed deploy is publish-safe only when the exact remote
         // secret/requirement evidence can be compared against later edits.
         const publishSafeDeployComplete =
-          remoteWorkerReady && (!modeRequirements.isWorkerCanonical || !!workerRequirementProof);
+          remoteWorkerReady && (!modeRequirements.usesWorkerRuntime || !!workerRequirementProof);
         if (publishSafeDeployComplete && litBootstrapStatus?.synced === true) {
           // Keep bootstrap authority through every post-deploy write. Clearing it
           // earlier makes a failed AI/RPC secret sync impossible to resume safely.
@@ -823,6 +847,7 @@ const useSessionWizardWorkerDeploy = ({
           displayWorkerUrl,
           publishSafeDeployComplete,
           workerRequirementProof,
+          agentSessionWrapped ? { agentSessionWrapped } : {},
         );
         updateDeploymentState({
           deployWorkerUrl: displayWorkerUrl,
@@ -880,9 +905,6 @@ const useSessionWizardWorkerDeploy = ({
       getMissingWorkerSecretsForDeploy,
       parseAllowOriginsInput,
       resolveConnectedAdminAddress,
-      resolveWorkerFaucetConfig,
-      resolveWorkerRpcUrl,
-      resolveWorkerRpcUrlMap,
       runtimeRef,
       signTypedAdminAction,
       sponsoredBundleAppliedBundleRef,

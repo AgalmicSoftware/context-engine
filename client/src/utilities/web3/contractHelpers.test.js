@@ -85,6 +85,7 @@ describe('contractHelpers sendTestnetFunds', () => {
     });
     expect(authContext).toEqual(
       expect.objectContaining({
+        sessionConfig: { slug: 'alpha', networkChainId: 84532 },
         sessionSlug: 'alpha',
         workerUrl: 'https://worker.example.com/base',
         allowDemoFallback: defaultStrictAllowDemoFallback(),
@@ -381,6 +382,7 @@ describe('contractHelpers sendTestnetFunds', () => {
       'https://demo-worker.example',
       expect.any(Object),
       expect.objectContaining({
+        sessionConfig: refreshedConfig,
         sessionSlug: 'demo-1',
         workerUrl: 'https://demo-worker.example',
       }),

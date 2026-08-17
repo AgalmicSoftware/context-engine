@@ -15,6 +15,7 @@ import { lazyWithRetry } from '../../utilities/ui/lazyImportRetry.js';
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { hasDemoAnalysisFixture } from '../../utilities/demo/demoPolisDatasets';
 import type { RiskMatrixRestoreState } from '../MainContent/RiskMatrix';
 import styles from './OnePageSession.module.scss';
 import OnePageSessionAutoMintAlerts, { type OnePageSessionAutoMintAlertsProps } from './OnePageSessionAutoMintAlerts';
@@ -152,12 +153,12 @@ const renderSectionHeading = (title: React.ReactNode, subtitle: React.ReactNode)
   </span>
 );
 
-const buildResultsViewOptions = (isDemoSlug: boolean): ResultsViewOption[] => [
+const buildResultsViewOptions = (isDemoSlug: boolean, showDemoAnalysisView: boolean): ResultsViewOption[] => [
   { key: 'polis', label: 'Report', icon: '🧾' },
   ...(isDemoSlug
     ? [
         { key: 'debateAtlas', label: 'Debate Map', icon: '🗺️' },
-        { key: 'analysis', label: 'Breakdown', icon: '📊' },
+        ...(showDemoAnalysisView ? [{ key: 'analysis', label: 'Breakdown', icon: '📊' }] : []),
         { key: 'riskMatrix', label: 'Risk Matrix', icon: '⚠️' },
       ]
     : []),
@@ -259,8 +260,11 @@ export default function OnePageSessionStandardShell({
   onViewAllQuestionsClick,
 }: OnePageSessionStandardShellProps) {
   const basePath = readPublicUrlBasePath();
-  const effectiveResultsViewMode = isDemoSlug ? resultsViewMode : 'polis';
-  const resultsViewOptions = buildResultsViewOptions(isDemoSlug);
+  const showDemoAnalysisView = isDemoSlug && hasDemoAnalysisFixture(displaySessionSlug);
+  const requestedResultsViewMode = isDemoSlug ? resultsViewMode : 'polis';
+  const effectiveResultsViewMode =
+    requestedResultsViewMode === 'analysis' && !showDemoAnalysisView ? 'polis' : requestedResultsViewMode;
+  const resultsViewOptions = buildResultsViewOptions(isDemoSlug, showDemoAnalysisView);
   const sectionsGridClassName = [styles.sectionsGrid, !isDemoSlug ? styles.sectionsGridTwoUp : '']
     .filter(Boolean)
     .join(' ');
@@ -392,8 +396,10 @@ export default function OnePageSessionStandardShell({
       </div>
 
       {showQuestions && (
-        <div className={styles.sectionContainer} ref={questionsSectionRef}>
-          <div className={`${styles.miniSectionContent} ${styles.miniSectionContentNoHeader}`}>
+        <div className={`${styles.sectionContainer} ${styles.questionsSectionContainer}`} ref={questionsSectionRef}>
+          <div
+            className={`${styles.miniSectionContent} ${styles.miniSectionContentNoHeader} ${styles.questionsSectionContent}`}
+          >
             <Suspense fallback={<LazyFallback label="Loading..." minHeight="20vh" />}>
               <MemoSurveyPage
                 miniMode={true}
@@ -640,7 +646,7 @@ export default function OnePageSessionStandardShell({
                     />
                   </Suspense>
                 )}
-                {isDemoSlug && effectiveResultsViewMode === 'analysis' && (
+                {showDemoAnalysisView && effectiveResultsViewMode === 'analysis' && (
                   <Suspense fallback={<LazyFallback label="Loading Analysis..." minHeight="30vh" />}>
                     <DemoAnalysisWorkspace sessionSlug={slug} />
                   </Suspense>

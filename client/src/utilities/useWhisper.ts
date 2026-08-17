@@ -13,6 +13,7 @@ import { fetchWorkerWithAuth } from './worker/workerAuth.js';
 import { defaultStrictAllowDemoFallback } from './worker/workerSessionResolution.js';
 import { normalizeBaseUrl } from './urlUtils.js';
 import { createLogger } from './logging.js';
+import { requestPreferredSpeechMicrophone } from './audio/microphoneSelection.js';
 
 type WhisperLegacyValue = any;
 type WhisperCallback = (...args: WhisperLegacyValue[]) => void;
@@ -376,7 +377,7 @@ export const useWhisper = ({
     setStatus(RECORDING_STATUS.REQUESTING_PERMISSION);
     setErrorMessage('');
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await requestPreferredSpeechMicrophone(navigator.mediaDevices);
       streamRef.current = stream;
       setStatus(RECORDING_STATUS.READY);
       return stream;
@@ -536,10 +537,14 @@ export const useWhisper = ({
         if (controller) fetchOpts.signal = controller.signal;
 
         const baseUrl = corsWorkerUrl.replace(/\/+$/, '').replace(/\/transcribe$/i, '');
+        // Regression guard: nonce auth and transcription must share the resolved config;
+        // re-resolving by slug can bind a different session identity and return 409.
         const res = await fetchWorkerWithAuth(endpoint, fetchOpts, {
           sessionSlug: effectiveSessionSlug,
+          sessionConfig: effectiveSessionConfig,
           context,
           workerUrl: baseUrl,
+          anonymousOnly: true,
           preferAnonymous: true,
           fallbackOnGateUnavailable: true,
           allowDemoFallback: defaultStrictAllowDemoFallback(),

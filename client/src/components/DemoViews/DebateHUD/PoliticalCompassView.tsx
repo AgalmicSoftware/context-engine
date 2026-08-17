@@ -120,7 +120,7 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
   const cH = svgH - 2 * padY;
   const cx = padX + cW / 2;
   const cy = padY + cH / 2;
-  const edgeLabelStyle: React.CSSProperties = { fontSize: '14px', fontWeight: 800, fill: '#222' };
+  const edgeLabelStyle: React.CSSProperties = { fontSize: '14px', fontWeight: 800, fill: 'var(--ce-document-text)' };
   const getPointComment = (point?: CompassPoint | null) =>
     typeof point?.comment === 'string' ? point.comment.trim() : '';
   const getPointSlug = (pointName?: string) =>
@@ -245,10 +245,10 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
   };
 
   const quadColors = {
-    topLeft: 'rgba(120, 199, 120, 0.35)',
-    topRight: 'rgba(100, 149, 237, 0.35)',
-    bottomLeft: 'rgba(230, 80, 80, 0.30)',
-    bottomRight: 'rgba(230, 210, 80, 0.35)',
+    topLeft: 'color-mix(in srgb, var(--ce-data-series-7) 35%, transparent)',
+    topRight: 'color-mix(in srgb, var(--ce-data-series-1) 35%, transparent)',
+    bottomLeft: 'color-mix(in srgb, var(--ce-data-series-4) 30%, transparent)',
+    bottomRight: 'color-mix(in srgb, var(--ce-data-series-5) 35%, transparent)',
   };
   const getAvatarBaseRadius = (point: CompassPoint) => {
     if (point?.type === 'historical') return 16;
@@ -604,7 +604,7 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
             height: 'auto',
             display: 'block',
             margin: isFullscreen ? '0 auto 24px' : '0 auto 16px',
-            background: '#fafafa',
+            background: 'var(--ce-document-surface)',
             border: `1px solid ${T.border}`,
             borderRadius: T.radiusSm,
           }}
@@ -614,10 +614,10 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
           <rect x={padX} y={cy} width={cW / 2} height={cH / 2} fill={quadColors.bottomLeft} />
           <rect x={cx} y={cy} width={cW / 2} height={cH / 2} fill={quadColors.bottomRight} />
 
-          <line x1={padX} y1={cy} x2={padX + cW} y2={cy} stroke="#222" strokeWidth="2.5" />
-          <line x1={cx} y1={padY} x2={cx} y2={padY + cH} stroke="#222" strokeWidth="2.5" />
+          <line x1={padX} y1={cy} x2={padX + cW} y2={cy} stroke="var(--ce-document-text)" strokeWidth="2.5" />
+          <line x1={cx} y1={padY} x2={cx} y2={padY + cH} stroke="var(--ce-document-text)" strokeWidth="2.5" />
 
-          <rect x={padX} y={padY} width={cW} height={cH} fill="none" stroke="#222" strokeWidth="2" />
+          <rect x={padX} y={padY} width={cW} height={cH} fill="none" stroke="var(--ce-document-text)" strokeWidth="2" />
 
           <text x={cx} y={padY - 16} textAnchor="middle" style={edgeLabelStyle}>
             <title>{compass.yAxis.top}</title>
@@ -661,7 +661,7 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
                   {isActive && <circle cx={px} cy={py} r={activeSize + 6} fill={point.color} opacity={0.2} />}
 
                   {/* Always render the original shape as a base layer / broken-image fallback */}
-                  <g fill={point.color} stroke="#fff" strokeWidth={isActive ? 2.5 : 1.5}>
+                  <g fill={point.color} stroke="var(--ce-document-canvas)" strokeWidth={isActive ? 2.5 : 1.5}>
                     {getShape(point, px, py, isActive ? activeSize : size)}
                   </g>
 
@@ -673,7 +673,7 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
                         width={point.name.length * 7 + 8}
                         height={16}
                         rx={3}
-                        fill="rgba(255,255,255,0.92)"
+                        fill="color-mix(in srgb, var(--ce-document-canvas) 92%, transparent)"
                         stroke={point.color}
                         strokeWidth={0.8}
                       />
@@ -684,7 +684,7 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
                         style={{
                           fontSize: point.type === 'debater' ? '11px' : '10px',
                           fontWeight: point.type === 'debater' ? 700 : 600,
-                          fill: '#222',
+                          fill: 'var(--ce-document-text)',
                           pointerEvents: 'none',
                         }}
                       >
@@ -722,8 +722,8 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
               transform: 'translate(-50%, -50%)',
               borderRadius: '50%',
               objectFit: 'cover',
-              background: '#fff',
-              border: `${isActive ? 2.5 : 1.5}px solid #fff`,
+              background: 'var(--ce-document-canvas)',
+              border: `${isActive ? 2.5 : 1.5}px solid var(--ce-document-canvas)`,
               boxShadow: `0 0 0 ${isActive ? 2 : 1}px ${point.color}`,
               pointerEvents: 'none',
             }}
@@ -741,9 +741,9 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
               maxWidth: 250,
               padding: '10px 12px',
               borderRadius: 12,
-              background: 'rgba(15, 23, 42, 0.96)',
-              color: '#f8fafc',
-              boxShadow: '0 10px 24px rgba(15, 23, 42, 0.28)',
+              background: 'var(--ce-tooltip-bg)',
+              color: 'var(--ce-tooltip-text)',
+              boxShadow: 'var(--ce-shadow-raised)',
               border: `1px solid ${soften(tooltipState.color || T.accent, 0.22)}`,
               fontFamily: 'var(--ce-font-mono)',
               lineHeight: 1.5,
@@ -761,7 +761,7 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
             >
               {tooltipState.name}
             </div>
-            <div style={{ fontSize: 12, color: '#f8fafc' }}>{tooltipState.comment}</div>
+            <div style={{ fontSize: 12, color: 'var(--ce-tooltip-text)' }}>{tooltipState.comment}</div>
           </div>
         )}
       </div>
@@ -778,19 +778,40 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
       >
         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <svg width="12" height="12">
-            <circle cx="6" cy="6" r="5" fill="#666" stroke="#fff" strokeWidth="1" />
+            <circle
+              cx="6"
+              cy="6"
+              r="5"
+              fill="var(--ce-text-muted)"
+              stroke="var(--ce-document-canvas)"
+              strokeWidth="1"
+            />
           </svg>{' '}
           Debater
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <svg width="12" height="12">
-            <polygon points="6,1 11,6 6,11 1,6" fill="#666" stroke="#fff" strokeWidth="1" />
+            <polygon
+              points="6,1 11,6 6,11 1,6"
+              fill="var(--ce-text-muted)"
+              stroke="var(--ce-document-canvas)"
+              strokeWidth="1"
+            />
           </svg>{' '}
           Tweeter
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <svg width="12" height="12">
-            <rect x="1" y="1" width="10" height="10" rx="1.5" fill="#666" stroke="#fff" strokeWidth="1" />
+            <rect
+              x="1"
+              y="1"
+              width="10"
+              height="10"
+              rx="1.5"
+              fill="var(--ce-text-muted)"
+              stroke="var(--ce-document-canvas)"
+              strokeWidth="1"
+            />
           </svg>{' '}
           Insider / Historical
         </span>
@@ -806,7 +827,7 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
         left: 0,
         right: 0,
         bottom: 0,
-        background: 'rgba(255,255,255,0.97)',
+        background: 'color-mix(in srgb, var(--ce-document-canvas) 97%, transparent)',
         zIndex: 200,
         display: 'flex',
         flexDirection: 'column',

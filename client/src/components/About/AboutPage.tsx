@@ -17,7 +17,6 @@ import styles from './AboutPage.module.scss';
 import cipPhoto from '../../assets/img/cip_photo.png';
 import polisLogo from '../../assets/img/polis_logo.png';
 import rxcLogo from '../../assets/img/rxc_logo.png';
-import { CE_ABOUT_POSTS_ENABLED } from '../../variables/appConfig.js';
 import { PUBLIC_REPO_URL, PUBLIC_WHITEPAPER_URL } from '../../variables/publicRepoMetadata.js';
 import {
   derivePrimarySessionSlugFromList,
@@ -292,13 +291,6 @@ const USE_CASES = [
   },
 ];
 
-const getHeroTertiaryLinks = () => [
-  ...HEADER_LINKS,
-  ...(CE_ABOUT_POSTS_ENABLED
-    ? [{ url: buildPublicRoute('/posts'), text: 'Posts', testId: 'ce-about-link-posts', external: false }]
-    : []),
-];
-
 export const getConfiguredRecognitionIndividuals = (individuals: unknown[] = []): RecognitionIndividual[] =>
   individuals.filter(
     (person): person is RecognitionIndividual =>
@@ -344,7 +336,6 @@ const AboutPage = () => {
   const activeUseCaseConfig = USE_CASES.find(({ slug }) => slug === activeUseCase) || null;
   const configuredRecognitionIndividuals = getConfiguredRecognitionIndividuals(RECOGNIZED_INDIVIDUALS);
   const hasRecognizedIndividuals = configuredRecognitionIndividuals.length > 0;
-  const heroTertiaryLinks = getHeroTertiaryLinks();
 
   const handleUseCaseToggle = (slug: string) => {
     setActiveUseCase((currentSlug) => (currentSlug === slug ? '' : slug));
@@ -475,7 +466,7 @@ const AboutPage = () => {
             </div>
 
             <div className={styles.heroLinks}>
-              {heroTertiaryLinks.map((link) => (
+              {HEADER_LINKS.map((link) => (
                 <a
                   key={link.text}
                   href={link.url}
@@ -590,6 +581,7 @@ const AboutPage = () => {
             onClick={() => setShowPresent((currentState) => !currentState)}
             onKeyDown={(event) => handleSectionToggleKeyDown(event, setShowPresent)}
             role="button"
+            data-ce-control-appearance="frameless"
             tabIndex={0}
             aria-expanded={showPresent}
           >
@@ -645,6 +637,7 @@ const AboutPage = () => {
             onClick={() => setShowRoadmap((currentState) => !currentState)}
             onKeyDown={(event) => handleSectionToggleKeyDown(event, setShowRoadmap)}
             role="button"
+            data-ce-control-appearance="frameless"
             tabIndex={0}
             aria-expanded={showRoadmap}
           >
@@ -690,6 +683,7 @@ const AboutPage = () => {
             onClick={() => setShowRecognition((currentState) => !currentState)}
             onKeyDown={(event) => handleSectionToggleKeyDown(event, setShowRecognition)}
             role="button"
+            data-ce-control-appearance="frameless"
             tabIndex={0}
             aria-expanded={showRecognition}
           >

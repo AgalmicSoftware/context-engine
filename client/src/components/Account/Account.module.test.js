@@ -22,11 +22,33 @@ describe('Account.module.scss modal account layout guards', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'Account.module.scss'), 'utf8');
 
     expect(scss).toMatch(
-      /#loginModalCard\s*{[\s\S]*?:global\(\.card-header\)\s*{[\s\S]*?position:\s*relative;[\s\S]*?padding-right:\s*4\.25rem;/,
+      /#loginModalCard\s*{[\s\S]*?margin-top:\s*0;[\s\S]*?:global\(\.card-header\)\s*{[\s\S]*?position:\s*relative;[\s\S]*?padding-right:\s*4\.25rem;/,
     );
     expect(scss).toMatch(
-      /:global\(\.modal-login \.close\)\s*(?:,[^{]*?)?\s*{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*1rem;[\s\S]*?right:\s*1rem;[\s\S]*?background:\s*transparent;[\s\S]*?opacity:\s*0\.5;/,
+      /:global\(\.modal-login \.close\)\s*(?:,[^{]*?)?\s*{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*1rem;[\s\S]*?right:\s*1rem;[\s\S]*?background:\s*transparent;[\s\S]*?color:\s*var\(--ce-titlebar-text\);[\s\S]*?opacity:\s*0\.85;/,
     );
+  });
+
+  it('uses matched semantic surfaces for the login title and passkey explanation', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'Account.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /\.Web3SettingsModalTitle\s*{[\s\S]*?color:\s*var\(--ce-titlebar-text\);[\s\S]*?opacity:\s*1;/,
+    );
+    expect(scss).toMatch(
+      /\.accountWarningMessage\s*{[\s\S]*?background:\s*var\(--ce-surface-sunken\);[\s\S]*?border-color:\s*var\(--ce-border-inset\);[\s\S]*?color:\s*var\(--ce-panel-text\);[\s\S]*?box-shadow:\s*var\(--ce-shadow-pressed\);/,
+    );
+    expect(scss).not.toMatch(
+      /\.accountWarningMessage\s*{[\s\S]*?background:\s*var\(--ce-overlay-base\);[\s\S]*?color:\s*var\(--ce-status-info-text\);/,
+    );
+  });
+
+  it('uses a solid login-card surface without a decorative gradient overlay', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'Account.module.scss'), 'utf8');
+
+    expect(scss).toMatch(/#loginModalCard\s*{[\s\S]*?position:\s*relative;[\s\S]*?background:\s*var\(--ce-surface\);/);
+    expect(scss).not.toMatch(/#loginModalCard::after\s*{/);
+    expect(scss).not.toMatch(/#loginModalCard::before\s*{/);
   });
 
   it('styles preference controls as switches and keeps the session summary in the config control family', () => {
@@ -36,14 +58,43 @@ describe('Account.module.scss modal account layout guards', () => {
       /\.preferenceToggleTrack\s*{[\s\S]*?width:\s*38px;[\s\S]*?height:\s*22px;[\s\S]*?border-radius:\s*var\(--ce-radius-pill\);/,
     );
     expect(scss).toMatch(
-      /\.preferenceToggleButton\[aria-pressed='true'\] \.preferenceToggleThumb\s*{[\s\S]*?background:\s*#4dffa4;[\s\S]*?transform:\s*translateX\(16px\);/,
+      /\.preferenceToggleButton\[aria-pressed='true'\] \.preferenceToggleThumb\s*{[\s\S]*?background:\s*var\(--ce-action-accent\);[\s\S]*?transform:\s*translateX\(16px\);/,
     );
     expect(scss).toMatch(
-      /\.settingsSessionRoute\s*{[\s\S]*?min-height:\s*44px;[\s\S]*?border-radius:\s*var\(--ce-radius-10\);[\s\S]*?border:\s*1px solid rgba\(255, 255, 255, 0\.36\);[\s\S]*?background:\s*transparent;/,
+      /\.settingsSessionRoute\s*{[\s\S]*?min-height:\s*44px;[\s\S]*?border-radius:\s*var\(--ce-radius-10\);[\s\S]*?border-color:\s*var\(--ce-settings-control-border\);[\s\S]*?border-width:\s*var\(--ce-settings-control-border-width\);[\s\S]*?background:\s*var\(--ce-settings-control-bg\);[\s\S]*?opacity:\s*var\(--ce-settings-control-opacity\);/,
     );
     expect(scss).toMatch(
-      /\.sendTestnetFundsButton\.settingsConfigToggleButton,[\s\S]*?\.sendTestnetFundsButton\.preferenceToggleButton\s*{[\s\S]*?border-color:\s*rgba\(255, 255, 255, 0\.36\);/,
+      /\.sendTestnetFundsButton\.settingsConfigToggleButton,[\s\S]*?\.sendTestnetFundsButton\.preferenceToggleButton\s*{[\s\S]*?background:\s*var\(--ce-settings-control-bg\);[\s\S]*?border-color:\s*var\(--ce-settings-control-border\);[\s\S]*?opacity:\s*var\(--ce-settings-control-opacity\);/,
     );
+  });
+
+  it('uses theme-owned readable surfaces and text throughout Settings', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'Account.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /\.preLoginSettingsPanel\s*{[\s\S]*?background:\s*var\(--ce-settings-panel-bg\);[\s\S]*?color:\s*var\(--ce-settings-text\);/,
+    );
+    expect(scss).toMatch(
+      /\.aiSettingsPanel\s*{[\s\S]*?background:\s*var\(--ce-settings-panel-bg\);[\s\S]*?color:\s*var\(--ce-settings-text\);/,
+    );
+    expect(scss).toMatch(/\.supportedResourceDetail\s*{[\s\S]*?color:\s*var\(--ce-settings-muted-text\);/);
+    expect(scss).toMatch(
+      /\.preLoginSettingsInput\s*{[\s\S]*?background:\s*var\(--ce-settings-field-bg\);[\s\S]*?color:\s*var\(--ce-settings-text\);/,
+    );
+    expect(scss).toMatch(/\.settingsSectionCard\s*{[\s\S]*?background:\s*var\(--ce-settings-section-bg\);/);
+    expect(scss).toMatch(
+      /\.preLoginSettingsActions :global\(\.btn-outline-secondary\)\s*{[\s\S]*?background:\s*var\(--ce-settings-control-bg\);[\s\S]*?color:\s*var\(--ce-settings-control-text\);[\s\S]*?opacity:\s*1;/,
+    );
+    [
+      'preLoginSettingsTitle',
+      'preLoginSettingsLabel',
+      'supportedResourceDetail',
+      'supportedResourceSessionsLabel',
+      'aiSettingsHint',
+      'sessionPillMeta',
+    ].forEach((className) => {
+      expect(scss).toMatch(new RegExp(`\\.${className}\\s*\\{[^}]*color:\\s*var\\(--ce-settings-muted-text\\);`));
+    });
   });
 
   it('wraps settings controls into non-overlapping half rows at medium widths', () => {
@@ -60,6 +111,21 @@ describe('Account.module.scss modal account layout guards', () => {
     );
     expect(scss).toMatch(
       /@media \(min-width:\s*769px\) and \(max-width:\s*1023px\)[\s\S]*?\.tooltipsToggleButton\s*{[\s\S]*?flex:\s*1 1 auto;[\s\S]*?width:\s*auto;[\s\S]*?min-width:\s*0;[\s\S]*?justify-content:\s*center;/,
+    );
+  });
+
+  it('keeps the pre-login Session summary outside a centered, wrapping settings row', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'Account.module.scss'), 'utf8');
+
+    expect(scss).toMatch(/\.preLoginSettingsTopRow\s*{[\s\S]*?justify-content:\s*space-between;/);
+    expect(scss).toMatch(
+      /\.preLoginSessionSummary\s*{[\s\S]*?display:\s*flex;[\s\S]*?flex:\s*1 1 auto;[\s\S]*?justify-content:\s*center;/,
+    );
+    expect(scss).toMatch(
+      /@media \(min-width:\s*540px\)\s*{[\s\S]*?\.preLoginSettingsControlRow\s*{[\s\S]*?flex-wrap:\s*wrap;[\s\S]*?justify-content:\s*center;/,
+    );
+    expect(scss).toMatch(
+      /@media \(min-width:\s*540px\)[\s\S]*?\.preLoginSettingsControlRow > \*\s*{[\s\S]*?flex:\s*1 1 220px;[\s\S]*?min-width:\s*min\(100%, 220px\);[\s\S]*?max-width:\s*300px;/,
     );
   });
 });

@@ -829,6 +829,104 @@ describe('workerAuth bootstrap admin signing', () => {
     );
   });
 
+  it('does not require Worker-canonical nonce identity for a registry config write', async () => {
+    global.fetch = jest.fn(async () => jsonResp(200, { nonce: 'nonce-registry-1' }));
+
+    await expect(
+      buildSignedAdminActionAuth({
+        action: 'set-config',
+        slug: 'edge',
+        body: {
+          sessionSlug: 'edge',
+          sessionId: CANONICAL_SESSION_ID,
+          config: {
+            sessionId: CANONICAL_SESSION_ID,
+            sessionModeProfile: { authority: { mode: 'evm_registry_canonical' } },
+          },
+        },
+        workerUrl: 'https://worker.example',
+        context: {
+          account: TEST_ADDRESS,
+          providerLike: 'wagmi',
+          chainId: 84532,
+        },
+      }),
+    ).resolves.toEqual(expect.objectContaining({ nonce: 'nonce-registry-1', signature: '0xtyped-signed' }));
+
+    expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual({
+      address: TEST_ADDRESS,
+      sessionSlug: 'edge',
+      adminAction: true,
+    });
+  });
+
+  it('uses explicit registry authority for a group action with a top-level session ID', async () => {
+    global.fetch = jest.fn(async () => jsonResp(200, { nonce: 'nonce-registry-groups-1' }));
+
+    await expect(
+      buildSignedAdminActionAuth({
+        action: 'groups/list',
+        slug: 'edge',
+        sessionId: CANONICAL_SESSION_ID,
+        sessionAuthorityMode: 'evm_registry_canonical',
+        body: { sessionId: CANONICAL_SESSION_ID },
+        workerUrl: 'https://worker.example',
+        context: {
+          account: TEST_ADDRESS,
+          providerLike: 'wagmi',
+          chainId: 84532,
+        },
+      }),
+    ).resolves.toEqual(expect.objectContaining({ nonce: 'nonce-registry-groups-1', signature: '0xtyped-signed' }));
+
+    expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual({
+      address: TEST_ADDRESS,
+      sessionSlug: 'edge',
+      adminAction: true,
+    });
+  });
+
+  it('requests explicit identity bootstrap for the first Worker-canonical config write', async () => {
+    const sessionId = '0x12121212121212121212121212121212';
+    global.fetch = jest.fn(async () =>
+      jsonResp(200, {
+        nonce: 'nonce-worker-bootstrap-1',
+        sessionSlug: 'edge',
+        sessionId,
+        bootstrapWorkerCanonicalIdentity: true,
+      }),
+    );
+
+    await expect(
+      buildSignedAdminActionAuth({
+        action: 'set-config',
+        slug: 'edge',
+        body: {
+          sessionSlug: 'edge',
+          sessionId,
+          config: {
+            sessionId,
+            sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+          },
+        },
+        workerUrl: 'https://worker.example',
+        context: {
+          account: TEST_ADDRESS,
+          providerLike: 'wagmi',
+          chainId: 84532,
+        },
+      }),
+    ).resolves.toEqual(expect.objectContaining({ nonce: 'nonce-worker-bootstrap-1', signature: '0xtyped-signed' }));
+
+    expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual({
+      address: TEST_ADDRESS,
+      sessionSlug: 'edge',
+      sessionId,
+      adminAction: true,
+      bootstrapWorkerCanonicalIdentity: true,
+    });
+  });
+
   it('binds Worker-canonical admin nonces to the exact session identity', async () => {
     const { ethers } = require('ethers');
     const { cryptoUtils } = require('../crypto/cryptography.js');
@@ -848,6 +946,7 @@ describe('workerAuth bootstrap admin signing', () => {
         action: 'groups/list',
         slug: 'edge',
         sessionId,
+        sessionAuthorityMode: 'worker_canonical',
         nonce: 'slug-only-stale-nonce',
         body: { sessionId },
         workerUrl: 'https://worker.example',
@@ -886,8 +985,12 @@ describe('workerAuth bootstrap admin signing', () => {
       buildSignedAdminActionAuth({
         action: 'groups/list',
         slug: 'edge',
-        sessionId,
-        body: { sessionId },
+        body: {
+          config: {
+            sessionId,
+            sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+          },
+        },
         workerUrl: 'https://worker.example',
         context: {
           account: TEST_ADDRESS,
@@ -1045,6 +1148,40 @@ describe('workerAuth fetchWorkerWithAuth', () => {
     expect(headers.get('X-Group-Slug')).toBe('general');
     expect(headers.get('X-Anonymous-Client-Id')).toMatch(/^[a-z0-9_-]{8,128}$/);
     expect(headers.get('Authorization')).toBeNull();
+  });
+
+  it('returns an anonymous denial without opening an interactive authentication flow when anonymous-only is required', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResp(403, {
+          error: 'Anonymous access denied: AI/transcribe require open default+ai gates or a request apiKey.',
+        }),
+      )
+      .mockResolvedValueOnce(jsonResp(200, { nonce: 'nonce-should-not-be-requested' }))
+      .mockResolvedValueOnce(
+        jsonResp(200, { token: 'token-should-not-be-requested', exp: Math.floor(Date.now() / 1000) + 3600 }),
+      )
+      .mockResolvedValueOnce(jsonResp(200, { ok: true }));
+
+    const response = await fetchWorkerWithAuth(
+      'https://worker.example/transcribe',
+      { method: 'POST', body: new FormData() },
+      {
+        sessionSlug: 'demo-sh',
+        preferAnonymous: true,
+        anonymousOnly: true,
+        context: {
+          account: TEST_ADDRESS,
+          providerLike: 'wagmi',
+          chainId: 84532,
+        },
+      },
+    );
+
+    expect(response.status).toBe(403);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(mockProviderRequest).not.toHaveBeenCalled();
   });
 
   it('retries anonymous request without X-Anonymous-Client-Id only after compatibility probe', async () => {

@@ -46,6 +46,45 @@ describe('UserPage cache refresh response hydration', () => {
     expect(instance.state.questionCreationInfo[0].prompt).toBe('Who goes there?');
   });
 
+  it('does not mutate cached survey or question records when creator metadata is inferred', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000bb';
+    const networkID = '84532';
+    const instance = makeInstance({ viewAddress });
+    const cachedSurvey = { id: 's-cache-only', title: 'Cached survey', questionIDs: [] };
+    const cachedQuestion = { id: 'q-cache-only', prompt: 'Cached question', type: 'freeform' };
+
+    const dataByNamespace = {
+      surveysCache: [],
+      sbtCache: [],
+      questionsCache: [],
+      userCache: [
+        {
+          slug: 'edge',
+          data: {
+            [viewAddress.toLowerCase()]: {
+              [networkID]: {
+                data: {
+                  createdSurveys: [{ id: cachedSurvey.id, data: cachedSurvey }],
+                  createdQuestions: [{ id: cachedQuestion.id, data: cachedQuestion }],
+                },
+              },
+            },
+          },
+        },
+      ],
+    };
+
+    instance._dgHasAny = jest.fn(() => true);
+    instance._dgReadAll = jest.fn((name) => dataByNamespace[name] || []);
+
+    instance._refreshAllDataFromCache({ force: true, markLoading: true });
+
+    expect(instance.state.surveyCreationInfo).toHaveLength(1);
+    expect(instance.state.questionCreationInfo).toHaveLength(1);
+    expect(cachedSurvey).not.toHaveProperty('creator');
+    expect(cachedQuestion).not.toHaveProperty('creator');
+  });
+
   it('preserves source session slugs for profile question cards', () => {
     const viewAddress = '0x00000000000000000000000000000000000000aa';
     const viewLower = viewAddress.toLowerCase();

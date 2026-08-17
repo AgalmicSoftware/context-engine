@@ -25,7 +25,7 @@ import contractScripts, {
 } from '../../utilities/web3/chainGateway.js';
 import SBTsList from '../SBTs/SBTsList';
 import SBTFilter from '../SBTs/SBTFilter';
-import BeeswarmPlot from '../SurveyTool/BeeswarmPlot';
+import BeeswarmPlot from '../Shared/BeeswarmPlot/BeeswarmPlot';
 import CETooltip from '../Shared/CETooltip';
 
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
@@ -47,11 +47,13 @@ import {
 } from '../../utilities/session/globalSessionState.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { POLIS_DEMO_DATA_AUTOLOAD_SLUGS } from '../../variables/appConfig.js';
-import { getPolisDemoDatasetForSlug } from '../PolisReport/PolisReport';
+import { buildRatingMatrixFromDemo, getPolisDemoDatasetForSlug } from '../PolisReport/PolisReport';
 import { persistCommunitySbtHolderHydrationResults } from './communitySbtHolderHydrationCache.js';
+import { buildCommunityBeeswarmPointsFromResults } from './communityBeeswarmPoints';
 
 const uiLog = createLogger('ui');
-const COMMUNITY_BEESWARM_DEMO_SLUG = 'demo';
+const COMMUNITY_BEESWARM_FALLBACK_DEMO_SLUG = 'demo';
+const COMMUNITY_BEESWARM_DOMAIN = [0, 1] as const;
 type CacheReadOptions = { clone?: boolean };
 type SessionSelectorOption = { value: string; label: string };
 type ScopeCacheEntry = {
@@ -471,27 +473,7 @@ class CommunityTab extends Component<any, any> {
         }),
       );
 
-      let changed = false;
-      results.forEach((res: any) => {
-        if (!res || res.countsOk === false) return;
-        const existing = sbtList[res.lower] || {};
-        sbtList[res.lower] = {
-          ...existing,
-          sbtAddress: existing.sbtAddress || res.addr,
-          mintedAddresses: res.mintedAddresses,
-          burnedAddresses: res.burnedAddresses,
-          countsLoaded: true,
-          mintedCountByAddress: res.counts?.mintedCountByAddress || existing.mintedCountByAddress || {},
-          burnedCountByAddress: res.counts?.burnedCountByAddress || existing.burnedCountByAddress || {},
-          mintedEventCount: res.counts?.mintedEventCount || existing.mintedEventCount || 0,
-          burnedEventCount: res.counts?.burnedEventCount || existing.burnedEventCount || 0,
-          blockNumber: Number.isFinite(Number(res.counts?.scannedToBlock))
-            ? Math.floor(Number(res.counts.scannedToBlock))
-            : existing.blockNumber,
-          countsScanCheckpoint: null,
-        };
-        changed = true;
-      });
+      const changed = results.some((res: any) => !!res && res.countsOk !== false);
 
       if (changed) {
         await persistCommunitySbtHolderHydrationResults({ slug, netKey, results });
@@ -1058,7 +1040,7 @@ class CommunityTab extends Component<any, any> {
     }
 
     const minLastBlock = Math.min(surveyLastBlock, questionLastBlock, sbtLastBlock);
-    return minLastBlock >= latestBlockNumber;
+    return latestBlockNumber > 0 && minLastBlock >= latestBlockNumber;
   };
 
   _computeNextPollDelayMs = () => {
@@ -1540,18 +1522,19 @@ class CommunityTab extends Component<any, any> {
     if (!Array.isArray(scopeEntries) || scopeEntries.length !== 1) return false;
     const activeSlug = normalizeSessionSlug(scopeEntries[0]?.slug || this._currentSlug() || '');
     if (!activeSlug) return false;
-    if (activeSlug !== COMMUNITY_BEESWARM_DEMO_SLUG) return false;
-    if (readSessionScanScope() !== 'list') return false;
     return (
       Array.isArray(POLIS_DEMO_DATA_AUTOLOAD_SLUGS) &&
-      POLIS_DEMO_DATA_AUTOLOAD_SLUGS.map((slug: any) => normalizeSessionSlug(slug)).includes(
-        COMMUNITY_BEESWARM_DEMO_SLUG,
-      )
+      POLIS_DEMO_DATA_AUTOLOAD_SLUGS.map((slug: any) => normalizeSessionSlug(slug)).includes(activeSlug)
     );
   };
 
-  _buildDemoBeeswarmPoints = () => {
-    const dataset = getPolisDemoDatasetForSlug(COMMUNITY_BEESWARM_DEMO_SLUG, { allowFallback: false }) as {
+  _buildDemoBeeswarmPoints = (slugOverride: string | null = null) => {
+    const scopeEntries = this._iterScopeCaches({ clone: false });
+    const activeSlug = normalizeSessionSlug(scopeEntries[0]?.slug || this._currentSlug() || '');
+    const requestedSlug = normalizeSessionSlug(slugOverride || activeSlug || COMMUNITY_BEESWARM_FALLBACK_DEMO_SLUG);
+    const dataset = getPolisDemoDatasetForSlug(requestedSlug, {
+      allowFallback: false,
+    }) as {
       comments?: unknown[];
       participantsVotes?: unknown[];
     } | null;
@@ -1562,47 +1545,43 @@ class CommunityTab extends Component<any, any> {
         .toLowerCase();
       return !t || t === 'binary';
     });
-    const binaryIndexMap: any[] = [];
-    comments.forEach((c: any, i: any) => {
-      const t = String(c?.type || '')
+    const ratingMatrixResult = buildRatingMatrixFromDemo(dataset);
+    const ratingMatrix = Array.isArray(ratingMatrixResult?.matrix) ? ratingMatrixResult.matrix : [];
+    if (!binaryComments.length || !ratingMatrix.length) return [];
+
+    return buildCommunityBeeswarmPointsFromResults({
+      questions: binaryComments.map((comment: any, index: number) => ({
+        label: String(comment?.commentBody || '(No prompt)'),
+        questionId: String(comment?.commentId || index),
+      })),
+      ratingMatrix,
+      results: computeQuestionDivisiveness(ratingMatrix),
+    });
+  };
+
+  _isZeroResponseBundledDemoPointSet = (points: any[] = []) => {
+    if (!Array.isArray(points) || points.length === 0) return false;
+    if (points.some((point: any) => Math.max(0, Number(point?.total || 0)) > 0)) return false;
+
+    const dataset = getPolisDemoDatasetForSlug(COMMUNITY_BEESWARM_FALLBACK_DEMO_SLUG, {
+      allowFallback: false,
+    }) as { comments?: unknown[] } | null;
+    const binaryComments = (Array.isArray(dataset?.comments) ? dataset.comments : []).filter((comment: any) => {
+      const type = String(comment?.type || '')
         .trim()
         .toLowerCase();
-      if (!t || t === 'binary') binaryIndexMap.push(i);
+      return !type || type === 'binary';
     });
-    const participants = Array.isArray(dataset?.participantsVotes) ? dataset.participantsVotes : [];
-    if (!binaryComments.length || !participants.length) return [];
+    if (binaryComments.length !== points.length) return false;
 
-    const ratingMatrix = binaryComments.map(() => Array(participants.length).fill(null));
-    participants.forEach((participant: any, participantIndex: any) => {
-      const votes = participant?.votes && typeof participant.votes === 'object' ? participant.votes : {};
-      binaryIndexMap.forEach((originalIndex: any, filteredIndex: any) => {
-        const rawVote = votes[String(originalIndex)];
-        if (rawVote === undefined) return;
-        const vote = this._normalizeBinaryVoteValue(rawVote);
-        if (vote == null) return;
-        ratingMatrix[filteredIndex][participantIndex] = vote;
-      });
-    });
+    const expectedIds = new Set(binaryComments.map((comment: any) => String(comment?.commentId || '').toLowerCase()));
+    const pointIds = points.map((point: any) => String(point?.questionId || '').toLowerCase());
+    if (pointIds.every((questionId: string) => questionId && expectedIds.has(questionId))) return true;
 
-    return computeQuestionDivisiveness(ratingMatrix).map((result: any) => {
-      const comment = (binaryComments[result.commentIndex] || {}) as {
-        commentId?: unknown;
-        commentBody?: unknown;
-      };
-      const rowVotes = Array.isArray(ratingMatrix[result.commentIndex]) ? ratingMatrix[result.commentIndex] : [];
-      const unsure = rowVotes.filter((vote: any) => vote === 0).length;
-      const total = result.agrees + result.disagrees + unsure;
-      return {
-        index: result.commentIndex,
-        questionId: String(comment.commentId || result.commentIndex),
-        // BeeswarmPlot expects `extremity`; this is 50/50-split divisiveness, not PCA extremity.
-        extremity: result.divisiveness,
-        label: String(comment.commentBody || '(No prompt)'),
-        agrees: result.agrees,
-        disagrees: result.disagrees,
-        unsure,
-        total,
-      };
+    const expectedLabels = new Set(binaryComments.map((comment: any) => String(comment?.commentBody || '').trim()));
+    return points.every((point: any) => {
+      const label = String(point?.label || '').trim();
+      return label && expectedLabels.has(label);
     });
   };
 
@@ -1709,23 +1688,13 @@ class CommunityTab extends Component<any, any> {
       });
     });
 
-    return computeQuestionDivisiveness(ratingMatrix).map((result: any) => {
-      const questionId = binaryQuestionIds[result.commentIndex];
-      const question = questionMap.get(questionId) || {};
-      const rowVotes = Array.isArray(ratingMatrix[result.commentIndex]) ? ratingMatrix[result.commentIndex] : [];
-      const unsure = rowVotes.filter((vote: any) => vote === 0).length;
-      const total = result.agrees + result.disagrees + unsure;
-      return {
-        index: result.commentIndex,
+    return buildCommunityBeeswarmPointsFromResults({
+      questions: binaryQuestionIds.map((questionId: any) => ({
+        label: questionMap.get(questionId)?.prompt || '(No prompt)',
         questionId,
-        // BeeswarmPlot expects `extremity`; this is 50/50-split divisiveness, not PCA extremity.
-        extremity: result.divisiveness,
-        label: question.prompt || '(No prompt)',
-        agrees: result.agrees,
-        disagrees: result.disagrees,
-        unsure,
-        total,
-      };
+      })),
+      ratingMatrix,
+      results: computeQuestionDivisiveness(ratingMatrix),
     });
   };
 
@@ -1887,7 +1856,13 @@ class CommunityTab extends Component<any, any> {
     const points = this._getQuestionSwarmPoints();
     return (
       <section className={styles.beeswarmSection} data-testid="ce-community-beeswarm-section">
-        <BeeswarmPlot points={points} height={220} showIdleSummary={false} />
+        <BeeswarmPlot
+          points={points}
+          className={styles.beeswarmPlot}
+          domain={COMMUNITY_BEESWARM_DOMAIN}
+          height={220}
+          showIdleSummary={false}
+        />
       </section>
     );
   }
@@ -1896,10 +1871,13 @@ class CommunityTab extends Component<any, any> {
     if (this._shouldUseDemoBeeswarmData()) {
       return this._buildDemoBeeswarmPoints();
     }
-    if (Array.isArray(this._beeswarmPoints) && this._beeswarmPoints.length > 0) {
-      return this._beeswarmPoints;
-    }
-    return this._buildCommunityBeeswarmPoints();
+    const points =
+      Array.isArray(this._beeswarmPoints) && this._beeswarmPoints.length > 0
+        ? this._beeswarmPoints
+        : this._buildCommunityBeeswarmPoints();
+    return this._isZeroResponseBundledDemoPointSet(points)
+      ? this._buildDemoBeeswarmPoints(COMMUNITY_BEESWARM_FALLBACK_DEMO_SLUG)
+      : points;
   };
 
   renderQuestionsModalContent = () => {
@@ -1912,7 +1890,7 @@ class CommunityTab extends Component<any, any> {
           </a>
         </div>
         <div className={styles.questionsModalPlot}>
-          <BeeswarmPlot points={points} height={240} showIdleSummary={false} />
+          <BeeswarmPlot points={points} domain={COMMUNITY_BEESWARM_DOMAIN} height={240} showIdleSummary={false} />
         </div>
       </div>
     );
@@ -2099,11 +2077,13 @@ class CommunityTab extends Component<any, any> {
 
   render() {
     const { showModal, modalTitle, loadingSbtsCreated, stats, initialLoadDone } = this.state;
+    const participantCount = this.getMemoizedLeaderboardData().length;
 
     return (
       <div className={styles.communityTab}>
         <div className={styles.leaderboardSection}>
           <div className={styles.leaderboardTopBar}>
+            <h2 className={styles.leaderboardTitle}>Participants ({participantCount})</h2>
             <div className={styles.headerActionsRight}>{this.renderLeaderboardControls()}</div>
           </div>
           <div className={styles.content}>

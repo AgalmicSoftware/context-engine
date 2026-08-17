@@ -153,6 +153,7 @@ describe('admin worker ports', () => {
         workerUrl: 'https://worker.example.test',
         address: '0x00000000000000000000000000000000000000aa',
         sessionSlug: 'edge',
+        sessionId: '0x44444444444444444444444444444444',
         chainId: 84532,
         statement: 'Sign in to Context Engine.',
       }),
@@ -168,6 +169,7 @@ describe('admin worker ports', () => {
       body: JSON.stringify({
         address: '0x00000000000000000000000000000000000000aa',
         sessionSlug: 'edge',
+        sessionId: '0x44444444444444444444444444444444',
       }),
     });
     expect(buildSiweMessage).toHaveBeenCalledWith({

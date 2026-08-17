@@ -650,6 +650,9 @@ async function uploadDataToArweave(data, format, opts = {}) {
           sessionSlug: Object.prototype.hasOwnProperty.call(attempt, 'sessionSlug')
             ? attempt.sessionSlug
             : resolvedSessionSlug,
+          sessionConfig: Object.prototype.hasOwnProperty.call(attempt, 'sessionConfig')
+            ? attempt.sessionConfig
+            : opts.sessionConfig,
           context: opts.context,
           workerUrl: normalizeWorkerBaseUrl(attempt.workerUrl || baseUrl),
           allowDemoFallback: defaultStrictAllowDemoFallback(),
@@ -732,6 +735,7 @@ async function uploadDataToArweave(data, format, opts = {}) {
 
   const uploadCandidates = await buildUploadSessionCandidates({
     selectedSessionSlug: resolvedSessionSlug,
+    selectedSessionConfig: opts.sessionConfig,
     initialWorkerUrl: baseUrl,
     context: opts.context,
   });
@@ -803,6 +807,7 @@ async function uploadDataToArweave(data, format, opts = {}) {
     try {
       response = await requestWithAuth(candidateEndpoint, buildRequestInit(), {
         sessionSlug: candidate?.sessionSlug || '',
+        sessionConfig: candidate?.sessionConfig || null,
         workerUrl: candidateBaseUrl,
       });
     } catch (err) {
@@ -868,6 +873,7 @@ async function uploadDataToArweave(data, format, opts = {}) {
           ? await fetch(candidateEndpoint, buildRequestInit())
           : await requestWithAuth(candidateEndpoint, buildRequestInit(), {
               sessionSlug: candidate?.sessionSlug || '',
+              sessionConfig: candidate?.sessionConfig || null,
               workerUrl: candidateBaseUrl,
             });
         const bootstrapPayload = await parseWorkerUploadResponseJson(bootstrapResponse, log);

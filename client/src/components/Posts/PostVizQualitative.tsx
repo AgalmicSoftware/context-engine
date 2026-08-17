@@ -4,7 +4,14 @@ import styles from './PostsPage.module.scss';
 type VizRecord = Record<string, unknown>;
 type VizProps = { spec: VizRecord; hideHeader?: boolean };
 
-const PALETTE = ['#4dffa4', '#7aa7ff', '#ffb347', '#ff6bcb', '#d8f36a', '#9ee7ff'];
+const PALETTE = [
+  'var(--ce-data-series-1)',
+  'var(--ce-data-series-2)',
+  'var(--ce-data-series-3)',
+  'var(--ce-data-series-4)',
+  'var(--ce-data-series-5)',
+  'var(--ce-data-series-6)',
+];
 const asRecord = (value: unknown): VizRecord | null =>
   !!value && typeof value === 'object' && !Array.isArray(value) ? (value as VizRecord) : null;
 const asArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
@@ -234,12 +241,12 @@ export const ThemeNetworkViz = ({ spec, hideHeader = false }: VizProps) => {
         <svg className={styles.networkCanvas} viewBox="0 0 100 64" role="img" aria-label={title}>
           <defs>
             <radialGradient id={highlightId} cx="30%" cy="30%" r="68%">
-              <stop offset="0%" stopColor="rgba(255, 255, 255, 0.68)" />
-              <stop offset="34%" stopColor="rgba(255, 255, 255, 0.28)" />
-              <stop offset="72%" stopColor="rgba(255, 255, 255, 0)" />
+              <stop offset="0%" stopColor="color-mix(in srgb, var(--ce-edge-highlight) 68%, transparent)" />
+              <stop offset="34%" stopColor="color-mix(in srgb, var(--ce-edge-highlight) 28%, transparent)" />
+              <stop offset="72%" stopColor="transparent" />
             </radialGradient>
             <filter id={shadowId} x="-70%" y="-70%" width="240%" height="240%" colorInterpolationFilters="sRGB">
-              <feDropShadow dx="0" dy="1.4" stdDeviation="1.5" floodColor="#000000" floodOpacity="0.34" />
+              <feDropShadow dx="0" dy="1.4" stdDeviation="1.5" floodColor="var(--ce-edge-dark)" floodOpacity="0.34" />
             </filter>
           </defs>
           {links.map((link) => {

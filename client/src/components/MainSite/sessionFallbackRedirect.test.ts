@@ -169,11 +169,23 @@ describe('sessionFallbackRedirect', () => {
   });
 
   describe('temporary initial-load about redirect', () => {
-    it('matches root and concrete session pages while excluding the session wizard', () => {
-      expect(isTemporaryInitialLoadAboutRedirectPath('/', { normalizeRoutePath })).toBe(true);
-      expect(isTemporaryInitialLoadAboutRedirectPath('/session/demo-1', { normalizeRoutePath })).toBe(true);
+    it('limits eligibility to the normalized root path', () => {
+      expect(isTemporaryInitialLoadAboutRedirectPath(' / ', { normalizeRoutePath })).toBe(true);
+      expect(isTemporaryInitialLoadAboutRedirectPath('/session/demo-1', { normalizeRoutePath })).toBe(false);
       expect(isTemporaryInitialLoadAboutRedirectPath('/session/demo-1/questions/results', { normalizeRoutePath })).toBe(
-        true,
+        false,
+      );
+      expect(isTemporaryInitialLoadAboutRedirectPath('/about', { normalizeRoutePath })).toBe(false);
+      expect(isTemporaryInitialLoadAboutRedirectPath('/session/new', { normalizeRoutePath })).toBe(false);
+    });
+
+    it('excludes direct, nested, fallback, about, and session-wizard paths', () => {
+      expect(isTemporaryInitialLoadAboutRedirectPath('/', { normalizeRoutePath })).toBe(true);
+      expect(isTemporaryInitialLoadAboutRedirectPath('/session', { normalizeRoutePath })).toBe(false);
+      expect(isTemporaryInitialLoadAboutRedirectPath('/session/general', { normalizeRoutePath })).toBe(false);
+      expect(isTemporaryInitialLoadAboutRedirectPath('/session/demo-1', { normalizeRoutePath })).toBe(false);
+      expect(isTemporaryInitialLoadAboutRedirectPath('/session/demo-1/questions/results', { normalizeRoutePath })).toBe(
+        false,
       );
       expect(isTemporaryInitialLoadAboutRedirectPath('/session/new', { normalizeRoutePath })).toBe(false);
       expect(isTemporaryInitialLoadAboutRedirectPath('/session/new/details', { normalizeRoutePath })).toBe(false);
@@ -185,7 +197,6 @@ describe('sessionFallbackRedirect', () => {
         getTemporaryInitialLoadAboutRedirectTarget({
           isFirstVisitRootRedirectEnabled: () => true,
           normalizeRoutePath,
-          normalizeSessionSlug,
           pathIn: '/',
         }),
       ).toEqual({ path: '/about' });
@@ -193,46 +204,30 @@ describe('sessionFallbackRedirect', () => {
         getTemporaryInitialLoadAboutRedirectTarget({
           isFirstVisitRootRedirectEnabled: () => true,
           normalizeRoutePath,
-          normalizeSessionSlug,
           pathIn: '/session/demo-1',
         }),
-      ).toEqual({
-        path: '/about',
-        cacheSlug: 'demo-1',
-        requiresPersistedCache: true,
-      });
+      ).toBeNull();
       expect(
         getTemporaryInitialLoadAboutRedirectTarget({
           isFirstVisitRootRedirectEnabled: () => false,
           normalizeRoutePath,
-          normalizeSessionSlug,
           pathIn: '/session/demo-1',
         }),
       ).toBeNull();
     });
 
-    it('lets callers restrict session about redirects to temporary demo slugs', () => {
-      const isTemporaryInitialLoadAboutRedirectSessionSlug = jest.fn((slug: string) => slug === 'demo-1');
-
+    it('returns null for direct routes even when the redirect flag is enabled', () => {
       expect(
         getTemporaryInitialLoadAboutRedirectTarget({
           isFirstVisitRootRedirectEnabled: () => true,
-          isTemporaryInitialLoadAboutRedirectSessionSlug,
           normalizeRoutePath,
-          normalizeSessionSlug,
           pathIn: '/session/demo-1/questions/results',
         }),
-      ).toEqual({
-        path: '/about',
-        cacheSlug: 'demo-1',
-        requiresPersistedCache: true,
-      });
+      ).toBeNull();
       expect(
         getTemporaryInitialLoadAboutRedirectTarget({
           isFirstVisitRootRedirectEnabled: () => true,
-          isTemporaryInitialLoadAboutRedirectSessionSlug,
           normalizeRoutePath,
-          normalizeSessionSlug,
           pathIn: '/session/e2e-custom-20260623-113657/questions',
         }),
       ).toBeNull();
@@ -260,6 +255,34 @@ describe('sessionFallbackRedirect', () => {
       expect(hasConsumedOneTimeFirstVisitRootRedirect(null)).toBe(true);
       expect(shouldForceOneTimeFirstVisitRootRedirect(null)).toBe(false);
       expect(consumeOneTimeFirstVisitRootRedirect(null)).toBe(false);
+    });
+
+    it('requires the primary marker to be readable after writing it', () => {
+      const storage = {
+        getItem: jest.fn((_key: string) => null),
+        setItem: jest.fn(),
+      };
+
+      expect(consumeOneTimeFirstVisitRootRedirect(storage)).toBe(false);
+      expect(storage.getItem).toHaveBeenCalledWith(FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY);
+    });
+
+    it('keeps legacy onboarding updates best effort after primary persistence', () => {
+      const values = new Map<string, string>();
+      const storage = {
+        getItem: jest.fn((key: string) => values.get(key) || null),
+        setItem: jest.fn((key: string, value: string) => {
+          if (key === 'firstVisit') throw new Error('legacy storage blocked');
+          values.set(key, value);
+        }),
+      };
+
+      expect(
+        consumeOneTimeFirstVisitRootRedirect(storage, {
+          firstVisitStorageKey: 'firstVisit',
+        }),
+      ).toBe(true);
+      expect(values.get(FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY)).toBe('true');
     });
   });
 

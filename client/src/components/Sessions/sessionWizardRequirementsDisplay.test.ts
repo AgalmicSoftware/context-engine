@@ -167,4 +167,81 @@ describe('sessionWizardRequirementsDisplay', () => {
       sponsoredBundleCoversNewSessionRequirements: true,
     });
   });
+
+  it('keeps decentralized mixed-provider requirements visible until every selected key is present', () => {
+    expect(
+      resolveSessionWizardNewSessionRequirementsDisplayState({
+        currentWorkerSecrets: {
+          openaiKey: 'transcription-secret',
+          arweaveJwk: '{"kty":"RSA"}',
+        },
+        hasSponsoredBundleLink: true,
+        isNewSessionWizardRoute: true,
+        normalizedAppliedSponsoredBundle: { faucetGrantToken: 'funding-grant' },
+        sessionAi: {
+          models: {
+            fast: { provider: 'anthropic' },
+            thinking: { provider: 'openrouter' },
+            transcription: { provider: 'openai' },
+          },
+        },
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
+        sponsoredBundleStatus: { tone: 'success' },
+      }),
+    ).toMatchObject({
+      hasNewSessionAiRequirementCovered: false,
+      requiredAiProviderKeyLabels: ['Anthropic key', 'OpenRouter key', 'OpenAI key'],
+      showNewSessionRequirementsBanner: true,
+      sponsoredBundleCoversNewSessionRequirements: false,
+      sponsoredBundleOwnsNewSessionEntryFlow: false,
+    });
+  });
+
+  it('keeps the decentralized Worker requirement visible until a runtime is attached or deploy-ready', () => {
+    const baseInput = {
+      currentWorkerSecrets: {
+        openaiKey: 'provider-secret',
+        arweaveJwk: '{"kty":"RSA"}',
+      },
+      hasSponsoredBundleLink: true,
+      isNewSessionWizardRoute: true,
+      normalizedAppliedSponsoredBundle: {
+        faucetGrantToken: 'funding-grant',
+        deployGrantToken: 'raw-deploy-grant',
+      },
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
+      sponsoredBundleStatus: { tone: 'success' },
+    };
+
+    expect(resolveSessionWizardNewSessionRequirementsDisplayState(baseInput)).toMatchObject({
+      hasNewSessionDeployRequirementCovered: false,
+      showNewSessionRequirementsBanner: true,
+      sponsoredBundleCoversNewSessionRequirements: false,
+      sponsoredBundleOwnsNewSessionEntryFlow: false,
+    });
+
+    expect(
+      resolveSessionWizardNewSessionRequirementsDisplayState({
+        ...baseInput,
+        hasCompatibleWorkerRuntime: true,
+      }),
+    ).toMatchObject({
+      hasNewSessionDeployRequirementCovered: true,
+      showNewSessionRequirementsBanner: false,
+      sponsoredBundleCoversNewSessionRequirements: true,
+      sponsoredBundleOwnsNewSessionEntryFlow: true,
+    });
+
+    expect(
+      resolveSessionWizardNewSessionRequirementsDisplayState({
+        ...baseInput,
+        canUseSponsoredAutoDeployNow: true,
+      }),
+    ).toMatchObject({
+      hasNewSessionDeployRequirementCovered: true,
+      showNewSessionRequirementsBanner: false,
+      sponsoredBundleCoversNewSessionRequirements: true,
+      sponsoredBundleOwnsNewSessionEntryFlow: true,
+    });
+  });
 });

@@ -13,7 +13,12 @@ import { buildDemoCorpusRecords } from '../../utilities/demo/demoCorpusRecords.j
 import { installSessionRegistryQueryInvalidation } from '../../utilities/query/sessionRegistryQueryInvalidation.js';
 
 const mockListNamespaceEntriesSync = jest.fn();
-const mockSubscribeCacheUpdates = jest.fn(() => () => {});
+type MockCacheUpdatePayload = {
+  namespace: string;
+  slug: string;
+  value: unknown;
+};
+const mockSubscribeCacheUpdates = jest.fn((_listener: (payload: MockCacheUpdatePayload) => void) => () => {});
 const mockGetAllSessionSlugs = jest.fn();
 const mockGetSessionConfigBySlug = jest.fn();
 const mockGetDemoSessionConfigBySlug = jest.fn();
@@ -377,6 +382,18 @@ describe('TagPage', () => {
     const scss = fs.readFileSync(scssPath, 'utf8');
 
     expect(scss).toMatch(/\.sectionTitle\s*{[\s\S]*?color:\s*\$page-text-color;/);
+  });
+
+  it('uses theme-owned high-contrast control colors for related tag chips', () => {
+    const scssPath = path.join(__dirname, 'TagPage.module.scss');
+    const scss = fs.readFileSync(scssPath, 'utf8');
+
+    expect(scss).toMatch(
+      /\.relatedTagButton\s*{[\s\S]*?border-color:\s*var\(--ce-border-raised\);[\s\S]*?background:\s*var\(--ce-control-face\);[\s\S]*?color:\s*var\(--ce-control-text\);/,
+    );
+    expect(scss).toMatch(
+      /\.relatedTagButton\s*{[\s\S]*?&:hover,[\s\S]*?&:focus\s*{[\s\S]*?background:\s*var\(--ce-action-accent\);[\s\S]*?color:\s*var\(--ce-action-accent-text\);/,
+    );
   });
 
   it('keeps the fullscreen tag modal content shrink-safe so demo cards cannot overflow the viewport width', () => {
@@ -909,6 +926,52 @@ describe('TagPage', () => {
     expect(await screen.findByText('Mocked interpretation')).toBeInTheDocument();
   });
 
+  it('keeps an AI interpretation until the scoped question content actually changes', async () => {
+    let edgePrompt = 'What changed?';
+    mockListNamespaceEntriesSync.mockImplementation((namespace) => {
+      if (namespace !== 'questionsCache') return [];
+      return [
+        buildQuestionsEntry({
+          slug: 'edge',
+          questions: {
+            q1: {
+              id: 'q1',
+              prompt: edgePrompt,
+              tags: ['governance'],
+            },
+          },
+        }),
+      ];
+    });
+
+    renderTagPage({ entry: '/tag/governance' });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /summarize discussions/i }));
+    });
+    expect(await screen.findByText('Mocked interpretation')).toBeInTheDocument();
+
+    const cacheSubscriber = mockSubscribeCacheUpdates.mock.calls[0]?.[0];
+    if (!cacheSubscriber) throw new Error('Expected TagPage to subscribe to cache updates');
+    act(() => {
+      cacheSubscriber({ namespace: 'questionsCache', slug: 'alpha', value: { unrelated: true } });
+    });
+    expect(screen.getByText('Mocked interpretation')).toBeInTheDocument();
+
+    act(() => {
+      cacheSubscriber({ namespace: 'questionsCache', slug: 'edge', value: { '11155420': {} } });
+    });
+    expect(screen.getByText('Mocked interpretation')).toBeInTheDocument();
+
+    edgePrompt = 'What materially changed?';
+    act(() => {
+      cacheSubscriber({ namespace: 'questionsCache', slug: 'EDGE', value: { '84532': {} } });
+    });
+
+    expect(screen.getByText('What materially changed?')).toBeInTheDocument();
+    expect(screen.queryByText('Mocked interpretation')).not.toBeInTheDocument();
+  });
+
   it('shows elapsed seconds while AI interpretation is generating', async () => {
     jest.useFakeTimers();
     let nowMs = 1000;
@@ -1111,7 +1174,9 @@ describe('TagModal', () => {
     expect(scss).toMatch(
       /\.tagModalContent\s*{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;[\s\S]*flex-wrap:\s*nowrap;[\s\S]*height:\s*100%;[\s\S]*position:\s*relative;/,
     );
-    expect(scss).toMatch(/\.tagModalBackdrop\s*{[\s\S]*background:\s*rgba\(3,\s*5,\s*18,\s*0\.08\) !important;/);
+    expect(scss).toMatch(
+      /\.tagModalBackdrop\s*{[\s\S]*background:\s*color-mix\(in srgb,\s*var\(--ce-overlay-base\) 8%,\s*transparent\) !important;/,
+    );
     expect(scss).toMatch(
       /\.tagModalHeaderBar\s*{[\s\S]*display:\s*flex;[\s\S]*width:\s*100%;[\s\S]*justify-content:\s*space-between;[\s\S]*position:\s*relative;/,
     );
@@ -1119,7 +1184,7 @@ describe('TagModal', () => {
       /\.tagModalHeaderActions\s*{[\s\S]*display:\s*inline-flex;[\s\S]*align-items:\s*center;[\s\S]*gap:\s*10px;/,
     );
     expect(scss).toMatch(
-      /\.tagModalChromeButton\s*{[\s\S]*border-radius:\s*999px;[\s\S]*width:\s*2\.4rem;[\s\S]*height:\s*2\.4rem;/,
+      /\.tagModalChromeButton\s*{[\s\S]*border-radius:\s*var\(--ce-radius-pill\);[\s\S]*width:\s*2\.4rem;[\s\S]*height:\s*2\.4rem;/,
     );
     expect(scss).toMatch(
       /\.tagModalChromePopover\s*{[\s\S]*position:\s*absolute;[\s\S]*top:\s*calc\(100% \+ 10px\);[\s\S]*right:\s*0;/,
@@ -1148,19 +1213,19 @@ describe('TagModal', () => {
     expect(jsx).not.toMatch(/<ModalHeader\b/);
   });
 
-  it('uses the fullscreen tag route blue palette for the modal shell', () => {
+  it('uses the runtime theme palette for the fullscreen modal shell', () => {
     const scssPath = path.join(__dirname, 'TagPage.module.scss');
     const scss = fs.readFileSync(scssPath, 'utf8');
 
-    expect(scss).toMatch(/\$tag-route-bg:\s*#20204e;/);
+    expect(scss).toMatch(/\$tag-route-bg:\s*var\(--ce-canvas\);/);
     expect(scss).toMatch(
-      /\.tagModalContent\s*{[\s\S]*radial-gradient\(circle at top right,\s*rgba\(\$tag-route-accent,\s*0\.18\),\s*transparent 34%\),[\s\S]*linear-gradient\(180deg,\s*rgba\(\$tag-route-bg,\s*0\.985\),\s*rgba\(\$tag-route-bg-deep,\s*0\.985\)\);[\s\S]*background-color:\s*\$tag-route-bg;/,
+      /\.tagModalContent\s*{[\s\S]*radial-gradient\(circle at top right,\s*color-mix\(in srgb,\s*var\(--ce-status-info\) 18%,\s*transparent\),\s*transparent 34%\),[\s\S]*linear-gradient\([\s\S]*color-mix\(in srgb,\s*var\(--ce-canvas\) 98\.5%,\s*transparent\),[\s\S]*color-mix\(in srgb,\s*var\(--ce-surface-sunken\) 98\.5%,\s*transparent\)[\s\S]*\);/,
     );
     expect(scss).toMatch(
-      /\.tagModalHeaderBar\s*{[\s\S]*linear-gradient\(180deg,\s*rgba\(\$tag-route-accent-alt,\s*0\.16\),\s*rgba\(\$tag-route-bg,\s*0\.1\)\),/,
+      /\.tagModalHeaderBar\s*{[\s\S]*linear-gradient\([\s\S]*color-mix\(in srgb,\s*var\(--ce-compat-indigo\) 16%,\s*transparent\),[\s\S]*color-mix\(in srgb,\s*var\(--ce-canvas\) 10%,\s*transparent\)[\s\S]*\),/,
     );
     expect(scss).toMatch(
-      /\.tagModalChromePopover\s*{[\s\S]*linear-gradient\(180deg,\s*rgba\(\$tag-route-accent-alt,\s*0\.14\),\s*rgba\(\$tag-route-bg-deep,\s*0\.14\)\),[\s\S]*rgba\(\$tag-route-bg,\s*0\.98\);/,
+      /\.tagModalChromePopover\s*{[\s\S]*linear-gradient\([\s\S]*color-mix\(in srgb,\s*var\(--ce-compat-indigo\) 14%,\s*transparent\),[\s\S]*color-mix\(in srgb,\s*var\(--ce-surface-sunken\) 14%,\s*transparent\)[\s\S]*\),[\s\S]*color-mix\(in srgb,\s*var\(--ce-canvas\) 98%,\s*transparent\);/,
     );
   });
 });

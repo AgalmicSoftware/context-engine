@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
+import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 
 export const resolveCompareAddressPillContentStyle = (): CSSProperties => ({
   alignItems: 'center',
@@ -11,9 +12,12 @@ export const resolveCompareAddressBlockieStyle = (): CSSProperties => ({
   borderRadius: 3,
 });
 
-export const buildCompareProfileHref = (address: unknown): string => {
+export const buildCompareProfileHref = (address: unknown, sessionSlug: unknown = ''): string => {
   const normalizedAddress = String(address || '').trim();
-  return normalizedAddress ? buildPublicRoute(`/u/${normalizedAddress}`) : '';
+  if (!normalizedAddress) return '';
+  const normalizedSessionSlug = normalizeSessionSlug(sessionSlug);
+  const query = normalizedSessionSlug ? `?session=${encodeURIComponent(normalizedSessionSlug)}` : '';
+  return buildPublicRoute(`/u/${normalizedAddress}${query}`);
 };
 
 export const buildCompareClassName = (...classNames: unknown[]): string =>
@@ -38,7 +42,7 @@ export const resolveCompareUnsureMoreStyle = (): CSSProperties => ({
 });
 
 export const resolveCompareBookmarksHeaderStyle = (): CSSProperties => ({
-  color: 'white',
+  color: 'var(--ce-panel-text)',
   fontWeight: '600',
   marginBottom: '10px',
 });
@@ -91,11 +95,6 @@ export const resolveCompareVennTooltipStyle = ({
   };
 };
 
-export const resolveCompareVennTooltipHeaderStyle = (): CSSProperties => ({
-  fontWeight: 700,
-  marginBottom: 4,
-});
-
 export const resolveCompareVennTooltipListStyle = (): CSSProperties => ({
   listStyle: 'none',
   margin: 0,
@@ -138,3 +137,34 @@ export const resolveCompareCompassLegendSwatchStyle = (background: unknown): CSS
 export const resolveCompareCompassScrollStyle = (): CSSProperties => ({
   overflowX: 'auto',
 });
+
+const COMPARE_COMPASS_SERIES_COLORS = Object.freeze([
+  'var(--ce-data-series-1)',
+  'var(--ce-data-series-2)',
+  'var(--ce-data-series-3)',
+  'var(--ce-data-series-4)',
+  'var(--ce-data-series-5)',
+  'var(--ce-data-series-6)',
+  'var(--ce-data-series-7)',
+  'var(--ce-data-series-8)',
+]);
+
+export const resolveCompareCompassSeriesColor = (index: number): string =>
+  COMPARE_COMPASS_SERIES_COLORS[index % COMPARE_COMPASS_SERIES_COLORS.length];
+
+export const buildCompareCompassQuadrants = ({
+  cx,
+  cy,
+  height,
+  width,
+}: {
+  cx: number;
+  cy: number;
+  height: number;
+  width: number;
+}) => [
+  { x: cx, y: cy, width: width - cx, height: height - cy, intensity: 4 },
+  { x: 0, y: cy, width: cx, height: height - cy, intensity: 4 },
+  { x: 0, y: 0, width: cx, height: cy, intensity: 5 },
+  { x: cx, y: 0, width: width - cx, height: cy, intensity: 5 },
+];

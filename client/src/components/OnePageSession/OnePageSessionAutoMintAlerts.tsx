@@ -231,7 +231,7 @@ const OnePageSessionAutoMintAlerts = ({
                   <div style={{ marginTop: '6px', marginLeft: '26px' }}>
                     <button
                       className="btn btn-sm btn-outline-dark"
-                      style={{ padding: '2px 10px', border: '1px solid rgba(0,0,0,0.2)', cursor: 'pointer' }}
+                      style={{ padding: '2px 10px', border: '1px solid var(--ce-border)', cursor: 'pointer' }}
                       onClick={onKickoffAutoMintIfNeeded}
                     >
                       Retry
@@ -244,7 +244,11 @@ const OnePageSessionAutoMintAlerts = ({
                     <img
                       src={sbtImage}
                       alt={`${t('sbt')} Preview`}
-                      style={{ maxHeight: '100px', borderRadius: '4px', border: '1px solid rgba(0,0,0,0.1)' }}
+                      style={{
+                        maxHeight: '100px',
+                        borderRadius: 'var(--ce-radius-4)',
+                        border: '1px solid var(--ce-border-light)',
+                      }}
                     />
                   </div>
                 )}

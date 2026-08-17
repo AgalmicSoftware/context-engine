@@ -84,15 +84,15 @@
 
 .manualWarning {
   flex-basis: 100%;
-  color: #a61e24;
+  color: var(--ce-status-danger);
   font-size: 0.85rem;
   line-height: 1.4;
 }
 
 .menuFooter {
   padding: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(0, 0, 0, 0.2);
+  border-top: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+  background: color-mix(in srgb, var(--ce-compat-dark) 20%, transparent);
 }
 
 .loadingMessage {
@@ -108,10 +108,10 @@
   gap: 6px;
   padding: 4px 8px;
   border-radius: var(--ce-radius-pill);
-  border: 1px solid rgba(32, 58, 44, 0.22);
-  background: rgba(77, 255, 164, 0.18);
-  color: #1f2733;
-  box-shadow: 0 1px 2px rgba(15, 18, 51, 0.08);
+  border: 1px solid color-mix(in srgb, var(--ce-status-success) 22%, transparent);
+  background: color-mix(in srgb, var(--ce-action-accent) 18%, transparent);
+  color: var(--ce-document-text);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ce-overlay-surface) 8%, transparent);
   font-size: 0.78rem;
   line-height: 1;
   min-height: 28px;
@@ -122,7 +122,7 @@
 }
 
 .loadingStatusSpinner {
-  color: #2f9d64;
+  color: var(--ce-status-success);
 }
 
 .loadingStatusText {
@@ -157,8 +157,8 @@
   min-width: 120px;
   white-space: nowrap;
   border-radius: var(--ce-radius-8);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(77, 255, 164, 0.12);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
+  background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
   color: var(--ce-color-white);
   height: 38px;
   padding: 8px 12px;
@@ -169,8 +169,8 @@
     background 0.2s ease;
 
   &:hover {
-    border-color: rgba(77, 255, 164, 0.5);
-    background: rgba(77, 255, 164, 0.2);
+    border-color: color-mix(in srgb, var(--ce-action-accent) 50%, transparent);
+    background: color-mix(in srgb, var(--ce-action-accent) 20%, transparent);
   }
 }
 
@@ -231,10 +231,10 @@
   align-items: center;
   margin: 5px;
   padding: 5px;
-  background-color: #f1f3f6;
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  background-color: var(--ce-document-surface);
+  border: 1px solid color-mix(in srgb, var(--ce-compat-dark) 12%, transparent);
   border-radius: var(--ce-radius-4);
-  color: #0c0e2a;
+  color: var(--ce-overlay-base);
 }
 
 .sbtName {
@@ -244,13 +244,13 @@
 
 .removeIcon {
   cursor: pointer;
-  color: #d64545;
+  color: var(--ce-status-error);
   font-size: 1.5em;
   /* Increase the font size */
 }
 
 .greyedOutLabel {
-  color: grey;
+  color: var(--ce-text-muted);
 }
 
 .greyedOutLabel input[type='checkbox'] {
@@ -264,14 +264,14 @@
 // SBTFilter
 
 .sbtFilter {
-  // background: #2a99eac7;
+  // background: color-mix(in srgb, var(--ce-status-info) 78%, transparent);
   // padding: 10px;
-  // border-radius: 5px;
+  // border-radius: var(--ce-radius-5);
   // font-weight: 500;
 }
 
 .filterOptions {
-  background: #2a99eac7;
+  background: color-mix(in srgb, var(--ce-status-info) 78%, transparent);
   padding: 10px;
   border-radius: var(--ce-radius-5);
   font-weight: 500;
@@ -297,34 +297,34 @@
 .adminVariant {
   padding: 12px;
   border-radius: var(--ce-radius-10);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(8, 10, 28, 0.45);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+  background: color-mix(in srgb, var(--ce-overlay-base) 45%, transparent);
 }
 
 .adminVariant .sbtLabel {
   font-size: 0.72rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: rgba(244, 247, 255, 0.78);
+  color: color-mix(in srgb, var(--ce-control-text) 78%, transparent);
 }
 
 .adminVariant .settingsButton {
   border-radius: var(--ce-radius-6);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  color: rgba(244, 247, 255, 0.85);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
+  color: color-mix(in srgb, var(--ce-control-text) 85%, transparent);
 }
 
 .adminVariant .groupPicker {
   padding: 8px;
   border-radius: var(--ce-radius-8);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(7, 9, 24, 0.5);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
+  background: color-mix(in srgb, var(--ce-overlay-base) 50%, transparent);
 }
 
 .adminVariant .groupSelect,
 .adminVariant .sbtAddressInput {
-  background: rgba(8, 10, 26, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: color-mix(in srgb, var(--ce-overlay-base) 60%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
   color: var(--ce-color-white);
 }
 
@@ -336,75 +336,75 @@
 
 .adminVariant .manualWarning,
 .createVariant .manualWarning {
-  color: #ff9ea4;
+  color: var(--ce-status-danger-text);
 }
 
 .adminVariant .addressTag {
-  background: rgba(10, 12, 32, 0.65);
-  border-color: rgba(255, 255, 255, 0.12);
+  background: color-mix(in srgb, var(--ce-overlay-base) 65%, transparent);
+  border-color: color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
   color: var(--ce-color-white);
 }
 
 .adminVariant .removeIcon {
-  color: #ff6b6b;
+  color: var(--ce-status-error);
 }
 
 .adminVariant .linkIcon {
-  color: rgba(244, 247, 255, 0.75);
+  color: color-mix(in srgb, var(--ce-control-text) 75%, transparent);
 }
 
 .createVariant {
   padding: 12px;
   border-radius: var(--ce-radius-10);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(15, 16, 42, 0.35);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
+  background: color-mix(in srgb, var(--ce-overlay-surface) 35%, transparent);
 }
 
 .createVariant .sbtLabel {
   font-size: 0.74rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: rgba(244, 247, 255, 0.7);
+  color: color-mix(in srgb, var(--ce-control-text) 70%, transparent);
 }
 
 .createVariant .settingsButton {
   border-radius: var(--ce-radius-6);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  color: rgba(244, 247, 255, 0.8);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
+  color: color-mix(in srgb, var(--ce-control-text) 80%, transparent);
 }
 
 .createVariant .groupPicker {
   padding: 8px;
   border-radius: var(--ce-radius-8);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(13, 15, 38, 0.5);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
+  background: color-mix(in srgb, var(--ce-overlay-base) 50%, transparent);
 }
 
 .createVariant .groupSelect,
 .createVariant .sbtAddressInput {
-  background: rgba(12, 14, 32, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: color-mix(in srgb, var(--ce-overlay-base) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
   color: var(--ce-color-white);
 }
 
 .createVariant .sbtAddButton {
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(77, 255, 164, 0.12);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
+  background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
   color: var(--ce-color-white);
 }
 
 .createVariant .addressTag {
-  background: rgba(17, 19, 46, 0.6);
-  border-color: rgba(255, 255, 255, 0.12);
+  background: color-mix(in srgb, var(--ce-overlay-surface) 60%, transparent);
+  border-color: color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
   color: var(--ce-color-white);
 }
 
 .createVariant .removeIcon {
-  color: #ff7b7b;
+  color: var(--ce-status-error);
 }
 
 .createVariant .linkIcon {
-  color: rgba(244, 247, 255, 0.75);
+  color: color-mix(in srgb, var(--ce-control-text) 75%, transparent);
 }
 
 .quickSelectRow {
@@ -422,8 +422,8 @@
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  color: #fff;
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 18%, transparent);
+  color: var(--ce-text-inverse);
   transition: opacity 0.15s ease;
 }
 
@@ -464,17 +464,17 @@
 }
 
 .filterButton.filterButtonOnLight {
-  background: rgba(255, 255, 255, 0.92) !important;
-  border: 1px solid rgba(15, 23, 42, 0.14) !important;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
-  color: #1f2733 !important;
+  background: color-mix(in srgb, var(--ce-text-inverse) 92%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--ce-document-text) 14%, transparent) !important;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--ce-document-text) 8%, transparent);
+  color: var(--ce-document-text) !important;
 
   &:hover,
   &:focus,
   &:active {
-    background: #ffffff !important;
-    border-color: rgba(77, 255, 164, 0.34) !important;
-    color: #111827 !important;
+    background: var(--ce-text-inverse) !important;
+    border-color: color-mix(in srgb, var(--ce-action-accent) 34%, transparent) !important;
+    color: var(--ce-document-text) !important;
   }
 }
 
@@ -483,8 +483,8 @@
 }
 
 .filterOptionsOnLight {
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
-  color: #1f2733;
+  background: color-mix(in srgb, var(--ce-text-inverse) 90%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-document-text) 10%, transparent);
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--ce-document-text) 8%, transparent);
+  color: var(--ce-document-text);
 }

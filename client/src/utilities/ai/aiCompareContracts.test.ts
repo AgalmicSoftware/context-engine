@@ -27,7 +27,7 @@ describe('aiCompareContracts', () => {
     expect(normalizeCompareBullets({ agreements: [] }, fallback)).toEqual(fallback);
   });
 
-  it('merges venn model counts while preserving fallback evidence for positive empty regions', () => {
+  it('keeps deterministic venn counts and evidence while accepting descriptive AI semantics', () => {
     const fallback = {
       counts: { a: 1, b: 0, c: 0, ab: 1, ac: 0, bc: 0, abc: 0 },
       semantics: 'fallback semantics',
@@ -40,15 +40,15 @@ describe('aiCompareContracts', () => {
     expect(
       mergeCompareVennWithEvidence(
         {
-          counts: { a: 2, ab: 1 },
-          semantics: '',
-          evidenceMap: { a: [] },
+          counts: { a: 999, ab: 999 },
+          semantics: 'AI description only',
+          evidenceMap: { a: ['AI-selected membership'] },
         },
         fallback,
       ),
     ).toEqual({
-      counts: { a: 2, b: 0, c: 0, ab: 1, ac: 0, bc: 0, abc: 0 },
-      semantics: 'fallback semantics',
+      counts: { a: 1, b: 0, c: 0, ab: 1, ac: 0, bc: 0, abc: 0 },
+      semantics: 'AI description only',
       evidenceMap: {
         a: ['fallback a'],
         ab: ['fallback ab'],

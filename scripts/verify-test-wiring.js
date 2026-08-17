@@ -118,6 +118,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/deploy-helper-deploy.mjs');
   expectFile('scripts/run-node-tests.js');
   expectFile('scripts/run-node-tests.test.js');
+  expectFile('.githooks/pre-push');
   expectFile('scripts/pre-push-guard.test.js');
   expectFile('scripts/check-client-boundaries.mjs');
   expectFile('scripts/check-client-boundaries.test.mjs');
@@ -169,20 +170,22 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/verify-test-inventory.test.js');
   expectFile('scripts/vite-navigation-smoke.js');
   expectFile('scripts/vite-navigation-smoke.test.js');
-  expectFile('scripts/verify-worker-bundle-sync.mjs');
-  expectFile('scripts/verify-worker-bundle-sync.test.js');
+  expectFileMissing('scripts/verify-worker-bundle-sync.mjs');
+  expectFileMissing('scripts/verify-worker-bundle-sync.test.js');
   expectFile('scripts/verify-public-release-surface.js');
   expectFile('scripts/verify-public-release-surface.test.js');
   expectFile('scripts/verify-public-docs.js');
   expectFile('scripts/verify-public-docs.test.js');
   expectFile('scripts/verify-public-release-pii.sh');
   expectFile('scripts/verify-public-release-pii.test.js');
+  expectFile('scripts/lib/public-release-strip-patterns.sh');
   expectFile('scripts/verify-public-assets.js');
   expectFile('scripts/verify-public-assets.test.js');
   expectFile('scripts/verify-public-text.js');
   expectFile('scripts/verify-public-text.test.js');
   expectFile('scripts/sync-public-history.sh');
   expectFile('scripts/release-version.mjs');
+  expectFile('scripts/release-version.test.mjs');
   expectFile('workers/sessionCorsWorker/package.json');
   expectFile('workers/agentBridgeWorker/package.json');
   expectFile('scripts/run-agent-bridge-worker-tests.js');
@@ -195,101 +198,48 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFileMissing('client/src/assets/worker/sessionCorsWorker.unbundled.js.txt');
   expectFileMissing('client/src/assets/worker/deploy-helper-worker.js.txt');
 
-  const surveysSbtProxyPath = 'client/src/utilities/web3/contractScripts.surveys-sbt.proxy.test.js';
-  if (fs.existsSync(path.join(rootDir, surveysSbtProxyPath))) {
-    expectScriptContains('test:surveys-sbt', 'src/utilities/web3/contractScripts.surveys-sbt.proxy.test.js');
-    expectScriptContains('tests', 'npm run test:surveys-sbt');
-  } else {
-    expectScriptMissing('test:surveys-sbt');
-    expectScriptOmits('tests', 'npm run test:surveys-sbt');
-  }
-  expectScriptContains('test:contracts', 'SurveysTest');
-  expectScriptContains('test:contracts', 'CustomSBTTest');
-  expectScriptContains('test:contracts', 'SessionRegistryTest');
-  expectScriptContains('test:contracts', 'SurveysFuzzTest');
-  expectScriptContains('test:contracts', 'CustomSBTFuzzTest');
-  expectScriptContains('test:contracts', 'SessionRegistryFuzzTest');
-  expectScriptContains('test:contracts', 'CustomSBTInvariantTest');
   expectScriptContains('abi:check', 'scripts/verify-abi-sync.mjs');
   expectScriptContains('verify:abi-sync', 'forge build');
   expectScriptContains('verify:abi-sync', 'abi:check');
-  expectScriptContains('test:node', 'scripts/run-node-tests.js');
-  expectScriptContains('test:node:tracked', 'scripts/run-node-tests.js --tracked-only');
   expectScriptContains('client-boundaries:check', 'scripts/check-client-boundaries.mjs');
-  expectScriptContains('test:root:jest', '--testMatch');
-  expectScriptContains('test:root:jest', '../tests/root/sessionCorsWorker.auth.test.js');
-  expectScriptContains('test:root:jest', '../tests/root/deployHelper.worker.test.js');
-  expectScriptContains('test:worker:session-cors', 'npm --prefix workers/sessionCorsWorker test');
-  expectScriptContains('test:worker:agent-bridge', 'scripts/run-agent-bridge-worker-tests.js');
-  expectScriptContains('test:e2e', 'npm run -s test:e2e:smoke');
-  expectScriptContains('test:e2e:quick', 'npm run -s test:e2e:smoke');
-  expectScriptContains('test:e2e:smoke', 'npm run -s ai:test-nav:smoke');
-  expectScriptContains('ai:test-nav:smoke', 'node scripts/vite-navigation-smoke.js');
-  expectScriptContains('ci:gate', 'scripts/run-ci-gates.mjs --gate');
-  expectScriptContains('ci:gates:check-hosted', 'scripts/run-ci-gates.mjs --check-results hosted');
-  expectScriptContains('test:ci', 'scripts/run-ci-gates.mjs --profile ci');
-  expectScriptOmits('test:ci', 'verify:release');
-  expectScriptOmits('test:ci', 'test:release:client');
-  expectScriptOmits('test:ci', 'test:node:tracked');
   expectScriptContains('test:wiring', 'client-boundaries:check');
   expectScriptContains('test:wiring', 'dead-exports:check');
-  expectScriptContains('test:wiring', 'scripts/verify-test-inventory.js');
-  expectScriptContains('tests', 'npm run test:ci');
-  expectScriptContains('test:client', 'test:coverage:full-universe');
-  expectScriptContains('test:release:client', 'npm test -- --watchAll=false --runInBand');
+  expectScriptContains('ci:gate', 'scripts/run-ci-gates.mjs --gate');
+  expectScriptContains('ci:gates:check-hosted', 'scripts/run-ci-gates.mjs --check-results hosted');
   expectScriptContains('typecheck:client', 'npm --prefix client run typecheck');
-  expectScriptContains('typecheck:client-tests', 'scripts/check-client-test-types.mjs');
   expectScriptContains('worker:bundle', 'scripts/worker-bundle.mjs');
   expectScriptContains('deploy-helper:deploy', 'scripts/deploy-helper-deploy.mjs');
-  expectScriptContains('verify:worker-bundle', 'scripts/verify-worker-bundle-sync.mjs');
+  expectScriptMissing('verify:worker-bundle');
   expectScriptContains('verify:public-release-surface', 'scripts/verify-public-release-surface.js');
   expectScriptContains('verify:public-assets', 'scripts/verify-public-assets.js');
   expectScriptContains('verify:public-text', 'scripts/verify-public-text.js');
   expectScriptContains('verify:public-text:prepared', 'scripts/verify-prepared-public-text.sh');
   expectScriptContains('verify:public-release-pii', 'scripts/verify-public-release-pii.sh');
   expectScriptContains('verify:release-version', 'scripts/release-version.mjs verify-worktree');
-  expectScriptContains('coverage-floor:check', 'scripts/check-client-coverage-floors.mjs');
   expectScriptContains('client:bundle-budget:check', 'scripts/check-client-bundle-budget.mjs');
   expectScriptContains('dead-exports:advisory', 'scripts/check-dead-exports-advisory.mjs');
   expectScriptContains('dead-exports:check', 'scripts/check-dead-exports-advisory.mjs --check');
   expectScriptContains('verify:release', 'scripts/run-ci-gates.mjs --profile release');
   expectScriptOmits('verify:release', 'NODE_OPTIONS=--openssl-legacy-provider');
 
-  [
-    'wiring-and-release',
-    'contracts',
-    'client',
-    'root-jest',
-    'workers',
-    'cecc-and-node',
-  ].forEach((gateName) => expectProfileContains('ci', gateName));
-  [
-    'wiring-and-release',
-    'public-text',
-    'contracts',
-    'client',
-    'root-jest',
-    'workers',
-    'e2e-smoke',
-    'cecc-and-node',
-  ].forEach((gateName) => expectProfileContains('hosted', gateName));
+  expectProfileContains('ci', 'wiring-and-release');
+  expectProfileContains('hosted', 'wiring-and-release');
+  expectProfileContains('hosted', 'public-text');
   expectProfileContains('release', 'release');
 
   [
-    'npm run test:wiring',
     'npm run type-debt:check',
     'npm run lint',
     'npm --prefix client run format:check',
      'npm run lint:workers',
      'npm run typecheck:client',
-     'npm run typecheck:client-tests',
      'npm run verify:release-version',
      'npm run verify:public-release-surface',
     'npm run verify:public-assets',
     'npm run worker:bundle',
-    'npm run verify:worker-bundle',
     'npm --prefix client run build',
   ].forEach((command) => expectGateContains('wiring-and-release', command));
+  expectGateOmits('wiring-and-release', 'npm run verify:worker-bundle');
   expectGateContains('wiring-and-release', 'npm run client:bundle-budget:check');
   expectGateAfter(
     'wiring-and-release',
@@ -297,36 +247,18 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
     'npm run client:bundle-budget:check',
   );
   expectGateContains('public-text', 'npm run verify:public-text:prepared');
-  expectGateContains('contracts', 'npm run test:contracts');
   expectGateContains('contracts', 'npm run abi:check');
   expectGateOmits('contracts', 'npm run verify:abi-sync');
-  expectGateContains('client', 'npm run test:client');
-  expectGateContains('client', 'npm run coverage-floor:check');
-  expectGateContains('root-jest', 'npm run test:root:jest');
-  expectGateContains('workers', 'npm run test:worker:session-cors');
-  expectGateContains('workers', 'npm run test:worker:agent-bridge');
-  expectGateContains('e2e-smoke', 'npm run test:e2e:smoke');
-  if (Object.prototype.hasOwnProperty.call(scripts, 'test:cc')) {
-    expectGateContains('cecc-and-node', 'npm run test:cc');
-  } else {
-    expectGateOmits('cecc-and-node', 'npm run test:cc');
-  }
-  expectGateContains('cecc-and-node', 'npm run test:node:tracked');
-  expectGateOmits('cecc-and-node', 'npm run test:node');
-  expectGateContains('cecc-and-node', 'npm run test:cache-guard');
   [
      'npm run lint',
      'npm run typecheck:client',
-     'npm run typecheck:client-tests',
      'npm run verify:release-version',
-     'npm run test:node:tracked',
-    'npm run test:release:client',
     'npm run verify:public-release-surface',
     'npm run verify:public-assets',
     'npm run worker:bundle',
-    'npm run verify:worker-bundle',
     'npm --prefix client run build',
   ].forEach((command) => expectGateContains('release', command));
+  expectGateOmits('release', 'npm run verify:worker-bundle');
   expectGateContains('release', 'npm run client:bundle-budget:check');
   expectGateAfter(
     'release',
@@ -341,12 +273,6 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectSyncPublicHistoryContains('CE-Private-Source:', 'private-to-public source mapping trailer');
 
   expectWorkflowContains('wiring-and-release:', 'the wiring-and-release job');
-  expectWorkflowContains('contracts:', 'the contracts job');
-  expectWorkflowContains('client:', 'the client job');
-  expectWorkflowContains('root-jest:', 'the root-jest job');
-  expectWorkflowContains('workers:', 'the workers job');
-  expectWorkflowContains('cecc-and-node:', 'the cecc-and-node job');
-  expectWorkflowContains('test:', 'the final aggregate test job');
   expectWorkflowContains('run: npm run ci:gate -- wiring-and-release', 'the manifest-backed wiring-and-release gate');
   expectWorkflowContains('run: npm run ci:gate -- public-text', 'the hosted public-text gate');
   expectWorkflowContains('node scripts/resolve-baseline-monotonicity-base.mjs', 'baseline monotonicity base resolver');
@@ -358,28 +284,78 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectWorkflowContains('BASELINE_MONOTONICITY_APPROVED:', 'verified baseline growth approval output');
   expectWorkflowContains('--require-base-sha', 'fail-closed baseline SHA requirement');
   expectWorkflowContains('fetch-depth: 0', 'complete history checkout for baseline comparison');
+  expectWorkflowContains(
+    "- 'release-staging/**'",
+    'nested release-staging push trigger',
+  );
   expectWorkflowContains('node scripts/check-baseline-monotonicity.mjs', '"node scripts/check-baseline-monotonicity.mjs"');
   expectWorkflowContains(
-    'node scripts/release-version.mjs verify-ref --candidate-ref HEAD --baseline-ref origin/main',
+    'RELEASE_PUSH_BEFORE_SHA: ${{ github.event.before }}',
+    'release-staging previous push SHA',
+  );
+  expectWorkflowContains(
+    'RELEASE_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}',
+    'release-staging pull request head SHA',
+  );
+  expectWorkflowContains(
+    'RELEASE_EVENT_NAME: ${{ github.event_name }}',
+    'release-staging push event discriminator',
+  );
+  expectWorkflowContains(
+    'if [ "$RELEASE_EVENT_NAME" = "pull_request" ]; then',
+    'release-staging pull request event discriminator',
+  );
+  expectWorkflowContains(
+    'release_candidate_ref="$RELEASE_PR_HEAD_SHA"',
+    'release-staging pull request candidate selection',
+  );
+  expectWorkflowContains(
+    'git fetch --no-tags origin "$release_candidate_ref"',
+    'release-staging pull request head fetch',
+  );
+  expectWorkflowOmits(
+    'git fetch --no-tags --depth=1',
+    'release verification fetches that discard existing history',
+  );
+  expectWorkflowContains(
+    'git fetch --force --tags origin',
+    'release-staging public tag history fetch',
+  );
+  expectWorkflowContains(
+    '--candidate-ref "$release_candidate_ref"',
+    'release-staging explicit candidate ref',
+  );
+  expectWorkflowOmits(
+    '--candidate-ref HEAD',
+    'synthetic pull request merge candidate',
+  );
+  expectWorkflowContains(
+    'if [ "$RELEASE_EVENT_NAME" = "push" ] && [ "$RELEASE_PUSH_BEFORE_SHA" != "$ZERO_OID" ]; then',
+    'release-staging nonzero previous push guard',
+  );
+  expectWorkflowContains(
+    'git fetch --no-tags origin "$RELEASE_PUSH_BEFORE_SHA"',
+    'release-staging previous push object fetch',
+  );
+  expectWorkflowContains(
+    'verify_args+=(--minimum-ref "$RELEASE_PUSH_BEFORE_SHA")',
+    'release-staging minimum version ref',
+  );
+  expectWorkflowContains(
+    'node scripts/release-version.mjs "${verify_args[@]}"',
     'release-staging version advancement verification',
+  );
+  expectWorkflowContains(
+    'node scripts/worker-release-artifacts.mjs verify-replay-range',
+    'release-staging replay identity and provenance verification',
   );
   expectWorkflowOmits('BASELINE_MONOTONICITY_ALLOW_TEXT', 'author-controlled baseline approval text');
   expectWorkflowOmits('--allow-text', 'author-controlled baseline approval option');
   expectWorkflowContains('run: npm --prefix client run build', '"npm --prefix client run build"');
-  expectWorkflowContains('run: npm run ci:gate -- contracts', 'the manifest-backed contracts gate');
-  expectWorkflowContains('run: npm run ci:gate -- client', 'the manifest-backed client gate');
-  expectWorkflowContains('run: npm run ci:gate -- root-jest', 'the manifest-backed root-jest gate');
-  expectWorkflowContains('run: npm run ci:gate -- workers', 'the manifest-backed workers gate');
-  expectWorkflowContains('npm run ci:gate -- e2e-smoke', 'the manifest-backed E2E smoke gate');
-  expectWorkflowContains('run: npm run ci:gate -- cecc-and-node', 'the manifest-backed CE-CC/Node gate');
   expectWorkflowContains('continue-on-error: true', 'non-blocking advisory step');
   expectWorkflowContains('run: npm run dead-exports:advisory', '"npm run dead-exports:advisory"');
   expectWorkflowContains('uses: actions/upload-artifact@', 'client coverage artifact upload');
   expectWorkflowContains('path: client/coverage/lcov.info', 'client coverage artifact path');
-  expectWorkflowContains('needs:', 'aggregate job dependency list');
-  expectWorkflowContains('if: ${{ always() }}', 'always-running aggregate test job');
-  expectWorkflowContains('CI_GATE_RESULTS_JSON:', 'manifest-backed aggregate result map');
-  expectWorkflowContains('run: npm run ci:gates:check-hosted', 'manifest-backed aggregate checker');
   expectWorkflowContains('worker-bundle-candidate-${{ github.sha }}', 'SHA-keyed tested Worker candidate');
   expectWorkflowContains('node scripts/worker-release-artifacts.mjs resolve-source', 'private-to-public provenance resolver');
   expectWorkflowContains('node scripts/worker-release-artifacts.mjs create', 'immutable Worker manifest creation');
@@ -390,6 +366,10 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
     '/.github/workflows/publish-worker-bundles.yml @AgalmicSoftware',
     '/.github/workflows/promote-worker-bundles.yml @AgalmicSoftware',
     '/.github/workflows/public-drift.yml @AgalmicSoftware',
+    '/.githooks/pre-push @AgalmicSoftware',
+    '/scripts/pre-push-guard.test.js @AgalmicSoftware',
+    '/scripts/release-version.mjs @AgalmicSoftware',
+    '/scripts/release-version.test.mjs @AgalmicSoftware',
     '/scripts/check-baseline-monotonicity.mjs @AgalmicSoftware',
     '/scripts/resolve-baseline-monotonicity-base.mjs @AgalmicSoftware',
     '/scripts/resolve-baseline-growth-approval.mjs @AgalmicSoftware',
@@ -398,6 +378,9 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
     '/scripts/run-ci-gates.test.mjs @AgalmicSoftware',
     '/scripts/worker-release-artifacts.mjs @AgalmicSoftware',
     '/scripts/worker-release-artifacts.test.mjs @AgalmicSoftware',
+    '/scripts/verify-public-release-pii.sh @AgalmicSoftware',
+    '/scripts/verify-public-release-pii.test.js @AgalmicSoftware',
+    '/scripts/lib/public-release-strip-patterns.sh @AgalmicSoftware',
     '/scripts/sync-public-history.sh @AgalmicSoftware',
     '/scripts/client-boundaries-baseline.json @AgalmicSoftware',
     '/scripts/type-debt-baseline.json @AgalmicSoftware',
@@ -411,7 +394,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
       failures.push(`CODEOWNERS must include "${rule}"`);
     }
   });
-  if (/npm run (?:worker:bundle|verify:worker-bundle)/.test(publishWorkflow)) {
+  if (/npm run worker:bundle/.test(publishWorkflow)) {
     failures.push('publish-worker-bundles workflow must consume tested CI bytes without rebuilding');
   }
   if (

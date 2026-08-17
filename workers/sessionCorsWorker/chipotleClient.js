@@ -1,4 +1,4 @@
-import rpcDefaults from '../../client/src/variables/rpcDefaults.js';
+import rpcDefaults from '../../shared/rpcDefaults.cjs';
 import { ethers } from 'ethers';
 import {
   buildLitChipotlePolicy,

@@ -13,8 +13,8 @@ import {
   getSessionWizardContractModalTriggerTestId,
   getSessionWizardContractTooltipTestId,
   WIZARD_CONTRACT_MODAL_TESTID,
-} from '../ContractPage/contractMetadata.js';
-import { buildContractViewerContracts } from '../ContractPage/contractViewerUtils.js';
+} from '../DocsPage/contractMetadata.js';
+import { buildContractViewerContracts } from '../DocsPage/contractViewerUtils.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import {
   clearSessionWizardPendingSbtDraftsCache,
@@ -35,6 +35,7 @@ const mockReplacementSbtAddress = ethers.utils.getAddress('0x8ba1f109551bd432803
 const mockTestAdminAddress = '0x00000000000000000000000000000000000000aa';
 const TEST_ADMIN_ADDRESS = mockTestAdminAddress;
 const ORIGINAL_PUBLIC_URL = process.env.PUBLIC_URL;
+const ORIGINAL_FETCH = global.fetch;
 const mockSelectorSourceFactory = '0x538A48BC439A36D2A86e63114DCD9c429d2ddEcA';
 const mockSelectorSourceStartBlock = 30297069;
 const buildMockSponsoredBundleEnvelope = () =>
@@ -167,7 +168,7 @@ jest.mock('../Shared/Json/JsonControls', () => ({
   JsonPanel: () => null,
   JsonButtonRow: () => null,
 }));
-jest.mock('../ContractPage/contractViewerUtils.js', () => ({
+jest.mock('../DocsPage/contractViewerUtils.js', () => ({
   buildContractViewerContracts: jest.fn(),
 }));
 
@@ -355,6 +356,52 @@ const selectDecentralizedPreset = () => {
     fireEvent.click(continueButton);
   }
 };
+const deployVerifiedWorkerForCurrentDraft = async () => {
+  let publicConfig = {};
+  global.fetch = jest.fn(async (url, options = {}) => {
+    const normalizedUrl = String(url);
+    if (normalizedUrl.endsWith('/deploy')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ok: true,
+          workerUrl: 'https://worker.example.test',
+          writesSessionConfig: true,
+          writesSessionSecrets: false,
+        }),
+      };
+    }
+    if (normalizedUrl.endsWith('/auth/nonce')) {
+      return { ok: true, status: 200, json: async () => ({ nonce: 'wizard-admin-nonce' }) };
+    }
+    if (normalizedUrl.endsWith('/admin/set-config')) {
+      publicConfig = JSON.parse(String(options.body || '{}')).config || publicConfig;
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    }
+    if (normalizedUrl.includes('/session-config')) {
+      const { litCredentials: _privateLitDescriptor, ...verifiedConfig } = publicConfig;
+      if (verifiedConfig.ai) verifiedConfig.ai = { models: verifiedConfig.ai.models };
+      return { ok: true, status: 200, json: async () => ({ config: verifiedConfig }) };
+    }
+    return { ok: true, status: 200, json: async () => ({ ok: true }) };
+  });
+
+  selectNormalModeCard('Worker');
+  const tokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
+  const reactPropsKey = Object.keys(tokenInput).find((key) => key.startsWith('__reactProps$'));
+  act(() => tokenInput[reactPropsKey].onChange({ target: { value: 'cf-render-test-token' } }));
+  fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
+    target: { value: 'sk-render-test' },
+  });
+  fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
+    target: { value: '{"kty":"RSA","n":"render-test"}' },
+  });
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
+  await waitFor(() => {
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Worker deployed.');
+  });
+};
 const getMockSelectorById = (selectorId) =>
   screen
     .queryAllByTestId('mock-wizard-sbt-selector')
@@ -423,6 +470,7 @@ describe('SessionWizard rendered validation', () => {
       process.env.PUBLIC_URL = ORIGINAL_PUBLIC_URL;
     }
     window.history.replaceState({}, '', '/');
+    global.fetch = ORIGINAL_FETCH;
     localStorage.clear();
     sessionStorage.clear();
     buildContractViewerContracts.mockImplementation(({ sessionContracts = {} } = {}) =>
@@ -595,7 +643,7 @@ describe('SessionWizard rendered validation', () => {
 
     expect(within(modal).getByTestId('ce-wizard-contract-modal-full-link')).toHaveAttribute(
       'href',
-      '/contracts?contract=sessionRegistry&session=session-alpha',
+      '/docs?contract=sessionRegistry&session=session-alpha',
     );
     expect(within(modal).getByTestId('ce-wizard-contract-modal-full-link')).toHaveAttribute(
       'rel',
@@ -991,7 +1039,6 @@ describe('SessionWizard rendered validation', () => {
     const { arweaveClient } = require('../../utilities/arweave/arweaveClient.js');
     let publishClicked = false;
     mockSessionExists.mockImplementation(async () => publishClicked);
-
     renderLoggedInSessionWizard();
     selectDecentralizedPreset();
     enableAdvancedMode();
@@ -1005,6 +1052,7 @@ describe('SessionWizard rendered validation', () => {
       target: { value: 'duplicate-session' },
     });
     await createPendingFeaturedDraft();
+    await deployVerifiedWorkerForCurrentDraft();
 
     fireEvent.click(screen.getByText('Publish').closest('button'));
     const publishButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);

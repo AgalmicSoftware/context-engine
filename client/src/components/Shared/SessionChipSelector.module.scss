@@ -9,9 +9,9 @@
 
 .chip {
   width: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
+  border-radius: var(--ce-radius-16);
+  background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
   color: var(--ce-color-panel-text);
   padding: 12px 14px;
   text-align: left;
@@ -22,8 +22,8 @@
 }
 
 .chip:hover:not(:disabled) {
-  border-color: rgba(90, 255, 194, 0.55);
-  background: rgba(255, 255, 255, 0.09);
+  border-color: color-mix(in srgb, var(--ce-action-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--ce-text-inverse) 9%, transparent);
   transform: translateY(-1px);
 }
 
@@ -33,12 +33,12 @@
 }
 
 .chipSelected {
-  border-color: rgba(90, 255, 194, 0.75);
-  box-shadow: 0 0 0 1px rgba(90, 255, 194, 0.24);
+  border-color: var(--ce-session-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ce-session-accent) 35%, transparent);
 }
 
 .chipActive {
-  background: rgba(90, 255, 194, 0.12);
+  background: color-mix(in srgb, var(--ce-session-accent) 14%, transparent);
 }
 
 .chipLoaded {
@@ -46,7 +46,7 @@
 }
 
 .chipUnloaded {
-  color: rgba(244, 247, 255, 0.78);
+  color: color-mix(in srgb, var(--ce-control-text) 78%, transparent);
 }
 
 .chipGeneral {
@@ -72,7 +72,7 @@
 }
 
 .chipCheck {
-  color: #5affc2;
+  color: var(--ce-session-accent);
   font-weight: 700;
 }
 
@@ -80,8 +80,8 @@
   margin-left: auto;
   border-radius: var(--ce-radius-pill);
   padding: 2px 8px;
-  background: rgba(91, 140, 255, 0.18);
-  color: #dbe7ff;
+  background: color-mix(in srgb, var(--ce-data-series-1) 18%, transparent);
+  color: var(--ce-status-info-text);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -89,7 +89,7 @@
 
 .externalLink {
   margin-left: auto;
-  color: rgba(244, 247, 255, 0.7);
+  color: color-mix(in srgb, var(--ce-control-text) 70%, transparent);
   display: inline-flex;
   align-items: center;
 }
@@ -101,7 +101,7 @@
 .metaText {
   display: block;
   margin-top: 7px;
-  color: rgba(244, 247, 255, 0.72);
+  color: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
   font-size: 0.82rem;
 }
 
@@ -116,7 +116,7 @@
   flex: 1;
   height: 5px;
   border-radius: var(--ce-radius-pill);
-  background: rgba(255, 255, 255, 0.12);
+  background: color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
   overflow: hidden;
 }
 
@@ -125,7 +125,7 @@
   width: var(--ce-chip-progress-width, 40%);
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #5affc2 0%, #5b8cff 100%);
+  background: linear-gradient(90deg, var(--ce-status-success-text) 0%, var(--ce-data-series-1) 100%);
 }
 
 .progressFillIndeterminate {
@@ -133,22 +133,22 @@
 }
 
 .progressText {
-  color: rgba(244, 247, 255, 0.72);
+  color: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
   font-size: 0.78rem;
   white-space: nowrap;
 }
 
 .emptyState {
-  color: rgba(244, 247, 255, 0.68);
+  color: color-mix(in srgb, var(--ce-control-text) 68%, transparent);
   font-size: 0.92rem;
 }
 
 .expandToggle {
   justify-self: start;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
   border-radius: var(--ce-radius-pill);
-  background: rgba(255, 255, 255, 0.06);
-  color: #f8fbff;
+  background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
+  color: var(--ce-document-surface);
   font-family: var(--ce-font-mono);
   font-size: 0.8rem;
   font-weight: 700;
@@ -162,8 +162,8 @@
 
   &:hover,
   &:focus-visible {
-    border-color: rgba(90, 255, 194, 0.55);
-    background: rgba(255, 255, 255, 0.09);
+    border-color: color-mix(in srgb, var(--ce-action-accent) 55%, transparent);
+    background: color-mix(in srgb, var(--ce-text-inverse) 9%, transparent);
     transform: translateY(-1px);
     outline: none;
   }

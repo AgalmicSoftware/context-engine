@@ -1,9 +1,6 @@
 import SBTFilter from './SBTFilter';
-import contractScripts, {
-  getSessionChainId,
-  getSessionSlugByName,
-  normalizeSessionSlug,
-} from '../../utilities/web3/chainGateway.js';
+import contractScripts, { getSessionChainId, getSessionSlugByName } from '../../utilities/web3/chainGateway.js';
+import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 
 jest.mock('./SBTSelector', () => () => null);
@@ -15,6 +12,10 @@ jest.mock('../../utilities/web3/chainGateway.js', () => ({
   },
   getSessionChainId: jest.fn(() => null),
   getSessionSlugByName: jest.fn(() => ''),
+}));
+
+jest.mock('../../utilities/session/sessionNaming.js', () => ({
+  __esModule: true,
   normalizeSessionSlug: jest.fn((value) =>
     String(value || '')
       .trim()
@@ -22,10 +23,19 @@ jest.mock('../../utilities/web3/chainGateway.js', () => ({
   ),
 }));
 
-jest.mock('../../utilities/cache/cacheScripts.js', () => ({
-  peekCacheSync: jest.fn(),
-  writeCache: jest.fn(() => Promise.resolve(true)),
-}));
+jest.mock('../../utilities/cache/cacheScripts.js', () => {
+  const peekCacheSync = jest.fn();
+  const writeCache = jest.fn(() => Promise.resolve(true));
+  return {
+    peekCacheSync,
+    writeCache,
+    updateCacheAtomic: jest.fn(async (namespace, slug, updater) => {
+      const next = await updater(peekCacheSync(namespace, slug));
+      await writeCache(namespace, slug, next);
+      return next;
+    }),
+  };
+});
 
 const createSubject = (props = {}, stateOverrides = {}) => {
   const mergedProps = {

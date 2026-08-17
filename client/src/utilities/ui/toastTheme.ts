@@ -1,5 +1,5 @@
 export const toastTheme = Object.freeze({
-  background: '#1a1a2e',
-  color: '#f4f7ff',
-  border: '1px solid rgba(255,255,255,0.1)',
+  background: 'var(--ce-surface-raised)',
+  color: 'var(--ce-panel-text)',
+  border: 'var(--ce-border-control-width) solid var(--ce-card-border)',
 });

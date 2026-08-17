@@ -1,0 +1,391 @@
+@use 'sass:list';
+@use 'sass:map';
+@use 'sass:meta';
+
+$required-theme-tokens: (
+  font-body,
+  font-ui,
+  font-mono,
+  font-button,
+  font-button-weight,
+  layout-profile,
+  welcome-slide-mode,
+  canvas,
+  surface,
+  surface-alt,
+  surface-raised,
+  surface-sunken,
+  surface-light,
+  surface-subtle,
+  document-canvas,
+  document-surface,
+  document-text,
+  document-text-muted,
+  document-border,
+  document-border-strong,
+  text,
+  text-muted,
+  text-inverse,
+  panel-text,
+  panel-text-muted,
+  border,
+  border-light,
+  border-strong,
+  tooltip-bg,
+  tooltip-text,
+  tooltip-muted,
+  tooltip-border,
+  response-agree-bg,
+  response-agree-border,
+  response-agree-text,
+  response-unsure-bg,
+  response-unsure-border,
+  response-unsure-text,
+  response-disagree-bg,
+  response-disagree-border,
+  response-disagree-text,
+  binary-choice-agree-bg,
+  binary-choice-unsure-bg,
+  binary-choice-disagree-bg,
+  overlay-base,
+  overlay-surface,
+  overlay-surface-alt,
+  overlay-text,
+  overlay-text-muted,
+  authoring-panel-bg,
+  authoring-panel-text,
+  authoring-panel-muted,
+  authoring-section-bg,
+  authoring-control-bg,
+  authoring-control-text,
+  authoring-control-muted,
+  authoring-control-border,
+  authoring-input-bg,
+  authoring-input-text,
+  authoring-input-placeholder,
+  authoring-input-border,
+  authoring-prompt-bg,
+  authoring-prompt-text,
+  authoring-prompt-border,
+  authoring-prompt-radius,
+  authoring-prompt-shadow,
+  authoring-prompt-heading,
+  authoring-prompt-meta,
+  authoring-prompt-meta-opacity,
+  authoring-prompt-variable-bg,
+  authoring-prompt-variable-text,
+  authoring-prompt-variable-border,
+  authoring-prompt-variable-radius,
+  authoring-prompt-json-text,
+  card-bg,
+  card-border,
+  card-shadow,
+  tool-card-border,
+  tool-card-shadow,
+  tool-card-hover-bg,
+  tool-card-shadow-hover,
+  footer-bar-bg,
+  footer-bar-border-color,
+  footer-margin-top,
+  footer-bar-padding,
+  footer-bar-padding-wide,
+  footer-link-gap,
+  footer-link-margin-x,
+  footer-link-height,
+  footer-link-padding-x,
+  footer-link-font-size,
+  footer-link-font-size-wide,
+  footer-copyright-font-size,
+  footer-copyright-font-size-wide,
+  footer-link-bg,
+  footer-link-border,
+  footer-link-border-width,
+  footer-link-shadow,
+  footer-link-text,
+  footer-link-hover-bg,
+  footer-link-hover-shadow,
+  footer-link-hover-text,
+  footer-link-active-border,
+  footer-link-active-shadow,
+  settings-panel-bg,
+  settings-surface-bg,
+  settings-section-bg,
+  settings-field-bg,
+  settings-border,
+  settings-control-bg,
+  settings-control-border,
+  settings-control-border-width,
+  settings-control-opacity,
+  settings-control-text,
+  settings-text,
+  settings-muted-text,
+  settings-placeholder-text,
+  input-bg,
+  input-border,
+  input-border-strong,
+  focus-ring,
+  action-primary,
+  action-primary-hover,
+  action-primary-text,
+  action-accent,
+  action-accent-hover,
+  action-accent-text,
+  action-submit,
+  action-submit-hover,
+  action-submit-text,
+  action-submit-disabled-bg,
+  action-submit-disabled-border,
+  action-submit-disabled-text,
+  link,
+  status-info,
+  status-success,
+  status-success-bright,
+  status-warning,
+  status-danger,
+  status-error,
+  status-info-text,
+  status-success-text,
+  status-warning-text,
+  status-danger-text,
+  status-info-soft,
+  status-success-soft,
+  status-success-soft-hover,
+  status-warning-soft,
+  status-warning-soft-hover,
+  data-series-1,
+  data-series-2,
+  data-series-3,
+  data-series-4,
+  data-series-5,
+  data-series-6,
+  data-series-7,
+  data-series-8,
+  data-viz-surface,
+  data-viz-border,
+  data-viz-axis,
+  data-viz-label,
+  data-viz-label-opacity,
+  data-viz-point,
+  data-viz-point-active,
+  data-viz-point-stroke,
+  control-face,
+  control-text,
+  control-disabled-bg,
+  control-disabled-text,
+  titlebar-bg,
+  titlebar-text,
+  nav-tab-inactive,
+  brand-logo-opacity,
+  brand-logo-blend-mode,
+  brand-logo-filter,
+  recognition-logo-backing,
+  recognition-logo-border,
+  welcome-artwork-blend-soft,
+  welcome-artwork-blend-intense,
+  welcome-artwork-blend-cutout,
+  welcome-artwork-detail-opacity-scale,
+  welcome-artwork-detail-filter,
+  welcome-artwork-backdrop,
+  selection-bg,
+  selection-text,
+  session-accent,
+  session-accent-hover,
+  session-accent-contrast,
+  session-chrome,
+  session-chrome-contrast,
+  session-focus,
+  edge-highlight,
+  edge-light,
+  edge-shadow,
+  edge-dark,
+  border-raised,
+  border-inset,
+  shadow-raised,
+  shadow-pressed,
+  shadow-neumorphic-dark,
+  shadow-neumorphic-light,
+  shadow-submit,
+  shadow-submit-hover,
+  border-control-width,
+  control-padding-y,
+  control-padding-x,
+  radius-0,
+  radius-2,
+  radius-3,
+  radius-4,
+  radius-5,
+  radius-6,
+  radius-7,
+  radius-8,
+  radius-10,
+  radius-12,
+  radius-14,
+  radius-15,
+  radius-16,
+  radius-18,
+  radius-20,
+  radius-22,
+  radius-24,
+  radius-28,
+  radius-30,
+  radius-50,
+  radius-pill,
+  radius-round,
+  compat-orange,
+  compat-indigo,
+  compat-indigo-hover,
+  compat-blue,
+  compat-yellow,
+  compat-pink,
+  compat-purple,
+  compat-cyan,
+  compat-dark,
+  compat-bootstrap-indigo,
+  compat-bootstrap-purple,
+  compat-bootstrap-pink,
+  compat-bootstrap-red,
+  compat-bootstrap-teal,
+  compat-bootstrap-cyan,
+  compat-bootstrap-light,
+  compat-bootstrap-secondary,
+  compat-bootstrap-default,
+  compat-bootstrap-gray-dark
+);
+
+@function missing-theme-tokens($tokens) {
+  $missing: ();
+
+  @each $token in $required-theme-tokens {
+    @if not map.has-key($tokens, $token) {
+      $missing: list.append($missing, $token);
+    }
+  }
+
+  @return $missing;
+}
+
+@function unexpected-theme-tokens($tokens) {
+  $unexpected: ();
+
+  @each $token, $value in $tokens {
+    @if not list.index($required-theme-tokens, $token) {
+      $unexpected: list.append($unexpected, $token);
+    }
+  }
+
+  @return $unexpected;
+}
+
+@mixin assert-theme-contract($name, $tokens) {
+  $missing: missing-theme-tokens($tokens);
+  $unexpected: unexpected-theme-tokens($tokens);
+
+  @if list.length($missing) > 0 {
+    @error 'Theme `#{$name}` is missing required tokens: #{$missing}';
+  }
+
+  @if list.length($unexpected) > 0 {
+    @error 'Theme `#{$name}` has unexpected tokens: #{$unexpected}';
+  }
+}
+
+@mixin emit-theme($selector, $name, $tokens) {
+  @include assert-theme-contract($name, $tokens);
+
+  #{$selector} {
+    @each $token, $value in $tokens {
+      --ce-#{$token}: #{meta.inspect($value)};
+    }
+  }
+}
+
+// Compatibility aliases keep existing consumers live while route slices move
+// to the semantic names above. New component styles must not add these aliases.
+@mixin emit-compatibility-aliases($selector) {
+  #{$selector} {
+    --blue: var(--ce-compat-indigo);
+    --indigo: var(--ce-compat-bootstrap-indigo);
+    --purple: var(--ce-compat-bootstrap-purple);
+    --pink: var(--ce-compat-bootstrap-pink);
+    --red: var(--ce-compat-bootstrap-red);
+    --orange: var(--ce-compat-orange);
+    --yellow: var(--ce-compat-yellow);
+    --green: var(--ce-status-success);
+    --teal: var(--ce-compat-bootstrap-teal);
+    --cyan: var(--ce-compat-bootstrap-cyan);
+    --white: var(--ce-text-inverse);
+    --gray: var(--ce-text-muted);
+    --gray-dark: var(--ce-compat-bootstrap-gray-dark);
+    --light: var(--ce-compat-bootstrap-light);
+    --lighter: var(--ce-surface-subtle);
+    --primary: var(--ce-action-primary);
+    --secondary: var(--ce-compat-bootstrap-secondary);
+    --success: var(--ce-status-success-bright);
+    --info: var(--ce-status-info);
+    --warning: var(--ce-status-warning);
+    --danger: var(--ce-status-danger);
+    --dark: var(--ce-compat-dark);
+    --default: var(--ce-compat-bootstrap-default);
+    --neutral: var(--ce-text-inverse);
+    --darker: var(--ce-overlay-base);
+
+    --ce-color-white: var(--ce-text-inverse);
+    --ce-color-black: var(--ce-overlay-base);
+    --ce-color-text: var(--ce-text);
+    --ce-color-text-muted: var(--ce-text-muted);
+    --ce-color-bg: var(--ce-canvas);
+    --ce-color-surface: var(--ce-surface);
+    --ce-color-surface-alt: var(--ce-surface-alt);
+    --ce-color-dark: var(--ce-compat-dark);
+    --ce-color-light: var(--ce-surface-subtle);
+    --ce-color-surface-light: var(--ce-surface-light);
+    --ce-color-border: var(--ce-border);
+    --ce-color-border-light: var(--ce-border-light);
+    --ce-color-tooltip-bg: var(--ce-tooltip-bg);
+    --ce-color-tooltip-text: var(--ce-tooltip-text);
+    --ce-color-tooltip-muted: var(--ce-tooltip-muted);
+    --ce-color-tooltip-border: var(--ce-tooltip-border);
+    --ce-color-panel-bg: var(--ce-surface-sunken);
+    --ce-color-panel-text: var(--ce-panel-text);
+    --ce-color-panel-text-muted: var(--ce-panel-text-muted);
+    --ce-color-card-bg: var(--ce-card-bg);
+    --ce-color-card-border: var(--ce-card-border);
+    --ce-shadow-card: var(--ce-card-shadow);
+    --ce-color-input-bg: var(--ce-input-bg);
+    --ce-color-input-border: var(--ce-input-border);
+    --ce-color-input-border-strong: var(--ce-input-border-strong);
+    --ce-color-error: var(--ce-status-error);
+    --ce-color-primary: var(--ce-action-primary);
+    --ce-color-primary-hover: var(--ce-action-primary-hover);
+    --ce-color-info: var(--ce-status-info);
+    --ce-color-success: var(--ce-status-success);
+    --ce-color-success-bright: var(--ce-status-success-bright);
+    --ce-color-warning: var(--ce-status-warning);
+    --ce-color-danger: var(--ce-status-danger);
+    --ce-color-orange: var(--ce-compat-orange);
+    --ce-color-indigo: var(--ce-compat-indigo);
+    --ce-color-indigo-hover: var(--ce-compat-indigo-hover);
+    --ce-color-blue: var(--ce-compat-blue);
+    --ce-color-yellow: var(--ce-compat-yellow);
+    --ce-color-pink: var(--ce-compat-pink);
+    --ce-color-purple: var(--ce-compat-purple);
+    --ce-color-cyan: var(--ce-compat-cyan);
+    --ce-color-accent: var(--ce-action-accent);
+    --ce-color-accent-hover: var(--ce-action-accent-hover);
+    --ce-color-info-soft: var(--ce-status-info-soft);
+    --ce-color-success-soft: var(--ce-status-success-soft);
+    --ce-color-success-soft-hover: var(--ce-status-success-soft-hover);
+    --ce-color-warning-soft: var(--ce-status-warning-soft);
+    --ce-color-warning-soft-hover: var(--ce-status-warning-soft-hover);
+
+    --breakpoint-xs: 0;
+    --breakpoint-sm: 576px;
+    --breakpoint-md: 768px;
+    --breakpoint-lg: 992px;
+    --breakpoint-xl: 1200px;
+    --font-family-sans-serif:
+      -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif,
+      'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-family-monospace: SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  }
+}

@@ -52,6 +52,7 @@ import {
   bindWorkerAuthRequestIdentity,
   resolveAdminActionSessionId,
   resolveWorkerAuthSessionId,
+  shouldBootstrapWorkerCanonicalIdentity,
   type WorkerLoginResponse,
 } from './workerAuthSessionIdentity.js';
 import {
@@ -59,6 +60,7 @@ import {
   NONCE_MISMATCH_ERROR,
   ONCHAIN_GATE_UNAVAILABLE_ERROR,
 } from './workerAuthRemoteError.js';
+import type { ResolveWorkerTokenRequestContextOptions, WorkerFetchAuthOptions } from './workerAuthRequestTypes.js';
 
 const accountLog = createLogger('account');
 
@@ -95,15 +97,6 @@ type SleepOptions = {
   requestAuthEpoch?: number;
   signal?: AbortSignal | null;
 };
-type ResolveWorkerTokenRequestContextOptions = {
-  allowDemoFallback?: boolean;
-  context?: unknown;
-  resolvedAddress?: unknown;
-  resolveWorkerUrl?: boolean;
-  sessionConfig?: unknown;
-  sessionSlug?: unknown;
-  workerUrl?: unknown;
-};
 type BuildSiweMessageOptions = {
   address?: unknown;
   chainId?: unknown;
@@ -120,6 +113,7 @@ type AdminActionAuthOptions = {
   context?: unknown;
   nonce?: unknown;
   sessionId?: unknown;
+  sessionAuthorityMode?: unknown;
   slug?: unknown;
   workerUrl?: unknown;
 };
@@ -132,11 +126,6 @@ type BootstrapAdminAuthOptions = {
 };
 type WorkerSessionTokenOptions = ResolveWorkerTokenRequestContextOptions & {
   requestContext?: WorkerTokenRequestContext;
-};
-type WorkerFetchAuthOptions = ResolveWorkerTokenRequestContextOptions & {
-  fallbackOnGateUnavailable?: boolean;
-  preferAnonymous?: boolean;
-  retry?: boolean;
 };
 type InFlightTokenRequest = {
   abortController: {
@@ -467,6 +456,7 @@ export const buildSignedAdminActionAuth = async ({
   context,
   nonce: providedNonce,
   sessionId: providedSessionId,
+  sessionAuthorityMode,
 }: AdminActionAuthOptions = {}) => {
   const actionName = toStr(action).trim().toLowerCase();
   if (!actionName) throw new Error('Admin action is required.');
@@ -483,7 +473,13 @@ export const buildSignedAdminActionAuth = async ({
 
   const targetSlug = normalizeSessionSlug(slug);
   const actionBody = body && typeof body === 'object' ? (body as UnknownRecord) : {};
-  const exactSessionId = resolveAdminActionSessionId({ body: actionBody, providedSessionId });
+  const exactSessionId = resolveAdminActionSessionId({
+    body: actionBody,
+    providedSessionId,
+    sessionAuthorityMode,
+  });
+  const bootstrapWorkerCanonicalIdentity =
+    !!exactSessionId && shouldBootstrapWorkerCanonicalIdentity({ action: actionName, body: actionBody });
   const audience = resolveAdminActionAudience(resolvedWorkerUrl);
   if (!audience) {
     throw new Error('Unable to resolve admin audience.');
@@ -503,6 +499,7 @@ export const buildSignedAdminActionAuth = async ({
         sessionSlug: targetSlug,
         ...(exactSessionId ? { sessionId: exactSessionId } : {}),
         adminAction: true,
+        ...(bootstrapWorkerCanonicalIdentity ? { bootstrapWorkerCanonicalIdentity: true } : {}),
       }),
     });
     const nonceData = await nonceResp.json().catch(() => ({}));
@@ -902,7 +899,9 @@ export const fetchWorkerWithAuth = async (
   });
   const slug = resolvedSession.sessionSlug;
   const workerUrl = normalizeWorkerUrl(opts.workerUrl || url);
-  const canAttemptAnonymous = opts.preferAnonymous && !isStreamBody(options?.body);
+  const bodyIsStream = isStreamBody(options?.body);
+  const anonymousOnly = opts.anonymousOnly === true;
+  const canAttemptAnonymous = (opts.preferAnonymous || anonymousOnly) && (!bodyIsStream || anonymousOnly);
   let anonymousResponse: Response | null = null;
   if (canAttemptAnonymous) {
     const requestApiKey = readRequestApiKey(options?.body);
@@ -913,6 +912,7 @@ export const fetchWorkerWithAuth = async (
     try {
       anonymousResponse = await fetch(url, { ...options, headers: anonymousHeaders });
     } catch (anonymousError) {
+      if (bodyIsStream) throw anonymousError;
       // Backward compatibility: older workers may reject preflight when this header is unknown.
       const hasAnonRateId = toStr(anonymousHeaders.get('X-Anonymous-Client-Id')).trim().length > 0;
       if (!hasAnonRateId) throw anonymousError;
@@ -925,6 +925,9 @@ export const fetchWorkerWithAuth = async (
       const fallbackAnonymousHeaders = stripAnonymousRateIdHeader(anonymousHeaders);
       anonymousResponse = await fetch(url, { ...options, headers: fallbackAnonymousHeaders });
     }
+    // Regression guard: user-initiated media capture must never turn a denied
+    // anonymous request into an unexpected wallet or passkey signing prompt.
+    if (anonymousOnly) return anonymousResponse;
     const shouldFallback = await shouldFallbackToAuthenticatedFlow(anonymousResponse, {
       requestApiKey,
       fallbackOnGateUnavailable: opts.fallbackOnGateUnavailable === true,

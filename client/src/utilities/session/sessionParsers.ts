@@ -427,6 +427,16 @@ export const parseWorkerConfig = (raw: unknown): ParsedWorkerConfig => {
     if (litCredentials) config.litCredentials = litCredentials;
   }
 
+  if (hasOwn(raw, 'workerAuthority')) {
+    if (raw.workerAuthority == null) {
+      delete config.workerAuthority;
+    } else if (!isObj(raw.workerAuthority)) {
+      pushTypeError(errors, 'workerAuthority', 'an object');
+    } else {
+      config.workerAuthority = cloneValue(raw.workerAuthority);
+    }
+  }
+
   return {
     ok: errors.length === 0,
     config,

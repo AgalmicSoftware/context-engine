@@ -2012,7 +2012,7 @@ class UserPage extends Component<any, any> {
           if (!itemRecord.id || !itemRecord.data) return;
           const sid = String(itemRecord.id || '').toLowerCase();
           if (!sid) return;
-          if (!combinedSurveys[sid]) combinedSurveys[sid] = toAnalysisRecord(itemRecord.data);
+          if (!combinedSurveys[sid]) combinedSurveys[sid] = { ...toAnalysisRecord(itemRecord.data) };
           if (!combinedSurveys[sid].creator) combinedSurveys[sid].creator = viewAddressKey;
           writeUserPageSourceSlug(surveySourceSlugById, sid, slug);
         });
@@ -2041,7 +2041,7 @@ class UserPage extends Component<any, any> {
           if (!itemRecord.id || !itemRecord.data) return;
           const qid = String(itemRecord.id || '').toLowerCase();
           if (!qid) return;
-          if (!combinedQuestions[qid]) combinedQuestions[qid] = toAnalysisRecord(itemRecord.data);
+          if (!combinedQuestions[qid]) combinedQuestions[qid] = { ...toAnalysisRecord(itemRecord.data) };
           if (!combinedQuestions[qid].creator) combinedQuestions[qid].creator = viewAddressKey;
           writeUserPageSourceSlug(questionSourceSlugById, qid, slug);
         });
@@ -3692,8 +3692,10 @@ class UserPage extends Component<any, any> {
 
         <UserPageComparePanel collapseOpen={collapseOpen} minimized={minimized}>
           <CompareAddressSection
+            activeSessionSlug={this.props.activeSessionSlug ?? this.props.sessionSlug ?? ''}
             firstAddress={propViewAddress}
             account={account}
+            sessionCachesReady={this.props.isAllCachesReady}
             scanSpecificUserProfile={this.props.scanSpecificUserProfile}
           />
         </UserPageComparePanel>

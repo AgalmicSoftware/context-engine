@@ -1,6 +1,6 @@
 import React from 'react';
 
-import type { ContractViewerContract } from '../ContractPage/ContractViewer';
+import type { ContractViewerContract } from '../DocsPage/ContractViewer';
 import SessionHeaderPreviewModal from './SessionHeaderPreviewModal';
 import SessionWizardContractViewerModal from './SessionWizardContractViewerModal';
 import SessionWizardCreateSbtModal from './SessionWizardCreateSbtModal';

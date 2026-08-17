@@ -70,6 +70,7 @@ export const LoginSettingsControlRow = ({
   onToggleConfig = null,
   rowClassName = '',
   sessionHref = '/session',
+  showSession = true,
   tooltipsControl = null,
 }: {
   activeSession?: SessionDescriptor;
@@ -83,13 +84,14 @@ export const LoginSettingsControlRow = ({
   onToggleConfig?: (() => void) | null;
   rowClassName?: string;
   sessionHref?: string;
+  showSession?: boolean;
   tooltipsControl?: React.ReactNode;
 }): React.ReactElement => (
   <div className={[styles.settingsContainer, containerClassName].filter(Boolean).join(' ')}>
     <div className={[styles.settingsRow, rowClassName].filter(Boolean).join(' ')}>
       {beforeConfig}
       <LoginSettingsConfigToggleControl expanded={configOpen} onToggle={onToggleConfig} testId={configTestId} />
-      <LoginSettingsSessionSummary activeSession={activeSession} sessionHref={sessionHref} />
+      {showSession ? <LoginSettingsSessionSummary activeSession={activeSession} sessionHref={sessionHref} /> : null}
       {betweenSessionAndTooltips}
       {tooltipsControl}
       {demoControl}

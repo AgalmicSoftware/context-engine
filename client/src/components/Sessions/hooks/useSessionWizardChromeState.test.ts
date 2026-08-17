@@ -29,7 +29,7 @@ describe('useSessionWizardChromeState', () => {
     expect(result.current.collapsedSections.encryption).toBe(false);
   });
 
-  it('normalizes normal-mode sections to a single open section', () => {
+  it('leaves mode-transition visibility to the dedicated normal-mode hook', () => {
     const { result, rerender } = renderHook(
       ({ wizardMode }) =>
         useSessionWizardChromeState({
@@ -53,7 +53,7 @@ describe('useSessionWizardChromeState', () => {
     expect(result.current.collapsedSections).toEqual({
       metadata: true,
       encryption: false,
-      worker: true,
+      worker: false,
       publish: true,
     });
   });

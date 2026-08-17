@@ -6,7 +6,7 @@ const statusViewStyle: React.CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   height: '50vh',
-  color: 'white',
+  color: 'var(--ce-panel-text)',
 };
 
 type MainSiteRouteStatusViewProps = {

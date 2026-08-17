@@ -41,4 +41,42 @@ describe('CommunityTab module styles', () => {
     );
     expect(scss).not.toMatch(/:global\(\.modal-header\)\s*{[\s\S]*?:global\(\.close\)/);
   });
+
+  it('uses the classic split-pane statistics window without changing the default layout', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'CommunityTab.module.scss'), 'utf8');
+
+    expect(scss).toContain('@container ce-theme style(--ce-layout-profile: desktop-window)');
+    expect(scss).not.toContain('data-ce-theme');
+    expect(scss).toMatch(/\.communityTab \.leaderboardSection\s*{[\s\S]*?flex:\s*0 0 28%;/);
+    expect(scss).toMatch(/\.communityTab \.statsGrid\s*{[\s\S]*?grid-template-columns:\s*repeat\(4,/);
+    expect(scss).toMatch(/\.communityTab \.beeswarmSection\s*{[\s\S]*?background:\s*var\(--ce-data-viz-surface\);/);
+    expect(scss).toMatch(
+      /\.communityTab \.beeswarmPlot\s*{[\s\S]*?flex:\s*1 1 auto;[\s\S]*?min-height:\s*0;[\s\S]*?justify-content:\s*center;/,
+    );
+  });
+
+  it('keeps classic participant addresses readable on light rows', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'CommunityTab.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /\.communityTab \.leaderboardItem\s*{[\s\S]*?background:\s*var\(--ce-surface-light\);[\s\S]*?color:\s*var\(--ce-document-text\);/,
+    );
+    expect(scss).toMatch(
+      /\.communityTab \.leaderboardItem \.name\s*{[\s\S]*?color:\s*var\(--ce-document-text\) !important;[\s\S]*?opacity:\s*1;/,
+    );
+    expect(scss).toMatch(
+      /\.communityTab \.leaderboardItem \.name a\s*{[\s\S]*?color:\s*var\(--ce-document-text\) !important;[\s\S]*?opacity:\s*1;/,
+    );
+    expect(scss).toMatch(
+      /\.communityTab \.leaderboardItem:hover\s*{[\s\S]*?background:\s*var\(--ce-surface-alt\);[\s\S]*?color:\s*var\(--ce-document-text\);/,
+    );
+  });
+
+  it('keeps the default stats and participant surfaces transparent', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'CommunityTab.module.scss'), 'utf8');
+
+    expect(scss).toMatch(/^ {2}\.leaderboardSection \{[\s\S]*?^ {4}background:\s*transparent;[\s\S]*?^ {2}\}/m);
+    expect(scss).toMatch(/^ {2}\.statsSection \{[\s\S]*?^ {4}background:\s*transparent;[\s\S]*?^ {2}\}/m);
+    expect(scss).toMatch(/^ {2}\.leaderboardItem \{[\s\S]*?^ {4}background:\s*transparent;[\s\S]*?^ {2}\}/m);
+  });
 });

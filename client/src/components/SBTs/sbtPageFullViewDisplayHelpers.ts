@@ -116,7 +116,7 @@ export const buildSbtPageSectionHeaderClassName = ({
 export const resolveSbtPageBookmarkButtonDisplayState = ({
   bookmarked = false,
 }: ResolveSbtPageBookmarkButtonDisplayStateArgs = {}): SbtPageBookmarkButtonDisplayState => ({
-  iconStyle: { color: bookmarked ? '#FFD700' : undefined },
+  iconStyle: { color: bookmarked ? 'var(--ce-status-warning)' : undefined },
 });
 
 export const resolveSbtPageInteractiveCursorStyle = (): Record<string, string> => ({
@@ -125,7 +125,7 @@ export const resolveSbtPageInteractiveCursorStyle = (): Record<string, string> =
 
 export const resolveSbtPageQuestionIconStyle = (): Record<string, string | number> => ({
   marginLeft: '5px',
-  color: '#00ff9d',
+  color: 'var(--ce-action-accent)',
   cursor: 'pointer',
   opacity: 0.5,
 });

@@ -60,10 +60,8 @@ class OnboardingWalkthrough extends Component<OnboardingWalkthroughProps, Onboar
     const title = getWelcomeSlide(this.state.arrowIndex)?.title || '';
 
     return title ? (
-      <div className={styles.onboardingInfo}>
-        <div className={styles.onboardingTitleArea}>
-          <h2 className={styles.onboardingTitle}>{title}</h2>
-        </div>
+      <div className={styles.onboardingTitleArea}>
+        <h2 className={styles.onboardingTitle}>{title}</h2>
       </div>
     ) : null;
   };
@@ -103,7 +101,7 @@ class OnboardingWalkthrough extends Component<OnboardingWalkthroughProps, Onboar
     const rightButton = this.getRightButton();
 
     return (
-      <div className="block-gradient-slow">
+      <div className={`block-gradient-slow ${styles.welcomeArtworkStage}`}>
         <Container className={styles.onboardingWalkthrough}>
           <div className={styles.onboardingInfo}>
             {onboardingHeadline}

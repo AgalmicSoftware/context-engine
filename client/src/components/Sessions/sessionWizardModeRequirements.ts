@@ -7,6 +7,7 @@ import {
 const SESSION_WIZARD_REQUIREMENT_IDS = Object.freeze({
   CLOUDFLARE_ACCOUNT: 'cloudflareAccount',
   CLOUDFLARE_API_TOKEN: 'cloudflareApiToken',
+  SESSION_WORKER: 'sessionWorker',
   AI_PROVIDER_KEY: 'aiProviderKey',
   ARWEAVE_JWK: 'arweaveJwk',
   RPC: 'rpc',
@@ -22,6 +23,8 @@ export type SessionWizardModeRequirements = {
   selected: boolean;
   authorityMode: string;
   isWorkerCanonical: boolean;
+  usesWorkerRuntime: boolean;
+  usesAgentSessionWrapped: boolean;
   presetKeyChips: string[];
   requiredRequirementIds: SessionWizardRequirementId[];
   requiredWorkerSecretFields: string[];
@@ -52,6 +55,8 @@ const emptyRequirements = (): SessionWizardModeRequirements => ({
   selected: false,
   authorityMode: '',
   isWorkerCanonical: false,
+  usesWorkerRuntime: false,
+  usesAgentSessionWrapped: false,
   presetKeyChips: [],
   requiredRequirementIds: [],
   requiredWorkerSecretFields: [],
@@ -95,6 +100,7 @@ export const resolveSessionWizardModeRequirements = (
 
   const authorityMode = String(profile.authority?.mode || '');
   const isWorkerCanonical = authorityMode === 'worker_canonical';
+  const usesWorkerRuntime = Object.values(profile.surfaces || {}).some((enabled) => enabled === true);
   const usesCloudflare = profile.storage?.backend === 'cloudflare';
   const usesAgentSessionWrapped = profile.surfaces?.agentHttp === true;
   const requiresArweave = profile.storage?.backend === 'arweave';
@@ -117,7 +123,10 @@ export const resolveSessionWizardModeRequirements = (
   const requiredRequirementIds: SessionWizardRequirementId[] = [];
   if (usesCloudflare) {
     requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.CLOUDFLARE_ACCOUNT);
-  } else if (usesAgentSessionWrapped) {
+  } else if (usesWorkerRuntime) {
+    requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.SESSION_WORKER);
+  }
+  if (usesAgentSessionWrapped) {
     requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.CLOUDFLARE_API_TOKEN);
   }
   requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.AI_PROVIDER_KEY);
@@ -140,23 +149,26 @@ export const resolveSessionWizardModeRequirements = (
   const presetKeyChips = usesCloudflare
     ? [
         'Cloudflare account',
+        ...(usesAgentSessionWrapped ? ['Request-only Cloudflare API token'] : []),
         'AI provider key',
         ...(requiresRpc ? ['RPC URL/key'] : []),
         ...(requiresLit ? ['Lit API key'] : []),
       ]
-    : usesAgentSessionWrapped
-      ? [
-          'Request-only Cloudflare API token',
-          'AI provider key',
-          ...(requiresRpc ? ['RPC URL/key'] : []),
-          ...(requiresLit ? ['Lit API key'] : []),
-        ]
-      : ['AI provider key', 'Arweave wallet/JWK', 'RPC URL/key', 'Lit API key if encryption is enabled'];
+    : [
+        ...(usesWorkerRuntime ? ['Compatible Session Worker'] : []),
+        ...(usesAgentSessionWrapped ? ['Request-only Cloudflare API token'] : []),
+        'AI provider key',
+        'Arweave wallet/JWK',
+        'RPC URL/key',
+        'Lit API key if encryption is enabled',
+      ];
 
   return {
     selected: true,
     authorityMode,
     isWorkerCanonical,
+    usesWorkerRuntime,
+    usesAgentSessionWrapped,
     presetKeyChips,
     requiredRequirementIds,
     requiredWorkerSecretFields,

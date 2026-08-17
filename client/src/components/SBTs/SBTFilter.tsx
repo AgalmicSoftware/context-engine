@@ -93,27 +93,29 @@ import type {
   SbtFilterSelectionState,
   UnknownRecord,
 } from './sbtFilterHelpers';
-import contractScripts, {
-  getSessionChainId,
-  getSessionSlugByName,
-  normalizeSessionSlug,
-} from '../../utilities/web3/chainGateway.js';
+import contractScripts, { getSessionChainId, getSessionSlugByName } from '../../utilities/web3/chainGateway.js';
+import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { resolveSbtDisplayLabel } from '../../utilities/sbt/sbtDisplayNames.js';
 import { bindSbtFilterRuntimePorts } from './sbtFilterRuntimePorts';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFilter, faSpinner, faTimes, faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
 import { createLogger } from '../../utilities/logging.js';
-import { writeCache } from '../../utilities/cache/cacheScripts.js';
+import { updateCacheAtomic, writeCache } from '../../utilities/cache/cacheScripts.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 
 const sbtLog = createLogger('sbt');
-const QUICK_CHIP_GATE_COLORS = ['#5affc2', '#5b8cff', '#ffb347', '#ff6bcb', '#ffd166'];
+const QUICK_CHIP_GATE_COLORS = [
+  'var(--ce-data-series-1)',
+  'var(--ce-data-series-2)',
+  'var(--ce-data-series-3)',
+  'var(--ce-data-series-4)',
+  'var(--ce-data-series-5)',
+];
 const sbtFilterRuntimePorts = bindSbtFilterRuntimePorts({
   contractScripts: () => contractScripts,
   writeCache: () => writeCache,
 });
-const writeCacheValue = sbtFilterRuntimePorts.writeCache;
 
 type SbtFilterQuickSbtOption = {
   address: string;
@@ -454,7 +456,23 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
           sbtAddress,
         });
         if (!nextCache) return null;
-        void writeCacheValue('sbtCache', String(slugForCache || ''), nextCache);
+        void updateCacheAtomic<UnknownRecord>('sbtCache', String(slugForCache || ''), (currentIn) => {
+          const freshCache = asCacheObject(currentIn);
+          return (
+            buildSbtFilterSbtEntryCachePatch({
+              entryPatch,
+              netKey: netKeyForCache,
+              rawCache: freshCache,
+              sbtAddress,
+            }) || freshCache
+          );
+        })
+          .then((persisted) => {
+            if (persisted) cacheBySlug.set(cacheKey, persisted);
+          })
+          .catch((error: unknown) => {
+            sbtLog.warn('SBT filter cache update failed:', error);
+          });
         cacheBySlug.set(cacheKey, nextCache);
         return nextCache;
       };
@@ -1213,7 +1231,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
           <div style={layoutDisplayState.filterOptionsFrameStyle}>
             {filterOptionsVisibilityState.shouldRenderLoadingOverlay && (
               <div style={layoutDisplayState.loadingOverlayStyle}>
-                <FontAwesomeIcon icon={faSpinner} spin size="2x" color="white" />
+                <FontAwesomeIcon icon={faSpinner} spin size="2x" color="var(--ce-panel-text)" />
               </div>
             )}
             <div className={surfaceClassNames.filterOptionsClassName}>

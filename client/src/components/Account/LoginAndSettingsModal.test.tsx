@@ -279,6 +279,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     await mountPromise;
 
     expect(mockedPasskeyWallet.unlockPasskeyWallet).toHaveBeenCalledTimes(1);
+    expect(mockedPasskeyWallet.unlockPasskeyWallet).toHaveBeenCalledWith({ selectCredential: true });
     expect(props.changeAccount).toHaveBeenCalledTimes(1);
     expect(props.changeAccount).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -392,6 +393,11 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   });
 
   it('uses the explicit worker route slug when requesting a passkey session token', async () => {
+    const sessionConfig = {
+      slug: 'worker-login',
+      sessionId: '0x33333333333333333333333333333333',
+    };
+    mockedGetSessionConfigBySlugOrDefault.mockReturnValue(sessionConfig);
     window.history.replaceState({}, '', '/session/worker-login?worker=https%3A%2F%2Fworker-login.example.com');
     const subject = mountClassSubject(
       new LoginAndSettingsModalSubject(
@@ -407,6 +413,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     await subject.ensureWorkerSessionToken();
 
     expect(getWorkerSessionToken).toHaveBeenCalledWith({
+      sessionConfig,
       sessionSlug: 'worker-login',
       context: {
         account: PASSKEY_ADDRESS,

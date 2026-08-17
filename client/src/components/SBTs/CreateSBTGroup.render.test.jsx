@@ -52,7 +52,7 @@ describe('CreateSBTGroup render and image authoring', () => {
 
     const panel = document.querySelector(`.${styles.createGroupExpanded}`);
     expect(panel).toBeInTheDocument();
-    expect(panel).toHaveStyle('--ce-create-group-surface-bg: #11182c');
+    expect(panel).toHaveStyle('--ce-create-group-surface-bg: var(--ce-overlay-surface)');
     expect(screen.getByRole('heading', { name: 'Add to Session' })).toBeInTheDocument();
   });
 
@@ -664,7 +664,7 @@ describe('CreateSBTGroup render and image authoring', () => {
     expect(scss).toMatch(/\.sectionHeaderButton\s*{[\s\S]*?font-family:\s*var\(--ce-font-body\);/);
     expect(scss).toMatch(/\.sectionHeaderButtonOpen\s*{[\s\S]*?justify-content:\s*flex-end;/);
     expect(scss).toMatch(
-      /\.sectionHeaderTitleText\s*{[\s\S]*?font-size:\s*1\.62rem;[\s\S]*?color:\s*rgba\(255,\s*255,\s*255,\s*0\.5\);/,
+      /\.sectionHeaderTitleText\s*{[\s\S]*?font-size:\s*1\.62rem;[\s\S]*?color:\s*color-mix\(in srgb,\s*var\(--ce-text-inverse\) 50%,\s*transparent\);/,
     );
   });
 });

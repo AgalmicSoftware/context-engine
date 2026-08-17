@@ -10,6 +10,7 @@ import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { isResponseAllowedForSessionSlug } from '../../utilities/session/responseSessionScope.js';
 import { canonicalizeLegacySessionAlias } from '../../utilities/session/sessionDemoCompat.js';
+import { resolveDemoPolisDataset } from '../../utilities/demo/demoPolisDatasets';
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
 import {
   getHistoricalFigureAvatarOrBlockie,
@@ -99,7 +100,7 @@ export interface PolisRepresentativeQuestion extends UnknownRecord {
   label: string;
   questionIndex: number;
   prompt: string;
-  difference: number;
+  difference: number | null;
   repfulFor?: string;
 }
 
@@ -346,7 +347,7 @@ const BUILT_IN_POLIS_DEMO_DATASETS_BY_SLUG = Object.freeze(
   (Array.isArray(CE_DEMO_SESSION_SLUGS) ? CE_DEMO_SESSION_SLUGS : ['demo']).reduce<Record<string, unknown>>(
     (acc, rawSlug) => {
       const slug = normalizeSessionSlug(rawSlug);
-      if (slug) acc[slug] = DEFAULT_POLIS_DEMO_DATA;
+      if (slug) acc[slug] = resolveDemoPolisDataset(slug, DEFAULT_POLIS_DEMO_DATA);
       return acc;
     },
     { demo: DEFAULT_POLIS_DEMO_DATA },
@@ -800,105 +801,6 @@ export function applyFilterStateToAggregator(
 }
 
 /***************************************************************
- * PolisBoxPlot
- * Distinguishes:
- *   - green (Agree => 1)
- *   - yellow (Unsure => 0)
- *   - red (Disagree => -1)
- *
- * NOTE: Non-answers (null/undefined) are ignored in both counts
- * and width calculations; no "white" segment is rendered.
- ***************************************************************/
-export function PolisBoxPlot({ votes }: { votes: Array<number | null | undefined> }) {
-  // Keep only concrete answers
-  const concreteVotes = Array.isArray(votes)
-    ? votes.filter((v): v is ConcretePolisVote => v === 1 || v === 0 || v === -1)
-    : [];
-
-  const totalConcrete = concreteVotes.length;
-
-  const agrees = concreteVotes.filter((v) => v === 1).length;
-  const disagrees = concreteVotes.filter((v) => v === -1).length;
-  const unsures = concreteVotes.filter((v) => v === 0).length;
-
-  // Dimensions for the mini bar
-  const svgWidth = 200;
-  const svgHeight = 30;
-
-  // Avoid division by zero; if no concrete votes, render only the frame
-  const denom = totalConcrete > 0 ? totalConcrete : 1;
-
-  // Convert counts to pixel widths using only concrete answers
-  const fractionAgree = (agrees / denom) * svgWidth;
-  const fractionUnsure = (unsures / denom) * svgWidth;
-  const fractionDisagree = (disagrees / denom) * svgWidth;
-
-  let currentX = 0;
-
-  return (
-    <div className={styles.polisBoxPlotContainer}>
-      <svg width={svgWidth} height={svgHeight} className={styles.polisBoxPlotSvg}>
-        <rect x={0} y={0} width={svgWidth} height={svgHeight} fill="none" stroke="#000" strokeWidth={1} />
-
-        {/* Only draw segments if there's at least one concrete answer */}
-        {totalConcrete > 0 && (
-          <>
-            <rect x={currentX} y={0} width={fractionAgree} height={svgHeight} fill="green" />
-            {fractionAgree > 0 && (currentX += fractionAgree)}
-
-            <rect x={currentX} y={0} width={fractionUnsure} height={svgHeight} fill="yellow" />
-            {fractionUnsure > 0 && (currentX += fractionUnsure)}
-
-            <rect x={currentX} y={0} width={fractionDisagree} height={svgHeight} fill="red" />
-          </>
-        )}
-      </svg>
-    </div>
-  );
-}
-
-export function PolisQuestionHoverCard({
-  label,
-  prompt,
-  votes = [],
-  metaLabel = '',
-}: {
-  label?: string;
-  prompt?: string;
-  votes?: Array<number | null | undefined>;
-  metaLabel?: string;
-}) {
-  const concreteVotes = Array.isArray(votes)
-    ? votes.filter((v): v is ConcretePolisVote => v === 1 || v === 0 || v === -1)
-    : [];
-
-  const agrees = concreteVotes.filter((v) => v === 1).length;
-  const disagrees = concreteVotes.filter((v) => v === -1).length;
-  const unsures = concreteVotes.filter((v) => v === 0).length;
-
-  return (
-    <div>
-      <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
-        {label ? `${label}: ` : ''}
-        {prompt || '(No prompt)'}
-      </div>
-      {metaLabel ? <div style={{ fontSize: '0.78rem', marginBottom: '6px', opacity: 0.85 }}>{metaLabel}</div> : null}
-      {concreteVotes.length === 0 ? (
-        <div style={{ fontSize: '0.85rem', opacity: 0.8 }}>No responses in this comparison.</div>
-      ) : (
-        <div className={styles.questionVoteRow}>
-          <span style={{ fontSize: '0.85rem', marginRight: '8px' }}>
-            <strong>Agree:</strong> {agrees} / <strong>Disagree:</strong> {disagrees} / <strong>Unsure:</strong>{' '}
-            {unsures}
-          </span>
-          <PolisBoxPlot votes={concreteVotes} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-/***************************************************************
  * Build rating matrix from real or from the included demo
  *
  * We only consider question responses of type 'binary'.
@@ -1101,12 +1003,17 @@ export const resolvePrecomputedClusterDifference = (
   differenceFromData: unknown,
   clusterAgreeRate: unknown,
   overallAgreeRate: unknown,
-): number => {
-  const difference = Number(differenceFromData);
-  if (Number.isFinite(difference)) return difference;
-  const clusterRate = Number(clusterAgreeRate);
-  const overallRate = Number(overallAgreeRate);
-  if (!Number.isFinite(clusterRate) || !Number.isFinite(overallRate)) return 0;
+): number | null => {
+  const toFiniteNumber = (value: unknown): number | null => {
+    if (value === null || value === undefined || value === '') return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+  const difference = toFiniteNumber(differenceFromData);
+  if (difference !== null) return difference;
+  const clusterRate = toFiniteNumber(clusterAgreeRate);
+  const overallRate = toFiniteNumber(overallAgreeRate);
+  if (clusterRate === null || overallRate === null) return null;
   return +Math.abs(clusterRate - overallRate).toFixed(1);
 };
 

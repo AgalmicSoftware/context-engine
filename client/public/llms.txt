@@ -1,24 +1,48 @@
 # Context Engine
 
-> Context Engine is an open-source toolkit for AI-enhanced deliberation and large-group sensemaking, with public and private surveys, AI-assisted analysis, permanent records, and cryptographic access control.
+> Context Engine is an open-source toolkit for AI-enhanced deliberation, decision-making, and negotiation in large groups. It supports public and private participation, AI-assisted input and analysis, configurable storage and authority, and cryptographic access control.
 
 Canonical site: https://contextengine.sh/
+Interactive user docs: https://contextengine.sh/docs
 Static summary: https://contextengine.sh/discoverability.html
 Canonical GitHub repository: https://github.com/AgalmicSoftware/context-engine
 Latest GitHub source tree: https://github.com/AgalmicSoftware/context-engine/tree/main
+
+## Current architecture
+
+EVM and Arweave are profile-specific options, not baseline dependencies. App hosting, session privacy, and the session infrastructure profile are separate choices.
+
+- Hosted & Fast: implemented default/recommended path after selection; a creator-owned per-session Cloudflare Worker and Cloudflare storage are canonical. It does not require EVM, RPC, gas, Arweave, or Lit by default.
+- Trustless & Slower: implemented opt-in path using public EVM contracts and Arweave. Lit is required only when its encryption path is selected.
+- Company-Operated (planned): future adapters for organization-managed identity, keys, storage, AI, networking, and observability. It is not generally available and does not require a private EVM.
+
+Do not infer that every session is on-chain. Use the session's selected profile and published configuration as the authority for its storage, access, and contract behavior.
 
 ## Latest branch documents
 
 - README: https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/README.md
 - AI agent bootstrap: https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/docs/ai-agent-bootstrap.md
 - Architecture: https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/ARCHITECTURE.md
+- Architecture and verification overview: https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/docs/architecture-overview.md
+- Documentation index: https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/docs/README.md
+- Session creation guide: https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/docs/session-creation-guide.md
+- Runtime modes: https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/docs/run-modes.md
+- Stable browser TestID API: https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/docs/e2e-testid-api.md
 - Whitepaper: https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/whitepaper/whitepaper.md
+
+## Agent guidance
+
+- Start with the interactive Docs page for product behavior and the AI agent bootstrap for repository automation.
+- Prefer the documented TestID API for browser interaction. In development and E2E environments, the opt-in `window.__ceAgent` bridge exposes supported state descriptions and actions.
+- Respect authentication, privacy, encryption, and group-gating boundaries. The presence of a route or client bundle does not authorize access to protected session data.
+- Treat Company-Operated capabilities as planned until the canonical architecture documents say otherwise.
 
 ## Focus areas
 
-- AI-assisted deliberation and sensemaking for large groups
-- Public and private survey authoring and response collection
+- AI-assisted deliberation, decision-making, and large-group sensemaking
+- Public and private survey authoring, response collection, and results analysis
+- Evaluation and preference-dataset exports for AI benchmarking and training
 - SBT-gated access control and encrypted fields
-- Passkey-oriented onboarding and account UX
-- Cloudflare Worker support, Arweave storage, and EVM integrations
-- Deterministic browser automation via a stable TestID API
+- Passkey-oriented participant and administrator identity
+- Cloudflare Worker, Arweave, EVM, and optional Lit deployment profiles
+- Deterministic browser automation through a stable TestID API and opt-in agent bridge

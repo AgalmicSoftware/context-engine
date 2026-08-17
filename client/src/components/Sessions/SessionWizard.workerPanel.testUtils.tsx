@@ -11,8 +11,8 @@ import {
   getSessionWizardContractModalTriggerTestId,
   getSessionWizardContractTooltipTestId,
   WIZARD_CONTRACT_MODAL_TESTID,
-} from '../ContractPage/contractMetadata.js';
-import { buildContractViewerContracts } from '../ContractPage/contractViewerUtils.js';
+} from '../DocsPage/contractMetadata.js';
+import { buildContractViewerContracts } from '../DocsPage/contractViewerUtils.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import {
   clearSessionWizardPendingSbtDraftsCache,
@@ -34,6 +34,7 @@ const mockTestAdminAddress = '0x00000000000000000000000000000000000000aa';
 const TEST_ADMIN_ADDRESS = mockTestAdminAddress;
 const NEW_SESSION_BANNER_DISMISSED_KEY = 'ce_new_session_banner_dismissed';
 const ORIGINAL_PUBLIC_URL = process.env.PUBLIC_URL;
+const ORIGINAL_FETCH = global.fetch;
 const mockSelectorSourceFactory = '0x538A48BC439A36D2A86e63114DCD9c429d2ddEcA';
 const mockSelectorSourceStartBlock = 30297069;
 const buildMockSponsoredBundleEnvelope = () =>
@@ -166,7 +167,7 @@ jest.mock('../Shared/Json/JsonControls', () => ({
   JsonPanel: () => null,
   JsonButtonRow: () => null,
 }));
-jest.mock('../ContractPage/contractViewerUtils.js', () => ({
+jest.mock('../DocsPage/contractViewerUtils.js', () => ({
   buildContractViewerContracts: jest.fn(),
 }));
 
@@ -344,6 +345,10 @@ const renderLoggedInSessionWizard = (props = {}) =>
     toggleLoginModal: jest.fn(),
     ...props,
   });
+const rerenderSessionWizard = (
+  view: ReturnType<typeof render>,
+  props: Omit<React.ComponentProps<typeof SessionWizard>, 'network'> = {},
+) => view.rerender(<SessionWizard network={{ id: 84532 }} {...props} />);
 const getWizardResourceCard = (resourceKey) =>
   screen
     .getAllByTestId(E2E_TESTIDS.WIZARD_RESOURCE_CARD)
@@ -457,6 +462,64 @@ const createPublicWorkerVerificationResponder = () => {
     return null;
   };
 };
+const installVerifiedWorkerDeploymentFetch = (workerUrl = 'https://worker.example.test') => {
+  const respondToPublicWorkerVerification = createPublicWorkerVerificationResponder();
+  const fetchMock = jest.fn(async (url, options = {}) => {
+    const normalizedUrl = String(url);
+    if (normalizedUrl.endsWith('/deploy')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ok: true,
+          workerUrl,
+          writesSessionConfig: true,
+          writesSessionSecrets: false,
+        }),
+      };
+    }
+    if (normalizedUrl.endsWith('/auth/nonce')) {
+      return { ok: true, status: 200, json: async () => ({ nonce: 'wizard-admin-nonce' }) };
+    }
+    const publicVerificationResponse = respondToPublicWorkerVerification(normalizedUrl, options);
+    if (publicVerificationResponse) return publicVerificationResponse;
+    return { ok: true, status: 200, json: async () => ({ ok: true }) };
+  });
+  Object.defineProperty(global, 'fetch', {
+    configurable: true,
+    writable: true,
+    value: fetchMock,
+  });
+  return fetchMock;
+};
+const deployVerifiedWorkerForCurrentDraft = async ({
+  workerUrl = 'https://worker.example.test',
+  openaiKey = 'sk-render-test',
+  arweaveJwk = '{"kty":"RSA","n":"render-test"}',
+} = {}) => {
+  const fetchMock = installVerifiedWorkerDeploymentFetch(workerUrl);
+  const customizeButton = screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED);
+  if (customizeButton?.getAttribute('aria-pressed') === 'true') fireEvent.click(customizeButton);
+  selectNormalModeCard('Worker');
+
+  const tokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
+  const reactPropsKey = Object.keys(tokenInput).find((key) => key.startsWith('__reactProps$'));
+  if (!reactPropsKey) throw new Error('Cloudflare token input does not expose React change props.');
+  const reactProps = Reflect.get(tokenInput, reactPropsKey) as {
+    onChange: (event: { target: { value: string } }) => void;
+  };
+  act(() => reactProps.onChange({ target: { value: 'cf-render-test-token' } }));
+  fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
+    target: { value: openaiKey },
+  });
+  const arweaveInput = screen.queryByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK);
+  if (arweaveInput) fireEvent.change(arweaveInput, { target: { value: arweaveJwk } });
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
+  await waitFor(() => {
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Worker deployed.');
+  });
+  return fetchMock;
+};
 const getMockSelectorById = (selectorId) =>
   screen
     .queryAllByTestId('mock-wizard-sbt-selector')
@@ -522,10 +585,12 @@ const resetSessionWizardWorkerPanelTestState = () => {
     process.env.PUBLIC_URL = ORIGINAL_PUBLIC_URL;
   }
   window.history.replaceState({}, '', '/');
+  global.fetch = ORIGINAL_FETCH;
   localStorage.clear();
   sessionStorage.clear();
-  buildContractViewerContracts.mockImplementation(({ sessionContracts = {} } = {}) =>
-    Object.keys(sessionContracts).map((contractKey) => ({
+  jest.mocked(buildContractViewerContracts).mockImplementation(({ sessionContracts = {} } = {}) => {
+    const normalizedSessionContracts = sessionContracts || {};
+    return Object.keys(normalizedSessionContracts).map((contractKey) => ({
       key: contractKey,
       name:
         contractKey === 'surveys'
@@ -545,18 +610,18 @@ const resetSessionWizardWorkerPanelTestState = () => {
               ? 'SessionRegistry.sol'
               : 'Contract.sol',
       source: `contract ${contractKey} {}`,
-      addresses: sessionContracts[contractKey]?.address
+      addresses: normalizedSessionContracts[contractKey]?.address
         ? [
             {
-              address: sessionContracts[contractKey].address,
-              id: sessionContracts[contractKey].chainId || 84532,
+              address: normalizedSessionContracts[contractKey].address,
+              id: Number(normalizedSessionContracts[contractKey].chainId) || 84532,
               testnet: true,
               explorerUrl: `https://example.example.test/${contractKey}`,
             },
           ]
         : [],
-    })),
-  );
+    }));
+  });
 };
 
 export {
@@ -615,10 +680,13 @@ export {
   createTooltipStore,
   renderSessionWizardWithTooltipStore,
   renderLoggedInSessionWizard,
+  rerenderSessionWizard,
   getWizardResourceCard,
   enableAdvancedMode,
   selectNormalModeCard,
   createPublicWorkerVerificationResponder,
+  installVerifiedWorkerDeploymentFetch,
+  deployVerifiedWorkerForCurrentDraft,
   getMockSelectorById,
   expectSelectorAddresses,
   openAdvancedMoreOptions,

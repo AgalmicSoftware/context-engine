@@ -2,6 +2,7 @@ import type { ChangedFieldsDiffCache, PendingEditStatsCache } from './surveyTool
 import type { ResponseSlice as SurveyToolResponseSlice, UnknownRecord } from './surveyToolTypes';
 import type { SurveyQuestionsProps, SurveyQuestionsState } from './surveyQuestionsTypes';
 import type { SurveyQuestionsStateUpdate } from './surveyQuestionsState';
+import type { SurveyAudioWorkerPropsMemo } from './surveyToolRuntimeSupport';
 
 declare global {
   interface Window {
@@ -171,6 +172,7 @@ export type SurveyQuestionsInstanceFields = {
   _maskedQuestionVisibilityMemoByPool: WeakMap<object, unknown>;
   // These property names survive minification in the SurveyQuestions chunk.
   _a: SurveyQuestionsRuntimeRecord | null;
+  _audioInputWorkerPropsMemo: SurveyAudioWorkerPropsMemo | null;
   _q: Map<string, SurveyQuestionsRuntimeRecord>;
   _canDecryptOtherResponsesKey: string;
   _canDecryptOtherResponsesInFlight: SurveyQuestionsCanDecryptRun;
@@ -252,6 +254,7 @@ export const createSurveyQuestionsInstanceFields = (): SurveyQuestionsInstanceFi
   _lockedQuestionGateDetailsMemo: { key: '', poolRef: null, poolVersion: 0, value: [] },
   _maskedQuestionVisibilityMemoByPool: new WeakMap(),
   _a: null,
+  _audioInputWorkerPropsMemo: null,
   _q: new Map(),
   _canDecryptOtherResponsesKey: '',
   _canDecryptOtherResponsesInFlight: null,

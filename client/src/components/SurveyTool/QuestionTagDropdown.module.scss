@@ -11,9 +11,9 @@
   height: 32px;
   padding: 0;
   border: none;
-  border-radius: 999px;
+  border-radius: var(--ce-radius-pill);
   background: transparent !important;
-  color: rgba(255, 255, 255, 0.78) !important;
+  color: color-mix(in srgb, var(--ce-text-inverse) 78%, transparent) !important;
   opacity: 0.35;
   font-size: 1.25rem;
   text-decoration: none !important;
@@ -26,14 +26,14 @@
   &:hover,
   &:focus {
     background: transparent !important;
-    color: #4dffa4 !important;
+    color: var(--ce-action-accent) !important;
     opacity: 1;
     box-shadow: none;
     transform: scale(1.05);
   }
 
   &[aria-expanded='true'] {
-    color: #4dffa4 !important;
+    color: var(--ce-action-accent) !important;
     opacity: 1;
   }
 }
@@ -41,21 +41,47 @@
 .menu {
   min-width: 170px;
   padding: 6px;
-  border: 1px solid rgba(77, 255, 164, 0.22);
-  border-radius: 14px;
-  background: #171941;
-  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.32);
+  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 22%, transparent);
+  border-radius: var(--ce-radius-14);
+  background: var(--ce-surface-sunken);
+  box-shadow: 0 14px 32px color-mix(in srgb, var(--ce-compat-dark) 32%, transparent);
 }
 
 .item {
-  border-radius: 10px;
-  color: #f4f7ff !important;
+  border-radius: var(--ce-radius-10);
+  color: var(--ce-control-text) !important;
   font-family: var(--ce-font-mono);
   font-size: 0.82rem;
 
   &:hover,
   &:focus {
-    background: rgba(77, 255, 164, 0.16) !important;
-    color: #4dffa4 !important;
+    background: color-mix(in srgb, var(--ce-action-accent) 16%, transparent) !important;
+    color: var(--ce-action-accent) !important;
+  }
+}
+
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  .toggle {
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: var(--ce-control-text) !important;
+    opacity: 0.5 !important;
+    transform: none;
+  }
+
+  .toggle:hover,
+  .toggle:focus-visible,
+  .toggle[aria-expanded='true'] {
+    background: transparent !important;
+    color: var(--ce-control-text) !important;
+    opacity: 1 !important;
+    box-shadow: none !important;
+    transform: none;
+  }
+
+  .toggle:focus-visible {
+    outline: 1px dotted var(--ce-control-text);
+    outline-offset: 2px;
   }
 }

@@ -4,6 +4,72 @@ set -euo pipefail
 REMOTE_NAME="${1:-}"
 REMOTE_URL="${2:-}"
 ZERO_OID="0000000000000000000000000000000000000000"
+PUBLIC_GIT_NAME="Agalmic"
+PUBLIC_GIT_EMAIL="agalmicsoftware@protonmail.com"
+
+is_canonical_public_repository_url() {
+  local normalized_url
+  local scheme
+  local remainder
+  local authority
+  local host
+  local repository_path
+
+  normalized_url="$(printf '%s' "${1:-}" | LC_ALL=C tr '[:upper:]' '[:lower:]')"
+  normalized_url="${normalized_url%/}"
+  case "$normalized_url" in
+    *://*)
+      scheme="${normalized_url%%://*}"
+      remainder="${normalized_url#*://}"
+      case "$remainder" in
+        */*)
+          authority="${remainder%%/*}"
+          repository_path="${remainder#*/}"
+          ;;
+        *)
+          return 1
+          ;;
+      esac
+      host="${authority##*@}"
+      case "$scheme:$host" in
+        https:github.com|https:github.com:443|\
+        http:github.com|http:github.com:80|\
+        git:github.com|git:github.com:9418|\
+        ssh:github.com|ssh:github.com:22|\
+        git+ssh:github.com|git+ssh:github.com:22|\
+        ssh+git:github.com|ssh+git:github.com:22|\
+        ssh:github.com-agalmic|git+ssh:github.com-agalmic|ssh+git:github.com-agalmic)
+          ;;
+        *)
+          return 1
+          ;;
+      esac
+      ;;
+    *:*)
+      authority="${normalized_url%%:*}"
+      repository_path="${normalized_url#*:}"
+      host="${authority##*@}"
+      case "$host" in
+        github.com|github.com-agalmic)
+          ;;
+        *)
+          return 1
+          ;;
+      esac
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+
+  case "$repository_path" in
+    agalmicsoftware/context-engine|agalmicsoftware/context-engine.git)
+      return 0
+      ;;
+  esac
+
+  return 1
+}
 
 should_protect_remote() {
   case "$REMOTE_NAME" in
@@ -12,13 +78,7 @@ should_protect_remote() {
       ;;
   esac
 
-  case "$REMOTE_URL" in
-    *AgalmicSoftware/context-engine*)
-      return 0
-      ;;
-  esac
-
-  return 1
+  is_canonical_public_repository_url "$REMOTE_URL"
 }
 
 is_allowed_public_ref() {
@@ -31,6 +91,337 @@ is_allowed_public_ref() {
   esac
 
   return 1
+}
+
+is_commit_in_remote_public_history() {
+  local commit_sha="$1"
+  local remote_name="$2"
+  local public_ref
+
+  while IFS= read -r public_ref; do
+    [ -n "$public_ref" ] || continue
+    if git merge-base --is-ancestor "$commit_sha" "$public_ref" 2>/dev/null; then
+      return 0
+    fi
+  done < <(git for-each-ref \
+    --format='%(refname)' \
+    "refs/remotes/${remote_name}/main" \
+    "refs/remotes/${remote_name}/release-staging*")
+
+  return 1
+}
+
+is_commit_in_fetched_public_history() {
+  local commit_sha="$1"
+  local origin_url
+
+  if is_commit_in_remote_public_history "$commit_sha" "$REMOTE_NAME"; then
+    return 0
+  fi
+
+  if [ "$REMOTE_NAME" != "origin" ] && is_canonical_public_repository_url "$REMOTE_URL"; then
+    origin_url="$(git remote get-url origin 2>/dev/null || true)"
+    if is_canonical_public_repository_url "$origin_url" &&
+      is_commit_in_remote_public_history "$commit_sha" origin; then
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
+PUBLIC_REMOTE_TAG_REFS=""
+PUBLIC_REMOTE_TAGS_AVAILABLE=0
+PUBLIC_REMOTE_TAGS_LOADED=0
+PUBLIC_TAG_HISTORY_ERROR=""
+collect_remote_public_tags() {
+  local origin_url
+
+  if [ "$PUBLIC_REMOTE_TAGS_LOADED" -eq 1 ]; then
+    if [ "$PUBLIC_REMOTE_TAGS_AVAILABLE" -eq 1 ]; then
+      return 0
+    fi
+    return 1
+  fi
+
+  PUBLIC_REMOTE_TAGS_LOADED=1
+  PUBLIC_REMOTE_TAG_REFS=""
+  PUBLIC_TAG_HISTORY_ERROR=""
+  if PUBLIC_REMOTE_TAG_REFS="$(git ls-remote --refs --tags "$REMOTE_NAME" 2>/dev/null)"; then
+    PUBLIC_REMOTE_TAGS_AVAILABLE=1
+    return 0
+  fi
+
+  if [ "$REMOTE_NAME" != "origin" ] && is_canonical_public_repository_url "$REMOTE_URL"; then
+    origin_url="$(git remote get-url origin 2>/dev/null || true)"
+    if is_canonical_public_repository_url "$origin_url" &&
+      PUBLIC_REMOTE_TAG_REFS="$(git ls-remote --refs --tags origin 2>/dev/null)"; then
+      PUBLIC_REMOTE_TAGS_AVAILABLE=1
+      return 0
+    fi
+  fi
+
+  if [ -n "$REMOTE_URL" ] &&
+    PUBLIC_REMOTE_TAG_REFS="$(git ls-remote --refs --tags "$REMOTE_URL" 2>/dev/null)"; then
+    PUBLIC_REMOTE_TAGS_AVAILABLE=1
+    return 0
+  fi
+
+  PUBLIC_TAG_HISTORY_ERROR="public tag history is unavailable"
+  return 1
+}
+
+is_commit_in_fetched_public_provenance() {
+  local commit_sha="$1"
+  local remote_tag_ref
+  local remote_tag_sha
+
+  if is_commit_in_fetched_public_history "$commit_sha"; then
+    return 0
+  fi
+
+  if ! collect_remote_public_tags; then
+    return 2
+  fi
+
+  while read -r remote_tag_sha remote_tag_ref; do
+    [ -n "$remote_tag_ref" ] || continue
+    if [ "$(git cat-file -t "$remote_tag_sha" 2>/dev/null || true)" = "commit" ] &&
+      git merge-base --is-ancestor "$commit_sha" "$remote_tag_sha" 2>/dev/null; then
+      return 0
+    fi
+  done <<< "$PUBLIC_REMOTE_TAG_REFS"
+
+  return 1
+}
+
+PUBLIC_TAG_ERROR=""
+validate_public_tag() {
+  local tag_sha="$1"
+  local object_type
+
+  PUBLIC_TAG_ERROR=""
+  object_type="$(git cat-file -t "$tag_sha" 2>/dev/null || true)"
+  if [ "$object_type" != "commit" ]; then
+    PUBLIC_TAG_ERROR="lightweight tags are required"
+    return 1
+  fi
+
+  if ! is_commit_in_fetched_public_history "$tag_sha"; then
+    PUBLIC_TAG_ERROR="target is not reachable from fetched public history"
+    return 1
+  fi
+
+  return 0
+}
+
+PUBLIC_MAIN_REFS=()
+collect_public_main_refs() {
+  local target_main_ref
+  local origin_url
+  local origin_main_ref
+
+  PUBLIC_MAIN_REFS=()
+  target_main_ref="refs/remotes/${REMOTE_NAME}/main"
+  if git rev-parse --verify --quiet "${target_main_ref}^{commit}" >/dev/null; then
+    PUBLIC_MAIN_REFS+=("$target_main_ref")
+  fi
+
+  if [ "$REMOTE_NAME" != "origin" ] && is_canonical_public_repository_url "$REMOTE_URL"; then
+    origin_url="$(git remote get-url origin 2>/dev/null || true)"
+    origin_main_ref="refs/remotes/origin/main"
+    if is_canonical_public_repository_url "$origin_url" &&
+      git rev-parse --verify --quiet "${origin_main_ref}^{commit}" >/dev/null; then
+      PUBLIC_MAIN_REFS+=("$origin_main_ref")
+    fi
+  fi
+
+  [ "${#PUBLIC_MAIN_REFS[@]}" -gt 0 ]
+}
+
+PUBLIC_BRANCH_ERROR=""
+PUBLIC_BRANCH_PRIVATE_REF=""
+find_non_public_ref_overlap() {
+  local candidate_sha="$1"
+  local base_sha="$2"
+  local pushed_local_ref="$3"
+  local candidate_ref
+  local candidate_ref_sha
+  local common_sha
+
+  PUBLIC_BRANCH_PRIVATE_REF=""
+  while IFS= read -r candidate_ref; do
+    [ -n "$candidate_ref" ] || continue
+    [ "$candidate_ref" != "$pushed_local_ref" ] || continue
+    candidate_ref_sha="$(git rev-parse --verify "${candidate_ref}^{commit}" 2>/dev/null || true)"
+    [ -n "$candidate_ref_sha" ] || continue
+    if is_commit_in_fetched_public_history "$candidate_ref_sha"; then
+      continue
+    fi
+
+    while IFS= read -r common_sha; do
+      [ -n "$common_sha" ] || continue
+      if ! git merge-base --is-ancestor "$common_sha" "$base_sha" 2>/dev/null; then
+        PUBLIC_BRANCH_PRIVATE_REF="$candidate_ref"
+        return 0
+      fi
+    done < <(git merge-base --all "$candidate_sha" "$candidate_ref_sha" 2>/dev/null || true)
+  done < <(git for-each-ref --format='%(refname)' 'refs/heads/*' 'refs/tags/*')
+
+  return 1
+}
+
+validate_public_branch() {
+  local remote_ref="$1"
+  local pushed_local_ref="$2"
+  local candidate_sha="$3"
+  local remote_sha="$4"
+  local resolved_candidate
+  local resolved_remote
+  local base_sha
+  local public_main_ref
+  local public_main_sha
+  local merge_sha
+  local replay_commit
+  local source_sha
+  local resolved_source_sha
+  local author_name
+  local author_email
+  local committer_name
+  local committer_email
+  local provenance_status
+  local public_pii_scanner
+  local public_repo_root
+  local replay_scan_base_sha
+
+  PUBLIC_BRANCH_ERROR=""
+  resolved_candidate="$(git rev-parse --verify "${candidate_sha}^{commit}" 2>/dev/null || true)"
+  if [ "$resolved_candidate" != "$candidate_sha" ]; then
+    PUBLIC_BRANCH_ERROR="candidate commit is unavailable"
+    return 1
+  fi
+
+  case "$remote_ref" in
+    refs/heads/main)
+      if [ "$remote_sha" = "$ZERO_OID" ]; then
+        PUBLIC_BRANCH_ERROR="public main cannot be created by a local push"
+        return 1
+      fi
+      resolved_remote="$(git rev-parse --verify "${remote_sha}^{commit}" 2>/dev/null || true)"
+      if [ "$resolved_remote" != "$remote_sha" ]; then
+        PUBLIC_BRANCH_ERROR="existing public main commit is unavailable"
+        return 1
+      fi
+      if [ "$candidate_sha" != "$remote_sha" ]; then
+        PUBLIC_BRANCH_ERROR="new main commits must arrive through a release-staging pull request"
+        return 1
+      fi
+      return 0
+      ;;
+    refs/heads/release-staging*)
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+
+  if ! collect_public_main_refs; then
+    PUBLIC_BRANCH_ERROR="public main baseline is unavailable"
+    return 1
+  fi
+
+  base_sha=""
+  for public_main_ref in "${PUBLIC_MAIN_REFS[@]}"; do
+    public_main_sha="$(git rev-parse "${public_main_ref}^{commit}")"
+    if [ -z "$base_sha" ] || git merge-base --is-ancestor "$base_sha" "$public_main_sha" 2>/dev/null; then
+      base_sha="$public_main_sha"
+    elif ! git merge-base --is-ancestor "$public_main_sha" "$base_sha" 2>/dev/null; then
+      PUBLIC_BRANCH_ERROR="fetched public main refs have diverged"
+      return 1
+    fi
+  done
+
+  if ! git merge-base --is-ancestor "$base_sha" "$candidate_sha" 2>/dev/null; then
+    PUBLIC_BRANCH_ERROR="candidate is not descended from fetched public main"
+    return 1
+  fi
+  replay_scan_base_sha="$base_sha"
+
+  if [ "$remote_sha" != "$ZERO_OID" ]; then
+    resolved_remote="$(git rev-parse --verify "${remote_sha}^{commit}" 2>/dev/null || true)"
+    if [ "$resolved_remote" != "$remote_sha" ]; then
+      PUBLIC_BRANCH_ERROR="existing staging commit is unavailable"
+      return 1
+    fi
+    if git merge-base --is-ancestor "$base_sha" "$remote_sha" 2>/dev/null &&
+      git merge-base --is-ancestor "$remote_sha" "$candidate_sha" 2>/dev/null; then
+      base_sha="$remote_sha"
+    fi
+  fi
+
+  if ! git merge-base --is-ancestor "$base_sha" "$candidate_sha" 2>/dev/null; then
+    PUBLIC_BRANCH_ERROR="candidate is not descended from its public baseline"
+    return 1
+  fi
+
+  merge_sha="$(git rev-list --min-parents=2 -n 1 "${base_sha}..${candidate_sha}" 2>/dev/null || true)"
+  if [ -n "$merge_sha" ]; then
+    PUBLIC_BRANCH_ERROR="candidate is not a linear public replay"
+    return 1
+  fi
+
+  while IFS= read -r replay_commit; do
+    [ -n "$replay_commit" ] || continue
+    author_name="$(git show -s --format='%an' "$replay_commit")"
+    author_email="$(git show -s --format='%ae' "$replay_commit")"
+    committer_name="$(git show -s --format='%cn' "$replay_commit")"
+    committer_email="$(git show -s --format='%ce' "$replay_commit")"
+    if [ "$author_name" != "$PUBLIC_GIT_NAME" ] ||
+      [ "$author_email" != "$PUBLIC_GIT_EMAIL" ] ||
+      [ "$committer_name" != "$PUBLIC_GIT_NAME" ] ||
+      [ "$committer_email" != "$PUBLIC_GIT_EMAIL" ]; then
+      PUBLIC_BRANCH_ERROR="commit $replay_commit lacks the required public replay author and committer identity"
+      return 1
+    fi
+    source_sha="$(git show -s --format='%(trailers:key=CE-Private-Source,valueonly)' "$replay_commit")"
+    if ! [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]]; then
+      PUBLIC_BRANCH_ERROR="commit $replay_commit lacks one valid CE-Private-Source trailer"
+      return 1
+    fi
+    resolved_source_sha="$(git rev-parse --verify "${source_sha}^{commit}" 2>/dev/null || true)"
+    if [ "$resolved_source_sha" != "$source_sha" ]; then
+      PUBLIC_BRANCH_ERROR="commit $replay_commit CE-Private-Source commit is unavailable"
+      return 1
+    fi
+    if git merge-base --is-ancestor "$source_sha" "$candidate_sha" 2>/dev/null; then
+      PUBLIC_BRANCH_ERROR="commit $replay_commit CE-Private-Source must not point to public history"
+      return 1
+    fi
+    if is_commit_in_fetched_public_provenance "$source_sha"; then
+      PUBLIC_BRANCH_ERROR="commit $replay_commit CE-Private-Source must not point to public history"
+      return 1
+    else
+      provenance_status="$?"
+      if [ "$provenance_status" -eq 2 ]; then
+        PUBLIC_BRANCH_ERROR="commit $replay_commit CE-Private-Source $PUBLIC_TAG_HISTORY_ERROR"
+        return 1
+      fi
+    fi
+  done < <(git rev-list --reverse "${base_sha}..${candidate_sha}")
+
+  if find_non_public_ref_overlap "$candidate_sha" "$base_sha" "$pushed_local_ref"; then
+    PUBLIC_BRANCH_ERROR="candidate commit is also reachable from non-public ref $PUBLIC_BRANCH_PRIVATE_REF"
+    return 1
+  fi
+
+  public_repo_root="$(git rev-parse --show-toplevel)"
+  public_pii_scanner="$public_repo_root/scripts/verify-public-release-pii.sh"
+  if ! bash "$public_pii_scanner" --git-range "$public_repo_root" "$replay_scan_base_sha" "$candidate_sha" >&2; then
+    PUBLIC_BRANCH_ERROR="candidate replay history failed the public release PII scan"
+    return 1
+  fi
+
+  return 0
 }
 
 consume_push_override() {
@@ -55,11 +446,21 @@ fi
 blocked_refs=()
 release_candidate_shas=()
 release_baseline_shas=()
+tag_candidate_refs=()
+tag_candidate_shas=()
+branch_candidate_refs=()
+branch_source_refs=()
+branch_candidate_shas=()
+branch_baseline_shas=()
+main_deletion_requested=0
 
 while read -r local_ref local_sha remote_ref remote_sha; do
   [ -n "${local_ref:-}" ] || continue
 
   if [ "${local_sha:-}" = "$ZERO_OID" ] || [ "$local_ref" = "(delete)" ]; then
+    if [ "$remote_ref" = "refs/heads/main" ]; then
+      main_deletion_requested=1
+    fi
     continue
   fi
 
@@ -73,27 +474,59 @@ while read -r local_ref local_sha remote_ref remote_sha; do
       release_candidate_shas+=("$local_sha")
       release_baseline_shas+=("$remote_sha")
       ;;
+    refs/tags/*)
+      tag_candidate_refs+=("$remote_ref")
+      tag_candidate_shas+=("$local_sha")
+      ;;
   esac
 
+  resolved_local_ref="$local_ref"
   case "$local_ref" in
-    refs/heads/*|refs/tags/*)
-      if ! is_allowed_public_ref "$local_ref"; then
-        blocked_refs+=("$local_ref")
-      fi
+    refs/*)
+      ;;
+    *)
+      resolved_local_ref="$(git rev-parse --symbolic-full-name "$local_ref" 2>/dev/null || true)"
+      ;;
+  esac
+
+  if ! is_allowed_public_ref "$resolved_local_ref"; then
+    blocked_refs+=("$local_ref")
+  fi
+
+  case "$remote_ref" in
+    refs/heads/main|refs/heads/release-staging*)
+      branch_candidate_refs+=("$remote_ref")
+      branch_source_refs+=("$resolved_local_ref")
+      branch_candidate_shas+=("$local_sha")
+      branch_baseline_shas+=("$remote_sha")
       ;;
   esac
 done
 
-if [ "${#blocked_refs[@]}" -gt 0 ]; then
-  if consume_push_override; then
-    exit 0
-  fi
-
+if [ "$main_deletion_requested" -eq 1 ]; then
   printf 'Blocked push to public Context Engine remote %s.\n' "${REMOTE_NAME:-remote}" >&2
-  printf 'Allowed refs are refs/heads/main, refs/heads/release-staging*, and refs/tags/*.\n' >&2
-  printf 'Rejected ref: %s\n' "${blocked_refs[0]}" >&2
+  printf 'Rejected ref: refs/heads/main\n' >&2
   exit 1
 fi
+
+if [ "${#blocked_refs[@]}" -gt 0 ]; then
+  if ! consume_push_override; then
+    printf 'Blocked push to public Context Engine remote %s.\n' "${REMOTE_NAME:-remote}" >&2
+    printf 'Allowed refs are refs/heads/main, refs/heads/release-staging*, and refs/tags/*.\n' >&2
+    printf 'Rejected ref: %s\n' "${blocked_refs[0]}" >&2
+    exit 1
+  fi
+fi
+
+for index in "${!tag_candidate_refs[@]}"; do
+  tag_ref="${tag_candidate_refs[$index]}"
+  tag_sha="${tag_candidate_shas[$index]}"
+  if ! validate_public_tag "$tag_sha"; then
+    printf 'Blocked public tag %s: %s.\n' "$tag_ref" "$PUBLIC_TAG_ERROR" >&2
+    printf 'Fetch public main and release-staging refs before retrying.\n' >&2
+    exit 1
+  fi
+done
 
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 for index in "${!release_candidate_shas[@]}"; do
@@ -109,13 +542,29 @@ for index in "${!release_candidate_shas[@]}"; do
     verify_args+=(--minimum-ref "$baseline_sha")
   fi
 
-  main_ref="refs/remotes/${REMOTE_NAME}/main"
-  if git rev-parse --verify --quiet "${main_ref}^{commit}" >/dev/null; then
-    verify_args+=(--baseline-ref "$main_ref")
+  if ! collect_public_main_refs; then
+    printf 'Blocked release-staging push: public main baseline is unavailable.\n' >&2
+    printf 'Fetch it before retrying: git fetch %s main:refs/remotes/%s/main\n' "$REMOTE_NAME" "$REMOTE_NAME" >&2
+    exit 1
   fi
+
+  for main_ref in "${PUBLIC_MAIN_REFS[@]}"; do
+    verify_args+=(--baseline-ref "$main_ref")
+  done
 
   if ! node "$repo_root/scripts/release-version.mjs" "${verify_args[@]}" >&2; then
     printf 'Blocked release-staging push: public application version verification failed.\n' >&2
+    exit 1
+  fi
+done
+
+for index in "${!branch_candidate_refs[@]}"; do
+  branch_ref="${branch_candidate_refs[$index]}"
+  branch_source_ref="${branch_source_refs[$index]}"
+  branch_sha="${branch_candidate_shas[$index]}"
+  branch_baseline_sha="${branch_baseline_shas[$index]}"
+  if ! validate_public_branch "$branch_ref" "$branch_source_ref" "$branch_sha" "$branch_baseline_sha"; then
+    printf 'Blocked public branch %s: %s.\n' "$branch_ref" "$PUBLIC_BRANCH_ERROR" >&2
     exit 1
   fi
 done

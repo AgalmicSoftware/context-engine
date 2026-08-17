@@ -8,6 +8,7 @@ import {
   type SessionWizardWorkerRequirementProof,
 } from './sessionWizardWorkerRequirementProof';
 import { normalizeSessionWizardWorkerUrl } from './sessionWizardUrlSupport';
+import { buildSessionWizardWorkerVerificationConfig } from './sessionWizardWorkerVerificationConfig';
 
 export type SessionWizardWorkerPublishEvidence = {
   verified: boolean;
@@ -59,6 +60,9 @@ const buildPublishInputFingerprint = ({
         workerSecrets,
         proof: proof || null,
         runtime: {
+          adminAddress: toStr(runtime.account || runtime.resolvedAdminAddress)
+            .trim()
+            .toLowerCase(),
           deployComplete: runtime.deployComplete === true,
           deployWorkerUrl: normalizeSessionWizardWorkerUrl(runtime.deployWorkerUrl),
           embeddedDeployHelperEnabled: runtime.embeddedDeployHelperEnabled,
@@ -69,6 +73,7 @@ const buildPublishInputFingerprint = ({
           sessionIdHex: toStr(runtime.sessionIdHex).trim(),
           workerLimitPerWallet: Number(runtime.workerLimitPerWallet || 0) || 0,
           workerMode: runtime.workerMode || '',
+          workerAllowOrigins: toStr(runtime.workerAllowOrigins).trim(),
           workerSecretsEnabled: runtime.workerSecretsEnabled !== false,
         },
       }),
@@ -136,6 +141,12 @@ export const resolveSessionWizardWorkerPublishEvidence = ({
     return { verified: false, reason: 'default-worker-changed', ...evidenceSnapshot };
   }
   if (customWorkerSelected) {
+    const workerConfig = buildSessionWizardWorkerVerificationConfig({
+      runtime: runtimeSnapshot,
+      draft,
+      workerUrl,
+      workerSecrets: secrets,
+    });
     const readiness = resolveSessionWizardWorkerRequirementReadiness({
       proof,
       workerUrl,
@@ -143,8 +154,10 @@ export const resolveSessionWizardWorkerPublishEvidence = ({
       sessionId: runtime.sessionIdHex || runtime.sessionId,
       sessionModeProfile: draft.sessionModeProfile as SessionModeProfile,
       sessionAi: draft.ai,
+      workerAllowOrigins: runtime.workerAllowOrigins,
       workerSecrets: secrets,
       workerSecretsEnabled: runtime.workerSecretsEnabled !== false,
+      workerConfig,
     });
     if (!readiness.verified) {
       return { ...readiness, ...evidenceSnapshot };

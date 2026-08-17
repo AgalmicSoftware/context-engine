@@ -1,6 +1,7 @@
 import { updateCacheAtomic } from '../../utilities/cache/cacheScripts.js';
+import { mergeSbtActivityCacheEntryCounts } from '../../utilities/sbt/sbtActivityCacheEntry.js';
 
-type CommunitySbtCacheEntry = Record<string, unknown> & {
+type CommunitySbtCacheEntry = {
   blockNumber?: unknown;
   burnedAddresses?: unknown;
   burnedCountByAddress?: unknown;
@@ -57,21 +58,20 @@ export const persistCommunitySbtHolderHydrationResults = async ({
     results.forEach((res) => {
       if (!res || res.countsOk === false || !res.lower) return;
       const existing = currentList[res.lower] || {};
-      currentList[res.lower] = {
-        ...existing,
+      currentList[res.lower] = mergeSbtActivityCacheEntryCounts(existing, {
         sbtAddress: existing.sbtAddress || res.addr,
         mintedAddresses: res.mintedAddresses,
         burnedAddresses: res.burnedAddresses,
         countsLoaded: true,
-        mintedCountByAddress: res.counts?.mintedCountByAddress || existing.mintedCountByAddress || {},
-        burnedCountByAddress: res.counts?.burnedCountByAddress || existing.burnedCountByAddress || {},
-        mintedEventCount: res.counts?.mintedEventCount || existing.mintedEventCount || 0,
-        burnedEventCount: res.counts?.burnedEventCount || existing.burnedEventCount || 0,
+        mintedCountByAddress: res.counts?.mintedCountByAddress || {},
+        burnedCountByAddress: res.counts?.burnedCountByAddress || {},
+        mintedEventCount: res.counts?.mintedEventCount || 0,
+        burnedEventCount: res.counts?.burnedEventCount || 0,
         blockNumber: Number.isFinite(Number(res.counts?.scannedToBlock))
           ? Math.floor(Number(res.counts?.scannedToBlock))
-          : existing.blockNumber,
+          : null,
         countsScanCheckpoint: null,
-      };
+      });
     });
 
     nextCache[netKey] = {

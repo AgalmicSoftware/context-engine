@@ -1,6 +1,7 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { STALE_CHUNK_RELOAD_STORAGE_KEY } from '../../bootRecovery.js';
 import { AppShell, appShellDispatchActions } from './AppShell';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import contractScripts from '../../utilities/web3/chainGateway.js';
@@ -27,6 +28,7 @@ import {
 
 const mockAdminPage = jest.fn(() => null);
 const mockNavbar = jest.fn(() => null);
+const mockMainAreaTabs = jest.fn(() => null);
 const mockSponsorPage = jest.fn(() => null);
 const mockSessionWizard = jest.fn(() => null);
 const mockSurveyPage = jest.fn(() => null);
@@ -77,7 +79,10 @@ jest.mock('../Navbar/Navbar', () => ({
     return null;
   },
 }));
-jest.mock('../MainContent/MainAreaTabs', () => () => null);
+jest.mock('../MainContent/MainAreaTabs', () => (props) => {
+  mockMainAreaTabs(props);
+  return null;
+});
 jest.mock('../Onboarding/OnboardingOverlay', () => () => null);
 jest.mock('../Footer/Footer', () => () => null);
 jest.mock('../UserPage/SimUserPage', () => () => null);
@@ -277,6 +282,9 @@ jest.mock('../UserPage/CompareAddresses', () => {
       return React.createElement('div', {
         'data-testid': 'mock-compare-addresses',
         'data-first-address': String(props.firstAddress || ''),
+        'data-active-session-slug': String(props.activeSessionSlug || ''),
+        'data-cache-ready': String(props.sessionCachesReady),
+        'data-profile-scan-enabled': String(typeof props.scanSpecificUserProfile === 'function'),
       });
     },
   };
@@ -701,6 +709,7 @@ describe('AppShell route render smoke', () => {
     restoreSessionScanGlobals();
     window.history.replaceState({}, '', '/');
     window.sessionStorage.clear();
+    document.documentElement.removeAttribute('data-ce-theme-source');
   });
 
   afterEach(() => {
@@ -722,6 +731,121 @@ describe('AppShell route render smoke', () => {
     restoreSessionScanGlobals();
     window.history.replaceState({}, '', '/');
     window.sessionStorage.clear();
+  });
+
+  it('clears stale-chunk recovery state after a synchronous primary route commits', async () => {
+    const subject = createSubject({ path: '/', search: '?ceChunkReload=123&keep=1' });
+    window.sessionStorage.setItem(STALE_CHUNK_RELOAD_STORAGE_KEY, 'true');
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_HOME_ROOT)).toBeInTheDocument();
+    await waitFor(() => expect(window.sessionStorage.getItem(STALE_CHUNK_RELOAD_STORAGE_KEY)).toBeNull());
+    expect(window.location.search).toBe('?keep=1');
+  });
+
+  it('preserves stale-chunk recovery state on the cache initialization placeholder', () => {
+    const subject = createSubject({ path: '/questions', search: '?ceChunkReload=123&keep=1' });
+    subject.state = {
+      ...subject.state,
+      isCacheManagerReady: false,
+    };
+    window.sessionStorage.setItem(STALE_CHUNK_RELOAD_STORAGE_KEY, 'true');
+
+    render(subject.render());
+
+    expect(window.sessionStorage.getItem(STALE_CHUNK_RELOAD_STORAGE_KEY)).toBe('true');
+    expect(window.location.search).toBe('?ceChunkReload=123&keep=1');
+  });
+
+  it('preserves stale-chunk recovery state while an explicit session ID is resolving', async () => {
+    const subject = createSubject({
+      path: `/session/${SESSION_ID}`,
+      search: '?ceChunkReload=123&keep=1',
+      sessionConfig: null,
+    });
+    subject.resolveSessionSlugFromPathToken = jest.fn(() => '');
+    subject.resolveSessionPathId = jest.fn();
+    subject._sessionPathResolver.getIdStatus = jest.fn(() => ({
+      hasAttempted: true,
+      isPending: true,
+      retryCount: 0,
+      lastErrorTs: null,
+    }));
+    window.sessionStorage.setItem(STALE_CHUNK_RELOAD_STORAGE_KEY, 'true');
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.SESSION_LOADING_SKELETON)).toBeInTheDocument();
+    expect(window.sessionStorage.getItem(STALE_CHUNK_RELOAD_STORAGE_KEY)).toBe('true');
+    expect(window.location.search).toBe('?ceChunkReload=123&keep=1');
+  });
+
+  it('clears stale-chunk recovery state after explicit session ID resolution is exhausted', async () => {
+    const subject = createSubject({
+      path: `/session/${SESSION_ID}`,
+      search: '?ceChunkReload=123&keep=1',
+      sessionConfig: null,
+    });
+    subject.resolveSessionSlugFromPathToken = jest.fn(() => '');
+    subject.resolveSessionPathId = jest.fn();
+    subject._sessionPathResolver.getIdStatus = jest.fn(() => ({
+      hasAttempted: true,
+      isPending: false,
+      retryCount: 0,
+      lastErrorTs: null,
+    }));
+    window.sessionStorage.setItem(STALE_CHUNK_RELOAD_STORAGE_KEY, 'true');
+
+    render(subject.render());
+
+    expect(await screen.findByRole('heading', { name: 'Session Not Found' })).toBeInTheDocument();
+    await waitFor(() => expect(window.sessionStorage.getItem(STALE_CHUNK_RELOAD_STORAGE_KEY)).toBeNull());
+    expect(window.location.search).toBe('?keep=1');
+  });
+
+  it('preserves stale-chunk recovery state while a session slug is resolving', async () => {
+    const subject = createSubject({
+      path: '/session/missing-session',
+      search: '?ceChunkReload=123&keep=1',
+      sessionConfig: null,
+    });
+    subject.resolveSessionPathSlug = jest.fn();
+    subject._sessionPathResolver.getSlugStatus = jest.fn(() => ({
+      hasAttempted: false,
+      isPending: false,
+      retryCount: 0,
+      lastErrorTs: null,
+    }));
+    window.sessionStorage.setItem(STALE_CHUNK_RELOAD_STORAGE_KEY, 'true');
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.SESSION_LOADING_SKELETON)).toBeInTheDocument();
+    expect(window.sessionStorage.getItem(STALE_CHUNK_RELOAD_STORAGE_KEY)).toBe('true');
+    expect(window.location.search).toBe('?ceChunkReload=123&keep=1');
+  });
+
+  it('clears stale-chunk recovery state after session slug resolution is exhausted', async () => {
+    const subject = createSubject({
+      path: '/session/missing-session',
+      search: '?ceChunkReload=123&keep=1',
+      sessionConfig: null,
+    });
+    subject.resolveSessionPathSlug = jest.fn();
+    subject._sessionPathResolver.getSlugStatus = jest.fn(() => ({
+      hasAttempted: true,
+      isPending: false,
+      retryCount: 0,
+      lastErrorTs: null,
+    }));
+    window.sessionStorage.setItem(STALE_CHUNK_RELOAD_STORAGE_KEY, 'true');
+
+    render(subject.render());
+
+    expect(await screen.findByRole('heading', { name: 'Session Not Found' })).toBeInTheDocument();
+    await waitFor(() => expect(window.sessionStorage.getItem(STALE_CHUNK_RELOAD_STORAGE_KEY)).toBeNull());
+    expect(window.location.search).toBe('?keep=1');
   });
 
   it('seeds built-in demo questions into canonical live-result buckets without scanning blocks', () => {
@@ -778,6 +902,33 @@ describe('AppShell route render smoke', () => {
         questionScanProgress: null,
       }),
       expect.any(Function),
+    );
+  });
+
+  it('forwards the active session cache context to the home tools explorer', () => {
+    const sessionConfig = {
+      slug: 'edge',
+      sessionName: 'Edge Session',
+      networkChainId: 84532,
+    };
+    const subject = createSubject({ path: '/', activeSessionSlug: 'edge', sessionConfig });
+    subject.state = {
+      ...subject.state,
+      questionResponsesNonce: 7,
+      questionScanProgress: { slug: 'edge', phase: 'hydrate', discoveredQuestions: 3 },
+    };
+
+    render(subject.render());
+
+    expect(mockMainAreaTabs).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        activeSessionSlug: 'edge',
+        sessionConfig,
+        networkChainId: 84532,
+        isResponsesCacheReady: true,
+        questionResponsesNonce: 7,
+        questionScanProgress: subject.state.questionScanProgress,
+      }),
     );
   });
 
@@ -951,6 +1102,31 @@ describe('AppShell route render smoke', () => {
     expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-question-session-slug', 'demo');
   });
 
+  it('scopes the active session color scheme declaratively and removes it on a non-session route', async () => {
+    document.documentElement.dataset.ceThemeSource = 'deployment';
+    const sessionConfig = buildSessionConfig({
+      slug: 'ocean-session',
+      sessionName: 'Ocean Session',
+      appearance: { colorSchemeId: 'ocean' },
+    });
+    const subject = createSubject({
+      path: '/session/ocean-session',
+      activeSessionSlug: 'ocean-session',
+      sessionConfig,
+    });
+    const view = render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
+    expect(view.container.querySelector('[data-ce-session-color-scope="active"]')).toHaveAttribute(
+      'data-ce-session-color-scheme',
+      'ocean',
+    );
+
+    const homeSubject = createSubject({ path: '/about', activeSessionSlug: 'ocean-session', sessionConfig });
+    view.rerender(homeSubject.render());
+    expect(view.container.querySelector('[data-ce-session-color-scope="active"]')).toBeNull();
+  });
+
   it('fresh-loads an explicit worker-canonical session without registry fallback', async () => {
     const workerOrigin = 'https://worker-session.example.com';
     const workerConfig = {
@@ -1009,9 +1185,7 @@ describe('AppShell route render smoke', () => {
 
     const view = render(subject.render());
 
-    expect(await screen.findByTestId('ce-worker-canonical-bootstrap-status')).toHaveTextContent(
-      'Loading worker session',
-    );
+    expect(screen.getByTestId('ce-worker-canonical-bootstrap-status')).toHaveTextContent('Loading worker session');
     expect(mockNavbar.mock.calls.at(-1)?.[0]?.sessionConfig).toBeNull();
     await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(subject.state.sessionPathResolutionNonce).toBeGreaterThan(0));
@@ -1199,10 +1373,12 @@ describe('AppShell route render smoke', () => {
       sessionConfig: null,
     });
     subject.resolveSessionPathSlug = jest.fn();
+    window.sessionStorage.setItem(STALE_CHUNK_RELOAD_STORAGE_KEY, 'true');
 
     render(subject.render());
 
     expect(await screen.findByRole('alert')).toHaveTextContent('must appear exactly once');
+    await waitFor(() => expect(window.sessionStorage.getItem(STALE_CHUNK_RELOAD_STORAGE_KEY)).toBeNull());
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(subject.resolveSessionPathSlug).not.toHaveBeenCalled();
   });
@@ -1210,6 +1386,7 @@ describe('AppShell route render smoke', () => {
   it('redirects a first-visit root load to the about page', async () => {
     const subject = createSubject({
       path: '/',
+      search: '?from=launch#overview',
       firstVisit: true,
     });
     const replaceStateSpy = jest.spyOn(window.history, 'replaceState');
@@ -1237,12 +1414,33 @@ describe('AppShell route render smoke', () => {
       await subject.componentDidMount();
     });
 
-    expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/about');
+    expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/about?from=launch#overview');
     expect(window.location.pathname).toBe('/about');
+    expect(window.location.search).toBe('?from=launch');
+    expect(window.location.hash).toBe('#overview');
+    expect(localStorage.getItem(FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY)).toBe('true');
 
     render(<MemoryRouter initialEntries={['/about']}>{subject.render()}</MemoryRouter>);
 
     expect(await screen.findByTestId(E2E_TESTIDS.PAGE_ABOUT_ROOT)).toBeInTheDocument();
+    subject.componentWillUnmount();
+  });
+
+  it('keeps the root hash when saved auto intent is restored after the about redirect', async () => {
+    const subject = createSubject({ path: '/', firstVisit: true });
+    const manageAutoHashPersistence = subject.manageAutoHashPersistence.bind(subject);
+    stubMainSiteMountSideEffects(subject);
+    subject.manageAutoHashPersistence = manageAutoHashPersistence;
+    window.sessionStorage.setItem('dg:autoHash:edge', 'auto=1');
+    window.history.replaceState({}, '', '/#overview');
+
+    await act(async () => {
+      await subject.componentDidMount();
+    });
+
+    expect(window.location.pathname).toBe('/about');
+    expect(window.location.search).toBe('?auto=1');
+    expect(window.location.hash).toBe('#overview');
     subject.componentWillUnmount();
   });
 
@@ -1263,10 +1461,11 @@ describe('AppShell route render smoke', () => {
     expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/about');
     expect(window.location.pathname).toBe('/about');
     expect(localStorage.getItem(FIRST_VISIT_STORAGE_KEY)).toBe('false');
+    expect(localStorage.getItem(FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY)).toBe('true');
     subject.componentWillUnmount();
   });
 
-  it('redirects a root refresh to about even after the old one-time toggle is consumed', async () => {
+  it('keeps the root route after the one-time about redirect is consumed', async () => {
     localStorage.setItem(FIRST_VISIT_STORAGE_KEY, 'false');
     localStorage.setItem(FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY, 'true');
     const subject = stubMainSiteMountSideEffects(
@@ -1281,12 +1480,108 @@ describe('AppShell route render smoke', () => {
       await subject.componentDidMount();
     });
 
-    expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/about');
-    expect(window.location.pathname).toBe('/about');
+    expect(replaceStateSpy).not.toHaveBeenCalledWith({}, '', '/about');
+    expect(window.location.pathname).toBe('/');
     subject.componentWillUnmount();
   });
 
-  it('temporarily redirects cached session page refreshes to the about page', async () => {
+  it('persists and reads the primary marker before replacing the root URL', async () => {
+    const subject = stubMainSiteMountSideEffects(createSubject({ path: '/', firstVisit: true }));
+    const order = [];
+    const values = new Map();
+    const storage = {
+      getItem: jest.fn((key) => values.get(key) || null),
+      setItem: jest.fn((key, value) => {
+        order.push(`set:${key}`);
+        values.set(key, value);
+      }),
+    };
+    subject.getFirstVisitRootRedirectStorage = jest.fn(() => storage);
+    const originalReplaceState = window.history.replaceState.bind(window.history);
+    const replaceStateSpy = jest.spyOn(window.history, 'replaceState').mockImplementation((...args) => {
+      order.push('replace');
+      return originalReplaceState(...args);
+    });
+
+    await act(async () => {
+      await subject.componentDidMount();
+    });
+
+    expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/about');
+    expect(order.indexOf(`set:${FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY}`)).toBeLessThan(
+      order.indexOf('replace'),
+    );
+    expect(storage.getItem).toHaveBeenCalledWith(FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY);
+    subject.componentWillUnmount();
+
+    const refreshedSubject = stubMainSiteMountSideEffects(createSubject({ path: '/', firstVisit: true }));
+    refreshedSubject.getFirstVisitRootRedirectStorage = jest.fn(() => storage);
+    replaceStateSpy.mockClear();
+
+    await act(async () => {
+      await refreshedSubject.componentDidMount();
+    });
+
+    expect(replaceStateSpy).not.toHaveBeenCalledWith({}, '', '/about');
+    expect(window.location.pathname).toBe('/');
+    refreshedSubject.componentWillUnmount();
+  });
+
+  it('skips the root redirect when durable storage is readable but unwritable', async () => {
+    const subject = stubMainSiteMountSideEffects(createSubject({ path: '/', firstVisit: true }));
+    subject.getFirstVisitRootRedirectStorage = jest.fn(() => ({
+      getItem: jest.fn(() => null),
+      setItem: jest.fn(() => {
+        throw new Error('storage blocked');
+      }),
+    }));
+    const replaceStateSpy = jest.spyOn(window.history, 'replaceState');
+
+    await act(async () => {
+      await subject.componentDidMount();
+    });
+
+    expect(replaceStateSpy).not.toHaveBeenCalledWith({}, '', '/about');
+    expect(window.location.pathname).toBe('/');
+    subject.componentWillUnmount();
+  });
+
+  it('skips the root redirect when durable storage is unavailable', async () => {
+    const subject = stubMainSiteMountSideEffects(createSubject({ path: '/', firstVisit: true }));
+    subject.getFirstVisitRootRedirectStorage = jest.fn(() => null);
+    const replaceStateSpy = jest.spyOn(window.history, 'replaceState');
+
+    await act(async () => {
+      await subject.componentDidMount();
+    });
+
+    expect(replaceStateSpy).not.toHaveBeenCalledWith({}, '', '/about');
+    expect(window.location.pathname).toBe('/');
+    subject.componentWillUnmount();
+  });
+
+  it('does not fall back to session storage when local storage is unavailable', async () => {
+    const subject = stubMainSiteMountSideEffects(createSubject({ path: '/', firstVisit: true }));
+    const replaceStateSpy = jest.spyOn(window.history, 'replaceState');
+    const localStorageGetterSpy = jest.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
+      throw new Error('localStorage unavailable');
+    });
+
+    try {
+      await act(async () => {
+        await subject.componentDidMount();
+      });
+
+      expect(replaceStateSpy).not.toHaveBeenCalledWith({}, '', '/about');
+      expect(window.location.pathname).toBe('/');
+      expect(window.sessionStorage.getItem(FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY)).toBeNull();
+    } finally {
+      localStorageGetterSpy.mockRestore();
+      subject.componentWillUnmount();
+    }
+  });
+
+  it('preserves cached direct session loads and later refreshes', async () => {
     const subject = stubMainSiteMountSideEffects(
       createSubject({
         path: '/session/demo-1',
@@ -1294,16 +1589,35 @@ describe('AppShell route render smoke', () => {
       }),
     );
     subject.hasPersistedManagedCacheData = jest.fn(async (slug) => slug === 'demo-1');
+    subject.reloadWindowLocation = jest.fn();
     const replaceStateSpy = jest.spyOn(window.history, 'replaceState');
 
     await act(async () => {
       await subject.componentDidMount();
     });
 
-    expect(subject.hasPersistedManagedCacheData).toHaveBeenCalledWith('demo-1');
-    expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/about');
-    expect(window.location.pathname).toBe('/about');
+    expect(replaceStateSpy).not.toHaveBeenCalledWith({}, '', '/about');
+    expect(window.location.pathname).toBe('/session/demo-1');
+    expect(localStorage.getItem(FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY)).toBeNull();
     subject.componentWillUnmount();
+
+    window.history.replaceState({}, '', '/session/demo-1');
+    replaceStateSpy.mockClear();
+    const refreshedSubject = stubMainSiteMountSideEffects(
+      createSubject({
+        path: '/session/demo-1',
+        firstVisit: false,
+      }),
+    );
+    refreshedSubject.hasPersistedManagedCacheData = jest.fn(async () => true);
+
+    await act(async () => {
+      await refreshedSubject.componentDidMount();
+    });
+
+    expect(replaceStateSpy).not.toHaveBeenCalledWith({}, '', '/about');
+    expect(window.location.pathname).toBe('/session/demo-1');
+    refreshedSubject.componentWillUnmount();
   });
 
   it('does not redirect first-time direct session loads without persisted session cache', async () => {
@@ -1320,7 +1634,6 @@ describe('AppShell route render smoke', () => {
       await subject.componentDidMount();
     });
 
-    expect(subject.hasPersistedManagedCacheData).toHaveBeenCalledWith('demo-1');
     expect(replaceStateSpy).not.toHaveBeenCalledWith({}, '', '/about');
     expect(window.location.pathname).toBe('/session/demo-1');
     subject.componentWillUnmount();
@@ -1630,6 +1943,67 @@ describe('AppShell route render smoke', () => {
 
     expect(await screen.findByTestId(E2E_TESTIDS.PAGE_COMPARE_ROOT)).toBeInTheDocument();
     expect(await screen.findByTestId('mock-compare-addresses')).toHaveAttribute('data-first-address', '');
+    expect(screen.getByTestId('mock-compare-addresses')).toHaveAttribute('data-active-session-slug', 'edge');
+    expect(screen.getByTestId('mock-compare-addresses')).toHaveAttribute('data-cache-ready', 'true');
+    expect(screen.getByTestId('mock-compare-addresses')).toHaveAttribute('data-profile-scan-enabled', 'true');
+  });
+
+  it('keeps pure Worker comparison session-scoped without invoking the on-chain profile scanner', async () => {
+    const workerConfig = buildSessionConfig({
+      slug: 'worker-session',
+      networkChainId: null,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    });
+    const subject = createSubject({
+      path: '/compare',
+      search: '?session=worker-session',
+      activeSessionSlug: 'worker-session',
+      sessionConfig: workerConfig,
+    });
+
+    render(subject.render());
+
+    expect(await screen.findByTestId('mock-compare-addresses')).toHaveAttribute(
+      'data-active-session-slug',
+      'worker-session',
+    );
+    expect(screen.getByTestId('mock-compare-addresses')).toHaveAttribute('data-profile-scan-enabled', 'false');
+  });
+
+  it('retains on-chain profile enrichment for Worker sessions with an explicit SBT gate', async () => {
+    const hybridProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    hybridProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    hybridProfile.evm.registryChainId = 11155420;
+    hybridProfile.encryption.accessConditions = {
+      match: 'any',
+      conditions: [
+        {
+          kind: 'sbt_onchain',
+          chainId: 11155420,
+          contract: '0x1111111111111111111111111111111111111111',
+          anyOrAll: 'any',
+        },
+      ],
+    };
+    const hybridConfig = buildSessionConfig({
+      slug: 'worker-sbt-session',
+      networkChainId: 11155420,
+      sessionModeProfile: hybridProfile,
+    });
+    const subject = createSubject({
+      path: '/compare',
+      search: '?session=worker-sbt-session',
+      activeSessionSlug: 'worker-sbt-session',
+      sessionConfig: hybridConfig,
+    });
+
+    render(subject.render());
+
+    expect(await screen.findByTestId('mock-compare-addresses')).toHaveAttribute(
+      'data-active-session-slug',
+      'worker-sbt-session',
+    );
+    expect(screen.getByTestId('mock-compare-addresses')).toHaveAttribute('data-profile-scan-enabled', 'true');
   });
 
   it('switches page roots cleanly when navigating between surveys and questions routes', async () => {
@@ -2042,6 +2416,38 @@ describe('AppShell route render smoke', () => {
     expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-question-session-slug', 'demo-sh');
     expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-network-id', '');
     expect(subject.resolveSessionPathSlug).not.toHaveBeenCalled();
+  });
+
+  it('initializes canonical Worker caches under the config slug behind /session/demo', async () => {
+    const demoConfig = buildSessionConfig({
+      slug: 'demo-sh',
+      sessionId: '0xb822b3eca85bdc35cf83cb947bceb6b2',
+      sessionName: 'Demo Session',
+      __registry: undefined,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    });
+    const subject = createSubject({
+      path: '/session/demo',
+      activeSessionSlug: 'demo-sh',
+      sessionConfig: null,
+    });
+    subject.getCacheSessionCfg = jest.fn(() => demoConfig);
+    subject.startCacheReinitRun = jest.fn(() => 1);
+    subject.isCacheReinitRunActive = jest.fn(() => true);
+    subject.initializeQuestionCacheForGroup = jest.fn(async () => undefined);
+    subject.fetchQuestionResponsesChunkedForGroup = jest.fn(async () => undefined);
+    subject.initializeSurveyCacheForGroup = jest.fn(async () => undefined);
+    subject.initializeSbtCacheForGroup = jest.fn(async () => undefined);
+    subject.startSbtEventListenerForGroup = jest.fn();
+    subject.setReadinessStateIfChanged = jest.fn();
+    subject.checkAllCachesReady = jest.fn();
+
+    await expect(subject.initializeWorkerCanonicalCachesForGroup('demo')).resolves.toBe(true);
+
+    expect(subject.getCacheSessionCfg).toHaveBeenCalledWith('demo');
+    expect(subject.initializeQuestionCacheForGroup).toHaveBeenCalledWith('demo-sh');
+    expect(subject.fetchQuestionResponsesChunkedForGroup).toHaveBeenCalledWith('demo-sh');
+    expect(subject.initializeSurveyCacheForGroup).toHaveBeenCalledWith('demo-sh');
   });
 
   it('uses registry-backed /session/demo metadata instead of the placeholder display fallback', async () => {
@@ -2877,10 +3283,12 @@ describe('AppShell route render smoke', () => {
         ),
       },
     });
+    window.sessionStorage.setItem(STALE_CHUNK_RELOAD_STORAGE_KEY, 'true');
 
     render(subject.render());
 
     expect(await screen.findByRole('heading', { name: 'Survey Not Found' })).toBeInTheDocument();
+    await waitFor(() => expect(window.sessionStorage.getItem(STALE_CHUNK_RELOAD_STORAGE_KEY)).toBeNull());
     expect(screen.queryByTestId('mock-survey-page')).not.toBeInTheDocument();
     expect(subject.queueSurveyGroupScan).not.toHaveBeenCalled();
   });
@@ -2920,12 +3328,14 @@ describe('AppShell route render smoke', () => {
         },
       },
     });
+    window.sessionStorage.setItem(STALE_CHUNK_RELOAD_STORAGE_KEY, 'true');
 
     render(subject.render());
 
     expect(await screen.findByRole('heading', { name: 'Loading Survey Metadata...' })).toBeInTheDocument();
     expect(screen.getByText('Loading surveys for session "demo-sh"...')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Survey Not Found' })).not.toBeInTheDocument();
+    expect(window.sessionStorage.getItem(STALE_CHUNK_RELOAD_STORAGE_KEY)).toBe('true');
     expect(subject.queueSurveyGroupScan).not.toHaveBeenCalled();
   });
 
@@ -2965,10 +3375,12 @@ describe('AppShell route render smoke', () => {
         },
       },
     });
+    window.sessionStorage.setItem(STALE_CHUNK_RELOAD_STORAGE_KEY, 'true');
 
     render(subject.render());
 
     expect(await screen.findByRole('heading', { name: 'Survey Metadata Load Error' })).toBeInTheDocument();
+    await waitFor(() => expect(window.sessionStorage.getItem(STALE_CHUNK_RELOAD_STORAGE_KEY)).toBeNull());
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 
     await waitFor(() =>
@@ -3153,6 +3565,30 @@ describe('AppShell route render smoke', () => {
     });
     subject._mounted = true;
     const dg = attachDgStore(subject);
+    updateCacheAtomic.mockImplementation(async (namespace, slug, updater) => {
+      let current = dg.read(namespace, slug);
+      if (namespace === 'userCache' && slug === 'edge') {
+        current = {
+          ...(current || {}),
+          [target.toLowerCase()]: {
+            ...(current?.[target.toLowerCase()] || {}),
+            84532: {
+              ...(current?.[target.toLowerCase()]?.['84532'] || {}),
+              data: {
+                sbts: [],
+                createdSurveys: [],
+                createdQuestions: [],
+                surveyResponses: [],
+                questionResponses: [{ id: 'concurrent-response', responder: target, blockNumber: 126 }],
+              },
+            },
+          },
+        };
+      }
+      const next = await updater(current);
+      dg.write(namespace, slug, next);
+      return next;
+    });
     subject.getUserProfileAllSessionsScanMode = jest.fn(() => ({
       legacyAllSessions: false,
       useAllSessionsSbtScan: false,
@@ -3232,6 +3668,9 @@ describe('AppShell route render smoke', () => {
     expect(dg.read('userCache', 'edge')?.[target.toLowerCase()]?.['84532']?.data?.sbts).toEqual([
       expect.objectContaining({ sbtAddress }),
     ]);
+    expect(dg.read('userCache', 'edge')?.[target.toLowerCase()]?.['84532']?.data?.questionResponses).toEqual([
+      expect.objectContaining({ id: 'concurrent-response', blockNumber: 126 }),
+    ]);
     expect(dg.read('sbtCache', 'edge')?.['84532']?.sbtList?.[sbtAddress.toLowerCase()]).toEqual(
       expect.objectContaining({
         sbtAddress,
@@ -3244,6 +3683,108 @@ describe('AppShell route render smoke', () => {
     expect(dg.read('questionsCache', 'edge')?.['84532']?.questions?.[questionId]).toEqual(
       expect.objectContaining({ id: questionId }),
     );
+  });
+
+  it('keeps a profile scan retryable when atomic cache persistence fails', async () => {
+    const target = '0x00000000000000000000000000000000000000af';
+    const sbtAddress = '0x00000000000000000000000000000000000000cf';
+    const sessionConfig = buildSessionConfig({ blockLimits: { start: 100, end: null } });
+    const subject = createSubject({
+      path: `/u/${target}`,
+      activeSessionSlug: 'edge',
+      sessionConfig,
+    });
+    subject._mounted = true;
+    subject.state = {
+      ...subject.state,
+      isSBTCacheReady: false,
+      isSurveyCacheReady: false,
+      isQuestionCacheReady: false,
+      isResponsesCacheReady: false,
+      sbtCacheRevision: 0,
+      questionResponsesNonce: 0,
+    };
+    attachDgStore(subject);
+    updateCacheAtomic.mockImplementation(async (namespace, _slug, updater) => {
+      if (namespace === 'userCache') return updater(null);
+      throw new Error('IndexedDB unavailable');
+    });
+    subject.getUserProfileAllSessionsScanMode = jest.fn(() => ({
+      legacyAllSessions: false,
+      useAllSessionsSbtScan: false,
+      useAllSessionsSurveyActivityScan: false,
+      useAllSessionsQuestionActivityScan: false,
+      useAllSessionsActivityScan: false,
+      useAllSessionsScan: false,
+    }));
+    subject.getProfileScanScopeContext = jest.fn(() => ({
+      scope: 'active',
+      list: [],
+      activeSlug: 'edge',
+      activeSlugFromRoute: true,
+    }));
+    subject.ensureRegistryHydratedForProfileScan = jest.fn(async () => null);
+    subject.resolveProfileDeepScanPlan = jest.fn(() => ({
+      slugs: ['edge'],
+      usedAllSessions: false,
+      coverageComplete: true,
+      coverageReason: '',
+      registryEntryCount: 1,
+      rawAllSlugCount: 1,
+      activeChainSlugCount: 1,
+      scopedFallbackSlugCount: 0,
+      relevantSlugs: ['edge'],
+      prioritizedGeneralFirst: false,
+      scanOrdering: 'active',
+    }));
+    subject.readProfileScanStepTimeoutMs = jest.fn(() => 5000);
+    subject.readProfileScanSbtBurstSize = jest.fn(() => 1);
+    subject.readProfileScanActivityLookbackBlocks = jest.fn(() => 0);
+    subject.emitProfileScanColdDiag = jest.fn();
+    subject.emitProfileScanTelemetry = jest.fn();
+    subject.scheduleProfileScanRetryAfterRegistryHydration = jest.fn();
+    subject.queueLocalRevisionUpdate = jest.fn();
+    subject.setState.mockClear();
+    contractScripts.getLatestBlockNumber.mockResolvedValue(125);
+    contractScripts.getSBTsForUser.mockResolvedValue({
+      data: [{ sbtAddress, sbtInfo: { name: 'Unpersisted badge' } }],
+      hadError: false,
+    });
+    contractScripts.getUserActivity.mockResolvedValue({
+      data: {
+        createdSurveys: [],
+        createdQuestions: [],
+        surveyResponses: [],
+        questionResponses: [],
+      },
+      hadError: false,
+    });
+
+    const report = await subject.scanSpecificUserProfile(target);
+
+    expect(report).toMatchObject({
+      anyNewData: false,
+      coverageComplete: false,
+      coverageReason: 'cache-persistence-failed',
+      hadRpcErrors: false,
+      scannedSlugs: [],
+      failedSlugs: ['edge'],
+      failedActivitySlugs: ['edge'],
+    });
+    expect(subject.scheduleProfileScanRetryAfterRegistryHydration).toHaveBeenCalledWith(
+      target,
+      'cache-persistence-failed',
+    );
+    expect(subject.queueLocalRevisionUpdate).not.toHaveBeenCalled();
+    expect(subject.setState).not.toHaveBeenCalled();
+    expect(subject.state).toMatchObject({
+      isSBTCacheReady: false,
+      isSurveyCacheReady: false,
+      isQuestionCacheReady: false,
+      isResponsesCacheReady: false,
+      sbtCacheRevision: 0,
+      questionResponsesNonce: 0,
+    });
   });
 
   it('reconciles survey events into survey and question caches without dropping arweave branches', async () => {
@@ -3742,6 +4283,14 @@ describe('AppShell single-SBT counts checkpoints', () => {
         cacheState = JSON.parse(JSON.stringify(value));
       }
       return value;
+    });
+    updateCacheAtomic.mockImplementation(async (namespace, slug, updater) => {
+      const current = namespace === 'sbtCache' && slug === 'edge' ? cacheState : null;
+      const next = await updater(JSON.parse(JSON.stringify(current)));
+      if (namespace === 'sbtCache' && slug === 'edge') {
+        cacheState = JSON.parse(JSON.stringify(next));
+      }
+      return next;
     });
 
     contractScripts.getSbtMintBurnCountsByAddress

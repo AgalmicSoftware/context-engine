@@ -72,7 +72,7 @@
   #rulesModalCard {
     display: flex;
     overflow: hidden;
-    background-color: #ffffff00 !important;
+    background-color: transparent !important;
     z-index: 10;
     border-radius: var(--ce-radius-0);
     min-height: 500px;
@@ -105,7 +105,7 @@
 }
 
 .sessionLoadingSkeletonSection {
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
   border-radius: var(--ce-radius-8);
   padding: 0.95rem;
 }
@@ -147,7 +147,7 @@
 .sessionLoadingSkeletonBar {
   height: 12px;
   border-radius: var(--ce-radius-4);
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
 }
 
 .sessionLoadingSkeletonTitleBar {
@@ -155,7 +155,7 @@
 }
 
 .sessionLoadingSkeletonStatus {
-  color: rgba(244, 247, 255, 0.65);
+  color: color-mix(in srgb, var(--ce-control-text) 65%, transparent);
 }
 
 .sessionLoadingSkeletonStatusTitle {
@@ -180,9 +180,9 @@
   inset: 0;
   background: linear-gradient(
     90deg,
-    rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.15) 50%,
-    rgba(255, 255, 255, 0) 100%
+    transparent 0%,
+    color-mix(in srgb, var(--ce-text-inverse) 15%, transparent) 50%,
+    transparent 100%
   );
   transform: translateX(-100%);
   animation: sessionLoadingSkeletonShimmerSweep 1.5s linear infinite;
@@ -197,5 +197,13 @@
 @media (prefers-reduced-motion: reduce) {
   .sessionLoadingSkeletonShimmer::after {
     animation: none;
+  }
+}
+
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  .main {
+    align-items: center;
+    justify-content: center;
+    margin-top: 0;
   }
 }

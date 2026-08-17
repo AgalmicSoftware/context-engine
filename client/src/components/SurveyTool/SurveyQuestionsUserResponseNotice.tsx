@@ -9,6 +9,7 @@ import styles from './SurveyTool.module.scss';
 type SurveyQuestionsUserResponseNoticeProps = {
   isDecrypting?: boolean;
   isEditing?: boolean;
+  isSingleQuestionView?: boolean;
   isSubmitting?: boolean;
   onDecryptEdit: () => void;
   onExitEditing: () => void;
@@ -22,6 +23,7 @@ type SurveyQuestionsUserResponseNoticeProps = {
 const SurveyQuestionsUserResponseNotice = ({
   isDecrypting = false,
   isEditing = false,
+  isSingleQuestionView = false,
   isSubmitting = false,
   onDecryptEdit,
   onExitEditing,
@@ -37,7 +39,9 @@ const SurveyQuestionsUserResponseNotice = ({
 
   return (
     <div className={styles.userResponseNotice} data-testid={E2E_TESTIDS.SURVEY_EXISTING_RESPONSE_NOTICE}>
-      <p className={styles.userResponseNoticeTitle}>Existing survey response detected</p>
+      <p className={styles.userResponseNoticeTitle}>
+        {isSingleQuestionView ? 'Existing response detected' : 'Existing survey response detected'}
+      </p>
       <div className={styles.userResponseNoticeActions}>
         <Button
           onClick={onStartFresh}
@@ -51,9 +55,17 @@ const SurveyQuestionsUserResponseNotice = ({
           onClick={onDecryptEdit}
           id={styles.decryptEditButton}
           data-testid={E2E_TESTIDS.SURVEY_DECRYPT_EDIT_ALL}
-          disabled={isDecrypting || isSubmitting || !userResponseEncrypted}
+          disabled={isDecrypting || isSubmitting}
         >
-          {isDecrypting ? 'Decrypting...' : 'Decrypt / Edit All'}
+          {isDecrypting
+            ? 'Decrypting...'
+            : userResponseEncrypted
+              ? isSingleQuestionView
+                ? 'Decrypt / Edit'
+                : 'Decrypt / Edit All'
+              : isSingleQuestionView
+                ? 'Edit Response'
+                : 'Edit All'}
         </Button>
         {submittedStateActive && responseUrl && (
           <a

@@ -5,6 +5,7 @@ export const STALE_CHUNK_RELOAD_STORAGE_KEY = 'ce:staleChunkReloadAttempted:v202
 type BootStorage = {
   clear?: () => void;
   getItem?: (key: string) => string | null;
+  removeItem?: (key: string) => void;
   setItem?: (key: string, value: string) => void;
 };
 
@@ -19,8 +20,14 @@ type BootLocation = {
   reload?: () => void;
 };
 
+type BootHistory = {
+  replaceState?: (data: unknown, unused: string, url?: string | URL | null) => void;
+  state?: unknown;
+};
+
 type BootWindow = {
   caches?: BootCacheApi;
+  history?: BootHistory;
   localStorage?: BootStorage;
   location?: BootLocation;
   sessionStorage?: BootStorage;
@@ -127,6 +134,35 @@ const hasReloadParam = (win: BootWindow, reloadParam: string): boolean => {
   }
 };
 
+export const clearBootReloadMarker = (
+  win: BootWindow = globalThis.window,
+  reloadParam = BOOT_RELOAD_PARAM,
+): boolean => {
+  if (!win?.location || !win.history?.replaceState) return false;
+
+  try {
+    const url = new URL(win.location.href);
+    if (!url.searchParams.has(reloadParam)) return false;
+    url.searchParams.delete(reloadParam);
+    win.history.replaceState(win.history.state ?? null, '', `${url.pathname}${url.search}${url.hash}`);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export const clearStaleChunkReloadMarker = (win: BootWindow = globalThis.window): boolean => {
+  // Regression guard: this loop sentinel must survive until a primary route commits;
+  // clearing it at entry-module load lets a still-stale lazy chunk reload forever.
+  try {
+    win?.sessionStorage?.removeItem?.(STALE_CHUNK_RELOAD_STORAGE_KEY);
+  } catch {
+    // Successful route cleanup is best-effort when storage is unavailable.
+  }
+
+  return clearBootReloadMarker(win, STALE_CHUNK_RELOAD_PARAM);
+};
+
 export const recoverFromStaleChunkLoadError = (error: unknown, options: BootRecoveryOptions = {}): boolean => {
   if (!isStaleChunkLoadError(error)) {
     return false;
@@ -180,10 +216,10 @@ const appendButton = (doc: Document, parent: Element, label: string, onClick: Ev
   button.setAttribute(
     'style',
     [
-      'border:1px solid rgba(147,170,255,0.55)',
+      'border:var(--ce-border-control-width,2px) solid var(--ce-focus-ring,Highlight)',
       'border-radius:10px',
-      'background:#2f67d3',
-      'color:#f6f8ff',
+      'background:var(--ce-action-primary,Highlight)',
+      'color:var(--ce-action-primary-text,HighlightText)',
       'cursor:pointer',
       'font:700 16px/1.2 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
       'padding:14px 18px',
@@ -206,7 +242,9 @@ export const renderBootFailure = (error: unknown, options: BootRecoveryOptions =
   const reloadParam = options.reloadParam || BOOT_RELOAD_PARAM;
   const reload = options.reload || (() => reloadWithCacheBuster(win, reloadParam));
   const clearCaches = options.clearCaches || (() => clearBootCaches(win));
-  const autoReloadDelayMs = typeof options.autoRefreshDelayMs === 'number' ? options.autoRefreshDelayMs : 3000;
+  const requestedAutoReloadDelayMs = typeof options.autoRefreshDelayMs === 'number' ? options.autoRefreshDelayMs : 3000;
+  const automaticReloadPaused = hasReloadParam(win, reloadParam);
+  const autoReloadDelayMs = automaticReloadPaused ? -1 : requestedAutoReloadDelayMs;
   let refreshStarted = false;
   const refresh = async (button: HTMLButtonElement | null) => {
     if (refreshStarted) return;
@@ -236,8 +274,8 @@ export const renderBootFailure = (error: unknown, options: BootRecoveryOptions =
       'display:flex',
       'align-items:center',
       'justify-content:center',
-      'background:#202252',
-      'color:#f6f8ff',
+      'background:var(--ce-surface-raised,Canvas)',
+      'color:var(--ce-panel-text,CanvasText)',
       'padding:32px',
       'font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
     ].join(';'),
@@ -249,10 +287,10 @@ export const renderBootFailure = (error: unknown, options: BootRecoveryOptions =
     [
       'max-width:680px',
       'width:100%',
-      'border:1px solid rgba(147,170,255,0.32)',
+      'border:var(--ce-border-control-width,2px) solid var(--ce-border-strong,CanvasText)',
       'border-radius:18px',
-      'background:rgba(33,36,90,0.92)',
-      'box-shadow:0 24px 70px rgba(0,0,0,0.28)',
+      'background:var(--ce-surface-raised,Canvas)',
+      'box-shadow:var(--ce-shadow-raised,none)',
       'padding:32px',
     ].join(';'),
   );
@@ -262,21 +300,23 @@ export const renderBootFailure = (error: unknown, options: BootRecoveryOptions =
     panel,
     'h1',
     'A new version of Context Engine is available',
-    'margin:0 0 14px;font-size:28px;line-height:1.15;font-weight:800',
+    'margin:0 0 14px;color:var(--ce-panel-text,CanvasText);font-size:28px;line-height:1.15;font-weight:800',
   );
   appendTextNode(
     doc,
     panel,
     'p',
     'Reloading clears cached app data and loads the latest version.',
-    'margin:0 0 20px;color:#d7dbff;font-size:17px;line-height:1.45',
+    'margin:0 0 20px;color:var(--ce-panel-text-muted,CanvasText);font-size:17px;line-height:1.45',
   );
   const countdownNode = appendTextNode(
     doc,
     panel,
     'p',
-    '',
-    'margin:0 0 20px;color:#f6f8ff;font-size:15px;font-weight:700;line-height:1.35',
+    automaticReloadPaused
+      ? 'Automatic reload paused after the previous attempt. Fix the startup issue, then select Reload.'
+      : '',
+    'margin:0 0 20px;color:var(--ce-panel-text,CanvasText);font-size:15px;font-weight:700;line-height:1.35',
   );
 
   const actions = doc.createElement('div');

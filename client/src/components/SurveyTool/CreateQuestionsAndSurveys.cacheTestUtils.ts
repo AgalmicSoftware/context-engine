@@ -25,7 +25,7 @@ type CreateQuestionsAndSurveysHarness = InstanceType<typeof CreateQuestionsAndSu
   setState: (update: unknown, cb?: () => void) => void;
 };
 type TreeElement = Record<string, unknown> & {
-  props?: {
+  props?: Record<string, unknown> & {
     children?: unknown;
     className?: unknown;
   };

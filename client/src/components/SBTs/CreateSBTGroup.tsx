@@ -24,14 +24,13 @@ import { arweaveClient as arweaveClient } from '../../utilities/arweave/arweaveC
 import { resolvePublishArweaveUploadOptions } from '../../utilities/arweave/publishUploadAuth.js';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import { validateNoLockedPlaintextInPayload } from '../../utilities/arweave/noLeakPayloads.js';
-import contractScripts, {
-  getSessionConfigBySlugOrDefault,
-  normalizeSessionSlug,
-} from '../../utilities/web3/chainGateway.js';
+import contractScripts, { getSessionConfigBySlugOrDefault } from '../../utilities/web3/chainGateway.js';
+import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { getEffectiveArweaveKey } from '../../utilities/session/resourceKeys.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { fetchImageFromURL } from '../../utilities/ui/imageFetchClient.js';
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
+import { FIXED_MEDIA_DARK, FIXED_MEDIA_LIGHT } from '../../utilities/ui/fixedMediaColors';
 import styles from './CreateSBTGroup.module.scss';
 import { QRCodeSVG } from 'qrcode.react';
 import { getChainById, getSessionContractsForChain, getSessionRegistryChains } from '../../variables/chains.js';
@@ -264,7 +263,7 @@ const buildDeferredDraftCreate2Salt = () =>
     randomBytes: ethers.utils.randomBytes,
   });
 const LOCKED_FIELD_MASK = '[encrypted]';
-const DEFERRED_MODAL_SURFACE_BG = '#11182c';
+const DEFERRED_MODAL_SURFACE_BG = 'var(--ce-overlay-surface)';
 const DISTRIBUTION_OPTION_CONFIGS = Object.freeze([
   {
     value: 'hasPasswords',
@@ -3736,7 +3735,7 @@ class CreateSBTGroup extends Component<any, any> {
         }
         canvas.width = img.width;
         canvas.height = img.height;
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = FIXED_MEDIA_LIGHT;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0);
         canvas.toBlob((blob: Blob | null) => {
@@ -4491,8 +4490,8 @@ class CreateSBTGroup extends Component<any, any> {
                 id="hidden-page-qr"
                 value={shareableUrl}
                 size={1024}
-                bgColor={'#ffffff'}
-                fgColor={'#000000'}
+                bgColor={FIXED_MEDIA_LIGHT}
+                fgColor={FIXED_MEDIA_DARK}
                 level="L"
                 includeMargin={true}
               />

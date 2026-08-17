@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "scope": "client/src/**/*.{css,scss}, excluding approved palette owners client/src/scss/themes and client/src/scss/session-color-schemes",
+  "counts": {}
+}

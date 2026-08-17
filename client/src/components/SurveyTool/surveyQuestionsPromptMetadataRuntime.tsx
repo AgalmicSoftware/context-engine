@@ -71,11 +71,14 @@ export const createSurveyQuestionsPromptMetadataRuntime = (
   };
 
   const getAudioInputWorkerProps = () => {
-    // Prefer the explicit route/session slug to avoid cross-cache slug drift on /question routes.
+    // Prefer the explicit route/session slug to avoid cross-cache slug drift on /question routes,
+    // while retaining an exact session config already supplied by the session shell. Worker-native
+    // demo routes can be intentionally absent from the on-chain registry cache.
     const explicitSessionSlug: SurveyQuestionsLegacyValue = resolveEffectiveSlug(propsRef.current);
-    const resolvedSession: SurveyQuestionsLegacyValue = explicitSessionSlug
-      ? resolveExplicitSessionContext(explicitSessionSlug)
-      : resolveDraftSessionContext(propsRef.current, inst._getEffectiveDraftSlug());
+    const resolvedSession: SurveyQuestionsLegacyValue = resolveDraftSessionContext(
+      propsRef.current,
+      explicitSessionSlug || inst._getEffectiveDraftSlug(),
+    );
     const sessionSlug: SurveyQuestionsLegacyValue = resolvedSession.sessionSlug || '';
     const sessionConfig: SurveyQuestionsLegacyValue = resolvedSession.sessionConfig || null;
     const providerLike: SurveyQuestionsLegacyValue =

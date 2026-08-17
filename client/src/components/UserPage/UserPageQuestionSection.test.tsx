@@ -10,7 +10,7 @@ jest.mock('reactstrap', () => ({
 
 jest.mock('../SurveyTool/SingleQuestionResponse', () => ({
   __esModule: true,
-  default: ({
+  default: function MockSingleQuestionResponse({
     canDecryptOtherResponses,
     mode,
     onDecryptQuestion,
@@ -34,7 +34,9 @@ jest.mock('../SurveyTool/SingleQuestionResponse', () => ({
     sbtCacheRevision?: unknown;
     sessionSlug?: unknown;
     showImportance?: unknown;
-  }) => {
+  }) {
+    const ReactModule = jest.requireActual('react') as typeof React;
+    const [mountedQuestionId] = ReactModule.useState(question?.id || '');
     const responseRecord =
       response && typeof response === 'object'
         ? (response as {
@@ -53,6 +55,7 @@ jest.mock('../SurveyTool/SingleQuestionResponse', () => ({
         data-can-decrypt={String(canDecryptOtherResponses)}
         data-has-response={String(!!response)}
         data-mode={String(mode)}
+        data-mounted-question-id={mountedQuestionId}
         data-nonce={String(questionResponsesNonce)}
         data-responder-address={String(responderAddress)}
         data-revision={String(sbtCacheRevision)}
@@ -235,6 +238,38 @@ describe('UserPageQuestionSection', () => {
       expect(card.querySelector('button')).toBeNull();
     });
     expect(onDecryptQuestion).not.toHaveBeenCalled();
+  });
+
+  it('preserves response component identity when recency sorting reorders rows', () => {
+    const responseMap = {
+      'q-older': { answer: { value: 'older' } },
+      'q-newer': { answer: { value: 'newer' } },
+    };
+    const olderQuestion = { id: 'q-older', prompt: 'Older response', sessionSlug: 'edge' };
+    const newerQuestion = { id: 'q-newer', prompt: 'Newer response', sessionSlug: 'edge' };
+    const { rerender } = render(
+      <UserPageQuestionSection
+        {...createProps({
+          detailedQuestionResponseMap: responseMap,
+          questionResponseEntries: [olderQuestion, newerQuestion],
+        })}
+      />,
+    );
+
+    rerender(
+      <UserPageQuestionSection
+        {...createProps({
+          detailedQuestionResponseMap: responseMap,
+          questionResponseEntries: [newerQuestion, olderQuestion],
+        })}
+      />,
+    );
+
+    const [firstCard, secondCard] = screen.getAllByTestId('question-response-card');
+    expect(firstCard).toHaveTextContent('Newer response');
+    expect(firstCard).toHaveAttribute('data-mounted-question-id', 'q-newer');
+    expect(secondCard).toHaveTextContent('Older response');
+    expect(secondCard).toHaveAttribute('data-mounted-question-id', 'q-older');
   });
 
   it('keeps gated cached responses visible and defers decrypt to the parent click handler', () => {

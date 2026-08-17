@@ -1,0 +1,35 @@
+.detailsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+  font-weight: 700;
+}
+
+.closeButton {
+  appearance: none;
+  border: 1px solid var(--ce-color-tooltip-border);
+  border-radius: var(--ce-radius-4);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  line-height: 1;
+  padding: 4px 7px;
+}
+
+.closeButton:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--ce-data-series-2) 70%, transparent);
+  outline-offset: 2px;
+}
+
+.empty {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.membershipKind {
+  font-size: 0.75rem;
+  opacity: 0.72;
+}

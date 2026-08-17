@@ -1,7 +1,9 @@
 import { ethers } from 'ethers';
 
 import demo1OnchainQuestionIds from '../../variables/demo/demo_1_onchain_question_ids.json';
-import demoPolisData from '../../variables/demo/demo_polis_data.json';
+import { comments as demo2QuestionComments } from '../../variables/demo/demo_2_question_seed.json';
+import { comments as legacyDemoQuestionComments } from '../../variables/demo/demo_polis_data.json';
+import { LEGACY_DEMO_POLL_OPTIONS } from '../demo/demoQuestionSemantics';
 import { normalizeSessionSlug } from './sessionNaming.js';
 
 type DemoComment = Record<string, unknown>;
@@ -12,16 +14,37 @@ type DemoQuestion = Record<string, unknown> & {
   sessionSlug: string;
 };
 
-const TEMPORARY_DEMO_QUESTION_SLUG = 'demo-1';
-const CLOUDFLARE_DEMO_QUESTION_SLUG = 'demo-sh';
+type DemoFixtureRegistryEntry = {
+  comments: DemoComment[];
+  fixtureFile: string;
+  onchainQuestionIds: unknown[];
+  onchainQuestionIdsFile: string;
+  sourceSessionSlug: string;
+};
+
 const ZERO_SURVEY_ID = '0x0000000000000000000000000000000000000000000000000000000000000000';
-const POLL_OPTIONS = [
-  'Technical researchers',
-  'AI developers and labs',
-  'Governments and regulators',
-  'The general public',
-  'Affected communities',
-];
+const legacyQuestionIds = Array.isArray(demo1OnchainQuestionIds) ? demo1OnchainQuestionIds : [];
+const LEGACY_DEMO_FIXTURE: DemoFixtureRegistryEntry = {
+  comments: Array.isArray(legacyDemoQuestionComments) ? legacyDemoQuestionComments : [],
+  fixtureFile: 'client/src/variables/demo/demo_polis_data.json',
+  onchainQuestionIds: legacyQuestionIds,
+  onchainQuestionIdsFile: 'client/src/variables/demo/demo_1_onchain_question_ids.json',
+  sourceSessionSlug: 'demo',
+};
+
+const DEMO_FIXTURES_BY_SLUG: Readonly<Record<string, DemoFixtureRegistryEntry>> = Object.freeze({
+  'demo-1': LEGACY_DEMO_FIXTURE,
+  'demo-2': {
+    // Regression guard: AppShell only needs question rows; importing the full
+    // participant/analysis fixture here pushes the route shell over its budget.
+    comments: Array.isArray(demo2QuestionComments) ? demo2QuestionComments : [],
+    fixtureFile: 'client/src/variables/demo/demo_2_question_seed.json',
+    onchainQuestionIds: [],
+    onchainQuestionIdsFile: '',
+    sourceSessionSlug: 'demo-2',
+  },
+  'demo-sh': LEGACY_DEMO_FIXTURE,
+});
 
 const uniqueStrings = (values: unknown[]): string[] => {
   const out: string[] = [];
@@ -37,6 +60,11 @@ const uniqueStrings = (values: unknown[]): string[] => {
   return out;
 };
 
+const readCommentPollOptions = (fixture: DemoFixtureRegistryEntry, comment: DemoComment): string[] =>
+  fixture === LEGACY_DEMO_FIXTURE
+    ? [...LEGACY_DEMO_POLL_OPTIONS]
+    : uniqueStrings(Array.isArray(comment.options) ? comment.options : []);
+
 const splitSources = (value: unknown): string[] =>
   String(value || '')
     .split(',')
@@ -44,11 +72,12 @@ const splitSources = (value: unknown): string[] =>
     .filter(Boolean);
 
 const buildDemoQuestionFromComment = (
+  fixture: DemoFixtureRegistryEntry,
   comment: DemoComment,
   index: number,
   sessionConfig: DemoSessionConfig = {},
   onchainQuestionId: unknown = '',
-  targetSlug = TEMPORARY_DEMO_QUESTION_SLUG,
+  targetSlug = 'demo-1',
   workerCanonical = false,
 ): DemoQuestion | null => {
   const sourceCommentId = String(comment?.commentId || '').trim();
@@ -76,10 +105,10 @@ const buildDemoQuestionFromComment = (
     temporaryDemoSeed: !workerCanonical,
     cloudflareDemoSeed: workerCanonical,
     demoFixture: {
-      sourceSessionSlug: 'demo',
-      fixtureFile: 'client/src/variables/demo/demo_polis_data.json',
+      sourceSessionSlug: fixture.sourceSessionSlug,
+      fixtureFile: fixture.fixtureFile,
       fixturePath: 'comments',
-      onchainQuestionIdsFile: 'client/src/variables/demo/demo_1_onchain_question_ids.json',
+      onchainQuestionIdsFile: fixture.onchainQuestionIdsFile,
       workerCanonical,
       sourceCommentIndex: index,
       sourceCommentId,
@@ -98,10 +127,27 @@ const buildDemoQuestionFromComment = (
     },
   };
   if (type === 'multichoice') {
-    question.options = POLL_OPTIONS;
+    question.options = readCommentPollOptions(fixture, comment);
     question.singleSelect = true;
   }
+  if (type === 'rating' && comment.scale && typeof comment.scale === 'object' && !Array.isArray(comment.scale)) {
+    question.scale = { ...comment.scale };
+  }
   return question;
+};
+
+export const getDemoFixtureQuestionIdsByIndex = (slugIn: unknown): string[] => {
+  const slug = normalizeSessionSlug(slugIn);
+  const fixture = DEMO_FIXTURES_BY_SLUG[slug];
+  if (!fixture) return [];
+  return fixture.comments.map((comment, index) => {
+    const canonicalQuestionId = String(fixture.onchainQuestionIds[index] || '')
+      .trim()
+      .toLowerCase();
+    if (canonicalQuestionId) return canonicalQuestionId;
+    const sourceCommentId = String(comment?.commentId || '').trim();
+    return sourceCommentId ? ethers.utils.id(`${slug}:${sourceCommentId}`).toLowerCase() : '';
+  });
 };
 
 export const getTemporaryDemoSessionQuestionFixtures = (
@@ -109,20 +155,25 @@ export const getTemporaryDemoSessionQuestionFixtures = (
   sessionConfig: DemoSessionConfig = {},
 ): DemoQuestion[] => {
   const slug = normalizeSessionSlug(slugIn);
-  if (slug !== TEMPORARY_DEMO_QUESTION_SLUG && slug !== CLOUDFLARE_DEMO_QUESTION_SLUG) return [];
+  const fixture = DEMO_FIXTURES_BY_SLUG[slug];
+  if (!fixture) return [];
   const seed = sessionConfig?.demoCompatibilitySeed;
   const seedConfig = seed && typeof seed === 'object' ? (seed as Record<string, unknown>) : {};
-  const workerCanonical = slug === CLOUDFLARE_DEMO_QUESTION_SLUG && seedConfig.workerCanonical === true;
+  const workerCanonical = seedConfig.workerCanonical === true;
   if (seedConfig.temporary === false && !workerCanonical) {
     return [];
   }
-  const comments = Array.isArray((demoPolisData as Record<string, unknown>)?.comments)
-    ? ((demoPolisData as Record<string, unknown>).comments as DemoComment[])
-    : [];
-  const questionIds = Array.isArray(demo1OnchainQuestionIds) ? demo1OnchainQuestionIds : [];
-  return comments
+  return fixture.comments
     .map((comment, index) =>
-      buildDemoQuestionFromComment(comment, index, sessionConfig, questionIds[index], slug, workerCanonical),
+      buildDemoQuestionFromComment(
+        fixture,
+        comment,
+        index,
+        sessionConfig,
+        fixture.onchainQuestionIds[index],
+        slug,
+        workerCanonical,
+      ),
     )
     .filter((question): question is DemoQuestion => !!question);
 };

@@ -19,6 +19,11 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => {
       store[String(slug || '')] = JSON.parse(JSON.stringify(value));
       return true;
     }),
+    updateCacheAtomic: jest.fn(async (_namespace: string, slug = '', updater: (current: unknown) => unknown) => {
+      const next = await updater(store[String(slug || '')] || null);
+      store[String(slug || '')] = JSON.parse(JSON.stringify(next));
+      return next;
+    }),
     peekCacheSync: jest.fn(() => null),
     listNamespaceEntriesSync: jest.fn(() => []),
     subscribeCacheUpdates: jest.fn(() => () => {}),

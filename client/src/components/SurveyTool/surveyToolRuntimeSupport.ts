@@ -9,6 +9,15 @@ type SurveyRuntimeGlobal = typeof globalThis & {
   __CE_DEBUG_COUNTERS__?: unknown;
   __CE_PERF_COUNTERS__?: SurveyPerfCounters | unknown;
 };
+type SurveyAudioWorkerProps = Record<string, unknown> & {
+  context?: Record<string, unknown>;
+  sessionConfig?: unknown;
+  sessionSlug?: unknown;
+};
+export type SurveyAudioWorkerPropsMemo = {
+  value: SurveyAudioWorkerProps;
+  deps: unknown[];
+};
 
 const getSurveyRuntimeGlobal = (): SurveyRuntimeGlobal | null =>
   typeof globalThis !== 'undefined' ? (globalThis as unknown as SurveyRuntimeGlobal) : null;
@@ -20,6 +29,17 @@ export const GATE_SBT_HYDRATION_RETRY_MS = 45 * 1000;
 // The pile hologram avatar is intentionally hidden for now, but the render/state
 // plumbing stays in place so future voice-mode work can re-enable it cleanly.
 export const SHOW_PILE_HOLOGRAM_TOGGLE = false;
+
+export const resolveStableSurveyAudioWorkerProps = (
+  memo: SurveyAudioWorkerPropsMemo | null,
+  next: SurveyAudioWorkerProps,
+): SurveyAudioWorkerPropsMemo => {
+  const context = next?.context || {};
+  const deps = [next?.sessionSlug, next?.sessionConfig, context.account, context.providerLike, context.chainId];
+  // Keep React.memo inputs stable across a vote, but invalidate them for any
+  // session or wallet-context change.
+  return memo?.deps.every((value, index) => Object.is(value, deps[index])) ? memo : { value: next, deps };
+};
 
 export const QUESTION_TAG_DROPDOWN_ROW_STYLE = {
   display: 'flex',

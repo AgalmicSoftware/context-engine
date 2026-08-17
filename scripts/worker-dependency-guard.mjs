@@ -1,13 +1,8 @@
-import { execFileSync } from 'child_process';
 import { existsSync, readFileSync } from 'fs';
 import { createRequire } from 'module';
 import { dirname, resolve } from 'path';
 
 const DEFAULT_DEPENDENCY_NAMES = ['ethers'];
-const AUTO_REPAIRABLE_ISSUE_PATTERNS = Object.freeze([
-  /^unable to resolve .* from workers\/sessionCorsWorker\/worker\.js:/,
-  /^resolved install for .* but worker package-lock\.json expects /,
-]);
 
 const readJson = (filePath) => JSON.parse(readFileSync(filePath, 'utf8'));
 
@@ -38,7 +33,6 @@ const getPaths = (rootDir) => ({
   workerPackageLockJson: resolve(rootDir, 'workers/sessionCorsWorker/package-lock.json'),
 });
 const resolveWorkerPackageDir = (rootDir) => resolve(rootDir, 'workers/sessionCorsWorker');
-const getNpmCommand = () => (process.platform === 'win32' ? 'npm.cmd' : 'npm');
 
 export const getWorkerDependencyVersionReport = ({
   rootDir = process.cwd(),
@@ -152,32 +146,4 @@ export const assertWorkerDependencyVersions = ({
   ]);
 
   throw new Error(lines.join('\n'));
-};
-
-export const canAutoRepairWorkerDependencyReport = (report = {}) => {
-  const issues = Array.isArray(report?.issues) ? report.issues : [];
-  return (
-    issues.length > 0 &&
-    issues.every((issue) => AUTO_REPAIRABLE_ISSUE_PATTERNS.some((pattern) => pattern.test(String(issue || ''))))
-  );
-};
-
-export const ensureWorkerDependencyInstall = ({
-  rootDir = process.cwd(),
-  dependencyName = 'ethers',
-  getDependencyReport = getWorkerDependencyVersionReport,
-  execFileSyncImpl = execFileSync,
-  stdio = 'inherit',
-} = {}) => {
-  let report = getDependencyReport({ rootDir, dependencyName });
-  if (!canAutoRepairWorkerDependencyReport(report)) {
-    return { changed: false, report };
-  }
-
-  execFileSyncImpl(getNpmCommand(), ['ci'], {
-    cwd: resolveWorkerPackageDir(rootDir),
-    stdio,
-  });
-  report = getDependencyReport({ rootDir, dependencyName });
-  return { changed: true, report };
 };

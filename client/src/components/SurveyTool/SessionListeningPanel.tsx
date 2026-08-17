@@ -16,6 +16,7 @@ import CreateQuestionsAndSurveys from './CreateQuestionsAndSurveys';
 import { useRollingTranscriptionRecorder } from '../../utilities/audio/useRollingTranscriptionRecorder';
 import { DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS } from '../../utilities/audio/rollingTranscription';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { readThemeToken, subscribeThemeChanges } from '../../utilities/ui/themeRuntime';
 import { generateQuestionsFromListeningTranscript, LISTENING_QUESTION_COUNT } from './sessionListeningQuestions';
 
 type SessionListeningPanelProps = Record<string, unknown> & {
@@ -76,6 +77,18 @@ function SessionListeningWaveform({ streamRef, isActive, isPaused }: SessionList
   const bufferLenRef = useRef(0);
   const ctx2dRef = useRef<CanvasRenderingContext2D | null>(null);
   const lastDrawRef = useRef(0);
+  const waveformColorsRef = useRef({ canvas: 'Canvas', bars: 'Highlight' });
+
+  useEffect(() => {
+    const refreshWaveformColors = () => {
+      waveformColorsRef.current = {
+        canvas: readThemeToken('ce-control-face', 'Canvas'),
+        bars: readThemeToken('ce-action-primary', 'Highlight'),
+      };
+    };
+    refreshWaveformColors();
+    return subscribeThemeChanges(refreshWaveformColors);
+  }, []);
 
   const sizeCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -122,7 +135,7 @@ function SessionListeningWaveform({ streamRef, isActive, isPaused }: SessionList
     const canvasWidth = canvas.width;
     const canvasHeight = canvas.height;
     const visualHeight = Math.max(1, canvasHeight - 4);
-    ctx.fillStyle = '#c0c0c0';
+    ctx.fillStyle = waveformColorsRef.current.canvas;
     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
     const barWidth = (canvasWidth / bufferLength) * 2.5;
@@ -132,7 +145,7 @@ function SessionListeningWaveform({ streamRef, isActive, isPaused }: SessionList
     }
     const scale = peak > 0 ? visualHeight / Math.max(peak, 16) : 0;
     let x = 0;
-    ctx.fillStyle = '#000080';
+    ctx.fillStyle = waveformColorsRef.current.bars;
     for (let i = 0; i < bufferLength; i += 1) {
       const barHeight = peak > 0 ? Math.max(2, Math.min(dataArray[i] * scale, visualHeight)) : 0;
       ctx.fillRect(x, canvasHeight - 2 - barHeight, barWidth, barHeight);

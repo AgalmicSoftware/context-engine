@@ -40,8 +40,7 @@ import LoginTooltipsToggleControl from './LoginTooltipsToggleControl';
 import LoginPreLoginConfigPanel from './LoginPreLoginConfigPanel';
 import LoginPreLoginSettingsDisplay from './LoginPreLoginSettingsDisplay';
 import LoginDemoSurfaceToggleControl from './LoginDemoSurfaceToggleControl';
-
-// Smart contract interactions and config
+import LoginThemeSettingsSection from './LoginThemeSettingsSection';
 import { DEFAULT_AUTO_REQUEST_TESTNET_FUNDS, DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 import contractScripts, {
   getAllSessionSlugs,
@@ -344,6 +343,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       aiSettingsStatus: '',
       aiSettingsOpen: false,
       aiSettingsSectionsOpen: {
+        appTheme: true,
         aiConfig: true,
         aiPerTask: false,
         aiAdvanced: false,
@@ -939,6 +939,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       const sessionSlug = this.getWorkerAuthSessionSlug();
       await getWorkerSessionToken({
         sessionSlug,
+        sessionConfig: this.getDisplaySessionConfig(sessionSlug),
         context: {
           account: this.props.account,
           providerLike: this.props.provider || 'wagmi',
@@ -1554,6 +1555,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     tooltipPlacement = 'top',
     containerClassName = '',
     rowClassName = '',
+    showSession = true,
   }: any = {}) =>
     LoginSettingsControlRow({
       activeSession,
@@ -1575,6 +1577,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       }),
       containerClassName,
       rowClassName,
+      showSession,
       sessionHref: buildSettingsSessionHref(activeSession.slug),
     });
 
@@ -1984,7 +1987,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
   renderSupportedResourceCard = (card: any) => {
     const activeSession = card?.activeSession || this.getSessionDescriptor(this.getActiveSessionSlug());
-    const activeSponsorSession = card?.activeSponsorSession || null;
     const extraSessions = Array.isArray(card?.otherSponsorSessions)
       ? card.otherSponsorSessions
       : Array.isArray(card?.sessions)
@@ -1997,7 +1999,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       <LoginSettingsSupportedResourceCard
         key={card.key}
         activeSession={activeSession}
-        activeSponsorSession={activeSponsorSession}
         card={card}
         extraSessions={extraSessions}
         extrasExpanded={extrasExpanded}
@@ -2251,6 +2252,10 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
                       ),
                     })
                   : null}
+                <LoginThemeSettingsSection
+                  isOpen={this.isAiSettingsSectionOpen('appTheme')}
+                  onToggle={() => this.toggleAiSettingsSection('appTheme')}
+                />
               </>
             ),
           })}

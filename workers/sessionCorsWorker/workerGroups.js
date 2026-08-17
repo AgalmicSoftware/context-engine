@@ -53,6 +53,8 @@ export const normalizeWorkerGroupId = (value) => {
 	return normalized;
 };
 
+export const isAddressShapedWorkerGroupId = (value) => /^0x[0-9a-f]{40}$/i.test(trim(value));
+
 const encodedPrincipalKeyPart = (value) =>
 	btoa(trim(value || 'id'))
 		.replace(/\+/g, '-')
@@ -1148,10 +1150,6 @@ const redactGroupForMember = (group) => ({
 	updatedAt: group.updatedAt,
 });
 
-const isDefinitiveWorkerGroupMembershipMiss = (result) =>
-	(Number(result?.status) === 403 && result?.reason === 'worker_group_membership_denied') ||
-	(Number(result?.status) === 404 && result?.reason === 'worker_group_not_found');
-
 const normalizeWorkerGroupMembershipFailure = (result) => ({
 	...(result && typeof result === 'object' ? result : {}),
 	ok: false,
@@ -1167,6 +1165,10 @@ export const createWorkerGroup = async ({ env, slug, sessionId, input, actorPrin
 	if (!canonicalSlug || !canonicalSessionId) {
 		return { ok: false, status: 400, reason: 'worker_group_session_identity_invalid' };
 	}
+	const requestedGroupId = trim(input?.groupId);
+	if (requestedGroupId && isAddressShapedWorkerGroupId(requestedGroupId)) {
+		return { ok: false, status: 400, reason: 'invalid_worker_group_id' };
+	}
 	if (!capacityAuthorized) {
 		const caps = resolveWorkerGroupCaps(env);
 		const existingGroups = await listGroupRecords({
@@ -1180,7 +1182,6 @@ export const createWorkerGroup = async ({ env, slug, sessionId, input, actorPrin
 	}
 	const normalized = normalizeGroupPatch({ input, actorPrincipal, deps });
 	if (!normalized.ok) return normalized;
-	const requestedGroupId = trim(input?.groupId);
 	const groupId = requestedGroupId ? normalizeWorkerGroupId(requestedGroupId) : createWorkerGroupId(deps);
 	if (!groupId) return { ok: false, status: 400, reason: 'invalid_worker_group_id' };
 	const existing = await readGroupRecord({
@@ -1338,11 +1339,20 @@ export const removeWorkerGroupMember = async ({ env, slug, sessionId, groupId, p
 		ok: true,
 		store: store.kind,
 		groupId: normalizeWorkerGroupId(groupId),
+		group: redactGroupForMember(group),
 		principal: normalized.principal,
 	};
 };
 
-export const listWorkerGroups = async ({ env, slug, sessionId, actorPrincipalResult, admin = false, expectedGroupCount } = {}) => {
+export const listWorkerGroups = async ({
+	env,
+	slug,
+	sessionId,
+	actorPrincipalResult,
+	admin = false,
+	includeMemberCount = false,
+	expectedGroupCount,
+} = {}) => {
 	const store = resolveWorkerGroupStore(env);
 	if (!store) return { ok: false, status: 501, reason: 'worker_group_store_not_configured' };
 	const authoritativeGroupCount = Number(expectedGroupCount);
@@ -1410,13 +1420,15 @@ export const listWorkerGroups = async ({ env, slug, sessionId, actorPrincipalRes
 			joinMode: authority.joinMode,
 			memberVisibility: authority.memberVisibility,
 		};
-		if (admin || authority.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION) {
-			visible.push(redactGroupForMember(authoritativeGroup));
-			continue;
-		}
-		if (authority.isMember && authority.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.MEMBERS) {
-			visible.push(redactGroupForMember(authoritativeGroup));
-		}
+		const mayViewGroup =
+			admin ||
+			authority.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION ||
+			(authority.isMember && authority.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.MEMBERS);
+		if (!mayViewGroup) continue;
+		visible.push({
+			...redactGroupForMember(authoritativeGroup),
+			...(includeMemberCount ? { memberCount: authority.memberCount } : {}),
+		});
 	}
 	return { ok: true, store: store.kind, groups: visible };
 };
@@ -1545,33 +1557,24 @@ export const listWorkerGroupMemberships = async ({ env, slug, sessionId, princip
 	if (!store) return { ok: false, status: 501, reason: 'worker_group_store_not_configured' };
 	const normalized = normalizeWorkerGroupPrincipal(principal, deps);
 	if (!normalized.ok) return { ok: false, status: 400, reason: normalized.reason };
-	const rows = await listMembershipRecords({
-		store,
+	const authority = await (deps.readCoordinatedWorkerGroupMemberships || readCoordinatedWorkerGroupMemberships)({
+		env,
 		slug,
 		sessionId,
-		principalKey: normalized.key,
+		principal: normalized.principal,
 	});
+	if (!authority.ok) return normalizeWorkerGroupMembershipFailure(authority);
+	if (!Array.isArray(authority.groups)) return normalizeWorkerGroupMembershipFailure();
 	const memberships = [];
-	for (const row of rows) {
-		// A KV principal index is only a projection. Filter it through the
-		// coordinator so a stale row cannot present a revoked membership as live.
-		const authoritativeMembership = await isWorkerGroupMember({
-			env,
-			slug,
-			sessionId,
-			groupId: row.groupId,
-			principal: normalized.principal,
-		});
-		if (!authoritativeMembership.ok) {
-			if (isDefinitiveWorkerGroupMembershipMiss(authoritativeMembership)) continue;
-			return normalizeWorkerGroupMembershipFailure(authoritativeMembership);
-		}
-		const authoritativeGroup = authoritativeMembership.group;
+	const seenGroupIds = new Set();
+	for (const authoritativeGroup of authority.groups) {
+		const authoritativeGroupId = normalizeWorkerGroupId(authoritativeGroup?.groupId);
 		const authoritativeJoinMode = trim(authoritativeGroup?.joinMode).toLowerCase();
 		const authoritativeVisibility = trim(authoritativeGroup?.memberVisibility).toLowerCase();
 		const authoritativeMemberCount = Number(authoritativeGroup?.memberCount);
 		if (
-			normalizeWorkerGroupId(authoritativeGroup?.groupId) !== normalizeWorkerGroupId(row.groupId) ||
+			!authoritativeGroupId ||
+			seenGroupIds.has(authoritativeGroupId) ||
 			!IMPLEMENTED_JOIN_MODES.has(authoritativeJoinMode) ||
 			!Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(authoritativeVisibility) ||
 			!Number.isSafeInteger(authoritativeMemberCount) ||
@@ -1579,15 +1582,42 @@ export const listWorkerGroupMemberships = async ({ env, slug, sessionId, princip
 		) {
 			return normalizeWorkerGroupMembershipFailure();
 		}
-		const group = await readGroupRecord({ store, slug, sessionId, groupId: row.groupId });
-		if (!group || group.deletedAt) continue;
+		seenGroupIds.add(authoritativeGroupId);
+		const group = await readGroupRecord({ store, slug, sessionId, groupId: authoritativeGroupId });
+		const member = await readMembershipRecord({
+			store,
+			slug,
+			sessionId,
+			groupId: authoritativeGroupId,
+			principalKey: normalized.key,
+		});
+		if (!group || group.deletedAt || !member || member.removedAt) {
+			return normalizeWorkerGroupMembershipFailure({
+				status: 503,
+				reason: 'worker_group_projection_unavailable',
+			});
+		}
+		try {
+			const canonicalIndexKey = memberIndexKey({
+				slug,
+				sessionId,
+				principalKey: normalized.key,
+				groupId: authoritativeGroupId,
+			});
+			if ((await store.store.get(canonicalIndexKey)) !== authoritativeGroupId) {
+				await store.store.put(canonicalIndexKey, authoritativeGroupId);
+			}
+		} catch {
+			// Principal indexes are optional discovery aids; coordinator authority
+			// plus the exact group/member projections determine this response.
+		}
 		memberships.push({
 			group: redactGroupForMember({
 				...group,
 				joinMode: authoritativeJoinMode,
 				memberVisibility: authoritativeVisibility,
 			}),
-			member: row,
+			member,
 			memberCount: authoritativeMemberCount,
 		});
 	}
@@ -1817,6 +1847,15 @@ export const readCoordinatedWorkerGroupCatalog = async ({ env, slug, sessionId, 
 		},
 	});
 
+export const readCoordinatedWorkerGroupMemberships = async ({ env, slug, sessionId, principal } = {}) =>
+	callWorkerGroupCoordinator({
+		env,
+		slug,
+		sessionId,
+		path: '/worker-groups/memberships',
+		payload: { principal },
+	});
+
 export const isWorkerGroupMember = async ({ env, slug, sessionId, groupId, principal, requesterAddress, authScopes, deps = {} } = {}) => {
 	const normalized = principal
 		? normalizeWorkerGroupPrincipal(principal, deps)
@@ -1941,6 +1980,7 @@ export const dispatchPublicWorkerGroupListRequest = async ({ request, config, en
 			slug,
 			sessionId: sessionIdentity.sessionId,
 			admin: false,
+			includeMemberCount: false,
 			expectedGroupCount: ready.meta?.groupCount,
 		});
 	} catch {
@@ -2107,6 +2147,7 @@ export const dispatchAdminWorkerGroupRequest = async ({ action, body, config, en
 				sessionId: sessionIdentity.sessionId,
 				actorPrincipalResult: actor,
 				admin: true,
+				includeMemberCount: true,
 				expectedGroupCount: ready.meta?.groupCount,
 			});
 		} catch {
@@ -2300,6 +2341,7 @@ export const workerGroupsRoute = async ({
 				sessionId: sessionIdentity.sessionId,
 				actorPrincipalResult: actor,
 				admin: false,
+				includeMemberCount: true,
 				expectedGroupCount: ready.meta?.groupCount,
 			});
 		} catch {
@@ -2358,6 +2400,9 @@ export const workerGroupsRoute = async ({
 			actorPrincipal: actor.principal,
 		});
 		if (!result.ok) return routeError(deps, result, baseHeaders);
+		if (!Number.isSafeInteger(result.memberCount) || result.memberCount < 0) {
+			return routeError(deps, { status: 503, reason: 'worker_group_projection_unavailable' }, baseHeaders);
+		}
 		return jsonResponse(
 			deps,
 			{
@@ -2366,6 +2411,7 @@ export const workerGroupsRoute = async ({
 				store: result.store,
 				group: result.group,
 				member: result.member,
+				memberCount: result.memberCount,
 			},
 			200,
 			baseHeaders,
@@ -2385,6 +2431,10 @@ export const workerGroupsRoute = async ({
 			actorPrincipal: actor.principal,
 		});
 		if (!result.ok) return routeError(deps, result, baseHeaders);
+		if (!Number.isSafeInteger(result.memberCount) || result.memberCount < 0) {
+			return routeError(deps, { status: 503, reason: 'worker_group_projection_unavailable' }, baseHeaders);
+		}
+		const retainGroup = result.group?.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION;
 		return jsonResponse(
 			deps,
 			{
@@ -2393,6 +2443,7 @@ export const workerGroupsRoute = async ({
 				store: result.store,
 				groupId: result.groupId,
 				principal: result.principal,
+				...(retainGroup ? { group: result.group, memberCount: result.memberCount } : {}),
 			},
 			200,
 			baseHeaders,

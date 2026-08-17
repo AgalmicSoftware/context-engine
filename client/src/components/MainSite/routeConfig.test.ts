@@ -11,6 +11,7 @@ describe('routeConfig', () => {
     expect(KNOWN_ROUTE_PREFIXES.has('survey')).toBe(true);
     expect(KNOWN_ROUTE_PREFIXES.has('session')).toBe(true);
     expect(KNOWN_ROUTE_PREFIXES.has('docs')).toBe(true);
+    expect(KNOWN_ROUTE_PREFIXES.has('contracts')).toBe(true);
     expect(KNOWN_ROUTE_PREFIXES.has('posts')).toBe(true);
     expect(KNOWN_ROUTE_PREFIXES.has('unknown')).toBe(false);
   });
@@ -19,6 +20,8 @@ describe('routeConfig', () => {
     expect(isStaticNonCacheRoute('/debate')).toBe(true);
     expect(isStaticNonCacheRoute('/tag/governance')).toBe(true);
     expect(isStaticNonCacheRoute('/contracts/0xabc')).toBe(true);
+    expect(isStaticNonCacheRoute('/docs')).toBe(true);
+    expect(isStaticNonCacheRoute('/docs/0xabc')).toBe(true);
     expect(isStaticNonCacheRoute('/docs/privacy')).toBe(true);
     expect(isStaticNonCacheRoute('/posts')).toBe(true);
     expect(isStaticNonCacheRoute('/posts/')).toBe(true);

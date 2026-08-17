@@ -2,6 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { execFileSync, spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -24,23 +25,44 @@ function withTempRepo(run) {
   }
 }
 
+function git(rootDir, args) {
+  return execFileSync('git', args, {
+    cwd: rootDir,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim();
+}
+
+function gitExitCode(rootDir, args) {
+  return spawnSync('git', args, {
+    cwd: rootDir,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).status;
+}
+
 test('repo test wiring invariants hold', () => {
   assert.deepEqual(verifyTestWiring(), []);
 });
 
-test('agent bridge tests are reachable through root CI and the workers job', () => {
-  const rootDir = path.resolve(__dirname, '..');
-  const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
-  const manifest = JSON.parse(fs.readFileSync(path.join(rootDir, 'scripts/ci-gates.json'), 'utf8'));
-  const workflow = fs.readFileSync(path.join(rootDir, '.github/workflows/ci.yml'), 'utf8');
-
-  assert.match(pkg.scripts['test:ci'], /run-ci-gates\.mjs --profile ci/);
-  assert.ok(manifest.profiles.ci.includes('workers'));
-  assert.ok(
-    manifest.gates.workers.commands
-      .some((entry) => entry.args.join(' ') === 'run test:worker:agent-bridge'),
-  );
-  assert.match(workflow, /run: npm run ci:gate -- workers/);
+test('Worker provenance checkouts include complete public history and tags', () => {
+  const repoRoot = path.resolve(__dirname, '..');
+  for (const [relativePath, resolveStep] of [
+    ['.github/workflows/ci.yml', '- name: Resolve private-to-public replay provenance'],
+    ['.github/workflows/publish-worker-bundles.yml', '- name: Resolve checked-out replay provenance'],
+    ['.github/workflows/promote-worker-bundles.yml', '- name: Resolve checked-out replay provenance'],
+  ]) {
+    const workflow = fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
+    const resolveIndex = workflow.indexOf(resolveStep);
+    const checkoutIndex = workflow.lastIndexOf('- name: Checkout', resolveIndex);
+    assert.notEqual(resolveIndex, -1, `${relativePath} must resolve Worker provenance`);
+    assert.notEqual(checkoutIndex, -1, `${relativePath} must check out the resolved source`);
+    assert.match(
+      workflow.slice(checkoutIndex, resolveIndex),
+      /fetch-depth: 0/,
+      `${relativePath} must fetch complete public history before resolving provenance`,
+    );
+  }
 });
 
 test('E2E preview readiness retries stay quiet but the final probe remains diagnostic', () => {
@@ -50,6 +72,117 @@ test('E2E preview readiness retries stay quiet but the final probe remains diagn
   assert.match(workflow, /if curl -fs "\$BASE_URL" >\/dev\/null; then/);
   assert.doesNotMatch(workflow, /if curl -fsS "\$BASE_URL" >\/dev\/null; then/);
   assert.match(workflow, /curl -fsS "\$BASE_URL" >\/dev\/null\s+npm run ci:gate -- e2e-smoke/);
+});
+
+test('release-staging PR verification uses the fetched PR head instead of merge HEAD', () => {
+  const rootDir = path.resolve(__dirname, '..');
+  const workflow = fs.readFileSync(path.join(rootDir, '.github/workflows/ci.yml'), 'utf8');
+
+  assert.match(
+    workflow,
+    /RELEASE_PR_HEAD_SHA: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/,
+  );
+  assert.match(
+    workflow,
+    /release_candidate_ref=HEAD\s+if \[ "\$RELEASE_EVENT_NAME" = "pull_request" \]; then\s+release_candidate_ref="\$RELEASE_PR_HEAD_SHA"\s+git fetch --no-tags origin "\$release_candidate_ref"\s+fi/,
+  );
+  assert.match(
+    workflow,
+    /git fetch --force --tags origin\s+node scripts\/worker-release-artifacts\.mjs verify-replay-range\s+\\\s+--base-ref origin\/main\s+\\\s+--candidate-ref "\$release_candidate_ref"/,
+  );
+  assert.match(
+    workflow,
+    /verify_args=\(verify-ref --candidate-ref "\$release_candidate_ref" --baseline-ref origin\/main\)/,
+  );
+});
+
+test('release workflow runs for nested release-staging branches', () => {
+  const rootDir = path.resolve(__dirname, '..');
+  const workflow = fs.readFileSync(path.join(rootDir, '.github/workflows/ci.yml'), 'utf8');
+
+  assert.match(workflow, /- 'release-staging\/\*\*'/);
+});
+
+test('release workflow fetches preserve public ancestry for exact release refs', () => {
+  const repoRoot = path.resolve(__dirname, '..');
+  const workflow = fs.readFileSync(path.join(repoRoot, '.github/workflows/ci.yml'), 'utf8');
+  const fetchCommands = Array.from(
+    workflow.matchAll(/^\s*(git fetch --no-tags[^\r\n]+)$/gm),
+    (match) => match[1].trim(),
+  );
+
+  assert.equal(fetchCommands.length, 4, 'expected every release no-tags fetch command');
+
+  withTempRepo((rootDir) => {
+    const originDir = path.join(rootDir, 'origin.git');
+    const sourceDir = path.join(rootDir, 'source');
+    const checkoutDir = path.join(rootDir, 'checkout');
+    fs.mkdirSync(sourceDir, { recursive: true });
+
+    git(rootDir, ['init', '--bare', originDir]);
+    git(sourceDir, ['init']);
+    git(sourceDir, ['config', 'user.name', 'Release Fixture']);
+    git(sourceDir, ['config', 'user.email', '[redacted-email]']);
+    git(sourceDir, ['branch', '-M', 'main']);
+
+    writeFile(sourceDir, 'public.txt', 'initial public release\n');
+    git(sourceDir, ['add', 'public.txt']);
+    git(sourceDir, ['commit', '-m', 'initial public release']);
+    const olderPublicSha = git(sourceDir, ['rev-parse', 'HEAD']);
+
+    writeFile(sourceDir, 'public.txt', 'current public release\n');
+    git(sourceDir, ['add', 'public.txt']);
+    git(sourceDir, ['commit', '-m', 'advance public main']);
+    const mainSha = git(sourceDir, ['rev-parse', 'HEAD']);
+
+    git(sourceDir, ['switch', '-c', 'release-staging']);
+    writeFile(sourceDir, 'candidate.txt', 'previous staging candidate\n');
+    git(sourceDir, ['add', 'candidate.txt']);
+    git(sourceDir, ['commit', '-m', 'prepare staging candidate']);
+    const previousStagingSha = git(sourceDir, ['rev-parse', 'HEAD']);
+
+    writeFile(sourceDir, 'candidate.txt', 'current staging candidate\n');
+    git(sourceDir, ['add', 'candidate.txt']);
+    git(sourceDir, ['commit', '-m', 'advance staging candidate']);
+    const releaseCandidateSha = git(sourceDir, ['rev-parse', 'HEAD']);
+
+    git(sourceDir, ['remote', 'add', 'origin', originDir]);
+    git(sourceDir, ['push', 'origin', 'main', 'release-staging']);
+    git(rootDir, ['--git-dir', originDir, 'symbolic-ref', 'HEAD', 'refs/heads/main']);
+    git(rootDir, ['clone', '--no-local', originDir, checkoutDir]);
+
+    assert.equal(git(checkoutDir, ['rev-parse', 'origin/main']), mainSha);
+    assert.equal(git(checkoutDir, ['rev-parse', '--is-shallow-repository']), 'false');
+
+    for (const command of fetchCommands) {
+      const expanded = command
+        .replace('"$release_candidate_ref"', releaseCandidateSha)
+        .replace('"$RELEASE_PUSH_BEFORE_SHA"', previousStagingSha);
+      const [executable, ...args] = expanded.split(/\s+/);
+      assert.equal(executable, 'git');
+      assert.doesNotMatch(expanded, /\$/);
+      git(checkoutDir, args);
+    }
+
+    assert.deepEqual(
+      {
+        isShallow: git(checkoutDir, ['rev-parse', '--is-shallow-repository']),
+        mainRemainsAncestor: gitExitCode(
+          checkoutDir,
+          ['merge-base', '--is-ancestor', 'origin/main', releaseCandidateSha],
+        ),
+        olderPublicRemainsAncestor: gitExitCode(
+          checkoutDir,
+          ['merge-base', '--is-ancestor', olderPublicSha, releaseCandidateSha],
+        ),
+      },
+      {
+        isShallow: 'false',
+        mainRemainsAncestor: 0,
+        olderPublicRemainsAncestor: 0,
+      },
+    );
+  });
 });
 
 test('agent bridge runner skips cleanly when a public artifact omits the worker', () => {
@@ -100,7 +233,6 @@ test('public-release style copies without .git still pass wiring checks', () => 
           'typecheck:client-tests': 'node scripts/check-client-test-types.mjs',
           'worker:bundle': 'node scripts/worker-bundle.mjs',
           'deploy-helper:deploy': 'node scripts/deploy-helper-deploy.mjs',
-          'verify:worker-bundle': 'node scripts/verify-worker-bundle-sync.mjs',
           'verify:public-release-surface': 'node scripts/verify-public-release-surface.js',
           'verify:public-assets': 'node scripts/verify-public-assets.js',
           'verify:public-text': 'node scripts/verify-public-text.js',
@@ -115,6 +247,10 @@ test('public-release style copies without .git still pass wiring checks', () => 
       rootDir,
       '.github/workflows/ci.yml',
       [
+        'on:',
+        '  push:',
+        '    branches:',
+        "      - 'release-staging/**'",
         'jobs:',
         '  wiring-and-release:',
         '    steps:',
@@ -122,7 +258,9 @@ test('public-release style copies without .git still pass wiring checks', () => 
         '        with:',
         '          fetch-depth: 0',
         '      - run: node scripts/resolve-baseline-growth-approval.mjs',
-        '      - run: node scripts/resolve-baseline-monotonicity-base.mjs',
+        '      - run: |',
+        '          git fetch --no-tags origin main',
+        '          node scripts/resolve-baseline-monotonicity-base.mjs',
         '      - env:',
         '          BASELINE_MONOTONICITY_BASE: ${{ steps.baseline-monotonicity-base.outputs.base_sha }}',
         '          BASELINE_MONOTONICITY_APPROVED: ${{ steps.baseline-growth-approval.outputs.approved }}',
@@ -130,7 +268,25 @@ test('public-release style copies without .git still pass wiring checks', () => 
         '      - run: npm run ci:gate -- wiring-and-release',
         '      - run: npm run ci:gate -- public-text',
         '      - run: node scripts/worker-release-artifacts.mjs stage',
-        '      - run: node scripts/release-version.mjs verify-ref --candidate-ref HEAD --baseline-ref origin/main',
+        '      - env:',
+        '          RELEASE_EVENT_NAME: ${{ github.event_name }}',
+        '          RELEASE_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}',
+        '          RELEASE_PUSH_BEFORE_SHA: ${{ github.event.before }}',
+        '        run: |',
+        '          git fetch --no-tags origin main',
+        '          release_candidate_ref=HEAD',
+        '          if [ "$RELEASE_EVENT_NAME" = "pull_request" ]; then',
+        '            release_candidate_ref="$RELEASE_PR_HEAD_SHA"',
+        '            git fetch --no-tags origin "$release_candidate_ref"',
+        '          fi',
+        '          git fetch --force --tags origin',
+        '          node scripts/worker-release-artifacts.mjs verify-replay-range --candidate-ref "$release_candidate_ref"',
+        '          verify_args=(verify-ref --candidate-ref "$release_candidate_ref" --baseline-ref origin/main)',
+        '          if [ "$RELEASE_EVENT_NAME" = "push" ] && [ "$RELEASE_PUSH_BEFORE_SHA" != "$ZERO_OID" ]; then',
+        '            git fetch --no-tags origin "$RELEASE_PUSH_BEFORE_SHA"',
+        '            verify_args+=(--minimum-ref "$RELEASE_PUSH_BEFORE_SHA")',
+        '          fi',
+        '          node scripts/release-version.mjs "${verify_args[@]}"',
         '      - uses: actions/upload-artifact@1111111111111111111111111111111111111111',
         '        with:',
         '          name: worker-bundle-candidate-${{ github.sha }}',
@@ -186,6 +342,10 @@ test('public-release style copies without .git still pass wiring checks', () => 
         '/.github/workflows/publish-worker-bundles.yml @AgalmicSoftware',
         '/.github/workflows/promote-worker-bundles.yml @AgalmicSoftware',
         '/.github/workflows/public-drift.yml @AgalmicSoftware',
+        '/.githooks/pre-push @AgalmicSoftware',
+        '/scripts/pre-push-guard.test.js @AgalmicSoftware',
+        '/scripts/release-version.mjs @AgalmicSoftware',
+        '/scripts/release-version.test.mjs @AgalmicSoftware',
         '/scripts/check-baseline-monotonicity.mjs @AgalmicSoftware',
         '/scripts/resolve-baseline-monotonicity-base.mjs @AgalmicSoftware',
         '/scripts/resolve-baseline-growth-approval.mjs @AgalmicSoftware',
@@ -194,6 +354,9 @@ test('public-release style copies without .git still pass wiring checks', () => 
         '/scripts/run-ci-gates.test.mjs @AgalmicSoftware',
         '/scripts/worker-release-artifacts.mjs @AgalmicSoftware',
         '/scripts/worker-release-artifacts.test.mjs @AgalmicSoftware',
+        '/scripts/verify-public-release-pii.sh @AgalmicSoftware',
+        '/scripts/verify-public-release-pii.test.js @AgalmicSoftware',
+        '/scripts/lib/public-release-strip-patterns.sh @AgalmicSoftware',
         '/scripts/sync-public-history.sh @AgalmicSoftware',
         '/scripts/client-boundaries-baseline.json @AgalmicSoftware',
         '/scripts/type-debt-baseline.json @AgalmicSoftware',
@@ -285,8 +448,10 @@ test('public-release style copies without .git still pass wiring checks', () => 
       'scripts/deploy-helper-deploy.mjs',
       'scripts/run-node-tests.js',
       'scripts/run-node-tests.test.js',
+      '.githooks/pre-push',
       'scripts/pre-push-guard.test.js',
       'scripts/release-version.mjs',
+      'scripts/release-version.test.mjs',
       'scripts/check-client-boundaries.mjs',
       'scripts/check-client-boundaries.test.mjs',
       'scripts/client-boundaries-baseline.json',
@@ -335,8 +500,6 @@ test('public-release style copies without .git still pass wiring checks', () => 
       'scripts/verify-test-inventory.test.js',
       'scripts/vite-navigation-smoke.js',
       'scripts/vite-navigation-smoke.test.js',
-      'scripts/verify-worker-bundle-sync.mjs',
-      'scripts/verify-worker-bundle-sync.test.js',
       'scripts/verify-public-release-surface.js',
       'scripts/verify-public-release-surface.test.js',
       'scripts/verify-public-docs.js',
@@ -348,6 +511,7 @@ test('public-release style copies without .git still pass wiring checks', () => 
       'scripts/verify-prepared-public-text.sh',
       'scripts/verify-public-release-pii.sh',
       'scripts/verify-public-release-pii.test.js',
+      'scripts/lib/public-release-strip-patterns.sh',
       'scripts/run-agent-bridge-worker-tests.js',
       'workers/sessionCorsWorker/package.json',
       'workers/agentBridgeWorker/package.json',

@@ -318,7 +318,7 @@ test('authenticated storage binding loads production session secrets with env an
 		deps: {
 			json,
 			getSessionSecrets,
-			createArweaveUploadWithWorkerDeps: () => async (value) => {
+			arweaveUpload: async (value) => {
 				uploadContext = value;
 				return json({ id: TX_ID }, 200);
 			},

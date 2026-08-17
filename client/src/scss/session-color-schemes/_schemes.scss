@@ -1,0 +1,39 @@
+// Session schemes are a narrow, color-only contract. Values are bundled here
+// and session metadata stores only one allowlisted scheme identifier.
+[data-ce-session-color-scheme='context-engine'] {
+  --ce-session-accent: #4dffa4;
+  --ce-session-accent-hover: #78ffbd;
+  --ce-session-accent-contrast: #08120d;
+  --ce-session-chrome: #25295e;
+  --ce-session-chrome-contrast: #f4f7ff;
+  --ce-session-focus: #8ab4ff;
+}
+
+[data-ce-session-color-scheme='ocean'] {
+  --ce-session-accent: #63c5ff;
+  --ce-session-accent-hover: #92d8ff;
+  --ce-session-accent-contrast: #07131d;
+  --ce-session-chrome: #0d2c3f;
+  --ce-session-chrome-contrast: #f5fbff;
+  --ce-session-focus: #ffd166;
+}
+
+[data-ce-session-color-scheme='amber'] {
+  --ce-session-accent: #ffca5c;
+  --ce-session-accent-hover: #ffd982;
+  --ce-session-accent-contrast: #1d1400;
+  --ce-session-chrome: #3b2600;
+  --ce-session-chrome-contrast: #fff8e8;
+  --ce-session-focus: #7dd3fc;
+}
+
+@media (forced-colors: active) {
+  [data-ce-session-color-scheme] {
+    --ce-session-accent: Highlight;
+    --ce-session-accent-hover: Highlight;
+    --ce-session-accent-contrast: HighlightText;
+    --ce-session-chrome: Canvas;
+    --ce-session-chrome-contrast: CanvasText;
+    --ce-session-focus: Highlight;
+  }
+}

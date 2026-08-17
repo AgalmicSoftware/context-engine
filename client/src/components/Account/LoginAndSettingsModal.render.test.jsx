@@ -573,6 +573,19 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(screen.queryByRole('button', { name: /Resource keys/i })).not.toBeInTheDocument();
   });
 
+  it('keeps the simplified theme control as the final signed-in settings section', () => {
+    const subject = buildWrongNetworkSubject({ aiSettingsOpen: true });
+
+    render(subject.getSettingsDisplay());
+
+    const aiConfigSection = screen.getByRole('button', { name: /AI config/i });
+    const appearanceSection = screen.getByRole('button', { name: /Appearance & colors/i });
+    expect(aiConfigSection.compareDocumentPosition(appearanceSection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByTestId('ce-settings-theme')).toHaveAccessibleName('App theme');
+    expect(screen.queryByText('Bundled app themes')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Changes the complete app appearance/i)).not.toBeInTheDocument();
+  });
+
   it('preserves PUBLIC_URL when building the active-session link', () => {
     process.env.PUBLIC_URL = '/ce/';
     const subject = buildWrongNetworkSubject();
@@ -696,6 +709,10 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     await openPreLoginSettingsDrawer();
 
     expect(screen.getByTestId('ce-prelogin-settings-panel')).toBeInTheDocument();
+    expect(screen.getByText('Appearance & colors')).toBeInTheDocument();
+    expect(screen.getByTestId('ce-settings-theme')).toHaveAccessibleName('App theme');
+    expect(screen.queryByText('Bundled app themes')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Changes the complete app appearance/i)).not.toBeInTheDocument();
     expect(document.getElementById('preLoginTooltipsToggleTooltip')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Explainers On' }));
@@ -804,7 +821,9 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
       expect(screen.getByText('Connect wallet')).toBeInTheDocument();
       expect(screen.getAllByText('Sponsored').length).toBeGreaterThan(0);
       expect(screen.getByRole('link', { name: 'Open session Demo Session' })).toBeInTheDocument();
-      expect(screen.getAllByText('configured here').length).toBeGreaterThan(0);
+      const sponsoredSessionDetail = screen.getAllByText(/A sponsor key is configured/i)[0];
+      expect(sponsoredSessionDetail.parentElement).toHaveTextContent(/Demo Session/i);
+      expect(screen.queryByText('configured here')).not.toBeInTheDocument();
     });
   });
 
@@ -843,7 +862,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(screen.getByLabelText('AI endpoint')).toBeInTheDocument();
   });
 
-  it('keeps the logged-out footer gear-only until the settings drawer opens', async () => {
+  it('keeps Session outside the logged-out settings drawer and the preferences inside it', async () => {
     const props = buildProps({
       demoSurfaceMode: true,
       setDemoSurfaceMode: jest.fn(),
@@ -851,7 +870,10 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(<LoginAndSettingsModal {...props} />);
 
+    const sessionSummary = screen.getByLabelText(/^Active session:/);
     expect(screen.queryByRole('button', { name: 'Demo Mode On' })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-prelogin-settings-panel')).not.toBeInTheDocument();
+    expect(sessionSummary).toBeInTheDocument();
 
     await openPreLoginSettingsDrawer();
 
@@ -861,6 +883,8 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(demoToggle).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getAllByRole('button', { name: 'Demo Mode On' })).toHaveLength(1);
     expect(panel).toContainElement(demoToggle);
+    expect(panel).not.toContainElement(sessionSummary);
+    expect(within(panel).queryByText('SESSION')).not.toBeInTheDocument();
 
     fireEvent.click(demoToggle);
 
@@ -1329,7 +1353,11 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(screen.queryByText('RPC scan scope')).not.toBeInTheDocument();
     expect(screen.queryByText(/Gate status is evaluated against the active session/i)).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open session Demo Session' })).toBeInTheDocument();
-    expect(screen.getAllByText('configured here').length).toBeGreaterThan(0);
+    const sponsoredSessionDetail = screen.getAllByText(
+      /Sponsored key is available for the active session|A sponsor key is configured/i,
+    )[0];
+    expect(sponsoredSessionDetail.parentElement).toHaveTextContent(/Demo Session/i);
+    expect(screen.queryByText('configured here')).not.toBeInTheDocument();
     expect(screen.queryAllByText('Edge Session')).toHaveLength(0);
 
     expect(screen.getByRole('button', { name: 'Show other AI sponsor sessions' })).toBeInTheDocument();

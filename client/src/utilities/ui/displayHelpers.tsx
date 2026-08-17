@@ -64,7 +64,7 @@ export const getShortenedSurveyID = (
         href={link}
         target="_blank"
         rel="noopener noreferrer"
-        style={{ padding: '0px', color: 'blue', marginLeft: '5px' }}
+        style={{ padding: '0px', color: 'var(--ce-link)', marginLeft: '5px' }}
       >
         {displayString}
       </NavLink>

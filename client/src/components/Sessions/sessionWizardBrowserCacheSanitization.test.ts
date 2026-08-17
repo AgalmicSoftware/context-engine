@@ -34,6 +34,11 @@ describe('sanitizeSessionWizardDraftForBrowserCache', () => {
       },
       storage: { cloudflare: { apiToken: 'cloudflare-secret', bucket: 'safe-bucket' } },
       sponsored: { faucetGrantToken: 'grant-secret', enabled: true },
+      appearance: {
+        colorSchemeId: 'ocean',
+        '--ce-session-accent': '#ffffff',
+        stylesheet: 'https://example.invalid/theme.css',
+      },
       encryptedFields: {
         'ai.providers.openai.apiKey': 'encrypted-secret',
         sessionInfo: 'safe-encrypted-session-info',
@@ -57,6 +62,7 @@ describe('sanitizeSessionWizardDraftForBrowserCache', () => {
         },
         storage: { cloudflare: { bucket: 'safe-bucket' } },
         sponsored: { enabled: true },
+        appearance: { colorSchemeId: 'ocean' },
         encryptedFields: { sessionInfo: 'safe-encrypted-session-info' },
         encryptedFieldGates: { sessionInfo: 'gate-public' },
       }),
@@ -66,5 +72,14 @@ describe('sanitizeSessionWizardDraftForBrowserCache', () => {
     expect(JSON.stringify(sanitized)).not.toContain('secret');
     expect(JSON.stringify(sanitized)).not.toContain('lit-auth');
     expect(JSON.stringify(sanitized)).not.toContain('credential');
+  });
+
+  it('falls back to the default ID and removes the superseded session theme shape', () => {
+    expect(
+      sanitizeSessionWizardDraftForBrowserCache({
+        appearance: { colorSchemeId: '../custom.scss' },
+        theme: { id: 'classic-95', brand: { primary: '#ffffff' } },
+      }),
+    ).toEqual({ appearance: { colorSchemeId: 'context-engine' } });
   });
 });

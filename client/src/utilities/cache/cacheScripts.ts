@@ -13,6 +13,7 @@ import {
   set as idbSet,
 } from './cacheScripts.idb.impl.js';
 import { createLogger } from '../logging.js';
+import { DG_MANAGED_CACHE_NAMESPACE_LIST } from './sessionCacheConstants.js';
 
 const cacheLog = createLogger('cacheScripts');
 
@@ -114,16 +115,7 @@ const safeClone = <T>(value: T): T => {
   return JSON.parse(JSON.stringify(value)) as T;
 };
 
-const MANAGED_NAMESPACE_LIST = [
-  'questionsCache',
-  'surveysCache',
-  'bookmarksCache',
-  'filters',
-  'sbtCache',
-  'userCache',
-  'analysisCache',
-];
-const MANAGED_NAMESPACES = new Set(MANAGED_NAMESPACE_LIST);
+const MANAGED_NAMESPACES = new Set(DG_MANAGED_CACHE_NAMESPACE_LIST);
 
 const mirrorByKey = new Map<string, CacheValue>();
 const mirrorByNamespace = new Map<string, Map<string, CacheValue>>();

@@ -27,6 +27,7 @@ export type NormalModeCardsInput = {
   canUseSponsoredAutoDeployNow: boolean;
   publishReadiness: Pick<SessionWizardPublishReadinessDescriptor, 'canPublishNow' | 'uploadBlockedReason'>;
   isWorkerCanonical: boolean;
+  usesWorkerRuntime: boolean;
   deployPendingSbts: boolean;
   publishesPendingSbts?: boolean;
   usesLit?: boolean;
@@ -80,6 +81,7 @@ export function buildNormalModeCards(opts: NormalModeCardsInput): NormalModeCard
     canUseSponsoredAutoDeployNow,
     publishReadiness,
     isWorkerCanonical,
+    usesWorkerRuntime,
     deployPendingSbts,
     publishesPendingSbts = false,
     usesLit = false,
@@ -89,7 +91,7 @@ export function buildNormalModeCards(opts: NormalModeCardsInput): NormalModeCard
   const normalizedSessionName = normalizeDisplayString(sessionName);
   const privacyTone: NormalModeCardTone = configuredPrivateGateCount || privateSlugMode ? 'ready' : 'neutral';
   const workerTone: NormalModeCardTone = normalModeRequiresCustomWorker
-    ? resolvedWorkerBaseUrl
+    ? resolvedWorkerBaseUrl && deployVerifiedInUi
       ? 'ready'
       : 'pending'
     : workerMode === 'default' || deployVerifiedInUi
@@ -100,17 +102,25 @@ export function buildNormalModeCards(opts: NormalModeCardsInput): NormalModeCard
     ? [
         {
           key: 'worker',
-          title: isWorkerCanonical ? 'Session Worker' : 'Worker',
+          title: usesWorkerRuntime ? 'Session Worker' : 'Worker',
           summary: normalModeRequiresCustomWorker
             ? resolvedWorkerBaseUrl
-              ? isWorkerCanonical
-                ? 'Worker URL configured; verify canonical config and browser access.'
-                : 'Your worker URL is configured.'
+              ? !deployVerifiedInUi
+                ? 'Worker URL saved; deploy or reverify it before publishing.'
+                : isWorkerCanonical
+                  ? 'Worker URL configured; verify canonical config and browser access.'
+                  : usesWorkerRuntime
+                    ? 'Compatible Session Worker URL configured; the EVM registry and Arweave remain canonical.'
+                    : 'Your worker URL is configured.'
               : isWorkerCanonical
                 ? 'Complete the Cloudflare dashboard handoff, then verify the Worker URL.'
-                : 'Deploy or paste your own worker URL.'
+                : usesWorkerRuntime
+                  ? 'Deploy or attach a compatible Session Worker; the EVM registry and Arweave remain canonical.'
+                  : 'Deploy or paste your own worker URL.'
             : workerMode === 'default'
-              ? 'Using the shared default worker.'
+              ? usesWorkerRuntime && !isWorkerCanonical
+                ? 'Using the shared default Session Worker; the EVM registry and Arweave remain canonical.'
+                : 'Using the shared default worker.'
               : deployVerifiedInUi
                 ? 'Custom worker deployed in this run.'
                 : 'Custom worker setup is available here.',
@@ -149,7 +159,9 @@ export function buildNormalModeCards(opts: NormalModeCardsInput): NormalModeCard
             : 'Deploy saves and verifies canonical config in the Session Worker.'
           : canUseSponsoredAutoDeployNow
             ? 'Publish will deploy the sponsored worker before uploading metadata.'
-            : 'Review the setup and deploy when ready.'
+            : usesWorkerRuntime
+              ? 'Publish uses the Session Worker runtime, uploads metadata to Arweave, and registers on-chain.'
+              : 'Review the setup and deploy when ready.'
         : uploadBlockedReason,
       tone: publishTone,
     },
@@ -210,7 +222,9 @@ export function buildNormalModePublishSummary(opts: NormalModePublishSummaryInpu
                 ? 'Sponsored auto-deploy waiting for the hosted bundle URL'
                 : normalModeRequiresCustomWorker
                   ? resolvedWorkerBaseUrl
-                    ? 'Custom worker ready'
+                    ? deployVerifiedInUi
+                      ? 'Custom worker ready'
+                      : 'Custom worker awaiting verification'
                     : 'Bring your own worker'
                   : workerMode === 'default'
                     ? 'Shared hosted worker'

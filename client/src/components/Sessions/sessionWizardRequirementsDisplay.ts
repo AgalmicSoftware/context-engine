@@ -5,8 +5,10 @@ import { resolveSessionWizardResourceSecretFields } from './sessionWizardResourc
 type SessionWizardRecord = Record<string, unknown>;
 
 type ResolveSessionWizardNewSessionRequirementsDisplayStateArgs = {
+  canUseSponsoredAutoDeployNow?: unknown;
   cloudflareWorkerSbtGateMode?: unknown;
   currentWorkerSecrets?: SessionWizardRecord | null;
+  hasCompatibleWorkerRuntime?: unknown;
   hasPendingSbtDrafts?: unknown;
   hasSponsoredBundleLink?: unknown;
   isNewSessionWizardRoute?: unknown;
@@ -27,6 +29,7 @@ type SessionWizardNewSessionRequirementsDisplayState = {
   hasNewSessionLitRequirementCovered: boolean;
   isNewSessionBannerDismissedForCurrentContext: boolean;
   newSessionRequiresLitCredential: boolean;
+  requiredAiProviderKeyLabels: string[];
   requiredRequirementIds: SessionWizardRequirementId[];
   shouldRespectPersistedNewSessionBannerDismissal: boolean;
   showNewSessionRequirementsBanner: boolean;
@@ -38,8 +41,10 @@ type SessionWizardNewSessionRequirementsDisplayState = {
 const toRequirementString = (value: unknown): string => String(value ?? '');
 
 export const resolveSessionWizardNewSessionRequirementsDisplayState = ({
+  canUseSponsoredAutoDeployNow = false,
   cloudflareWorkerSbtGateMode = false,
   currentWorkerSecrets = null,
+  hasCompatibleWorkerRuntime = false,
   hasPendingSbtDrafts = false,
   hasSponsoredBundleLink = false,
   isNewSessionWizardRoute = false,
@@ -59,10 +64,11 @@ export const resolveSessionWizardNewSessionRequirementsDisplayState = ({
   const hasAnyAiProviderKey = ['openaiKey', 'anthropicKey', 'openrouterKey'].some(
     (key) => !!toRequirementString(currentWorkerSecrets?.[key]).trim(),
   );
-  const hasNewSessionAiRequirementCovered = modeRequirements.isWorkerCanonical
-    ? resolveSessionWizardResourceSecretFields('ai', sessionAi).every(
-        (field) => !!toRequirementString(currentWorkerSecrets?.[field.key]).trim(),
-      )
+  const requiredAiProviderKeyFields = modeRequirements.selected
+    ? resolveSessionWizardResourceSecretFields('ai', sessionAi)
+    : [];
+  const hasNewSessionAiRequirementCovered = modeRequirements.selected
+    ? requiredAiProviderKeyFields.every((field) => !!toRequirementString(currentWorkerSecrets?.[field.key]).trim())
     : hasAnyAiProviderKey;
   const hasNewSessionArweaveRequirementCovered =
     (modeRequirements.selected && !modeRequirements.requiresArweave) ||
@@ -81,9 +87,11 @@ export const resolveSessionWizardNewSessionRequirementsDisplayState = ({
   const requiresCloudflareDeploy = modeRequirements.requiredRequirementIds.some(
     (requirementId) => requirementId === 'cloudflareAccount' || requirementId === 'cloudflareApiToken',
   );
-  const hasNewSessionDeployRequirementCovered =
-    (modeRequirements.selected && !requiresCloudflareDeploy) ||
-    !!toRequirementString(normalizedAppliedSponsoredBundle?.deployGrantToken).trim();
+  const requiresSessionWorker = modeRequirements.requiredRequirementIds.includes('sessionWorker');
+  const hasNewSessionDeployRequirementCovered = requiresSessionWorker
+    ? !!hasCompatibleWorkerRuntime || !!canUseSponsoredAutoDeployNow
+    : (modeRequirements.selected && !requiresCloudflareDeploy) ||
+      !!toRequirementString(normalizedAppliedSponsoredBundle?.deployGrantToken).trim();
   const sponsoredBundleCoversNewSessionRequirements =
     sponsoredBundleStatusTone === 'success' &&
     hasNewSessionAiRequirementCovered &&
@@ -111,6 +119,7 @@ export const resolveSessionWizardNewSessionRequirementsDisplayState = ({
     hasNewSessionLitRequirementCovered,
     isNewSessionBannerDismissedForCurrentContext,
     newSessionRequiresLitCredential,
+    requiredAiProviderKeyLabels: requiredAiProviderKeyFields.map((field) => field.label),
     requiredRequirementIds: modeRequirements.requiredRequirementIds,
     shouldRespectPersistedNewSessionBannerDismissal,
     showNewSessionRequirementsBanner,

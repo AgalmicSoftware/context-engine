@@ -20,7 +20,6 @@ const mockPolisReport = jest.fn();
 const mockSBTsPage = jest.fn();
 const mockDebateMap = jest.fn();
 const mockRiskMatrix = jest.fn();
-const mockDebateSelector = jest.fn();
 const mockDemoAnalysisWorkspace = jest.fn();
 const originalFetch = global.fetch;
 const fullCrossCorpusPayload = JSON.parse(
@@ -143,11 +142,6 @@ jest.mock('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace', () => ({
     return <div data-testid="demo-analysis-workspace-view">Demo Analysis</div>;
   },
 }));
-jest.mock('../DemoViews/DebateHUD/DebateSelector', () => (props) => {
-  mockDebateSelector(props);
-  return <div data-testid="debate-selector">Debate Selector</div>;
-});
-
 describe('OnePageSession auto-mint queue', () => {
   afterEach(() => {
     jest.useRealTimers();
@@ -212,7 +206,7 @@ describe('OnePageSession auto-mint queue', () => {
   const getAutoMintStorageKey = (account, sbtAddress, chainId = 84532) =>
     `autoMint:${String(account || '').toLowerCase()}:${chainId}:${String(sbtAddress || '').toLowerCase()}`;
 
-  it('uses getNativeBalance for auto-mint balance checks when the legacy getETHBalance alias is unavailable', async () => {
+  it('uses getNativeBalance for auto-mint balance checks', async () => {
     const subject = createSubject({
       sessionConfig: {
         ...buildProps().sessionConfig,
@@ -223,17 +217,10 @@ describe('OnePageSession auto-mint queue', () => {
     const nativeBalanceSpy = jest
       .spyOn(contractScripts, 'getNativeBalance')
       .mockResolvedValue(ethers.utils.parseEther('0.1'));
-    const originalLegacyReader = contractScripts.getETHBalance;
+    const ok = await subject.waitForSufficientBalance('mock', account, ethers.utils.parseEther('0.00002'), 50, 1);
 
-    try {
-      delete contractScripts.getETHBalance;
-      const ok = await subject.waitForSufficientBalance('mock', account, ethers.utils.parseEther('0.00002'), 50, 1);
-
-      expect(ok).toBe(true);
-      expect(nativeBalanceSpy).toHaveBeenCalledWith(account, expect.any(String));
-    } finally {
-      contractScripts.getETHBalance = originalLegacyReader;
-    }
+    expect(ok).toBe(true);
+    expect(nativeBalanceSpy).toHaveBeenCalledWith(account, expect.any(String));
   });
 
   it('pins the session slug on auto-mint status links', () => {
@@ -377,6 +364,109 @@ describe('OnePageSession auto-mint queue', () => {
     } finally {
       window.history.replaceState({}, '', originalUrl || '/');
     }
+  });
+
+  it('cancels a queued target before ownership checks when the wallet changes during metadata loading', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000c4';
+    const accountA = '0x00000000000000000000000000000000000000c5';
+    const accountB = '0x00000000000000000000000000000000000000c6';
+    let resolveMetadata;
+    const metadataPromise = new Promise((resolve) => {
+      resolveMetadata = resolve;
+    });
+    const subject = createSubject({
+      account: accountA,
+      loginComplete: true,
+      slug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      autoMintTargets: [{ sbt: sbtAddress }],
+    };
+
+    jest.spyOn(contractScriptsModule, 'getAllSessionSlugs').mockReturnValue([]);
+    const cacheReadSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({});
+    const metadataSpy = jest.spyOn(contractScripts, 'getSbtMetadata').mockReturnValue(metadataPromise);
+    const groupHashSpy = jest
+      .spyOn(contractScripts, 'getGroupPasswordHash')
+      .mockResolvedValue(ethers.constants.HashZero);
+    const claimSpy = jest.spyOn(contractScripts, 'claim').mockResolvedValue({ transactionHash: '0xclaim' });
+    subject.waitForSufficientBalance = jest.fn().mockResolvedValue(true);
+
+    const queueRun = subject.runAutoMintQueue();
+    expect(metadataSpy).toHaveBeenCalledTimes(1);
+    subject.props = { ...subject.props, account: accountB };
+    resolveMetadata({
+      name: 'Identity-bound Badge',
+      tokenURI: 'ar://identity-bound-badge',
+      hasPasswordMint: false,
+      maxTokens: '0',
+    });
+    await queueRun;
+
+    expect(cacheReadSpy).toHaveBeenCalledTimes(1);
+    expect(groupHashSpy).not.toHaveBeenCalled();
+    expect(subject.waitForSufficientBalance).not.toHaveBeenCalled();
+    expect(claimSpy).not.toHaveBeenCalled();
+    expect(window.sessionStorage.getItem(getAutoMintStorageKey(accountA, sbtAddress))).toBeNull();
+    expect(window.sessionStorage.getItem(getAutoMintStorageKey(accountB, sbtAddress))).toBeNull();
+    expect(subject.state.autoMintStatuses[sbtAddress.toLowerCase()]).toMatchObject({
+      status: 'info',
+      name: 'Skipped (wallet changed)',
+    });
+  });
+
+  it('does not submit or consume a queued target when the wallet changes during the balance gate', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000c7';
+    const accountA = '0x00000000000000000000000000000000000000c8';
+    const accountB = '0x00000000000000000000000000000000000000c9';
+    let resolveBalanceGate;
+    const balanceGatePromise = new Promise((resolve) => {
+      resolveBalanceGate = resolve;
+    });
+    const subject = createSubject({
+      account: accountA,
+      loginComplete: true,
+      slug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      autoMintTargets: [{ sbt: sbtAddress }],
+    };
+
+    jest.spyOn(contractScriptsModule, 'getAllSessionSlugs').mockReturnValue([]);
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({});
+    jest.spyOn(contractScripts, 'getSbtMetadata').mockResolvedValue({
+      name: 'Balance-gated Badge',
+      tokenURI: 'ar://balance-gated-badge',
+      hasPasswordMint: false,
+      maxTokens: '0',
+    });
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
+    const claimSpy = jest.spyOn(contractScripts, 'claim').mockResolvedValue({ transactionHash: '0xclaim' });
+    subject.waitForSufficientBalance = jest.fn().mockReturnValue(balanceGatePromise);
+
+    const queueRun = subject.runAutoMintQueue();
+    await waitFor(() =>
+      expect(subject.waitForSufficientBalance).toHaveBeenCalledWith(
+        'wagmi',
+        accountA.toLowerCase(),
+        expect.anything(),
+        expect.any(Number),
+        expect.any(Number),
+      ),
+    );
+    subject.props = { ...subject.props, account: accountB };
+    resolveBalanceGate(true);
+    await queueRun;
+
+    expect(claimSpy).not.toHaveBeenCalled();
+    expect(window.sessionStorage.getItem(getAutoMintStorageKey(accountA, sbtAddress))).toBeNull();
+    expect(window.sessionStorage.getItem(getAutoMintStorageKey(accountB, sbtAddress))).toBeNull();
+    expect(subject.state.autoMintStatuses[sbtAddress.toLowerCase()]).toMatchObject({
+      status: 'info',
+      name: 'Skipped (wallet changed)',
+    });
   });
 
   it('does not consume public auto-mint attempts when a claim fails before succeeding later', async () => {
@@ -777,7 +867,12 @@ describe('OnePageSession auto-mint queue', () => {
     await subject.runAutoMintQueue();
 
     expect(subject.verifyGroupPasswordBinding).toHaveBeenCalledWith(sbtAddress, 'shared-secret');
-    expect(subject.mintUnlimitedSBTWithGroupPassword).toHaveBeenCalledWith(sbtAddress, 'shared-secret');
+    expect(subject.mintUnlimitedSBTWithGroupPassword).toHaveBeenCalledWith(
+      sbtAddress,
+      'shared-secret',
+      subject.props.account.toLowerCase(),
+      'wagmi',
+    );
     expect(subject.state.autoMintStatuses[sbtAddress.toLowerCase()]).toMatchObject({
       status: 'success',
       name: 'Joined: Unlimited Badge',

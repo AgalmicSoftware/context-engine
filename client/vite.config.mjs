@@ -5,11 +5,16 @@ import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv, transformWithEsbuild } from 'vite';
 import { createBundleReportPlugin } from './scripts/bundle-report.mjs';
 import { writePostSocialPreviewHtml } from './scripts/post-social-preview.mjs';
+import { transformGroupPasswordDerivationCommonJs } from './scripts/source-commonjs-compatibility.mjs';
+import { normalizeThemeIdForHtml } from './scripts/theme-registry-core.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const srcDir = path.resolve(__dirname, 'src');
 const publicDir = path.resolve(__dirname, 'public');
 const postsDir = path.resolve(__dirname, '..', 'posts');
+const groupPasswordDerivationCjsPath = path.resolve(srcDir, 'utilities', 'crypto', 'groupPasswordDerivation.cjs');
+const themeRegistry = JSON.parse(fs.readFileSync(path.resolve(srcDir, 'scss', 'themes', 'registry.json'), 'utf8'));
+const themeIds = Object.freeze(themeRegistry.themes.map(({ id }) => String(id)));
 const headers = {
   'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
   'Cross-Origin-Embedder-Policy': 'unsafe-none',
@@ -19,6 +24,10 @@ const normalizePublicUrlForHtml = (raw) => {
   const value = String(raw || '').trim();
   if (!value || value === '/') return '';
   return value.replace(/\/+$/, '');
+};
+
+export const normalizeDeploymentThemeForHtml = (raw) => {
+  return normalizeThemeIdForHtml(raw, themeRegistry);
 };
 
 const normalizeBase = (raw) => {
@@ -221,6 +230,11 @@ const manualChunkGroups = [
 
 export const resolveManualChunk = (id) => {
   const normalizedId = String(id || '').split(path.sep).join('/');
+  // Keep the synchronous question seed cacheable without folding it back into
+  // AppShell; the full demo-2 results fixture remains owned by lazy consumers.
+  if (normalizedId.includes('/src/variables/demo/demo_2_question_seed.json')) {
+    return 'demo-2-question-seed';
+  }
   if (!normalizedId.includes('/node_modules/')) return undefined;
 
   const group = manualChunkGroups.find(({ patterns }) => (
@@ -394,6 +408,19 @@ const jsxInJsCompatibilityPlugin = () => ({
   },
 });
 
+const sourceCommonJsCompatibilityPlugin = () => ({
+  name: 'ce-source-commonjs-compatibility',
+  enforce: 'pre',
+  transform(code, id) {
+    const [filePath] = id.split('?');
+    if (path.resolve(filePath) !== groupPasswordDerivationCjsPath) return null;
+    return {
+      code: transformGroupPasswordDerivationCommonJs(code),
+      map: null,
+    };
+  },
+});
+
 const walletProfileBundleGuardPlugin = (walletRuntimeProfile) => ({
   name: 'ce-wallet-profile-bundle-guard',
   apply: 'build',
@@ -485,6 +512,7 @@ export default defineConfig(({ mode }) => {
       'process.env': JSON.stringify(clientEnv),
     },
     plugins: [
+      sourceCommonJsCompatibilityPlugin(),
       jsxInJsCompatibilityPlugin(),
       react(),
       jsToTsCompatibilityPlugin(),
@@ -498,7 +526,10 @@ export default defineConfig(({ mode }) => {
       {
         name: 'ce-public-url-html-compatibility',
         transformIndexHtml(html) {
-          return html.replace(/__PUBLIC_URL__/g, normalizePublicUrlForHtml(clientEnv.PUBLIC_URL));
+          return html
+            .replace(/__PUBLIC_URL__/g, normalizePublicUrlForHtml(clientEnv.PUBLIC_URL))
+            .replace(/__CE_DEFAULT_THEME__/g, normalizeDeploymentThemeForHtml(clientEnv.REACT_APP_CE_DEFAULT_THEME))
+            .replace(/__CE_THEME_IDS__/g, themeIds.join(' '));
         },
       },
     ],
@@ -510,6 +541,7 @@ export default defineConfig(({ mode }) => {
         { find: 'components', replacement: path.resolve(srcDir, 'components') },
         { find: 'utilities', replacement: path.resolve(srcDir, 'utilities') },
         { find: 'variables', replacement: path.resolve(srcDir, 'variables') },
+        { find: '@ce-shared', replacement: path.resolve(__dirname, '..', 'shared') },
         { find: /^buffer$/, replacement: path.resolve(__dirname, 'node_modules', 'buffer', 'index.js') },
         { find: /^node:buffer$/, replacement: path.resolve(__dirname, 'node_modules', 'buffer', 'index.js') },
         { find: /^@metamask\/superstruct$/, replacement: path.resolve(srcDir, 'shims', 'metamask-superstruct.ts') },
@@ -553,7 +585,12 @@ export default defineConfig(({ mode }) => {
           '.js': 'jsx',
         },
       },
-      include: ['buffer', 'process/browser'],
+      include: [
+        'buffer',
+        'process/browser',
+        'utilities/crypto/groupPasswordDerivation.cjs',
+        '@ce-shared/rpcDefaults.cjs',
+      ],
     },
   };
 });

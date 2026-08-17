@@ -32,6 +32,7 @@
 
 import { Buffer } from 'buffer';
 import { ethers, utils } from 'ethers';
+import groupPasswordDerivation from 'utilities/crypto/groupPasswordDerivation.cjs';
 import { createLogger } from '../logging';
 import { perfDebugDecryptEnvelope } from '../web3/rpcDebugStats.js';
 
@@ -413,53 +414,12 @@ const decodeBase64Field = (value: unknown, fieldName: string): Uint8Array => {
   return new Uint8Array(Buffer.from(value, 'base64'));
 };
 
-const buildGroupPasswordSalt = (sbtAddress: unknown) => {
-  const rawAddress = typeof sbtAddress === 'string' ? sbtAddress : '';
-  const addr = rawAddress && ethers.utils.isAddress(rawAddress) ? ethers.utils.getAddress(rawAddress) : '';
-  return ethers.utils.solidityKeccak256(
-    ['string', 'address'],
-    ['sbt-group-password-v3', addr || ethers.constants.AddressZero],
-  );
-};
-
-const deriveGroupPasswordWallet = ({ password, sbtAddress }: GroupPasswordInput) => {
-  const pwHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(String(password || '')));
-  const salt = buildGroupPasswordSalt(sbtAddress);
-  const seed = ethers.utils.solidityKeccak256(['bytes32', 'bytes32'], [pwHash, salt]);
-  const tmpSk = ethers.utils.keccak256(ethers.utils.arrayify(seed));
-  return new ethers.Wallet(tmpSk);
-};
-
-const computeGroupPasswordHash = ({ password, sbtAddress }: GroupPasswordInput) => {
-  const tmpWallet = deriveGroupPasswordWallet({ password, sbtAddress });
-  const tmpAddress = tmpWallet.address;
-  return ethers.utils.solidityKeccak256(['address'], [tmpAddress]);
-};
-
-const resolveGroupPasswordWalletScopeAddress = ({ password, sbtAddress, groupPasswordHash }: GroupPasswordInput) => {
-  const expectedHash = String(groupPasswordHash || '')
-    .trim()
-    .toLowerCase();
-  if (!expectedHash || expectedHash === ethers.constants.HashZero.toLowerCase()) {
-    return null;
-  }
-
-  const normalizedSbtAddress =
-    typeof sbtAddress === 'string' && ethers.utils.isAddress(sbtAddress) ? ethers.utils.getAddress(sbtAddress) : '';
-  if (normalizedSbtAddress) {
-    const scopedHash = computeGroupPasswordHash({ password, sbtAddress: normalizedSbtAddress });
-    if (scopedHash.toLowerCase() === expectedHash) {
-      return normalizedSbtAddress;
-    }
-  }
-
-  const zeroScopedHash = computeGroupPasswordHash({ password, sbtAddress: '' });
-  if (zeroScopedHash.toLowerCase() === expectedHash) {
-    return '';
-  }
-
-  return null;
-};
+const {
+  buildGroupPasswordSalt,
+  computeGroupPasswordHash,
+  deriveGroupPasswordWallet,
+  resolveGroupPasswordWalletScopeAddress,
+} = groupPasswordDerivation.createGroupPasswordDerivation(ethers);
 
 const computeGroupMintMessageHash = (sbtAddress: string, userAddress: string) => {
   if (!ethers.utils.isAddress(sbtAddress) || !ethers.utils.isAddress(userAddress)) {

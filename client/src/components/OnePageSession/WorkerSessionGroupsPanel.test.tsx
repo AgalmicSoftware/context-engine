@@ -314,7 +314,7 @@ describe('WorkerSessionGroupsPanel', () => {
     expect(mockGetWorkerSessionToken).not.toHaveBeenCalled();
   });
 
-  it('keeps a remembered account anonymous on a public groups route until creation is requested', async () => {
+  it('loads durable memberships for a signed-in account on every public groups render', async () => {
     mockGetWorkerSessionToken.mockResolvedValue('public-action-token');
     const publicConfig = {
       ...sessionConfig,
@@ -322,7 +322,7 @@ describe('WorkerSessionGroupsPanel', () => {
       groupCreationPolicy: 'participants',
       sessionModeProfile: publicSessionModeProfile,
     };
-    const { rerender } = render(
+    const firstRender = render(
       <WorkerSessionGroupsPanel
         account={ADMIN}
         provider="wagmi"
@@ -333,27 +333,29 @@ describe('WorkerSessionGroupsPanel', () => {
       />,
     );
 
-    expect(screen.getByTestId('membership-panel')).toBeInTheDocument();
-    expect(mockMembershipPanel).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        allowAnonymousGroupDiscovery: true,
-        workerToken: '',
-      }),
+    await waitFor(() => expect(mockGetWorkerSessionToken).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(mockMembershipPanel).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          allowAnonymousGroupDiscovery: true,
+          workerToken: 'public-action-token',
+        }),
+      ),
     );
-    expect(mockGetWorkerSessionToken).not.toHaveBeenCalled();
 
-    rerender(
+    firstRender.unmount();
+    render(
       <WorkerSessionGroupsPanel
         account={ADMIN}
         provider="wagmi"
         networkChainId={11155420}
         sessionConfig={publicConfig}
         sessionSlug="demo-sh"
-        showCreate={true}
+        showCreate={false}
       />,
     );
 
-    await waitFor(() => expect(mockGetWorkerSessionToken).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockGetWorkerSessionToken).toHaveBeenCalledTimes(2));
     await waitFor(() =>
       expect(mockMembershipPanel).toHaveBeenLastCalledWith(
         expect.objectContaining({

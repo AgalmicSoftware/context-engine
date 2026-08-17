@@ -469,7 +469,7 @@ export const SURVEY_RESULTS_CLICKABLE_ICON_STYLE: React.CSSProperties = {
 
 export const SURVEY_RESULTS_METADATA_MISSING_STYLE: React.CSSProperties = {
   fontStyle: 'italic',
-  color: '#bbb',
+  color: 'var(--ce-text-muted)',
   padding: '1rem',
 };
 
@@ -504,7 +504,7 @@ export const resolveSurveyResultsSyncDetailsStyle = (syncDetailsOpen: unknown): 
 
 export const resolveSurveyResultsToggleKnobStyle = (isAggregate: unknown): React.CSSProperties => ({
   left: isAggregate ? '31px' : '1px',
-  backgroundColor: isAggregate ? '#4caf50' : '#fff',
+  backgroundColor: isAggregate ? 'var(--ce-status-success)' : 'var(--ce-control-face)',
 });
 
 const scheduleMicrotask = (cb: unknown): void => {

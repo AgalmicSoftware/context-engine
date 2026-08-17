@@ -23,17 +23,6 @@ type ResolvedAgreementRate = UnknownRecord & {
   groupName: string;
 };
 
-type BeeswarmPoint = UnknownRecord & {
-  extremity?: unknown;
-  x?: number;
-  y?: number;
-};
-
-type BeeswarmPadding = {
-  top?: unknown;
-  left?: unknown;
-};
-
 type DemoAnalysisQuestion = UnknownRecord & {
   id?: unknown;
   text?: unknown;
@@ -211,51 +200,6 @@ export const getMinMaxAgreement = (
   }
 
   return { min, max };
-};
-
-export const beeswarmByExtremity = (
-  points: BeeswarmPoint[] = [],
-  innerWidth = 0,
-  innerHeight = 0,
-  padding: BeeswarmPadding = {},
-): BeeswarmPoint[] => {
-  if (!Array.isArray(points) || points.length === 0) return [];
-
-  const radius = 6;
-  const baseY = Number(padding.top || 0) + innerHeight / 2;
-  const minY = Number(padding.top || 0) + radius;
-  const maxY = Number(padding.top || 0) + innerHeight - radius;
-  const placed: BeeswarmPoint[] = [];
-
-  return points
-    .map((point) => ({
-      ...point,
-      x: Number(padding.left || 0) + Number(point.extremity || 0) * innerWidth,
-      y: baseY,
-    }))
-    .sort((left, right) => left.x - right.x)
-    .map((point) => {
-      let candidateY = baseY;
-      let layer = 0;
-
-      const collides = (x: number, y: number) =>
-        placed.some((existing) => Math.hypot(Number(existing.x || 0) - x, Number(existing.y || 0) - y) < radius * 2);
-
-      while (collides(point.x, candidateY)) {
-        layer += 1;
-        const direction = layer % 2 === 0 ? -1 : 1;
-        const offset = Math.ceil(layer / 2) * radius * 1.7;
-        candidateY = Math.max(minY, Math.min(maxY, baseY + direction * offset));
-        if (layer > 40) break;
-      }
-
-      const nextPoint = {
-        ...point,
-        y: candidateY,
-      };
-      placed.push(nextPoint);
-      return nextPoint;
-    });
 };
 
 export const buildQuestionMap = (questions: DemoAnalysisQuestion[] = []): Map<string, DemoAnalysisQuestion> =>

@@ -2,7 +2,12 @@ import { compareSbtRealtimeEventCursor, normalizeSbtRealtimeEventCursor } from '
 
 interface SbtRealtimeNetworkCache extends Record<PropertyKey, unknown> {
   lastRealtimeEventCursor?: unknown;
+  recentRealtimeEventCursors?: unknown;
 }
+
+const MAX_RECENT_REALTIME_EVENT_CURSORS = 128;
+
+const isSameCursor = (left: unknown, right: unknown): boolean => compareSbtRealtimeEventCursor(left, right) === 0;
 
 export const updateSbtRealtimeCursorForNetworkCache = (networkCache: unknown, eventCursor: unknown): boolean => {
   if (!networkCache || typeof networkCache !== 'object') return false;
@@ -11,10 +16,21 @@ export const updateSbtRealtimeCursorForNetworkCache = (networkCache: unknown, ev
   if (!normalizedCursor) return false;
 
   const previousCursor = normalizeSbtRealtimeEventCursor(cache.lastRealtimeEventCursor);
-  if (previousCursor && compareSbtRealtimeEventCursor(normalizedCursor, previousCursor) <= 0) {
+  const recentCursors = Array.isArray(cache.recentRealtimeEventCursors)
+    ? cache.recentRealtimeEventCursors.map(normalizeSbtRealtimeEventCursor).filter(Boolean)
+    : [];
+  if (
+    (previousCursor && isSameCursor(normalizedCursor, previousCursor)) ||
+    recentCursors.some((cursor) => isSameCursor(normalizedCursor, cursor))
+  ) {
     return false;
   }
 
-  cache.lastRealtimeEventCursor = normalizedCursor;
+  // Keep dedupe identity separate from the high-water cursor: async listeners
+  // can complete in reverse chain order, and both distinct events must apply.
+  cache.recentRealtimeEventCursors = [...recentCursors, normalizedCursor].slice(-MAX_RECENT_REALTIME_EVENT_CURSORS);
+  if (!previousCursor || compareSbtRealtimeEventCursor(normalizedCursor, previousCursor) > 0) {
+    cache.lastRealtimeEventCursor = normalizedCursor;
+  }
   return true;
 };

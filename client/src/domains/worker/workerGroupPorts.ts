@@ -20,6 +20,7 @@ export type WorkerGroup = {
   adminAddress?: string;
   joinMode: WorkerGroupJoinMode;
   memberVisibility: WorkerGroupMemberVisibility;
+  memberCount?: number;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -165,6 +166,7 @@ const SAFE_LOCAL_WORKER_GROUP_REASONS = new Set([
   'worker_group_request_failed',
   'worker_group_response_cursor_invalid',
   'worker_group_response_group_invalid',
+  'worker_group_response_group_visibility_invalid',
   'worker_group_response_member_count_invalid',
   'worker_group_response_member_invalid',
   'worker_group_response_session_identity_mismatch',
@@ -183,6 +185,13 @@ export class WorkerGroupRequestError extends Error {
     this.status = status;
   }
 }
+
+const normalizeWorkerGroupMemberCount = (value: unknown): number => {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
+    throw new WorkerGroupRequestError('worker_group_response_member_count_invalid');
+  }
+  return value;
+};
 
 const normalizeWorkerGroupResponseStatus = (value: unknown): number => {
   const status = Number(value);
@@ -261,7 +270,11 @@ const assertExactSessionIdentity = (
   return { sessionId, sessionSlug };
 };
 
-const normalizeGroup = (value: unknown, expectedSessionSlug?: unknown): WorkerGroup | null => {
+const normalizeGroup = (
+  value: unknown,
+  expectedSessionSlug?: unknown,
+  includeMemberCount = false,
+): WorkerGroup | null => {
   const source = toRecord(value);
   const groupId = toStringValue(source.groupId);
   const label = toStringValue(source.label);
@@ -272,6 +285,9 @@ const normalizeGroup = (value: unknown, expectedSessionSlug?: unknown): WorkerGr
   const memberLimit = Number(source.memberLimit);
   const joinEndsAt = toStringValue(source.joinEndsAt);
   const adminAddress = toStringValue(source.adminAddress);
+  const hasMemberCount = Object.prototype.hasOwnProperty.call(source, 'memberCount');
+  const memberCount =
+    includeMemberCount && hasMemberCount ? normalizeWorkerGroupMemberCount(source.memberCount) : undefined;
   if (
     !groupId ||
     !label ||
@@ -310,6 +326,7 @@ const normalizeGroup = (value: unknown, expectedSessionSlug?: unknown): WorkerGr
     adminAddress: adminAddress || undefined,
     joinMode: joinMode as WorkerGroupJoinMode,
     memberVisibility: memberVisibility as WorkerGroupMemberVisibility,
+    ...(memberCount === undefined ? {} : { memberCount }),
     createdAt: toStringValue(source.createdAt) || undefined,
     updatedAt: toStringValue(source.updatedAt) || undefined,
   };
@@ -323,17 +340,18 @@ const normalizeMembership = (value: unknown, expectedSessionSlug?: unknown): Wor
   if (expectedSessionSlug !== undefined) {
     assertExactSessionSlug(member.sessionSlug, expectedSessionSlug);
   }
-  const memberCount = Number(source.memberCount);
+  const hasMemberCount = Object.prototype.hasOwnProperty.call(source, 'memberCount');
+  const memberCount = hasMemberCount ? normalizeWorkerGroupMemberCount(source.memberCount) : undefined;
   return {
     group,
     member,
-    ...(Number.isFinite(memberCount) && memberCount >= 0 ? { memberCount } : {}),
+    ...(memberCount === undefined ? {} : { memberCount }),
   };
 };
 
-const normalizeGroups = (value: unknown, expectedSessionSlug?: unknown): WorkerGroup[] =>
+const normalizeGroups = (value: unknown, expectedSessionSlug?: unknown, includeMemberCount = false): WorkerGroup[] =>
   (Array.isArray(value) ? value : [])
-    .map((group) => normalizeGroup(group, expectedSessionSlug))
+    .map((group) => normalizeGroup(group, expectedSessionSlug, includeMemberCount))
     .filter((group): group is WorkerGroup => group !== null);
 
 const normalizeMemberships = (value: unknown, expectedSessionSlug?: unknown): WorkerGroupMembership[] =>
@@ -491,9 +509,13 @@ export const loadWorkerGroupOverview = async ({
       fetchImpl,
     }),
   ]);
+  const memberships = normalizeMemberships(membershipsPayload.memberships, expectedSessionSlug);
+  const membershipGroupIds = new Set(memberships.map(({ group }) => group.groupId));
   return {
-    groups: normalizeGroups(groupsPayload.groups, expectedSessionSlug),
-    memberships: normalizeMemberships(membershipsPayload.memberships, expectedSessionSlug),
+    groups: normalizeGroups(groupsPayload.groups, expectedSessionSlug, true).filter(
+      (group) => group.memberVisibility === 'session' || membershipGroupIds.has(group.groupId),
+    ),
+    memberships,
   };
 };
 
@@ -557,10 +579,7 @@ export const loadWorkerGroupMembers = async ({
   if (members.some((member) => member === null)) {
     throw new WorkerGroupRequestError('worker_group_response_member_invalid');
   }
-  const memberCount = Number(payload.memberCount);
-  if (!Number.isSafeInteger(memberCount) || memberCount < 0) {
-    throw new WorkerGroupRequestError('worker_group_response_member_count_invalid');
-  }
+  const memberCount = normalizeWorkerGroupMemberCount(payload.memberCount);
   const nextCursorValue = payload.nextCursor;
   if (nextCursorValue != null && (typeof nextCursorValue !== 'string' || nextCursorValue.length > 1024)) {
     throw new WorkerGroupRequestError('worker_group_response_cursor_invalid');
@@ -602,8 +621,11 @@ export const joinWorkerGroup = async ({
     fetchImpl,
   }).then((payload) => {
     const group = normalizeGroup(payload.group, expectedSessionSlug);
-    if (!group) throw new WorkerGroupRequestError('worker_group_response_group_invalid');
-    return { ...payload, group };
+    if (!group || group.groupId !== toStringValue(groupId)) {
+      throw new WorkerGroupRequestError('worker_group_response_group_invalid');
+    }
+    const memberCount = normalizeWorkerGroupMemberCount(payload.memberCount);
+    return { ...payload, group: { ...group, memberCount }, memberCount };
   });
 };
 
@@ -638,7 +660,21 @@ export const leaveWorkerGroup = async ({
     if (toStringValue(payload.groupId) !== expectedGroupId) {
       throw new WorkerGroupRequestError('worker_group_response_group_invalid');
     }
-    return payload;
+    const hasGroup = payload.group != null;
+    const hasMemberCount = Object.prototype.hasOwnProperty.call(payload, 'memberCount');
+    if (!hasGroup) {
+      if (hasMemberCount) throw new WorkerGroupRequestError('worker_group_response_group_invalid');
+      return payload;
+    }
+    const group = normalizeGroup(payload.group, expectedSessionSlug);
+    if (!group || group.groupId !== expectedGroupId) {
+      throw new WorkerGroupRequestError('worker_group_response_group_invalid');
+    }
+    if (group.memberVisibility !== 'session') {
+      throw new WorkerGroupRequestError('worker_group_response_group_visibility_invalid');
+    }
+    const memberCount = normalizeWorkerGroupMemberCount(payload.memberCount);
+    return { ...payload, group: { ...group, memberCount }, memberCount };
   });
 };
 

@@ -1,6 +1,7 @@
 import {
   E2E_TESTIDS,
   act,
+  deployVerifiedWorkerForCurrentDraft,
   ethers,
   fireEvent,
   getWizardResourceCard,
@@ -165,6 +166,7 @@ describe('SessionWizard worker resource rendering', () => {
     renderLoggedInSessionWizard();
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
     await selectTrustlessPublicPreset();
+    await deployVerifiedWorkerForCurrentDraft();
     enableAdvancedMode();
 
     const publishButton = await openPublishSection();

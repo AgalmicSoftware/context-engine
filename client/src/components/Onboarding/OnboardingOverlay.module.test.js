@@ -4,6 +4,13 @@ import path from 'path';
 describe('Onboarding overlay welcome slide styles', () => {
   const scss = fs.readFileSync(path.join(__dirname, 'OnboardingOverlay.module.scss'), 'utf8');
 
+  it('uses the main-site Welcome backdrop without duplicate panel paint layers', () => {
+    expect(scss).toMatch(/\.panelFrame\s*{[\s\S]*?background-image:\s*var\(--ce-welcome-artwork-backdrop\);/);
+    expect(scss).toMatch(/\.panel\s*{[\s\S]*?background:\s*transparent;/);
+    expect(scss).not.toMatch(/\.panel\[data-slide-key='intro'\]\s*{/);
+    expect(scss).not.toMatch(/\.panel::(?:before|after)\s*{/);
+  });
+
   it('moves medium slide arrows below the skip button instead of leaving them in the content flow', () => {
     expect(scss).toMatch(/\.panelFrame\s*\{[\s\S]*?height:\s*min\(92vh,\s*1180px\);[\s\S]*?min-height:\s*680px;/);
     expect(scss).toMatch(/\.panel\s*\{[\s\S]*?--modal-panel-pad-top:\s*24px;[\s\S]*?--modal-panel-pad-bottom:\s*76px;/);
@@ -15,7 +22,7 @@ describe('Onboarding overlay welcome slide styles', () => {
     );
     expect(scss).toMatch(/\.controlSlot\s*\{[\s\S]*?min-height:\s*0;[\s\S]*?height:\s*auto;/);
     expect(scss).toMatch(
-      /\.controlSlotPlaceholder\s*\{[\s\S]*?pointer-events:\s*none;[\s\S]*?background:\s*rgba\(139,\s*183,\s*150,\s*0\.28\);/,
+      /\.controlSlotPlaceholder\s*\{[\s\S]*?pointer-events:\s*none;[\s\S]*?background:\s*color-mix\(in srgb,\s*var\(--ce-status-success\) 28%,\s*transparent\);/,
     );
     expect(scss).toMatch(
       /@media \(max-width:\s*760px\)\s*\{[\s\S]*?\.panel\s*\{[\s\S]*?--modal-panel-pad-bottom:\s*158px;/,
@@ -27,7 +34,7 @@ describe('Onboarding overlay welcome slide styles', () => {
       /@media \(max-width:\s*760px\)\s*\{[\s\S]*?\.onboardingControls\s*\{[\s\S]*?width:\s*auto;[\s\S]*?height:\s*76px;[\s\S]*?gap:\s*0;/,
     );
     expect(scss).toMatch(
-      /@media \(max-width:\s*760px\)\s*\{[\s\S]*?\.takeSurveyButton\s*\{[\s\S]*?background:\s*rgba\(139,\s*183,\s*150,\s*0\.42\);[\s\S]*?color:\s*rgba\(16,\s*43,\s*35,\s*0\.82\);/,
+      /@media \(max-width:\s*760px\)\s*\{[\s\S]*?\.takeSurveyButton\s*\{[\s\S]*?background:\s*color-mix\(in srgb,\s*var\(--ce-status-success\) 42%,\s*transparent\);[\s\S]*?color:\s*color-mix\(in srgb,\s*var\(--ce-overlay-base\) 82%,\s*transparent\);/,
     );
     expect(scss).toMatch(/@media \(max-width:\s*760px\)\s*\{[\s\S]*?\.skipButton\s*\{[\s\S]*?bottom:\s*98px;/);
     expect(scss).toMatch(
@@ -93,7 +100,7 @@ describe('Onboarding overlay welcome slide styles', () => {
 
   it('uses the transparent goals artwork without reintroducing an inverted image rectangle', () => {
     expect(scss).toMatch(
-      /\.mediaImageGoals\s*\{[\s\S]*?mix-blend-mode:\s*screen\s*!important;[\s\S]*?opacity:\s*0\.86;/,
+      /\.mediaImageGoals\s*\{[\s\S]*?mix-blend-mode:\s*var\(--ce-welcome-artwork-blend-cutout\)\s*!important;[\s\S]*?opacity:\s*0\.86;/,
     );
     expect(scss).not.toMatch(/\.mediaImageGoals\s*\{[\s\S]*?filter:\s*invert\(1\);/);
   });
@@ -110,7 +117,7 @@ describe('Onboarding overlay welcome slide styles', () => {
   it('blends the audience slide jpeg with scss only so its source background falls away', () => {
     expect(scss).toMatch(/\.onboardingWalkthrough\s*\{[\s\S]*?position:\s*relative;[\s\S]*?z-index:\s*auto;/);
     expect(scss).toMatch(
-      /\.mediaImageBuiltToHelp\s*\{[\s\S]*?mix-blend-mode:\s*screen\s*!important;[\s\S]*?opacity:\s*1;[\s\S]*?filter:\s*brightness\(1\.08\) saturate\(1\.18\) contrast\(1\.08\);/,
+      /\.mediaImageBuiltToHelp\s*\{[\s\S]*?mix-blend-mode:\s*var\(--ce-welcome-artwork-blend-cutout\)\s*!important;[\s\S]*?opacity:\s*1;[\s\S]*?filter:\s*brightness\(1\.08\) saturate\(1\.18\) contrast\(1\.08\);/,
     );
     expect(scss).not.toMatch(/\.mediaImageBuiltToHelp\s*\{[\s\S]*?mask-image:/);
   });
