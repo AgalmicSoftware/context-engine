@@ -103,12 +103,8 @@ describe('runtime SCSS theme contract', () => {
     );
     const fontDirectory = path.resolve(scssDir, 'assets/fonts/classic-95');
 
-    expect(globalSource).toMatch(
-      /@font-face\s*{[\s\S]*?font-family:\s*'CE Tahoma';[\s\S]*?wine-tahoma-regular\.ttf/,
-    );
-    expect(globalSource).toMatch(
-      /@font-face\s*{[\s\S]*?font-family:\s*'CE Tahoma';[\s\S]*?wine-tahoma-bold\.ttf/,
-    );
+    expect(globalSource).toMatch(/@font-face\s*{[\s\S]*?font-family:\s*'CE Tahoma';[\s\S]*?wine-tahoma-regular\.ttf/);
+    expect(globalSource).toMatch(/@font-face\s*{[\s\S]*?font-family:\s*'CE Tahoma';[\s\S]*?wine-tahoma-bold\.ttf/);
     expect(classicThemeSource).toMatch(/font-body:\s*\(\s*'CE Tahoma'/);
     expect(classicThemeSource).toMatch(/font-ui:\s*\(\s*'CE Tahoma'/);
     expect(classicThemeSource).toMatch(/font-button:\s*\(\s*'CE Tahoma'/);

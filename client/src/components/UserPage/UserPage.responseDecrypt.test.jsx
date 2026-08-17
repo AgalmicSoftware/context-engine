@@ -17,7 +17,7 @@ jest.mock('../../utilities/web3/sponsoredAccess.js', () => ({
   checkSponsoredAccess: jest.fn(),
 }));
 
-jest.mock('utilities/ai/aiScripts.js', () => ({
+jest.mock('utilities/ai/aiClient.js', () => ({
   analyzeUserOpinions: jest.fn(async () => ({
     summary: 'summary',
     details: 'details',
@@ -54,6 +54,31 @@ const makeInstance = (props = {}) => {
 describe('UserPage response decrypt helpers', () => {
   afterEach(() => {
     jest.clearAllMocks();
+  });
+
+  it('keeps decrypt clicks inert without a connected account', async () => {
+    const instance = makeInstance({
+      account: '',
+      provider: 'wagmi',
+    });
+    const encryptedResponse = {
+      questionID: 'q1',
+      answer: {
+        value: '*',
+        encrypted: true,
+        encryptedPortion: '{"v":2}',
+      },
+      additional: {
+        value: '',
+        encrypted: false,
+      },
+    };
+
+    const didDecrypt = await instance.handleDecryptQuestionAnswer('q1', 'answer', encryptedResponse);
+
+    expect(didDecrypt).toBe(false);
+    expect(cryptoUtils.decryptSingleField).not.toHaveBeenCalled();
+    expect(instance.setState).not.toHaveBeenCalled();
   });
 
   it('decrypts gated responses and patches detailed response state', async () => {
@@ -155,16 +180,80 @@ describe('UserPage response decrypt helpers', () => {
     await instance.handleDecryptQuestionAnswer('q1', 'answer', encryptedResponse);
 
     expect(cryptoUtils.decryptSingleField).toHaveBeenCalledWith(
-      expect.any(Object),
+      {
+        answers: {
+          q1: {
+            value: '*',
+            encrypted: true,
+            encryptedPortion: '{"v":2}',
+          },
+        },
+        additionalComments: {
+          q1: {
+            value: '',
+            encrypted: false,
+          },
+        },
+        importance: {},
+        conviction: {},
+      },
       'q1',
       'answer',
-      expect.objectContaining({
+      {
+        account: '0x00000000000000000000000000000000000000bb',
+        provider: 'wagmi',
+        providerKind: 'wagmi',
+        chainId: 84532,
         surveyId,
         acceptedSurveyIds: [surveyId, ethers.constants.HashZero],
         lit: null,
         throwOnError: true,
       },
     );
+  });
+
+  it('keeps encrypted response state unchanged when decrypt execution fails', async () => {
+    const instance = makeInstance({
+      account: '0x00000000000000000000000000000000000000bb',
+      provider: 'wagmi',
+    });
+    const encryptedResponse = {
+      questionID: 'q1',
+      answer: {
+        value: '*',
+        encrypted: true,
+        encryptedPortion: '{"v":2}',
+      },
+      additional: {
+        value: '',
+        encrypted: false,
+      },
+    };
+    instance.state = {
+      ...instance.state,
+      detailedQuestionResponses: {
+        q1: encryptedResponse,
+      },
+      detailedSurveyResponses: {
+        s1: [
+          {
+            questionData: { id: 'q1', prompt: 'Question 1', type: 'freeform' },
+            responseData: encryptedResponse,
+            canDecryptOtherResponses: true,
+          },
+        ],
+      },
+    };
+    cryptoUtils.decryptSingleField.mockRejectedValue(new Error('lit unavailable'));
+
+    const didDecrypt = await instance.handleDecryptQuestionAnswer('q1', 'answer', encryptedResponse);
+
+    expect(didDecrypt).toBe(false);
+    expect(cryptoUtils.decryptSingleField).toHaveBeenCalled();
+    expect(instance.setState).not.toHaveBeenCalled();
+    expect(instance.state.detailedQuestionResponses.q1).toBe(encryptedResponse);
+    expect(instance.state.detailedQuestionResponses.q1.answer.encrypted).toBe(true);
+    expect(instance.state.detailedSurveyResponses.s1[0].responseData).toBe(encryptedResponse);
   });
 
   it('keeps duplicated payload strings isolated when decrypting one response', async () => {

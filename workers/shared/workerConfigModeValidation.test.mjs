@@ -1,10 +1,107 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import {
-  validateDeploymentModeValues,
-  validateWorkerConfigModeValues,
-} from './workerConfigModeValidation.mjs';
+import { validateDeploymentModeValues, validateWorkerConfigModeValues } from './workerConfigModeValidation.mjs';
+
+const fastCloudflareProfile = () => ({
+  profileVersion: 1,
+  preset: 'fast_cheap_cloudflare',
+  authority: { mode: 'worker_canonical' },
+  evm: { registryChainId: null },
+  storage: {
+    backend: 'cloudflare',
+    payloadAccessControl: {
+      gate: 'role_gate',
+      encryption: 'worker_envelope',
+      accessConditions: {
+        match: 'any',
+        conditions: [
+          { kind: 'worker_role', role: 'admin' },
+          { kind: 'agent_grant_scope', scope: 'storage' },
+        ],
+      },
+    },
+  },
+  identity: { default: 'passkey', enabled: ['passkey'] },
+  authorization: { mechanisms: ['worker_roles'] },
+  encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
+  surfaces: {
+    web: true,
+    telegram: false,
+    miniApp: false,
+    agentHttp: false,
+    mcp: false,
+    ceCc: false,
+  },
+  results: {
+    visibility: 'participant_aggregate',
+    exposure: {
+      aggregateResultsEnabled: true,
+      anonymizedGroupsEnabled: false,
+      minGroupSize: 2,
+    },
+  },
+  export: { scope: 'admin_raw' },
+});
+
+const decentralizedProfile = () => ({
+  profileVersion: 1,
+  preset: 'trustless_public_decentralized',
+  authority: { mode: 'evm_registry_canonical' },
+  evm: { registryChainId: 11155420 },
+  storage: { backend: 'arweave' },
+  identity: { default: 'wallet', enabled: ['wallet', 'passkey'] },
+  authorization: { mechanisms: ['sbt_onchain'] },
+  encryption: { mode: 'none' },
+  surfaces: {
+    web: true,
+    telegram: false,
+    miniApp: false,
+    agentHttp: false,
+    mcp: false,
+    ceCc: false,
+  },
+  results: {
+    visibility: 'public_full_if_storage_public',
+    exposure: {
+      aggregateResultsEnabled: true,
+      anonymizedGroupsEnabled: false,
+      minGroupSize: 2,
+    },
+  },
+  export: { scope: 'all_session' },
+});
+
+const fullWorkerProfile = () => ({
+  profileVersion: 1,
+  preset: 'custom',
+  authority: { mode: 'worker_canonical' },
+  evm: { registryChainId: null },
+  storage: {
+    backend: 'cloudflare',
+    payloadAccessControl: { gate: 'none', encryption: 'none' },
+  },
+  identity: { default: 'passkey', enabled: ['passkey'] },
+  authorization: { mechanisms: ['worker_roles'] },
+  encryption: { mode: 'none' },
+  surfaces: {
+    web: true,
+    telegram: false,
+    miniApp: false,
+    agentHttp: false,
+    mcp: false,
+    ceCc: false,
+  },
+  results: {
+    visibility: 'public_full_if_storage_public',
+    exposure: {
+      aggregateResultsEnabled: true,
+      anonymizedGroupsEnabled: false,
+      minGroupSize: 2,
+    },
+  },
+  export: { scope: 'all_session' },
+});
 
 const cloneJson = (value) => JSON.parse(JSON.stringify(value));
 
@@ -396,14 +493,20 @@ test('public stored results require unencrypted, condition-free public storage',
 });
 
 test('mode validation rejects explicit aliases, blanks, and reserved providers at their exact paths', () => {
+  const invalidAuthority = fullWorkerProfile();
+  invalidAuthority.authority.mode = 'registry';
+  const missingAuthorityMode = fullWorkerProfile();
+  missingAuthorityMode.authority = {};
+  const blankEncryptionMode = fullWorkerProfile();
+  blankEncryptionMode.encryption.mode = '';
+  const reservedKeyProvider = fullWorkerProfile();
+  reservedKeyProvider.encryption = { mode: 'worker_envelope', keyProvider: 'external_kms' };
+
   const cases = [
-    [{ sessionModeProfile: { authority: { mode: 'registry' } } }, 'sessionModeProfile.authority.mode'],
-    [{ sessionModeProfile: { authority: {} } }, 'sessionModeProfile.authority.mode'],
-    [{ sessionModeProfile: { encryption: { mode: '' } } }, 'sessionModeProfile.encryption.mode'],
-    [
-      { sessionModeProfile: { encryption: { mode: 'worker_envelope', keyProvider: 'external_kms' } } },
-      'sessionModeProfile.encryption.keyProvider',
-    ],
+    [{ sessionModeProfile: invalidAuthority }, 'sessionModeProfile.authority.mode'],
+    [{ sessionModeProfile: missingAuthorityMode }, 'sessionModeProfile.authority.mode'],
+    [{ sessionModeProfile: blankEncryptionMode }, 'sessionModeProfile.encryption.mode'],
+    [{ sessionModeProfile: reservedKeyProvider }, 'sessionModeProfile.encryption.keyProvider'],
     [{ storageProfile: {} }, 'storageProfile.backend'],
     [{ storageProfile: { backend: 'r2' } }, 'storageProfile.backend'],
     [
@@ -428,10 +531,15 @@ test('mode validation rejects explicit aliases, blanks, and reserved providers a
 
 test('mode validation permits absent optional mode fields but rejects malformed explicit containers', () => {
   assert.deepEqual(validateWorkerConfigModeValues({ sessionName: 'No mode patch' }), { ok: true });
-  assert.deepEqual(
-    validateWorkerConfigModeValues({ sessionModeProfile: null }),
-    { ok: false, path: 'sessionModeProfile' },
-  );
+  const malformedProfiles = [
+    [{}, 'sessionModeProfile.profileVersion'],
+    [null, 'sessionModeProfile'],
+    [[], 'sessionModeProfile'],
+  ];
+  for (const [sessionModeProfile, path] of malformedProfiles) {
+    assert.deepEqual(validateDeploymentModeValues({ sessionModeProfile }), { ok: false, path });
+    assert.deepEqual(validateWorkerConfigModeValues({ sessionModeProfile }), { ok: false, path });
+  }
   assert.deepEqual(
     validateDeploymentModeValues({ storageProfile: { backend: 'cloudflare', payloadAccessControl: [] } }),
     { ok: false, path: 'storageProfile.payloadAccessControl' },

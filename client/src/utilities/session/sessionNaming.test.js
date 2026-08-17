@@ -19,10 +19,7 @@ const collectSourceFiles = (directory) =>
 
 describe('sessionNaming helpers', () => {
   it('keeps SBT leaf slug normalization session-owned', () => {
-    const sourceRoots = [
-      path.resolve(__dirname, '../sbt'),
-      path.resolve(__dirname, '../../components/SBTs'),
-    ];
+    const sourceRoots = [path.resolve(__dirname, '../sbt'), path.resolve(__dirname, '../../components/SBTs')];
     const web3SlugImports = sourceRoots
       .flatMap(collectSourceFiles)
       .filter((filePath) =>

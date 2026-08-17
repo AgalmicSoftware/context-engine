@@ -1,38 +1,39 @@
 import React from 'react';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import fs from 'fs';
+import path from 'path';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router-dom';
 import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
 import PostsPage from './PostsPage';
 import type { PostsFetch } from './postsContent';
 
-const makeJsonResponse = (body: unknown): Response => ({
-  ok: true,
-  status: 200,
-  json: async () => body,
-} as Response);
+const makeJsonResponse = (body: unknown): Response =>
+  ({
+    ok: true,
+    status: 200,
+    json: async () => body,
+  }) as Response;
 
-const makeTextResponse = (body: string): Response => ({
-  ok: true,
-  status: 200,
-  text: async () => body,
-} as Response);
+const makeTextResponse = (body: string): Response =>
+  ({
+    ok: true,
+    status: 200,
+    text: async () => body,
+  }) as Response;
 
 const LocationProbe = () => {
   const location = useLocation();
   return <output data-testid="test-location">{location.pathname}</output>;
 };
 
-const renderPostsPage = (
-  fetcher: PostsFetch,
-  enabled = true,
-  initialEntries = ['/posts']
-) => render(
-  <MemoryRouter initialEntries={initialEntries}>
-    <PostsPage fetcher={fetcher} enabled={enabled} />
-    <LocationProbe />
-  </MemoryRouter>
-);
+const renderPostsPage = (fetcher: PostsFetch, enabled = true, initialEntries = ['/posts']) =>
+  render(
+    <MemoryRouter initialEntries={initialEntries}>
+      <PostsPage fetcher={fetcher} enabled={enabled} />
+      <LocationProbe />
+    </MemoryRouter>,
+  );
 
 const manifest = {
   posts: [
@@ -67,6 +68,16 @@ const firstPostMarkdown = [
   '![Two robots read papers at an outdoor table.](attachments/agent-village.png "Agent Village media example")',
   '',
   '<script>alert("no html")</script>',
+  '',
+  '## Data Visualization (n=4)',
+  '',
+  '```ce-viz-group',
+  '{',
+  '  "title": "Data Exploration (n=4)",',
+  '  "defaultOpen": false,',
+  '  "childrenOpen": false',
+  '}',
+  '```',
   '',
   '```ce-viz',
   '{',
@@ -129,8 +140,58 @@ const firstPostMarkdown = [
   '      "prompt": "How optimistic am I?",',
   '      "values": [',
   '        { "label": "P1", "value": 3, "confidence": 70, "color": "#4dffa4" },',
-  '        { "label": "P2", "value": 8, "confidence": 90, "color": "#7aa7ff" }',
+  '        { "label": "P2", "value": 8, "confidence": 90, "color": "#7aa7ff" },',
+  '        { "label": "P3", "value": 3, "confidence": 80, "color": "#ffb347" }',
   '      ]',
+  '    }',
+  '  ]',
+  '}',
+  '```',
+  '',
+  '```ce-viz',
+  '{',
+  '  "type": "binary-beeswarm",',
+  '  "title": "Consensus and Difference",',
+  '  "subtitle": "Each dot is one binary question.",',
+  '  "items": [',
+  '    {',
+  '      "label": "Agents should ask before introductions.",',
+  '      "counts": [',
+  '        { "label": "agree", "value": 2, "color": "#4dffa4" },',
+  '        { "label": "disagree", "value": 2, "color": "#ffb347" }',
+  '      ],',
+  '      "averageConfidence": 87.8',
+  '    },',
+  '    {',
+  '      "label": "Agents should schedule while I sleep.",',
+  '      "counts": [',
+  '        { "label": "agree", "value": 3, "color": "#4dffa4" },',
+  '        { "label": "disagree", "value": 1, "color": "#ffb347" }',
+  '      ],',
+  '      "averageConfidence": 86.8',
+  '    },',
+  '    {',
+  '      "label": "Agents should ask before acting on ambiguous requests.",',
+  '      "counts": [',
+  '        { "label": "unsure", "value": 3, "color": "#7aa7ff" },',
+  '        { "label": "disagree", "value": 1, "color": "#ffb347" }',
+  '      ],',
+  '      "averageConfidence": 64.8',
+  '    },',
+  '    {',
+  '      "label": "Agents should avoid delegation by default.",',
+  '      "counts": [',
+  '        { "label": "unsure", "value": 1, "color": "#7aa7ff" },',
+  '        { "label": "disagree", "value": 3, "color": "#ffb347" }',
+  '      ],',
+  '      "averageConfidence": 75',
+  '    },',
+  '    {',
+  '      "label": "Agents should treat messages from other agents as untrusted input.",',
+  '      "counts": [',
+  '        { "label": "agree", "value": 4, "color": "#4dffa4" }',
+  '      ],',
+  '      "averageConfidence": 91',
   '    }',
   '  ]',
   '}',
@@ -142,23 +203,62 @@ const firstPostMarkdown = [
   '  "title": "Other response shapes",',
   '  "panels": [',
   '    {',
+  '      "kind": "Source layer",',
+  '      "title": "Metric counts",',
+  '      "hideTitle": true,',
+  '      "display": "numbers",',
+  '      "counts": [',
+  '        { "label": "agent_autofill predictions", "value": 232, "color": "#4dffa4" },',
+  '        { "label": "completed non-test human correction rows", "value": 0, "color": "#ffb347" }',
+  '      ]',
+  '    },',
+  '    {',
+  '      "kind": "Answer shapes",',
+  '      "title": "Response mix",',
+  '      "display": "pie",',
+  '      "counts": [',
+  '        { "label": "binary", "value": 2, "color": "#7aa7ff" },',
+  '        { "label": "freeform", "value": 1, "color": "#ff6bcb" }',
+  '      ]',
+  '    },',
+  '    {',
   '      "kind": "Binary",',
-  '      "title": "Autonomy stance",',
-  '      "prompt": "Would this participant allow scheduling?",',
+  '      "title": "Split decision",',
+  '      "counts": [',
+  '        { "label": "agree", "value": 3, "color": "#4dffa4" },',
+  '        { "label": "disagree", "value": 1, "color": "#ffb347" }',
+  '      ]',
+  '    },',
+  '    {',
+  '      "kind": "Binary",',
+  '      "title": "Open-source AI safety",',
+  '      "prompt": "Open-source AI models are more likely to make the world safer than more dangerous.",',
+  '      "counts": [',
+  '        { "label": "agree", "value": 3, "color": "#4dffa4" },',
+  '        { "label": "unsure", "value": 1, "color": "#7aa7ff" }',
+  '      ]',
+  '    },',
+  '    {',
+  '      "kind": "Binary",',
+  '      "title": "Would this participant allow scheduling?",',
   '      "counts": [',
   '        { "label": "agree", "value": 2 },',
-  '        { "label": "disagree", "value": 1 }',
+  '        { "label": "disagree", "value": 1 },',
+  '        { "label": "human corrections", "value": 0 }',
   '      ]',
   '    },',
   '    {',
   '      "kind": "Freeform",',
-  '      "title": "Personal AI fire alarm",',
+  '      "title": "In one sentence: what is my personal AI fire alarm?",',
   '      "quotes": [',
   '        { "label": "P1", "text": "A privacy-line crossing." }',
   '      ]',
   '    }',
   '  ]',
   '}',
+  '```',
+  '',
+  '```ce-viz-group-end',
   '```',
   '',
   '```ce-viz',
@@ -172,9 +272,28 @@ const firstPostMarkdown = [
   '```',
 ].join('\n');
 
+const openGroupPostMarkdown = firstPostMarkdown.replace('"defaultOpen": false', '"defaultOpen": true');
+
+const renderFirstPostMarkdown = (markdown = firstPostMarkdown) => {
+  const fetcher = jest
+    .fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
+    .mockResolvedValueOnce(makeJsonResponse(manifest))
+    .mockResolvedValueOnce(makeTextResponse(markdown));
+
+  renderPostsPage(fetcher, true, ['/posts/first-post']);
+
+  return fetcher;
+};
+
+const getCarouselSlides = (carousel: HTMLElement) =>
+  within(carousel)
+    .getAllByRole('group', { hidden: true })
+    .filter((group) => group.getAttribute('aria-roledescription') === 'slide');
+
 describe('PostsPage', () => {
   it('loads the root posts manifest as summary links without rendering a post body', async () => {
-    const fetcher = jest.fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
+    const fetcher = jest
+      .fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
       .mockResolvedValueOnce(makeJsonResponse(manifest));
 
     renderPostsPage(fetcher);
@@ -192,15 +311,19 @@ describe('PostsPage', () => {
     expect(screen.queryByRole('heading', { name: 'First Post', level: 2 })).not.toBeInTheDocument();
     expect(screen.queryByText('Theme distribution')).not.toBeInTheDocument();
     expect(screen.getByTestId('test-location')).toHaveTextContent('/posts');
-    expect(fetcher).toHaveBeenCalledWith('/posts/manifest.json', expect.objectContaining({
-      headers: { accept: 'application/json' },
-      cache: 'no-store',
-    }));
+    expect(fetcher).toHaveBeenCalledWith(
+      '/posts/manifest.json',
+      expect.objectContaining({
+        headers: { accept: 'application/json' },
+        cache: 'no-store',
+      }),
+    );
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
   it('opens a post URL from the summary list and returns to the posts index', async () => {
-    const fetcher = jest.fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
+    const fetcher = jest
+      .fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
       .mockResolvedValueOnce(makeJsonResponse(manifest))
       .mockResolvedValueOnce(makeTextResponse(firstPostMarkdown));
 
@@ -212,23 +335,73 @@ describe('PostsPage', () => {
     expect(screen.queryByRole('heading', { name: 'Posts', level: 1 })).not.toBeInTheDocument();
     const detailHeading = await screen.findByRole('heading', { name: 'First Post', level: 1 });
     expect(detailHeading).toBeInTheDocument();
+    await waitFor(() => expect(document.title).toBe('First Post'));
+    expect(document.head.querySelector('meta[property="og:type"]')).toHaveAttribute('content', 'article');
+    expect(document.head.querySelector('meta[property="og:image"]')).toHaveAttribute(
+      'content',
+      `${window.location.origin}/posts/first-post/attachments/first-hero.jpeg`,
+    );
+    expect(document.head.querySelector('meta[name="twitter:card"]')).toHaveAttribute('content', 'summary_large_image');
+    expect(document.head.querySelector('link[rel="canonical"]')).toHaveAttribute(
+      'href',
+      `${window.location.origin}/posts/first-post`,
+    );
     expect(screen.queryByRole('heading', { name: 'First Post', level: 2 })).not.toBeInTheDocument();
     expect(screen.queryByText('Post')).not.toBeInTheDocument();
     expect(screen.queryByText('First summary')).not.toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'First post header graphic' }))
-      .toHaveAttribute('src', '/posts/first-post/attachments/first-hero.jpeg');
-    expect(screen.getByRole('img', { name: 'Two robots read papers at an outdoor table.' }))
-      .toHaveAttribute('src', '/posts/first-post/attachments/agent-village.png');
-    const postImageFigure = screen.getByLabelText('Preview image: Two robots read papers at an outdoor table.');
-    expect(postImageFigure).toHaveAttribute('tabindex', '0');
-    const fullscreenImage = postImageFigure.querySelector('span img');
+    const detailHeader = detailHeading.closest('header') as HTMLElement;
+    expect(within(detailHeader).queryByText('Context Engine')).not.toBeInTheDocument();
+    const detailDate = within(detailHeader).getByText('Jul 3, 2026');
+    const tagAnalysis = within(detailHeader).getByText('analysis');
+    const tagViz = within(detailHeader).getByText('viz');
+    const metaRow = detailDate.parentElement as HTMLElement;
+    expect(metaRow).toContainElement(tagAnalysis);
+    expect(metaRow).toContainElement(tagViz);
+    expect(tagAnalysis.compareDocumentPosition(detailDate) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(tagViz.compareDocumentPosition(detailDate) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole('img', { name: 'First post header graphic' })).toHaveAttribute(
+      'src',
+      '/posts/first-post/attachments/first-hero.jpeg',
+    );
+    expect(screen.getByRole('img', { name: 'Two robots read papers at an outdoor table.' })).toHaveAttribute(
+      'src',
+      '/posts/first-post/attachments/agent-village.png',
+    );
+    const postImageButton = screen.getByRole('button', {
+      name: 'Open image preview: Two robots read papers at an outdoor table.',
+    });
+    expect(screen.queryByRole('button', { name: 'Close image preview' })).not.toBeInTheDocument();
+    await userEvent.click(postImageButton);
+    const closePreviewButton = screen.getByRole('button', { name: 'Close image preview' });
+    const fullscreenImage = closePreviewButton.querySelector('img');
     expect(fullscreenImage).toHaveAttribute('src', '/posts/first-post/attachments/agent-village.png');
     expect(fullscreenImage).toHaveAttribute('alt', '');
+    await userEvent.click(closePreviewButton);
+    expect(screen.queryByRole('button', { name: 'Close image preview' })).not.toBeInTheDocument();
     expect(screen.getByText('Agent Village media example')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Context Engine' })).toHaveAttribute('href', 'https://contextengine.sh');
     expect(screen.getByText(/<script>alert\("no html"\)<\/script>/)).toBeInTheDocument();
-    expect(document.querySelector('script')).not.toBeInTheDocument();
+    expect(Array.from(document.scripts).some((script) => script.textContent?.includes('alert("no html")'))).toBe(false);
+    const sampleHeading = screen.getByRole('heading', { name: 'Data Visualization (n=4)', level: 2 });
+    const sampleSize = within(sampleHeading).getByText('(n=4)');
+    expect(sampleSize.tagName).toBe('SPAN');
+    const dataExploration = screen.getByText('Data Exploration (n=4)').closest('details') as HTMLElement;
+    expect(dataExploration).toBeInTheDocument();
+    expect(dataExploration).not.toHaveAttribute('open');
+    expect(within(dataExploration).getByText('Theme distribution')).toBeInTheDocument();
+    expect(within(dataExploration).getByText('Other response shapes')).toBeInTheDocument();
+    expect(within(dataExploration).queryByText('Respondent notes')).not.toBeInTheDocument();
+    const carousel = within(dataExploration).getByTestId('ce-posts-viz-carousel');
+    expect(carousel).toHaveAttribute('aria-roledescription', 'carousel');
+    expect(carousel).toHaveAccessibleName('Data Exploration (n=4) visualizations');
+    expect(carousel.querySelectorAll('details')).toHaveLength(0);
+    const carouselSlides = getCarouselSlides(carousel);
+    expect(carouselSlides).toHaveLength(6);
+    expect(carouselSlides[0]).toHaveAttribute('aria-label', '1 of 6: Theme distribution');
+    expect(carouselSlides[4]).toHaveAttribute('aria-label', '5 of 6: Consensus and Difference');
+    expect(within(carousel).getByText('1 / 6')).toBeInTheDocument();
     expect(screen.getByText('Theme distribution')).toBeInTheDocument();
+    expect(screen.queryByText('Toggle')).not.toBeInTheDocument();
     expect(screen.getByText('Legible disagreement')).toBeInTheDocument();
     expect(screen.getByText('4')).toHaveStyle({ color: 'var(--ce-data-series-1)' });
     expect(screen.getByText('Ranked interview themes')).toBeInTheDocument();
@@ -239,8 +412,14 @@ describe('PostsPage', () => {
     expect(screen.getAllByText('Memory').length).toBeGreaterThan(0);
     expect(screen.getByText('Rating answers')).toBeInTheDocument();
     expect(screen.getByText('AI optimism')).toBeInTheDocument();
-    expect(screen.getByLabelText('P1: 3/10, 70% confidence')).toBeInTheDocument();
-    expect(screen.getByText('P2 - completed')).toBeInTheDocument();
+    const p1Rating = screen.getByLabelText('P1: 3/10, 70% confidence');
+    const p3Rating = screen.getByLabelText('P3: 3/10, 80% confidence');
+    expect(p1Rating).toBeInTheDocument();
+    expect(p3Rating).toBeInTheDocument();
+    expect(p1Rating.style.left).not.toEqual(p3Rating.style.left);
+    expect(p1Rating.style.top).not.toEqual(p3Rating.style.top);
+    expect(screen.queryByLabelText('Participant legend')).not.toBeInTheDocument();
+    expect(screen.queryByText('P2 - completed')).not.toBeInTheDocument();
     expect(screen.queryByText(/No completed answer:/)).not.toBeInTheDocument();
     expect(screen.queryByText(/started only/)).not.toBeInTheDocument();
     expect(screen.getByText('Consensus and Difference')).toBeInTheDocument();
@@ -318,16 +497,25 @@ describe('PostsPage', () => {
     expect(screen.getByText('In one sentence: what is my personal AI fire alarm?')).toBeInTheDocument();
     expect(screen.getByText('A privacy-line crossing.')).toBeInTheDocument();
     expect(screen.getByText('Respondent notes')).toBeInTheDocument();
+    const respondentNotesDisclosure = screen.getByText('Respondent notes').closest('details') as HTMLElement;
+    expect(respondentNotesDisclosure).toBeInTheDocument();
+    expect(screen.getByText('Respondent notes').closest('summary')).toBeInTheDocument();
     expect(screen.getByText('Show the structure without hiding the source.')).toBeInTheDocument();
-    expect(fetcher).toHaveBeenCalledWith('/posts/first-post/index.md', expect.objectContaining({
-      headers: { accept: 'text/markdown,text/plain' },
-      cache: 'no-store',
-    }));
+    expect(fetcher).toHaveBeenCalledWith(
+      '/posts/first-post/index.md',
+      expect.objectContaining({
+        headers: { accept: 'text/markdown,text/plain' },
+        cache: 'no-store',
+      }),
+    );
 
     await userEvent.click(screen.getByRole('link', { name: /Posts/i }));
 
     expect(screen.getByTestId('test-location')).toHaveTextContent('/posts');
     expect(await screen.findByRole('heading', { name: 'Posts', level: 1 })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(document.head.querySelector('meta[name="twitter:card"]')).toHaveAttribute('content', 'summary'),
+    );
     expect(await screen.findByRole('link', { name: /First Post/i })).toBeInTheDocument();
     expect(screen.getByText('First summary')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'First Post', level: 2 })).not.toBeInTheDocument();
@@ -579,8 +767,8 @@ describe('PostsPage', () => {
     await screen.findByRole('heading', { name: 'First Post', level: 1 });
     const binaryBeeswarmSvg = await screen.findByRole('img', { name: 'Consensus and Difference' });
     expect(within(binaryBeeswarmSvg as HTMLElement).getByText('Avg. confidence')).toBeInTheDocument();
-    expect(within(binaryBeeswarmSvg as HTMLElement).getByText('60')).toBeInTheDocument();
-    expect(within(binaryBeeswarmSvg as HTMLElement).getByText('100')).toBeInTheDocument();
+    expect(within(binaryBeeswarmSvg as HTMLElement).getByText('60%')).toBeInTheDocument();
+    expect(within(binaryBeeswarmSvg as HTMLElement).getByText('100%')).toBeInTheDocument();
     const schedulingDot = Array.from(binaryBeeswarmSvg.querySelectorAll('[aria-label]')).find((element) =>
       element.getAttribute('aria-label')?.includes('Agents should schedule while I sleep.'),
     ) as Element;
@@ -643,7 +831,7 @@ describe('PostsPage', () => {
     expect(rows[0]).toHaveTextContent('Agents should ask before introductions.');
     expect(rows[1]).toHaveTextContent('Agents should schedule while I sleep.');
     expect(rows[0]).toHaveTextContent('agree 2, disagree 2');
-    expect(rows[0]).toHaveTextContent('conf 88/100');
+    expect(rows[0]).toHaveTextContent('avg confidence 88%');
     expect(screen.queryByText('Consensus')).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByTestId('ce-posts-binary-sort-confidence'));
@@ -657,7 +845,7 @@ describe('PostsPage', () => {
     expect(screen.getByText('Consensus')).toBeInTheDocument();
   });
 
-  it('defaults the binary visualization to the list view on narrow screens', async () => {
+  it('keeps the binary visualization in swarm view on narrow screens', async () => {
     const originalMatchMedia = window.matchMedia;
     Object.defineProperty(window, 'matchMedia', {
       configurable: true,
@@ -683,9 +871,9 @@ describe('PostsPage', () => {
       renderPostsPage(fetcher, true, ['/posts/first-post']);
 
       await screen.findByRole('heading', { name: 'First Post', level: 1 });
-      expect(await screen.findByTestId('ce-posts-binary-list')).toBeInTheDocument();
-      expect(screen.getByTestId('ce-posts-binary-view-list')).toHaveAttribute('aria-pressed', 'true');
-      expect(screen.queryByRole('img', { name: 'Consensus and Difference' })).not.toBeInTheDocument();
+      expect(await screen.findByRole('img', { name: 'Consensus and Difference' })).toBeInTheDocument();
+      expect(screen.getByTestId('ce-posts-binary-view-swarm')).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.queryByTestId('ce-posts-binary-list')).not.toBeInTheDocument();
     } finally {
       Object.defineProperty(window, 'matchMedia', {
         configurable: true,
@@ -696,7 +884,8 @@ describe('PostsPage', () => {
   });
 
   it('loads a post directly from a detail URL without showing the summary list', async () => {
-    const fetcher = jest.fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
+    const fetcher = jest
+      .fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
       .mockResolvedValueOnce(makeJsonResponse(manifest))
       .mockResolvedValueOnce(makeTextResponse(firstPostMarkdown));
 
@@ -840,14 +1029,16 @@ describe('PostsPage', () => {
   });
 
   it('shows a quiet unavailable state when the manifest fetch fails', async () => {
-    const fetcher = jest.fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
+    const fetcher = jest
+      .fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>()
       .mockResolvedValueOnce({ ok: false, status: 404, json: async () => ({}) } as Response);
 
     renderPostsPage(fetcher);
 
     const status = await screen.findByText('Posts unavailable');
     expect(status).toBeInTheDocument();
-    expect(within(status.closest('section') as HTMLElement).getByText(/rest of Context Engine is unaffected/i))
-      .toBeInTheDocument();
+    expect(
+      within(status.closest('section') as HTMLElement).getByText(/rest of Context Engine is unaffected/i),
+    ).toBeInTheDocument();
   });
 });

@@ -73,7 +73,7 @@ const preventDefault = (event?: UserPageActionEventLike | null): void => {
 };
 
 export const runUserPageAnalyzeActionController = <AnalyzeArgs extends readonly unknown[] = readonly unknown[]>({
-  analyzeArgs = [] as unknown as AnalyzeArgs,
+  analyzeArgs,
   event = null,
   plan = null,
   ports = {},
@@ -117,7 +117,7 @@ export const runUserPageAnalyzeActionController = <AnalyzeArgs extends readonly 
 };
 
 export const runUserPageBookmarkActionController = <BookmarkArgs extends readonly unknown[] = readonly unknown[]>({
-  bookmarkArgs = [] as unknown as BookmarkArgs,
+  bookmarkArgs,
   event = null,
   plan = null,
   ports = {},

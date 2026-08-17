@@ -1,6 +1,9 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import BullhornToggleButton from './BullhornToggleButton';
+import BullhornToggleButton, {
+  buildBullhornToggleButtonClassName,
+  resolveBullhornToggleIconClassName,
+} from './BullhornToggleButton';
 
 describe('BullhornToggleButton', () => {
   it('applies active classes when active and invokes the click handler', () => {

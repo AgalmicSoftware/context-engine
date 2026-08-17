@@ -1,7 +1,25 @@
 import React from 'react';
+import { faCaretDown, faCaretUp } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+  EditorialResponseTypeGridPresentation,
+  PrecisionBeeswarmPresentation,
+  ResponseTypeGridPresentation,
+} from './PostVizPresentations.js';
+import { CategoryDotsViz, QuoteWallViz, RankedThemesViz, ThemeNetworkViz } from './PostVizQualitative.js';
+import {
+  formatBinaryCountsLabel,
+  orderedResponseSplitCounts,
+  readResponsePanels,
+  resolveResponseCountColor,
+  type ResponseCountDatum,
+} from './postVizResponsePanels.js';
 import styles from './PostsPage.module.scss';
 
 type VizRecord = Record<string, unknown>;
+type TooltipPositionStyle = React.CSSProperties & {
+  '--post-viz-tooltip-x'?: string;
+};
 
 const PALETTE = [
   'var(--ce-data-series-7)',
@@ -14,11 +32,8 @@ const PALETTE = [
 const BINARY_DOT_COLOR = 'var(--ce-data-series-8)';
 const BINARY_AXIS_COLOR = 'var(--ce-data-series-1)';
 
-const asRecord = (value: unknown): VizRecord | null => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-    ? value as VizRecord
-    : null
-);
+const asRecord = (value: unknown): VizRecord | null =>
+  !!value && typeof value === 'object' && !Array.isArray(value) ? (value as VizRecord) : null;
 
 const asArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 
@@ -29,9 +44,24 @@ const toNumber = (value: unknown, fallback = 0): number => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
-const clamp = (value: number, min: number, max: number): number => (
-  Math.min(max, Math.max(min, value))
-);
+const toBoolean = (value: unknown): boolean => value === true || value === 'true';
+
+const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
+
+const useEscapeToClear = (active: boolean, onClear: () => void) => {
+  React.useEffect(() => {
+    if (!active) return undefined;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClear();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [active, onClear]);
+};
 
 const toSafeColor = (value: unknown, fallback: string): string => {
   const color = toText(value);
@@ -39,362 +69,46 @@ const toSafeColor = (value: unknown, fallback: string): string => {
 };
 
 const formatValue = (value: number, suffix = ''): string => {
-  const rounded = Math.abs(value) >= 10
-    ? Math.round(value)
-    : Number(value.toFixed(1));
+  const rounded = Math.abs(value) >= 10 ? Math.round(value) : Number(value.toFixed(1));
   return `${rounded}${suffix}`;
 };
 
-type CategoryDatum = {
-  label: string;
-  value: number;
-  detail: string;
-  color: string;
-};
+const renderFormattedText = (text: string): React.ReactNode[] => {
+  const parts: React.ReactNode[] = [];
+  const boldPattern = /\*\*([^*]+)\*\*/g;
+  let cursor = 0;
+  let match: RegExpExecArray | null;
 
-const readCategories = (spec: VizRecord): CategoryDatum[] => (
-  asArray(spec.categories)
-    .map((entry, index): CategoryDatum | null => {
-      const record = asRecord(entry);
-      if (!record) return null;
-      const label = toText(record.label);
-      if (!label) return null;
-      return {
-        label,
-        value: Math.max(0, toNumber(record.value)),
-        detail: toText(record.detail),
-        color: toSafeColor(record.color, PALETTE[index % PALETTE.length]),
-      };
-    })
-    .filter((entry): entry is CategoryDatum => !!entry)
-);
-
-const CategoryDotsViz = ({ spec }: { spec: VizRecord }) => {
-  const title = toText(spec.title) || 'Distribution';
-  const subtitle = toText(spec.subtitle);
-  const suffix = toText(spec.valueSuffix);
-  const dotUnit = Math.max(1, toNumber(spec.dotUnit, 1));
-  const categories = readCategories(spec);
-
-  if (categories.length === 0) {
-    return <p className={styles.vizFallback}>Visualization has no categories.</p>;
+  while ((match = boldPattern.exec(text)) !== null) {
+    if (match.index > cursor) {
+      parts.push(text.slice(cursor, match.index));
+    }
+    parts.push(<strong key={`bold-${match.index}`}>{match[1]}</strong>);
+    cursor = match.index + match[0].length;
   }
 
+  if (cursor < text.length) {
+    parts.push(text.slice(cursor));
+  }
+
+  return parts;
+};
+
+const VizHeader = ({ title, subtitle, hidden = false }: { title: string; subtitle?: string; hidden?: boolean }) => {
+  if (hidden && !subtitle) return null;
+
   return (
-    <section className={styles.vizCard} aria-label={title}>
-      <div className={styles.vizHeader}>
-        <h3 className={styles.vizTitle}>{title}</h3>
-        {subtitle && <p className={styles.vizSubtitle}>{subtitle}</p>}
-      </div>
-      <div className={styles.categoryViz}>
-        {categories.map((category) => {
-          const dotCount = Math.max(1, Math.min(160, Math.round(category.value / dotUnit)));
-          return (
-            <div key={category.label} className={styles.categoryRow}>
-              <div className={styles.categoryMeta}>
-                <span className={styles.categoryLabel}>{category.label}</span>
-                <span className={styles.categoryValue}>{formatValue(category.value, suffix)}</span>
-              </div>
-              <div
-                className={styles.dotGrid}
-                aria-label={`${category.label}: ${formatValue(category.value, suffix)}`}
-              >
-                {Array.from({ length: dotCount }).map((_, index) => (
-                  <span
-                    // eslint-disable-next-line react/no-array-index-key
-                    key={`${category.label}-${index}`}
-                    className={styles.dot}
-                    style={{ backgroundColor: category.color }}
-                  />
-                ))}
-              </div>
-              {category.detail && <p className={styles.categoryDetail}>{category.detail}</p>}
-            </div>
-          );
-        })}
-      </div>
-    </section>
+    <div className={styles.vizHeader}>
+      {!hidden && <h3 className={styles.vizTitle}>{title}</h3>}
+      {subtitle && <p className={styles.vizSubtitle}>{renderFormattedText(subtitle)}</p>}
+    </div>
   );
 };
 
-type QuoteDatum = {
-  text: string;
-  label: string;
+type VizBodyProps = {
+  spec: VizRecord;
+  hideHeader?: boolean;
 };
-
-const readQuotes = (spec: VizRecord): QuoteDatum[] => (
-  asArray(spec.quotes)
-    .map((entry): QuoteDatum | null => {
-      const record = asRecord(entry);
-      if (!record) return null;
-      const text = toText(record.text);
-      if (!text) return null;
-      return {
-        text,
-        label: toText(record.label),
-      };
-    })
-    .filter((entry): entry is QuoteDatum => !!entry)
-);
-
-const QuoteWallViz = ({ spec }: { spec: VizRecord }) => {
-  const title = toText(spec.title) || 'Voices';
-  const subtitle = toText(spec.subtitle);
-  const quotes = readQuotes(spec);
-
-  if (quotes.length === 0) {
-    return <p className={styles.vizFallback}>Visualization has no quotes.</p>;
-  }
-
-  return (
-    <section className={styles.vizCard} aria-label={title}>
-      <div className={styles.vizHeader}>
-        <h3 className={styles.vizTitle}>{title}</h3>
-        {subtitle && <p className={styles.vizSubtitle}>{subtitle}</p>}
-      </div>
-      <div className={styles.quoteWall}>
-        {quotes.map((quote, index) => (
-          <figure key={`${quote.label || 'quote'}-${index}`} className={styles.quoteItem}>
-            <blockquote className={styles.quoteText}>{quote.text}</blockquote>
-            {quote.label && <figcaption className={styles.quoteLabel}>{quote.label}</figcaption>}
-          </figure>
-        ))}
-      </div>
-    </section>
-  );
-};
-
-type RankedThemeDatum = {
-  rank: string;
-  label: string;
-  value: number;
-  summary: string;
-  quote: string;
-  source: string;
-  color: string;
-};
-
-const readRankedThemes = (spec: VizRecord): RankedThemeDatum[] => (
-  asArray(spec.items || spec.categories)
-    .map((entry, index): RankedThemeDatum | null => {
-      const record = asRecord(entry);
-      if (!record) return null;
-      const label = toText(record.label);
-      if (!label) return null;
-      return {
-        rank: toText(record.rank) || String(index + 1).padStart(2, '0'),
-        label,
-        value: Math.max(0, toNumber(record.value)),
-        summary: toText(record.summary || record.detail),
-        quote: toText(record.quote),
-        source: toText(record.source),
-        color: toSafeColor(record.color, PALETTE[index % PALETTE.length]),
-      };
-    })
-    .filter((entry): entry is RankedThemeDatum => !!entry)
-);
-
-const RankedThemesViz = ({ spec }: { spec: VizRecord }) => {
-  const title = toText(spec.title) || 'Ranked themes';
-  const subtitle = toText(spec.subtitle);
-  const suffix = toText(spec.valueSuffix) || '%';
-  const items = readRankedThemes(spec);
-  const maxValue = Math.max(...items.map((item) => item.value), 1);
-
-  if (items.length === 0) {
-    return <p className={styles.vizFallback}>Visualization has no ranked themes.</p>;
-  }
-
-  return (
-    <section className={`${styles.vizCard} ${styles.rankedThemesCard}`} aria-label={title}>
-      <div className={styles.vizHeader}>
-        <h3 className={styles.vizTitle}>{title}</h3>
-        {subtitle && <p className={styles.vizSubtitle}>{subtitle}</p>}
-      </div>
-      <div className={styles.rankedThemes}>
-        {items.map((item) => (
-          <article key={`${item.rank}-${item.label}`} className={styles.rankedTheme}>
-            <div className={styles.rankBadge}>{item.rank}</div>
-            <div className={styles.rankedThemeBody}>
-              <div className={styles.rankedThemeHeader}>
-                <h4 className={styles.rankedThemeTitle}>{item.label}</h4>
-                <span className={styles.rankedThemeValue}>{formatValue(item.value, suffix)}</span>
-              </div>
-              <div className={styles.rankedThemeTrack} aria-label={`${item.label}: ${formatValue(item.value, suffix)}`}>
-                <span
-                  className={styles.rankedThemeFill}
-                  style={{
-                    width: `${clamp((item.value / maxValue) * 100, 4, 100)}%`,
-                    backgroundColor: item.color,
-                  }}
-                />
-              </div>
-              {item.summary && <p className={styles.rankedThemeSummary}>{item.summary}</p>}
-              {item.quote && (
-                <figure className={styles.rankedThemeQuote}>
-                  <blockquote>{item.quote}</blockquote>
-                  {item.source && <figcaption>{item.source}</figcaption>}
-                </figure>
-              )}
-            </div>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-};
-
-type NetworkNodeDatum = {
-  id: string;
-  label: string;
-  value: number;
-  x: number;
-  y: number;
-  detail: string;
-  color: string;
-};
-
-type NetworkLinkDatum = {
-  source: string;
-  target: string;
-  strength: number;
-  label: string;
-};
-
-const readNetworkNodes = (spec: VizRecord): NetworkNodeDatum[] => (
-  asArray(spec.nodes)
-    .map((entry, index): NetworkNodeDatum | null => {
-      const record = asRecord(entry);
-      if (!record) return null;
-      const label = toText(record.label);
-      const id = toText(record.id) || label;
-      if (!id || !label) return null;
-      return {
-        id,
-        label,
-        value: Math.max(1, toNumber(record.value, 1)),
-        x: clamp(toNumber(record.x, 50), 8, 92),
-        y: clamp(toNumber(record.y, 32), 8, 56),
-        detail: toText(record.detail),
-        color: toSafeColor(record.color, PALETTE[index % PALETTE.length]),
-      };
-    })
-    .filter((entry): entry is NetworkNodeDatum => !!entry)
-);
-
-const readNetworkLinks = (spec: VizRecord, nodeIds: Set<string>): NetworkLinkDatum[] => (
-  asArray(spec.links)
-    .map((entry): NetworkLinkDatum | null => {
-      const record = asRecord(entry);
-      if (!record) return null;
-      const source = toText(record.source);
-      const target = toText(record.target);
-      if (!nodeIds.has(source) || !nodeIds.has(target)) return null;
-      return {
-        source,
-        target,
-        strength: clamp(toNumber(record.strength, 0.5), 0.1, 1),
-        label: toText(record.label),
-      };
-    })
-    .filter((entry): entry is NetworkLinkDatum => !!entry)
-);
-
-const ThemeNetworkViz = ({ spec }: { spec: VizRecord }) => {
-  const title = toText(spec.title) || 'Theme network';
-  const subtitle = toText(spec.subtitle);
-  const nodes = readNetworkNodes(spec);
-  const nodesById = new Map(nodes.map((node) => [node.id, node]));
-  const links = readNetworkLinks(spec, new Set(nodesById.keys()));
-  const maxValue = Math.max(...nodes.map((node) => node.value), 1);
-
-  if (nodes.length === 0) {
-    return <p className={styles.vizFallback}>Visualization has no network nodes.</p>;
-  }
-
-  return (
-    <section className={`${styles.vizCard} ${styles.themeNetworkCard}`} aria-label={title}>
-      <div className={styles.vizHeader}>
-        <h3 className={styles.vizTitle}>{title}</h3>
-        {subtitle && <p className={styles.vizSubtitle}>{subtitle}</p>}
-      </div>
-      <div className={styles.networkFrame}>
-        <svg className={styles.networkCanvas} viewBox="0 0 100 64" role="img" aria-label={title}>
-          {links.map((link) => {
-            const source = nodesById.get(link.source);
-            const target = nodesById.get(link.target);
-            if (!source || !target) return null;
-            return (
-              <line
-                key={`${link.source}-${link.target}`}
-                className={styles.networkLink}
-                x1={source.x}
-                y1={source.y}
-                x2={target.x}
-                y2={target.y}
-                strokeWidth={0.25 + link.strength * 1.6}
-              />
-            );
-          })}
-          {nodes.map((node) => {
-            const radius = 2.8 + (node.value / maxValue) * 5.5;
-            return (
-              <g key={node.id}>
-                <circle
-                  className={styles.networkNode}
-                  cx={node.x}
-                  cy={node.y}
-                  r={radius}
-                  fill={node.color}
-                />
-                <text
-                  className={styles.networkLabel}
-                  x={node.x}
-                  y={node.y + radius + 4.2}
-                  textAnchor="middle"
-                >
-                  {node.label}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
-        <div className={styles.networkLegend}>
-          {nodes.map((node) => (
-            <div key={node.id} className={styles.networkLegendItem}>
-              <span className={styles.networkLegendSwatch} style={{ backgroundColor: node.color }} />
-              <div>
-                <span className={styles.networkLegendTitle}>{node.label}</span>
-                {node.detail && <p>{node.detail}</p>}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-};
-
-type LegendDatum = {
-  label: string;
-  detail: string;
-  color: string;
-};
-
-const readLegend = (spec: VizRecord): LegendDatum[] => (
-  asArray(spec.participants || spec.legend)
-    .map((entry, index): LegendDatum | null => {
-      const record = asRecord(entry);
-      const label = record ? toText(record.label) : toText(entry);
-      if (!label) return null;
-      return {
-        label,
-        detail: record ? toText(record.status || record.detail) : '',
-        color: record ? toSafeColor(record.color, PALETTE[index % PALETTE.length]) : PALETTE[index % PALETTE.length],
-      };
-    })
-    .filter((entry): entry is LegendDatum => !!entry)
-);
 
 type BeeswarmPointDatum = {
   label: string;
@@ -411,7 +125,7 @@ type BeeswarmRowDatum = {
   missing: string[];
 };
 
-const readBeeswarmRows = (spec: VizRecord): BeeswarmRowDatum[] => (
+const readBeeswarmRows = (spec: VizRecord): BeeswarmRowDatum[] =>
   asArray(spec.items || spec.questions)
     .map((entry, rowIndex): BeeswarmRowDatum | null => {
       const record = asRecord(entry);
@@ -441,10 +155,56 @@ const readBeeswarmRows = (spec: VizRecord): BeeswarmRowDatum[] => (
         missing: asArray(record.missing).map(toText).filter(Boolean),
       };
     })
-    .filter((entry): entry is BeeswarmRowDatum => !!entry)
-);
+    .filter((entry): entry is BeeswarmRowDatum => !!entry);
 
-const BeeswarmViz = ({ spec }: { spec: VizRecord }) => {
+const duplicateValueKey = (value: number) => value.toFixed(4);
+
+const defaultBeeswarmTops = [32, 50, 68, 40, 60];
+// Carousel scroll tracks clip at their padding box, so top-edge pins flip below
+// their dot instead of escaping the visible slide.
+const SWARM_TOOLTIP_FLIP_TOP_PERCENT = 40;
+
+const duplicateBeeswarmOffsets = [
+  { x: -14, top: 34 },
+  { x: 14, top: 66 },
+  { x: -14, top: 66 },
+  { x: 14, top: 34 },
+  { x: 0, top: 50 },
+];
+
+const buildBeeswarmPlacements = (points: BeeswarmPointDatum[]) => {
+  const valueCounts = points.reduce<Map<string, number>>((counts, point) => {
+    const key = duplicateValueKey(point.value);
+    counts.set(key, (counts.get(key) || 0) + 1);
+    return counts;
+  }, new Map());
+  const seenCounts = new Map<string, number>();
+
+  return points.map((point, index) => {
+    const key = duplicateValueKey(point.value);
+    const totalWithValue = valueCounts.get(key) || 0;
+    const duplicateIndex = seenCounts.get(key) || 0;
+    seenCounts.set(key, duplicateIndex + 1);
+
+    if (totalWithValue <= 1) {
+      return {
+        x: 0,
+        top: defaultBeeswarmTops[index % defaultBeeswarmTops.length],
+      };
+    }
+
+    const offset = duplicateBeeswarmOffsets[duplicateIndex % duplicateBeeswarmOffsets.length];
+    return offset;
+  });
+};
+
+const formatCalcPercentWithPx = (percent: number, pxOffset: number) => {
+  if (pxOffset === 0) return `${percent}%`;
+  const operator = pxOffset > 0 ? '+' : '-';
+  return `calc(${percent}% ${operator} ${Math.abs(pxOffset)}px)`;
+};
+
+const DefaultBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
   const title = toText(spec.title) || 'Rating responses';
   const subtitle = toText(spec.subtitle);
   const note = toText(spec.note);
@@ -452,8 +212,14 @@ const BeeswarmViz = ({ spec }: { spec: VizRecord }) => {
   const min = toNumber(spec.min, 0);
   const max = Math.max(min + 1, toNumber(spec.max, 10));
   const rows = readBeeswarmRows(spec);
-  const legend = readLegend(spec);
   const ticks = [min, (min + max) / 2, max];
+  const [hoverKey, setHoverKey] = React.useState<string | null>(null);
+  const [pinnedKey, setPinnedKey] = React.useState<string | null>(null);
+  const tooltipId = `rating-beeswarm-tooltip-${React.useId().replace(/:/g, '')}`;
+  const clearPin = React.useCallback(() => setPinnedKey(null), []);
+  useEscapeToClear(pinnedKey !== null, clearPin);
+  const activeKey = pinnedKey ?? hoverKey;
+  const isPinned = pinnedKey !== null;
 
   if (rows.length === 0) {
     return <p className={styles.vizFallback}>Visualization has no beeswarm rows.</p>;
@@ -561,131 +327,87 @@ const BeeswarmViz = ({ spec }: { spec: VizRecord }) => {
           );
         })}
       </div>
-      <div className={styles.beeswarmViz}>
-        {rows.map((row) => (
-          <div key={row.label} className={styles.beeswarmRow}>
-            <div className={styles.beeswarmRowMeta}>
-              <h4>{row.label}</h4>
-              {row.prompt && <p>{row.prompt}</p>}
-            </div>
-            <div className={styles.beeswarmPlot} role="img" aria-label={`${row.label} ratings`}>
-              <span className={styles.beeswarmAxis} />
-              {ticks.map((tick) => (
-                <span
-                  key={`${row.label}-${tick}`}
-                  className={styles.beeswarmTick}
-                  style={{ left: `${clamp(((tick - min) / (max - min)) * 100, 0, 100)}%` }}
-                >
-                  {formatValue(tick, suffix)}
-                </span>
-              ))}
-              {row.values.map((point, index) => {
-                const left = clamp(((point.value - min) / (max - min)) * 100, 0, 100);
-                const top = 26 + (index % 3) * 18;
-                const confidenceLabel = point.confidence > 0 ? `, ${formatValue(point.confidence, '%')} confidence` : '';
-                return (
-                  <span
-                    key={`${row.label}-${point.label}-${index}`}
-                    className={styles.beeswarmDot}
-                    style={{
-                      left: `${left}%`,
-                      top: `${top}%`,
-                      backgroundColor: point.color,
-                      opacity: 0.62 + (point.confidence / 100) * 0.34,
-                    }}
-                    role="img"
-                    aria-label={`${point.label}: ${formatValue(point.value, suffix)}${confidenceLabel}`}
-                    title={`${point.label}: ${formatValue(point.value, suffix)}${confidenceLabel}`}
-                  >
-                    {point.label}
-                  </span>
-                );
-              })}
-            </div>
-            {row.missing.length > 0 && (
-              <p className={styles.beeswarmMissing}>No completed answer: {row.missing.join(', ')}</p>
-            )}
-          </div>
-        ))}
-      </div>
-      {legend.length > 0 && (
-        <div className={styles.vizLegend} aria-label="Participant legend">
-          {legend.map((item) => (
-            <span key={item.label} className={styles.vizLegendItem}>
-              <span className={styles.vizLegendSwatch} style={{ backgroundColor: item.color }} />
-              <span>{item.label}{item.detail ? ` - ${item.detail}` : ''}</span>
-            </span>
-          ))}
-        </div>
-      )}
-      {note && <p className={styles.vizNote}>{note}</p>}
+      {note && <p className={styles.vizNote}>{renderFormattedText(note)}</p>}
     </section>
   );
 };
 
-type ResponseCountDatum = {
-  label: string;
-  value: number;
-  color: string;
+const BeeswarmViz = (props: VizBodyProps) => {
+  if (toText(props.spec.presentation).toLowerCase() !== 'precision') {
+    return <DefaultBeeswarmViz {...props} />;
+  }
+
+  const title = toText(props.spec.title) || 'Rating responses';
+  const min = toNumber(props.spec.min, 0);
+  const max = Math.max(min + 1, toNumber(props.spec.max, 10));
+  const rows = readBeeswarmRows(props.spec);
+
+  if (rows.length === 0) {
+    return <p className={styles.vizFallback}>Visualization has no beeswarm rows.</p>;
+  }
+
+  return (
+    <PrecisionBeeswarmPresentation
+      title={title}
+      subtitle={toText(props.spec.subtitle)}
+      note={toText(props.spec.note)}
+      suffix={toText(props.spec.valueSuffix)}
+      min={min}
+      max={max}
+      rows={rows}
+      hideHeader={props.hideHeader ?? false}
+    />
+  );
 };
 
-type ResponseQuoteDatum = {
+type BinaryBeeswarmQuestionDatum = {
   label: string;
-  text: string;
-};
-
-type ResponsePanelDatum = {
-  kind: string;
-  title: string;
   prompt: string;
-  note: string;
   counts: ResponseCountDatum[];
-  quotes: ResponseQuoteDatum[];
+  total: number;
+  averageConfidence: number;
+  difference: number;
 };
 
-const readResponsePanels = (spec: VizRecord): ResponsePanelDatum[] => (
-  asArray(spec.panels || spec.items)
-    .map((entry, panelIndex): ResponsePanelDatum | null => {
+const readBinaryBeeswarmItems = (spec: VizRecord): BinaryBeeswarmQuestionDatum[] =>
+  asArray(spec.items || spec.questions)
+    .map((entry, itemIndex): BinaryBeeswarmQuestionDatum | null => {
       const record = asRecord(entry);
       if (!record) return null;
-      const title = toText(record.title || record.label);
-      if (!title) return null;
-      const counts = asArray(record.counts || record.choices || record.options)
-        .map((count, countIndex): ResponseCountDatum | null => {
-          const countRecord = asRecord(count);
-          if (!countRecord) return null;
-          const label = toText(countRecord.label);
-          if (!label) return null;
-          return {
-            label,
-            value: Math.max(0, toNumber(countRecord.value)),
-            color: toSafeColor(countRecord.color, PALETTE[(panelIndex + countIndex) % PALETTE.length]),
-          };
-        })
-        .filter((count): count is ResponseCountDatum => !!count);
-      const quotes = asArray(record.quotes || record.examples)
-        .map((quote): ResponseQuoteDatum | null => {
-          const quoteRecord = asRecord(quote);
-          if (!quoteRecord) return null;
-          const text = toText(quoteRecord.text);
-          if (!text) return null;
-          return {
-            label: toText(quoteRecord.label),
-            text,
-          };
-        })
-        .filter((quote): quote is ResponseQuoteDatum => !!quote);
+      const label = toText(record.label || record.title);
+      if (!label) return null;
+      const counts = orderedResponseSplitCounts(
+        asArray(record.counts || record.choices || record.options)
+          .map((count, countIndex): ResponseCountDatum | null => {
+            const countRecord = asRecord(count);
+            if (!countRecord) return null;
+            const countLabel = toText(countRecord.label);
+            if (!countLabel) return null;
+            return {
+              label: countLabel,
+              value: Math.max(0, toNumber(countRecord.value)),
+              color: resolveResponseCountColor(
+                countLabel,
+                countRecord.color,
+                PALETTE[(itemIndex + countIndex) % PALETTE.length],
+              ),
+            };
+          })
+          .filter((count): count is ResponseCountDatum => !!count),
+      );
+      const total = counts.reduce((sum, count) => sum + count.value, 0);
+      if (total <= 0) return null;
+      const maxCount = Math.max(...counts.map((count) => count.value));
       return {
-        kind: toText(record.kind || record.type),
-        title,
-        prompt: toText(record.prompt),
-        note: toText(record.note),
+        label,
+        prompt: toText(record.prompt || record.detail),
         counts,
-        quotes,
+        total,
+        averageConfidence: clamp(toNumber(record.averageConfidence || record.confidence, 0), 0, 100),
+        difference: clamp((total - maxCount) / total, 0, 0.5),
       };
     })
-    .filter((entry): entry is ResponsePanelDatum => !!entry)
-);
+    .filter((entry): entry is BinaryBeeswarmQuestionDatum => !!entry);
 
 type BinaryBeeswarmPlacement = {
   x: number;
@@ -1104,74 +826,83 @@ const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
 const ResponseTypeGridViz = ({ spec, hideHeader = false }: VizBodyProps) => {
   const title = toText(spec.title) || 'Response types';
   const subtitle = toText(spec.subtitle);
-  const panels = readResponsePanels(spec);
+  const panels = readResponsePanels(spec, PALETTE);
   const note = toText(spec.note);
+  const presentation = toText(spec.presentation).toLowerCase();
 
   if (panels.length === 0) {
     return <p className={styles.vizFallback}>Visualization has no response panels.</p>;
   }
 
+  if (presentation === 'editorial') {
+    return (
+      <EditorialResponseTypeGridPresentation
+        title={title}
+        subtitle={subtitle}
+        panels={panels}
+        note={note}
+        hideHeader={hideHeader}
+      />
+    );
+  }
+
   return (
-    <section className={`${styles.vizCard} ${styles.responseTypeCard}`} aria-label={title}>
-      <div className={styles.vizHeader}>
-        <h3 className={styles.vizTitle}>{title}</h3>
-        {subtitle && <p className={styles.vizSubtitle}>{subtitle}</p>}
-      </div>
-      <div className={styles.responseTypeGrid}>
-        {panels.map((panel) => {
-          const maxValue = Math.max(...panel.counts.map((count) => count.value), 1);
-          return (
-            <article key={`${panel.kind}-${panel.title}`} className={styles.responseTypePanel}>
-              {panel.kind && <p className={styles.responseTypeKind}>{panel.kind}</p>}
-              <h4>{panel.title}</h4>
-              {panel.prompt && <p className={styles.responseTypePrompt}>{panel.prompt}</p>}
-              {panel.counts.length > 0 && (
-                <div className={styles.responseBars}>
-                  {panel.counts.map((count) => (
-                    <div key={count.label} className={styles.responseBarRow}>
-                      <div className={styles.responseBarMeta}>
-                        <span>{count.label}</span>
-                        <span>{formatValue(count.value)}</span>
-                      </div>
-                      <div className={styles.responseBarTrack} aria-label={`${count.label}: ${formatValue(count.value)}`}>
-                        <span
-                          className={styles.responseBarFill}
-                          style={{
-                            width: `${clamp((count.value / maxValue) * 100, 6, 100)}%`,
-                            backgroundColor: count.color,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {panel.quotes.length > 0 && (
-                <div className={styles.responseQuotes}>
-                  {panel.quotes.map((quote, index) => (
-                    <figure key={`${quote.label || 'quote'}-${index}`}>
-                      <blockquote>{quote.text}</blockquote>
-                      {quote.label && <figcaption>{quote.label}</figcaption>}
-                    </figure>
-                  ))}
-                </div>
-              )}
-              {panel.note && <p className={styles.responseTypeNote}>{panel.note}</p>}
-            </article>
-          );
-        })}
-      </div>
-      {note && <p className={styles.vizNote}>{note}</p>}
-    </section>
+    <ResponseTypeGridPresentation
+      title={title}
+      subtitle={subtitle}
+      panels={panels}
+      note={note}
+      hideHeader={hideHeader}
+      precision={presentation === 'precision'}
+    />
   );
 };
 
 type PostVizProps = {
   spec: unknown;
   error?: string;
+  defaultOpen?: boolean;
+  nested?: boolean;
+  presentation?: 'disclosure' | 'slide';
 };
 
-const PostViz = ({ spec, error = '' }: PostVizProps) => {
+const getFallbackTitle = (type: string): string => {
+  if (type === 'category-dots') return 'Distribution';
+  if (type === 'quote-wall') return 'Voices';
+  if (type === 'ranked-themes') return 'Ranked themes';
+  if (type === 'theme-network') return 'Theme network';
+  if (type === 'beeswarm') return 'Rating responses';
+  if (type === 'binary-beeswarm') return 'Binary question beeswarm';
+  if (type === 'response-type-grid') return 'Response types';
+  return 'Data exhibit';
+};
+
+export const getPostVizTitle = (spec: unknown): string => {
+  const record = asRecord(spec);
+  const type = toText(record?.type);
+
+  return toText(record?.title) || getFallbackTitle(type);
+};
+
+const renderVizBody = (record: VizRecord, type: string, hideHeader = true) => {
+  if (type === 'category-dots') return <CategoryDotsViz spec={record} hideHeader={hideHeader} />;
+  if (type === 'quote-wall') return <QuoteWallViz spec={record} hideHeader={hideHeader} />;
+  if (type === 'ranked-themes') return <RankedThemesViz spec={record} hideHeader={hideHeader} />;
+  if (type === 'theme-network') return <ThemeNetworkViz spec={record} hideHeader={hideHeader} />;
+  if (type === 'beeswarm') return <BeeswarmViz spec={record} hideHeader={hideHeader} />;
+  if (type === 'binary-beeswarm') return <BinaryBeeswarmViz spec={record} hideHeader={hideHeader} />;
+  if (type === 'response-type-grid') return <ResponseTypeGridViz spec={record} hideHeader={hideHeader} />;
+
+  return <p className={styles.vizFallback}>Unsupported visualization type: {type}</p>;
+};
+
+const PostViz = ({
+  spec,
+  error = '',
+  defaultOpen = true,
+  nested = false,
+  presentation = 'disclosure',
+}: PostVizProps) => {
   if (error) {
     return <p className={styles.vizFallback}>Visualization JSON is invalid.</p>;
   }
@@ -1182,14 +913,31 @@ const PostViz = ({ spec, error = '' }: PostVizProps) => {
     return <p className={styles.vizFallback}>Visualization block is missing a type.</p>;
   }
 
-  if (type === 'category-dots') return <CategoryDotsViz spec={record} />;
-  if (type === 'quote-wall') return <QuoteWallViz spec={record} />;
-  if (type === 'ranked-themes') return <RankedThemesViz spec={record} />;
-  if (type === 'theme-network') return <ThemeNetworkViz spec={record} />;
-  if (type === 'beeswarm') return <BeeswarmViz spec={record} />;
-  if (type === 'response-type-grid') return <ResponseTypeGridViz spec={record} />;
+  const title = getPostVizTitle(record);
+  const inline = toBoolean(record.inline);
 
-  return <p className={styles.vizFallback}>Unsupported visualization type: {type}</p>;
+  if (presentation === 'slide') {
+    // hideTitle only affects the visible header; the title still names the
+    // slide and its dot via getPostVizTitle, so accessible labels survive.
+    return renderVizBody(record, type, toBoolean(record.hideTitle));
+  }
+
+  if (inline) {
+    return <div className={styles.vizInlineContent}>{renderVizBody(record, type)}</div>;
+  }
+
+  return (
+    <details className={`${styles.vizDisclosure} ${nested ? styles.vizDisclosureNested : ''}`} open={defaultOpen}>
+      <summary className={styles.vizDisclosureSummary}>
+        <span>{title}</span>
+        <span className={styles.vizDisclosureIcon} aria-hidden="true">
+          <FontAwesomeIcon className={styles.vizDisclosureIconClosed} icon={faCaretDown} />
+          <FontAwesomeIcon className={styles.vizDisclosureIconOpen} icon={faCaretUp} />
+        </span>
+      </summary>
+      {renderVizBody(record, type)}
+    </details>
+  );
 };
 
 export default PostViz;

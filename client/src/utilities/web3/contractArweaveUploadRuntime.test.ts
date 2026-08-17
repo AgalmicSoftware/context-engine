@@ -29,7 +29,7 @@ describe('buildArweaveUploadBootstrapAuth', () => {
     global.fetch = jest.fn(async () => ({
       ok: true,
       json: async () => ({ nonce: 'nonce-1', sessionSlug: 'demo-sh', sessionId }),
-    })) as typeof fetch;
+    })) as unknown as typeof fetch;
 
     const result = await buildArweaveUploadBootstrapAuth({
       signer,

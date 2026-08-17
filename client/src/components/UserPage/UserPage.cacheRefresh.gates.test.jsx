@@ -25,7 +25,7 @@ describe('UserPage cache refresh gate access', () => {
     const account = '0x00000000000000000000000000000000000000bb';
     const instance = makeInstance({ account });
     const queueSpy = jest.spyOn(instance, 'queueCacheRefresh').mockImplementation(() => {});
-    const cacheKey = instance._buildGateAccessCacheKey({
+    const cacheKey = buildGateAccessCacheKey(instance, {
       slug: 'edge',
       resourceKey: 'questionResponses',
     });
@@ -55,7 +55,7 @@ describe('UserPage cache refresh gate access', () => {
     const instance = makeInstance({ account });
     const queueSpy = jest.spyOn(instance, 'queueCacheRefresh').mockImplementation(() => {});
     const retrySpy = jest.spyOn(instance, 'scheduleResponseGateRetry').mockImplementation(() => {});
-    const cacheKey = instance._buildGateAccessCacheKey({
+    const cacheKey = buildGateAccessCacheKey(instance, {
       slug: 'edge',
       resourceKey: 'questionResponses',
     });
@@ -161,7 +161,7 @@ describe('UserPage cache refresh gate access', () => {
     checkSponsoredAccess.mockImplementation(() => deferred.promise);
     const queueSpy = jest.spyOn(instance, 'queueCacheRefresh').mockImplementation(() => {});
     const retrySpy = jest.spyOn(instance, 'scheduleResponseGateRetry').mockImplementation(() => {});
-    const pendingKey = instance._buildGatePendingKey({
+    const pendingKey = buildUserPageGatePendingKey({
       slug: 'edge',
       resourceKey: 'questionResponses',
     });
@@ -186,11 +186,11 @@ describe('UserPage cache refresh gate access', () => {
     const account = '0x00000000000000000000000000000000000000bb';
     const instance = makeInstance({ account });
     const queueSpy = jest.spyOn(instance, 'queueCacheRefresh').mockImplementation(() => {});
-    const pendingKey = instance._buildGatePendingKey({
+    const pendingKey = buildUserPageGatePendingKey({
       slug: 'edge',
       resourceKey: 'questionResponses',
     });
-    const cacheKey = instance._buildGateAccessCacheKey({
+    const cacheKey = buildGateAccessCacheKey(instance, {
       slug: 'edge',
       resourceKey: 'questionResponses',
     });
@@ -210,16 +210,35 @@ describe('UserPage cache refresh gate access', () => {
     expect(queueSpy).toHaveBeenCalledWith({ markLoading: false, bypassSignature: true });
   });
 
+  it('keeps the nearest response-gate retry timer when later retries are requested', () => {
+    jest.useFakeTimers();
+    const instance = makeInstance();
+    const queueSpy = jest.spyOn(instance, 'queueCacheRefresh').mockImplementation(() => {});
+
+    instance.scheduleResponseGateRetry(30_000);
+    instance.scheduleResponseGateRetry(60_000);
+
+    jest.advanceTimersByTime(29_999);
+    expect(queueSpy).not.toHaveBeenCalled();
+
+    jest.advanceTimersByTime(1);
+    expect(queueSpy).toHaveBeenCalledTimes(1);
+    expect(queueSpy).toHaveBeenCalledWith({ markLoading: false, bypassSignature: true });
+
+    jest.advanceTimersByTime(30_000);
+    expect(queueSpy).toHaveBeenCalledTimes(1);
+  });
+
   it('schedules a delayed refresh when error gate access is still within retry TTL', () => {
     jest.useFakeTimers();
     const account = '0x00000000000000000000000000000000000000bb';
     const instance = makeInstance({ account });
     const queueSpy = jest.spyOn(instance, 'queueCacheRefresh').mockImplementation(() => {});
-    const pendingKey = instance._buildGatePendingKey({
+    const pendingKey = buildUserPageGatePendingKey({
       slug: 'edge',
       resourceKey: 'questionResponses',
     });
-    const cacheKey = instance._buildGateAccessCacheKey({
+    const cacheKey = buildGateAccessCacheKey(instance, {
       slug: 'edge',
       resourceKey: 'questionResponses',
     });
@@ -244,11 +263,11 @@ describe('UserPage cache refresh gate access', () => {
     const account = '0x00000000000000000000000000000000000000bb';
     const instance = makeInstance({ account });
     const queueSpy = jest.spyOn(instance, 'queueCacheRefresh').mockImplementation(() => {});
-    const pendingKey = instance._buildGatePendingKey({
+    const pendingKey = buildUserPageGatePendingKey({
       slug: 'edge',
       resourceKey: 'questionResponses',
     });
-    const cacheKey = instance._buildGateAccessCacheKey({
+    const cacheKey = buildGateAccessCacheKey(instance, {
       slug: 'edge',
       resourceKey: 'questionResponses',
     });

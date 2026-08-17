@@ -221,7 +221,7 @@ const ToolExplorer = (props: ToolExplorerProps) => {
       sessionSlug: toStr(props.activeSessionSlug),
       migrateLegacyToSessionKey: true,
       clearInvalid: true,
-    } as any);
+    });
 
   const handleClick = (Component: ToolComponent, data: ToolData) => {
     if (!data.disabled) {

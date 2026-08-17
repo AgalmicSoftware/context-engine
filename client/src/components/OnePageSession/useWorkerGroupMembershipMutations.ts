@@ -74,7 +74,8 @@ export const useWorkerGroupMembershipMutations = (targetKey: string) => {
   );
 
   return {
-    membershipActions: membershipActionState.targetKey === targetKey ? membershipActionState.actions : noMembershipActions,
+    membershipActions:
+      membershipActionState.targetKey === targetKey ? membershipActionState.actions : noMembershipActions,
     beginMembershipMutation,
     finishMembershipMutation,
     isMembershipMutationCurrent,

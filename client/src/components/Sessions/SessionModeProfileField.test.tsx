@@ -6,9 +6,9 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 describe('SessionModeProfileField', () => {
-  it('renders compact hosting choices with Corporate visibly unavailable', () => {
+  it('renders two entry cards with the inputs needed for each setup path', () => {
     const onChange = jest.fn();
-    render(<SessionModeProfileField registryChainId={11155420} onChange={onChange} />);
+    render(<SessionModeProfileField registryChainId={11155420} onChange={onChange} entryOnly />);
 
     expect(screen.queryByTestId('ce-new-preset-continue')).not.toBeInTheDocument();
     expect(screen.queryByText('How should this session run?')).not.toBeInTheDocument();
@@ -135,7 +135,7 @@ describe('SessionModeProfileField', () => {
 
     expect(onChange).toHaveBeenCalledWith(
       expect.objectContaining({
-        preset: 'trustless_public_decentralized',
+        preset: 'custom',
         evm: { registryChainId: 84532 },
         storage: { backend: 'arweave' },
       }),
@@ -149,12 +149,7 @@ describe('SessionModeProfileField', () => {
     const onChange = jest.fn();
     const onContinue = jest.fn();
     render(
-      <SessionModeProfileField
-        registryChainId={11155420}
-        onChange={onChange}
-        onContinue={onContinue}
-        entryOnly
-      />,
+      <SessionModeProfileField registryChainId={11155420} onChange={onChange} onContinue={onContinue} entryOnly />,
     );
 
     fireEvent.click(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare'));

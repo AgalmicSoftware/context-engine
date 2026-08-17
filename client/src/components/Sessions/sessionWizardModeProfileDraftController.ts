@@ -45,8 +45,8 @@ export const applyGroupCreationPolicyToDraft = <Draft extends SessionWizardModeD
 export const applyStorageProfileChangeToModeDraft = <Draft extends SessionWizardModeDraft>(
   prev: Draft,
   nextProfile: unknown,
-): SessionWizardModeDraft => {
-  const next = deepClone(prev);
+): Draft => {
+  const next = deepClone(prev) as Draft;
   const normalizedProfile = normalizeSessionStorageProfileConfig(nextProfile);
   next.storageProfile = normalizedProfile;
   if (isRecord(next.sessionModeProfile)) {
@@ -74,8 +74,8 @@ export const applyStorageProfileChangeToModeDraft = <Draft extends SessionWizard
   return next;
 };
 
-export const applySessionModeProfileSelectionToDraft = (
-  prev: SessionWizardModeDraft,
+export const applySessionModeProfileSelectionToDraft = <Draft extends SessionWizardModeDraft>(
+  prev: Draft,
   profile: SessionModeProfile,
   compiled: { storageProfile: UnknownRecord },
 ): DraftWithSelectedModeProfile<Draft> => {

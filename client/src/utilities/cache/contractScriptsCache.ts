@@ -182,12 +182,15 @@ export const ARWEAVE_TX_CACHE_MAX_ENTRIES = 1200;
 export const ARWEAVE_TX_FAILURE_CACHE_MAX_ENTRIES = 1200;
 export const HASH_MISS_SENTINEL = '__ce_hash_missing__';
 
-const pruneTimestampedRecord = (record, { tsField, maxEntries } = {}) => {
+const pruneTimestampedRecord = (record: TimestampedRecord, { tsField, maxEntries }: PruneTimestampedOptions = {}) => {
   if (!record || typeof record !== 'object') return record;
+  const timestampField = tsField || 'ts';
   const max = Math.max(0, Math.floor(Number(maxEntries) || 0));
   const keys = Object.keys(record);
   if (max <= 0 || keys.length <= max) return record;
-  const sorted = keys.map((key) => ({ key, ts: Number(record?.[key]?.[tsField] || 0) })).sort((a, b) => a.ts - b.ts);
+  const sorted = keys
+    .map((key) => ({ key, ts: Number(record?.[key]?.[timestampField] || 0) }))
+    .sort((a, b) => a.ts - b.ts);
   for (let i = 0; i < sorted.length - max; i += 1) {
     try {
       delete record[sorted[i].key];
@@ -282,10 +285,11 @@ const resolveSession = (groupKeyOrCfg: unknown): SessionConfigRecord | null => {
   return getDemoDefaultSessionConfig();
 };
 
-export const memoizedResolveSession = (groupKeyOrCfg) => {
+export const memoizedResolveSession = (groupKeyOrCfg: unknown) => {
+  const groupRecord = asSessionConfigRecord(groupKeyOrCfg);
   const resolvedInput =
-    groupKeyOrCfg && typeof groupKeyOrCfg === 'object' && groupKeyOrCfg._isWeb3Context === true
-      ? (groupKeyOrCfg.groupKeyOrCfg ?? groupKeyOrCfg.cfg ?? groupKeyOrCfg)
+    groupRecord && groupRecord._isWeb3Context === true
+      ? (groupRecord.groupKeyOrCfg ?? groupRecord.cfg ?? groupRecord)
       : groupKeyOrCfg;
   const key =
     resolvedInput === undefined
@@ -365,12 +369,12 @@ export const setTimedMemoValue = <T>(
 
 export const buildHashReadMemoKey = ({ baseKey, id }: HashReadMemoKeyInput) => `${baseKey}|${id}`;
 
-export const buildHashReadInflightKey = ({ baseKey, id, throwOnError = false }) =>
+export const buildHashReadInflightKey = ({ baseKey, id, throwOnError = false }: HashReadInflightKeyInput) =>
   `${buildHashReadMemoKey({ baseKey, id })}|strict:${throwOnError ? '1' : '0'}`;
 
 const readQuestionsCacheStorage = async (slug: string): Promise<UnknownRecord> => {
   const parsed = await readCache('questionsCache', slug);
-  return parsed && typeof parsed === 'object' ? parsed : {};
+  return isRecord(parsed) ? parsed : {};
 };
 
 const ensureQuestionsNetworkNode = (cacheObj: UnknownRecord, netIdStr: string): QuestionsNetworkNode => {
@@ -443,7 +447,7 @@ export const createContractScriptsCache = ({
     return String(Math.max(0, Math.floor(n)));
   };
 
-  const buildSbtScopeMemoTag = (groupKeyOrCfg, resolvedCfg = null) => {
+  const buildSbtScopeMemoTag = (groupKeyOrCfg: unknown, resolvedCfg: SessionConfigRecord | null = null) => {
     const cfg =
       resolvedCfg && typeof resolvedCfg === 'object'
         ? resolvedCfg
@@ -466,7 +470,7 @@ export const createContractScriptsCache = ({
     return next;
   };
 
-  const isLatestSbtMemoRun = (store, memoKey, runVersion) =>
+  const isLatestSbtMemoRun = (store: RunVersionStore, memoKey: string, runVersion: unknown) =>
     Number(store?._runVersion?.[memoKey] || 0) === Number(runVersion || 0);
 
   const buildSessionStartCacheKey = (chainId: unknown, registrySlug: unknown) => {
@@ -708,8 +712,8 @@ export const createContractScriptsCache = ({
     const { slug, chainId } = resolveReadContext(groupKeyOrCfg);
     if (!chainId) return null;
     const netIdStr = String(chainId);
-    await updateCacheAtomic('questionsCache', slug, (current) => {
-      const cache = current && typeof current === 'object' ? current : {};
+    await updateCacheAtomic('questionsCache', slug, (current: unknown) => {
+      const cache = isRecord(current) ? current : {};
       const net = ensureQuestionsNetworkNode(cache, netIdStr);
       net.arweaveTxFailureCache[normalizedTxId] = { ...normalizedEntry };
       pruneTimestampedRecord(net.arweaveTxFailureCache, {
@@ -728,8 +732,8 @@ export const createContractScriptsCache = ({
     const { slug, chainId } = resolveReadContext(groupKeyOrCfg);
     if (!chainId) return;
     const netIdStr = String(chainId);
-    await updateCacheAtomic('questionsCache', slug, (current) => {
-      const cache = current && typeof current === 'object' ? current : {};
+    await updateCacheAtomic('questionsCache', slug, (current: unknown) => {
+      const cache = isRecord(current) ? current : {};
       const net = ensureQuestionsNetworkNode(cache, netIdStr);
       if (
         net.arweaveTxFailureCache &&
@@ -755,8 +759,8 @@ export const createContractScriptsCache = ({
     const { slug, chainId } = resolveReadContext(groupKeyOrCfg);
     if (!chainId) return;
     const netIdStr = String(chainId);
-    await updateCacheAtomic('questionsCache', slug, (current) => {
-      const cache = current && typeof current === 'object' ? current : {};
+    await updateCacheAtomic('questionsCache', slug, (current: unknown) => {
+      const cache = isRecord(current) ? current : {};
       const net = ensureQuestionsNetworkNode(cache, netIdStr);
       net.arweaveTxCache[normalizedTxId] = {
         text,
@@ -771,10 +775,15 @@ export const createContractScriptsCache = ({
     });
   };
 
-  const buildArweaveTxFetchInflightKey = ({ chainId, txId, forceFetch = false }) =>
+  const buildArweaveTxFetchInflightKey = ({ chainId, txId, forceFetch = false }: ArweaveInflightKeyInput) =>
     `${Number(chainId || 0)}|${String(txId || '').trim()}|force:${forceFetch ? '1' : '0'}`;
 
-  const runArweaveTxFetchCoalesced = async ({ chainId, txId, forceFetch = false, task }) => {
+  const runArweaveTxFetchCoalesced = async <T>({
+    chainId,
+    txId,
+    forceFetch = false,
+    task,
+  }: ArweaveInflightRunInput<T>) => {
     const inflightKey = buildArweaveTxFetchInflightKey({ chainId, txId, forceFetch });
     if (ARWEAVE_TX_FETCH_INFLIGHT.has(inflightKey)) {
       return ARWEAVE_TX_FETCH_INFLIGHT.get(inflightKey);

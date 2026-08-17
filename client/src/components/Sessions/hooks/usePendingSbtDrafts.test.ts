@@ -57,7 +57,7 @@ describe('usePendingSbtDrafts', () => {
     ]);
   });
 
-  it('retains the memory update while reporting a failed legacy-artifact purge', () => {
+  it('reports a throwing sessionStorage clear instead of swallowing it', () => {
     const storage = {
       removeItem: jest.fn(() => {
         throw new Error('sessionStorage denied');

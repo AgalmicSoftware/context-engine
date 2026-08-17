@@ -1,9 +1,12 @@
 import {
+  SESSION_STORAGE_PAYLOAD_ACCESS_GATES,
+  SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES,
   SESSION_STORAGE_PAYLOAD_ACCESS_MODES,
   normalizeSessionStorageConfig,
   requiresLitForSessionStorage,
   resolveSessionStorageBackend,
   usesCloudflareSessionStorage,
+  usesPublicReadCloudflareStorage,
   usesWorkerSbtGateCloudflareStorage,
 } from './sessionStorageConfig.js';
 import { STORAGE_BACKENDS } from './storageRefs.js';

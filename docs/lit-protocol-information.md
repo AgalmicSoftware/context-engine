@@ -100,9 +100,10 @@ still useful for understanding the older Naga-era implementation.
   - `litGroupId`
   - `litPkpId`
   - `litActionCid`
-- `/session/new` now treats Lit setup in two distinct modes:
-  - bootstrap authority: `litApiBase` + `litAccountApiKey`
-  - scoped runtime: `litApiBase` + `litGroupId` + `litPkpId` + `litActionCid` + `litUsageApiKey`
+- `/session/new` now presents the Lit setup as one manual field:
+  - bootstrap authority: `litAccountApiKey` / `LIT_ACCOUNT_API_KEY`
+  - the worker uses the default Chipotle API base unless worker config/env overrides it, then derives and persists `litApiBase`, `litGroupId`, `litPkpId`, `litActionCid`, and `litUsageApiKey`
+  - scoped-runtime identifiers remain supported as worker-side/admin/sponsored-bundle config, but they are no longer hand-entered in the `/new` Lit card
 - `/admin` Lit quick tests now run against the currently active hook runtime rather than assuming a hidden legacy default.
 - When passkey EOA soft-session mode is enabled and the current page has an
   unlocked in-memory signer, typed-data signatures are auto-signed, so worker
@@ -596,10 +597,10 @@ Key official pages used for traceability: see [Lit Protocol Developer Docs](http
 - Dev helper: `window.__litTools.encryptForSbt({ value, sbtAddresses, contextLabel })` returns a v1 envelope string.
 - Dev helper: `window.__litTools.decryptEnvelope(envelopeJson)` decrypts a v1 envelope (if you hold the gate SBT).
 - `/admin` now uses worker-mediated Lit status/bootstrap/provision checks; there is no supported generic admin execute helper.
-- `/new` Session Wizard no longer shows a Lit quick-test panel; when old Lit metadata is rewritten it normalizes legacy network labels onto `chipotle`.
+- `/new` Session Wizard no longer shows a Lit quick-test panel or scoped runtime fields; when old Lit metadata is rewritten it normalizes legacy network labels onto `chipotle`.
 - Demo session secrets live in `client/src/variables/demo/demo_sessions.json` under the `test` session.
 
 - CE should default to one reusable group per environment or trust boundary, not one group per session. The SBT gate itself belongs in Lit Action code and request params. Session-specific groups remain an optional isolation choice, not the default migration target.
 - Session Wizard can now automate both Chipotle setup modes from canonical CE action source:
   - existing-account mode: use `lit-chipotle-provision` to register the default CE action into a configured group/PKP, preferring a stored session `litAccountApiKey` and falling back to deployment-level `LIT_ACCOUNT_API_KEY`
-  - bootstrap mode: use `lit-chipotle-bootstrap-session` to either create a brand-new Lit account or, when a session/deployment `litAccountApiKey` already exists, derive the missing default group, PKP, usage key, and CE action inside that existing account before persisting the returned `litCredentials`
+  - bootstrap mode: use `lit-chipotle-bootstrap-session` with a stored/session/deployment `litAccountApiKey` to derive the missing default group, PKP, usage key, and CE action before persisting the returned `litCredentials`; if no account key is available, the worker can still create a brand-new session account

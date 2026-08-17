@@ -1,7 +1,4 @@
-import {
-  getNativeBalance,
-  hasNativeBalanceReader,
-} from './sessionBalanceReaders';
+import { getNativeBalance, hasNativeBalanceReader } from './sessionBalanceReaders';
 import contractScripts from '../../utilities/web3/chainGateway.js';
 
 jest.mock('../../utilities/web3/chainGateway.js', () => ({

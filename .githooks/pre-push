@@ -85,7 +85,7 @@ is_allowed_public_ref() {
   local ref_name="$1"
 
   case "$ref_name" in
-    refs/heads/dev)
+    refs/heads/main|refs/heads/release-staging*|refs/tags/*)
       return 0
       ;;
   esac
@@ -464,11 +464,9 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     continue
   fi
 
-  if is_protected_branch_ref "$local_ref" || is_protected_branch_ref "$remote_ref"; then
-    printf 'Blocked push of the private `dev` branch to %s.\n' "$REMOTE_NAME" >&2
-    printf 'Use `scripts/sync-public-history.sh` to publish `release-staging` instead.\n' >&2
-    printf 'If this push is truly intentional, rerun with `CE_ALLOW_PRIVATE_BRANCH_PUSH=1`.\n' >&2
-    exit 1
+  if ! is_allowed_public_ref "$remote_ref"; then
+    blocked_refs+=("$remote_ref")
+    continue
   fi
 
   case "$remote_ref" in
@@ -541,7 +539,7 @@ for index in "${!release_candidate_shas[@]}"; do
   )
 
   if [ "$baseline_sha" != "$ZERO_OID" ]; then
-    verify_args+=(--baseline-ref "$baseline_sha")
+    verify_args+=(--minimum-ref "$baseline_sha")
   fi
 
   if ! collect_public_main_refs; then

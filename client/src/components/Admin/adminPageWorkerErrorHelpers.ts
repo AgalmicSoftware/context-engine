@@ -71,7 +71,7 @@ export const sleep = (ms: unknown): Promise<void> => new Promise((resolve) => se
 export const addSessionConfigHint = (message: unknown): string => {
   const raw = toStr(message).trim();
   if (!raw)
-    return 'Worker session config is missing. Run the AI test again as admin to seed it, or re-deploy for this slug.';
+    return 'Worker canonical config is missing. Return to /new with this Worker URL to complete signed setup, then retry.';
   if (!raw.toLowerCase().includes('session config not found')) return raw;
   return `${raw} Return to /new with this Worker URL to complete signed setup, then verify the Worker URL and selected session slug match.`;
 };

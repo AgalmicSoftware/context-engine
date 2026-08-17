@@ -190,9 +190,11 @@ const isMainSitePresent = <T>(value: T | null | undefined): value is T => value 
 const readMainSiteErrorMessage = (error: unknown): unknown => (error instanceof Error ? error.message : error);
 
 const isMainSiteProfilePersistenceFailure = (error: unknown): boolean =>
-  !!error && typeof error === 'object' && (error as { cachePersistenceFailed?: unknown }).cachePersistenceFailed === true;
+  !!error &&
+  typeof error === 'object' &&
+  (error as { cachePersistenceFailed?: unknown }).cachePersistenceFailed === true;
 
-const persistMainSiteProfileCacheAtomic = async <TValue,>(
+const persistMainSiteProfileCacheAtomic = async <TValue>(
   namespace: 'sbtCache' | 'userCache',
   slug: string,
   updater: (current: TValue | null) => TValue | Promise<TValue>,
@@ -1002,12 +1004,15 @@ export const runMainSiteScanSpecificUserProfile = async (
         }
 
         // Persist only this user/chain node so concurrent response writers survive the profile scan.
-        await persistMainSiteProfileCacheAtomic<MainSiteProfileUserCache>('userCache', slug, (currentIn) =>
-          mergeMainSiteProfileUserCache(currentIn, {
-            chainEntry,
-            netKey,
-            targetLower,
-          }) as MainSiteProfileUserCache,
+        await persistMainSiteProfileCacheAtomic<MainSiteProfileUserCache>(
+          'userCache',
+          slug,
+          (currentIn) =>
+            mergeMainSiteProfileUserCache(currentIn, {
+              chainEntry,
+              netKey,
+              targetLower,
+            }) as MainSiteProfileUserCache,
         );
 
         if (!hasNewData) {

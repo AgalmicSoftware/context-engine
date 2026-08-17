@@ -7,32 +7,24 @@ jest.mock('utilities/logging', () => ({
   })),
 }));
 
-jest.mock(
-  '../../utilities/cache/cacheScripts.js',
-  () => ({
-    __esModule: true,
-    readCache: jest.fn(),
-  }),
-  { virtual: true },
-);
+jest.mock('../../utilities/cache/cacheScripts', () => ({
+  __esModule: true,
+  readCache: jest.fn(),
+}));
 
-jest.mock('../../components/MainSite/cacheConstants', () => ({
+jest.mock('./sessionCacheConstants', () => ({
   __esModule: true,
   DG_PRIMARY_ROUTE_CACHE_NAMES: ['surveysCache', 'questionsCache', 'sbtCache'],
 }));
 
-jest.mock(
-  '../../utilities/web3/contractScripts.js',
-  () => ({
-    __esModule: true,
-    normalizeSessionSlug: jest.fn(),
-  }),
-  { virtual: true },
-);
+jest.mock('../../utilities/web3/chainGateway', () => ({
+  __esModule: true,
+  normalizeSessionSlug: jest.fn(),
+}));
 
 const { createSessionCachePersistenceController } = require('./sessionCachePersistenceController.js');
-const { readCache } = require('../../utilities/cache/cacheScripts.js');
-const contractScriptsModule = require('../../utilities/web3/contractScripts.js');
+const { readCache } = require('../../utilities/cache/cacheScripts');
+const contractScriptsModule = require('../../utilities/web3/chainGateway');
 
 const createMockHost = (opts = {}) => {
   const state = { cacheHasLoaded: false, ...opts.initialState };

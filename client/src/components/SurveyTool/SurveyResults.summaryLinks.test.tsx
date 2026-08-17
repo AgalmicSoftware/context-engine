@@ -18,33 +18,36 @@ import {
 } from './surveyResultsSummaryModels';
 import { renderSurveyResults } from './surveyResultsTestHarness';
 import styles from './SurveyResults.module.scss';
-import * as cacheScriptsModule from '../../utilities/cache/cacheScripts.js';
-import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
-import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
-import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
-import * as sessionScanScopeModule from '../../utilities/session/sessionScanScope.js';
-import { resolveSurveyResultsQuestionReadScope } from './surveyResultsSessionResolution.js';
-import { sbtBasePath } from '../../utilities/ui/terminology.js';
-import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
-import SurveyResultsModalHeader from './SurveyResultsModalHeader';
-import SurveyResultsQuestionSummaryCard from './SurveyResultsQuestionSummaryCard';
+import type { SurveyResultsSyncStatusDisplayPlan } from './surveyResultsSyncStatusController';
 
-type TreeNode = any;
-type TreePredicate = (node: TreeNode) => boolean;
-type SurveyResultsProps = Record<string, any>;
 const cacheScripts: any = cacheScriptsModule;
-const sessionScanScope: any = sessionScanScopeModule;
+
+const NETWORK_ID = '84532';
+const RESPONDER_ONE = '0x1111111111111111111111111111111111111111';
+const RESPONDER_TWO = '0x2222222222222222222222222222222222222222';
+const VIEW_MODE_SWITCH_NAME = 'Toggle between individual and aggregate view';
 
 const mockSbtFilter = jest.fn((..._args: any[]) => null);
 jest.mock('../SBTs/SBTFilter', () => (props: any) => {
   mockSbtFilter(props);
   return null;
 });
-jest.mock('./QuestionFilter', () => () => null);
+const mockQuestionFilter = jest.fn((..._args: any[]) => null);
+jest.mock('./QuestionFilter', () => {
+  const ReactActual = jest.requireActual('react');
+  return ReactActual.forwardRef((props: any, ref: any) => {
+    mockQuestionFilter(props);
+    ReactActual.useImperativeHandle(ref, () => ({
+      handleApplyFilters: jest.fn(),
+      handleClearFilters: jest.fn(),
+    }));
+    return null;
+  });
+});
 const mockPolisReport = jest.fn((..._args: any[]) => null);
 jest.mock('../PolisReport/PolisReport', () => (props: any) => {
   mockPolisReport(props);
-  return null;
+  return <div data-testid="surveyresults-demo-polis-report">Polis Report</div>;
 });
 const mockSingleQuestionResponse = jest.fn((..._args: any[]) => null);
 jest.mock('./SingleQuestionResponse', () => (props: any) => {
@@ -89,33 +92,13 @@ jest.mock('../MainContent/RiskMatrix', () => ({
   },
 }));
 
-const SurveyResults: any = (ConnectedSurveyResults as any).WrappedComponent;
-
-const createSubject = (props: SurveyResultsProps = {}): any =>
-  new SurveyResults({
-    network: { id: 84532 },
-    ...props,
-  });
-
-const createDeferred = <T,>() => {
-  let resolve!: (value: T | PromiseLike<T>) => void;
-  let reject!: (reason?: any) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
+type CacheEnvironment = {
+  bookmarksBySlug?: Record<string, any>;
+  questionsBySlug?: Record<string, any>;
+  surveysBySlug?: Record<string, any>;
 };
 
-const attachStateHarness = (subject: any): any => {
-  subject.setState = jest.fn((updater, cb) => {
-    const patch = typeof updater === 'function' ? updater(subject.state, subject.props) : updater;
-    subject.state = { ...subject.state, ...(patch || {}) };
-    if (typeof cb === 'function') cb();
-    return patch;
-  });
-  return subject;
-};
+let cacheUpdateListener: ((update: Record<string, any>) => void) | null = null;
 
 const normalizeQuestionCache = (bucket: Record<string, any> = {}): Record<string, any> => ({
   [NETWORK_ID]: {
@@ -303,25 +286,21 @@ const switchToAggregateView = async (): Promise<void> => {
   });
 };
 
-const collectTreeNodes = (
-  node: TreeNode,
-  predicate: TreePredicate,
-  acc: TreeNode[] = []
-): TreeNode[] => {
-  if (node == null) return acc;
-  if (Array.isArray(node)) {
-    node.forEach((child) => collectTreeNodes(child, predicate, acc));
-    return acc;
+const switchToIndividualsView = async (): Promise<void> => {
+  const viewSwitch = await screen.findByRole('switch', { name: VIEW_MODE_SWITCH_NAME });
+  if (viewSwitch.getAttribute('aria-checked') === 'true') {
+    fireEvent.click(viewSwitch);
   }
   await waitFor(() => {
     expect(screen.getByRole('switch', { name: VIEW_MODE_SWITCH_NAME })).toHaveAttribute('aria-checked', 'false');
   });
 };
 
-const normalizeChildren = (children: TreeNode): TreeNode[] => {
-  if (children == null) return [];
-  if (Array.isArray(children)) return children.filter(Boolean);
-  return [children].filter(Boolean);
+const openQuestionTable = async (): Promise<void> => {
+  fireEvent.click(screen.getByText(/View & Sort Questions/));
+  await waitFor(() => {
+    expect(screen.getByRole('columnheader', { name: /Prompt/ })).toBeInTheDocument();
+  });
 };
 
 const getTableRowByPrompt = (prompt: string): HTMLElement => {
@@ -373,12 +352,15 @@ const buildSyncStatusDisplay = (
 });
 
 beforeEach(() => {
+  localStorage.clear();
   mockSbtFilter.mockClear();
+  mockQuestionFilter.mockClear();
   mockPolisReport.mockClear();
   mockSingleQuestionResponse.mockClear();
   mockDemoAnalysisWorkspace.mockClear();
   mockDebateMap.mockClear();
   mockRiskMatrix.mockClear();
+  cacheUpdateListener = null;
 });
 
 afterEach(() => {
@@ -393,120 +375,10 @@ afterEach(() => {
 
 describe('SurveyResults multichoice aggregator summary', () => {
   it('renders the empty multichoice state inside the SurveyResults-only aggregator panel', () => {
-    const subject = createSubject();
-
-    const tree = subject.renderMultichoiceAggregatorSummary([], {
-      id: 'q1',
-      type: 'multichoice',
-      options: ['Alpha', 'Beta'],
-    });
-    const panel = findElement(
-      tree,
-      (element) => typeof element?.props?.className === 'string' && element.props.className.includes('surveyResultsAggregatorPanel')
-    );
-
-    expect(panel).toBeTruthy();
-    expect(treeHasText(tree, 'No multichoice responses available.')).toBe(true);
-  });
-
-  it('renders multichoice question cards with the SurveyResults-only freeform-style summary rows', () => {
-    const subject = createSubject();
-    subject.state = {
-      ...subject.state,
-      activeQuestionToggles: { q1: true },
-      surveyId: 'survey-1',
-    };
-
-    const markup = renderToStaticMarkup(subject.renderQuestionSummary(
-      'q1',
-      [
-        {
-          responder: '0xaaa',
-          timestamp: 1,
-          response: { type: 'multichoice', answer: { value: ['Alpha'] } },
-        },
-        {
-          responder: '0xaaa',
-          timestamp: 2,
-          response: { type: 'multichoice', answer: { value: ['Alpha', 'Beta'] } },
-        },
-        {
-          responder: '0xbbb',
-          timestamp: 1,
-          response: { type: 'multichoice', answer: { value: ['Alpha'] } },
-        },
-      ],
-      {
-        q1: {
+    const { container } = render(
+      <SurveyResultsMultichoiceAggregatorSummary
+        summary={buildSurveyResultsMultichoiceSummaryModel([], {
           id: 'q1',
-          prompt: 'Pick some options',
-          type: 'multichoice',
-          options: ['Alpha', 'Beta', 'Gamma'],
-        },
-      }
-    ));
-
-    expect(markup).toContain('2 total responders to this multichoice question.');
-    expect(markup).toContain('Alpha');
-    expect(markup).toContain('2 (100.00%)');
-    expect(markup).toContain('Beta');
-    expect(markup).toContain('1 (50.00%)');
-    expect(markup).toContain('Gamma');
-    expect(markup).toContain('0 (0.00%)');
-  });
-
-  it('keeps the SurveyResults multichoice summary renderer when question metadata is still missing', () => {
-    const subject = createSubject();
-    subject.state = {
-      ...subject.state,
-      activeQuestionToggles: { q1: true },
-      surveyId: 'survey-1',
-    };
-
-    const markup = renderToStaticMarkup(subject.renderQuestionSummary(
-      'q1',
-      [
-        {
-          responder: '0xaaa',
-          timestamp: 2,
-          response: { type: 'multichoice', answer: { value: ['Alpha', 'Beta'] } },
-        },
-      ],
-      {}
-    ));
-
-    expect(markup).toContain('No metadata found for this question in local cache.');
-    expect(markup).toContain('1 total responders to this multichoice question.');
-    expect(markup).toContain('Alpha');
-    expect(markup).toContain('Beta');
-  });
-
-  it('shows the deduped latest-responder count in the question card header', () => {
-    const subject = createSubject();
-    subject.state = {
-      ...subject.state,
-      activeQuestionToggles: { q1: true },
-      surveyId: 'survey-1',
-    };
-
-    const tree = subject.renderQuestionSummary(
-      'q1',
-      [
-        {
-          responder: '0xaaa',
-          timestamp: 1,
-          response: { type: 'multichoice', answer: { value: ['Alpha'] } },
-        },
-        {
-          responder: '0xaaa',
-          timestamp: 2,
-          response: { type: 'multichoice', answer: { value: ['Alpha', 'Beta'] } },
-        },
-      ],
-      {
-        q1: {
-          id: 'q1',
-          prompt: 'Pick some options',
           type: 'multichoice',
           options: ['Alpha', 'Beta'],
         })}
@@ -780,48 +652,30 @@ describe('SurveyResults selected result display wiring', () => {
 });
 
 describe('SurveyResults question table counts', () => {
-  it('dedupes the question-table response count by responder before sorting/display', () => {
-    const subject = createSubject();
-    subject.state = {
-      ...subject.state,
-      questionIdSortBy: 'responses',
-      questionIdSortAsc: true,
-    };
-
-    const entries = subject.getMemoizedQuestionTableEntries(
-      {
-        q1: [
-          {
-            responder: '0xaaa',
-            timestamp: 1,
-            response: { answer: { value: 'Old answer' } },
+  it('dedupes the question-table response count by responder before sorting/display', async () => {
+    seedCacheEnvironment({
+      questionsBySlug: {
+        demo: buildQuestionCache({
+          questions: {
+            q1: { id: 'q1', prompt: 'Question one', type: 'freeform' },
           },
-          {
-            responder: '0xaaa',
-            timestamp: 2,
-            response: { answer: { value: 'Latest answer' } },
+          questionResponses: {
+            q1: {
+              [RESPONDER_ONE]: { answer: { value: 'Old answer' }, timeStamp: 1 },
+              [RESPONDER_ONE.toUpperCase()]: { answer: { value: 'Latest answer' }, timeStamp: 2 },
+              [RESPONDER_TWO]: { answer: { value: 'Other responder' }, timeStamp: 1 },
+            },
           },
-          {
-            responder: '0xbbb',
-            timestamp: 1,
-            response: { answer: { value: 'Other responder' } },
-          },
-        ],
+        }),
       },
-      {
-        q1: {
-          prompt: 'Question one',
-          type: 'freeform',
-        },
-      }
-    );
+    });
 
-    expect(entries).toEqual([
-      expect.objectContaining({
-        questionId: 'q1',
-        responsesCount: 2,
-      }),
-    ]);
+    renderQuestionResults({ activeSessionSlug: 'demo', sessionSlug: 'demo' });
+    await waitForText('Question one');
+    await openQuestionTable();
+
+    const row = getTableRowByPrompt('Question one');
+    expect(within(row).getByText('2')).toBeInTheDocument();
   });
 });
 
@@ -837,10 +691,10 @@ describe('SurveyResults filter summary counts', () => {
       />,
     );
 
-    expect(summaryNode).toBeTruthy();
-    expect(treeHasText(summaryNode, '17')).toBe(true);
-    expect(treeHasText(summaryNode, '29')).toBe(true);
-    expect(spinnerNodes).toHaveLength(0);
+    const summaryNode = container.querySelector('[class*="filterSummaryText"]') as HTMLElement;
+    expect(summaryNode).toHaveTextContent('17');
+    expect(summaryNode).toHaveTextContent('29');
+    expect(summaryNode.querySelectorAll('[data-icon="spinner"]')).toHaveLength(0);
   });
 
   it('keeps the summary spinners while counts have not hydrated yet', () => {
@@ -854,8 +708,8 @@ describe('SurveyResults filter summary counts', () => {
       />,
     );
 
-    expect(summaryNode).toBeTruthy();
-    expect(spinnerNodes).toHaveLength(2);
+    const summaryNode = container.querySelector('[class*="filterSummaryText"]') as HTMLElement;
+    expect(summaryNode.querySelectorAll('[data-icon="spinner"]')).toHaveLength(2);
   });
 
   it('clamps stale filtered summary counts so they never exceed the visible totals', () => {
@@ -903,72 +757,31 @@ describe('SurveyResults sync status display', () => {
 });
 
 describe('SurveyResults demo results views', () => {
-  it('shows the demo results switcher only for configured demo question results', () => {
-    const nonDemoSubject = createSubject({
-      isOpen: true,
-      viewMode: 'questions',
-      sessionSlug: 'edge',
+  it('shows the demo results switcher only for configured demo question results', async () => {
+    seedCacheEnvironment();
+    const view = renderQuestionResults({ sessionSlug: 'edge', activeSessionSlug: 'edge' });
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Question Results' })).toBeInTheDocument();
     });
-    nonDemoSubject.state = {
-      ...nonDemoSubject.state,
-      viewMode: 'questions',
-    };
+    expect(screen.queryByTestId('ce-surveyresults-demo-view-nav')).toBeNull();
 
-    const nonDemoTree = nonDemoSubject.render();
-    const nonDemoNav = findElement(
-      nonDemoTree,
-      (element) => element?.props?.['data-testid'] === 'ce-surveyresults-demo-view-nav'
-    );
-    expect(nonDemoNav).toBeNull();
-
-    const demoSubject = createSubject({
-      isOpen: true,
-      viewMode: 'questions',
-      sessionSlug: 'demo',
+    await act(async () => {
+      view.rerenderSurveyResults({ sessionSlug: 'demo', activeSessionSlug: 'demo' });
+      await Promise.resolve();
     });
-    demoSubject.state = {
-      ...demoSubject.state,
-      viewMode: 'questions',
-    };
 
-    const demoTree = demoSubject.render();
-    const demoNav = findElement(
-      demoTree,
-      (element) => element?.props?.['data-testid'] === 'ce-surveyresults-demo-view-nav'
-    );
-    const headerControls = findElement(
-      demoTree,
-      (element) =>
-        typeof element?.props?.className === 'string' &&
-        element.props.className.includes('modalHeaderControls')
-    );
-    const headerControlChildren = normalizeChildren(headerControls?.props?.children);
-    const syncIndex = headerControlChildren.findIndex(
-      (child) =>
-        typeof child?.props?.className === 'string' &&
-        child.props.className.includes('syncStatusContainer')
-    );
-    const demoNavIndex = headerControlChildren.findIndex(
-      (child) => child?.props?.['data-testid'] === 'ce-surveyresults-demo-view-nav'
-    );
+    const demoNav = await screen.findByTestId('ce-surveyresults-demo-view-nav');
+    expect(within(demoNav).getByText('Report')).toBeInTheDocument();
+    expect(within(demoNav).getByText('Breakdown')).toBeInTheDocument();
+    expect(within(demoNav).getByText('Atlas')).toBeInTheDocument();
+    expect(within(demoNav).getByText('Risk Matrix')).toBeInTheDocument();
+    const syncNode = document.querySelector('[class*="syncStatusContainer"]') as HTMLElement;
+    expect(syncNode.compareDocumentPosition(demoNav) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
-    expect(demoNav).toBeTruthy();
-    expect(treeHasText(demoNav, 'Report')).toBe(true);
-    expect(treeHasText(demoNav, 'Breakdown')).toBe(true);
-    expect(treeHasText(demoNav, 'Atlas')).toBe(true);
-    expect(treeHasText(demoNav, 'Risk Matrix')).toBe(true);
-    expect(syncIndex).toBeGreaterThanOrEqual(0);
-    expect(demoNavIndex).toBeGreaterThan(syncIndex);
-
-    const demoThreeSubject = createSubject({
-      isOpen: true,
-      viewMode: 'questions',
-      sessionSlug: 'demo-1',
+    await act(async () => {
+      view.rerenderSurveyResults({ sessionSlug: 'demo-1', activeSessionSlug: 'demo-1' });
+      await Promise.resolve();
     });
-    demoThreeSubject.state = {
-      ...demoThreeSubject.state,
-      viewMode: 'questions',
-    };
 
     const demoOneNav = await screen.findByTestId('ce-surveyresults-demo-view-nav');
     expect(within(demoOneNav).getByText('Report')).toBeInTheDocument();
@@ -1005,11 +818,18 @@ describe('SurveyResults demo results views', () => {
   });
 
   it('switches the demo modal surface from the top bar buttons and maps report to Polis', async () => {
-    const subject = attachStateHarness(createSubject({
-      isOpen: true,
-      viewMode: 'questions',
-      sessionSlug: 'demo',
-    }));
+    seedCacheEnvironment({
+      questionsBySlug: {
+        demo: buildQuestionCache({
+          questions: {
+            q1: { id: 'q1', prompt: 'Visible question', type: 'freeform' },
+          },
+          questionResponses: {
+            q1: { [RESPONDER_ONE]: { answer: { value: 'Visible answer' } } },
+          },
+        }),
+      },
+    });
 
     renderQuestionResults({ sessionSlug: 'demo', activeSessionSlug: 'demo' });
     const demoNav = await screen.findByTestId('ce-surveyresults-demo-view-nav');
@@ -1019,36 +839,27 @@ describe('SurveyResults demo results views', () => {
         .map((button) => button.textContent?.trim()),
     ).toEqual(['Report', 'Atlas', 'Breakdown', 'Risk Matrix']);
 
-    expect(screen.getByTestId('ce-surveyresults-demo-view-report')).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.queryByTestId('ce-surveyresults-demo-surface-report')).not.toBeInTheDocument();
-    expect(mockPolisReport).not.toHaveBeenCalled();
-
     const reportButton = screen.getByTestId('ce-surveyresults-demo-view-report');
     const atlasButton = screen.getByTestId('ce-surveyresults-demo-view-atlas');
     const breakdownButton = screen.getByTestId('ce-surveyresults-demo-view-breakdown');
     const riskMatrixButton = screen.getByTestId('ce-surveyresults-demo-view-riskMatrix');
 
+    expect(reportButton).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByTestId('ce-surveyresults-demo-surface-report')).toBeNull();
+    expect(mockPolisReport).not.toHaveBeenCalled();
     expect(reportButton.compareDocumentPosition(atlasButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(atlasButton.compareDocumentPosition(breakdownButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(breakdownButton.compareDocumentPosition(riskMatrixButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
     fireEvent.click(reportButton);
-    rerenderSubject();
-
-    await waitFor(() => {
-      expect(screen.getByTestId('ce-surveyresults-demo-surface-report')).toBeInTheDocument();
-    });
+    expect(await screen.findByTestId('ce-surveyresults-demo-surface-report')).toBeInTheDocument();
     expect(mockPolisReport).toHaveBeenCalled();
-    expect(subject.state.demoResultsViewMode).toBe('report');
     expect(screen.getByTestId('ce-surveyresults-demo-view-report')).toHaveAttribute('aria-pressed', 'true');
 
-    fireEvent.click(reportButton);
-    rerenderSubject();
-
+    fireEvent.click(screen.getByTestId('ce-surveyresults-demo-view-report'));
     await waitFor(() => {
-      expect(screen.queryByTestId('ce-surveyresults-demo-surface-report')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('ce-surveyresults-demo-surface-report')).toBeNull();
     });
-    expect(subject.state.demoResultsViewMode).toBe('raw');
     expect(screen.getByTestId('ce-surveyresults-demo-view-report')).toHaveAttribute('aria-pressed', 'false');
 
     fireEvent.click(screen.getByTestId('ce-surveyresults-demo-view-breakdown'));
@@ -1056,25 +867,18 @@ describe('SurveyResults demo results views', () => {
     expect(mockDemoAnalysisWorkspace).toHaveBeenLastCalledWith(expect.objectContaining({ sessionSlug: 'demo' }));
 
     fireEvent.click(screen.getByTestId('ce-surveyresults-demo-view-riskMatrix'));
-    rerenderSubject();
-
     const riskMatrixView = await screen.findByTestId('surveyresults-demo-risk-matrix-view');
-    expect(riskMatrixView).toBeInTheDocument();
     expect(riskMatrixView.closest(`.${styles.demoResultsRiskMatrixSurface}`)).not.toBeNull();
-    expect(subject.state.demoResultsViewMode).toBe('riskMatrix');
 
     fireEvent.click(riskMatrixView);
-    rerenderSubject();
-
     await waitFor(() => {
       expect(screen.getByTestId('surveyresults-demo-atlas-view')).toHaveTextContent('atlas-node-1');
     });
-    expect(subject.state.demoResultsViewMode).toBe('atlas');
     expect(screen.getByTestId('ce-surveyresults-demo-view-atlas')).toHaveAttribute('aria-pressed', 'true');
   });
 });
 
-describe('SurveyResults.resolveSummaryQuestionType', () => {
+describe('resolveSurveyResultsSummaryQuestionType', () => {
   it('infers freeform from response.answer.type when question metadata is missing', () => {
     expect(
       resolveSurveyResultsSummaryQuestionType(undefined, [
@@ -1096,38 +900,35 @@ describe('SurveyResults.resolveSummaryQuestionType', () => {
   });
 });
 
-describe('SurveyResults.getMemoizedViewableResponsesCount', () => {
+describe('countSurveyResultsViewableResponses', () => {
   it('excludes blank freeform answers and encrypted placeholders', () => {
-    const subject = createSubject();
     const responses = [
       { response: { answer: { value: '   ', encrypted: false } } },
       { response: { answer: { value: 'Visible freeform answer', encrypted: false } } },
       { response: { answer: { value: '*', encrypted: true } } },
     ];
 
-    expect(subject.getMemoizedViewableResponsesCount(responses, 'freeform')).toBe(1);
+    expect(countSurveyResultsViewableResponses(responses, 'freeform')).toBe(1);
   });
 
   it('does not exclude blank answers for non-freeform questions', () => {
-    const subject = createSubject();
     const responses = [
       { response: { answer: { value: '   ', encrypted: false } } },
       { response: { answer: { value: 'Agree', encrypted: false } } },
       { response: { answer: { value: '*', encrypted: true } } },
     ];
 
-    expect(subject.getMemoizedViewableResponsesCount(responses, 'binary')).toBe(2);
+    expect(countSurveyResultsViewableResponses(responses, 'binary')).toBe(2);
   });
 
-  it('uses question type in memoization for the same responses array', () => {
-    const subject = createSubject();
+  it('uses question type when counting the same responses array', () => {
     const responses = [
       { response: { answer: { value: '   ', encrypted: false } } },
       { response: { answer: { value: 'Visible answer', encrypted: false } } },
     ];
 
-    const freeformCount = subject.getMemoizedViewableResponsesCount(responses, 'freeform');
-    const binaryCount = subject.getMemoizedViewableResponsesCount(responses, 'binary');
+    const freeformCount = countSurveyResultsViewableResponses(responses, 'freeform');
+    const binaryCount = countSurveyResultsViewableResponses(responses, 'binary');
 
     expect(freeformCount).toBe(1);
     expect(binaryCount).toBe(2);
@@ -1135,14 +936,13 @@ describe('SurveyResults.getMemoizedViewableResponsesCount', () => {
   });
 
   it('does not count malformed rows that have no answer payload', () => {
-    const subject = createSubject();
     const responses = [
       { response: null },
       { response: {} },
       { response: { answer: { value: 'Visible answer', encrypted: false } } },
     ];
 
-    expect(subject.getMemoizedViewableResponsesCount(responses, 'freeform')).toBe(1);
+    expect(countSurveyResultsViewableResponses(responses, 'freeform')).toBe(1);
   });
 });
 
@@ -1165,15 +965,14 @@ describe('SurveyResults freeform summary rendering', () => {
       />,
     );
 
-    const markup = renderToStaticMarkup(subject.renderFreeformAggregatorSummary(responses));
-    expect(markup).toContain('1 total responses. 1 blank not shown.');
-    expect(markup).not.toContain('0 encrypted responses not shown.');
-    expect(markup).toContain('Visible freeform answer');
+    expect(screen.getByText('1 total responses. 1 blank not shown.')).toBeInTheDocument();
+    expect(screen.queryByText('0 encrypted responses not shown.')).toBeNull();
+    expect(screen.getByText('Visible freeform answer')).toBeInTheDocument();
   });
 });
 
-describe('SurveyResults Polis report props', () => {
-  it('passes scoped question scan progress through to PolisReport', () => {
+describe('SurveyResults demo surface props', () => {
+  it('passes scoped question scan progress through to the demo report surface', async () => {
     const progress = {
       slug: 'edge',
       phase: 'scan',
@@ -1182,22 +981,16 @@ describe('SurveyResults Polis report props', () => {
       scannedBlocks: 30,
       remainingBlocks: 90,
     };
-    const subject = createSubject({
-      isOpen: true,
+    seedCacheEnvironment();
+
+    renderQuestionResults({
+      activeSessionSlug: 'demo',
       isQuestionCacheReady: false,
       isResponsesCacheReady: false,
       questionScanProgress: progress,
       sessionSlug: 'demo',
-      activeSessionSlug: 'demo',
-      viewMode: 'questions',
     });
-    subject.state = {
-      ...subject.state,
-      viewMode: 'questions',
-      demoResultsViewMode: 'report',
-      aggregatorQuestionResponses: {},
-      sbtFilteredAggregatorQuestionResponses: {},
-    };
+    fireEvent.click(await screen.findByTestId('ce-surveyresults-demo-view-report'));
 
     await waitFor(() => {
       expect(mockPolisReport).toHaveBeenCalledWith(
@@ -1214,134 +1007,67 @@ describe('SurveyResults Polis report props', () => {
 });
 
 describe('SurveyResults survey/response links', () => {
-  it('encodes survey IDs in /survey/:id links', () => {
+  it('encodes survey IDs in /survey/:id links', async () => {
     const surveyId = 'survey id/with spaces?and=query';
-    const subject = createSubject({
-      isOpen: true,
-      viewMode: 'survey',
-      filterState: {},
-      isResponsesCacheReady: true,
-      isQuestionCacheReady: true,
-      isSBTCacheReady: true,
-    });
+    seedCacheEnvironment();
 
-    subject.state = {
-      ...subject.state,
-      viewMode: 'survey',
-      surveyId,
-      surveyViewMode: 'aggregate',
-      sbtFilteredAggregatorQuestionResponses: {},
-      aggregateQuestionResponses: {},
-      responses: [],
-      sbtFilteredResponses: [],
-    };
-
-    const tree = subject.render();
-    const surveyLink = findElement(
-      tree,
-      (element) => element?.type === 'a' && element?.props?.href && element.props.href.startsWith(`/survey/${encodeURIComponent(surveyId)}`)
-    );
-    expect(surveyLink).toBeTruthy();
+    renderSurveyModeResults({ surveyId });
+    const link = await findLinkByHref(`/survey/${encodeURIComponent(surveyId)}`);
+    expect(link).toHaveAttribute('href', `/survey/${encodeURIComponent(surveyId)}`);
   });
 
-  it('appends session query to survey links when an effective slug exists', () => {
+  it('appends session query to survey links when an effective slug exists', async () => {
     const surveyId = 'survey id/with spaces?and=query';
-    const subject = createSubject({
-      isOpen: true,
-      viewMode: 'survey',
-      filterState: {},
-      isResponsesCacheReady: true,
-      isQuestionCacheReady: true,
-      isSBTCacheReady: true,
-      sessionSlug: 'edge',
-    });
+    seedCacheEnvironment();
 
-    subject.state = {
-      ...subject.state,
-      viewMode: 'survey',
-      surveyId,
-      surveyViewMode: 'aggregate',
-      sbtFilteredAggregatorQuestionResponses: {},
-      aggregateQuestionResponses: {},
-      responses: [],
-      sbtFilteredResponses: [],
-    };
-
-    const tree = subject.render();
-    const surveyLink = findElement(
-      tree,
-      (element) => (
-        element?.type === 'a' &&
-        element?.props?.href &&
-        element.props.href.startsWith(`/survey/${encodeURIComponent(surveyId)}`) &&
-        element.props.href.includes(`session=${encodeURIComponent('edge')}`)
-      )
-    );
-    expect(surveyLink).toBeTruthy();
+    renderSurveyModeResults({ sessionSlug: 'edge', surveyId });
+    const link = await findLinkByHref(`/survey/${encodeURIComponent(surveyId)}?session=edge`);
+    expect(link).toHaveAttribute('href', `/survey/${encodeURIComponent(surveyId)}?session=edge`);
   });
 
-  it('encodes responder addresses in /u/:address links', () => {
-    const surveyId = 'survey id/with spaces?and=query';
+  it('encodes responder addresses in /u/:address links', async () => {
+    const surveyId = 'survey-id-with-weird-responder';
     const responder = '0xabc123/def456?foo=bar';
-    const subject = createSubject({
-      isOpen: true,
-      viewMode: 'survey',
-      filterState: {},
-      isResponsesCacheReady: true,
-      isQuestionCacheReady: true,
-      isSBTCacheReady: true,
+    seedCacheEnvironment({
+      questionsBySlug: {
+        demo: buildQuestionCache({
+          questions: { q1: { id: 'q1', prompt: 'Question one', type: 'freeform' } },
+        }),
+      },
+      surveysBySlug: {
+        demo: buildSurveyCache({
+          surveyId,
+          responsesByResponder: {
+            [responder]: {
+              responses: [{ questionID: 'q1', answer: { value: 'Visible answer' } }],
+            },
+          },
+        }),
+      },
     });
 
-    subject.state = {
-      ...subject.state,
-      viewMode: 'survey',
-      surveyId,
-      surveyViewMode: 'individuals',
-      responses: [
-        {
-          responder,
-          surveyId,
-          response: { responses: [] },
-        },
-      ],
-      sbtFilteredResponses: [
-        {
-          responder,
-          surveyId,
-          response: { responses: [] },
-        },
-      ],
-    };
-
-    const tree = subject.render();
-    const responsesList = findElement(
-      tree,
-      (element) => element?.type === SurveyResultsIndividualResponsesList
-    );
-    const markup = renderToStaticMarkup(responsesList);
-
-    expect(markup).toContain(`/u/${encodeURIComponent(responder)}`);
+    renderSurveyModeResults({ sessionSlug: 'demo', surveyId });
+    await switchToIndividualsView();
+    const userLink = await findLinkByHref(`/u/${encodeURIComponent(responder.toLowerCase())}`);
+    expect(userLink).toHaveAttribute('href', `/u/${encodeURIComponent(responder.toLowerCase())}`);
   });
 
   it('renders only the latest answer row in expanded survey individual view for duplicate question updates', async () => {
     const surveyId = 'survey-individual-dedupe';
-    const responder = '0x1111111111111111111111111111111111111111';
-    const networkId = '84532';
-    const surveysCache = {
-      [networkId]: {
-        surveys: {
-          [surveyId]: {
-            title: 'Individual Dedupe Survey',
-            questionIDs: ['q1'],
+    seedCacheEnvironment({
+      questionsBySlug: {
+        'session-slug': buildQuestionCache({
+          questions: {
+            q1: { id: 'q1', prompt: 'Question one', type: 'freeform' },
           },
-        },
-        surveysLatestBlock: 4,
-        surveyResponsesLatestBlock: {
-          [surveyId]: 5,
-        },
-        surveyResponses: {
-          [surveyId]: {
-            [responder]: {
+        }),
+      },
+      surveysBySlug: {
+        'session-slug': buildSurveyCache({
+          surveyId,
+          title: 'Individual Dedupe Survey',
+          responsesByResponder: {
+            [RESPONDER_ONE]: {
               timeStamp: '2025-01-01T00:00:00.000Z',
               responses: [
                 {
@@ -1357,19 +1083,16 @@ describe('SurveyResults survey/response links', () => {
               ],
             },
           },
-        },
+        }),
       },
-    };
+    });
 
-    const subject = attachStateHarness(createSubject({
-      isOpen: true,
-      viewMode: 'survey',
-      filterState: {},
-      isResponsesCacheReady: true,
-      isQuestionCacheReady: true,
-      isSBTCacheReady: true,
-      network: { id: Number(networkId) },
-    }));
+    renderSurveyModeResults({ sessionSlug: 'session-slug', surveyId });
+    await switchToIndividualsView();
+    const responderLink = await findLinkByHref(`/u/${RESPONDER_ONE.toLowerCase()}`);
+    const responseHeader = responderLink.closest('[class*="responseHeader"]') as HTMLElement;
+    expect(responseHeader).toBeTruthy();
+    fireEvent.click(responseHeader);
 
     await waitFor(() => {
       const individualCalls = mockSingleQuestionResponse.mock.calls
@@ -1386,94 +1109,44 @@ describe('SurveyResults survey/response links', () => {
         }),
       );
     });
-    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({});
-
-    await subject.fetchSurveyModeResponses();
-    const responsesList = findElement(
-      subject.render(),
-      (element) => element?.type === SurveyResultsIndividualResponsesList
-    );
-    const singleResponseNodes = collectTreeNodes(
-      responsesList?.props?.renderResponseBody(responsesList.props.responses[0], 0),
-      (element) => (
-        typeof element?.type === 'function' &&
-        element?.props?.aggregatorResponseMode === false
-      )
-    );
-
-    expect(singleResponseNodes).toHaveLength(1);
-    expect(singleResponseNodes[0].props).toEqual(expect.objectContaining({
-      response: expect.objectContaining({
-        questionID: 'q1',
-        answer: expect.objectContaining({ value: 'Latest answer' }),
-      }),
-    }));
   });
 
-  it('renders survey document URL links in the modal header when available', () => {
+  it('renders survey document URL links in the modal header when available', async () => {
     const surveyId = 'survey-id-with-docs';
     const docUrl = 'https://example.com/docs/survey-reference';
-    const subject = createSubject({
-      isOpen: true,
-      viewMode: 'survey',
-      filterState: {},
-      isResponsesCacheReady: true,
-      isQuestionCacheReady: true,
-      isSBTCacheReady: true,
+    seedCacheEnvironment({
+      surveysBySlug: {
+        demo: buildSurveyCache({
+          surveyId,
+          title: 'Survey with docs',
+          documentURLs: [docUrl],
+        }),
+      },
     });
 
-    subject.state = {
-      ...subject.state,
-      viewMode: 'survey',
-      surveyId,
-      surveyTitle: 'Survey with docs',
-      surveyDocumentURLs: [docUrl],
-      surveyViewMode: 'aggregate',
-      sbtFilteredAggregatorQuestionResponses: {},
-      aggregateQuestionResponses: {},
-      responses: [],
-      sbtFilteredResponses: [],
-    };
+    renderSurveyModeResults({ sessionSlug: 'demo', surveyId });
 
-    const tree = subject.render();
-    const docLink = findElement(
-      tree,
-      (element) =>
-        element?.type === 'a' &&
-        element?.props?.href === docUrl &&
-        element?.props?.target === '_blank'
-    );
-
-    expect(docLink).toBeTruthy();
+    const docLink = await screen.findByRole('link', { name: docUrl });
+    expect(docLink).toHaveAttribute('href', docUrl);
+    expect(docLink).toHaveAttribute('target', '_blank');
   });
 
-  it('does not render survey document URL links in question view', () => {
+  it('does not render survey document URL links in question view', async () => {
     const docUrl = 'https://example.com/docs/question-view-hidden';
-    const subject = createSubject({
-      isOpen: true,
-      viewMode: 'questions',
-      filterState: {},
-      isResponsesCacheReady: true,
-      isQuestionCacheReady: true,
-      isSBTCacheReady: true,
+    seedCacheEnvironment({
+      surveysBySlug: {
+        demo: buildSurveyCache({
+          surveyId: 'survey-id-with-docs',
+          title: 'Survey with docs',
+          documentURLs: [docUrl],
+        }),
+      },
     });
 
-    subject.state = {
-      ...subject.state,
-      viewMode: 'questions',
-      surveyDocumentURLs: [docUrl],
-      aggregateQuestionResponses: {},
-      sbtFilteredAggregatorQuestionResponses: {},
-      responses: [],
-      sbtFilteredResponses: [],
-    };
-
-    const tree = subject.render();
-    const docLink = findElement(
-      tree,
-      (element) => element?.type === 'a' && element?.props?.href === docUrl
-    );
-
-    expect(docLink).toBeNull();
+    renderQuestionResults({ sessionSlug: 'demo', activeSessionSlug: 'demo' });
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Question Results' })).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('link', { name: docUrl })).toBeNull();
   });
 });

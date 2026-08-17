@@ -137,3 +137,34 @@ export const resolveCompareCompassLegendSwatchStyle = (background: unknown): CSS
 export const resolveCompareCompassScrollStyle = (): CSSProperties => ({
   overflowX: 'auto',
 });
+
+const COMPARE_COMPASS_SERIES_COLORS = Object.freeze([
+  'var(--ce-data-series-1)',
+  'var(--ce-data-series-2)',
+  'var(--ce-data-series-3)',
+  'var(--ce-data-series-4)',
+  'var(--ce-data-series-5)',
+  'var(--ce-data-series-6)',
+  'var(--ce-data-series-7)',
+  'var(--ce-data-series-8)',
+]);
+
+export const resolveCompareCompassSeriesColor = (index: number): string =>
+  COMPARE_COMPASS_SERIES_COLORS[index % COMPARE_COMPASS_SERIES_COLORS.length];
+
+export const buildCompareCompassQuadrants = ({
+  cx,
+  cy,
+  height,
+  width,
+}: {
+  cx: number;
+  cy: number;
+  height: number;
+  width: number;
+}) => [
+  { x: cx, y: cy, width: width - cx, height: height - cy, intensity: 4 },
+  { x: 0, y: cy, width: cx, height: height - cy, intensity: 4 },
+  { x: 0, y: 0, width: cx, height: cy, intensity: 5 },
+  { x: cx, y: 0, width: width - cx, height: cy, intensity: 5 },
+];

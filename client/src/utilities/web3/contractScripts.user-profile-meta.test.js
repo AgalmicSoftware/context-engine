@@ -1,7 +1,7 @@
 import contractScripts from './chainGateway.js';
 import { __test__contractScriptsReadCaches } from './chainGateway.js';
 import { ethers } from 'ethers';
-import { arweaveScripts } from '../arweave/arweaveScripts.js';
+import { arweaveClient } from '../arweave/arweaveClient.js';
 
 const TEST_PROFILE_ADDRESS = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
@@ -724,7 +724,7 @@ describe('contractScripts user profile metadata wrappers', () => {
     jest.spyOn(ethers, 'Contract').mockImplementation(() => ({
       getResponse: contractGetResponse,
     }));
-    const downloadSpy = jest.spyOn(arweaveScripts, 'downloadDataFromArweave').mockResolvedValue('{}');
+    const downloadSpy = jest.spyOn(arweaveClient, 'downloadDataFromArweave').mockResolvedValue('{}');
 
     globalThis.CE_E2E_LIT_MOCK = true;
     window.__CE_E2E_MOCKED_VIEWED_RESPONSES__ = {
@@ -762,7 +762,7 @@ describe('contractScripts user profile metadata wrappers', () => {
       getResponse: contractGetResponse,
     }));
     const downloadSpy = jest
-      .spyOn(arweaveScripts, 'downloadDataFromArweave')
+      .spyOn(arweaveClient, 'downloadDataFromArweave')
       .mockResolvedValue(JSON.stringify(downloadedPayload));
 
     window.__CE_E2E_MOCKED_VIEWED_RESPONSES__ = {
@@ -815,7 +815,7 @@ describe('contractScripts user profile metadata wrappers', () => {
       getResponse: contractGetResponse,
     }));
     const downloadSpy = jest
-      .spyOn(arweaveScripts, 'downloadDataFromArweave')
+      .spyOn(arweaveClient, 'downloadDataFromArweave')
       .mockResolvedValue(JSON.stringify(downloadedPayload));
 
     const result = await contractScripts.getResponse('none', responderAddress, questionId, groupCfg, {

@@ -1,17 +1,13 @@
 jest.mock('../arweave/arweaveClient.js', () => ({
   arweaveClient: {
-    buildArweaveGatewayUrl: jest.fn<string, [string]>(
-      (txId) => `https://arweave.net/${txId}`,
-    ),
+    buildArweaveGatewayUrl: jest.fn<string, [string]>((txId) => `https://arweave.net/${txId}`),
     uploadDataToArweave: jest.fn<Promise<string>, [string, string, unknown]>(),
   },
 }));
 
 import { uploadMarkdownSummaryToArweave } from './aiClient.js';
 
-const { arweaveClient: mockArweaveClient } = jest.requireMock(
-  '../arweave/arweaveClient.js',
-) as {
+const { arweaveClient: mockArweaveClient } = jest.requireMock('../arweave/arweaveClient.js') as {
   arweaveClient: {
     buildArweaveGatewayUrl: jest.Mock<string, [string]>;
     uploadDataToArweave: jest.Mock<Promise<string>, [string, string, unknown]>;

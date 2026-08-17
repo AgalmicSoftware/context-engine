@@ -94,11 +94,9 @@ describe('SurveyTool styles', () => {
       /@media \(max-width: 768px\)\s*{\s*@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.pileInteractionUnit\s*{[\s\S]*?--pile-card-width:\s*min\(720px, calc\(100vw - 76px\)\);/,
     );
     expect(scss).toMatch(
-      /@media \(max-width: 768px\)\s*{\s*@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.pileControls\s*{[\s\S]*?position:\s*static;[\s\S]*?display:\s*grid;[\s\S]*?grid-template-columns:\s*auto minmax\(180px, 1fr\) auto;[\s\S]*?grid-template-areas:\s*"actions footer nav";[\s\S]*?overflow:\s*visible;/,
+      /@media \(max-width: 768px\)\s*{\s*@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.pileControls\s*{[\s\S]*?position:\s*static;[\s\S]*?display:\s*grid;[\s\S]*?grid-template-columns:\s*auto minmax\(180px, 1fr\) auto;[\s\S]*?grid-template-areas:\s*['"]actions footer nav['"];[\s\S]*?overflow:\s*visible;/,
     );
-    expect(scss).toMatch(
-      /\.pileActionsMenuEligible \.pileActionMenuToggle\s*{[\s\S]*?display:\s*none;/,
-    );
+    expect(scss).toMatch(/\.pileActionsMenuEligible \.pileActionMenuToggle\s*{[\s\S]*?display:\s*none;/);
     expect(scss).toMatch(
       /\.pileActionsMenuEligible \.pileActionButtonGroup,[\s\S]*?\.pileActionsMenuEligible:hover \.pileActionButtonGroup\s*{[\s\S]*?position:\s*static;[\s\S]*?display:\s*flex;[\s\S]*?flex-direction:\s*row;[\s\S]*?background:\s*transparent;[\s\S]*?box-shadow:\s*none;/,
     );
@@ -217,9 +215,7 @@ describe('SurveyTool styles', () => {
   it('removes the old SurveyTool session selector overlay styles', () => {
     const scss = readSurveyToolScss();
 
-    expect(scss).toMatch(
-      /#surveysRow\s*{[\s\S]*?position:\s*sticky;[\s\S]*?top:\s*10px;[\s\S]*?z-index:\s*20;/,
-    );
+    expect(scss).toMatch(/#surveysRow\s*{[\s\S]*?position:\s*sticky;[\s\S]*?top:\s*10px;[\s\S]*?z-index:\s*20;/);
     expect(scss).not.toMatch(/\.sessionSelectorTriggerRow\s*{/);
     expect(scss).not.toMatch(/\.sessionSelectorBackdrop\s*{/);
     expect(scss).not.toMatch(/\.sessionSelectorPopover\s*{/);

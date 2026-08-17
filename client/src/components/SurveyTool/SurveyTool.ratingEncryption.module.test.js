@@ -1,4 +1,3 @@
-import SurveyTool from './SurveyTool';
 import {
   buildAdditionalAudienceSelectionPlan,
   buildAnswerAudienceSelectionPlan,
@@ -9,36 +8,6 @@ import { buildAdditionalEncryptionAudienceState, buildAnswerEncryptionAudienceSt
 import { buildSurveyResponseStateArray } from './surveyToolHydrationFlow';
 import { SurveyQuestionsFullQuestionResponseInput } from './SurveyQuestionsFullQuestionResponseInput';
 import DeferredRatingSlider from './DeferredRatingSlider';
-import FullQuestionRatingInput from './FullQuestionRatingInput';
-import SurveyQuestionsFullQuestionResponseInput from './SurveyQuestionsFullQuestionResponseInput';
-import SurveyQuestionTagControl from './SurveyQuestionTagControl';
-import { DeferredCommitSlider } from './DeferredCommitSlider';
-import { QuestionFilter as RawQuestionFilter } from './QuestionFilter';
-import TagModal from '../TagPage/TagModal';
-import GatedPromptNotice from './GatedPromptNotice';
-import styles from './SurveyTool.module.scss';
-import { renderToStaticMarkup } from 'react-dom/server';
-import contractScripts, * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
-import * as portoFunctions from '../../utilities/web3/portoFunctions.js';
-import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
-import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
-import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
-import * as sponsoredAccess from '../../utilities/web3/sponsoredAccess.js';
-import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
-import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
-import { t } from '../../utilities/ui/terminology.js';
-import {
-  countElements,
-  findElement,
-  findFirstNodeByType,
-  findNodeByClassName,
-  getElementChildren,
-  nodeHasClassName,
-  treeHasDataTestId,
-  treeHasLabel,
-  treeHasText,
-} from './surveyToolTreeTestHelpers.js';
 
 const buildEmptyResponseFieldState = () => ({
   value: '',
@@ -79,13 +48,20 @@ const applyAnswerAudience = (state, questionId, audience, options = {}) => {
     questionId,
     surveyIndex: options.surveyIndex || 0,
   });
-  return { promise, resolve, reject };
+  return { ...state, ...patch };
 };
 
-const flushAsyncCallbacks = async () => {
-  await Promise.resolve();
-  await Promise.resolve();
-  await new Promise((resolve) => setTimeout(resolve, 0));
+const applyAdditionalAudience = (state, questionId, audience, options = {}) => {
+  const patch = buildAdditionalEncryptionAudienceState(state, {
+    audience,
+    buildAdditionalAudienceSelectionPlan,
+    buildSurveyResponseStateArray,
+    deps: buildFieldEncryptionDeps(),
+    gateId: options.gateId || '',
+    questionId,
+    surveyIndex: options.surveyIndex || 0,
+  });
+  return { ...state, ...patch };
 };
 
 const renderResponseInput = ({
@@ -143,6 +119,7 @@ describe('SurveyTool rating encryption controller', () => {
     jest.restoreAllMocks();
     jest.useRealTimers();
   });
+
   it('lets additional comments Match Answer until an explicit override is chosen', () => {
     let state = {
       surveysResponseState: [
@@ -171,85 +148,41 @@ describe('SurveyTool rating encryption controller', () => {
       ],
     };
 
-    subject.applyAnswerEncryptionAudience(0, 'q1', 'gate', { gateId: 'gate-b' });
-    expect(subject.state.surveysResponseState[0].answers.q1.encryptionGateId).toBe('gate-b');
-    expect(subject.state.surveysResponseState[0].additionalComments.q1.encryptionGateId).toBe('gate-b');
-    expect(subject.state.surveysResponseState[0].additionalComments.q1.audienceMode).toBe('inherit');
+    state = applyAnswerAudience(state, 'q1', 'gate', { gateId: 'gate-b' });
+    expect(state.surveysResponseState[0].answers.q1.encryptionGateId).toBe('gate-b');
+    expect(state.surveysResponseState[0].additionalComments.q1.encryptionGateId).toBe('gate-b');
+    expect(state.surveysResponseState[0].additionalComments.q1.audienceMode).toBe('inherit');
 
-    subject.applyAdditionalEncryptionAudience(0, 'q1', 'self');
-    expect(subject.state.surveysResponseState[0].additionalComments.q1.encryptionAudience).toBe('self');
-    expect(subject.state.surveysResponseState[0].additionalComments.q1.audienceMode).toBe('explicit');
+    state = applyAdditionalAudience(state, 'q1', 'self');
+    expect(state.surveysResponseState[0].additionalComments.q1.encryptionAudience).toBe('self');
+    expect(state.surveysResponseState[0].additionalComments.q1.audienceMode).toBe('explicit');
 
-    subject.applyAnswerEncryptionAudience(0, 'q1', 'gate', { gateId: 'gate-a' });
-    expect(subject.state.surveysResponseState[0].answers.q1.encryptionGateId).toBe('gate-a');
-    expect(subject.state.surveysResponseState[0].additionalComments.q1.encryptionAudience).toBe('self');
-    expect(subject.state.surveysResponseState[0].additionalComments.q1.encryptionGateId).toBeNull();
+    state = applyAnswerAudience(state, 'q1', 'gate', { gateId: 'gate-a' });
+    expect(state.surveysResponseState[0].answers.q1.encryptionGateId).toBe('gate-a');
+    expect(state.surveysResponseState[0].additionalComments.q1.encryptionAudience).toBe('self');
+    expect(state.surveysResponseState[0].additionalComments.q1.encryptionGateId).toBeNull();
 
-    subject.applyAdditionalEncryptionAudience(0, 'q1', 'follow');
-    expect(subject.state.surveysResponseState[0].additionalComments.q1.audienceMode).toBe('inherit');
-    expect(subject.state.surveysResponseState[0].additionalComments.q1.encryptionGateId).toBe('gate-a');
+    state = applyAdditionalAudience(state, 'q1', 'follow');
+    expect(state.surveysResponseState[0].additionalComments.q1.audienceMode).toBe('inherit');
+    expect(state.surveysResponseState[0].additionalComments.q1.encryptionGateId).toBe('gate-a');
   });
 
   it('applies answer and additional audiences into ensured survey slots', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
-    });
-    subject.setState = (next, cb) => {
-      const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
-      subject.state = { ...subject.state, ...(patch || {}) };
-      if (typeof cb === 'function') cb();
-    };
-    subject.scheduleJsonPreviewUpdate = jest.fn();
-    subject.persistDraftSafely = jest.fn();
-    subject.invalidateDiffCaches = jest.fn();
-    subject.isQuestionLockedForResponse = jest.fn(() => false);
-    subject.getEffectiveRecipientsForQid = jest.fn(() => [{ accessControlConditions: [{ contractAddress: '0x1' }], chain: 'base' }]);
-    subject.getResponseGateOptions = jest.fn(() => [
-      {
-        gateId: 'gate-a',
-        label: 'Gate A',
-        sbtAddresses: ['0x00000000000000000000000000000000000000a1'],
-        sbtSummary: 'Gate A SBT',
-        recipients: [{ accessControlConditions: [{ contractAddress: '0x1' }], chain: 'base' }],
-      },
-    ]);
-    subject.state = {
-      ...subject.state,
-      surveysResponseState: [],
-    };
+    let state = { surveysResponseState: [] };
 
-    subject.applyAnswerEncryptionAudience(2, 'q1', 'gate', { gateId: 'gate-a' });
-    expect(subject.state.surveysResponseState).toHaveLength(3);
-    expect(subject.state.surveysResponseState[2].answers.q1.encryptionAudience).toBe('gate');
-    expect(subject.state.surveysResponseState[2].answers.q1.encryptionGateId).toBe('gate-a');
+    state = applyAnswerAudience(state, 'q1', 'gate', { gateId: 'gate-a', surveyIndex: 2 });
+    expect(state.surveysResponseState).toHaveLength(3);
+    expect(state.surveysResponseState[2].answers.q1.encryptionAudience).toBe('gate');
+    expect(state.surveysResponseState[2].answers.q1.encryptionGateId).toBe('gate-a');
 
-    subject.applyAdditionalEncryptionAudience(2, 'q1', 'follow');
-    expect(subject.state.surveysResponseState[2].additionalComments.q1.audienceMode).toBe('inherit');
-    expect(subject.state.surveysResponseState[2].additionalComments.q1.encryptionGateId).toBe('gate-a');
+    state = applyAdditionalAudience(state, 'q1', 'follow', { surveyIndex: 2 });
+    expect(state.surveysResponseState[2].additionalComments.q1.audienceMode).toBe('inherit');
+    expect(state.surveysResponseState[2].additionalComments.q1.encryptionGateId).toBe('gate-a');
   });
 
   it('groups answer and additional encryption work by field-specific gate recipients', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: true,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
-    });
     const gateARecipients = [{ accessControlConditions: [{ contractAddress: '0x1' }], chain: 'base' }];
     const gateBRecipients = [{ accessControlConditions: [{ contractAddress: '0x2' }], chain: 'base' }];
-    subject.isQuestionLockedForResponse = jest.fn(() => false);
-    subject.resolveFieldEncryptionAudience = (field) => field?.encryptionAudience || 'self';
-    subject.resolveFieldEncryptionGateId = (field) => field?.encryptionGateId || null;
-    subject.getEffectiveRecipientsForField = jest.fn(({ field }) => (
-      field?.encryptionGateId === 'gate-b' ? gateBRecipients : gateARecipients
-    ));
 
     const { groups, missingRecipients } = buildFieldEncryptionWorkGroups(
       {
@@ -323,30 +256,11 @@ describe('SurveyTool rating encryption controller', () => {
   });
 
   it('uses the deferred slider wrapper for single-question rating cards', () => {
-    const subject = new SurveyQuestions({
+    const deferredSlider = renderResponseInput({
+      answerValue: '8',
       singleQuestionMode: true,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
     });
 
-    const question = {
-      id: 'q1',
-      type: 'rating',
-      question: 'How strongly do you agree?',
-    };
-
-    const currentSurveyResponseState = {
-      answers: { q1: { value: '8', encrypted: false } },
-      additionalComments: { q1: { value: '', encrypted: false } },
-      importance: {},
-      conviction: {},
-    };
-
-    const fullQuestionCard = subject.renderQuestion(question, 0, currentSurveyResponseState);
-    const deferredSlider = renderFullQuestionResponseInput(fullQuestionCard);
     expect(deferredSlider.type).toBe(DeferredRatingSlider);
     expect(deferredSlider.props.value).toBe(8);
     expect(typeof deferredSlider.props.onCommit).toBe('function');
@@ -379,43 +293,26 @@ describe('SurveyTool rating encryption controller', () => {
           additionalComments: {
             q1: { value: '', encrypted: false, encryptionAudience: 'gate' },
           },
-          importance: { q1: 7 },
-          conviction: { q1: 3 },
         },
-      ],
-      userAnswers: null,
-      hasher: { hash: jest.fn() },
-    };
-    subject.prepareJsonAndHash = jest.fn(() => ({
-      questionID: 'q1',
-      answer: { value: '*', encrypted: true, encryptedPortion: 'answer-env' },
-      additional: { value: '', encrypted: false },
-      importance: 7,
-      conviction: 3,
-    }));
-    subject.getChangedQidsAndFields = jest.fn(() => ({
-      changedQids: new Set(['q1']),
-      changedMap: { q1: { importance: 1, conviction: 1 } },
-    }));
-    subject.isQuestionLockedForResponse = jest.fn(() => false);
-    subject.resolveFieldEncryptionAudience = jest.fn(() => 'gate');
-    subject.getDefaultResponseEncryptionAudienceForQid = jest.fn(() => 'gate');
-    const recipients = [{ accessControlConditions: [{ contractAddress: '0x1' }], chain: 'base' }];
-    const sharedLitOpts = { recipients, accessControlConditions: recipients[0].accessControlConditions, chain: 'base' };
-    subject.getEffectiveRecipientsForQid = jest.fn(() => recipients);
-    subject.buildLitEncryptionOptionsForRecipients = jest.fn(() => sharedLitOpts);
+        questionResponses,
+        changedMapForSubmit: { q1: { importance: true, conviction: true } },
+      }),
+      buildRatingEnvelopeDeps({
+        resolveFieldEncryptionAudience: () => 'gate',
+        getDefaultResponseEncryptionAudienceForQid: () => 'gate',
+        getEffectiveRecipientsForQid: () => recipients,
+        getEffectiveRecipientsForField: () => recipients,
+        buildLitEncryptionOptionsForRecipients: () => sharedLitOpts,
+        encryptEnvelopeValue,
+      }),
+    );
 
-    const encryptSpy = jest
-      .spyOn(cryptoUtils, 'encryptEnvelopeValue')
-      .mockImplementation(async (_value, opts) => `env:${opts.qId}`);
-    const submitSpy = jest
-      .spyOn(contractScripts, 'submitResponses')
-      .mockResolvedValue({
-        wait: jest.fn().mockResolvedValue({
-          status: 1,
-          transactionHash: `0x${'1'.repeat(64)}`,
-        }),
-      });
+    expect(result).toEqual(expect.objectContaining({ processed: true, questionsEncrypted: 1 }));
+    expect(encryptEnvelopeValue).toHaveBeenCalledTimes(2);
+    expect(encryptEnvelopeValue.mock.calls[0][1].qId).toBe('importance:q1');
+    expect(encryptEnvelopeValue.mock.calls[1][1].qId).toBe('conviction:q1');
+    expect(encryptEnvelopeValue.mock.calls[0][1].lit).toBe(sharedLitOpts);
+    expect(encryptEnvelopeValue.mock.calls[1][1].lit).toBe(sharedLitOpts);
 
     expect(questionResponses[0]).toEqual(
       expect.objectContaining({
@@ -454,49 +351,30 @@ describe('SurveyTool rating encryption controller', () => {
           additionalComments: {
             q1: { value: '', encrypted: false, encryptionAudience: 'gate' },
           },
-          importance: { q1: 7 },
-          conviction: { q1: 3 },
         },
-      ],
-      userAnswers: null,
-      hasher: { hash: jest.fn() },
-    };
-    subject.prepareJsonAndHash = jest.fn(() => ({
-      questionID: 'q1',
-      answer: { value: '*', encrypted: true, encryptedPortion: 'answer-env' },
-      additional: { value: '', encrypted: false },
-      importance: 7,
-      conviction: 3,
-    }));
-    subject.getChangedQidsAndFields = jest.fn(() => ({
-      changedQids: new Set(['q1']),
-      changedMap: { q1: { importance: 1, conviction: 1 } },
-    }));
-    subject.isQuestionLockedForResponse = jest.fn(() => false);
-    subject.resolveFieldEncryptionAudience = jest.fn(() => 'gate');
-    subject.getDefaultResponseEncryptionAudienceForQid = jest.fn(() => 'gate');
-    const recipients = [{ accessControlConditions: [{ contractAddress: '0x1' }], chain: 'base' }];
-    const sharedLitOpts = { recipients, accessControlConditions: recipients[0].accessControlConditions, chain: 'base' };
-    subject.getEffectiveRecipientsForQid = jest.fn(() => recipients);
-    subject.buildLitEncryptionOptionsForRecipients = jest.fn(() => sharedLitOpts);
+        questionResponses,
+        changedMapForSubmit: { q1: { importance: true, conviction: true } },
+        encryptionBaseOpts: {
+          provider: {},
+          account: '0xabc',
+          chainId: 84532,
+          surveyId: '0xsurvey',
+          kind: 'response',
+          hasher: { hash: jest.fn() },
+        },
+      }),
+      buildRatingEnvelopeDeps({
+        resolveFieldEncryptionAudience: () => 'gate',
+        getDefaultResponseEncryptionAudienceForQid: () => 'gate',
+        getEffectiveRecipientsForQid: () => recipients,
+        getEffectiveRecipientsForField: () => recipients,
+        buildLitEncryptionOptionsForRecipients: () => sharedLitOpts,
+        encryptEnvelopeValue,
+      }),
+    );
 
-    const encryptSpy = jest
-      .spyOn(cryptoUtils, 'encryptEnvelopeValue')
-      .mockImplementation(async (_value, opts) => `env:${opts.qId}`);
-    const submitSpy = jest
-      .spyOn(contractScripts, 'submitResponses')
-      .mockResolvedValue({
-        wait: jest.fn().mockResolvedValue({
-          status: 1,
-          transactionHash: `0x${'3'.repeat(64)}`,
-        }),
-      });
-
-    await subject.submitSurveyResponse();
-
-    expect(encryptSpy).toHaveBeenCalledTimes(2);
-    expect(encryptSpy.mock.calls[0][1].chainId).toBe(84532);
-    expect(encryptSpy.mock.calls[1][1].chainId).toBe(84532);
-    expect(submitSpy).toHaveBeenCalledTimes(1);
+    expect(encryptEnvelopeValue).toHaveBeenCalledTimes(2);
+    expect(encryptEnvelopeValue.mock.calls[0][1].chainId).toBe(84532);
+    expect(encryptEnvelopeValue.mock.calls[1][1].chainId).toBe(84532);
   });
 });

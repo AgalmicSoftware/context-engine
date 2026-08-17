@@ -1,6 +1,9 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import MultichoiceQuestionInput from './MultichoiceQuestionInput';
+import MultichoiceQuestionInput, {
+  buildMultichoiceOptionClassName,
+  findDuplicateMultichoiceOptionLabels,
+} from './MultichoiceQuestionInput';
 
 describe('MultichoiceQuestionInput', () => {
   it('adds and removes values for multi-select questions', () => {

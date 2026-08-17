@@ -75,6 +75,7 @@ describe('SBTFilter render guards', () => {
       mode: 'addresses',
       autoExpand: true,
       sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
       sessionConfig,
       ensureLightSbtUniverse,
     });
@@ -87,6 +88,7 @@ describe('SBTFilter render guards', () => {
     expect(addressSelectors).toHaveLength(2);
     addressSelectors.forEach((selectorNode) => {
       expect(selectorNode.props.sessionSlug).toBe('edge');
+      expect(selectorNode.props.activeSessionSlug).toBe('edge');
       expect(selectorNode.props.sessionConfig).toBe(sessionConfig);
       expect(selectorNode.props.ensureLightSbtUniverse).toBe(ensureLightSbtUniverse);
     });

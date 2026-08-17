@@ -35,6 +35,17 @@ type SbtMintBurnCountsByAddressResult = {
   ok?: boolean;
   [key: string]: unknown;
 };
+type ProviderName = string;
+type GroupKeyOrConfig = string | Record<string, unknown> | null | undefined;
+type Bytes32Input = string | number | null | undefined;
+type MetadataPayload = Record<string, unknown>;
+type PayloadPointerUpload = {
+  pointerBytes: string;
+  arweaveTxId?: string;
+  storageRef?: unknown;
+};
+
+const toMetadataPayload = (value: MetadataPayload | null | undefined): MetadataPayload => value || {};
 
 export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRuntimeDeps): ContractScriptsMethodMap => {
   const {
@@ -56,7 +67,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
     STORAGE_RESOURCE_KEYS,
     SURVEYS,
     SURVEYS_INTERFACE,
-    arweaveScripts,
+    arweaveClient,
     attachStorageRefCompatibilityFields,
     buildSbtScopeMemoTag,
     clearReadCachesForGroup,
@@ -64,6 +75,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
     getTimedMemoValue,
     normalizeSbtSessionLinkFields,
     resolveArweaveUploadOpts,
+    refreshSessionRegistryFieldsCache,
     resolveSessionNameValue,
     attachPayloadPointerFields,
     buildArweaveDebugContext,
@@ -135,14 +147,23 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
     validateNoLockedPlaintextInPayload,
   } = deps;
 
+  const assertNonZeroBytes32 = (value: unknown, label: string): void => {
+    if (!utils.isHexString(value, 32)) {
+      throw new Error(`${label} is not a bytes32.`);
+    }
+    if (!hasNonZeroHashValue(value)) {
+      throw new Error(`${label} cannot be zero.`);
+    }
+  };
+
   return {
     addSurveyWithQuestions: async function (
-      providerName: any,
-      surveyId: any,
-      surveyData: any,
-      questionIds: any,
-      questionDataArray: any,
-      groupKeyOrCfg: any = null,
+      providerName: ProviderName,
+      surveyId: Bytes32Input,
+      surveyData: MetadataPayload | null | undefined,
+      questionIds: Bytes32Input[],
+      questionDataArray: Array<MetadataPayload | null | undefined>,
+      groupKeyOrCfg: GroupKeyOrConfig = null,
     ) {
       if (providerName === 'none') {
         throw new Error('addSurveyWithQuestions requires a signer-capable provider (not read-only).');
@@ -162,13 +183,11 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
           `[addSurveyWithQuestions] Missing surveys contract address for session slug "${slug || 'general'}".`,
         );
       }
-      const SurveyContract = new ethers.Contract(addr, SURVEYS, signer as any);
-
-      let surveyPayloadUpload = null;
-      let questionPayloadUploads: any[] = [];
+      let surveyPayloadUpload: PayloadPointerUpload | null = null;
+      const questionPayloadUploads: PayloadPointerUpload[] = [];
 
       // Normalize IDs to bytes32
-      const ensureHash = (v: any) => {
+      const ensureHash = (v: Bytes32Input) => {
         try {
           if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') return cryptoUtils.hashIdentifier(v);
         } catch {}
@@ -182,9 +201,9 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
       const sId = ensureHash(surveyId);
       const qIds32 = (Array.isArray(questionIds) ? questionIds : []).map(ensureHash);
 
-      if (!utils.isHexString(sId, 32)) throw new Error('addSurveyWithQuestions: surveyId is not a bytes32.');
-      qIds32.forEach((id: any, i: any) => {
-        if (!utils.isHexString(id, 32)) throw new Error(`addSurveyWithQuestions: questionIds[${i}] is not bytes32.`);
+      assertNonZeroBytes32(sId, 'addSurveyWithQuestions: surveyId');
+      qIds32.forEach((id: string, i: number) => {
+        assertNonZeroBytes32(id, `addSurveyWithQuestions: questionIds[${i}]`);
       });
 
       const canUseSessionStorage =
@@ -197,16 +216,16 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
         const _sessionMetadataOptions = _sessionSlug ? { sessionSlug: _sessionSlug } : {};
         const surveyDataToUpload = normalizeSessionNameFields(
           {
-            ...(surveyData || {}),
+            ...toMetadataPayload(surveyData),
           },
           _sessionName,
           _sessionMetadataOptions,
         );
 
-        const qArrayToUpload = (Array.isArray(questionDataArray) ? questionDataArray : []).map((q: any) =>
+        const qArrayToUpload = (Array.isArray(questionDataArray) ? questionDataArray : []).map((q) =>
           normalizeSessionNameFields(
             {
-              ...(q || {}),
+              ...toMetadataPayload(q),
             },
             _sessionName,
             _sessionMetadataOptions,
@@ -217,7 +236,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
           family: 'survey_metadata',
           path: 'survey metadata',
         });
-        qArrayToUpload.forEach((questionData: any, index: any) => {
+        qArrayToUpload.forEach((questionData, index) => {
           validateNoLockedPlaintextInPayload(questionData, {
             family: 'question_metadata',
             path: `question metadata[${index}]`,
@@ -258,8 +277,17 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
         throw new Error('Payload uploads are disabled; cannot create survey/questions.');
       }
 
+      if (!surveyPayloadUpload) {
+        throw new Error('Survey payload upload did not return a storage pointer.');
+      }
+
       const surveyArweaveHashBytes = surveyPayloadUpload.pointerBytes;
-      const questionArweaveHashesBytes = questionPayloadUploads.map((upload: any) => upload.pointerBytes);
+      const questionArweaveHashesBytes = questionPayloadUploads.map((upload) => upload.pointerBytes);
+      assertNonZeroBytes32(surveyArweaveHashBytes, 'addSurveyWithQuestions: survey content hash');
+      questionArweaveHashesBytes.forEach((hash, index) => {
+        assertNonZeroBytes32(hash, `addSurveyWithQuestions: question content hashes[${index}]`);
+      });
+      const SurveyContract = new ethers.Contract(addr, SURVEYS, signer as any);
 
       rpcLog('RPC Call (Tx):', {
         function: 'addSurveyWithQuestions',
@@ -295,7 +323,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
         });
         clearReadCachesForGroup(groupKeyOrCfg);
         const surveyStorageRef = surveyPayloadUpload.storageRef;
-        const uploadedQuestions = qIds32.map((id: any, index: any) =>
+        const uploadedQuestions = qIds32.map((id: string, index: number) =>
           attachStorageRefCompatibilityFields(
             {
               questionId: id,
@@ -312,18 +340,18 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
           ...(surveyStorageRef ? { surveyStorageRef } : {}),
           uploadedQuestions,
         };
-      } catch (error: any) {
+      } catch (error: unknown) {
         notifyUserFacingTransactionError(error);
         throw error;
       }
     },
 
     addQuestions: async function (
-      providerName: any,
-      questionIds: any,
-      questionDataArray: any,
-      surveyIds: any,
-      groupKeyOrCfg: any = null,
+      providerName: ProviderName,
+      questionIds: Bytes32Input[],
+      questionDataArray: Array<MetadataPayload | null | undefined>,
+      surveyIds: Bytes32Input[],
+      groupKeyOrCfg: GroupKeyOrConfig = null,
     ) {
       if (providerName === 'none') {
         throw new Error('addQuestions requires a signer-capable provider (not read-only).');
@@ -341,12 +369,10 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
         const slug = normalizeSessionSlug(typeof groupKeyOrCfg === 'string' ? groupKeyOrCfg : cfg?.slug || '');
         throw new Error(`[addQuestions] Missing surveys contract address for session slug "${slug || 'general'}".`);
       }
-      const SurveyContract = new ethers.Contract(addr, SURVEYS, signer as any);
-
-      let questionPayloadUploads: any[] = [];
+      const questionPayloadUploads: PayloadPointerUpload[] = [];
 
       // Normalize IDs to bytes32
-      const ensureHash = (v: any) => {
+      const ensureHash = (v: Bytes32Input) => {
         try {
           if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') return cryptoUtils.hashIdentifier(v);
         } catch {}
@@ -360,10 +386,10 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
       const qIds32 = (Array.isArray(questionIds) ? questionIds : []).map(ensureHash);
       const sIds32 = (Array.isArray(surveyIds) ? surveyIds : []).map(ensureHash);
 
-      qIds32.forEach((id: any, i: any) => {
-        if (!utils.isHexString(id, 32)) throw new Error(`addQuestions: questionIds[${i}] is not a bytes32.`);
+      qIds32.forEach((id: string, i: number) => {
+        assertNonZeroBytes32(id, `addQuestions: questionIds[${i}]`);
       });
-      sIds32.forEach((id: any, i: any) => {
+      sIds32.forEach((id: string, i: number) => {
         if (!utils.isHexString(id, 32)) throw new Error(`addQuestions: surveyIds[${i}] is not a bytes32.`);
       });
 
@@ -373,17 +399,17 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
         const _sessionName = String(cfg?.sessionName || cfg?.slug || '' || '');
         const _sessionSlug = resolveStorageSessionSlug(groupKeyOrCfg, cfg);
         const _sessionMetadataOptions = _sessionSlug ? { sessionSlug: _sessionSlug } : {};
-        const qArrayToUpload = (Array.isArray(questionDataArray) ? questionDataArray : []).map((q: any) =>
+        const qArrayToUpload = (Array.isArray(questionDataArray) ? questionDataArray : []).map((q) =>
           normalizeSessionNameFields(
             {
-              ...(q || {}),
+              ...toMetadataPayload(q),
             },
             _sessionName,
             _sessionMetadataOptions,
           ),
         );
 
-        qArrayToUpload.forEach((questionData: any, index: any) => {
+        qArrayToUpload.forEach((questionData, index) => {
           validateNoLockedPlaintextInPayload(questionData, {
             family: 'question_metadata',
             path: `question metadata[${index}]`,
@@ -413,7 +439,11 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
         throw new Error('Payload uploads are disabled; cannot add questions.');
       }
 
-      const questionArweaveHashBytesArray = questionPayloadUploads.map((upload: any) => upload.pointerBytes);
+      const questionArweaveHashBytesArray = questionPayloadUploads.map((upload) => upload.pointerBytes);
+      questionArweaveHashBytesArray.forEach((hash, index) => {
+        assertNonZeroBytes32(hash, `addQuestions: content hashes[${index}]`);
+      });
+      const SurveyContract = new ethers.Contract(addr, SURVEYS, signer as any);
 
       rpcLog('RPC Call (Tx):', {
         function: 'addQuestions',
@@ -446,7 +476,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
         revertMessage: 'addQuestions transaction reverted on-chain.',
       });
 
-      const uploadedQuestions = qIds32.map((id: any, index: any) => {
+      const uploadedQuestions = qIds32.map((id: string, index: number) => {
         const upload = questionPayloadUploads[index] || {};
         return attachStorageRefCompatibilityFields(
           {
@@ -464,12 +494,12 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
     },
 
     submitResponses: async function (
-      providerName: any,
-      questionIds: any,
-      questionResponses: any,
-      surveyId: any,
-      surveyResponse: any,
-      groupKeyOrCfg: any = null,
+      providerName: ProviderName,
+      questionIds: Bytes32Input[],
+      questionResponses: MetadataPayload[],
+      surveyId: Bytes32Input,
+      surveyResponse: MetadataPayload | null | undefined,
+      groupKeyOrCfg: GroupKeyOrConfig = null,
     ) {
       let cfg = resolveSession(groupKeyOrCfg || '');
       let sessionProjection = resolveSessionCapabilityProjection(cfg);
@@ -493,7 +523,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
       }
 
       // 🔐 Normalize identifiers to bytes32 at the boundary
-      const ensureHash = (v: any) => {
+      const ensureHash = (v: Bytes32Input) => {
         try {
           if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') {
             return cryptoUtils.hashIdentifier(v);
@@ -508,10 +538,15 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
 
       const hashedQuestionIds = Array.isArray(questionIds) ? questionIds.map(ensureHash) : [];
       const hashedSurveyId = ensureHash(surveyId);
+      const hasSurveyId = hasNonZeroHashValue(hashedSurveyId);
+      const hasSurveyResponse = !!surveyResponse;
+      if (hasSurveyId !== hasSurveyResponse) {
+        throw new Error('submitResponses: survey response ID/hash mismatch.');
+      }
 
       // Optional preflight
-      hashedQuestionIds.forEach((id: any, i: any) => {
-        if (!utils.isHexString(id, 32)) throw new Error(`submitResponses: questionIds[${i}] is not a bytes32.`);
+      hashedQuestionIds.forEach((id: string, i: number) => {
+        assertNonZeroBytes32(id, `submitResponses: questionIds[${i}]`);
       });
       if (!utils.isHexString(hashedSurveyId, 32)) {
         throw new Error('submitResponses: surveyId is not a bytes32.');
@@ -570,10 +605,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
           chainId: sessionProjection.chainId,
         };
         const arweaveOpts = {
-          ...(await resolveArweaveUploadOpts(groupKeyOrCfg, {
-            providerLike: ethersProvider,
-            signer,
-          })),
+          ...resolvedArweaveOpts,
           context: uploadContext,
         };
         if (surveyResponse) {
@@ -620,7 +652,15 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
         return; // no-op when no configured payload storage path is available
       }
 
-      const questionResponseHashesBytes = questionResponseUploads.map((upload: any) => upload.pointerBytes);
+      const questionResponseHashesBytes = questionResponseUploads.map((upload) => upload.pointerBytes);
+      // Regression guard: zero remains the absence sentinel on-chain, so uploaded
+      // pointers and the optional survey pair must be validated before wallet submission.
+      questionResponseHashesBytes.forEach((hash, index) => {
+        assertNonZeroBytes32(hash, `submitResponses: questionResponseHashes[${index}]`);
+      });
+      if (hasSurveyResponse) {
+        assertNonZeroBytes32(surveyResponseHashBytes, 'submitResponses: survey response hash');
+      }
 
       if (sessionProjection.profileValid && sessionProjection.isWorkerCanonical && canUseSessionStorage) {
         const storageRefs = [
@@ -646,7 +686,12 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
       }
 
       const SurveyContract = new ethers.Contract(addr, SURVEYS, signer as any);
-      const txArgs: any[] = [hashedQuestionIds, questionResponseHashesBytes, hashedSurveyId, surveyResponseHashBytes];
+      const txArgs: unknown[] = [
+        hashedQuestionIds,
+        questionResponseHashesBytes,
+        hashedSurveyId,
+        surveyResponseHashBytes,
+      ];
       const txOverrides = await resolveTxGasOverrides({
         contract: SurveyContract,
         method: 'submitResponses',
@@ -681,7 +726,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
         });
         clearReadCachesForGroup(groupKeyOrCfg);
         return receipt;
-      } catch (error: any) {
+      } catch (error: unknown) {
         notifyUserFacingTransactionError(error);
         contractsLog.error('Error sending transaction with provider.request:', error);
         throw error;

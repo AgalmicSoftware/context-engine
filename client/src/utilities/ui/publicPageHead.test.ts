@@ -1,6 +1,8 @@
 import {
   DEFAULT_PUBLIC_PAGE_DESCRIPTION,
+  DEFAULT_PUBLIC_PAGE_IMAGE,
   DEFAULT_PUBLIC_PAGE_TITLE,
+  DEFAULT_PUBLIC_SITE_URL,
   buildCanonicalPublicUrl,
   syncPublicPageHead,
 } from './publicPageHead.js';
@@ -156,6 +158,7 @@ describe('publicPageHead', () => {
       expect.objectContaining({
         title: DEFAULT_PUBLIC_PAGE_TITLE,
         description: DEFAULT_PUBLIC_PAGE_DESCRIPTION,
+        image: DEFAULT_PUBLIC_PAGE_IMAGE,
         canonicalUrl: 'https://contextengine.xyz/session/demo?session=edge',
         ogUrl: 'https://contextengine.xyz/session/demo?session=edge',
       }),
@@ -167,6 +170,37 @@ describe('publicPageHead', () => {
     expect(document.head.querySelector('meta[property="og:url"]')?.getAttribute('content')).toBe(
       'https://contextengine.xyz/session/demo?session=edge',
     );
+    expect(document.head.querySelector('meta[property="og:image"]')?.getAttribute('content')).toBe(
+      DEFAULT_PUBLIC_PAGE_IMAGE,
+    );
+    expect(document.head.querySelector('meta[name="twitter:image"]')?.getAttribute('content')).toBe(
+      DEFAULT_PUBLIC_PAGE_IMAGE,
+    );
+  });
+
+  it('supports article metadata with a large social preview image', () => {
+    const state = syncPublicPageHead({
+      location: new URL('https://contextengine.xyz/posts/agent-village-wrapped-2026'),
+      title: 'Agent Village Wrapped',
+      description: 'A personal-agent evaluation.',
+      image: 'https://contextengine.xyz/posts/agent-village-wrapped/attachments/header.jpg',
+      ogType: 'article',
+      twitterCard: 'summary_large_image',
+    });
+
+    expect(state).toEqual(
+      expect.objectContaining({
+        ogType: 'article',
+        twitterCard: 'summary_large_image',
+      }),
+    );
+    expect(document.head.querySelector('meta[property="og:type"]')?.getAttribute('content')).toBe('article');
+    expect(document.head.querySelector('meta[property="og:image"]')?.getAttribute('content')).toBe(
+      'https://contextengine.xyz/posts/agent-village-wrapped/attachments/header.jpg',
+    );
+    expect(document.head.querySelector('meta[name="twitter:card"]')?.getAttribute('content')).toBe(
+      'summary_large_image',
+    );
   });
 
   it('emits deployment-origin discovery significantLink URLs for root-host deployments', () => {
@@ -174,12 +208,8 @@ describe('publicPageHead', () => {
 
     syncPublicPageHead({ location: window.location });
 
-    const structuredData = JSON.parse(
-      document.head.querySelector(
-        'script[type="application/ld+json"][data-ce-structured-data="public-page"]'
-      )?.textContent || '{}'
-    );
-    const webPage = structuredData['@graph']?.find?.((entry: any) => entry?.['@type'] === 'WebPage');
+    const structuredData = parseStructuredData();
+    const webPage = findStructuredDataNode(structuredData, 'WebPage');
 
     expect(webPage?.significantLink).toEqual(
       expect.arrayContaining([`${window.location.origin}/discoverability.html`, `${window.location.origin}/llms.txt`]),
@@ -191,12 +221,8 @@ describe('publicPageHead', () => {
 
     syncPublicPageHead({ location });
 
-    const structuredData = JSON.parse(
-      document.head.querySelector(
-        'script[type="application/ld+json"][data-ce-structured-data="public-page"]'
-      )?.textContent || '{}'
-    );
-    const webPage = structuredData['@graph']?.find?.((entry: any) => entry?.['@type'] === 'WebPage');
+    const structuredData = parseStructuredData();
+    const webPage = findStructuredDataNode(structuredData, 'WebPage');
 
     expect(webPage?.significantLink).toEqual(
       expect.arrayContaining([
@@ -215,12 +241,8 @@ describe('publicPageHead', () => {
     try {
       syncPublicPageHead({ location });
 
-      const structuredData = JSON.parse(
-        document.head.querySelector(
-          'script[type="application/ld+json"][data-ce-structured-data="public-page"]'
-        )?.textContent || '{}'
-      );
-      const webPage = structuredData['@graph']?.find?.((entry: any) => entry?.['@type'] === 'WebPage');
+      const structuredData = parseStructuredData();
+      const webPage = findStructuredDataNode(structuredData, 'WebPage');
 
       expect(webPage?.significantLink).toEqual(
         expect.arrayContaining([
@@ -245,11 +267,10 @@ describe('publicPageHead', () => {
     const structuredDataNode = document.head.querySelector(structuredDataSelector);
     expect(structuredDataNode).not.toBeNull();
 
-    const structuredData = JSON.parse(structuredDataNode?.textContent || '{}');
-    const graph = Array.isArray(structuredData['@graph']) ? structuredData['@graph'] : [];
-    const organization = graph.find((entry) => entry?.['@type'] === 'Organization');
-    const sourceCode = graph.find((entry) => entry?.['@type'] === 'SoftwareSourceCode');
-    const webPage = graph.find((entry) => entry?.['@type'] === 'WebPage');
+    const structuredData = JSON.parse(structuredDataNode?.textContent || '{}') as StructuredData;
+    const organization = findStructuredDataNode(structuredData, 'Organization');
+    const sourceCode = findStructuredDataNode(structuredData, 'SoftwareSourceCode');
+    const webPage = findStructuredDataNode(structuredData, 'WebPage');
 
     expect(organization).toEqual(
       expect.objectContaining({
@@ -279,6 +300,7 @@ describe('publicPageHead', () => {
     document.head.innerHTML = `
       <link rel="canonical" href="https://contextengine.xyz/" />
       <meta property="og:url" content="https://contextengine.xyz/" />
+      <script type="application/ld+json" data-ce-structured-data="public-page">{}</script>
     `;
 
     syncPublicPageHead({
@@ -299,12 +321,8 @@ describe('publicPageHead', () => {
     expect(document.head.querySelector('meta[property="og:url"]')?.getAttribute('content')).toBe(
       'https://contextengine.xyz/session/demo',
     );
-    const structuredData = JSON.parse(
-      document.head.querySelector(
-        'script[type="application/ld+json"][data-ce-structured-data="public-page"]'
-      )?.textContent || '{}'
-    );
-    const webPage = structuredData['@graph']?.find?.((entry: any) => entry?.['@type'] === 'WebPage');
+    const structuredData = parseStructuredData();
+    const webPage = findStructuredDataNode(structuredData, 'WebPage');
     expect(webPage?.url).toBe('https://contextengine.xyz/session/demo');
   });
 });

@@ -1,4 +1,5 @@
-import { SurveyQuestions } from './SurveyQuestions';
+import React from 'react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceControl';
 import { buildGateAudienceSbtItems, resolveLockAudienceSessionName } from './surveyToolResponseGateController';
 import { buildResponseGatePolicy } from '../../utilities/crypto/litGatePolicy.js';
@@ -149,26 +150,8 @@ describe('SurveyQuestions lock audience details', () => {
       />,
     );
 
-    subject.state = {
-      ...subject.state,
-      lockAudienceMenuByQuestion: { q1: true },
-      lockAudienceGateDetailsByQuestion: { q1: 'default_gate' },
-    };
-
-    const expandedControl = subject.renderAnswerLockControl({
-      surveyIndex: 0,
-      questionId: 'q1',
-      answer: { encrypted: false, encryptionAudience: 'self' },
-      lockDisabled: false,
-      lockTitle: 'Not encrypted',
-      glowAnswer: false,
-      forceAudienceMenu: true,
-      selfAudienceLabel: 'only me',
-    });
-
-    const expandedTree = renderLockAudienceControl(expandedControl);
-    expect(treeHasText(expandedTree, 'AI Gate Test SBT')).toBe(true);
-    expect(treeHasText(expandedTree, '0x1111...1111')).toBe(true);
+    expect(screen.getByText('AI Gate Test SBT')).toBeInTheDocument();
+    expect(screen.getByText('0x1111...1111')).toBeInTheDocument();
   });
 
   it('wires shared lock-audience gate helper callbacks for select and details toggle', () => {
@@ -194,13 +177,11 @@ describe('SurveyQuestions lock audience details', () => {
       onToggleGateDetails,
     });
 
-    const preventDefault = jest.fn();
-    const stopPropagation = jest.fn();
-    caretButton.props.onClick({ preventDefault, stopPropagation });
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_GATE));
+    fireEvent.click(screen.getByRole('button', { name: /show vip gate/i }));
 
-    expect(preventDefault).toHaveBeenCalled();
-    expect(stopPropagation).toHaveBeenCalled();
-    expect(subject.toggleLockAudienceGateDetails).toHaveBeenCalledWith('q1', 'vip_gate', 'answer');
+    expect(onSelectAudience).toHaveBeenCalledWith('gate', 'vip_gate');
+    expect(onToggleGateDetails).toHaveBeenCalledWith('q1', 'vip_gate', 'answer');
   });
 
   it('hides the plaintext audience option for additional comment lock menus', () => {
@@ -211,10 +192,9 @@ describe('SurveyQuestions lock audience details', () => {
       showFollowOption: true,
     });
 
-    const lockTree = renderLockAudienceControl(lockControl);
-    expect(treeHasText(lockTree, 'Not encrypted')).toBe(false);
-    expect(treeHasDataTestId(lockTree, E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_NONE)).toBe(false);
-    expect(treeHasText(lockTree, 'only me')).toBe(true);
-    expect(treeHasText(lockTree, 'Match Answer')).toBe(true);
+    expect(screen.queryByText('Not encrypted')).not.toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_NONE)).not.toBeInTheDocument();
+    expect(screen.getByText('only me')).toBeInTheDocument();
+    expect(screen.getByText('Match Answer')).toBeInTheDocument();
   });
 });

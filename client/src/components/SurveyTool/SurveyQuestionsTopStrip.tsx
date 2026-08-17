@@ -5,9 +5,14 @@ import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './SurveyTool.module.scss';
 import SurveyQuestionsUserResponseNotice from './SurveyQuestionsUserResponseNotice';
+import type {
+  SurveyQuestionsLayoutDisplayState,
+  SurveyQuestionsRouteViewDisplayState,
+  SurveyQuestionsSubmitFooterDisplayState,
+} from './surveyQuestionsTypes.js';
 
 type SurveyQuestionsTopStripProps = {
-  className?: string;
+  displayAnswerMode?: boolean;
   isDecrypting?: boolean;
   isEditing?: boolean;
   isSubmitting?: boolean;
@@ -24,7 +29,6 @@ type SurveyQuestionsTopStripProps = {
   submitDisplayState?: Pick<SurveyQuestionsSubmitFooterDisplayState, 'submittedStateActive'>;
   userHasResponse?: boolean;
   userResponseEncrypted?: boolean;
-  viewAnswersButtonText?: React.ReactNode;
 };
 
 const SurveyQuestionsTopStrip = React.forwardRef<HTMLDivElement, SurveyQuestionsTopStripProps>(

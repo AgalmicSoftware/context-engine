@@ -352,13 +352,15 @@ describe('surveyResultsHydrationRuntime', () => {
       string,
       Array<{ responder: string; response: { answer?: { value?: unknown }; source?: unknown } }>
     >;
-    const liveRows = aggregator[questionId].filter(
-      (row) => row.responder === fixtureResponder.toLowerCase(),
-    );
+    const liveRows = aggregator[questionId].filter((row) => row.responder === fixtureResponder.toLowerCase());
     expect(liveRows).toHaveLength(1);
     expect(liveRows[0].response.answer?.value).toBe(0);
     expect(liveRows[0].response.source).not.toBe('demo-polis-data');
-    expect(Object.values(aggregator).flat().some((row) => row.responder === '0xstale-cache-responder')).toBe(false);
+    expect(
+      Object.values(aggregator)
+        .flat()
+        .some((row) => row.responder === '0xstale-cache-responder'),
+    ).toBe(false);
     expect(aggregator).not.toHaveProperty(staleQuestionId);
   });
 });

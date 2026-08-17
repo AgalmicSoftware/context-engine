@@ -37,14 +37,7 @@ export function bufferSourceToWebCryptoBufferSource(buffer: ArrayBuffer | ArrayB
 }
 
 export function bufferToBase64URL(buffer: ArrayBuffer | ArrayBufferView): string {
-  let bytes: Uint8Array;
-  if (isArrayBufferLike(buffer)) {
-    bytes = new Uint8Array(buffer);
-  } else if (ArrayBuffer.isView(buffer)) {
-    bytes = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-  } else {
-    throw new Error('Expected an ArrayBuffer or ArrayBufferView.');
-  }
+  const bytes = bufferSourceToUint8Array(buffer);
   let value = '';
   for (let i = 0; i < bytes.byteLength; i += 1) {
     value += String.fromCharCode(bytes[i]);

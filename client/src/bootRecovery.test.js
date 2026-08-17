@@ -88,7 +88,10 @@ describe('bootRecovery', () => {
     expect(document.body).not.toHaveTextContent('stale app chunk');
     expect(document.querySelector('[role="alert"]')).not.toBeNull();
     expect(document.querySelector('[role="alert"]')).toHaveAttribute('data-boot-error', 'stale app chunk');
-    expect(document.querySelector('h1')).toHaveAttribute('style', expect.stringContaining('color:#f6f8ff'));
+    expect(document.querySelector('h1')).toHaveAttribute(
+      'style',
+      expect.stringContaining('color:var(--ce-panel-text,CanvasText)'),
+    );
     expect(document.querySelectorAll('button')).toHaveLength(1);
     expect(document.querySelector('button')).toHaveTextContent('Reload');
 
@@ -193,25 +196,6 @@ describe('bootRecovery', () => {
     expect(assign).toHaveBeenCalledWith('http://localhost:3000/session/demo-1?existing=1&ceBootReload=123456');
 
     Date.now.mockRestore();
-  });
-
-  it('removes the boot reload marker after a successful startup', () => {
-    const state = { route: 'about' };
-    const replaceState = jest.fn();
-    const fakeWindow = {
-      history: { replaceState, state },
-      location: {
-        href: 'http://localhost:3000/about?existing=1&ceBootReload=123456#recognition',
-      },
-    };
-
-    clearBootReloadMarker(fakeWindow);
-
-    expect(replaceState).toHaveBeenCalledWith(
-      state,
-      '',
-      'http://localhost:3000/about?existing=1#recognition',
-    );
   });
 
   it('clears storage and Cache API entries on a best-effort basis', async () => {

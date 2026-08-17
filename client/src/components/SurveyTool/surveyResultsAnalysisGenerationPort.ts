@@ -18,7 +18,7 @@ export type SurveyResultsAnalysisGenerationPort = {
   generateSection: (request: SurveyResultsAnalysisGenerationRequest) => Promise<unknown>;
 };
 
-export type SurveyResultsAiScriptsModule = {
+export type SurveyResultsAiClientModule = {
   callAI: (prompt: string, options: SurveyResultsAnalysisGenerationCallOptions) => Promise<unknown> | unknown;
 };
 
@@ -30,7 +30,7 @@ export const bindSurveyResultsAnalysisGenerationPort = ({
   aiClient,
 }: BindSurveyResultsAnalysisGenerationPortArgs): SurveyResultsAnalysisGenerationPort => ({
   generateSection: async ({ maxTokens, prompt, sessionSlug }) =>
-    aiScripts().callAI(prompt, {
+    aiClient().callAI(prompt, {
       maxTokens,
       response_format: { type: 'json_object' },
       sessionSlug,

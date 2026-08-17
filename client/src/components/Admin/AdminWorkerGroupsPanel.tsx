@@ -95,7 +95,12 @@ const withJoinMode = (draft: WorkerGroupDraft, joinMode: WorkerGroupJoinMode): W
   memberVisibility: joinMode === 'open' && draft.memberVisibility === 'admin_only' ? 'session' : draft.memberVisibility,
 });
 
-const memberAddress = (member: WorkerGroupMember): string => String(member.principal?.address || '').trim();
+const memberAddress = (member: WorkerGroupMember): string => {
+  const principal = member.principal;
+  return principal?.kind === 'evm_address' || principal?.kind === 'passkey_account'
+    ? String(principal.address || '').trim()
+    : '';
+};
 const memberIdentity = (member: WorkerGroupMember): string =>
   String(member.principalKey || memberAddress(member) || `${member.groupId || ''}\n${member.addedAt || ''}`);
 const asRecord = (value: unknown): Record<string, unknown> =>
@@ -210,14 +215,7 @@ const AdminWorkerGroupsPanel = ({
     setBusy(false);
     setStatus('');
     if (autoLoad && !createOnly) void loadGroups();
-  }, [
-    autoLoad,
-    createOnly,
-    defaultGroupTags,
-    loadGroups,
-    signedAccount,
-    targetKey,
-  ]); // targetKey includes normalized defaults.
+  }, [autoLoad, createOnly, defaultGroupTags, loadGroups, signedAccount, targetKey]); // targetKey includes normalized defaults.
 
   const runMutation = async (
     operation: () => Promise<unknown>,
@@ -501,7 +499,11 @@ const AdminWorkerGroupsPanel = ({
                 {url}
               </a>
             ))}
-            {group.memberLimit ? <span>Limit: {group.memberLimit} members</span> : <span>No group-specific member limit</span>}
+            {group.memberLimit ? (
+              <span>Limit: {group.memberLimit} members</span>
+            ) : (
+              <span>No group-specific member limit</span>
+            )}
             {group.joinEndsAt ? <span>Join deadline: {new Date(group.joinEndsAt).toLocaleString()}</span> : null}
             {group.adminAddress ? <span>Group admin: {group.adminAddress}</span> : null}
             <div>

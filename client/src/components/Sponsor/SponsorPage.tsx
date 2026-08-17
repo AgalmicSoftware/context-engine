@@ -261,7 +261,7 @@ const readSponsorPageCache = (): SponsorPageCache => {
     return {
       persistBundleDraft,
       bundleForm: persistBundleDraft ? normalizeSponsorBundleDraftForm(parsed.bundleForm) : buildEmptyBundleForm(),
-      expiresAt: expiresAt instanceof Date && Number.isFinite(expiresAt.getTime()) ? expiresAt : null,
+      expiresAt,
     };
   } catch (_) {
     return fallback;
@@ -979,12 +979,12 @@ const SponsorPage = ({
         throw new Error('Add at least one sponsored credential before creating a URL.');
       }
 
-      const secret = generateSponsoredBundleSecret();
+      const secret = sponsoredBundlePort.generateSponsoredBundleSecret();
       setCreateStatusIfCurrent('Uploading sponsored bundle…');
 
       const adminAuth = await buildBootstrapUploadAuth({ workerUrl: resolvedWorkerUrl });
       if (!isCurrentCreateRequest()) return;
-      const result = await uploadSponsoredBundleUntyped({
+      const result = await sponsoredBundlePort.uploadSponsoredBundle({
         secret,
         label,
         expiresAt: normalizedExpiry,

@@ -68,9 +68,7 @@ export const resolveSessionWizardNewSessionRequirementsDisplayState = ({
     ? resolveSessionWizardResourceSecretFields('ai', sessionAi)
     : [];
   const hasNewSessionAiRequirementCovered = modeRequirements.selected
-    ? requiredAiProviderKeyFields.every(
-        (field) => !!toRequirementString(currentWorkerSecrets?.[field.key]).trim(),
-      )
+    ? requiredAiProviderKeyFields.every((field) => !!toRequirementString(currentWorkerSecrets?.[field.key]).trim())
     : hasAnyAiProviderKey;
   const hasNewSessionArweaveRequirementCovered =
     (modeRequirements.selected && !modeRequirements.requiresArweave) ||

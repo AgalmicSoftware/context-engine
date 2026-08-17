@@ -91,7 +91,7 @@ import {
 import { isResponseRecencyAtLeast, toResponseRecencyPair } from '../../utilities/survey/responseRecency.js';
 import { resolveSessionRegistryBootstrapChainIds } from '../../utilities/session/registryBootstrapChainIds.js';
 import { t } from '../../utilities/ui/terminology.js';
-import { initCacheManager, subscribeCacheUpdates } from '../../utilities/cache/cacheScripts.js';
+import { initCacheManager, subscribeCacheUpdates, updateCacheAtomic } from '../../utilities/cache/cacheScripts.js';
 import { createMainSiteDgStorage, type MainSiteDgStorage } from '../../utilities/cache/mainSiteDgStorage.js';
 import {
   createSessionCachePersistenceController,
@@ -152,7 +152,7 @@ import {
   resolveMainSiteSessionSlugFromProps,
   resolveMainSiteSessionSlugFromPathToken,
 } from './routeSessionResolution.js';
-import { resolveMainSiteLitSessionConfig, resolveMainSiteLitSessionConfigSource } from './litSessionConfig.js';
+import { resolveMainSiteLitRouteContextKey, syncMainSiteLitHooks } from './mainSiteLitHooksBinding.js';
 import {
   buildMetadataSessionCacheEnvelope as buildMetadataSessionCacheEnvelopeFn,
   resolveMetadataSessionBinding as resolveMetadataSessionBindingFn,
@@ -605,6 +605,27 @@ type MainSiteProfileScanControllerBootstrap = SessionProfileScanController & {
   _registryBootstrapScopeKey?: string;
 };
 
+const createMainSiteSurveyNetworkCache = (initialLastBlock: number): MainSiteSurveyNetworkCache => ({
+  surveysLatestBlock: initialLastBlock,
+  surveys: {},
+  surveyResponses: {},
+  surveyResponsesLatestBlock: {},
+  pendingSurveyMetadata: {},
+});
+
+const createMainSiteQuestionNetworkCache = (initialLastBlock: number): MainSiteQuestionNetworkCache => ({
+  questionsLatestBlock: initialLastBlock,
+  questionsDiscoveryCheckpointBlock: initialLastBlock,
+  questions: {},
+  questionResponses: {},
+  questionResponsesMeta: {},
+  questionResponsesLatestBlock: initialLastBlock,
+  pendingQuestionMetadata: {},
+  arweaveTxCache: {},
+  arweaveTxFailureCache: {},
+  questionHydrationMeta: {},
+});
+
 const isMainSiteRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object';
 
@@ -896,9 +917,16 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       networkID: string,
       opts?: Record<string, unknown>,
     ) =>
-      this.writeSurveyMetadataToCache(slug, surveyID, surveyData, creationBlock as number | string | null, networkID, {
-        enforceScopedIsolation: opts?.enforceScopedIsolation === true,
-      }),
+      this.writeSurveyMetadataToCacheAtomic(
+        slug,
+        surveyID,
+        surveyData,
+        creationBlock as number | string | null,
+        networkID,
+        {
+          enforceScopedIsolation: opts?.enforceScopedIsolation === true,
+        },
+      ),
     queueLocalRevisionUpdate: (opts?: Parameters<SessionCacheReadinessController['queueLocalRevisionUpdate']>[0]) =>
       this.queueLocalRevisionUpdate(opts),
     getSessionScanScope: () => this.getSessionScanScope(),
@@ -945,7 +973,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       networkID: string,
       opts?: Record<string, unknown>,
     ) =>
-      this.writeQuestionMetadataToCache(slug, questionID, questionData, networkID, {
+      this.writeQuestionMetadataToCacheAtomic(slug, questionID, questionData, networkID, {
         enforceScopedIsolation: opts?.enforceScopedIsolation === true,
       }),
     queueLocalRevisionUpdate: (opts?: Parameters<SessionCacheReadinessController['queueLocalRevisionUpdate']>[0]) =>
@@ -1535,43 +1563,12 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
   getLitRouteContextKey = () => resolveMainSiteLitRouteContextKey(this);
 
   syncLitHooks = () => {
-    if (typeof window === 'undefined') return;
-    const slug = this.getActiveSessionSlug();
-    const cfg = resolveMainSiteLitSessionConfigSource({
-      slug,
-      resolveRegistryConfigBySlug: (sessionSlug: string) => sessionRegistryReadsPort.getSessionConfig(sessionSlug),
-      resolveStaticConfigBySlug: (sessionSlug: string) => getSessionConfigBySlugOrDefault(sessionSlug),
-    });
-    const { chainId, litNetwork, litChain, accessControlConditions, userMaxPrice, chipotle } =
-      resolveMainSiteLitSessionConfig({
-        sessionConfig: cfg,
-        networkChainIdFallback: this.props.network?.id || null,
-      });
-
-    const hooks = chipotle
-      ? createLitHooks({
-          providerLike: this.props.provider,
-          account: this.props.account,
-          chainId,
-          litChain,
-          litNetwork,
-          userMaxPrice,
-          accessControlConditions: accessControlConditions || undefined,
-          chipotle: {
-            ...chipotle,
-            sessionSlug: slug,
-          },
-        })
-      : null;
-
-    setGlobalLitHooks(hooks);
-    attachLitDevTools({
-      providerLike: this.props.provider,
-      account: this.props.account,
-      chainId,
-      litChain,
-    });
-    this.setState(buildMainSiteLitHooksStatePatch(hooks));
+    const result = syncMainSiteLitHooks(this);
+    if (!result) return;
+    // Keep the route key aligned with hook installation. A later navigation can
+    // then clear a prior session's hooks before its new bootstrap is trusted.
+    this._lastLitRouteContextKey = result.routeContextKey;
+    this.setState({ litHooks: result.hooks });
   };
 
   getSessionInfoForGroup = (sessionConfig: unknown = {}, slug = '') => {
@@ -1653,59 +1650,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
 
   buildMetadataSessionCacheEnvelope = (metadata: unknown, fallbackSlug = '', options: BuildEnvelopeOptions = {}) =>
     buildMetadataSessionCacheEnvelopeFn(metadata, fallbackSlug, options);
-
-  writeSurveyMetadataToCache = (
-    slugIn: unknown,
-    surveyId: unknown,
-    surveyData: MetadataRecord | null | undefined,
-    creationBlock: number | string | null = null,
-    netKeyIn: unknown = null,
-    options: MainSiteMetadataWriterOptions = {},
-  ): boolean => {
-    const slug = normalizeSessionSlug(slugIn || '');
-    const sid = String(surveyId || surveyData?.surveyID || surveyData?.id || '').toLowerCase();
-    const netKey = String(netKeyIn || this.getSessionChainId(slug) || '');
-    if (!sid || !netKey) return false;
-    const enforceScopedIsolation = options.enforceScopedIsolation === true;
-
-    const normalizedSurveyData = prepareSurveyMetadataCacheEntryFn({
-      surveyId: sid,
-      surveyData,
-      slug,
-      creationBlock,
-      enforceScopedIsolation,
-    });
-
-    const groupCache = (this.readDgRecord('surveysCache', slug) || {}) as MainSiteSurveyMetadataCache;
-    this.mergeLegacyNumericNetworkKey(groupCache, netKey);
-    if (!groupCache[netKey]) {
-      groupCache[netKey] = {
-        surveysLatestBlock: 0,
-        surveys: {},
-        surveyResponses: {},
-        surveyResponsesLatestBlock: {},
-        pendingSurveyMetadata: {},
-      };
-    }
-    const networkCache = groupCache[netKey] as MainSiteSurveyNetworkCache;
-    if (!isMainSiteRecord(networkCache.surveys)) {
-      networkCache.surveys = {};
-    }
-    if (!isMainSiteRecord(networkCache.pendingSurveyMetadata)) {
-      networkCache.pendingSurveyMetadata = {};
-    }
-
-    networkCache.surveys[sid] = normalizedSurveyData;
-    if (networkCache.pendingSurveyMetadata[sid]) {
-      try {
-        delete networkCache.pendingSurveyMetadata[sid];
-      } catch (e) {
-        mainSiteLog.warn('MainSite: fallback', e);
-      }
-    }
-    this.DG.write('surveysCache', slug, groupCache);
-    return true;
-  };
 
   writeQuestionMetadataToCache = (
     slugIn: unknown,
@@ -3629,12 +3573,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     >;
     this.mergeLegacyNumericNetworkKey(surveysCache, networkID);
     if (!surveysCache[networkID]) {
-      surveysCache[networkID] = {
-        surveysLatestBlock: initialLastBlockDefault,
-        surveys: {},
-        surveyResponses: {},
-        surveyResponsesLatestBlock: {},
-      };
+      surveysCache[networkID] = createMainSiteSurveyNetworkCache(initialLastBlockDefault);
     }
     let currentSurveyNetworkCache = surveysCache[networkID] as MainSiteSurveyNetworkCache;
     if (
@@ -3651,18 +3590,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     >;
     this.mergeLegacyNumericNetworkKey(questionsCache, networkID);
     if (!questionsCache[networkID]) {
-      questionsCache[networkID] = {
-        questionsLatestBlock: initialLastBlockDefault,
-        questionsDiscoveryCheckpointBlock: initialLastBlockDefault,
-        questions: {},
-        questionResponses: {},
-        questionResponsesMeta: {}, // ensure meta map exists
-        questionResponsesLatestBlock: initialLastBlockDefault,
-        pendingQuestionMetadata: {},
-        arweaveTxCache: {},
-        arweaveTxFailureCache: {},
-        questionHydrationMeta: {},
-      };
+      questionsCache[networkID] = createMainSiteQuestionNetworkCache(initialLastBlockDefault);
     }
     let currentQuestionNetworkCache = questionsCache[networkID] as MainSiteQuestionNetworkCache;
     if (!currentQuestionNetworkCache.questions) currentQuestionNetworkCache.questions = {};
@@ -3674,21 +3602,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       currentQuestionNetworkCache.questionResponsesMeta = {};
     }
     ensureQuestionArweaveCacheBranches(currentQuestionNetworkCache);
-    const mergeFreshQuestionArweaveBranches = () => {
-      try {
-        const freshCache = (this.readDgRecord('questionsCache', slug) || {}) as Record<
-          string,
-          MainSiteQuestionNetworkCache | undefined
-        >;
-        this.mergeLegacyNumericNetworkKey(freshCache, networkID);
-        const freshNet = freshCache[networkID];
-        if (!freshNet || typeof freshNet !== 'object') return;
-        mergeQuestionArweaveCacheBranches(currentQuestionNetworkCache, freshNet);
-      } catch (e) {
-        mainSiteLog.warn('MainSite: fallback', e);
-      }
-    };
-
     if (event.type === 'SurveyAdded') {
       if (eventBlockNumber > (currentSurveyNetworkCache.surveysLatestBlock || 0)) {
         this.setReadinessStateIfChanged({ isSurveyCacheReady: false, isQuestionCacheReady: false });
@@ -3728,7 +3641,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
               } catch (e) {
                 mainSiteLog.warn('MainSite: fallback', e);
               }
-              this.writeSurveyMetadataToCache(
+              const persisted = await this.writeSurveyMetadataToCacheAtomic(
                 targetSurveySlug,
                 surveyID,
                 preparedSurveyData,
@@ -3738,6 +3651,9 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
                   enforceScopedIsolation: true,
                 },
               );
+              if (!persisted) {
+                throw new MainSiteCachePersistenceError(`Failed to persist surveys cache for ${targetSurveySlug}`);
+              }
             }
             mainSiteLog.log(`Survey data for ${surveyID} fetched and added to local cache object.`);
 
@@ -3788,9 +3704,21 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
                       } catch (e) {
                         mainSiteLog.warn('MainSite: fallback', e);
                       }
-                      this.writeQuestionMetadataToCache(targetQuestionSlug, qid, preparedQuestionData, networkID, {
-                        enforceScopedIsolation: true,
-                      });
+                      rebucketedEventQuestionIds.add(qid);
+                      const persisted = await this.writeQuestionMetadataToCacheAtomic(
+                        targetQuestionSlug,
+                        qid,
+                        preparedQuestionData,
+                        networkID,
+                        {
+                          enforceScopedIsolation: true,
+                        },
+                      );
+                      if (!persisted) {
+                        throw new MainSiteCachePersistenceError(
+                          `Failed to persist questions cache for ${targetQuestionSlug}`,
+                        );
+                      }
                     }
                     mainSiteLog.log(`Question ${qid} data fetched and added to local cache object.`);
                   } else {
@@ -3892,6 +3820,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
           }
         } catch (error) {
           mainSiteLog.error(`Error processing SurveyAdded event for ${surveyID}:`, error);
+          if (error instanceof MainSiteCachePersistenceError) throw error;
           this.setReadinessStateIfChanged(
             { isSurveyCacheReady: true, isQuestionCacheReady: true },
             this.checkAllCachesReady,
@@ -3949,9 +3878,19 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
                   } catch (e) {
                     mainSiteLog.warn('MainSite: fallback', e);
                   }
-                  this.writeQuestionMetadataToCache(targetQuestionSlug, qid, preparedQuestionData, networkID, {
-                    enforceScopedIsolation: true,
-                  });
+                  rebucketedEventQuestionIds.add(qid);
+                  const persisted = await this.writeQuestionMetadataToCacheAtomic(
+                    targetQuestionSlug,
+                    qid,
+                    preparedQuestionData,
+                    networkID,
+                    { enforceScopedIsolation: true },
+                  );
+                  if (!persisted) {
+                    throw new MainSiteCachePersistenceError(
+                      `Failed to persist questions cache for ${targetQuestionSlug}`,
+                    );
+                  }
                 }
                 mainSiteLog.log(`New question ${qid} data fetched and added to local cache object.`);
               } else {
@@ -4068,21 +4007,13 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       questionIdsFromEvent.forEach((qId: string) => {
         const responseMetaByResponder = currentQuestionNetworkCache.questionResponsesMeta[qId] || {};
         const prev = responseMetaByResponder[responderAddressLower] || {};
-        const prevBn = Number(prev.bn ?? prev.blockNumber ?? 0);
-        const prevTxi = Number(prev.txi ?? prev.transactionIndex ?? prev.txIndex ?? 0);
-        const prevLi = Number(prev.li ?? prev.logIndex ?? 0);
-        const prevTs = Number(prev.ts ?? prev.timestamp ?? 0);
-        const isNewer =
-          bn > prevBn ||
-          (bn === prevBn &&
-            (eventTransactionIndex > prevTxi ||
-              (eventTransactionIndex === prevTxi &&
-                (eventLogIndex > prevLi || (eventLogIndex === prevLi && eventTimestamp >= prevTs)))));
+        const previousResponseRecency = toResponseRecencyPair(prev);
+        const isNewer = isResponseRecencyAtLeast(incomingResponseRecency, prev);
         if (isNewer) {
           qIdsToFetch.push(qId);
         } else {
           mainSiteLog.log(
-            `[ResponsesSubmitted][recency-guard] STALE ignored for qId=${qId}, responder=${responderAddressLower} (prev bn/tx/li/ts=${prevBn}/${prevTxi}/${prevLi}/${prevTs}, incoming bn/tx/li/ts=${bn}/${eventTransactionIndex}/${eventLogIndex}/${eventTimestamp})`,
+            `[ResponsesSubmitted][recency-guard] STALE ignored for qId=${qId}, responder=${responderAddressLower} (prev bn/tx/li/ts=${previousResponseRecency.bn}/${previousResponseRecency.txi}/${previousResponseRecency.li}/${previousResponseRecency.ts}, incoming bn/tx/li/ts=${bn}/${eventTransactionIndex}/${eventLogIndex}/${eventTimestamp})`,
           );
         }
       });
@@ -4157,7 +4088,36 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
           return next;
         });
       }
-      if (surveyCacheUpdated || questionCacheUpdated) {
+      let questionResponsePersisted = false;
+      if (questionCacheUpdated) {
+        await updateMainSiteQuestionCacheAtomic(slug, (current) => {
+          const next = (isMainSiteRecord(current) ? current : {}) as MainSiteQuestionMetadataCache;
+          this.mergeLegacyNumericNetworkKey(next, networkID);
+          const targetNet = next[networkID] || createMainSiteQuestionNetworkCache(initialLastBlockDefault);
+          ensureQuestionArweaveCacheBranches(targetNet);
+          qIdsToFetch.forEach((qId) => {
+            const incomingResponse = currentQuestionNetworkCache.questionResponses[qId]?.[responderAddressLower];
+            const incomingMeta = currentQuestionNetworkCache.questionResponsesMeta[qId]?.[responderAddressLower];
+            if (!incomingResponse || !incomingMeta) return;
+            if (!isMainSiteRecord(targetNet.questionResponses[qId])) targetNet.questionResponses[qId] = {};
+            if (!isMainSiteRecord(targetNet.questionResponsesMeta[qId])) targetNet.questionResponsesMeta[qId] = {};
+            const existingMeta = targetNet.questionResponsesMeta[qId]?.[responderAddressLower] || {};
+            if (!isResponseRecencyAtLeast(incomingResponseRecency, existingMeta)) return;
+            targetNet.questionResponses[qId]![responderAddressLower] = incomingResponse;
+            targetNet.questionResponsesMeta[qId]![responderAddressLower] = incomingMeta;
+            questionResponsePersisted = true;
+          });
+          if (questionResponsePersisted) {
+            targetNet.questionResponsesLatestBlock = Math.max(
+              Number(targetNet.questionResponsesLatestBlock) || initialLastBlockDefault,
+              bn,
+            );
+          }
+          next[networkID] = targetNet;
+          return next;
+        });
+      }
+      if (surveyResponsePersisted || questionResponsePersisted) {
         mainSiteLog.log('ResponsesSubmitted event processed; caches updated (survey and/or questions).');
         this.queueLocalRevisionUpdate({ needsQuestionResponsesNonce: true });
       }
@@ -4260,10 +4220,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
 
         {mainViewDisplay}
 
-        <Footer
-          toggleLoginModal={this.props.toggleLoginModal}
-          flowAtDocumentEnd={hasActiveSessionRoute}
-        />
+        <Footer toggleLoginModal={this.props.toggleLoginModal} flowAtDocumentEnd={hasActiveSessionRoute} />
       </SessionColorSchemeScope>
     );
   }

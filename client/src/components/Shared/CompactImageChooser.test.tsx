@@ -47,12 +47,7 @@ describe('CompactImageChooser', () => {
 
   it('keeps URL and paste controls while hiding file controls', () => {
     const { container } = render(
-      <CompactImageChooser
-        showUploadControl={false}
-        showUrlInput
-        onToggleUrlMode={() => {}}
-        onPaste={() => {}}
-      />,
+      <CompactImageChooser showUploadControl={false} showUrlInput onToggleUrlMode={() => {}} onPaste={() => {}} />,
     );
 
     expect(screen.getByRole('button', { name: 'URL' })).toBeInTheDocument();

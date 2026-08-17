@@ -6,6 +6,24 @@ export type PostMarkdownBlock =
   | { type: 'list'; ordered: boolean; items: string[] }
   | { type: 'code'; language: string; code: string }
   | { type: 'viz'; raw: string; spec: unknown; error?: string }
+  | {
+      type: 'vizGroupStart';
+      raw: string;
+      title: string;
+      defaultOpen: boolean;
+      childrenOpen: boolean;
+      layout: 'carousel' | 'stack';
+      error?: string;
+    }
+  | { type: 'vizGroupEnd' }
+  | {
+      type: 'disclosureStart';
+      raw: string;
+      title: string;
+      defaultOpen: boolean;
+      error?: string;
+    }
+  | { type: 'disclosureEnd' }
   | { type: 'rule' };
 
 const stripFrontmatter = (markdown: string): string => {
@@ -58,7 +76,12 @@ export const parsePostMarkdown = (markdown: string): PostMarkdownBlock[] => {
       const language = fenceMatch[1] || '';
       const codeLines: string[] = [];
       index += 1;
-      while (index < lines.length && !String(lines[index] || '').trim().startsWith('```')) {
+      while (
+        index < lines.length &&
+        !String(lines[index] || '')
+          .trim()
+          .startsWith('```')
+      ) {
         codeLines.push(lines[index] || '');
         index += 1;
       }
@@ -67,6 +90,41 @@ export const parsePostMarkdown = (markdown: string): PostMarkdownBlock[] => {
       if (language.toLowerCase() === 'ce-viz') {
         const parsed = parseVizSpec(code);
         blocks.push({ type: 'viz', raw: code, spec: parsed.spec, ...(parsed.error ? { error: parsed.error } : {}) });
+      } else if (language.toLowerCase() === 'ce-viz-group') {
+        const parsed = parseVizSpec(code);
+        const record =
+          parsed.spec && typeof parsed.spec === 'object' && !Array.isArray(parsed.spec)
+            ? (parsed.spec as Record<string, unknown>)
+            : {};
+        const title =
+          typeof record.title === 'string' && record.title.trim() ? record.title.trim() : 'Data Exploration';
+        blocks.push({
+          type: 'vizGroupStart',
+          raw: code,
+          title,
+          defaultOpen: record.defaultOpen === true,
+          childrenOpen: record.childrenOpen === true,
+          layout: record.layout === 'stack' ? 'stack' : 'carousel',
+          ...(parsed.error ? { error: parsed.error } : {}),
+        });
+      } else if (language.toLowerCase() === 'ce-viz-group-end') {
+        blocks.push({ type: 'vizGroupEnd' });
+      } else if (language.toLowerCase() === 'ce-disclosure') {
+        const parsed = parseVizSpec(code);
+        const record =
+          parsed.spec && typeof parsed.spec === 'object' && !Array.isArray(parsed.spec)
+            ? (parsed.spec as Record<string, unknown>)
+            : {};
+        const title = typeof record.title === 'string' && record.title.trim() ? record.title.trim() : 'More details';
+        blocks.push({
+          type: 'disclosureStart',
+          raw: code,
+          title,
+          defaultOpen: record.defaultOpen === true,
+          ...(parsed.error ? { error: parsed.error } : {}),
+        });
+      } else if (language.toLowerCase() === 'ce-disclosure-end') {
+        blocks.push({ type: 'disclosureEnd' });
       } else {
         blocks.push({ type: 'code', language, code });
       }
@@ -114,9 +172,7 @@ export const parsePostMarkdown = (markdown: string): PostMarkdownBlock[] => {
       const items: string[] = [];
       while (index < lines.length) {
         const itemLine = String(lines[index] || '').trim();
-        const itemMatch = ordered
-          ? itemLine.match(/^\d+\.\s+(.+)$/)
-          : itemLine.match(/^[-*]\s+(.+)$/);
+        const itemMatch = ordered ? itemLine.match(/^\d+\.\s+(.+)$/) : itemLine.match(/^[-*]\s+(.+)$/);
         if (!itemMatch) break;
         items.push(itemMatch[1].trim());
         index += 1;

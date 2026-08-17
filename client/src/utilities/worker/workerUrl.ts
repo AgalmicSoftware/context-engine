@@ -7,6 +7,7 @@ export const WORKER_ENDPOINT_SUFFIXES = Object.freeze([
   '/admin/set-config',
   '/admin/set-secrets',
   '/admin/set-limits',
+  '/admin/secret-presence',
   '/admin/lit-chipotle-provision',
   '/transcribe',
   '/ai',

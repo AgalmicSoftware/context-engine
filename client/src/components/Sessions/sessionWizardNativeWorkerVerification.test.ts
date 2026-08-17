@@ -237,10 +237,7 @@ describe('verifyNativeSessionWorker', () => {
         targetSlug: 'registry-session',
       }),
     );
-    expect(updateDraftValue).toHaveBeenCalledWith(
-      ['corsWorkerUrl'],
-      'https://registry-session.example.test',
-    );
+    expect(updateDraftValue).toHaveBeenCalledWith(['corsWorkerUrl'], 'https://registry-session.example.test');
     expect(updateDeploymentState).toHaveBeenCalledWith(
       expect.objectContaining({
         deployComplete: true,

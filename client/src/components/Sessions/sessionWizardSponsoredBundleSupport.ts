@@ -82,6 +82,7 @@ export const cacheSessionWorkerConfigAfterDeploy = ({
   if (
     !shouldCacheSessionWorkerConfigAfterDeploy({
       deployStatusCode,
+      deployPartial,
       configSyncStatus,
       workerUrl,
     })

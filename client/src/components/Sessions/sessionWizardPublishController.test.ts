@@ -78,6 +78,7 @@ describe('runSessionWizardPublishController', () => {
     await expect(
       runSessionWizardPublishController({
         input: {
+          publishAllowed: true,
           publishExecutionPlan: buildPlan({
             stepNumbers: {
               'deploy-worker': 3,
@@ -109,6 +110,7 @@ describe('runSessionWizardPublishController', () => {
     await expect(
       runSessionWizardPublishController({
         input: {
+          publishAllowed: true,
           publishExecutionPlan: buildPlan({
             shouldAutoDeployWorker: false,
             stepNumbers: {
@@ -156,6 +158,7 @@ describe('runSessionWizardPublishController', () => {
     await expect(
       runSessionWizardPublishController({
         input: {
+          publishAllowed: true,
           publishExecutionPlan: buildPlan({
             shouldDeployPendingSbts: true,
             stepNumbers: {
@@ -196,6 +199,7 @@ describe('runSessionWizardPublishController', () => {
     await expect(
       runSessionWizardPublishController({
         input: {
+          publishAllowed: true,
           publishExecutionPlan: buildPlan({
             shouldAutoDeployWorker: false,
             shouldDeployPendingSbts: true,
@@ -242,6 +246,7 @@ describe('runSessionWizardPublishController', () => {
     await expect(
       runSessionWizardPublishController({
         input: {
+          publishAllowed: true,
           publishExecutionPlan: buildPlan({
             shouldPersistWorkerConfig: true,
             stepNumbers: {
@@ -285,6 +290,7 @@ describe('runSessionWizardPublishController', () => {
     await expect(
       runSessionWizardPublishController({
         input: {
+          publishAllowed: true,
           publishExecutionPlan: buildPlan({
             shouldAutoDeployWorker: false,
             shouldPersistWorkerConfig: true,
@@ -300,6 +306,7 @@ describe('runSessionWizardPublishController', () => {
     await expect(
       runSessionWizardPublishController({
         input: {
+          publishAllowed: true,
           publishExecutionPlan: buildPlan(),
         },
         ports: {
@@ -315,12 +322,45 @@ describe('runSessionWizardPublishController', () => {
     ).rejects.toThrow('Worker deploy failed upstream.');
   });
 
+  it('stops forced publication when required worker secrets were not confirmed remotely', async () => {
+    const persistWorkerConfig = jest.fn();
+
+    await expect(
+      runSessionWizardPublishController({
+        input: {
+          publishAllowed: true,
+          publishExecutionPlan: buildPlan({
+            shouldPersistWorkerConfig: true,
+          }),
+        },
+        ports: {
+          deployWorker: jest.fn().mockResolvedValue({
+            ok: true,
+            deployComplete: false,
+            workerUrl: 'https://deployed-worker.example',
+            requiredWorkerSecretsReady: false,
+            requiredWorkerSecretFields: ['openaiKey'],
+          }),
+          persistWorkerConfig,
+        },
+        callbacks: {
+          setPublishStep: jest.fn(),
+        },
+      }),
+    ).rejects.toThrow(
+      'Required worker secrets were not confirmed after deploy. Retry session creation to resume secret sync.',
+    );
+
+    expect(persistWorkerConfig).not.toHaveBeenCalled();
+  });
+
   it('preserves thrown deploy errors', async () => {
     const error = new Error('network refused deploy request');
 
     await expect(
       runSessionWizardPublishController({
         input: {
+          publishAllowed: true,
           publishExecutionPlan: buildPlan(),
         },
         ports: {
@@ -339,6 +379,7 @@ describe('runSessionWizardPublishController', () => {
     await expect(
       runSessionWizardPublishController({
         input: {
+          publishAllowed: true,
           publishExecutionPlan: buildPlan({
             shouldAutoDeployWorker: false,
             shouldDeployPendingSbts: true,

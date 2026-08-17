@@ -17,6 +17,7 @@ describe('SurveyQuestionsFullQuestionCardShell', () => {
     );
 
     expect(screen.getByText('Prompt text')).toBeInTheDocument();
+    expect(screen.getByText('Prompt text').closest('.questionTitleBody')).toHaveClass('fullQuestionBody');
     expect(screen.getByRole('button', { name: 'Card action' })).toBeInTheDocument();
     expect(screen.getByLabelText('Answer')).toBeInTheDocument();
     expect(screen.getByText('Slider')).toBeInTheDocument();

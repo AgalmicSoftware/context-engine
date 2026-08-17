@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import SBTPage from './SBTPage';
 import styles from './SBTPage.module.scss';
 import { renderSbtPageHolderModal } from './SBTPageModals';
-import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
+import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 
 const mockIsCryptoMode = jest.fn(() => true);
@@ -40,6 +40,12 @@ const createSubject = (props = {}) => {
 const findElementInTree = (node, predicate) => {
   if (!node || typeof node !== 'object') return null;
   if (predicate(node)) return node;
+  const rendered = renderResolvableComponent(node);
+  if (rendered !== null) {
+    const found = findElementInTree(rendered, predicate);
+    if (found) return found;
+    return null;
+  }
   const children = node?.props?.children;
   if (Array.isArray(children)) {
     for (const child of children) {
@@ -61,9 +67,36 @@ const treeIncludesText = (node, text) => {
     return node.some((entry) => treeIncludesText(entry, text));
   }
   if (typeof node === 'object') {
+    const rendered = renderResolvableComponent(node);
+    if (rendered !== null) return treeIncludesText(rendered, text);
     return treeIncludesText(node?.props?.children, text);
   }
   return false;
+};
+
+const getNodeTypeName = (node) => {
+  const type = node?.type;
+  if (!type) return '';
+  if (typeof type === 'string') return type;
+  return String(type.displayName || type.name || '');
+};
+
+const RESOLVABLE_SBT_PAGE_COMPONENTS = new Set([
+  'SbtPageHolderStatusDisplay',
+  'SbtPageIdentityPanel',
+  'SbtPageStatsSection',
+]);
+
+const resolvedComponentCache = new WeakMap();
+
+const renderResolvableComponent = (node) => {
+  const typeName = getNodeTypeName(node);
+  if (!RESOLVABLE_SBT_PAGE_COMPONENTS.has(typeName)) return null;
+  if (typeof node?.type !== 'function') return null;
+  if (resolvedComponentCache.has(node)) return resolvedComponentCache.get(node);
+  const rendered = node.type(node.props || {});
+  resolvedComponentCache.set(node, rendered);
+  return rendered;
 };
 
 describe('SBTPage holder modal rendering', () => {

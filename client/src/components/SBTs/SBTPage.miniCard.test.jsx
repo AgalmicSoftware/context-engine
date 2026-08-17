@@ -1,5 +1,7 @@
 import SBTPage from './SBTPage';
+import SbtPageMiniActionArea from './SbtPageMiniActionArea';
 import SbtPageMiniCard from './SbtPageMiniCard';
+import SbtPageMiniCardDisplay from './SbtPageMiniCardDisplay';
 import styles from './SBTPage.module.scss';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
@@ -46,6 +48,12 @@ const resolvedTreeComponentCache = new WeakMap();
 const findElementInTree = (node, predicate) => {
   if (!node || typeof node !== 'object') return null;
   if (predicate(node)) return node;
+  if (RESOLVABLE_TREE_COMPONENTS.has(node.type)) {
+    if (!resolvedTreeComponentCache.has(node)) {
+      resolvedTreeComponentCache.set(node, node.type(node.props || {}));
+    }
+    return findElementInTree(resolvedTreeComponentCache.get(node), predicate);
+  }
   const children = node?.props?.children;
   if (Array.isArray(children)) {
     for (const child of children) {
@@ -62,7 +70,15 @@ const flattenText = (node) => {
   if (node == null) return '';
   if (typeof node === 'string' || typeof node === 'number') return String(node);
   if (Array.isArray(node)) return node.map((entry) => flattenText(entry)).join('');
-  if (typeof node === 'object') return flattenText(node?.props?.children);
+  if (typeof node === 'object') {
+    if (RESOLVABLE_TREE_COMPONENTS.has(node.type)) {
+      if (!resolvedTreeComponentCache.has(node)) {
+        resolvedTreeComponentCache.set(node, node.type(node.props || {}));
+      }
+      return flattenText(resolvedTreeComponentCache.get(node));
+    }
+    return flattenText(node?.props?.children);
+  }
   return '';
 };
 
@@ -71,7 +87,7 @@ const nodeHasClassName = (node, className) =>
     .split(/\s+/)
     .includes(className);
 
-const renderMiniCardNode = (props = {}) => {
+const renderMiniCardNode = (props = {}, stateOverrides = {}, configureSubject = null) => {
   const sbtAddress = '0x00000000000000000000000000000000000000f1';
   const subject = createSubject({
     miniaturized: true,
@@ -96,7 +112,10 @@ const renderMiniCardNode = (props = {}) => {
     burningStatus: 'idle',
     hasGroupPasswordMint: false,
     hasInviteMint: false,
+    showMiniPasswordInput: false,
+    ...stateOverrides,
   };
+  if (typeof configureSubject === 'function') configureSubject(subject);
   const tree = subject.render();
   const cardNode = findElementInTree(tree, (element) => element?.type === SbtPageMiniCard);
   return { cardNode, sbtAddress, subject };
@@ -474,5 +493,40 @@ describe('SBTPage mini-card', () => {
     expect(openSpy).not.toHaveBeenCalled();
     expect(preventDefault).not.toHaveBeenCalled();
     openSpy.mockRestore();
+  });
+
+  it('routes mini-card burn clicks through the parent mini burn handler', () => {
+    const subject = createSubject({
+      account: '0x00000000000000000000000000000000000000f1',
+      miniaturized: true,
+      miniMintable: true,
+      SBTAddress: '0x00000000000000000000000000000000000000f1',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        image: 'https://example.example.test/badge.png',
+        mintingEndTime: 0,
+        burnAuth: 1,
+        hasPasswordMint: false,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+      },
+      userHasSBT: true,
+      userIsSbtAdmin: false,
+      mintingStatus: 'idle',
+      burningStatus: 'idle',
+      hasGroupPasswordMint: false,
+      hasInviteMint: false,
+    };
+    subject.miniBurnHandler = jest.fn();
+
+    const tree = subject.render();
+    const miniCardNode = findElementInTree(tree, (element) => element?.type === SbtPageMiniCard);
+
+    expect(miniCardNode).not.toBeNull();
+    miniCardNode.props.onMiniBurn({ preventDefault: jest.fn() });
+    expect(subject.miniBurnHandler).toHaveBeenCalledTimes(1);
   });
 });

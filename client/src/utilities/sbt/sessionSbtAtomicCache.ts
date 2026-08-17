@@ -52,7 +52,11 @@ export const createSessionSbtAtomicCacheWriter = ({
 }: SessionSbtAtomicWriterOptions) => {
   const callPort = async (port: AtomicPort | undefined, cacheName: string, slug: string, updater: CacheUpdater) => {
     if (typeof port !== 'function') {
-      throw markPersistenceFailure(new Error(`Session cache persistence requires an atomic ${cacheName} port.`), cacheName, slug);
+      throw markPersistenceFailure(
+        new Error(`Session cache persistence requires an atomic ${cacheName} port.`),
+        cacheName,
+        slug,
+      );
     }
     try {
       return await port(slug, updater);
@@ -100,9 +104,7 @@ export const mergeSessionSbtHolderAdditions = (
     const currentChain = isCacheRecord(holderNode[networkID]) ? holderNode[networkID] : {};
     const currentData = isCacheRecord(currentChain.data) ? currentChain.data : {};
     const sbts: HolderSbtEntry[] = Array.isArray(currentData.sbts) ? currentData.sbts.slice() : [];
-    const indexByAddress = new Map(
-      sbts.map((entry, index) => [String(entry?.sbtAddress || '').toLowerCase(), index]),
-    );
+    const indexByAddress = new Map(sbts.map((entry, index) => [String(entry?.sbtAddress || '').toLowerCase(), index]));
     additions.forEach((entry, address) => {
       const existingIndex = indexByAddress.get(address);
       if (existingIndex == null) {
@@ -127,10 +129,7 @@ export const mergeSessionSbtHolderAdditions = (
   return next;
 };
 
-export const createSessionSbtCheckpointWriteQueue = <T>({
-  minIntervalMs,
-  write,
-}: CheckpointWriteQueueOptions<T>) => {
+export const createSessionSbtCheckpointWriteQueue = <T>({ minIntervalMs, write }: CheckpointWriteQueueOptions<T>) => {
   let pending: T | null = null;
   let lastWriteMs = 0;
   let chain: Promise<unknown> = Promise.resolve();
@@ -176,9 +175,7 @@ export const mergeSessionSbtCountsCheckpointEntry = (
   return {
     ...current,
     sbtAddress,
-    ...(metadata
-      ? { sbtInfo: { ...(isCacheRecord(current.sbtInfo) ? current.sbtInfo : {}), ...metadata } }
-      : {}),
+    ...(metadata ? { sbtInfo: { ...(isCacheRecord(current.sbtInfo) ? current.sbtInfo : {}), ...metadata } } : {}),
     countsLoaded: false,
     countsScanCheckpoint: checkpoint,
   };

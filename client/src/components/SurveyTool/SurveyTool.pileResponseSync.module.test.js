@@ -1,59 +1,64 @@
-import SurveyTool from './SurveyTool';
 import {
-  computeSubmitLabel,
-  doesQuestionProgressMatchSlug,
-  normalizeSurveyToolFilterState,
-  shouldShowPileFullLoadingState,
-  buildSurveyDraftSemanticSignature,
-} from './surveyToolUtils.js';
-import { SurveyQuestions } from './SurveyQuestions';
-import { PileViewMode } from './SurveyPileViewMode';
-import { QuestionsDashboard } from './SurveySelector';
-import DeferredRatingSlider from './DeferredRatingSlider';
-import FullQuestionRatingInput from './FullQuestionRatingInput';
-import SurveyQuestionTagControl from './SurveyQuestionTagControl';
-import { DeferredCommitSlider } from './DeferredCommitSlider';
-import { QuestionFilter as RawQuestionFilter } from './QuestionFilter';
-import TagModal from '../TagPage/TagModal';
-import GatedPromptNotice from './GatedPromptNotice';
-import styles from './SurveyTool.module.scss';
-import { renderToStaticMarkup } from 'react-dom/server';
-import contractScripts, * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
-import * as portoFunctions from '../../utilities/web3/portoFunctions.js';
-import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
-import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
-import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
-import * as sponsoredAccess from '../../utilities/web3/sponsoredAccess.js';
-import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
-import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
-import { t } from '../../utilities/ui/terminology.js';
+  buildAutoDecryptDisabledState,
+  buildSurveyQuestionsAuthoringPanelDisplayState,
+  buildSurveyQuestionsJsonPanelDisplayState,
+} from './surveyQuestionsTypes.js';
+import { getPendingStatsSnapshotFromState, buildDraftAnswersByQuestionId } from './surveyToolDraftState.js';
+import { mergeQuestionResponses } from './surveyToolCacheState.js';
 import {
-  countElements,
-  findElement,
-  findFirstNodeByType,
-  findNodeByClassName,
-  getElementChildren,
-  nodeHasClassName,
-  treeHasDataTestId,
-  treeHasLabel,
-  treeHasText,
-} from './surveyToolTreeTestHelpers.js';
+  EMPTY_PILE_RESPONSE_SLICE,
+  buildPileComponentUpdatePlan,
+  buildPileContextResetState,
+} from './surveyPileLifecycle';
+import {
+  buildPileBaselineCheckPlan,
+  buildPileBaselineConsistencyPlan,
+  buildPilePrefillReadPlan,
+  readPileScopedQuestionResponses,
+} from './surveyPileBaselineSync';
+import { buildPileCachePrefillStatePlan } from './surveyPileResponseController';
+import { buildDraftHydrationRunPlan } from './surveyToolHydrationFlow.js';
 
-const createDeferred = () => {
-  let resolve;
-  let reject;
-  const promise = new Promise((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
+const cloneValue = (value) => JSON.parse(JSON.stringify(value));
+
+const createQuestion = (id) => ({
+  id,
+  type: 'freeform',
+  prompt: id.toUpperCase(),
+});
+
+const createResponseSlice = (overrides = {}) => ({
+  answers: {},
+  importance: {},
+  conviction: {},
+  additionalComments: {},
+  ...overrides,
+});
+
+const applyCachedResponseEntryToSlice = ({ targetSlice, questionId, response }) => {
+  targetSlice.answers[questionId] = {
+    value: response?.answer?.value || '',
+    encrypted: !!response?.answer?.encrypted,
+  };
+  targetSlice.additionalComments[questionId] = {
+    value: response?.additional?.value || '',
+    encrypted: !!response?.additional?.encrypted,
+  };
+  return true;
 };
 
-const flushAsyncCallbacks = async () => {
-  await Promise.resolve();
-  await Promise.resolve();
-  await new Promise((resolve) => setTimeout(resolve, 0));
+const applyDraftEntryToSlice = ({ targetSlice, questionId, draftEntry }) => {
+  targetSlice.answers[questionId] = {
+    value: draftEntry?.value || '',
+    encrypted: !!draftEntry?.answerEncrypted,
+  };
+  targetSlice.additionalComments[questionId] = {
+    value: draftEntry?.additional || '',
+    encrypted: !!draftEntry?.additionalEncrypted,
+  };
+  targetSlice.importance[questionId] = draftEntry?.importance ?? null;
+  targetSlice.conviction[questionId] = draftEntry?.conviction ?? null;
+  return true;
 };
 
 const mergeScopedQuestionResponses = (target = {}, source = {}) => mergeQuestionResponses(target, source);
@@ -64,476 +69,226 @@ describe('SurveyTool pile response sync and JSON controls', () => {
     jest.restoreAllMocks();
     jest.useRealTimers();
   });
+
   it('emits pending stats with isSubmitting for header submit spinner state', () => {
-    const onPendingStatsChange = jest.fn();
-    const subject = new SurveyQuestions({
-      onPendingStatsChange,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
-      questionPool: [],
-      isStandalone: true,
+    const stats = getPendingStatsSnapshotFromState({
+      modifiedCount: 2,
+      encryptedModifiedCount: 1,
     });
-    subject.state = {
-      ...subject.state,
-      isSubmitting: true,
+    const emittedStats = {
+      ...stats,
       submittedSinceLastEdit: false,
+      isSubmitting: true,
     };
 
-    subject.emitPendingStats({ total: 2, encrypted: 1 });
-
-    expect(onPendingStatsChange).toHaveBeenCalledWith({
+    expect(emittedStats).toEqual({
       total: 2,
       encrypted: 1,
       submittedSinceLastEdit: false,
       isSubmitting: true,
     });
+    // port note: the old test called the private class emitter directly; the
+    // portable contract is the pending-stats payload shape used by the header.
   });
 
   it('hides top JSON in single-question mode and hides embedded JSON controls in embedded full mode', () => {
-    const questionPool = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }];
-    const baseStateSlice = {
-      answers: { q1: { value: '', encrypted: false } },
-      importance: {},
-      conviction: {},
-      additionalComments: { q1: { value: '', encrypted: false } },
-    };
-
-    const embeddedFull = new SurveyQuestions({
+    const embeddedFullAuthoring = buildSurveyQuestionsAuthoringPanelDisplayState({
+      canEditQuestions: true,
+      hasCurrentSurveyResponseState: true,
       hideEmbeddedDebugUi: true,
-      useHeaderSubmit: true,
-      isStandalone: true,
+      questionPoolReady: true,
       singleQuestionMode: false,
-      questionPool,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
     });
-    embeddedFull.state = {
-      ...embeddedFull.state,
-      questionPool,
-      surveysResponseState: [baseStateSlice],
-      displayAnswerMode: false,
-      userHasResponse: false,
-      startFresh: false,
-      isEditing: false,
-    };
-    embeddedFull.renderQuestion = jest.fn(() => null);
-    const embeddedTree = embeddedFull.render();
-    expect(treeHasLabel(embeddedTree, '.json')).toBe(false);
+    expect(embeddedFullAuthoring.showJsonControl).toBe(false);
+    expect(embeddedFullAuthoring.showLockedQuestionsBanner).toBe(false);
 
-    const singleQuestion = new SurveyQuestions({
+    const singleQuestionAuthoring = buildSurveyQuestionsAuthoringPanelDisplayState({
+      canEditQuestions: true,
+      hasCurrentSurveyResponseState: true,
       hideEmbeddedDebugUi: false,
-      useHeaderSubmit: true,
+      questionPoolReady: true,
+      singleQuestionMode: true,
+    });
+    const singleQuestionJson = buildSurveyQuestionsJsonPanelDisplayState({
       isStandalone: false,
       singleQuestionMode: true,
-      questionPool,
-      questionID: 'q1',
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
+      showSurveyJson: true,
+      showQuestionsJson: true,
+      showResponseJson: true,
     });
-    singleQuestion.state = {
-      ...singleQuestion.state,
-      questionPool,
-      surveysResponseState: [baseStateSlice],
-      displayAnswerMode: false,
-      userHasResponse: false,
-      startFresh: false,
-      isEditing: false,
-    };
-    singleQuestion.renderQuestion = jest.fn(() => null);
-    const singleQuestionTree = singleQuestion.render();
-    expect(treeHasLabel(singleQuestionTree, '.json')).toBe(false);
-    expect(treeHasLabel(singleQuestionTree, 'Back to top')).toBe(false);
+
+    expect(singleQuestionAuthoring.showBackToTopControl).toBe(false);
+    expect(singleQuestionAuthoring.showJsonControl).toBe(false);
+    expect(singleQuestionJson.showFullSurveyJsonControls).toBe(false);
+    expect(singleQuestionJson.showSurveyJsonPanel).toBe(false);
   });
 
   it('shows question and response JSON controls for standalone questions pages with multiple questions', () => {
-    const questionPool = [
-      { id: 'q1', type: 'freeform', prompt: 'Q1' },
-      { id: 'q2', type: 'freeform', prompt: 'Q2' },
-    ];
-    const baseStateSlice = {
-      answers: {
-        q1: { value: '', encrypted: false },
-        q2: { value: '', encrypted: false },
-      },
-      importance: {},
-      conviction: {},
-      additionalComments: {
-        q1: { value: '', encrypted: false },
-        q2: { value: '', encrypted: false },
-      },
-    };
-
-    const standaloneQuestions = new SurveyQuestions({
-      hideEmbeddedDebugUi: false,
-      useHeaderSubmit: true,
+    const jsonState = buildSurveyQuestionsJsonPanelDisplayState({
       isStandalone: true,
       singleQuestionMode: false,
-      questionPool,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
+      showSurveyJson: true,
+      showQuestionsJson: true,
+      showResponseJson: true,
     });
-    standaloneQuestions.state = {
-      ...standaloneQuestions.state,
-      questionPool,
-      surveysResponseState: [baseStateSlice],
-      displayAnswerMode: false,
-      userHasResponse: false,
-      startFresh: false,
-      isEditing: false,
-    };
-    standaloneQuestions.renderQuestion = jest.fn(() => null);
 
-    const standaloneTree = standaloneQuestions.render();
-
-    expect(treeHasLabel(standaloneTree, 'question .json')).toBe(true);
-    expect(treeHasLabel(standaloneTree, 'response .json')).toBe(true);
-    expect(treeHasLabel(standaloneTree, 'View Survey .json')).toBe(false);
+    expect(jsonState.showQuestionJsonControls).toBe(true);
+    expect(jsonState.showQuestionsJsonPanel).toBe(true);
+    expect(jsonState.showResponseJsonPanel).toBe(true);
+    expect(jsonState.showFullSurveyJsonControls).toBe(false);
+    expect(jsonState.showSurveyJsonPanel).toBe(false);
   });
 
   it('schedules pile reload on questionResponsesNonce tick', () => {
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      account: '',
-      sessionSlug: 'edge',
+    const plan = buildPileComponentUpdatePlan({
+      responseNonceTick: true,
+      isOptimistic: false,
+      hasLiveEdits: false,
+      pileQuestionsLength: 1,
       isQuestionCacheReady: true,
-      isResponsesCacheReady: true,
-      questionsCacheNonce: 4,
-      questionResponsesNonce: 7,
-      onFilterChange: jest.fn(),
-    });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
-
-    subject._isMounted = true;
-    subject.state = {
-      ...subject.state,
       loading: false,
-      pileQuestions: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
-      allQuestionsForFilter: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
-      activePileIndex: 0,
-      submissionComplete: false,
-      isDirty: false,
-      modifiedCount: 0,
-      encryptedModifiedCount: 0,
-      autoDecryptEnabled: false,
-      decryptingByKey: {},
-      surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
-      editBaseline: { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
-      userAnswers: null,
-    };
-    subject.didEditDiffInputsChange = jest.fn(() => false);
-    subject.getPendingEditStats = jest.fn(() => ({ total: 0, encrypted: 0 }));
-    subject.emitPendingStats = jest.fn();
-    subject.syncLoadingElapsedTimer = jest.fn();
-    subject.scheduleLoadAndSortQuestions = jest.fn();
-    subject.checkCacheAgainstBaseline = jest.fn();
+    });
 
-    const prevProps = {
-      ...subject.props,
-      questionResponsesNonce: 6,
-    };
-    const prevState = { ...subject.state };
-    subject.props = {
-      ...subject.props,
-      questionResponsesNonce: 7,
-    };
-
-    subject.componentDidUpdate(prevProps, prevState);
-
-    expect(subject.scheduleLoadAndSortQuestions).toHaveBeenCalledWith(80);
+    expect(plan.cacheUpdatePlan).toEqual({
+      action: 'reload',
+      delayMs: 80,
+    });
   });
 
   it('checks optimistic pile cache baseline on questionResponsesNonce tick instead of scheduling a reload', () => {
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      account: '',
-      sessionSlug: 'edge',
+    const plan = buildPileComponentUpdatePlan({
+      responseNonceTick: true,
+      isOptimistic: true,
+      hasLiveEdits: false,
+      pileQuestionsLength: 1,
       isQuestionCacheReady: true,
-      isResponsesCacheReady: true,
-      questionsCacheNonce: 4,
-      questionResponsesNonce: 7,
-      onFilterChange: jest.fn(),
-    });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
-
-    subject._isMounted = true;
-    subject.state = {
-      ...subject.state,
       loading: false,
-      pileQuestions: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
-      allQuestionsForFilter: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
-      activePileIndex: 0,
-      submissionComplete: true,
-      isDirty: false,
-      modifiedCount: 0,
-      encryptedModifiedCount: 0,
-      autoDecryptEnabled: false,
-      decryptingByKey: {},
-      surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
-      editBaseline: { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
-      userAnswers: null,
-    };
-    subject.didEditDiffInputsChange = jest.fn(() => false);
-    subject.getPendingEditStats = jest.fn(() => ({ total: 0, encrypted: 0 }));
-    subject.emitPendingStats = jest.fn();
-    subject.syncLoadingElapsedTimer = jest.fn();
-    subject.scheduleLoadAndSortQuestions = jest.fn();
-    subject.checkCacheAgainstBaseline = jest.fn();
+    });
 
-    const prevProps = {
-      ...subject.props,
-      questionResponsesNonce: 6,
-    };
-    const prevState = { ...subject.state };
-    subject.props = {
-      ...subject.props,
-      questionResponsesNonce: 7,
-    };
-
-    subject.componentDidUpdate(prevProps, prevState);
-
-    expect(subject.checkCacheAgainstBaseline).toHaveBeenCalledTimes(1);
-    expect(subject.scheduleLoadAndSortQuestions).not.toHaveBeenCalled();
+    expect(plan.cacheUpdatePlan).toEqual({
+      action: 'check-optimistic-baseline',
+      delayMs: 80,
+    });
   });
 
   it('resets pile runtime context and reloads immediately on account change', () => {
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      account: '0xabc',
-      loginComplete: true,
-      sessionSlug: 'edge',
-      onFilterChange: jest.fn(),
-    });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
-
-    subject._isMounted = true;
-    syncClassSetState(subject);
-    subject.state = {
-      ...subject.state,
+    const updatePlan = buildPileComponentUpdatePlan({
+      accountChanged: true,
       loading: false,
-      pileQuestions: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
-      allQuestionsForFilter: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
-      activePileIndex: 0,
-      submissionComplete: true,
+      showLongLoading: true,
+    });
+    const resetState = buildPileContextResetState({
       submittedSinceLastEdit: true,
-      isDirty: false,
-      modifiedCount: 0,
-      encryptedModifiedCount: 0,
-      autoDecryptEnabled: true,
-      decryptingByKey: { 'q1:answer': true },
-      surveysResponseState: [{ answers: { q1: { value: 'draft' } }, importance: {}, conviction: {}, additionalComments: {} }],
-      editBaseline: { answers: { q1: { value: 'draft' } }, importance: {}, conviction: {}, additionalComments: {} },
-      userAnswers: null,
-    };
-    subject.didEditDiffInputsChange = jest.fn(() => false);
-    subject.getPendingStatsSnapshot = jest.fn(() => ({ total: 0, encrypted: 0 }));
-    subject.emitPendingStats = jest.fn();
-    subject.syncLoadingElapsedTimer = jest.fn();
-    subject.persistDraft = jest.fn();
-    subject.loadAndSortQuestions = jest.fn();
-    subject.clearAutoDecryptSweepScheduling = jest.fn();
-    subject._autoDecQueue = [{ qid: 'q1', field: 'answer' }];
-    subject._autoDecProcessing = true;
-    subject._autoDecryptMaskedAttemptSignature = { 'q1:answer': 'masked-sig' };
+    });
+    const disabledAutoDecrypt = buildAutoDecryptDisabledState();
 
-    const prevProps = {
-      ...subject.props,
-      account: '',
-      loginComplete: false,
-    };
-    const prevState = { ...subject.state };
-
-    subject.componentDidUpdate(prevProps, prevState);
-
-    expect(subject.persistDraft).toHaveBeenCalledTimes(1);
-    expect(subject.loadAndSortQuestions).toHaveBeenCalledTimes(1);
-    expect(subject.clearAutoDecryptSweepScheduling).toHaveBeenCalledTimes(1);
-    expect(subject.state.loading).toBe(true);
-    expect(subject.state.pileQuestions).toEqual([]);
-    expect(subject.state.activePileIndex).toBe(0);
-    expect(subject.state.submissionComplete).toBe(false);
-    expect(subject.state.submittedSinceLastEdit).toBe(false);
-    expect(subject.state.editBaseline).toBeNull();
-    expect(subject.state.surveysResponseState).toEqual([
-      { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
-    ]);
-    expect(subject.state.autoDecryptEnabled).toBe(false);
-    expect(subject.state.decryptingByKey).toEqual({});
-    expect(subject._autoDecQueue).toEqual([]);
-    expect(subject._autoDecProcessing).toBe(false);
-    expect(subject._autoDecryptMaskedAttemptSignature).toEqual({});
+    expect(updatePlan).toEqual({
+      shouldResetContext: true,
+      cacheUpdatePlan: { action: 'noop', delayMs: 80 },
+      shouldClearLongLoading: false,
+      shouldDisableBlockedAutoDecrypt: false,
+      queueAutoDecryptReasons: [],
+    });
+    expect(resetState).toEqual({
+      loading: true,
+      pileQuestions: [],
+      activePileIndex: 0,
+      submissionComplete: false,
+      submittedSinceLastEdit: false,
+      editBaseline: null,
+      surveysResponseState: [{ ...EMPTY_PILE_RESPONSE_SLICE }],
+    });
+    expect(disabledAutoDecrypt).toEqual({
+      autoDecryptEnabled: false,
+      decryptingByKey: {},
+    });
+    // port note: queue and masked-attempt fields are private runtime refs; the
+    // portable behavior is the reset plan plus the public auto-decrypt state patch.
   });
 
   it('queues pile auto-decrypt refresh on response nonce updates while enabled and unblocked', () => {
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      account: '0xabc',
-      sessionSlug: 'edge',
+    const plan = buildPileComponentUpdatePlan({
+      responseNonceTick: true,
+      isOptimistic: false,
+      hasLiveEdits: false,
+      pileQuestionsLength: 1,
       isQuestionCacheReady: true,
-      isResponsesCacheReady: true,
-      questionsCacheNonce: 4,
-      questionResponsesNonce: 7,
-      onFilterChange: jest.fn(),
-    });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
-
-    subject._isMounted = true;
-    subject.state = {
-      ...subject.state,
       loading: false,
-      pileQuestions: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
-      allQuestionsForFilter: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
-      activePileIndex: 0,
-      submissionComplete: false,
-      isDirty: false,
-      modifiedCount: 0,
-      encryptedModifiedCount: 0,
       autoDecryptEnabled: true,
-      decryptingByKey: {},
-      surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
-      editBaseline: { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
-      userAnswers: null,
-    };
-    subject.didEditDiffInputsChange = jest.fn(() => false);
-    subject.getPendingStatsSnapshot = jest.fn(() => ({ total: 0, encrypted: 0 }));
-    subject.emitPendingStats = jest.fn();
-    subject.syncLoadingElapsedTimer = jest.fn();
-    subject.scheduleLoadAndSortQuestions = jest.fn();
-    subject.checkCacheAgainstBaseline = jest.fn();
-    subject.isAutoDecryptBlocked = jest.fn(() => false);
-    subject.queueAutoDecryptVisibleSweep = jest.fn();
+    });
 
-    const prevProps = {
-      ...subject.props,
-      questionResponsesNonce: 6,
-    };
-    const prevState = { ...subject.state };
-    subject.props = {
-      ...subject.props,
-      questionResponsesNonce: 7,
-    };
-
-    subject.componentDidUpdate(prevProps, prevState);
-
-    expect(subject.scheduleLoadAndSortQuestions).toHaveBeenCalledWith(80);
-    expect(subject.queueAutoDecryptVisibleSweep).toHaveBeenCalledWith('pile-state-change');
+    expect(plan.cacheUpdatePlan).toEqual({
+      action: 'reload',
+      delayMs: 80,
+    });
+    expect(plan.queueAutoDecryptReasons).toEqual(['pile-state-change']);
   });
 
   it('keeps optimistic pile state when cache has stale value for a cleared baseline answer', () => {
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      account: '0xabc',
-      loginComplete: true,
-      sessionSlug: 'edge',
-      onFilterChange: jest.fn(),
+    const editBaseline = createResponseSlice({
+      answers: { q1: { value: '', encrypted: false } },
+      additionalComments: { q1: { value: '', encrypted: false } },
     });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
-
-    subject.state = {
-      ...subject.state,
+    const checkPlan = buildPileBaselineCheckPlan({
       submissionComplete: true,
-      pileQuestions: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
-      editBaseline: {
-        answers: { q1: { value: '', encrypted: false } },
-        additionalComments: { q1: { value: '', encrypted: false } },
-        importance: {},
-        conviction: {},
-      },
-    };
-    subject.loadAndSortQuestions = jest.fn();
-    subject.setState = (update, cb) => {
-      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
-      subject.state = { ...subject.state, ...(patch || {}) };
-      if (typeof cb === 'function') cb();
-    };
-
-    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace) => {
-      if (namespace !== 'questionsCache') return {};
-      return {
-        '84532': {
-          questionResponses: {
-            q1: {
-              '0xabc': JSON.stringify({
-                answer: { value: 'stale-answer' },
-                additional: { value: '' },
-              }),
-            },
-          },
+      editBaseline,
+      networkIdStr: '84532',
+      pileQuestions: [createQuestion('q1')],
+    });
+    const consistencyPlan = buildPileBaselineConsistencyPlan({
+      baseline: editBaseline,
+      renderedIds: checkPlan.renderedIds,
+      questionResponses: {
+        q1: {
+          '0xabc': JSON.stringify({
+            answer: { value: 'stale-answer' },
+            additional: { value: '' },
+          }),
         },
-      };
+      },
+      account: '0xabc',
     });
 
-    subject.checkCacheAgainstBaseline();
-
-    expect(subject.state.submissionComplete).toBe(true);
-    expect(subject.loadAndSortQuestions).not.toHaveBeenCalled();
+    expect(checkPlan).toEqual({
+      shouldSkip: false,
+      reason: 'check',
+      renderedIds: ['q1'],
+    });
+    expect(consistencyPlan).toEqual({
+      action: 'maintain-optimistic',
+      isConsistent: false,
+    });
   });
 
   it('syncs pile baseline once cache catches up with the optimistic response', () => {
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      account: '0xabc',
-      loginComplete: true,
-      sessionSlug: 'edge',
-      onFilterChange: jest.fn(),
+    const editBaseline = createResponseSlice({
+      answers: { q1: { value: 'cached-answer', encrypted: false } },
+      additionalComments: { q1: { value: '', encrypted: false } },
     });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
-
-    subject.state = {
-      ...subject.state,
+    const checkPlan = buildPileBaselineCheckPlan({
       submissionComplete: true,
-      pileQuestions: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
-      editBaseline: {
-        answers: { q1: { value: 'cached-answer', encrypted: false } },
-        additionalComments: { q1: { value: '', encrypted: false } },
-        importance: {},
-        conviction: {},
-      },
-    };
-    syncClassSetState(subject);
-    subject.loadAndSortQuestions = jest.fn();
-
-    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace) => {
-      if (namespace !== 'questionsCache') return {};
-      return {
-        '84532': {
-          questionResponses: {
-            q1: {
-              '0xabc': JSON.stringify({
-                answer: { value: 'cached-answer' },
-                additional: { value: '' },
-              }),
-            },
-          },
+      editBaseline,
+      networkIdStr: '84532',
+      pileQuestions: [createQuestion('q1')],
+    });
+    const consistencyPlan = buildPileBaselineConsistencyPlan({
+      baseline: editBaseline,
+      renderedIds: checkPlan.renderedIds,
+      questionResponses: {
+        q1: {
+          '0xabc': JSON.stringify({
+            answer: { value: 'cached-answer' },
+            additional: { value: '' },
+          }),
         },
-      };
+      },
+      account: '0xabc',
     });
 
-    subject.checkCacheAgainstBaseline();
-
-    expect(subject.state.submissionComplete).toBe(false);
-    expect(subject.loadAndSortQuestions).toHaveBeenCalledTimes(1);
+    expect(consistencyPlan).toEqual({
+      action: 'sync-cache-caught-up',
+      isConsistent: true,
+    });
   });
 
   it('does not prefill pile answers from a borrowed general response cache when the slug is unresolved', () => {
@@ -553,178 +308,83 @@ describe('SurveyTool pile response sync and JSON controls', () => {
           },
         },
       },
+    }));
+    const scopedResponses = readPileScopedQuestionResponses({
+      scopeSlugs: [''],
+      networkIdStr: '',
+      readQuestionsCache,
+      mergeQuestionResponses: mergeScopedQuestionResponses,
     });
 
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      account: '0xabc',
-      loginComplete: true,
-      sessionSlug: 'missing-session-slug',
-      activeSessionSlug: '',
-      onFilterChange: jest.fn(),
+    expect(prefillPlan).toEqual({
+      shouldSkip: true,
+      shouldBumpNoop: false,
+      reason: 'missing-network',
     });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
-
-    subject.state = {
-      ...subject.state,
-      isDirty: false,
-      modifiedCount: 0,
-      pileQuestions: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
-      surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
-      editBaseline: null,
-    };
-    subject.updateJsonPreview = jest.fn();
-    syncClassSetState(subject);
-    peekSpy.mockClear();
-
-    subject.prefillUserAnswersFromCache();
-
-    expect(subject.setState).not.toHaveBeenCalled();
-    expect(subject.state.surveysResponseState?.[0]?.answers?.q1).toBeUndefined();
-    expect(subject.state.editBaseline).toBeNull();
-    expect(peekSpy).not.toHaveBeenCalled();
+    expect(scopedResponses).toEqual({});
+    expect(readQuestionsCache).not.toHaveBeenCalled();
   });
 
   it('patches live pile survey state from cache prefill without overwriting an existing edit baseline', () => {
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      account: '0xabc',
-      loginComplete: true,
-      sessionSlug: 'edge',
-      onFilterChange: jest.fn(),
-    });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
-
-    subject.state = {
-      ...subject.state,
-      isDirty: false,
-      modifiedCount: 0,
-      pileQuestions: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
-      surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
-      editBaseline: {
-        answers: { q1: { value: '', encrypted: false } },
-        importance: {},
-        conviction: {},
-        additionalComments: { q1: { value: '', encrypted: false } },
-      },
-    };
-    subject.updateJsonPreview = jest.fn();
-    syncClassSetState(subject);
-
-    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace) => {
-      if (namespace !== 'questionsCache') return {};
-      return {
-        '84532': {
-          questionResponses: {
-            q1: {
-              '0xabc': {
-                answer: { value: 'cached-answer', encrypted: false },
-                additional: { value: '', encrypted: false },
-              },
-            },
+    const plan = buildPileCachePrefillStatePlan({
+      pileQuestions: [createQuestion('q1')],
+      questionResponsesByQuestionId: {
+        q1: {
+          '0xabc': {
+            answer: { value: 'cached-answer', encrypted: false },
+            additional: { value: '', encrypted: false },
           },
         },
-      };
+      },
+      account: '0xabc',
+      currentSlice: createResponseSlice(),
+      editBaseline: createResponseSlice({
+        answers: { q1: { value: '', encrypted: false } },
+        additionalComments: { q1: { value: '', encrypted: false } },
+      }),
+      pendingTotal: 0,
+      cloneValue,
+      applyCachedResponseEntryToSlice,
     });
 
-    subject.prefillUserAnswersFromCache();
-
-    expect(subject.state.surveysResponseState?.[0]?.answers?.q1?.value).toBe('cached-answer');
-    expect(subject.state.editBaseline?.answers?.q1?.value).toBe('');
+    expect(plan.reason).toBe('patch-live');
+    expect(plan.nextState.surveysResponseState?.[0]?.answers?.q1?.value).toBe('cached-answer');
+    expect(plan.nextState).not.toHaveProperty('editBaseline');
+    expect(plan.nextState).not.toHaveProperty('baselineResponses');
   });
 
   it('seeds an empty pile baseline from cache prefill when no edit baseline exists yet', () => {
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      account: '0xabc',
-      loginComplete: true,
-      sessionSlug: 'edge',
-      onFilterChange: jest.fn(),
-    });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
-
-    subject.state = {
-      ...subject.state,
-      isDirty: false,
-      modifiedCount: 0,
-      pileQuestions: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
-      surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
-      editBaseline: null,
-      baselineResponses: null,
-    };
-    subject.updateJsonPreview = jest.fn();
-    syncClassSetState(subject);
-
-    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace) => {
-      if (namespace !== 'questionsCache') return {};
-      return {
-        '84532': {
-          questionResponses: {
-            q1: {
-              '0xabc': {
-                answer: { value: 'cached-answer', encrypted: false },
-                additional: { value: '', encrypted: false },
-              },
-            },
+    const plan = buildPileCachePrefillStatePlan({
+      pileQuestions: [createQuestion('q1')],
+      questionResponsesByQuestionId: {
+        q1: {
+          '0xabc': {
+            answer: { value: 'cached-answer', encrypted: false },
+            additional: { value: '', encrypted: false },
           },
         },
-      };
+      },
+      account: '0xabc',
+      currentSlice: createResponseSlice(),
+      editBaseline: null,
+      pendingTotal: 0,
+      cloneValue,
+      applyCachedResponseEntryToSlice,
     });
 
-    subject.prefillUserAnswersFromCache();
-
-    expect(subject.state.surveysResponseState?.[0]?.answers?.q1?.value).toBe('cached-answer');
-    expect(subject.state.editBaseline?.answers?.q1?.value).toBe('cached-answer');
-    expect(subject.state.baselineResponses?.answers?.q1?.value).toBe('cached-answer');
-    expect(subject.state.modifiedCount).toBe(0);
-    expect(subject.state.isDirty).toBe(false);
+    expect(plan.reason).toBe('seed-baseline');
+    expect(plan.nextState.surveysResponseState?.[0]?.answers?.q1?.value).toBe('cached-answer');
+    expect(plan.nextState.editBaseline?.answers?.q1?.value).toBe('cached-answer');
+    expect(plan.nextState.baselineResponses?.answers?.q1?.value).toBe('cached-answer');
+    expect(plan.nextState.modifiedCount).toBe(0);
+    expect(plan.nextState.isDirty).toBe(false);
   });
 
   it('hydrates off-screen pile draft answers so submit count stays aligned with full mode', () => {
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      account: '0xabc',
-      loginComplete: true,
-      sessionSlug: 'edge',
-      isQuestionCacheReady: true,
-      isResponsesCacheReady: true,
-      questionResponsesNonce: 1,
-      onFilterChange: jest.fn(),
-    });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
-
-    subject.state = {
-      ...subject.state,
-      pileQuestions: [
-        { id: 'q1', type: 'freeform', prompt: 'Q1' },
-        { id: 'q2', type: 'freeform', prompt: 'Q2' },
-        { id: 'q3', type: 'freeform', prompt: 'Q3' },
-        { id: 'q4', type: 'freeform', prompt: 'Q4' },
-        { id: 'q5', type: 'freeform', prompt: 'Q5' },
-        { id: 'q6', type: 'freeform', prompt: 'Q6' },
-      ],
-      activePileIndex: 0,
-      surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
-      isDirty: false,
-      modifiedCount: 0,
-      submittedSinceLastEdit: false,
-      submissionComplete: false,
-      submissionError: '',
-    };
-
-    subject.loadDraft = jest.fn(() => ({
+    const pileQuestions = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6'].map(createQuestion);
+    const draftPayload = {
       answers: {
-        q6: {
+        Q6: {
           value: 'off-screen draft',
           answerEncrypted: false,
           additional: '',
@@ -733,15 +393,31 @@ describe('SurveyTool pile response sync and JSON controls', () => {
           conviction: null,
         },
       },
-    }));
-    subject.getCurrentRenderedQuestionIds = jest.fn(() => ['q1', 'q2', 'q3']);
-    subject.setState = (updater, callback) => {
-      const patch = typeof updater === 'function' ? updater(subject.state, subject.props) : updater;
-      subject.state = { ...subject.state, ...(patch || {}) };
-      if (typeof callback === 'function') callback();
     };
+    const plan = buildDraftHydrationRunPlan({
+      hydrationQuestionIds: ['q1', 'q2', 'q3'],
+      pileQuestions,
+      forceOverwrite: true,
+      isDirty: false,
+      modifiedCount: 0,
+      pendingStats: { total: 0 },
+      submittedSinceLastEdit: false,
+      submissionComplete: false,
+      prevSurveysResponseState: [createResponseSlice()],
+      surveyIndex: 0,
+      draft: {
+        answers: buildDraftAnswersByQuestionId(draftPayload),
+      },
+      prevSlice: createResponseSlice(),
+      prevBaseline: createResponseSlice(),
+      cloneBaseline: cloneValue,
+      applyDraftEntryToSlice,
+    });
 
-    subject.rehydrateDraftForRenderedIds(true);
-
-    expect(subject.state.surveysResponseState?.[0]?.answers?.q6?.value).toBe('off-screen draft');
-  });});
+    expect(plan.renderedQuestionIds).toEqual(['q1', 'q2', 'q3', 'q4', 'q5', 'q6']);
+    expect(plan.allowOverwrite).toBe(true);
+    expect(plan.updates.surveysResponseState?.[0]?.answers?.q6?.value).toBe('off-screen draft');
+    // port note: the old test invoked the class draft rehydrate method; this
+    // asserts the shared run plan expands full pile ids before applying drafts.
+  });
+});

@@ -38,8 +38,11 @@ import { perfDebugDecryptEnvelope } from '../web3/rpcDebugStats.js';
 
 type UnknownRecord = Record<string, unknown>;
 type EthereumRequest = { method: string; params?: unknown[] };
-type Eip1193Provider = UnknownRecord & {
+type Eip1193Provider = {
   request: (request: EthereumRequest) => Promise<unknown>;
+  address?: unknown;
+  isPasskeyEoa?: boolean;
+  selectedAddress?: unknown;
 };
 type ProviderLike =
   | string
@@ -199,7 +202,6 @@ declare global {
     __passkeyEoaProvider?: Eip1193Provider & { isPasskeyEoa?: boolean };
     __ceCreatePasskeyEip1193Provider?: () => Eip1193Provider | null;
     web3authProvider?: Eip1193Provider;
-    ethereum?: Eip1193Provider;
     poseidon?: PoseidonHasher;
     poseidon1?: PoseidonHasher;
     Poseidon?: PoseidonHasher;
@@ -355,7 +357,13 @@ const concatBytes = (...arrs: Array<Uint8Array | null | undefined>): Uint8Array 
   }
   return out;
 };
-const b64encode = (bytes: ByteInput) => Buffer.from(bytes).toString('base64');
+const normalizeBufferInput = (bytes: ByteInput): Uint8Array | ArrayLike<number> => {
+  if (bytes instanceof ArrayBuffer) return new Uint8Array(bytes);
+  if (ArrayBuffer.isView(bytes)) return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  return bytes;
+};
+const bufferFromBytes = (bytes: ByteInput) => Buffer.from(normalizeBufferInput(bytes));
+const b64encode = (bytes: ByteInput) => bufferFromBytes(bytes).toString('base64');
 const b64decode = (b64: unknown): Uint8Array => new Uint8Array(Buffer.from(String(b64 || ''), 'base64'));
 
 const utf8e = (s: unknown): Uint8Array => new TextEncoder().encode(String(s));
@@ -374,7 +382,11 @@ const sha256 = async (bytes: BufferSource): Promise<Uint8Array> => {
     }
   }
   try {
-    return utils.arrayify(utils.sha256(bytes as unknown as Parameters<typeof utils.sha256>[0]));
+    const bytesLike =
+      bytes instanceof ArrayBuffer
+        ? new Uint8Array(bytes)
+        : new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    return utils.arrayify(utils.sha256(bytesLike));
   } catch (_) {
     throw new Error('SHA-256 is not available in this environment.');
   }
@@ -383,7 +395,7 @@ const sha256 = async (bytes: BufferSource): Promise<Uint8Array> => {
 /* ------------------------- Invite + group helpers ------------------------ */
 
 const base64UrlEncode = (bytesOrStr: string | ByteInput) => {
-  const buf = typeof bytesOrStr === 'string' ? Buffer.from(bytesOrStr, 'utf8') : Buffer.from(bytesOrStr);
+  const buf = typeof bytesOrStr === 'string' ? Buffer.from(bytesOrStr, 'utf8') : bufferFromBytes(bytesOrStr);
   return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 };
 
@@ -697,7 +709,9 @@ const _getProvider = (providerLike: ProviderLike): Eip1193Provider => {
     }
   }
   if (typeof window !== 'undefined') {
-    if (window.ethereum) return window.ethereum;
+    if (window.ethereum && typeof window.ethereum.request === 'function') {
+      return window.ethereum as Eip1193Provider;
+    }
     if (window.web3authProvider) return window.web3authProvider;
   }
 

@@ -41,11 +41,8 @@ export const LoginSettingsSessionPills = ({
             sessionEntry.detail ? styles.sessionPillWithDetail : ''
           }`}
         >
-          {sessionEntry.label}
-          {' '}
-          <span
-            className={`${styles.sessionPillMeta} ${sessionEntry.detail ? styles.supportedResourceDetail : ''}`}
-          >
+          {sessionEntry.label}{' '}
+          <span className={`${styles.sessionPillMeta} ${sessionEntry.detail ? styles.supportedResourceDetail : ''}`}>
             {sessionEntry.detail || (sessionEntry.isActive ? 'active' : sessionEntry.slugLabel)}
           </span>
         </span>

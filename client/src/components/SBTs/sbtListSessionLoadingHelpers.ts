@@ -81,6 +81,27 @@ export type SbtListSessionChipState = {
 
 export type SbtListSessionChipStateBySlug = Record<string, SbtListSessionChipState | undefined>;
 
+export type SbtListSectionLoadingState = {
+  refreshButtonBusy: boolean;
+  sectionSessionDiscoveryPending: boolean;
+  sectionSessionSearchFlag: boolean;
+  shouldKeepSectionSpinnersOn: boolean;
+};
+
+export type SbtListReadinessDisplayPlan = {
+  canShowSectionEmptyState: boolean;
+  initialLoadingActive: boolean;
+  sectionHeaderSpinnerVisible: boolean;
+  sectionReadinessPending: boolean;
+  shouldDeferInitialLoaderForUniverse: boolean;
+  showExpiredSectionLoadingHint: boolean;
+  showFeaturedSectionLoadingHint: boolean;
+  showInitialLoader: boolean;
+  showLiveSectionLoadingHint: boolean;
+  showSectionBodyLoadingHint: boolean;
+  showUniverseSpinner: boolean;
+};
+
 type BuildSbtListSessionLoadingStatusArgs = {
   allSessionsMode?: boolean;
   alwaysShow?: boolean;
@@ -88,6 +109,21 @@ type BuildSbtListSessionLoadingStatusArgs = {
   formatBlockCount?: (value: unknown) => string;
   loading?: boolean;
   snapshot?: SbtListSessionLoadingStatusSnapshot | null;
+};
+
+type BuildSbtListInitialLoaderStatusesArgs = {
+  fallbackSlug?: unknown;
+  loaderSessionSlugs?: unknown;
+  resolveStatus?: SbtListSessionLoadingStatusResolver;
+  windowAvailable?: boolean;
+};
+
+type BuildSbtListChipLoadingStatusBySlugArgs = {
+  allSessionsMode?: unknown;
+  displayedSessionUniverseSlugs?: unknown;
+  isListModeScopeEnabled?: unknown;
+  resolveStatus?: SbtListSessionLoadingStatusResolver;
+  selectedSessionUniverseSlugs?: Set<unknown> | unknown[];
 };
 
 type BuildSbtListSessionChipStateBySlugArgs = {
@@ -103,6 +139,43 @@ type BuildSbtListSessionChipStateBySlugArgs = {
   sbtListBySlug?: Record<string, unknown>;
   sessionHasLoadedOnceBySlug?: Record<string, unknown>;
   sessionLoadStateBySlug?: Record<string, unknown>;
+};
+
+type ResolveSbtListSectionLoadingStateArgs = {
+  getSessionProgressSnapshot?: (slug: string) => {
+    deferred?: unknown;
+    hasLatest?: unknown;
+    remainingBlocks?: unknown;
+    scanInProgress?: unknown;
+  } | null;
+  hasNoSessionCards?: unknown;
+  isSBTCacheReady?: unknown;
+  loading?: unknown;
+  refreshing?: unknown;
+  revisionSyncPending?: unknown;
+  sbtListBySlug?: Record<string, unknown>;
+  sectionSessionSlugs?: unknown;
+  sessionHasLoadedOnceBySlug?: Record<string, unknown>;
+  sessionLoadStateBySlug?: Record<string, unknown>;
+  sessionUniverseRegistryPending?: unknown;
+};
+
+type ResolveSbtListReadinessDisplayPlanArgs = {
+  allSessionsMode?: unknown;
+  availableSessionSlugCount?: unknown;
+  displayedFeaturedCount?: unknown;
+  displayedSessionUniverseSlugs?: unknown;
+  emptySectionSpinnerActive?: unknown;
+  expiredCount?: unknown;
+  initialLoadCompleted?: unknown;
+  isSBTCacheReady?: unknown;
+  loading?: unknown;
+  mintingLiveCount?: unknown;
+  refreshing?: unknown;
+  revisionSyncPending?: unknown;
+  sectionSessionDiscoveryPending?: unknown;
+  sectionSessionSearchFlag?: unknown;
+  sessionUniverseRegistryPending?: unknown;
 };
 
 type BuildSbtListSessionProgressSnapshotArgs = {

@@ -49,6 +49,7 @@ const LOCAL_OVERRIDE_SECTIONS = [
   { sectionKey: 'arweave', secretKey: 'jwk' },
   { sectionKey: 'faucet', secretKey: 'privateKey' },
 ] as const;
+type MutableLocalOverrideSection = UnknownRecord & { useLocal: boolean };
 const WORKER_LIT_CREDENTIAL_FIELDS = ['litApiBase', 'litGroupId', 'litPkpId', 'litActionCid'] as const;
 
 const isObj = (value: unknown): value is UnknownRecord => !!value && typeof value === 'object' && !Array.isArray(value);

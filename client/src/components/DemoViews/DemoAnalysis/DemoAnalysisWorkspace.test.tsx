@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import DemoAnalysisWorkspace from './DemoAnalysisWorkspace';
 
 jest.mock('../../Shared/CheckboxMultiSelect', () => ({
@@ -188,16 +188,12 @@ describe('DemoAnalysisWorkspace', () => {
     });
 
     const banner = screen.getByTestId('demo-analysis-question-banner');
-    const customGroundingTag = within(banner).getByRole('button', { name: 'Custom Grounding' });
-    const tweetsTag = within(banner).getByRole('button', { name: 'Tweets' });
+    const customGroundingTag = within(banner).getByRole('link', { name: 'Custom Grounding' });
+    const tweetsTag = within(banner).getByRole('link', { name: 'Tweets' });
 
     expect(screen.getByTestId('demo-analysis-selected-question-tension')).toHaveTextContent(/Key tension:/i);
-    expect(customGroundingTag).toHaveAttribute('aria-pressed', 'false');
-    expect(tweetsTag).toHaveAttribute('aria-pressed', 'false');
-
-    fireEvent.click(customGroundingTag);
-
-    expect(customGroundingTag).toHaveAttribute('aria-pressed', 'true');
+    expect(customGroundingTag).toHaveAttribute('href', '/tag/Custom%20Grounding?session=demo');
+    expect(tweetsTag).toHaveAttribute('href', '/tag/Tweets?session=demo');
   });
 
   it('auto-selects a strong correlation from the wand action', async () => {

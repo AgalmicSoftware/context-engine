@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { Provider } from 'react-redux';
 import { createStore } from 'redux';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { Navbar } from './Navbar';
 
@@ -152,18 +152,23 @@ describe('Navbar logo navigation', () => {
     expect(screen.queryByTestId('ce-navbar-link-github')).not.toBeInTheDocument();
   });
 
-  it('forwards the active route session config to the account settings modal', () => {
+  it('loads the settings modal only when it opens and forwards the active session config', async () => {
     const sessionConfig = {
       slug: 'worker-session',
       corsWorkerUrl: 'https://worker-session.example',
     };
 
     renderNavbar({ sessionConfig });
+    expect(mockLoginAndSettingsModal).not.toHaveBeenCalled();
 
-    expect(mockLoginAndSettingsModal).toHaveBeenCalledWith(
-      expect.objectContaining({
-        sessionConfig,
-      }),
+    renderNavbar({ sessionConfig }, { sessionState: { loginModalToggled: true } });
+
+    await waitFor(() =>
+      expect(mockLoginAndSettingsModal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionConfig,
+        }),
+      ),
     );
   });
 

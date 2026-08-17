@@ -47,17 +47,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           SELECTED_RUN_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.run_id || github.event.workflow_run.id }}
         run: |
-          SHORT_SHA="${GITHUB_SHA::7}"
-          APP_VERSION="$(node -p 'require("./package.json").version')"
-          RELEASE_STAMP="$(date -u +'%Y-%m-%d %H:%M UTC')"
-          TAG_NAME="worker-bundles-${GITHUB_RUN_NUMBER}-${SHORT_SHA}"
-          RELEASE_NAME="Context Engine ${APP_VERSION} worker bundles (${SHORT_SHA})"
-          {
-            echo "tag_name=${TAG_NAME}"
-            echo "release_name=${RELEASE_NAME}"
-            echo "release_stamp=${RELEASE_STAMP}"
-            echo "app_version=${APP_VERSION}"
-          } >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SELECTED_RUN_ID}" > "${RUNNER_TEMP}/ci-run.json"
+          node scripts/worker-release-artifacts.mjs validate-run \
+            --run-json "${RUNNER_TEMP}/ci-run.json" \
+            --repository "$GITHUB_REPOSITORY" \
+            --github-output "$GITHUB_OUTPUT"
 
       - name: Checkout exact successful CI source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -105,6 +100,7 @@ jobs:
           SOURCE_TREE: ${{ steps.source.outputs.sourceTree }}
         run: |
           set -euo pipefail
+          app_version="$(node -p 'require("./package.json").version')"
           tag="worker-bundles-${SOURCE_COMMIT}"
           artifact_dir="${RUNNER_TEMP}/worker-release"
           if gh release view "$tag" >/dev/null 2>&1; then
@@ -132,6 +128,7 @@ jobs:
           {
             echo "Immutable Worker bundles produced and verified by canonical CI run ${RUN_ID}."
             echo
+            echo "Context Engine version: \`${app_version}\`"
             echo "Source commit: \`${SOURCE_COMMIT}\`"
             echo "Source ref: \`${SOURCE_REF}\`"
             echo "Provenance and SHA-256 checksums: \`worker-release-manifest.json\`"
@@ -144,6 +141,6 @@ jobs:
             "$artifact_dir/agentBridgeWorker.bundle.js" \
             "$artifact_dir/worker-release-manifest.json" \
             --target "$SOURCE_COMMIT" \
-            --title "Worker bundles ${SOURCE_COMMIT}" \
+            --title "Context Engine ${app_version} Worker bundles ${SOURCE_COMMIT}" \
             --notes-file "$notes" \
             --latest=false

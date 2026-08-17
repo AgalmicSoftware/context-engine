@@ -64,8 +64,8 @@ export function readQuestionsCacheRef(slug: string): QuestionsCacheByNetwork {
   return peekCacheSync<QuestionsCacheByNetwork>('questionsCache', slug, { clone: false }) || {};
 }
 
-export async function readQuestionsCacheAsync(slug: string) {
-  const value = await readCache('questionsCache', slug);
+export async function readQuestionsCacheAsync(slug: string): Promise<QuestionsCacheByNetwork> {
+  const value = await readCache<QuestionsCacheByNetwork>('questionsCache', slug);
   return value && typeof value === 'object' ? value : readQuestionsCache(slug) || {};
 }
 
@@ -106,8 +106,8 @@ export function readSurveysCacheRef(slug: string): SurveysCacheByNetwork {
   return peekCacheSync<SurveysCacheByNetwork>('surveysCache', slug, { clone: false }) || {};
 }
 
-export async function readSurveysCacheAsync(slug: string) {
-  const value = await readCache('surveysCache', slug);
+export async function readSurveysCacheAsync(slug: string): Promise<SurveysCacheByNetwork> {
+  const value = await readCache<SurveysCacheByNetwork>('surveysCache', slug);
   return value && typeof value === 'object' ? value : readSurveysCache(slug) || {};
 }
 

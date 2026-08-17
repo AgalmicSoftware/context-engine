@@ -69,9 +69,7 @@ describe('LoginButton', () => {
     expect(classicLoginStyles).not.toContain('min-width: 116px !important;');
     expect(classicLoginStyles).not.toContain('min-height: 40px !important;');
     expect(classicLoginStyles).not.toContain('.classicLoginKey');
-    expect(classicLoginStyles).toMatch(
-      /\.loginPromptText\s*\{[\s\S]*?font-family:\s*var\(--ce-font-button\);/,
-    );
+    expect(classicLoginStyles).toMatch(/\.loginPromptText\s*\{[\s\S]*?font-family:\s*var\(--ce-font-button\);/);
     expect(classicLoginStyles).not.toMatch(/\.loginPromptText\s*{[\s\S]*?font-size:\s*(?:1rem|0\.88rem);/);
   });
 });

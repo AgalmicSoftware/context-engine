@@ -1,6 +1,6 @@
 import SBTPage from './SBTPage';
 import { ethers } from 'ethers';
-import contractScripts from '../../utilities/web3/contractScripts.js';
+import contractScripts from '../../utilities/web3/chainGateway.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 
 const mockIsCryptoMode = jest.fn(() => true);

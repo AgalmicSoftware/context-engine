@@ -371,11 +371,13 @@ $user-page-background: var(--ce-surface-sunken);
     $box-shadow: var(--ce-shadow-submit),
     $hover-box-shadow: var(--ce-shadow-submit-hover)
   );
-  width: 100%;
-  margin-top: 20px;
-  position: relative;
-  /* for progress fill */
-  overflow: hidden;
+  & {
+    width: 100%;
+    margin-top: 20px;
+    position: relative;
+    /* for progress fill */
+    overflow: hidden;
+  }
 }
 
 .submitSurveyBtn {

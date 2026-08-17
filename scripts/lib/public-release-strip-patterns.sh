@@ -28,6 +28,8 @@ EOF
 ce_public_release_strip_patterns() {
   cat <<'EOF'
 contextEngine-cc
+outreach-and-applications
+grant-applications
 client/public/skill.md
 TODO
 local-private-version
@@ -66,6 +68,7 @@ docs/*prd*.md
 scripts/test-*.js
 scripts/test-*.ui.js
 scripts/seed-*.js
+scripts/e2e
 scripts/lib/e2e
 scripts/lib/passkey-wallet-derivation.js
 scripts/start-playwright-server.js
@@ -74,8 +77,8 @@ scripts/run-ux-*
 scripts/capture-ux-*
 scripts/run-contextengine-cc-tests.js
 scripts/run-contextengine-cc-tests.test.js
+scripts/e2e-env-example.test.js
 scripts/vendor-cecc-ethers-bundle.js
-scripts/scrub-public-package-json.js
 scripts/build_external_llm_prompt.py
 scripts/restore-private-pack.sh
 scripts/audit-diff.sh
@@ -137,13 +140,14 @@ local-private-version
 scripts/test-*.js
 scripts/test-*.ui.js
 scripts/seed-*.js
+scripts/e2e
 scripts/lib/e2e
 scripts/lib/passkey-wallet-derivation.js
 scripts/start-playwright-server.js
 scripts/run-contextengine-cc-tests.js
 scripts/run-contextengine-cc-tests.test.js
+scripts/e2e-env-example.test.js
 scripts/vendor-cecc-ethers-bundle.js
-scripts/scrub-public-package-json.js
 scripts/restore-private-pack.sh
 scripts/audit-diff.sh
 scripts/audit-full.sh

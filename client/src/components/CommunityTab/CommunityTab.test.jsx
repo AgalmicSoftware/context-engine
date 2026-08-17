@@ -484,9 +484,7 @@ describe('CommunityTab helpers', () => {
 
     expect(headingText).not.toContain('Leaderboard');
     expect(headingText).not.toContain('Statistics');
-    expect(headingText).toEqual(
-      expect.arrayContaining([expect.stringMatching(/^Participants \(\d+\)$/)]),
-    );
+    expect(headingText).toEqual(expect.arrayContaining([expect.stringMatching(/^Participants \(\d+\)$/)]));
   });
 
   it('renders survey links with session query suffix in modal content', () => {
@@ -1333,6 +1331,65 @@ describe('CommunityTab helpers', () => {
         burnedAddresses: [],
         countsLoaded: true,
         blockNumber: 25,
+      }),
+    );
+  });
+
+  it('preserves concurrent SBT cache rows while hydrating holder counts', async () => {
+    const instance = attachMutableSetState(new CommunityTab({ activeSessionSlug: '' }));
+    const netKey = String(instance._resolveNetKeyForSlug('') || '');
+    expect(netKey).not.toBe('');
+
+    await writeCache('sbtCache', '', {
+      [netKey]: {
+        lastBlock: 10,
+        sbtList: {
+          '0x1': {
+            sbtAddress: '0x1',
+            creationBlock: 1,
+            countsLoaded: false,
+          },
+        },
+      },
+    });
+    jest.spyOn(contractScripts, 'getSbtMintBurnCountsByAddress').mockImplementation(async () => {
+      await cacheScripts.updateCacheAtomic('sbtCache', '', (current) => ({
+        ...(current || {}),
+        [netKey]: {
+          ...((current || {})[netKey] || {}),
+          sbtList: {
+            ...(((current || {})[netKey] || {}).sbtList || {}),
+            '0x2': {
+              sbtAddress: '0x2',
+              creationBlock: 2,
+              countsLoaded: false,
+            },
+          },
+        },
+      }));
+      return {
+        mintedCountByAddress: { '0xabc': 1 },
+        burnedCountByAddress: {},
+        mintedEventCount: 1,
+        burnedEventCount: 0,
+        scannedToBlock: 25,
+        ok: true,
+      };
+    });
+
+    await instance._hydrateSbtHoldersForSlug('');
+
+    const cache = await readCache('sbtCache', '');
+    expect(cache[netKey].sbtList['0x1']).toEqual(
+      expect.objectContaining({
+        mintedAddresses: ['0xabc'],
+        countsLoaded: true,
+      }),
+    );
+    expect(cache[netKey].sbtList['0x2']).toEqual(
+      expect.objectContaining({
+        sbtAddress: '0x2',
+        countsLoaded: false,
       }),
     );
   });

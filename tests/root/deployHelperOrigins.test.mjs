@@ -9,6 +9,9 @@ import {
   DEFAULT_ALLOWED_ORIGINS,
   ensureWorkersDevSubdomain,
 } from '../../workers/shared/deployHelperCore.mjs';
+import {
+  CLOUDFLARE_API_BASE_URL_ENV,
+} from '../../workers/shared/deployHelperEndpointConfig.mjs';
 
 const makeKvBinding = (initial = {}) => {
   const store = new Map(Object.entries(initial));

@@ -2,8 +2,8 @@
   "meta": {
     "description": "Comprehensive corpus of academic papers on AI safety, alignment, interpretability, and governance. Curated for the Context Engine AI policy deliberation platform.",
     "version": "1.0",
-    "last_updated": "2026-02-22",
-    "total_entries": 266
+    "last_updated": "2026-07-04",
+    "total_entries": 279
   },
   "entries": [
     {
@@ -1076,71 +1076,6 @@
       "source_links": [
         "https://arxiv.org/abs/2305.10601",
         "https://github.com/princeton-nlp/tree-of-thought-llm"
-      ]
-    },
-    {
-      "id": "constitutional_ai_harmlessness_anthropic_2022",
-      "title": "Constitutional AI: Harmlessness from AI Feedback",
-      "authors": [
-        "Yuntao Bai",
-        "Saurav Kadavath",
-        "Sandipan Kundu",
-        "Amanda Askell",
-        "Jackson Kernion",
-        "Andy Jones",
-        "Anna Chen",
-        "Anna Conerly",
-        "Nova DasSarma",
-        "Dawn Drain",
-        "Liane Lovitt",
-        "Neel Nanda",
-        "Rajeev Nayak",
-        "Catherine Olsson",
-        "Sam Ringer",
-        "Dario Amodei",
-        "Tom B. Brown"
-      ],
-      "year": 2023,
-      "arxiv_id": "2212.08073",
-      "url": "https://arxiv.org/abs/2212.08073",
-      "venue": "ArXiv preprint",
-      "institution": [
-        "Anthropic"
-      ],
-      "type": "empirical",
-      "summary": "Constitutional AI demonstrates a training methodology for improving model harmlessness without human feedback on harmful outputs. Models critique their own harmful behaviors against a 'constitution' of principles, then refine responses to be harmless. This RLAIF approach scales harmlessness training without proportional scaling of human annotation.",
-      "novel_arguments_and_concepts": "Constitutional AI addresses a key bottleneck in alignment: scaling human feedback requires proportionally scaling expensive human annotation. The paper proposes RL from AI Feedback (RLAIF): rather than humans labeling whether outputs are harmful, the model itself critiques outputs against a constitution (set of principles like 'be helpful, harmless, and honest'), then learns to generate non-harmful outputs. This dramatically reduces human annotation needs while leveraging the model's own reasoning capabilities to identify problems.\n\nThe methodology consists of two phases: (1) The model critiques a candidate response against the constitution, identifying potential harms, (2) The model then revises the response to address identified concerns. This revision is then used as training data for RL, teaching the model to produce harmless outputs. The approach is elegant: rather than humans deciding what's harmful, the model reasons through principles and applies them. The empirical finding is that models trained with Constitutional AI feedback produce outputs rated as similarly harmful to human-feedback trained models, with reduced human annotation burden. Key limitations include that the constitution itself requires human specification and ideological judgments about what principles matter, the model's ability to critique its own failures may be limited (it might miss certain failure modes), and the approach assumes the model can reliably apply principles (possible value drift), the robustness of RLAIF to adversarial examples isn't fully explored.",
-      "key_findings": [
-        "AI feedback on harmlessness can match human feedback quality with reduced annotation",
-        "Model critiques its own outputs against constitutional principles",
-        "RLAIF scales harmlessness training more efficiently than human feedback",
-        "Constitutional AI produces outputs rated similarly harmful to human feedback trained versions",
-        "Alignment can leverage model reasoning about principles"
-      ],
-      "methodology": "Constitutional AI training on models with size up to 60B parameters. Evaluation comparing harmlessness against human feedback baselines. Analysis of critique quality and revision effectiveness.",
-      "tags": [
-        "Constitutional AI",
-        "Alignment",
-        "RLAIF",
-        "harmlessness",
-        "scalable training"
-      ],
-      "importance_score": 8,
-      "citation_count": 3200,
-      "category": "Technical Safety",
-      "builds_on": [
-        "Prior RLHF research",
-        "Alignment work"
-      ],
-      "influenced": [
-        "Scaling alignment techniques",
-        "Industry practices"
-      ],
-      "limitations_and_critiques": "The constitution requires human specification—shifting the bottleneck from annotation to principle selection. The model's critique quality may not catch all harms. RLAIF hasn't been validated against adversarial attacks or novel harm categories. The assumption that models can reliably apply principles may not hold under distribution shift. Real-world deployment requires human oversight to catch failures.",
-      "policy_relevance": "Constitutional AI demonstrated that alignment can be more scalable than traditional human feedback approaches, influencing industry adoption of RLAIF. This contributed to discussions about feasibility of scaling AI safety alongside model capabilities. Anthropic's emphasis on constitutional principles raised questions about whose values get encoded in AI systems.",
-      "source_links": [
-        "https://arxiv.org/abs/2212.08073",
-        "https://www.anthropic.com/research/constitutional-ai-harmlessness-from-ai-feedback"
       ]
     },
     {
@@ -9371,60 +9306,6 @@
       "policy_relevance": "Relevant to ensuring AI systems follow appropriate instructions.",
       "source_links": [
         "https://openai.com/research"
-      ]
-    },
-    {
-      "id": "attention_is_all_you_need_vaswani_2017",
-      "title": "Attention Is All You Need",
-      "authors": [
-        "Ashish Vaswani",
-        "Noam Shazeer",
-        "Parmar Amitn",
-        "Jakob Uszkoreit",
-        "Llion Jones",
-        "Aidan N. Gomez",
-        "Łukasz Kaiser",
-        "Illia Polosukhin"
-      ],
-      "year": 2017,
-      "arxiv_id": "1706.03762",
-      "url": "https://arxiv.org/abs/1706.03762",
-      "venue": "NeurIPS",
-      "institution": [
-        "Google Brain"
-      ],
-      "type": "empirical",
-      "summary": "This foundational paper introduces the Transformer architecture, which has become the foundation for modern language models.",
-      "novel_arguments_and_concepts": "The Transformer architecture replaces recurrence with self-attention, enabling parallel processing and better long-range dependencies. The architecture is simple, effective, and has proven to be remarkably scalable. This single paper has been more influential than almost any other in recent ML history.\n\nThe work enables modern language models by providing an architecture that scales effectively and benefits from increased compute and data.",
-      "key_findings": [
-        "Self-attention is sufficient for sequence modeling",
-        "Architecture enables parallel processing",
-        "Scales better than RNNs/LSTMs",
-        "Captures long-range dependencies effectively",
-        "Enables modern large language models"
-      ],
-      "methodology": "Propose Transformer architecture with self-attention blocks",
-      "tags": [
-        "Transformers",
-        "attention",
-        "architecture",
-        "foundation"
-      ],
-      "importance_score": 10,
-      "citation_count": 120000,
-      "category": "Capabilities",
-      "builds_on": [
-        "Sequence modeling",
-        "Attention mechanisms"
-      ],
-      "influenced": [
-        "All modern language models",
-        "Multimodal models"
-      ],
-      "limitations_and_critiques": "Quadratic complexity in sequence length. Doesn't address interpretability or alignment. Architecture details have limitations.",
-      "policy_relevance": "Foundational to understanding modern AI systems.",
-      "source_links": [
-        "https://arxiv.org/abs/1706.03762"
       ]
     },
     {

@@ -6,7 +6,7 @@
  *
  * Key exports: normalizeArweaveUrl, parseArweaveTxId, isArweaveTxId, arweaveUrlUtils
  */
-import { arweaveScripts } from './arweaveScripts.js';
+import { arweaveClient } from './arweaveClient.js';
 import { ARWEAVE_GATEWAY_URL, CE_ARWEAVE_AR_IO_URL, CE_ARWEAVE_DIRECT_TO_AR_IO } from '../../variables/appConfig.js';
 import {
   ARWEAVE_DEFAULT_GATEWAY_CANDIDATES,
@@ -222,8 +222,8 @@ export const normalizeArweaveUrl = (
   const txId = parseArweaveTxId(raw);
   if (!txId) return raw;
   try {
-    if (arweaveScripts && typeof arweaveScripts.registerTxContext === 'function') {
-      arweaveScripts.registerTxContext(txId, {
+    if (arweaveClient && typeof arweaveClient.registerTxContext === 'function') {
+      arweaveClient.registerTxContext(txId, {
         category:
           String(contextLabel || 'ui_media')
             .trim()

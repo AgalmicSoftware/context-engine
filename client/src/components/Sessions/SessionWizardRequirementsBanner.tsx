@@ -4,10 +4,7 @@ import { faTimes } from '@fortawesome/free-solid-svg-icons';
 
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import styles from './SessionWizard.module.scss';
-import {
-  buildCloudflareTokenTemplateUrl,
-  CLOUDFLARE_TOKEN_SETUP_GUIDE_URL,
-} from './cloudflareTokenTemplate.js';
+import { buildCloudflareTokenTemplateUrl, CLOUDFLARE_TOKEN_SETUP_GUIDE_URL } from './cloudflareTokenTemplate.js';
 import type { SessionWizardRequirementId } from './sessionWizardModeRequirements';
 
 export const SESSION_WIZARD_REQUIREMENT_LINKS = Object.freeze({
@@ -19,7 +16,6 @@ export const SESSION_WIZARD_REQUIREMENT_LINKS = Object.freeze({
 });
 
 type SessionWizardRequirementsBannerProps = {
-  cloudflareTokenAccountId?: string;
   cloudflareTokenSlug?: string;
   fundingRequirementHref?: string;
   fundingRequirementLabel: string;
@@ -30,7 +26,6 @@ type SessionWizardRequirementsBannerProps = {
 };
 
 const SessionWizardRequirementsBanner = ({
-  cloudflareTokenAccountId = '',
   cloudflareTokenSlug = '',
   fundingRequirementHref = '',
   fundingRequirementLabel,
@@ -50,8 +45,11 @@ const SessionWizardRequirementsBanner = ({
   const walletRequirementLabel = fundingRequirementLabel.includes('SBT publishing')
     ? 'A connected wallet for on-chain SBT publishing'
     : 'A connected wallet for on-chain registration';
+  const rpcRequirementLabel =
+    requires('wallet') || requires('funding')
+      ? 'RPC URL or provider key for on-chain reads and publishing'
+      : 'RPC URL or provider key for read-only access checks or encryption; no on-chain publishing transaction is required';
   const cloudflareTokenTemplateHref = buildCloudflareTokenTemplateUrl({
-    accountId: cloudflareTokenAccountId,
     slug: cloudflareTokenSlug,
   });
 
@@ -94,7 +92,7 @@ const SessionWizardRequirementsBanner = ({
                 className={styles.newSessionBannerLink}
                 data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_TOKEN_ONBOARDING_LINK}
               >
-                Lit API key
+                Cloudflare API token
               </a>{' '}
               — if you&apos;re already logged into Cloudflare, this link opens a token form with permissions prefilled.
               Create the token, then copy it into the Worker step.{' '}
@@ -110,7 +108,9 @@ const SessionWizardRequirementsBanner = ({
             </li>
           ) : null}
           {hasResolvedRequirements && requires('sessionWorker') ? (
-            <li>A compatible Session Worker provides the web runtime; the EVM registry and Arweave remain canonical.</li>
+            <li>
+              A compatible Session Worker provides the web runtime; the EVM registry and Arweave remain canonical.
+            </li>
           ) : null}
           {requires('aiProviderKey') ? (
             <li>
@@ -131,8 +131,8 @@ const SessionWizardRequirementsBanner = ({
                     OpenAI API key
                   </a>
                 </>
-              )}
-              {' '}for text and transcription
+              )}{' '}
+              for text and transcription
             </li>
           ) : null}
           {requires('lit') ? (
@@ -167,7 +167,7 @@ const SessionWizardRequirementsBanner = ({
               for permanent storage
             </li>
           ) : null}
-          {requires('rpc') ? <li>RPC URL or provider key for on-chain reads and publishing</li> : null}
+          {requires('rpc') ? <li>{rpcRequirementLabel}</li> : null}
           {requires('wallet') ? <li>{walletRequirementLabel}</li> : null}
           {requires('funding') ? (
             <li>

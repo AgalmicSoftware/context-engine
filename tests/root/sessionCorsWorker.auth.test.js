@@ -428,6 +428,7 @@ describe('sessionCorsWorker auth routes', () => {
       faucet: true,
       fetch: true,
       lit: false,
+      groups: true,
     });
     expect(kv.delete).toHaveBeenCalledWith(`nonce:${sessionSlug}:${wallet.address.toLowerCase()}`);
   });

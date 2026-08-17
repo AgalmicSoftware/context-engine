@@ -1,6 +1,7 @@
 import {
   buildLockedGateRequirementSentence,
   buildLockedQuestionGateDetailsFromPool,
+  collectGateSbtAddressesForHydrationFromSources,
   isGenericResourceGateLabel,
 } from './surveyQuestionGateDetails';
 

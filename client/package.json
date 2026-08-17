@@ -32,7 +32,6 @@
     "html2canvas": "1.4.1",
     "jspdf": "4.2.1",
     "ml-kmeans": "6.0.0",
-    "networkanalysis-ts": "1.0.0",
     "poseidon-lite": "0.3.0",
     "prop-types": "15.7.2",
     "qrcode.react": "4.2.0",
@@ -74,23 +73,26 @@
     "@babel/preset-env": "7.29.5",
     "@babel/preset-react": "7.28.5",
     "@babel/preset-typescript": "7.28.5",
+    "@eslint/js": "9.39.1",
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.2",
     "@testing-library/user-event": "14.6.1",
     "@types/node": "20.19.39",
     "@types/react": "18.3.28",
     "@types/react-dom": "18.3.7",
-    "@typescript-eslint/parser": "4.33.0",
+    "@typescript-eslint/parser": "8.59.4",
     "@vitejs/plugin-react": "4.7.0",
     "babel-jest": "30.4.1",
     "buffer": "6.0.3",
-    "eslint": "7.32.0",
+    "eslint": "9.39.1",
     "eslint-plugin-react": "7.37.5",
-    "eslint-plugin-react-hooks": "4.6.2",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.6.0",
     "identity-obj-proxy": "3.0.0",
     "jest": "30.4.2",
     "jest-environment-jsdom": "30.4.1",
     "patch-package": "8.0.1",
+    "prettier": "3.9.4",
     "process": "0.11.10",
     "sass": "1.78.0",
     "typescript": "5.8.3",
@@ -135,28 +137,6 @@
     "@remix-run/router": "1.23.2",
     "follow-redirects": "1.16.0",
     "@metamask/utils": "9.2.0"
-  },
-  "babel": {
-    "presets": [
-      [
-        "@babel/preset-env",
-        {
-          "targets": {
-            "node": "current"
-          }
-        }
-      ],
-      [
-        "@babel/preset-react",
-        {
-          "runtime": "automatic"
-        }
-      ],
-      "@babel/preset-typescript"
-    ],
-    "plugins": [
-      "@babel/plugin-syntax-import-meta"
-    ]
   },
   "browserslist": [
     ">0.2%",

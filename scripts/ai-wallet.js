@@ -2,9 +2,6 @@
 
 const { ethers } = require('ethers');
 const { loadClientDefaults } = require('./lib/network-defaults.js');
-const {
-  buildWalletFromPasskeyRawId,
-} = require('./lib/porto-wallet-derivation.js');
 const { getPublicRpcUrls } = require('../client/src/variables/rpcDefaults.js');
 const {
   buildPasskeyDerivedWallet,
@@ -38,11 +35,6 @@ const normalizeGroupPasswordInput = (raw) => {
 };
 
 const { computeGroupPasswordHash } = createGroupPasswordDerivation(ethers);
-
-const deriveWalletFromPasskeyRawId = (rawIdB64Url) => {
-  const { rawIdBytes, privateKey, wallet } = buildWalletFromPasskeyRawId(rawIdB64Url);
-  return { rawIdBytes, privateKey, wallet };
-};
 
 async function main() {
   const rawIdB64Url = process.env.PASSKEY_RAW_ID_B64URL || DEFAULT_PASSKEY_RAW_ID_B64URL;

@@ -9,6 +9,8 @@ import {
   bootstrapLitChipotleSession,
   executeLitChipotleAction,
   executeSessionLitChipotleAction,
+  fetchChipotleJson,
+  isLitChipotleLocalApiBaseAllowed,
   normalizeLitChipotleApiBase,
   provisionLitChipotleAction,
   readLitChipotleStatus,
@@ -19,7 +21,7 @@ import {
   buildLitChipotlePolicy,
   buildLitChipotleWrappedPlaintext,
   fingerprintLitChipotlePolicy,
-} from '../../client/src/utilities/crypto/litChipotlePolicy.js';
+} from './litChipotlePolicyCore.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ethersUtils = ethers?.utils || ethers;
@@ -382,6 +384,7 @@ test('resolveLitChipotleRuntime prefers request, then session secret, then worke
     },
   }), {
     litApiBase: 'https://api.chipotle.litprotocol.com',
+    allowLocalApiBase: false,
     litUsageApiKey: 'request-key',
     apiKeySource: 'request',
     litGroupId: 'group_123',
@@ -622,6 +625,45 @@ test('executeSessionLitChipotleAction validates source code and executes the con
     cekHex: `0x${'12'.repeat(32)}`,
     policy: expectedPolicy,
   }));
+});
+
+test('executeSessionLitChipotleAction rejects malformed explicit gate chains instead of falling through', async () => {
+  for (const chainId of ['3.1337e4', '11155420.0', false]) {
+    let actionCalls = 0;
+    const fetchImpl = async (url) => {
+      if (String(url).endsWith('/core/v1/get_lit_action_ipfs_id')) {
+        return jsonResponse(TEST_ACTION_CID);
+      }
+      actionCalls += 1;
+      return jsonResponse({ has_error: false, response: { ok: true } });
+    };
+
+    await assert.rejects(
+      () => executeSessionLitChipotleAction({
+        config: {
+          networkChainId: 11155420,
+          litCredentials: {
+            litApiBase: 'https://api.chipotle.litprotocol.com',
+            litActionCid: TEST_ACTION_CID,
+            litPkpId: TEST_PKP_ID,
+          },
+        },
+        secrets: { litUsageApiKey: 'usage-key' },
+        request: {
+          actionCode: 'async function main() { return { ok: true }; }',
+          op: 'encrypt',
+          sbtAddresses: [TEST_GATE_ADDRESS],
+          chainId,
+          message: `0x${'12'.repeat(32)}`,
+        },
+        requesterAddress: TEST_REQUESTER,
+        fetchImpl,
+      }),
+      /requires a gate chain ID/i,
+      String(chainId),
+    );
+    assert.equal(actionCalls, 0, String(chainId));
+  }
 });
 
 test('executeSessionLitChipotleAction submits verified source code when configured action CID is not cached yet', async () => {
@@ -902,6 +944,50 @@ test('executeSessionLitChipotleAction falls back to a default public RPC for the
   });
 });
 
+test('executeSessionLitChipotleAction prefers the session-secret custom RPC over public fallbacks', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options = {}) => {
+    calls.push([String(url), options]);
+    if (String(url).endsWith('/core/v1/get_lit_action_ipfs_id')) {
+      return jsonResponse('QmAction123');
+    }
+    if (String(url).endsWith('/core/v1/lit_action')) {
+      return jsonResponse({
+        has_error: false,
+        logs: '',
+        response: { ok: true, allowed: true },
+      });
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  };
+
+  await executeSessionLitChipotleAction({
+    config: {
+      networkChainId: 11155420,
+      litCredentials: {
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litActionCid: 'QmAction123',
+        litPkpId: '0xpkp123',
+      },
+    },
+    secrets: {
+      litUsageApiKey: 'usage-key',
+      customRpcUrl: 'https://rpc.example.test',
+    },
+    request: {
+      actionCode: 'async function main() { return { ok: true }; }',
+      op: 'check',
+      sbtAddresses: ['0x29563ff3aCC8AFb220D810F8022218095e25C1f6'],
+      chainId: 11155420,
+    },
+    requesterAddress: '0x00000000000000000000000000000000000000aa',
+    fetchImpl,
+  });
+
+  const body = JSON.parse(calls[1][1].body);
+  assert.equal(body.js_params.rpcUrl, 'https://rpc.example.test/');
+});
+
 
 test('resolveLitChipotleProvisioningRuntime prefers session account secrets before worker env credentials and accepts group names', () => {
   assert.deepEqual(resolveLitChipotleProvisioningRuntime({
@@ -921,12 +1007,30 @@ test('resolveLitChipotleProvisioningRuntime prefers session account secrets befo
     },
   }), {
     litApiBase: 'https://api.chipotle.litprotocol.com',
+    allowLocalApiBase: false,
     litManagementApiKey: 'session-account-key',
     apiKeySource: 'session-secret',
     litGroupId: 'ce-session-content-prod',
     litPkpId: 'pkp_123',
     litActionCid: '',
   });
+});
+
+test('Lit Chipotle runtime resolution rejects unapproved API bases', () => {
+  assert.throws(
+    () => resolveLitChipotleRuntime({
+      secrets: { litUsageApiKey: 'session-key' },
+      body: { litApiBase: 'https://attacker.example' },
+    }),
+    /host is not approved/,
+  );
+  assert.throws(
+    () => resolveLitChipotleProvisioningRuntime({
+      secrets: { litAccountApiKey: 'session-account-key' },
+      body: { litApiBase: 'https://api.chipotle.litprotocol.com.evil.example' },
+    }),
+    /host is not approved/,
+  );
 });
 
 test('bootstrapLitChipotleSession creates a per-session account, group, wallet, usage key, and default action wiring', async () => {
@@ -1178,7 +1282,8 @@ test('bootstrapLitChipotleSession reuses a request account key to create missing
 
   const result = await bootstrapLitChipotleSession({
     env: {
-      LIT_API_BASE: 'https://chipotle-env.example.test/core/v1/',
+      LIT_API_BASE: 'http://localhost:8787/core/v1/',
+      LIT_CHIPOTLE_ALLOW_LOCAL_API_BASE: 'true',
     },
     config: {
       litCredentials: {},
@@ -1198,7 +1303,7 @@ test('bootstrapLitChipotleSession reuses a request account key to create missing
     ok: true,
     bootstrapMode: 'existing-account',
     alreadyBootstrapped: false,
-    apiBase: 'https://chipotle-env.example.test',
+    apiBase: 'http://localhost:8787',
     litActionCid: 'QmAction123',
     litGroupId: '7',
     litPkpId: '0xpkp123',
@@ -1207,7 +1312,7 @@ test('bootstrapLitChipotleSession reuses a request account key to create missing
       balance_display: '$0.00',
     },
     litCredentials: {
-      litApiBase: 'https://chipotle-env.example.test',
+      litApiBase: 'http://localhost:8787',
       litActionCid: 'QmAction123',
       litGroupId: '7',
       litPkpId: '0xpkp123',
@@ -1231,7 +1336,7 @@ test('bootstrapLitChipotleSession reuses a request account key to create missing
     calls.some(([url]) => url.endsWith('/core/v1/new_account')),
     false,
   );
-  assert.ok(calls.every(([url]) => url.startsWith('https://chipotle-env.example.test/core/v1/')));
+  assert.ok(calls.every(([url]) => url.startsWith('http://localhost:8787/core/v1/')));
   assert.equal(calls[0][1].headers.Authorization, 'Bearer account-key');
 });
 

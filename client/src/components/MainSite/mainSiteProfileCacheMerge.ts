@@ -67,14 +67,22 @@ export const mergeMainSiteProfileRows = <TRow extends ProfileRow>(
 };
 
 export const buildMainSiteProfileSurveyResponseKey = (item: ProfileRow) => {
-  const surveyId = String(item.surveyId || item.surveyID || item.id || '').trim().toLowerCase();
-  const responder = String(item.responder || '').trim().toLowerCase();
+  const surveyId = String(item.surveyId || item.surveyID || item.id || '')
+    .trim()
+    .toLowerCase();
+  const responder = String(item.responder || '')
+    .trim()
+    .toLowerCase();
   return surveyId && responder ? `${surveyId}|${responder}` : '';
 };
 
 export const buildMainSiteProfileQuestionResponseKey = (item: ProfileRow) => {
-  const questionId = String(item.questionId || item.questionID || item.id || '').trim().toLowerCase();
-  const responder = String(item.responder || '').trim().toLowerCase();
+  const questionId = String(item.questionId || item.questionID || item.id || '')
+    .trim()
+    .toLowerCase();
+  const responder = String(item.responder || '')
+    .trim()
+    .toLowerCase();
   return questionId && responder ? `${questionId}|${responder}` : '';
 };
 
@@ -96,8 +104,10 @@ export const mergeMainSiteProfileUserCache = (
     sbts: mergeMainSiteProfileRows(rows(currentData.sbts), rows(incomingData.sbts), (row) =>
       String(row.sbtAddress || JSON.stringify(row)).toLowerCase(),
     ),
-    createdSurveys: mergeMainSiteProfileRows(rows(currentData.createdSurveys), rows(incomingData.createdSurveys), (row) =>
-      String(row.id || JSON.stringify(row)),
+    createdSurveys: mergeMainSiteProfileRows(
+      rows(currentData.createdSurveys),
+      rows(incomingData.createdSurveys),
+      (row) => String(row.id || JSON.stringify(row)),
     ),
     createdQuestions: mergeMainSiteProfileRows(
       rows(currentData.createdQuestions),

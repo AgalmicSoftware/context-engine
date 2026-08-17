@@ -28,9 +28,9 @@ import {
   processAdditionalSources,
   fetchContentFromURL,
   analyzePhotoForQuestionGeneration,
-} from '../../../utilities/ai/aiScripts.js';
+} from '../../../utilities/ai/aiClient.js';
 import { getEffectiveAiConfig } from '../../../utilities/ai/aiSettings.js';
-import { getAllSessionSlugs, getSessionConfigBySlug } from '../../../utilities/web3/contractScripts.js';
+import { getAllSessionSlugs, getSessionConfigBySlug } from '../../../utilities/web3/chainGateway.js';
 import AudioInput from '../../Shared/AudioInput/AudioInput';
 import CompactImageChooser from '../../Shared/CompactImageChooser';
 import { readCompactImageClipboard } from '../../Shared/compactImageClipboard.js';
@@ -2062,115 +2062,6 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
                 </div>
               </>
             ) : null}
-
-            {shouldShowGenerateButton && (
-              <div className={styles.actionRow}>
-                <Button type="submit" className={styles.generateButton} disabled={loading}>
-                  {loading && activeAction === 'generate' ? (
-                    <>
-                      {isTranscribing ? 'Transcribing... ' : 'Processing... '}
-                      {waitingSeconds}s <FontAwesomeIcon icon={faSpinner} spin />
-                    </>
-                  ) : (
-                    'Generate Questions'
-                  )}
-                </Button>
-              </div>
-            )}
-          </form>
-
-          {error && !loading && (
-            <div className={styles.error} style={SURVEY_GENERATOR_ERROR_STYLE}>
-              {error}
-            </div>
-
-            <div className={styles.formSection}>
-              <h3 className={styles.sectionTitle}>Types</h3>
-
-              <div className={styles.questionTypeGrid}>
-                <div
-                  className={buildSurveyGeneratorTypeButtonClassName(styles, questionTypes.binary)}
-                  onClick={() => toggleQuestionType('binary')}
-                >
-                  <div className={styles.typeTitle}>Binary</div>
-                  <div className={styles.typePreviewRow}>
-                    <span className={buildSurveyGeneratorTypePillClassName(styles, 'agree')}>Agree</span>
-                    <span className={buildSurveyGeneratorTypePillClassName(styles, 'unsure')}>Unsure</span>
-                    <span className={buildSurveyGeneratorTypePillClassName(styles, 'disagree')}>Disagree</span>
-                  </div>
-                </div>
-
-                <div
-                  className={buildSurveyGeneratorTypeButtonClassName(styles, questionTypes.multichoice)}
-                  onClick={() => toggleQuestionType('multichoice')}
-                >
-                  <div className={styles.typeTitle}>Multichoice</div>
-                  <div className={styles.typePreviewRow}>
-                    <span className={styles.pill}>Opt 1</span>
-                    <span className={styles.pill}>Opt 2</span>
-                    <span className={styles.pill}>Opt 3</span>
-                  </div>
-                </div>
-
-                <div
-                  className={buildSurveyGeneratorTypeButtonClassName(styles, questionTypes.rating)}
-                  onClick={() => toggleQuestionType('rating')}
-                >
-                  <div className={styles.typeTitle}>Rating</div>
-                  <div className={styles.ratingPreviewWrap}>
-                    <div className={styles.ratingPreviewFill} />
-                    <div className={styles.ratingPreviewHandle} />
-                  </div>
-                </div>
-
-                <div
-                  className={buildSurveyGeneratorTypeButtonClassName(styles, questionTypes.freeform)}
-                  onClick={() => toggleQuestionType('freeform')}
-                >
-                  <div className={styles.typeTitle}>Freeform</div>
-                  <div className={styles.freeformPreview}>...</div>
-                </div>
-              </div>
-            </div>
-
-            <div className={styles.formSection}>
-              <div className={styles.countControlRow} role="group" aria-label="Number of questions">
-                <span className={styles.countInlineLabel} aria-hidden="true">
-                  # Questions
-                </span>
-                <div
-                  className={styles.countReadout}
-                  aria-label={`Number of questions: ${count}`}
-                  data-testid={E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}
-                  aria-live="polite"
-                  aria-atomic="true"
-                >
-                  <span>{count}</span>
-                </div>
-                <Button
-                  type="button"
-                  color="secondary"
-                  className={styles.countAdjustButton}
-                  onClick={() => adjustQuestionCount(-QUESTION_COUNT_STEP)}
-                  disabled={count <= MIN_QUESTION_COUNT || loading}
-                  aria-label="Decrease question count"
-                  data-testid={E2E_TESTIDS.DATABASE_QUESTION_COUNT_DECREMENT}
-                >
-                  -
-                </Button>
-                <Button
-                  type="button"
-                  color="secondary"
-                  className={styles.countAdjustButton}
-                  onClick={() => adjustQuestionCount(QUESTION_COUNT_STEP)}
-                  disabled={count >= MAX_QUESTION_COUNT || loading}
-                  aria-label="Increase question count"
-                  data-testid={E2E_TESTIDS.DATABASE_QUESTION_COUNT_INCREMENT}
-                >
-                  +
-                </Button>
-              </div>
-            </div>
 
             {shouldShowGenerateButton && (
               <div className={styles.actionRow}>

@@ -145,10 +145,10 @@ export function serializeFilterState(filterStateObj: FilterStateRecord | null | 
  */
 export function deserializeFilterState(base64UrlString: string | null | undefined): SurveyFilterState {
   // Create a new instance of the default state for fallback, ensuring arrays are new instances.
-  const newDefaultStateInstance = {
+  const newDefaultStateInstance: SurveyFilterState = {
     ...defaultEmptyFilterState,
     questionTypes: [...defaultEmptyFilterState.questionTypes],
-    selectedTags: [...defaultEmptyFilterState.selectedTags]
+    selectedTags: [...defaultEmptyFilterState.selectedTags],
   };
 
   if (base64UrlString === null || base64UrlString === undefined || base64UrlString.trim() === '') {

@@ -17,6 +17,32 @@ type SessionWizardGateOption = {
   color: unknown;
 };
 
+export type SessionWizardResourceGateSelectionState = string | string[];
+
+type SessionWizardResourceGateOptionLike = Record<string, unknown> & {
+  id?: unknown;
+  value?: unknown;
+};
+
+type SessionWizardResourceGateSelectionInput = {
+  value?: unknown;
+  fallbackGateId?: unknown;
+  gateOptions?: SessionWizardResourceGateOptionLike[];
+};
+
+type SessionWizardResourceGateSelectionStatePlan = {
+  availableGateIds: string[];
+  disabled: boolean;
+  fallbackGateId: string;
+  selectedGateIds: string[];
+};
+
+type SessionWizardResourceGateSelectionUpdateInput = {
+  nextIds?: unknown;
+  availableGateIds?: string[];
+  fallbackGateId?: unknown;
+};
+
 type SessionWizardResolvedResourceGate = {
   gateId: string;
   gateIds: string[];

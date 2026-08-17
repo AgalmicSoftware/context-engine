@@ -338,10 +338,7 @@ describe('useSessionWizardWorkerSecretsController', () => {
       }),
     });
 
-    expect(missing.result.current.getMissingWorkerSecretsForDeploy()).toEqual([
-      'Anthropic key',
-      'OpenRouter key',
-    ]);
+    expect(missing.result.current.getMissingWorkerSecretsForDeploy()).toEqual(['Anthropic key', 'OpenRouter key']);
     expect(complete.result.current.getMissingWorkerSecretsForDeploy()).toEqual([]);
   });
 

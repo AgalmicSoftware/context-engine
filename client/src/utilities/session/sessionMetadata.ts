@@ -7,20 +7,6 @@
  */
 import type { SessionMetadata, UnknownRecord } from './sessionTypes.js';
 
-export type SessionMetadata = Record<string, any> & {
-  gates?: Array<Record<string, any>> | Record<string, any>;
-  lit?: Record<string, any> | null;
-  litNetwork?: string;
-  orgInfo?: string;
-  orgInfoEncrypted?: string | Record<string, any> | null;
-  orgName?: string;
-  sessionInfo?: string;
-  sessionInfoEncrypted?: string | Record<string, any> | null;
-  sessionName?: string;
-  sponsored?: boolean | Record<string, any>;
-  sponsoredSbtAddress?: string;
-};
-
 const DEFAULT_LIT_NETWORK = 'chipotle';
 const LEGACY_LIT_NETWORK_ALIASES = Object.freeze({
   chipotle: 'chipotle',

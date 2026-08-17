@@ -6,7 +6,7 @@ type CloudflareTokenPermission = {
   type: string;
 };
 
-export const CLOUDFLARE_API_TOKENS_URL = 'https://dash.cloudflare.com/profile/api-tokens';
+const CLOUDFLARE_API_TOKENS_URL = 'https://dash.cloudflare.com/profile/api-tokens';
 export const CLOUDFLARE_TOKEN_SETUP_GUIDE_URL = buildPublicRepoBlobUrl(
   'docs/session-cors-worker.md#api-token-setup-and-handling',
 );
@@ -16,10 +16,7 @@ export const CLOUDFLARE_TOKEN_TEMPLATE_BASE_PERMISSIONS = Object.freeze([
   { key: 'workers_kv_storage', type: 'edit' },
 ]);
 
-export const CLOUDFLARE_TOKEN_TEMPLATE_DOC_STORAGE_PERMISSIONS = Object.freeze([
-  { key: 'workers_r2', type: 'edit' },
-  { key: 'd1', type: 'edit' },
-]);
+export const CLOUDFLARE_TOKEN_TEMPLATE_R2_PERMISSIONS = Object.freeze([{ key: 'workers_r2', type: 'edit' }]);
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'] as const;
 const CLOUDFLARE_TOKEN_NAME_PREFIX = 'contextEngine-corsSessionWorker-';
@@ -73,44 +70,25 @@ export const buildCloudflareTokenTemplatePermissions = ({
   return permissions;
 };
 
-export const buildCloudflareTokenTemplatePermissions = ({
-  includeWorkersDevSubdomainSetup = false,
-  includeDocStorage = true,
-}: {
-  includeWorkersDevSubdomainSetup?: boolean;
-  includeDocStorage?: boolean;
-} = {}) => {
-  const permissions: CloudflareTokenPermission[] = [...CLOUDFLARE_TOKEN_TEMPLATE_BASE_PERMISSIONS];
-  if (includeDocStorage === true) {
-    permissions.push(...CLOUDFLARE_TOKEN_TEMPLATE_DOC_STORAGE_PERMISSIONS);
-  }
-  permissions.push(...CLOUDFLARE_TOKEN_TEMPLATE_RUNTIME_PERMISSIONS);
-  if (includeWorkersDevSubdomainSetup === true) {
-    permissions.push(CLOUDFLARE_WORKERS_DEV_SUBDOMAIN_PERMISSION);
-  }
-  return permissions;
-};
-
 export const buildCloudflareTokenTemplateUrl = ({
   slug,
-  includeWorkersDevSubdomainSetup = false,
-  includeDocStorage = true,
+  includeR2Storage = false,
 }: {
   slug?: unknown;
-  includeWorkersDevSubdomainSetup?: boolean;
-  includeDocStorage?: boolean;
+  includeR2Storage?: boolean;
 } = {}): string => {
   const params = new URLSearchParams();
   params.set(
     'permissionGroupKeys',
     JSON.stringify(
       buildCloudflareTokenTemplatePermissions({
-        includeWorkersDevSubdomainSetup,
-        includeDocStorage,
+        includeR2Storage,
       }),
     ),
   );
-  params.set('accountId', toStr(accountId).trim() || '*');
+  // Account selection stays operator-controlled in Cloudflare; deploy resolves
+  // the one token-visible account and never trusts browser-cached account IDs.
+  params.set('accountId', '*');
   params.set('zoneId', 'all');
   params.set('name', buildTokenName(slug));
   return `${CLOUDFLARE_API_TOKENS_URL}?${params.toString()}`;

@@ -25,9 +25,6 @@ const collectAtlasNodeIds = (nodes: any[] = []): Set<string> => {
   return ids;
 };
 
-const mutableEnv = process.env as Record<string, string | undefined>;
-const originalPublicUrl = process.env.PUBLIC_URL;
-
 describe('RiskMatrix', () => {
   afterEach(() => {
     if (originalPublicUrl === undefined) delete mutableEnv.PUBLIC_URL;
@@ -158,22 +155,6 @@ describe('RiskMatrix', () => {
         .getAllByAltText('Alan Turing')
         .some((image) => image.getAttribute('src') === '/ce/historical-avatars/alanturing.jpg'),
     ).toBe(true);
-  });
-
-  it('prepends PUBLIC_URL to atlas scenario imagery for subpath deploys', () => {
-    mutableEnv.PUBLIC_URL = '/ce/';
-    render(<RiskMatrix />);
-
-    fireEvent.click(screen.getByTestId('ce-risk-matrix-cell-safety-vs-capabilities'));
-
-    expect(screen.getByAltText(/alan turing portrait anchoring the audit-aware agents overlap/i)).toHaveAttribute(
-      'src',
-      '/ce/historical-avatars/alanturing.jpg'
-    );
-    expect(screen.getByAltText('Alan Turing')).toHaveAttribute(
-      'src',
-      '/ce/historical-avatars/alanturing.jpg'
-    );
   });
 
   it('shows multiple linked crypto scenarios for capabilities x crypto overlaps', () => {

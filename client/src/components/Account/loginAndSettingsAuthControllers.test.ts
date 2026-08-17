@@ -4,9 +4,11 @@ import { buildPasskeyWalletNetwork, createLoginPasskeyActions } from './loginAnd
 import { createLoginAgentActions, formatAgentTokenError } from './loginAndSettingsAgentTokenActions';
 
 const envelope: AgentClientLoginEnvelope = {
+  v: 2,
   sessionSlug: 'alpha',
   address: '0x0000000000000000000000000000000000000001',
-  credential: { token: 'ceagt_test' },
+  bridgeCredential: { kind: 'agent_bridge_browser_token', token: 'ceagt_bridge_test' },
+  workerCredential: { kind: 'session_worker_jwt', token: 'jwt-worker-test' },
   capabilities: { submitAnswers: true },
   expiresAt: '2026-01-01T00:00:00.000Z',
 };
@@ -113,7 +115,7 @@ describe('loginAndSettings auth controllers', () => {
     );
   });
 
-  it('resolves agent-token session context from prop config before fallbacks', () => {
+  it('keeps canonical agent-token operational fields authoritative over a matching prop overlay', () => {
     const actions = createLoginAgentActions({
       changeAccount: jest.fn(),
       exchangeAgentClientLogin: async () => envelope,
@@ -122,7 +124,11 @@ describe('loginAndSettings auth controllers', () => {
       getAgentTokenInput: () => '',
       getDemoSessionConfigBySlug: () => ({ slug: 'demo' }),
       getPropSessionConfig: () => ({ slug: 'alpha', agentBridgeUrl: 'https://bridge.example/' }),
-      getSessionConfigBySlugOrDefault: () => ({ slug: 'fallback' }),
+      getSessionConfigBySlugOrDefault: () => ({
+        slug: 'alpha',
+        agentBridgeUrl: 'https://registry-bridge.example/',
+        sponsoredKeys: { ai: true },
+      }),
       getTargetNetwork: () => ({ id: 11155420 }),
       isTelegramFirstSessionConfig: () => true,
       normalizeSettingsSessionSlug: (slug) =>

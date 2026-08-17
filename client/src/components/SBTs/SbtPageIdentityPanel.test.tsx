@@ -39,17 +39,20 @@ describe('SbtPageIdentityPanel', () => {
     );
     expect(screen.getByRole('link', { name: '0x000...00f1' })).toHaveAttribute('rel', 'noopener noreferrer');
     expect(screen.getByTitle('Open token metadata')).toHaveAttribute('href', 'https://arweave.example.test/metadata');
+    expect(screen.getByTitle('Open token metadata')).toHaveAttribute('target', '_blank');
   });
 
   it('preserves handler wiring for passive identity controls', () => {
     const onBookmark = jest.fn();
     const onContractCopy = jest.fn();
+    const onImageError = jest.fn();
     const onImageOpen = jest.fn();
     render(
       <SbtPageIdentityPanel
         {...createProps({
           onBookmark,
           onContractCopy,
+          onImageError,
           onImageOpen,
         })}
       />,
@@ -58,9 +61,11 @@ describe('SbtPageIdentityPanel', () => {
     fireEvent.click(screen.getAllByRole('button')[0]);
     fireEvent.click(screen.getAllByRole('button')[1]);
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SBT_PAGE_IMAGE).parentElement as HTMLElement);
+    fireEvent.error(screen.getByTestId(E2E_TESTIDS.SBT_PAGE_IMAGE));
 
     expect(onBookmark).toHaveBeenCalledTimes(1);
     expect(onContractCopy).toHaveBeenCalledTimes(1);
+    expect(onImageError).toHaveBeenCalledTimes(1);
     expect(onImageOpen).toHaveBeenCalledTimes(1);
   });
 

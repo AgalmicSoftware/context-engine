@@ -1,7 +1,5 @@
-import type {
-  CompiledSessionModeProfile,
-  SessionModeProfile,
-} from '../../utilities/session/sessionModeProfile';
+import type { SessionModeProfile } from '../../utilities/session/sessionModeProfile';
+import type { UnknownRecord } from '../../utilities/session/sessionTypes';
 import SessionModeProfileField from './SessionModeProfileField';
 
 export type SessionWizardSessionModeProfileControlProps = {

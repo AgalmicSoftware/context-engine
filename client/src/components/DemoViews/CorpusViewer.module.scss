@@ -7,17 +7,22 @@ $text: var(--ce-panel-text);
 
 .container {
   background: $surface;
+  box-sizing: border-box;
   border: 1px solid $card-border;
   border-radius: var(--ce-radius-12);
   color: $text;
+  max-width: 100%;
   overflow: hidden;
   padding: 16px;
+  width: 100%;
 }
 
 .tabBar {
+  box-sizing: border-box;
   display: flex;
   gap: 8px;
   margin-bottom: 10px;
+  max-width: 100%;
   overflow-x: auto;
   scroll-padding-inline: 4px;
   scroll-snap-type: x proximity;
@@ -59,7 +64,7 @@ $text: var(--ce-panel-text);
 .tabIcon {
   color: $muted;
   display: inline-flex;
-  font-size: 20px;
+  font-size: 24px;
 }
 
 .tabIconActive {
@@ -76,9 +81,18 @@ $text: var(--ce-panel-text);
 
 .sectionBlock {
   display: flex;
+  flex-direction: column;
+  gap: 8px;
   justify-content: flex-start;
   margin-bottom: 14px;
   padding-left: 4px;
+}
+
+.sectionActionRow {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .sectionHeader {
@@ -94,13 +108,16 @@ $text: var(--ce-panel-text);
 }
 
 .githubLink {
+  appearance: none;
   align-items: center;
   background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
   box-sizing: border-box;
   border: 1px solid $card-border;
   border-radius: var(--ce-radius-pill);
   color: $text;
+  cursor: pointer;
   display: inline-flex;
+  font: inherit;
   font-size: 12px;
   font-weight: 600;
   gap: 6px;
@@ -146,7 +163,7 @@ $text: var(--ce-panel-text);
   border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
   border-radius: var(--ce-radius-14);
   margin-bottom: 0;
-  padding: 10px 12px 4px;
+  padding: 4px 4px 0;
 }
 
 .policySplitLayout {
@@ -203,7 +220,7 @@ $text: var(--ce-panel-text);
   color: $muted;
   font-size: 11px;
   line-height: 1.45;
-  margin-top: 8px;
+  margin-top: 6px;
 }
 
 .policyMapHeader {
@@ -264,18 +281,25 @@ $text: var(--ce-panel-text);
 }
 
 .scrollArea {
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 12px;
   max-height: 560px;
+  max-width: 100%;
   min-width: 0;
   overflow-y: auto;
   padding-right: 4px;
+  width: 100%;
 }
 
 .entriesCollection {
+  box-sizing: border-box;
   display: grid;
   gap: 12px;
+  max-width: 100%;
+  min-width: 0;
+  width: 100%;
 }
 
 .entriesCollectionHalf {
@@ -338,11 +362,13 @@ $text: var(--ce-panel-text);
 .card {
   background: $card;
   border: 1px solid $card-border;
+  box-sizing: border-box;
   border-radius: var(--ce-radius-8);
   color: $text;
   display: block;
   min-width: 0;
   padding: 16px;
+  width: 100%;
 }
 
 .tweetCard {
@@ -494,7 +520,10 @@ $text: var(--ce-panel-text);
   display: inline-flex;
   font-size: 11px;
   line-height: 1.4;
+  max-width: 100%;
   padding: 2px 8px;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .pillButton {
@@ -520,9 +549,12 @@ $text: var(--ce-panel-text);
 }
 
 .pillRow {
+  box-sizing: border-box;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .tweetTags {
@@ -699,25 +731,42 @@ $text: var(--ce-panel-text);
   gap: 16px;
   justify-content: space-between;
   margin-top: 12px;
+  max-width: 100%;
   padding-top: 12px;
+  width: 100%;
 }
 
 .cardFooter {
   align-items: flex-start;
+  box-sizing: border-box;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
   justify-content: space-between;
   margin-top: 12px;
+  max-width: 100%;
+  width: 100%;
 }
 
 .cardFooterLinks {
   align-items: center;
+  box-sizing: border-box;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
+  max-width: 100%;
   min-width: 0;
+  width: 100%;
+}
+
+.tweetActionRow {
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.tweetActionRow .externalLink {
+  margin-left: auto;
 }
 
 .cardFooter:empty,
@@ -727,9 +776,12 @@ $text: var(--ce-panel-text);
 }
 
 .engagementRow {
+  box-sizing: border-box;
   display: flex;
   flex-wrap: wrap;
   gap: 20px;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .entryTitle {
@@ -1150,53 +1202,6 @@ $text: var(--ce-panel-text);
   padding: 12px 12px 10px;
 }
 
-.tagModal {
-  max-width: min(1180px, calc(100vw - 32px));
-  margin: 24px auto;
-}
-
-.tagModal :global(.modal-content) {
-  background:
-    radial-gradient(circle at top right, rgba(77, 255, 164, 0.08), transparent 32%),
-    linear-gradient(180deg, rgba(12, 18, 34, 0.98), rgba(8, 12, 24, 0.98));
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 18px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
-  color: $text;
-  overflow: hidden;
-}
-
-.tagModal :global(.modal-header) {
-  align-items: center;
-  background: rgba(255, 255, 255, 0.03);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  color: $text;
-  padding: 18px 20px;
-}
-
-.tagModal :global(.modal-title) {
-  color: $text;
-  font-size: 15px;
-  font-weight: 700;
-}
-
-.tagModal :global(.modal-body) {
-  background: transparent;
-  padding: 20px;
-}
-
-.tagModal :global(.close) {
-  color: $text;
-  opacity: 0.72;
-  text-shadow: none;
-}
-
-.tagModal :global(.close:hover),
-.tagModal :global(.close:focus) {
-  color: $accent;
-  opacity: 1;
-}
-
 .debateMapHeader {
   align-items: center;
   display: flex;
@@ -1224,15 +1229,21 @@ $text: var(--ce-panel-text);
 }
 
 .debateMapFooter {
+  box-sizing: border-box;
+  max-width: 100%;
   min-width: 0;
+  width: 100%;
 }
 
 .debateMapFooterLinks {
   align-items: center;
+  box-sizing: border-box;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  max-width: 100%;
   min-width: 0;
+  width: 100%;
 }
 
 .debateMapLink {
@@ -1252,6 +1263,11 @@ $text: var(--ce-panel-text);
   padding: 5px 9px;
   text-decoration: none;
   white-space: normal;
+}
+
+.debateMapIcon {
+  flex-shrink: 0;
+  font-size: 0.8rem;
 }
 
 .debateMapLinkButton {
@@ -1324,32 +1340,39 @@ $text: var(--ce-panel-text);
 
 @media (max-width: 720px) {
   .container {
-    border-radius: var(--ce-radius-10);
-    padding: 12px;
+    border-radius: var(--ce-radius-12);
+    padding: 10px;
   }
 
   .tabBar {
+    display: grid;
     gap: 10px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     margin-bottom: 12px;
+    overflow: visible;
+    padding-inline: 0;
     padding-bottom: 8px;
+    scroll-snap-type: none;
   }
 
   .tabButton {
     align-items: flex-start;
     flex-direction: column;
-    gap: 10px;
-    max-width: 144px;
-    min-width: 112px;
-    padding: 12px 12px 14px;
+    gap: 8px;
+    max-width: none;
+    min-height: 104px;
+    min-width: 0;
+    padding: 12px 12px 13px;
+    width: 100%;
   }
 
   .tabIcon {
-    font-size: 18px;
+    font-size: 28px;
   }
 
   .tabLabel {
-    font-size: 14px;
-    line-height: 1.25;
+    font-size: 18px;
+    line-height: 1.18;
     white-space: normal;
   }
 
@@ -1371,16 +1394,24 @@ $text: var(--ce-panel-text);
   }
 
   .policySplitLayout {
-    gap: 14px;
+    gap: 10px;
+  }
+
+  .policyMapColumn {
+    order: -1;
+  }
+
+  .policyListColumn {
+    order: 1;
   }
 
   .policyListHeader,
   .policyMapPanel {
-    padding: 12px;
+    padding: 8px;
   }
 
   .policyMapLens {
-    padding: 8px 8px 2px;
+    padding: 0;
   }
 
   .card,
@@ -1395,9 +1426,11 @@ $text: var(--ce-panel-text);
     gap: 10px;
   }
 
-  .tweetAuthorRow {
-    flex-wrap: wrap;
+  .tweetCard .tweetAuthorRow {
+    align-items: start;
+    display: grid;
     gap: 10px;
+    grid-template-columns: 44px minmax(0, 1fr);
   }
 
   .tweetAuthorMeta,
@@ -1405,18 +1438,47 @@ $text: var(--ce-panel-text);
     min-width: 0;
   }
 
+  .tweetCard .tweetAvatar {
+    grid-row: 1 / span 2;
+  }
+
+  .tweetCard .tweetAuthorMeta,
+  .tweetCard .tweetAuthorNames {
+    min-width: 0;
+  }
+
+  .tweetCard .tweetAuthorNames {
+    gap: 4px 6px;
+  }
+
   .tweetDate {
-    margin-left: 58px;
+    grid-column: 2;
+    margin-left: 0;
     padding-top: 0;
     text-align: left;
     white-space: normal;
-    width: calc(100% - 58px);
+    width: auto;
   }
 
   .tweetBody,
   .entrySummary {
     font-size: 15px;
     line-height: 1.65;
+  }
+
+  .entryTitle,
+  .arxivTitle,
+  .insiderName,
+  .insiderRole,
+  .insiderInterviewer,
+  .entryMeta,
+  .entrySummary,
+  .arxivAuthors,
+  .arxivDate,
+  .tweetName,
+  .tweetHandle,
+  .tweetDate {
+    overflow-wrap: anywhere;
   }
 
   .entryMeta,
@@ -1432,8 +1494,13 @@ $text: var(--ce-panel-text);
     gap: 4px;
   }
 
+  .arxivDate {
+    white-space: normal;
+  }
+
   .entryMediaBlock {
     margin-bottom: 14px;
+    width: 100%;
   }
 
   .entryMediaImage {
@@ -1450,26 +1517,90 @@ $text: var(--ce-panel-text);
     padding: 4px 10px;
   }
 
+  .pillRow {
+    gap: 8px;
+    width: 100%;
+  }
+
+  .tweetEngagement {
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .engagementRow {
+    gap: 12px;
+    justify-content: space-between;
+    width: 100%;
+  }
+
   .cardFooter,
   .cardFooterLinks,
+  .debateMapFooter,
   .debateMapFooterLinks {
     align-items: stretch;
     justify-content: flex-start;
     width: 100%;
   }
 
+  .cardFooter {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .cardFooterLinks,
+  .debateMapFooterLinks {
+    gap: 10px;
+  }
+
+  .tweetActionRow {
+    align-items: stretch;
+  }
+
+  .tweetActionRow .externalLink {
+    margin-left: 0;
+  }
+
+  .tweetPreviewControl {
+    margin-top: 2px;
+  }
+
   .debateMapLink,
   .externalLink {
+    align-items: flex-start;
+    flex: 1 1 100%;
+    justify-content: flex-start;
     min-height: 42px;
-    padding: 8px 12px;
+    overflow-wrap: anywhere;
+    padding: 9px 12px;
+    width: 100%;
+  }
+
+  .externalLink span {
+    min-width: 0;
   }
 }
 
 @media (max-width: 480px) {
+  .container {
+    padding: 8px;
+  }
+
+  .tabBar {
+    gap: 8px;
+  }
+
   .tabButton {
-    max-width: 132px;
-    min-width: 106px;
-    padding: 11px 11px 13px;
+    min-height: 96px;
+    padding: 11px 10px 12px;
+  }
+
+  .tabIcon {
+    font-size: 26px;
+  }
+
+  .tabLabel {
+    font-size: 17px;
+    line-height: 1.16;
   }
 
   .policyListTitle,
@@ -1477,20 +1608,33 @@ $text: var(--ce-panel-text);
     font-size: 16px;
   }
 
-  .tweetAvatar {
-    flex-basis: 44px;
-    font-size: 17px;
-    height: 44px;
-    width: 44px;
+  .card,
+  .tweetCard {
+    padding: 12px;
   }
 
-  .tweetDate {
-    margin-left: 54px;
-    width: calc(100% - 54px);
+  .tweetCard .tweetAuthorRow {
+    grid-template-columns: 40px minmax(0, 1fr);
+  }
+
+  .tweetAvatar {
+    flex-basis: 40px;
+    font-size: 16px;
+    height: 40px;
+    width: 40px;
   }
 
   .externalIconLink {
-    height: 42px;
-    width: 42px;
+    height: 40px;
+    width: 40px;
+  }
+
+  .tweetPreviewControl {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .tweetPreviewButton {
+    width: 100%;
   }
 }

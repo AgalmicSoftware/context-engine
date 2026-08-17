@@ -128,6 +128,12 @@ const TagModalComponent = TagModal as React.ComponentType<any>;
 const buildTagInterpretationPromptAny = buildTagInterpretationPrompt as any;
 let queryClient: QueryClient;
 
+const AppQueryProvider = ({ children }: { children: React.ReactNode }) => {
+  const client = queryClient;
+  React.useEffect(() => installSessionRegistryQueryInvalidation(client), [client]);
+  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+};
+
 describe('tag AI cache helpers', () => {
   it('refreshes cache recency when reading an existing interpretation', () => {
     const cache = new Map([
@@ -272,11 +278,13 @@ const renderTagPage = ({
   tagPageProps = {},
 }: Record<string, any> = {}) =>
   render(
-    <Provider store={createTagPageStore(sessionState)}>
-      <MemoryRouter initialEntries={[entry]}>
-        <TagPageComponent questionResponsesNonce={0} isQuestionCacheReady={isQuestionCacheReady} {...tagPageProps} />
-      </MemoryRouter>
-    </Provider>,
+    <AppQueryProvider>
+      <Provider store={createTagPageStore(sessionState)}>
+        <MemoryRouter initialEntries={[entry]}>
+          <TagPageComponent questionResponsesNonce={0} isQuestionCacheReady={isQuestionCacheReady} {...tagPageProps} />
+        </MemoryRouter>
+      </Provider>
+    </AppQueryProvider>,
   );
 
 const renderTagModal = ({
@@ -289,17 +297,19 @@ const renderTagModal = ({
   toggle = jest.fn(),
 }: Record<string, any> = {}) =>
   render(
-    <Provider store={createTagPageStore(sessionState)}>
-      <MemoryRouter initialEntries={[entry]}>
-        <TagModalComponent
-          isOpen={isOpen}
-          toggle={toggle}
-          activeTag={activeTag}
-          demoCorpusMode={demoCorpusMode}
-          demoCorpusRecords={demoCorpusRecordsOverride}
-        />
-      </MemoryRouter>
-    </Provider>,
+    <AppQueryProvider>
+      <Provider store={createTagPageStore(sessionState)}>
+        <MemoryRouter initialEntries={[entry]}>
+          <TagModalComponent
+            isOpen={isOpen}
+            toggle={toggle}
+            activeTag={activeTag}
+            demoCorpusMode={demoCorpusMode}
+            demoCorpusRecords={demoCorpusRecordsOverride}
+          />
+        </MemoryRouter>
+      </Provider>
+    </AppQueryProvider>,
   );
 
 describe('TagPage', () => {
@@ -1067,7 +1077,9 @@ describe('TagModal', () => {
     expect(
       screen.getByText(/demo corpus mode uses the demo corpus records currently loaded in this view/i),
     ).toBeInTheDocument();
-    expect(screen.getByText(/session scope: edge/i)).toBeInTheDocument();
+    expect(screen.getByText(/session scope: Registry Edge \(edge\)/i)).toBeInTheDocument();
+    expect(mockPortGetAllSessionSlugs).not.toHaveBeenCalled();
+    expect(mockPortGetSessionConfigBySlug).toHaveBeenCalledWith('edge');
     expect(screen.queryByTestId('ce-tag-page-session-selector-toggle')).not.toBeInTheDocument();
   });
 
@@ -1101,17 +1113,19 @@ describe('TagModal', () => {
     scrollArea.scrollTop = 240;
 
     rerender(
-      <Provider store={createTagPageStore({})}>
-        <MemoryRouter initialEntries={['/demo/corpus-viewer']}>
-          <TagModalComponent
-            isOpen={true}
-            toggle={toggle}
-            activeTag="Open Source"
-            demoCorpusMode={false}
-            demoCorpusRecords={[]}
-          />
-        </MemoryRouter>
-      </Provider>,
+      <AppQueryProvider>
+        <Provider store={createTagPageStore({})}>
+          <MemoryRouter initialEntries={['/demo/corpus-viewer']}>
+            <TagModalComponent
+              isOpen={true}
+              toggle={toggle}
+              activeTag="Open Source"
+              demoCorpusMode={false}
+              demoCorpusRecords={[]}
+            />
+          </MemoryRouter>
+        </Provider>
+      </AppQueryProvider>,
     );
 
     expect(screen.getByRole('heading', { name: '#Open Source' })).toBeInTheDocument();

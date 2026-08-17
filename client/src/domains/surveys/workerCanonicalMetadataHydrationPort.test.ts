@@ -214,21 +214,24 @@ describe('workerCanonicalMetadataHydrationPort', () => {
       cursor: null,
       listComplete: true,
     });
-    const readSessionStorageBlob = jest.fn(async ({ storageRef }: any) => ({
-      json: async () =>
-        storageRef.id === 'legacy-question'
-          ? {
-              id: '0xlegacyquestion',
-              prompt: 'Legacy Worker question',
-              sessionSlug: 'worker-session',
-            }
-          : {
-              id: '0xmalformedsessionquestion',
-              prompt: 'Malformed session question',
-              sessionId: 'not-a-session-id',
-              sessionSlug: 'worker-session',
-            },
-    }));
+    const readSessionStorageBlob = jest.fn(
+      async ({ storageRef }: any) =>
+        ({
+          json: async () =>
+            storageRef.id === 'legacy-question'
+              ? {
+                  id: '0xlegacyquestion',
+                  prompt: 'Legacy Worker question',
+                  sessionSlug: 'worker-session',
+                }
+              : {
+                  id: '0xmalformedsessionquestion',
+                  prompt: 'Malformed session question',
+                  sessionId: 'not-a-session-id',
+                  sessionSlug: 'worker-session',
+                },
+        }) as Response,
+    );
 
     const rows = await loadWorkerCanonicalQuestions(
       {

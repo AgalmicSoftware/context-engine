@@ -551,40 +551,6 @@ $modal-muted: var(--ce-panel-text-muted);
   line-height: 1.2;
 }
 
-.featureHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 8px;
-  flex-wrap: wrap;
-
-  .featureLabel {
-    margin: 0;
-  }
-}
-
-.featureStatusComplete {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.36rem 0.72rem;
-  border-radius: 999px;
-  border: 1px solid rgba(77, 255, 164, 0.34);
-  background: rgba(77, 255, 164, 0.12);
-  color: rgba(184, 255, 221, 0.98);
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-
-  &::before {
-    content: '\2713';
-    font-size: 0.9em;
-    line-height: 1;
-  }
-}
-
 .featureText {
   display: block;
   color: color-mix(in srgb, var(--ce-control-text) 84%, transparent);
@@ -593,12 +559,12 @@ $modal-muted: var(--ce-panel-text-muted);
   line-height: 1.65;
 }
 
-.roadmapSubList {
+.roadmapSectionList {
   list-style: none;
-  margin: 0.9rem 0 0;
   padding: 0;
   display: grid;
-  gap: 0.7rem;
+  gap: 0;
+  margin: 0;
 }
 
 .roadmapSectionItem {
@@ -1416,8 +1382,12 @@ $modal-muted: var(--ce-panel-text-muted);
     font-size: 1.02rem;
   }
 
-  .featureStatusComplete {
-    font-size: 0.72rem;
+  .roadmapCategory {
+    font-size: 0.94rem;
+  }
+
+  .roadmapChecklistItem {
+    font-size: 0.94rem;
   }
 
   .featureText {

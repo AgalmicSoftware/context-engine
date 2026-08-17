@@ -65,13 +65,18 @@ const MultichoiceQuestionInput = ({
           <Label
             check
             key={`${optionLabel}-${optionIndex}`}
-            className={`${styles.checkboxOptionText} ${isSelected ? styles.selected : ''}`}
+            className={buildMultichoiceOptionClassName({
+              baseClassName: styles.checkboxOptionText,
+              isSelected,
+              selectedClassName: styles.selected,
+            })}
           >
             <Input
               type="checkbox"
               name={`question-${questionId}`}
               value={optionLabel}
               onChange={(event) => {
+                if (disabled) return;
                 const checked = !!event.target.checked;
                 let nextValues: unknown[] = [];
 

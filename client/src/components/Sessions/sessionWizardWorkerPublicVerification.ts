@@ -65,10 +65,7 @@ export const verifySessionWizardWorkerPublicDeployment = async ({
   if (allowedOrigins.some((origin) => origin.includes('*'))) {
     throw new Error('Prepared Worker config must use exact browser origins; wildcards are not supported.');
   }
-  if (
-    !allowedOrigins.length ||
-    (expectedBrowserOrigin && !allowedOrigins.includes(expectedBrowserOrigin))
-  ) {
+  if (!allowedOrigins.length || (expectedBrowserOrigin && !allowedOrigins.includes(expectedBrowserOrigin))) {
     throw new Error('Prepared Worker config must allow the current browser origin.');
   }
 
@@ -94,7 +91,9 @@ export const verifySessionWizardWorkerPublicDeployment = async ({
   if (normalizeSlug(publicConfig.slug || publicConfig.sessionSlug) !== normalizedSlug) {
     throw new Error('Prepared Worker config does not match the exact session slug.');
   }
-  if (normalizeWorkerCanonicalSessionIdHex(publicConfig.sessionIdHex || publicConfig.sessionId) !== normalizedSessionId) {
+  if (
+    normalizeWorkerCanonicalSessionIdHex(publicConfig.sessionIdHex || publicConfig.sessionId) !== normalizedSessionId
+  ) {
     throw new Error('Prepared Worker config does not match the exact session ID.');
   }
   if (normalizeAdminAddress(publicConfig.adminAddress) !== normalizedAdminAddress) {

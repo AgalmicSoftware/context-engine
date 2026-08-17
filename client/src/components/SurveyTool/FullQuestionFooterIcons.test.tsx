@@ -1,6 +1,10 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import FullQuestionFooterIcons from './FullQuestionFooterIcons';
+import FullQuestionFooterIcons, {
+  buildFullQuestionCommentButtonClassName,
+  resolveFullQuestionCommentIconClassName,
+} from './FullQuestionFooterIcons';
+import styles from './SurveyTool.module.scss';
 
 describe('FullQuestionFooterIcons', () => {
   it('builds inactive and active comment button classes', () => {

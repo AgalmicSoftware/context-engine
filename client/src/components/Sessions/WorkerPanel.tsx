@@ -29,7 +29,6 @@ type DeployForm = {
   workerName?: string;
   bundleUrl?: string;
   apiToken?: string;
-  accountId?: string;
   adminAddress?: string;
 };
 

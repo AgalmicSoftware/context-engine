@@ -13,23 +13,10 @@ jest.mock(
   { virtual: true },
 );
 
-jest.mock(
-  '../../utilities/ui/uiRuntimeStats.js',
-  () => ({
-    __esModule: true,
-    recordCeRuntimeCacheEvent: jest.fn(),
-  }),
-  { virtual: true },
-);
-
-jest.mock(
-  '../../utilities/web3/contractScripts.js',
-  () => ({
-    __esModule: true,
-    normalizeSessionSlug: jest.fn(),
-  }),
-  { virtual: true },
-);
+jest.mock('../../utilities/web3/chainGateway', () => ({
+  __esModule: true,
+  normalizeSessionSlug: jest.fn(),
+}));
 
 const { createSessionCacheReadinessController } = require('./sessionCacheReadinessController.js');
 const {
@@ -135,6 +122,8 @@ describe('createSessionCacheReadinessController', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    stopCeRuntimeStats();
+    resetCeRuntimeStats();
     contractScriptsModule.normalizeSessionSlug.mockImplementation((slug) =>
       String(slug || '')
         .trim()

@@ -2,31 +2,15 @@
 
 import React from 'react';
 import { connect } from 'react-redux';
-import { FormGroup, Label, Input, Button, Modal, ModalHeader, ModalBody, ModalFooter } from 'reactstrap';
+import { Button, Modal, ModalHeader, ModalBody, ModalFooter } from 'reactstrap';
 import styles from './QuestionFilter.module.scss';
-import SBTFilter from '../SBTs/SBTFilter';
 import GateTooltip from '../Gates/GateTooltip';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faFilter,
-  faChevronDown,
-  faStar,
-  faRobot,
-  faSpinner,
-  faLock,
-  faTimes,
-  faClipboard,
-  faBookmark,
-  faCheck,
-  faQuestionCircle,
-  faPlus,
-} from '@fortawesome/free-solid-svg-icons';
+import { faSpinner, faLock, faPlus } from '@fortawesome/free-solid-svg-icons';
 import { serializeFilterState, deserializeFilterStateStrict } from '../../utilities/survey/filterStateUtils.js';
 import { isFreeformBlankAnswer } from '../../utilities/survey/freeformAnswerUtils.js';
 import { toStr } from '../../utilities/shared/primitives.js';
-
-import AudioInput from '../Shared/AudioInput/AudioInput';
-import { rankQuestionsAI } from '../../utilities/ai/aiScripts.js';
+import { rankQuestionsAI } from '../../utilities/ai/aiClient.js';
 import { getLocalAiSettings } from '../../utilities/ai/aiSettings.js';
 import { resolveEncryptionGate } from '../../utilities/crypto/encryptionGates.js';
 import {
@@ -153,7 +137,7 @@ import {
   normalizeNonceKey,
   stableSerializeSmallObject,
   toLowerId,
-} from './questionFilterHelpers.js';
+} from './questionFilterSignatureHelpers.js';
 export {
   QUESTION_FILTER_ACTIONS_STYLE,
   QUESTION_FILTER_BOOKMARK_FEEDBACK_STYLE,
@@ -178,234 +162,6 @@ export {
 } from './questionFilterDisplayHelpers';
 
 const questionFilterLog = createLogger('questionFilter');
-const FILTER_STORAGE_KEY_PREFIX = 'dg:filters:';
-type UnknownRecord = Record<string, unknown>;
-type QuestionFilterMutableStatePatch = Record<string, unknown>;
-type QuestionFilterBookmarkCache = Record<string, unknown> & {
-  bookmarkedFilters?: unknown[];
-  filters?: unknown[];
-};
-type QuestionFilterResponsesByQuestion = Record<string, unknown>;
-type QuestionFilterWriteCache = (
-  namespace: string,
-  slug: string | undefined,
-  value: unknown,
-) => boolean | Promise<boolean>;
-type QuestionFilterSessionProps = UnknownRecord & {
-  account?: string;
-  activeSessionSlug?: unknown;
-  network?: {
-    id?: unknown;
-    [key: string]: unknown;
-  } | null;
-  provider?: unknown;
-  sessionConfig?: unknown;
-  sessionSlug?: unknown;
-  ensureLightSbtUniverse?: unknown;
-  storageKeyPrefix?: unknown;
-};
-type QuestionFilterAiRequestOptions = {
-  sessionSlug: string;
-  sessionConfig: UnknownRecord;
-  context: {
-    account: string;
-    providerLike?: unknown;
-    chainId: unknown;
-  };
-};
-type QuestionFilterAiProviderSettings = {
-  apiKey?: unknown;
-  encryptedApiKey?: unknown;
-};
-type QuestionFilterQuestionRecord = UnknownRecord & {
-  id?: unknown;
-  tags?: unknown;
-  type?: unknown;
-};
-type QuestionFilterResponseStats = {
-  responseCount: number;
-  totalImportance: number;
-};
-type QuestionFilterResponseStatsMemo = {
-  relevantResponsesRef: unknown;
-  mergedQuestionsRef: unknown;
-  questionResponsesNonceKey: unknown;
-  questionsCacheNonceKey: unknown;
-  result: Map<string, QuestionFilterResponseStats>;
-};
-type QuestionFilterPipelineResult = {
-  finalQuestions: QuestionFilterQuestionRecord[];
-  count: number;
-};
-type QuestionFilterPipelineMemo = {
-  usePendingState: boolean;
-  mergedQuestionsRef: unknown;
-  relevantResponsesRef: unknown;
-  selectedTypesRef: unknown;
-  sortByImportance: unknown;
-  sbtFilteredQuestionsRef: unknown;
-  showTopQuestions: unknown;
-  topQuestionsCount: unknown;
-  showTopQuestionsByResponses: unknown;
-  selectedTagsRef: unknown;
-  filterByResponded: unknown;
-  filterByNotResponded: unknown;
-  aiSearchQuery: string;
-  aiFilterApplied: boolean;
-  aiAppliedTopN: number;
-  aiCombineWithOtherFilters: boolean;
-  aiRankedIdsSignature: string;
-  questionResponsesNonceKey: unknown;
-  questionsCacheNonceKey: unknown;
-  result: QuestionFilterPipelineResult;
-};
-type QuestionFilterRankedQuestion = [QuestionFilterQuestionRecord, number, number];
-type QuestionFilterSerializableState = Record<string, unknown> & {
-  sbtFilter?: unknown;
-};
-type QuestionFilterQuestionsCacheNet = UnknownRecord & {
-  questions?: Record<string, QuestionFilterQuestionRecord | null | undefined>;
-};
-type QuestionFilterAiApplySignatureArgs = {
-  stateIn?: unknown;
-  propsIn?: QuestionFilterSessionProps;
-  queryOverride?: unknown;
-  candidateQuestions?: unknown;
-};
-type QuestionFilterAiApplyOptions = {
-  auto?: boolean;
-  queryOverride?: unknown;
-  source?: unknown;
-  topNOverride?: unknown;
-};
-type QuestionFilterPersistenceProps = QuestionFilterSessionProps & {
-  defaultFilterState?: unknown;
-  enableLocalStorage?: unknown;
-  filterState?: unknown;
-  filterType?: unknown;
-};
-type QuestionFilterStateArg = {
-  stateIn?: unknown;
-};
-type QuestionFilterResponseDrivenStateArgs = QuestionFilterStateArg & {
-  usePendingState?: boolean;
-};
-type QuestionFilterInputChangeEvent =
-  | {
-      target?: {
-        checked?: unknown;
-        value?: unknown;
-      } | null;
-    }
-  | null
-  | undefined;
-type QuestionFilterLoadStateOptions = {
-  resetIfMissing?: boolean;
-};
-type QuestionFilterRequiredValueEvent = {
-  target: {
-    value: unknown;
-  };
-};
-type QuestionFilterSbtSummaryEntry = {
-  address?: unknown;
-  name?: unknown;
-};
-type QuestionFilterSbtSummaryState = Record<string, unknown> & {
-  excludedSBTGroups?: unknown[];
-  excludedSBTGroupsCreator?: unknown[];
-  excludedSBTGroupsResponder?: unknown[];
-  selectedSBTGroups?: unknown[];
-  selectedSBTGroupsCreator?: unknown[];
-  selectedSBTGroupsResponder?: unknown[];
-};
-type QuestionFilterSummaryItem = {
-  label: string;
-  onRemove: () => void;
-  type: string;
-};
-type QuestionFilterAiAccessState = {
-  enabled: boolean;
-  sponsoredAvailable: boolean;
-  localKeyAvailable: boolean;
-  sponsoredStatus: string;
-};
-type QuestionFilterGateTooltipProps = {
-  gateId: string | null;
-  gateConfig: React.ComponentProps<typeof GateTooltip>['gateConfig'];
-  mode: string;
-  sbtAddresses: string[];
-} | null;
-type QuestionFilterStateRecord = UnknownRecord & {
-  aiAppliedTopN?: number | null;
-  aiRankingCount?: number;
-  expandedSections: Record<string, boolean>;
-  topQuestionsCount?: number;
-};
-const toUnknownRecord = (value: unknown): UnknownRecord =>
-  value && typeof value === 'object' ? (value as UnknownRecord) : {};
-const getErrorMessage = (error: unknown, fallback = 'Unknown error') => {
-  const message =
-    error && typeof error === 'object' && 'message' in error ? (error as { message?: unknown }).message : '';
-  return typeof message === 'string' && message.trim() ? message : fallback;
-};
-const getEncryptedQuestionCount = (questions: unknown): number =>
-  (Array.isArray(questions) ? questions : []).filter(
-    (question: { prompt?: unknown }) => String(question?.prompt || '').trim() === '[encrypted]',
-  ).length;
-
-/**
- * This component provides the UI and logic for filtering questions based on type, tags,
- * SBT ownership (creator or responder), popularity, and (when enabled) AI search/ranking.
- *
- * The AI-based filter is currently placed at the top but disabled so it cannot be used.
- * A summary of selected filters is displayed at the top, allowing removal of each filter item by clicking.
- */
-const DEFAULT_TOP_QUESTIONS_COUNT = 10;
-const DEFAULT_AI_TOP_N = 10;
-const QUESTION_FILTER_RESPONSE_PARSE_MEMO_MAX = 500;
-const EMPTY_FILTER_RESPONSES = Object.freeze({});
-
-const modalStyles = {
-  backgroundColor: 'white',
-  fontSize: '16px',
-};
-
-/* ---------------------------------------------------------------------------
- * Group-aware helpers (file-local, minimal surface)
- * -------------------------------------------------------------------------*/
-
-/** Resolve effective session slug:
- * Priority: URL /session/:slug → Redux activeSessionSlug → props.sessionSlug → '' (general)
- */
-function resolveEffectiveSlug(props: QuestionFilterSessionProps = {}) {
-  return resolveQuestionFilterEffectiveSlug({
-    pathname: (typeof window !== 'undefined' && window.location?.pathname) || '',
-    activeSessionSlug: props.activeSessionSlug,
-    sessionSlug: props.sessionSlug,
-  });
-}
-
-function resolveEffectiveSessionContext(props: QuestionFilterSessionProps = {}) {
-  return resolveQuestionFilterSessionContext({
-    pathname: (typeof window !== 'undefined' && window.location?.pathname) || '',
-    activeSessionSlug: props.activeSessionSlug,
-    sessionSlug: props.sessionSlug,
-    resolveBySlug: getSessionConfigBySlug,
-  });
-}
-
-function resolveFilterStorageSlug(props: QuestionFilterSessionProps = {}) {
-  const prefix = String(props?.storageKeyPrefix || '').trim();
-  if (prefix.startsWith(FILTER_STORAGE_KEY_PREFIX)) {
-    return prefix.slice(FILTER_STORAGE_KEY_PREFIX.length);
-  }
-  return resolveEffectiveSlug(props);
-}
-
-const readQuestionsCacheSync = (slug: string | undefined) =>
-  peekCacheSync('questionsCache', slug, { clone: false }) || {};
-
 let QUESTION_FILTER_INSTANCE_SEQ = 0;
 
 export { shouldEnableQuestionFilterSbt };
@@ -1269,7 +1025,7 @@ class QuestionFilter extends React.Component<any, any> {
     }
 
     const slug = resolveFilterStorageSlug(this.props);
-    let bookmarksCacheObject = {};
+    let bookmarksCacheObject: QuestionFilterBookmarkCache = {};
 
     try {
       const parsedCache = peekCacheSync('filters', slug, { clone: false });
@@ -2393,7 +2149,7 @@ class QuestionFilter extends React.Component<any, any> {
     return isQuestionFilterStateDefault(filterStateToTest);
   };
 
-  handleCopyFilterUrl = () => {
+  handleCopyFilterUrl = (): void => {
     const { currentViewModeForUrl, currentSurveyIdForUrl } = this.props;
 
     // Validate context props
@@ -2984,88 +2740,6 @@ class QuestionFilter extends React.Component<any, any> {
   // ----------------------------------------------------------------------------------
   // RENDER
   // ----------------------------------------------------------------------------------
-  renderCollapsibleSection(
-    title: React.ReactNode,
-    sectionKey: string,
-    icon: React.ComponentProps<typeof FontAwesomeIcon>['icon'],
-    content: React.ReactNode,
-    disabled = false,
-    headerTestId = '',
-  ): JSX.Element {
-    const { expandedSections } = this.state;
-    const isOpen = expandedSections[sectionKey];
-    const clickable = !disabled;
-
-    return (
-      <div className={styles.filterSection}>
-        <div
-          className={styles.sectionHeader}
-          data-testid={headerTestId || undefined}
-          onClick={() => {
-            if (clickable) {
-              this.toggleSection(sectionKey);
-            }
-          }}
-          style={{ cursor: clickable ? 'pointer' : 'not-allowed', opacity: disabled ? 0.5 : 1 }}
-        >
-          <h3>
-            <FontAwesomeIcon icon={icon} className="me-2" />
-            {title}
-          </h3>
-          <FontAwesomeIcon icon={faChevronDown} className={buildQuestionFilterSectionIconClassName(styles, isOpen)} />
-        </div>
-        <div style={{ display: isOpen && !disabled ? 'block' : 'none' }}>
-          <div className={styles.sectionContent}>{content}</div>
-        </div>
-      </div>
-    );
-  }
-
-  renderFilterActionsIcons = () => {
-    const currentFilterStateForIcon = this.buildFilterState();
-    const isDefault = this.isFilterStateDefault(currentFilterStateForIcon);
-
-    return (
-      <span style={{ marginLeft: 'auto', paddingLeft: '15px', display: 'flex', alignItems: 'center' }}>
-        {/* Clear (X) Icon */}
-        <FontAwesomeIcon
-          icon={faTimes}
-          data-testid={E2E_TESTIDS.QUESTION_FILTER_CLEAR_ALL}
-          onClick={!isDefault ? this.handleClearFilters : undefined}
-          className={styles.clearFilterIcon}
-          title={isDefault ? 'No filters to clear' : 'Clear current filters'}
-          style={resolveQuestionFilterClearIconStyle(isDefault)}
-        />
-
-        {/* Copy URL Icon */}
-        <FontAwesomeIcon
-          icon={this.state.copiedUrlSuccess ? faCheck : faClipboard}
-          onClick={!isDefault && !this.state.copiedUrlSuccess ? this.handleCopyFilterUrl : undefined}
-          style={resolveQuestionFilterCopyIconStyle(isDefault, this.state.copiedUrlSuccess)}
-          title={
-            isDefault ? 'No custom filters to copy' : this.state.copiedUrlSuccess ? 'URL Copied!' : 'Copy Filter URL'
-          }
-        />
-        {/* Bookmark Icon */}
-        <FontAwesomeIcon
-          icon={faBookmark}
-          onClick={!isDefault ? this.handleBookmarkCurrentFilter : undefined}
-          style={resolveQuestionFilterBookmarkIconStyle(
-            isDefault,
-            this.state.isCurrentFilterBookmarked,
-            this.state.filterBookmarkedFeedback,
-          )}
-          title={isDefault ? 'No custom filters to bookmark' : 'Bookmark Current Filter'}
-        />
-        {/* Text feedback for bookmarking (if not using icon color change alone) */}
-        {this.state.filterBookmarkedFeedback &&
-          !this.state.copiedUrlSuccess && ( // Avoid overlap if both happen
-            <span style={QUESTION_FILTER_BOOKMARK_FEEDBACK_STYLE}>Filter Bookmarked!</span>
-          )}
-      </span>
-    );
-  };
-
   render() {
     const isInline = this.props.resultsMode;
     const {
@@ -3134,178 +2808,49 @@ class QuestionFilter extends React.Component<any, any> {
 
     const bodyContent = (
       <div>
-        {/* MOST POPULAR (Top X) */}
-        {this.renderCollapsibleSection(
-          'Most Popular',
-          'popular',
-          faStar,
-          <div>
-            <FormGroup>
-              <Label className={styles.filterOption}>
-                <Input
-                  type="checkbox"
-                  checked={pendingShowTopQuestions}
-                  onChange={() => this.toggleShowTopQuestions(false)}
-                  disabled={false}
-                />
-                Show top
-                <Input
-                  type="number"
-                  min="1"
-                  value={pendingTopQuestionsCount}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                    this.setState(
-                      buildQuestionFilterTopQuestionsCountPatch(e.target.value, DEFAULT_TOP_QUESTIONS_COUNT),
-                      () => {
-                        if (this.state.pendingShowTopQuestions || this.state.pendingShowTopQuestionsByResponses) {
-                          // Use this.state for check
-                          this.handleApplyFilters(true);
-                        }
-                      },
-                    );
-                  }}
-                  disabled={!pendingShowTopQuestions && !pendingShowTopQuestionsByResponses}
-                  id={styles.topQuestionsCountInput}
-                />
-                {/* questions (by total importance) */}
-                questions (by total conviction)
-              </Label>
-            </FormGroup>
-
-            <FormGroup>
-              <Label className={styles.filterOption}>
-                <Input
-                  type="checkbox"
-                  checked={pendingShowTopQuestionsByResponses}
-                  onChange={() => this.toggleShowTopQuestions(true)}
-                />
-                Show top
-                <Input
-                  type="number"
-                  min="1"
-                  value={pendingTopQuestionsCount}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                    this.setState(
-                      buildQuestionFilterTopQuestionsCountPatch(e.target.value, DEFAULT_TOP_QUESTIONS_COUNT),
-                      () => {
-                        if (this.state.pendingShowTopQuestions || this.state.pendingShowTopQuestionsByResponses) {
-                          // Use this.state for check
-                          this.handleApplyFilters(true);
-                        }
-                      },
-                    );
-                  }}
-                  disabled={!pendingShowTopQuestions && !pendingShowTopQuestionsByResponses}
-                  id={styles.topQuestionsCountInput}
-                />
-                questions (by # of responses)
-              </Label>
-            </FormGroup>
-            {(pendingShowTopQuestions || pendingShowTopQuestionsByResponses) && (
-              <small className="text-muted">This overrides other filters (type, tag, etc.)</small>
-            )}
-          </div>,
-        )}
+        <QuestionFilterTopQuestionsSection
+          expandedSections={expandedSections}
+          pendingShowTopQuestions={pendingShowTopQuestions}
+          pendingShowTopQuestionsByResponses={pendingShowTopQuestionsByResponses}
+          pendingTopQuestionsCount={pendingTopQuestionsCount}
+          onToggleSection={this.toggleSection}
+          onToggleShowTopQuestions={this.toggleShowTopQuestions}
+          onTopQuestionsCountChange={this.handleTopQuestionsCountChange}
+        />
 
         <div className={buildQuestionFilterDisabledSectionClassName(styles, isOtherFiltersDisabled)}>
-          {/* TAGS */}
-          {this.renderCollapsibleSection(
-            <>
-              Tags
-              <FontAwesomeIcon
-                icon={faQuestionCircle}
-                className={styles.tooltip}
-                id={this._tagsTooltipId}
-                onClick={(e: React.MouseEvent<SVGSVGElement>) => e.stopPropagation()}
-              />
-              <CETooltip
-                placement="right"
-                trigger="hover focus click"
-                target={this._tagsTooltipId}
-                className={styles.tooltipBubble}
-              >
-                Tags are for user filtering/search. Session default tag suggestions are fed into the AI tagger and do
-                not hide questions.
-              </CETooltip>
-            </>,
-            'tags',
-            faFilter,
-            isOtherFiltersDisabled ? (
-              <p className={styles.disabledText}>{otherFiltersDisabledReason}</p>
-            ) : (
-              (() => {
-                if (!tagsToDisplay.length) {
-                  return <p>No tags found in current questions.</p>;
-                }
-                return (
-                  <>
-                    <div className={styles.tagsContainer}>
-                      {tagsToDisplay.map((tag) => {
-                        const isSelected = selectedTags.includes(tag);
-                        return (
-                          <div
-                            key={tag}
-                            className={`${styles.tagBubble} ${
-                              isSelected ? styles.tagBubbleSelected : ''
-                            }`}
-                            onClick={() => this.handleTagSelection(tag)}
-                          >
-                            #{tag}
-                          </div>
-                        );
-                      })}
-                    </div>
-                    {allTags.length > 10 && (
-                      <Button color="link" onClick={this.toggleShowAllTags} className={styles.showMoreTagsButton}>
-                        {showAllTags ? 'Show Less' : 'Show More'}
-                      </Button>
-                    )}
-                  </>
-                );
-              })()
-            ),
-            isOtherFiltersDisabled, // Pass disabled state to the section itself
-          )}
+          <QuestionFilterTagsSection
+            allTagsCount={allTags.length}
+            disabled={isOtherFiltersDisabled}
+            disabledReason={otherFiltersDisabledReason}
+            expandedSections={expandedSections}
+            onTagSelection={this.handleTagSelection}
+            onToggleSection={this.toggleSection}
+            onToggleShowAllTags={this.toggleShowAllTags}
+            selectedTags={selectedTags}
+            showAllTags={showAllTags}
+            tagsToDisplay={tagsToDisplay}
+            tooltipId={this._tagsTooltipId}
+          />
 
-          {/* QUESTION TYPES */}
-          {this.renderCollapsibleSection(
-            'Question Types',
-            'types',
-            faFilter,
-            <div className={styles.questionTypeGrid}>
-              <button
-                type="button"
-                className={`${styles.typeButton} ${
-                  pendingSelectedTypes.includes('binary') ? styles.typeButtonActive : ''
-                }`}
-                onClick={() => this.handleTypeSelection('binary')}
-                disabled={isOtherFiltersDisabled}
-                aria-pressed={pendingSelectedTypes.includes('binary')}
-              >
-                <div className={styles.typeTitle}>Binary</div>
-                <div className={styles.typePreviewRow}>
-                  <span className={`${styles.typePill} ${styles.typePillAgree}`}>Agree</span>
-                  <span className={`${styles.typePill} ${styles.typePillUnsure}`}>Unsure</span>
-                  <span className={`${styles.typePill} ${styles.typePillDisagree}`}>Disagree</span>
-                </div>
-              </button>
+          <QuestionFilterQuestionTypesSection
+            disabled={isOtherFiltersDisabled}
+            expandedSections={expandedSections}
+            onToggleSection={this.toggleSection}
+            onTypeSelection={this.handleTypeSelection}
+            pendingSelectedTypes={pendingSelectedTypes}
+          />
 
-              <button
-                type="button"
-                className={`${styles.typeButton} ${
-                  pendingSelectedTypes.includes('multichoice') ? styles.typeButtonActive : ''
-                }`}
-                onClick={() => this.handleTypeSelection('multichoice')}
-                disabled={isOtherFiltersDisabled}
-                aria-pressed={pendingSelectedTypes.includes('multichoice')}
-              >
-                <div className={styles.typeTitle}>Multichoice</div>
-                <div className={styles.typePreviewRow}>
-                  <span className={styles.typePill}>Opt 1</span>
-                  <span className={styles.typePill}>Opt 2</span>
-                  <span className={styles.typePill}>Opt 3</span>
-                </div>
-              </button>
+          <QuestionFilterResponseStatusSection
+            disabled={isOtherFiltersDisabled}
+            expandedSections={expandedSections}
+            hasConnectedAccount={hasConnectedAccount}
+            onRespondedToggle={this.handleRespondedToggle}
+            onNotRespondedToggle={this.handleNotRespondedToggle}
+            onToggleSection={this.toggleSection}
+            filterByResponded={this.state.filterByResponded}
+            filterByNotResponded={this.state.filterByNotResponded}
+          />
 
           <QuestionFilterCapabilitySbtSection
             disabled={isOtherFiltersDisabled}
@@ -3314,196 +2859,29 @@ class QuestionFilter extends React.Component<any, any> {
             host={this}
           />
 
-              <button
-                type="button"
-                className={`${styles.typeButton} ${
-                  pendingSelectedTypes.includes('freeform') ? styles.typeButtonActive : ''
-                }`}
-                onClick={() => this.handleTypeSelection('freeform')}
-                disabled={isOtherFiltersDisabled}
-                aria-pressed={pendingSelectedTypes.includes('freeform')}
-              >
-                <div className={styles.typeTitle}>Freeform</div>
-                <div className={styles.freeformPreview}>...</div>
-              </button>
-            </div>,
-            isOtherFiltersDisabled,
-          )}
-
-          {hasConnectedAccount &&
-            this.renderCollapsibleSection(
-              'Response Status',
-              'responseStatus',
-              faCheck,
-              <FormGroup>
-                <Label className={styles.filterOption}>
-                  <Input
-                    type="checkbox"
-                    checked={this.state.filterByResponded}
-                    onChange={() =>
-                      this.setState(
-                        (prev: { filterByResponded?: unknown }) => ({ filterByResponded: !prev.filterByResponded }),
-                        () => {
-                          this.handleApplyFilters(true);
-                          this.queueCombinedAiRefreshIfNeeded('response-status-filter-change');
-                        },
-                      )
-                    }
-                    disabled={isOtherFiltersDisabled}
-                  />
-                  Responded
-                </Label>
-                <Label className={styles.filterOption}>
-                  <Input
-                    type="checkbox"
-                    checked={this.state.filterByNotResponded}
-                    onChange={() =>
-                      this.setState(
-                        (prev: { filterByNotResponded?: unknown }) => ({
-                          filterByNotResponded: !prev.filterByNotResponded,
-                        }),
-                        () => {
-                          this.handleApplyFilters(true);
-                          this.queueCombinedAiRefreshIfNeeded('response-status-filter-change');
-                        },
-                      )
-                    }
-                    disabled={isOtherFiltersDisabled}
-                  />
-                  Not responded
-                </Label>
-              </FormGroup>,
-              isOtherFiltersDisabled,
-            )}
-
-          {/* SBT GROUPS */}
-          {this.renderCollapsibleSection(
-            <>
-              {this.props.creatorAndResponderMode
-                ? 'Group(s) of Question Creator / Responder'
-                : 'Group(s) of Question Creator'}
-              {!this.props.isSBTCacheReady && (
-                <span className={styles.sbtSectionLoadingStatus}>
-                  <FontAwesomeIcon icon={faSpinner} spin style={QUESTION_FILTER_SBT_SPINNER_STYLE} />
-                  <span>Loading groups</span>
-                </span>
-              )}
-            </>,
-            'sbts',
-            faStar,
-            isOtherFiltersDisabled ? (
-              <p className={styles.disabledText}>{otherFiltersDisabledReason}</p>
-            ) : (
-              <SBTFilter
-                items={this.state.mergedQuestions}
-                provider={this.props.provider}
-                network={this.props.network}
-                mode={this.props.creatorAndResponderMode ? 'creatorAndResponder' : 'creator'}
-                onFilter={this.handleFilteredQuestions}
-                setFilterLoading={this.setFilterLoading}
-                autoExpand={true}
-                externalSBTFilterState={sbtFilterLocalState}
-                defaultFeaturedSBTs={this.props.defaultFeaturedSBTs} // Pass the prop down
-                //
-                isQuestionCacheReady={this.props.isQuestionCacheReady}
-                isSurveyCacheReady={this.props.isSurveyCacheReady}
-                isSBTCacheReady={this.props.isSBTCacheReady}
-                sbtCacheRevision={this.props.sbtCacheRevision}
-                sessionSlug={sbtFilterSessionSlug}
-                sessionConfig={sbtFilterSessionConfig}
-                ensureLightSbtUniverse={this.props.ensureLightSbtUniverse}
-              />
-            ),
-            isOtherFiltersDisabled || !this.props.isSBTCacheReady, // Pass disabled state
-            E2E_TESTIDS.QUESTION_FILTER_SECTION_SBT,
-          )}
-
-          {/* AI FILTER */}
-          {this.renderCollapsibleSection(
-            'AI Filter',
-            'ai',
-            faRobot,
-            <FormGroup>
-              {!aiAccessState.enabled && (
-                <p className={styles.disabledText} style={QUESTION_FILTER_DISABLED_TEXT_SPACING_STYLE}>
-                  AI filter unavailable. Requires an AI sponsored gate in this session or a local API key.
-                </p>
-              )}
-              {isTopQuestionsModeActive && (
-                <p className={styles.disabledText} style={QUESTION_FILTER_DISABLED_TEXT_SPACING_STYLE}>
-                  Disabled by “Top X questions” selection.
-                </p>
-              )}
-              <div className={styles.aiFilterInputWrap}>
-                <AudioInput
-                  hideEncryption={true}
-                  disableEncryption={true}
-                  enableAiRewrite={false}
-                  placeholder="Describe what you want to find..."
-                  value={aiDraftQuery}
-                  updateFunction={this.handleAiDraftQueryChange}
-                  dataTestId={E2E_TESTIDS.QUESTION_FILTER_AI_QUERY}
-                  disabled={aiControlsDisabled}
-                />
-                <div className={styles.aiActionCard}>
-                  <div className={styles.aiActionRow}>
-                    <div className={styles.aiCountControl}>
-                      <Label className={styles.aiCountLabel} for={E2E_TESTIDS.QUESTION_FILTER_AI_TOP_N}>
-                        Questions
-                      </Label>
-                      <Input
-                        id={E2E_TESTIDS.QUESTION_FILTER_AI_TOP_N}
-                        className={styles.aiCountInput}
-                        type="number"
-                        data-testid={E2E_TESTIDS.QUESTION_FILTER_AI_TOP_N}
-                        min="1"
-                        value={aiRankingCount}
-                        onChange={this.handleAiTopNChange}
-                        disabled={aiControlsDisabled}
-                      />
-                    </div>
-                    <Button
-                      color="info"
-                      className={styles.aiApplyButton}
-                      data-testid={E2E_TESTIDS.QUESTION_FILTER_AI_APPLY}
-                      disabled={aiControlsDisabled}
-                      onClick={() => this.handleApplyAIFilter({ auto: false, source: 'manual-click' })}
-                    >
-                      {aiApplying && <FontAwesomeIcon icon={faSpinner} spin className={styles.aiApplySpinner} />}
-                      <span>{aiApplyButtonLabel}</span>
-                    </Button>
-                    <FormGroup check className={styles.aiCombineGroup}>
-                      <Label check className={buildQuestionFilterAiCombineRowClassName(styles)}>
-                        <Input
-                          type="checkbox"
-                          checked={aiCombineWithOtherFilters}
-                          onChange={this.handleAiCombineWithFiltersChange}
-                          disabled={aiControlsDisabled}
-                        />
-                        Combine with other filters
-                      </Label>
-                    </FormGroup>
-                  </div>
-                  {this.state.aiFilterApplied && aiSearchQuery && !aiApplyError && (
-                    <p className={styles.aiStatusText}>
-                      Active: &quot;{aiSearchQuery}&quot; • Top{' '}
-                      {normalizePositiveInt(this.state.aiAppliedTopN, DEFAULT_AI_TOP_N)} •{' '}
-                      {aiCombineWithOtherFilters ? 'Combined' : 'Override'}
-                    </p>
-                  )}
-                  {this.state.aiFilterApplied && aiSearchQuery && !aiCombineWithOtherFilters && !aiApplyError && (
-                    <p className={styles.aiHintText}>
-                      AI Top-N override mode is active. Enable &quot;Combine with other filters&quot; to intersect with
-                      type/tag/SBT filters.
-                    </p>
-                  )}
-                  {!!aiApplyError && <p className={styles.aiErrorText}>{aiApplyError}</p>}
-                </div>
-              </div>
-            </FormGroup>,
-            aiSectionDisabled,
-            E2E_TESTIDS.QUESTION_FILTER_SECTION_AI,
-          )}
+          <QuestionFilterAiSection
+            activeAiTopN={activeAiTopN}
+            aiAccessEnabled={aiAccessState.enabled}
+            aiApplyButtonLabel={aiApplyButtonLabel}
+            aiApplyError={aiApplyError}
+            aiApplying={aiApplying}
+            aiCombineWithOtherFilters={aiCombineWithOtherFilters}
+            aiControlsDisabled={aiControlsDisabled}
+            aiDraftQuery={aiDraftQuery}
+            aiRankingCount={aiRankingCount}
+            aiSearchQuery={aiSearchQuery}
+            aiSectionDisabled={aiSectionDisabled}
+            expandedSections={expandedSections}
+            isAiFilterApplied={this.state.aiFilterApplied}
+            isTopQuestionsModeActive={isTopQuestionsModeActive}
+            onAiCombineWithFiltersChange={this.handleAiCombineWithFiltersChange}
+            onAiDraftQueryChange={this.handleAiDraftQueryChange}
+            onAiTopNChange={this.handleAiTopNChange}
+            onApplyAiFilter={() => {
+              void this.handleApplyAIFilter({ auto: false, source: 'manual-click' });
+            }}
+            onToggleSection={this.toggleSection}
+          />
         </div>
 
         {filterLoading && (
@@ -3516,45 +2894,20 @@ class QuestionFilter extends React.Component<any, any> {
     );
 
     const filterSummaryAndControlsJsx = (
-      <div className={styles.filterSummaryContainer}>
-        <div className={styles.filterSummaryLabel}>
-          <span>Current Filters:</span>
-          <div className={styles.filterSummaryActions}>{this.renderFilterActionsIcons()}</div>
-        </div>
-
-        <div className={styles.summaryItemsRow}>
-          {summaryItems.map((item, idx) => (
-            <div key={idx} className={styles.filterBubble} onClick={item.onRemove}>
-              <span>{item.label}</span>
-              <FontAwesomeIcon icon={faTimes} className={styles.removeIcon} />
-            </div>
-          ))}
-        </div>
-
-        {/* Load filter row (appears only when + icon is clicked) */}
-        {showLoadInput && (
-          <div className={styles.filterControlsRow}>
-            <div className={styles.loadFilterContainer}>
-              <Input
-                type="text"
-                bsSize="sm"
-                value={filterUrlInput}
-                onChange={(e) => this.setState({ filterUrlInput: e.target.value })}
-                placeholder="Load filter from URL/string..."
-                className={styles.loadFilterInput}
-              />
-              <Button
-                size="sm"
-                onClick={this.handleLoadFilter}
-                disabled={!filterUrlInput}
-                className={styles.loadFilterButton}
-              >
-                Load
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
+      <QuestionFilterSummaryControls
+        copiedUrlSuccess={this.state.copiedUrlSuccess}
+        filterBookmarkedFeedback={this.state.filterBookmarkedFeedback}
+        filterUrlInput={filterUrlInput}
+        isCurrentFilterBookmarked={this.state.isCurrentFilterBookmarked}
+        isDefault={isCurrentFilterDefault}
+        onBookmarkCurrentFilter={this.handleBookmarkCurrentFilter}
+        onClearFilters={this.handleClearFilters}
+        onCopyFilterUrl={this.handleCopyFilterUrl}
+        onFilterUrlInputChange={this.handleFilterUrlInputChange}
+        onLoadFilter={this.handleLoadFilter}
+        showLoadInput={showLoadInput}
+        summaryItems={summaryItems}
+      />
     );
 
     if (isInline) {
@@ -3623,26 +2976,11 @@ class QuestionFilter extends React.Component<any, any> {
               {summaryItems.length > 0 && filterSummaryAndControlsJsx}
               {/* In modal mode, also allow loading even if there are no current filters */}
               {showLoadInput && summaryItems.length === 0 && (
-                <div className={styles.filterControlsRow}>
-                  <div className={styles.loadFilterContainer}>
-                    <Input
-                      type="text"
-                      bsSize="sm"
-                      value={filterUrlInput}
-                      onChange={this.handleFilterUrlInputChange}
-                      placeholder="Load filter from URL/string..."
-                      className={styles.loadFilterInput}
-                    />
-                    <Button
-                      size="sm"
-                      onClick={this.handleLoadFilter}
-                      disabled={!filterUrlInput}
-                      className={styles.loadFilterButton}
-                    >
-                      Load
-                    </Button>
-                  </div>
-                </div>
+                <QuestionFilterLoadFilterControls
+                  filterUrlInput={filterUrlInput}
+                  onFilterUrlInputChange={this.handleFilterUrlInputChange}
+                  onLoadFilter={this.handleLoadFilter}
+                />
               )}
               {bodyContent}
             </ModalBody>

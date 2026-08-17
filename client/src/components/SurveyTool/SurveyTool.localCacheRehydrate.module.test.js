@@ -6,7 +6,7 @@ import {
   buildLocalCacheRehydrationUpdatePlan,
   loadLocalCacheHydrationSlice,
   mergeQuestionResponses,
-} from './surveyToolUtils.js';
+} from './surveyToolUtils';
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
@@ -208,155 +208,92 @@ describe('SurveyTool local-cache response rehydrate', () => {
       slug: 'edge',
       responder: '0xabc',
     });
-
-    subject._isMounted = true;
-    subject.state = {
-      ...subject.state,
-      submissionComplete: false,
-      isSubmitting: false,
-    };
-    subject.setState = (update, cb) => {
-      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
-      subject.state = { ...subject.state, ...(patch || {}) };
-      if (typeof cb === 'function') cb();
-    };
-    subject.props = {
-      ...subject.props,
-      account: '0xabc',
-      loginComplete: true,
-      displayAnswerMode: false,
-      viewAddress: '',
-      singleQuestionMode: false,
-      responderAddress: '',
-      refreshQuestionResponses: jest.fn().mockResolvedValue(undefined),
-    };
-    subject.getMissingRenderedResponseIdsForAccount = jest.fn().mockResolvedValue({
-      missingIds: ['q1'],
-      slug: 'edge',
-      netId: '84532',
-    });
-    subject.rehydrateLocalCacheAnswersForRenderedIds = jest.fn();
-    subject._localCacheSliceMemo = { key: 'stale', value: null, hasValue: true };
-    subject._rehydrateLocalCacheLastSig = 'stale|sig';
-
-    await subject.ensurePriorResponsesForRenderedIds();
-
-    expect(subject.props.refreshQuestionResponses).toHaveBeenCalledWith(['q1'], {
-      slug: 'edge',
-      responder: '0xabc',
-    });
-    expect(subject._localCacheSliceMemo).toEqual({ key: '', value: null, hasValue: false });
-    expect(subject._rehydrateLocalCacheLastSig).toBe('');
-    expect(subject.rehydrateLocalCacheAnswersForRenderedIds).toHaveBeenCalledTimes(1);
+    expect(cacheRefs.localCacheSliceMemo).toEqual({ key: '', value: null, hasValue: false });
+    expect(cacheRefs.rehydrateLocalCacheLastSig).toBe('');
+    expect(rehydrateLocalCacheAnswersForRenderedIds).toHaveBeenCalledTimes(1);
   });
 
   it('does not skip targeted prior-response backfill while pile mode is active', async () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
-      minifiedMode: 'pile',
-    });
-
-    subject.state = {
-      ...subject.state,
-      submissionComplete: false,
-      isSubmitting: false,
-    };
-    subject.props = {
-      ...subject.props,
-      minifiedMode: 'pile',
-      account: '0xabc',
-      loginComplete: true,
-      displayAnswerMode: false,
-      viewAddress: '',
-      singleQuestionMode: false,
-      responderAddress: '',
-      refreshQuestionResponses: jest.fn().mockResolvedValue(undefined),
-    };
-    subject.getMissingRenderedResponseIdsForAccount = jest.fn().mockResolvedValue({
+    const refreshQuestionResponses = jest.fn().mockResolvedValue(undefined);
+    const getMissingRenderedResponseIdsForAccount = jest.fn().mockResolvedValue({
       missingIds: ['q1'],
       slug: 'edge',
       netId: '84532',
     });
-    subject.rehydrateLocalCacheAnswersForRenderedIds = jest.fn();
 
-    const fetched = await subject.ensurePriorResponsesForRenderedIds();
+    const fetched = await executeSurveyPriorResponseBackfill({
+      props: {
+        minifiedMode: 'pile',
+        account: '0xabc',
+        loginComplete: true,
+        displayAnswerMode: false,
+        viewAddress: '',
+        singleQuestionMode: false,
+        responderAddress: '',
+        refreshQuestionResponses,
+      },
+      state: {
+        submissionComplete: false,
+        isSubmitting: false,
+      },
+      attemptedSet: new Set(),
+      getMissingRenderedResponseIdsForAccount,
+      setHydratingState: jest.fn(),
+      isMounted: false,
+      readQuestionsCacheAsync: jest.fn().mockResolvedValue(undefined),
+    });
 
     expect(fetched).toBe(true);
-    expect(subject.getMissingRenderedResponseIdsForAccount).toHaveBeenCalled();
-    expect(subject.props.refreshQuestionResponses).toHaveBeenCalled();
+    expect(getMissingRenderedResponseIdsForAccount).toHaveBeenCalled();
+    expect(refreshQuestionResponses).toHaveBeenCalledWith(['q1'], {
+      slug: 'edge',
+      responder: '0xabc',
+    });
   });
 
   it('groups pile prior-response backfill by question session slug under list scope', async () => {
-    jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
-    jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha', 'beta']);
-    jest.spyOn(cacheScripts, 'readCache').mockImplementation(async (namespace) => {
-      if (namespace !== 'questionsCache') return {};
-      return {
-        '84532': {
-          questionResponses: {},
-        },
-      };
+    const refreshQuestionResponses = jest.fn().mockResolvedValue(undefined);
+    const rehydrateLocalCacheAnswersForRenderedIds = jest.fn();
+
+    const fetched = await executeSurveyPriorResponseBackfill({
+      props: {
+        minifiedMode: 'pile',
+        account: '0xabc',
+        loginComplete: true,
+        displayAnswerMode: false,
+        viewAddress: '',
+        singleQuestionMode: false,
+        responderAddress: '',
+        refreshQuestionResponses,
+      },
+      state: {
+        submissionComplete: false,
+        isSubmitting: false,
+      },
+      attemptedSet: new Set(),
+      getMissingRenderedResponseIdsForAccount: jest.fn().mockResolvedValue({
+        requests: [
+          { slug: 'alpha', missingIds: ['q1'] },
+          { slug: 'beta', missingIds: ['q2'] },
+        ],
+      }),
+      setHydratingState: jest.fn(),
+      isMounted: true,
+      readQuestionsCacheAsync: jest.fn().mockResolvedValue(undefined),
+      resetLocalCacheMemo: jest.fn(),
+      triggerRehydrate: rehydrateLocalCacheAnswersForRenderedIds,
     });
-
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
-      sessionSlug: 'edge',
-      activeSessionSlug: 'edge',
-      minifiedMode: 'pile',
-    });
-
-    subject._isMounted = true;
-    subject.state = {
-      ...subject.state,
-      submissionComplete: false,
-      isSubmitting: false,
-      pileQuestions: [
-        { id: 'q1', sessionSlug: 'alpha', type: 'freeform', prompt: 'Alpha prompt' },
-        { id: 'q2', sessionSlug: 'beta', type: 'freeform', prompt: 'Beta prompt' },
-      ],
-    };
-    subject.setState = (update, cb) => {
-      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
-      subject.state = { ...subject.state, ...(patch || {}) };
-      if (typeof cb === 'function') cb();
-    };
-    subject.props = {
-      ...subject.props,
-      minifiedMode: 'pile',
-      account: '0xabc',
-      loginComplete: true,
-      displayAnswerMode: false,
-      viewAddress: '',
-      singleQuestionMode: false,
-      responderAddress: '',
-      refreshQuestionResponses: jest.fn().mockResolvedValue(undefined),
-    };
-    subject.rehydrateLocalCacheAnswersForRenderedIds = jest.fn();
-    subject._localCacheSliceMemo = { key: 'stale', value: null, hasValue: true };
-    subject._rehydrateLocalCacheLastSig = 'stale|sig';
-
-    const fetched = await subject.ensurePriorResponsesForRenderedIds();
 
     expect(fetched).toBe(true);
-    expect(subject.props.refreshQuestionResponses).toHaveBeenNthCalledWith(1, ['q1'], {
+    expect(refreshQuestionResponses).toHaveBeenNthCalledWith(1, ['q1'], {
       slug: 'alpha',
       responder: '0xabc',
     });
-    expect(subject.props.refreshQuestionResponses).toHaveBeenNthCalledWith(2, ['q2'], {
+    expect(refreshQuestionResponses).toHaveBeenNthCalledWith(2, ['q2'], {
       slug: 'beta',
       responder: '0xabc',
     });
-    expect(subject.rehydrateLocalCacheAnswersForRenderedIds).toHaveBeenCalledTimes(1);
+    expect(rehydrateLocalCacheAnswersForRenderedIds).toHaveBeenCalledTimes(1);
   });
 
   it('does not hydrate local-cache responses for unresolved draft slugs without a resolved network id', () => {
@@ -384,85 +321,61 @@ describe('SurveyTool local-cache response rehydrate', () => {
         questionResponses: {
           q1: {
             '0xabc': {
-              answer: { value: 'wrong-cache-answer', encrypted: false },
-              additional: { value: '', encrypted: false },
+              answer: {
+                value: 'plaintext answer should stay masked',
+                encrypted: true,
+                encryptionAudience: 'gate',
+                encryptedPortion: 'ans-env',
+              },
+              additional: {
+                value: 'plaintext additional should stay masked',
+                encrypted: true,
+                encryptionAudience: 'gate',
+                audienceMode: 'inherit',
+                encryptedPortion: 'add-env',
+              },
+              importance: 4,
+              conviction: 7,
             },
           },
         },
       },
-    });
-
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      sessionSlug: 'missing-session-slug',
-      activeSessionSlug: '',
-    });
-    subject._getEffectiveDraftSlug = jest.fn(() => 'missing-session-slug');
-    subject.getCurrentRenderedQuestionIds = jest.fn().mockReturnValue(['q1']);
-    peekSpy.mockClear();
-
-    expect(subject.buildSliceFromLocalCache()).toBeNull();
-    expect(peekSpy).not.toHaveBeenCalled();
-  });
-
-  it('builds local-cache slices through the shared cache hydration helper', () => {
-    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
-      if (namespace !== 'questionsCache' || slug !== 'edge') return {};
-      return {
-        '84532': {
-          questionResponses: {
-            q1: {
-              '0xabc': {
-                answer: {
-                  value: 'plaintext answer should stay masked',
-                  encrypted: true,
-                  encryptionAudience: 'gate',
-                  encryptedPortion: 'ans-env',
-                },
-                additional: {
-                  value: 'plaintext additional should stay masked',
-                  encrypted: true,
-                  encryptionAudience: 'gate',
-                  audienceMode: 'inherit',
-                  encryptedPortion: 'add-env',
-                },
-                importance: 4,
-                conviction: 7,
-              },
-            },
-          },
-        },
-      };
-    });
-
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
-      sessionSlug: 'edge',
-      activeSessionSlug: 'edge',
-      questionsCacheNonce: 1,
-      questionResponsesNonce: 1,
-    });
-    subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
-    subject.getCurrentRenderedQuestionIds = jest.fn().mockReturnValue(['q1']);
-    subject.normalizeResponseEncryptionAudience = jest.fn((audience) => audience || 'self');
-    subject.resolveFieldEncryptionGateId = jest.fn((_field, qid, fieldKey) => `${qid}:${fieldKey}`);
-    subject.normalizeFieldAudienceMode = jest.fn((mode) => mode || 'explicit');
-    subject.buildInheritedAdditionalFieldState = jest.fn((additionalState, answerState) => ({
-      ...additionalState,
-      encryptionGateId: answerState?.encryptionGateId || null,
-      inheritedFromAnswer: answerState?.encryptedPortion || null,
     }));
+    const applyCachedResponseEntryToSlice = jest.fn(({ targetSlice, questionId, response }) => {
+      targetSlice.answers[questionId] = {
+        value: response.answer.encrypted ? '*' : response.answer.value,
+        encrypted: !!response.answer.encrypted,
+        encryptionAudience: response.answer.encryptionAudience || 'self',
+        encryptionGateId: `${questionId}:answer`,
+        audienceMode: response.answer.audienceMode || 'explicit',
+        hash: response.answer.hash || '',
+        encryptedPortion: response.answer.encryptedPortion || '',
+      };
+      targetSlice.additionalComments[questionId] = {
+        value: response.additional.encrypted ? '*' : response.additional.value,
+        encrypted: !!response.additional.encrypted,
+        encryptionAudience: response.additional.encryptionAudience || 'self',
+        encryptionGateId: `${questionId}:answer`,
+        audienceMode: response.additional.audienceMode || 'explicit',
+        hash: response.additional.hash || '',
+        encryptedPortion: response.additional.encryptedPortion || '',
+        inheritedFromAnswer: response.answer.encryptedPortion || null,
+      };
+      targetSlice.importance[questionId] = response.importance;
+      targetSlice.conviction[questionId] = response.conviction;
+      return true;
+    });
 
-    const slice = subject.buildSliceFromLocalCache();
+    const slice = loadLocalCacheHydrationSlice({
+      scopeSlugs: ['edge'],
+      networkIdStr: '84532',
+      account: '0xabc',
+      renderedQuestionIds: ['q1'],
+      readQuestionsCache,
+      mergeQuestionResponses,
+      parseResponse: (raw) => raw,
+      applyCachedResponseEntryToSlice,
+    });
 
     expect(slice).toEqual({
       answers: {
@@ -494,169 +407,65 @@ describe('SurveyTool local-cache response rehydrate', () => {
   });
 
   it('does not block retry when local-cache slice is missing', async () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
+    const stateRef = createBaseStateRef();
+    const ensurePriorResponses = jest.fn();
+
+    await runLocalCacheRehydrate({
+      stateRef,
+      cacheSlice: null,
+      signature: 'stable|sig',
+      ensurePriorResponses,
+    });
+    await runLocalCacheRehydrate({
+      stateRef,
+      cacheSlice: null,
+      signature: 'stable|sig',
+      ensurePriorResponses,
     });
 
-    subject.state = {
-      ...subject.state,
-      suppressPrefill: false,
-      submissionError: '',
-      submissionComplete: false,
-      surveysResponseState: [
-        { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
-      ],
-    };
-
-    subject.getCurrentRenderedQuestionIds = jest.fn().mockReturnValue(['q1']);
-    subject.buildLocalCacheHydrationSignature = jest.fn().mockReturnValue('stable|sig');
-    subject.buildSliceFromLocalCache = jest.fn().mockResolvedValue(null);
-    subject.ensurePriorResponsesForRenderedIds = jest.fn().mockResolvedValue(false);
-    subject._rehydrateLocalCacheLastSig = '';
-
-    await subject.rehydrateLocalCacheAnswersForRenderedIds();
-    await subject.rehydrateLocalCacheAnswersForRenderedIds();
-
-    expect(subject.ensurePriorResponsesForRenderedIds).toHaveBeenCalledTimes(2);
-    expect(subject._rehydrateLocalCacheLastSig).toBe('');
+    expect(ensurePriorResponses).toHaveBeenCalledTimes(2);
+    expect(stateRef.current._rehydrateLocalCacheLastSig).toBe('');
   });
 
   it('does not remask decrypted empty additional comments during local-cache rehydrate', async () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
-    });
-
-    subject.state = {
-      ...subject.state,
-      suppressPrefill: false,
-      submissionError: '',
-      submissionComplete: false,
-      surveysResponseState: [{
-        answers: {},
-        importance: {},
-        conviction: {},
-        additionalComments: {
-          q1: {
-            value: '',
-            encrypted: true,
-            encryptedPortion: 'enc-1',
-            hash: 'hash-1',
-          },
-        },
-      }],
-      editBaseline: {
-        answers: {},
-        importance: {},
-        conviction: {},
-        additionalComments: {
-          q1: {
-            value: '',
-            encrypted: true,
-            encryptedPortion: 'enc-1',
-            hash: 'hash-1',
-          },
-        },
-      },
-    };
-    subject.getHydrationQuestionIds = jest.fn().mockReturnValue(['q1']);
-    subject.buildLocalCacheHydrationSignature = jest.fn().mockReturnValue('rehydrate|q1');
-    subject.buildSliceFromLocalCache = jest.fn().mockResolvedValue({
+    const stateRef = createBaseStateRef({
       answers: {},
       importance: {},
       conviction: {},
       additionalComments: {
         q1: {
-          value: '*',
+          value: '',
           encrypted: true,
           encryptedPortion: 'enc-1',
           hash: 'hash-1',
         },
       },
     });
-    subject.ensurePriorResponsesForRenderedIds = jest.fn().mockResolvedValue(false);
-    subject.setState = (update, cb) => {
-      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
-      subject.state = { ...subject.state, ...(patch || {}) };
-      if (typeof cb === 'function') cb();
-    };
 
-    await subject.rehydrateLocalCacheAnswersForRenderedIds();
+    await runLocalCacheRehydrate({
+      stateRef,
+      signature: 'rehydrate|q1',
+      cacheSlice: {
+        answers: {},
+        importance: {},
+        conviction: {},
+        additionalComments: {
+          q1: {
+            value: '*',
+            encrypted: true,
+            encryptedPortion: 'enc-1',
+            hash: 'hash-1',
+          },
+        },
+      },
+    });
 
-    expect(subject.state.surveysResponseState?.[0]?.additionalComments?.q1?.value).toBe('');
-    expect(subject.state.editBaseline?.additionalComments?.q1?.value).toBe('');
+    expect(stateRef.current.surveysResponseState?.[0]?.additionalComments?.q1?.value).toBe('');
+    expect(stateRef.current.editBaseline?.additionalComments?.q1?.value).toBe('');
   });
 
   it('replaces masked additional value with draft decrypted-empty value when envelope matches', async () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
-    });
-
-    subject.state = {
-      ...subject.state,
-      suppressPrefill: false,
-      submissionError: '',
-      submissionComplete: false,
-      surveysResponseState: [{
-        answers: {},
-        importance: {},
-        conviction: {},
-        additionalComments: {
-          q1: {
-            value: '*',
-            encrypted: true,
-            encryptedPortion: 'enc-1',
-            hash: 'hash-1',
-          },
-        },
-      }],
-      editBaseline: {
-        answers: {},
-        importance: {},
-        conviction: {},
-        additionalComments: {
-          q1: {
-            value: '*',
-            encrypted: true,
-            encryptedPortion: 'enc-1',
-            hash: 'hash-1',
-          },
-        },
-      },
-    };
-    subject.loadDraft = jest.fn().mockReturnValue({
-      answers: {
-        q1: {
-          value: 'anchor-answer',
-          answerEncrypted: false,
-          answerEncryptionAudience: 'self',
-          answerEncryptedPortion: 'ans-1',
-          additional: '',
-          additionalEncrypted: true,
-          additionalEncryptionAudience: 'gate',
-          additionalEncryptedPortion: 'enc-1',
-          importance: null,
-          conviction: null,
-        },
-      },
-    });
-    subject.getHydrationQuestionIds = jest.fn().mockReturnValue(['q1']);
-    subject.buildLocalCacheHydrationSignature = jest.fn().mockReturnValue('rehydrate|q1|masked');
-    subject.buildSliceFromLocalCache = jest.fn().mockResolvedValue({
+    const stateRef = createBaseStateRef({
       answers: {},
       importance: {},
       conviction: {},
@@ -669,82 +478,49 @@ describe('SurveyTool local-cache response rehydrate', () => {
         },
       },
     });
-    subject.ensurePriorResponsesForRenderedIds = jest.fn().mockResolvedValue(false);
-    subject.setState = (update, cb) => {
-      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
-      subject.state = { ...subject.state, ...(patch || {}) };
-      if (typeof cb === 'function') cb();
-    };
 
-    await subject.rehydrateLocalCacheAnswersForRenderedIds();
+    await runLocalCacheRehydrate({
+      stateRef,
+      signature: 'rehydrate|q1|masked',
+      draft: {
+        answers: {
+          q1: {
+            value: 'anchor-answer',
+            answerEncrypted: false,
+            answerEncryptionAudience: 'self',
+            answerEncryptedPortion: 'ans-1',
+            additional: '',
+            additionalEncrypted: true,
+            additionalEncryptionAudience: 'gate',
+            additionalEncryptedPortion: 'enc-1',
+            importance: null,
+            conviction: null,
+          },
+        },
+      },
+      cacheSlice: {
+        answers: {},
+        importance: {},
+        conviction: {},
+        additionalComments: {
+          q1: {
+            value: '*',
+            encrypted: true,
+            encryptedPortion: 'enc-1',
+            hash: 'hash-1',
+          },
+        },
+      },
+    });
 
-    expect(subject.state.surveysResponseState?.[0]?.additionalComments?.q1?.value).toBe('');
-    expect(subject.state.surveysResponseState?.[0]?.additionalComments?.q1?.encryptedPortion).toBe('enc-1');
-    expect(subject.state.editBaseline?.additionalComments?.q1?.value).toBe('');
-    expect(subject.state.editBaseline?.additionalComments?.q1?.encryptedPortion).toBe('enc-1');
+    expect(stateRef.current.surveysResponseState?.[0]?.additionalComments?.q1?.value).toBe('');
+    expect(stateRef.current.surveysResponseState?.[0]?.additionalComments?.q1?.encryptedPortion).toBe('enc-1');
+    expect(stateRef.current.editBaseline?.additionalComments?.q1?.value).toBe('');
+    expect(stateRef.current.editBaseline?.additionalComments?.q1?.encryptedPortion).toBe('enc-1');
   });
 
   it('replaces masked additional value when both draft/cache envelopes are missing but encrypted is true', async () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
-    });
-
-    subject.state = {
-      ...subject.state,
-      suppressPrefill: false,
-      submissionError: '',
-      submissionComplete: false,
-      surveysResponseState: [{
-        answers: {},
-        importance: {},
-        conviction: {},
-        additionalComments: {
-          q1: {
-            value: '*',
-            encrypted: true,
-            encryptedPortion: '',
-            hash: 'hash-1',
-          },
-        },
-      }],
-      editBaseline: {
-        answers: {},
-        importance: {},
-        conviction: {},
-        additionalComments: {
-          q1: {
-            value: '*',
-            encrypted: true,
-            encryptedPortion: '',
-            hash: 'hash-1',
-          },
-        },
-      },
-    };
-    subject.loadDraft = jest.fn().mockReturnValue({
-      answers: {
-        q1: {
-          value: 'anchor-answer',
-          answerEncrypted: false,
-          answerEncryptionAudience: 'self',
-          answerEncryptedPortion: 'ans-1',
-          additional: '',
-          additionalEncrypted: true,
-          additionalEncryptionAudience: 'gate',
-          additionalEncryptedPortion: '',
-          importance: null,
-          conviction: null,
-        },
-      },
-    });
-    subject.getHydrationQuestionIds = jest.fn().mockReturnValue(['q1']);
-    subject.buildLocalCacheHydrationSignature = jest.fn().mockReturnValue('rehydrate|q1|masked-empty-env');
-    subject.buildSliceFromLocalCache = jest.fn().mockResolvedValue({
+    const stateRef = createBaseStateRef({
       answers: {},
       importance: {},
       conviction: {},
@@ -757,55 +533,80 @@ describe('SurveyTool local-cache response rehydrate', () => {
         },
       },
     });
-    subject.ensurePriorResponsesForRenderedIds = jest.fn().mockResolvedValue(false);
-    subject.setState = (update, cb) => {
-      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
-      subject.state = { ...subject.state, ...(patch || {}) };
-      if (typeof cb === 'function') cb();
-    };
 
-    await subject.rehydrateLocalCacheAnswersForRenderedIds();
+    await runLocalCacheRehydrate({
+      stateRef,
+      signature: 'rehydrate|q1|masked-empty-env',
+      draft: {
+        answers: {
+          q1: {
+            value: 'anchor-answer',
+            answerEncrypted: false,
+            answerEncryptionAudience: 'self',
+            answerEncryptedPortion: 'ans-1',
+            additional: '',
+            additionalEncrypted: true,
+            additionalEncryptionAudience: 'gate',
+            additionalEncryptedPortion: '',
+            importance: null,
+            conviction: null,
+          },
+        },
+      },
+      cacheSlice: {
+        answers: {},
+        importance: {},
+        conviction: {},
+        additionalComments: {
+          q1: {
+            value: '*',
+            encrypted: true,
+            encryptedPortion: '',
+            hash: 'hash-1',
+          },
+        },
+      },
+    });
 
-    expect(subject.state.surveysResponseState?.[0]?.additionalComments?.q1?.value).toBe('');
-    expect(subject.state.surveysResponseState?.[0]?.additionalComments?.q1?.encryptedPortion).toBe('');
-    expect(subject.state.editBaseline?.additionalComments?.q1?.value).toBe('');
-    expect(subject.state.editBaseline?.additionalComments?.q1?.encryptedPortion).toBe('');
+    expect(stateRef.current.surveysResponseState?.[0]?.additionalComments?.q1?.value).toBe('');
+    expect(stateRef.current.surveysResponseState?.[0]?.additionalComments?.q1?.encryptedPortion).toBe('');
+    expect(stateRef.current.editBaseline?.additionalComments?.q1?.value).toBe('');
+    expect(stateRef.current.editBaseline?.additionalComments?.q1?.encryptedPortion).toBe('');
   });
 
   it('rehydrates local-cache answers when draft loading throws', async () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
+    const stateRef = createBaseStateRef();
+    const ensurePriorResponses = jest.fn();
+    const onError = jest.fn();
+
+    await runLocalCacheRehydrate({
+      stateRef,
+      signature: 'rehydrate|q1|draft-throw',
+      loadDraft: () => {
+        throw new Error('draft-load-failed');
+      },
+      onError,
+      ensurePriorResponses,
+      cacheSlice: {
+        answers: {
+          q1: {
+            value: 'cached answer',
+            encrypted: false,
+          },
+        },
+        importance: { q1: 4 },
+        conviction: { q1: 7 },
+        additionalComments: {
+          q1: {
+            value: 'cached notes',
+            encrypted: false,
+          },
+        },
+      },
     });
 
-    subject.state = {
-      ...subject.state,
-      suppressPrefill: false,
-      submissionError: '',
-      submissionComplete: false,
-      surveysResponseState: [{
-        answers: {},
-        importance: {},
-        conviction: {},
-        additionalComments: {},
-      }],
-      editBaseline: {
-        answers: {},
-        importance: {},
-        conviction: {},
-        additionalComments: {},
-      },
-    };
-    subject.loadDraft = jest.fn(() => {
-      throw new Error('draft-load-failed');
-    });
-    subject.getHydrationQuestionIds = jest.fn().mockReturnValue(['q1']);
-    subject.buildLocalCacheHydrationSignature = jest.fn().mockReturnValue('rehydrate|q1|draft-throw');
-    subject.buildSliceFromLocalCache = jest.fn().mockResolvedValue({
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(stateRef.current.surveysResponseState?.[0]).toEqual({
       answers: {
         q1: {
           value: 'cached answer',
@@ -821,17 +622,7 @@ describe('SurveyTool local-cache response rehydrate', () => {
         },
       },
     });
-    subject.ensurePriorResponsesForRenderedIds = jest.fn().mockResolvedValue(false);
-    subject.setState = (update, cb) => {
-      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
-      subject.state = { ...subject.state, ...(patch || {}) };
-      if (typeof cb === 'function') cb();
-    };
-
-    await subject.rehydrateLocalCacheAnswersForRenderedIds();
-
-    expect(subject.loadDraft).toHaveBeenCalledTimes(1);
-    expect(subject.state.surveysResponseState?.[0]).toEqual({
+    expect(stateRef.current.editBaseline).toEqual({
       answers: {
         q1: {
           value: 'cached answer',
@@ -847,35 +638,10 @@ describe('SurveyTool local-cache response rehydrate', () => {
         },
       },
     });
-    expect(subject.state.editBaseline).toEqual({
-      answers: {
-        q1: {
-          value: 'cached answer',
-          encrypted: false,
-        },
-      },
-      importance: { q1: 4 },
-      conviction: { q1: 7 },
-      additionalComments: {
-        q1: {
-          value: 'cached notes',
-          encrypted: false,
-        },
-      },
-    });
-    expect(subject.ensurePriorResponsesForRenderedIds).toHaveBeenCalledTimes(1);
+    expect(ensurePriorResponses).toHaveBeenCalledTimes(1);
   });
 
   it('skips setState for local-cache rehydrate when cache data matches current and baseline state', async () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
-    });
-
     const matchingSlice = {
       answers: {
         q1: {
@@ -892,23 +658,14 @@ describe('SurveyTool local-cache response rehydrate', () => {
         },
       },
     };
-
-    subject.state = {
-      ...subject.state,
-      suppressPrefill: false,
-      submissionError: '',
-      submissionComplete: false,
-      surveysResponseState: [matchingSlice],
-      editBaseline: JSON.parse(JSON.stringify(matchingSlice)),
-    };
-    subject.getHydrationQuestionIds = jest.fn().mockReturnValue(['q1']);
-    subject.buildLocalCacheHydrationSignature = jest.fn().mockReturnValue('rehydrate|q1|unchanged');
-    subject.buildSliceFromLocalCache = jest.fn().mockResolvedValue(JSON.parse(JSON.stringify(matchingSlice)));
-    subject.ensurePriorResponsesForRenderedIds = jest.fn().mockResolvedValue(false);
-    subject.setState = jest.fn();
+    const stateRef = createBaseStateRef(matchingSlice);
     const callback = jest.fn();
+    const ensurePriorResponses = jest.fn();
 
-    await subject.rehydrateLocalCacheAnswersForRenderedIds(callback);
+    const setState = jest.fn((update, cb) => applyStateUpdate(stateRef, update, cb));
+    const setLastHydrationSig = jest.fn((value) => {
+      stateRef.current._rehydrateLocalCacheLastSig = value;
+    });
 
     await expect(
       executeSurveyLocalCacheRehydrate({
@@ -951,6 +708,6 @@ describe('SurveyTool local-cache response rehydrate', () => {
     expect(setState).not.toHaveBeenCalled();
     expect(ensurePriorResponses).toHaveBeenCalledTimes(1);
     expect(callback).toHaveBeenCalledTimes(1);
-    expect(subject._rehydrateLocalCacheLastSig).toBe('rehydrate|q1|unchanged');
+    expect(stateRef.current._rehydrateLocalCacheLastSig).toBe('rehydrate|q1|unchanged');
   });
 });

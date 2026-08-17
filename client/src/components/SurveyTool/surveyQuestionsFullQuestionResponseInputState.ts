@@ -1,5 +1,5 @@
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { getNormalizedUiRatingValue, isSingleSelectMultichoice, normalizeMultichoiceValue } from './surveyToolUtils.js';
+import { getNormalizedUiRatingValue, isSingleSelectMultichoice, normalizeMultichoiceValue } from './surveyToolUtils';
 
 type SurveyQuestionRecord = {
   id: string;
@@ -37,7 +37,6 @@ export type SurveyQuestionsFullQuestionResponseInputDescriptor =
   | {
       kind: 'audio';
       questionId: string;
-      qIndex: number;
       value: string | number;
       encrypted: boolean;
       dataTestId: string;
@@ -45,7 +44,6 @@ export type SurveyQuestionsFullQuestionResponseInputDescriptor =
       disabled: boolean;
       forceGlow: boolean;
       placeholder: string;
-      disableEncryption: boolean;
     };
 
 export type SurveyQuestionsFullQuestionResponseInputActionDescriptor =
@@ -100,13 +98,11 @@ type BuildResponseInputActionDescriptorArgs = {
 
 export const buildSurveyQuestionsFullQuestionResponseInputDescriptor = ({
   question,
-  qIndex = 0,
   answer,
   glowAnswer = false,
   isSubmitting = false,
 }: {
   question: SurveyQuestionRecord;
-  qIndex?: number;
   answer: SurveyAnswerRecord;
   glowAnswer?: boolean;
   isSubmitting?: boolean;
@@ -127,6 +123,7 @@ export const buildSurveyQuestionsFullQuestionResponseInputDescriptor = ({
     case 'rating':
       return {
         kind: 'rating',
+        questionId: question.id,
         ratingValue: getNormalizedUiRatingValue(answer.value),
         disabled,
         // Regression guard: keep pointer-drag ticks local; parent updates rebuild the full question list.
@@ -148,7 +145,7 @@ export const buildSurveyQuestionsFullQuestionResponseInputDescriptor = ({
 
       return {
         kind: 'audio',
-        qIndex,
+        questionId: question.id,
         value: audioInputValue,
         encrypted: answer.encrypted || false,
         dataTestId: E2E_TESTIDS.SURVEY_ANSWER_INPUT,
@@ -158,7 +155,6 @@ export const buildSurveyQuestionsFullQuestionResponseInputDescriptor = ({
         disabled,
         forceGlow: !!glowAnswer,
         placeholder: 'response (optional)',
-        disableEncryption: true,
       };
     }
   }

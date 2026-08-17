@@ -25,8 +25,9 @@ import {
 describe('AudioSurveyGenerator session context saves', () => {
   setupAudioSurveyGeneratorTestLifecycle();
 
-  it('defaults generate-time session context saves to only-me when the session doc gate uses OP Sepolia', async () => {
+  it('defaults generate-time OP Sepolia session context saves to the session doc gate', async () => {
     delete window.__litHooks;
+    const scopedSaveKey = jest.fn(async () => ({ ciphertext: 'ciphertext', dataToEncryptHash: 'hash' }));
     const onQuestionsGenerated = jest.fn();
     mockProcessAdditionalSources.mockResolvedValue(
       'This additional source content is long enough to drive question generation on its own.',
@@ -49,6 +50,7 @@ describe('AudioSurveyGenerator session context saves', () => {
         provider={{ request: jest.fn() }}
         network={{ id: 11155420 }}
         account="0x0000000000000000000000000000000000000123"
+        litHooks={{ saveKey: scopedSaveKey }}
         loginComplete
         toggleLoginModal={jest.fn()}
         activeSessionSlug="edge"
@@ -69,9 +71,9 @@ describe('AudioSurveyGenerator session context saves', () => {
     toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`));
 
     const audienceButton = container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_BUTTON}"]`);
-    expect(audienceButton.getAttribute('data-ce-doc-save-audience')).toBe('self');
-    expect(audienceButton.getAttribute('aria-label')).toContain('only me');
-    expect(audienceButton.textContent).not.toContain('only me');
+    expect(audienceButton.getAttribute('data-ce-doc-save-audience')).toBe('session');
+    expect(audienceButton.getAttribute('aria-label')).toContain('Edge Session');
+    expect(audienceButton.textContent).not.toContain('Edge Session');
 
     await act(async () => {
       container.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));

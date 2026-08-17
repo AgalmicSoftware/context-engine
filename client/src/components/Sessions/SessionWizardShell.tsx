@@ -418,6 +418,7 @@ const SessionWizardShell = ({
       renderInfoTooltip={renderSessionWizardInfoTooltip}
       sessionModeProfileControl={sessionModeProfileControl}
       sessionModeProfileLabel={sessionModeProfileLabel}
+      sessionModeProfileSelectionStep={showSessionModeProfileGate}
       wizardDisplaySettingsOpen={wizardDisplaySettingsOpen}
       wizardMode={wizardMode}
       showNetworkSelector={showNetworkSelector}
@@ -434,7 +435,6 @@ const SessionWizardShell = ({
 
       <SessionWizardIntroStatusRail
         activeNormalModeIndex={activeNormalModeIndex}
-        cloudflareTokenAccountId={deployForm?.accountId}
         cloudflareTokenSlug={draft.slug}
         collapsedSections={collapsedSections}
         fundingRequirementHref={newSessionFundingRequirementHref}
@@ -585,6 +585,7 @@ const SessionWizardShell = ({
           isNormalMode={isNormalMode}
           onToggleCollapsed={() => toggleSection('publish')}
           normalModePublishSummary={normalModePublishSummary}
+          onCreateAnotherSession={onCreateAnotherSession}
           onPublish={onPublish}
           onTogglePublishAdvanced={() => onTogglePublishAdvanced()}
           showSponsoredBundleFallbackInput={showSponsoredBundleFallbackInput}
@@ -599,6 +600,7 @@ const SessionWizardShell = ({
           localWorkerBundleFallbackFilePath={localWorkerBundleFallbackFilePath}
           sponsoredManualBundleRetryMessage={sponsoredManualBundleRetryMessage}
           publishUiPlan={publishUiPlan}
+          publishSettingsCapabilities={publishSettingsCapabilities}
           renderInfoTooltip={renderSessionWizardInfoTooltip}
           resolvedWorkerBaseUrl={resolvedWorkerBaseUrl}
           workerUrlSource={workerUrlSource}

@@ -1,8 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-const readAudioInputScss = () =>
-  fs.readFileSync(path.join(__dirname, 'AudioInput.module.scss'), 'utf8');
+const readAudioInputScss = () => fs.readFileSync(path.join(__dirname, 'AudioInput.module.scss'), 'utf8');
 
 describe('AudioInput styles', () => {
   it('keeps the microphone control borderless while preserving its keyboard focus indicator', () => {

@@ -570,7 +570,7 @@ const DEMO_PARTICIPANT_XIDS = Object.freeze(
 );
 
 const HISTORICAL_FIGURE_DEMOGRAPHICS = Object.freeze(
-  DEMO_PARTICIPANT_XIDS.reduce((acc, xid) => {
+  DEMO_PARTICIPANT_XIDS.reduce<Record<string, HistoricalFigureDemographicsEntry>>((acc, xid) => {
     if (!xid || acc[xid]) {
       return acc;
     }

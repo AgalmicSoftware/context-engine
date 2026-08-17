@@ -67,7 +67,8 @@ export class Navbar extends Component<NavbarProps, NavbarState> {
   constructor(props: NavbarProps) {
     super(props);
     const hasWindow = typeof window !== 'undefined';
-    const shouldAnimate = ENABLE_CE_LOGO_ANIMATION && hasWindow && !(window as any).__ceLogoAnimationPlayed;
+    const runtimeWindow = hasWindow ? (window as NavbarRuntimeWindow) : null;
+    const shouldAnimate = ENABLE_CE_LOGO_ANIMATION && !!runtimeWindow && !runtimeWindow.__ceLogoAnimationPlayed;
     this.state = {
       showAnimatedLogo: shouldAnimate,
     };

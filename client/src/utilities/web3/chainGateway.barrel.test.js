@@ -1,9 +1,4 @@
-import contractScripts, { getReadProviderForGroup, getSessionConfigBySlug } from './contractScripts.js';
-import * as contractScriptsModule from './contractScripts.js';
-import chainGateway, {
-  getReadProviderForGroup as getReadProviderForGroupGateway,
-  getSessionConfigBySlug as getSessionConfigBySlugGateway,
-} from './chainGateway.js';
+import chainGateway, { getReadProviderForGroup, getSessionConfigBySlug } from './chainGateway.js';
 import * as chainGatewayModule from './chainGateway.js';
 import chainGatewayImpl, {
   getReadProviderForGroup as getReadProviderForGroupImpl,
@@ -15,17 +10,9 @@ const path = require('path');
 const vm = require('vm');
 const { execFileSync } = require('child_process');
 
-describe('contractScripts compatibility barrel', () => {
+describe('chainGateway barrel', () => {
   afterEach(() => {
     jest.restoreAllMocks();
-  });
-
-  it('keeps the legacy js entrypoint spyable for Jest callers', () => {
-    const mocked = { slug: 'mock-session' };
-    const spy = jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockReturnValue(mocked);
-
-    expect(contractScriptsModule.getSessionConfigBySlug('ignored')).toBe(mocked);
-    expect(spy).toHaveBeenCalledWith('ignored');
   });
 
   it('keeps the canonical chainGateway entrypoint spyable for Jest callers', () => {
@@ -54,19 +41,19 @@ describe('contractScripts compatibility barrel', () => {
 
   it('can load through a browser-targeted Vite bundle without CommonJS exports', () => {
     const clientRoot = path.resolve(__dirname, '../../..');
-    const tmpDir = fs.mkdtempSync(path.join(clientRoot, '.tmp-contract-scripts-barrel-'));
+    const tmpDir = fs.mkdtempSync(path.join(clientRoot, '.tmp-chain-gateway-barrel-'));
     const outputDir = path.join(tmpDir, 'dist');
     const entryPath = path.join(tmpDir, 'entry.js');
     const implStubPath = path.join(tmpDir, 'contractScripts.impl.stub.js');
     const viteConfigPath = path.join(tmpDir, 'vite.config.mjs');
     const viteBinPath = path.join(clientRoot, 'node_modules/vite/bin/vite.js');
-    const barrelPath = path.resolve(__dirname, 'contractScripts.ts');
+    const barrelPath = path.resolve(__dirname, 'chainGateway.ts');
 
     fs.mkdirSync(outputDir, { recursive: true });
     fs.writeFileSync(
       implStubPath,
       `
-      const contractScripts = {
+      const chainGateway = {
         marker: 'stub-default',
         getProviderLocation: () => 'stub-provider',
         getNativeBalance: () => '1',
@@ -99,13 +86,13 @@ describe('contractScripts compatibility barrel', () => {
       export const __test__contractScriptsErrors = {
         isNonexistentTokenError: () => true,
       };
-      export default contractScripts;
+      export default chainGateway;
     `,
     );
     fs.writeFileSync(
       entryPath,
       `
-      import contractScripts, {
+      import chainGateway, {
         __test__contractScriptsErrors,
         getReadProviderForGroup,
         getSessionConfigBySlug,
@@ -142,7 +129,7 @@ describe('contractScripts compatibility barrel', () => {
             output: {
               entryFileNames: 'bundle.js',
               format: 'iife',
-              name: 'ContractScriptsBarrelSmoke',
+              name: 'ChainGatewayBarrelSmoke',
               inlineDynamicImports: true,
             },
           },

@@ -27,7 +27,7 @@ This directory contains demo and fixture data for the Context Engine survey plat
 | [`demo_sbt_collection.json`](./demo_sbt_collection.json) | Sample SBT group metadata with per-figure demographic attributes such as gender, era, country, affiliation, and atlas category. |
 | [`expanded_tag_list.json`](./expanded_tag_list.json) | Taxonomy tag list for survey question classification and topic labeling. |
 | [`risk_matrix_data.json`](./risk_matrix_data.json) | Input data for the debate risk matrix visualization. |
-| [`corpus_sample.json`](./corpus_sample.json) | Sample AI discourse corpus documents used by demo corpus views. |
+| [`corpus_sample.json`](./corpus_sample.json) | Sample AI discourse corpus documents used by demo corpus views. This now includes visible `LessWrong` and `Cross-Corpus Debates` slices instead of leaving those tabs hidden or empty. |
 | [`corpus_debate_map_links.json`](./corpus_debate_map_links.json) | Legacy corpus `debate_nodes` to atlas node mapping used to deep-link demo cards into the Debate Map. |
 | [`debates.json`](./debates.json) | Generated debate entries for Debate HUD and related demo views. |
 | [`loophole_historical_figure_principles.json`](./loophole_historical_figure_principles.json) | Per-figure moral principles used to deepen the atlas historical-case briefs in the Loophole-style demo flow. |
@@ -185,10 +185,13 @@ The breakdown tab now uses [`demo_analysis_data.json`](./demo_analysis_data.json
 - Regenerate it from the repo root with `npm run demo:analysis:generate`
 - The generator lives at [`scripts/generate-demo-analysis-fixture.mjs`](../../../../scripts/generate-demo-analysis-fixture.mjs)
 - Generation policy is explicit-map tree-first, Polis-fallback:
-  - only map a breakdown question to atlas tree votes when the generator contains a manually validated question-to-node mapping for that exact question index
+  - only map a breakdown question to atlas tree votes when [`demo_analysis_generation_config.json`](./demo_analysis_generation_config.json) contains a manually validated question-to-node mapping for that exact question index
   - require the mapped atlas `nodeId` to still match the question's current `nodeId` in [`demo_polis_data.json`](./demo_polis_data.json) before using tree votes
   - map tree scores to `Agree` / `Unsure` / `Disagree` with `>= 2`, between, and `<= -2`
   - fall back to [`demo_polis_data.json`](./demo_polis_data.json) when a question is unmapped, when the mapping drifts, or when a persona has no tree vote for that node
+  - apply curated breakdown-only comment overrides from [`demo_analysis_generation_config.json`](./demo_analysis_generation_config.json) so poll/freeform/rating prompts become corpus-grounded `Agree` / `Unsure` / `Disagree` statements before the fixture is written
+  - expand the seeded participant rows with deterministic synthetic variants using the same config file, preserving demographic lineage while increasing response density for the Breakdown view
+  - keep those overrides semantically aligned with the explicit atlas node mapping; if a rewritten question is no longer equivalent to the mapped node, remove the mapping or rewrite the prompt again before regenerating
 - Keep [`demo_polis_data.json`](./demo_polis_data.json) unchanged unless you also intend to refresh `PolisReport` precomputed cluster metadata
 
 ## Reconciling Simulated Profile Answers

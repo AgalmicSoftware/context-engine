@@ -97,7 +97,7 @@ describe('surveyQuestionsPromptMetadataRuntime', () => {
       slug: 'demo-sh',
       corsWorkerUrl: 'https://demo-sh-worker.example',
     };
-    const resolveDraftSessionContext = jest.fn(() => ({
+    const resolveDraftSessionContext = jest.fn((_props: unknown, _effectiveDraftSlug: string) => ({
       sessionSlug: 'demo-sh',
       sessionConfig,
     }));

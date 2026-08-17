@@ -52,7 +52,10 @@ type UserPageQuestionSectionProps = {
   sbtCacheRevision?: unknown;
 };
 
-const normalizeRowKeyPart = (value: unknown): string => String(value || '').trim().toLowerCase();
+const normalizeRowKeyPart = (value: unknown): string =>
+  String(value || '')
+    .trim()
+    .toLowerCase();
 
 const resolveQuestionSessionSlug = (question: UserPageQuestionEntry, activeSessionSlug: unknown): string =>
   normalizeSessionSlug(question?.sessionSlug || question?.slug || activeSessionSlug || '');
@@ -70,7 +73,11 @@ const buildQuestionResponseRowKey = ({
 }): string => {
   const responseRecord = response && typeof response === 'object' ? (response as Record<string, unknown>) : {};
   const responseIdentity =
-    responseRecord.responseId || responseRecord.id || responseRecord.responder || responderAddress || 'profile-response';
+    responseRecord.responseId ||
+    responseRecord.id ||
+    responseRecord.responder ||
+    responderAddress ||
+    'profile-response';
   return [
     'response',
     resolveQuestionSessionSlug(question, activeSessionSlug),
@@ -79,10 +86,7 @@ const buildQuestionResponseRowKey = ({
   ].join(':');
 };
 
-const buildCreatedQuestionRowKey = (
-  question: UserPageQuestionEntry,
-  activeSessionSlug: unknown,
-): string =>
+const buildCreatedQuestionRowKey = (question: UserPageQuestionEntry, activeSessionSlug: unknown): string =>
   ['created', resolveQuestionSessionSlug(question, activeSessionSlug), normalizeRowKeyPart(question.id)].join(':');
 
 const UserPageQuestionSection = ({
@@ -193,7 +197,10 @@ const UserPageQuestionSection = ({
       <Collapse isOpen={questionsCreatedSectionToggleState.isOpen}>
         {questionSectionDisplayState.hasCreatedQuestions ? (
           questionCreationEntries.map((question) => (
-            <div key={buildCreatedQuestionRowKey(question, activeSessionSlug)} className={createdQuestionWrapperClassName}>
+            <div
+              key={buildCreatedQuestionRowKey(question, activeSessionSlug)}
+              className={createdQuestionWrapperClassName}
+            >
               <SingleQuestionResponse
                 question={question}
                 response={null}

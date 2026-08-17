@@ -8,10 +8,10 @@ import CreateQuestionsAndSurveys, {
 import type { ComponentProps } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
-import { arweaveScripts } from '../../utilities/arweave/arweaveScripts';
+import { arweaveClient } from '../../utilities/arweave/arweaveClient';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import * as resourceKeys from '../../utilities/session/resourceKeys.js';
-import contractScripts from '../../utilities/web3/contractScripts.js';
+import contractScripts from '../../utilities/web3/chainGateway.js';
 import { sessionRegistryStore, sessionRegistryUtils } from '../../utilities/web3/sessionRegistry.js';
 import { getChainById, getDefaultHttpRpc } from '../../variables/chains.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -25,7 +25,7 @@ type CreateQuestionsAndSurveysHarness = InstanceType<typeof CreateQuestionsAndSu
   setState: (update: unknown, cb?: () => void) => void;
 };
 type TreeElement = Record<string, unknown> & {
-  props?: {
+  props?: Record<string, unknown> & {
     children?: unknown;
     className?: unknown;
   };
@@ -110,7 +110,7 @@ export {
   selectManagedNetBucketSnapshot,
   renderToStaticMarkup,
   cacheScripts,
-  arweaveScripts,
+  arweaveClient,
   normalizeArweaveUrl,
   resourceKeys,
   contractScripts,

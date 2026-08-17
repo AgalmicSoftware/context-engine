@@ -18,6 +18,22 @@ const outputPath = path.join(
   'demo',
   'demo_analysis_data.json'
 );
+const demoPolisPath = path.join(
+  repoRoot,
+  'client',
+  'src',
+  'variables',
+  'demo',
+  'demo_polis_data.json'
+);
+const configPath = path.join(
+  repoRoot,
+  'client',
+  'src',
+  'variables',
+  'demo',
+  'demo_analysis_generation_config.json'
+);
 
 test('generate-demo-analysis-fixture stays in sync with the committed fixture output', async () => {
   const {

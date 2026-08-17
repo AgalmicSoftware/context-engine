@@ -52,19 +52,28 @@
   }
 }
 
-.docsTitleRow {
+.docsHeaderTitleRow {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   flex-wrap: wrap;
   gap: 14px;
 }
 
-.docsRepoLink {
+.docsGithubLinks {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.docsGithubLink {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 44px;
   height: 44px;
+  min-height: 44px;
+  padding: 0;
   border: var(--ce-border-control-width) solid var(--docs-titlebar-text);
   border-radius: var(--ce-radius-pill);
   background: color-mix(in srgb, var(--docs-titlebar-text) 12%, transparent);
@@ -77,16 +86,20 @@
     transform 0.15s ease;
 }
 
-.docsRepoLink:hover,
-.docsRepoLink:focus-visible {
+.docsGithubLink:hover,
+.docsGithubLink:focus-visible {
   background: var(--docs-titlebar-text);
   color: var(--docs-titlebar-bg);
   outline: 3px solid var(--ce-focus-ring);
   outline-offset: 3px;
 }
 
-.docsRepoLink:active {
+.docsGithubLink:active {
   transform: translateY(1px);
+}
+
+.docsGithubLink svg {
+  flex: 0 0 auto;
 }
 
 .docsSection {
@@ -200,7 +213,7 @@
 
 .docsInlineLink {
   display: inline-flex;
-  color: #174f7d;
+  color: var(--docs-link);
   font-weight: 700;
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -208,10 +221,10 @@
 
 .docsInlineCode {
   padding: 0.08em 0.35em;
-  border: 1px solid #b6812f;
+  border: 1px solid var(--ce-status-warning-text);
   border-radius: var(--ce-radius-4);
-  background: #fff3d6;
-  color: #704000;
+  background: var(--ce-status-warning-soft);
+  color: var(--ce-status-warning-text);
   font-family: var(--ce-font-mono);
   font-size: 0.9em;
   font-weight: 700;
@@ -268,23 +281,23 @@
   flex-direction: column;
   gap: 14px;
   padding: 18px;
-  border: 2px solid var(--retro-blue-300);
+  border: var(--ce-border-control-width) solid var(--docs-border);
   border-radius: var(--ce-radius-10);
-  background: linear-gradient(135deg, var(--retro-blue-50), var(--retro-blue-100));
-  box-shadow: 4px 4px 0 rgba(120, 160, 190, 0.35);
+  background: var(--docs-surface-alt);
+  box-shadow: var(--ce-shadow-raised);
 }
 
 .contractSessionExplorerHeader {
   h2 {
     margin: 0;
-    color: var(--retro-ink);
+    color: var(--docs-panel-text);
     font-size: 1.15rem;
     font-weight: 800;
   }
 
   p {
     margin: 6px 0 0;
-    color: var(--retro-ink-soft);
+    color: var(--docs-panel-muted);
     line-height: 1.5;
   }
 }
@@ -296,27 +309,27 @@
   max-width: 460px;
 
   label {
-    color: var(--retro-ink);
+    color: var(--docs-panel-text);
     font-weight: 800;
   }
-}
 
-.contractSessionControl select {
-  width: 100%;
-  min-height: 44px;
-  padding: 9px 38px 9px 12px;
-  border: 2px solid #2b6ea8;
-  border-radius: var(--ce-radius-6);
-  background: var(--ce-color-white);
-  color: var(--retro-ink);
-  font-family: var(--ce-font-mono);
-  font-size: 0.95rem;
-  font-weight: 700;
-}
+  select {
+    width: 100%;
+    min-height: 44px;
+    padding: 9px 38px 9px 12px;
+    border: var(--ce-border-control-width) solid var(--docs-border);
+    border-radius: var(--ce-radius-6);
+    background: var(--docs-control);
+    color: var(--docs-control-text);
+    font-family: var(--ce-font-mono);
+    font-size: 0.95rem;
+    font-weight: 700;
+  }
 
-.contractSessionControl select:focus-visible {
-  outline: 3px solid var(--ce-color-info);
-  outline-offset: 2px;
+  select:focus-visible {
+    outline: 3px solid var(--ce-focus-ring);
+    outline-offset: 2px;
+  }
 }
 
 .contractSessionDetails {
@@ -327,10 +340,10 @@
 
 .contractSessionEmptyState {
   padding: 14px;
-  border: 2px dashed var(--retro-blue-300);
+  border: var(--ce-border-control-width) dashed var(--docs-document-border);
   border-radius: var(--ce-radius-8);
-  background: var(--ce-color-white);
-  color: var(--retro-ink);
+  background: var(--docs-document);
+  color: var(--docs-document-text);
   font-weight: 700;
 }
 
@@ -346,17 +359,6 @@
   color: var(--docs-panel-text);
   font-family: var(--ce-font-mono);
   font-size: 0.9rem;
-}
-
-.sessionContractsGroup {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 10px;
-  border: var(--ce-border-control-width) solid var(--docs-border);
-  border-radius: var(--ce-radius-10);
-  background: var(--docs-surface-alt);
-  box-shadow: var(--ce-shadow-raised);
 }
 
 .contractsSection {
@@ -876,19 +878,6 @@
 .collapseButton:active {
   transform: translateY(1px);
   box-shadow: var(--ce-shadow-pressed);
-}
-
-@media (forced-colors: active) {
-  .docsGithubLink {
-    border-color: LinkText;
-    color: LinkText;
-  }
-
-  .docsInlineCode {
-    border-color: CanvasText;
-    background: Canvas;
-    color: CanvasText;
-  }
 }
 
 @media (max-width: 640px) {

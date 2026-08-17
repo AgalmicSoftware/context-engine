@@ -1,7 +1,9 @@
 import { ethers } from 'ethers';
 
 import SBTPage from './SBTPage';
+import SbtPageActionsSection from './SbtPageActionsSection';
 import SbtPageIdentityPanel from './SbtPageIdentityPanel';
+import SbtPageMoreDetailsSection from './SbtPageMoreDetailsSection';
 import SbtPageRelevantInfo from './SbtPageRelevantInfo';
 import SbtPageStatsSection from './SbtPageStatsSection';
 import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
@@ -44,6 +46,12 @@ const createSubject = (props = {}) => {
 const findElementInTree = (node, predicate) => {
   if (!node || typeof node !== 'object') return null;
   if (predicate(node)) return node;
+  if (RESOLVABLE_TREE_COMPONENTS.has(node.type)) {
+    if (!resolvedTreeComponentCache.has(node)) {
+      resolvedTreeComponentCache.set(node, node.type(node.props || {}));
+    }
+    return findElementInTree(resolvedTreeComponentCache.get(node), predicate);
+  }
   const children = node?.props?.children;
   if (Array.isArray(children)) {
     for (const child of children) {
@@ -65,6 +73,12 @@ const treeIncludesText = (node, text) => {
     return node.some((entry) => treeIncludesText(entry, text));
   }
   if (typeof node === 'object') {
+    if (RESOLVABLE_TREE_COMPONENTS.has(node.type)) {
+      if (!resolvedTreeComponentCache.has(node)) {
+        resolvedTreeComponentCache.set(node, node.type(node.props || {}));
+      }
+      return treeIncludesText(resolvedTreeComponentCache.get(node), text);
+    }
     return treeIncludesText(node?.props?.children, text);
   }
   return false;
@@ -125,9 +139,10 @@ describe('SBTPage metadata display', () => {
     };
 
     const tree = subject.render();
-    expect(treeIncludesText(tree, 'Admin:')).toBe(true);
-    expect(treeIncludesText(tree, 'Creator:')).toBe(true);
-    expect(treeIncludesText(tree, 'Deployer:')).toBe(false);
+    const statsTree = renderStatsSectionTree(tree);
+    expect(treeIncludesText(statsTree, 'Admin:')).toBe(true);
+    expect(treeIncludesText(statsTree, 'Creator:')).toBe(true);
+    expect(treeIncludesText(statsTree, 'Deployer:')).toBe(false);
   });
 
   it('hides the docs entry section in UX while keeping the rest of the page visible', () => {
@@ -516,11 +531,13 @@ describe('SBTPage metadata display', () => {
     expect(sbtImage.props.src).toBe(defaultSbtImage);
   });
 
-  it('falls back to the default badge when the preferred Arweave image URL fails', () => {
+  it('falls back through Arweave gateways before the default badge', () => {
     const txId = 'DqYBh1qm9GvaTOGkF5R7abnLoB3OPiXNNBcTsYPtlRc';
     const preferredGateway = 'https://arweave.net'; // intentional: real URL - verifies production gateway fallback order
+    const arIoGateway = 'https://ar-io.dev'; // intentional: real URL - verifies production gateway fallback order
+    const fallbackGateway = 'https://gateway.irys.xyz'; // intentional: real URL - verifies production gateway fallback order
     const arIoSubdomainGateway = 'https://b2tadb22u32gxwsm4gsbpfd3ng44xia5zy7cltjuc4j3da7nsulq.ar-io.dev'; // intentional: real URL - verifies AR.IO subdomain parsing
-    globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
+    globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = false;
     const subject = createSubject({
       SBTAddress: '0x00000000000000000000000000000000000000a1',
     });
@@ -546,9 +563,15 @@ describe('SBTPage metadata display', () => {
     expect(firstAttempt.src).toBe(`${preferredGateway}/${txId}`);
 
     subject.handleDisplayImageError(firstAttempt);
-    subject.handleDisplayImageError(firstAttempt);
+    const secondAttempt = getDisplayImageRenderState(subject.state.sbtInfo, subject.state, defaultSbtImage);
+    expect(secondAttempt.src).toBe(`${arIoGateway}/${txId}`);
+    subject.handleDisplayImageError(secondAttempt);
 
-    expect(subject.state.displayImageFallbackIndex).toBe(1);
+    const thirdAttempt = getDisplayImageRenderState(subject.state.sbtInfo, subject.state, defaultSbtImage);
+    expect(thirdAttempt.src).toBe(`${fallbackGateway}/${txId}`);
+    subject.handleDisplayImageError(thirdAttempt);
+
+    expect(subject.state.displayImageFallbackIndex).toBe(3);
 
     const tree = subject.render();
     const sbtImage = findElementInTree(

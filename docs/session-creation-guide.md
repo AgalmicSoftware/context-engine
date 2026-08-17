@@ -24,9 +24,10 @@ identity is recorded in a public EVM registry; its pills list the AI, Arweave,
 RPC, and testnet-gas inputs without exposing internal runtime terminology.
 
 For the default `Fast & Cheap (Cloudflare)` preset, the user needs a Cloudflare
-account and one API key for the selected AI provider. The native deploy button
-runs in Cloudflare and does not ask for a Cloudflare API token, OAuth token,
-Context Engine deploy helper, or local agent.
+account and one API key for the selected AI provider. The native path is a
+guided Cloudflare dashboard handoff: it does not ask for a Cloudflare API token,
+OAuth token, Context Engine deploy helper, or local agent, but it is not a
+browser OAuth callback or a one-click deployment.
 
 The app's passkey-derived EOA supplies the admin identity and signs the worker
 config, but it does not submit a transaction and needs no gas. Context Engine
@@ -262,7 +263,7 @@ separate Continue action for a new selection:
 - `Fast & Cheap (Cloudflare)` compiles to a Cloudflare-backed,
   worker-canonical session shape with Cloudflare-internal worker encryption
   (`worker_envelope`) enabled by default. After selection, the requirements
-  banner lists exactly the Cloudflare API token and one AI-provider key. It does
+  banner lists exactly a Cloudflare account and one AI-provider key. It does
   not ask for Arweave, Lit, RPC, funding, faucet, or gas inputs.
 - `Trustless & Public (Decentralized)` compiles to the public Arweave +
   EVM-registry session shape. Its requirements banner lists a compatible
@@ -504,17 +505,20 @@ publication. Registry and Arweave remain canonical for decentralized sessions.
 
 In the default native handoff you provide:
 
-- Cloudflare API token
+- a Cloudflare account and dashboard deployment
 - one OpenAI / Anthropic / OpenRouter key matching the selected AI models
 
-The wizard derives the worker name. Advanced profiles may additionally expose
+The wizard generates the session slug, passkey-derived public admin address,
+and two independent Worker runtime secrets. It provides a copy control for each
+value, opens Cloudflare in a separate tab, and waits for the creator to return
+with the resulting `workers.dev` URL. Advanced profiles may additionally expose
 Arweave, Lit, RPC, faucet, or custom-provider inputs when their selected
 capabilities actually require them.
 
 Common combinations:
 
 - Default Fast & Cheap session:
-  - Cloudflare API token
+  - Cloudflare account
   - one AI provider key matching the selected models
 - Worker/SBT hybrid:
   - Cloudflare account, AI provider key, and RPC
@@ -534,9 +538,13 @@ Common combinations:
 What happens during deploy:
 
 - The deploy-helper calls Cloudflare’s Workers API
-- For a worker-canonical publish, it creates an isolated physical worker name
-  by appending a random deployment suffix to the requested display name. A
-  retry cannot overwrite an earlier same-name worker.
+- For every first-party publish, it creates an isolated physical worker name by
+  deriving a deterministic suffix from the publish generation's stable
+  `deploymentRequestId`. A retry after a lost or gateway-shaped response reuses
+  that ID and resumes or replays the same physical deployment instead of
+  allocating another worker. Starting an explicit new generation produces a
+  new deterministic identity; only legacy requests without an ID receive a
+  random suffix.
 - It fetches the account `workers.dev` subdomain and creates/changes it only when explicitly needed
 - It returns the final worker URL
 - The wizard auto-fills `corsWorkerUrl`
@@ -937,7 +945,9 @@ For the default native handoff, check these first:
 
 - the selected Cloudflare account owns the newly deployed Worker
 - the account has an active `workers.dev` subdomain
-- the deploy helper can confirm the generated physical worker name is absent
+- all four setup values were copied into the matching Cloudflare fields
+- the returned URL is the HTTPS `workers.dev` origin, without a path
+- the Worker allows the current Context Engine browser origin
 
 If deployment succeeds but verification fails:
 

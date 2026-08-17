@@ -37,6 +37,7 @@ test('collectNodeTestFiles recursively includes classified root, script, and sha
     writeFile(rootDir, 'tests/root/rpcDefaults.compat.test.js');
     writeFile(rootDir, 'tests/root/sessionCorsWorker.faucet-proof.test.mjs');
     writeFile(rootDir, 'tests/root/private-runtime.private.test.mjs');
+    writeFile(rootDir, 'scripts/pre-push-guard.test.js');
     writeFile(rootDir, 'scripts/verify-test-wiring.test.js');
     writeFile(rootDir, 'scripts/verify-public-release-pii.test.js');
     writeFile(rootDir, 'scripts/run-node-tests.test.js');
@@ -67,6 +68,7 @@ test('collectNodeTestFiles recursively includes classified root, script, and sha
       path.join('scripts', 'nested', 'recovery', 'checkpoint.test.mjs'),
       path.join('scripts', 'pre-push-guard.test.js'),
       path.join('scripts', 'run-node-tests.test.js'),
+      path.join('scripts', 'verify-public-release-pii.test.js'),
       path.join('scripts', 'verify-test-wiring.test.js'),
     ]);
     assert.equal(new Set(collectNodeTestFiles(rootDir)).size, collectNodeTestFiles(rootDir).length);

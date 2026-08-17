@@ -8,12 +8,13 @@ import {
 import type { AgentClientLoginEnvelope } from './agentClientLogin';
 
 const envelope: AgentClientLoginEnvelope = {
-  v: 1,
+  v: 2,
   sessionSlug: 'alpha',
   expiresAt: '2026-07-05T00:00:00.000Z',
   address: '0x1111111111111111111111111111111111111111',
   capabilities: { readQuestions: true, readResults: true, submitAnswers: true },
-  credential: { kind: 'session_worker_jwt', token: 'jwt-session-token' },
+  bridgeCredential: { kind: 'agent_bridge_browser_token', token: 'bridge-browser-token' },
+  workerCredential: { kind: 'session_worker_jwt', token: 'jwt-session-token' },
   agentBridgeUrl: 'https://bridge.example',
   buckets: {
     categories: [{ categoryId: 'role', label: 'Role', options: [{ optionId: 'builder', label: 'Builder' }] }],
@@ -93,7 +94,7 @@ describe('telegramSessionBackend', () => {
       'https://bridge.example/api/agent/preferences',
       expect.objectContaining({
         method: 'POST',
-        headers: expect.objectContaining({ Authorization: 'Bearer jwt-session-token' }),
+        headers: expect.objectContaining({ Authorization: 'Bearer bridge-browser-token' }),
       }),
     );
   });

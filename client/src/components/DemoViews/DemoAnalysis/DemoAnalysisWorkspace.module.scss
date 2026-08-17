@@ -106,6 +106,7 @@
   font-size: 0.88rem;
   font-weight: 650;
   line-height: 1.1;
+  text-decoration: none;
   cursor: pointer;
   box-shadow: 0 4px 12px color-mix(in srgb, var(--ce-status-info) 8%, transparent);
   transition:
@@ -754,67 +755,6 @@
   line-height: 1.55;
 }
 
-.mapSelectedQuestionPanel {
-  display: grid;
-  gap: 0.45rem;
-  border-top: 1px solid #d7dde5;
-  background: rgba(248, 249, 252, 0.98);
-  padding: 0.95rem 1rem 1.05rem;
-}
-
-.mapSelectedQuestionLabel {
-  color: #495057;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.mapSelectedQuestionText {
-  margin: 0;
-  color: #212529;
-  font-size: 1rem;
-  font-weight: 600;
-  line-height: 1.45;
-}
-
-.mapFrameCompact {
-  align-items: center;
-  display: flex;
-  justify-content: center;
-  margin-top: 0;
-  padding: 0.2rem 0 0.1rem;
-
-  :global(svg) {
-    height: auto;
-    width: min(100%, 420px);
-  }
-}
-
-.modalBackdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.75rem 0.75rem 0.25rem;
-}
-
-.mapFrameViewportEmpty {
-  min-height: 280px;
-  padding: 1.5rem;
-  text-align: center;
-}
-
-.mapViewportHint {
-  margin: 0;
-  max-width: 34rem;
-  color: #5f6b7a;
-  font-size: 1rem;
-  line-height: 1.55;
-}
-
 .mapFrameCompact {
   align-items: center;
   display: flex;
@@ -863,11 +803,11 @@
   }
 
   .mapFrameCompact {
-    padding-top: 0.35rem;
+    padding-top: 0;
   }
 
   .mapFrameCompact :global(svg) {
-    max-width: 100%;
+    max-width: none;
     width: 100%;
   }
 

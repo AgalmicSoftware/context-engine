@@ -57,7 +57,7 @@ const buildMockSponsoredBundle = () => ({
     createdBy: '0xadmin',
     expiresAt: '2099-03-21T12:00:00.000Z',
     sourceSessionSlug: 'source-session',
-    sourceWorkerUrl: 'https://source-worker.example',
+    sourceWorkerUrl: 'https://source-worker.example.test',
   },
 });
 const buildMockPendingSbtDraft = ({
@@ -191,7 +191,7 @@ jest.mock('../../utilities/arweave/arweaveClient.js', () => ({
   arweaveClient: {
     uploadDataToArweave: jest.fn(),
     downloadDataFromArweave: (...args) => mockDownloadDataFromArweave(...args),
-    buildArweaveGatewayUrl: jest.fn((txId) => `https://arweave.net/${txId}`),
+    buildArweaveGatewayUrl: jest.fn((txId) => `https://arweave.example.test/${txId}`),
   },
 }));
 
@@ -339,7 +339,22 @@ const selectNormalModeCard = (label) => {
   fireEvent.click(screen.getByRole('button', { name: new RegExp(label, 'i') }));
 };
 const selectCloudflarePreset = () => {
-  fireEvent.click(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare'));
+  const preset = screen.queryByTestId('ce-new-preset-fast_cheap_cloudflare');
+  if (!preset) return;
+  fireEvent.click(preset);
+  const continueButton = screen.queryByTestId('ce-new-preset-continue');
+  if (continueButton && !continueButton.disabled) {
+    fireEvent.click(continueButton);
+  }
+};
+const selectDecentralizedPreset = () => {
+  const preset = screen.queryByTestId('ce-new-preset-trustless_public_decentralized');
+  if (!preset) return;
+  fireEvent.click(preset);
+  const continueButton = screen.queryByTestId('ce-new-preset-continue');
+  if (continueButton && !continueButton.disabled) {
+    fireEvent.click(continueButton);
+  }
 };
 const deployVerifiedWorkerForCurrentDraft = async () => {
   let publicConfig = {};
@@ -1021,11 +1036,11 @@ describe('SessionWizard rendered validation', () => {
   });
 
   it('checks session slug collisions before publish upload or register side effects', async () => {
-    const { arweaveScripts } = require('../../utilities/arweave/arweaveScripts.js');
+    const { arweaveClient } = require('../../utilities/arweave/arweaveClient.js');
     let publishClicked = false;
     mockSessionExists.mockImplementation(async () => publishClicked);
     renderLoggedInSessionWizard();
-    selectCloudflarePreset();
+    selectDecentralizedPreset();
     enableAdvancedMode();
     const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
     const slugInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG);
@@ -1054,7 +1069,7 @@ describe('SessionWizard rendered validation', () => {
     expect(await screen.findByText('Session slug already exists on-chain: duplicate-session')).toBeInTheDocument();
     expect(mockSessionExists).toHaveBeenCalledWith('duplicate-session');
     expect(mockCreateSBT).not.toHaveBeenCalled();
-    expect(arweaveScripts.uploadDataToArweave).not.toHaveBeenCalled();
+    expect(arweaveClient.uploadDataToArweave).not.toHaveBeenCalled();
     expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
   });
 

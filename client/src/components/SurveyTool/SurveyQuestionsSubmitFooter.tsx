@@ -15,39 +15,34 @@ import {
   buildSurveyQuestionsSubmitAuxIconClassName,
   SURVEY_QUESTIONS_SUBMISSION_ERROR_STYLE,
   SURVEY_QUESTIONS_SUBMIT_ICON_STYLE,
+  type SurveyQuestionsSubmitFooterDisplayState,
 } from './surveyQuestionsTypes.js';
 
 type SurveyQuestionsSubmitFooterProps = {
+  displayState?: Partial<SurveyQuestionsSubmitFooterDisplayState>;
   isSingleQuestionView?: boolean;
   isSubmitting?: boolean;
   onPrimarySubmitClick: () => void;
   onRevertPendingChanges: () => void;
   pendingEditCount?: number;
   responseUrl?: string;
-  showSubmitAux?: boolean;
   submitButtonText?: React.ReactNode;
-  submitDisabled?: boolean;
-  submittedIndicatorActive?: boolean;
   submissionError?: string;
-  uploadStatusText?: React.ReactNode;
 };
 
 const renderSubmissionErrorText = (submissionError: string): string =>
   submissionError.length > 50 ? `${submissionError.substring(0, 47)}...` : submissionError;
 
 const SurveyQuestionsSubmitFooter = ({
+  displayState = {},
   isSingleQuestionView = false,
   isSubmitting = false,
   onPrimarySubmitClick,
   onRevertPendingChanges,
   pendingEditCount = 0,
   responseUrl = '',
-  showSubmitAux = false,
   submitButtonText = '',
-  submitDisabled = false,
-  submittedIndicatorActive = false,
   submissionError = '',
-  uploadStatusText = 'Uploading...',
 }: SurveyQuestionsSubmitFooterProps): React.ReactElement => {
   const {
     showSubmitAux = false,

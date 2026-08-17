@@ -1,7 +1,7 @@
 import {
   E2E_TESTIDS,
   REGISTRY_CACHE_KEY,
-  arweaveScripts,
+  arweaveClient,
   cacheScripts,
   collectTreeNodes,
   contractScripts,

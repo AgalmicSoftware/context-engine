@@ -121,23 +121,20 @@ export function resolveSessionWizardPublishReadiness({
   const modeRequirements = resolveSessionWizardModeRequirements(sessionModeProfile);
   const hasCompatibleWorkerRuntime =
     !!resolvedWorkerBaseUrl &&
-    ((workerMode === 'default' && usesDefaultWorkerUrl) ||
-      (deployVerifiedInUi && deployWorkerMatchesConfiguredUrl));
+    ((workerMode === 'default' && usesDefaultWorkerUrl) || (deployVerifiedInUi && deployWorkerMatchesConfiguredUrl));
   const canUploadMetadataNow = hasCompatibleWorkerRuntime;
   const uploadBlockedReason = !resolvedWorkerBaseUrl
     ? 'Set a worker URL before uploading metadata.'
-    : workerMode !== 'default' && !usesDefaultWorkerUrl && !deployVerifiedInUi
+    : workerMode !== 'default' && !deployVerifiedInUi
       ? 'Custom worker mode requires a successful deploy in this run before metadata upload.'
-      : workerMode !== 'default' && !usesDefaultWorkerUrl && deployVerifiedInUi && !deployWorkerMatchesConfiguredUrl
+      : workerMode !== 'default' && deployVerifiedInUi && !deployWorkerMatchesConfiguredUrl
         ? 'Configured worker URL differs from the last successful deploy URL; re-deploy or reset to the verified URL.'
         : 'Deploy the worker and ensure the worker URL is set before uploading metadata.';
   const hasManualMetadata = !!normalizeSessionWizardArweaveUri(manualMetadataUrl);
   const hasUploadedMetadata = !!normalizeSessionWizardArweaveUri(metadataUrl);
   // Regression guard: a URL only proves where a custom worker lives. It does
   // not prove that post-deploy config and required secrets reached that worker.
-  const canPersistWorkerConfigNow =
-    modeRequirements.isWorkerCanonical &&
-    hasCompatibleWorkerRuntime;
+  const canPersistWorkerConfigNow = modeRequirements.isWorkerCanonical && hasCompatibleWorkerRuntime;
   const workerRuntimeReady = !modeRequirements.usesWorkerRuntime || hasCompatibleWorkerRuntime;
   const canPublishNow = modeRequirements.isWorkerCanonical
     ? canPersistWorkerConfigNow || canUseSponsoredAutoDeployNow
@@ -154,14 +151,14 @@ export function resolveSessionWizardPublishReadiness({
     : modeRequirements.usesWorkerRuntime && !hasCompatibleWorkerRuntime && !canUseSponsoredAutoDeployNow
       ? 'blocked'
       : hasManualMetadata
-      ? 'manual-metadata'
-      : hasUploadedMetadata
-        ? 'uploaded-metadata'
-        : canUploadMetadataNow
-          ? 'worker-upload'
-          : canUseSponsoredAutoDeployNow
-            ? 'sponsored-auto-deploy'
-            : 'blocked';
+        ? 'manual-metadata'
+        : hasUploadedMetadata
+          ? 'uploaded-metadata'
+          : canUploadMetadataNow
+            ? 'worker-upload'
+            : canUseSponsoredAutoDeployNow
+              ? 'sponsored-auto-deploy'
+              : 'blocked';
   const showUploadBlockedReason =
     !modeRequirements.isWorkerCanonical &&
     !canPublishNow &&

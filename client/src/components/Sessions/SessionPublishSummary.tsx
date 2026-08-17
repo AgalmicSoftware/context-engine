@@ -114,6 +114,8 @@ const SessionPublishSummary = ({
   const { displayMode, publishAdvancedOpen } = publishActionDisplayState;
   const isNormalDisplayMode = displayMode === 'normal';
   const { showUploadBlockedReason, uploadBlockedReason } = publishReadiness;
+  const showPublishSettingsButton =
+    publishSettingsCapabilities.showArweaveMetadataControls || publishSettingsCapabilities.showGasOverrideControls;
 
   return (
     <section id="session-wizard-section-publish" className={styles.panel}>
@@ -140,6 +142,7 @@ const SessionPublishSummary = ({
                 displayState={publishActionDisplayState}
                 onPublish={onPublish}
                 onTogglePublishAdvanced={onTogglePublishAdvanced}
+                showSettingsButton={showPublishSettingsButton}
               />
             </div>
           ) : (
@@ -182,6 +185,7 @@ const SessionPublishSummary = ({
               onManualMaxFeePerGasGweiChange={onManualMaxFeePerGasGweiChange}
               onManualMaxPriorityFeePerGasGweiChange={onManualMaxPriorityFeePerGasGweiChange}
               onManualMetadataUrlChange={onManualMetadataUrlChange}
+              publishSettingsCapabilities={publishSettingsCapabilities}
               renderInfoTooltip={renderInfoTooltip}
               resolvedWorkerBaseUrl={resolvedWorkerBaseUrl}
               workerUrlSource={workerUrlSource}
@@ -191,6 +195,7 @@ const SessionPublishSummary = ({
           <SessionPublishResultLinks
             adminUrl={adminUrl}
             adminUrlStatus={adminUrlStatus}
+            onCreateAnotherSession={onCreateAnotherSession}
             onCopyAdminUrl={onCopyAdminUrl}
             publishMetadataDisplayState={publishMetadataDisplayState}
             publishedPendingSbtLinks={publishedPendingSbtLinks}

@@ -385,6 +385,27 @@ const ComparisonReport = ({
     setInternalSelectedTagIDs(next);
   };
 
+  const buildDistributionDatasets = (item: AnalysisRow): DistributionDataset[] => {
+    const questionRows = flatResponses.filter((row) => String(row.questionId) === String(item.questionId));
+    const responseTexts = getOrderedResponseTexts(questionRows, item.responseText);
+
+    return comparisonGroups.map((group) => {
+      const groupRows = questionRows.filter((row) => row.segmentKey === group.segmentKey);
+      return {
+        groupName: group.name,
+        segmentKey: group.segmentKey,
+        meta: formatDistributionMeta(groupRows),
+        rows: responseTexts.map((responseText) => {
+          const matchingRow = groupRows.find((row) => row.responseText === responseText);
+          return {
+            responseText,
+            rate: Math.max(0, Math.min(1, Number(matchingRow?.rate || 0))),
+          };
+        }),
+      };
+    });
+  };
+
   const renderBeeswarmPlot = () => {
     if (comparisonGroups.length < 2) {
       return <p className={styles.noData}>Please select at least two demographic groups to compare.</p>;
@@ -455,25 +476,14 @@ const ComparisonReport = ({
 
     return (
       <ul className={styles.analysisList}>
-        {items.map((item) => {
-          const colorizedGroupRates = item.groupRates.map((groupRate, index) => ({
-            ...groupRate,
-            color: groupColorScale(index),
-          }));
-          const scoreElement = type === 'Consensus'
-            ? <ConsensusVisualizer groupRates={colorizedGroupRates} colorScale={groupColorScale} />
-            : <DivergenceVisualizer groupRates={colorizedGroupRates} colorScale={groupColorScale} />;
-
-          return (
-            <li key={`${type}:${item.questionId}:${item.responseText}`} className={styles.analysisListItem}>
-              <div className={styles.reportAnalysisContent}>
-                <div className={styles.questionText}>{item.questionText}</div>
-                <ResponseLine responseText={item.responseText} />
-                <div className={styles.scoreVisualizerContainer}>{scoreElement}</div>
-              </div>
-            </li>
-          );
-        })}
+        {dedupeAnalysisItemsByQuestion(items).map((item) => (
+          <li key={`${type}:${item.questionId}`} className={styles.analysisListItem}>
+            <div className={styles.reportAnalysisContent}>
+              <div className={styles.questionText}>{item.questionText}</div>
+              <DistributionCandlesticks datasets={buildDistributionDatasets(item)} />
+            </div>
+          </li>
+        ))}
       </ul>
     );
   };

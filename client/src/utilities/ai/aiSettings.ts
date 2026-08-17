@@ -20,6 +20,91 @@ import { createLogger } from '../logging.js';
 
 const log = createLogger('aiSettings');
 
+type UnknownRecord = Record<string, unknown>;
+type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
+type AiTaskReasoningEffort = {
+  generate: string | null;
+  rewrite: string | null;
+  summarize: string | null;
+  rank: string | null;
+};
+type NormalizedAiProviderSettings = UnknownRecord & {
+  apiKey: string;
+  encryptedApiKey: string;
+  rpcUrl?: string;
+  functions?: string;
+};
+type NormalizedTranscriptionSettings = {
+  provider: string;
+  model: string;
+  rpcUrl: string;
+};
+type NormalizedAiSettings = UnknownRecord & {
+  useLocal?: boolean;
+  preset: string;
+  mode: string;
+  reasoningEffort: string;
+  taskReasoningEffort: AiTaskReasoningEffort;
+  models: Record<string, string>;
+  modelProviders: Record<string, string>;
+  transcription: NormalizedTranscriptionSettings;
+  providers: Record<string, NormalizedAiProviderSettings>;
+  _sessionSlug?: string;
+  _sessionName?: string;
+  _sessionConfigSource?: string;
+};
+type AiPresetConfig = {
+  provider: string;
+  models: Record<string, string>;
+};
+type AiSettingsEnvelopeMetadata = UnknownRecord & {
+  encryptedAvailable?: boolean;
+  legacyPlaintextDetected?: boolean;
+  requiresWallet?: boolean;
+};
+type AiSettingsEnvelopeRecord = UnknownRecord & {
+  v?: unknown;
+  kind?: unknown;
+  settings?: unknown;
+  metadata?: AiSettingsEnvelopeMetadata;
+};
+type LocalAiSettingsEnvelopeResult =
+  | {
+      ok: true;
+      status: string;
+      settings: NormalizedAiSettings;
+      metadata: AiSettingsEnvelopeMetadata;
+      error?: never;
+    }
+  | {
+      ok: false;
+      status: string;
+      settings: null;
+      metadata: AiSettingsEnvelopeMetadata;
+      error?: string;
+    };
+type AiSecretResolutionMeta = {
+  apiKey: string;
+  status: string;
+  encryptedAvailable: boolean;
+};
+type AiWalletContext = {
+  account?: unknown;
+  providerLike?: unknown;
+  chainId?: unknown;
+  lit?: unknown;
+};
+type LitHooksLike = UnknownRecord & {
+  getKey?: (...args: unknown[]) => unknown;
+};
+
+const isRecord = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
+const asRecord = (value: unknown): UnknownRecord => (isRecord(value) ? value : {});
+const asProviderEntry = (value: unknown): NormalizedAiProviderSettings => normalizeProvider(value);
+const getErrorMessage = (error: unknown): string =>
+  isRecord(error) && typeof error.message === 'string' ? error.message : toStr(error);
+
 export const AI_PROVIDERS = Object.freeze({
   ANTHROPIC: 'anthropic',
   OPENAI: 'openai',
@@ -156,9 +241,9 @@ export const deriveAiPreset = ({
   );
   return match ? match[0] : 'custom';
 };
-const normalizeTaskReasoningEffort = (raw = {}) => {
-  const obj = raw && typeof raw === 'object' ? raw : {};
-  const hasOwn = (key) => Object.prototype.hasOwnProperty.call(obj, key);
+const normalizeTaskReasoningEffort = (raw: unknown = {}): AiTaskReasoningEffort => {
+  const obj = asRecord(raw);
+  const hasOwn = (key: string) => Object.prototype.hasOwnProperty.call(obj, key);
   return {
     generate: hasOwn('generate')
       ? normalizeOptionalReasoningEffort(obj.generate)
@@ -220,8 +305,8 @@ const hasProviderEncryptedKey = (entry: unknown = {}): boolean => !!toStr(asReco
 // the envelope writer so normal saves cannot downgrade or leak apiKey values.
 let volatileLocalAiProviderKeys: Record<string, string> = {};
 
-const summarizeAiSettingsSecretMetadata = (settings = {}) => {
-  const providers = settings?.providers && typeof settings.providers === 'object' ? settings.providers : {};
+const summarizeAiSettingsSecretMetadata = (settings: Partial<NormalizedAiSettings> | null = {}) => {
+  const providers = asRecord(settings?.providers);
   const entries = Object.values(providers);
   return {
     encryptedAvailable: entries.some((entry) => hasProviderEncryptedKey(entry)),
@@ -229,8 +314,8 @@ const summarizeAiSettingsSecretMetadata = (settings = {}) => {
   };
 };
 
-const rememberVolatilePlaintextProviderKeys = (settings = {}) => {
-  const providers = settings?.providers && typeof settings.providers === 'object' ? settings.providers : {};
+const rememberVolatilePlaintextProviderKeys = (settings: unknown = {}) => {
+  const providers = asRecord(asRecord(settings).providers);
   volatileLocalAiProviderKeys = {
     ...volatileLocalAiProviderKeys,
     ...Object.entries(providers).reduce<Record<string, string>>((acc, [provider, entry]) => {
@@ -270,7 +355,7 @@ const overlayVolatilePlaintextProviderKeys = (settings: NormalizedAiSettings): N
 
 const stripPlaintextProviderKeys = (settings: NormalizedAiSettings): NormalizedAiSettings => {
   const normalized = normalizeAiSettings(settings, { includeUseLocal: true });
-  const providers = normalized.providers && typeof normalized.providers === 'object' ? normalized.providers : {};
+  const providers = asRecord(normalized.providers);
   return {
     ...normalized,
     providers: Object.entries(providers).reduce<Record<string, NormalizedAiProviderSettings>>(
@@ -286,8 +371,8 @@ const stripPlaintextProviderKeys = (settings: NormalizedAiSettings): NormalizedA
   };
 };
 
-const normalizeProvider = (raw = {}, extras = {}) => {
-  const obj = raw && typeof raw === 'object' ? raw : {};
+function normalizeProvider(raw: unknown = {}, extras: UnknownRecord = {}): NormalizedAiProviderSettings {
+  const obj = asRecord(raw);
   return {
     ...extras,
     apiKey: toStr(obj.apiKey || obj.key || obj.token || ''),
@@ -295,10 +380,9 @@ const normalizeProvider = (raw = {}, extras = {}) => {
   };
 }
 
-const normalizeModels = (raw = {}, fallbackProvider, providerOverridesRaw = {}) => {
-  const obj = raw && typeof raw === 'object' ? raw : {};
-  const providerOverrides =
-    providerOverridesRaw && typeof providerOverridesRaw === 'object' ? providerOverridesRaw : {};
+const normalizeModels = (raw: unknown = {}, fallbackProvider: unknown, providerOverridesRaw: unknown = {}) => {
+  const obj = asRecord(raw);
+  const providerOverrides = asRecord(providerOverridesRaw);
   const fastProviderOverride = toLower(providerOverrides.fast || providerOverrides.default || '');
   const thinkingProviderOverride = toLower(providerOverrides.thinking || providerOverrides.reasoning || '');
   const normalizeEntry = (entry: unknown, fallbackModel: string, providerFallback: unknown) => {
@@ -335,8 +419,8 @@ const normalizeModels = (raw = {}, fallbackProvider, providerOverridesRaw = {}) 
   };
 };
 
-const normalizeTranscription = (raw = {}) => {
-  const obj = raw && typeof raw === 'object' ? raw : {};
+const normalizeTranscription = (raw: unknown = {}): NormalizedTranscriptionSettings => {
+  const obj = asRecord(raw);
   return {
     provider: toLower(obj.provider || DEFAULT_TRANSCRIPTION.provider) || DEFAULT_TRANSCRIPTION.provider,
     model: toStr(obj.model || DEFAULT_TRANSCRIPTION.model),
@@ -378,7 +462,10 @@ const applyAiPresetConfig = (settings: unknown = {}, presetKey = ''): Normalized
   };
 };
 
-export const applyPreLoginAiProviderKeyChange = (settings = {}, { provider, apiKey } = {}) => {
+export const applyPreLoginAiProviderKeyChange = (
+  settings: unknown = {},
+  { provider, apiKey }: { provider?: unknown; apiKey?: unknown } = {},
+): NormalizedAiSettings => {
   const nextProvider = toLower(provider || '');
   const current = normalizeAiSettings(settings, { includeUseLocal: true });
   const nextKey = toStr(apiKey || '');
@@ -434,7 +521,7 @@ export const normalizeAiSettings = (
   opts: { includeUseLocal?: boolean } = {},
 ): NormalizedAiSettings => {
   const includeUseLocal = opts.includeUseLocal !== false;
-  const obj = raw && typeof raw === 'object' ? raw : {};
+  const obj = asRecord(raw);
 
   const mode = toLower(obj.mode || obj.provider || DEFAULT_SETTINGS.mode) || DEFAULT_SETTINGS.mode;
   const reasoningEffort = normalizeReasoningEffort(obj.reasoningEffort || obj.reasoning_effort);
@@ -450,8 +537,8 @@ export const normalizeAiSettings = (
     modelProviders: normalizedModels.modelProviders,
   });
 
-  const providersRaw = obj.providers && typeof obj.providers === 'object' ? obj.providers : {};
-  const customRaw = providersRaw.custom || obj.custom || {};
+  const providersRaw = asRecord(obj.providers);
+  const customRaw = asRecord(providersRaw.custom || obj.custom);
   let customFunctions = '';
   if (typeof customRaw.functions === 'string') {
     customFunctions = customRaw.functions;
@@ -485,7 +572,8 @@ export const normalizeAiSettings = (
   };
 };
 
-const buildDefaultAiSettings = (includeUseLocal = true) => normalizeAiSettings(DEFAULT_SETTINGS, { includeUseLocal });
+const buildDefaultAiSettings = (includeUseLocal = true): NormalizedAiSettings =>
+  normalizeAiSettings(DEFAULT_SETTINGS, { includeUseLocal });
 
 export const normalizeLocalAiSettingsEnvelopeRecord = (raw: unknown = null): LocalAiSettingsEnvelopeResult => {
   if (!isRecord(raw)) {
@@ -669,45 +757,47 @@ export const saveLocalAiSettings = (nextSettings: unknown = {}): NormalizedAiSet
   if (typeof window === 'undefined') return buildDefaultAiSettings(true);
   try {
     const current = getLocalAiSettings();
-    const next = nextSettings && typeof nextSettings === 'object' ? nextSettings : {};
+    const next = asRecord(nextSettings);
+    const nextProviders = asRecord(next.providers);
+    const currentProviders = current.providers || {};
     const merged = normalizeAiSettings(
       {
         ...current,
         ...next,
         models: {
           ...(current.models || {}),
-          ...(next.models || {}),
+          ...asRecord(next.models),
         },
         modelProviders: {
           ...(current.modelProviders || {}),
-          ...(next.modelProviders || {}),
+          ...asRecord(next.modelProviders),
         },
         taskReasoningEffort: {
           ...(current.taskReasoningEffort || {}),
-          ...(next.taskReasoningEffort || {}),
+          ...asRecord(next.taskReasoningEffort),
         },
         transcription: {
           ...(current.transcription || {}),
-          ...(next.transcription || {}),
+          ...asRecord(next.transcription),
         },
         providers: {
-          ...(current.providers || {}),
-          ...(next.providers || {}),
+          ...currentProviders,
+          ...nextProviders,
           anthropic: {
-            ...(current.providers?.anthropic || {}),
-            ...(next.providers?.anthropic || {}),
+            ...(currentProviders.anthropic || {}),
+            ...asRecord(nextProviders.anthropic),
           },
           openai: {
-            ...(current.providers?.openai || {}),
-            ...(next.providers?.openai || {}),
+            ...(currentProviders.openai || {}),
+            ...asRecord(nextProviders.openai),
           },
           openrouter: {
-            ...(current.providers?.openrouter || {}),
-            ...(next.providers?.openrouter || {}),
+            ...(currentProviders.openrouter || {}),
+            ...asRecord(nextProviders.openrouter),
           },
           custom: {
-            ...(current.providers?.custom || {}),
-            ...(next.providers?.custom || {}),
+            ...(currentProviders.custom || {}),
+            ...asRecord(nextProviders.custom),
           },
         },
       },
@@ -760,7 +850,7 @@ const getWalletContext = (override: AiWalletContext = {}) => {
   try {
     const state = store?.getState?.();
     const profile = state?.profile || {};
-    const network = profile.network || {};
+    const network = asRecord(profile.network);
     const chainId = override.chainId || network.id || network.chainId || null;
     return {
       account: override.account || profile.account || '',

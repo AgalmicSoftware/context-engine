@@ -96,14 +96,14 @@ describe('Footer', () => {
     expect(screen.queryByTestId('ce-footer-agalmic-link')).not.toBeInTheDocument();
   });
 
-  it('uses full-width readable footer nav links across the mobile breakpoints', () => {
+  it('keeps all five footer links on one full-width row across the mobile breakpoints', () => {
     [
       { minWidth: 0, maxWidth: 319, fontSize: 'clamp\\(0\\.56rem, 2\\.75vw, 0\\.68rem\\)' },
       { minWidth: 320, maxWidth: 465, fontSize: 'clamp\\(0\\.62rem, 2\\.45vw, 0\\.78rem\\)' },
       { minWidth: 466, maxWidth: 768, fontSize: 'clamp\\(0\\.9rem, 2\\.25vw, 1\\.08rem\\)' },
     ].forEach(({ minWidth, maxWidth, fontSize }) => {
       const breakpointRule = new RegExp(
-        `@media \\(min-width: ${minWidth}px\\) and \\(max-width: ${maxWidth}px\\) \\{[\\s\\S]*?\\.footer \\{[\\s\\S]*?nav \\{[\\s\\S]*?width: 100%;[\\s\\S]*?ul \\{[\\s\\S]*?display: grid;[\\s\\S]*?grid-template-columns: repeat\\(${columns}, minmax\\(0, 1fr\\)\\);[\\s\\S]*?justify-content: stretch;[\\s\\S]*?width: 100%;[\\s\\S]*?li \\{[\\s\\S]*?width: 100%;[\\s\\S]*?li \\.footerLink \\{[\\s\\S]*?display: flex;[\\s\\S]*?font-size: ${fontSize};[\\s\\S]*?justify-content: center;[\\s\\S]*?width: 100%;`,
+        `@media \\(min-width: ${minWidth}px\\) and \\(max-width: ${maxWidth}px\\) \\{[\\s\\S]*?\\.footer \\{[\\s\\S]*?nav \\{[\\s\\S]*?width: 100%;[\\s\\S]*?ul \\{[\\s\\S]*?display: grid;[\\s\\S]*?grid-template-columns: repeat\\(5, minmax\\(0, 1fr\\)\\);[\\s\\S]*?justify-content: stretch;[\\s\\S]*?width: 100%;[\\s\\S]*?li \\{[\\s\\S]*?width: 100%;[\\s\\S]*?li \\.footerLink \\{[\\s\\S]*?display: flex;[\\s\\S]*?font-size: ${fontSize};[\\s\\S]*?justify-content: center;[\\s\\S]*?margin-left: 0 !important;[\\s\\S]*?margin-right: 0 !important;[\\s\\S]*?white-space: nowrap;[\\s\\S]*?width: 100%;`,
       );
 
       expect(footerStylesheet).toMatch(breakpointRule);
@@ -170,7 +170,9 @@ describe('Footer', () => {
     expect(footerStylesheet).toMatch(
       /\.footer\s*{[\s\S]*?position:\s*relative;[\s\S]*?width:\s*100%;[\s\S]*?margin-top:\s*auto;[\s\S]*?background:\s*var\(--ce-control-face\);/,
     );
-    expect(footerStylesheet).not.toMatch(/@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)[\s\S]*?position:\s*fixed;/);
+    expect(footerStylesheet).not.toMatch(
+      /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)[\s\S]*?position:\s*fixed;/,
+    );
     expect(footerStylesheet).not.toMatch(/:global\(body\)\s*{[\s\S]*?padding-bottom:\s*42px;/);
   });
 

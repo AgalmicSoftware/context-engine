@@ -1,5 +1,5 @@
 import type { SbtOwnershipReadsPort } from './sbtPorts.js';
-import { bindSbtOwnershipReadsPort } from './contractScriptsSbtOwnershipReadsPort.js';
+import { bindSbtOwnershipReadsPort } from './sbtOwnershipReadsPort.js';
 
 const readSbtOwnershipSnapshot = async (port: SbtOwnershipReadsPort, sbtAddress: string, sessionSlug: string) => {
   const [owner, tokenId, historySummary] = await Promise.all([
@@ -36,27 +36,27 @@ describe('SbtOwnershipReadsPort', () => {
     expect(fakePort.getSbtHistorySummary).toHaveBeenCalledWith('none', sbtAddress, 'alpha');
   });
 
-  it('binds ownership reads through a call-time contractScripts getter', async () => {
-    const firstContractScripts = {
+  it('binds ownership reads through a call-time chainGateway getter', async () => {
+    const firstChainGateway = {
       getOwnerByTokenId: jest.fn(async () => '0x0000000000000000000000000000000000000003'),
       getSBTTokenIdByOwner: jest.fn(async () => '7'),
       getSbtHistorySummary: jest.fn(async () => ({ totalMinted: '8' })),
     };
-    const secondContractScripts = {
+    const secondChainGateway = {
       getOwnerByTokenId: jest.fn(async () => '0x0000000000000000000000000000000000000004'),
       getSBTTokenIdByOwner: jest.fn(async () => '9'),
       getSbtHistorySummary: jest.fn(async () => ({ totalMinted: '10' })),
     };
-    let currentContractScripts = firstContractScripts;
+    let currentChainGateway = firstChainGateway;
     const port = bindSbtOwnershipReadsPort({
-      contractScripts: () => currentContractScripts,
+      chainGateway: () => currentChainGateway,
     });
 
     await expect(
       port.getOwnerByTokenId('none', '0x0000000000000000000000000000000000000001', '7', 'alpha'),
     ).resolves.toBe('0x0000000000000000000000000000000000000003');
 
-    currentContractScripts = secondContractScripts;
+    currentChainGateway = secondChainGateway;
 
     await expect(
       port.getSBTTokenIdByOwner(
@@ -70,19 +70,19 @@ describe('SbtOwnershipReadsPort', () => {
       port.getSbtHistorySummary('none', '0x0000000000000000000000000000000000000002', 'beta'),
     ).resolves.toEqual({ totalMinted: '10' });
 
-    expect(firstContractScripts.getOwnerByTokenId).toHaveBeenCalledWith(
+    expect(firstChainGateway.getOwnerByTokenId).toHaveBeenCalledWith(
       'none',
       '0x0000000000000000000000000000000000000001',
       '7',
       'alpha',
     );
-    expect(secondContractScripts.getSBTTokenIdByOwner).toHaveBeenCalledWith(
+    expect(secondChainGateway.getSBTTokenIdByOwner).toHaveBeenCalledWith(
       'none',
       '0x0000000000000000000000000000000000000002',
       '0x0000000000000000000000000000000000000005',
       'beta',
     );
-    expect(secondContractScripts.getSbtHistorySummary).toHaveBeenCalledWith(
+    expect(secondChainGateway.getSbtHistorySummary).toHaveBeenCalledWith(
       'none',
       '0x0000000000000000000000000000000000000002',
       'beta',

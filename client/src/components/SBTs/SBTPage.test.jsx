@@ -6,6 +6,8 @@ import {
   cacheScripts,
   render,
   createSubject,
+  flattenText,
+  findElementInTree,
   treeIncludesText,
   createReadCachePayload,
   setupSBTPageTestLifecycle,

@@ -1,6 +1,12 @@
-import { resolvePolisReportSessionSlug } from './ceAgent.js';
+import { installCeAgent, resolvePolisReportSessionSlug } from './ceAgent.js';
 
 describe('ceAgent PolisReport contract', () => {
+  beforeEach(() => {
+    delete window.__ceAgent;
+    window.localStorage.clear();
+    window.history.pushState({}, '', '/');
+  });
+
   it('prefers an explicit params.sessionSlug', () => {
     expect(
       resolvePolisReportSessionSlug({

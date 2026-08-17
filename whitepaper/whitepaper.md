@@ -6,12 +6,6 @@
 
 For technical documentation, see [`spec.md`](../spec.md) and [`docs/`](../docs/README.md).
 
----
-
-keywords: sensemaking, deliberation, collective intelligence, discourse, debate, ethereum, coasean bargaining, cryptography, programmable cryptography, decentralized networks, agi, social infrastructure, ai policy, community currencies, coordination, negotiation, voting, democracy, zk, homomorphic encryption
-
----
-
 ## Abstract
 
 The pace of AI development has exceeded the capacity of democratic and civic institutions to deliberate in a timely and coherent way. This is partially an infrastructure problem: we lack formats and interfaces for large-scale discourse, debate, and negotiation that can withstand information overwhelm and attention scarcity.
@@ -88,7 +82,7 @@ Organizations can run a local version of the decentralized stack described above
 
 Many online communities have norms, values, and tacit knowledge in forms that cannot be easily read by outsiders and/or AI systems: chat logs, moderation histories, ongoing discussions, and informal relationships.
 
-Not every group should aim to formalize itself for outside interaction, but those which generate value through traffic, attention, and interpretation could begin to retain ownership over the data and value they create (RadicalxChange Foundation, n.d.-b; Posner & Weyl, 2018).
+Not every group should aim to formalize itself for outside interaction, but those which generate value through traffic, attention, and interpretation could begin to retain ownership over the data and value they create (RadicalxChange Foundation, n.d.-b).
 
 Context Engine points towards several directions:
 
@@ -114,7 +108,7 @@ Recurring or related communities can add or reference the same map, compare chan
 
 Groups are not only formal organizations or informal pre-existing communities. With zkTLS proofs, a group can be defined by any shared attribute or verifiable condition: web activity, student status, demographics, attendance of an event, shared beliefs, media consumption, purchase history, financial proofs, and more.
 
-This relates to the Plurality view that individuals are intersections of many groups. Programmable cryptography makes these group definitions expressible in code, and future versions of this toolkit will allow people to prove membership in one group without exposing every other affiliation.
+This relates to the Plurality view that individuals are intersections of many groups (Weyl, Tang, & the Plurality Community, 2023). Programmable cryptography makes these group definitions expressible in code, and future versions of this toolkit will allow people to prove membership in one group without exposing every other affiliation.
 
 
 ### Cities and Public Institutions
@@ -156,10 +150,6 @@ The roadmap is best understood as several related directions rather than a singl
 - **Group prompting and backcasting** — convert result clusters into scenarios groups are trying to aim for or avoid, render them as interactive media, and connect those scenarios back to present-day policy choices.
 - **Agent-to-agent negotiation tooling** — support multi-step negotiation processes involving private information.
 
-- **AI Whistleblowing Toolkit**: prove you have @aiLab.com email address using ZK → Make claims (potentially encrypted or conditionally timelocked)
-
-- **Post-quantum Cryptography**: Transition cryptographic functionalities to post-quantum versions
-
 
 ## 6. Closing Thoughts
 
@@ -169,7 +159,7 @@ A longer-term goal is cryptographic diplomacy: incentive-compatible programmatic
 
 Programmable cryptography seems like an underexplored toolkit for AI safety and alignment efforts (0xPARC, 2023). Storytelling is another area that seems underexplored in current AI alignment efforts – Context Engine is intended to help various groups define, debate, and analyze visions of possible futures, and connect them directly to present-day choices.
 
-Context Engine recognizes and builds on the pioneering work of those involved with RadicalxChange, Pol.is, vTaiwan, g0v, TalkToTheCity, Loophole, the Plurality Book, 0xPARC, Zuzalu, Edge City, MetaGov, PCARE, and many other related efforts. The author also gratefully acknowledges the AI programming assistance that finally made this effort tractable.
+Context Engine recognizes and builds on the pioneering work of those involved with RadicalxChange, Pol.is, vTaiwan, g0v, TalkToTheCity, the Plurality Book, 0xPARC, Zuzalu, Edge City, MetaGov, PCARE, and many other related efforts. The author also gratefully acknowledges the AI programming assistance that finally made this effort tractable.
 
 
 ## References
@@ -182,13 +172,9 @@ EigenLayer. (n.d.). "AVS Developer Guide." *EigenLayer Docs.* https://docs.eigen
 
 g0v. (2014). *vTaiwan: An Open Consultation Process for National Issues.* https://info.vtaiwan.tw/
 
-Griffin, C. (2024, May 30). "The AI Policy Atlas." *AI Policy Perspectives.* https://www.aipolicyperspectives.com/p/the-ai-policy-atlas
-
 Griffith, V. (2019, April 8). "Ethereum is game-changing technology, literally." *Medium.* https://medium.com/@virgilgr/ethereum-is-game-changing-technology-literally-d67e01a01cf8
 
 Henderson, J. (2025, February 7). "The Art of Broad Listening." *Combinations.* https://www.combinationsmag.com/the-art-of-broad-listening/
-
-Hogan, B. (n.d.). *Loophole: AI Policy Loophole Finder.* GitHub. https://github.com/brendanhogan/loophole
 
 Jigsaw. (n.d.). "Reimagining the Town Hall Meeting." *Jigsaw.* https://jigsaw.google/our-work/reimagining-the-town-hall-meeting/
 
@@ -198,13 +184,7 @@ Ohlhaver, P. (2025, January 2). *Community Currencies: The Price Of Attention An
 
 RadicalxChange Foundation. (n.d.-a). "Social Identity." *RadicalxChange Wiki.* https://www.radicalxchange.org/wiki/social-identity/
 
-RadicalxChange Foundation. (n.d.-a). "Social Identity." *RadicalxChange Wiki.* https://www.radicalxchange.org/wiki/social-identity/
-
 RadicalxChange Foundation. (n.d.-b). "Data Dignity." *RadicalxChange Wiki.* https://www.radicalxchange.org/wiki/data-dignity/
-
-Owocki, K. (2026, March 5). "Collective Intelligence Infrastructure: Protocols for Thinking Together." *Gitcoin.* https://gitcoin.co/research/collective-intelligence-protocols-for-thinking-together
-
-Ohlhaver, P., Weyl, E. G., & Buterin, V. (2022, May 10). *Decentralized Society: Finding Web3's Soul.* SSRN. https://doi.org/10.2139/ssrn.4105763
 
 Shi, W., Bhagia, A., Farhat, K., Muennighoff, N., Walsh, P., Morrison, J., Schwenk, D., Longpre, S., Poznanski, J., Ettinger, A., Liu, D., Li, M., Groeneveld, D., Lewis, M., Yih, W., Soldaini, L., Lo, K., Smith, N. A., Zettlemoyer, L., Koh, P. W., Hajishirzi, H., Farhadi, A., & Min, S. (2025). "FlexOlmo: Open Language Models for Flexible Data Use." *arXiv:2507.07024.* https://arxiv.org/abs/2507.07024
 

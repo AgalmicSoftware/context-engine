@@ -1,6 +1,9 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import QuestionCardLinks from './QuestionCardLinks';
+import QuestionCardLinks, {
+  buildQuestionCardBookmarkClassName,
+  resolveQuestionCardBookmarkIconStyle,
+} from './QuestionCardLinks';
 
 describe('QuestionCardLinks', () => {
   it('renders bookmark, spinner, and external links with the expected behavior', () => {

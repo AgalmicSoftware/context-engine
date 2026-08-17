@@ -95,6 +95,21 @@ export const resolveSbtListCreateGroupInitialVisibility = ({
       })
     : false;
 
+export const resolveSbtListInitialActiveSessionSlug = ({
+  globalPrimarySessionSlug,
+  routeSlug,
+  storage,
+}: ResolveSbtListInitialActiveSessionSlugArgs = {}): string => {
+  try {
+    const resolvedStorage = typeof storage === 'undefined' ? getDefaultSbtListStorage() : storage;
+    const stored = resolvedStorage?.getItem?.('dg:lastActiveSbtSession');
+    if (stored != null) return normalizeSessionSlug(stored);
+  } catch (_) {
+    // Fall through to the shared or route selection.
+  }
+  return normalizeSessionSlug(globalPrimarySessionSlug || routeSlug || '');
+};
+
 export const readSbtListUniverseCollapsedState = (storage?: SbtListStorageReader | null): boolean => {
   try {
     const resolvedStorage = typeof storage === 'undefined' ? getDefaultSbtListStorage() : storage;

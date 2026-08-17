@@ -107,6 +107,7 @@ broadcast/
 
 # Local scratch
 /.tmp/
+/.tmp-review/
 /tmp/
 /tmp-launch-channel-chrome.js
 /node-compile-cache/
@@ -117,12 +118,16 @@ broadcast/
 /ce-startup-*/
 /.jest-cache/
 /.jest-tmp/
+/.tmp-jest/
+/tmp_jest/
+/tmp_jest_cache/
 /client/.jest-cache/
 /client/.jest-tmp/
 /client/.tmp-jest/
 /client/tmp_jest/
 /client/tmp_jest_cache/
 /client/build-vite/
+/client/vite-build/
 
 # AI agent local config and skills (maintainer-only; AGENTS.md is the public surface)
 .claude/
@@ -138,6 +143,7 @@ broadcast/
 /TODO/
 /contextEngine-cc/TODO/
 /docs/internal-prds/
+/docs/potential-tools/
 /local-private-version/
 CLAUDE.md
 
@@ -192,10 +198,13 @@ whitepaper/IdeasMap.md
 client/src/components/MainSite/MainSite.module.test.js
 client/src/utilities/worker/sessionCorsWorker.*.proxy.test.js
 client/src/utilities/web3/contractScripts.*.proxy.test.js
-docs/outreach/
+
+# Private grants, applications, outreach, and relationship operations
+/outreach-and-applications/
 
 # Public release staging artifact (output of `make release`)
 /release-public/
+/private-pack.manifest.json
 
 # Python bytecode (repo includes small workflow builders)
 __pycache__/

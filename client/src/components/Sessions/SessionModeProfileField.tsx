@@ -8,6 +8,7 @@ import type { AnyRecord } from '../shellTypes';
 import { PUBLIC_GITHUB_BRANCH, PUBLIC_REPO_URL } from '../../variables/publicRepoMetadata.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
+  SESSION_MODE_DEFAULT_REGISTRY_CHAIN_ID,
   SESSION_MODE_PRESET_IDS,
   cloneSessionModePreset,
   compileSessionModeProfile,
@@ -62,6 +63,9 @@ const presetForChain = (
   const profile = cloneSessionModePreset(presetId);
   if (presetId === SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED && registryChainId) {
     profile.evm.registryChainId = registryChainId;
+    if (registryChainId !== SESSION_MODE_DEFAULT_REGISTRY_CHAIN_ID) {
+      profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    }
   }
   return profile;
 };
@@ -218,7 +222,7 @@ const SessionModeProfileField = ({
       )}
 
       {entryOnly && profile ? (
-        <div className={styles.modeSavedProfile}>
+        <div className={`${styles.modeSavedProfile} ${styles.modeSavedProfileEntry}`}>
           <span>Saved {profile.preset === SESSION_MODE_PRESET_IDS.CUSTOM ? 'custom' : 'hosting'} settings</span>
           <Button type="button" color="primary" onClick={onContinue}>
             Continue with saved settings

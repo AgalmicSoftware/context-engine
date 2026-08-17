@@ -23,9 +23,6 @@ describe('cloudflareTokenTemplate', () => {
     expect(JSON.parse(url.searchParams.get('permissionGroupKeys') || '[]')).toEqual([
       { key: 'workers_scripts', type: 'edit' },
       { key: 'workers_kv_storage', type: 'edit' },
-      { key: 'workers_r2', type: 'edit' },
-      { key: 'd1', type: 'edit' },
-      { key: 'workers_durable_objects', type: 'edit' },
     ]);
     expect(buildCloudflareTokenTemplatePermissions()).toEqual([
       { key: 'workers_scripts', type: 'edit' },
@@ -51,7 +48,7 @@ describe('cloudflareTokenTemplate', () => {
     expect(permissions).toEqual([
       { key: 'workers_scripts', type: 'edit' },
       { key: 'workers_kv_storage', type: 'edit' },
-      { key: 'workers_durable_objects', type: 'edit' },
+      { key: 'workers_r2', type: 'edit' },
     ]);
     expect(buildCloudflareTokenTemplatePermissions({ includeR2Storage: true })).toEqual(permissions);
     expect(url.searchParams.get('accountId')).toBe('*');
@@ -62,8 +59,16 @@ describe('cloudflareTokenTemplate', () => {
 
     expect(permissionKeys).not.toEqual(
       expect.arrayContaining([
-        { key: 'workers_r2', type: 'edit' },
-        { key: 'd1', type: 'edit' },
+        'workers_r2',
+        'd1',
+        'workers_durable_objects',
+        'account_settings',
+        'pages',
+        'builds',
+        'agents',
+        'observability',
+        'containers',
+        'tail',
       ]),
     );
   });

@@ -9,26 +9,17 @@ import {
 } from '../../utilities/storage/sessionStorageConfig.js';
 import type { AnyRecord } from '../shellTypes';
 
-export const SESSION_STORAGE_BACKENDS = Object.freeze({
-  ARWEAVE: 'arweave',
-  CLOUDFLARE: 'cloudflare',
-});
-
-export const SESSION_STORAGE_RESOURCE_STAGES = Object.freeze({
-  ACTIVE: 'active',
-  STAGED: 'staged',
-});
+export const SESSION_STORAGE_BACKENDS = STORAGE_BACKENDS;
+export {
+  SESSION_STORAGE_PAYLOAD_ACCESS_MODES,
+  SESSION_STORAGE_RESOURCE_STAGES,
+  normalizeSessionStoragePayloadAccessMode,
+};
 
 export const SESSION_STORAGE_CLOUDFLARE_PRIMITIVES = Object.freeze({
   r2: ['session_context_payloads', 'question_payloads', 'survey_payloads', 'response_payloads', 'media_blob_payloads'],
   kv: ['metadata_indexes', 'audit_events', 'short_lived_action_ids', 'webhook_replay_cache', 'ephemeral_start_params'],
   durableObjects: ['signer_runtime_coordination_only', 'coordination_locks'],
-});
-
-export const SESSION_STORAGE_PAYLOAD_ACCESS_MODES = Object.freeze({
-  PUBLIC_READ: 'public_read',
-  WORKER_SBT_GATE: 'worker_sbt_gate',
-  LIT_ENCRYPTED: 'lit_encrypted',
 });
 
 export const SESSION_STORAGE_PAYLOAD_ACCESS_RESOURCE_GATES = Object.freeze({
@@ -101,29 +92,18 @@ const trim = (value: unknown): string =>
   (typeof value === 'string' ? value : value == null ? '' : String(value)).trim();
 
 const normalizeBackend = (value: unknown): string => normalizeStorageBackend(value);
-export const normalizeSessionStoragePayloadAccessMode = (value: unknown): string => {
-  const normalized = trim(value).toLowerCase();
-  if (
-    normalized === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ ||
-    normalized === 'public' ||
-    normalized === 'public-read'
-  ) {
-    return SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ;
-  }
-  if (normalized === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED) {
-    return SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED;
-  }
-  return SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE;
-};
 
 export const buildSessionStoragePayloadAccessControl = (
   mode: unknown = SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE,
 ): AnyRecord => {
-  const normalizedMode = normalizeSessionStoragePayloadAccessMode(mode);
+  const accessControl = normalizeSessionStoragePayloadAccessControl(mode);
+  const normalizedMode = accessControl.mode;
   const litEncrypted = normalizedMode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED;
   const publicRead = normalizedMode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ;
   const workerEnvelope = accessControl.encryption === SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE;
   return {
+    gate: accessControl.gate,
+    encryption: accessControl.encryption,
     mode: normalizedMode,
     enforcement: litEncrypted
       ? 'lit_access_control_conditions'
@@ -170,6 +150,8 @@ export const buildDefaultSessionStorageProfile = (): AnyRecord => ({
     questions: SESSION_STORAGE_RESOURCE_STAGES.STAGED,
     surveys: SESSION_STORAGE_RESOURCE_STAGES.STAGED,
     responses: SESSION_STORAGE_RESOURCE_STAGES.STAGED,
+    generatedArtifacts: SESSION_STORAGE_RESOURCE_STAGES.STAGED,
+    media: SESSION_STORAGE_RESOURCE_STAGES.STAGED,
     images: SESSION_STORAGE_RESOURCE_STAGES.STAGED,
   },
   sbtGatedAccess: {
@@ -192,6 +174,12 @@ export const normalizeSessionStorageProfileConfig = (input: unknown = {}): AnyRe
       ? SESSION_STORAGE_RESOURCE_STAGES.ACTIVE
       : SESSION_STORAGE_RESOURCE_STAGES.STAGED;
   const docsContext = trim(rawResources.docsContext || raw.docsContext || '').toLowerCase();
+  const normalizeResourceStage = (value: unknown, fallback: string): string => {
+    const normalized = trim(value).toLowerCase();
+    if (normalized === SESSION_STORAGE_RESOURCE_STAGES.ACTIVE) return SESSION_STORAGE_RESOURCE_STAGES.ACTIVE;
+    if (normalized === SESSION_STORAGE_RESOURCE_STAGES.STAGED) return SESSION_STORAGE_RESOURCE_STAGES.STAGED;
+    return fallback;
+  };
   const normalized: AnyRecord = {
     ...base,
     backend,
@@ -221,13 +209,7 @@ export const normalizeSessionStorageProfileConfig = (input: unknown = {}): AnyRe
   };
 
   if (backend === SESSION_STORAGE_BACKENDS.CLOUDFLARE) {
-    const accessMode = normalizeSessionStoragePayloadAccessMode(
-      (isObj(raw.payloadAccessControl) ? raw.payloadAccessControl.mode : '') ||
-      (isObj(raw.cloudflare) ? raw.cloudflare.payloadAccessMode : '') ||
-      raw.payloadAccessMode ||
-      raw.accessControlMode
-    );
-    const payloadAccessControl = buildSessionStoragePayloadAccessControl(accessMode);
+    const payloadAccessControl = buildSessionStoragePayloadAccessControl(raw);
     normalized.payloadAccessControl = payloadAccessControl;
     normalized.sbtGatedAccess = {
       ...normalized.sbtGatedAccess,

@@ -389,6 +389,88 @@ describe('routeSessionResolution', () => {
     expect(resolveDisplaySessionConfigBySlug).toHaveBeenCalledWith('rxc');
   });
 
+  it('fills demo display fields without replacing registry worker or gate config', () => {
+    const registryConfig = {
+      slug: 'demo-1',
+      sessionName: 'Registry Demo',
+      networkChainId: 11155420,
+      corsWorkerUrl: 'https://registry-worker.example',
+      sponsoredKeys: { arweave: true, faucet: true },
+      __registry: {
+        metadataURI: 'ar://registry-metadata',
+        gatesByResource: {
+          arweave: { lookupStatus: 'ok', sbtAddresses: [] },
+        },
+      },
+      contracts: {
+        surveys: { address: '0xregistry' },
+      },
+      blockLimits: { start: 44967477, end: null },
+    };
+    const displayConfig = {
+      slug: 'demo-1',
+      sessionName: 'Demo Session',
+      defaultFeaturedSBTs: ['0x29563ff3aCC8AFb220D810F8022218095e25C1f6'],
+      featured_SBTs_LIST: ['0x5d2f0207B7EB26e807C4a12f2A185928558C00b9'],
+      demoCompatibilitySeed: {
+        temporary: true,
+        sourceSessionSlug: 'demo',
+      },
+      corsWorkerUrl: '',
+      sponsoredKeys: {},
+      contracts: {
+        surveys: { address: '0xfixture' },
+      },
+      blockLimits: { start: 1, end: null },
+    };
+
+    const result = resolveMainSiteSessionRouteContext({
+      sessionTokenRaw: 'demo-1',
+      formatSessionId: () => null,
+      resolveSessionConfigById: () => null,
+      resolveSessionConfigBySlug: () => registryConfig,
+      resolveDisplaySessionConfigBySlug: () => displayConfig,
+      resolveSessionSlugFromPathToken: () => 'demo-1',
+    });
+
+    expect(result.sessionConfig).toMatchObject({
+      slug: 'demo-1',
+      sessionName: 'Demo Session',
+      corsWorkerUrl: 'https://registry-worker.example',
+      sponsoredKeys: { arweave: true, faucet: true },
+      __registry: registryConfig.__registry,
+      contracts: registryConfig.contracts,
+      blockLimits: registryConfig.blockLimits,
+      defaultFeaturedSBTs: ['0x29563ff3aCC8AFb220D810F8022218095e25C1f6'],
+      featured_SBTs_LIST: ['0x5d2f0207B7EB26e807C4a12f2A185928558C00b9'],
+      demoCompatibilitySeed: {
+        temporary: true,
+        sourceSessionSlug: 'demo',
+      },
+    });
+  });
+
+  it('fills a missing registry start block from the matching demo display config', () => {
+    const result = mergeMainSiteSessionDisplayConfig(
+      {
+        slug: 'demo-1',
+        corsWorkerUrl: 'https://registry-worker.example',
+        blockLimits: { end: null },
+      },
+      {
+        slug: 'demo-1',
+        demoCompatibilitySeed: { temporary: true },
+        blockLimits: { start: 44967477, end: null },
+      },
+    );
+
+    expect(result).toMatchObject({
+      slug: 'demo-1',
+      corsWorkerUrl: 'https://registry-worker.example',
+      blockLimits: { start: 44967477, end: null },
+    });
+  });
+
   it('uses the default bucket as the source slug for the built-in demo route only', () => {
     expect(
       resolveMainSiteSessionRouteSourceSlug({

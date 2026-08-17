@@ -55,3 +55,34 @@ test('verifyPublicAssets rejects an image with no source, doc, or manifest owner
     assert.match(cli.stderr, /docs\/assets\/orphan\.png/);
   });
 });
+
+test('verifyPublicAssets ignores local build-audit output excluded from the client tree', () => {
+  withFixture((rootDir) => {
+    writeFile(rootDir, 'client/.tmp-build-audit/orphan.png', Buffer.from([0, 1, 2]));
+    writeFile(rootDir, 'client/.tmp-build-audit/index.html', '<img src="orphan.png">\n');
+    writeFile(rootDir, 'README.md', '# Public project\n');
+
+    const result = verifyPublicAssets(rootDir);
+    assert.deepEqual(result.findings, []);
+    assert.equal(result.scannedFiles, 0);
+  });
+});
+
+test('verifyPublicAssets scans large text corpora without aggregating them into one string', () => {
+  withFixture((rootDir) => {
+    writeFile(rootDir, 'client/src/assets/owned.png', Buffer.from([0, 1, 2]));
+    const chunk = 'x'.repeat(3 * 1024 * 1024);
+    for (let index = 0; index < 20; index += 1) {
+      writeFile(rootDir, `corpus/chunk-${index}.txt`, chunk);
+    }
+    writeFile(rootDir, 'client/src/assetManifest.json', '{"src":"/assets/owned.png"}\n');
+
+    const cli = spawnSync(
+      process.execPath,
+      ['--max-old-space-size=32', path.join(__dirname, 'verify-public-assets.js'), rootDir],
+      { encoding: 'utf8' },
+    );
+    assert.equal(cli.status, 0, cli.stderr || cli.stdout);
+    assert.match(cli.stdout, /public asset verification passed/);
+  });
+});

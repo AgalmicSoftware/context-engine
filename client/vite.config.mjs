@@ -118,12 +118,6 @@ const manualChunkGroups = [
     ],
   },
   {
-    name: 'vendor-lit',
-    patterns: [
-      '/node_modules/@lit-protocol/',
-    ],
-  },
-  {
     name: 'vendor-arweave',
     patterns: [
       '/node_modules/arweave/',
@@ -140,7 +134,6 @@ const manualChunkGroups = [
       '/node_modules/java-random/',
       '/node_modules/ml-',
       '/node_modules/ml-kmeans/',
-      '/node_modules/networkanalysis-ts/',
       '/node_modules/react-simple-maps/',
       '/node_modules/robust-predicates/',
       '/node_modules/topojson-',
@@ -204,7 +197,6 @@ const manualChunkGroups = [
   {
     name: 'vendor-ui',
     patterns: [
-      '/node_modules/@dnd-kit/',
       '/node_modules/@fortawesome/',
       '/node_modules/@popperjs/',
       '/node_modules/@vanilla-extract/',
@@ -403,24 +395,6 @@ const litContractsSubpathShim = () => ({
   },
 });
 
-const rawLoaderCompatibilityPlugin = () => ({
-  name: 'ce-raw-loader-compatibility',
-  enforce: 'pre',
-  resolveId(source, importer) {
-    const prefix = '!!raw-loader!';
-    if (!source.startsWith(prefix)) return null;
-    const request = source.slice(prefix.length);
-    const baseDir = importer ? path.dirname(importer) : __dirname;
-    return `\0ce-raw-loader:${path.resolve(baseDir, request)}`;
-  },
-  load(id) {
-    const prefix = '\0ce-raw-loader:';
-    if (!id.startsWith(prefix)) return null;
-    const filePath = id.slice(prefix.length);
-    return `export default ${JSON.stringify(fs.readFileSync(filePath, 'utf8'))};`;
-  },
-});
-
 const jsxInJsCompatibilityPlugin = () => ({
   name: 'ce-jsx-in-js-compatibility',
   enforce: 'pre',
@@ -517,9 +491,11 @@ const postsAssetsCompatibilityPlugin = () => ({
   },
   writeBundle(options) {
     if (!fs.existsSync(postsDir)) return;
-    fs.cpSync(postsDir, path.resolve(options.dir || path.resolve(__dirname, 'build'), 'posts'), {
+    const outputDir = options.dir || path.resolve(__dirname, 'build');
+    fs.cpSync(postsDir, path.resolve(outputDir, 'posts'), {
       recursive: true,
     });
+    writePostSocialPreviewHtml({ buildDir: outputDir, postsDir });
   },
 });
 
@@ -570,9 +546,9 @@ export default defineConfig(({ mode }) => {
         { find: /^node:buffer$/, replacement: path.resolve(__dirname, 'node_modules', 'buffer', 'index.js') },
         { find: /^@metamask\/superstruct$/, replacement: path.resolve(srcDir, 'shims', 'metamask-superstruct.ts') },
         { find: /^zod-validation-error$/, replacement: path.resolve(__dirname, 'node_modules', 'zod-validation-error', 'dist', 'index.js') },
-        { find: /^worker_threads$/, replacement: path.resolve(srcDir, 'shims', 'node-worker-threads.js') },
-        { find: /^node:worker_threads$/, replacement: path.resolve(srcDir, 'shims', 'node-worker-threads.js') },
-        { find: /^source-map-support\/register$/, replacement: path.resolve(srcDir, 'shims', 'source-map-support-register.js') },
+        { find: /^worker_threads$/, replacement: path.resolve(srcDir, 'shims', 'node-worker-threads.ts') },
+        { find: /^node:worker_threads$/, replacement: path.resolve(srcDir, 'shims', 'node-worker-threads.ts') },
+        { find: /^source-map-support\/register$/, replacement: path.resolve(srcDir, 'shims', 'source-map-support-register.ts') },
       ],
     },
     server: {
@@ -582,9 +558,9 @@ export default defineConfig(({ mode }) => {
       headers,
     },
     css: {
-      // The legacy PostCSS config runs PurgeCSS. Vite loads it during dev/build,
-      // which strips CSS Module selectors before the app can reference their
-      // generated class names.
+      // Keep PostCSS disabled unless a Vite-specific config is reintroduced.
+      // The retired PurgeCSS setup stripped CSS Module selectors before the
+      // app could reference their generated class names.
       postcss: { plugins: [] },
       preprocessorOptions: {
         scss: {
@@ -598,6 +574,9 @@ export default defineConfig(({ mode }) => {
       manifest: 'vite-bundle-manifest.json',
       rollupOptions: {
         input: path.resolve(__dirname, 'index.html'),
+        output: {
+          manualChunks: resolveManualChunk,
+        },
       },
     },
     optimizeDeps: {

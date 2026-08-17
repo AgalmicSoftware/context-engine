@@ -1,10 +1,6 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import styles from './BeeswarmPlot.module.scss';
-import {
-  layoutBeeswarmPoints,
-  type BeeswarmLayoutDomain,
-  type BeeswarmLayoutStrategy,
-} from './beeswarmLayout';
+import { layoutBeeswarmPoints, type BeeswarmLayoutDomain, type BeeswarmLayoutStrategy } from './beeswarmLayout';
 import BeeswarmTooltip, {
   resolveTooltipLayout,
   TOOLTIP_MARGIN,
@@ -227,7 +223,14 @@ export default function BeeswarmPlot({
     if (!hasQuestions) return [];
     if (points.length === 1) {
       return [
-        normalizePointPosition({ ...points[0], x: width / 2, y: resolvedCenterY }, 0, width, height, pointRadius, axisY),
+        normalizePointPosition(
+          { ...points[0], x: width / 2, y: resolvedCenterY },
+          0,
+          width,
+          height,
+          pointRadius,
+          axisY,
+        ),
       ];
     }
 
@@ -241,9 +244,7 @@ export default function BeeswarmPlot({
       minY: minLayoutY,
       maxY: maxLayoutY,
       collisionRadius,
-    }).map((point, index) =>
-      normalizePointPosition(point, index, width, height, pointRadius, axisY),
-    );
+    }).map((point, index) => normalizePointPosition(point, index, width, height, pointRadius, axisY));
   }, [
     axisY,
     collisionRadius,

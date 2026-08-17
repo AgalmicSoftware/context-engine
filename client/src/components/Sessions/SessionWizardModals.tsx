@@ -26,7 +26,7 @@ type WizardDraftLike = Record<string, unknown> & {
   defaultSbtTags?: string;
 };
 
-type SessionWizardModalsProps = {
+export type SessionWizardModalsProps = {
   account?: string;
   provider?: unknown;
   createSbtModalState: CreateSbtModalState;

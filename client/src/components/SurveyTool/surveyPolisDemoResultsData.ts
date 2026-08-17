@@ -63,17 +63,12 @@ const resolveTypedAnswer = (
 
 export const buildPolisDemoSurveyResultsNetworkData = (
   source: unknown = undefined,
-  {
-    sessionSlug = 'demo',
-    questionIdsByIndex = [],
-  }: { sessionSlug?: unknown; questionIdsByIndex?: string[] } = {},
+  { sessionSlug = 'demo', questionIdsByIndex = [] }: { sessionSlug?: unknown; questionIdsByIndex?: string[] } = {},
 ): SurveyResultsScopedQuestionNetworkData => {
   const normalizedSessionSlug = normalizeSessionSlug(sessionSlug || 'demo') || 'demo';
   const resolvedSource = source === undefined ? resolveDemoPolisDataset(normalizedSessionSlug, demoPolisData) : source;
   const comments =
-    isRecord(resolvedSource) && Array.isArray(resolvedSource.comments)
-      ? resolvedSource.comments.filter(isRecord)
-      : [];
+    isRecord(resolvedSource) && Array.isArray(resolvedSource.comments) ? resolvedSource.comments.filter(isRecord) : [];
   const participantsVotes =
     isRecord(resolvedSource) && Array.isArray(resolvedSource.participantsVotes)
       ? resolvedSource.participantsVotes.filter(isRecord)
@@ -192,10 +187,7 @@ export const buildSimulatedDemoResultsNetworkData = (
 
 export const buildPolisDemoSurveyResultsAggregatorData = (
   source: unknown = undefined,
-  {
-    sessionSlug = 'demo',
-    questionIdsByIndex = [],
-  }: { sessionSlug?: unknown; questionIdsByIndex?: string[] } = {},
+  { sessionSlug = 'demo', questionIdsByIndex = [] }: { sessionSlug?: unknown; questionIdsByIndex?: string[] } = {},
 ): Record<string, Array<{ responder: string; questionId: string; response: string }>> => {
   const networkData = buildPolisDemoSurveyResultsNetworkData(source, { sessionSlug, questionIdsByIndex });
   const out: Record<string, Array<{ responder: string; questionId: string; response: string }>> = {};

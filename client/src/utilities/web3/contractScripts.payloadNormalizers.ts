@@ -53,7 +53,7 @@ export const coerceQuestionOptionLabels = (value: unknown): string[] => {
     }
     rawOptions = [trimmed];
   } else if (value && typeof value === 'object') {
-    rawOptions = Object.values(value as AnyRecord);
+    rawOptions = Object.values(value as PayloadRecord);
   }
 
   const seen = new Set<string>();
@@ -102,10 +102,10 @@ export const normalizeQuestionFlags = (questionData: PayloadRecord | null | unde
       : (questionData.choices ??
         questionData.answers ??
         questionData.choiceOptions ??
-        questionData.config?.options ??
-        questionData.config?.choices ??
-        questionData.payload?.options ??
-        questionData.data?.options ??
+        config?.options ??
+        config?.choices ??
+        payload?.options ??
+        data?.options ??
         questionData.optionsMap ??
         questionData.options_by_id);
   const normalizedOptions = coerceQuestionOptionLabels(optionAliases);

@@ -6,8 +6,27 @@ const path = require('node:path');
 const ROOT_DIR = path.resolve(__dirname, '..');
 const CORPUS_DIR = path.join(ROOT_DIR, 'ai-discourse-corpus', 'corpuses');
 const CLIENT_DEBATES_PATH = path.join(ROOT_DIR, 'client', 'src', 'variables', 'demo', 'debates.json');
+const CLIENT_CORPUS_SAMPLE_PATH = path.join(ROOT_DIR, 'client', 'src', 'variables', 'demo', 'corpus_sample.json');
+
+const CLIENT_SAMPLE_CORPUS_KEYS = Object.freeze({
+  tweets: 'tweets',
+  ai_laws_policy: 'ai-laws-policy',
+  arxiv_ai_safety: 'arxiv-ai-safety',
+  lesswrong_posts: 'lesswrong-posts',
+  dwarkesh_lab_insiders: 'dwarkesh-lab-insiders',
+  ai_scifi_books: 'ai-scifi-books',
+  metr_evals_metrics: 'metr-evals-metrics',
+  cross_corpus: 'cross-corpus',
+});
 
 const CORPUS_FILES = Object.freeze({
+  'ai-forecasting-economics': {
+    corpusKey: 'ai-forecasting-economics',
+    aliases: ['ai-forecasting-economics', 'ai_forecasting_economics', 'forecasting', 'forecasting-economics', 'econ'],
+    relativePath: 'ai-discourse-corpus/corpuses/ai-forecasting-economics-corpus.json',
+    collectionKey: 'entries',
+    metaCountKeys: ['entry_count'],
+  },
   'ai-laws-policy': {
     corpusKey: 'ai-laws-policy',
     aliases: ['ai-laws-policy', 'ai_laws_policy', 'laws', 'ai-laws', 'ai_laws'],
@@ -34,7 +53,7 @@ const CORPUS_FILES = Object.freeze({
     aliases: ['cross-corpus', 'cross_corpus', 'debates'],
     relativePath: 'ai-discourse-corpus/corpuses/cross-corpus-debates.json',
     collectionKey: 'debates',
-    metaCountKeys: ['total_debates'],
+    metaCountKeys: ['debate_count'],
   },
   'dwarkesh-lab-insiders': {
     corpusKey: 'dwarkesh-lab-insiders',
@@ -49,6 +68,13 @@ const CORPUS_FILES = Object.freeze({
     relativePath: 'ai-discourse-corpus/corpuses/enriched-tweets.json',
     collectionKey: null,
     metaCountKeys: [],
+  },
+  'lab-primary-docs': {
+    corpusKey: 'lab-primary-docs',
+    aliases: ['lab-primary-docs', 'lab_primary_docs', 'lab-docs', 'labs'],
+    relativePath: 'ai-discourse-corpus/corpuses/lab-primary-docs-corpus.json',
+    collectionKey: 'entries',
+    metaCountKeys: ['entry_count'],
   },
   'lesswrong-posts': {
     corpusKey: 'lesswrong-posts',
@@ -74,15 +100,129 @@ const CORPUS_FILES = Object.freeze({
 });
 
 const TARGET_DEBATE_IDS = Object.freeze([
+  'debate_exponential_progress',
+  'debate_reward_hacking_misalignment',
+  'debate_predeployment_eval_adequacy',
+  'debate_ai_rd_automation',
+  'debate_open_vs_closed_safety',
+  'debate_benchmark_validity',
+  'debate_regulation_speed',
+  'debate_deceptive_alignment',
   'debate_ai_water_usage',
   'debate_ai_labor_automation',
   'debate_ai_education_integrity',
   'debate_ai_copyright_training',
   'debate_multimodal_deepfake_governance',
+  'debate_government_prerelease_access',
+  'debate_alignment_tractability_2026',
+  'debate_ai_labor_displacement_timeline',
 ]);
 
 const VALID_PRIMARY_URL_RE = /^https?:\/\//i;
 const DATE_RANGE_RE = /^\d{4}-\d{4}$/;
+
+// Canonical vocabularies for taxonomy fields that previously drifted across
+// ingestion batches (mixed casing / snake_case variants). `validate` flags any
+// value outside these sets so new batches cannot re-introduce drift.
+const TAXONOMY_ENUMS = Object.freeze({
+  'ai-forecasting-economics': Object.freeze({
+    category: Object.freeze([
+      'compute_trends',
+      'data_resource',
+      'economic_agenda',
+      'economic_model',
+      'empirical_economics',
+      'forecast_tracking',
+      'forecasting_tournament',
+      'growth_theory',
+      'organization_report',
+      'prediction_market',
+    ]),
+  }),
+  'arxiv-ai-safety': Object.freeze({
+    category: Object.freeze([
+      'Alignment Theory',
+      'Capabilities',
+      'Evaluations',
+      'Fairness',
+      'Forecasting',
+      'Framework',
+      'Governance',
+      'Interpretability',
+      'Policy',
+      'Robustness',
+      'Survey',
+      'Technical Safety',
+    ]),
+  }),
+  'lesswrong-posts': Object.freeze({
+    platform: Object.freeze([
+      'AI Alignment Blog',
+      'AI Impacts',
+      'ARC Evals',
+      'Alignment Forum',
+      'Anthropic',
+      'Astral Codex Ten',
+      'Bounded Regret',
+      'Cold Takes',
+      'EA Forum',
+      'Epoch AI',
+      'Google DeepMind',
+      'Gwern',
+      'LessWrong',
+      'MIRI',
+      'Managing AI Risks',
+      'OpenAI',
+      'Personal Blog',
+      'Sideways View',
+      'Slate Star Codex',
+      'Substack',
+      'TIME Magazine',
+      'Website',
+      'arXiv',
+    ]),
+  }),
+  'lab-primary-docs': Object.freeze({
+    lab: Object.freeze([
+      'Amazon',
+      'Anthropic',
+      'Frontier Model Forum',
+      'Google DeepMind',
+      'Meta',
+      'Microsoft',
+      'OpenAI',
+      'xAI',
+    ]),
+    doc_type: Object.freeze([
+      'deployment_update',
+      'framework_report',
+      'model_spec',
+      'policy_statement',
+      'safety_framework',
+      'safety_publication',
+      'system_card',
+      'transparency_report',
+    ]),
+  }),
+  'dwarkesh-lab-insiders': Object.freeze({
+    role_category: Object.freeze([
+      'analyst',
+      'capabilities_researcher',
+      'economist',
+      'educator',
+      'former_insider',
+      'governance_expert',
+      'host',
+      'independent_researcher',
+      'investor_strategist',
+      'lab_leader',
+      'lab_researcher',
+      'policy_advisor',
+      'researcher',
+      'safety_researcher',
+    ]),
+  }),
+});
 
 function readJson(absolutePath) {
   return JSON.parse(fs.readFileSync(absolutePath, 'utf8'));
@@ -103,6 +243,53 @@ function getEntryIdentifier(entry) {
     return null;
   }
   return entry.id || entry.url || null;
+}
+
+function normalizeUrlKey(value) {
+  if (typeof value !== 'string' || !VALID_PRIMARY_URL_RE.test(value.trim())) {
+    return null;
+  }
+  try {
+    const parsed = new URL(value.trim());
+    parsed.protocol = 'https:';
+    parsed.hostname = parsed.hostname.replace(/^www\./i, '').toLowerCase();
+    parsed.pathname = parsed.pathname.replace(/\/+$/, '') || '/';
+    const normalized = parsed.toString();
+    return parsed.pathname === '/' && !parsed.search && !parsed.hash
+      ? normalized.replace(/\/$/, '')
+      : normalized;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeTitleKey(value) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const normalized = value
+    .normalize('NFKC')
+    .toLocaleLowerCase('en-US')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+  return normalized || null;
+}
+
+function getEntryLookupKeys(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return [];
+  }
+  const keys = new Set();
+  [entry.id, entry.url].forEach((value) => {
+    if (typeof value === 'string' && value) {
+      keys.add(value);
+      const normalizedUrl = normalizeUrlKey(value);
+      if (normalizedUrl) {
+        keys.add(normalizedUrl);
+      }
+    }
+  });
+  return [...keys];
 }
 
 function createCorpusAliasMap() {
@@ -140,6 +327,7 @@ function loadCorpusFiles(rootDir = ROOT_DIR) {
 function buildRecordIndex(corpusFiles = loadCorpusFiles()) {
   const aliasMap = createCorpusAliasMap();
   const byCorpusAndId = new Map();
+  const lookupKeyEntryCounts = new Map();
   const duplicateIds = [];
   const seenGlobalIds = new Map();
 
@@ -149,8 +337,17 @@ function buildRecordIndex(corpusFiles = loadCorpusFiles()) {
       if (!id) {
         return;
       }
-      const scopedKey = `${file.corpusKey}:${id}`;
-      byCorpusAndId.set(scopedKey, { file, entry });
+      // Index every lookup key (id and url) so debate references can resolve
+      // records by either form. First entry wins, matching extractRecord's
+      // first-match semantics; lookupKeyEntryCounts tracks how many distinct
+      // entries share each key so reference ambiguity can be reported.
+      getEntryLookupKeys(entry).forEach((lookupKey) => {
+        const scopedKey = `${file.corpusKey}:${lookupKey}`;
+        if (!byCorpusAndId.has(scopedKey)) {
+          byCorpusAndId.set(scopedKey, { file, entry });
+        }
+        lookupKeyEntryCounts.set(scopedKey, (lookupKeyEntryCounts.get(scopedKey) || 0) + 1);
+      });
       if (seenGlobalIds.has(id)) {
         duplicateIds.push({
           id,
@@ -166,8 +363,28 @@ function buildRecordIndex(corpusFiles = loadCorpusFiles()) {
   return {
     aliasMap,
     byCorpusAndId,
+    lookupKeyEntryCounts,
     duplicateIds,
   };
+}
+
+function resolveRecord(index, corpusKey, id) {
+  const normalizedCorpusKey = normalizeCorpusKey(corpusKey, index.aliasMap);
+  const direct = index.byCorpusAndId.get(`${normalizedCorpusKey}:${id}`);
+  if (direct) {
+    return direct;
+  }
+  const normalizedUrl = normalizeUrlKey(id);
+  return normalizedUrl
+    ? index.byCorpusAndId.get(`${normalizedCorpusKey}:${normalizedUrl}`) || null
+    : null;
+}
+
+function countEntriesForKey(index, corpusKey, id) {
+  const normalizedCorpusKey = normalizeCorpusKey(corpusKey, index.aliasMap);
+  const normalizedUrl = normalizeUrlKey(id);
+  const lookupKey = normalizedUrl || id;
+  return index.lookupKeyEntryCounts.get(`${normalizedCorpusKey}:${lookupKey}`) || 0;
 }
 
 function collectSummary(rootDir = ROOT_DIR) {
@@ -194,31 +411,47 @@ function collectSummary(rootDir = ROOT_DIR) {
 }
 
 function hasRecord(index, corpusKey, id) {
-  const normalizedCorpusKey = normalizeCorpusKey(corpusKey, index.aliasMap);
-  return index.byCorpusAndId.has(`${normalizedCorpusKey}:${id}`);
+  return Boolean(resolveRecord(index, corpusKey, id));
 }
 
 function collectDebateReferenceIssues(crossCorpusFile, index, debateIds = null) {
   const debateIdSet = debateIds ? new Set(debateIds) : null;
   const missing = [];
   const duplicatePositions = [];
+  const ambiguousReferences = [];
 
   crossCorpusFile.entries.forEach((debate) => {
     if (debateIdSet && !debateIdSet.has(debate.id)) {
       return;
     }
 
-    const seenPositionKeys = new Set();
+    const seenResolvedKeys = new Set();
     (debate.positions || []).forEach((position, positionIndex) => {
       const id = position.entry_url_or_id;
       const corpus = position.corpus;
-      const positionKey = `${corpus}:${id}`;
-      if (seenPositionKeys.has(positionKey)) {
+      if (!id || !corpus) {
+        return;
+      }
+      const resolved = resolveRecord(index, corpus, id);
+      if (!resolved) {
+        missing.push({ debateId: debate.id, field: 'positions.entry_url_or_id', corpus, id });
+        return;
+      }
+      // Duplicate detection keys on the resolved record so a url-form and an
+      // id-form reference to the same entry cannot hide a duplicate position.
+      const resolvedKey = `${normalizeCorpusKey(corpus, index.aliasMap)}:${getEntryIdentifier(resolved.entry)}`;
+      if (seenResolvedKeys.has(resolvedKey)) {
         duplicatePositions.push({ debateId: debate.id, positionIndex, corpus, id });
       }
-      seenPositionKeys.add(positionKey);
-      if (id && corpus && !hasRecord(index, corpus, id)) {
-        missing.push({ debateId: debate.id, field: 'positions.entry_url_or_id', corpus, id });
+      seenResolvedKeys.add(resolvedKey);
+      if (countEntriesForKey(index, corpus, id) > 1) {
+        ambiguousReferences.push({
+          debateId: debate.id,
+          field: 'positions.entry_url_or_id',
+          corpus,
+          id,
+          matchingEntries: countEntriesForKey(index, corpus, id),
+        });
       }
     });
 
@@ -227,19 +460,30 @@ function collectDebateReferenceIssues(crossCorpusFile, index, debateIds = null) 
         ['from', reference.from_corpus, reference.from_id],
         ['to', reference.to_corpus, reference.to_id],
       ].forEach(([side, corpus, id]) => {
-        if (id && corpus && !hasRecord(index, corpus, id)) {
+        if (!id || !corpus) {
+          return;
+        }
+        if (!hasRecord(index, corpus, id)) {
           missing.push({
             debateId: debate.id,
             field: `cross_corpus_references[${referenceIndex}].${side}_id`,
             corpus,
             id,
           });
+        } else if (countEntriesForKey(index, corpus, id) > 1) {
+          ambiguousReferences.push({
+            debateId: debate.id,
+            field: `cross_corpus_references[${referenceIndex}].${side}_id`,
+            corpus,
+            id,
+            matchingEntries: countEntriesForKey(index, corpus, id),
+          });
         }
       });
     });
   });
 
-  return { missing, duplicatePositions };
+  return { missing, duplicatePositions, ambiguousReferences };
 }
 
 function collectValidation(rootDir = ROOT_DIR) {
@@ -249,12 +493,69 @@ function collectValidation(rootDir = ROOT_DIR) {
   const crossCorpusDebateIds = new Set(crossCorpusFile.entries.map((debate) => debate.id));
   const clientDebates = readJson(path.join(rootDir, path.relative(ROOT_DIR, CLIENT_DEBATES_PATH)));
   const clientDebateIds = new Set((Array.isArray(clientDebates) ? clientDebates : []).map((debate) => debate.id));
+  const clientCorpusSample = readJson(path.join(rootDir, path.relative(ROOT_DIR, CLIENT_CORPUS_SAMPLE_PATH)));
   const metaCountDrift = [];
   const malformedYears = [];
   const rangeDateFields = [];
   const invalidPrimaryUrls = [];
+  const taxonomyDrift = [];
+  const unknownCorpusKeys = [];
+  const duplicateTitles = [];
+  const clientSampleCountDrift = [];
+  const missingClientSampleEntries = [];
+
+  const corpusFilesByKey = new Map(corpusFiles.map((file) => [file.corpusKey, file]));
+  Object.entries(clientCorpusSample.corpuses || {}).forEach(([sampleKey, sampleCorpus]) => {
+    const corpusKey = CLIENT_SAMPLE_CORPUS_KEYS[sampleKey];
+    const corpusFile = corpusFilesByKey.get(corpusKey);
+    if (!corpusFile) {
+      missingClientSampleEntries.push({ sampleKey, id: null, reason: 'unknown corpus' });
+      return;
+    }
+    const expectedCount = corpusFile.entries.length;
+    if (sampleCorpus.count_full !== expectedCount) {
+      clientSampleCountDrift.push({
+        sampleKey,
+        field: 'count_full',
+        expected: expectedCount,
+        actual: sampleCorpus.count_full,
+      });
+    }
+    const metaFullCount = clientCorpusSample.meta?.corpuses?.[sampleKey]?.full_count;
+    if (metaFullCount !== expectedCount) {
+      clientSampleCountDrift.push({
+        sampleKey,
+        field: 'meta.full_count',
+        expected: expectedCount,
+        actual: metaFullCount,
+      });
+    }
+    (sampleCorpus.entries || []).forEach((entry) => {
+      const id = getEntryIdentifier(entry);
+      if (!id || !resolveRecord(index, corpusKey, id)) {
+        missingClientSampleEntries.push({ sampleKey, id, reason: 'missing record' });
+      }
+    });
+  });
+
+  const declaredSourceTotal = crossCorpusFile.data?.meta?.total_cross_corpus_sources;
+  if (typeof declaredSourceTotal === 'number') {
+    const actualSourceTotal = crossCorpusFile.entries.reduce(
+      (sum, debate) => sum + (debate.positions || []).length,
+      0
+    );
+    if (declaredSourceTotal !== actualSourceTotal) {
+      metaCountDrift.push({
+        corpus: 'cross-corpus',
+        field: 'total_cross_corpus_sources',
+        expected: declaredSourceTotal,
+        actual: actualSourceTotal,
+      });
+    }
+  }
 
   corpusFiles.forEach((file) => {
+    const seenTitles = new Map();
     file.metaCountKeys.forEach((key) => {
       const expected = file.data?.meta?.[key];
       if (typeof expected === 'number' && expected !== file.entries.length) {
@@ -269,6 +570,19 @@ function collectValidation(rootDir = ROOT_DIR) {
 
     file.entries.forEach((entry) => {
       const id = getEntryIdentifier(entry);
+      const normalizedTitle = normalizeTitleKey(entry?.title);
+      if (normalizedTitle) {
+        if (seenTitles.has(normalizedTitle)) {
+          duplicateTitles.push({
+            corpus: file.corpusKey,
+            title: normalizedTitle,
+            firstId: seenTitles.get(normalizedTitle),
+            secondId: id,
+          });
+        } else {
+          seenTitles.set(normalizedTitle, id);
+        }
+      }
       if (typeof entry?.year === 'string' && /^\d+$/.test(entry.year)) {
         malformedYears.push({ corpus: file.corpusKey, id, year: entry.year });
       }
@@ -289,6 +603,30 @@ function collectValidation(rootDir = ROOT_DIR) {
           invalidPrimaryUrls.push({ corpus: file.corpusKey, id, field, value });
         }
       });
+
+      Object.entries(TAXONOMY_ENUMS[file.corpusKey] || {}).forEach(([field, allowedValues]) => {
+        if (!Object.prototype.hasOwnProperty.call(entry || {}, field)) {
+          return;
+        }
+        if (!allowedValues.includes(entry[field])) {
+          taxonomyDrift.push({ corpus: file.corpusKey, id, field, value: entry[field] });
+        }
+      });
+    });
+  });
+
+  crossCorpusFile.entries.forEach((debate) => {
+    const flagUnknown = (field, value) => {
+      if (value && !index.aliasMap.has(value) && !index.aliasMap.has(String(value).replaceAll('_', '-'))) {
+        unknownCorpusKeys.push({ debateId: debate.id, field, value });
+      }
+    };
+    (debate.positions || []).forEach((position, positionIndex) => {
+      flagUnknown(`positions[${positionIndex}].corpus`, position.corpus);
+    });
+    (debate.cross_corpus_references || []).forEach((reference, referenceIndex) => {
+      flagUnknown(`cross_corpus_references[${referenceIndex}].from_corpus`, reference.from_corpus);
+      flagUnknown(`cross_corpus_references[${referenceIndex}].to_corpus`, reference.to_corpus);
     });
   });
 
@@ -297,15 +635,22 @@ function collectValidation(rootDir = ROOT_DIR) {
 
   return {
     duplicateIds: index.duplicateIds,
+    duplicateTitles,
     metaCountDrift,
     malformedYears,
     rangeDateFields,
     invalidPrimaryUrls,
+    taxonomyDrift,
+    unknownCorpusKeys,
     debateReferences: allReferenceIssues,
     targetDebateReferences: targetReferenceIssues,
     clientDebateMirror: {
       missingFromClient: [...crossCorpusDebateIds].filter((id) => !clientDebateIds.has(id)),
       extraInClient: [...clientDebateIds].filter((id) => !crossCorpusDebateIds.has(id)),
+    },
+    clientSampleMirror: {
+      countDrift: clientSampleCountDrift,
+      missingEntries: missingClientSampleEntries,
     },
   };
 }
@@ -345,8 +690,12 @@ function compactRecord(record) {
 
 function extractRecord(id, rootDir = ROOT_DIR) {
   const corpusFiles = loadCorpusFiles(rootDir);
+  const normalizedUrl = normalizeUrlKey(id);
   for (const file of corpusFiles) {
-    const entry = file.entries.find((candidate) => getEntryIdentifier(candidate) === id);
+    const entry = file.entries.find((candidate) => {
+      const lookupKeys = getEntryLookupKeys(candidate);
+      return lookupKeys.includes(id) || Boolean(normalizedUrl && lookupKeys.includes(normalizedUrl));
+    });
     if (entry) {
       return {
         corpus: file.corpusKey,
@@ -395,9 +744,11 @@ if (require.main === module) {
 }
 
 module.exports = {
+  CLIENT_CORPUS_SAMPLE_PATH,
   CLIENT_DEBATES_PATH,
   CORPUS_FILES,
   TARGET_DEBATE_IDS,
+  TAXONOMY_ENUMS,
   buildRecordIndex,
   collectSummary,
   collectValidation,
@@ -406,4 +757,5 @@ module.exports = {
   loadCorpusFiles,
   main,
   normalizeCorpusKey,
+  normalizeUrlKey,
 };

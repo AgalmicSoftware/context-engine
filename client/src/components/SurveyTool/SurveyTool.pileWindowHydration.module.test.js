@@ -50,63 +50,47 @@ describe('SurveyTool pile visible window hydration', () => {
     jest.restoreAllMocks();
     jest.useRealTimers();
   });
-  it('rehydrates newly visible pile window answers when active index changes without nonce ticks', async () => {
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      account: '0xabc',
-      loginComplete: true,
-      sessionSlug: 'edge',
-      questionResponsesNonce: 5,
-      questionsCacheNonce: 1,
-      onFilterChange: jest.fn(),
-    });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
 
-    subject.state = {
-      ...subject.state,
-      suppressPrefill: false,
-      submissionError: '',
-      submissionComplete: false,
-      pileQuestions: [
-        { id: 'q1', type: 'freeform', prompt: 'Q1' },
-        { id: 'q2', type: 'freeform', prompt: 'Q2' },
-        { id: 'q3', type: 'freeform', prompt: 'Q3' },
-        { id: 'q4', type: 'freeform', prompt: 'Q4' },
-        { id: 'q5', type: 'freeform', prompt: 'Q5' },
-        { id: 'q6', type: 'freeform', prompt: 'Q6' },
-      ],
-      activePileIndex: 0,
-      surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
-      editBaseline: { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
-    };
-    subject.setState = (update, cb) => {
-      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
-      subject.state = { ...subject.state, ...(patch || {}) };
-      if (typeof cb === 'function') cb();
-    };
-    subject.buildSliceFromLocalCache = jest.fn().mockResolvedValue({
-      answers: {
-        q6: { value: 'Hydrated q6', encrypted: false },
+  it('rehydrates newly visible pile window answers when active index changes without nonce ticks', () => {
+    const pileQuestions = createPileQuestions(6);
+    const questionResponsesByQuestionId = {
+      q6: {
+        '0xabc': {
+          answer: { value: 'Hydrated q6', encrypted: false },
+          additional: { value: '', encrypted: false },
+        },
       },
-      additionalComments: {},
-      importance: {},
-      conviction: {},
+    };
+
+    const initialWindow = buildPileResponseWindow({ pileQuestions, activePileIndex: 0 });
+    const initialPlan = buildPileCachePrefillStatePlan({
+      pileQuestions: initialWindow.visibleQuestions,
+      questionResponsesByQuestionId,
+      account: '0xabc',
+      currentSlice: { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+      editBaseline: { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+      pendingTotal: 0,
+      cloneValue,
+      applyCachedResponseEntryToSlice,
     });
-    subject.ensurePriorResponsesForRenderedIds = jest.fn().mockResolvedValue(false);
-    subject.rehydrateDraftForRenderedIds = jest.fn();
 
-    await subject.rehydrateLocalCacheAnswersForRenderedIds();
-    expect(subject.buildSliceFromLocalCache).toHaveBeenCalledTimes(1);
-    expect(subject.state.surveysResponseState?.[0]?.answers?.q6).toBeUndefined();
+    expect(initialWindow.visibleIdsSignature).toBe('q1|q2|q3');
+    expect(initialPlan.nextState.surveysResponseState?.[0]?.answers?.q6).toBeUndefined();
 
-    subject.state = { ...subject.state, activePileIndex: 5 };
-    await subject.rehydrateLocalCacheAnswersForRenderedIds();
+    const nextWindow = buildPileResponseWindow({ pileQuestions, activePileIndex: 5 });
+    const nextPlan = buildPileCachePrefillStatePlan({
+      pileQuestions: nextWindow.visibleQuestions,
+      questionResponsesByQuestionId,
+      account: '0xabc',
+      currentSlice: initialPlan.nextState.surveysResponseState?.[0],
+      editBaseline: { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+      pendingTotal: 0,
+      cloneValue,
+      applyCachedResponseEntryToSlice,
+    });
 
-    expect(subject.buildSliceFromLocalCache).toHaveBeenCalledTimes(2);
-    expect(subject.state.surveysResponseState?.[0]?.answers?.q6?.value).toBe('Hydrated q6');
+    expect(nextWindow.visibleIdsSignature).toBe('q4|q5|q6');
+    expect(nextPlan.nextState.surveysResponseState?.[0]?.answers?.q6?.value).toBe('Hydrated q6');
   });
 
   it('backfills newly visible pile response slots without clearing the current auto-decrypt ledger', () => {
@@ -150,8 +134,6 @@ describe('SurveyTool pile visible window hydration', () => {
       onRehydrateVisibleWindow,
       onError: jest.fn(),
     });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
 
     expect(plan?.reason).toBe('backfill');
     expect(onRehydrateVisibleWindow).toHaveBeenCalledTimes(1);
@@ -168,35 +150,37 @@ describe('SurveyTool pile visible window hydration', () => {
   });
 
   it('does not rebuild the same visible pile response window twice', () => {
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      account: '0xabc',
-      loginComplete: true,
-      sessionSlug: 'edge',
-      questionResponsesNonce: 5,
-      questionsCacheNonce: 1,
-      onFilterChange: jest.fn(),
-    });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
+    let lastInitializeResponseSig = '';
+    const setState = jest.fn();
 
-    syncClassSetState(subject);
-    subject.state = {
-      ...subject.state,
-      pileQuestions: [
-        { id: 'q1', type: 'freeform', prompt: 'Q1' },
-        { id: 'q2', type: 'freeform', prompt: 'Q2' },
-        { id: 'q3', type: 'freeform', prompt: 'Q3' },
-        { id: 'q4', type: 'freeform', prompt: 'Q4' },
-      ],
-      activePileIndex: 1,
+    const firstPlan = executePileInitializeResponseState({
       isDirty: false,
       modifiedCount: 0,
-      surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
-      editBaseline: null,
-    };
+      pileQuestions: createPileQuestions(4),
+      activePileIndex: 1,
+      lastInitializeResponseSig,
+      buildEmptyResponseFieldState,
+      setLastInitializeResponseSig: (value) => {
+        lastInitializeResponseSig = value;
+      },
+      cloneValue,
+      setState,
+      onComplete: jest.fn(),
+      onNoop: jest.fn(),
+    });
+    const secondPlan = executePileInitializeResponseState({
+      isDirty: false,
+      modifiedCount: 0,
+      pileQuestions: createPileQuestions(4),
+      activePileIndex: 1,
+      lastInitializeResponseSig,
+      buildEmptyResponseFieldState,
+      setLastInitializeResponseSig: jest.fn(),
+      cloneValue,
+      setState,
+      onComplete: jest.fn(),
+      onNoop: jest.fn(),
+    });
 
     expect(firstPlan.reason).toBe('initialize');
     expect(firstPlan.initialSlice?.answers && Object.keys(firstPlan.initialSlice.answers)).toEqual([
@@ -210,208 +194,115 @@ describe('SurveyTool pile visible window hydration', () => {
   });
 
   it('skips duplicate pile question-set hydration signatures', () => {
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      account: '0xabc',
-      loginComplete: true,
-      sessionSlug: 'edge',
-      questionResponsesNonce: 5,
-      questionsCacheNonce: 1,
-      onFilterChange: jest.fn(),
-    });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
+    const initializeResponseState = jest.fn();
+    const rehydrateVisiblePileWindow = jest.fn();
+    const onNoop = jest.fn();
 
-    subject._loadAndSortQuestionsEpoch = 4;
-    subject._lastLoadAndSortResultSignature = 'same-signature';
-    subject.initializeResponseState = jest.fn((cb) => {
-      if (typeof cb === 'function') cb();
-    });
-    subject.rehydrateVisiblePileWindow = jest.fn();
-
-    subject.runPileQuestionSetHydration({
+    const plan = executePileQuestionSetHydration({
       requestEpoch: 4,
       resultSignature: 'same-signature',
+      lastResultSignature: 'same-signature',
+      shouldAbortRequest: () => false,
+      initializeResponseState,
+      rehydrateVisiblePileWindow,
+      onNoop,
     });
 
-    expect(subject.initializeResponseState).not.toHaveBeenCalled();
-    expect(subject.rehydrateVisiblePileWindow).not.toHaveBeenCalled();
+    expect(plan?.shouldSkipDuplicateSignature).toBe(true);
+    expect(initializeResponseState).not.toHaveBeenCalled();
+    expect(rehydrateVisiblePileWindow).not.toHaveBeenCalled();
+    expect(onNoop).toHaveBeenCalledTimes(1);
   });
 
   it('rehydrates pile windows directly when load-time hydration skips response initialization', () => {
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      account: '0xabc',
-      loginComplete: true,
-      sessionSlug: 'edge',
-      questionResponsesNonce: 5,
-      questionsCacheNonce: 1,
-      onFilterChange: jest.fn(),
-    });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
+    const initializeResponseState = jest.fn();
+    const rehydrateVisiblePileWindow = jest.fn();
+    const setLastResultSignature = jest.fn();
 
-    subject._loadAndSortQuestionsEpoch = 6;
-    subject.initializeResponseState = jest.fn();
-    subject.rehydrateVisiblePileWindow = jest.fn();
-
-    subject.runPileQuestionSetHydration({
+    const plan = executePileQuestionSetHydration({
       requestEpoch: 6,
       resultSignature: 'next-signature',
+      lastResultSignature: '',
       initializeResponses: false,
       forceOverwriteDraft: true,
       resetAutoDecryptLedger: true,
       autoDecryptReason: 'pile-refresh',
       autoDecryptResetReason: 'pile-refresh-reset',
+      shouldAbortRequest: () => false,
+      setLastResultSignature,
+      initializeResponseState,
+      rehydrateVisiblePileWindow,
+      onNoop: jest.fn(),
     });
 
-    expect(subject.initializeResponseState).not.toHaveBeenCalled();
-    expect(subject.rehydrateVisiblePileWindow).toHaveBeenCalledWith({
+    expect(plan?.shouldInitializeResponses).toBe(false);
+    expect(initializeResponseState).not.toHaveBeenCalled();
+    expect(rehydrateVisiblePileWindow).toHaveBeenCalledWith({
       requestEpoch: 6,
       forceOverwriteDraft: true,
       resetAutoDecryptLedger: true,
       autoDecryptReason: 'pile-refresh',
       autoDecryptResetReason: 'pile-refresh-reset',
     });
-    expect(subject._lastLoadAndSortResultSignature).toBe('next-signature');
+    expect(setLastResultSignature).toHaveBeenCalledWith('next-signature');
   });
 
   it('schedules pile reload when scoped hydration progress advances without nonce ticks', () => {
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      account: '',
-      sessionSlug: 'edge',
-      isQuestionCacheReady: true,
-      isResponsesCacheReady: true,
-      questionsCacheNonce: 4,
-      questionResponsesNonce: 7,
-      questionScanProgress: {
-        slug: 'edge',
-        phase: 'hydrate',
-        discoveredQuestions: 43,
-        hydratedQuestions: 12,
-      },
-      onFilterChange: jest.fn(),
-    });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
-
-    subject._isMounted = true;
-    subject.state = {
-      ...subject.state,
-      loading: false,
-      pileQuestions: [],
-      allQuestionsForFilter: [],
-      activePileIndex: 0,
-      submissionComplete: false,
-      isDirty: false,
-      modifiedCount: 0,
-      encryptedModifiedCount: 0,
-      autoDecryptEnabled: false,
-      decryptingByKey: {},
-      surveysResponseState: [
-        { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
-      ],
-      editBaseline: { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
-      userAnswers: null,
-    };
-
-    subject.didEditDiffInputsChange = jest.fn(() => false);
-    subject.getPendingEditStats = jest.fn(() => ({ total: 0, encrypted: 0 }));
-    subject.getPendingStatsSnapshot = jest.fn(() => ({ total: 0, encrypted: 0 }));
-    subject.emitPendingStats = jest.fn();
-    subject.syncLoadingElapsedTimer = jest.fn();
-    subject.scheduleLoadAndSortQuestions = jest.fn();
-    subject.checkCacheAgainstBaseline = jest.fn();
-
-    const prevProps = {
-      ...subject.props,
-      questionScanProgress: {
+    const progressSignals = buildPileQuestionProgressSignals({
+      previousProgress: {
         slug: 'edge',
         phase: 'hydrate',
         discoveredQuestions: 43,
         hydratedQuestions: 11,
       },
-    };
-    const prevState = { ...subject.state };
-
-    subject.componentDidUpdate(prevProps, prevState);
-
-    expect(subject.scheduleLoadAndSortQuestions).toHaveBeenCalledWith(80);
-    expect(subject.checkCacheAgainstBaseline).not.toHaveBeenCalled();
-  });
-
-  it('schedules pile reload when pending metadata retry count changes without hydrate count changes', () => {
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      account: '',
-      sessionSlug: 'edge',
-      isQuestionCacheReady: true,
-      isResponsesCacheReady: true,
-      questionsCacheNonce: 4,
-      questionResponsesNonce: 7,
-      questionScanProgress: {
+      nextProgress: {
         slug: 'edge',
         phase: 'hydrate',
         discoveredQuestions: 43,
-        hydratedQuestions: 43,
-        pendingMetadataCount: 2,
+        hydratedQuestions: 12,
       },
-      onFilterChange: jest.fn(),
     });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
-
-    subject._isMounted = true;
-    subject.state = {
-      ...subject.state,
+    const updatePlan = buildPileComponentUpdatePlan({
+      progressHydrationTick: progressSignals.progressHydrationTick,
+      progressCompletedTick: progressSignals.progressCompletedTick,
+      isOptimistic: false,
+      hasLiveEdits: false,
+      pileQuestionsLength: 0,
+      isQuestionCacheReady: true,
       loading: false,
-      pileQuestions: [],
-      allQuestionsForFilter: [],
-      activePileIndex: 0,
-      submissionComplete: false,
-      isDirty: false,
-      modifiedCount: 0,
-      encryptedModifiedCount: 0,
-      autoDecryptEnabled: false,
-      decryptingByKey: {},
-      surveysResponseState: [
-        { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
-      ],
-      editBaseline: { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
-      userAnswers: null,
-    };
+    });
 
-    subject.didEditDiffInputsChange = jest.fn(() => false);
-    subject.getPendingEditStats = jest.fn(() => ({ total: 0, encrypted: 0 }));
-    subject.emitPendingStats = jest.fn();
-    subject.syncLoadingElapsedTimer = jest.fn();
-    subject.scheduleLoadAndSortQuestions = jest.fn();
-    subject.checkCacheAgainstBaseline = jest.fn();
+    expect(updatePlan.cacheUpdatePlan).toEqual({ action: 'reload', delayMs: 80 });
+    expect(updatePlan.shouldResetContext).toBe(false);
+  });
 
-    const prevProps = {
-      ...subject.props,
-      questionScanProgress: {
+  it('schedules pile reload when pending metadata retry count changes without hydrate count changes', () => {
+    const progressSignals = buildPileQuestionProgressSignals({
+      previousProgress: {
         slug: 'edge',
         phase: 'hydrate',
         discoveredQuestions: 43,
         hydratedQuestions: 43,
         pendingMetadataCount: 0,
       },
-    };
-    const prevState = { ...subject.state };
+      nextProgress: {
+        slug: 'edge',
+        phase: 'hydrate',
+        discoveredQuestions: 43,
+        hydratedQuestions: 43,
+        pendingMetadataCount: 2,
+      },
+    });
+    const updatePlan = buildPileComponentUpdatePlan({
+      progressHydrationTick: progressSignals.progressHydrationTick,
+      progressCompletedTick: progressSignals.progressCompletedTick,
+      isOptimistic: false,
+      hasLiveEdits: false,
+      pileQuestionsLength: 0,
+      isQuestionCacheReady: true,
+      loading: false,
+    });
 
-    subject.componentDidUpdate(prevProps, prevState);
-
-    expect(subject.scheduleLoadAndSortQuestions).toHaveBeenCalledWith(80);
+    expect(updatePlan.cacheUpdatePlan).toEqual({ action: 'reload', delayMs: 80 });
   });
-
 });

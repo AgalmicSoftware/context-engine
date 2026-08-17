@@ -194,6 +194,7 @@ const GateMultiSelectLock = ({
         aria-expanded={canEditGateLock ? open : undefined}
         aria-haspopup={canEditGateLock ? 'dialog' : undefined}
         data-testid={E2E_TESTIDS.GATE_LOCK_BUTTON}
+        data-ce-lock-state={locked ? 'locked' : 'unlocked'}
       >
         <FontAwesomeIcon
           icon={locked ? faLock : faLockOpen}

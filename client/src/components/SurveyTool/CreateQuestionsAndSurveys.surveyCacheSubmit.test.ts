@@ -1,7 +1,7 @@
 import {
   E2E_TESTIDS,
   REGISTRY_CACHE_KEY,
-  arweaveScripts,
+  arweaveClient,
   cacheScripts,
   collectTreeNodes,
   contractScripts,
@@ -52,7 +52,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     const keySpy = jest.spyOn(resourceKeys, 'getEffectiveArweaveKey').mockResolvedValue({
       arweaveJwk: '{"kty":"RSA"}',
     } as any);
-    const uploadSpy = jest.spyOn(arweaveScripts, 'uploadDataToArweave').mockRejectedValue(new Error('upload failed'));
+    const uploadSpy = jest.spyOn(arweaveClient, 'uploadDataToArweave').mockRejectedValue(new Error('upload failed'));
 
     try {
       const instance = makeInstance({
@@ -120,7 +120,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       arweaveJwk: '{"kty":"RSA"}',
       source: 'local',
     } as any);
-    const uploadSpy = jest.spyOn(arweaveScripts, 'uploadDataToArweave').mockResolvedValue('survey-arweave-tx');
+    const uploadSpy = jest.spyOn(arweaveClient, 'uploadDataToArweave').mockResolvedValue('survey-arweave-tx');
     writeCacheOptimisticMock.mockResolvedValue(undefined);
     peekCacheSyncMock.mockReturnValue({});
 
@@ -196,7 +196,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     const keySpy = jest.spyOn(resourceKeys, 'getEffectiveArweaveKey').mockResolvedValue({
       arweaveJwk: '{"kty":"RSA"}',
     } as any);
-    const uploadSpy = jest.spyOn(arweaveScripts, 'uploadDataToArweave').mockResolvedValue('survey-arweave-tx');
+    const uploadSpy = jest.spyOn(arweaveClient, 'uploadDataToArweave').mockResolvedValue('survey-arweave-tx');
     writeCacheOptimisticMock.mockResolvedValue(undefined);
     peekCacheSyncMock.mockReturnValue({});
 

@@ -1,7 +1,4 @@
-import {
-  ARWEAVE_DEFAULT_GATEWAY_CANDIDATES,
-  DOC_LIBRARY_ARWEAVE_GATEWAYS,
-} from './arweaveGateways.js';
+import { ARWEAVE_DEFAULT_GATEWAY_CANDIDATES, DOC_LIBRARY_ARWEAVE_GATEWAYS } from './arweaveGateways.js';
 
 describe('Arweave gateway ownership', () => {
   it('aliases the Document Library defaults to the canonical ordered candidates', () => {

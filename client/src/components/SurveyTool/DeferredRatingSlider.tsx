@@ -24,7 +24,7 @@ const DeferredRatingSlider = ({ value, disabled = false, onCommit }: DeferredRat
     tooltip={false}
     disabled={disabled}
     className={styles.ratingSlider}
-    style={{ width: '200px' }}
+    style={resolveDeferredRatingSliderStyle()}
     onCommit={onCommit}
   >
     {({ value: liveValue, sliderProps }) => (

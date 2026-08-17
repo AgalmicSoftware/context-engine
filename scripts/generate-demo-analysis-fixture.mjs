@@ -32,10 +32,36 @@ const OUTPUT_PATH = path.join(
   'demo',
   'demo_analysis_data.json'
 );
+const GENERATION_CONFIG_PATH = path.join(
+  REPO_ROOT,
+  'client',
+  'src',
+  'variables',
+  'demo',
+  'demo_analysis_generation_config.json'
+);
+
+function readJson(filePath) {
+  return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+}
+
+const generationConfig = readJson(GENERATION_CONFIG_PATH);
 
 export const TREE_AGREE_THRESHOLD = 2;
 export const TREE_DISAGREE_THRESHOLD = -2;
-export const SEMANTIC_TREE_NODE_IDS_BY_QUESTION_ID = Object.freeze({});
+export const SEMANTIC_TREE_NODE_IDS_BY_QUESTION_ID = Object.freeze(
+  generationConfig?.treeNodeIdsByQuestionId || {}
+);
+export const QUESTION_OVERRIDES_BY_QUESTION_ID = Object.freeze(
+  generationConfig?.questionOverridesByQuestionId || {}
+);
+export const SYNTHETIC_PARTICIPANT_CONFIG = Object.freeze(
+  generationConfig?.syntheticParticipantConfig || {}
+);
+const BASE_PROFILE_ID = 'historical_baseline';
+const BASE_PROFILE_LABEL = 'Historical persona baseline';
+const BASE_PROFILE_CONFIDENCE = 'High';
+const BASE_PROFILE_RATIONALE = 'Original historical-figure vote row anchored to the canonical demo persona fixtures and explicit tree/POLIS mappings.';
 
 const HASH_SEED = 2166136261 >>> 0;
 const HASH_DIVISOR = 0xffffffff;
@@ -409,6 +435,12 @@ const buildParticipantRow = (
     participant: String(participant?.participant || '').trim(),
     xid,
     groupId: Number(participant?.groupId ?? 0),
+    profileId: BASE_PROFILE_ID,
+    profileLabel: BASE_PROFILE_LABEL,
+    profileConfidence: BASE_PROFILE_CONFIDENCE,
+    profileRationale: BASE_PROFILE_RATIONALE,
+    profileSourceType: 'historical_baseline',
+    profileParentXid: xid,
     nVotes: normalizedVotes.length,
     nAgree: normalizedVotes.filter((value) => value === 1).length,
     nDisagree: normalizedVotes.filter((value) => value === -1).length,
@@ -416,9 +448,13 @@ const buildParticipantRow = (
   };
 };
 
-const buildCommentRows = (comments = [], participantsVotes = []) => comments.map((comment, index) => {
+const buildCommentRows = (
+  comments = [],
+  participantsVotes = []
+) => comments.map((comment, index) => {
+  const questionKey = String(index);
   const summary = participantsVotes.reduce((acc, participant) => {
-    const vote = normalizePolisVote(participant?.votes?.[String(index)]);
+    const vote = normalizePolisVote(participant?.votes?.[questionKey]);
     if (vote === 1) acc.agrees += 1;
     if (vote === -1) acc.disagrees += 1;
     return acc;
@@ -426,26 +462,49 @@ const buildCommentRows = (comments = [], participantsVotes = []) => comments.map
 
   return {
     ...comment,
+    datetime: formatDemoUtcDateTime(comment?.timestamp) || String(comment?.datetime || '').trim(),
     agrees: summary.agrees,
     disagrees: summary.disagrees,
   };
 });
 
-export const buildDemoAnalysisFixture = () => {
+export const buildDemoAnalysisFixture = ({
+  semanticTreeNodeIdsByQuestion = SEMANTIC_TREE_NODE_IDS_BY_QUESTION_ID,
+  questionOverridesByQuestion = QUESTION_OVERRIDES_BY_QUESTION_ID,
+  syntheticParticipantConfig = SYNTHETIC_PARTICIPANT_CONFIG,
+} = {}) => {
   const demoPolisData = readJson(DEMO_POLIS_PATH);
   const treeData = readJson(TREE_VOTES_PATH);
   const comments = Array.isArray(demoPolisData?.comments) ? demoPolisData.comments : [];
   const participants = Array.isArray(demoPolisData?.participantsVotes)
     ? demoPolisData.participantsVotes
     : [];
-  const treeNodeIdsByQuestion = buildTreeVoteNodeIdsByQuestion(comments);
-
-  const participantsVotes = participants.map((participant) => (
-    buildParticipantRow(participant, comments, treeData, treeNodeIdsByQuestion)
+  const normalizedComments = comments.map((comment, index) => (
+    applyCommentOverrides(comment, String(index), questionOverridesByQuestion)
   ));
+  const treeNodeIdsByQuestion = buildTreeVoteNodeIdsByQuestion(
+    normalizedComments,
+    semanticTreeNodeIdsByQuestion
+  );
+
+  const baseParticipantsVotes = participants.map((participant) => (
+    buildParticipantRow(participant, normalizedComments, treeData, treeNodeIdsByQuestion)
+  ));
+  const mappedQuestionIds = new Set(
+    treeNodeIdsByQuestion
+      .map((treeNodeId, questionIndex) => (treeNodeId ? String(questionIndex) : null))
+      .filter(Boolean)
+  );
+  const syntheticParticipantsVotes = buildSyntheticParticipantRows({
+    baseParticipantsVotes,
+    comments: normalizedComments,
+    syntheticParticipantConfig,
+    mappedQuestionIds,
+  });
+  const participantsVotes = [...baseParticipantsVotes, ...syntheticParticipantsVotes];
 
   return {
-    comments: buildCommentRows(comments, participantsVotes),
+    comments: buildCommentRows(normalizedComments, participantsVotes),
     participantsVotes,
   };
 };

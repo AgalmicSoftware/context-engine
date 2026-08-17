@@ -303,12 +303,20 @@ SPA fallback concept, but their redirect config syntax differs.
 - Custom RPC URLs supplied as worker secrets stay worker-private and are not
   mirrored into public registry fields. Client reads use only explicit
   browser-visible session `rpcUrl` / `rpcUrlsByChainId` values.
-- OP Sepolia browser fallbacks intentionally avoid leading with
-  `https://sepolia.optimism.io`; it remains available later in the list, but the
-  wallet/RainbowKit primary URL should prefer less rate-limited public mirrors
-  when PATH or a paid runtime RPC is not active.
-- Ethers read providers apply endpoint-level exponential backoff after RPC 429
-  responses before retrying that same URL.
+- OP Sepolia anonymous browser reads use only the official
+  `https://sepolia.optimism.io` endpoint. PublicNode, dRPC, and Tenderly are not
+  anonymous fallbacks because their browser-facing endpoints have returned
+  sustained `400`, `403`, or `429` responses under registry/SBT discovery load.
+  Production deployments should configure a session-visible sponsored RPC or
+  another authenticated provider instead of adding anonymous fanout.
+- Ethers read providers serialize distinct reads per endpoint. After a network
+  request returns `429` or an endpoint rejects browser access with `403`,
+  queued reads fail locally and use normal provider
+  fallback without issuing more requests to the cooling endpoint. Actual
+  network `429` responses increase the endpoint-level exponential cooldown;
+  locally generated cooldown errors do not extend it. Active-session SBT cache
+  warming also fetches only the selected registry slug instead of enumerating
+  every session.
 - Optional paid testnet read RPCs are env/runtime-only and are no longer
   committed in source.
   - `REACT_APP_CE_BASE_SEPOLIA_PAID_RPC_URL_HTTP`

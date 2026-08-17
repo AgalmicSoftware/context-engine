@@ -44,9 +44,7 @@ const resolveReadiness = (overrides: Record<string, unknown> = {}) =>
 
 describe('sessionWizardWorkerRequirementProof', () => {
   it('selects a present faucet key only for profiles that expose transaction funding', () => {
-    const decentralizedProfile = cloneSessionModePreset(
-      SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED,
-    );
+    const decentralizedProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
     const secrets = {
       openaiKey: 'sk-verified-openai',
       faucetPrivateKey: 'faucet-test-secret',
@@ -92,9 +90,7 @@ describe('sessionWizardWorkerRequirementProof', () => {
   });
 
   it('binds a selected faucet key into decentralized Worker readiness', () => {
-    const decentralizedProfile = cloneSessionModePreset(
-      SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED,
-    );
+    const decentralizedProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
     const decentralizedSecrets = {
       openaiKey: 'sk-verified-openai',
       faucetPrivateKey: 'faucet-test-secret',

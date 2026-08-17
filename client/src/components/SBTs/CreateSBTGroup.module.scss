@@ -980,13 +980,9 @@ $placeholder-color: var(--ce-panel-text-muted);
         $box-shadow: var(--ce-shadow-submit),
         $hover-box-shadow: var(--ce-shadow-submit-hover)
       );
-      min-width: 220px;
-    }
-
-    .primaryCreateButtonContent {
-      @include finalSubmitCta.final-submit-cta-content($gap: 10px);
-      flex-wrap: wrap;
-      text-transform: uppercase;
+      & {
+        min-width: 220px;
+      }
     }
 
     .primaryCreateButtonContent {

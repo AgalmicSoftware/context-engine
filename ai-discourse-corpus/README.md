@@ -8,14 +8,16 @@ This corpus is maintained as part of [Context Engine](https://github.com/Agalmic
 
 | Sub-corpus | Items | Description |
 |------------|-------|-------------|
-| `ai-laws-policy-corpus.json` | 223 | Global AI legislation, regulatory proposals, policy frameworks, agency guidance, and official reports with governance-focused analysis. |
-| `ai-scifi-books-corpus.json` | 151 | Science fiction works curated for AI safety, alignment, ethics, and policy discourse. |
-| `arxiv-ai-safety-corpus.json` | 266 | Academic papers on AI safety, alignment, interpretability, and governance. |
-| `cross-corpus-debates.json` | 13 | Structured debate trees that synthesize evidence across multiple AI discourse sources. |
-| `dwarkesh-lab-insiders-corpus.json` | 149 | Interviews and writings from AI lab insiders and practitioners on frontier AI development. |
-| `enriched-tweets.json` | 4036 | Enriched social-media discourse with summaries, tags, relevance signals, and linked context. |
-| `lesswrong-posts-corpus.json` | 211 | Influential LessWrong, Alignment Forum, EA Forum, and related AI safety/rationalist writing. |
-| `metr-evals-metrics-corpus.json` | 95 | METR publications, benchmarks, evaluation reports, and measurement-oriented policy material. |
+| `ai-forecasting-economics-corpus.json` | 17 | AI forecasting and economics: compute/capability trend data, crowd and tournament forecasts, and the formal economics of transformative AI. |
+| `ai-laws-policy-corpus.json` | 224 | Global AI legislation, regulatory proposals, policy frameworks, agency guidance, and official reports with governance-focused analysis. |
+| `ai-scifi-books-corpus.json` | 156 | Science fiction works curated for AI safety, alignment, ethics, and policy discourse. |
+| `arxiv-ai-safety-corpus.json` | 279 | Academic papers on AI safety, alignment, interpretability, and governance. |
+| `cross-corpus-debates.json` | 16 | Structured debate trees that synthesize evidence across multiple AI discourse sources. |
+| `dwarkesh-lab-insiders-corpus.json` | 154 | Interviews and writings from AI lab insiders and practitioners on frontier AI development. |
+| `enriched-tweets.json` | 4140 | Enriched social-media discourse from 2018-09-21 through 2026-07-11, with summaries, tags, relevance signals, and linked context. |
+| `lab-primary-docs-corpus.json` | 30 | Primary safety/governance documents from frontier labs: safety frameworks (RSP, Preparedness, FSF), system cards, framework compliance reports, model specs, and deployment updates. |
+| `lesswrong-posts-corpus.json` | 225 | Influential LessWrong, Alignment Forum, EA Forum, and related AI safety/rationalist writing. |
+| `metr-evals-metrics-corpus.json` | 100 | METR publications, benchmarks, evaluation reports, and measurement-oriented policy material. |
 | `loophole-historical-cases.json` | 40 | Mirrored copy of Context Engine's Loophole historical-case dataset, generated via the methodology from [brendanhogan/loophole](https://github.com/brendanhogan/loophole). Explores regulatory edge cases through adversarial scenario generation. |
 
 ## Format
@@ -36,7 +38,13 @@ node scripts/ai-discourse-corpus-tools.js validate
 node scripts/ai-discourse-corpus-tools.js extract debate_ai_water_usage
 ```
 
-The helper reports counts, metadata drift, debate-reference coverage, client mirror coverage, malformed date/year fields, and compact single-record extracts without dumping the full corpus into the chat context. This is especially important for `enriched-tweets.json`, which is much larger than the other corpus files.
+The helper reports counts, metadata drift, duplicate IDs and per-sub-corpus normalized titles,
+debate-reference coverage, client debate/sample mirror coverage, taxonomy and
+date/year drift, and compact single-record extracts without dumping the full
+corpus into the chat context. URL-form lookups normalize protocol, `www`, and
+trailing slashes while preserving case-sensitive paths. This is especially
+important for `enriched-tweets.json`, which is much larger than the other
+corpus files.
 
 ## License
 

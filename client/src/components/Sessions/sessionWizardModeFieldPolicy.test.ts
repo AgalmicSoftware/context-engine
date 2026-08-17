@@ -7,9 +7,7 @@ import {
 import { resolveSessionWizardModeRequirements } from './sessionWizardModeRequirements';
 
 const cloudflareRequirements = () =>
-  resolveSessionWizardModeRequirements(
-    cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
-  );
+  resolveSessionWizardModeRequirements(cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE));
 
 describe('sessionWizardModeFieldPolicy', () => {
   it('enumerates and strips every policy-governed field that is hidden by the final profile', () => {
@@ -26,11 +24,15 @@ describe('sessionWizardModeFieldPolicy', () => {
     ]);
     const payload = Object.fromEntries(SESSION_WIZARD_MODE_POLICY_FIELD_KEYS.map((key) => [key, 'stale']));
 
-    expect(applySessionWizardModeFieldPolicyToPayload(payload, resolveSessionWizardModeFieldPolicy(cloudflareRequirements())))
-      .toEqual({
-        sessionEndsAt: 'stale',
-        defaultGroupTags: 'stale',
-      });
+    expect(
+      applySessionWizardModeFieldPolicyToPayload(
+        payload,
+        resolveSessionWizardModeFieldPolicy(cloudflareRequirements()),
+      ),
+    ).toEqual({
+      sessionEndsAt: 'stale',
+      defaultGroupTags: 'stale',
+    });
   });
 
   it('strips hidden mode fields from encrypted metadata sidecars', () => {
@@ -93,9 +95,7 @@ describe('sessionWizardModeFieldPolicy', () => {
       ],
     };
 
-    expect(
-      resolveSessionWizardModeFieldPolicy(resolveSessionWizardModeRequirements(profile)),
-    ).toEqual({
+    expect(resolveSessionWizardModeFieldPolicy(resolveSessionWizardModeRequirements(profile))).toEqual({
       showBlockLimits: false,
       showFaucet: false,
       showSessionEndsAt: true,

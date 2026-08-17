@@ -813,7 +813,7 @@
           "from_corpus": "dwarkesh-lab-insiders",
           "from_id": "amodei_dario_dwarkesh_2026_end_of_exponential",
           "to_corpus": "metr-evals-metrics",
-          "to_id": "metr_time_horizon_11_2026",
+          "to_id": "metr_time_horizon_1_1_2026",
           "relationship": "discusses_implications_of",
           "relevance_score": 9
         },
@@ -4261,7 +4261,7 @@
           "relevance_score": 7
         },
         {
-          "entry_url_or_id": "https://metr.org/hcast.pdf",
+          "entry_url_or_id": "metr_cybersecurity_eval_capabilities",
           "corpus": "metr-evals-metrics",
           "side": "a",
           "stance_summary": "Cybersecurity Evaluation Capabilities in HCAST",
@@ -4972,7 +4972,7 @@
           "relevance_score": 7
         },
         {
-          "entry_url_or_id": "https://metr.org/blog/2025-03-19-measuring-ai-ability-to-complete-long-tasks/",
+          "entry_url_or_id": "metr_exponential_trend_evidence",
           "corpus": "metr-evals-metrics",
           "side": "a",
           "stance_summary": "Evidence for Exponential AI Capability Growth",
@@ -6075,14 +6075,14 @@
           "relevance_score": 7
         },
         {
-          "entry_url_or_id": "dwarkesh_elon_musk_feb_2026",
+          "entry_url_or_id": "musk_elon_dwarkesh_2026_ai_in_space",
           "corpus": "dwarkesh-lab-insiders",
           "side": "b",
           "stance_summary": "Musk's orbital-data-center discussion is retained only as speculative industry-response evidence, not as a policy-grade mitigation claim.",
           "relevance_score": 3
         },
         {
-          "entry_url_or_id": "international_ai_safety_report_2026",
+          "entry_url_or_id": "intl_ai_safety_report_2026_policy",
           "corpus": "ai-laws-policy",
           "side": "a",
           "stance_summary": "International safety framing increasingly includes environmental sustainability as one dimension of AI governance capacity.",
@@ -6194,6 +6194,13 @@
           "side": "a",
           "stance_summary": "AI Index economy and education trends provide a broad empirical frame for adoption, exposure, and public policy capacity.",
           "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "nber_korinek_suh_agi_scenarios_2024",
+          "corpus": "ai-forecasting-economics",
+          "side": "b",
+          "stance_summary": "Korinek-Suh: wages can collapse before full automation if remaining human tasks are bounded — displacement risk is a scenario property, not a current-data question",
+          "relevance_score": 7
         }
       ],
       "cross_corpus_references": [
@@ -6220,6 +6227,14 @@
           "to_id": "anthropic_economic_index_2025",
           "relationship": "adds_labor_rights_context_to",
           "relevance_score": 7
+        },
+        {
+          "from_corpus": "ai-forecasting-economics",
+          "from_id": "nber_korinek_suh_agi_scenarios_2024",
+          "to_corpus": "ai-scifi-books",
+          "to_id": "vonnegut_player_piano",
+          "relationship": "fictional_treatment_in",
+          "relevance_score": 6
         }
       ],
       "argument_tree": {
@@ -6713,21 +6728,14 @@
           "entry_url_or_id": "ai_content_labeling_watermarking",
           "corpus": "ai-laws-policy",
           "side": "a",
-          "stance_summary": "Content-labeling and watermarking policies aim to preserve provenance and user awareness for generated media.",
-          "relevance_score": 7
+          "stance_summary": "China synthetic-content labeling rules demonstrate a more mandatory traceability-oriented approach.",
+          "relevance_score": 8
         },
         {
           "entry_url_or_id": "california_ab_2885",
           "corpus": "ai-laws-policy",
           "side": "a",
           "stance_summary": "California AB 2885 provides a state-level digital-content authenticity and watermarking example.",
-          "relevance_score": 8
-        },
-        {
-          "entry_url_or_id": "china_011",
-          "corpus": "ai-laws-policy",
-          "side": "a",
-          "stance_summary": "China synthetic-content labeling rules demonstrate a more mandatory traceability-oriented approach.",
           "relevance_score": 8
         },
         {
@@ -6808,7 +6816,7 @@
         },
         {
           "from_corpus": "ai-laws-policy",
-          "from_id": "china_011",
+          "from_id": "ai_content_labeling_watermarking",
           "to_corpus": "ai-laws-policy",
           "to_id": "ai_content_labeling_watermarking",
           "relationship": "specific_jurisdictional_instance_of",

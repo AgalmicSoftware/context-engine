@@ -31,8 +31,7 @@ type FooterState = {
   startMenuOpen: boolean;
 };
 
-const isDesktopWindowTheme = (themeId: string): boolean =>
-  getThemeMetadata(themeId).layoutProfile === 'desktop-window';
+const isDesktopWindowTheme = (themeId: string): boolean => getThemeMetadata(themeId).layoutProfile === 'desktop-window';
 
 class Footer extends React.Component<FooterProps, FooterState> {
   private footerRef = React.createRef<HTMLElement>();

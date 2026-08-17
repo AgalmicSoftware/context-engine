@@ -93,10 +93,6 @@ jest.mock('../../utilities/web3/chainGateway.js', () => {
   };
 });
 
-import SBTSelector from './SBTSelector';
-import * as contractScriptsUtils from '../../utilities/web3/contractScripts.js';
-import * as sessionRegistryUtils from '../../utilities/web3/sessionRegistry.js';
-
 const mockGetAllSessionSlugs = contractScriptsUtils.getAllSessionSlugs as jest.Mock;
 const mockGetSessionChainId = contractScriptsUtils.getSessionChainId as jest.Mock;
 const mockGetSessionLists = contractScriptsUtils.getSessionLists as jest.Mock;

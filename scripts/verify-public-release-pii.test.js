@@ -64,7 +64,7 @@ test('verify-public-release-pii passes clean text while warning on public values
     ].join('\n'));
     writeFile(rootDir, 'ai-discourse-corpus/corpuses/public-corpus.json', [
       '{',
-      '  "contact": "[redacted-email]"',
+      `  "contact": "${corpusContact}"`,
       '}',
       '',
     ].join('\n'));
@@ -72,7 +72,7 @@ test('verify-public-release-pii passes clean text while warning on public values
       '{',
       '  "packages": {',
       '    "node_modules/public-package": {',
-      '      "author": "Package Maintainer <[redacted-email]>"',
+      `      "author": "Package Maintainer <${packageMaintainer}>"`,
       '    }',
       '  }',
       '}',

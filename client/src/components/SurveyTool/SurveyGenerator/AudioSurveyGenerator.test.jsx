@@ -107,7 +107,10 @@ describe('AudioSurveyGenerator input and question generation', () => {
     expect(findGenerateQuestionsButton()).toBeTruthy();
   });
 
-  it('treats queued photo uploads as valid DatabaseTool input content', async () => {
+  it('queues multiple photo uploads as preview cards and treats them as valid DatabaseTool input content', async () => {
+    const firstPhoto = new File(['photo-one'], 'memo.png', { type: 'image/png' });
+    const secondPhoto = new File(['photo-two'], 'diagram.webp', { type: 'image/webp' });
+
     await renderSubject(
       <AudioSurveyGenerator provider={{}} network={{}} account="0x123" loginComplete toggleLoginModal={jest.fn()} />,
     );
@@ -154,9 +157,13 @@ describe('AudioSurveyGenerator input and question generation', () => {
 
     addAdditionalPhoto();
 
-    expect(container.textContent).toContain('[photo]');
-    expect(container.textContent).toContain('Queued for analysis');
-    expect(findGenerateQuestionsButton()).toBeTruthy();
+    const photoCard = getPhotoCardByName('memo.png');
+    const sourceId = getPhotoSourceId(photoCard);
+
+    expect(photoCard).toBeTruthy();
+    expect(photoCard.textContent).toContain('Queued for analysis');
+    expect(getPhotoAnalysisToggleBySourceId(sourceId)).toBeNull();
+    expect(getPhotoAnalysisBodyBySourceId(sourceId)).toBeNull();
   });
 
   it('uses simplified section headings in the generator surface', async () => {
@@ -208,12 +215,16 @@ describe('AudioSurveyGenerator input and question generation', () => {
       );
     });
 
-    expect(Array.from(container.querySelectorAll('h3')).some((node) => node.textContent.trim() === 'Types')).toBe(false);
+    expect(Array.from(container.querySelectorAll('h3')).some((node) => node.textContent.trim() === 'Types')).toBe(
+      false,
+    );
     expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}"]`)).toBeNull();
 
     setAudioInputValue('   ');
 
-    expect(Array.from(container.querySelectorAll('h3')).some((node) => node.textContent.trim() === 'Types')).toBe(false);
+    expect(Array.from(container.querySelectorAll('h3')).some((node) => node.textContent.trim() === 'Types')).toBe(
+      false,
+    );
     expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}"]`)).toBeNull();
 
     setAudioInputValue('Context that should reveal question configuration.');
@@ -223,7 +234,9 @@ describe('AudioSurveyGenerator input and question generation', () => {
 
     setAudioInputValue('');
 
-    expect(Array.from(container.querySelectorAll('h3')).some((node) => node.textContent.trim() === 'Types')).toBe(false);
+    expect(Array.from(container.querySelectorAll('h3')).some((node) => node.textContent.trim() === 'Types')).toBe(
+      false,
+    );
     expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}"]`)).toBeNull();
   });
 

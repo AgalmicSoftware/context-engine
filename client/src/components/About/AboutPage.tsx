@@ -67,7 +67,7 @@ const RECOGNITION_GROUPS: RecognitionGroup[] = [
     itemClassName: 'recognitionItemEthereum',
     logoClassName: 'recognitionLogoEthereum',
     description:
-      'Context Engine uses a passkey Ethereum wallet model rather than email for accounts. In the whitepaper, Ethereum matters as the cryptographic base that natively supports proof-of-human credentials, digital group membership tokens, access gates, and durable on-chain references, while decentralized protocols add censorship-resistance and data permanence. Although the app runs on Ethereum infrastructure, users do not need to know anything about cryptocurrency to use it.',
+      'Context Engine uses a passkey Ethereum wallet model rather than email for accounts. Ethereum provides the cryptographic foundation for proof-of-human and attestation-based access, SBT-style membership, gated encryption, and durable on-chain references, while decentralized infrastructure adds censorship-resistance and data permanence. Users do not need any crypto expertise to use it.',
     links: [
       { url: 'https://ethereum.org/', text: 'Ethereum.org' },
       { url: 'https://ethereum.org/en/what-is-ethereum/', text: 'What is Ethereum?' },

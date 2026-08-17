@@ -126,21 +126,6 @@ export const reloadWithCacheBuster = (win: BootWindow = globalThis.window, reloa
   win.location.reload?.();
 };
 
-export const clearBootReloadMarker = (
-  win: BootWindow = globalThis.window,
-  reloadParam = BOOT_RELOAD_PARAM,
-): void => {
-  try {
-    if (!win?.location || !win.history?.replaceState) return;
-    const url = new URL(win.location.href);
-    if (!url.searchParams.has(reloadParam)) return;
-    url.searchParams.delete(reloadParam);
-    win.history.replaceState(win.history.state ?? null, '', url.toString());
-  } catch {
-    // URL cleanup is best-effort and must never interrupt a successful boot.
-  }
-};
-
 const hasReloadParam = (win: BootWindow, reloadParam: string): boolean => {
   try {
     return win.location ? new URL(win.location.href).searchParams.has(reloadParam) : false;
@@ -315,7 +300,7 @@ export const renderBootFailure = (error: unknown, options: BootRecoveryOptions =
     panel,
     'h1',
     'A new version of Context Engine is available',
-    'margin:0 0 14px;color:#f6f8ff;font-size:28px;line-height:1.15;font-weight:800',
+    'margin:0 0 14px;color:var(--ce-panel-text,CanvasText);font-size:28px;line-height:1.15;font-weight:800',
   );
   appendTextNode(
     doc,
@@ -331,7 +316,7 @@ export const renderBootFailure = (error: unknown, options: BootRecoveryOptions =
     automaticReloadPaused
       ? 'Automatic reload paused after the previous attempt. Fix the startup issue, then select Reload.'
       : '',
-    'margin:0 0 20px;color:#f6f8ff;font-size:15px;font-weight:700;line-height:1.35',
+    'margin:0 0 20px;color:var(--ce-panel-text,CanvasText);font-size:15px;font-weight:700;line-height:1.35',
   );
 
   const actions = doc.createElement('div');
@@ -341,8 +326,7 @@ export const renderBootFailure = (error: unknown, options: BootRecoveryOptions =
   container.appendChild(panel);
   root.appendChild(container);
 
-  const alreadyReloaded = hasReloadParam(win, reloadParam);
-  if (autoReloadDelayMs >= 0 && !alreadyReloaded) {
+  if (autoReloadDelayMs >= 0) {
     const schedule = win?.setTimeout || globalThis.setTimeout;
     const delaySeconds = Math.max(0, Math.ceil(autoReloadDelayMs / 1000));
     let remainingSeconds = delaySeconds;
@@ -367,9 +351,6 @@ export const renderBootFailure = (error: unknown, options: BootRecoveryOptions =
     schedule?.(() => {
       refresh(refreshButton);
     }, autoReloadDelayMs);
-  } else if (alreadyReloaded) {
-    countdownNode.textContent =
-      'Automatic reload stopped because the app is still failing to start. Try Reload after the client is updated.';
   }
 
   return true;

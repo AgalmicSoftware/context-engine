@@ -2052,7 +2052,11 @@ class CommunityTab extends Component<any, any> {
                   <span
                     className={styles.responsesCount}
                     onClick={() =>
-                      window.open(buildPublicRoute(`/survey/${survey.id}/results${sessionQuery}`), '_blank')
+                      window.open(
+                        buildPublicRoute(`/survey/${survey.id}/results${sessionQuery}`),
+                        '_blank',
+                        'noopener,noreferrer',
+                      )
                     } // Link to results page
                     style={{ cursor: 'pointer' }} // Add pointer cursor
                   >

@@ -95,8 +95,7 @@ describe('publicDeploymentConfig', () => {
   });
 
   it('enables Cloudflare-native deploy only for a full immutable public replay commit', () => {
-    process.env.REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT =
-      '0123456789abcdef0123456789abcdef01234567';
+    process.env.REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT = '0123456789abcdef0123456789abcdef01234567';
     jest.isolateModules(() => {
       const config = require('./publicDeploymentConfig.js');
       expect(config.CLOUDFLARE_NATIVE_DEPLOY_URL).toContain('https://deploy.workers.cloudflare.com/');
@@ -121,8 +120,7 @@ describe('publicDeploymentConfig', () => {
     process.env.REACT_APP_CE_AGENT_BRIDGE_WORKER_BUNDLE_URL = 'https://assets.example.test/agentBridgeWorker.bundle.js';
     process.env.REACT_APP_CE_WORKER_RELEASE_MANIFEST_URL = 'https://assets.example.test/worker-release-manifest.json';
     process.env.REACT_APP_CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED = 'false';
-    process.env.REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT =
-      'abcdef0123456789abcdef0123456789abcdef01';
+    process.env.REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT = 'abcdef0123456789abcdef0123456789abcdef01';
 
     jest.isolateModules(() => {
       const config = require('./publicDeploymentConfig.js');

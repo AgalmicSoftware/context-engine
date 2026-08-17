@@ -1,4 +1,7 @@
-import { persistAndVerifySessionWizardWorkerConfig } from './sessionWizardWorkerConfigPersistence';
+import {
+  persistAndVerifySessionWizardWorkerConfig,
+  type SessionWizardWorkerConfigSignInput,
+} from './sessionWizardWorkerConfigPersistence';
 import { buildSessionWizardWorkerConfigPayload } from './sessionWizardWriteNormalization';
 import { buildSessionWizardDefaultTemplate } from './sessionWizardDraftState';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
@@ -6,6 +9,12 @@ import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities
 const ADMIN_ADDRESS = '0x1111111111111111111111111111111111111111';
 const SESSION_ID = '0x00112233445566778899aabbccddeeff';
 const WORKER_ORIGIN = 'https://session-worker.example.test';
+const CREDENTIALED_LIT_API_BASE = (() => {
+  const url = new URL('https://lit.example');
+  url.username = 'user';
+  url.password = 'secret';
+  return url.toString();
+})();
 
 const baseConfig = () => ({
   sessionName: 'Worker Canonical Session',
@@ -34,12 +43,13 @@ const verifiedConfig = (revision: string, overrides: Record<string, unknown> = {
 
 describe('persistAndVerifySessionWizardWorkerConfig', () => {
   it('signs and writes non-secret config, then returns only an exactly verified public config', async () => {
-    const signAdminAction = jest.fn(async () => ({
+    let signedConfig: Record<string, unknown> | null = null;
+    const signAdminAction = jest.fn(async (_input: SessionWizardWorkerConfigSignInput) => ({
       address: ADMIN_ADDRESS,
       message: 'signed set-config message',
       signature: '0xsigned',
     }));
-    signAdminAction.mockImplementationOnce(async (input) => {
+    signAdminAction.mockImplementationOnce(async (input: SessionWizardWorkerConfigSignInput) => {
       signedConfig = input.body.config;
       return { address: ADMIN_ADDRESS, message: 'signed set-config message', signature: '0xsigned' };
     });
@@ -55,16 +65,18 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
       config: baseConfig(),
       signAdminAction,
       fetchImpl,
-      randomRevision: () => 'revision-1',
       retryDelaysMs: [],
     });
+
+    const revision = result.configRevision;
+    expect(revision).toMatch(/^config:[a-f0-9]{64}$/);
 
     expect(signAdminAction).toHaveBeenCalledWith({
       action: 'set-config',
       body: {
         sessionSlug: 'worker-session',
         adminAddress: ADMIN_ADDRESS,
-        config: verifiedConfig('revision-1'),
+        config: verifiedConfig(revision),
       },
       targetSlug: 'worker-session',
       workerUrl: WORKER_ORIGIN,
@@ -89,7 +101,7 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
       signature: '0xsigned',
       sessionSlug: 'worker-session',
       adminAddress: ADMIN_ADDRESS,
-      config: verifiedConfig('revision-1'),
+      config: verifiedConfig(revision),
     });
 
     expect(fetchImpl.mock.calls[1]).toEqual([
@@ -106,10 +118,56 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
     ]);
     expect(result).toEqual({
       workerOrigin: WORKER_ORIGIN,
-      configRevision: 'revision-1',
-      publicConfig: verifiedConfig('revision-1'),
+      configRevision: revision,
+      publicConfig: verifiedConfig(revision),
     });
     expect(result.publicConfig.appearance).toEqual({ colorSchemeId: 'amber' });
+  });
+
+  it('rejects an unsupported profile before signing or transport', async () => {
+    const signAdminAction = jest.fn();
+    const fetchImpl = jest.fn();
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    sessionModeProfile.authority.mode = 'worker_with_public_anchor';
+    sessionModeProfile.evm.registryChainId = 11155420;
+
+    await expect(
+      persistAndVerifySessionWizardWorkerConfig({
+        workerUrl: WORKER_ORIGIN,
+        slug: 'worker-session',
+        sessionId: SESSION_ID,
+        adminAddress: ADMIN_ADDRESS,
+        config: { ...baseConfig(), sessionModeProfile },
+        signAdminAction,
+        fetchImpl,
+        retryDelaysMs: [],
+      }),
+    ).rejects.toThrow(/unsupported session mode profile/i);
+
+    expect(signAdminAction).not.toHaveBeenCalled();
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('rejects an all-zero session ID before signing or transport', async () => {
+    const signAdminAction = jest.fn();
+    const fetchImpl = jest.fn();
+
+    await expect(
+      persistAndVerifySessionWizardWorkerConfig({
+        workerUrl: WORKER_ORIGIN,
+        slug: 'worker-session',
+        sessionId: '0x00000000000000000000000000000000',
+        adminAddress: ADMIN_ADDRESS,
+        config: baseConfig(),
+        signAdminAction,
+        fetchImpl,
+        retryDelaysMs: [],
+      }),
+    ).rejects.toThrow(/valid 16-byte session id/i);
+
+    expect(signAdminAction).not.toHaveBeenCalled();
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it('emits the same deterministic revision from two independent persistence invocations', async () => {
@@ -201,7 +259,7 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
   });
 
   it('retries a stale successful read until the requested config revision is visible', async () => {
-    const sleep = jest.fn(async () => undefined);
+    const sleep = jest.fn(async (_delayMs: number) => undefined);
     const fetchImpl = jest
       .fn()
       .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
@@ -400,7 +458,9 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
       litPkpId: 'pkp_123',
       litActionCid: 'bafy123',
     };
-    const signAdminAction = jest.fn(async () => ({ signature: '0xsigned' }));
+    const signAdminAction = jest.fn(async (_input: SessionWizardWorkerConfigSignInput) => ({
+      signature: '0xsigned',
+    }));
     const fetchImpl = jest
       .fn()
       .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
@@ -435,6 +495,10 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
     sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
     sessionModeProfile.encryption = { mode: 'lit' };
     sessionModeProfile.evm.registryChainId = 11155420;
+    sessionModeProfile.storage.payloadAccessControl = {
+      ...sessionModeProfile.storage.payloadAccessControl!,
+      encryption: 'lit',
+    };
     const config = buildSessionWizardWorkerConfigPayload({
       slug: 'worker-session',
       draft: {
@@ -489,6 +553,7 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
   it.each([
     ['slug', { slug: 'different-session' }],
     ['session id', { sessionId: '0xffeeddccbbaa99887766554433221100' }],
+    ['zero session id', { sessionId: '0x00000000000000000000000000000000' }],
     [
       'authority profile',
       {
@@ -583,6 +648,12 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
     ['AI provider key', { ai: { anthropicKey: 'ai-secret' } }],
     ['Arweave JWK', { storage: { arweaveJwk: 'arweave-secret' } }],
     ['Lit credential', { litCredentials: { litUsageApiKey: 'lit-secret' } }],
+    ['Lit account credential', { litCredentials: { litAccountApiKey: 'lit-secret' } }],
+    ['generic Lit API key', { litCredentials: { apiKey: 'lit-secret' } }],
+    ['generic Lit token', { litCredentials: { token: 'lit-secret' } }],
+    ['unknown Lit descriptor field', { litCredentials: { litNetwork: 'datil' } }],
+    ['nested Lit secret alias', { litCredentials: { metadata: { clientSecret: 'lit-secret' } } }],
+    ['credential-bearing Lit API base', { litCredentials: { litApiBase: CREDENTIALED_LIT_API_BASE } }],
     ['RPC config', { rpcUrlsByChainId: { '1': ['https://rpc-key.example'] } }],
     ['faucet config', { faucet: { privateKey: 'faucet-secret' } }],
   ])('rejects a secret-bearing %s before signing or persistence', async (_label, secretConfig) => {
@@ -635,5 +706,36 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
         retryDelaysMs: [],
       }),
     ).rejects.toThrow(/secret-bearing worker config field/i);
+  });
+
+  it('rejects a verified public response that exposes even a non-secret Lit descriptor', async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
+      .mockResolvedValueOnce(
+        jsonResponse(200, {
+          config: {
+            ...verifiedConfig('revision-public-lit'),
+            litCredentials: {
+              litApiBase: 'https://api.chipotle.litprotocol.com',
+              litActionCid: 'bafy123',
+            },
+          },
+        }),
+      );
+
+    await expect(
+      persistAndVerifySessionWizardWorkerConfig({
+        workerUrl: WORKER_ORIGIN,
+        slug: 'worker-session',
+        sessionId: SESSION_ID,
+        adminAddress: ADMIN_ADDRESS,
+        config: baseConfig(),
+        signAdminAction: async () => ({ signature: '0xsigned' }),
+        fetchImpl,
+        configRevision: 'revision-public-lit',
+        retryDelaysMs: [],
+      }),
+    ).rejects.toThrow(/public worker config response exposed litCredentials/i);
   });
 });

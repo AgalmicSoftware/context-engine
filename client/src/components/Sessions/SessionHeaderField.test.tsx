@@ -112,9 +112,7 @@ describe('SessionHeaderField', () => {
     });
 
     expect(screen.queryByLabelText('Upload file')).not.toBeInTheDocument();
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_URL)).toHaveValue(
-      'https://example.test/header.png',
-    );
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_URL)).toHaveValue('https://example.test/header.png');
     expect(advanced.container.querySelector('input[type="file"]')).toBeNull();
     advanced.unmount();
 

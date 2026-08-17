@@ -1,10 +1,52 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import SurveyQuestionsFullQuestionResponseInput from './SurveyQuestionsFullQuestionResponseInput';
-import { buildSurveyQuestionsFullQuestionResponseInputDescriptor } from './surveyQuestionsFullQuestionResponseInputState';
+import {
+  buildSurveyQuestionsFullQuestionResponseInputActionDescriptor,
+  buildSurveyQuestionsFullQuestionResponseInputDescriptor,
+  shouldDispatchSurveyQuestionsFullQuestionResponseInputAction,
+} from './surveyQuestionsFullQuestionResponseInputState';
+
+const mockSurveyAudioFieldInputProps: any[] = [];
+
+jest.mock('./SurveyAudioFieldInput', () => {
+  const React = require('react');
+
+  return {
+    __esModule: true,
+    default: (props: any) => {
+      mockSurveyAudioFieldInputProps.push(props);
+      return (
+        <div
+          data-testid="mock-survey-audio-field-input"
+          data-ce-question-id={props.dataCeQuestionId || ''}
+          data-disabled={String(!!props.disabled)}
+          data-encrypted={String(!!props.encrypted)}
+          data-force-glow={String(!!props.forceGlow)}
+          data-input-testid={props.dataTestId || ''}
+          data-session-slug={props.sessionSlug || ''}
+          data-value={String(props.value)}
+          data-worker-url={props.workerUrl || ''}
+        >
+          <button type="button" onClick={() => props.updateFunction('next answer')}>
+            update answer
+          </button>
+          <button type="button" onClick={() => props.toggleEncryption(true)}>
+            toggle encryption
+          </button>
+        </div>
+      );
+    },
+  };
+});
 
 describe('SurveyQuestionsFullQuestionResponseInput', () => {
+  beforeEach(() => {
+    mockSurveyAudioFieldInputProps.length = 0;
+  });
+
   it('builds pure response input descriptors for supported question types', () => {
     expect(
       buildSurveyQuestionsFullQuestionResponseInputDescriptor({
@@ -29,6 +71,7 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
       }),
     ).toEqual({
       kind: 'rating',
+      questionId: 'q2',
       ratingValue: 7,
       disabled: false,
       useDeferredRating: true,
@@ -37,13 +80,12 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
     expect(
       buildSurveyQuestionsFullQuestionResponseInputDescriptor({
         question: { id: ' Q3 ', type: 'freeform' },
-        qIndex: 4,
         answer: { value: { ignored: true }, encrypted: true },
         glowAnswer: true,
       }),
     ).toEqual({
       kind: 'audio',
-      qIndex: 4,
+      questionId: ' Q3 ',
       value: '',
       encrypted: true,
       dataTestId: E2E_TESTIDS.SURVEY_ANSWER_INPUT,
@@ -51,8 +93,72 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
       disabled: false,
       forceGlow: true,
       placeholder: 'response (optional)',
-      disableEncryption: true,
     });
+  });
+
+  it('describes response input actions with question identity and dispatch readiness', () => {
+    const inputDescriptor = buildSurveyQuestionsFullQuestionResponseInputDescriptor({
+      question: { id: 'q-rating', type: 'rating' },
+      answer: { value: '5' },
+    });
+    const event = { type: 'keydown' };
+
+    const ratingChange = buildSurveyQuestionsFullQuestionResponseInputActionDescriptor({
+      inputDescriptor,
+      kind: 'rating-change',
+      nextValue: 8,
+      event,
+    });
+    expect(ratingChange).toMatchObject({
+      kind: 'rating-change',
+      questionId: 'q-rating',
+      responseKey: 'answer',
+      disabled: false,
+      nextValue: 8,
+      persistStrategy: 'event-sensitive',
+    });
+    expect(ratingChange.event).toBe(event);
+    expect(shouldDispatchSurveyQuestionsFullQuestionResponseInputAction(ratingChange)).toBe(true);
+
+    const ratingCommit = buildSurveyQuestionsFullQuestionResponseInputActionDescriptor({
+      inputDescriptor,
+      kind: 'rating-commit',
+      nextValue: '9',
+    });
+    expect(ratingCommit).toEqual({
+      kind: 'rating-commit',
+      questionId: 'q-rating',
+      responseKey: 'answer',
+      disabled: false,
+      nextValue: 9,
+      persistDraft: false,
+      flushAfterUpdate: true,
+    });
+
+    const encryptionToggle = buildSurveyQuestionsFullQuestionResponseInputActionDescriptor({
+      inputDescriptor,
+      kind: 'answer-encryption-toggle',
+      nextEncryptedState: true,
+    });
+    expect(encryptionToggle).toEqual({
+      kind: 'answer-encryption-toggle',
+      questionId: 'q-rating',
+      responseKey: 'answer',
+      disabled: false,
+      nextEncryptedState: true,
+    });
+
+    const disabledDescriptor = buildSurveyQuestionsFullQuestionResponseInputDescriptor({
+      question: { id: 'q-disabled', type: 'binary' },
+      answer: { value: 'Agree' },
+      isSubmitting: true,
+    });
+    const disabledAction = buildSurveyQuestionsFullQuestionResponseInputActionDescriptor({
+      inputDescriptor: disabledDescriptor,
+      kind: 'answer-change',
+      nextValue: 'Disagree',
+    });
+    expect(shouldDispatchSurveyQuestionsFullQuestionResponseInputAction(disabledAction)).toBe(false);
   });
 
   it('renders multichoice input and forwards selected values', () => {
@@ -238,6 +344,42 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
     const props = mockSurveyAudioFieldInputProps[mockSurveyAudioFieldInputProps.length - 1];
     expect(props.sessionConfig).toBe(sessionConfig);
     expect(props.context).toBe(context);
+  });
+
+  it('skips non-edited answer inputs when stable parent props are reused', () => {
+    const audioInputWorkerProps = { sessionSlug: 'edge' };
+    const onAnswerChange = jest.fn();
+    const onToggleAnswerEncryption = jest.fn();
+    const firstQuestion = { id: 'q-one', type: 'freeform' };
+    const secondQuestion = { id: 'q-two', type: 'freeform' };
+    const firstAnswer = { value: 'first', encrypted: false };
+    const secondAnswer = { value: 'second', encrypted: false };
+    const secondAnswerUpdated = { value: 'second edited', encrypted: false };
+    const renderInputs = (nextSecondAnswer = secondAnswer) => (
+      <>
+        <SurveyQuestionsFullQuestionResponseInput
+          question={firstQuestion}
+          answer={firstAnswer}
+          audioInputWorkerProps={audioInputWorkerProps}
+          onAnswerChange={onAnswerChange}
+          onToggleAnswerEncryption={onToggleAnswerEncryption}
+        />
+        <SurveyQuestionsFullQuestionResponseInput
+          question={secondQuestion}
+          answer={nextSecondAnswer}
+          audioInputWorkerProps={audioInputWorkerProps}
+          onAnswerChange={onAnswerChange}
+          onToggleAnswerEncryption={onToggleAnswerEncryption}
+        />
+      </>
+    );
+    const { rerender } = render(renderInputs());
+
+    expect(mockSurveyAudioFieldInputProps.map((props) => props.dataCeQuestionId)).toEqual(['q-one', 'q-two']);
+
+    rerender(renderInputs(secondAnswerUpdated));
+
+    expect(mockSurveyAudioFieldInputProps.map((props) => props.dataCeQuestionId)).toEqual(['q-one', 'q-two', 'q-two']);
   });
 
   it('keeps submitting default answer actions inert even if a child emits', () => {

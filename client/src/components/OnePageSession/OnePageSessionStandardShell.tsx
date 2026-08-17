@@ -396,10 +396,7 @@ export default function OnePageSessionStandardShell({
       </div>
 
       {showQuestions && (
-        <div
-          className={`${styles.sectionContainer} ${styles.questionsSectionContainer}`}
-          ref={questionsSectionRef}
-        >
+        <div className={`${styles.sectionContainer} ${styles.questionsSectionContainer}`} ref={questionsSectionRef}>
           <div
             className={`${styles.miniSectionContent} ${styles.miniSectionContentNoHeader} ${styles.questionsSectionContent}`}
           >

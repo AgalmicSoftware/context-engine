@@ -1,10 +1,9 @@
-import React from 'react';
-import {
-  PostMarkdownBlock,
-  parsePostMarkdown,
-} from './postMarkdownParser.js';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { faArrowLeft, faArrowRight, faCaretDown, faCaretUp } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { PostMarkdownBlock, parsePostMarkdown } from './postMarkdownParser.js';
 import { buildPostAssetUrl } from './postsContent.js';
-import PostViz from './PostViz.js';
+import PostViz, { getPostVizTitle } from './PostViz.js';
 import styles from './PostsPage.module.scss';
 
 type PostMarkdownRendererProps = {
@@ -13,10 +12,66 @@ type PostMarkdownRendererProps = {
   title?: string;
 };
 
+type ImageBlock = Extract<PostMarkdownBlock, { type: 'image' }>;
+type VizGroupBlock = Extract<PostMarkdownBlock, { type: 'vizGroupStart' }> & {
+  blocks: PostMarkdownBlock[];
+};
+type DisclosureBlock = Extract<PostMarkdownBlock, { type: 'disclosureStart' }> & {
+  blocks: PostMarkdownBlock[];
+};
+type RenderablePostBlock = PostMarkdownBlock | VizGroupBlock | DisclosureBlock;
+
 type RenderBlockArgs = {
-  block: PostMarkdownBlock;
+  block: RenderablePostBlock;
   index: number;
   assetBasePath?: string;
+  vizDefaultOpen?: boolean;
+  nestedViz?: boolean;
+};
+
+const getCarouselScrollBehavior = (): ScrollBehavior => {
+  if (
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  ) {
+    return 'auto';
+  }
+
+  return 'smooth';
+};
+
+const getCarouselSlideTitle = (block: PostMarkdownBlock, index: number): string => {
+  if (block.type === 'viz') return getPostVizTitle(block.spec);
+
+  if (block.type === 'heading' || block.type === 'paragraph' || block.type === 'blockquote') {
+    return block.text;
+  }
+
+  return `Visualization ${index + 1}`;
+};
+
+const clampSlideIndex = (index: number, slideCount: number): number => Math.min(Math.max(index, 0), slideCount - 1);
+
+const combinesWithPreviousSlide = (block: PostMarkdownBlock): boolean => {
+  if (block.type !== 'viz') return false;
+  const spec = block.spec as { combineWithPrevious?: unknown } | null;
+  return !!spec && spec.combineWithPrevious === true;
+};
+
+const packCarouselSlides = (blocks: PostMarkdownBlock[]): PostMarkdownBlock[][] => {
+  const slides: PostMarkdownBlock[][] = [];
+
+  blocks.forEach((block) => {
+    if (slides.length > 0 && combinesWithPreviousSlide(block)) {
+      slides[slides.length - 1].push(block);
+      return;
+    }
+
+    slides.push([block]);
+  });
+
+  return slides;
 };
 
 const sanitizeHref = (href: string): string => {
@@ -62,18 +117,20 @@ const renderInline = (text: string): React.ReactNode[] => {
       parts.push(<code key={`code-${match.index}`}>{match[3]}</code>);
     } else if (match[4] && match[5]) {
       const href = sanitizeHref(match[5]);
-      parts.push(href ? (
-        <a
-          key={`link-${match.index}`}
-          href={href}
-          target={href.startsWith('http') ? '_blank' : undefined}
-          rel={href.startsWith('http') ? 'noopener noreferrer' : undefined}
-        >
-          {match[4]}
-        </a>
-      ) : (
-        <span key={`unsafe-link-${match.index}`}>{match[4]}</span>
-      ));
+      parts.push(
+        href ? (
+          <a
+            key={`link-${match.index}`}
+            href={href}
+            target={href.startsWith('http') ? '_blank' : undefined}
+            rel={href.startsWith('http') ? 'noopener noreferrer' : undefined}
+          >
+            {match[4]}
+          </a>
+        ) : (
+          <span key={`unsafe-link-${match.index}`}>{match[4]}</span>
+        ),
+      );
     }
 
     cursor = match.index + match[0].length;
@@ -397,10 +454,21 @@ const VizGroupCarousel = ({ block, assetBasePath }: { block: VizGroupBlock; asse
 
 const renderBlock = ({ block, index, assetBasePath, vizDefaultOpen, nestedViz = false }: RenderBlockArgs) => {
   if (block.type === 'heading') {
-    const HeadingTag = (`h${block.level}` as 'h1' | 'h2' | 'h3');
+    const HeadingTag = `h${block.level}` as 'h1' | 'h2' | 'h3';
+    const headingSample = splitHeadingSampleSize(block.text);
     return (
-      <HeadingTag key={`heading-${index}`} className={styles.postHeading}>
-        {renderInline(block.text)}
+      <HeadingTag
+        key={`heading-${index}`}
+        className={`${styles.postHeading} ${headingSample ? styles.postHeadingWithSample : ''}`}
+      >
+        {headingSample ? (
+          <>
+            <span>{renderInline(headingSample.label)}</span>
+            <span className={styles.postHeadingSample}>{headingSample.sampleSize}</span>
+          </>
+        ) : (
+          renderInline(block.text)
+        )}
       </HeadingTag>
     );
   }
@@ -414,35 +482,7 @@ const renderBlock = ({ block, index, assetBasePath, vizDefaultOpen, nestedViz = 
   }
 
   if (block.type === 'image') {
-    const src = sanitizeImageSrc(block.src, assetBasePath);
-    if (!src) return null;
-    return (
-      <figure
-        key={`image-${index}`}
-        className={styles.postImageFigure}
-        tabIndex={0}
-        aria-label={block.alt ? `Preview image: ${block.alt}` : 'Preview image'}
-      >
-        <img
-          className={styles.postImage}
-          src={src}
-          alt={block.alt}
-          loading="lazy"
-          decoding="async"
-        />
-        <span className={styles.postImageFullscreen} aria-hidden="true">
-          <img
-            className={styles.postImageFullscreenImage}
-            src={src}
-            alt=""
-            decoding="async"
-          />
-        </span>
-        {block.caption && (
-          <figcaption className={styles.postImageCaption}>{renderInline(block.caption)}</figcaption>
-        )}
-      </figure>
-    );
+    return <PostImageFigure key={`image-${index}`} block={block} assetBasePath={assetBasePath} />;
   }
 
   if (block.type === 'blockquote') {
@@ -473,29 +513,128 @@ const renderBlock = ({ block, index, assetBasePath, vizDefaultOpen, nestedViz = 
   }
 
   if (block.type === 'viz') {
-    return <PostViz key={`viz-${index}`} spec={block.spec} error={block.error} />;
+    return (
+      <PostViz
+        key={`viz-${index}`}
+        spec={block.spec}
+        error={block.error}
+        defaultOpen={vizDefaultOpen}
+        nested={nestedViz}
+      />
+    );
+  }
+
+  if (block.type === 'vizGroupStart' && 'blocks' in block) {
+    return (
+      <details
+        key={`viz-group-${index}`}
+        className={`${styles.vizDisclosure} ${styles.vizGroupDisclosure}`}
+        open={block.defaultOpen}
+      >
+        <summary className={styles.vizDisclosureSummary}>
+          <span>{block.title}</span>
+          <span className={styles.vizDisclosureIcon} aria-hidden="true">
+            <FontAwesomeIcon className={styles.vizDisclosureIconClosed} icon={faCaretDown} />
+            <FontAwesomeIcon className={styles.vizDisclosureIconOpen} icon={faCaretUp} />
+          </span>
+        </summary>
+        <section className={`${styles.vizCard} ${styles.vizGroupCard}`} aria-label={block.title}>
+          {block.layout === 'stack' ? (
+            <VizGroupStack block={block} assetBasePath={assetBasePath} />
+          ) : (
+            <VizGroupCarousel block={block} assetBasePath={assetBasePath} />
+          )}
+        </section>
+      </details>
+    );
+  }
+
+  if (block.type === 'disclosureStart' && 'blocks' in block) {
+    return (
+      <details key={`disclosure-${index}`} className={styles.postDisclosure} open={block.defaultOpen}>
+        <summary className={styles.postDisclosureSummary}>
+          <span>{block.title}</span>
+          <span className={styles.postDisclosureIcon} aria-hidden="true">
+            <FontAwesomeIcon className={styles.postDisclosureIconClosed} icon={faCaretDown} />
+            <FontAwesomeIcon className={styles.postDisclosureIconOpen} icon={faCaretUp} />
+          </span>
+        </summary>
+        <div className={styles.postDisclosureBody}>
+          {block.blocks.map((childBlock, childIndex) =>
+            renderBlock({ block: childBlock, index: childIndex, assetBasePath }),
+          )}
+        </div>
+      </details>
+    );
+  }
+
+  if (
+    block.type === 'vizGroupStart' ||
+    block.type === 'vizGroupEnd' ||
+    block.type === 'disclosureStart' ||
+    block.type === 'disclosureEnd'
+  ) {
+    return null;
   }
 
   return <hr key={`rule-${index}`} className={styles.postRule} />;
 };
 
+const groupContainerBlocks = (blocks: PostMarkdownBlock[]): RenderablePostBlock[] => {
+  const groupedBlocks: RenderablePostBlock[] = [];
+  let activeGroup: VizGroupBlock | DisclosureBlock | null = null;
+
+  const flushActiveGroup = () => {
+    if (activeGroup) groupedBlocks.push(activeGroup);
+    activeGroup = null;
+  };
+
+  blocks.forEach((block) => {
+    if (block.type === 'vizGroupStart') {
+      flushActiveGroup();
+      activeGroup = { ...block, blocks: [] };
+      return;
+    }
+
+    if (block.type === 'disclosureStart') {
+      flushActiveGroup();
+      activeGroup = { ...block, blocks: [] };
+      return;
+    }
+
+    if (
+      (block.type === 'vizGroupEnd' && activeGroup?.type === 'vizGroupStart') ||
+      (block.type === 'disclosureEnd' && activeGroup?.type === 'disclosureStart')
+    ) {
+      flushActiveGroup();
+      return;
+    }
+
+    if (activeGroup) {
+      activeGroup.blocks.push(block);
+      return;
+    }
+
+    groupedBlocks.push(block);
+  });
+
+  flushActiveGroup();
+
+  return groupedBlocks;
+};
+
 const normalizeHeadingText = (value: string): string => value.trim().replace(/\s+/g, ' ').toLowerCase();
 
-const suppressDuplicateTitleHeading = (
-  blocks: PostMarkdownBlock[],
-  title?: string
-): PostMarkdownBlock[] => {
+const suppressDuplicateTitleHeading = (blocks: PostMarkdownBlock[], title?: string): PostMarkdownBlock[] => {
   if (!title || blocks[0]?.type !== 'heading' || blocks[0].level !== 1) {
     return blocks;
   }
 
-  return normalizeHeadingText(blocks[0].text) === normalizeHeadingText(title)
-    ? blocks.slice(1)
-    : blocks;
+  return normalizeHeadingText(blocks[0].text) === normalizeHeadingText(title) ? blocks.slice(1) : blocks;
 };
 
 const PostMarkdownRenderer = ({ markdown, assetBasePath = '', title }: PostMarkdownRendererProps) => {
-  const blocks = suppressDuplicateTitleHeading(parsePostMarkdown(markdown), title);
+  const blocks = groupContainerBlocks(suppressDuplicateTitleHeading(parsePostMarkdown(markdown), title));
 
   return (
     <div className={styles.markdownBody}>

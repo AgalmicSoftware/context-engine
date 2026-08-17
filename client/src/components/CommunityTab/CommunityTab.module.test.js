@@ -49,9 +49,7 @@ describe('CommunityTab module styles', () => {
     expect(scss).not.toContain('data-ce-theme');
     expect(scss).toMatch(/\.communityTab \.leaderboardSection\s*{[\s\S]*?flex:\s*0 0 28%;/);
     expect(scss).toMatch(/\.communityTab \.statsGrid\s*{[\s\S]*?grid-template-columns:\s*repeat\(4,/);
-    expect(scss).toMatch(
-      /\.communityTab \.beeswarmSection\s*{[\s\S]*?background:\s*var\(--ce-data-viz-surface\);/,
-    );
+    expect(scss).toMatch(/\.communityTab \.beeswarmSection\s*{[\s\S]*?background:\s*var\(--ce-data-viz-surface\);/);
     expect(scss).toMatch(
       /\.communityTab \.beeswarmPlot\s*{[\s\S]*?flex:\s*1 1 auto;[\s\S]*?min-height:\s*0;[\s\S]*?justify-content:\s*center;/,
     );
@@ -77,14 +75,8 @@ describe('CommunityTab module styles', () => {
   it('keeps the default stats and participant surfaces transparent', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'CommunityTab.module.scss'), 'utf8');
 
-    expect(scss).toMatch(
-      /^ {2}\.leaderboardSection \{[\s\S]*?^ {4}background:\s*transparent;[\s\S]*?^ {2}\}/m,
-    );
-    expect(scss).toMatch(
-      /^ {2}\.statsSection \{[\s\S]*?^ {4}background:\s*transparent;[\s\S]*?^ {2}\}/m,
-    );
-    expect(scss).toMatch(
-      /^ {2}\.leaderboardItem \{[\s\S]*?^ {4}background:\s*transparent;[\s\S]*?^ {2}\}/m,
-    );
+    expect(scss).toMatch(/^ {2}\.leaderboardSection \{[\s\S]*?^ {4}background:\s*transparent;[\s\S]*?^ {2}\}/m);
+    expect(scss).toMatch(/^ {2}\.statsSection \{[\s\S]*?^ {4}background:\s*transparent;[\s\S]*?^ {2}\}/m);
+    expect(scss).toMatch(/^ {2}\.leaderboardItem \{[\s\S]*?^ {4}background:\s*transparent;[\s\S]*?^ {2}\}/m);
   });
 });

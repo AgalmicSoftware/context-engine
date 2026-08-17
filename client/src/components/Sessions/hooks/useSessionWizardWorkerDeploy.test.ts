@@ -45,16 +45,13 @@ const buildHookOptions = () => ({
   updateDeploymentState: jest.fn(),
   clearSelectedBundleFile: jest.fn(),
   clearCachedWorkerSecretsAfterDeploy: jest.fn(),
-  verifyPublicWorkerDeployment: jest.fn(async ({
-    workerUrl,
-  }: {
-    workerUrl: unknown;
-    config?: Record<string, unknown>;
-  }) => ({
-    workerOrigin: String(workerUrl),
-    configRevision: 'test-verification',
-    publicConfig: {},
-  })),
+  verifyPublicWorkerDeployment: jest.fn(
+    async ({ workerUrl }: { workerUrl: unknown; config?: Record<string, unknown> }) => ({
+      workerOrigin: String(workerUrl),
+      configRevision: 'test-verification',
+      publicConfig: {},
+    }),
+  ),
 });
 
 const buildDeployHookOptions = () => {
@@ -101,6 +98,10 @@ const buildWorkerCanonicalLitProfile = () => {
   profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
   profile.encryption = { mode: 'lit' };
   profile.evm.registryChainId = 11155420;
+  profile.storage.payloadAccessControl = {
+    ...profile.storage.payloadAccessControl!,
+    encryption: 'lit',
+  };
   return profile;
 };
 
@@ -642,6 +643,159 @@ describe('useSessionWizardWorkerDeploy', () => {
     );
   });
 
+  it('reuses the pending deployment identity when missing remote handlers fall back to corrected bundle bytes', async () => {
+    const deployBodies: Record<string, unknown>[] = [];
+    let deployCalls = 0;
+    global.fetch = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (String(url).endsWith('/deploy')) {
+        deployCalls += 1;
+        deployBodies.push(JSON.parse(String(init?.body || '{}')));
+        if (deployCalls === 1) {
+          return {
+            ok: false,
+            status: 502,
+            json: async () => ({
+              error: 'The uploaded script has no registered event handlers.',
+              deploymentRequestPending: true,
+              bundleDiagnostics: {
+                source: 'remote-url',
+                length: 216,
+                hasAnyExport: true,
+                hasExportDefault: false,
+                hasNamedDefaultExport: false,
+                hasFetchHandler: false,
+                hasServiceWorkerFetch: false,
+              },
+            }),
+          } as Response;
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        } as Response;
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+    });
+    const options = buildDeployHookOptions();
+    options.refs.runtimeRef.current = {
+      ...options.refs.runtimeRef.current,
+      wizardMode: 'normal',
+      bundleMode: 'url',
+      forceManualBundleFile: false,
+      bundleFile: null,
+    } as SessionWizardWorkerDeployRuntime;
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+
+    await act(async () => {
+      await result.current.handleDeployWorker();
+    });
+    expect(options.updateDeploymentState).toHaveBeenCalledWith({ forceManualBundleFile: true });
+
+    options.refs.runtimeRef.current = {
+      ...options.refs.runtimeRef.current,
+      forceManualBundleFile: true,
+      bundleFile: {
+        text: async () => 'export default { fetch() { return new Response("ok"); } };',
+      } as File,
+    } as SessionWizardWorkerDeployRuntime;
+    let retryResult: Record<string, unknown> = {};
+    await act(async () => {
+      retryResult = await result.current.handleDeployWorker();
+    });
+
+    expect(retryResult.ok).toBe(true);
+    expect(deployBodies).toHaveLength(2);
+    expect(deployBodies[0].bundleUrl).toEqual(expect.any(String));
+    expect(deployBodies[0].bundleText).toBeUndefined();
+    expect(deployBodies[1].bundleUrl).toBeUndefined();
+    expect(deployBodies[1].bundleText).toContain('export default');
+    expect(deployBodies[1].deploymentRequestId).toBe(deployBodies[0].deploymentRequestId);
+    expect(deployBodies[1].configRevision).toBe(deployBodies[0].configRevision);
+  });
+
+  it('keeps a newer deploy generation when an older tab succeeds after a terminal conflict', async () => {
+    let resolveFirstDeploy!: (response: Response) => void;
+    const firstDeployResponse = new Promise<Response>((resolve) => {
+      resolveFirstDeploy = resolve;
+    });
+    const deployBodies: Record<string, unknown>[] = [];
+    let deployCalls = 0;
+    const successfulDeployResponse = () =>
+      ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ok: true,
+          workerUrl: 'https://deployed.example.test',
+          writesSessionConfig: true,
+          writesSessionSecrets: false,
+        }),
+      }) as Response;
+    global.fetch = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (String(url).endsWith('/deploy')) {
+        deployCalls += 1;
+        deployBodies.push(JSON.parse(String(init?.body || '{}')));
+        if (deployCalls === 1) return firstDeployResponse;
+        if (deployCalls === 2) {
+          return {
+            ok: false,
+            status: 409,
+            json: async () => ({
+              error: 'This deployment request is already bound to a different Cloudflare account.',
+              deploymentRequestConflict: true,
+              deploymentRequestTerminal: true,
+            }),
+          } as Response;
+        }
+        return successfulDeployResponse();
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+    });
+    const firstTab = renderHook(() => useSessionWizardWorkerDeploy(buildDeployHookOptions()));
+    const secondTab = renderHook(() => useSessionWizardWorkerDeploy(buildDeployHookOptions()));
+    let firstAttemptPromise!: ReturnType<typeof firstTab.result.current.handleDeployWorker>;
+
+    act(() => {
+      firstAttemptPromise = firstTab.result.current.handleDeployWorker();
+    });
+    await waitFor(() => expect(deployBodies).toHaveLength(1));
+    await act(async () => {
+      expect((await secondTab.result.current.handleDeployWorker()).ok).toBe(false);
+    });
+
+    const attemptKey = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index)).find((key) =>
+      key?.startsWith('ce:sessionWizardDeployAttempt:v1:'),
+    );
+    expect(JSON.parse(localStorage.getItem(attemptKey || '') || '{}')).toEqual(
+      expect.objectContaining({ generation: 1, status: 'active' }),
+    );
+
+    resolveFirstDeploy(successfulDeployResponse());
+    await act(async () => {
+      expect((await firstAttemptPromise).ok).toBe(true);
+    });
+    expect(JSON.parse(localStorage.getItem(attemptKey || '') || '{}')).toEqual(
+      expect.objectContaining({ generation: 1, status: 'active' }),
+    );
+
+    await act(async () => {
+      expect((await secondTab.result.current.handleDeployWorker()).ok).toBe(true);
+    });
+    expect(deployBodies).toHaveLength(3);
+    expect(deployBodies[1].deploymentRequestId).toBe(deployBodies[0].deploymentRequestId);
+    expect(deployBodies[2].deploymentRequestId).not.toBe(deployBodies[0].deploymentRequestId);
+    expect(deployBodies[2].configRevision).not.toBe(deployBodies[0].configRevision);
+    expect(JSON.parse(localStorage.getItem(attemptKey || '') || '{}')).toEqual(
+      expect.objectContaining({ generation: 1, status: 'completed' }),
+    );
+  });
+
   it('treats explicit writesSessionSecrets false as authoritative on a resumed helper response', async () => {
     global.fetch = jest.fn(async (url: RequestInfo | URL) => {
       const normalizedUrl = String(url);
@@ -1094,6 +1248,7 @@ describe('useSessionWizardWorkerDeploy', () => {
   it.each([
     {
       label: 'structured conflict',
+      status: 409,
       responseBody: {
         error: 'deploymentRequestId was already used with a different request payload.',
         deploymentRequestIdConflict: true,
@@ -1101,20 +1256,29 @@ describe('useSessionWizardWorkerDeploy', () => {
     },
     {
       label: 'legacy exact conflict error',
+      status: 409,
       responseBody: {
         error: 'deploymentRequestId was already used with a different request payload.',
       },
     },
+    {
+      label: 'structured pending response',
+      status: 503,
+      responseBody: {
+        error: 'Deployment request is already running; retry the same request later.',
+        deploymentRequestPending: true,
+      },
+    },
   ])(
     'never advances after a $label while another tab can still complete the owned request',
-    async ({ responseBody }) => {
+    async ({ responseBody, status }) => {
       const deployBodies: Record<string, unknown>[] = [];
       global.fetch = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
         if (String(url).endsWith('/deploy')) {
           deployBodies.push(JSON.parse(String(init?.body || '{}')));
           return {
             ok: false,
-            status: 409,
+            status,
             json: async () => responseBody,
           } as Response;
         }
@@ -1136,6 +1300,110 @@ describe('useSessionWizardWorkerDeploy', () => {
       expect(deployBodies[1].configRevision).toBe(deployBodies[0].configRevision);
     },
   );
+
+  it.each([
+    'This deployment request is already bound to a different Cloudflare account.',
+    'deploymentRequestId was already used for a different immutable deployment identity.',
+  ])('rotates only the next explicit attempt after a definitive conflict: %s', async (error) => {
+    const deployBodies: Record<string, unknown>[] = [];
+    let deployCalls = 0;
+    global.fetch = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (String(url).endsWith('/deploy')) {
+        deployCalls += 1;
+        deployBodies.push(JSON.parse(String(init?.body || '{}')));
+        if (deployCalls === 1) {
+          return {
+            ok: false,
+            status: 409,
+            json: async () => ({
+              error,
+              deploymentRequestConflict: true,
+              deploymentRequestTerminal: true,
+            }),
+          } as Response;
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        } as Response;
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+    });
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(buildDeployHookOptions()));
+
+    let firstResult: Record<string, unknown> = {};
+    await act(async () => {
+      firstResult = await result.current.handleDeployWorker();
+    });
+    expect(firstResult).toEqual({
+      ok: false,
+      error: expect.stringContaining('click Deploy worker again to start a fresh deployment attempt'),
+    });
+    expect(deployBodies).toHaveLength(1);
+
+    await act(async () => {
+      await result.current.handleDeployWorker();
+    });
+
+    expect(deployBodies).toHaveLength(2);
+    expect(deployBodies[1].deploymentRequestId).not.toBe(deployBodies[0].deploymentRequestId);
+    expect(deployBodies[1].configRevision).not.toBe(deployBodies[0].configRevision);
+  });
+
+  it('rotates after a server terminal conflict even when the local attempt was already completed', async () => {
+    const deployBodies: Record<string, unknown>[] = [];
+    let deployCalls = 0;
+    global.fetch = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (String(url).endsWith('/deploy')) {
+        deployCalls += 1;
+        deployBodies.push(JSON.parse(String(init?.body || '{}')));
+        if (deployCalls === 2) {
+          return {
+            ok: false,
+            status: 409,
+            json: async () => ({
+              error: 'This deployment request is already bound to a different Cloudflare account.',
+              deploymentRequestConflict: true,
+              deploymentRequestTerminal: true,
+            }),
+          } as Response;
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        } as Response;
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+    });
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(buildDeployHookOptions()));
+
+    await act(async () => {
+      expect((await result.current.handleDeployWorker()).ok).toBe(true);
+    });
+    await act(async () => {
+      expect((await result.current.handleDeployWorker()).ok).toBe(false);
+    });
+    await act(async () => {
+      expect((await result.current.handleDeployWorker()).ok).toBe(true);
+    });
+
+    expect(deployBodies).toHaveLength(3);
+    expect(deployBodies[1].deploymentRequestId).toBe(deployBodies[0].deploymentRequestId);
+    expect(deployBodies[2].deploymentRequestId).not.toBe(deployBodies[1].deploymentRequestId);
+    expect(deployBodies[2].configRevision).not.toBe(deployBodies[1].configRevision);
+  });
 
   it('rotates the deploy identity across a remount after a structured terminal orphan response', async () => {
     const deployBodies: Record<string, unknown>[] = [];
@@ -1236,6 +1504,7 @@ describe('useSessionWizardWorkerDeploy', () => {
     } as SessionWizardWorkerDeployRuntime;
     options.getCurrentWorkerSecrets.mockReturnValue({
       openaiKey: 'sk-ai',
+      anthropicKey: 'must-not-send',
       arweaveJwk: 'must-not-send',
       faucetPrivateKey: 'must-not-send',
       litUsageApiKey: 'must-not-send',
@@ -1245,8 +1514,9 @@ describe('useSessionWizardWorkerDeploy', () => {
     options.resolveWorkerFaucetConfig.mockReturnValue({});
     const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
 
+    let deployResult: Record<string, any> = {};
     await act(async () => {
-      await result.current.handleDeployWorker();
+      deployResult = await result.current.handleDeployWorker();
     });
 
     const deployCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
@@ -1411,8 +1681,9 @@ describe('useSessionWizardWorkerDeploy', () => {
     options.resolveWorkerFaucetConfig.mockReturnValue({});
     const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
 
+    let deployResult: Record<string, unknown> = {};
     await act(async () => {
-      await result.current.handleDeployWorker();
+      deployResult = await result.current.handleDeployWorker();
     });
 
     const requestedUrls = fetchMock.mock.calls.map(([url]) => String(url));
@@ -1421,6 +1692,12 @@ describe('useSessionWizardWorkerDeploy', () => {
     const deployCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
     const deployPayload = JSON.parse(String(deployCall?.[1]?.body || '{}'));
     expect(deployPayload.secrets).toEqual({ openaiKey: 'sk-ai' });
+    expect(deployResult).toEqual(
+      expect.objectContaining({
+        requiredWorkerSecretsReady: true,
+        requiredWorkerSecretFields: ['openaiKey'],
+      }),
+    );
   });
 
   it('routes explicit-Lit RPC inputs through session secrets without duplicating them in canonical config', async () => {
@@ -1430,6 +1707,10 @@ describe('useSessionWizardWorkerDeploy', () => {
     sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
     sessionModeProfile.encryption = { mode: 'lit' };
     sessionModeProfile.evm.registryChainId = 11155420;
+    sessionModeProfile.storage.payloadAccessControl = {
+      ...sessionModeProfile.storage.payloadAccessControl!,
+      encryption: 'lit',
+    };
     options.refs.runtimeRef.current = {
       ...options.refs.runtimeRef.current,
       sessionId: '123e4567-e89b-12d3-a456-426614174000',
@@ -1452,8 +1733,9 @@ describe('useSessionWizardWorkerDeploy', () => {
     });
     const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
 
+    let deployResult: Record<string, unknown> = {};
     await act(async () => {
-      await result.current.handleDeployWorker();
+      deployResult = await result.current.handleDeployWorker();
     });
 
     const deployCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
@@ -1466,6 +1748,341 @@ describe('useSessionWizardWorkerDeploy', () => {
       customRpcKey: 'rpc-secret',
       litUsageApiKey: 'lit-secret',
     });
+    const setConfigCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/admin/set-config'));
+    expect(JSON.parse(String(setConfigCall?.[1]?.body || '{}')).config.litCredentials).toEqual({
+      litApiBase: 'https://api.chipotle.litprotocol.com',
+      litGroupId: 'group_123',
+      litPkpId: 'pkp_123',
+      litActionCid: 'bafy123',
+    });
+    expect(deployResult).toEqual(
+      expect.objectContaining({
+        deployComplete: true,
+        requiredLitRuntimeReady: true,
+        requiredWorkerSecretsReady: true,
+        requiredWorkerSecretFields: ['openaiKey', 'litUsageApiKey', 'customRpcUrl', 'customRpcKey'],
+      }),
+    );
+  });
+
+  it('does not mark a selected Lit deployment complete when bootstrap fails after worker creation', async () => {
+    const fetchMock = jest.fn(async (url: RequestInfo | URL) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/deploy')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            configVerified: true,
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        } as Response;
+      }
+      if (normalizedUrl.endsWith('/admin/lit-chipotle-bootstrap-session')) {
+        return {
+          ok: false,
+          status: 502,
+          json: async () => ({ error: 'Lit account bootstrap rejected.' }),
+        } as Response;
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+    });
+    global.fetch = fetchMock;
+    const options = buildDeployHookOptions();
+    const sessionModeProfile = buildWorkerCanonicalLitProfile();
+    options.refs.runtimeRef.current = {
+      ...options.refs.runtimeRef.current,
+      draft: {
+        ...options.refs.runtimeRef.current.draft,
+        slug: 'worker-lit-bootstrap-failure',
+        sessionModeProfile,
+      },
+      workerSecretsEnabled: true,
+    } as SessionWizardWorkerDeployRuntime;
+    options.getCurrentWorkerSecrets.mockReturnValue({
+      openaiKey: 'sk-ai',
+      customRpcUrl: 'https://rpc.example.test',
+      litAccountApiKey: 'lit-account-secret',
+    });
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+
+    let deployResult: Record<string, unknown> = {};
+    await act(async () => {
+      deployResult = await result.current.handleDeployWorker();
+    });
+
+    expect(deployResult).toEqual(
+      expect.objectContaining({
+        ok: true,
+        deployComplete: false,
+        requiredLitRuntimeReady: false,
+        requiredWorkerSecretsReady: false,
+      }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith('https://deployed.example.test/admin/set-secrets', expect.any(Object));
+    expect(options.updateDeploymentState).toHaveBeenCalledWith(expect.objectContaining({ deployComplete: false }));
+  });
+
+  it('accepts Lit bootstrap only after the worker confirms both secret and config writes', async () => {
+    const fetchMock = jest.fn(async (url: RequestInfo | URL) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/deploy')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            configVerified: true,
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        } as Response;
+      }
+      if (normalizedUrl.endsWith('/admin/lit-chipotle-bootstrap-session')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            apiBase: 'https://api.chipotle.litprotocol.com',
+            litGroupId: 'group-1',
+            litPkpId: 'pkp-1',
+            litActionCid: 'bafy-action',
+          }),
+        } as Response;
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+    });
+    global.fetch = fetchMock;
+    const options = buildDeployHookOptions();
+    options.refs.runtimeRef.current = {
+      ...options.refs.runtimeRef.current,
+      draft: {
+        ...options.refs.runtimeRef.current.draft,
+        slug: 'worker-lit-bootstrap-success',
+        sessionModeProfile: buildWorkerCanonicalLitProfile(),
+      },
+      workerSecretsEnabled: true,
+    } as SessionWizardWorkerDeployRuntime;
+    options.getCurrentWorkerSecrets.mockReturnValue({
+      openaiKey: 'sk-ai',
+      customRpcUrl: 'https://rpc.example.test',
+      litAccountApiKey: 'lit-account-secret',
+    });
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+
+    let deployResult: Record<string, unknown> = {};
+    await act(async () => {
+      deployResult = await result.current.handleDeployWorker();
+    });
+
+    expect(deployResult).toEqual(
+      expect.objectContaining({
+        ok: true,
+        deployComplete: true,
+        requiredLitRuntimeReady: true,
+        requiredWorkerSecretsReady: true,
+      }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://deployed.example.test/admin/lit-chipotle-bootstrap-session',
+      expect.any(Object),
+    );
+  });
+
+  it('retains Lit bootstrap authority until a failed post-deploy secret sync resumes', async () => {
+    const deployBodies: Record<string, unknown>[] = [];
+    let secretSyncCalls = 0;
+    const fetchMock = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/deploy')) {
+        deployBodies.push(JSON.parse(String(init?.body || '{}')));
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            configVerified: true,
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        } as Response;
+      }
+      if (normalizedUrl.endsWith('/admin/lit-chipotle-bootstrap-session')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            apiBase: 'https://api.chipotle.litprotocol.com',
+            litGroupId: 'group-1',
+            litPkpId: 'pkp-1',
+            litActionCid: 'bafy-action',
+          }),
+        } as Response;
+      }
+      if (normalizedUrl.endsWith('/admin/set-secrets')) {
+        secretSyncCalls += 1;
+        if (secretSyncCalls === 1) {
+          return {
+            ok: false,
+            status: 503,
+            json: async () => ({ error: 'Required session secret sync was rejected.' }),
+          } as Response;
+        }
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+    });
+    global.fetch = fetchMock;
+    const options = buildDeployHookOptions();
+    options.refs.runtimeRef.current = {
+      ...options.refs.runtimeRef.current,
+      draft: {
+        ...options.refs.runtimeRef.current.draft,
+        slug: 'worker-lit-secret-resume',
+        sessionModeProfile: buildWorkerCanonicalLitProfile(),
+      },
+      workerSecretsEnabled: true,
+    } as SessionWizardWorkerDeployRuntime;
+    let currentSecrets: WorkerSecretsLike = {
+      openaiKey: 'sk-ai',
+      customRpcUrl: 'https://rpc.example.test',
+      litAccountApiKey: 'lit-account-secret',
+    };
+    options.getCurrentWorkerSecrets.mockImplementation(() => currentSecrets);
+    options.applyWorkerSecretsUpdate.mockImplementation((nextValueOrUpdater: unknown) => {
+      currentSecrets =
+        typeof nextValueOrUpdater === 'function'
+          ? (nextValueOrUpdater as (previous: WorkerSecretsLike) => WorkerSecretsLike)(currentSecrets)
+          : nextValueOrUpdater && typeof nextValueOrUpdater === 'object'
+            ? { ...currentSecrets, ...(nextValueOrUpdater as WorkerSecretsLike) }
+            : currentSecrets;
+      return currentSecrets;
+    });
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+
+    let firstResult: Record<string, unknown> = {};
+    let retryResult: Record<string, unknown> = {};
+    await act(async () => {
+      firstResult = await result.current.handleDeployWorker();
+    });
+    expect(firstResult).toEqual(expect.objectContaining({ deployComplete: false }));
+    expect(currentSecrets.litAccountApiKey).toBe('lit-account-secret');
+    expect(currentSecrets).toEqual(
+      expect.objectContaining({
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litGroupId: 'group-1',
+        litPkpId: 'pkp-1',
+        litActionCid: 'bafy-action',
+        litRuntimeRecovered: 'bootstrap',
+      }),
+    );
+    currentSecrets = { ...currentSecrets, openaiKey: 'sk-ai-edited-before-retry' };
+
+    await act(async () => {
+      retryResult = await result.current.handleDeployWorker();
+    });
+
+    expect(retryResult).toEqual(
+      expect.objectContaining({
+        deployComplete: true,
+        requiredLitRuntimeReady: true,
+        requiredWorkerSecretsReady: true,
+      }),
+    );
+    expect(deployBodies).toHaveLength(2);
+    expect(deployBodies[1].deploymentRequestId).toBe(deployBodies[0].deploymentRequestId);
+    expect(deployBodies[1].secrets).toEqual(expect.objectContaining({ openaiKey: 'sk-ai-edited-before-retry' }));
+    expect(
+      fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/admin/lit-chipotle-bootstrap-session')),
+    ).toHaveLength(1);
+    const retryConfigWrites = fetchMock.mock.calls
+      .filter(([url]) => String(url).endsWith('/admin/set-config'))
+      .map(([, init]) => JSON.parse(String(init?.body || '{}')).config);
+    expect(retryConfigWrites).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          litCredentials: {
+            litApiBase: 'https://api.chipotle.litprotocol.com',
+            litGroupId: 'group-1',
+            litPkpId: 'pkp-1',
+            litActionCid: 'bafy-action',
+          },
+        }),
+      ]),
+    );
+    expect(currentSecrets.litAccountApiKey).toBe('');
+    expect(secretSyncCalls).toBe(2);
+  });
+
+  it('does not mark a selected Lit deployment complete when action provisioning fails', async () => {
+    const fetchMock = jest.fn(async (url: RequestInfo | URL) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/deploy')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            configVerified: true,
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        } as Response;
+      }
+      if (normalizedUrl.endsWith('/admin/lit-chipotle-provision')) {
+        return {
+          ok: false,
+          status: 502,
+          json: async () => ({ error: 'Lit action provisioning rejected.' }),
+        } as Response;
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+    });
+    global.fetch = fetchMock;
+    const options = buildDeployHookOptions();
+    options.refs.runtimeRef.current = {
+      ...options.refs.runtimeRef.current,
+      draft: {
+        ...options.refs.runtimeRef.current.draft,
+        slug: 'worker-lit-provision-failure',
+        sessionModeProfile: buildWorkerCanonicalLitProfile(),
+      },
+      workerSecretsEnabled: true,
+    } as SessionWizardWorkerDeployRuntime;
+    options.getCurrentWorkerSecrets.mockReturnValue({
+      openaiKey: 'sk-ai',
+      customRpcUrl: 'https://rpc.example.test',
+      litApiBase: 'https://api.chipotle.litprotocol.com',
+      litGroupId: 'group-1',
+      litPkpId: 'pkp-1',
+      litUsageApiKey: 'lit-usage-secret',
+    });
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+
+    let deployResult: Record<string, unknown> = {};
+    await act(async () => {
+      deployResult = await result.current.handleDeployWorker();
+    });
+
+    expect(deployResult).toEqual(
+      expect.objectContaining({
+        ok: true,
+        deployComplete: false,
+        requiredLitRuntimeReady: false,
+        requiredWorkerSecretsReady: false,
+      }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://deployed.example.test/admin/lit-chipotle-provision',
+      expect.any(Object),
+    );
   });
 
   it.each([
@@ -1504,14 +2121,21 @@ describe('useSessionWizardWorkerDeploy', () => {
       options.resolveWorkerRpcUrlMap.mockReturnValue({});
       const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
 
+      let deployResult: Record<string, unknown> = {};
       await act(async () => {
-        await result.current.handleDeployWorker();
+        deployResult = await result.current.handleDeployWorker();
       });
 
       const deployCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
       const deployPayload = JSON.parse(String(deployCall?.[1]?.body || '{}'));
       expect(deployPayload.secrets).toEqual({ [key]: 'provider-secret', openaiKey: 'transcription-secret' });
       expect(JSON.stringify(deployPayload)).not.toMatch(/must-not-send/);
+      expect(deployResult).toEqual(
+        expect.objectContaining({
+          requiredWorkerSecretsReady: true,
+          requiredWorkerSecretFields: [key, 'openaiKey'],
+        }),
+      );
     },
   );
 

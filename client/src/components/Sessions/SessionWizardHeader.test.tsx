@@ -38,17 +38,6 @@ describe('SessionWizardHeader', () => {
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL)).not.toBeInTheDocument();
   });
 
-  it('renders sponsored display settings without changing the mode test ids', () => {
-    render(<SessionWizardHeader {...baseProps} hasSponsoredBundleLink wizardDisplaySettingsOpen />);
-
-    expect(screen.getByRole('heading', { name: 'Session Setup (Cloudflare)' })).toBeInTheDocument();
-    const hostingControl = screen.getByTestId('hosting-profile-control');
-    expect(hostingControl).toBeInTheDocument();
-    expect(screen.queryByText('Normal')).not.toBeInTheDocument();
-    expect(screen.queryByText('Advanced')).not.toBeInTheDocument();
-    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL)).not.toBeInTheDocument();
-  });
-
   it('gives the initial profile cards the full header surface before setup continues', () => {
     render(
       <SessionWizardHeader

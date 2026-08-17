@@ -9,7 +9,7 @@ jest.mock('../../variables/appConfig.js', () => {
 const mockBase64urlToHex = (value) =>
   String(value || '').startsWith('A') ? `0x${'11'.repeat(32)}` : `0x${'22'.repeat(32)}`;
 
-jest.mock('../arweave/arweaveScripts.js', () => {
+jest.mock('../arweave/arweaveClient.js', () => {
   return {
     arweaveClient: {
       uploadDataToArweave: jest.fn(),
@@ -83,9 +83,9 @@ jest.mock('ethers', () => {
 });
 
 const { ethers } = require('ethers');
-const { arweaveScripts } = require('../arweave/arweaveScripts.js');
+const { arweaveClient } = require('../arweave/arweaveClient.js');
 const { uploadDataToSessionStorage, readSessionStorageBlob } = require('../storage/storageClient.js');
-const contractScriptsBarrel = require('./contractScripts');
+const contractScriptsBarrel = require('./chainGateway');
 
 const contractScripts = contractScriptsBarrel.default;
 const submitResponses = (...args) => contractScripts.submitResponses(...args);
@@ -200,8 +200,8 @@ const makeWriteContractMock = ({ address = TEST_ADDRESS, data = '0xdeadbeef', me
 describe('error paths', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    arweaveScripts.uploadDataToArweave.mockReset();
-    arweaveScripts.base64urlToHex.mockImplementation(mockBase64urlToHex);
+    arweaveClient.uploadDataToArweave.mockReset();
+    arweaveClient.base64urlToHex.mockImplementation(mockBase64urlToHex);
     uploadDataToSessionStorage.mockReset();
     readSessionStorageBlob.mockReset();
     delete window.ethereum;
@@ -612,7 +612,7 @@ describe('error paths', () => {
       return mockSurveyContract;
     });
 
-    arweaveScripts.uploadDataToArweave.mockResolvedValueOnce(SURVEY_TX_ID).mockResolvedValueOnce(QUESTION_TX_ID);
+    arweaveClient.uploadDataToArweave.mockResolvedValueOnce(SURVEY_TX_ID).mockResolvedValueOnce(QUESTION_TX_ID);
 
     const submitSpy = jest.spyOn(contractScripts, 'submitResponses');
 
@@ -621,8 +621,8 @@ describe('error paths', () => {
     ).rejects.toBe(timeoutError);
 
     expect(submitSpy).toHaveBeenCalledTimes(1);
-    expect(arweaveScripts.uploadDataToArweave).toHaveBeenCalledTimes(2);
-    const uploadOpts = arweaveScripts.uploadDataToArweave.mock.calls[0][2];
+    expect(arweaveClient.uploadDataToArweave).toHaveBeenCalledTimes(2);
+    const uploadOpts = arweaveClient.uploadDataToArweave.mock.calls[0][2];
     expect(uploadOpts).toEqual(
       expect.objectContaining({
         sessionSlug: 'error-path-session',
@@ -788,6 +788,46 @@ describe('error paths', () => {
     expect(mockFactory.createSBTDeterministicConfigured).not.toHaveBeenCalled();
   });
 
+  it('fails before broadcasting configured deterministic deploys from a non-admin signer', async () => {
+    window.ethereum = makeRpcProvider();
+
+    const mockFactory = {
+      estimateGas: {
+        createSBTDeterministicConfigured: jest.fn(),
+      },
+      createSBTDeterministicConfigured: jest.fn(),
+    };
+
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
+      return mockFactory;
+    });
+
+    await expect(
+      createSBT(
+        'wagmi',
+        'Error Path Group',
+        'EPG',
+        0,
+        '0x00000000000000000000000000000000000000bb',
+        0,
+        false,
+        0,
+        [],
+        'ipfs://token-uri',
+        ethers.constants.HashZero,
+        GROUP_CFG,
+        'predictable-salt',
+        {
+          useConfiguredDeterministic: true,
+          initializeGroupPasswordHash: true,
+        },
+      ),
+    ).rejects.toThrow('Configured deterministic SBT deployment must be submitted by the SBT admin wallet.');
+
+    expect(mockFactory.estimateGas.createSBTDeterministicConfigured).not.toHaveBeenCalled();
+    expect(mockFactory.createSBTDeterministicConfigured).not.toHaveBeenCalled();
+  });
+
   it('surfaces a clear preview error when configured deterministic prediction is unavailable on the factory', async () => {
     const unsupportedCall = Object.assign(new Error('missing revert data in call exception'), {
       code: 'CALL_EXCEPTION',
@@ -885,7 +925,7 @@ describe('error paths', () => {
     jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
       return mockSurveyContract;
     });
-    arweaveScripts.uploadDataToArweave.mockResolvedValueOnce(SURVEY_TX_ID).mockResolvedValueOnce(QUESTION_TX_ID);
+    arweaveClient.uploadDataToArweave.mockResolvedValueOnce(SURVEY_TX_ID).mockResolvedValueOnce(QUESTION_TX_ID);
     const addSurveySpy = jest.spyOn(contractScripts, 'addSurveyWithQuestions');
 
     await expect(
@@ -1030,7 +1070,7 @@ describe('error paths', () => {
       CLOUDFLARE_GROUP_CFG,
     );
 
-    expect(arweaveScripts.uploadDataToArweave).not.toHaveBeenCalled();
+    expect(arweaveClient.uploadDataToArweave).not.toHaveBeenCalled();
     expect(uploadDataToSessionStorage).toHaveBeenCalledTimes(2);
     expect(uploadDataToSessionStorage.mock.calls.map((call) => call[2].resource)).toEqual(['surveys', 'questions']);
     expect(mockSurveyContract.interface.encodeFunctionData).toHaveBeenCalledWith('addSurvey', [
@@ -1084,7 +1124,7 @@ describe('error paths', () => {
       CLOUDFLARE_GROUP_CFG,
     );
 
-    expect(arweaveScripts.uploadDataToArweave).not.toHaveBeenCalled();
+    expect(arweaveClient.uploadDataToArweave).not.toHaveBeenCalled();
     expect(uploadDataToSessionStorage).toHaveBeenCalledTimes(2);
     expect(uploadDataToSessionStorage.mock.calls.every((call) => call[2].resource === 'responses')).toBe(true);
     expect(uploadDataToSessionStorage.mock.calls[0][2].context).toEqual(
@@ -1104,7 +1144,7 @@ describe('error paths', () => {
   });
 
   it('resolves Cloudflare question pointers through session storage before Arweave fallback', async () => {
-    arweaveScripts.hexToBase64url.mockReturnValue(CF_QUESTION_ID);
+    arweaveClient.hexToBase64url.mockReturnValue(CF_QUESTION_ID);
     readSessionStorageBlob.mockResolvedValue(
       new Response(
         JSON.stringify({

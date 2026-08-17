@@ -1,4 +1,4 @@
-import { getAllSessionSlugs, getSessionSlugByName } from '../../utilities/web3/contractScripts.js';
+import { getAllSessionSlugs, getSessionSlugByName } from '../../utilities/web3/chainGateway.js';
 import { readQuestionsCacheRef, readSurveysCacheRef } from './surveyToolCacheState.js';
 import { resolveEffectiveSlug, resolveIdLookupContext } from './surveyToolScope.js';
 

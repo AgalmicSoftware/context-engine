@@ -1,6 +1,7 @@
-import SurveyTool from './SurveyTool';
-import { PileViewMode } from './SurveyPileViewMode';
-import SurveyQuestionsLockedQuestionsPanel from './SurveyQuestionsLockedQuestionsPanel';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
+
+import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
+import { createPileViewRuntimeStrategy } from './SurveyPileViewMode';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
 import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
@@ -93,29 +94,7 @@ describe('SurveyPileViewMode gated empty states', () => {
   it('keeps hydrate loading active when only gate hints are known and no hidden questions are cached', async () => {
     mockQuestionsCache();
 
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      account: '',
-      loginComplete: false,
-      sessionSlug: 'edge',
-      cacheHasLoaded: true,
-      isQuestionCacheReady: false,
-      questionResponsesNonce: 2,
-      questionsCacheNonce: 2,
-      questionScanProgress: {
-        slug: 'edge',
-        phase: 'hydrate',
-        discoveredQuestions: 1,
-        hydratedQuestions: 0,
-        pendingMetadataCount: 0,
-        remainingBlocks: 0,
-      },
-      onFilterChange: jest.fn(),
-    });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
+    renderPile();
 
     expect(await screen.findByText(/Loading Metadata/)).toBeInTheDocument();
     expect(screen.queryByText('No accessible questions. This session has gated content.')).toBeNull();
@@ -149,8 +128,6 @@ describe('SurveyPileViewMode gated empty states', () => {
       questionScanProgress: null,
       refreshQuestionMetadata,
     });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
 
     await waitFor(() => {
       expect(refreshQuestionMetadata).toHaveBeenCalledWith({ forceDiscoveryRescan: true });
@@ -250,60 +227,5 @@ describe('SurveyPileViewMode gated empty states', () => {
     screen.getAllByRole('link', { name: /VIP SBT/i }).forEach((link) => {
       expect(link).toHaveAttribute('href', expectedSbtHref);
     });
-    subject.scheduleLoadAndSortQuestions = jest.fn();
-    subject.initializeResponseState = jest.fn((cb) => {
-      if (typeof cb === 'function') cb();
-    });
-    subject.rehydrateLocalCacheAnswersForRenderedIds = jest.fn((cb) => {
-      if (typeof cb === 'function') cb();
-    });
-    subject.rehydrateDraftForRenderedIds = jest.fn();
-
-    await subject.loadAndSortQuestions();
-    subject.state = {
-      ...subject.state,
-      questionPool: [{
-        id: 'q1',
-        prompt: '[encrypted]',
-        type: 'freeform',
-        encryption: {
-          enabled: true,
-          gates: [],
-        },
-      }],
-      allQuestionsForFilter: [{
-        id: 'q1',
-        prompt: '[encrypted]',
-        type: 'freeform',
-        encryption: {
-          enabled: true,
-          gates: [{ label: 'VIP Gate', sbtAddress: gateSbt }],
-        },
-      }],
-      hasHiddenGatedQuestions: true,
-    };
-
-    const tree = subject.render();
-    const expectedSbtHref = buildSbtDetailPath(gateSbt, 'edge');
-    expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_LOCKED_BANNER)).toBe(true);
-    expect(treeHasText(tree, `This session's questions are ${t('gatedLower')}`)).toBe(true);
-    expect(treeHasText(tree, t('sbt'))).toBe(true);
-    expect(treeHasText(tree, 'required:')).toBe(true);
-    expect(treeHasText(tree, `Connect an eligible ${t('walletLower')} that satisfies the ${t('gateLower')} requirements below, then decrypt to view the questions.`)).toBe(true);
-    expect(treeHasLinkHref(tree, expectedSbtHref)).toBe(true);
-    expect(treeHasText(tree, 'VIP Gate')).toBe(false);
-    expect(treeHasText(tree, 'VIP SBT')).toBe(true);
-    expect(treeHasText(tree, 'Retry decrypt')).toBe(false);
-    expect(treeHasText(tree, 'Decrypt')).toBe(true);
-    expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_LOCKED_BANNER_CARET)).toBe(true);
-
-    subject.state = {
-      ...subject.state,
-      lockedGateDetailsExpanded: true,
-    };
-
-    const expandedTree = subject.render();
-    expect(treeHasText(expandedTree, 'VIP Gate')).toBe(true);
-    expect(treeHasText(expandedTree, 'VIP SBT')).toBe(true);
   });
 });

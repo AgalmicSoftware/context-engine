@@ -16,7 +16,7 @@ import {
   normalizeChipotleCekHex,
   normalizeLitChipotleMetadataVersion,
 } from './litChipotlePolicy.js';
-import { arweaveScripts } from '../arweave/arweaveScripts.js';
+import { arweaveClient } from '../arweave/arweaveClient.js';
 import { createLogger } from '../logging';
 import { perfDebugLitGetKey } from '../web3/rpcDebugStats.js';
 import { toStr } from '../shared/primitives.js';
@@ -132,9 +132,17 @@ type LitGetKeyCacheEntry = {
   value?: unknown;
   errMsg?: string;
 };
+type BufferBigUIntWriter = {
+  writeBigUInt64BE?(value: string | number | bigint, offset?: number): unknown;
+  writeBigUint64BE?(value: string | number | bigint, offset?: number): unknown;
+};
+
 type BufferCtorLike = {
-  prototype?: UnknownRecord;
-  alloc?: (size: number) => Uint8Array & UnknownRecord;
+  prototype?: BufferBigUIntWriter;
+  alloc?: (size: number) => Uint8Array & BufferBigUIntWriter;
+};
+type RuntimeBufferScope = {
+  Buffer?: BufferCtorLike;
 };
 
 declare global {
@@ -323,9 +331,11 @@ const DEFAULT_LIT_CHAIN = 'ethereum';
 const DEFAULT_LIT_CONNECT_TIMEOUT = 45000;
 const DEFAULT_LIT_SESSION_TTL_MS = 1000 * 60 * 10;
 
-const getGlobalScope = (): (typeof globalThis & { Buffer?: BufferCtorLike }) | null => {
-  if (typeof globalThis !== 'undefined') return globalThis;
-  if (typeof window !== 'undefined') return window;
+const asRuntimeBufferScope = (scope: object): RuntimeBufferScope => scope;
+
+const getGlobalScope = (): RuntimeBufferScope | null => {
+  if (typeof globalThis !== 'undefined') return asRuntimeBufferScope(globalThis);
+  if (typeof window !== 'undefined') return asRuntimeBufferScope(window);
   return null;
 };
 
@@ -388,16 +398,16 @@ export const ensureLitBufferCompatibility = () => {
   const bundledBuffer = Buffer as BufferCtorLike;
   if (bufferHasBigUIntWrite(runtimeBuffer)) return runtimeBuffer;
 
-  if (bufferHasBigUIntWrite(Buffer as unknown as BufferCtorLike)) {
-    scope.Buffer = Buffer as unknown as BufferCtorLike;
+  if (bufferHasBigUIntWrite(bundledBuffer)) {
+    scope.Buffer = bundledBuffer;
     return scope.Buffer;
   }
 
   if (installBufferBigUIntWriteShim(runtimeBuffer)) {
     return runtimeBuffer;
   }
-  if (installBufferBigUIntWriteShim(Buffer as unknown as BufferCtorLike)) {
-    scope.Buffer = Buffer as unknown as BufferCtorLike;
+  if (installBufferBigUIntWriteShim(bundledBuffer)) {
+    scope.Buffer = bundledBuffer;
     return scope.Buffer;
   }
   return null;
@@ -406,7 +416,7 @@ export const ensureLitBufferCompatibility = () => {
 ensureLitBufferCompatibility();
 
 const logLit = (level: string, message: string, meta?: unknown) => {
-  const logger = log as unknown as Record<string, (...args: unknown[]) => void>;
+  const logger = log as Record<string, (...args: unknown[]) => void>;
   const fn = logger[level] || logger.log;
   if (meta === undefined) {
     fn(message);
@@ -466,9 +476,7 @@ const LIT_CHAIN_BY_ID: Readonly<Record<number, string>> = Object.freeze({
   11155420: 'optimismSepolia',
 });
 
-const LIT_WALLET_CHAIN_FALLBACKS: Readonly<Record<string, string>> = Object.freeze({
-  optimismSepolia: 'sepolia',
-});
+const LIT_WALLET_CHAIN_FALLBACKS: Readonly<Record<string, string>> = Object.freeze({});
 
 const CHAIN_ID_BY_LIT_CHAIN: Readonly<Record<string, number>> = Object.freeze(
   Object.entries(LIT_CHAIN_BY_ID).reduce((acc: Record<string, number>, [id, chain]) => {
@@ -477,9 +485,7 @@ const CHAIN_ID_BY_LIT_CHAIN: Readonly<Record<string, number>> = Object.freeze(
   }, {}),
 );
 
-const LIT_UNSUPPORTED_CONTRACT_GATE_ERRORS: Readonly<Record<string, string>> = Object.freeze({
-  optimismSepolia: 'Lit does not currently support OP Sepolia for SBT-gated encryption. Choose "only me" private encryption or move the gate to a supported chain such as Base Sepolia.',
-});
+const LIT_UNSUPPORTED_CONTRACT_GATE_ERRORS: Readonly<Record<string, string>> = Object.freeze({});
 
 const LIT_NETWORK_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   chipotle: 'chipotle',
@@ -1132,7 +1138,7 @@ export const buildSbtAccessControlConditions = ({
       returnValueTest: { comparator: '>', value: '0' },
     }));
 
-  if (!conditions.length) return null as unknown as undefined;
+  if (!conditions.length) return undefined;
   if (conditions.length === 1) return conditions;
   const out: LitAccessControlCondition[] = [];
   conditions.forEach((cond, idx) => {
@@ -1504,7 +1510,7 @@ const createLitChipotleHooks = ({
     if (!gate) throw new Error('Lit Chipotle gate is required.');
     const chipotleActionUrl = `${normalizedWorkerUrl.replace(/\/+$/, '')}/lit/chipotle-action`;
     const response = await fetchWorkerWithAuth(
-      normalizedWorkerUrl,
+      chipotleActionUrl,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1668,7 +1674,7 @@ const createLitChipotleHooks = ({
  *   resourceAbilityRequests?: unknown,
  *   connectTimeout?: number | string | null,
  *   litConnectTimeout?: number | string | null,
- *   chipotle?: Record<string, any>
+ *   chipotle?: Record<string, unknown>
  * }} [options={}]
  * @returns {LitHooksApi}
  */

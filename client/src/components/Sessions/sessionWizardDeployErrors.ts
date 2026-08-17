@@ -2,6 +2,17 @@ import { toStr } from '../../utilities/shared/primitives.js';
 import { CLOUDFLARE_MISSING_HANDLER_ERROR, DEPLOY_HELPER_BUNDLE_FETCH_ERROR } from './sessionWizardPublishFlow';
 
 type SessionWizardDeployRecord = Record<string, unknown>;
+type ResolveSessionWizardDeployStatusDisplayStateArgs = {
+  deployInFlight?: unknown;
+  deployStatus?: unknown;
+  deployVerifiedInUi?: unknown;
+  workerCanonicalPublishCompleted?: unknown;
+};
+export type SessionWizardDeployStatusDisplayState = {
+  deployButtonDisabled: boolean;
+  deployStatusText: string;
+  isError: boolean;
+};
 
 const asDeployRecord = (value: unknown): SessionWizardDeployRecord =>
   value !== null && typeof value === 'object' ? (value as SessionWizardDeployRecord) : {};
@@ -78,11 +89,12 @@ export const resolveSessionWizardDeployStatusDisplayState = ({
   deployInFlight = false,
   deployStatus = '',
   deployVerifiedInUi = false,
+  workerCanonicalPublishCompleted = false,
 }: ResolveSessionWizardDeployStatusDisplayStateArgs = {}): SessionWizardDeployStatusDisplayState => {
   const deployStatusText = toStr(deployStatus);
   const deployStatusLower = deployStatusText.toLowerCase();
   return {
-    deployButtonDisabled: !!deployInFlight,
+    deployButtonDisabled: !!deployInFlight || !!workerCanonicalPublishCompleted,
     deployStatusText,
     isError:
       !!deployStatusText && !deployInFlight && !deployVerifiedInUi && !deployStatusLower.includes('worker deployed'),
@@ -145,14 +157,9 @@ export const formatSessionWizardDeployOrphanResources = (value: unknown = {}): s
   const kvNamespaceId = toStr(resources?.kvNamespaceId).trim();
   const kvCleanupStatus = toStr(resources?.kvCleanupStatus).trim();
   const workerCleanupStatus = toStr(resources?.workerCleanupStatus).trim();
-  const workerMayStillOwnKv = [
-    'preserved-existing',
-    'ownership-changed',
-    'ownership-unverified',
-  ].includes(workerCleanupStatus);
-  const retainedKv = !!kvNamespaceId && (
-    kvCleanupStatus === 'retained-live-worker' || (!kvCleanupStatus && workerMayStillOwnKv)
-  );
+  const workerMayStillOwnKv = WORKER_MAY_STILL_OWN_KV_STATUSES.has(workerCleanupStatus);
+  const retainedKv =
+    !!kvNamespaceId && (RETAINED_KV_CLEANUP_STATUSES.has(kvCleanupStatus) || (!kvCleanupStatus && workerMayStillOwnKv));
   const labels = [
     workerName && workerCleanupStatus === 'owned-delete-failed' ? `worker ${workerName}` : '',
     kvNamespaceId && !retainedKv ? `KV namespace ${kvNamespaceId}` : '',
@@ -163,14 +170,16 @@ export const formatSessionWizardDeployOrphanResources = (value: unknown = {}): s
   const ownershipNote =
     workerCleanupStatus === 'preserved-existing'
       ? ' The pre-existing worker was preserved.'
-      : workerCleanupStatus === 'ownership-changed'
-        ? ' A newer or foreign worker deployment was detected and preserved.'
-        : workerCleanupStatus === 'ownership-unverified'
-          ? ' Worker ownership could not be verified, so no worker deletion was attempted.'
-          : '';
-  const retainedKvNote = retainedKv
-    ? ` KV namespace ${kvNamespaceId} was retained because it remains or may remain bound to the live worker. Do not delete it before recovery or ownership verification.`
-    : '';
+      : workerCleanupStatus === 'retained-pre-existing'
+        ? ' The existing worker and deployment state were preserved.'
+        : workerCleanupStatus === 'retained-config-propagation-pending'
+          ? ' Worker config propagation is still pending; the deployment was preserved for recovery.'
+          : workerCleanupStatus === 'ownership-changed'
+            ? ' A newer or foreign worker deployment was detected and preserved.'
+            : workerCleanupStatus === 'ownership-unverified'
+              ? ' Worker ownership could not be verified, so no worker deletion was attempted.'
+              : '';
+  const retainedKvNote = retainedKv ? buildRetainedKvGuidance({ kvNamespaceId, kvCleanupStatus }) : '';
   return `${cleanupInstruction}${ownershipNote}${retainedKvNote}`;
 };
 
@@ -193,6 +202,8 @@ export const normalizeSessionWizardDeployErrorMessage = ({
     error?.responseDeploymentRequestConflict === true && error?.responseDeploymentRequestTerminal === true;
   const bundleDiagnostics = error?.responseBundleDiagnostics;
   const diagnosticsSummary = bundleDiagnostics ? formatSessionWizardDeployBundleDiagnostics(bundleDiagnostics) : '';
+  const orphanResourcesSummary = formatSessionWizardDeployOrphanResources(error?.responseOrphanResources);
+  const withOrphanResources = (message: string): string => `${message}${orphanResourcesSummary}`;
 
   if ((statusCode === 403 && responseLower.includes('origin')) || responseLower.includes('origin not allowed')) {
     return withOrphanResources(

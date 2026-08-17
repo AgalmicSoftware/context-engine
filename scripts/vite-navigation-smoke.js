@@ -13,7 +13,7 @@ const DEFAULT_ROUTES = Object.freeze([
 ]);
 const DEFAULT_ROUTE_TEXT = Object.freeze({
   '/session/demo': ['Session'],
-  '/session/pe4': ['Session'],
+  '/session/pe4': ['Groups', 'Results'],
   '/admin': ['Session Admin'],
   '/about': ['Context Engine'],
   '/docs': ['Docs'],
@@ -78,6 +78,15 @@ function isAllowedFailedRequest(requestUrl, baseUrl) {
   return (
     (parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost') &&
     parsed.port === '8545'
+  );
+}
+
+function isExpectedLoadedMediaAbort(request = {}, loadedMediaUrls = []) {
+  return (
+    request.resourceType === 'media' &&
+    request.failure === 'net::ERR_ABORTED' &&
+    Array.isArray(loadedMediaUrls) &&
+    loadedMediaUrls.includes(request.url)
   );
 }
 
@@ -182,6 +191,12 @@ async function inspectRoute(browser, baseUrl, route, options = {}) {
       .map((link) => link.href);
     const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
     const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    const loadedMediaUrls = Array.from(new Set(
+      Array.from(document.querySelectorAll('video, audio'))
+        .filter((media) => media.readyState >= 1 && !media.error)
+        .map((media) => media.currentSrc)
+        .filter(Boolean)
+    ));
     const isInViewport = (rect) => (
       rect.bottom > 0 &&
       rect.right > 0 &&
@@ -240,6 +255,7 @@ async function inspectRoute(browser, baseUrl, route, options = {}) {
       bodyTextPreview: bodyText.slice(0, 240),
       styleCount: styleTags + linkedStyles.length,
       layoutIssues,
+      loadedMediaUrls,
     };
   }, layoutProbeSelectors);
 
@@ -259,9 +275,9 @@ async function inspectRoute(browser, baseUrl, route, options = {}) {
   return {
     route,
     status: response?.status() || null,
-    ...info,
+    ...reportInfo,
     badResponses,
-    failedRequests,
+    failedRequests: reportableFailedRequests,
     unexpectedFailedRequests,
     consoleIssues,
     unexpectedConsoleIssues,
@@ -402,6 +418,7 @@ module.exports = {
   inspectRoute,
   isAllowedConsoleIssue,
   isAllowedFailedRequest,
+  isExpectedLoadedMediaAbort,
   normalizeBaseUrl,
   normalizeLayoutProbeSelectors,
   normalizeRoutes,

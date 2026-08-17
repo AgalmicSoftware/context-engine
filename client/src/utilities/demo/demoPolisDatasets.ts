@@ -18,25 +18,15 @@ const DEMO_SIMULATED_RESPONSE_SLUGS = Object.freeze(['demo-2']);
 // The checked-in Breakdown fixture is derived from the legacy demo dataset.
 // demo-2's Polis cluster summaries are separate; keep Breakdown hidden until
 // demo-2 has a matching Breakdown fixture.
-const DEMO_ANALYSIS_FIXTURE_SLUGS = Object.freeze([
-  'demo',
-  'demo-1',
-  'demo-3',
-  'demo-sh',
-]);
+const DEMO_ANALYSIS_FIXTURE_SLUGS = Object.freeze(['demo', 'demo-1', 'demo-3', 'demo-sh']);
 
-export const resolveDemoPolisDataset = (
-  slugIn: unknown,
-  fallback: unknown = demoPolisData
-): unknown => {
+export const resolveDemoPolisDataset = (slugIn: unknown, fallback: unknown = demoPolisData): unknown => {
   const slug = normalizeSessionSlug(slugIn);
   return DEMO_POLIS_DATASETS_BY_SLUG[slug] || fallback;
 };
 
-export const hasSimulatedDemoResponses = (slugIn: unknown): boolean => (
-  DEMO_SIMULATED_RESPONSE_SLUGS.includes(normalizeSessionSlug(slugIn))
-);
+export const hasSimulatedDemoResponses = (slugIn: unknown): boolean =>
+  DEMO_SIMULATED_RESPONSE_SLUGS.includes(normalizeSessionSlug(slugIn));
 
-export const hasDemoAnalysisFixture = (slugIn: unknown): boolean => (
-  DEMO_ANALYSIS_FIXTURE_SLUGS.includes(normalizeSessionSlug(slugIn))
-);
+export const hasDemoAnalysisFixture = (slugIn: unknown): boolean =>
+  DEMO_ANALYSIS_FIXTURE_SLUGS.includes(normalizeSessionSlug(slugIn));

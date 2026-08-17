@@ -881,17 +881,6 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       props,
     }) as CreateSurveyResolvedSessionConfig;
 
-  getSessionConfig = (props: CreateQuestionsAndSurveysProps = this.props): CreateSurveySessionConfigLike =>
-    props.sessionConfig && typeof props.sessionConfig === 'object'
-      ? (props.sessionConfig as CreateSurveySessionConfigLike)
-      : EMPTY_SESSION_CONFIG;
-
-  getResolvedSessionConfig = (props: CreateQuestionsAndSurveysProps = this.props): CreateSurveyResolvedSessionConfig =>
-    resolveCreateSurveySessionConfig({
-      propConfig: this.getSessionConfig(props),
-      props,
-    }) as CreateSurveyResolvedSessionConfig;
-
   resolveSessionChainId = (
     sessionConfigIn: unknown = null,
     props: CreateQuestionsAndSurveysProps = this.props,
@@ -1682,15 +1671,12 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           const qid = uploadedQid || fallbackQid;
           if (!qid) return null;
           const uploaded = uploadedById.get(qid) || uploadedByIndex || null;
-          const arweaveTxId = String(uploaded?.arweaveTxId || row?.arweaveTxId || '').trim();
-          const storageRef = uploaded?.storageRef || row?.storageRef || storageRefFromLegacyArweaveTxId(arweaveTxId);
-          return {
+          const compatible = attachStorageRefCompatibilityFields({
             ...row,
             ...(uploaded || {}),
             id: qid,
-            ...(arweaveTxId ? { arweaveTxId } : {}),
-            ...(storageRef ? { storageRef } : {}),
-          };
+          });
+          return compatible as CreateQuestionsSeededQuestionRow;
         })
         .filter((row): row is CreateQuestionsSeededQuestionRow => !!row);
       if (!normalizedRows.length) return false;
@@ -3156,7 +3142,9 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
             aria-label="Add Freeform question"
           >
             <div className={styles.typeTitle}>Freeform</div>
-            <div className={styles.freeformPreview} aria-hidden="true">Write an answer...</div>
+            <div className={styles.freeformPreview} aria-hidden="true">
+              Write an answer...
+            </div>
           </button>
         </div>
       </div>
@@ -3223,10 +3211,10 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       if (normalized.length) return normalized;
       return defaultGateId ? [defaultGateId] : [];
     };
-    const applyStandaloneSelectedGateIds = (value: unknown) => {
+    const applyStandaloneSelectedGateIds = (value: unknown, touched: unknown) => {
       const normalized = normalizeSelectedGateIds(value);
       if (normalized.length) return normalized;
-      if (Array.isArray(value) && normalizeGateIds(value).length === 0) return [];
+      if (touched && Array.isArray(value) && normalizeGateIds(value).length === 0) return [];
       return defaultGateId ? [defaultGateId] : [];
     };
     const surveySelectedGateIds = !isStandaloneQuestion ? applyDefaultSelectedGateIds(surveyLockGateIds) : [];

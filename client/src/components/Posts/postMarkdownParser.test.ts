@@ -1,4 +1,13 @@
+import { readFileSync } from 'fs';
 import { parsePostMarkdown } from './postMarkdownParser';
+
+const readAgentVillageWrappedPost = () =>
+  readFileSync('../posts/agent-village-wrapped/agent-village-wrapped.md', 'utf8');
+
+const actualAgentVillageVizSpecs = () =>
+  parsePostMarkdown(readAgentVillageWrappedPost())
+    .filter((block) => block.type === 'viz')
+    .map((block) => block.spec as Record<string, any>);
 
 describe('parsePostMarkdown', () => {
   it('strips frontmatter and parses Markdown blocks plus ce-viz JSON', () => {

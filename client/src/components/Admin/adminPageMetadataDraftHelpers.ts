@@ -115,47 +115,53 @@ export const buildAdminMetadataDraft = (metadata: any = {}) => {
   };
 };
 
-export const applyAdminMetadataDraft = (metadata: any = {}, draft: any = {}) => {
+export const applyAdminMetadataDraft = (
+  metadata: any = {},
+  draft: any = {},
+  { includeChainFields = true }: { includeChainFields?: boolean } = {},
+) => {
   const next = deepClone(metadata && typeof metadata === 'object' ? metadata : {});
 
   next.defaultTags = toStr(draft.defaultTags).trim();
   next.questionsGenPrompt = toStr(draft.questionsGenPrompt).trim();
-  next.defaultSbtTags = toStr(draft.defaultSbtTags).trim();
   next.defaultFilterState = parseDefaultFilterStateDraft(draft.defaultFilterState);
-  next.defaultFeaturedSBTs = dedupeSbtSelections(draft.defaultFeaturedSBTs || []).map((entry: any) => entry.address);
   next.HIGHLIGHTED_QUESTION_IDS = parseDelimitedDraftList(draft.highlightedQuestionIds);
   next.BLOCKED_QUESTION_IDS = parseDelimitedDraftList(draft.blockedQuestionIds);
   next.HIGHLIGHTED_SURVEY_IDS = parseDelimitedDraftList(draft.highlightedSurveyIds);
   next.BLOCKED_SURVEY_IDS = parseDelimitedDraftList(draft.blockedSurveyIds);
-  next.ignored_SBTs_LIST = parseDelimitedDraftList(draft.ignoredSbtsList);
-  next.featured_SBTs_LIST = parseDelimitedDraftList(draft.featuredSbtsList);
+  if (includeChainFields) {
+    next.defaultSbtTags = toStr(draft.defaultSbtTags).trim();
+    next.defaultFeaturedSBTs = dedupeSbtSelections(draft.defaultFeaturedSBTs || []).map((entry: any) => entry.address);
+    next.ignored_SBTs_LIST = parseDelimitedDraftList(draft.ignoredSbtsList);
+    next.featured_SBTs_LIST = parseDelimitedDraftList(draft.featuredSbtsList);
 
-  const existingContracts = next.contracts && typeof next.contracts === 'object' ? { ...next.contracts } : {};
-  ADMIN_EDITABLE_CONTRACT_FIELDS.forEach(({ contractKey, draftKey, label }: any) => {
-    const normalizedAddress = normalizeAdminContractAddress(draft[draftKey], label);
-    if (!normalizedAddress) return;
-    const existingEntry =
-      existingContracts[contractKey] && typeof existingContracts[contractKey] === 'object'
-        ? { ...existingContracts[contractKey] }
-        : {};
-    const fallbackChainId = getAdminContractChainIdFallback(next, contractKey);
-    existingContracts[contractKey] = {
-      ...existingEntry,
-      address: normalizedAddress,
-      ...(fallbackChainId ? { chainId: fallbackChainId } : {}),
-    };
-  });
-  if (Object.keys(existingContracts).length) next.contracts = existingContracts;
+    const existingContracts = next.contracts && typeof next.contracts === 'object' ? { ...next.contracts } : {};
+    ADMIN_EDITABLE_CONTRACT_FIELDS.forEach(({ contractKey, draftKey, label }: any) => {
+      const normalizedAddress = normalizeAdminContractAddress(draft[draftKey], label);
+      if (!normalizedAddress) return;
+      const existingEntry =
+        existingContracts[contractKey] && typeof existingContracts[contractKey] === 'object'
+          ? { ...existingContracts[contractKey] }
+          : {};
+      const fallbackChainId = getAdminContractChainIdFallback(next, contractKey);
+      existingContracts[contractKey] = {
+        ...existingEntry,
+        address: normalizedAddress,
+        ...(fallbackChainId ? { chainId: fallbackChainId } : {}),
+      };
+    });
+    if (Object.keys(existingContracts).length) next.contracts = existingContracts;
 
-  const faucet = next.faucet && typeof next.faucet === 'object' ? { ...next.faucet } : {};
-  const faucetAmountEth = toStr(draft.faucetAmountEth).trim();
-  const faucetBalanceThresholdEth = toStr(draft.faucetBalanceThresholdEth).trim();
-  if (faucetAmountEth) faucet.amountEth = faucetAmountEth;
-  else delete faucet.amountEth;
-  if (faucetBalanceThresholdEth) faucet.balanceThresholdEth = faucetBalanceThresholdEth;
-  else delete faucet.balanceThresholdEth;
-  if (Object.keys(faucet).length) next.faucet = faucet;
-  else delete next.faucet;
+    const faucet = next.faucet && typeof next.faucet === 'object' ? { ...next.faucet } : {};
+    const faucetAmountEth = toStr(draft.faucetAmountEth).trim();
+    const faucetBalanceThresholdEth = toStr(draft.faucetBalanceThresholdEth).trim();
+    if (faucetAmountEth) faucet.amountEth = faucetAmountEth;
+    else delete faucet.amountEth;
+    if (faucetBalanceThresholdEth) faucet.balanceThresholdEth = faucetBalanceThresholdEth;
+    else delete faucet.balanceThresholdEth;
+    if (Object.keys(faucet).length) next.faucet = faucet;
+    else delete next.faucet;
+  }
 
   const hasExistingAi = !!(metadata && metadata.ai && typeof metadata.ai === 'object');
   const aiDefaults = buildAdminMetadataDraft({});
@@ -249,16 +255,30 @@ export const buildWorkerCanonicalMetadataConfigPatch = ({
   metadata,
   slug,
   adminAddress,
+  includeChainFields = true,
 }: {
   metadata?: unknown;
   slug?: unknown;
   adminAddress?: unknown;
+  includeChainFields?: boolean;
 } = {}) => {
   const source = metadata && typeof metadata === 'object' ? (metadata as Record<string, unknown>) : {};
   const patch: Record<string, unknown> = {};
   // Regression guard: this is a partial metadata mutation, so copy only fields
   // owned by the editor instead of replaying stale authority/runtime config.
-  WORKER_CANONICAL_METADATA_PATCH_KEYS.forEach((key) => {
+  WORKER_CANONICAL_METADATA_PATCH_KEYS.filter(
+    (key) =>
+      includeChainFields ||
+      ![
+        'defaultSbtTags',
+        'defaultFeaturedSBTs',
+        'autoFeatureSBTsBySessionSlug',
+        'ignored_SBTs_LIST',
+        'featured_SBTs_LIST',
+        'contracts',
+        'blockLimits',
+      ].includes(key),
+  ).forEach((key) => {
     if (Object.prototype.hasOwnProperty.call(source, key)) patch[key] = deepClone(source[key]);
   });
   const sourceFaucet =
@@ -267,7 +287,7 @@ export const buildWorkerCanonicalMetadataConfigPatch = ({
     if (Object.prototype.hasOwnProperty.call(sourceFaucet, key)) next[key] = deepClone(sourceFaucet[key]);
     return next;
   }, {});
-  if (Object.keys(faucet).length) patch.faucet = faucet;
+  if (includeChainFields && Object.keys(faucet).length) patch.faucet = faucet;
   patch.slug = normalizeSlug(slug);
   patch.adminAddress = toStr(adminAddress).trim();
   return patch;
@@ -282,6 +302,7 @@ export const buildEditableSessionMetadataPayload = ({
   hasAutoFeatureOverride = false,
   advancedDraft = null,
   requireBlockLimits = true,
+  includeChainFields = true,
 }: any = {}) => {
   const metadata = deepClone(sessionConfig && typeof sessionConfig === 'object' ? sessionConfig : {});
   delete metadata.__registry;
@@ -293,7 +314,7 @@ export const buildEditableSessionMetadataPayload = ({
   if (!normalizedBlockLimits && requireBlockLimits) {
     throw new Error('Session metadata requires blockLimits.start (positive block number).');
   }
-  if (normalizedBlockLimits) metadata.blockLimits = normalizedBlockLimits;
+  if (includeChainFields && normalizedBlockLimits) metadata.blockLimits = normalizedBlockLimits;
   else delete metadata.blockLimits;
   const existingAutoFeature = resolveAutoFeatureBySessionSlug(metadata);
   delete metadata.autoFeatureSBTsWithFeaturedSbtTags;
@@ -304,18 +325,37 @@ export const buildEditableSessionMetadataPayload = ({
   } else if (existingAutoFeature !== undefined) {
     metadata.autoFeatureSBTsBySessionSlug = existingAutoFeature;
   }
-  const withAdvancedEdits = advancedDraft ? applyAdminMetadataDraft(metadata, advancedDraft) : metadata;
+  const withAdvancedEdits = advancedDraft
+    ? applyAdminMetadataDraft(metadata, advancedDraft, { includeChainFields })
+    : metadata;
   const sanitized = sanitizeSessionWizardMetadataPayload(withAdvancedEdits, {
     defaultAiModels: ADMIN_DEFAULT_AI_MODELS,
   });
   delete sanitized.autoFeatureSBTsWithFeaturedSbtTags;
-  const originalContracts = metadata.contracts && typeof metadata.contracts === 'object' ? metadata.contracts : {};
-  const sanitizedContracts = sanitized.contracts && typeof sanitized.contracts === 'object' ? sanitized.contracts : {};
-  const mergedContracts = { ...originalContracts, ...sanitizedContracts };
-  if (Object.keys(mergedContracts).length) {
-    sanitized.contracts = mergedContracts;
-  } else {
-    delete sanitized.contracts;
+  if (!includeChainFields) {
+    [
+      'blockLimits',
+      'contracts',
+      'autoFeatureSBTsBySessionSlug',
+      'defaultFeaturedSBTs',
+      'defaultSbtTags',
+      'faucet',
+      'featured_SBTs_LIST',
+      'ignored_SBTs_LIST',
+      'networkChainId',
+      'registryChainId',
+    ].forEach((key) => delete sanitized[key]);
+  }
+  if (includeChainFields) {
+    const originalContracts = metadata.contracts && typeof metadata.contracts === 'object' ? metadata.contracts : {};
+    const sanitizedContracts =
+      sanitized.contracts && typeof sanitized.contracts === 'object' ? sanitized.contracts : {};
+    const mergedContracts = { ...originalContracts, ...sanitizedContracts };
+    if (Object.keys(mergedContracts).length) {
+      sanitized.contracts = mergedContracts;
+    } else {
+      delete sanitized.contracts;
+    }
   }
   return sanitized;
 };

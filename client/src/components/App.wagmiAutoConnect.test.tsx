@@ -296,21 +296,6 @@ describe('App wagmi auto-connect persistence', () => {
   it('uses an injected-only MetaMask connector when the browser-wallet profile is enabled', () => {
     buildEnabledMetaMaskConnectors();
 
-    expect(mockCreateClient).toHaveBeenCalledWith(
-      expect.objectContaining({
-        connectors: [],
-        webSocketProvider: { kind: 'configured-websocket-provider' },
-      }),
-    );
-    expect(mockConnectorsForWallets).not.toHaveBeenCalled();
-    expect(mockMetaMaskWallet).not.toHaveBeenCalled();
-    expect(mockMetaMaskConnector).not.toHaveBeenCalled();
-    expect(mockMetaMaskWalletCreateConnector).not.toHaveBeenCalled();
-  });
-
-  it('uses an injected-only MetaMask connector when the browser-wallet profile is enabled', () => {
-    buildEnabledMetaMaskConnectors();
-
     const connectorCalls = mockConnectorsForWallets.mock.calls as unknown as Array<[WalletGroup[]]>;
     const walletGroups = connectorCalls[0]?.[0] ?? [];
     const wallet = walletGroups[0]?.wallets?.[0];

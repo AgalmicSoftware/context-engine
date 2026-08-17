@@ -129,6 +129,7 @@ describe('workerAuth normalizeWorkerUrl', () => {
   it('strips known endpoint suffixes to recover worker base URL', () => {
     expect(normalizeWorkerUrl('https://worker.example/arweave/upload')).toBe('https://worker.example');
     expect(normalizeWorkerUrl('https://worker.example/auth/nonce')).toBe('https://worker.example');
+    expect(normalizeWorkerUrl('https://worker.example/admin/secret-presence')).toBe('https://worker.example');
     expect(normalizeWorkerUrl('https://worker.example/admin/lit-chipotle-provision')).toBe('https://worker.example');
     expect(normalizeWorkerUrl('https://worker.example/lit/chipotle-action')).toBe('https://worker.example');
   });

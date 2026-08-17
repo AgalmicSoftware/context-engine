@@ -460,8 +460,10 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     $box-shadow: var(--ce-shadow-submit),
     $hover-box-shadow: var(--ce-shadow-submit-hover)
   );
-  text-transform: uppercase;
-  opacity: 1;
+  & {
+    text-transform: uppercase;
+    opacity: 1;
+  }
 }
 
 #submitSurveyButton.singleQuestionSubmitButton {
@@ -3203,7 +3205,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 /* Container for Card + Controls Side-by-Side */
 .pileInteractionUnit {
-  --pile-desktop-submit-rail-offset: 64px;
+  --pile-desktop-submit-rail-offset: 42px;
   --pile-desktop-rail-gap: 24px;
   --pile-card-width: min(550px, 90vw);
   display: flex;
@@ -3298,7 +3300,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 /* --- Controls Container (Nav + Actions) --- */
 .pileControls {
   position: absolute;
-  top: var(--pile-current-submit-rail-offset);
+  top: 0;
   right: 0;
   bottom: 0;
   left: 0;
@@ -3470,7 +3472,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 .pileHologramToggle {
   position: absolute;
-  top: calc(var(--pile-current-submit-rail-offset) + 6px);
+  top: 6px;
   right: 16px;
   width: 42px;
   height: 42px;
@@ -3804,15 +3806,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 @media (min-width: 1367px) {
-  .pileInteractionUnit {
-    --pile-current-submit-rail-offset: 0px;
-    --pile-current-submit-rail-padding: 0px;
-  }
-
-  .pileControls {
-    top: 0;
-  }
-
   .miniSpinnerWrapper {
     top: 0;
   }
@@ -3822,7 +3815,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 
   .pileFooter {
-    top: -72px;
+    top: -50px;
     right: 32px;
     left: 0;
     width: auto;
@@ -4136,11 +4129,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 @media (max-width: 480px) {
-  .pileInteractionUnit {
-    --pile-current-submit-rail-offset: 0px;
-    --pile-current-submit-rail-padding: 0px;
-  }
-
   .pileControls {
     gap: 10px;
     padding: 0 6px;
@@ -4154,58 +4142,15 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     top: 14px;
   }
 
-  .pileActions {
-    flex-direction: row;
-    gap: 16px;
-    order: 1;
-    padding: 0;
-  }
-
-  .pileActionButtonGroup {
-    flex-direction: row;
-    gap: 16px;
+  .pileFooter {
+    flex: 1 1 190px;
+    gap: 8px;
+    margin-right: 0;
   }
 
   .pileNav {
-    flex-direction: row;
-    gap: 12px;
-    order: 2;
-    margin-left: auto;
-    padding: 6px 16px;
-    border-radius: 50px;
-    min-width: auto;
-  }
-
-  .pileFooter {
-    position: absolute;
-    top: -60px;
-    right: 20px;
-    left: 10px;
-    flex: 0 0 auto;
-    width: auto;
-    justify-content: center;
-    min-height: 0;
-    gap: 10px;
-    transform: none;
-  }
-
-  .pileFooter .pileSubmitButton {
-    flex: 1 1 auto;
-    width: auto;
-    max-width: none;
-    min-height: 54px;
-    padding: 11px 18px;
-    font-size: 1rem;
-    border-radius: var(--ce-radius-16);
-  }
-
-  .pileFooter .pileIconButton,
-  .pileFooter .pileSubmitLink {
-    position: static;
-    top: auto;
-    left: auto;
-    transform: none;
-    flex: 0 0 auto;
+    gap: 8px;
+    padding: 6px 4px;
   }
 
   .pileNavArrow {
@@ -4630,7 +4575,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
       position: static;
       display: grid;
       grid-template-columns: auto minmax(180px, 1fr) auto;
-      grid-template-areas: "actions footer nav";
+      grid-template-areas: 'actions footer nav';
       align-items: center;
       width: 100%;
       margin-top: 14px;
@@ -4758,8 +4703,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
       grid-template-areas:
-        "footer nav"
-        "actions actions";
+        'footer nav'
+        'actions actions';
       align-items: center;
       justify-content: stretch;
       width: 100%;
@@ -4974,15 +4919,19 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     $box-shadow: var(--ce-shadow-submit),
     $hover-box-shadow: var(--ce-shadow-submit-hover)
   );
-  white-space: nowrap;
-  max-width: 300px;
-  overflow: visible;
+  & {
+    --pile-submit-button-radius: var(--ce-radius-8);
+    white-space: nowrap;
+    max-width: 300px;
+    overflow: visible;
+  }
 }
 
 .pileFooter .pileSubmitButton {
   position: relative;
   isolation: isolate;
   z-index: 0;
+  --pile-submit-button-radius: var(--ce-radius-16);
   width: 100%;
   max-width: none;
   min-height: 60px;
@@ -5043,6 +4992,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   height: 60px;
   border-radius: var(--ce-radius-round);
   color: var(--ce-color-white);
+  text-decoration: none;
   background:
     radial-gradient(
       circle at 30% 28%,
@@ -5071,7 +5021,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   font-size: 1.35rem;
 }
 
-@media (min-width: 1367px), (max-width: 480px) {
+@media (min-width: 769px) {
   .pileSubmitButtonTrail {
     display: inline-flex;
   }
@@ -5093,10 +5043,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   pointer-events: none;
 }
 
-  .pileFooter .pileSubmitButton.submitGlow::before {
-    background-position: 80% 0;
-    animation: beforeLineAnim 5.4s linear infinite;
-  }
+.pileFooter .pileSubmitButton.submitGlow::before {
+  background-position: 80% 0;
+  animation: beforeLineAnim 5.4s linear infinite;
 }
 
 @keyframes beforeLineAnim {
@@ -5145,11 +5094,14 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 @media (max-width: 480px) {
   .pileFooter .pileSubmitButton {
+    --pile-submit-button-radius: var(--ce-radius-8);
     width: 100%;
     max-width: none;
-    min-height: 54px;
-    padding: 11px 18px;
-    border-radius: var(--ce-radius-16);
+    min-width: 150px;
+    min-height: 0;
+    padding: 12px 18px;
+    font-size: 1rem;
+    border-radius: var(--ce-radius-8);
   }
 
   .pileSubmitSuccessBadge {

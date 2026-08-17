@@ -1,6 +1,10 @@
-import { SurveyQuestions } from './SurveyQuestions';
-import { renderToStaticMarkup } from 'react-dom/server';
+import React from 'react';
+import { render, screen } from '@testing-library/react';
+
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import SurveyQuestionsRouteSurface from './SurveyQuestionsRouteSurface';
+import SurveyQuestionsSubmitFooter from './SurveyQuestionsSubmitFooter';
+import SurveyQuestionsUserResponseNotice from './SurveyQuestionsUserResponseNotice';
 import {
   buildSurveyQuestionsLayoutDisplayState,
   buildSurveyQuestionsRouteViewDisplayState,
@@ -153,101 +157,44 @@ describe('SurveyTool pending edit render affordances', () => {
     jest.restoreAllMocks();
     jest.useRealTimers();
   });
-  it('renders submitted indicator test id when submitted latch is active', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: true,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 1 },
-    });
-    subject.state = {
-      ...subject.state,
-      isSubmitting: false,
-      submittedSinceLastEdit: true,
-      submissionComplete: false,
-      submissionError: '',
-      userHasResponse: false,
-      startFresh: false,
-      isEditing: false,
-      questionPool: [],
-      surveysResponseState: [
-        { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
-      ],
-    };
 
-    const tree = subject.render();
-    expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR)).toBe(true);
+  it('renders submitted indicator test id when submitted latch is active', () => {
+    const displayState = buildSurveyQuestionsSubmitFooterDisplayState({
+      submittedSinceLastEdit: true,
+    });
+
+    renderSubmitFooter({
+      displayState,
+      pendingEditCount: 0,
+      submitButtonText: 'Submit Response',
+    });
+
+    expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR)).toBeInTheDocument();
   });
 
   it('keeps inline submitted indicator visible after submit when userHasResponse is true', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 1 },
-    });
-    const emptyField = { value: '', encrypted: false, encryptionAudience: 'self' };
-    subject.state = {
-      ...subject.state,
-      isSubmitting: false,
+    const displayState = buildSurveyQuestionsSubmitFooterDisplayState({
       submittedSinceLastEdit: true,
-      submissionComplete: false,
-      submissionError: '',
       userHasResponse: true,
-      startFresh: false,
-      isEditing: false,
-      displayAnswerMode: false,
-      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Prompt' }],
-      surveysResponseState: [
-        {
-          answers: { q1: { ...emptyField } },
-          importance: {},
-          conviction: {},
-          additionalComments: { q1: { ...emptyField } },
-        },
-      ],
-      userAnswers: null,
-    };
+    });
 
-    const tree = subject.render();
-    expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR)).toBe(true);
+    renderSubmitFooter({
+      displayState,
+      pendingEditCount: 0,
+      submitButtonText: 'Submit Response',
+    });
+
+    expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR)).toBeInTheDocument();
   });
 
   it('does not render existing-response notice in single-question mode', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: true,
-      isStandalone: false,
-      surveyIndex: 0,
-      questionID: 'q1',
+    const routeViewDisplayState = buildSurveyQuestionsRouteViewDisplayState({
       account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
-    });
-    const emptyField = { value: '', encrypted: false, encryptionAudience: 'self' };
-    subject.state = {
-      ...subject.state,
-      isSubmitting: false,
-      submissionError: '',
+      questionPool: [{ id: 'q1' }],
+      singleQuestionMode: true,
       userHasResponse: true,
-      userResponseEncrypted: true,
-      startFresh: false,
-      isEditing: false,
-      displayAnswerMode: true,
-      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Prompt' }],
-      surveysResponseState: [
-        {
-          answers: { q1: { ...emptyField } },
-          importance: {},
-          conviction: {},
-          additionalComments: { q1: { ...emptyField } },
-        },
-      ],
-      userAnswers: { answer: { ...emptyField } },
-    };
+      viewingAnswers: true,
+    });
 
     render(
       <SurveyQuestionsUserResponseNotice
@@ -259,40 +206,18 @@ describe('SurveyTool pending edit render affordances', () => {
       />,
     );
 
-    expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_EXISTING_RESPONSE_NOTICE)).toBe(false);
-    expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_DECRYPT_EDIT_ALL)).toBe(false);
+    expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_EXISTING_RESPONSE_NOTICE)).toBeNull();
+    expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_DECRYPT_EDIT_ALL)).toBeNull();
   });
 
   it('keeps existing-response notice available in survey mode for bulk decrypt actions', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
+    const routeViewDisplayState = buildSurveyQuestionsRouteViewDisplayState({
       account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
-    });
-    const emptyField = { value: '', encrypted: false, encryptionAudience: 'self' };
-    subject.state = {
-      ...subject.state,
-      isSubmitting: false,
-      submissionError: '',
+      questionPool: [{ id: 'q1' }],
+      singleQuestionMode: false,
       userHasResponse: true,
-      userResponseEncrypted: true,
-      startFresh: false,
-      isEditing: false,
-      displayAnswerMode: true,
-      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Prompt' }],
-      surveysResponseState: [
-        {
-          answers: { q1: { ...emptyField } },
-          importance: {},
-          conviction: {},
-          additionalComments: { q1: { ...emptyField } },
-        },
-      ],
-      userAnswers: { responses: [] },
-    };
+      viewingAnswers: true,
+    });
 
     render(
       <SurveyQuestionsUserResponseNotice
@@ -304,216 +229,90 @@ describe('SurveyTool pending edit render affordances', () => {
       />,
     );
 
-    expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_EXISTING_RESPONSE_NOTICE)).toBe(true);
-    expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_DECRYPT_EDIT_ALL)).toBe(true);
+    expect(screen.getByTestId(E2E_TESTIDS.SURVEY_EXISTING_RESPONSE_NOTICE)).toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.SURVEY_DECRYPT_EDIT_ALL)).toBeInTheDocument();
   });
 
   it('renders the single-question inline submit below the question when edits are pending', () => {
-    const subject = new SurveyQuestions({
+    const submitReadiness = buildSurveyQuestionsSubmitReadinessDescriptor({
+      pendingStats: { total: 1, encrypted: 0 },
       singleQuestionMode: true,
-      isStandalone: false,
-      surveyIndex: 0,
-      questionID: 'q1',
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
     });
-    const emptyField = { value: '', encrypted: false, encryptionAudience: 'self' };
-    subject.state = {
-      ...subject.state,
-      isSubmitting: false,
-      submittedSinceLastEdit: false,
-      submissionComplete: false,
-      submissionError: '',
-      userHasResponse: false,
-      startFresh: false,
-      isEditing: false,
-      displayAnswerMode: false,
+    const displayState = buildSurveyQuestionsSubmitFooterDisplayState({
       isDirty: true,
-      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Prompt' }],
-      surveysResponseState: [
-        {
-          answers: { q1: { ...emptyField, value: 'Answer' } },
-          importance: {},
-          conviction: {},
-          additionalComments: { q1: { ...emptyField } },
-        },
-      ],
-    };
-    subject.getPendingStatsSnapshot = jest.fn(() => ({ total: 1, encrypted: 0 }));
-    subject.renderQuestion = jest.fn(() => <div key="q1" data-testid="question-card-stub">Question Card</div>);
+      isSingleQuestionView: true,
+      pendingEditCount: submitReadiness.pendingEditCount,
+      singleQuestionMode: true,
+    });
 
-    const tree = subject.render();
-    const markup = renderToStaticMarkup(tree);
+    expect(displayState.showInlineSubmit).toBe(true);
 
-    expect(markup).not.toContain('singleQuestionSubmitLayout');
-    expect(markup).not.toContain('singleQuestionSubmitRail');
-    expect(markup).toContain('Question Card');
-    expect(markup).toContain('SUBMIT');
-    expect(markup).toContain(E2E_TESTIDS.SURVEY_SUBMIT);
-    expect(markup).not.toContain('Clear pending changes');
-    expect(subject.renderQuestion).toHaveBeenCalledTimes(1);
+    renderSingleQuestionSurface({ showSubmit: displayState.showInlineSubmit });
+
+    expect(screen.getByTestId('question-card-stub')).toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /SUBMIT/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Clear pending changes' })).toBeNull();
   });
 
   it('does not render single-question submit controls before pending edits appear', () => {
-    const subject = new SurveyQuestions({
+    const submitReadiness = buildSurveyQuestionsSubmitReadinessDescriptor({
+      pendingStats: { total: 0, encrypted: 0 },
       singleQuestionMode: true,
-      isStandalone: false,
-      surveyIndex: 0,
-      questionID: 'q1',
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
     });
-    const emptyField = { value: '', encrypted: false, encryptionAudience: 'self' };
-    subject.state = {
-      ...subject.state,
-      isSubmitting: false,
-      submittedSinceLastEdit: false,
-      submissionComplete: false,
-      submissionError: '',
-      userHasResponse: false,
-      startFresh: false,
-      isEditing: false,
-      displayAnswerMode: false,
+    const displayState = buildSurveyQuestionsSubmitFooterDisplayState({
       isDirty: false,
-      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Prompt' }],
-      surveysResponseState: [
-        {
-          answers: { q1: { ...emptyField, value: '' } },
-          importance: {},
-          conviction: {},
-          additionalComments: { q1: { ...emptyField } },
-        },
-      ],
-    };
-    subject.getPendingStatsSnapshot = jest.fn(() => ({ total: 0, encrypted: 0 }));
-    subject.renderQuestion = jest.fn(() => <div key="q1" data-testid="question-card-stub">Question Card</div>);
+      isSingleQuestionView: true,
+      pendingEditCount: submitReadiness.pendingEditCount,
+      singleQuestionMode: true,
+    });
 
-    const tree = subject.render();
-    const markup = renderToStaticMarkup(tree);
+    expect(displayState.showInlineSubmit).toBe(false);
 
-    expect(markup).not.toContain('singleQuestionSubmitLayout');
-    expect(markup).not.toContain('singleQuestionSubmitRail');
-    expect(markup).not.toContain(E2E_TESTIDS.SURVEY_SUBMIT);
-    expect(subject.renderQuestion).toHaveBeenCalledTimes(1);
+    renderSingleQuestionSurface({ showSubmit: displayState.showInlineSubmit });
+
+    expect(screen.getByTestId('question-card-stub')).toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).toBeNull();
   });
 
   it('does not render submitted CTA state in single-question mode when no pending edits remain', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: true,
-      isStandalone: false,
-      surveyIndex: 0,
-      questionID: 'q1',
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
-    });
-    const emptyField = { value: '', encrypted: false, encryptionAudience: 'self' };
-    subject.state = {
-      ...subject.state,
-      isSubmitting: false,
-      submittedSinceLastEdit: true,
-      submissionComplete: false,
-      submissionError: '',
-      userHasResponse: true,
-      startFresh: false,
-      isEditing: true,
-      displayAnswerMode: false,
+    const displayState = buildSurveyQuestionsSubmitFooterDisplayState({
       isDirty: false,
-      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Prompt' }],
-      surveysResponseState: [
-        {
-          answers: { q1: { ...emptyField, value: 'Answer' } },
-          importance: {},
-          conviction: {},
-          additionalComments: { q1: { ...emptyField } },
-        },
-      ],
-    };
-    subject.renderQuestion = jest.fn(() => <div key="q1" data-testid="question-card-stub">Question Card</div>);
+      isEditing: true,
+      isSingleQuestionView: true,
+      pendingEditCount: 0,
+      singleQuestionMode: true,
+      submittedSinceLastEdit: true,
+      userHasResponse: true,
+    });
 
-    const tree = subject.render();
+    expect(displayState.showInlineSubmit).toBe(false);
+    expect(displayState.submittedIndicatorActive).toBe(true);
 
-    expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_SUBMIT)).toBe(false);
-    expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR)).toBe(false);
+    renderSingleQuestionSurface({ showSubmit: displayState.showInlineSubmit });
+
+    expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).toBeNull();
+    expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR)).toBeNull();
   });
 
   it('applies single-question response page wrappers in read mode', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: true,
-      isStandalone: false,
-      surveyIndex: 0,
-      questionID: 'q1',
-      responderAddress: '0xdef',
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
-    });
-    subject.state = {
-      ...subject.state,
-      isLoadingResponse: false,
-      noResponse: false,
-      displayAnswerMode: true,
-      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Prompt' }],
-      parsedViewAddressAnswers: { answer: { value: '*', encrypted: true } },
-      surveysResponseState: [
-        { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
-      ],
-    };
-    subject.renderQuestionAnswer = jest.fn(() => <div key="resp" data-testid="response-card-stub">Response Card</div>);
+    const { container } = renderSingleQuestionSurface({ showSubmit: false, viewingAnswers: true });
 
-    const tree = subject.render();
-    const pageRoot = findElement(
-      tree,
-      (node) => String(node?.props?.className || '').includes('singleQuestionPage')
-    );
-    const responseView = findElement(
-      tree,
-      (node) => String(node?.props?.className || '').includes('singleQuestionResponseView')
-    );
-    const addressLink = findElement(
-      tree,
-      (node) => node?.type === 'a' && node?.props?.href === '/u/0xdef'
-    );
-
-    expect(pageRoot).not.toBeNull();
-    expect(responseView).not.toBeNull();
-    expect(addressLink).not.toBeNull();
-    expect(treeHasLabel(tree, 'question .json')).toBe(true);
-    expect(treeHasLabel(tree, 'response .json')).toBe(true);
-    expect(subject.renderQuestionAnswer).toHaveBeenCalledTimes(1);
+    expect(container.querySelector('.singleQuestionPage')).not.toBeNull();
+    expect(container.querySelector('.singleQuestionResponseView')).not.toBeNull();
+    expect(screen.getByTestId('response-card-stub')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '0xdef' })).toHaveAttribute('href', '/u/0xdef');
+    expect(screen.getByRole('button', { name: /question \.json/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /response \.json/i })).toBeInTheDocument();
   });
 
   it('does not call getPendingEditStats during SurveyQuestions.render', () => {
-    const subject = new SurveyQuestions({
+    const getPendingEditStats = jest.fn(() => ({ total: 9, encrypted: 4 }));
+
+    const submitReadiness = buildSurveyQuestionsSubmitReadinessDescriptor({
+      pendingStats: { total: 2, encrypted: 1 },
       singleQuestionMode: true,
-      isStandalone: false,
-      surveyIndex: 0,
-      questionID: 'q1',
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 1 },
     });
-    const emptyField = { value: '', encrypted: false, encryptionAudience: 'self' };
-    subject.getPendingEditStats = jest.fn(() => ({ total: 9, encrypted: 4 }));
-    subject.state = {
-      ...subject.state,
-      displayAnswerMode: false,
-      surveysResponseState: [
-        {
-          answers: { q1: { ...emptyField } },
-          importance: {},
-          conviction: {},
-          additionalComments: { q1: { ...emptyField } },
-        },
-      ],
-      questionPool: [{ id: 'q1', type: 'binary', prompt: 'Prompt' }],
-      modifiedCount: 2,
-      encryptedModifiedCount: 1,
-      hasEncryptedChanges: true,
-      showComments: {},
-    };
 
     // port note: the old unmounted class render asserted a private method call count.
     // The portable contract is that render-time display state consumes the already

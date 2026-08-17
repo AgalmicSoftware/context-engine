@@ -97,7 +97,7 @@ export function WagmiHooksHOC<P extends object>(Component: React.ComponentType<P
 
     // Removed: local JsonRpcProvider + window.defaultProvider anti-pattern.
     // Downstream components should use the centralized, group-aware read provider
-    // from contractScripts.js (getReadProviderForGroup).
+    // from the chain gateway (getReadProviderForGroup).
 
     const { openConnectModal } = useConnectModal();
     const { openAccountModal } = useAccountModal();

@@ -1,5 +1,5 @@
 import SBTPage from './SBTPage';
-import contractScripts from '../../utilities/web3/contractScripts.js';
+import contractScripts from '../../utilities/web3/chainGateway.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { buildSbtPageAutoMintStorageKey } from './sbtPageAutoMintHelpers';
@@ -119,6 +119,8 @@ describe('SBTPage auto-mint routing', () => {
   });
 
   it('does not mark public URL auto-mint complete when the real mint path catches a wallet failure', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const walletError = new Error('wallet rejected');
     const sbtAddress = '0x0000000000000000000000000000000000000107';
     const previousHref = window.location.href;
     const successKey = buildSbtPageAutoMintStorageKey({
@@ -148,7 +150,7 @@ describe('SBTPage auto-mint routing', () => {
       jest
         .spyOn(contractScripts, 'getGroupPasswordHash')
         .mockResolvedValue('0x0000000000000000000000000000000000000000000000000000000000000000');
-      jest.spyOn(contractScripts, 'claim').mockRejectedValue(new Error('wallet rejected'));
+      jest.spyOn(contractScripts, 'claim').mockRejectedValue(walletError);
       jest.spyOn(subject, 'loadSBTInfo').mockResolvedValue(undefined);
 
       const result = await subject.handleUrlAutoMintIntent();
@@ -158,6 +160,7 @@ describe('SBTPage auto-mint routing', () => {
       expect(consoleErrorSpy).toHaveBeenCalledWith('[sbt]', 'Minting failed in handleMint:', walletError);
       expect(window.sessionStorage.getItem(successKey)).toBeNull();
     } finally {
+      consoleErrorSpy.mockRestore();
       window.history.replaceState({}, '', previousHref);
     }
   });
@@ -548,9 +551,23 @@ describe('SBTPage auto-mint routing', () => {
     expect(handleMintSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('retries password-list auto-mint when the target changes', () => {
+  it.each([
+    {
+      label: 'SBT address',
+      nextProps: {
+        SBTAddress: '0x0000000000000000000000000000000000000114',
+      },
+      expectedTargetPart: '0x0000000000000000000000000000000000000114',
+    },
+    {
+      label: 'account',
+      nextProps: {
+        account: '0x0000000000000000000000000000000000000def',
+      },
+      expectedTargetPart: '0x0000000000000000000000000000000000000def',
+    },
+  ])('retries password-list auto-mint when the $label target changes', ({ nextProps, expectedTargetPart }) => {
     const oldSbtAddress = '0x0000000000000000000000000000000000000113';
-    const nextSbtAddress = '0x0000000000000000000000000000000000000114';
     const subject = createSubject({
       SBTAddress: oldSbtAddress,
       account: '0x0000000000000000000000000000000000000abc',
@@ -564,19 +581,30 @@ describe('SBTPage auto-mint routing', () => {
       mintingStatus: 'idle',
     };
     subject.markAttemptedListMintForCurrentTarget();
+    const prevProps = { ...subject.props };
     subject.props = {
       ...subject.props,
-      SBTAddress: nextSbtAddress,
+      ...nextProps,
     };
+    const loadSbtInfoSpy = jest.spyOn(subject, 'loadSBTInfo').mockImplementation(() => {
+      const prevState = { ...subject.state };
+      subject.state = {
+        ...subject.state,
+        sbtInfo: { hasPasswordMint: true },
+      };
+      subject.componentDidUpdate(subject.props, prevState);
+      return Promise.resolve();
+    });
     const listMintSpy = jest.spyOn(subject, 'attemptMintWithPasswordList').mockResolvedValue(undefined);
 
-    subject.componentDidUpdate(subject.props, {
+    subject.componentDidUpdate(prevProps, {
       ...subject.state,
       mintingStatus: 'pending',
     });
 
+    expect(loadSbtInfoSpy).toHaveBeenCalled();
     expect(listMintSpy).toHaveBeenCalledWith(['claim-code']);
-    expect(subject._attemptedListMintTargetKey).toContain(nextSbtAddress.toLowerCase());
+    expect(subject._attemptedListMintTargetKey).toContain(expectedTargetPart.toLowerCase());
   });
 
   it('resets pending mint UI when the connected account changes', () => {

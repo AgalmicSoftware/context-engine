@@ -1,7 +1,11 @@
+import sha256 from 'crypto-js/sha256';
 import {
+  normalizeWorkerCanonicalSessionIdHex,
   parseSessionWorkerDiscoveryOrigin,
   type DiscoveryEnvironment,
 } from '../../utilities/session/sessionWorkerDiscovery';
+import { classifySessionModeProfileSupport, type SessionModeProfile } from '../../utilities/session/sessionModeProfile';
+import { CHIPOTLE_LIT_CONFIG_FIELDS } from './sessionWizardWorkerSecretSupport';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -31,7 +35,6 @@ export type PersistAndVerifySessionWizardWorkerConfigInput = {
   signAdminAction: SessionWizardWorkerConfigSignPort;
   fetchImpl?: SessionWizardWorkerConfigFetchPort;
   configRevision?: unknown;
-  randomRevision?: (() => unknown) | null;
   sleep?: ((delayMs: number) => Promise<void>) | null;
   retryDelaysMs?: readonly number[];
   environment?: DiscoveryEnvironment;
@@ -87,9 +90,9 @@ const PUBLIC_WORKER_CONFIG_FIELDS = Object.freeze([
   'networkChainId',
   'embeddedDeployHelperEnabled',
 ]);
-const SESSION_ID_PATTERN = /^0x[0-9a-f]{32}$/;
 const ADDRESS_PATTERN = /^0x[0-9a-f]{40}$/;
 const REVISION_PATTERN = /^[a-z0-9._:-]{1,128}$/i;
+const LIT_CREDENTIAL_DESCRIPTOR_FIELDS = new Set<string>(CHIPOTLE_LIT_CONFIG_FIELDS);
 
 const toTrimmedString = (value: unknown): string =>
   typeof value === 'string' ? value.trim() : value == null ? '' : String(value).trim();
@@ -99,11 +102,7 @@ const normalizeSlug = (value: unknown): string =>
     .toLowerCase()
     .replace(/[^a-z0-9_-]/g, '');
 
-const normalizeSessionId = (value: unknown): string => {
-  const normalized = toTrimmedString(value).toLowerCase().replace(/-/g, '');
-  const withPrefix = normalized.startsWith('0x') ? normalized : `0x${normalized}`;
-  return SESSION_ID_PATTERN.test(withPrefix) ? withPrefix : '';
-};
+const normalizeSessionId = normalizeWorkerCanonicalSessionIdHex;
 
 const normalizeAdminAddress = (value: unknown): string => {
   const normalized = toTrimmedString(value).toLowerCase();
@@ -131,6 +130,31 @@ const isSecretBearingConfigField = (key: unknown): boolean => {
   return false;
 };
 
+const hasUrlCredentials = (value: unknown): boolean => {
+  if (typeof value !== 'string' || !/^https?:\/\//i.test(value.trim())) return false;
+  try {
+    const parsed = new URL(value);
+    return !!parsed.username || !!parsed.password;
+  } catch {
+    return false;
+  }
+};
+
+const cloneLitCredentialsDescriptor = (value: unknown, path: string): UnknownRecord => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`Secret-bearing worker config field "${path}" is not allowed.`);
+  }
+  return Object.entries(value as UnknownRecord).reduce((acc: UnknownRecord, [key, entry]) => {
+    const nextPath = `${path}.${key}`;
+    if (!LIT_CREDENTIAL_DESCRIPTOR_FIELDS.has(key) || typeof entry !== 'string' || hasUrlCredentials(entry)) {
+      throw new Error(`Secret-bearing worker config field "${nextPath}" is not allowed.`);
+    }
+    const normalized = entry.trim();
+    if (normalized) acc[key] = normalized;
+    return acc;
+  }, {});
+};
+
 const clonePublicConfigValue = (value: unknown, path: string, seen: WeakSet<object>): unknown => {
   if (value == null || typeof value === 'string' || typeof value === 'boolean') return value;
   if (typeof value === 'number') {
@@ -151,6 +175,10 @@ const clonePublicConfigValue = (value: unknown, path: string, seen: WeakSet<obje
     const next: UnknownRecord = {};
     for (const [key, entry] of Object.entries(source)) {
       const nextPath = path ? `${path}.${key}` : key;
+      if (path === 'config' && key === 'litCredentials') {
+        next[key] = cloneLitCredentialsDescriptor(entry, nextPath);
+        continue;
+      }
       if (
         isSecretBearingConfigField(key) &&
         !(normalizeSecretFieldKey(key).startsWith('exposes') && typeof entry === 'boolean')
@@ -172,10 +200,16 @@ const clonePublicConfig = (value: unknown): UnknownRecord => {
   return clonePublicConfigValue(value, 'config', new WeakSet()) as UnknownRecord;
 };
 
-const defaultRandomRevision = (): string => {
-  if (typeof globalThis.crypto?.randomUUID === 'function') return globalThis.crypto.randomUUID();
-  const randomPart = Math.random().toString(36).slice(2);
-  return `${Date.now().toString(36)}-${randomPart}`;
+const canonicalizeRevisionInput = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(canonicalizeRevisionInput);
+  if (!value || typeof value !== 'object') return value;
+  return Object.keys(value as UnknownRecord)
+    .sort()
+    .reduce<UnknownRecord>((result, key) => {
+      const entry = (value as UnknownRecord)[key];
+      if (entry !== undefined) result[key] = canonicalizeRevisionInput(entry);
+      return result;
+    }, {});
 };
 
 const buildExpectedPublicConfig = (config: UnknownRecord): UnknownRecord =>
@@ -236,11 +270,12 @@ const deriveConfigRevision = (value: UnknownRecord): string =>
 
 const resolveConfigRevision = ({
   configRevision,
-  randomRevision,
-}: Pick<PersistAndVerifySessionWizardWorkerConfigInput, 'configRevision' | 'randomRevision'>): string => {
-  const revision = toTrimmedString(
-    configRevision || (typeof randomRevision === 'function' ? randomRevision() : defaultRandomRevision()),
-  );
+  derivedRevision,
+}: {
+  configRevision: unknown;
+  derivedRevision: string;
+}): string => {
+  const revision = toTrimmedString(configRevision || derivedRevision);
   if (!REVISION_PATTERN.test(revision)) {
     throw new Error('Worker config revision must be a non-secret identifier of 1-128 safe characters.');
   }
@@ -262,7 +297,32 @@ const readResponseError = (body: UnknownRecord): string =>
 
 const getPublicConfigFromResponse = (body: UnknownRecord): UnknownRecord => {
   const candidate = body.config || body.sessionConfig || body;
+  if (
+    candidate &&
+    typeof candidate === 'object' &&
+    !Array.isArray(candidate) &&
+    Object.prototype.hasOwnProperty.call(candidate, 'litCredentials')
+  ) {
+    throw new Error('Public worker config response exposed litCredentials.');
+  }
   return clonePublicConfig(candidate);
+};
+
+const assertReachableWorkerCanonicalProfile = (profile: unknown, context: string): SessionModeProfile => {
+  const support = classifySessionModeProfileSupport(profile);
+  if (support.status !== 'reachable') {
+    const firstIssue = support.validation.issues[0];
+    throw new Error(
+      `${context} failed: unsupported session mode profile${
+        firstIssue ? ` at "${firstIssue.path || 'profile'}" (${firstIssue.code})` : ''
+      }.`,
+    );
+  }
+  const reachableProfile = profile as SessionModeProfile;
+  if (reachableProfile.authority.mode !== 'worker_canonical') {
+    throw new Error(`${context} is not worker_canonical.`);
+  }
+  return reachableProfile;
 };
 
 const verifyCriticalWorkerConfigFields = ({
@@ -284,15 +344,7 @@ const verifyCriticalWorkerConfigFields = ({
   if (normalizeSessionId(config.sessionIdHex || config.sessionId) !== sessionId) {
     throw new Error('Worker config verification failed: session ID mismatch.');
   }
-  const profile =
-    config.sessionModeProfile && typeof config.sessionModeProfile === 'object'
-      ? (config.sessionModeProfile as UnknownRecord)
-      : {};
-  const authority =
-    profile.authority && typeof profile.authority === 'object' ? (profile.authority as UnknownRecord) : {};
-  if (authority.mode !== 'worker_canonical') {
-    throw new Error('Worker config verification failed: authority profile is not worker_canonical.');
-  }
+  assertReachableWorkerCanonicalProfile(config.sessionModeProfile, 'Worker config verification');
   let representedWorkerOrigin = '';
   try {
     representedWorkerOrigin = parseSessionWorkerDiscoveryOrigin(config.corsWorkerUrl, { environment });
@@ -313,7 +365,6 @@ export const persistAndVerifySessionWizardWorkerConfig = async ({
   signAdminAction,
   fetchImpl = globalThis.fetch.bind(globalThis),
   configRevision,
-  randomRevision = null,
   sleep = defaultSleep,
   retryDelaysMs = SESSION_WIZARD_WORKER_CONFIG_VISIBILITY_RETRY_DELAYS_MS,
   environment,
@@ -334,17 +385,24 @@ export const persistAndVerifySessionWizardWorkerConfig = async ({
   if (typeof fetchImpl !== 'function') throw new Error('Worker config transport is unavailable.');
 
   const publicConfig = clonePublicConfig(config);
-  const profile =
-    publicConfig.sessionModeProfile && typeof publicConfig.sessionModeProfile === 'object'
-      ? (publicConfig.sessionModeProfile as UnknownRecord)
-      : {};
-  const authority =
-    profile.authority && typeof profile.authority === 'object' ? (profile.authority as UnknownRecord) : {};
-  if (authority.mode !== 'worker_canonical') {
-    throw new Error('Prepared worker config must declare authority.mode "worker_canonical".');
-  }
+  assertReachableWorkerCanonicalProfile(publicConfig.sessionModeProfile, 'Prepared worker config');
 
-  const revision = resolveConfigRevision({ configRevision, randomRevision });
+  const revisionConfig = { ...publicConfig };
+  delete revisionConfig.configRevision;
+  delete revisionConfig.workerCanonicalPublicationRevision;
+  // Regression guard: transport loss after the worker commits must be
+  // retryable across reloads. Hash the canonical public publication payload so
+  // independent invocations produce the same server-side revision marker.
+  const revision = resolveConfigRevision({
+    configRevision,
+    derivedRevision: deriveConfigRevision({
+      config: revisionConfig,
+      slug: normalizedSlug,
+      sessionId: normalizedSessionId,
+      adminAddress: normalizedAdminAddress,
+      corsWorkerUrl: workerOrigin,
+    }),
+  });
   const configToPersist: UnknownRecord = {
     ...publicConfig,
     slug: normalizedSlug,

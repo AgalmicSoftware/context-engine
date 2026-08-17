@@ -24,7 +24,6 @@ const baseCardsInput: NormalModeCardsInput = {
   resolvedWorkerBaseUrl: 'https://worker.example',
   workerMode: 'default',
   deployVerifiedInUi: false,
-  canPublishNow: false,
   canUseSponsoredAutoDeployNow: false,
   publishReadiness: {
     canPublishNow: false,
@@ -82,7 +81,10 @@ describe('sessionWizardNormalModeCards', () => {
     it('marks publish ready when publishing is available', () => {
       const publishCard = buildNormalModeCards({
         ...baseCardsInput,
-        canPublishNow: true,
+        publishReadiness: {
+          ...baseCardsInput.publishReadiness,
+          canPublishNow: true,
+        },
       }).find((card) => card.key === 'publish');
 
       expect(publishCard).toEqual(
@@ -187,7 +189,7 @@ describe('sessionWizardNormalModeCards', () => {
           ...basePublishSummaryInput,
           pendingDraftCount: 0,
         }).find((item) => item.label === 'Pending SBTs')?.value,
-      ).toBe('None');
+      ).toBeUndefined();
     });
 
     it('labels worker states in publish summary order', () => {
@@ -267,6 +269,33 @@ describe('sessionWizardNormalModeCards', () => {
       expect(summary.find((item) => item.label === 'Pending SBTs')).toBeUndefined();
       expect(summary.find((item) => item.label === 'Session access')?.value).toBe('Passkey · Worker roles and Groups');
       expect(summary.find((item) => item.label === 'Worker')?.value).toBe('Canonical Worker config verified');
+    });
+
+    it('separates read-only Worker Lit/SBT access from actual SBT publishing', () => {
+      const readOnlySummary = buildNormalModePublishSummary({
+        ...basePublishSummaryInput,
+        isWorkerCanonical: true,
+        deployPendingSbts: true,
+        usesLit: true,
+        pendingDraftCount: 0,
+      });
+
+      expect(readOnlySummary.find((item) => item.label === 'Advanced/external access')?.value).toBe(
+        'Lit encryption · existing on-chain SBT checks (read-only)',
+      );
+      expect(readOnlySummary.find((item) => item.label === 'Pending SBTs')).toBeUndefined();
+
+      const publishingSummary = buildNormalModePublishSummary({
+        ...basePublishSummaryInput,
+        isWorkerCanonical: true,
+        deployPendingSbts: true,
+        pendingDraftCount: 2,
+      });
+
+      expect(publishingSummary.find((item) => item.label === 'Advanced/external access')?.value).toBe(
+        'On-chain SBT access · SBT publishing required',
+      );
+      expect(publishingSummary.find((item) => item.label === 'Pending SBTs')?.value).toBe('2 drafts ready');
     });
   });
 });

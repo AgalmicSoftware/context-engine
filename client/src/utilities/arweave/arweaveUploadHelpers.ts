@@ -61,15 +61,30 @@ export const buildArweaveUploadTags = (
 
 export const resolveArweaveUploadOpts = async (
   groupKeyOrCfg?: string | Record<string, unknown> | null,
-  { providerLike = null, signer = null }: { providerLike?: unknown; signer?: unknown } = {},
+  {
+    providerLike = null,
+    signer = null,
+    refreshSessionConfig = null,
+  }: { providerLike?: unknown; signer?: unknown; refreshSessionConfig?: RefreshSessionConfig | null } = {},
 ): Promise<ArweaveUploadOpts> => {
-  const cfg = (
+  let cfg = (
     groupKeyOrCfg && typeof groupKeyOrCfg === 'object'
       ? groupKeyOrCfg
       : getSessionConfigBySlugOrDefault(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg)
   ) as Record<string, unknown> | null;
-  const cfgAny = cfg as LooseRecord | null;
+  let cfgAny = cfg as LooseRecord | null;
   const slug = normalizeSessionSlug(typeof groupKeyOrCfg === 'string' ? groupKeyOrCfg : cfgAny?.slug || '');
+  if (slug && typeof groupKeyOrCfg === 'string' && typeof refreshSessionConfig === 'function') {
+    try {
+      const refreshed = await refreshSessionConfig({ slug, sessionConfig: cfg, providerLike });
+      if (refreshed && typeof refreshed === 'object') {
+        cfg = refreshed;
+        cfgAny = refreshed as LooseRecord;
+      }
+    } catch (_) {
+      // Uploads retain the cached config when a targeted registry refresh is unavailable.
+    }
+  }
   const tags = buildArweaveUploadTags(cfg, slug);
 
   let arweaveJwk = '';

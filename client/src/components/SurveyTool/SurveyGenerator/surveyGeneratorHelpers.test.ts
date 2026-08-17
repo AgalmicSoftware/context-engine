@@ -109,30 +109,20 @@ describe('surveyGeneratorHelpers', () => {
   });
 
   it('uses semantic theme tokens for the AI prompt preview', () => {
-    const scss = fs.readFileSync(
-      path.join(__dirname, 'AudioSurveyGenerator.module.scss'),
-      'utf8',
-    );
-    const classic95Theme = fs.readFileSync(
-      path.join(__dirname, '../../../scss/themes/_classic-95.scss'),
-      'utf8',
-    );
+    const scss = fs.readFileSync(path.join(__dirname, 'AudioSurveyGenerator.module.scss'), 'utf8');
+    const classic95Theme = fs.readFileSync(path.join(__dirname, '../../../scss/themes/_classic-95.scss'), 'utf8');
 
     expect(scss).toMatch(
       /\.aiPromptWrapper\s*\{[\s\S]*?background:\s*var\(--ce-authoring-prompt-bg\);[\s\S]*?color:\s*var\(--ce-authoring-prompt-text\);/,
     );
-    expect(scss).toMatch(
-      /\.aiPromptHeader\s*\{[\s\S]*?color:\s*var\(--ce-authoring-prompt-heading\);/,
-    );
+    expect(scss).toMatch(/\.aiPromptHeader\s*\{[\s\S]*?color:\s*var\(--ce-authoring-prompt-heading\);/);
     expect(scss).toMatch(
       /\.aiPromptMeta\s*\{[\s\S]*?opacity:\s*var\(--ce-authoring-prompt-meta-opacity\);[\s\S]*?color:\s*var\(--ce-authoring-prompt-meta\);/,
     );
     expect(scss).toMatch(
       /\.aiVar\s*\{[\s\S]*?background:\s*var\(--ce-authoring-prompt-variable-bg\);[\s\S]*?color:\s*var\(--ce-authoring-prompt-variable-text\);/,
     );
-    expect(scss).toMatch(
-      /\.jsonDisplay\s*\{[\s\S]*?color:\s*var\(--ce-authoring-prompt-json-text\);/,
-    );
+    expect(scss).toMatch(/\.jsonDisplay\s*\{[\s\S]*?color:\s*var\(--ce-authoring-prompt-json-text\);/);
     expect(scss).not.toContain('@container ce-theme style(--ce-layout-profile: desktop-window)');
     expect(classic95Theme).toMatch(/authoring-prompt-bg:\s*#ffffff,/);
     expect(classic95Theme).toMatch(/authoring-prompt-text:\s*#000000,/);
@@ -519,6 +509,22 @@ describe('surveyGeneratorHelpers', () => {
     });
 
     expect(prompt).toBe(["source $& $$ $` $'", '$& default, $$ tag', "instructions $& $$ $` $'"].join('\n'));
+  });
+
+  it('replaces every source type token in generation prompts', () => {
+    const prompt = buildSingleGenerationPrompt({
+      promptTemplate: 'source=<SourceType>\nconditional=<SourceType>',
+      sourceDocContent: '',
+      count: 2,
+      questionTypes: {
+        freeform: true,
+      },
+      defaultTags: [],
+      transcriptMode: true,
+    });
+
+    expect(prompt).toBe('source=transcript\nconditional=transcript');
+    expect(prompt).not.toContain('<SourceType>');
   });
 
   it('uses prompt defaults when no question types or overrides are selected', () => {

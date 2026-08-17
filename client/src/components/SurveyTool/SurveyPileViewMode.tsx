@@ -191,7 +191,7 @@ import contractScripts, {
   getAllSessionSlugs,
   getSessionConfigBySlug as getStrictSessionConfigBySlug,
   getSessionSlugByName,
-} from '../../utilities/web3/contractScripts.js';
+} from '../../utilities/web3/chainGateway.js';
 import { ethers, utils } from 'ethers';
 import CESlider from '../Shared/CESlider';
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
@@ -492,55 +492,18 @@ import { SurveyQuestions } from './SurveyQuestions';
 export const LazyPileCreateQuestionsAndSurveys = React.lazy(() => import('./CreateQuestionsAndSurveys'));
 export const LazySessionListeningPanel = React.lazy(() => import('./SessionListeningPanel'));
 
-export class PileViewMode extends SurveyQuestions {
-  constructor(props) {
-    super(props);
-
 export const buildPileRuntimeInitialState = (engine: SurveyQuestionsRuntimeEngine) => {
   const props = engine.props || {};
   let initialFilterState = normalizeSurveyToolFilterState(props.filterState);
   if (Object.keys(initialFilterState).length === 0 && typeof window !== 'undefined') {
     try {
-      if (!propsIn?.isQuestionCacheReady) return null;
-      const slug = resolveEffectiveSlug(propsIn);
-      const extraSlugs = getExtraQuestionReadSlugs(propsIn, slug);
-      const context = resolvePileWarmSeedContext(propsIn, slug);
-      const networkID = context.networkIdStr || '';
-      if (!networkID) return null;
-
-      const scopeSlugs = [slug, ...extraSlugs];
-      const seenQuestionIds = new Set();
-      const hlSet = new Set();
-      const allQuestions = [];
-      const allResponses = {};
-      scopeSlugs.forEach((scopeSlug) => {
-        const questionsCache = readQuestionsCacheRef(scopeSlug) || {};
-        const networkCache = questionsCache?.[networkID] || {};
-        const blockedQuestionIds = getBlockedQuestionIdsSet(scopeSlug);
-        getHighlightedQuestionIdsSet(scopeSlug).forEach((questionId) => {
-          hlSet.add(String(questionId || '').toLowerCase());
-        });
-        mergeQuestionResponses(allResponses, networkCache.questionResponses || {});
-        Object.keys(networkCache.questions || {}).forEach((questionId) => {
-          const question = networkCache.questions?.[questionId];
-          if (isPendingQuestionMetadataPlaceholder(question)) return;
-          const normalizedQuestionId = normalizeQuestionIdKey(question?.id || questionId);
-          if (!normalizedQuestionId || blockedQuestionIds.has(normalizedQuestionId)) return;
-          if (seenQuestionIds.has(normalizedQuestionId)) return;
-          seenQuestionIds.add(normalizedQuestionId);
-          allQuestions.push({
-            id: normalizedQuestionId,
-            creator: question?.creator || '',
-            tags: question?.tags || [],
-            ...(question || {}),
-            sessionSlug: scopeSlug,
-          });
-        });
-      });
-
-      const responseCounts = {};
-      for (const qId in allResponses) {
-        responseCounts[qId] = Object.keys(allResponses[qId] || {}).length;
+      const url = new URL(window.location.href);
+      const f = url.searchParams.get('filter');
+      if (f) {
+        initialFilterState = normalizeSurveyToolFilterState(deserializeFilterState(f));
+        // Clear from URL immediately
+        url.searchParams.delete('filter');
+        window.history.replaceState({}, '', url.toString());
       }
     } catch (e) {
       surveyLog.error('PileViewMode: Error hydrating filter state', e);
@@ -681,34 +644,6 @@ const doesQuestionProgressMatchSlugForPile = doesQuestionProgressMatchSlug as un
   progressSlugValue: unknown,
   currentSlug: string,
 ) => boolean;
-
-const createPileViewInstanceFields = () => ({
-  _pileQuestionsGeneration: 0,
-  _currentRenderedQuestionIdsCacheKey: '',
-  _questionObjectSignatureCache: new WeakMap(),
-  _questionListSignatureCache: new WeakMap(),
-  _currentPileQuestionsSignature: '0:0',
-  _currentPileQuestionsSignatureListRef: null,
-  _responseCountsCacheKey: '',
-  _responseCountsCacheValue: null,
-  _emptyReadyProbeStartedAtMs: 0,
-  _pileScanDisplayBaselineKey: '',
-  _pileScanDisplayBaselineRemaining: 0,
-  _lastGatedEmptyRecoveryKey: '',
-});
-
-const bindPileEngineMethod =
-  <Args extends unknown[], Result>(
-    engine: PileViewModeEngine,
-    method: (engine: PileViewModeEngine, ...args: Args) => Result,
-  ) =>
-  (...args: Args): Result =>
-    method(engine, ...args);
-
-const bindPileMethod =
-  <Args extends unknown[], Result>(method: (...args: Args) => Result) =>
-  (...args: Args): Result =>
-    method(...args);
 
 const attachPileViewRuntimeEngine = (engine: PileViewModeEngine): PileViewModeEngine => {
   if (!engine || typeof engine !== 'object') return engine;

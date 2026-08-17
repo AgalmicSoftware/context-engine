@@ -94,6 +94,7 @@ const getMockRegistrySessions = () => {
 const mockSessionRegistryGetSessionConfig = jest.fn();
 const mockSessionRegistryReadCache = jest.fn();
 const mockSessionRegistryGetAllSessionEntries = jest.fn();
+const mockSessionRegistryRefreshSessionRegistryFieldsCache = jest.fn();
 const mockOverlayCachedSessionWorkerConfig = jest.fn();
 
 const resetResolverMockImplementations = () => {
@@ -116,6 +117,9 @@ const resetResolverMockImplementations = () => {
     Object.entries(getMockRegistrySessions()).map(([key, value]) => [key, deepClone(value)]),
   );
 
+  mockSessionRegistryRefreshSessionRegistryFieldsCache.mockReset();
+  mockSessionRegistryRefreshSessionRegistryFieldsCache.mockResolvedValue(undefined);
+
   mockOverlayCachedSessionWorkerConfig.mockReset();
   mockOverlayCachedSessionWorkerConfig.mockImplementation(({ sessionConfig }) => sessionConfig);
 };
@@ -135,6 +139,10 @@ const installResolverMocks = ({ useOnchainRegistry }) => {
         getSessionConfig: mockSessionRegistryGetSessionConfig,
         readCache: mockSessionRegistryReadCache,
         getAllSessionEntries: mockSessionRegistryGetAllSessionEntries,
+      },
+      refreshSessionRegistryFieldsCache: mockSessionRegistryRefreshSessionRegistryFieldsCache,
+      sessionRegistryUtils: {
+        refreshSessionRegistryFieldsCache: mockSessionRegistryRefreshSessionRegistryFieldsCache,
       },
     };
   });
@@ -273,81 +281,81 @@ const INPUT_CASES = [
 const CALLER_NULL_SAFETY = [
   {
     caller: 'getWeb3Context',
-    file: 'contractScripts.impl.js:490',
+    file: 'contractScripts.impl.ts#getWeb3Context',
     safe: true,
     reason:
       'extractChainId(cfg) and getSessionAddresses(cfg) are null-tolerant, so the context is created with fallback/default-chain resolution.',
   },
   {
     caller: 'maybeDecryptSurveyPayload',
-    file: 'contractScripts.impl.js:880',
+    file: 'contractScripts.impl.ts#maybeDecryptSurveyPayload',
     safe: true,
     reason: 'getDecryptContext(cfg) accepts null and later reads use cfg?.slug optional chaining.',
   },
   {
     caller: 'maybeDecryptQuestionPayload',
-    file: 'contractScripts.impl.js:934',
+    file: 'contractScripts.impl.ts#maybeDecryptQuestionPayload',
     safe: true,
     reason: 'same null-tolerant decrypt-context path as survey payload decryption.',
   },
   {
     caller: 'predictSBTAddress',
-    file: 'contractScripts.impl.js:1680',
+    file: 'contractScripts.impl.ts#predictSBTAddress',
     safe: true,
     reason:
       'null cfg collapses to empty slug/address lookup; missing sbtFactory address returns an empty string early.',
   },
   {
     caller: 'addSurveyWithQuestions',
-    file: 'contractScripts.impl.js:2501',
+    file: 'contractScripts.impl.ts#addSurveyWithQuestions',
     safe: true,
     reason: 'missing surveys address is guarded and converted into an explicit session-address error.',
   },
   {
     caller: 'addQuestions',
-    file: 'contractScripts.impl.js:2633',
+    file: 'contractScripts.impl.ts#addQuestions',
     safe: true,
     reason: 'same guarded missing-surveys-address path as addSurveyWithQuestions.',
   },
   {
     caller: 'createSBT',
-    file: 'contractScripts.impl.js:3392',
+    file: 'contractScripts.impl.ts#createSBT',
     safe: true,
     reason: 'missing factory address logs and returns early instead of dereferencing null session data.',
   },
   {
     caller: 'countSBTCreated',
-    file: 'contractScripts.impl.js:3556',
+    file: 'contractScripts.impl.ts#countSBTCreated',
     safe: true,
     reason: 'missing factory address returns 0 as the neutral read result.',
   },
   {
     caller: 'getSbtCreationBlockByAddress',
-    file: 'contractScripts.impl.js:3681',
+    file: 'contractScripts.impl.ts#getSbtCreationBlockByAddress',
     safe: true,
     reason: 'getSessionAddresses(cfg) handles null and the function returns null when no factory address resolves.',
   },
   {
     caller: 'getSbtMetadata',
-    file: 'contractScripts.impl.js:3969',
+    file: 'contractScripts.impl.ts#getSbtMetadata',
     safe: true,
     reason: 'provider resolution and chain-id extraction both tolerate null cfg inputs.',
   },
   {
     caller: 'isPasswordValid',
-    file: 'contractScripts.impl.js:4552',
+    file: 'contractScripts.impl.ts#isPasswordValid',
     safe: true,
     reason: 'null-tolerant provider/chain helpers sit inside an outer try/catch that returns false on failure.',
   },
   {
     caller: 'getLocalAwareReadProviderForGroup',
-    file: 'rpcProviders.js:444',
+    file: 'rpcProviders.js#getLocalAwareReadProviderForGroup',
     safe: true,
     reason: 'extractChainId(null) falls back through DEFAULT_CHAIN_ID before delegating to getReadProviderForGroup.',
   },
   {
     caller: 'getReadProviderForGroup',
-    file: 'rpcProviders.js:465',
+    file: 'rpcProviders.js#getReadProviderForGroup',
     safe: true,
     reason:
       'extractChainId(null) falls back through DEFAULT_CHAIN_ID and the remaining provider-selection helpers use optional chaining.',
@@ -554,83 +562,83 @@ describe('resolveSession parity characterization', () => {
       expect(CALLER_NULL_SAFETY).toEqual([
         {
           caller: 'getWeb3Context',
-          file: 'contractScripts.impl.js:490',
+          file: 'contractScripts.impl.ts#getWeb3Context',
           safe: true,
           reason:
             'extractChainId(cfg) and getSessionAddresses(cfg) are null-tolerant, so the context is created with fallback/default-chain resolution.',
         },
         {
           caller: 'maybeDecryptSurveyPayload',
-          file: 'contractScripts.impl.js:880',
+          file: 'contractScripts.impl.ts#maybeDecryptSurveyPayload',
           safe: true,
           reason: 'getDecryptContext(cfg) accepts null and later reads use cfg?.slug optional chaining.',
         },
         {
           caller: 'maybeDecryptQuestionPayload',
-          file: 'contractScripts.impl.js:934',
+          file: 'contractScripts.impl.ts#maybeDecryptQuestionPayload',
           safe: true,
           reason: 'same null-tolerant decrypt-context path as survey payload decryption.',
         },
         {
           caller: 'predictSBTAddress',
-          file: 'contractScripts.impl.js:1680',
+          file: 'contractScripts.impl.ts#predictSBTAddress',
           safe: true,
           reason:
             'null cfg collapses to empty slug/address lookup; missing sbtFactory address returns an empty string early.',
         },
         {
           caller: 'addSurveyWithQuestions',
-          file: 'contractScripts.impl.js:2501',
+          file: 'contractScripts.impl.ts#addSurveyWithQuestions',
           safe: true,
           reason: 'missing surveys address is guarded and converted into an explicit session-address error.',
         },
         {
           caller: 'addQuestions',
-          file: 'contractScripts.impl.js:2633',
+          file: 'contractScripts.impl.ts#addQuestions',
           safe: true,
           reason: 'same guarded missing-surveys-address path as addSurveyWithQuestions.',
         },
         {
           caller: 'createSBT',
-          file: 'contractScripts.impl.js:3392',
+          file: 'contractScripts.impl.ts#createSBT',
           safe: true,
           reason: 'missing factory address logs and returns early instead of dereferencing null session data.',
         },
         {
           caller: 'countSBTCreated',
-          file: 'contractScripts.impl.js:3556',
+          file: 'contractScripts.impl.ts#countSBTCreated',
           safe: true,
           reason: 'missing factory address returns 0 as the neutral read result.',
         },
         {
           caller: 'getSbtCreationBlockByAddress',
-          file: 'contractScripts.impl.js:3681',
+          file: 'contractScripts.impl.ts#getSbtCreationBlockByAddress',
           safe: true,
           reason:
             'getSessionAddresses(cfg) handles null and the function returns null when no factory address resolves.',
         },
         {
           caller: 'getSbtMetadata',
-          file: 'contractScripts.impl.js:3969',
+          file: 'contractScripts.impl.ts#getSbtMetadata',
           safe: true,
           reason: 'provider resolution and chain-id extraction both tolerate null cfg inputs.',
         },
         {
           caller: 'isPasswordValid',
-          file: 'contractScripts.impl.js:4552',
+          file: 'contractScripts.impl.ts#isPasswordValid',
           safe: true,
           reason: 'null-tolerant provider/chain helpers sit inside an outer try/catch that returns false on failure.',
         },
         {
           caller: 'getLocalAwareReadProviderForGroup',
-          file: 'rpcProviders.js:444',
+          file: 'rpcProviders.js#getLocalAwareReadProviderForGroup',
           safe: true,
           reason:
             'extractChainId(null) falls back through DEFAULT_CHAIN_ID before delegating to getReadProviderForGroup.',
         },
         {
           caller: 'getReadProviderForGroup',
-          file: 'rpcProviders.js:465',
+          file: 'rpcProviders.js#getReadProviderForGroup',
           safe: true,
           reason:
             'extractChainId(null) falls back through DEFAULT_CHAIN_ID and the remaining provider-selection helpers use optional chaining.',

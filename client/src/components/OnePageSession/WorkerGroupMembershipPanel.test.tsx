@@ -1,9 +1,8 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { AgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
-import WorkerGroupMembershipPanel, {
-  resolveWorkerGroupJoinWindowDisplay,
-} from './WorkerGroupMembershipPanel';
+import WorkerGroupMembershipPanel from './WorkerGroupMembershipPanel';
+import { resolveWorkerGroupJoinWindowDisplay } from './workerGroupDisplayHelpers';
 
 const SESSION_ID = '0x11111111111111111111111111111111';
 const OTHER_SESSION_ID = '0x22222222222222222222222222222222';
@@ -373,8 +372,21 @@ describe('WorkerGroupMembershipPanel', () => {
                 sessionSlug: 'alpha',
                 principal: { kind: 'telegram', principalId: 'telegram:12345' },
               },
+              {
+                groupId: 'reviewers',
+                sessionSlug: 'alpha',
+                principal: {
+                  kind: 'passkey_account',
+                  address: '0x00000000000000000000000000000000000000bb',
+                },
+              },
+              {
+                groupId: 'reviewers',
+                sessionSlug: 'alpha',
+                principal: { kind: 'agent', grantId: 'agent-grant-1' },
+              },
             ],
-            memberCount: 2,
+            memberCount: 4,
             nextCursor: '',
           }),
           { status: 200, headers: { 'content-type': 'application/json' } },
@@ -416,11 +428,13 @@ describe('WorkerGroupMembershipPanel', () => {
       '/u/0x00000000000000000000000000000000000000aa',
     );
     expect(screen.getByText('Telegram · telegram:12345')).toBeInTheDocument();
-    expect(screen.getByText('(2)')).toBeInTheDocument();
+    expect(screen.getByTitle('0x00000000000000000000000000000000000000bb')).toHaveTextContent(/^Passkey · /);
+    expect(screen.getByText('Agent · agent-grant-1')).toBeInTheDocument();
+    expect(screen.getByText('(4)')).toBeInTheDocument();
     expect(screen.queryByText(/must-not-render/)).not.toBeInTheDocument();
-    expect(fetchImpl.mock.calls.filter(([url]) => new URL(String(url)).pathname.endsWith('/groups/members'))).toHaveLength(
-      1,
-    );
+    expect(
+      fetchImpl.mock.calls.filter(([url]) => new URL(String(url)).pathname.endsWith('/groups/members')),
+    ).toHaveLength(1);
   });
 
   it('omits descriptions from minimized cards without changing the full-view default', async () => {
@@ -461,6 +475,77 @@ describe('WorkerGroupMembershipPanel', () => {
     const groupCard = await screen.findByRole('article', { name: 'Compact reviewers' });
     expect(screen.queryByText('Only show this description in the full Groups view.')).not.toBeInTheDocument();
     expect(groupCard).not.toHaveAttribute('aria-describedby');
+  });
+
+  it('shows only joined Groups when embedded in the signed-in user profile', async () => {
+    const fetchImpl = jest.fn(async (input: RequestInfo | URL) => {
+      const pathname = new URL(String(input)).pathname;
+      if (pathname.endsWith('/groups/my-memberships')) {
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: 'alpha',
+            memberships: [
+              {
+                group: {
+                  groupId: 'joined-reviewers',
+                  sessionSlug: 'alpha',
+                  label: 'Joined reviewers',
+                  joinMode: 'open',
+                  memberVisibility: 'session',
+                },
+                member: {
+                  groupId: 'joined-reviewers',
+                  sessionSlug: 'alpha',
+                  principalKey: 'evm:0xaa',
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          sessionId: SESSION_ID,
+          sessionSlug: 'alpha',
+          groups: [
+            {
+              groupId: 'joined-reviewers',
+              sessionSlug: 'alpha',
+              label: 'Joined reviewers',
+              joinMode: 'open',
+              memberVisibility: 'session',
+            },
+            {
+              groupId: 'available-reviewers',
+              sessionSlug: 'alpha',
+              label: 'Available reviewers',
+              joinMode: 'open',
+              memberVisibility: 'session',
+            },
+          ],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    });
+
+    render(
+      <WorkerGroupMembershipPanel
+        envelope={envelope}
+        fetchImpl={fetchImpl as typeof fetch}
+        membershipsOnly={true}
+        showDescriptions={false}
+        showListHeader={false}
+      />,
+    );
+
+    expect(await screen.findByRole('article', { name: 'Joined reviewers' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Leave Joined reviewers' })).toBeInTheDocument();
+    expect(screen.queryByText('Available reviewers')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Join Available reviewers' })).not.toBeInTheDocument();
   });
 
   it('hides the redundant list header and reloads when the parent refresh nonce changes', async () => {
@@ -625,10 +710,7 @@ describe('WorkerGroupMembershipPanel', () => {
     const groupImage = screen.getByTestId('ce-session-worker-group-image');
     expect(groupImage).toHaveAttribute('src', 'https://ar-io.dev/open-reviewers-image');
     expect(groupImage).toHaveClass('sbtImage');
-    expect(groupImage.parentElement).toHaveClass(
-      'miniImageContainer',
-      'workerGroupCardImageContainer',
-    );
+    expect(groupImage.parentElement).toHaveClass('miniImageContainer', 'workerGroupCardImageContainer');
     expect(screen.getByText('Invited reviewers')).toBeInTheDocument();
     expect(screen.queryByText('Details')).not.toBeInTheDocument();
     expect(screen.queryByText(/contract|network|rpc|gas|mint/i)).toBeNull();
@@ -862,9 +944,7 @@ describe('WorkerGroupMembershipPanel', () => {
         ok: true,
         sessionId: SESSION_ID,
         sessionSlug: 'alpha',
-        memberships: isMember
-          ? [{ group, member: { groupId: group.groupId, sessionSlug: 'alpha' }, memberCount }]
-          : [],
+        memberships: isMember ? [{ group, member: { groupId: group.groupId, sessionSlug: 'alpha' }, memberCount }] : [],
       });
     const fetchImpl = jest.fn(async (input: RequestInfo | URL) => {
       const pathname = new URL(String(input)).pathname;
@@ -987,10 +1067,10 @@ describe('WorkerGroupMembershipPanel', () => {
           { status: 200, headers: { 'content-type': 'application/json' } },
         );
       }
-      return new Response(
-        JSON.stringify({ ok: true, sessionId: SESSION_ID, sessionSlug: 'alpha', groups: [group] }),
-        { status: 200, headers: { 'content-type': 'application/json' } },
-      );
+      return new Response(JSON.stringify({ ok: true, sessionId: SESSION_ID, sessionSlug: 'alpha', groups: [group] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
     });
 
     render(
@@ -1066,10 +1146,10 @@ describe('WorkerGroupMembershipPanel', () => {
           { status: 200, headers: { 'content-type': 'application/json' } },
         );
       }
-      return new Response(
-        JSON.stringify({ ok: true, sessionId: SESSION_ID, sessionSlug: 'alpha', groups: [] }),
-        { status: 200, headers: { 'content-type': 'application/json' } },
-      );
+      return new Response(JSON.stringify({ ok: true, sessionId: SESSION_ID, sessionSlug: 'alpha', groups: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
     });
 
     render(

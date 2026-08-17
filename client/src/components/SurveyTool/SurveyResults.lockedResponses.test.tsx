@@ -1,49 +1,33 @@
 import React from 'react';
 import fs from 'fs';
 import path from 'path';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { renderToStaticMarkup } from 'react-dom/server';
-import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
-import ConnectedSurveyResults, {
-  SURVEY_RESULTS_CLICKABLE_ICON_STYLE,
-  SURVEY_RESULTS_DOCUMENT_LINK_ICON_STYLE,
-  SURVEY_RESULTS_METADATA_MISSING_STYLE,
-  SURVEY_RESULTS_MINI_BAR_SPINNER_STYLE,
-  SURVEY_RESULTS_MINI_PROGRESS_STYLE,
-  SURVEY_RESULTS_SORTABLE_HEADER_STYLE,
-  SURVEY_RESULTS_SURVEY_BOOKMARK_STYLE,
-  SURVEY_RESULTS_SYNC_REMAINING_SPINNER_STYLE,
-  SURVEY_RESULTS_TABLE_BOOKMARK_STYLE,
-  SURVEY_RESULTS_TABLE_CELL_STYLE,
-  SURVEY_RESULTS_TRAILING_LABEL_STYLE,
-  buildSurveyResultsAggregatorPanelClassName,
-  buildSurveyResultsMultichoiceOptionClassName,
-  countQuestionModeResponses,
-  hasAnyCountableSurveyAnswer,
-  resolveSurveyResultsSyncDetailsStyle,
-  resolveSurveyResultsToggleKnobStyle,
-} from './SurveyResults';
-import styles from './SurveyResults.module.scss';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import * as cacheScriptsModule from '../../utilities/cache/cacheScripts.js';
-import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
+import contractScriptsDefault from '../../utilities/web3/chainGateway.js';
+import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
-import * as sessionScanScopeModule from '../../utilities/session/sessionScanScope.js';
-import { resolveSurveyResultsQuestionReadScope } from './surveyResultsSessionResolution.js';
+import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { sbtBasePath } from '../../utilities/ui/terminology.js';
+import { normalizeScssContract } from 'testUtils/scssContractAssertions';
+import {
+  SurveyResultsLockedResponsesBanner,
+  SurveyResultsLockedResponsesToggle,
+} from './SurveyResultsLockedResponsesPanel';
+import { renderSurveyResults } from './surveyResultsTestHarness';
 
-type TreeNode = any;
-type TreePredicate = (node: TreeNode) => boolean;
-type SurveyResultsProps = Record<string, any>;
 const cacheScripts: any = cacheScriptsModule;
-const sessionScanScope: any = sessionScanScopeModule;
 
 const mockSbtFilter = jest.fn((..._args: any[]) => null);
 jest.mock('../SBTs/SBTFilter', () => (props: any) => {
   mockSbtFilter(props);
   return null;
 });
-jest.mock('./QuestionFilter', () => () => null);
+// forwardRef so the real mount can attach questionFilterRef without warnings.
+jest.mock('./QuestionFilter', () => {
+  const ReactActual = jest.requireActual('react');
+  return ReactActual.forwardRef(() => null);
+});
 const mockPolisReport = jest.fn((..._args: any[]) => null);
 jest.mock('../PolisReport/PolisReport', () => (props: any) => {
   mockPolisReport(props);
@@ -92,7 +76,10 @@ jest.mock('../MainContent/RiskMatrix', () => ({
   },
 }));
 
-const SurveyResults: any = (ConnectedSurveyResults as any).WrappedComponent;
+// Loose-typed views of the presentational exports so RTL can render them
+// regardless of their `React.ReactNode` return annotation.
+const LockedToggle = SurveyResultsLockedResponsesToggle as unknown as React.FC<any>;
+const LockedBanner = SurveyResultsLockedResponsesBanner as unknown as React.FC<any>;
 
 const GENERIC_GATE_MESSAGE = 'Locked responses require an eligible group. Connect an eligible account to decrypt.';
 const VIEW_MODE_SWITCH_NAME = 'Toggle between individual and aggregate view';
@@ -129,7 +116,6 @@ const switchToAggregateView = async (): Promise<void> => {
   await waitFor(() => {
     expect(screen.getByRole('switch', { name: VIEW_MODE_SWITCH_NAME })).toHaveAttribute('aria-checked', 'true');
   });
-  return { promise, resolve, reject };
 };
 
 /** Inject filtered response data through the recorded SBTFilter onFilter seam. */
@@ -140,7 +126,6 @@ const injectSbtFilteredResponses = (payload: unknown, sbtFilterState: Record<str
   act(() => {
     sbtFilterProps.onFilter(payload, sbtFilterState);
   });
-  return subject;
 };
 
 const buildLockedAggregatorRow = (responder: string, answerOverrides: Record<string, unknown> = {}) => ({
@@ -181,7 +166,6 @@ describe('SurveyResults locked responses banner', () => {
     jest.spyOn(contractScriptsDefault as any, 'getLatestBlockNumber').mockResolvedValue(0);
   });
 
-describe('SurveyResults locked responses banner', () => {
   afterEach(() => {
     jest.restoreAllMocks();
     try {
@@ -220,11 +204,11 @@ describe('SurveyResults locked responses banner', () => {
       />,
     );
 
-    expect(summaryToggle).toBeTruthy();
-    expect(summaryToggle.props['aria-label']).toBe('Show 6 locked responses');
-    expect(summaryToggle.props['aria-expanded']).toBe(false);
-    expect(treeHasText(summaryToggle, '6')).toBe(true);
-    expect(detailCard).toBeNull();
+    const summaryToggle = screen.getByTestId('ce-results-locked-toggle');
+    expect(summaryToggle).toHaveAttribute('aria-label', 'Show 6 locked responses');
+    expect(summaryToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(summaryToggle).toHaveTextContent('6');
+    expect(bannerContainer).toBeEmptyDOMElement();
   });
 
   it('shows gate links and decrypt controls when expanded', () => {
@@ -288,15 +272,6 @@ describe('SurveyResults locked responses banner', () => {
         buildLockedAggregatorRow('0xaaa0000000000000000000000000000000000003'),
       ],
     });
-    const decryptButton = findElement(
-      tree,
-      (element) => element?.props?.['data-testid'] === 'ce-results-decrypt-btn'
-    );
-    const gateLink = findElement(
-      tree,
-      (element) => element?.type === 'a' && element?.props?.href === 'https://example.com/sbt/0x2222222222222222222222222222222222222222'
-    );
-    const markup = renderToStaticMarkup(tree);
 
     // port note: dropped toggle/decrypt onClick reference-identity checks and getMemoizedLockedResponsesModel.toHaveBeenCalledWith({}) — no behavioral seam for instance-method identity/arguments; click-driven assertions below verify the same wiring.
     const toggle = await screen.findByTestId('ce-results-locked-toggle');
@@ -324,12 +299,7 @@ describe('SurveyResults locked responses banner', () => {
     });
   });
 
-  it('resolves SBT details from configured session gates before falling back to generic copy', () => {
-    const subject = createSubject({
-      network: { id: 84532 },
-    });
-    subject.getEffectiveSlug = jest.fn(() => 'session-slug');
-
+  it('resolves SBT details from configured session gates before falling back to generic copy', async () => {
     jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockReturnValue({
       sponsored: {
         resources: {
@@ -346,12 +316,12 @@ describe('SurveyResults locked responses banner', () => {
     });
     jest.spyOn(sbtDisplayNameUtils, 'resolveSbtDisplayLabel').mockReturnValue('Contributor Pass');
 
-    const model = subject.buildLockedGateDetails(
-      [
-        { questionId: 'q1' },
-      ],
-      {
+    seedQuestionsCache('session-slug', {
+      questions: {
         q1: {
+          id: 'q1',
+          type: 'freeform',
+          prompt: 'Gated question one',
           encryption: {
             enabled: true,
             gate: {
@@ -384,23 +354,10 @@ describe('SurveyResults locked responses banner', () => {
       'href',
       buildSbtDetailPath('0x1111111111111111111111111111111111111111', 'session-slug'),
     );
-
-    expect(model.hasGenericGateMessage).toBe(false);
-    expect(model.gateDetails).toEqual([
-      expect.objectContaining({
-        address: '0x1111111111111111111111111111111111111111',
-        label: 'Contributor Pass',
-        href: buildSbtDetailPath('0x1111111111111111111111111111111111111111', 'session-slug'),
-      }),
-    ]);
+    expect(screen.queryByText(GENERIC_GATE_MESSAGE)).toBeNull();
   });
 
-  it('can resolve named SBT links from gate sbt objects when address arrays are absent', () => {
-    const subject = createSubject({
-      network: { id: 84532 },
-    });
-    subject.getEffectiveSlug = jest.fn(() => 'session-slug');
-
+  it('can resolve named SBT links from gate sbt objects when address arrays are absent', async () => {
     jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockReturnValue({
       sponsored: {
         gates: {
@@ -417,12 +374,12 @@ describe('SurveyResults locked responses banner', () => {
     });
     jest.spyOn(sbtDisplayNameUtils, 'resolveSbtDisplayLabel').mockReturnValue('');
 
-    const model = subject.buildLockedGateDetails(
-      [
-        { questionId: 'q1' },
-      ],
-      {
+    seedQuestionsCache('session-slug', {
+      questions: {
         q1: {
+          id: 'q1',
+          type: 'freeform',
+          prompt: 'Gated question one',
           encryption: {
             enabled: true,
             gate: {
@@ -454,15 +411,7 @@ describe('SurveyResults locked responses banner', () => {
       'href',
       buildSbtDetailPath('0x3333333333333333333333333333333333333333', 'session-slug'),
     );
-
-    expect(model.hasGenericGateMessage).toBe(false);
-    expect(model.gateDetails).toEqual([
-      expect.objectContaining({
-        address: '0x3333333333333333333333333333333333333333',
-        label: 'Contributor Pass',
-        href: buildSbtDetailPath('0x3333333333333333333333333333333333333333', 'session-slug'),
-      }),
-    ]);
+    expect(screen.queryByText(GENERIC_GATE_MESSAGE)).toBeNull();
   });
 
   it('does not show the generic decrypt message when named gate details are available', () => {
@@ -484,20 +433,8 @@ describe('SurveyResults locked responses banner', () => {
       />,
     );
 
-    const tree = subject.renderLockedResponsesBanner({
-      lockedCount: 1,
-      gateDetails: [
-        {
-          address: '0x1111111111111111111111111111111111111111',
-          href: `${sbtBasePath()}/0x1111111111111111111111111111111111111111`,
-          label: 'Contributor Pass',
-        },
-      ],
-      hasGenericGateMessage: true,
-    });
-
-    expect(treeHasText(tree, 'Contributor Pass')).toBe(true);
-    expect(treeHasText(tree, 'Locked responses require an eligible group. Connect an eligible account to decrypt.')).toBe(false);
+    expect(screen.getByText('Contributor Pass')).toBeInTheDocument();
+    expect(screen.queryByText(GENERIC_GATE_MESSAGE)).toBeNull();
   });
 
   it('uses terminology-aware generic decrypt messaging when gate details are unavailable', () => {
@@ -513,13 +450,7 @@ describe('SurveyResults locked responses banner', () => {
       />,
     );
 
-    const tree = subject.renderLockedResponsesBanner({
-      lockedCount: 1,
-      gateDetails: [],
-      hasGenericGateMessage: true,
-    });
-
-    expect(treeHasText(tree, 'Locked responses require an eligible group. Connect an eligible account to decrypt.')).toBe(true);
+    expect(screen.getByText(GENERIC_GATE_MESSAGE)).toBeInTheDocument();
   });
 
   it('uses terminology-aware decrypt failure alerts when locked responses stay encrypted', async () => {
@@ -532,23 +463,15 @@ describe('SurveyResults locked responses banner', () => {
       account: '0xabc',
       provider: 'mock-provider',
     });
-    subject.setState = jest.fn((next, cb) => {
-      const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
-      subject.state = { ...subject.state, ...(patch || {}) };
-      if (typeof cb === 'function') cb();
-      return patch;
-    });
-    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({}));
-    subject.getMemoizedLockedResponsesModel = jest.fn(() => ({
-      lockedRows: [{
-        key: 'row-1',
-        response: { answer: {} },
-        mergedResponse: { answer: { locked: true } },
-      }],
-    }));
-    subject.decryptFieldValue = jest.fn().mockResolvedValue({ ok: false });
+    await switchToAggregateView();
 
-    await subject.handleDecryptLockedResponses();
+    injectSbtFilteredResponses({
+      q1: [buildLockedAggregatorRow('0xaaa0000000000000000000000000000000000001')],
+    });
+
+    const toggle = await screen.findByTestId('ce-results-locked-toggle');
+    expect(toggle).toHaveAttribute('aria-label', 'Show 1 locked response');
+    fireEvent.click(toggle);
 
     const decryptButton = await screen.findByTestId('ce-results-decrypt-btn');
     fireEvent.click(decryptButton);
@@ -560,42 +483,46 @@ describe('SurveyResults locked responses banner', () => {
     expect(decryptSpy).toHaveBeenCalled();
   });
 
-  it('skips the locked banner model for self-encrypted responses without gate access rules', () => {
-    const subject = createSubject({
-      isOpen: true,
-      viewMode: 'questions',
-    });
-    subject.getEffectiveSlug = jest.fn(() => '');
-    subject.state = {
-      ...subject.state,
-      viewMode: 'questions',
-      surveyViewMode: 'aggregate',
-      sbtFilteredResponses: [],
-      sbtFilteredAggregatorQuestionResponses: {
-        q1: [
-          {
-            responder: '0xabc',
-            response: {
-              questionID: 'q1',
-              answer: {
-                value: '*',
-                encrypted: true,
-                encryptionAudience: 'self',
-              },
-            },
-          },
-        ],
+  it('skips the locked banner model for self-encrypted responses without gate access rules', async () => {
+    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockReturnValue(null);
+
+    seedQuestionsCache('', {
+      questions: {
+        q1: {
+          id: 'q1',
+          type: 'freeform',
+          prompt: 'Self encrypted question',
+          encryption: { enabled: false },
+        },
       },
-    };
-
-    const model = subject.getMemoizedLockedResponsesModel({
-      q1: { id: 'q1', type: 'freeform', encryption: { enabled: false } },
+      questionResponses: {
+        q1: {
+          '0xabc': {
+            questionID: 'q1',
+            answer: {
+              value: '*',
+              encrypted: true,
+              encryptionAudience: 'self',
+            },
+            timeStamp: 1,
+          },
+        },
+      },
     });
 
-    expect(model.lockedCount).toBe(0);
-    expect(model.lockedRows).toEqual([]);
-    expect(model.gateDetails).toEqual([]);
-    expect(model.hasGenericGateMessage).toBe(false);
+    mountSurveyResults({ viewMode: 'questions' });
+
+    // Positive hydration signal first: the seeded question reached the results view.
+    await waitFor(() => {
+      expect(document.body.textContent).toMatch(/Questions:\s*1/);
+    });
+
+    // port note: dropped {lockedCount, lockedRows, gateDetails, hasGenericGateMessage} model-shape equality — asserted via its only observable projection: no locked toggle, banner, decrypt control, or gate copy renders for self-encrypted rows.
+    expect(screen.queryByTestId('ce-results-locked-toggle')).toBeNull();
+    expect(screen.queryByTestId('ce-results-locked-banner')).toBeNull();
+    expect(screen.queryByTestId('ce-results-decrypt-btn')).toBeNull();
+    expect(screen.queryByText(/Locked Responses/)).toBeNull();
+    expect(screen.queryByText(GENERIC_GATE_MESSAGE)).toBeNull();
   });
 });
 
@@ -634,6 +561,7 @@ describe('SurveyResults module styles', () => {
   it('keeps survey-results controls readable on the light modal surface', () => {
     const scssPath = path.join(__dirname, 'SurveyResults.module.scss');
     const scss = fs.readFileSync(scssPath, 'utf8');
+    const normalizedScss = normalizeScssContract(scss);
 
     expect(scss).toMatch(/\.toggleLabel\s*{[\s\S]*?color:\s*var\(--ce-document-text\);/);
     expect(scss).toMatch(/\.exportAndFilterContainer\s*{[\s\S]*?background:\s*var\(--ce-status-info-text\);/);

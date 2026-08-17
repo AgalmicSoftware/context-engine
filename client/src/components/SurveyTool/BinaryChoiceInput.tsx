@@ -44,9 +44,11 @@ const BinaryChoiceInput = ({
             value={option}
             checked={isSelected}
             onChange={() => {
+              if (disabled) return;
               if (typeof onChange === 'function') onChange(option);
             }}
             onClick={() => {
+              if (disabled) return;
               if (isSelected && typeof onChange === 'function') onChange(option);
             }}
             disabled={disabled}

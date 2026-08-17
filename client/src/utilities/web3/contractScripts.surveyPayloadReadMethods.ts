@@ -56,7 +56,7 @@ export const createContractScriptsSurveyPayloadReadMethods = (
     STORAGE_RESOURCE_KEYS,
     SURVEYS,
     SURVEYS_INTERFACE,
-    arweaveScripts,
+    arweaveClient,
     attachStorageRefCompatibilityFields,
     buildSbtScopeMemoTag,
     clearReadCachesForGroup,
@@ -280,7 +280,7 @@ export const createContractScriptsSurveyPayloadReadMethods = (
           if (!arweaveHash || arweaveHash === ethers.constants.HashZero) {
             return null;
           }
-          return arweaveScripts.hexToBase64url(arweaveHash);
+          return arweaveClient.hexToBase64url(arweaveHash);
         });
         return typeof result === 'string' && result ? result : null;
       } catch (error: any) {
@@ -382,7 +382,7 @@ export const createContractScriptsSurveyPayloadReadMethods = (
             }
             return null;
           }
-          const payloadPointerId = arweaveScripts.hexToBase64url(arweaveHash);
+          const payloadPointerId = arweaveClient.hexToBase64url(arweaveHash);
           const mockedResponse = readE2EMockedViewedResponse();
           if (mockedResponse) {
             normalizeSessionNameFields(mockedResponse);
@@ -518,7 +518,7 @@ export const createContractScriptsSurveyPayloadReadMethods = (
           if (!arweaveHashBytes || arweaveHashBytes === ethers.constants.HashZero) {
             return null;
           }
-          return arweaveScripts.hexToBase64url(arweaveHashBytes);
+          return arweaveClient.hexToBase64url(arweaveHashBytes);
         });
         setTimedMemoValue(
           READ_MEMO.questionHash,
@@ -605,7 +605,7 @@ export const createContractScriptsSurveyPayloadReadMethods = (
           if (!arweaveHashBytes || arweaveHashBytes === ethers.constants.HashZero) {
             return null;
           }
-          return arweaveScripts.hexToBase64url(arweaveHashBytes);
+          return arweaveClient.hexToBase64url(arweaveHashBytes);
         });
         setTimedMemoValue(
           READ_MEMO.surveyHash,

@@ -56,6 +56,24 @@ All notable changes to this project will be documented in this file.
   `appearance.colorSchemeId` persistence across Worker/Arweave paths, scoped
   active-session accents, accessibility contrast checks, and fixed-light
   standalone exports.
+- Added `/session/demo-2` as a fixture-backed preview of “Living With
+  Artificial Minds”: 40 typed questions, 62 unique simulated participants,
+  deterministic generated responses, and a three-cluster Polis report.
+  Poll choices, rating bounds, freeform answers, and stable question IDs now
+  agree across the session, report, and question-results surfaces. Simulated
+  rows are display-only and live responses win collisions. `demo-sh` remains
+  the public default until a dedicated demo-2 Worker, canonical question seed,
+  and Worker-held AI key pass live voice/AI verification; no credential is
+  stored in the preview config or fixture data.
+- Preserved the published `demo-sh` question fixture exactly while preventing
+  tri-state sentiment from being presented as a poll, rating, or freeform
+  answer. Distinct corrected choices for legacy polls remain deferred until a
+  deliberate Worker reseed. Direct Debate Map issue links now close back to the
+  Atlas index when no safe return target exists.
+- Made SBT and related holder-cache writes atomic across discovery, detail
+  hydration, profile scans, filters, selectors, and realtime events. Delayed
+  scans now preserve newer activity, unrelated networks, and concurrent user
+  responses, and readiness is published only after persistence succeeds.
 - Replaced the `/contracts` utility reference with a user-facing `/docs` page
   containing a quickstart, session-options guide, and FAQ. The page retains
   AI prompt references and a contract deployment explorer that waits for an
@@ -294,6 +312,10 @@ All notable changes to this project will be documented in this file.
   and previewed Corporate hosting as unavailable without changing publishing
   semantics. Cloudflare token guidance now explains that the linked form
   prefills permissions for users already signed in.
+- Restored the two primary `/new` setup choices as large, requirement-aware
+  entry cards. Selecting Fast & Cheap or Trustless & Public now transitions to
+  the existing compact header selector; the native fast path identifies its
+  creator inputs as a Cloudflare login and one AI API key.
 - Made `contextengine.sh` the canonical public URL across site metadata,
   discovery assets, documentation, and Agent Bridge links. Worker and Bridge
   bootstrap allowlists now prefer `.sh` while retaining `.xyz` as redirect
@@ -396,6 +418,9 @@ All notable changes to this project will be documented in this file.
   results, failing closed when membership cannot be checked. Telegram-optional
   user and service exchanges now derive their worker wallet from the stored
   credential principal.
+- Granted the explicit worker-group scope after a registry-backed participant
+  passes the session's default gate, restoring direct group reads and joins
+  without weakening group membership checks.
 - Prevented worker-native group state from silently switching to an unrelated
   D1 or envelope-audit binding: session-worker groups now use only the explicit
   group KV or storage-index KV aliases, and D1-only group configuration fails
@@ -440,8 +465,18 @@ All notable changes to this project will be documented in this file.
   they are live at configured addresses.
 - Fixed passkey survey-response uploads by preserving object-valued EIP-1193
   providers through worker authentication, kept SBT metadata and image reads on
-  AR.IO while direct mode is enabled, and extended the shared RPC 429 probe
-  window so exponential backoff engages before neighboring reads create a burst.
+  AR.IO while direct mode is enabled, and serialized shared RPC reads per
+  endpoint so one 429 stops queued requests before they create a console burst.
+- Fixed active-session SBT loading and sponsorship reporting by avoiding full
+  registry enumeration, refreshing selected worker fields before survey
+  uploads, moving the rate-limited Tenderly OP Sepolia gateway to the last
+  fallback, and reading boolean-only resource presence from the session worker.
+- Prevented repeated RPC retries against browser-forbidden (`403`) endpoints,
+  and constrained returning passkey-wallet unlocks to the stored credential so
+  SBT mint/sign prompts do not reopen the passkey account chooser.
+- Removed failing anonymous OP Sepolia fallback fanout from cold session loads,
+  deferred worker resource-presence checks until account settings are opened,
+  and resolved Vite's browser `buffer` shim explicitly.
 
 ## [0.7.0] - 2026-07-06
 
@@ -493,6 +528,7 @@ All notable changes to this project will be documented in this file.
 
 - Added the first Session Results HTML report export slice: redacted snapshot/HTML helpers, safe embedded JSON, a SurveyResults confirmation/download flow, and focused regression coverage.
 - Extended Session Results exports with logged-in downloader metadata, visible artifact watermarking, explicit unavailable reasons, section checkboxes, exported viewer/static HTML/single-page PDF options, and local AI-generated analysis artifacts that use synthetic participant IDs before provider calls.
+- Simplified the Session Results export modal copy, fixed light-mode checkbox/radio layout, and added demo preview mode for local demo analysis sections without wallet auth.
 
 ## 2026-05-17
 

@@ -1,11 +1,10 @@
 // Remaining broad SurveyResults coverage owns pure count helpers and display-helper constants.
+// Behavior-level port: instance-driven tests now mount through surveyResultsTestHarness and
+// drive the component exclusively via DOM events, recorded child-mock props, prop-callback
+// spies, and jest-spied module boundaries (cacheScripts / contractScripts / sessionScanScope).
 import React from 'react';
-import fs from 'fs';
-import path from 'path';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { renderToStaticMarkup } from 'react-dom/server';
-import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
-import ConnectedSurveyResults, {
+import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
+import {
   SURVEY_RESULTS_CLICKABLE_ICON_STYLE,
   SURVEY_RESULTS_DOCUMENT_LINK_ICON_STYLE,
   SURVEY_RESULTS_METADATA_MISSING_STYLE,

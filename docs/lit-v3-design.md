@@ -63,6 +63,16 @@ The smallest design that preserves "only holders of this SBT can decrypt" is:
 3. Use a registered Chipotle Lit Action, not arbitrary inline code.
 4. Let that action verify the requester's SBT eligibility on-chain, then unwrap or decrypt the protected CEK inside Lit.
 
+### Chain scope
+
+Lit v3 gate evaluation should be treated as chain-configured across EVM chains,
+not Base-specific. Context Engine's default E2E and deployment target is OP
+Sepolia (`11155420`), but that is an application default, not a Lit limitation.
+Lit access conditions should derive their Lit chain from the session or gate
+`chainId` / `litChain` value. Base Sepolia (`84532`) should continue to work
+for legacy and development compatibility, but it is best-effort rather than an
+actively supported E2E or deployment target.
+
 ### v3 trust boundary
 
 Browser:
@@ -137,7 +147,7 @@ The current browser Lit runtime fans out from `client/src/utilities/crypto/litPr
 - `client/src/utilities/crypto/cryptography.ts`
 - `client/src/utilities/crypto/encryptedFields.ts`
 - `client/src/components/MainSite/litSessionConfig.ts`
-- `client/src/utilities/session/sessionMetaController.js`
+- `client/src/utilities/session/sessionMetaController.ts`
 
 ### Session metadata and AppShell
 

@@ -30,15 +30,6 @@ describe('SessionDocumentsPage', () => {
   it('keeps the general-session back link canonical as /session', () => {
     render(<SessionDocumentsPage sessionToken="general" sessionSlug="" sessionConfig={{ slug: '' }} />);
 
-    expect(screen.getByRole('link', { name: 'Back to session' })).toHaveAttribute(
-      'href',
-      '/session/worker-docs?worker=https%3A%2F%2Fworker-docs.example.workers.dev',
-    );
-  });
-
-  it('keeps the general-session back link canonical as /session', () => {
-    render(<SessionDocumentsPage sessionToken="general" sessionSlug="" sessionConfig={{ slug: '' }} />);
-
     expect(screen.getByRole('link', { name: 'Back to session' })).toHaveAttribute('href', '/session');
   });
 });

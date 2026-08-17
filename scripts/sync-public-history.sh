@@ -393,7 +393,11 @@ strip_private_paths_from_clone() {
     done
 
     apply_agent_bridge_public_history_policy "$commit_sha"
-    node "$REPO_ROOT/scripts/scrub-public-package-json.js" "$TEMP_CLONE/package.json"
+    git -C "$REPO_ROOT" show "${commit_sha}:package.json" > "$TMP_ROOT/public-package-source.json"
+    node \
+      "$REPO_ROOT/scripts/scrub-public-package-json.js" \
+      "$TEMP_CLONE/package.json" \
+      "$TMP_ROOT/public-package-source.json"
 
     # The canonical artifact redacts non-public emails and local home paths.
     # Apply the same transformation to each changed replay delta so no
@@ -456,6 +460,12 @@ reset_clone_to_branch_head() {
   git -C "$TEMP_CLONE" cherry-pick --abort >/dev/null 2>&1 || true
   git -C "$TEMP_CLONE" reset --hard --quiet HEAD
   git -C "$TEMP_CLONE" clean -fdq
+}
+
+clone_has_no_pending_changes() {
+  git -C "$TEMP_CLONE" diff --quiet &&
+    git -C "$TEMP_CLONE" diff --cached --quiet &&
+    ! git -C "$TEMP_CLONE" diff --name-only --diff-filter=U | grep -q .
 }
 
 resolve_private_cherry_pick_conflicts() {
@@ -675,22 +685,30 @@ ensure_public_node_modules_link() {
   local node_path="$REPO_ROOT/node_modules"
   local temp_node_path="$TEMP_CLONE/node_modules"
 
-  if [ ! -f "$TEMP_CLONE/package.json" ]; then
-    fail "Cannot run public Node tests; package.json was not found in replay output." 1
-  fi
-
   if [ -d "$node_path" ] && [ ! -e "$temp_node_path" ]; then
     log_info "Linking source node_modules into public test checkout."
     ln -s "$node_path" "$temp_node_path"
   fi
+}
 
-  log_info "Running public release Node tests."
+run_public_npm_script() {
+  local script_name="$1"
+  local description="$2"
+  local node_path="$REPO_ROOT/node_modules"
+
+  if [ ! -f "$TEMP_CLONE/package.json" ]; then
+    fail "Cannot run public $description; package.json was not found in replay output." 1
+  fi
+
+  ensure_public_node_modules_link
+
+  log_info "Running public release $description."
   (
     cd "$TEMP_CLONE"
     if [ -d "$node_path" ]; then
-      NODE_PATH="$node_path${NODE_PATH:+:$NODE_PATH}" npm run test:node
+      NODE_PATH="$node_path${NODE_PATH:+:$NODE_PATH}" npm run "$script_name"
     else
-      npm run test:node
+      npm run "$script_name"
     fi
   )
 }
@@ -826,6 +844,11 @@ stamp_release_candidate_version() {
       printf '\nRelease impact suggested %s; operator acknowledged a patch release.\n' "$RELEASE_IMPACT"
     fi
   } > "$message_file"
+
+  if [ -z "$LATEST_REPLAYED_SOURCE_COMMIT" ]; then
+    fail "Cannot bind the release version commit without a replayed private source commit." 2
+  fi
+  bind_public_replay_to_source "$LATEST_REPLAYED_SOURCE_COMMIT" "$message_file"
 
   git -C "$TEMP_CLONE" \
     -c "core.hooksPath=$REPLAY_HOOKS_DIR" \
@@ -1127,6 +1150,13 @@ for commit_sha in "${COMMITS[@]}"; do
   if ! git -C "$TEMP_CLONE" cherry-pick --no-commit -X theirs "$commit_sha" >/dev/null 2>&1; then
     if resolve_private_cherry_pick_conflicts "$commit_sha"; then
       log_info "Resolved stripped-path cherry-pick conflicts for $commit_sha | $subject"
+    elif resolve_theirs_cherry_pick_conflicts; then
+      log_info "Resolved remaining cherry-pick conflicts from source for $commit_sha | $subject"
+    elif clone_has_no_pending_changes; then
+      SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+      log_info "Skipped $commit_sha because the public patch is already present."
+      reset_clone_to_branch_head
+      continue
     else
       log_error "Cherry-pick failed for $commit_sha | $subject"
       reset_clone_to_branch_head

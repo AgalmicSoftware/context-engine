@@ -1,4 +1,5 @@
 import type { SurveyQuestionsLegacyRecord, SurveyQuestionsLegacyValue } from './surveyQuestionsTypes.js';
+import { resolveStableSurveyAudioWorkerProps } from './surveyToolRuntimeSupport';
 
 export type SurveyQuestionsQuestionDisplayRuntime = SurveyQuestionsLegacyRecord;
 
@@ -103,33 +104,11 @@ export const createSurveyQuestionsQuestionDisplayRuntime = (
       return inst._a;
     }
 
-    const nextWorkerProps = getAudioInputWorkerProps();
-    const nextContext = nextWorkerProps?.context || {};
-    const memo = inst._audioInputWorkerPropsMemo;
-    const hasSameWorkerContext =
-      memo &&
-      Object.is(memo.sessionSlug, nextWorkerProps?.sessionSlug) &&
-      Object.is(memo.sessionConfig, nextWorkerProps?.sessionConfig) &&
-      Object.is(memo.account, nextContext.account) &&
-      Object.is(memo.providerLike, nextContext.providerLike) &&
-      Object.is(memo.chainId, nextContext.chainId);
-
-    // Stable props let React.memo skip every unchanged question response input
-    // after a vote while still invalidating on any session or wallet change.
-    if (hasSameWorkerContext) {
-      inst._a = memo.value;
-      return inst._a;
-    }
-
-    inst._audioInputWorkerPropsMemo = {
-      value: nextWorkerProps,
-      sessionSlug: nextWorkerProps?.sessionSlug,
-      sessionConfig: nextWorkerProps?.sessionConfig,
-      account: nextContext.account,
-      providerLike: nextContext.providerLike,
-      chainId: nextContext.chainId,
-    };
-    inst._a = nextWorkerProps;
+    inst._audioInputWorkerPropsMemo = resolveStableSurveyAudioWorkerProps(
+      inst._audioInputWorkerPropsMemo,
+      getAudioInputWorkerProps(),
+    );
+    inst._a = inst._audioInputWorkerPropsMemo.value;
     return inst._a;
   };
 

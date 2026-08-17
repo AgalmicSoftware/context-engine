@@ -54,6 +54,7 @@ type CreateSurveyValidationInput = {
 };
 type CreateSurveySubmitGatePlanQuestion = {
   lockGateIds?: unknown;
+  lockGateIdsTouched?: unknown;
   [key: string]: unknown;
 };
 type CreateSurveySubmitGatePlanArgs = {
@@ -867,10 +868,10 @@ export const buildCreateSurveySubmitGatePlan = ({
     const normalized = normalizeKnownGateIds(value);
     return normalized.length ? normalized : defaultSubmitGateIds;
   };
-  const applyStandaloneQuestionGateIds = (value: unknown): string[] => {
+  const applyStandaloneQuestionGateIds = (value: unknown, touched: unknown): string[] => {
     const normalized = normalizeKnownGateIds(value);
     if (normalized.length) return normalized;
-    if (Array.isArray(value) && normalizeGateIds(value).length === 0) return [];
+    if (touched && Array.isArray(value) && normalizeGateIds(value).length === 0) return [];
     return defaultSubmitGateIds;
   };
 

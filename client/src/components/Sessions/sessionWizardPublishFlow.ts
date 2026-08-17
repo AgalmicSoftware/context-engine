@@ -1,9 +1,6 @@
 import { toStr } from '../../utilities/shared/primitives.js';
 import sha256 from 'crypto-js/sha256';
-import {
-  CLOUDFLARE_WORKER_BUNDLE_URL,
-  CLOUDFLARE_WORKER_RELEASE_MANIFEST_URL,
-} from '../../variables/appConfig.js';
+import { CLOUDFLARE_WORKER_BUNDLE_URL, CLOUDFLARE_WORKER_RELEASE_MANIFEST_URL } from '../../variables/appConfig.js';
 import {
   hasSponsoredBundleFields,
   normalizeSparseSponsoredBundlePayload,
@@ -632,9 +629,11 @@ export const buildSessionWizardPublishProgressSteps = ({
             ? `Deploy ${normalizedSbtLabel}`
             : key === 'upload-metadata'
               ? 'Upload Arweave'
-              : key === 'register-session'
-                ? 'Register On-chain'
-                : 'Done',
+              : key === 'persist-worker-config'
+                ? 'Verify Worker Config'
+                : key === 'register-session'
+                  ? 'Register On-chain'
+                  : 'Done',
       state: isActive ? 'active' : isComplete ? 'complete' : 'pending',
     };
   });

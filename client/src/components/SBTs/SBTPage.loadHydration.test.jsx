@@ -5,6 +5,7 @@ import {
   cacheScripts,
   render,
   createSubject,
+  createReadCachePayload,
   treeIncludesText,
   flushPromises,
   createDeferred,
@@ -13,6 +14,32 @@ import {
 
 describe('SBTPage metadata load hydration', () => {
   setupSBTPageTestLifecycle();
+
+  it('keeps cache revision ticks scoped to metadata hydration without action side effects', () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000a1';
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      account: '0x00000000000000000000000000000000000000b1',
+      sbtCacheRevision: 2,
+      sessionSlug: 'edge',
+    });
+    subject._metaHydrationTried = { stale: true };
+    subject.loadSBTInfo = jest.fn();
+    subject.checkForMintPassword = jest.fn();
+    subject.handleMint = jest.fn();
+    subject.handleUrlAutoMintIntent = jest.fn();
+
+    subject.componentDidUpdate({
+      ...subject.props,
+      sbtCacheRevision: 1,
+    });
+
+    expect(subject._metaHydrationTried).toEqual({});
+    expect(subject.loadSBTInfo).toHaveBeenCalledWith(false);
+    expect(subject.checkForMintPassword).not.toHaveBeenCalled();
+    expect(subject.handleMint).not.toHaveBeenCalled();
+    expect(subject.handleUrlAutoMintIntent).not.toHaveBeenCalled();
+  });
 
   it('coalesces overlapping loadSBTInfo calls and queues a single forced rerun', async () => {
     jest.useFakeTimers();

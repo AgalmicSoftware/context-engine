@@ -178,11 +178,7 @@ describe('sessionWizardModeRequirements', () => {
 
     const requirements = resolveSessionWizardModeRequirements(profile);
 
-    expect(requirements.requiredRequirementIds).toEqual([
-      'cloudflareAccount',
-      'cloudflareApiToken',
-      'aiProviderKey',
-    ]);
+    expect(requirements.requiredRequirementIds).toEqual(['cloudflareAccount', 'cloudflareApiToken', 'aiProviderKey']);
     expect(requirements.presetKeyChips).toEqual([
       'Cloudflare account',
       'Request-only Cloudflare API token',

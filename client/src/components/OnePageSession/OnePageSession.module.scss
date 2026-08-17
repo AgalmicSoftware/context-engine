@@ -658,7 +658,7 @@
   }
 }
 
-#brandingSectionTitle {
+.brandingSectionTitle {
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -906,44 +906,7 @@
 
 .documentsSectionHeader {
   width: 100%;
-  justify-content: space-between;
-}
-
-.documentsSectionHeaderMain {
-  align-items: flex-start;
-  display: inline-flex;
-  gap: 10px;
-  min-width: 0;
-}
-
-.documentsSectionHeaderMeta {
-  flex: 0 0 auto;
-  flex-wrap: nowrap;
-  margin-left: auto;
-  min-width: 0;
-}
-
-.sectionHeaderLink {
-  align-items: center;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
-  color: var(--ce-color-white);
-  display: inline-flex;
-  gap: 6px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  line-height: 1;
-  margin-top: 1px;
-  padding: 7px 10px;
-  text-decoration: none;
-
-  &:hover,
-  &:focus-visible {
-    color: var(--ce-color-white);
-    border-color: rgba(255, 255, 255, 0.32);
-    outline: none;
-  }
+  justify-content: flex-start;
 }
 
 .sectionHeaderActionsScroller {
@@ -1416,19 +1379,21 @@
   }
 
   .sectionHeader {
+    align-items: center;
     font-size: 1.6em;
     padding-left: 10px;
   }
 
   .sectionHeader .sectionHeaderText {
     flex-direction: row;
-    align-items: baseline;
+    align-items: center;
     flex-wrap: wrap;
     gap: 6px 12px;
   }
 
   .sectionHeader .sectionHeaderSubtitle {
-    font-size: 0.68em;
+    font-size: 1em;
+    font-weight: inherit;
     line-height: 1;
     color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
   }
@@ -1440,74 +1405,6 @@
   .documentsSectionHeader {
     gap: 10px;
     width: 100%;
-  }
-
-  .documentsSectionHeaderMain {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: flex-start;
-    column-gap: 10px;
-    flex: 1 1 220px;
-    width: 100%;
-  }
-
-  .documentsSectionHeaderMain .sectionToggleIcon {
-    margin-right: 0;
-    margin-top: 0.1em;
-  }
-
-  .documentsSectionHeaderText {
-    display: grid;
-    grid-template-areas:
-      "title subtitle"
-      "actions actions";
-    grid-template-columns: minmax(0, auto) minmax(0, 1fr);
-    align-items: center;
-    column-gap: 12px;
-    row-gap: 10px;
-    min-width: 0;
-    width: 100%;
-  }
-
-  .documentsSectionHeaderTitleRow {
-    display: contents;
-  }
-
-  .documentsSectionHeaderTitleRow .sectionHeaderTitle {
-    grid-area: title;
-  }
-
-  .documentsSectionHeaderText > .sectionHeaderSubtitle {
-    grid-area: subtitle;
-    justify-self: start;
-    font-size: 0.82em;
-    line-height: 1;
-  }
-
-  .documentsSectionHeaderMeta {
-    align-items: center;
-    box-sizing: border-box;
-    flex-wrap: wrap;
-    grid-area: actions;
-    justify-self: end;
-    justify-content: flex-end;
-    gap: 8px;
-    padding-right: 10px;
-    width: 100%;
-  }
-
-  .documentsSectionHeaderMeta .sectionHeaderTooltip {
-    align-items: center;
-    display: inline-flex;
-    margin-left: 0;
-    margin-top: 0;
-    min-height: 40px;
-  }
-
-  .documentsSectionHeaderMeta .sectionHeaderLink {
-    font-size: 0.78rem;
-    min-height: 40px;
-    padding: 8px 11px;
   }
 
   .sectionHeaderActionsScroller {
@@ -1586,13 +1483,14 @@
 /* Keep smaller tablets on the inline header layout without pulling in the full phone chrome. */
 @media only screen and (min-width: 601px) and (max-width: 767px) {
   .sectionHeader {
+    align-items: center;
     font-size: 1.6em;
     padding-left: 10px;
   }
 
   .sectionHeader .sectionHeaderText {
     flex-direction: row;
-    align-items: baseline;
+    align-items: center;
     flex-wrap: wrap;
     gap: 6px 12px;
   }
@@ -1611,74 +1509,6 @@
   .documentsSectionHeader {
     gap: 10px;
     width: 100%;
-  }
-
-  .documentsSectionHeaderMain {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: flex-start;
-    column-gap: 10px;
-    flex: 1 1 220px;
-    width: 100%;
-  }
-
-  .documentsSectionHeaderMain .sectionToggleIcon {
-    margin-right: 0;
-    margin-top: 0.1em;
-  }
-
-  .documentsSectionHeaderText {
-    display: grid;
-    grid-template-areas:
-      "title subtitle"
-      "actions actions";
-    grid-template-columns: minmax(0, auto) minmax(0, 1fr);
-    align-items: center;
-    column-gap: 12px;
-    row-gap: 10px;
-    min-width: 0;
-    width: 100%;
-  }
-
-  .documentsSectionHeaderTitleRow {
-    display: contents;
-  }
-
-  .documentsSectionHeaderTitleRow .sectionHeaderTitle {
-    grid-area: title;
-  }
-
-  .documentsSectionHeaderText > .sectionHeaderSubtitle {
-    grid-area: subtitle;
-    justify-self: start;
-    font-size: 0.82em;
-    line-height: 1;
-  }
-
-  .documentsSectionHeaderMeta {
-    align-items: center;
-    box-sizing: border-box;
-    flex-wrap: wrap;
-    grid-area: actions;
-    justify-self: end;
-    justify-content: flex-end;
-    gap: 8px;
-    padding-right: 10px;
-    width: 100%;
-  }
-
-  .documentsSectionHeaderMeta .sectionHeaderTooltip {
-    align-items: center;
-    display: inline-flex;
-    margin-left: 0;
-    margin-top: 0;
-    min-height: 40px;
-  }
-
-  .documentsSectionHeaderMeta .sectionHeaderLink {
-    font-size: 0.78rem;
-    min-height: 40px;
-    padding: 8px 11px;
   }
 
   .pileHeaderRow {

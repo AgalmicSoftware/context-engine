@@ -7,7 +7,10 @@ describe('DecryptActionChip', () => {
     const onClick = jest.fn();
     render(<DecryptActionChip onClick={onClick} actionLabel="Decrypt Answer" />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Decrypt Answer' }));
+    const button = screen.getByRole('button', { name: 'Decrypt Answer' });
+    expect(button).toHaveClass('decryptQuestionButton');
+
+    fireEvent.click(button);
 
     expect(onClick).toHaveBeenCalledTimes(1);
   });
@@ -20,5 +23,9 @@ describe('DecryptActionChip', () => {
     rerender(<DecryptActionChip spinnerOnly busy={false} actionLabel="Decrypt Answer" />);
 
     expect(screen.queryByText('Decrypting...')).not.toBeInTheDocument();
+  });
+
+  it('resolves spinner spacing style', () => {
+    expect(resolveDecryptActionChipSpinnerStyle()).toEqual({ marginRight: 8 });
   });
 });

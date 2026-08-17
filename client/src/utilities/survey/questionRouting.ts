@@ -9,6 +9,7 @@ import { normalizeSessionSlug } from '../session/sessionNaming.js';
 import {
   SESSION_STORAGE_PAYLOAD_ACCESS_MODES,
   normalizeSessionStorageConfig,
+  normalizeSessionStoragePayloadAccessControl,
 } from '../storage/sessionStorageConfig.js';
 
 type SessionConfig = {

@@ -66,9 +66,7 @@ const WorkerGroupCard = ({
         onClick={() => onOpenDetails(group.groupId)}
         aria-label={`Open group details for ${group.label}`}
       >
-        <div
-          className={`${sbtPageStyles.miniImageContainer} ${styles.workerGroupCardImageContainer}`}
-        >
+        <div className={`${sbtPageStyles.miniImageContainer} ${styles.workerGroupCardImageContainer}`}>
           {group.imageUrl ? (
             <WorkerGroupImage
               src={group.imageUrl}

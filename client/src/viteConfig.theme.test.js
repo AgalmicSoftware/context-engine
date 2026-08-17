@@ -27,9 +27,7 @@ describe('Vite theme bootstrap contract', () => {
   });
 
   test('transforms the shared CommonJS password derivation helper for Vite', async () => {
-    const { transformGroupPasswordDerivationCommonJs } = await import(
-      '../scripts/source-commonjs-compatibility.mjs'
-    );
+    const { transformGroupPasswordDerivationCommonJs } = await import('../scripts/source-commonjs-compatibility.mjs');
     const commonJsSource = fs.readFileSync(
       path.join(clientRoot, 'src', 'utilities', 'crypto', 'groupPasswordDerivation.cjs'),
       'utf8',

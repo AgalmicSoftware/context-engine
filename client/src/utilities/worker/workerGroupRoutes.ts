@@ -23,12 +23,11 @@ export const buildWorkerGroupsPath = ({
   const slug = canonicalizeSessionSlug(sessionSlug);
   const normalizedGroupId = String(groupId || '').trim();
   const usesLegacyHashRoute = ADDRESS_SHAPED_WORKER_GROUP_ID_RE.test(normalizedGroupId);
-  const path = normalizedGroupId && !usesLegacyHashRoute
-    ? buildPublicRoute(`/group/${encodeURIComponent(normalizedGroupId)}`)
-    : buildPublicRoute(normalizeListRoot(rootPath));
-  const hash = usesLegacyHashRoute
-    ? `${WORKER_GROUP_HASH_PREFIX}${encodeURIComponent(normalizedGroupId)}`
-    : '';
+  const path =
+    normalizedGroupId && !usesLegacyHashRoute
+      ? buildPublicRoute(`/group/${encodeURIComponent(normalizedGroupId)}`)
+      : buildPublicRoute(normalizeListRoot(rootPath));
+  const hash = usesLegacyHashRoute ? `${WORKER_GROUP_HASH_PREFIX}${encodeURIComponent(normalizedGroupId)}` : '';
   if (!slug) return `${path}${hash}`;
 
   const params = new URLSearchParams();

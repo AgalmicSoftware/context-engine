@@ -8,6 +8,7 @@ import styles from './UserPage.module.scss';
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
+  buildCompareCompassQuadrants,
   buildCompareClassName,
   buildCompareProfileHref,
   resolveCompareAddressBlockieStyle,
@@ -18,6 +19,7 @@ import {
   resolveCompareCompassLegendStyle,
   resolveCompareCompassLegendSwatchStyle,
   resolveCompareCompassScrollStyle,
+  resolveCompareCompassSeriesColor,
   resolveCompareDrillBodyStyle,
   resolveCompareErrorStyle,
   resolveCompareLoadingTextStyle,
@@ -1919,18 +1921,8 @@ export function OpinionCompass2D({ users = [], labels = [], precomputed = null }
   const toX = (v: number) => cx + r * Number(v || 0);
   const toY = (v: number) => cy - r * Number(v || 0);
   const ticks = [-1, -0.5, 0, 0.5, 1];
-
-  const seriesColors = [
-    'var(--ce-data-series-1)',
-    'var(--ce-data-series-2)',
-    'var(--ce-data-series-3)',
-    'var(--ce-data-series-4)',
-    'var(--ce-data-series-5)',
-    'var(--ce-data-series-6)',
-    'var(--ce-data-series-7)',
-    'var(--ce-data-series-8)',
-  ];
-  const colorFor = (i: number) => seriesColors[i % seriesColors.length];
+  const quadrants = buildCompareCompassQuadrants({ cx, cy, height, width });
+  const colorFor = resolveCompareCompassSeriesColor;
 
   const addrIdx = new Map((users || []).map((u, i) => [String(u?.address || '').toLowerCase(), i]));
   const pointsOrdered = precomputed.points
@@ -2014,34 +2006,13 @@ export function OpinionCompass2D({ users = [], labels = [], precomputed = null }
           >
             {/* Background quadrants */}
             <rect x="0" y="0" width={width} height={height} fill="transparent" />
-            <rect
-              x={cx}
-              y={cy}
-              width={width - cx}
-              height={height - cy}
-              fill="color-mix(in srgb, var(--ce-text-inverse) 4%, transparent)"
-            />
-            <rect
-              x={0}
-              y={cy}
-              width={cx}
-              height={height - cy}
-              fill="color-mix(in srgb, var(--ce-text-inverse) 4%, transparent)"
-            />
-            <rect
-              x={0}
-              y={0}
-              width={cx}
-              height={cy}
-              fill="color-mix(in srgb, var(--ce-text-inverse) 5%, transparent)"
-            />
-            <rect
-              x={cx}
-              y={0}
-              width={width - cx}
-              height={cy}
-              fill="color-mix(in srgb, var(--ce-text-inverse) 5%, transparent)"
-            />
+            {quadrants.map(({ intensity, ...rect }, index) => (
+              <rect
+                key={`quadrant-${index}`}
+                {...rect}
+                fill={`color-mix(in srgb, var(--ce-text-inverse) ${intensity}%, transparent)`}
+              />
+            ))}
 
             {/* Subtle grid */}
             {ticks.map((t) => (
@@ -2092,22 +2063,17 @@ export function OpinionCompass2D({ users = [], labels = [], precomputed = null }
             ))}
 
             {/* Axes */}
-            <line
-              x1={cx - r}
-              y1={cy}
-              x2={cx + r}
-              y2={cy}
-              stroke="color-mix(in srgb, var(--ce-text-inverse) 60%, transparent)"
-              strokeWidth="2"
-            />
-            <line
-              x1={cx}
-              y1={cy - r}
-              x2={cx}
-              y2={cy + r}
-              stroke="color-mix(in srgb, var(--ce-text-inverse) 60%, transparent)"
-              strokeWidth="2"
-            />
+            {[
+              { x1: cx - r, y1: cy, x2: cx + r, y2: cy },
+              { x1: cx, y1: cy - r, x2: cx, y2: cy + r },
+            ].map((line, index) => (
+              <line
+                key={`axis-${index}`}
+                {...line}
+                stroke="color-mix(in srgb, var(--ce-text-inverse) 60%, transparent)"
+                strokeWidth="2"
+              />
+            ))}
 
             {/* Axis labels (titles as tooltips) */}
             <text x={cx + r} y={cy + 30} fontSize="13" textAnchor="end" fill="var(--ce-panel-text)" opacity="0.95">

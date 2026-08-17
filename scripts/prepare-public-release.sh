@@ -249,6 +249,7 @@ while IFS= read -r path; do
 done < "$MATCHED_PATHS_FILE"
 
 scrub_public_package_json
+scrub_public_pii_text
 
 (
   cd "$STAGING_ROOT"

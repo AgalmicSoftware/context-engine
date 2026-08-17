@@ -1,4 +1,4 @@
-import { getConvictionFromResponse, getImportanceFromResponse } from './surveyToolUtils.js';
+import { getConvictionFromResponse, getImportanceFromResponse } from './surveyToolUtils';
 
 type UnknownRecord = Record<string, unknown>;
 type IndexedValue = Record<string | number, unknown>;

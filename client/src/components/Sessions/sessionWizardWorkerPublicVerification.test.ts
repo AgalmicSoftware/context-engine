@@ -69,11 +69,7 @@ describe('verifySessionWizardWorkerPublicDeployment', () => {
   it.each([
     ['slug', { slug: 'other-session' }, /prepared Worker config.*session slug/i],
     ['session ID', { sessionId: '0x00000000000000000000000000000002' }, /prepared Worker config.*session ID/i],
-    [
-      'admin address',
-      { adminAddress: '0x00000000000000000000000000000000000000bb' },
-      /prepared Worker config.*admin/i,
-    ],
+    ['admin address', { adminAddress: '0x00000000000000000000000000000000000000bb' }, /prepared Worker config.*admin/i],
     ['Worker origin', { corsWorkerUrl: 'https://other-worker.example.test' }, /prepared Worker config.*origin/i],
     ['browser origin', { allowOrigins: ['https://other-app.example.test'] }, /current browser origin/i],
     ['empty browser allowlist', { allowOrigins: [] }, /must allow the current browser origin/i],
@@ -89,27 +85,30 @@ describe('verifySessionWizardWorkerPublicDeployment', () => {
       { sessionModeProfile: {} },
       /must claim a selected non-Worker-canonical runtime profile/i,
     ],
-  ])('rejects a mismatched prepared public %s before signing or transport', async (_label, overrides, expectedError) => {
-    const fetchImpl = jest.fn();
-    const signAdminAction = jest.fn(async () => ({ address: ADMIN, signature: '0xsigned' }));
+  ])(
+    'rejects a mismatched prepared public %s before signing or transport',
+    async (_label, overrides, expectedError) => {
+      const fetchImpl = jest.fn();
+      const signAdminAction = jest.fn(async () => ({ address: ADMIN, signature: '0xsigned' }));
 
-    await expect(
-      verifySessionWizardWorkerPublicDeployment({
-        workerUrl: WORKER_URL,
-        slug: 'registry-session',
-        sessionId: SESSION_ID,
-        adminAddress: ADMIN,
-        config: buildRegistryWorkerConfig(overrides),
-        isWorkerCanonical: false,
-        signAdminAction,
-        fetchImpl,
-        browserOrigin: BROWSER_ORIGIN,
-      }),
-    ).rejects.toThrow(expectedError);
+      await expect(
+        verifySessionWizardWorkerPublicDeployment({
+          workerUrl: WORKER_URL,
+          slug: 'registry-session',
+          sessionId: SESSION_ID,
+          adminAddress: ADMIN,
+          config: buildRegistryWorkerConfig(overrides),
+          isWorkerCanonical: false,
+          signAdminAction,
+          fetchImpl,
+          browserOrigin: BROWSER_ORIGIN,
+        }),
+      ).rejects.toThrow(expectedError);
 
-    expect(signAdminAction).not.toHaveBeenCalled();
-    expect(fetchImpl).not.toHaveBeenCalled();
-  });
+      expect(signAdminAction).not.toHaveBeenCalled();
+      expect(fetchImpl).not.toHaveBeenCalled();
+    },
+  );
 
   it('fails closed when config transport returns success without signed-write acceptance', async () => {
     const fetchImpl = jest

@@ -280,12 +280,8 @@ const normalizeGroup = (
   const label = toStringValue(source.label);
   const joinMode = toStringValue(source.joinMode);
   const memberVisibility = toStringValue(source.memberVisibility);
-  const tags = Array.isArray(source.tags)
-    ? source.tags.map(toStringValue).filter(Boolean)
-    : [];
-  const documentURLs = Array.isArray(source.documentURLs)
-    ? source.documentURLs.map(toStringValue).filter(Boolean)
-    : [];
+  const tags = Array.isArray(source.tags) ? source.tags.map(toStringValue).filter(Boolean) : [];
+  const documentURLs = Array.isArray(source.documentURLs) ? source.documentURLs.map(toStringValue).filter(Boolean) : [];
   const memberLimit = Number(source.memberLimit);
   const joinEndsAt = toStringValue(source.joinEndsAt);
   const adminAddress = toStringValue(source.adminAddress);
@@ -368,23 +364,17 @@ const normalizeVisibleWorkerGroupPrincipal = (value: unknown): WorkerGroupPrinci
   const kind = toStringValue(source.kind).toLowerCase();
   if (kind === 'evm_address' || kind === 'passkey_account') {
     const address = toStringValue(source.address);
-    return /^0x[0-9a-fA-F]{40}$/.test(address)
-      ? { kind, address: address.toLowerCase() }
-      : null;
+    return /^0x[0-9a-fA-F]{40}$/.test(address) ? { kind, address: address.toLowerCase() } : null;
   }
   if (kind === 'telegram') {
     const principalId = toStringValue(source.principalId);
-    return principalId &&
-      principalId.length <= 180 &&
-      /^[A-Za-z0-9:_@./=-]+$/.test(principalId)
+    return principalId && principalId.length <= 180 && /^[A-Za-z0-9:_@./=-]+$/.test(principalId)
       ? { kind, principalId }
       : null;
   }
   if (kind === 'agent') {
     const grantId = toStringValue(source.grantId);
-    return grantId && grantId.length <= 180 && /^[A-Za-z0-9:_@./=-]+$/.test(grantId)
-      ? { kind, grantId }
-      : null;
+    return grantId && grantId.length <= 180 && /^[A-Za-z0-9:_@./=-]+$/.test(grantId) ? { kind, grantId } : null;
   }
   return null;
 };
@@ -781,47 +771,6 @@ export const reconcileEmptyWorkerGroupsAdmin = ({
     sessionId,
     sessionSlug,
     postSignedRequest,
-  });
-
-export const listWorkerGroupMembers = ({
-  groupId,
-  cursor,
-  limit,
-  sessionId,
-  sessionSlug,
-  postSignedRequest,
-}: {
-  groupId: unknown;
-  cursor?: string;
-  limit?: number;
-  sessionId: unknown;
-  sessionSlug: unknown;
-  postSignedRequest: PostSignedWorkerGroupRequest;
-}): Promise<WorkerGroupMemberPage> =>
-  runAdminAction({
-    action: 'groups/list-members',
-    body: {
-      groupId: toStringValue(groupId),
-      ...(cursor ? { cursor } : {}),
-      ...(limit == null ? {} : { limit }),
-    },
-    sessionId,
-    sessionSlug,
-    postSignedRequest,
-  }).then((payload) => {
-    const group = normalizeGroup(payload.group, sessionSlug);
-    if (!group) throw new WorkerGroupRequestError('worker_group_response_group_invalid');
-    const members = normalizeWorkerGroupMembersAdminPayload(payload, sessionSlug);
-    const nextCursorValue = payload.nextCursor;
-    if (nextCursorValue != null && (typeof nextCursorValue !== 'string' || nextCursorValue.length > 1024)) {
-      throw new WorkerGroupRequestError('worker_group_response_cursor_invalid');
-    }
-    return {
-      ...payload,
-      group,
-      members,
-      nextCursor: typeof nextCursorValue === 'string' ? nextCursorValue : '',
-    };
   });
 
 export const listWorkerGroupMembers = ({

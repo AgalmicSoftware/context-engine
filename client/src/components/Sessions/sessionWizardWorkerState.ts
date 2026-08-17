@@ -117,8 +117,13 @@ export const shouldCacheSessionWorkerConfigAfterDeploy = ({
   workerUrl,
 }: {
   deployStatusCode?: unknown;
+  deployPartial?: unknown;
   configSyncStatus?: SessionWizardConfigSyncStatus | null;
   workerUrl?: unknown;
-} = {}) =>
-  !!normalizeWorkerAuthUrl(toStr(workerUrl).trim()) &&
-  (Number(deployStatusCode || 0) === 200 || configSyncStatus?.synced === true);
+} = {}) => {
+  if (!normalizeWorkerAuthUrl(toStr(workerUrl).trim())) return false;
+  // A partial 200 proves infrastructure survival, not config authority. Cache
+  // the draft only after the signed recovery write confirms the current config.
+  if (deployPartial === true) return configSyncStatus?.synced === true;
+  return Number(deployStatusCode || 0) === 200 || configSyncStatus?.synced === true;
+};

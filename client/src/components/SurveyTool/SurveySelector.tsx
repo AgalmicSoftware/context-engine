@@ -57,7 +57,6 @@ import {
 import AudioInput from '../Shared/AudioInput/AudioInput';
 import QuestionFilter from './QuestionFilter';
 import type { QuestionFilterHandle } from './QuestionFilter';
-import PileHologramAssistant from './PileHologramAssistant';
 import QuestionTagDropdown from './QuestionTagDropdown';
 import SingleQuestionResponse from './SingleQuestionResponse';
 import { JsonButtonRow, JsonIconButton, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
@@ -70,7 +69,7 @@ import contractScripts, {
   getAllSessionSlugs,
   getSessionConfigBySlug as getStrictSessionConfigBySlug,
   getSessionSlugByName,
-} from '../../utilities/web3/contractScripts.js';
+} from '../../utilities/web3/chainGateway.js';
 import { ethers, utils } from 'ethers';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { serializeFilterState, deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
@@ -168,8 +167,6 @@ import {
   EMPTY_QUESTION_POOL,
   DEBUG_PREFILL,
   GATE_SBT_HYDRATION_RETRY_MS,
-  QUESTION_TAG_DROPDOWN_ROW_STYLE,
-  SHOW_PILE_HOLOGRAM_TOGGLE,
   appendExplicitSessionHintToPath,
   applyExistingGroupPrefix,
   areEnvelopesEquivalent,
@@ -266,7 +263,7 @@ import {
   writeQuestionsCache,
   writeSurveysCache,
   bumpSurveyPerfCounter,
-} from './surveyToolUtils.js';
+} from './surveyToolUtils';
 import {
   appendMissingAuthoritativePoolQuestions,
   filterQuestionsByAuthoritativePool,
@@ -889,60 +886,6 @@ export class SurveySelector extends Component<any, any> {
     if (!this.state.loading) {
       this.setState(buildSurveySelectorLoadingPatch(true));
     }
-  };
-
-  async fetchSurveys() {
-    const requestEpoch = Number(this._surveySelectorFetchEpoch || 0) + 1;
-    this._surveySelectorFetchEpoch = requestEpoch;
-    if (!this.state.loading) {
-      this.setState(buildSurveySelectorLoadingPatch(true));
-    }
-
-    // 1. Resolve Context
-    const slug = resolveEffectiveSlug(this.props);
-    const surveyReadContext = resolveSurveyReadContext(this.props, slug);
-    const effectiveSlug = surveyReadContext.sessionSlug || slug;
-    const netIdStr = surveyReadContext.networkIdStr;
-
-    if (!netIdStr) {
-      if (requestEpoch !== this._surveySelectorFetchEpoch) return;
-      surveyLog.error('SurveySelector: Network ID is undefined in fetchSurveys.');
-      this.setState(buildSurveySelectorEmptySurveyListPatch());
-      return;
-    }
-
-    // 2. Read Caches (Pure Read - No Fetching)
-    let surveysCache = ensureSurveysNet(await readSurveysCacheAsync(effectiveSlug), netIdStr);
-    // Read path only: avoid write-on-read feedback loops via questionsCacheNonce.
-    if (requestEpoch !== this._surveySelectorFetchEpoch) return;
-
-    const surveyBag = surveysCache?.[netIdStr]?.surveys || {};
-
-    // 3. Build List from Cache
-    const userSubmittedSurveys = buildSurveySelectorSubmittedSurveyList(surveyBag);
-
-    // 4. Handle Cache Warmup State (Prevent flashing empty during transient re-fetches)
-    // Keep previous list when re-fetch produces empty AND context (slug+network) hasn't changed.
-    // This prevents unmounting SurveyQuestions during login-triggered cache re-reads.
-    const shouldKeepExisting =
-      userSubmittedSurveys.length === 0 &&
-      this.state.surveys &&
-      this.state.surveys.length > 0 &&
-      this._lastFetchSurveysSlug === effectiveSlug &&
-      this._lastFetchSurveysNetId === netIdStr;
-
-    if (shouldKeepExisting) {
-      if (requestEpoch !== this._surveySelectorFetchEpoch) return;
-      this.setState(buildSurveySelectorLoadingPatch(false), this.updateSelectedSurvey);
-      return;
-    }
-
-    if (requestEpoch !== this._surveySelectorFetchEpoch) return;
-    // Track context unconditionally so session/network switches always clear stale data.
-    this._lastFetchSurveysSlug = effectiveSlug;
-    this._lastFetchSurveysNetId = netIdStr;
-    this.setState(buildSurveySelectorLoadedSurveysPatch(userSubmittedSurveys), this.updateSelectedSurvey);
-  }
 
     // 1. Resolve Context
     const slug = resolveEffectiveSlug(this.props);
@@ -1661,6 +1604,8 @@ export class SurveySelector extends Component<any, any> {
               questionScanProgress={this.props.questionScanProgress}
               hideEmbeddedDebugUi={this.props.hideEmbeddedDebugUi}
               sessionSlug={this.props.sessionSlug}
+              sessionConfig={sessionConfig}
+              networkChainId={this.props.networkChainId}
             />
           </React.Suspense>
         )}

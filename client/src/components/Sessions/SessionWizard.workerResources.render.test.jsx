@@ -91,6 +91,7 @@ describe('SessionWizard worker resource rendering', () => {
     renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    await selectTrustlessPublicPreset();
     expect(screen.queryByText('Session Storage')).not.toBeInTheDocument();
 
     enableAdvancedMode();
@@ -112,32 +113,22 @@ describe('SessionWizard worker resource rendering', () => {
     expect(screen.queryByRole('radio', { name: 'Lit encrypted' })).not.toBeInTheDocument();
   });
 
-  it('shows Lit-encrypted Cloudflare copy while keeping Arweave credentials in worker resources', async () => {
+  it('shows only AI, RPC, and Lit resources when Cloudflare Lit encryption is explicitly selected', async () => {
     renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    await selectCloudflareLitProfile();
     enableAdvancedMode();
-    fireEvent.click(screen.getByRole('button', { name: 'Session Storage expand' }));
-
-    fireEvent.click(screen.getByRole('radio', { name: 'Cloudflare' }));
-    fireEvent.click(screen.getByRole('radio', { name: 'Lit encrypted' }));
-
-    await waitFor(() => {
-      expect(screen.getByRole('radio', { name: 'Lit encrypted' })).toHaveAttribute('aria-checked', 'true');
-    });
-    expect(
-      screen.getByText(/Lit-encrypted mode is configured for encrypted Cloudflare payload envelopes/i),
-    ).toBeInTheDocument();
-
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
 
-    const arweaveCard = await waitFor(() => {
-      const card = getWizardResourceCard('arweave');
-      expect(card).toBeTruthy();
-      return card;
+    await waitFor(() => {
+      expect(screen.getAllByTestId(E2E_TESTIDS.WIZARD_RESOURCE_CARD)).toHaveLength(3);
     });
-    expect(within(arweaveCard).getByText('Arweave JWK *')).toBeInTheDocument();
-    expect(within(arweaveCard).getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK)).toBeInTheDocument();
+    expect(getWizardResourceCard('ai')).toBeTruthy();
+    expect(getWizardResourceCard('rpc')).toBeTruthy();
+    expect(getWizardResourceCard('lit')).toBeTruthy();
+    expect(getWizardResourceCard('arweave')).toBeUndefined();
+    expect(getWizardResourceCard('txGas')).toBeUndefined();
   });
 
   it('blocks publishing worker resources with unrepresentable All gate groups', async () => {
@@ -302,6 +293,7 @@ describe('SessionWizard worker resource rendering', () => {
   it('renders only the Chipotle Lit API key in the normal-mode worker secret view', async () => {
     renderSessionWizard();
 
+    await selectDecentralizedLitProfile();
     selectNormalModeCard('Worker');
     const litCard = (await screen.findByText('LIT')).closest(`[data-testid="${E2E_TESTIDS.WIZARD_RESOURCE_CARD}"]`);
 
@@ -319,6 +311,7 @@ describe('SessionWizard worker resource rendering', () => {
     const litProtocol = require('../../utilities/crypto/litProtocol.js');
     litProtocol.createLitHooks.mockClear();
     renderSessionWizard();
+    await selectDecentralizedLitProfile();
     selectNormalModeCard('Worker');
 
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_ACCOUNT_API_KEY), {
@@ -349,6 +342,7 @@ describe('SessionWizard worker resource rendering', () => {
     renderSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    await selectDecentralizedLitProfile();
     selectNormalModeCard('Worker');
     expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_ACCOUNT_API_KEY)).toBeInTheDocument();
 
@@ -362,6 +356,7 @@ describe('SessionWizard worker resource rendering', () => {
     jest.useFakeTimers();
     try {
       renderSessionWizard();
+      await selectDecentralizedLitProfile();
       selectNormalModeCard('Worker');
 
       const trigger = await screen.findByTestId('ce-wizard-resource-tooltip-lit');
@@ -386,10 +381,11 @@ describe('SessionWizard worker resource rendering', () => {
     jest.useFakeTimers();
     try {
       renderSessionWizard();
+      await selectDecentralizedLitProfile();
       selectNormalModeCard('Worker');
 
       const tooltipCases = [
-        ['ai', 'Session-funded OpenAI key used for text generation and transcription.'],
+        ['ai', 'Session-funded provider key used by the selected AI models.'],
         ['rpc', 'Authenticated RPC endpoint used by the worker for chain reads and related operations.'],
         ['arweave', 'Account used to pay for Arweave uploads and storage.'],
         ['txGas', 'Faucet signer used to send small testnet funding grants.'],
@@ -504,6 +500,7 @@ describe('SessionWizard worker resource rendering', () => {
     );
 
     renderSessionWizard();
+    await selectDecentralizedLitProfile();
     selectNormalModeCard('Worker');
 
     expect(screen.getByText('LIT')).toBeInTheDocument();

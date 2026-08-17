@@ -7,7 +7,8 @@ import {
 import { createMemoryWalletStorage } from './keystore/storage.js';
 import { assertSoftSessionAllowed, createSoftSessionPolicy } from './session/sessionPolicy.js';
 import type { PasskeyCredentialClient, PasskeyWalletConfig } from './types.js';
-import type { SoftSessionClient } from './session/sessionWorkerClient.js';
+import { createInMemorySoftSessionClient, type SoftSessionClient } from './session/sessionWorkerClient.js';
+import { bufferToBase64URL } from './passkey/encoding.js';
 
 const PRIVATE_KEY = '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5' as const;
 const ADDRESS = new ethers.Wallet(PRIVATE_KEY).address as `0x${string}`;
@@ -276,9 +277,9 @@ describe('PasskeyEoaWalletClient', () => {
     });
 
     await expect(returning.unlockWallet()).resolves.toBe(createdAddress);
-    const request = (returningCredentials.get as jest.Mock).mock.calls[0][0];
-    expect(request.publicKey.allowCredentials).toHaveLength(1);
-    expect(bufferToBase64URL(request.publicKey.allowCredentials[0].id)).toBe(stored?.credentialId);
+    const request = (returningCredentials.get as jest.Mock).mock.calls[0][0] as CredentialRequestOptions;
+    expect(request.publicKey?.allowCredentials).toHaveLength(1);
+    expect(bufferToBase64URL(request.publicKey?.allowCredentials?.[0].id as ArrayBuffer)).toBe(stored?.credentialId);
   });
 
   it('invites the platform passkey chooser during explicit login and adopts the selected wallet', async () => {

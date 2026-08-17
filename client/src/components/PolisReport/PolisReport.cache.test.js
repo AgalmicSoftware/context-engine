@@ -17,7 +17,9 @@ import PolisReport, {
   POLIS_CLUSTER_COLORS,
   REPORT_DEFAULT_EMBEDDING_LABEL,
   REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT,
+  resolveExploratoryClusterCount,
   resolveJsPdfConstructor,
+  resolvePrecomputedClusterDifference,
   shouldAutoEnablePolisDemoData,
 } from './PolisReport';
 import { d3Report } from './polisReportRuntime';
@@ -1195,9 +1197,11 @@ describe('PolisReport demo data defaults', () => {
         short: expect.stringMatching(/Safety-minded institutionalists/i),
       }),
     );
-    expect(Object.values(precomputedState.repQuestions).flat().every((question) => question.difference === null)).toBe(
-      true,
-    );
+    expect(
+      Object.values(precomputedState.repQuestions)
+        .flat()
+        .every((question) => question.difference === null),
+    ).toBe(true);
   });
 
   it('labels missing demo representative differences as unavailable', async () => {

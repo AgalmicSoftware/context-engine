@@ -75,7 +75,6 @@ import { normalizeArweaveUrl, parseArweaveTxId } from '../arweave/arweaveUrls.js
 import { createArweaveDownloadOps } from '../arweave/arweaveDownload.js';
 import { buildArweaveUploadTags, resolveArweaveUploadOpts } from '../arweave/arweaveUploadHelpers.js';
 import { validateNoLockedPlaintextInPayload } from '../arweave/noLeakPayloads.js';
-import { getGlobalLitHooks } from '../crypto/litProtocol.js';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
 import { normalizeAddress } from './addressNormalization.js';
@@ -104,6 +103,7 @@ import {
   memoizedResolveSession,
   setTimedMemoValue,
 } from '../cache/contractScriptsCache.js';
+import { resolveWeb3ContextCacheEntry } from '../cache/web3ContextCache.js';
 import { isCallExceptionError, logArweaveMetadataFetchFailure } from '../arweave/arweaveMetadataFailureLog.js';
 import {
   buildHashUnavailableMetadataError,
@@ -307,127 +307,7 @@ const RPC_STATS_MAX = 200;
 /* ------------------------------------------------------------------ */
 
 const MAX_CACHE_SIZE = 500;
-/** @type {Map<string, any>} */
-const _encryptedValueCache = new Map();
-/** @type {Set<string>} */
-const _decryptFailureLogCache = new Set();
-
-const toLower = (val: any) => toStr(val).trim().toLowerCase();
-const isObj = (val: any) => !!val && typeof val === 'object' && !Array.isArray(val);
-
-const getLitGetKey = (ctx: any = {}) => {
-  if (ctx?.litOpts && typeof ctx.litOpts.getKey === 'function') return ctx.litOpts.getKey;
-  if (ctx?.litHooks && typeof ctx.litHooks.getKey === 'function') return ctx.litHooks.getKey;
-  if (ctx?.lit && typeof ctx.lit.getKey === 'function') return ctx.lit.getKey;
-  return null;
-};
-
-const buildDecryptContextTag = (ctx: any = {}) => {
-  const account = normalizeAddress(ctx?.account || '');
-  const providerLike = toLower(ctx?.providerLike || '');
-  const chainId = Number(ctx?.chainId || 0) || 0;
-  const hasLitGetKey = !!getLitGetKey(ctx);
-  const preferLitRecipients = ctx?.preferLitRecipients ? '1' : '0';
-  return `${account}|${providerLike}|${chainId}|lit:${hasLitGetKey ? '1' : '0'}|litFirst:${preferLitRecipients}`;
-};
-
-const resolveDefaultProviderLike = () => {
-  try {
-    const state = store?.getState ? store.getState() : null;
-    const fromStore = toStr(state?.profile?.provider || '').trim();
-    if (fromStore) return fromStore;
-  } catch (err: any) {
-    contractsLog.debug('resolveDefaultProviderLike error:', err);
-  }
-  if (typeof window !== 'undefined') {
-    if (window.__passkeyEoaProvider && window.__passkeyEoaProvider.isPasskeyEoa) return 'passkey_eoa';
-    if (window.ethereum) return 'wagmi';
-    if (window.web3authProvider) return 'web3auth';
-  }
-  // Default to the embedded passkey EOA because passkey auth is the primary wallet path.
-  return 'passkey_eoa';
-};
-
-const classifyDecryptFailure = (err: any, ctx: any = {}) => {
-  const msg = toLower(err?.message || err?.reason || '');
-  if (!ctx?.chainId) return 'missing-chain';
-  if (!ctx?.providerLike) return 'missing-provider';
-  if (!ctx?.account) return 'missing-account';
-  if (!getLitGetKey(ctx)) return 'missing-lit-hooks';
-  if (
-    msg.includes('access control') ||
-    msg.includes('unable to unwrap cek') ||
-    msg.includes('not authorized') ||
-    msg.includes('unauthorized') ||
-    msg.includes('auth sig')
-  ) {
-    return 'acc-failed';
-  }
-  if (
-    msg.includes('wrong chain') ||
-    msg.includes('wrong network') ||
-    msg.includes('chain mismatch')
-  ) {
-    return 'wrong-chain';
-  }
-  return 'decrypt-failed';
-};
-
-const getDecryptFailureMessage = (reason: any) => {
-  switch (reason) {
-    case 'missing-chain':
-      return 'Missing chainId for decrypt context.';
-    case 'missing-provider':
-      return 'Missing provider for decrypt context.';
-    case 'missing-account':
-      return 'Missing account for decrypt context.';
-    case 'missing-lit-hooks':
-      return 'Missing Lit hooks for decrypt context.';
-    case 'acc-failed':
-      return 'Lit access control check failed.';
-    case 'wrong-chain':
-      return 'Decrypt attempted on the wrong network.';
-    case 'decrypt-failed':
-      return 'Encrypted payload failed integrity checks.';
-    default:
-      return 'Unknown decrypt failure.';
-  }
-};
-
-const buildDecryptFailureResult = (reason: any, err: any = null) => {
-  let type = 'unknown';
-  let retryable = false;
-  switch (reason) {
-    case 'missing-chain':
-    case 'missing-provider':
-    case 'missing-account':
-    case 'missing-lit-hooks':
-      type = 'key_unavailable';
-      retryable = true;
-      break;
-    case 'acc-failed':
-      type = 'lit_failure';
-      break;
-    case 'wrong-chain':
-      type = 'network';
-      retryable = true;
-      break;
-    case 'decrypt-failed':
-      type = 'aes_integrity';
-      break;
-    default:
-      type = 'unknown';
-      break;
-  }
-  return {
-    value: null,
-    error: {
-      type,
-      message: err?.message || err?.reason || getDecryptFailureMessage(reason),
-      retryable,
-    },
-  };
-};
+const isObj = (val: unknown): val is Record<string, unknown> => !!val && typeof val === 'object' && !Array.isArray(val);
 
 const isRetryableSurveyResponseReadError = (error: any) => {
   if (!error) return false;
@@ -497,55 +377,6 @@ const isRetryableSurveyResponseReadError = (error: any) => {
     message.includes('server error') ||
     message.includes('temporarily unavailable')
   );
-};
-
-const WEB3_CONTEXT_CACHE = new Map();
-let web3ContextCacheClearQueued = false;
-
-const scheduleWeb3ContextCacheClear = () => {
-  if (web3ContextCacheClearQueued) return;
-  web3ContextCacheClearQueued = true;
-  const clearCache = () => {
-    WEB3_CONTEXT_CACHE.clear();
-    web3ContextCacheClearQueued = false;
-  };
-  try {
-    Promise.resolve().then(clearCache);
-  } catch {
-    setTimeout(clearCache, 100);
-  }
-};
-
-const normalizeWeb3ContextCacheValue = (value: any, seen: any = new WeakSet()): any => {
-  if (value === undefined) return '__undefined__';
-  if (value === null) return null;
-  if (typeof value === 'symbol') return value.toString();
-  if (typeof value === 'function') return `__fn:${value.name || 'anonymous'}__`;
-  if (typeof value !== 'object') return value;
-  if (seen.has(value)) return '__circular__';
-  seen.add(value);
-  if (Array.isArray(value)) {
-    return value.map((item: any) => normalizeWeb3ContextCacheValue(item, seen));
-  }
-  const out: any = {};
-  Object.keys(value)
-    .sort()
-    .forEach((key: any) => {
-      out[key] = normalizeWeb3ContextCacheValue(value[key], seen);
-    });
-  return out;
-};
-
-const serializeWeb3ContextCacheKey = (groupKeyOrCfg: any) => {
-  try {
-    return JSON.stringify(normalizeWeb3ContextCacheValue(groupKeyOrCfg));
-  } catch {
-    try {
-      return String(groupKeyOrCfg);
-    } catch {
-      return '__unserializable__';
-    }
-  }
 };
 
 export function getWeb3Context(groupKeyOrCfg: any) {
@@ -821,10 +652,10 @@ const resolveStorageBackendForResource = (cfg: any, resource: any, opts: any = {
 const isCloudflareStorageResource = (cfg: any, resource: any, opts: any = {}) =>
   resolveStorageBackendForResource(cfg, resource, opts) === STORAGE_BACKENDS.CLOUDFLARE;
 
-const payloadPointerIdToBytes32 = (id, label = 'storage pointer') => {
+const payloadPointerIdToBytes32 = (id: any, label: any = 'storage pointer') => {
   const pointerId = toStr(id).trim();
   if (!pointerId) throw new Error(`${label}: missing storage pointer id.`);
-  const hex = arweaveScripts.base64urlToHex(pointerId);
+  const hex = arweaveClient.base64urlToHex(pointerId);
   if (!/^0x[0-9a-fA-F]{64}$/.test(toStr(hex))) {
     throw new Error(`${label}: storage pointer id is not bytes32-compatible (hex length ${toStr(hex).length}).`);
   }
@@ -839,7 +670,7 @@ const uploadJsonPayloadForContractPointer = async ({
   arweaveUploadOpts,
   uploadWithRetry = false,
   storageContext = {},
-}) => {
+}: any) => {
   const payloadString = JSON.stringify(payload);
   if (isCloudflareStorageResource(cfg, resource)) {
     const sessionSlug = resolveStorageSessionSlug(groupKeyOrCfg, cfg);
@@ -870,7 +701,7 @@ const uploadJsonPayloadForContractPointer = async ({
   }
   const txId = uploadWithRetry
     ? await uploadDataToArweaveWithRetry(payloadString, 'json', arweaveUploadOpts)
-    : await arweaveScripts.uploadDataToArweave(payloadString, 'json', arweaveUploadOpts);
+    : await arweaveClient.uploadDataToArweave(payloadString, 'json', arweaveUploadOpts);
   return {
     pointerId: txId,
     pointerBytes: payloadPointerIdToBytes32(txId, `${resource} Arweave upload`),
@@ -906,7 +737,7 @@ const readPayloadPointerTextForGroup = async ({ pointerId, resource, groupKeyOrC
   if (isCloudflareStorageResource(cfg, resource)) {
     try {
       return await readCloudflarePointerTextForGroup({ pointerId, resource, groupKeyOrCfg, cfg });
-    } catch (cloudflareError) {
+    } catch (cloudflareError: any) {
       contractsLog.warn(`Cloudflare ${resource} payload read failed; trying legacy Arweave fallback.`, cloudflareError);
       if (!ARWEAVE_ACTIVE) throw cloudflareError;
     }
@@ -932,7 +763,7 @@ const attachPayloadPointerFields = (payload: any, pointerId: any, resource: any,
     { resource },
   );
 
-const recordInFlightStat = (kind = 'miss') => {
+const recordInFlightStat = (kind: any = 'miss') => {
   try {
     if (typeof window === 'undefined') return;
     const stats = window.__RPC_STATS__ || { counts: {}, recent: [] };
@@ -1024,7 +855,7 @@ const profileChainReadDeps: any = {
   latestBlockCache,
 };
 
-const contractEventScanMethods = createContractScriptsEventScanMethods({
+const contractEventScanMethods = createChainEventScanMethods({
   ethers,
   SURVEYS,
   SURVEYS_INTERFACE,
@@ -1056,7 +887,7 @@ const contractScriptsRuntimeDeps = {
   STORAGE_RESOURCE_KEYS,
   SURVEYS,
   SURVEYS_INTERFACE,
-  arweaveScripts,
+  arweaveClient,
   attachStorageRefCompatibilityFields,
   attachPayloadPointerFields,
   buildArweaveDebugContext,
@@ -1118,6 +949,7 @@ const contractScriptsRuntimeDeps = {
   resolveReadContext,
   resolveReadProvider,
   resolveArweaveUploadOpts,
+  refreshSessionRegistryFieldsCache: sessionRegistryUtils.refreshSessionRegistryFieldsCache,
   resolveSession,
   resolveSessionByName,
   resolveSessionNameValue,
@@ -1172,8 +1004,6 @@ async function resolveGroupPasswordWalletScopeSbtAddress({
 /* ------------------------------------------------------------------ */
 
 const contractScripts: any = {
-  _blockCache: {}, // For the memoized getBlockWithCaching
-
   // Expose embedded passkey wallet auth for UI.
   createPasskeyWallet: passkeyWallet.createPasskeyWallet,
 
@@ -1188,7 +1018,7 @@ const contractScripts: any = {
   ...createContractScriptsSbtRegistryMethods(contractScriptsRuntimeDeps),
   ...createContractScriptsSurveyPayloadReadMethods(contractScriptsRuntimeDeps),
   ...createContractScriptsSbtMintMethods(contractScriptsRuntimeDeps),
-  ...createProfileChainReadMethods(contractProfileDeps),
+  ...createProfileChainReadMethods(profileChainReadDeps),
 
   // SBT Functionality Ends -----------------------------
 
@@ -1199,8 +1029,9 @@ const contractScripts: any = {
       injectedProvider: win.ethereum,
       web3AuthProvider: win.web3authProvider,
       passkeyProviderFactory: () => passkeyWallet.createPasskeyEip1193Provider(),
-      // Compatibility wrapper: preserve the old unknown-provider injected fallback
-      // until call sites explicitly opt into stricter signer-provider resolution.
+      // Legacy empty provider state can still use an injected wallet. Named
+      // providers must resolve explicitly so passkey flows cannot silently
+      // degrade to a different signer.
       allowInjectedSignerFallback: true,
     });
     if (resolved.ok) return resolved.provider;

@@ -93,6 +93,14 @@
           ]
         },
         {
+          "label": "Verify release version surfaces",
+          "command": "npm",
+          "args": [
+            "run",
+            "verify:release-version"
+          ]
+        },
+        {
           "label": "Verify public release surface",
           "command": "npm",
           "args": [
@@ -243,6 +251,14 @@
     "cecc-and-node": {
       "commands": [
         {
+          "label": "Run tracked root Node tests",
+          "command": "npm",
+          "args": [
+            "run",
+            "test:node:tracked"
+          ]
+        },
+        {
           "label": "Run managed-cache guard",
           "command": "npm",
           "args": [
@@ -292,6 +308,14 @@
           "args": [
             "run",
             "verify:release-version"
+          ]
+        },
+        {
+          "label": "Run tracked Node release tests",
+          "command": "npm",
+          "args": [
+            "run",
+            "test:node:tracked"
           ]
         },
         {

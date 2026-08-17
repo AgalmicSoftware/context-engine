@@ -20,8 +20,10 @@ import { WORKER_SECRET_CACHE_SAFE_FIELDS } from './sessionWizardWorkerSecretSupp
 import { sanitizeSessionWizardDraftForBrowserCache } from './sessionWizardBrowserCacheSanitization';
 import { normalizeSessionAppearance } from '../../utilities/ui/sessionColorSchemes';
 import {
+  classifySessionModeProfileSupport,
   compileSessionModeProfile,
   hasLegacyTelegramFirstSessionFlags,
+  mergeSessionModeProfileStorageAccess,
   profileFromLegacyConfig,
   type SessionModeProfile,
 } from '../../utilities/session/sessionModeProfile';
@@ -50,6 +52,16 @@ const hasCachedStorageProfile = (draft: AnyRecord | null): boolean =>
       (draft.sessionStorageProfile && typeof draft.sessionStorageProfile === 'object') ||
       (draft.storage && typeof draft.storage === 'object'))
   );
+const getCachedStorageProfileOverride = (draft: AnyRecord | null): AnyRecord | null => {
+  if (!draft || draft.storageProfile) return null;
+  if (draft.sessionStorageProfile && typeof draft.sessionStorageProfile === 'object') {
+    return draft.sessionStorageProfile as AnyRecord;
+  }
+  if (draft.storage && typeof draft.storage === 'object') {
+    return draft.storage as AnyRecord;
+  }
+  return null;
+};
 const getCachedStorageProfilePayloadAccessMode = (draft: AnyRecord): string => {
   const storageProfile =
     draft.storageProfile && typeof draft.storageProfile === 'object' ? (draft.storageProfile as AnyRecord) : {};
@@ -166,9 +178,7 @@ export const normalizeSessionWizardDraftShape = (draftIn: AnyRecord = {}): AnyRe
   const resolvedAutoFeature = resolveSessionWizardAutoFeatureBySessionSlug(draft);
   draft.sessionEndsAt = toStr(draft.sessionEndsAt).trim();
   draft.defaultGroupTags =
-    typeof draft.defaultGroupTags === 'string'
-      ? draft.defaultGroupTags.trim()
-      : DEFAULT_NEW_SESSION_SBT_TAGS;
+    typeof draft.defaultGroupTags === 'string' ? draft.defaultGroupTags.trim() : DEFAULT_NEW_SESSION_SBT_TAGS;
   delete draft.autoFeatureSBTsWithFeaturedSbtTags;
   if (typeof resolvedAutoFeature !== 'boolean') {
     draft.autoFeatureSBTsBySessionSlug = true;
@@ -183,8 +193,13 @@ export const normalizeSessionWizardDraftShape = (draftIn: AnyRecord = {}): AnyRe
       draft.sessionModeProfile as SessionModeProfile,
       draft.storageProfile,
     );
-    const compiled = compileSessionModeProfile(draft.sessionModeProfile as SessionModeProfile);
-    draft.storageProfile = normalizeSessionStorageProfileConfig(compiled.storageProfile);
+    const support = classifySessionModeProfileSupport(draft.sessionModeProfile);
+    draft.storageProfile =
+      support.status === 'reachable'
+        ? normalizeSessionStorageProfileConfig(
+            compileSessionModeProfile(draft.sessionModeProfile as SessionModeProfile).storageProfile,
+          )
+        : normalizeSessionStorageProfileConfig(draft.storageProfile);
   } else {
     draft.storageProfile = normalizeSessionStorageProfileConfig(
       draft.storageProfile || draft.sessionStorageProfile || draft.storage,
@@ -291,15 +306,21 @@ export const buildSessionWizardInitialDraftFromCache = ({
     base.embeddedDeployHelperEnabled = sourceEmbeddedDeployHelperDefault;
   }
   const merged = cachedDraft ? mergeSessionWizardDraftDeep(base, cachedDraft) : base;
+  const cachedStorageProfileOverride = getCachedStorageProfileOverride(cachedDraft);
+  if (cachedStorageProfileOverride) {
+    merged.storageProfile = cachedStorageProfileOverride;
+  }
   const shouldBuildCachedStorageModeProfile =
     cachedDraft && !merged.sessionModeProfile && hasCachedStorageProfile(cachedDraft);
   const normalized = normalizeSessionWizardDraftShape(merged);
   if (shouldBuildCachedStorageModeProfile && !normalized.sessionModeProfile) {
     normalized.sessionModeProfile = buildCachedDraftSessionModeProfile(normalized);
-    const compiled = compileSessionModeProfile(normalized.sessionModeProfile as SessionModeProfile);
-    normalized.storageProfile = normalizeSessionStorageProfileConfig(compiled.storageProfile);
+    const support = classifySessionModeProfileSupport(normalized.sessionModeProfile);
+    if (support.status === 'reachable') {
+      const compiled = compileSessionModeProfile(normalized.sessionModeProfile as SessionModeProfile);
+      normalized.storageProfile = normalizeSessionStorageProfileConfig(compiled.storageProfile);
+    }
   }
-  const normalized = normalizeSessionWizardDraftShape(merged);
   if (normalModeSharedHostedWorkerEnabled === false && !cachedWizard?.deployComplete) {
     normalized.corsWorkerUrl = '';
   }
@@ -311,11 +332,15 @@ export const applySessionWizardRegistryChainDraftDefaults = ({
   chainId = 0,
   contractDefaults = {},
   pathRpc = '',
+  includeContracts = true,
+  includeFaucet = true,
 }: {
   draft?: AnyRecord | null;
   chainId?: unknown;
   contractDefaults?: AnyRecord | null;
   pathRpc?: unknown;
+  includeContracts?: boolean;
+  includeFaucet?: boolean;
 } = {}): AnyRecord => {
   const resolvedChainId = Number(chainId || 0) || 0;
   const next = deepClone(draft && typeof draft === 'object' ? draft : {}) as AnyRecord;
@@ -325,19 +350,54 @@ export const applySessionWizardRegistryChainDraftDefaults = ({
     next.networkChainId = resolvedChainId;
   }
 
-  const defaults = contractDefaults && typeof contractDefaults === 'object' ? contractDefaults : {};
-  const contracts = next.contracts && typeof next.contracts === 'object' ? (next.contracts as AnyRecord) : {};
-  next.contracts = contracts;
-  const keys = new Set([...Object.keys(contracts || {}), ...Object.keys(defaults || {})]);
-  keys.forEach((key) => {
-    const entry = contracts[key] && typeof contracts[key] === 'object' ? (contracts[key] as AnyRecord) : {};
-    const fallback = toStr(defaults[key] || '').trim();
-    if (fallback) {
-      entry.address = fallback;
+  if (
+    next.sessionModeProfile &&
+    typeof next.sessionModeProfile === 'object' &&
+    !Array.isArray(next.sessionModeProfile)
+  ) {
+    const support = classifySessionModeProfileSupport(next.sessionModeProfile);
+    if (support.status === 'reachable') {
+      const profile = next.sessionModeProfile as SessionModeProfile;
+      const accessDocuments = [
+        profile.encryption.accessConditions,
+        profile.storage.payloadAccessControl?.accessConditions,
+      ];
+      const hasSbtCondition = accessDocuments.some(
+        (document) =>
+          Array.isArray(document?.conditions) &&
+          document.conditions.some((condition) => condition.kind === 'sbt_onchain'),
+      );
+      const chainRelevant =
+        profile.authority.mode === 'evm_registry_canonical' || profile.encryption.mode === 'lit' || hasSbtCondition;
+      if (chainRelevant) {
+        if (profile.evm.registryChainId !== resolvedChainId) {
+          profile.evm.registryChainId = resolvedChainId;
+          profile.preset = 'custom';
+        }
+        accessDocuments.forEach((document) => {
+          document?.conditions.forEach((condition) => {
+            if (condition.kind === 'sbt_onchain') condition.chainId = resolvedChainId;
+          });
+        });
+      }
     }
-    entry.chainId = resolvedChainId;
-    contracts[key] = entry;
-  });
+  }
+
+  if (includeContracts) {
+    const defaults = contractDefaults && typeof contractDefaults === 'object' ? contractDefaults : {};
+    const contracts = next.contracts && typeof next.contracts === 'object' ? (next.contracts as AnyRecord) : {};
+    next.contracts = contracts;
+    const keys = new Set([...Object.keys(contracts || {}), ...Object.keys(defaults || {})]);
+    keys.forEach((key) => {
+      const entry = contracts[key] && typeof contracts[key] === 'object' ? (contracts[key] as AnyRecord) : {};
+      const fallback = toStr(defaults[key] || '').trim();
+      if (fallback) {
+        entry.address = fallback;
+      }
+      entry.chainId = resolvedChainId;
+      contracts[key] = entry;
+    });
+  }
 
   const resolvedPathRpc = toStr(pathRpc).trim();
   if (resolvedPathRpc) {
@@ -355,10 +415,12 @@ export const applySessionWizardRegistryChainDraftDefaults = ({
       pathProvider.rpcUrl = resolvedPathRpc;
     }
 
-    const faucet = next.faucet && typeof next.faucet === 'object' ? (next.faucet as AnyRecord) : {};
-    next.faucet = faucet;
-    if (!toStr(faucet.rpcUrl).trim()) {
-      faucet.rpcUrl = resolvedPathRpc;
+    if (includeFaucet) {
+      const faucet = next.faucet && typeof next.faucet === 'object' ? (next.faucet as AnyRecord) : {};
+      next.faucet = faucet;
+      if (!toStr(faucet.rpcUrl).trim()) {
+        faucet.rpcUrl = resolvedPathRpc;
+      }
     }
   }
 
@@ -385,6 +447,7 @@ export const buildSessionWizardCacheWritePayload = ({
   deployForm = {},
   deployComplete = false,
   deployWorkerUrl = '',
+  workerRequirementProof = null,
   provisionedSponsoredContext = null,
 }: AnyRecord = {}): AnyRecord => {
   const workerSecretsRecord =
@@ -401,7 +464,6 @@ export const buildSessionWizardCacheWritePayload = ({
   const durableDeployForm = {
     workerName: toStr(deployFormRecord.workerName || '').trim(),
     adminAddress: toStr(deployFormRecord.adminAddress || '').trim() || undefined,
-    accountId: toStr(deployFormRecord.accountId || '').trim(),
     bundleUrl: toStr(deployFormRecord.bundleUrl || '').trim(),
   };
 
@@ -427,7 +489,9 @@ export const buildSessionWizardCacheWritePayload = ({
     persistWorkerSecrets: false,
     workerSecrets: publicWorkerConfig,
     deployForm: durableDeployForm,
-    deployComplete,
+    // Remote requirement evidence is intentionally live-memory only. A reload
+    // must replay the stable deployment request and reverify the same worker.
+    deployComplete: workerRequirementProof ? false : deployComplete,
     deployWorkerUrl,
     provisionedSponsoredContext,
   };

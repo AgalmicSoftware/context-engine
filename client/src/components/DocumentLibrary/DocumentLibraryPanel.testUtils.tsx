@@ -65,12 +65,13 @@ jest.mock('../../utilities/crypto/litProtocol.js', () => ({
   resolveLitChain: jest.fn(() => 'ethereum'),
 }));
 
-jest.mock('../../utilities/arweave/arweaveScripts.js', () => ({
-  arweaveScripts: {
+jest.mock('../../utilities/arweave/arweaveClient.js', () => {
+  const arweaveClient = {
     buildArweaveGatewayUrl: (txId: string, gateway = 'https://arweave.example.test') => `${gateway}/${txId}`,
     downloadDataFromArweave: jest.fn(),
-  },
-}));
+  };
+  return { arweaveClient };
+});
 
 jest.mock('../../utilities/docLibrary/uploads.js', () => ({
   resolveDocUploadsGate: (...args: any[]) => mockResolveDocUploadsGate(...args),
@@ -79,7 +80,10 @@ jest.mock('../../utilities/docLibrary/uploads.js', () => ({
 }));
 
 jest.mock('../../utilities/storage/storageClient.js', () => ({
-  listSessionStorageRefs: (...args: any[]) => mockListSessionStorageRefs(...args),
+  listSessionStorageRefsPage: async (...args: any[]) => {
+    const result = await mockListSessionStorageRefs(...args);
+    return Array.isArray(result) ? { items: result, cursor: null, listComplete: true } : result;
+  },
   readSessionStorageBlob: (...args: any[]) => mockReadSessionStorageBlob(...args),
 }));
 

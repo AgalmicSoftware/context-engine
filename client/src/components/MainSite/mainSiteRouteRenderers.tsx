@@ -1,5 +1,8 @@
 import React from 'react';
 import { ethers } from 'ethers';
+import type { AppShell } from './AppShell';
+import type { SessionConfigLike as ShellSessionConfigLike } from '../shellTypes';
+import type { MainSiteSessionConfigLike } from '../../utilities/session/mainSiteSessionConfig.js';
 import stylesRaw from './AppShell.module.scss';
 import MainAreaTabsRaw from '../MainContent/MainAreaTabs';
 import RightSideRaw from '../RightSidebar/RightSide';
@@ -489,13 +492,8 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
   },
 
   _renderHomeRoute: (ctx: RouteRenderCtx) => {
-    const {
-      defaultSlug,
-      defaultSessionCfg,
-      defaultSessionChainId,
-      defaultSessionNetwork,
-      cacheInitializationError,
-    } = ctx;
+    const { defaultSlug, defaultSessionCfg, defaultSessionChainId, defaultSessionNetwork, cacheInitializationError } =
+      ctx;
     return (
       <InitialRouteBoundary fallback={<LazyFallback label="Loading..." />}>
         <div className={styles.main} data-testid={E2E_TESTIDS.PAGE_HOME_ROOT}>
@@ -512,13 +510,18 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
             demoMode={host.props.demoMode}
             demoSurfaceMode={host.props.demoSurfaceMode}
             activeSessionSlug={defaultSlug}
+            sessionConfig={defaultSessionCfg}
             network={defaultSessionNetwork}
+            networkChainId={defaultSessionChainId}
             isAllCachesReady={host.state.isAllCachesReady}
             cacheHasLoaded={host.state.cacheHasLoaded}
             sbtCacheRevision={host.state.sbtCacheRevision}
             isSurveyCacheReady={host.state.isSurveyCacheReady}
             isQuestionCacheReady={host.state.isQuestionCacheReady}
+            isResponsesCacheReady={host.state.isResponsesCacheReady}
             isSBTCacheReady={host.state.isSBTCacheReady}
+            questionResponsesNonce={host.state.questionResponsesNonce}
+            questionScanProgress={host.state.questionScanProgress}
             sbtRealtimeCoverageBySlug={host.state.sbtRealtimeCoverageBySlug}
             ensureLightSbtDiscovery={host.ensureLightSbtDiscovery}
             ensureLightSbtUniverse={host.ensureLightSbtUniverse}
@@ -660,7 +663,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
       ? resolveMainSiteQuestionRouteSessionContext({
           search: searchStr,
           isCacheManagerReady: host.state.isCacheManagerReady,
-          getSessionConfigBySlug: (slug: string) => host.getDisplaySessionCfg(slug) as SessionConfigLike | null,
+          getSessionConfigBySlug: (slug: string) => host.getDisplaySessionCfg(slug) as ShellSessionConfigLike | null,
           formatSessionId: sessionRegistryReadsPort.formatSessionId,
           resolveSessionConfigById: (sessionId: string | number) =>
             sessionRegistryReadsPort.getSessionConfigById(sessionId),

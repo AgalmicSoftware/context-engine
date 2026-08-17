@@ -137,9 +137,9 @@ const buildTagAiContentRevision = (questions: QuestionSummary[]): string =>
         networkId: String(question.networkId || ''),
       }))
       .sort((left, right) =>
-        [left.sessionSlug, left.networkId, left.id].join('::').localeCompare(
-          [right.sessionSlug, right.networkId, right.id].join('::'),
-        ),
+        [left.sessionSlug, left.networkId, left.id]
+          .join('::')
+          .localeCompare([right.sessionSlug, right.networkId, right.id].join('::')),
       ),
   );
 
@@ -237,7 +237,7 @@ const dedupeSessionSlugs = (values: unknown[] | unknown = []): string[] => {
 const buildSessionScopeLabel = (slugIn = '', configsBySlug: Record<string, SessionRegistryConfig> = {}): string => {
   const slug = normalizeSessionSlug(slugIn);
   if (!slug) return 'General';
-  const cfg = getStrictSessionConfigBySlug(slug) || getDemoSessionConfigBySlug(slug, { allowDemoFallback: true }) || {};
+  const cfg = configsBySlug[slug] || getDemoSessionConfigBySlug(slug, { allowDemoFallback: true }) || {};
   const sessionName = String(cfg?.sessionName || '').trim();
   return sessionName && sessionName.toLowerCase() !== slug.toLowerCase()
     ? `${sessionName} (${slug})`
@@ -868,14 +868,14 @@ export const TagPageView = ({
         scopeSlugs: effectiveScopeSlugs,
         routePinned,
         localOverrideTouched: localSessionOverrideTouched,
-        sessionRegistryRevision,
+        sessionConfigsBySlug: sessionRegistrySnapshot.configsBySlug,
       }),
     [
       effectiveScopeState.filterMode,
       effectiveScopeSlugs,
       localSessionOverrideTouched,
       routePinned,
-      sessionRegistryRevision,
+      sessionRegistrySnapshot.configsBySlug,
     ],
   );
   const sessionSelectorHint = useMemo(
@@ -887,11 +887,6 @@ export const TagPageView = ({
       }),
     [globalSessionSelection, isDemoCorpusContext, localSessionOverrideTouched, routePinned],
   );
-  const selectedSessionSelectorSlug = routePinned
-    ? normalizeSessionSlug(queryPinnedScopeSlug)
-    : localSessionOverrideTouched
-      ? normalizedLocalOverrideSlug
-      : null;
   const sessionSelectorOptions = useMemo<SessionSelectorOption[]>(
     () =>
       isDemoCorpusContext
@@ -900,14 +895,16 @@ export const TagPageView = ({
             selectedSlug: selectedSessionSelectorSlug,
             primarySlug: globalSessionSelection.primarySessionSlug || '',
             scopedSlugs: effectiveScopeSlugs,
-            sessionRegistryRevision,
+            registrySlugs: sessionRegistrySnapshot.slugs,
+            sessionConfigsBySlug: sessionRegistrySnapshot.configsBySlug,
           }),
     [
       effectiveScopeSlugs,
       globalSessionSelection.primarySessionSlug,
       isDemoCorpusContext,
-      sessionRegistryRevision,
       selectedSessionSelectorSlug,
+      sessionRegistrySnapshot.configsBySlug,
+      sessionRegistrySnapshot.slugs,
     ],
   );
 

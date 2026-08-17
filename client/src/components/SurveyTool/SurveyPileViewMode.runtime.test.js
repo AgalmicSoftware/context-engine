@@ -185,20 +185,6 @@ describe('SurveyPileViewMode runtime surface', () => {
       promptHeader: <span data-testid="pile-masked-prompt">Prompt</span>,
       gatedPromptNotice: <div data-testid="pile-gated-notice" />,
     });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
-
-    subject.state = {
-      ...subject.state,
-      surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
-      showComments: {},
-      showConviction: {},
-    };
-    subject.isQuestionPromptMasked = jest.fn(() => true);
-    subject.renderPromptWithManualDecrypt = jest.fn(() => <span data-testid="pile-masked-prompt">Prompt</span>);
-    subject.renderGatedPromptNotice = jest.fn(() => <div data-testid="pile-gated-notice" />);
-
-    const tree = subject.renderActiveQuestion({ id: 'q1', prompt: 'masked', promptDecrypted: false });
 
     expect(treeHasDataTestId(tree, 'pile-masked-prompt')).toBe(true);
     expect(treeHasDataTestId(tree, 'pile-gated-notice')).toBe(true);
@@ -408,19 +394,9 @@ describe('SurveyPileViewMode runtime surface', () => {
 
   it('shows and clears the pile submit empty-state feedback without submitting', async () => {
     jest.useFakeTimers();
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      account: '0xabc',
-      loginComplete: true,
-      computeSubmitLabel: jest.fn(() => 'Submit now'),
-      questionResponsesNonce: 5,
-      onFilterChange: jest.fn(),
-    });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
-    const visibleList = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }];
+    const encryptAndUpload = jest.fn();
+    const feedbackPlan = buildNoPendingPileSubmitFeedbackPlan({ submitLabel: 'Submit' });
+    let state = { pileSubmitTempText: null };
 
     state = applyPatch(state, buildPileSubmitTempTextPatch(feedbackPlan.initialText));
     const timer = setTimeout(() => {
@@ -732,26 +708,10 @@ describe('SurveyPileViewMode runtime surface', () => {
   });
 
   it('does not call getPendingEditStats during PileViewMode.render', () => {
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      account: '',
-      questionResponsesNonce: 5,
-      onFilterChange: jest.fn(),
-    });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
-
-    subject.getPendingEditStats = jest.fn(() => ({ total: 7, encrypted: 2 }));
-    subject.state = {
-      ...subject.state,
-      loading: true,
-      pileQuestions: [],
-      allQuestionsForFilter: [],
-      filterState: {},
-      modifiedCount: 2,
-      encryptedModifiedCount: 1,
+    const getPendingEditStats = jest.fn(() => ({ total: 7, encrypted: 2 }));
+    const rail = buildPileSubmitRailViewState({
+      pendingStats: { total: 2, encrypted: 1 },
+      isSubmitting: false,
       submittedSinceLastEdit: false,
       submissionComplete: false,
       pileSubmitTempText: '',

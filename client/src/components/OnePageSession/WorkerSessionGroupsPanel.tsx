@@ -30,6 +30,7 @@ export type WorkerSessionGroupsPanelProps = {
   selectedGroupId?: string;
   showGroupDescriptions?: boolean;
   showMembershipListHeader?: boolean;
+  membershipsOnly?: boolean;
   toggleLoginModal?: (open: boolean) => void;
 };
 
@@ -63,6 +64,7 @@ const WorkerSessionGroupsPanel = ({
   selectedGroupId = '',
   showGroupDescriptions = true,
   showMembershipListHeader = true,
+  membershipsOnly = false,
   toggleLoginModal,
 }: WorkerSessionGroupsPanelProps) => {
   const config = asRecord(sessionConfig);
@@ -377,6 +379,7 @@ const WorkerSessionGroupsPanel = ({
           selectedGroupId={selectedGroupId}
           showDescriptions={showGroupDescriptions}
           showListHeader={showMembershipListHeader}
+          membershipsOnly={membershipsOnly}
           participantAddress={normalizedAccount}
           onSignIn={requestActionAuthentication}
         />

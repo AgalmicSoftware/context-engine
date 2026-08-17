@@ -3,11 +3,7 @@ type UnknownRecord = Record<string, unknown>;
 export type CanonicalMembershipKind = 'sbt_onchain' | 'worker_group';
 export type CanonicalMembershipStatus = 'member' | 'not_member' | 'unknown';
 export type CanonicalMembershipProvenance =
-  | 'complete_counts'
-  | 'partial_counts'
-  | 'legacy_history'
-  | 'worker_authoritative'
-  | 'none';
+  'complete_counts' | 'partial_counts' | 'legacy_history' | 'worker_authoritative' | 'none';
 
 export type CanonicalMembershipIdentity = {
   kind: CanonicalMembershipKind;

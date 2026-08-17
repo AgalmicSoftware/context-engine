@@ -1,5 +1,5 @@
 import store from '../../store.js';
-import contractScripts from './contractScripts.js';
+import contractScripts from './chainGateway.js';
 import { getReadProviderDiagnostics, getReadProviderForGroup, resolveGroupPathRpcPreference } from './rpcProviders.js';
 import { checkSponsoredAccess } from './sponsoredAccess.js';
 

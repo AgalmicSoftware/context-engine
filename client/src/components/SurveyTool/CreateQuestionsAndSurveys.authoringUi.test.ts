@@ -1,7 +1,7 @@
 import {
   E2E_TESTIDS,
   REGISTRY_CACHE_KEY,
-  arweaveScripts,
+  arweaveClient,
   cacheScripts,
   collectTreeNodes,
   contractScripts,
@@ -54,26 +54,16 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
   it('renders recognizable previews for rating and freeform question types', () => {
     const instance = makeInstance();
     const tree = instance.renderTypeSelector();
-    const ratingButtons = collectTreeNodes(
-      tree,
-      (node) => node?.props?.['aria-label'] === 'Add Rating question',
-    );
-    const freeformButtons = collectTreeNodes(
-      tree,
-      (node) => node?.props?.['aria-label'] === 'Add Freeform question',
-    );
+    const ratingButtons = collectTreeNodes(tree, (node) => node?.props?.['aria-label'] === 'Add Rating question');
+    const freeformButtons = collectTreeNodes(tree, (node) => node?.props?.['aria-label'] === 'Add Freeform question');
 
     expect(ratingButtons).toHaveLength(1);
-    expect(
-      collectTreeNodes(ratingButtons[0], (node) => nodeHasClassName(node, 'ratingPreview')),
-    ).toHaveLength(1);
+    expect(collectTreeNodes(ratingButtons[0], (node) => nodeHasClassName(node, 'ratingPreview'))).toHaveLength(1);
     expect(treeHasText(ratingButtons[0], '1')).toBe(true);
     expect(treeHasText(ratingButtons[0], '10')).toBe(true);
 
     expect(freeformButtons).toHaveLength(1);
-    expect(
-      collectTreeNodes(freeformButtons[0], (node) => nodeHasClassName(node, 'freeformPreview')),
-    ).toHaveLength(1);
+    expect(collectTreeNodes(freeformButtons[0], (node) => nodeHasClassName(node, 'freeformPreview'))).toHaveLength(1);
     expect(treeHasText(freeformButtons[0], 'Write an answer...')).toBe(true);
   });
 

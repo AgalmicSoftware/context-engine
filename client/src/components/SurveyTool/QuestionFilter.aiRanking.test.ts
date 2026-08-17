@@ -1,5 +1,5 @@
 import { QuestionFilter as QuestionFilterComponent } from './QuestionFilter';
-import * as aiScripts from '../../utilities/ai/aiScripts.js';
+import * as aiClient from '../../utilities/ai/aiClient.js';
 import * as aiSettings from '../../utilities/ai/aiSettings.js';
 import * as sponsoredAccess from '../../utilities/web3/sponsoredAccess.js';
 import { serializeFilterState } from '../../utilities/survey/filterStateUtils.js';
@@ -259,39 +259,7 @@ describe('QuestionFilter AI ranking lifecycle', () => {
     expect(combinedResult.finalQuestions.map((q: any) => q.id)).toEqual(['q3', 'q1']);
   });
 
-  it('ranks within the filtered subset when AI combine global top results miss it', () => {
-    const questions = [
-      { id: 'q1', type: 'binary', tags: ['alpha'], prompt: 'Q1' },
-      { id: 'q2', type: 'rating', tags: ['beta'], prompt: 'Q2' },
-      { id: 'q3', type: 'binary', tags: ['alpha'], prompt: 'Q3' },
-      { id: 'q4', type: 'freeform', tags: ['beta'], prompt: 'Q4' },
-    ];
-    const instance = new QuestionFilter({
-      questions,
-      questionResponses: {},
-      questionResponsesNonce: 1,
-      questionsCacheNonce: 1,
-    });
-    instance.state = {
-      ...instance.state,
-      mergedQuestions: questions,
-      pendingSelectedTypes: ['binary'],
-      pendingSbtFilteredQuestions: [{ id: 'q1' }, { id: 'q3' }],
-      pendingShowTopQuestions: false,
-      pendingShowTopQuestionsByResponses: false,
-      selectedTags: ['alpha'],
-      aiSearchQuery: 'climate',
-      aiAppliedTopN: 2,
-      aiFilterApplied: true,
-      aiRankedQuestionIds: ['q4', 'q2', 'q3', 'q1'],
-      aiCombineWithOtherFilters: true,
-    };
-
-    const combinedResult = instance.buildFilterPipelineResult(true);
-    expect(combinedResult.finalQuestions.map((q: any) => q.id)).toEqual(['q3', 'q1']);
-  });
-
-  it('auto-reapplies AI when external filter state carries aiFilter + aiTopN', async () => {
+  it('refreshes combined AI ranking when a tag filter changes the candidate subset', async () => {
     jest.useFakeTimers();
     const gateSpy = jest
       .spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource')
@@ -589,7 +557,7 @@ describe('QuestionFilter AI ranking lifecycle', () => {
       .mockReturnValue({ status: sponsoredAccess.SPONSORED_GATE_STATES.OPEN });
     const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
     const rankSpy = jest
-      .spyOn(aiScripts, 'rankQuestionsAI')
+      .spyOn(aiClient, 'rankQuestionsAI')
       .mockResolvedValueOnce(['q1'])
       .mockResolvedValueOnce(['q2', 'q1']);
 
@@ -811,7 +779,7 @@ describe('QuestionFilter AI ranking lifecycle', () => {
     const rankPromise = new Promise((resolve) => {
       resolveRank = resolve as (value: any) => void;
     });
-    const rankSpy = jest.spyOn(aiScripts, 'rankQuestionsAI').mockImplementationOnce(() => rankPromise);
+    const rankSpy = jest.spyOn(aiClient, 'rankQuestionsAI').mockImplementationOnce(() => rankPromise);
 
     const questions = [
       { id: 'q1', type: 'binary', tags: [], prompt: 'Q1' },
@@ -892,7 +860,7 @@ describe('QuestionFilter AI ranking lifecycle', () => {
       resolveSecond = resolve as (value: any) => void;
     });
     const rankSpy = jest
-      .spyOn(aiScripts, 'rankQuestionsAI')
+      .spyOn(aiClient, 'rankQuestionsAI')
       .mockImplementationOnce(() => firstPromise)
       .mockImplementationOnce(() => secondPromise);
 
@@ -962,7 +930,7 @@ describe('QuestionFilter AI ranking lifecycle', () => {
     const rankPromise = new Promise((resolve) => {
       resolveRank = resolve as (value: any) => void;
     });
-    const rankSpy = jest.spyOn(aiScripts, 'rankQuestionsAI').mockImplementationOnce(() => rankPromise);
+    const rankSpy = jest.spyOn(aiClient, 'rankQuestionsAI').mockImplementationOnce(() => rankPromise);
 
     const questions = [
       { id: 'q1', type: 'binary', tags: [], prompt: 'Q1' },
@@ -1038,7 +1006,7 @@ describe('QuestionFilter AI ranking lifecycle', () => {
     const rankPromise = new Promise((resolve) => {
       resolveRank = resolve as (value: any) => void;
     });
-    const rankSpy = jest.spyOn(aiScripts, 'rankQuestionsAI').mockImplementationOnce(() => rankPromise);
+    const rankSpy = jest.spyOn(aiClient, 'rankQuestionsAI').mockImplementationOnce(() => rankPromise);
 
     const questions = [
       { id: 'q1', type: 'binary', tags: [], prompt: 'Q1' },

@@ -182,6 +182,57 @@ describe('DocumentLibraryPanel thumbnails and storage providers', () => {
     );
   });
 
+  it('keeps manual Cloudflare continuation available when an authorized page is empty', async () => {
+    mockResolveDocLibraryProvider.mockReturnValue('cloudflare');
+    mockListSessionStorageRefs
+      .mockResolvedValueOnce({ items: [], cursor: 'page-two', listComplete: false })
+      .mockResolvedValueOnce({
+        items: [
+          {
+            storageRef: {
+              backend: 'cloudflare',
+              id: 'cf_docopaque2',
+              contentType: 'text/plain',
+              resource: 'docsContext',
+            },
+            metadata: {
+              tags: [
+                { name: 'CE-DocKind', value: 'file' },
+                { name: 'CE-DocName', value: 'Paged policy note' },
+              ],
+            },
+          },
+        ],
+        cursor: null,
+        listComplete: true,
+      });
+
+    render(
+      <DocumentLibraryPanel
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        sessionSlug="edge"
+        sessionConfig={{ storageProfile: { backend: 'cloudflare' } }}
+        mode="session"
+        sessionIdHex={`0x${'7'.repeat(32)}`}
+        pageSize={25}
+      />,
+    );
+
+    expect(await screen.findByText('No accessible documents on this page.')).toBeInTheDocument();
+    expect(mockListSessionStorageRefs).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Load more' }));
+
+    expect(await screen.findByText('Paged policy note')).toBeInTheDocument();
+    expect(mockListSessionStorageRefs).toHaveBeenCalledTimes(2);
+    expect(mockListSessionStorageRefs.mock.calls[1][0]).toEqual(
+      expect.objectContaining({ cursor: 'page-two', limit: 25 }),
+    );
+  });
+
   it('auto-opens Cloudflare viewer links through session storage refs', async () => {
     mockReadSessionStorageBlob.mockResolvedValueOnce({
       headers: { get: (name: string) => (name.toLowerCase() === 'content-type' ? 'text/plain' : null) },
@@ -218,10 +269,9 @@ describe('DocumentLibraryPanel thumbnails and storage providers', () => {
     expect(window.location.search).toBe('?keep=1');
   });
 
-  it('waits for Lit hooks before auto-opening encrypted viewer links', async () => {
+  it('auto-opens encrypted viewer links without requiring Lit getKey hooks', async () => {
     const litStorage = require('../../utilities/crypto/litProtocol.js').litStorage;
     const txId = 'F'.repeat(43);
-    const getKey = jest.fn(async () => ({ ciphertext: 'ciphertext', dataToEncryptHash: 'hash' }));
     litStorage.downloadEncryptedArweaveData.mockResolvedValueOnce({
       payload: { name: 'Encrypted auto', mime: 'text/plain', text: 'lit auto text' },
     });
@@ -244,13 +294,11 @@ describe('DocumentLibraryPanel thumbnails and storage providers', () => {
       sessionIdHex: `0x${'8'.repeat(32)}`,
     };
 
-    const { rerender } = render(<DocumentLibraryPanel {...panelProps} />);
-
-    await Promise.resolve();
-    expect(litStorage.downloadEncryptedArweaveData).not.toHaveBeenCalled();
-    expect(window.location.search).toContain('__ceDocTx=');
-
-    rerender(<DocumentLibraryPanel {...panelProps} litHooks={{ getKey }} />);
+    await act(async () => {
+      render(<DocumentLibraryPanel {...panelProps} />);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
 
     await waitFor(() => {
       expect(litStorage.downloadEncryptedArweaveData).toHaveBeenCalledWith(
@@ -261,6 +309,7 @@ describe('DocumentLibraryPanel thumbnails and storage providers', () => {
         }),
       );
     });
+    expect(litStorage.downloadEncryptedArweaveData.mock.calls[0][0]).not.toHaveProperty('lit');
     expect(await screen.findByTestId(E2E_TESTIDS.DOC_VIEWER_TEXT)).toHaveTextContent('lit auto text');
     expect(window.location.search).toBe('');
   });

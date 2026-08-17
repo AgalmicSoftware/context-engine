@@ -1,5 +1,6 @@
 import { toTrimmedString } from './stringCoercion.js';
 import { isWorkerCanonicalSessionConfig } from './workerCanonicalAuthority.js';
+import { resolveRegistryChainId } from './chainIdNormalization.js';
 
 export const resolveLoginAuthorityContext = async ({
   slug,

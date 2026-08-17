@@ -69,8 +69,6 @@ function collectNodeTestFiles(rootDir = path.resolve(__dirname, '..'), options =
 
   const uniqueFiles = [...new Set(files)];
 
-  const uniqueFiles = [...new Set(files)];
-
   if (!options.trackedOnly) {
     return uniqueFiles;
   }
@@ -168,5 +166,6 @@ module.exports = {
   listTrackedFiles,
   parseRunNodeTestsArgs,
   partitionNodeTestFiles,
+  readOptionalTestDir,
   runNodeTests,
 };

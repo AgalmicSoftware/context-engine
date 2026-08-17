@@ -36,6 +36,8 @@ $viz-panel-border: var(--ce-card-border);
 
 .pageShell {
   width: min(1240px, 100%);
+  max-width: 100%;
+  min-width: 0;
   margin: 0 auto;
   display: grid;
   gap: 24px;
@@ -113,6 +115,11 @@ $viz-panel-border: var(--ce-card-border);
   text-align: left;
   text-decoration: none;
   cursor: pointer;
+  transition:
+    border-color 0.16s ease,
+    background 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
 
   &:visited {
     color: $text;
@@ -124,6 +131,16 @@ $viz-panel-border: var(--ce-card-border);
     background: color-mix(in srgb, var(--ce-action-accent) 9%, transparent);
     box-shadow: 0 12px 30px color-mix(in srgb, var(--ce-compat-dark) 26%, transparent);
     outline: none;
+    transform: translateY(-2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .postNavItem,
+  .postNavItem:hover,
+  .postNavItem:focus-visible {
+    transform: none;
+    transition: none;
   }
 }
 
@@ -159,7 +176,10 @@ $viz-panel-border: var(--ce-card-border);
 }
 
 .postArticle {
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
+  box-sizing: border-box;
   padding: 34px;
   border: 1px solid $border;
   border-radius: var(--ce-radius-8);
@@ -187,7 +207,12 @@ $viz-panel-border: var(--ce-card-border);
 }
 
 .postHeader {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   margin-bottom: 24px;
   padding-bottom: 18px;
@@ -204,6 +229,9 @@ $viz-panel-border: var(--ce-card-border);
 }
 
 .postHeroFigure {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   overflow: hidden;
   margin-bottom: 8px;
 }
@@ -212,12 +240,16 @@ $viz-panel-border: var(--ce-card-border);
 .postImage {
   display: block;
   width: 100%;
+  max-width: 100%;
   height: auto;
 }
 
 .postImageFigure {
   position: relative;
   display: grid;
+  justify-self: center;
+  width: 100%;
+  max-width: min(100%, 720px);
   gap: 0;
 }
 
@@ -231,6 +263,7 @@ $viz-panel-border: var(--ce-card-border);
   border-radius: var(--ce-radius-7);
   background: transparent;
   cursor: zoom-in;
+  transition: filter 0.16s ease;
 
   &:hover {
     filter: brightness(1.07);
@@ -240,13 +273,6 @@ $viz-panel-border: var(--ce-card-border);
     outline: 2px solid color-mix(in srgb, var(--ce-action-accent) 70%, transparent);
     outline-offset: 3px;
   }
-
-  &:hover .postImageFullscreen,
-  &:focus .postImageFullscreen,
-  &:focus-within .postImageFullscreen {
-    opacity: 1;
-    visibility: visible;
-  }
 }
 
 .postImageButton .postImage {
@@ -254,6 +280,7 @@ $viz-panel-border: var(--ce-card-border);
 }
 
 .postImageFullscreen {
+  appearance: none;
   position: fixed;
   z-index: 10000;
   inset: 0;
@@ -267,7 +294,15 @@ $viz-panel-border: var(--ce-card-border);
   opacity: 0;
   pointer-events: none;
   visibility: hidden;
-  transition: opacity 140ms ease, visibility 140ms ease;
+  transition:
+    opacity 140ms ease,
+    visibility 140ms ease;
+}
+
+.postImageFullscreenOpen {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
 }
 
 .postImageFullscreenImage {
@@ -290,25 +325,37 @@ $viz-panel-border: var(--ce-card-border);
 }
 
 .postTitle {
+  min-width: 0;
   font-size: 2.45rem;
+  overflow-wrap: anywhere;
 }
 
 .postMeta {
+  width: 100%;
+  min-width: 0;
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
   gap: 10px;
   color: $muted;
   font-size: 1rem;
 }
 
+.postDate {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
 .tagList {
   display: flex;
+  flex: 1 1 auto;
   flex-wrap: wrap;
   gap: 8px;
 }
 
 .tag {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   min-height: 28px;
   padding: 0 10px;
@@ -426,10 +473,9 @@ h3.postHeading {
 }
 
 .postParagraph {
-  max-width: 74ch;
-
-  a {
-    color: $accent;
+  strong {
+    color: $text;
+    font-weight: 800;
   }
 
   code {
@@ -444,10 +490,13 @@ h3.postHeading {
   display: grid;
   gap: 8px;
   padding-left: 1.25rem;
+
+  li::marker {
+    color: $accent;
+  }
 }
 
 .postBlockquote {
-  max-width: 68ch;
   padding: 14px 18px;
   border-left: 3px solid $accent;
   border-radius: var(--ce-radius-0) var(--ce-radius-8) var(--ce-radius-8) var(--ce-radius-0);
@@ -971,32 +1020,37 @@ h3.postHeading {
 
 .vizHeader {
   display: grid;
-  gap: 6px;
+  gap: $viz-gap-xs;
 }
 
 .vizTitle {
   margin: 0;
   color: $text;
   font-family: var(--ce-post-font-heading);
-  font-size: 1.2rem;
+  font-size: 1.08rem;
   letter-spacing: 0;
+  line-height: 1.22;
 }
 
 .vizSubtitle {
   margin: 0;
   color: $muted;
-  font-size: 0.92rem;
-  line-height: 1.5;
+  font-size: 0.85rem;
+  line-height: 1.42;
+
+  strong {
+    color: $text;
+  }
 }
 
 .categoryViz {
   display: grid;
-  gap: 14px;
+  gap: $viz-gap-md;
 }
 
 .categoryRow {
   display: grid;
-  gap: 8px;
+  gap: $viz-gap-xs;
 }
 
 .categoryMeta {
@@ -1008,6 +1062,7 @@ h3.postHeading {
 }
 
 .categoryLabel {
+  font-family: var(--ce-font-mono);
   font-weight: 700;
 }
 
@@ -1018,8 +1073,8 @@ h3.postHeading {
 .dotGrid {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
-  min-height: 15px;
+  gap: 4px;
+  min-height: 12px;
 }
 
 .dot {
@@ -1032,8 +1087,8 @@ h3.postHeading {
 .categoryDetail {
   margin: 0;
   color: $muted;
-  font-size: 0.9rem;
-  line-height: 1.5;
+  font-size: 0.84rem;
+  line-height: 1.4;
 }
 
 .quoteWall {
@@ -1045,9 +1100,10 @@ h3.postHeading {
 .quoteItem {
   margin: 0;
   padding: 14px;
-  border: 1px solid rgba(122, 167, 255, 0.22);
-  border-radius: 8px;
-  background: rgba(122, 167, 255, 0.08);
+  border: 1px solid $input-border;
+  border-radius: var(--ce-radius-8);
+  background: $input-bg;
+  box-shadow: $card-shadow;
 }
 
 .quoteText {
@@ -1083,9 +1139,10 @@ h3.postHeading {
   grid-template-columns: 44px minmax(0, 1fr);
   gap: 14px;
   padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  background: rgba(9, 13, 30, 0.38);
+  border: 1px solid $card-border;
+  border-radius: var(--ce-radius-8);
+  background: $card-bg;
+  box-shadow: $card-shadow;
 }
 
 .rankBadge {
@@ -1129,6 +1186,7 @@ h3.postHeading {
 }
 
 .rankedThemeTrack {
+  position: relative;
   height: 8px;
   overflow: hidden;
   border-radius: var(--ce-radius-pill);
@@ -1259,6 +1317,7 @@ h3.postHeading {
 }
 
 .beeswarmCard,
+.binaryBeeswarmCard,
 .responseTypeCard {
   background: $viz-panel-bg;
 }
@@ -1492,7 +1551,7 @@ h3.postHeading {
 
 .beeswarmViz {
   display: grid;
-  gap: 18px;
+  gap: $viz-gap-lg;
 }
 
 .beeswarmRow {
@@ -1518,21 +1577,21 @@ h3.postHeading {
   h4 {
     color: $text;
     font-family: var(--ce-post-font-heading);
-    font-size: 1.06rem;
+    font-size: 1rem;
     line-height: 1.25;
   }
 
   p {
     color: $muted;
-    font-size: 0.9rem;
-    line-height: 1.45;
+    font-size: 0.84rem;
+    line-height: 1.36;
   }
 }
 
 .beeswarmPlot {
   position: relative;
-  height: 76px;
-  margin: 0 18px 4px;
+  height: 56px;
+  margin: 0 12px;
 }
 
 .beeswarmAxis {
@@ -1555,10 +1614,10 @@ h3.postHeading {
   white-space: nowrap;
 
   &::before {
-    content: "";
+    content: '';
     position: absolute;
     left: 50%;
-    bottom: 20px;
+    bottom: 18px;
     width: 1px;
     height: 28px;
     background: color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
@@ -1566,13 +1625,15 @@ h3.postHeading {
 }
 
 .beeswarmDot {
+  appearance: none;
   position: absolute;
   z-index: 1;
-  width: 30px;
-  height: 30px;
+  width: 26px;
+  height: 26px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
   transform: translate(-50%, -50%);
   border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 62%, transparent);
   border-radius: var(--ce-radius-pill);
@@ -1616,11 +1677,10 @@ h3.postHeading {
   line-height: 1.45;
 }
 
-.vizLegend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  padding-top: 4px;
+.binaryBeeswarmFrame {
+  position: relative;
+  display: grid;
+  gap: $viz-gap-sm;
 }
 
 .binaryBeeswarmSvg {
@@ -2225,7 +2285,7 @@ h3.postHeading {
   h4 {
     color: $text;
     font-family: var(--ce-post-font-heading);
-    font-size: 1.04rem;
+    font-size: 1rem;
     line-height: 1.25;
   }
 }
@@ -2411,18 +2471,18 @@ h3.postHeading {
 
 .responseTypePrompt {
   color: $muted;
-  font-size: 0.88rem;
-  line-height: 1.45;
+  font-size: 0.82rem;
+  line-height: 1.36;
 }
 
 .responseBars {
   display: grid;
-  gap: 8px;
+  gap: $viz-gap-xs;
 }
 
 .responseBarRow {
   display: grid;
-  gap: 4px;
+  gap: 3px;
 }
 
 .responseBarMeta {
@@ -2608,7 +2668,8 @@ h3.postHeading {
 }
 
 .responseBarTrack {
-  height: 8px;
+  position: relative;
+  height: 6px;
   overflow: hidden;
   border-radius: var(--ce-radius-pill);
   background: $input-bg;
@@ -2622,14 +2683,14 @@ h3.postHeading {
 
 .responseQuotes {
   display: grid;
-  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+  gap: $viz-gap-sm;
 
   figure {
     margin: 0;
-    padding: 10px;
-    border: 1px solid rgba(122, 167, 255, 0.2);
-    border-radius: 8px;
-    background: rgba(122, 167, 255, 0.08);
+    padding: $viz-gap-sm $viz-gap-md;
+    border-radius: $viz-radius;
+    background: $input-bg;
   }
 
   blockquote {
@@ -2640,9 +2701,9 @@ h3.postHeading {
   }
 
   figcaption {
-    margin-top: 6px;
+    margin-top: 4px;
     color: $blue;
-    font-size: 0.76rem;
+    font-size: 0.72rem;
   }
 }
 
@@ -2671,16 +2732,46 @@ h3.postHeading {
     font-size: 2.05rem;
   }
 
-  .networkFrame {
-    grid-template-columns: 1fr;
+  .postMeta {
+    flex-wrap: nowrap;
+    align-items: center;
   }
 
-  .responseTypeGrid {
+  .tagList {
+    width: 70%;
+    max-width: 70%;
+    min-width: 0;
+    flex: 0 1 70%;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  .postDate {
+    flex: 0 0 auto;
+    align-self: center;
+    margin-left: auto;
+    text-align: right;
+  }
+
+  .networkFrame {
     grid-template-columns: 1fr;
   }
 
   .networkCanvas {
     min-height: 220px;
+  }
+}
+
+@media (max-width: 460px) {
+  .responsePie {
+    grid-template-columns: 1fr;
   }
 }
 

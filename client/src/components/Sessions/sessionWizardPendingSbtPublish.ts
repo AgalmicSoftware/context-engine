@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
 import { finalizeDeferredCreateSbtDraftUpload } from '../SBTs/CreateSBTGroup';
-import contractScripts from '../../utilities/web3/contractScripts.js';
+import contractScripts from '../../utilities/web3/chainGateway.js';
 import { hasPasswordMintForSbtMintMode } from '../../utilities/sbt/sbtMintMode.js';
 import { upsertSbtPasswordRecoveryCodes } from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
 import { normalizeWorkerUrl as normalizeWorkerAuthUrl } from '../../utilities/worker/workerAuth.js';
@@ -50,7 +50,7 @@ type DeploySessionWizardPendingSbtDraftResult = {
   receipt: PendingSbtDeployReceipt;
 };
 
-const createSessionWizardPendingDraftSbt = contractScripts.createSBT as unknown as CreateSbtForPendingDraft;
+const createSessionWizardPendingDraftSbt = contractScripts.createSBT as CreateSbtForPendingDraft;
 
 export const FEATURED_DRAFT_GATE_AUTO_LINK_GATE_ID = 'gate-1';
 export const FEATURED_DRAFT_GATE_AUTO_LINK_SOURCE = 'defaultFeaturedSBTs';

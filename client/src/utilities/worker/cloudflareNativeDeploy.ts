@@ -6,7 +6,9 @@ export const CLOUDFLARE_NATIVE_DEPLOY_ORIGIN = 'https://deploy.workers.cloudflar
 const FULL_GIT_COMMIT_RE = /^[a-f0-9]{40}$/i;
 
 export const normalizeCloudflareNativeDeployCommit = (value: unknown): string => {
-  const commit = String(value ?? '').trim().toLowerCase();
+  const commit = String(value ?? '')
+    .trim()
+    .toLowerCase();
   return FULL_GIT_COMMIT_RE.test(commit) ? commit : '';
 };
 
@@ -18,7 +20,9 @@ export const buildCloudflareNativeDeployUrl = ({
   repositoryUrl?: string;
 } = {}): string => {
   const immutableCommit = normalizeCloudflareNativeDeployCommit(commit);
-  const normalizedRepositoryUrl = String(repositoryUrl || '').trim().replace(/\/+$/, '');
+  const normalizedRepositoryUrl = String(repositoryUrl || '')
+    .trim()
+    .replace(/\/+$/, '');
   if (!immutableCommit || !/^https:\/\/github\.com\//i.test(normalizedRepositoryUrl)) return '';
 
   const sourceUrl = `${normalizedRepositoryUrl}/tree/${immutableCommit}/${CLOUDFLARE_NATIVE_DEPLOY_PACKAGE_PATH}`;

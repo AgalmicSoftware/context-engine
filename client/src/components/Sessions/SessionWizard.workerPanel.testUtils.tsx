@@ -348,8 +348,7 @@ const renderLoggedInSessionWizard = (props = {}) =>
 const rerenderSessionWizard = (
   view: ReturnType<typeof render>,
   props: Omit<React.ComponentProps<typeof SessionWizard>, 'network'> = {},
-) =>
-  view.rerender(<SessionWizard network={{ id: 84532 }} {...props} />);
+) => view.rerender(<SessionWizard network={{ id: 84532 }} {...props} />);
 const getWizardResourceCard = (resourceKey) =>
   screen
     .getAllByTestId(E2E_TESTIDS.WIZARD_RESOURCE_CARD)
@@ -378,7 +377,21 @@ const resolveSessionModePresetTestId = () => {
     ? 'ce-new-preset-fast_cheap_cloudflare'
     : 'ce-new-preset-trustless_public_decentralized';
 };
-const hasCommittedSessionModeProfile = () => {
+const clickSessionModePresetForTest = (testId) => {
+  const preset = screen.queryByTestId(testId);
+  if (!preset) return false;
+  const originalConfirm = window.confirm;
+  window.confirm = jest.fn(() => true);
+  try {
+    act(() => {
+      fireEvent.click(preset);
+    });
+  } finally {
+    window.confirm = originalConfirm;
+  }
+  return true;
+};
+const hasSelectedSessionModeProfile = () => {
   const continueButton = screen.queryByTestId('ce-new-preset-continue');
   if (continueButton) return !continueButton.disabled;
   return !!screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
@@ -411,7 +424,9 @@ function commitSessionModeProfileGateIfPresent() {
   ensureSessionModeProfileReady();
 }
 const ensureSessionModeProfileSelected = () => {
-  if (hasCommittedSessionModeProfile()) return;
+  if (hasSelectedSessionModeProfile()) return;
+  commitSessionModeProfileGateIfPresent();
+  if (hasSelectedSessionModeProfile()) return;
   const presetTestId = resolveSessionModePresetTestId();
   clickSessionModePresetForTest(presetTestId);
 };
@@ -424,8 +439,15 @@ const selectNormalModeCard = (label) => {
   fireEvent.click(screen.getByRole('button', { name: new RegExp(label, 'i') }));
 };
 const createPublicWorkerVerificationResponder = () => {
-  let publicConfig = {};
-  return (url, options = {}) => {
+  type PublicWorkerVerificationConfig = {
+    ai?: {
+      models?: unknown;
+    };
+    litCredentials?: unknown;
+    [key: string]: unknown;
+  };
+  let publicConfig: PublicWorkerVerificationConfig = {};
+  return (url: unknown, options: RequestInit = {}) => {
     const normalizedUrl = String(url);
     if (normalizedUrl.endsWith('/admin/set-config')) {
       const payload = JSON.parse(String(options.body || '{}'));
@@ -566,8 +588,9 @@ const resetSessionWizardWorkerPanelTestState = () => {
   global.fetch = ORIGINAL_FETCH;
   localStorage.clear();
   sessionStorage.clear();
-  buildContractViewerContracts.mockImplementation(({ sessionContracts = {} } = {}) =>
-    Object.keys(sessionContracts).map((contractKey) => ({
+  jest.mocked(buildContractViewerContracts).mockImplementation(({ sessionContracts = {} } = {}) => {
+    const normalizedSessionContracts = sessionContracts || {};
+    return Object.keys(normalizedSessionContracts).map((contractKey) => ({
       key: contractKey,
       name:
         contractKey === 'surveys'
@@ -587,18 +610,18 @@ const resetSessionWizardWorkerPanelTestState = () => {
               ? 'SessionRegistry.sol'
               : 'Contract.sol',
       source: `contract ${contractKey} {}`,
-      addresses: sessionContracts[contractKey]?.address
+      addresses: normalizedSessionContracts[contractKey]?.address
         ? [
             {
-              address: sessionContracts[contractKey].address,
-              id: sessionContracts[contractKey].chainId || 84532,
+              address: normalizedSessionContracts[contractKey].address,
+              id: Number(normalizedSessionContracts[contractKey].chainId) || 84532,
               testnet: true,
               explorerUrl: `https://example.example.test/${contractKey}`,
             },
           ]
         : [],
-    })),
-  );
+    }));
+  });
 };
 
 export {

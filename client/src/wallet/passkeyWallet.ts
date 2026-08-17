@@ -14,6 +14,7 @@ import type {
 } from './types.js';
 import { PASSKEY_WALLET_CAPABILITIES, getPasskeyWalletConfig } from './config.js';
 import { chainHexId, chainHttpRpc, chainHttpRpcNoPath, getChainById, getDefaultChainId } from '../variables/chains.js';
+import { getReadProviderForChain } from '../utilities/web3/rpcProviders.js';
 import { createPasskeyCredential } from './passkey/createCredential.js';
 import { authenticatePasskeyCredential } from './passkey/authenticateCredential.js';
 import { bufferToBase64URL, base64URLToBuffer, randomBase64Url } from './passkey/encoding.js';
@@ -31,7 +32,7 @@ import { createSoftSessionPolicy } from './session/sessionPolicy.js';
 import { createWorkerSoftSessionClient, type SoftSessionClient } from './session/sessionWorkerClient.js';
 import { createLogger } from '../utilities/logging.js';
 
-type ChainLike = Record<string, any>;
+type ChainLike = Record<string, unknown>;
 
 type ReadOnlyRpcChildProvider = {
   send?: (method: string, params: unknown[]) => Promise<unknown>;
@@ -78,12 +79,15 @@ type PasskeyWalletClientDeps = {
   storage?: PasskeyWalletStorage;
   credentials?: PasskeyCredentialClient;
   sessionClient?: SoftSessionClient;
+  sessionClientFactory?: () => SoftSessionClient;
+  readProviderFactory?: (chainId: number) => unknown;
   privateKeyFactory?: () => HexString;
   now?: () => number;
 };
 
 const walletLog = createLogger('wallet');
 const MISSING_WALLET_CODE = 'CE_PASSKEY_WALLET_RECORD_MISSING';
+const PASSKEY_WALLET_LOCKED_MESSAGE = 'Passkey wallet is locked.';
 
 export class MissingPasskeyWalletRecordError extends Error {
   code = MISSING_WALLET_CODE;
@@ -171,6 +175,8 @@ export class PasskeyEoaWalletClient {
   private readonly storage: PasskeyWalletStorage;
   private readonly credentials?: PasskeyCredentialClient;
   private readonly privateKeyFactory: () => HexString;
+  private readonly sessionClientFactory: () => SoftSessionClient;
+  private readonly readProviderFactory: (chainId: number) => unknown;
   private readonly now: () => number;
   private sessionClient: SoftSessionClient;
   private activeRecord: PasskeyWalletRecord | null = null;
@@ -184,7 +190,9 @@ export class PasskeyEoaWalletClient {
     this.config = deps.config || getPasskeyWalletConfig();
     this.storage = deps.storage || indexedDbWalletStorage;
     this.credentials = deps.credentials;
-    this.sessionClient = deps.sessionClient || createWorkerSoftSessionClient();
+    this.sessionClientFactory = deps.sessionClientFactory || createWorkerSoftSessionClient;
+    this.sessionClient = deps.sessionClient || this.sessionClientFactory();
+    this.readProviderFactory = deps.readProviderFactory || getReadProviderForChain;
     this.privateKeyFactory = deps.privateKeyFactory || createRandomEoaPrivateKey;
     this.now = deps.now || (() => Date.now());
   }
@@ -286,6 +294,13 @@ export class PasskeyEoaWalletClient {
     let privateKey: HexString | null = null;
     try {
       if (this.config.walletKeyMode === 'passkey-derived') {
+        const storedRecord = await this.storage.read();
+        if (storedRecord && storedRecord.rpId !== this.config.rpId) {
+          throw new Error(`Stored wallet belongs to RP ID "${storedRecord.rpId}", not "${this.config.rpId}".`);
+        }
+        if (storedRecord && !isPasskeyDerivedWalletRecord(storedRecord)) {
+          throw new Error('Stored wallet metadata is not a passkey-derived wallet.');
+        }
         const saltBytes = await getPasskeyDerivedPrfSalt(this.config);
         const selectCredential = options.selectCredential === true;
         const { credential, prfOutput } = await authenticatePasskeyCredential({
@@ -428,7 +443,7 @@ export class PasskeyEoaWalletClient {
           session: 'soft',
         };
       default:
-        return this.readProvider().send(method, params);
+        return this.requestReadOnlyRpc(method, params);
     }
   }
 
@@ -448,7 +463,7 @@ export class PasskeyEoaWalletClient {
     this.lockTimer = null;
     this.unlockExpiresAt = 0;
     await this.sessionClient.lock();
-    this.sessionClient = createWorkerSoftSessionClient();
+    this.sessionClient = this.sessionClientFactory();
   }
 
   async disconnect(): Promise<void> {
@@ -585,7 +600,6 @@ export class PasskeyEoaWalletClient {
     if (chainId) return this.readProviderFactory(chainId);
     const rpcUrl = resolveRpcUrl(this.activeChain);
     if (!rpcUrl) throw new Error('No RPC URL is configured for the passkey wallet chain.');
-    const chainId = Number(this.activeChain?.id ?? this.activeChain?.chainId ?? 0) || undefined;
     return new ethers.providers.JsonRpcProvider(rpcUrl, chainId);
   }
 }

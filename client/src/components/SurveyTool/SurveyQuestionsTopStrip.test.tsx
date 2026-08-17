@@ -64,10 +64,17 @@ describe('SurveyQuestionsTopStrip', () => {
     render(
       <SurveyQuestionsTopStrip
         {...baseProps}
+        displayAnswerMode
         isEditing
         responseUrl="https://example.com/submitted-response"
-        showUserResponseNotice
-        submittedStateActive
+        routeViewDisplayState={{
+          isOwnResponse: true,
+          isSingleQuestionView: false,
+          showViewAnswersButton: false,
+          viewAnswersButtonText: '',
+        }}
+        submitDisplayState={{ submittedStateActive: true }}
+        userHasResponse
         userResponseEncrypted
       />,
     );

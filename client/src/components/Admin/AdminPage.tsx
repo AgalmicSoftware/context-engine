@@ -7,12 +7,9 @@ import {
   faCaretUp,
   faClipboard,
   faExternalLinkAlt,
-  faLock,
-  faLockOpen,
   faPen,
   faQuestionCircle,
   faSync,
-  faTimes,
 } from '@fortawesome/free-solid-svg-icons';
 import { ethers } from 'ethers';
 import styles from './AdminPage.module.scss';
@@ -80,7 +77,7 @@ import {
 } from './adminPageDraftFormattingHelpers';
 import {
   areAdminEncryptedEntriesEquivalent,
-  buildAdminChainRegistryDisplay,
+  buildAdminPageSessionIdentityKey,
   buildSessionUrl,
   collectEncryptedEntries,
   getAdminSessionDisplayUrl,
@@ -116,6 +113,13 @@ import {
   buildAdminFaucetInvalidResource,
   buildAdminFaucetLoadingResource,
   buildAdminFaucetRpcUnavailableResource,
+  buildAdminLitErrorResource,
+  buildAdminLitLoadingResource,
+  buildAdminLitNotConfiguredResource,
+  buildAdminLitStatusNotLoadedResource,
+  buildAdminLitStatusResource,
+  buildAdminLitUnavailableResource,
+  getAdminLitResourceLabel,
 } from './adminPageResourceDisplayHelpers';
 import {
   ADMIN_AI_PROVIDER_OPTIONS,
@@ -126,7 +130,6 @@ import {
   buildWorkerCanonicalMetadataConfigPatch,
   parseChainIdInput,
   resolveAutoFeatureBySessionSlug,
-  shouldShowInlineResourceSummary,
 } from './adminPageMetadataDraftHelpers';
 import {
   asAdminSessionConfig,
@@ -220,8 +223,8 @@ const AdminPageRuntime = ({
   const [transcribeText, setTranscribeText] = useState('');
   const [openSection, setOpenSection] = useState('');
   const [showTestsPanel, setShowTestsPanel] = useState(false);
-  const [encryptedFields, setEncryptedFields] = useState<any>({});
-  const [decryptedFields, setDecryptedFields] = useState<any>({});
+  const [encryptedFields, setEncryptedFields] = useState<Record<string, unknown>>({});
+  const [decryptedFields, setDecryptedFields] = useState<AdminDecryptedFieldMap>({});
   const [sessionLookupStatus, setSessionLookupStatus] = useState('');
   const [sessionsRefreshStatus, setSessionsRefreshStatus] = useState('');
   const [sessionsRefreshBusy, setSessionsRefreshBusy] = useState(false);
@@ -278,24 +281,20 @@ const AdminPageRuntime = ({
   });
   const [arweaveResource, setArweaveResource] = useState<any>(() => buildAdminArweaveEmptyResource());
   const [faucetResource, setFaucetResource] = useState<any>(() => buildAdminFaucetEmptyResource());
-  const [litResource, setLitResource] = useState<any>({
-    address: '',
-    display: 'Lit Chipotle not configured',
-    meta: 'Enter a Lit account API key or Lit usage API key above, or save Lit Chipotle config to the worker, then refresh status.',
-    loading: false,
-    manualRefreshAvailable: false,
-  });
+  const [litResource, setLitResource] = useState<any>(() => buildAdminLitNotConfiguredResource());
   const arweaveResourceRequestRef = useRef(0);
   const faucetResourceRequestRef = useRef(0);
   const litResourceRequestRef = useRef(0);
-  const rawMetadataCopyResetRef = useRef<any>(null);
+  const secretPresenceRequestRef = useRef(0);
+  const secretPresenceTargetKeyRef = useRef('');
+  const rawMetadataCopyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevSelectedSlugForDraftRef = useRef(selectedSlug);
   const prevSelectedSlugForAllowOriginsDraftRef = useRef(selectedSlug);
   const encryptedFieldsSessionKeyRef = useRef('');
   const metadataDraftTouchedRef = useRef(metadataDraftTouched);
   metadataDraftTouchedRef.current = metadataDraftTouched;
 
-  const handleSecretChange = useCallback((key: any, value: any) => {
+  const handleSecretChange = useCallback((key: string, value: string) => {
     setSecrets((prev) => ({ ...prev, [key]: value }));
     setWorkerSecretsDirty(true);
     setClearedSecretKeys((prev) => {
@@ -306,7 +305,7 @@ const AdminPageRuntime = ({
     });
   }, []);
 
-  const handleClearSecret = useCallback((key: any) => {
+  const handleClearSecret = useCallback((key: string) => {
     setSecrets((prev) => ({ ...prev, [key]: '' }));
     setWorkerSecretsDirty(true);
     setClearedSecretKeys((prev) => {
@@ -586,6 +585,7 @@ const AdminPageRuntime = ({
     const reported = Object.prototype.hasOwnProperty.call(selectedConfig, 'allowOrigins');
     return { origins: parseAllowOriginsDraft(selectedConfig?.allowOrigins), reported };
   }, [selectedConfig, selectedSlug]);
+  const effectiveWorkerAllowOrigins = effectiveWorkerCorsState.origins;
   const effectiveAllowOriginsDraft = useMemo(
     () => formatAllowOriginsDraft(effectiveWorkerAllowOrigins),
     [effectiveWorkerAllowOrigins],
@@ -662,13 +662,10 @@ const AdminPageRuntime = ({
     });
     setWorkerSecretsDirty(false);
     setClearedSecretKeys(new Set());
-    setLitResource({
-      address: '',
-      display: 'Lit Chipotle not configured',
-      meta: 'Enter a Lit account API key or Lit usage API key above, or save Lit Chipotle config to the worker, then refresh status.',
-      loading: false,
-      manualRefreshAvailable: false,
-    });
+    setStoredSecretPresence({});
+    setSecretPresenceStatus('idle');
+    setSecretPresenceMessage('');
+    setLitResource(buildAdminLitNotConfiguredResource());
     setShowTestsPanel(false);
   }, [selectedSlug]);
 
@@ -1887,7 +1884,7 @@ const AdminPageRuntime = ({
       );
       const tx = String(txId || '').trim();
       const txLabel = tx ? `OK (tx ${tx.slice(0, 12)}…)` : 'OK';
-      const txUrl = tx ? arweaveScripts.buildArweaveGatewayUrl(tx) : '';
+      const txUrl = tx ? adminArweavePort.buildArweaveGatewayUrl(tx) : '';
       setTestResults((prev) => ({ ...prev, arweave: { label: txLabel, href: txUrl } }));
       setTestStatus('Arweave upload succeeded.');
     } catch (err: any) {
@@ -2081,6 +2078,7 @@ const AdminPageRuntime = ({
         hasAutoFeatureOverride: metadataAutoFeatureTouched,
         advancedDraft: metadataConfigDraft,
         requireBlockLimits: canAdminRegistry,
+        includeChainFields: sessionCapabilities.usesChainMetadata,
       });
       const nextConfig = { ...selectedConfig, ...metadata };
       if (!canAdminRegistry) {
@@ -2088,6 +2086,7 @@ const AdminPageRuntime = ({
           metadata,
           slug: selectedSlug,
           adminAddress: workerAdminAddress,
+          includeChainFields: sessionCapabilities.usesChainMetadata,
         });
         await ensureWorkerSessionConfig({
           sessionConfigOverride: nextConfig,
@@ -2238,13 +2237,15 @@ const AdminPageRuntime = ({
     if (metadataLoadState === 'unavailable') return 'Metadata unavailable; contracts below may be chain defaults';
     return 'No registry metadata URI configured';
   })();
-  const metadataContracts =
-    groupMetadata?.contracts && typeof groupMetadata.contracts === 'object' ? groupMetadata.contracts : {};
+  const metadataContracts = asAdminSessionConfig(groupMetadata?.contracts);
   const visibleMetadataContracts = Object.entries(metadataContracts).filter(
-    ([, value]: any) => value && typeof value === 'object',
+    (entry): entry is [string, Record<string, unknown>] => {
+      const value = entry[1];
+      return !!value && typeof value === 'object' && !Array.isArray(value);
+    },
   );
   const readonlyMetadataContracts = visibleMetadataContracts.filter(
-    ([key]: any) => !ADMIN_EDITABLE_CONTRACT_KEY_SET.has(key),
+    ([key]) => !ADMIN_EDITABLE_CONTRACT_KEY_SET.has(key),
   );
   const sessionCardTone = selectedConfig ? 'ready' : availableSessions.length ? 'idle' : 'warning';
   const showHeroMedia = !!resolvedSessionHeader && heroHeaderImageReady;
@@ -2577,67 +2578,28 @@ const AdminPageRuntime = ({
           </div>
           {!groupMetadata && (
             <div className={styles.warningNote}>
-              No metadata found for this session yet. Register the session on-chain or select a legacy demo session.
+              {sessionCapabilities.isWorkerCanonical
+                ? 'No canonical Session Worker config was loaded. Restore the Worker URL and retry.'
+                : 'No metadata found for this session yet. Register the session on-chain or select a legacy demo session.'}
             </div>
           )}
           {metadataOpen && groupMetadata && (
             <>
-              <div className={styles.metadataGrid}>
-                <div className={styles.metadataItem}>
-                  <span>Slug</span>
-                  <span>
-                    {metadataSessionUrl ? (
-                      <a href={metadataSessionUrl} target="_blank" rel="noreferrer" className={styles.metadataLink}>
-                        {metadataSlugDisplay}
-                      </a>
-                    ) : (
-                      metadataSlugDisplay
-                    )}
-                  </span>
-                </div>
-                <div className={styles.metadataItem}>
-                  <span>Session name</span>
-                  <span>{toStr(groupMetadata.sessionName || '').trim() || '—'}</span>
-                </div>
-                <div className={styles.metadataItem}>
-                  <span>Chain / Registry</span>
-                  <span>
-                    {buildAdminChainRegistryDisplay({
-                      chainId: groupMetadata.networkChainId || groupMetadata.__registry?.chainId || '',
-                      registryChainId: groupMetadata.__registry?.registryChainId || groupMetadata.registryChainId || '',
-                    })}
-                  </span>
-                </div>
-                <div className={styles.metadataItem}>
-                  <span>Admin</span>
-                  <span>
-                    {metadataAdminUrl ? (
-                      <a href={metadataAdminUrl} target="_blank" rel="noreferrer" className={styles.metadataLink}>
-                        {shortAddress(metadataAdminAddress) || metadataAdminAddress}
-                      </a>
-                    ) : (
-                      '—'
-                    )}
-                  </span>
-                </div>
-                <div className={styles.metadataItem}>
-                  <span>Metadata URI</span>
-                  <span>
-                    {metadataUriUrl ? (
-                      <a href={metadataUriUrl} target="_blank" rel="noreferrer" className={styles.metadataLink}>
-                        {metadataUriValue}
-                      </a>
-                    ) : (
-                      '—'
-                    )}
-                  </span>
-                </div>
-                <div className={styles.metadataItem}>
-                  <span>Metadata source</span>
-                  <span>{metadataLoadStateLabel}</span>
-                </div>
-              </div>
-              {metadataContractsNeedVerification && (
+              <AdminPageSessionMetadataSummary
+                groupMetadata={groupMetadata}
+                isWorkerCanonical={sessionCapabilities.isWorkerCanonical}
+                workerUrl={baseWorkerUrl || selectedConfigWorkerUrl}
+                allowedOriginCount={effectiveWorkerAllowOrigins.length}
+                allowedOriginsReported={effectiveWorkerCorsState.reported}
+                metadataSlugDisplay={metadataSlugDisplay}
+                metadataSessionUrl={metadataSessionUrl}
+                metadataAdminAddress={metadataAdminAddress}
+                metadataAdminUrl={metadataAdminUrl}
+                metadataUriValue={metadataUriValue}
+                metadataUriUrl={metadataUriUrl}
+                metadataLoadStateLabel={metadataLoadStateLabel}
+              />
+              {sessionCapabilities.usesChainMetadata && metadataContractsNeedVerification && (
                 <div className={styles.warningNote}>
                   Session metadata could not be loaded, so the contract addresses below are currently synthesized from
                   chain defaults. Verify them before publishing any metadata update.
@@ -2672,6 +2634,7 @@ const AdminPageRuntime = ({
                   visibleMetadataContracts={visibleMetadataContracts}
                   handleSaveSessionMetadata={handleSaveSessionMetadata}
                   metadataUpdateStatus={metadataUpdateStatus}
+                  showChainFields={sessionCapabilities.usesChainMetadata}
                 />
               )}
               <div className={styles.metadataJsonSection}>
@@ -2750,24 +2713,91 @@ const AdminPageRuntime = ({
                 </div>
               </div>
               <Button
-                color="primary"
-                className={styles.actionButton}
-                onClick={handleSyncDefaultGate}
-                data-testid={E2E_TESTIDS.ADMIN_GATE_UPDATE_BUTTON}
-                disabled={!canAdminRegistry || gateSyncBusy}
-                style={{ opacity: gateConfigDirty ? 1 : 0.5 }}
+                size="sm"
+                color="secondary"
+                outline
+                className={styles.collapseToggle}
+                onClick={() => toggleSection('defaultGate')}
+                aria-label="Toggle On-chain default gate section"
               >
-                Update default gate on-chain
+                <FontAwesomeIcon icon={defaultGateOpen ? faCaretUp : faCaretDown} />
               </Button>
-              {gateSyncStatus && (
-                <div className={styles.statusNote} data-testid={E2E_TESTIDS.ADMIN_GATE_STATUS}>
-                  {gateSyncStatus}
+            </div>
+            {defaultGateOpen && (
+              <>
+                <div className={styles.formRow}>
+                  <FormGroup>
+                    <Label className={styles.gateLabelRow}>
+                      <span>Default gate SBTs</span>
+                      <Input
+                        type="select"
+                        value={defaultGateDraft.mode}
+                        data-testid={E2E_TESTIDS.ADMIN_GATE_MODE_SELECT}
+                        onChange={(e: any) => {
+                          setDefaultGateTouched(true);
+                          setGateConfigDirty(true);
+                          setDefaultGateDraft((prev: any) => ({ ...prev, mode: e.target.value }));
+                        }}
+                        className={styles.gateModeSelect}
+                      >
+                        <option value="any">ANY</option>
+                        <option value="all">ALL</option>
+                      </Input>
+                    </Label>
+                    <SBTSelector
+                      id="admin-default-gate-sbts"
+                      label=""
+                      selectedSBTs={dedupeSbtSelections(defaultGateDraft.sbts || [])}
+                      onAddSBT={(sbt: any) => {
+                        setDefaultGateTouched(true);
+                        setGateConfigDirty(true);
+                        setDefaultGateDraft((prev: any) => ({
+                          ...prev,
+                          sbts: dedupeSbtSelections([...(prev.sbts || []), sbt]),
+                        }));
+                      }}
+                      onRemoveSBT={(address: any) => {
+                        setDefaultGateTouched(true);
+                        setGateConfigDirty(true);
+                        setDefaultGateDraft((prev: any) => ({
+                          ...prev,
+                          sbts: dedupeSbtSelections(prev.sbts || []).filter(
+                            (entry: any) => toStr(entry.address).toLowerCase() !== toStr(address).toLowerCase(),
+                          ),
+                        }));
+                      }}
+                      network={network}
+                      chainId={
+                        Number(
+                          selectedConfig?.networkChainId || selectedConfig?.__registry?.chainId || network?.id || 0,
+                        ) || null
+                      }
+                      sessionSlug={normalizeSlug(selectedSlug)}
+                      variant="admin"
+                      ensureLightSbtUniverse={ensureLightSbtUniverse}
+                    />
+                  </FormGroup>
                 </div>
-              )}
-              {gateSyncResult && <div className={styles.statusNote}>{renderAdminTestResult(gateSyncResult)}</div>}
-            </>
-          )}
-        </section>
+                <Button
+                  color="primary"
+                  className={styles.actionButton}
+                  onClick={handleSyncDefaultGate}
+                  data-testid={E2E_TESTIDS.ADMIN_GATE_UPDATE_BUTTON}
+                  disabled={!canAdminRegistry || gateSyncBusy}
+                  style={{ opacity: gateConfigDirty ? 1 : 0.5 }}
+                >
+                  Update default gate on-chain
+                </Button>
+                {gateSyncStatus && (
+                  <div className={styles.statusNote} data-testid={E2E_TESTIDS.ADMIN_GATE_STATUS}>
+                    {gateSyncStatus}
+                  </div>
+                )}
+                {gateSyncResult && <div className={styles.statusNote}>{renderAdminTestResult(gateSyncResult)}</div>}
+              </>
+            )}
+          </section>
+        ) : null}
 
         {sessionCapabilities.usesOnChainSbt && !sessionCapabilities.isRegistryCanonical ? (
           <section className={`${styles.panel} ${styles.gatePanel}`} data-testid="ce-admin-worker-sbt-gates">
@@ -2831,295 +2861,49 @@ const AdminPageRuntime = ({
           handleSaveWorkerSecrets={handleSaveWorkerSecrets}
           saveStatus={saveStatus}
           chainStatus={chainStatus}
+          visibleCardKeys={sessionCapabilities.adminSecretCardKeys}
         />
 
         {showTestsPanel && (
-          <section className={`${styles.panel} ${styles.testsPanel}`}>
-            <div className={styles.panelHeader}>
-              <div className={styles.panelTitleGroup}>
-                <div className={styles.panelTitleRow}>
-                  <div className={styles.panelTitle}>Tests</div>
-                  {renderInfoTooltip(
-                    'admin-tests-tip',
-                    <div className={styles.tooltipTextStack}>
-                      <div>Run quick checks against the selected worker and the session&apos;s gate rules.</div>
-                      <div>
-                        Run these as a user who holds the sponsored SBT. Tests use the configured worker URL and auth
-                        flow.
-                      </div>
-                    </div>,
-                  )}
-                </div>
-              </div>
-              <Button
-                size="sm"
-                color="secondary"
-                outline
-                className={styles.collapseToggle}
-                onClick={() => {
-                  setShowTestsPanel(false);
-                  setOpenSection((prev: any) => (prev === 'tests' ? '' : prev));
-                }}
-                aria-label="Toggle Tests section"
-              >
-                <FontAwesomeIcon icon={testsOpen ? faCaretUp : faCaretDown} />
-              </Button>
-            </div>
-            {testsOpen && (
-              <>
-                <div className={styles.panelTitleRow}>
-                  <div className={styles.panelSubtitle}>Lit quick test (no worker)</div>
-                  {renderInfoTooltip(
-                    'admin-lit-test-tip',
-                    'Uses the selected session’s default gate + Lit hooks. Does not call the worker.',
-                  )}
-                </div>
-                <FormGroup>
-                  <Label>Lit test value</Label>
-                  <Input
-                    type="textarea"
-                    rows="2"
-                    value={litTestValue}
-                    onChange={(e: any) => setLitTestValue(e.target.value)}
-                    placeholder="Type a short test string"
-                  />
-                </FormGroup>
-                <div className={`${styles.formRow} ${styles.litActionRow}`}>
-                  <Button
-                    color="primary"
-                    outline
-                    className={styles.actionButton}
-                    onClick={runLitEncryptTest}
-                    disabled={litTestBusy}
-                  >
-                    Encrypt
-                  </Button>
-                  <Button
-                    color="primary"
-                    outline
-                    className={styles.actionButton}
-                    onClick={runLitDecryptTest}
-                    disabled={litTestBusy || !litTestEnvelope}
-                  >
-                    Decrypt
-                  </Button>
-                </div>
-                {litTestStatus && <div className={styles.statusNote}>{litTestStatus}</div>}
-                {litTestEnvelope && (
-                  <div className={styles.resultBox}>
-                    <div>Envelope</div>
-                    <pre>{litTestEnvelope}</pre>
-                  </div>
-                )}
-                {litTestDecrypted && <div className={styles.statusNote}>Decrypted: {litTestDecrypted}</div>}
-                <div className={styles.inlineRow}>
-                  <Label>
-                    Transcription test (AudioInput)
-                    {!canRunTests &&
-                      renderInfoTooltip(
-                        'admin-transcription-tip',
-                        'Connect a wallet and set a worker URL to test transcription.',
-                      )}
-                  </Label>
-                  {canRunTests ? (
-                    <AudioInput
-                      placeholder="Record a short clip to test /transcribe…"
-                      updateFunction={(next: any) => {
-                        setTranscribeText(next);
-                        const trimmed = toStr(next).trim();
-                        setTestResults((prev) => ({
-                          ...prev,
-                          transcribe: trimmed ? `OK (${trimmed.slice(0, 80)})` : '',
-                        }));
-                      }}
-                      toggleEncryption={() => {}}
-                      value={transcribeText}
-                      encrypted={false}
-                      hideEncryption
-                      disableEncryption
-                      enableAiRewrite={false}
-                      sessionSlug={normalizeSlug(selectedSlug)}
-                      sessionConfig={testSessionConfig}
-                      context={testContext}
-                      workerUrl={baseWorkerUrl}
-                    />
-                  ) : null}
-                </div>
-                {testStatus && <div className={styles.statusNote}>{testStatus}</div>}
-                <div className={styles.grid}>
-                  <div
-                    className={`${styles.statusItem} ${canRunHealthTest ? styles.statusItemClickable : ''}`}
-                    onClick={() => {
-                      if (!testBusy && canRunHealthTest) runWorkerHealthTest();
-                    }}
-                    role={canRunHealthTest ? 'button' : undefined}
-                    tabIndex={canRunHealthTest ? 0 : -1}
-                    onKeyDown={(e: any) => {
-                      if (e.key === 'Enter' && !testBusy && canRunHealthTest) runWorkerHealthTest();
-                    }}
-                    title={(() => {
-                      if (!baseWorkerUrl) return 'Set a worker URL to test /health';
-                      if (!defaultGateIsEmpty && !walletReady) return 'Connect a wallet to run the gated access test.';
-                      return 'Click to test /health';
-                    })()}
-                    id={!defaultGateIsEmpty && !walletReady ? 'admin-health-test-chip' : undefined}
-                  >
-                    <span>Health</span>
-                    <span>{testBusy ? 'Testing\u2026' : renderAdminTestResult(testResults.health)}</span>
-                  </div>
-                  {!defaultGateIsEmpty && !walletReady && (
-                    <CETooltip
-                      placement="top"
-                      trigger="hover focus click"
-                      target="admin-health-test-chip"
-                      className={styles.tooltipBubble}
-                    >
-                      Connect a wallet to run the gated access test.
-                    </CETooltip>
-                  )}
-                  <div
-                    className={`${styles.statusItem} ${account ? styles.statusItemClickable : ''}`}
-                    onClick={() => {
-                      if (!testBusy && account) runWorkerAiTest();
-                    }}
-                    role={account ? 'button' : undefined}
-                    tabIndex={account ? 0 : -1}
-                    onKeyDown={(e: any) => {
-                      if (e.key === 'Enter' && !testBusy && account) runWorkerAiTest();
-                    }}
-                    title="Click to test AI"
-                  >
-                    <span>AI</span>
-                    <span>{testBusy ? 'Testing\u2026' : renderAdminTestResult(testResults.ai)}</span>
-                  </div>
-                  <div
-                    className={`${styles.statusItem} ${account ? styles.statusItemClickable : ''}`}
-                    onClick={() => {
-                      if (!testBusy && account) runWorkerArweaveTest();
-                    }}
-                    role={account ? 'button' : undefined}
-                    tabIndex={account ? 0 : -1}
-                    onKeyDown={(e: any) => {
-                      if (e.key === 'Enter' && !testBusy && account) runWorkerArweaveTest();
-                    }}
-                    title="Click to test Arweave upload"
-                  >
-                    <span>Arweave</span>
-                    <span>{testBusy ? 'Testing\u2026' : renderAdminTestResult(testResults.arweave)}</span>
-                  </div>
-                  <div
-                    className={`${styles.statusItem} ${account ? styles.statusItemClickable : ''}`}
-                    onClick={() => {
-                      if (!testBusy && account) runWorkerFaucetTest();
-                    }}
-                    role={account ? 'button' : undefined}
-                    tabIndex={account ? 0 : -1}
-                    onKeyDown={(e: any) => {
-                      if (e.key === 'Enter' && !testBusy && account) runWorkerFaucetTest();
-                    }}
-                    title="Click to test faucet (0.0000001)"
-                  >
-                    <span>Faucet</span>
-                    <span>{testBusy ? 'Testing\u2026' : renderAdminTestResult(testResults.faucet)}</span>
-                  </div>
-                  <div className={styles.statusItem}>
-                    <span>Transcribe</span>
-                    <span>{renderAdminTestResult(testResults.transcribe)}</span>
-                  </div>
-                </div>
-                <div className={styles.panelTitleRow} style={{ marginTop: 16 }}>
-                  <div className={styles.panelTitle}>Negative tests (denied access)</div>
-                  {renderInfoTooltip(
-                    'admin-negative-tests-tip',
-                    'Connect a wallet that does NOT hold the sponsored SBT. Each test expects a 403 during login.',
-                  )}
-                </div>
-                {deniedStatus && <div className={styles.statusNote}>{deniedStatus}</div>}
-                <div className={styles.grid}>
-                  <div
-                    className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
-                    onClick={() => {
-                      if (!deniedBusy) runDeniedAccessTest('login');
-                    }}
-                    role={!deniedBusy ? 'button' : undefined}
-                    tabIndex={!deniedBusy ? 0 : -1}
-                    onKeyDown={(e: any) => {
-                      if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('login');
-                    }}
-                    title="Click to test login denied"
-                    data-testid="ce-admin-denied-chip-login"
-                  >
-                    <span>Login</span>
-                    <span>{renderAdminTestResult(deniedResults.login)}</span>
-                  </div>
-                  <div
-                    className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
-                    onClick={() => {
-                      if (!deniedBusy) runDeniedAccessTest('ai');
-                    }}
-                    role={!deniedBusy ? 'button' : undefined}
-                    tabIndex={!deniedBusy ? 0 : -1}
-                    onKeyDown={(e: any) => {
-                      if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('ai');
-                    }}
-                    title="Click to test AI denied"
-                    data-testid="ce-admin-denied-chip-ai"
-                  >
-                    <span>AI</span>
-                    <span>{renderAdminTestResult(deniedResults.ai)}</span>
-                  </div>
-                  <div
-                    className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
-                    onClick={() => {
-                      if (!deniedBusy) runDeniedAccessTest('arweave');
-                    }}
-                    role={!deniedBusy ? 'button' : undefined}
-                    tabIndex={!deniedBusy ? 0 : -1}
-                    onKeyDown={(e: any) => {
-                      if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('arweave');
-                    }}
-                    title="Click to test Arweave denied"
-                    data-testid="ce-admin-denied-chip-arweave"
-                  >
-                    <span>Arweave</span>
-                    <span>{renderAdminTestResult(deniedResults.arweave)}</span>
-                  </div>
-                  <div
-                    className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
-                    onClick={() => {
-                      if (!deniedBusy) runDeniedAccessTest('transcribe');
-                    }}
-                    role={!deniedBusy ? 'button' : undefined}
-                    tabIndex={!deniedBusy ? 0 : -1}
-                    onKeyDown={(e: any) => {
-                      if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('transcribe');
-                    }}
-                    title="Click to test transcription denied"
-                    data-testid="ce-admin-denied-chip-transcribe"
-                  >
-                    <span>Transcribe</span>
-                    <span>{renderAdminTestResult(deniedResults.transcribe)}</span>
-                  </div>
-                  <div
-                    className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
-                    onClick={() => {
-                      if (!deniedBusy) runDeniedAccessTest('faucet');
-                    }}
-                    role={!deniedBusy ? 'button' : undefined}
-                    tabIndex={!deniedBusy ? 0 : -1}
-                    onKeyDown={(e: any) => {
-                      if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('faucet');
-                    }}
-                    title="Click to test faucet denied"
-                    data-testid="ce-admin-denied-chip-faucet"
-                  >
-                    <span>Faucet</span>
-                    <span>{renderAdminTestResult(deniedResults.faucet)}</span>
-                  </div>
-                </div>
-              </>
-            )}
-          </section>
+          <AdminPageTestsPanel
+            testsOpen={testsOpen}
+            onCollapse={() => {
+              setShowTestsPanel(false);
+              setOpenSection((prev) => (prev === 'tests' ? '' : prev));
+            }}
+            litTestValue={litTestValue}
+            setLitTestValue={setLitTestValue}
+            litTestBusy={litTestBusy}
+            litTestEnvelope={litTestEnvelope}
+            litTestStatus={litTestStatus}
+            litTestDecrypted={litTestDecrypted}
+            runLitEncryptTest={runLitEncryptTest}
+            runLitDecryptTest={runLitDecryptTest}
+            canRunTests={canRunTests}
+            canRunHealthTest={canRunHealthTest}
+            defaultGateIsEmpty={defaultGateIsEmpty}
+            walletReady={walletReady}
+            account={account}
+            testBusy={testBusy}
+            testResults={testResults}
+            testStatus={testStatus}
+            runWorkerHealthTest={runWorkerHealthTest}
+            runWorkerAiTest={runWorkerAiTest}
+            runWorkerArweaveTest={runWorkerArweaveTest}
+            runWorkerFaucetTest={runWorkerFaucetTest}
+            transcribeText={transcribeText}
+            handleTranscribeTestTextChange={handleTranscribeTestTextChange}
+            selectedSlug={selectedSlug}
+            testSessionConfig={testSessionConfig}
+            testContext={testContext}
+            baseWorkerUrl={baseWorkerUrl}
+            deniedBusy={deniedBusy}
+            deniedStatus={deniedStatus}
+            deniedResults={deniedResults}
+            runDeniedAccessTest={runDeniedAccessTest}
+            visibleTestKeys={sessionCapabilities.adminTestKeys}
+            gateKind={sessionCapabilities.gateKind}
+          />
         )}
       </div>
     </div>

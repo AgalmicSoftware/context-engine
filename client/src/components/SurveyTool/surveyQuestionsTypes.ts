@@ -85,10 +85,14 @@ export type SurveyQuestionsFullLoadingProgressState = {
 };
 
 export type SurveyQuestionsJsonPanelDisplayState = {
+  showFullSurveyJsonControls: boolean;
   showQuestionJsonControls: boolean;
+  showQuestionsJson: boolean;
   showSurveyJsonPanel: boolean;
   showQuestionsJsonPanel: boolean;
+  showResponseJson: boolean;
   showResponseJsonPanel: boolean;
+  showSurveyJson: boolean;
   surveyJsonRowClassName: string | undefined;
   surveyJsonToggleClassName: string | undefined;
   questionJsonToggleClassName: string | undefined;
@@ -98,6 +102,11 @@ export type SurveyQuestionsJsonPanelDisplayState = {
 
 export type SurveyQuestionsJsonForDisplayState = {
   jsonForDisplay: unknown;
+};
+
+export type SurveyQuestionsJsonPreviewDisplayState = {
+  canUseJsonPreview: boolean;
+  jsonPreview: unknown;
 };
 
 export type SurveyQuestionsLayoutDisplayState = {
@@ -130,6 +139,59 @@ export type SurveyQuestionsSubmitFooterDisplayState = {
   genericShowInlineSubmit: boolean;
   showInlineSubmit: boolean;
   showTopInlineSubmit: boolean;
+};
+
+export type SurveyQuestionsSubmitReadinessDescriptor = {
+  currentStep: number;
+  encryptedPendingEditCount: number;
+  hasEncryptedAnswers: boolean;
+  hasMaskedCurrentQuestionPayload: boolean;
+  isSubmitting: boolean;
+  pendingEditCount: number;
+  shouldCheckMaskedCurrentQuestionPayload: boolean;
+  singleQuestionMode: boolean;
+  uploadPhase: 'encrypting' | 'uploading';
+};
+
+export type SurveyQuestionsRenderReadinessDescriptor = {
+  surveyIndex: number;
+  currentSurveyResponseState: ResponseSlice | null;
+  fullQuestionPool: unknown[];
+  visibleQuestionPool: unknown[];
+  hiddenMaskedQuestionIds: string[];
+  questionPoolReady: boolean;
+  gatedEmptyStateReady: boolean;
+  hasHiddenMaskedQuestions: boolean;
+  canFallThroughDisplayAnswerMode: boolean;
+  shouldShowLoadingState: boolean;
+};
+
+export type SurveyQuestionsMaskedQuestionVisibilityState = {
+  fullQuestionPool: unknown[];
+  visibleQuestionPool: unknown[];
+  hiddenMaskedQuestionIds: string[];
+};
+
+export type SurveyQuestionsAuthoringPanelDisplayState = {
+  showBackToTopControl: boolean;
+  showJsonControl: boolean;
+  showLockedQuestionsBanner: boolean;
+};
+
+export type SurveyQuestionsAuthoringRouteReadinessDescriptor = {
+  canEditQuestions: boolean;
+  gatedEmptyStateReady: boolean;
+  hasCurrentSurveyResponseState: boolean;
+  hasVisibleQuestions: boolean;
+  questionPoolReady: boolean;
+  shouldRenderEditableQuestions: boolean;
+  visibleQuestionCount: number;
+};
+
+export type SurveyQuestionsPrimarySubmitPlan = {
+  action: 'inert' | 'navigate' | 'submit';
+  reason: string;
+  path: string;
 };
 
 export type SurveyAutoDecryptDisabledStatePatch = {

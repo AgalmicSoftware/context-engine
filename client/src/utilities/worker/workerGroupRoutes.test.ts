@@ -1,8 +1,4 @@
-import {
-  buildWorkerGroupsPath,
-  readWorkerGroupIdFromHash,
-  readWorkerGroupIdFromPath,
-} from './workerGroupRoutes';
+import { buildWorkerGroupsPath, readWorkerGroupIdFromHash, readWorkerGroupIdFromPath } from './workerGroupRoutes';
 
 describe('workerGroupRoutes', () => {
   const legacyAddressGroupId = '0x1234567890abcdef1234567890abcdef12345678';
@@ -54,9 +50,7 @@ describe('workerGroupRoutes', () => {
   });
 
   it('reads only canonical Worker Group detail paths', () => {
-    expect(readWorkerGroupIdFromPath('/group/reviewers%20%2F%20public?sessionName=demo-sh')).toBe(
-      'reviewers / public',
-    );
+    expect(readWorkerGroupIdFromPath('/group/reviewers%20%2F%20public?sessionName=demo-sh')).toBe('reviewers / public');
     expect(readWorkerGroupIdFromPath('/groups/reviewers')).toBe('');
     expect(readWorkerGroupIdFromPath('/group/reviewers/extra')).toBe('');
     expect(readWorkerGroupIdFromPath('/group/%E0%A4%A')).toBe('');

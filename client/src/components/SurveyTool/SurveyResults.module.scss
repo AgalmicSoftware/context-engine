@@ -431,7 +431,17 @@
     vertical-align: top;
   }
 
+  th:first-child,
+  td:first-child {
+    width: 4.25rem;
+    text-align: center;
+  }
+
+  :global(.form-check-input),
   input[type='checkbox'] {
+    position: static !important;
+    float: none !important;
+    margin: 0 !important;
     width: 1rem;
     height: 1rem;
     opacity: 1 !important;
@@ -461,17 +471,22 @@
 }
 
 .htmlReportOptionRow {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1.15rem minmax(0, 1fr);
   align-items: flex-start;
-  gap: 0.6rem;
-  margin: 0.65rem 0;
-  padding: 0;
+  column-gap: 0.7rem;
+  row-gap: 0.15rem;
+  margin: 0.7rem 0;
+  padding: 0 !important;
 
+  :global(.form-check-input),
+  input[type='checkbox'],
   input[type='radio'] {
-    flex: 0 0 auto;
+    position: static !important;
+    float: none !important;
     width: 1rem;
     height: 1rem;
-    margin: 0.25rem 0 0;
+    margin: 0.2rem 0 0 !important;
     opacity: 1 !important;
     visibility: visible !important;
     accent-color: var(--ce-status-info);

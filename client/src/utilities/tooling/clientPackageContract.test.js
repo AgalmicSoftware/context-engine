@@ -25,15 +25,19 @@ describe('client package modernization contract', () => {
     const pkg = readClientPackageJson();
 
     expect(pkg.scripts.dev).toBe('PUBLIC_URL=/ vite --host 0.0.0.0 --port 3000');
+    expect(pkg.scripts.prebuild).toBe('node scripts/clean-legacy-vite-output.mjs');
     expect(pkg.scripts.build).toBe('PUBLIC_URL=/ vite build');
     expect(pkg.scripts.preview).toBe('vite preview --host 0.0.0.0');
     expect(pkg.scripts.start).toBe('npm run preview');
     expect(pkg.scripts.test).toBe('jest');
+    expect(pkg.scripts.lint).toBe(expectedLintCommand);
+    expect(pkg.scripts['format:check']).toBe(
+      'prettier --config .prettierrc.js --ignore-path ../.prettierignore --check "src/**/*.{js,jsx,mjs,cjs,ts,tsx,css,scss}"',
+    );
   });
 
   it('makes bundle analysis use the local Vite reporter without publishing sourcemaps', () => {
     const pkg = readClientPackageJson();
-    const eslintConfig = readClientFile('.eslintrc.json');
 
     expect(pkg.scripts.build).not.toContain('sourcemap');
     expect(pkg.scripts.analyze).toBe('CE_BUNDLE_REPORT=1 npm run build');
@@ -54,6 +58,21 @@ describe('client package modernization contract', () => {
     expect(pkg.scripts.eject).toBeUndefined();
     expect(pkg.scripts.start).toBe('npm run preview');
     expect(eslintConfig).not.toContain('react-app');
+    expect(eslintConfig).toContain("const typedDomainFiles = ['src/domains/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedSessionUtilityFiles = ['src/utilities/session/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedWorkerUtilityFiles = ['src/utilities/worker/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedArweaveUtilityFiles = ['src/utilities/arweave/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedWeb3UtilityFiles = ['src/utilities/web3/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedCacheUtilityFiles = ['src/utilities/cache/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedSurveyUtilityFiles = ['src/utilities/survey/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedSbtUtilityFiles = ['src/utilities/sbt/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedUserUtilityFiles = ['src/utilities/user/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedSponsorUtilityFiles = ['src/utilities/sponsor/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedTagsUtilityFiles = ['src/utilities/tags/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedContractsUtilityFiles = ['src/utilities/contracts/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedSharedUtilityFiles = ['src/utilities/shared/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedStorageUtilityFiles = ['src/utilities/storage/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain('files: typedStorageUtilityFiles');
     expect(eslintConfig).toContain("const typedGateComponentFiles = ['src/components/Gates/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain(
       "const typedCommunityTabComponentFiles = ['src/components/CommunityTab/**/*.{ts,tsx}']",
@@ -156,7 +175,6 @@ describe('client package modernization contract', () => {
       'vendor-ethers',
       'vendor-wallet-core',
       'vendor-wallet-connectors',
-      'vendor-lit',
       'vendor-arweave',
       'vendor-visualization',
       'vendor-canvas',
@@ -181,6 +199,7 @@ describe('client package modernization contract', () => {
     expect(viteConfig).not.toContain("'/node_modules/poseidon-lite/constants/1.js'");
     expect(viteConfig).not.toContain("'/node_modules/poseidon-lite/constants/4.js'");
     expect(viteConfig).not.toContain("'/node_modules/poseidon-lite/constants/16.js'");
+    expect(viteConfig).not.toContain("'/node_modules/@dnd-kit/'");
     expect(viteConfig).not.toContain('vendor-lit');
     expect(viteConfig).toContain("'/src/variables/demo/demo_2_question_seed.json'");
     expect(viteConfig).toContain("'/node_modules/hash.js/'");
@@ -251,23 +270,9 @@ describe('client package modernization contract', () => {
     const jestConfig = readClientFile('jest.config.cjs');
     const jsdomPolyfills = readClientFile('scripts/jest/jsdomPolyfills.js');
 
-    expect(pkg.babel.presets).toEqual([
-      [
-        '@babel/preset-env',
-        {
-          targets: {
-            node: 'current',
-          },
-        },
-      ],
-      [
-        '@babel/preset-react',
-        {
-          runtime: 'automatic',
-        },
-      ],
-      '@babel/preset-typescript',
-    ]);
+    expect(pkg.babel).toBeUndefined();
+    expect(jestConfig).toContain('@babel/preset-env');
+    expect(jestConfig).toContain('@babel/preset-react');
     expect(jestConfig).toContain("modules: 'commonjs'");
     expect(jestConfig).toContain('@babel/preset-typescript');
     expect(jestConfig).toContain('scripts/jest/jsdomPolyfills.js');
@@ -278,7 +283,17 @@ describe('client package modernization contract', () => {
     expect(jsdomPolyfills).toContain('process.env.PUBLIC_URL');
   });
 
-  it('keeps Vite browser-loaded compatibility shims free of runtime require calls', () => {
+  it('keeps stale direct Babel syntax plugin wiring out of the client contract', () => {
+    const pkg = readClientPackageJson();
+    const jestConfig = readClientFile('jest.config.cjs');
+
+    expect(pkg.devDependencies['@babel/plugin-proposal-private-property-in-object']).toBeUndefined();
+    expect(pkg.devDependencies['@babel/plugin-syntax-import-meta']).toBeUndefined();
+    expect(pkg.babel).toBeUndefined();
+    expect(jestConfig).not.toContain('@babel/plugin-syntax-import-meta');
+  });
+
+  it('keeps Vite browser-loaded TS entrypoints free of runtime require calls', () => {
     [
       'src/components/DebateMap/DebateMap.tsx',
       'src/components/SurveyTool/CreateQuestionsAndSurveys.tsx',
@@ -296,11 +311,13 @@ describe('client package modernization contract', () => {
       '@babel/preset-env',
       '@babel/preset-react',
       '@babel/preset-typescript',
+      '@eslint/js',
       '@typescript-eslint/parser',
       'babel-jest',
       'eslint',
       'eslint-plugin-react',
       'eslint-plugin-react-hooks',
+      'globals',
       'sass',
       'vite',
     ];

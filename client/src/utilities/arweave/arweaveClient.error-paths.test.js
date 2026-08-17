@@ -146,7 +146,7 @@ describe('error paths', () => {
       return new Promise(() => {});
     });
 
-    const pending = arweaveScripts.downloadDataFromArweave(TX_ID_TIMEOUT, {
+    const pending = arweaveClient.downloadDataFromArweave(TX_ID_TIMEOUT, {
       gateways: [TEST_AR_IO_GATEWAY],
       retries: 0,
       bypassCache: true,

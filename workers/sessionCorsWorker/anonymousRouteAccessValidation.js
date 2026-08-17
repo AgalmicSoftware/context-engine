@@ -1,4 +1,5 @@
 import { toTrimmedString } from './stringCoercion.js';
+import { resolveRegistryChainId } from './chainIdNormalization.js';
 import {
   evaluateWorkerCanonicalAnonymousAccess,
   isWorkerCanonicalSessionConfig,
@@ -75,17 +76,6 @@ export const evaluateAnonymousRouteAccess = async ({
 
   if (requestApiKey) {
     return { ok: true, reason: 'request-api-key' };
-  }
-
-  if (isWorkerCanonicalSessionConfig(config)) {
-    const result = evaluateWorkerCanonicalAnonymousAccess({ config, route: routeKey });
-    return result.ok
-      ? result
-      : {
-          ...result,
-          status: 403,
-          error: anonymousRouteDeniedError,
-        };
   }
 
   const registryAddress = toTrimmedString(config?.registryAddress, deps);

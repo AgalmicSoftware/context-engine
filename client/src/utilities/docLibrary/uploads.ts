@@ -24,38 +24,11 @@ type BaseUploadContextArgs = {
   chainId?: unknown;
 };
 
-const normalizeTagsForTagMap = (tags) => (
-  (Array.isArray(tags) ? tags : [])
-    .filter((tag) => tag && typeof tag === 'object')
-    .map((tag) => ({ name: toStr(tag.name).trim(), value: toStr(tag.value).trim() }))
-    .filter((tag) => tag.name && tag.value !== '')
-);
-
-const buildTagMap = (tags) => Object.fromEntries(
-  normalizeTagsForTagMap(tags).map((tag) => [tag.name, tag.value])
-);
-
-export const buildSessionDocLibraryViewerUrl = ({
-  sessionToken,
-  txId,
-  storageRef,
-  storageId,
-  storage = 'lit-arweave',
-  kind = 'file',
-  name = '',
-} = {}) => {
-  const token = toStr(sessionToken).trim();
-  // __ceDocTx is the legacy query name. For non-Arweave backends it carries the
-  // backend-specific opaque storage ref, not necessarily an Arweave transaction id.
-  const id = toStr(storageRef || storageId || txId).trim();
-  if (!token || !id) return '';
-  const pathname = buildPublicUrlPath(`/session/${encodeURIComponent(token)}/docs`);
-  const query = new URLSearchParams();
-  query.set('__ceDocTx', id);
-  query.set('__ceDocStorage', toStr(storage).trim() || 'lit-arweave');
-  query.set('__ceDocKind', toStr(kind).trim() || 'file');
-  if (toStr(name).trim()) query.set('__ceDocName', toStr(name).trim());
-  return `${pathname}?${query.toString()}`;
+type DocPayloadOptions = {
+  name?: unknown;
+  format?: unknown;
+  mime?: unknown;
+  type?: unknown;
 };
 
 type DocEncryptionOptions = UnknownRecord & {
@@ -295,7 +268,7 @@ const buildEncryptedUploadArgs = ({
   providerLike,
   chainId,
   encryption,
-} = {}) =>
+}: EncryptedDocUploadArgs = {}) =>
   litStorage.uploadEncryptedArweaveData({
     data,
     name,
@@ -333,7 +306,7 @@ const buildSelfRecipientUploadArgs = ({
   providerLike,
   chainId,
   encryption,
-} = {}) =>
+}: EncryptedDocUploadArgs = {}) =>
   uploadSelfRecipientEncryptedDocData({
     data,
     name,
@@ -416,9 +389,9 @@ export const uploadDocLibraryFile = async ({
     txId,
     url:
       storage === STORAGE_BACKENDS.CLOUDFLARE
-        ? toStr(result?.storageRef?.uri).trim()
+        ? toStr(readRecord(resultStorageRef, 'uri')).trim()
         : txId
-          ? arweaveScripts.buildArweaveGatewayUrl(txId)
+          ? arweaveClient.buildArweaveGatewayUrl(txId)
           : '',
     storage,
     storageRef: resultStorageRef || null,
@@ -497,9 +470,9 @@ export const uploadDocLibraryUrlRecord = async ({
     txId,
     url:
       storage === STORAGE_BACKENDS.CLOUDFLARE
-        ? toStr(result?.storageRef?.uri).trim()
+        ? toStr(readRecord(resultStorageRef, 'uri')).trim()
         : txId
-          ? arweaveScripts.buildArweaveGatewayUrl(txId)
+          ? arweaveClient.buildArweaveGatewayUrl(txId)
           : '',
     storage,
     storageRef: resultStorageRef || null,

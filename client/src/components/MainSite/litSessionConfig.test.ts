@@ -1,4 +1,9 @@
 import { resolveMainSiteLitSessionConfig, resolveMainSiteLitSessionConfigSource } from './litSessionConfig.js';
+import {
+  SESSION_MODE_PRESET_IDS,
+  cloneSessionModePreset,
+  type SessionModeProfile,
+} from '../../utilities/session/sessionModeProfile';
 
 const VALID_SBT_ADDRESS = '0x0000000000000000000000000000000000000001';
 const LEGACY_SESSION_ID = '0x00112233445566778899aabbccddeeff';

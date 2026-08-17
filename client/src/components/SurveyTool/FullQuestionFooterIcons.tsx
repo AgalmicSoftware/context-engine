@@ -36,7 +36,7 @@ const FullQuestionFooterIcons = ({
   <div className={styles.fullQuestionIcons}>
     <button
       type="button"
-      className={`${styles.iconButton} ${styles.commentButton} ${hasAdditionalContent ? styles.iconButtonActive : ''}`}
+      className={buildFullQuestionCommentButtonClassName(styles, hasAdditionalContent)}
       onClick={onToggleComments}
       aria-pressed={commentsOpen}
       title="Additional comments"

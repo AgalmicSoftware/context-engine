@@ -229,7 +229,7 @@ function resolveSpecifier(specifier, importerPath) {
       module: specifier,
       importer: importerPath,
       error: error && error.message ? error.message : String(error),
-      fixHint: PASSKEY_FIX_HINT,
+      fixHint: dependencyFixHint(specifier),
     };
   }
 }
@@ -273,7 +273,7 @@ function firstUnresolvableRequire(filePath, rootDir, visited = new Set()) {
       module: path.relative(rootDir, normalizedFile),
       importer: null,
       error: error && error.message ? error.message : String(error),
-      fixHint: PASSKEY_FIX_HINT,
+      fixHint: dependencyFixHint(path.relative(rootDir, normalizedFile)),
     };
   }
 

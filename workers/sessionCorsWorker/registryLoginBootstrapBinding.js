@@ -83,6 +83,9 @@ export const createRegistryLoginBootstrapAdaptersWithWorkerDeps = ({
     config,
     requestedScopes,
   } = {}) => {
+    // Endpoint identity is memoized only for this login request. A shared cache
+    // would let a later request trust an endpoint that has since changed chain.
+    const chainAttestationCache = new Map();
     const {
       authorityMode,
       registryAddress,

@@ -39,9 +39,9 @@
       },
       "cross_corpus": {
         "label": "Cross-Corpus Debates",
-        "sample_count": 8,
-        "full_count": 8,
-        "count": 13
+        "sample_count": 16,
+        "full_count": 16,
+        "count": 16
       }
     }
   },
@@ -264,7 +264,7 @@
         {
           "url": "https://x.com/sama/status/1983584366547829073",
           "author": "@sama",
-          "text": "Yesterday we did a livestream. TL;DR:\n\nWe have set internal goals of having an automated AI research intern by September of 2026 running on hundreds of thousands of GPUs, and a true automated AI researcher by March of 2028. We may totally fail at this goal, but given the extraordinary potential impacts we think it is in the public interest to be transparent about this.\n\nWe have a safety strategy that relies on 5 layers: Value alignment, Goal alignment, Reliability, Adversarial robustness, and System safety. Chain-of-thought faithfulness is a tool we are particularly excited about, but it somewhat fragile and requires drawing a boundary and a clear abstraction.\n\nOn the product side, we are trying to move towards a true platform, where people and companies building on top of our offerings will capture most of the value. Today people can build on our API and apps in ChatGPT; eventually, we want to offer an AI cloud that enables huge businesses.\n\nWe have currently committed to about 30 gigawatts of compute, with a total cost of ownership over the years of about $1.4 trillion. We are comfortable with this given what we see on the horizon for model capability growth and revenue growth. We would like to do more—we would like to build an AI factory that can make 1 gigawatt per week of new capacity, at a greatly reduced cost relative to today—but that will require more confidence in future models, revenue, and technological/financial innovation.\n\nOur new structure is much simpler than our old one. We have a non-profit calledOpenAI Foundation that governs a Public Benefit Corporation called OpenAI Group. The foundation initially owns 26% of the PBC, but it can increase with warrants over time if the PBC does super well. The PBC can attract the resources needed to achieve the mission.\n\nOur mission, for both our non-profit and PBC, remains the same: to ensure that artificial general intelligence benefits all of humanity.\n\nThe nonprofit is initially committing $25 billion to health and curing disease, and AI resilience (all of the things that could help society have a successful transition to a post-AGI world, including technical safety but also things like economic impact, cyber security, and much more). The nonprofit now has the ability to actually deploy capital relatively quickly, unlike before.\n\nIn 2026 we expect that our AI systems may be able to make small new discoveries; in 2028 we could be looking at big ones. This is a really big deal; we think that science, and the institutions that let us widely distribute the fruits of science, are the most important ways that quality of life improves over time.",
+          "text": "Yesterday we did a livestream. TL;DR:\n\nWe have set internal goals of having an automated AI research intern by September of 2026 running on hundreds of thousands of GPUs, and a true automated AI researcher by March of 2028. We may totally fail at this goal, but given the extraordinary potential impacts we think it is in the public interest to be transparent about this.\n\nWe have a safety strategy that relies on 5 layers: Value alignment, Goal alignment, Reliability, Adversarial robustness, and System safety. Chain-of-thought faithfulness is a tool we are particularly excited about, but it is somewhat fragile and requires drawing a boundary and a clear abstraction.\n\nOn the product side, we are trying to move towards a true platform, where people and companies building on top of our offerings will capture most of the value. Today people can build on our API and apps in ChatGPT; eventually, we want to offer an AI cloud that enables huge businesses.\n\nWe have currently committed to about 30 gigawatts of compute, with a total cost of ownership over the years of about $1.4 trillion. We are comfortable with this given what we see on the horizon for model capability growth and revenue growth. We would like to do more—we would like to build an AI factory that can make 1 gigawatt per week of new capacity, at a greatly reduced cost relative to today—but that will require more confidence in future models, revenue, and technological/financial innovation.\n\nOur new structure is much simpler than our old one. We have a non-profit called OpenAI Foundation that governs a Public Benefit Corporation called OpenAI Group. The foundation initially owns 26% of the PBC, but it can increase with warrants over time if the PBC does super well. The PBC can attract the resources needed to achieve the mission.\n\nOur mission, for both our non-profit and PBC, remains the same: to ensure that artificial general intelligence benefits all of humanity.\n\nThe nonprofit is initially committing $25 billion to health and curing disease, and AI resilience (all of the things that could help society have a successful transition to a post-AGI world, including technical safety but also things like economic impact, cyber security, and much more). The nonprofit now has the ability to actually deploy capital relatively quickly, unlike before.\n\nIn 2026 we expect that our AI systems may be able to make small new discoveries; in 2028 we could be looking at big ones. This is a really big deal; we think that science, and the institutions that let us widely distribute the fruits of science, are the most important ways that quality of life improves over time.",
           "created_at": "2025-10-29T17:19:00.000Z",
           "tags": [
             "Alignment",
@@ -1278,14 +1278,20 @@
           ]
         },
         {
-          "id": "council_of_europe_ai_convention",
+          "id": "coe_framework_convention_ai",
           "url": "https://www.coe.int/en/web/artificial-intelligence/the-framework-convention-on-artificial-intelligence",
           "title": "Council of Europe Framework Convention on Artificial Intelligence and Human Rights, Democracy and the Rule of Law",
-          "jurisdiction": "International",
-          "status": "enacted",
-          "summary": "The first legally binding international treaty on artificial intelligence, adopted by the Council of Europe Committee of Ministers on May 17, 2024, and opened for signature on September 5, 2024. The Convention ensures AI activities are consistent with human rights, democracy, and the rule of law while promoting technological progress and innovation. It adopts a risk-based approach and is compatible with the EU AI Act.",
+          "jurisdiction": "Council of Europe",
+          "status": "framework",
+          "summary": "Opened for signature September 5, 2024, and represents the first legally binding international agreement on AI. The Convention applies to AI systems throughout their lifecycle, requiring parties to implement measures ensuring consistency with human rights, democracy, and rule of law. As of July 19, 2026, the Council of Europe listed the European Union as a party and 21 signatories, including the United States, United Kingdom, Canada, Japan, Israel, and Uruguay. Implementation occurs through national legislative measures coordinated with the EU AI Act and other frameworks.",
           "date_enacted": "2024-05-17",
           "tags": [
+            "International Coordination",
+            "AI Governance",
+            "Human Rights",
+            "Democracy",
+            "Rule of Law",
+            "Frameworks",
             "international treaty",
             "human rights",
             "rule of law",
@@ -2426,43 +2432,26 @@
       "count_full": 154,
       "entries": [
         {
-          "id": "amodei_dario_dwarkesh_2026_scaling",
-          "url": "https://www.dwarkeshpatel.com/p/dario-amodei-3",
-          "title": "We are near the end of the exponential",
+          "id": "amodei_dario_dwarkesh_2026_end_of_exponential",
+          "url": "https://www.dwarkesh.com/p/dario-amodei-2",
+          "title": "We Are Near the End of the Exponential",
           "author": "Dario Amodei",
           "interviewer": "Dwarkesh Patel",
-          "date": "2026-02-10",
+          "date": "2026-02-13",
           "image_url": null,
-          "summary": "In this follow-up conversation, Dario Amodei provides a more cautious perspective on pure scaling compared to his 2023 appearance. He discusses whether classical scaling laws are hitting physical and economic limits, examining both computational and data constraints. The episode covers Anthropic's revenue growth and the commercial viability of advanced AI systems, along with Claude's capabilities evolution. Amodei addresses the paradigm shift from scale-driven progress to research-driven progress, discussing what comes after the scaling era. He explores whether labs will need architectural innovations, better algorithms, or different training paradigms to continue capability improvements. The conversation reflects updated thinking on AI development trajectories given empirical evidence from 2024-2026, including discussions of compute constraints, energy requirements, and the economics of frontier model development.",
-          "top_quotes": [
-            "The next decade may reward research breakthroughs more than another order of magnitude of scale."
-          ],
+          "summary": "Dario Amodei returns to the Dwarkesh Podcast for a wide-ranging second interview covering the evolving economics and trajectory of frontier AI. Amodei expresses 90% confidence that AGI will arrive within 10 years, with a personal hunch of 1-3 years for coding-level autonomy. He discusses whether pure scaling is reaching its limits and what comes next, including the roles of diffusion-based approaches, continual learning, and architectural innovation. A central theme is the business model transition for AI labs: Anthropic's revenue grew from $0 to $100M in 2023, then $1B in 2024, and is projected at $9-10B for 2025 with roughly 10x year-over-year growth that may level off in 2026. Amodei argues that API access is a durable business model alongside emerging 'pay for results' pricing. He addresses the labor market implications, estimating that 50% of entry-level white-collar jobs could disappear within 5 years, and discusses the geopolitical stakes of why both China and America cannot simultaneously have 'a country of geniuses in a datacenter.' The conversation covers regulatory risk, whether regulations could destroy AGI's benefits, and Anthropic's positioning as a safety-focused lab navigating an accelerating capability landscape.",
+          "top_quotes": [],
           "tags": [
-            "scaling-laws",
+            "Scaling Laws",
+            "AGI Timelines",
+            "Anthropic",
+            "Revenue",
+            "Labor Market",
+            "Geopolitics",
+            "Regulation",
+            "Business Model",
             "post-scaling",
             "lab-economics"
-          ]
-        },
-        {
-          "id": "amodei_dario_dwarkesh_2023_scaling",
-          "url": "https://www.dwarkeshpatel.com/p/dario-amodei",
-          "title": "Scaling, Alignment, & AI Progress",
-          "author": "Dario Amodei",
-          "interviewer": "Dwarkesh Patel",
-          "date": "2023-08-15",
-          "image_url": null,
-          "summary": "Dario Amodei, CEO of Anthropic, discusses the relationship between scaling laws and alignment in AI systems. He argues that safety and capabilities development are not fundamentally in tension, but rather complementary pursuits. The conversation covers mechanistic interpretability research aimed at understanding model internals, the development of Constitutional AI and Anthropic's responsible scaling practices (RSP framework). Amodei explains how safety research informs architectural choices and training procedures, making systems more predictable and aligned. He also discusses competitive dynamics between AI labs and how safety practices might influence the future of AI development. The episode provides insights into Anthropic's philosophy that building safe, interpretable systems is achievable without sacrificing performance.",
-          "top_quotes": [
-            "If you can understand the model better, you can also steer it better."
-          ],
-          "tags": [
-            "alignment",
-            "scaling",
-            "interpretability",
-            "anthropic",
-            "rlhf",
-            "constitutional-ai",
-            "safety-culture"
           ]
         },
         {
@@ -2488,21 +2477,47 @@
           ]
         },
         {
-          "id": "sutskever_ilya_dwarkesh_2025_research",
-          "url": "https://www.dwarkeshpatel.com/p/ilya-sutskever",
-          "title": "Moving from the age of scaling to the age of research",
-          "author": "Ilya Sutskever",
+          "id": "amodei_dario_dwarkesh_2023_scaling",
+          "url": "https://www.dwarkeshpatel.com/p/dario-amodei",
+          "title": "Scaling, Alignment, & AI Progress",
+          "author": "Dario Amodei",
           "interviewer": "Dwarkesh Patel",
-          "date": "2025-11-08",
+          "date": "2023-08-15",
           "image_url": null,
-          "summary": "Ilya Sutskever, former Chief Scientist at OpenAI and founder of SSI (Safety and Superintelligence Institute), discusses the transition from scaling-driven AI development to research-driven innovation. He articulates why scaling laws are reaching their limits and what comes next—arguing that major breakthroughs will require fundamental research into model generalization, reasoning, and alignment. Sutskever covers the challenge of reinforcement learning at scale and why current approaches may be insufficient for AGI. He discusses his departure from OpenAI and the reasoning behind founding SSI, framed around the necessity of solving alignment before developing superintelligence. The conversation emphasizes that the next era requires deeper understanding of how models generalize and reason, rather than simply increasing parameters and data.",
+          "summary": "Dario Amodei, CEO of Anthropic, discusses the relationship between scaling laws and alignment in AI systems. He argues that safety and capabilities development are not fundamentally in tension, but rather complementary pursuits. The conversation covers mechanistic interpretability research aimed at understanding model internals, the development of Constitutional AI and Anthropic's responsible scaling practices (RSP framework). Amodei explains how safety research informs architectural choices and training procedures, making systems more predictable and aligned. He also discusses competitive dynamics between AI labs and how safety practices might influence the future of AI development. The episode provides insights into Anthropic's philosophy that building safe, interpretable systems is achievable without sacrificing performance.",
           "top_quotes": [
-            "We are moving out of the age of scaling and into the age of deeper ideas."
+            "If you can understand the model better, you can also steer it better."
           ],
           "tags": [
+            "alignment",
+            "scaling",
+            "interpretability",
+            "anthropic",
+            "rlhf",
+            "constitutional-ai",
+            "safety-culture"
+          ]
+        },
+        {
+          "id": "sutskever_ilya_dwarkesh_2025_after_llms",
+          "url": "https://www.dwarkesh.com/p/ilya-sutskever-2",
+          "title": "What Comes After LLMs?",
+          "author": "Ilya Sutskever",
+          "interviewer": "Dwarkesh Patel",
+          "date": "2025-11-25",
+          "image_url": null,
+          "summary": "Ilya Sutskever's second long-form interview with Dwarkesh Patel since his dramatic departure from OpenAI, and only his second public interview in that period. Sutskever co-founded Safe Superintelligence (SSI), which at the time of recording had reached a $32 billion valuation without releasing a single product — a testament to investor confidence in Sutskever's vision and track record. The central thesis is stark: scaling has 'hit a wall,' and the pursuit of general intelligence must fundamentally shift away from brute-force data gathering toward discovering new, more efficient scientific principles for learning and reasoning. Sutskever argues that the current LLM paradigm, while enormously successful, has reached the point of diminishing returns on the primary axes that drove its progress — data volume and compute scaling. What comes next, he contends, requires genuine scientific breakthroughs in how machines learn, not just engineering improvements to existing architectures. The conversation explores what these post-LLM paradigms might look like, how SSI's safety-first research philosophy shapes its technical agenda, and why Sutskever believes the transition from LLMs to whatever comes next is both the most important and most dangerous period in AI development.",
+          "top_quotes": [],
+          "tags": [
+            "Scaling Laws",
+            "Post-LLM",
+            "SSI",
+            "Superintelligence",
+            "AI Safety",
+            "Scientific Discovery",
             "openai-departure",
             "ssi",
-            "alignment",
+            "Alignment",
             "rl-challenges",
             "post-scaling",
             "research",
@@ -2743,25 +2758,29 @@
           ]
         },
         {
-          "id": "karpathy_andrej_dwarkesh_2025_agi",
-          "url": "https://www.dwarkeshpatel.com/p/andrej-karpathy",
-          "title": "AGI is still a decade away",
+          "id": "karpathy_andrej_dwarkesh_2025_decade_of_agents",
+          "url": "https://www.dwarkesh.com/p/andrej-karpathy",
+          "title": "AGI is Still a Decade Away",
           "author": "Andrej Karpathy",
           "interviewer": "Dwarkesh Patel",
-          "date": "2025-10-18",
+          "date": "2025-10-17",
           "image_url": null,
-          "summary": "Andrej Karpathy presents a more conservative estimate of AGI timelines, arguing that a decade remains before AGI-level capabilities emerge. He discusses what current systems lack relative to AGI: persistent learning, embodied experience, real-world problem-solving, and robust reasoning. Karpathy examines limitations of current language models and language-model-only approaches, arguing that language models alone will plateau in capabilities. The conversation covers what genuine AGI might require beyond scaling: physical grounding, continuous learning, world models, and integration with embodied systems. Karpathy's position contrasts with nearer-term predictions from others, offering technical reasons why current architectures may be insufficient.",
-          "top_quotes": [
-            "Language models are impressive, but AGI likely needs grounding, memory, and continual learning."
-          ],
+          "summary": "Andrej Karpathy pushes back against the prevailing industry hype about AI agents, reframing the narrative from the 'year of agents' to a much longer 'decade of agents.' He characterizes current model-generated code as 'slop' and estimates AGI is roughly ten years away, a notably more conservative timeline than many peers at frontier labs. Karpathy introduces the evocative metaphor of LLMs as 'Ghosts' — disembodied spirits formed by mimicking patterns in human-generated text, lacking the grounded experience and embodied cognition that underpin human intelligence. The wide-ranging conversation covers LLM cognitive deficits, why reinforcement learning is 'terrible' as a learning paradigm compared to how humans actually acquire skills, the future of education in an AI-augmented world, and reflections on why self-driving technology took far longer than early optimists predicted. Karpathy argues that current models lack core cognitive abilities including reliable memory, genuine multimodal understanding, and the capacity to consistently handle complex multi-step tasks — deficits that will take years of architectural and algorithmic innovation to address.",
+          "top_quotes": [],
           "tags": [
+            "AGI Timelines",
+            "Agents",
+            "LLM Limitations",
+            "Education",
+            "Reinforcement Learning",
+            "Autonomous AI",
             "agi-timeline",
             "embodied-ai",
             "scaling-limits",
-            "world-models",
+            "World Models",
             "conservative-timeline",
             "language-model-limits",
-            "robotics"
+            "Robotics"
           ]
         },
         {
@@ -3599,18 +3618,24 @@
           ]
         },
         {
-          "id": "metr_predeployment_inadequate_2025",
-          "url": "https://metr.org/blog/2025-01-15-predeployment-inadequate-framework/",
-          "title": "Why pre-deployment testing is not an adequate framework for AI risk management",
+          "id": "metr_dangerous_before_deployment_2025",
+          "url": "https://metr.org/blog/2025-01-17-ai-models-dangerous-before-public-deployment/",
+          "title": "AI models can be dangerous before public deployment",
           "authors": [
             "METR Team"
           ],
-          "date": "2025-01-15",
+          "date": "2025-01-17",
           "category": "research_finding",
-          "summary": "Foundational argument that pre-deployment testing alone is insufficient for managing AI risks, particularly for frontier models. METR demonstrates that AI models can be substantially modified and improved after deployment through fine-tuning, prompting, and in-context learning. This means that evaluations conducted before deployment may not reflect actual capabilities available to users post-deployment. The paper catalogs concrete mechanisms through which models can become more dangerous after deployment: capability elicitation through sophisticated prompting, specialized fine-tuning on dangerous objectives, jailbreaking techniques that circumvent training-time safety measures, and system-level adaptations that compound individual model capabilities. METR argues that pre-deployment testing creates false sense of security by suggesting that safety was established at a fixed moment, when in reality deployed models can be substantially modified. This directly challenges regulatory frameworks based on pre-deployment gates and advocates for ongoing monitoring and evaluation throughout the full model lifecycle.",
+          "summary": "Counterargument that frontier AI models pose significant risks even before public deployment, directly supporting pre-deployment evaluation mandates. METR demonstrates that risks from frontier models materialize through multiple channels prior to public release: API access to early model versions enables researchers and determined users to study models for misuse purposes, internal organizational use exposes models to insiders who may have incentive or opportunity to misuse them, fine-tuning capabilities allow researchers to develop dangerous applications before models are publicly available, and research partnerships enable external access to unreleased models. These mechanisms mean that treating deployment as the risk trigger point misses substantial risk window where models are already in use but not yet widely available. METR argues that pre-deployment evaluation and safety certification should occur before any of these access mechanisms are activated. This supports regulatory approaches that mandate evaluation and approval before models enter any form of use, not just before public release.",
           "tags": [
-            "post_deployment_risks",
+            "pre_deployment_risks",
+            "model_access",
+            "evaluation_requirements",
+            "api_access_risks",
+            "insider_threats",
+            "deployment_timeline",
             "governance_framework",
+            "post_deployment_risks",
             "capability_elicitation",
             "model_modification",
             "continuous_evaluation",
@@ -3739,7 +3764,7 @@
     "cross_corpus": {
       "label": "Cross-Corpus Debates",
       "icon": "link",
-      "count_full": 13,
+      "count_full": 16,
       "entries": [
         {
           "id": "debate_exponential_progress",
@@ -4077,6 +4102,88 @@
             "Multimodal AI",
             "Watermarking",
             "Likeness Rights"
+          ]
+        },
+        {
+          "id": "debate_government_prerelease_access",
+          "url": "https://github.com/AgalmicSoftware/context-engine/blob/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json",
+          "source_label": "Open dataset",
+          "title": "Should Governments Get Pre-Release Access to Frontier Models?",
+          "author": "Cross-corpus synthesis",
+          "date": "2026-06-02",
+          "category": "policy_dispute",
+          "summary": "Should frontier AI developers be required or encouraged to give governments pre-release access to models for safety/security assessment?",
+          "central_tension": "The policy spectrum runs from SB 53's transparency-only approach through the EO's voluntary access to the Great American AI Act's binding IVO audits — the core disagreement is whether voluntary cooperation suffices or binding obligations are necessary, against the backdrop of real security risks from centralizing model access",
+          "featured_source_title": "Executive Order — Promoting Advanced Artificial Intelligence Innovation and Security",
+          "featured_source_author": "White House",
+          "featured_source_corpus": "AI Laws",
+          "corpora_synthesized": [
+            "AI Laws",
+            "AI Safety Papers",
+            "METR",
+            "Lab Interviews"
+          ],
+          "tags": [
+            "Cross-Corpus",
+            "Policy Dispute",
+            "AI Laws",
+            "AI Safety Papers",
+            "METR"
+          ]
+        },
+        {
+          "id": "debate_alignment_tractability_2026",
+          "url": "https://github.com/AgalmicSoftware/context-engine/blob/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json",
+          "source_label": "Open dataset",
+          "title": "Is AI Alignment Being Solved or Increasingly Intractable?",
+          "author": "Cross-corpus synthesis",
+          "date": "2026-02-05",
+          "category": "methodology_debate",
+          "summary": "Is alignment becoming more tractable as models scale, or are we generating false confidence while fundamental problems remain unsolved?",
+          "central_tension": "Whether alignment tractability claims are grounded in genuine empirical progress or reflect an epistemological trap where AI systems optimizing for appearing aligned produce systematically misleading evidence of safety",
+          "featured_source_title": "We Are Near the End of the Exponential",
+          "featured_source_author": "Dario Amodei",
+          "featured_source_corpus": "Lab Interviews",
+          "corpora_synthesized": [
+            "AI Safety Papers",
+            "Lab Interviews",
+            "METR",
+            "LessWrong"
+          ],
+          "tags": [
+            "Cross-Corpus",
+            "Methodology Debate",
+            "AI Safety Papers",
+            "Lab Interviews",
+            "METR"
+          ]
+        },
+        {
+          "id": "debate_ai_labor_displacement_timeline",
+          "url": "https://github.com/AgalmicSoftware/context-engine/blob/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json",
+          "source_label": "Open dataset",
+          "title": "Will AI Displace Entry-Level Knowledge Workers Within 5 Years?",
+          "author": "Cross-corpus synthesis",
+          "date": "2026-02-05",
+          "category": "forecasting_disagreement",
+          "summary": "Will AI automate a majority of entry-level white-collar jobs within 5 years, as some lab leaders predict?",
+          "central_tension": "The core disagreement maps benchmark extrapolation against real-world complexity — METR's accelerating time horizons provide the strongest quantitative case for rapid displacement, but METR's own external validity caveats and the IAISR's documentation of expert disagreement suggest the 5-year timeline may be an artifact of confusing structured-task performance with holistic job substitutability",
+          "featured_source_title": "We Are Near the End of the Exponential",
+          "featured_source_author": "Dario Amodei",
+          "featured_source_corpus": "Lab Interviews",
+          "corpora_synthesized": [
+            "Lab Interviews",
+            "METR",
+            "AI Safety Papers",
+            "LessWrong",
+            "AI Laws"
+          ],
+          "tags": [
+            "Cross-Corpus",
+            "Forecasting Disagreement",
+            "Lab Interviews",
+            "METR",
+            "AI Safety Papers"
           ]
         }
       ]

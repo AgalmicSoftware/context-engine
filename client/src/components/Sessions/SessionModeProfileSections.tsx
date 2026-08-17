@@ -150,7 +150,12 @@ const SessionModeProfileSections = ({
     base.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
     mutate(base);
     base.surfaces.web = true;
-    const compiled = compileSessionModeProfile(base);
+    const compileSource = validateSessionModeProfile(base).valid
+      ? base
+      : profile && validateSessionModeProfile(profile).valid
+        ? profile
+        : cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    const compiled = compileSessionModeProfile(compileSource);
     onChange(base, { storageProfile: compiled.storageProfile });
   };
 
@@ -289,6 +294,8 @@ const SessionModeProfileSections = ({
               draft.storage.backend = backend as SessionModeProfile['storage']['backend'];
               if (backend === 'cloudflare') {
                 draft.authority.mode = 'worker_canonical';
+                draft.identity = { default: 'passkey', enabled: ['passkey'] };
+                draft.authorization = { mechanisms: ['worker_roles'] };
                 const defaultAccess = defaultCloudflarePayloadAccessControl();
                 draft.storage.payloadAccessControl = {
                   ...defaultAccess,
@@ -304,6 +311,8 @@ const SessionModeProfileSections = ({
                 }
               } else {
                 draft.authority.mode = 'evm_registry_canonical';
+                draft.identity = { default: 'wallet', enabled: ['wallet', 'passkey'] };
+                draft.authorization = { mechanisms: ['sbt_onchain'] };
                 draft.evm.registryChainId = draft.evm.registryChainId || registryChainId || 11155420;
                 delete draft.storage.payloadAccessControl;
                 if (draft.encryption.mode === 'worker_envelope') draft.encryption = { mode: 'none' };

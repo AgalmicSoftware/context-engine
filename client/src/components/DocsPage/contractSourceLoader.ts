@@ -1,8 +1,8 @@
 import { CONTRACT_SOURCE_FILES } from './contractMetadata.js';
-import surveysSource from '!!raw-loader!../../../../contracts/Surveys.sol';
-import sbtFactorySource from '!!raw-loader!../../../../contracts/SBTFactory.sol';
-import sessionRegistrySource from '!!raw-loader!../../../../contracts/SessionRegistry.sol';
-import customSbtSource from '!!raw-loader!../../../../contracts/CustomSBT.sol';
+import surveysSource from '../../../../contracts/Surveys.sol?raw';
+import sbtFactorySource from '../../../../contracts/SBTFactory.sol?raw';
+import sessionRegistrySource from '../../../../contracts/SessionRegistry.sol?raw';
+import customSbtSource from '../../../../contracts/CustomSBT.sol?raw';
 
 export const getContractSourceDefinitions = (): Record<string, { file: string; source: string }> => ({
   surveys: {

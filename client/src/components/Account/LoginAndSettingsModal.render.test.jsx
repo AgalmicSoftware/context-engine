@@ -131,7 +131,7 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
 }));
 
 import { LoginAndSettingsModal, buildBookmarksRoutePath } from './LoginAndSettingsModal';
-import contractScripts from '../../utilities/web3/contractScripts.js';
+import contractScripts from '../../utilities/web3/chainGateway.js';
 import * as passkeyWallet from '../../wallet/passkeyWallet.js';
 import { saveLocalAiSettings } from '../../utilities/ai/aiSettings.js';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
@@ -140,7 +140,7 @@ import {
   getAllSessionSlugs,
   getSessionConfigBySlugOrDefault,
   getSessionNetwork,
-} from '../../utilities/web3/contractScripts.js';
+} from '../../utilities/web3/chainGateway.js';
 
 const DEFAULT_NETWORK = {
   id: 84532,
@@ -256,9 +256,8 @@ const loadIsolatedSettingsModal = () => {
   jest.isolateModules(() => {
     loaded = {
       LoginAndSettingsModal: require('./LoginAndSettingsModal').LoginAndSettingsModal,
-      getAllSessionSlugs: require('../../utilities/web3/contractScripts.js').getAllSessionSlugs,
-      getSessionConfigBySlugOrDefault: require('../../utilities/web3/contractScripts.js')
-        .getSessionConfigBySlugOrDefault,
+      getAllSessionSlugs: require('../../utilities/web3/chainGateway.js').getAllSessionSlugs,
+      getSessionConfigBySlugOrDefault: require('../../utilities/web3/chainGateway.js').getSessionConfigBySlugOrDefault,
       checkSponsoredAccess: require('../../utilities/web3/sponsoredAccess.js').checkSponsoredAccess,
     };
   });
@@ -268,7 +267,12 @@ const loadIsolatedSettingsModal = () => {
   return loaded;
 };
 
-const buildWrongNetworkSubject = ({ mode = undefined, aiSettingsOpen = false, activeSessionSlug = 'edge' } = {}) => {
+const buildWrongNetworkSubject = ({
+  mode = undefined,
+  aiSettingsOpen = false,
+  activeSessionSlug = 'edge',
+  sessionConfig = null,
+} = {}) => {
   if (typeof mode === 'undefined') {
     delete process.env.REACT_APP_TERMINOLOGY_MODE;
   } else {
@@ -311,6 +315,7 @@ const buildWrongNetworkSubject = ({ mode = undefined, aiSettingsOpen = false, ac
       },
     }),
   );
+  subject._sessionCapabilityProjectionResolver = resolveSessionCapabilityProjection;
 
   if (aiSettingsOpen) {
     subject.state = {
@@ -1071,6 +1076,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
         selectedSessionSlugs: ['edge', 'rxc'],
       }),
     );
+    subject._sessionCapabilityProjectionResolver = resolveSessionCapabilityProjection;
     subject.state = {
       ...subject.state,
       preLoginSettingsOpen: true,
@@ -1323,6 +1329,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
         provider: 'wagmi',
       }),
     );
+    subject._sessionCapabilityProjectionResolver = resolveSessionCapabilityProjection;
     subject.state = {
       ...subject.state,
       aiSettingsOpen: true,
@@ -1418,27 +1425,9 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
       });
     });
 
-    const rpcCard = (await screen.findByText('RPC')).closest(`.${styles.supportedResourceCard}`);
-    expect(rpcCard).toBeTruthy();
-    expect(within(rpcCard).getByText('Not sponsored')).toBeInTheDocument();
-    expect(within(rpcCard).queryByText('Gate locked')).not.toBeInTheDocument();
-    expect(within(rpcCard).getByText('General')).toBeInTheDocument();
-    expect(within(rpcCard).getByText('not configured here')).toBeInTheDocument();
-    expect(within(rpcCard).queryByText('OP Session Test')).not.toBeInTheDocument();
-
-    fireEvent.click(within(rpcCard).getByRole('button', { name: 'Show other RPC sponsor sessions' }));
-
-    await waitFor(() => {
-      expect(within(rpcCard).getByText('OP Session Test')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByRole('button', { name: /Resource keys/i }));
-
-    expect(
-      await screen.findByText(
-        'No active-session RPC sponsor. Other sessions with RPC: OP Session Test. Switch sessions to use one.',
-      ),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('AI')).toBeInTheDocument();
+    expect(screen.queryByText('RPC')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Resource keys/i })).not.toBeInTheDocument();
   });
 
   it('does not render the legacy send-testnet-funds control in settings', () => {
@@ -1717,11 +1706,17 @@ describe('LoginAndSettingsModal agent token login', () => {
         new Response(
           JSON.stringify({
             ok: true,
-            tokenType: 'session_worker_jwt',
             sessionSlug: 'alpha',
             accountAddress: '0x3333333333333333333333333333333333333333',
             workerUrl: 'https://session-worker.example',
-            workerToken: 'jwt-session-token',
+            bridgeCredential: {
+              kind: 'agent_bridge_browser_token',
+              token: 'bridge-browser-token',
+            },
+            workerCredential: {
+              kind: 'session_worker_jwt',
+              token: 'jwt-session-token',
+            },
             expiresAt: '2027-07-05T00:00:00.000Z',
           }),
           { status: 200, headers: { 'content-type': 'application/json' } },

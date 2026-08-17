@@ -162,6 +162,7 @@ import {
   SPONSORED_DEPLOY_NOTICE,
   SPONSORED_FAUCET_NOTICE,
   configureAdvancedUseUrlDeploy,
+  continueNewSessionEntry,
   enableAdvancedMode,
   expectSponsoredStatus,
   getFieldInputByLabel,
@@ -169,7 +170,7 @@ import {
   openWorkerPanel,
   selectNormalModeCard,
   setCloudflareTokenValue,
-} from './SessionWizard.sponsoredBundleDom.testUtils.js';
+} from './SessionWizard.sponsoredBundleDom.testUtils';
 import {
   buildDecryptedSponsoredBundle,
   buildEnvelope,
@@ -233,8 +234,8 @@ describe('SessionWizard sponsored bundle flow', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
 
     expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('sponsored-openai');
-    expect(screen.queryByText('Anthropic key *')).not.toBeInTheDocument();
-    expect(screen.queryByText('OpenRouter key')).not.toBeInTheDocument();
+    expect(getFieldInputByLabel('Anthropic key *')).toHaveValue('sponsored-anthropic');
+    expect(getFieldInputByLabel('OpenRouter key *')).toHaveValue('sponsored-openrouter');
     expect(getFieldInputByLabel('Arweave JWK *')).toHaveValue('{"kty":"RSA"}');
     expect(getFieldInputByLabel('Faucet private key')).toHaveValue('0xsponsoredfaucet');
     expect(getFieldInputByLabel('Lit API key')).toHaveValue('lit-account-secret');

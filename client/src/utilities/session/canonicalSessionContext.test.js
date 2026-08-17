@@ -240,10 +240,7 @@ describe('canonicalSessionContext', () => {
       sponsored: { defaultGateId: 'member' },
       sponsoredSbtAddress: '0x0000000000000000000000000000000000000001',
       workerAuthority: { version: 1, participantScopes: ['ai', 'storage'] },
-      sessionModeProfile: {
-        authority: { mode: 'worker_canonical' },
-        encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
-      },
+      sessionModeProfile: workerCanonicalProfile(),
       storageProfile: { backend: 'cloudflare' },
     };
 
@@ -308,7 +305,7 @@ describe('canonicalSessionContext', () => {
       slug: 'worker-room',
       sessionId: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
       corsWorkerUrl: 'https://worker-room.example.test',
-      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+      sessionModeProfile: workerCanonicalProfile(),
     };
     const unvalidated = resolveCanonicalSessionContext({
       requestedSlug: 'worker-room',
@@ -326,7 +323,7 @@ describe('canonicalSessionContext', () => {
         source: 'worker-kv',
         config: {
           ...baseConfig,
-          sessionModeProfile: { authority: { mode: 'evm_registry_canonical' } },
+          sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
         },
       },
       mode: 'production',
@@ -357,7 +354,7 @@ describe('canonicalSessionContext', () => {
           sessionId: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
           sessionName: 'Worker Room',
           corsWorkerUrl: 'https://worker-room.example.test',
-          sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+          sessionModeProfile: workerCanonicalProfile(),
         },
       },
       mode: 'production',
@@ -385,7 +382,7 @@ describe('canonicalSessionContext', () => {
           slug: 'worker-room',
           sessionName: 'Incomplete Worker Room',
           corsWorkerUrl: 'https://worker-room.example.test',
-          sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+          sessionModeProfile: workerCanonicalProfile(),
         },
       },
       mode: 'production',

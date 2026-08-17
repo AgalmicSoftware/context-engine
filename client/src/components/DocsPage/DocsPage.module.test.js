@@ -32,16 +32,16 @@ describe('Docs page theme readability styles', () => {
 
   it('keeps the Docs GitHub action beside the title with a visible focus treatment', () => {
     expect(scss).toMatch(
-      /\.docsTitleRow\s*\{[\s\S]*?display:\s*flex;[\s\S]*?align-items:\s*center;[\s\S]*?gap:\s*14px;/,
+      /\.docsHeaderTitleRow\s*\{[\s\S]*?display:\s*flex;[\s\S]*?align-items:\s*center;[\s\S]*?gap:\s*14px;/,
     );
     expect(scss).toMatch(
-      /\.docsRepoLink\s*\{[\s\S]*?color:\s*var\(--docs-titlebar-text\);[\s\S]*?\.docsRepoLink:focus-visible\s*\{[\s\S]*?outline:\s*3px solid var\(--ce-focus-ring\);/,
+      /\.docsGithubLink\s*\{[\s\S]*?color:\s*var\(--docs-titlebar-text\);[\s\S]*?\.docsGithubLink:focus-visible\s*\{[\s\S]*?outline:\s*3px solid var\(--ce-focus-ring\);/,
     );
   });
 
-  it('frames the session context and Smart Contracts as one bottom group', () => {
+  it('frames the session selector, context, and Smart Contracts as one bottom explorer', () => {
     expect(scss).toMatch(
-      /\.sessionContractsGroup\s*\{[\s\S]*?display:\s*flex;[\s\S]*?flex-direction:\s*column;[\s\S]*?gap:\s*10px;[\s\S]*?padding:\s*10px;[\s\S]*?border:\s*var\(--ce-border-control-width\) solid var\(--docs-border\);[\s\S]*?background:\s*var\(--docs-surface-alt\);/,
+      /\.contractSessionExplorer\s*\{[\s\S]*?display:\s*flex;[\s\S]*?flex-direction:\s*column;[\s\S]*?gap:\s*14px;[\s\S]*?padding:\s*18px;[\s\S]*?border:\s*var\(--ce-border-control-width\) solid var\(--docs-border\);[\s\S]*?background:\s*var\(--docs-surface-alt\);/,
     );
     expect(scss).not.toContain('.advancedExternalNotice');
   });

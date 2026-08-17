@@ -95,6 +95,27 @@ export const SbtListSectionTitle = ({
   </div>
 );
 
+export const SbtListSectionBody = ({
+  children,
+  emptyLabel,
+  hasItems = false,
+  loadingHint = null,
+  wrapClassName = '',
+}: {
+  children?: React.ReactNode;
+  emptyLabel: React.ReactNode;
+  hasItems?: boolean;
+  loadingHint?: React.ReactNode;
+  wrapClassName?: string;
+}): React.ReactElement => {
+  if (hasItems) {
+    const content = <>{children}</>;
+    return wrapClassName ? <div className={wrapClassName}>{content}</div> : content;
+  }
+  if (loadingHint) return <>{loadingHint}</>;
+  return <div className={styles.sectionEmptyHint}>{emptyLabel}</div>;
+};
+
 export const SbtListSectionLoadingHint = ({
   allSessionsMode = false,
   blocksLeft = null,

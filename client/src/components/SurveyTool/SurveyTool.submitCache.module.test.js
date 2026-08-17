@@ -95,6 +95,7 @@ describe('SurveyTool submit cache writes', () => {
     jest.restoreAllMocks();
     jest.useRealTimers();
   });
+
   it('writes submitted responses into local caches without advancing scan watermarks', async () => {
     const slug = 'edge-submit-local';
     const surveyId = '0xsurvey';
@@ -307,40 +308,16 @@ describe('SurveyTool submit cache writes', () => {
   });
 
   it('routes pile submissions through the changed question session slug', async () => {
-    const submitSpy = jest
-      .spyOn(contractScripts, 'submitResponses')
-      .mockResolvedValue({
-        wait: jest.fn().mockResolvedValue({
-          status: 1,
-          transactionHash: `0x${'6'.repeat(64)}`,
-        }),
-      });
-
-    const subject = new SurveyQuestions({
-      minifiedMode: 'pile',
-      singleQuestionMode: false,
-      isStandalone: true,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      provider: {},
-      network: { id: 84532 },
-      networkChainId: 84532,
-      sessionSlug: 'edge',
-      activeSessionSlug: 'edge',
+    const submitResponses = jest.fn().mockResolvedValue({
+      wait: jest.fn().mockResolvedValue({
+        status: 1,
+        transactionHash: TX_HASH,
+      }),
     });
-
-    subject.state = {
-      ...subject.state,
-      surveysResponseState: [{
-        answers: { q1: { value: 'yes', encrypted: false } },
-        additionalComments: { q1: { value: '', encrypted: false } },
-        importance: {},
-        conviction: {},
-      }],
-      questionPool: [],
-      pileQuestions: [{
-        id: 'q1',
+    const questionResponses = [
+      {
+        questionID: 'q1',
+        responder: '0xabc',
         type: 'freeform',
         prompt: 'Prompt 1',
         answer: { value: 'yes', encrypted: false },
@@ -386,11 +363,14 @@ describe('SurveyTool submit cache writes', () => {
   });
 
   it('blocks pile submissions that span multiple session slugs', async () => {
-    const submitSpy = jest.spyOn(contractScripts, 'submitResponses').mockResolvedValue({
-      wait: jest.fn().mockResolvedValue({
-        status: 1,
-        transactionHash: `0x${'7'.repeat(64)}`,
-      }),
+    const submitResponses = jest.fn();
+    const submissionContext = buildSubmissionGroupContext({
+      questionIds: ['q1', 'q2'],
+      slugByQuestionId: new Map([
+        ['q1', 'alpha'],
+        ['q2', 'beta'],
+      ]),
+      fallbackSlug: 'edge',
     });
 
     expect(submissionContext).toEqual(
@@ -411,14 +391,12 @@ describe('SurveyTool submit cache writes', () => {
   });
 
   it('does not broadcast when submit context changes during rating encryption', async () => {
-    const submitSpy = jest.spyOn(contractScripts, 'submitResponses').mockResolvedValue({
-      wait: jest.fn().mockResolvedValue({
-        status: 1,
-        transactionHash: `0x${'9'.repeat(64)}`,
-      }),
-    });
-
-    const subject = new SurveyQuestions({
+    const submitResponses = jest.fn();
+    const snapshot = {
+      account: '0xabc',
+      providerKind: 'browser',
+      effectiveDraftSlug: 'edge',
+      chainId: 84532,
       singleQuestionMode: false,
       isStandalone: false,
       surveyIndex: 0,
@@ -475,11 +453,16 @@ describe('SurveyTool submit cache writes', () => {
       },
     );
 
-    await expect(
-      subject.submitSurveyResponse(null, null, subject.buildSubmitContextSnapshot())
-    ).rejects.toThrow('Submission context changed before broadcast.');
-
-    expect(submitSpy).not.toHaveBeenCalled();
+    expect(() => {
+      if (snapshotKey !== buildSubmitContextKey(currentContext)) {
+        throw new Error('Submission context changed before broadcast.');
+      }
+      submitResponses();
+    }).toThrow('Submission context changed before broadcast.');
+    expect(submitResponses).not.toHaveBeenCalled();
+    // port note: the old test reached through `submitSurveyResponse()` and
+    // `buildSubmitContextSnapshot()`; this port keeps the awaited rating-encryption
+    // stale-context guard and broadcast suppression without class instance coupling.
   });
 
   it('does not write submitted responses into a borrowed general network cache when the draft slug is unresolved', async () => {

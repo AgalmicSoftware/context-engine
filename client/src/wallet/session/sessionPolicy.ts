@@ -5,6 +5,7 @@ export const createSoftSessionPolicy = ({
   address,
   ttlSeconds,
   now = Date.now(),
+  allowedMethods,
   allowedChainIds,
   allowedTargets,
   maxTransactionValueWei = '0',
@@ -12,6 +13,7 @@ export const createSoftSessionPolicy = ({
   address: HexString;
   ttlSeconds: number;
   now?: number;
+  allowedMethods?: SoftSessionPolicy['allowedMethods'];
   allowedChainIds?: number[];
   allowedTargets?: HexString[];
   maxTransactionValueWei?: string;
@@ -20,7 +22,7 @@ export const createSoftSessionPolicy = ({
   address,
   createdAt: now,
   expiresAt: now + Math.max(1, ttlSeconds) * 1000,
-  allowedMethods: ['personal_sign', 'eth_signTypedData_v4', 'eth_sendTransaction'],
+  allowedMethods: allowedMethods || ['personal_sign', 'eth_signTypedData_v4', 'eth_sendTransaction'],
   allowedChainIds,
   allowedTargets,
   maxTransactionValueWei,
@@ -86,15 +88,26 @@ export const assertSoftSessionAllowed = ({
   if (!policy.allowedMethods.includes(method)) {
     throw new Error(`Soft session does not allow ${method}.`);
   }
+  const requestChainId = chainIdToNumber(tx?.chainId);
+  const activeChainId = chainIdToNumber(chainId);
+  if (requestChainId && activeChainId && requestChainId !== activeChainId) {
+    throw new Error('Soft session transaction chain does not match the active chain.');
+  }
+  const effectiveChainId = requestChainId || activeChainId;
   if (
-    Number.isFinite(Number(chainId)) &&
+    effectiveChainId &&
     Array.isArray(policy.allowedChainIds) &&
     policy.allowedChainIds.length > 0 &&
-    !policy.allowedChainIds.includes(Number(chainId))
+    !policy.allowedChainIds.includes(effectiveChainId)
   ) {
     throw new Error('Soft session does not allow this chain.');
   }
-  if (method !== 'eth_sendTransaction') return;
+  if (method !== 'eth_sendTransaction' && method !== 'eth_signTransaction') return;
+  const from = normalizeAddress(tx?.from);
+  const sessionAddress = normalizeAddress(policy.address);
+  if (from && sessionAddress && from !== sessionAddress) {
+    throw new Error('Soft session transaction sender does not match the unlocked wallet.');
+  }
   const target = normalizeAddress(tx?.to);
   if (Array.isArray(policy.allowedTargets) && policy.allowedTargets.length > 0) {
     const allowedTargets = policy.allowedTargets.map(normalizeAddress).filter(Boolean);

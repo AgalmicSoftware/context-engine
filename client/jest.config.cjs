@@ -23,14 +23,13 @@ const babelJestOptions = {
     }],
     '@babel/preset-typescript',
   ],
-  plugins: ['@babel/plugin-syntax-import-meta'],
 };
 
 module.exports = {
   roots: ['<rootDir>/src', '<rootDir>/../tests/root'],
   testEnvironment: 'jsdom',
   setupFiles: ['<rootDir>/scripts/jest/jsdomPolyfills.js'],
-  setupFilesAfterEnv: ['<rootDir>/src/setupTests.js'],
+  setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
   modulePaths: ['<rootDir>/src', '<rootDir>/node_modules', '<rootDir>/../node_modules'],
   moduleFileExtensions: ['web.js', 'js', 'web.ts', 'ts', 'web.tsx', 'tsx', 'json', 'web.jsx', 'jsx', 'node'],
   testMatch: [
@@ -47,10 +46,11 @@ module.exports = {
     '^.+\\.(css|sass|scss)$': 'identity-obj-proxy',
     '^.+\\.(bmp|gif|jpg|jpeg|png|svg|webp|avif|ico|mp4|webm|wav|mp3|m4a|aac|oga|txt|html)$':
       '<rootDir>/scripts/jest/fileMock.js',
+    '^.+\\.sol\\?raw$': '<rootDir>/scripts/jest/fileMock.js',
     '^(\\.{1,2}/.+)\\.js$': '$1',
     '^(utilities/.+)\\.js$': '$1',
-    '^node:os$': '<rootDir>/src/shims/node-os.js',
-    '^node:events$': '<rootDir>/src/shims/node-events.js',
+    '^node:os$': '<rootDir>/src/shims/node-os.ts',
+    '^node:events$': '<rootDir>/src/shims/node-events.ts',
     '^viem$': '<rootDir>/node_modules/viem/_cjs/index.js',
     '^viem\\/(.*)$': '<rootDir>/node_modules/viem/_cjs/$1',
     '^ox$': `${oxCjsBase}/index.js`,
@@ -60,5 +60,15 @@ module.exports = {
     '^ox\\/([A-Z].*)$': `${oxCjsBase}/core/$1.js`,
   },
   watchPathIgnorePatterns: ['<rootDir>/build', '<rootDir>/coverage'],
+  // Coverage floors are banked from full-client coverage runs. Move them only
+  // upward after large lanes, rounding down to avoid CI flakes.
+  coverageThreshold: {
+    global: {
+      statements: 75.7,
+      branches: 61.0,
+      functions: 77.0,
+      lines: 79.1,
+    },
+  },
   resetMocks: false,
 };

@@ -21,6 +21,20 @@ describe('sbtListStorageHelpers', () => {
     expect(readStoredSbtListModeSelectedSessionSlugs({ getItem: () => '{bad' })).toEqual([]);
     expect(readStoredSbtListModeSelectedSessionSlugs(null)).toEqual([]);
     expect(
+      resolveSbtListInitialActiveSessionSlug({
+        globalPrimarySessionSlug: 'global',
+        routeSlug: 'route',
+        storage: { getItem: () => 'local' },
+      }),
+    ).toBe('local');
+    expect(
+      resolveSbtListInitialActiveSessionSlug({
+        globalPrimarySessionSlug: 'global',
+        routeSlug: 'route',
+        storage: null,
+      }),
+    ).toBe('global');
+    expect(
       resolveSbtListCreateGroupInitialVisibility({
         hasCachedCreateSbtForm: jest.fn(() => true),
         listSlug: ' Alpha ',

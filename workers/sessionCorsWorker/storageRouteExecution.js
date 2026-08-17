@@ -54,11 +54,8 @@ const isJsonContentType = (contentType) => {
 
 const getStorageR2Binding = (env = {}) => env.CE_STORAGE_R2 || env.STORAGE_R2 || env.R2_BUCKET || null;
 const getStorageIndexBinding = (env = {}) => env.CE_STORAGE_INDEX_KV || env.STORAGE_INDEX_KV || env.STORAGE_KV || null;
-const PAYLOAD_ACCESS_MODES = Object.freeze({
-  PUBLIC_READ: 'public_read',
-  WORKER_SBT_GATE: 'worker_sbt_gate',
-  LIT_ENCRYPTED: 'lit_encrypted',
-});
+const DEFAULT_STORAGE_LIST_PAGE_SIZE = 100;
+const MAX_STORAGE_LIST_PAGE_SIZE = 100;
 const DEFAULT_RESOURCE_GATES = Object.freeze({
   docsContext: 'docUploads',
   questions: 'questionResponses',
@@ -78,30 +75,20 @@ const bytesToBase64url = (bytes) => {
   bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 };
-const fillDeterministicBytes = (seed) => {
-  const source = encoder.encode(trim(seed) || `ts-${Date.now()}-${Math.random()}`);
+const buildCloudflareStorageId = ({ randomBytes, getRandomValues: getRandomValuesDep } = {}) => {
   const bytes = new Uint8Array(32);
-  for (let index = 0; index < bytes.length; index += 1) {
-    bytes[index] = source[index % source.length] ^ ((index * 31) & 0xff);
-  }
-  return bytes;
-};
-const buildCloudflareStorageId = ({ randomBytes, randomUUID, getRandomValues: getRandomValuesDep, now = Date.now } = {}) => {
-  const bytes = new Uint8Array(32);
-  const suppliedBytes = typeof randomBytes === 'function' ? randomBytes() : null;
+  const suppliedBytes = typeof randomBytes === 'function' ? randomBytes(32) : null;
   const getRandomValues = typeof getRandomValuesDep === 'function'
     ? getRandomValuesDep
+    : getRandomValuesDep === null
+      ? null
     : globalThis?.crypto?.getRandomValues?.bind(globalThis.crypto);
   if (suppliedBytes && suppliedBytes.length >= 32) {
     bytes.set(new Uint8Array(suppliedBytes).slice(0, 32));
   } else if (typeof getRandomValues === 'function') {
     getRandomValues(bytes);
   } else {
-    bytes.set(fillDeterministicBytes(
-      typeof randomUUID === 'function'
-        ? randomUUID()
-        : `ts-${now()}-${Math.random().toString(36).slice(2)}`
-    ));
+    throw new Error('Secure randomness is required for Cloudflare storage references.');
   }
   // Contract pointer fields are bytes32. Keeping Cloudflare refs to the same
   // 32-byte base64url shape lets existing bytes32 helpers round-trip the id
@@ -114,6 +101,15 @@ const buildIndexKey = ({ slug, resource, id }) => `ce-storage:${safeSlugPart(slu
 const buildIndexPrefix = ({ slug, resource }) => `ce-storage:${safeSlugPart(slug)}:${trim(resource) || 'docsContext'}:`;
 const buildSessionIndexPrefix = ({ slug }) => `ce-storage:${safeSlugPart(slug)}:`;
 const buildPayloadKey = ({ slug, id }) => `ce-storage-payload:${safeSlugPart(slug)}:${id}`;
+const safeGroupId = (value) => trim(value).toLowerCase().replace(/[^a-z0-9._:-]+/g, '-').replace(/^-+|-+$/g, '');
+const normalizeGroupIdList = (value) => {
+  let raw = value;
+  if (typeof raw === 'string' && raw.trim().startsWith('[')) {
+    try { raw = JSON.parse(raw); } catch { raw = value; }
+  }
+  const source = Array.isArray(raw) ? raw : [raw];
+  return Array.from(new Set(source.map(safeGroupId).filter(Boolean)));
+};
 const readKvPayloadEnvelope = async ({ index, slug, id }) => {
   if (!index || typeof index.get !== 'function') return null;
   try {
@@ -279,28 +275,34 @@ const resolveConfiguredStorageBackend = ({ config, requestedBackend, payloadEncr
   return normalizeStorageBackend(requestedBackend, configured);
 };
 
-const normalizePayloadAccessMode = (value) => {
-  const normalized = trim(value).toLowerCase();
-  if (normalized === PAYLOAD_ACCESS_MODES.PUBLIC_READ || normalized === 'public' || normalized === 'public-read') {
-    return PAYLOAD_ACCESS_MODES.PUBLIC_READ;
-  }
-  if (normalized === PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED) return PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED;
-  return PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE;
-};
-
 const resolvePayloadAccessControl = (config = {}) => {
   const profile = isObj(config?.storageProfile) ? config.storageProfile : {};
   const cloudflare = isObj(profile.cloudflare) ? profile.cloudflare : {};
   const payloadAccessControl = isObj(profile.payloadAccessControl) ? profile.payloadAccessControl : {};
-  const mode = normalizePayloadAccessMode(
+  const legacyMode = normalizeLegacyPayloadAccessMode(
     payloadAccessControl.mode ||
     cloudflare.payloadAccessMode ||
     profile.payloadAccessMode ||
     profile.accessControlMode
   );
+  const accessControl = (
+    Object.prototype.hasOwnProperty.call(payloadAccessControl, 'gate') ||
+    Object.prototype.hasOwnProperty.call(payloadAccessControl, 'encryption')
+  )
+    ? normalizePayloadAccessControl(payloadAccessControl, legacyMode)
+    : normalizePayloadAccessControl(legacyMode);
   const resourceGates = isObj(payloadAccessControl.resources) ? payloadAccessControl.resources : {};
+  const conditions = normalizeAccessConditionDocument(
+    payloadAccessControl.accessConditions ||
+    payloadAccessControl.conditions ||
+    cloudflare.accessConditions ||
+    profile.accessConditions
+  );
   return {
-    mode,
+    ...accessControl,
+    mode: deriveLegacyPayloadAccessMode(accessControl),
+    conditions,
+    groupIds: normalizeGroupIdList(payloadAccessControl.groupIds || payloadAccessControl.groups || payloadAccessControl.groupId),
     resources: { ...DEFAULT_RESOURCE_GATES, ...resourceGates },
   };
 };
@@ -321,7 +323,7 @@ const normalizeDirectGate = (gate) => {
   const sbtAddresses = Array.isArray(gate.sbtAddresses) ? gate.sbtAddresses.filter(Boolean) : [];
   return {
     sbtAddresses,
-    chainId: Number(gate.chainId || 0) || null,
+    chainId: toChainId(gate.chainId) || null,
     mode: normalizeGateMode(gate.mode),
   };
 };
@@ -347,6 +349,8 @@ const readStorageGate = async ({ config, slug, resource, deps }) => {
     registryRpcUrls,
     registrySlug,
     resourceKey,
+    expectedChainId: resolveRegistryChainId(config),
+    chainAttestationCache: deps?.[STORAGE_RPC_CHAIN_ATTESTATION_CACHE],
   });
   if (!result?.ok) {
     return {
@@ -750,10 +754,13 @@ const authorizeWorkerRoleAccess = ({ config, requesterAddress, baseHeaders, deps
 };
 
 const authorizeCloudflareStorageAccess = async ({
+  env,
   config,
   slug,
   resource,
   requesterAddress,
+  authScopes,
+  metadata,
   baseHeaders,
   deps,
 }) => {
@@ -847,9 +854,38 @@ const authorizeCloudflareStorageAccess = async ({
     };
   }
   const gate = gateRead.gate;
-  if (!gate.sbtAddresses.length) return { ok: true, mode: access.mode, gateKey: gateRead.resourceKey };
+  if (!gate.sbtAddresses.length) {
+    return {
+      ok: true,
+      mode: access.mode,
+      payloadAccessControl: access,
+      gateKey: gateRead.resourceKey,
+      conditionMatched: { source: 'gate_fallback', kind: 'sbt_onchain', resourceKey: gateRead.resourceKey, emptyGate: true },
+    };
+  }
+  if (!gate.chainId) {
+    return {
+      ok: false,
+      response: responseJson(deps, {
+        error: 'Invalid chain ID for Cloudflare worker SBT gate.',
+        reason: 'invalid_sbt_gate_chain',
+      }, 403, baseHeaders),
+    };
+  }
+  let gateConfig = config;
+  try {
+    gateConfig = await resolveStorageGateRuntimeConfig({ config, deps });
+  } catch {
+    return {
+      ok: false,
+      response: responseJson(deps, {
+        error: 'Cloudflare worker SBT gate RPC credentials unavailable.',
+        reason: 'sbt_rpc_secret_unavailable',
+      }, 403, baseHeaders),
+    };
+  }
   const rpcUrls = typeof deps?.resolveRpcUrlListForGate === 'function'
-    ? deps.resolveRpcUrlListForGate(config, gate.chainId)
+    ? deps.resolveRpcUrlListForGate(gateConfig, gate.chainId)
     : [];
   if (!rpcUrls.length || typeof deps?.checkSbtGate !== 'function') {
     return {
@@ -865,8 +901,22 @@ const authorizeCloudflareStorageAccess = async ({
       rpcUrl,
       mode: gate.mode,
       chainId: gate.chainId,
+      rpcUrlIsPrivate: isSessionSecretRpcUrlForGateRuntime({
+        config: gateConfig,
+        gateChainId: gate.chainId,
+        rpcUrl,
+      }),
+      chainAttestationCache: deps?.[STORAGE_RPC_CHAIN_ATTESTATION_CACHE],
     });
-    if (ok) return { ok: true, mode: access.mode, gateKey: gateRead.resourceKey };
+    if (ok) {
+      return {
+        ok: true,
+        mode: access.mode,
+        payloadAccessControl: access,
+        gateKey: gateRead.resourceKey,
+        conditionMatched: { source: 'gate_fallback', kind: 'sbt_onchain', resourceKey: gateRead.resourceKey },
+      };
+    }
   }
   return {
     ok: false,
@@ -1041,47 +1091,55 @@ const handleArweaveStorageUpload = async ({ request, env, config, slug, uploader
   }, 200, baseHeaders);
 };
 
-const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, payload, baseHeaders, deps }) => {
+const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, authScopes, payload, baseHeaders, deps }) => {
   const r2 = getStorageR2Binding(env);
   const index = getStorageIndexBinding(env);
   const canWriteR2 = !!r2 && typeof r2.put === 'function';
   const canWriteKvPayload = !!index && typeof index.put === 'function';
+  const canUseR2Index = canWriteKvPayload && typeof index.get === 'function';
   if (!canWriteR2 && !canWriteKvPayload) {
     return responseJson(deps, { error: 'Cloudflare storage binding not configured.' }, 501, baseHeaders);
   }
+  if (canWriteR2 && !canUseR2Index) {
+    return responseJson(deps, { error: 'Cloudflare R2 storage requires an index KV binding.' }, 501, baseHeaders);
+  }
   const access = await authorizeCloudflareStorageAccess({
+    env,
     config,
     slug,
     resource: payload.resource,
     requesterAddress: uploaderAddress,
+    authScopes,
+    metadata: payload.accessConditions ? { accessConditions: payload.accessConditions } : null,
     baseHeaders,
     deps,
   });
   if (!access.ok) return access.response;
+  const uploadPolicy = await enforceCloudflareUploadPolicy({
+    env,
+    config,
+    slug,
+    payload,
+    requesterAddress: uploaderAddress,
+    authScopes,
+    baseHeaders,
+    deps,
+  });
+  if (!uploadPolicy.ok) return uploadPolicy.response;
   const payloadAccess = resolvePayloadAccessControl(config);
-  if (
-    payloadAccess.encryption === PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE &&
-    !canWriteKvPayload
-  ) {
-    // The wrapped DEK and readable index live in KV. Writing ciphertext to R2
-    // without that projection would return a reference that can never decrypt.
-    return responseJson(
-      deps,
-      { error: 'Cloudflare worker-envelope storage requires an index KV binding.' },
-      501,
-      baseHeaders,
-    );
-  }
   if (payloadAccess.encryption === PAYLOAD_ENCRYPTION_MODES.LIT && payload.payloadEncrypted !== true) {
     return responseJson(deps, { error: 'Cloudflare lit_encrypted storage requires payloadEncrypted=true.' }, 400, baseHeaders);
   }
 
-  const id = buildCloudflareStorageId({
-    randomBytes: deps?.randomBytes,
-    randomUUID: deps?.randomUUID,
-    getRandomValues: deps?.getRandomValues,
-    now: deps?.now,
-  });
+  let id = '';
+  try {
+    id = buildCloudflareStorageId({
+      randomBytes: deps?.randomBytes,
+      getRandomValues: deps?.getRandomValues,
+    });
+  } catch {
+    return responseJson(deps, { error: 'Secure randomness is required for Cloudflare storage references.' }, 500, baseHeaders);
+  }
   if (!isSafeCloudflareStorageRefId(id)) {
     return responseJson(deps, { error: 'Failed to create safe Cloudflare storage reference.' }, 500, baseHeaders);
   }
@@ -1089,6 +1147,33 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, payl
   const objectKey = buildObjectKey({ slug, id });
   const resource = trim(payload.resource) || 'docsContext';
   const storageLayer = canWriteR2 ? 'r2' : 'kv';
+  let bytesToStore = payload.bytes || new Uint8Array();
+  let envelope = null;
+  let accessConditions = payload.accessConditions || null;
+  let conditionRef = accessConditions?.conditions?.length ? 'payload' : 'gate_fallback';
+  if (!accessConditions?.conditions?.length && payloadAccess.conditions?.conditions?.length) {
+    accessConditions = payloadAccess.conditions;
+    conditionRef = 'session';
+  }
+  if (payloadAccess.encryption === PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE) {
+    try {
+      const encrypted = await encryptPayloadWithStorageEnvelope({
+        env,
+        config,
+        slug,
+        payloadId: id,
+        plaintextBytes: bytesToStore,
+        contentType: payload.contentType,
+        accessConditions,
+        conditionRef,
+        deps,
+      });
+      bytesToStore = encrypted.ciphertextBytes;
+      envelope = encrypted.envelope;
+    } catch (error) {
+      return responseJson(deps, { error: error?.message || 'Cloudflare worker envelope encryption failed.' }, 500, baseHeaders);
+    }
+  }
   const metadata = {
     id,
     backend: STORAGE_BACKENDS.CLOUDFLARE,
@@ -1109,25 +1194,55 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, payl
       ? { responder: trim(uploaderAddress).toLowerCase() }
       : {}),
     payloadAccessMode: payloadAccess.mode,
+    payloadAccessControl: {
+      gate: payloadAccess.gate,
+      encryption: payloadAccess.encryption,
+      ...(payloadAccess.groupIds.length ? { groupIds: payloadAccess.groupIds } : {}),
+    },
+    ...(accessConditions?.conditions?.length ? { accessConditions } : {}),
+    ...(envelope ? { envelope } : {}),
     storageLayer,
   };
-  assertNoCloudflarePrivateMaterial(metadata);
+  assertNoCloudflarePrivateMaterial({
+    id,
+    backend: metadata.backend,
+    resource,
+    contentType: metadata.contentType,
+    gate: metadata.gate,
+    createdAt,
+    payloadAccessMode: payloadAccess.mode,
+    payloadAccessControl: metadata.payloadAccessControl,
+  });
+
+  const serializedMetadata = JSON.stringify(metadata);
+  const serializedKvPayload = canWriteR2
+    ? ''
+    : JSON.stringify({
+        metadata,
+        payloadBase64url: bytesToBase64url(bytesToStore || new Uint8Array()),
+      });
+  const kvValueFailure = (
+    (!canWriteR2 && rejectKvValueOverLimit({ serializedValue: serializedKvPayload, deps })) ||
+    (index && rejectKvValueOverLimit({ serializedValue: serializedMetadata, deps }))
+  );
+  if (kvValueFailure) {
+    return responseJson(deps, { error: kvValueFailure.error }, kvValueFailure.status, baseHeaders);
+  }
 
   if (canWriteR2) {
-    await r2.put(objectKey, payload.bytes, {
+    await r2.put(objectKey, bytesToStore, {
       httpMetadata: { contentType: metadata.contentType },
       customMetadata: {
         id,
         resource,
         encrypted: metadata.encrypted ? 'true' : 'false',
         payloadAccessMode: payloadAccess.mode,
+        payloadAccessControl: JSON.stringify(metadata.payloadAccessControl),
+        groupIds: metadata.groupIds?.length ? JSON.stringify(metadata.groupIds) : '',
       },
     });
   } else {
-    await index.put(buildPayloadKey({ slug, id }), JSON.stringify({
-      metadata,
-      payloadBase64url: bytesToBase64url(payload.bytes || new Uint8Array()),
-    }));
+    await index.put(buildPayloadKey({ slug, id }), serializedKvPayload);
   }
 
   if (index && typeof index.put === 'function') {
@@ -1153,7 +1268,56 @@ const readRequestId = async ({ request, url }) => {
   }
 };
 
-const handleCloudflareRead = async ({ request, env, config, slug, uploaderAddress, baseHeaders, deps }) => {
+const normalizeStorageListLimit = (value) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_STORAGE_LIST_PAGE_SIZE;
+  return Math.min(MAX_STORAGE_LIST_PAGE_SIZE, Math.max(1, Math.trunc(parsed)));
+};
+
+const readStorageListOptions = async ({ request, url }) => {
+  const queryResource = trim(url.searchParams.get('resource'));
+  const queryCursor = trim(url.searchParams.get('cursor'));
+  const queryLimit = trim(url.searchParams.get('limit'));
+  if (request.method.toUpperCase() !== 'POST') {
+    return {
+      ok: true,
+      resource: queryResource || 'docsContext',
+      cursor: queryCursor,
+      limit: normalizeStorageListLimit(queryLimit),
+    };
+  }
+
+  let raw = '';
+  try {
+    raw = await (typeof request?.clone === 'function' ? request.clone() : request).text();
+  } catch {
+    return { ok: false, error: 'Invalid JSON.' };
+  }
+  if (!trim(raw)) {
+    return {
+      ok: true,
+      resource: queryResource || 'docsContext',
+      cursor: queryCursor,
+      limit: normalizeStorageListLimit(queryLimit),
+    };
+  }
+
+  let body;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    return { ok: false, error: 'Invalid JSON.' };
+  }
+  if (!isObj(body)) return { ok: false, error: 'Invalid JSON.' };
+  return {
+    ok: true,
+    resource: queryResource || trim(body.resource) || 'docsContext',
+    cursor: queryCursor || trim(body.cursor),
+    limit: normalizeStorageListLimit(queryLimit || body.limit),
+  };
+};
+
+const handleCloudflareRead = async ({ request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps }) => {
   const url = new URL(request.url);
   const id = await readRequestId({ request, url });
   if (!isSafeCloudflareStorageRefId(id)) return responseJson(deps, { error: 'Invalid storage id.' }, 400, baseHeaders);
@@ -1164,21 +1328,51 @@ const handleCloudflareRead = async ({ request, env, config, slug, uploaderAddres
   if (!canReadR2 && !canReadKvPayload) {
     return responseJson(deps, { error: 'Cloudflare storage binding not configured.' }, 501, baseHeaders);
   }
+  if (canReadR2 && !canReadKvPayload) {
+    return responseJson(deps, { error: 'Cloudflare R2 storage requires an index KV binding.' }, 501, baseHeaders);
+  }
   let object = null;
   let metadata = null;
   let body = null;
   if (canReadR2) {
     object = await r2.get(buildObjectKey({ slug, id }));
     if (object) {
-      metadata = {
-        resource: trim(object?.customMetadata?.resource) || 'docsContext',
-        contentType: trim(object?.httpMetadata?.contentType || object?.customMetadata?.contentType) || 'application/octet-stream',
-      };
-      body = object?.body || object;
-      if (typeof object?.arrayBuffer === 'function') {
-        body = await object.arrayBuffer();
-      } else if (typeof object?.text === 'function') {
-        body = await object.text();
+      const indexedResource = trim(object?.customMetadata?.resource) || 'docsContext';
+      let rawMetadata;
+      try {
+        rawMetadata = await index.get(buildIndexKey({ slug, resource: indexedResource, id }));
+      } catch {
+        return responseJson(
+          deps,
+          { error: 'Cloudflare storage index metadata is unavailable.' },
+          503,
+          baseHeaders,
+        );
+      }
+      if (rawMetadata == null || (typeof rawMetadata === 'string' && !trim(rawMetadata))) {
+        return responseJson(deps, { error: 'Storage object not found.' }, 404, baseHeaders);
+      }
+      try {
+        metadata = typeof rawMetadata === 'string' ? JSON.parse(rawMetadata) : rawMetadata;
+      } catch {
+        return responseJson(
+          deps,
+          { error: 'Cloudflare storage index metadata is unavailable.' },
+          503,
+          baseHeaders,
+        );
+      }
+      if (
+        !isObj(metadata) ||
+        trim(metadata.id) !== id ||
+        (trim(metadata.resource) || 'docsContext') !== indexedResource
+      ) {
+        return responseJson(
+          deps,
+          { error: 'Cloudflare storage index metadata is unavailable.' },
+          503,
+          baseHeaders,
+        );
       }
     }
   }
@@ -1194,14 +1388,52 @@ const handleCloudflareRead = async ({ request, env, config, slug, uploaderAddres
   }
   const resource = trim(metadata?.resource) || 'docsContext';
   const access = await authorizeCloudflareStorageAccess({
+    env,
     config,
     slug,
     resource,
     requesterAddress: uploaderAddress,
+    authScopes,
+    metadata,
     baseHeaders,
     deps,
   });
   if (!access.ok) return access.response;
+  if (object) {
+    body = object?.body || object;
+    if (typeof object?.arrayBuffer === 'function') {
+      body = await object.arrayBuffer();
+    } else if (typeof object?.text === 'function') {
+      body = await object.text();
+    }
+  }
+  let responseBody = body;
+  const resolvedAccess = normalizePayloadAccessControl(
+    metadata?.payloadAccessControl || metadata?.payloadAccessMode || resolvePayloadAccessControl(config)
+  );
+  if (resolvedAccess.encryption === PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE) {
+    try {
+      await writeStorageEnvelopeKeyReleaseAudit({
+        env,
+        slug,
+        payloadId: id,
+        principal: uploaderAddress,
+        conditionMatched: access.conditionMatched || 'gate_fallback',
+        deps,
+      });
+      responseBody = await decryptPayloadWithStorageEnvelope({
+        env,
+        config,
+        slug,
+        payloadId: id,
+        ciphertextBytes: await toUint8Array(body),
+        envelope: metadata?.envelope,
+        deps,
+      });
+    } catch (error) {
+      return responseJson(deps, { error: error?.message || 'Cloudflare worker envelope decrypt failed.' }, 403, baseHeaders);
+    }
+  }
   const contentType = trim(metadata?.contentType) || 'application/octet-stream';
   const responseHeaders = new Headers(baseHeaders || {});
   responseHeaders.set('Content-Type', contentType);
@@ -1217,14 +1449,18 @@ const handleCloudflareRead = async ({ request, env, config, slug, uploaderAddres
   });
 };
 
-const handleCloudflareList = async ({ request, env, config, slug, uploaderAddress, baseHeaders, deps }) => {
+const handleCloudflareList = async ({ request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps }) => {
   const url = new URL(request.url);
-  const resource = trim(url.searchParams.get('resource')) || 'docsContext';
+  const listOptions = await readStorageListOptions({ request, url });
+  if (!listOptions.ok) return responseJson(deps, { error: listOptions.error }, 400, baseHeaders);
+  const { cursor, limit, resource } = listOptions;
   const access = await authorizeCloudflareStorageAccess({
+    env,
     config,
     slug,
     resource,
     requesterAddress: uploaderAddress,
+    authScopes,
     baseHeaders,
     deps,
   });
@@ -1254,24 +1490,7 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
     if (!name) continue;
     let raw;
     try {
-      // eslint-disable-next-line no-await-in-loop
-      const raw = await index.get(name);
-      const metadata = typeof raw === 'string' ? JSON.parse(raw) : raw;
-      const storageRef = normalizeStorageRef(metadata || {});
-      if (storageRef) {
-        items.push({
-          storageRef,
-          metadata: {
-            resource: storageRef.resource || resource,
-            contentType: trim(metadata?.contentType),
-            encrypted: metadata?.encrypted === true,
-            tags: normalizeTagsForMetadata(metadata?.tags),
-            size: Number(metadata?.size || 0) || 0,
-            createdAt: trim(metadata?.createdAt),
-            payloadAccessMode: trim(metadata?.payloadAccessMode) || resolvePayloadAccessControl(config).mode,
-          },
-        });
-      }
+      raw = await index.get(name);
     } catch {
       return responseJson(
         deps,
@@ -1518,192 +1737,6 @@ export const exportCloudflareEncryptedPayloadEnvelopes = async ({
   };
 };
 
-const listCloudflareMetadataRows = async ({ index, slug, resource = '' }) => {
-  const rows = [];
-  const prefix = trim(resource)
-    ? buildIndexPrefix({ slug, resource })
-    : buildSessionIndexPrefix({ slug });
-  let cursor = '';
-  do {
-    // eslint-disable-next-line no-await-in-loop
-    const listed = await index.list({
-      prefix,
-      ...(cursor ? { cursor } : {}),
-    });
-    const keys = Array.isArray(listed?.keys) ? listed.keys : [];
-    for (const keyEntry of keys) {
-      const key = trim(keyEntry?.name || keyEntry);
-      if (!key || typeof index.get !== 'function') continue;
-      try {
-        // eslint-disable-next-line no-await-in-loop
-        const raw = await index.get(key);
-        const metadata = typeof raw === 'string' ? JSON.parse(raw) : raw;
-        if (isObj(metadata) && trim(metadata.id)) rows.push({ key, metadata });
-      } catch {
-        rows.push({ key, metadata: null, error: 'invalid_metadata' });
-      }
-    }
-    cursor = listed?.list_complete === false ? trim(listed?.cursor) : '';
-  } while (cursor);
-  return rows;
-};
-
-const readStoredCloudflarePayloadBytes = async ({ env, index, slug, metadata }) => {
-  const id = trim(metadata?.id);
-  if (!id) return null;
-  const r2 = getStorageR2Binding(env);
-  if (r2 && typeof r2.get === 'function') {
-    const object = await r2.get(buildObjectKey({ slug, id }));
-    if (object) return toUint8Array(object);
-  }
-  const envelope = await readKvPayloadEnvelope({ index, slug, id });
-  if (envelope?.payloadBase64url) return base64urlToBytes(envelope.payloadBase64url);
-  return null;
-};
-
-const resolveEnvelopeExportKeyProvider = ({ metadataAccess, metadata, config }) => {
-  const explicit = trim(metadata?.envelope?.keyProvider);
-  if (explicit) return explicit;
-  if (metadataAccess?.encryption === PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE) {
-    return trim(config?.storageEnvelope?.keyProvider || 'worker_secret');
-  }
-  if (metadataAccess?.encryption === PAYLOAD_ENCRYPTION_MODES.LIT) return 'lit';
-  return '';
-};
-
-const resolveEnvelopeExportManifestKeyProvider = ({ sessionEnvelope, payloads }) => {
-  const providers = new Set();
-  const sessionProvider = trim(sessionEnvelope?.keyProvider);
-  if (sessionProvider) providers.add(sessionProvider);
-  for (const payload of payloads || []) {
-    const provider = trim(payload?.keyProvider);
-    if (provider) providers.add(provider);
-  }
-  if (providers.size > 1) return 'mixed';
-  return [...providers][0] || 'worker_secret';
-};
-
-export const exportCloudflareEncryptedPayloadEnvelopes = async ({
-  env,
-  config,
-  slug,
-  resource = '',
-  includeSessionEnvelope = true,
-  deps = {},
-} = {}) => {
-  const configuredBackend = resolveConfiguredStorageBackend({ config });
-  if (configuredBackend !== STORAGE_BACKENDS.CLOUDFLARE) {
-    return {
-      ok: false,
-      status: 400,
-      error: 'Encrypted-envelope export is only available for Cloudflare storage.',
-    };
-  }
-  const index = getStorageIndexBinding(env);
-  if (!index || typeof index.list !== 'function' || typeof index.get !== 'function') {
-    return {
-      ok: false,
-      status: 501,
-      error: 'Cloudflare storage index binding not configured.',
-    };
-  }
-  const generatedAt = new Date((deps?.now?.() || Date.now())).toISOString();
-  let rows = [];
-  let storageListError = null;
-  try {
-    rows = await listCloudflareMetadataRows({ index, slug, resource });
-  } catch (error) {
-    storageListError = { reason: error?.message || 'storage_list_failed' };
-  }
-  const payloads = [];
-  const readErrors = [];
-  let encryptedPayloadCount = 0;
-  for (const row of rows) {
-    if (!row.metadata) {
-      readErrors.push({ key: row.key, error: row.error || 'invalid_metadata' });
-      continue;
-    }
-    const metadataAccess = normalizePayloadAccessControl(
-      row.metadata.payloadAccessControl ||
-      row.metadata.payloadAccessMode ||
-      resolvePayloadAccessControl(config)
-    );
-    if (metadataAccess.encryption === PAYLOAD_ENCRYPTION_MODES.NONE) continue;
-    encryptedPayloadCount += 1;
-    try {
-      // eslint-disable-next-line no-await-in-loop
-      const ciphertextBytes = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata: row.metadata });
-      if (!ciphertextBytes) {
-        readErrors.push({ id: trim(row.metadata.id), error: 'payload_bytes_missing' });
-        continue;
-      }
-      const keyProvider = resolveEnvelopeExportKeyProvider({ metadataAccess, metadata: row.metadata, config });
-      payloads.push({
-        storageRef: normalizeStorageRef(row.metadata),
-        metadata: {
-          id: trim(row.metadata.id),
-          resource: trim(row.metadata.resource),
-          contentType: trim(row.metadata.contentType) || 'application/octet-stream',
-          encrypted: row.metadata.encrypted === true,
-          createdAt: trim(row.metadata.createdAt),
-          size: Number(row.metadata.size || ciphertextBytes.length || 0) || 0,
-          payloadAccessControl: {
-            gate: metadataAccess.gate,
-            encryption: metadataAccess.encryption,
-          },
-          payloadAccessMode: deriveLegacyPayloadAccessMode(metadataAccess),
-          ...(row.metadata.accessConditions ? { accessConditions: row.metadata.accessConditions } : {}),
-        },
-        envelope: isObj(row.metadata.envelope) ? row.metadata.envelope : null,
-        ciphertextBase64url: bytesToBase64url(ciphertextBytes),
-        keyProvider,
-        wrappedKeysIncluded: !!trim(row.metadata.envelope?.dek?.wrappedKey),
-      });
-    } catch (error) {
-      readErrors.push({ id: trim(row.metadata.id), error: error?.message || 'payload_read_failed' });
-    }
-  }
-  const sessionEnvelope = includeSessionEnvelope && isObj(config?.storageEnvelope)
-    ? JSON.parse(JSON.stringify(config.storageEnvelope))
-    : null;
-  const keyProvider = resolveEnvelopeExportManifestKeyProvider({ sessionEnvelope, payloads });
-  const deploymentKekContinuityRequired = (
-    !!trim(sessionEnvelope?.sessionKey?.wrappedKey) ||
-    payloads.some((entry) => entry.keyProvider === 'worker_secret' || entry.keyProvider === 'mixed')
-  );
-  const manifest = {
-    type: 'ce_storage_encrypted_envelopes_export',
-    version: 1,
-    exportScope: 'encrypted_envelopes_only',
-    storageBackend: STORAGE_BACKENDS.CLOUDFLARE,
-    sessionSlug: safeSlugPart(slug),
-    resource: trim(resource) || 'all',
-    exportedAt: generatedAt,
-    exportedPayloadCount: payloads.length,
-    encryptedPayloadCount,
-    partial: !!storageListError || readErrors.length > 0,
-    storageListError,
-    readErrors,
-    gatewayErrors: [],
-    errors: [
-      ...(storageListError ? [storageListError] : []),
-      ...readErrors,
-    ],
-    wrappedKeysIncluded: !!sessionEnvelope?.sessionKey?.wrappedKey || payloads.some((entry) => entry.wrappedKeysIncluded),
-    keyProvider,
-    deploymentKekContinuityRequired,
-    // Version-1 consumers still read this name. It is now a continuity warning,
-    // not an instruction to call a key-changing worker action.
-    rewrapRequiredForNewDeployment: deploymentKekContinuityRequired,
-  };
-  return {
-    ok: true,
-    manifest,
-    ...(sessionEnvelope ? { sessionEnvelope } : {}),
-    payloads,
-  };
-};
-
 export const storageRoute = async ({ path, method, request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps } = {}) => {
   if (path === '/storage/upload' && method === 'POST') {
     const maxUploadBytes = resolveMaxUploadBytes({ env, deps });
@@ -1718,7 +1751,8 @@ export const storageRoute = async ({ path, method, request, env, config, slug, u
     if (isArweaveStorageBackend(backend)) {
       return handleArweaveStorageUpload({ request, env, config, slug, uploaderAddress, backend, payload, baseHeaders, deps });
     }
-    return handleCloudflareUpload({ env, config, slug, uploaderAddress, payload, baseHeaders, deps });
+    const routeDeps = createStorageRouteGateDeps({ config, env, slug, deps });
+    return handleCloudflareUpload({ env, config, slug, uploaderAddress, authScopes, payload, baseHeaders, deps: routeDeps });
   }
 
   const configuredBackend = resolveConfiguredStorageBackend({ config });
@@ -1726,12 +1760,17 @@ export const storageRoute = async ({ path, method, request, env, config, slug, u
     return responseJson(deps, { error: 'Storage route read/list is only available for Cloudflare storage.' }, 400, baseHeaders);
   }
   if (path === '/storage/read' && (method === 'GET' || method === 'POST')) {
-    return handleCloudflareRead({ request, env, config, slug, uploaderAddress, baseHeaders, deps });
+    const routeDeps = createStorageRouteGateDeps({ config, env, slug, deps });
+    return handleCloudflareRead({ request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps: routeDeps });
   }
   if (path === '/storage/list' && (method === 'GET' || method === 'POST')) {
-    return handleCloudflareList({ request, env, config, slug, uploaderAddress, baseHeaders, deps });
+    const routeDeps = createStorageRouteGateDeps({ config, env, slug, deps });
+    return handleCloudflareList({ request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps: routeDeps });
   }
   if (path === '/storage/export-envelopes' && (method === 'GET' || method === 'POST')) {
+    if (!isEnvelopeExportAuthorized({ config, requesterAddress: uploaderAddress, authScopes })) {
+      return responseJson(deps, { error: 'Encrypted-envelope export requires session export admin authorization.' }, 403, baseHeaders);
+    }
     const url = new URL(request.url);
     let resource = trim(url.searchParams.get('resource'));
     if (!resource && method === 'POST') {

@@ -1,10 +1,6 @@
 import demoPolisData from '../../variables/demo/demo_polis_data.json';
 import demo2PolisData from '../../variables/demo/demo_2_polis_data.json';
-import {
-  hasDemoAnalysisFixture,
-  hasSimulatedDemoResponses,
-  resolveDemoPolisDataset,
-} from './demoPolisDatasets';
+import { hasDemoAnalysisFixture, hasSimulatedDemoResponses, resolveDemoPolisDataset } from './demoPolisDatasets';
 
 const LEGACY_DEMO_SLUGS = ['demo', 'demo-1', 'demo-3', 'demo-sh'];
 
@@ -53,9 +49,9 @@ describe('demo_2_polis_data fixture shape', () => {
   });
 
   it('has three roughly balanced clusters', () => {
-    const sizes = [0, 1, 2].map((groupId) => (
-      participants.filter((participant) => participant.groupId === groupId).length
-    ));
+    const sizes = [0, 1, 2].map(
+      (groupId) => participants.filter((participant) => participant.groupId === groupId).length,
+    );
     expect(sizes.reduce((sum, size) => sum + size, 0)).toBe(62);
     sizes.forEach((size) => {
       expect(size).toBeGreaterThanOrEqual(15);
@@ -92,12 +88,12 @@ describe('demo_2_polis_data fixture shape', () => {
   });
 
   it('keeps vote coverage high without being complete', () => {
-    const voteQuestionCount = comments.filter((comment) => (
-      comment.type === 'binary' || comment.type === 'rating'
-    )).length;
+    const voteQuestionCount = comments.filter(
+      (comment) => comment.type === 'binary' || comment.type === 'rating',
+    ).length;
     const totalVotes = participants.reduce(
       (sum, participant) => sum + Object.keys((participant.votes as Record<string, unknown>) || {}).length,
-      0
+      0,
     );
     const coverage = totalVotes / (participants.length * voteQuestionCount);
     expect(coverage).toBeGreaterThan(0.8);

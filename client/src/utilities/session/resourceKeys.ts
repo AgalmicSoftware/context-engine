@@ -236,9 +236,10 @@ const getWalletContext = (
 } => {
   try {
     const state = store?.getState?.();
-    const profile = state?.profile || {};
-    const network = profile.network || {};
+    const profile: UnknownRecord = isObj(state?.profile) ? state.profile : {};
+    const network: UnknownRecord = isObj(profile.network) ? profile.network : {};
     const chainId = override.chainId || network.id || network.chainId || null;
+    const providerLike = typeof profile.provider === 'string' || isObj(profile.provider) ? profile.provider : 'wagmi';
     return {
       account: override.account || toStr(profile.account),
       providerLike: override.providerLike || providerLike,

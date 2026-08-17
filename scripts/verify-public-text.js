@@ -14,6 +14,8 @@ const EXEMPT_PATHS = new Set([
   'scripts/pre-push-guard.test.js',
   'scripts/prepare-public-release.sh',
   'scripts/prepare-public-release.test.js',
+  'scripts/scrub-public-package-json.js',
+  'scripts/scrub-public-package-json.test.js',
   'scripts/sync-public-history.sh',
   'scripts/sync-public-history.test.js',
   'scripts/verify-public-assets.js',

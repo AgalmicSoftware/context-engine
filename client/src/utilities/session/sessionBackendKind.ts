@@ -13,6 +13,7 @@ export type TelegramSessionMeta = {
 export type ResolveSessionBackendKindArgs = {
   sessionConfig?: unknown;
   probeResult?: TelegramSessionMeta | null;
+  sessionSlug?: unknown;
 };
 
 const normalizeSessionSlug = (value: unknown): string => {

@@ -2,19 +2,40 @@
   "title": "Agent Village Wrapped completed launch subset",
   "sourceSession": "agent-village-wrapped",
   "sourceExport": "agent-village-combined-research-export-20260703T215341Z",
-  "sampleNote": "Four non-test principals remained after excluding the export's test principal. This display subset contains the three completed Wrapped answer sets.",
+  "sampleNote": "The displayed slice contains n=4 completed attendee responses: 232 agent-predicted answer cells across 58 questions.",
+  "archiveAudit": {
+    "olderAgentVillage2026Rows": 170,
+    "olderAgentVillage2026UsableNonTestRows": 0,
+    "reasonExcluded": "Older agent-village-2026 answer rows are not used as reviewed answer corrections.",
+    "humanCurrentAnswerRowsInWrappedWideExport": 0,
+    "reviewStatusRowsInWrappedWideExport": 0,
+    "sourceLayer": "Completed display rows are source=agent_autofill predictions.",
+    "nonTestWrappedVoteRows": 15,
+    "nonTestWrappedVotePrincipals": 1,
+    "voteRowsNote": "The archive has a small non-test vote slice, but it is one principal and not the same field as reviewed human corrections, so it is not used to enlarge the answer sample."
+  },
   "nonTestPrincipalCount": 4,
-  "sampleSizePeople": 3,
-  "completedAnswerSets": 3,
+  "sampleSizePeople": 4,
+  "completedAnswerSets": 4,
+  "displayedAnswerSets": 4,
+  "attendeeAnswerSets": 4,
+  "dedupedAgentPredictionCount": 174,
+  "displayedAgentPredictionCount": 232,
+  "questionsPerCompletedPrincipal": 58,
   "privacy": {
-    "participantIds": "Pseudonymized as P1-P3",
+    "participantIds": "Attendee answer sets are pseudonymized as P1-P4",
     "excluded": "Raw principal IDs, run IDs, Telegram IDs, wallet addresses, and long freeform profile text",
     "freeformHandling": "Short excerpts are paraphrased for display."
   },
+  "testRunSelection": {
+    "participant": "P4",
+    "policy": "Use the latest tester-attendee run with 58 accepted predictions and substantive displayed answers; later complete runs were excluded when the displayed fields were mostly placeholder-like neutral values."
+  },
   "participants": [
-    { "label": "P1", "status": "completed", "color": "#4dffa4" },
+    { "label": "P1", "status": "completed", "color": "#9ee7ff" },
     { "label": "P2", "status": "completed", "color": "#7aa7ff" },
-    { "label": "P3", "status": "completed", "color": "#ffb347" }
+    { "label": "P3", "status": "completed", "color": "#ffb347" },
+    { "label": "P4", "status": "completed", "color": "#c4a7ff" }
   ],
   "sourceLayerDisplays": [
     {
@@ -33,9 +54,8 @@
       "counts": [
         { "label": "google/gemini-3.5-flash", "value": 2, "color": "#7aa7ff" },
         { "label": "z-ai/glm-5.2", "value": 1, "color": "#ff6bcb" },
-        { "label": "unserialized model record (Hermes Agent v0.14.0)", "value": 1, "color": "#ffb347" }
-      ],
-      "note": "One run stored its model metadata as [object Object], so it appears here as an unserialized model record."
+        { "label": "[object Object] record (Hermes v.0.14.0)", "value": 1, "color": "#ffb347" }
+      ]
     },
     {
       "kind": "Answer shapes",
@@ -415,66 +435,56 @@
         "label": "AI improves flourishing",
         "prompt": "How optimistic am I that AI will broadly improve human flourishing over the next decade?",
         "values": [
-          { "label": "P1", "value": 3, "confidence": 70, "color": "#4dffa4" },
+          { "label": "P1", "value": 3, "confidence": 70, "color": "#9ee7ff" },
           { "label": "P2", "value": 8, "confidence": 90, "color": "#7aa7ff" },
-          { "label": "P3", "value": 7, "confidence": 76, "color": "#ffb347" }
+          { "label": "P3", "value": 7, "confidence": 76, "color": "#ffb347" },
+          { "label": "P4", "value": 7, "confidence": 65, "color": "#c4a7ff" }
         ]
       },
       {
         "label": "Current model moral patienthood",
         "prompt": "How likely is it that any current frontier model has morally relevant experiences?",
         "values": [
-          { "label": "P1", "value": 2, "confidence": 65, "color": "#4dffa4" },
+          { "label": "P1", "value": 2, "confidence": 65, "color": "#9ee7ff" },
           { "label": "P2", "value": 1, "confidence": 90, "color": "#7aa7ff" },
-          { "label": "P3", "value": 1, "confidence": 72, "color": "#ffb347" }
+          { "label": "P3", "value": 1, "confidence": 72, "color": "#ffb347" },
+          { "label": "P4", "value": 2, "confidence": 65, "color": "#c4a7ff" }
         ]
       },
       {
         "label": "Predicted group average",
         "prompt": "Predict the average answer in this group to the previous question about morally relevant model experiences.",
         "values": [
-          { "label": "P1", "value": 4, "confidence": 50, "color": "#4dffa4" },
+          { "label": "P1", "value": 4, "confidence": 50, "color": "#9ee7ff" },
           { "label": "P2", "value": 3, "confidence": 85, "color": "#7aa7ff" },
-          { "label": "P3", "value": 3, "confidence": 63, "color": "#ffb347" }
+          { "label": "P3", "value": 3, "confidence": 63, "color": "#ffb347" },
+          { "label": "P4", "value": 3, "confidence": 60, "color": "#c4a7ff" }
         ]
       }
     ]
   },
   "responseTypeDisplays": [
     {
-      "kind": "Binary",
-      "title": "Autonomy stance",
-      "prompt": "I would let my agent schedule a 1:1 while I am asleep, if it follows constraints I already set.",
-      "counts": [
-        { "label": "agree", "value": 2, "color": "#4dffa4" },
-        { "label": "disagree", "value": 1, "color": "#ffb347" }
-      ],
-      "note": "Three completed agent predictions."
-    },
-    {
       "kind": "Multi-select",
-      "title": "First delegation surface",
-      "prompt": "Which area would I most likely delegate to an agent first?",
+      "title": "Which area would I most likely delegate to an agent first?",
       "counts": [
         { "label": "calendar scheduling", "value": 2, "color": "#7aa7ff" },
         { "label": "message drafting", "value": 2, "color": "#4dffa4" },
-        { "label": "event filtering", "value": 2, "color": "#ffb347" },
-        { "label": "introductions", "value": 1, "color": "#ff6bcb" },
+        { "label": "event filtering", "value": 3, "color": "#ffb347" },
+        { "label": "introductions", "value": 2, "color": "#ff6bcb" },
         { "label": "memory/context", "value": 1, "color": "#9ee7ff" },
         { "label": "nothing without review", "value": 1, "color": "#d8f36a" }
-      ],
-      "note": "Multi-select totals can exceed participant count."
+      ]
     },
     {
       "kind": "Freeform",
-      "title": "Personal AI fire alarm",
-      "prompt": "In one sentence: what is my personal AI fire alarm?",
+      "title": "In one sentence: what is my personal AI fire alarm?",
       "quotes": [
         { "label": "P1", "text": "Widespread job displacement for young entrants." },
         { "label": "P2", "text": "A fully unsupervised multi-day coordination task." },
-        { "label": "P3", "text": "A privacy-line crossing or unwanted commitment." }
-      ],
-      "note": "Short paraphrased excerpts from agent-predicted freeform answers."
+        { "label": "P3", "text": "A privacy-line crossing or unwanted commitment." },
+        { "label": "P4", "text": "Autonomous agents changing collective governance at scale." }
+      ]
     }
   ]
 }

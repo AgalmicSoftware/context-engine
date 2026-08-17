@@ -1,6 +1,8 @@
 import SurveyTool from './SurveyTool';
 import { createPileViewRuntimeStrategy } from './SurveyPileViewMode';
 import { SurveySelector } from './SurveySelector';
+import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
+import { resolveSurveyToolQuestionReadCacheContext } from './surveyToolSessionResolution';
 
 const REACT_LAZY_TYPE = Symbol.for('react.lazy');
 

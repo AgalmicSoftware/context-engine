@@ -1,8 +1,5 @@
 import SBTFilter from './SBTFilter';
-import contractScripts, {
-  getSessionChainId,
-  getSessionSlugByName,
-} from '../../utilities/web3/chainGateway.js';
+import contractScripts, { getSessionChainId, getSessionSlugByName } from '../../utilities/web3/chainGateway.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 

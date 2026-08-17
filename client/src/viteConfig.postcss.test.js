@@ -51,12 +51,10 @@ describe('vite PostCSS compatibility', () => {
     expect(config).toContain("'utilities/crypto/groupPasswordDerivation.cjs'");
     expect(config).toContain("'@ce-shared/rpcDefaults.cjs'");
     expect(config).toContain("find: '@ce-shared'");
-    expect(cryptographySource).toContain(
-      "from 'utilities/crypto/groupPasswordDerivation.cjs'",
+    expect(cryptographySource).toContain("from 'utilities/crypto/groupPasswordDerivation.cjs'");
+    expect(fs.readFileSync(path.join(clientRoot, 'src', 'variables', 'rpcDefaults.ts'), 'utf8')).toContain(
+      "from '@ce-shared/rpcDefaults.cjs'",
     );
-    expect(
-      fs.readFileSync(path.join(clientRoot, 'src', 'variables', 'rpcDefaults.ts'), 'utf8'),
-    ).toContain("from '@ce-shared/rpcDefaults.cjs'");
   });
 
   it('writes crawler-facing post HTML with the header as a large social image', () => {

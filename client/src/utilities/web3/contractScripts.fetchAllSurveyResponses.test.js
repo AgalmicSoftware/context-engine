@@ -58,7 +58,7 @@ const RESPONSES_SUBMITTED_IFACE = new ethers.utils.Interface([
   'event ResponsesSubmitted(address indexed responder,bytes32[] questionIds,bytes32 indexed surveyId)',
 ]);
 
-const makeResponsesSubmittedLog = (responder, blockNumber, logIndex = 0) => {
+const makeResponsesSubmittedLog = (responder, blockNumber, logIndex = 0, transactionIndex = 0) => {
   const encoded = RESPONSES_SUBMITTED_IFACE.encodeEventLog(RESPONSES_SUBMITTED_IFACE.getEvent('ResponsesSubmitted'), [
     responder,
     [QUESTION_ID],

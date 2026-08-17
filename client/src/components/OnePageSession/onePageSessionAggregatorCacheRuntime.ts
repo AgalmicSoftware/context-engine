@@ -9,10 +9,7 @@ import {
   workerCanonicalCacheIdentityMatches,
   withWorkerCanonicalCacheIdentity,
 } from '../../utilities/survey/workerCanonicalCacheIdentity';
-import {
-  hasSimulatedDemoResponses,
-  resolveDemoPolisDataset,
-} from '../../utilities/demo/demoPolisDatasets';
+import { hasSimulatedDemoResponses, resolveDemoPolisDataset } from '../../utilities/demo/demoPolisDatasets';
 import { getDemoFixtureQuestionIdsByIndex } from '../../utilities/session/demoSessionQuestionFixtures.js';
 import { buildPolisDemoSurveyResultsAggregatorData } from '../SurveyTool/surveyPolisDemoResultsData';
 import {
@@ -117,10 +114,7 @@ export const buildDemoFixtureAggregatorRows = (
 ): AggregatorResultMap | null => {
   const displaySlug = normalizeOnePageSessionSlug(displaySlugIn);
   const questionSourceSlug = normalizeOnePageSessionSlug(questionSourceSlugIn);
-  if (
-    !hasSimulatedDemoResponses(displaySlug) ||
-    (questionSourceSlug !== '' && questionSourceSlug !== displaySlug)
-  ) {
+  if (!hasSimulatedDemoResponses(displaySlug) || (questionSourceSlug !== '' && questionSourceSlug !== displaySlug)) {
     return null;
   }
 
@@ -217,11 +211,20 @@ export const mergeAggregatorResultRows = (
     if (sourceWinsResponderCollisions) {
       const sourceResponders = new Set(
         rows
-          .map((row) => String(row?.responder || '').trim().toLowerCase())
+          .map((row) =>
+            String(row?.responder || '')
+              .trim()
+              .toLowerCase(),
+          )
           .filter(Boolean),
       );
       nextTarget[qid] = nextTarget[qid].filter(
-        (row) => !sourceResponders.has(String(row?.responder || '').trim().toLowerCase()),
+        (row) =>
+          !sourceResponders.has(
+            String(row?.responder || '')
+              .trim()
+              .toLowerCase(),
+          ),
       );
     }
     const seenRows = new Set(nextTarget[qid].map((row) => `${row?.responder || ''}|${row?.response || ''}`));
@@ -259,7 +262,11 @@ export const buildOnePageSessionAggregatorCacheResult = ({
 
   if (!cacheScope || (!isQuestionCacheReady && !useDemoFallback)) {
     return fixtureRows
-      ? { map: fixtureRows, signature: fixtureSignature, sourceSignature: `${sourcePrefix}|fixture:${fixtureSignature}` }
+      ? {
+          map: fixtureRows,
+          signature: fixtureSignature,
+          sourceSignature: `${sourcePrefix}|fixture:${fixtureSignature}`,
+        }
       : emptyResult('not-ready');
   }
   if (cacheScope === 'worker' && !workerCacheIdentity) return emptyResult('invalid-worker-identity');

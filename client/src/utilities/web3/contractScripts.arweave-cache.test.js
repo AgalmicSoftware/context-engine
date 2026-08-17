@@ -247,7 +247,7 @@ describe('contractScripts arweave tx cache + failure cache', () => {
   });
 
   it('coalesces concurrent tx downloads to a single network fetch', async () => {
-    arweaveScripts.downloadDataFromArweave.mockImplementation(
+    arweaveClient.downloadDataFromArweave.mockImplementation(
       async () => new Promise((resolve) => setTimeout(() => resolve('{"ok":true}'), 20)),
     );
 
@@ -268,7 +268,7 @@ describe('contractScripts arweave tx cache + failure cache', () => {
   });
 
   it('coalesces concurrent tx downloads across slugs on the same chain', async () => {
-    arweaveScripts.downloadDataFromArweave.mockImplementation(
+    arweaveClient.downloadDataFromArweave.mockImplementation(
       async () => new Promise((resolve) => setTimeout(() => resolve('{"ok":true}'), 20)),
     );
 
@@ -438,7 +438,7 @@ describe('contractScripts arweave tx cache + failure cache', () => {
     const surveyId = '0x5555555555555555555555555555555555555555555555555555555555555555';
     const surveyTxId = 'force_inflight_survey_tx';
     const hashSpy = jest.spyOn(contractScripts, 'getSurveyHash').mockResolvedValue(surveyTxId);
-    arweaveScripts.downloadDataFromArweave.mockImplementation(
+    arweaveClient.downloadDataFromArweave.mockImplementation(
       (_txId, opts = {}) =>
         new Promise((resolve) => {
           setTimeout(() => {
@@ -476,8 +476,8 @@ describe('contractScripts arweave tx cache + failure cache', () => {
         }),
       );
       expect(hashSpy).toHaveBeenCalledTimes(2);
-      expect(arweaveScripts.downloadDataFromArweave).toHaveBeenCalledTimes(2);
-      expect(arweaveScripts.downloadDataFromArweave).toHaveBeenCalledWith(
+      expect(arweaveClient.downloadDataFromArweave).toHaveBeenCalledTimes(2);
+      expect(arweaveClient.downloadDataFromArweave).toHaveBeenCalledWith(
         surveyTxId,
         expect.objectContaining({
           forceRetry: false,
@@ -485,7 +485,7 @@ describe('contractScripts arweave tx cache + failure cache', () => {
           bypassFailureCache: false,
         }),
       );
-      expect(arweaveScripts.downloadDataFromArweave).toHaveBeenCalledWith(
+      expect(arweaveClient.downloadDataFromArweave).toHaveBeenCalledWith(
         surveyTxId,
         expect.objectContaining({
           forceRetry: true,

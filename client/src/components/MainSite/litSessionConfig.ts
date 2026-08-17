@@ -27,6 +27,7 @@ type MainSiteLitSessionConfigLike = Record<string, unknown> & {
   litCredentials?: unknown;
   litUserMaxPrice?: unknown;
   networkChainId?: unknown;
+  sessionModeProfile?: unknown;
   sponsored?: unknown;
 };
 
@@ -135,8 +136,7 @@ export const resolveMainSiteLitSessionConfig = ({
       ? (cfg.litCredentials as LitCredentialsLike)
       : null;
   const chipotleWorkerUrl = toStr(cfg?.corsWorkerUrl).trim();
-  const hasChipotleRuntime = (
-    chipotleWorkerUrl &&
+  const hasCompleteLitCredentials = !!(
     litCredentials &&
     toStr(litCredentials?.litApiBase).trim() &&
     toStr(litCredentials?.litPkpId).trim() &&
@@ -147,9 +147,13 @@ export const resolveMainSiteLitSessionConfig = ({
   const litNetworkHint = toStr(litConfig?.network || (cfg as Record<string, unknown>)?.litNetwork)
     .trim()
     .toLowerCase();
+  // Regression guard: fresh worker bootstraps intentionally redact Lit
+  // descriptors. Only a schema-valid worker-canonical Lit profile may replace
+  // those legacy runtime hints; arbitrary public profile fragments fail closed.
+  const workerCanonicalLitProfile = resolveValidatedWorkerCanonicalLitProfile(cfg.sessionModeProfile);
+  const workerCanonicalLitChainId = workerCanonicalLitProfile?.evm.registryChainId || null;
   const gate = resolvePrimaryLitGate(cfg);
-  const chainId = gate?.chainId || cfg?.networkChainId || networkChainIdFallback || null;
-  const litNetwork = hasChipotleRuntime ? 'chipotle' : '';
+  const chainId = gate?.chainId || workerCanonicalLitChainId || cfg?.networkChainId || networkChainIdFallback || null;
   const userMaxPrice = cfg?.lit?.userMaxPrice || cfg?.litUserMaxPrice || '';
   const litChain = resolveLitChain({
     chainId,
@@ -158,7 +162,10 @@ export const resolveMainSiteLitSessionConfig = ({
   const gateAddresses = getGateSbtAddresses(gate);
   const hasChipotleRuntime = !!(
     chipotleWorkerUrl &&
-    (hasCompleteLitCredentials || litNetworkHint === 'chipotle' || gateAddresses.length > 0)
+    (hasCompleteLitCredentials ||
+      litNetworkHint === 'chipotle' ||
+      gateAddresses.length > 0 ||
+      workerCanonicalLitProfile)
   );
   const litNetwork = hasChipotleRuntime ? 'chipotle' : '';
   const accessControlConditions = gateAddresses.length

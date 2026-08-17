@@ -223,12 +223,11 @@ export const renderSurveyResultsRenderSurface = ({
   const questionModeEntries = viewMode === 'questions' ? aggregatorEntries : [];
   const surveyIdAbbreviation = currentSurveyId ? getShortenedSurveyID(currentSurveyId, false, null, false) : null;
   const isDemoQuestionResults = getIsDemoQuestionResultsContext();
-  const { demoResultsViewMode, demoResultsViewOptions, isDemoAlternateResultsView } =
-    buildSurveyResultsDemoViewPlan({
-      isDemoQuestionResults,
-      requestedViewMode: state.demoResultsViewMode,
-      slug,
-    });
+  const { demoResultsViewMode, demoResultsViewOptions, isDemoAlternateResultsView } = buildSurveyResultsDemoViewPlan({
+    isDemoQuestionResults,
+    requestedViewMode: state.demoResultsViewMode,
+    slug,
+  });
   const cacheControllerSnapshot = buildSurveyResultsCacheControllerSnapshot({
     activeSessionSlug: slug,
     aggregatorEntriesCount,

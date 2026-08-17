@@ -4,10 +4,11 @@ import { normalizeArweaveFailureMeta, shouldStopPendingMetadataRetry } from '../
 import { prepareSurveyMetadataCacheEntry } from './metadataCacheEntryBuilders.js';
 import { resolveScopedMetadataSessionSlug } from '../session/metadataSessionBinding.js';
 import {
+  mergeSurveyResponseCacheSnapshot,
   normalizeSurveyResponseBatchResult,
   resolveSurveyResponseWatermark,
-  type SurveyResponseItem,
 } from './sessionSurveyResponseHelpers.js';
+import { isResponseRecencyNewer, toResponseRecencyPair } from './responseRecency.js';
 import { sbtEventStreamsPort } from '../../domains/sbts/sbtEventStreamsPort.js';
 import type { SbtEventStreamsPort } from '../../domains/sbts/sbtPorts.js';
 import { readWorkerMetadataSessionConfig, type WorkerMetadataHydrationHost } from './workerCanonicalCacheHydration';
@@ -114,7 +115,7 @@ interface PendingSurveyRetryResult {
 }
 
 interface SurveyContractScripts {
-  getRelevantBlockWindowForFilter: (slug: string) => Promise<{ fromBlock: number; toBlock: number }>;
+  getRelevantBlockWindowForFilter: (sessionRef: unknown) => Promise<{ fromBlock: number; toBlock: number }>;
   getSurveyDataById: (
     providerName: string,
     surveyId: string,
@@ -153,6 +154,7 @@ export interface SessionSurveyCacheHost extends WorkerMetadataHydrationHost {
   shouldSkipSessionScanForSlug?: (slug: string, op: string, scopeCtx?: unknown) => boolean;
   scanScopeNoop?: (slug: string, op: string, onSkipped?: () => void) => boolean;
   onSurveyEventDetectedForGroup?: (slug: string, event: unknown) => unknown;
+  surveyEventStreamsPort?: SurveyEventStreamsPort;
   checkAllCachesReady?: () => void;
   mergeLegacyNumericNetworkKey?: (cache: Record<string, unknown>, networkID: string) => boolean;
   writeSurveyMetadataToCache?: (
@@ -162,7 +164,7 @@ export interface SessionSurveyCacheHost extends WorkerMetadataHydrationHost {
     creationBlock: unknown,
     networkID: string,
     opts?: Record<string, unknown>,
-  ) => boolean | void;
+  ) => Promise<boolean>;
   queueLocalRevisionUpdate?: (opts?: QueueLocalRevisionUpdateOptions) => void;
 }
 
@@ -178,7 +180,9 @@ export interface SessionSurveyCacheController {
 const mainSiteLog = createLogger('mainSite');
 const surveyContractScripts = contractScripts as unknown as SurveyContractScripts;
 
-export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost = {}): SessionSurveyCacheController => {
+class SurveyCachePersistenceError extends Error {}
+
+export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost): SessionSurveyCacheController => {
   let _surveyInitInFlight: Record<string, Promise<void> | undefined> = {};
   let _surveyInitPending: Record<string, SurveyInitOptions | undefined> = {};
   let _pendingSurveyMetadataRetryTimers: Record<string, ReturnType<typeof setTimeout> | undefined> = {};
@@ -192,8 +196,6 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost 
   const isMounted = (): boolean => (typeof host.isMounted === 'function' ? host.isMounted() : false);
   const dgRead = (...args: [string, string]): CacheRecord | null =>
     typeof host.dgRead === 'function' ? (host.dgRead(...args) as CacheRecord | null) : null;
-  const dgWrite = (...args: [string, string, CacheRecord]): unknown =>
-    typeof host.dgWrite === 'function' ? host.dgWrite(...args) : null;
   const getActiveSessionSlug = (): string =>
     String(typeof host.getActiveSessionSlug === 'function' ? host.getActiveSessionSlug() || '' : '');
   const getSessionBlockWindowRef = (slugIn: string): CacheRecord | string => {
@@ -232,7 +234,7 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost 
     typeof host.mergeLegacyNumericNetworkKey === 'function'
       ? host.mergeLegacyNumericNetworkKey(cache, networkID)
       : false;
-  const writeSurveyMetadataToCache = (
+  const writeSurveyMetadataToCache = async (
     ...args: [string, string, CacheRecord, unknown, string, CacheRecord?]
   ): Promise<boolean> => {
     try {
@@ -401,8 +403,9 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost 
 
         const networkID = String(getSessionChainId(slug) || '');
 
-        const { fromBlock: baseFrom, toBlock: baseTo } =
-          await surveyContractScripts.getRelevantBlockWindowForFilter(slug);
+        const { fromBlock: baseFrom, toBlock: baseTo } = await surveyContractScripts.getRelevantBlockWindowForFilter(
+          getSessionBlockWindowRef(slug),
+        );
         if (baseFrom > baseTo) {
           setSurveyState({ isSurveyCacheReady: true }, checkAllCachesReady);
           return;
@@ -608,6 +611,8 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost 
             } catch (e: unknown) {
               mainSiteLog.warn('MainSite: fallback', e);
             }
+            touchedPendingSurveyMetadata.delete(surveyIdLower);
+            deletedPendingSurveyMetadata.add(surveyIdLower);
             mainSiteLog.warn('[MainSite] Stopping pending survey metadata retry', {
               group: slug,
               surveyId: surveyIdLower,
@@ -645,6 +650,8 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost 
           } catch (e: unknown) {
             mainSiteLog.warn('MainSite: fallback', e);
           }
+          touchedPendingSurveyMetadata.delete(surveyIdLower);
+          deletedPendingSurveyMetadata.add(surveyIdLower);
         };
         const pruneLoadedPendingSurveyMetadata = (): number => {
           try {
@@ -661,6 +668,8 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost 
               try {
                 delete pending[sidRaw];
                 removed += 1;
+                touchedPendingSurveyMetadata.delete(sid);
+                deletedPendingSurveyMetadata.add(sid);
               } catch (e: unknown) {
                 mainSiteLog.warn('MainSite: fallback', e);
               }
@@ -742,29 +751,6 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost 
                 }),
               );
 
-              const results: PendingSurveyRetryResult[] = await Promise.all(
-                batch.map(async ({ sid, entry }) => {
-                  const sidLower = String(sid || '').toLowerCase();
-                  if (!sidLower) return { sid: sidLower, entry, surveyData: null };
-                  if (currentNetworkCache?.surveys?.[sidLower]) {
-                    return {
-                      sid: sidLower,
-                      entry,
-                      surveyData: currentNetworkCache.surveys[sidLower],
-                      skippedCached: true,
-                    };
-                  }
-                  try {
-                    const surveyData = (await surveyContractScripts.getSurveyDataById('none', sidLower, slug, {
-                      throwOnFailure: true,
-                    })) as SurveyMetadata;
-                    return { sid: sidLower, entry, surveyData };
-                  } catch (err: unknown) {
-                    return { sid: sidLower, entry, surveyData: null, err };
-                  }
-                }),
-              );
-
               for (const item of results) {
                 const sid = String(item.sid || '').toLowerCase();
                 if (!sid) continue;
@@ -784,7 +770,9 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost 
                     } catch (e: unknown) {
                       mainSiteLog.warn('MainSite: fallback', e);
                     }
-                    writeSurveyMetadataToCache(
+                    touchedSurveyMetadata.delete(sid);
+                    deletedSurveyMetadata.add(sid);
+                    const persisted = await writeSurveyMetadataToCache(
                       targetSlug,
                       sid,
                       preparedSurveyData,
@@ -995,9 +983,19 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost 
                     } catch (e: unknown) {
                       mainSiteLog.warn('MainSite: fallback', e);
                     }
-                    writeSurveyMetadataToCache(targetSlug, surveyID, preparedSurveyData, creationBlock, networkID, {
-                      enforceScopedIsolation: true,
-                    });
+                    touchedSurveyMetadata.delete(surveyID);
+                    deletedSurveyMetadata.add(surveyID);
+                    const persisted = await writeSurveyMetadataToCache(
+                      targetSlug,
+                      surveyID,
+                      preparedSurveyData,
+                      creationBlock,
+                      networkID,
+                      { enforceScopedIsolation: true },
+                    );
+                    if (!persisted) {
+                      throw new SurveyCachePersistenceError(`Failed to persist surveys cache for ${targetSlug}`);
+                    }
                   }
                   clearPendingSurvey(surveyID);
 
@@ -1045,6 +1043,7 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost 
                 `Fetching/updating responses for survey ${surveyIDLower}, from block ${startBlock} up to ${latestBlock} (group=${slug})`,
               );
               try {
+                const preFetchResponses = { ...(currentNetworkCache.surveyResponses[surveyIDLower] || {}) };
                 const surveyResponseBatch = normalizeSurveyResponseBatchResult(
                   await surveyContractScripts.fetchAllSurveyResponses(
                     'none',
@@ -1064,13 +1063,37 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost 
 
                   const uData = ensureUserNode(responderAddr, latestBlock);
                   if (!uData.surveyResponses) uData.surveyResponses = [];
-                  if (!uData.surveyResponses.some((response) => response.surveyId === surveyIDLower)) {
-                    uData.surveyResponses.push({
-                      surveyId: surveyIDLower,
-                      responder: responderAddr,
-                      response: item.response,
-                    });
+                  const nextUserResponse: SurveyResponseUserEntry = {
+                    surveyId: surveyIDLower,
+                    responder: responderAddr,
+                    response: item.response,
+                    blockNumber: item.blockNumber,
+                    transactionIndex: item.transactionIndex ?? item.txIndex ?? item.txi,
+                    logIndex: item.logIndex,
+                    timestamp: item.timestamp,
+                  };
+                  const existingResponseIndex = uData.surveyResponses.findIndex(
+                    (response) => response.surveyId === surveyIDLower,
+                  );
+                  if (existingResponseIndex === -1) {
+                    uData.surveyResponses.push(nextUserResponse);
                     userCacheModified = true;
+                    touchedUserNodes.add(responderAddr);
+                  } else {
+                    const existingResponse = uData.surveyResponses[existingResponseIndex];
+                    if (
+                      isResponseRecencyNewer(
+                        toResponseRecencyPair(nextUserResponse, nextUserResponse.response),
+                        toResponseRecencyPair(existingResponse, existingResponse.response),
+                      )
+                    ) {
+                      uData.surveyResponses[existingResponseIndex] = {
+                        ...existingResponse,
+                        ...nextUserResponse,
+                      };
+                      userCacheModified = true;
+                      touchedUserNodes.add(responderAddr);
+                    }
                   }
                 }
                 currentNetworkCache.surveyResponsesLatestBlock[surveyIDLower] = resolveSurveyResponseWatermark({
@@ -1078,6 +1101,11 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost 
                   latestBlock,
                   hadPartialFailure: surveyResponseBatch.hadPartialFailure,
                   lowestFailedBlock: surveyResponseBatch.lowestFailedBlock,
+                });
+                responseDeltas.set(surveyIDLower, {
+                  preFetchResponses,
+                  fetchedResponses: surveyResponseBatch.responses,
+                  safeResponseWatermark: currentNetworkCache.surveyResponsesLatestBlock[surveyIDLower],
                 });
               } catch (error: unknown) {
                 mainSiteLog.warn('Error fetching survey responses; leaving watermark unchanged', {
@@ -1138,8 +1166,7 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost 
     });
     surveyEventStreams.removeSurveyEventsListener('none', slug);
     if (shouldSkipSessionScanForSlug(slug, 'startSurveyAndQuestionEventListenerForGroup')) return false;
-    if (typeof surveyContractScripts.listenForSurveyEvents !== 'function') return false;
-    surveyContractScripts.listenForSurveyEvents(
+    surveyEventStreams.listenForSurveyEvents(
       'none',
       (event: unknown) => onSurveyEventDetectedForGroup(slug, event),
       slug,

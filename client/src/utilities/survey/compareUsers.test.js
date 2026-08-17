@@ -393,9 +393,7 @@ describe('compare user pure helpers', () => {
   it('normalizes SBT labels, keys, shortened addresses, and address validity', () => {
     expect(getCompareSbtLabel({ sbtInfo: { name: '  Alpha Ring  ' } })).toBe('Alpha Ring');
     expect(getCompareSbtKey({ sbtInfo: { name: 'Alpha Ring' } })).toBe('alpha ring');
-    expect(getCompareSbtKey({ compareKey: 'Canonical:Membership', name: 'Alpha Ring' })).toBe(
-      'canonical:membership',
-    );
+    expect(getCompareSbtKey({ compareKey: 'Canonical:Membership', name: 'Alpha Ring' })).toBe('canonical:membership');
     expect(getCompareSbtKey({ name: '[encrypted]', address: ADDRESS_A })).toBe(ADDRESS_A);
     expect(shortenPlain('0x1234567890abcdef1234567890abcdef1234abcd')).toBe('0x1234\u2026abcd');
     expect(shortenPlain('not-an-address')).toBe('not-an-address');

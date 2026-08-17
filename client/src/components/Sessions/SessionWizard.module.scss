@@ -127,6 +127,27 @@ $muted-text: var(--ce-panel-text-muted);
   max-width: 100%;
 }
 
+.headerProfileSelectionStep {
+  align-items: stretch;
+
+  .headerTitleBlock {
+    flex-basis: 100%;
+    min-width: 0;
+    text-align: center;
+  }
+
+  .headerActions {
+    flex: 1 1 100%;
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .headerControlStack {
+    width: 100%;
+    justify-items: stretch;
+  }
+}
+
 .headerSecondaryActions {
   display: flex;
   align-items: center;
@@ -3044,6 +3065,11 @@ $muted-text: var(--ce-panel-text-muted);
     border-radius: var(--ce-radius-pill);
     font-size: 0.7rem;
   }
+}
+
+.modeSavedProfileEntry {
+  justify-content: center;
+  white-space: normal;
 }
 
 .modeCheckboxRow {

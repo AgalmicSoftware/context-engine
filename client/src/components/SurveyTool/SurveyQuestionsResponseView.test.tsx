@@ -59,18 +59,25 @@ describe('SurveyQuestionsResponseView', () => {
     const question = { id: 'q1', prompt: 'Question?' };
     const parsedViewAddressAnswers = { q1: 'viewed answer' };
 
-    render(
+    const { container } = render(
       <SurveyQuestionsResponseView
+        layoutDisplayState={{ responseViewClassName: 'response-view' }}
         parsedViewAddressAnswers={parsedViewAddressAnswers}
         questionPool={[question]}
         questionPoolReady
         renderQuestionAnswer={renderQuestionAnswer}
         renderSurveyAnswers={renderSurveyAnswers}
-        shortenedViewAddress="0xabc...1234"
+        routeViewDisplayState={{
+          isOwnResponse: undefined,
+          shortenedViewAddress: '0xabc...1234',
+          viewedAddressLower: '0xabc1234',
+          viewedAddressRaw: '0xABC1234',
+        }}
         singleQuestionMode
       />,
     );
 
+    expect(container.firstElementChild).toHaveClass('response-view');
     expect(screen.getByRole('link', { name: '0xabc...1234' })).toHaveAttribute('href', '/u/0xabc1234');
     expect(screen.getByText('Response:')).toBeInTheDocument();
     expect(screen.getByTestId('single-answer')).toBeInTheDocument();
@@ -83,11 +90,16 @@ describe('SurveyQuestionsResponseView', () => {
 
     render(
       <SurveyQuestionsResponseView
-        isOwnResponse
         questionPool={[{ id: 'q1' }]}
         questionPoolReady
         renderQuestionAnswer={renderQuestionAnswer}
         renderSurveyAnswers={renderSurveyAnswers}
+        routeViewDisplayState={{
+          isOwnResponse: true,
+          shortenedViewAddress: '',
+          viewedAddressLower: '',
+          viewedAddressRaw: '',
+        }}
         userAnswers={{ responses }}
       />,
     );

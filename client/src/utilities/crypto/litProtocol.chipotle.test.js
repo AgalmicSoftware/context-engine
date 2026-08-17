@@ -33,8 +33,8 @@ jest.mock('../worker/workerAuth.js', () => ({
   },
 }));
 
-jest.mock('../arweave/arweaveScripts.js', () => ({
-  arweaveScripts: {
+jest.mock('../arweave/arweaveClient.js', () => ({
+  arweaveClient: {
     uploadDataToArweave: (...args) => mockUploadDataToArweave(...args),
     downloadDataFromArweave: (...args) => mockDownloadDataFromArweave(...args),
     buildArweaveGatewayUrl: (txId) => `https://arweave.example.test/${txId}`,

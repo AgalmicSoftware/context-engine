@@ -2,15 +2,6 @@
 import { useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { ethers } from 'ethers';
 import { ReactReduxContext } from 'react-redux';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faCaretDown,
-  faCaretUp,
-  faCheck,
-  faExclamationCircle,
-  faImage,
-  faSpinner,
-} from '@fortawesome/free-solid-svg-icons';
 import styles from './SessionWizard.module.scss';
 import { resolveLitChain, getGlobalLitHooks } from '../../utilities/crypto/litProtocol.js';
 import { getEffectiveArweaveKey } from '../../utilities/session/resourceKeys.js';
@@ -25,7 +16,6 @@ import type { SessionConfig, UnknownRecord } from '../../utilities/session/sessi
 import { validateSessionModeProfile, type SessionModeProfile } from '../../utilities/session/sessionModeProfile';
 import { normalizeBaseUrl } from '../../utilities/urlUtils.js';
 import { t } from '../../utilities/ui/terminology.js';
-import { buildSponsoredFlagFields as buildSponsoredSessionFlagFields } from '../../utilities/session/sponsoredFlags.js';
 import { createLogger } from '../../utilities/logging';
 import {
   getSessionWizardContractDefaults,
@@ -33,18 +23,11 @@ import {
   resolveSessionWizardInitialRegistryChainId,
   resolveSessionWizardRegistryAddress,
 } from './sessionWizardContracts.js';
-import { resolveWorkerSecretsSnapshot } from './sessionWizardSecrets.js';
 import { resolveSessionWizardDeployStatusDisplayState } from './sessionWizardDeployErrors';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { notify } from '../../utilities/ui/notify.js';
-import {
-  SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS,
-  buildSessionWizardRegistrySessionFields,
-  sanitizeSessionWizardMetadataPayload,
-} from './sessionWizardWriteNormalization.js';
-import usePendingSbtDrafts, { normalizePendingSbtDrafts, type PendingSbtDraft } from './hooks/usePendingSbtDrafts.js';
-import useSponsoredBundleLifecycle from './hooks/useSponsoredBundleLifecycle';
+import usePendingSbtDrafts, { normalizePendingSbtDrafts } from './hooks/usePendingSbtDrafts.js';
 import useSessionWizardWorkerDeploy, {
   type SessionWizardWorkerDeployRuntime,
 } from './hooks/useSessionWizardWorkerDeploy';
@@ -135,6 +118,7 @@ import {
   resolveSessionWizardSlugAvailabilityPort,
 } from './sessionWizardSlugAvailability';
 import { createSessionWizardPublishRuntimeController } from './sessionWizardPublishRuntimeController';
+import { resolveSessionWizardWorkerPublishEvidence } from './sessionWizardWorkerPublishEvidence';
 import {
   resolveSessionWizardPublishRequestDescriptor,
   resolveSessionWizardPublishUiPlan,
@@ -151,8 +135,6 @@ import {
   isSessionWizardDefaultWorkerPlaceholderUrl,
 } from './sessionWizardWorkerDefaults';
 import {
-  SESSION_STORAGE_BACKENDS,
-  buildSessionStorageProfileDisplayDescriptor,
   isWorkerSbtGateCloudflareStorageProfile,
   normalizeSessionStorageProfileConfig,
 } from './sessionWizardStorageProfile';
@@ -188,6 +170,7 @@ import {
   sanitizeSessionWizardWorkerSecretsForLitMode,
 } from './sessionWizardWorkerSecretSupport';
 import {
+  applySessionWizardRegistryChainDraftDefaults,
   buildSessionWizardCacheWritePayload,
   buildSessionWizardInitialDraftFromCache,
 } from './sessionWizardDraftState';
@@ -215,6 +198,7 @@ import {
   deepClone,
   generateSessionId,
   getChainName,
+  getSessionWizardErrorMessage,
 } from './sessionWizardCoreUtils';
 import {
   clearSessionWizardCache,
@@ -222,18 +206,13 @@ import {
   useStableSerializedObject,
   writeSessionWizardCache,
 } from './sessionWizardLocalStateSupport';
-import {
-  RESOURCE_LABELS,
-  RESOURCE_SECTION_TOOLTIPS,
-  resolveSessionWizardResourceSecretFields,
-} from './sessionWizardResourceConfig';
+import { writeSessionWizardWorkerSettlement } from './sessionWizardWorkerSettlement';
 import {
   buildSessionWizardNewSessionBannerDismissalContextKey,
   isNewSessionWizardPathname,
 } from './sessionWizardRouteState';
 import { buildPublishedPendingSbtLinks, type PublishedPendingSbtLink } from './sessionWizardPublishLinks';
 import { resolveSessionWizardNewSessionRequirementsDisplayState } from './sessionWizardRequirementsDisplay';
-import { getSessionWizardSecretFieldTestId, resolveSessionHeaderImageFormat } from './sessionWizardUiSupport';
 import {
   getSessionWizardExplorerBaseUrl as getExplorerBaseUrl,
   normalizeSessionWizardSlug as normalizeSlug,
@@ -246,11 +225,6 @@ import {
   resolveSessionWizardResourceGate as resolveResourceGate,
   resolveSessionWizardResourceGateSelectionUpdate,
 } from './sessionWizardResourceGateSupport';
-import {
-  applySessionWizardMetadataUploadGuards,
-  buildSessionWizardSecretFieldGateErrorMessage,
-  resolveSessionWizardMetadataPayloadBase,
-} from './sessionWizardMetadataPayload';
 import {
   buildSessionWizardCreateSbtModalLaunchState,
   buildSessionWizardDeferredCreateSbtComponentProps,
@@ -343,12 +317,7 @@ const ignoreSessionPublishStep = (_publishStep: number): void => {};
 
 const log = createLogger('general');
 const DEFAULT_TEMPLATE: DraftState = SESSION_WIZARD_DEFAULT_TEMPLATE as DraftState;
-const NEW_SESSION_RESOURCE_LINKS = Object.freeze({
-  openaiApiKey: 'https://platform.openai.com/api-keys',
-  litApiKeys: 'https://developer.litprotocol.com/management/api_keys',
-  arweaveWallet: 'https://docs.arweave.org/developers/wallets/arweave-wallet',
-  optimismSepoliaFaucet: 'https://console.optimism.io/faucet',
-});
+const pathKey = (path: string[]): string => path.join('.');
 
 const buildProvisionedSponsoredContextState = (value: unknown): ProvisionedSponsoredContextState => {
   const context = value && typeof value === 'object' ? (value as UnknownRecord) : {};
@@ -404,7 +373,7 @@ const SessionWizard = ({
       : null;
   }, [cachedWizard?.draft?.networkChainId, network?.chainId, network?.id, resolvedActiveSessionSlug]);
   const initialDraft = useMemo(() => {
-    return buildSessionWizardInitialDraftFromCache({
+    const draftFromCache = buildSessionWizardInitialDraftFromCache({
       cachedWizard,
       defaultTemplate: DEFAULT_TEMPLATE,
       normalModeSharedHostedWorkerEnabled: NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED,
@@ -446,22 +415,25 @@ const SessionWizard = ({
   const [openLockKey, setOpenLockKey] = useState('');
   const [openResourceGateKey, setOpenResourceGateKey] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [metadataUrl, setMetadataUrl] = useState('');
-  const [metadataTxId, setMetadataTxId] = useState('');
-  const [manualMetadataUrl, setManualMetadataUrl] = useState('');
-  const [manualGasLimit, setManualGasLimit] = useState(() => (
-    toStr(cachedWizard?.manualGasLimit || '1200000').trim() || '1200000'
-  ));
-  const [manualGasPriceGwei, setManualGasPriceGwei] = useState(() => (
-    toStr(cachedWizard?.manualGasPriceGwei || '').trim()
-  ));
-  const [manualMaxFeePerGasGwei, setManualMaxFeePerGasGwei] = useState(() => (
-    toStr(cachedWizard?.manualMaxFeePerGasGwei || '').trim()
-  ));
-  const [manualMaxPriorityFeePerGasGwei, setManualMaxPriorityFeePerGasGwei] = useState(() => (
-    toStr(cachedWizard?.manualMaxPriorityFeePerGasGwei || '').trim()
-  ));
-  const [registerTxs, setRegisterTxs] = useState<UnknownRecord[]>([]);
+  const {
+    metadataUrl,
+    setMetadataUrl,
+    metadataTxId,
+    setMetadataTxId,
+    manualMetadataUrl,
+    setManualMetadataUrl,
+    manualGasLimit,
+    setManualGasLimit,
+    manualGasPriceGwei,
+    setManualGasPriceGwei,
+    manualMaxFeePerGasGwei,
+    setManualMaxFeePerGasGwei,
+    manualMaxPriorityFeePerGasGwei,
+    setManualMaxPriorityFeePerGasGwei,
+    publishAdvancedOpen,
+    setPublishAdvancedOpen,
+  } = useSessionWizardPublishAdvancedState({ cachedWizard });
+  const [registerTxs, setRegisterTxs] = useState<SessionWizardRegisterTxEntry[]>([]);
   const [pendingOnChainFields, setPendingOnChainFields] = useState<UnknownRecord>({});
   const [status, setStatus] = useState('');
   const [sessionUrl, setSessionUrl] = useState('');
@@ -476,20 +448,12 @@ const SessionWizard = ({
   const publishRequestInFlightRef = useRef(false);
   const [publishStepElapsedMs, setPublishStepElapsedMs] = useState(0);
   const [wizardMode, setWizardMode] = useState('normal');
-  const [wizardDisplaySettingsOpen, setWizardDisplaySettingsOpen] = useState(false);
-  const [registryChainId, setRegistryChainId] = useState(() => {
-    const fromDraft = Number(draft.networkChainId || 0);
-    if (fromDraft && getSessionRegistryAddress(fromDraft)) return fromDraft;
-    const fromNetwork = Number(network?.id || 0);
-    if (fromNetwork && getSessionRegistryAddress(fromNetwork)) return fromNetwork;
-    const defaultRegistryChainId = Number(DEFAULT_CHAIN_ID || 0);
-    if (defaultRegistryChainId && getSessionRegistryAddress(defaultRegistryChainId)) {
-      return defaultRegistryChainId;
-    }
-    const available = getSessionRegistryChains();
-    if (available.length) return available[0].id;
-    return DEFAULT_CHAIN_ID;
-  });
+  const [registryChainId, setRegistryChainId] = useState<number>(() =>
+    resolveSessionWizardInitialRegistryChainId({
+      draftChainId: draft.networkChainId,
+      networkChainId: network?.id,
+    }),
+  );
   const checkSessionSlugExists = useCallback(
     async ({ registryChainId: chainId, slug }: SessionSlugExistsArgs): Promise<boolean> => {
       const registryRead = sessionRegistryPublishAdapter.getRegistryContract({
@@ -503,13 +467,6 @@ const SessionWizard = ({
     },
     [],
   );
-  const { slugAvailability } = useSessionSlugState({
-    slug: draft?.slug,
-    privateSlugMode,
-    registryChainId,
-    isReservedSlug: isReservedSessionSlug,
-    sessionExists: checkSessionSlugExists,
-  });
   const [encryptionGates, setEncryptionGates] = useState<EncryptionGateState[]>(() => cachedInitialState.initialGates);
   // Pending SBT drafts carry deploy secrets and claim codes, so keep them only
   // in this mounted tab. Reloading or leaving the wizard intentionally clears them.
@@ -528,7 +485,7 @@ const SessionWizard = ({
     open: false,
     contractKey: '',
   }));
-  const [pendingCreateSbtLaunch, setPendingCreateSbtLaunch] = useState<UnknownRecord | null>(null);
+  const [pendingCreateSbtLaunch, setPendingCreateSbtLaunch] = useState<SessionWizardCreateSbtLaunchState | null>(null);
   const hasPrivateSbtName = useMemo(() => {
     const gates = Array.isArray(encryptionGates) ? encryptionGates : [];
     return gates.some((gate) =>
@@ -537,19 +494,20 @@ const SessionWizard = ({
   }, [encryptionGates]);
   const lastHasPrivateSbtNameRef = useRef(false);
   const [gateSelections, setGateSelections] = useState<GateSelectionsState>(
-    () => initialGateSelections as GateSelectionsState,
+    () => cachedInitialState.initialGateSelections as GateSelectionsState,
   );
-  const [defaultGateId, setDefaultGateId] = useState(() => initialDefaultGateId || initialGateRef.current.id);
-  const [createSbtTargetGateId, setCreateSbtTargetGateId] = useState(
-    () => initialDefaultGateId || initialGateRef.current?.id || '',
+  const [defaultGateId, setDefaultGateId] = useState(() => cachedInitialState.initialDefaultGateId);
+  const [createSbtTargetGateId, setCreateSbtTargetGateId] = useState(() => cachedInitialState.initialDefaultGateId);
+  const [featuredDraftGateAutoLink, setFeaturedDraftGateAutoLink] = useState(
+    () => cachedInitialState.initialFeaturedDraftGateAutoLink,
   );
   // Gate selection is always per-resource when multiple gates exist (no toggle needed).
   const [resourceGateMap, setResourceGateMap] = useState<ResourceGateMapState>(() => {
     const cachedMap = cachedWizard?.resourceGateMap;
     if (cachedMap && typeof cachedMap === 'object') return cachedMap as ResourceGateMapState;
     return buildResourceGateMap(
-      initialGates,
-      initialDefaultGateId || initialGateRef.current.id,
+      cachedInitialState.initialGates,
+      cachedInitialState.initialDefaultGateId,
     ) as ResourceGateMapState;
   });
   const [jsonCopied, setJsonCopied] = useState(false);
@@ -666,6 +624,8 @@ const SessionWizard = ({
   const sponsoredPublishBundleFileInputRef = useRef<HTMLInputElement | null>(null);
   const deployCompleteRef = useRef(deployComplete);
   const deployWorkerUrlRef = useRef(normalizeBaseUrl(toStr(cachedWizard?.deployWorkerUrl).trim()));
+  deployCompleteRef.current = deployComplete;
+  deployWorkerUrlRef.current = deployWorkerUrl;
   const provisionedSponsoredContextRef = useRef<ProvisionedSponsoredContextState>(
     buildProvisionedSponsoredContextState(cachedWizard?.provisionedSponsoredContext),
   );
@@ -674,21 +634,15 @@ const SessionWizard = ({
   const workerSecretsRef = useRef<WorkerSecretsLike>(
     sanitizeSessionWizardWorkerSecretsForLitMode(cachedWizard?.workerSecrets),
   );
-  const workerDeployRuntimeRef = useRef(null);
+  const workerDeployRuntimeRef = useRef<SessionWizardWorkerDeployRuntime | null>(null);
   const toggleLoginModalRef = useRef<SessionWizardProps['toggleLoginModal']>(toggleLoginModal);
   toggleLoginModalRef.current = toggleLoginModal;
   const togglePrivateSlugModeRef = useRef<null | (() => void)>(null);
-  const updateDraftValueRef = useRef<null | ((path: unknown[], value: unknown) => void)>(null);
+  const updateDraftValueRef = useRef<null | ((path: string[], value: unknown) => void)>(null);
   const resolveCreateSbtTargetGateIdRef = useRef<null | ((requestedGateId?: unknown) => string)>(null);
   const openCreateSbtModalRef = useRef<
     null | ((options?: SessionWizardCreateSbtLaunchOptions | SessionWizardCreateSbtLaunchState) => void)
   >(null);
-  const clearPendingSbtDraftsRef = useRef<null | ((draftsToClear?: unknown[], statusMessage?: string) => void)>(null);
-  const pruneAllPendingSbtSelectionsRef = useRef<null | (() => void)>(null);
-  const prunePendingSbtSelectionsRef = useRef<null | ((addressLowerSet: Set<string>) => void)>(null);
-  const clearFeaturedDraftGateAutoLinkRef = useRef<null | ((address?: unknown) => void)>(null);
-  const dismissFeaturedDraftGateAutoLinkRef = useRef<null | ((args?: UnknownRecord) => void)>(null);
-  const [workerUrlAutoFilled, setWorkerUrlAutoFilled] = useState(false);
   const defaultSponsoredSbtLookupInFlightRef = useRef('');
   const pendingSbtDeployContextSignature = useMemo(
     () =>
@@ -714,113 +668,6 @@ const SessionWizard = ({
     );
     return toStr(secrets?.arweaveJwk).trim();
   };
-  // Regression guard: sponsored-bundle apply/restore spans async work, so these
-  // helpers must read from refs instead of state dependencies. Recreating them
-  // mid-apply causes the bundle loader effect to cancel before it can finish.
-  const getCurrentWorkerSecrets = useCallback(
-    () =>
-      sanitizeSessionWizardWorkerSecretsForLitMode(
-        resolveWorkerSecretsSnapshot({
-          workerSecretsRef,
-          defaults: DEFAULT_WORKER_SECRETS,
-        }),
-      ),
-    [],
-  );
-  const getCurrentEnabledWorkerSecrets = useCallback(
-    () =>
-      resolveSessionWizardEnabledWorkerSecrets({
-        workerSecrets: getCurrentWorkerSecrets(),
-        workerSecretsEnabled,
-      }),
-    [getCurrentWorkerSecrets, workerSecretsEnabled],
-  );
-  const applyWorkerSecretsUpdate = useCallback((nextValueOrUpdater: unknown) => {
-    const current = resolveWorkerSecretsSnapshot({
-      workerSecretsRef,
-      defaults: DEFAULT_WORKER_SECRETS,
-    });
-    const nextValue =
-      typeof nextValueOrUpdater === 'function'
-        ? (nextValueOrUpdater as WorkerSecretsUpdateFn)(current)
-        : nextValueOrUpdater;
-    const next = sanitizeSessionWizardWorkerSecretsForLitMode({
-      ...DEFAULT_WORKER_SECRETS,
-      ...(nextValue && typeof nextValue === 'object' ? nextValue : {}),
-    });
-    workerSecretsRef.current = next;
-    setWorkerSecrets(next);
-    return next;
-  }, []);
-  const updateSponsoredBundleDraftCorsWorkerUrl = useCallback((nextCorsWorkerUrl = '') => {
-    setDraft((prev) => {
-      const desiredWorkerUrl = toStr(nextCorsWorkerUrl || '').trim();
-      if (toStr(prev?.corsWorkerUrl || '').trim() === desiredWorkerUrl) return prev;
-      const next = deepClone(prev);
-      next.corsWorkerUrl = desiredWorkerUrl;
-      return next;
-    });
-  }, []);
-  const updateSponsoredBundleDeploymentState = useCallback(
-    ({
-      deployForm: nextDeployForm,
-      deployStatus: nextDeployStatus,
-      deployInFlight: nextDeployInFlight,
-      deployComplete: nextDeployComplete,
-      workerMode: nextWorkerMode,
-      deployWorkerUrl: nextDeployWorkerUrl,
-      provisionedSponsoredContext: nextProvisionedSponsoredContext,
-      forceManualBundleFile: nextForceManualBundleFile,
-      normalModeBundleUrlOverride: nextNormalModeBundleUrlOverride,
-      workerUrlAutoFilled: nextWorkerUrlAutoFilled,
-    }: SponsoredBundleDeploymentStatePatch = {}) => {
-      if (nextDeployForm !== undefined) {
-        setDeployForm(nextDeployForm);
-      }
-      if (typeof nextDeployStatus === 'string') {
-        setDeployStatus(nextDeployStatus);
-      }
-      if (typeof nextDeployInFlight === 'boolean') {
-        setDeployInFlight(nextDeployInFlight);
-      }
-      if (typeof nextDeployComplete === 'boolean') {
-        setDeployComplete(nextDeployComplete);
-      }
-      if (typeof nextWorkerMode === 'string') {
-        setWorkerMode(nextWorkerMode);
-      }
-      if (typeof nextDeployWorkerUrl === 'string') {
-        setDeployWorkerUrl(nextDeployWorkerUrl);
-      }
-      if (nextProvisionedSponsoredContext !== undefined) {
-        setProvisionedSponsoredContext(buildProvisionedSponsoredContextState(nextProvisionedSponsoredContext));
-      }
-      if (typeof nextForceManualBundleFile === 'boolean') {
-        setForceManualBundleFile(nextForceManualBundleFile);
-      }
-      if (typeof nextNormalModeBundleUrlOverride === 'string') {
-        setNormalModeBundleUrlOverride(nextNormalModeBundleUrlOverride);
-      }
-      if (typeof nextWorkerUrlAutoFilled === 'boolean') {
-        setWorkerUrlAutoFilled(nextWorkerUrlAutoFilled);
-      }
-    },
-    [],
-  );
-  const updateSponsoredBundleWorkerSecretState = useCallback(
-    ({
-      workerSecretsEnabled: nextWorkerSecretsEnabled,
-      persistWorkerSecrets: nextPersistWorkerSecrets,
-    }: SponsoredBundleWorkerSecretStatePatch = {}) => {
-      if (typeof nextWorkerSecretsEnabled === 'boolean') {
-        setWorkerSecretsEnabled(nextWorkerSecretsEnabled);
-      }
-      if (typeof nextPersistWorkerSecrets === 'boolean') {
-        setPersistWorkerSecrets(nextPersistWorkerSecrets);
-      }
-    },
-    [],
-  );
   const {
     sponsoredBundleStatus,
     sponsoredBundleRetryNonce,
@@ -839,6 +686,7 @@ const SessionWizard = ({
     initialSponsoredBundleId,
     initialSponsoredBundleKey,
     draftSlug: draft?.slug,
+    workerSecretsEnabled,
     refs: {
       draftRef,
       deployFormRef,
@@ -986,8 +834,16 @@ const SessionWizard = ({
         getChainById,
         getChainName,
         registryChainId,
+        purpose:
+          sessionModeRequirements.publish.deployPendingSbts && !sessionModeRequirements.publish.registerSession
+            ? 'SBT publishing'
+            : 'registration',
       }),
-    [registryChainId],
+    [
+      registryChainId,
+      sessionModeRequirements.publish.deployPendingSbts,
+      sessionModeRequirements.publish.registerSession,
+    ],
   );
   const newSessionFundingRequirementLabel = newSessionFundingRequirement.label;
   const newSessionFundingRequirementHref = newSessionFundingRequirement.href;
@@ -1048,7 +904,7 @@ const SessionWizard = ({
   }, []);
 
   useEffect(() => {
-    // Default: redact secret values so refresh requires re-entry (security: no keys in localStorage).
+    // Redact secret values; live deployment evidence never enters localStorage.
     if (workerCanonicalSettlement.isSettled) return;
     const cachePayload = buildSessionWizardCacheWritePayload({
       sessionId,
@@ -1071,6 +927,7 @@ const SessionWizard = ({
       deployForm,
       deployComplete,
       deployWorkerUrl,
+      workerRequirementProof,
       provisionedSponsoredContext,
     });
     const result = writeSessionWizardCache(cachePayload, { expectedCachedPayload: wizardCacheSnapshotRef.current });
@@ -1112,88 +969,23 @@ const SessionWizard = ({
   }, [encryptedFieldGates]);
 
   useEffect(() => {
-    const nextName = buildWorkerName(draft.sessionName || '');
-    if (nextName && nextName !== deployForm.workerName) {
-      setDeployForm((prev) => ({ ...prev, workerName: nextName }));
-    }
-  }, [draft.sessionName, deployForm.workerName]);
-
-  useEffect(() => {
-    const defaultUrl = getSessionWizardDefaultWorkerUrl();
-    const current = toStr(draft.corsWorkerUrl).trim();
-    if (current && defaultUrl && current !== defaultUrl) {
-      setWorkerMode('custom');
-    }
-  }, [draft.corsWorkerUrl]);
-
-  useEffect(() => {
-    if (!deployComplete) return;
-    const configured = normalizeBaseUrl(toStr(draft.corsWorkerUrl).trim());
-    const deployed = normalizeBaseUrl(toStr(deployWorkerUrl).trim());
-    if (!configured || !deployed || configured !== deployed) {
-      setDeployComplete(false);
-    }
-  }, [draft.corsWorkerUrl, deployComplete, deployWorkerUrl]);
-
-  useEffect(() => {
-    if (wizardMode !== 'normal' || NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED) return;
-    const fallbackUrl = normalizeWorkerAuthUrl(getSessionWizardDefaultWorkerUrl());
-    const configuredUrl = normalizeWorkerAuthUrl(toStr(draft.corsWorkerUrl).trim());
-    if (workerMode === 'default') {
-      setWorkerMode('custom');
-    }
-    if (!deployComplete && configuredUrl && fallbackUrl && configuredUrl === fallbackUrl) {
-      setWorkerUrlAutoFilled(false);
-      updateDraftValueRef.current?.(['corsWorkerUrl'], '');
-    }
-  }, [wizardMode, workerMode, draft.corsWorkerUrl, deployComplete]);
-
-  useEffect(() => {
+    if (!sessionModeRequirements.requiresRpc) return;
     const chainId = Number(registryChainId || 0) || 0;
     if (!chainId) return;
     setDraft((prev) => {
-      const next = deepClone(prev);
-      if (Number(next.networkChainId || 0) !== chainId) {
-        // NOTE: For now we assume session chain === registry chain; split these when they diverge.
-        next.networkChainId = chainId;
-      }
+      // NOTE: For now we assume session chain === registry chain; split these when they diverge.
       // Contract defaults currently come from bundled per-chain config; ENS discovery remains future work.
-      const defaults = getSessionWizardContractDefaults(chainId);
-      if (!next.contracts || typeof next.contracts !== 'object') {
-        next.contracts = {};
-      }
-      const keys = new Set([
-        ...Object.keys(next.contracts || {}),
-        ...Object.keys(defaults || {}),
-      ]);
-      keys.forEach((key) => {
-        if (!next.contracts[key] || typeof next.contracts[key] !== 'object') {
-          next.contracts[key] = {};
-        }
-        const fallback = toStr(defaults?.[key] || '').trim();
-        if (fallback) {
-          next.contracts[key].address = fallback;
-        }
-        next.contracts[key].chainId = chainId;
-      });
       // Auto-fill the current PATH public RPC; dedicated gateway/provider-tier support remains future work.
-      const pathRpc = getDefaultHttpRpc(chainId);
-      if (pathRpc) {
-        if (!next.rpc || typeof next.rpc !== 'object') next.rpc = {};
-        if (!toStr(next.rpc.provider).trim()) {
-          next.rpc.provider = 'path';
-        }
-        if (!next.rpc.providers || typeof next.rpc.providers !== 'object') next.rpc.providers = {};
-        if (!next.rpc.providers.path || typeof next.rpc.providers.path !== 'object') next.rpc.providers.path = {};
-        if (!toStr(next.rpc.providers.path.rpcUrl).trim()) {
-          next.rpc.providers.path.rpcUrl = pathRpc;
-        }
-        if (!next.faucet || typeof next.faucet !== 'object') next.faucet = {};
-        if (!toStr(next.faucet.rpcUrl).trim()) {
-          next.faucet.rpcUrl = pathRpc;
-        }
-      }
-      return next;
+      return applySessionWizardRegistryChainDraftDefaults({
+        draft: prev,
+        chainId,
+        contractDefaults: sessionModeRequirements.publish.registerSession
+          ? getSessionWizardContractDefaults(chainId)
+          : {},
+        pathRpc: getDefaultHttpRpc(chainId),
+        includeContracts: sessionModeRequirements.publish.registerSession,
+        includeFaucet: sessionModeRequirements.requiresFunding,
+      }) as DraftState;
     });
     setGateSelections((prev) => {
       let changed = false;
@@ -1207,19 +999,12 @@ const SessionWizard = ({
       });
       return changed ? next : prev;
     });
-    const normalizedPendingDrafts = normalizePendingSbtDrafts(pendingSbtDraftsRef.current);
-    if (!registryChainHydratedRef.current) {
-      registryChainHydratedRef.current = true;
-      return;
-    }
-    if (normalizedPendingDrafts.length > 0) {
-      clearPendingSbtDraftsRef.current?.(
-        normalizedPendingDrafts,
-        'Pending SBT drafts were cleared because the session chain or SBT factory changed. Recreate them before publishing.',
-      );
-      pruneAllPendingSbtSelectionsRef.current?.();
-    }
-  }, [registryChainId]);
+  }, [
+    registryChainId,
+    sessionModeRequirements.publish.registerSession,
+    sessionModeRequirements.requiresFunding,
+    sessionModeRequirements.requiresRpc,
+  ]);
 
   useEffect(() => {
     const gateIds = encryptionGates.map((gate) => gate.id).filter(Boolean);
@@ -1366,130 +1151,7 @@ const SessionWizard = ({
     });
   }, [aiModelProviderPatch]);
 
-  useEffect(() => {
-    const duration = Number(blockLimitDuration || 0);
-    const unitMs = blockLimitUnit === 'days' ? 86400000 : blockLimitUnit === 'minutes' ? 60000 : 3600000;
-    const startFromDraft = Number(draft?.blockLimits?.start);
-    const fallbackStart = Number(latestChainBlock);
-    const startBlock = (Number.isFinite(startFromDraft) && startFromDraft > 0)
-      ? startFromDraft
-      : ((Number.isFinite(fallbackStart) && fallbackStart > 0) ? fallbackStart : 0);
-    if (!startBlock || !Number.isFinite(duration) || duration <= 0) {
-      if (blockEndAutoRef.current) {
-        updateDraftValueRef.current?.(['blockLimits', 'end'], null);
-        blockEndAutoRef.current = false;
-      }
-      return;
-    }
-    const blockTimeMs = getChainBlockTimeMs(registryChainId);
-    const blocks = Math.max(1, Math.ceil((duration * unitMs) / blockTimeMs));
-    const endBlock = startBlock + blocks;
-    updateDraftValueRef.current?.(['blockLimits', 'end'], endBlock);
-    blockEndAutoRef.current = true;
-  }, [blockLimitDuration, blockLimitUnit, latestChainBlock, registryChainId, draft?.blockLimits?.start]);
-
-  useEffect(() => {
-    const fastProvider = normalizeAiProvider(draft?.ai?.models?.fast?.provider || 'openai');
-    const thinkingProvider = normalizeAiProvider(draft?.ai?.models?.thinking?.provider || 'openai');
-    const fastCurrent = toStr(draft?.ai?.models?.fast?.model).trim();
-    const thinkingCurrent = toStr(draft?.ai?.models?.thinking?.model).trim();
-    const fastNext = normalizeAiModelForProvider('fast', fastProvider, fastCurrent);
-    const thinkingNext = normalizeAiModelForProvider('thinking', thinkingProvider, thinkingCurrent);
-    if (fastNext === fastCurrent && thinkingNext === thinkingCurrent) return;
-    setDraft((prev) => {
-      const next = deepClone(prev);
-      if (!next.ai || typeof next.ai !== 'object') next.ai = {};
-      if (!next.ai.models || typeof next.ai.models !== 'object') next.ai.models = {};
-      if (fastNext !== fastCurrent) {
-        if (!next.ai.models.fast || typeof next.ai.models.fast !== 'object') next.ai.models.fast = {};
-        next.ai.models.fast.model = fastNext;
-      }
-      if (thinkingNext !== thinkingCurrent) {
-        if (!next.ai.models.thinking || typeof next.ai.models.thinking !== 'object') next.ai.models.thinking = {};
-        next.ai.models.thinking.model = thinkingNext;
-      }
-      return next;
-    });
-  }, [
-    draft?.ai?.models?.fast?.provider,
-    draft?.ai?.models?.fast?.model,
-    draft?.ai?.models?.thinking?.provider,
-    draft?.ai?.models?.thinking?.model,
-  ]);
-
-  useEffect(() => {
-    const canCreateObjectUrl = typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function';
-    if (!sessionHeaderFile) {
-      const currentPreviewUrl = sessionHeaderPreviewUrlRef.current;
-      if (
-        currentPreviewUrl &&
-        typeof URL !== 'undefined' &&
-        typeof URL.revokeObjectURL === 'function'
-      ) {
-        URL.revokeObjectURL(currentPreviewUrl);
-      }
-      setSessionHeaderPreviewUrl('');
-      return;
-    }
-    if (!canCreateObjectUrl) return undefined;
-    const previewUrl = URL.createObjectURL(sessionHeaderFile);
-    setSessionHeaderPreviewUrl(previewUrl);
-    return () => {
-      if (typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
-        URL.revokeObjectURL(previewUrl);
-      }
-    };
-  }, [sessionHeaderFile]);
-
-  const sessionHeaderPreviewSrc = useMemo(() => {
-    if (sessionHeaderMode === 'upload') {
-      return toStr(sessionHeaderPreviewUrl).trim();
-    }
-    return normalizeArweaveUrl(draft?.sessionHeader || '', {
-      contextLabel: 'session_wizard_header_preview',
-    });
-  }, [draft?.sessionHeader, sessionHeaderMode, sessionHeaderPreviewUrl]);
-
-  useEffect(() => {
-    if (sessionHeaderPreviewSrc) return;
-    setSessionHeaderPreviewModalOpen(false);
-  }, [sessionHeaderPreviewSrc]);
-
-  const handlePasteSessionHeaderFromClipboard = async () => {
-    const clipboardResult = await readCompactImageClipboard({
-      fileNamePrefix: 'clipboard-session-header',
-    });
-
-    if (clipboardResult?.kind === 'file' && clipboardResult.file) {
-      setSessionHeaderMode('upload');
-      setCompactSessionHeaderMode('idle');
-      setSessionHeaderFile(clipboardResult.file);
-      setSessionHeaderStatus('');
-      return;
-    }
-
-    if (clipboardResult?.kind === 'text') {
-      setSessionHeaderMode('url');
-      setCompactSessionHeaderMode('url');
-      setSessionHeaderFile(null);
-      updateDraftValue(['sessionHeader'], clipboardResult.text);
-      setSessionHeaderStatus('');
-      return;
-    }
-
-    setSessionHeaderStatus(clipboardResult?.error || 'Clipboard does not contain a supported image or URL.', 'error');
-  };
-
-  const handleClearSessionHeaderPreview = () => {
-    setSessionHeaderPreviewModalOpen(false);
-    setSessionHeaderMode('url');
-    setCompactSessionHeaderMode('idle');
-    setSessionHeaderFile(null);
-    updateDraftValue(['sessionHeader'], '');
-    setSessionHeaderStatus('');
-  };
-
-  const defaultSponsoredGateId = draft?.sponsored?.defaultGateId;
+  const defaultSponsoredGateId = toStr(draft?.sponsored?.defaultGateId).trim();
   const defaultSponsoredGate = defaultSponsoredGateId ? draft?.sponsored?.gates?.[defaultSponsoredGateId] : null;
   const defaultSponsoredSbtAddress = toStr(defaultSponsoredGate?.sbtAddress || '').trim();
   const defaultSponsoredLookupSlug = resolvedActiveSessionSlug || draft?.slug || '';
@@ -1640,17 +1302,6 @@ const SessionWizard = ({
     return [...encryptionGates];
   }, [encryptionGates]);
 
-  const pendingSbtSelectorOptions = useMemo(
-    () =>
-      normalizePendingSbtDrafts(pendingSbtDrafts).map((draftEntry) => ({
-        address: draftEntry.predictedAddress,
-        name: `${draftEntry.displayName} (Pending)`,
-        pending: true,
-        metadataPreview: draftEntry.metadataPreview || null,
-      })),
-    [pendingSbtDrafts],
-  );
-
   const getGateById = (gateId: unknown): EncryptionGateState | null =>
     getSessionWizardGateById(allEncryptionGates, gateId) as EncryptionGateState | null;
   const resolveCreateSbtTargetGateId = (requestedGateId: unknown = '') =>
@@ -1750,43 +1401,6 @@ const SessionWizard = ({
   }, [account, pendingCreateSbtLaunch]);
 
   useEffect(() => {
-    if (!publishBusy || publishStep <= 0) {
-      setPublishStepElapsedMs(0);
-      return undefined;
-    }
-    setPublishStepElapsedMs(0);
-    const startedAt = Date.now();
-    const timer = setInterval(() => {
-      setPublishStepElapsedMs(Date.now() - startedAt);
-    }, 120);
-    return () => clearInterval(timer);
-  }, [publishBusy, publishStep]);
-
-  useEffect(() => {
-    deployCompleteRef.current = deployComplete;
-  }, [deployComplete]);
-
-  useEffect(() => {
-    deployWorkerUrlRef.current = deployWorkerUrl;
-  }, [deployWorkerUrl]);
-
-  useEffect(() => {
-    provisionedSponsoredContextRef.current = provisionedSponsoredContext;
-  }, [provisionedSponsoredContext]);
-
-  useEffect(() => {
-    workerSecretsEnabledRef.current = workerSecretsEnabled;
-  }, [workerSecretsEnabled]);
-
-  useEffect(() => {
-    persistWorkerSecretsRef.current = persistWorkerSecrets;
-  }, [persistWorkerSecrets]);
-
-  useEffect(() => {
-    workerSecretsRef.current = workerSecrets;
-  }, [workerSecrets]);
-
-  useEffect(() => {
     const resolvedGateId = resolveCreateSbtTargetGateIdRef.current?.(createSbtTargetGateId) || '';
     if (resolvedGateId !== toStr(createSbtTargetGateId).trim()) {
       setCreateSbtTargetGateId(resolvedGateId);
@@ -1854,140 +1468,6 @@ const SessionWizard = ({
     setEncryptionGates((prev) => prev.map((gate) => (gate.id === gateId ? { ...gate, ...normalizedUpdates } : gate)));
   };
 
-  const clearFeaturedDraftGateAutoLink = (address = '') => {
-    const addressLower = toStr(address).trim().toLowerCase();
-    setFeaturedDraftGateAutoLink((prev) => {
-      const current = normalizeFeaturedDraftGateAutoLink(prev);
-      if (!current) return prev;
-      if (addressLower && current.address.toLowerCase() !== addressLower) return prev;
-      return null;
-    });
-  };
-  clearFeaturedDraftGateAutoLinkRef.current = clearFeaturedDraftGateAutoLink;
-
-  const dismissFeaturedDraftGateAutoLink = ({ gateId = '', address = '' } = {}) => {
-    const gateIdStr = toStr(gateId).trim();
-    const addressLower = toStr(address).trim().toLowerCase();
-    setFeaturedDraftGateAutoLink((prev) => {
-      const current = normalizeFeaturedDraftGateAutoLink(prev);
-      if (!current) return prev;
-      if (gateIdStr && toStr(current.gateId).trim() !== gateIdStr) return prev;
-      if (addressLower && current.address.toLowerCase() !== addressLower) return prev;
-      if (current.dismissed) return prev;
-      return { ...current, dismissed: true };
-    });
-  };
-  dismissFeaturedDraftGateAutoLinkRef.current = dismissFeaturedDraftGateAutoLink;
-
-  const handleGateAddSbt = (gateId, sbt) => {
-    const gateIdStr = toStr(gateId).trim();
-    const nextSbt = normalizeSbtSelection([sbt])[0];
-    if (!gateIdStr || !nextSbt) return;
-    const autoLink = normalizeFeaturedDraftGateAutoLink(featuredDraftGateAutoLink);
-    const nextAddressLower = toStr(nextSbt?.address).trim().toLowerCase();
-    if (
-      autoLink &&
-      autoLink.dismissed !== true &&
-      toStr(autoLink.gateId).trim() === gateIdStr &&
-      nextAddressLower &&
-      nextAddressLower !== autoLink.address.toLowerCase()
-    ) {
-      dismissFeaturedDraftGateAutoLink({ gateId: gateIdStr });
-    }
-    const targetGate = getGateById(gateIdStr);
-    updateEncryptionGate(gateIdStr, { sbts: [...normalizeSbtSelection(targetGate?.sbts || []), nextSbt] });
-  };
-
-  const handleGateRemoveSbt = (gateId, address) => {
-    const gateIdStr = toStr(gateId).trim();
-    const addressLower = toStr(address).trim().toLowerCase();
-    if (!gateIdStr || !addressLower) return;
-    const autoLink = normalizeFeaturedDraftGateAutoLink(featuredDraftGateAutoLink);
-    if (autoLink && toStr(autoLink.gateId).trim() === gateIdStr && autoLink.address.toLowerCase() === addressLower) {
-      dismissFeaturedDraftGateAutoLink({ gateId: gateIdStr, address: toStr(address).trim() });
-    }
-    const targetGate = getGateById(gateIdStr);
-    updateEncryptionGate(gateIdStr, {
-      sbts: normalizeSbtSelection(targetGate?.sbts || []).filter(
-        (sbt) => toStr(sbt.address).toLowerCase() !== addressLower,
-      ),
-    });
-  };
-
-  const handleRemoveDefaultFeaturedSbt = (address) => {
-    const addressLower = toStr(address).trim().toLowerCase();
-    if (!addressLower) return;
-    const nextSelections = normalizeSbtSelection(draftRef.current?.defaultFeaturedSBTs || []).filter(
-      (sbt) => toStr(sbt.address).toLowerCase() !== addressLower,
-    );
-    updateDraftValue(['defaultFeaturedSBTs'], serializeDefaultFeaturedSbtSelections(nextSelections));
-
-    const autoLink = normalizeFeaturedDraftGateAutoLink(featuredDraftGateAutoLink);
-    if (
-      !autoLink ||
-      autoLink.dismissed === true ||
-      toStr(autoLink.source).trim() !== FEATURED_DRAFT_GATE_AUTO_LINK_SOURCE ||
-      autoLink.address.toLowerCase() !== addressLower
-    ) {
-      return;
-    }
-
-    // Regression guard: removing a Step-1 featured pending SBT should also
-    // remove the auto-linked Gate A entry. Otherwise the gate keeps a draft the
-    // admin already removed from the featured list.
-    clearFeaturedDraftGateAutoLink(address);
-    const gateId = toStr(autoLink.gateId).trim() || FEATURED_DRAFT_GATE_AUTO_LINK_GATE_ID;
-    const targetGate = getGateById(gateId);
-    updateEncryptionGate(gateId, {
-      sbts: normalizeSbtSelection(targetGate?.sbts || []).filter(
-        (sbt) => toStr(sbt.address).toLowerCase() !== addressLower,
-      ),
-    });
-  };
-
-  const promoteDeployedPendingSbtSelections = (deployedDrafts = []) => {
-    const normalizedDeployedDrafts = normalizePendingSbtDrafts(deployedDrafts);
-    if (!normalizedDeployedDrafts.length) return;
-    const deployedAddressSet = new Set(
-      normalizedDeployedDrafts
-        .map((entry) =>
-          toStr(entry?.deployedAddress || entry?.predictedAddress)
-            .trim()
-            .toLowerCase(),
-        )
-        .filter(Boolean),
-    );
-    if (!deployedAddressSet.size) return;
-
-    // Regression guard: publish clears pending drafts immediately after
-    // on-chain registration. Promote matching pending selections to normal
-    // deployed selections first so the just-published gate/featured state
-    // survives in the local wizard and cache.
-    setEncryptionGates((prev) =>
-      prev.map((gate) => ({
-        ...gate,
-        sbts: promotePendingSbtSelectionsAfterDeploy({
-          selections: gate?.sbts || [],
-          deployedDrafts: normalizedDeployedDrafts,
-        }),
-      })),
-    );
-    updateDraftValue(
-      ['defaultFeaturedSBTs'],
-      serializeDefaultFeaturedSbtSelections(
-        promotePendingSbtSelectionsAfterDeploy({
-          selections: draftRef.current?.defaultFeaturedSBTs || [],
-          deployedDrafts: normalizedDeployedDrafts,
-        }),
-      ),
-    );
-    setFeaturedDraftGateAutoLink((prev) => {
-      const current = normalizeFeaturedDraftGateAutoLink(prev);
-      if (!current) return prev;
-      return deployedAddressSet.has(current.address.toLowerCase()) ? null : prev;
-    });
-  };
-
   const addEncryptionGate = () => {
     setEncryptionGates((prev) => {
       const idx = getNextGateIndex(prev);
@@ -2025,1171 +1505,39 @@ const SessionWizard = ({
     });
   };
 
-  const prunePendingSbtSelections = (addressLowerSet) => {
-    if (!(addressLowerSet instanceof Set) || addressLowerSet.size === 0) return;
-    setEncryptionGates((prev) =>
-      prev.map((gate) => ({
-        ...gate,
-        sbts: normalizeSbtSelection(gate?.sbts || []).filter(
-          (sbt) => !addressLowerSet.has(toStr(sbt?.address).trim().toLowerCase()),
-        ),
-      })),
-    );
-    updateDraftValue(
-      ['defaultFeaturedSBTs'],
-      serializeDefaultFeaturedSbtSelections(
-        normalizeSbtSelection(draftRef.current?.defaultFeaturedSBTs || []).filter(
-          (entry) => !addressLowerSet.has(toStr(entry?.address).trim().toLowerCase()),
-        ),
-      ),
-    );
-  };
-  prunePendingSbtSelectionsRef.current = prunePendingSbtSelections;
+  const {
+    clearPendingSbtDrafts,
+    handleGateAddSbt,
+    handleGateRemoveSbt,
+    handleRemoveDefaultFeaturedSbt,
+    handleSavePendingSbtDraft,
+    pendingSbtSelectorOptions,
+    promoteDeployedPendingSbtSelections,
+    removePendingSbtDraft,
+  } = useSessionWizardPendingSbtController<EncryptionGateState>({
+    allEncryptionGates,
+    createSbtModalState,
+    draftDefaultFeaturedSBTs: draft?.defaultFeaturedSBTs,
+    draftRef,
+    encryptionGates,
+    featuredDraftGateAutoLink,
+    network,
+    pendingSbtDeployContextSignature,
+    pendingSbtDrafts,
+    registryChainId,
+    closeCreateSbtModal,
+    resolveCreateSbtTargetGateId,
+    setEncryptionGates,
+    setFeaturedDraftGateAutoLink,
+    setPendingSbtDrafts,
+    setStatus,
+    updateDraftValue,
+  });
 
-  const pruneAllPendingSbtSelections = () => {
-    setEncryptionGates((prev) =>
-      prev.map((gate) => ({
-        ...gate,
-        sbts: normalizeSbtSelection(gate?.sbts || []).filter((sbt) => sbt?.pending !== true),
-      })),
-    );
-    updateDraftValue(
-      ['defaultFeaturedSBTs'],
-      serializeDefaultFeaturedSbtSelections(
-        normalizeSbtSelection(draftRef.current?.defaultFeaturedSBTs || []).filter((entry) => entry?.pending !== true),
-      ),
-    );
-  };
-  pruneAllPendingSbtSelectionsRef.current = pruneAllPendingSbtSelections;
-
-  const removePendingSbtDraft = (predictedAddress) => {
-    const addressLower = toStr(predictedAddress).trim().toLowerCase();
-    if (!addressLower) return;
-    setPendingSbtDrafts((prev) =>
-      prev.filter((entry) => toStr(entry?.predictedAddress).trim().toLowerCase() !== addressLower),
-    );
-    prunePendingSbtSelections(new Set([addressLower]));
-    clearFeaturedDraftGateAutoLink(predictedAddress);
-  };
-
-  const clearPendingSbtDrafts = (draftsToClear = [], statusMessage = '') => {
-    const normalizedDrafts = normalizePendingSbtDrafts(draftsToClear);
-    if (!normalizedDrafts.length) return;
-    const addressLowerSet = new Set(
-      normalizedDrafts.map((entry) => toStr(entry?.predictedAddress).trim().toLowerCase()).filter(Boolean),
-    );
-    setPendingSbtDrafts((prev) =>
-      prev.filter((entry) => !addressLowerSet.has(toStr(entry?.predictedAddress).trim().toLowerCase())),
-    );
-    prunePendingSbtSelections(addressLowerSet);
-    if (statusMessage) {
-      setStatus(statusMessage);
-    }
-  };
-  clearPendingSbtDraftsRef.current = clearPendingSbtDrafts;
-
-  const handleSavePendingSbtDraft = async (draftPayload) => {
-    const normalizedDrafts = normalizePendingSbtDrafts([draftPayload]);
-    const baseDraft = normalizedDrafts[0];
-    const predictedAddress = toStr(baseDraft?.predictedAddress).trim();
-    const nextDraft: PendingSbtDraft | null =
-      baseDraft && predictedAddress
-        ? {
-            ...baseDraft,
-            predictedAddress,
-            deployed: false,
-            networkChainId:
-              Number(draftRef.current?.networkChainId || registryChainId || network?.id || network?.chainId || 0) || 0,
-            sbtFactoryAddress: toStr(draftRef.current?.contracts?.sbtFactory?.address || '').trim(),
-            deploymentContextSignature: pendingSbtDeployContextSignature,
-          }
-        : null;
-    if (!nextDraft) {
-      throw new Error('Unable to prepare the pending SBT draft.');
-    }
-    const pendingSelection = buildPendingSbtSelection(nextDraft);
-    if (!pendingSelection) {
-      throw new Error('Unable to build the pending SBT selector entry.');
-    }
-
-    setPendingSbtDrafts((prev) => {
-      const filtered = prev.filter(
-        (entry) => toStr(entry?.predictedAddress).trim().toLowerCase() !== nextDraft.predictedAddress?.toLowerCase(),
-      );
-      return [...filtered, nextDraft];
-    });
-
-    if (createSbtModalState.targetType === 'defaultFeaturedSBTs') {
-      const next = [...normalizeSbtSelection(draftRef.current?.defaultFeaturedSBTs || []), pendingSelection];
-      updateDraftValue(['defaultFeaturedSBTs'], serializeDefaultFeaturedSbtSelections(dedupeSbtSelection(next)));
-      const gateA = getGateById(FEATURED_DRAFT_GATE_AUTO_LINK_GATE_ID);
-      const gateASelections = dedupeSbtSelection(gateA?.sbts || []);
-      if (!gateASelections.length) {
-        updateEncryptionGate(FEATURED_DRAFT_GATE_AUTO_LINK_GATE_ID, {
-          sbts: [...gateASelections, pendingSelection],
-        });
-        setFeaturedDraftGateAutoLink({
-          gateId: FEATURED_DRAFT_GATE_AUTO_LINK_GATE_ID,
-          address: pendingSelection.address,
-          dismissed: false,
-          source: FEATURED_DRAFT_GATE_AUTO_LINK_SOURCE,
-        });
-      }
-    } else {
-      const targetGateId = resolveCreateSbtTargetGateId(createSbtModalState.gateId);
-      if (targetGateId) {
-        const targetGate = getGateById(targetGateId);
-        const nextSelections = dedupeSbtSelection([...normalizeSbtSelection(targetGate?.sbts || []), pendingSelection]);
-        updateEncryptionGate(targetGateId, { sbts: nextSelections });
-      }
-    }
-
-    notify.success(`Prepared ${nextDraft.displayName} for deploy.`);
-    closeCreateSbtModal();
-  };
-
-  useEffect(() => {
-    const previousContextSignature = pendingSbtDeployContextRef.current;
-    pendingSbtDeployContextRef.current = pendingSbtDeployContextSignature;
-    const normalizedDrafts = normalizePendingSbtDrafts(pendingSbtDrafts);
-    if (!previousContextSignature || previousContextSignature === pendingSbtDeployContextSignature) return;
-    if (!normalizedDrafts.length) return;
-    // Regression guard: pending SBT drafts are CREATE2-addressed against the
-    // current chain/factory pair. Keeping them after that context changes can
-    // mine a real deploy tx and only fail after the address mismatch check.
-    clearPendingSbtDraftsRef.current?.(
-      normalizedDrafts,
-      'Pending SBT drafts were cleared because the session chain or SBT factory changed. Recreate them before publishing.',
-    );
-    pruneAllPendingSbtSelectionsRef.current?.();
-  }, [pendingSbtDeployContextSignature, pendingSbtDrafts]);
-
-  useEffect(() => {
-    const livePendingAddressSet = new Set(
-      normalizePendingSbtDrafts(pendingSbtDrafts)
-        .map((entry) => toStr(entry?.predictedAddress).trim().toLowerCase())
-        .filter(Boolean),
-    );
-    const hasDanglingPendingSelection =
-      encryptionGates.some((gate) =>
-        normalizeSbtSelection(gate?.sbts || []).some(
-          (sbt) => sbt?.pending === true && !livePendingAddressSet.has(toStr(sbt?.address).trim().toLowerCase()),
-        ),
-      ) ||
-      normalizeSbtSelection(draft?.defaultFeaturedSBTs || []).some(
-        (entry) => entry?.pending === true && !livePendingAddressSet.has(toStr(entry?.address).trim().toLowerCase()),
-      );
-    if (!hasDanglingPendingSelection) return;
-    // Keep gate selections aligned with the in-memory pending-draft list.
-    // A `pending: true` entry without a live draft is always stale UI state.
-    prunePendingSbtSelectionsRef.current?.(
-      new Set(
-        [
-          ...encryptionGates.flatMap((gate) => normalizeSbtSelection(gate?.sbts || [])),
-          ...normalizeSbtSelection(draft?.defaultFeaturedSBTs || []),
-        ]
-          .filter((entry) => entry?.pending === true)
-          .map((entry) => toStr(entry?.address).trim().toLowerCase())
-          .filter((addressLower) => addressLower && !livePendingAddressSet.has(addressLower)),
-      ),
-    );
-  }, [draft?.defaultFeaturedSBTs, encryptionGates, pendingSbtDrafts]);
-
-  useEffect(() => {
-    const autoLink = normalizeFeaturedDraftGateAutoLink(featuredDraftGateAutoLink);
-    if (!autoLink) return;
-    const gateId = toStr(autoLink.gateId).trim() || FEATURED_DRAFT_GATE_AUTO_LINK_GATE_ID;
-    const linkedAddressLower = autoLink.address.toLowerCase();
-    const liveDraft = normalizePendingSbtDrafts(pendingSbtDrafts).find(
-      (entry) => toStr(entry?.predictedAddress).trim().toLowerCase() === linkedAddressLower,
-    );
-    if (!liveDraft) {
-      clearFeaturedDraftGateAutoLinkRef.current?.(autoLink.address);
-      return;
-    }
-    const targetGate = encryptionGates.find((gate) => toStr(gate?.id).trim() === gateId);
-    if (!targetGate) {
-      clearFeaturedDraftGateAutoLinkRef.current?.(autoLink.address);
-      return;
-    }
-    const gateSelections = dedupeSbtSelection(targetGate?.sbts || []);
-    const hasAutoLinkedSelection = gateSelections.some(
-      (entry) => toStr(entry?.address).trim().toLowerCase() === linkedAddressLower,
-    );
-    const hasOtherSelections = gateSelections.some(
-      (entry) => toStr(entry?.address).trim().toLowerCase() !== linkedAddressLower,
-    );
-    if (hasOtherSelections && autoLink.dismissed !== true) {
-      dismissFeaturedDraftGateAutoLinkRef.current?.({ gateId, address: autoLink.address });
-      return;
-    }
-    if (autoLink.dismissed || hasAutoLinkedSelection) return;
-    const pendingSelection = buildPendingSbtSelection(liveDraft);
-    if (!pendingSelection) {
-      clearFeaturedDraftGateAutoLinkRef.current?.(autoLink.address);
-      return;
-    }
-    // Keep the Step-1 featured-draft link resilient across refreshes, but stop
-    // restoring it once the user has explicitly edited Gate A or the draft is gone.
-    setEncryptionGates((prev) =>
-      prev.map((gate) => {
-        if (toStr(gate?.id).trim() !== gateId) return gate;
-        return {
-          ...gate,
-          sbts: dedupeSbtSelection([...normalizeSbtSelection(gate?.sbts || []), pendingSelection]),
-        };
-      }),
-    );
-  }, [featuredDraftGateAutoLink, encryptionGates, pendingSbtDrafts]);
-
-  const renderField = (key: string, value: unknown, path: string[], opts: SessionWizardRenderFieldOptions = {}) => {
-    const forceShow = !!opts.forceShow;
-    const currentPath = [...path, key];
-    if (
-      shouldHideSessionWizardField({
-        forceShow,
-        key,
-        path,
-        currentPath,
-        wizardMode,
-      })
-    ) {
-      return null;
-    }
-    const keyString = pathKey(currentPath);
-    const isSlugField = keyString === 'slug';
-    const isNormalMode = wizardMode !== 'advanced';
-    const displayLabel = getSessionWizardFieldLabel(keyString, key);
-    const isSecretPath = isSecretFieldPath(currentPath);
-    const canLock = shouldLockable(value) && (!isSecretPath || !workerSecretsEnabled);
-    if (!forceShow && isSecretPath && workerSecretsEnabled) return null;
-    // Hide serialized defaultFilterState presets until a user-facing builder exists.
-    const isDefaultFilterState = keyString === 'defaultFilterState';
-    const isQuestionsPrompt = keyString === 'questionsGenPrompt';
-    const isSessionHeaderField = keyString === 'sessionHeader';
-    const isCorsWorkerField = keyString === 'corsWorkerUrl';
-    const isNetworkChainField = keyString === 'networkChainId';
-    if (path.length === 0 && key === 'sessionModeProfile') return null;
-    const e2eTestId = (() => {
-      if (keyString === 'sessionName') return E2E_TESTIDS.WIZARD_SESSION_NAME;
-      if (keyString === 'sessionInfo') return E2E_TESTIDS.WIZARD_SESSION_INFO;
-      if (keyString === 'slug') return E2E_TESTIDS.WIZARD_SLUG;
-      if (keyString === 'corsWorkerUrl') return E2E_TESTIDS.WIZARD_WORKER_URL;
-      return '';
-    })();
-    const gateIds = gateOptions.map((opt) => opt.id).filter(Boolean);
-    const selectedGateIds = !isSlugField
-      ? normalizeGateIds(encryptedFieldGates[keyString]).filter((id) => gateIds.includes(id))
-      : [];
-    const primaryGate = selectedGateIds.length === 1 ? getGateById(selectedGateIds[0]) : null;
-    const locked = selectedGateIds.length > 0;
-    const lockActive = isSlugField ? privateSlugMode : locked;
-    const defaultLockLabel = isNormalMode ? '' : t('sbt');
-    const lockBadgeLabel = isSlugField
-      ? 'ID'
-      : selectedGateIds.length === 0
-        ? defaultLockLabel
-        : selectedGateIds.length === 1
-          ? primaryGateLabel || selectedGateIds[0] || defaultLockLabel
-          : `${selectedGateIds.length} ${t('gatesLower')}`;
-    const showLockBadge = !!lockBadgeLabel;
-    const lockBadgeStyle =
-      !isSlugField && selectedGateIds.length === 1 && primaryGateColor
-        ? { borderColor: primaryGateColor, color: primaryGateColor }
-        : undefined;
-    const lockTitle = isSlugField
-      ? slugPinnedByPendingSbtDrafts
-        ? `Queued ${t('sbt')} drafts pinned this session URL. Remove them before changing the slug.`
-        : privateSlugMode
-          ? 'Private URL mode enabled (uses session ID). Click to restore manual URL.'
-          : 'Use session ID as the URL (private mode). This does not encrypt the URL.'
-      : locked
-        ? selectedGateIds.length === 1
-          ? `Locked with ${primaryGateLabel || selectedGateIds[0]}. Click to edit or unlock.`
-          : `Locked with ${selectedGateIds.length} ${t('gatesLower')}. Click to edit or unlock.`
-        : `Click to lock with a ${t('gateLower')}.`;
-    const lockIconStyle =
-      !isSlugField && selectedGateIds.length === 1 && primaryGateColor ? { color: primaryGateColor } : undefined;
-    const handleLockClick = () => {
-      if (isSlugField) {
-        if (slugPinnedByPendingSbtDrafts) return;
-        togglePrivateSlugMode();
-      }
-    };
-    const tooltipId = `gw-tip-${keyString.replace(/[^a-z0-9_-]/gi, '-')}`;
-    const tooltipText = getSessionWizardFieldTooltip(currentPath, value);
-    const chainName = /chainid$/i.test(keyString) ? getChainName(value) : '';
-    const displayLabelText = chainName ? `${displayLabel} (${chainName})` : displayLabel;
-    const fieldTooltipControl = renderSessionWizardInfoTooltip({
-      id: tooltipId,
-      content: tooltipText,
-      placement: 'right',
-      ariaLabel: `${displayLabelText} info`,
-    });
-    const slugValidationError = isSlugField ? getSessionSlugValidationError(value) : '';
-    const fieldGateLockProps = !isSlugField
-      ? {
-          gateOptions,
-          selectedGateIds,
-          onChangeSelectedGateIds: (nextIds: unknown) => {
-            const filtered = normalizeGateIds(nextIds).filter((id) => gateIds.includes(id));
-            setEncryptedFieldGates((prev) => {
-              const next = { ...(prev || {}) };
-              if (!filtered.length) {
-                delete next[keyString];
-                return next;
-              }
-              next[keyString] = filtered.length === 1 ? filtered[0] : filtered;
-              return next;
-            });
-            if (!filtered.length) setOpenLockKey('');
-          },
-          open: openLockKey === keyString,
-          onToggleOpen: (nextOpen: boolean) => setOpenLockKey(nextOpen ? keyString : ''),
-          disabled: !gateIds.length,
-          showDots: true,
-        }
-      : null;
-    const fieldFrameProps: LockableFieldFrameProps = {
-      label: displayLabelText,
-      tooltipText,
-      tooltipId,
-      tooltipPlacement: 'right',
-      tooltipAriaLabel: `${displayLabelText} info`,
-      tooltipsEnabled: sessionWizardTooltipsEnabled,
-      canLock,
-      isLocked: lockActive,
-      onLockToggle: handleLockClick,
-      lockTitle,
-      lockBadgeLabel: showLockBadge ? lockBadgeLabel : '',
-      lockBadgeStyle,
-      lockIconStyle,
-      gateLockProps: fieldGateLockProps,
-    };
-
-    const aiOrGateSelect = renderAiOrGateSelect({
-      keyString,
-      value,
-      currentPath,
-      displayLabelText,
-      fieldTooltipControl,
-      onUpdateDraftValue: updateDraftValue,
-      draft,
-      encryptionGates,
-      defaultGateId,
-      onSetDefaultGateId: setDefaultGateId,
-    });
-    if (aiOrGateSelect) return aiOrGateSelect;
-
-    if (keyString === 'defaultFeaturedSBTs') {
-      const selections = normalizeSbtSelection(value);
-      const uniqueSelections = selections.filter((sbt, idx, arr) => {
-        const addr = toStr(sbt.address).toLowerCase();
-        return addr && arr.findIndex((other) => toStr(other.address).toLowerCase() === addr) === idx;
-      });
-      return (
-        <FeaturedSbtField
-          key={keyString}
-          label={displayLabelText}
-          tooltipControl={fieldTooltipControl}
-          createButtonLabel={`Create ${t('sbt')}`}
-          onCreateSbt={() => launchCreateSbtModal({ targetType: 'defaultFeaturedSBTs' })}
-          selectedSBTs={uniqueSelections}
-          onSelectionsChange={(next) => {
-            updateDraftValue(['defaultFeaturedSBTs'], serializeDefaultFeaturedSbtSelections(next));
-          }}
-          onRemove={(address) => handleRemoveDefaultFeaturedSbt(address)}
-          selectorLabel={`Choose ${t('sbts')} to feature by default`}
-          network={network}
-          additionalSBTOptions={pendingSbtSelectorOptions}
-          chainId={selectorSourceChainId}
-          sessionSlug={selectorSourceSessionConfig?.slug || resolvedActiveSessionSlug || ''}
-          sessionConfig={selectorSourceSessionConfig}
-          sbtCacheRevision={sbtCacheRevision}
-          ensureLightSbtUniverse={ensureLightSbtUniverse}
-        />
-      );
-    }
-
-    if (path.length === 0 && key === 'contracts') {
-      const contracts: SessionContractsLike =
-        value && typeof value === 'object' && !Array.isArray(value) ? (value as SessionContractsLike) : {};
-      const defaults = getSessionWizardContractDefaults(registryChainId);
-      const visibleKeys = getVisibleSessionWizardContractKeys(contracts, defaults);
-      const isCollapsed = metadataObjectCollapsed.contracts;
-      return (
-        <ContractsSection
-          key={keyString}
-          title={displayLabel}
-          contracts={contracts}
-          defaults={defaults}
-          visibleKeys={visibleKeys}
-          isCollapsed={isCollapsed}
-          onToggleCollapsed={() => setMetadataObjectCollapsed((prev) => ({ ...prev, contracts: !prev.contracts }))}
-          onAddressChange={(contractKey, address) => updateDraftValue(['contracts', contractKey, 'address'], address)}
-          onOpenContractViewer={openContractViewerModal}
-          renderInfoTooltip={renderSessionWizardInfoTooltip}
-        />
-      );
-    }
-
-    if (path.length === 0 && key === 'faucet') {
-      const faucet = value && typeof value === 'object' ? value : {};
-      const isCollapsed = metadataObjectCollapsed.faucet;
-      return (
-        <CollapsibleFieldGroup
-          key={keyString}
-          title={displayLabel}
-          isCollapsed={isCollapsed}
-          toggleAriaLabel={`${displayLabel} ${isCollapsed ? 'expand' : 'collapse'}`}
-          onToggleCollapsed={() => setMetadataObjectCollapsed((prev) => ({ ...prev, faucet: !prev.faucet }))}
-        >
-          {!isCollapsed &&
-            Object.entries(faucet).map(([childKey, childValue]) => renderField(childKey, childValue, currentPath))}
-        </CollapsibleFieldGroup>
-      );
-    }
-
-    if (path.length === 0 && key === 'ai') {
-      const ai = value && typeof value === 'object' ? value : {};
-      const isCollapsed = metadataObjectCollapsed.ai;
-      return (
-        <CollapsibleFieldGroup
-          key={keyString}
-          title={displayLabel}
-          isCollapsed={isCollapsed}
-          toggleAriaLabel={`${displayLabel} ${isCollapsed ? 'expand' : 'collapse'}`}
-          onToggleCollapsed={() => setMetadataObjectCollapsed((prev) => ({ ...prev, ai: !prev.ai }))}
-        >
-          {!isCollapsed &&
-            Object.entries(ai).map(([childKey, childValue]) => renderField(childKey, childValue, currentPath))}
-        </CollapsibleFieldGroup>
-      );
-    }
-
-    if (path.length === 0 && key === 'lit') {
-      if (wizardMode !== 'advanced') return null;
-      const lit = value && typeof value === 'object' ? value : {};
-      const isCollapsed = metadataObjectCollapsed.lit;
-      return (
-        <CollapsibleFieldGroup
-          key={keyString}
-          title={displayLabel}
-          isCollapsed={isCollapsed}
-          toggleAriaLabel={`${displayLabel} ${isCollapsed ? 'expand' : 'collapse'}`}
-          onToggleCollapsed={() => setMetadataObjectCollapsed((prev) => ({ ...prev, lit: !prev.lit }))}
-        >
-          {!isCollapsed &&
-            Object.entries(lit).map(([childKey, childValue]) => renderField(childKey, childValue, currentPath))}
-        </CollapsibleFieldGroup>
-      );
-    }
-
-    if (path.length === 0 && key === 'storageProfile') {
-      if (wizardMode !== 'advanced') return null;
-      const storageProfile = normalizeSessionStorageProfileConfig(value);
-      const storageProfileDisplay = buildSessionStorageProfileDisplayDescriptor(storageProfile);
-      const isCollapsed = metadataObjectCollapsed.storageProfile;
-      const updateStorageBackend = (backend) => {
-        updateDraftValue(
-          ['storageProfile'],
-          normalizeSessionStorageProfileConfig({
-            ...(value && typeof value === 'object' ? value : {}),
-            backend,
-          })
-        );
-      };
-      const updateCloudflarePayloadAccessMode = (mode) => {
-        updateDraftValue(
-          ['storageProfile'],
-          normalizeSessionStorageProfileConfig({
-            ...(value && typeof value === 'object' ? value : {}),
-            backend: SESSION_STORAGE_BACKENDS.CLOUDFLARE,
-            payloadAccessControl: {
-              ...(storageProfile.payloadAccessControl && typeof storageProfile.payloadAccessControl === 'object'
-                ? storageProfile.payloadAccessControl
-                : {}),
-              mode,
-            },
-          })
-        );
-      };
-      return (
-        <SessionWizardStorageProfileMetadataField
-          key={keyString}
-          title={displayLabel}
-          isCollapsed={isCollapsed}
-          onToggleCollapsed={() =>
-            setMetadataObjectCollapsed((prev) => ({ ...prev, storageProfile: !prev.storageProfile }))
-          }
-          onStorageProfileChange={(nextProfile) => {
-            setDraft((prev) => {
-              const next = applyStorageProfileChangeToModeDraft(prev, nextProfile);
-              draftRef.current = next;
-              return next;
-            });
-          }}
-        />
-      );
-    }
-
-    if (path.length === 0 && key === 'blockLimits') {
-      return (
-        <BlockLimitsField
-          key={keyString}
-          blockLimits={value}
-          onStartChange={(raw) => {
-            blockStartManualRef.current = true;
-            updateDraftValue(['blockLimits', 'start'], raw === '' ? null : Number(raw));
-          }}
-          blockLimitDuration={blockLimitDuration}
-          blockLimitUnit={blockLimitUnit}
-          onDurationChange={setBlockLimitDuration}
-          onUnitChange={setBlockLimitUnit}
-          latestChainBlock={latestChainBlock}
-          latestBlockStatus={latestBlockStatus}
-          label={displayLabelText}
-          tooltipControl={fieldTooltipControl}
-        />
-      );
-    }
-
-    if (Array.isArray(value)) {
-      const isFlat = isStringArray(value);
-      const display = isFlat ? value.join('\n') : JSON.stringify(value, null, 2);
-      return (
-        <LockableFieldFrame key={keyString} {...fieldFrameProps} fieldError={fieldErrors[keyString]}>
-          <Input
-            type="textarea"
-            rows="4"
-            value={display}
-            onChange={(e) => updateArrayValue(currentPath, e.target.value, !isFlat)}
-            className={styles.textarea}
-          />
-        </LockableFieldFrame>
-      );
-    }
-
-    if (value && typeof value === 'object') {
-      const childNodes = Object.entries(value)
-        .map(([childKey, childValue]) => renderField(childKey, childValue, currentPath))
-        .filter(Boolean);
-      return (
-        <div key={keyString} className={styles.objectGroup}>
-          <div className={styles.objectHeader}>
-            <div className={styles.objectTitle}>{displayLabel}</div>
-          </div>
-          <div className={styles.objectBody}>
-            {childNodes.length ? (
-              childNodes
-            ) : (
-              <div className={styles.helperText}>
-                {key === 'arweave' && workerSecretsEnabled
-                  ? 'Arweave keys are stored in worker secrets.'
-                  : 'No editable fields in this section yet.'}
-              </div>
-            )}
-          </div>
-        </div>
-      );
-    }
-
-    const isBool = typeof value === 'boolean';
-    const isNumber = typeof value === 'number';
-    if (isBool) {
-      const checkboxClass = keyString === 'autoFeatureSBTsBySessionSlug' ? styles.checkboxOffset : '';
-      return (
-        <LockableFieldFrame
-          key={keyString}
-          {...fieldFrameProps}
-          labelInlineControl={
-            <Input
-              type="checkbox"
-              checked={!!value}
-              onChange={(e) => updateDraftValue(currentPath, !!e.target.checked)}
-              disabled={isDefaultFilterState || isNetworkChainField}
-              className={`${styles.inlineCheckbox} ${checkboxClass}`}
-            />
-          }
-        />
-      );
-    }
-    if (isSessionHeaderField) {
-      if (isNormalMode) {
-        return (
-          <LockableFieldFrame
-            key={keyString}
-            {...fieldFrameProps}
-            label="Image"
-            labelPrefix={<FontAwesomeIcon icon={faImage} className={styles.compactSessionHeaderIcon} />}
-          >
-            <SessionHeaderField
-              compact
-              value={draft?.sessionHeader}
-              sessionHeaderMode={sessionHeaderMode}
-              compactSessionHeaderMode={compactSessionHeaderMode}
-              sessionHeaderPreviewSrc={sessionHeaderPreviewSrc}
-              sessionHeaderUploadStatus={sessionHeaderUploadStatus}
-              sessionHeaderUploadStatusTone={sessionHeaderUploadStatusTone}
-              compactSessionHeaderInputRef={compactSessionHeaderInputRef}
-              onCompactUrlChange={(event) => {
-                updateDraftValue(['sessionHeader'], event.target.value);
-                setSessionHeaderStatus('');
-              }}
-              onToggleCompactUrlMode={() => {
-                setCompactSessionHeaderMode((prev) => (prev === 'url' ? 'idle' : 'url'));
-                setSessionHeaderMode('url');
-                setSessionHeaderFile(null);
-                setSessionHeaderStatus('');
-              }}
-              onPaste={handlePasteSessionHeaderFromClipboard}
-              onCompactUploadClick={() => {
-                setCompactSessionHeaderMode('idle');
-                setSessionHeaderMode('upload');
-                setSessionHeaderStatus('');
-                if (compactSessionHeaderInputRef.current) {
-                  compactSessionHeaderInputRef.current.click();
-                }
-              }}
-              onCompactFileChange={(event) => {
-                setSessionHeaderMode('upload');
-                setSessionHeaderFile(event.target.files?.[0] || null);
-                setSessionHeaderStatus('');
-              }}
-              onClear={handleClearSessionHeaderPreview}
-            />
-          </LockableFieldFrame>
-        );
-      }
-      return (
-        <LockableFieldFrame key={keyString} {...fieldFrameProps}>
-          <SessionHeaderField
-            value={value}
-            sessionHeaderMode={sessionHeaderMode}
-            compactSessionHeaderMode={compactSessionHeaderMode}
-            sessionHeaderPreviewSrc={sessionHeaderPreviewSrc}
-            sessionHeaderUploadStatus={sessionHeaderUploadStatus}
-            sessionHeaderUploadStatusTone={sessionHeaderUploadStatusTone}
-            onUrlChange={(e) => updateDraftValue(currentPath, e.target.value)}
-            onUseUrlMode={() => {
-              setSessionHeaderMode('url');
-              setSessionHeaderFile(null);
-              setSessionHeaderStatus('');
-            }}
-            onUseUploadMode={() => {
-              setSessionHeaderMode('upload');
-              setSessionHeaderStatus('');
-            }}
-            onAdvancedFileChange={(e) => setSessionHeaderFile(e.target.files?.[0] || null)}
-            onClear={handleClearSessionHeaderPreview}
-            onExpandPreview={() => setSessionHeaderPreviewModalOpen(true)}
-          />
-        </LockableFieldFrame>
-      );
-    }
-
-    if (isQuestionsPrompt) {
-      const promptPreview = seedGenPrompt.replace('<GroupCustomInstructions>', toStr(value || ''));
-      return (
-        <FormGroup key={keyString} className={styles.fieldGroup}>
-          <div className={styles.fieldHeader}>
-            <div className={styles.fieldLabelRow}>
-              <Label>{displayLabelText}</Label>
-              {fieldTooltipControl}
-            </div>
-            <Button
-              type="button"
-              className={styles.secondaryButton}
-              onClick={() => setShowPromptPreview((prev) => !prev)}
-            >
-              Preview prompt{' '}
-              <FontAwesomeIcon icon={showPromptPreview ? faCaretUp : faCaretDown} style={{ marginLeft: 6 }} />
-            </Button>
-          </div>
-          <Input
-            type="textarea"
-            rows="4"
-            value={value == null ? '' : value}
-            onChange={(e) => updateDraftValue(currentPath, e.target.value)}
-            className={styles.textarea}
-          />
-          {showPromptPreview && (
-            <div className={styles.promptPreview}>
-              <pre className={styles.promptPreviewText}>{promptPreview}</pre>
-            </div>
-          )}
-        </FormGroup>
-      );
-    }
-    return (
-      <LockableFieldFrame
-        key={keyString}
-        {...fieldFrameProps}
-        lockTrailingContent={
-          isSlugField ? (
-            <>
-              {!privateSlugMode && slugAvailability.status === 'checking' && (
-                <FontAwesomeIcon
-                  icon={faSpinner}
-                  spin
-                  style={{ marginLeft: 6, opacity: 0.5, fontSize: 12 }}
-                  title="Checking availability…"
-                />
-              )}
-              {!privateSlugMode && slugAvailability.status === 'available' && (
-                <FontAwesomeIcon
-                  icon={faCheck}
-                  style={{ marginLeft: 6, color: '#4dffa4', fontSize: 12 }}
-                  title="Slug available"
-                  data-testid={E2E_TESTIDS.WIZARD_SLUG_AVAILABLE}
-                />
-              )}
-              {!privateSlugMode && slugAvailability.status === 'taken' && (
-                <FontAwesomeIcon
-                  icon={faExclamationCircle}
-                  style={{ marginLeft: 6, color: '#ffcc7b', fontSize: 12 }}
-                  title="Slug already taken"
-                  data-testid={E2E_TESTIDS.WIZARD_SLUG_TAKEN}
-                />
-              )}
-            </>
-          ) : null
-        }
-        fieldError={slugValidationError}
-      >
-        <Input
-          type={isNumber ? 'number' : 'text'}
-          value={value == null ? '' : typeof value === 'number' ? value : toStr(value)}
-          disabled={
-            isDefaultFilterState ||
-            isNetworkChainField ||
-            (isSlugField && (privateSlugMode || slugPinnedByPendingSbtDrafts))
-          }
-          data-testid={e2eTestId || undefined}
-          onChange={(e) => {
-            const raw = e.target.value;
-            if (isCorsWorkerField) setWorkerUrlAutoFilled(false);
-            updateDraftValue(currentPath, isNumber ? Number(raw) : raw);
-          }}
-        />
-        {isSlugField && slugPinnedByPendingSbtDrafts && (
-          <div className={styles.helperText}>
-            {`Queued ${t('sbt')} drafts pinned this slug so their uploaded metadata stays aligned with the final session URL.`}
-          </div>
-        )}
-      </LockableFieldFrame>
-    );
-  };
-
-  const applyEncryption = async (metadata: UnknownRecord): Promise<SessionWizardMetadataEncryptionResult> => {
-    const encryptedKeys = Object.keys(encryptedFieldGates || {}).filter((key) => key !== 'slug');
-    // Testing mode: we do not remap legacy cached gate keys.
-    // Only canonical `session*` field paths are encrypted from this point forward.
-    const onChainFields = {};
-    // Reset any stale encryption artifacts from cached drafts before rebuilding.
-    delete metadata.encryptedFields;
-    delete metadata.encryptedFieldGates;
-    delete metadata.encryption;
-    delete metadata.sessionInfoEncrypted;
-    if (!encryptedKeys.length) {
-      ONCHAIN_FIELD_KEYS.forEach((fieldKey) => {
-        const path = ONCHAIN_FIELD_PATHS[fieldKey] || fieldKey.split('.');
-        const value = getValueAtPath(metadata, path);
-        if (value != null && value !== '') {
-          onChainFields[fieldKey] = value;
-        }
-      });
-      return { metadata, onChainFields };
-    }
-
-    const chainId = Number(metadata.networkChainId || registryChainId || network?.id || 0) || null;
-    const litChain = resolveLitChain({ chainId });
-
-    const encryptedFields = {};
-    const encryptedFieldGatesOut = {};
-    const encryptionQueue = [];
-    for (const key of encryptedKeys) {
-      const selectedGateIds = normalizeGateIds(encryptedFieldGates[key] ?? encryptedFieldGates?.[key])
-        .map((id) => toStr(id).trim())
-        .filter(Boolean);
-      if (!selectedGateIds.length) continue;
-      const path = key.split('.');
-      if (isSecretFieldPath(path)) {
-        throw new Error(buildSessionWizardSecretFieldGateErrorMessage([key]));
-      }
-      const value = getValueAtPath(metadata, path);
-      if (value == null || value === '') continue;
-
-      const recipients = [];
-      const appliedGateIds = [];
-
-      for (const gateId of selectedGateIds) {
-        const gate = getGateById(gateId);
-        if (!gate) continue;
-        const sbtAddresses = normalizeSbtSelection(gate.sbts || [])
-          .map((s) => s.address)
-          .filter(Boolean);
-        if (!sbtAddresses.length) {
-          if (typeof console !== 'undefined') {
-            log.warn('[lit][encrypt] skipping gate without SBTs', { key, gateId });
-          }
-          continue;
-        }
-        const accessControlConditions = buildSbtAccessControlConditions({
-          sbtAddresses,
-          chainId,
-          litChain,
-          mode: gate.mode,
-        });
-        if (!accessControlConditions) continue;
-        recipients.push({ accessControlConditions, chain: litChain });
-        appliedGateIds.push(gateId);
-      }
-
-      if (!recipients.length) continue;
-
-      encryptionQueue.push({
-        key,
-        gateIds: appliedGateIds,
-        path,
-        value,
-        recipients,
-      });
-    }
-
-    if (!encryptionQueue.length) {
-      ONCHAIN_FIELD_KEYS.forEach((fieldKey) => {
-        const path = ONCHAIN_FIELD_PATHS[fieldKey] || fieldKey.split('.');
-        const value = getValueAtPath(metadata, path);
-        if (value != null && value !== '') {
-          onChainFields[fieldKey] = value;
-        }
-      });
-      metadata.encryptedFields = encryptedFields;
-      metadata.encryptedFieldGates = encryptedFieldGatesOut;
-      return { metadata, onChainFields };
-    }
-
-    if (!account) {
-      if (toggleLoginModal) toggleLoginModal(true);
-      throw new Error('Connect a wallet to encrypt fields.');
-    }
-    const hooks = getGlobalLitHooks();
-    if (!hooks || typeof hooks.saveKey !== 'function') {
-      throw new Error('Lit hooks not initialized.');
-    }
-
-    if (typeof console !== 'undefined') {
-      const litNetwork = hooks?.litNetwork || null;
-      log.info('[lit][encrypt] start', {
-        fields: encryptionQueue.length,
-        chainId,
-        litChain,
-        litNetwork,
-      });
-    }
-
-    for (const entry of encryptionQueue) {
-      const { key, gateIds, path, value, recipients } = entry;
-      let envelope;
-      try {
-        if (typeof console !== 'undefined') {
-          log.info('[lit][encrypt] field start', {
-            key,
-            gateIds,
-            chainId,
-            litChain,
-            litNetwork: hooks?.litNetwork || null,
-            recipientCount: Array.isArray(recipients) ? recipients.length : 0,
-          });
-        }
-        envelope = await cryptoUtils.encryptEnvelopeValue(value, {
-          providerLike: provider,
-          account,
-          chainId,
-          contextLabel: `group:${metadata.slug || 'group'}:${key}`,
-          lit: {
-            saveKey: hooks.saveKey,
-            accessControlConditions: recipients?.[0]?.accessControlConditions,
-            chain: recipients?.[0]?.chain || litChain,
-            recipients,
-          },
-        });
-      } catch (err) {
-        if (typeof console !== 'undefined') {
-          log.error('[lit][encrypt] field failed', {
-            key,
-            gateIds,
-            chainId,
-            litChain,
-            litNetwork: hooks?.litNetwork || null,
-            message: err?.message || err,
-          });
-        }
-        throw err;
-      }
-
-      const onChainFieldKey = getOnChainFieldKeyForPath(path);
-      const skipEncryptedFields = path.length === 1 && path[0] === 'sessionInfo';
-      if (path.length === 1 && path[0] === 'sessionInfo') {
-        metadata.sessionInfoEncrypted = envelope;
-        setValueAtPath(metadata, path, '');
-      } else {
-        setValueAtPath(metadata, path, '');
-      }
-      if (onChainFieldKey) {
-        onChainFields[onChainFieldKey] = envelope;
-      } else if (!skipEncryptedFields) {
-        encryptedFields[key] = envelope;
-      }
-      const cleanGateIds = Array.isArray(gateIds) ? gateIds.map((id) => toStr(id).trim()).filter(Boolean) : [];
-      if (cleanGateIds.length === 1) {
-        encryptedFieldGatesOut[key] = cleanGateIds[0];
-      } else if (cleanGateIds.length > 1) {
-        encryptedFieldGatesOut[key] = cleanGateIds;
-      }
-    }
-
-    ONCHAIN_FIELD_KEYS.forEach((fieldKey) => {
-      if (Object.prototype.hasOwnProperty.call(onChainFields, fieldKey)) return;
-      const path = ONCHAIN_FIELD_PATHS[fieldKey] || fieldKey.split('.');
-      const value = getValueAtPath(metadata, path);
-      if (value != null && value !== '') {
-        onChainFields[fieldKey] = value;
-      }
-    });
-
-    metadata.encryptedFields = encryptedFields;
-    metadata.encryptedFieldGates = encryptedFieldGatesOut;
-    const gatesById = allEncryptionGates.reduce((acc, gate) => {
-      const sbtAddresses = normalizeSbtSelection(gate.sbts || [])
-        .map((s) => s.address)
-        .filter(Boolean);
-      acc[gate.id] = {
-        type: 'sbt',
-        sbtAddresses,
-        mode: gate.mode,
-        chainId,
-        litChain,
-        color: gate.color,
-        label: gate.label,
-      };
-      return acc;
-    }, {});
-    const gateIds = allEncryptionGates.map((gate) => gate.id);
-    const gateCounts = {};
-    Object.values(encryptedFieldGatesOut || {}).forEach((value) => {
-      if (!value) return;
-      const ids = Array.isArray(value) ? value : [value];
-      ids.forEach((id) => {
-        const gateId = toStr(id).trim();
-        if (!gateId) return;
-        gateCounts[gateId] = (gateCounts[gateId] || 0) + 1;
-      });
-    });
-    let primaryGateId = gateIds[0] || null;
-    if (primaryGateId) {
-      gateIds.forEach((id) => {
-        if ((gateCounts[id] || 0) > (gateCounts[primaryGateId] || 0)) {
-          primaryGateId = id;
-        }
-      });
-    }
-    metadata.encryption = { gates: gatesById };
-    if (primaryGateId && gatesById[primaryGateId]) {
-      metadata.encryption.gate = gatesById[primaryGateId];
-    }
-
-    return { metadata, encryptedFields, onChainFields };
-  };
-
-  const stripSecretFieldsFromMetadata = (metadata) => {
-    if (!metadata || typeof metadata !== 'object') return;
-    if (metadata.ai && typeof metadata.ai === 'object') {
-      delete metadata.ai.providers;
-      delete metadata.ai.mode;
-      delete metadata.ai.provider;
-    }
-    if (metadata.rpc && typeof metadata.rpc === 'object') {
-      delete metadata.rpc;
-    }
-    if (metadata.arweave && typeof metadata.arweave === 'object') {
-      delete metadata.arweave;
-    }
-    if (metadata.faucet && typeof metadata.faucet === 'object') {
-      delete metadata.faucet.privateKey;
-      delete metadata.faucet.encryptedPrivateKey;
-    }
-    if (metadata.encryptedFields && typeof metadata.encryptedFields === 'object') {
-      Object.keys(metadata.encryptedFields).forEach((key) => {
-        if (isSecretFieldPath(key.split('.'))) {
-          delete metadata.encryptedFields[key];
-        }
-      });
-    }
-    if (metadata.encryptedFieldGates && typeof metadata.encryptedFieldGates === 'object') {
-      Object.keys(metadata.encryptedFieldGates).forEach((key) => {
-        if (isSecretFieldPath(key.split('.'))) {
-          delete metadata.encryptedFieldGates[key];
-        }
-      });
-    }
-  };
-
-  const buildMetadataPayload = async ({ workerUrlOverride = '', signerAccountOverride = '' } = {}) => {
-    const metadata = normalizeSessionNaming(normalizeLitMetadataNetwork(deepClone(draft)));
-    const authAccount = toStr(signerAccountOverride || resolvedWalletAccountRef.current || account).trim();
-    metadata.sessionName = toStr(metadata.sessionName || '').trim();
-    metadata.sessionInfo = toStr(metadata.sessionInfo || '').trim();
-    if (!metadata.sessionName) delete metadata.sessionName;
-    if (!metadata.sessionInfo) delete metadata.sessionInfo;
-    metadata.slug = normalizeSlug(metadata.slug);
-    const resolvedAutoFeature = resolveSessionWizardAutoFeatureBySessionSlug(metadata);
-    delete metadata.autoFeatureSBTsWithFeaturedSbtTags;
-    if (resolvedAutoFeature !== undefined) {
-      metadata.autoFeatureSBTsBySessionSlug = resolvedAutoFeature;
-    }
-    const formattedSessionId = sessionRegistryUtils.formatSessionId(sessionId);
-    const sessionIdHex = sessionRegistryUtils.normalizeSessionIdHex(sessionId);
-    metadata.sessionId = formattedSessionId || toStr(sessionId).trim() || '';
-    if (sessionIdHex) {
-      metadata.sessionIdHex = sessionIdHex;
-    } else {
-      delete metadata.sessionIdHex;
-    }
-    delete metadata.sponsoredSbtAddress;
-    if (metadata.defaultFeaturedSBTs != null) {
-      if (Array.isArray(metadata.defaultFeaturedSBTs)) {
-        metadata.defaultFeaturedSBTs = metadata.defaultFeaturedSBTs
-          .map((entry) => (typeof entry === 'string' ? entry : entry?.address || entry?.sbtAddress))
-          .map((entry) => toStr(entry).trim())
-          .filter(Boolean);
-      } else if (typeof metadata.defaultFeaturedSBTs === 'string') {
-        metadata.defaultFeaturedSBTs = metadata.defaultFeaturedSBTs
-          .split(/[\n,]+/)
-          .map((entry) => entry.trim())
-          .filter(Boolean);
-      } else {
-        metadata.defaultFeaturedSBTs = [];
-      }
-      const seen = new Set();
-      metadata.defaultFeaturedSBTs = metadata.defaultFeaturedSBTs.filter((entry) => {
-        const lower = entry.toLowerCase();
-        if (seen.has(lower)) return false;
-        seen.add(lower);
-        return true;
-      });
-    }
-    if (sessionHeaderMode === 'upload') {
-      if (sessionHeaderFile) {
-        setSessionHeaderStatus('Uploading header image…', 'loading');
-        const format = resolveSessionHeaderImageFormat(sessionHeaderFile);
-        if (!format) {
-          throw new Error('Unsupported header image format. Use png, jpg, jpeg, or gif.');
-        }
-        let arweaveJwk = toStr(getCurrentWorkerSecrets().arweaveJwk).trim();
-        if (!arweaveJwk && !workerSecretsEnabled) {
-          const resolved = await getEffectiveArweaveKey({
-            sessionConfig: metadata,
-            sessionSlug: metadata.slug || '',
-            context: {
-              account: authAccount,
-              providerLike: provider,
-              chainId: metadata.networkChainId || registryChainId,
-            },
-          });
-          arweaveJwk = resolved?.arweaveJwk || '';
-        }
-        const headerRequestId = `arw_header_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-        const baseUrl =
-          workerAuthPublishAdapter.normalizeWorkerUrl(toStr(workerUrlOverride).trim()) || resolveWorkerBaseUrl();
-        const uploadAuthOptions = await buildSessionWizardPublishArweaveUploadOptions({
-          arweaveJwk,
-          workerUrl: baseUrl,
-          sessionSlug: metadata.slug,
-          authAccount,
-        });
-        log.info('[arweave][ui] header upload start', {
-          requestId: headerRequestId,
-          workerUrl: uploadAuthOptions.forceDirectArweaveUpload ? null : uploadAuthOptions.workerUrl || null,
-          sessionSlug: metadata.slug || '',
-          adminAddress: null,
-          hasJwk: !!uploadAuthOptions.arweaveJwk,
-          ts: new Date().toISOString(),
-        });
-        let headerTxId;
-        try {
-          headerTxId = (await arweavePublishAdapter.uploadDataToArweave({
-            data: sessionHeaderFile,
-            format,
-            options: {
-              sessionConfig: metadata,
-              sessionSlug: metadata.slug || '',
-              context: {
-                account: authAccount,
-                providerLike: provider,
-                chainId: metadata.networkChainId || registryChainId,
-              },
-              requestId: headerRequestId,
-              ...uploadAuthOptions,
-            },
-          })) as string;
-        } catch (err) {
-          log.error('[arweave][ui] header upload error', {
-            requestId: headerRequestId,
-            message: err?.message || err,
-            ts: new Date().toISOString(),
-          });
-          throw err;
-        }
-        log.info('[arweave][ui] header upload success', {
-          requestId: headerRequestId,
-          txId: headerTxId,
-          ts: new Date().toISOString(),
-        });
-        metadata.sessionHeader = `ar://${headerTxId}`;
-        setSessionHeaderStatus('Header image uploaded.');
-      } else {
-        metadata.sessionHeader = '';
-      }
-    } else {
-      setSessionHeaderStatus('');
-    }
-    const normalizedBlockLimits = normalizeBlockLimitsForConfig(metadata.blockLimits, latestChainBlock);
-    if (normalizedBlockLimits) {
-      metadata.blockLimits = normalizedBlockLimits;
-    }
-    stripSecretFieldsFromMetadata(metadata);
-    // Keep selected Lit gate id for encryption UX, but do not write auth gate authority to metadata.
-    if (metadata.lit && typeof metadata.lit === 'object') {
-      metadata.lit.defaultGateId = defaultGateId || metadata.lit.defaultGateId;
-    }
-    // Keep per-member budget fields hidden until semantics and enforcement are implemented.
-    metadata.perMemberSpendLimits = {
-      ...(metadata.perMemberSpendLimits || {}),
-      ai: gateSelections.ai?.perMemberLimit || metadata.perMemberSpendLimits?.ai || '',
-      arweave: gateSelections.arweave?.perMemberLimit || metadata.perMemberSpendLimits?.arweave || '',
-      txGas: gateSelections.txGas?.perMemberLimit || metadata.perMemberSpendLimits?.txGas || '',
-    };
-    const result = await applyEncryption(metadata);
-    result.metadata = sanitizeSessionWizardMetadataPayload(result.metadata, {
-      fieldOrder: METADATA_FIELD_ORDER,
-      sanitizeContracts: sanitizeSessionWizardContracts,
-      normalizeAiProvider,
-      normalizeAiModels: (raw, fallbackProvider = 'openai', transcription) =>
-        normalizeAiModels(raw, fallbackProvider, transcription as UnknownRecord | null | undefined),
-      normalizeAiModelForProvider,
-      defaultAiModels: DEFAULT_AI_MODELS,
-    });
-    const sponsoredFields = buildSponsoredFlagFields();
-    result.onChainFields = buildSessionWizardRegistrySessionFields({
-      onChainFields: result.onChainFields,
-      sponsoredFields,
-    });
-    return { ...result };
-  };
-
-  const handleUploadMetadata = async ({ workerUrlOverride = '', signerAccountOverride = '' } = {}) => {
+  const handleUploadMetadata = async ({
+    workerUrlOverride = '',
+    signerAccountOverride = '',
+  }: Partial<SessionWizardPublishWorkerSignerArgs> = {}) => {
     let uploadRequestId = '';
     try {
       const rawSlug = toStr(draft.slug).trim();
@@ -3425,15 +1773,10 @@ const SessionWizard = ({
       sessionIdHexValue,
     });
     try {
-      const registerDuplicateCheckDescriptor = resolveSessionWizardRegisterDuplicateCheckDescriptor({
-        registryChainId: registryChainIdValue,
-        registrySlug,
-        sessionIdHexValue,
-      });
-      const registryRead = sessionRegistryUtils.getRegistryContract(
-        registerDuplicateCheckDescriptor.chainId,
-        null
-      ) as SessionRegistryReadContract | null;
+      const registryRead = sessionRegistryPublishAdapter.getRegistryContract({
+        chainId: registerDuplicateCheckDescriptor.chainId,
+        providerLike: null,
+      }) as SessionRegistryReadContract | null;
       if (registryRead) {
         if (registerDuplicateCheckDescriptor.shouldCheckSlug && typeof registryRead.sessionExists === 'function') {
           const slugExists = await registryRead.sessionExists(registerDuplicateCheckDescriptor.registrySlug);
@@ -3452,7 +1795,11 @@ const SessionWizard = ({
         }
       }
     } catch (err) {
-      if (getSessionWizardErrorMessage(err)) throw err;
+      const message = getSessionWizardErrorMessage(err);
+      if (isSessionWizardRegisterDuplicatePreflightError(message, registerDuplicateCheckDescriptor)) throw err;
+      if (message) {
+        console.warn('SessionWizard: duplicate preflight check unavailable; continuing to publish flow', err);
+      }
     }
     return registerIdentityDescriptor;
   };
@@ -3509,8 +1856,11 @@ const SessionWizard = ({
       setSessionUrl(registerSuccessSettlement.sessionUrl);
       setAdminUrl(registerSuccessSettlement.adminUrl);
       setAdminUrlStatus(registerSuccessSettlement.adminUrlStatus);
+      // Regression guard: persist drafts suppressed by this publish plan before
+      // identity rotation or registry refresh can leave the page mid-settlement.
       const cacheClearResult = clearSessionWizardCache({
         expectedPublicationIdentity: { slug: draft.slug, sessionId },
+        ...(Array.isArray(preservedPendingSbtDrafts) ? { preservedPendingSbtDrafts } : {}),
       });
       // A successful clear releases the next generated identity to own this tab's cache.
       if (cacheClearResult.draft.ok && cacheClearResult.draft.status !== 'preserved-foreign-draft')
@@ -3555,6 +1905,7 @@ const SessionWizard = ({
       setStatus('Publish already in progress.');
       return;
     }
+    if (workerCanonicalSettlement.preventDuplicatePublish(setStatus)) return;
     publishRequestInFlightRef.current = true;
     try {
       const publishStartPreflightDescriptor = resolveSessionWizardPublishStartPreflightDescriptor({
@@ -3577,9 +1928,7 @@ const SessionWizard = ({
         }
         return;
       }
-      if (
-        resolveSessionWizardModeRequirements(draft.sessionModeProfile as SessionModeProfile).publish.registerSession
-      ) {
+      if (sessionModeRequirements.publish.registerSession) {
         try {
           await resolveAvailableRegisterIdentity();
         } catch (err) {
@@ -3642,22 +1991,37 @@ const SessionWizard = ({
         const publishRequestDescriptor = resolveSessionWizardPublishRequestDescriptor({
           pendingDraftSnapshot,
           manualMetadataUrl,
-          workerMode,
+          workerMode: liveRuntime?.workerMode || workerMode,
           sponsoredAutoDeployReady: sponsoredAutoDeployState.ready,
-          deployComplete,
+          deployComplete: deployCompleteRef.current,
           canUploadMetadataNow,
-          sessionModeProfile: draft.sessionModeProfile as SessionModeProfile,
+          sessionModeProfile: liveDraft.sessionModeProfile as SessionModeProfile,
         });
+        const liveWorkerEvidence = getWorkerPublishEvidence();
         const { publishExecutionPlan } = publishRequestDescriptor;
+        const publishAllowed =
+          publishUiPlan.publishReadiness.canPublishNow &&
+          (!publishExecutionPlan.shouldPersistWorkerConfig ||
+            publishExecutionPlan.shouldAutoDeployWorker ||
+            liveWorkerEvidence?.verified === true);
+        if (!publishAllowed) {
+          setStatus('Deploy and verify the selected worker before publishing.');
+          return;
+        }
         beginSessionPublishReducerAttempt(dispatchSessionPublish, publishExecutionPlan);
         let uploadResult = null;
         let workerUrlOverride = '';
         let deployedPendingDrafts = [];
         const publishControllerResult = await sessionWizardPublishRuntimeController.runPreparation({
+          publishAllowed,
           publishExecutionPlan,
           signerAccountOverride,
           runTrackedPublishEffect,
         });
+        if (publishControllerResult.status === 'blocked') {
+          dispatchSessionPublish({ type: 'edit' });
+          return;
+        }
         workerUrlOverride = publishControllerResult.workerUrlOverride;
         deployedPendingDrafts = publishControllerResult.deployedPendingDrafts;
         const metadataUploadRequest = resolveSessionWizardPublishMetadataUploadRequest({
@@ -3680,7 +2044,14 @@ const SessionWizard = ({
           callbacks: { setPublishStep: ignoreSessionPublishStep },
         });
         uploadResult = metadataUploadControllerResult.uploadResult;
+        const preservedPendingSbtDrafts = normalizePendingSbtDrafts(
+          resolveSessionWizardRemainingPendingDrafts({
+            deployedPendingDrafts: normalizePendingSbtDrafts(deployedPendingDrafts),
+            pendingDraftSnapshot: publishRequestDescriptor.pendingDraftSnapshot,
+          }),
+        );
         await sessionWizardPublishRuntimeController.settleRegistration({
+          preservedPendingSbtDrafts,
           publishExecutionPlan,
           uploadResult,
           publishControllerResult,
@@ -3822,66 +2193,71 @@ const SessionWizard = ({
       });
   };
 
-  const resolveWorkerBaseUrl = () =>
-    resolveSessionWizardWorkerBaseUrlFromDraft({
-      draft,
-      wizardMode,
-      deployComplete,
-      deployWorkerUrl,
-      workerMode,
-      allowNormalModeSharedHostedWorker: NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED,
-    });
+  const {
+    buildSessionWizardPublishArweaveUploadOptions,
+    buildSponsoredFlagFields,
+    clearCachedArweaveJwkAfterUpload,
+    clearCachedWorkerSecretsAfterDeploy,
+    clearWorkerSecretFields,
+    effectiveDefaultWorkerRpcUrl,
+    getMissingWorkerSecretsForDeploy,
+    getResourceSecretFields,
+    parseAllowOriginsInput,
+    resolveWorkerBaseUrl,
+    resolveWorkerFaucetConfig,
+    resolveWorkerRpcUrl,
+    resolveWorkerRpcUrlMap,
+    resolvedWorkerBaseUrlForDelegation,
+    signBootstrapAdminAction,
+    signTypedAdminAction,
+  } = useSessionWizardWorkerSecretsController({
+    account,
+    provider,
+    network,
+    draft,
+    wizardMode,
+    deployComplete,
+    deployWorkerUrl,
+    workerMode,
+    workerSecrets,
+    workerSecretsEnabled,
+    workerAllowOrigins,
+    provisionedSponsoredContext,
+    effectivePersistWorkerSecrets,
+    registryChainId,
+    allowNormalModeSharedHostedWorker: NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED,
+    getCurrentWorkerSecrets,
+    getCurrentEnabledWorkerSecrets,
+    applyWorkerSecretsUpdate,
+    updateDraftValue,
+    resolvedWalletAccountRef,
+    resolveChipotleHookConfig: resolveSessionWizardChipotleHookConfig,
+  });
 
-  const resolveWorkerRpcUrl = () =>
-    resolveSessionWizardWorkerRpcUrlFromDraft({
-      draft,
-      registryChainId,
-      networkId: network?.id,
-      workerSecrets: getCurrentEnabledWorkerSecrets(),
-    });
-
-  const resolveWorkerRpcUrlMap = () =>
-    resolveSessionWizardWorkerRpcUrlMapFromDraft({
-      draft,
-      registryChainId,
-      networkId: network?.id,
-      workerSecrets: getCurrentEnabledWorkerSecrets(),
-    });
-
-  const resolveWorkerFaucetConfig = () =>
-    resolveSessionWizardWorkerFaucetConfigFromDraft({
-      draft,
-      registryChainId,
-      networkId: network?.id,
-      workerSecrets: getCurrentEnabledWorkerSecrets(),
-    });
-  const effectiveDefaultWorkerRpcUrl = toStr(resolveWorkerRpcUrl()).trim();
-  const resolvedWorkerBaseUrlForDelegation = resolveWorkerBaseUrl();
-
-  const parseAllowOriginsInput = () => parseSessionWizardAllowOriginsInput(workerAllowOrigins);
-
-  const getResourceSecretFields = (resourceKey) => {
-    return resolveSessionWizardResourceSecretFields(resourceKey, draft?.ai);
-  };
-
-  const buildSponsoredFlagFields = (secretsSnapshot = getCurrentWorkerSecrets()) => {
-    const currentSlug = normalizeSlug(draft?.slug || '');
-    const currentWorkerUrl = workerAuthPublishAdapter.normalizeWorkerUrl(resolvedWorkerBaseUrlForDelegation);
-    const fallbackFields =
-      currentSlug &&
-      currentSlug === normalizeSlug(provisionedSponsoredContext?.sessionSlug || '') &&
-      (!currentWorkerUrl ||
-        !provisionedSponsoredContext?.workerUrl ||
-        currentWorkerUrl === provisionedSponsoredContext.workerUrl)
-        ? provisionedSponsoredContext?.fields
-        : {};
-
-    return buildSponsoredSessionFlagFields({
-      secrets: sanitizeSessionWizardWorkerSecretsForLitMode(secretsSnapshot),
-      fallbackFields: sanitizeSessionWizardSponsoredFieldSnapshotForLitMode(fallbackFields),
-      workerSecretsEnabled,
-    });
-  };
+  const buildMetadataPayload = buildSessionWizardMetadataPayloadBuilder({
+    account,
+    allEncryptionGates,
+    buildSessionWizardPublishArweaveUploadOptions,
+    buildSponsoredFlagFields,
+    defaultGateId,
+    draft,
+    encryptedFieldGates,
+    gateSelections,
+    getCurrentWorkerSecrets,
+    getGateById,
+    latestChainBlock,
+    network,
+    provider,
+    registryChainId,
+    resolveWorkerBaseUrl,
+    resolvedWalletAccountRef,
+    sessionHeaderFile,
+    sessionHeaderMode,
+    sessionId,
+    setSessionHeaderStatus,
+    toggleLoginModal,
+    workerSecretsEnabled,
+  });
 
   // Build a snapshot of gate selections from the current gate UI (default gate + resource mapping).
   // This keeps on-chain resource gates aligned with the selected default gate even if state updates are still pending.
@@ -3916,195 +2292,6 @@ const SessionWizard = ({
     return snapshot;
   };
 
-  const getMissingWorkerSecretsForDeploy = (secretsSnapshot = getCurrentWorkerSecrets()) => {
-    const missing = [];
-    if (!toStr(secretsSnapshot.openaiKey).trim()) {
-      missing.push('OpenAI key');
-    }
-    if (!toStr(secretsSnapshot.arweaveJwk).trim()) missing.push('Arweave JWK');
-    const rpcUrl = resolveWorkerRpcUrl();
-    if (!rpcUrl) missing.push('Worker RPC URL');
-    const hasAnyChipotleField =
-      CHIPOTLE_LIT_CONFIG_FIELDS.some((key) => !!toStr(secretsSnapshot?.[key]).trim()) ||
-      !!toStr(secretsSnapshot?.litAccountApiKey).trim() ||
-      !!toStr(secretsSnapshot?.litUsageApiKey).trim();
-    const accountKeyOnlyChipotleConfig = !!toStr(secretsSnapshot?.litAccountApiKey).trim();
-    const bootstrapOnlyChipotleConfig =
-      accountKeyOnlyChipotleConfig ||
-      (!!toStr(secretsSnapshot?.litApiBase).trim() &&
-        !toStr(secretsSnapshot?.litGroupId).trim() &&
-        !toStr(secretsSnapshot?.litPkpId).trim() &&
-        !toStr(secretsSnapshot?.litActionCid).trim() &&
-        !toStr(secretsSnapshot?.litUsageApiKey).trim());
-    if (hasAnyChipotleField && !bootstrapOnlyChipotleConfig) {
-      const requiredChipotleFields = [
-        ['litApiBase', 'Lit API base'],
-        ['litGroupId', 'Lit group ID'],
-        ['litPkpId', 'Lit PKP ID'],
-      ];
-      requiredChipotleFields.forEach(([key, label]) => {
-        if (!toStr(secretsSnapshot?.[key]).trim()) missing.push(label);
-      });
-    }
-    return missing;
-  };
-
-  const chipotleHookWorkerSecrets = useMemo<WorkerSecretsLike>(
-    () => ({
-      litApiBase: workerSecrets.litApiBase,
-      litGroupId: workerSecrets.litGroupId,
-      litPkpId: workerSecrets.litPkpId,
-      litActionCid: workerSecrets.litActionCid,
-      litAccountApiKey: workerSecrets.litAccountApiKey,
-      litUsageApiKey: workerSecrets.litUsageApiKey,
-    }),
-    [
-      workerSecrets.litAccountApiKey,
-      workerSecrets.litActionCid,
-      workerSecrets.litApiBase,
-      workerSecrets.litGroupId,
-      workerSecrets.litPkpId,
-      workerSecrets.litUsageApiKey,
-    ],
-  );
-
-  useEffect(() => {
-    const previousHooks = getGlobalLitHooks();
-    const chainId = Number(registryChainId || draft?.networkChainId || network?.id || 0) || null;
-    const chipotle = resolveSessionWizardChipotleHookConfig({
-      workerSecretsEnabled,
-      workerSecrets,
-      resolvedWorkerUrl: resolvedWorkerBaseUrlForDelegation,
-      draft,
-    });
-    const nextHooks = chipotle
-      ? createLitHooks({
-          providerLike: provider,
-          account,
-          chainId,
-          litChain: resolveLitChain({ chainId }),
-          litNetwork: 'chipotle',
-          chipotle,
-        })
-      : null;
-    setGlobalLitHooks(nextHooks);
-    return () => {
-      setGlobalLitHooks(previousHooks);
-    };
-  }, [
-    account,
-    draft,
-    network?.id,
-    provider,
-    registryChainId,
-    resolvedWorkerBaseUrlForDelegation,
-    workerSecretsEnabled,
-    workerSecrets.litAccountApiKey,
-    workerSecrets.litActionCid,
-    workerSecrets.litApiBase,
-    workerSecrets.litGroupId,
-    workerSecrets.litPkpId,
-    workerSecrets.litUsageApiKey,
-  ]);
-
-  const clearWorkerSecretFields = () => {
-    const aiConfig =
-      draft?.ai && typeof draft.ai === 'object' && !Array.isArray(draft.ai) ? (draft.ai as UnknownRecord) : {};
-    const aiProviders =
-      aiConfig.providers && typeof aiConfig.providers === 'object' && !Array.isArray(aiConfig.providers)
-        ? (aiConfig.providers as UnknownRecord)
-        : {};
-    Object.keys(aiProviders).forEach((key) => {
-      updateDraftValue(['ai', 'providers', key, 'apiKey'], '');
-      updateDraftValue(['ai', 'providers', key, 'encryptedApiKey'], '');
-    });
-    const rpcConfig =
-      draft?.rpc && typeof draft.rpc === 'object' && !Array.isArray(draft.rpc) ? (draft.rpc as UnknownRecord) : {};
-    const rpcProviders =
-      rpcConfig.providers && typeof rpcConfig.providers === 'object' && !Array.isArray(rpcConfig.providers)
-        ? (rpcConfig.providers as UnknownRecord)
-        : {};
-    Object.keys(rpcProviders).forEach((key) => {
-      updateDraftValue(['rpc', 'providers', key, 'apiKey'], '');
-      updateDraftValue(['rpc', 'providers', key, 'encryptedApiKey'], '');
-    });
-    updateDraftValue(['arweave', 'jwk'], '');
-    updateDraftValue(['arweave', 'encryptedJwk'], '');
-    updateDraftValue(['faucet', 'privateKey'], '');
-    updateDraftValue(['faucet', 'encryptedPrivateKey'], '');
-  };
-
-  // Cache worker secrets only until they've been submitted in a deploy payload.
-  // After a successful deploy, stop persisting secrets to cache. Keep the live
-  // in-memory copy so the current publish run can still finish without forcing
-  // the user to re-enter keys.
-  const clearCachedWorkerSecretsAfterDeploy = () => {
-    if (effectivePersistWorkerSecrets) return;
-  };
-
-  // After successful metadata upload, clear arweaveJwk from cache (skip in dev).
-  const clearCachedArweaveJwkAfterUpload = () => {
-    if (effectivePersistWorkerSecrets) return;
-    applyWorkerSecretsUpdate((prev) => ({ ...prev, arweaveJwk: '' }));
-  };
-
-  const signBootstrapAdminAction = async ({ statement, targetSlug, workerUrl, accountOverride = '' }) => {
-    const baseUrl = normalizeWorkerUrl(workerUrl || resolveWorkerBaseUrl());
-    if (!baseUrl) throw new Error('Worker URL is missing.');
-    const authAccount = toStr(accountOverride || resolvedWalletAccountRef.current || account).trim();
-    return buildSignedBootstrapAdminAuth({
-      slug: normalizeSlug(targetSlug),
-      workerUrl: baseUrl,
-      statement,
-      context: {
-        account: authAccount,
-        chainId: Number(registryChainId || draft.networkChainId || network?.id || 1) || 1,
-        providerLike: typeof provider === 'string' ? provider : undefined,
-      },
-    });
-  };
-
-  const buildSessionWizardPublishArweaveUploadOptions = async ({
-    arweaveJwk = '',
-    workerUrl = '',
-    sessionSlug = '',
-    authAccount = '',
-  }: PublishArweaveUploadOptionsInput = {}) =>
-    // Regression guard: keep session metadata/header uploads on the same
-    // sponsored-JWK path as deferred SBT finalization so /new publish does not
-    // fix only one Arweave leg and regress the next.
-    arweavePublishAdapter.resolveUploadOptions({
-      arweaveJwk,
-      workerUrl,
-      preferDirectArweaveUpload: !!toStr(arweaveJwk).trim(),
-      allowDirectFallbackOnBootstrapFailure: false,
-      requireAdminAuthWithoutJwk: true,
-      buildAdminAuth: ({ workerUrl: resolvedWorkerUrl }) =>
-        signBootstrapAdminAction({
-          statement: 'Admin request: bootstrap arweave upload',
-          targetSlug: sessionSlug,
-          workerUrl: resolvedWorkerUrl,
-          accountOverride: authAccount,
-        }),
-    });
-
-  const signTypedAdminAction = async ({ action = 'set-config', body = {}, targetSlug, workerUrl, accountOverride = '' }) => {
-    const baseUrl = normalizeWorkerUrl(workerUrl || resolveWorkerBaseUrl());
-    if (!baseUrl) throw new Error('Worker URL is missing.');
-    const authAccount = toStr(accountOverride || resolvedWalletAccountRef.current || account).trim();
-    return buildSignedAdminActionAuth({
-      action,
-      slug: normalizeSlug(targetSlug),
-      body,
-      workerUrl: baseUrl,
-      context: {
-        account: authAccount,
-        chainId: Number(registryChainId || draft.networkChainId || network?.id || 1) || 1,
-        providerLike: typeof provider === 'string' ? provider : undefined,
-      },
-    });
-  };
-
   const sessionIdHex = sessionRegistryPublishAdapter.normalizeSessionIdHex(sessionId);
   const embeddedDeployHelperEnabled =
     typeof draft.embeddedDeployHelperEnabled === 'boolean'
@@ -4135,6 +2322,10 @@ const SessionWizard = ({
     latestChainBlock,
     sessionId,
     sessionIdHex,
+    workerCanonicalPublishCompleted: workerCanonicalSettlement.publishCompleted,
+    deployComplete,
+    deployWorkerUrl,
+    workerRequirementProof,
     draft,
     deployForm,
   };
@@ -4166,8 +2357,7 @@ const SessionWizard = ({
     getErrorMessage: getSessionWizardErrorMessage,
     deployWorker: () => handleDeployWorker({ forceSponsoredAutoDeploy: true }),
     deployPendingSbts: deployPendingSbtDrafts,
-    getCurrentWorkerSecrets,
-    resolveWorkerBaseUrl,
+    getWorkerPublishEvidence,
     resolveWorkerRpcUrl,
     resolveWorkerRpcUrlMap,
     parseAllowOriginsInput,
@@ -4179,7 +2369,9 @@ const SessionWizard = ({
       setSessionUrl,
       setAdminUrl,
       setAdminUrlStatus,
+      setWorkerCanonicalPublishSettled: workerCanonicalSettlement.setSettled,
       clearSessionWizardCache,
+      writeSessionWizardWorkerSettlement,
       setSessionId,
       setSessionIdStatus,
     },
@@ -4189,13 +2381,6 @@ const SessionWizard = ({
     () => encryptionGates.map((gate) => ({ value: gate.id, label: gate.label || gate.id })),
     [encryptionGates],
   );
-
-  const updateResourceGate = (resourceKey: string, gateId: SessionWizardResourceGateSelectionState) => {
-    setResourceGateMap((prev) => ({
-      ...prev,
-      [resourceKey]: gateId,
-    }));
-  };
 
   const renderSessionWizardInfoTooltip = useCallback(
     ({
@@ -4330,8 +2515,7 @@ const SessionWizard = ({
     ? ''
     : toStr(draft.corsWorkerUrl).trim() || visibleConfiguredWorkerUrl;
   const showSharedWorkerChoice = !normalModeRequiresCustomWorker;
-  const showWorkerUrlField =
-    customWorkerSelected && (deployVerifiedInUi || sessionModeRequirements.usesWorkerRuntime);
+  const showWorkerUrlField = customWorkerSelected && (deployVerifiedInUi || sessionModeRequirements.usesWorkerRuntime);
   const allowNativeWorkerVerification =
     sessionModeRequirements.selected &&
     sessionModeRequirements.usesWorkerRuntime &&
@@ -4346,7 +2530,6 @@ const SessionWizard = ({
       visibleConfiguredWorkerUrl,
       workerMode,
     });
-  const currentWorkerSecrets = getCurrentWorkerSecrets();
   const sponsoredAutoDeployState = resolveSessionWizardSponsoredAutoDeployReadiness({
     wizardMode,
     sponsoredBundle: sponsoredBundleAppliedBundleRef.current,
@@ -4440,6 +2623,7 @@ const SessionWizard = ({
     hasPendingDrafts: hasUndeployedPendingSbtDrafts,
     isNormalMode,
     publishAdvancedOpen,
+    publishCompleted: workerCanonicalSettlement.publishCompleted,
     publishStepElapsedMs,
     sbtsLabel: t('sbts'),
     sessionModeProfile: draft.sessionModeProfile as SessionModeProfile,
@@ -4453,21 +2637,21 @@ const SessionWizard = ({
     requiredRequirementIds,
     showNewSessionRequirementsBanner,
   } = resolveSessionWizardNewSessionRequirementsDisplayState({
-      canUseSponsoredAutoDeployNow,
-      cloudflareWorkerSbtGateMode,
-      currentWorkerSecrets,
-      hasCompatibleWorkerRuntime: publishUiPlan.publishReadiness.canUploadMetadataNow,
-      hasPendingSbtDrafts: hasUndeployedPendingSbtDrafts,
-      hasSponsoredBundleLink,
-      isNewSessionWizardRoute,
-      newSessionBannerDismissalContextKey,
-      newSessionBannerDismissedContext,
-      normalizedAppliedSponsoredBundle,
-      persistedNewSessionBannerDismissed,
-      sessionAi: draft.ai,
-      sessionModeProfile: draft.sessionModeProfile,
-      sponsoredBundleStatus,
-    });
+    canUseSponsoredAutoDeployNow,
+    cloudflareWorkerSbtGateMode,
+    currentWorkerSecrets,
+    hasCompatibleWorkerRuntime: publishUiPlan.publishReadiness.canUploadMetadataNow,
+    hasPendingSbtDrafts: hasUndeployedPendingSbtDrafts,
+    hasSponsoredBundleLink,
+    isNewSessionWizardRoute,
+    newSessionBannerDismissalContextKey,
+    newSessionBannerDismissedContext,
+    normalizedAppliedSponsoredBundle,
+    persistedNewSessionBannerDismissed,
+    sessionAi: draft.ai,
+    sessionModeProfile: draft.sessionModeProfile,
+    sponsoredBundleStatus,
+  });
   const {
     publishProgressDisplayState: { publishStep },
   } = publishUiPlan;
@@ -4477,6 +2661,7 @@ const SessionWizard = ({
     deployInFlight,
     deployStatus,
     deployVerifiedInUi,
+    workerCanonicalPublishCompleted: workerCanonicalSettlement.publishCompleted,
   });
   const pendingDraftCount = normalizedPendingSbtDrafts.length;
   const sessionDetailsComplete = !!toStr(draft?.sessionName).trim() && !!toStr(draft?.sessionInfo).trim();
@@ -4493,145 +2678,14 @@ const SessionWizard = ({
     resolvedWorkerBaseUrl,
     workerMode,
     deployVerifiedInUi,
-    canPublishNow,
     canUseSponsoredAutoDeployNow,
     publishReadiness: publishUiPlan.publishReadiness,
     isWorkerCanonical: sessionModeRequirements.isWorkerCanonical,
     usesWorkerRuntime: sessionModeRequirements.usesWorkerRuntime,
     deployPendingSbts: sessionModeRequirements.publish.deployPendingSbts,
+    publishesPendingSbts: sessionModeRequirements.publish.deployPendingSbts && hasUndeployedPendingSbtDrafts,
+    usesLit: sessionModeRequirements.requiresLit,
     t,
-  });
-  const activeNormalModeIndex = normalModeCards.findIndex((card) => collapsedSections[card.key] === false);
-  const normalModePublishSummary = buildNormalModePublishSummary({
-    sessionName: toStr(draft?.sessionName),
-    configuredPrivateGateCount,
-    privateSlugMode,
-    canUseSponsoredAutoDeployNow,
-    shouldUseSponsoredAutoDeployFlow,
-    normalModeRequiresCustomWorker,
-    resolvedWorkerBaseUrl,
-    workerMode,
-    deployVerifiedInUi,
-    pendingDraftCount,
-    isWorkerCanonical: sessionModeRequirements.isWorkerCanonical,
-    deployPendingSbts: sessionModeRequirements.publish.deployPendingSbts,
-    t,
-  });
-  useEffect(() => {
-    if (!isNormalMode) return;
-    const visibleSectionOrder = showNormalModeWorkerStep
-      ? ['metadata', 'encryption', 'worker', 'publish']
-      : ['metadata', 'encryption', 'publish'];
-    setCollapsedSections((prev) => {
-      const firstOpenSection = visibleSectionOrder.find((key) => prev[key] === false) || 'metadata';
-      return {
-        metadata: firstOpenSection !== 'metadata',
-        encryption: firstOpenSection !== 'encryption',
-        worker: showNormalModeWorkerStep ? firstOpenSection !== 'worker' : true,
-        publish: firstOpenSection !== 'publish',
-      };
-    });
-  }, [isNormalMode, showNormalModeWorkerStep]);
-  const createSbtModalChainId = Number(draft.networkChainId || registryChainId || network?.id || network?.chainId || 0) || null;
-  const createSbtModalNetwork = getChainById(createSbtModalChainId) || (
-    createSbtModalChainId
-      ? { id: createSbtModalChainId, name: getChainName(createSbtModalChainId) || `Chain ${createSbtModalChainId}` }
-      : (network || { id: null, name: '' })
-  );
-  const createSbtModalSessionSlug = toStr(
-    createSbtModalState.sessionSlug ||
-    draft.slug ||
-    resolvedActiveSessionSlug ||
-    ''
-  ).trim();
-  const createSbtModalArweaveJwkOverride = workerSecretsEnabled
-    ? toStr(
-        createSbtModalState.arweaveJwkOverride ||
-        getEnabledWorkerArweaveJwk()
-      ).trim()
-    : '';
-  const wizardContractViewerContracts = useMemo(() => {
-    const draftContracts = draft?.contracts && typeof draft.contracts === 'object'
-      ? draft.contracts
-      : {};
-    const defaults = getSessionWizardContractDefaults(registryChainId);
-    const visibleKeys = getVisibleSessionWizardContractKeys(draftContracts, defaults);
-    const resolvedChainId = Number(
-      registryChainId ||
-      draft?.networkChainId ||
-      network?.id ||
-      network?.chainId ||
-      0
-    ) || null;
-    const mergedContracts = visibleKeys.reduce((acc, contractKey) => {
-      const entry = draftContracts[contractKey] && typeof draftContracts[contractKey] === 'object'
-        ? draftContracts[contractKey]
-        : {};
-      const address = toStr(entry.address || '').trim() || toStr(defaults?.[contractKey] || '').trim();
-      acc[contractKey] = {
-        ...entry,
-        address,
-        chainId: Number(entry.chainId || resolvedChainId || 0) || null,
-      };
-      return acc;
-    }, {});
-
-    return buildContractViewerContracts({
-      sessionContracts: mergedContracts,
-      chainId: resolvedChainId,
-      includeSessionRegistry: true,
-      includeCustomSBT: false,
-    });
-  }, [
-    draft?.contracts,
-    draft?.networkChainId,
-    network?.chainId,
-    network?.id,
-    registryChainId,
-  ]);
-  const selectedWizardContract = useMemo(() => (
-    wizardContractViewerContracts.find(
-      (contract) => contract.key === contractViewerModalState.contractKey
-    ) || null
-  ), [contractViewerModalState.contractKey, wizardContractViewerContracts]);
-  const selectedWizardContractSessionSlug = toStr(
-    selectorSourceSessionConfig?.slug ||
-    activeSessionSlug ||
-    resolvedActiveSessionSlug ||
-    ''
-  ).trim();
-  const selectedWizardContractHref = useMemo(() => buildContractsPageHref({
-    contractKey: selectedWizardContract?.key || '',
-    sessionSlug: selectedWizardContractSessionSlug,
-  }), [selectedWizardContract?.key, selectedWizardContractSessionSlug]);
-  const publishProgressSteps = buildSessionWizardPublishPlan({
-    shouldAutoDeployWorker: resolveSessionWizardShouldAutoDeployWorker({
-      workerMode,
-      sponsoredAutoDeployReady: canUseSponsoredAutoDeployNow,
-      deployComplete,
-    }),
-    hasPendingDrafts: hasUndeployedPendingSbtDrafts,
-    hasManualMetadata,
-  }).map((key) => ({
-    key,
-    label: key === 'deploy-worker'
-      ? 'Deploy Worker'
-      : key === 'deploy-sbts'
-        ? `Deploy ${t('sbts')}`
-        : key === 'upload-metadata'
-          ? 'Upload Arweave'
-          : key === 'register-session'
-            ? 'Register On-chain'
-            : 'Done',
-  }));
-  const activePublishProgressStep = publishProgressSteps[
-    Math.max(0, Math.min((publishStep || 1) - 1, Math.max(0, publishProgressSteps.length - 1)))
-  ] || publishProgressSteps[0] || null;
-  const publishProgressPercent = getSessionWizardPublishProgressPercent({
-    publishStep,
-    publishBusy,
-    totalSteps: publishProgressSteps.length,
-    elapsedMs: publishStepElapsedMs,
   });
   const activeNormalModeIndex = normalModeCards.findIndex((card) => collapsedSections[card.key] === false);
   const normalModePublishSummary = buildNormalModePublishSummary({
@@ -4808,6 +2862,7 @@ const SessionWizard = ({
       onCloseDisplaySettings={() => setWizardDisplaySettingsOpen(false)}
       onCloseSessionHeaderPreviewModal={() => setSessionHeaderPreviewModalOpen(false)}
       onCopyDraftJson={handleCopyDraftJson}
+      onCreateAnotherSession={workerCanonicalSettlement.onCreateAnotherSession}
       onDismissNewSessionRequirementsBanner={handleDismissNewSessionRequirementsBanner}
       onEnterAdvancedMode={handleEnterAdvancedMode}
       onEnterNormalMode={handleEnterNormalMode}
@@ -4831,6 +2886,7 @@ const SessionWizard = ({
       primaryDraftEntries={primaryDraftEntries}
       provider={provider}
       publishUiPlan={publishUiPlan}
+      publishSettingsCapabilities={sessionModeRequirements.publishSettings}
       publishedPendingSbtLinks={publishedPendingSbtLinks}
       registerExplorerBaseUrl={registerExplorerBaseUrl}
       registerTxs={registerTxs}

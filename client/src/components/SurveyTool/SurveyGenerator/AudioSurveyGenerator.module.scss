@@ -598,28 +598,6 @@ $input-border: var(--ce-input-border);
     white-space: nowrap;
   }
 
-  .sourceStatus {
-    font-size: 0.75rem;
-    line-height: 1.35;
-    color: rgba(255, 255, 255, 0.7);
-  }
-
-  .sourceStatusQueued {
-    color: rgba(255, 255, 255, 0.7);
-  }
-
-  .sourceStatusLoading {
-    color: #7fe8ff;
-  }
-
-  .sourceStatusReady {
-    color: #4dffa4;
-  }
-
-  .sourceStatusError {
-    color: #ff8b8b;
-  }
-
   .removeSourceBtn {
     background: none;
     border: none;

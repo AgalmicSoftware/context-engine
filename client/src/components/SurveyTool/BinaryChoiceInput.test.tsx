@@ -1,6 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import BinaryChoiceInput from './BinaryChoiceInput';
+import BinaryChoiceInput, { buildBinaryChoiceOptionClassName } from './BinaryChoiceInput';
+import styles from './SurveyTool.module.scss';
 
 describe('BinaryChoiceInput', () => {
   it('builds selected and unselected option classes', () => {

@@ -1,9 +1,5 @@
 import { bufferToBase64URL } from './encoding.js';
-import {
-  deriveAesGcmKeyFromPrf,
-  getCredentialPrfOutput,
-  getOptionalCredentialPrfOutput,
-} from './prf.js';
+import { deriveAesGcmKeyFromPrf, getCredentialPrfOutput, getOptionalCredentialPrfOutput } from './prf.js';
 
 const makeCredentialWithPrfOutput = (byteLength: number) =>
   ({

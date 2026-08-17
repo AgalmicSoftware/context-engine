@@ -22,7 +22,7 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { hasCachedCreateSbtForm } from '../../utilities/sbt/sbtCreateFormCache.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
-import { buildWorkerGroupsPath, readWorkerGroupIdFromHash } from '../../utilities/worker/workerGroupRoutes';
+import { workerGroupNavigationPort } from '../../domains/worker/workerGroupNavigationPort';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
 import {
   claimsWorkerCanonicalAuthority,
@@ -55,85 +55,22 @@ import {
   resolveSBTsPageReferrerSessionSlug as resolveReferrerSessionSlug,
   resolveSBTsPageCacheFeaturedCardLinkStyle as resolveCacheFeaturedCardLinkStyle,
 } from './sbtOverviewPageHelpers';
-type FeaturedEntry = {
-  address: string;
-  sessionSlug: string;
-};
-type CacheBackedFeaturedCard = {
-  address: string;
-  sessionSlug: string;
-  sbt: FeaturedSbtLike & { sbtInfo: FeaturedSbtMetadataLike };
-};
-type FeaturedRenderEntry =
-  { kind: 'cache'; entry: CacheBackedFeaturedCard } | { kind: 'fallback'; entry: FeaturedEntry };
-type MemoBucket<T> = {
-  key: string;
-  result: T[];
-};
-
-type FeaturedListArgs = {
-  baseFeaturedList?: unknown;
-  effectiveSessionSlug?: unknown;
-  autoFeature?: unknown;
-  requireExplicitSessionSlug?: unknown;
-  isSBTCacheReady?: unknown;
-  isAllSessionsMode?: boolean;
-  progressBySlug?: Record<string, FeaturedProgressLike | unknown>;
-};
-type FeaturedEntriesArgs = {
-  baseFeaturedList?: unknown;
-  effectiveSessionSlug?: unknown;
-  effectiveSessionAutoFeature?: unknown;
-  requireExplicitAutoFeatureSessionSlug?: unknown;
-  isSBTCacheReady?: unknown;
-  isAllSessionsMode?: boolean;
-  includeListScopeSessions?: boolean;
-  listScopeSessionSlugs?: unknown;
-  progressBySlug?: Record<string, FeaturedProgressLike | unknown>;
-};
-type FeaturedCacheCardsArgs = {
-  featuredEntries?: unknown;
-  isSBTCacheReady?: unknown;
-  progressBySlug?: Record<string, FeaturedProgressLike | unknown>;
-};
-
-type SBTsPageProps = UnknownRecord & {
-  sessionSlug?: string | null;
-  sessionConfig?: SBTSessionConfigLike | null;
-  activeSessionSlug?: string | null;
-  sessionName?: string;
-  sessionInfo?: string;
-  workerGroupId?: string;
-  provider?: unknown;
-  network?: unknown;
-  account?: unknown;
-  litHooks?: unknown;
-  loginComplete?: boolean;
-  toggleLoginModal?: unknown;
-  isSBTCacheReady?: boolean;
-  sbtCacheRevision?: number | string | null;
-  defaultSbtTags?: unknown;
-  defaultFeaturedSBTs?: unknown[];
-  onCreateGroupToggleExternal?: () => void;
-  showCreateGroupExternal?: boolean;
-  hideMiniActionRow?: boolean;
-  showCreateGroupAboveFeatured?: boolean;
-  preferCacheBackedFeaturedCards?: boolean;
-  requireExplicitAutoFeatureSessionSlug?: boolean;
-  miniaturized?: boolean;
-  refreshSbtData?: unknown;
-  onRequestSbtCacheRefresh?: unknown;
-  latestBlockNumber?: unknown;
-  sbtScanProgressBySlug?: Record<string, FeaturedProgressLike | unknown>;
-  sbtRealtimeCoverageBySlug?: unknown;
-  ensureLightSbtDiscovery?: unknown;
-  ensureLightSbtUniverse?: unknown;
-  refreshSessionUniverseRegistryCache?: unknown;
-};
-type SBTsPageState = {
-  showSBTsList: boolean;
-  showCreateGroup: boolean;
-};
+import type {
+  CacheBackedFeaturedCard,
+  FeaturedCacheCardsArgs,
+  FeaturedEntriesArgs,
+  FeaturedEntry,
+  FeaturedListArgs,
+  FeaturedProgressLike,
+  FeaturedRenderEntry,
+  FeaturedSbtLike,
+  FeaturedSbtMetadataLike,
+  MemoBucket,
+  SBTSessionConfigLike,
+  SBTsPageProps,
+  SBTsPageState,
+  UnknownRecord,
+} from './SBTsPage.types';
 
 const SBTsListComponent = SBTsList as React.ComponentType<Record<string, unknown>>;
 const CreateGroupComponent = CreateGroup as React.ComponentType<Record<string, unknown>>;
@@ -223,6 +160,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     baseFeaturedList,
     effectiveSessionSlug,
     autoFeature,
+    baseFeaturedListIsConfigured = false,
     requireExplicitSessionSlug = false,
     isSBTCacheReady,
     isAllSessionsMode = false,
@@ -233,6 +171,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     const key = [
       sessionSlugTarget,
       autoFeature ? '1' : '0',
+      baseFeaturedListIsConfigured ? '1' : '0',
       requireExplicitSessionSlug ? '1' : '0',
       isSBTCacheReady ? '1' : '0',
       isAllSessionsMode ? '1' : '0',
@@ -382,6 +321,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
         baseFeaturedList: featuredForSlug,
         effectiveSessionSlug: slug,
         autoFeature: autoFeatureForSlug,
+        baseFeaturedListIsConfigured: true,
         requireExplicitSessionSlug: requireExplicitAutoFeatureSessionSlug,
         isSBTCacheReady,
         isAllSessionsMode,
@@ -470,9 +410,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     const detailSessionSlug = onWorkerGroupDetailRoute
       ? normalizeSessionSlug(
           this.props.sessionSlug ||
-            (typeof window !== 'undefined'
-              ? new URLSearchParams(window.location.search).get('sessionName') || ''
-              : ''),
+            (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('sessionName') || '' : ''),
         )
       : '';
     const urlSlugLike = onWorkerGroupDetailRoute
@@ -568,8 +506,11 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
         const activeGroupCapabilities = resolveSessionCapabilityProjection(activeGroup);
         const canonicalPath =
           activeGroupCapabilities.profileValid && activeGroupCapabilities.isWorkerCanonical
-            ? buildWorkerGroupsPath({
-                groupId: typeof window !== 'undefined' ? readWorkerGroupIdFromHash(window.location.hash) : '',
+            ? workerGroupNavigationPort.buildPath({
+                groupId:
+                  typeof window !== 'undefined'
+                    ? workerGroupNavigationPort.readGroupIdFromHash(window.location.hash)
+                    : '',
                 rootPath: parts[0] === 'sbts' ? '/sbts' : '/groups',
                 sessionSlug: canonicalSlug,
               })
@@ -604,7 +545,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     const showCreateGroupAboveFeatured = this.props.showCreateGroupAboveFeatured === true;
     const routeWorkerGroupId = String(
       this.props.workerGroupId ||
-        (typeof window !== 'undefined' ? readWorkerGroupIdFromHash(window.location.hash) : ''),
+        (typeof window !== 'undefined' ? workerGroupNavigationPort.readGroupIdFromHash(window.location.hash) : ''),
     ).trim();
 
     // Resolve routing + slug once per render
@@ -729,9 +670,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     }
 
     const shouldRenderWorkerGroupsPanel =
-      usesWorkerNativeCreate &&
-      !!activeWorkerSessionSlug &&
-      (onSbtsRoute || this.props.embeddedWorkerGroups === true);
+      usesWorkerNativeCreate && !!activeWorkerSessionSlug && (onSbtsRoute || this.props.embeddedWorkerGroups === true);
 
     if (shouldRenderWorkerGroupsPanel) {
       return (

@@ -303,6 +303,51 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
     expect(questionLock.querySelector(`.${gateLockStyles.dots}`)).toBeNull();
   });
 
+  it('opens the controlled question lock through the stable test-ID surface', () => {
+    const instance = makeInstance();
+    instance.resolveGateOptions = jest.fn(() => ({
+      gateMap: {
+        gate_1: { id: 'gate_1' },
+      },
+      gateOptions: [{ id: 'gate_1', label: 'Edge Alpha', badgeLabel: 'Edge Alpha', color: '#5affc2' }],
+      defaultGateId: 'gate_1',
+    }));
+    instance.state = {
+      ...instance.state,
+      showAutoTool: false,
+      isStandaloneQuestion: true,
+      openLockKey: '',
+      questions: [
+        {
+          uiKey: 'q1',
+          id: 'q1',
+          type: 'freeform',
+          prompt: 'Question 1',
+          lockGateIds: ['gate_1'],
+          lockGateIdsTouched: true,
+          tags: [],
+          currentTagInputValue: '',
+          aiGeneratedTagsFromSource: [],
+          isGeneratingTags: false,
+        },
+      ],
+    };
+
+    const { rerender } = render(instance.render());
+    const question = screen.getByTestId(E2E_TESTIDS.CREATE_QUESTION);
+    fireEvent.click(within(question).getByTestId(E2E_TESTIDS.GATE_LOCK_BUTTON));
+
+    expect(instance.state.openLockKey).toBe('q-lock:q1');
+
+    rerender(instance.render());
+    const rerenderedQuestion = screen.getByTestId(E2E_TESTIDS.CREATE_QUESTION);
+    expect(within(rerenderedQuestion).getByTestId(E2E_TESTIDS.GATE_LOCK_BUTTON)).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(within(rerenderedQuestion).getByTestId(E2E_TESTIDS.GATE_LOCK_POPOVER)).toBeInTheDocument();
+  });
+
   it('keeps an explicit empty standalone question gate selection unlocked', () => {
     const instance = makeInstance();
     instance.resolveGateOptions = jest.fn(() => ({

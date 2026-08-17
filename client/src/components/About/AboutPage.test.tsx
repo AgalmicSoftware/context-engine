@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import fs from 'fs';
 import path from 'path';
 import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
+import { normalizeScssContract } from 'testUtils/scssContractAssertions';
 
 import AboutPage, { getAboutDemoSessionPath, getConfiguredRecognitionIndividuals } from './AboutPage';
 
@@ -349,10 +350,7 @@ describe('AboutPage', () => {
     renderAboutPage();
 
     ['Functionality', 'Roadmap', 'Recognition'].forEach((name) => {
-      expect(screen.getByRole('button', { name })).toHaveAttribute(
-        'data-ce-control-appearance',
-        'frameless',
-      );
+      expect(screen.getByRole('button', { name })).toHaveAttribute('data-ce-control-appearance', 'frameless');
     });
   });
 
@@ -479,12 +477,8 @@ describe('AboutPage', () => {
     expect(scss).toMatch(
       /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)\s*{[\s\S]*?\.heroPrimaryButton,\s*\.tertiaryLink,\s*\.titleRepoLink\s*{[\s\S]*?border:\s*2px solid;[\s\S]*?box-shadow:\s*var\(--ce-shadow-raised\);[\s\S]*?font-family:\s*var\(--ce-font-body\);/,
     );
-    expect(scss).toMatch(
-      /\.heroPrimaryButton\s*{[\s\S]*?min-width:\s*148px;[\s\S]*?min-height:\s*48px;/,
-    );
-    expect(scss).toMatch(
-      /\.tertiaryLink\s*{[\s\S]*?min-width:\s*108px;[\s\S]*?min-height:\s*34px;/,
-    );
+    expect(scss).toMatch(/\.heroPrimaryButton\s*{[\s\S]*?min-width:\s*148px;[\s\S]*?min-height:\s*48px;/);
+    expect(scss).toMatch(/\.tertiaryLink\s*{[\s\S]*?min-width:\s*108px;[\s\S]*?min-height:\s*34px;/);
     expect(scss).toMatch(
       /\.titleRepoLink\s*{[\s\S]*?width:\s*64px;[\s\S]*?height:\s*44px;[\s\S]*?background:\s*var\(--ce-control-face\);/,
     );

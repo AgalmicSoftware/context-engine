@@ -20,7 +20,7 @@ import styles from './DocsPage.module.scss';
 //
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faGithub } from '@fortawesome/free-brands-svg-icons';
-import { faExpand, faCaretDown, faCaretUp, faCopy, faCheck } from '@fortawesome/free-solid-svg-icons';
+import { faCaretDown, faCaretUp, faCheck, faCopy, faExpand } from '@fortawesome/free-solid-svg-icons';
 import { notify } from '../../utilities/ui/notify.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildPublicRoute, stripPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
@@ -35,7 +35,7 @@ import { normalizeContractKeyParam } from './contractMetadata.js';
 import { buildContractViewerContracts } from './contractViewerUtils.js';
 import { DOCS_PAGE_COPY, FAQ_ITEMS, GUIDE_TOPICS, QUICKSTART_STEPS } from './docsContent.js';
 import { sbtsListPath, t } from '../../utilities/ui/terminology.js';
-import { buildPublicContractSourceUrl, PUBLIC_REPO_URL } from '../../variables/publicRepoMetadata.js';
+import { PUBLIC_REPO_URL, buildPublicContractSourceUrl } from '../../variables/publicRepoMetadata.js';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
 
@@ -103,7 +103,6 @@ const buildContractsForViewer = buildContractViewerContracts as (options?: {
   sessionContracts?: SessionContractsMap;
   chainId?: number;
   includeSessionRegistry?: boolean;
-  includeAdvancedSourceTemplates?: boolean;
   includeCustomSBT?: boolean;
 }) => ContractViewerContract[];
 
@@ -208,9 +207,7 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
   }, [activeSession?.slug, activeSessionSlug, reduxActiveSessionSlug, selectedContractSessionSlug]);
 
   const selectedContractSessionValue =
-    selectedContractSessionSlug === null
-      ? ''
-      : selectedContractSessionSlug || DOCS_GENERAL_SESSION_SELECT_VALUE;
+    selectedContractSessionSlug === null ? '' : selectedContractSessionSlug || DOCS_GENERAL_SESSION_SELECT_VALUE;
 
   // Sync generic docs URLs to /docs?session= while preserving unrelated search params.
   useEffect(() => {
@@ -328,9 +325,7 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
   const resolvedChainLabel = contributesSessionContracts
     ? getSessionChainLabel(resolvedChainId)
     : 'Not used by this session';
-  const sessionLabel = String(
-    selectedSession?.sessionName || selectedContractSessionSlug || 'Default (general)',
-  );
+  const sessionLabel = String(selectedSession?.sessionName || selectedContractSessionSlug || 'Default (general)');
   const contracts = useMemo(() => {
     const chainId = Number(sessionNetworkChainId || firstContract?.chainId || 0) || undefined;
     return buildContractsForViewer({
@@ -458,19 +453,21 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
   return (
     <div className={styles.docsPage} data-testid={E2E_TESTIDS.PAGE_DOCS_ROOT}>
       <header className={styles.docsHeader}>
-        <div className={styles.docsTitleRow}>
+        <div className={styles.docsHeaderTitleRow}>
           <h1>{DOCS_PAGE_COPY.title}</h1>
-          <a
-            href={PUBLIC_REPO_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.docsRepoLink}
-            data-testid={E2E_TESTIDS.DOCS_GITHUB_LINK}
-            aria-label="View Context Engine on GitHub"
-            title="View Context Engine on GitHub"
-          >
-            <FontAwesomeIcon icon={faGithub} aria-hidden="true" />
-          </a>
+          <nav className={styles.docsGithubLinks} aria-label="Project links on GitHub">
+            <a
+              href={PUBLIC_REPO_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={styles.docsGithubLink}
+              data-testid={E2E_TESTIDS.DOCS_GITHUB_LINK}
+              aria-label="View Context Engine repository on GitHub"
+              title="Repository"
+            >
+              <FontAwesomeIcon icon={faGithub} aria-hidden="true" />
+            </a>
+          </nav>
         </div>
         <p>{DOCS_PAGE_COPY.introduction}</p>
       </header>
@@ -560,43 +557,85 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
           {FAQ_ITEMS.map((item) => (
             <article key={item.id} className={styles.faqItem}>
               <h2>{item.question}</h2>
-              <p>{item.answer}</p>
+              <p>{renderDocsInlineCode(item.answer)}</p>
             </article>
           ))}
         </div>
       </DocsSection>
 
-      <div className={styles.sessionContractsGroup} data-testid={E2E_TESTIDS.DOCS_SESSION_CONTRACTS_GROUP}>
-        <div className={styles.sessionContext} data-testid={E2E_TESTIDS.DOCS_SESSION_CONTEXT}>
-          <span>
-            <strong>Session:</strong> {sessionLabel}
-          </span>
-          <span aria-hidden="true">{' · '}</span>
-          <span>
-            <strong>Chain:</strong> {getSessionChainLabel(resolvedChainId)}
-          </span>
+      <section
+        className={styles.contractSessionExplorer}
+        aria-labelledby="docs-contract-session-title"
+        data-testid={E2E_TESTIDS.DOCS_SESSION_CONTRACTS_GROUP}
+      >
+        <div className={styles.contractSessionExplorerHeader}>
+          <h2 id="docs-contract-session-title">Contract deployment details</h2>
+          <p>Choose a session to view its contract deployment details.</p>
         </div>
-        <ContractViewer
-          contracts={contracts}
-          autoOpenContractKey={deepLinkedContractKey}
-          renderSourceHeaderActions={(contract) => {
-            const sourceUrl = buildPublicContractSourceUrl(contract?.sourceFile || '');
-            if (!sourceUrl) return null;
+        <div className={styles.contractSessionControl}>
+          <label htmlFor="docs-contract-session-select">Session</label>
+          <select
+            id="docs-contract-session-select"
+            value={selectedContractSessionValue}
+            onChange={(event) => {
+              const nextValue = event.target.value;
+              setSelectedContractSessionSlug(nextValue === DOCS_GENERAL_SESSION_SELECT_VALUE ? '' : nextValue || null);
+            }}
+            data-testid={E2E_TESTIDS.DOCS_CONTRACT_SESSION_SELECTOR}
+          >
+            <option value="">Choose a session…</option>
+            {contractSessionOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
 
-            return (
-              <a
-                href={sourceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={styles.sourceActionLink}
-                data-testid={`ce-contract-view-source-${contract.key}`}
-              >
-                View Source
-              </a>
-            );
-          }}
-        />
-      </div>
+        {selectedSession ? (
+          <div className={styles.contractSessionDetails}>
+            <div className={styles.sessionContext} data-testid={E2E_TESTIDS.DOCS_SESSION_CONTEXT}>
+              <span>
+                <strong>Session:</strong> {sessionLabel}
+              </span>
+              <span aria-hidden="true">{' · '}</span>
+              <span>
+                <strong>Chain:</strong> {resolvedChainLabel}
+              </span>
+            </div>
+            {contracts.length ? (
+              <ContractViewer
+                contracts={contracts}
+                autoOpenContractKey={deepLinkedContractKey}
+                renderSourceHeaderActions={(contract) => {
+                  const sourceUrl = buildPublicContractSourceUrl(contract?.sourceFile || '');
+                  if (!sourceUrl) return null;
+
+                  return (
+                    <a
+                      href={sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={styles.sourceActionLink}
+                      data-testid={`ce-contract-view-source-${contract.key}`}
+                    >
+                      View Source
+                    </a>
+                  );
+                }}
+              />
+            ) : (
+              <div className={styles.contractSessionEmptyState} role="status">
+                No contract addresses are published for this session.
+              </div>
+            )}
+          </div>
+        ) : selectedContractSessionSlug !== null ? (
+          <div className={styles.contractSessionEmptyState} role="status">
+            Session details are unavailable for this selection.
+          </div>
+        ) : null}
+      </section>
     </div>
   );
 };

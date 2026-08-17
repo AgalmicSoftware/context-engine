@@ -25,6 +25,14 @@ type BuildLockedQuestionGateDetailsArgs = {
   translate?: (key: string) => string;
 };
 
+type CollectGateSbtAddressesForHydrationArgs = {
+  policy?: unknown;
+  questionPools?: unknown;
+  getQuestionEncryptionGates?: (question: unknown) => GateDetailRecord[];
+  isAddress?: (value: string) => boolean;
+  getAddress?: (value: string) => string;
+};
+
 type LockedQuestionGateDetailDraft = {
   id: string;
   label: string;

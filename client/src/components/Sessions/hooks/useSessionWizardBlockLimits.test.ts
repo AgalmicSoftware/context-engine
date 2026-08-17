@@ -14,6 +14,8 @@ const renderBlockLimits = (
     draftBlockLimitStart: unknown;
     setDraft: jest.Mock;
     updateDraftValue: jest.Mock;
+    enabled: boolean;
+    readLatestBlockNumber: (args: { chainId: number; rpcUrl: string }) => Promise<number>;
   }> = {},
 ) => {
   const setDraft = overrides.setDraft || jest.fn();
@@ -25,10 +27,12 @@ const renderBlockLimits = (
     updateDraftValue,
     ...renderHook(() =>
       useSessionWizardBlockLimits<DraftState>({
+        enabled: overrides.enabled ?? true,
         registryChainId: overrides.registryChainId ?? 0,
         draftBlockLimitStart: overrides.draftBlockLimitStart,
         setDraft,
         updateDraftValueRef,
+        readLatestBlockNumber: overrides.readLatestBlockNumber,
       }),
     ),
   };

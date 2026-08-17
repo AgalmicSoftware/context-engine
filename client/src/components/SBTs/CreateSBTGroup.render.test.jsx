@@ -8,8 +8,8 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 const mockFetchImageFromURL = jest.fn();
 
-jest.mock('../../utilities/ui/imageScripts.js', () => {
-  const actual = jest.requireActual('../../utilities/ui/imageScripts.js');
+jest.mock('../../utilities/ui/imageFetchClient.js', () => {
+  const actual = jest.requireActual('../../utilities/ui/imageFetchClient.js');
   return {
     __esModule: true,
     ...actual,
@@ -359,6 +359,7 @@ describe('CreateSBTGroup render and image authoring', () => {
   });
 
   it('keeps the existing uploaded image when a pasted clipboard image blob is too large', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const originalClipboard = navigator.clipboard;
     const originalCreateObjectURL = URL.createObjectURL;
     const originalRevokeObjectURL = URL.revokeObjectURL;
@@ -411,6 +412,7 @@ describe('CreateSBTGroup render and image authoring', () => {
         'blob:existing-sbt-preview',
       );
       expect(screen.getByText('Image too large (>10MB)')).toBeInTheDocument();
+      expect(consoleErrorSpy).toHaveBeenCalledWith('[sbt]', 'Image too large (>10MB)');
       expect(instance.state.sbtMinted).toBe(true);
       expect(instance.state.sbtAddress).toBe('0x9999999999999999999999999999999999999999');
       expect(instance.state.currentStep).toBe(4);
@@ -425,10 +427,12 @@ describe('CreateSBTGroup render and image authoring', () => {
       });
       URL.createObjectURL = originalCreateObjectURL;
       URL.revokeObjectURL = originalRevokeObjectURL;
+      consoleErrorSpy.mockRestore();
     }
   });
 
   it('keeps the existing uploaded image when a pasted image URL fails validation', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const originalClipboard = navigator.clipboard;
     const originalCreateObjectURL = URL.createObjectURL;
     const originalRevokeObjectURL = URL.revokeObjectURL;
@@ -483,6 +487,7 @@ describe('CreateSBTGroup render and image authoring', () => {
       });
       URL.createObjectURL = originalCreateObjectURL;
       URL.revokeObjectURL = originalRevokeObjectURL;
+      consoleErrorSpy.mockRestore();
     }
   });
 

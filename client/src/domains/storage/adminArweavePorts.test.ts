@@ -41,12 +41,12 @@ describe('admin Arweave ports', () => {
     expect(ports.formatWinstonToAr('2000000000000', 4)).toBe('2.000000');
     expect(ports.buildArweaveGatewayUrl('second-tx')).toBe('https://arweave.net/second-tx');
 
-    expect(firstScripts.readArweaveWalletBalance).toHaveBeenCalledWith(jwk);
-    expect(secondScripts.uploadDataToArweave).toHaveBeenCalledWith({ type: 'admin-test' }, 'json', {
+    expect(firstClient.readArweaveWalletBalance).toHaveBeenCalledWith(jwk);
+    expect(secondClient.uploadDataToArweave).toHaveBeenCalledWith({ type: 'admin-test' }, 'json', {
       sessionSlug: 'edge',
     });
-    expect(secondScripts.formatWinstonToAr).toHaveBeenCalledWith('2000000000000', 4);
-    expect(secondScripts.buildArweaveGatewayUrl).toHaveBeenCalledWith('second-tx');
+    expect(secondClient.formatWinstonToAr).toHaveBeenCalledWith('2000000000000', 4);
+    expect(secondClient.buildArweaveGatewayUrl).toHaveBeenCalledWith('second-tx');
   });
 
   it('normalizes display URLs through call-time URL helper lookup', () => {

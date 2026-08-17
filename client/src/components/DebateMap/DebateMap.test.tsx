@@ -9,7 +9,11 @@ import DebateMap, {
   buildHistoricalCompassPoints,
   getAtlasLinkStableKey,
   getCompactTreeNodeLabel,
+  getDebateNodeListStableKeys,
   getDebateNodeStableKey,
+  getDebateQuestionListStableKeys,
+  getDebateQuestionStableKey,
+  getDebateTagStableKeys,
   getPackedAtlasClickTarget,
   getPackedAtlasLabelFontSizePx,
   getPackedAtlasVerticalLiftPx,
@@ -85,7 +89,11 @@ const buildHistoricalCaseBriefAny = buildHistoricalCaseBrief as any;
 const buildHistoricalCompassPointsAny = buildHistoricalCompassPoints as any;
 const getAtlasLinkStableKeyAny = getAtlasLinkStableKey as any;
 const getCompactTreeNodeLabelAny = getCompactTreeNodeLabel as any;
+const getDebateNodeListStableKeysAny = getDebateNodeListStableKeys as any;
 const getDebateNodeStableKeyAny = getDebateNodeStableKey as any;
+const getDebateQuestionListStableKeysAny = getDebateQuestionListStableKeys as any;
+const getDebateQuestionStableKeyAny = getDebateQuestionStableKey as any;
+const getDebateTagStableKeysAny = getDebateTagStableKeys as any;
 const getPackedAtlasClickTargetAny = getPackedAtlasClickTarget as any;
 const getPackedAtlasLabelFontSizePxAny = getPackedAtlasLabelFontSizePx as any;
 const getPackedAtlasVerticalLiftPxAny = getPackedAtlasVerticalLiftPx as any;
@@ -1281,9 +1289,7 @@ describe('DebateMap', () => {
 
     render(
       <MemoryRouter
-        initialEntries={[
-          `/atlas/0x1110000000000000000000000000000000000000000000000000000000000000${search}`,
-        ]}
+        initialEntries={[`/atlas/0x1110000000000000000000000000000000000000000000000000000000000000${search}`]}
       >
         <Routes>
           <Route

@@ -1,30 +1,8 @@
 /** @file OnePageSession.tsx */
-import React, { Component, Suspense } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faCaretDown,
-  faCaretUp,
-  faDownload,
-  faExternalLinkAlt,
-  faQuestionCircle,
-  faSpinner,
-  faCheck,
-  faTimes,
-  faImage,
-  faArrowLeft,
-  faExpand,
-  faPlus,
-  faSyncAlt,
-  faSignOutAlt,
-} from '@fortawesome/free-solid-svg-icons';
-import { Alert } from 'reactstrap';
+import React, { Component } from 'react';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { createLitHooks } from '../../utilities/crypto/litProtocol.js';
 import { ethers } from 'ethers';
-
-import styles from './OnePageSession.module.scss';
-
-import LazyFallback from '../Shared/LazyFallback';
 
 import {
   getNativeBalance,
@@ -36,47 +14,31 @@ import { sbtGroupMintAuthorizationPort } from '../../domains/sbts/sbtGroupMintAu
 import { sbtMetadataReadsPort } from '../../domains/sbts/sbtMetadataReadsPort.js';
 import { sbtMintExecutionPort } from '../../domains/sbts/sbtMintExecutionPort.js';
 
-
-import styles from './OnePageSession.module.scss';
-
-import LazyFallback from '../Shared/LazyFallback';
-
-import contractScripts, { getAllSessionSlugs } from '../../utilities/web3/contractScripts.js';
-
-import { resolveEffectiveSlug, normalizeSurveyToolFilterState } from '../SurveyTool/surveyToolUtils.js';
+import { resolveEffectiveSlug, normalizeSurveyToolFilterState } from '../SurveyTool/surveyToolUtils';
 import { resolvePolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionPool.js';
 import { serializeFilterState, deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { createLogger } from 'utilities/logging.js';
-import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { listNamespaceEntriesSync, peekCacheSync, writeCache } from '../../utilities/cache/cacheScripts.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
-import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js';
-import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
+import { sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import { resolveMainSiteLitSessionConfig } from '../MainSite/litSessionConfig.js';
 import type { RiskMatrixRestoreState } from '../MainContent/RiskMatrix';
 import { clearAgentClientLoginEnvelope, readAgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
 import {
   envelopeAllowsSubmit,
-  loadGroups as loadTelegramGroups,
   loadQuestions as loadTelegramQuestions,
   loadResultsDataset as loadTelegramResultsDataset,
   submitAnswer as submitTelegramAnswer,
-  type TelegramAnswerInput,
-  type TelegramResultsDataset,
 } from '../../utilities/session/telegramSessionBackend';
-import {
-  isTelegramAgentAuthFailure,
-  type TelegramAgentQuestion,
-} from '../../utilities/session/telegramAgentData';
+import { isTelegramAgentAuthFailure } from '../../utilities/session/telegramAgentData';
 import {
   buildAggregatorFromLocalCache,
   computeAggregatorDataSignature,
   computeAggregatorSourceSnapshotSignature,
 } from './onePageSessionAggregator';
-import OnePageSessionAutoMintAlerts from './OnePageSessionAutoMintAlerts';
 import OnePageSessionTelegramShell from './OnePageSessionTelegramShell';
 import {
   buildCurrentSessionConfigRequest,
@@ -123,20 +85,28 @@ import {
 
 const demoLog = createLogger('demo');
 const ONE_PAGE_DEMO_PERF_SCOPE = 'onePageDemo';
-const SBT_TOOLTIP_LABEL = isCryptoMode() ? 'Soulbound tokens (SBTs)' : `${t('sbtFull')}s`;
-const DEMO_CORPUS_GITHUB_URL = PUBLIC_AI_DISCOURSE_CORPUS_URL;
-const DEFAULT_AGENT_BRIDGE_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
-const DEFAULT_CORPUS_VIEWER_LOAD_STATE = Object.freeze({
-  activeCorpusKey: 'cross_corpus',
-  activeCorpusLabel: 'Cross-Corpus',
-  loadStatus: 'idle',
-  loadButtonLabel: 'Load full corpus',
-  disableLoadButton: false,
-  error: '',
-});
-const globalState: any = globalThis as any;
-const contractScriptsAny: any = contractScripts as any;
-const DebateMapAny: any = DebateMap;
+type OnePageGlobalState = typeof globalThis & {
+  ENABLE_CE_UI_PERF_STATS?: boolean;
+  ENABLE_CE_DEBUG_COUNTERS?: boolean;
+  __CE_DEBUG_COUNTERS__?: boolean;
+  __CE_PERF_COUNTERS__?: Record<string, Record<string, number>>;
+};
+type OnePageSbtCacheEntry = Record<string, unknown> & {
+  burnedAddresses?: unknown[];
+  burnedCountByAddress?: Record<string, unknown>;
+  countsLoaded?: boolean;
+  countsScanCheckpoint?: Record<string, unknown> | null;
+  mintedAddresses?: unknown[];
+  mintedCountByAddress?: Record<string, unknown>;
+  sbtInfo?: Record<string, unknown> & {
+    tokenURI?: unknown;
+  };
+};
+type OnePageSbtNetworkCache = Record<string, unknown> & {
+  sbtList?: Record<string, OnePageSbtCacheEntry>;
+};
+type OnePageSbtCache = Record<string, OnePageSbtNetworkCache>;
+const globalState = globalThis as OnePageGlobalState;
 
 const getErrorMessage = (error: unknown, fallback = 'Unknown error') =>
   error && typeof error === 'object' && typeof (error as { message?: unknown }).message === 'string'
@@ -351,15 +321,25 @@ class OnePageSession extends Component<any, any> {
     // view-all handler
     this.handleViewAllQuestionsClick = this.handleViewAllQuestionsClick.bind(this);
 
-    this.restoreTelegramEnvelopeFromStorage = this.restoreTelegramEnvelopeFromStorage.bind(this);
-    this.loadTelegramSessionMeta = this.loadTelegramSessionMeta.bind(this);
-    this.loadTelegramAgentQuestions = this.loadTelegramAgentQuestions.bind(this);
-    this.loadTelegramAgentResults = this.loadTelegramAgentResults.bind(this);
-    this.loadTelegramAgentData = this.loadTelegramAgentData.bind(this);
-    this.handleTelegramQuestionSubmit = this.handleTelegramQuestionSubmit.bind(this);
-    this.handleTelegramLogout = this.handleTelegramLogout.bind(this);
-    this.handleTelegramAuthFailure = this.handleTelegramAuthFailure.bind(this);
-    this.handleAgentClientLoginEvent = this.handleAgentClientLoginEvent.bind(this);
+    const telegramActions = createOnePageSessionTelegramActions({
+      getState: () => this.state as OnePageSessionTelegramState,
+      isTelegramBackendMode: (sessionConfig) => this.isTelegramBackendMode(sessionConfig),
+      ports: {
+        clearStoredEnvelope: clearAgentClientLoginEnvelope,
+        envelopeAllowsSubmit,
+        fetchImpl: fetch,
+        isAuthFailure: isTelegramAgentAuthFailure,
+        loadQuestions: loadTelegramQuestions,
+        loadResultsDataset: loadTelegramResultsDataset,
+        readStoredEnvelope: readAgentClientLoginEnvelope,
+        submitAnswer: submitTelegramAnswer,
+      },
+      resolveCurrentSessionConfig: () => this.resolveCurrentSessionConfig(),
+      resolveCurrentSessionSlug: () => this.resolveCurrentSessionSlug(),
+      resolveTelegramAgentBridgeUrl: (sessionConfig) => this.resolveTelegramAgentBridgeUrl(sessionConfig),
+      setState: (patch, callback) => this.setState(patch, callback),
+    });
+    Object.assign(this, telegramActions);
   }
 
   kickoffLightSbtUniverseScan(propsIn: any = this.props) {
@@ -397,8 +377,6 @@ class OnePageSession extends Component<any, any> {
 
     initializeSbtAutoMintRuntime(this, (error) => demoLog.warn('OnePageSession: fallback', error));
 
-    initializeSbtAutoMintRuntime(this, (error) => demoLog.warn('OnePageSession: fallback', error));
-
     window.addEventListener('sbt-mint-success', this.onSbtMintSuccess);
     window.addEventListener('ce-agent-client-login', this.handleAgentClientLoginEvent as EventListener);
 
@@ -415,14 +393,7 @@ class OnePageSession extends Component<any, any> {
 
     this._aggregatorInputSig = this.buildAggregatorInputSignature(this.props, this.state);
 
-    if (this.isTelegramBackendMode(this.resolveCurrentSessionConfig())) {
-      const envelope = this.restoreTelegramEnvelopeFromStorage();
-      if (envelope) {
-        this.loadTelegramAgentData(true);
-      } else {
-        this.loadTelegramSessionMeta();
-      }
-    }
+    this.bootstrapTelegramSession();
   }
 
   componentWillUnmount() {
@@ -549,226 +520,26 @@ class OnePageSession extends Component<any, any> {
     });
   }
 
-  resolveCurrentSessionSlug(propsIn: any = this.props) {
-    return normalizeOnePageSessionSlug(resolveEffectiveSlug(propsIn) || propsIn.sessionConfig?.slug || '');
+  resolveCurrentSessionSlug(propsIn: OnePageSessionPropsLike = this.props) {
+    return resolveCurrentSessionSlugForProps(propsIn, resolveEffectiveSlug);
   }
 
-  resolveCurrentSessionConfig(propsIn: any = this.props) {
-    const slug = this.resolveCurrentSessionSlug(propsIn);
-    return this.getResolvedSessionConfig({
-      slug,
-      sessionName: propsIn.sessionName,
-      questionsGenPrompt: propsIn.questionsGenPrompt,
-      autoFeatureSBTsBySessionSlug: propsIn.autoFeatureSBTsBySessionSlug,
-      autoFeatureSBTsWithFeaturedSbtTags: propsIn.autoFeatureSBTsWithFeaturedSbtTags,
-      incomingSessionConfig: propsIn.sessionConfig,
-      contracts: propsIn.contracts,
-    });
+  resolveCurrentSessionConfig(propsIn: OnePageSessionPropsLike = this.props) {
+    return this.getResolvedSessionConfig(buildCurrentSessionConfigRequest(propsIn, resolveEffectiveSlug));
   }
 
-  resolveTelegramAgentBridgeUrl(sessionConfig: any = this.resolveCurrentSessionConfig()) {
-    const cfg = sessionConfig && typeof sessionConfig === 'object' ? sessionConfig : {};
-    const telegram = cfg.telegram && typeof cfg.telegram === 'object' ? cfg.telegram : {};
-    return String(
-      cfg.agentBridgeUrl ||
-      cfg.agentBridgeWorkerUrl ||
-      cfg.telegramAgentBridgeUrl ||
-      telegram.agentBridgeUrl ||
-      telegram.workerUrl ||
-      DEFAULT_AGENT_BRIDGE_URL
-    ).trim().replace(/\/+$/g, '');
+  resolveTelegramAgentBridgeUrl(sessionConfig: unknown = this.resolveCurrentSessionConfig()) {
+    return resolveTelegramAgentBridgeUrlForSession(sessionConfig);
   }
 
-  isTelegramBackendMode(sessionConfig: any = this.resolveCurrentSessionConfig()) {
-    return resolveSessionBackendKind({
+  isTelegramBackendMode(
+    sessionConfig: unknown = this.resolveCurrentSessionConfig(),
+    sessionSlug: unknown = this.resolveCurrentSessionSlug(),
+  ) {
+    return isOnePageTelegramBackendMode({
       sessionConfig,
-      probeResult: this.state.telegramSessionMeta,
-    }) === 'telegram';
-  }
-
-  restoreTelegramEnvelopeFromStorage() {
-    const sessionSlug = this.resolveCurrentSessionSlug();
-    const envelope = readAgentClientLoginEnvelope(sessionSlug);
-    const currentToken = this.state.telegramClientEnvelope?.credential?.token || '';
-    const nextToken = envelope?.credential?.token || '';
-    if (currentToken !== nextToken || this.state.telegramClientEnvelope?.sessionSlug !== envelope?.sessionSlug) {
-      this.setState({ telegramClientEnvelope: envelope });
-    }
-    return envelope;
-  }
-
-  async loadTelegramSessionMeta() {
-    const sessionSlug = this.resolveCurrentSessionSlug();
-    const sessionConfig = this.resolveCurrentSessionConfig();
-    const agentBridgeUrl = this.resolveTelegramAgentBridgeUrl(sessionConfig);
-    if (!sessionSlug || !agentBridgeUrl) return null;
-    this.setState({ telegramSessionMetaStatus: 'loading' });
-    try {
-      const url = new URL(`${agentBridgeUrl}/api/agent/session-meta`);
-      url.searchParams.set('sessionSlug', sessionSlug);
-      const response = await fetch(url.toString(), { method: 'GET', cache: 'no-store' });
-      const body = await response.json().catch(() => null) as TelegramSessionMeta | null;
-      if (!response.ok || !body || body.ok === false) {
-        this.setState({ telegramSessionMetaStatus: 'error' });
-        return null;
-      }
-      this.setState({
-        telegramSessionMeta: body,
-        telegramSessionMetaStatus: 'ready',
-      });
-      return body;
-    } catch (_) {
-      this.setState({ telegramSessionMetaStatus: 'error' });
-      return null;
-    }
-  }
-
-  handleTelegramAuthFailure(reason: any = '') {
-    const sessionSlug = this.resolveCurrentSessionSlug();
-    clearAgentClientLoginEnvelope(sessionSlug);
-    this.clearTelegramEnvelopeMemoryCache(sessionSlug);
-    this.setState({
-      telegramClientEnvelope: null,
-      telegramAgentQuestionsStatus: 'idle',
-      telegramAgentQuestions: [],
-      telegramAgentResultsStatus: 'idle',
-      telegramAgentResults: null,
-      telegramPolisDataset: null,
-      telegramQuestionSubmitError: String(reason || 'Telegram session expired. Paste a fresh agent token.'),
-    });
-  }
-
-  handleAgentClientLoginEvent(event: CustomEvent) {
-    const detail = event?.detail || {};
-    const envelope = detail.envelope as AgentClientLoginEnvelope | null;
-    if (!envelope?.credential?.token) return;
-    if (normalizeOnePageSessionSlug(envelope.sessionSlug) !== this.resolveCurrentSessionSlug()) return;
-    this.setState({ telegramClientEnvelope: envelope }, () => this.loadTelegramAgentData(true));
-  }
-
-  clearTelegramEnvelopeMemoryCache(sessionSlug: any = this.resolveCurrentSessionSlug()) {
-    try {
-      const globalTarget = globalThis as any;
-      const cache = globalTarget.__CE_AGENT_CLIENT_LOGIN_ENVELOPES__;
-      if (cache && typeof cache === 'object') {
-        delete cache[normalizeOnePageSessionSlug(sessionSlug) || 'general'];
-      }
-    } catch (_) {}
-  }
-
-  async loadTelegramAgentQuestions(force: any = false) {
-    const sessionConfig = this.resolveCurrentSessionConfig();
-    if (!this.isTelegramBackendMode(sessionConfig)) return null;
-    const envelope = this.state.telegramClientEnvelope || this.restoreTelegramEnvelopeFromStorage();
-    if (!envelope) return null;
-    if (!force && this.state.telegramAgentQuestionsStatus === 'loading') return null;
-    this.setState({ telegramAgentQuestionsStatus: 'loading', telegramQuestionSubmitError: '' });
-    const result = await loadTelegramQuestions({
-      envelope,
-      agentBridgeUrl: this.resolveTelegramAgentBridgeUrl(sessionConfig),
-    });
-    if (!result.ok) {
-      if (isTelegramAgentAuthFailure({ status: result.status, reason: result.reason })) {
-        this.handleTelegramAuthFailure(result.reason);
-      } else {
-        this.setState({
-          telegramAgentQuestionsStatus: 'error',
-          telegramQuestionSubmitError: result.reason || 'Could not load Telegram questions.',
-        });
-      }
-      return result;
-    }
-    this.setState({
-      telegramAgentQuestionsStatus: 'ready',
-      telegramAgentQuestions: result.questions || [],
-      telegramAgentAnswerState: result.answerState || null,
-      telegramQuestionPileIndex: 0,
-    });
-    return result;
-  }
-
-  async loadTelegramAgentResults(force: any = false) {
-    const sessionConfig = this.resolveCurrentSessionConfig();
-    if (!this.isTelegramBackendMode(sessionConfig)) return null;
-    const envelope = this.state.telegramClientEnvelope || this.restoreTelegramEnvelopeFromStorage();
-    if (!envelope) return null;
-    if (!force && this.state.telegramAgentResultsStatus === 'loading') return null;
-    this.setState({ telegramAgentResultsStatus: 'loading' });
-    const result: TelegramResultsDataset = await loadTelegramResultsDataset({
-      envelope,
-      agentBridgeUrl: this.resolveTelegramAgentBridgeUrl(sessionConfig),
-    });
-    const authView = Object.values(result.views || {}).find((view: any) => view?.status === 'auth');
-    if (authView) {
-      this.handleTelegramAuthFailure((authView as any).reason);
-      return result;
-    }
-    this.setState({
-      telegramAgentResultsStatus: 'ready',
-      telegramAgentResults: result,
-      telegramPolisDataset: result.polisDataset,
-    });
-    return result;
-  }
-
-  loadTelegramAgentData(force: any = false) {
-    this.loadTelegramSessionMeta();
-    return Promise.all([
-      this.loadTelegramAgentQuestions(force),
-      this.loadTelegramAgentResults(force),
-    ]);
-  }
-
-  async handleTelegramQuestionSubmit(question: TelegramAgentQuestion, answer: TelegramAnswerInput) {
-    const envelope = this.state.telegramClientEnvelope;
-    if (!envelopeAllowsSubmit(envelope, this.state.telegramSessionMeta)) {
-      this.setState({ telegramQuestionSubmitError: 'Submitting from the client is not enabled for this deployment yet.' });
-      return;
-    }
-    this.setState({ telegramSubmittingQuestionId: question.questionId, telegramQuestionSubmitError: '' });
-    const result = await submitTelegramAnswer({
-      envelope,
-      agentBridgeUrl: this.resolveTelegramAgentBridgeUrl(),
-      question,
-      answer,
-    });
-    if (!result.ok) {
-      if (isTelegramAgentAuthFailure({ status: result.status, reason: result.reason })) {
-        this.handleTelegramAuthFailure(result.reason);
-      } else {
-        this.setState({
-          telegramSubmittingQuestionId: '',
-          telegramQuestionSubmitError: result.reason || 'Could not submit this answer.',
-        });
-      }
-      return;
-    }
-    this.setState((prev: Readonly<OnePageSession['state']>) => ({
-      telegramSubmittingQuestionId: '',
-      telegramSubmittedQuestionIds: Array.from(new Set([
-        ...(prev.telegramSubmittedQuestionIds || []),
-        question.questionId,
-      ])),
-    }));
-    this.loadTelegramAgentData(true);
-  }
-
-  handleTelegramLogout() {
-    const sessionSlug = this.resolveCurrentSessionSlug();
-    clearAgentClientLoginEnvelope(sessionSlug);
-    this.clearTelegramEnvelopeMemoryCache(sessionSlug);
-    this.setState({
-      telegramClientEnvelope: null,
-      telegramAgentQuestionsStatus: 'idle',
-      telegramAgentQuestions: [],
-      telegramAgentAnswerState: null,
-      telegramQuestionPileIndex: 0,
-      telegramSubmittingQuestionId: '',
-      telegramSubmittedQuestionIds: [],
-      telegramQuestionSubmitError: '',
-      telegramAgentResultsStatus: 'idle',
-      telegramAgentResults: null,
-      telegramPolisDataset: null,
+      telegramSessionMeta: this.state.telegramSessionMeta,
+      sessionSlug,
     });
   }
 
@@ -1178,7 +949,7 @@ class OnePageSession extends Component<any, any> {
     let cachedNames: Record<string, string> = {};
     let cachedImages: Record<string, unknown> = {};
     try {
-      const parsed = peekCacheSync('sbtCache', slug, { clone: false });
+      const parsed = peekCacheSync<OnePageSbtCache>('sbtCache', slug, { clone: false });
       if (parsed && typeof parsed === 'object') {
         // Determine network key if available, else null
         const netId = this.props.network?.id || this.props.networkChainId;
@@ -1739,7 +1510,7 @@ class OnePageSession extends Component<any, any> {
               return out;
             };
             for (const s of slugsToCheck) {
-              const parsed = peekCacheSync('sbtCache', s, { clone: false });
+              const parsed = peekCacheSync<OnePageSbtCache>('sbtCache', s, { clone: false });
               if (!parsed || typeof parsed !== 'object') continue;
               for (const netKey of Object.keys(parsed)) {
                 const entry = parsed[netKey]?.sbtList?.[sbtKey];
@@ -2412,217 +2183,6 @@ class OnePageSession extends Component<any, any> {
     });
   }
 
-  renderTelegramQuestionsPanel() {
-    return (
-      <Suspense fallback={<LazyFallback label="Loading Telegram questions..." minHeight="20vh" />}>
-        <TelegramQuestionPile
-          activeIndex={this.state.telegramQuestionPileIndex}
-          canSubmit={envelopeAllowsSubmit(this.state.telegramClientEnvelope, this.state.telegramSessionMeta)}
-          disabledReason="Submitting from the client is not enabled for this deployment yet."
-          questions={this.state.telegramAgentQuestions || []}
-          status={this.state.telegramAgentQuestionsStatus}
-          submittedQuestionIds={this.state.telegramSubmittedQuestionIds}
-          submittingQuestionId={this.state.telegramSubmittingQuestionId}
-          submitError={this.state.telegramQuestionSubmitError}
-          onActiveIndexChange={(telegramQuestionPileIndex: number) => this.setState({ telegramQuestionPileIndex })}
-          onSubmitAnswer={this.handleTelegramQuestionSubmit}
-        />
-      </Suspense>
-    );
-  }
-
-  renderTelegramBucketsPanel() {
-    return (
-      <Suspense fallback={<LazyFallback label="Loading Telegram groups..." minHeight="20vh" />}>
-        <TelegramBucketCards
-          cards={loadTelegramGroups(this.state.telegramClientEnvelope)}
-          onReconnect={() => this.props.toggleLoginModal?.(true)}
-        />
-      </Suspense>
-    );
-  }
-
-  renderTelegramResultsPanel({
-    sessionName,
-    sessionHeader,
-    sessionInfo,
-    defaultTags,
-    displaySessionSlug,
-    contracts,
-    blockLimits,
-    networkChainId,
-  }: any) {
-    const resultsMode = this.state.resultsViewMode === 'debateAtlas' ? 'debateAtlas' : 'polis';
-    const polisDataset = this.state.telegramPolisDataset;
-    return (
-      <section className={styles.telegramListPanel} data-testid="ce-session-telegram-results">
-        <div className={styles.telegramListHeader}>
-          <span>Results</span>
-          <div className={styles.telegramTabs}>
-            <button
-              type="button"
-              className={`${styles.telegramTabButton} ${resultsMode === 'polis' ? styles.telegramTabButtonActive : ''}`}
-              aria-pressed={resultsMode === 'polis'}
-              onClick={() => this.setState({ resultsViewMode: 'polis' })}
-            >
-              Report
-            </button>
-            <button
-              type="button"
-              className={`${styles.telegramTabButton} ${resultsMode === 'debateAtlas' ? styles.telegramTabButtonActive : ''}`}
-              aria-pressed={resultsMode === 'debateAtlas'}
-              onClick={() => this.setState({ resultsViewMode: 'debateAtlas' })}
-            >
-              Debate Map
-            </button>
-          </div>
-        </div>
-        {this.state.telegramAgentResultsStatus === 'loading' ? (
-          <div className={styles.telegramListEmpty}>Loading results...</div>
-        ) : null}
-        {resultsMode === 'polis' && polisDataset ? (
-          <>
-            {polisDataset.synthesized ? (
-              <p className={styles.telegramReportApprox} data-testid="ce-session-telegram-report-approx">
-                Approximate report: raw participant vectors are not available yet, so this view synthesizes a deterministic aggregate dataset.
-              </p>
-            ) : null}
-            <Suspense fallback={<LazyFallback label="Loading Polis report..." minHeight="20vh" />}>
-              <PolisReport
-                onePageDemo={true}
-                miniMode={true}
-                account={this.props.account}
-                provider={this.props.provider}
-                network={this.props.network}
-                loginComplete={this.props.loginComplete}
-                questionResponses={polisDataset.aggregator}
-                disclaimersActive={this.state.disclaimersActive}
-                filterState={this.state.filterState}
-                sessionName={sessionName}
-                sessionHeader={sessionHeader}
-                sessionInfo={sessionInfo}
-                defaultTags={defaultTags}
-                isQuestionCacheReady={true}
-                isResponsesCacheReady={true}
-                questionScanProgress={this.props.questionScanProgress}
-                questionResponsesNonce={this.props.questionResponsesNonce}
-                sessionSlug={displaySessionSlug}
-                demoDataFirstLoad={false}
-                contracts={contracts}
-                blockLimits={blockLimits}
-                networkChainId={networkChainId}
-              />
-            </Suspense>
-          </>
-        ) : null}
-        {resultsMode === 'polis' && !polisDataset && this.state.telegramAgentResultsStatus !== 'loading' ? (
-          <div className={styles.telegramListEmpty}>No participant-visible results are available yet.</div>
-        ) : null}
-        {resultsMode === 'debateAtlas' ? (
-          <Suspense fallback={<LazyFallback label="Loading debate map prompt..." minHeight="20vh" />}>
-            <TelegramDebateMapPanel
-              questions={this.state.telegramAgentQuestions || []}
-              results={this.state.telegramAgentResults}
-            />
-          </Suspense>
-        ) : null}
-      </section>
-    );
-  }
-
-  renderTelegramSessionShell({
-    titleText,
-    sessionInfo,
-    sessionName,
-    sessionHeader,
-    defaultTags,
-    displaySessionSlug,
-    contracts,
-    blockLimits,
-    networkChainId,
-  }: any) {
-    const envelope = this.state.telegramClientEnvelope as AgentClientLoginEnvelope | null;
-    if (!envelope) {
-      return (
-        <div className={styles.onePageDemoContainer}>
-          <div className={styles.telegramOnlyShell}>
-            <div className={styles.telegramHeaderText}>
-              <h2 className={styles.telegramHeaderTitle}>{titleText}</h2>
-              {sessionInfo ? <p className={styles.telegramHeaderSubtitle}>{sessionInfo}</p> : null}
-            </div>
-            <Alert
-              color="info"
-              className={styles.telegramOnlyNotice}
-              data-testid={E2E_TESTIDS.SESSION_TELEGRAM_ONLY_NOTICE}
-              fade={false}
-            >
-              <strong>Telegram-first session</strong>
-              <span>
-                Sign in with a Context Engine agent token to view questions, groups, and participant-visible results in the web client.
-              </span>
-              <button
-                type="button"
-                className={styles.telegramPrimaryButton}
-                data-testid="ce-session-telegram-login-open"
-                onClick={() => this.props.toggleLoginModal?.(true)}
-              >
-                Log in with agent token
-              </button>
-            </Alert>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className={styles.onePageDemoContainer}>
-        <div className={styles.telegramShell}>
-          <header className={styles.telegramHeader}>
-            <div className={styles.telegramHeaderText}>
-              <h2 className={styles.telegramHeaderTitle}>{titleText}</h2>
-              {sessionInfo ? <p className={styles.telegramHeaderSubtitle}>{sessionInfo}</p> : null}
-            </div>
-            <button
-              type="button"
-              className={styles.telegramSecondaryButton}
-              onClick={() => this.loadTelegramAgentData(true)}
-              data-testid="ce-session-telegram-refresh"
-            >
-              <FontAwesomeIcon icon={faSyncAlt} />
-              <span>Refresh</span>
-            </button>
-          </header>
-          <div className={styles.telegramAuthBar}>
-            <span className={styles.telegramAuthIndicator}>Signed in from Telegram</span>
-            <button
-              type="button"
-              className={styles.telegramLogoutButton}
-              data-testid="ce-session-telegram-logout"
-              onClick={this.handleTelegramLogout}
-            >
-              <FontAwesomeIcon icon={faSignOutAlt} />
-              <span>Logout</span>
-            </button>
-          </div>
-          <div className={styles.telegramGrid}>
-            {this.renderTelegramQuestionsPanel()}
-            {this.renderTelegramBucketsPanel()}
-            {this.renderTelegramResultsPanel({
-              sessionName,
-              sessionHeader,
-              sessionInfo,
-              defaultTags,
-              displaySessionSlug,
-              contracts,
-              blockLimits,
-              networkChainId,
-            })}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   render() {
     bumpPerfCounter('renderCount');
     const {
@@ -2688,58 +2248,15 @@ class OnePageSession extends Component<any, any> {
       ? {
           ...resolvedSessionConfig,
           slug: embeddedGroupsSessionSlug,
-          autoFeatureSBTsBySessionSlug: true,
         }
       : resolvedSessionConfig;
-    const resultsViewMode = isDemoSlug ? this.state.resultsViewMode : 'polis';
-    const resultsViewOptions = [
-      { key: 'polis', label: 'Report', icon: '🧾' },
-      ...(isDemoSlug
-        ? [
-            { key: 'debateAtlas', label: 'Debate Map', icon: '🗺️' },
-            { key: 'analysis', label: 'Breakdown', icon: '📊' },
-            { key: 'riskMatrix', label: 'Risk Matrix', icon: '⚠️' },
-          ]
-        : []),
-    ];
-    const basePath = readPublicUrlBasePath();
-    const sectionsGridClassName = [styles.sectionsGrid, !isDemoSlug ? styles.sectionsGridTwoUp : '']
-      .filter(Boolean)
-      .join(' ');
-
     const fallbackSessionLabel = slug && String(slug).trim() ? String(slug).trim() : 'Session';
     const titleText = sessionName ? `${sessionName}` : fallbackSessionLabel;
-    const renderSectionHeading = (title: any, subtitle: any) => (
-      <span className={styles.sectionHeaderText}>
-        <span className={styles.sectionHeaderTitle}>{title}</span>
-        <span className={styles.sectionHeaderSubtitle}>{subtitle}</span>
-      </span>
-    );
-    const questionsSectionTitle = renderSectionHeading('Questions', 'Answer or Add');
-    const questionsSectionTooltip =
-      'Survey and question platform allowing detailed responses, advanced question formats, preference weighing, and group filtering.';
-    const documentsSectionTooltip =
-      'Allows the conversation to be enriched by data, and the formats can change per-session';
     const corpusViewerLoadState = this.state.corpusViewerLoadState || DEFAULT_CORPUS_VIEWER_LOAD_STATE;
-    const loadFullCorpusButtonLabel =
-      corpusViewerLoadState.loadButtonLabel || DEFAULT_CORPUS_VIEWER_LOAD_STATE.loadButtonLabel;
-    const disableLoadFullCorpusButton = !!corpusViewerLoadState.disableLoadButton;
-    const pileSubmitRailActive = !this.state.showQuestions && this.state.pileSubmitRailVisible;
-    const brandingSectionClassName = [
-      styles.brandingSection,
-      pileSubmitRailActive ? styles.brandingSectionWithPileSubmitRail : '',
-    ]
-      .filter(Boolean)
-      .join(' ');
-    const titleContainerClassName = [
-      styles.titleContainer,
-      pileSubmitRailActive ? styles.titleContainerWithPileSubmitRail : '',
-    ]
-      .filter(Boolean)
-      .join(' ');
     const isTelegramSession = isOnePageTelegramBackendMode({
       sessionConfig: resolvedSessionConfig,
-      probeResult: this.state.telegramSessionMeta,
+      telegramSessionMeta: this.state.telegramSessionMeta,
+      sessionSlug: displaySessionSlug,
     });
     const telegramLoginTarget = resolveAgentClientLoginIdentityTarget({
       sessionConfig: resolvedSessionConfig,

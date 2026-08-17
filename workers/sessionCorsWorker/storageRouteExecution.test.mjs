@@ -30,8 +30,6 @@ const CLOUDFLARE_WORKER_GATE_CONFIG = {
 };
 
 const fixedRandomBytes = () => Uint8Array.from({ length: 32 }, (_, index) => index + 1);
-
-const fixedRandomBytes = () => Uint8Array.from({ length: 32 }, (_, index) => index + 1);
 const fixedGetRandomValues = (target) => {
 	target.set(fixedRandomBytes());
 	return target;

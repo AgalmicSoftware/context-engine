@@ -33,7 +33,7 @@ const makeHost = (overrides = {}) => ({
   getSessionSlugHintFromSearch: jest.fn().mockReturnValue(null),
   getSessionTokenFromPath: jest.fn().mockReturnValue(''),
   isSbtListRoutePath: jest.fn().mockReturnValue(false),
-  isWorkerCanonicalSessionSlug: jest.fn().mockReturnValue(false),
+  shouldSuppressSbtScansForSessionSlug: jest.fn().mockReturnValue(false),
   ...overrides,
 });
 
@@ -359,7 +359,7 @@ describe('createSessionScanPolicy', () => {
 
   it('always skips chain scans and SBT listeners for worker-canonical sessions', () => {
     const host = makeHost({
-      isWorkerCanonicalSessionSlug: jest.fn((slug) => slug === 'worker-session'),
+      shouldSuppressSbtScansForSessionSlug: jest.fn((slug) => slug === 'worker-session'),
     });
     const policy = createSessionScanPolicy(host);
 

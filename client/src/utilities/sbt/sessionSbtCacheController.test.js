@@ -71,7 +71,7 @@ jest.mock('../session/mainSiteUtils', () => ({
   isForcedSbtSelectorDebugEnabled: jest.fn(() => false),
 }));
 
-jest.mock('../../components/MainSite/progressHelpers', () => ({
+jest.mock('../session/mainSiteProgressHelpers', () => ({
   __esModule: true,
   mapSbtWorkProgressToBlock: jest.fn(
     ({ baseFrom = 0, baseTo = 0, completedUnits = 0, totalUnits = 1, reserveTailBlocks = 0 }) => {
@@ -1330,6 +1330,82 @@ describe('createSessionSbtCacheController', () => {
       expect(host.writeFlag).toHaveBeenCalledWith('sbt:fullScanInProgress', 'alpha', false);
     });
 
+    it('does not advance the full-scan watermark when the fresh-cache path skips discovery', async () => {
+      const sbtAddress = '0x0000000000000000000000000000000000000f04';
+      const host = createMockHost({
+        currentPath: '/dashboard',
+        initialStorage: {
+          sbtCache: {
+            alpha: {
+              11155420: {
+                lastBlock: 35,
+                sbtList: {
+                  [sbtAddress.toLowerCase()]: {
+                    sbtAddress,
+                    sbtInfo: createCompleteSbtMetadata({
+                      name: 'Fresh Cached SBT',
+                      creationBlock: 10,
+                    }),
+                    blockNumber: 35,
+                    countsLoaded: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      const controller = createSessionSbtCacheController(host);
+
+      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValueOnce({ fromBlock: 10, toBlock: 40 });
+
+      await controller.initializeSbtCacheForGroup('alpha', { mode: 'full' });
+
+      const storedSbtCache = host.getStored('sbtCache', 'alpha');
+      expect(contractScripts.getSbtsCreated).not.toHaveBeenCalled();
+      expect(storedSbtCache[11155420]).toEqual(
+        expect.objectContaining({
+          lastBlock: 35,
+          sbtList: expect.objectContaining({
+            [sbtAddress.toLowerCase()]: expect.objectContaining({
+              sbtAddress,
+              blockNumber: 35,
+            }),
+          }),
+        }),
+      );
+      expect(host.getStateSnapshot()).toMatchObject({ isSBTCacheReady: true });
+    });
+
+    it('does not mark the global SBT cache ready when a full scan completes for a stale active slug', async () => {
+      let activeSlug = 'alpha';
+      const host = createMockHost({
+        currentPath: '/dashboard',
+        getActiveSessionSlug: jest.fn(() => activeSlug),
+        initialState: {
+          isSBTCacheReady: false,
+        },
+      });
+      const controller = createSessionSbtCacheController(host);
+
+      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValueOnce({ fromBlock: 10, toBlock: 12 });
+      contractScripts.getSbtsCreated.mockImplementationOnce(async () => {
+        activeSlug = 'beta';
+        return [];
+      });
+
+      await controller.initializeSbtCacheForGroup('alpha', { mode: 'full' });
+
+      expect(host.getStored('sbtCache', 'alpha')[11155420]).toEqual(
+        expect.objectContaining({
+          lastBlock: 12,
+          sbtList: {},
+        }),
+      );
+      expect(host.getStateSnapshot()).toMatchObject({ isSBTCacheReady: false });
+      expect(host.writeFlag).toHaveBeenCalledWith('sbt:fullScanInProgress', 'alpha', false);
+    });
+
     it('deduplicates concurrent light discovery calls for the same in-flight key', async () => {
       const host = createMockHost();
       const controller = createSessionSbtCacheController(host);
@@ -1672,22 +1748,16 @@ describe('createSessionSbtCacheController', () => {
         .mockReturnValueOnce(olderMetadata.promise)
         .mockResolvedValueOnce(createCompleteSbtMetadata({ name: 'Newer event SBT' }));
 
-      const olderRun = controller.onSbtActivityDetectedForGroup(
-        'alpha',
-        '0xOlderSbt',
-        '0xOlderHolder',
-        false,
-        10,
-        { blockNumber: 10, transactionIndex: 0, logIndex: 1 },
-      );
-      const newerRun = controller.onSbtActivityDetectedForGroup(
-        'alpha',
-        '0xNewerSbt',
-        '0xNewerHolder',
-        false,
-        11,
-        { blockNumber: 11, transactionIndex: 0, logIndex: 1 },
-      );
+      const olderRun = controller.onSbtActivityDetectedForGroup('alpha', '0xOlderSbt', '0xOlderHolder', false, 10, {
+        blockNumber: 10,
+        transactionIndex: 0,
+        logIndex: 1,
+      });
+      const newerRun = controller.onSbtActivityDetectedForGroup('alpha', '0xNewerSbt', '0xNewerHolder', false, 11, {
+        blockNumber: 11,
+        transactionIndex: 0,
+        logIndex: 1,
+      });
 
       await newerRun;
       olderMetadata.resolve(createCompleteSbtMetadata({ name: 'Older event SBT' }));

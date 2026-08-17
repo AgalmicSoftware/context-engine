@@ -117,6 +117,8 @@ describe('sessionWorkerConfigCache', () => {
     });
     expect(conflict).toMatchObject({
       status: 'conflict',
+      existingSessionIdHex: firstConfig.sessionId,
+      sessionIdHex: replacementConfig.sessionId,
       existingWorkerOrigin: 'https://first.example',
       workerOrigin: 'https://replacement.example',
     });
@@ -142,6 +144,70 @@ describe('sessionWorkerConfigCache', () => {
     expect(
       getWorkerCanonicalSessionBootstrap({ slug: firstConfig.slug, workerOrigin: firstConfig.corsWorkerUrl }),
     ).toBeNull();
+  });
+
+  it('requires an explicit TOFU re-pin before a different slug can reuse an authoritative session ID', () => {
+    const sharedSessionId = '0x11112222333344445555666677778888';
+    const workerOrigin = 'https://shared-id.example';
+    const firstConfig = {
+      slug: 'first-session',
+      sessionId: sharedSessionId,
+      corsWorkerUrl: workerOrigin,
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    };
+    const replacementConfig = {
+      ...firstConfig,
+      slug: 'replacement-session',
+    };
+    upsertWorkerCanonicalSessionBootstrap({
+      slug: firstConfig.slug,
+      sessionIdHex: firstConfig.sessionId,
+      workerOrigin,
+      config: firstConfig,
+    });
+    expect(
+      markWorkerCanonicalSessionBootstrapVerified({
+        slug: firstConfig.slug,
+        sessionIdHex: firstConfig.sessionId,
+        workerOrigin,
+      }),
+    ).toBe(true);
+
+    const conflict = upsertWorkerCanonicalSessionBootstrap({
+      slug: replacementConfig.slug,
+      sessionIdHex: replacementConfig.sessionId,
+      workerOrigin,
+      config: replacementConfig,
+    });
+
+    expect(conflict).toMatchObject({
+      status: 'conflict',
+      existingSessionIdHex: sharedSessionId,
+      sessionIdHex: sharedSessionId,
+      existingWorkerOrigin: workerOrigin,
+      workerOrigin,
+    });
+    expect(getVerifiedWorkerCanonicalSessionBootstrap({ slug: firstConfig.slug, workerOrigin })).toEqual(firstConfig);
+    expect(getWorkerCanonicalSessionBootstrap({ slug: replacementConfig.slug, workerOrigin })).toBeNull();
+    expect(readSessionWorkerConfigCache().bySession[`session:0:${sharedSessionId}`]).toMatchObject({
+      slug: firstConfig.slug,
+      canonicalConfig: firstConfig,
+    });
+
+    expect(
+      upsertWorkerCanonicalSessionBootstrap({
+        slug: replacementConfig.slug,
+        sessionIdHex: replacementConfig.sessionId,
+        workerOrigin,
+        config: replacementConfig,
+        allowRepin: true,
+      }).status,
+    ).toBe('cached');
+    expect(getWorkerCanonicalSessionBootstrap({ slug: firstConfig.slug, workerOrigin })).toBeNull();
+    expect(getWorkerCanonicalSessionBootstrap({ slug: replacementConfig.slug, workerOrigin })).toEqual(
+      replacementConfig,
+    );
+    expect(getVerifiedWorkerCanonicalSessionBootstrap({ slug: replacementConfig.slug, workerOrigin })).toBeNull();
   });
 
   it('returns an empty normalized store when no cache exists', () => {

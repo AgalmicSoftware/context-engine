@@ -7,10 +7,17 @@ import {
   normalizeChipotleCekHex,
   normalizeChipotleSbtAddresses,
   normalizeLitChipotleMetadataVersion,
-} from '../../client/src/utilities/crypto/litChipotlePolicy.js';
+} from './litChipotlePolicyCore.mjs';
+import {
+  resolveChainIdWithLegacyFallback,
+  toChainId,
+} from './chainIdNormalization.js';
 
 const DEFAULT_LIT_API_BASE = 'https://api.chipotle.litprotocol.com';
 const CHIPOTLE_API_PREFIX = '/core/v1';
+const APPROVED_LIT_CHIPOTLE_API_HOSTS = new Set(['api.chipotle.litprotocol.com']);
+const LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG = 'LIT_CHIPOTLE_ALLOW_LOCAL_API_BASE';
+const LEGACY_LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG = 'CE_LIT_CHIPOTLE_ALLOW_LOCAL_API_BASE';
 const DEFAULT_PAGE_NUMBER = 0;
 const DEFAULT_PAGE_SIZE = 100;
 const { getPathRpcUrl, getPublicRpcUrls } = rpcDefaults;
@@ -25,10 +32,6 @@ const toTrimmedString = (value) => (
 );
 
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
-const toChainId = (value) => {
-  const parsed = Number(value || 0);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
-};
 
 const normalizeChipotleRpcCandidateList = (value = []) => {
   const out = [];
@@ -54,15 +57,163 @@ const normalizeChipotleMembershipValue = (value = '') => (
   toTrimmedString(value).toLowerCase()
 );
 
-export const normalizeLitChipotleApiBase = (value) => {
-  const trimmed = toTrimmedString(value || DEFAULT_LIT_API_BASE).replace(/\/+$/, '');
-  if (!trimmed) return DEFAULT_LIT_API_BASE;
-  return trimmed.replace(/\/core\/v1$/i, '');
+const normalizeHostname = (value = '') => toTrimmedString(value)
+  .toLowerCase()
+  .replace(/^\[(.*)\]$/, '$1');
+
+const parseIpv4Octets = (hostname = '') => {
+  const normalized = normalizeHostname(hostname);
+  const parts = normalized.split('.');
+  if (parts.length !== 4 || parts.some((part) => !/^\d{1,3}$/.test(part))) return null;
+  const octets = parts.map((part) => Number(part));
+  return octets.every((octet) => Number.isInteger(octet) && octet >= 0 && octet <= 255)
+    ? octets
+    : null;
 };
 
-const buildChipotleUrl = (apiBase, path) => {
-  const normalizedBase = normalizeLitChipotleApiBase(apiBase);
-  const normalizedPath = `/${toTrimmedString(path).replace(/^\/+/, '')}`;
+const isPrivateOrLocalIpv4 = (octets = []) => {
+  const [a, b] = octets;
+  return (
+    a === 0 ||
+    a === 10 ||
+    a === 127 ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    (a === 198 && (b === 18 || b === 19)) ||
+    a >= 224
+  );
+};
+
+const isPrivateOrLocalIpv6 = (hostname = '') => {
+  const normalized = normalizeHostname(hostname);
+  if (!normalized.includes(':')) return false;
+  if (
+    normalized === '::' ||
+    normalized === '::1' ||
+    normalized === '0:0:0:0:0:0:0:1'
+  ) {
+    return true;
+  }
+  if (normalized.startsWith('::ffff:')) {
+    const embeddedIpv4 = parseIpv4Octets(normalized.slice('::ffff:'.length));
+    return embeddedIpv4 ? isPrivateOrLocalIpv4(embeddedIpv4) : true;
+  }
+  const firstHextetText = normalized.split(':').find(Boolean) || '0';
+  const firstHextet = Number.parseInt(firstHextetText, 16);
+  if (!Number.isFinite(firstHextet)) return true;
+  return (
+    (firstHextet & 0xfe00) === 0xfc00 ||
+    (firstHextet & 0xffc0) === 0xfe80 ||
+    (firstHextet & 0xff00) === 0xff00
+  );
+};
+
+const isPrivateOrLocalHostname = (hostname = '') => {
+  const normalized = normalizeHostname(hostname);
+  if (!normalized) return true;
+  if (
+    normalized === 'localhost' ||
+    normalized.endsWith('.localhost') ||
+    normalized.endsWith('.local')
+  ) {
+    return true;
+  }
+  const ipv4Octets = parseIpv4Octets(normalized);
+  if (ipv4Octets) return isPrivateOrLocalIpv4(ipv4Octets);
+  return isPrivateOrLocalIpv6(normalized);
+};
+
+const isApprovedLocalChipotleApiHost = (hostname = '') => {
+  const normalized = normalizeHostname(hostname);
+  const ipv4Octets = parseIpv4Octets(normalized);
+  return (
+    normalized === 'localhost' ||
+    normalized.endsWith('.localhost') ||
+    normalized === '::1' ||
+    normalized === '0:0:0:0:0:0:0:1' ||
+    (ipv4Octets && ipv4Octets[0] === 127)
+  );
+};
+
+const isTruthyFlag = (value) => ['1', 'true', 'yes', 'on'].includes(
+  toTrimmedString(value).toLowerCase()
+);
+
+export const isLitChipotleLocalApiBaseAllowed = (env = {}) => (
+  isTruthyFlag(env?.[LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG]) ||
+  isTruthyFlag(env?.[LEGACY_LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG])
+);
+
+export const normalizeLitChipotleApiBase = (value, {
+  allowLocalApiBase = false,
+} = {}) => {
+  const raw = toTrimmedString(value);
+  const candidate = raw || DEFAULT_LIT_API_BASE;
+  let parsed;
+  try {
+    parsed = new URL(candidate);
+  } catch {
+    throw new Error('Lit Chipotle API base URL is invalid.');
+  }
+
+  const hostname = normalizeHostname(parsed.hostname);
+  const isApprovedLocalHost = isApprovedLocalChipotleApiHost(hostname);
+  const localOverrideAllowed = allowLocalApiBase === true && isApprovedLocalHost;
+  const protocol = toTrimmedString(parsed.protocol).toLowerCase();
+  if (parsed.username || parsed.password) {
+    throw new Error('Lit Chipotle API base URL must not include credentials.');
+  }
+  if (protocol !== 'https:' && !(protocol === 'http:' && localOverrideAllowed)) {
+    throw new Error('Lit Chipotle API base URL must use HTTPS unless an approved local override is enabled.');
+  }
+  if (parsed.port && !localOverrideAllowed) {
+    throw new Error('Lit Chipotle API base URL must not include a custom port.');
+  }
+  if (isPrivateOrLocalHostname(hostname) && !localOverrideAllowed) {
+    throw new Error('Lit Chipotle API base URL must use an approved public host.');
+  }
+  if (!localOverrideAllowed && !APPROVED_LIT_CHIPOTLE_API_HOSTS.has(hostname)) {
+    throw new Error('Lit Chipotle API base URL host is not approved.');
+  }
+  if (isApprovedLocalHost && allowLocalApiBase !== true) {
+    throw new Error('Lit Chipotle API base URL local override is not enabled.');
+  }
+
+  const normalizedPath = parsed.pathname.replace(/\/+$/, '');
+  if (normalizedPath && normalizedPath.toLowerCase() !== CHIPOTLE_API_PREFIX) {
+    throw new Error(`Lit Chipotle API base URL path must be empty or ${CHIPOTLE_API_PREFIX}.`);
+  }
+  if (parsed.search || parsed.hash) {
+    throw new Error('Lit Chipotle API base URL must not include query or fragment.');
+  }
+
+  return parsed.origin.replace(/\/+$/, '');
+};
+
+const normalizeChipotleRequestPath = (path) => {
+  const raw = toTrimmedString(path);
+  if (!raw) return '/';
+  if (/^[a-z][a-z0-9+.-]*:/i.test(raw) || raw.startsWith('//') || raw.includes('\\')) {
+    throw new Error('Lit Chipotle request path must be relative.');
+  }
+  if (raw.includes('#')) {
+    throw new Error('Lit Chipotle request path must not include a fragment.');
+  }
+  const pathOnly = raw.split('?')[0];
+  if (
+    pathOnly.split('/').some((segment) => segment === '.' || segment === '..') ||
+    /%2e/i.test(pathOnly)
+  ) {
+    throw new Error('Lit Chipotle request path must stay under the Chipotle API prefix.');
+  }
+  return `/${raw.replace(/^\/+/, '')}`;
+};
+
+const buildChipotleUrl = (apiBase, path, { allowLocalApiBase = false } = {}) => {
+  const normalizedBase = normalizeLitChipotleApiBase(apiBase, { allowLocalApiBase });
+  const normalizedPath = normalizeChipotleRequestPath(path);
   return `${normalizedBase}${CHIPOTLE_API_PREFIX}${normalizedPath}`;
 };
 
@@ -91,8 +242,10 @@ export const fetchChipotleJson = async ({
   path = '',
   method = 'GET',
   body,
+  allowLocalApiBase = false,
   fetchImpl = globalThis.fetch,
 } = {}) => {
+  const requestUrl = buildChipotleUrl(apiBase, path, { allowLocalApiBase });
   if (typeof fetchImpl !== 'function') {
     throw new Error('Fetch unavailable for Chipotle request.');
   }
@@ -109,9 +262,10 @@ export const fetchChipotleJson = async ({
 
   let response;
   try {
-    response = await fetchImpl(buildChipotleUrl(apiBase, path), {
+    response = await fetchImpl(requestUrl, {
       method,
       headers,
+      redirect: 'error',
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     });
   } catch (error) {
@@ -137,6 +291,7 @@ export const resolveLitChipotleRuntime = ({
 } = {}) => {
   const litCredentials = isObj(config?.litCredentials) ? config.litCredentials : {};
   const requestBody = isObj(body) ? body : {};
+  const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
   const envApiKey = toTrimmedString(env?.LIT_USAGE_API_KEY || env?.LIT_ACCOUNT_API_KEY);
   const requestApiKey = toTrimmedString(requestBody.litUsageApiKey || requestBody.apiKey);
   const secretApiKey = toTrimmedString(secrets?.litUsageApiKey);
@@ -151,8 +306,10 @@ export const resolveLitChipotleRuntime = ({
       requestBody.litApiBase ||
       litCredentials.litApiBase ||
       env?.LIT_API_BASE ||
-      DEFAULT_LIT_API_BASE
+      DEFAULT_LIT_API_BASE,
+      { allowLocalApiBase }
     ),
+    allowLocalApiBase,
     litUsageApiKey,
     apiKeySource,
     litGroupId: toTrimmedString(requestBody.litGroupId || litCredentials.litGroupId),
@@ -171,6 +328,7 @@ export const resolveLitChipotleProvisioningRuntime = ({
 } = {}) => {
   const litCredentials = isObj(config?.litCredentials) ? config.litCredentials : {};
   const requestBody = isObj(body) ? body : {};
+  const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
   const secretManagementApiKey = toTrimmedString(secrets?.litAccountApiKey);
   const envManagementApiKey = toTrimmedString(env?.LIT_ACCOUNT_API_KEY || env?.LIT_USAGE_API_KEY);
   const litManagementApiKey = secretManagementApiKey || envManagementApiKey;
@@ -186,8 +344,10 @@ export const resolveLitChipotleProvisioningRuntime = ({
       requestBody.litApiBase ||
       litCredentials.litApiBase ||
       env?.LIT_API_BASE ||
-      DEFAULT_LIT_API_BASE
+      DEFAULT_LIT_API_BASE,
+      { allowLocalApiBase }
     ),
+    allowLocalApiBase,
     litManagementApiKey,
     apiKeySource,
     litGroupId: resolvedGroupSelector,
@@ -219,11 +379,14 @@ const buildPagedPath = (path, params = {}) => {
   return serialized ? `${path}?${serialized}` : path;
 };
 
+const runtimeAllowsLocalApiBase = (runtime = {}) => runtime?.allowLocalApiBase === true;
+
 const listGroupWallets = async ({ runtime, fetchImpl } = {}) => {
   if (!toTrimmedString(runtime?.litGroupId)) return [];
   const response = await fetchChipotleJson({
     apiBase: runtime.litApiBase,
     apiKey: runtime.litUsageApiKey,
+    allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
     path: buildPagedPath('/list_wallets_in_group', {
       group_id: runtime.litGroupId,
       page_number: DEFAULT_PAGE_NUMBER,
@@ -245,6 +408,7 @@ const listActions = async ({ runtime, fetchImpl, groupId } = {}) => {
   const response = await fetchChipotleJson({
     apiBase: runtime.litApiBase,
     apiKey: runtime.litUsageApiKey || runtime.litManagementApiKey,
+    allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
     path: buildPagedPath('/list_actions', {
       ...(resolvedGroupId ? { group_id: resolvedGroupId } : {}),
       page_number: DEFAULT_PAGE_NUMBER,
@@ -264,6 +428,7 @@ const listGroups = async ({ runtime, fetchImpl } = {}) => {
   const response = await fetchChipotleJson({
     apiBase: runtime.litApiBase,
     apiKey: runtime.litManagementApiKey,
+    allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
     path: buildPagedPath('/list_groups', {
       page_number: DEFAULT_PAGE_NUMBER,
       page_size: DEFAULT_PAGE_SIZE,
@@ -277,6 +442,7 @@ const listWallets = async ({ runtime, fetchImpl } = {}) => {
   const response = await fetchChipotleJson({
     apiBase: runtime.litApiBase,
     apiKey: runtime.litManagementApiKey,
+    allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
     path: buildPagedPath('/list_wallets', {
       page_number: DEFAULT_PAGE_NUMBER,
       page_size: DEFAULT_PAGE_SIZE,
@@ -319,6 +485,7 @@ export const readLitChipotleStatus = async ({
   const balance = await fetchChipotleJson({
     apiBase: runtime.litApiBase,
     apiKey: runtime.litUsageApiKey,
+    allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
     path: '/billing/balance',
     fetchImpl,
   }).catch((error) => {
@@ -328,6 +495,7 @@ export const readLitChipotleStatus = async ({
 
   const clientConfig = await fetchChipotleJson({
     apiBase: runtime.litApiBase,
+    allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
     path: '/get_lit_action_client_config',
     fetchImpl,
   }).catch((error) => {
@@ -390,6 +558,7 @@ const deriveLitActionCid = async ({ runtime = {}, actionCode = '', fetchImpl = g
   if (!normalizedCode) throw new Error('Lit Action code is required.');
   return toTrimmedString(await fetchChipotleJson({
     apiBase: runtime.litApiBase,
+    allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
     path: '/get_lit_action_ipfs_id',
     method: 'POST',
     body: normalizedCode,
@@ -410,24 +579,7 @@ const normalizeGateMode = (value) => (
   toTrimmedString(value).toLowerCase() === 'all' ? 'all' : 'any'
 );
 
-const isPrivateHostname = (hostname = '') => {
-  const normalized = toTrimmedString(hostname).toLowerCase();
-  if (!normalized) return true;
-  if (
-    normalized === 'localhost' ||
-    normalized === '0.0.0.0' ||
-    normalized === '127.0.0.1' ||
-    normalized === '::1' ||
-    normalized.endsWith('.local')
-  ) {
-    return true;
-  }
-  if (/^10\./.test(normalized)) return true;
-  if (/^192\.168\./.test(normalized)) return true;
-  if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(normalized)) return true;
-  if (/^169\.254\./.test(normalized)) return true;
-  return false;
-};
+const isPrivateHostname = isPrivateOrLocalHostname;
 
 const validateChipotleRpcUrl = (value = '') => {
   const raw = toTrimmedString(value);
@@ -562,6 +714,7 @@ const buildSessionBootstrapMetadata = ({
 
 const createLitChipotleAccount = async ({
   apiBase = DEFAULT_LIT_API_BASE,
+  allowLocalApiBase = false,
   request = {},
   sessionSlug = '',
   fetchImpl = globalThis.fetch,
@@ -570,6 +723,7 @@ const createLitChipotleAccount = async ({
   const requestBody = isObj(request) ? request : {};
   const response = await fetchChipotleJson({
     apiBase,
+    allowLocalApiBase,
     path: '/new_account',
     method: 'POST',
     body: {
@@ -596,6 +750,7 @@ const createLitChipotleGroup = async ({
   const response = await fetchChipotleJson({
     apiBase: runtime.litApiBase,
     apiKey: runtime.litManagementApiKey,
+    allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
     path: '/add_group',
     method: 'POST',
     body: {
@@ -619,6 +774,7 @@ const createLitChipotleWallet = async ({
   const response = await fetchChipotleJson({
     apiBase: runtime.litApiBase,
     apiKey: runtime.litManagementApiKey,
+    allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
     path: '/create_wallet',
     fetchImpl,
   });
@@ -649,6 +805,7 @@ const createLitChipotleUsageKey = async ({
   const response = await fetchChipotleJson({
     apiBase: runtime.litApiBase,
     apiKey: runtime.litManagementApiKey,
+    allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
     path: '/add_usage_api_key',
     method: 'POST',
     body: {
@@ -673,10 +830,12 @@ const createLitChipotleUsageKey = async ({
 const readChipotleBillingBalance = async ({
   apiBase = DEFAULT_LIT_API_BASE,
   apiKey = '',
+  allowLocalApiBase = false,
   fetchImpl = globalThis.fetch,
 } = {}) => fetchChipotleJson({
   apiBase,
   apiKey,
+  allowLocalApiBase,
   path: '/billing/balance',
   fetchImpl,
 }).catch(() => null);
@@ -709,6 +868,7 @@ const ensureActionMetadata = async ({ runtime = {}, litActionCid = '', actionNam
   const response = await fetchChipotleJson({
     apiBase: runtime.litApiBase,
     apiKey: runtime.litManagementApiKey,
+    allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
     path: '/add_action',
     method: 'POST',
     body: {
@@ -741,6 +901,7 @@ const ensureActionInGroup = async ({ runtime = {}, groupId = '', litActionCid = 
   const response = await fetchChipotleJson({
     apiBase: runtime.litApiBase,
     apiKey: runtime.litManagementApiKey,
+    allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
     path: '/add_action_to_group',
     method: 'POST',
     body: {
@@ -778,6 +939,7 @@ const ensurePkpInGroup = async ({ runtime = {}, groupId = '', fetchImpl = global
   const response = await fetchChipotleJson({
     apiBase: runtime.litApiBase,
     apiKey: runtime.litManagementApiKey,
+    allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
     path: '/add_pkp_to_group',
     method: 'POST',
     body: {
@@ -870,11 +1032,13 @@ export const bootstrapLitChipotleSession = async ({
   const existingGroupId = toTrimmedString(litCredentials?.litGroupId);
   const existingPkpId = toTrimmedString(litCredentials?.litPkpId);
   const existingActionCid = toTrimmedString(litCredentials?.litActionCid);
+  const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
   const litApiBase = normalizeLitChipotleApiBase(
     requestBody.litApiBase ||
     litCredentials.litApiBase ||
     env?.LIT_API_BASE ||
-    DEFAULT_LIT_API_BASE
+    DEFAULT_LIT_API_BASE,
+    { allowLocalApiBase }
   );
 
   if (
@@ -923,6 +1087,7 @@ export const bootstrapLitChipotleSession = async ({
   if (existingAccountApiKey) {
     const runtime = {
       litApiBase,
+      allowLocalApiBase,
       litManagementApiKey: existingAccountApiKey,
       apiKeySource: existingAccountApiKeySource,
     };
@@ -1005,6 +1170,7 @@ export const bootstrapLitChipotleSession = async ({
     const billingBalance = await readChipotleBillingBalance({
       apiBase: litApiBase,
       apiKey: existingAccountApiKey,
+      allowLocalApiBase,
       fetchImpl,
     });
 
@@ -1044,6 +1210,7 @@ export const bootstrapLitChipotleSession = async ({
 
   const account = await createLitChipotleAccount({
     apiBase: litApiBase,
+    allowLocalApiBase,
     request: requestBody,
     sessionSlug,
     fetchImpl,
@@ -1054,6 +1221,7 @@ export const bootstrapLitChipotleSession = async ({
 
   const runtime = {
     litApiBase,
+    allowLocalApiBase,
     litManagementApiKey: account.accountApiKey,
     apiKeySource: 'bootstrap-account',
   };
@@ -1115,6 +1283,7 @@ export const bootstrapLitChipotleSession = async ({
   const billingBalance = await readChipotleBillingBalance({
     apiBase: litApiBase,
     apiKey: account.accountApiKey,
+    allowLocalApiBase,
     fetchImpl,
   });
 
@@ -1182,6 +1351,7 @@ export const executeLitChipotleAction = async ({
     response = await fetchChipotleJson({
       apiBase: runtime.litApiBase,
       apiKey: runtime.litUsageApiKey,
+      allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
       path: '/lit_action',
       method: 'POST',
       body: payload,
@@ -1252,11 +1422,15 @@ export const executeSessionLitChipotleAction = async ({
   }
 
   const gateMode = normalizeGateMode(requestBody.gateMode);
-  const gateChainId = toChainId(
-    requestBody.chainId ||
-    requestBody.gateChainId ||
-    config?.networkChainId ||
-    config?.registryChainId
+  const gateChainId = resolveChainIdWithLegacyFallback(
+    requestBody.chainId,
+    resolveChainIdWithLegacyFallback(
+      requestBody.gateChainId,
+      resolveChainIdWithLegacyFallback(
+        config?.networkChainId,
+        resolveChainIdWithLegacyFallback(config?.registryChainId, 0),
+      ),
+    ),
   );
   if (!gateChainId) {
     throw new Error('Lit Chipotle requires a gate chain ID.');

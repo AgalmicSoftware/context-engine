@@ -22,6 +22,9 @@ const findDemoSessionConfigBySlug = (slugIn: unknown = ''): SessionConfigLike | 
       .trim()
       .toLowerCase() === 'demo'
   ) {
+    const primaryDemoSlug = canonicalizeSessionSlug(getPrimaryDemoSessionSlug());
+    const primaryDemoConfig = DEMO_SESSION_MAP[primaryDemoSlug];
+    if (isObj(primaryDemoConfig)) return primaryDemoConfig;
     return isObj(DEMO_SESSION_MAP.general) ? DEMO_SESSION_MAP.general : null;
   }
 

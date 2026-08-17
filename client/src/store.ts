@@ -3,6 +3,7 @@ import type { PreloadedState } from 'redux';
 // import { persistReducer, persistStore } from 'redux-persist';
 import thunk from 'redux-thunk';
 import rootReducer from './reducers';
+import type { RootState } from './reducers';
 import { composeWithOptionalDevTools } from './utilities/state/composeEnhancers.js';
 // import storage from 'redux-persist/lib/storage';
 

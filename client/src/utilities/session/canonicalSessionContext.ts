@@ -184,9 +184,8 @@ const resolveValidatedWorkerCanonicalConfig = (source: unknown): UnknownRecord |
   // to worker KV only after the discovery boundary supplies this validated wrapper.
   if (!isObj(source) || source.validated !== true || source.source !== AUTHORITY_SOURCES.WORKER_KV) return null;
   const config = isObj(source.config) ? source.config : null;
-  const profile = config && isObj(config.sessionModeProfile) ? config.sessionModeProfile : null;
-  const authority = profile && isObj(profile.authority) ? profile.authority : null;
-  return config && authority?.mode === 'worker_canonical' ? config : null;
+  const projection = resolveSessionCapabilityProjection(config);
+  return config && projection.profileValid && projection.isWorkerCanonical ? config : null;
 };
 const buildWorkerCanonicalIdentityInput = (config: unknown): UnknownRecord => {
   const source = isObj(config) ? config : {};

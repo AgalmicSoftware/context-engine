@@ -77,7 +77,40 @@ const PAYLOAD_ACCESS_MODES = Object.freeze({
   WORKER_SBT_GATE: 'worker_sbt_gate',
   LIT_ENCRYPTED: 'lit_encrypted',
 });
+const PAYLOAD_ACCESS_GATES = Object.freeze({
+  NONE: 'none',
+  SBT_GATE: 'sbt_gate',
+  GROUP_GATE: 'group_gate',
+  ROLE_GATE: 'role_gate',
+});
+const PAYLOAD_ENCRYPTION_MODES = Object.freeze({
+  NONE: 'none',
+  WORKER_ENVELOPE: 'worker_envelope',
+  LIT: 'lit',
+});
+const STORAGE_ENVELOPE_KEK_SECRET_NAME = 'CE_STORAGE_ENVELOPE_KEK';
+const DEPLOYMENT_ID_BINDING_NAME = 'CE_DEPLOYMENT_ID';
+const DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME = 'CE_DEPLOYMENT_REQUEST_DIGEST';
+const BUNDLE_SHA256_BINDING_NAME = 'CE_BUNDLE_SHA256';
+const SESSION_COORDINATOR_BINDING_NAME = 'CE_SESSION_COORDINATOR';
+const SESSION_COORDINATOR_CLASS_NAME = 'SessionWriteCoordinator';
+const SESSION_COORDINATOR_MIGRATION_TAG = 'ce-session-write-coordinator-v1';
 const R2_BUCKET_NAME_RE = /^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/;
+const ALLOWED_WORKER_AUTHORITY_SCOPES = new Set([
+  'ai',
+  'transcribe',
+  'storage',
+  'groups',
+  'arweave',
+  'faucet',
+  'fetch',
+  'lit',
+]);
+const DEFAULT_WORKER_CANONICAL_AUTHORITY = Object.freeze({
+  version: 1,
+  participantScopes: Object.freeze(['ai', 'transcribe', 'storage', 'groups', 'fetch']),
+  anonymousScopes: Object.freeze([]),
+});
 
 export const toStr = (val) => (typeof val === 'string' ? val : val == null ? '' : String(val));
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -758,6 +791,93 @@ const normalizePayloadAccessMode = (value) => {
   return PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE;
 };
 
+const normalizePayloadAccessGate = (value, fallback = PAYLOAD_ACCESS_GATES.SBT_GATE) => {
+  const normalized = toStr(value).trim().toLowerCase().replace(/-/g, '_');
+  if (!normalized) return fallback;
+  if (normalized === 'none' || normalized === 'public' || normalized === PAYLOAD_ACCESS_MODES.PUBLIC_READ) {
+    return PAYLOAD_ACCESS_GATES.NONE;
+  }
+  if (
+    normalized === 'sbt' ||
+    normalized === 'sbt_gate' ||
+    normalized === 'worker_sbt' ||
+    normalized === PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE
+  ) {
+    return PAYLOAD_ACCESS_GATES.SBT_GATE;
+  }
+  if (normalized === 'group' || normalized === 'group_gate' || normalized === 'worker_group') {
+    return PAYLOAD_ACCESS_GATES.GROUP_GATE;
+  }
+  if (normalized === 'role' || normalized === 'role_gate' || normalized === 'worker_role') {
+    return PAYLOAD_ACCESS_GATES.ROLE_GATE;
+  }
+  return fallback;
+};
+
+const normalizePayloadEncryptionMode = (value, fallback = PAYLOAD_ENCRYPTION_MODES.NONE) => {
+  const raw = isObj(value) ? value.mode : value;
+  const normalized = toStr(raw).trim().toLowerCase().replace(/-/g, '_');
+  if (!normalized) return fallback;
+  if (normalized === 'none' || normalized === 'plain' || normalized === 'plaintext') {
+    return PAYLOAD_ENCRYPTION_MODES.NONE;
+  }
+  if (normalized === 'worker_envelope' || normalized === 'cloudflare_envelope') {
+    return PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE;
+  }
+  if (normalized === 'lit' || normalized === PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED) {
+    return PAYLOAD_ENCRYPTION_MODES.LIT;
+  }
+  return fallback;
+};
+
+const deriveLegacyPayloadAccessMode = ({ gate, encryption }) => {
+  if (encryption === PAYLOAD_ENCRYPTION_MODES.LIT) return PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED;
+  if (gate === PAYLOAD_ACCESS_GATES.NONE) return PAYLOAD_ACCESS_MODES.PUBLIC_READ;
+  return PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE;
+};
+
+const cloneAccessConditions = (source) => {
+  const conditions = isObj(source?.accessConditions)
+    ? source.accessConditions
+    : (isObj(source?.conditions) ? source.conditions : null);
+  return conditions ? JSON.parse(JSON.stringify(conditions)) : null;
+};
+
+const normalizePayloadAccessControl = (raw) => {
+  const rawRecord = isObj(raw) ? raw : {};
+  const rawAccess = isObj(rawRecord.payloadAccessControl) ? rawRecord.payloadAccessControl : {};
+  const rawCloudflare = isObj(rawRecord.cloudflare) ? rawRecord.cloudflare : {};
+  const legacyMode = normalizePayloadAccessMode(
+    rawAccess.mode ||
+    rawCloudflare.payloadAccessMode ||
+    rawRecord.payloadAccessMode ||
+    rawRecord.accessControlMode
+  );
+  const fallbackGate = (
+    legacyMode === PAYLOAD_ACCESS_MODES.PUBLIC_READ ||
+    legacyMode === PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED
+  )
+    ? PAYLOAD_ACCESS_GATES.NONE
+    : PAYLOAD_ACCESS_GATES.SBT_GATE;
+  const fallbackEncryption = legacyMode === PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED
+    ? PAYLOAD_ENCRYPTION_MODES.LIT
+    : PAYLOAD_ENCRYPTION_MODES.NONE;
+  const directV2 = (
+    Object.prototype.hasOwnProperty.call(rawRecord, 'gate') ||
+    Object.prototype.hasOwnProperty.call(rawRecord, 'encryption')
+  );
+  const source = directV2 ? rawRecord : rawAccess;
+  const gate = normalizePayloadAccessGate(isObj(source) ? source.gate : undefined, fallbackGate);
+  const encryption = normalizePayloadEncryptionMode(isObj(source) ? source.encryption : undefined, fallbackEncryption);
+  const accessConditions = cloneAccessConditions(source);
+  return {
+    gate,
+    encryption,
+    mode: deriveLegacyPayloadAccessMode({ gate, encryption }),
+    ...(accessConditions ? { accessConditions } : {}),
+  };
+};
+
 const normalizeStorageProfileInput = (incoming) => {
   if (incoming == null) return null;
   if (isObj(incoming)) return incoming;
@@ -804,29 +924,31 @@ export const normalizeDeployStorageProfile = (incoming) => {
   };
   if (backend !== STORAGE_BACKENDS.CLOUDFLARE) return profile;
 
-  const rawCloudflare = isObj(raw.cloudflare) ? raw.cloudflare : {};
-  const rawAccess = isObj(raw.payloadAccessControl) ? raw.payloadAccessControl : {};
-  const accessMode = normalizePayloadAccessMode(
-    rawAccess.mode ||
-    rawCloudflare.payloadAccessMode ||
-    raw.payloadAccessMode ||
-    raw.accessControlMode
-  );
+  const accessControl = normalizePayloadAccessControl(raw);
+  const accessMode = accessControl.mode;
   const litEncrypted = accessMode === PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED;
+  const workerEnvelope = accessControl.encryption === PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE;
   const publicRead = accessMode === PAYLOAD_ACCESS_MODES.PUBLIC_READ;
   profile.payloadAccessControl = {
+    gate: accessControl.gate,
+    encryption: accessControl.encryption,
     mode: accessMode,
     enforcement: litEncrypted
       ? 'lit_access_control_conditions'
-      : (publicRead ? 'session_worker_public_read' : 'session_worker_sbt_gate'),
+      : (workerEnvelope
+        ? 'session_worker_envelope_conditions'
+        : (publicRead ? 'session_worker_public_read' : 'session_worker_sbt_gate')),
     litRequired: litEncrypted,
     label: litEncrypted
       ? 'Lit-encrypted Cloudflare payloads'
-      : (publicRead ? 'Public-read Cloudflare payloads' : 'Worker-enforced SBT access control'),
+      : (workerEnvelope
+        ? 'Worker-envelope encrypted Cloudflare payloads'
+        : (publicRead ? 'Public-read Cloudflare payloads' : 'Worker-enforced SBT access control')),
     resources: {
       ...DEFAULT_PAYLOAD_ACCESS_RESOURCES,
-      ...(isObj(rawAccess.resources) ? rawAccess.resources : {}),
+      ...(isObj(raw.payloadAccessControl?.resources) ? raw.payloadAccessControl.resources : {}),
     },
+    ...(accessControl.accessConditions ? { accessConditions: accessControl.accessConditions } : {}),
   };
   profile.sbtGatedAccess = {
     ...profile.sbtGatedAccess,
@@ -1347,6 +1469,7 @@ const executeDeployHelperRequestCore = async ({
     cfFetchOptions,
   );
   const workerNameConfirmedAbsent = !workerNamePreflight.ok && Number(workerNamePreflight.status || 0) === 404;
+  const mayResumeExistingWorker = workerNamePreflight.ok && !!toStr(idempotencyContext?.requestMarker).trim();
   // A non-404 lookup failure cannot distinguish an available name from a live
   // worker, so every deploy mode fails closed before provisioning resources.
   if (!workerNamePreflight.ok && !workerNameConfirmedAbsent) {
@@ -1361,9 +1484,9 @@ const executeDeployHelperRequestCore = async ({
   // namespace may contain auth markers, groups, storage indexes, and wrapped
   // envelope keys that are not part of this deploy request. Require a fresh
   // script name until an explicit state-migration workflow exists.
-  if (workerNamePreflight.ok) {
+  if (workerNamePreflight.ok && !mayResumeExistingWorker) {
     return buildFailure(409, {
-      error: `Worker name "${workerName}" already exists. In-place redeploy is disabled to protect existing worker state. Choose a new worker name before retrying.`,
+      error: `Generated worker name "${workerName}" already exists. In-place redeploy is disabled to protect existing worker state. Retry to allocate a new physical worker name.`,
     });
   }
   // Resolve the account workers.dev hostname before staging config. The URL is
@@ -1450,6 +1573,11 @@ const executeDeployHelperRequestCore = async ({
   const config = {
     slug: sessionSlug,
     authzEpoch: 1,
+    workerGroupsBootstrap: {
+      version: 2,
+      state: 'fresh_empty',
+      bootstrapId: deploymentId,
+    },
     adminAddress,
     allowOrigins,
     limits,
@@ -1470,6 +1598,9 @@ const executeDeployHelperRequestCore = async ({
     ...selectDeployWorkerSessionConfigFields(body),
     groupCreationPolicy,
   };
+  if (workerCanonicalRequested) {
+    config.workerAuthority = workerCanonicalAuthority.value;
+  }
   if (storageProfile) {
     config.storageProfile = storageProfile;
   }
@@ -1804,27 +1935,19 @@ const executeDeployHelperRequestCore = async ({
       : { kvNamespaceId: kvId, kvCleanupStatus: 'delete-failed' };
   };
 
-  // Establish the signed admin binding before the runnable script can ever be
-  // attached to this namespace. Otherwise a redeployed workers.dev hostname
-  // has a first-write interval where an unrelated signer can claim the slug.
-  const configPut = await putFreshKvNamespaceValue({
-    apiToken,
-    path: `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionConfigKey}`,
-    options: {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(config),
-    },
-    cfFetchOptions,
-  });
-  if (!configPut.ok) {
-    const orphanKv = await cleanupStagedKv();
-    return buildFailure(502, {
-      error: configPut.error,
-      detail: configPut.detail,
-      orphanResources: { ...orphanKv, workerName: '' },
-    }, {
-      fallbackEligible: shouldAllowFallbackForCloudflareFailure(configPut),
+  if (!resumeUploadedWorker && idempotencyContext?.definitiveUploadRejected !== true) {
+    // Establish the signed admin binding before the runnable script can ever be
+    // attached to this namespace. Otherwise a redeployed workers.dev hostname
+    // has a first-write interval where an unrelated signer can claim the slug.
+    const configPut = await putFreshKvNamespaceValue({
+      apiToken,
+      path: `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionConfigKey}`,
+      options: {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config),
+      },
+      cfFetchOptions,
     });
     if (!configPut.ok) {
       const orphanKv = await cleanupStagedKv();
@@ -1896,19 +2019,28 @@ const executeDeployHelperRequestCore = async ({
     compatibility_date: toStr(env?.WORKER_COMPATIBILITY_DATE || DEFAULT_COMPAT_DATE),
     compatibility_flags: ['nodejs_compat'],
   };
-  const cleanupDeploymentResources = async () => {
-    let removableWorkerName = '';
-    let workerCleanupStatus = '';
-    const cleanupWorkerIfOwned = async () => {
-      const settingsResp = await cfFetch(
+  const readWorkerSettingsAfterUpload = async () => {
+    let settingsResp = null;
+    // Settings can briefly lag an accepted upload. Re-read before classifying
+    // ownership, but never reinterpret a persistent 404 as proof that an
+    // upload attempt had no effect.
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      settingsResp = await cfFetch(
         apiToken,
         `/accounts/${accountId}/workers/scripts/${workerName}/settings`,
         { method: 'GET' },
         cfFetchOptions,
       );
-      if (!settingsResp.ok) {
-        if (Number(settingsResp.status || 0) === 404) return true;
-        workerCleanupStatus = 'ownership-unverified';
+      if (settingsResp.ok) break;
+    }
+    return settingsResp;
+  };
+  const cleanupDeploymentResources = async () => {
+    let removableWorkerName = workerName;
+    let workerCleanupStatus = '';
+    const cleanupWorkerIfOwned = async () => {
+      if (!uploadedWorkerThisInvocation) {
+        workerCleanupStatus = 'retained-pre-existing';
         return false;
       }
       const settingsResp = await readWorkerSettingsAfterUpload();
@@ -1928,10 +2060,12 @@ const executeDeployHelperRequestCore = async ({
         cfFetchOptions,
       );
       if (!scriptCleanup.ok) {
-        removableWorkerName = workerName;
-        workerCleanupStatus = 'owned-delete-failed';
+        workerCleanupStatus = isAmbiguousCloudflareMutationFailure(scriptCleanup)
+          ? 'owned-delete-failed'
+          : 'owned-delete-rejected';
         return false;
       }
+      removableWorkerName = '';
       return true;
     };
     // The uploaded script may have been applied even when Cloudflare's response
@@ -1943,6 +2077,14 @@ const executeDeployHelperRequestCore = async ({
       return {
         kvNamespaceId: kvId,
         kvCleanupStatus: 'retained-live-worker',
+        workerName: removableWorkerName,
+        ...(workerCleanupStatus ? { workerCleanupStatus } : {}),
+      };
+    }
+    if (!createdKvThisInvocation) {
+      return {
+        kvNamespaceId: kvId,
+        kvCleanupStatus: 'retained-pre-existing',
         workerName: removableWorkerName,
         ...(workerCleanupStatus ? { workerCleanupStatus } : {}),
       };
@@ -1982,19 +2124,166 @@ const executeDeployHelperRequestCore = async ({
   };
 
   const scriptUploadPath = `/accounts/${accountId}/workers/scripts/${workerName}`;
-  const scriptUpload = await cfFetch(apiToken, scriptUploadPath, {
-    method: 'PUT',
-    body: form,
-  }, cfFetchOptions);
-  if (!scriptUpload.ok) {
-    consoleImpl?.error?.('[deploy-helper] script upload failed', JSON.stringify({
-      workerName,
-      sessionSlug: displaySlug,
-      error: scriptUpload.error,
-      detail: scriptUpload.detail,
-      diagnostics: bundleDiagnostics,
-    }));
-    const bundleSummary = formatBundleDiagnostics(bundleDiagnostics);
+  if (!resumeUploadedWorker) {
+    // Recheck the allocated physical name after staging KV. Legacy random names
+    // guard caller-prefix collisions; stable request names intentionally converge
+    // and must retain their request-marked namespace if another call advances first.
+    const finalWorkerNamePreflight = await cfFetch(
+      apiToken,
+      `/accounts/${accountId}/workers/scripts/${workerName}/settings`,
+      { method: 'GET' },
+      cfFetchOptions,
+    );
+    if (finalWorkerNamePreflight.ok) {
+      if (requestMarker && idempotencyContext?.definitiveUploadRejected === true) {
+        if (!workerSettingsMatchDeployment(finalWorkerNamePreflight, kvId, { ignoreBundleIdentity: true })) {
+          return buildDeploymentFailure(409, {
+            error: 'Existing worker does not match this deployment request; required bindings differ and resume stopped.',
+            deploymentRequestPending: true,
+            orphanResources: {
+              kvNamespaceId: kvId,
+              kvCleanupStatus: 'retained-upload-pending',
+              workerName,
+              workerCleanupStatus: 'ownership-changed',
+            },
+          });
+        }
+        if (readWorkerBundleSha256(finalWorkerNamePreflight) === bundleDiagnostics.sha256) {
+          resumeUploadedWorker = true;
+        } else {
+          replaceRejectedWorker = true;
+        }
+      } else if (requestMarker) {
+        return buildDeploymentFailure(503, {
+          error: 'This deployment request is already advancing in another invocation. Retry the same request ID.',
+          deploymentRequestPending: true,
+          orphanResources: {
+            kvNamespaceId: kvId,
+            kvCleanupStatus: 'retained-live-worker',
+            workerName,
+          },
+        });
+      } else {
+        const orphanKv = await cleanupStagedKv();
+        return buildDeploymentFailure(409, {
+          error: `Generated worker name "${workerName}" became unavailable during deployment. No script was uploaded; retry to allocate a new physical worker name.`,
+          orphanResources: { ...orphanKv, workerName: '' },
+        });
+      }
+    }
+    if (!finalWorkerNamePreflight.ok && Number(finalWorkerNamePreflight.status || 0) !== 404) {
+      const orphanKv = await cleanupStagedKv();
+      return buildDeploymentFailure(502, {
+        error: finalWorkerNamePreflight.error || 'Failed to re-verify worker-name availability.',
+        detail: finalWorkerNamePreflight.detail,
+        orphanResources: { ...orphanKv, workerName: '' },
+      }, {
+        fallbackEligible: shouldAllowFallbackForCloudflareFailure(finalWorkerNamePreflight),
+      });
+    }
+    if (!resumeUploadedWorker) {
+      try {
+        await idempotencyContext?.markUploadStarted?.(bundleDiagnostics?.sha256);
+      } catch (error) {
+        return buildDeploymentFailure(503, {
+          error: `Failed to journal deployment upload identity: ${toStr(error?.message || error).trim() || 'Unknown error.'}`,
+          deploymentRequestPending: true,
+          orphanResources: {
+            kvNamespaceId: kvId,
+            kvCleanupStatus: 'retained-upload-pending',
+            workerName,
+          },
+        }, { fallbackEligible: true });
+      }
+      uploadedWorkerThisInvocation = true;
+      let scriptUpload = await cfFetch(apiToken, scriptUploadPath, {
+        method: 'PUT',
+        body: buildScriptUploadForm(),
+      }, cfFetchOptions);
+      const migrationPreconditionFailure = Number(scriptUpload.status || 0) === 412 && /migration tag precondition failed/i.test([
+        scriptUpload.error,
+        ...(Array.isArray(scriptUpload.detail)
+          ? scriptUpload.detail.map((entry) => toStr(entry?.message || entry))
+          : [scriptUpload.detail]),
+      ].filter(Boolean).join('\n'));
+      if (migrationPreconditionFailure) {
+        // A prior deploy of this same script already applied the class migration.
+        // Retry the identical module and bindings without replaying that migration.
+        scriptUpload = await cfFetch(apiToken, scriptUploadPath, {
+          method: 'PUT',
+          body: buildScriptUploadForm({ omitMigrations: true }),
+        }, cfFetchOptions);
+      }
+      if (!scriptUpload.ok) {
+        consoleImpl?.error?.('[deploy-helper] script upload failed', JSON.stringify({
+          workerName,
+          sessionSlug: displaySlug,
+          error: scriptUpload.error,
+          detail: scriptUpload.detail,
+          diagnostics: bundleDiagnostics,
+        }));
+        const bundleSummary = formatBundleDiagnostics(bundleDiagnostics);
+        const uploadWasDefinitivelyRejected = isDefinitiveWorkerUploadRejection(scriptUpload);
+        const stableUploadWasDefinitivelyRejected = (
+          uploadWasDefinitivelyRejected &&
+          !!requestMarker &&
+          !!kvId
+        );
+        const stableUploadMayHaveCommitted = (
+          !uploadWasDefinitivelyRejected &&
+          !!requestMarker &&
+          !!kvId
+        );
+        let rejectionJournalError = '';
+        if (stableUploadWasDefinitivelyRejected) {
+          try {
+            await idempotencyContext?.markDefinitiveUploadRejected?.(bundleDiagnostics?.sha256);
+          } catch (error) {
+            rejectionJournalError = toStr(error?.message || error).trim() || 'Unknown error.';
+          }
+        }
+        const orphanResources = stableUploadWasDefinitivelyRejected || stableUploadMayHaveCommitted
+          ? {
+              kvNamespaceId: kvId,
+              kvCleanupStatus: 'retained-upload-pending',
+              workerName,
+            }
+          : uploadWasDefinitivelyRejected
+            ? { ...(await cleanupStagedKv()), workerName: '' }
+            : await cleanupDeploymentResources();
+        return buildDeploymentFailure(rejectionJournalError ? 503 : 502, {
+          error: rejectionJournalError
+            ? `Failed to persist definitive upload rejection: ${rejectionJournalError}`
+            : `${scriptUpload.error} Bundle diagnostics: ${bundleSummary}`,
+          detail: scriptUpload.detail,
+          bundleDiagnostics,
+          orphanResources,
+          ...(stableUploadWasDefinitivelyRejected || stableUploadMayHaveCommitted
+            ? { deploymentRequestPending: true }
+            : {}),
+        }, {
+          fallbackEligible: rejectionJournalError
+            ? true
+            : shouldAllowFallbackForCloudflareFailure(scriptUpload),
+        });
+      }
+      if (idempotencyContext?.definitiveUploadRejected === true) {
+        // This retry reused already-staged KV state. Treat the corrected upload
+        // like a resume so secrets/config are preserved until signed sync.
+        resumeUploadedWorker = true;
+      }
+    }
+  }
+
+  // Confirm that the uploaded script still carries this deployment's marker
+  // before enabling its hostname or writing runtime secrets. If another writer
+  // replaced it, preserve both resources for an operator rather than deleting
+  // a script that is no longer ours or activating a mixed deployment.
+  const uploadedWorkerSettings = await readWorkerSettingsAfterUpload();
+  const uploadedWorkerStillOwned = workerSettingsMatchDeployment(uploadedWorkerSettings, kvId);
+  if (!uploadedWorkerStillOwned) {
+    const settingsVisibilityPending = !uploadedWorkerSettings.ok &&
+      Number(uploadedWorkerSettings.status || 0) === 404;
     const orphanResources = await cleanupDeploymentResources();
     return buildDeploymentFailure(uploadedWorkerSettings.ok ? 409 : 502, {
       error: uploadedWorkerSettings.ok
@@ -2006,6 +2295,34 @@ const executeDeployHelperRequestCore = async ({
       fallbackEligible: settingsVisibilityPending ||
         (!uploadedWorkerSettings.ok && shouldAllowFallbackForCloudflareFailure(uploadedWorkerSettings)),
     });
+  }
+
+  let resumedSecretBindings = new Set();
+  if (resumeUploadedWorker) {
+    const secretList = await cfFetch(
+      apiToken,
+      `/accounts/${accountId}/workers/scripts/${workerName}/secrets`,
+      { method: 'GET' },
+      cfFetchOptions,
+    );
+    const listedSecrets = secretList?.data?.result;
+    if (!secretList.ok || !Array.isArray(listedSecrets)) {
+      return buildDeploymentFailure(502, {
+        error: secretList.error || 'Failed to verify existing Worker secret bindings during recovery.',
+        detail: secretList.detail,
+        deploymentRequestPending: true,
+        orphanResources: {
+          kvNamespaceId: kvId,
+          kvCleanupStatus: 'retained-pre-existing',
+          workerName,
+          workerCleanupStatus: 'retained-pre-existing',
+        },
+      }, { fallbackEligible: true });
+    }
+    resumedSecretBindings = new Set(listedSecrets
+      .filter((binding) => toStr(binding?.type).trim() === 'secret_text')
+      .map((binding) => toStr(binding?.name).trim())
+      .filter(Boolean));
   }
 
   let envelopeKekSecretSet = false;
@@ -2054,9 +2371,9 @@ const executeDeployHelperRequestCore = async ({
     // Mutable retry secrets must be applied by the signed post-deploy sync.
     writesSessionSecrets: !resumeUploadedWorker,
     tokenSecretSet: false,
-    tokenSecretPreserved: false,
+    tokenSecretPreserved,
     envelopeKekSecretSet,
-    envelopeKekSecretPreserved: false,
+    envelopeKekSecretPreserved,
     subdomain,
     subdomainStatus,
     subdomainEnabled,
@@ -2242,6 +2559,8 @@ const executeDeployHelperRequestCore = async ({
           });
         }
       }
+      envelopeKekSecretSet = true;
+      deploymentPayload.envelopeKekSecretSet = true;
     }
   }
 

@@ -74,7 +74,27 @@ export const bindSessionRegistryReadsPort = ({
     loadSessionRegistryCache: (input) => readSessionRegistry().loadSessionRegistryCache(input),
     loadGroupRegistryCache: (input) => readSessionRegistry().loadGroupRegistryCache(input),
     getAllSessionEntries: () => readSessionRegistry().sessionRegistryStore.getAllSessionEntries(),
+    getAllSessionSlugs: (options) => {
+      if (readSessionConfig) return readSessionConfig().getAllSessionSlugs(options);
+      const includeEmpty = options?.includeEmpty !== false;
+      return Array.from(
+        new Set(
+          readSessionRegistry()
+            .sessionRegistryStore.getAllSessionEntries()
+            .map(([key, config]) => {
+              const record = config && typeof config === 'object' ? (config as SessionRegistryRecord) : {};
+              const rawSlug = typeof record.slug === 'string' ? record.slug : key;
+              return rawSlug === 'general' ? '' : String(rawSlug || '');
+            })
+            .filter((slug) => includeEmpty || slug !== ''),
+        ),
+      );
+    },
     getSessionConfig: (slug) => readSessionRegistry().sessionRegistryStore.getSessionConfig(slug),
+    getSessionConfigBySlug: (slug) =>
+      readSessionConfig
+        ? readSessionConfig().getSessionConfigBySlug(slug)
+        : readSessionRegistry().sessionRegistryStore.getSessionConfig(slug),
     getSessionConfigById: (sessionId) => readSessionRegistry().sessionRegistryStore.getSessionConfigById(sessionId),
     fetchSessionFromRegistry: (input) =>
       publishAdapter.fetchSessionFromRegistry(input || {}) as Promise<SessionRegistryRecord | null | undefined>,

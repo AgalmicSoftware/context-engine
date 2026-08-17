@@ -23,7 +23,8 @@ describe('surveyPolisDemoResultsData', () => {
     const data = buildPolisDemoSurveyResultsNetworkData();
     const expectedVoteCount = demoPolisData.participantsVotes.reduce(
       (sum, participant) =>
-        sum + Object.keys(participant.votes || {}).filter((voteIndex) => binaryCommentIndexes.has(Number(voteIndex))).length,
+        sum +
+        Object.keys(participant.votes || {}).filter((voteIndex) => binaryCommentIndexes.has(Number(voteIndex))).length,
       0,
     );
 
@@ -160,9 +161,9 @@ describe('surveyPolisDemoResultsData', () => {
       expect(simulated).not.toBeNull();
       expect(Object.keys(simulated?.questions || {})).toEqual(questionIds);
       expect(buildSimulatedDemoResultsNetworkData('demo-sh')).toBeNull();
-      expect(Object.keys(buildPolisDemoSurveyResultsNetworkData(undefined, { sessionSlug: 'demo-2' }).questions)).toHaveLength(
-        40,
-      );
+      expect(
+        Object.keys(buildPolisDemoSurveyResultsNetworkData(undefined, { sessionSlug: 'demo-2' }).questions),
+      ).toHaveLength(40);
     });
 
     it('emits only valid per-question poll choices', () => {
@@ -230,9 +231,7 @@ describe('surveyPolisDemoResultsData', () => {
           comments: [
             { commentId: 'zero-rating', commentBody: 'Rate from zero', type: 'rating', scale: { min: 0, max: 10 } },
           ],
-          participantsVotes: [
-            { participant: '0xzero', votes: { 0: -1 }, responses: { 0: { value: 0 } } },
-          ],
+          participantsVotes: [{ participant: '0xzero', votes: { 0: -1 }, responses: { 0: { value: 0 } } }],
         },
         { sessionSlug: 'demo-2' },
       );

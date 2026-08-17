@@ -19,6 +19,12 @@ type AdminChainRegistryDisplayArgs = {
   registryChainId?: unknown;
 };
 
+type AdminPageSessionIdentityArgs = {
+  initialSessionId?: unknown;
+  initialRegistryChainId?: unknown;
+  initialSessionConfig?: unknown;
+};
+
 const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 

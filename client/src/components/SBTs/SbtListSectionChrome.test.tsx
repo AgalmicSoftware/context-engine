@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 
 import {
   SbtListInitialLoader,
+  SbtListSectionBody,
   SbtListSectionLoadingHint,
   SbtListSectionTitle,
 } from './SbtListSectionChrome';

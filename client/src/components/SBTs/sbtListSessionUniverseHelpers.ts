@@ -70,13 +70,19 @@ type ResolveSbtListChipSelectedSessionSlugsArgs = {
   selectedSlug?: unknown;
   wasSelected?: unknown;
 };
-type SbtListSessionUniverseSnapshotLike = {
+export type SbtListSessionUniverseSnapshot = {
+  fallbackEntryCount: number;
+  registryEntryCount: number;
+  registryHydrated: boolean;
+  slugs: string[];
+};
+export type SbtListSessionUniverseSnapshotLike = {
   fallbackEntryCount?: unknown;
   registryEntryCount?: unknown;
   registryHydrated?: unknown;
   slugs?: unknown;
 };
-type ResolveSbtListSessionUniverseSnapshotUpdateArgs<TPrevious, TNext> = {
+type ResolveSbtListSessionUniverseSnapshotUpdateArgs<TPrevious, TNext = TPrevious> = {
   nextSnapshot?: TNext;
   previousSnapshot?: TPrevious;
 };
@@ -243,7 +249,7 @@ export function resolveSbtListSessionUniverseSnapshotUpdate({
     return previousSnapshot;
   }
   return nextSnapshot;
-};
+}
 
 export const resolveSbtListDefaultSelectedSessionSlugs = ({
   displayedSessionUniverseSlugs = [],

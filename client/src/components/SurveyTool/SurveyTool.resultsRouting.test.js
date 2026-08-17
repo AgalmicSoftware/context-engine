@@ -3,6 +3,16 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import SurveyTool from './SurveyTool';
 import { SurveySelector } from './SurveySelector';
 
+jest.mock('./SurveyResults', () => ({
+  __esModule: true,
+  default: ({ onClose }) =>
+    jest.requireActual('react').createElement('button', { onClick: onClose }, 'Close functional results'),
+}));
+
+jest.mock('./SurveySelector', () => ({
+  SurveySelector: () => jest.requireActual('react').createElement('div', { 'data-testid': 'mock-survey-selector' }),
+}));
+
 const REACT_LAZY_TYPE = Symbol.for('react.lazy');
 
 const treeHasDataTestId = (node, testId) => {
@@ -136,7 +146,6 @@ describe('SurveyTool results routing', () => {
 
   it('preserves query and hash through the functional results close path', async () => {
     const priorUrl = window.location.href;
-
     try {
       window.history.pushState(
         {},
@@ -146,20 +155,38 @@ describe('SurveyTool results routing', () => {
       render(
         <SurveyTool autoOpenResults={true} preventUrlChange={true} activeSessionSlug="edge" network={{ id: 84532 }} />,
       );
-      const subject = new SurveyTool({
-        autoOpenResults: false,
-        preventUrlChange: true,
-      });
 
-      subject.setState = jest.fn((next) => {
-        const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
-        subject.state = { ...subject.state, ...(patch || {}) };
-      });
+      fireEvent.click(await screen.findByRole('button', { name: 'Close functional results' }));
 
-      subject.closeResultsModal();
+      expect(window.location.pathname).toBe('/ce/session/edge');
+      expect(window.location.search).toBe('?worker=https%3A%2F%2Fworker.example.test&session=edge');
+      expect(window.location.hash).toBe('#responses');
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
 
-      expect(subject.setState).toHaveBeenCalledWith({ showResultsModal: false });
-      expect(window.location.pathname).toBe('/session/edge');
+  it('leaves functional results routing to an external close owner', async () => {
+    const priorUrl = window.location.href;
+    const onResultsModalClose = jest.fn();
+    try {
+      window.history.pushState({}, '', '/session/edge/questions/results?worker=external#owned');
+      render(
+        <SurveyTool
+          autoOpenResults={true}
+          preventUrlChange={true}
+          activeSessionSlug="edge"
+          network={{ id: 84532 }}
+          onResultsModalClose={onResultsModalClose}
+        />,
+      );
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Close functional results' }));
+
+      expect(`${window.location.pathname}${window.location.search}${window.location.hash}`).toBe(
+        '/session/edge/questions/results?worker=external#owned',
+      );
+      expect(onResultsModalClose).toHaveBeenCalledTimes(1);
     } finally {
       window.history.replaceState({}, '', priorUrl);
     }

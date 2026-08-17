@@ -6,7 +6,7 @@ const CROSS_CHAIN_SESSION_RPC_URL = 'https://session-cross-chain.example/rpc';
 const NESTED_OTHER_CHAIN_RPC_URL = 'https://session-nested-other-chain.example/rpc';
 const PATH_DEFAULT_BASE_SEPOLIA = 'https://base-sepolia-testnet.api.pocket.network';
 const PATH_DEFAULT_OP_SEPOLIA = 'https://op-sepolia-testnet.api.pocket.network';
-const ARCHIVE_OP_SEPOLIA_RPC = 'https://optimism-sepolia.gateway.tenderly.co';
+const OFFICIAL_OP_SEPOLIA_RPC = 'https://sepolia.optimism.io';
 
 const buildGroupCfg = (rpc = {}, overrides = {}) => {
   const base = {
@@ -341,7 +341,7 @@ describe('contractScripts getReadProviderForGroup', () => {
         skipGlobalPreferred: true,
       }),
     );
-    expect(urls[0]).toBe(ARCHIVE_OP_SEPOLIA_RPC);
+    expect(urls[0]).toBe(OFFICIAL_OP_SEPOLIA_RPC);
     expect(urls).not.toContain(PATH_DEFAULT_OP_SEPOLIA);
   });
 

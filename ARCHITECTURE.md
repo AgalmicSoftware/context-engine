@@ -6,43 +6,30 @@
 
 ![Context Engine deployment modes](client/src/assets/img/readme-architecture-deployment-modes.png)
 
-```
-                              ┌──────────────────────────────┐
-                              │    EVM Chain (configurable)   │
-                              │    Optimism / Base / etc.     │
-                              │                              │
-                              │  SessionRegistry  ◄── gates  │
-                              │  Surveys          ◄── hashes │
-                              │  CustomSBT        ◄── tokens │
-                              │  SBTFactory       ◄── deploy │
-                              └──────────┬───────────────────┘
-                                         │ ethers.js
-┌────────────────────┐          ┌────────┴─────────┐
-│     Arweave        │◄─────────┤   React SPA      │
-│                    │  upload   │   (client/)      │
-│  session metadata  │          │                  │
-│  survey payloads   │  read    │  Redux + hooks   │
-│  question content  │─────────▸│  managed cache   │
-│  SBT tokenURI     │          │  (IDB + LS fb)   │
-│  doc library       │          └──┬──────┬────────┘
-└────────────────────┘             │      │
-                                   │      │ fetch + auth token
-                          Lit SDK  │      │
-                    ┌──────────────┘      │
-                    ▼                     ▼
-          ┌─────────────────┐   ┌─────────────────────────┐
-          │  Lit Protocol   │   │  CORS Worker (CF)       │
-          │                 │   │  sessionCorsWorker      │
-          │  encrypt/decrypt│   │                         │
-          │  SBT-gated ACC  │   │  /auth/nonce + /login   │
-          └─────────────────┘   │  /ai  /transcribe       │
-                                │  /arweave/upload         │
-                                │  /admin/set-config      │
-                                │  request_test_eth        │
-                                │  fetch_url / fetch_image│
-                                │                         │
-                                │  KV: config + secrets   │
-                                └─────────────────────────┘
+App hosting, public/private session access, and session infrastructure are
+separate choices. A publicly hosted web app can open either a private
+worker-canonical session or a public decentralized session. The `/new` chooser
+opens with no preset automatically selected; Hosted & Fast is the implemented
+default/recommended path once chosen.
+
+### Implemented Profiles
+
+```mermaid
+flowchart LR
+  Creator["Session creator"] --> Choice{"/new profile choice"}
+  Choice --> Hosted["Hosted & Fast<br/>Fast & Cheap (Cloudflare)<br/>implemented default path"]
+  Choice --> Trustless["Trustless & Slower<br/>Trustless & Public (Decentralized)<br/>implemented opt-in"]
+
+  Hosted --> DeployHelper["Deploy helper<br/>Cloudflare token is request-only"]
+  DeployHelper --> Worker["Creator-owned per-session Worker<br/>worker_canonical authority"]
+  Worker --> Cloudflare["Worker KV / Cloudflare payload storage<br/>worker_envelope by default"]
+  Worker --> AI["Selected AI provider"]
+  Passkey["Passkey-derived EOA<br/>signing/admin identity"] --> Worker
+
+  Trustless --> EVM["Public EVM registry/contracts<br/>wallet transaction + gas"]
+  Trustless --> Arweave["Arweave metadata and payloads"]
+  Trustless --> WorkerServices["Session worker services<br/>AI, auth, fetch, profile-enabled routes"]
+  Trustless -.->|Lit encryption selected| Lit["Lit Protocol"]
 ```
 
 Hosted & Fast needs a creator Cloudflare API token and one AI-provider key. Its
@@ -69,19 +56,23 @@ flowchart LR
   Boundary -.->|possible future optional adapter| PrivateEVM["Private EVM"]
 ```
 
-Key difference from public mode: planned private deployments swap public registry-backed session reads for private session-source adapters (for example a local DB) while keeping the same auth-capable worker surface. The `/new` wizard writes session configs to that private backend instead of relying on public registry lookups. Same UI, same contracts, different storage + encryption backends.
-
-The corporate deployment roadmap remains in private planning until the public deployment mode is ready to document here.
+Company-Operated is a target for existing hardware, private clouds, and internal
+networks; these adapters and a packaged corporate edition are not generally
+available. The target can be entirely off-chain. A private EVM may be explored
+as an optional compatibility adapter, but it is not required by this
+architecture.
 
 ## Layer Descriptions
 
-| Layer | What it does | Primary location |
-|-------|-------------|-----------------|
-| **Client** | React SPA: survey authoring, response collection, SBT management, encryption gates, admin, session wizard | `client/src/` |
-| **CORS Worker** | Cloudflare Worker: SIWE auth, AI proxy, Arweave uploads, transcription, faucet, resource gating via on-chain gates | `workers/sessionCorsWorker/` |
-| **Contracts** | Solidity on any EVM chain: session registry (gates + metadata pointers), surveys (hash anchoring), SBTs (membership tokens), factory | `contracts/` |
-| **Arweave** | Immutable JSON storage: session metadata, survey/question payloads, SBT tokenURI, doc library files | N/A (external) |
-| **Lit Protocol** | Client-side encrypt/decrypt with SBT-gated access control conditions (ACC) | N/A (external SDK) |
+| Layer | What it does | Profile role | Primary location |
+|-------|-------------|--------------|-----------------|
+| **Client** | React SPA: survey authoring, response collection, SBT management, encryption gates, admin, session wizard | Shared across implemented profiles | `client/src/` |
+| **Session Worker** | Auth, canonical config, AI proxy, transcription, storage/fetch routes, and profile-enabled chain/Arweave helpers | Canonical authority for Hosted & Fast; service boundary for decentralized/custom profiles | `workers/sessionCorsWorker/` |
+| **Cloudflare storage** | Worker KV config, secrets, encrypted payload envelopes/indexes, and optional advanced R2 blobs | Hosted & Fast default | Worker bindings (external) |
+| **Contracts** | Session registry, surveys, SBTs, gates, and factory on supported EVM chains | Trustless & Slower and explicit chain-backed custom profiles | `contracts/` |
+| **Arweave** | Immutable metadata, survey/question payloads, SBT tokenURI, and document-library files | Trustless & Slower and explicit Arweave-backed custom profiles | External |
+| **Lit Protocol** | Client-side encrypt/decrypt with EVM access-control conditions | Optional when Lit encryption is selected | External SDK |
+| **Organization adapters** | IAM, key release/KMS, storage, AI, networking, and observability | Planned Company-Operated profile; not shipped | Future adapter boundary |
 
 ## Data Flows
 
@@ -184,7 +175,7 @@ Lit opt-in:
 | SBT management | `components/SBTs/SBTsList.tsx`, `SBTPage.tsx`, `CreateSBTGroup.tsx` |
 | Gate components | `components/Gates/` |
 | **Utilities** | |
-| Web3 / contracts | `utilities/web3/contractScripts.js` (compat barrel), `contractScripts.impl.ts`, `contractHelpers.ts`, `contractEventListeners.ts`, `contractProfile.ts`, `sessionRegistry.ts` |
+| Web3 / contracts | `utilities/web3/chainGateway.ts`, `contractScripts.impl.ts`, `contractHelpers.ts`, `chainEventStreams.ts`, `profileChainReads.ts`, `sessionRegistry.ts` |
 | Wallet | `client/src/wallet/` passkey EOA wallet config, encrypted keystore, EIP-1193 provider, and soft-session worker |
 | Crypto / Lit | `utilities/crypto/litProtocol.ts`, `cryptography.ts`, `encryptedFields.ts` |
 | Arweave | `utilities/arweave/arweaveClient.js`, `arweaveUrls.ts` |

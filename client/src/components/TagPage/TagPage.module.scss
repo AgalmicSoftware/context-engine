@@ -17,6 +17,8 @@ $tag-route-accent-alt: var(--ce-compat-indigo);
 .pageEmbedded {
   min-height: auto;
   padding: 0;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .shell {
@@ -28,6 +30,8 @@ $tag-route-accent-alt: var(--ce-compat-indigo);
 
 .shellEmbedded {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .header {

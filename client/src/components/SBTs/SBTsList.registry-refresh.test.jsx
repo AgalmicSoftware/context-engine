@@ -53,7 +53,7 @@ jest.mock('../TagPage/TagModal', () => (props) => {
   return <div data-testid="mock-tag-modal">{props.activeTag}</div>;
 });
 
-jest.mock('../../utilities/web3/contractScripts.js', () => ({
+jest.mock('../../utilities/web3/chainGateway.js', () => ({
   __esModule: true,
   default: {
     getRelevantBlockWindowForFilter: (...args) => mockGetRelevantBlockWindowForFilter(...args),

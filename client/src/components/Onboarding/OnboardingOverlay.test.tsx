@@ -102,10 +102,7 @@ describe('OnboardingOverlay', () => {
     expect(bulletContainer.className).toMatch(/titlelessBulletListContainer/);
     expect(controls.className).toContain(styles.onboardingControlsDualArrow);
     expect(controlSlots).toHaveLength(2);
-    expect(screen.getByRole('button', { name: 'Back' })).toHaveAttribute(
-      'data-ce-control-appearance',
-      'frameless',
-    );
+    expect(screen.getByRole('button', { name: 'Back' })).toHaveAttribute('data-ce-control-appearance', 'frameless');
     expect(nextButton).toHaveAttribute('data-ce-control-appearance', 'frameless');
     expect(screen.getByText(/A toolkit/i)).toBeInTheDocument();
 

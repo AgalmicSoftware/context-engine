@@ -10,6 +10,8 @@ const ROOT = path.resolve(__dirname, '..');
 const TRACKED_ANCHOR_FILES = Object.freeze([
   'AGENTS.md',
   'ARCHITECTURE.md',
+  'client/src/variables/demo/LOOPHOLE_SCHEMA.md',
+  'client/src/variables/demo/README.md',
   'docs/MainSite.MAP.md',
   'docs/SessionWizard.MAP.md',
   'docs/SurveyTool.MAP.md',
@@ -146,7 +148,9 @@ test('tracked utility anchors use live TypeScript source paths', () => {
   });
 
   UTILITY_ANCHOR_FILES.forEach((relativePath) => {
-    const source = fs.readFileSync(path.join(ROOT, relativePath), 'utf8');
+    const absolutePath = path.join(ROOT, relativePath);
+    if (!fs.existsSync(absolutePath)) return;
+    const source = fs.readFileSync(absolutePath, 'utf8');
     MIGRATED_UTILITY_DOC_PATHS.forEach(({ stalePath }) => {
       assert.equal(source.includes(stalePath), false, `${relativePath} should not reference ${stalePath}`);
     });

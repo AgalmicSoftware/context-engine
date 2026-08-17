@@ -43,6 +43,7 @@ export const E2E_TESTIDS = Object.freeze({
   DOCS_GITHUB_LINK: 'ce-docs-github-link',
   DOCS_SESSION_CONTEXT: 'ce-docs-session-context',
   DOCS_SESSION_CONTRACTS_GROUP: 'ce-docs-session-contracts-group',
+  DOCS_CONTRACT_SESSION_SELECTOR: 'ce-docs-contract-session-selector',
   PAGE_ABOUT_ROOT: 'ce-page-about-root',
   PAGE_POSTS_ROOT: 'ce-page-posts-root',
   PAGE_ADMIN_ROOT: 'ce-page-admin-root',

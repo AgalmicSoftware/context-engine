@@ -3,8 +3,8 @@
     "description": "Comprehensive corpus of science fiction works relevant to AI discourse. Curated for AI safety, policy, alignment, and ethics conversations. Each entry includes substantive intellectual analysis of the work's novel arguments and contributions to AI thinking.",
     "version": "2.0",
     "date_created": "2026-02-15",
-    "last_updated": "2026-02-15",
-    "total_entries": 151,
+    "last_updated": "2026-07-04",
+    "total_entries": 156,
     "usage_notes": "This corpus serves as a knowledge base of arguments, thought experiments, and intellectual contributions expressed through fiction. The 'novel_arguments_and_concepts' field extracts genuine philosophical content. The 'notable_discussions_and_commentary' field captures discourse about each work. Tags align with the expanded_tag_list.json taxonomy. Works span from 1818 (Frankenstein) to 2024, covering novels, short stories, novellas, films, TV series, graphic novels, and manga/anime."
   },
   "entries": [

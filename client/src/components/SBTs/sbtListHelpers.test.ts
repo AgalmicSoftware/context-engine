@@ -6,7 +6,6 @@ import {
   buildSbtListLoadingGroupStatusClassName,
   buildSbtListLoadingProgressFillClassName,
   buildSbtListMiniSettingsButtonClassName,
-  buildSbtListRenderBuckets,
   buildSbtListRootClassName,
   buildSbtListSessionUniversePanelClassName,
   isSbtListManagedDgCacheName,

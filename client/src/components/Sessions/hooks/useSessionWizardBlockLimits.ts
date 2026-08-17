@@ -149,6 +149,7 @@ const useSessionWizardBlockLimits = <TDraft extends DraftWithBlockLimits>({
   }, [
     blockLimitDuration,
     blockLimitUnit,
+    enabled,
     latestChainBlock,
     registryChainId,
     draftBlockLimitStart,

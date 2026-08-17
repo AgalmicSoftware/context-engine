@@ -556,30 +556,14 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
       chainKey: string = 'default',
     ): Promise<ethers.providers.Block> {
       void providerName;
-      const blockCache = this._blockCache!;
-      const key = `${String(chainKey)}_${String(blockNumber)}`;
-      if (blockCache[key] && Date.now() - blockCache[key].timestamp < BLOCK_CACHE_MS) {
-        return blockCache[key].block;
-      }
-
-      const block = await callWithRetry(() => providerPassedIn.getBlock(blockNumber), `getBlock(${blockNumber})`);
-      const now = Date.now();
-      Object.keys(blockCache).forEach((cacheKey: string) => {
-        if (now - (blockCache[cacheKey]?.timestamp || 0) >= BLOCK_CACHE_MS) {
-          delete blockCache[cacheKey];
-        }
+      return resolveContractBlockWithCache({
+        provider: providerPassedIn,
+        blockNumber,
+        chainKey,
+        ttlMs: BLOCK_CACHE_MS,
+        maxEntries: MAX_CACHE_SIZE,
+        callWithRetry,
       });
-
-      blockCache[key] = { block, timestamp: now };
-
-      const keys = Object.keys(blockCache);
-      if (keys.length > MAX_CACHE_SIZE) {
-        keys.sort((a: string, b: string) => (blockCache[a]?.timestamp || 0) - (blockCache[b]?.timestamp || 0));
-        for (let i = 0; i < keys.length - MAX_CACHE_SIZE; i += 1) {
-          delete blockCache[keys[i]];
-        }
-      }
-      return block;
     },
 
     async fetchLogsSmart(

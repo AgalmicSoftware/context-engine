@@ -42,6 +42,10 @@ describe('SurveyQuestionsSubmitFooter', () => {
     const { rerender } = render(
       <SurveyQuestionsSubmitFooter
         {...baseProps}
+        displayState={{
+          submitDisabled: true,
+          uploadStatusText: 'Encrypting...',
+        }}
         isSubmitting
       />,
     );
@@ -53,12 +57,18 @@ describe('SurveyQuestionsSubmitFooter', () => {
     rerender(
       <SurveyQuestionsSubmitFooter
         {...baseProps}
+        displayState={{
+          showSubmitAux: true,
+          submittedIndicatorActive: true,
+        }}
         responseUrl="https://example.test/response"
       />,
     );
 
     expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR)).toHaveTextContent('Submitted');
     expect(screen.getByTitle('View submitted response')).toHaveAttribute('href', 'https://example.test/response');
+    expect(screen.getByTitle('View submitted response')).toHaveAttribute('target', '_blank');
+    expect(screen.getByTitle('View submitted response')).toHaveAttribute('rel', 'noopener noreferrer');
     expect(screen.queryByRole('button', { name: 'Clear pending changes' })).toBeNull();
 
     rerender(

@@ -137,7 +137,10 @@ export const mergeSbtActivityCacheEntryMetadata = (currentIn: unknown, patchIn: 
   return hydrateSbtActivityCacheEntry({
     ...current,
     ...patch,
-    sbtInfo: currentInfo || patchInfo ? { ...(currentInfo || {}), ...(patchInfo || {}) } : patch.sbtInfo ?? current.sbtInfo ?? null,
+    sbtInfo:
+      currentInfo || patchInfo
+        ? { ...(currentInfo || {}), ...(patchInfo || {}) }
+        : (patch.sbtInfo ?? current.sbtInfo ?? null),
     blockNumber: Math.max(Number(current.blockNumber) || 0, Number(patch.blockNumber) || 0),
     mintedAddresses: current.mintedAddresses,
     burnedAddresses: current.burnedAddresses,
@@ -172,8 +175,7 @@ export const mergeSbtActivityCacheEntryCounts = (currentIn: unknown, scanIn: unk
     Number.isFinite(currentBlock) ? currentBlock : 0,
     Number.isFinite(checkpointBlock) ? checkpointBlock : 0,
   );
-  const scanCoversCurrentActivity =
-    freshnessFloor === 0 || (Number.isFinite(scanBlock) && scanBlock >= freshnessFloor);
+  const scanCoversCurrentActivity = freshnessFloor === 0 || (Number.isFinite(scanBlock) && scanBlock >= freshnessFloor);
   const scanFinalized = scan.countsLoaded === true && scanCoversCurrentActivity;
   const newestCheckpoint = selectNewestCheckpoint(current.countsScanCheckpoint, scan.countsScanCheckpoint);
 
@@ -199,7 +201,9 @@ export const mergeSbtActivityCacheEntryCounts = (currentIn: unknown, scanIn: unk
         burnedCountByAddress,
         mintedEventCount,
         burnedEventCount,
-      }) || normalizeSbtHistorySummary(scan.historySummary) || normalizeSbtHistorySummary(current.historySummary),
+      }) ||
+      normalizeSbtHistorySummary(scan.historySummary) ||
+      normalizeSbtHistorySummary(current.historySummary),
   }) as SbtActivityCacheEntry;
 };
 

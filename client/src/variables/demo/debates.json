@@ -599,21 +599,21 @@
         "relevance_score": 7
       },
       {
-        "entry_url_or_id": "https://metr.org/blog/2025-07-14-how-does-time-horizon-vary-across-domains/",
+        "entry_url_or_id": "metr_cross_domain_th_2025",
         "corpus": "metr-evals-metrics",
         "side": "a",
         "stance_summary": "How Does Time Horizon Vary Across Domains?",
         "relevance_score": 7
       },
       {
-        "entry_url_or_id": "https://metr.org/blog/2024-08-06-update-on-evaluations/",
+        "entry_url_or_id": "metr_general_capability_evals_update_2023",
         "corpus": "metr-evals-metrics",
         "side": "a",
         "stance_summary": "An update on our general capability evaluations",
         "relevance_score": 7
       },
       {
-        "entry_url_or_id": "https://metr.org/blog/2025-03-19-measuring-ai-ability-to-complete-long-tasks/",
+        "entry_url_or_id": "metr_exponential_trend_evidence",
         "corpus": "metr-evals-metrics",
         "side": "a",
         "stance_summary": "Evidence for Exponential AI Capability Growth",
@@ -646,24 +646,61 @@
         "side": "a",
         "stance_summary": "Reasoning, RLHF, & Plan for 2027 AGI",
         "relevance_score": 7
+      },
+      {
+        "entry_url_or_id": "epoch_can_scaling_continue_2030_2024",
+        "corpus": "ai-forecasting-economics",
+        "side": "a",
+        "stance_summary": "Epoch: ~2e29 FLOP training runs feasible by 2030 — input constraints do not end the exponential this decade",
+        "relevance_score": 8
+      },
+      {
+        "entry_url_or_id": "epoch_gate_model_2025",
+        "corpus": "ai-forecasting-economics",
+        "side": "a",
+        "stance_summary": "GATE model: compute-driven automation supports 2-20x growth acceleration under central parameters",
+        "relevance_score": 7
+      },
+      {
+        "entry_url_or_id": "metaculus_weak_agi_question",
+        "corpus": "ai-forecasting-economics",
+        "side": "a",
+        "stance_summary": "Metaculus crowd median for weak AGI compressed ~15 years since 2020, to mid-2028",
+        "relevance_score": 7
       }
     ],
     "cross_corpus_references": [
       {
         "from_corpus": "dwarkesh-lab-insiders",
-        "from_id": "dwarkesh_dario_amodei_feb_2026",
+        "from_id": "amodei_dario_dwarkesh_2026_end_of_exponential",
         "to_corpus": "metr-evals-metrics",
-        "to_id": "metr_time_horizon_11_2026",
+        "to_id": "metr_time_horizon_1_1_2026",
         "relationship": "discusses_implications_of",
         "relevance_score": 9
       },
       {
         "from_corpus": "dwarkesh-lab-insiders",
-        "from_id": "dwarkesh_elon_musk_feb_2026",
+        "from_id": "musk_elon_dwarkesh_2026_ai_in_space",
         "to_corpus": "arxiv-ai-safety",
         "to_id": "measuring_ai_rd_automation_2026",
         "relationship": "makes_claims_tested_by",
         "relevance_score": 8
+      },
+      {
+        "from_corpus": "ai-forecasting-economics",
+        "from_id": "epoch_gate_model_2025",
+        "to_corpus": "loophole-historical-cases",
+        "to_id": "loophole_historical_exponential_progress_debate_condorcet_hume",
+        "relationship": "adversarial_case_study_of",
+        "relevance_score": 6
+      },
+      {
+        "from_corpus": "ai-forecasting-economics",
+        "from_id": "epoch_can_scaling_continue_2030_2024",
+        "to_corpus": "ai-scifi-books",
+        "to_id": "stross_accelerando",
+        "relationship": "fictional_treatment_in",
+        "relevance_score": 5
       }
     ]
   },
@@ -1149,7 +1186,7 @@
         "relevance_score": 7
       },
       {
-        "entry_url_or_id": "https://metr.org/blog/2025-06-05-recent-reward-hacking/",
+        "entry_url_or_id": "metr_reward_hacking_2025",
         "corpus": "metr-evals-metrics",
         "side": "a",
         "stance_summary": "Recent Frontier Models Are Reward Hacking",
@@ -1308,6 +1345,20 @@
         "side": "a",
         "stance_summary": "Tweet engaging with alignment is important themes",
         "relevance_score": 6
+      },
+      {
+        "entry_url_or_id": "skalse_et_al_2022_reward_hacking",
+        "corpus": "arxiv-ai-safety",
+        "side": "a",
+        "stance_summary": "Skalse et al.: formal definition and characterization of reward hacking in RL systems",
+        "relevance_score": 8
+      },
+      {
+        "entry_url_or_id": "sycophancy_to_subterfuge_denison_2024",
+        "corpus": "arxiv-ai-safety",
+        "side": "a",
+        "stance_summary": "Denison et al.: specification gaming generalizes from sycophancy to reward-tamper attempts in frontier models",
+        "relevance_score": 8
       }
     ],
     "cross_corpus_references": [
@@ -1326,6 +1377,14 @@
         "to_id": "sabotage_evaluations_2024",
         "relationship": "builds_on",
         "relevance_score": 9
+      },
+      {
+        "from_corpus": "arxiv-ai-safety",
+        "from_id": "skalse_et_al_2022_reward_hacking",
+        "to_corpus": "loophole-historical-cases",
+        "to_id": "loophole_historical_reward_hacking_misalignment_franklin_hammurabi",
+        "relationship": "adversarial_case_study_of",
+        "relevance_score": 6
       }
     ]
   },
@@ -1707,7 +1766,7 @@
     },
     "positions": [
       {
-        "entry_url_or_id": "https://metr.org/blog/2026-05-19-frontier-risk-report/",
+        "entry_url_or_id": "metr_frontier_risk_report_2026",
         "corpus": "metr-evals-metrics",
         "side": "a",
         "stance_summary": "Frontier Risk Report (February to March 2026)",
@@ -1728,7 +1787,7 @@
         "relevance_score": 10
       },
       {
-        "entry_url_or_id": "https://metr.org/blog/2026-01-19-early-work-on-monitorability-evaluations/",
+        "entry_url_or_id": "metr_monitorability_evals_2026",
         "corpus": "metr-evals-metrics",
         "side": "a",
         "stance_summary": "Early work on monitorability evaluations",
@@ -1952,7 +2011,7 @@
         "relevance_score": 7
       },
       {
-        "entry_url_or_id": "https://metr.org/notes/2026-01-29-frontier-ai-safety-regulations/",
+        "entry_url_or_id": "metr_frontier_regulations_reference_2026",
         "corpus": "metr-evals-metrics",
         "side": "a",
         "stance_summary": "Frontier AI safety regulations: A reference for lab staff",
@@ -1973,24 +2032,38 @@
         "relevance_score": 7
       },
       {
-        "entry_url_or_id": "metr_predeployment_inadequate_2025",
-        "corpus": "metr-evals-metrics",
-        "side": "a",
-        "stance_summary": "Why pre-deployment testing is not an adequate framework for AI risk management",
-        "relevance_score": 7
-      },
-      {
-        "entry_url_or_id": "https://metr.org/blog/2025-01-17-ai-models-dangerous-before-public-deployment/",
+        "entry_url_or_id": "metr_dangerous_before_deployment_2025",
         "corpus": "metr-evals-metrics",
         "side": "a",
         "stance_summary": "AI models can be dangerous before public deployment",
+        "relevance_score": 7
+      },
+      {
+        "entry_url_or_id": "deepmind_gemini3_pro_fsf_report_2025",
+        "corpus": "lab-primary-docs",
+        "side": "a",
+        "stance_summary": "Per-launch FSF compliance reporting makes threshold determinations auditable — the disclosure template evals advocates asked for",
+        "relevance_score": 8
+      },
+      {
+        "entry_url_or_id": "anthropic_claude4_launch_asl3_2025",
+        "corpus": "lab-primary-docs",
+        "side": "a",
+        "stance_summary": "First precautionary ASL-3 activation: deployment gated on inability to rule out threshold crossing",
+        "relevance_score": 8
+      },
+      {
+        "entry_url_or_id": "fmf_risk_taxonomy_thresholds_2025",
+        "corpus": "lab-primary-docs",
+        "side": "a",
+        "stance_summary": "Industry-consensus report formalizing enabling vs acceptable-deployment thresholds and their unresolved baselining problem",
         "relevance_score": 7
       }
     ],
     "cross_corpus_references": [
       {
         "from_corpus": "metr-evals-metrics",
-        "from_id": "metr_frontier_risk_report_feb_mar_2026",
+        "from_id": "metr_frontier_risk_report_2026",
         "to_corpus": "arxiv-ai-safety",
         "to_id": "metr_evaluating_language_model_agents_2023",
         "relationship": "evaluates_methods_from",
@@ -2014,7 +2087,7 @@
       },
       {
         "from_corpus": "metr-evals-metrics",
-        "from_id": "metr_frontier_risk_report_feb_mar_2026",
+        "from_id": "metr_frontier_risk_report_2026",
         "to_corpus": "dwarkesh-lab-insiders",
         "to_id": "anthropic_claude_opus_46_system_card",
         "relationship": "evaluates_claims_in",
@@ -2035,6 +2108,14 @@
         "to_id": "metr_monitorability_evals_2026",
         "relationship": "complements",
         "relevance_score": 8
+      },
+      {
+        "from_corpus": "lab-primary-docs",
+        "from_id": "fmf_risk_taxonomy_thresholds_2025",
+        "to_corpus": "loophole-historical-cases",
+        "to_id": "loophole_historical_pre_deployment_testing_churchill_roosevelt",
+        "relationship": "adversarial_case_study_of",
+        "relevance_score": 6
       }
     ]
   },
@@ -2455,7 +2536,7 @@
     },
     "positions": [
       {
-        "entry_url_or_id": "https://metr.org/blog/2026-05-19-frontier-risk-report/",
+        "entry_url_or_id": "metr_frontier_risk_report_2026",
         "corpus": "metr-evals-metrics",
         "side": "a",
         "stance_summary": "Frontier Risk Report (February to March 2026)",
@@ -2483,7 +2564,7 @@
         "relevance_score": 10
       },
       {
-        "entry_url_or_id": "https://metr.org/blog/2026-1-29-time-horizon-1-1/",
+        "entry_url_or_id": "metr_time_horizon_1_1_2026",
         "corpus": "metr-evals-metrics",
         "side": "a",
         "stance_summary": "Time Horizon 1.1",
@@ -2532,7 +2613,7 @@
         "relevance_score": 10
       },
       {
-        "entry_url_or_id": "https://metr.org/blog/2026-1-29-time-horizon-1-1/",
+        "entry_url_or_id": "dwarkesh_metr_time_horizon_11_2026",
         "corpus": "dwarkesh-lab-insiders",
         "side": "a",
         "stance_summary": "Time Horizon 1.1",
@@ -2686,7 +2767,7 @@
         "relevance_score": 7
       },
       {
-        "entry_url_or_id": "https://metr.org/blog/2025-07-14-how-does-time-horizon-vary-across-domains/",
+        "entry_url_or_id": "metr_time_horizon_coding_domain_2025",
         "corpus": "metr-evals-metrics",
         "side": "a",
         "stance_summary": "Time Horizon in Coding Domain: Detailed Analysis",
@@ -2733,12 +2814,33 @@
         "side": "a",
         "stance_summary": "Tweet engaging with existential risk real themes",
         "relevance_score": 6
+      },
+      {
+        "entry_url_or_id": "econtai_automating_ai_research_explosive_growth_2026",
+        "corpus": "ai-forecasting-economics",
+        "side": "a",
+        "stance_summary": "Davidson-Halperin-Houlden-Korinek: analytical take-off threshold for explosive growth from automated AI R&D is within reach",
+        "relevance_score": 9
+      },
+      {
+        "entry_url_or_id": "deepmind_fsf_v3_2025",
+        "corpus": "lab-primary-docs",
+        "side": "a",
+        "stance_summary": "DeepMind FSF 3.0 adds protocols for ML R&D capabilities that could destabilizingly accelerate AI development",
+        "relevance_score": 8
+      },
+      {
+        "entry_url_or_id": "openai_preparedness_framework_v2_2025",
+        "corpus": "lab-primary-docs",
+        "side": "a",
+        "stance_summary": "OpenAI Preparedness v2 elevates AI self-improvement to a tracked catastrophic-risk category",
+        "relevance_score": 8
       }
     ],
     "cross_corpus_references": [
       {
         "from_corpus": "metr-evals-metrics",
-        "from_id": "metr_frontier_risk_report_feb_mar_2026",
+        "from_id": "metr_frontier_risk_report_2026",
         "to_corpus": "arxiv-ai-safety",
         "to_id": "metr_evaluating_language_model_agents_2023",
         "relationship": "evaluates_methods_from",
@@ -2762,11 +2864,35 @@
       },
       {
         "from_corpus": "dwarkesh-lab-insiders",
-        "from_id": "dwarkesh_dario_amodei_feb_2026",
+        "from_id": "amodei_dario_dwarkesh_2026_end_of_exponential",
         "to_corpus": "metr-evals-metrics",
         "to_id": "metr_mirrorcode_2026",
         "relationship": "makes_claims_supported_by",
         "relevance_score": 9
+      },
+      {
+        "from_corpus": "ai-forecasting-economics",
+        "from_id": "econtai_automating_ai_research_explosive_growth_2026",
+        "to_corpus": "ai-forecasting-economics",
+        "to_id": "epoch_gate_model_2025",
+        "relationship": "formalizes_mechanism_of",
+        "relevance_score": 7
+      },
+      {
+        "from_corpus": "ai-forecasting-economics",
+        "from_id": "econtai_automating_ai_research_explosive_growth_2026",
+        "to_corpus": "loophole-historical-cases",
+        "to_id": "loophole_historical_recursive_self_improvement_lovelace_caesar",
+        "relationship": "adversarial_case_study_of",
+        "relevance_score": 6
+      },
+      {
+        "from_corpus": "lab-primary-docs",
+        "from_id": "deepmind_fsf_v3_2025",
+        "to_corpus": "ai-scifi-books",
+        "to_id": "jones_colossus",
+        "relationship": "fictional_treatment_in",
+        "relevance_score": 5
       }
     ]
   },
@@ -3223,7 +3349,7 @@
         "relevance_score": 7
       },
       {
-        "entry_url_or_id": "https://evaluations.metr.org/",
+        "entry_url_or_id": "metr_deepseek_mid2025_eval_2025",
         "corpus": "metr-evals-metrics",
         "side": "a",
         "stance_summary": "Details about METR's evaluation of DeepSeek mid-2025 models",
@@ -3368,16 +3494,53 @@
         "side": "a",
         "stance_summary": "Tweet engaging with coordination necessary themes",
         "relevance_score": 6
+      },
+      {
+        "entry_url_or_id": "meta_frontier_ai_framework_2025",
+        "corpus": "lab-primary-docs",
+        "side": "a",
+        "stance_summary": "Meta FAIF: outcomes-led thresholds reconcile open-weights release with catastrophic-risk management",
+        "relevance_score": 8
+      },
+      {
+        "entry_url_or_id": "meta_advanced_ai_scaling_framework_v2_2026",
+        "corpus": "lab-primary-docs",
+        "side": "a",
+        "stance_summary": "Meta AASF v2 keeps open-weights context while formally tracking loss-of-control outcomes",
+        "relevance_score": 7
+      },
+      {
+        "entry_url_or_id": "anthropic_claude_fable5_mythos5_2026",
+        "corpus": "lab-primary-docs",
+        "side": "b",
+        "stance_summary": "Fable/Mythos tiered release: classifier-gated general access plus vetted unclassifiered access as the structured alternative to open weights",
+        "relevance_score": 8
       }
     ],
     "cross_corpus_references": [
       {
         "from_corpus": "dwarkesh-lab-insiders",
-        "from_id": "dwarkesh_elon_musk_feb_2026",
+        "from_id": "musk_elon_dwarkesh_2026_ai_in_space",
         "to_corpus": "ai-laws-policy",
         "to_id": "us_national_ai_framework_2026",
         "relationship": "advocates_against",
         "relevance_score": 7
+      },
+      {
+        "from_corpus": "lab-primary-docs",
+        "from_id": "meta_frontier_ai_framework_2025",
+        "to_corpus": "loophole-historical-cases",
+        "to_id": "loophole_historical_open_vs_closed_safety_hamilton_douglass",
+        "relationship": "adversarial_case_study_of",
+        "relevance_score": 6
+      },
+      {
+        "from_corpus": "lab-primary-docs",
+        "from_id": "anthropic_claude_fable5_mythos5_2026",
+        "to_corpus": "ai-scifi-books",
+        "to_id": "scifi_bostrom_superintelligence",
+        "relationship": "conceptual_precursor_in",
+        "relevance_score": 5
       }
     ]
   },
@@ -3784,7 +3947,7 @@
         "relevance_score": 10
       },
       {
-        "entry_url_or_id": "https://metr.org/blog/2026-1-29-time-horizon-1-1/",
+        "entry_url_or_id": "metr_time_horizon_1_1_2026",
         "corpus": "metr-evals-metrics",
         "side": "a",
         "stance_summary": "Time Horizon 1.1",
@@ -3805,7 +3968,7 @@
         "relevance_score": 10
       },
       {
-        "entry_url_or_id": "https://metr.org/blog/2026-1-29-time-horizon-1-1/",
+        "entry_url_or_id": "dwarkesh_metr_time_horizon_11_2026",
         "corpus": "dwarkesh-lab-insiders",
         "side": "a",
         "stance_summary": "Time Horizon 1.1",
@@ -3854,7 +4017,7 @@
         "relevance_score": 8
       },
       {
-        "entry_url_or_id": "https://metr.org/blog/2025-10-14-malt-dataset-of-natural-and-prompted-behaviors/",
+        "entry_url_or_id": "metr_eval_integrity_metascience",
         "corpus": "metr-evals-metrics",
         "side": "a",
         "stance_summary": "Evaluation Integrity as Metascience: Can We Trust AI Measurements?",
@@ -3952,14 +4115,14 @@
         "relevance_score": 7
       },
       {
-        "entry_url_or_id": "https://metr.org/blog/2025-03-19-measuring-ai-ability-to-complete-long-tasks/",
+        "entry_url_or_id": "metr_benchmark_saturation_problem",
         "corpus": "metr-evals-metrics",
         "side": "a",
         "stance_summary": "The Benchmark Saturation Problem and Time Horizon as Solution",
         "relevance_score": 7
       },
       {
-        "entry_url_or_id": "https://metr.org/hcast.pdf",
+        "entry_url_or_id": "metr_cybersecurity_eval_capabilities",
         "corpus": "metr-evals-metrics",
         "side": "a",
         "stance_summary": "Cybersecurity Evaluation Capabilities in HCAST",
@@ -4041,12 +4204,26 @@
         "side": "a",
         "stance_summary": "Tweet engaging with evaluation needed themes",
         "relevance_score": 6
+      },
+      {
+        "entry_url_or_id": "epoch_data_hub_trajectory_of_ai",
+        "corpus": "ai-forecasting-economics",
+        "side": "a",
+        "stance_summary": "Epoch benchmark and compute databases: the longitudinal measurement layer benchmark-validity claims are tested against",
+        "relevance_score": 7
+      },
+      {
+        "entry_url_or_id": "futuresearch_agi_timeline_tracker_2026",
+        "corpus": "ai-forecasting-economics",
+        "side": "a",
+        "stance_summary": "Tracked forecasters tie timeline updates to specific benchmark milestones — an audit trail of what benchmarks moved beliefs",
+        "relevance_score": 6
       }
     ],
     "cross_corpus_references": [
       {
         "from_corpus": "metr-evals-metrics",
-        "from_id": "metr_time_horizon_11_2026",
+        "from_id": "metr_time_horizon_1_1_2026",
         "to_corpus": "metr-evals-metrics",
         "to_id": "metr_mirrorcode_2026",
         "relationship": "extended_by",
@@ -4059,6 +4236,14 @@
         "to_id": "metr_monitorability_evals_2026",
         "relationship": "challenges_assumptions_of",
         "relevance_score": 8
+      },
+      {
+        "from_corpus": "ai-forecasting-economics",
+        "from_id": "epoch_data_hub_trajectory_of_ai",
+        "to_corpus": "loophole-historical-cases",
+        "to_id": "loophole_historical_benchmark_validity_einstein_darwin",
+        "relationship": "adversarial_case_study_of",
+        "relevance_score": 6
       }
     ]
   },
@@ -4487,7 +4672,7 @@
         "relevance_score": 8
       },
       {
-        "entry_url_or_id": "https://metr.org/notes/2026-01-29-frontier-ai-safety-regulations/",
+        "entry_url_or_id": "metr_sb53_analysis_2026",
         "corpus": "metr-evals-metrics",
         "side": "a",
         "stance_summary": "California SB 53 Requirements Analysis",
@@ -4641,14 +4826,14 @@
         "relevance_score": 7
       },
       {
-        "entry_url_or_id": "https://metr.org/common-elements",
+        "entry_url_or_id": "metr_risk_thresholds_framework",
         "corpus": "metr-evals-metrics",
         "side": "a",
         "stance_summary": "Risk Thresholds and Capability-Based Governance",
         "relevance_score": 7
       },
       {
-        "entry_url_or_id": "https://metr.org/blog/2025-03-19-measuring-ai-ability-to-complete-long-tasks/",
+        "entry_url_or_id": "metr_exponential_trend_evidence",
         "corpus": "metr-evals-metrics",
         "side": "a",
         "stance_summary": "Evidence for Exponential AI Capability Growth",
@@ -4669,7 +4854,7 @@
         "relevance_score": 7
       },
       {
-        "entry_url_or_id": "https://www.anthropic.com/responsible-scaling-policy",
+        "entry_url_or_id": "anthropic_rsp_v1_2023",
         "corpus": "dwarkesh-lab-insiders",
         "side": "a",
         "stance_summary": "Anthropic's Responsible Scaling Policy",
@@ -4716,6 +4901,27 @@
         "side": "b",
         "stance_summary": "The U.S. action plan argues for accelerating AI innovation and infrastructure rather than slowing development through broad precautionary rules.",
         "relevance_score": 9
+      },
+      {
+        "entry_url_or_id": "epoch_frontier_model_counts_2025",
+        "corpus": "ai-forecasting-economics",
+        "side": "a",
+        "stance_summary": "Fixed compute thresholds go from covering ~10 models (2026) to 200+ (2030) — regulation design lags capability diffusion",
+        "relevance_score": 8
+      },
+      {
+        "entry_url_or_id": "anthropic_rsp_v3_2026",
+        "corpus": "lab-primary-docs",
+        "side": "b",
+        "stance_summary": "RSP v3: quantified Risk Reports and safety roadmaps as evidence voluntary risk management is maturing without statute",
+        "relevance_score": 7
+      },
+      {
+        "entry_url_or_id": "xai_frontier_ai_framework_2025",
+        "corpus": "lab-primary-docs",
+        "side": "b",
+        "stance_summary": "Twelve firms converging on frontier-framework form suggests industry norms can move faster than legislation",
+        "relevance_score": 6
       }
     ],
     "cross_corpus_references": [
@@ -4750,6 +4956,14 @@
         "to_id": "eo_14179_trump_ai",
         "relationship": "implements_policy_direction_from",
         "relevance_score": 9
+      },
+      {
+        "from_corpus": "ai-forecasting-economics",
+        "from_id": "epoch_frontier_model_counts_2025",
+        "to_corpus": "loophole-historical-cases",
+        "to_id": "loophole_historical_speed_of_regulation_madison_bonaparte",
+        "relationship": "adversarial_case_study_of",
+        "relevance_score": 6
       }
     ]
   },
@@ -5201,7 +5415,7 @@
     },
     "positions": [
       {
-        "entry_url_or_id": "https://metr.org/blog/2026-05-19-frontier-risk-report/",
+        "entry_url_or_id": "metr_frontier_risk_report_2026",
         "corpus": "metr-evals-metrics",
         "side": "a",
         "stance_summary": "Frontier Risk Report (February to March 2026)",
@@ -5215,7 +5429,7 @@
         "relevance_score": 10
       },
       {
-        "entry_url_or_id": "https://metr.org/blog/2026-01-19-early-work-on-monitorability-evaluations/",
+        "entry_url_or_id": "metr_monitorability_evals_2026",
         "corpus": "metr-evals-metrics",
         "side": "a",
         "stance_summary": "Early work on monitorability evaluations",
@@ -5404,14 +5618,14 @@
         "relevance_score": 7
       },
       {
-        "entry_url_or_id": "https://arxiv.org/abs/2406.06652",
+        "entry_url_or_id": "alignment_faking_large_language_models_greenblatt_2024",
         "corpus": "arxiv-ai-safety",
         "side": "a",
         "stance_summary": "Alignment Faking in Large Language Models",
         "relevance_score": 7
       },
       {
-        "entry_url_or_id": "https://www.lesswrong.com/posts/pRkFkzwKZ2zfa3R6H/without-specific-countermeasures-the-easiest-path-to",
+        "entry_url_or_id": "cotra_without_specific_countermeasures",
         "corpus": "lesswrong-posts",
         "side": "a",
         "stance_summary": "Without Specific Countermeasures, the Easiest Path to Transformative AI Likely L",
@@ -5486,12 +5700,26 @@
         "side": "a",
         "stance_summary": "GPT-5 system-card disclosures about high-capability domains and safe completions provide a lab-side safety frame for frontier-model risk management.",
         "relevance_score": 8
+      },
+      {
+        "entry_url_or_id": "deepmind_fsf_v2_2025",
+        "corpus": "lab-primary-docs",
+        "side": "a",
+        "stance_summary": "FSF 2.0: first frontier framework to operationalize deceptive alignment via instrumental-reasoning CCLs and reasoning monitoring",
+        "relevance_score": 8
+      },
+      {
+        "entry_url_or_id": "anthropic_claude_opus_45_system_card_2025",
+        "corpus": "lab-primary-docs",
+        "side": "a",
+        "stance_summary": "Opus 4.5 system card quantifies evaluation awareness — behavior shifts when the model infers it is being tested",
+        "relevance_score": 8
       }
     ],
     "cross_corpus_references": [
       {
         "from_corpus": "metr-evals-metrics",
-        "from_id": "metr_frontier_risk_report_feb_mar_2026",
+        "from_id": "metr_frontier_risk_report_2026",
         "to_corpus": "arxiv-ai-safety",
         "to_id": "metr_evaluating_language_model_agents_2023",
         "relationship": "evaluates_methods_from",
@@ -5536,6 +5764,22 @@
         "to_id": "sabotage_evaluations_2024",
         "relationship": "applies_framework_from",
         "relevance_score": 8
+      },
+      {
+        "from_corpus": "lab-primary-docs",
+        "from_id": "deepmind_fsf_v2_2025",
+        "to_corpus": "loophole-historical-cases",
+        "to_id": "loophole_historical_deceptive_alignment_lovelace_oppenheimer",
+        "relationship": "adversarial_case_study_of",
+        "relevance_score": 6
+      },
+      {
+        "from_corpus": "lab-primary-docs",
+        "from_id": "anthropic_claude_opus_45_system_card_2025",
+        "to_corpus": "ai-scifi-books",
+        "to_id": "film_ex_machina",
+        "relationship": "fictional_treatment_in",
+        "relevance_score": 6
       }
     ]
   },
@@ -5692,14 +5936,14 @@
         "relevance_score": 7
       },
       {
-        "entry_url_or_id": "dwarkesh_elon_musk_feb_2026",
+        "entry_url_or_id": "musk_elon_dwarkesh_2026_ai_in_space",
         "corpus": "dwarkesh-lab-insiders",
         "side": "b",
         "stance_summary": "Musk's orbital-data-center discussion is retained only as speculative industry-response evidence, not as a policy-grade mitigation claim.",
         "relevance_score": 3
       },
       {
-        "entry_url_or_id": "international_ai_safety_report_2026",
+        "entry_url_or_id": "intl_ai_safety_report_2026_policy",
         "corpus": "ai-laws-policy",
         "side": "a",
         "stance_summary": "International safety framing increasingly includes environmental sustainability as one dimension of AI governance capacity.",
@@ -5811,6 +6055,13 @@
         "side": "a",
         "stance_summary": "AI Index economy and education trends provide a broad empirical frame for adoption, exposure, and public policy capacity.",
         "relevance_score": 7
+      },
+      {
+        "entry_url_or_id": "nber_korinek_suh_agi_scenarios_2024",
+        "corpus": "ai-forecasting-economics",
+        "side": "b",
+        "stance_summary": "Korinek-Suh: wages can collapse before full automation if remaining human tasks are bounded — displacement risk is a scenario property, not a current-data question",
+        "relevance_score": 7
       }
     ],
     "cross_corpus_references": [
@@ -5837,6 +6088,14 @@
         "to_id": "anthropic_economic_index_2025",
         "relationship": "adds_labor_rights_context_to",
         "relevance_score": 7
+      },
+      {
+        "from_corpus": "ai-forecasting-economics",
+        "from_id": "nber_korinek_suh_agi_scenarios_2024",
+        "to_corpus": "ai-scifi-books",
+        "to_id": "vonnegut_player_piano",
+        "relationship": "fictional_treatment_in",
+        "relevance_score": 6
       }
     ],
     "argument_tree": {
@@ -5929,599 +6188,6 @@
           "Objective productivity effects can lag perception",
           "Algorithmic hiring and worker-management systems create discrimination risks",
           "Partial task automation can still shift bargaining power, job quality, and entry-level opportunities"
-        ]
-      }
-    },
-    "meta": {
-      "added_by": "corpus_audit_fix",
-      "date_added": "2026-05-21"
-    }
-  },
-  {
-    "id": "debate_ai_education_integrity",
-    "title": "AI in Education: Learning Tool or Assessment Threat?",
-    "category": "societal_impact",
-    "question": "Should education policy encourage broad AI adoption, or restrict AI use around assessment and student evaluation?",
-    "status": "active",
-    "positions": [
-      {
-        "entry_url_or_id": "anthropic_education_report_2025",
-        "corpus": "dwarkesh-lab-insiders",
-        "side": "a",
-        "stance_summary": "Educators use AI to build curricula, simulations, and learning materials, showing constructive uses beyond student cheating narratives.",
-        "relevance_score": 10
-      },
-      {
-        "entry_url_or_id": "us_department_education_ai_report_2023",
-        "corpus": "ai-laws-policy",
-        "side": "a",
-        "stance_summary": "U.S. Department of Education guidance frames AI as intelligence augmentation while requiring human-centered, explainable, and overridable systems.",
-        "relevance_score": 9
-      },
-      {
-        "entry_url_or_id": "unesco_ai_education_guidance",
-        "corpus": "ai-laws-policy",
-        "side": "a",
-        "stance_summary": "UNESCO calls for regulated, human-centered AI in education with teacher training rather than unmanaged adoption or blanket panic.",
-        "relevance_score": 8
-      },
-      {
-        "entry_url_or_id": "ohio_education_ai_policy",
-        "corpus": "ai-laws-policy",
-        "side": "a",
-        "stance_summary": "Ohio HB 96 moves schools toward local AI policies and model guidance instead of ad hoc classroom-level decisions.",
-        "relevance_score": 7
-      },
-      {
-        "entry_url_or_id": "international_baccalaureate_ai_assessment_policy_2023",
-        "corpus": "ai-laws-policy",
-        "side": "b",
-        "stance_summary": "IB assessment policy shows that AI use can be permitted only when academic integrity, attribution, and assessment design adapt.",
-        "relevance_score": 9
-      },
-      {
-        "entry_url_or_id": "stanford_ai_index_2026",
-        "corpus": "arxiv-ai-safety",
-        "side": "b",
-        "stance_summary": "AI Index education trends show adoption is broad while institutional policy clarity lags behind tool availability.",
-        "relevance_score": 7
-      }
-    ],
-    "cross_corpus_references": [
-      {
-        "from_corpus": "dwarkesh-lab-insiders",
-        "from_id": "anthropic_education_report_2025",
-        "to_corpus": "ai-laws-policy",
-        "to_id": "ohio_education_ai_policy",
-        "relationship": "informs_policy_design",
-        "relevance_score": 8
-      },
-      {
-        "from_corpus": "ai-laws-policy",
-        "from_id": "us_department_education_ai_report_2023",
-        "to_corpus": "ai-laws-policy",
-        "to_id": "unesco_ai_education_guidance",
-        "relationship": "aligns_with_human_centered_guidance",
-        "relevance_score": 8
-      },
-      {
-        "from_corpus": "ai-laws-policy",
-        "from_id": "international_baccalaureate_ai_assessment_policy_2023",
-        "to_corpus": "dwarkesh-lab-insiders",
-        "to_id": "anthropic_education_report_2025",
-        "relationship": "adds_assessment_integrity_context_to",
-        "relevance_score": 9
-      }
-    ],
-    "argument_tree": {
-      "root": {
-        "id": "node_1",
-        "claim": "AI can expand educational capacity, but assessment and grading need stronger guardrails than routine instructional support.",
-        "type": "thesis",
-        "children": [
-          {
-            "id": "node_2",
-            "claim": "AI can help educators create curricula and interactive materials that would otherwise be costly to build.",
-            "type": "support",
-            "source": {
-              "corpus": "dwarkesh-lab-insiders",
-              "entry_id": "anthropic_education_report_2025"
-            },
-            "evidence_strength": "strong",
-            "fact_check_status": "verified",
-            "children": []
-          },
-          {
-            "id": "node_3",
-            "claim": "Automating grading and evaluation risks undermining educational trust and fairness.",
-            "type": "qualification",
-            "source": {
-              "corpus": "dwarkesh-lab-insiders",
-              "entry_id": "anthropic_education_report_2025"
-            },
-            "evidence_strength": "strong",
-            "fact_check_status": "verified",
-            "children": []
-          }
-        ]
-      }
-    },
-    "fact_layer": {
-      "verified_claims": [
-        "Anthropic education report analyzed higher-education educator Claude use and noted grading concerns",
-        "Ohio HB 96 requires school AI policies by July 1, 2026",
-        "IB statement was published March 1, 2023 and updated February 19, 2026"
-      ],
-      "contested_claims": [
-        "Whether AI-enabled assignment redesign can keep pace with model capability improvements",
-        "Whether disclosure rules are enough for academic integrity"
-      ],
-      "needs_review": []
-    },
-    "fallacy_flags": [],
-    "steel_man_assists": {
-      "side_a": "",
-      "side_b": ""
-    },
-    "goalpost_monitor": {
-      "tracked_terms": [],
-      "possible_shifts": []
-    },
-    "agreement_map": {
-      "shared_premises": [
-        "Students and educators are already using generative AI",
-        "Assessment policy must change rather than rely only on detection"
-      ],
-      "remaining_disagreements": [
-        "How permissive AI use should be in graded work",
-        "Whether educator productivity gains justify automation in sensitive evaluation tasks"
-      ]
-    },
-    "burden_of_proof": [],
-    "audience_sentiment": {
-      "initial": {},
-      "pivotal_moments": []
-    },
-    "scoring_rubric": {
-      "evidence_quality": 0,
-      "specificity": 0,
-      "cross_corpus_support": 0
-    },
-    "premise_extraction": {
-      "side_a": {
-        "label": "Adopt With Guidance",
-        "premises": [
-          "AI can help educators create richer materials and reduce administrative burdens",
-          "Policy should teach responsible use and disclosure",
-          "Blanket bans can leave schools unprepared for real-world AI use"
-        ]
-      },
-      "side_b": {
-        "label": "Protect Assessment Integrity",
-        "premises": [
-          "Automated grading and student submissions raise trust and fairness risks",
-          "Foundational skills can atrophy if assignments are not redesigned",
-          "Institutions need explicit rules before high-stakes assessment use"
-        ]
-      }
-    },
-    "meta": {
-      "added_by": "corpus_audit_fix",
-      "date_added": "2026-05-21"
-    }
-  },
-  {
-    "id": "debate_ai_copyright_training",
-    "title": "AI Training and Copyright: Fair Use or Licensing Market?",
-    "category": "policy_dispute",
-    "question": "Should developers be allowed to train on copyrighted works under fair use, or should licensing and compensation be required?",
-    "status": "active",
-    "positions": [
-      {
-        "entry_url_or_id": "us_copyright_office_ai_training_report_2025",
-        "corpus": "ai-laws-policy",
-        "side": "a",
-        "stance_summary": "The Copyright Office frames training as a fact-sensitive fair-use and market-harm question rather than a blanket permission.",
-        "relevance_score": 10
-      },
-      {
-        "entry_url_or_id": "nyt_v_openai_copyright",
-        "corpus": "ai-laws-policy",
-        "side": "a",
-        "stance_summary": "New York Times v. OpenAI captures the plaintiff-side claim that training and outputs can substitute for protected journalism and require accountability.",
-        "relevance_score": 9
-      },
-      {
-        "entry_url_or_id": "ai_training_data_transparency_act",
-        "corpus": "ai-laws-policy",
-        "side": "a",
-        "stance_summary": "Disclosure proposals seek to make training-data use visible enough for creators and regulators to contest.",
-        "relevance_score": 8
-      },
-      {
-        "entry_url_or_id": "california_ab_2013",
-        "corpus": "ai-laws-policy",
-        "side": "a",
-        "stance_summary": "California AB 2013 operationalizes training-data transparency through public dataset-summary obligations for public generative AI systems.",
-        "relevance_score": 8
-      },
-      {
-        "entry_url_or_id": "eu_gpai_code_of_practice_2025",
-        "corpus": "ai-laws-policy",
-        "side": "a",
-        "stance_summary": "EU GPAI Code copyright obligations show the AI Act path toward transparency and rights-reservation compliance.",
-        "relevance_score": 8
-      },
-      {
-        "entry_url_or_id": "bartz_v_anthropic_fair_use_2025",
-        "corpus": "ai-laws-policy",
-        "side": "b",
-        "stance_summary": "Bartz supports the fair-use side for lawfully acquired books while warning that pirated acquisition and retention remain legally exposed.",
-        "relevance_score": 10
-      },
-      {
-        "entry_url_or_id": "japan_copyright_art_30_4",
-        "corpus": "ai-laws-policy",
-        "side": "b",
-        "stance_summary": "Japan Article 30-4 is a major example of a more permissive text-and-data-mining approach for non-enjoyment uses.",
-        "relevance_score": 8
-      },
-      {
-        "entry_url_or_id": "eu_copyright_ai_training",
-        "corpus": "ai-laws-policy",
-        "side": "b",
-        "stance_summary": "EU copyright rules preserve text-and-data-mining pathways but rely on opt-outs and rights-reservation mechanics.",
-        "relevance_score": 8
-      }
-    ],
-    "cross_corpus_references": [
-      {
-        "from_corpus": "ai-laws-policy",
-        "from_id": "us_copyright_office_ai_training_report_2025",
-        "to_corpus": "ai-laws-policy",
-        "to_id": "ai_training_data_transparency_act",
-        "relationship": "provides_policy_context_for",
-        "relevance_score": 9
-      },
-      {
-        "from_corpus": "ai-laws-policy",
-        "from_id": "bartz_v_anthropic_fair_use_2025",
-        "to_corpus": "ai-laws-policy",
-        "to_id": "us_copyright_office_ai_training_report_2025",
-        "relationship": "tests_policy_framework_in_court",
-        "relevance_score": 9
-      },
-      {
-        "from_corpus": "ai-laws-policy",
-        "from_id": "california_ab_2013",
-        "to_corpus": "ai-laws-policy",
-        "to_id": "eu_gpai_code_of_practice_2025",
-        "relationship": "parallel_training_transparency_regime",
-        "relevance_score": 8
-      },
-      {
-        "from_corpus": "ai-laws-policy",
-        "from_id": "japan_copyright_art_30_4",
-        "to_corpus": "ai-laws-policy",
-        "to_id": "eu_copyright_ai_training",
-        "relationship": "contrasts_international_tdm_rules_with",
-        "relevance_score": 8
-      }
-    ],
-    "argument_tree": {
-      "root": {
-        "id": "node_1",
-        "claim": "Copyright policy for AI training turns on fair-use facts, market substitution, and whether licensing can scale.",
-        "type": "thesis",
-        "children": [
-          {
-            "id": "node_2",
-            "claim": "Training can involve copyright-relevant copying, so fair use cannot be assumed without factual analysis.",
-            "type": "support",
-            "source": {
-              "corpus": "ai-laws-policy",
-              "entry_id": "us_copyright_office_ai_training_report_2025"
-            },
-            "evidence_strength": "strong",
-            "fact_check_status": "verified",
-            "children": []
-          },
-          {
-            "id": "node_3",
-            "claim": "The scale and diversity of frontier training data may make conventional licensing difficult, creating pressure for collective or statutory approaches.",
-            "type": "qualification",
-            "source": {
-              "corpus": "ai-laws-policy",
-              "entry_id": "us_copyright_office_ai_training_report_2025"
-            },
-            "evidence_strength": "strong",
-            "fact_check_status": "verified",
-            "children": []
-          }
-        ]
-      }
-    },
-    "fact_layer": {
-      "verified_claims": [
-        "U.S. Copyright Office Part 3 was released in May 2025 as a pre-publication report",
-        "Bartz v. Anthropic split fair-use treatment between lawful training copies and pirated-library conduct",
-        "EU GPAI Code includes Transparency and Copyright chapters for GPAI providers"
-      ],
-      "contested_claims": [
-        "Whether training on specific copyrighted works causes legally cognizable market harm",
-        "Whether opt-out, collective licensing, or subpoena mechanisms scale fairly"
-      ],
-      "needs_review": []
-    },
-    "fallacy_flags": [],
-    "steel_man_assists": {
-      "side_a": "",
-      "side_b": ""
-    },
-    "goalpost_monitor": {
-      "tracked_terms": [],
-      "possible_shifts": []
-    },
-    "agreement_map": {
-      "shared_premises": [
-        "Training-data opacity is a real source of legal conflict",
-        "Pending cases and legislation are still shaping the doctrine"
-      ],
-      "remaining_disagreements": [
-        "Whether fair use should cover most training by default",
-        "Whether transparency duties are enough without compensation or licensing rights"
-      ]
-    },
-    "burden_of_proof": [],
-    "audience_sentiment": {
-      "initial": {},
-      "pivotal_moments": []
-    },
-    "scoring_rubric": {
-      "evidence_quality": 0,
-      "specificity": 0,
-      "cross_corpus_support": 0
-    },
-    "premise_extraction": {
-      "side_a": {
-        "label": "Licensing / Transparency Required",
-        "premises": [
-          "Training involves copying that can implicate copyright",
-          "Unlicensed training may harm markets for works or licensing",
-          "Creators need disclosure to enforce rights"
-        ]
-      },
-      "side_b": {
-        "label": "Fair Use / Scalable Access",
-        "premises": [
-          "Some lawful training uses can be transformative fair use",
-          "Licensing every work at frontier scale may be infeasible",
-          "Broad text-and-data-mining exceptions can support innovation and research"
-        ]
-      }
-    },
-    "meta": {
-      "added_by": "corpus_audit_fix",
-      "date_added": "2026-05-21"
-    }
-  },
-  {
-    "id": "debate_multimodal_deepfake_governance",
-    "title": "Multimodal AI: Can Likeness and Deepfake Rules Keep Up?",
-    "category": "policy_dispute",
-    "question": "Can watermarking, disclosure, and platform safeguards manage video/audio generation risks, or are stronger restrictions needed?",
-    "status": "active",
-    "positions": [
-      {
-        "entry_url_or_id": "openai_sora2_system_card_2025",
-        "corpus": "dwarkesh-lab-insiders",
-        "side": "a",
-        "stance_summary": "OpenAI describes staged deployment, upload limits, and heightened safeguards for minors and likeness use as a practical mitigation path.",
-        "relevance_score": 10
-      },
-      {
-        "entry_url_or_id": "nist_synthetic_content_transparency_2024",
-        "corpus": "ai-laws-policy",
-        "side": "a",
-        "stance_summary": "NIST frames provenance, watermarking, labeling, testing, and auditing as a portfolio of technical transparency tools.",
-        "relevance_score": 9
-      },
-      {
-        "entry_url_or_id": "ai_content_labeling_watermarking",
-        "corpus": "ai-laws-policy",
-        "side": "a",
-        "stance_summary": "Content-labeling and watermarking policies aim to preserve provenance and user awareness for generated media.",
-        "relevance_score": 7
-      },
-      {
-        "entry_url_or_id": "california_ab_2885",
-        "corpus": "ai-laws-policy",
-        "side": "a",
-        "stance_summary": "California AB 2885 provides a state-level digital-content authenticity and watermarking example.",
-        "relevance_score": 8
-      },
-      {
-        "entry_url_or_id": "china_011",
-        "corpus": "ai-laws-policy",
-        "side": "a",
-        "stance_summary": "China synthetic-content labeling rules demonstrate a more mandatory traceability-oriented approach.",
-        "relevance_score": 8
-      },
-      {
-        "entry_url_or_id": "take_it_down_act",
-        "corpus": "ai-laws-policy",
-        "side": "b",
-        "stance_summary": "TAKE IT DOWN shows that severe intimate-digital-forgery harms receive enforceable takedown duties, not only disclosure labels.",
-        "relevance_score": 10
-      },
-      {
-        "entry_url_or_id": "fcc_ai_voice_robocall_tcpa_2024",
-        "corpus": "ai-laws-policy",
-        "side": "b",
-        "stance_summary": "FCC robocall ruling applies existing communications law to AI voice cloning used in scams and election misinformation.",
-        "relevance_score": 9
-      },
-      {
-        "entry_url_or_id": "deepfakes_accountability_act",
-        "corpus": "ai-laws-policy",
-        "side": "b",
-        "stance_summary": "Deepfake accountability proposals reflect concern that disclosure alone is inadequate when synthetic media targets real people.",
-        "relevance_score": 8
-      },
-      {
-        "entry_url_or_id": "tennessee_elvis_act",
-        "corpus": "ai-laws-policy",
-        "side": "b",
-        "stance_summary": "Tennessee ELVIS Act illustrates voice and likeness rights as a separate layer from generic content labeling.",
-        "relevance_score": 8
-      },
-      {
-        "entry_url_or_id": "michigan_nonconsensual_deepfakes",
-        "corpus": "ai-laws-policy",
-        "side": "b",
-        "stance_summary": "State nonconsensual-deepfake statutes show targeted criminal and civil responses to intimate-image harms.",
-        "relevance_score": 7
-      },
-      {
-        "entry_url_or_id": "wisconsin_ai_deepfakes",
-        "corpus": "ai-laws-policy",
-        "side": "b",
-        "stance_summary": "Election-deepfake laws show political misinformation as a distinct governance target.",
-        "relevance_score": 7
-      }
-    ],
-    "cross_corpus_references": [
-      {
-        "from_corpus": "dwarkesh-lab-insiders",
-        "from_id": "openai_sora2_system_card_2025",
-        "to_corpus": "ai-laws-policy",
-        "to_id": "ai_content_labeling_watermarking",
-        "relationship": "implements_risk_area_addressed_by",
-        "relevance_score": 8
-      },
-      {
-        "from_corpus": "ai-laws-policy",
-        "from_id": "nist_synthetic_content_transparency_2024",
-        "to_corpus": "ai-laws-policy",
-        "to_id": "california_ab_2885",
-        "relationship": "technical_guidance_for",
-        "relevance_score": 8
-      },
-      {
-        "from_corpus": "ai-laws-policy",
-        "from_id": "take_it_down_act",
-        "to_corpus": "ai-laws-policy",
-        "to_id": "michigan_nonconsensual_deepfakes",
-        "relationship": "federal_state_ncii_alignment",
-        "relevance_score": 8
-      },
-      {
-        "from_corpus": "ai-laws-policy",
-        "from_id": "fcc_ai_voice_robocall_tcpa_2024",
-        "to_corpus": "ai-laws-policy",
-        "to_id": "tennessee_elvis_act",
-        "relationship": "voice_likeness_governance_parallel",
-        "relevance_score": 8
-      },
-      {
-        "from_corpus": "ai-laws-policy",
-        "from_id": "china_011",
-        "to_corpus": "ai-laws-policy",
-        "to_id": "ai_content_labeling_watermarking",
-        "relationship": "specific_jurisdictional_instance_of",
-        "relevance_score": 8
-      }
-    ],
-    "argument_tree": {
-      "root": {
-        "id": "node_1",
-        "claim": "Video and audio generation creates modality-specific risks that require both technical safeguards and legal accountability.",
-        "type": "thesis",
-        "children": [
-          {
-            "id": "node_2",
-            "claim": "Staged deployment and modality-specific safeguards can reduce immediate abuse while preserving beneficial creative uses.",
-            "type": "support",
-            "source": {
-              "corpus": "dwarkesh-lab-insiders",
-              "entry_id": "openai_sora2_system_card_2025"
-            },
-            "evidence_strength": "strong",
-            "fact_check_status": "verified",
-            "children": []
-          },
-          {
-            "id": "node_3",
-            "claim": "Likeness and deepfake harms may require enforceable duties because provenance labels do not prevent all nonconsensual or misleading uses.",
-            "type": "attack",
-            "source": {
-              "corpus": "ai-laws-policy",
-              "entry_id": "deepfakes_accountability_act"
-            },
-            "evidence_strength": "moderate",
-            "fact_check_status": "verified",
-            "children": []
-          }
-        ]
-      }
-    },
-    "fact_layer": {
-      "verified_claims": [
-        "NIST AI 100-4 was published November 20, 2024 and updated April 8, 2026",
-        "TAKE IT DOWN became Public Law 119-12 on May 19, 2025",
-        "FCC ruled on February 8, 2024 that AI-generated voices in robocalls are artificial voices under the TCPA"
-      ],
-      "contested_claims": [
-        "Whether watermarking survives adversarial editing and cross-platform distribution",
-        "Whether platform takedown duties can operate quickly without over-removal",
-        "Whether state-by-state likeness laws can handle global multimodal generation"
-      ],
-      "needs_review": []
-    },
-    "fallacy_flags": [],
-    "steel_man_assists": {
-      "side_a": "",
-      "side_b": ""
-    },
-    "goalpost_monitor": {
-      "tracked_terms": [],
-      "possible_shifts": []
-    },
-    "agreement_map": {
-      "shared_premises": [
-        "Synthetic audio/video creates distinct harms from text generation",
-        "Technical and legal tools are both needed"
-      ],
-      "remaining_disagreements": [
-        "How much risk can be handled by provenance and model safeguards",
-        "How broad deepfake liability should be without chilling protected expression"
-      ]
-    },
-    "burden_of_proof": [],
-    "audience_sentiment": {
-      "initial": {},
-      "pivotal_moments": []
-    },
-    "scoring_rubric": {
-      "evidence_quality": 0,
-      "specificity": 0,
-      "cross_corpus_support": 0
-    },
-    "premise_extraction": {
-      "side_a": {
-        "label": "Layered Technical Safeguards Can Help",
-        "premises": [
-          "Model providers can stage releases and restrict high-risk modalities",
-          "Provenance, watermarking, and labeling can preserve context for users and platforms",
-          "Technical standards can improve interoperability and auditability"
-        ]
-      },
-      "side_b": {
-        "label": "Legal Accountability Is Necessary",
-        "premises": [
-          "Labels do not prevent nonconsensual intimate-image, voice, or likeness harms",
-          "Victims need enforceable removal and liability pathways",
-          "Election and robocall contexts require rapid response beyond voluntary safeguards"
         ]
       }
     },

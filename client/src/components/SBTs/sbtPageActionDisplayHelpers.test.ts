@@ -23,6 +23,7 @@ import {
   resolveSbtPageMiniTokenActionDisplayState,
   resolveSbtPageMintEndDisplayState,
   resolveSbtPageMintActionPlan,
+  resolveSbtPageMintButtonDisplayState,
   resolveSbtPageMintFlowDisplayState,
   resolveSbtPageFullActionDisplayPlan,
   resolveSbtPageOpenMintButtonState,
@@ -663,9 +664,58 @@ describe('sbtPageActionDisplayHelpers', () => {
     });
   });
 
-  it('resolves status content, action feedback, and control styles', () => {
-    expect(resolveSbtPagePasswordJoinButtonState({
-      groupPasswordInput: ' code ',
+  it('builds the full mint button display descriptor without dispatch ownership', () => {
+    const hidden = resolveSbtPageMintButtonDisplayState({
+      burningStatus: 'idle',
+      nowSeconds: 100,
+      sbtInfo: { mintingEndTime: 0 },
+      userHasSBT: true,
+    });
+    expect(hidden.mintActionPlan).toEqual({
+      blockedReason: 'already-has-token',
+      shouldRenderMintButton: false,
+    });
+    expect(hidden.openMintButtonState.readinessDescriptor).toMatchObject({
+      canOpenMintTx: false,
+      hasMintTransactionHash: false,
+    });
+
+    const openMint = resolveSbtPageMintButtonDisplayState({
+      burningStatus: 'idle',
+      lastMintTxHash: '0xmint',
+      mintLowerLabel: 'claim',
+      mintedLabel: 'Claimed',
+      mintingStatus: 'success',
+      nowSeconds: 100,
+      sbtInfo: { mintingEndTime: 0 },
+    });
+    expect(openMint.mintActionPlan).toEqual({
+      blockedReason: 'none',
+      shouldRenderMintButton: true,
+    });
+    expect(openMint.mintFlowDisplayState.shouldRenderOpenMintButton).toBe(true);
+    expect(openMint.openMintButtonState).toMatchObject({
+      canOpenMintTx: true,
+      disabled: false,
+      title: 'View claim transaction',
+    });
+    expect(openMint.openMintButtonContentState).toMatchObject({
+      shouldRenderSuccess: true,
+      successLabel: 'Claimed',
+    });
+  });
+
+  it('builds the full action display plan without execution callbacks', () => {
+    const plan = resolveSbtPageFullActionDisplayPlan({
+      account: '0xOwner',
+      actionClassName: 'action',
+      burnedLabel: 'Removed',
+      burningStatus: 'idle',
+      burnButtonClassName: 'burn',
+      burnLabel: 'Remove',
+      groupPasswordInput: 'group-code',
+      hasGroupPasswordMint: true,
+      mintButtonClassName: 'mint',
       mintingStatus: 'idle',
       nowSeconds: 100,
       sbtInfo: {

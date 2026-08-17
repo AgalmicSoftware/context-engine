@@ -298,10 +298,14 @@
   }
 
   .filterButton {
+    font-size: 11px;
     justify-content: center;
+    line-height: 1.25;
     min-height: 42px;
     min-width: 0;
     padding: 8px 10px;
+    text-align: center;
+    white-space: normal;
   }
 
   .policyTitleRow {
@@ -310,5 +314,22 @@
 
   .policyBadgeRow {
     align-items: flex-start;
+  }
+}
+
+@media (max-width: 420px) {
+  .filterRow {
+    gap: 6px;
+  }
+
+  .filterButton {
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .filterSwatch {
+    flex: 0 0 8px;
+    height: 8px;
+    width: 8px;
   }
 }

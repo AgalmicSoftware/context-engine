@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { SBTsPage } from './SBTsPage';
 import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
-import { getDemoSessionConfigBySlug, getSessionLists } from '../../utilities/web3/contractScripts.js';
+import { getDemoSessionConfigBySlug, getSessionLists } from '../../utilities/web3/chainGateway.js';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
 import { sbtsListPath, t } from '../../utilities/ui/terminology.js';
@@ -104,7 +104,7 @@ describe('SBTsPage auto-feature flag', () => {
   });
 
   it('keeps demo-only list-route slugs instead of collapsing back to general', () => {
-    const contractScripts = jest.requireMock('../../utilities/web3/contractScripts.js');
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
     contractScripts.getSessionConfigBySlug.mockImplementation((slug) =>
       String(slug || '') === '' ? { slug: '' } : null,
     );
@@ -127,7 +127,7 @@ describe('SBTsPage auto-feature flag', () => {
   });
 
   it('keeps an explicit demo alias as the cache slug when display config falls back to general', () => {
-    const contractScripts = jest.requireMock('../../utilities/web3/contractScripts.js');
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
     const demoAutoAddress = '0x0000000000000000000000000000000000000d0a';
     contractScripts.getSessionConfigBySlug.mockImplementation((slug) =>
       String(slug || '') === '' ? { slug: '' } : null,
@@ -210,7 +210,7 @@ describe('SBTsPage auto-feature flag', () => {
   });
 
   it('recognizes and canonicalizes PUBLIC_URL-prefixed groups routes', () => {
-    const contractScripts = jest.requireMock('../../utilities/web3/contractScripts.js');
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
     process.env.PUBLIC_URL = '/ce/';
     contractScripts.getSessionConfigBySlug.mockImplementation((slug) => {
       const normalized = String(slug || '');
@@ -859,7 +859,7 @@ describe('SBTsPage auto-feature flag', () => {
   });
 
   it('keeps configured featured cards when strict embedded auto-feature filtering is enabled', () => {
-    const contractScripts = jest.requireMock('../../utilities/web3/contractScripts.js');
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
     const configuredAddress = '0x000000000000000000000000000000000000d001';
     contractScripts.getSessionConfigBySlug.mockImplementation((slug) =>
       String(slug || '') === 'demo-1' ? { slug: 'demo-1' } : null,
@@ -1518,7 +1518,7 @@ describe('SBTsPage auto-feature flag', () => {
   });
 
   it('falls back to mini SBT readers when cached featured metadata is missing its image', () => {
-    const contractScripts = jest.requireMock('../../utilities/web3/contractScripts.js');
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
     const featuredAddress = '0x00000000000000000000000000000000000000b2';
     contractScripts.getSessionConfigBySlug.mockImplementation((slug) =>
       String(slug || '') === 'alpha' ? { slug: 'alpha' } : null,
@@ -1557,6 +1557,7 @@ describe('SBTsPage auto-feature flag', () => {
     );
 
     expect(screen.queryByTestId(`cache-featured-sbt-link-${featuredAddress.toLowerCase()}`)).not.toBeInTheDocument();
+    expect(screen.getByTestId('embedded-featured-spinner')).toBeInTheDocument();
     expect(screen.getAllByTestId('mock-sbt-page')).toHaveLength(1);
     expect(mockSBTPage.mock.calls[mockSBTPage.mock.calls.length - 1][0]).toEqual(
       expect.objectContaining({
@@ -1568,8 +1569,8 @@ describe('SBTsPage auto-feature flag', () => {
 
   it('hides cache-backed featured card addresses in plain mode', () => {
     const featuredAddress = '0x00000000000000000000000000000000000000b3';
-    const cryptoModeSpy = jest.spyOn(terminology, 'isCryptoMode').mockReturnValue(false);
-    const shortenedAddress = proposalScripts.getShortenedAddress(featuredAddress, false);
+    mockIsCryptoMode.mockReturnValue(false);
+    const shortenedAddress = getShortenedAddress(featuredAddress, false);
 
     peekCacheSync.mockReturnValue({
       84532: {
@@ -1606,14 +1607,12 @@ describe('SBTsPage auto-feature flag', () => {
     expect(screen.getByTestId(`cache-featured-sbt-link-${featuredAddress.toLowerCase()}`)).toBeInTheDocument();
     expect(screen.getByText('Plain Mode Group')).toBeInTheDocument();
     expect(screen.queryByText(shortenedAddress)).not.toBeInTheDocument();
-
-    cryptoModeSpy.mockRestore();
   });
 
   it('shows cache-backed featured card addresses in crypto mode', () => {
     const featuredAddress = '0x00000000000000000000000000000000000000b4';
-    const cryptoModeSpy = jest.spyOn(terminology, 'isCryptoMode').mockReturnValue(true);
-    const shortenedAddress = proposalScripts.getShortenedAddress(featuredAddress, false);
+    mockIsCryptoMode.mockReturnValue(true);
+    const shortenedAddress = getShortenedAddress(featuredAddress, false);
 
     peekCacheSync.mockReturnValue({
       84532: {
@@ -1650,8 +1649,6 @@ describe('SBTsPage auto-feature flag', () => {
     expect(screen.getByTestId(`cache-featured-sbt-link-${featuredAddress.toLowerCase()}`)).toBeInTheDocument();
     expect(screen.getByText('Crypto Mode Group')).toBeInTheDocument();
     expect(screen.getByText(shortenedAddress)).toBeInTheDocument();
-
-    cryptoModeSpy.mockRestore();
   });
 
   it('uses terminology-aware ended minting aria labels on cache-backed featured cards', () => {

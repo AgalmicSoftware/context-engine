@@ -92,6 +92,7 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
     const config = (demoSessions as Record<string, any>)['demo-1'];
 
     expect(config.corsWorkerUrl).toBe('');
+    expect(config.defaultTags).toBe('');
     expect(config.networkChainId).toBe(11155420);
     expect(config.sponsoredKeys).toBeUndefined();
     expect(config.__registry).toBeUndefined();
@@ -115,6 +116,7 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
       demoFixture: { workerCanonical: true },
     });
     expect(config).toMatchObject({
+      networkChainId: 11155420,
       slug: 'demo-sh',
       sessionId: '0xb822b3eca85bdc35cf83cb947bceb6b2',
       configRevision: 'demo-sh-v1',
@@ -124,7 +126,25 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
         workerCanonical: true,
         questionCount: 42,
       },
+      sessionModeProfile: {
+        authority: { mode: 'worker_canonical' },
+        evm: { registryChainId: null },
+        results: {
+          visibility: 'public_full_if_storage_public',
+          exposure: {
+            aggregateResultsEnabled: true,
+            anonymizedGroupsEnabled: false,
+            minGroupSize: 2,
+          },
+        },
+        export: { scope: 'all_session' },
+      },
+      workerAuthority: {
+        version: 1,
+        anonymousScopes: ['storage', 'ai', 'transcribe'],
+      },
     });
+    expect(classifySessionModeProfileSupport(config.sessionModeProfile).status).toBe('reachable');
   });
 
   it('seeds all 40 typed demo-2 questions with deterministic fixture ids', () => {
@@ -153,14 +173,8 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
         fixtureFile: 'client/src/variables/demo/demo_2_question_seed.json',
         onchainQuestionIdsFile: '',
       },
-      workerAuthority: {
-        version: 1,
-        anonymousScopes: ['storage', 'ai', 'transcribe'],
-      },
     });
-    expect(getDemoFixtureQuestionIdsByIndex('demo-2')).toEqual(
-      questions.map((question) => question.id.toLowerCase()),
-    );
+    expect(getDemoFixtureQuestionIdsByIndex('demo-2')).toEqual(questions.map((question) => question.id.toLowerCase()));
   });
 
   it('keeps the checked-in demo-2 config on the fixture-only preview path', () => {

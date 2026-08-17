@@ -1,7 +1,7 @@
 import { ethers } from 'ethers';
 
 import CreateSBTGroup from './CreateSBTGroup';
-import { arweaveScripts } from '../../utilities/arweave/arweaveScripts.js';
+import { arweaveClient } from '../../utilities/arweave/arweaveClient.js';
 import * as resourceKeys from '../../utilities/session/resourceKeys.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 
@@ -320,6 +320,7 @@ describe('CreateSBTGroup metadata and deferred upload helpers', () => {
         name: ['missing-gate'],
       },
     };
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
     try {
       await expect(instance.uploadTokenUriToArweave()).rejects.toThrow(
@@ -356,7 +357,7 @@ describe('CreateSBTGroup metadata and deferred upload helpers', () => {
     };
 
     jest.spyOn(resourceKeys, 'getEffectiveArweaveKey').mockResolvedValue({ arweaveJwk: 'test-jwk' });
-    const uploadSpy = jest.spyOn(arweaveScripts, 'uploadDataToArweave').mockImplementation(async (data) => {
+    const uploadSpy = jest.spyOn(arweaveClient, 'uploadDataToArweave').mockImplementation(async (data) => {
       const parsed = JSON.parse(data);
       expect(parsed.adminRecovery).toBeUndefined();
       return 'test-token-uri';
@@ -396,7 +397,7 @@ describe('CreateSBTGroup metadata and deferred upload helpers', () => {
     expect(preview.image).toBe(`ar://${rawImageTxId}`);
 
     jest.spyOn(resourceKeys, 'getEffectiveArweaveKey').mockResolvedValue({ arweaveJwk: 'test-jwk' });
-    const uploadSpy = jest.spyOn(arweaveScripts, 'uploadDataToArweave').mockImplementation(async (data) => {
+    const uploadSpy = jest.spyOn(arweaveClient, 'uploadDataToArweave').mockImplementation(async (data) => {
       const parsed = JSON.parse(data);
       expect(parsed.image).toBe(`ar://${rawImageTxId}`);
       return 'test-token-uri';
@@ -457,7 +458,7 @@ describe('CreateSBTGroup metadata and deferred upload helpers', () => {
     };
 
     jest.spyOn(resourceKeys, 'getEffectiveArweaveKey').mockResolvedValue({ arweaveJwk: 'test-jwk' });
-    const uploadSpy = jest.spyOn(arweaveScripts, 'uploadDataToArweave').mockImplementation(async (data) => {
+    const uploadSpy = jest.spyOn(arweaveClient, 'uploadDataToArweave').mockImplementation(async (data) => {
       const parsed = JSON.parse(data);
       expect(parsed.image).toBe('');
       expect(parsed.encryptedFields.image).toEqual({
@@ -505,7 +506,7 @@ describe('CreateSBTGroup metadata and deferred upload helpers', () => {
 
     const resourceSpy = jest.spyOn(resourceKeys, 'getEffectiveArweaveKey');
     const uploadSpy = jest
-      .spyOn(arweaveScripts, 'uploadDataToArweave')
+      .spyOn(arweaveClient, 'uploadDataToArweave')
       .mockImplementation(async (_data, _format, opts = {}) => {
         expect(opts.arweaveJwk).toBe('{"kty":"RSA"}');
         expect(opts.sessionSlug).toBe('local-test');
@@ -556,7 +557,7 @@ describe('CreateSBTGroup metadata and deferred upload helpers', () => {
     };
 
     const uploadSpy = jest
-      .spyOn(arweaveScripts, 'uploadDataToArweave')
+      .spyOn(arweaveClient, 'uploadDataToArweave')
       .mockImplementation(async (_data, _format, opts = {}) => {
         expect(opts.forceDirectArweaveUpload).toBe(true);
         expect(opts.arweaveJwk).toBe('{"kty":"RSA"}');
@@ -612,7 +613,7 @@ describe('CreateSBTGroup metadata and deferred upload helpers', () => {
     };
 
     const uploadSpy = jest
-      .spyOn(arweaveScripts, 'uploadDataToArweave')
+      .spyOn(arweaveClient, 'uploadDataToArweave')
       .mockImplementation(async (_data, _format, opts = {}) => {
         expect(opts.forceDirectArweaveUpload).toBe(true);
         expect(opts.arweaveJwk).toBe('{"kty":"RSA"}');
@@ -652,7 +653,8 @@ describe('CreateSBTGroup metadata and deferred upload helpers', () => {
       },
     };
 
-    const uploadSpy = jest.spyOn(arweaveScripts, 'uploadDataToArweave');
+    const uploadSpy = jest.spyOn(arweaveClient, 'uploadDataToArweave');
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
     try {
       await expect(instance.uploadTokenUriToArweave()).rejects.toThrow(
@@ -712,7 +714,7 @@ describe('CreateSBTGroup metadata and deferred upload helpers', () => {
       },
     };
 
-    const uploadSpy = jest.spyOn(arweaveScripts, 'uploadDataToArweave');
+    const uploadSpy = jest.spyOn(arweaveClient, 'uploadDataToArweave');
     const getKeySpy = jest.spyOn(resourceKeys, 'getEffectiveArweaveKey').mockResolvedValue({});
 
     const result = await instance.handleDeferredSave();
@@ -791,7 +793,7 @@ describe('CreateSBTGroup metadata and deferred upload helpers', () => {
       },
     };
 
-    const uploadSpy = jest.spyOn(arweaveScripts, 'uploadDataToArweave');
+    const uploadSpy = jest.spyOn(arweaveClient, 'uploadDataToArweave');
 
     const result = await instance.handleDeferredSave();
 
@@ -1068,10 +1070,16 @@ describe('CreateSBTGroup metadata and deferred upload helpers', () => {
     };
 
     jest.spyOn(resourceKeys, 'getEffectiveArweaveKey').mockResolvedValue({ arweaveJwk: 'test-jwk' });
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-    await expect(instance.uploadTokenUriToArweave()).rejects.toThrow(/could not be resolved/i);
+    try {
+      await expect(instance.uploadTokenUriToArweave()).rejects.toThrow(/could not be resolved/i);
 
-    expect(instance.state.mintingFailed).toBe(true);
-    expect(instance.state.error).toMatch(/could not be resolved/i);
+      expect(instance.state.mintingFailed).toBe(true);
+      expect(instance.state.error).toMatch(/could not be resolved/i);
+      expectUploadFailureLog(consoleErrorSpy, /could not be resolved/i);
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 });

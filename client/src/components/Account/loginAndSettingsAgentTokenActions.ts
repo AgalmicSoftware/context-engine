@@ -7,6 +7,17 @@ import {
 } from '../OnePageSession/onePageSessionTelegramController';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 
+type UnknownRecord = Record<string, unknown>;
+export type LoginDisplaySessionConfig = UnknownRecord & {
+  chainId?: unknown;
+  name?: unknown;
+  networkChainId?: unknown;
+  sessionName?: unknown;
+  slug?: unknown;
+  sponsoredKeys?: UnknownRecord;
+  title?: unknown;
+};
+
 export type LoginAgentSessionContext = {
   agentBridgeUrl: string;
   sessionId: string;
@@ -30,7 +41,7 @@ export type LoginAgentActionsDeps = {
     tokenOrLink: string;
     workerUrl?: unknown;
   }) => Promise<AgentClientLoginEnvelope>;
-  extractAgentClientToken: (tokenOrLink: string) => { ok: true } | { ok: false; reason: string };
+  extractAgentClientToken: (tokenOrLink: string) => AgentClientTokenValidation;
   getActiveSessionSlug: () => string;
   getAgentTokenInput: () => string;
   getDemoSessionConfigBySlug: (slug: string, options: { allowDemoFallback: boolean }) => unknown;
@@ -39,7 +50,7 @@ export type LoginAgentActionsDeps = {
   getTargetNetwork: () => unknown;
   isTelegramFirstSessionConfig: (sessionConfig: unknown) => boolean;
   normalizeSettingsSessionSlug: (slug: unknown) => string;
-  setState: (patch: { agentTokenError?: string; agentTokenInput?: string; agentTokenLoginOpen?: boolean; agentTokenStatus?: string } | ((prev: { agentTokenLoginOpen: boolean }) => { agentTokenError: string; agentTokenInput: string; agentTokenLoginOpen: boolean; agentTokenStatus: string })) => void;
+  setState: (patch: AgentTokenStatePatch | ((prev: { agentTokenLoginOpen: boolean }) => AgentTokenStatePatch)) => void;
   setStateIfMounted: (patch: { agentTokenError?: string; agentTokenInput?: string; agentTokenStatus?: string }) => void;
   updateLoginInfo: (payload: { loginComplete: boolean; loginInProgress: boolean; provider: string | null }) => void;
   windowTarget?: (Window & typeof globalThis) | null;
@@ -49,7 +60,7 @@ export type LoginAgentActions = {
   completeAgentClientLogin: (envelope: AgentClientLoginEnvelope) => void;
   formatAgentTokenError: (error: unknown) => string;
   getAgentTokenLoginSessionContext: () => LoginAgentSessionContext;
-  getDisplaySessionConfig: (slugIn?: unknown, cfgIn?: unknown) => unknown;
+  getDisplaySessionConfig: (slugIn?: unknown, cfgIn?: unknown) => LoginDisplaySessionConfig;
   handleAgentTokenLoginSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   resolveAgentBridgeUrl: (sessionConfig?: unknown) => string;
   shouldShowAgentTokenLogin: () => boolean;
@@ -112,7 +123,7 @@ export const formatAgentTokenError = (error: unknown): string => {
 };
 
 export const createLoginAgentActions = (deps: LoginAgentActionsDeps): LoginAgentActions => {
-  const getDisplaySessionConfig = (slugIn: unknown = '', cfgIn: unknown = null): unknown => {
+  const getDisplaySessionConfig = (slugIn: unknown = '', cfgIn: unknown = null): LoginDisplaySessionConfig => {
     const cfgRecord = isRecord(cfgIn) ? cfgIn : {};
     const slug = deps.normalizeSettingsSessionSlug(slugIn || cfgRecord.slug || '');
     const propSessionConfig = deps.getPropSessionConfig();
@@ -125,9 +136,14 @@ export const createLoginAgentActions = (deps: LoginAgentActionsDeps): LoginAgent
     });
     if (!cfgIn && verifiedWorkerConfig) return verifiedWorkerConfig;
     if (!cfgIn && propConfigRecord && propConfigSlug === slug) {
-      return propConfigRecord;
+      const canonicalConfig = deps.getSessionConfigBySlugOrDefault(slug);
+      // Regression guard: route/demo overlays may add display fields, but registry
+      // worker URLs and sponsorship flags remain operational authority.
+      return isRecord(canonicalConfig)
+        ? mergeDisplaySessionConfig(propConfigRecord, canonicalConfig)
+        : propConfigRecord;
     }
-    return (
+    return toRecord(
       cfgIn ||
         deps.getSessionConfigBySlugOrDefault(slug) ||
         deps.getDemoSessionConfigBySlug(slug, { allowDemoFallback: true }) ||
@@ -206,7 +222,7 @@ export const createLoginAgentActions = (deps: LoginAgentActionsDeps): LoginAgent
     const validation = deps.extractAgentClientToken(tokenOrLink);
     deps.setState({
       agentTokenInput: '',
-      agentTokenError: validation.ok ? '' : formatAgentTokenError(new Error(validation.reason)),
+      agentTokenError: validation.ok ? '' : formatAgentTokenError(new Error(validation.reason || '')),
       agentTokenStatus: validation.ok ? 'loading' : 'error',
     });
     if (!validation.ok) return;

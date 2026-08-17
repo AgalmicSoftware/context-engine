@@ -66,21 +66,23 @@ export const buildCanDecryptOtherResponsesSnapshot = ({
   };
 };
 
-export const buildResponseGateConfigSignature = (cfg = {}) => {
-  const normText = (value) =>
+const readObj = (value: unknown): UnknownRecord => (value && typeof value === 'object' ? (value as UnknownRecord) : {});
+
+export const buildResponseGateConfigSignature = (cfg: ResponseAccessConfig = {}) => {
+  const normText = (value: unknown) =>
     String(value == null ? '' : value)
       .trim()
       .toLowerCase();
-  const normChain = (value) => {
+  const normChain = (value: unknown) => {
     const normalizedValue = Number(value || 0);
     return Number.isFinite(normalizedValue) && normalizedValue > 0 ? String(normalizedValue) : '';
   };
-  const normAddresses = (...sources) =>
+  const normAddresses = (...sources: unknown[]) =>
     Array.from(
       new Set(
         sources
           .flat()
-          .map((address) =>
+          .map((address: unknown) =>
             String(address || '')
               .trim()
               .toLowerCase(),
@@ -90,13 +92,14 @@ export const buildResponseGateConfigSignature = (cfg = {}) => {
     )
       .sort()
       .join(',');
-  const readObj = (value) => (value && typeof value === 'object' ? value : {});
-  const stablePairs = (obj, mapper) =>
-    Object.keys(readObj(obj))
+  const stablePairs = (obj: unknown, mapper: (value: unknown, key: string) => string) => {
+    const record = readObj(obj);
+    return Object.keys(record)
       .sort()
-      .map((key) => `${key}:${mapper(readObj(obj)[key], key)}`)
+      .map((key) => `${key}:${mapper(record[key], key)}`)
       .join('|');
-  const gateSnapshot = (gate = {}) => {
+  };
+  const gateSnapshot = (gate: unknown = {}) => {
     const nextGate = readObj(gate);
     return [
       normText(nextGate.gateId || nextGate.id),

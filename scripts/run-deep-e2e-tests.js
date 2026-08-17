@@ -84,6 +84,10 @@ function buildDeepE2eSteps(packageScripts = readPackageScripts()) {
     steps.push(['agent bridge worker', ['run', '-s', 'test:worker:agent-bridge']]);
   }
 
+  if (Object.prototype.hasOwnProperty.call(packageScripts, 'ai:test-cf-envelope:all')) {
+    steps.push(['Cloudflare envelope and groups', ['run', '-s', 'ai:test-cf-envelope:all']]);
+  }
+
   return steps;
 }
 

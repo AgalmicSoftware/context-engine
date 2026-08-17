@@ -98,7 +98,6 @@ const asSessionConfigRecord = (value: unknown): SessionConfigRecord | null =>
 const asMutableSbtCache = (value: unknown): Record<string, SbtCacheBucket> =>
   isRecord(value) ? (value as Record<string, SbtCacheBucket>) : {};
 
-
 const NAME_LOOKUP_BASE_DELAY_MS = 30 * 1000;
 const NAME_LOOKUP_MAX_DELAY_MS = 60 * 60 * 1000;
 const NAME_LOOKUP_MAX_EXPONENT = 8;
@@ -125,7 +124,7 @@ const normalizeAddress = (value: unknown) => {
   }
 };
 
-const isUnresolvedSessionConfig = (config) => !!config && typeof config === 'object' && config.__unresolved === true;
+const isUnresolvedSessionConfig = (config: unknown) => isRecord(config) && config.__unresolved === true;
 
 const getDisplaySessionConfig = (preferredSlug: unknown = ''): SessionConfigRecord | null => {
   const slug = sanitizeSlug(preferredSlug);
@@ -136,7 +135,7 @@ const getDisplaySessionConfig = (preferredSlug: unknown = ''): SessionConfigReco
   if (!ALLOW_DEMO_SESSION_FALLBACK) {
     return strictLookupConfig || null;
   }
-  const demoLookupConfig = getDemoSessionConfigBySlug(slug, { allowDemoFallback: true });
+  const demoLookupConfig = asSessionConfigRecord(getDemoSessionConfigBySlug(slug, { allowDemoFallback: true }));
   return demoLookupConfig || strictLookupConfig || null;
 };
 
@@ -562,7 +561,7 @@ export const warmSbtDisplayNamesTargeted = async ({
   metadataLookupConfig = null,
   chainId = null,
   writeBack = true,
-} = {}) => {
+}: WarmSbtDisplayNamesArgs = {}) => {
   const unique = Array.from(
     new Set((Array.isArray(addresses) ? addresses : []).map((value) => normalizeAddress(value)).filter(Boolean)),
   );

@@ -136,6 +136,7 @@ export const renderSurveyResultsFilterExportControls = ({
             isSBTCacheReady={isSBTCacheReady}
             sbtCacheRevision={sbtCacheRevision}
             sessionSlug={sessionSlug ?? activeSessionSlug}
+            activeSessionSlug={activeSessionSlug}
             sessionConfig={sessionConfig}
             ensureLightSbtUniverse={ensureLightSbtUniverse}
           />
@@ -156,6 +157,7 @@ export const renderSurveyResultsFilterExportControls = ({
             isSBTCacheReady={isSBTCacheReady}
             sbtCacheRevision={sbtCacheRevision}
             sessionSlug={sessionSlug ?? activeSessionSlug}
+            activeSessionSlug={activeSessionSlug}
             sessionConfig={sessionConfig}
             ensureLightSbtUniverse={ensureLightSbtUniverse}
           />

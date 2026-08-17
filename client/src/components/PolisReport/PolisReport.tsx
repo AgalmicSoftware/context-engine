@@ -22,9 +22,6 @@ import {
 } from '../../utilities/survey/consensusReportMath.js';
 
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
-import demoData from '../../variables/demo/demo_polis_data.json';
-import { CE_DEMO_SESSION_SLUGS, POLIS_DEMO_DATA_AUTOLOAD_SLUGS } from '../../variables/appConfig.js';
-import { getChainById } from '../../variables/chains.js';
 import styles from './PolisReport.module.scss';
 import { QRCodeSVG } from 'qrcode.react';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -39,14 +36,26 @@ import {
   buildQuestionScanProgressDisplay,
   doesQuestionProgressMatchSlug,
   normalizeQuestionProgressSlug,
-} from '../SurveyTool/surveyToolUtils.js';
-import { canonicalizeLegacySessionAlias } from '../../utilities/session/sessionDemoCompat.js';
-
-/**************************************************************
- * Helper: tiny identicon ("blockie") generator with no deps
- * Produces a symmetric 8x8 grid identicon as a data URL.
- **************************************************************/
-import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
+} from '../SurveyTool/surveyToolUtils';
+import type {
+  BooleanMap,
+  EmbeddingChoice,
+  NumberMap,
+  PolisAnalysisCacheByKey,
+  PolisAnalysisErrorsByKey,
+  PolisCommentStat,
+  PolisPoint,
+  PolisRepQuestionsMap,
+  PolisReportProps,
+  PolisSbtSelection,
+  PolisStats,
+  PolisVote,
+  PrecomputedDemoClusterState,
+  RatingMatrix,
+  RatingMatrixBuildResult,
+  StringMap,
+  UnknownRecord,
+} from './polisReportRuntime';
 import {
   DEFAULT_EXPLORATORY_CLUSTER_COUNT,
   OPINION_GROUPS_TOOLTIP_TEXT,
@@ -76,6 +85,7 @@ import {
   resolveJsPdfConstructor,
   shouldAutoEnablePolisDemoData,
 } from './polisReportRuntime';
+import PolisReportSectionToggleLabel from './PolisReportSectionToggleLabel';
 export {
   OPINION_GROUPS_TOOLTIP_TEXT,
   PARTICIPANTS_GRAPH_TOOLTIP_TEXT,
@@ -224,6 +234,10 @@ export default function PolisReport({
   const [manualClusterCount, setManualClusterCount] = useState<string>(() => defaultManualClusterCount);
   const [exploratoryClusterAssignments, setExploratoryClusterAssignments] = useState<number[]>([]);
   const [exploratoryRepQuestions, setExploratoryRepQuestions] = useState<PolisRepQuestionsMap>({});
+
+  useEffect(() => {
+    embeddingChoiceRef.current = embeddingChoice;
+  }, [embeddingChoice]);
 
   // Representative questions
   const [repQuestions, setRepQuestions] = useState<PolisRepQuestionsMap>({});
@@ -1091,8 +1105,7 @@ export default function PolisReport({
         </p>
       );
     }
-    const barData = getCommentBarData(ratingMatrix) || [];
-    const lines = barData.map((_bar: unknown, i: number) => {
+    const lines = ratingMatrix.map((votes, i: number) => {
       const label = questionLabels[i] || `#${i + 1}`;
       const originalId = allQuestions[i];
       const prompt = questionPrompts[originalId] || '(No prompt)';
@@ -1614,7 +1627,7 @@ export default function PolisReport({
                     )}
                     {analysis && (
                       <div className={styles.clusterAnalysisText}>
-                        <div className={styles.clusterAnalysisShort}>"{analysis.short}"</div>
+                        <div className={styles.clusterAnalysisShort}>&quot;{analysis.short}&quot;</div>
                         <div className={styles.clusterAnalysisLong}>{analysis.long}</div>
                       </div>
                     )}
@@ -2410,15 +2423,7 @@ export default function PolisReport({
                   Summary and Statistics
                 </h5>
                 <div className={styles.pdfIgnore} style={{ textAlign: 'right', flex: '1' }}>
-                  {statsOpen ? 'Hide' : 'Show'}
-                  {!statsOpen && (
-                    <span
-                      className={styles.showWhenPdf}
-                      style={{ marginLeft: '10px', color: 'var(--ce-document-text-muted)' }}
-                    >
-                      (Omitted)
-                    </span>
-                  )}
+                  <PolisReportSectionToggleLabel open={statsOpen} />
                 </div>
               </div>
               {statsOpen ? (
@@ -2506,15 +2511,7 @@ export default function PolisReport({
                   Consensus and Difference
                 </h5>
                 <div className={styles.pdfIgnore} style={{ textAlign: 'right', flex: '1' }}>
-                  {beeswarmOpen ? 'Hide' : 'Show'}
-                  {!beeswarmOpen && (
-                    <span
-                      className={styles.showWhenPdf}
-                      style={{ marginLeft: '10px', color: 'var(--ce-document-text-muted)' }}
-                    >
-                      (Omitted)
-                    </span>
-                  )}
+                  <PolisReportSectionToggleLabel open={beeswarmOpen} />
                 </div>
               </div>
               {beeswarmOpen ? <div className={styles.graphSection}>{renderCommentSwarm()}</div> : null}
@@ -2538,15 +2535,7 @@ export default function PolisReport({
                   })}
                 </h5>
                 <div className={styles.pdfIgnore} style={{ textAlign: 'right', flex: '1' }}>
-                  {participantsGraphOpen ? 'Hide' : 'Show'}
-                  {!participantsGraphOpen && (
-                    <span
-                      className={styles.showWhenPdf}
-                      style={{ marginLeft: '10px', color: 'var(--ce-document-text-muted)' }}
-                    >
-                      (Omitted)
-                    </span>
-                  )}
+                  <PolisReportSectionToggleLabel open={participantsGraphOpen} />
                 </div>
               </div>
               {participantsGraphOpen ? (
@@ -2731,15 +2720,7 @@ export default function PolisReport({
                   All Questions
                 </h5>
                 <div className={styles.pdfIgnore} style={{ textAlign: 'right', flex: '1' }}>
-                  {allQuestionsOpen ? 'Hide' : 'Show'}
-                  {!allQuestionsOpen && (
-                    <span
-                      className={styles.showWhenPdf}
-                      style={{ marginLeft: '10px', color: 'var(--ce-document-text-muted)' }}
-                    >
-                      (Omitted)
-                    </span>
-                  )}
+                  <PolisReportSectionToggleLabel open={allQuestionsOpen} />
                 </div>
               </div>
               {allQuestionsOpen ? <>{buildQuestionList()}</> : null}
@@ -2760,15 +2741,7 @@ export default function PolisReport({
                   List of Participants
                 </h5>
                 <div className={styles.pdfIgnore} style={{ textAlign: 'right', flex: '1' }}>
-                  {participantsListOpen ? 'Hide' : 'Show'}
-                  {!participantsListOpen && (
-                    <span
-                      className={styles.showWhenPdf}
-                      style={{ marginLeft: '10px', color: 'var(--ce-document-text-muted)' }}
-                    >
-                      (Omitted)
-                    </span>
-                  )}
+                  <PolisReportSectionToggleLabel open={participantsListOpen} />
                 </div>
               </div>
               {participantsListOpen ? renderParticipantsList() : null}

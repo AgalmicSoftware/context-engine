@@ -55,18 +55,18 @@ const defineCompatChain = (config: UnknownRecord): CeChain =>
 
 const SEPOLIA_SOURCE_ID = 11_155_111;
 const OP_MAINNET_SOURCE_ID = 1;
-const BASE_SEPOLIA_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(84532));
-const BASE_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(8453));
-const OPTIMISM_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(10));
-const OPTIMISM_SEPOLIA_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(11155420));
-const ARBITRUM_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(42161));
-const ARBITRUM_SEPOLIA_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(421614));
-const ETHEREUM_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(1));
-const POLYGON_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(137));
-const BSC_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(56));
-const CELO_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(42220));
-const KATANA_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(747474));
-const CONFIGURED_PAID_RPC_URL_HTTP_BY_CHAIN = Object.freeze({
+const BASE_SEPOLIA_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(84532));
+const BASE_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(8453));
+const OPTIMISM_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(10));
+const OPTIMISM_SEPOLIA_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(11155420));
+const ARBITRUM_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(42161));
+const ARBITRUM_SEPOLIA_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(421614));
+const ETHEREUM_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(1));
+const POLYGON_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(137));
+const BSC_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(56));
+const CELO_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(42220));
+const KATANA_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(747474));
+const CONFIGURED_PAID_RPC_URL_HTTP_BY_CHAIN: RpcUrlMap = Object.freeze({
   84532: readPublicEnv('REACT_APP_CE_BASE_SEPOLIA_PAID_RPC_URL_HTTP', ''),
   11155420: readPublicEnv('REACT_APP_CE_OP_SEPOLIA_PAID_RPC_URL_HTTP', ''),
 });
@@ -127,8 +127,9 @@ const readUseInfuraRpcFlag = () => {
 
 const readRpcProviderMode = () => {
   try {
-    if (typeof globalThis !== 'undefined' && typeof globalThis.CE_RPC_PROVIDER_MODE !== 'undefined') {
-      const mode = String(globalThis.CE_RPC_PROVIDER_MODE || '')
+    const g = runtimeGlobal();
+    if (g && typeof g.CE_RPC_PROVIDER_MODE !== 'undefined') {
+      const mode = String(g.CE_RPC_PROVIDER_MODE || '')
         .trim()
         .toLowerCase();
       if (mode === 'infura_only' || mode === 'fallback') return mode;
@@ -143,7 +144,7 @@ const readRpcProviderMode = () => {
   return 'fallback';
 };
 
-const isInfuraOnlyForChain = (chainId) =>
+const isInfuraOnlyForChain = (chainId: unknown) =>
   readRpcProviderMode() === 'infura_only' && !!getConfiguredPaidRpcHttpUrl(chainId);
 
 const readPreferPathRpcFlag = (chainId: unknown = null) => {
@@ -717,7 +718,7 @@ export const anvil = defineCompatChain({
   testnet: true,
 });
 
-export const chainRegistry = {
+export const chainRegistry: ChainRegistry = {
   1: mainnet,
   10: optimism,
   11155420: optimismSepolia,
@@ -755,13 +756,14 @@ const buildExplorerEntityUrl = (chainId: unknown, segment: string, value: unknow
 const CHAINS_WITH_FAUCET_RPC_FALLBACK = new Set<number>([84532, 11155420]);
 
 const LOCAL_CONTRACT_CHAIN_ID = Number(localContracts?.chainId || 0) || 0;
-const normalizeLoopbackHost = (value) =>
+const normalizeLoopbackHost = (value: unknown): string =>
   String(value || '')
     .trim()
     .toLowerCase()
     .replace(/^\[(.*)\]$/, '$1');
 const LOCAL_SESSION_REGISTRY_LIST_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1']);
-export const isLocalDevLoopbackHost = (value) => LOCAL_SESSION_REGISTRY_LIST_HOSTS.has(normalizeLoopbackHost(value));
+export const isLocalDevLoopbackHost = (value: unknown): boolean =>
+  LOCAL_SESSION_REGISTRY_LIST_HOSTS.has(normalizeLoopbackHost(value));
 const LOCAL_SESSION_REGISTRY_ADDRESSES =
   LOCAL_CONTRACT_CHAIN_ID && normalizeOptionalAddress(localContracts?.SessionRegistry)
     ? { [LOCAL_CONTRACT_CHAIN_ID]: normalizeOptionalAddress(localContracts.SessionRegistry) }
@@ -788,8 +790,8 @@ const readIncludeLocalSessionRegistryFlag = () => {
     void e; /* fallback: runtime override lookup. */
   }
   try {
-    const hostname =
-      typeof globalThis !== 'undefined' ? normalizeLoopbackHost(globalThis.location?.hostname || '') : '';
+    const g = runtimeGlobal();
+    const hostname = g ? normalizeLoopbackHost(g.location?.hostname || '') : '';
     return isLocalDevLoopbackHost(hostname);
   } catch (e) {
     void e; /* fallback: runtime override lookup. */
@@ -808,20 +810,21 @@ export const SESSION_REGISTRY_ADDRESSES: Record<number, string> = Object.fromEnt
   Object.entries({
     ...(contractsConfig.sessionRegistryAddresses || {}),
     ...LOCAL_SESSION_REGISTRY_ADDRESSES,
-  }).map(([k, v]) => [Number(k), v]),
+  }).map(([k, v]) => [Number(k), normalizeOptionalAddress(v)]),
 );
 
 export const SESSION_CONTRACTS_BY_CHAIN: Record<number, UnknownRecord> = Object.fromEntries(
   Object.entries({
     ...(contractsConfig.sessionContractsByChain || {}),
     ...LOCAL_SESSION_CONTRACTS_BY_CHAIN,
-  }).map(([k, v]) => [Number(k), v]),
+  }).map(([k, v]) => [Number(k), v && typeof v === 'object' ? (v as UnknownRecord) : {}]),
 );
 
-export function getChainById(id) {
-  return chainRegistry[id] || null;
+export function getChainById(id: unknown): CeChain | null {
+  const normalizedId = normalizeChainIdValue(id);
+  return normalizedId ? chainRegistry[normalizedId] || null : null;
 }
-export function getDefaultChainId() {
+export function getDefaultChainId(): number | null {
   return normalizeChainIdValue(DEFAULT_CHAIN_ID);
 }
 export function buildExplorerAddressUrl(chainId: unknown, address: unknown): string | null {
@@ -875,8 +878,9 @@ export function getDefaultGasPriceGwei(id: unknown): string {
   }
   return '0.08';
 }
-export function getDefaultHttpRpc(id, opts = {}) {
-  const ch = chainRegistry[id];
+export function getDefaultHttpRpc(id: unknown, opts: DefaultHttpRpcOptions = {}): string | null {
+  const normalizedId = normalizeChainIdValue(id);
+  const ch = normalizedId ? chainRegistry[normalizedId] : null;
   if (!ch) return null;
   const allowPath = opts?.allowPath !== false;
 
@@ -897,13 +901,18 @@ export function getDefaultHttpRpc(id, opts = {}) {
 }
 
 // --- wagmi Chain adapters (DEFAULT_NETWORK / ch are wagmi Chain objects) ---
-export const chainHexId = (ch) => '0x' + Number(ch?.id ?? 0).toString(16);
+export const chainHexId = (ch: unknown): string => '0x' + Number(readRecord(ch, 'id') ?? 0).toString(16);
 
 export const chainHttpRpc = (ch: unknown): string => {
   const id = Number(readRecord(ch, 'id') ?? 0);
   const pathUrl = resolvePathRpcUrl(id);
   if (pathUrl) return pathUrl;
-  return ch?.rpcUrls?.public?.http?.[0] || ch?.rpcUrls?.default?.http?.[0] || '';
+  const rpcUrls = asRecord(readRecord(ch, 'rpcUrls'));
+  const publicRpcUrls = asRecord(readRecord(rpcUrls, 'public'));
+  const defaultRpcUrls = asRecord(readRecord(rpcUrls, 'default'));
+  return (
+    readStringList(readRecord(publicRpcUrls, 'http'))[0] || readStringList(readRecord(defaultRpcUrls, 'http'))[0] || ''
+  );
 };
 
 export const chainHttpRpcNoPath = (ch: unknown): string => {
@@ -919,15 +928,26 @@ export const chainHttpRpcNoPath = (ch: unknown): string => {
   const filtered = pathUrl ? candidates.filter((url) => url !== pathUrl) : candidates;
   return filtered[0] || '';
 };
-export const chainCurrency = (ch) => ch?.nativeCurrency ?? { name: 'ETH', symbol: 'ETH', decimals: 18 };
-export const isTestnetChain = (ch) => {
-  if (typeof ch?.testnet === 'boolean') return ch.testnet;
+export const chainCurrency = (ch: unknown) => {
+  const nativeCurrency = readRecord(ch, 'nativeCurrency');
+  return nativeCurrency && typeof nativeCurrency === 'object'
+    ? nativeCurrency
+    : { name: 'ETH', symbol: 'ETH', decimals: 18 };
+};
+export const isTestnetChain = (ch: unknown): boolean => {
+  const chain = asRecord(ch);
+  if (typeof chain.testnet === 'boolean') return chain.testnet;
+  const rpcUrls = asRecord(chain.rpcUrls);
+  const defaultRpcUrls = asRecord(readRecord(rpcUrls, 'default'));
+  const publicRpcUrls = asRecord(readRecord(rpcUrls, 'public'));
+  const blockExplorers = asRecord(chain.blockExplorers);
+  const defaultBlockExplorer = asRecord(readRecord(blockExplorers, 'default'));
   const bag = [
-    ch?.name,
-    ch?.network,
-    ch?.blockExplorers?.default?.url,
-    ...(ch?.rpcUrls?.default?.http || []),
-    ...(ch?.rpcUrls?.public?.http || []),
+    chain.name,
+    chain.network,
+    defaultBlockExplorer.url,
+    ...readStringList(readRecord(defaultRpcUrls, 'http')),
+    ...readStringList(readRecord(publicRpcUrls, 'http')),
   ]
     .join(' ')
     .toLowerCase();

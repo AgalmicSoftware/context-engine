@@ -5,7 +5,7 @@ managed-namespace behavior.
 
 The `bookmarksCache` namespace is stored under logical keys `dg:bookmarksCache:<slug>`.
 
-Writes/reads go through `client/src/utilities/cache/cacheScripts.js`:
+Writes/reads go through `client/src/utilities/cache/cacheScripts.ts`:
 
 - Primary backend: IndexedDB (`idb-keyval`) in `ce_cache_v1 / ce_cache_entries_v1`
 - In-memory mirror provides synchronous reads

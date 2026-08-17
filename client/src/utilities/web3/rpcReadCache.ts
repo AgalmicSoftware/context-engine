@@ -132,9 +132,6 @@ const normalizeDebugMethod = (value: unknown): string => {
 const nowMs = (): number => Date.now();
 const RPC_RATE_LIMIT_BASE_BACKOFF_MS = 60_000;
 const RPC_RATE_LIMIT_MAX_BACKOFF_MS = 5 * 60_000;
-// A slow 429 response must settle before neighboring reads are released;
-// 500 ms allowed the initial getLogs burst to escape before backoff engaged.
-const RPC_RATE_LIMIT_PROBE_WAIT_MS = 10_000;
 
 const isCacheDisabled = (): boolean => {
   try {
@@ -536,36 +533,15 @@ const getRpcRateLimitBackoffError = (key: string, meta: ProviderSendMeta): (Erro
   return buildRpcRateLimitBackoffError(meta, state);
 };
 
-const waitForActiveRateLimitProbe = async (key: string): Promise<void> => {
-  if (!key) return;
-  const probe = getGlobalCache().rateLimitProbes.get(key);
-  if (!probe?.promise) return;
-  const elapsed = nowMs() - Number(probe.startedAt || 0);
-  const remaining = Math.max(0, RPC_RATE_LIMIT_PROBE_WAIT_MS - elapsed);
-  if (remaining <= 0) return;
-  await Promise.race([
-    probe.promise,
-    new Promise<void>((resolve) => {
-      setTimeout(resolve, remaining);
-    }),
-  ]);
-};
-
-const trackRateLimitProbe = (key: string, run: Promise<unknown>): void => {
-  if (!key) return;
+const runWithRpcRateLimitGate = async <T>(key: string, meta: ProviderSendMeta, send: () => Promise<T>): Promise<T> => {
+  if (!key) return await send();
+  // Regression guard: release endpoint reads one at a time. Releasing every
+  // waiter after a successful probe lets a later 429 arrive after the burst escaped.
   const cache = getGlobalCache();
-  const probe: RpcRateLimitProbe = {
-    promise: run.then(
-      () => undefined,
-      () => undefined,
-    ),
-    startedAt: nowMs(),
-  };
-  cache.rateLimitProbes.set(key, probe);
-  probe.promise.then(() => {
-    if (cache.rateLimitProbes.get(key) === probe) {
-      cache.rateLimitProbes.delete(key);
-    }
+  const previous = cache.rateLimitTails.get(key) || Promise.resolve();
+  let releaseTurn = (): void => {};
+  const turn = new Promise<void>((resolve) => {
+    releaseTurn = resolve;
   });
   const tail = previous.then(
     () => turn,
@@ -914,7 +890,7 @@ export const __test__resetRpcReadCache = (): void => {
       g.__CE_RPC_READ_CACHE__.inflight = new Map<string, Promise<unknown>>();
       g.__CE_RPC_READ_CACHE__.cacheByMethod = createCacheByMethod();
       g.__CE_RPC_READ_CACHE__.rateLimits = new Map<string, RpcRateLimitState>();
-      g.__CE_RPC_READ_CACHE__.rateLimitProbes = new Map<string, RpcRateLimitProbe>();
+      g.__CE_RPC_READ_CACHE__.rateLimitTails = new Map<string, Promise<void>>();
     } catch (e) {
       log.warn('rpcReadCache: fallback', e);
     }

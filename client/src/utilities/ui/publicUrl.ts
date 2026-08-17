@@ -22,20 +22,14 @@ export const readPublicUrlBasePath = (proc: ProcWithEnv = BUNDLED_PUBLIC_URL_PRO
   }
 };
 
-export const buildPublicUrlPath = (
-  pathname = '',
-  proc: ProcWithEnv = BUNDLED_PUBLIC_URL_PROCESS,
-): string => {
+export const buildPublicUrlPath = (pathname = '', proc: ProcWithEnv = BUNDLED_PUBLIC_URL_PROCESS): string => {
   const normalizedPath = toStr(pathname).trim();
   if (!normalizedPath) return '';
   const basePath = readPublicUrlBasePath(proc);
   return `${basePath}${normalizedPath}` || normalizedPath;
 };
 
-export const stripPublicUrlBasePath = (
-  pathname = '',
-  proc: ProcWithEnv = BUNDLED_PUBLIC_URL_PROCESS,
-): string => {
+export const stripPublicUrlBasePath = (pathname = '', proc: ProcWithEnv = BUNDLED_PUBLIC_URL_PROCESS): string => {
   const rawPath = toStr(pathname).trim();
   const basePath = readPublicUrlBasePath(proc);
   if (!rawPath || !basePath || basePath === '/') return rawPath;
@@ -51,10 +45,7 @@ export const stripPublicUrlBasePath = (
   return rawPath;
 };
 
-export const buildPublicRoute = (
-  pathname = '',
-  proc: ProcWithEnv = BUNDLED_PUBLIC_URL_PROCESS,
-): string => {
+export const buildPublicRoute = (pathname = '', proc: ProcWithEnv = BUNDLED_PUBLIC_URL_PROCESS): string => {
   const normalizedPath = toStr(pathname).trim();
   if (!normalizedPath) return readPublicUrlBasePath(proc) || '/';
   return buildPublicUrlPath(normalizedPath, proc) || normalizedPath;

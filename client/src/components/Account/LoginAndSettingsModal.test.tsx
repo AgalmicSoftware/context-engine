@@ -12,7 +12,7 @@ import {
   getSessionConfigBySlugOrDefault,
   getSessionNetwork,
   getProviderLocation,
-} from '../../utilities/web3/contractScripts.js';
+} from '../../utilities/web3/chainGateway.js';
 import { getWorkerSessionToken, clearAllWorkerSessionTokens } from '../../utilities/worker/workerAuth.js';
 import { notify } from '../../utilities/ui/notify.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
@@ -518,32 +518,6 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     expect(subject.loadSponsoredAccess).toHaveBeenCalledTimes(1);
     expect(subject.syncPasskeyWalletChain).not.toHaveBeenCalled();
     expect(getWorkerSessionToken).not.toHaveBeenCalled();
-  });
-
-  it('preserves passkey resync when navigating to a validated on-chain session', () => {
-    mockedGetSessionConfigBySlugOrDefault.mockImplementation((slug: string) => buildRegistryFundingConfig(slug, 84532));
-    const prevProps = buildProps({
-      account: PASSKEY_ADDRESS,
-      provider: 'passkey_eoa',
-      loginComplete: true,
-      activeSessionSlug: 'edge',
-    });
-    const nextProps = buildProps({
-      account: PASSKEY_ADDRESS,
-      provider: 'passkey_eoa',
-      loginComplete: true,
-      activeSessionSlug: 'registry',
-    });
-    const subject = mountClassSubject(new LoginAndSettingsModalSubject(nextProps));
-    subject.checkAndSendTestFundsIfNeeded = jest.fn();
-    subject.loadAiSettings = jest.fn();
-    subject.loadResourceKeys = jest.fn();
-    subject.loadSponsoredAccess = jest.fn();
-    subject.syncPasskeyWalletChain = jest.fn();
-
-    subject.componentDidUpdate(prevProps, subject.state);
-
-    expect(subject.syncPasskeyWalletChain).toHaveBeenCalledWith(expect.objectContaining({ id: 84532 }));
   });
 
   it('preserves passkey resync when navigating to a validated on-chain session', () => {
@@ -1451,6 +1425,37 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
         }),
       }),
     ]);
+  });
+
+  it('uses active worker presence when registry sponsorship flags are stale', () => {
+    mockedGetAllSessionSlugs.mockReturnValue(['demo-1']);
+    mockedGetSessionConfigBySlugOrDefault.mockImplementation((slug: any) =>
+      String(slug || '') === 'demo-1'
+        ? {
+            slug: 'demo-1',
+            sessionName: 'demo 1',
+            sponsoredKeys: { faucet: true },
+          }
+        : {},
+    );
+
+    const subject = new LoginAndSettingsModalSubject(
+      buildProps({
+        activeSessionSlug: 'demo-1',
+      }),
+    );
+    subject.state.workerResourcePresence = {
+      ai: true,
+      arweave: true,
+      rpc: true,
+      txGas: true,
+    };
+
+    const sources = subject.getSponsoredSessionSources({ activeSlug: 'demo-1' });
+    expect(sources.byResource.ai[0]).toEqual(expect.objectContaining({ slug: 'demo-1', isActive: true }));
+    expect(sources.byResource.arweave[0]).toEqual(expect.objectContaining({ slug: 'demo-1', isActive: true }));
+    expect(sources.byResource.rpc[0]).toEqual(expect.objectContaining({ slug: 'demo-1', isActive: true }));
+    expect(sources.byResource.txGas[0]).toEqual(expect.objectContaining({ slug: 'demo-1', isActive: true }));
   });
 
   it('refreshes settings overview sponsorship cards when sponsored keys change without slug churn', () => {

@@ -60,10 +60,7 @@ import {
   NONCE_MISMATCH_ERROR,
   ONCHAIN_GATE_UNAVAILABLE_ERROR,
 } from './workerAuthRemoteError.js';
-import type {
-  ResolveWorkerTokenRequestContextOptions,
-  WorkerFetchAuthOptions,
-} from './workerAuthRequestTypes.js';
+import type { ResolveWorkerTokenRequestContextOptions, WorkerFetchAuthOptions } from './workerAuthRequestTypes.js';
 
 const accountLog = createLogger('account');
 
@@ -209,9 +206,9 @@ const doesWorkerAuthAddressMatchStore = (address: unknown): boolean => {
 
 let trackedWorkerAuthAddress = getCurrentWorkerAuthStoreAddress();
 
-const isNonceMismatchError = (message) => toStr(message).toLowerCase().includes(NONCE_MISMATCH_ERROR);
+const isNonceMismatchError = (message: unknown): boolean => toStr(message).toLowerCase().includes(NONCE_MISMATCH_ERROR);
 
-const isOnChainGateUnavailableError = (message) =>
+const isOnChainGateUnavailableError = (message: unknown): boolean =>
   toStr(message).toLowerCase().includes(ONCHAIN_GATE_UNAVAILABLE_ERROR);
 
 const createAbortError = (message = 'Worker auth request aborted.') => {
@@ -223,7 +220,8 @@ const createAbortError = (message = 'Worker auth request aborted.') => {
   return error;
 };
 
-const isAbortError = (error) => toStr(error?.name) === 'AbortError';
+const isAbortError = (error: unknown): boolean =>
+  toStr(error && typeof error === 'object' ? (error as { name?: unknown }).name : '') === 'AbortError';
 
 const abortInFlightTokenRequests = () => {
   inFlightTokenRequests.forEach((request) => {
@@ -274,25 +272,28 @@ const assertWorkerAuthRequestCurrent = (
   }
 };
 
-const sleep = (ms, { signal, requestAuthEpoch, requestAddress } = {}) =>
-  new Promise((resolve, reject) => {
+const sleep = (ms: number, { signal, requestAuthEpoch, requestAddress }: SleepOptions = {}) =>
+  new Promise<void>((resolve, reject) => {
+    let timerId: ReturnType<typeof setTimeout> | null = null;
+    const clearTimer = () => {
+      if (timerId !== null) clearTimeout(timerId);
+    };
     const onAbort = () => {
-      clearTimeout(timerId);
+      clearTimer();
       if (signal && typeof signal.removeEventListener === 'function') {
         signal.removeEventListener('abort', onAbort);
       }
       reject(createAbortError());
     };
-    const finish = (cb) => {
-      clearTimeout(timerId);
+    const finish = (cb: () => void) => {
+      clearTimer();
       if (signal && typeof signal.removeEventListener === 'function') {
         signal.removeEventListener('abort', onAbort);
       }
       cb();
     };
-    let timerId = null;
     try {
-      assertWorkerAuthRequestCurrent(signal, requestAuthEpoch, requestAddress);
+      assertWorkerAuthRequestCurrent(signal ?? null, requestAuthEpoch, requestAddress);
     } catch (error) {
       reject(error);
       return;
@@ -303,7 +304,7 @@ const sleep = (ms, { signal, requestAuthEpoch, requestAddress } = {}) =>
     timerId = setTimeout(() => {
       finish(() => {
         try {
-          assertWorkerAuthRequestCurrent(signal, requestAuthEpoch, requestAddress);
+          assertWorkerAuthRequestCurrent(signal ?? null, requestAuthEpoch, requestAddress);
           resolve();
         } catch (error) {
           reject(error);
@@ -312,8 +313,8 @@ const sleep = (ms, { signal, requestAuthEpoch, requestAddress } = {}) =>
     }, ms);
   });
 
-const resolveSignerAddress = async (providerLike, fallbackAddress = '') => {
-  const provider = cryptoUtils._getProvider(providerLike || resolveDefaultProviderLike());
+const resolveSignerAddress = async (providerLike: unknown, fallbackAddress: unknown = '') => {
+  const provider = getWorkerProvider(providerLike);
   let address = normalizeAddress(fallbackAddress) || normalizeAddress(provider?.selectedAddress || provider?.address);
   if (provider && typeof provider.request === 'function') {
     try {
@@ -324,124 +325,6 @@ const resolveSignerAddress = async (providerLike, fallbackAddress = '') => {
     } catch (_) {}
   }
   return { provider, address };
-};
-
-const readTokenCache = (key) => {
-  if (typeof window === 'undefined') return null;
-  try {
-    return JSON.parse(localStorage.getItem(key) || 'null');
-  } catch {
-    return null;
-  }
-};
-
-const normalizeTokenCacheEntry = (
-  entry,
-  {
-    workerUrl,
-    sessionSlug,
-    address,
-    nowSeconds = Math.floor(Date.now() / 1000),
-    skewSeconds = TOKEN_SKEW_SECONDS,
-    maxTtlSeconds = MAX_TOKEN_CACHE_TTL_SECONDS,
-  } = {},
-) => {
-  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
-    return { ok: false, status: 'malformed' };
-  }
-
-  const token = toStr(entry.token).trim();
-  const expiresAt = Number(entry.expiresAt || entry.exp || 0);
-  if (!token) return { ok: false, status: 'missing-token' };
-  if (!Number.isFinite(expiresAt) || expiresAt <= 0) {
-    return { ok: false, status: 'missing-expiry' };
-  }
-  if (expiresAt <= Number(nowSeconds || 0) + Number(skewSeconds || 0)) {
-    return { ok: false, status: 'expired' };
-  }
-
-  if (Number(entry.v || 0) >= 1) {
-    const issuedAt = Number(entry.issuedAt || 0) || null;
-    const maxTtl = Number(maxTtlSeconds || 0);
-    if (issuedAt && Number.isFinite(maxTtl) && maxTtl > 0 && expiresAt > issuedAt + maxTtl) {
-      return { ok: false, status: 'ttl-too-long' };
-    }
-    const expectedWorkerUrl = normalizeWorkerUrl(workerUrl);
-    const expectedSlug = normalizeSessionSlug(sessionSlug);
-    const expectedAddress = normalizeAddress(address);
-    const entryWorkerUrl = normalizeWorkerUrl(entry.workerUrl);
-    const entrySlug = normalizeSessionSlug(entry.sessionSlug);
-    const entryAddress = normalizeAddress(entry.address);
-    if (
-      (expectedWorkerUrl && entryWorkerUrl && expectedWorkerUrl !== entryWorkerUrl) ||
-      entrySlug !== expectedSlug ||
-      (expectedAddress && entryAddress && expectedAddress !== entryAddress)
-    ) {
-      return { ok: false, status: 'scope-mismatch' };
-    }
-  }
-
-  return {
-    ok: true,
-    token,
-    exp: expiresAt,
-    expiresAt,
-    issuedAt: Number(entry.issuedAt || 0) || null,
-    legacy: Number(entry.v || 0) < 1,
-  };
-};
-
-const readScopedTokenCache = (key, scope = {}) => {
-  const parsed = readTokenCache(key);
-  const normalized = normalizeTokenCacheEntry(parsed, scope);
-  if (normalized.ok) return normalized;
-  if (parsed) {
-    try {
-      localStorage.removeItem(key);
-    } catch (_) {}
-  }
-  return null;
-};
-
-const buildTokenCacheEnvelope = ({
-  token,
-  exp,
-  workerUrl,
-  sessionSlug,
-  address,
-  issuedAt = Math.floor(Date.now() / 1000),
-} = {}) => ({
-  v: 1,
-  workerUrl: normalizeWorkerUrl(workerUrl),
-  sessionSlug: normalizeSessionSlug(sessionSlug),
-  address: normalizeAddress(address),
-  issuedAt: Number(issuedAt || 0) || Math.floor(Date.now() / 1000),
-  expiresAt: Number(exp || 0),
-  token: toStr(token).trim(),
-});
-
-const writeTokenCache = (key, payload) => {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(key, JSON.stringify(payload));
-  } catch (_) {}
-};
-
-const clearTokenCache = (key) => {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.removeItem(key);
-  } catch (_) {}
-};
-
-const buildTokenCacheKey = ({ workerUrl, slug, address }) => {
-  const resolvedUrl = normalizeWorkerUrl(workerUrl);
-  const normalizedSlug = normalizeSessionSlug(slug);
-  const normalizedAddress = normalizeAddress(address);
-  if (normalizedAddress) {
-    return `${STORAGE_PREFIX}:${resolvedUrl}:${normalizedSlug}:${normalizedAddress}`;
-  }
-  return `${STORAGE_PREFIX}:${resolvedUrl}:${normalizedSlug}`;
 };
 
 const resolveWorkerTokenRequestContext = async ({
@@ -547,77 +430,15 @@ const signMessage = async ({
   return signer.signMessage(message);
 };
 
-const normalizeOrigin = (value) => {
-  const raw = toStr(value).trim();
-  if (!raw) return '';
-  try {
-    const parsed = new URL(raw);
-    if ((parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') && !parsed.port) {
-      return DEFAULT_LOCAL_ADMIN_ORIGIN;
-    }
-    return parsed.origin;
-  } catch {
-    return '';
-  }
-};
-
-const WORKER_AUTH_FETCH_ERROR_PATTERNS = [
-  'failed to fetch',
-  'network request failed',
-  'networkerror',
-  'load failed',
-  'fetch failed',
-];
-
-const isWorkerAuthFetchReachabilityError = (error) => {
-  const message = toStr(error?.message || error)
-    .trim()
-    .toLowerCase();
-  if (!message || message.includes('failed to reach worker auth endpoint')) return false;
-  return WORKER_AUTH_FETCH_ERROR_PATTERNS.some((pattern) => message.includes(pattern));
-};
-
-const buildWorkerAuthReachabilityMessage = (endpoint) => {
-  const normalizedEndpoint = toStr(endpoint).trim();
-  const browserOrigin = (() => {
-    try {
-      if (typeof window !== 'undefined') return normalizeOrigin(window.location?.origin);
-    } catch (_) {}
-    return '';
-  })();
-  const allowOriginsHint = browserOrigin ? ` Check worker URL and allowOrigins includes ${browserOrigin}.` : '';
-  return `Failed to reach worker auth endpoint (${normalizedEndpoint}).${allowOriginsHint}`;
-};
-
-const normalizeWorkerAuthFetchError = (error, endpoint) => {
-  if (!isWorkerAuthFetchReachabilityError(error)) return error;
-  const normalized = new Error(buildWorkerAuthReachabilityMessage(endpoint));
-  try {
-    normalized.cause = error;
-  } catch (_) {}
-  return normalized;
-};
-
-const fetchWorkerAuthEndpoint = async (endpoint, init) => {
-  try {
-    return await fetch(endpoint, init);
-  } catch (error) {
-    throw normalizeWorkerAuthFetchError(error, endpoint);
-  }
-};
-
-const resolveAdminActionAudience = (workerUrl) => {
-  const browserOrigin = (() => {
-    try {
-      if (typeof window !== 'undefined') return normalizeOrigin(window.location?.origin);
-    } catch (_) {}
-    return '';
-  })();
-  if (browserOrigin) return browserOrigin;
-  return normalizeOrigin(normalizeWorkerUrl(workerUrl));
-};
-
-const signTypedDataV4 = async ({ typedData, provider, address }) => {
+const signTypedDataV4 = async ({
+  typedData,
+  provider,
+  address,
+}: {
+  address: string;
+  provider: WorkerProvider | null | undefined;
+  typedData: unknown;
+}) => {
   if (!provider || typeof provider.request !== 'function') {
     throw new Error('Wallet provider does not support typed-data signing.');
   }
@@ -805,7 +626,7 @@ export const getWorkerSessionToken = async ({
   workerUrl,
   allowDemoFallback,
   requestContext,
-} = {}) => {
+}: WorkerSessionTokenOptions = {}) => {
   const resolvedRequest =
     requestContext ||
     (await resolveWorkerTokenRequestContext({
@@ -935,7 +756,7 @@ export const getWorkerSessionToken = async ({
           continue;
         }
         const canRetryGateUnavailable =
-          isOnChainGateUnavailableError(err?.message) && attempt < LOGIN_GATE_UNAVAILABLE_RETRIES;
+          isOnChainGateUnavailableError(getErrorMessage(err)) && attempt < LOGIN_GATE_UNAVAILABLE_RETRIES;
         if (!canRetryGateUnavailable) throw err;
         const retryInMs = LOGIN_GATE_UNAVAILABLE_RETRY_BASE_MS * (attempt + 1);
         accountLog.warn('[workerAuth] transient gate-read failure during login; retrying', {
@@ -969,7 +790,7 @@ export const getWorkerSessionToken = async ({
     return loginData.token;
   };
 
-  const inFlightRequest = { abortController, promise: null };
+  const inFlightRequest: InFlightTokenRequest = { abortController, promise: null };
   const inFlight = requestToken().finally(() => {
     if (inFlightTokenRequests.get(storageKey) === inFlightRequest) {
       inFlightTokenRequests.delete(storageKey);
@@ -1065,253 +886,11 @@ export const getWorkerAuthHeaders = async ({
   return headers;
 };
 
-const mergeHeaders = (base, extra) => {
-  const out = new Headers(base || {});
-  Object.entries(extra || {}).forEach(([key, value]) => {
-    if (value !== undefined) out.set(key, value);
-  });
-  return out;
-};
-
-const ANONYMOUS_RATE_ID_STORAGE_KEY = 'ce:anonClientId:v1';
-
-const normalizeAnonymousRateId = (raw) => {
-  const cleaned = toStr(raw).trim().toLowerCase();
-  if (!cleaned) return '';
-  if (!/^[a-z0-9_-]{8,128}$/.test(cleaned)) return '';
-  return cleaned;
-};
-
-const createAnonymousRateId = () => {
-  try {
-    if (
-      typeof globalThis !== 'undefined' &&
-      globalThis.crypto &&
-      typeof globalThis.crypto.getRandomValues === 'function'
-    ) {
-      const bytes = new Uint8Array(16);
-      globalThis.crypto.getRandomValues(bytes);
-      return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
-    }
-  } catch (_) {}
-  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 14)}`;
-};
-
-const getAnonymousRateId = () => {
-  if (typeof window === 'undefined') return '';
-  try {
-    const cached = normalizeAnonymousRateId(localStorage.getItem(ANONYMOUS_RATE_ID_STORAGE_KEY) || '');
-    if (cached) return cached;
-  } catch (_) {}
-  const generated = normalizeAnonymousRateId(createAnonymousRateId());
-  if (!generated) return '';
-  try {
-    localStorage.setItem(ANONYMOUS_RATE_ID_STORAGE_KEY, generated);
-  } catch (_) {}
-  return generated;
-};
-
-const buildWorkerAuthNonceHeaders = (baseHeaders) => {
-  const headers = mergeHeaders(baseHeaders, {});
-  const anonRateId = getAnonymousRateId();
-  if (anonRateId && !headers.has('X-Anonymous-Client-Id')) {
-    headers.set('X-Anonymous-Client-Id', anonRateId);
-  }
-  return headers;
-};
-
-const isStreamBody = (body) => {
-  if (!body) return false;
-  if (typeof ReadableStream !== 'undefined' && body instanceof ReadableStream) return true;
-  return typeof body?.getReader === 'function';
-};
-
-const buildAnonymousHeaders = ({ baseHeaders, slug }) => {
-  const headers = mergeHeaders(baseHeaders, {});
-  headers.delete('Authorization');
-  headers.delete('authorization');
-  const anonRateId = getAnonymousRateId();
-  if (anonRateId && !headers.has('X-Anonymous-Client-Id')) {
-    headers.set('X-Anonymous-Client-Id', anonRateId);
-  }
-  if (!headers.has('X-Session-Slug') && !headers.has('X-Group-Slug')) {
-    headers.set('X-Group-Slug', slug || 'general');
-  }
-  return headers;
-};
-
-const stripAnonymousRateIdHeader = (baseHeaders) => {
-  const headers = mergeHeaders(baseHeaders, {});
-  headers.delete('X-Anonymous-Client-Id');
-  headers.delete('x-anonymous-client-id');
-  return headers;
-};
-
-const normalizeHttpMethod = (methodIn = 'GET') => {
-  const normalized = toStr(methodIn || 'GET')
-    .trim()
-    .toUpperCase();
-  return normalized || 'GET';
-};
-
-const isIdempotentRequestMethod = (methodIn = 'GET') => {
-  const method = normalizeHttpMethod(methodIn);
-  return method === 'GET' || method === 'HEAD' || method === 'OPTIONS';
-};
-
-const buildProbeInit = (headers, options = {}) => {
-  const init = {
-    method: 'GET',
-    headers,
-    cache: 'no-store',
-  };
-  if (options && typeof options === 'object') {
-    if (options.credentials !== undefined) init.credentials = options.credentials;
-    if (options.mode !== undefined) init.mode = options.mode;
-    if (options.redirect !== undefined) init.redirect = options.redirect;
-    if (options.referrerPolicy !== undefined) init.referrerPolicy = options.referrerPolicy;
-    if (options.signal !== undefined) init.signal = options.signal;
-  }
-  return init;
-};
-
-const shouldRetryAnonymousWithoutRateId = async ({ workerUrl, anonymousHeaders, options = {} } = {}) => {
-  if (isIdempotentRequestMethod(options?.method)) return true;
-  const baseUrl = normalizeWorkerUrl(workerUrl);
-  if (!baseUrl) return false;
-
-  // For non-idempotent requests, verify likely CORS-preflight incompatibility first.
-  const probeUrl = `${baseUrl.replace(/\/+$/, '')}/health`;
-  const probeHeadersWithRateId = mergeHeaders(anonymousHeaders, {});
-  const probeHeadersWithoutRateId = stripAnonymousRateIdHeader(probeHeadersWithRateId);
-  try {
-    await fetch(probeUrl, buildProbeInit(probeHeadersWithRateId, options));
-    // Any transport-level success means this header is not preflight-blocked.
-    // Do not replay non-idempotent writes when that signal is present.
-    return false;
-  } catch (_) {}
-  try {
-    await fetch(probeUrl, buildProbeInit(probeHeadersWithoutRateId, options));
-    // A successful transport response (even 401/403) is enough to confirm
-    // the header-triggered preflight issue has been avoided.
-    return true;
-  } catch (_) {
-    return false;
-  }
-};
-
-const AUTH_OR_GATE_DENIAL_PATTERNS = [
-  /missing authorization header/i,
-  /missing requester address for worker sbt gate/i,
-  /token missing .* scope/i,
-  /token does not match requested session slug/i,
-  /token expired/i,
-];
-
-const AUTHENTICATED_RETRY_DENIAL_PATTERNS = [
-  /missing authorization header/i,
-  /token missing .* scope/i,
-  /token does not match requested session slug/i,
-  /token expired/i,
-  /invalid token/i,
-];
-
-const shouldFallbackForAnonymousDeny = (normalizedError) => {
-  const msg = toStr(normalizedError).trim().toLowerCase();
-  if (!msg.includes('anonymous access denied')) return false;
-  return true;
-};
-
-const readRequestApiKey = (body) => {
-  if (!body) return '';
-  try {
-    if (typeof FormData !== 'undefined' && body instanceof FormData) {
-      return toStr(body.get('apiKey')).trim();
-    }
-  } catch (_) {}
-  try {
-    if (typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams) {
-      return toStr(body.get('apiKey')).trim();
-    }
-  } catch (_) {}
-
-  if (typeof body === 'string') {
-    const raw = body.trim();
-    if (!raw) return '';
-    try {
-      const parsed = JSON.parse(raw);
-      return toStr(parsed?.apiKey).trim();
-    } catch (e) {
-      accountLog.warn('workerAuth: JSON parse failed', e);
-      return '';
-    }
-  }
-
-  if (typeof body === 'object') {
-    return toStr(body?.apiKey).trim();
-  }
-  return '';
-};
-
-const parseErrorMessage = (payload) => {
-  if (!payload || typeof payload !== 'object') return '';
-  const direct = typeof payload?.error === 'string' ? payload.error : '';
-  const nested = typeof payload?.error?.message === 'string' ? payload.error.message : '';
-  const message = typeof payload?.message === 'string' ? payload.message : '';
-  return toStr(direct || nested || message).trim();
-};
-
-const readResponseErrorMessage = async (response) => {
-  if (!response || typeof response.clone !== 'function') return '';
-  let text = '';
-  try {
-    text = await response.clone().text();
-  } catch {
-    return '';
-  }
-  const trimmed = toStr(text).trim();
-  if (!trimmed) return '';
-  try {
-    const parsed = JSON.parse(trimmed);
-    return parseErrorMessage(parsed) || trimmed;
-  } catch (e) {
-    accountLog.warn('workerAuth: JSON parse failed', e);
-    return trimmed;
-  }
-};
-
-const shouldFallbackToAuthenticatedFlow = async (
-  response,
-  { requestApiKey = '', fallbackOnGateUnavailable = false } = {},
+export const fetchWorkerWithAuth = async (
+  url: RequestInfo | URL,
+  options: RequestInit = {},
+  opts: WorkerFetchAuthOptions = {},
 ) => {
-  const status = Number(response?.status || 0);
-  const errorMessage = await readResponseErrorMessage(response);
-  if (!errorMessage) return false;
-  const normalizedError = toStr(errorMessage).trim().toLowerCase();
-  if (normalizedError.includes('on-chain gate data unavailable')) {
-    return fallbackOnGateUnavailable === true;
-  }
-  if (status === 429 && (normalizedError === 'rate limit exceeded.' || normalizedError === 'rate limit exceeded')) {
-    if (toStr(requestApiKey).trim()) return false;
-    return true;
-  }
-  if (status !== 401 && status !== 403) return false;
-  if (shouldFallbackForAnonymousDeny(normalizedError)) {
-    return true;
-  }
-  return AUTH_OR_GATE_DENIAL_PATTERNS.some((pattern) => pattern.test(errorMessage));
-};
-
-const shouldRetryAuthenticatedResponse = async (response) => {
-  const status = Number(response?.status || 0);
-  if (status === 401) return true;
-  if (status !== 403) return false;
-  const errorMessage = await readResponseErrorMessage(response);
-  if (!errorMessage) return false;
-  return AUTHENTICATED_RETRY_DENIAL_PATTERNS.some((pattern) => pattern.test(errorMessage));
-};
-
-export const fetchWorkerWithAuth = async (url, options = {}, opts = {}) => {
   const resolvedSession = resolveWorkerSessionContext({
     sessionSlug: opts.sessionSlug,
     sessionConfig: opts.sessionConfig,

@@ -1,10 +1,12 @@
 import {
   SESSION_MODE_PRESET_IDS,
   SESSION_MODE_PRESETS,
+  classifySessionModeProfileSupport,
   cloneSessionModePreset,
   compileSessionModeProfile,
   hasLegacyTelegramFirstSessionFlags,
   isSessionModeProfileTelegramFirst,
+  mergeSessionModeProfileStorageAccess,
   profileFromLegacyConfig,
   validateSessionModeProfile,
   type SessionModeProfile,
@@ -68,7 +70,18 @@ describe('sessionModeProfile', () => {
     expect(compiled.telegramBridgeEnabled).toBe(false);
   });
 
-  it('compiles the public decentralized preset without changing enforcement enums', () => {
+  it('round-trips the exact Cloudflare preset through its compiled storage profile', () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    const compiled = compileSessionModeProfile(profile);
+
+    const restored = mergeSessionModeProfileStorageAccess(profile, compiled.storageProfile);
+
+    expect(restored).toEqual(profile);
+    expect(validateSessionModeProfile(restored)).toEqual({ valid: true, issues: [] });
+    expect(() => compileSessionModeProfile(restored)).not.toThrow();
+  });
+
+  it('compiles the public decentralized preset with a derived legacy access string', () => {
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
     const compiled = compileSessionModeProfile(profile);
 
@@ -83,6 +96,7 @@ describe('sessionModeProfile', () => {
       }),
     );
     expect(compiled.storageProfile).not.toHaveProperty('payloadAccessControl');
+    expect(compiled.payloadAccessControl).toEqual({ gate: 'sbt_gate', encryption: 'none' });
     expect(compiled.payloadAccessMode).toBe('worker_sbt_gate');
     expect(compiled.exportScope).toBe('all_session');
   });
@@ -236,6 +250,7 @@ describe('sessionModeProfile', () => {
     );
 
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
     profile.evm.registryChainId = 11155420;
     profile.encryption = {
       mode: 'worker_envelope',

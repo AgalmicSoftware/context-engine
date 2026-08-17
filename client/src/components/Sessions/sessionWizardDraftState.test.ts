@@ -1,4 +1,5 @@
 import {
+  applySessionWizardRegistryChainDraftDefaults,
   buildSessionWizardCacheWritePayload,
   buildSessionWizardInitialDraftFromCache,
   buildSessionWizardDefaultTemplate,
@@ -199,6 +200,102 @@ describe('sessionWizardDraftState', () => {
     );
   });
 
+  it('gates cached storage profile migration on cache-owned storage fields', () => {
+    const normalized = buildSessionWizardInitialDraftFromCache({
+      cachedWizard: {
+        draft: {
+          sessionName: 'Cached Legacy Storage Alias',
+          sessionStorageProfile: {
+            backend: 'cloudflare',
+            payloadAccessControl: { mode: 'lit_encrypted' },
+          },
+        },
+      },
+    });
+
+    expect(normalized.sessionModeProfile).toEqual(
+      expect.objectContaining({
+        preset: 'custom',
+        storage: expect.objectContaining({ backend: 'cloudflare' }),
+        encryption: { mode: 'lit' },
+      }),
+    );
+    expect(normalized.storageProfile).toEqual(
+      expect.objectContaining({
+        backend: 'cloudflare',
+        payloadAccessControl: expect.objectContaining({ mode: 'lit_encrypted' }),
+      }),
+    );
+    expect(normalized.sessionStorageProfile).toBeUndefined();
+  });
+
+  it('does not infer a session mode profile from default storage when cache lacks storage fields', () => {
+    const normalized = buildSessionWizardInitialDraftFromCache({
+      defaultTemplate: {
+        ...buildSessionWizardDefaultTemplate(),
+        storageProfile: {
+          backend: 'cloudflare',
+          payloadAccessControl: { mode: 'lit_encrypted' },
+        },
+      },
+      cachedWizard: {
+        draft: {
+          sessionName: 'Cached No Storage',
+        },
+      },
+    });
+
+    expect(normalized.sessionName).toBe('Cached No Storage');
+    expect(normalized.sessionModeProfile).toBeUndefined();
+    expect(normalized.storageProfile).toEqual(
+      expect.objectContaining({
+        backend: 'cloudflare',
+        payloadAccessControl: expect.objectContaining({ mode: 'lit_encrypted' }),
+      }),
+    );
+  });
+
+  it('preserves an invalid cached profile as blocked draft state without compiling it', () => {
+    const malformedProfile = {
+      profileVersion: 1,
+      authority: { mode: 'worker_canonical' },
+    };
+
+    expect(() =>
+      normalizeSessionWizardDraftShape({
+        sessionModeProfile: malformedProfile,
+        storageProfile: { backend: 'cloudflare' },
+      }),
+    ).not.toThrow();
+    const normalized = normalizeSessionWizardDraftShape({
+      sessionModeProfile: malformedProfile,
+      storageProfile: { backend: 'cloudflare' },
+    });
+
+    expect(normalized.sessionModeProfile).toEqual(malformedProfile);
+    expect(normalized.storageProfile).toEqual(expect.objectContaining({ backend: 'cloudflare' }));
+  });
+
+  it('preserves a schema-only profile synthesized from stale cached storage without throwing', () => {
+    const cachedWizard = {
+      draft: {
+        sessionName: 'Cached Cloudflare Draft',
+        storageProfile: { backend: 'cloudflare' },
+      },
+    };
+
+    expect(() => buildSessionWizardInitialDraftFromCache({ cachedWizard })).not.toThrow();
+    const normalized = buildSessionWizardInitialDraftFromCache({ cachedWizard });
+
+    expect(normalized.sessionModeProfile).toEqual(
+      expect.objectContaining({
+        authority: { mode: 'worker_canonical' },
+        storage: expect.objectContaining({ backend: 'cloudflare' }),
+      }),
+    );
+    expect(normalized.storageProfile).toEqual(expect.objectContaining({ backend: 'cloudflare' }));
+  });
+
   it('applies registry-chain contract defaults and worker RPC fallbacks without mutating the draft', () => {
     const draft = {
       networkChainId: 84532,
@@ -376,13 +473,28 @@ describe('sessionWizardDraftState', () => {
       workerSecrets: {
         apiToken: 'secret',
         optional: '',
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litGroupId: 'group-1',
+        litPkpId: 'pkp-1',
+        litActionCid: 'bafy-action-1',
       },
+      deployComplete: true,
       deployForm: {
         apiToken: 'cf-secret',
         workerName: ' worker ',
         adminAddress: ' 0xAdmin ',
         accountId: ' account ',
         bundleUrl: ' https://bundle.example/worker.js ',
+      },
+      workerRequirementProof: {
+        version: 1,
+        secretFingerprintSalt: 'd'.repeat(64),
+        workerIdentityFingerprint: 'a'.repeat(64),
+        requirementsFingerprint: 'b'.repeat(64),
+        requiredSecretFields: ['openaiKey'],
+        secretValueFingerprints: { openaiKey: 'c'.repeat(64) },
+        remoteManagedSecretFields: [],
+        litRuntimeFingerprint: '',
       },
     });
 
@@ -398,10 +510,10 @@ describe('sessionWizardDraftState', () => {
           litPkpId: 'pkp-1',
           litActionCid: 'bafy-action-1',
         },
+        deployComplete: false,
         deployForm: {
           workerName: 'worker',
           adminAddress: '0xAdmin',
-          accountId: 'account',
           bundleUrl: 'https://bundle.example/worker.js',
         },
       }),

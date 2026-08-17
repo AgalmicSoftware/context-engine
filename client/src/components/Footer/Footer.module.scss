@@ -15,10 +15,10 @@
       width: 100%;
       ul {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(5, minmax(0, 1fr));
         justify-content: stretch;
         align-items: center;
-        gap: 4px;
+        gap: 0;
         width: 100%;
         li {
           min-width: 0;
@@ -27,21 +27,21 @@
         li .footerLink {
           align-items: center;
           display: flex;
-          font-size: clamp(0.9rem, 5.4vw, 1.08rem);
+          font-size: clamp(0.56rem, 2.75vw, 0.68rem);
           font-weight: 700;
           justify-content: center;
           letter-spacing: 0;
-          margin-left: 0;
-          margin-right: 0;
+          margin-left: 0 !important;
+          margin-right: 0 !important;
           min-height: 42px;
-          padding: 8px 4px;
+          padding: 8px 0;
           text-align: center;
           white-space: nowrap;
           width: 100%;
         }
       }
     }
-    #copyright {
+    .copyright {
       text-align: center;
       line-height: 1.5;
       font-family: inherit;
@@ -64,10 +64,10 @@
       width: 100%;
       ul {
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(5, minmax(0, 1fr));
         justify-content: stretch;
         align-items: center;
-        gap: 4px;
+        gap: 1px;
         width: 100%;
         li {
           min-width: 0;
@@ -76,21 +76,21 @@
         li .footerLink {
           align-items: center;
           display: flex;
-          font-size: clamp(0.86rem, 3.05vw, 1.08rem);
+          font-size: clamp(0.62rem, 2.45vw, 0.78rem);
           font-weight: 700;
           justify-content: center;
           letter-spacing: 0;
-          margin-left: 0;
-          margin-right: 0;
+          margin-left: 0 !important;
+          margin-right: 0 !important;
           min-height: 44px;
-          padding: 8px 2px;
+          padding: 8px 1px;
           text-align: center;
           white-space: nowrap;
           width: 100%;
         }
       }
     }
-    #copyright {
+    .copyright {
       text-align: center;
       line-height: 1.5;
       font-family: inherit;
@@ -113,10 +113,10 @@
       width: 100%;
       ul {
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(5, minmax(0, 1fr));
         justify-content: stretch;
         align-items: center;
-        gap: 6px;
+        gap: 4px;
         width: 100%;
         li {
           min-width: 0;
@@ -129,8 +129,8 @@
           font-weight: 700;
           justify-content: center;
           letter-spacing: 0;
-          margin-left: 0;
-          margin-right: 0;
+          margin-left: 0 !important;
+          margin-right: 0 !important;
           min-height: 46px;
           padding: 8px 4px;
           text-align: center;
@@ -139,7 +139,7 @@
         }
       }
     }
-    #copyright {
+    .copyright {
       text-align: center;
       line-height: 1.5;
       font-family: inherit;

@@ -1,8 +1,4 @@
-import {
-  resolveInjectedProvider,
-  resolveReadProvider,
-  resolveSignerProvider,
-} from './providerAdapter.js';
+import { resolveInjectedProvider, resolveReadProvider, resolveSignerProvider } from './providerAdapter.js';
 import * as providerAdapterModule from './providerAdapter.js';
 
 it('exports only live provider resolution responsibilities', () => {
@@ -105,5 +101,4 @@ describe('providerAdapter', () => {
       source: 'passkey-eoa',
     });
   });
-
 });

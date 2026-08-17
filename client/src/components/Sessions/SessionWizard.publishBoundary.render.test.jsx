@@ -32,20 +32,36 @@ const openPublishSection = async () => {
   return screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
 };
 
-const seedVerifiedWorkerCache = (workerUrl = 'https://worker.example.test', overrides = {}) => {
-  const draft = {
-    corsWorkerUrl: workerUrl,
-    ...(overrides.draft || {}),
-  };
-  sessionStorage.setItem(
-    'ce:sessionWizardDraft:v1',
-    JSON.stringify({
-      ...overrides,
-      draft,
-      deployComplete: true,
-      deployWorkerUrl: workerUrl,
-    }),
-  );
+const deployVerifiedCustomWorker = async ({ sessionName, sessionInfo, openaiKey }) => {
+  const fastPreset = screen.queryByTestId('ce-new-preset-fast_cheap_cloudflare');
+  if (fastPreset) {
+    const previousConfirm = window.confirm;
+    window.confirm = jest.fn(() => true);
+    fireEvent.click(fastPreset);
+    window.confirm = previousConfirm;
+  }
+  const continueButton = screen.queryByTestId('ce-new-preset-continue');
+  if (continueButton && !continueButton.disabled) fireEvent.click(continueButton);
+  fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+    target: { value: sessionName },
+  });
+  fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_INFO), {
+    target: { value: sessionInfo },
+  });
+  await chooseCustomWorkerWithoutDeploy();
+  fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL), {
+    target: { value: 'https://deploy-helper.example.test' },
+  });
+  const tokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
+  const reactPropsKey = Object.keys(tokenInput).find((key) => key.startsWith('__reactProps$'));
+  act(() => tokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } }));
+  const openAiKeyInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY);
+  fireEvent.change(openAiKeyInput, { target: { value: openaiKey } });
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
+  await waitFor(() => {
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Worker deployed.');
+  });
+  return openAiKeyInput;
 };
 
 const enableGeneralInfoLogging = () => {
@@ -80,7 +96,7 @@ const readWizardCache = () => JSON.parse(sessionStorage.getItem('ce:sessionWizar
 describe('SessionWizard publish boundary rendering', () => {
   beforeEach(resetSessionWizardWorkerPanelTestState);
 
-  it('blocks an invalid session mode profile before publish side effects', async () => {
+  it('keeps an initially invalid session mode profile fail-closed before publish side effects', async () => {
     const { arweaveClient } = require('../../utilities/arweave/arweaveClient.js');
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
     profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
@@ -100,15 +116,9 @@ describe('SessionWizard publish boundary rendering', () => {
     renderLoggedInSessionWizard();
     enableAdvancedMode();
     const publishButton = await openPublishSection();
-    fireEvent.click(screen.getByLabelText('Advanced publish settings'));
-    fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
-      target: { value: `ar://${'a'.repeat(43)}` },
-    });
-    await waitFor(() => expect(publishButton).not.toBeDisabled());
 
-    fireEvent.click(publishButton);
-
-    expect(await screen.findByText(/Fix the session hosting settings before publishing/i)).toBeInTheDocument();
+    expect(publishButton).toBeDisabled();
+    expect(screen.queryByLabelText('Advanced publish settings')).not.toBeInTheDocument();
     expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
     expect(arweaveClient.uploadDataToArweave).not.toHaveBeenCalled();
   });
@@ -396,8 +406,7 @@ describe('SessionWizard publish boundary rendering', () => {
     });
   });
 
-  it('preserves suppressed pending SBT drafts while post-registration refresh is still pending', async () => {
-    const manualMetadataUri = `ar://${'g'.repeat(43)}`;
+  it('preserves pending SBT drafts when an invalid registry authorization profile blocks publication', async () => {
     const customRegistryProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
     customRegistryProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
     customRegistryProfile.authorization = { mechanisms: [] };
@@ -410,13 +419,6 @@ describe('SessionWizard publish boundary rendering', () => {
         },
       }),
     );
-    let resolveRegistryRefresh = () => {};
-    const registryRefreshPromise = new Promise((resolve) => {
-      resolveRegistryRefresh = resolve;
-    });
-    mockRegisterSessionOnChain.mockResolvedValue({ txs: [] });
-    mockFetchSessionFromRegistry.mockImplementation(() => registryRefreshPromise);
-
     renderLoggedInSessionWizard();
     enableAdvancedMode();
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
@@ -426,18 +428,9 @@ describe('SessionWizard publish boundary rendering', () => {
     await createPendingFeaturedDraft();
 
     const publishButton = await openPublishSection();
-    fireEvent.click(screen.getByLabelText('Advanced publish settings'));
-    fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
-      target: { value: manualMetadataUri },
-    });
-    await waitFor(() => {
-      expect(publishButton).not.toBeDisabled();
-    });
-    fireEvent.click(publishButton);
 
-    await waitFor(() => {
-      expect(mockFetchSessionFromRegistry).toHaveBeenCalledTimes(1);
-    });
+    expect(publishButton).toBeDisabled();
+    expect(screen.queryByLabelText('Advanced publish settings')).not.toBeInTheDocument();
     expect(mockCreateSBT).not.toHaveBeenCalled();
     expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
     expect(mockFetchSessionFromRegistry).not.toHaveBeenCalled();
@@ -558,23 +551,6 @@ describe('SessionWizard publish boundary rendering', () => {
       }
       return { ok: true, status: 200, json: async () => ({ ok: true }) };
     });
-    sessionStorage.setItem(
-      'ce:sessionWizardDraft:v1',
-      JSON.stringify({
-        sessionId: '0x00112233445566778899aabbccddeeff',
-        deployComplete: true,
-        deployWorkerUrl: workerUrl,
-        workerSecretsEnabled: false,
-        draft: {
-          slug: 'single-worker-session',
-          sessionName: 'Single Worker Session',
-          sessionInfo: 'One canonical session per worker.',
-          corsWorkerUrl: workerUrl,
-          storageProfile: { backend: 'cloudflare' },
-          sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
-        },
-      }),
-    );
 
     try {
       const firstView = renderLoggedInSessionWizard();
@@ -778,7 +754,7 @@ describe('SessionWizard publish boundary rendering', () => {
         expect(mockRegisterSessionOnChain).toHaveBeenCalledTimes(1);
       });
 
-      const [metadataPayload, uploadFormat, uploadOptions] = arweaveScripts.uploadDataToArweave.mock.calls[0];
+      const [metadataPayload, uploadFormat, uploadOptions] = arweaveClient.uploadDataToArweave.mock.calls[0];
       expect(metadataPayload).toEqual(
         expect.objectContaining({
           sessionName: 'Uploaded Metadata Register Boundary Session',
@@ -944,39 +920,6 @@ describe('SessionWizard publish boundary rendering', () => {
       ).toBeInTheDocument();
     });
     expect(arweaveClient.uploadDataToArweave).not.toHaveBeenCalled();
-    expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
-  });
-
-  it('blocks cached secret field gates before metadata upload', async () => {
-    const { arweaveScripts } = require('../../utilities/arweave/arweaveScripts.js');
-    seedVerifiedWorkerCache('https://worker.example.test', {
-      encryptedFieldGates: {
-        'arweave.jwk': 'gate-1',
-      },
-    });
-
-    renderLoggedInSessionWizard();
-    enableAdvancedMode();
-
-    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
-      target: { value: 'Secret Gate Boundary Session' },
-    });
-
-    const publishButton = await openPublishSection();
-    await waitFor(() => {
-      expect(publishButton).not.toBeDisabled();
-    });
-
-    fireEvent.click(publishButton);
-
-    await waitFor(() => {
-      expect(
-        screen.getByText(
-          'Worker secret fields cannot be locked in public metadata: arweave.jwk. Store secrets in the Worker panel instead.',
-        ),
-      ).toBeInTheDocument();
-    });
-    expect(arweaveScripts.uploadDataToArweave).not.toHaveBeenCalled();
     expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
   });
 

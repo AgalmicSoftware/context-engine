@@ -122,8 +122,8 @@ const OnePageSessionTelegramShell = ({
           >
             <strong>Agent-enabled session</strong>
             <span>
-              Sign in with a Context Engine agent token to view questions, groups, and participant-visible results in
-              the web client.
+              Sign in with a Context Engine agent token to view questions, access groups, and participant-visible
+              results in the web client. Telegram is optional.
             </span>
             <button
               type="button"

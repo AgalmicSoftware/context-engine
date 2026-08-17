@@ -3,7 +3,7 @@
     "description": "Corpus of METR (Model Evaluation and Threat Research) publications, benchmarks, datasets, evaluation reports, and policy work. Provides the empirical measurement foundation for AI progress and governance debates - the actual data on how fast AI capabilities are advancing, how reliably we can measure them, and what quantitative trends imply for policy.",
     "version": "1.0",
     "date_generated": "2026-02-15",
-    "entry_count": 95,
+    "entry_count": 100,
     "coverage": {
       "source_types": [
         "benchmark",
@@ -205,73 +205,6 @@
       "source_links": [
         "https://arxiv.org/abs/2503.14499",
         "https://metr.org/blog/2025-03-19-measuring-ai-ability-to-complete-long-tasks/",
-        "https://metr.org/time-horizons/"
-      ]
-    },
-    {
-      "id": "metr_time_horizon_1_1_2026",
-      "title": "Time Horizon 1.1",
-      "authors": [
-        "METR"
-      ],
-      "date": "2026-01-29",
-      "source_type": "research_note",
-      "source_platform": "METR Blog",
-      "url": "https://metr.org/blog/2026-1-29-time-horizon-1-1/",
-      "category": "metric",
-      "summary": "Major update to METR's time horizon measurement expanding to 228 tasks and incorporating new evaluation infrastructure built on UK AISI's Inspect framework. The update finds a post-2023 doubling time of approximately 131 days (roughly 4.3 months), suggesting acceleration compared to the original 7-month doubling estimate across the full 2019-2025 period. Includes updated measurements for all major frontier models including GPT-5, Claude Opus 4.5, and o3-series models. The faster doubling time implies that the transition from current capabilities to transformative AI may occur sooner than the original paper's extrapolations suggested. The update also refines methodology around scaffold selection and task difficulty calibration, addressing some limitations noted in the original paper.",
-      "key_findings": [
-        "Post-2023 doubling time of approximately 131 days (4.3 months)",
-        "Expanded task set to 228 tasks",
-        "Built on UK AISI Inspect framework",
-        "Suggests acceleration of capability growth compared to 2019-2023 trend",
-        "Updated measurements for GPT-5, Claude Opus 4.5, o3-series",
-        "Refined scaffold selection methodology"
-      ],
-      "quantitative_data": {
-        "metric_name": "50%-task-completion time horizon (updated)",
-        "doubling_time_post_2023": "131 days (~4.3 months)",
-        "doubling_time_overall": "~7 months (2019-2025)",
-        "task_count": 228,
-        "framework": "UK AISI Inspect",
-        "acceleration": "Post-2023 trend roughly 60% faster than overall trend"
-      },
-      "novel_arguments_and_concepts": "TH1.1 represents the first systematic attempt to detect acceleration in AI capability growth. While the original paper documented exponential growth, TH1.1 asks whether the exponential itself is speeding up. The finding of a 131-day post-2023 doubling time versus the 7-month overall doubling time is potentially one of the most consequential empirical findings in AI governance — it suggests that capability growth may be super-exponential during the current period. The transition to the Inspect framework also represents an important step toward evaluation infrastructure standardization, making it possible for other organizations to replicate and extend METR's measurements. The methodological refinements around scaffold selection address a key criticism of the original paper: that measured capability depends heavily on the software scaffolding provided to the model.",
-      "implications_for_governance": [
-        "131-day doubling means regulatory frameworks designed for annual review are inadequate",
-        "Super-exponential acceleration strengthens case for proactive rather than reactive regulation",
-        "Standardized evaluation infrastructure (Inspect) enables third-party verification",
-        "Updated measurements provide more current calibration for frontier AI safety policies"
-      ],
-      "debate_connections": [
-        "existential_risk_debate",
-        "regulation_timing",
-        "safety_vs_capabilities",
-        "who_governs_ai"
-      ],
-      "related_work": [
-        "metr_time_horizon_paper_2025",
-        "metr_hcast_2025",
-        "metr_claude_code_codex_th_2026"
-      ],
-      "themes": [
-        "AI Progress Measurement",
-        "Acceleration Detection",
-        "Evaluation Infrastructure",
-        "Capability Trends"
-      ],
-      "tags": [
-        "Time Horizon",
-        "Doubling Time",
-        "Acceleration",
-        "Inspect Framework",
-        "Frontier Models",
-        "METR"
-      ],
-      "influence_score": 9,
-      "citation_context": "Updated the most-cited AI progress metric. Referenced in subsequent METR evaluation reports and external analysis.",
-      "source_links": [
-        "https://metr.org/blog/2026-1-29-time-horizon-1-1/",
         "https://metr.org/time-horizons/"
       ]
     },
@@ -2954,72 +2887,6 @@
       "related_work": [],
       "verification_status": "verified",
       "verification_notes": "Corrected to METR PDF response to OSTP AI Action Plan RFI."
-    },
-    {
-      "id": "metr_predeployment_inadequate_2025",
-      "title": "AI models can be dangerous before public deployment",
-      "authors": [
-        "METR Team"
-      ],
-      "date": "2025-01-17",
-      "source_type": "blog_post",
-      "source_platform": "METR",
-      "url": "https://metr.org/blog/2025-01-17-ai-models-dangerous-before-public-deployment/",
-      "category": "research_finding",
-      "summary": "METR argues that pre-deployment testing centered on public release can miss risks created during internal development and internal deployment, including model theft and sanctioned or rogue internal model use. The entry supports continuous and earlier lifecycle evaluation rather than treating public deployment as the only risk boundary.",
-      "key_findings": [
-        "Pre-deployment testing before public release is not enough when internal model development or use can create risk",
-        "Training and internal deployment can be less reversible than public product access",
-        "Frontier developers need evaluation earlier in the model lifecycle, not only shortly before public launch"
-      ],
-      "quantitative_data": {
-        "publication_date": "2025-01-15",
-        "capability_elicitation_mechanisms": 4,
-        "regulatory_frameworks_challenged": "Frameworks based on pre-deployment gates"
-      },
-      "novel_arguments_and_concepts": "This work makes a critical contribution to AI governance theory by arguing that deployment itself should not be treated as the critical safety boundary. Rather than viewing the model as static after deployment, METR demonstrates that models are dynamic systems continuously modified through user interaction, fine-tuning, and system-level adaptation. This reframes risk management from a gate-keeping problem (deciding whether model is safe enough to release) to a continuous monitoring problem (ensuring safety properties hold across various uses and modifications). The argument has profound implications for regulatory design, suggesting that post-deployment monitoring and evaluation frameworks are not supplementary to pre-deployment evaluation but fundamental to safety governance. This challenges the assumption that companies can certify model safety at a fixed pre-deployment moment.",
-      "implications_for_governance": [
-        "Regulatory frameworks based solely on pre-deployment gates are inadequate",
-        "Ongoing post-deployment monitoring is essential to frontier AI safety governance",
-        "Companies should maintain evaluation capabilities throughout model lifecycle",
-        "Government oversight may need post-deployment monitoring and evaluation access",
-        "Safety governance requires continuous rather than one-time assessment",
-        "Risk management must account for model modification post-deployment"
-      ],
-      "debate_connections": [
-        "alignment_tractability",
-        "regulation_timing",
-        "safety_vs_capabilities",
-        "who_governs_ai"
-      ],
-      "themes": [
-        "Post-deployment risks",
-        "Capability elicitation",
-        "Governance framework design",
-        "Model modification mechanisms",
-        "Continuous evaluation requirements",
-        "Safety boundaries"
-      ],
-      "tags": [
-        "post_deployment_risks",
-        "governance_framework",
-        "capability_elicitation",
-        "model_modification",
-        "continuous_evaluation",
-        "regulatory_analysis",
-        "frontier_ai_safety"
-      ],
-      "influence_score": 8,
-      "citation_context": "Foundational argument for post-deployment monitoring as essential to frontier AI safety governance. Directly challenges assumptions underlying many regulatory frameworks.",
-      "source_links": [
-        "https://metr.org/blog/2025-01-17-ai-models-dangerous-before-public-deployment/"
-      ],
-      "related_work": [
-        "metr_dangerous_before_deployment_2025",
-        "metr_legible_reasoning_2025"
-      ],
-      "verification_status": "verified",
-      "verification_notes": "Corrected title, date, source, and summary against METR post."
     },
     {
       "id": "metr_dangerous_before_deployment_2025",

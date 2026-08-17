@@ -341,12 +341,13 @@ describe('agentClientLogin', () => {
 
   it('clears expired stored envelopes into the re-paste flow', () => {
     writeAgentClientLoginEnvelope({
-      v: 1,
+      v: 2,
       sessionSlug: 'alpha',
       expiresAt: '2020-01-01T00:00:00.000Z',
       address: '0x1111111111111111111111111111111111111111',
       capabilities: { readQuestions: true },
-      credential: { kind: 'session_worker_jwt', token: 'expired-jwt' },
+      bridgeCredential: { kind: 'agent_bridge_browser_token', token: 'expired-bridge-token' },
+      workerCredential: { kind: 'session_worker_jwt', token: 'expired-worker-token' },
     });
 
     expect(readAgentClientLoginEnvelope('alpha')).toBeNull();

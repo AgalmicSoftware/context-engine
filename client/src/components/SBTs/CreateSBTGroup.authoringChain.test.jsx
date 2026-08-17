@@ -2,7 +2,7 @@ import { act, render, screen, within } from '@testing-library/react';
 
 import CreateSBTGroup from './CreateSBTGroup';
 import styles from './CreateSBTGroup.module.scss';
-import { getDemoSessionConfigBySlug } from '../../utilities/web3/contractScripts.js';
+import { getDemoSessionConfigBySlug } from '../../utilities/web3/chainGateway.js';
 import { getSessionContractsForChain, getSessionRegistryChains } from '../../variables/chains.js';
 
 const makeInstance = (props = {}) => {
@@ -186,6 +186,10 @@ describe('CreateSBTGroup authoring chain selection', () => {
   });
 
   it('keeps the current authoring chain when the wallet switch request is rejected', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const switchError = Object.assign(new Error('User rejected network switch'), {
+      code: 4001,
+    });
     const instance = makeInstance({
       account: '0x00000000000000000000000000000000000000aa',
       network: { id: 84532, name: 'Base Sepolia' },
@@ -207,14 +211,13 @@ describe('CreateSBTGroup authoring chain selection', () => {
       { id: 31337, name: 'Anvil' },
     ]);
 
-    const request = jest.fn().mockRejectedValue(Object.assign(new Error('User rejected network switch'), {
-      code: 4001,
-    }));
+    const request = jest.fn().mockRejectedValue(switchError);
     window.ethereum = { request };
 
-    await act(async () => {
-      await instance.handleNetworkChange({ target: { value: '31337' } });
-    });
+    try {
+      await act(async () => {
+        await instance.handleNetworkChange({ target: { value: '31337' } });
+      });
 
       expect(request).toHaveBeenCalledWith({
         method: 'wallet_switchEthereumChain',

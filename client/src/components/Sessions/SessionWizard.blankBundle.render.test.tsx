@@ -54,6 +54,20 @@ const buildMockSponsoredBundle = () => ({
   },
 });
 
+const selectDecentralizedProfile = async () => {
+  const preset = screen.getByTestId('ce-new-preset-trustless_public_decentralized');
+  const originalConfirm = window.confirm;
+  window.confirm = jest.fn(() => true);
+  try {
+    fireEvent.click(preset);
+  } finally {
+    window.confirm = originalConfirm;
+  }
+  await waitFor(() => {
+    expect(preset).toHaveAttribute('aria-checked', 'true');
+  });
+};
+
 jest.mock('../SBTs/SBTSelector', () => () => <div data-testid="mock-wizard-sbt-selector" />);
 jest.mock('../SBTs/CreateSBTGroup', () => () => null);
 jest.mock('../Gates/GateMultiSelectLock', () => () => <div data-testid="mock-wizard-gate-lock" />);

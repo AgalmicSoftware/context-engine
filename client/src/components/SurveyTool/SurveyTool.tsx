@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import '../../assets/css/contextEngine.scss';
 import styles from './SurveyTool.module.scss';
-import contractScripts, { getSessionSlugByName } from '../../utilities/web3/contractScripts.js';
+import contractScripts, { getSessionSlugByName } from '../../utilities/web3/chainGateway.js';
 import { listNamespaceEntriesSync, updateCacheAtomic } from '../../utilities/cache/cacheScripts.js';
 import {
   resolveEffectiveSlug,
@@ -322,6 +322,7 @@ const renderSurveyToolContent = ({
             loginComplete={props.loginComplete}
             loginInProgress={props.loginInProgress}
             network={props.network}
+            networkChainId={props.networkChainId}
             cache={cache}
             updateCache={updateCache}
             pubKey={pubKey}
@@ -341,6 +342,7 @@ const renderSurveyToolContent = ({
             activeSessionSlug={activeSessionSlug}
             sessionSlug={toolSessionSlug}
             sessionSlugPinned={props.sessionSlugPinned}
+            sessionConfig={props.sessionConfig}
             hideEmbeddedDebugUi={props.hideEmbeddedDebugUi}
           />
         </React.Suspense>

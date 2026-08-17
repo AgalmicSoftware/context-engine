@@ -8,7 +8,7 @@ type RenderInfoTooltipProps = Parameters<NonNullable<WorkerDeploySectionProps['r
 const buildWorkerDeploySectionProps = (props: Partial<WorkerDeploySectionProps> = {}): WorkerDeploySectionProps => ({
   allowNativeWorkerVerification: true,
   isNormalMode: false,
-  renderInfoTooltip: ({ testId }) => <button type="button" data-testid={testId} />,
+  renderInfoTooltip: ({ testId }: RenderInfoTooltipProps) => <button type="button" data-testid={testId} />,
   workerMode: 'custom',
   shouldUseSponsoredAutoDeployFlow: false,
   deployForm: { workerName: 'demo-worker', bundleUrl: '', apiToken: '', adminAddress: '' },
@@ -37,9 +37,11 @@ const buildWorkerDeploySectionProps = (props: Partial<WorkerDeploySectionProps> 
   cloudflareTokenSlug: 'demo-worker',
   setDeployForm: () => {},
   handleDeployWorker: () => {},
-  deployInFlight: false,
-  deployStatus: '',
-  deployStatusIsError: false,
+  deployStatusDisplayState: {
+    deployButtonDisabled: false,
+    deployStatusText: '',
+    isError: false,
+  },
   ...props,
 });
 
@@ -70,16 +72,13 @@ describe('WorkerDeploySection', () => {
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_ADMIN_ADDRESS)).toHaveValue(
       '0x0000000000000000000000000000000000000001',
     );
-    expect(
-      (screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_TOKEN_HMAC) as HTMLInputElement).value,
-    ).toMatch(/^[a-f0-9]{64}$/);
-    expect(
-      (screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_STORAGE_KEK) as HTMLInputElement).value,
-    ).toMatch(/^[a-f0-9]{64}$/);
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_DEPLOY)).toHaveAttribute(
-      'href',
-      nativeDeployUrl,
+    expect((screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_TOKEN_HMAC) as HTMLInputElement).value).toMatch(
+      /^[a-f0-9]{64}$/,
     );
+    expect((screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_STORAGE_KEK) as HTMLInputElement).value).toMatch(
+      /^[a-f0-9]{64}$/,
+    );
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_DEPLOY)).toHaveAttribute('href', nativeDeployUrl);
     expect(screen.getByText('Legacy deploy-helper fallback')).toBeInTheDocument();
     expect(screen.getByText('Legacy deploy-helper fallback').closest('details')).not.toHaveAttribute('open');
   });
@@ -402,7 +401,7 @@ describe('WorkerDeploySection', () => {
     expect(handleDeployWorker).toHaveBeenCalledTimes(1);
   });
 
-  it('scopes the prefilled token link to a known Cloudflare account', () => {
+  it('does not let hidden legacy account state scope the token template', () => {
     renderWorkerDeploySection({
       deployForm: {
         workerName: 'demo-worker',
@@ -524,89 +523,6 @@ describe('WorkerDeploySection', () => {
     ).toEqual({
       workerName: 'demo-worker',
       apiToken: 'new-token',
-      adminAddress: '',
-    });
-  });
-
-  it('keeps a cached Cloudflare account id when first filling the API token', () => {
-    const setDeployForm = jest.fn();
-
-    renderWorkerDeploySection({
-      deployForm: {
-        workerName: 'demo-worker',
-        bundleUrl: '',
-        apiToken: '',
-        accountId: 'cf-account-1',
-        adminAddress: '',
-      },
-      setDeployForm,
-    });
-
-    fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN), {
-      target: { value: 'new-token' },
-    });
-
-    expect(setDeployForm).toHaveBeenCalledWith(expect.any(Function));
-    const updater = setDeployForm.mock.calls[0][0];
-    expect(
-      updater({
-        workerName: 'demo-worker',
-        apiToken: '',
-        accountId: 'cf-account-1',
-        adminAddress: '',
-      }),
-    ).toEqual({
-      workerName: 'demo-worker',
-      apiToken: 'new-token',
-      accountId: 'cf-account-1',
-      adminAddress: '',
-    });
-  });
-
-  it('clears the cached Cloudflare account id when replacing an API token', () => {
-    const setDeployForm = jest.fn();
-
-    renderWorkerDeploySection({
-      deployForm: {
-        workerName: 'demo-worker',
-        bundleUrl: '',
-        apiToken: 'old-token',
-        accountId: 'cf-account-1',
-        adminAddress: '',
-      },
-      setDeployForm,
-    });
-
-    fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN), {
-      target: { value: 'new-token' },
-    });
-
-    expect(setDeployForm).toHaveBeenCalledWith(expect.any(Function));
-    const updater = setDeployForm.mock.calls[0][0];
-    expect(
-      updater({
-        workerName: 'demo-worker',
-        apiToken: 'old-token',
-        accountId: 'cf-account-1',
-        adminAddress: '',
-      }),
-    ).toEqual({
-      workerName: 'demo-worker',
-      apiToken: 'new-token',
-      accountId: '',
-      adminAddress: '',
-    });
-    expect(
-      updater({
-        workerName: 'demo-worker',
-        apiToken: 'new-token',
-        accountId: 'cf-account-1',
-        adminAddress: '',
-      }),
-    ).toEqual({
-      workerName: 'demo-worker',
-      apiToken: 'new-token',
-      accountId: 'cf-account-1',
       adminAddress: '',
     });
   });

@@ -324,7 +324,10 @@ const dedupeRegionItems = (items: CompareVennItem[]): CompareVennItem[] => {
 export const buildCompareVennModel = (options: BuildCompareVennModelOptions): CompareVennModel | null => {
   const dimension = options.dimension;
   const users = (Array.isArray(options.users) ? options.users : []).slice(0, dimension);
-  const labels = Array.from({ length: dimension }, (_, index) => options.labels?.[index] || String.fromCharCode(65 + index));
+  const labels = Array.from(
+    { length: dimension },
+    (_, index) => options.labels?.[index] || String.fromCharCode(65 + index),
+  );
   const membershipRegions = buildMembershipRegions(dimension, Array.isArray(options.sets) ? options.sets : []);
   const hasOpinionCounts = Boolean(options.preCounts && typeof options.preCounts === 'object');
   if (!hasOpinionCounts && !membershipRegions) return null;
@@ -341,9 +344,7 @@ export const buildCompareVennModel = (options: BuildCompareVennModelOptions): Co
       promptById,
       imageByMembership,
     }).map((item): CompareVennItem =>
-      item.type === 'question'
-        ? { ...item, votes: buildQuestionVotes(item, userIndices, encodedUsers) }
-        : item,
+      item.type === 'question' ? { ...item, votes: buildQuestionVotes(item, userIndices, encodedUsers) } : item,
     );
     const fallbackMemberships: CompareVennMembershipItem[] = Array.from(membershipRegions?.[key] || []).map(
       (membershipKey) => {

@@ -165,6 +165,11 @@ const createMockHost = (overrides = {}) => {
     updateSurveysCacheAtomic,
     updateUserCacheAtomic,
     getActiveSessionSlug: jest.fn(() => activeSlug || 'test-slug'),
+    getSessionCfg: jest.fn((slug) => ({
+      slug,
+      networkChainId: 11155420,
+      blockLimits: { start: 10, end: null },
+    })),
     getSessionChainId: jest.fn(() =>
       Object.prototype.hasOwnProperty.call(overrides, 'chainId') ? chainId : '11155420',
     ),

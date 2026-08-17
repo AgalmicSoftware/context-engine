@@ -56,5 +56,6 @@ workers, storage, and data flow details.
 - React
 - Vite
 - Jest 30
+- ESLint 9 flat config
 - SCSS Modules / Sass
 - ethers and viem for web3 interactions

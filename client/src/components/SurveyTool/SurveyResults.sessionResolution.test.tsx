@@ -1,33 +1,9 @@
 import React from 'react';
 import fs from 'fs';
 import path from 'path';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { renderToStaticMarkup } from 'react-dom/server';
-import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
-import ConnectedSurveyResults, {
-  SURVEY_RESULTS_CLICKABLE_ICON_STYLE,
-  SURVEY_RESULTS_DOCUMENT_LINK_ICON_STYLE,
-  SURVEY_RESULTS_METADATA_MISSING_STYLE,
-  SURVEY_RESULTS_MINI_BAR_SPINNER_STYLE,
-  SURVEY_RESULTS_MINI_PROGRESS_STYLE,
-  SURVEY_RESULTS_SORTABLE_HEADER_STYLE,
-  SURVEY_RESULTS_SURVEY_BOOKMARK_STYLE,
-  SURVEY_RESULTS_SYNC_REMAINING_SPINNER_STYLE,
-  SURVEY_RESULTS_TABLE_BOOKMARK_STYLE,
-  SURVEY_RESULTS_TABLE_CELL_STYLE,
-  SURVEY_RESULTS_TRAILING_LABEL_STYLE,
-  buildSurveyResultsAggregatorPanelClassName,
-  buildSurveyResultsMultichoiceOptionClassName,
-  countQuestionModeResponses,
-  hasAnyCountableSurveyAnswer,
-  resolveSurveyResultsSyncDetailsStyle,
-  resolveSurveyResultsToggleKnobStyle,
-} from './SurveyResults';
-import styles from './SurveyResults.module.scss';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import * as cacheScriptsModule from '../../utilities/cache/cacheScripts.js';
-import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
-import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
-import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
+import contractScriptsDefault, * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import * as sessionScanScopeModule from '../../utilities/session/sessionScanScope.js';
 import {
   resolveSurveyResultsQuestionReadScope,
@@ -36,11 +12,12 @@ import {
 import { renderSurveyResults } from './surveyResultsTestHarness';
 import { getPolisDemoQuestionPool } from './surveyPolisDemoQuestionPool';
 
-type TreeNode = any;
-type TreePredicate = (node: TreeNode) => boolean;
-type SurveyResultsProps = Record<string, any>;
 const cacheScripts: any = cacheScriptsModule;
 const sessionScanScope: any = sessionScanScopeModule;
+
+const NETWORK_ID = '84532';
+const RESPONDER_ONE = '0x1111111111111111111111111111111111111111';
+const VIEW_MODE_SWITCH_NAME = 'Toggle between individual and aggregate view';
 
 const mockSbtFilter = jest.fn((..._args: any[]) => null);
 jest.mock('../SBTs/SBTFilter', () => (props: any) => {
@@ -106,22 +83,10 @@ jest.mock('../MainContent/RiskMatrix', () => ({
   },
 }));
 
-const SurveyResults: any = (ConnectedSurveyResults as any).WrappedComponent;
-
-const createSubject = (props: SurveyResultsProps = {}): any =>
-  new SurveyResults({
-    network: { id: 84532 },
-    ...props,
-  });
-
-const createDeferred = <T,>() => {
-  let resolve!: (value: T | PromiseLike<T>) => void;
-  let reject!: (reason?: any) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
+type CacheEnvironment = {
+  bookmarksBySlug?: Record<string, any>;
+  questionsBySlug?: Record<string, any>;
+  surveysBySlug?: Record<string, any>;
 };
 
 let cacheUpdateListener: ((update: Record<string, any>) => void) | null = null;
@@ -211,19 +176,9 @@ const seedCacheEnvironment = ({
     }
     return null;
   });
-  return subject;
-};
-
-const findElement = (node: TreeNode, predicate: TreePredicate): TreeNode | null => {
-  const stack: TreeNode[] = [node];
-  while (stack.length > 0) {
-    const current = stack.pop();
-    if (!current) continue;
-    if (Array.isArray(current)) {
-      for (let i = current.length - 1; i >= 0; i -= 1) {
-        stack.push(current[i]);
-      }
-      continue;
+  jest.spyOn(cacheScripts, 'readCache').mockImplementation(async (namespace: any, slug: any) => {
+    if (namespace === 'bookmarksCache') {
+      return lookupSlug(bookmarksBySlug, slug, defaultBookmarks);
     }
     if (namespace === 'questionsCache') {
       return lookupSlug(questionsBySlug, slug, {});
@@ -334,45 +289,21 @@ const switchToIndividualsView = async (): Promise<void> => {
   if (viewSwitch?.getAttribute('aria-checked') === 'true') {
     fireEvent.click(viewSwitch);
   }
-  return null;
+  await waitFor(() => {
+    expect(collectSurveyLinks().some((href) => href.includes(`/${RESPONDER_ONE}`))).toBe(true);
+  });
 };
-
-const collectTreeNodes = (
-  node: TreeNode,
-  predicate: TreePredicate,
-  acc: TreeNode[] = []
-): TreeNode[] => {
-  if (node == null) return acc;
-  if (Array.isArray(node)) {
-    node.forEach((child) => collectTreeNodes(child, predicate, acc));
-    return acc;
-  }
-  if (typeof node !== 'object') return acc;
-  if (predicate(node)) acc.push(node);
-  return collectTreeNodes(node?.props?.children, predicate, acc);
-};
-
-const normalizeChildren = (children: TreeNode): TreeNode[] => {
-  if (children == null) return [];
-  if (Array.isArray(children)) return children.filter(Boolean);
-  return [children].filter(Boolean);
-};
-
-const renderSubjectTree = (subject: any) => (
-  render(
-    <MemoryRouter>
-      {subject.render()}
-    </MemoryRouter>
-  )
-);
 
 beforeEach(() => {
+  localStorage.clear();
   mockSbtFilter.mockClear();
+  mockQuestionFilter.mockClear();
   mockPolisReport.mockClear();
   mockSingleQuestionResponse.mockClear();
   mockDemoAnalysisWorkspace.mockClear();
   mockDebateMap.mockClear();
   mockRiskMatrix.mockClear();
+  cacheUpdateListener = null;
 });
 
 afterEach(() => {
@@ -421,10 +352,21 @@ describe('SurveyResults session resolution', () => {
     expect(scss).not.toMatch(/\.sessionSelectorPopover\s*{/);
   });
 
-  it('reads bookmarks cache using canonical explicit session aliases in the constructor', () => {
-    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({
-      surveys: [],
-      questions: ['q1'],
+  it('reads bookmarks cache using canonical explicit session aliases in the constructor', async () => {
+    seedCacheEnvironment({
+      bookmarksBySlug: {
+        DEBATE: { surveys: [], questions: ['q1'] },
+      },
+      questionsBySlug: {
+        DEBATE: buildQuestionCache({
+          questions: {
+            q1: { id: 'q1', prompt: 'Debate question', type: 'rating', sessionSlug: 'DEBATE' },
+          },
+          questionResponses: {
+            q1: { '0xdebate': { answer: { value: 4, encrypted: false } } },
+          },
+        }),
+      },
     });
 
     renderQuestionResults(
@@ -436,32 +378,36 @@ describe('SurveyResults session resolution', () => {
     );
     await waitForPrompt('Debate question');
 
-    expect(peekSpy).toHaveBeenCalledWith('bookmarksCache', 'DEBATE', { clone: false });
-    expect(subject.state.bookmarkedQuestionIDs).toEqual(['q1']);
+    expect(cacheScripts.peekCacheSync).toHaveBeenCalledWith('bookmarksCache', 'DEBATE', { clone: false });
+    expect(document.querySelector('svg[color="gold"]')).toBeTruthy();
   });
 
-  it('keeps explicit general aliases from falling through to survey-cache scans', () => {
-    const listSpy = jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockReturnValue([
-      {
-        slug: 'edge',
-        value: {
-          '84532': {
-            surveys: {
-              'survey-1': { title: 'Edge survey' },
+  it('keeps explicit general aliases from falling through to survey-cache scans', async () => {
+    seedCacheEnvironment({
+      surveysBySlug: {
+        edge: buildSurveyCache({
+          surveyId: 'survey-1',
+          title: 'Edge survey',
+          responsesByResponder: {
+            [RESPONDER_ONE]: {
+              responses: [{ questionID: 'q1', answer: { value: 'edge' } }],
             },
           },
-        },
+        }),
       },
-    ]);
+    });
 
-    const subject = createSubject({ sessionSlug: 'general' });
-    subject.state = {
-      ...subject.state,
+    renderSurveyModeResults({
+      sessionSlug: 'general',
       surveyId: 'survey-1',
-    };
+    });
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Survey Results' })).toBeInTheDocument();
+    });
 
-    expect(subject.getEffectiveSlug()).toBe('');
-    expect(listSpy).not.toHaveBeenCalled();
+    expect(cacheScripts.listNamespaceEntriesSync).not.toHaveBeenCalled();
+    expect(collectSurveyLinks()).toContain('/survey/survey-1');
+    expect(collectSurveyLinks().some((href) => href.includes('session=general'))).toBe(false);
   });
 
   it('keeps explicit non-general session slugs unresolved when no config exists', async () => {
@@ -470,60 +416,54 @@ describe('SurveyResults session resolution', () => {
       return null;
     });
 
-    const subject = createSubject({ sessionSlug: 'DEBATE' });
+    const context = resolveSurveyResultsSessionContext({
+      sessionSlug: 'DEBATE',
+      resolveBySlug: configSpy,
+    });
 
-    expect(subject.getEffectiveSessionContext()).toMatchObject({
+    expect(context).toMatchObject({
       sessionSlug: 'DEBATE',
       sessionConfig: null,
     });
     expect(configSpy).toHaveBeenCalledWith('DEBATE');
+    expect(configSpy).not.toHaveBeenCalledWith('rxc');
   });
 
-  it('memoizes fallback slug scan and invalidates on surveys cache updates', () => {
-    const entriesSpy = jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockReturnValue([
-      {
-        slug: 'edge',
-        value: {
-          '84532': {
-            surveys: {
-              '0xsurvey': { id: '0xsurvey' },
-            },
-          },
-        },
+  it('memoizes fallback slug scan and invalidates on surveys cache updates', async () => {
+    seedCacheEnvironment({
+      surveysBySlug: {
+        edge: buildSurveyCache({ surveyId: '0xsurvey' }),
       },
-    ]);
+    });
 
-    const subject = createSubject({
+    const view = renderSurveyModeResults({
+      questionResponsesNonce: 1,
+      questionsCacheNonce: 2,
+      surveyId: '0xSurvey',
+    });
+    await waitFor(() => {
+      expect(collectSurveyLinks()).toContain('/survey/0xSurvey?session=edge');
+    });
+    const firstCount = cacheScripts.listNamespaceEntriesSync.mock.calls.length;
+
+    await rerenderHarness(view as ReturnType<typeof renderQuestionResults>, {
       questionResponsesNonce: 1,
       questionsCacheNonce: 2,
     });
-    subject.state = {
-      ...subject.state,
-      surveyId: '0xSurvey',
-    };
+    expect(cacheScripts.listNamespaceEntriesSync.mock.calls.length).toBe(firstCount);
 
-    const first = subject.getEffectiveSlug();
-    const second = subject.getEffectiveSlug();
-
-    expect(first).toBe('edge');
-    expect(second).toBe('edge');
-    expect(entriesSpy).toHaveBeenCalledTimes(1);
-    expect(entriesSpy).toHaveBeenCalledWith('surveysCache', { cloneValues: false });
-
-    subject.props = {
-      ...subject.props,
+    await rerenderHarness(view as ReturnType<typeof renderQuestionResults>, {
       questionResponsesNonce: 2,
-    };
-    const third = subject.getEffectiveSlug();
+    });
+    const nonceCount = cacheScripts.listNamespaceEntriesSync.mock.calls.length;
+    expect(nonceCount).toBeGreaterThan(firstCount);
 
-    expect(third).toBe('edge');
-    expect(entriesSpy).toHaveBeenCalledTimes(2);
-
-    subject.handleManagedCacheUpdate({ namespace: 'surveysCache', slug: 'edge', action: 'write' });
-    const fourth = subject.getEffectiveSlug();
-
-    expect(fourth).toBe('edge');
-    expect(entriesSpy).toHaveBeenCalledTimes(3);
+    act(() => {
+      cacheUpdateListener?.({ namespace: 'surveysCache', slug: 'edge', action: 'write' });
+    });
+    await rerenderHarness(view as ReturnType<typeof renderQuestionResults>, {});
+    expect(cacheScripts.listNamespaceEntriesSync.mock.calls.length).toBeGreaterThan(nonceCount);
+    expect(collectSurveyLinks()).toContain('/survey/0xSurvey?session=edge');
   });
 
   it('keeps /session route question reads scoped to one session', () => {
@@ -557,32 +497,20 @@ describe('SurveyResults session resolution', () => {
   });
 
   it('keeps pinned question results scoped to the current session even when global list scope includes more sessions', async () => {
-    const priorUrl = window.location.href;
-    window.history.replaceState({}, '', '/session/edge/questions/results');
-    try {
-      jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
-      jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha']);
-      jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
-        if (namespace === 'bookmarksCache') return { surveys: [], questions: [] };
-        if (namespace !== 'questionsCache') return {};
-        if (slug === 'edge') {
-          return {
-            '84532': {
-              questions: { q1: { id: 'q1', prompt: 'Edge 1', type: 'freeform' } },
-              questionResponses: { q1: { '0xedge': { answer: { value: 'edge', encrypted: false } } } },
-            },
-          };
-        }
-        if (slug === 'alpha') {
-          return {
-            '84532': {
-              questions: { q2: { id: 'q2', prompt: 'Alpha 2', type: 'freeform' } },
-              questionResponses: { q2: { '0xalpha': { answer: { value: 'alpha', encrypted: false } } } },
-            },
-          };
-        }
-        return {};
-      });
+    seedCacheEnvironment({
+      questionsBySlug: {
+        edge: buildQuestionCache({
+          questions: { q1: { id: 'q1', prompt: 'Edge 1', type: 'freeform' } },
+          questionResponses: { q1: { '0xedge': { answer: { value: 'edge', encrypted: false } } } },
+        }),
+        alpha: buildQuestionCache({
+          questions: { q2: { id: 'q2', prompt: 'Alpha 2', type: 'freeform' } },
+          questionResponses: { q2: { '0xalpha': { answer: { value: 'alpha', encrypted: false } } } },
+        }),
+      },
+    });
+    jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+    jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha']);
 
     renderQuestionResults(
       {
@@ -593,62 +521,36 @@ describe('SurveyResults session resolution', () => {
     );
     await waitForPrompt('Edge 1');
 
-      await subject.fetchQuestionModeResponses();
-      expect(subject.getQuestionReadSlugs('questions')).toEqual(['edge']);
-      expect(Object.keys(subject.state.aggregatorQuestionResponses).sort()).toEqual(['q1']);
-      expect(findElement(
-        subject.render(),
-        (node) => node?.props?.['data-testid'] === 'ce-surveyresults-session-selector-toggle'
-      )).toBeNull();
-    } finally {
-      window.history.replaceState({}, '', priorUrl);
-    }
+    expectPromptAbsent('Alpha 2');
+    expect(cacheScripts.peekCacheSync).toHaveBeenCalledWith('questionsCache', 'edge', { clone: false });
+    expect(cacheScripts.peekCacheSync).not.toHaveBeenCalledWith('questionsCache', 'alpha', { clone: false });
+    expect(screen.queryByTestId('ce-surveyresults-session-selector-toggle')).toBeNull();
   });
 
   it('keeps explicit query-pinned question results scoped to authoritative question bindings only', async () => {
-    const priorUrl = window.location.href;
-    window.history.replaceState({}, '', '/questions/results?session=demo');
-    try {
-      jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
-      jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['demo', 'alpha']);
-      jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
-        if (namespace === 'bookmarksCache') return { surveys: [], questions: [] };
-        if (namespace !== 'questionsCache') return {};
-        if (slug !== 'demo') return {};
-        return {
-          '84532': {
-            questions: {
-              qDemo: {
-                id: 'qDemo',
-                prompt: 'Demo question',
-                type: 'freeform',
-                sessionSlug: 'demo',
-                sessionSlugExplicit: true,
-              },
-              qLeakedExplicit: {
-                id: 'qLeakedExplicit',
-                prompt: 'Wrong session question',
-                type: 'freeform',
-                sessionSlug: 'alpha',
-                sessionSlugExplicit: true,
-              },
-              qLeakedLegacy: {
-                id: 'qLeakedLegacy',
-                prompt: 'Legacy leaked question',
-                type: 'freeform',
-                sessionSlug: 'demo',
-              },
+    seedCacheEnvironment({
+      questionsBySlug: {
+        demo: buildQuestionCache({
+          questions: {
+            qDemo: {
+              id: 'qDemo',
+              prompt: 'Demo question',
+              type: 'freeform',
+              sessionSlug: 'demo',
+              sessionSlugExplicit: true,
             },
-            questionResponses: {
-              qDemo: {
-                '0xdemo': { answer: { value: 'demo', encrypted: false } },
-              },
-              qLeakedExplicit: {
-                '0xalpha': { answer: { value: 'alpha', encrypted: false } },
-              },
-              qLeakedLegacy: {
-                '0xlegacy': { answer: { value: 'legacy', encrypted: false } },
-              },
+            qLeakedExplicit: {
+              id: 'qLeakedExplicit',
+              prompt: 'Wrong session question',
+              type: 'freeform',
+              sessionSlug: 'alpha',
+              sessionSlugExplicit: true,
+            },
+            qLeakedLegacy: {
+              id: 'qLeakedLegacy',
+              prompt: 'Legacy leaked question',
+              type: 'freeform',
+              sessionSlug: 'demo',
             },
           },
           questionResponses: {
@@ -877,43 +779,33 @@ describe('SurveyResults session resolution', () => {
   });
 
   it('keeps embedded pinned session results on legacy bucket-backed questions while excluding explicit cross-session leaks', async () => {
-    const priorUrl = window.location.href;
-    window.history.replaceState({}, '', '/questions/results?session=demo');
-    try {
-      jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
-      jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['demo', 'alpha']);
-      jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
-        if (namespace === 'bookmarksCache') return { surveys: [], questions: [] };
-        if (namespace !== 'questionsCache') return {};
-        if (slug !== 'demo') return {};
-        return {
-          '84532': {
-            questions: {
-              qLegacy: {
-                id: 'qLegacy',
-                prompt: 'Legacy demo question',
-                type: 'freeform',
-                sessionSlug: 'demo',
-              },
-              qLeakedExplicit: {
-                id: 'qLeakedExplicit',
-                prompt: 'Wrong session question',
-                type: 'freeform',
-                sessionSlug: 'alpha',
-                sessionSlugExplicit: true,
-              },
+    seedCacheEnvironment({
+      questionsBySlug: {
+        demo: buildQuestionCache({
+          questions: {
+            qLegacy: {
+              id: 'qLegacy',
+              prompt: 'Legacy demo question',
+              type: 'freeform',
+              sessionSlug: 'demo',
             },
-            questionResponses: {
-              qLegacy: {
-                '0xdemo': { answer: { value: 'demo', encrypted: false } },
-              },
-              qLeakedExplicit: {
-                '0xalpha': { answer: { value: 'alpha', encrypted: false } },
-              },
+            qLeakedExplicit: {
+              id: 'qLeakedExplicit',
+              prompt: 'Wrong session question',
+              type: 'freeform',
+              sessionSlug: 'alpha',
+              sessionSlugExplicit: true,
             },
           },
-        };
-      });
+          questionResponses: {
+            qLegacy: { '0xdemo': { answer: { value: 'demo', encrypted: false } } },
+            qLeakedExplicit: { '0xalpha': { answer: { value: 'alpha', encrypted: false } } },
+          },
+        }),
+      },
+    });
+    jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+    jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['demo', 'alpha']);
 
     renderQuestionResults(
       {
@@ -926,30 +818,16 @@ describe('SurveyResults session resolution', () => {
     );
     await waitForPrompt('Legacy demo question');
 
-      await subject.fetchQuestionModeResponses();
-
-      expect(Object.keys(subject.state.aggregatorQuestionResponses)).toEqual(['qlegacy']);
-      expect(Object.keys(subject.state.questionResponses)).toEqual(['qlegacy']);
-      expect(subject.state.totalQuestionsCount).toBe(1);
-      expect(subject.state.totalResponsesCount).toBe(1);
-    } finally {
-      window.history.replaceState({}, '', priorUrl);
-    }
+    expectPromptAbsent('Wrong session question');
+    expectQuestionResponseCounts(1, 1);
   });
 
   it('resets stale filtered question counts when unfiltered question results refresh', async () => {
-    const subject = attachStateHarness(createSubject({
-      isOpen: true,
-      viewMode: 'questions',
-    }));
-
-    subject.state = {
-      ...subject.state,
-      viewMode: 'questions',
-      isFilterActive: false,
-      filteredQuestionsCount: 42,
-      filteredResponsesCount: 9,
-      questionResultsHydrated: false,
+    const questionsBySlug = {
+      edge: buildQuestionCache({
+        questions: { q1: { id: 'q1', prompt: 'Edge question', type: 'freeform' } },
+        questionResponses: { q1: { '0xedge': { answer: { value: 'edge', encrypted: false } } } },
+      }),
     };
     seedCacheEnvironment({ questionsBySlug });
 
@@ -970,22 +848,29 @@ describe('SurveyResults session resolution', () => {
       expectPromptAbsent('Edge question');
       expectQuestionResponseCounts(0, 0);
     });
-
-    await subject.fetchQuestionModeResponses();
-
-    expect(subject.state.totalQuestionsCount).toBe(0);
-    expect(subject.state.totalResponsesCount).toBe(0);
-    expect(subject.state.filteredQuestionsCount).toBe(0);
-    expect(subject.state.filteredResponsesCount).toBe(0);
-    expect(subject.state.questionResultsHydrated).toBe(true);
   });
 
   it('keeps question-mode reads scoped to the /session route slug', async () => {
-    const priorUrl = window.location.href;
-    window.history.replaceState({}, '', '/session/edge');
-    try {
-      jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
-      jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha', 'beta']);
+    seedCacheEnvironment({
+      questionsBySlug: {
+        edge: buildQuestionCache({
+          questionsLatestBlock: 11,
+          questionResponsesLatestBlock: 12,
+          questions: { q1: { id: 'q1', prompt: 'Edge 1', type: 'freeform' } },
+          questionResponses: { q1: { '0xedge': { answer: { value: 'edge', encrypted: false } } } },
+        }),
+        alpha: buildQuestionCache({
+          questions: { q2: { id: 'q2', prompt: 'Alpha 2', type: 'freeform' } },
+          questionResponses: { q2: { '0xalpha': { answer: { value: 'alpha', encrypted: false } } } },
+        }),
+        beta: buildQuestionCache({
+          questions: { q3: { id: 'q3', prompt: 'Beta 3', type: 'freeform' } },
+          questionResponses: { q3: { '0xbeta': { answer: { value: 'beta', encrypted: false } } } },
+        }),
+      },
+    });
+    jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+    jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha', 'beta']);
 
     renderQuestionResults(
       {
@@ -995,134 +880,71 @@ describe('SurveyResults session resolution', () => {
     );
     await waitForPrompt('Edge 1');
 
-      const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
-        if (namespace === 'bookmarksCache') return { surveys: [], questions: [] };
-        if (namespace !== 'questionsCache') return {};
-        return questionCachesBySlug[String(slug)] || {};
-      });
-
-      const subject = createSubject({
-        activeSessionSlug: 'edge',
-        isQuestionCacheReady: true,
-        isResponsesCacheReady: true,
-      });
-      attachStateHarness(subject);
-      subject.questionFilterRef = { current: { handleApplyFilters: jest.fn() } };
-      subject.state = {
-        ...subject.state,
-        viewMode: 'questions',
-      };
-
-      await subject.fetchQuestionModeResponses();
-
-      expect(Object.keys(subject.state.aggregatorQuestionResponses).sort()).toEqual(['q1']);
-      expect(Object.keys(subject.state.questionResponses).sort()).toEqual(['q1']);
-      expect(subject.state.totalQuestionsCount).toBe(1);
-      expect(subject.state.totalResponsesCount).toBe(1);
-      expect(subject.getNetworkQuestionsForCurrentContext()).toMatchObject({
-        q1: expect.objectContaining({ sessionSlug: 'edge', prompt: 'Edge 1' }),
-      });
-      expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'edge', { clone: false });
-      expect(peekSpy).not.toHaveBeenCalledWith('questionsCache', 'alpha', { clone: false });
-      expect(peekSpy).not.toHaveBeenCalledWith('questionsCache', 'beta', { clone: false });
-    } finally {
-      window.history.replaceState({}, '', priorUrl);
-    }
+    expectPromptAbsent('Alpha 2');
+    expectPromptAbsent('Beta 3');
+    expect(cacheScripts.peekCacheSync).toHaveBeenCalledWith('questionsCache', 'edge', { clone: false });
+    expect(cacheScripts.peekCacheSync).not.toHaveBeenCalledWith('questionsCache', 'alpha', { clone: false });
+    expect(cacheScripts.peekCacheSync).not.toHaveBeenCalledWith('questionsCache', 'beta', { clone: false });
+    const filterProps = getLatestQuestionFilterProps();
+    expect(filterProps.questions).toEqual([
+      expect.objectContaining({ id: 'q1', prompt: 'Edge 1', sessionSlug: 'edge' }),
+    ]);
   });
 
-  it('uses the route slug filter storage bucket on /session question results', () => {
-    const priorUrl = window.location.href;
-    window.history.replaceState({}, '', '/session/edge');
-    try {
-      jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
-      jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha', 'beta']);
-      jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
-        if (namespace === 'bookmarksCache') return { surveys: [], questions: [] };
-        if (namespace !== 'questionsCache') return {};
-        if (slug === 'edge') {
-          return {
-            '84532': {
-              questions: {
-                q1: { id: 'q1', prompt: 'Edge 1', type: 'freeform' },
-              },
-              questionResponses: {},
+  it('reads scoped question cache buckets without write, fetch, decrypt, or state side effects', async () => {
+    seedCacheEnvironment({
+      questionsBySlug: {
+        edge: buildQuestionCache({
+          questionsLatestBlock: 41,
+          questionResponsesLatestBlock: 42,
+          questions: {
+            q1: {
+              id: 'q1',
+              prompt: 'Ready edge question',
+              sessionSlug: 'edge',
+              type: 'freeform',
             },
-          };
-        }
-        if (slug === 'alpha') {
-          return {
-            '84532': {
-              questions: {
-                q2: { id: 'q2', prompt: 'Alpha 2', type: 'freeform' },
-              },
-              questionResponses: {},
+            qpending: {
+              id: 'qpending',
+              prompt: '[encrypted]',
+              sessionSlug: 'edge',
+              __ceQuestionMetadataPending: true,
             },
-          };
-        }
-        if (slug === 'beta') {
-          return {
-            '84532': {
-              questions: {
-                q3: { id: 'q3', prompt: 'Beta 3', type: 'freeform' },
-              },
-              questionResponses: {},
-            },
-          };
-        }
-        return {};
-      });
-
-      const subject = createSubject({
-        activeSessionSlug: 'edge',
-        isOpen: true,
-        isQuestionCacheReady: true,
-        isResponsesCacheReady: true,
-      });
-      subject.state = {
-        ...subject.state,
-        viewMode: 'questions',
-        showQuestionFilter: true,
-        questionResponses: {
-          q1: {
-            '0xedge': { answer: { value: 'edge', encrypted: false } },
           },
-        },
-        aggregatorQuestionResponses: {
-          q1: [
-            {
-              responder: '0xedge',
-              questionId: 'q1',
-              response: { answer: { value: 'edge', encrypted: false } },
+          questionResponses: {
+            q1: { '0xaaa': { answer: { value: 'Ready answer' } } },
+            qpending: { '0xbbb': { answer: { value: 'Pending answer' } } },
+          },
+        }),
+        alpha: buildQuestionCache({
+          questionsLatestBlock: 37,
+          questionResponsesLatestBlock: 39,
+          questions: {
+            q2: {
+              id: 'q2',
+              prompt: 'Ready alpha question',
+              sessionSlug: 'alpha',
+              sessionSlugExplicit: true,
+              type: 'binary',
             },
-          ],
-        },
-        sbtFilteredAggregatorQuestionResponses: {
-          q1: [
-            {
-              responder: '0xedge',
-              questionId: 'q1',
-              response: { answer: { value: 'edge', encrypted: false } },
+          },
+          questionResponses: {
+            q2: { '0xccc': { answer: { value: true } } },
+          },
+        }),
+        beta: buildQuestionCache({
+          questions: {
+            q3: {
+              id: 'q3',
+              prompt: 'Out of scope beta question',
+              sessionSlug: 'beta',
+              sessionSlugExplicit: true,
+              type: 'rating',
             },
-          ],
-        },
-        totalQuestionsCount: 1,
-        totalResponsesCount: 1,
-      };
-
-      const tree = subject.render();
-      const questionFilterNode = findElement(
-        tree,
-        (node) =>
-          node?.props?.resultsMode === true &&
-          node?.props?.onFilter === subject.handleQuestionFilter
-      );
-
-      expect(questionFilterNode?.props?.storageKeyPrefix).toBe('dg:filters:edge');
-      expect(questionFilterNode?.props?.questions).toEqual([
-        expect.objectContaining({
-          id: 'q1',
-          prompt: 'Edge 1',
-          sessionSlug: 'edge',
+          },
+          questionResponses: {
+            q3: { '0xddd': { answer: { value: 5 } } },
+          },
         }),
       },
     });
@@ -1189,48 +1011,36 @@ describe('SurveyResults session resolution', () => {
   });
 
   it('excludes response-discovered pending placeholders from /session question results', async () => {
-    const priorUrl = window.location.href;
     const leakedResponder = '0x02a2a289d5cde3c7d7b957c7f32299ca35d53526';
-    window.history.replaceState({}, '', '/session/telegram-demo-2');
-    try {
-      jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
-      jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['telegram-demo-2', 'demo']);
-      jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
-        if (namespace === 'bookmarksCache') return { surveys: [], questions: [] };
-        if (namespace !== 'questionsCache') return {};
-        if (slug !== 'telegram-demo-2') return {};
-        return {
-          '84532': {
-            questions: {
-              qLocal: { id: 'qLocal', prompt: 'Local question', type: 'binary' },
-              qPending: {
-                id: 'qPending',
-                prompt: '[encrypted]',
-                type: 'binary',
-                __ceQuestionMetadataPending: true,
-              },
-              qDemoExplicit: {
-                id: 'qDemoExplicit',
-                prompt: 'Demo question',
-                type: 'binary',
-                sessionSlug: 'demo',
-                sessionSlugExplicit: true,
-              },
+    seedCacheEnvironment({
+      questionsBySlug: {
+        'telegram-demo-2': buildQuestionCache({
+          questions: {
+            qLocal: { id: 'qLocal', prompt: 'Local question', type: 'binary' },
+            qPending: {
+              id: 'qPending',
+              prompt: '[encrypted]',
+              type: 'binary',
+              __ceQuestionMetadataPending: true,
             },
-            questionResponses: {
-              qLocal: {
-                '0xlocal': { type: 'binary', answer: { value: 'Agree', encrypted: false } },
-              },
-              qPending: {
-                [leakedResponder]: { type: 'binary', answer: { value: 'Disagree', encrypted: false } },
-              },
-              qDemoExplicit: {
-                [leakedResponder]: { type: 'binary', answer: { value: 'Agree', encrypted: false } },
-              },
+            qDemoExplicit: {
+              id: 'qDemoExplicit',
+              prompt: 'Demo question',
+              type: 'binary',
+              sessionSlug: 'demo',
+              sessionSlugExplicit: true,
             },
           },
-        };
-      });
+          questionResponses: {
+            qLocal: { '0xlocal': { type: 'binary', answer: { value: 'Agree', encrypted: false } } },
+            qPending: { [leakedResponder]: { type: 'binary', answer: { value: 'Disagree', encrypted: false } } },
+            qDemoExplicit: { [leakedResponder]: { type: 'binary', answer: { value: 'Agree', encrypted: false } } },
+          },
+        }),
+      },
+    });
+    jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+    jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['telegram-demo-2', 'demo']);
 
     renderQuestionResults(
       {
@@ -1240,48 +1050,35 @@ describe('SurveyResults session resolution', () => {
     );
     await waitForPrompt('Local question');
 
-      await subject.fetchQuestionModeResponses();
-
-      expect(Object.keys(subject.state.aggregatorQuestionResponses).sort()).toEqual(['qlocal']);
-      expect(Object.keys(subject.state.questionResponses).sort()).toEqual(['qlocal']);
-      expect(JSON.stringify(subject.state.aggregatorQuestionResponses).toLowerCase()).not.toContain(leakedResponder);
-    } finally {
-      window.history.replaceState({}, '', priorUrl);
-    }
+    expectPromptAbsent('[encrypted]');
+    expectPromptAbsent('Demo question');
+    expect(document.body.innerHTML.toLowerCase()).not.toContain(leakedResponder);
+    expect(JSON.stringify(mockSingleQuestionResponse.mock.calls).toLowerCase()).not.toContain(leakedResponder);
   });
 
   it('hydrates question results from cache before latest-block lookups resolve', async () => {
-    const priorUrl = window.location.href;
-    window.history.replaceState({}, '', '/questions/results?session=demo');
-    try {
-      let resolveLatestBlock: ((value: number) => void) | null = null;
-      const latestBlockPromise = new Promise<number>((resolve) => {
-        resolveLatestBlock = resolve;
-      });
-      jest.spyOn(contractScriptsModule.default, 'getLatestBlockNumber')
-        .mockReturnValue(latestBlockPromise);
-      jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
-        if (namespace === 'bookmarksCache') return { surveys: [], questions: [] };
-        if (namespace !== 'questionsCache') return {};
-        if (slug !== 'demo') return {};
-        return {
-          '84532': {
-            questions: {
-              qLegacy: {
-                id: 'qLegacy',
-                prompt: 'Legacy demo question',
-                type: 'freeform',
-                sessionSlug: 'demo',
-              },
-            },
-            questionResponses: {
-              qLegacy: {
-                '0xdemo': { answer: { value: 'demo', encrypted: false } },
-              },
+    let resolveLatestBlock: ((value: number) => void) | null = null;
+    const latestBlockPromise = new Promise<number>((resolve) => {
+      resolveLatestBlock = resolve;
+    });
+    seedCacheEnvironment({
+      questionsBySlug: {
+        demo: buildQuestionCache({
+          questions: {
+            qLegacy: {
+              id: 'qLegacy',
+              prompt: 'Legacy demo question',
+              type: 'freeform',
+              sessionSlug: 'demo',
             },
           },
-        };
-      });
+          questionResponses: {
+            qLegacy: { '0xdemo': { answer: { value: 'demo', encrypted: false } } },
+          },
+        }),
+      },
+    });
+    (contractScriptsDefault.getLatestBlockNumber as jest.Mock).mockReturnValue(latestBlockPromise);
 
     renderQuestionResults(
       {
@@ -1293,29 +1090,24 @@ describe('SurveyResults session resolution', () => {
       '/questions/results?session=demo',
     );
 
-      const fetchPromise = subject.fetchResponses();
-      const raceResult = await Promise.race([
-        fetchPromise.then(() => 'fetch-complete'),
-        new Promise((resolve) => setTimeout(() => resolve('still-waiting'), 0)),
-      ]);
-
-      expect(raceResult).toBe('fetch-complete');
-      expect(subject.state.totalQuestionsCount).toBe(1);
-      expect(subject.state.totalResponsesCount).toBe(1);
-      expect(subject.state.networkLatestBlock).toBe(0);
-
-      (resolveLatestBlock as any)?.(12345);
-      await Promise.resolve();
-      await Promise.resolve();
-
-      expect(subject.state.networkLatestBlock).toBe(12345);
-      await fetchPromise;
-    } finally {
-      window.history.replaceState({}, '', priorUrl);
-    }
+    await waitForPrompt('Legacy demo question');
+    expectQuestionResponseCounts(1, 1);
+    (resolveLatestBlock as any)?.(12345);
+    await waitFor(() => {
+      expect(contractScriptsDefault.getLatestBlockNumber).toHaveBeenCalled();
+    });
+    // port note: exact networkLatestBlock state values are internal; this keeps the cache-first hydration guarantee while RPC is unresolved.
   });
 
-  it('clears stale question results when the base session changes under global list scope', () => {
+  it('clears stale question results when the base session changes under global list scope', async () => {
+    const questionsBySlug = {
+      edge: buildQuestionCache({
+        questions: { q1: { id: 'q1', prompt: 'Edge 1', type: 'freeform' } },
+        questionResponses: { q1: { '0xedge': { answer: { value: 'edge', encrypted: false } } } },
+      }),
+      beta: buildQuestionCache(),
+    };
+    seedCacheEnvironment({ questionsBySlug });
     jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
     jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha', 'beta']);
 
@@ -1335,11 +1127,10 @@ describe('SurveyResults session resolution', () => {
       activeSessionSlug: 'beta',
       questionResponsesNonce: 2,
     });
-    subject.setState = jest.fn((next, cb) => {
-      const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
-      subject.state = { ...subject.state, ...(patch || {}) };
-      if (typeof cb === 'function') cb();
-      return patch;
+
+    await waitFor(() => {
+      expectPromptAbsent('Edge 1');
+      expectQuestionResponseCounts(0, 0);
     });
     expect(cacheScripts.peekCacheSync).toHaveBeenCalledWith('questionsCache', 'beta', { clone: false });
     // port note: the old queueResultsRefresh reason string is internal; the observable guard is the beta cache read and cleared UI.
@@ -1417,25 +1208,22 @@ describe('SurveyResults session resolution', () => {
       return links;
     };
 
-    const prevProps = subject.props;
-    const prevState = { ...subject.state };
-    subject.props = {
-      ...subject.props,
-      sessionSlug: 'beta',
-      activeSessionSlug: 'beta',
-    };
+    const debateLinks = await collectLinksForSession('DEBATE');
+    expect(debateLinks).toContain('/survey/0xSurvey?session=DEBATE');
+    expect(debateLinks).toContain(`/survey/0xSurvey/${RESPONDER_ONE.toLowerCase()}?session=DEBATE`);
+    expect(debateLinks).not.toContain('/survey/0xSurvey?session=rxc');
+    expect(debateLinks).not.toContain(`/survey/0xSurvey/${RESPONDER_ONE.toLowerCase()}?session=rxc`);
 
-    subject.componentDidUpdate(prevProps, prevState);
+    jest.restoreAllMocks();
+    mockSbtFilter.mockClear();
+    mockQuestionFilter.mockClear();
+    mockSingleQuestionResponse.mockClear();
 
-    expect(subject.state.questionResponses).toEqual({});
-    expect(subject.state.aggregatorQuestionResponses).toEqual({});
-    expect(subject.state.sbtFilteredAggregatorQuestionResponses).toEqual({});
-    expect(subject.state.totalQuestionsCount).toBe(0);
-    expect(subject.state.totalResponsesCount).toBe(0);
-    expect(subject.state.filteredResponsesCount).toBe(0);
-    expect(subject.state.filteredQuestionsCount).toBe(0);
-    expect(subject.getQuestionReadSlugs('questions')).toEqual(['beta']);
-    expect(subject.queueResultsRefresh).toHaveBeenCalledWith(expect.stringContaining('question-scope-change'));
+    const generalLinks = await collectLinksForSession('general');
+    expect(generalLinks).toContain('/survey/0xSurvey');
+    expect(generalLinks).toContain(`/survey/0xSurvey/${RESPONDER_ONE.toLowerCase()}`);
+    expect(generalLinks).not.toContain('/survey/0xSurvey?session=general');
+    expect(generalLinks).not.toContain(`/survey/0xSurvey/${RESPONDER_ONE.toLowerCase()}?session=general`);
   });
 
   it('does not inherit the general session config for unknown non-general slugs', async () => {
@@ -1444,9 +1232,12 @@ describe('SurveyResults session resolution', () => {
       return null;
     });
 
-    const subject = createSubject({ sessionSlug: 'missing-session-slug' });
+    const context = resolveSurveyResultsSessionContext({
+      sessionSlug: 'missing-session-slug',
+      resolveBySlug: configSpy,
+    });
 
-    expect(subject.getEffectiveSessionContext()).toMatchObject({
+    expect(context).toMatchObject({
       sessionSlug: 'missing-session-slug',
       sessionConfig: null,
     });

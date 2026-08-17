@@ -34,6 +34,8 @@ Worker, Arweave, and on-chain development flows may also require a funded test w
 - Client typecheck: `npm run typecheck:client`
 - Root CI-equivalent test flow: `npm test`
 - Client-only tests (no Foundry required): `cd client && npm test -- --watchAll=false` (Jest 30)
+- Client lint: `cd client && npm run lint` (ESLint 9 flat config)
+- Client format check: `cd client && npm run format:check`
 - Contract tests: `forge test`
 - Public route/style smoke: `npm run test:e2e`
 
@@ -44,6 +46,7 @@ Before opening a PR, run the smallest relevant test set for your change plus `np
 - Branch from the current default branch.
 - Keep PRs scoped to one change or closely related set of changes.
 - Describe user-visible behavior changes clearly.
+- Keep public PR text free of internal planning IDs, private paths, and private operational notes.
 - Keep changelog entries public-facing. Do not include internal planning identifiers in any `CHANGELOG.md`; rewrite entries as release notes that describe the shipped behavior or technical change directly.
 - Include screenshots, logs, or repro notes for UI, web3, worker, or encryption-flow changes when they help review.
 - Update docs and tests when behavior, config, or workflows change.

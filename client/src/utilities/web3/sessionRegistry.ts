@@ -23,7 +23,7 @@ import {
   getSessionRegistryAddress,
   getSessionRegistryChainIds,
 } from '../../variables/chains.js';
-import { arweaveScripts } from '../arweave/arweaveScripts.js';
+import { arweaveClient } from '../arweave/arweaveClient.js';
 import { getCacheBackendDiagnostics } from '../cache/cacheScripts.js';
 import { litStorage } from '../crypto/litProtocol.js';
 import { cryptoUtils } from '../crypto/cryptography.js';
@@ -886,7 +886,15 @@ const readSignerChainId = async (
   return 0;
 };
 
-const assertSignerOnRegistryWriteChain = async ({ signer, ethersProvider = null, chainId }) => {
+const assertSignerOnRegistryWriteChain = async ({
+  signer,
+  ethersProvider = null,
+  chainId,
+}: {
+  signer: AnyRecord;
+  ethersProvider?: ethers.providers.Web3Provider | null;
+  chainId?: unknown;
+}) => {
   const writeChainId = Number(chainId || 0) || 0;
   const signerChainId = await readSignerChainId(signer, ethersProvider);
   if (writeChainId && !signerChainId) {
@@ -995,7 +1003,7 @@ const fetchMetadataFromArweave = async (uri: unknown, opts: AnyRecord = {}) => {
   };
   let text = '';
   try {
-    text = await arweaveScripts.downloadDataFromArweave(txId, {
+    text = await arweaveClient.downloadDataFromArweave(txId, {
       debugContext,
     });
   } catch (err) {
@@ -1004,7 +1012,7 @@ const fetchMetadataFromArweave = async (uri: unknown, opts: AnyRecord = {}) => {
       const cacheBackend = getCacheBackendDiagnostics();
       surveysLog.warn('[sessionRegistry] metadata fetch failed', {
         txId,
-        error: err?.message || String(err),
+        error: error?.message || String(err),
         slug: debugContext.slug || null,
         chainId: debugContext.chainId || null,
         cacheBackend: cacheBackend?.persistentBackend || 'unknown',
@@ -1262,6 +1270,11 @@ const mergeSessionFieldsIntoCachedConfig = ({
   session,
   fieldsByKey,
   registryChainId,
+}: {
+  baseConfig?: AnyRecord | null;
+  session?: AnyRecord | null;
+  fieldsByKey?: AnyRecord | null;
+  registryChainId?: number | string | null;
 }) => {
   const base = normalizeSessionNaming(
     baseConfig && typeof baseConfig === 'object' ? { ...baseConfig } : {},
@@ -1325,7 +1338,7 @@ const mergeSessionFieldsIntoCachedConfig = ({
   return normalizeSessionNaming(config);
 };
 
-const addSessionConfigToCache = (cache, config, opts = {}) => {
+const addSessionConfigToCache = (cache: RegistryCache | null, config: AnyRecord | null, opts: AnyRecord = {}) => {
   if (!cache || !config || typeof config !== 'object') return;
   const slug = normalizeSlug(config.slug);
 
@@ -1617,7 +1630,7 @@ export const refreshSessionRegistryFieldsCache = async ({
 };
 
 export const loadSessionRegistryCache = async (
-  { chainIds, providerLike, account, lit, force, bootstrapRpc } = {} as AnyRecord,
+  { chainIds, slugs, providerLike, account, lit, force, bootstrapRpc } = {} as AnyRecord,
 ) => {
   if (!USE_ONCHAIN_SESSION_REGISTRY && !force) return null;
   const useBootstrapRpc = typeof bootstrapRpc === 'boolean' ? bootstrapRpc : true;
@@ -1643,6 +1656,9 @@ export const loadSessionRegistryCache = async (
   }
 
   const ids = Array.isArray(chainIds) && chainIds.length ? chainIds : getSessionRegistryChainIds();
+  const requestedSlugs = Array.isArray(slugs)
+    ? Array.from(new Set(slugs.map((slug) => toRegistrySlug(slug)).filter(Boolean)))
+    : [];
 
   const cache: RegistryCache = {
     ts: Date.now(),
@@ -1748,38 +1764,9 @@ export const loadSessionRegistryCache = async (
           registryChainId: chainId,
           metadataLoadState: resolveMetadataLoadState({ metadata, hasMetadataUri }),
         });
-        const decrypted = await tryDecryptEnvelope(encrypted, {
-          account,
-          providerLike,
-          chainId: session.chainId || chainId,
-          lit,
-        });
-        metadata = decrypted || null;
-      }
-
-      const gatesByResource: RegistryGateMap = {};
-      const gateEntries = await Promise.all(
-        DEFAULT_RESOURCES.map(async (resourceKey) => {
-          const gate = await fetchGateForResource(contract, slug, resourceKey);
-          return { resourceKey, gate };
-        }),
-      );
-      gateEntries.forEach(({ resourceKey, gate }) => {
-        gatesByResource[resourceKey] = gate;
-      });
-
-      const fieldsByKey = await fetchSessionFields(contract, slug);
-
-      const config = buildSessionConfigFromRegistry({
-        session,
-        metadata,
-        gatesByResource,
-        fieldsByKey,
-        registryChainId: chainId,
-        metadataLoadState: resolveMetadataLoadState({ metadata, hasMetadataUri }),
-      });
-      return { config, hadLoadErrors: false };
-    });
+        return { config, hadLoadErrors: false };
+      },
+    );
 
     return {
       chainId,

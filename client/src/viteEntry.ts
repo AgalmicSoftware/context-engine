@@ -1,6 +1,7 @@
 import processShim from 'process/browser';
 import { Buffer } from 'buffer/';
 import { clearBootReloadMarker, renderBootFailure } from './bootRecovery.js';
+import { initializeThemeRuntime } from './utilities/ui/themeRuntime';
 import 'assets/css/contextEngine.scss';
 
 globalThis.process = globalThis.process || processShim;

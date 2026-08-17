@@ -52,11 +52,23 @@ const BullhornToggleButton = ({
     type="button"
     onClick={onClick}
     disabled={disabled}
-    className={`${styles.iconButton} ${styles.commentButton} ${styles.bullhornButton} ${active ? styles.iconButtonActive : ''}`}
+    className={buildBullhornToggleButtonClassName({
+      active,
+      activeClassName: styles.iconButtonActive,
+      baseClassName: styles.iconButton,
+      bullhornClassName: styles.bullhornButton,
+      commentClassName: styles.commentButton,
+    })}
     title={title}
     aria-label={ariaLabel}
   >
-    <FontAwesomeIcon icon={faBullhorn} className={active ? styles.iconGlow : undefined} />
+    <FontAwesomeIcon
+      icon={faBullhorn}
+      className={resolveBullhornToggleIconClassName({
+        active,
+        iconGlowClassName: styles.iconGlow,
+      })}
+    />
   </button>
 );
 

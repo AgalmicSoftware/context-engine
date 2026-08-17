@@ -8,7 +8,7 @@
 
 import * as contractScriptsImpl from './contractScripts.impl.js';
 
-type AnyRecord = Record<string, any>;
+type CommonJsExportRecord = Record<string, unknown>;
 type ContractScriptsImplModule = typeof import('./contractScripts.impl.js');
 type ContractScriptsDefaultExport = ContractScriptsImplModule['default'];
 

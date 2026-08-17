@@ -403,7 +403,8 @@ describe('surveyPileInteractionSurface', () => {
     const iconButtonCount = countElements(controlsNode, isIconToolbarButton);
     const framelessIconButtonCount = countElements(
       controlsNode,
-      (node) => isIconToolbarButton(node) && isElementNode(node) && node.props['data-ce-control-appearance'] === 'frameless',
+      (node) =>
+        isIconToolbarButton(node) && isElementNode(node) && node.props['data-ce-control-appearance'] === 'frameless',
     );
 
     expect(iconButtonCount).toBe(8);

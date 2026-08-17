@@ -20,6 +20,8 @@ describe('sessionWizardStorageProfile', () => {
       questions: 'staged',
       surveys: 'staged',
       responses: 'staged',
+      generatedArtifacts: 'staged',
+      media: 'staged',
       images: 'staged',
     });
     expect(profile.sbtGatedAccess.litRequired).toBe('payload_encrypted_only');
@@ -53,6 +55,8 @@ describe('sessionWizardStorageProfile', () => {
     expect(profile.resources.questions).toBe('active');
     expect(profile.resources.surveys).toBe('active');
     expect(profile.resources.responses).toBe('active');
+    expect(profile.payloadAccessControl.gate).toBe('sbt_gate');
+    expect(profile.payloadAccessControl.encryption).toBe('none');
     expect(profile.payloadAccessControl.mode).toBe(SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE);
     expect(profile.payloadAccessControl.enforcement).toBe('session_worker_sbt_gate');
     expect(profile.payloadAccessControl.resources.docsContext).toBe('docUploads');
@@ -62,8 +66,20 @@ describe('sessionWizardStorageProfile', () => {
     expect(profile.payloadAccessControl.resources.generatedArtifacts).toBe('surveyResponses');
     expect(profile.sbtGatedAccess.litRequired).toBe('not_required_worker_enforced');
     expect(SESSION_STORAGE_CLOUDFLARE_PRIMITIVES).toEqual({
-      r2: ['session_context_payloads', 'question_payloads', 'survey_payloads', 'response_payloads', 'media_blob_payloads'],
-      kv: ['metadata_indexes', 'audit_events', 'short_lived_action_ids', 'webhook_replay_cache', 'ephemeral_start_params'],
+      r2: [
+        'session_context_payloads',
+        'question_payloads',
+        'survey_payloads',
+        'response_payloads',
+        'media_blob_payloads',
+      ],
+      kv: [
+        'metadata_indexes',
+        'audit_events',
+        'short_lived_action_ids',
+        'webhook_replay_cache',
+        'ephemeral_start_params',
+      ],
       durableObjects: ['signer_runtime_coordination_only', 'coordination_locks'],
     });
     expect(profile.cloudflare.primitives).toEqual(SESSION_STORAGE_CLOUDFLARE_PRIMITIVES);
@@ -83,6 +99,8 @@ describe('sessionWizardStorageProfile', () => {
     });
 
     expect(profile.payloadAccessControl.mode).toBe(SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED);
+    expect(profile.payloadAccessControl.gate).toBe('none');
+    expect(profile.payloadAccessControl.encryption).toBe('lit');
     expect(profile.payloadAccessControl.enforcement).toBe('lit_access_control_conditions');
     expect(profile.payloadAccessControl.litRequired).toBe(true);
     expect(profile.sbtGatedAccess.litRequired).toBe('required_for_cloudflare_payload_encryption');
@@ -96,6 +114,8 @@ describe('sessionWizardStorageProfile', () => {
     });
 
     expect(profile.payloadAccessControl.mode).toBe(SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ);
+    expect(profile.payloadAccessControl.gate).toBe('none');
+    expect(profile.payloadAccessControl.encryption).toBe('none');
     expect(profile.payloadAccessControl.enforcement).toBe('session_worker_public_read');
     expect(profile.payloadAccessControl.litRequired).toBe(false);
     expect(profile.payloadAccessControl.label).toBe('Public-read Cloudflare payloads');

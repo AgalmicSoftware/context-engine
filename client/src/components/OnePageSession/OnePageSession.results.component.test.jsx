@@ -8,8 +8,8 @@ import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
 import OnePageSession from './OnePageSession';
 import styles from './OnePageSession.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import contractScripts from '../../utilities/web3/contractScripts.js';
-import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
+import contractScripts from '../../utilities/web3/chainGateway.js';
+import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
@@ -26,6 +26,7 @@ const mockSBTsPage = jest.fn();
 const mockDebateMap = jest.fn();
 const mockRiskMatrix = jest.fn();
 const mockDemoAnalysisWorkspace = jest.fn();
+const mockCorpusViewer = jest.fn();
 const originalFetch = global.fetch;
 const fullCrossCorpusPayload = JSON.parse(
   fs.readFileSync(path.join(__dirname, '../../../../ai-discourse-corpus/corpuses/cross-corpus-debates.json'), 'utf8'),
@@ -406,12 +407,13 @@ describe('OnePageSession results routing', () => {
     }
   });
 
-  it('keeps results-route open and close navigation under PUBLIC_URL subpaths', async () => {
+  it('preserves worker session context through results open and close under PUBLIC_URL subpaths', async () => {
     jest.useFakeTimers();
     const originalScrollIntoView = window.HTMLElement.prototype.scrollIntoView;
     window.HTMLElement.prototype.scrollIntoView = jest.fn();
     const priorUrl = window.location.href;
     const priorPublicUrl = process.env.PUBLIC_URL;
+    const workerSessionSearch = '?worker=https%3A%2F%2Fworker.example.test&session=edge';
     // '/ce/' is our synthetic subpath fixture for the dormant-but-supported
     // PUBLIC_URL mode; root deployment remains the default today.
     process.env.PUBLIC_URL = '/ce/';
@@ -422,7 +424,7 @@ describe('OnePageSession results routing', () => {
         .filter((childProps) => childProps?.miniMode === true && childProps?.minifiedMode !== 'pile');
 
     try {
-      window.history.replaceState({}, '', '/ce/session/edge');
+      window.history.replaceState({}, '', `/ce/session/edge${workerSessionSearch}#responses`);
       render(<OnePageSession {...buildProps()} />);
 
       await waitFor(() => {
@@ -439,7 +441,8 @@ describe('OnePageSession results routing', () => {
         expect(screen.getByTestId('survey-page-full')).toBeInTheDocument();
       });
       expect(window.location.pathname).toBe('/ce/session/edge/questions/results');
-      expect(window.location.search).toBe('?session=edge');
+      expect(window.location.search).toBe(workerSessionSearch);
+      expect(window.location.hash).toBe('#responses');
 
       act(() => {
         const latestProps = getFullCalls()[getFullCalls().length - 1];
@@ -450,6 +453,8 @@ describe('OnePageSession results routing', () => {
         expect(getFullCalls()[getFullCalls().length - 1]?.autoOpenResults).toBe(false);
       });
       expect(window.location.pathname).toBe('/ce/session/edge');
+      expect(window.location.search).toBe(workerSessionSearch);
+      expect(window.location.hash).toBe('#responses');
     } finally {
       process.env.PUBLIC_URL = priorPublicUrl;
       window.HTMLElement.prototype.scrollIntoView = originalScrollIntoView;

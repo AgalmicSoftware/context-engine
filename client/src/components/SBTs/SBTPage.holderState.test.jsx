@@ -447,6 +447,43 @@ describe('SBTPage holder state preservation', () => {
     expect(subject.state.filteredMintedUsers).toEqual([ownerA.toLowerCase()]);
   });
 
+  it('does not repeat the central event refresh when the holder meta key was already scanned', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000a1';
+    const sbtLower = sbtAddress.toLowerCase();
+    const cacheEntry = createReadCachePayload({
+      sbtAddress,
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: false,
+      blockNumber: 1234,
+    });
+
+    const readSpy = jest.spyOn(cacheScripts, 'readCache').mockResolvedValue(cacheEntry);
+    const refreshSpy = jest.fn().mockResolvedValue(undefined);
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
+    jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue(null);
+
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      sessionSlug: 'edge',
+      refreshSbtData: refreshSpy,
+    });
+    subject.state = {
+      ...subject.state,
+      network: { id: 84532, name: 'Base Sepolia' },
+    };
+    subject._eventScanTried = {
+      [`edge:84532:${sbtLower}`]: true,
+    };
+
+    await subject.loadSBTInfo(false);
+
+    expect(readSpy).toHaveBeenCalledTimes(1);
+    expect(refreshSpy).not.toHaveBeenCalled();
+    expect(subject._eventScanTried[`edge:84532:${sbtLower}`]).toBe(true);
+    expect(subject.state.countsLoaded).toBe(false);
+  });
+
   it('clears only the holder whose burn count increases during a same-key empty refresh', async () => {
     const sbtAddress = '0x00000000000000000000000000000000000000a1';
     const ownerA = '0x00000000000000000000000000000000000000b1';

@@ -51,6 +51,7 @@ export type WorkerGroupMembershipPanelProps = {
   selectedGroupId?: string;
   showDescriptions?: boolean;
   showListHeader?: boolean;
+  membershipsOnly?: boolean;
 };
 
 const emptyOverview: WorkerGroupOverview = { groups: [], memberships: [] };
@@ -92,131 +93,6 @@ const emptyMemberListState = (targetKey: string, groupId = ''): WorkerGroupMembe
 const groupJoinHasEnded = (group: WorkerGroup): boolean =>
   Boolean(group.joinEndsAt && Date.parse(group.joinEndsAt) <= Date.now());
 
-export type WorkerGroupJoinWindowDisplay =
-  | { status: 'never'; countdownText: ''; fullDateText: '' }
-  | { status: 'active'; countdownText: string; fullDateText: string }
-  | { status: 'expired'; countdownText: ''; fullDateText: string };
-
-const formatWorkerGroupRemainingTime = (remainingMs: number): string => {
-  const totalSeconds = Math.max(0, Math.floor(remainingMs / 1000));
-  const days = Math.floor(totalSeconds / 86400);
-  const hours = Math.floor((totalSeconds % 86400) / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  if (days > 0) return `${days}d ${hours}h`;
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  if (minutes > 0) return `${minutes}m ${seconds}s`;
-  return `${seconds}s`;
-};
-
-export const resolveWorkerGroupJoinWindowDisplay = ({
-  joinEndsAt,
-  nowMs = Date.now(),
-}: {
-  joinEndsAt?: unknown;
-  nowMs?: number;
-}): WorkerGroupJoinWindowDisplay => {
-  const rawJoinEndsAt = String(joinEndsAt || '').trim();
-  if (!rawJoinEndsAt) return { status: 'never', countdownText: '', fullDateText: '' };
-  const endMs = Date.parse(rawJoinEndsAt);
-  if (!Number.isFinite(endMs)) return { status: 'never', countdownText: '', fullDateText: '' };
-  const fullDateText = new Date(endMs).toLocaleString();
-  if (endMs <= nowMs) return { status: 'expired', countdownText: '', fullDateText };
-  return {
-    status: 'active',
-    countdownText: formatWorkerGroupRemainingTime(endMs - nowMs),
-    fullDateText,
-  };
-};
-
-type WorkerGroupCardProps = {
-  children: React.ReactNode;
-  copyGroupLink: (groupId: string) => Promise<void>;
-  fetchImpl: typeof fetch;
-  group: WorkerGroup;
-  isActive: boolean;
-  onOpenDetails: (groupId: string) => void;
-  showDescription: boolean;
-  sessionConfig: unknown;
-  sessionSlug: string;
-  workerToken: string;
-  workerUrl: string;
-};
-
-const WorkerGroupCard = ({
-  children,
-  copyGroupLink,
-  fetchImpl,
-  group,
-  isActive,
-  onOpenDetails,
-  showDescription,
-  sessionConfig,
-  sessionSlug,
-  workerToken,
-  workerUrl,
-}: WorkerGroupCardProps) => {
-  const safeGroupId = group.groupId.replace(/[^a-zA-Z0-9_-]/g, '-');
-  const titleId = `worker-group-${safeGroupId}-title`;
-  const descriptionId = showDescription && group.description ? `worker-group-${safeGroupId}-description` : undefined;
-
-  return (
-    <article
-      id={`group-${encodeURIComponent(group.groupId)}`}
-      className={`${sbtPageStyles.sbtItem} ${styles.workerGroupCard}`}
-      aria-labelledby={titleId}
-      aria-describedby={descriptionId}
-    >
-      <div className={sbtPageStyles.iconOverlay}>
-        <div
-          className={isActive ? sbtPageStyles.liveIndicator : sbtPageStyles.endedIndicator}
-          aria-label={isActive ? 'Group joining open' : 'Group joining closed'}
-        ></div>
-        <button
-          type="button"
-          className={styles.workerGroupCardLinkButton}
-          onClick={() => void copyGroupLink(group.groupId)}
-          aria-label={`Copy ${group.label} group link`}
-          title="Copy group link"
-        >
-          <FontAwesomeIcon icon={faLink} />
-        </button>
-      </div>
-      <button
-        type="button"
-        className={styles.workerGroupCardBodyButton}
-        onClick={() => onOpenDetails(group.groupId)}
-        aria-label={`Open group details for ${group.label}`}
-      >
-        <div className={sbtPageStyles.miniImageContainer}>
-          {group.imageUrl ? (
-            <WorkerGroupImage
-              src={group.imageUrl}
-              alt={group.label}
-              className={sbtPageStyles.sbtImage}
-              fetchImpl={fetchImpl}
-              sessionConfig={sessionConfig}
-              sessionSlug={sessionSlug}
-              testId="ce-session-worker-group-image"
-              workerToken={workerToken}
-              workerUrl={workerUrl}
-            />
-          ) : null}
-        </div>
-        <p id={titleId} className={sbtPageStyles.miniSbtName}>
-          {group.label}
-        </p>
-        {showDescription && group.description ? (
-          <p id={descriptionId} className={styles.workerGroupCardDescription} title={group.description}>
-            {group.description}
-          </p>
-        ) : null}
-      </button>
-      <div className={styles.workerGroupCardActions}>{children}</div>
-    </article>
-  );
-};
-
 const toSafeExternalUrl = (value: unknown): string => {
   try {
     const url = new URL(String(value || '').trim());
@@ -231,7 +107,7 @@ const workerGroupPrincipalIdentity = (member: WorkerGroupMember): string => {
   if (!principal) return '';
   if (principal.kind === 'evm_address' || principal.kind === 'passkey_account') return principal.address;
   if (principal.kind === 'telegram') return principal.principalId;
-  return principal.grantId;
+  return principal.kind === 'agent' ? principal.grantId : '';
 };
 
 const workerGroupPrincipalKindLabel = (member: WorkerGroupMember): string => {
@@ -307,18 +183,14 @@ const WorkerGroupMembersModal = ({
           {members.map((member) => {
             const identity = workerGroupPrincipalIdentity(member);
             const kindLabel = workerGroupPrincipalKindLabel(member);
-            const isAddress =
-              member.principal?.kind === 'evm_address' || member.principal?.kind === 'passkey_account';
+            const isAddress = member.principal?.kind === 'evm_address' || member.principal?.kind === 'passkey_account';
             const blockieUrl = generateBlockieDataUrl(
               `${member.principal?.kind || 'member'}:${identity}`.toLowerCase(),
               8,
               4,
             );
             return (
-              <div
-                key={`${member.principal?.kind || 'member'}:${identity}`}
-                className={sbtPageStyles.userItem}
-              >
+              <div key={`${member.principal?.kind || 'member'}:${identity}`} className={sbtPageStyles.userItem}>
                 <div className={sbtPageStyles.userItemLeft}>
                   {blockieUrl ? <img src={blockieUrl} alt="" className={sbtPageStyles.userBlockie} /> : null}
                   {isAddress ? (
@@ -594,6 +466,7 @@ const WorkerGroupMembershipPanel = ({
   selectedGroupId: selectedGroupIdProp = '',
   showDescriptions = true,
   showListHeader = true,
+  membershipsOnly = false,
 }: WorkerGroupMembershipPanelProps) => {
   const canReadGroups = canReadGroupsProp ?? envelope?.capabilities?.readGroups === true;
   const workerUrl = normalizeWorkerUrl(workerUrlProp || envelope?.workerUrl || '');
@@ -611,12 +484,8 @@ const WorkerGroupMembershipPanel = ({
   const [memberListState, setMemberListState] = useState<WorkerGroupMemberListState>(() =>
     emptyMemberListState(targetKey),
   );
-  const {
-    membershipActions,
-    beginMembershipMutation,
-    finishMembershipMutation,
-    isMembershipMutationCurrent,
-  } = useWorkerGroupMembershipMutations(targetKey);
+  const { membershipActions, beginMembershipMutation, finishMembershipMutation, isMembershipMutationCurrent } =
+    useWorkerGroupMembershipMutations(targetKey);
   const [membershipStatusState, setMembershipStatusState] = useState({ targetKey, status: '' });
   const [shareState, setShareState] = useState({ targetKey, status: '' });
   const activeViewState = viewState.targetKey === targetKey ? viewState : emptyViewState(targetKey);
@@ -626,9 +495,7 @@ const WorkerGroupMembershipPanel = ({
   const membershipStatus = membershipStatusState.targetKey === targetKey ? membershipStatusState.status : '';
   const shareStatus = shareState.targetKey === targetKey ? shareState.status : '';
   const activeMemberListState =
-    memberListState.targetKey === targetKey
-      ? memberListState
-      : emptyMemberListState(targetKey, selectedGroupId);
+    memberListState.targetKey === targetKey ? memberListState : emptyMemberListState(targetKey, selectedGroupId);
 
   const reload = useCallback(async () => {
     const requestTargetKey = targetKey;
@@ -702,7 +569,8 @@ const WorkerGroupMembershipPanel = ({
   const availableGroups = overview.groups.filter(
     (group) =>
       !membershipIdentityKeys.has(
-        buildWorkerGroupMembershipIdentity({ groupId: group.groupId, sessionSlug: group.sessionSlug || sessionSlug }).key,
+        buildWorkerGroupMembershipIdentity({ groupId: group.groupId, sessionSlug: group.sessionSlug || sessionSlug })
+          .key,
       ),
   );
   const displayedAvailableGroups = membershipsOnly ? [] : availableGroups;
@@ -716,9 +584,9 @@ const WorkerGroupMembershipPanel = ({
   const selectedGroup = selectedMembership?.group || availableGroups.find((group) => group.groupId === selectedGroupId);
   const canViewSelectedGroupMembers = Boolean(
     workerToken &&
-      selectedGroup &&
-      (selectedGroup.memberVisibility === 'session' ||
-        (selectedGroup.memberVisibility === 'members' && selectedMembership)),
+    selectedGroup &&
+    (selectedGroup.memberVisibility === 'session' ||
+      (selectedGroup.memberVisibility === 'members' && selectedMembership)),
   );
 
   const loadSelectedGroupMembers = useCallback(
@@ -752,10 +620,7 @@ const WorkerGroupMembershipPanel = ({
           limit: 100,
           fetchImpl,
         });
-        if (
-          targetKeyRef.current !== requestTargetKey ||
-          memberListRequestIdRef.current !== requestId
-        ) {
+        if (targetKeyRef.current !== requestTargetKey || memberListRequestIdRef.current !== requestId) {
           return;
         }
         setMemberListState((current) => {
@@ -777,10 +642,7 @@ const WorkerGroupMembershipPanel = ({
           };
         });
       } catch (memberListError) {
-        if (
-          targetKeyRef.current !== requestTargetKey ||
-          memberListRequestIdRef.current !== requestId
-        ) {
+        if (targetKeyRef.current !== requestTargetKey || memberListRequestIdRef.current !== requestId) {
           return;
         }
         setMemberListState((current) => ({
@@ -789,23 +651,11 @@ const WorkerGroupMembershipPanel = ({
             : emptyMemberListState(requestTargetKey, requestGroupId)),
           isOpen: true,
           status: 'error',
-          error:
-            memberListError instanceof Error
-              ? memberListError.message
-              : 'worker_group_member_list_failed',
+          error: memberListError instanceof Error ? memberListError.message : 'worker_group_member_list_failed',
         }));
       }
     },
-    [
-      canViewSelectedGroupMembers,
-      fetchImpl,
-      selectedGroup,
-      sessionId,
-      sessionSlug,
-      targetKey,
-      workerToken,
-      workerUrl,
-    ],
+    [canViewSelectedGroupMembers, fetchImpl, selectedGroup, sessionId, sessionSlug, targetKey, workerToken, workerUrl],
   );
 
   const handleOpenMembers = () => {
@@ -821,9 +671,7 @@ const WorkerGroupMembershipPanel = ({
   };
 
   const handleCloseMembers = () => {
-    setMemberListState((current) =>
-      current.targetKey === targetKey ? { ...current, isOpen: false } : current,
-    );
+    setMemberListState((current) => (current.targetKey === targetKey ? { ...current, isOpen: false } : current));
   };
 
   const handleLoadMoreMembers = () => {
@@ -1047,7 +895,9 @@ const WorkerGroupMembershipPanel = ({
             sessionSlug={sessionSlug}
             workerToken={workerToken}
             workerUrl={workerUrl}
-            memberCount={activeMemberListState.memberCount ?? selectedMembership?.memberCount ?? selectedGroup.memberCount}
+            memberCount={
+              activeMemberListState.memberCount ?? selectedMembership?.memberCount ?? selectedGroup.memberCount
+            }
             onCloseMembers={handleCloseMembers}
             onLoadMoreMembers={handleLoadMoreMembers}
             onOpenMembers={handleOpenMembers}
@@ -1090,7 +940,7 @@ const WorkerGroupMembershipPanel = ({
         </div>
       ) : null}
       {shareStatus ? <div className={styles.telegramReportApprox}>{shareStatus}</div> : null}
-      {overview.memberships.length || availableGroups.length ? (
+      {overview.memberships.length || displayedAvailableGroups.length ? (
         <div className={`${sbtsPageStyles.sbtGrid} ${styles.workerGroupCardGrid}`}>
           {overview.memberships.map((membership) => (
             <WorkerGroupCard
@@ -1109,7 +959,7 @@ const WorkerGroupMembershipPanel = ({
               {renderMembershipAction(membership.group, true)}
             </WorkerGroupCard>
           ))}
-          {availableGroups.map((group) => (
+          {displayedAvailableGroups.map((group) => (
             <WorkerGroupCard
               key={group.groupId}
               copyGroupLink={copyGroupLink}
@@ -1128,8 +978,10 @@ const WorkerGroupMembershipPanel = ({
           ))}
         </div>
       ) : null}
-      {status === 'ready' && !overview.memberships.length && !availableGroups.length ? (
-        <div className={styles.telegramListEmpty}>No visible Groups are configured.</div>
+      {status === 'ready' && !overview.memberships.length && !displayedAvailableGroups.length ? (
+        <div className={styles.telegramListEmpty}>
+          {membershipsOnly ? 'No Groups joined yet.' : 'No visible Groups are configured.'}
+        </div>
       ) : null}
     </section>
   );

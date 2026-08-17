@@ -28,6 +28,9 @@ const renderStandaloneQuestion = () =>
 const getAnswerLockIconName = () =>
   screen.getByTestId(E2E_TESTIDS.SURVEY_ANSWER_LOCK).querySelector('svg')?.getAttribute('data-icon');
 
+const getAdditionalLockIconName = () =>
+  screen.getByTestId(E2E_TESTIDS.SURVEY_ADDITIONAL_LOCK).querySelector('svg')?.getAttribute('data-icon');
+
 const normalizeQuestionIdKey = (value) =>
   String(value || '')
     .trim()
@@ -80,20 +83,10 @@ describe('SurveyQuestions lock audience controls', () => {
       kind: 'enable-answer-and-open-menu',
     });
 
-    const lockControl = subject.renderAnswerLockControl({
-      surveyIndex: 0,
-      questionId: 'q1',
-      answer: { encrypted: false, encryptionAudience: 'self' },
-      lockDisabled: false,
-      lockTitle: 'Not encrypted',
-      glowAnswer: false,
-      forceAudienceMenu: true,
-      selfAudienceLabel: 'only me',
-    });
-    const lockButton = findFirstNodeByType(lockControl, SurveyQuestionsLockAudienceControl);
-    expect(lockButton).toBeTruthy();
+    renderStandaloneQuestion();
+    await screen.findByTestId(E2E_TESTIDS.SURVEY_ANSWER_LOCK);
 
-    lockButton.props.onLockClick();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SURVEY_ANSWER_LOCK));
 
     expect(await screen.findByTestId(E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_SELF)).toHaveTextContent('only me');
     expect(getAnswerLockIconName()).toBe('lock');
@@ -113,33 +106,6 @@ describe('SurveyQuestions lock audience controls', () => {
       kind: 'set-menu-open',
       nextOpen: true,
     });
-    subject.state = { ...subject.state, lockAudienceMenuByQuestion: {} };
-    subject.isQuestionLockedForResponse = jest.fn(() => false);
-    subject.resolveQuestionGateOption = jest.fn(() => ({ address: '0x00000000000000000000000000000000000000a1' }));
-    subject.resolveFieldEncryptionAudience = jest.fn(() => 'self');
-    subject.resolveLockAudienceSessionName = jest.fn(() => 'session');
-    subject.toggleAnswerEncryption = jest.fn();
-    subject.toggleAdditionalCommentsEncryption = jest.fn();
-    subject.toggleLockAudienceMenu = jest.fn();
-
-    const lockControl = subject.renderAnswerLockControl({
-      surveyIndex: 0,
-      questionId: 'q1',
-      answer: { encrypted: false, encryptionAudience: 'self' },
-      lockDisabled: false,
-      lockTitle: 'Not encrypted',
-      glowAnswer: false,
-      forceAudienceMenu: true,
-      selfAudienceLabel: 'only me',
-    });
-    const lockButton = findFirstNodeByType(lockControl, SurveyQuestionsLockAudienceControl);
-    expect(lockButton).toBeTruthy();
-
-    lockButton.props.onLockClick();
-
-    expect(subject.toggleLockAudienceMenu).toHaveBeenCalledWith('q1', true, 'answer');
-    expect(subject.toggleAnswerEncryption).not.toHaveBeenCalled();
-    expect(subject.toggleAdditionalCommentsEncryption).not.toHaveBeenCalled();
   });
 
   it('shows only the self audience option in pile lock menu when no gate is configured', async () => {
@@ -148,10 +114,23 @@ describe('SurveyQuestions lock audience controls', () => {
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SURVEY_ANSWER_LOCK));
 
-    const audienceControl = findFirstNodeByType(lockControl, SurveyQuestionsLockAudienceControl);
-    expect(audienceControl).toBeTruthy();
-    expect(audienceControl.props.normalizedSelfAudienceLabel).toBe('only me');
-    expect(audienceControl.props.gateOptions).toEqual([]);
+    expect(await screen.findByTestId(E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_SELF)).toHaveTextContent('only me');
+    expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_GATE)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_NONE)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_FOLLOW)).not.toBeInTheDocument();
+  });
+
+  it('keeps the answer encrypted when additional comments opt out', async () => {
+    renderStandaloneQuestion();
+    await screen.findByTestId(E2E_TESTIDS.SURVEY_ANSWER_LOCK);
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SURVEY_ANSWER_LOCK));
+    fireEvent.click(screen.getByTitle('Additional comments'));
+    fireEvent.click(await screen.findByTestId(E2E_TESTIDS.SURVEY_ADDITIONAL_LOCK));
+
+    expect(getAnswerLockIconName()).toBe('lock');
+    expect(getAdditionalLockIconName()).toBe('unlock');
+    expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_NONE)).not.toBeInTheDocument();
   });
 
   it('derives lock-audience display state for additional fields with inherit mode', () => {
@@ -202,13 +181,11 @@ describe('SurveyQuestions lock audience controls', () => {
       currentGateId: '',
       currentAudienceMode: 'explicit',
     });
-    const lockButton = findFirstNodeByType(lockControl, SurveyQuestionsLockAudienceControl);
 
-    expect(lockButton).toBeTruthy();
-    expect(lockButton.props.isPileVisualContext).toBe(true);
-    expect(lockButton.props.pileMenuPressed).toBe(true);
-    expect(lockButton.props.showBrightLockState).toBe(false);
-    expect(lockButton.props.menuOpen).toBe(true);
+    expect(displayState.isPileVisualContext).toBe(true);
+    expect(displayState.pileMenuPressed).toBe(true);
+    expect(displayState.showBrightLockState).toBe(false);
+    expect(displayState.menuOpen).toBe(true);
   });
 
   it('labels response gate audience options with the session name', () => {

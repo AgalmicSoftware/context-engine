@@ -46,9 +46,7 @@ describe('Account.module.scss modal account layout guards', () => {
   it('uses a solid login-card surface without a decorative gradient overlay', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'Account.module.scss'), 'utf8');
 
-    expect(scss).toMatch(
-      /#loginModalCard\s*{[\s\S]*?position:\s*relative;[\s\S]*?background:\s*var\(--ce-surface\);/,
-    );
+    expect(scss).toMatch(/#loginModalCard\s*{[\s\S]*?position:\s*relative;[\s\S]*?background:\s*var\(--ce-surface\);/);
     expect(scss).not.toMatch(/#loginModalCard::after\s*{/);
     expect(scss).not.toMatch(/#loginModalCard::before\s*{/);
   });
@@ -79,15 +77,11 @@ describe('Account.module.scss modal account layout guards', () => {
     expect(scss).toMatch(
       /\.aiSettingsPanel\s*{[\s\S]*?background:\s*var\(--ce-settings-panel-bg\);[\s\S]*?color:\s*var\(--ce-settings-text\);/,
     );
-    expect(scss).toMatch(
-      /\.supportedResourceDetail\s*{[\s\S]*?color:\s*var\(--ce-settings-muted-text\);/,
-    );
+    expect(scss).toMatch(/\.supportedResourceDetail\s*{[\s\S]*?color:\s*var\(--ce-settings-muted-text\);/);
     expect(scss).toMatch(
       /\.preLoginSettingsInput\s*{[\s\S]*?background:\s*var\(--ce-settings-field-bg\);[\s\S]*?color:\s*var\(--ce-settings-text\);/,
     );
-    expect(scss).toMatch(
-      /\.settingsSectionCard\s*{[\s\S]*?background:\s*var\(--ce-settings-section-bg\);/,
-    );
+    expect(scss).toMatch(/\.settingsSectionCard\s*{[\s\S]*?background:\s*var\(--ce-settings-section-bg\);/);
     expect(scss).toMatch(
       /\.preLoginSettingsActions :global\(\.btn-outline-secondary\)\s*{[\s\S]*?background:\s*var\(--ce-settings-control-bg\);[\s\S]*?color:\s*var\(--ce-settings-control-text\);[\s\S]*?opacity:\s*1;/,
     );
@@ -123,9 +117,7 @@ describe('Account.module.scss modal account layout guards', () => {
   it('keeps the pre-login Session summary outside a centered, wrapping settings row', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'Account.module.scss'), 'utf8');
 
-    expect(scss).toMatch(
-      /\.preLoginSettingsTopRow\s*{[\s\S]*?justify-content:\s*space-between;/,
-    );
+    expect(scss).toMatch(/\.preLoginSettingsTopRow\s*{[\s\S]*?justify-content:\s*space-between;/);
     expect(scss).toMatch(
       /\.preLoginSessionSummary\s*{[\s\S]*?display:\s*flex;[\s\S]*?flex:\s*1 1 auto;[\s\S]*?justify-content:\s*center;/,
     );

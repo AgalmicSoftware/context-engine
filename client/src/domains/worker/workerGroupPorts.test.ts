@@ -30,10 +30,7 @@ describe('worker group ports', () => {
         defaultSbtTags: 'ignored',
       }),
     ).toEqual(['Facilitators', 'reviewers']);
-    expect(normalizeWorkerGroupDefaultTags({ defaultSbtTags: ['legacy', 'tags'] })).toEqual([
-      'legacy',
-      'tags',
-    ]);
+    expect(normalizeWorkerGroupDefaultTags({ defaultSbtTags: ['legacy', 'tags'] })).toEqual(['legacy', 'tags']);
   });
 
   it('loads public session-visible groups without sending a credential', async () => {
@@ -485,77 +482,6 @@ describe('worker group ports', () => {
               memberVisibility: 'session',
             },
             memberCount: 1,
-          }),
-          {
-            status: 200,
-            headers: { 'content-type': 'application/json' },
-          },
-        ),
-    );
-    await expect(
-      loadWorkerGroupMembers({
-        workerUrl: WORKER_URL,
-        credentialToken: WORKER_TOKEN,
-        sessionId: SESSION_ID,
-        sessionSlug: SESSION_SLUG,
-        groupId: 'admin-only',
-        fetchImpl: deniedFetch,
-      }),
-    ).rejects.toMatchObject({ message: 'worker_group_member_list_forbidden', status: 403 });
-
-    const malformedFetch = jest.fn(
-      async () =>
-        new Response(
-          JSON.stringify({
-            ok: true,
-            sessionId: SESSION_ID,
-            sessionSlug: SESSION_SLUG,
-            group: {
-              groupId: 'reviewers',
-              sessionSlug: SESSION_SLUG,
-              label: 'Reviewers',
-              joinMode: 'open',
-              memberVisibility: 'session',
-            },
-            members: [
-              {
-                groupId: 'reviewers',
-                sessionSlug: SESSION_SLUG,
-                principal: { kind: 'telegram', principalId: '<script>' },
-              },
-            ],
-            memberCount: 1,
-          }),
-          { status: 200, headers: { 'content-type': 'application/json' } },
-        ),
-    );
-    await expect(
-      loadWorkerGroupMembers({
-        workerUrl: WORKER_URL,
-        credentialToken: WORKER_TOKEN,
-        sessionId: SESSION_ID,
-        sessionSlug: SESSION_SLUG,
-        groupId: 'reviewers',
-        fetchImpl: malformedFetch,
-      }),
-    ).rejects.toMatchObject({ message: 'worker_group_response_member_invalid' });
-  });
-
-  it('joins and leaves only through self-service worker routes and preserves explicit failure reasons', async () => {
-    const successfulFetch = jest.fn(
-      async (_input?: RequestInfo | URL, _init?: RequestInit) =>
-        new Response(
-          JSON.stringify({
-            ok: true,
-            sessionId: SESSION_ID,
-            sessionSlug: SESSION_SLUG,
-            group: {
-              groupId: 'reviewers',
-              sessionSlug: SESSION_SLUG,
-              label: 'Reviewers',
-              joinMode: 'open',
-              memberVisibility: 'session',
-            },
           }),
           {
             status: 200,

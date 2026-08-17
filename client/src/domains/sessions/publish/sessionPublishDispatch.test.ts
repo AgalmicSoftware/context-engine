@@ -22,7 +22,10 @@ describe('sessionPublishDispatch', () => {
       buildSessionPublishReducerPlan({
         shouldAutoDeployWorker: true,
         shouldDeployPendingSbts: true,
+        shouldPersistWorkerConfig: false,
         shouldUploadMetadata: false,
+        shouldRegisterSession: true,
+        shouldRefreshRegistryCache: true,
       }),
     ).toEqual({
       autoDeployWorker: true,

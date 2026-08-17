@@ -20,4 +20,8 @@ describe('DeferredRatingSlider', () => {
 
     expect(onCommit).toHaveBeenCalledWith(7);
   });
+
+  it('resolves the fixed deferred rating slider width', () => {
+    expect(resolveDeferredRatingSliderStyle()).toEqual({ width: '200px' });
+  });
 });

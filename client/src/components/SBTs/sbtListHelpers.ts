@@ -31,8 +31,8 @@ export {
   readSbtListCacheMetaSnapshot,
 } from './sbtListItemNormalizationHelpers';
 export type { SbtCacheMetaSnapshot } from './sbtListItemNormalizationHelpers';
-import type { SbtListHelperItem } from './sbtListCardDetailsHelpers';
-import type { SbtSessionGroupLists } from './sbtListSessionUniverseHelpers';
+export { buildSbtListCacheReadPlan } from './sbtListCacheReadPlanHelpers';
+export type { SbtListCacheReadPlan } from './sbtListCacheReadPlanHelpers';
 export {
   collectSbtDocumentUrls,
   collectSbtTagValues,
@@ -72,18 +72,29 @@ export {
 } from './sbtListSessionUniverseHelpers';
 export type {
   SbtListSessionUniverseOptions,
+  SbtListSessionUniverseSnapshot,
+  SbtListSessionUniverseSnapshotLike,
   SbtSessionGroupLists,
 } from './sbtListSessionUniverseHelpers';
 export {
+  buildSbtListChipLoadingStatusBySlug,
+  buildSbtListInitialLoaderStatuses,
   buildSbtListSessionChipStateBySlug,
   buildSbtListSessionLoadingStatus,
   buildSbtListSessionProgressSnapshot,
+  resolveSbtListReadinessDisplayPlan,
+  resolveSbtListSectionLoadingState,
 } from './sbtListSessionLoadingHelpers';
 export type {
   SbtListLiveProgressSnapshot,
+  SbtListReadinessDisplayPlan,
+  SbtListSectionLoadingState,
   SbtListSessionChipState,
   SbtListSessionChipStateBySlug,
   SbtListSessionLoadingStatus,
+  SbtListSessionLoadingStatusBySlug,
+  SbtListSessionLoadingStatusOptions,
+  SbtListSessionLoadingStatusResolver,
   SbtListSessionLoadingStatusSnapshot,
   SbtListSessionProgressSnapshot,
 } from './sbtListSessionLoadingHelpers';
@@ -157,6 +168,7 @@ export {
   readSbtListUniverseCollapsedState,
   readStoredSbtListModeSelectedSessionSlugs,
   resolveSbtListCreateGroupInitialVisibility,
+  resolveSbtListInitialActiveSessionSlug,
   SBT_LIST_MODE_SELECTION_STORAGE_KEY,
 } from './sbtListStorageHelpers';
 export type { SbtListStorageReader } from './sbtListStorageHelpers';
@@ -172,4 +184,4 @@ export {
 } from './sbtListSessionBindingHelpers';
 export { buildSbtListRenderBuckets } from './sbtListRenderBucketHelpers';
 export type { BuildSbtRenderBucketsOptions, SbtRenderBuckets } from './sbtListRenderBucketHelpers';
-export { buildSbtListDetailHref } from './sbtListRouteHelpers';
+export { buildSbtListDetailHref, resolveSbtListRouteScope } from './sbtListRouteHelpers';

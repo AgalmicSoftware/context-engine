@@ -282,6 +282,7 @@ describe('sessionWizardWriteNormalization', () => {
 
   test('sanitizeSessionWizardMetadataPayload writes profile-only mode metadata', () => {
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
     profile.surfaces.telegram = true;
     profile.surfaces.miniApp = true;
 
@@ -306,6 +307,32 @@ describe('sessionWizardWriteNormalization', () => {
     expect(metadata.sessionMode).toBeUndefined();
     expect(metadata.telegramBridgeEnabled).toBeUndefined();
     expect(metadata.telegram).toBeUndefined();
+  });
+
+  test('publication normalization rejects invalid profiles before compiling storage metadata', () => {
+    const malformedProfile = {
+      profileVersion: 1,
+      preset: 'custom',
+      authority: { mode: 'worker_canonical' },
+    };
+
+    expect(() =>
+      sanitizeSessionWizardMetadataPayload({
+        slug: 'invalid-profile',
+        sessionModeProfile: malformedProfile,
+        storageProfile: { backend: 'cloudflare' },
+      }),
+    ).toThrow(/requires a reachable session mode profile/i);
+
+    expect(() =>
+      buildSessionWizardWorkerConfigPayload({
+        slug: 'invalid-profile',
+        draft: {
+          sessionModeProfile: malformedProfile,
+          storageProfile: { backend: 'cloudflare' },
+        },
+      }),
+    ).toThrow(/requires a reachable session mode profile/i);
   });
 
   test('sanitizeSessionWizardMetadataPayload upgrades legacy Telegram flags to a profile without dual-write fields', () => {
@@ -566,6 +593,15 @@ describe('sessionWizardWriteNormalization', () => {
         contracts: {
           surveys: { address: '0x111', chainId: DEFAULT_CONFIG_CHAIN_ID },
         },
+        ai: {
+          models: {
+            fast: { provider: 'openai', model: 'gpt-4o-mini' },
+            thinking: { provider: 'openai', model: 'gpt-4o' },
+            // The default wizard draft always carries this browser-only key,
+            // even when its value is empty. It must not reach worker config.
+            transcription: { provider: 'openai', model: 'whisper-1', rpcUrl: '' },
+          },
+        },
         sessionModeProfile,
       },
       deployPayload: {
@@ -619,6 +655,8 @@ describe('sessionWizardWriteNormalization', () => {
     expect(payload.rpcUrlsByChainId).toBeUndefined();
     expect(payload.faucet).toBeUndefined();
     expect(payload.litCredentials).toBeUndefined();
+    expect(payload.ai.models.transcription).toEqual({ provider: 'openai', model: 'whisper-1' });
+    expect(payload.ai.models.transcription).not.toHaveProperty('rpcUrl');
     expect(JSON.stringify(payload)).not.toMatch(/must-never-persist|0xRegistry|rpc\.example|faucet\.example/i);
   });
 
@@ -670,9 +708,7 @@ describe('sessionWizardWriteNormalization', () => {
     expect(payload.networkChainId).toBe(DEFAULT_CONFIG_CHAIN_ID);
     expect(payload.defaultGroupTags).toBe('worker-groups');
     expect(payload.defaultSbtTags).toBe('on-chain-groups');
-    expect(payload.defaultFeaturedSBTs).toEqual([
-      '0x0000000000000000000000000000000000000002',
-    ]);
+    expect(payload.defaultFeaturedSBTs).toEqual(['0x0000000000000000000000000000000000000002']);
     expect(payload.autoFeatureSBTsBySessionSlug).toBe(false);
     expect(payload.contracts).toEqual({
       sbtFactory: {
@@ -838,7 +874,7 @@ describe('sessionWizardWriteNormalization', () => {
     expect(workerPayload.storageProfile).toEqual(
       expect.objectContaining({
         backend: 'cloudflare',
-        payloadAccessControl: expect.objectContaining({ mode: 'worker_sbt_gate' }),
+        payloadAccessControl: expect.objectContaining({ mode: 'public_read' }),
       }),
     );
     expect(workerPayload.telegramOnly).toBeUndefined();

@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 import corpusSample from './corpus_sample.json';
+import demoAnalysisGenerationConfig from './demo_analysis_generation_config.json';
 import debateMapData from './debate_map_demo_data.json';
 import demoAnalysisData from './demo_analysis_data.json';
 import debates from './debates.json';
@@ -66,7 +67,7 @@ describe('demo data fixture cleanup', () => {
     expect(fs.existsSync(path.join(demoDir, 'debates_part1.json'))).toBe(false);
     expect(fs.existsSync(path.join(demoDir, 'debates_part2.json'))).toBe(false);
     expect(Array.isArray(debates)).toBe(true);
-    expect(debates).toHaveLength(13);
+    expect(debates).toHaveLength(16);
     expect(debates.map((debate) => debate.id)).toEqual([
       'debate_exponential_progress',
       'debate_reward_hacking_misalignment',
@@ -81,6 +82,9 @@ describe('demo data fixture cleanup', () => {
       'debate_ai_education_integrity',
       'debate_ai_copyright_training',
       'debate_multimodal_deepfake_governance',
+      'debate_government_prerelease_access',
+      'debate_alignment_tractability_2026',
+      'debate_ai_labor_displacement_timeline',
     ]);
   });
 
@@ -90,7 +94,7 @@ describe('demo data fixture cleanup', () => {
       ai_laws_policy: 20,
       arxiv_ai_safety: 20,
       lesswrong_posts: 20,
-      cross_corpus: 13,
+      cross_corpus: 16,
       dwarkesh_lab_insiders: 20,
       ai_scifi_books: 20,
       metr_evals_metrics: 15,
@@ -101,7 +105,7 @@ describe('demo data fixture cleanup', () => {
         'https://x.com/Gregory_C_Allen/status/1898040379611504983',
         'https://x.com/PalisadeAI/status/1926084635903025621',
       ],
-      ai_laws_policy: ['eu_ai_act', 'eu_gdpr_article_22', 'council_of_europe_ai_convention'],
+      ai_laws_policy: ['eu_ai_act', 'eu_gdpr_article_22', 'coe_framework_convention_ai'],
       arxiv_ai_safety: [
         'gpt3_language_models_few_shot',
         'gpt4_technical_report',
@@ -114,9 +118,9 @@ describe('demo data fixture cleanup', () => {
         'debate_predeployment_eval_adequacy',
       ],
       dwarkesh_lab_insiders: [
-        'amodei_dario_dwarkesh_2026_scaling',
-        'amodei_dario_dwarkesh_2023_scaling',
+        'amodei_dario_dwarkesh_2026_end_of_exponential',
         'hassabis_demis_dwarkesh_2024_superhuman',
+        'amodei_dario_dwarkesh_2023_scaling',
       ],
       ai_scifi_books: ['shelley_frankenstein', 'butler_erewhon', 'forster_machine_stops'],
       metr_evals_metrics: [
@@ -145,6 +149,37 @@ describe('demo data fixture cleanup', () => {
           expectedIds,
         );
       });
+  });
+
+  it('keeps the canonical demo fixtures internally consistent with normalized UTC datetimes', () => {
+    const formatDemoUtcDateTime = (timestamp) => {
+      const date = new Date(Number(timestamp));
+      const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const pad = (value) => String(value).padStart(2, '0');
+      return [
+        weekdays[date.getUTCDay()],
+        months[date.getUTCMonth()],
+        pad(date.getUTCDate()),
+        `${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())}`,
+        'UTC',
+        date.getUTCFullYear(),
+      ].join(' ');
+    };
+
+    [demoPolisData.comments, demoAnalysisData.comments].forEach((comments) => {
+      comments.forEach((comment) => {
+        expect(comment.datetime).toBe(formatDemoUtcDateTime(comment.timestamp));
+      });
+    });
+  });
+
+  it('removes the known demo corpus text glitches that made the sample feel synthetic', () => {
+    const serializedCorpusSample = JSON.stringify(corpusSample);
+
+    expect(serializedCorpusSample).not.toMatch(/partneredwith/);
+    expect(serializedCorpusSample).not.toMatch(/calledOpenAI/);
+    expect(serializedCorpusSample).not.toMatch(/it somewhat fragile/);
   });
 
   it('covers every atlas leaf node with at least one Loophole historical case', () => {

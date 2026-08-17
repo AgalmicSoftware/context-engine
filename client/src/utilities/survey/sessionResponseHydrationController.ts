@@ -125,7 +125,7 @@ interface HandlePartialResponseDataOptions {
 const RECENT_RESPONSE_PREFETCH_WINDOW_COUNT = 12;
 
 interface ResponseHydrationContractScripts {
-  getRelevantBlockWindowForFilter: (slug: string) => Promise<{ fromBlock: number; toBlock: number }>;
+  getRelevantBlockWindowForFilter: (sessionRef: unknown) => Promise<{ fromBlock: number; toBlock: number }>;
   getQuestionResponsesChunkedWithCallback: (
     providerName: string,
     fromBlock: number,
@@ -187,6 +187,8 @@ interface SessionResponseHydrationControllerRuntime {
 const mainSiteLog = createLogger('mainSite');
 const responseHydrationContractScripts = contractScripts as unknown as ResponseHydrationContractScripts;
 const responseHydrationCryptoUtils = cryptoUtils as unknown as ResponseHydrationCryptoUtils;
+
+class ResponseCachePersistenceError extends Error {}
 
 const isRecord = (value: unknown): value is CacheRecord => !!value && typeof value === 'object';
 
@@ -498,7 +500,7 @@ const ensureUserDataRecord = (value: unknown): UserDataRecord => {
 };
 
 export const createSessionResponseHydrationController = (
-  host: SessionResponseHydrationHost = {},
+  host: SessionResponseHydrationHost,
 ): SessionResponseHydrationControllerRuntime => {
   let _responseInitInFlight: Record<string, Promise<void> | undefined> = {};
   let _responseInitPending: Record<string, ResponseInitOptions | undefined> = {};
@@ -515,8 +517,6 @@ export const createSessionResponseHydrationController = (
   const isMounted = (): boolean => (typeof host.isMounted === 'function' ? host.isMounted() : false);
   const dgRead = (...args: [string, string]): CacheRecord | null =>
     typeof host.dgRead === 'function' ? (host.dgRead(...args) as CacheRecord | null) : null;
-  const dgWrite = (...args: [string, string, CacheRecord]): unknown =>
-    typeof host.dgWrite === 'function' ? host.dgWrite(...args) : null;
   const getActiveSessionSlug = (): string =>
     String(typeof host.getActiveSessionSlug === 'function' ? host.getActiveSessionSlug() || '' : '');
   const getSessionCfg = (slug: string): CacheRecord | null =>
@@ -885,11 +885,8 @@ export const createSessionResponseHydrationController = (
               sourceMeta?.[qid]?.[responder] ||
               null;
             if (
-              !shouldApplyIncomingResponse({
-                existingMeta,
-                incomingMeta: toResponseRecencyPair(incomingMeta, incomingResponse),
-                hasExistingResponse,
-              })
+              hasExistingResponse &&
+              !isResponseRecencyNewer(toResponseRecencyPair(incomingMeta, incomingResponse), existingMeta)
             )
               return;
             targetByResponder[responder] = incomingResponse;
@@ -905,35 +902,61 @@ export const createSessionResponseHydrationController = (
         pendingCache: QuestionCache | CacheRecord,
         freshCache: QuestionCache | CacheRecord,
       ): QuestionCache => {
-        const targetCache = ensureResponseQuestionCacheBucket(pendingCache as CacheRecord);
-        const sourceCache = ensureResponseQuestionCacheBucket(freshCache as CacheRecord);
-        const targetNet = targetCache[networkID] as QuestionCacheNetworkNode;
-        const sourceNet = sourceCache[networkID] as QuestionCacheNetworkNode;
-        targetNet.questionsLatestBlock = Math.max(
-          Number(targetNet.questionsLatestBlock || 0),
-          Number(sourceNet?.questionsLatestBlock || 0),
+        const pending = ensureResponseQuestionCacheBucket(pendingCache as CacheRecord);
+        const fresh = ensureResponseQuestionCacheBucket(freshCache as CacheRecord);
+        const pendingNet = pending[networkID] as QuestionCacheNetworkNode;
+        const freshNet = fresh[networkID] as QuestionCacheNetworkNode;
+        const mergedNet = {
+          ...freshNet,
+          questions: { ...(freshNet.questions || {}) },
+          pendingQuestionMetadata: { ...(freshNet.pendingQuestionMetadata || {}) },
+          questionHydrationMeta: {
+            ...(pendingNet.questionHydrationMeta || {}),
+            ...(freshNet.questionHydrationMeta || {}),
+          },
+        } as QuestionCacheNetworkNode;
+        ensureQuestionArweaveCacheBranches(mergedNet);
+
+        Object.keys(pendingNet.questions || {}).forEach((qidRaw) => {
+          const qid = String(qidRaw || '').toLowerCase();
+          if (!qid) return;
+          const incoming = pendingNet.questions[qidRaw];
+          const existing = mergedNet.questions[qid];
+          if (!existing || (!hasHydratedQuestionMetadata(existing) && hasHydratedQuestionMetadata(incoming))) {
+            mergedNet.questions[qid] = incoming;
+          }
+        });
+        Object.keys(pendingNet.pendingQuestionMetadata || {}).forEach((qidRaw) => {
+          const qid = String(qidRaw || '').toLowerCase();
+          if (!qid || hasHydratedQuestionMetadata(mergedNet.questions[qid])) return;
+          const incoming = toRecord(pendingNet.pendingQuestionMetadata[qidRaw]);
+          const existing = toRecord(mergedNet.pendingQuestionMetadata[qid]);
+          mergedNet.pendingQuestionMetadata[qid] = {
+            ...(existing || {}),
+            ...(incoming || {}),
+            attempts: Math.max(Number(existing?.attempts || 0), Number(incoming?.attempts || 0)),
+            nextRetryAtMs: Math.max(Number(existing?.nextRetryAtMs || 0), Number(incoming?.nextRetryAtMs || 0)),
+          };
+        });
+        Object.keys(mergedNet.pendingQuestionMetadata).forEach((qid) => {
+          if (hasHydratedQuestionMetadata(mergedNet.questions[qid])) {
+            delete mergedNet.pendingQuestionMetadata[qid];
+          }
+        });
+
+        mergedNet.questionsLatestBlock = Math.max(
+          Number(pendingNet.questionsLatestBlock || 0),
+          Number(freshNet.questionsLatestBlock || 0),
         );
-        targetNet.questionsDiscoveryCheckpointBlock = Math.max(
-          Number(targetNet.questionsDiscoveryCheckpointBlock || 0),
-          Number(sourceNet?.questionsDiscoveryCheckpointBlock || 0),
+        mergedNet.questionsDiscoveryCheckpointBlock = Math.max(
+          Number(pendingNet.questionsDiscoveryCheckpointBlock || 0),
+          Number(freshNet.questionsDiscoveryCheckpointBlock || 0),
         );
-        targetNet.questions = {
-          ...(targetNet.questions || {}),
-          ...(sourceNet?.questions || {}),
-        };
-        targetNet.pendingQuestionMetadata = {
-          ...(targetNet.pendingQuestionMetadata || {}),
-          ...(sourceNet?.pendingQuestionMetadata || {}),
-        };
-        targetNet.questionHydrationMeta = {
-          ...(targetNet.questionHydrationMeta || {}),
-          ...(sourceNet?.questionHydrationMeta || {}),
-        };
-        mergeQuestionArweaveCacheBranches(targetNet, sourceNet);
-        mergeResponseMapsByRecency(targetNet, sourceNet);
-        targetNet.questionResponsesLatestBlock = Math.max(
-          Number(targetNet.questionResponsesLatestBlock || 0),
-          Number(sourceNet?.questionResponsesLatestBlock || 0),
+        mergeQuestionArweaveCacheBranches(mergedNet, pendingNet);
+        mergeResponseMapsByRecency(mergedNet, pendingNet);
+        mergedNet.questionResponsesLatestBlock = Math.max(
+          Number(pendingNet.questionResponsesLatestBlock || 0),
+          Number(freshNet.questionResponsesLatestBlock || 0),
         );
         fresh[networkID] = mergedNet;
         Object.keys(pending).forEach((netKey) => {
@@ -997,10 +1020,6 @@ export const createSessionResponseHydrationController = (
           ts: Number.isFinite(ts) ? ts : 0,
         };
       };
-      const hasUserCacheRowRecencyHints = (entry: unknown): boolean => {
-        const recency = readUserCacheRowRecency(entry);
-        return recency.bn > 0 || recency.txi > 0 || recency.li > 0 || recency.ts > 0;
-      };
       const compareUserCacheRowsByRecency = (incomingRow: unknown, existingRow: unknown): number => {
         const incoming = readUserCacheRowRecency(incomingRow);
         const existing = readUserCacheRowRecency(existingRow);
@@ -1060,21 +1079,12 @@ export const createSessionResponseHydrationController = (
               return;
             }
             if (cmp === 0 && existing && typeof existing === 'object' && entry && typeof entry === 'object') {
-              const hasIncomingHints = hasUserCacheRowRecencyHints(entry);
-              const hasExistingHints = hasUserCacheRowRecencyHints(existing);
-              if (!hasIncomingHints && !hasExistingHints) {
-                // If neither row has recency hints, preserve merge order and let source payload win.
-                merged[idx] = {
-                  ...existing,
-                  ...entry,
-                };
-              } else {
-                // Preserve existing payload values while backfilling any missing fields.
-                merged[idx] = {
-                  ...entry,
-                  ...existing,
-                };
-              }
+              // Equal or unorderable pending rows may be older than the fresh atomic snapshot.
+              // Backfill missing fields without replacing the latest persisted payload.
+              merged[idx] = {
+                ...entry,
+                ...existing,
+              };
             }
             return;
           }
@@ -1121,9 +1131,9 @@ export const createSessionResponseHydrationController = (
         freshCache: UserCache | CacheRecord,
       ): UserCache => {
         const targetCache =
-          pendingCache && typeof pendingCache === 'object' ? (pendingCache as UserCache) : ({} as UserCache);
-        const sourceCache =
           freshCache && typeof freshCache === 'object' ? (freshCache as UserCache) : ({} as UserCache);
+        const sourceCache =
+          pendingCache && typeof pendingCache === 'object' ? (pendingCache as UserCache) : ({} as UserCache);
         Object.keys(sourceCache).forEach((addrRaw) => {
           const sourceByNetwork = sourceCache[addrRaw];
           if (!sourceByNetwork || typeof sourceByNetwork !== 'object') return;
@@ -1179,14 +1189,16 @@ export const createSessionResponseHydrationController = (
         lastResponseCacheWriteMs = nowMs;
 
         if (questionsSnapshot) {
-          const latestQuestionsSnapshot = mergeFreshQuestionsCacheIntoPendingSnapshot(
-            questionsSnapshot,
-            (dgRead('questionsCache', slug) || {}) as QuestionCache,
-          );
-          questionsCache = latestQuestionsSnapshot;
           const questionsWrite = trackManagedWrite(
             'questionsCache',
-            dgWrite('questionsCache', slug, latestQuestionsSnapshot as CacheRecord),
+            host.updateQuestionsCacheAtomic(slug, (current) => {
+              const latestQuestionsSnapshot = mergeFreshQuestionsCacheIntoPendingSnapshot(
+                questionsSnapshot,
+                current || {},
+              );
+              questionsCache = JSON.parse(JSON.stringify(latestQuestionsSnapshot)) as QuestionCache;
+              return latestQuestionsSnapshot;
+            }),
           );
           questionsWrite
             .then((ok) => {
@@ -1197,9 +1209,13 @@ export const createSessionResponseHydrationController = (
             .catch(() => undefined);
         }
         if (userSnapshot) {
-          const latestUserSnapshot = mergeFreshUserCacheIntoPendingSnapshot(
-            userSnapshot,
-            (dgRead('userCache', slug) || {}) as UserCache,
+          trackManagedWrite(
+            'userCache',
+            host.updateUserCacheAtomic(slug, (current) => {
+              const latestUserSnapshot = mergeFreshUserCacheIntoPendingSnapshot(userSnapshot, current || {});
+              responseUserCache = JSON.parse(JSON.stringify(latestUserSnapshot)) as UserCache;
+              return latestUserSnapshot;
+            }),
           );
         }
         return true;
@@ -1422,7 +1438,7 @@ export const createSessionResponseHydrationController = (
           processedWindowToBlock = Math.max(processedWindowToBlock, toBlock);
         }
         flushResponsePartialWrites({ force: true });
-        await Promise.allSettled(pendingPersistenceWrites);
+        await Promise.all(pendingPersistenceWrites);
 
         return {
           completedWithoutPartialData: !sawPartialData,
@@ -1478,6 +1494,7 @@ export const createSessionResponseHydrationController = (
             publishPartialResponseData();
           }
         } catch (e: unknown) {
+          if (e instanceof ResponseCachePersistenceError) throw e;
           mainSiteLog.error('getQuestionResponsesChunkedWithCallback failed:', e);
           // DO NOT mark complete; we’ll leave the watermark where we truly got to (processedToBlock)
           break;
@@ -1501,14 +1518,12 @@ export const createSessionResponseHydrationController = (
           processedToBlock,
         });
       mergeFreshArweaveBranches();
-      await awaitManagedWrite('questionsCache', dgWrite('questionsCache', slug, questionsCache as CacheRecord));
-
-      if (persistenceFailureCount > 0) {
-        mainSiteLog.warn(
-          '[MainSite] response-cache initialization finished with persistence failures; continuing with in-memory data',
-          { slug, persistenceFailureCount },
-        );
-      }
+      await awaitManagedWrite(
+        'questionsCache',
+        host.updateQuestionsCacheAtomic(slug, (current) =>
+          mergeFreshQuestionsCacheIntoPendingSnapshot(questionsCache, current || {}),
+        ),
+      );
 
       mainSiteLog.log(
         `Finished responses. Watermark now ${
@@ -1648,90 +1663,60 @@ export const createSessionResponseHydrationController = (
       });
 
       if (nextByQid.size > 0) {
-        // Re-read right before merge/write so concurrent listener hydrations are preserved.
-        const freshCache = (dgRead('questionsCache', slug) || {}) as QuestionCache;
-        const freshUserCache = (dgRead('userCache', slug) || {}) as UserCache;
-        migrateQuestionCacheNetworkKey(freshCache as CacheRecord, networkID);
-        const net = ensureQuestionCacheNetworkNode(freshCache, networkID, initialLastBlockQR);
-        const userNode = ensureUserCacheNetworkNode(freshUserCache, responderLower, networkID, initialLastBlockQR);
-        let userCacheUpdated = false;
+        const nextUserEntries = new Map<string, UserCacheEntry>();
+        const questionsPersisted = await host.updateQuestionsCacheAtomic(slug, (current) => {
+          const freshCache = (current && typeof current === 'object' ? current : {}) as QuestionCache;
+          migrateQuestionCacheNetworkKey(freshCache as CacheRecord, networkID);
+          const net = ensureQuestionCacheNetworkNode(freshCache, networkID, initialLastBlockQR);
 
-        nextByQid.forEach((response, qId) => {
-          seedPendingQuestionMetadataFromResponse(net, qId, slug, response);
-          if (!net.questionResponses[qId] || typeof net.questionResponses[qId] !== 'object') {
-            net.questionResponses[qId] = {};
-          }
-          if (!net.questionResponsesMeta[qId] || typeof net.questionResponsesMeta[qId] !== 'object') {
-            net.questionResponsesMeta[qId] = {};
-          }
-
-          net.questionResponses[qId][responderLower] = response;
-
-          // Targeted refresh is not event-ordered, so never stamp synthetic high logIndex values.
-          // Clamp any legacy synthetic marker (li >= 1000) to 0 so same-block real events can win.
-          const prevMeta = toRecord(net.questionResponsesMeta[qId][responderLower]);
-          const prevBn = Number(prevMeta.bn);
-          const prevTxi = Number(prevMeta.txi ?? prevMeta.transactionIndex ?? prevMeta.txIndex);
-          const prevLi = Number(prevMeta.li);
-          const prevTs = Number(prevMeta.ts ?? prevMeta.timestamp);
-          const hadLegacySyntheticLi = Number.isFinite(prevLi) && prevLi >= 1000;
-          net.questionResponsesMeta[qId][responderLower] = hadLegacySyntheticLi
-            ? { bn: 0, txi: 0, li: 0, ts: 0 }
-            : {
-                bn: Number.isFinite(prevBn) && prevBn >= 0 ? prevBn : 0,
-                txi: Number.isFinite(prevTxi) && prevTxi >= 0 ? prevTxi : 0,
-                li: Number.isFinite(prevLi) && prevLi >= 0 ? prevLi : 0,
-                ts: Number.isFinite(prevTs) && prevTs >= 0 ? prevTs : 0,
-              };
-          updatedAny = true;
-
-          if (userNode) {
-            const responseMeta = net.questionResponsesMeta[qId]?.[responderLower] || {};
-            const responseMetaBn = Number((responseMeta as ResponseRecencyPair).bn ?? 0);
-            const responseMetaTxi = Number(
-              (responseMeta as CacheRecord).txi ??
-                (responseMeta as CacheRecord).transactionIndex ??
-                (responseMeta as CacheRecord).txIndex ??
-                0,
+          nextByQid.forEach((response, qId) => {
+            const metadataChanged = seedPendingQuestionMetadataFromResponse(net, qId, slug, response);
+            if (!net.questionResponses[qId] || typeof net.questionResponses[qId] !== 'object') {
+              net.questionResponses[qId] = {};
+            }
+            if (!net.questionResponsesMeta[qId] || typeof net.questionResponsesMeta[qId] !== 'object') {
+              net.questionResponsesMeta[qId] = {};
+            }
+            const prevMeta = toRecord(net.questionResponsesMeta[qId][responderLower]);
+            const prevLi = Number(prevMeta.li);
+            const existingRecency = toResponseRecencyPair(prevMeta, net.questionResponses[qId][responderLower]);
+            const incomingRecency = toResponseRecencyPair(null, response);
+            const hasExistingResponse = Object.prototype.hasOwnProperty.call(
+              net.questionResponses[qId],
+              responderLower,
             );
-            const responseMetaLi = Number(
-              (responseMeta as CacheRecord).li ?? (responseMeta as CacheRecord).logIndex ?? 0,
-            );
-            const responseMetaTs = Number(
-              (responseMeta as CacheRecord).ts ?? (responseMeta as CacheRecord).timestamp ?? 0,
-            );
-            const hasResponseRecencyHint =
-              (Number.isFinite(responseMetaBn) && responseMetaBn > 0) ||
-              (Number.isFinite(responseMetaTxi) && responseMetaTxi > 0) ||
-              (Number.isFinite(responseMetaLi) && responseMetaLi > 0) ||
-              (Number.isFinite(responseMetaTs) && responseMetaTs > 0);
-            const nextEntry: UserCacheEntry = {
+            const hasExistingRecency =
+              existingRecency.bn > 0 || existingRecency.txi > 0 || existingRecency.li > 0 || existingRecency.ts > 0;
+            const hasIncomingRecency =
+              incomingRecency.bn > 0 || incomingRecency.txi > 0 || incomingRecency.li > 0 || incomingRecency.ts > 0;
+            const hadLegacySyntheticLi = Number.isFinite(prevLi) && prevLi >= 1000;
+            const shouldReplaceResponse =
+              !hasExistingResponse ||
+              hadLegacySyntheticLi ||
+              !hasExistingRecency ||
+              (hasIncomingRecency && isResponseRecencyNewer(incomingRecency, existingRecency));
+            if (!shouldReplaceResponse) {
+              if (metadataChanged) updatedAny = true;
+              return;
+            }
+
+            net.questionResponses[qId][responderLower] = response;
+            const responseMeta: ResponseRecencyPair = hadLegacySyntheticLi
+              ? { bn: 0, txi: 0, li: 0, ts: 0 }
+              : toResponseRecencyPair(prevMeta, response);
+            net.questionResponsesMeta[qId][responderLower] = responseMeta;
+            nextUserEntries.set(qId, {
               questionId: qId,
               responder: responderLower,
               response,
-            };
-            if (hasResponseRecencyHint) {
-              nextEntry.blockNumber = Math.max(0, responseMetaBn);
-              nextEntry.transactionIndex = Math.max(0, responseMetaTxi);
-              nextEntry.logIndex = Math.max(0, responseMetaLi);
-              nextEntry.timestamp = Math.max(0, responseMetaTs);
-            }
-            const responses = userNode.data.questionResponses;
-            const existingIdx = responses.findIndex((item) => String(item?.questionId || '').toLowerCase() === qId);
-            if (existingIdx === -1) {
-              if (!hasResponseRecencyHint) {
-                // Brand-new targeted rows may lack ordering metadata; store explicit neutral hints.
-                nextEntry.blockNumber = 0;
-                nextEntry.transactionIndex = 0;
-                nextEntry.logIndex = 0;
-                nextEntry.timestamp = 0;
-              }
-              responses.push(nextEntry);
-            } else {
-              responses[existingIdx] = { ...(responses[existingIdx] || {}), ...nextEntry };
-            }
-            userCacheUpdated = true;
-          }
+              blockNumber: Math.max(0, responseMeta.bn),
+              transactionIndex: Math.max(0, responseMeta.txi),
+              logIndex: Math.max(0, responseMeta.li),
+              timestamp: Math.max(0, responseMeta.ts),
+            });
+            updatedAny = true;
+          });
+          return freshCache;
         });
         if (!questionsPersisted) {
           throw new ResponseCachePersistenceError(`Failed to persist questions cache for ${slug}`);

@@ -20,6 +20,18 @@ import {
 import {
   exportCloudflareEncryptedPayloadEnvelopes,
 } from './storageRouteExecution.js';
+import {
+  dispatchAdminWorkerGroupRequest,
+} from './workerGroups.js';
+import {
+  ABUSE_COUNTER_TYPES,
+  recordAbuseEvent as recordAbuseEventBoundary,
+} from './abuseObservability.js';
+import {
+  findForbiddenCloudflareDeploymentTokenPath,
+  findForbiddenWorkerConfigSecretPath,
+} from '../shared/workerSessionConfig.mjs';
+import { executeCoordinatedSessionConfigMutation } from './sessionWriteCoordinator.js';
 
 const ALLOWED_SECRET_KEYS = [
   'openaiKey',
@@ -96,6 +108,18 @@ const mergeAdminSecrets = ({
     if (value !== undefined) nextSecrets[key] = value;
   });
   return nextSecrets;
+};
+
+const executeDirectSessionConfigMutation = async ({
+  env,
+  slug,
+  existingConfig,
+  mutation,
+  deps,
+} = {}) => {
+  const coordinate = deps?.executeCoordinatedSessionConfigMutation ||
+    executeCoordinatedSessionConfigMutation;
+  return coordinate({ env, slug, existingConfig, mutation });
 };
 
 export const dispatchAdminRequest = async ({
@@ -218,6 +242,15 @@ export const dispatchAdminRequest = async ({
     return deps?.json?.({ ok: true }, 200, headers);
   }
 
+  if (action === 'secret-presence') {
+    const existingSecrets = (await deps?.getSessionSecrets?.(env, targetSlug)) || {};
+    return deps?.json?.({
+      ok: true,
+      sessionSlug: targetSlug,
+      secrets: buildSecretPresenceManifest(existingSecrets),
+    }, 200, headers);
+  }
+
   if (action === 'lit-chipotle-status') {
     try {
       const existingSecrets = { ...((await deps?.getSessionSecrets?.(env, targetSlug)) || {}) };
@@ -265,12 +298,20 @@ export const dispatchAdminRequest = async ({
         ...(result?.litPkpId ? { litPkpId: result.litPkpId } : {}),
       } : null;
       if (litCredentials) {
-        const mergedConfig = deps?.mergeWorkerConfigRecords?.({
-          existingConfig,
-          incomingConfig: { litCredentials },
+        const mutationResult = await executeDirectSessionConfigMutation({
+          env,
           slug: targetSlug,
+          existingConfig,
+          mutation: { kind: 'merge-lit-credentials', litCredentials },
+          deps,
         });
-        await deps?.putSessionConfig?.(env, targetSlug, mergedConfig);
+        if (!mutationResult?.ok) {
+          return deps?.json?.(
+            mutationResult?.body || { error: 'Session config mutation failed.' },
+            mutationResult?.status || 503,
+            headers,
+          );
+        }
       }
       return deps?.json?.(result, 200, headers);
     } catch (error) {
@@ -302,19 +343,20 @@ export const dispatchAdminRequest = async ({
         typeof result.litCredentials === 'object'
       ) ? result.litCredentials : null;
       if (litCredentials) {
-        const mergedConfig = deps?.mergeWorkerConfigRecords?.({
-          existingConfig,
-          incomingConfig: {
-            litCredentials: {
-              ...((existingConfig?.litCredentials && typeof existingConfig.litCredentials === 'object')
-                ? existingConfig.litCredentials
-                : {}),
-              ...litCredentials,
-            },
-          },
+        const mutationResult = await executeDirectSessionConfigMutation({
+          env,
           slug: targetSlug,
+          existingConfig,
+          mutation: { kind: 'merge-lit-credentials', litCredentials },
+          deps,
         });
-        await deps?.putSessionConfig?.(env, targetSlug, mergedConfig);
+        if (!mutationResult?.ok) {
+          return deps?.json?.(
+            mutationResult?.body || { error: 'Session config mutation failed.' },
+            mutationResult?.status || 503,
+            headers,
+          );
+        }
       }
       const responseBody = { ...result };
       delete responseBody.secretOutputs;

@@ -67,7 +67,12 @@ describe('displayHelpers', () => {
       </>,
     );
 
-    expect(screen.getByRole('link', { name: 'qwe...rst' })).toHaveAttribute('href', '/custom-question');
-    expect(screen.getByRole('link', { name: '0x1234...fedcba' })).toHaveAttribute('href', '/custom-tx');
+    const questionLink = screen.getByRole('link', { name: 'qwe...rst' });
+    const transactionLink = screen.getByRole('link', { name: '0x1234...fedcba' });
+
+    expect(questionLink).toHaveAttribute('href', '/custom-question');
+    expect(questionLink).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(transactionLink).toHaveAttribute('href', '/custom-tx');
+    expect(transactionLink).toHaveAttribute('rel', 'noopener noreferrer');
   });
 });
