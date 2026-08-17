@@ -9,6 +9,7 @@ const { execFileSync, spawnSync } = require('node:child_process');
 const INSTALLER_SOURCE_PATH = path.join(__dirname, 'install-private-branch-guard.sh');
 const PRE_PUSH_SOURCE_PATH = path.join(__dirname, '..', '.githooks', 'pre-push');
 const TEST_TMP_ROOT = path.join(__dirname, '.tmp-install-private-branch-guard-tests');
+const joinAt = (left, right) => `${left}@${right}`;
 
 function writeFile(rootDir, relativePath, contents) {
   const absolutePath = path.join(rootDir, relativePath);
@@ -49,7 +50,7 @@ function setupSourceRepo() {
     git(tempRoot, ['init', '--bare', '--initial-branch=main', remoteDir], { stdio: 'ignore' });
     git(tempRoot, ['clone', remoteDir, sourceDir], { stdio: 'ignore' });
     git(sourceDir, ['config', 'user.name', 'Private Dev'], { stdio: 'ignore' });
-    git(sourceDir, ['config', 'user.email', '[redacted-email]'], { stdio: 'ignore' });
+    git(sourceDir, ['config', 'user.email', joinAt('private', 'example.com')], { stdio: 'ignore' });
 
     installFixture(sourceDir);
 
@@ -132,7 +133,11 @@ test('installed pre-push hook blocks publishing dev to matching public remotes e
     const installResult = runInstaller(sourceDir);
     assert.equal(installResult.status, 0);
 
-    const hookResult = spawnSync('bash', [path.join(sourceDir, '.githooks', 'pre-push'), 'public', '[redacted-email]-agalmic:AgalmicSoftware/context-engine.git'], {
+    const hookResult = spawnSync('bash', [
+      path.join(sourceDir, '.githooks', 'pre-push'),
+      'public',
+      joinAt('git', 'github.com-agalmic:AgalmicSoftware/context-engine.git'),
+    ], {
       cwd: sourceDir,
       encoding: 'utf8',
       input: 'refs/heads/dev 1111111111111111111111111111111111111111 refs/heads/dev 0000000000000000000000000000000000000000\n',

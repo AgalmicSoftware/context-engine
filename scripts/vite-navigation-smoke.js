@@ -116,6 +116,14 @@ async function runRouteProbe(page, probe, context = {}) {
   }
 }
 
+async function dismissOnboardingIfPresent(page, { timeoutMs }) {
+  const overlay = page.getByTestId('ce-onboarding-overlay');
+  if ((await overlay.count()) === 0) return;
+
+  await overlay.getByRole('button', { name: /^Skip$/i }).click();
+  await overlay.waitFor({ state: 'detached', timeout: timeoutMs });
+}
+
 async function inspectRoute(browser, baseUrl, route, options = {}) {
   const page = await browser.newPage({ viewport: options.viewport || resolveViewport() });
   const consoleIssues = [];
@@ -389,6 +397,8 @@ module.exports = {
   DEFAULT_ROUTES,
   DEFAULT_ROUTE_TEXT,
   compactSmokeSummary,
+  dismissOnboardingIfPresent,
+  findMissingExpectedText,
   inspectRoute,
   isAllowedConsoleIssue,
   isAllowedFailedRequest,

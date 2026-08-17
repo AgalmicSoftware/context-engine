@@ -21,6 +21,7 @@ import {
 const SHA_A = 'a'.repeat(40);
 const SHA_B = 'b'.repeat(40);
 const SHA_C = 'c'.repeat(40);
+const joinAt = (left, right) => `${left}@${right}`;
 
 function publicReplayFixture() {
   const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-public-replay-'));
@@ -43,7 +44,7 @@ function sourceProvenanceFixture(prefix = 'ce-worker-source-') {
   const git = (args) => execFileSync('git', args, { cwd: rootDir, encoding: 'utf8' }).trim();
   git(['init', '-b', 'main']);
   git(['config', 'user.name', 'Test']);
-  git(['config', 'user.email', '[redacted-email]']);
+  git(['config', 'user.email', joinAt('test', 'example.invalid')]);
   fs.writeFileSync(path.join(rootDir, 'base.txt'), 'base\n');
   git(['add', 'base.txt']);
   git(['commit', '-m', 'base']);
@@ -276,7 +277,7 @@ test('public replay range verification rejects identity and trailer drift', () =
         '--amend',
         '--no-edit',
         '--author',
-        'Private Person <[redacted-email]>',
+        `Private Person <${joinAt('private.person', 'example.test')}>`,
       ]);
       const candidateCommit = git(['rev-parse', 'HEAD']);
       assert.throws(
@@ -364,7 +365,10 @@ test('public replay range rejects tag-only public commits as private-source prov
 test('public replay range rejects PII added and removed before the candidate tip', () => {
   const { rootDir, git, baseCommit } = publicReplayFixture();
   try {
-    fs.writeFileSync(path.join(rootDir, 'transient-leak.txt'), 'Contact [redacted-email]\n');
+    fs.writeFileSync(
+      path.join(rootDir, 'transient-leak.txt'),
+      `Contact ${joinAt('owner', 'example.test')}\n`,
+    );
     git(['add', 'transient-leak.txt']);
     git(['commit', '-m', messageWithSource('add temporary release note', SHA_C)]);
     git(['rm', 'transient-leak.txt']);
@@ -643,7 +647,7 @@ test('source provenance rejects commits without an explicit replay mapping', () 
   const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-worker-source-missing-'));
   execFileSync('git', ['init', '-b', 'main'], { cwd: rootDir });
   execFileSync('git', ['config', 'user.name', 'Test'], { cwd: rootDir });
-  execFileSync('git', ['config', 'user.email', '[redacted-email]'], { cwd: rootDir });
+  execFileSync('git', ['config', 'user.email', joinAt('test', 'example.invalid')], { cwd: rootDir });
   fs.writeFileSync(path.join(rootDir, 'file.txt'), 'base\n');
   execFileSync('git', ['add', 'file.txt'], { cwd: rootDir });
   execFileSync('git', ['commit', '-m', 'base'], { cwd: rootDir });

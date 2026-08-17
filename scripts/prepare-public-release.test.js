@@ -82,7 +82,15 @@ test('prepare-public-release strips private surfaces without publishing an inven
     for (const relativePath of [
       '.github/ISSUE_TEMPLATE/config.yml',
       'client/src/variables/publicRepoMetadata.ts',
+      'scripts/deployment-surface-docs.test.js',
+      'scripts/install-private-branch-guard.test.js',
+      'scripts/pre-push-guard.test.js',
+      'scripts/release-version.test.mjs',
+      'scripts/vite-navigation-smoke.js',
+      'scripts/vite-navigation-smoke.test.js',
+      'scripts/worker-release-artifacts.test.mjs',
       'workers/sessionCorsWorker/chipotleClient.test.mjs',
+      'workers/sessionCorsWorker/transcribeExecution.test.mjs',
     ]) {
       writeFile(sourceDir, relativePath, fs.readFileSync(path.join(REPO_ROOT, relativePath), 'utf8'));
     }
@@ -220,6 +228,37 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.match(publicChipotleTest, /credentialedApiBase/);
     assert.match(publicChipotleTest, /must not include credentials/);
     assert.doesNotMatch(publicChipotleTest, /\[redacted-email\]/);
+    const publicWorkerConfigPersistenceTest = fs.readFileSync(
+      path.join(outputDir, 'client/src/components/Sessions/sessionWizardWorkerConfigPersistence.test.ts'),
+      'utf8',
+    );
+    assert.match(publicWorkerConfigPersistenceTest, /credential-bearing Lit API base/);
+    assert.doesNotMatch(publicWorkerConfigPersistenceTest, /\[redacted-email\]/);
+    const publicTranscribeTest = fs.readFileSync(
+      path.join(outputDir, 'workers/sessionCorsWorker/transcribeExecution.test.mjs'),
+      'utf8',
+    );
+    assert.match(publicTranscribeTest, /\.join\('@'\)/);
+    assert.doesNotMatch(publicTranscribeTest, /\[redacted-email\]/);
+    const publicPrePushTest = fs.readFileSync(
+      path.join(outputDir, 'scripts/pre-push-guard.test.js'),
+      'utf8',
+    );
+    assert.match(publicPrePushTest, /const joinAt =/);
+    assert.doesNotMatch(publicPrePushTest, /\[redacted-email\]/);
+    const publicNavigationTest = fs.readFileSync(
+      path.join(outputDir, 'scripts/vite-navigation-smoke.test.js'),
+      'utf8',
+    );
+    assert.doesNotMatch(publicNavigationTest, /test-session-demo\.ui/);
+    assert.match(
+      fs.readFileSync(path.join(outputDir, 'scripts/deployment-surface-docs.test.js'), 'utf8'),
+      /fs\.existsSync/,
+    );
+    assert.match(
+      fs.readFileSync(path.join(outputDir, 'scripts/release-version.test.mjs'), 'utf8'),
+      /skip: !releaseGuideIsPresent/,
+    );
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(outputDir, 'package.json'), 'utf8')).scripts, {
       test: 'node scripts/run-node-tests.js',
       'test:ci': 'npm run test',

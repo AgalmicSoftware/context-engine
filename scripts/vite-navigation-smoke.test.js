@@ -7,6 +7,8 @@ const {
   DEFAULT_ROUTES,
   DEFAULT_ROUTE_TEXT,
   compactSmokeSummary,
+  dismissOnboardingIfPresent,
+  findMissingExpectedText,
   isAllowedConsoleIssue,
   isAllowedFailedRequest,
   normalizeBaseUrl,
@@ -17,7 +19,6 @@ const {
   runRouteProbe,
   summarizeFailures,
 } = require('./vite-navigation-smoke');
-const { dismissOnboardingIfPresent } = require('./test-session-demo.ui');
 
 test('default navigation smoke covers Docs and its legacy contracts alias', () => {
   assert.ok(DEFAULT_ROUTES.includes('/docs'));

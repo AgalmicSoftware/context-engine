@@ -53,7 +53,10 @@ test('session Worker docs define group authority, counts, and id compatibility',
 });
 
 test('route docs preserve legacy address-shaped Worker group links', () => {
+  let checkedDocuments = 0;
   for (const relativePath of ['CHANGELOG.md', 'docs/MainSite.MAP.md', 'docs/e2e-testid-api.md']) {
+    if (!fs.existsSync(path.join(ROOT, relativePath))) continue;
+    checkedDocuments += 1;
     const routeDoc = read(relativePath);
     assert.match(routeDoc, /non-address[\s\S]{0,160}Worker[\s\S]{0,160}`\/group\/<groupId>/i, relativePath);
     assert.match(
@@ -62,6 +65,7 @@ test('route docs preserve legacy address-shaped Worker group links', () => {
       relativePath,
     );
   }
+  assert.ok(checkedDocuments > 0, 'expected at least one public route document');
 });
 
 test('first-visit redirect configuration describes root-only eligibility', () => {

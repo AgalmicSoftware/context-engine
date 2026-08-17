@@ -124,7 +124,10 @@ test('transcribe rejects malformed, insecure, and credential-bearing custom URLs
   const cases = [
     ['not-a-url', 'Custom transcription URL target is not allowed'],
     ['http://transcribe.example/v1', 'Custom transcription URL must use HTTPS'],
-    ['https://user:[redacted-email]/v1', 'Custom transcription URL must not contain credentials'],
+    [
+      ['https://user:password', 'transcribe.example/v1'].join('@'),
+      'Custom transcription URL must not contain credentials',
+    ],
   ];
 
   for (const [requestRpcUrl, expectedError] of cases) {

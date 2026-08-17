@@ -15,6 +15,7 @@ const PUBLIC_GIT_NAME = 'Agalmic';
 const PUBLIC_GIT_EMAIL = 'agalmicsoftware@protonmail.com';
 const NON_ZERO_SHA = '1111111111111111111111111111111111111111';
 const ZERO_SHA = '0000000000000000000000000000000000000000';
+const joinAt = (left, right) => `${left}@${right}`;
 
 function writeFile(rootDir, relativePath, contents) {
   const absolutePath = path.join(rootDir, relativePath);
@@ -72,7 +73,7 @@ function runHook(
   rootDir,
   input,
   remoteName = 'origin',
-  remoteUrl = '[redacted-email]-agalmic:AgalmicSoftware/context-engine.git',
+  remoteUrl = joinAt('git', 'github.com-agalmic:AgalmicSoftware/context-engine.git'),
 ) {
   return spawnSync(
     'bash',
@@ -110,7 +111,7 @@ function writeVersionSurfaces(rootDir, version, clientVersion = version) {
 
 function createVersionedCandidate(rootDir, candidateVersion, clientVersion = candidateVersion) {
   git(rootDir, ['config', 'user.name', 'Test User']);
-  git(rootDir, ['config', 'user.email', '[redacted-email]']);
+  git(rootDir, ['config', 'user.email', joinAt('test', 'example.com')]);
   writeVersionSurfaces(rootDir, '0.1.0');
   git(rootDir, ['add', '-A']);
   git(rootDir, ['commit', '--quiet', '-m', 'base']);
@@ -179,7 +180,7 @@ function createPrivateSourceCommit(rootDir, parentSha) {
 
 function createCommitOnBranch(rootDir, branchName) {
   git(rootDir, ['config', 'user.name', 'Test User']);
-  git(rootDir, ['config', 'user.email', '[redacted-email]']);
+  git(rootDir, ['config', 'user.email', joinAt('test', 'example.com')]);
   git(rootDir, ['checkout', '--quiet', '-b', branchName]);
   writeFile(rootDir, 'fixture.txt', 'fixture\n');
   git(rootDir, ['add', 'fixture.txt']);
@@ -203,13 +204,13 @@ test('pre-push guard blocks dev pushes to the public origin', () => {
 
 const PUBLIC_REMOTE_URLS = [
   'https://github.com/agalmicsoftware/context-engine.git',
-  'https://[redacted-email]/AgalmicSoftware/context-engine.git',
-  'https://[redacted-email]:443/AgalmicSoftware/context-engine.git',
-  '[redacted-email]:agalmicsoftware/context-engine.git',
+  joinAt('https://git', 'github.com/AgalmicSoftware/context-engine.git'),
+  joinAt('https://git', 'github.com:443/AgalmicSoftware/context-engine.git'),
+  joinAt('git', 'github.com:agalmicsoftware/context-engine.git'),
   'github.com:AgalmicSoftware/context-engine.git',
-  'ssh://[redacted-email]:22/AgalmicSoftware/context-engine.git',
-  'git+ssh://[redacted-email]/AgalmicSoftware/context-engine.git',
-  'ssh+git://[redacted-email]/AgalmicSoftware/context-engine.git',
+  joinAt('ssh://git', 'github.com:22/AgalmicSoftware/context-engine.git'),
+  joinAt('git+ssh://git', 'github.com/AgalmicSoftware/context-engine.git'),
+  joinAt('ssh+git://git', 'github.com/AgalmicSoftware/context-engine.git'),
   'git://github.com:9418/AgalmicSoftware/context-engine.git',
 ];
 
@@ -236,9 +237,9 @@ for (const remoteUrl of [
   'https://github.com.evil/AgalmicSoftware/context-engine.git',
   'https://github.com/AgalmicSoftware/context-engine-archive.git',
   'https://github.com/Other/context-engine.git',
-  'ssh://[redacted-email]/AgalmicSoftware/context-engine.git',
-  '[redacted-email]:AgalmicSoftware/context-engine.git.evil',
-  'https://github.com.evil/[redacted-email]/AgalmicSoftware/context-engine.git',
+  joinAt('ssh://git', 'github.com.evil/AgalmicSoftware/context-engine.git'),
+  joinAt('git', 'github.com:AgalmicSoftware/context-engine.git.evil'),
+  joinAt('https://github.com.evil/example', 'github.com/AgalmicSoftware/context-engine.git'),
   'https://github.com/AgalmicSoftware/context-engine.git?mirror=1',
 ]) {
   test(`pre-push guard ignores non-public lookalike ${remoteUrl}`, () => {
@@ -384,7 +385,7 @@ test('pre-push guard requires the public replay author and committer identity', 
       '--amend',
       '--no-edit',
       '--author',
-      'Private Person <[redacted-email]>',
+      `Private Person <${joinAt('private.person', 'example.test')}>`,
     ]);
     const candidateSha = git(rootDir, ['rev-parse', 'HEAD']);
     git(rootDir, ['branch', '-M', 'release-staging']);
@@ -401,7 +402,7 @@ test('pre-push guard requires the public replay author and committer identity', 
   withHookFixture((rootDir) => {
     createVersionedCandidate(rootDir, '0.1.1');
     git(rootDir, ['config', 'user.name', 'Private Person']);
-    git(rootDir, ['config', 'user.email', '[redacted-email]']);
+    git(rootDir, ['config', 'user.email', joinAt('private.person', 'example.test')]);
     git(rootDir, [
       'commit',
       '--quiet',
@@ -916,7 +917,7 @@ test('pre-push guard blocks a public alias when its main baseline has no verifie
 test('pre-push guard compares a public alias to a verified same-repository origin baseline', () => {
   withHookFixture((rootDir) => {
     const { candidateSha } = createVersionedCandidate(rootDir, '0.1.0');
-    git(rootDir, ['remote', 'set-url', 'origin', '[redacted-email]-agalmic:AgalmicSoftware/context-engine.git']);
+    git(rootDir, ['remote', 'set-url', 'origin', joinAt('git', 'github.com-agalmic:AgalmicSoftware/context-engine.git')]);
     const result = runHook(rootDir, pushLine({
       localRef: 'refs/heads/release-staging',
       localSha: candidateSha,
@@ -940,7 +941,7 @@ test('pre-push guard rejects an alias candidate that omits a newer public main',
     const newerMainSha = git(rootDir, ['rev-parse', 'HEAD']);
     git(rootDir, ['update-ref', 'refs/remotes/origin/main', newerMainSha]);
     git(rootDir, ['update-ref', 'refs/remotes/public-alias/main', mainSha]);
-    git(rootDir, ['remote', 'set-url', 'origin', '[redacted-email]-agalmic:AgalmicSoftware/context-engine.git']);
+    git(rootDir, ['remote', 'set-url', 'origin', joinAt('git', 'github.com-agalmic:AgalmicSoftware/context-engine.git')]);
     git(rootDir, ['checkout', '--quiet', candidateBranch]);
     git(rootDir, ['branch', '-M', 'release-staging']);
 
@@ -963,7 +964,7 @@ test('pre-push guard rejects an alias candidate that omits a newer public main',
 test('pre-push guard enforces release floors through case-variant public aliases', () => {
   withHookFixture((rootDir) => {
     const { candidateSha } = createVersionedCandidate(rootDir, '0.1.0');
-    git(rootDir, ['remote', 'set-url', 'origin', '[redacted-email]:agalmicsoftware/context-engine.git']);
+    git(rootDir, ['remote', 'set-url', 'origin', joinAt('git', 'github.com:agalmicsoftware/context-engine.git')]);
     const result = runHook(
       rootDir,
       pushLine({
