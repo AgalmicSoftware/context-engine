@@ -28,8 +28,11 @@
     "theme:literals:check": "node scripts/check-theme-color-literals.mjs",
     "verify:cloudflare-template": "node scripts/cloudflare-session-template.mjs --check",
     "demo:analysis:generate": "node scripts/generate-demo-analysis-fixture.mjs",
+    "demo:2:generate": "node scripts/generate-demo-2-polis-fixture.mjs",
     "demo:sim-answers:reconcile": "node scripts/reconcile-sim-profile-answers.mjs",
+    "verify:demo-sh-question-parity": "node scripts/verify-demo-sh-question-parity.mjs",
     "deploy-helper:deploy": "node scripts/deploy-helper-deploy.mjs",
+    "deploy:evm": "node scripts/deploy-evm.mjs",
     "deploy:op-sepolia": "node scripts/deploy-op-sepolia.mjs",
     "verify:public-release-surface": "node scripts/verify-public-release-surface.js",
     "verify:public-assets": "node scripts/verify-public-assets.js",
@@ -89,10 +92,7 @@
     "ai:test-session:color-schemes": "npm run -s ai:node -- scripts/session-color-schemes-smoke.js",
     "lint": "cd client && npm run lint",
     "lint:workers": "node scripts/run-workers-lint.js",
-    "test:cache-guard": "bash ./scripts/check-managed-cache-localstorage.sh",
-    "demo:2:generate": "node scripts/generate-demo-2-polis-fixture.mjs",
-    "verify:demo-sh-question-parity": "node scripts/verify-demo-sh-question-parity.mjs",
-    "deploy:evm": "node scripts/deploy-evm.mjs"
+    "test:cache-guard": "bash ./scripts/check-managed-cache-localstorage.sh"
   },
   "devDependencies": {
     "@openzeppelin/contracts": "5.4.0",

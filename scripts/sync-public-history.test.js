@@ -832,7 +832,8 @@ test('sync-public-history rejects an unsafe symlink added and deleted from publi
   withSourceRepo(({ sourceDir }) => {
     const publicLinkPath = path.join('client', 'src', 'transient-link');
     const absoluteLinkPath = path.join(sourceDir, publicLinkPath);
-    const unsafeTarget = `/${'Us'}ers/example/${['provider', 'api', 'token'].join('_')}='${['live', 'credential', 'material', 'must', 'not', 'ship'].join('-')}'`;
+    const secretAssignment = `${'provider_api'}_${'token'}='${'live-credential'}-material-must-not-ship'`;
+    const unsafeTarget = `/${'Us'}ers/example/${secretAssignment}`;
     fs.mkdirSync(path.dirname(absoluteLinkPath), { recursive: true });
     fs.symlinkSync(unsafeTarget, absoluteLinkPath);
     commitAll(sourceDir, 'Add temporary public symlink', {

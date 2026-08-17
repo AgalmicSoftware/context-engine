@@ -15,7 +15,7 @@ Decisions (confirmed with operator):
 
 ## Key existing machinery to reuse
 
-- `client/src/components/ContractPage/` — the whole module moves/renames; `ContractViewer.tsx`, `contractMetadata.ts`, `contractViewerUtils.ts`, `contractSourceLoader.ts` keep their names (they describe the contracts domain, honestly).
+- `client/src/components/DocsPage/` — the implemented owner for the renamed page; `ContractViewer.tsx`, `contractMetadata.ts`, `contractViewerUtils.ts`, and `contractSourceLoader.ts` retain contracts-domain names.
 - **Redirect precedent:** `routeTable.ts` already supports `canonicalPath` (the `/new` → `/session/new` alias, consumed in `mainSiteRouteRenderers.tsx` via `history.replaceState(buildPublicRoute(canonicalPath) + search + hash)`); `App.tsx` patches `replaceState` (`subscribeToHistorySync`) so the app re-renders and re-syncs head tags after the rewrite. Reuse this — just hoist the consumption out of the wizard-only branch.
 - Session context: `contractPageSessionResolution.ts` (slug from `/docs/:slug` → `?session=` → Redux active slug → default `general`); `getChainLabelById` from `utilities/web3/chainGateway.js` (import precedent: `SbtPageFullView.tsx`) for "OP Sepolia (11155420)"-style labels.
 - Copy sources (verify each claim in code before it ships): `About/AboutPage.tsx`, `spec.md`, `docs/session-creation-guide.md`, `docs/session-registry.md`, `docs/doc-library.md`, `docs/lit-protocol-information.md`, `docs/session-listening-mode.md`, and `utilities/session/sessionTypes.ts` (`SessionConfig` = ground truth for what's configurable). Use `t('sbt')`/`t('sbtFull')` from `utilities/ui/terminology.js` and `buildPublicRoute` for internal links.
@@ -27,7 +27,7 @@ The working branch sits on the `main` lineage. Rebase it onto `dev` (`git rebase
 
 ## Commit 1 — Mechanical rename, zero behavior change
 
-`git mv client/src/components/ContractPage client/src/components/DocsPage`, then inside:
+The implementation moved the former ContractPage directory to `client/src/components/DocsPage`, then inside:
 
 - `ContractPage.tsx` → `DocsPage.tsx` (component/props renamed; still renders all four old sections this commit)
 - `ContractPage.module.scss` → `DocsPage.module.scss`
@@ -86,8 +86,8 @@ Tests: `DocsPage.render.test.tsx` adds section-render (expand Quickstart, assert
 ## Commit 4 — Docs/spec/changelog sweep
 
 - `spec.md` Primary Routes: `/docs` entry (+ "/contracts redirects here") — spec's Update Policy mandates same-PR.
-- `docs/e2e-testid-api.md`: `ce-nav-docs`/`ce-page-docs-root` rows + a "renamed testids" migration note for the two retired ids.
-- `docs/discoverability.md`, `docs/public-client-config.md`, `docs/bundle-budget.md`, `docs/testing-budget.md` (SMOKE_ROUTES), `docs/MainSite.MAP.md` (renderer name if listed), `CHANGELOG.md` (user-visible entry).
+- The repository's E2E selector contract records `ce-nav-docs`/`ce-page-docs-root` and the two retired IDs.
+- `docs/discoverability.md`, `docs/public-client-config.md`, `docs/bundle-budget.md`, and `CHANGELOG.md` record the public route and user-visible change; the private route/test inventories were updated alongside the implementation.
 - Sweep: `git grep -n "/contracts" -- docs/ *.md client/src scripts` — every remaining hit must be contracts-the-domain or intentional legacy-alias code.
 
 ## Verification
@@ -100,5 +100,5 @@ Per commit: `cd client && npx tsc --noEmit` + targeted jest (client tests run **
 2. **Hoisted replaceState blast radius** — `canonicalPath` now fires for any route defining it; the routeTable guard test pins the set to `wizard` + `docs`.
 3. **Dev-vs-main drift** — base all edits on `git show dev:<path>`; the dev tip moves daily.
 4. **Tooling couplings** — the eslint glob + `clientPackageContract.test.js` (5 refs) must move with the `git mv` in Commit 1.
-5. **Retired testids** break external e2e harnesses loudly by design; the `docs/e2e-testid-api.md` note is the contract.
+5. **Retired testids** break external E2E harnesses loudly by design; the repository's selector-contract checks pin the migration.
 6. **Copy accuracy** — nothing enters `docsContent.ts` without a verified code/doc source.

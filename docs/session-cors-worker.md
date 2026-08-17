@@ -1261,20 +1261,17 @@ modules under `workers/sessionCorsWorker/`. Key boundary files:
   composition, upload-start/success/error logging, and the
   `transactions.post(...)` fallback error contract for both bootstrap and
   authenticated uploads.
-- Shared Arweave upload execution binding now routes through
-  `workers/sessionCorsWorker/arweaveUploadExecutionBinding.js`,
-  preserving the worker-local logging/json helpers plus the
-  contract/tag/association deps bundle into the extracted Arweave upload
-  execution helper.
+- Worker-local Arweave, transcribe, AI-provider, fetch, and faucet dependencies
+  are assembled centrally by
+  `workers/sessionCorsWorker/workerExecutionServiceBinding.js`. The binding
+  preserves each execution helper's logging, JSON, outbound-request, RPC,
+  contract, and validation dependencies without maintaining one wrapper module
+  per service.
 - Shared transcribe execution now routes through
   `workers/sessionCorsWorker/transcribeExecution.js`, preserving provider
   selection, request-vs-worker key precedence, blocked-custom-url
   rejection, upstream error mapping, and final `{ text }` response
   normalization for authenticated and anonymous transcribe requests.
-- Shared transcribe execution binding now routes through
-  `workers/sessionCorsWorker/transcribeExecutionBinding.js`, preserving the
-  worker-local `safeFetch` / blocked-url / default-URL deps bundle into the
-  extracted transcribe execution helper.
 - Shared AI provider execution now routes through
   `workers/sessionCorsWorker/aiProviderExecution.js`, preserving
   Anthropic/OpenRouter request header/body/error normalization, OpenAI
@@ -1282,25 +1279,12 @@ modules under `workers/sessionCorsWorker/`. Key boundary files:
   custom RPC request-vs-worker `rpcUrl` / key precedence, blocked-target
   rejection, `safeFetch(...)` passthrough, and final `{ completion, raw }`
   response normalization for authenticated and anonymous AI requests.
-- Shared AI provider execution binding now routes through
-  `workers/sessionCorsWorker/aiProviderExecutionBinding.js`, preserving the
-  worker-local JSON response helper plus `safeFetch(...)` / blocked-url deps
-  bundle into the extracted AI provider execution helper.
 - Shared fetch helper execution now routes through
   `workers/sessionCorsWorker/fetchExecution.js`, preserving normalized-target
   failure passthrough, `safeFetch(...)` passthrough handling,
   content-length/status/type validation, HTML stripping, and final
   image/HTML/JSON response normalization for authenticated `fetch_image` and
   `fetch_url` requests.
-- Shared fetch helper execution binding now routes through
-  `workers/sessionCorsWorker/fetchExecutionBinding.js`, preserving the
-  worker-local JSON response helper plus normalized-target / blocked-url /
-  `safeFetch(...)` deps bundle into the extracted fetch execution helper.
-- Shared faucet execution binding now routes through
-  `workers/sessionCorsWorker/faucetExecutionBinding.js`, preserving the
-  worker-local JSON response/logging helpers plus `ethers.Wallet`,
-  RPC/proof-validation deps, and default faucet constants into the
-  extracted faucet execution helper.
 - Shared auth/CORS/admin adapter binding now routes through
   `workers/sessionCorsWorker/authCorsAdminBinding.js`, preserving the
   worker-local CORS deps bundle, existing-session config lookup binding,
@@ -1957,9 +1941,9 @@ Signed login/bootstrap requests:
   - Upstream transcribe execution now also routes through `workers/sessionCorsWorker/transcribeExecution.js`,
     preserving provider selection, blocked custom-target rejection, request-vs-worker key precedence,
     upstream 401/general error mapping, and final `{ text }` response normalization.
-  - The remaining worker-specific transcribe binding now also routes through
-    `workers/sessionCorsWorker/transcribeExecutionBinding.js`, preserving the worker-local
-    `safeFetch` / blocked-url / default-URL deps bundle before the execution helper runs.
+  - Worker-local transcribe dependencies are assembled by
+    `workers/sessionCorsWorker/workerExecutionServiceBinding.js`, preserving the
+    `safeFetch` / blocked-url / default-URL bundle before the execution helper runs.
 - `POST /arweave/upload` (multipart or JSON)
   - Optional override: `arweaveJwk` (JSON string or object).
   - Upload bodies are capped at 25 MB by default. The Worker rejects oversized `Content-Length`, JSON `data`, or multipart file bytes with `413`; set `CE_MAX_UPLOAD_BYTES` to configure the limit.
@@ -1982,9 +1966,9 @@ Signed login/bootstrap requests:
     `workers/sessionCorsWorker/arweaveUploadExecution.js`, preserving module resolution,
     upload-start/success/error logging, tag/association rejection logs, and the `transactions.post(...)`
     fallback error contract while leaving upload behavior unchanged.
-  - The remaining worker-specific authenticated/bootstrap Arweave upload binding now also routes through
-    `workers/sessionCorsWorker/arweaveUploadExecutionBinding.js`, preserving the worker-local logging/json helpers
-    plus the contract/tag/association deps bundle before the execution helper runs.
+  - Worker-local authenticated/bootstrap Arweave dependencies are assembled by
+    `workers/sessionCorsWorker/workerExecutionServiceBinding.js`, preserving the logging/JSON helpers
+    plus the contract/tag/association dependency bundle before the execution helper runs.
   - Authenticated upload parsing is also normalized across JSON and multipart before JWK parsing, tag validation, and upload execution.
   - If request `arweaveJwk` is present, it is authoritative for that upload; malformed overrides fail closed rather than falling back to the worker secret.
   - Optional `tags`:

@@ -143,7 +143,8 @@ test('verify-public-release-pii fails emails, home paths, secrets, PEMs, and pri
 test('verify-public-release-pii scans broken symlink targets', () => {
   withFixture((rootDir) => {
     const linkPath = path.join(rootDir, 'client', 'src', 'unsafe-link');
-    const unsafeTarget = `/${'Us'}ers/example/${['provider', 'api', 'token'].join('_')}='${['live', 'credential', 'material', 'must', 'not', 'ship'].join('-')}'`;
+    const secretAssignment = `${'provider_api'}_${'token'}='${'live-credential'}-material-must-not-ship'`;
+    const unsafeTarget = `/${'Us'}ers/example/${secretAssignment}`;
     fs.mkdirSync(path.dirname(linkPath), { recursive: true });
     fs.symlinkSync(unsafeTarget, linkPath);
 
@@ -217,6 +218,10 @@ test('verify-public-release-pii rejects private planning tokens in Git commit me
       result.stderr,
       /FAIL private-commit-message: \.git-commit-messages\/[a-f0-9]{40}\.txt:3: internal planning identifier/,
     );
-    assert.match(result.stderr, /FAIL private-release-path: TODO\/private-note\.md:1: matched TODO/);
+    const privatePathToken = `${'TO'}${'DO'}`;
+    assert.match(
+      result.stderr,
+      new RegExp(`FAIL private-release-path: ${privatePathToken}/private-note\\.md:1: matched ${privatePathToken}`),
+    );
   });
 });
