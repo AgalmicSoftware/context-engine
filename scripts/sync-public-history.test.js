@@ -458,6 +458,53 @@ test('sync-public-history resolves replay deletes over public-main edits', () =>
   });
 });
 
+test('sync-public-history resolves large modify-delete conflict sets without racing the index', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const conflictPaths = Array.from(
+      { length: 128 },
+      (_, index) => path.join('conflict-fixtures', `entry-${String(index).padStart(3, '0')}.txt`),
+    );
+
+    git(sourceDir, ['checkout', '--quiet', 'main']);
+    for (const relativePath of conflictPaths) writeFile(sourceDir, relativePath, 'shared base\n');
+    commitAll(sourceDir, 'Add shared conflict fixtures', {
+      authorDate: '2025-01-06T00:00:00Z',
+      committerDate: '2025-01-06T00:00:00Z',
+    });
+    const sharedFixtureCommit = git(sourceDir, ['rev-parse', 'HEAD']).trim();
+    git(sourceDir, ['push', '--quiet', 'origin', 'main']);
+
+    git(sourceDir, ['checkout', '--quiet', 'dev']);
+    git(sourceDir, ['cherry-pick', '--quiet', sharedFixtureCommit]);
+    for (const relativePath of conflictPaths) writeFile(sourceDir, relativePath, 'source update\n');
+    commitAll(sourceDir, 'Update shared conflict fixtures', {
+      authorDate: '2025-01-07T00:00:00Z',
+      committerDate: '2025-01-07T00:00:00Z',
+    });
+
+    git(sourceDir, ['checkout', '--quiet', 'main']);
+    for (const relativePath of conflictPaths) fs.rmSync(path.join(sourceDir, relativePath));
+    commitAll(sourceDir, 'Remove shared conflict fixtures', {
+      authorDate: '2025-01-08T00:00:00Z',
+      committerDate: '2025-01-08T00:00:00Z',
+    });
+    git(sourceDir, ['push', '--quiet', 'origin', 'main']);
+    git(sourceDir, ['checkout', '--quiet', 'dev']);
+
+    const result = runSyncScript(sourceDir, ['--allow-diverged-source', 'release-candidate']);
+
+    assert.equal(result.status, 0, syncFailureMessage(result));
+    assert.match(result.stderr, /Resolved remaining cherry-pick conflicts from source/);
+    for (const relativePath of conflictPaths) {
+      const pathCheck = spawnSync('git', ['cat-file', '-e', `release-candidate:${relativePath}`], {
+        cwd: sourceDir,
+        encoding: 'utf8',
+      });
+      assert.notEqual(pathCheck.status, 0);
+    }
+  });
+});
+
 test('sync-public-history installs the private dev push guard before replaying', () => {
   withSourceRepo(({ sourceDir }) => {
     git(sourceDir, ['branch', '--set-upstream-to=origin/main', 'dev'], { stdio: 'ignore' });

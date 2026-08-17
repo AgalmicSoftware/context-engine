@@ -484,6 +484,38 @@ resolve_private_cherry_pick_conflicts() {
   return 0
 }
 
+resolve_theirs_cherry_pick_conflicts() {
+  local path
+  local found_conflict=0
+  local conflict_paths_file="$TMP_ROOT/cherry-pick-conflict-paths.txt"
+
+  # Materialize the producer before mutating the index. Streaming `git diff`
+  # through process substitution can leave its index refresh alive long enough
+  # for the first `git rm` in a large conflict set to lose an index.lock race.
+  git -C "$TEMP_CLONE" diff --name-only --diff-filter=U > "$conflict_paths_file"
+
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    found_conflict=1
+    git -C "$TEMP_CLONE" checkout --theirs -- "$path" >/dev/null 2>&1 || true
+    if git -C "$TEMP_CLONE" ls-files -u -- "$path" | grep -q .; then
+      git -C "$TEMP_CLONE" rm -f -- "$path" >/dev/null 2>&1 || return 1
+    fi
+  done < "$conflict_paths_file"
+
+  if [ "$found_conflict" -ne 1 ]; then
+    return 1
+  fi
+
+  git -C "$TEMP_CLONE" add -A
+
+  if git -C "$TEMP_CLONE" diff --name-only --diff-filter=U | grep -q .; then
+    return 1
+  fi
+
+  return 0
+}
+
 sync_branch_back_to_source_repo() {
   if git -C "$REPO_ROOT" show-ref --verify --quiet "refs/heads/$TARGET_BRANCH"; then
     if [ "$(git -C "$REPO_ROOT" branch --show-current)" = "$TARGET_BRANCH" ]; then
