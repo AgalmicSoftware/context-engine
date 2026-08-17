@@ -254,6 +254,14 @@ for (const [pattern, replacement] of replacements) {
   message = message.replace(pattern, replacement);
 }
 
+// Replay commits have one canonical public author/committer. Historical
+// identity trailers can otherwise re-publish private contributor addresses
+// even after the Git identity itself has been rewritten.
+message = message.replace(
+  /^(?:co-authored-by|signed-off-by|reviewed-by|acked-by|tested-by|reported-by|suggested-by|helped-by):[^\r\n]*<[^>\r\n]*@[^>\r\n]*>\r?\n?/gim,
+  '',
+);
+
 fs.writeFileSync(messagePath, message);
 NODE
 }
@@ -263,16 +271,20 @@ ensure_public_replay_message() {
   local subject="$2"
   local message_file="$3"
   local token
+  local had_private_token=0
 
   if token=$(private_replay_message_token "$message_file"); then
-    if [ "$SANITIZE_PRIVATE_REPLAY_MESSAGES" -eq 1 ]; then
-      sanitize_private_replay_message "$message_file"
-      if ! token=$(private_replay_message_token "$message_file"); then
-        log_info "Sanitized private replay message tokens for $commit_sha | $subject"
-        return 0
-      fi
-    fi
+    had_private_token=1
+  fi
 
+  if [ "$SANITIZE_PRIVATE_REPLAY_MESSAGES" -eq 1 ]; then
+    sanitize_private_replay_message "$message_file"
+    if [ "$had_private_token" -eq 1 ] && ! token=$(private_replay_message_token "$message_file"); then
+      log_info "Sanitized private replay message tokens for $commit_sha | $subject"
+    fi
+  fi
+
+  if token=$(private_replay_message_token "$message_file"); then
     log_error "Refusing to replay $commit_sha | $subject"
     log_error "Commit message mentions private release token: $token"
     log_error "Split the private-only changes into a stripped commit or rewrite the replayed public commit message."

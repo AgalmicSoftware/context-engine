@@ -984,7 +984,8 @@ test('sync-public-history rejects replayed commit messages that mention private 
 test('sync-public-history can sanitize private tokens in otherwise public replay messages', () => {
   withSourceRepo(({ sourceDir }) => {
     writeFile(sourceDir, 'public-sanitized.txt', 'public change\n');
-    commitAll(sourceDir, 'Public sanitized change\n\nMentions contextEngine-cc and agent-native follow-up details.\n', {
+    const privateCoauthor = ['noreply', 'anthropic.com'].join('@');
+    commitAll(sourceDir, `Public sanitized change\n\nMentions contextEngine-cc and agent-native follow-up details.\n\nCo-Authored-By: Assistant <${privateCoauthor}>\n`, {
       authorDate: '2025-01-05T06:07:08Z',
       committerDate: '2025-01-05T06:07:08Z',
     });
@@ -1017,6 +1018,7 @@ test('sync-public-history can sanitize private tokens in otherwise public replay
     assert.match(latestMessage, /private integration/);
     assert.doesNotMatch(latestMessage, /contextEngine-cc/i);
     assert.doesNotMatch(latestMessage, /agent-native/i);
+    assert.doesNotMatch(latestMessage, /Co-Authored-By/i);
   });
 });
 
