@@ -373,6 +373,7 @@ strip_private_paths_from_clone() {
   local commit_sha="$1"
   local pattern
   local matches=()
+  local changed_paths_file="$TMP_ROOT/public-replay-changed-paths.bin"
 
   (
     cd "$TEMP_CLONE"
@@ -393,6 +394,15 @@ strip_private_paths_from_clone() {
 
     apply_agent_bridge_public_history_policy "$commit_sha"
     node "$REPO_ROOT/scripts/scrub-public-package-json.js" "$TEMP_CLONE/package.json"
+
+    # The canonical artifact redacts non-public emails and local home paths.
+    # Apply the same transformation to each changed replay delta so no
+    # intermediate public commit exposes text that the final artifact removes.
+    git diff --cached --name-only -z > "$changed_paths_file"
+    node \
+      "$REPO_ROOT/scripts/scrub-public-pii-text.mjs" \
+      "$TEMP_CLONE" \
+      --paths-file "$changed_paths_file"
 
     git add -A
   )

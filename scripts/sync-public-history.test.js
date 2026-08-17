@@ -14,6 +14,7 @@ const ASSET_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-assets.js
 const TEXT_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-text.js');
 const PII_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-release-pii.sh');
 const PACKAGE_SCRUBBER_SOURCE_PATH = path.join(__dirname, 'scrub-public-package-json.js');
+const PII_SCRUBBER_SOURCE_PATH = path.join(__dirname, 'scrub-public-pii-text.mjs');
 const RELEASE_VERSION_SOURCE_PATH = path.join(__dirname, 'release-version.mjs');
 const PRIVATE_BRANCH_GUARD_INSTALLER_SOURCE_PATH = path.join(__dirname, 'install-private-branch-guard.sh');
 const PRE_PUSH_HOOK_SOURCE_PATH = path.join(__dirname, '..', '.githooks', 'pre-push');
@@ -70,6 +71,11 @@ function installSyncScriptFixture(sourceDir) {
     sourceDir,
     path.join('scripts', 'scrub-public-package-json.js'),
     fs.readFileSync(PACKAGE_SCRUBBER_SOURCE_PATH, 'utf8'),
+  );
+  writeFile(
+    sourceDir,
+    path.join('scripts', 'scrub-public-pii-text.mjs'),
+    fs.readFileSync(PII_SCRUBBER_SOURCE_PATH, 'utf8'),
   );
   writeFile(
     sourceDir,
@@ -985,6 +991,8 @@ test('sync-public-history can sanitize private tokens in otherwise public replay
   withSourceRepo(({ sourceDir }) => {
     writeFile(sourceDir, 'public-sanitized.txt', 'public change\n');
     const privateCoauthor = ['noreply', 'anthropic.com'].join('@');
+    const syntheticEmail = ['private', 'example.com'].join('@');
+    writeFile(sourceDir, 'public-synthetic-email.txt', `fixture=${syntheticEmail}\n`);
     commitAll(sourceDir, `Public sanitized change\n\nMentions contextEngine-cc and agent-native follow-up details.\n\nCo-Authored-By: Assistant <${privateCoauthor}>\n`, {
       authorDate: '2025-01-05T06:07:08Z',
       committerDate: '2025-01-05T06:07:08Z',
@@ -1019,6 +1027,10 @@ test('sync-public-history can sanitize private tokens in otherwise public replay
     assert.doesNotMatch(latestMessage, /contextEngine-cc/i);
     assert.doesNotMatch(latestMessage, /agent-native/i);
     assert.doesNotMatch(latestMessage, /Co-Authored-By/i);
+    assert.equal(
+      git(sourceDir, ['show', 'release-candidate:public-synthetic-email.txt']),
+      'fixture=[redacted-email]\n',
+    );
   });
 });
 

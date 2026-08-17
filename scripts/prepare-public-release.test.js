@@ -8,6 +8,7 @@ const { spawnSync } = require('node:child_process');
 
 const SCRIPT_SOURCE_PATH = path.join(__dirname, 'prepare-public-release.sh');
 const PACKAGE_SCRUBBER_SOURCE_PATH = path.join(__dirname, 'scrub-public-package-json.js');
+const PII_SCRUBBER_SOURCE_PATH = path.join(__dirname, 'scrub-public-pii-text.mjs');
 const HELPER_SOURCE_PATH = path.join(__dirname, 'lib', 'public-release-strip-patterns.sh');
 const SURFACE_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-release-surface.js');
 const DOCS_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-docs.js');
@@ -45,6 +46,11 @@ test('prepare-public-release strips private surfaces without publishing an inven
       sourceDir,
       path.join('scripts', 'scrub-public-package-json.js'),
       fs.readFileSync(PACKAGE_SCRUBBER_SOURCE_PATH, 'utf8'),
+    );
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'scrub-public-pii-text.mjs'),
+      fs.readFileSync(PII_SCRUBBER_SOURCE_PATH, 'utf8'),
     );
     writeFile(
       sourceDir,
@@ -289,6 +295,11 @@ test('prepare-public-release fails if private planning paths survive strip rules
       sourceDir,
       path.join('scripts', 'scrub-public-package-json.js'),
       fs.readFileSync(PACKAGE_SCRUBBER_SOURCE_PATH, 'utf8'),
+    );
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'scrub-public-pii-text.mjs'),
+      fs.readFileSync(PII_SCRUBBER_SOURCE_PATH, 'utf8'),
     );
     writeFile(
       sourceDir,
