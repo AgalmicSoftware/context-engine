@@ -271,10 +271,11 @@ credits, so concentrated priority is deliberately expensive.
 ```bash
 node ./bin/ai-discourse-bench.mjs run-importance \
   --provider local \
-  --questions ./banks/ai-futures/v0.1-candidate/question-bank.json \
+  --questions ./banks/ai-futures/v0.2-reviewed-candidate/question-bank.json \
   --models ./data/model-roster.sample.json \
   --out ./runs/local-importance-runs.json \
   --budget 100 \
+  --max-allocations 10 \
   --repeats 1
 ```
 
@@ -283,6 +284,15 @@ checkpoint, retry, concurrency, and `--resume` behavior as stance runs. One
 allocation covers the whole bank, so its repeat count is configured separately
 from the canonical/reversed stance depth. Repeats are averaged within each
 model first; models then receive equal weight in question and topic importance.
+Each model and allocation repeat receives a deterministic hash-shuffled question
+order, recorded in provenance, so fixed bank order does not systematically favor
+early questions.
+Allocations are sparse by default: a model may prioritize at most 10 questions.
+The per-question vote maximum is derived from the budget and allocation cap
+(`3` votes for the default 100-credit/10-question method), so every
+schema-valid allocation is guaranteed to remain within the quadratic budget.
+This keeps the budget legible and the structured response bounded.
+Use `--max-allocations` to change that cap for a separately identified run.
 
 ## Generate a Report
 

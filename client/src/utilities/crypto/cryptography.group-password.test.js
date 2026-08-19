@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
 import { cryptoUtils } from './cryptography.js';
-import * as groupPasswordDerivation from './groupPasswordDerivation.cjs';
+import groupPasswordDerivation from './groupPasswordDerivation.cjs';
 
 const PASSWORD = 'shared-secret';
 const SBT_A = '0x00000000000000000000000000000000000000a1';

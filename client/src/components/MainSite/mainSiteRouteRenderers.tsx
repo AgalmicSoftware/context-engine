@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { ethers } from 'ethers';
 import type { AppShell } from './AppShell';
 import type { SessionConfigLike as ShellSessionConfigLike } from '../shellTypes';

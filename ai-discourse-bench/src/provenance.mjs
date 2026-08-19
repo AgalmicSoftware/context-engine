@@ -111,8 +111,13 @@ export const buildReportFingerprint = (report = {}) => hashJson({
   questions: report.questions || [],
   participants: report.participants || [],
   polisReport: report.polisReport || {},
+  participantGraph: report.participantGraph || {},
+  statistics: report.statistics || {},
   importance: report.importance || {},
   debateAtlas: report.debateAtlas || {},
+  riskMatrix: report.riskMatrix || {},
+  rawMaterial: report.rawMaterial || {},
+  integrity: report.integrity || {},
 });
 
 export const hashReleaseReportContent = (report = {}) => {

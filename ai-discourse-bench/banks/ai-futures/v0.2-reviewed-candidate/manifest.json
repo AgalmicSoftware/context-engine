@@ -36,7 +36,7 @@
     {
       "corpus": "tweets",
       "relativePath": "ai-discourse-corpus/corpuses/enriched-tweets.json",
-      "sha256": "f3440096c2115b6a6ad6a30f6a50097d965f2c531ff09e29e1cb4a530c910df4"
+      "sha256": "a02090cfa9fb4b24bf6aebd8d0f1e6093d3d8bc82d0e6fc269dbd8f39d49074b"
     },
     {
       "corpus": "lesswrong-posts",

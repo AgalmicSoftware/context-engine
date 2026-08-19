@@ -32,7 +32,7 @@
 
 import { Buffer } from 'buffer';
 import { ethers, utils } from 'ethers';
-import { createGroupPasswordDerivation } from './groupPasswordDerivation.js';
+import groupPasswordDerivation from 'utilities/crypto/groupPasswordDerivation.cjs';
 import { createLogger } from '../logging';
 import { perfDebugDecryptEnvelope } from '../web3/rpcDebugStats.js';
 
@@ -419,7 +419,7 @@ const {
   computeGroupPasswordHash,
   deriveGroupPasswordWallet,
   resolveGroupPasswordWalletScopeAddress,
-} = createGroupPasswordDerivation(ethers);
+} = groupPasswordDerivation.createGroupPasswordDerivation(ethers);
 
 const computeGroupMintMessageHash = (sbtAddress: string, userAddress: string) => {
   if (!ethers.utils.isAddress(sbtAddress) || !ethers.utils.isAddress(userAddress)) {

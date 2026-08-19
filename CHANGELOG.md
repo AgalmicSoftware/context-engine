@@ -82,6 +82,10 @@ All notable changes to this project will be documented in this file.
   hydration, profile scans, filters, selectors, and realtime events. Delayed
   scans now preserve newer activity, unrelated networks, and concurrent user
   responses, and readiness is published only after persistence succeeds.
+- Added a `/benchmarks` route for bundled AI Opinions Benchmark reports. The
+  static viewer treats models as participants, preserves interactive report
+  controls inside a sandboxed frame, and labels incomplete or unvalidated
+  artifacts as development previews rather than released results.
 - Replaced the `/contracts` utility reference with a user-facing `/docs` page
   containing a quickstart, session-options guide, and FAQ. The page retains
   AI prompt references and a contract deployment explorer that waits for an

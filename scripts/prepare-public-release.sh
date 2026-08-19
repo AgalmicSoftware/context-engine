@@ -119,6 +119,17 @@ scrub_public_pii_text() {
   node "$SCRIPT_DIR/scrub-public-pii-text.mjs" "$STAGING_ROOT"
 }
 
+refresh_public_benchmark_source_hashes() {
+  local refresher="$STAGING_ROOT/scripts/refresh-public-benchmark-source-hashes.mjs"
+
+  if [ ! -f "$refresher" ]; then
+    printf 'Public benchmark source-hash refresher is missing from release copy.\n' >&2
+    return 1
+  fi
+
+  node "$refresher" "$STAGING_ROOT" >&2
+}
+
 if [ "$OUTPUT_ABS" = "$REPO_ROOT" ]; then
   printf 'Refusing to overwrite the repo root.\n' >&2
   exit 1
@@ -250,6 +261,7 @@ done < "$MATCHED_PATHS_FILE"
 
 scrub_public_package_json
 scrub_public_pii_text
+refresh_public_benchmark_source_hashes
 
 (
   cd "$STAGING_ROOT"

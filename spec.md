@@ -1,7 +1,7 @@
 # Context Engine Specification
 
 Status: Living specification (update alongside feature work)
-Last reviewed: 2026-08-10
+Last reviewed: 2026-08-18
 Canonical deep-dive docs: `docs/` (see `docs/README.md`)
 
 ## Purpose
@@ -95,9 +95,10 @@ Core routes:
 - `/benchmarks`: Static benchmark index and interactive report viewer. Bundled
   manifests identify each artifact as either a development preview or a
   released result; the report itself runs in a sandboxed iframe.
-- `/docs`: User-facing quickstart, session-options guide, FAQ, and session-aware
-  smart-contract and AI-prompt reference. Legacy `/contracts` links redirect
-  here without dropping their path suffix, query, or hash.
+- `/docs`: User-facing quickstart, session-options guide, FAQ, AI-prompt
+  reference, and an explicit session selector for published smart-contract
+  deployment details. Legacy `/contracts` links redirect here without dropping
+  their path suffix, query, or hash.
 - `/:0x...`: Address-based user profile page (activity, responses, comparisons).
 - `/u/:address`: Alias for the address-based user profile page.
 - `/su/:username`: Simulated historical-user profile view used by demo/atlas surfaces.

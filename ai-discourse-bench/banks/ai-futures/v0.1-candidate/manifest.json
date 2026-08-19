@@ -5,7 +5,7 @@
   "version": "0.1.0-candidate.1",
   "releaseStatus": "candidate",
   "benchmarkId": "ai-discourse-bench-ai-futures-v0.1-candidate",
-  "questionBankHash": "561bd7679b0b5b4592f51924cfd79146f0cae3d5e6344dfab4e8d39c10190963",
+  "questionBankHash": "cc442e11af1794116cbab693146150e88512464e72368618e31a18f2e991bdd5",
   "sourceCorpusRevision": "79b19bbd9826b42968abbffb05e402949417a88c",
   "sourceFiles": [
     {
@@ -36,7 +36,7 @@
     {
       "corpus": "tweets",
       "relativePath": "ai-discourse-corpus/corpuses/enriched-tweets.json",
-      "sha256": "f3440096c2115b6a6ad6a30f6a50097d965f2c531ff09e29e1cb4a530c910df4"
+      "sha256": "a02090cfa9fb4b24bf6aebd8d0f1e6093d3d8bc82d0e6fc269dbd8f39d49074b"
     },
     {
       "corpus": "lesswrong-posts",
