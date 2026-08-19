@@ -17,9 +17,7 @@ describe('SessionModeProfileField theme contrast styles', () => {
     expect(source).toMatch(
       /\.headerProfileSelectionStep\s*\{[\s\S]*?\.headerTitleBlock\s*\{[\s\S]*?h1\s*\{[\s\S]*?font-size:\s*clamp\(28px, 4vw, 32px\);/,
     );
-    expect(source).toMatch(
-      /\.modeProfileEntryEyebrow\s*\{[\s\S]*?font-size:\s*0\.82rem;[\s\S]*?font-weight:\s*850;/,
-    );
+    expect(source).toMatch(/\.modeProfileEntryEyebrow\s*\{[\s\S]*?font-size:\s*0\.82rem;[\s\S]*?font-weight:\s*850;/);
     expect(source).toMatch(/\.modeProfileArchitectureLink\s*\{[\s\S]*?font-size:\s*0\.9rem;/);
   });
 

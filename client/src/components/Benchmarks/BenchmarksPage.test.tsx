@@ -7,10 +7,7 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
 const previewHtml = '<!doctype html><title>Benchmark preview</title>';
-const reportEntry = (
-  html: string,
-  overrides: Partial<BenchmarkReportEntry> = {},
-): BenchmarkReportEntry => ({
+const reportEntry = (html: string, overrides: Partial<BenchmarkReportEntry> = {}): BenchmarkReportEntry => ({
   id: 'preview',
   title: 'AI Futures & Policy',
   topic: 'AI Futures & Policy',

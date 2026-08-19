@@ -51,12 +51,7 @@ describe('sessionWizardModeRequirements', () => {
     };
     const requirements = resolveSessionWizardModeRequirements(profile);
 
-    expect(requirements.presetKeyChips).toEqual([
-      'Cloudflare account',
-      'OpenAI API Key',
-      'RPC URL/key',
-      'Lit API key',
-    ]);
+    expect(requirements.presetKeyChips).toEqual(['Cloudflare account', 'OpenAI API Key', 'RPC URL/key', 'Lit API key']);
     expect(requirements.requiredWorkerSecretFields).toEqual(['openaiKey', 'litAccountApiKey']);
     expect(requirements.visibleWorkerResourceKeys).toEqual(['ai', 'rpc', 'lit']);
     expect(requirements.requiresRpc).toBe(true);

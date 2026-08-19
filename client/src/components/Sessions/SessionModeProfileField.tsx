@@ -225,12 +225,7 @@ const SessionModeProfileField = ({
 
       {entryOnly && profile ? (
         <div className={`${styles.modeSavedProfile} ${styles.modeSavedProfileEntry}`}>
-          <Button
-            type="button"
-            color="primary"
-            onClick={onContinue}
-            data-testid={E2E_TESTIDS.WIZARD_MODE_RESUME}
-          >
+          <Button type="button" color="primary" onClick={onContinue} data-testid={E2E_TESTIDS.WIZARD_MODE_RESUME}>
             Resume in-progress session setup
           </Button>
         </div>

@@ -14,8 +14,6 @@ describe('SessionWizardNormalModeRail responsive styles', () => {
     expect(source).toMatch(
       /@media \(max-width: 720px\)[\s\S]*?\.normalModeCardTitle\s*\{[\s\S]*?font-size:\s*0\.9rem;[\s\S]*?line-height:\s*1\.15;/,
     );
-    expect(source).toMatch(
-      /@media \(max-width: 720px\)[\s\S]*?\.normalModeCardSummary\s*\{[\s\S]*?display:\s*none;/,
-    );
+    expect(source).toMatch(/@media \(max-width: 720px\)[\s\S]*?\.normalModeCardSummary\s*\{[\s\S]*?display:\s*none;/);
   });
 });
