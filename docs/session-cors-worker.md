@@ -114,7 +114,7 @@ The route-shell bundle is intentionally still a large boundary object because it
 
 ## Native wizard flow (/new + Cloudflare deploy button)
 
-For the default `Fast & Cheap (Cloudflare)` preset:
+For the default `Fast & Private (Cloudflare)` preset:
 
 1. Context Engine shows the exact session slug, public passkey-derived admin
    address, and two independently generated Worker runtime secrets.
@@ -185,7 +185,7 @@ grant Cloudflare account access. The Worker is deployed with
 
 ## Legacy wizard flow (/new + deploy-helper fallback)
 
-For the default `Fast & Cheap (Cloudflare)` preset:
+For the default `Fast & Private (Cloudflare)` preset:
 
 ### API token setup and handling
 

@@ -47,9 +47,9 @@ flowchart TD
 
 Static app hosting, public/private session access, and the session
 infrastructure profile are independent choices. The `/new` screen does not
-automatically preselect a hosting option; `Fast & Cheap (Cloudflare)` is the implemented
+automatically preselect a hosting option; `Centralized (Cloudflare)` is the implemented
 default/recommended path once chosen, and
-`Trustless & Public (Decentralized)` is the implemented opt-in path. The
+`Decentralized (Arweave + EVM)` is the implemented opt-in path. The
 Company-Operated branch is a planned adapter architecture, not a shipped
 corporate package. It can target entirely off-chain infrastructure; a private
 EVM would be only a possible future adapter, never a requirement.
@@ -171,7 +171,7 @@ The worker surface is documented in `docs/session-cors-worker.md`.
 - `workers/sessionCorsWorker/` is the session worker. It handles AI proxying,
   transcription, Arweave uploads, storage routes, fetch helpers, auth, gates,
   faucet support, and sponsored/deploy-helper paths.
-- In the default `Fast & Cheap (Cloudflare)` profile, a creator-owned
+- In the default `Centralized (Cloudflare)` profile, a creator-owned
   per-session instance is the canonical config, auth, and payload-storage
   authority. Its passkey-derived admin EOA signs config without submitting an
   EVM transaction.

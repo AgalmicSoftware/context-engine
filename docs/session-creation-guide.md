@@ -16,14 +16,14 @@ Related docs:
 The first `/new` screen presents the two implemented setup paths as large cards
 with their required inputs. After a creator chooses one, the cards collapse to
 the compact Hosting selector in the wizard header so the profile can still be
-changed. The Fast & Cheap card summarizes its inputs as
-`Cloudflare account / AI provider key` and explains that session settings and
-responses are stored in Cloudflare without a public-blockchain requirement. The
+changed. The Centralized card summarizes its inputs as
+`Cloudflare account / OpenAI API Key` and explains that session settings and
+responses are stored in Cloudflare without a blockchain requirement. The
 decentralized card explains that session data is stored on Arweave while session
-identity is recorded in a public EVM registry; its pills list the AI, Arweave,
+identity is recorded in an EVM registry; its pills list the OpenAI, Arweave,
 RPC, and testnet-gas inputs without exposing internal runtime terminology.
 
-For the default `Fast & Cheap (Cloudflare)` preset, the user needs a Cloudflare
+For the default `Centralized (Cloudflare)` preset, the user needs a Cloudflare
 account and one API key for the selected AI provider. The native path is a
 guided Cloudflare dashboard handoff: it does not ask for a Cloudflare API token,
 OAuth token, Context Engine deploy helper, or local agent, but it is not a
@@ -78,6 +78,13 @@ Important:
 Pure Cloudflare setup does not display or persist block numbers, registry
 contracts, Surveys contracts, faucet settings, or an EVM network. Choosing
 `Customize` does not override this capability boundary.
+
+The metadata **Optional details** area (**More options** in Customize) contains
+the settings that most sessions can leave at their defaults. **Session colors**
+is the final field group and starts collapsed there; expand it to choose a
+curated color scheme and see its preview. **Who can create groups?** is a
+dropdown in the same area, constrained to **All participants** or **Admins
+only** rather than accepting freeform config text.
 
 The optional **Session end time** is a timestamp for Worker-canonical sessions.
 It must be in the future when the session is published. At that instant the
@@ -196,6 +203,11 @@ The default client build is passkey-only and uses the Context Engine passkey EOA
 to sign Worker SIWE-style messages. Chain-backed profiles use the same account
 for OP Sepolia transactions.
 
+In the legacy deploy-helper fallback, the **Admin address** control says
+**Click to login** while signed out and opens the existing login modal when
+activated. After sign-in, the connected wallet address is filled into the
+deploy form automatically.
+
 - Context Engine passkey EOA wallet
 
 Deployments built with `REACT_APP_CE_ENABLE_METAMASK_CONNECTOR=true` can also use MetaMask. The separate WalletConnect fallback remains opt-in; see `docs/public-client-config.md`.
@@ -255,20 +267,20 @@ Open `/new`. The app canonicalizes that route to `/session/new`, but `/new` is t
 
 The first screen is the session-mode choice. A blank draft has nothing
 preselected. If this browser already has an explicit saved profile, the header
-shows that profile and offers `Continue with saved settings` instead of silently
-discarding or replacing it. Choosing a new preset immediately opens the
+offers `Resume in-progress session setup` instead of silently discarding or
+replacing it. Choosing a new preset immediately opens the
 four-stage setup with fields prefilled from the chosen mode; there is no
 separate Continue action for a new selection:
 
-- `Fast & Cheap (Cloudflare)` compiles to a Cloudflare-backed,
+- `Centralized (Cloudflare)` compiles to a Cloudflare-backed,
   worker-canonical session shape with Cloudflare-internal worker encryption
   (`worker_envelope`) enabled by default. After selection, the requirements
-  banner lists exactly a Cloudflare account and one AI-provider key. It does
+  banner lists exactly a Cloudflare account and one `OpenAI API Key`. It does
   not ask for Arweave, Lit, RPC, funding, faucet, or gas inputs.
-- `Trustless & Public (Decentralized)` compiles to the public Arweave +
+- `Decentralized (Arweave + EVM)` compiles to the Arweave +
   EVM-registry session shape. Its requirements banner lists a compatible
   Session Worker for the web runtime, the Arweave wallet/JWK, EVM RPC URL, EVM
-  gas for transaction fees, AI provider key, and optional Lit key needed when encryption is enabled. The
+  gas for transaction fees, an `OpenAI API Key`, and an optional Lit key needed when encryption is enabled. The
   Worker assists the browser runtime; the EVM registry and Arweave remain the
   canonical authority and metadata store.
 
@@ -277,12 +289,12 @@ which capabilities are reachable:
 
 | Reachable `/new` profile                   | Canonical authority and storage                              | Identity and Groups                                                                                | Chain-dependent capabilities                                                          |
 | ------------------------------------------ | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Fast & Cheap default                       | Session Worker + Cloudflare; `worker_envelope`               | Passkey + **Native Worker Groups**                                                                 | None; `evm.registryChainId` is `null`                                                 |
+| Centralized default                        | Session Worker + Cloudflare; `worker_envelope`               | Passkey + **Native Worker Groups**                                                                 | None; `evm.registryChainId` is `null`                                                 |
 | Custom Cloudflare, no encryption           | Session Worker + Cloudflare; `encryption: "none"`            | Passkey + **Native Worker Groups**                                                                 | None; `evm.registryChainId` is `null`                                                 |
 | Custom Cloudflare, Worker envelope         | Session Worker + Cloudflare; `encryption: "worker_envelope"` | Passkey + **Native Worker Groups**                                                                 | None unless an explicit `sbt_onchain` condition is added                              |
 | Custom Cloudflare + explicit `sbt_onchain` | Session Worker + Cloudflare; Worker envelope                 | Passkey + **Native Worker Groups**; SBT conditions are separate **Advanced on-chain access gates** | Positive chain ID and RPC; wallet/gas only when `/new` must create an SBT             |
 | Custom Cloudflare + Lit                    | Session Worker + Cloudflare; `encryption: "lit"`             | Passkey + **Native Worker Groups**                                                                 | Positive chain ID, RPC, and Lit credential; this does not make the registry canonical |
-| Trustless or custom Arweave                | EVM registry + Arweave; Session Worker-assisted web runtime; `encryption: "none"` or `"lit"` | Wallet with passkey support + on-chain SBT Groups                                 | Compatible Session Worker, chain/RPC, registry transactions, gas, and Arweave; Lit also needs its credential |
+| Decentralized or custom Arweave            | EVM registry + Arweave; Session Worker-assisted web runtime; `encryption: "none"` or `"lit"` | Wallet with passkey support + on-chain SBT Groups                                 | Compatible Session Worker, chain/RPC, registry transactions, gas, and Arweave; Lit also needs its credential |
 
 Telegram, Mini App, Agent Session Wrapped, result-visibility, and export choices
 do not change that ownership split. Mini App requires Telegram. Profiles marked
@@ -348,7 +360,9 @@ Enter the core session metadata:
 
 - `sessionName`
 - `sessionInfo`
-- **Session colors** → **Color scheme**. Choose `Context Engine`, `Ocean`, or
+- **Optional details** (**More options** in Customize) → **Session colors** →
+  **Color scheme**. Session colors is the final optional field group and is
+  collapsed by default. Expand it to choose `Context Engine`, `Ocean`, or
   `Amber`; the compact preview updates immediately. This controls only
   documented session accents/chrome and does not change the app theme.
 - slug
@@ -376,14 +390,27 @@ What gets stored where:
   block limits, contract pointers, featured lists, the same
   `appearance.colorSchemeId`, and any Lit-encrypted fields. The EVM registry
   stores only the metadata pointer; it does not duplicate the scheme ID.
-- The Fast & Cheap preset combines `storageProfile.backend = "cloudflare"`
+- The Centralized preset combines `storageProfile.backend = "cloudflare"`
   with `worker_envelope` encryption and Worker-role/agent-grant access.
   Advanced Cloudflare profiles can add an explicit `sbt_onchain` access
   condition, which makes the profile hybrid and requires its configured
   chain/RPC before the Worker serves bytes. That is a separately labelled
   Advanced on-chain gate; it does not replace the session's Worker-native
   Groups and is not end-to-end encryption.
-- Advanced encryption options are `none` (payload bytes are stored as provided), `lit` (Cloudflare stores caller-supplied Lit ciphertext and rejects plaintext uploads until the Lit path sends `payloadEncrypted=true`), and Cloudflare `worker_envelope`: data is encrypted before Cloudflare stores it, and the session worker decrypts only after checking access. `worker_envelope` is available only with Cloudflare storage. The operator and Cloudflare runtime can decrypt; it is not decentralized, not end-to-end, and not private from the session operator or Cloudflare runtime.
+- The **Data storage** controls include separate help tooltips. Arweave is
+  permanent storage and can receive payloads encrypted before upload.
+  Cloudflare storage is mutable and not permanent; a future attestation layer
+  could make stored revisions verifiable, but would not make the underlying
+  storage permanent.
+- Each **Session encryption** option has its own help tooltip. Advanced options
+  are `none` (payload bytes are stored as provided), `lit` (data is encrypted
+  before upload and decryption follows on-chain access conditions), and
+  Cloudflare `worker_envelope`: data is encrypted before Cloudflare stores it,
+  and the session worker decrypts only after checking access. `lit` requires a
+  registry network, RPC connection, and Lit credentials. `worker_envelope` is
+  available only with Cloudflare storage. The operator and Cloudflare runtime
+  can decrypt; it is not decentralized, not end-to-end, and not private from
+  the session operator or Cloudflare runtime.
 - Public stored-results visibility requires unencrypted storage. The current
   wizard offers it only for Arweave + no encryption; switching backend or
   encryption coerces an incompatible selection back to participant aggregate.
@@ -443,8 +470,8 @@ Worker/Lit hybrid likewise remains Worker-canonical while exposing only its
 explicit Lit/RPC requirements. Registry-canonical sessions continue to use the
 on-chain SBT group flow below.
 
-The **Who can create groups?** choice is available for every `/new` mode and is
-persisted as `groupCreationPolicy`:
+The **Who can create groups?** dropdown is available under **More options** for
+every `/new` mode and is persisted as `groupCreationPolicy`:
 
 - **All participants** is the new-session default. In Worker-native sessions,
   an authenticated participant with the `groups` scope can join or create an
@@ -517,9 +544,9 @@ capabilities actually require them.
 
 Common combinations:
 
-- Default Fast & Cheap session:
+- Default Centralized session:
   - Cloudflare account
-  - one AI provider key matching the selected models
+  - one OpenAI API key for the default text and transcription models
 - Worker/SBT hybrid:
   - Cloudflare account, AI provider key, and RPC
   - wallet and gas only when the wizard must create a new SBT

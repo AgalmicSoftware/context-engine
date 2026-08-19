@@ -89,7 +89,13 @@ it against the viewport bottom.
 
 The embedded Welcome deck keeps navigation in a compact bottom strip at every
 viewport size. Every slide uses the same viewport-capped frame height, so the
-arrow targets do not move when headings, artwork, or copy change. Non-intro artwork consumes the
+arrow targets do not move when headings, artwork, or copy change. The standard
+app and desktop-window profiles retain their separately sized frames, while
+slide headings stay horizontally centered in both. At standard full-screen
+desktop widths, the opening artwork fills and centers within a taller shared
+frame. Its navigation strip restores the larger pre-theme arrow scale, remains
+visible in the initial viewport, and places the site footer below the fold.
+The desktop-window profile retains its compact controls. Non-intro artwork consumes the
 `--ce-welcome-artwork-detail-*` tokens: Context Engine retains the original
 presentation while Classic 95 uses normal image blending, restrained partial
 grayscale, and moderate opacity so the illustrations stay visible without

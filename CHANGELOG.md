@@ -6,10 +6,82 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Added a `/benchmarks` route for bundled AI Opinions Benchmark reports. The
-  static viewer treats models as participants, preserves interactive report
-  controls inside a sandboxed frame, and labels incomplete or unvalidated
-  artifacts as development previews rather than released results.
+- Renamed the `/new` setup choices to **Centralized** and **Decentralized**, moved Session
+  colors into a default-collapsed More options section, and replaced the
+  freeform group-creation policy input with a constrained dropdown there.
+- Restored centered Welcome-slide headings across responsive layouts while
+  preserving each theme profile's constant slide-frame and navigation height.
+  On standard full-screen desktops, the opening artwork is centered and sized
+  to keep the controls visible while placing the site footer below the fold,
+  and the taller navigation strip restores the pre-theme 80px arrow scale.
+- Replaced the Classic 95 beeswarm tooltip's yellow-to-olive Unsure gradient
+  with a solid warning-yellow segment.
+- Kept both Classic 95 Welcome-slide navigation arrows fully opaque and white
+  while preserving the Context Engine theme's existing arrow treatment.
+- Restored editing controls for an account's submitted standalone-question
+  response and made explicit passkey login open the platform chooser when
+  multiple passkey-derived wallets are available; background signing remains
+  pinned to the active credential.
+- Gave the Classic 95 question lock-audience popup a raised Windows-style
+  boundary so it remains distinct from the question card beneath it.
+- Fixed signed-out standalone-question bookmarks so the control updates its
+  pressed/color state immediately and restores the session-scoped bookmark
+  after a reload.
+- Restored the Questions toolbar's viewport-sticky behavior in Classic 95 and
+  kept unchanged response inputs memoized so binary vote selection avoids
+  rebuilding every visible question control.
+- Kept related-tag chips readable in both bundled app themes by using each
+  theme's paired control surface and foreground colors.
+- Reordered Docs so Prompts precedes FAQ, removed the external-tools notice,
+  grouped the bottom session context and Smart Contracts viewer in one frame,
+  and added a public GitHub shortcut beside the title. The signed-out login
+  control is now text-only and uses the active theme's button font.
+- Removed the duplicate Posts link from the About hero while retaining Posts
+  in the persistent footer navigation.
+- Added a named runtime SCSS app-theme contract with user/deployment precedence,
+  pre-paint initialization, a default-on Settings selector, and bundled
+  `context-engine` and `classic-95` themes. The complete client presentation
+  surface now consumes semantic runtime color, typography, geometry, border,
+  elevation, and control-state tokens; a zero-baseline source gate prevents
+  raw presentation colors outside narrowly owned theme, export, QR/bitmap, and
+  deterministic avatar sources. Session metadata cannot select an app theme.
+  Question authoring now uses explicit paired workspace/control/input tokens;
+  Classic 95 renders the generator and its toolbar on readable standard gray
+  surfaces with white fields instead of mixing black controls into navy. The
+  session question, simulated-user, and Groups surfaces now retain readable,
+  minimal gray panels at desktop and mobile widths. Its semantic
+  `desktop-window` layout profile now presents Tools as Control Panel applets,
+  Community Stats as a participant/plot split window, session questions as
+  compact dialogs, and footer navigation as a taskbar without theme-ID
+  selectors in components. The Classic 95 taskbar stays docked to the viewport
+  bottom on short and scrolling pages while reserving space for page content.
+- Fixed local Vite startup for the shared CommonJS group-password derivation
+  helper. Persistent startup failures now stop after one automatic cache-busted
+  reload, and the recovery heading uses the active panel-text token so the
+  fallback remains readable across themes.
+- Added **Session colors** to the Session Wizard with the curated
+  `context-engine`, `ocean`, and `amber` schemes, immediate preview, exact
+  `appearance.colorSchemeId` persistence across Worker/Arweave paths, scoped
+  active-session accents, accessibility contrast checks, and fixed-light
+  standalone exports.
+- Added `/session/demo-2` as a fixture-backed preview of “Living With
+  Artificial Minds”: 40 typed questions, 62 unique simulated participants,
+  deterministic generated responses, and a three-cluster Polis report.
+  Poll choices, rating bounds, freeform answers, and stable question IDs now
+  agree across the session, report, and question-results surfaces. Simulated
+  rows are display-only and live responses win collisions. `demo-sh` remains
+  the public default until a dedicated demo-2 Worker, canonical question seed,
+  and Worker-held AI key pass live voice/AI verification; no credential is
+  stored in the preview config or fixture data.
+- Preserved the published `demo-sh` question fixture exactly while preventing
+  tri-state sentiment from being presented as a poll, rating, or freeform
+  answer. Distinct corrected choices for legacy polls remain deferred until a
+  deliberate Worker reseed. Direct Debate Map issue links now close back to the
+  Atlas index when no safe return target exists.
+- Made SBT and related holder-cache writes atomic across discovery, detail
+  hydration, profile scans, filters, selectors, and realtime events. Delayed
+  scans now preserve newer activity, unrelated networks, and concurrent user
+  responses, and readiness is published only after persistence succeeds.
 - Replaced the `/contracts` utility reference with a user-facing `/docs` page
   containing a quickstart, session-options guide, and FAQ. The page retains
   AI prompt references and a contract deployment explorer that waits for an
@@ -249,7 +321,7 @@ All notable changes to this project will be documented in this file.
   semantics. Cloudflare token guidance now explains that the linked form
   prefills permissions for users already signed in.
 - Restored the two primary `/new` setup choices as large, requirement-aware
-  entry cards. Selecting Fast & Cheap or Trustless & Public now transitions to
+  entry cards. Selecting Centralized or Decentralized now transitions to
   the existing compact header selector; the native fast path identifies its
   creator inputs as a Cloudflare login and one AI API key.
 - Made `contextengine.sh` the canonical public URL across site metadata,

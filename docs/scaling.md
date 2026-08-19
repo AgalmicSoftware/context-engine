@@ -9,9 +9,9 @@ session's authority, storage, access policy, or settlement path.
 ## Current Implemented Profiles
 
 The `/new` chooser opens with no preset automatically selected. Its default and
-recommended path is **Hosted & Fast**, labeled `Fast & Cheap (Cloudflare)` in
+recommended path is **Hosted & Fast**, labeled `Centralized (Cloudflare)` in
 the wizard. **Trustless & Slower**, labeled
-`Trustless & Public (Decentralized)`, is an implemented opt-in path. Advanced
+`Decentralized (Arweave + EVM)`, is an implemented opt-in path. Advanced
 per-axis changes are recorded as `Custom`.
 
 | Profile | Availability | Canonical authority and storage | Creator setup | Chain requirement |
