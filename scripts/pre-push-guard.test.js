@@ -15,6 +15,8 @@ const PUBLIC_GIT_NAME = 'Agalmic';
 const PUBLIC_GIT_EMAIL = 'agalmicsoftware@protonmail.com';
 const NON_ZERO_SHA = '1111111111111111111111111111111111111111';
 const ZERO_SHA = '0000000000000000000000000000000000000000';
+const FIXTURE_CLEANUP_MAX_RETRIES = 10;
+const FIXTURE_CLEANUP_RETRY_DELAY_MS = 100;
 const joinAt = (left, right) => `${left}@${right}`;
 
 function writeFile(rootDir, relativePath, contents) {
@@ -58,9 +60,36 @@ function withHookFixture(run) {
   try {
     return run(tempDir);
   } finally {
-    fs.rmSync(tempDir, { recursive: true, force: true });
+    removeHookFixture(tempDir);
   }
 }
+
+function removeHookFixture(tempDir, remove = fs.rmSync) {
+  remove(tempDir, {
+    recursive: true,
+    force: true,
+    maxRetries: FIXTURE_CLEANUP_MAX_RETRIES,
+    retryDelay: FIXTURE_CLEANUP_RETRY_DELAY_MS,
+  });
+}
+
+test('hook fixture cleanup retries transient filesystem contention', () => {
+  const calls = [];
+
+  removeHookFixture('/tmp/fixture', (target, options) => calls.push({ target, options }));
+
+  assert.deepEqual(calls, [
+    {
+      target: '/tmp/fixture',
+      options: {
+        recursive: true,
+        force: true,
+        maxRetries: FIXTURE_CLEANUP_MAX_RETRIES,
+        retryDelay: FIXTURE_CLEANUP_RETRY_DELAY_MS,
+      },
+    },
+  ]);
+});
 
 function gitDir(rootDir) {
   return execFileSync('git', ['rev-parse', '--git-dir'], {

@@ -74,6 +74,42 @@ test('E2E preview readiness retries stay quiet but the final probe remains diagn
   assert.match(workflow, /curl -fsS "\$BASE_URL" >\/dev\/null\s+npm run ci:gate -- e2e-smoke/);
 });
 
+test('E2E smoke timeout leaves room for Playwright installation and execution', () => {
+  const rootDir = path.resolve(__dirname, '..');
+  const workflow = fs.readFileSync(path.join(rootDir, '.github/workflows/ci.yml'), 'utf8');
+  const e2eJob = workflow.slice(workflow.indexOf('  e2e-smoke:'), workflow.indexOf('  cecc-and-node:'));
+
+  assert.match(e2eJob, /timeout-minutes: 20/);
+});
+
+test('release-staging PR events do not duplicate the authoritative push matrix', () => {
+  const rootDir = path.resolve(__dirname, '..');
+  const workflow = fs.readFileSync(path.join(rootDir, '.github/workflows/ci.yml'), 'utf8');
+  const dedupCondition =
+    "if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository || !startsWith(github.head_ref, 'release-staging') }}";
+
+  for (const jobName of [
+    'wiring-and-release',
+    'contracts',
+    'client',
+    'root-jest',
+    'workers',
+    'e2e-smoke',
+    'cecc-and-node',
+  ]) {
+    assert.ok(
+      workflow.includes(`  ${jobName}:\n    ${dedupCondition}`),
+      `${jobName} must skip duplicate same-repository release-staging PR verification`,
+    );
+  }
+
+  const aggregateJob = workflow.slice(workflow.indexOf('  test:'));
+  assert.match(aggregateJob, /name: \$\{\{ github\.event_name == 'pull_request'.*'release-staging-pr-deduplicated' \|\| 'test' \}\}/);
+  assert.match(aggregateJob, /if: \$\{\{ always\(\) \}\}/);
+  assert.match(aggregateJob, /Report deduplicated release-staging PR verification/);
+  assert.match(aggregateJob, /Check split CI job results\s+if: \$\{\{ github\.event_name == 'push'/);
+});
+
 test('release-staging PR verification uses the fetched PR head instead of merge HEAD', () => {
   const rootDir = path.resolve(__dirname, '..');
   const workflow = fs.readFileSync(path.join(rootDir, '.github/workflows/ci.yml'), 'utf8');
