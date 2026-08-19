@@ -387,7 +387,7 @@ describe('SessionWizardShell', () => {
 
     const modeProfile = screen.getByTestId('shell-mode-profile');
     expect(header).toContainElement(modeProfile);
-    expect(header).toHaveAttribute('data-profile-label', 'Cloudflare');
+    expect(header).toHaveAttribute('data-profile-label', 'Centralized');
     expect(header.compareDocumentPosition(requirements) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(requirements.compareDocumentPosition(sponsoredStatus) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(sponsoredStatus.compareDocumentPosition(rail) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

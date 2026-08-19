@@ -52,7 +52,10 @@ const SessionWizardHeader = ({
   return (
     <header className={`${styles.header} ${sessionModeProfileSelectionStep ? styles.headerProfileSelectionStep : ''}`}>
       <div className={styles.headerTitleBlock}>
-        <h1>Session Setup{sessionModeProfileLabel ? ` (${sessionModeProfileLabel})` : ''}</h1>
+        <h1>
+          Session Setup
+          {!sessionModeProfileSelectionStep && sessionModeProfileLabel ? ` (${sessionModeProfileLabel})` : ''}
+        </h1>
       </div>
       <div className={styles.headerActions}>
         <div className={styles.headerControlStack}>

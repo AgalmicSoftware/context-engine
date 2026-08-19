@@ -35,12 +35,74 @@ async function main() {
 
     const picker = page.getByTestId(E2E_TESTIDS.WIZARD_SESSION_COLOR_SCHEME);
     const preview = page.getByTestId(E2E_TESTIDS.WIZARD_SESSION_COLOR_PREVIEW);
+    await page.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED).click();
+    const moreOptions = page.getByRole('button', { name: 'More options' });
+    await moreOptions.click();
+    const colorsToggle = page.getByRole('button', { name: 'Session colors expand' });
+    const groupCreationPolicy = page.getByTestId(E2E_TESTIDS.WIZARD_GROUP_CREATION_POLICY);
+    await colorsToggle.waitFor({ timeout: 30000 });
+    await groupCreationPolicy.waitFor({ timeout: 30000 });
+
+    assert.equal(await moreOptions.getAttribute('aria-expanded'), 'true', 'More options exposes optional controls');
+    assert.equal(
+      await groupCreationPolicy.inputValue(),
+      'participants',
+      'Group creation policy starts with the participant default',
+    );
+    assert.deepEqual(
+      await groupCreationPolicy.locator('option').evaluateAll((options) =>
+        options.map((option) => ({ value: option.value, label: option.textContent?.trim() }))),
+      [
+        { value: 'participants', label: 'All participants' },
+        { value: 'admin_only', label: 'Admins only' },
+      ],
+      'Group creation policy exposes only supported values',
+    );
+    assert.equal(
+      await page.getByRole('textbox', { name: 'Who can create groups?' }).count(),
+      0,
+      'Group creation policy is not a freeform text input',
+    );
+    await groupCreationPolicy.selectOption('admin_only');
+    await page.waitForFunction(
+      (cacheKey) => {
+        const raw = window.sessionStorage.getItem(cacheKey);
+        return raw ? JSON.parse(raw).draft?.groupCreationPolicy === 'admin_only' : false;
+      },
+      WIZARD_CACHE_KEY,
+      { timeout: 30000 },
+    );
+    await groupCreationPolicy.selectOption('participants');
+    await page.waitForFunction(
+      (cacheKey) => {
+        const raw = window.sessionStorage.getItem(cacheKey);
+        return raw ? JSON.parse(raw).draft?.groupCreationPolicy === 'participants' : false;
+      },
+      WIZARD_CACHE_KEY,
+      { timeout: 30000 },
+    );
+    assert.equal(
+      await colorsToggle.getAttribute('aria-expanded'),
+      'false',
+      'Session colors starts collapsed inside More options',
+    );
+    assert.equal(
+      await colorsToggle.evaluate((element) => {
+        const colorsGroup = element.parentElement?.parentElement;
+        return !!colorsGroup && colorsGroup.parentElement?.lastElementChild === colorsGroup;
+      }),
+      true,
+      'Session colors is the final field group inside More options',
+    );
+    assert.equal(await picker.count(), 0, 'The color scheme picker stays hidden until Session colors is expanded');
+
+    await colorsToggle.click();
     await picker.waitFor({ timeout: 30000 });
 
     assert.equal(
       await page.getByText('Session colors', { exact: true }).count(),
       1,
-      'Session colors appears as a primary Wizard section',
+      'Session colors appears once inside More options',
     );
     assert.equal(
       await picker.evaluate((element) => element.labels?.[0]?.textContent?.trim()),
@@ -92,6 +154,9 @@ async function main() {
       'The tab-scoped draft retains the stable scheme identifier across reload',
     );
     await page.getByTestId('ce-new-preset-fast_cheap_cloudflare').click();
+    await page.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED).click();
+    await page.getByRole('button', { name: 'More options' }).click();
+    await page.getByRole('button', { name: 'Session colors expand' }).click();
     await page.getByTestId(E2E_TESTIDS.WIZARD_SESSION_COLOR_SCHEME).waitFor({ timeout: 30000 });
     assert.equal(
       await page.getByTestId(E2E_TESTIDS.WIZARD_SESSION_COLOR_PREVIEW).getAttribute('data-ce-color-scheme-id'),

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 
-import SessionModeProfileSections from './SessionModeProfileSections';
+import SessionModeProfileSections, { type SessionModeProfileSectionsProps } from './SessionModeProfileSections';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
   SESSION_MODE_PRESET_IDS,
   cloneSessionModePreset,
@@ -14,25 +15,19 @@ const VALID_SBT_CONTRACT = '0x00000000000000000000000000000000000000aa';
 const renderSection = (
   section: 'privacy' | 'worker' | 'publish',
   initialProfile?: SessionModeProfile,
-  initialGroupCreationPolicy = 'participants',
+  renderInfoTooltip?: SessionModeProfileSectionsProps['renderInfoTooltip'],
 ) => {
   const onChange = jest.fn();
-  const onGroupCreationPolicyChange = jest.fn();
   const seed = initialProfile || cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
 
   const Harness = () => {
     const [profile, setProfile] = useState(seed);
-    const [groupCreationPolicy, setGroupCreationPolicy] = useState(initialGroupCreationPolicy);
     return (
       <SessionModeProfileSections
         section={section}
         registryChainId={11155420}
         value={profile}
-        groupCreationPolicy={groupCreationPolicy}
-        onGroupCreationPolicyChange={(next) => {
-          onGroupCreationPolicyChange(next);
-          setGroupCreationPolicy(next);
-        }}
+        renderInfoTooltip={renderInfoTooltip}
         onChange={(next, compiled) => {
           onChange(next, compiled);
           setProfile(next);
@@ -42,7 +37,7 @@ const renderSection = (
   };
 
   render(<Harness />);
-  return { onChange, onGroupCreationPolicyChange };
+  return { onChange };
 };
 
 describe('SessionModeProfileSections', () => {
@@ -57,27 +52,52 @@ describe('SessionModeProfileSections', () => {
     expect(screen.queryByText('Export scope')).not.toBeInTheDocument();
   });
 
-  it.each([
-    ['Cloudflare', cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE)],
-    ['on-chain', cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED)],
-  ])('offers admin and participant group creation policies for %s sessions', (_label, profile) => {
-    const { onGroupCreationPolicyChange } = renderSection('worker', profile);
-    const policy = screen.getByRole('radiogroup', { name: 'Who can create groups?' });
+  it('explains storage permanence separately for Cloudflare and Arweave', () => {
+    renderSection('privacy', undefined, ({ content, testId, ariaLabel }) => (
+      <button type="button" data-testid={testId} aria-label={ariaLabel}>
+        {content}
+      </button>
+    ));
 
-    expect(within(policy).getByRole('radio', { name: 'All participants' })).toHaveAttribute('aria-checked', 'true');
-    fireEvent.click(within(policy).getByRole('radio', { name: 'Admins only' }));
-    expect(onGroupCreationPolicyChange).toHaveBeenLastCalledWith('admin_only');
-    expect(within(policy).getByRole('radio', { name: 'Admins only' })).toHaveAttribute('aria-checked', 'true');
+    const cloudflareInfo = screen.getByTestId(E2E_TESTIDS.WIZARD_STORAGE_CLOUDFLARE_INFO);
+    expect(cloudflareInfo).toHaveAccessibleName('About Cloudflare storage');
+    expect(cloudflareInfo).toHaveTextContent(/mutable and not permanent/i);
+    expect(cloudflareInfo).toHaveTextContent(/future attestation.*verifiable proofs/i);
+
+    const arweaveInfo = screen.getByTestId(E2E_TESTIDS.WIZARD_STORAGE_ARWEAVE_INFO);
+    expect(arweaveInfo).toHaveAccessibleName('About Arweave storage');
+    expect(arweaveInfo).toHaveTextContent(/permanent storage/i);
+    expect(arweaveInfo).toHaveTextContent(/encrypted before upload/i);
   });
 
-  it('discloses the public-factory limit for on-chain admin-only policy', () => {
-    renderSection(
-      'worker',
-      cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
-      'admin_only',
-    );
+  it('explains every session encryption option separately', () => {
+    renderSection('privacy', undefined, ({ content, testId, ariaLabel }) => (
+      <button type="button" data-testid={testId} aria-label={ariaLabel}>
+        {content}
+      </button>
+    ));
 
-    expect(screen.getByText(/Public SBT factories remain callable directly on-chain/i)).toBeInTheDocument();
+    const noneInfo = screen.getByTestId(E2E_TESTIDS.WIZARD_ENCRYPTION_NONE_INFO);
+    expect(noneInfo).toHaveAccessibleName('About no encryption');
+    expect(noneInfo).toHaveTextContent(/adds no encryption layer/i);
+    expect(noneInfo).toHaveTextContent(/stored as provided/i);
+
+    const litInfo = screen.getByTestId(E2E_TESTIDS.WIZARD_ENCRYPTION_LIT_INFO);
+    expect(litInfo).toHaveAccessibleName('About Lit encryption');
+    expect(litInfo).toHaveTextContent(/encrypts data before upload/i);
+    expect(litInfo).toHaveTextContent(/on-chain access conditions/i);
+
+    const cloudflareInfo = screen.getByTestId(E2E_TESTIDS.WIZARD_ENCRYPTION_CLOUDFLARE_INFO);
+    expect(cloudflareInfo).toHaveAccessibleName('About Cloudflare encryption');
+    expect(cloudflareInfo).toHaveTextContent(/key held by the session worker/i);
+    expect(cloudflareInfo).toHaveTextContent(/not end-to-end encryption/i);
+  });
+
+  it('keeps group creation policy out of the participation-channel editor', () => {
+    renderSection('worker');
+
+    expect(screen.queryByRole('combobox', { name: 'Who can create groups?' })).not.toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Session participation channels' })).toBeInTheDocument();
   });
 
   it('uses the explicit Cloudflare defaults and reveals plain-language custom rules only on override', () => {

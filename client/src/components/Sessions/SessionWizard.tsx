@@ -2780,6 +2780,7 @@ const SessionWizard = ({
     onEnterNormalMode: handleEnterNormalMode,
     customizing: wizardMode === 'advanced',
     registryChainId,
+    renderInfoTooltip: renderSessionWizardInfoTooltip,
     setCollapsedSections,
     setDraft,
     showContinue: showSessionModeProfileEntryStep || !isNewSessionWizardRoute,

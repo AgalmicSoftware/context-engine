@@ -62,7 +62,7 @@ describe('useSessionWizardWorkerSyncEffects', () => {
   it('fills the deploy admin address from the connected account when blank', () => {
     const { setDeployForm } = renderWorkerSync({
       account: '0xAdmin',
-      deployFormAdminAddress: undefined,
+      deployFormAdminAddress: '',
     });
 
     expect(setDeployForm).toHaveBeenCalledTimes(1);

@@ -5,6 +5,8 @@ import { faTrash } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './SessionWizard.module.scss';
 import type { AnyRecord } from '../shellTypes';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
 import {
   SESSION_MODE_PRESET_IDS,
   cloneSessionModePreset,
@@ -18,13 +20,6 @@ import {
   type SessionModeResultsVisibility,
   type SessionModeSurface,
 } from '../../utilities/session/sessionModeProfile';
-import {
-  DEFAULT_NEW_SESSION_GROUP_CREATION_POLICY,
-  normalizeGroupCreationPolicy,
-  GROUP_CREATION_POLICIES,
-  type GroupCreationPolicy,
-} from '../../utilities/session/groupCreationPolicy';
-import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 export type SessionModeProfileSection = 'privacy' | 'worker' | 'publish';
 
@@ -33,9 +28,19 @@ export type SessionModeProfileSectionsProps = {
   registryChainId?: number | null;
   value?: unknown;
   onChange: (profile: SessionModeProfile, compiled: { storageProfile: AnyRecord }) => void;
-  groupCreationPolicy?: unknown;
-  onGroupCreationPolicyChange?: (policy: GroupCreationPolicy) => void;
+  renderInfoTooltip?: (options: SessionWizardTooltipRenderOptions) => React.ReactNode;
 };
+
+const CLOUDFLARE_STORAGE_TOOLTIP =
+  'Cloudflare storage is mutable and not permanent. A future attestation layer could provide verifiable proofs of stored revisions, but it would not make the underlying storage permanent.';
+const ARWEAVE_STORAGE_TOOLTIP =
+  'Arweave provides permanent storage. Session data can be encrypted before upload, so permanent storage does not require publishing readable content.';
+const NO_ENCRYPTION_TOOLTIP =
+  'This setting adds no encryption layer: payload bytes are stored as provided. Access and visibility controls do not turn unencrypted payloads into encrypted data.';
+const LIT_ENCRYPTION_TOOLTIP =
+  'Lit encrypts data before upload and uses on-chain access conditions to control decryption. It requires a registry network, an RPC connection, and Lit credentials.';
+const CLOUDFLARE_ENCRYPTION_TOOLTIP =
+  'Cloudflare encryption protects data before storage with a key held by the session worker. The worker checks access before decrypting, but the operator and Cloudflare runtime can decrypt, so this is not end-to-end encryption.';
 
 const RESULT_VISIBILITY_OPTIONS: Array<{ value: SessionModeResultsVisibility; label: string; available?: boolean }> = [
   { value: 'private_admin', label: 'Admins only (not available yet)', available: false },
@@ -130,8 +135,7 @@ const SessionModeProfileSections = ({
   registryChainId = null,
   value = null,
   onChange,
-  groupCreationPolicy: groupCreationPolicyValue = null,
-  onGroupCreationPolicyChange,
+  renderInfoTooltip,
 }: SessionModeProfileSectionsProps): React.ReactElement => {
   const profile = isProfile(value) ? value : null;
   const validation = useMemo(
@@ -168,10 +172,6 @@ const SessionModeProfileSections = ({
   }
 
   if (section === 'worker') {
-    const groupCreationPolicy = normalizeGroupCreationPolicy(
-      groupCreationPolicyValue,
-      DEFAULT_NEW_SESSION_GROUP_CREATION_POLICY,
-    );
     return (
       <section className={styles.modeSection} aria-label="Participation channels">
         <div className={styles.modeSectionHeading}>
@@ -202,25 +202,6 @@ const SessionModeProfileSections = ({
           Agent Session Wrapped deploys an additional per-session Worker/Bridge. Telegram stays optional and is off by
           default.
         </p>
-        <FormRow label="Who can create groups?">
-          <div>
-            <SegmentedButtons
-              ariaLabel="Who can create groups?"
-              options={[
-                { value: GROUP_CREATION_POLICIES.ADMIN_ONLY, label: 'Admins only' },
-                { value: GROUP_CREATION_POLICIES.PARTICIPANTS, label: 'All participants' },
-              ]}
-              value={groupCreationPolicy}
-              onChange={(policy) => onGroupCreationPolicyChange?.(policy as GroupCreationPolicy)}
-              dataTestIdPrefix={E2E_TESTIDS.WIZARD_GROUP_CREATION_POLICY}
-            />
-            <p className={styles.helperText}>
-              {profile.authority.mode === 'worker_canonical'
-                ? 'Participant-created groups are open to session participants. Updating groups and managing membership remain admin-only.'
-                : 'This controls group creation in Context Engine. Public SBT factories remain callable directly on-chain, so “Admins only” cannot block independent contract deployments.'}
-            </p>
-          </div>
-        </FormRow>
         <ValidationIssues issues={sectionValidationIssues} />
       </section>
     );
@@ -285,10 +266,29 @@ const SessionModeProfileSections = ({
         <SegmentedButtons
           ariaLabel="Data storage"
           options={[
-            { value: 'cloudflare', label: 'Cloudflare' },
-            { value: 'arweave', label: 'Arweave' },
+            {
+              value: 'cloudflare',
+              label: 'Cloudflare',
+              tooltip: {
+                id: 'ce-new-storage-cloudflare-info',
+                content: CLOUDFLARE_STORAGE_TOOLTIP,
+                testId: E2E_TESTIDS.WIZARD_STORAGE_CLOUDFLARE_INFO,
+                ariaLabel: 'About Cloudflare storage',
+              },
+            },
+            {
+              value: 'arweave',
+              label: 'Arweave',
+              tooltip: {
+                id: 'ce-new-storage-arweave-info',
+                content: ARWEAVE_STORAGE_TOOLTIP,
+                testId: E2E_TESTIDS.WIZARD_STORAGE_ARWEAVE_INFO,
+                ariaLabel: 'About Arweave storage',
+              },
+            },
           ]}
           value={profile.storage.backend}
+          renderInfoTooltip={renderInfoTooltip}
           onChange={(backend) =>
             updateProfile((draft) => {
               draft.storage.backend = backend as SessionModeProfile['storage']['backend'];
@@ -330,17 +330,44 @@ const SessionModeProfileSections = ({
         <SegmentedButtons
           ariaLabel="Session encryption"
           options={[
-            { value: 'none', label: 'None' },
-            { value: 'lit', label: 'Lit', disabled: !!litDisabledReason, title: litDisabledReason },
+            {
+              value: 'none',
+              label: 'None',
+              tooltip: {
+                id: 'ce-new-encryption-none-info',
+                content: NO_ENCRYPTION_TOOLTIP,
+                testId: E2E_TESTIDS.WIZARD_ENCRYPTION_NONE_INFO,
+                ariaLabel: 'About no encryption',
+              },
+            },
+            {
+              value: 'lit',
+              label: 'Lit',
+              disabled: !!litDisabledReason,
+              title: litDisabledReason,
+              tooltip: {
+                id: 'ce-new-encryption-lit-info',
+                content: LIT_ENCRYPTION_TOOLTIP,
+                testId: E2E_TESTIDS.WIZARD_ENCRYPTION_LIT_INFO,
+                ariaLabel: 'About Lit encryption',
+              },
+            },
             {
               value: 'worker_envelope',
               label: 'Cloudflare',
               disabled: !!workerEnvelopeDisabledReason,
               title: workerEnvelopeDisabledReason,
               describedBy: workerEnvelopeDisabledReason ? WORKER_ENVELOPE_DISABLED_HELP_ID : undefined,
+              tooltip: {
+                id: 'ce-new-encryption-cloudflare-info',
+                content: CLOUDFLARE_ENCRYPTION_TOOLTIP,
+                testId: E2E_TESTIDS.WIZARD_ENCRYPTION_CLOUDFLARE_INFO,
+                ariaLabel: 'About Cloudflare encryption',
+              },
             },
           ]}
           value={profile.encryption.mode}
+          renderInfoTooltip={renderInfoTooltip}
           onChange={(mode) =>
             updateProfile((draft) => {
               draft.encryption = { mode: mode as SessionModeEncryptionMode };
@@ -535,10 +562,18 @@ const FormRow = ({ label, children }: FormRowProps): React.ReactElement => (
 
 type SegmentedButtonsProps = {
   ariaLabel: string;
-  options: Array<{ value: string; label: string; disabled?: boolean; title?: string; describedBy?: string }>;
+  options: Array<{
+    value: string;
+    label: string;
+    disabled?: boolean;
+    title?: string;
+    describedBy?: string;
+    tooltip?: SessionWizardTooltipRenderOptions;
+  }>;
   value: string;
   onChange: (value: string) => void;
   dataTestIdPrefix?: string;
+  renderInfoTooltip?: SessionModeProfileSectionsProps['renderInfoTooltip'];
 };
 
 const SegmentedButtons = ({
@@ -547,6 +582,7 @@ const SegmentedButtons = ({
   value,
   onChange,
   dataTestIdPrefix = '',
+  renderInfoTooltip,
 }: SegmentedButtonsProps): React.ReactElement => {
   const enabledOptions = options.filter((option) => !option.disabled);
   const selectedEnabledIndex = enabledOptions.findIndex((option) => option.value === value);
@@ -557,37 +593,39 @@ const SegmentedButtons = ({
         const enabledIndex = enabledOptions.findIndex((entry) => entry.value === option.value);
         const isSelected = value === option.value;
         return (
-          <Button
-            key={option.value}
-            type="button"
-            role="radio"
-            aria-checked={isSelected}
-            aria-describedby={option.describedBy}
-            disabled={option.disabled}
-            title={option.title}
-            tabIndex={option.disabled || (!isSelected && !(selectedEnabledIndex < 0 && enabledIndex === 0)) ? -1 : 0}
-            data-testid={dataTestIdPrefix ? `${dataTestIdPrefix}-${option.value}` : undefined}
-            className={`${styles.workerModePill} ${isSelected ? styles.workerModePillActive : ''}`}
-            onClick={() => onChange(option.value)}
-            onKeyDown={(event) => {
-              const direction = ['ArrowRight', 'ArrowDown'].includes(event.key)
-                ? 1
-                : ['ArrowLeft', 'ArrowUp'].includes(event.key)
-                  ? -1
-                  : 0;
-              if (!direction || enabledIndex < 0 || enabledOptions.length < 2) return;
-              event.preventDefault();
-              const nextIndex = (enabledIndex + direction + enabledOptions.length) % enabledOptions.length;
-              const nextOption = enabledOptions[nextIndex];
-              const enabledRadios = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
-                '[role="radio"]:not(:disabled)',
-              );
-              enabledRadios?.[nextIndex]?.focus();
-              onChange(nextOption.value);
-            }}
-          >
-            {option.label}
-          </Button>
+          <div key={option.value} className={styles.modeSegmentedOption}>
+            <Button
+              type="button"
+              role="radio"
+              aria-checked={isSelected}
+              aria-describedby={option.describedBy}
+              disabled={option.disabled}
+              title={option.title}
+              tabIndex={option.disabled || (!isSelected && !(selectedEnabledIndex < 0 && enabledIndex === 0)) ? -1 : 0}
+              data-testid={dataTestIdPrefix ? `${dataTestIdPrefix}-${option.value}` : undefined}
+              className={`${styles.workerModePill} ${isSelected ? styles.workerModePillActive : ''}`}
+              onClick={() => onChange(option.value)}
+              onKeyDown={(event) => {
+                const direction = ['ArrowRight', 'ArrowDown'].includes(event.key)
+                  ? 1
+                  : ['ArrowLeft', 'ArrowUp'].includes(event.key)
+                    ? -1
+                    : 0;
+                if (!direction || enabledIndex < 0 || enabledOptions.length < 2) return;
+                event.preventDefault();
+                const nextIndex = (enabledIndex + direction + enabledOptions.length) % enabledOptions.length;
+                const nextOption = enabledOptions[nextIndex];
+                const enabledRadios = event.currentTarget
+                  .closest('[role="radiogroup"]')
+                  ?.querySelectorAll<HTMLButtonElement>('[role="radio"]:not(:disabled)');
+                enabledRadios?.[nextIndex]?.focus();
+                onChange(nextOption.value);
+              }}
+            >
+              {option.label}
+            </Button>
+            {option.tooltip && renderInfoTooltip ? renderInfoTooltip(option.tooltip) : null}
+          </div>
         );
       })}
     </div>

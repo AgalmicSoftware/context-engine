@@ -23,34 +23,35 @@ describe('SessionModeProfileField', () => {
     expect(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).toHaveAttribute('aria-checked', 'false');
     const cloudflareRequirements = within(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).getByRole('list', {
-      name: 'Fast & Cheap requirements',
+      name: 'Centralized requirements',
     });
     expect(
       within(cloudflareRequirements)
         .getAllByRole('listitem')
         .map((item) => item.textContent),
-    ).toEqual(['Cloudflare account', 'AI provider key']);
+    ).toEqual(['Cloudflare account', 'OpenAI API Key']);
     const decentralizedRequirements = within(
       screen.getByTestId('ce-new-preset-trustless_public_decentralized'),
-    ).getByRole('list', { name: 'Trustless & Public requirements' });
+    ).getByRole('list', { name: 'Decentralized requirements' });
     expect(
       within(decentralizedRequirements)
         .getAllByRole('listitem')
         .map((item) => item.textContent),
-    ).toEqual(['AI provider key', 'Arweave wallet', 'EVM RPC URL', 'EVM Gas (TX Fees)']);
+    ).toEqual(['OpenAI API Key', 'Arweave wallet', 'EVM RPC URL', 'EVM Gas (TX Fees)']);
     expect(
-      screen.getByText('Session settings and responses are stored in Cloudflare. No public blockchain is required.'),
+      screen.getByText('Session settings and responses are stored in Cloudflare. No blockchain is required.'),
     ).toBeInTheDocument();
     expect(
-      screen.getByText('Session data is stored on Arweave, with session identity recorded in a public EVM registry.'),
+      screen.getByText('Session data is stored on Arweave, with session identity recorded in an EVM registry.'),
     ).toBeInTheDocument();
     expect(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).not.toHaveTextContent(/worker/i);
     expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).not.toHaveTextContent(/worker/i);
     expect(screen.queryByText('Recommended')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /advanced options/i })).not.toBeInTheDocument();
     const selector = screen.getByRole('radiogroup', { name: 'Session hosting profile' });
-    expect(within(selector).getByRole('radio', { name: 'Fast & Cheap (Cloudflare)' })).toBeInTheDocument();
-    expect(within(selector).getByRole('radio', { name: 'Trustless & Public (Decentralized)' })).toBeInTheDocument();
+    expect(within(selector).getByRole('radio', { name: 'Centralized (Cloudflare)' })).toBeInTheDocument();
+    expect(within(selector).getByRole('radio', { name: 'Decentralized (Arweave + EVM)' })).toBeInTheDocument();
+    expect(within(selector).queryByText(/\b(?:public|private)\b/i)).not.toBeInTheDocument();
     expect(within(selector).queryByRole('radio', { name: /Corporate/i })).not.toBeInTheDocument();
   });
 
@@ -73,11 +74,14 @@ describe('SessionModeProfileField', () => {
 
     fireEvent.click(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare'));
 
-    expect(screen.queryByRole('list', { name: 'Fast & Cheap requirements' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Centralized requirements' })).not.toBeInTheDocument();
     expect(screen.queryByText('Hosting')).not.toBeInTheDocument();
     expect(screen.queryByText('Recommended')).not.toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: 'Cloudflare' })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByRole('radio', { name: /Corporate.*coming later/i })).toBeDisabled();
+    expect(screen.getByRole('radio', { name: 'Centralized' })).toHaveAttribute('aria-checked', 'true');
+    const compactChoices = screen.getAllByRole('radio');
+    compactChoices.forEach((choice) => expect(choice).toHaveAttribute('data-ce-control-appearance', 'frameless'));
+    expect(screen.getByRole('radio', { name: /Corporate.*coming soon/i })).toBeDisabled();
+    expect(screen.getByText('Soon')).toBeInTheDocument();
   });
 
   it('sends customization into the wizard instead of opening a header popover', () => {
@@ -186,8 +190,10 @@ describe('SessionModeProfileField', () => {
       />,
     );
 
-    expect(screen.getByText('Saved custom settings')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Continue with saved settings' }));
+    expect(screen.queryByText(/Saved (?:custom|hosting) settings/)).not.toBeInTheDocument();
+    const resumeButton = screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_RESUME);
+    expect(resumeButton).toHaveAccessibleName('Resume in-progress session setup');
+    fireEvent.click(resumeButton);
 
     expect(onContinue).toHaveBeenCalledTimes(1);
   });

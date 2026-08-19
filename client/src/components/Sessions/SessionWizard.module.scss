@@ -134,6 +134,10 @@ $muted-text: var(--ce-panel-text-muted);
     flex-basis: 100%;
     min-width: 0;
     text-align: center;
+
+    h1 {
+      font-size: clamp(28px, 4vw, 32px);
+    }
   }
 
   .headerActions {
@@ -1349,7 +1353,9 @@ $muted-text: var(--ce-panel-text-muted);
   }
 
   .normalModeRail {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(var(--session-wizard-card-count, 4), minmax(0, 1fr));
+    gap: 6px;
+    margin-bottom: 12px;
   }
 
   .sessionIdentityRow {
@@ -1357,11 +1363,30 @@ $muted-text: var(--ce-panel-text-muted);
   }
 
   .normalModeCard {
-    min-height: 96px;
+    min-width: 0;
+    min-height: 78px;
+    padding: 26px 8px 10px;
+    border-radius: var(--ce-radius-10);
   }
 
   .normalModeCardNumber {
-    font-size: 2.8rem;
+    top: 5px;
+    right: 7px;
+    font-size: 1.65rem;
+  }
+
+  .normalModeCardContent {
+    gap: 0;
+    max-width: 100%;
+  }
+
+  .normalModeCardTitle {
+    font-size: 0.9rem;
+    line-height: 1.15;
+  }
+
+  .normalModeCardSummary {
+    display: none;
   }
 
   .panelHeaderRow {
@@ -1449,6 +1474,10 @@ $muted-text: var(--ce-panel-text-muted);
   .workerModePill {
     flex: 1 1 100%;
     text-align: center;
+  }
+
+  .modeSegmentedOption {
+    flex-basis: 100%;
   }
 }
 
@@ -1703,6 +1732,19 @@ $muted-text: var(--ce-panel-text-muted);
   padding: 2px 0 4px;
 }
 
+.modeSegmentedOption {
+  display: flex;
+  flex: 1 1 180px;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+
+  .workerModePill {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+
 .sessionIdRow {
   display: flex;
   align-items: center;
@@ -1831,6 +1873,22 @@ $muted-text: var(--ce-panel-text-muted);
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
+}
+
+.groupWizard .adminLoginControl {
+  cursor: pointer;
+  color: $clickable-color;
+  font-weight: 800;
+  text-align: left;
+  -webkit-text-fill-color: $clickable-color;
+
+  &:hover,
+  &:focus-visible {
+    border-color: $clickable-color;
+    background: color-mix(in srgb, var(--ce-action-accent) 10%, $input-bg);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ce-action-accent) 20%, transparent);
+    outline: none;
+  }
 }
 
 .workerDeployActions {
@@ -2811,7 +2869,7 @@ $muted-text: var(--ce-panel-text-muted);
   align-items: center;
   justify-content: center;
   color: var(--ce-text-inverse);
-  font-size: 0.82rem;
+  font-size: 0.9rem;
   line-height: 1;
   transition:
     color 0.18s ease,
@@ -2832,7 +2890,7 @@ $muted-text: var(--ce-panel-text-muted);
 
 .modeProfileEntryEyebrow {
   color: var(--ce-text-inverse);
-  font-size: 0.7rem;
+  font-size: 0.82rem;
   font-weight: 850;
   letter-spacing: 0.11em;
   text-transform: uppercase;
@@ -2939,20 +2997,22 @@ $muted-text: var(--ce-panel-text-muted);
 .modePresetCardRequirementPills {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
+  gap: 9px;
 }
 
 .modePresetCardRequirementPill {
   display: inline-flex;
   align-items: center;
   width: fit-content;
-  padding: 5px 9px;
-  border: 1px solid var(--ce-overlay-text-muted);
+  min-height: 34px;
+  padding: 7px 12px;
+  border: 1px solid var(--ce-action-accent);
   border-radius: var(--ce-radius-pill);
-  background: var(--ce-overlay-base);
-  color: var(--ce-overlay-text);
-  font-size: 0.78rem;
-  font-weight: 750;
+  background: color-mix(in srgb, var(--ce-action-accent) 88%, var(--ce-overlay-base));
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--ce-action-accent) 18%, transparent);
+  color: var(--ce-action-accent-text);
+  font-size: 0.84rem;
+  font-weight: 800;
   line-height: 1.25;
 }
 
@@ -2980,7 +3040,7 @@ $muted-text: var(--ce-panel-text-muted);
   gap: 6px;
   min-height: 34px;
   padding: 5px 10px;
-  border: 1px solid transparent;
+  border: 0;
   border-radius: var(--ce-radius-pill);
   background: transparent;
   color: color-mix(in srgb, var(--ce-control-text) 78%, transparent);
@@ -2996,7 +3056,6 @@ $muted-text: var(--ce-panel-text-muted);
 
 .modePresetButton:hover,
 .modePresetButton:focus-visible {
-  border-color: color-mix(in srgb, var(--ce-action-accent) 42%, transparent);
   background: color-mix(in srgb, var(--ce-action-accent) 10%, transparent);
   color: var(--ce-text-inverse);
 }
@@ -3007,14 +3066,12 @@ $muted-text: var(--ce-panel-text-muted);
 }
 
 .modePresetButtonSelected {
-  border-color: color-mix(in srgb, var(--ce-action-accent) 52%, transparent);
   background: color-mix(in srgb, var(--ce-action-accent) 14%, transparent);
   color: var(--ce-text-inverse);
 }
 
 .modePresetButtonDisabled,
 .modePresetButtonDisabled:hover {
-  border-color: transparent;
   background: transparent;
   color: color-mix(in srgb, var(--ce-control-text) 46%, transparent);
   cursor: not-allowed;
@@ -3070,6 +3127,13 @@ $muted-text: var(--ce-panel-text-muted);
 .modeSavedProfileEntry {
   justify-content: center;
   white-space: normal;
+
+  :global(.btn) {
+    min-height: 48px;
+    padding: 10px 18px;
+    font-size: 0.9rem;
+    font-weight: 800;
+  }
 }
 
 .modeCheckboxRow {

@@ -4,11 +4,8 @@ import type { SessionModeProfile } from '../../../utilities/session/sessionModeP
 import type { UnknownRecord } from '../../../utilities/session/sessionTypes';
 import SessionModeProfileSections from '../SessionModeProfileSections';
 import SessionWizardSessionModeProfileControl from '../SessionWizardSessionModeProfileControl';
-import {
-  applyGroupCreationPolicyToDraft,
-  applySessionModeProfileSelectionToDraft,
-} from '../sessionWizardModeProfileDraftController';
-import type { GroupCreationPolicy } from '../../../utilities/session/groupCreationPolicy';
+import type { SessionWizardTooltipRenderOptions } from '../SessionWizardInfoTooltip';
+import { applySessionModeProfileSelectionToDraft } from '../sessionWizardModeProfileDraftController';
 
 type SessionModeDraft = UnknownRecord & {
   sessionModeProfile?: unknown;
@@ -23,6 +20,7 @@ type SessionWizardModeProfileControlsProps<Draft extends SessionModeDraft, Secti
   onEnterNormalMode: () => void;
   customizing: boolean;
   registryChainId: number | null;
+  renderInfoTooltip?: (options: SessionWizardTooltipRenderOptions) => ReactNode;
   setCollapsedSections: Dispatch<SetStateAction<Sections>>;
   setDraft: Dispatch<SetStateAction<Draft>>;
   showContinue: boolean;
@@ -57,6 +55,7 @@ const useSessionWizardModeProfileControls = <Draft extends SessionModeDraft, Sec
   onEnterNormalMode,
   customizing,
   registryChainId,
+  renderInfoTooltip,
   setCollapsedSections,
   setDraft,
   showContinue,
@@ -74,16 +73,9 @@ const useSessionWizardModeProfileControls = <Draft extends SessionModeDraft, Sec
 
   const sharedSectionProps = {
     registryChainId,
+    renderInfoTooltip,
     value: draft.sessionModeProfile,
     onChange: handleChange,
-    groupCreationPolicy: draft.groupCreationPolicy,
-    onGroupCreationPolicyChange: (policy: GroupCreationPolicy) => {
-      setDraft((prev) => {
-        const next = applyGroupCreationPolicyToDraft(prev, policy);
-        draftRef.current = next;
-        return next;
-      });
-    },
   };
 
   return {

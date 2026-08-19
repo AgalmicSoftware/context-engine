@@ -25,12 +25,12 @@ describe('SessionWizardHeader', () => {
       <SessionWizardHeader
         {...baseProps}
         sessionModeProfileControl={<div data-testid="hosting-profile-control">hosting selector</div>}
-        sessionModeProfileLabel="Cloudflare"
+        sessionModeProfileLabel="Centralized"
         wizardMode="normal"
       />,
     );
 
-    expect(screen.getByRole('heading', { name: 'Session Setup (Cloudflare)' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Session Setup (Centralized)' })).toBeInTheDocument();
     const hostingControl = screen.getByTestId('hosting-profile-control');
     expect(hostingControl).toBeInTheDocument();
     expect(screen.queryByText('Normal')).not.toBeInTheDocument();
@@ -43,11 +43,13 @@ describe('SessionWizardHeader', () => {
       <SessionWizardHeader
         {...baseProps}
         sessionModeProfileControl={<div data-testid="hosting-profile-control">hosting cards</div>}
+        sessionModeProfileLabel="Centralized"
         sessionModeProfileSelectionStep
       />,
     );
 
     expect(screen.getByRole('heading', { name: 'Session Setup' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /Centralized/i })).not.toBeInTheDocument();
     expect(screen.getByTestId('hosting-profile-control')).toHaveTextContent('hosting cards');
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL)).not.toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED)).not.toBeInTheDocument();

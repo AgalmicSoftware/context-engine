@@ -47,7 +47,12 @@ const SessionMetadataEditor = ({
     const toggleLabel = wizardMode === 'advanced' ? 'More options' : 'Optional details';
     return (
       <div className={styles.moreOptionsSection}>
-        <button type="button" className={styles.moreOptionsToggle} onClick={onToggleMoreOptions}>
+        <button
+          type="button"
+          className={styles.moreOptionsToggle}
+          aria-expanded={moreOptionsOpen}
+          onClick={onToggleMoreOptions}
+        >
           {toggleLabel} <FontAwesomeIcon icon={moreOptionsOpen ? faCaretUp : faCaretDown} style={{ marginLeft: 6 }} />
         </button>
         {moreOptionsOpen ? (

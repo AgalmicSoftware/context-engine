@@ -392,7 +392,7 @@ const SessionWizardShell = ({
   const sessionModeProfileLabel = (() => {
     switch (draft.sessionModeProfile?.preset) {
       case SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE:
-        return 'Cloudflare';
+        return 'Centralized';
       case SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED:
         return 'Decentralized';
       case SESSION_MODE_PRESET_IDS.CUSTOM:
@@ -566,6 +566,7 @@ const SessionWizardShell = ({
             advancedBundleFileInputRef={advancedBundleFileInputRef}
             showSponsoredDeployAccessNotice={showSponsoredDeployAccessNotice}
             account={account}
+            toggleLoginModal={toggleLoginModal}
             resolvedActiveSessionSlug={resolvedActiveSessionSlug}
             setDeployForm={setDeployForm}
             handleDeployWorker={handleDeployWorker}
