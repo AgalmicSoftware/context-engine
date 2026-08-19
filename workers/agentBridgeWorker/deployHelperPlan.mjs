@@ -3,7 +3,7 @@
 import { fileURLToPath } from 'url';
 import { resolve } from 'path';
 import { randomBytes } from 'crypto';
-import rpcDefaults from '../../client/src/variables/rpcDefaults.js';
+import rpcDefaults from '../../shared/rpcDefaults.cjs';
 import { resolvePinnedSessionWorkerAuthority } from './sessionWorkerAuthority.mjs';
 
 const DEFAULT_WORKER_NAME = 'ce-agent-bridge-worker';

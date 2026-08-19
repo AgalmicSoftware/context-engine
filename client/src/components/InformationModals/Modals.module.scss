@@ -1787,9 +1787,18 @@ input[type='radio']:checked:after {
 }
 
 @media (min-width: 1367px) {
-  .welcomeSlideImageIntro[data-slide-layout='flushBottom'] {
-    width: 75%;
-    height: 100%;
+  @container ce-theme style(--ce-layout-profile: standard-app) {
+    .welcomeSlideEmbed .welcomeSlideLayout .welcomeSlideMediaButton[data-slide-key='intro'] {
+      width: 100%;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .welcomeSlideImageIntro[data-slide-layout='flushBottom'] {
+      width: 100%;
+      height: 100%;
+      object-position: center center;
+    }
   }
 }
 

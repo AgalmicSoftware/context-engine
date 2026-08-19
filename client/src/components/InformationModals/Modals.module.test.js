@@ -9,7 +9,7 @@ describe('Modals contrast styles', () => {
     expect(scss).not.toMatch(/background:\s*var\(--ce-color-white\);\s*color:\s*var\(--ce-color-white\);/);
   });
 
-  it('keeps the intro image bottom-flush while preserving the centered titleless slide hooks', () => {
+  it('centers and enlarges the intro image on standard full-screen desktops', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'Modals.module.scss'), 'utf8');
 
     expect(scss).toMatch(
@@ -22,7 +22,7 @@ describe('Modals contrast styles', () => {
       /\.welcomeSlideImageIntro\[data-slide-layout='flushBottom'\]\s*\{[\s\S]*?max-height:\s*none\s*!important;[\s\S]*?object-fit:\s*contain;[\s\S]*?object-position:\s*left bottom;[\s\S]*?transform:\s*translateY\(2\.75%\);/,
     );
     expect(scss).toMatch(
-      /@media \(min-width:\s*1367px\)\s*{[\s\S]*?\.welcomeSlideImageIntro\[data-slide-layout='flushBottom'\]\s*\{[\s\S]*?width:\s*75%;[\s\S]*?height:\s*100%;/,
+      /@media \(min-width:\s*1367px\)\s*{\s*@container ce-theme style\(--ce-layout-profile: standard-app\)\s*{[\s\S]*?\.welcomeSlideMediaButton\[data-slide-key='intro'\]\s*\{[\s\S]*?width:\s*100%;[\s\S]*?justify-content:\s*center;[\s\S]*?align-items:\s*center;[\s\S]*?\.welcomeSlideImageIntro\[data-slide-layout='flushBottom'\]\s*\{[\s\S]*?width:\s*100%;[\s\S]*?height:\s*100%;[\s\S]*?object-position:\s*center center;/,
     );
     expect(scss).toMatch(
       /@media \(max-width:\s*768px\)\s*{[\s\S]*?\.welcomeSlideMediaButton\[data-slide-layout='flushBottom'\],\s*\.welcomeSlideMediaButtonCentered\[data-slide-layout='centered'\]\s*\{\s*overflow:\s*hidden;/,
