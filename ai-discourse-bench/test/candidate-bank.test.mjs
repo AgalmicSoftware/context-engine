@@ -24,7 +24,10 @@ test('candidate bank is source-resolved, balanced, and explicitly not validated'
   assert.deepEqual(bank.questions.map((question) => question.id), CANDIDATE_QUESTION_IDS);
   assert.deepEqual(validateQuestionBank(bank), []);
 
-  const topics = Object.groupBy(bank.questions, (question) => question.topic);
+  const topics = bank.questions.reduce((questionsByTopic, question) => {
+    (questionsByTopic[question.topic] ??= []).push(question);
+    return questionsByTopic;
+  }, {});
   const counts = Object.values(topics).map((questions) => questions.length);
   assert.equal(Object.keys(topics).length, 20);
   assert.equal(counts.filter((count) => count === 3).length, 10);
