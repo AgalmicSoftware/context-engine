@@ -1,7 +1,7 @@
 .page {
   min-height: 100vh;
-  color: #f4f7ff;
-  background: #20204e;
+  color: var(--ce-overlay-text);
+  background: var(--ce-canvas);
   font-family: var(--ce-font-body);
 }
 
@@ -11,24 +11,24 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  background: rgba(39, 43, 101, 0.96);
+  background: color-mix(in srgb, var(--ce-overlay-surface-alt) 96%, transparent);
 }
 
 .selector {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: rgba(244, 247, 255, 0.7);
+  color: color-mix(in srgb, var(--ce-overlay-text) 70%, transparent);
   font-size: 0.78rem;
 
   select {
     min-width: 220px;
     min-height: 42px;
     padding: 0 36px 0 12px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid color-mix(in srgb, var(--ce-overlay-text) 20%, transparent);
     border-radius: 4px;
-    color: #fff;
-    background: #11152f;
+    color: var(--ce-overlay-text);
+    background: var(--ce-overlay-base);
   }
 }
 
@@ -38,7 +38,7 @@
   height: 100vh;
   min-height: 600px;
   overflow: hidden;
-  background: #fff;
+  background: var(--ce-document-surface);
 }
 
 .reportSurfaceWithChooser {
@@ -50,7 +50,7 @@
   height: 100%;
   display: block;
   border: 0;
-  background: #20204e;
+  background: var(--ce-canvas);
 }
 
 .status,
@@ -62,12 +62,12 @@
   gap: 8px;
   padding: 24px;
   text-align: center;
-  color: #334155;
-  background: #f8fafc;
+  color: var(--ce-document-text);
+  background: var(--ce-document-surface);
 }
 
 .error strong {
-  color: #991b1b;
+  color: var(--ce-status-danger-text);
 }
 
 @media (max-width: 760px) {

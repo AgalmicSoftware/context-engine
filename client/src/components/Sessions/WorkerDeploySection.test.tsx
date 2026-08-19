@@ -125,6 +125,22 @@ describe('WorkerDeploySection', () => {
     expect(adminAddress).toHaveValue('0x00000000000000000000000000000000000000aa');
   });
 
+  it('keeps a restored admin address editable when the wallet disconnects', () => {
+    renderWorkerDeploySection({
+      account: '',
+      deployForm: {
+        workerName: 'demo-worker',
+        bundleUrl: '',
+        apiToken: '',
+        adminAddress: '0x00000000000000000000000000000000000000bb',
+      },
+    });
+
+    const adminAddress = screen.getByTestId(E2E_TESTIDS.WIZARD_ADMIN_ADDRESS);
+    expect(adminAddress).toHaveAttribute('type', 'text');
+    expect(adminAddress).toHaveValue('0x00000000000000000000000000000000000000bb');
+  });
+
   it('does not report success until Worker reachability, CORS, and canonical config readback verify', async () => {
     const onNativeWorkerVerified = jest.fn();
     const verifyNativeWorker = jest.fn().mockResolvedValue({

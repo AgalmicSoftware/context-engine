@@ -2,12 +2,15 @@ import React from 'react';
 import { createHash } from 'node:crypto';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import BenchmarksPage from './BenchmarksPage';
-import { decodeBenchmarkReport } from './benchmarkArtifact';
+import { decodeBenchmarkReport, type BenchmarkReportEntry } from './benchmarkArtifact';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
 const previewHtml = '<!doctype html><title>Benchmark preview</title>';
-const reportEntry = (html: string, overrides = {}) => ({
+const reportEntry = (
+  html: string,
+  overrides: Partial<BenchmarkReportEntry> = {},
+): BenchmarkReportEntry => ({
   id: 'preview',
   title: 'AI Futures & Policy',
   topic: 'AI Futures & Policy',
@@ -23,6 +26,11 @@ const reportEntry = (html: string, overrides = {}) => ({
   contentSha256: sha256(html),
   ...overrides,
 });
+
+const installFetchMock = (mock: jest.Mock): jest.Mock => {
+  global.fetch = mock as unknown as typeof fetch;
+  return mock;
+};
 
 const manifest = {
   schemaVersion: 1,
@@ -40,10 +48,12 @@ describe('BenchmarksPage', () => {
   });
 
   it('loads the manifest and embeds the selected interactive report', async () => {
-    global.fetch = jest
-      .fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify(manifest), { status: 200 }))
-      .mockResolvedValueOnce(new Response(previewHtml, { status: 200 }));
+    installFetchMock(
+      jest
+        .fn()
+        .mockResolvedValueOnce(new Response(JSON.stringify(manifest), { status: 200 }))
+        .mockResolvedValueOnce(new Response(previewHtml, { status: 200 })),
+    );
 
     render(<BenchmarksPage />);
 
@@ -60,10 +70,12 @@ describe('BenchmarksPage', () => {
   });
 
   it('shows an actionable error when the report artifact is missing', async () => {
-    global.fetch = jest
-      .fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify(manifest), { status: 200 }))
-      .mockResolvedValueOnce(new Response('', { status: 404 }));
+    installFetchMock(
+      jest
+        .fn()
+        .mockResolvedValueOnce(new Response(JSON.stringify(manifest), { status: 200 }))
+        .mockResolvedValueOnce(new Response('', { status: 404 })),
+    );
 
     render(<BenchmarksPage />);
 
@@ -72,13 +84,15 @@ describe('BenchmarksPage', () => {
   });
 
   it('rejects unsafe artifact names without crashing the page', async () => {
-    global.fetch = jest.fn().mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          ...manifest,
-          reports: [{ ...manifest.reports[0], artifact: '../preview.html' }],
-        }),
-        { status: 200 },
+    installFetchMock(
+      jest.fn().mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            ...manifest,
+            reports: [{ ...manifest.reports[0], artifact: '../preview.html' }],
+          }),
+          { status: 200 },
+        ),
       ),
     );
 
@@ -91,14 +105,16 @@ describe('BenchmarksPage', () => {
 
   it('rejects a stale default report id', async () => {
     const html = '<p>fallback report</p>';
-    global.fetch = jest.fn().mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          ...manifest,
-          defaultReportId: 'missing',
-          reports: [reportEntry(html)],
-        }),
-        { status: 200 },
+    installFetchMock(
+      jest.fn().mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            ...manifest,
+            defaultReportId: 'missing',
+            reports: [reportEntry(html)],
+          }),
+          { status: 200 },
+        ),
       ),
     );
 
@@ -109,14 +125,16 @@ describe('BenchmarksPage', () => {
   });
 
   it('reports an empty manifest instead of loading forever', async () => {
-    global.fetch = jest.fn().mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          ...manifest,
-          defaultReportId: '',
-          reports: [],
-        }),
-        { status: 200 },
+    installFetchMock(
+      jest.fn().mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            ...manifest,
+            defaultReportId: '',
+            reports: [],
+          }),
+          { status: 200 },
+        ),
       ),
     );
 
@@ -159,13 +177,15 @@ describe('BenchmarksPage', () => {
 
   it('rejects manifest entries without integrity metadata', async () => {
     const { sha256: _artifactHash, contentSha256: _contentHash, ...unsigned } = reportEntry(previewHtml);
-    global.fetch = jest.fn().mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          ...manifest,
-          reports: [unsigned],
-        }),
-        { status: 200 },
+    installFetchMock(
+      jest.fn().mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            ...manifest,
+            reports: [unsigned],
+          }),
+          { status: 200 },
+        ),
       ),
     );
 
@@ -176,18 +196,20 @@ describe('BenchmarksPage', () => {
   });
 
   it('rejects released entries without a bound release report hash', async () => {
-    global.fetch = jest.fn().mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          ...manifest,
-          reports: [
-            reportEntry(previewHtml, {
-              publicationStatus: 'released',
-              releaseReportContentHash: null,
-            }),
-          ],
-        }),
-        { status: 200 },
+    installFetchMock(
+      jest.fn().mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            ...manifest,
+            reports: [
+              reportEntry(previewHtml, {
+                publicationStatus: 'released',
+                releaseReportContentHash: null,
+              }),
+            ],
+          }),
+          { status: 200 },
+        ),
       ),
     );
 
@@ -196,13 +218,15 @@ describe('BenchmarksPage', () => {
   });
 
   it('rejects non-numeric question and participant counts', async () => {
-    global.fetch = jest.fn().mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          ...manifest,
-          reports: [reportEntry(previewHtml, { questionCount: { value: 200 } })],
-        }),
-        { status: 200 },
+    installFetchMock(
+      jest.fn().mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            ...manifest,
+            reports: [reportEntry(previewHtml, { questionCount: { value: 200 } as unknown as number })],
+          }),
+          { status: 200 },
+        ),
       ),
     );
 
@@ -211,17 +235,19 @@ describe('BenchmarksPage', () => {
   });
 
   it('keeps the loading state while the manifest is unresolved', async () => {
-    global.fetch = jest.fn(() => new Promise(() => {})) as jest.Mock;
+    installFetchMock(jest.fn(() => new Promise(() => {})));
     render(<BenchmarksPage />);
     expect(screen.getByText('Loading benchmark report...')).toBeInTheDocument();
     await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
   });
 
   it('synchronizes safe report hashes across the sandboxed iframe boundary', async () => {
-    global.fetch = jest
-      .fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify(manifest), { status: 200 }))
-      .mockResolvedValueOnce(new Response(previewHtml, { status: 200 }));
+    installFetchMock(
+      jest
+        .fn()
+        .mockResolvedValueOnce(new Response(JSON.stringify(manifest), { status: 200 }))
+        .mockResolvedValueOnce(new Response(previewHtml, { status: 200 })),
+    );
     window.history.replaceState(null, '', `${window.location.pathname}#breakdown`);
 
     render(<BenchmarksPage />);
@@ -231,31 +257,31 @@ describe('BenchmarksPage', () => {
     expect(frame.contentWindow).not.toBeNull();
     const postMessage = jest.spyOn(frame.contentWindow as Window, 'postMessage').mockImplementation(() => {});
     fireEvent.load(frame);
-    expect(postMessage).toHaveBeenCalledWith(
+    expect(postMessage.mock.calls).toContainEqual([
       {
         type: 'ce-benchmark-set-hash',
         hash: '#breakdown',
       },
       '*',
-    );
-    expect(postMessage).toHaveBeenCalledWith(
+    ]);
+    expect(postMessage.mock.calls).toContainEqual([
       {
         type: 'ce-benchmark-config',
         downloadUrl: '/benchmark-artifacts/preview.html',
         downloadFilename: 'preview.html',
       },
       '*',
-    );
+    ]);
 
     window.history.replaceState(null, '', `${window.location.pathname}#risk-matrix`);
     window.dispatchEvent(new HashChangeEvent('hashchange'));
-    expect(postMessage).toHaveBeenCalledWith(
+    expect(postMessage.mock.calls).toContainEqual([
       {
         type: 'ce-benchmark-set-hash',
         hash: '#risk-matrix',
       },
       '*',
-    );
+    ]);
 
     window.dispatchEvent(
       new MessageEvent('message', {
@@ -275,20 +301,22 @@ describe('BenchmarksPage', () => {
   });
 
   it('downloads the selected verified artifact when the report header requests it', async () => {
-    global.fetch = jest
-      .fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify(manifest), { status: 200 }))
-      .mockResolvedValueOnce(new Response(previewHtml, { status: 200 }));
+    installFetchMock(
+      jest
+        .fn()
+        .mockResolvedValueOnce(new Response(JSON.stringify(manifest), { status: 200 }))
+        .mockResolvedValueOnce(new Response(previewHtml, { status: 200 })),
+    );
 
     render(<BenchmarksPage />);
 
     const frame = (await screen.findByTestId('ce-benchmark-report-frame')) as HTMLIFrameElement;
     const click = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
     const createElement = document.createElement.bind(document);
-    let downloadAnchor: HTMLAnchorElement | null = null;
+    const downloadAnchors: HTMLAnchorElement[] = [];
     jest.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
       const element = createElement(tagName, options);
-      if (tagName.toLowerCase() === 'a') downloadAnchor = element as HTMLAnchorElement;
+      if (tagName.toLowerCase() === 'a') downloadAnchors.push(element as HTMLAnchorElement);
       return element;
     });
 
@@ -300,8 +328,8 @@ describe('BenchmarksPage', () => {
     );
 
     expect(click).toHaveBeenCalledTimes(1);
-    expect(downloadAnchor).not.toBeNull();
-    expect(downloadAnchor?.getAttribute('href')).toBe('/benchmark-artifacts/preview.html');
-    expect(downloadAnchor?.download).toBe('preview.html');
+    expect(downloadAnchors).toHaveLength(1);
+    expect(downloadAnchors[0].getAttribute('href')).toBe('/benchmark-artifacts/preview.html');
+    expect(downloadAnchors[0].download).toBe('preview.html');
   });
 });

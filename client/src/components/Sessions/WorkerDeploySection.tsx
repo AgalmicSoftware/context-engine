@@ -651,10 +651,10 @@ const WorkerDeploySection = ({
               </FormGroup>
               <FormGroup>
                 <Label for="ce-wizard-admin-address">Admin address</Label>
-                {connectedAccount ? (
+                {nativeAdminAddress ? (
                   <Input
                     id="ce-wizard-admin-address"
-                    value={deployForm.adminAddress || connectedAccount}
+                    value={nativeAdminAddress}
                     data-testid={E2E_TESTIDS.WIZARD_ADMIN_ADDRESS}
                     onChange={(e) => setDeployForm((prev) => ({ ...prev, adminAddress: e.target.value }))}
                   />

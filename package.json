@@ -57,6 +57,9 @@
     "test:worker:agent-bridge": "node scripts/run-agent-bridge-worker-tests.js",
     "test:node": "node scripts/run-node-tests.js",
     "test:node:tracked": "node scripts/run-node-tests.js --tracked-only",
+    "test:ai-discourse-bench": "npm --prefix ai-discourse-bench test",
+    "check:ai-discourse-bench-results-sync": "npm --prefix ai-discourse-bench run check:results-sync",
+    "check:ai-discourse-bench-publication": "npm --prefix ai-discourse-bench run check:static-publication",
     "client-boundaries:check": "node scripts/check-client-boundaries.mjs",
     "dead-exports:advisory": "node scripts/check-dead-exports-advisory.mjs",
     "dead-exports:check": "node scripts/check-dead-exports-advisory.mjs --check",
@@ -93,10 +96,7 @@
     "ai:test-session:color-schemes": "npm run -s ai:node -- scripts/session-color-schemes-smoke.js",
     "lint": "cd client && npm run lint",
     "lint:workers": "node scripts/run-workers-lint.js",
-    "test:cache-guard": "bash ./scripts/check-managed-cache-localstorage.sh",
-    "test:ai-discourse-bench": "npm --prefix ai-discourse-bench test",
-    "check:ai-discourse-bench-results-sync": "npm --prefix ai-discourse-bench run check:results-sync",
-    "check:ai-discourse-bench-publication": "npm --prefix ai-discourse-bench run check:static-publication"
+    "test:cache-guard": "bash ./scripts/check-managed-cache-localstorage.sh"
   },
   "devDependencies": {
     "@openzeppelin/contracts": "5.4.0",
