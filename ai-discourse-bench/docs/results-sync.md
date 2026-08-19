@@ -25,8 +25,8 @@ $ai-discourse-bench-results-sync
 ```
 
 The portable skill source is
-`skills/ai-discourse-bench-results-sync/`. Repository-local `.codex/skills` and
-`.claude/skills` copies are installed mirrors and may remain gitignored.
+`ai-discourse-bench/skills/ai-discourse-bench-results-sync/`. Tool-specific
+installed copies are mirrors and may remain gitignored.
 
 The skill requires a semantic port and visual verification. It does not blindly
 copy CSS module files, because generated class names, React state, and live

@@ -223,9 +223,10 @@ node ./bin/ai-discourse-bench.mjs export-ce \
 
 - Context Engine serves published benchmark artifacts through the static,
   cache-independent `/benchmarks` route. The client loads a versioned manifest
-  and deterministic gzip report artifact from `client/public/benchmark-artifacts/`.
-  `scripts/publish-static-report.mjs` updates both and enforces the report's
-  release gate when invoked with `--release`.
+  and deterministic gzip report artifact from its tracked public benchmark
+  publication directory. `ai-discourse-bench/scripts/publish-static-report.mjs`
+  updates both and enforces the report's release gate when invoked with
+  `--release`.
 - Whether OpenRouter model rosters should live in public files or private local
   config.
 - Whether production should store generated analysis overlays beside report

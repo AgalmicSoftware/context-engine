@@ -160,3 +160,15 @@ test('verifyPublicText matches release export visibility in a git checkout', () 
     }]);
   });
 });
+
+test('verifyPublicText exempts nested gitignore files that hide private working directories', () => {
+  withFixture((rootDir) => {
+    writeFile(rootDir, 'packages/benchmark/.gitignore', 'node_modules/\nTODO/\n');
+    writeFile(rootDir, 'packages/benchmark/README.md', '# Public benchmark\n');
+
+    const result = verifyPublicText(rootDir);
+
+    assert.deepEqual(result.findings, []);
+    assert.equal(result.scannedFiles, 1);
+  });
+});
