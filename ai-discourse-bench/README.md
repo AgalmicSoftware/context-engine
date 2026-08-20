@@ -86,8 +86,12 @@ The second command writes
 and an item-level audit. The bank covers all 20 topics and every question
 resolves to concrete evidence in the OSS corpus. The AI-assisted audit accepted
 42 wording pairs and revised 8. It remains `candidate`, not `validated`, until
-two independent reviewers approve claim support, reversal quality, and
-single-axis status.
+two independently recorded human reviews approve claim support, reversal
+quality, and single-axis status. The two reviews are defined as: (1) an
+author-side review recorded without model outputs displayed or consulted, and
+(2) an external reader's review conducted blind to model outputs and
+independently of the author's judgment. Unresolved disagreement leaves the
+item at `candidate`.
 
 Before launching calls, inspect the experiment plan:
 
@@ -178,7 +182,8 @@ are triage inputs for human review, not automatic inclusion or exclusion
 decisions. The JSON records a deterministic hash of the aggregate report and,
 when `--reviewed-bank` is supplied, both outputs distinguish the AI-reviewed
 candidate slice from deferred development questions. Every question remains
-pending independent human adjudication until the bank review gate is complete.
+pending human adjudication (the two independently recorded reviews defined
+above) until the bank review gate is complete.
 
 Model roster entries may set `structuredOutput` to `auto`, `json_schema`,
 `json_object`, or `none`. `auto` tries the strict answer schema and falls back

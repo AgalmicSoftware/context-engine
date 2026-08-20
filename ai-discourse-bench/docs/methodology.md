@@ -180,6 +180,9 @@ recommended runnable bank is
 `banks/ai-futures/v0.2-reviewed-candidate/question-bank.json`: 50 selected
 questions across all 20 topics with resolved question-level evidence,
 source-record hashes, a pinned corpus revision, and an AI-assisted wording
-audit. It is still a candidate. Two independent reviewers must approve claim
-support, reversal, and single-axis adjudication before its status can become
-`validated` or its reports release-ready.
+audit. It is still a candidate. Promotion to `validated` requires two independently
+recorded human reviews approving claim support, reversal, and single-axis
+adjudication: an author-side review recorded without model outputs displayed
+or consulted, and an external reader's review conducted blind to model outputs
+and independently of the author's judgment. Unresolved disagreement leaves the
+question at candidate status, and its reports are not release-ready.
