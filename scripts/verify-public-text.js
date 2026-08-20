@@ -41,6 +41,10 @@ function normalizePath(relativePath) {
   return relativePath.split(path.sep).join('/');
 }
 
+function isExemptPath(relativePath) {
+  return EXEMPT_PATHS.has(relativePath) || relativePath.endsWith('/.gitignore');
+}
+
 function lineForOffset(text, offset) {
   return text.slice(0, offset).split('\n').length;
 }
@@ -86,7 +90,7 @@ function collectTextFiles(rootDir, isStrippedPath) {
   if (gitVisiblePaths) {
     for (const relativePath of gitVisiblePaths) {
       const normalizedPath = normalizePath(relativePath);
-      if (isStrippedPath(normalizedPath) || EXEMPT_PATHS.has(normalizedPath)) continue;
+      if (isStrippedPath(normalizedPath) || isExemptPath(normalizedPath)) continue;
       const absolutePath = path.join(rootDir, relativePath);
       if (!fs.existsSync(absolutePath) || !fs.statSync(absolutePath).isFile()) continue;
       const buffer = fs.readFileSync(absolutePath);
@@ -107,7 +111,7 @@ function collectTextFiles(rootDir, isStrippedPath) {
         continue;
       }
       if (!entry.isFile()) continue;
-      if (EXEMPT_PATHS.has(relativePath)) continue;
+      if (isExemptPath(relativePath)) continue;
       const buffer = fs.readFileSync(absolutePath);
       if (!isProbablyBinary(buffer)) files.push({ absolutePath, relativePath, text: buffer.toString('utf8') });
     }

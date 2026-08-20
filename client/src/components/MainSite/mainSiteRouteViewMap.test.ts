@@ -28,6 +28,7 @@ const buildRenderers = (calls: string[] = []): MainSiteRouteViewRenderers => {
     about: render('about'),
     posts: render('posts'),
     demos: render('demos'),
+    benchmarks: render('benchmarks'),
     matrix: render('matrix'),
     docs: render('docs'),
     admin: render('admin'),

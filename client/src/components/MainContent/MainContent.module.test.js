@@ -22,6 +22,31 @@ describe('Main welcome walkthrough styles', () => {
     expect(baseScss).toMatch(/height:\s*var\(--ce-main-welcome-frame-height,\s*100%\);/);
   });
 
+  it('uses a tall shared frame for the standard full-screen desktop deck', () => {
+    expect(scss).toMatch(
+      /@media \(min-width:\s*1367px\)\s*{\s*@container ce-theme style\(--ce-layout-profile: standard-app\)\s*{[\s\S]*?\.onboardingWalkthrough\s*{[\s\S]*?--ce-main-welcome-frame-height:\s*max\(540px,\s*calc\(100dvh - 330px\)\);/,
+    );
+    expect(scss).toMatch(
+      /@media \(min-width:\s*1367px\)\s*{\s*@container ce-theme style\(--ce-layout-profile: standard-app\)\s*{[\s\S]*?--ce-welcome-controls-height:\s*clamp\(108px,\s*12dvh,\s*140px\);/,
+    );
+    expect(scss).toMatch(
+      /@media \(min-width:\s*1367px\)\s*{\s*@container ce-theme style\(--ce-layout-profile: standard-app\)\s*{[\s\S]*?\.onboardingWalkthrough \.onboardingControls\s*{[\s\S]*?flex:\s*0 0 var\(--ce-welcome-controls-height\);[\s\S]*?height:\s*var\(--ce-welcome-controls-height\);[\s\S]*?min-height:\s*var\(--ce-welcome-controls-height\);/,
+    );
+    expect(scss).toMatch(
+      /@media \(min-width:\s*1367px\)\s*{\s*@container ce-theme style\(--ce-layout-profile: standard-app\)\s*{[\s\S]*?\.onboardingControls \.takeSurveyIcon\s*{[\s\S]*?font-size:\s*clamp\(64px,\s*7dvh,\s*80px\);/,
+    );
+  });
+
+  it('centers welcome slide titles across responsive layout modes', () => {
+    expect(baseScss).toMatch(
+      /\.onboardingTitleArea\s*\{[\s\S]*?width:\s*100%;[\s\S]*?align-items:\s*center;[\s\S]*?align-self:\s*center;/,
+    );
+    expect(baseScss).toMatch(/\.onboardingTitle\s*\{[\s\S]*?text-align:\s*center;/);
+    expect(compactDesktopScss).toMatch(/\.onboardingTitle\s*\{[\s\S]*?align-self:\s*center;/);
+    expect(desktopScss).toMatch(/\.onboardingTitle\s*\{[\s\S]*?align-self:\s*center;/);
+    expect(desktopScss).not.toMatch(/\.onboardingTitle\s*\{[\s\S]*?align-self:\s*flex-start;/);
+  });
+
   it('keeps compact desktop controls from growing beyond their allocated strip', () => {
     expect(compactDesktopScss).toMatch(/\.onboardingControls\s*\{[\s\S]*?height:\s*clamp\(60px,\s*10dvh,\s*100px\);/);
     expect(compactDesktopScss).toMatch(/\.takeSurveyButton\s*\{[\s\S]*?height:\s*100%;[\s\S]*?flex-direction:\s*row;/);

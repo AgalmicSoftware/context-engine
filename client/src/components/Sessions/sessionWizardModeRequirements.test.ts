@@ -17,7 +17,7 @@ describe('sessionWizardModeRequirements', () => {
         authorityMode: 'worker_canonical',
         isWorkerCanonical: true,
         usesWorkerRuntime: true,
-        presetKeyChips: ['Cloudflare account', 'AI provider key'],
+        presetKeyChips: ['Cloudflare account', 'OpenAI API Key'],
         requiredRequirementIds: ['cloudflareAccount', 'aiProviderKey'],
         requiredWorkerSecretFields: ['openaiKey'],
         visibleWorkerResourceKeys: ['ai'],
@@ -51,12 +51,7 @@ describe('sessionWizardModeRequirements', () => {
     };
     const requirements = resolveSessionWizardModeRequirements(profile);
 
-    expect(requirements.presetKeyChips).toEqual([
-      'Cloudflare account',
-      'AI provider key',
-      'RPC URL/key',
-      'Lit API key',
-    ]);
+    expect(requirements.presetKeyChips).toEqual(['Cloudflare account', 'OpenAI API Key', 'RPC URL/key', 'Lit API key']);
     expect(requirements.requiredWorkerSecretFields).toEqual(['openaiKey', 'litAccountApiKey']);
     expect(requirements.visibleWorkerResourceKeys).toEqual(['ai', 'rpc', 'lit']);
     expect(requirements.requiresRpc).toBe(true);
@@ -137,7 +132,7 @@ describe('sessionWizardModeRequirements', () => {
         usesWorkerRuntime: true,
         presetKeyChips: [
           'Compatible Session Worker',
-          'AI provider key',
+          'OpenAI API Key',
           'Arweave wallet/JWK',
           'RPC URL/key',
           'Lit API key if encryption is enabled',
@@ -182,7 +177,7 @@ describe('sessionWizardModeRequirements', () => {
     expect(requirements.presetKeyChips).toEqual([
       'Cloudflare account',
       'Request-only Cloudflare API token',
-      'AI provider key',
+      'OpenAI API Key',
     ]);
   });
 
@@ -205,7 +200,7 @@ describe('sessionWizardModeRequirements', () => {
     expect(requirements.presetKeyChips).toEqual([
       'Compatible Session Worker',
       'Request-only Cloudflare API token',
-      'AI provider key',
+      'OpenAI API Key',
       'Arweave wallet/JWK',
       'RPC URL/key',
       'Lit API key if encryption is enabled',

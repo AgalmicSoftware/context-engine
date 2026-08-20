@@ -8,6 +8,7 @@ export type CollapsedSectionsState = Record<string, boolean> & {
 };
 
 export type MetadataObjectCollapsedState = Record<string, boolean> & {
+  appearance: boolean;
   contracts: boolean;
   faucet: boolean;
   ai: boolean;
@@ -26,6 +27,7 @@ const useSessionWizardChromeState = ({ wizardMode, hasSponsoredBundleLink }: Use
   const [showJsonPreview, setShowJsonPreview] = useState(false);
   const [showPromptPreview, setShowPromptPreview] = useState(false);
   const [metadataObjectCollapsed, setMetadataObjectCollapsed] = useState<MetadataObjectCollapsedState>({
+    appearance: true,
     contracts: true,
     faucet: true,
     ai: true,

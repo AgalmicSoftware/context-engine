@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "models": [
+    {
+      "id": "mock-frontier-us-closed",
+      "label": "Mock Frontier US Closed",
+      "provider": "mock",
+      "model": "mock-frontier-us-closed",
+      "temperature": 0.2,
+      "traits": {
+        "parameterClass": "frontier",
+        "ossStatus": "closed",
+        "countryOfOrigin": "US",
+        "providerClass": "commercial"
+      }
+    },
+    {
+      "id": "mock-open-weights-mid",
+      "label": "Mock Open Weights Mid",
+      "provider": "mock",
+      "model": "mock-open-weights-mid",
+      "temperature": 0.2,
+      "traits": {
+        "parameterClass": "mid",
+        "ossStatus": "open-weights",
+        "countryOfOrigin": "multi",
+        "providerClass": "community"
+      }
+    }
+  ]
+}

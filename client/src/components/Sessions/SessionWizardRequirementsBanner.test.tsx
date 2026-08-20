@@ -17,7 +17,7 @@ describe('SessionWizardRequirementsBanner', () => {
     );
 
     expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'OpenAI API key' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'OpenAI API Key' })).toHaveAttribute(
       'href',
       SESSION_WIZARD_REQUIREMENT_LINKS.openaiApiKey,
     );

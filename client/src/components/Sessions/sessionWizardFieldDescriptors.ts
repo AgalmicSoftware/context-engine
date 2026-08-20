@@ -47,6 +47,7 @@ const TOP_LEVEL_FIELD_ORDER = [
   'sessionName',
   'sessionInfo',
   'appearance',
+  'groupCreationPolicy',
   'sessionModeProfile',
   'sessionHeader',
   'sessionEndsAt',
@@ -70,6 +71,8 @@ const TOP_LEVEL_FIELD_ORDER = [
 const WORKER_ONLY_DRAFT_FIELDS = new Set(['embeddedDeployHelperEnabled']);
 
 const MORE_OPTIONS_FIELDS = new Set([
+  'appearance',
+  'groupCreationPolicy',
   'sessionEndsAt',
   'defaultTags',
   'defaultGroupTags',
@@ -92,6 +95,7 @@ const FIELD_TOOLTIPS: Record<string, string> = {
   sessionEndsAt:
     'Optional end time for this Cloudflare session. After this timestamp, participant writes stop while existing groups and results remain readable.',
   appearance: "Choose one bundled color scheme for this session's documented accents and chrome.",
+  groupCreationPolicy: 'Choose whether every participant or only session admins can create groups.',
   storageProfile: 'Advanced: choose the session-owned storage profile for documents, context, and media payloads.',
   defaultTags:
     'Suggested tags for AI-assisted question tagging. They guide the model, but they do not limit which questions or surveys appear.',
@@ -128,6 +132,7 @@ const FIELD_LABELS: Record<string, string> = {
   sessionHeader: 'Header Image',
   sessionEndsAt: 'Session end time',
   appearance: 'Session colors',
+  groupCreationPolicy: 'Who can create groups?',
   storageProfile: 'Session Storage',
   defaultTags: 'Default Tag Suggestions',
   defaultGroupTags: 'Default Group Tags',
@@ -258,11 +263,18 @@ export const splitSessionWizardDraftEntries = (
 ): {
   primaryEntries: Array<[string, unknown]>;
   moreOptionsEntries: Array<[string, unknown]>;
-} => ({
-  primaryEntries: orderedDraftEntries.filter(
-    ([key]) => !MORE_OPTIONS_FIELDS.has(key) && !(isNormalMode && key === 'blockLimits'),
-  ),
-  moreOptionsEntries: orderedDraftEntries.filter(
+} => {
+  const moreOptionsEntries = orderedDraftEntries.filter(
     ([key]) => MORE_OPTIONS_FIELDS.has(key) || (isNormalMode && key === 'blockLimits'),
-  ),
-});
+  );
+
+  return {
+    primaryEntries: orderedDraftEntries.filter(
+      ([key]) => !MORE_OPTIONS_FIELDS.has(key) && !(isNormalMode && key === 'blockLimits'),
+    ),
+    moreOptionsEntries: [
+      ...moreOptionsEntries.filter(([key]) => key !== 'appearance'),
+      ...moreOptionsEntries.filter(([key]) => key === 'appearance'),
+    ],
+  };
+};

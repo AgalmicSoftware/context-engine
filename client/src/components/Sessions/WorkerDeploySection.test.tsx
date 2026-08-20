@@ -34,6 +34,7 @@ const buildWorkerDeploySectionProps = (props: Partial<WorkerDeploySectionProps> 
   advancedBundleFileInputRef: { current: null },
   showSponsoredDeployAccessNotice: false,
   account: '0xabc',
+  toggleLoginModal: jest.fn(),
   cloudflareTokenSlug: 'demo-worker',
   setDeployForm: () => {},
   handleDeployWorker: () => {},
@@ -94,6 +95,50 @@ describe('WorkerDeploySection', () => {
 
     expect(screen.getByText(/Connect or sign in as the session admin/i)).toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_DEPLOY)).not.toBeInTheDocument();
+  });
+
+  it('opens login from the admin address control when no wallet is signed in', () => {
+    const toggleLoginModal = jest.fn();
+    renderWorkerDeploySection({
+      account: '',
+      toggleLoginModal,
+      deployForm: { workerName: 'demo-worker', bundleUrl: '', apiToken: '', adminAddress: '' },
+    });
+
+    const loginControl = screen.getByTestId(E2E_TESTIDS.WIZARD_ADMIN_ADDRESS);
+    expect(loginControl).toHaveAttribute('type', 'button');
+    expect(loginControl).toHaveValue('Click to login');
+
+    fireEvent.click(loginControl);
+
+    expect(toggleLoginModal).toHaveBeenCalledWith(true);
+  });
+
+  it('shows the connected wallet in the admin address input while the form syncs', () => {
+    renderWorkerDeploySection({
+      account: '0x00000000000000000000000000000000000000aa',
+      deployForm: { workerName: 'demo-worker', bundleUrl: '', apiToken: '', adminAddress: '' },
+    });
+
+    const adminAddress = screen.getByTestId(E2E_TESTIDS.WIZARD_ADMIN_ADDRESS);
+    expect(adminAddress).toHaveAttribute('type', 'text');
+    expect(adminAddress).toHaveValue('0x00000000000000000000000000000000000000aa');
+  });
+
+  it('keeps a restored admin address editable when the wallet disconnects', () => {
+    renderWorkerDeploySection({
+      account: '',
+      deployForm: {
+        workerName: 'demo-worker',
+        bundleUrl: '',
+        apiToken: '',
+        adminAddress: '0x00000000000000000000000000000000000000bb',
+      },
+    });
+
+    const adminAddress = screen.getByTestId(E2E_TESTIDS.WIZARD_ADMIN_ADDRESS);
+    expect(adminAddress).toHaveAttribute('type', 'text');
+    expect(adminAddress).toHaveValue('0x00000000000000000000000000000000000000bb');
   });
 
   it('does not report success until Worker reachability, CORS, and canonical config readback verify', async () => {

@@ -35,6 +35,30 @@
           ]
         },
         {
+          "label": "Run AI Discourse Bench tests",
+          "command": "npm",
+          "args": [
+            "run",
+            "test:ai-discourse-bench"
+          ]
+        },
+        {
+          "label": "Verify AI Discourse Bench Results sync",
+          "command": "npm",
+          "args": [
+            "run",
+            "check:ai-discourse-bench-results-sync"
+          ]
+        },
+        {
+          "label": "Verify AI Discourse Bench publication artifact",
+          "command": "npm",
+          "args": [
+            "run",
+            "check:ai-discourse-bench-publication"
+          ]
+        },
+        {
           "label": "Check type debt ratchet",
           "command": "npm",
           "args": [
@@ -270,6 +294,30 @@
     },
     "release": {
       "commands": [
+        {
+          "label": "Run AI Discourse Bench tests",
+          "command": "npm",
+          "args": [
+            "run",
+            "test:ai-discourse-bench"
+          ]
+        },
+        {
+          "label": "Verify AI Discourse Bench Results sync",
+          "command": "npm",
+          "args": [
+            "run",
+            "check:ai-discourse-bench-results-sync"
+          ]
+        },
+        {
+          "label": "Verify AI Discourse Bench publication artifact",
+          "command": "npm",
+          "args": [
+            "run",
+            "check:ai-discourse-bench-publication"
+          ]
+        },
         {
           "label": "Lint client",
           "command": "npm",

@@ -1,0 +1,4 @@
+interface:
+  display_name: "AI Discourse Results Sync"
+  short_description: "Sync standalone benchmark Results with CE"
+  default_prompt: "Use $ai-discourse-bench-results-sync to inspect Context Engine Results drift and update the standalone benchmark report safely."

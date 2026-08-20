@@ -99,6 +99,7 @@ const WELCOME_FIT_VIEWPORTS = Object.freeze([
   { name: 'compact desktop', width: 1280, height: 720 },
   { name: 'wide desktop', width: 1904, height: 900 },
   { name: 'ultra-wide short desktop', width: 2048, height: 876 },
+  { name: 'full-screen desktop', width: 2048, height: 1151 },
 ]);
 
 const WELCOME_FIT_THEME_IDS = Object.freeze(['context-engine', 'classic-95']);
@@ -3753,6 +3754,7 @@ async function assertWelcomeSlideGeometry(browser, baseUrl, viewport, themeId) {
           const walkthrough = document.querySelector('[class*="onboardingWalkthrough"]');
           const info = walkthrough?.querySelector(':scope > [class*="onboardingInfo"]');
           const controls = walkthrough?.querySelector(':scope > [class*="onboardingControls"]');
+          const controlIcons = [...(controls?.querySelectorAll('[class*="takeSurveyIcon"]') || [])];
           const title = info?.querySelector('[class*="onboardingTitle"]');
           const slideLayout = info?.querySelector('[class*="welcomeSlideLayout"]');
           const slideImage = info?.querySelector('[data-testid="ce-welcome-slide-image"]');
@@ -3774,17 +3776,21 @@ async function assertWelcomeSlideGeometry(browser, baseUrl, viewport, themeId) {
                 }
               : null;
           };
-          const footerBottom = footer?.getBoundingClientRect().bottom || 0;
+          const footerBounds = footer?.getBoundingClientRect();
+          const footerTop = footerBounds?.top || 0;
+          const footerBottom = footerBounds?.bottom || 0;
           const slideImageStyle = slideImage ? window.getComputedStyle(slideImage) : null;
           const finalActionStyle = finalAction ? window.getComputedStyle(finalAction) : null;
           return {
             slideKey,
             clientHeight: document.documentElement.clientHeight,
+            footerTop,
             footerBottom,
             scrollHeight: document.documentElement.scrollHeight,
             walkthrough: rect(walkthrough),
             info: rect(info),
             controls: rect(controls),
+            controlIcons: controlIcons.map(rect),
             title: rect(title),
             slideLayout: rect(slideLayout),
             slideImage: rect(slideImage),
@@ -3795,6 +3801,7 @@ async function assertWelcomeSlideGeometry(browser, baseUrl, viewport, themeId) {
               scrollWidth: element.scrollWidth,
             })),
             slideImageBlendMode: slideImageStyle?.mixBlendMode || '',
+            slideImageObjectPosition: slideImageStyle?.objectPosition || '',
             slideImageOpacity: slideImageStyle ? Number.parseFloat(slideImageStyle.opacity) : null,
             finalAction: finalAction
               ? {
@@ -3817,6 +3824,11 @@ async function assertWelcomeSlideGeometry(browser, baseUrl, viewport, themeId) {
           fit.footerBottom <= fit.clientHeight + 1 && fit.scrollHeight <= fit.clientHeight + 1,
           `${slideLabel} should fit the viewport; received footer bottom ${fit.footerBottom.toFixed(1)}px, scroll height ${fit.scrollHeight}px, viewport ${fit.clientHeight}px`,
         );
+      } else if (viewport.width >= 1367 && fit.slideKey === 'intro') {
+        assert.ok(
+          fit.footerTop >= fit.clientHeight - 1 && fit.scrollHeight > fit.clientHeight + 1,
+          `${slideLabel} should keep the footer below the initial full-screen viewport`,
+        );
       }
       assert.ok(fit.walkthrough && fit.info && fit.controls, `${slideLabel} geometry should render`);
       assert.ok(
@@ -3834,16 +3846,46 @@ async function assertWelcomeSlideGeometry(browser, baseUrl, viewport, themeId) {
           Math.abs(fit.controls.height - firstFit.controls.height) <= 1,
         `${slideLabel} should keep the same window and arrow-strip geometry as the first slide`,
       );
+      if (themeId === 'context-engine' && viewport.width >= 1367) {
+        assert.ok(
+          fit.controls.height >= 107,
+          `${slideLabel} should restore the taller standard-desktop navigation strip`,
+        );
+        assert.ok(
+          fit.controlIcons.length > 0 && fit.controlIcons.every((icon) => icon.height >= 63),
+          `${slideLabel} should restore the larger standard-desktop arrow icons`,
+        );
+      }
       if (fit.title && fit.slideLayout) {
         assert.ok(
           fit.title.bottom <= fit.slideLayout.top + 1,
           `${slideLabel} title should not overlap the slide artwork`,
+        );
+        assert.ok(
+          Math.abs((fit.title.left + fit.title.right) / 2 - (fit.info.left + fit.info.right) / 2) <= 2,
+          `${slideLabel} title should remain horizontally centered in the slide frame`,
         );
       }
       if (fit.slideImage && fit.slideLayout) {
         assert.ok(
           fit.slideImage.top >= fit.slideLayout.top - 1 && fit.slideImage.bottom <= fit.slideLayout.bottom + 1,
           `${slideLabel} artwork should remain inside its slide panel`,
+        );
+      }
+      if (themeId === 'context-engine' && viewport.width >= 1367 && fit.slideKey === 'intro') {
+        assert.equal(
+          fit.slideImageObjectPosition,
+          '50% 50%',
+          `${slideLabel} artwork should be centered in its media pane`,
+        );
+        assert.ok(
+          Math.abs((fit.slideImage.left + fit.slideImage.right) / 2 - (fit.slideLayout.left + fit.slideLayout.right) / 2) <=
+            2,
+          `${slideLabel} artwork should remain horizontally centered in the slide frame`,
+        );
+        assert.ok(
+          fit.slideImage.height >= fit.clientHeight * 0.44,
+          `${slideLabel} artwork should be large enough to anchor the full-screen deck`,
         );
       }
       if (fit.slideKey === 'looking-for') {

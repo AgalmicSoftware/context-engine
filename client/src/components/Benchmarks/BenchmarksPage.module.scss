@@ -1,0 +1,90 @@
+.page {
+  min-height: 100vh;
+  color: var(--ce-overlay-text);
+  background: var(--ce-canvas);
+  font-family: var(--ce-font-body);
+}
+
+.reportChooser {
+  min-height: 58px;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  background: color-mix(in srgb, var(--ce-overlay-surface-alt) 96%, transparent);
+}
+
+.selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: color-mix(in srgb, var(--ce-overlay-text) 70%, transparent);
+  font-size: 0.78rem;
+
+  select {
+    min-width: 220px;
+    min-height: 42px;
+    padding: 0 36px 0 12px;
+    border: 1px solid color-mix(in srgb, var(--ce-overlay-text) 20%, transparent);
+    border-radius: 4px;
+    color: var(--ce-overlay-text);
+    background: var(--ce-overlay-base);
+  }
+}
+
+.reportSurface {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  min-height: 600px;
+  overflow: hidden;
+  background: var(--ce-document-surface);
+}
+
+.reportSurfaceWithChooser {
+  height: calc(100vh - 58px);
+}
+
+.reportFrame {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border: 0;
+  background: var(--ce-canvas);
+}
+
+.status,
+.error {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+  color: var(--ce-document-text);
+  background: var(--ce-document-surface);
+}
+
+.error strong {
+  color: var(--ce-status-danger-text);
+}
+
+@media (max-width: 760px) {
+  .reportChooser {
+    padding: 8px;
+  }
+
+  .selector {
+    width: 100%;
+
+    select {
+      min-width: 0;
+      width: 100%;
+    }
+  }
+
+  .reportSurface {
+    min-height: 520px;
+  }
+}

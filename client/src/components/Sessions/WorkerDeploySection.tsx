@@ -83,6 +83,7 @@ export type WorkerDeploySectionProps = {
   advancedBundleFileInputRef?: React.Ref<HTMLInputElement>;
   showSponsoredDeployAccessNotice: boolean;
   account?: string;
+  toggleLoginModal?: ((open?: boolean) => void) | null;
   cloudflareTokenSlug?: string;
   cloudflareNativeDeployUrl?: string;
   setDeployForm: React.Dispatch<React.SetStateAction<DeployForm>>;
@@ -126,6 +127,7 @@ const WorkerDeploySection = ({
   advancedBundleFileInputRef,
   showSponsoredDeployAccessNotice,
   account,
+  toggleLoginModal,
   cloudflareTokenSlug = '',
   cloudflareNativeDeployUrl = CLOUDFLARE_NATIVE_DEPLOY_URL,
   setDeployForm,
@@ -164,7 +166,8 @@ const WorkerDeploySection = ({
   const nativeVerificationEnabled = allowNativeWorkerVerification === true;
   const nativeDeployUrl = nativeVerificationEnabled ? String(cloudflareNativeDeployUrl || '').trim() : '';
   const nativeSessionSlug = String(cloudflareTokenSlug || '').trim();
-  const nativeAdminAddress = String(deployForm.adminAddress || account || '').trim();
+  const connectedAccount = String(account || '').trim();
+  const nativeAdminAddress = String(deployForm.adminAddress || connectedAccount).trim();
   const nativeSetupIdentity = buildNativeSetupIdentity({
     sessionSlug: nativeSessionSlug,
     adminAddress: nativeAdminAddress,
@@ -647,12 +650,24 @@ const WorkerDeploySection = ({
                 </div>
               </FormGroup>
               <FormGroup>
-                <Label>Admin address</Label>
-                <Input
-                  value={deployForm.adminAddress ?? ''}
-                  placeholder={account || '0x...'}
-                  onChange={(e) => setDeployForm((prev) => ({ ...prev, adminAddress: e.target.value }))}
-                />
+                <Label for="ce-wizard-admin-address">Admin address</Label>
+                {nativeAdminAddress ? (
+                  <Input
+                    id="ce-wizard-admin-address"
+                    value={nativeAdminAddress}
+                    data-testid={E2E_TESTIDS.WIZARD_ADMIN_ADDRESS}
+                    onChange={(e) => setDeployForm((prev) => ({ ...prev, adminAddress: e.target.value }))}
+                  />
+                ) : (
+                  <Input
+                    id="ce-wizard-admin-address"
+                    type="button"
+                    value="Click to login"
+                    className={styles.adminLoginControl}
+                    data-testid={E2E_TESTIDS.WIZARD_ADMIN_ADDRESS}
+                    onClick={() => toggleLoginModal?.(true)}
+                  />
+                )}
               </FormGroup>
             </div>
             <div className={styles.workerDeployActions}>

@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 1,
+  "models": [
+    {
+      "id": "gpt-oss-120b",
+      "label": "GPT-OSS 120B",
+      "provider": "local",
+      "model": "gpt-oss-120b",
+      "temperature": 0.2,
+      "maxTokens": 700,
+      "timeoutMs": 300000,
+      "structuredOutput": "auto",
+      "traits": {
+        "parameterClass": "120B MoE",
+        "ossStatus": "open-weights",
+        "countryOfOrigin": "US",
+        "providerClass": "local"
+      },
+      "provenance": {
+        "modelRevision": "openai/gpt-oss-120b",
+        "weightsRevision": "local-config-e2ecef20847b0eaa",
+        "quantization": "MXFP4 with selected Q8 layers",
+        "inferenceEngine": "mlx-openai-server",
+        "runtimeVersion": "1.6.3 (mlx-lm 0.31.1, mlx 0.31.1)",
+        "systemPromptId": "aidb-strict-json-v1",
+        "sourceUrl": "https://huggingface.co/mlx-community/gpt-oss-120b-MXFP4-Q8",
+        "license": "Apache-2.0",
+        "asOf": "2026-07-13"
+      }
+    },
+    {
+      "id": "qwen3-30b-a3b",
+      "label": "Qwen3 30B A3B",
+      "provider": "local",
+      "model": "qwen3-30b-a3b",
+      "temperature": 0.2,
+      "maxTokens": 700,
+      "timeoutMs": 300000,
+      "structuredOutput": "auto",
+      "traits": {
+        "parameterClass": "30B A3B MoE",
+        "ossStatus": "open-weights",
+        "countryOfOrigin": "China",
+        "providerClass": "local"
+      },
+      "provenance": {
+        "modelRevision": "Qwen/Qwen3-30B-A3B",
+        "weightsRevision": "local-config-5a5fdac36fffb64e",
+        "quantization": "4-bit DWQ MLX",
+        "inferenceEngine": "mlx-openai-server",
+        "runtimeVersion": "1.6.3 (mlx-lm 0.31.1, mlx 0.31.1)",
+        "systemPromptId": "aidb-strict-json-v1",
+        "sourceUrl": "https://huggingface.co/mlx-community/Qwen3-30B-A3B-4bit-DWQ",
+        "license": "Apache-2.0",
+        "asOf": "2026-07-13"
+      }
+    },
+    {
+      "id": "nemotron-3-nano-30b-a3b",
+      "label": "Nemotron 3 Nano 30B A3B",
+      "provider": "local",
+      "model": "nemotron-3-nano-30b-a3b",
+      "temperature": 0.2,
+      "maxTokens": 700,
+      "timeoutMs": 300000,
+      "structuredOutput": "auto",
+      "traits": {
+        "parameterClass": "30B A3B MoE",
+        "ossStatus": "open-weights",
+        "countryOfOrigin": "US",
+        "providerClass": "local"
+      },
+      "provenance": {
+        "modelRevision": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16",
+        "weightsRevision": "local-config-3851b235c24000fc",
+        "quantization": "6-bit MLX",
+        "inferenceEngine": "mlx-openai-server",
+        "runtimeVersion": "1.6.3 (mlx-lm 0.31.1, mlx 0.31.1)",
+        "systemPromptId": "aidb-strict-json-v1",
+        "sourceUrl": "https://huggingface.co/mlx-community/NVIDIA-Nemotron-3-Nano-30B-A3B-MLX-6Bit",
+        "license": "NVIDIA Open Model License",
+        "asOf": "2026-07-13"
+      }
+    },
+    {
+      "id": "qwen3-coder-next",
+      "label": "Qwen3 Coder Next",
+      "provider": "local",
+      "model": "qwen3-coder-next",
+      "temperature": 0.2,
+      "maxTokens": 700,
+      "timeoutMs": 300000,
+      "structuredOutput": "auto",
+      "traits": {
+        "parameterClass": "MoE",
+        "ossStatus": "open-weights",
+        "countryOfOrigin": "China",
+        "providerClass": "local"
+      },
+      "provenance": {
+        "modelRevision": "Qwen/Qwen3-Coder-Next",
+        "weightsRevision": "local-config-ad6f5598ad9e24c1",
+        "quantization": "6-bit MLX",
+        "inferenceEngine": "mlx-openai-server",
+        "runtimeVersion": "1.6.3 (mlx-lm 0.31.1, mlx 0.31.1)",
+        "systemPromptId": "aidb-strict-json-v1",
+        "sourceUrl": "https://huggingface.co/mlx-community/Qwen3-Coder-Next-6bit",
+        "license": "Apache-2.0",
+        "asOf": "2026-07-13"
+      }
+    },
+    {
+      "id": "gemma4-e4b-obliterated",
+      "label": "Gemma 4 E4B Obliterated",
+      "provider": "local",
+      "model": "gemma4-e4b-obliterated",
+      "temperature": 0.2,
+      "maxTokens": 700,
+      "timeoutMs": 300000,
+      "structuredOutput": "auto",
+      "traits": {
+        "parameterClass": "E4B MoE",
+        "ossStatus": "open-weights-modified",
+        "countryOfOrigin": "US",
+        "providerClass": "local"
+      },
+      "provenance": {
+        "modelRevision": "google/gemma-4-E4B-it modified by OBLITERATUS",
+        "weightsRevision": "local-config-70f91cfde5d1da6f",
+        "quantization": "GGUF Q4_K_M",
+        "inferenceEngine": "llama.cpp llama-server",
+        "runtimeVersion": "8990 (660b1b4bd)",
+        "chatTemplate": "chatml",
+        "reasoningConfiguration": "off; budget=0; format=none",
+        "systemPromptId": "aidb-strict-json-v1",
+        "sourceUrl": "https://huggingface.co/OBLITERATUS/gemma-4-E4B-it-OBLITERATED",
+        "license": "Apache-2.0",
+        "asOf": "2026-07-13"
+      }
+    }
+  ]
+}

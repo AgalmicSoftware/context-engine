@@ -81,7 +81,7 @@ opt-in; **Company-Operated** is planned.
 
 ### Hosted & Fast — implemented default
 
-This is labeled `Fast & Cheap (Cloudflare)` in the wizard.
+This is labeled `Centralized (Cloudflare)` in the wizard.
 
 - A creator deploys a per-session Cloudflare Worker with Cloudflare-backed
   canonical config and payload storage.

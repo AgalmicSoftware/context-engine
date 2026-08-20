@@ -6,6 +6,14 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Renamed the `/new` setup choices to **Centralized** and **Decentralized**, moved Session
+  colors into a default-collapsed More options section, and replaced the
+  freeform group-creation policy input with a constrained dropdown there.
+- Restored centered Welcome-slide headings across responsive layouts while
+  preserving each theme profile's constant slide-frame and navigation height.
+  On standard full-screen desktops, the opening artwork is centered and sized
+  to keep the controls visible while placing the site footer below the fold,
+  and the taller navigation strip restores the pre-theme 80px arrow scale.
 - Replaced the Classic 95 beeswarm tooltip's yellow-to-olive Unsure gradient
   with a solid warning-yellow segment.
 - Kept both Classic 95 Welcome-slide navigation arrows fully opaque and white
@@ -74,6 +82,10 @@ All notable changes to this project will be documented in this file.
   hydration, profile scans, filters, selectors, and realtime events. Delayed
   scans now preserve newer activity, unrelated networks, and concurrent user
   responses, and readiness is published only after persistence succeeds.
+- Added a `/benchmarks` route for bundled AI Opinions Benchmark reports. The
+  static viewer treats models as participants, preserves interactive report
+  controls inside a sandboxed frame, and labels incomplete or unvalidated
+  artifacts as development previews rather than released results.
 - Replaced the `/contracts` utility reference with a user-facing `/docs` page
   containing a quickstart, session-options guide, and FAQ. The page retains
   AI prompt references and a contract deployment explorer that waits for an
@@ -313,7 +325,7 @@ All notable changes to this project will be documented in this file.
   semantics. Cloudflare token guidance now explains that the linked form
   prefills permissions for users already signed in.
 - Restored the two primary `/new` setup choices as large, requirement-aware
-  entry cards. Selecting Fast & Cheap or Trustless & Public now transitions to
+  entry cards. Selecting Centralized or Decentralized now transitions to
   the existing compact header selector; the native fast path identifies its
   creator inputs as a Cloudflare login and one AI API key.
 - Made `contextengine.sh` the canonical public URL across site metadata,

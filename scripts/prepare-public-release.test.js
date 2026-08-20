@@ -9,6 +9,7 @@ const { spawnSync } = require('node:child_process');
 const SCRIPT_SOURCE_PATH = path.join(__dirname, 'prepare-public-release.sh');
 const PACKAGE_SCRUBBER_SOURCE_PATH = path.join(__dirname, 'scrub-public-package-json.js');
 const PII_SCRUBBER_SOURCE_PATH = path.join(__dirname, 'scrub-public-pii-text.mjs');
+const BENCHMARK_HASH_REFRESHER_SOURCE_PATH = path.join(__dirname, 'refresh-public-benchmark-source-hashes.mjs');
 const HELPER_SOURCE_PATH = path.join(__dirname, 'lib', 'public-release-strip-patterns.sh');
 const SURFACE_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-release-surface.js');
 const DOCS_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-docs.js');
@@ -51,6 +52,11 @@ test('prepare-public-release strips private surfaces without publishing an inven
       sourceDir,
       path.join('scripts', 'scrub-public-pii-text.mjs'),
       fs.readFileSync(PII_SCRUBBER_SOURCE_PATH, 'utf8'),
+    );
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'refresh-public-benchmark-source-hashes.mjs'),
+      fs.readFileSync(BENCHMARK_HASH_REFRESHER_SOURCE_PATH, 'utf8'),
     );
     writeFile(
       sourceDir,
@@ -134,6 +140,15 @@ test('prepare-public-release strips private surfaces without publishing an inven
     writeFile(sourceDir, path.join('docs', 'security', 'audit-prep-2026-07-06.md'), 'private audit snapshot\n');
     writeFile(sourceDir, 'AGENTS.md', 'private agent instructions\n');
     writeFile(sourceDir, path.join('ai-discourse-corpus', 'corpuses', '_local_helper.js'), 'local helper script\n');
+    const publicBenchmarkCorpusPath = path.join('ai-discourse-corpus', 'corpuses', 'public-corpus.json');
+    writeFile(sourceDir, publicBenchmarkCorpusPath, '{"contact":"[redacted-email]"}\n');
+    writeFile(
+      sourceDir,
+      path.join('ai-discourse-bench', 'banks', 'topic', 'v1', 'manifest.json'),
+      `${JSON.stringify({
+        sourceFiles: [{ relativePath: publicBenchmarkCorpusPath, sha256: 'source-hash-before-redaction' }],
+      }, null, 2)}\n`,
+    );
     writeFile(sourceDir, path.join('.tmp-review', 'review.js'), 'temporary review snapshot\n');
     writeFile(sourceDir, path.join('Demo Integration Package', 'private.txt'), 'private integration material\n');
     writeFile(sourceDir, 'private-pack.manifest.json', 'tracked root manifest that should be replaced\n');
@@ -294,6 +309,15 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'security', 'audit-prep-2026-07-06.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'AGENTS.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'ai-discourse-corpus', 'corpuses', '_local_helper.js')), false);
+    const publicBenchmarkCorpus = fs.readFileSync(path.join(outputDir, publicBenchmarkCorpusPath));
+    const publicBenchmarkManifest = JSON.parse(fs.readFileSync(
+      path.join(outputDir, 'ai-discourse-bench', 'banks', 'topic', 'v1', 'manifest.json'),
+      'utf8',
+    ));
+    assert.equal(
+      publicBenchmarkManifest.sourceFiles[0].sha256,
+      require('node:crypto').createHash('sha256').update(publicBenchmarkCorpus).digest('hex'),
+    );
     assert.equal(fs.existsSync(path.join(outputDir, '.tmp-review')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'Demo Integration Package')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'outreach-and-applications')), false);
@@ -350,6 +374,11 @@ test('prepare-public-release fails if private planning paths survive strip rules
       sourceDir,
       path.join('scripts', 'scrub-public-pii-text.mjs'),
       fs.readFileSync(PII_SCRUBBER_SOURCE_PATH, 'utf8'),
+    );
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'refresh-public-benchmark-source-hashes.mjs'),
+      fs.readFileSync(BENCHMARK_HASH_REFRESHER_SOURCE_PATH, 'utf8'),
     );
     writeFile(
       sourceDir,

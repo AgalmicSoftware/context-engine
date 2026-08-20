@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { ethers } from 'ethers';
 import type { AppShell } from './AppShell';
 import type { SessionConfigLike as ShellSessionConfigLike } from '../shellTypes';
@@ -80,6 +80,7 @@ import {
   AboutPage as AboutPageRaw,
   AdminPage as AdminPageRaw,
   AgentPage as AgentPageRaw,
+  BenchmarksPage as BenchmarksPageRaw,
   DebateMap as DebateMapRaw,
   BookmarksPage as BookmarksPageRaw,
   CompareAddresses as CompareAddressesRaw,
@@ -138,6 +139,7 @@ const NotFoundRoute = asMainSiteRouteComponent(NotFoundRouteRaw);
 const AboutPage = asMainSiteRouteComponent(AboutPageRaw);
 const AdminPage = asMainSiteRouteComponent(AdminPageRaw);
 const AgentPage = asMainSiteRouteComponent(AgentPageRaw);
+const BenchmarksPage = asMainSiteRouteComponent(BenchmarksPageRaw);
 const DebateMap = asMainSiteRouteComponent(DebateMapRaw);
 const BookmarksPage = asMainSiteRouteComponent(BookmarksPageRaw);
 const CompareAddresses = asMainSiteRouteComponent(CompareAddressesRaw);
@@ -184,6 +186,12 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     <InitialRouteBoundary fallback={<div />}>
       <DemosIndex />
     </InitialRouteBoundary>
+  ),
+
+  _renderBenchmarksRoute: () => (
+    <Suspense fallback={<LazyFallback label="Loading benchmarks..." minHeight="60vh" />}>
+      <BenchmarksPage />
+    </Suspense>
   ),
 
   _renderMatrixRoute: () => (
@@ -1357,6 +1365,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
         about: () => host._renderAboutRoute(),
         posts: renderPostsRoute,
         demos: () => host._renderDemosRoute(),
+        benchmarks: () => host._renderBenchmarksRoute(),
         matrix: () => host._renderMatrixRoute(),
         docs: () => host._renderDocsRoute(ctx),
         admin: () => host._renderAdminRoute(ctx),

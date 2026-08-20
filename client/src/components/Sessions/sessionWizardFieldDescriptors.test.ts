@@ -51,6 +51,7 @@ describe('sessionWizardFieldDescriptors', () => {
       [
         ['sessionName', 'Demo'],
         ['appearance', { colorSchemeId: 'amber' }],
+        ['groupCreationPolicy', 'participants'],
         ['sessionEndsAt', '2099-01-01T00:00:00.000Z'],
         ['blockLimits', { start: 1, end: 2 }],
         ['defaultTags', 'ai'],
@@ -58,13 +59,20 @@ describe('sessionWizardFieldDescriptors', () => {
       true,
     );
 
-    expect(primaryEntries.map(([key]) => key)).toEqual(['sessionName', 'appearance']);
-    expect(moreOptionsEntries.map(([key]) => key)).toEqual(['sessionEndsAt', 'blockLimits', 'defaultTags']);
+    expect(primaryEntries.map(([key]) => key)).toEqual(['sessionName']);
+    expect(moreOptionsEntries.map(([key]) => key)).toEqual([
+      'groupCreationPolicy',
+      'sessionEndsAt',
+      'blockLimits',
+      'defaultTags',
+      'appearance',
+    ]);
   });
 
   it('resolves labels and tooltips from field descriptors', () => {
     expect(getSessionWizardFieldLabel('sessionName', 'sessionName')).toBe('Session Name');
     expect(getSessionWizardFieldLabel('appearance', 'appearance')).toBe('Session colors');
+    expect(getSessionWizardFieldLabel('groupCreationPolicy', 'groupCreationPolicy')).toBe('Who can create groups?');
     expect(getSessionWizardFieldTooltip(['sessionEndsAt'], '')).toContain('participant writes stop');
   });
 

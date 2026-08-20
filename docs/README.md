@@ -67,6 +67,8 @@ Design and public presentation:
 - `docs/design-system.md`: shared visual and interaction conventions.
 - `docs/visual-identity.md`: public visual identity and asset guidance.
 - `docs/reference-links.md`: background references used by the project documentation.
+- `../ai-discourse-bench/README.md`: AI Opinions Benchmark question-bank,
+  local-model, OpenRouter, report-generation, and publication workflow.
 
 Wallets:
 - `docs/passkey-wallet.md`: passkey-unlocked EOA wallet wiring and deterministic test wallet workflow.

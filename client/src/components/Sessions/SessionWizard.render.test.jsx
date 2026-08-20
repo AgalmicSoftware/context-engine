@@ -708,6 +708,37 @@ describe('SessionWizard rendered validation', () => {
     expect(screen.getByText('Ends at block 988,000.')).toBeInTheDocument();
   });
 
+  it('keeps session colors and group creation policy inside guided optional controls', async () => {
+    renderSessionWizard();
+    selectCloudflarePreset();
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    const optionalDetails = screen.getByRole('button', { name: /Optional details/i });
+    expect(optionalDetails).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_GROUP_CREATION_POLICY)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Session colors expand' })).not.toBeInTheDocument();
+
+    fireEvent.click(optionalDetails);
+
+    expect(optionalDetails).toHaveAttribute('aria-expanded', 'true');
+    const policy = screen.getByTestId(E2E_TESTIDS.WIZARD_GROUP_CREATION_POLICY);
+    expect(policy).toHaveAccessibleName('Who can create groups?');
+    expect(policy).toHaveValue('participants');
+    expect(screen.queryByRole('textbox', { name: 'Who can create groups?' })).not.toBeInTheDocument();
+
+    const colorsToggle = screen.getByRole('button', { name: 'Session colors expand' });
+    expect(colorsToggle).toHaveAttribute('aria-expanded', 'false');
+    const colorsGroup = colorsToggle.parentElement?.parentElement;
+    expect(colorsGroup).toBeTruthy();
+    expect(colorsGroup?.parentElement?.lastElementChild).toBe(colorsGroup);
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_COLOR_SCHEME)).not.toBeInTheDocument();
+    fireEvent.click(colorsToggle);
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_COLOR_SCHEME)).toHaveValue('context-engine');
+
+    fireEvent.change(policy, { target: { value: 'admin_only' } });
+    expect(policy).toHaveValue('admin_only');
+  });
+
   it('keeps legacy sponsoredSbtAddress inside optional details in normal mode', async () => {
     const sponsoredSbtAddress = '0x00000000000000000000000000000000000000f1';
     sessionStorage.setItem(
@@ -1028,11 +1059,13 @@ describe('SessionWizard rendered validation', () => {
 
     renderSessionWizard();
 
-    expect(screen.getByRole('heading', { name: 'Session Setup (Custom)' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Session Setup' })).toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Continue with saved settings' }));
+    expect(screen.queryByText(/Saved (?:custom|hosting) settings/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_RESUME));
 
     expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).toHaveValue('Saved custom session');
+    expect(screen.getByRole('heading', { name: 'Session Setup (Custom)' })).toBeInTheDocument();
   });
 
   it('checks session slug collisions before publish upload or register side effects', async () => {

@@ -25,6 +25,7 @@ export const KNOWN_ROUTE_PREFIXES = new Set([
   'u',
   'new',
   'demo',
+  'benchmarks',
   'about',
   'posts',
   'demos',
@@ -49,6 +50,8 @@ export function isStaticNonCacheRoute(path: string) {
     path.startsWith('/posts/') ||
     path === '/demos' ||
     path === '/demos/' ||
+    path === '/benchmarks' ||
+    path === '/benchmarks/' ||
     path === '/matrix' ||
     path === '/contracts' ||
     path === '/contracts/' ||

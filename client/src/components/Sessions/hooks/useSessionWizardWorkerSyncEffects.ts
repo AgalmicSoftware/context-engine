@@ -52,8 +52,9 @@ const useSessionWizardWorkerSyncEffects = <TDeployForm extends DeployFormLike>({
   buildWorkerNameRef.current = buildWorkerName;
 
   useEffect(() => {
-    if (account && (deployFormAdminAddress === undefined || deployFormAdminAddress === null)) {
-      setDeployForm((prev) => ({ ...prev, adminAddress: account }));
+    const normalizedAccount = toStr(account).trim();
+    if (normalizedAccount && !toStr(deployFormAdminAddress).trim()) {
+      setDeployForm((prev) => ({ ...prev, adminAddress: normalizedAccount }));
     }
   }, [account, deployFormAdminAddress, setDeployForm]);
 

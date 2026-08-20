@@ -118,7 +118,7 @@ const SessionWizardRequirementsBanner = ({
                 requiredAiProviderKeyLabels.length ? (
                   requiredAiProviderKeyLabels.join(', ')
                 ) : (
-                  'AI provider key'
+                  'OpenAI API Key'
                 )
               ) : (
                 <>
@@ -128,7 +128,7 @@ const SessionWizardRequirementsBanner = ({
                     rel="noopener noreferrer"
                     className={styles.newSessionBannerLink}
                   >
-                    OpenAI API key
+                    OpenAI API Key
                   </a>
                 </>
               )}{' '}

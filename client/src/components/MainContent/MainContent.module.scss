@@ -519,7 +519,7 @@
   }
 
   .onboardingTitle {
-    align-self: flex-start;
+    align-self: center;
     font-weight: 600;
     color: color-mix(in srgb, var(--ce-text-inverse) 18%, transparent);
     text-transform: uppercase;
@@ -619,6 +619,8 @@
     display: flex;
     flex-direction: column;
     flex-wrap: wrap;
+    width: 100%;
+    align-items: center;
     justify-content: flex-start;
     align-self: center;
   }
@@ -627,6 +629,7 @@
     font-weight: 700;
     color: color-mix(in srgb, var(--ce-text-inverse) 54%, transparent);
     text-transform: uppercase;
+    text-align: center;
     margin-bottom: 0px;
   }
 
@@ -867,6 +870,25 @@
     .mainAreaTabsAlt,
     #mainAreaTabs {
       flex-basis: auto;
+    }
+  }
+}
+
+@media (min-width: 1367px) {
+  @container ce-theme style(--ce-layout-profile: standard-app) {
+    .onboardingWalkthrough {
+      --ce-main-welcome-frame-height: max(540px, calc(100dvh - 330px));
+      --ce-welcome-controls-height: clamp(108px, 12dvh, 140px);
+    }
+
+    .onboardingWalkthrough .onboardingControls {
+      flex: 0 0 var(--ce-welcome-controls-height);
+      height: var(--ce-welcome-controls-height);
+      min-height: var(--ce-welcome-controls-height);
+    }
+
+    .onboardingControls .takeSurveyIcon {
+      font-size: clamp(64px, 7dvh, 80px);
     }
   }
 }

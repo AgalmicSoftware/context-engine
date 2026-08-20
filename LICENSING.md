@@ -19,6 +19,7 @@ The public open-source core is licensed under `MPL-2.0`. The root [LICENSE](LICE
 | `LICENSE` | `MPL-2.0` | Standard MPL 2.0 text for the public open-source core default. |
 | `package.json` / `package-lock.json` | `MPL-2.0` | Root package metadata for repo-level project code and tooling unless a more specific notice applies. |
 | `client/` | `MPL-2.0` | Main browser app/package. `client/package.json` declares `MPL-2.0`, and `client/LICENSE` points to the root MPL text. |
+| `ai-discourse-bench/` | `MPL-2.0` | AI Opinions Benchmark harness, question-bank tooling, report generator, and package documentation. `ai-discourse-bench/package.json` declares `MPL-2.0`. |
 | Repository docs/spec prose | `MPL-2.0` unless a more specific local note says otherwise | The previous map treated remaining docs/spec material as part of the root default license. No separate documentation-content license notice was found. |
 | Files with `SPDX-License-Identifier: MIT` | MIT | Explicit file-level notices control, including Solidity contracts, deployment scripts, and contract tests that carry MIT SPDX headers. |
 | `workers/` | MIT | Worker subtree. `workers/LICENSE` contains the MIT text for worker-side project code. |

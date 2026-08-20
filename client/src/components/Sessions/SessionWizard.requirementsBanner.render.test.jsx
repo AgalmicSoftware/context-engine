@@ -55,7 +55,7 @@ describe('SessionWizard new-session requirements banner', () => {
     expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
   });
 
-  it('offers native Cloudflare deployment without a token from the Fast & Cheap onboarding banner', async () => {
+  it('offers native Cloudflare deployment without a token from the Centralized onboarding banner', async () => {
     window.history.replaceState({}, '', '/session/new');
 
     renderSessionWizard();

@@ -19,6 +19,7 @@ import CollapsibleFieldGroup from './CollapsibleFieldGroup';
 import SessionWizardContractsField from './SessionWizardContractsField';
 import SessionWizardStorageProfileMetadataField from './SessionWizardStorageProfileMetadataField';
 import SessionColorSchemeField from './SessionColorSchemeField';
+import SessionGroupCreationPolicyField from './SessionGroupCreationPolicyField';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { seedGenPrompt } from '../../prompts/seedGenPrompt.js';
 import { t } from '../../utilities/ui/terminology.js';
@@ -491,8 +492,22 @@ export const buildSessionWizardDraftFieldRenderer = ({
       return (
         <SessionColorSchemeField
           key={keyString}
+          isCollapsed={metadataObjectCollapsed.appearance}
           value={appearanceValue}
           onChange={(nextAppearance) => updateDraftValue(['appearance'], nextAppearance)}
+          onToggleCollapsed={() => setMetadataObjectCollapsed((prev) => ({ ...prev, appearance: !prev.appearance }))}
+        />
+      );
+    }
+
+    if (path.length === 0 && key === 'groupCreationPolicy') {
+      const sessionModeProfile = draft.sessionModeProfile as { authority?: { mode?: unknown } } | null | undefined;
+      return (
+        <SessionGroupCreationPolicyField
+          key={keyString}
+          value={value}
+          isWorkerCanonical={sessionModeProfile?.authority?.mode === 'worker_canonical'}
+          onChange={(nextPolicy) => updateDraftValue(['groupCreationPolicy'], nextPolicy)}
         />
       );
     }

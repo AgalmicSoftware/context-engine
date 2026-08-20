@@ -23,6 +23,7 @@ permissions:
 
 jobs:
   wiring-and-release:
+    if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository || !startsWith(github.head_ref, 'release-staging') }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
@@ -128,6 +129,7 @@ jobs:
           retention-days: 1
 
   contracts:
+    if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository || !startsWith(github.head_ref, 'release-staging') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -154,6 +156,7 @@ jobs:
         run: npm run ci:gate -- contracts
 
   client:
+    if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository || !startsWith(github.head_ref, 'release-staging') }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
@@ -183,6 +186,7 @@ jobs:
           if-no-files-found: warn
 
   root-jest:
+    if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository || !startsWith(github.head_ref, 'release-staging') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -213,6 +217,7 @@ jobs:
         run: npm run ci:gate -- root-jest
 
   workers:
+    if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository || !startsWith(github.head_ref, 'release-staging') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -239,8 +244,9 @@ jobs:
         run: npm run ci:gate -- workers
 
   e2e-smoke:
+    if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository || !startsWith(github.head_ref, 'release-staging') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -288,6 +294,7 @@ jobs:
           npm run ci:gate -- e2e-smoke
 
   cecc-and-node:
+    if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository || !startsWith(github.head_ref, 'release-staging') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -318,6 +325,7 @@ jobs:
         run: npm run dead-exports:advisory
 
   test:
+    name: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && startsWith(github.head_ref, 'release-staging') && 'release-staging-pr-deduplicated' || 'test' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     needs:
@@ -331,17 +339,24 @@ jobs:
     if: ${{ always() }}
 
     steps:
+      - name: Report deduplicated release-staging PR verification
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && startsWith(github.head_ref, 'release-staging') }}
+        run: echo "Release-staging PR verification is covered by the authoritative push workflow."
+
       - name: Checkout
+        if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository || !startsWith(github.head_ref, 'release-staging') }}
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
 
       - name: Setup Node
+        if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository || !startsWith(github.head_ref, 'release-staging') }}
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
 
       - name: Check split CI job results
+        if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository || !startsWith(github.head_ref, 'release-staging') }}
         env:
           CI_GATE_RESULTS_JSON: >-
             {"wiring-and-release":"${{ needs.wiring-and-release.result }}","public-text":"${{ needs.wiring-and-release.result }}","contracts":"${{ needs.contracts.result }}","client":"${{ needs.client.result }}","root-jest":"${{ needs.root-jest.result }}","workers":"${{ needs.workers.result }}","e2e-smoke":"${{ needs.e2e-smoke.result }}","cecc-and-node":"${{ needs.cecc-and-node.result }}"}

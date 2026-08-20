@@ -33,15 +33,6 @@ type DraftWithSelectedModeProfile<Draft extends SessionWizardModeDraft> = DraftW
 const isRecord = (value: unknown): value is UnknownRecord =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 
-export const applyGroupCreationPolicyToDraft = <Draft extends SessionWizardModeDraft>(
-  prev: Draft,
-  groupCreation: GroupCreationPolicy,
-): DraftWithGroupCreationPolicy<Draft> => {
-  const next = deepClone(prev) as DraftWithGroupCreationPolicy<Draft>;
-  next.groupCreationPolicy = normalizeGroupCreationPolicy(groupCreation, DEFAULT_NEW_SESSION_GROUP_CREATION_POLICY);
-  return next;
-};
-
 export const applyStorageProfileChangeToModeDraft = <Draft extends SessionWizardModeDraft>(
   prev: Draft,
   nextProfile: unknown,

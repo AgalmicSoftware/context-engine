@@ -150,14 +150,14 @@ export const resolveSessionWizardModeRequirements = (
     ? [
         'Cloudflare account',
         ...(usesAgentSessionWrapped ? ['Request-only Cloudflare API token'] : []),
-        'AI provider key',
+        'OpenAI API Key',
         ...(requiresRpc ? ['RPC URL/key'] : []),
         ...(requiresLit ? ['Lit API key'] : []),
       ]
     : [
         ...(usesWorkerRuntime ? ['Compatible Session Worker'] : []),
         ...(usesAgentSessionWrapped ? ['Request-only Cloudflare API token'] : []),
-        'AI provider key',
+        'OpenAI API Key',
         'Arweave wallet/JWK',
         'RPC URL/key',
         'Lit API key if encryption is enabled',

@@ -1,6 +1,6 @@
 {
   "name": "contextEngine",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Context Engine — an OSS toolkit for groups",
   "author": "Context Engine Contributors",
   "license": "MPL-2.0",
@@ -57,6 +57,9 @@
     "test:worker:agent-bridge": "node scripts/run-agent-bridge-worker-tests.js",
     "test:node": "node scripts/run-node-tests.js",
     "test:node:tracked": "node scripts/run-node-tests.js --tracked-only",
+    "test:ai-discourse-bench": "npm --prefix ai-discourse-bench test",
+    "check:ai-discourse-bench-results-sync": "npm --prefix ai-discourse-bench run check:results-sync",
+    "check:ai-discourse-bench-publication": "npm --prefix ai-discourse-bench run check:static-publication",
     "client-boundaries:check": "node scripts/check-client-boundaries.mjs",
     "dead-exports:advisory": "node scripts/check-dead-exports-advisory.mjs",
     "dead-exports:check": "node scripts/check-dead-exports-advisory.mjs --check",

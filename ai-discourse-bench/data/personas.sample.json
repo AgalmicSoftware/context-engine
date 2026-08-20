@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "personas": [
+    {
+      "id": "ada-lovelace",
+      "label": "Ada Lovelace",
+      "publicFigure": true,
+      "profileType": "public-figure-weights-only",
+      "evaluationClaim": "model-interpretation-not-ground-truth"
+    },
+    {
+      "id": "norbert-wiener",
+      "label": "Norbert Wiener",
+      "publicFigure": true,
+      "profileType": "public-figure-weights-only",
+      "evaluationClaim": "model-interpretation-not-ground-truth"
+    }
+  ]
+}

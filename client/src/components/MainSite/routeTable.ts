@@ -21,6 +21,7 @@ export type MainSiteRouteKey =
   | 'about'
   | 'posts'
   | 'demos'
+  | 'benchmarks'
   | 'matrix'
   | 'docs'
   | 'admin'
@@ -157,6 +158,10 @@ const routeDefinitions: RouteDefinition[] = [
   {
     key: 'demos',
     match: ({ fullPath }) => isExactRoute(fullPath, '/demos'),
+  },
+  {
+    key: 'benchmarks',
+    match: ({ fullPath }) => isExactRoute(fullPath, '/benchmarks'),
   },
   {
     key: 'matrix',

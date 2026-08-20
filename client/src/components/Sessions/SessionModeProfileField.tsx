@@ -30,21 +30,21 @@ export type SessionModeProfileFieldProps = {
 const HOSTING_PRESETS = [
   {
     id: SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE,
-    label: 'Cloudflare',
-    ariaLabel: 'Cloudflare',
-    entryLabel: 'Fast & Cheap',
+    label: 'Centralized',
+    ariaLabel: 'Centralized',
+    entryLabel: 'Centralized',
     entryProvider: 'Cloudflare',
-    entryDescription: 'Session settings and responses are stored in Cloudflare. No public blockchain is required.',
-    entryRequirements: ['Cloudflare account', 'AI provider key'],
+    entryDescription: 'Session settings and responses are stored in Cloudflare. No blockchain is required.',
+    entryRequirements: ['Cloudflare account', 'OpenAI API Key'],
   },
   {
     id: SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED,
     label: 'Decentralized',
     ariaLabel: 'Decentralized',
-    entryLabel: 'Trustless & Public',
-    entryProvider: 'Decentralized',
-    entryDescription: 'Session data is stored on Arweave, with session identity recorded in a public EVM registry.',
-    entryRequirements: ['AI provider key', 'Arweave wallet', 'EVM RPC URL', 'EVM Gas (TX Fees)'],
+    entryLabel: 'Decentralized',
+    entryProvider: 'Arweave + EVM',
+    entryDescription: 'Session data is stored on Arweave, with session identity recorded in an EVM registry.',
+    entryRequirements: ['OpenAI API Key', 'Arweave wallet', 'EVM RPC URL', 'EVM Gas (TX Fees)'],
   },
 ] as const;
 
@@ -141,6 +141,7 @@ const SessionModeProfileField = ({
             : `${styles.modePresetButton} ${selected ? styles.modePresetButtonSelected : ''}`
         }
         data-testid={`ce-new-preset-${preset.id}`}
+        data-ce-control-appearance={entryCard ? undefined : 'frameless'}
         tabIndex={selected || (!selectedPreset && index === 0) ? 0 : -1}
         onClick={() => selectPreset(preset.id)}
         onKeyDown={(event) => handlePresetKeyDown(event, index)}
@@ -208,24 +209,24 @@ const SessionModeProfileField = ({
           <button
             type="button"
             role="radio"
-            aria-label="Corporate (coming later)"
+            aria-label="Corporate (coming soon)"
             aria-checked="false"
             className={`${styles.modePresetButton} ${styles.modePresetButtonDisabled}`}
-            title="Corporate hosting is coming later"
+            title="Corporate hosting is coming soon"
+            data-ce-control-appearance="frameless"
             disabled
             tabIndex={-1}
           >
             <span>Corporate</span>
-            <span className={styles.modePresetSoon}>Later</span>
+            <span className={styles.modePresetSoon}>Soon</span>
           </button>
         </div>
       )}
 
       {entryOnly && profile ? (
         <div className={`${styles.modeSavedProfile} ${styles.modeSavedProfileEntry}`}>
-          <span>Saved {profile.preset === SESSION_MODE_PRESET_IDS.CUSTOM ? 'custom' : 'hosting'} settings</span>
-          <Button type="button" color="primary" onClick={onContinue}>
-            Continue with saved settings
+          <Button type="button" color="primary" onClick={onContinue} data-testid={E2E_TESTIDS.WIZARD_MODE_RESUME}>
+            Resume in-progress session setup
           </Button>
         </div>
       ) : null}

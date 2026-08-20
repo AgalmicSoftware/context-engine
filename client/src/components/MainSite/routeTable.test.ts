@@ -27,6 +27,7 @@ describe('MainSite route table', () => {
       'about',
       'posts',
       'demos',
+      'benchmarks',
       'matrix',
       'docs',
       'admin',
@@ -53,6 +54,8 @@ describe('MainSite route table', () => {
     ['/sponsor', 'sponsor', {}],
     ['/posts', 'posts', {}],
     ['/posts/first-post', 'posts', {}],
+    ['/benchmarks', 'benchmarks', {}],
+    ['/benchmarks/', 'benchmarks', {}],
     ['/docs', 'docs', { canonicalPath: undefined }],
     ['/docs/pe4', 'docs', { canonicalPath: undefined }],
     ['/contracts', 'docs', { canonicalPath: '/docs' }],
@@ -156,6 +159,13 @@ describe('MainSite route table', () => {
     expect(resolveMainSiteRouteMatch({ fullPath: '/posts/first-post', isAddress })).toEqual(
       expect.objectContaining({
         key: 'posts',
+        isKnownRoutePrefix: true,
+        shouldBypassCacheHydrationWait: true,
+      }),
+    );
+    expect(resolveMainSiteRouteMatch({ fullPath: '/benchmarks', isAddress })).toEqual(
+      expect.objectContaining({
+        key: 'benchmarks',
         isKnownRoutePrefix: true,
         shouldBypassCacheHydrationWait: true,
       }),

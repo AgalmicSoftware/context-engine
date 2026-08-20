@@ -87,6 +87,7 @@ export type WorkerPanelProps = {
   advancedBundleFileInputRef?: React.Ref<HTMLInputElement>;
   showSponsoredDeployAccessNotice: boolean;
   account?: string;
+  toggleLoginModal?: WorkerDeploySectionProps['toggleLoginModal'];
   resolvedActiveSessionSlug?: string;
   setDeployForm: React.Dispatch<React.SetStateAction<DeployForm>>;
   handleDeployWorker: () => void;
@@ -149,6 +150,7 @@ const WorkerPanel = ({
   advancedBundleFileInputRef,
   showSponsoredDeployAccessNotice,
   account,
+  toggleLoginModal,
   resolvedActiveSessionSlug,
   setDeployForm,
   handleDeployWorker,
@@ -295,6 +297,7 @@ const WorkerPanel = ({
             advancedBundleFileInputRef={advancedBundleFileInputRef}
             showSponsoredDeployAccessNotice={showSponsoredDeployAccessNotice}
             account={account}
+            toggleLoginModal={toggleLoginModal}
             cloudflareTokenSlug={toStr(draft.slug || resolvedActiveSessionSlug).trim()}
             setDeployForm={setDeployForm}
             handleDeployWorker={handleDeployWorker}

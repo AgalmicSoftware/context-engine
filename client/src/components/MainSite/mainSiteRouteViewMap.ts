@@ -29,6 +29,7 @@ export const MAIN_SITE_ROUTE_VIEW_KEYS: MainSiteRouteViewKey[] = [
   'about',
   'posts',
   'demos',
+  'benchmarks',
   'matrix',
   'docs',
   'admin',
