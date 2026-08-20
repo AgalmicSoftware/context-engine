@@ -97,7 +97,3 @@ export function base64DecodeURL(b64urlstring) {
   const b64string = b64urlstring.replace(/-/g, '+').replace(/_/g, '/');
   return decodeBase64ToBytes(b64string);
 }
-
-// --- Arweave gateway ---
-
-export const ARWEAVE_GATEWAY = 'https://ar-io.dev';

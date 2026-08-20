@@ -40,8 +40,3 @@ export const buildWorkerAllowOrigins = ({
   const extras = coerceOriginListInput(extraOrigins);
   return normalizeOriginList([currentOrigin, ...SHARED_DEFAULT_WORKER_ALLOWED_ORIGINS, ...extras]);
 };
-
-export const workerCorsOrigins = {
-  DEFAULT_WORKER_ALLOWED_ORIGINS,
-  buildWorkerAllowOrigins,
-};

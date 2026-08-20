@@ -129,8 +129,6 @@ const hasPromptEncryptionEnvelope = (payload: QuestionPayload): boolean => {
   );
 };
 
-export const normalizeQuestionRouteSessionSlug = (rawSlug: unknown): string => normalizeSlug(rawSlug);
-
 export const isKnownOrGeneralSessionSlug = (
   slugIn: unknown,
   getSessionConfigBySlug: SessionConfigResolver,

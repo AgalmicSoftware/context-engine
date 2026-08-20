@@ -1157,10 +1157,6 @@ export function formatBlockchainNetworkLabel(network: UnknownRecord | null = nul
   return 'Unknown';
 }
 
-export function getLastBlock() {
-  return '20608649';
-}
-
 export function getUTCDataTimestamp() {
   const now = new Date();
   return now.toISOString().replace('T', ' ').split('.')[0] + ' UTC';

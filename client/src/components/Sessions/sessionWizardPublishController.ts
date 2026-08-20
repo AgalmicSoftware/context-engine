@@ -872,9 +872,3 @@ export const runSessionWizardPublishCompletionController = ({
     remainingPendingDrafts,
   };
 };
-
-export const __test__ = {
-  assertVerifiedWorkerDeploy,
-  getPendingDraftAddressKey,
-  getPublishStepNumber,
-} satisfies AnyRecord;

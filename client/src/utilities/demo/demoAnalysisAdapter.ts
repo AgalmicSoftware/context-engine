@@ -437,18 +437,4 @@ export const buildDemoAnalysisData = (
   };
 };
 
-export const getHighestParticipationQuestion = (
-  questions: DemoAnalysisQuestion[] = [],
-): DemoAnalysisQuestion | null => {
-  if (!Array.isArray(questions) || questions.length === 0) return null;
-  return (
-    [...questions].sort((left, right) => {
-      if (right.participationCount !== left.participationCount) {
-        return right.participationCount - left.participationCount;
-      }
-      return left.index - right.index;
-    })[0] || null
-  );
-};
-
 export default buildDemoAnalysisData;

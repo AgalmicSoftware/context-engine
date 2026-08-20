@@ -1,7 +1,6 @@
 import {
   base64URLToBuffer,
   bufferSourceToWebCryptoBufferSource,
-  bufferToBase64URL,
   isArrayBufferLike,
 } from './encoding.js';
 
@@ -61,5 +60,3 @@ export const deriveAesGcmKeyFromPrf = async (prfOutput: ArrayBuffer, saltBase64U
     ['encrypt', 'decrypt'],
   );
 };
-
-export const encodePrfSalt = (salt: ArrayBuffer | Uint8Array): string => bufferToBase64URL(salt);

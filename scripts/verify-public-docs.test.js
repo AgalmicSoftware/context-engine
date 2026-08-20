@@ -87,3 +87,20 @@ test('verify-public-docs CLI exits nonzero when a public doc leaks planning cont
     assert.match(result.stderr, /internal planning identifier/);
   });
 });
+
+test('verifyPublicDocs rejects internal document classes even when their text is generic', () => {
+  withFixture((rootDir) => {
+    writeFile(rootDir, 'ai-discourse-corpus/AGENTS.md', '# Instructions\n');
+    writeFile(rootDir, 'docs/plans/refactor.md', '# Refactor\n');
+    writeFile(rootDir, 'docs/client-build-assets.md', '# Build assets\n');
+    writeFile(rootDir, 'posts/example/diagram-prompts.md', '# Diagrams\n');
+    writeFile(rootDir, 'posts/example/attachments/README.md', '# Attachments\n');
+
+    const { findings } = verifyPublicDocs(rootDir);
+    const formatted = findings.map((finding) => `${finding.kind}: ${finding.detail}`).join('\n');
+    assert.match(formatted, /internal agent instruction document/);
+    assert.match(formatted, /internal planning document path/);
+    assert.match(formatted, /stale build inventory document/);
+    assert.match(formatted, /internal post authoring document/);
+  });
+});

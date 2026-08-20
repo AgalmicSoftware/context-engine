@@ -119,10 +119,6 @@ export const buildSurveyResultsSurveyViewModePatch = (surveyViewMode: unknown) =
   surveyViewMode,
 });
 
-export const buildSurveyResultsBookmarkFeedbackPatch = (filterBookmarkedFeedback: unknown) => ({
-  filterBookmarkedFeedback: !!filterBookmarkedFeedback,
-});
-
 export const buildSurveyResultsBookmarkedSurveyIdsPatch = (bookmarkedSurveyIDs: unknown = []) => ({
   bookmarkedSurveyIDs: Array.isArray(bookmarkedSurveyIDs) ? [...bookmarkedSurveyIDs] : [],
 });

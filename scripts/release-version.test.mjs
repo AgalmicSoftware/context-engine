@@ -81,7 +81,7 @@ test('release planning uses the greatest public baseline and keeps major/minor o
 test('release impact reports breaking surfaces, explicit features, and patch-only changes', () => {
   assert.equal(
     assessReleaseImpact({
-      paths: ['client/src/utilities/shared/encryption/envelopeV1Core.mjs'],
+      paths: ['client/src/utilities/crypto/cryptography.ts'],
       subjects: ['fix: clarify envelope failure'],
     }).level,
     'major',

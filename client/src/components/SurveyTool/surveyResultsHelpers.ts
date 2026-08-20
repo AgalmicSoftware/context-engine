@@ -139,7 +139,6 @@ type SurveyResponseLatestEntry = SurveyResponseNormalizationEntry & SurveyQuesti
 
 export {
   buildSurveyResultsAlertMessagePatch,
-  buildSurveyResultsBookmarkFeedbackPatch,
   buildSurveyResultsBookmarkedQuestionIdsPatch,
   buildSurveyResultsBookmarkedSurveyIdsPatch,
   buildSurveyResultsBooleanTogglePatch,
@@ -616,17 +615,6 @@ export const buildSurveyResultsRefreshStatusSequencePlan = ({
     orderedEffects,
     shouldDispatchFollowUp: true,
     shouldWrite: true,
-    statePatch,
-    target,
-  };
-};
-
-export const buildSurveyResultsRefreshStatusWritePlan = (args: BuildSurveyResultsRefreshStatusWritePlanArgs = {}) => {
-  const { blockedReason, shouldWrite, statePatch, target } = buildSurveyResultsRefreshStatusSequencePlan(args);
-
-  return {
-    blockedReason,
-    shouldWrite,
     statePatch,
     target,
   };

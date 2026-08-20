@@ -344,18 +344,6 @@ export const getRiskMatrixAtlasScenariosForCell = (cellId = '') => {
 export const getRiskMatrixAtlasScenarioCountForCell = (cellId = '') =>
   getRiskMatrixAtlasScenariosForCell(cellId).length;
 
-export const getRiskMatrixAtlasCoveredPairCount = () => {
-  const coveredPairs = new Set();
-
-  riskMatrixAtlasScenarioSamples.forEach((sample) => {
-    const parsed = parseRiskMatrixCell(sample.riskMatrixCell);
-    if (!parsed) return;
-    coveredPairs.add([parsed.categoryX, parsed.categoryY].sort().join('|'));
-  });
-
-  return coveredPairs.size;
-};
-
 export const getRiskMatrixAtlasScenariosForAtlasNode = (atlasNodeId = '') => {
   const normalizedNodeId = String(atlasNodeId || '')
     .trim()

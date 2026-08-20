@@ -611,10 +611,6 @@ export const getPasskeyWalletClient = (): PasskeyEoaWalletClient => {
   return singleton;
 };
 
-export const resetPasskeyWalletClientForTests = (client: PasskeyEoaWalletClient | null = null): void => {
-  singleton = client;
-};
-
 export const setPasskeyWalletChain = (chainOrId: unknown): ChainLike => getPasskeyWalletClient().setChain(chainOrId);
 export const getPasskeyWalletChain = (): ChainLike => getPasskeyWalletClient().getChain();
 export const createPasskeyWallet = (): Promise<HexString> => getPasskeyWalletClient().createWallet();
@@ -622,15 +618,9 @@ export const unlockPasskeyWallet = (options: UnlockOptions = {}): Promise<HexStr
   getPasskeyWalletClient().unlockWallet(options);
 export const restorePasskeyWalletSession = (options: RestoreOptions = {}): Promise<HexString | null> =>
   getPasskeyWalletClient().restoreSession(options);
-export const lockPasskeyWallet = (): Promise<void> => getPasskeyWalletClient().lock();
 export const logoutPasskeyWallet = (): Promise<void> => getPasskeyWalletClient().disconnect();
-export const getPasskeyWalletAddress = (): HexString | null => getPasskeyWalletClient().getAddress();
-export const hasPasskeyWalletSigner = (): boolean => getPasskeyWalletClient().hasSigner();
 export const isPasskeyWalletAutoSignReady = (): boolean => getPasskeyWalletClient().isUnlocked();
-export const sendPasskeyWalletTransaction = (tx: Record<string, unknown>): Promise<HexString> =>
-  getPasskeyWalletClient().sendTransaction(tx);
 export const createPasskeyEip1193Provider = (): Eip1193Provider => getPasskeyWalletClient().createProvider();
-export const getPasskeyWalletCapabilities = (): PasskeyWalletCapabilities => PASSKEY_WALLET_CAPABILITIES;
 
 try {
   if (typeof window !== 'undefined') {

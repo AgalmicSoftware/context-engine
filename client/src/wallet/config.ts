@@ -172,8 +172,6 @@ export const getPasskeyWalletConfig = (runtimeLocation?: PasskeyWalletRuntimeLoc
   });
 };
 
-export const PASSKEY_WALLET_PROVIDER = 'passkey_eoa' as const;
-
 export const PASSKEY_WALLET_CAPABILITIES: PasskeyWalletCapabilities = {
   passkeyWallet: true,
   eoa: true,

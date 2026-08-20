@@ -38,5 +38,3 @@ export const resolveSessionBackendKind = ({
       normalizeSessionSlug(probeResult.sessionSlug) === normalizeSessionSlug(sessionSlug)))
     ? 'telegram'
     : 'onchain';
-
-export const isTelegramSessionBackendKind = (kind: SessionBackendKind): boolean => kind === 'telegram';

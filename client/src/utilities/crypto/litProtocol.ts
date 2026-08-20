@@ -1185,47 +1185,6 @@ export const buildWalletAddressAccessControlConditions = ({
   ];
 };
 
-/**
- * Builds Lit access control conditions that require a Hats Protocol wearer check to pass.
- *
- * @param {{
- *   hatsAddress?: string,
- *   hatId?: string | number | null,
- *   chain?: string | number | null,
- *   litChain?: string | number | null,
- *   chainId?: number | string | null
- * }} [options={}]
- * @returns {LitAccessControlCondition[] | null}
- */
-export const buildHatAccessControlConditions = ({
-  hatsAddress,
-  hatId,
-  chain,
-  litChain,
-  chainId,
-}: {
-  hatsAddress?: unknown;
-  hatId?: unknown;
-  chain?: ChainInput;
-  litChain?: ChainInput;
-  chainId?: ChainInput;
-} = {}): LitAccessControlCondition[] | null => {
-  const address = toStr(hatsAddress).trim();
-  const id = toStr(hatId).trim();
-  if (!address || !ethers.utils.isAddress(address) || !id) return null;
-  const resolvedChain = resolveLitChain({ chainId, litChain, chain });
-  return [
-    {
-      contractAddress: address,
-      standardContractType: '',
-      chain: resolvedChain,
-      method: 'isWearerOfHat',
-      parameters: [':userAddress', id],
-      returnValueTest: { comparator: '=', value: 'true' },
-    },
-  ];
-};
-
 const normalizeUserMaxPrice = (value: unknown) => {
   if (typeof value === 'bigint') return value;
   const raw = toStr(value).trim();

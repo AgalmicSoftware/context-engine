@@ -95,7 +95,7 @@ const majorPathRules = [
     reason: 'public contract ABI changed',
   },
   {
-    pattern: /^client\/src\/utilities\/shared\/encryption\/(?:envelope|.*schema)/i,
+    pattern: /^client\/src\/utilities\/crypto\/(?:cryptography|.*(?:envelope|schema))/i,
     reason: 'persisted encryption envelope/schema surface changed',
   },
   {

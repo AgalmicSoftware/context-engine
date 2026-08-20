@@ -1,6 +1,7 @@
 'use strict';
 
 const { execFileSync } = require('node:child_process');
+const fs = require('node:fs');
 const path = require('node:path');
 
 const TYPED_TEST_SOURCE_RE = /\.(?:test|spec)\.(?:ts|tsx)$/;
@@ -39,6 +40,7 @@ function listTrackedClientTestTypeFiles(rootDir) {
   return output.split('\0')
     .filter(Boolean)
     .map(normalizeRepoPath)
+    .filter((relativePath) => fs.existsSync(path.join(rootDir, relativePath)))
     .filter((relativePath) => classifyClientTestTypePath(relativePath).included)
     .sort();
 }

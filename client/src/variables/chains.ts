@@ -109,7 +109,6 @@ const readConfiguredPaidRpcUrl = (chainId: unknown, transport: RpcTransport = 'h
 
 export const getConfiguredPaidRpcHttpUrl = (chainId: unknown) => readConfiguredPaidRpcUrl(chainId, 'http');
 export const getConfiguredPaidRpcWssUrl = (chainId: unknown) => readConfiguredPaidRpcUrl(chainId, 'wss');
-export const getConfiguredBaseSepoliaPaidRpcHttpUrl = () => getConfiguredPaidRpcHttpUrl(84532);
 
 const readUseInfuraRpcFlag = () => {
   try {

@@ -18,7 +18,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './AudioInput.module.scss';
-import { requestAiRewrite, setVadTrimEnabled } from '../../../utilities/ai/aiClient.js';
+import { requestAiRewrite } from '../../../utilities/ai/aiClient.js';
 import { useWhisper, RECORDING_STATUS } from '../../../utilities/useWhisper.js';
 import { createLogger } from '../../../utilities/logging.js';
 import { readThemeToken, subscribeThemeChanges } from '../../../utilities/ui/themeRuntime';
@@ -221,14 +221,6 @@ const AudioInput = ({
       cancelPendingParentUpdate();
     };
   }, [cancelPendingParentUpdate]);
-
-  // Silence-trim (VAD) toggle - local component state only (no visible UI)
-  const [trimOn, setTrimOn] = useState(true);
-
-  // Keep the module-scoped flag in sync with component state
-  useEffect(() => {
-    setVadTrimEnabled(trimOn);
-  }, [trimOn]);
 
   const flushQueuedParentUpdate = useCallback(() => {
     parentUpdateRafRef.current = null;

@@ -38,7 +38,7 @@ import {
 // NEW: blockie data URL generator (tiny, deterministic)
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
 
-// NEW: single public entry for comparison bundle + drilldown stays on toolkit path
+// AI comparison sections use the toolkit; drilldown stays local to cached comparison data.
 import { runCompareToolkit } from 'utilities/ai/aiClient.js';
 import {
   mergeCompareVennWithEvidence,

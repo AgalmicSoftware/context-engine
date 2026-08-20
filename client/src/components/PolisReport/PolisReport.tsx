@@ -2485,10 +2485,6 @@ export default function PolisReport({
                           </span>
                         </div>
                       ) : null}
-                      {/* <div className={styles.statsItem}>
-                        <span className={styles.statLabel}>Last Block:</span>
-                        <span className={styles.statValue}>{getLastBlock()}</span>
-                      </div> */}
                       <div className={styles.statsItem}>
                         <span className={styles.statLabel}>Timestamp:</span>
                         <span className={styles.statValue}>{getUTCDataTimestamp()}</span>

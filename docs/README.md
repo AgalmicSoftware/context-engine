@@ -58,7 +58,6 @@ Payload schemas:
 
 Local development:
 - `docs/bundle-budget.md`: bundle-size budget and regression policy.
-- `docs/client-build-assets.md`: Vite build outputs over 500 KB, source ownership, and safe follow-up actions.
 - `docs/local-chain.md`: Foundry/Anvil local chain setup, deploy flow, and test commands.
 - `docs/run-modes.md`: repo run modes (`core-local`, `local-chain`, `hosted/onchain`) plus the current manual-fork verification note.
 - `docs/testing.md`: centralized test commands and runtime requirements across root, client, and E2E flows.

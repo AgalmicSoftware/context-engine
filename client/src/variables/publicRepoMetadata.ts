@@ -1,7 +1,6 @@
 export const PUBLIC_GITHUB_ORG = 'AgalmicSoftware';
 export const PUBLIC_GITHUB_REPO = 'context-engine';
 export const PUBLIC_GITHUB_BRANCH = 'main';
-export const PUBLIC_SECURITY_EMAIL = 'contextengine@protonmail.com';
 
 export const PUBLIC_REPO_URL = `https://github.com/${PUBLIC_GITHUB_ORG}/${PUBLIC_GITHUB_REPO}`;
 export const PUBLIC_REPO_SOURCE_URL = `${PUBLIC_REPO_URL}/tree/${PUBLIC_GITHUB_BRANCH}`;
@@ -21,12 +20,7 @@ export const buildPublicRepoRawUrl = (pathname = ''): string =>
   pathname
     ? `https://raw.githubusercontent.com/${PUBLIC_GITHUB_ORG}/${PUBLIC_GITHUB_REPO}/${PUBLIC_GITHUB_BRANCH}/${String(pathname).replace(/^\/+/, '')}`
     : '';
-export const PUBLIC_README_URL = buildPublicRepoRawUrl('README.md');
-export const PUBLIC_ARCHITECTURE_URL = buildPublicRepoRawUrl('ARCHITECTURE.md');
-export const PUBLIC_CONTRIBUTING_URL = buildPublicRepoBlobUrl('CONTRIBUTING.md');
-export const PUBLIC_LICENSE_URL = buildPublicRepoBlobUrl('LICENSE');
 export const PUBLIC_WHITEPAPER_URL = buildPublicRepoBlobUrl('whitepaper/whitepaper.md');
-export const PUBLIC_WHITEPAPER_RAW_URL = buildPublicRepoRawUrl('whitepaper/whitepaper.md');
 export const PUBLIC_CONTRACTS_SOURCE_BASE_URL = buildPublicRepoBlobUrl('contracts');
 export const PUBLIC_AI_DISCOURSE_CORPUS_URL = buildPublicRepoTreeUrl('ai-discourse-corpus');
 

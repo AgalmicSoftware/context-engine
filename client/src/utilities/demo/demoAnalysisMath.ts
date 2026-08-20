@@ -13,16 +13,6 @@ export type ComparisonGroup = {
   filters?: Array<{ type: string; value: string }>;
 };
 
-type AgreementRate = UnknownRecord & {
-  rate?: number;
-  groupName?: unknown;
-};
-
-type ResolvedAgreementRate = UnknownRecord & {
-  rate: number;
-  groupName: string;
-};
-
 type DemoAnalysisQuestion = UnknownRecord & {
   id?: unknown;
   text?: unknown;
@@ -84,19 +74,6 @@ type FindMostDivergentPairsOptions = {
   questions?: DemoAnalysisQuestion[];
   topN?: number;
   allowedSegmentKeys?: string[];
-};
-
-type IndicatorHeatmapOptions = {
-  questions?: DemoAnalysisQuestion[];
-  flatResponses?: DemoFlatResponse[];
-  selectedSegmentKey?: string;
-};
-
-type IndicatorHeatmapData = {
-  title: string;
-  rowLabels: string[];
-  columnLabels: string[];
-  pivotData: Array<Array<number | null>>;
 };
 
 const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
@@ -163,43 +140,6 @@ export const calculateDivisiveness = (
   const divergence = calculateDivergence(ratesBySegment, selectedSegmentKeys);
   if (divergence == null || !Number.isFinite(divergence)) return null;
   return Math.max(0, Math.min(divergence / 0.5, 1));
-};
-
-export const getMinMaxAgreement = (
-  groupRates: AgreementRate[] = [],
-): {
-  min: ResolvedAgreementRate;
-  max: ResolvedAgreementRate;
-} => {
-  if (!Array.isArray(groupRates) || groupRates.length === 0) {
-    return { min: { rate: 0, groupName: 'N/A' }, max: { rate: 0, groupName: 'N/A' } };
-  }
-
-  const normalizedRates = groupRates
-    .map((entry) => ({
-      ...entry,
-      groupName: String(entry?.groupName || 'N/A'),
-      rate: Number(entry?.rate || 0),
-    }))
-    .filter((entry): entry is ResolvedAgreementRate => isFiniteNumber(entry.rate));
-  if (!normalizedRates.length) {
-    return { min: { rate: 0, groupName: 'N/A' }, max: { rate: 0, groupName: 'N/A' } };
-  }
-
-  let min = normalizedRates[0];
-  let max = normalizedRates[0];
-
-  for (let index = 1; index < normalizedRates.length; index += 1) {
-    const rate = normalizedRates[index];
-    if (rate.rate < min.rate) {
-      min = rate;
-    }
-    if (rate.rate > max.rate) {
-      max = rate;
-    }
-  }
-
-  return { min, max };
 };
 
 export const buildQuestionMap = (questions: DemoAnalysisQuestion[] = []): Map<string, DemoAnalysisQuestion> =>
@@ -350,44 +290,4 @@ export const findMostDivergentPairs = ({
   }
 
   return pairResults.sort((left, right) => right.score - left.score).slice(0, topN);
-};
-
-export const buildIndicatorHeatmapData = ({
-  questions = [],
-  flatResponses = [],
-  selectedSegmentKey = 'All',
-}: IndicatorHeatmapOptions = {}): IndicatorHeatmapData => {
-  const categoryQuestionIds = new Map<string, string[]>();
-  (Array.isArray(questions) ? questions : []).forEach((question) => {
-    const category = String(question?.category || '').trim();
-    const questionId = String(question?.id || '').trim();
-    if (!category || !questionId) return;
-    const existingQuestionIds = categoryQuestionIds.get(category) || [];
-    existingQuestionIds.push(questionId);
-    categoryQuestionIds.set(category, existingQuestionIds);
-  });
-
-  const columnLabels = ['Agree', 'Unsure', 'Disagree'];
-  const rowLabels = Array.from(categoryQuestionIds.keys());
-  const pivotData = rowLabels.map((category) => {
-    const questionIds = categoryQuestionIds.get(category) || [];
-    return columnLabels.map((responseText) => {
-      const rows = (Array.isArray(flatResponses) ? flatResponses : []).filter(
-        (row) =>
-          row?.segmentKey === selectedSegmentKey &&
-          row?.responseText === responseText &&
-          questionIds.includes(String(row?.questionId || '')),
-      );
-      if (rows.length === 0) return null;
-      const averageRate = rows.reduce((sum, row) => sum + Number(row?.rate || 0), 0) / rows.length;
-      return averageRate;
-    });
-  });
-
-  return {
-    title: `${getSegmentDisplayName(selectedSegmentKey)} Topic Heatmap`,
-    rowLabels,
-    columnLabels,
-    pivotData,
-  };
 };

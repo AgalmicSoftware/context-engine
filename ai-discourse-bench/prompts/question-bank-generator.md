@@ -23,7 +23,6 @@ humans can adjudicate before publication.
 
 Read these files before generating anything:
 
-- `ai-discourse-corpus/AGENTS.md`
 - `ai-discourse-corpus/README.md`
 - `ai-discourse-bench/src/schema.mjs`
 - `ai-discourse-bench/src/corpus-evidence.mjs`

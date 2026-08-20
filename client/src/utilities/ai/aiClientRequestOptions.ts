@@ -38,7 +38,6 @@ export type AiClientOptionRecord = UnknownRecord & {
   sessionSelection?: unknown;
   sessionSlug?: unknown;
   sessionTitle?: unknown;
-  sizeThresholdBytes?: unknown;
   style?: unknown;
   taskType?: unknown;
   thinking?: unknown;
@@ -96,11 +95,6 @@ export const withAiTaskTypeFallback = (input: unknown = {}, fallback: unknown): 
 export const readAiErrorMessage = (input: unknown, fallback: string): string => {
   const message = asOptionRecord(input).message;
   return String(message || fallback);
-};
-
-export const readNumericOption = (input: unknown = {}, key: keyof AiClientOptionRecord): number | null => {
-  const value = asOptionRecord(input)[key];
-  return typeof value === 'number' ? value : null;
 };
 
 export const resolveTranscriptionUploadOptions = (
@@ -163,9 +157,6 @@ export const resolveAiSessionOptions = (input: unknown = {}): AiSessionOptions =
 };
 
 export const resolveAiSessionSlug = (input: unknown = {}): string => resolveAiSessionOptions(input).sessionSlug;
-
-export const resolveAiSessionConfig = (input: unknown = {}): SessionConfig | null =>
-  resolveAiSessionOptions(input).sessionConfig;
 
 export const resolveAiSessionSelection = (input: unknown = {}): AiSessionSelection | null => {
   const sessionSelection = asOptionRecord(input).sessionSelection;

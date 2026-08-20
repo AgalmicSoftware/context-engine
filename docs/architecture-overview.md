@@ -186,8 +186,9 @@ Auth decisions:
 
 - `docs/adr/0002-worker-auth-revalidation.md` records 4-hour login tokens with
   `jti` markers in KV and fail-closed marker checks for authenticated routes.
-- `docs/adr/0004-worker-auth-consistency-risk-acceptance.md` accepts the
-  remaining cross-isolate KV consistency limits for nonce and rate-limit state.
+- `docs/adr/0004-worker-auth-consistency-risk-acceptance.md` records the
+  superseded KV-only consistency decision and its replacement by the mandatory
+  Session coordinator Durable Object for nonce and rate-limit authority.
 
 ## Storage Model
 

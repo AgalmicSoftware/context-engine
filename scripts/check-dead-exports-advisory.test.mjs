@@ -81,24 +81,73 @@ test('formatDeadExportAdvisory prints bounded candidate lists', () => {
   assert.match(output, /unused-export\? client\/src\/components\/Dead\/Dead\.tsx#deadExport/);
 });
 
-test('runDeadExportCheck passes at the banked counts and fails on regrowth', () => {
+test('runDeadExportCheck requires zero unresolved candidates', () => {
   withTempRoot((rootDir) => {
-    writeFile(rootDir, 'client/src/components/Dead/Dead.ts', 'export const deadExport = true;\n');
     writeFile(
       rootDir,
-      'scripts/dead-exports-baseline.json',
-      `${JSON.stringify({ version: 1, candidateDeadFiles: 1, candidateUnusedExports: 1 }, null, 2)}\n`,
+      'client/src/components/Used/Used.ts',
+      'export const usedExport = true;\n',
     );
+    writeFile(rootDir, 'client/src/index.ts', "import { usedExport } from './components/Used/Used';\nvoid usedExport;\n");
 
     const passingOutput = [];
     assert.equal(runDeadExportCheck({ rootDir, stdout: (line) => passingOutput.push(line) }), 0);
-    assert.match(passingOutput.join('\n'), /Dead export ratchet passed/);
+    assert.match(passingOutput.join('\n'), /zero candidates/);
 
-    writeFile(rootDir, 'client/src/components/Dead/Second.ts', 'export const secondDeadExport = true;\n');
+    writeFile(rootDir, 'client/src/components/Dead/Dead.ts', 'export const deadExport = true;\n');
     const failingOutput = [];
     assert.equal(runDeadExportCheck({ rootDir, stderr: (line) => failingOutput.push(line) }), 1);
-    assert.match(failingOutput.join('\n'), /candidate dead files increased: 1 -> 2/);
-    assert.match(failingOutput.join('\n'), /candidate unused named exports increased: 1 -> 2/);
+    assert.match(failingOutput.join('\n'), /remove or explicitly wire every candidate/);
+    assert.match(failingOutput.join('\n'), /dead-file\? client\/src\/components\/Dead\/Dead\.ts/);
+    assert.match(failingOutput.join('\n'), /unused-export\? client\/src\/components\/Dead\/Dead\.ts#deadExport/);
+  });
+});
+
+test('collectDeadExportAdvisory counts test consumers without treating test support as production', () => {
+  withTempRoot((rootDir) => {
+    writeFile(
+      rootDir,
+      'client/src/components/Widget/Widget.ts',
+      'export const widgetValue = true;\n',
+    );
+    writeFile(
+      rootDir,
+      'client/src/components/Widget/WidgetHarness.ts',
+      "export { widgetValue } from './Widget';\n",
+    );
+    writeFile(
+      rootDir,
+      'client/src/components/Widget/Widget.test.ts',
+      "import { widgetValue } from './WidgetHarness';\nvoid widgetValue;\n",
+    );
+
+    const result = collectDeadExportAdvisory({ rootDir });
+    assert.equal(result.filesScanned, 1);
+    assert.deepEqual(result.candidateDeadFiles, ['client/src/components/Widget/Widget.ts']);
+    assert.deepEqual(result.candidateUnusedExports, []);
+  });
+});
+
+test('collectDeadExportAdvisory ignores prose while preserving code after apostrophes and template expressions', () => {
+  withTempRoot((rootDir) => {
+    writeFile(
+      rootDir,
+      'client/src/components/Widget/Widget.ts',
+      "export const internallyUsed = 'value';\n// It's important that this comment does not consume the rest of the file.\nexport const rendered = `value: ${internallyUsed}`;\nexport const proseOnly = true;\nconst note = 'proseOnly';\nvoid note;\n",
+    );
+    writeFile(
+      rootDir,
+      'client/src/index.ts',
+      "import { rendered } from './components/Widget/Widget';\nvoid rendered;\n",
+    );
+
+    const result = collectDeadExportAdvisory({ rootDir });
+    assert.deepEqual(result.candidateUnusedExports, [
+      {
+        exportName: 'proseOnly',
+        file: 'client/src/components/Widget/Widget.ts',
+      },
+    ]);
   });
 });
 

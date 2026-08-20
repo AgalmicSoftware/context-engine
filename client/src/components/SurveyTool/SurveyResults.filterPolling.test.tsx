@@ -727,8 +727,7 @@ describe('SurveyResults bookmark cache writes', () => {
   });
 
   it('falls back to async filter cache reads before writing bookmark payloads', async () => {
-    // port note: filter bookmark cache ordering belongs in the filter bookmark write controller
-    // units. Render-side invariant preserved: no filters reads happen unprompted.
+    // Render-side invariant: no filter cache reads happen unprompted.
     const peekSpy = mockPeekCacheSync(buildPeekImpl({}));
     const readSpy = jest.spyOn(cacheScripts, 'readCache');
     renderSurveyResults({
@@ -744,8 +743,7 @@ describe('SurveyResults bookmark cache writes', () => {
   });
 
   it('initializes invalid bookmarked filter cache shape without changing the target identity', async () => {
-    // port note: invalid-shape normalization is no longer results-owned and belongs in
-    // surveyResultsFilterBookmarkWriteController unit tests. Render-side invariant preserved.
+    // Render-side invariant: invalid cached state remains untouched.
     const invalidCache = {
       bookmarkedFilters: 'not-an-array',
       otherField: 'kept',
@@ -768,8 +766,7 @@ describe('SurveyResults bookmark cache writes', () => {
   });
 
   it('does not mutate live bookmarkedFilters cache when filter write fails', async () => {
-    // port note: failed-write non-mutation is no longer results-owned and belongs in
-    // surveyResultsFilterBookmarkWriteController unit tests. Render-side invariant preserved.
+    // Render-side invariant: cached bookmarks remain untouched.
     const liveCache = { bookmarkedFilters: ['existing-filter'] };
     mockPeekCacheSync((namespace: string) => (namespace === 'filters' ? liveCache : null));
     const writeSpy = jest.spyOn(cacheScripts, 'writeCache');
@@ -786,8 +783,7 @@ describe('SurveyResults bookmark cache writes', () => {
   });
 
   it('keeps failed filter bookmark writes inert and allows a later successful retry', async () => {
-    // port note: reject-then-retry and feedback-timer facets are no longer results-owned and belong in
-    // surveyResultsFilterBookmarkWriteController unit tests. Render-side invariant preserved.
+    // Render-side invariant: rerenders do not mutate the cached bookmarks.
     const liveCache = { bookmarkedFilters: ['existing-filter'] };
     mockPeekCacheSync((namespace: string) => (namespace === 'filters' ? liveCache : null));
     const writeSpy = jest.spyOn(cacheScripts, 'writeCache');

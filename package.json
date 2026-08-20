@@ -61,7 +61,6 @@
     "check:ai-discourse-bench-results-sync": "npm --prefix ai-discourse-bench run check:results-sync",
     "check:ai-discourse-bench-publication": "npm --prefix ai-discourse-bench run check:static-publication",
     "client-boundaries:check": "node scripts/check-client-boundaries.mjs",
-    "dead-exports:advisory": "node scripts/check-dead-exports-advisory.mjs",
     "dead-exports:check": "node scripts/check-dead-exports-advisory.mjs --check",
     "test:hygiene": "node scripts/check-text-hygiene.mjs",
     "test:wiring": "node scripts/verify-test-wiring.js && node scripts/verify-test-inventory.js && npm run -s client-boundaries:check && npm run -s dead-exports:check && npm run -s test:hygiene && node --test scripts/client-large-file-inventory.test.js",

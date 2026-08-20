@@ -60,24 +60,16 @@ describe('aiCompareContracts', () => {
     expect(mergeCompareVennWithEvidence({ evidenceMap: {} }, { counts: {}, evidenceMap: {} })).toBeNull();
   });
 
-  it('normalizes compare toolkit tasks and payloads without changing fallbacks', () => {
-    expect(readCompareToolkitTask('DRILLDOWN')).toBe('drilldown');
+  it('normalizes compare toolkit tasks and bounds payload users', () => {
+    expect(readCompareToolkitTask('AXES')).toBe('axes');
     expect(readCompareToolkitTask(null)).toBe('');
     expect(
       resolveCompareToolkitPayload({
-        pointText: 42,
-        type: 'disagreement',
         users: Array.from({ length: 12 }, (_, index) => ({ address: `0x${index}` })),
       }),
     ).toEqual({
-      pointText: '42',
-      type: 'disagreement',
       users: Array.from({ length: 10 }, (_, index) => ({ address: `0x${index}` })),
     });
-    expect(resolveCompareToolkitPayload({ type: 'other', users: 'not-users' })).toEqual({
-      pointText: '',
-      type: 'agreement',
-      users: [],
-    });
+    expect(resolveCompareToolkitPayload({ users: 'not-users' })).toEqual({ users: [] });
   });
 });

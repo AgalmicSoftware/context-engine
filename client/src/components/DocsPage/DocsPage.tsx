@@ -259,8 +259,6 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
   const compareToolkitPromptDisplay = buildCompareToolkitPrompt({
     task: '<task>',
     users: '<users>',
-    pointText: '<pointText>',
-    type: '<type>',
   });
 
   const userAnalysisPromptDisplay = buildUserAnalysisPrompt({
