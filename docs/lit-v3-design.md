@@ -256,7 +256,7 @@ This keeps account/master credentials server-side while eliminating the manual L
 The default CE Lit action now lives in repo code rather than as an out-of-band dashboard snippet:
 
 - name: `ce-sbt-gated-crypto-v3`
-- source: `client/src/components/Sessions/sessionWizardChipotleLitSupport.ts`
-- bundled params example: `SESSION_WIZARD_CHIPOTLE_ACTION_PARAMS_EXAMPLE`
+- source: `client/src/utilities/crypto/litChipotleCatalog.ts`
+- bundled params example: `DEFAULT_CHIPOTLE_ACTION_PARAMS_EXAMPLE`
 
 That gives CE a code-reviewed action catalog surface for future Lit action families such as group prompting or additional gated decrypt/sign flows.
