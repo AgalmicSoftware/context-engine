@@ -86,8 +86,12 @@ The second command writes
 and an item-level audit. The bank covers all 20 topics and every question
 resolves to concrete evidence in the OSS corpus. The AI-assisted audit accepted
 42 wording pairs and revised 8. It remains `candidate`, not `validated`, until
-two independent reviewers approve claim support, reversal quality, and
-single-axis status.
+two independently recorded human reviews approve claim support, reversal
+quality, and single-axis status. The two reviews are defined as: (1) an
+author-side review recorded without model outputs displayed or consulted, and
+(2) an external reader's review conducted blind to model outputs and
+independently of the author's judgment. Unresolved disagreement leaves the
+item at `candidate`.
 
 Before launching calls, inspect the experiment plan:
 
@@ -178,7 +182,8 @@ are triage inputs for human review, not automatic inclusion or exclusion
 decisions. The JSON records a deterministic hash of the aggregate report and,
 when `--reviewed-bank` is supplied, both outputs distinguish the AI-reviewed
 candidate slice from deferred development questions. Every question remains
-pending independent human adjudication until the bank review gate is complete.
+pending human adjudication (the two independently recorded reviews defined
+above) until the bank review gate is complete.
 
 Model roster entries may set `structuredOutput` to `auto`, `json_schema`,
 `json_object`, or `none`. `auto` tries the strict answer schema and falls back
@@ -430,165 +435,22 @@ node ./bin/ai-discourse-bench.mjs render-report \
   --out ./results/mock-self-report.html
 ```
 
-The Raw Results pane also exposes this artifact as both a Download AI Analysis
-Input button and an AI Analysis Input JSON collapsible panel.
-When `analysisOverlay.aiAnalysis` is present, the Report pane adds an optional
-AI Analysis section with the generated executive summary, strongest consensus,
-sharpest disagreements, and caveats.
-When `analysisOverlay.debateAtlas.topicCircles` is present, the standalone
-Debate Map renders those generated topics instead of the deterministic topic
-rollup. When `analysisOverlay.debateAtlas.compasses` is present, the same pane
-adds DebateMap-style collapsible compass panels below the packed topic map.
-Every topic circle opens a client-style issue-area modal. Without an overlay,
-the modal shows measured stance, model difference, repeat consistency, derived
-tags, and linked questions. `analysisOverlay.debateAtlas.issueAreas` can add a
-grounded summary, reusable tags, tensions, agreement/disagreement findings,
-implications, open questions, and freeform titled sections. Issue-area ids must
-match deterministic or generated topic-circle ids, and all question links are
-validated against the source report.
-Risk Matrix overlay cells can also include `scenarios` so clicking a matrix
-square opens live-style atlas scenario cards in a dedicated scenario rail before
-the generated summaries. Overlay provenance includes the exact source-report
-hash, generator model, prompt version, and timestamp; mismatched overlays are
-rejected. Without a validated overlay, the Risk Matrix stays visibly
-ungenerated. This keeps interpretation as a second AI pass while preserving the
-benchmark runner as repeatable raw measurement.
+## Reviewing Benchmark Output
 
-The HTML report mirrors the live Context Engine session Results view as closely
-as a standalone artifact can: the OnePageSession `sectionsGrid` wrapper around
-the expanded Results section, the Results/View header with its help tooltip, the
-live app background plus Bootstrap-style and CE theme tokens, the `index-page`
-body baseline, `polisReportContainer`, `reportInner`, the live `#root`
-app-shell inset, live report-settings gear, live-style static collapsible Polis sections in
-Report mode, and Report /
-Debate Map / Breakdown / Risk Matrix / Raw Results controls. In
-the settings row, the static PDF control keeps the live button title and icon
-copy even though PDF generation itself remains a live-session action. In
-Report mode, the visible order is Summary, Consensus and Difference,
-Participants Graph, All Questions, and List of Participants. Summary keeps the
-live visible counts / Active Filters / Blockchain-Timestamp row shape; benchmark
-id, mode, persona, and issue counts stay in attributes, Raw Results, and export
-JSON instead of benchmark-only visible summary rows. Summary `Votes` and
-`Votes/Voter Avg` count averaged model/question participant responses, not raw
-repeat calls. All Questions also reports one distribution per model; raw run
-counts and invalid/no-response attempts remain in `runSummary` and Raw Results. The participant
-graph uses the live small-point Polis graph shape, with opinion groups below the
-plot instead of benchmark-specific side panels. Its control groups use the live
-Polis flex layout and native select padding instead of benchmark-specific bold
-labels or custom select chrome, and the post-graph cluster action row keeps the
-live `pdfIgnore` wrapper with inline button margins instead of a benchmark-only
-flex helper. Hovering or focusing a participant point shows
-the model label, opinion group, model id/provider, coverage, and compact trait summary
-using the same tooltip surface as statement-level chart hovers. Opinion-group headers start
-collapsed like the live report; Expand Clusters reveals representative
-statements with same-row box-plot comparisons against the other opinion groups,
-and the layer toggles control real statement, participant, cluster-outline,
-axis, and radial-axis SVG layers. Like the live client, groups of three or more
-participants use a filled convex-hull outline whose straight edges connect the
-outer points; two-participant groups use a single colored connector and
-singletons remain unoutlined.
-The precomputed embedding uses classical multidimensional scaling over
-distributional answer similarity; models without enough shared-question
-coverage are separated instead of receiving an invented position. Opinion
-groups are connected components over the report similarity threshold. Because
-the standalone HTML contains a precomputed embedding, the embedding
-choice, opinion-group count, Auto, and Analyze clusters controls are rendered in
-their live positions but disabled; regenerate the report after new runs to
-change those static outputs. Disabled static graph controls keep live-style
-opacity, native select padding, and cluster-number input colors instead of
-benchmark-only dimmed chrome.
-The Consensus and Difference report section stays chart-only like the live Polis
-report, with statement positions using a consensus-to-difference axis derived
-from the report's observed model-to-model answer spread: consensus on the left,
-the highest model disagreement on the live-style Difference edge, plus live-style
-centerline beeswarm lanes;
-detailed
-statement inspection remains in All Questions, Raw Results,
-and the CE import export. Hover and focus states reuse the live
-`beeswarmCircleHover` class instead of standalone-only circle effects.
-Collapsible report bodies keep the standalone wrapper
-spacing-neutral so live classes such as `statsSectionCollapsible` and
-`graphSection` own the visual spacing. The report settings row starts collapsed behind the
-same gear control used by a normal non-demo live Results report. All Questions keeps the live Polis stacked vote row
-shape, visible `#1` / `#2` statement labels, and zeroed vote-summary margin
-before each box plot. Row totals count model participants, while raw attempts
-and invalid responses remain available in the report integrity data. The mini
-box plot is normalized over model-level agree/unsure/disagree distributions
-like live `PolisBoxPlot`. Benchmark ids and
-topics remain in row attributes,
-stable `#question-...` anchors, Raw Results, and CE export JSON rather than a
-visible metadata line. The other Results controls switch the standalone artifact to the matching pane instead of scrolling to a
-closed section, and direct hash links preserve the Results header context while
-scrolling to the exact report section or question target. The
-mode controls keep the live emoji mode icons, with Raw Results as a separate
-action button after the mode list; in the standalone viewer it opens the local
-Raw Results pane without taking the selected view-mode pill state. Raw Results
-uses the same visible Results labels as the main switcher, including `Debate
-Map` for the atlas-backed view. The Debate Map pane uses an embedded
-DebateMap shell inside the same `80vh` scrolling wrapper as OnePageSession, with live-style controls, inline legend,
-packed atlas behavior, topic nodes using the live packed-node class stack, and
-mobile-wrapping controls so the view buttons and inline legend stay inside the
-pane. On narrow screens, the static atlas title pill drops below the live Top Debates
-control and truncates long titles instead of overlapping it, while packed topic circles use generated
-desktop and mobile layout diameters instead of a fixed benchmark-only miniature scale. The static
-artifact exposes the live DebateMap view-mode hooks for Circles and List, plus
-any second-pass compass panels, without adding standalone-only hover titles or
-disabled ARIA states to the live-style mode buttons. Atlas and Tree remain
-live-session interactions and are omitted from the static report.
-Circles and Top Debates entries open the same backdrop modal used for issue
-analysis. Its header, tags, collapsible sections, close behavior, narrow-screen
-floating close control, and question rows follow the live DebateMap modal
-vocabulary. Each linked question includes a participant-weighted Agree, Unsure,
-and Disagree count plus a stacked model-vote bar; repeated runs do not give one
-model extra weight. The question list is expanded when the modal opens, while
-analysis sections render only when real overlay content exists. The issue
-overview names every model contributing valid answers and explains aggregate
-response direction, between-model difference, and repeat stability in plain
-language. Tag and sort
-controls re-pack the visible circles, and stable
-`#debate-atlas-<topic-id>` hashes reopen the matching modal.
-Breakdown uses the live DemoAnalysis-style order: a Compare Demographics
-selector adapted to model traits, comparison suggestions beside a
-world-results map, then a separate question-breakdown chart and
-ComparisonReport-style collapse body. The static artifact opens with the
-strongest available suggestion selected so the selected-question banner, country
-map, cohort distributions, and comparison report are populated immediately.
-Suggestion buttons and the Parameter Class, OSS Status, Country of Origin, and
-Provider Class menus update the selected statement, model-cohort pills,
-distribution rows, map, and comparison report in-place without React or network
-requests. Remove, Clear all, and automatic-pair actions use the same embedded
-snapshot, so the report remains one static HTML artifact. The comparison report's similarity-and-difference spectrum uses
-the same question-level beeswarm interaction as the main report: cohort
-difference runs left to right, repeat consistency runs bottom to top, and every
-point exposes the question and response details on hover or keyboard focus.
-The selector action controls preserve their live pill shape on
-narrow viewports so button labels do not wrap into stacked text. Field-like
-selector controls use the live DemoAnalysis breakpoints adapted to the four
-benchmark traits: four columns at 1280px and wider, two columns at 980px and
-narrower, and one column at 640px and
-narrower. Risk Matrix uses a static embedded RiskMatrix-style grid,
-selector/subgrid controls, and scenario-card shell. The live ten-category CE
-matrix (`Safety`, `Capabilities`, `Governance`, `Open Source`, `Labor`,
-`Security`, `Military`, `Infra`, `Discourse`, `Crypto`) remains empty until a
-validated second-pass analysis overlay supplies cells. Subcategory selector
-labels match the client component, and card headers stay scoped to the compact
-embedded RiskMatrix typography. The static main grid
-keeps expanded category tracks on mobile, preserving labels by scrolling
-horizontally instead of splitting longer labels mid-word. Risk cells expose
-stable second-pass AI analysis hooks for click popups, generated notes, and
-atlas-linked narratives. Overlay-provided scenario cards render in the same
-modal structure used for live atlas-linked detail cards. Raw
-Results uses a
-static CE HTML-report export surface with the live Question Results header,
-responsive section table, and collapsible JSON payloads styled through the same
-HTML-report details class as the client export modal. Its close button keeps the
-live modal-header positioning, transparent reset, dark close color, zero margin,
-and full opacity. Benchmark-specific snapshot
-JSON and CE import JSON downloads live in Raw Results while benchmark metadata
-stays in the report/export content instead of the modal header, keeping the
-header visually aligned with the live client report controls; on narrow screens,
-the export controls follow the live mobile sizing rules and the section table
-scrolls instead of shrinking the Include column.
+The rendered report is a review aid, not a substitute for question
+adjudication:
+
+- Each model contributes one averaged answer per question; repeated calls inform
+  stability and wording-sensitivity measures.
+- Raw Results retains the aggregate report, Context Engine export, and
+  provenance needed to audit a finding.
+- Optional AI-generated summaries, Debate Map topics, and Risk Matrix content
+  are accepted only when their overlay is bound to the exact source-report
+  hash.
+
+See [docs/methodology.md](docs/methodology.md) for interpretation and release
+rules. See [docs/results-sync.md](docs/results-sync.md) for report-rendering and
+live-client synchronization details.
 
 ## Question Bank Prompt
 

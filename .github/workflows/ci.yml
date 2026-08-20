@@ -100,7 +100,7 @@ jobs:
           RELEASE_EVENT_NAME: ${{ github.event_name }}
           RELEASE_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           RELEASE_PUSH_BEFORE_SHA: ${{ github.event.before }}
-          ZERO_OID: 0000000000000000000000000000000000000000
+          ZERO_OID: "0000000000000000000000000000000000000000"
         run: |
           set -euo pipefail
           git fetch --no-tags origin main

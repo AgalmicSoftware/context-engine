@@ -116,6 +116,11 @@ test('release-staging PR verification uses the fetched PR head instead of merge 
 
   assert.match(
     workflow,
+    /ZERO_OID:\s+["']0{40}["']/,
+    'the zero OID must remain quoted so YAML does not coerce it to numeric zero',
+  );
+  assert.match(
+    workflow,
     /RELEASE_PR_HEAD_SHA: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/,
   );
   assert.match(
