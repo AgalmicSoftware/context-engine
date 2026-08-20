@@ -16,6 +16,7 @@ const PII_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-release-pii
 const PACKAGE_SCRUBBER_SOURCE_PATH = path.join(__dirname, 'scrub-public-package-json.js');
 const PII_SCRUBBER_SOURCE_PATH = path.join(__dirname, 'scrub-public-pii-text.mjs');
 const RELEASE_VERSION_SOURCE_PATH = path.join(__dirname, 'release-version.mjs');
+const DEAD_EXPORT_CHECKER_SOURCE_PATH = path.join(__dirname, 'check-dead-exports-advisory.mjs');
 const PRIVATE_BRANCH_GUARD_INSTALLER_SOURCE_PATH = path.join(__dirname, 'install-private-branch-guard.sh');
 const PRE_PUSH_HOOK_SOURCE_PATH = path.join(__dirname, '..', '.githooks', 'pre-push');
 const TEST_TMP_ROOT = path.join(__dirname, '.tmp-sync-public-history-tests');
@@ -993,6 +994,47 @@ test('sync-public-history links source node_modules for public Node ESM imports 
     assert.equal(result.status, 0, syncFailureMessage(result));
     assert.match(result.stderr, /Linking source node_modules into public test checkout/);
     assert.match(result.stdout, /public node ESM fixture passed/);
+  });
+});
+
+test('sync-public-history links source client node_modules for strict public wiring checks', () => {
+  withSourceRepo(({ sourceDir }) => {
+    writeFile(
+      sourceDir,
+      'package.json',
+      `${JSON.stringify(
+        {
+          scripts: {
+            'test:node': 'node scripts/public-node-test-fixture.js',
+            'test:wiring': 'node scripts/check-dead-exports-advisory.mjs --check',
+            'test:worker:agent-bridge': 'node scripts/run-agent-bridge-worker-tests.js',
+          },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'check-dead-exports-advisory.mjs'),
+      fs.readFileSync(DEAD_EXPORT_CHECKER_SOURCE_PATH, 'utf8'),
+    );
+    writeFile(sourceDir, path.join('scripts', 'verify-test-wiring.js'), "'use strict';\n");
+    writeFile(sourceDir, path.join('client', 'src', 'index.ts'), 'export const publicEntry = true;\n');
+    commitAll(sourceDir, 'Run strict public wiring fixture', {
+      authorDate: '2025-01-05T08:09:10Z',
+      committerDate: '2025-01-05T08:09:10Z',
+    });
+
+    const installedClientNodeModules = path.join(__dirname, '..', 'client', 'node_modules');
+    assert.equal(fs.existsSync(path.join(installedClientNodeModules, 'typescript', 'lib', 'typescript.js')), true);
+    fs.symlinkSync(installedClientNodeModules, path.join(sourceDir, 'client', 'node_modules'), 'dir');
+
+    const result = runSyncScript(sourceDir, ['--push', 'release-staging']);
+
+    assert.equal(result.status, 0, syncFailureMessage(result));
+    assert.match(result.stderr, /Linking source client\/node_modules into public test checkout/);
+    assert.match(result.stdout, /Dead export check passed: 1 production client files, zero candidates/);
   });
 });
 

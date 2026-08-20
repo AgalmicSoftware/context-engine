@@ -684,10 +684,17 @@ verify_agent_bridge_public_replay_pii() {
 ensure_public_node_modules_link() {
   local node_path="$REPO_ROOT/node_modules"
   local temp_node_path="$TEMP_CLONE/node_modules"
+  local client_node_path="$REPO_ROOT/client/node_modules"
+  local temp_client_node_path="$TEMP_CLONE/client/node_modules"
 
   if [ -d "$node_path" ] && [ ! -e "$temp_node_path" ]; then
     log_info "Linking source node_modules into public test checkout."
     ln -s "$node_path" "$temp_node_path"
+  fi
+
+  if [ -d "$client_node_path" ] && [ -d "$TEMP_CLONE/client" ] && [ ! -e "$temp_client_node_path" ]; then
+    log_info "Linking source client/node_modules into public test checkout."
+    ln -s "$client_node_path" "$temp_client_node_path"
   fi
 }
 
