@@ -460,11 +460,12 @@ test('resolveAdminRequestAuthority falls back from bootstrap auth to validateAdm
 });
 
 test('resolveAdminRequestAuthority preserves the final admin authorization failure contract', async () => {
+  const body = createSignedBody({
+    action: 'set-secrets',
+  });
   const result = await resolveAdminRequestAuthority(createRequestArgs({
     action: 'set-secrets',
-    body: createSignedBody({
-      action: 'set-secrets',
-    }),
+    body,
     deps: createAuthorityDeps({
       validateBootstrapAdmin: async () => {
         throw new Error('bootstrap auth should not run for set-secrets');
@@ -475,9 +476,7 @@ test('resolveAdminRequestAuthority preserves the final admin authorization failu
           slug: 'session-a',
           address: '0xabc',
           config: { adminAddress: '0xabc' },
-          body: createSignedBody({
-            action: 'set-secrets',
-          }),
+          body,
         });
         return false;
       },
