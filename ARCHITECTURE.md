@@ -68,6 +68,7 @@ architecture.
 |-------|-------------|--------------|-----------------|
 | **Client** | React SPA: survey authoring, response collection, SBT management, encryption gates, admin, session wizard | Shared across implemented profiles | `client/src/` |
 | **Session Worker** | Auth, canonical config, AI proxy, transcription, storage/fetch routes, and profile-enabled chain/Arweave helpers | Canonical authority for Hosted & Fast; service boundary for decentralized/custom profiles | `workers/sessionCorsWorker/` |
+| **Agent Bridge** | Scoped Agent HTTP API plus optional Telegram bot/Mini App adapters; delegates session membership and gate authority to the configured Session Worker where required | Separately deployed, optional sidecar for agent-enabled sessions | `workers/agentBridgeWorker/` |
 | **Cloudflare storage** | Worker KV config, secrets, encrypted payload envelopes/indexes, and optional advanced R2 blobs | Hosted & Fast default | Worker bindings (external) |
 | **Contracts** | Session registry, surveys, SBTs, gates, and factory on supported EVM chains | Trustless & Slower and explicit chain-backed custom profiles | `contracts/` |
 | **Arweave** | Immutable metadata, survey/question payloads, SBT tokenURI, and document-library files | Trustless & Slower and explicit Arweave-backed custom profiles | External |
@@ -182,7 +183,7 @@ Lit opt-in:
 | Session helpers | `utilities/session/sessionNaming.ts`, `sessionMetadata.ts`, `resourceKeys.ts`, `sessionModeProfile.ts`, `groupCreationPolicy.ts`, `sessionBackendKind.ts`, `agentClientLogin.ts`, `telegramAgentData.ts`, `telegramSessionBackend.ts` |
 | Worker auth | `utilities/worker/workerAuth.ts`, `corsProxy.ts` |
 | Cache | `utilities/cache/cacheScripts.ts` |
-| AI | `utilities/ai/aiClient.js`, `aiSettings.ts` |
+| AI | `utilities/ai/aiClient.ts`, `aiSettings.ts` |
 | Survey logic | `utilities/survey/questionRouting.ts`, `filterStateUtils.ts`, `compareUsers.ts` |
 | **Config / variables** | |
 | Feature flags | `variables/appConfig.ts` |
@@ -204,6 +205,7 @@ Lit opt-in:
 |--------|---------|
 | `sessionCorsWorker/worker.js` | Canonical config/auth/storage for Hosted & Fast, plus profile-enabled AI, Arweave, fetch, transcription, and faucet routes |
 | `deploy-helper/worker.js` | One-click worker deployment from the session wizard |
+| `agentBridgeWorker/worker.js` | Separately deployed Agent HTTP service with canonical `/api/agent/*` routes, scoped `ceagt_` credentials, and optional Telegram/Mini App adapters |
 
 ### Verification
 
