@@ -10,6 +10,9 @@ Context Engine has its core deliberation, SBT, worker, encryption, and deploymen
 - **Client modernization baseline**: the client is on React 18 and TypeScript 5.8, with production component surfaces moved to TSX and a growing set of helper-level tests.
 - **Protected SBT mint modes**: SBT contracts now expose explicit mint modes so protected password, group-signature, and invite-signature flows do not fall through to public `claim()` minting.
 - **Worker auth coordination and revocation**: the mandatory Session coordinator serializes nonce consumption and route counters across isolates, while server-managed authorization epochs and current-policy revalidation invalidate stale permissions after config or gate changes.
+- **Agent access foundation**: the optional Agent Bridge ships a scoped
+  `/api/agent/*` HTTP contract, credentials, action catalog, and Telegram bot /
+  Mini App adapters while delegating canonical session authority.
 
 ## Current Engineering Priorities
 
@@ -23,7 +26,11 @@ Context Engine has its core deliberation, SBT, worker, encryption, and deploymen
 
 ## AI Agent Interface
 
-A near-term priority is making Context Engine usable by AI agents, not just humans in a browser. The goal is to let people interact with sessions, answer surveys, and manage SBTs through their own AI assistants and custom tool clients. This includes exposing a machine-readable API layer, a tool-access server, and workflow definitions that agents can discover and invoke autonomously.
+The Agent Bridge foundation is implemented and separately deployable. Remaining
+work is to complete the catalog entries that are still explicitly contract-only
+or bridge-local, expand canonical handoffs for settings, SBT, decrypt, and
+storage actions, and harden operator setup and lifecycle verification. The
+worker catalog and README distinguish implemented routes from planned ones.
 
 ## Future Development
 

@@ -22,7 +22,7 @@ Context Engine separates how the web app is hosted from how each session establi
 
 | Mode | Availability | Infrastructure and setup |
 | --- | --- | --- |
-| **Hosted & Fast** | Available; default/recommended path after selection in `/new` | Public or private sessions use a per-session Cloudflare Worker and Cloudflare storage. The creator supplies a Cloudflare API token and one AI-provider key. No EVM network or transaction, RPC endpoint, gas, Arweave, or Lit is required by default. |
+| **Hosted & Fast** | Available; default/recommended path after selection in `/new` | Public or private sessions use a per-session Cloudflare Worker and Cloudflare storage. Native setup uses a Cloudflare account/dashboard login and one AI-provider key; it does not ask for a Cloudflare API token. No EVM network or transaction, RPC endpoint, gas, Arweave, or Lit is required by default. |
 | **Trustless & Slower** | Available; opt-in | Public or private sessions use Arweave plus an EVM registry and contracts. Setup requires an Arweave wallet/JWK, an EVM RPC URL and gas, and one AI-provider key; add Lit credentials only when Lit encryption is selected. |
 | **Company-Operated** | Planned; not yet generally available | Existing hardware, private clouds, or internal networks connect through adapters for company identity and key management, storage, AI gateways, and observability. Public EVM and Arweave are not architectural requirements, so this mode can be entirely off-chain. |
 
@@ -53,7 +53,7 @@ For testing, run modes, and deeper setup:
 - [docs/testing.md](docs/testing.md)
 - [docs/run-modes.md](docs/run-modes.md)
 - [docs/session-creation-guide.md](docs/session-creation-guide.md)
-- [docs/public-client-config.md#static-frontend-deploy](docs/public-client-config.md#static-frontend-deploy) for Netlify/custom-domain static frontend deploys
+- [docs/public-client-config.md#netlify-static-deploy](docs/public-client-config.md#netlify-static-deploy) for Netlify/custom-domain static frontend deploys
 
 ## Features
 
@@ -77,6 +77,16 @@ For testing, run modes, and deeper setup:
 - Export deliberation snapshots and consensus statistics as evaluation / preference datasets for AI benchmarking and training
 - OpenAI, Anthropic, OpenRouter, and custom provider paths
 
+### Agent and Telegram Access
+
+- Optional Agent Bridge Worker with scoped `/api/agent/*` credentials and a
+  machine-readable action catalog
+- Optional Telegram bot and Mini App adapters over the same session boundaries
+- Delegated membership, gate, storage, and chain authority rather than a second
+  copy of canonical session state
+- Setup and endpoint reference in
+  [workers/agentBridgeWorker/README.md](workers/agentBridgeWorker/README.md)
+
 ### User and Deployer UX: Passkey Sign-On
 
 - Users log in with a simple passkey / biometric flow (native PIN, fingerprint, or Face ID on phones)
@@ -85,7 +95,7 @@ For testing, run modes, and deeper setup:
 
 ### Deployer UX: Sponsored Bundles
 
-- Setup requirements follow the selected profile: the default Cloudflare profile needs only a Cloudflare deploy token and one AI-provider key
+- Setup requirements follow the selected profile: the default Cloudflare profile needs a Cloudflare account/dashboard login and one AI-provider key; a Cloudflare API token is used only by Agent Session Wrapped or the explicit legacy deploy-helper fallback
 - Sponsored bundles and advanced configuration can supply Arweave, EVM/RPC, Lit, or other credentials only when the selected decentralized or encrypted profile needs them; planned company-operated adapters will connect internal services instead
 
 ## AI Discourse Corpus
@@ -114,6 +124,7 @@ The default public deployment supports hundreds to low thousands of concurrent p
 - Public client config and current defaults: [docs/public-client-config.md](docs/public-client-config.md)
 - PATH / RPC behavior: [docs/path-rpc.md](docs/path-rpc.md)
 - Cloudflare worker docs: [docs/session-cors-worker.md](docs/session-cors-worker.md)
+- Agent Bridge worker docs: [workers/agentBridgeWorker/README.md](workers/agentBridgeWorker/README.md)
 - Session registry and gate model: [docs/session-registry.md](docs/session-registry.md)
 - Scaling reference: [docs/scaling.md](docs/scaling.md)
 - Public roadmap: [ROADMAP.md](ROADMAP.md)

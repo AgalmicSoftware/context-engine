@@ -69,9 +69,10 @@ Lit v3 gate evaluation should be treated as chain-configured across EVM chains,
 not Base-specific. Context Engine's default E2E and deployment target is OP
 Sepolia (`11155420`), but that is an application default, not a Lit limitation.
 Lit access conditions should derive their Lit chain from the session or gate
-`chainId` / `litChain` value. Base Sepolia (`84532`) should continue to work
-for legacy and development compatibility, but it is best-effort rather than an
-actively supported E2E or deployment target.
+`chainId` / `litChain` value. Base Sepolia (`84532`) remains a best-effort
+legacy/development compatibility target, not an actively supported E2E or
+deployment runtime, and it is not currently configured in the canonical CE
+contract manifest.
 
 ### v3 trust boundary
 

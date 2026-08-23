@@ -1,7 +1,7 @@
 # Context Engine Specification
 
 Status: Living specification (update alongside feature work)
-Last reviewed: 2026-08-18
+Last reviewed: 2026-08-23
 Canonical deep-dive docs: `docs/` (see `docs/README.md`)
 
 ## Purpose
@@ -30,31 +30,47 @@ Update triggers (if any of these change, `spec.md` should change too):
 
 ## System Summary (What This App Is)
 
-Context Engine is a web3-native suite of tools for large-group deliberation and coordination, centered on:
-- Surveys/questions with on-chain anchoring and optional privacy via encryption.
-- SBT (Soulbound Token) groups to represent membership/roles and to gate access.
-- A Cloudflare Worker used as a "sponsored resource proxy" for AI, transcription, Arweave uploads, and a testnet faucet.
-- An on-chain SessionRegistry that is the authority for access gates (Any/All SBT rules) for sensitive resources.
+Context Engine is a deployment-profile-aware suite of tools for large-group
+deliberation and coordination, centered on:
+- Surveys and questions with profile-selected storage/anchoring plus optional
+  privacy via encryption.
+- Worker-native groups or EVM SBT (Soulbound Token) groups for membership,
+  roles, and gated access.
+- A per-session Cloudflare Worker for canonical Hosted & Fast sessions and for
+  profile-enabled AI, transcription, storage, fetch, and chain/Arweave helpers.
+- An optional Agent Bridge Worker that exposes scoped `/api/agent/*` requests
+  and Telegram/Mini App adapters without replacing session authority.
 
 Primary storage and authority split:
-- On-chain contracts: identity, gating, and "root of truth" for access decisions.
-- Arweave: durable content payloads (survey metadata, tokenURI JSON, optionally encrypted fields).
-- Cloudflare Worker KV: per-session secrets + operational config (not gate authority).
-- Browser local storage: caches and user settings for performance and usability.
+- Hosted & Fast: the creator-owned Session Worker is canonical for config,
+  authentication, Worker-native groups/gates, and Cloudflare payload/index
+  storage; it does not require EVM or Arweave.
+- Trustless & Slower: public EVM contracts anchor identity and gate state, while
+  Arweave stores durable metadata and payloads.
+- Agent Bridge: a separately deployed adapter that delegates canonical session
+  membership, gates, and storage to the configured Session Worker when needed.
+- Browser IndexedDB/local storage: caches, encrypted wallet records, and user
+  settings for performance and usability, never shared authority.
 
 ## Glossary (Core Concepts)
 
 - Session: A named "space" (identified by `slug` and/or `sessionId`) that ties together contracts, metadata, worker config, and access gates.
 - Group: Either an on-chain SBT contract representing membership/entitlement,
   or a Worker-native group record for a Worker-canonical session.
-- Gate: An access rule stored on-chain in `SessionRegistry` that says which SBT(s) are required (and whether Any/All) to access a resource.
+- Gate: A profile-owned access rule. Chain-backed sessions use `SessionRegistry`
+  Any/All SBT rules; Worker-canonical sessions use the Session Worker's signed
+  config and native group authority.
 - Passkey EOA wallet: A passkey-unlocked embedded EOA wallet using WebAuthn PRF
   to derive the EOA key by default, with optional AES-GCM encrypted private-key
   compatibility mode and soft worker-held sessions.
-- Doc Library: A per-session and per-SBT-group document store on Arweave, with optional Lit encryption.
+- Doc Library: A per-session and per-group document store whose provider follows
+  the session profile: Cloudflare storage with profile-selected Worker access
+  and encryption (Worker-envelope in the Hosted & Fast preset), or Arweave with
+  optional Lit encryption for Arweave-backed sessions.
 - Sponsored resource: A service that uses secrets (AI keys, Arweave wallet, faucet key) and therefore routes through the Worker.
 - Sponsored grant: A pre-authorized access token for worker resources (deploy, faucet) redeemable without full auth.
-- Worker token: A short-lived session token minted after an SIWE-style login; it encodes scopes granted by on-chain gates.
+- Worker token: A short-lived session token minted after login; it encodes
+  scopes granted by the selected session authority.
 - Metadata URI: An Arweave JSON payload containing session content/config (non-authoritative for gates).
 - Lit encryption: Client-side encryption where decryption access is controlled by programmable conditions (in this app, typically SBT ownership) via Lit Protocol.
 - Lit payment delegation: A bootstrap mechanism allowing session admins to delegate Lit Protocol capacity credits without a logged-in session.
@@ -72,10 +88,13 @@ The client uses React Router to route all paths to `MainSite`, which then render
 
 Core routes:
 - `/`: Home (tabs: Latest, Community, Tools, Welcome).
-- `/session/new` (alias: `/new`; sponsored links can land here as `/new?sponsored=<txId>#k=<secret>`): Session Wizard (deploy/configure worker, upload metadata, register on-chain).
+- `/session/new` (alias: `/new`; sponsored links can land here as `/new?sponsored=<txId>#k=<secret>`): Session Wizard. Hosted & Fast publishes canonical Worker config without EVM/Arweave; Trustless & Slower uploads metadata and registers on-chain.
 - `/session/:token`: Session landing page (accepts a slug or a UUID-like session id token; resolves and renders a one-page session view).
 - `/session/:token/questions`, `/session/:token/questions/results`: Session-scoped question list/results rendered inside the session shell.
-- `/session/:token/docs`: Session Doc Library (indexed by `sessionIdHex`; supports upload/browse + optional Lit encryption; session-id tokens are kept stable on this subroute).
+- `/session/:token/docs`: Session Doc Library. Worker-canonical sessions use the
+  resolved session identity and opaque Cloudflare storage refs; Arweave-backed
+  sessions use `sessionIdHex` indexing and optional Lit encryption. Session-id
+  route tokens remain stable on this subroute.
 - `/surveys`, `/survey/:id`, `/survey/:id/results`: Survey list/view/results.
 - `/questions`, `/questions/results`: Question list/results.
 - `/question/:id`: Single question view. Canonical session hint uses `?session=<slug>` (legacy `?group=<slug>` accepted).
@@ -95,6 +114,7 @@ Core routes:
 - `/benchmarks`: Static benchmark index and interactive report viewer. Bundled
   manifests identify each artifact as either a development preview or a
   released result; the report itself runs in a sandboxed iframe.
+- `/posts` and `/posts/:slug`: Public Markdown post index and rendered post pages.
 - `/docs`: User-facing quickstart, session-options guide, FAQ, AI-prompt
   reference, and an explicit session selector for published smart-contract
   deployment details. Legacy `/contracts` links redirect here without dropping
@@ -134,10 +154,15 @@ What users can do:
   stylesheets, or CSS.
 
 What the system does:
-- Stores session gates and key operational pointers on-chain in `SessionRegistry` (authoritative for access).
-- Stores session content/config on Arweave (metadata URI), optionally with Lit-encrypted fields.
-- Stores worker operational config + secrets in Worker KV (not authoritative for gates).
-- Maintains legacy compatibility while migrating from `demo/demo_sessions.json` to on-chain registry reads.
+- In Hosted & Fast, stores canonical signed session config, secrets,
+  Worker-native group/gate state, and Cloudflare payload indexes in the
+  per-session Worker; publication does not perform an EVM transaction or
+  Arweave upload.
+- In Trustless & Slower, stores session gates and operational pointers in
+  `SessionRegistry` and content/config on Arweave, optionally with Lit-encrypted
+  fields.
+- Maintains compatibility readers for older demo and chain-backed session data
+  while keeping authority explicit per selected profile.
 
 Deep-dive docs:
 - `docs/session-registry.md`
@@ -234,8 +259,11 @@ What users can do:
 - Avoid “nonsense answers”: gated questions are hidden from non-holders in session question lists, and direct question links disable answering/submission while the prompt remains masked.
 
 What the system does:
-- Uses `SessionRegistry` as the single source of truth for access gates (Any/All, per-resource).
-- Worker login checks gates on `/auth/login` and issues a scoped token (`ai`, `arweave`, `transcribe`, `faucet`, `fetch`, `lit`).
+- Uses `SessionRegistry` as the gate authority for chain-backed sessions and the
+  Session Worker's signed config/native groups for Worker-canonical sessions.
+- Worker login checks the selected profile's authority on `/auth/login` and
+  issues only the permitted scopes (`ai`, `arweave`, `transcribe`, `faucet`,
+  `fetch`, `lit`, `storage`, and `groups` as configured).
 - Gated encryption/decrypt uses the worker-mediated Lit Chipotle runtime for supported sessions; legacy Lit payload readers remain for compatibility.
 - Stores per-field metadata encryption decisions via `encryptedFieldGates` (values are `string | string[]`; 1 gate stays legacy `string`, 2+ gates become `string[]`).
 - Stores per-question/per-survey encryption audiences in the payload (`encryption.gates`), and SurveyTool derives response encryption recipients per question from that lock state (with fallback to session response gate policy when a question is not locked).
@@ -249,7 +277,8 @@ Deep-dive docs:
 What users can do (through the app UI):
 - Make AI calls (for question generation and other assistive features).
 - Transcribe recorded audio to text.
-- Upload JSON and markdown payloads to Arweave.
+- Upload JSON, Markdown, and media payloads to the selected Cloudflare or
+  Arweave storage profile.
 - Request small amounts of testnet ETH when below a threshold (testnet faucet).
 - Fetch remote URLs/images through a controlled proxy for safety/CORS.
 - Redeem sponsor-provided deploy/faucet grants during session setup flows.
@@ -272,6 +301,31 @@ What the system does:
 Deep-dive docs:
 - `docs/session-cors-worker.md`
 - `docs/resource-keys.md`
+
+### 6a) Agent Bridge (Optional Separate Worker)
+
+What integrations can do:
+- Use scoped credentials with the canonical `/api/agent/*` HTTP contract for
+  implemented account, session, question, response, preference, and agent-only
+  flows.
+- Use optional Telegram bot and Mini App adapters, including the live
+  `/telegram/webhook` route, without changing the underlying Context Engine
+  authority model.
+- Exchange an authorized Session Worker identity for a bridge credential on the
+  implemented wrapped-member handoff.
+
+What the system does:
+- Deploys `workers/agentBridgeWorker/` separately from each Session Worker.
+- Delegates canonical membership, gates, storage, and chain operations to the
+  configured Session Worker or contract boundary when required. Bridge-local
+  indexes and contract-only catalog entries are not presented as canonical
+  session state.
+- Keeps reusable worker modules under `workers/shared/`; that directory is not a
+  deployable Worker.
+
+Deep-dive docs:
+- `workers/agentBridgeWorker/README.md`
+- `docs/session-cors-worker.md`
 
 ### 7) Wallet and Login Options
 
@@ -317,18 +371,33 @@ Deep-dive docs:
 ### 10) Doc Library (Sessions + SBT Groups)
 
 What users can do:
-- Upload and browse documents associated with a **Session** (discoverability by `sessionIdHex`) and/or an **SBT group** (discoverability by `chainId + sbtAddress`).
-- Store either plaintext docs (Arweave) or Lit-encrypted docs (Arweave payload encrypted client-side; decrypt gated by SBT ownership conditions).
+- Upload and browse documents associated with a **Session** and/or an **SBT
+  group**. Arweave-backed sessions index by `sessionIdHex`; Worker-canonical
+  Cloudflare storage is scoped by session identity and opaque storage refs.
+- Store plaintext or Worker-envelope documents in Cloudflare storage, or
+  plaintext/Lit-encrypted documents on Arweave when that provider is selected.
 - Add a URL as a small “link record” (optionally Lit-encrypted) without uploading remote content.
 - View decrypted/plaintext docs inline (images/PDF/audio/video/text) or download as a file.
 
 What the system does:
-- Indexes docs using Arweave tags (all `CE-*`), and lists them via Arweave GraphQL (`https://arweave.net/graphql` by default).
-- Uses SessionRegistry’s `docUploads` gate as the *default* encryption audience when configured:
-  - If `docUploads` gate is empty or unavailable, session docs default to plaintext (no fallback to any “general” gate).
-- Allows encrypted uploads to target either the session `docUploads` gate or a custom SBT audience, with a "Copy from session gate" shortcut to prefill the session audience.
-- Enforces association integrity and anti-spam at upload time in the Worker:
-  - `CE-SessionId` must match the authenticated session’s on-chain `sessionIdHex`.
+- Resolves the document provider from the session storage profile. Cloudflare
+  documents use authorized `/storage/upload`, `/storage/list`, and
+  `/storage/read` calls with opaque refs; Arweave documents use `CE-*` tags and
+  Arweave GraphQL (`https://arweave.net/graphql` by default).
+- For Arweave/Lit audience selection, uses the selected profile's chain-backed
+  `docUploads` SessionRegistry gate when configured. If that gate is empty or
+  unavailable, Arweave session docs default to plaintext rather than falling
+  back to a “general” gate.
+- For Worker-canonical Cloudflare storage, encryption and access conditions
+  follow `storageProfile`; the Hosted & Fast preset uses Worker-envelope
+  encryption with Worker role/scope conditions and does not infer plaintext
+  from the absence of a SessionRegistry `docUploads` gate.
+- For Lit-Arweave uploads, allows either the session `docUploads` gate or a
+  custom SBT audience, with a "Copy from session gate" shortcut.
+- Enforces provider-appropriate association integrity and anti-spam at upload
+  time in the Worker:
+  - For Arweave tags, `CE-SessionId` must match the authenticated session's
+    on-chain `sessionIdHex`.
   - `CE-SbtChainId` + `CE-SbtAddress` association requires uploader is a holder or admin/owner (where available).
 
 Deep-dive docs:
@@ -368,10 +437,21 @@ Key contracts (current Context Engine flows):
 ### Cloudflare Workers
 
 Primary runtime worker:
-- `workers/sessionCorsWorker/worker.js`: Multi-tenant, KV-backed secrets/config, auth tokens, and sponsored resource proxying.
+- `workers/sessionCorsWorker/worker.js`: session-scoped canonical config/auth and
+  Cloudflare storage for Worker-canonical profiles, plus profile-enabled AI,
+  transcription, fetch, chain, Arweave, and faucet services.
 
-Optional helper:
-- `workers/deploy-helper/`: Helper for one-click Worker deploys from the Session Wizard (trusted endpoint).
+Optional legacy/sponsored helper:
+- `workers/deploy-helper/`: Trusted endpoint for the explicit legacy Session
+  Wizard fallback, sponsored deployment, and Agent Wrapped provisioning; the
+  default Hosted & Fast path uses the native Cloudflare dashboard handoff.
+
+Optional agent sidecar:
+- `workers/agentBridgeWorker/`: Scoped Agent HTTP API and optional Telegram bot
+  and Mini App adapters. It delegates canonical session authority rather than
+  duplicating it.
+- `workers/shared/`: Reusable modules bundled into worker packages; not a
+  deployable Worker.
 
 Worker API (selected endpoints):
 - `POST /auth/nonce`: Start SIWE-style login (returns nonce).
@@ -380,6 +460,11 @@ Worker API (selected endpoints):
 - `POST /ai`: AI proxy (provider-based); authenticated by default, with anonymous access supported when the session config allows it. Also supports `POST /` with `{ action: "ai", ... }`.
 - `POST /transcribe`: Transcription proxy; authenticated by default, with anonymous access supported when the session config allows it (`workerAuthority.anonymousScopes` for worker-canonical sessions).
 - `POST /arweave/upload`: Authenticated Arweave upload (also supports an admin-signed bootstrap path when no auth header).
+- `POST /storage/upload`: Profile-aware payload upload to Cloudflare or Arweave.
+- `GET|POST /storage/read`: Authorized read by opaque storage reference.
+- `GET|POST /storage/list`: Bounded, authorization-filtered metadata/index pages.
+- `GET|POST /storage/export-envelopes`: Authorized export of encrypted payload
+  ciphertext and envelope metadata; session KEK material is never returned.
 - `POST /groups/create`: Authenticated participant Worker-group creation,
   enabled only by `groupCreationPolicy: "participants"` and forced to an open,
   session-visible record. Tags, public reference URLs, member limit, and join
@@ -415,12 +500,24 @@ Worker API (selected endpoints):
 - `POST /admin/lit-chipotle-provision`: Signed admin action to register the default CE action in an existing Lit account.
 - `POST /admin/lit-chipotle-bootstrap-session`: Signed admin action to create or derive the session Chipotle group, PKP, usage key, and CE action metadata.
 - `POST /admin/issue-sponsored-grants`: Signed admin action to issue sponsored access grants.
+- `GET /admin/abuse-summary`: Bearer-admin abuse/rate-limit summary for a bounded
+  number of coordinator windows.
 - `POST /`: Authenticated action-style requests using an `action` field: `request_test_eth` (testnet faucet), `fetch_url`, `fetch_image`.
+
+Agent Bridge API families (selected):
+- `/api/agent/*`: Canonical scoped agent contract; implemented and
+  contract-only entries are identified in the Agent Bridge catalog.
+- `/telegram/webhook` and `/telegram/mini-app*`: Optional Telegram adapter and
+  Mini App surfaces.
 
 ### Storage and Data
 
-- Arweave: durable JSON payloads for session metadata, survey metadata, question payloads, and SBT tokenURI metadata.
-- Worker KV: operational per-session config and secrets.
+- Cloudflare Worker storage: canonical signed config, secrets, payload envelopes,
+  authorization metadata/index rows, and optional advanced R2 blobs for Hosted &
+  Fast.
+- Arweave: durable JSON payloads for chain-backed session metadata, survey and
+  question payloads, SBT tokenURI metadata, and explicitly Arweave-backed
+  resources.
 - Browser localStorage: caches for surveys/questions/responses/SBTs/bookmarks/user scans.
 - Browser IndexedDB: passkey EOA encrypted wallet records. Plaintext wallet
   keys must not be stored in localStorage or IndexedDB.
