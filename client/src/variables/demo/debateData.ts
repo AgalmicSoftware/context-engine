@@ -800,27 +800,6 @@ export const debateData = [
   },
 ];
 
-export const audienceRoster = [
-  { name: 'Hypatia', tag: 'philosopher', icon: '🏛️', votes: [1, 2, 1, 1, 2, 1, 1, 1, 1, 1] },
-  { name: 'Hannah Arendt', tag: 'philosopher', icon: '🏛️', votes: [2, 1, 1, 1, 2, 1, 1, 1, 1, 1] },
-  { name: 'Ada Lovelace', tag: 'mathematician', icon: '🏛️', votes: [1, 1, 2, 1, 1, 1, 1, 2, 2, 2] },
-  { name: 'Thomas Paine', tag: 'revolutionary', icon: '🏛️', votes: [1, 2, 1, 1, 1, 1, 2, 2, 2, 2] },
-  { name: 'Ashoka', tag: 'emperor', icon: '🏛️', votes: [2, 2, 1, 1, 1, 1, 1, 1, 1, 1] },
-];
-
-export const audienceVotes = Array.from({ length: 10 }, (_, i) => i).map((debateIdx) => {
-  let a = 0,
-    b = 0,
-    ab = 0;
-  audienceRoster.forEach((m) => {
-    const v = m.votes[debateIdx];
-    if (v === 1) a++;
-    else if (v === 2) b++;
-    else ab++;
-  });
-  return { a, b, abstain: ab, total: a + b + ab };
-});
-
 export const voterProfiles = {
   'Dario Amodei': {
     affiliation: 'Anthropic',
@@ -842,43 +821,4 @@ export const voterProfiles = {
     disagreements: [],
     policyPositions: [],
   },
-};
-
-export const sourceLinks = {
-  'METR scaling analysis': 'https://metr.org/blog/2024-11-22-evaluating-frontier-ai-rd/',
-  'Scaling law trajectory': 'https://arxiv.org/abs/2001.08361',
-  'METR compute efficiency analysis': 'https://metr.org/blog/2024-11-22-evaluating-frontier-ai-rd/',
-  'Model capability timeline': 'https://epochai.org/trends',
-  'Agent benchmarks': 'https://metr.org/blog/2024-03-13-autonomy-evaluation/',
-  'Capability emergence pattern': 'https://arxiv.org/abs/2206.07682',
-  'METR RCT with developers': 'https://metr.org/blog/2025-02-14-measuring-ai-ability-to-complete-long-tasks/',
-  'Empirical observation': 'https://metr.org/blog/2024-11-22-evaluating-frontier-ai-rd/',
-  'Benchmark vs practice analysis': 'https://arxiv.org/abs/2312.11805',
-  'Model limitation analysis': 'https://epochai.org/trends',
-  'Scaling law limitations': 'https://arxiv.org/abs/2404.04125',
-  'Physical constraints': 'https://epochai.org/blog/compute-trends',
-  'Deception analysis across model suites': 'https://arxiv.org/abs/2308.14752',
-  'Behavioral analysis': 'https://arxiv.org/abs/2311.07590',
-  'Instrumental convergence theory': 'https://arxiv.org/abs/2209.00626',
-  'Scaling behavior pattern': 'https://arxiv.org/abs/2312.09390',
-  'Strategic escalation analysis': 'https://arxiv.org/abs/2311.07590',
-  'Training dynamics prediction': 'https://arxiv.org/abs/2401.05566',
-  'Model interrogation protocols': 'https://arxiv.org/abs/2310.01405',
-  'Interpretability studies': 'https://transformer-circuits.pub/',
-  'Interpretability philosophy': 'https://arxiv.org/abs/2310.01405',
-  'Mechanistic interpretability': 'https://transformer-circuits.pub/2023/monosemantic-features/',
-  'Scaling transparency analysis': 'https://arxiv.org/abs/2401.12874',
-  'Training effect studies': 'https://arxiv.org/abs/2310.01405',
-  'Regulatory timeline analysis': 'https://arxiv.org/abs/2307.03718',
-  'Scaling risk analysis': 'https://metr.org/blog/2024-03-13-autonomy-evaluation/',
-  'Irreversibility principle': 'https://arxiv.org/abs/2306.12001',
-  'Alignment necessity': 'https://arxiv.org/abs/2209.00626',
-  'Precautionary principle': 'https://arxiv.org/abs/2307.03718',
-  'Risk asymmetry analysis': 'https://arxiv.org/abs/2306.12001',
-  'Industry adoption survey': 'https://aiindex.stanford.edu/report/',
-  'Harm prevention principle': 'https://arxiv.org/abs/2307.03718',
-  'Proportionality doctrine': 'https://arxiv.org/abs/2307.03718',
-  'Precaution paradox': 'https://arxiv.org/abs/2307.15043',
-  'Adaptive governance': 'https://arxiv.org/abs/2307.03718',
-  'Regulatory lock-in': 'https://arxiv.org/abs/2307.15043',
 };
