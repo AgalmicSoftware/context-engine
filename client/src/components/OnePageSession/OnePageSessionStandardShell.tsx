@@ -638,6 +638,7 @@ export default function OnePageSessionStandardShell({
                       questionScanProgress={questionScanProgress}
                       questionResponsesNonce={questionResponsesNonce}
                       sessionSlug={displaySessionSlug}
+                      sessionConfig={resolvedSessionConfig}
                       demoDataFirstLoad={isDemoSlug}
                       demoDataBySlug={resolvedPolisDemoDataBySlug}
                       contracts={contracts}

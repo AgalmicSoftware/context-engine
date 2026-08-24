@@ -138,6 +138,7 @@ export default function PolisReport({
   networkChainId = null,
   slug = '',
   sessionSlug = '',
+  sessionConfig = null,
 }: PolisReportProps) {
   const [ratingMatrix, setRatingMatrix] = useState<RatingMatrix | null>(null);
   const [allResponders, setAllResponders] = useState<string[]>([]);
@@ -694,7 +695,13 @@ export default function PolisReport({
     try {
       if (!effectiveUseDemoData) {
         // Apply the upstream filterState BEFORE building the matrix
-        const filteredAgg = applyFilterStateToAggregator(questionResponses, network, filterState, activeReportSlug);
+        const filteredAgg = applyFilterStateToAggregator(
+          questionResponses,
+          network,
+          filterState,
+          activeReportSlug,
+          sessionConfig,
+        );
         buildResult = buildRatingMatrixFromRealData(filteredAgg, { sessionSlug: activeReportSlug });
       } else {
         // Demo mode: bypass all filters entirely
@@ -734,6 +741,7 @@ export default function PolisReport({
     questionResponsesNonce,
     activeReportSlug,
     activeDemoData,
+    sessionConfig,
   ]);
 
   useEffect(() => {

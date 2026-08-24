@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Fixed inline Polis filtering for Cloudflare-canonical sessions so tag and
+  question-type totals use identity-matched Worker question metadata instead
+  of silently treating every question as metadata-free.
 - Fixed Raw Results for pure Cloudflare-canonical sessions so identity-matched
   Worker question/response caches populate totals without requiring a chain ID
   or starting an RPC latest-block read.

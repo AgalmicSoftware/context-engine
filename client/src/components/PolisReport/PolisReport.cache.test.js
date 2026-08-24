@@ -27,6 +27,11 @@ import { computePolisCommentStats, computePolisConversationMath } from '../../ut
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
+import {
+  resolveWorkerCanonicalCacheIdentity,
+  withWorkerCanonicalCacheIdentity,
+} from '../../utilities/survey/workerCanonicalCacheIdentity';
 
 jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   peekCacheSync: jest.fn(() => ({})),
@@ -214,6 +219,54 @@ describe('PolisReport cache read options', () => {
         ['qLegacy'],
         expect.objectContaining({ randomSeed: 42 }),
       );
+    });
+  });
+
+  it('applies tag and type filters from an identity-matched Worker question cache', () => {
+    const sessionConfig = {
+      slug: 'worker-session',
+      sessionId: `0x${'2'.repeat(32)}`,
+      corsWorkerUrl: 'https://polis-worker.example.test',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      storageProfile: {
+        backend: 'cloudflare',
+        resources: { questions: 'active', surveys: 'active' },
+        payloadAccessControl: {
+          gate: 'role_gate',
+          encryption: 'worker_envelope',
+          mode: 'authorized_read',
+        },
+      },
+    };
+    const identity = resolveWorkerCanonicalCacheIdentity({ sessionConfig, sessionSlug: 'worker-session' });
+    cacheScripts.peekCacheSync.mockImplementation((namespace, slug) => {
+      if (namespace !== 'questionsCache' || slug !== 'worker-session') return {};
+      return {
+        worker: withWorkerCanonicalCacheIdentity(
+          {
+            questions: {
+              qKeep: { tags: ['included'], type: 'binary' },
+              qDrop: { tags: ['excluded'], type: 'rating' },
+            },
+          },
+          identity,
+        ),
+      };
+    });
+
+    const out = applyFilterStateToAggregator(
+      {
+        qKeep: [{ responder: '0xabc', questionId: 'qKeep', response: { answer: { value: 'yes' } } }],
+        qDrop: [{ responder: '0xdef', questionId: 'qDrop', response: { answer: { value: 4 } } }],
+      },
+      { id: null },
+      { selectedTags: ['included'], questionTypes: ['binary'] },
+      'worker-session',
+      sessionConfig,
+    );
+
+    expect(out).toEqual({
+      qKeep: [{ responder: '0xabc', questionId: 'qKeep', response: { answer: { value: 'yes' } } }],
     });
   });
 

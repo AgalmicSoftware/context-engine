@@ -10,6 +10,11 @@ import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { isResponseAllowedForSessionSlug } from '../../utilities/session/responseSessionScope.js';
 import { canonicalizeLegacySessionAlias } from '../../utilities/session/sessionDemoCompat.js';
+import {
+  readSurveyToolScopedCacheNode,
+  resolveSurveyToolWorkerTargetSignature,
+} from '../SurveyTool/surveyToolWorkerCacheIsolation';
+import { WORKER_CANONICAL_CACHE_SCOPE_KEY } from '../../utilities/survey/workerCanonicalCacheIdentity';
 import { resolveDemoPolisDataset } from '../../utilities/demo/demoPolisDatasets';
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
 import {
@@ -164,6 +169,7 @@ export interface PolisReportProps {
   networkChainId?: number | string | null;
   slug?: string;
   sessionSlug?: string;
+  sessionConfig?: unknown;
 }
 
 export type DoUMAPFn = (data: number[][], nNeighbors: number, randomSeed: number) => [number, number][];
@@ -520,10 +526,9 @@ export function applyFilterStateToAggregator(
   network: UnknownRecord | null | undefined,
   filterState: PolisFilterState | null | undefined,
   sessionSlug: unknown,
+  sessionConfig?: unknown,
 ): PolisQuestionResponses {
   if (!questionResponses || typeof questionResponses !== 'object') return {};
-
-  const netId = network?.id != null ? String(network.id) : null;
 
   // Resolve group slug (optional param -> URL path fallback)
   const resolveSlug = () => {
@@ -545,6 +550,14 @@ export function applyFilterStateToAggregator(
   };
   const slug = resolveSlug();
   const readSlugs = resolvePolisReadSlugs(slug);
+  const workerTarget = resolveSurveyToolWorkerTargetSignature({ sessionConfig, sessionSlug: slug });
+  const cacheScope = workerTarget.isWorkerCanonical
+    ? workerTarget.valid
+      ? WORKER_CANONICAL_CACHE_SCOPE_KEY
+      : null
+    : network?.id != null
+      ? String(network.id)
+      : null;
 
   // Safe cache reads (group-aware dg:* keys)
   const qMap: Record<string, PolisQuestionMeta> = {};
@@ -554,8 +567,32 @@ export function applyFilterStateToAggregator(
     const sParsed = peekCacheSync('sbtCache', readSlug, { clone: false });
     const qCache = (qParsed || null) as Record<string, { questions?: Record<string, PolisQuestionMeta> }> | null;
     const sCache = (sParsed || null) as Record<string, { sbtList?: Record<string, PolisSbtEntry> }> | null;
-    const scopedQuestions = netId && qCache && qCache[netId] && qCache[netId].questions ? qCache[netId].questions : {};
-    const scopedSbtList = netId && sCache && sCache[netId] && sCache[netId].sbtList ? sCache[netId].sbtList : {};
+    // Regression guard: Worker sessions have no numeric network ID, and their
+    // shared `worker` bucket is readable only when its canonical identity matches.
+    const questionNode = cacheScope
+      ? readSurveyToolScopedCacheNode({
+          cache: qCache,
+          cacheScope,
+          sessionConfig,
+          sessionSlug: readSlug,
+        })
+      : null;
+    const sbtNode = cacheScope
+      ? readSurveyToolScopedCacheNode({
+          cache: sCache,
+          cacheScope,
+          sessionConfig,
+          sessionSlug: readSlug,
+        })
+      : null;
+    const scopedQuestions =
+      questionNode?.questions && typeof questionNode.questions === 'object'
+        ? (questionNode.questions as Record<string, PolisQuestionMeta>)
+        : {};
+    const scopedSbtList =
+      sbtNode?.sbtList && typeof sbtNode.sbtList === 'object'
+        ? (sbtNode.sbtList as Record<string, PolisSbtEntry>)
+        : {};
 
     Object.keys(scopedQuestions).forEach((questionId) => {
       const lowerQuestionId = String(questionId || '').toLowerCase();
