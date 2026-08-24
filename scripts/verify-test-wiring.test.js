@@ -82,6 +82,18 @@ test('E2E smoke timeout leaves room for Playwright installation and execution', 
   assert.match(e2eJob, /timeout-minutes: 20/);
 });
 
+test('Context Engine CC and Node gate installs client parser dependencies', () => {
+  const rootDir = path.resolve(__dirname, '..');
+  const workflow = fs.readFileSync(path.join(rootDir, '.github/workflows/ci.yml'), 'utf8');
+  const ceccJob = workflow.slice(workflow.indexOf('  cecc-and-node:'), workflow.indexOf('  test:'));
+  const installIndex = ceccJob.indexOf('npm --prefix client ci');
+  const gateIndex = ceccJob.indexOf('npm run ci:gate -- cecc-and-node');
+
+  assert.match(ceccJob, /cache-dependency-path:[\s\S]*client\/package-lock\.json/);
+  assert.notEqual(installIndex, -1, 'cecc-and-node must install client dependencies');
+  assert.ok(installIndex < gateIndex, 'client dependencies must be installed before the gate runs');
+});
+
 test('release-staging PR events do not duplicate the authoritative push matrix', () => {
   const rootDir = path.resolve(__dirname, '..');
   const workflow = fs.readFileSync(path.join(rootDir, '.github/workflows/ci.yml'), 'utf8');

@@ -309,10 +309,14 @@ jobs:
           cache: npm
           cache-dependency-path: |
             package-lock.json
+            client/package-lock.json
             workers/sessionCorsWorker/package-lock.json
 
       - name: Install root dependencies
         run: npm ci
+
+      - name: Install client dependencies
+        run: npm --prefix client ci
 
       - name: Install sessionCorsWorker dependencies
         run: npm --prefix workers/sessionCorsWorker ci
