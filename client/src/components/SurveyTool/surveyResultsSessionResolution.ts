@@ -12,12 +12,14 @@ type UnknownRecord = Record<string, unknown>;
 type SurveyResultsExplicitSessionSource = {
   sessionSlug?: string;
   activeSessionSlug?: string;
+  sessionConfig?: unknown;
 };
 
 type SurveyResultsSessionInput = {
   search?: unknown;
   sessionSlug?: unknown;
   activeSessionSlug?: unknown;
+  sessionConfig?: unknown;
 };
 
 type SurveyResultsQuestionReadScopeInput = SurveyResultsSessionInput & {
@@ -118,20 +120,21 @@ const buildSurveyResultsExplicitSessionSource = ({
   search = '',
   sessionSlug,
   activeSessionSlug,
+  sessionConfig,
 }: SurveyResultsSessionInput = {}): SurveyResultsExplicitSessionSource | null => {
   const explicitQuerySessionSlug = parseQuestionSessionSlugFromSearch(toStr(search));
   if (explicitQuerySessionSlug !== null) {
-    return { sessionSlug: explicitQuerySessionSlug };
+    return { sessionSlug: explicitQuerySessionSlug, ...(isObj(sessionConfig) ? { sessionConfig } : {}) };
   }
 
   const explicitSessionSlug = readExplicitSessionSlug(sessionSlug);
   if (explicitSessionSlug !== null) {
-    return { sessionSlug: explicitSessionSlug };
+    return { sessionSlug: explicitSessionSlug, ...(isObj(sessionConfig) ? { sessionConfig } : {}) };
   }
 
   const explicitActiveSessionSlug = readExplicitSessionSlug(activeSessionSlug);
   if (explicitActiveSessionSlug !== null) {
-    return { activeSessionSlug: explicitActiveSessionSlug };
+    return { activeSessionSlug: explicitActiveSessionSlug, ...(isObj(sessionConfig) ? { sessionConfig } : {}) };
   }
 
   return null;

@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Fixed Raw Results for pure Cloudflare-canonical sessions so identity-matched
+  Worker question/response caches populate totals without requiring a chain ID
+  or starting an RPC latest-block read.
 - Fixed home Stats for an active Cloudflare-canonical session so questions and
   surveys come from its identity-scoped Worker caches, Groups count the
   viewer-visible Worker catalog, and the Groups detail modal stays on the

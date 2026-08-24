@@ -91,6 +91,7 @@ export type SurveyResultsHydrationInstance = {
 
 export type SurveyResultsHydrationPorts = {
   applyStatePatch: (patch: unknown, afterApply?: () => void) => void;
+  getCacheScope?: () => string;
   getEffectiveSlug: () => string;
   getNetworkQuestionsForCurrentContext: () => Record<string, SurveyResultsRecord>;
   getProps: () => SurveyResultsProps;
@@ -113,10 +114,10 @@ export const fetchSurveyResultsSurveyModeResponses = async ({
   ports,
 }: SurveyResultsHydrationRuntimeArgs): Promise<void> => {
   const state = ports.getState();
-  const props = ports.getProps();
   const currentSurveyID = state.surveyId ? state.surveyId.toLowerCase() : null;
   const slug = ports.getEffectiveSlug();
-  const netIdStr = String(props.network?.id ?? props.networkChainId ?? '');
+  const props = ports.getProps();
+  const netIdStr = ports.getCacheScope?.() || String(props.network?.id ?? props.networkChainId ?? '');
 
   let surveysCache = (ports.readSurveyCacheSync(slug) || {}) as SurveyResultsRecord;
   if (!surveysCache || Object.keys(surveysCache).length === 0) {
@@ -243,7 +244,7 @@ export const fetchSurveyResultsQuestionModeResponses = async ({
   ports,
 }: SurveyResultsHydrationRuntimeArgs): Promise<void> => {
   const props = ports.getProps();
-  const netIdStr = String(props.network?.id ?? props.networkChainId ?? '');
+  const netIdStr = ports.getCacheScope?.() || String(props.network?.id ?? props.networkChainId ?? '');
   if (!netIdStr) return;
   const questionNetCache = await ports.getScopedQuestionNetworkData('questions');
   const effectiveSlug = ports.getEffectiveSlug();
