@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import MainAreaTabs, { MAIN_AREA_TABS } from './MainAreaTabs';
 
 const mockToolExplorer = jest.fn();
+const mockCommunityTab = jest.fn();
 
 jest.mock('./ToolExplorer', () => ({
   __esModule: true,
@@ -24,7 +25,10 @@ jest.mock('./OnboardingWalkthrough', () => ({
 
 jest.mock('../CommunityTab/CommunityTab', () => ({
   __esModule: true,
-  default: () => <div data-testid="mock-community-tab" />,
+  default: (props: any) => {
+    mockCommunityTab(props);
+    return <div data-testid="mock-community-tab" />;
+  },
 }));
 
 const createProps = (overrides: Record<string, unknown> = {}) => ({
@@ -95,6 +99,22 @@ describe('MainAreaTabs', () => {
         isResponsesCacheReady: true,
         questionResponsesNonce: 7,
         questionScanProgress: props.questionScanProgress,
+      }),
+    );
+  });
+
+  it('passes the active session cache context through to Stats', async () => {
+    const props = createProps({ focusedTab: MAIN_AREA_TABS.COMMUNITY });
+    render(<MainAreaTabs {...props} />);
+
+    await screen.findByTestId('mock-community-tab');
+    expect(mockCommunityTab).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        activeSessionSlug: 'demo',
+        sessionConfig: props.sessionConfig,
+        networkChainId: 84532,
+        isResponsesCacheReady: true,
+        questionResponsesNonce: 7,
       }),
     );
   });

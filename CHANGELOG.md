@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Fixed home Stats for an active Cloudflare-canonical session so questions and
+  surveys come from its identity-scoped Worker caches, Groups count the
+  viewer-visible Worker catalog, and the Groups detail modal stays on the
+  Worker-native route.
 - Renamed the `/new` setup choices to **Centralized** and **Decentralized**, moved Session
   colors into a default-collapsed More options section, and replaced the
   freeform group-creation policy input with a constrained dropdown there.

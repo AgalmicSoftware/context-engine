@@ -10,6 +10,7 @@ import styles from './MainContent.module.scss';
 import { TabContent, TabPane, Card, CardHeader, CardBody, Nav, NavItem, NavLink } from 'reactstrap';
 
 import LazyFallback from '../Shared/LazyFallback';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 const log = createLogger('ui');
 
@@ -129,6 +130,7 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
                   role="tab"
                   aria-label={MAIN_AREA_TAB_TITLES[MAIN_AREA_TABS.COMMUNITY]}
                   aria-selected={this.props.focusedTab === MAIN_AREA_TABS.COMMUNITY}
+                  data-testid={E2E_TESTIDS.MAIN_STATS_TAB}
                 >
                   <FontAwesomeIcon icon={faGlobe} className={styles.navTabIcon} />
                   <div id="mainContentTabTitle"> {MAIN_AREA_TAB_TITLES[MAIN_AREA_TABS.COMMUNITY]} </div>
@@ -169,14 +171,19 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
                       demoMode={this.props.demoMode}
                       provider={this.props.provider}
                       network={this.props.network}
+                      networkChainId={this.props.networkChainId}
                       account={this.props.account}
+                      activeSessionSlug={this.props.activeSessionSlug}
+                      sessionConfig={this.props.sessionConfig}
                       loginComplete={this.props.loginComplete}
                       loginInProgress={this.props.loginInProgress}
                       toggleLoginModal={(loginModalIsOpen: boolean) => this.props.toggleLoginModal(loginModalIsOpen)}
                       //
                       isQuestionCacheReady={this.props.isQuestionCacheReady}
+                      isResponsesCacheReady={this.props.isResponsesCacheReady}
                       isSurveyCacheReady={this.props.isSurveyCacheReady}
                       isSBTCacheReady={this.props.isSBTCacheReady}
+                      questionResponsesNonce={this.props.questionResponsesNonce}
                       sbtCacheRevision={this.props.sbtCacheRevision}
                       sbtRealtimeCoverageBySlug={this.props.sbtRealtimeCoverageBySlug}
 

@@ -525,19 +525,18 @@ files should open through the Mini App once that surface is re-enabled.
 Generating questions without selected files returns
 `Select or upload attachments before generating questions.`
 
-Storage profile selection belongs to session config, not Telegram. Hosted &
-Fast is the default/recommended choice after selection and uses Cloudflare,
-where the session/general worker can enforce SBT gates before issuing upload
-permissions, snippets, short-lived reads, or download bytes. Trustless & Slower
-uses Arweave; legacy/custom drafts without a compiled mode profile retain the
-Arweave fallback. Lit is required only when the session profile selects
-`lit_encrypted` and the payload itself is intentionally Lit/client encrypted.
-The default Cloudflare payload access mode is `worker_sbt_gate`, which is
-worker-enforced access control and not end-to-end encryption. `public_read`
-keeps canonical payloads in Cloudflare but serves read/list requests without
-wallet auth; writes still require the session worker. This is the intended mode
-for public Telegram question prompts that should behave the same in the bot,
-Mini App, and CE client.
+Storage profile selection belongs to session config, not Telegram.
+`arweave` remains the default profile. `cloudflare` is an explicit session
+storage profile where the session/general worker can enforce SBT gates before
+issuing upload permissions, snippets, short-lived reads, or download bytes. Lit
+is required only when the session profile selects `lit_encrypted` and the
+payload itself is intentionally Lit/client encrypted. The default Cloudflare
+payload access mode is `worker_sbt_gate`, which is worker-enforced access
+control and not end-to-end encryption. `public_read` keeps canonical payloads
+in Cloudflare but serves read/list requests without wallet auth; writes still
+require the session worker. This is the intended mode for public Telegram
+question prompts that should behave the same in the bot, Mini App, and CE
+client.
 Cloudflare storage is for CE payloads such as session context, docs, media,
 questions, surveys, responses, and generated artifacts; it is not Telegram,
 user preference, or profile storage. Agent and Telegram-facing records should
