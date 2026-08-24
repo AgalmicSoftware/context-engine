@@ -56,6 +56,20 @@ test('verifyPublicAssets rejects an image with no source, doc, or manifest owner
   });
 });
 
+test('verifyPublicAssets does not let one relative reference mask an orphan with the same basename', () => {
+  withFixture((rootDir) => {
+    writeFile(rootDir, 'client/src/used/logo.png', Buffer.from([0, 1, 2]));
+    writeFile(rootDir, 'client/src/unused/logo.png', Buffer.from([3, 4, 5]));
+    writeFile(rootDir, 'client/src/App.tsx', "import logo from './used/logo.png';\nvoid logo;\n");
+
+    const result = verifyPublicAssets(rootDir);
+    assert.deepEqual(result.findings, [{
+      file: 'client/src/unused/logo.png',
+      kind: 'unreferenced public asset',
+    }]);
+  });
+});
+
 test('verifyPublicAssets ignores local build-audit output excluded from the client tree', () => {
   withFixture((rootDir) => {
     writeFile(rootDir, 'client/.tmp-build-audit/orphan.png', Buffer.from([0, 1, 2]));

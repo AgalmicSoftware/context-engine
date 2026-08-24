@@ -85,7 +85,6 @@ jest.mock('../../../utilities/ai/aiClient', () => {
   return {
     ...actual,
     requestAiRewrite: jest.fn(),
-    setVadTrimEnabled: jest.fn(),
   };
 });
 

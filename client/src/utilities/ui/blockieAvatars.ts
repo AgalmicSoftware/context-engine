@@ -58,6 +58,3 @@ export function generateBlockieDataUrl(seed: unknown, cells = 8, scale = 4): str
 
   return canvas.toDataURL('image/png');
 }
-
-// Optional alias for convenience
-export const getBlockieDataUrl = generateBlockieDataUrl;

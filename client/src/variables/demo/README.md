@@ -39,8 +39,7 @@ This directory contains demo and fixture data for the Context Engine survey plat
 | --- | --- |
 | [`historical_figure_demographics.ts`](./historical_figure_demographics.ts) | Computes demographic breakdowns from merged historical figure data plus the Polis fixture. Exports `DEMO_ANALYSIS_DEMOGRAPHIC_FIELDS` and the default historical figure lookup object. |
 | [`historical_figure_demographics.test.ts`](./historical_figure_demographics.test.ts) | Regression coverage for the demographics lookup and fixture completeness. |
-| [`debateData.ts`](./debateData.ts) | Debate HUD fixture module with debate cards, argument trees, audience roster/votes, voter profiles, and source links. |
-| [`index.ts`](./index.ts) | Barrel export for the most commonly imported demo datasets and demographics helpers. |
+| [`debateData.ts`](./debateData.ts) | Debate HUD fixture module with debate cards, argument trees, and voter profiles. |
 
 ## Primary Consumers
 

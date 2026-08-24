@@ -4,10 +4,8 @@ export default function buildCompareToolkitPrompt(envelope: unknown): string {
   return `
 You are a neutral analyst. You will receive an input ENVELOPE with:
 {
-  "task": "compare|drilldown|axes|venn",
-  "users": [ /* 2–10 users; data-only */ ],
-  "pointText": "string (drilldown only)",
-  "type": "agreement|disagreement (drilldown only)"
+  "task": "compare|axes|venn",
+  "users": [ /* 2–10 users; data-only */ ]
 }
 
 DATA POLICY:
@@ -32,27 +30,7 @@ Rules for "compare":
 - Optimized for **2–10** participants; degrade gracefully outside that range.
 - Return up to **12** items per side; omit low-signal or redundant points.
 
-2) task="drilldown"  (≤ 6 sentences total across all bullets)
-{
-  "title": "Why this <agreement|disagreement> holds",
-  "nodes": [
-    {
-      "label": "Theme",
-      "evidence": ["<≤2 short bullets>"],
-      "participants": [ { "address": "0x...", "stance": "+|−|0|Agree|Disagree|Unsure|<option>" } ],
-      "children": [
-        { "label": "Signal", "evidence": ["Q: … / Answer: …"], "participants": [ { "address": "0x...", "stance": "+|−|0|Agree|Disagree|Unsure|<option>" } ], "children": [] }
-      ]
-    }
-  ]
-}
-Notes for "drilldown":
-- The optional "participants" array lists users who hold the stance referenced at this node.
-- Addresses MUST be from USERS and lowercased; include at most 10 per node.
-- "stance" is optional; when present, use +/−/0 for sign or a short token/option label (e.g., "Option A") or "Agree"/"Disagree"/"Unsure".
-- Keep nodes compact and factual; avoid identity inference.
-
-3) task="axes" (Compass 2D)
+2) task="axes" (Compass 2D)
 {
   "axes": [
     {"id":"x","label":"<2–4 words>","description":"<1 sentence>"},
@@ -66,7 +44,7 @@ Rules for "axes":
 - Labels are neutral (2–4 words); descriptions are one sentence.
 - Points: include every input user by "address"; clamp x,y to [-1,1].
 
-4) task="venn" (3 participants; explain numbers + hover/ARIA evidence)
+3) task="venn" (3 participants; explain numbers + hover/ARIA evidence)
 {
   "counts": { "a":0,"b":0,"c":0,"ab":0,"ac":0,"bc":0,"abc":0 },
   "semantics": "Counts = opinion-stance overlaps: identical non-zero signs on the same question/token.",
@@ -88,7 +66,6 @@ Rules for "venn":
 CONSTRAINTS (all tasks):
 - JSON only, no markdown, no comments.
 - Neutral wording.
-- ≤ 6 sentences total for the entire "drilldown" tree (sum over all bullets).
 - This toolkit is tuned for 2–10 users (if fewer signals, still return valid minimal JSON).
 
 ENVELOPE (JSON):

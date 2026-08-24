@@ -137,8 +137,13 @@ test('prepare-public-release strips private surfaces without publishing an inven
     writeFile(sourceDir, path.join('docs', 'telegram-response-export-scope-prd.md'), 'private product planning\n');
     writeFile(sourceDir, path.join('docs', 'e2e-commands.md'), 'private operator commands\n');
     writeFile(sourceDir, path.join('docs', 'release-runbook.md'), 'private release procedure\n');
+    writeFile(sourceDir, path.join('docs', 'plans', 'implementation-plan.md'), 'private implementation plan\n');
+    writeFile(sourceDir, path.join('docs', 'client-build-assets.md'), 'private build inventory\n');
     writeFile(sourceDir, path.join('docs', 'security', 'audit-prep-2026-07-06.md'), 'private audit snapshot\n');
     writeFile(sourceDir, 'AGENTS.md', 'private agent instructions\n');
+    writeFile(sourceDir, path.join('ai-discourse-corpus', 'AGENTS.md'), 'nested private agent instructions\n');
+    writeFile(sourceDir, path.join('posts', 'example', 'diagram-prompts.md'), 'private generation prompts\n');
+    writeFile(sourceDir, path.join('posts', 'example', 'attachments', 'README.md'), 'private attachment notes\n');
     writeFile(sourceDir, path.join('ai-discourse-corpus', 'corpuses', '_local_helper.js'), 'local helper script\n');
     const publicBenchmarkCorpusPath = path.join('ai-discourse-corpus', 'corpuses', 'public-corpus.json');
     writeFile(sourceDir, publicBenchmarkCorpusPath, '{"contact":"[redacted-email]"}\n');
@@ -191,6 +196,7 @@ test('prepare-public-release strips private surfaces without publishing an inven
     writeFile(sourceDir, path.join('scripts', 'e2e-env-example.test.js'), 'private E2E env fixture test\n');
     writeFile(sourceDir, path.join('scripts', 'vendor-cecc-ethers-bundle.js'), 'private companion vendoring\n');
     writeFile(sourceDir, path.join('scripts', 'restore-private-pack.sh'), 'private restore workflow\n');
+    writeFile(sourceDir, path.join('scripts', 'audit-deferred-findings.txt'), 'private deferred security ledger\n');
     writeFile(
       sourceDir,
       path.join('scripts', 'lib', 'passkey-wallet-derivation.js'),
@@ -230,10 +236,6 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.match(
       fs.readFileSync(path.join(outputDir, '.github/ISSUE_TEMPLATE/config.yml'), 'utf8'),
       /mailto:contextengine@protonmail\.com/,
-    );
-    assert.match(
-      fs.readFileSync(path.join(outputDir, 'client/src/variables/publicRepoMetadata.ts'), 'utf8'),
-      /PUBLIC_SECURITY_EMAIL = 'contextengine@protonmail\.com'/,
     );
     assert.equal(
       fs.readFileSync(path.join(outputDir, 'deploy', 'cloudflare', 'session-worker', 'worker.mjs'), 'utf8'),
@@ -306,8 +308,13 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'telegram-response-export-scope-prd.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'e2e-commands.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'release-runbook.md')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'plans')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'client-build-assets.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'security', 'audit-prep-2026-07-06.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'AGENTS.md')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'ai-discourse-corpus', 'AGENTS.md')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'posts', 'example', 'diagram-prompts.md')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'posts', 'example', 'attachments', 'README.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'ai-discourse-corpus', 'corpuses', '_local_helper.js')), false);
     const publicBenchmarkCorpus = fs.readFileSync(path.join(outputDir, publicBenchmarkCorpusPath));
     const publicBenchmarkManifest = JSON.parse(fs.readFileSync(
@@ -343,6 +350,7 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'e2e-env-example.test.js')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'vendor-cecc-ethers-bundle.js')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'restore-private-pack.sh')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'audit-deferred-findings.txt')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'lib', 'passkey-wallet-derivation.js')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'private-pack.manifest.json')), false);
     assert.match(

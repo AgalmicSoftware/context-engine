@@ -309,20 +309,20 @@ jobs:
           cache: npm
           cache-dependency-path: |
             package-lock.json
+            client/package-lock.json
             workers/sessionCorsWorker/package-lock.json
 
       - name: Install root dependencies
         run: npm ci
+
+      - name: Install client dependencies
+        run: npm --prefix client ci
 
       - name: Install sessionCorsWorker dependencies
         run: npm --prefix workers/sessionCorsWorker ci
 
       - name: Run Context Engine CC and Node gate
         run: npm run ci:gate -- cecc-and-node
-
-      - name: Run dead export advisory
-        continue-on-error: true
-        run: npm run dead-exports:advisory
 
   test:
     name: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && startsWith(github.head_ref, 'release-staging') && 'release-staging-pr-deduplicated' || 'test' }}

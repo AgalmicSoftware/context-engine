@@ -24,7 +24,6 @@
 /scripts/sync-public-history.sh @AgalmicSoftware
 /scripts/client-boundaries-baseline.json @AgalmicSoftware
 /scripts/type-debt-baseline.json @AgalmicSoftware
-/scripts/dead-exports-baseline.json @AgalmicSoftware
 /scripts/client-bundle-budget.json @AgalmicSoftware
 /scripts/verify-abi-sync.mjs @AgalmicSoftware
 /client/src/contractsABI/ @AgalmicSoftware

@@ -82,6 +82,18 @@ test('E2E smoke timeout leaves room for Playwright installation and execution', 
   assert.match(e2eJob, /timeout-minutes: 20/);
 });
 
+test('Context Engine CC and Node gate installs client parser dependencies', () => {
+  const rootDir = path.resolve(__dirname, '..');
+  const workflow = fs.readFileSync(path.join(rootDir, '.github/workflows/ci.yml'), 'utf8');
+  const ceccJob = workflow.slice(workflow.indexOf('  cecc-and-node:'), workflow.indexOf('  test:'));
+  const installIndex = ceccJob.indexOf('npm --prefix client ci');
+  const gateIndex = ceccJob.indexOf('npm run ci:gate -- cecc-and-node');
+
+  assert.match(ceccJob, /cache-dependency-path:[\s\S]*client\/package-lock\.json/);
+  assert.notEqual(installIndex, -1, 'cecc-and-node must install client dependencies');
+  assert.ok(installIndex < gateIndex, 'client dependencies must be installed before the gate runs');
+});
+
 test('release-staging PR events do not duplicate the authoritative push matrix', () => {
   const rootDir = path.resolve(__dirname, '..');
   const workflow = fs.readFileSync(path.join(rootDir, '.github/workflows/ci.yml'), 'utf8');
@@ -252,7 +264,6 @@ test('public-release style copies without .git still pass wiring checks', () => 
           'test:node': 'node scripts/run-node-tests.js',
           'test:node:tracked': 'node scripts/run-node-tests.js --tracked-only',
           'client-boundaries:check': 'node scripts/check-client-boundaries.mjs',
-          'dead-exports:advisory': 'node scripts/check-dead-exports-advisory.mjs',
           'dead-exports:check': 'node scripts/check-dead-exports-advisory.mjs --check',
           'test:e2e': 'npm run -s test:e2e:smoke',
           'test:e2e:quick': 'npm run -s test:e2e:smoke',
@@ -353,8 +364,6 @@ test('public-release style copies without .git still pass wiring checks', () => 
         '  cecc-and-node:',
         '    steps:',
         '      - run: npm run ci:gate -- cecc-and-node',
-        '      - continue-on-error: true',
-        '        run: npm run dead-exports:advisory',
         '  test:',
         '    needs:',
         '      - wiring-and-release',
@@ -401,7 +410,6 @@ test('public-release style copies without .git still pass wiring checks', () => 
         '/scripts/sync-public-history.sh @AgalmicSoftware',
         '/scripts/client-boundaries-baseline.json @AgalmicSoftware',
         '/scripts/type-debt-baseline.json @AgalmicSoftware',
-        '/scripts/dead-exports-baseline.json @AgalmicSoftware',
         '/scripts/client-bundle-budget.json @AgalmicSoftware',
         '/scripts/verify-abi-sync.mjs @AgalmicSoftware',
         '/client/src/contractsABI/ @AgalmicSoftware',
@@ -521,7 +529,6 @@ test('public-release style copies without .git still pass wiring checks', () => 
       'docs/bundle-budget.md',
       'scripts/check-dead-exports-advisory.mjs',
       'scripts/check-dead-exports-advisory.test.mjs',
-      'scripts/dead-exports-baseline.json',
       'scripts/check-baseline-monotonicity.mjs',
       'scripts/check-baseline-monotonicity.test.mjs',
       'scripts/resolve-baseline-monotonicity-base.mjs',

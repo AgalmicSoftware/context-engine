@@ -1,6 +1,6 @@
 /**
  * @module components/MainSite/mainSiteRouteViewMap
- * @description Ordered route-key to render-method dispatch for MainSite.
+ * @description Typed route-key to render-method dispatch for MainSite.
  */
 
 import type { ReactNode } from 'react';
@@ -10,33 +10,6 @@ export type MainSiteRouteViewKey = Exclude<MainSiteRouteKey, 'wizard' | 'notFoun
 export type MainSiteRouteViewRenderers = {
   [Key in MainSiteRouteViewKey]: () => ReactNode;
 };
-
-export const MAIN_SITE_ROUTE_VIEW_KEYS: MainSiteRouteViewKey[] = [
-  'surveyId',
-  'home',
-  'debate',
-  'atlas',
-  'tag',
-  'bookmarks',
-  'compare',
-  'surveysOrQuestionsList',
-  'questionDetail',
-  'sbtCreate',
-  'sbtsList',
-  'sbtDetail',
-  'simUser',
-  'userProfile',
-  'about',
-  'posts',
-  'demos',
-  'benchmarks',
-  'matrix',
-  'docs',
-  'admin',
-  'sponsor',
-  'agent',
-  'session',
-];
 
 export type RenderMainSiteRouteViewArgs = {
   routeKey: MainSiteRouteKey;
@@ -55,9 +28,5 @@ export const renderMainSiteRouteView = ({
     return renderNotFound(fullPath);
   }
 
-  for (const key of MAIN_SITE_ROUTE_VIEW_KEYS) {
-    if (routeKey === key) return renderers[key]();
-  }
-
-  return renderNotFound(fullPath);
+  return renderers[routeKey]();
 };

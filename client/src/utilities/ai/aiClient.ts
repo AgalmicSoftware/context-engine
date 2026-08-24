@@ -17,31 +17,22 @@ import { getEffectiveAiConfig, getEffectiveTranscriptionConfig } from './aiSetti
 import {
   TRANSCRIBE_MAX_UPLOAD_BYTES,
   TRANSCRIBE_WAV_TARGET_HZ,
-  extractSpeechAudio,
   mergeTranscriptText,
   normalizeAudioToWav,
   splitAudioBlobToWavChunks,
 } from './aiClientAudioTranscription.js';
-import { buildCompareFallbackTree, sanitizeCompareTreePayload } from './aiClientCompareTree.js';
 import { getEffectiveArweaveKey } from '../session/resourceKeys.js';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
 import { normalizeBaseUrl } from '../urlUtils.js';
-import {
-  buildE2eMockClusterAnalysis,
-  buildE2eMockCompareBullets,
-  buildE2eMockDrilldownTree,
-  isE2eAiMockEnabled,
-} from './aiClientE2eMocks.js';
+import { buildE2eMockClusterAnalysis, buildE2eMockCompareBullets, isE2eAiMockEnabled } from './aiClientE2eMocks.js';
 import {
   asParsedJsonRecord,
   buildHeuristicClusterSummary,
   deriveFallbackClusterName,
   parseJsonFlexible,
-  pickParsedString,
   readParsedLegacyString,
-  readParsedString,
   stripEnclosingMarkdownFences as _stripEnclosingMarkdownFences,
 } from './aiClientParsing.js';
 import {
@@ -63,19 +54,13 @@ import {
   readAiOptionThrowOnError,
   readAiOptionWorkerUrl,
   readArweaveJwkOption,
-  readNumericOption,
   resolveAudioSummaryOptions,
   resolveAiSessionOptions,
   resolveAiSessionSelection,
   resolveTranscriptionUploadOptions,
   withAiTaskTypeFallback,
 } from './aiClientRequestOptions.js';
-import {
-  mergeCompareVennWithEvidence,
-  normalizeCompareBullets,
-  readCompareToolkitTask,
-  resolveCompareToolkitPayload,
-} from './aiCompareContracts.js';
+import { readCompareToolkitTask, resolveCompareToolkitPayload } from './aiCompareContracts.js';
 import {
   buildAiWorkerRequestPlan,
   parseAiWorkerCompletion,
@@ -88,14 +73,6 @@ import {
 } from './aiClientTranscriptionWorkerTransport.js';
 import { enqueueAiCallWithRetry } from './aiClientQueue.js';
 
-import {
-  pcaLiteCompass,
-  computeVennEvidence,
-  computeOverlapMatrix,
-  sanitizeCompass as sanitizeCompassPure,
-  fallbackBullets,
-  type CompareUser,
-} from '../survey/compareUsers.js';
 import { createLogger } from '../logging.js';
 import type { UnknownRecord } from '../session/sessionTypes.js';
 
@@ -109,20 +86,10 @@ type AudioUploadBlob = Blob & {
   size?: number;
   type?: string;
 };
-type AiClientOptions = Record<string, unknown>;
-type CompareBundleOptions = AiClientOptions & {
-  needCompass?: unknown;
-  needMatrix?: unknown;
-  needVenn?: unknown;
-};
-
 const asRecord = (value: unknown): UnknownRecord =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : {};
 
-const readCompareUsers = (value: unknown, maxUsers = Infinity): CompareUser[] =>
-  (Array.isArray(value) ? value.slice(0, maxUsers) : []) as CompareUser[];
-
-export { TRANSCRIBE_MAX_UPLOAD_BYTES, extractSpeechAudio } from './aiClientAudioTranscription.js';
+export { TRANSCRIBE_MAX_UPLOAD_BYTES } from './aiClientAudioTranscription.js';
 export { isE2eAiMockEnabled } from './aiClientE2eMocks.js';
 export { fetchContentFromURL, processAdditionalSources } from './aiClientSourceFetch.js';
 
@@ -207,18 +174,6 @@ export const analyzePhotoForQuestionGeneration = async (file: PhotoUploadFile, o
     requestFormat: support.format,
   };
 };
-
-// === Client-side silence trimming feature flag and config (runtime-controlled from UI) ===
-let __vadTrimEnabled = true;
-let __vadTrimConfig: UnknownRecord = {};
-export function setVadTrimEnabled(v: unknown) {
-  __vadTrimEnabled = !!v;
-}
-export function setVadTrimConfig(cfg: unknown) {
-  if (cfg && typeof cfg === 'object') {
-    __vadTrimConfig = { ...__vadTrimConfig, ...cfg };
-  }
-}
 
 /* ======================================================================
  * Core fetch + AI helpers
@@ -318,23 +273,6 @@ export const callAI = async (prompt: unknown, opts: unknown = {}): Promise<strin
  */
 export const callAIQueued = (prompt: unknown, opts: unknown = {}): Promise<string> => {
   return enqueueAiCallWithRetry(() => callAI(prompt, opts));
-};
-
-/* ======================================================================
- * Lightweight utilities for other product areas (unchanged behavior)
- * ====================================================================== */
-
-export const analyzeSurveyResponses = async (responses: unknown, opts: unknown = {}): Promise<string> => {
-  const prompt = `Analyze the following survey responses and provide a summary of the key findings: ${JSON.stringify(
-    responses,
-  )}`;
-  try {
-    const analysis = await callAI(prompt, pickAiRequestOpts(opts));
-    return analysis;
-  } catch (error) {
-    aiLog.error('Error analyzing survey responses:', error);
-    throw error;
-  }
 };
 
 /**
@@ -481,20 +419,6 @@ export async function transcribeAudio(audioBlobOrFile: AudioUploadBlob, opts: un
       aiLog.warn('Audio normalization failed; using original upload:', error);
       // Soft-fail: keep original; server may still accept it.
     }
-  }
-
-  // Optional client-side VAD-based silence trimming (runtime-configured; no hardcoded tunables here)
-  try {
-    const sizeThreshold = readNumericOption(__vadTrimConfig, 'sizeThresholdBytes');
-    if (__vadTrimEnabled && sizeThreshold != null && (uploadFile?.size || 0) > sizeThreshold) {
-      const trimmed = await extractSpeechAudio(uploadFile, __vadTrimConfig || {});
-      if (trimmed && trimmed.size > 0 && trimmed.size < (uploadFile.size || Infinity)) {
-        uploadFile = trimmed; // replace only if smaller
-      }
-    }
-  } catch (error) {
-    aiLog.warn('Speech trimming failed; using original upload:', error);
-    // Trimming failed — silent fallback to original
   }
 
   const transport = await resolveTranscriptionTransport(opts);
@@ -689,104 +613,13 @@ export async function analyzeUserOpinions(userData: unknown, opts: unknown = {})
  * ====================================================================== */
 
 /**
- * Plain-text drilldown explainer as a minimal fallback (≤ ~6 sentences).
- */
-export async function drillDownComparisonPoint(
-  users: unknown,
-  pointText: unknown,
-  type: unknown,
-  opts: unknown = {},
-): Promise<string> {
-  const safeUsers = readCompareUsers(users, Number.POSITIVE_INFINITY);
-  const safePoint = typeof pointText === 'string' ? pointText : '';
-  const t = typeof type === 'string' && type.toLowerCase().includes('dis') ? 'disagreement' : 'agreement';
-  const aiCallOpts = pickAiRequestOpts(opts);
-
-  try {
-    const drillPrompt = `You are an impartial analyst expanding on a ${t} found in a multi-user comparison.
-Focus ONLY on the evidence in USERS (JSON) below: overlaps/divergences in SBTs, similar/different answers (binary/rating/multichoice/freeform), optional "importance"/"additionalComment", and created content ("questionsCreated","surveysCreated","createdCounts").
-
-Point to elaborate (${t}):
-${JSON.stringify(safePoint)}
-
-Instructions:
-- Explain why this point arises, referencing specific signals in the provided data (e.g., shared SBT names, matched/different prompts & answers, recurring tags, authored content themes).
-- Keep it neutral, factual, and privacy-preserving; do not infer identities or any PII.
-- Do NOT use external knowledge; rely solely on USERS (JSON).
-- Return ONLY plain text (no JSON/markdown), at most 6 sentences.
-
-USERS (JSON):
-${JSON.stringify(safeUsers, null, 2)}`;
-    const raw = await callAIQueued(drillPrompt, { ...aiCallOpts, thinking: true });
-
-    // Parse/sanitize to plain string
-    let text = '';
-    const parsed = asParsedJsonRecord(parseJsonFlexible(String(raw || '')));
-    if (parsed) {
-      const candidate = pickParsedString(parsed, ['text', 'explanation', 'message', 'output', 'content']);
-      if (candidate) text = candidate;
-    }
-    if (!text) {
-      let s = String(raw || '');
-      // Strip common code fences if present
-      const fence = s.match(/```(?:json|md|markdown)?\s*([\s\S]*?)```/i);
-      if (fence && fence[1]) s = fence[1];
-      // Remove any stray HTML tags and surrounding quotes/backticks
-      s = s.replace(/<[^>]+>/g, '').replace(/^[\s"'`]+|[\s"'`]+$/g, '');
-      text = s;
-    }
-
-    text = String(text || '').trim();
-    return text || 'No additional details available.';
-  } catch (err) {
-    aiLog.error('drillDownComparisonPoint error:', err);
-    return 'Sorry—couldn’t expand that point right now.';
-  }
-}
-
-/**
- * Hierarchical drill-down explanation (tree). AI-only; if invalid, falls back to a tiny tree
- * wrapping the plain-text explainer above.
- */
-export async function drillDownComparisonTree(users: unknown, pointText: unknown, type: unknown, opts: unknown = {}) {
-  const safeUsers = readCompareUsers(users, 10);
-  const t = typeof type === 'string' && type.toLowerCase().includes('dis') ? 'disagreement' : 'agreement';
-  const aiCallOpts = pickAiRequestOpts(opts);
-
-  try {
-    const envelope = {
-      task: 'drilldown',
-      users: safeUsers,
-      pointText: String(pointText || ''),
-      type: t,
-    };
-    const prompt = buildCompareToolkitPrompt(envelope);
-    const raw = await callAIQueued(prompt, { ...aiCallOpts, thinking: true });
-    const parsed = parseJsonFlexible(raw);
-
-    const sanitizedTree = sanitizeCompareTreePayload(parsed, `Why this ${t} holds`);
-    if (sanitizedTree) {
-      return sanitizedTree;
-    }
-
-    // Fallback to plain-text summary wrapped as a tiny tree
-    const text = await drillDownComparisonPoint(safeUsers, pointText, t, aiCallOpts);
-    return buildCompareFallbackTree(`Why this ${t} holds`, text);
-  } catch (err) {
-    aiLog.error('drillDownComparisonTree error:', err);
-    const text = await drillDownComparisonPoint(users, pointText, type, aiCallOpts);
-    return buildCompareFallbackTree(`Why this ${type || 'agreement'} holds`, text);
-  }
-}
-
-/**
  * Unified entry for LLM-powered comparison subtasks.
  * This function is **AI-only** and returns raw model outputs (parsed),
  * leaving deterministic fallbacks to higher-level orchestrators.
  *
- * @param {"compare"|"drilldown"|"axes"|"venn"} task
- * @param {{users:Array, pointText?:string, type?:"agreement"|"disagreement"}} payload
- * @returns {Promise<unknown>} Parsed JSON per task, or a plain string for drilldown fallback.
+ * @param {"compare"|"axes"|"venn"} task
+ * @param {{users:Array}} payload
+ * @returns {Promise<unknown>} Parsed JSON per task.
  */
 export async function runCompareToolkit(task: unknown, payload: unknown = {}, opts: unknown = {}) {
   const t = readCompareToolkitTask(task);
@@ -799,21 +632,12 @@ export async function runCompareToolkit(task: unknown, payload: unknown = {}, op
 
   if (isE2eAiMockEnabled()) {
     if (t === 'compare') return buildE2eMockCompareBullets(safeUsers);
-    if (t === 'drilldown') {
-      return buildE2eMockDrilldownTree(payload, safeUsers);
-    }
     return null;
   }
 
   const envelope = {
-    task: t === 'compare' || t === 'drilldown' || t === 'axes' || t === 'venn' ? t : 'compare',
+    task: t === 'compare' || t === 'axes' || t === 'venn' ? t : 'compare',
     users: safeUsers,
-    ...(t === 'drilldown'
-      ? {
-          pointText: comparePayload.pointText,
-          type: comparePayload.type,
-        }
-      : {}),
   };
 
   try {
@@ -821,96 +645,12 @@ export async function runCompareToolkit(task: unknown, payload: unknown = {}, op
     const raw = await callAIQueued(prompt, { ...aiCallOpts, thinking: true });
     const parsed = parseJsonFlexible(raw);
 
-    if (t === 'drilldown') {
-      const parsedTree = asParsedJsonRecord(parsed);
-      if (readParsedString(parsedTree, 'title') && Array.isArray(parsedTree?.nodes)) {
-        return parsed;
-      }
-      // Provide plain-text fallback (string)
-      return await drillDownComparisonPoint(safeUsers, envelope.pointText, envelope.type, aiCallOpts);
-    }
-
-    // For compare/axes/venn: return parsed raw (may be null/invalid; caller handles fallbacks)
+    // Return parsed raw output; callers own deterministic fallbacks.
     return parsed || null;
   } catch (err) {
     aiLog.error('runCompareToolkit error:', err);
-    if (t === 'drilldown') {
-      return await drillDownComparisonPoint(safeUsers, envelope.pointText, envelope.type, aiCallOpts);
-    }
     return null;
   }
-}
-
-/* ======================================================================
- * Single public entry: normalized bundle for Compare UI
- * ====================================================================== */
-
-/**
- * getComparisonBundle(users, opts) → one normalized bundle for Compare UI.
- * - Kicks off LLM tasks and deterministic fallbacks in parallel.
- * - Prefers valid LLM outputs; else uses fallbacks from compareUsers.js.
- * - Always sanitizes compass; guarantees non-empty Venn evidence where counts>0.
- */
-export async function getComparisonBundle(
-  users: unknown,
-  opts: CompareBundleOptions = {
-    needCompass: true,
-    needVenn: false,
-    needMatrix: false,
-  },
-) {
-  const safeUsers = readCompareUsers(users, 10);
-  const needCompass = !!opts.needCompass;
-  const needVenn = !!opts.needVenn && safeUsers.length === 3;
-  const needMatrix = !!opts.needMatrix;
-  const aiCallOpts = pickAiRequestOpts(opts);
-
-  // LLM tasks
-  const pBullets = runCompareToolkit('compare', { users: safeUsers }, aiCallOpts);
-  const pAxes = needCompass ? runCompareToolkit('axes', { users: safeUsers }, aiCallOpts) : null;
-  const pVenn = needVenn ? runCompareToolkit('venn', { users: safeUsers }, aiCallOpts) : null;
-
-  // Deterministic fallbacks
-  const fAxes = needCompass ? pcaLiteCompass(safeUsers) : null;
-  const fVenn = needVenn ? computeVennEvidence(safeUsers) : null;
-  const fMatrix = needMatrix ? computeOverlapMatrix(safeUsers, 20) : null;
-
-  const settled = await Promise.allSettled([pBullets, pAxes, pVenn, fAxes, fVenn, fMatrix]);
-  const val = (i: number) => {
-    const result = settled[i];
-    return result && result.status === 'fulfilled' ? result.value : null;
-  };
-
-  // Bullets (prefer LLM)
-  const bullets = normalizeCompareBullets(val(0), fallbackBullets(safeUsers));
-
-  // Compass (prefer LLM, sanitize)
-  let compassRaw = val(1) || val(3) || null;
-  let compass = compassRaw
-    ? sanitizeCompassPure(
-        compassRaw,
-        safeUsers.map((u) => u.address),
-      )
-    : null;
-
-  // Venn (prefer LLM, guarantee non-empty evidence for positive regions)
-  let venn = null;
-  const vennCandidate = needVenn ? val(2) || val(4) || null : null;
-  if (vennCandidate) {
-    // Compute deterministic labels as a safety net for evidence
-    const ensure = computeVennEvidence(safeUsers);
-    venn = mergeCompareVennWithEvidence(vennCandidate, ensure);
-  }
-
-  // Matrix (deterministic only)
-  const matrix = needMatrix ? val(5) || computeOverlapMatrix(safeUsers, 20) : null;
-
-  return {
-    bullets,
-    compass,
-    venn,
-    matrix,
-  };
 }
 
 // AI Summarization of Audio

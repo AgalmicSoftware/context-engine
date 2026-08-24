@@ -6,6 +6,7 @@
 ce_public_release_private_doc_patterns() {
   cat <<'EOF'
 AGENTS.md
+*/AGENTS.md
 docs/agent-native*.md
 docs/ai-agent-bootstrap.md
 docs/*.MAP.md
@@ -14,6 +15,7 @@ docs/dead-code-disposition.md
 docs/dependency-audit*.md
 docs/e2e-*.md
 docs/passkey-wallet-migration-audit.md
+docs/plans
 docs/release-runbook.md
 docs/releasing.md
 docs/security/at-rest-hardening-decision-note.md
@@ -22,6 +24,9 @@ docs/security-sweeps.md
 docs/testing-budget.md
 docs/typescript-strictness-plan.md
 docs/worker-auth-phase*-options.md
+docs/client-build-assets.md
+posts/*/diagram-prompts.md
+posts/*/attachments/README.md
 EOF
 }
 
@@ -83,6 +88,7 @@ scripts/build_external_llm_prompt.py
 scripts/restore-private-pack.sh
 scripts/audit-diff.sh
 scripts/audit-full.sh
+scripts/audit-deferred-findings.txt
 scripts/dependency-audit-hotspots.test.js
 tests/root/*.private.test.*
 artifacts
@@ -151,6 +157,7 @@ scripts/vendor-cecc-ethers-bundle.js
 scripts/restore-private-pack.sh
 scripts/audit-diff.sh
 scripts/audit-full.sh
+scripts/audit-deferred-findings.txt
 scripts/dependency-audit-hotspots.test.js
 tests/root/*.private.test.*
 Demo Integration Package

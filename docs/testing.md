@@ -91,11 +91,17 @@ npm run test:node
 npm run test:client
 npm run coverage-floor:check
 npm run typecheck:client-tests
+npm run dead-exports:check
 npm run ci:gate -- workers
 ```
 
-`npm run test:wiring` also runs `scripts/verify-test-inventory.js` and the
-client architecture boundary checker. The boundary checker runs in
+`npm run test:wiring` also runs `scripts/verify-test-inventory.js`, the strict
+dead-export check, and the client architecture boundary checker. The dead-export
+check requires installed client dependencies, uses test/support references for
+named-export usage while keeping production reachability production-only,
+understands explicit non-import entrypoints, and fails on any conservative
+unresolved production-file or named-export candidate instead of comparing
+against a debt-count baseline. The boundary checker runs in
 fail-on-new-violation mode against `scripts/client-boundaries-baseline.json`, so
 existing legacy imports stay visible while new direct violations fail the gate.
 The inventory check keeps root tests classified as one of:

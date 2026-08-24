@@ -5,7 +5,6 @@ import {
   DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED,
   DEFAULT_SHARED_WORKER_URL,
   DEPLOY_HELPER_URL,
-  HEALTHCHECK_WORKER_URL,
   WORKER_BUNDLE_URL,
   WORKER_RELEASE_MANIFEST_URL,
 } from './publicDeploymentConfig.js';
@@ -218,16 +217,11 @@ export const DEFAULT_CHAIN_ID = readPublicIntEnv('REACT_APP_DEFAULT_CHAIN_ID', D
 // TESTNET FUNDS (faucet is handled by the Cloudflare Worker)
 // Client-side auto-send threshold (UI hint). Keep in sync with the Worker TESTNET_BALANCE_THRESHOLD.
 export const TESTNET_AUTO_SEND_THRESHOLD_ETH = readPublicEnv('REACT_APP_TESTNET_AUTO_SEND_THRESHOLD_ETH', '0.001');
-// NOTE: TESTNET_AMOUNT is a legacy/UI-only hint and has no client consumers today.
-// export const TESTNET_AMOUNT = "0.001";
-// Optional manual faucet/RPC link shown in UI; auto-funding uses the Worker.
-export const ETH_FAUCET_LINK = readPublicEnv('REACT_APP_ETH_FAUCET_LINK', 'http://127.0.0.1:8545');
 
 // Shared worker fallback defaults to the project-hosted demo worker and remains env-overridable.
 // Set `REACT_APP_CE_SHARED_WORKER_URL` to replace that fallback for a deployment.
 export const CLOUDFLARE_CORS_WORKER_URL = readPublicEnv('REACT_APP_CE_SHARED_WORKER_URL', DEFAULT_SHARED_WORKER_URL);
 export const CLOUDFLARE_DEPLOY_HELPER_URL = DEPLOY_HELPER_URL;
-export const CLOUDFLARE_HEALTHCHECK_WORKER_URL = HEALTHCHECK_WORKER_URL;
 export const CLOUDFLARE_WORKER_BUNDLE_URL = WORKER_BUNDLE_URL;
 export const CLOUDFLARE_WORKER_RELEASE_MANIFEST_URL = WORKER_RELEASE_MANIFEST_URL;
 export const CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED = DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED;

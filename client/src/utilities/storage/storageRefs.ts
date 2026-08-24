@@ -86,9 +86,6 @@ export const isArweaveStorageBackend = (value: unknown): boolean => {
   return backend === STORAGE_BACKENDS.ARWEAVE || backend === STORAGE_BACKENDS.LIT_ARWEAVE;
 };
 
-export const isCloudflareStorageBackend = (value: unknown): boolean =>
-  normalizeStorageBackend(value) === STORAGE_BACKENDS.CLOUDFLARE;
-
 export const isArweaveTxId = (value: unknown): boolean => ARWEAVE_TX_ID_RE.test(trim(value));
 
 export const isSafeCloudflareStorageRefId = (value: unknown): boolean => {
@@ -245,8 +242,6 @@ export const attachStorageRefCompatibilityFields = (
   }
   return source;
 };
-
-export const storageRefFromLegacyArweaveTxId = deriveStorageRefFromLegacyArweaveTxId;
 export const normalizeStorageRefForRecord = resolvePayloadStorageRef;
 export const withStorageRefCompatibility = attachStorageRefCompatibilityFields;
 

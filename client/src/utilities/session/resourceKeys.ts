@@ -4,7 +4,7 @@
  * @description Worker KV resource key management — keeps per-session RPC keys,
  *              Arweave JWKs, and faucet configuration in memory and resolves session defaults.
  *
- * Key exports: getEffectiveArweaveKey, getEffectiveRpcKey, getEffectiveFaucetConfig, resourceKeysUtils, getLocalResourceKeys
+ * Key exports: getEffectiveArweaveKey, getEffectiveFaucetConfig, getLocalResourceKeys
  */
 import { sessionRegistryStore } from '../web3/sessionRegistry.js';
 import { cryptoUtils } from '../crypto/cryptography.js';
@@ -54,16 +54,6 @@ type EffectiveResourceKeyOptions = {
   sessionConfig?: SessionConfig | null;
   preferLocal?: boolean;
   context?: ResourceKeyResolutionContext;
-};
-type EffectiveRpcKeyResult = {
-  apiKey: string;
-  source: 'session' | 'local';
-  sessionConfigSource: string;
-  status: string;
-  preferLocal: boolean;
-  sessionStatus: string;
-  groupStatus: string;
-  localStatus: string;
 };
 type EffectiveArweaveKeyResult = {
   arweaveJwk: string;
@@ -206,10 +196,6 @@ export const clearLocalResourceKeys = (slugIn = ''): void => {
 
 /** @type {typeof getLocalResourceKeys} */
 export const getLocalSessionResourceKeys = getLocalResourceKeys;
-/** @type {typeof saveLocalResourceKeys} */
-export const saveLocalSessionResourceKeys = saveLocalResourceKeys;
-/** @type {typeof clearLocalResourceKeys} */
-export const clearLocalSessionResourceKeys = clearLocalResourceKeys;
 
 const resolveSessionConfig = (slugIn = ''): SessionConfig | null => {
   const normalizedSlug = canonicalizeSessionSlug(slugIn);
@@ -299,15 +285,6 @@ const resolveEncryptedValue = async (
   }
 };
 
-const resolveSessionRpcKey = async (
-  sessionCfg: SessionConfig | null,
-  context: ResourceKeyResolutionContext = {},
-): Promise<WorkerKeyMeta<'apiKey'>> => {
-  void sessionCfg;
-  void context;
-  return buildWorkerKeyMeta('apiKey');
-};
-
 const resolveSessionArweaveKey = async (
   sessionCfg: SessionConfig | null,
   context: ResourceKeyResolutionContext = {},
@@ -324,48 +301,6 @@ const resolveSessionFaucetKey = async (
   void sessionCfg;
   void context;
   return buildWorkerKeyMeta('privateKey');
-};
-
-export const getEffectiveRpcKey = async ({
-  sessionSlug,
-  sessionConfig,
-  preferLocal,
-  context,
-}: EffectiveResourceKeyOptions = {}): Promise<EffectiveRpcKeyResult> => {
-  const resolved = resolveCanonicalSessionConfig({
-    source: { sessionSlug, sessionConfig },
-    resolveBySlug: resolveSessionConfig,
-  });
-  const slug = resolved.sessionSlug;
-  const cfg = resolved.sessionConfig;
-  const local = getLocalResourceKeys(slug);
-  const preferLocalResolved = typeof preferLocal === 'boolean' ? preferLocal : !!local.rpc.useLocal;
-
-  const sessionResolved = await resolveSessionRpcKey(cfg, context);
-  const localKey = toStr(local.rpc.apiKey).trim();
-  const localResolved = {
-    apiKey: localKey,
-    status: localKey ? 'local' : 'missing',
-    encryptedAvailable: false,
-  };
-
-  let selected = sessionResolved;
-  let source: 'session' | 'local' = 'session';
-  if (preferLocalResolved) {
-    selected = localResolved;
-    source = 'local';
-  }
-
-  return {
-    apiKey: toStr(selected.apiKey || '').trim(),
-    source,
-    sessionConfigSource: resolved.sessionConfigSource,
-    status: selected.status,
-    preferLocal: preferLocalResolved,
-    sessionStatus: sessionResolved.status,
-    groupStatus: sessionResolved.status,
-    localStatus: localResolved.status,
-  };
 };
 
 export const getEffectiveArweaveKey = async ({
@@ -469,20 +404,4 @@ export const getEffectiveFaucetConfig = async ({
     balanceThresholdEth: toStr(balanceThresholdEth || '').trim(),
     encryptedAvailable: !!sessionResolved.encryptedAvailable,
   };
-};
-
-/** @type {typeof getEffectiveRpcKey} */
-export const getEffectiveSessionRpcKey = getEffectiveRpcKey;
-/** @type {typeof getEffectiveArweaveKey} */
-export const getEffectiveSessionArweaveKey = getEffectiveArweaveKey;
-/** @type {typeof getEffectiveFaucetConfig} */
-export const getEffectiveSessionFaucetConfig = getEffectiveFaucetConfig;
-
-export const resourceKeysUtils = {
-  getLocalResourceKeys,
-  saveLocalResourceKeys,
-  clearLocalResourceKeys,
-  getEffectiveRpcKey,
-  getEffectiveArweaveKey,
-  getEffectiveFaucetConfig,
 };

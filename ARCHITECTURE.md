@@ -17,11 +17,13 @@ default/recommended path once chosen.
 ```mermaid
 flowchart LR
   Creator["Session creator"] --> Choice{"/new profile choice"}
-  Choice --> Hosted["Hosted & Fast<br/>Fast & Cheap (Cloudflare)<br/>implemented default path"]
-  Choice --> Trustless["Trustless & Slower<br/>Trustless & Public (Decentralized)<br/>implemented opt-in"]
+  Choice --> Hosted["Centralized (Cloudflare)<br/>implemented default path"]
+  Choice --> Trustless["Decentralized (Arweave + EVM)<br/>implemented opt-in"]
 
-  Hosted --> DeployHelper["Deploy helper<br/>Cloudflare token is request-only"]
-  DeployHelper --> Worker["Creator-owned per-session Worker<br/>worker_canonical authority"]
+  Hosted --> NativeDeploy["Native Deploy to Cloudflare<br/>dashboard handoff; no API token"]
+  NativeDeploy --> Worker["Creator-owned per-session Worker<br/>worker_canonical authority"]
+  Hosted -.-> LegacyHelper["Legacy deploy-helper / Agent Wrapped<br/>request-only Cloudflare token"]
+  LegacyHelper -.-> Worker
   Worker --> Cloudflare["Worker KV / Cloudflare payload storage<br/>worker_envelope by default"]
   Worker --> AI["Selected AI provider"]
   Passkey["Passkey-derived EOA<br/>signing/admin identity"] --> Worker
@@ -32,12 +34,14 @@ flowchart LR
   Trustless -.->|Lit encryption selected| Lit["Lit Protocol"]
 ```
 
-Hosted & Fast needs a creator Cloudflare API token and one AI-provider key. Its
-passkey-derived EOA signs the canonical worker config but does not submit an EVM
-transaction; public EVM, registry, RPC, gas, Arweave, and Lit are not default
-dependencies. Trustless & Slower preserves the public EVM, Arweave, wallet, and
-gas path as an opt-in profile. Lit credentials are required only when Lit
-encryption is selected.
+Hosted & Fast needs a creator Cloudflare account/dashboard login and one
+AI-provider key. Its native handoff does not ask for a Cloudflare API token; a
+request-only token belongs only to Agent Session Wrapped or the explicit legacy
+deploy-helper fallback. The passkey-derived EOA signs canonical Worker config
+without an EVM transaction, so public EVM, registry, RPC, gas, Arweave, and Lit
+are not default dependencies. Trustless & Slower preserves the public EVM,
+Arweave, wallet, and gas path as an opt-in profile. Lit credentials are required
+only when Lit encryption is selected.
 
 Participants use session identity and authorization. They never need the
 creator's Cloudflare token, AI key, Arweave key, or other deployer API keys.
@@ -67,7 +71,8 @@ architecture.
 | Layer | What it does | Profile role | Primary location |
 |-------|-------------|--------------|-----------------|
 | **Client** | React SPA: survey authoring, response collection, SBT management, encryption gates, admin, session wizard | Shared across implemented profiles | `client/src/` |
-| **Session Worker** | Auth, canonical config, AI proxy, transcription, storage/fetch routes, and profile-enabled chain/Arweave helpers | Canonical authority for Hosted & Fast; service boundary for decentralized/custom profiles | `workers/sessionCorsWorker/` |
+| **Session Worker** | Auth, canonical config, AI proxy, transcription, storage routes, controlled URL/image fetch, and profile-enabled chain/Arweave helpers | Canonical authority for Hosted & Fast; service boundary for decentralized/custom profiles | `workers/sessionCorsWorker/` |
+| **Agent Bridge** | Scoped Agent HTTP API plus optional Telegram bot/Mini App adapters; delegates session membership and gate authority to the configured Session Worker where required | Separately deployed, optional sidecar for agent-enabled sessions | `workers/agentBridgeWorker/` |
 | **Cloudflare storage** | Worker KV config, secrets, encrypted payload envelopes/indexes, and optional advanced R2 blobs | Hosted & Fast default | Worker bindings (external) |
 | **Contracts** | Session registry, surveys, SBTs, gates, and factory on supported EVM chains | Trustless & Slower and explicit chain-backed custom profiles | `contracts/` |
 | **Arweave** | Immutable metadata, survey/question payloads, SBT tokenURI, and document-library files | Trustless & Slower and explicit Arweave-backed custom profiles | External |
@@ -81,8 +86,8 @@ architecture.
 Hosted & Fast:
 
 ```text
-Wizard UI  ──▸  Deploy creator-owned per-session Worker (via deploy-helper)
-           ──▸  Seed Worker secrets and Cloudflare storage bindings
+Wizard UI  ──▸  Open the immutable native Deploy to Cloudflare template
+           ──▸  Creator installs the per-session Worker, KV, Durable Object, and runtime secrets in the Cloudflare dashboard
            ──▸  Persist and read back admin-signed canonical Worker config
            ──▸  Return reload-safe session/admin URLs with the public Worker URL
 
@@ -182,7 +187,7 @@ Lit opt-in:
 | Session helpers | `utilities/session/sessionNaming.ts`, `sessionMetadata.ts`, `resourceKeys.ts`, `sessionModeProfile.ts`, `groupCreationPolicy.ts`, `sessionBackendKind.ts`, `agentClientLogin.ts`, `telegramAgentData.ts`, `telegramSessionBackend.ts` |
 | Worker auth | `utilities/worker/workerAuth.ts`, `corsProxy.ts` |
 | Cache | `utilities/cache/cacheScripts.ts` |
-| AI | `utilities/ai/aiClient.js`, `aiSettings.ts` |
+| AI | `utilities/ai/aiClient.ts`, `aiSettings.ts` |
 | Survey logic | `utilities/survey/questionRouting.ts`, `filterStateUtils.ts`, `compareUsers.ts` |
 | **Config / variables** | |
 | Feature flags | `variables/appConfig.ts` |
@@ -203,7 +208,8 @@ Lit opt-in:
 | Worker | Purpose |
 |--------|---------|
 | `sessionCorsWorker/worker.js` | Canonical config/auth/storage for Hosted & Fast, plus profile-enabled AI, Arweave, fetch, transcription, and faucet routes |
-| `deploy-helper/worker.js` | One-click worker deployment from the session wizard |
+| `deploy-helper/worker.js` | Explicit legacy/sponsored Worker-deployment fallback and Agent Wrapped provisioning; not the native `/new` default |
+| `agentBridgeWorker/worker.js` | Separately deployed Agent HTTP service with canonical `/api/agent/*` routes, scoped `ceagt_` credentials, and optional Telegram/Mini App adapters |
 
 ### Verification
 
@@ -212,17 +218,20 @@ Public unit and integration coverage lives beside client source and under
 
 ## Contract Addresses
 
-Contracts are chain-agnostic EVM Solidity. Deployments are configured per chain in `client/src/variables/chains.ts` (`SESSION_REGISTRY_ADDRESSES`, `SESSION_CONTRACTS_BY_CHAIN`).
+Contracts are chain-agnostic EVM Solidity. The SPA's canonical deployment
+manifest is `client/src/variables/contracts.json`, exposed through
+`client/src/variables/chains.ts` as `SESSION_REGISTRY_ADDRESSES` and
+`SESSION_CONTRACTS_BY_CHAIN`.
 
 | Chain | SessionRegistry | Surveys | SBTFactory |
 |-------|----------------|---------|------------|
 | OP Sepolia (11155420) | `0xDcB1731984E9F75c6a061c38dD8b67d18De4C0c1` | `0x59664B9dA510a33F2edB7E14Cf0c2749bf506B8A` | `0x8CBeE1EE46603b446b499cb32F63fa9860a50478` |
-| Base Sepolia (84532) | `0xD55Aa8fb29964d034d59B90DFFD23790f7B34B00` | `0xcccb5c1a96b3e10f395e318ae75db24e45bd3808` | `0x538A48BC439A36D2A86e63114DCD9c429d2ddEcA` |
 
-The listed immutable Surveys and SBTFactory deployments predate the current
+OP Sepolia is the current default and the only chain configured in the canonical
+manifest. Its immutable Surveys and SBTFactory deployments predate the current
 source hardening. The restrictions above become live only after a testnet
-redeploy and corresponding address/transaction updates; no mainnet migration is
-in scope.
+redeploy and corresponding manifest/transaction updates; no mainnet migration
+is in scope.
 
 CustomSBT instances are deployed per-group via SBTFactory. Configured
 deterministic SBT creation is admin-submitted; sponsored or relayed configured
@@ -231,16 +240,29 @@ creation requires a separate authorization design.
 The current OP Sepolia `SBTFactory` default above was deployed in tx
 `0x57b91018ed6b93f64c83d5a44bfb9d0be1920f96929ecc045aa3946ba7cc917e`.
 
-The legacy Base Sepolia `SBTFactory` default above was deployed in tx
+### Historical Base Sepolia Record
+
+Base Sepolia (`84532`) remains a best-effort legacy/development compatibility
+target, not an actively supported runtime. The canonical client manifest has no
+Base contract set. The historical addresses below are retained for auditability;
+they are not active client configuration.
+
+| SessionRegistry | Surveys | SBTFactory |
+|-----------------|---------|------------|
+| `0xD55Aa8fb29964d034d59B90DFFD23790f7B34B00` | `0xcccb5c1a96b3e10f395e318ae75db24e45bd3808` | `0x538A48BC439A36D2A86e63114DCD9c429d2ddEcA` |
+
+The historical Base Sepolia `SBTFactory` was deployed in tx
 `0x4a0428a0fe6d6090fd6112885ea46b30ff84a1a551d0806c0f9afda4b44a5f21`.
 
-To add a new chain: deploy contracts, add entries to `SESSION_REGISTRY_ADDRESSES` and `SESSION_CONTRACTS_BY_CHAIN` in `chains.ts`, and add the chain definition to the chain registry.
+To activate a new chain: verify the representative compatibility flows, deploy
+contracts, add the canonical set to `contracts.json`, expose the chain through
+`chains.ts`, and add its chain definition to the chain registry.
 
 ### Address Discovery
 
 Contract address discovery is currently file-based rather than on-chain.
 `client/src/variables/chains.ts` imports the base deployment map from `contracts.json`.
-`SESSION_REGISTRY_ADDRESSES` maps each supported chain ID to its `SessionRegistry` address.
+`SESSION_REGISTRY_ADDRESSES` maps each configured chain ID to its `SessionRegistry` address.
 `SESSION_CONTRACTS_BY_CHAIN` provides the per-chain contract configuration used by the SPA.
 That bundle includes addresses such as `SessionRegistry`, `Surveys`, and `SBTFactory`.
 For local development, `local-contracts.json` can override the checked-in defaults.

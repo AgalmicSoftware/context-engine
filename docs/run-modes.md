@@ -97,7 +97,7 @@ This is labeled `Centralized (Cloudflare)` in the wizard.
 
 ### Trustless & Slower — implemented opt-in
 
-This is labeled `Trustless & Public (Decentralized)` in the wizard.
+This is labeled `Decentralized (Arweave + EVM)` in the wizard.
 
 - Public EVM registry/contracts provide session and gate authority.
 - Arweave stores metadata and payloads.

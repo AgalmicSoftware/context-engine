@@ -64,6 +64,8 @@ late-binding behavior.
 ## Current Domain Homes
 
 - `client/src/domains/chain/`: chain scan read ports backed by `contractScripts`.
+- `client/src/domains/crypto/`: shared Lit/SBT-gated envelope decrypt execution
+  backed by the canonical crypto utilities.
 - `client/src/domains/membership/`: canonical session-scoped SBT and Worker
   Group membership identity, provenance, and projection.
 - `client/src/domains/profiles/`: profile scan ports backed by `contractScripts`.

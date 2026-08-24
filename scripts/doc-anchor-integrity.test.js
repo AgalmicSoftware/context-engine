@@ -164,6 +164,18 @@ test('repository guidance prefers TypeScript for non-JSX client modules', () => 
   assert.doesNotMatch(source, /Use `.js` or `.mjs` for non-React modules/);
 });
 
+test('README Netlify deploy link targets the live public config heading', () => {
+  const readme = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
+  const publicConfig = fs.readFileSync(path.join(ROOT, 'docs/public-client-config.md'), 'utf8');
+
+  assert.match(
+    readme,
+    /\(docs\/public-client-config\.md#netlify-static-deploy\)/,
+  );
+  assert.doesNotMatch(readme, /#static-frontend-deploy/);
+  assert.match(publicConfig, /^## Netlify Static Deploy$/m);
+});
+
 test('local workflow skill anchors point at live component files when the private workflow tree is present', () => {
   OPTIONAL_WORKFLOW_SKILL_CHECKS.forEach(({ skillPath, stalePaths, livePaths, livePathAlternates = [] }) => {
     const absoluteSkillPath = path.join(ROOT, skillPath);

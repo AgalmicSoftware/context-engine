@@ -43,8 +43,10 @@ describe('prompt builders', () => {
     });
 
     expect(prompt).toContain('OUTPUT CONTRACTS');
+    expect(prompt).toContain('"task": "compare|axes|venn"');
     expect(prompt).toContain('"task": "compare"');
     expect(prompt).toContain('"address": "0xabc"');
+    expect(prompt).not.toContain('task="drilldown"');
   });
 
   it('serializes user analysis data and falls back to an empty object for null input', () => {

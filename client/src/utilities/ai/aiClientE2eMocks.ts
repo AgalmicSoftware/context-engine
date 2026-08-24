@@ -169,23 +169,3 @@ export const buildE2eMockClusterAnalysis = (clusterData: unknown) => {
 
   return { name, short, long: longParts.join(' ') };
 };
-
-export const buildE2eMockDrilldownTree = (payload: unknown = {}, users: unknown[] = []) => {
-  const source = asRecord(payload);
-  const kind = source.type === 'disagreement' ? 'disagreement' : 'agreement';
-  const pointText = String(source.pointText || '').trim();
-  const evidence = (Array.isArray(users) ? users : [])
-    .map((u) => shortAddr(asRecord(u).address))
-    .filter(Boolean)
-    .slice(0, 4);
-  return {
-    title: `Mock drilldown (${kind})`,
-    nodes: [
-      {
-        label: pointText ? `Point: ${pointText.slice(0, 160)}` : 'Point',
-        evidence,
-        children: [],
-      },
-    ],
-  };
-};

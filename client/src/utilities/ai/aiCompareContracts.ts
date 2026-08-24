@@ -16,11 +16,7 @@ export interface CompareVennResult {
   evidenceMap?: CompareVennEvidenceMap;
 }
 
-export type CompareToolkitPointType = 'agreement' | 'disagreement';
-
 export interface CompareToolkitPayload {
-  pointText: string;
-  type: CompareToolkitPointType;
   users: unknown[];
 }
 
@@ -63,8 +59,6 @@ export const readCompareToolkitTask = (task: unknown): string => String(task || 
 export const resolveCompareToolkitPayload = (payload: unknown, maxUsers = 10): CompareToolkitPayload => {
   const record = isRecord(payload) ? payload : {};
   return {
-    pointText: String(record.pointText || ''),
-    type: record.type === 'disagreement' ? 'disagreement' : 'agreement',
     users: Array.isArray(record.users) ? record.users.slice(0, maxUsers) : [],
   };
 };

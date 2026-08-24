@@ -1,7 +1,7 @@
 import { MAIN_SITE_ROUTE_DEFINITIONS } from './routeTable.js';
 import {
-  MAIN_SITE_ROUTE_VIEW_KEYS,
   renderMainSiteRouteView,
+  type MainSiteRouteViewKey,
   type MainSiteRouteViewRenderers,
 } from './mainSiteRouteViewMap.js';
 
@@ -39,31 +39,35 @@ const buildRenderers = (calls: string[] = []): MainSiteRouteViewRenderers => {
 };
 
 describe('mainSiteRouteViewMap', () => {
-  it('tracks every non-wizard concrete route definition in order', () => {
-    expect(MAIN_SITE_ROUTE_VIEW_KEYS).toEqual(
-      MAIN_SITE_ROUTE_DEFINITIONS.map(({ key }) => key).filter((key) => key !== 'wizard'),
-    );
-  });
-
-  it('dispatches the matched route key to exactly one renderer', () => {
+  it('dispatches every concrete route definition in order to exactly one renderer', () => {
     const calls: string[] = [];
-    const result = renderMainSiteRouteView({
-      routeKey: 'tag',
-      fullPath: '/tag/example',
-      renderers: buildRenderers(calls),
-      renderNotFound: (path) => `notFound:${path}`,
-    });
+    const renderers = buildRenderers(calls);
+    const routeKeys = MAIN_SITE_ROUTE_DEFINITIONS.map(({ key }) => key).filter(
+      (key): key is MainSiteRouteViewKey => key !== 'wizard' && key !== 'notFound',
+    );
 
-    expect(result).toBe('tag');
-    expect(calls).toEqual(['tag']);
+    expect(routeKeys).toEqual(Object.keys(renderers));
+
+    for (const routeKey of routeKeys) {
+      calls.length = 0;
+      const result = renderMainSiteRouteView({
+        routeKey,
+        fullPath: `/${routeKey}`,
+        renderers,
+        renderNotFound: (path) => `notFound:${path}`,
+      });
+
+      expect(result).toBe(routeKey);
+      expect(calls).toEqual([routeKey]);
+    }
   });
 
-  it('falls back to the not-found renderer for unresolved route keys', () => {
+  it.each(['wizard', 'notFound'] as const)('falls back to the not-found renderer for %s', (routeKey) => {
     const calls: string[] = [];
 
     expect(
       renderMainSiteRouteView({
-        routeKey: 'notFound',
+        routeKey,
         fullPath: '/missing',
         renderers: buildRenderers(calls),
         renderNotFound: (path) => `notFound:${path}`,

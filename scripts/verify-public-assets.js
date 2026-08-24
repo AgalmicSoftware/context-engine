@@ -59,29 +59,56 @@ function isTextFile(absolutePath) {
   return !sample.includes(0);
 }
 
-function findUnreferencedAssetNames(files, images) {
-  const unreferencedNames = new Set(images.map((absolutePath) => path.basename(absolutePath)));
-  for (const absolutePath of files) {
-    if (unreferencedNames.size === 0) break;
-    if (IMAGE_RE.test(absolutePath) || !isTextFile(absolutePath)) continue;
-    const contents = fs.readFileSync(absolutePath, 'utf8');
-    for (const assetName of unreferencedNames) {
-      if (contents.includes(assetName)) unreferencedNames.delete(assetName);
+function buildAssetReferenceCandidates(rootDir, textPath, imagePath) {
+  const rootRelative = normalizePath(path.relative(rootDir, imagePath));
+  const textRelative = normalizePath(path.relative(path.dirname(textPath), imagePath));
+  const candidates = new Set([
+    rootRelative,
+    textRelative,
+    textRelative.startsWith('.') ? textRelative : `./${textRelative}`,
+  ]);
+
+  const publicPrefix = 'client/public/';
+  if (rootRelative.startsWith(publicPrefix)) {
+    candidates.add(`/${rootRelative.slice(publicPrefix.length)}`);
+    candidates.add(rootRelative.slice(publicPrefix.length));
+  }
+
+  const sourcePrefix = 'client/src/';
+  if (rootRelative.startsWith(sourcePrefix)) {
+    candidates.add(rootRelative.slice(sourcePrefix.length));
+  }
+
+  return candidates;
+}
+
+function findUnreferencedAssets(rootDir, files, images) {
+  const textFiles = files.filter((absolutePath) => !IMAGE_RE.test(absolutePath) && isTextFile(absolutePath));
+  const unreferencedAssets = new Set(images);
+
+  for (const textPath of textFiles) {
+    if (unreferencedAssets.size === 0) break;
+    const contents = fs.readFileSync(textPath, 'utf8');
+    for (const imagePath of unreferencedAssets) {
+      const isReferenced = [...buildAssetReferenceCandidates(rootDir, textPath, imagePath)]
+        .some((candidate) => candidate && contents.includes(candidate));
+      if (isReferenced) unreferencedAssets.delete(imagePath);
     }
   }
-  return unreferencedNames;
+
+  return [...unreferencedAssets];
 }
 
 function verifyPublicAssets(rootDir = path.resolve(__dirname, '..')) {
   const absoluteRoot = path.resolve(rootDir);
   const files = walkFiles(absoluteRoot);
   const images = files.filter((absolutePath) => IMAGE_RE.test(absolutePath));
-  const unreferencedNames = findUnreferencedAssetNames(files, images);
+  const unreferencedAssets = new Set(findUnreferencedAssets(absoluteRoot, files, images));
 
   // Regression guard: dynamic public assets still need a literal manifest entry.
   // Without one, an unreferenced binary silently bloats every release artifact.
   const findings = images
-    .filter((absolutePath) => unreferencedNames.has(path.basename(absolutePath)))
+    .filter((absolutePath) => unreferencedAssets.has(absolutePath))
     .map((absolutePath) => ({
       file: normalizePath(path.relative(absoluteRoot, absolutePath)),
       kind: 'unreferenced public asset',

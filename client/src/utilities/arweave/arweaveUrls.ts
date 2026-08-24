@@ -260,25 +260,3 @@ export const buildArweaveGatewayUrlCandidates = (
   if (!gateways.length) return [raw];
   return gateways.map((base) => `${base}/${txId}`);
 };
-
-export const arweaveUrlUtils = {
-  DEFAULT_ARWEAVE_LINK_GATEWAY,
-  DEFAULT_AR_IO_GATEWAY,
-  normalizeGatewayBase,
-  normalizeGatewayList,
-  normalizeBoolish,
-  getRuntimeArweaveGatewayOverride,
-  getRuntimeArweaveGatewayFallbacks,
-  isDirectToArIoEnabled,
-  getRuntimeArIoGatewayOverride,
-  getPreferredArIoGateway,
-  getDefaultArweaveGateways,
-  getPreferredArweaveGateway,
-  isArweaveGatewayHost,
-  isArweaveTxId,
-  readArweaveTxIdFromPathSegments,
-  parseArweaveTxId,
-  normalizeArweaveUrl,
-  buildArweaveGatewayUrl,
-  buildArweaveGatewayUrlCandidates,
-};

@@ -9,7 +9,6 @@ export const BASELINE_GROWTH_APPROVAL_LABEL = 'baseline-growth-approved';
 
 const BOUNDARY_BASELINE = 'scripts/client-boundaries-baseline.json';
 const TYPE_DEBT_BASELINE = 'scripts/type-debt-baseline.json';
-const DEAD_EXPORT_BASELINE = 'scripts/dead-exports-baseline.json';
 const LEGACY_COVERAGE_BASELINE = 'scripts/coverage-baseline.json';
 const FULL_COVERAGE_BASELINE = 'scripts/client-coverage-full-baseline.json';
 const COVERAGE_EXCLUSIONS_BASELINE = 'scripts/client-coverage-exclusions.json';
@@ -25,7 +24,6 @@ function usage() {
 Fails if baseline files grow relative to a base ref:
   - ${BOUNDARY_BASELINE} must not gain violation entries.
   - ${TYPE_DEBT_BASELINE} must not increase any count.
-  - ${DEAD_EXPORT_BASELINE} must not increase either candidate count.
   - Client coverage floors must not decrease, exclusion rules must not broaden,
     and the fixed legacy comparable file set must not grow.
   - Typed-test diagnostics must not grow, classifications must not shrink, and
@@ -45,7 +43,7 @@ Approval gate:
   Boundary or type-debt growth requires the ${BASELINE_GROWTH_APPROVAL_LABEL}
   label applied by a maintainer plus a distinct approving CODEOWNER review.
   CI verifies that GitHub metadata before passing --approval approved. Direct
-  pushes, dead-export growth, coverage contract regressions, and bundle-budget
+  pushes, coverage contract regressions, and bundle-budget
   regressions cannot use this exception.
 `;
 }
@@ -155,14 +153,6 @@ function typeDebtIncreases(baseBaseline, currentBaseline) {
     const base = toFiniteCount(baseCounts[pattern], pattern, TYPE_DEBT_BASELINE);
     const current = toFiniteCount(currentCounts[pattern], pattern, TYPE_DEBT_BASELINE);
     return current > base ? [{ pattern, base, current }] : [];
-  });
-}
-
-function deadExportCountIncreases(baseBaseline, currentBaseline) {
-  return ['candidateDeadFiles', 'candidateUnusedExports'].flatMap((field) => {
-    const base = toFiniteCount(baseBaseline?.[field], field, DEAD_EXPORT_BASELINE);
-    const current = toFiniteCount(currentBaseline?.[field], field, DEAD_EXPORT_BASELINE);
-    return current > base ? [{ field, base, current }] : [];
   });
 }
 
@@ -374,7 +364,6 @@ export function collectBaselineMonotonicityFindings({
       notices,
       boundaryGains: [],
       typeDebtIncreases: [],
-      deadExportIncreases: [],
       coverageRegressions: [],
       testTypeRegressions: [],
       bundleBudgetRegressions: [],
@@ -389,7 +378,6 @@ export function collectBaselineMonotonicityFindings({
       notices,
       boundaryGains: [],
       typeDebtIncreases: [],
-      deadExportIncreases: [],
       coverageRegressions: [],
       testTypeRegressions: [],
       bundleBudgetRegressions: [],
@@ -409,7 +397,6 @@ export function collectBaselineMonotonicityFindings({
       notices,
       boundaryGains: [],
       typeDebtIncreases: [],
-      deadExportIncreases: [],
       coverageRegressions: [],
       testTypeRegressions: [],
       bundleBudgetRegressions: [],
@@ -418,14 +405,6 @@ export function collectBaselineMonotonicityFindings({
 
   const currentBoundary = readCurrentJson(resolvedRepoDir, BOUNDARY_BASELINE);
   const currentTypeDebt = readCurrentJson(resolvedRepoDir, TYPE_DEBT_BASELINE);
-  const currentDeadExports = readCurrentJson(resolvedRepoDir, DEAD_EXPORT_BASELINE);
-  let baseDeadExports = null;
-  try {
-    baseDeadExports = readBaseJson(resolvedRepoDir, baseCommit, DEAD_EXPORT_BASELINE);
-  } catch (_error) {
-    notices.push(`Baseline monotonicity bootstrap: ${DEAD_EXPORT_BASELINE} was not present at ${baseRef}.`);
-  }
-
   const optionalCoverageBaselines = [
     LEGACY_COVERAGE_BASELINE,
     FULL_COVERAGE_BASELINE,
@@ -454,7 +433,6 @@ export function collectBaselineMonotonicityFindings({
     notices,
     boundaryGains: boundaryViolationGains(baseBoundary, currentBoundary),
     typeDebtIncreases: typeDebtIncreases(baseTypeDebt, currentTypeDebt),
-    deadExportIncreases: baseDeadExports ? deadExportCountIncreases(baseDeadExports, currentDeadExports) : [],
     coverageRegressions: coverageContractRegressions({
       repoDir: resolvedRepoDir,
       baseLegacyCoverage: baseOptionalCoverage[LEGACY_COVERAGE_BASELINE],
@@ -492,10 +470,6 @@ function formatTypeDebtIncrease(increase) {
   return `${increase.pattern}: ${increase.base} -> ${increase.current}`;
 }
 
-function formatDeadExportIncrease(increase) {
-  return `${increase.field}: ${increase.base} -> ${increase.current}`;
-}
-
 function printFindings(result, writeLine) {
   if (result.boundaryGains.length > 0) {
     writeLine(`${BOUNDARY_BASELINE} gained ${result.boundaryGains.length} violation entr${result.boundaryGains.length === 1 ? 'y' : 'ies'}:`);
@@ -511,12 +485,6 @@ function printFindings(result, writeLine) {
     });
   }
 
-  if (result.deadExportIncreases.length > 0) {
-    writeLine(`${DEAD_EXPORT_BASELINE} increased ${result.deadExportIncreases.length} count${result.deadExportIncreases.length === 1 ? '' : 's'}:`);
-    result.deadExportIncreases.forEach((increase) => {
-      writeLine(`  - ${formatDeadExportIncrease(increase)}`);
-    });
-  }
   if (result.coverageRegressions.length > 0) {
     writeLine(`Client coverage contract regressed in ${result.coverageRegressions.length} place${result.coverageRegressions.length === 1 ? '' : 's'}:`);
     result.coverageRegressions.forEach((regression) => {
@@ -544,7 +512,6 @@ function printFindings(result, writeLine) {
 export function hasBaselineGrowth(result) {
   return result.boundaryGains.length > 0
     || result.typeDebtIncreases.length > 0
-    || result.deadExportIncreases.length > 0
     || result.coverageRegressions.length > 0
     || result.testTypeRegressions.length > 0
     || result.bundleBudgetRegressions.length > 0;
@@ -588,7 +555,6 @@ function runCli(argv) {
   const approved = options.approval === 'approved';
   if (
     approved
-    && result.deadExportIncreases.length === 0
     && result.coverageRegressions.length === 0
     && result.testTypeRegressions.length === 0
     && result.bundleBudgetRegressions.length === 0
@@ -599,9 +565,6 @@ function runCli(argv) {
   }
 
   console.error('Baseline monotonicity check failed.');
-  if (result.deadExportIncreases.length > 0 && approved) {
-    console.error(`${DEAD_EXPORT_BASELINE} growth cannot be approved.`);
-  }
   if (result.coverageRegressions.length > 0 && approved) {
     console.error('Client coverage contract regression cannot be approved.');
   }

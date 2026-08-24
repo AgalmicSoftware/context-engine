@@ -148,7 +148,6 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('docs/bundle-budget.md');
   expectFile('scripts/check-dead-exports-advisory.mjs');
   expectFile('scripts/check-dead-exports-advisory.test.mjs');
-  expectFile('scripts/dead-exports-baseline.json');
   expectFile('scripts/check-baseline-monotonicity.mjs');
   expectFile('scripts/check-baseline-monotonicity.test.mjs');
   expectFile('scripts/resolve-baseline-monotonicity-base.mjs');
@@ -217,7 +216,6 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('verify:public-release-pii', 'scripts/verify-public-release-pii.sh');
   expectScriptContains('verify:release-version', 'scripts/release-version.mjs verify-worktree');
   expectScriptContains('client:bundle-budget:check', 'scripts/check-client-bundle-budget.mjs');
-  expectScriptContains('dead-exports:advisory', 'scripts/check-dead-exports-advisory.mjs');
   expectScriptContains('dead-exports:check', 'scripts/check-dead-exports-advisory.mjs --check');
   expectScriptContains('verify:release', 'scripts/run-ci-gates.mjs --profile release');
   expectScriptOmits('verify:release', 'NODE_OPTIONS=--openssl-legacy-provider');
@@ -352,8 +350,6 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectWorkflowOmits('BASELINE_MONOTONICITY_ALLOW_TEXT', 'author-controlled baseline approval text');
   expectWorkflowOmits('--allow-text', 'author-controlled baseline approval option');
   expectWorkflowContains('run: npm --prefix client run build', '"npm --prefix client run build"');
-  expectWorkflowContains('continue-on-error: true', 'non-blocking advisory step');
-  expectWorkflowContains('run: npm run dead-exports:advisory', '"npm run dead-exports:advisory"');
   expectWorkflowContains('uses: actions/upload-artifact@', 'client coverage artifact upload');
   expectWorkflowContains('path: client/coverage/lcov.info', 'client coverage artifact path');
   expectWorkflowContains('worker-bundle-candidate-${{ github.sha }}', 'SHA-keyed tested Worker candidate');
@@ -384,7 +380,6 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
     '/scripts/sync-public-history.sh @AgalmicSoftware',
     '/scripts/client-boundaries-baseline.json @AgalmicSoftware',
     '/scripts/type-debt-baseline.json @AgalmicSoftware',
-    '/scripts/dead-exports-baseline.json @AgalmicSoftware',
     '/scripts/client-bundle-budget.json @AgalmicSoftware',
     '/scripts/verify-abi-sync.mjs @AgalmicSoftware',
     '/client/src/contractsABI/ @AgalmicSoftware',

@@ -1,6 +1,5 @@
 import {
   buildSurveyResultsAlertMessagePatch,
-  buildSurveyResultsBookmarkFeedbackPatch,
   buildSurveyResultsBookmarkedQuestionIdsPatch,
   buildSurveyResultsBookmarkedSurveyIdsPatch,
   buildSurveyResultsBooleanTogglePatch,
@@ -142,12 +141,6 @@ describe('surveyResultsDisplayPatchHelpers', () => {
     const surveyIds = ['s1'];
     const questionIds = ['q1'];
 
-    expect(buildSurveyResultsBookmarkFeedbackPatch(1)).toEqual({
-      filterBookmarkedFeedback: true,
-    });
-    expect(buildSurveyResultsBookmarkFeedbackPatch('')).toEqual({
-      filterBookmarkedFeedback: false,
-    });
     expect(buildSurveyResultsBookmarkedSurveyIdsPatch(surveyIds)).toEqual({
       bookmarkedSurveyIDs: ['s1'],
     });

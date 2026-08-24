@@ -34,7 +34,6 @@ function writeBaselines(
   {
     violations,
     counts,
-    deadExports = { candidateDeadFiles: 4, candidateUnusedExports: 2 },
     legacyCoverage = { statements: 75.7, branches: 61, functions: 77, lines: 79.1 },
     fullCoverage = { statements: 70, branches: 55, functions: 70, lines: 72 },
     coverageRules = [{ id: 'test-source', jestPatterns: ['!src/**/*.test.ts'], reason: 'tests' }],
@@ -59,10 +58,6 @@ function writeBaselines(
   });
   writeJson(repoDir, 'scripts/type-debt-baseline.json', {
     counts,
-  });
-  writeJson(repoDir, 'scripts/dead-exports-baseline.json', {
-    version: 1,
-    ...deadExports,
   });
   writeJson(repoDir, 'scripts/coverage-baseline.json', { global: legacyCoverage });
   writeJson(repoDir, 'scripts/client-coverage-full-baseline.json', { global: fullCoverage });
@@ -122,14 +117,12 @@ test('passes when baselines stay flat or shrink', () => {
     writeBaselines(repoDir, {
       violations: [],
       counts: { colonAny: 3, asAny: 2 },
-      deadExports: { candidateDeadFiles: 3, candidateUnusedExports: 2 },
     });
 
     const result = collectBaselineMonotonicityFindings({ repoDir, baseRef: base });
     assert.equal(result.skipped, false);
     assert.deepEqual(result.boundaryGains, []);
     assert.deepEqual(result.typeDebtIncreases, []);
-    assert.deepEqual(result.deadExportIncreases, []);
   });
 });
 
@@ -145,7 +138,6 @@ test('reports boundary gains and type-debt increases', () => {
     writeBaselines(repoDir, {
       violations: [BASE_VIOLATION, NEW_VIOLATION],
       counts: { colonAny: 5, asAny: 2 },
-      deadExports: { candidateDeadFiles: 5, candidateUnusedExports: 2 },
     });
 
     const result = collectBaselineMonotonicityFindings({ repoDir, baseRef: base });
@@ -155,9 +147,6 @@ test('reports boundary gains and type-debt increases', () => {
     ]);
     assert.deepEqual(result.typeDebtIncreases, [
       { pattern: 'colonAny', base: 4, current: 5 },
-    ]);
-    assert.deepEqual(result.deadExportIncreases, [
-      { field: 'candidateDeadFiles', base: 4, current: 5 },
     ]);
   });
 });
@@ -368,39 +357,6 @@ test('verified maintainer approval lets intentional boundary and type-debt growt
   });
 });
 
-test('verified maintainer approval cannot permit dead-export baseline growth', () => {
-  withTempRepo((repoDir) => {
-    writeBaselines(repoDir, {
-      violations: [],
-      counts: { colonAny: 0 },
-      deadExports: { candidateDeadFiles: 4, candidateUnusedExports: 2 },
-    });
-    commitAll(repoDir, 'base baselines');
-    const base = git(repoDir, ['rev-parse', 'HEAD']).trim();
-
-    writeBaselines(repoDir, {
-      violations: [],
-      counts: { colonAny: 0 },
-      deadExports: { candidateDeadFiles: 5, candidateUnusedExports: 2 },
-    });
-
-    const result = spawnSync(process.execPath, [
-      SCRIPT_PATH,
-      '--repo',
-      repoDir,
-      '--base',
-      base,
-      '--approval',
-      'approved',
-    ], {
-      encoding: 'utf8',
-    });
-
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /dead-exports-baseline\.json growth cannot be approved/);
-  });
-});
-
 test('cli fails without verified approval when baselines grow', () => {
   withTempRepo((repoDir) => {
     writeBaselines(repoDir, {
@@ -413,7 +369,6 @@ test('cli fails without verified approval when baselines grow', () => {
     writeBaselines(repoDir, {
       violations: [NEW_VIOLATION],
       counts: { colonAny: 1 },
-      deadExports: { candidateDeadFiles: 5, candidateUnusedExports: 2 },
     });
 
     const result = spawnSync(process.execPath, [
@@ -430,32 +385,6 @@ test('cli fails without verified approval when baselines grow', () => {
     assert.match(result.stderr, /Baseline monotonicity check failed/);
     assert.match(result.stderr, /client-boundaries-baseline\.json gained 1 violation/);
     assert.match(result.stderr, /type-debt-baseline\.json increased 1 count/);
-    assert.match(result.stderr, /dead-exports-baseline\.json increased 1 count/);
-  });
-});
-
-test('bootstraps the dead-export baseline when the base ref predates it', () => {
-  withTempRepo((repoDir) => {
-    writeJson(repoDir, 'scripts/client-boundaries-baseline.json', {
-      version: 1,
-      mode: 'fail-on-new-violation',
-      violations: [],
-    });
-    writeJson(repoDir, 'scripts/type-debt-baseline.json', {
-      counts: { colonAny: 0 },
-    });
-    commitAll(repoDir, 'base baselines without dead exports');
-    const base = git(repoDir, ['rev-parse', 'HEAD']).trim();
-
-    writeJson(repoDir, 'scripts/dead-exports-baseline.json', {
-      version: 1,
-      candidateDeadFiles: 17,
-      candidateUnusedExports: 219,
-    });
-
-    const result = collectBaselineMonotonicityFindings({ repoDir, baseRef: base });
-    assert.deepEqual(result.deadExportIncreases, []);
-    assert.match(result.notices.join('\n'), /dead-exports-baseline\.json was not present/);
   });
 });
 

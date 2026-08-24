@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -9,13 +10,20 @@ const __dirname = path.dirname(__filename);
 
 export const DEFAULT_ROOT_DIR = path.resolve(__dirname, '..');
 export const SOURCE_ROOT = 'client/src';
-export const DEAD_EXPORT_BASELINE_PATH = 'scripts/dead-exports-baseline.json';
+
+const require = createRequire(import.meta.url);
+let typescript = null;
+try {
+  typescript = require(path.join(DEFAULT_ROOT_DIR, 'client/node_modules/typescript/lib/typescript.js'));
+} catch {
+  // Report a focused setup error from the public entrypoints below.
+}
 
 const SOURCE_FILE_RE = /\.(?:js|jsx|mjs|cjs|ts|tsx)$/;
 const DECLARATION_FILE_RE = /\.d\.ts$/;
 const TEST_FILE_RE = /\.(?:test|spec)\.(?:js|jsx|mjs|cjs|ts|tsx)$/;
 const TEST_UTILITY_FILE_RE =
-  /(?:^|[._-])(?:test-?utils?|testing|fixtures?)(?:[._-]|\.)|(?:testFixtures|testUtils|testingUtils)/i;
+  /(?:^|[._-])(?:test-?utils?|testing|fixtures?)(?:[._-]|\.)|(?:harness|fixtures|testUtils?|testingUtils?)\.(?:js|jsx|mjs|cjs|ts|tsx)$/i;
 const SKIP_SEGMENTS = new Set([
   '__fixtures__',
   '__mocks__',
@@ -24,8 +32,19 @@ const SKIP_SEGMENTS = new Set([
   'fixtures',
   'test',
   'test-utils',
+  'testutils',
   'tests',
   'testing',
+]);
+
+// These files are selected by build aliases or package scripts instead of a
+// client/src import. Keeping the executable entry-point map beside the scanner
+// is more truthful than banking a count of false-positive "dead" files.
+const NON_IMPORT_ENTRYPOINT_FILES = new Set([
+  'client/src/app/runtime/walletConnectorProfile.metamask.ts',
+  'client/src/app/runtime/walletUiRuntime.metamask.tsx',
+  'client/src/shims/metamask-superstruct.ts',
+  'client/src/utilities/survey/commongroundExport.ts',
 ]);
 
 const ENTRYPOINT_BASENAMES = new Set([
@@ -41,8 +60,6 @@ const IMPORT_RE = /\bimport\s+(?:type\s+)?(?:[^'";]+?\s+from\s*)?['"]([^'"]+)['"
 const EXPORT_FROM_RE = /\bexport\s+(?:type\s+)?(?:\*|\{[\s\S]*?\})\s+from\s*['"]([^'"]+)['"]/g;
 const DYNAMIC_IMPORT_RE = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
 const REQUIRE_RE = /\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
-const NAMED_EXPORT_DECL_RE = /\bexport\s+(?:async\s+)?(?:const|let|var|function|class)\s+([A-Za-z_$][\w$]*)/g;
-const NAMED_EXPORT_LIST_RE = /\bexport\s+(?:type\s+)?\{([\s\S]*?)\}(?!\s+from\s*['"])/g;
 
 const normalizePath = (filePath) => filePath.split(/[\\/]+/).join('/');
 
@@ -79,7 +96,12 @@ function isProductionSourceFile(filePath) {
     return false;
   }
   const segments = normalized.slice(`${SOURCE_ROOT}/`.length).split('/');
-  return !segments.some((segment) => SKIP_SEGMENTS.has(segment));
+  return !segments.some((segment) => SKIP_SEGMENTS.has(segment.toLowerCase()));
+}
+
+function isReferenceSourceFile(filePath) {
+  const normalized = normalizePath(filePath);
+  return normalized.startsWith(`${SOURCE_ROOT}/`) && SOURCE_FILE_RE.test(normalized);
 }
 
 function isCandidateFile(filePath) {
@@ -156,64 +178,125 @@ function extractImportSpecifiers(sourceText) {
   return [...new Set(specifiers)].sort();
 }
 
-function parseExportList(listText) {
-  return listText
-    .split(',')
-    .map((entry) => entry.trim())
-    .filter(Boolean)
-    .map((entry) => entry.replace(/^type\s+/, '').split(/\s+as\s+/).pop().trim())
-    .filter((entry) => /^[A-Za-z_$][\w$]*$/.test(entry));
+function parseSourceFile(sourceText, filePath) {
+  const scriptKind = filePath.endsWith('.tsx') || filePath.endsWith('.jsx')
+    ? typescript.ScriptKind.TSX
+    : filePath.endsWith('.js') || filePath.endsWith('.mjs') || filePath.endsWith('.cjs')
+      ? typescript.ScriptKind.JS
+      : typescript.ScriptKind.TS;
+  return typescript.createSourceFile(filePath, sourceText, typescript.ScriptTarget.Latest, true, scriptKind);
 }
 
-function extractNamedExports(sourceText) {
+function hasExportModifier(node) {
+  return Boolean(node.modifiers?.some((modifier) => modifier.kind === typescript.SyntaxKind.ExportKeyword));
+}
+
+function hasDefaultModifier(node) {
+  return Boolean(node.modifiers?.some((modifier) => modifier.kind === typescript.SyntaxKind.DefaultKeyword));
+}
+
+function extractNamedExports(sourceText, filePath) {
+  const sourceFile = parseSourceFile(sourceText, filePath);
   const exports = new Set();
-
-  for (const match of sourceText.matchAll(NAMED_EXPORT_DECL_RE)) {
-    exports.add(match[1]);
-  }
-  for (const match of sourceText.matchAll(NAMED_EXPORT_LIST_RE)) {
-    parseExportList(match[1]).forEach((exportName) => exports.add(exportName));
-  }
-
+  sourceFile.statements.forEach((statement) => {
+    if (typescript.isVariableStatement(statement) && hasExportModifier(statement)) {
+      statement.declarationList.declarations.forEach((declaration) => {
+        if (typescript.isIdentifier(declaration.name)) exports.add(declaration.name.text);
+      });
+    } else if (
+      (typescript.isFunctionDeclaration(statement) || typescript.isClassDeclaration(statement))
+      && hasExportModifier(statement)
+      && !hasDefaultModifier(statement)
+      && statement.name
+    ) {
+      exports.add(statement.name.text);
+    } else if (
+      typescript.isExportDeclaration(statement)
+      && !statement.moduleSpecifier
+      && statement.exportClause
+      && typescript.isNamedExports(statement.exportClause)
+    ) {
+      statement.exportClause.elements.forEach((element) => exports.add(element.name.text));
+    }
+  });
   return [...exports].sort();
 }
 
-function extractIdentifiers(sourceText) {
-  const withoutStrings = sourceText.replace(/(['"`])(?:\\.|(?!\1)[\s\S])*\1/g, ' ');
-  const identifiers = new Set();
-  for (const match of withoutStrings.matchAll(/\b[A-Za-z_$][\w$]*\b/g)) {
-    identifiers.add(match[0]);
+function isOwnExportName(node) {
+  const parent = node.parent;
+  if (
+    (typescript.isFunctionDeclaration(parent) || typescript.isClassDeclaration(parent))
+    && parent.name === node
+    && hasExportModifier(parent)
+  ) {
+    return true;
   }
+  if (typescript.isVariableDeclaration(parent) && parent.name === node) {
+    const declarationList = parent.parent;
+    const statement = declarationList?.parent;
+    return Boolean(statement && typescript.isVariableStatement(statement) && hasExportModifier(statement));
+  }
+  if (typescript.isExportSpecifier(parent) && parent.name === node) {
+    const exportDeclaration = parent.parent?.parent;
+    return Boolean(exportDeclaration && typescript.isExportDeclaration(exportDeclaration) && !exportDeclaration.moduleSpecifier);
+  }
+  return false;
+}
+
+function extractIdentifiers(sourceText, filePath, { omitOwnExports = false } = {}) {
+  const sourceFile = parseSourceFile(sourceText, filePath);
+  const identifiers = new Set();
+  const visit = (node) => {
+    if (typescript.isIdentifier(node) && !(omitOwnExports && isOwnExportName(node))) {
+      identifiers.add(node.text);
+    }
+    typescript.forEachChild(node, visit);
+  };
+  visit(sourceFile);
   return identifiers;
 }
 
-function stripOwnExportNames(sourceText) {
-  return sourceText
-    .replace(NAMED_EXPORT_DECL_RE, (match, exportName) => match.replace(exportName, ' '))
-    .replace(NAMED_EXPORT_LIST_RE, ' ');
-}
-
 export function collectDeadExportAdvisory({ rootDir = DEFAULT_ROOT_DIR } = {}) {
-  const files = walkFiles(rootDir).filter(isProductionSourceFile).sort();
-  const fileSet = new Set(files);
+  if (!typescript) {
+    throw new Error('Dead export analysis requires client dependencies. Run `npm --prefix client install` first.');
+  }
+  const referenceFiles = walkFiles(rootDir).filter(isReferenceSourceFile).sort();
+  const files = referenceFiles.filter(isProductionSourceFile);
+  const fileSet = new Set(referenceFiles);
   const importedFiles = new Set();
   const allIdentifiers = new Set();
   const fileExports = [];
+  const sourceByFile = new Map();
+
+  for (const file of referenceFiles) {
+    const sourceText = fs.readFileSync(path.join(rootDir, file), 'utf8');
+    sourceByFile.set(file, sourceText);
+    const productionSource = isProductionSourceFile(file);
+    const identifiers = productionSource
+      ? extractIdentifiers(sourceText, file, { omitOwnExports: true })
+      : extractIdentifiers(sourceText, file);
+    identifiers.forEach((identifier) => allIdentifiers.add(identifier));
+    if (productionSource || DECLARATION_FILE_RE.test(file)) {
+      extractImportSpecifiers(sourceText)
+        .map((specifier) => resolveClientImport(file, specifier, fileSet))
+        .filter(Boolean)
+        .forEach((resolved) => {
+          importedFiles.add(resolved);
+          const twin = resolveTwinSibling(resolved, fileSet);
+          if (twin) importedFiles.add(twin);
+        });
+    }
+  }
+
+  NON_IMPORT_ENTRYPOINT_FILES.forEach((file) => {
+    if (fileSet.has(file)) importedFiles.add(file);
+  });
 
   for (const file of files) {
-    const sourceText = fs.readFileSync(path.join(rootDir, file), 'utf8');
-    extractIdentifiers(stripOwnExportNames(sourceText)).forEach((identifier) => allIdentifiers.add(identifier));
-    extractImportSpecifiers(sourceText)
-      .map((specifier) => resolveClientImport(file, specifier, fileSet))
-      .filter(Boolean)
-      .forEach((resolved) => {
-        importedFiles.add(resolved);
-        const twin = resolveTwinSibling(resolved, fileSet);
-        if (twin) importedFiles.add(twin);
-      });
+    const sourceText = sourceByFile.get(file) || '';
     fileExports.push({
       file,
-      exports: extractNamedExports(sourceText),
+      exports: extractNamedExports(sourceText, file),
     });
   }
 
@@ -222,7 +305,7 @@ export function collectDeadExportAdvisory({ rootDir = DEFAULT_ROOT_DIR } = {}) {
     .map(({ file }) => file);
   const exportsByFile = new Map(fileExports.map(({ file, exports }) => [file, exports]));
   const candidateUnusedExports = fileExports
-    .filter(({ file }) => isCandidateFile(file))
+    .filter(({ file }) => isCandidateFile(file) && !NON_IMPORT_ENTRYPOINT_FILES.has(file))
     .flatMap(({ file, exports }) => exports
       .filter((exportName) => !allIdentifiers.has(exportName))
       .filter((exportName) => {
@@ -260,34 +343,17 @@ export function formatDeadExportAdvisory(result) {
   return lines.join('\n');
 }
 
-export function runDeadExportAdvisory({ rootDir = DEFAULT_ROOT_DIR, stdout = console.log } = {}) {
+export function runDeadExportAdvisory({
+  rootDir = DEFAULT_ROOT_DIR,
+  stdout = console.log,
+  stderr = console.error,
+} = {}) {
+  if (!typescript) {
+    stderr('Dead export analysis requires client dependencies. Run `npm --prefix client install` first.');
+    return 1;
+  }
   stdout(formatDeadExportAdvisory(collectDeadExportAdvisory({ rootDir })));
   return 0;
-}
-
-function readDeadExportBaseline(rootDir) {
-  const baselinePath = path.join(rootDir, DEAD_EXPORT_BASELINE_PATH);
-  const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
-  const candidateDeadFiles = Number(baseline?.candidateDeadFiles);
-  const candidateUnusedExports = Number(baseline?.candidateUnusedExports);
-  if (!Number.isFinite(candidateDeadFiles) || candidateDeadFiles < 0) {
-    throw new Error(`${DEAD_EXPORT_BASELINE_PATH} candidateDeadFiles must be a non-negative number`);
-  }
-  if (!Number.isFinite(candidateUnusedExports) || candidateUnusedExports < 0) {
-    throw new Error(`${DEAD_EXPORT_BASELINE_PATH} candidateUnusedExports must be a non-negative number`);
-  }
-  return { candidateDeadFiles, candidateUnusedExports };
-}
-
-export function collectDeadExportRatchet({ rootDir = DEFAULT_ROOT_DIR } = {}) {
-  const current = collectDeadExportAdvisory({ rootDir });
-  const baseline = readDeadExportBaseline(rootDir);
-  return {
-    current,
-    baseline,
-    deadFileIncrease: Math.max(0, current.candidateDeadFiles.length - baseline.candidateDeadFiles),
-    unusedExportIncrease: Math.max(0, current.candidateUnusedExports.length - baseline.candidateUnusedExports),
-  };
 }
 
 export function runDeadExportCheck({
@@ -295,30 +361,18 @@ export function runDeadExportCheck({
   stdout = console.log,
   stderr = console.error,
 } = {}) {
-  let result;
-  try {
-    result = collectDeadExportRatchet({ rootDir });
-  } catch (error) {
-    stderr(`Dead export ratchet failed: ${error.message}`);
+  if (!typescript) {
+    stderr('Dead export check requires client dependencies. Run `npm --prefix client install` first.');
+    return 1;
+  }
+  const current = collectDeadExportAdvisory({ rootDir });
+  if (current.candidateDeadFiles.length > 0 || current.candidateUnusedExports.length > 0) {
+    stderr('Dead export check failed; remove or explicitly wire every candidate:');
+    stderr(formatDeadExportAdvisory(current));
     return 1;
   }
 
-  const { current, baseline, deadFileIncrease, unusedExportIncrease } = result;
-  if (deadFileIncrease > 0) {
-    stderr(
-      `Dead export ratchet failed: candidate dead files increased: ${baseline.candidateDeadFiles} -> ${current.candidateDeadFiles.length}.`,
-    );
-  }
-  if (unusedExportIncrease > 0) {
-    stderr(
-      `Dead export ratchet failed: candidate unused named exports increased: ${baseline.candidateUnusedExports} -> ${current.candidateUnusedExports.length}.`,
-    );
-  }
-  if (deadFileIncrease > 0 || unusedExportIncrease > 0) return 1;
-
-  stdout(
-    `Dead export ratchet passed: dead files ${current.candidateDeadFiles.length}/${baseline.candidateDeadFiles}; unused named exports ${current.candidateUnusedExports.length}/${baseline.candidateUnusedExports}.`,
-  );
+  stdout(`Dead export check passed: ${current.filesScanned} production client files, zero candidates.`);
   return 0;
 }
 

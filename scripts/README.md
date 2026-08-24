@@ -47,6 +47,15 @@ npm run client-boundaries:check
 
 This compares conservative client import-boundary rules against `scripts/client-boundaries-baseline.json` and fails for new violations, duplicate baseline entries, or resolved baseline entries that were not pruned in the same change. The checker resolves Vite client aliases, guards production imports from excluded test/harness files, and flags likely low-level pass-through facades outside sanctioned domain/runtime layers. Use `node scripts/check-client-boundaries.mjs --write-baseline` after reviewed boundary cleanup removes or intentionally reclassifies entries.
 
+Dead-export check:
+
+```bash
+npm --prefix client install
+npm run dead-exports:check
+```
+
+This parser-backed check requires zero conservative candidates for unresolved production client files or unused named exports. It uses test/support references when assessing named-export usage while keeping production-file reachability production-only, excludes test-only source files from the production-file inventory, and lists explicit build/script entrypoints that are not reachable through ordinary client imports. There is no count-only debt baseline; remove a candidate, wire it to a real entrypoint, or classify a proven non-import entrypoint explicitly.
+
 The published checkout keeps `scripts/vite-navigation-smoke.js` as the maintained
 local route/style smoke runner. Run it through `npm run test:e2e`.
 

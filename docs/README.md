@@ -1,10 +1,16 @@
-# Documentation Index
+# Public Documentation Index
+
+This index covers the references retained in the prepared public release. Some
+tracked development records, migration plans, audit notes, and internal E2E maps
+are intentionally removed by the release scrubber and should not be linked from
+retained public docs unless that release policy changes too.
 
 Primary product and system specification:
 - `spec.md` (repo root)
 
-Canonical reference set:
-- root docs: `README.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`, `spec.md`
+Canonical public reference set:
+- root docs: `README.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`, `spec.md`,
+  `CHANGELOG.md`, `ROADMAP.md`, `SECURITY.md`, and `LICENSING.md`
 - the `docs/` reference docs listed below
 - `docs/architecture-overview.md` is the first-read architecture and verification
   map for new engineers and auditors
@@ -20,7 +26,9 @@ Private planning docs should stay in ignored local paths, not in public docs.
 When you add or change a feature, update documentation in the same PR:
 - Add or update a doc in `docs/` when the change introduces new workflows, endpoints, config keys, schemas, or operational steps.
 - Update `spec.md` to reflect new capabilities and any new surface area (routes, Worker endpoints, contracts, config keys).
-- Add your new/updated doc link to this index so others can discover it.
+- Add a new retained public doc to this index so others can discover it. Keep
+  release-stripped development records discoverable through development-only
+  tooling instead of linking them from this retained index.
 
 ## Core Docs
 
@@ -29,7 +37,8 @@ Architecture and repository conventions:
 - `docs/adr/0001-client-domain-boundaries.md`: client domain-boundary rules.
 - `docs/adr/0002-worker-auth-revalidation.md`: worker authentication revalidation policy.
 - `docs/adr/0003-storage-port-and-read-model.md`: storage port and read-model boundary.
-- `docs/adr/0004-worker-auth-consistency-risk-acceptance.md`: accepted worker consistency limits.
+- `docs/adr/0004-worker-auth-consistency-risk-acceptance.md`: superseded KV-only
+  consistency decision and the mandatory Session coordinator replacement.
 - `docs/adr/0005-route-table-migration.md`: route-table migration decision.
 - `docs/repo-structure.md`: canonical source naming and placement rules.
 
@@ -40,6 +49,8 @@ Session, gates, and the Worker:
 - `docs/standard-sponsored-links-fixture.md`: Temporary tracked fixture for publishing a small set of public sponsored setup links with minimal onboarding friction.
 - `docs/session-registry.md`: SessionRegistry migration and on-chain gate authority model.
 - `docs/session-cors-worker.md`: Cloudflare `sessionCorsWorker` behavior, endpoints, KV layouts, and wizard flow.
+- `../workers/agentBridgeWorker/README.md`: optional Agent Bridge HTTP API,
+  Telegram/Mini App adapters, credentials, and Session Worker delegation.
 - `docs/scaling.md`: Public scaling reference covering write-path settlement, indexed reads, private compute modes, and deployment profiles.
 
 Keys and RPCs:
@@ -58,9 +69,8 @@ Payload schemas:
 
 Local development:
 - `docs/bundle-budget.md`: bundle-size budget and regression policy.
-- `docs/client-build-assets.md`: Vite build outputs over 500 KB, source ownership, and safe follow-up actions.
 - `docs/local-chain.md`: Foundry/Anvil local chain setup, deploy flow, and test commands.
-- `docs/run-modes.md`: repo run modes (`core-local`, `local-chain`, `hosted/onchain`) plus the current manual-fork verification note.
+- `docs/run-modes.md`: developer run modes, current session-infrastructure profiles, and the manual-fork verification note.
 - `docs/testing.md`: centralized test commands and runtime requirements across root, client, and E2E flows.
 
 Design and public presentation:

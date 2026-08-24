@@ -20,7 +20,7 @@ regenerate this block rather than maintaining parallel numbers.
 | --- | ---: | --- |
 | Application entry | 250,000 bytes gzip | `index.html` and its direct dynamic application entry |
 | Non-vendor JavaScript | 500,000 bytes minified | All other non-vendor, non-exception chunks |
-| Temporary exception: app-shell-temporary | 625,000 bytes minified | `assets/AppShell-*.js` |
+| Temporary exception: app-shell-temporary | 525,000 bytes minified | `assets/AppShell-*.js` |
 | Duplicate emitted/compatibility images | 0 pairs | 0 explicit allowlist entries |
 | Warning threshold | 95% of each byte cap | Warning only; more than 100% fails |
 <!-- END GENERATED CLIENT BUNDLE POLICY -->
@@ -88,6 +88,12 @@ executable runtime modules produced browser initialization-order failures. Keep
 runtime and controller reductions behind real lazy boundaries; narrowly
 isolating immutable, side-effect-free fixture data is acceptable only when the
 built import graph, bundle gate, and route smoke prove the split safe.
+
+The August 2026 dead-code cleanup produced a 518,829-byte minified AppShell
+chunk on the current development tree, so the temporary exception was tightened
+from 625,000 to 525,000 bytes. The dated snapshot above remains the historical
+evidence for the former cap; the machine-readable budget is the current
+authority.
 
 This is an accepted temporary exception for the current release line. The
 follow-up work is a dedicated AppShell chunk diet: map the current chunk

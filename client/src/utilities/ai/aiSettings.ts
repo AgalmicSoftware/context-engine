@@ -1117,8 +1117,3 @@ export const getEffectiveTranscriptionConfig = async ({
     group: session,
   };
 };
-
-export const getEffectiveSessionAiConfig = getEffectiveAiConfig;
-export const getEffectiveSessionTranscriptionConfig = getEffectiveTranscriptionConfig;
-
-export const parseCustomFunctions = parseFunctionsJson;

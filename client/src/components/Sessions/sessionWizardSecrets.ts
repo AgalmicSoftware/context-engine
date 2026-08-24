@@ -71,15 +71,6 @@ const TRANSIENT_SYNC_ERROR_PATTERNS = [
   'fetch failed',
 ];
 
-const CONFIG_SYNC_ERROR_PATTERNS = [
-  'alloworigins',
-  'origin not allowed',
-  'sessionSlug does not match'.toLowerCase(),
-  'missing sessionslug',
-  'admin authorization failed',
-  'session config not found',
-];
-
 const defaultWait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 const toErrorMessage = (err: unknown) => toStr((err as AnyRecord)?.message || err).trim();
@@ -88,12 +79,6 @@ export const isTransientSecretsSyncError = (err: unknown): boolean => {
   const message = toErrorMessage(err).toLowerCase();
   if (!message) return false;
   return TRANSIENT_SYNC_ERROR_PATTERNS.some((pattern) => message.includes(pattern));
-};
-
-export const isSecretsSyncConfigError = (err: unknown): boolean => {
-  const message = toErrorMessage(err).toLowerCase();
-  if (!message) return false;
-  return CONFIG_SYNC_ERROR_PATTERNS.some((pattern) => message.includes(pattern));
 };
 
 export const isSecretsSyncConfigBootstrapError = (err: unknown): boolean => {

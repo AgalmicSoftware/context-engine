@@ -349,10 +349,6 @@ export const rpcDebugPushProviderContextWithToken = (
   }
 };
 
-export const rpcDebugPushProviderContext = (provider: object | null | undefined, contextIn: unknown): boolean => {
-  return rpcDebugPushProviderContextWithToken(provider, contextIn) != null;
-};
-
 export const rpcDebugPopProviderContext = (provider: object | null | undefined, token: number | null = null): void => {
   if (!provider || (typeof provider !== 'object' && typeof provider !== 'function')) return;
   try {

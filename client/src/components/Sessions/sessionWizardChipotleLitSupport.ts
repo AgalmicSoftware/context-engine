@@ -1,11 +1,5 @@
 import { toStr } from '../../utilities/shared/primitives.js';
-import {
-  DEFAULT_CHIPOTLE_ACTION,
-  DEFAULT_CHIPOTLE_ACTION_CODE,
-  DEFAULT_CHIPOTLE_ACTION_DESCRIPTION,
-  DEFAULT_CHIPOTLE_ACTION_NAME,
-  DEFAULT_CHIPOTLE_ACTION_PARAMS_EXAMPLE,
-} from '../../utilities/crypto/litChipotleCatalog.js';
+import { DEFAULT_CHIPOTLE_ACTION, DEFAULT_CHIPOTLE_ACTION_NAME } from '../../utilities/crypto/litChipotleCatalog.js';
 import type { AnyRecord, WorkerSecretSyncResult, WorkerSecretsLike } from '../shellTypes';
 
 type AsyncShellResult = AnyRecord | null | undefined;
@@ -43,9 +37,6 @@ const isTransientLitSyncError = (err: unknown): boolean => {
 };
 
 export const SESSION_WIZARD_CHIPOTLE_ACTION_NAME = DEFAULT_CHIPOTLE_ACTION_NAME;
-export const SESSION_WIZARD_CHIPOTLE_ACTION_DESCRIPTION = DEFAULT_CHIPOTLE_ACTION_DESCRIPTION;
-export const SESSION_WIZARD_CHIPOTLE_ACTION_CODE = DEFAULT_CHIPOTLE_ACTION_CODE;
-export const SESSION_WIZARD_CHIPOTLE_ACTION_PARAMS_EXAMPLE = DEFAULT_CHIPOTLE_ACTION_PARAMS_EXAMPLE;
 export const SESSION_WIZARD_CHIPOTLE_DEFAULT_ACTION = DEFAULT_CHIPOTLE_ACTION;
 
 export const buildSessionWizardLitBootstrapRequest = (

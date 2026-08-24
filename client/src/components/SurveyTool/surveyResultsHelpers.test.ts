@@ -1,6 +1,5 @@
 import {
   buildSurveyResultsAlertMessagePatch,
-  buildSurveyResultsBookmarkFeedbackPatch,
   buildSurveyResultsBookmarkedQuestionIdsPatch,
   buildSurveyResultsBookmarkedSurveyIdsPatch,
   buildSurveyResultsBooleanTogglePatch,
@@ -30,7 +29,6 @@ import {
   buildSurveyResultsQuestionScopeResetPatch,
   buildSurveyResultsRefreshStatusSequencePlan,
   buildSurveyResultsRefreshTargetBlocksPatch,
-  buildSurveyResultsRefreshStatusWritePlan,
   buildSurveyResultsSurveyIdPropChangePatch,
   buildSurveyResultsSurveyIdStateChangePatch,
   buildSurveyResultsSurveyModeHydratedPatch,
@@ -193,80 +191,6 @@ describe('surveyResultsHelpers state patches', () => {
       refreshTargetQuestionBlock: 456,
       refreshTargetResponseBlock: 456,
       refreshTargetSurveyBlock: 456,
-    });
-    expect(buildSurveyResultsRefreshStatusWritePlan({ latestBlock: 456 })).toEqual({
-      blockedReason: '',
-      shouldWrite: true,
-      statePatch: {
-        refreshTargetQuestionBlock: 456,
-        refreshTargetResponseBlock: 456,
-        refreshTargetSurveyBlock: 456,
-      },
-      target: {
-        latestBlock: 456,
-      },
-    });
-    expect(
-      buildSurveyResultsRefreshStatusWritePlan({
-        latestBlock: 789,
-        writeNetworkLatestBlock: true,
-      }),
-    ).toEqual({
-      blockedReason: '',
-      shouldWrite: true,
-      statePatch: {
-        networkLatestBlock: 789,
-        refreshTargetQuestionBlock: 789,
-        refreshTargetResponseBlock: 789,
-        refreshTargetSurveyBlock: 789,
-      },
-      target: {
-        latestBlock: 789,
-      },
-    });
-    expect(
-      buildSurveyResultsRefreshStatusWritePlan({
-        latestBlock: Number.POSITIVE_INFINITY,
-        writeNetworkLatestBlock: true,
-      }),
-    ).toEqual({
-      blockedReason: '',
-      shouldWrite: true,
-      statePatch: {
-        networkLatestBlock: 0,
-        refreshTargetQuestionBlock: Number.POSITIVE_INFINITY,
-        refreshTargetResponseBlock: Number.POSITIVE_INFINITY,
-        refreshTargetSurveyBlock: Number.POSITIVE_INFINITY,
-      },
-      target: {
-        latestBlock: Number.POSITIVE_INFINITY,
-      },
-    });
-    expect(
-      buildSurveyResultsRefreshStatusWritePlan({
-        isMounted: false,
-        latestBlock: 999,
-        writeNetworkLatestBlock: true,
-      }),
-    ).toEqual({
-      blockedReason: 'unmounted',
-      shouldWrite: false,
-      statePatch: null,
-      target: {
-        latestBlock: 999,
-      },
-    });
-    expect(buildSurveyResultsRefreshStatusWritePlan({ latestBlock: undefined })).toEqual({
-      blockedReason: '',
-      shouldWrite: true,
-      statePatch: {
-        refreshTargetQuestionBlock: undefined,
-        refreshTargetResponseBlock: undefined,
-        refreshTargetSurveyBlock: undefined,
-      },
-      target: {
-        latestBlock: undefined,
-      },
     });
     expect(
       buildSurveyResultsRefreshStatusSequencePlan({
@@ -457,12 +381,6 @@ describe('surveyResultsHelpers state patches', () => {
     ).toBeNull();
     expect(buildSurveyResultsSurveyViewModePatch('aggregate')).toEqual({
       surveyViewMode: 'aggregate',
-    });
-    expect(buildSurveyResultsBookmarkFeedbackPatch(1)).toEqual({
-      filterBookmarkedFeedback: true,
-    });
-    expect(buildSurveyResultsBookmarkFeedbackPatch('')).toEqual({
-      filterBookmarkedFeedback: false,
     });
     expect(buildSurveyResultsViewStatePatch('survey', '0x1')).toEqual({
       viewMode: 'survey',

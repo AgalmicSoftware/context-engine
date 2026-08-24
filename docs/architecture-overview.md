@@ -30,20 +30,34 @@ flowchart TD
   ProfileChoice --> Hosted["Hosted & Fast<br/>implemented default path"]
   ProfileChoice --> Trustless["Trustless & Slower<br/>implemented opt-in"]
   ProfileChoice -.-> Company["Company-Operated<br/>planned"]
-  Hosted --> DeployHelper["deploy-helper worker<br/>workers/deploy-helper"]
-  DeployHelper --> HostedWorker["per-session sessionCorsWorker<br/>canonical config, auth, AI, storage"]
+  Hosted --> NativeTemplate["native Deploy to Cloudflare template<br/>dashboard handoff; no API token"]
+  NativeTemplate --> HostedWorker["per-session sessionCorsWorker<br/>canonical config, auth, AI, storage"]
+  Hosted -.-> DeployHelper["legacy/sponsored deploy-helper fallback<br/>workers/deploy-helper"]
+  DeployHelper -.-> HostedWorker
   HostedWorker --> CloudflareStorage["Cloudflare KV payload/index storage<br/>optional existing R2"]
+  AgentClient["Agent/tool client or Telegram"] --> AgentBridge["optional agentBridgeWorker<br/>scoped HTTP and adapter surface"]
+  AgentBridge --> HostedWorker
   Trustless --> Contracts["Public EVM contracts<br/>SessionRegistry, Surveys, SBTFactory, CustomSBT"]
   Trustless --> Arweave["Arweave metadata and payloads"]
   Trustless --> WorkerServices["profile-enabled session worker services<br/>AI, auth, fetch, Arweave routes"]
+  AgentBridge --> WorkerServices
+  AgentBridge -.->|policy-enabled direct submit| Contracts
   Company -.-> OrgAdapters["Planned IAM, key release/KMS, storage,<br/>AI, networking, observability adapters"]
   PublicRelease["public release tree"] --> Browser
   PublicRelease --> HostedWorker
+  PublicRelease --> NativeTemplate
   PublicRelease --> DeployHelper
+  PublicRelease --> AgentBridge
   AggregateCI["successful aggregate CI<br/>tested Worker bytes + provenance"] --> ImmutableWorkerRelease["immutable SHA-keyed Worker release"]
   ImmutableWorkerRelease --> ProtectedPromotion["manual protected stable/latest promotion"]
   ProtectedPromotion --> Hosted
 ```
+
+Agent Bridge normally delegates session authority and gated reads to the
+session Worker. When session policy and live testnet contract configuration
+explicitly enable managed-account broadcast, it may submit directly to the
+Surveys contract; the EVM contracts remain canonical for that chain-backed
+write.
 
 Static app hosting, public/private session access, and the session
 infrastructure profile are independent choices. The `/new` screen does not
@@ -175,9 +189,16 @@ The worker surface is documented in `docs/session-cors-worker.md`.
   per-session instance is the canonical config, auth, and payload-storage
   authority. Its passkey-derived admin EOA signs config without submitting an
   EVM transaction.
-- `workers/deploy-helper/` is a separate helper worker used by `/new` and
-  self-hosted deployments to call Cloudflare APIs, create the target worker and
-  KV namespace, and seed initial session config/secrets.
+- `workers/deploy-helper/` is the explicit legacy/sponsored and self-hosted
+  fallback, plus Agent Wrapped provisioning. It calls Cloudflare APIs to create
+  the target Worker and bindings; the default `/new` path instead opens the
+  tracked native Cloudflare dashboard template without requesting an API token.
+- `workers/agentBridgeWorker/` is an optional, separately deployed sidecar. It
+  owns the scoped `/api/agent/*` contract plus optional Telegram bot and Mini App
+  adapters, while delegating session membership, gates, and canonical storage to
+  the configured Session Worker when those authorities are required.
+- `workers/shared/` contains modules reused by worker packages; it is not an
+  independently deployed Worker.
 - `scripts/worker-bundle.mjs` generates ignored local/manual bundles in
   `dist/`; `scripts/cloudflare-session-template.mjs` separately maintains and
   verifies byte parity for the tracked Cloudflare-native Session Worker package.
@@ -186,8 +207,9 @@ Auth decisions:
 
 - `docs/adr/0002-worker-auth-revalidation.md` records 4-hour login tokens with
   `jti` markers in KV and fail-closed marker checks for authenticated routes.
-- `docs/adr/0004-worker-auth-consistency-risk-acceptance.md` accepts the
-  remaining cross-isolate KV consistency limits for nonce and rate-limit state.
+- `docs/adr/0004-worker-auth-consistency-risk-acceptance.md` records the
+  superseded KV-only consistency decision and its replacement by the mandatory
+  Session coordinator Durable Object for nonce and rate-limit authority.
 
 ## Storage Model
 
@@ -207,6 +229,8 @@ The session worker exposes the profile-aware canonical storage routes:
 - `POST /storage/upload`
 - `GET|POST /storage/read`
 - `GET|POST /storage/list`
+- `GET|POST /storage/export-envelopes` (authorized encrypted-envelope export;
+  ciphertext and metadata only, never session KEK material)
 
 `docs/session-cors-worker.md` describes how those routes map to Cloudflare or
 Arweave storage, worker envelopes, and gated access checks.
@@ -225,10 +249,11 @@ tests in `foundry/test/`:
 
 The client reads ABIs from `client/src/contractsABI/`. Checked-in chain-profile
 fallbacks live in `client/src/variables/chains.ts` and
-`client/src/variables/contracts.json`; OP Sepolia (`11155420`) is the default
-chain fallback when a profile selects EVM behavior, while Base Sepolia
-(`84532`) remains a compatibility chain. Neither chain is required by the
-default worker-canonical profile.
+`client/src/variables/contracts.json`. OP Sepolia (`11155420`) is the current
+default and the only chain with canonical CE addresses in that manifest. Base
+Sepolia (`84532`) remains a best-effort legacy/development compatibility target,
+not an actively supported or currently configured runtime. Neither chain is
+required by the default worker-canonical profile.
 
 ## Release And Public Surface
 

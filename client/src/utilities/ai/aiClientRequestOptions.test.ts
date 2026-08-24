@@ -9,7 +9,6 @@ import {
   readAiOptionThinking,
   readAiOptionThrowOnError,
   readArweaveJwkOption,
-  readNumericOption,
   resolveAudioSummaryOptions,
   resolveAiSessionOptions,
   resolveAiSessionSelection,
@@ -187,10 +186,7 @@ describe('aiClientRequestOptions', () => {
     });
   });
 
-  it('reads numeric and summary option contracts without mutating AI call options', () => {
-    expect(readNumericOption({ sizeThresholdBytes: 2048 }, 'sizeThresholdBytes')).toBe(2048);
-    expect(readNumericOption({ sizeThresholdBytes: '2048' }, 'sizeThresholdBytes')).toBeNull();
-
+  it('resolves summary option contracts without mutating AI call options', () => {
     expect(
       resolveAudioSummaryOptions({
         model: 'gpt-5',

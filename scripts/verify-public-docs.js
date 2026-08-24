@@ -8,6 +8,12 @@ const MARKDOWN_FILE_RE = /\.md$/i;
 const REPO_PATH_RE = /^(?:client|docs|scripts|workers|contracts|foundry|tests|posts|whitepaper|ai-discourse-corpus)\//;
 const ROOT_FILE_RE = /^(?:README|ARCHITECTURE|CONTRIBUTING|CHANGELOG|LICENSING|SECURITY|ROADMAP|spec|package)(?:\.[A-Za-z0-9]+)?$/;
 const ALLOWED_UNTRACKED_PATH_RE = /^(?:client\/(?:build(?:-vite)?|vite-build)(?:\/|$)|client\/\.env(?:$|\.)|(?:dist|out|broadcast|cache|coverage|release-public)(?:\/|$))/;
+const FORBIDDEN_DOCUMENT_PATHS = Object.freeze([
+  { label: 'internal agent instruction document', re: /(?:^|\/)AGENTS\.md$/i },
+  { label: 'internal planning document path', re: /^docs\/plans(?:\/|$)/i },
+  { label: 'internal post authoring document', re: /^posts\/[^/]+\/(?:diagram-prompts\.md|attachments\/README\.md)$/i },
+  { label: 'stale build inventory document', re: /^docs\/client-build-assets\.md$/i },
+]);
 const FORBIDDEN_MARKERS = Object.freeze([
   { label: 'internal planning identifier', re: /\bPRDs?(?:\s*(?:[#:_-]\s*)?\d+|\d+)\b/gi },
   { label: 'private planning path', re: /(?:^|[^\w])TODO\//gi },
@@ -82,6 +88,17 @@ function scanForbiddenMarkers(rootDir, relativePath, text) {
     }
   }
   return findings;
+}
+
+function scanForbiddenDocumentPath(relativePath) {
+  return FORBIDDEN_DOCUMENT_PATHS
+    .filter(({ re }) => re.test(relativePath))
+    .map(({ label }) => ({
+      file: relativePath,
+      line: 1,
+      kind: label,
+      detail: relativePath,
+    }));
 }
 
 function scanNpmCommands(rootDir, relativePath, text, packageScripts) {
@@ -193,6 +210,7 @@ function verifyPublicDocs(rootDir = path.resolve(__dirname, '..')) {
   for (const absolutePath of markdownFiles) {
     const relativePath = normalizePath(path.relative(absoluteRoot, absolutePath));
     const text = fs.readFileSync(absolutePath, 'utf8');
+    findings.push(...scanForbiddenDocumentPath(relativePath));
     findings.push(...scanForbiddenMarkers(absoluteRoot, relativePath, text));
     findings.push(...scanNpmCommands(absoluteRoot, relativePath, text, packageScripts));
     findings.push(...scanLocalLinks(absoluteRoot, absolutePath, relativePath, text));
@@ -231,6 +249,7 @@ module.exports = {
   collectPackageScripts,
   formatFindings,
   scanForbiddenMarkers,
+  scanForbiddenDocumentPath,
   scanLocalLinks,
   scanInlineRepoPaths,
   scanNpmCommands,

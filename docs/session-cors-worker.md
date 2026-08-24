@@ -8,7 +8,7 @@ versioned Worker KV envelope; public config never contains API keys, private
 keys, JWKs, bearer tokens, credentials, RPC/faucet settings, or URL-embedded
 credentials.
 
-It also exposes canonical session storage routes for future backend routing: `POST /storage/upload`, `GET|POST /storage/read`, and `GET|POST /storage/list`. `/arweave/upload` remains supported for compatibility.
+It also exposes canonical session storage routes for future backend routing: `POST /storage/upload`, `GET|POST /storage/read`, `GET|POST /storage/list`, and the authorization-gated `GET|POST /storage/export-envelopes`. `/arweave/upload` remains supported for compatibility.
 
 ## Agent Bridge Client Handoff
 
@@ -114,7 +114,8 @@ The route-shell bundle is intentionally still a large boundary object because it
 
 ## Native wizard flow (/new + Cloudflare deploy button)
 
-For the default `Fast & Private (Cloudflare)` preset:
+For the default **Hosted & Fast** profile, labeled `Centralized (Cloudflare)`
+in the wizard:
 
 1. Context Engine shows the exact session slug, public passkey-derived admin
    address, and two independently generated Worker runtime secrets.
@@ -185,7 +186,8 @@ grant Cloudflare account access. The Worker is deployed with
 
 ## Legacy wizard flow (/new + deploy-helper fallback)
 
-For the default `Fast & Private (Cloudflare)` preset:
+For the default **Hosted & Fast** profile, labeled `Centralized (Cloudflare)`
+in the wizard:
 
 ### API token setup and handling
 
@@ -365,10 +367,15 @@ deleted speculatively.
     decentralized profile keeps the existing metadata upload and on-chain
     registration steps. Both paths default to the hosted GitHub release asset
     URL.
-- Sponsored faucet redemption writes a secret-free `redeeming` reservation
-  before it can broadcast the one-shot transfer. If the transfer or receipt is
-  ambiguous, the grant remains pending and the action is not repeated; inspect
-  the first attempt and issue a new grant instead of retrying the same bearer.
+- `POST /sponsored/redeem-faucet` accepts the one-time `faucetGrantToken` plus
+  a recipient address, validates the grant and the source session's CORS
+  policy, and reserves the transfer in `SessionWriteCoordinator` before calling
+  the faucet. Same-payload retries replay the terminal safe receipt; conflicting
+  payloads return `409`, and missing coordination fails closed before transfer.
+  The route writes a secret-free `redeeming` reservation before it can broadcast
+  the one-shot transfer. If the transfer or receipt is ambiguous, the grant
+  remains pending and the action is not repeated; inspect the first attempt and
+  issue a new grant instead of retrying the same bearer.
 
 - The worker KV config now keeps a mirrored `embeddedDeployHelperEnabled` boolean so the frontend can reopen the wizard with the current deploy-time toggle state, but runtime behavior still comes from the worker's `DEPLOY_HELPER_ENABLED` binding.
   - If the hosted release-asset fetch fails, the normal-mode worker step or sponsored normal-mode Publish panel keeps the GitHub release asset URL as the default path and offers either a manual bundle URL override or `nvm use 20 && npm run worker:bundle` plus `/dist/sessionCorsWorker.bundle.js` as an optional local upload override.
@@ -471,7 +478,7 @@ Legacy/default worker URL:
   request key when the route policy allows it, but an anonymous denial is
   returned to the recorder and never escalates into an interactive wallet or
   passkey signature.
-- **Stage-B fail-closed strictness (2026-03-12):** All security-sensitive callers — Arweave uploads (`arweaveClient.js`), AI requests (`aiClient.js`), transcription (`useWhisper.ts`), faucet (`contractHelpers.ts`), image fetch (`imageFetchClient.ts`), session-config resolution (`contractScripts.impl.ts`, `resourceKeys.ts`, `aiSettings.ts`), and the canonical resolver (`canonicalSessionContext.ts`) — now require explicit `allowDemoFallback: true` opt-in to use demo session fixtures when the on-chain registry is active. The CORS proxy demo-fallback policy (`defaultCorsProxyAllowDemoFallback`) is also tightened to match auth defaults. `getSessionConfigBySlugOrDefault` returns `null` for unknown non-general slugs instead of silently mapping them to the general default config.
+- **Stage-B fail-closed strictness (2026-03-12):** All security-sensitive callers — Arweave uploads (`arweaveClient.js`), AI requests (`aiClient.ts`), transcription (`useWhisper.ts`), faucet (`contractHelpers.ts`), image fetch (`imageFetchClient.ts`), session-config resolution (`contractScripts.impl.ts`, `resourceKeys.ts`, `aiSettings.ts`), and the canonical resolver (`canonicalSessionContext.ts`) — now require explicit `allowDemoFallback: true` opt-in to use demo session fixtures when the on-chain registry is active. The CORS proxy demo-fallback policy (`defaultCorsProxyAllowDemoFallback`) is also tightened to match auth defaults. `getSessionConfigBySlugOrDefault` returns `null` for unknown non-general slugs instead of silently mapping them to the general default config.
 - In on-chain registry mode, worker auth/cors proxy no longer treat `demoSessions.general`
   as an implicit worker authority for the default session; the shared fallback is used instead.
 - The shared fallback is only used for the general/default session; non-general slugs do not fall back to it.
@@ -1682,9 +1689,16 @@ Anonymous exception (AI/transcribe only):
     request-`apiKey` bypass from touching worker secrets, retains the anonymous custom-provider
     `rpcUrl` validation for `/ai`, and preserves downstream provider/transcribe dispatch behavior.
 
-## Admin endpoints (signed message, no token)
+## Admin endpoints
 
-Admin requests require a fresh signed SIWE message (no session token):
+`GET /admin/abuse-summary[?windows=<positive integer>]` is a token-authenticated
+exception to the signed-admin routes below. It requires a current session Bearer
+token whose subject validates as the current session admin, applies that
+session's CORS policy, and returns aggregate abuse-counter windows without
+secret values.
+
+The remaining Admin requests require a fresh signed SIWE message (no session
+token):
 
 - `POST /admin/set-config`
 - `POST /admin/set-secrets`
@@ -1946,6 +1960,17 @@ Signed login/bootstrap requests:
   - The account/settings sponsorship cards use this as operational truth for
     the active session and retain registry flags as a compatibility fallback
     for older workers that return `404`.
+- `GET /admin/abuse-summary[?windows=<positive integer>]`
+  - Requires a current session Bearer token whose subject validates as the
+    current session admin; unlike the signed `POST /admin/*` routes, it does not
+    accept a signed Admin request body.
+  - Returns aggregate abuse-counter windows after session CORS validation.
+- `POST /sponsored/redeem-deploy` or `POST /sponsored/redeem-faucet`
+  - Redeems a matching, unexpired one-time grant from the request body after
+    validating the source session's CORS policy.
+  - Coordinated reservations make matching retries replay-safe and reject
+    conflicting payloads; missing coordination fails closed before the deploy
+    or faucet side effect.
 - `POST /ai` or `POST /` with JSON `{ action: "ai", provider: "anthropic"|"openai"|"openrouter"|"custom", ... }`
   - Anonymous access is allowed only under the rules above (request `apiKey`, or explicit open `default+ai` gates with available on-chain authority).
   - Optional overrides: `apiKey` (all providers), `rpcUrl` (custom provider only).

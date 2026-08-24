@@ -29,7 +29,7 @@ Add a Markdown file under root `posts/`, then add it to
       "author": "Context Engine",
       "tags": ["agent evals"],
       "headerImage": {
-        "src": "agent-village-wrapped/attachments/header.png",
+        "src": "agent-village-wrapped/attachments/header.jpg",
         "alt": "Descriptive header image alt text."
       },
       "attachments": "agent-village-wrapped/attachments",
@@ -45,16 +45,15 @@ code, standalone images, lists, blockquotes, code fences, horizontal rules, and
 it appears as text.
 
 Posts can be a single Markdown file directly under `posts/`, or a directory
-with its own Markdown file, attachments, data, and supporting prompts:
+with its own Markdown file, attachments, and public data:
 
 ```text
 posts/
   agent-village-wrapped/
     agent-village-wrapped.md
     attachments/
-      header.png
+      header.jpg
       example-wrapped-poster.jpeg
-    diagram-prompts.md
 ```
 
 Manifest paths are relative to `posts/`. Markdown image paths are relative to
@@ -80,8 +79,7 @@ preview uses the manifest `title` and `summary`, sets the Open Graph type to
 a `summary_large_image` card.
 
 Header images should therefore be compressed web assets, preferably JPEG or
-WebP, rather than full-resolution working files. The Agent Village post keeps
-its PNG source alongside a compressed JPEG selected by the manifest.
+WebP, rather than full-resolution working files.
 
 Non-post routes use the square Context Engine mark at
 `/assets/img/context-engine-social-preview-square.png`. Individual posts replace

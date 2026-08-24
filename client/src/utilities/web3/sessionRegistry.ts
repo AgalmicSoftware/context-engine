@@ -2184,8 +2184,6 @@ export const registerSessionOnChain = async (
   return { txs };
 };
 
-export const registerGroupOnChain = registerSessionOnChain;
-
 export const setSessionFieldsOnChain = async (
   {
     providerLike,
@@ -2284,8 +2282,6 @@ export const setSessionFieldsOnChain = async (
   }
   return { ok: true };
 };
-
-export const setGroupFieldsOnChain = setSessionFieldsOnChain;
 
 export const updateSessionMetadataOnChain = async (
   {
