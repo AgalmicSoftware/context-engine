@@ -1,8 +1,5 @@
 import { toStr } from '../../utilities/shared/primitives.js';
-import {
-  DEFAULT_CHIPOTLE_ACTION,
-  DEFAULT_CHIPOTLE_ACTION_NAME,
-} from '../../utilities/crypto/litChipotleCatalog.js';
+import { DEFAULT_CHIPOTLE_ACTION, DEFAULT_CHIPOTLE_ACTION_NAME } from '../../utilities/crypto/litChipotleCatalog.js';
 import type { AnyRecord, WorkerSecretSyncResult, WorkerSecretsLike } from '../shellTypes';
 
 type AsyncShellResult = AnyRecord | null | undefined;

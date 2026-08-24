@@ -1,8 +1,4 @@
-import {
-  base64URLToBuffer,
-  bufferSourceToWebCryptoBufferSource,
-  isArrayBufferLike,
-} from './encoding.js';
+import { base64URLToBuffer, bufferSourceToWebCryptoBufferSource, isArrayBufferLike } from './encoding.js';
 
 type PrfResults = {
   prf?: {

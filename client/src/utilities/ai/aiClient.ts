@@ -26,11 +26,7 @@ import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
 import { normalizeBaseUrl } from '../urlUtils.js';
-import {
-  buildE2eMockClusterAnalysis,
-  buildE2eMockCompareBullets,
-  isE2eAiMockEnabled,
-} from './aiClientE2eMocks.js';
+import { buildE2eMockClusterAnalysis, buildE2eMockCompareBullets, isE2eAiMockEnabled } from './aiClientE2eMocks.js';
 import {
   asParsedJsonRecord,
   buildHeuristicClusterSummary,

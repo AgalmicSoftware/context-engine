@@ -42,9 +42,9 @@ describe('mainSiteRouteViewMap', () => {
   it('dispatches every concrete route definition in order to exactly one renderer', () => {
     const calls: string[] = [];
     const renderers = buildRenderers(calls);
-    const routeKeys = MAIN_SITE_ROUTE_DEFINITIONS
-      .map(({ key }) => key)
-      .filter((key): key is MainSiteRouteViewKey => key !== 'wizard' && key !== 'notFound');
+    const routeKeys = MAIN_SITE_ROUTE_DEFINITIONS.map(({ key }) => key).filter(
+      (key): key is MainSiteRouteViewKey => key !== 'wizard' && key !== 'notFound',
+    );
 
     expect(routeKeys).toEqual(Object.keys(renderers));
 

@@ -2,10 +2,7 @@
  * @module components/MainSite/urlUtils
  */
 
-import {
-  buildPublicRoute as buildSharedPublicRoute,
-  stripPublicUrlBasePath,
-} from '../../utilities/ui/publicUrl.js';
+import { buildPublicRoute as buildSharedPublicRoute, stripPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import { isRouteResponderAddress } from '../../utilities/session/mainSiteUtils.js';
 
 export const buildPublicRoute = (pathname = ''): string => buildSharedPublicRoute(pathname);
