@@ -6,7 +6,12 @@ import { createStore } from 'redux';
 import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
 import fs from 'fs';
 import path from 'path';
-import TagPage, { loadTagPageWorkerGroupData, readTagAiCacheEntry, writeTagAiCacheEntry } from './TagPage';
+import TagPage, {
+  loadTagPageWorkerGroupData,
+  readTagAiCacheEntry,
+  resolveTagPageWorkerSessionConfig,
+  writeTagAiCacheEntry,
+} from './TagPage';
 import TagModal from './TagModal';
 import buildTagInterpretationPrompt from '../../prompts/tagInterpretationPrompt.js';
 import { buildDemoCorpusRecords } from '../../utilities/demo/demoCorpusRecords.js';
@@ -172,6 +177,15 @@ describe('tag AI cache helpers', () => {
 });
 
 describe('Tag Explorer Worker groups', () => {
+  it('opts into a known demo Worker config when a direct tag route has no registry snapshot yet', () => {
+    const demoConfig = { slug: 'demo-sh', sessionId: `0x${'3'.repeat(32)}` };
+    mockGetSessionConfigBySlug.mockReturnValue(null);
+    mockGetDemoSessionConfigBySlug.mockReturnValue(demoConfig);
+
+    expect(resolveTagPageWorkerSessionConfig('demo-sh')).toBe(demoConfig);
+    expect(mockGetDemoSessionConfigBySlug).toHaveBeenCalledWith('demo-sh', { allowDemoFallback: true });
+  });
+
   it('includes matching public Worker groups with their native detail route', async () => {
     const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;

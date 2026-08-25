@@ -242,11 +242,21 @@ type TagPageWorkerGroupPorts = {
 };
 
 const defaultTagPageWorkerGroupPorts: TagPageWorkerGroupPorts = {
-  getSessionConfig: (slug, configsBySlug) =>
-    configsBySlug[slug] || getSessionConfigBySlug(slug) || getDemoSessionConfigBySlug(slug),
+  getSessionConfig: (slug, configsBySlug) => resolveTagPageWorkerSessionConfig(slug, configsBySlug),
   getWorkerSessionToken,
   loadPublicWorkerGroups,
   loadWorkerGroupOverview,
+};
+
+export const resolveTagPageWorkerSessionConfig = (
+  slug: string,
+  configsBySlug: Record<string, unknown> = {},
+): unknown => {
+  const registeredConfig = configsBySlug[slug] || getSessionConfigBySlug(slug);
+  if (registeredConfig) return registeredConfig;
+  // Regression guard: a direct tag URL can load before the registry snapshot
+  // contains a known demo Worker, so opt into that exact tracked fallback.
+  return getDemoSessionConfigBySlug(slug, { allowDemoFallback: true });
 };
 
 export const loadTagPageWorkerGroupData = async (
