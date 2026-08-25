@@ -12,6 +12,7 @@ import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import contractScripts from '../../utilities/web3/chainGateway.js';
 import * as workerGroupPorts from '../../domains/worker/workerGroupPorts';
 import * as workerAuth from '../../utilities/worker/workerAuth';
+import { dispatchWorkerGroupsChanged } from '../../utilities/worker/workerGroupChangeEvents';
 import {
   WORKER_CANONICAL_CACHE_SCOPE_KEY,
   resolveWorkerCanonicalCacheIdentity,
@@ -387,6 +388,74 @@ describe('CommunityTab helpers', () => {
         '0x00000000000000000000000000000000000000bb',
       ]),
     );
+  });
+
+  it('evicts a matching Worker group count as soon as that session mutates', () => {
+    const instance = attachMutableSetState(
+      new CommunityTab({
+        activeSessionSlug: 'demo-sh',
+        sessionConfig: WORKER_SESSION_CONFIG,
+      }),
+    );
+    const identity = resolveWorkerCanonicalCacheIdentity({
+      sessionConfig: WORKER_SESSION_CONFIG,
+      sessionSlug: 'demo-sh',
+    });
+    const cacheKey = instance._getWorkerGroupCountCacheKey(identity);
+    instance._workerGroupCountCache.set(cacheKey, {
+      count: 1,
+      groupIds: ['stale-group'],
+      visibleUserIds: [],
+      status: 'ready',
+      updatedAtMs: Date.now(),
+    });
+    instance._scheduleNextStatsPoll = jest.fn();
+    instance._queueCacheDrivenRefresh = jest.fn();
+
+    instance.componentDidMount();
+    dispatchWorkerGroupsChanged({
+      sessionSlug: 'demo-sh',
+      sessionId: WORKER_SESSION_CONFIG.sessionId,
+    });
+
+    expect(instance._workerGroupCountCache.has(cacheKey)).toBe(false);
+    expect(instance._queueCacheDrivenRefresh).toHaveBeenCalledWith({ force: true });
+    instance.componentWillUnmount();
+  });
+
+  it('does not let an in-flight Worker catalog read restore an invalidated count', async () => {
+    let resolveGroups;
+    const groupsPromise = new Promise((resolve) => {
+      resolveGroups = resolve;
+    });
+    jest.spyOn(workerGroupPorts, 'loadPublicWorkerGroups').mockReturnValue(groupsPromise);
+    const instance = new CommunityTab({
+      activeSessionSlug: 'demo-sh',
+      sessionConfig: WORKER_SESSION_CONFIG,
+    });
+    const [scopeEntry] = instance._iterScopeCaches({ clone: false });
+    const identity = scopeEntry.workerCanonicalIdentity;
+    const cacheKey = instance._getWorkerGroupCountCacheKey(identity);
+
+    const loadPromise = instance._loadWorkerGroupCount(scopeEntry);
+    expect(instance._workerGroupCountCache.get(cacheKey)?.status).toBe('loading');
+    instance._queueCacheDrivenRefresh = jest.fn();
+    instance._handleWorkerGroupsChanged({
+      sessionSlug: 'demo-sh',
+      sessionId: WORKER_SESSION_CONFIG.sessionId,
+    });
+    resolveGroups([
+      {
+        groupId: 'stale-group',
+        sessionSlug: 'demo-sh',
+        label: 'Stale group',
+        joinMode: 'open',
+        memberVisibility: 'session',
+      },
+    ]);
+    await loadPromise;
+
+    expect(instance._workerGroupCountCache.has(cacheKey)).toBe(false);
   });
 
   it('does not wait for EVM block readiness for a Worker-canonical scope', async () => {

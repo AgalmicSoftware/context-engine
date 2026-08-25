@@ -68,6 +68,10 @@ import {
   type WorkerGroupOverview,
 } from '../../domains/worker/workerGroupPorts';
 import { getWorkerSessionToken } from '../../utilities/worker/workerAuth';
+import {
+  subscribeWorkerGroupsChanged,
+  type WorkerGroupsChangedDetail,
+} from '../../utilities/worker/workerGroupChangeEvents';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 const uiLog = createLogger('ui');
@@ -218,6 +222,8 @@ class CommunityTab extends Component<any, any> {
     this._isUnmounted = false;
     this._beeswarmPoints = [];
     this._workerGroupCountCache = new Map<string, WorkerGroupCountCacheEntry>();
+    this._workerGroupCountCacheRevisions = new Map<string, number>();
+    this._workerGroupsChangedUnsubscribe = null;
     this._leaderboardMemo = {
       uniqueUsersRef: null,
       uniqueUsersLength: 0,
@@ -468,6 +474,36 @@ class CommunityTab extends Component<any, any> {
     };
   };
 
+  _invalidateWorkerGroupCountCache = (detail: WorkerGroupsChangedDetail) => {
+    this._workerGroupCountCache.forEach((_entry: WorkerGroupCountCacheEntry, cacheKey: string) => {
+      const identityKeyEnd = cacheKey.indexOf('\n');
+      if (identityKeyEnd < 0) return;
+      try {
+        const identityParts = JSON.parse(cacheKey.slice(0, identityKeyEnd));
+        if (
+          !Array.isArray(identityParts) ||
+          identityParts[1] !== detail.sessionSlug ||
+          String(identityParts[2] || '').toLowerCase() !== detail.sessionId
+        ) {
+          return;
+        }
+        // Regression guard: invalidate the TTL entry before forcing Stats.
+        // The revision also stops an older in-flight read from restoring stale data.
+        this._workerGroupCountCacheRevisions.set(
+          cacheKey,
+          Number(this._workerGroupCountCacheRevisions.get(cacheKey) || 0) + 1,
+        );
+        this._workerGroupCountCache.delete(cacheKey);
+      } catch (_) {}
+    });
+  };
+
+  _handleWorkerGroupsChanged = (detail: WorkerGroupsChangedDetail) => {
+    if (this._isUnmounted) return;
+    this._invalidateWorkerGroupCountCache(detail);
+    this._queueCacheDrivenRefresh({ force: true });
+  };
+
   _buildScopeEntriesFromSlugs = (slugs: unknown[] = [], options: CacheReadOptions = {}): ScopeCacheEntry[] => {
     const out: ScopeCacheEntry[] = [];
     this._dedupeNormalizedSlugs(slugs).forEach((slug: string) => {
@@ -514,6 +550,9 @@ class CommunityTab extends Component<any, any> {
     // Keep anonymous and account-authorized projections isolated; otherwise a
     // sign-in transition can reuse the wrong visible-group count for 30s.
     const countCacheKey = this._getWorkerGroupCountCacheKey(identity);
+    const requestRevision = Number(this._workerGroupCountCacheRevisions.get(countCacheKey) || 0);
+    const requestIsCurrent = () =>
+      Number(this._workerGroupCountCacheRevisions.get(countCacheKey) || 0) === requestRevision;
     const existing = this._workerGroupCountCache.get(countCacheKey);
     if (existing?.promise) {
       await existing.promise;
@@ -606,6 +645,7 @@ class CommunityTab extends Component<any, any> {
         if (overviewMemberships.length > 0 && isDisplayableWorkerUserId(account)) {
           visibleUserIds.add(account.toLowerCase());
         }
+        if (!requestIsCurrent()) return;
         this._workerGroupCountCache.set(countCacheKey, {
           count: groupIds.length,
           groupIds,
@@ -614,6 +654,7 @@ class CommunityTab extends Component<any, any> {
           updatedAtMs: Date.now(),
         });
       } catch (error) {
+        if (!requestIsCurrent()) return;
         uiLog.warn(`CommunityTab: Worker group count unavailable for ${slug}`, error);
         this._workerGroupCountCache.set(countCacheKey, {
           count: existing?.count || 0,
@@ -1565,6 +1606,7 @@ class CommunityTab extends Component<any, any> {
         this._queueCacheDrivenRefresh({ force: false });
       }
     });
+    this._workerGroupsChangedUnsubscribe = subscribeWorkerGroupsChanged(this._handleWorkerGroupsChanged);
     if (typeof document !== 'undefined') {
       this._visibilityListenerBound = () => {
         if (this._isUnmounted) return;
@@ -1614,6 +1656,14 @@ class CommunityTab extends Component<any, any> {
       }
     }
     this._cacheUpdateUnsubscribe = null;
+    if (typeof this._workerGroupsChangedUnsubscribe === 'function') {
+      try {
+        this._workerGroupsChangedUnsubscribe();
+      } catch (e) {
+        uiLog.warn('CommunityTab: cleanup', e);
+      }
+    }
+    this._workerGroupsChangedUnsubscribe = null;
     if (this._visibilityListenerBound && typeof document !== 'undefined') {
       try {
         document.removeEventListener('visibilitychange', this._visibilityListenerBound);

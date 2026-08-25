@@ -48,6 +48,7 @@ export type WorkerGroupMembershipPanelProps = {
   sessionSlug?: string;
   allowAnonymousGroupDiscovery?: boolean;
   onSignIn?: () => void;
+  onGroupsChanged?: () => void;
   selectedGroupId?: string;
   showDescriptions?: boolean;
   showListHeader?: boolean;
@@ -463,6 +464,7 @@ const WorkerGroupMembershipPanel = ({
   sessionSlug: sessionSlugProp = '',
   allowAnonymousGroupDiscovery = false,
   onSignIn,
+  onGroupsChanged,
   selectedGroupId: selectedGroupIdProp = '',
   showDescriptions = true,
   showListHeader = true,
@@ -737,6 +739,7 @@ const WorkerGroupMembershipPanel = ({
         isMember: true,
         retainGroup: true,
       });
+      onGroupsChanged?.();
     } catch (joinError) {
       if (!isMembershipMutationCurrent(mutation)) return;
       setViewState((current) => ({
@@ -778,6 +781,7 @@ const WorkerGroupMembershipPanel = ({
         isMember: false,
         retainGroup: Boolean(retainedGroup),
       });
+      onGroupsChanged?.();
     } catch (leaveError) {
       if (!isMembershipMutationCurrent(mutation)) return;
       setViewState((current) => ({

@@ -741,6 +741,7 @@ describe('WorkerGroupMembershipPanel', () => {
 
   it('updates only the changed card without reloading the full group collection', async () => {
     let membershipReadCount = 0;
+    const onGroupsChanged = jest.fn();
     const group = {
       groupId: 'open-reviewers',
       sessionSlug: 'alpha',
@@ -805,6 +806,7 @@ describe('WorkerGroupMembershipPanel', () => {
         fetchImpl={fetchImpl as typeof fetch}
         showDescriptions={false}
         showListHeader={false}
+        onGroupsChanged={onGroupsChanged}
       />,
     );
 
@@ -812,11 +814,13 @@ describe('WorkerGroupMembershipPanel', () => {
 
     expect(await screen.findByRole('status')).toHaveTextContent('Joined Open reviewers.');
     expect(await screen.findByRole('button', { name: 'Leave Open reviewers' })).toHaveTextContent(/^Leave$/);
+    expect(onGroupsChanged).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByRole('button', { name: 'Leave Open reviewers' }));
 
     expect(await screen.findByRole('status')).toHaveTextContent('Left Open reviewers.');
     expect(await screen.findByRole('button', { name: 'Join Open reviewers' })).toHaveTextContent(/^Join$/);
+    expect(onGroupsChanged).toHaveBeenCalledTimes(2);
     expect(membershipReadCount).toBe(1);
     expect(fetchImpl).toHaveBeenCalledTimes(4);
   });

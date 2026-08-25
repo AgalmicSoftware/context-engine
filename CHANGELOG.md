@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Refreshed mounted Stats immediately after successful Cloudflare group
+  mutations, evicting the affected session's short-lived Worker catalog cache
+  before recounting groups and visible participants.
 - Fixed Stats Users/Participants for Cloudflare-canonical sessions so visible
   Worker group admins and the signed-in viewer's own memberships contribute to
   the identity count without fetching or inferring hidden member identities.

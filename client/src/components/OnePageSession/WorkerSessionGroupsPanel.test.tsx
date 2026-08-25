@@ -2,6 +2,7 @@ import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 import { buildSignedAdminActionAuth, getWorkerSessionToken } from '../../utilities/worker/workerAuth';
+import { dispatchWorkerGroupsChanged } from '../../utilities/worker/workerGroupChangeEvents';
 import { postSignedAdminWorkerRequest } from '../Admin/adminPageSignedWorkerRequest';
 import WorkerSessionGroupsPanel from './WorkerSessionGroupsPanel';
 
@@ -11,6 +12,9 @@ const mockParticipantCreatePanel = jest.fn();
 jest.mock('../../utilities/worker/workerAuth', () => ({
   buildSignedAdminActionAuth: jest.fn(),
   getWorkerSessionToken: jest.fn(),
+}));
+jest.mock('../../utilities/worker/workerGroupChangeEvents', () => ({
+  dispatchWorkerGroupsChanged: jest.fn(),
 }));
 jest.mock('../Admin/adminPageSignedWorkerRequest', () => ({
   postSignedAdminWorkerRequest: jest.fn(),
@@ -30,6 +34,9 @@ const mockBuildSignedAdminActionAuth = buildSignedAdminActionAuth as jest.Mocked
 >;
 const mockPostSignedAdminWorkerRequest = postSignedAdminWorkerRequest as jest.MockedFunction<
   typeof postSignedAdminWorkerRequest
+>;
+const mockDispatchWorkerGroupsChanged = dispatchWorkerGroupsChanged as jest.MockedFunction<
+  typeof dispatchWorkerGroupsChanged
 >;
 
 const ADMIN = '0x00000000000000000000000000000000000000aa';
@@ -158,6 +165,10 @@ describe('WorkerSessionGroupsPanel', () => {
       ),
     );
     expect(await screen.findByText('Group created.')).toBeInTheDocument();
+    expect(mockDispatchWorkerGroupsChanged).toHaveBeenCalledWith({
+      sessionSlug: 'demo-sh',
+      sessionId: SESSION_ID,
+    });
     expect(mockBuildSignedAdminActionAuth).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'groups/create',

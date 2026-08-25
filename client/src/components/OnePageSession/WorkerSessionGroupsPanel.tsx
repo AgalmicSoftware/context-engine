@@ -7,6 +7,7 @@ import { resolveSessionCapabilityProjection } from '../../utilities/session/sess
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
 import { resolveWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery.js';
 import { buildSignedAdminActionAuth, getWorkerSessionToken } from '../../utilities/worker/workerAuth';
+import { dispatchWorkerGroupsChanged } from '../../utilities/worker/workerGroupChangeEvents';
 import { GROUP_CREATION_POLICIES, resolveGroupCreationPolicy } from '../../utilities/session/groupCreationPolicy';
 import { sessionModeAllowsAnonymousWorkerGroupDiscovery } from '../../utilities/session/sessionModeProfile';
 import type { PostSignedWorkerGroupRequest } from '../../domains/worker/workerGroupPorts';
@@ -214,6 +215,16 @@ const WorkerSessionGroupsPanel = ({
     },
     [account, canonicalSessionId, canonicalSessionSlug, chainId, provider, workerUrl],
   );
+  const broadcastGroupsChanged = useCallback(() => {
+    dispatchWorkerGroupsChanged({
+      sessionSlug: canonicalSessionSlug,
+      sessionId: canonicalSessionId,
+    });
+  }, [canonicalSessionId, canonicalSessionSlug]);
+  const handleGroupsChanged = useCallback(() => {
+    setGroupsRevision((revision) => revision + 1);
+    broadcastGroupsChanged();
+  }, [broadcastGroupsChanged]);
 
   if (!hasExactWorkerProfile) {
     if (createOnly) {
@@ -259,7 +270,7 @@ const WorkerSessionGroupsPanel = ({
           authenticationRequired={!normalizedAccount || !workerToken}
           authenticationBusy={!!normalizedAccount && authStatus === 'loading'}
           onRequestAuthentication={requestActionAuthentication}
-          onGroupsChanged={() => setGroupsRevision((revision) => revision + 1)}
+          onGroupsChanged={handleGroupsChanged}
         />
       );
     }
@@ -278,7 +289,7 @@ const WorkerSessionGroupsPanel = ({
           postSignedRequest={postSignedRequest}
           autoLoad={!createOnly}
           createOnly={createOnly}
-          onGroupsChanged={() => setGroupsRevision((revision) => revision + 1)}
+          onGroupsChanged={handleGroupsChanged}
         />
       );
     }
@@ -310,7 +321,7 @@ const WorkerSessionGroupsPanel = ({
           postSignedRequest={postSignedRequest}
           autoLoad={!createOnly}
           createOnly={createOnly}
-          onGroupsChanged={() => setGroupsRevision((revision) => revision + 1)}
+          onGroupsChanged={handleGroupsChanged}
         />
       );
     }
@@ -382,6 +393,7 @@ const WorkerSessionGroupsPanel = ({
           membershipsOnly={membershipsOnly}
           participantAddress={normalizedAccount}
           onSignIn={requestActionAuthentication}
+          onGroupsChanged={broadcastGroupsChanged}
         />
       ) : null}
       {showCreate ? renderCreatePanel() : null}
