@@ -278,7 +278,7 @@ jobs:
       - name: Run tracked E2E smoke
         env:
           BASE_URL: http://127.0.0.1:4173
-          SMOKE_ROUTES: /session/pe4,/about,/contracts
+          SMOKE_ROUTES: /session/new,/session/pe4,/about,/contracts
         run: |
           set -euo pipefail
           npm --prefix client run preview -- --host 127.0.0.1 --port 4173 > /tmp/context-engine-vite-preview.log 2>&1 &
@@ -292,6 +292,15 @@ jobs:
           done
           curl -fsS "$BASE_URL" >/dev/null
           npm run ci:gate -- e2e-smoke
+
+      - name: Upload E2E diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: e2e-smoke-diagnostics
+          path: /tmp/context-engine-vite-preview.log
+          if-no-files-found: warn
+          retention-days: 7
 
   cecc-and-node:
     if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository || !startsWith(github.head_ref, 'release-staging') }}

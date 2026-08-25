@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  DEFAULT_ROUTE_PROBES,
   DEFAULT_ROUTES,
   DEFAULT_ROUTE_TEXT,
   compactSmokeSummary,
@@ -15,19 +16,56 @@ const {
   normalizeBaseUrl,
   normalizeLayoutProbeSelectors,
   normalizeRoutes,
+  probeSessionModePresets,
   resolveViewport,
   routeUrl,
   runRouteProbe,
   summarizeFailures,
 } = require('./vite-navigation-smoke');
 
-test('default navigation smoke covers Docs, its legacy contracts alias, and benchmarks', () => {
+test('default navigation smoke covers session modes, Docs, its legacy contracts alias, and benchmarks', () => {
+  assert.ok(DEFAULT_ROUTES.includes('/session/new'));
+  assert.equal(DEFAULT_ROUTE_PROBES['/session/new'], probeSessionModePresets);
   assert.ok(DEFAULT_ROUTES.includes('/docs'));
   assert.ok(DEFAULT_ROUTES.includes('/contracts'));
   assert.ok(DEFAULT_ROUTES.includes('/benchmarks'));
   assert.deepEqual(DEFAULT_ROUTE_TEXT['/docs'], ['Docs']);
   assert.deepEqual(DEFAULT_ROUTE_TEXT['/contracts'], ['Docs']);
   assert.deepEqual(DEFAULT_ROUTE_TEXT['/benchmarks'], ['AI Opinions Benchmark']);
+});
+
+test('session mode probe selects both supported presets', async () => {
+  const selected = new Map();
+  const presetIds = ['fast_cheap_cloudflare', 'trustless_public_decentralized'];
+  const page = {
+    getByTestId: (testId) => {
+      if (testId === 'ce-onboarding-overlay') {
+        return { count: async () => 0 };
+      }
+      const presetId = testId.replace('ce-new-preset-', '');
+      assert.ok(presetIds.includes(presetId));
+      return {
+        waitFor: async ({ state, timeout }) => {
+          assert.equal(state, 'visible');
+          assert.equal(timeout, 1234);
+        },
+        click: async () => {
+          presetIds.forEach((id) => selected.set(id, id === presetId));
+        },
+        getAttribute: async (name) => {
+          assert.equal(name, 'aria-checked');
+          return selected.get(presetId) ? 'true' : 'false';
+        },
+      };
+    },
+    once: (eventName, handler) => {
+      assert.equal(eventName, 'dialog');
+      handler({ accept: async () => {} });
+    },
+  };
+
+  assert.deepEqual(await probeSessionModePresets(page, { timeoutMs: 1234 }), []);
+  assert.equal(selected.get('trustless_public_decentralized'), true);
 });
 
 test('normalizeBaseUrl keeps the app origin and removes path/search/hash drift', () => {

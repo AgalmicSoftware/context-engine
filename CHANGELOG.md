@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Added credential-free CI configuration-contract coverage for every reachable
+  session-mode family, plus runtime assurance for generated Cloudflare Worker
+  envelope storage, concurrent multi-agent voting, representative
+  response-encryption paths, and both `/new` infrastructure presets while
+  keeping external-service live suites operator-run.
 - Refreshed mounted Stats immediately after successful Cloudflare group
   mutations, evicting the affected session's short-lived Worker catalog cache
   before recounting groups and visible participants.
