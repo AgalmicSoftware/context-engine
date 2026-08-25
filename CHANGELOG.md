@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Fixed Stats Users/Participants for Cloudflare-canonical sessions so visible
+  Worker group admins and the signed-in viewer's own memberships contribute to
+  the identity count without fetching or inferring hidden member identities.
 - Updated Tag Explorer's Groups count and listing to combine tagged on-chain
   SBT groups with the public or account-authorized Worker group catalog for
   Cloudflare-canonical sessions, using Worker-native detail links.

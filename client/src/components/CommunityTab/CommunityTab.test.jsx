@@ -279,6 +279,7 @@ describe('CommunityTab helpers', () => {
         groupId: 'reviewers',
         sessionSlug: 'demo-sh',
         label: 'Reviewers',
+        adminAddress: '0x0000000000000000000000000000000000000011',
         joinMode: 'open',
         memberVisibility: 'session',
       },
@@ -311,6 +312,8 @@ describe('CommunityTab helpers', () => {
     expect(instance.state.stats.find((stat) => stat.label === 'Questions').count).toBe(1);
     expect(instance.state.stats.find((stat) => stat.label === 'Surveys').count).toBe(1);
     expect(instance.state.stats.find((stat) => stat.label === 'Groups').count).toBe(2);
+    expect(instance.state.stats.find((stat) => stat.label === 'Users').count).toBe(3);
+    expect(instance.state.uniqueUsers).toContain('0x0000000000000000000000000000000000000011');
   });
 
   it('counts authorized Worker groups for a signed-in Cloudflare session', async () => {
@@ -323,6 +326,7 @@ describe('CommunityTab helpers', () => {
           groupId: 'session-visible',
           sessionSlug: 'demo-sh',
           label: 'Session visible',
+          adminAddress: '0x00000000000000000000000000000000000000bb',
           joinMode: 'open',
           memberVisibility: 'session',
         },
@@ -336,7 +340,14 @@ describe('CommunityTab helpers', () => {
             joinMode: 'admin_add',
             memberVisibility: 'members',
           },
-          member: { groupId: 'member-only', sessionSlug: 'demo-sh' },
+          member: {
+            groupId: 'member-only',
+            sessionSlug: 'demo-sh',
+            principal: {
+              kind: 'passkey_account',
+              address: '0x00000000000000000000000000000000000000aa',
+            },
+          },
         },
       ],
     });
@@ -369,6 +380,13 @@ describe('CommunityTab helpers', () => {
     );
     expect(workerGroupPorts.loadPublicWorkerGroups).not.toHaveBeenCalled();
     expect(instance.state.stats.find((stat) => stat.label === 'Groups').count).toBe(2);
+    expect(instance.state.stats.find((stat) => stat.label === 'Users').count).toBe(4);
+    expect(instance.state.uniqueUsers).toEqual(
+      expect.arrayContaining([
+        '0x00000000000000000000000000000000000000aa',
+        '0x00000000000000000000000000000000000000bb',
+      ]),
+    );
   });
 
   it('does not wait for EVM block readiness for a Worker-canonical scope', async () => {

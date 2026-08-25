@@ -65,6 +65,7 @@ import {
   loadPublicWorkerGroups,
   loadWorkerGroupOverview,
   type WorkerGroup,
+  type WorkerGroupOverview,
 } from '../../domains/worker/workerGroupPorts';
 import { getWorkerSessionToken } from '../../utilities/worker/workerAuth';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -82,6 +83,7 @@ type ScopeCacheEntry = {
   sessionConfig: Record<string, unknown>;
   workerCanonicalIdentity: WorkerCanonicalCacheIdentity | null;
   workerGroupIds: string[];
+  workerVisibleUserIds: string[];
   workerGroupsCount: number;
   workerGroupsStatus: string;
   surveysCache: Record<string, unknown>;
@@ -110,6 +112,7 @@ type ContractScriptsWithBlockWindow = typeof contractScripts & {
 type WorkerGroupCountCacheEntry = {
   count: number;
   groupIds: string[];
+  visibleUserIds: string[];
   status: 'idle' | 'loading' | 'ready' | 'error' | 'unavailable';
   updatedAtMs: number;
   promise?: Promise<void>;
@@ -123,6 +126,7 @@ const COMMUNITY_STAT_TEST_IDS: Record<string, string> = Object.freeze({
   Surveys: E2E_TESTIDS.COMMUNITY_STAT_SURVEYS,
   Groups: E2E_TESTIDS.COMMUNITY_STAT_GROUPS,
 });
+const isDisplayableWorkerUserId = (value: unknown): boolean => /^0x[0-9a-f]{40}$/i.test(String(value || '').trim());
 
 const getDisplaySessionLists = (slugIn = '') => {
   const strictLists = getSessionLists(slugIn) || {};
@@ -458,6 +462,7 @@ class CommunityTab extends Component<any, any> {
     const cached = identity ? this._workerGroupCountCache.get(this._getWorkerGroupCountCacheKey(identity)) : null;
     return {
       workerGroupIds: Array.isArray(cached?.groupIds) ? cached.groupIds : [],
+      workerVisibleUserIds: Array.isArray(cached?.visibleUserIds) ? cached.visibleUserIds : [],
       workerGroupsCount: Number(cached?.count || 0),
       workerGroupsStatus: String(cached?.status || 'idle'),
     };
@@ -527,6 +532,7 @@ class CommunityTab extends Component<any, any> {
       this._workerGroupCountCache.set(countCacheKey, {
         count: existing?.count || 0,
         groupIds: existing?.groupIds || [],
+        visibleUserIds: existing?.visibleUserIds || [],
         status: 'unavailable',
         updatedAtMs: Date.now(),
       });
@@ -542,6 +548,7 @@ class CommunityTab extends Component<any, any> {
       this._workerGroupCountCache.set(countCacheKey, {
         count: existing?.count || 0,
         groupIds: existing?.groupIds || [],
+        visibleUserIds: existing?.visibleUserIds || [],
         status: 'error',
         updatedAtMs: Date.now(),
       });
@@ -551,6 +558,7 @@ class CommunityTab extends Component<any, any> {
     const request = (async () => {
       try {
         let groups: WorkerGroup[];
+        let overviewMemberships: WorkerGroupOverview['memberships'] = [];
         if (account) {
           const projection = resolveSessionCapabilityProjection(sessionConfig);
           const credentialToken = await getWorkerSessionToken({
@@ -574,6 +582,7 @@ class CommunityTab extends Component<any, any> {
             sessionId,
             sessionSlug: slug,
           });
+          overviewMemberships = overview.memberships || [];
           groups = [...(overview.groups || []), ...(overview.memberships || []).map((membership) => membership.group)];
         } else {
           groups = await loadPublicWorkerGroups({ workerUrl, sessionId, sessionSlug: slug });
@@ -581,9 +590,26 @@ class CommunityTab extends Component<any, any> {
         const groupIds = Array.from(
           new Set(groups.map((group) => String(group?.groupId || '').trim()).filter(Boolean)),
         );
+        const visibleUserIds = new Set<string>();
+        groups.forEach((group) => {
+          const adminAddress = String(group?.adminAddress || '').trim().toLowerCase();
+          if (isDisplayableWorkerUserId(adminAddress)) visibleUserIds.add(adminAddress);
+        });
+        // Regression guard: count only identities already visible to this viewer.
+        // Do not turn aggregate memberCount values into guesses or fetch hidden lists.
+        overviewMemberships.forEach((membership) => {
+          const principal = membership?.member?.principal;
+          const principalAddress =
+            principal && 'address' in principal ? String(principal.address || '').trim().toLowerCase() : '';
+          if (isDisplayableWorkerUserId(principalAddress)) visibleUserIds.add(principalAddress);
+        });
+        if (overviewMemberships.length > 0 && isDisplayableWorkerUserId(account)) {
+          visibleUserIds.add(account.toLowerCase());
+        }
         this._workerGroupCountCache.set(countCacheKey, {
           count: groupIds.length,
           groupIds,
+          visibleUserIds: Array.from(visibleUserIds),
           status: 'ready',
           updatedAtMs: Date.now(),
         });
@@ -592,6 +618,7 @@ class CommunityTab extends Component<any, any> {
         this._workerGroupCountCache.set(countCacheKey, {
           count: existing?.count || 0,
           groupIds: existing?.groupIds || [],
+          visibleUserIds: existing?.visibleUserIds || [],
           status: 'error',
           updatedAtMs: Date.now(),
         });
@@ -600,6 +627,7 @@ class CommunityTab extends Component<any, any> {
     this._workerGroupCountCache.set(countCacheKey, {
       count: existing?.count || 0,
       groupIds: existing?.groupIds || [],
+      visibleUserIds: existing?.visibleUserIds || [],
       status: 'loading',
       updatedAtMs: existing?.updatedAtMs || 0,
       promise: request,
@@ -875,6 +903,7 @@ class CommunityTab extends Component<any, any> {
       sbtCache,
       workerGroupsCount,
       workerGroupsStatus,
+      workerVisibleUserIds,
     } of scopeEntries) {
       const surveyBlock = Number(surveysCache?.surveysLatestBlock) || Number(surveysCache?.lastBlock) || 0;
       const questionBlock =
@@ -913,6 +942,7 @@ class CommunityTab extends Component<any, any> {
           sbtMembersSummary.hash,
           Number(workerGroupsCount || 0),
           String(workerGroupsStatus || ''),
+          Array.isArray(workerVisibleUserIds) ? workerVisibleUserIds.slice().sort().join(',') : '',
         ].join(':'),
       );
     }
@@ -937,6 +967,7 @@ class CommunityTab extends Component<any, any> {
         sbtCache,
         workerGroupsCount,
         workerGroupsStatus,
+        workerVisibleUserIds,
       } of scopeEntries) {
         const surveyBlock = Number(surveysCache?.surveysLatestBlock) || Number(surveysCache?.lastBlock) || 0;
         const questionBlock =
@@ -981,6 +1012,7 @@ class CommunityTab extends Component<any, any> {
             sbtRefId,
             Number(workerGroupsCount || 0),
             String(workerGroupsStatus || ''),
+            Array.isArray(workerVisibleUserIds) ? workerVisibleUserIds.slice().sort().join(',') : '',
           ].join(':'),
         );
       }
@@ -1080,6 +1112,10 @@ class CommunityTab extends Component<any, any> {
             const normalizedGroupId = String(groupId || '').trim();
             if (normalizedGroupId) workerGroupIdentitySet.add(`${slug}:${normalizedGroupId}`);
           });
+          (scopeEntry.workerVisibleUserIds || []).forEach((userId: unknown) => {
+            const normalizedUserId = String(userId || '').trim().toLowerCase();
+            if (isDisplayableWorkerUserId(normalizedUserId)) userSet.add(normalizedUserId);
+          });
         }
 
         Object.keys(scopeEntry.isWorkerCanonical ? {} : sbtList || {}).forEach((addrLower: any) => {
@@ -1175,6 +1211,12 @@ class CommunityTab extends Component<any, any> {
       }
 
       let sbtsCreatedCount = scopeEntry.isWorkerCanonical ? Number(scopeEntry.workerGroupsCount || 0) : 0;
+      if (scopeEntry.isWorkerCanonical) {
+        (scopeEntry.workerVisibleUserIds || []).forEach((userId: unknown) => {
+          const normalizedUserId = String(userId || '').trim().toLowerCase();
+          if (isDisplayableWorkerUserId(normalizedUserId)) uniqueUsersSet.add(normalizedUserId);
+        });
+      }
       for (const sbtAddress in scopeEntry.isWorkerCanonical ? {} : sbtList) {
         const sbtItem = sbtList[sbtAddress];
         if (!sbtItem) continue;
