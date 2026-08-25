@@ -6,11 +6,12 @@ import { createStore } from 'redux';
 import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
 import fs from 'fs';
 import path from 'path';
-import TagPage, { readTagAiCacheEntry, writeTagAiCacheEntry } from './TagPage';
+import TagPage, { loadTagPageWorkerGroupData, readTagAiCacheEntry, writeTagAiCacheEntry } from './TagPage';
 import TagModal from './TagModal';
 import buildTagInterpretationPrompt from '../../prompts/tagInterpretationPrompt.js';
 import { buildDemoCorpusRecords } from '../../utilities/demo/demoCorpusRecords.js';
 import { installSessionRegistryQueryInvalidation } from '../../utilities/query/sessionRegistryQueryInvalidation.js';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 
 const mockListNamespaceEntriesSync = jest.fn();
 type MockCacheUpdatePayload = {
@@ -167,6 +168,76 @@ describe('tag AI cache helpers', () => {
       ['third', 'Third summary'],
       ['second', 'Updated summary'],
     ]);
+  });
+});
+
+describe('Tag Explorer Worker groups', () => {
+  it('includes matching public Worker groups with their native detail route', async () => {
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    sessionModeProfile.storage.payloadAccessControl = { gate: 'none', encryption: 'none' };
+    sessionModeProfile.encryption = { mode: 'none' };
+    sessionModeProfile.results.visibility = 'public_full_if_storage_public';
+    sessionModeProfile.export.scope = 'all_session';
+    const sessionConfig = {
+      slug: 'worker-session',
+      sessionId: `0x${'3'.repeat(32)}`,
+      corsWorkerUrl: 'https://tag-worker.example.test',
+      sessionModeProfile,
+      storageProfile: {
+        backend: 'cloudflare',
+        resources: { questions: 'active', surveys: 'active' },
+        payloadAccessControl: {
+          gate: 'role_gate',
+          encryption: 'worker_envelope',
+          mode: 'authorized_read',
+        },
+      },
+    };
+    const loadPublicWorkerGroups = jest.fn(async () => [
+      {
+        groupId: 'public-reviewers',
+        sessionSlug: 'worker-session',
+        label: 'Public reviewers',
+        tags: ['research', 'reviewers'],
+        joinMode: 'open' as const,
+        memberVisibility: 'session' as const,
+      },
+      {
+        groupId: 'other-group',
+        sessionSlug: 'worker-session',
+        label: 'Other group',
+        tags: ['operations'],
+        joinMode: 'open' as const,
+        memberVisibility: 'session' as const,
+      },
+    ]);
+
+    const groups = await loadTagPageWorkerGroupData(
+      {
+        selectedTags: ['research'],
+        sessionSlugs: ['worker-session'],
+      },
+      {
+        getSessionConfig: () => sessionConfig,
+        getWorkerSessionToken: jest.fn(),
+        loadPublicWorkerGroups,
+        loadWorkerGroupOverview: jest.fn(),
+      } as any,
+    );
+
+    expect(groups).toEqual([
+      expect.objectContaining({
+        kind: 'worker',
+        address: 'public-reviewers',
+        href: '/group/public-reviewers?sessionName=worker-session',
+        name: 'Public reviewers',
+        networkId: 'worker',
+      }),
+    ]);
+    expect(loadPublicWorkerGroups).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionSlug: 'worker-session' }),
+    );
   });
 });
 

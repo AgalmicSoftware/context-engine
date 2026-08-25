@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Updated Tag Explorer's Groups count and listing to combine tagged on-chain
+  SBT groups with the public or account-authorized Worker group catalog for
+  Cloudflare-canonical sessions, using Worker-native detail links.
 - Fixed inline Polis filtering for Cloudflare-canonical sessions so tag and
   question-type totals use identity-matched Worker question metadata instead
   of silently treating every question as metadata-free.

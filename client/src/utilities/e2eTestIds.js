@@ -114,6 +114,7 @@ const E2E_TESTIDS = Object.freeze({
   COMMUNITY_STAT_QUESTIONS: 'ce-community-stat-questions',
   COMMUNITY_STAT_SURVEYS: 'ce-community-stat-surveys',
   COMMUNITY_STAT_GROUPS: 'ce-community-stat-groups',
+  TAG_GROUPS_SECTION: 'ce-tag-groups-section',
   SESSION_ADVANCED_ONCHAIN_ACCESS_GATES: 'ce-session-advanced-onchain-access-gates',
   SESSION_GROUPS_UNAVAILABLE: 'ce-session-groups-unavailable',
   SESSION_GROUP_CREATION_POLICY_DENIED: 'ce-session-group-creation-policy-denied',
