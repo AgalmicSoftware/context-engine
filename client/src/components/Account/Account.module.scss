@@ -3592,6 +3592,8 @@ h1 {
   :global(.card-header) {
     position: relative;
     padding-right: 4.25rem;
+    background: var(--ce-surface);
+    border-bottom: 0;
   }
 }
 
@@ -3931,6 +3933,13 @@ body.w3a-silent iframe[class^='walletIframe-'] {
 }
 
 @container ce-theme style(--ce-layout-profile: desktop-window) {
+  .Web3SettingsModalTitle,
+  #closeModalIcon,
+  :global(.modal-login .close),
+  :global(.modal-login .btn-close) {
+    color: var(--ce-panel-text);
+  }
+
   .navConnectContainer {
     display: flex;
     align-items: flex-start;

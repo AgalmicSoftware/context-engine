@@ -43,6 +43,17 @@ describe('Account.module.scss modal account layout guards', () => {
     );
   });
 
+  it('uses the modal surface for both the login card and its header', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'Account.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /#loginModalCard\s*\{[\s\S]*?background:\s*var\(--ce-surface\);[\s\S]*?:global\(\.card-header\)\s*\{[\s\S]*?background:\s*var\(--ce-surface\);[\s\S]*?border-bottom:\s*0;/,
+    );
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)\s*\{[\s\S]*?\.Web3SettingsModalTitle,[\s\S]*?color:\s*var\(--ce-panel-text\);/,
+    );
+  });
+
   it('uses a solid login-card surface without a decorative gradient overlay', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'Account.module.scss'), 'utf8');
 
