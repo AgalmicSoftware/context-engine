@@ -489,8 +489,12 @@ export const createSurveyQuestionsSubmitRuntime = (
             });
             if (!isSubmitContextCurrent(submitContext)) return;
 
+            // Worker write-through updates IndexedDB directly, so there is no chain event to advance
+            // MainSite's response nonce. Rehydrate once to publish that revision to live Results views.
+            const shouldRefreshQuestionResponses =
+              !cacheWriteResult?.questionCacheWritten || !!submitContext.workerTargetKey;
             if (
-              !cacheWriteResult?.questionCacheWritten &&
+              shouldRefreshQuestionResponses &&
               typeof propsRef.current.refreshQuestionResponses === 'function'
             ) {
               const ids: SurveyQuestionsLegacyValue = Array.from(changedQids)
