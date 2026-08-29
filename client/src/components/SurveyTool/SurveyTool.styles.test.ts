@@ -70,7 +70,7 @@ describe('SurveyTool styles', () => {
 
     const audioScss = readAudioInputScss();
     expect(audioScss).toMatch(
-      /\.audioTextarea\s*\{[\s\S]*?color:\s*var\(--ce-panel-text, var\(--ce-text\)\);[\s\S]*?caret-color:\s*var\(--ce-panel-text, var\(--ce-text\)\);/,
+      /\.audioTextarea\s*\{[\s\S]*?font-weight:\s*500;[\s\S]*?color:\s*var\(--ce-panel-text, var\(--ce-text\)\) !important;[\s\S]*?caret-color:\s*var\(--ce-panel-text, var\(--ce-text\)\) !important;/,
     );
   });
 
