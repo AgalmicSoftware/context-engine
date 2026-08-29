@@ -450,8 +450,18 @@ version-1 `workerAuthority` policy. It does not require an SBT, registry, RPC,
 or Lit key. Participant and anonymous scopes, plus any login gate, are evaluated
 by the session worker.
 
-After publishing a worker-canonical session, its Groups section manages native
-Cloudflare records. The worker admin supplies the group name, optional
+Before publishing a worker-canonical session, the **Session Access** section can
+queue Groups with a name, optional description, join mode, and member
+visibility. These drafts stay in the recoverable browser wizard state; they do
+not pretend to be live records before a canonical Worker origin, slug, and
+session ID exist. Publish first verifies the Worker config, then creates the
+queued Groups with stable IDs. If creation is interrupted, retrying reuses an
+identical already-created ID and continues instead of duplicating it. A
+conflicting record or other Worker error leaves the wizard recoverable and
+reports the failure instead of marking the session complete.
+
+After publishing, the session's Groups section manages those native Cloudflare
+records and adds the full editing surface. The worker admin supplies the group name, optional
 description and HTTPS image, tags, public HTTPS reference URLs, an optional
 per-group member limit, an optional self-join deadline, group-admin address,
 join mode, and visibility. The deadline closes participant self-join; configured

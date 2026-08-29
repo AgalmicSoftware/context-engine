@@ -137,6 +137,8 @@ const SAFE_REMOTE_WORKER_GROUP_REASONS = new Set([
   'worker_group_coordination_unavailable',
   'worker_group_creation_admin_only',
   'worker_group_discovery_not_public',
+  'worker_group_exists',
+  'worker_group_id_retired',
   'worker_group_join_denied',
   'worker_group_join_ended',
   'worker_group_member_cap_exceeded',

@@ -33,6 +33,7 @@ import {
   type SessionModeProfile,
 } from '../../utilities/session/sessionModeProfile';
 import type { AnyRecord } from '../shellTypes';
+import { normalizePendingWorkerGroupDrafts } from './sessionWizardPendingWorkerGroups';
 
 const { getPathRpcUrl } = rpcDefaults;
 
@@ -472,6 +473,7 @@ export const buildSessionWizardCacheWritePayload = ({
   deployWorkerUrl = '',
   workerRequirementProof = null,
   provisionedSponsoredContext = null,
+  pendingWorkerGroupDrafts = [],
 }: AnyRecord = {}): AnyRecord => {
   const workerSecretsRecord =
     workerSecrets && typeof workerSecrets === 'object' && !Array.isArray(workerSecrets)
@@ -499,6 +501,7 @@ export const buildSessionWizardCacheWritePayload = ({
     // Regression guard: pending CREATE2 SBT drafts remain tab-memory-only;
     // this durable wizard cache must never contain their deploy or claim secrets.
     pendingSbtDrafts: [],
+    pendingWorkerGroupDrafts: normalizePendingWorkerGroupDrafts(pendingWorkerGroupDrafts),
     encryptedFieldGates,
     gateSelections,
     defaultGateId,

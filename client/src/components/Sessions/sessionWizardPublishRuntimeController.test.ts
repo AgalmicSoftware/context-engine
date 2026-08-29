@@ -50,6 +50,10 @@ const createControllerHarness = () => {
     events.push('register');
   });
   const deployPendingSbts = jest.fn(async () => []);
+  const createPendingWorkerGroups = jest.fn(async () => {
+    events.push('create-groups');
+    return { created: 1, reused: 0 };
+  });
   const parseAllowOriginsInput = jest.fn(() => ['https://app.example.test']);
   const runtimeRef = {
     current: {
@@ -113,6 +117,7 @@ const createControllerHarness = () => {
     callbacks,
     buildWorkerConfig,
     persistWorkerConfig,
+    createPendingWorkerGroups,
   });
   const runTrackedPublishEffect = async <Result>(effect: string, run: () => Promise<Result>): Promise<Result> => {
     events.push(`effect:${effect}`);
@@ -122,6 +127,7 @@ const createControllerHarness = () => {
   return {
     buildWorkerConfig,
     callbacks,
+    createPendingWorkerGroups,
     controller,
     dispatch,
     deployPendingSbts,
@@ -213,6 +219,50 @@ describe('sessionWizardPublishRuntimeController', () => {
         adminAddress: ADMIN_ADDRESS,
       }),
     );
+  });
+
+  it('creates queued Groups after verified config persistence and before settlement', async () => {
+    const harness = createControllerHarness();
+    const pendingWorkerGroupDrafts = [
+      {
+        groupId: 'group-draft-1',
+        label: 'Research team',
+        description: '',
+        joinMode: 'open' as const,
+        memberVisibility: 'session' as const,
+      },
+    ];
+
+    const result = await harness.controller.runPreparation({
+      publishAllowed: true,
+      publishExecutionPlan: {
+        shouldPersistWorkerConfig: true,
+        shouldCreateWorkerGroups: true,
+        shouldRegisterSession: false,
+      },
+      signerAccountOverride: ADMIN_ADDRESS,
+      runTrackedPublishEffect: harness.runTrackedPublishEffect,
+      pendingWorkerGroupDrafts,
+    });
+
+    expect(result.status).toBe('completed');
+    expect(harness.createPendingWorkerGroups).toHaveBeenCalledWith(
+      expect.objectContaining({
+        drafts: pendingWorkerGroupDrafts,
+        sessionId: SESSION_ID,
+        sessionSlug: 'worker-session',
+        signerAccount: ADMIN_ADDRESS,
+        workerUrl: WORKER_ORIGIN,
+      }),
+    );
+    expect(harness.events).toEqual([
+      'effect:persistWorkerConfig',
+      'persist',
+      'dispatch:effectSucceeded:persistWorkerConfig',
+      'effect:createWorkerGroups',
+      'create-groups',
+      'dispatch:effectSucceeded:createWorkerGroups',
+    ]);
   });
 
   it('fails closed before persistence when live worker evidence is absent', async () => {

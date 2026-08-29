@@ -1046,6 +1046,41 @@ describe('SessionWizard rendered validation', () => {
     }
   });
 
+  it('queues Worker Groups before Cloudflare session deployment and restores them from wizard state', async () => {
+    window.history.replaceState({}, '', '/new');
+    renderSessionWizard();
+
+    fireEvent.click(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare'));
+    selectNormalModeCard('Session Access');
+    const groupDrafts = await screen.findByTestId('ce-new-worker-group-drafts');
+    expect(within(groupDrafts).getByText(/created after this session/i)).toBeInTheDocument();
+    fireEvent.change(within(groupDrafts).getByTestId('ce-new-worker-group-name'), {
+      target: { value: 'Research team' },
+    });
+    fireEvent.click(within(groupDrafts).getByTestId('ce-new-worker-group-add'));
+
+    expect(within(groupDrafts).getByDisplayValue('Research team')).toBeInTheDocument();
+    fireEvent.change(within(groupDrafts).getByLabelText(/Description/i), {
+      target: { value: 'Reviews research questions.' },
+    });
+    fireEvent.change(within(groupDrafts).getByLabelText('Joining'), {
+      target: { value: 'admin_add' },
+    });
+
+    await waitFor(() => {
+      const cached = JSON.parse(sessionStorage.getItem('ce:sessionWizardDraft:v1'));
+      expect(cached.pendingWorkerGroupDrafts).toEqual([
+        expect.objectContaining({
+          groupId: expect.any(String),
+          label: 'Research team',
+          description: 'Reviews research questions.',
+          joinMode: 'admin_add',
+          memberVisibility: 'session',
+        }),
+      ]);
+    });
+  });
+
   it('offers to continue a cached custom profile on /new without silently replacing it', async () => {
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;

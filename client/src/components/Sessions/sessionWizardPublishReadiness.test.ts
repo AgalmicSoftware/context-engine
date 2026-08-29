@@ -376,6 +376,7 @@ describe('resolveSessionWizardPublishReadiness', () => {
       effectiveMetadataGatewayUrl: `https://arweave.net/${txId}`,
       effectiveMetadataTxId: txId,
       hasPendingDrafts: true,
+      hasPendingWorkerGroupDrafts: false,
       isNormalMode: true,
       metadataUrl: `ar://${txId}`,
       publishAdvancedOpen: true,
@@ -712,12 +713,14 @@ describe('resolveSessionWizardPublishRequestDescriptor', () => {
     expect(descriptor).toEqual({
       pendingDraftSnapshot,
       hasPendingDrafts: true,
+      hasPendingWorkerGroupDrafts: false,
       hasManualMetadata: true,
       publishExecutionPlan: {
         shouldAutoDeployWorker: true,
         shouldDeployPendingSbts: true,
         shouldUploadMetadata: false,
         shouldPersistWorkerConfig: false,
+        shouldCreateWorkerGroups: false,
         shouldRegisterSession: true,
         shouldRefreshRegistryCache: true,
         steps: ['deploy-worker', 'deploy-sbts', 'register-session', 'done'],

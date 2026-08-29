@@ -38,6 +38,7 @@ export type SessionWizardPublishUiPlanInput = SessionWizardPublishReadinessInput
   effectiveMetadataGatewayUrl?: string;
   effectiveMetadataTxId?: string;
   hasPendingDrafts?: boolean;
+  hasPendingWorkerGroupDrafts?: boolean;
   isNormalMode?: boolean;
   publishAdvancedOpen?: boolean;
   publishBusy?: boolean;
@@ -92,6 +93,7 @@ export type SessionWizardPublishRequestPendingDraft = {
 
 export type SessionWizardPublishRequestDescriptorInput = {
   pendingDraftSnapshot?: readonly SessionWizardPublishRequestPendingDraft[];
+  hasPendingWorkerGroupDrafts?: boolean;
   manualMetadataUrl?: string;
   workerMode?: string;
   sponsoredAutoDeployReady?: boolean;
@@ -103,6 +105,7 @@ export type SessionWizardPublishRequestDescriptorInput = {
 export type SessionWizardPublishRequestDescriptor = {
   pendingDraftSnapshot: readonly SessionWizardPublishRequestPendingDraft[];
   hasPendingDrafts: boolean;
+  hasPendingWorkerGroupDrafts: boolean;
   hasManualMetadata: boolean;
   publishExecutionPlan: ReturnType<typeof buildSessionWizardPublishExecutionPlan>;
 };
@@ -177,6 +180,7 @@ export function resolveSessionWizardPublishReadiness({
 
 export function resolveSessionWizardPublishRequestDescriptor({
   pendingDraftSnapshot = [],
+  hasPendingWorkerGroupDrafts = false,
   manualMetadataUrl = '',
   workerMode = 'default',
   sponsoredAutoDeployReady = false,
@@ -195,11 +199,13 @@ export function resolveSessionWizardPublishRequestDescriptor({
     hasManualMetadata,
     canUploadMetadataNow,
     sessionModeProfile,
+    hasPendingWorkerGroupDrafts,
   });
 
   return {
     pendingDraftSnapshot: normalizedPendingDraftSnapshot,
     hasPendingDrafts,
+    hasPendingWorkerGroupDrafts,
     hasManualMetadata,
     publishExecutionPlan,
   };
@@ -289,6 +295,7 @@ export function resolveSessionWizardPublishUiPlan({
   effectiveMetadataGatewayUrl: effectiveMetadataGatewayUrlOverride = '',
   effectiveMetadataTxId: effectiveMetadataTxIdOverride = '',
   hasPendingDrafts = false,
+  hasPendingWorkerGroupDrafts = false,
   isNormalMode = false,
   publishAdvancedOpen = false,
   publishBusy = false,
@@ -304,6 +311,7 @@ export function resolveSessionWizardPublishUiPlan({
     sponsoredAutoDeployReady: readinessInput.canUseSponsoredAutoDeployNow,
     deployComplete,
     hasPendingDrafts,
+    hasPendingWorkerGroupDrafts,
     hasManualMetadata: publishReadiness.hasManualMetadata,
     canUploadMetadataNow: publishReadiness.canUploadMetadataNow,
     sessionModeProfile: readinessInput.sessionModeProfile,

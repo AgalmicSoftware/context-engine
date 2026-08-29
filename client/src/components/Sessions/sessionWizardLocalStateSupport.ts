@@ -103,6 +103,7 @@ export type SessionWizardCachedState = Record<string, unknown> & {
   workerSecrets?: WorkerSecretsLike;
   workerSecretsEnabled?: unknown;
   persistWorkerSecrets?: unknown;
+  pendingWorkerGroupDrafts?: unknown;
 };
 
 const isSessionWizardCachedState = (value: unknown): value is SessionWizardCachedState =>

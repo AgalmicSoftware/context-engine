@@ -118,6 +118,13 @@ import {
   resolveSessionWizardSlugAvailabilityPort,
 } from './sessionWizardSlugAvailability';
 import { createSessionWizardPublishRuntimeController } from './sessionWizardPublishRuntimeController';
+import {
+  createPendingWorkerGroupDraft,
+  normalizePendingWorkerGroupDrafts,
+  validatePendingWorkerGroupDrafts,
+  type PendingWorkerGroupDraft,
+} from './sessionWizardPendingWorkerGroups';
+import { publishPendingWorkerGroupDrafts } from './sessionWizardPendingWorkerGroupPublish';
 import { resolveSessionWizardWorkerPublishEvidence } from './sessionWizardWorkerPublishEvidence';
 import {
   resolveSessionWizardPublishRequestDescriptor,
@@ -474,6 +481,11 @@ const SessionWizard = ({
     usePendingSbtDrafts();
   const pendingSbtDraftsRef = useRef(pendingSbtDrafts);
   pendingSbtDraftsRef.current = pendingSbtDrafts;
+  const [pendingWorkerGroupDrafts, setPendingWorkerGroupDrafts] = useState<PendingWorkerGroupDraft[]>(() =>
+    normalizePendingWorkerGroupDrafts(cachedWizard?.pendingWorkerGroupDrafts),
+  );
+  const pendingWorkerGroupDraftsRef = useRef(pendingWorkerGroupDrafts);
+  pendingWorkerGroupDraftsRef.current = pendingWorkerGroupDrafts;
   const [createSbtModalState, setCreateSbtModalState] = useState<CreateSbtModalState>(() => ({
     open: false,
     targetType: 'gate',
@@ -929,6 +941,7 @@ const SessionWizard = ({
       deployWorkerUrl,
       workerRequirementProof,
       provisionedSponsoredContext,
+      pendingWorkerGroupDrafts,
     });
     const result = writeSessionWizardCache(cachePayload, { expectedCachedPayload: wizardCacheSnapshotRef.current });
     if (result.ok && result.status !== 'preserved-foreign-draft') wizardCacheSnapshotRef.current = cachePayload;
@@ -955,6 +968,7 @@ const SessionWizard = ({
     deployWorkerUrl,
     workerRequirementProof,
     provisionedSponsoredContext,
+    pendingWorkerGroupDrafts,
     workerCanonicalSettlement.isSettled,
   ]);
 
@@ -1483,6 +1497,33 @@ const SessionWizard = ({
     });
   };
 
+  const addPendingWorkerGroupDraft = useCallback((label: string) => {
+    setPendingWorkerGroupDrafts((current) => {
+      if (current.length >= 100) return current;
+      return [...current, createPendingWorkerGroupDraft(label)];
+    });
+  }, []);
+
+  const removePendingWorkerGroupDraft = useCallback((groupId: string) => {
+    setPendingWorkerGroupDrafts((current) => current.filter((entry) => entry.groupId !== groupId));
+  }, []);
+
+  const updatePendingWorkerGroupDraft = useCallback(
+    (groupId: string, patch: Partial<PendingWorkerGroupDraft>) => {
+      setPendingWorkerGroupDrafts((current) =>
+        current.map((entry) => {
+          if (entry.groupId !== groupId) return entry;
+          const next = { ...entry, ...patch, groupId: entry.groupId };
+          if (next.joinMode === 'open' && next.memberVisibility === 'admin_only') {
+            next.memberVisibility = 'session';
+          }
+          return next;
+        }),
+      );
+    },
+    [],
+  );
+
   const removeEncryptionGate = (gateId: unknown) => {
     const gateIdStr = toStr(gateId).trim();
     setEncryptionGates((prev) => prev.filter((gate) => gate.id !== gateIdStr));
@@ -1965,6 +2006,14 @@ const SessionWizard = ({
       };
       try {
         const pendingDraftSnapshot = normalizePendingSbtDrafts(pendingSbtDrafts);
+        const pendingWorkerGroupDraftSnapshot = normalizePendingWorkerGroupDrafts(
+          pendingWorkerGroupDraftsRef.current,
+        );
+        const pendingWorkerGroupIssues = validatePendingWorkerGroupDrafts(pendingWorkerGroupDraftsRef.current);
+        if (pendingWorkerGroupIssues.length) {
+          setStatus(pendingWorkerGroupIssues[0]);
+          return;
+        }
         const currentWorkerSecrets = getCurrentWorkerSecrets();
         const liveRuntime = workerDeployRuntimeRef.current;
         const liveDraft = liveRuntime?.draft || draftRef.current;
@@ -1990,6 +2039,7 @@ const SessionWizard = ({
         });
         const publishRequestDescriptor = resolveSessionWizardPublishRequestDescriptor({
           pendingDraftSnapshot,
+          hasPendingWorkerGroupDrafts: pendingWorkerGroupDraftSnapshot.length > 0,
           manualMetadataUrl,
           workerMode: liveRuntime?.workerMode || workerMode,
           sponsoredAutoDeployReady: sponsoredAutoDeployState.ready,
@@ -2017,6 +2067,7 @@ const SessionWizard = ({
           publishExecutionPlan,
           signerAccountOverride,
           runTrackedPublishEffect,
+          pendingWorkerGroupDrafts: pendingWorkerGroupDraftSnapshot,
         });
         if (publishControllerResult.status === 'blocked') {
           dispatchSessionPublish({ type: 'edit' });
@@ -2057,6 +2108,9 @@ const SessionWizard = ({
           publishControllerResult,
           runTrackedPublishEffect,
         });
+        if (publishExecutionPlan.shouldCreateWorkerGroups) {
+          setPendingWorkerGroupDrafts([]);
+        }
         const completionRequest = resolveSessionWizardPublishCompletionRequest({
           publishExecutionPlan,
           deployedPendingDrafts,
@@ -2363,6 +2417,11 @@ const SessionWizard = ({
     parseAllowOriginsInput,
     resolveWorkerFaucetConfig,
     signTypedAdminAction,
+    createPendingWorkerGroups: (input) =>
+      publishPendingWorkerGroupDrafts({
+        ...input,
+        signTypedAdminAction,
+      }),
     handleRegisterGroup,
     generateSessionId,
     callbacks: {
@@ -2621,6 +2680,7 @@ const SessionWizard = ({
     buildMetadataGatewayUrl: (txId) => arweavePublishAdapter.buildArweaveGatewayUrl({ txId }),
     deployComplete,
     hasPendingDrafts: hasUndeployedPendingSbtDrafts,
+    hasPendingWorkerGroupDrafts: pendingWorkerGroupDrafts.length > 0,
     isNormalMode,
     publishAdvancedOpen,
     publishCompleted: workerCanonicalSettlement.publishCompleted,
@@ -2883,6 +2943,10 @@ const SessionWizard = ({
       onToggleMoreOptions={() => setMoreOptionsOpen((prev) => !prev)}
       onTogglePublishAdvanced={() => setPublishAdvancedOpen((prev) => !prev)}
       pendingSbtDrafts={pendingSbtDrafts}
+      pendingWorkerGroupDrafts={pendingWorkerGroupDrafts}
+      onAddPendingWorkerGroupDraft={addPendingWorkerGroupDraft}
+      onRemovePendingWorkerGroupDraft={removePendingWorkerGroupDraft}
+      onUpdatePendingWorkerGroupDraft={updatePendingWorkerGroupDraft}
       pendingSbtSelectorOptions={pendingSbtSelectorOptions}
       primaryDraftEntries={primaryDraftEntries}
       provider={provider}

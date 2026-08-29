@@ -7,7 +7,13 @@ import {
 
 export type SessionWizardPublishStepNumbers = Partial<
   Record<
-    'deploy-worker' | 'deploy-sbts' | 'persist-worker-config' | 'upload-metadata' | 'register-session' | 'done',
+    | 'deploy-worker'
+    | 'deploy-sbts'
+    | 'persist-worker-config'
+    | 'create-worker-groups'
+    | 'upload-metadata'
+    | 'register-session'
+    | 'done',
     number
   >
 >;
@@ -29,6 +35,7 @@ const BUSY_STATUSES = new Set<SessionPublishState['status']>([
   'deployingWorker',
   'deployingPendingSbts',
   'persistingWorkerConfig',
+  'creatingWorkerGroups',
   'uploadingMetadata',
   'registeringOnChain',
 ]);
@@ -77,6 +84,13 @@ export const resolveSessionWizardPublishReducerUiState = ({
     return {
       publishBusy: true,
       publishStep: getStepNumber(stepNumbers, 'persist-worker-config'),
+    };
+  }
+
+  if (state.currentEffect === 'createWorkerGroups') {
+    return {
+      publishBusy: true,
+      publishStep: getStepNumber(stepNumbers, 'create-worker-groups'),
     };
   }
 

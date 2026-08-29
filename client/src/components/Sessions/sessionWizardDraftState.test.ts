@@ -505,6 +505,15 @@ describe('sessionWizardDraftState', () => {
       sessionId: 'session-1',
       draft: { sessionName: 'Draft' },
       pendingSbtDrafts: [{ address: '0xpending' }],
+      pendingWorkerGroupDrafts: [
+        {
+          groupId: 'draft-group-1',
+          label: 'Research team',
+          description: '',
+          joinMode: 'open',
+          memberVisibility: 'session',
+        },
+      ],
       effectivePersistWorkerSecrets: false,
       workerSecrets: {
         apiToken: 'secret',
@@ -539,6 +548,15 @@ describe('sessionWizardDraftState', () => {
         sessionId: 'session-1',
         draft: { sessionName: 'Draft' },
         pendingSbtDrafts: [],
+        pendingWorkerGroupDrafts: [
+          {
+            groupId: 'draft-group-1',
+            label: 'Research team',
+            description: '',
+            joinMode: 'open',
+            memberVisibility: 'session',
+          },
+        ],
         persistWorkerSecrets: false,
         workerSecrets: {
           litApiBase: 'https://api.chipotle.litprotocol.com',

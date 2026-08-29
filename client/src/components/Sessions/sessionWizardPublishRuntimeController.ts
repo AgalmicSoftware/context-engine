@@ -26,6 +26,7 @@ import {
   type SessionWizardWorkerConfigSignInput,
 } from './sessionWizardWorkerConfigPersistence';
 import type { SessionWizardWorkerSettlementInput } from './sessionWizardWorkerSettlement';
+import type { PendingWorkerGroupDraft } from './sessionWizardPendingWorkerGroups';
 import {
   matchesSessionWizardWorkerPublishEvidence,
   type SessionWizardWorkerPublishEvidence,
@@ -100,6 +101,14 @@ type PublishRuntimeControllerOptions = {
   callbacks: PublishRuntimeCallbacks;
   buildWorkerConfig?: typeof buildSessionWizardWorkerConfigPayload;
   persistWorkerConfig?: typeof persistAndVerifySessionWizardWorkerConfig;
+  createPendingWorkerGroups?: (input: {
+    drafts: PendingWorkerGroupDraft[];
+    sessionConfig: AnyRecord;
+    sessionId: string;
+    sessionSlug: string;
+    signerAccount: string;
+    workerUrl: string;
+  }) => Promise<{ created: number; reused: number }>;
 };
 
 type RunPreparationInput = {
@@ -107,6 +116,7 @@ type RunPreparationInput = {
   publishExecutionPlan: PublishExecutionPlan;
   signerAccountOverride: string;
   runTrackedPublishEffect: RunTrackedPublishEffect;
+  pendingWorkerGroupDrafts?: PendingWorkerGroupDraft[];
 };
 
 type SettleRegistrationInput = {
@@ -157,6 +167,7 @@ export const createSessionWizardPublishRuntimeController = ({
   callbacks,
   buildWorkerConfig = buildSessionWizardWorkerConfigPayload,
   persistWorkerConfig = persistAndVerifySessionWizardWorkerConfig,
+  createPendingWorkerGroups,
 }: PublishRuntimeControllerOptions) => {
   const buildConfigForEvidence = ({
     evidence,
@@ -200,9 +211,10 @@ export const createSessionWizardPublishRuntimeController = ({
     publishExecutionPlan,
     signerAccountOverride,
     runTrackedPublishEffect,
+    pendingWorkerGroupDrafts = [],
   }: RunPreparationInput): Promise<SessionWizardPublishControllerResult> => {
     const runEffect = createEffectRunner({ dispatch, getErrorMessage, runTrackedPublishEffect });
-    return runSessionWizardPublishController({
+    const controllerResult = await runSessionWizardPublishController({
       input: { publishAllowed, publishExecutionPlan, signerAccountOverride },
       ports: {
         deployWorker: () =>
@@ -273,6 +285,30 @@ export const createSessionWizardPublishRuntimeController = ({
       },
       callbacks: { setPublishStep: () => {} },
     });
+    if (controllerResult.status === 'blocked' || !publishExecutionPlan.shouldCreateWorkerGroups) {
+      return controllerResult;
+    }
+    const verifiedWorkerConfig = controllerResult.verifiedWorkerConfig;
+    const evidence = verifiedWorkerConfig?.workerPublishEvidence;
+    const settlementIdentity = evidence?.settlementIdentity;
+    const workerUrl = toStr(verifiedWorkerConfig?.workerUrl).trim();
+    if (!createPendingWorkerGroups || !settlementIdentity || !workerUrl) {
+      throw new Error('Queued Groups require verified Worker session identity before creation.');
+    }
+    await runEffect({
+      effect: 'createWorkerGroups',
+      run: () =>
+        createPendingWorkerGroups({
+          drafts: pendingWorkerGroupDrafts,
+          sessionConfig: evidence.draft,
+          sessionId: settlementIdentity.sessionId,
+          sessionSlug: settlementIdentity.slug,
+          signerAccount: signerAccountOverride,
+          workerUrl,
+        }),
+      result: ({ created, reused }) => ({ createdWorkerGroupCount: created + reused }),
+    });
+    return controllerResult;
   };
 
   const settleRegistration = async ({
