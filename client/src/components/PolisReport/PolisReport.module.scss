@@ -280,6 +280,34 @@
   padding: 10px;
 }
 
+.reportSettingsToggle {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: inherit;
+  cursor: pointer;
+  line-height: 1;
+  margin-right: 10px;
+  padding: 4px;
+
+  &:hover,
+  &:focus-visible {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+  }
+
+  &:hover {
+    opacity: 0.72;
+  }
+
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+}
+
 /* PDF Mode classes */
 .pdfMode {
   /* Show/hide pieces specifically for PDF if needed */
@@ -993,6 +1021,15 @@
     background: var(--ce-status-info-text);
   }
 
+  .reportSettingsToggle,
+  .reportSettingsToggle:hover,
+  .reportSettingsToggle:focus-visible {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    color: var(--ce-document-text);
+  }
+
   input[type='checkbox'] {
     accent-color: var(--ce-status-info);
   }
@@ -1257,6 +1294,15 @@
 
   button:hover {
     background: var(--ce-overlay-surface);
+  }
+
+  .reportSettingsToggle,
+  .reportSettingsToggle:hover,
+  .reportSettingsToggle:focus-visible {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    color: var(--ce-document-surface);
   }
 
   input[type='checkbox'] {

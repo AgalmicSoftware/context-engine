@@ -2263,18 +2263,11 @@ export default function PolisReport({
         )}
         <button
           type="button"
+          className={styles.reportSettingsToggle}
           data-testid={E2E_TESTIDS.POLIS_SETTINGS_TOGGLE}
           aria-label={showSettingsRow ? 'Hide report settings' : 'Show report settings'}
           onClick={() => setShowSettingsRow(!showSettingsRow)}
           title="Toggle settings row"
-          style={{
-            background: 'transparent',
-            border: 'none',
-            padding: 0,
-            cursor: 'pointer',
-            marginRight: '10px',
-            color: 'inherit',
-          }}
         >
           <FontAwesomeIcon icon={faCog} style={{ fontSize: '1.3rem' }} />
         </button>
