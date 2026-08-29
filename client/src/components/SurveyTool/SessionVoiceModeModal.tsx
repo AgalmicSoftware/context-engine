@@ -488,7 +488,7 @@ function SessionInterviewPanel({
       {kickoff ? (
         <div className={styles.sessionAgentKickoff}>
           <strong className={styles.sessionAgentKickoffTitle}>
-            Paste this prompt to augment interview with history from Claude or ChatGPT
+            Copy and Paste this prompt to augment interview with history from Claude or ChatGPT
           </strong>
           <button
             type="button"

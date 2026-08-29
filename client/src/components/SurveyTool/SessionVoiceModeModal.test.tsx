@@ -80,7 +80,7 @@ describe('SessionVoiceModeModal', () => {
       'Interview status: Ready',
     );
     expect(screen.getByText(
-      'Paste this prompt to augment interview with history from Claude or ChatGPT',
+      'Copy and Paste this prompt to augment interview with history from Claude or ChatGPT',
     )).toBeInTheDocument();
     const promptToggle = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE);
     expect(promptToggle).toHaveAccessibleName('View prompt');
