@@ -174,6 +174,7 @@ type PersistedDraftSliceLike = {
   additionalComments?: Record<string, UnknownRecord | unknown> | null;
   importance?: Record<string, unknown> | null;
   conviction?: Record<string, unknown> | null;
+  interviewProvenance?: Record<string, UnknownRecord | unknown> | null;
 } & UnknownRecord;
 
 type SubmitLabelContext = {
