@@ -219,6 +219,47 @@ test('dispatchAnonymousRoute skips worker secrets for request-api-key transcribe
   assert.equal(result, response);
 });
 
+test('dispatchAnonymousRoute validates and proxies realtime calls with session worker secrets', async () => {
+  const request = new Request('https://worker.example/realtime/call?slug=session-a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sdp: 'v=0\r\n', instructions: 'Interview the responder.' }),
+  });
+  const response = new Response('v=0\r\nanswer');
+  const secrets = { openaiKey: 'sk-worker-openai' };
+
+  const result = await dispatchAnonymousRoute({
+    path: '/realtime/call',
+    request,
+    anonymousContext: createAnonymousContext(),
+    deps: {
+      readRealtimeCallRequestPayload: async ({ request: receivedRequest }) => {
+        assert.equal(receivedRequest, request);
+        return { ok: true, payload: { sdp: 'v=0\r\n', instructions: 'Interview the responder.' } };
+      },
+      evaluateAnonymousRouteAccess: async (value) => {
+        assert.equal(value.route, 'realtime');
+        return { ok: true, reason: 'open-default-ai-gates' };
+      },
+      getSessionSecrets: async (slug) => {
+        assert.equal(slug, 'session-a');
+        return secrets;
+      },
+      proxyOpenAiRealtimeCall: async (value) => {
+        assert.deepEqual(value.payload, { sdp: 'v=0\r\n', instructions: 'Interview the responder.' });
+        assert.equal(value.secrets, secrets);
+        assert.deepEqual(value.config, createAnonymousContext().config);
+        assert.deepEqual(value.baseHeaders, { 'Access-Control-Allow-Origin': 'https://allowed.example' });
+        assert.equal(typeof value.deps.json, 'function');
+        return response;
+      },
+      json: (body, status, headers) => ({ body, status, headers }),
+    },
+  });
+
+  assert.equal(result, response);
+});
+
 test('dispatchAnonymousRoute preserves ai parse error passthrough', async () => {
   let accessCalled = false;
 

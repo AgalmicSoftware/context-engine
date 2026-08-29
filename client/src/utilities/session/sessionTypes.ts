@@ -51,6 +51,8 @@ export interface SessionMetadata extends UnknownRecord {
   sessionName?: string;
   sessionInfo?: string;
   sessionEndsAt?: string;
+  interviewModeEnabled?: boolean;
+  interviewMode?: UnknownRecord;
   defaultTags?: string;
   defaultGroupTags?: string | string[];
   defaultSbtTags?: string;

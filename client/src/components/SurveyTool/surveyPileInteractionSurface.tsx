@@ -52,6 +52,9 @@ type PileActionControlsProps = {
   toggleCreate: VoidHandler;
   showListeningPanel?: boolean;
   toggleListeningPanel?: VoidHandler;
+  showVoiceModeControl?: boolean;
+  voiceModeActive?: boolean;
+  toggleVoiceModeModal?: VoidHandler;
   onViewAllClick?: VoidHandler | null;
   handleViewAllFromPile: VoidHandler;
 };
@@ -125,6 +128,9 @@ export type PileInteractionSurfaceProps = {
   toggleCreate: VoidHandler;
   showListeningPanel?: boolean;
   toggleListeningPanel?: VoidHandler;
+  showVoiceModeControl?: boolean;
+  voiceModeActive?: boolean;
+  toggleVoiceModeModal?: VoidHandler;
   onViewAllClick?: VoidHandler | null;
   handleViewAllFromPile: VoidHandler;
   pileTopRailVisible: boolean;
@@ -280,6 +286,9 @@ const renderPileActionControls = ({
   toggleCreate,
   showListeningPanel = false,
   toggleListeningPanel = () => {},
+  showVoiceModeControl = true,
+  voiceModeActive = false,
+  toggleVoiceModeModal = toggleListeningPanel,
   onViewAllClick,
   handleViewAllFromPile,
 }: PileActionControlsProps): React.ReactElement => {
@@ -321,16 +330,19 @@ const renderPileActionControls = ({
           <FontAwesomeIcon icon={showCreate ? faMinus : faPlus} />
         </button>
 
-        <button
-          onClick={toggleListeningPanel}
-          className={`${styles.actionButton} ${showListeningPanel ? styles.actionButtonActive : ''}`}
-          title={showListeningPanel ? 'Close listening' : 'Open listening'}
-          aria-pressed={showListeningPanel}
-          data-testid={E2E_TESTIDS.SESSION_LISTENING_TOGGLE}
-          data-ce-control-appearance="frameless"
-        >
-          <FontAwesomeIcon icon={faMicrophone} />
-        </button>
+        {showVoiceModeControl ? (
+          <button
+            onClick={toggleVoiceModeModal}
+            className={`${styles.actionButton} ${voiceModeActive ? styles.actionButtonActive : ''}`}
+            title={voiceModeActive ? 'Close voice mode' : 'Open voice mode'}
+            aria-label="Open voice mode"
+            aria-pressed={voiceModeActive}
+            data-testid={E2E_TESTIDS.SESSION_LISTENING_TOGGLE}
+            data-ce-control-appearance="frameless"
+          >
+            <FontAwesomeIcon icon={faMicrophone} />
+          </button>
+        ) : null}
 
         {onViewAllClick && (
           <button
@@ -558,6 +570,9 @@ export const renderPileInteractionSurface = ({
   toggleCreate,
   showListeningPanel,
   toggleListeningPanel,
+  showVoiceModeControl,
+  voiceModeActive,
+  toggleVoiceModeModal,
   onViewAllClick,
   handleViewAllFromPile,
   pileTopRailVisible,
@@ -656,8 +671,11 @@ export const renderPileInteractionSurface = ({
           toggleFilterModal,
           showCreate,
           toggleCreate,
-          showListeningPanel,
-          toggleListeningPanel,
+            showListeningPanel,
+            toggleListeningPanel,
+            showVoiceModeControl,
+            voiceModeActive,
+            toggleVoiceModeModal,
           onViewAllClick,
           handleViewAllFromPile,
         })}

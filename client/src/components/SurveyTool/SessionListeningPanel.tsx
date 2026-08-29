@@ -26,6 +26,7 @@ type SessionListeningPanelProps = Record<string, unknown> & {
   workerUrl?: string;
   defaultTags?: string | string[] | null;
   onClose?: () => void;
+  panelMode?: 'recordGroup' | 'listening';
 };
 type CreateQuestionsAndSurveysPanelProps = React.ComponentProps<typeof CreateQuestionsAndSurveys>;
 type BrowserAudioWindow = Window &
@@ -285,7 +286,15 @@ function SessionListeningWaveform({ streamRef, isActive, isPaused }: SessionList
 }
 
 export default function SessionListeningPanel(props: SessionListeningPanelProps) {
-  const { sessionSlug = '', sessionConfig = null, context, workerUrl, defaultTags = null, onClose } = props;
+  const {
+    sessionSlug = '',
+    sessionConfig = null,
+    context,
+    workerUrl,
+    defaultTags = null,
+    onClose,
+    panelMode = 'listening',
+  } = props;
   const recorder = useRollingTranscriptionRecorder({
     sessionSlug,
     sessionConfig,
@@ -467,7 +476,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
         {hasVisibleStatus ? (
           <div className={styles.sessionListeningTitle}>
             <FontAwesomeIcon icon={faMicrophone} />
-            <span>Listening</span>
+            <span>{panelMode === 'recordGroup' ? 'Group Conversation' : 'Listening'}</span>
           </div>
         ) : (
           <div aria-hidden="true" />

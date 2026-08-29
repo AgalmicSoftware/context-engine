@@ -23,6 +23,8 @@ export const METADATA_FIELD_ORDER = [
   'sessionInfo',
   'appearance',
   'sessionModeProfile',
+  'interviewModeEnabled',
+  'interviewMode',
   'groupCreationPolicy',
   'sessionHeaderImg',
   'corsWorkerUrl',

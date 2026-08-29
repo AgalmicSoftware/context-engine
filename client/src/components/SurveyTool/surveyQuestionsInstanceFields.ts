@@ -87,6 +87,7 @@ export type SurveyQuestionsHydrationPatch = {
   importanceValue?: unknown;
   convictionChanged?: boolean;
   convictionValue?: unknown;
+  interviewProvenanceState?: SurveyQuestionsRecord;
   changed?: unknown;
 };
 type SurveyQuestionsParseValue = (value: unknown) => unknown;

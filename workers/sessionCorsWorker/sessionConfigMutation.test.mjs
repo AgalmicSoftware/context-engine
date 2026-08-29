@@ -274,6 +274,8 @@ test('set-config accepts Worker lifecycle and generic Group defaults', () => {
         defaultTags: 'governance,ai',
         defaultGroupTags: 'facilitators,reviewers',
         questionsGenPrompt: 'Prefer concrete tradeoffs.',
+        interviewModeEnabled: false,
+        interviewMode: { enabled: false, provider: 'openai', realtimeModel: 'gpt-realtime-2.1' },
         defaultFilterState: { sort: 'recent' },
         appearance: { colorSchemeId: 'ocean' },
       },
@@ -284,7 +286,31 @@ test('set-config accepts Worker lifecycle and generic Group defaults', () => {
   assert.equal(result.ok, true);
   assert.equal(result.config.sessionEndsAt, '2030-01-02T03:04:00Z');
   assert.equal(result.config.defaultGroupTags, 'facilitators,reviewers');
+  assert.equal(result.config.interviewModeEnabled, false);
+  assert.deepEqual(result.config.interviewMode, {
+    enabled: false,
+    provider: 'openai',
+    realtimeModel: 'gpt-realtime-2.1',
+  });
   assert.deepEqual(result.config.appearance, { colorSchemeId: 'ocean' });
+});
+
+test('set-config rejects malformed or unsupported interview mode config', () => {
+  for (const incomingConfig of [
+    { interviewModeEnabled: 'false' },
+    { interviewMode: { enabled: 'false' } },
+    { interviewMode: { provider: 'openrouter' } },
+    { interviewMode: { realtimeModel: 'gpt-5' } },
+    { interviewMode: { enabled: true, apiKey: 'must-not-be-public' } },
+  ]) {
+    const result = applySessionConfigMutation({
+      existingConfig: cloneJson(profileBearingConfig),
+      mutation: { kind: 'set-config', incomingConfig },
+      slug: 'session-a',
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.status, 400);
+  }
 });
 
 test('set-config rejects unsafe or unregistered session appearance config', () => {

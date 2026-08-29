@@ -6,11 +6,56 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Added credential-free CI configuration-contract coverage for every reachable
-  session-mode family, plus runtime assurance for generated Cloudflare Worker
-  envelope storage, concurrent multi-agent voting, representative
-  response-encryption paths, and both `/new` infrastructure presets while
-  keeping external-service live suites operator-run.
+- Shortened the ordinary Claude/ChatGPT interview-prefill prompt, moved new
+  handoffs to a distinct inert catalog URL to avoid stale external fetches, and
+  made binary, rating, and multichoice answer formats explicit.
+- Added default-on, per-session voice modes to the session microphone:
+  `?mode=interview` runs an OpenAI Realtime one-person interview and maps only
+  supported transcript/context evidence into explicitly reviewed response
+  drafts, while `?mode=recordGroup` reuses rolling transcription to generate
+  draft questions. Ordinary ChatGPT or Claude can use a public per-session
+  Worker prompt and base64url fragment link to prefill the same review flow
+  without MCP, plugins, installation, or pre-login account linking. Existing
+  local answers are never replaced silently, normal login/submission remains
+  final authority, and optional source platform/model prediction provenance is
+  retained beside the final edited answer. Session creators can set the OpenAI
+  Realtime voice model in `/new`; it defaults to `gpt-realtime-2.1` and is
+  persisted in the public per-session interview configuration. The Interview
+  modal now uses the session's high-contrast surface tokens, hides responder
+  context unless an AI prefill supplied it, replaces verbose status text with
+  an accessible green/red dot, and presents the Claude/ChatGPT memory handoff
+  in a collapsed-by-default card titled **Paste this prompt to augment interview
+  with history from Claude or ChatGPT**, with a dedicated caret-labelled **View
+  prompt** control, muted prompt preview, and top-right clipboard icon. That
+  zero-install handoff now presents itself
+  as an explicit review-only user request, accepts only a session-approved
+  return origin, requires a readable fact preview before encoding, strips
+  identifying source details, and returns a clean interview link instead of an
+  opaque empty packet when no relevant memory exists. The copied prompt now
+  contains the complete user request while the fetched Worker endpoint returns
+  only an inert JSON question catalog, avoiding fetched-page instruction
+  ambiguity. External agents can include defensible low-confidence predictions
+  with an explained basis; confidence is shown in the review UI and retained in
+  submitted prediction provenance without re-authoring version 3 drafts through
+  another model. The review now uses pile-style binary choices, confidence
+  progress meters, collapsed evidence bases, compact remove/apply actions, and
+  a scroll-bounded sticky apply rail. Copying the external-agent prompt gives
+  immediate checkmark feedback, and the prompt asks Claude/ChatGPT to hide the
+  base64url payload behind an **Open prefilled interview** link. Model provenance
+  now survives the anonymous-review-to-login draft migration before submission.
+  The `demo-interview` poll questions now use question-specific
+  choices while legacy demo fixtures retain their historical choices. Realtime call setup now preserves the browser
+  SDP offer byte-for-byte (including its terminal CRLF) and sends the SDP and
+  JSON as typed multipart fields, avoiding OpenAI's empty-offer parse failure.
+  Voice-mode chooser hover states now keep both titles and descriptions on the
+  high-contrast accent text color, and the modal heading is larger. The
+  interviewer now explicitly invites personal or topic-level insight and tells
+  the responder they can steer the conversation at any point; completed
+  responder speech is available afterward in a collapsed transcript
+  disclosure. Empty evidence-to-response mappings now show a descriptive,
+  high-contrast “not enough information” notice with concrete next steps and
+  hide the unchanged retry action. The bundled `demo-interview` session also
+  resolves its Worker without exposing a `worker=` query parameter.
 - Refreshed mounted Stats immediately after successful Cloudflare group
   mutations, evicting the affected session's short-lived Worker catalog cache
   before recounting groups and visible participants.

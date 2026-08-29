@@ -11,6 +11,8 @@ const PUBLIC_CONFIG_KEYS = Object.freeze([
   'sessionInfo',
   'sessionHeaderImg',
   'sessionEndsAt',
+  'interviewModeEnabled',
+  'interviewMode',
   'defaultTags',
   'defaultGroupTags',
   'defaultSbtTags',
@@ -51,6 +53,8 @@ const DEPLOY_CANONICAL_CONFIG_KEYS = Object.freeze([
   'sessionInfo',
   'sessionHeaderImg',
   'sessionEndsAt',
+  'interviewModeEnabled',
+  'interviewMode',
   'defaultTags',
   'defaultGroupTags',
   'defaultSbtTags',
@@ -69,6 +73,7 @@ const DEPLOY_CANONICAL_CONFIG_KEYS = Object.freeze([
 
 const OPEN_CONFIG_SUBTREE_KEYS = Object.freeze([
   'ai',
+  'interviewMode',
   'contracts',
   'limits',
   'scopes',

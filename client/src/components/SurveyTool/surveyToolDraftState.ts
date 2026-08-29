@@ -21,6 +21,7 @@ type SurveyDraftQuestionEntry = {
   additionalEncryptedPortion?: unknown;
   importance?: unknown;
   conviction?: unknown;
+  interviewProvenance?: unknown;
 } & UnknownRecord;
 
 type PersistedDraftEntryResolvers = {
@@ -313,6 +314,7 @@ export const buildSurveyDraftSemanticSignature = (payload: SurveyDraftPayload | 
     parts.push(`additionalEncryptedPortion:${buildStableDraftValueSignature(answerEntry.additionalEncryptedPortion)}`);
     parts.push(`importance:${buildStableDraftValueSignature(answerEntry.importance)}`);
     parts.push(`conviction:${buildStableDraftValueSignature(answerEntry.conviction)}`);
+    parts.push(`interviewProvenance:${buildStableDraftValueSignature(answerEntry.interviewProvenance)}`);
   });
   baselineIds.forEach((qid) => {
     const baselineEntry = getDraftQuestionEntry(baseline, qid);
@@ -560,6 +562,9 @@ export const buildDraftHydrationPatchForQuestion = ({
   let convictionValue;
   let importanceChanged = false;
   let convictionChanged = false;
+  const interviewProvenanceState = isRecord(draftEntry.interviewProvenance)
+    ? { ...draftEntry.interviewProvenance }
+    : undefined;
   let changed = false;
 
   if ((!hasCurrentAnswer || allowOverwrite) && draftEntry.value !== undefined) {
@@ -634,6 +639,8 @@ export const buildDraftHydrationPatchForQuestion = ({
     changed = true;
   }
 
+  if (interviewProvenanceState) changed = true;
+
   return {
     changed,
     answerState,
@@ -642,6 +649,7 @@ export const buildDraftHydrationPatchForQuestion = ({
     importanceValue,
     convictionChanged,
     convictionValue,
+    ...(interviewProvenanceState ? { interviewProvenanceState } : {}),
   };
 };
 
@@ -1032,6 +1040,7 @@ export const buildPersistedDraftQuestionEntry = ({
   additional = {},
   importance = null,
   conviction = null,
+  interviewProvenance = null,
   resolvers = {},
 }: {
   questionId?: unknown;
@@ -1039,6 +1048,7 @@ export const buildPersistedDraftQuestionEntry = ({
   additional?: UnknownRecord | null;
   importance?: unknown;
   conviction?: unknown;
+  interviewProvenance?: unknown;
   resolvers?: PersistedDraftEntryResolvers;
 } = {}): SurveyDraftQuestionEntry | null => {
   const qid = normalizeQuestionIdKey(questionId);
@@ -1092,6 +1102,7 @@ export const buildPersistedDraftQuestionEntry = ({
     ...(additionalField.encryptedPortion ? { additionalEncryptedPortion: additionalField.encryptedPortion } : {}),
     importance,
     conviction,
+    ...(isRecord(interviewProvenance) ? { interviewProvenance: { ...interviewProvenance } } : {}),
   };
 };
 
@@ -1131,6 +1142,9 @@ export const buildPersistedDraftMapsForAllowedIds = ({
       normalizedSlice.conviction && Object.prototype.hasOwnProperty.call(normalizedSlice.conviction, qid)
         ? normalizedSlice.conviction[qid]
         : null;
+    const interviewProvenance = isRecord(normalizedSlice.interviewProvenance?.[qid])
+      ? normalizedSlice.interviewProvenance?.[qid]
+      : null;
 
     const answerEntry = buildPersistedDraftQuestionEntry({
       questionId: qid,
@@ -1138,6 +1152,7 @@ export const buildPersistedDraftMapsForAllowedIds = ({
       additional: add,
       importance: imp,
       conviction: conv,
+      interviewProvenance,
       resolvers,
     });
 

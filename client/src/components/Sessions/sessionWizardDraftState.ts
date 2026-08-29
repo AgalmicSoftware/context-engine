@@ -10,6 +10,11 @@ import { getDemoTemplateSeed } from '../../utilities/session/sessionDemoCompat.j
 import { toStr } from '../../utilities/shared/primitives.js';
 import { DEFAULT_REASONING_EFFORT } from '../../utilities/ai/aiSettings.js';
 import {
+  DEFAULT_REALTIME_INTERVIEW_MODEL,
+  REALTIME_INTERVIEW_PROVIDER,
+  normalizeRealtimeInterviewModel,
+} from '../../utilities/audio/realtimeInterviewConfig';
+import {
   DEFAULT_AI_MODELS,
   normalizeAiModels,
   normalizeAiProvider,
@@ -188,6 +193,18 @@ export const normalizeSessionWizardDraftShape = (draftIn: AnyRecord = {}): AnyRe
   if (typeof draft.embeddedDeployHelperEnabled !== 'boolean') {
     draft.embeddedDeployHelperEnabled = CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED !== false;
   }
+  const interviewMode: AnyRecord =
+    draft.interviewMode && typeof draft.interviewMode === 'object' && !Array.isArray(draft.interviewMode)
+      ? (draft.interviewMode as AnyRecord)
+      : {};
+  if (typeof draft.interviewModeEnabled !== 'boolean') {
+    draft.interviewModeEnabled = typeof interviewMode.enabled === 'boolean' ? interviewMode.enabled : true;
+  }
+  draft.interviewMode = {
+    enabled: draft.interviewModeEnabled !== false,
+    provider: REALTIME_INTERVIEW_PROVIDER,
+    realtimeModel: normalizeRealtimeInterviewModel(interviewMode.realtimeModel),
+  };
   if (draft.sessionModeProfile && typeof draft.sessionModeProfile === 'object') {
     draft.sessionModeProfile = mergeSessionModeProfileStorageAccess(
       draft.sessionModeProfile as SessionModeProfile,
@@ -244,6 +261,12 @@ export const buildSessionWizardDefaultTemplate = (): AnyRecord => {
   // drafts should start with session-group auto-feature enabled.
   delete draft.autoFeatureSBTsWithFeaturedSbtTags;
   draft.autoFeatureSBTsBySessionSlug = true;
+  draft.interviewModeEnabled = true;
+  draft.interviewMode = {
+    enabled: true,
+    provider: REALTIME_INTERVIEW_PROVIDER,
+    realtimeModel: DEFAULT_REALTIME_INTERVIEW_MODEL,
+  };
   draft.embeddedDeployHelperEnabled = CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED !== false;
   draft.litCredentials = {};
   draft.perMemberSpendLimits = draft.perMemberSpendLimits || { ai: '', arweave: '', txGas: '' };

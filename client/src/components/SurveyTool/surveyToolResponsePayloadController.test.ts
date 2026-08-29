@@ -66,6 +66,43 @@ describe('surveyToolResponsePayloadController', () => {
     );
   });
 
+  it('includes consented self-reported interview provenance beside the final editable answer', () => {
+    const result = buildResponsePayload(
+      defaultOpts({
+        questionPool: [{ id: 'q1', type: 'freeform', prompt: 'What matters?' }],
+        surveyResponseState: {
+          answers: { q1: { value: 'Final edited answer' } },
+          additionalComments: {},
+          importance: {},
+          conviction: {},
+          interviewProvenance: {
+            q1: {
+              source: { platform: 'claude', modelId: 'claude-example', verification: 'self_reported' },
+              promptVersion: 'ce-interview-brief-v1',
+              questionSetHash: 'hash',
+              originalPrediction: { answer: 'Original agent prediction', confidence: 0.22 },
+              appliedAt: 123,
+            },
+          },
+        } as never,
+      }),
+    );
+
+    expect(result.responses![0]).toEqual(
+      expect.objectContaining({
+        answer: expect.objectContaining({ value: 'Final edited answer' }),
+        interviewProvenance: {
+          version: 1,
+          source: { platform: 'claude', modelId: 'claude-example', verification: 'self_reported' },
+          promptVersion: 'ce-interview-brief-v1',
+          questionSetHash: 'hash',
+          originalPrediction: { answer: 'Original agent prediction', confidence: 0.22 },
+          appliedAt: 123,
+        },
+      }),
+    );
+  });
+
   it('importance falls back to conviction when null', () => {
     const result = buildResponsePayload(
       defaultOpts({

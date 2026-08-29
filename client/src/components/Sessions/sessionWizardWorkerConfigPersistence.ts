@@ -66,6 +66,8 @@ const PUBLIC_WORKER_CONFIG_FIELDS = Object.freeze([
   'appearance',
   'sessionHeaderImg',
   'sessionEndsAt',
+  'interviewModeEnabled',
+  'interviewMode',
   'defaultTags',
   'defaultGroupTags',
   'defaultSbtTags',

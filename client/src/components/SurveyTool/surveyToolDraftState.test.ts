@@ -207,6 +207,45 @@ describe('surveyToolDraftState', () => {
     });
   });
 
+  it('round-trips interview model provenance through the anonymous draft entry', () => {
+    const provenance = {
+      version: 1,
+      source: { platform: 'claude', modelId: 'claude-example', verification: 'self_reported' },
+      promptVersion: 'ce-interview-brief-v4',
+      questionSetHash: 'abc123',
+      originalPrediction: { answer: 'Agree', confidence: 0.65 },
+      appliedAt: 12345,
+    };
+    const { answersObj } = buildPersistedDraftMapsForAllowedIds({
+      allowedQuestionIds: ['q1'],
+      slice: {
+        answers: { q1: { value: 'Agree' } },
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+        interviewProvenance: { q1: provenance },
+      },
+    });
+
+    expect(answersObj.q1).toMatchObject({
+      value: 'Agree',
+      interviewProvenance: provenance,
+    });
+    expect(buildSurveyDraftSemanticSignature({ answers: answersObj })).not.toBe(
+      buildSurveyDraftSemanticSignature({ answers: { q1: { value: 'Agree' } } }),
+    );
+    expect(
+      buildDraftHydrationPatchForQuestion({
+        questionId: 'q1',
+        draftEntry: answersObj.q1,
+        currentAnswer: { value: '' },
+      }),
+    ).toMatchObject({
+      changed: true,
+      interviewProvenanceState: provenance,
+    });
+  });
+
   it('derives persistable draft question ids from rendered, dirty, or slice-backed questions', () => {
     expect(
       buildPersistDraftAllowedQuestionIds({

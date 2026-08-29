@@ -716,6 +716,7 @@ describe('SessionWizard rendered validation', () => {
     const optionalDetails = screen.getByRole('button', { name: /Optional details/i });
     expect(optionalDetails).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_GROUP_CREATION_POLICY)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_INTERVIEW_REALTIME_MODEL)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Session colors expand' })).not.toBeInTheDocument();
 
     fireEvent.click(optionalDetails);
@@ -725,6 +726,10 @@ describe('SessionWizard rendered validation', () => {
     expect(policy).toHaveAccessibleName('Who can create groups?');
     expect(policy).toHaveValue('participants');
     expect(screen.queryByRole('textbox', { name: 'Who can create groups?' })).not.toBeInTheDocument();
+    const realtimeModel = screen.getByTestId(E2E_TESTIDS.WIZARD_INTERVIEW_REALTIME_MODEL);
+    expect(realtimeModel).toHaveValue('gpt-realtime-2.1');
+    fireEvent.change(realtimeModel, { target: { value: 'gpt-realtime-custom' } });
+    expect(realtimeModel).toHaveValue('gpt-realtime-custom');
 
     const colorsToggle = screen.getByRole('button', { name: 'Session colors expand' });
     expect(colorsToggle).toHaveAttribute('aria-expanded', 'false');

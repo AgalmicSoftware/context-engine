@@ -32,6 +32,8 @@ const WORKER_CANONICAL_SET_CONFIG_KEYS = new Set([
   'defaultGroupTags',
   'defaultSbtTags',
   'questionsGenPrompt',
+  'interviewMode',
+  'interviewModeEnabled',
   'defaultFilterState',
   'defaultFeaturedSBTs',
   'autoFeatureSBTsBySessionSlug',
@@ -77,6 +79,20 @@ const validAllowOrigins = (config) =>
   config.allowOrigins.every((origin) => typeof origin !== 'string' || !origin.includes('*'));
 const validAppearanceConfig = (config) =>
   !hasOwn(config, 'appearance') || normalizeWorkerSessionAppearance(config.appearance) !== null;
+const validInterviewModeConfig = (config) => {
+  if (hasOwn(config, 'interviewModeEnabled') && typeof config.interviewModeEnabled !== 'boolean') return false;
+  if (!hasOwn(config, 'interviewMode')) return true;
+  const interview = config.interviewMode;
+  if (!interview || typeof interview !== 'object' || Array.isArray(interview)) return false;
+  if (Object.keys(interview).some((key) => !['enabled', 'provider', 'realtimeModel'].includes(key))) return false;
+  if (hasOwn(interview, 'enabled') && typeof interview.enabled !== 'boolean') return false;
+  if (hasOwn(interview, 'provider') && interview.provider !== 'openai') return false;
+  if (
+    hasOwn(interview, 'realtimeModel') &&
+    (typeof interview.realtimeModel !== 'string' || !/^gpt-realtime(?:-[a-z0-9.]+)*$/i.test(interview.realtimeModel))
+  ) return false;
+  return true;
+};
 
 const getWorkerAuthorityMode = (config) => toTrimmedString(
   config?.sessionModeProfile?.authority?.mode,
@@ -279,6 +295,9 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
     if (!validAppearanceConfig(incomingConfig)) {
       return { ok: false, status: 400, error: 'Invalid session appearance config.' };
     }
+    if (!validInterviewModeConfig(incomingConfig)) {
+      return { ok: false, status: 400, error: 'Invalid interview mode config.' };
+    }
     // A patch may update the profile without resending the already-persisted
     // canonical storage object. The complete merged record below remains
     // strict and is the only record eligible for persistence.
@@ -335,6 +354,9 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
   }
   if (!validAppearanceConfig(mergedConfig)) {
     return { ok: false, status: 400, error: 'Invalid session appearance config.' };
+  }
+  if (!validInterviewModeConfig(mergedConfig)) {
+    return { ok: false, status: 400, error: 'Invalid interview mode config.' };
   }
   const mergedModeValidation = validateWorkerConfigModeValues(mergedConfig);
   if (!mergedModeValidation.ok) {

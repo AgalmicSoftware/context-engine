@@ -247,6 +247,7 @@ export const buildSessionWizardDraftFieldRenderer = ({
       if (keyString === 'slug') return E2E_TESTIDS.WIZARD_SLUG;
       if (keyString === 'corsWorkerUrl') return E2E_TESTIDS.WIZARD_WORKER_URL;
       if (keyString === 'sessionEndsAt') return E2E_TESTIDS.WIZARD_SESSION_ENDS_AT;
+      if (keyString === 'interviewMode.realtimeModel') return E2E_TESTIDS.WIZARD_INTERVIEW_REALTIME_MODEL;
       return '';
     })();
     const gateIds = gateOptions.map((opt) => toStr(opt.id).trim()).filter(Boolean);

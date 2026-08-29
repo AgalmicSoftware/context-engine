@@ -3177,6 +3177,638 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
+.sessionVoiceModeModal {
+  display: flex;
+  flex-direction: column;
+  max-height: min(90vh, 900px);
+  overflow: hidden;
+  background: var(--ce-surface-sunken) !important;
+  color: var(--ce-panel-text) !important;
+  border: 1px solid var(--ce-card-border) !important;
+  border-radius: var(--ce-radius-12) !important;
+  box-shadow: var(--ce-card-shadow) !important;
+  font-family: var(--ce-font-mono);
+
+  :global(.modal-header),
+  :global(.modal-footer) {
+    border-color: var(--ce-card-border);
+    background: var(--ce-card-bg);
+    color: var(--ce-panel-text);
+  }
+
+  :global(.modal-header) {
+    align-items: center;
+    padding: 14px 16px;
+  }
+
+  :global(.modal-title) {
+    color: var(--ce-panel-text) !important;
+    font-size: clamp(1.35rem, 2.4vw, 1.6rem);
+    font-weight: 800;
+    line-height: 1.2;
+  }
+
+  :global(.modal-body) {
+    min-height: 0;
+    padding: 18px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    color: var(--ce-panel-text);
+  }
+
+  :global(.modal-header) :global(.btn-close) {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 32px;
+    width: 32px;
+    height: 32px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: var(--ce-radius-6);
+    background: transparent;
+    color: var(--ce-panel-text);
+    filter: none;
+    opacity: 0.82;
+  }
+
+  :global(.modal-header) :global(.btn-close):hover,
+  :global(.modal-header) :global(.btn-close):focus-visible {
+    background: var(--ce-card-bg);
+    color: var(--ce-action-accent);
+    opacity: 1;
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 1px;
+  }
+
+  label,
+  strong {
+    color: var(--ce-panel-text);
+  }
+
+  :global(.form-control) {
+    background: var(--ce-input-bg) !important;
+    border-color: var(--ce-input-border) !important;
+    color: var(--ce-panel-text) !important;
+  }
+
+  :global(.form-control)::placeholder {
+    color: var(--ce-panel-text-muted) !important;
+    opacity: 1;
+  }
+}
+
+.sessionVoiceModeChooser {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+
+  button {
+    min-height: 220px;
+    padding: 28px;
+    border: 1px solid var(--ce-card-border);
+    border-radius: var(--ce-radius-8);
+    background: var(--ce-card-bg);
+    color: var(--ce-panel-text);
+    box-shadow: var(--ce-card-shadow);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 14px;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  button:hover,
+  button:focus-visible {
+    background: var(--ce-action-accent);
+    color: var(--ce-action-accent-text);
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 2px;
+
+    strong,
+    span,
+    svg {
+      color: var(--ce-action-accent-text) !important;
+    }
+  }
+
+  svg {
+    font-size: 2.4rem;
+  }
+
+  strong {
+    font-size: 1.5rem;
+  }
+
+  span {
+    line-height: 1.45;
+  }
+}
+
+.sessionInterviewPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  color: var(--ce-panel-text);
+}
+
+.sessionInterviewContext {
+  display: grid;
+  gap: 7px;
+
+  label {
+    margin: 0;
+    color: var(--ce-panel-text);
+    font-size: 0.86rem;
+    font-weight: 800;
+  }
+}
+
+.sessionInterviewContextInput {
+  min-height: 94px;
+  resize: vertical;
+}
+
+.sessionInterviewActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.sessionInterviewPrimaryAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sessionInterviewStatusDot {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 12px;
+  border: 2px solid color-mix(in srgb, var(--ce-status-success) 72%, var(--ce-panel-text));
+  border-radius: var(--ce-radius-round);
+  background: var(--ce-status-success);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ce-status-success) 18%, transparent);
+}
+
+.sessionInterviewStatusDotError {
+  border-color: color-mix(in srgb, var(--ce-status-error) 72%, var(--ce-panel-text));
+  background: var(--ce-status-error);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ce-status-error) 18%, transparent);
+}
+
+.sessionInterviewPanel .sessionListeningError {
+  background: color-mix(in srgb, var(--ce-status-error) 14%, var(--ce-surface-sunken));
+  color: var(--ce-panel-text);
+}
+
+.sessionInterviewMappingNotice {
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--ce-status-warning) 58%, var(--ce-card-border));
+  border-radius: var(--ce-radius-8);
+  background: color-mix(in srgb, var(--ce-status-warning) 12%, var(--ce-surface-sunken));
+  color: var(--ce-panel-text);
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.sessionInterviewTranscriptDisclosure {
+  overflow: hidden;
+  border: 1px solid var(--ce-card-border);
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-card-bg);
+  color: var(--ce-panel-text);
+  box-shadow: var(--ce-card-shadow);
+}
+
+.sessionInterviewTranscriptToggle {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 13px;
+  border: 0;
+  background: transparent;
+  color: var(--ce-panel-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  strong {
+    color: inherit;
+    line-height: 1.3;
+  }
+
+  span {
+    margin-left: auto;
+    color: var(--ce-panel-text-muted);
+    font-size: 0.78rem;
+  }
+
+  &:hover,
+  &:focus-visible {
+    background: color-mix(in srgb, var(--ce-action-accent) 10%, transparent);
+    color: var(--ce-action-accent);
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: -2px;
+
+    span {
+      color: var(--ce-panel-text);
+    }
+  }
+}
+
+.sessionInterviewTranscriptCaret {
+  flex: 0 0 auto;
+  transition: transform 150ms ease;
+}
+
+.sessionInterviewTranscriptCaretCollapsed {
+  transform: rotate(-90deg);
+}
+
+.sessionInterviewTranscript {
+  max-height: 240px;
+  margin: 0;
+  padding: 12px 14px 14px 36px;
+  overflow: auto;
+  border-top: 1px solid var(--ce-card-border);
+  background: var(--ce-input-bg);
+  color: var(--ce-panel-text);
+  font: inherit;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.sessionAgentKickoff {
+  position: relative;
+  min-height: 48px;
+  display: grid;
+  gap: 8px;
+  padding: 12px 52px 12px 14px;
+  border: 1px solid var(--ce-card-border);
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-card-bg);
+  color: var(--ce-panel-text);
+  box-shadow: var(--ce-card-shadow);
+}
+
+.sessionAgentKickoffTitle {
+  display: block;
+  color: var(--ce-panel-text);
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.sessionAgentKickoffToggle {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 3px 2px;
+  border: 0;
+  border-radius: var(--ce-radius-4);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    color: var(--ce-action-accent);
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 3px;
+  }
+}
+
+.sessionAgentKickoffCaret {
+  flex: 0 0 auto;
+  transition: transform 150ms ease;
+}
+
+.sessionAgentKickoffCaretExpanded {
+  transform: rotate(180deg);
+}
+
+.sessionAgentKickoffPrompt {
+  display: block;
+  padding-left: 0;
+  color: var(--ce-panel-text);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  opacity: 0.5;
+}
+
+.sessionAgentKickoffCopy {
+  appearance: none;
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ce-radius-6);
+  background: transparent;
+  color: var(--ce-panel-text);
+  cursor: pointer;
+  opacity: 0.78;
+
+  &:hover,
+  &:focus-visible {
+    background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+    color: var(--ce-action-accent);
+    opacity: 1;
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 1px;
+  }
+}
+
+.sessionAgentKickoffCopied {
+  color: var(--ce-status-success);
+  opacity: 1;
+}
+
+.sessionInterviewReview {
+  display: grid;
+  gap: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--ce-card-border);
+
+  h4 {
+    margin: 0;
+    color: var(--ce-panel-text);
+  }
+}
+
+.sessionInterviewReviewHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+
+  span {
+    color: var(--ce-panel-text-muted);
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+}
+
+.sessionInterviewDraft {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  padding: 14px 48px 14px 14px;
+  border: 1px solid var(--ce-card-border);
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-card-bg);
+  color: var(--ce-panel-text);
+}
+
+.sessionInterviewDraftRemoved {
+  border-style: dashed;
+  background: color-mix(in srgb, var(--ce-card-bg) 74%, var(--ce-surface-sunken));
+}
+
+.sessionInterviewDraftRemove {
+  appearance: none;
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ce-radius-6);
+  background: transparent;
+  color: var(--ce-panel-text-muted);
+  cursor: pointer;
+
+  &:hover:not(:disabled),
+  &:focus-visible {
+    background: color-mix(in srgb, var(--ce-status-error) 14%, transparent);
+    color: var(--ce-status-error);
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 1px;
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.28;
+  }
+}
+
+.sessionInterviewQuestion {
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.sessionInterviewAnswerInput {
+  min-height: 92px;
+  resize: vertical;
+  background: var(--ce-input-bg) !important;
+  color: var(--ce-panel-text) !important;
+  caret-color: var(--ce-panel-text);
+  font-family: var(--ce-font-body);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.5;
+  opacity: 1;
+}
+
+.sessionInterviewBinaryAnswer {
+  min-width: 0;
+
+  #binaryChoice {
+    justify-content: flex-start;
+    margin: 4px 0;
+  }
+}
+
+.sessionInterviewConfidence {
+  display: grid;
+  gap: 6px;
+  width: min(100%, 440px);
+  color: var(--ce-panel-text);
+  font-size: 0.82rem;
+}
+
+.sessionInterviewConfidenceMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+
+  strong {
+    color: var(--ce-action-accent);
+  }
+
+  span {
+    color: var(--ce-panel-text-muted);
+  }
+}
+
+.sessionInterviewConfidenceTrack {
+  width: 100%;
+  height: 9px;
+  overflow: hidden;
+  border: 1px solid var(--ce-card-border);
+  border-radius: var(--ce-radius-round);
+  background: var(--ce-surface-sunken);
+
+  span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--ce-status-warning), var(--ce-status-success));
+  }
+}
+
+.sessionInterviewEvidenceDisclosure {
+  display: grid;
+  gap: 6px;
+}
+
+.sessionInterviewEvidenceToggle {
+  appearance: none;
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 2px;
+  border: 0;
+  border-radius: var(--ce-radius-4);
+  background: transparent;
+  color: var(--ce-panel-text);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 800;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    color: var(--ce-action-accent);
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+.sessionInterviewEvidenceCaret {
+  transform: rotate(-90deg);
+  transition: transform 150ms ease;
+}
+
+.sessionInterviewEvidenceCaretExpanded {
+  transform: rotate(0);
+}
+
+.sessionInterviewEvidence {
+  padding: 8px 10px;
+  border-left: 3px solid var(--ce-card-border);
+  font-size: 0.9rem;
+  color: var(--ce-panel-text-muted);
+  line-height: 1.45;
+}
+
+.sessionInterviewDraftActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.sessionInterviewDraftApply {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid var(--ce-card-border);
+  border-radius: var(--ce-radius-6);
+  background: var(--ce-surface-sunken);
+  color: var(--ce-panel-text);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--ce-action-accent);
+    color: var(--ce-action-accent);
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 1px;
+  }
+}
+
+.sessionInterviewDraftApplySelected {
+  border-color: color-mix(in srgb, var(--ce-status-success) 68%, var(--ce-card-border));
+  background: color-mix(in srgb, var(--ce-status-success) 14%, var(--ce-card-bg));
+  color: var(--ce-status-success);
+}
+
+.sessionInterviewReviewActions {
+  position: sticky;
+  bottom: -18px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 0 -18px -18px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--ce-card-border);
+  background: var(--ce-surface-sunken);
+  box-shadow: 0 -10px 24px color-mix(in srgb, var(--ce-overlay-base) 18%, transparent);
+}
+
+.sessionInterviewProvenance {
+  margin: 0;
+  color: var(--ce-panel-text);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+@media (max-width: 700px) {
+  .sessionVoiceModeChooser {
+    grid-template-columns: 1fr;
+
+    button {
+      min-height: 150px;
+    }
+  }
+
+  .sessionInterviewDraft {
+    padding: 12px 42px 12px 12px;
+  }
+
+  .sessionInterviewReviewActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
 @media (max-width: 1100px) {
   .pileListeningLayout {
     display: block;

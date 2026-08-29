@@ -136,20 +136,22 @@ export const GUIDE_TOPICS: readonly GuideTopic[] = Object.freeze(
       id: 'ai-features',
       title: 'AI features',
       summary:
-        'Context Engine supports question generation, rolling listening-mode transcription, cluster summaries, result analysis, and position comparison.',
+        'Context Engine supports conversational voice interviews, group-conversation question generation, cluster summaries, result analysis, and position comparison.',
       points: [
+        'Interview mode turns a realtime conversation or a reviewed ChatGPT/Claude handoff into local response drafts with visible confidence; it never submits automatically.',
         'Generated questions remain drafts for review rather than being published automatically.',
         'The prompt templates used by these features are published in the Prompts section below.',
       ],
     },
     {
       id: 'limits-listening',
-      title: 'Block limits and listening mode',
+      title: 'Block limits and voice modes',
       summary:
         'Chain-scanned sessions use `blockLimits` to bound discovery. Worker-canonical sessions can instead use `sessionEndsAt` to close participant mutations while preserving allowed reads and admin recovery.',
       points: [
-        'Listening mode opens with `?mode=listening` and starts recording only after you press Record.',
-        'Audio is transcribed in rolling three-minute segments and stitched into a transcript for draft question suggestions.',
+        'Use `?mode=interview` for one-person conversational response drafting or `?mode=recordGroup` to turn a recorded discussion into draft questions.',
+        'The optional ChatGPT/Claude memory handoff keeps instructions in the pasted user request, fetches only an inert question catalog, shows the exact packet before encoding, and includes explained per-answer confidence; no relevant signal produces a clean interview link.',
+        'The legacy `?mode=listening` link remains supported for the pile-adjacent group recorder, and recording starts only after you press Record.',
       ],
     },
     {

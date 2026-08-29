@@ -753,6 +753,11 @@ export const SurveyQuestions = (props: SurveyQuestionsProps): React.ReactElement
     if (patch.additionalState) targetAdditional[questionId] = patch.additionalState;
     if (patch.importanceChanged) targetImportance[questionId] = patch.importanceValue;
     if (patch.convictionChanged) targetConviction[questionId] = patch.convictionValue;
+    if (patch.interviewProvenanceState) {
+      const targetProvenance = (targetSlice.interviewProvenance || {}) as Record<string, unknown>;
+      targetProvenance[questionId] = patch.interviewProvenanceState;
+      targetSlice.interviewProvenance = targetProvenance;
+    }
     return !!patch.changed;
   };
 

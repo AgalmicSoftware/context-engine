@@ -47,7 +47,7 @@ export const evaluateAnonymousRouteAccess = async ({
 
   const routeKey = toTrimmedString(route, deps).toLowerCase();
   const requestApiKey = toTrimmedString(apiKey, deps);
-  if (routeKey !== 'ai' && routeKey !== 'transcribe') {
+  if (routeKey !== 'ai' && routeKey !== 'transcribe' && routeKey !== 'realtime') {
     return { ok: false, status: 403, error: 'Anonymous access denied for route.' };
   }
 
@@ -64,7 +64,10 @@ export const evaluateAnonymousRouteAccess = async ({
   }
 
   if (isWorkerCanonicalSessionConfig(config)) {
-    const result = evaluateWorkerCanonicalAnonymousAccess({ config, route: routeKey });
+    const result = evaluateWorkerCanonicalAnonymousAccess({
+      config,
+      route: routeKey === 'realtime' ? 'ai' : routeKey,
+    });
     return result.ok
       ? result
       : {

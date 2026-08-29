@@ -41,6 +41,10 @@ import { normalizeSessionWizardDefaultFeaturedSbtMetadata } from './sessionWizar
 import { normalizeSessionWizardEndsAt } from './sessionWizardSessionLifecycle';
 import { normalizeSessionAppearance } from '../../utilities/ui/sessionColorSchemes';
 import {
+  REALTIME_INTERVIEW_PROVIDER,
+  normalizeRealtimeInterviewModel,
+} from '../../utilities/audio/realtimeInterviewConfig';
+import {
   applySessionWizardModeFieldPolicyToPayload,
   resolveSessionWizardModeFieldPolicy,
 } from './sessionWizardModeFieldPolicy';
@@ -384,6 +388,14 @@ export const buildSessionWizardWorkerConfigPayload = ({
     sessionInfo: trimString(resolvedDraft.sessionInfo),
     sessionHeaderImg: trimString(resolvedDraft.sessionHeader || resolvedDraft.sessionHeaderImg),
     ...(publishedAppearance ? { appearance: publishedAppearance } : {}),
+    interviewModeEnabled: resolvedDraft.interviewModeEnabled !== false,
+    interviewMode: {
+      enabled: resolvedDraft.interviewModeEnabled !== false,
+      provider: REALTIME_INTERVIEW_PROVIDER,
+      realtimeModel: normalizeRealtimeInterviewModel(
+        isObj(resolvedDraft.interviewMode) ? resolvedDraft.interviewMode.realtimeModel : undefined,
+      ),
+    },
     defaultTags: trimString(resolvedDraft.defaultTags),
     defaultGroupTags: trimString(resolvedDraft.defaultGroupTags),
     questionsGenPrompt: trimString(resolvedDraft.questionsGenPrompt),

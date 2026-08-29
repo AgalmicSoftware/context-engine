@@ -35,6 +35,10 @@ export const resolveTopLevelRouteSelection = ({
     return { kind: 'session-config' };
   }
 
+  if ((path === '/agent/interview-catalog' || path === '/agent/interview-brief') && method === 'GET') {
+    return { kind: 'interview-brief' };
+  }
+
   if (path === '/sponsored/redeem-deploy' && method === 'POST') {
     return {
       kind: 'sponsored-bootstrap-redeem',
@@ -60,10 +64,14 @@ export const resolveTopLevelRouteSelection = ({
     };
   }
 
-  if (!hasTrimmedAuthorization && method === 'POST' && (path === '/ai' || path === '/transcribe')) {
+  if (
+    !hasTrimmedAuthorization &&
+    method === 'POST' &&
+    (path === '/ai' || path === '/transcribe' || path === '/realtime/call')
+  ) {
     return {
       kind: 'anonymous',
-      anonymousRoute: path === '/transcribe' ? 'transcribe' : 'ai',
+      anonymousRoute: path === '/transcribe' ? 'transcribe' : path === '/realtime/call' ? 'realtime' : 'ai',
     };
   }
 

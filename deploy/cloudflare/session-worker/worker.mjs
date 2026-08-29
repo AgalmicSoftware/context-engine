@@ -5531,22 +5531,22 @@ var require_sha22 = __commonJS({
     var __sha5122 = _sha5122;
     var locked2562 = false;
     var locked5122 = false;
-    function sha2563(_data5) {
+    function sha2564(_data5) {
       const data = (0, index_js_1.getBytes)(_data5, "data");
       return (0, index_js_1.hexlify)(__sha2562(data));
     }
-    exports.sha256 = sha2563;
-    sha2563._ = _sha2562;
-    sha2563.lock = function() {
+    exports.sha256 = sha2564;
+    sha2564._ = _sha2562;
+    sha2564.lock = function() {
       locked2562 = true;
     };
-    sha2563.register = function(func) {
+    sha2564.register = function(func) {
       if (locked2562) {
         throw new Error("sha256 is locked");
       }
       __sha2562 = func;
     };
-    Object.freeze(sha2563);
+    Object.freeze(sha2564);
     function sha5123(_data5) {
       const data = (0, index_js_1.getBytes)(_data5, "data");
       return (0, index_js_1.hexlify)(__sha5122(data));
@@ -5562,7 +5562,7 @@ var require_sha22 = __commonJS({
       }
       __sha5122 = func;
     };
-    Object.freeze(sha2563);
+    Object.freeze(sha2564);
   }
 });
 
@@ -29153,7 +29153,7 @@ var require_ar = __commonJS({
           return new instance(value);
         };
       }
-      winstonToAr(winstonString, { formatted = false, decimals = 12, trim: trim7 = true } = {}) {
+      winstonToAr(winstonString, { formatted = false, decimals = 12, trim: trim10 = true } = {}) {
         let number2 = this.stringToBigNum(winstonString, decimals).shiftedBy(-12);
         return formatted ? number2.toFormat(decimals) : number2.toFixed(decimals);
       }
@@ -56993,6 +56993,8 @@ var PUBLIC_CONFIG_KEYS = Object.freeze([
   "sessionInfo",
   "sessionHeaderImg",
   "sessionEndsAt",
+  "interviewModeEnabled",
+  "interviewMode",
   "defaultTags",
   "defaultGroupTags",
   "defaultSbtTags",
@@ -57032,6 +57034,8 @@ var DEPLOY_CANONICAL_CONFIG_KEYS = Object.freeze([
   "sessionInfo",
   "sessionHeaderImg",
   "sessionEndsAt",
+  "interviewModeEnabled",
+  "interviewMode",
   "defaultTags",
   "defaultGroupTags",
   "defaultSbtTags",
@@ -57049,6 +57053,7 @@ var DEPLOY_CANONICAL_CONFIG_KEYS = Object.freeze([
 ]);
 var OPEN_CONFIG_SUBTREE_KEYS = Object.freeze([
   "ai",
+  "interviewMode",
   "contracts",
   "limits",
   "scopes",
@@ -58225,11 +58230,11 @@ var buildBundleDiagnostics = async (bundleSource, sourceKind) => {
   };
 };
 var formatBundleDiagnostics = (diagnostics = {}) => {
-  const sha2563 = toStr13(diagnostics?.sha256).trim();
+  const sha2564 = toStr13(diagnostics?.sha256).trim();
   return [
     `source=${toStr13(diagnostics?.source).trim() || "unknown"}`,
     `len=${Number(diagnostics?.length || 0) || 0}`,
-    `sha256=${sha2563 ? sha2563.slice(0, 16) : "n/a"}`,
+    `sha256=${sha2564 ? sha2564.slice(0, 16) : "n/a"}`,
     `export=${diagnostics?.hasAnyExport === true ? "1" : "0"}`,
     `default=${diagnostics?.hasExportDefault === true ? "1" : "0"}`,
     `namedDefault=${diagnostics?.hasNamedDefaultExport === true ? "1" : "0"}`,
@@ -60665,6 +60670,8 @@ var WORKER_CANONICAL_SET_CONFIG_KEYS = /* @__PURE__ */ new Set([
   "defaultGroupTags",
   "defaultSbtTags",
   "questionsGenPrompt",
+  "interviewMode",
+  "interviewModeEnabled",
   "defaultFilterState",
   "defaultFeaturedSBTs",
   "autoFeatureSBTsBySessionSlug",
@@ -60695,6 +60702,17 @@ var hasOwn3 = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, 
 var validGroupCreationPolicy = (config) => !hasOwn3(config, "groupCreationPolicy") || config?.groupCreationPolicy === "admin_only" || config?.groupCreationPolicy === "participants";
 var validAllowOrigins = (config) => !hasOwn3(config, "allowOrigins") || !Array.isArray(config?.allowOrigins) || config.allowOrigins.every((origin) => typeof origin !== "string" || !origin.includes("*"));
 var validAppearanceConfig = (config) => !hasOwn3(config, "appearance") || normalizeWorkerSessionAppearance(config.appearance) !== null;
+var validInterviewModeConfig = (config) => {
+  if (hasOwn3(config, "interviewModeEnabled") && typeof config.interviewModeEnabled !== "boolean") return false;
+  if (!hasOwn3(config, "interviewMode")) return true;
+  const interview = config.interviewMode;
+  if (!interview || typeof interview !== "object" || Array.isArray(interview)) return false;
+  if (Object.keys(interview).some((key) => !["enabled", "provider", "realtimeModel"].includes(key))) return false;
+  if (hasOwn3(interview, "enabled") && typeof interview.enabled !== "boolean") return false;
+  if (hasOwn3(interview, "provider") && interview.provider !== "openai") return false;
+  if (hasOwn3(interview, "realtimeModel") && (typeof interview.realtimeModel !== "string" || !/^gpt-realtime(?:-[a-z0-9.]+)*$/i.test(interview.realtimeModel))) return false;
+  return true;
+};
 var getWorkerAuthorityMode = (config) => toTrimmedString6(
   config?.sessionModeProfile?.authority?.mode
 ).toLowerCase();
@@ -60864,6 +60882,9 @@ var applySessionConfigMutation = ({ existingConfig, mutation, slug } = {}) => {
     if (!validAppearanceConfig(incomingConfig)) {
       return { ok: false, status: 400, error: "Invalid session appearance config." };
     }
+    if (!validInterviewModeConfig(incomingConfig)) {
+      return { ok: false, status: 400, error: "Invalid interview mode config." };
+    }
     const incomingModeValidation = validateWorkerConfigModeValues(incomingConfig, {
       allowPartialProfileStorage: true
     });
@@ -60907,6 +60928,9 @@ var applySessionConfigMutation = ({ existingConfig, mutation, slug } = {}) => {
   }
   if (!validAppearanceConfig(mergedConfig)) {
     return { ok: false, status: 400, error: "Invalid session appearance config." };
+  }
+  if (!validInterviewModeConfig(mergedConfig)) {
+    return { ok: false, status: 400, error: "Invalid interview mode config." };
   }
   const mergedModeValidation = validateWorkerConfigModeValues(mergedConfig);
   if (!mergedModeValidation.ok) {
@@ -63228,7 +63252,7 @@ var evaluateAnonymousRouteAccess = async ({
   const anonymousScopeDisabledError = toTrimmedString2(constants?.anonymousScopeDisabledError, deps) || "Anonymous access denied: route scope disabled in session config.";
   const routeKey = toTrimmedString2(route, deps).toLowerCase();
   const requestApiKey = toTrimmedString2(apiKey, deps);
-  if (routeKey !== "ai" && routeKey !== "transcribe") {
+  if (routeKey !== "ai" && routeKey !== "transcribe" && routeKey !== "realtime") {
     return { ok: false, status: 403, error: "Anonymous access denied for route." };
   }
   const scopeKey = routeKey === "transcribe" ? "transcribe" : "ai";
@@ -63243,7 +63267,10 @@ var evaluateAnonymousRouteAccess = async ({
     };
   }
   if (isWorkerCanonicalSessionConfig(config)) {
-    const result = evaluateWorkerCanonicalAnonymousAccess({ config, route: routeKey });
+    const result = evaluateWorkerCanonicalAnonymousAccess({
+      config,
+      route: routeKey === "realtime" ? "ai" : routeKey
+    });
     return result.ok ? result : {
       ...result,
       status: 403,
@@ -69217,15 +69244,15 @@ var faucet = async ({
   const wallet = new Wallet2(privateKey);
   const fromAddress = wallet.address;
   const thresholdWeiBig = toBigInt2(thresholdWei);
-  for (const rpc of rpcUrls || []) {
-    const masked = maskRpcUrl(rpc);
+  for (const rpc2 of rpcUrls || []) {
+    const masked = maskRpcUrl(rpc2);
     let chainId = 0;
     try {
-      const chainHex = await rpcRequest({ rpcUrl: rpc, method: "eth_chainId", params: [] });
+      const chainHex = await rpcRequest({ rpcUrl: rpc2, method: "eth_chainId", params: [] });
       chainId = deps?.toChainId?.(chainHex) || 0;
     } catch (err) {
       const failure2 = buildSafeRpcFailure({
-        rpcUrl: rpc,
+        rpcUrl: rpc2,
         error: err,
         errorLabel: "RPC chain check failed.",
         maskRpcUrl,
@@ -69260,14 +69287,14 @@ var faucet = async ({
     let currentBalanceWei = 0n;
     try {
       const balanceHex = await rpcRequest({
-        rpcUrl: rpc,
+        rpcUrl: rpc2,
         method: "eth_getBalance",
         params: [to, "latest"]
       });
       currentBalanceWei = toBigInt2(balanceHex);
     } catch (err) {
       const failure2 = buildSafeRpcFailure({
-        rpcUrl: rpc,
+        rpcUrl: rpc2,
         error: err,
         errorLabel: "RPC balance check failed.",
         maskRpcUrl,
@@ -69292,13 +69319,13 @@ var faucet = async ({
     let nonceHex = "0x0";
     try {
       nonceHex = await rpcRequest({
-        rpcUrl: rpc,
+        rpcUrl: rpc2,
         method: "eth_getTransactionCount",
         params: [fromAddress, "pending"]
       });
     } catch (err) {
       const failure2 = buildSafeRpcFailure({
-        rpcUrl: rpc,
+        rpcUrl: rpc2,
         error: err,
         errorLabel: "RPC nonce lookup failed.",
         maskRpcUrl,
@@ -69309,7 +69336,7 @@ var faucet = async ({
     }
     let gasPriceHex = DEFAULT_GAS_PRICE_HEX;
     try {
-      gasPriceHex = await rpcRequest({ rpcUrl: rpc, method: "eth_gasPrice", params: [] });
+      gasPriceHex = await rpcRequest({ rpcUrl: rpc2, method: "eth_gasPrice", params: [] });
     } catch (_) {
       gasPriceHex = DEFAULT_GAS_PRICE_HEX;
     }
@@ -69334,7 +69361,7 @@ var faucet = async ({
     }
     try {
       const txHash = await rpcRequest({
-        rpcUrl: rpc,
+        rpcUrl: rpc2,
         method: "eth_sendRawTransaction",
         params: [signedTx]
       });
@@ -69352,7 +69379,7 @@ var faucet = async ({
       );
     } catch (err) {
       const failure2 = buildSafeRpcFailure({
-        rpcUrl: rpc,
+        rpcUrl: rpc2,
         error: err,
         errorLabel: "RPC transaction submission failed.",
         maskRpcUrl,
@@ -76069,6 +76096,369 @@ var dispatchSessionConfigBootstrapRequest = async ({
   }, 200, buildBootstrapHeaders(corsContext.headers));
 };
 
+// workers/sessionCorsWorker/interviewQuestionCatalog.js
+var QUESTIONS_ADDED_TOPIC0 = "0x3b584fb360a325f39352e75bd13458807d8e31735ef4dadaeff99fc3e59b517a";
+var GET_QUESTION_HASH_SELECTOR = "0x24b9f713";
+var ZERO_BYTES32 = `0x${"00".repeat(32)}`;
+var MAX_QUESTIONS = 100;
+var MAX_SCAN_BLOCKS = 2e6;
+var RPC_CHUNK_SIZE = 1e5;
+var BINARY_RESPONSE_OPTIONS = ["Agree", "Unsure", "Disagree"];
+var trim7 = (value) => String(value == null ? "" : value).trim();
+var lower3 = (value) => trim7(value).toLowerCase();
+var isObj12 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var hasRestrictedPrompt = (question = {}) => {
+  const visibility = lower3(question.visibility || question.access || question.questionVisibility);
+  return Boolean(
+    question.promptEncrypted || question.encryptedPrompt || question.locked === true || question.gated === true || question.gate || Array.isArray(question.gates) && question.gates.length || /private|locked|gated|encrypted/.test(visibility)
+  );
+};
+var normalizeQuestion = (value = {}) => {
+  const question = isObj12(value) ? value : {};
+  const id2 = lower3(question.id || question.questionId);
+  const prompt = trim7(question.prompt || question.question || question.title);
+  if (!id2 || !prompt || hasRestrictedPrompt(question) || /connect.+decrypt|encrypted prompt/i.test(prompt)) return null;
+  const type = lower3(question.type || question.questionType || "freeform") || "freeform";
+  const rawOptions = question.options || question.choices;
+  const options = type === "binary" ? [...BINARY_RESPONSE_OPTIONS] : (Array.isArray(rawOptions) ? rawOptions : []).map((entry) => trim7(isObj12(entry) ? entry.label || entry.value : entry)).filter(Boolean);
+  return {
+    id: id2,
+    prompt,
+    type,
+    options
+  };
+};
+var dedupeQuestions = (questions = []) => {
+  const seen = /* @__PURE__ */ new Set();
+  return questions.map(normalizeQuestion).filter((question) => {
+    if (!question || seen.has(question.id)) return false;
+    seen.add(question.id);
+    return true;
+  }).slice(0, MAX_QUESTIONS);
+};
+var readJsonResponse = async (response2) => {
+  if (!response2 || Number(response2.status || 0) < 200 || Number(response2.status || 0) >= 300) return null;
+  try {
+    return await response2.clone().json();
+  } catch {
+    try {
+      return JSON.parse(await response2.text());
+    } catch {
+      return null;
+    }
+  }
+};
+var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageRoute2 }) => {
+  if (typeof storageRoute2 !== "function") return [];
+  const origin = "https://session-worker.invalid";
+  const listResponse = await storageRoute2({
+    path: "/storage/list",
+    method: "GET",
+    request: new Request(`${origin}/storage/list?resource=questions&limit=${MAX_QUESTIONS}`),
+    env,
+    config,
+    slug,
+    uploaderAddress: "",
+    baseHeaders: {}
+  });
+  const listing = await readJsonResponse(listResponse);
+  const items = Array.isArray(listing?.items) ? listing.items.slice(0, MAX_QUESTIONS) : [];
+  const questions = [];
+  for (const item of items) {
+    const id2 = trim7(item?.storageRef?.id || item?.metadata?.id || item?.id);
+    if (!id2) continue;
+    const readResponse = await storageRoute2({
+      path: "/storage/read",
+      method: "GET",
+      request: new Request(`${origin}/storage/read?id=${encodeURIComponent(id2)}`),
+      env,
+      config,
+      slug,
+      uploaderAddress: "",
+      baseHeaders: {}
+    });
+    const payload = await readJsonResponse(readResponse);
+    if (payload) questions.push(payload);
+  }
+  return dedupeQuestions(questions);
+};
+var pickContractAddress = (config = {}) => {
+  const contracts = isObj12(config.contracts) ? config.contracts : {};
+  const surveys = isObj12(contracts.surveys) ? contracts.surveys.address : contracts.surveys;
+  return trim7(surveys || contracts.survey || config.surveysAddress || config.surveyAddress);
+};
+var pickRpcUrls = (config = {}) => {
+  const chainId = trim7(config.networkChainId || config.registryChainId || config.chainId || "11155420");
+  const rpcConfig = isObj12(config.rpc) ? config.rpc : {};
+  const pathProvider = isObj12(rpcConfig?.providers?.path) ? rpcConfig.providers.path : isObj12(rpcConfig.path) ? rpcConfig.path : {};
+  const byChainMap = isObj12(config.rpcUrlsByChainId) ? config.rpcUrlsByChainId : isObj12(pathProvider.rpcUrlsByChainId) ? pathProvider.rpcUrlsByChainId : {};
+  const byChain = byChainMap[chainId];
+  const source = [
+    ...Array.isArray(byChain) ? byChain : [byChain],
+    ...Array.isArray(config.rpcUrls) ? config.rpcUrls : [config.rpcUrl],
+    ...Array.isArray(pathProvider.rpcUrls) ? pathProvider.rpcUrls : [pathProvider.rpcUrl]
+  ];
+  return [...new Set(source.map(trim7).filter((value) => /^https:\/\//i.test(value)))];
+};
+var rpc = async ({ rpcUrls, method, params, fetchImpl }) => {
+  let lastError;
+  for (const rpcUrl of rpcUrls) {
+    try {
+      const response2 = await fetchImpl(rpcUrl, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params })
+      });
+      const data = await response2.json();
+      if (!response2.ok || data?.error) throw new Error(data?.error?.message || `RPC ${method} failed.`);
+      return data.result;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error(`No RPC URL succeeded for ${method}.`);
+};
+var wordAt = (hex, index) => trim7(hex).replace(/^0x/, "").slice(index * 64, index * 64 + 64);
+var decodeQuestionIds = (data = "") => {
+  const clean = trim7(data).replace(/^0x/, "");
+  if (clean.length < 128) return [];
+  const offsetBytes = Number(BigInt(`0x${wordAt(clean, 0) || "0"}`));
+  const lengthWordIndex = offsetBytes / 32;
+  const length = Math.min(MAX_QUESTIONS, Number(BigInt(`0x${wordAt(clean, lengthWordIndex) || "0"}`)));
+  const ids = [];
+  for (let index = 0; index < length; index += 1) {
+    const id2 = `0x${wordAt(clean, lengthWordIndex + 1 + index)}`.toLowerCase();
+    if (/^0x[0-9a-f]{64}$/.test(id2) && id2 !== ZERO_BYTES32) ids.push(id2);
+  }
+  return ids;
+};
+var base64urlFromHex = (hex = "") => {
+  const clean = trim7(hex).replace(/^0x/, "");
+  if (!/^[0-9a-fA-F]{64}$/.test(clean)) return "";
+  const bytes2 = new Uint8Array(clean.match(/.{2}/g).map((part) => Number.parseInt(part, 16)));
+  let binary = "";
+  bytes2.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+};
+var payloadSessionSlug = (payload = {}) => {
+  const session = isObj12(payload.session) ? payload.session : {};
+  for (const candidate of [
+    payload.sessionSlug,
+    payload.session_slug,
+    payload.groupSlug,
+    session.sessionSlug,
+    session.slug,
+    payload.session
+  ]) {
+    if (typeof candidate !== "string" && typeof candidate !== "number") continue;
+    const normalized = lower3(candidate).replace(/[^a-z0-9_-]/g, "").slice(0, 128);
+    if (normalized) return normalized;
+  }
+  return "";
+};
+var fetchArweaveQuestion = async (pointer, fetchImpl) => {
+  if (!/^[a-zA-Z0-9_-]{1,43}$/.test(pointer)) return null;
+  for (const gateway of ["https://ar-io.dev", "https://arweave.net"]) {
+    try {
+      const response2 = await fetchImpl(`${gateway}/${pointer}`, { headers: { accept: "application/json" } });
+      if (!response2.ok) continue;
+      const payload = await response2.json();
+      if (isObj12(payload)) return payload;
+    } catch {
+    }
+  }
+  return null;
+};
+var loadOnChainQuestions = async ({ config, slug, fetchImpl }) => {
+  const surveysAddress = pickContractAddress(config);
+  const rpcUrls = pickRpcUrls(config);
+  const start = Number(config?.blockLimits?.start);
+  if (!/^0x[0-9a-fA-F]{40}$/.test(surveysAddress) || !rpcUrls.length || !Number.isFinite(start) || start < 0) {
+    return [];
+  }
+  const latestHex = await rpc({ rpcUrls, method: "eth_blockNumber", params: [], fetchImpl });
+  const latest = Number(BigInt(latestHex));
+  const configuredEnd = Number(config?.blockLimits?.end);
+  const end = Number.isFinite(configuredEnd) && configuredEnd >= start ? Math.min(configuredEnd, latest) : latest;
+  if (end < start || end - start > MAX_SCAN_BLOCKS) return [];
+  const ids = [];
+  for (let from = start; from <= end && ids.length < MAX_QUESTIONS; from += RPC_CHUNK_SIZE) {
+    const to = Math.min(end, from + RPC_CHUNK_SIZE - 1);
+    const logs = await rpc({
+      rpcUrls,
+      method: "eth_getLogs",
+      params: [{
+        address: surveysAddress,
+        fromBlock: `0x${from.toString(16)}`,
+        toBlock: `0x${to.toString(16)}`,
+        topics: [QUESTIONS_ADDED_TOPIC0]
+      }],
+      fetchImpl
+    });
+    (Array.isArray(logs) ? logs : []).forEach((log2) => {
+      decodeQuestionIds(log2?.data).forEach((id2) => {
+        if (!ids.includes(id2) && ids.length < MAX_QUESTIONS) ids.push(id2);
+      });
+    });
+  }
+  const questions = [];
+  for (const id2 of ids) {
+    const result = await rpc({
+      rpcUrls,
+      method: "eth_call",
+      params: [{ to: surveysAddress, data: `${GET_QUESTION_HASH_SELECTOR}${id2.slice(2)}` }, "latest"],
+      fetchImpl
+    });
+    const pointer = base64urlFromHex(result);
+    if (!pointer) continue;
+    const payload = await fetchArweaveQuestion(pointer, fetchImpl);
+    if (payload && payloadSessionSlug(payload) === lower3(slug)) {
+      questions.push({ ...payload, id: payload.id || id2 });
+    }
+  }
+  return dedupeQuestions(questions);
+};
+var loadPublicInterviewQuestions = async ({
+  env = {},
+  config = {},
+  slug = "",
+  storageRoute: storageRoute2,
+  fetch: fetchImpl = globalThis.fetch
+} = {}) => {
+  const cloudflareQuestions = await loadCloudflareQuestions({ env, config, slug, storageRoute: storageRoute2 });
+  if (cloudflareQuestions.length) return cloudflareQuestions;
+  return loadOnChainQuestions({ config, slug, fetchImpl });
+};
+
+// workers/sessionCorsWorker/interviewBriefDispatch.js
+var INTERVIEW_PROMPT_VERSION = "ce-interview-brief-v4";
+var trim8 = (value) => String(value == null ? "" : value).trim();
+var isObj13 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isInterviewEnabled = (config = {}) => {
+  const interview = isObj13(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
+  return config.interviewModeEnabled !== false && interview.enabled !== false;
+};
+var normalizeAllowedOrigins = (raw) => (Array.isArray(raw) ? raw : [raw]).map((entry) => {
+  try {
+    return new URL(trim8(entry)).origin;
+  } catch {
+    return "";
+  }
+}).filter(Boolean);
+var safeSessionUrl = (value, { slug = "", allowOrigins } = {}) => {
+  try {
+    const url = new URL(trim8(value));
+    if (url.protocol !== "https:" && url.hostname !== "localhost") return "";
+    const parts = url.pathname.split("/").filter(Boolean).map((part) => decodeURIComponent(part));
+    if (parts.length < 2 || parts.at(-2) !== "session" || parts.at(-1)?.toLowerCase() !== trim8(slug).toLowerCase()) {
+      return "";
+    }
+    const allowedOrigins = normalizeAllowedOrigins(allowOrigins);
+    if (!allowedOrigins.length || !allowedOrigins.includes(url.origin)) return "";
+    url.search = "";
+    url.hash = "";
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return "";
+  }
+};
+var sha2563 = async (value) => {
+  const bytes2 = new TextEncoder().encode(String(value));
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes2);
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+};
+var canonicalizeQuestions = (questions = []) => [...questions].sort(
+  (left, right) => trim8(left?.id).localeCompare(trim8(right?.id)) || trim8(left?.prompt).localeCompare(trim8(right?.prompt)) || trim8(left?.type).localeCompare(trim8(right?.type))
+);
+var buildInterviewBriefDocument = ({
+  slug,
+  sessionUrl,
+  questions,
+  questionSetHash
+} = {}) => ({
+  type: "context-engine.interview-question-catalog",
+  version: 1,
+  sessionSlug: slug,
+  reviewUrl: `${sessionUrl}?mode=interview`,
+  questionSetHash,
+  prefillPromptVersion: INTERVIEW_PROMPT_VERSION,
+  answerContract: {
+    binary: ["Agree", "Unsure", "Disagree"],
+    rating: { min: 0, max: 10, step: 1 },
+    multichoice: "Use one exact question option."
+  },
+  questions
+});
+var dispatchInterviewBriefRequest = async ({
+  request,
+  env,
+  slugHint,
+  baseHeaders,
+  deps,
+  constants
+} = {}) => {
+  const slugResolution = deps?.resolveRequestSlugWithoutToken?.({ request, env, slugHint }) || {
+    ok: false,
+    error: "Invalid session slug."
+  };
+  if (!slugResolution.ok || !slugResolution.explicitSlugProvided) {
+    return deps?.json?.({ error: slugResolution.error || constants?.missingSlugError }, 400, baseHeaders);
+  }
+  const slug = slugResolution.slug;
+  const config = await deps?.getSessionConfig?.(env, slug);
+  if (!config) return deps?.json?.({ error: constants?.sessionConfigNotFoundError }, 404, baseHeaders);
+  const corsContext = await deps?.getCorsContext?.({ request, config });
+  if (!corsContext?.ok) return corsContext?.response;
+  const headers = new Headers(corsContext.headers || baseHeaders || {});
+  headers.set("cache-control", "no-store");
+  if (!isInterviewEnabled(config)) {
+    return deps?.json?.({ error: "Interview mode is disabled for this session." }, 404, headers);
+  }
+  if (typeof deps?.checkRateLimit === "function") {
+    const rateAllowed = await deps.checkRateLimit({
+      env,
+      slug,
+      address: deps?.resolveAnonymousRateIdentity?.(request),
+      limit: config?.limits?.perWalletPerDay || 0,
+      route: "interview-brief"
+    });
+    if (!rateAllowed) return deps?.json?.({ error: "Rate limit exceeded." }, 429, headers);
+  }
+  const loadPublicInterviewQuestions2 = deps?.loadPublicInterviewQuestions || loadPublicInterviewQuestions;
+  const questions = await loadPublicInterviewQuestions2({
+    env,
+    config,
+    slug,
+    storageRoute: deps?.storageRoute,
+    fetch: deps?.fetch
+  });
+  if (!questions.length) {
+    return deps?.json?.({ error: "No public, accessible questions are available for interview prefill." }, 404, headers);
+  }
+  const url = new URL(request.url);
+  const configuredAllowedOrigins = [
+    ...Array.isArray(config.allowOrigins) ? config.allowOrigins : [config.allowOrigins],
+    config.sessionUrl,
+    config.publicSessionUrl,
+    config.appSessionUrl
+  ];
+  const sessionUrl = safeSessionUrl(
+    url.searchParams.get("sessionUrl") || config.sessionUrl || config.publicSessionUrl || config.appSessionUrl,
+    { slug, allowOrigins: configuredAllowedOrigins }
+  );
+  if (!sessionUrl) {
+    return deps?.json?.({ error: "A session-approved HTTPS (or localhost) sessionUrl is required." }, 400, headers);
+  }
+  const questionSetHash = await (deps?.sha256 || sha2563)(JSON.stringify(canonicalizeQuestions(questions)));
+  return deps?.json?.(
+    buildInterviewBriefDocument({ slug, sessionUrl, questions, questionSetHash }),
+    200,
+    headers
+  );
+};
+
 // workers/sessionCorsWorker/topLevelRouteSelection.js
 var resolveTopLevelRouteSelection = ({
   path,
@@ -76100,6 +76490,9 @@ var resolveTopLevelRouteSelection = ({
   if (path === "/session-config" && method === "GET") {
     return { kind: "session-config" };
   }
+  if ((path === "/agent/interview-catalog" || path === "/agent/interview-brief") && method === "GET") {
+    return { kind: "interview-brief" };
+  }
   if (path === "/sponsored/redeem-deploy" && method === "POST") {
     return {
       kind: "sponsored-bootstrap-redeem",
@@ -76121,10 +76514,10 @@ var resolveTopLevelRouteSelection = ({
       action: path.replace("/admin/", "").trim()
     };
   }
-  if (!hasTrimmedAuthorization && method === "POST" && (path === "/ai" || path === "/transcribe")) {
+  if (!hasTrimmedAuthorization && method === "POST" && (path === "/ai" || path === "/transcribe" || path === "/realtime/call")) {
     return {
       kind: "anonymous",
-      anonymousRoute: path === "/transcribe" ? "transcribe" : "ai"
+      anonymousRoute: path === "/transcribe" ? "transcribe" : path === "/realtime/call" ? "realtime" : "ai"
     };
   }
   if (!hasTrimmedAuthorization && (path === "/storage/read" && (method === "GET" || method === "POST") || path === "/storage/list" && (method === "GET" || method === "POST"))) {
@@ -76156,6 +76549,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
   const dispatchSponsoredBootstrapRedeem2 = deps?.dispatchSponsoredBootstrapRedeem || dispatchSponsoredBootstrapRedeem;
   const dispatchResourcePresenceRequest2 = deps?.dispatchResourcePresenceRequest || dispatchResourcePresenceRequest;
   const dispatchSessionConfigBootstrapRequest2 = deps?.dispatchSessionConfigBootstrapRequest || dispatchSessionConfigBootstrapRequest;
+  const dispatchInterviewBriefRequest2 = deps?.dispatchInterviewBriefRequest || dispatchInterviewBriefRequest;
   const dispatchAdminRequestWithWorkerDeps2 = deps?.dispatchAdminRequestWithWorkerDeps || dispatchAdminRequestWithWorkerDeps;
   const dispatchAdminAbuseSummaryRequest2 = deps?.dispatchAdminAbuseSummaryRequest || dispatchAdminAbuseSummaryRequest;
   const dispatchAnonymousRouteEntryWithWorkerDeps2 = deps?.dispatchAnonymousRouteEntryWithWorkerDeps || dispatchAnonymousRouteEntryWithWorkerDeps;
@@ -76200,6 +76594,28 @@ var createWorkerRouteShellWithWorkerDeps = ({
             resolveRequestSlugWithoutToken: deps?.resolveRequestSlugWithoutToken,
             getSessionConfig: deps?.getSessionConfig,
             getCorsContext: deps?.getCorsContext,
+            json: deps?.json
+          },
+          constants: {
+            missingSlugError: constants?.missingSlugError,
+            sessionConfigNotFoundError: constants?.sessionConfigNotFoundError
+          }
+        });
+      }
+      if (routeSelection.kind === "interview-brief") {
+        return await dispatchInterviewBriefRequest2({
+          request,
+          env,
+          slugHint: envSlug,
+          baseHeaders: routeBaseHeaders,
+          deps: {
+            resolveRequestSlugWithoutToken: deps?.resolveRequestSlugWithoutToken,
+            getSessionConfig: deps?.getSessionConfig,
+            getCorsContext: deps?.getCorsContext,
+            resolveAnonymousRateIdentity: deps?.resolveAnonymousRateIdentity,
+            checkRateLimit: deps?.checkRateLimit,
+            storageRoute: deps?.storageRoute,
+            fetch: deps?.fetch,
             json: deps?.json
           },
           constants: {
@@ -77633,6 +78049,113 @@ var dispatchAuthenticatedRoute = async ({
   return deps?.json?.({ error: "Not found." }, 404, headers);
 };
 
+// workers/sessionCorsWorker/realtimeCallExecution.js
+var OPENAI_REALTIME_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
+var DEFAULT_INTERVIEW_REALTIME_MODEL = "gpt-realtime-2.1";
+var trim9 = (value) => String(value == null ? "" : value).trim();
+var isObj14 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var buildRealtimeMultipartBody = ({ sdp, session }) => {
+  const boundary = `----context-engine-realtime-${crypto.randomUUID().replace(/-/g, "")}`;
+  const body = [
+    `--${boundary}\r
+`,
+    'Content-Disposition: form-data; name="sdp"\r\n',
+    "Content-Type: application/sdp\r\n\r\n",
+    sdp,
+    `\r
+--${boundary}\r
+`,
+    'Content-Disposition: form-data; name="session"\r\n',
+    "Content-Type: application/json\r\n\r\n",
+    JSON.stringify(session),
+    `\r
+--${boundary}--\r
+`
+  ].join("");
+  return { body, contentType: `multipart/form-data; boundary=${boundary}` };
+};
+var readRealtimeCallRequestPayload = async ({ request } = {}) => {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return { ok: false, status: 400, error: "Invalid JSON." };
+  }
+  if (!isObj14(body)) return { ok: false, status: 400, error: "Invalid JSON." };
+  const sdp = String(body.sdp == null ? "" : body.sdp);
+  const instructions = trim9(body.instructions);
+  if (!sdp || !/^v=0(?:\r?\n|$)/.test(sdp)) return { ok: false, status: 400, error: "Invalid SDP offer." };
+  if (sdp.length > 64e3) return { ok: false, status: 413, error: "SDP offer is too large." };
+  if (!instructions || instructions.length > 32e3) {
+    return { ok: false, status: instructions ? 413 : 400, error: "Interview instructions are missing or too large." };
+  }
+  return { ok: true, payload: { sdp, instructions } };
+};
+var resolveRealtimeConfig = (config = {}) => {
+  const interview = isObj14(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
+  const provider = trim9(interview.provider || "openai").toLowerCase();
+  const requestedModel = trim9(interview.realtimeModel || config?.ai?.realtimeModel);
+  const model = /^gpt-realtime(?:-[a-z0-9.]+)*$/i.test(requestedModel) ? requestedModel : DEFAULT_INTERVIEW_REALTIME_MODEL;
+  return { provider, model };
+};
+var proxyOpenAiRealtimeCall = async ({
+  payload,
+  secrets,
+  config,
+  baseHeaders,
+  deps,
+  constants
+} = {}) => {
+  const fetchImpl = deps?.fetch || fetch;
+  const realtime = resolveRealtimeConfig(config);
+  if (realtime.provider !== "openai") {
+    return deps?.json?.({ error: "Realtime interview voice currently requires the OpenAI provider." }, 400, baseHeaders);
+  }
+  const key = trim9(secrets?.openaiKey);
+  if (!key) {
+    return deps?.json?.({ error: "Server misconfigured: openaiKey is missing." }, 401, baseHeaders);
+  }
+  const session = {
+    type: "realtime",
+    model: realtime.model,
+    output_modalities: ["audio"],
+    instructions: payload.instructions,
+    max_output_tokens: 2048,
+    audio: {
+      input: {
+        transcription: { model: "gpt-transcribe" },
+        turn_detection: {
+          type: "server_vad",
+          create_response: true,
+          interrupt_response: true
+        }
+      }
+    }
+  };
+  const multipart = buildRealtimeMultipartBody({ sdp: payload.sdp, session });
+  const response2 = await fetchImpl(constants?.openAiRealtimeCallsUrl || OPENAI_REALTIME_CALLS_URL, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${key}`,
+      "content-type": multipart.contentType
+    },
+    body: multipart.body
+  });
+  const text = await response2.text();
+  if (!response2.ok) {
+    let message = "OpenAI Realtime call failed.";
+    try {
+      message = JSON.parse(text)?.error?.message || message;
+    } catch {
+    }
+    return deps?.json?.({ error: message }, response2.status, baseHeaders);
+  }
+  const headers = new Headers(baseHeaders || {});
+  headers.set("content-type", "application/sdp");
+  headers.set("cache-control", "no-store");
+  return new Response(text, { status: 200, headers });
+};
+
 // workers/sessionCorsWorker/anonymousRouteDispatch.js
 var resolveDefaultModelForProvider2 = (provider) => {
   if (provider === "anthropic") return "claude-3-5-sonnet-20240620";
@@ -77717,6 +78240,38 @@ var dispatchAnonymousRoute = async ({
       secrets: secrets2,
       baseHeaders: headers,
       transcribeRequest
+    });
+  }
+  if (path === "/realtime/call") {
+    const readRealtimeCallRequestPayload2 = deps?.readRealtimeCallRequestPayload || readRealtimeCallRequestPayload;
+    const realtimeRequest = await readRealtimeCallRequestPayload2({ request });
+    if (!realtimeRequest?.ok) {
+      return deps?.json?.(
+        { error: realtimeRequest?.error },
+        realtimeRequest?.status || 400,
+        headers
+      );
+    }
+    const anonymousAccess2 = await deps?.evaluateAnonymousRouteAccess?.({
+      slug,
+      config,
+      route: "realtime"
+    });
+    if (!anonymousAccess2?.ok) {
+      return deps?.json?.(
+        { error: anonymousAccess2?.error || deps?.ANONYMOUS_ROUTE_DENIED_ERROR },
+        anonymousAccess2?.status || 403,
+        headers
+      );
+    }
+    const secrets2 = await deps?.getSessionSecrets?.(slug) || {};
+    const proxyOpenAiRealtimeCall2 = deps?.proxyOpenAiRealtimeCall || proxyOpenAiRealtimeCall;
+    return proxyOpenAiRealtimeCall2({
+      payload: realtimeRequest.payload,
+      secrets: secrets2,
+      config,
+      baseHeaders: headers,
+      deps: { json: deps?.json }
     });
   }
   const aiRequest = await deps?.readAiRequestPayload?.({
@@ -78107,7 +78662,7 @@ var LOGIN_SIWE_FUTURE_SKEW_MS = 60 * 1e3;
 var DEFAULT_FAUCET_RPC_URL2 = getPathRpcUrl3(11155420) || "";
 var DEFAULT_FAUCET_AMOUNT_ETH2 = "0.0002";
 var DEFAULT_FAUCET_BALANCE_THRESHOLD_ETH2 = "0.001";
-var ZERO_BYTES32 = `0x${"0".repeat(64)}`;
+var ZERO_BYTES322 = `0x${"0".repeat(64)}`;
 var SESSION_CONFIG_NOT_FOUND_ERROR = "Session config not found.";
 var BOOTSTRAP_SESSION_CONFIG_REQUIRED_ERROR = "Session config not found. Provide arweaveJwk for bootstrap uploads or register session config first.";
 var RESOURCE_GATE_KEYS = ["default", "ai", "arweave", "txGas", "rpc", "lit"];
@@ -78145,7 +78700,7 @@ var createWorkerTopLevelRuntimeWithWorkerDeps = ({
       USED_NONCE_TTL_SECONDS,
       LOGIN_SIWE_MAX_AGE_MS,
       LOGIN_SIWE_FUTURE_SKEW_MS,
-      ZERO_BYTES32,
+      ZERO_BYTES32: ZERO_BYTES322,
       RESOURCE_GATE_KEYS,
       ANONYMOUS_RATE_ID_HEADER,
       ANONYMOUS_GATE_UNAVAILABLE_ERROR,

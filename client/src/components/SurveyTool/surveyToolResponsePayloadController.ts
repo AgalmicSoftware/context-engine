@@ -1,5 +1,8 @@
 import type { ResponseSlice, UnknownRecord } from './surveyToolTypes';
 
+const asRecord = (value: unknown): UnknownRecord =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : {};
+
 type ResponseFieldState = UnknownRecord & {
   value?: unknown;
   encrypted?: unknown;
@@ -11,6 +14,7 @@ type ResponseFieldState = UnknownRecord & {
 type SurveyResponsePayloadState = Omit<ResponseSlice, 'answers' | 'additionalComments'> & {
   answers?: Record<string, ResponseFieldState> | null;
   additionalComments?: Record<string, ResponseFieldState> | null;
+  interviewProvenance?: Record<string, UnknownRecord> | null;
 };
 
 type ResponseQuestionSource = UnknownRecord & {
@@ -44,6 +48,7 @@ type ResponsePayloadEntry = UnknownRecord & {
   importance: number | null;
   answer: ResponsePayloadField;
   additional: ResponsePayloadField;
+  interviewProvenance?: UnknownRecord;
 };
 
 type ResponsePayload = UnknownRecord & {
@@ -141,6 +146,22 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
     const conviction = opts.getConvictionFromSlice(surveyResponseState, q.id);
     const importance = opts.getImportanceFromSlice(surveyResponseState, q.id);
     const importanceForPayload = importance !== null ? importance : conviction;
+    const rawInterviewProvenance = surveyResponseState.interviewProvenance?.[q.id];
+    const interviewSource = asRecord(asRecord(rawInterviewProvenance).source);
+    const interviewProvenance = rawInterviewProvenance && typeof rawInterviewProvenance === 'object'
+      ? {
+          version: 1,
+          source: {
+            platform: String(interviewSource.platform || 'other').slice(0, 64),
+            modelId: String(interviewSource.modelId || '').slice(0, 256),
+            verification: 'self_reported',
+          },
+          promptVersion: String(rawInterviewProvenance.promptVersion || '').slice(0, 128),
+          questionSetHash: String(rawInterviewProvenance.questionSetHash || '').slice(0, 256),
+          originalPrediction: rawInterviewProvenance.originalPrediction || null,
+          appliedAt: Number(rawInterviewProvenance.appliedAt || 0) || null,
+        }
+      : null;
 
     return {
       questionID: q.id,
@@ -171,6 +192,7 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
         hash: additional.hash || '',
         encryptedPortion: additionalEncrypted ? additional.encryptedPortion || '' : '',
       },
+      ...(interviewProvenance ? { interviewProvenance } : {}),
     };
   });
 

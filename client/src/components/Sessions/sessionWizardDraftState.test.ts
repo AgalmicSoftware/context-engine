@@ -27,6 +27,12 @@ describe('sessionWizardDraftState', () => {
         sessionInfo: 'Draft Info',
         sessionHeader: 'https://example.test/header.png',
         autoFeatureSBTsBySessionSlug: true,
+        interviewModeEnabled: true,
+        interviewMode: {
+          enabled: true,
+          provider: 'openai',
+          realtimeModel: 'gpt-realtime-2.1',
+        },
         embeddedDeployHelperEnabled: true,
       }),
     );
@@ -49,6 +55,12 @@ describe('sessionWizardDraftState', () => {
         corsWorkerUrl: '',
         defaultSbtTags: expect.any(String),
         appearance: { colorSchemeId: 'context-engine' },
+        interviewModeEnabled: true,
+        interviewMode: {
+          enabled: true,
+          provider: 'openai',
+          realtimeModel: 'gpt-realtime-2.1',
+        },
       }),
     );
     expect(template.ai).toEqual(
@@ -64,6 +76,30 @@ describe('sessionWizardDraftState', () => {
     expect(template.telegramOnly).toBeUndefined();
     expect(template.sessionMode).toBeUndefined();
     expect(template.telegramBridgeEnabled).toBeUndefined();
+  });
+
+  it('preserves an explicit per-session interview-mode opt-out', () => {
+    expect(normalizeSessionWizardDraftShape({ interviewModeEnabled: false })).toEqual(
+      expect.objectContaining({
+        interviewModeEnabled: false,
+        interviewMode: {
+          enabled: false,
+          provider: 'openai',
+          realtimeModel: 'gpt-realtime-2.1',
+        },
+      }),
+    );
+  });
+
+  it('preserves a valid realtime model and normalizes unsupported values to the OpenAI default', () => {
+    expect(
+      normalizeSessionWizardDraftShape({ interviewMode: { realtimeModel: ' gpt-realtime-custom ' } }).interviewMode,
+    ).toEqual({ enabled: true, provider: 'openai', realtimeModel: 'gpt-realtime-custom' });
+    expect(normalizeSessionWizardDraftShape({ interviewMode: { realtimeModel: 'gpt-5' } }).interviewMode).toEqual({
+      enabled: true,
+      provider: 'openai',
+      realtimeModel: 'gpt-realtime-2.1',
+    });
   });
 
   it('preserves a cached color scheme id and normalizes invalid ids without palette values', () => {

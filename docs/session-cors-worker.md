@@ -1665,15 +1665,19 @@ Authenticated requests must include:
 - Authenticated route dispatch ordering now also routes through a shared helper:
   it preserves secret path-route checks before authenticated JSON parsing, keeps authenticated parse errors on the existing `Expected application/json.` / `Invalid JSON.` path with authenticated headers, runs non-secret action routes before secret action routes, and retains the final authenticated `404 Not found.` response contract.
 
-Anonymous exception (AI/transcribe only):
+Anonymous exception (AI/transcribe/realtime interview only):
 
 - `POST /ai` and `POST /transcribe` may run without `Authorization` only when either:
   - request includes a non-empty `apiKey`, or
   - on-chain gate authority is available and both `default` + `ai` gates are explicitly open.
+- `POST /realtime/call` does not accept a browser-supplied provider key. It may
+  run without `Authorization` only when worker-canonical anonymous AI access is
+  enabled or on-chain `default` + `ai` gates are explicitly open.
 - Anonymous `apiKey` bypass does not inherit worker secrets:
   - For `provider: "custom"` on `POST /ai`, request must include `rpcUrl` (no fallback to secret `customRpcUrl`).
 - Session scope overrides still apply to anonymous requests:
   - `scopes.ai=false` denies anonymous `POST /ai` (even when a request `apiKey` is present).
+  - `scopes.ai=false` also denies anonymous `POST /realtime/call`.
   - `scopes.transcribe=false` denies anonymous `POST /transcribe`.
 - If on-chain gate authority is unavailable/unresolved, anonymous access fails closed.
 - For the canonical default session slug (`""`), clients should send `X-Session-Slug: general` on anonymous-first attempts.
@@ -1685,9 +1689,9 @@ Anonymous exception (AI/transcribe only):
     it prefers `X-Session-Slug`, still accepts legacy `X-Group-Slug`, and preserves the current
     fail-closed missing-slug behavior when no explicit anonymous slug is provided.
   - Anonymous route dispatch now also routes through a shared helper:
-    it preserves `/transcribe` multipart parse failures before anonymous gate evaluation, keeps
+    it preserves `/transcribe` multipart and realtime SDP parse failures before anonymous gate evaluation, keeps
     request-`apiKey` bypass from touching worker secrets, retains the anonymous custom-provider
-    `rpcUrl` validation for `/ai`, and preserves downstream provider/transcribe dispatch behavior.
+    `rpcUrl` validation for `/ai`, and preserves downstream provider/transcribe/realtime dispatch behavior.
 
 ## Admin endpoints
 
@@ -1980,6 +1984,43 @@ Signed login/bootstrap requests:
     still requires on-chain `default` and `ai` gates to be explicitly open.
   - Request parsing/provider inference now routes through the AI helper:
     omitted/`default`/`auto` providers infer from `model` (`claude*` => Anthropic, slash models => OpenRouter, `gpt-*`/`o*`/`chatgpt` => OpenAI) before falling back to OpenAI.
+- `GET /agent/interview-catalog?slug=<slug>&sessionUrl=<https-session-url>`
+  (`/agent/interview-brief` remains a compatibility alias)
+  - Public, CORS-scoped, and disabled when `interviewModeEnabled=false` or
+    `interviewMode.enabled=false`.
+  - Returns only an inert JSON question catalog: `type`, `version`,
+    `sessionSlug`, `reviewUrl`, `questionSetHash`, `prefillPromptVersion`,
+    `answerContract`, and `questions`. Binary options and the 0-10 rating range
+    are explicit. It deliberately contains no agent instructions; the client-side
+    clipboard prompt carries the user's request.
+  - Reads at most 100 accessible public questions. Cloudflare-native questions
+    pass through `/storage/list` and each `/storage/read` authorization check;
+    on-chain discovery requires configured block limits and is capped at a
+    two-million-block range.
+  - Applies the session's anonymous rate-limit bucket before reading questions.
+  - The compact client clipboard prompt tells ordinary ChatGPT/Claude to search only
+    already-authorized history, memory, and connected sources directly related
+    to those questions. It rejects stale catalog versions, requests reviewable
+    response drafts with per-answer confidence and basis, shows the exact JSON
+    before encoding, and returns a clean interview link when no relevant signal
+    exists.
+  - The supplied return URL must be HTTPS (or localhost), its origin must match
+    the session's `allowOrigins` or a configured public/app/session URL, and its
+    `/session/<slug>` path must match. Existing query and fragment state are
+    stripped before the Worker supplies `reviewUrl`.
+- `POST /realtime/call?slug=<slug>` with JSON `{ "sdp": "v=0...", "instructions": "..." }`
+  - Uses the anonymous AI eligibility policy above, then exchanges the bounded
+    browser SDP offer for an OpenAI Realtime SDP answer without exposing the
+    Worker-held `openaiKey`.
+  - Preserves the browser offer byte-for-byte, including its terminal CRLF,
+    then forwards it as a filename-free `application/sdp` multipart field and
+    sends the session configuration as `application/json`, matching OpenAI's
+    Realtime call contract. Trimming the SDP can make an otherwise valid offer
+    fail with an unexpected EOF.
+  - Defaults to `gpt-realtime-2.1`, `gpt-transcribe`, server VAD, and audio
+    output. A session may set `interviewMode.realtimeModel` to another
+    `gpt-realtime*` ID. `interviewMode.provider` is reserved for future
+    providers; values other than `openai` currently return `400`.
 - `POST /transcribe` (multipart/form-data, file field `file` or `audio`)
   - Anonymous access is allowed only under the rules above (request `apiKey`, or explicit open `default+ai` gates with available on-chain authority).
   - Optional overrides: `provider` (`openai` or `custom`), `apiKey`, `rpcUrl` (custom only).

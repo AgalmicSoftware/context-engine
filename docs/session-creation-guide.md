@@ -84,7 +84,11 @@ the settings that most sessions can leave at their defaults. **Session colors**
 is the final field group and starts collapsed there; expand it to choose a
 curated color scheme and see its preview. **Who can create groups?** is a
 dropdown in the same area, constrained to **All participants** or **Admins
-only** rather than accepting freeform config text.
+only** rather than accepting freeform config text. **Voice interview modes**
+defaults on. Its adjacent **Interview voice settings** group exposes the
+OpenAI **Realtime voice model**, defaulting to `gpt-realtime-2.1`; `/new`
+publishes this as `interviewMode.realtimeModel` for both Worker-canonical and
+Arweave-backed sessions.
 
 The optional **Session end time** is a timestamp for Worker-canonical sessions.
 It must be in the future when the session is published. At that instant the
@@ -377,6 +381,8 @@ AI configuration also lives in the session metadata draft:
 - `ai.models.fast`
 - `ai.models.thinking`
 - `ai.models.transcription`
+- `interviewMode.realtimeModel` (OpenAI Realtime voice; defaults to
+  `gpt-realtime-2.1`)
 
 What gets stored where:
 

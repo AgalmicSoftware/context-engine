@@ -309,6 +309,31 @@ describe('sessionWizardWriteNormalization', () => {
     expect(metadata.telegram).toBeUndefined();
   });
 
+  test('sanitizeSessionWizardMetadataPayload preserves public interview model configuration', () => {
+    const metadata = sanitizeSessionWizardMetadataPayload(
+      {
+        slug: 'interview-session',
+        interviewModeEnabled: true,
+        interviewMode: {
+          enabled: true,
+          provider: 'openai',
+          realtimeModel: 'gpt-realtime-custom',
+        },
+      },
+      { fieldOrder: ['slug', 'interviewModeEnabled', 'interviewMode'] },
+    );
+
+    expect(metadata).toEqual({
+      slug: 'interview-session',
+      interviewModeEnabled: true,
+      interviewMode: {
+        enabled: true,
+        provider: 'openai',
+        realtimeModel: 'gpt-realtime-custom',
+      },
+    });
+  });
+
   test('publication normalization rejects invalid profiles before compiling storage metadata', () => {
     const malformedProfile = {
       profileVersion: 1,
@@ -732,6 +757,33 @@ describe('sessionWizardWriteNormalization', () => {
     });
 
     expect(payload.groupCreationPolicy).toBe('admin_only');
+    expect(payload.interviewModeEnabled).toBe(true);
+    expect(payload.interviewMode).toEqual({
+      enabled: true,
+      provider: 'openai',
+      realtimeModel: 'gpt-realtime-2.1',
+    });
+  });
+
+  test('buildSessionWizardWorkerConfigPayload preserves an explicit interview-mode opt-out', () => {
+    const payload = buildSessionWizardWorkerConfigPayload({
+      slug: 'no-interviews',
+      draft: {
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        interviewModeEnabled: false,
+        interviewMode: { realtimeModel: 'gpt-realtime-custom' },
+      },
+      account: '0x00000000000000000000000000000000000000aa',
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      workerUrl: 'https://worker.example',
+    });
+
+    expect(payload.interviewModeEnabled).toBe(false);
+    expect(payload.interviewMode).toEqual({
+      enabled: false,
+      provider: 'openai',
+      realtimeModel: 'gpt-realtime-custom',
+    });
   });
 
   test('buildSessionWizardWorkerConfigPayload keeps only the Lit public descriptor for worker-canonical Lit mode', () => {
