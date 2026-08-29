@@ -45,6 +45,7 @@ type InterviewDraftApplicationProps = {
     source: InterviewPrefillPacket['source'] | null,
     packet: InterviewPrefillPacket | null,
     included: boolean,
+    responderName: string,
   ) => void | Promise<void>;
 };
 
@@ -149,6 +150,7 @@ function SessionInterviewPanel({
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [editedAnswers, setEditedAnswers] = useState<Record<string, string>>({});
   const [includeProvenance, setIncludeProvenance] = useState(true);
+  const [includeResponderName, setIncludeResponderName] = useState(false);
   const [showAgentPrompt, setShowAgentPrompt] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
   const [promptCopied, setPromptCopied] = useState(false);
@@ -313,6 +315,7 @@ function SessionInterviewPanel({
           prefillPacket?.source || directContextSource,
           prefillPacket,
           includeProvenance,
+          includeResponderName ? String(prefillPacket?.responderContext?.name || '').trim() : '',
         );
       }
       onClose();
@@ -341,6 +344,7 @@ function SessionInterviewPanel({
     ? buildExternalInterviewKickoff({ workerUrl: resolvedWorkerUrl, sessionSlug, sessionUrl })
     : '';
   const importedContext = prefillPacket?.responderContext;
+  const importedResponderName = String(importedContext?.name || '').trim();
   const hasImportedResponderContext = Boolean(
     importedContext?.summary?.trim() || importedContext?.facts?.length,
   );
@@ -611,14 +615,27 @@ function SessionInterviewPanel({
             );
           })}
           <div className={styles.sessionInterviewReviewActions}>
-            <Label check className={styles.sessionInterviewProvenance}>
-              <Input
-                type="checkbox"
-                checked={includeProvenance}
-                onChange={(event) => setIncludeProvenance(event.target.checked)}
-              />{' '}
-              Include self-reported AI platform/model provenance with submitted responses
-            </Label>
+            <div>
+              <Label check className={styles.sessionInterviewProvenance}>
+                <Input
+                  type="checkbox"
+                  checked={includeProvenance}
+                  onChange={(event) => setIncludeProvenance(event.target.checked)}
+                />{' '}
+                Include self-reported AI platform/model provenance with submitted responses
+              </Label>
+              {importedResponderName ? (
+                <Label check className={styles.sessionInterviewProvenance}>
+                  <Input
+                    type="checkbox"
+                    checked={includeResponderName}
+                    onChange={(event) => setIncludeResponderName(event.target.checked)}
+                    data-testid={E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME}
+                  />{' '}
+                  Include “{importedResponderName}” as the responder name with submitted responses
+                </Label>
+              ) : null}
+            </div>
             <Button
               color="primary"
               onClick={() => { void applyDrafts(); }}

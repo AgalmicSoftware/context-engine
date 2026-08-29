@@ -3,7 +3,11 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import PileHologramAssistant from './PileHologramAssistant';
 import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
-import { buildPileRuntimeInitialState, createPileViewRuntimeStrategy } from './SurveyPileViewMode';
+import {
+  buildPileRuntimeInitialState,
+  createPileViewRuntimeStrategy,
+  recordInterviewProvenance,
+} from './SurveyPileViewMode';
 import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
 import {
   buildNoPendingPileSubmitFeedbackPlan,
@@ -449,6 +453,41 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(modal).toHaveAttribute('data-prefill-confidence', '0.22');
     await waitFor(() => expect(window.location.hash).toBe(''));
     rendered.unmount();
+  });
+
+  it('records opted-in names independently from optional model provenance', async () => {
+    const engine = {
+      props: { sessionConfig: {} },
+      state: {
+        surveysResponseState: [{
+          answers: { q1: { value: 'Agree' } },
+          importance: {},
+          conviction: {},
+          additionalComments: {},
+        }],
+      },
+      persistDraft: jest.fn(),
+      setState(updater, callback) {
+        this.state = { ...this.state, ...updater(this.state) };
+        callback?.();
+      },
+    };
+
+    await recordInterviewProvenance(
+      engine,
+      [{ questionId: 'q1', answer: 'Agree', confidence: 0.8 }],
+      { platform: 'claude', modelId: 'claude-example', verification: 'self_reported' },
+      { promptVersion: 'ce-interview-brief-v4', questionSetHash: 'hash' },
+      false,
+      '  Ada   Example  ',
+    );
+
+    expect(engine.state.surveysResponseState[0].interviewProvenance.q1).toMatchObject({
+      includeAiProvenance: false,
+      responderName: 'Ada Example',
+    });
+    expect(engine.state.surveysResponseState[0].interviewProvenance.q1).not.toHaveProperty('source');
+    expect(engine.persistDraft).toHaveBeenCalled();
   });
 
   it('shows and clears the pile submit empty-state feedback without submitting', async () => {

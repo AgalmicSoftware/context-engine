@@ -49,6 +49,7 @@ type ResponsePayloadEntry = UnknownRecord & {
   answer: ResponsePayloadField;
   additional: ResponsePayloadField;
   interviewProvenance?: UnknownRecord;
+  responderName?: string;
 };
 
 type ResponsePayload = UnknownRecord & {
@@ -147,8 +148,14 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
     const importance = opts.getImportanceFromSlice(surveyResponseState, q.id);
     const importanceForPayload = importance !== null ? importance : conviction;
     const rawInterviewProvenance = surveyResponseState.interviewProvenance?.[q.id];
-    const interviewSource = asRecord(asRecord(rawInterviewProvenance).source);
-    const interviewProvenance = rawInterviewProvenance && typeof rawInterviewProvenance === 'object'
+    const interviewProvenanceRecord = asRecord(rawInterviewProvenance);
+    const interviewSource = asRecord(interviewProvenanceRecord.source);
+    const includeAiProvenance = interviewProvenanceRecord.includeAiProvenance !== false;
+    const responderName = String(interviewProvenanceRecord.responderName || '')
+      .trim()
+      .replace(/\s+/g, ' ')
+      .slice(0, 160);
+    const interviewProvenance = includeAiProvenance && rawInterviewProvenance && typeof rawInterviewProvenance === 'object'
       ? {
           version: 1,
           source: {
@@ -192,6 +199,7 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
         hash: additional.hash || '',
         encryptedPortion: additionalEncrypted ? additional.encryptedPortion || '' : '',
       },
+      ...(responderName ? { responderName } : {}),
       ...(interviewProvenance ? { interviewProvenance } : {}),
     };
   });

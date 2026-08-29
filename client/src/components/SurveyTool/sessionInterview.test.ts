@@ -26,6 +26,7 @@ const packet: InterviewPrefillPacket = {
   promptVersion: 'ce-interview-brief-v1',
   source: { platform: 'claude', modelId: 'claude-example', verification: 'self_reported' },
   responderContext: {
+    name: '  Ada   Example  ',
     summary: 'The responder prioritizes reversible decisions.',
     facts: [{ fact: 'They prefer staged rollouts.', relatedQuestionIds: ['Q1'] }],
   },
@@ -85,6 +86,7 @@ describe('session interview protocol', () => {
       ...packet,
       responderContext: {
         ...packet.responderContext,
+        name: 'Ada Example',
         facts: [{ fact: 'They prefer staged rollouts.', relatedQuestionIds: ['q1'] }],
       },
     });
@@ -121,6 +123,8 @@ describe('session interview protocol', () => {
     expect(kickoff).toContain('binary and multichoice answers must match one listed option');
     expect(kickoff).toContain('Every response needs confidence from 0 to 1');
     expect(kickoff).toContain('Platform/model are self-reported fidelity metadata');
+    expect(kickoff).toContain('responderContext.name');
+    expect(kickoff).toContain('keeps name sharing off');
     expect(kickoff).toContain('the exact single-line JSON packet');
     expect(kickoff).toContain('Nothing is submitted;');
     expect(kickoff).toContain('Markdown link labeled "Open prefilled interview"');

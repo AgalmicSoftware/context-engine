@@ -1702,14 +1702,16 @@ const closeSessionVoiceModeModal = (engine: PileViewModeEngine) => {
   });
 };
 
-const recordInterviewProvenance = (
+export const recordInterviewProvenance = (
   engine: PileViewModeEngine,
   drafts: InterviewDraftResponse[],
   source: InterviewPrefillPacket['source'] | null,
   packet: InterviewPrefillPacket | null,
   included = true,
+  responderName = '',
 ) => {
   const normalizedSource = source || resolveRealtimeInterviewSource(engine.props?.sessionConfig);
+  const normalizedResponderName = String(responderName || '').trim().replace(/\s+/g, ' ').slice(0, 160);
   return new Promise<void>((resolve) => {
     engine.setState((prev: any) => {
       const states = [...(prev.surveysResponseState || [])];
@@ -1718,23 +1720,29 @@ const recordInterviewProvenance = (
       };
       const provenance = { ...(slice.interviewProvenance || {}) };
       drafts.forEach((draft) => {
-        if (!included) {
+        if (!included && !normalizedResponderName) {
           delete provenance[draft.questionId];
           return;
         }
         provenance[draft.questionId] = {
           version: 1,
-          source: normalizedSource,
-          promptVersion: packet?.promptVersion || INTERVIEW_PROMPT_VERSION,
-          questionSetHash: packet?.questionSetHash || '',
-          originalPrediction: {
-            answer: draft.answer,
-            additionalComments: draft.additionalComments || '',
-            importance: draft.importance ?? null,
-            conviction: draft.conviction ?? null,
-            confidence: draft.confidence ?? null,
-            evidence: draft.evidence || '',
-          },
+          includeAiProvenance: included,
+          ...(included
+            ? {
+                source: normalizedSource,
+                promptVersion: packet?.promptVersion || INTERVIEW_PROMPT_VERSION,
+                questionSetHash: packet?.questionSetHash || '',
+                originalPrediction: {
+                  answer: draft.answer,
+                  additionalComments: draft.additionalComments || '',
+                  importance: draft.importance ?? null,
+                  conviction: draft.conviction ?? null,
+                  confidence: draft.confidence ?? null,
+                  evidence: draft.evidence || '',
+                },
+              }
+            : {}),
+          ...(normalizedResponderName ? { responderName: normalizedResponderName } : {}),
           appliedAt: Date.now(),
         };
       });

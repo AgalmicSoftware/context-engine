@@ -357,6 +357,7 @@ describe('PolisReport cache read options', () => {
             type: 'binary',
             sessionSlug: 'demo',
             prompt: 'Shared demo prompt',
+            responderName: 'Ada Example',
             answer: { value: 'Agree', encrypted: false },
           }),
         },
@@ -379,6 +380,7 @@ describe('PolisReport cache read options', () => {
     expect(result.promptsMap).toEqual({ qDemo: 'Shared demo prompt' });
     expect(result.questions).toEqual(['qDemo']);
     expect(result.responders).toEqual(['0xdemo']);
+    expect(result.displayNamesMap).toEqual({ '0xdemo': 'Ada Example' });
     expect(JSON.stringify(result)).not.toContain('0xforeign');
     expect(JSON.stringify(result)).not.toContain('test-2');
   });

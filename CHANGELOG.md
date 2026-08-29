@@ -58,7 +58,10 @@ All notable changes to this project will be documented in this file.
   disclosure. Empty evidence-to-response mappings now show a descriptive,
   high-contrast “not enough information” notice with concrete next steps and
   hide the unchanged retry action. The bundled `demo-interview` session also
-  resolves its Worker without exposing a `worker=` query parameter.
+  resolves its Worker without exposing a `worker=` query parameter. Claude and
+  ChatGPT handoffs may now carry an already-known preferred responder name;
+  sharing it with submitted answers requires a separate default-off opt-in, and
+  opted-in names become the participant label in the results report.
 - Refreshed mounted Stats immediately after successful Cloudflare group
   mutations, evicting the affected session's short-lived Worker catalog cache
   before recounting groups and visible participants.

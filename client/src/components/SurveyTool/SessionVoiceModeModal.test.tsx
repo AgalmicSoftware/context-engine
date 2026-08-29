@@ -184,6 +184,7 @@ describe('SessionVoiceModeModal', () => {
       prefillPacket.source,
       prefillPacket,
       true,
+      '',
     ));
     await waitFor(() => expect(baseProps.onClose).toHaveBeenCalled());
   });
@@ -235,6 +236,7 @@ describe('SessionVoiceModeModal', () => {
       prefillPacket.source,
       prefillPacket,
       true,
+      '',
     ));
   });
 
@@ -351,8 +353,47 @@ describe('SessionVoiceModeModal', () => {
       expect.objectContaining({ platform: 'claude' }),
       expect.any(Object),
       false,
+      '',
     ));
     await waitFor(() => expect(baseProps.onClose).toHaveBeenCalled());
+  });
+
+  it('keeps an imported responder name private until the responder opts in', async () => {
+    const prefillPacket = {
+      version: 1 as const,
+      sessionSlug: 'demo',
+      questionSetHash: 'a'.repeat(64),
+      promptVersion: 'ce-interview-brief-v4',
+      source: { platform: 'claude' as const, modelId: 'claude-example', verification: 'self_reported' as const },
+      responderContext: { name: 'Ada Example' },
+      responses: [{ questionId: 'q1', answer: 'Draft answer', confidence: 0.8 }],
+    };
+    const first = render(<SessionVoiceModeModal {...baseProps} mode="interview" prefillPacket={prefillPacket} />);
+
+    const includeName = await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME);
+    expect(includeName).not.toBeChecked();
+    expect(screen.getByText(/Include “Ada Example” as the responder name/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    await waitFor(() => expect(baseProps.onRecordProvenance).toHaveBeenCalledWith(
+      expect.any(Array),
+      prefillPacket.source,
+      prefillPacket,
+      true,
+      '',
+    ));
+    first.unmount();
+
+    jest.clearAllMocks();
+    render(<SessionVoiceModeModal {...baseProps} mode="interview" prefillPacket={prefillPacket} />);
+    fireEvent.click(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME));
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    await waitFor(() => expect(baseProps.onRecordProvenance).toHaveBeenCalledWith(
+      expect.any(Array),
+      prefillPacket.source,
+      prefillPacket,
+      true,
+      'Ada Example',
+    ));
   });
 
   it('rejects stale imported context before calling the mapper', async () => {

@@ -213,6 +213,7 @@ describe('surveyToolDraftState', () => {
       source: { platform: 'claude', modelId: 'claude-example', verification: 'self_reported' },
       promptVersion: 'ce-interview-brief-v4',
       questionSetHash: 'abc123',
+      responderName: 'Ada Example',
       originalPrediction: { answer: 'Agree', confidence: 0.65 },
       appliedAt: 12345,
     };

@@ -860,7 +860,7 @@ export function buildRatingMatrixFromRealData(
   options: { sessionSlug?: unknown } = {},
 ): RatingMatrixBuildResult {
   if (!realQR || typeof realQR !== 'object') {
-    return { matrix: null, responders: [], questions: [], promptsMap: {} };
+    return { matrix: null, responders: [], questions: [], promptsMap: {}, displayNamesMap: {} };
   }
   const sessionSlug = options.sessionSlug || '';
 
@@ -868,6 +868,7 @@ export function buildRatingMatrixFromRealData(
   const participantsSet = new Set<string>();
   const binaryQuestions: Array<{ qId: string; prompt: string }> = [];
   const promptsMap: StringMap = {};
+  const displayNamesMap: StringMap = {};
 
   Object.entries(realQR).forEach(([qId, arr]) => {
     if (!Array.isArray(arr) || arr.length === 0) return;
@@ -896,14 +897,20 @@ export function buildRatingMatrixFromRealData(
       if (isPolisDemoFixturePayload(parsed)) continue;
       if (!isPolisRealRowAllowedForSession(r, parsed, sessionSlug)) continue;
       if (r?.responder) {
-        participantsSet.add(String(r.responder).toLowerCase());
+        const responder = String(r.responder).toLowerCase();
+        participantsSet.add(responder);
+        const responderName = String(parsed?.responderName || '')
+          .trim()
+          .replace(/\s+/g, ' ')
+          .slice(0, 160);
+        if (responderName && !displayNamesMap[responder]) displayNamesMap[responder] = responderName;
       }
     }
   });
 
   // No usable questions or participants => bail out
   if (binaryQuestions.length === 0 || participantsSet.size === 0) {
-    return { matrix: null, responders: [], questions: [], promptsMap: {} };
+    return { matrix: null, responders: [], questions: [], promptsMap: {}, displayNamesMap: {} };
   }
 
   // Deterministic ordering
@@ -953,6 +960,7 @@ export function buildRatingMatrixFromRealData(
     responders: respondersSorted,
     questions: questionsSorted,
     promptsMap,
+    displayNamesMap,
   };
 }
 

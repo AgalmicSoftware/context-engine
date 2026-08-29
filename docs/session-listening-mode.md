@@ -69,6 +69,12 @@ submission and login rules still apply. When the default-on provenance option
 is retained, submitted response metadata keeps the original model prediction,
 the final edited answer, prompt/question-set revision, and self-reported source
 platform/model.
+An external AI may also include a preferred responder name that it already
+knows from the permitted context. The review modal shows a separate
+**Include “name” as the responder name** checkbox only when a name was supplied,
+and that checkbox is off by default. The name is attached to submitted answers
+only after this explicit opt-in; declining it does not affect the drafts or the
+platform/model provenance choice.
 
 ## Ordinary ChatGPT or Claude, without MCP
 
@@ -119,7 +125,10 @@ confidence and basis, source platform, exact model ID when available, and
 has a defensible indirect signal and explains its basis; only questions with no
 relevant signal are omitted. Model identity is collected to measure prediction
 fidelity across models and may be `unknown` when the interface does not expose
-one. The packet contains no credential and is carried in `#prefill=...`, so it
+one. A packet may include a preferred name only when the external AI already
+knows it; the prompt forbids inference and the client does not submit it unless
+the responder enables the default-off name control. The packet contains no
+credential and is carried in `#prefill=...`, so it
 is not sent to the web host as an HTTP request target. The fragment is still
 intentionally readable by scripts on the destination page, which is why source
 identifiers are forbidden and the exact JSON is shown first. Prompt version
@@ -144,7 +153,9 @@ The review surface shows confidence as a progress meter and keeps each evidence
 basis collapsed until requested. Binary drafts reuse the normal pile-view
 Agree/Unsure/Disagree controls. Applied source/model provenance is persisted in
 the anonymous draft together with its answer, so logging in after review does
-not remove the attribution before final submission.
+not remove the attribution before final submission. An explicitly opted-in
+responder name follows the same draft migration and becomes the report display
+name for that response address.
 
 The external AI's own memory/source availability is platform-controlled.
 Context Engine neither grants it new access nor verifies the claimed model ID;

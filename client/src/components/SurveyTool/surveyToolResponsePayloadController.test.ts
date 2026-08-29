@@ -77,6 +77,8 @@ describe('surveyToolResponsePayloadController', () => {
           conviction: {},
           interviewProvenance: {
             q1: {
+              includeAiProvenance: true,
+              responderName: '  Ada   Example  ',
               source: { platform: 'claude', modelId: 'claude-example', verification: 'self_reported' },
               promptVersion: 'ce-interview-brief-v1',
               questionSetHash: 'hash',
@@ -91,6 +93,7 @@ describe('surveyToolResponsePayloadController', () => {
     expect(result.responses![0]).toEqual(
       expect.objectContaining({
         answer: expect.objectContaining({ value: 'Final edited answer' }),
+        responderName: 'Ada Example',
         interviewProvenance: {
           version: 1,
           source: { platform: 'claude', modelId: 'claude-example', verification: 'self_reported' },
@@ -101,6 +104,33 @@ describe('surveyToolResponsePayloadController', () => {
         },
       }),
     );
+  });
+
+  it('submits an opted-in responder name without leaking opted-out model provenance', () => {
+    const result = buildResponsePayload(
+      defaultOpts({
+        questionPool: [{ id: 'q1', type: 'freeform', prompt: 'What matters?' }],
+        surveyResponseState: {
+          answers: { q1: { value: 'Reviewed answer' } },
+          additionalComments: {},
+          importance: {},
+          conviction: {},
+          interviewProvenance: {
+            q1: {
+              includeAiProvenance: false,
+              responderName: 'Ada Example',
+              source: { platform: 'claude', modelId: 'claude-example', verification: 'self_reported' },
+            },
+          },
+        } as never,
+      }),
+    );
+
+    expect(result.responses![0]).toMatchObject({
+      answer: expect.objectContaining({ value: 'Reviewed answer' }),
+      responderName: 'Ada Example',
+    });
+    expect(result.responses![0]).not.toHaveProperty('interviewProvenance');
   });
 
   it('importance falls back to conviction when null', () => {

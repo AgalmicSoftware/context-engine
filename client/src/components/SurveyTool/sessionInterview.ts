@@ -40,6 +40,7 @@ export type InterviewPrefillPacket = {
   promptVersion?: string;
   source: InterviewSource;
   responderContext: {
+    name?: string;
     summary?: string;
     facts?: Array<{ fact: string; evidence?: string; relatedQuestionIds?: string[] }>;
   };
@@ -270,6 +271,9 @@ export const normalizeInterviewPrefillPacket = (value: unknown): InterviewPrefil
       verification: 'self_reported',
     },
     responderContext: {
+      ...(toTrimmedString(responderContext.name)
+        ? { name: toTrimmedString(responderContext.name).replace(/\s+/g, ' ').slice(0, 160) }
+        : {}),
       ...(toTrimmedString(responderContext.summary)
         ? { summary: toTrimmedString(responderContext.summary).slice(0, 12000) }
         : {}),
@@ -329,14 +333,14 @@ export const buildExternalInterviewKickoff = ({
     '',
     'Search only conversation history, memory, and connected sources already available to you for evidence directly related to its questions. Do not seek new access or invent a position.',
     '',
-    'Draft direct statements and reasonable inferences. Give inferences lower confidence and explain their basis; omit only questions with no signal. Follow each question type exactly: binary and multichoice answers must match one listed option, and ratings are numbers from 0 to 10.',
+    'Draft direct statements and reasonable inferences; lower confidence for inferences and explain their basis. Omit only questions with no signal; binary and multichoice answers must match one listed option; ratings are 0-10.',
     '',
-    'Keep the result concise. Do not audit the catalog or list omitted questions. Show: (1) a table of question, answer, confidence, and basis; (2) the exact single-line JSON packet; (3) its review link.',
+    'Return only: (1) a question/answer/confidence/basis table; (2) the exact single-line JSON packet; (3) its review link. Do not audit the catalog or list omissions.',
     '',
     'Use catalog values in this compact shape:',
-    '{"version":1,"sessionSlug":"...","questionSetHash":"...","promptVersion":"...","source":{"platform":"chatgpt|claude|other","modelId":"specific ID or unknown","verification":"self_reported"},"responderContext":{"summary":"optional"},"responses":[{"questionId":"...","answer":"...","confidence":0.35,"evidence":"short basis"}]}',
+    '{"version":1,"sessionSlug":"...","questionSetHash":"...","promptVersion":"...","source":{"platform":"chatgpt|claude|other","modelId":"specific ID or unknown","verification":"self_reported"},"responderContext":{"name":"optional known preferred name","summary":"optional"},"responses":[{"questionId":"...","answer":"...","confidence":0.35,"evidence":"short basis"}]}',
     '',
-    'Every response needs confidence from 0 to 1 and evidence: 0-.39 weak inference, .40-.69 moderate support, .70-1 direct/repeated support. Optional additionalComments, importance (0-100), and conviction (0-100) may be added when useful. Keep evidence non-identifying: no quotes, conversation/document names, URLs, timestamps, account IDs, or hidden reasoning. Platform/model are self-reported fidelity metadata; use "unknown" if unavailable.',
+    'Every response needs confidence from 0 to 1 and evidence: 0-.39 weak inference, .40-.69 moderate support, .70-1 direct/repeated support. Optional additionalComments, importance, and conviction range from 0-100. Evidence must omit quotes, source names, URLs, timestamps, account IDs, and hidden reasoning. Platform/model are self-reported fidelity metadata; use "unknown" if unavailable. If you already know my preferred name, set responderContext.name; never infer it. Review keeps name sharing off by default.',
     '',
     'Encode the exact JSON bytes as unpadded base64url and append them to catalog.reviewUrl as #prefill=PACKET. Do not POST or upload it. Nothing is submitted; the link opens editable drafts for my review. Present it as a Markdown link labeled "Open prefilled interview" so the long encoded URL is only the link target, never visible text or a code block. If Markdown links are unsupported, return the raw URL. If there are no responses, return the clean reviewUrl.',
   ].join('\n');
