@@ -157,18 +157,12 @@ const EncryptionPanel = ({
       {!isCollapsed && (
         <div className={styles.panelBody}>
           {isWorkerCanonical && !showOnChainGateControls ? (
-            <>
-              <div className={styles.modeSummaryList} data-testid="ce-new-worker-native-access-summary">
-                Session access uses passkeys and Worker roles. Choose who may create more Groups under More options.
-                SBT/Lit gates require Advanced hybrid.
-              </div>
-              <SessionWorkerGroupDraftsPanel
-                drafts={pendingWorkerGroupDrafts}
-                onAdd={onAddPendingWorkerGroupDraft}
-                onRemove={onRemovePendingWorkerGroupDraft}
-                onUpdate={onUpdatePendingWorkerGroupDraft}
-              />
-            </>
+            <SessionWorkerGroupDraftsPanel
+              drafts={pendingWorkerGroupDrafts}
+              onAdd={onAddPendingWorkerGroupDraft}
+              onRemove={onRemovePendingWorkerGroupDraft}
+              onUpdate={onUpdatePendingWorkerGroupDraft}
+            />
           ) : null}
           {showOnChainGateControls ? (
             <>

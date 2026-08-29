@@ -101,6 +101,13 @@ describe('EncryptionPanel', () => {
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CREATE_SBT)).toBeInTheDocument();
   });
 
+  it('shows the Worker Group drafts without redundant Session Access copy', () => {
+    renderEncryptionPanel({ isWorkerCanonical: true, showOnChainGateControls: false });
+
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_GROUP_DRAFTS)).toBeInTheDocument();
+    expect(screen.queryByText(/Session access uses passkeys and Worker roles/i)).not.toBeInTheDocument();
+  });
+
   it('updates gate mode controls without touching selector handlers', () => {
     const updateEncryptionGate = jest.fn();
     const handleGateAddSbt = jest.fn();
