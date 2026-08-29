@@ -139,7 +139,7 @@ describe('SessionListeningPanel', () => {
     render(<SessionListeningPanel sessionSlug="demo" />);
 
     expect(screen.getByText('2:05')).toBeInTheDocument();
-    expect(screen.getAllByText('Recording').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Recording')).toHaveLength(1);
     expect(screen.getByLabelText('Stop recording')).toBeInTheDocument();
     expect(screen.getByLabelText('Pause recording')).toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_LISTENING_START)).not.toBeInTheDocument();
@@ -163,7 +163,7 @@ describe('SessionListeningPanel', () => {
 
     render(<SessionListeningPanel sessionSlug="demo" />);
 
-    expect(screen.getAllByText('Paused').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Paused')).toHaveLength(1);
     expect(screen.getByText('0:45')).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText('Resume recording'));
     expect(resumeRecording).toHaveBeenCalledTimes(1);

@@ -380,15 +380,12 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   const isRecordButtonSpinning = recorder.isStopping || isStarting;
   const statusLabel = recorder.isStopping
     ? 'Stopping recorder'
-    : recorder.isPaused
-      ? 'Paused'
-      : recorder.isRecording
-        ? 'Recording'
-        : isStarting
-          ? 'Starting recorder'
-          : hasTranscript
-            ? 'Transcript ready'
-            : '';
+    : isStarting
+      ? 'Starting recorder'
+      : hasTranscript && !isRecorderSessionActive
+        ? 'Transcript ready'
+        : '';
+  const shouldShowMeta = Boolean(statusLabel || hasTranscript || isGenerating);
 
   useEffect(() => {
     if (!isGenerating) {
@@ -557,7 +554,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
         </div>
       )}
 
-      {hasVisibleStatus && (
+      {shouldShowMeta && (
         <div className={styles.sessionListeningMeta} aria-live="polite">
           {statusLabel && <span>{statusLabel}</span>}
           {hasTranscript && (
