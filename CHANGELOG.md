@@ -67,6 +67,11 @@ All notable changes to this project will be documented in this file.
   fields. Locked answers and comments are represented by redacted markers in
   that comparison, with final plaintext captured before encryption solely to
   calculate the edit signal.
+  External Claude/ChatGPT handoffs now also self-report research coverage:
+  distinct prior chats, memory items, connected sources, and user-authored
+  statements searched or used. The review shows those counts, unknown searched
+  totals remain `null`, and opted-in model provenance retains them beside the
+  final prediction comparison for fidelity analysis.
 - Refreshed mounted Stats immediately after successful Cloudflare group
   mutations, evicting the affected session's short-lived Worker catalog cache
   before recounting groups and visible participants.

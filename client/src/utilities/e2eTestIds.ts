@@ -255,6 +255,7 @@ export const E2E_TESTIDS = Object.freeze({
   SESSION_VOICE_MODE_GROUP: 'ce-session-voice-mode-group',
   SESSION_INTERVIEW_PANEL: 'ce-session-interview-panel',
   SESSION_INTERVIEW_CONTEXT: 'ce-session-interview-context',
+  SESSION_INTERVIEW_RESEARCH_COVERAGE: 'ce-session-interview-research-coverage',
   SESSION_INTERVIEW_STATUS: 'ce-session-interview-status',
   SESSION_INTERVIEW_START: 'ce-session-interview-start',
   SESSION_INTERVIEW_STOP: 'ce-session-interview-stop',

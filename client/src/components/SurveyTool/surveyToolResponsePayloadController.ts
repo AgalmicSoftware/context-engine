@@ -27,6 +27,29 @@ const buildRedactedComparisonValue = (): UnknownRecord => ({
   reason: 'encrypted_field',
 });
 
+const normalizeResearchCoverageCount = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0) return null;
+  return Math.min(1_000_000, Math.floor(number));
+};
+
+const buildSubmittedResearchCoverage = (value: unknown): UnknownRecord | null => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const coverage = asRecord(value);
+  const searchScopeNote = String(coverage.searchScopeNote || '').trim().slice(0, 500);
+  return {
+    historyChatsSearched: normalizeResearchCoverageCount(coverage.historyChatsSearched),
+    historyChatsUsed: normalizeResearchCoverageCount(coverage.historyChatsUsed),
+    memoryItemsSearched: normalizeResearchCoverageCount(coverage.memoryItemsSearched),
+    memoryItemsUsed: normalizeResearchCoverageCount(coverage.memoryItemsUsed),
+    connectedSourcesSearched: normalizeResearchCoverageCount(coverage.connectedSourcesSearched),
+    connectedSourcesUsed: normalizeResearchCoverageCount(coverage.connectedSourcesUsed),
+    userStatementsUsed: normalizeResearchCoverageCount(coverage.userStatementsUsed),
+    ...(searchScopeNote ? { searchScopeNote } : {}),
+  };
+};
+
 type ResponseFieldState = UnknownRecord & {
   value?: unknown;
   encrypted?: unknown;
@@ -199,6 +222,7 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
     const rawInterviewProvenance = surveyResponseState.interviewProvenance?.[q.id];
     const interviewProvenanceRecord = asRecord(rawInterviewProvenance);
     const interviewSource = asRecord(interviewProvenanceRecord.source);
+    const researchCoverage = buildSubmittedResearchCoverage(interviewSource.researchCoverage);
     const includeAiProvenance = interviewProvenanceRecord.includeAiProvenance !== false;
     const includePredictionComparison = interviewProvenanceRecord.includePredictionComparison === true;
     const originalPrediction = asRecord(interviewProvenanceRecord.originalPrediction);
@@ -269,6 +293,7 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
                   platform: String(interviewSource.platform || 'other').slice(0, 64),
                   modelId: String(interviewSource.modelId || '').slice(0, 256),
                   verification: 'self_reported',
+                  ...(researchCoverage ? { researchCoverage } : {}),
                 },
                 promptVersion: String(rawInterviewProvenance.promptVersion || '').slice(0, 128),
                 questionSetHash: String(rawInterviewProvenance.questionSetHash || '').slice(0, 256),

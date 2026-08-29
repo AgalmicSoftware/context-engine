@@ -25,6 +25,7 @@ import {
   type InterviewDraftResponse,
   type InterviewPrefillPacket,
   type InterviewQuestion,
+  type InterviewResearchCoverage,
   type SessionVoiceMode,
 } from './sessionInterview';
 import {
@@ -105,6 +106,25 @@ const displayResponderContext = (packet: InterviewPrefillPacket | null): string 
     .map((entry) => String(entry?.fact || '').trim())
     .filter(Boolean)
     .join('\n');
+};
+
+const describeResearchCoverage = (coverage: InterviewResearchCoverage | undefined): string[] => {
+  if (!coverage) return [];
+  const describeResource = (
+    label: string,
+    searched: number | null,
+    used: number | null,
+  ): string => {
+    if (searched === null && used === null) return '';
+    if (searched !== null) return `${label}: ${used === null ? 'unknown' : used} used / ${searched} searched`;
+    return `${label}: ${used} used`;
+  };
+  return [
+    describeResource('History chats', coverage.historyChatsSearched, coverage.historyChatsUsed),
+    describeResource('Memories', coverage.memoryItemsSearched, coverage.memoryItemsUsed),
+    describeResource('Connected sources', coverage.connectedSourcesSearched, coverage.connectedSourcesUsed),
+    coverage.userStatementsUsed !== null ? `${coverage.userStatementsUsed} user statements used` : '',
+  ].filter(Boolean);
 };
 
 type SessionInterviewPanelProps = InterviewDraftApplicationProps & {
@@ -348,6 +368,8 @@ function SessionInterviewPanel({
     : '';
   const importedContext = prefillPacket?.responderContext;
   const importedResponderName = String(importedContext?.name || '').trim();
+  const researchCoverage = prefillPacket?.source?.researchCoverage;
+  const researchCoverageDetails = describeResearchCoverage(researchCoverage);
   const hasImportedResponderContext = Boolean(
     importedContext?.summary?.trim() || importedContext?.facts?.length,
   );
@@ -370,6 +392,18 @@ function SessionInterviewPanel({
             data-testid={E2E_TESTIDS.SESSION_INTERVIEW_CONTEXT}
           />
         </div>
+      ) : null}
+
+      {researchCoverage ? (
+        <section
+          className={styles.sessionInterviewResearchCoverage}
+          aria-label="Self-reported agent research coverage"
+          data-testid={E2E_TESTIDS.SESSION_INTERVIEW_RESEARCH_COVERAGE}
+        >
+          <strong>Self-reported agent research coverage</strong>
+          <span>{researchCoverageDetails.join(' · ') || 'Coverage counts unavailable'}</span>
+          {researchCoverage.searchScopeNote ? <small>{researchCoverage.searchScopeNote}</small> : null}
+        </section>
       ) : null}
 
       <audio ref={audioRef} className={styles.sessionListeningSrOnly} aria-label="Realtime interviewer audio" />

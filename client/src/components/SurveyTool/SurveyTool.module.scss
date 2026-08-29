@@ -3333,6 +3333,28 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   resize: vertical;
 }
 
+.sessionInterviewResearchCoverage {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid var(--ce-card-border);
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-surface-sunken);
+  color: var(--ce-panel-text);
+
+  strong {
+    color: var(--ce-panel-text);
+    font-size: 0.84rem;
+  }
+
+  span,
+  small {
+    color: color-mix(in srgb, var(--ce-panel-text) 78%, transparent);
+    font-size: 0.78rem;
+    line-height: 1.4;
+  }
+}
+
 .sessionInterviewActions {
   display: flex;
   flex-wrap: wrap;

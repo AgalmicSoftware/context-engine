@@ -31,6 +31,18 @@ export type InterviewSource = {
   platform: 'chatgpt' | 'claude' | 'other';
   modelId: string;
   verification: 'self_reported';
+  researchCoverage?: InterviewResearchCoverage;
+};
+
+export type InterviewResearchCoverage = {
+  historyChatsSearched: number | null;
+  historyChatsUsed: number | null;
+  memoryItemsSearched: number | null;
+  memoryItemsUsed: number | null;
+  connectedSourcesSearched: number | null;
+  connectedSourcesUsed: number | null;
+  userStatementsUsed: number | null;
+  searchScopeNote?: string;
 };
 
 export type InterviewPrefillPacket = {
@@ -73,6 +85,30 @@ const normalizePlatform = (value: unknown): InterviewSource['platform'] => {
 const clampRating = (value: unknown): number | undefined => {
   const number = Number(value);
   return Number.isFinite(number) ? Math.max(0, Math.min(100, number)) : undefined;
+};
+
+const normalizeCoverageCount = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0) return null;
+  return Math.min(1_000_000, Math.floor(number));
+};
+
+const normalizeResearchCoverage = (value: unknown): InterviewResearchCoverage | null => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const coverage = asRecord(value);
+  return {
+    historyChatsSearched: normalizeCoverageCount(coverage.historyChatsSearched),
+    historyChatsUsed: normalizeCoverageCount(coverage.historyChatsUsed),
+    memoryItemsSearched: normalizeCoverageCount(coverage.memoryItemsSearched),
+    memoryItemsUsed: normalizeCoverageCount(coverage.memoryItemsUsed),
+    connectedSourcesSearched: normalizeCoverageCount(coverage.connectedSourcesSearched),
+    connectedSourcesUsed: normalizeCoverageCount(coverage.connectedSourcesUsed),
+    userStatementsUsed: normalizeCoverageCount(coverage.userStatementsUsed),
+    ...(toTrimmedString(coverage.searchScopeNote)
+      ? { searchScopeNote: toTrimmedString(coverage.searchScopeNote).slice(0, 500) }
+      : {}),
+  };
 };
 
 const normalizeDraftCandidates = (
@@ -230,6 +266,7 @@ export const normalizeInterviewPrefillPacket = (value: unknown): InterviewPrefil
   if (Number(packet.version) !== 1) return null;
   const sessionSlug = toTrimmedString(packet.sessionSlug).toLowerCase();
   const source = asRecord(packet.source);
+  const researchCoverage = normalizeResearchCoverage(source.researchCoverage);
   const responderContext = asRecord(packet.responderContext);
   const questionSetHash = toTrimmedString(packet.questionSetHash).toLowerCase();
   const promptVersion = toTrimmedString(packet.promptVersion);
@@ -269,6 +306,7 @@ export const normalizeInterviewPrefillPacket = (value: unknown): InterviewPrefil
       platform: normalizePlatform(source.platform),
       modelId: toTrimmedString(source.modelId).slice(0, 256),
       verification: 'self_reported',
+      ...(researchCoverage ? { researchCoverage } : {}),
     },
     responderContext: {
       ...(toTrimmedString(responderContext.name)
@@ -335,12 +373,12 @@ export const buildExternalInterviewKickoff = ({
     '',
     'Draft direct statements and reasonable inferences; lower confidence for inferences and explain their basis. Omit only questions with no signal; binary and multichoice answers must match one listed option; ratings are 0-10.',
     '',
-    'Return only: (1) a question/answer/confidence/basis table; (2) the exact single-line JSON packet; (3) its review link. Do not audit the catalog or list omissions.',
+    'Return only: (1) one short research-coverage line; (2) a question/answer/confidence/basis table; (3) the exact single-line JSON packet; (4) its review link. Do not audit the catalog or list omissions.',
     '',
     'Use catalog values in this compact shape:',
-    '{"version":1,"sessionSlug":"...","questionSetHash":"...","promptVersion":"...","source":{"platform":"chatgpt|claude|other","modelId":"specific ID or unknown","verification":"self_reported"},"responderContext":{"name":"optional known preferred name","summary":"optional"},"responses":[{"questionId":"...","answer":"...","confidence":0.35,"evidence":"short basis"}]}',
+    '{"version":1,"sessionSlug":"...","questionSetHash":"...","promptVersion":"...","source":{"platform":"chatgpt|claude|other","modelId":"specific ID or unknown","verification":"self_reported","researchCoverage":{"historyChatsSearched":null,"historyChatsUsed":0,"memoryItemsSearched":null,"memoryItemsUsed":0,"connectedSourcesSearched":null,"connectedSourcesUsed":0,"userStatementsUsed":0,"searchScopeNote":"optional"}},"responderContext":{"name":"optional known preferred name","summary":"optional"},"responses":[{"questionId":"...","answer":"...","confidence":0.35,"evidence":"short basis"}]}',
     '',
-    'Every response needs confidence from 0 to 1 and evidence: 0-.39 weak inference, .40-.69 moderate support, .70-1 direct/repeated support. Optional additionalComments, importance, and conviction range from 0-100. Evidence must omit quotes, source names, URLs, timestamps, account IDs, and hidden reasoning. Platform/model are self-reported fidelity metadata; use "unknown" if unavailable. If you already know my preferred name, set responderContext.name; never infer it. Review keeps name sharing off by default.',
+    'Every response needs confidence from 0 to 1 and evidence: 0-.39 weak inference, .40-.69 moderate support, .70-1 direct/repeated support. Optional additionalComments, importance, and conviction range from 0-100. Evidence must omit quotes, source names, URLs, timestamps, account IDs, and hidden reasoning. Coverage counts are self-reported: count distinct prior chats/memories/sources searched and actually used, plus distinct user-authored statements used; do not count your own prior output. Use null when the platform does not reveal a searched count, and 0 only when none were used; searchScopeNote may describe count limitations only. Platform/model are self-reported fidelity metadata; use "unknown" if unavailable. If you already know my preferred name, set responderContext.name; never infer it. Review keeps name sharing off by default.',
     '',
     'Encode the exact JSON bytes as unpadded base64url and append them to catalog.reviewUrl as #prefill=PACKET. Do not POST or upload it. Nothing is submitted; the link opens editable drafts for my review. Present it as a Markdown link labeled "Open prefilled interview" so the long encoded URL is only the link target, never visible text or a code block. If Markdown links are unsupported, return the raw URL. If there are no responses, return the clean reviewUrl.',
   ].join('\n');

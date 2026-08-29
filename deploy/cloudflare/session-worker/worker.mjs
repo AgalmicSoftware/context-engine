@@ -76389,6 +76389,19 @@ var buildInterviewBriefDocument = ({
     rating: { min: 0, max: 10, step: 1 },
     multichoice: "Use one exact question option."
   },
+  researchCoverageContract: {
+    countFields: [
+      "historyChatsSearched",
+      "historyChatsUsed",
+      "memoryItemsSearched",
+      "memoryItemsUsed",
+      "connectedSourcesSearched",
+      "connectedSourcesUsed",
+      "userStatementsUsed"
+    ],
+    unknownSearchedCount: null,
+    verification: "self_reported"
+  },
   questions
 });
 var dispatchInterviewBriefRequest = async ({

@@ -31,6 +31,19 @@ test('buildInterviewBriefDocument returns only an inert question catalog', () =>
       rating: { min: 0, max: 10, step: 1 },
       multichoice: 'Use one exact question option.',
     },
+    researchCoverageContract: {
+      countFields: [
+        'historyChatsSearched',
+        'historyChatsUsed',
+        'memoryItemsSearched',
+        'memoryItemsUsed',
+        'connectedSourcesSearched',
+        'connectedSourcesUsed',
+        'userStatementsUsed',
+      ],
+      unknownSearchedCount: null,
+      verification: 'self_reported',
+    },
     questions: [{ id: 'q1', type: 'freeform', prompt: 'What matters?', options: [] }],
   });
   assert.equal('instructions' in document, false);
@@ -75,6 +88,8 @@ test('dispatchInterviewBriefRequest returns public questions and a stable revisi
   assert.equal(body.reviewUrl, 'https://app.example/session/demo?mode=interview');
   assert.deepEqual(body.answerContract.binary, ['Agree', 'Unsure', 'Disagree']);
   assert.deepEqual(body.answerContract.rating, { min: 0, max: 10, step: 1 });
+  assert.equal(body.researchCoverageContract.verification, 'self_reported');
+  assert.equal(body.researchCoverageContract.unknownSearchedCount, null);
   assert.equal('instructions' in body, false);
 });
 

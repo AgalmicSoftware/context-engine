@@ -127,7 +127,13 @@ showing the encoded payload; raw-URL fallback remains allowed for interfaces
 without clickable Markdown. The packet records the session slug, question-set
 hash, prompt version, an optional responder summary, proposed response drafts, per-draft
 confidence and basis, source platform, exact model ID when available, and
-`self_reported` verification. Low-confidence responses are allowed when the AI
+`self_reported` verification. It also carries self-reported research coverage:
+distinct prior chats, memory items, and connected sources searched and used,
+plus the number of distinct user-authored statements used as evidence. A
+searched count is `null` when the platform does not expose it; zero means the AI
+reports that it used none. The review modal shows these counts before drafts are
+applied, and retained model provenance keeps them beside the eventual prediction
+comparison. Low-confidence responses are allowed when the AI
 has a defensible indirect signal and explains its basis; only questions with no
 relevant signal are omitted. Model identity is collected to measure prediction
 fidelity across models and may be `unknown` when the interface does not expose
@@ -142,8 +148,10 @@ identifiers are forbidden and the exact JSON is shown first. Prompt version
 the distinct `/agent/interview-catalog` URL to avoid stale external fetches. The
 catalog makes the application answer contract explicit: binary responses use
 `Agree`, `Unsure`, or `Disagree`; ratings use 0-10; and multichoice responses
-must use an exact listed option. The client continues to accept version 1-3
-packets from previously copied prompts.
+must use an exact listed option. Its additive `researchCoverageContract` lists
+the count fields and labels them self-reported without turning the catalog into
+agent instructions. The client continues to accept version 1-3 packets from
+previously copied prompts.
 
 When Context Engine opens that link, it validates the packet, requires the
 session slug and question-set hash to match, removes the fragment from browser

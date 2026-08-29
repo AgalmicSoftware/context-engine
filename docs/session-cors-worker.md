@@ -1990,9 +1990,10 @@ Signed login/bootstrap requests:
     `interviewMode.enabled=false`.
   - Returns only an inert JSON question catalog: `type`, `version`,
     `sessionSlug`, `reviewUrl`, `questionSetHash`, `prefillPromptVersion`,
-    `answerContract`, and `questions`. Binary options and the 0-10 rating range
-    are explicit. It deliberately contains no agent instructions; the client-side
-    clipboard prompt carries the user's request.
+    `answerContract`, `researchCoverageContract`, and `questions`. Binary options,
+    the 0-10 rating range, and the additive self-reported research-coverage count
+    fields are explicit. It deliberately contains no agent instructions; the
+    client-side clipboard prompt carries the user's request.
   - Reads at most 100 accessible public questions. Cloudflare-native questions
     pass through `/storage/list` and each `/storage/read` authorization check;
     on-chain discovery requires configured block limits and is capped at a
@@ -2002,8 +2003,9 @@ Signed login/bootstrap requests:
     already-authorized history, memory, and connected sources directly related
     to those questions. It rejects stale catalog versions, requests reviewable
     response drafts with per-answer confidence and basis, shows the exact JSON
-    before encoding, and returns a clean interview link when no relevant signal
-    exists.
+    before encoding, asks for distinct searched/used chat, memory, source, and
+    user-statement counts (`null` when a platform cannot expose a searched count),
+    and returns a clean interview link when no relevant signal exists.
   - The supplied return URL must be HTTPS (or localhost), its origin must match
     the session's `allowOrigins` or a configured public/app/session URL, and its
     `/session/<slug>` path must match. Existing query and fragment state are

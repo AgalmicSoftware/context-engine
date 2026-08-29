@@ -196,7 +196,21 @@ describe('SessionVoiceModeModal', () => {
       sessionSlug: 'demo',
       questionSetHash: 'a'.repeat(64),
       promptVersion: 'ce-interview-brief-v3',
-      source: { platform: 'claude' as const, modelId: 'claude-example', verification: 'self_reported' as const },
+      source: {
+        platform: 'claude' as const,
+        modelId: 'claude-example',
+        verification: 'self_reported' as const,
+        researchCoverage: {
+          historyChatsSearched: null,
+          historyChatsUsed: 8,
+          memoryItemsSearched: 20,
+          memoryItemsUsed: 4,
+          connectedSourcesSearched: 3,
+          connectedSourcesUsed: 1,
+          userStatementsUsed: 15,
+          searchScopeNote: 'Chat search did not expose a total scanned count.',
+        },
+      },
       responderContext: { summary: 'A tentative related signal.' },
       responses: [{
         questionId: 'q1',
@@ -214,6 +228,13 @@ describe('SessionVoiceModeModal', () => {
     );
 
     expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).toBeInTheDocument();
+    const coverage = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_RESEARCH_COVERAGE);
+    expect(coverage).toHaveTextContent('Self-reported agent research coverage');
+    expect(coverage).toHaveTextContent('History chats: 8 used');
+    expect(coverage).toHaveTextContent('Memories: 4 used / 20 searched');
+    expect(coverage).toHaveTextContent('Connected sources: 1 used / 3 searched');
+    expect(coverage).toHaveTextContent('15 user statements used');
+    expect(coverage).toHaveTextContent('Chat search did not expose a total scanned count.');
     expect(screen.getByDisplayValue('A cautious prediction')).toBeInTheDocument();
     expect(screen.getByLabelText('Prediction confidence: 22% (Weak inference)')).toBeInTheDocument();
     expect(screen.getByRole('progressbar', { name: 'Confidence for What matters?' })).toHaveAttribute(
