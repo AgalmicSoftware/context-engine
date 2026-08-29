@@ -1,3 +1,24 @@
+.embeddedDraftForm {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  color: var(--ce-control-text);
+  font-family: var(--ce-font-mono);
+}
+
+.embeddedDraftForm .sectionHeading {
+  color: var(--ce-control-text);
+  font-size: 1.05rem;
+}
+
+.embeddedDraftForm .field label,
+.embeddedDraftForm .imageLabel,
+.embeddedDraftForm .metadataCard > label,
+.embeddedDraftForm .accessHelp,
+.embeddedDraftForm .formHelp {
+  color: color-mix(in srgb, var(--ce-control-text) 82%, transparent);
+}
+
 .sessionContext {
   display: flex;
   align-items: center;

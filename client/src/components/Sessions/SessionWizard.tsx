@@ -2421,6 +2421,13 @@ const SessionWizard = ({
       publishPendingWorkerGroupDrafts({
         ...input,
         signTypedAdminAction,
+        workerAuthContext: {
+          account: input.signerAccount,
+          providerLike: provider,
+          chainId: draft.networkChainId || registryChainId,
+        },
+        onDraftImageUploaded: (groupId, imageUrl) =>
+          updatePendingWorkerGroupDraft(groupId, { imageUrl, imageFile: null }),
       }),
     handleRegisterGroup,
     generateSessionId,

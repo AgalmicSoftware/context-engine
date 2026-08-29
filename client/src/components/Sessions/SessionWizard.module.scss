@@ -3222,7 +3222,7 @@ $muted-text: var(--ce-panel-text-muted);
   padding: 16px;
   border: 1px solid color-mix(in srgb, var(--ce-control-text) 28%, transparent);
   border-radius: var(--ce-radius-10);
-  background: color-mix(in srgb, var(--ce-control-bg) 88%, transparent);
+  background: color-mix(in srgb, var(--ce-session-chrome) 82%, transparent);
   color: var(--ce-control-text);
 }
 
@@ -3303,31 +3303,7 @@ $muted-text: var(--ce-panel-text-muted);
   padding: 13px;
   border: 1px solid color-mix(in srgb, var(--ce-control-text) 24%, transparent);
   border-radius: var(--ce-radius-8);
-  background: color-mix(in srgb, var(--ce-session-chrome) 38%, var(--ce-control-bg));
-
-  label {
-    display: grid;
-    gap: 5px;
-    color: var(--ce-control-text);
-    font-size: 0.78rem;
-    font-weight: 800;
-  }
-
-  label span {
-    opacity: 0.68;
-    font-weight: 500;
-  }
-
-  input,
-  textarea,
-  select {
-    width: 100%;
-    border: 1px solid color-mix(in srgb, var(--ce-control-text) 38%, transparent);
-    border-radius: var(--ce-radius-6);
-    background: var(--ce-control-bg);
-    color: var(--ce-control-text);
-    padding: 8px 10px;
-  }
+  background: color-mix(in srgb, var(--ce-session-chrome) 58%, transparent);
 }
 
 .pendingWorkerGroupCardHeader {
@@ -3350,15 +3326,8 @@ $muted-text: var(--ce-panel-text-muted);
   }
 }
 
-.pendingWorkerGroupOptions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
 @media (max-width: 640px) {
-  .pendingWorkerGroupAddRow > div,
-  .pendingWorkerGroupOptions {
+  .pendingWorkerGroupAddRow > div {
     grid-template-columns: 1fr;
   }
 }

@@ -2,19 +2,35 @@ import { publishPendingWorkerGroupDrafts } from './sessionWizardPendingWorkerGro
 import type { PendingWorkerGroupDraft } from './sessionWizardPendingWorkerGroups';
 
 const SESSION_ID = `0x${'12'.repeat(16)}`;
+const ADMIN_ADDRESS = `0x${'34'.repeat(20)}`;
 const draft: PendingWorkerGroupDraft = {
   groupId: 'group-draft-1',
   label: 'Research team',
   description: 'Reviews research questions.',
+  imageUrl: 'https://images.example.test/research.png',
+  tags: ['policy'],
+  documentURLs: ['https://docs.example.test/brief'],
+  memberLimit: '25',
+  joinEndsAt: '2099-01-02T03:04',
+  adminAddress: ADMIN_ADDRESS,
   joinMode: 'admin_add',
   memberVisibility: 'members',
 };
 
 const payloadGroup = {
-  ...draft,
+  groupId: draft.groupId,
+  label: draft.label,
+  description: draft.description,
+  imageUrl: draft.imageUrl,
+  tags: ['research', 'policy'],
+  documentURLs: draft.documentURLs,
+  memberLimit: 25,
+  joinEndsAt: new Date('2099-01-02T03:04').toISOString(),
+  adminAddress: ADMIN_ADDRESS,
+  joinMode: draft.joinMode,
+  memberVisibility: draft.memberVisibility,
   sessionSlug: 'test-session',
   sessionId: SESSION_ID,
-  tags: ['research'],
 };
 
 describe('publishPendingWorkerGroupDrafts', () => {
@@ -42,7 +58,7 @@ describe('publishPendingWorkerGroupDrafts', () => {
         sessionConfig: { defaultGroupTags: ['research'] },
         sessionId: SESSION_ID,
         sessionSlug: 'test-session',
-        signerAccount: `0x${'34'.repeat(20)}`,
+        signerAccount: ADMIN_ADDRESS,
         workerUrl: 'https://worker.example',
         signTypedAdminAction,
         postSignedRequestImpl,
@@ -55,12 +71,17 @@ describe('publishPendingWorkerGroupDrafts', () => {
         path: '/admin/groups/create',
         body: expect.objectContaining({
           sessionId: SESSION_ID,
-          group: expect.objectContaining({ groupId: draft.groupId, tags: ['research'] }),
+          group: expect.objectContaining({
+            groupId: draft.groupId,
+            tags: ['research', 'policy'],
+            documentURLs: ['https://docs.example.test/brief'],
+            memberLimit: 25,
+          }),
         }),
       }),
     );
     expect(signTypedAdminAction).toHaveBeenCalledWith(
-      expect.objectContaining({ targetSlug: 'test-session', accountOverride: `0x${'34'.repeat(20)}` }),
+      expect.objectContaining({ targetSlug: 'test-session', accountOverride: ADMIN_ADDRESS }),
     );
   });
 
@@ -82,7 +103,7 @@ describe('publishPendingWorkerGroupDrafts', () => {
         sessionConfig: { defaultGroupTags: ['research'] },
         sessionId: SESSION_ID,
         sessionSlug: 'test-session',
-        signerAccount: `0x${'34'.repeat(20)}`,
+        signerAccount: ADMIN_ADDRESS,
         workerUrl: 'https://worker.example',
         signTypedAdminAction: jest.fn(),
         postSignedRequestImpl,
@@ -93,5 +114,71 @@ describe('publishPendingWorkerGroupDrafts', () => {
       'groups/create',
       'groups/list',
     ]);
+  });
+
+  it('uploads a selected draft image after Worker verification and persists its retry URL', async () => {
+    const imageFile = new File(['image'], 'research.png', { type: 'image/png' });
+    const uploadImageImpl = jest.fn(async () => 'https://worker.example/storage/read?id=image-1');
+    const getWorkerTokenImpl = jest.fn(async () => 'worker-token');
+    const onDraftImageUploaded = jest.fn();
+    const postSignedRequestImpl = jest.fn(async () => ({
+      data: {
+        sessionSlug: 'test-session',
+        sessionId: SESSION_ID,
+        group: payloadGroup,
+      },
+    }));
+    const imageDraft: PendingWorkerGroupDraft = {
+      ...draft,
+      imageUrl: '',
+      imageFile,
+      adminAddress: '',
+    };
+
+    await expect(
+      publishPendingWorkerGroupDrafts({
+        drafts: [imageDraft],
+        sessionConfig: { defaultGroupTags: ['research'], storageProfile: { backend: 'cloudflare' } },
+        sessionId: SESSION_ID,
+        sessionSlug: 'test-session',
+        signerAccount: ADMIN_ADDRESS,
+        workerUrl: 'https://worker.example',
+        signTypedAdminAction: jest.fn(),
+        postSignedRequestImpl,
+        uploadImageImpl,
+        getWorkerTokenImpl,
+        onDraftImageUploaded,
+      }),
+    ).resolves.toEqual({ created: 1, reused: 0 });
+
+    expect(getWorkerTokenImpl).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionSlug: 'test-session',
+        workerUrl: 'https://worker.example',
+      }),
+    );
+    expect(uploadImageImpl).toHaveBeenCalledWith(
+      expect.objectContaining({
+        file: imageFile,
+        sessionSlug: 'test-session',
+        workerUrl: 'https://worker.example',
+        credentialToken: 'worker-token',
+        context: { account: ADMIN_ADDRESS },
+      }),
+    );
+    expect(onDraftImageUploaded).toHaveBeenCalledWith(
+      imageDraft.groupId,
+      'https://worker.example/storage/read?id=image-1',
+    );
+    expect(postSignedRequestImpl).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.objectContaining({
+          group: expect.objectContaining({
+            imageUrl: 'https://worker.example/storage/read?id=image-1',
+            adminAddress: ADMIN_ADDRESS,
+          }),
+        }),
+      }),
+    );
   });
 });

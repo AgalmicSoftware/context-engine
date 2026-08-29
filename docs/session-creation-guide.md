@@ -451,14 +451,20 @@ or Lit key. Participant and anonymous scopes, plus any login gate, are evaluated
 by the session worker.
 
 Before publishing a worker-canonical session, the **Session Access** section can
-queue Groups with a name, optional description, join mode, and member
-visibility. These drafts stay in the recoverable browser wizard state; they do
-not pretend to be live records before a canonical Worker origin, slug, and
-session ID exist. Publish first verifies the Worker config, then creates the
-queued Groups with stable IDs. If creation is interrupted, retrying reuses an
-identical already-created ID and continues instead of duplicating it. A
-conflicting record or other Worker error leaves the wizard recoverable and
-reports the failure instead of marking the session complete.
+queue Groups through the same form used by normal Worker Group creation. Each
+draft supports a name, description, image URL or local image file, tags, public
+HTTPS reference URLs, member limit, self-join deadline, group-admin address,
+join mode, and member visibility. Durable text and URL metadata stays in the
+recoverable browser wizard state. A selected local image file stays only in the
+current tab; after the canonical Worker origin, slug, and session ID are
+verified, publish uploads it through the selected session storage and writes
+the resulting public URL back into the draft before creating the Group. Publish
+then creates queued Groups with stable IDs and merges the session's default
+Group tags with each draft's tags. If creation is interrupted, retrying reuses
+an identical already-created ID and continues instead of duplicating it. A
+conflicting record, failed image upload, or other Worker error leaves the
+wizard recoverable and reports the failure instead of marking the session
+complete.
 
 After publishing, the session's Groups section manages those native Cloudflare
 records and adds the full editing surface. The worker admin supplies the group name, optional

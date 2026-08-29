@@ -3,6 +3,7 @@ import type {
   WorkerGroupJoinMode,
   WorkerGroupMemberVisibility,
 } from '../../domains/worker/workerGroupPorts';
+import { validateWorkerGroupImageFile } from '../../domains/worker/workerGroupImageUpload';
 import { generateSessionId } from './sessionWizardCoreUtils';
 
 export const MAX_PENDING_WORKER_GROUP_DRAFTS = 100;
@@ -11,11 +12,54 @@ export type PendingWorkerGroupDraft = {
   groupId: string;
   label: string;
   description: string;
+  imageUrl: string;
+  imageFile?: Blob | null;
+  tags: string[];
+  documentURLs: string[];
+  memberLimit: string;
+  joinEndsAt: string;
+  adminAddress: string;
   joinMode: WorkerGroupJoinMode;
   memberVisibility: WorkerGroupMemberVisibility;
 };
 
 const toText = (value: unknown): string => String(value ?? '').trim();
+
+const isBlob = (value: unknown): value is Blob => typeof Blob !== 'undefined' && value instanceof Blob;
+
+const isSafeHttpsUrl = (value: string): boolean => {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'https:' && !parsed.username && !parsed.password && value.length <= 2048;
+  } catch {
+    return false;
+  }
+};
+
+const normalizeTags = (value: unknown): string[] => {
+  const seen = new Set<string>();
+  return (Array.isArray(value) ? value : [])
+    .map(toText)
+    .filter((tag) => {
+      const key = tag.toLowerCase();
+      if (!tag || tag.length > 64 || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 20);
+};
+
+const normalizeDocumentURLs = (value: unknown): string[] => {
+  const seen = new Set<string>();
+  return (Array.isArray(value) ? value : [])
+    .map(toText)
+    .filter((url) => {
+      if (!isSafeHttpsUrl(url) || seen.has(url)) return false;
+      seen.add(url);
+      return true;
+    })
+    .slice(0, 10);
+};
 
 const normalizeJoinMode = (value: unknown): WorkerGroupJoinMode =>
   value === 'admin_add' ? 'admin_add' : 'open';
@@ -38,6 +82,13 @@ export const createPendingWorkerGroupDraft = (
     groupId: toText(overrides.groupId) || generateSessionId(),
     label: toText(label).slice(0, 120),
     description: toText(overrides.description).slice(0, 500),
+    imageUrl: toText(overrides.imageUrl).slice(0, 2048),
+    ...(isBlob(overrides.imageFile) ? { imageFile: overrides.imageFile } : {}),
+    tags: normalizeTags(overrides.tags),
+    documentURLs: normalizeDocumentURLs(overrides.documentURLs),
+    memberLimit: toText(overrides.memberLimit),
+    joinEndsAt: toText(overrides.joinEndsAt),
+    adminAddress: toText(overrides.adminAddress),
     joinMode,
     memberVisibility: normalizeMemberVisibility(overrides.memberVisibility, joinMode),
   };
@@ -75,6 +126,45 @@ export const validatePendingWorkerGroupDrafts = (value: unknown): string[] => {
     if (toText(raw.description).length > 500) {
       issues.push(`Group ${index + 1} description must be 500 characters or fewer.`);
     }
+    const imageUrl = toText(raw.imageUrl);
+    if (imageUrl && !isSafeHttpsUrl(imageUrl)) {
+      issues.push(`Group ${index + 1} image must use a public HTTPS URL.`);
+    }
+    if (raw.imageFile != null) {
+      const imageIssue = validateWorkerGroupImageFile(raw.imageFile);
+      if (imageIssue) issues.push(`Group ${index + 1} image: ${imageIssue}`);
+    }
+    if (
+      raw.tags != null &&
+      (!Array.isArray(raw.tags) || raw.tags.length > 20 || normalizeTags(raw.tags).length !== raw.tags.length)
+    ) {
+      issues.push(`Group ${index + 1} tags must be unique, non-empty, and 64 characters or fewer.`);
+    }
+    if (
+      raw.documentURLs != null &&
+      (!Array.isArray(raw.documentURLs) ||
+        raw.documentURLs.length > 10 ||
+        normalizeDocumentURLs(raw.documentURLs).length !== raw.documentURLs.length)
+    ) {
+      issues.push(`Group ${index + 1} references must be unique public HTTPS URLs.`);
+    }
+    const memberLimit = toText(raw.memberLimit);
+    const memberLimitNumber = Number(memberLimit);
+    if (
+      memberLimit &&
+      (!Number.isSafeInteger(memberLimitNumber) || memberLimitNumber < 1 || memberLimitNumber > 1000)
+    ) {
+      issues.push(`Group ${index + 1} member limit must be a whole number from 1 to 1000.`);
+    }
+    const joinEndsAt = toText(raw.joinEndsAt);
+    const joinEndsAtTime = joinEndsAt ? new Date(joinEndsAt).getTime() : 0;
+    if (joinEndsAt && (!Number.isFinite(joinEndsAtTime) || joinEndsAtTime <= Date.now())) {
+      issues.push(`Group ${index + 1} join deadline must be in the future.`);
+    }
+    const adminAddress = toText(raw.adminAddress);
+    if (adminAddress && !/^0x[0-9a-fA-F]{40}$/.test(adminAddress)) {
+      issues.push(`Group ${index + 1} admin address must be a valid EVM address.`);
+    }
   });
   normalized.forEach((draft, index) => {
     if (!draft.label) issues.push(`Group ${index + 1} needs a name.`);
@@ -83,18 +173,43 @@ export const validatePendingWorkerGroupDrafts = (value: unknown): string[] => {
 };
 
 export const buildPendingWorkerGroupInput = ({
+  defaultAdminAddress = '',
   defaultTags = [],
   draft,
+  preparedImageUrl = '',
 }: {
+  defaultAdminAddress?: string;
   defaultTags?: string[];
   draft: PendingWorkerGroupDraft;
-}): Omit<WorkerGroup, 'sessionSlug'> => ({
-  groupId: draft.groupId,
-  label: draft.label,
-  ...(draft.description ? { description: draft.description } : {}),
-  ...(defaultTags.length ? { tags: defaultTags } : {}),
-  joinMode: draft.joinMode,
-  memberVisibility: draft.joinMode === 'open' && draft.memberVisibility === 'admin_only'
-    ? 'session'
-    : draft.memberVisibility,
-});
+  preparedImageUrl?: string;
+}): Omit<WorkerGroup, 'sessionSlug'> => {
+  const tags = normalizeTags([...defaultTags, ...draft.tags]);
+  const memberLimit = Number(draft.memberLimit);
+  const imageUrl = toText(preparedImageUrl || draft.imageUrl);
+  const adminAddress = toText(draft.adminAddress || defaultAdminAddress);
+  return {
+    groupId: draft.groupId,
+    label: draft.label,
+    ...(draft.description ? { description: draft.description } : {}),
+    ...(imageUrl ? { imageUrl } : {}),
+    ...(tags.length ? { tags } : {}),
+    ...(draft.documentURLs.length ? { documentURLs: draft.documentURLs } : {}),
+    ...(Number.isSafeInteger(memberLimit) && memberLimit > 0 ? { memberLimit } : {}),
+    ...(draft.joinEndsAt ? { joinEndsAt: new Date(draft.joinEndsAt).toISOString() } : {}),
+    ...(adminAddress ? { adminAddress } : {}),
+    joinMode: draft.joinMode,
+    memberVisibility:
+      draft.joinMode === 'open' && draft.memberVisibility === 'admin_only'
+        ? 'session'
+        : draft.memberVisibility,
+  };
+};
+
+export const serializePendingWorkerGroupDrafts = (
+  value: unknown,
+): Array<Omit<PendingWorkerGroupDraft, 'imageFile'>> =>
+  normalizePendingWorkerGroupDrafts(value).map((draft) => {
+    const durableDraft: Partial<PendingWorkerGroupDraft> = { ...draft };
+    delete durableDraft.imageFile;
+    return durableDraft as Omit<PendingWorkerGroupDraft, 'imageFile'>;
+  });

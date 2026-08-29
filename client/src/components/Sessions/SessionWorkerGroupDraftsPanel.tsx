@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faTrash } from '@fortawesome/free-solid-svg-icons';
+import WorkerGroupCreateForm from '../Shared/WorkerGroupCreateForm';
 import styles from './SessionWizard.module.scss';
 import type { PendingWorkerGroupDraft } from './sessionWizardPendingWorkerGroups';
 
@@ -66,7 +67,12 @@ const SessionWorkerGroupDraftsPanel = ({
       {drafts.length ? (
         <div className={styles.pendingWorkerGroupList}>
           {drafts.map((draft, index) => (
-            <article key={draft.groupId} className={styles.pendingWorkerGroupCard}>
+            <article
+              key={draft.groupId}
+              className={styles.pendingWorkerGroupCard}
+              data-testid="ce-new-worker-group-draft"
+              data-ce-group-index={index}
+            >
               <div className={styles.pendingWorkerGroupCardHeader}>
                 <strong>Group {index + 1}</strong>
                 <button
@@ -77,58 +83,44 @@ const SessionWorkerGroupDraftsPanel = ({
                   <FontAwesomeIcon icon={faTrash} />
                 </button>
               </div>
-              <label>
-                Name
-                <input
-                  value={draft.label}
-                  maxLength={120}
-                  required
-                  onChange={(event) => onUpdate(draft.groupId, { label: event.target.value })}
-                />
-              </label>
-              <label>
-                Description <span>optional</span>
-                <textarea
-                  value={draft.description}
-                  maxLength={500}
-                  rows={2}
-                  onChange={(event) => onUpdate(draft.groupId, { description: event.target.value })}
-                />
-              </label>
-              <div className={styles.pendingWorkerGroupOptions}>
-                <label>
-                  Joining
-                  <select
-                    value={draft.joinMode}
-                    onChange={(event) =>
-                      onUpdate(draft.groupId, {
-                        joinMode: event.target.value === 'admin_add' ? 'admin_add' : 'open',
-                      })
-                    }
-                  >
-                    <option value="open">Open join</option>
-                    <option value="admin_add">Admin adds members</option>
-                  </select>
-                </label>
-                <label>
-                  Visible to
-                  <select
-                    value={draft.memberVisibility}
-                    onChange={(event) =>
-                      onUpdate(draft.groupId, {
-                        memberVisibility:
-                          event.target.value === 'members' || event.target.value === 'admin_only'
-                            ? event.target.value
-                            : 'session',
-                      })
-                    }
-                  >
-                    <option value="session">Session participants</option>
-                    <option value="members">Group members</option>
-                    {draft.joinMode === 'admin_add' ? <option value="admin_only">Admins only</option> : null}
-                  </select>
-                </label>
-              </div>
+              <WorkerGroupCreateForm
+                embedded={true}
+                busy={false}
+                description={draft.description}
+                descriptionTestId="ce-new-worker-group-draft-description"
+                imageFile={draft.imageFile || null}
+                imageTestId="ce-new-worker-group-draft-image"
+                imageUrl={draft.imageUrl}
+                tags={draft.tags}
+                documentURLs={draft.documentURLs}
+                memberLimit={draft.memberLimit}
+                joinEndsAt={draft.joinEndsAt}
+                adminAddress={draft.adminAddress}
+                joinMode={draft.joinMode}
+                joinModeTestId="ce-new-worker-group-draft-join-mode"
+                label={draft.label}
+                labelTestId="ce-new-worker-group-draft-label"
+                memberVisibility={draft.memberVisibility}
+                memberVisibilityTestId="ce-new-worker-group-draft-visibility"
+                rootTestId="ce-new-worker-group-draft-form"
+                sessionSlug="pending-session"
+                submitTestId="ce-new-worker-group-draft-submit"
+                deferImageUpload={true}
+                deferredImageStatusText="Image ready in this tab. It will upload after the session Worker is deployed."
+                onDescriptionChange={(description) => onUpdate(draft.groupId, { description })}
+                onDocumentURLsChange={(documentURLs) => onUpdate(draft.groupId, { documentURLs })}
+                onImageFileChange={(imageFile) => onUpdate(draft.groupId, { imageFile })}
+                onImageUrlChange={(imageUrl) => onUpdate(draft.groupId, { imageUrl })}
+                onJoinEndsAtChange={(joinEndsAt) => onUpdate(draft.groupId, { joinEndsAt })}
+                onJoinModeChange={(joinMode) => onUpdate(draft.groupId, { joinMode })}
+                onLabelChange={(label) => onUpdate(draft.groupId, { label })}
+                onMemberLimitChange={(memberLimit) => onUpdate(draft.groupId, { memberLimit })}
+                onMemberVisibilityChange={(memberVisibility) => onUpdate(draft.groupId, { memberVisibility })}
+                onAdminAddressChange={(adminAddress) => onUpdate(draft.groupId, { adminAddress })}
+                onTagsChange={(tags) => onUpdate(draft.groupId, { tags })}
+                onReset={() => undefined}
+                onSubmit={() => undefined}
+              />
             </article>
           ))}
         </div>

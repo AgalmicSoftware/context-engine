@@ -510,6 +510,13 @@ describe('sessionWizardDraftState', () => {
           groupId: 'draft-group-1',
           label: 'Research team',
           description: '',
+          imageUrl: 'https://images.example.test/research.png',
+          imageFile: new File(['image'], 'research.png', { type: 'image/png' }),
+          tags: ['research'],
+          documentURLs: ['https://docs.example.test/brief'],
+          memberLimit: '25',
+          joinEndsAt: '2099-01-02T03:04',
+          adminAddress: `0x${'34'.repeat(20)}`,
           joinMode: 'open',
           memberVisibility: 'session',
         },
@@ -553,6 +560,12 @@ describe('sessionWizardDraftState', () => {
             groupId: 'draft-group-1',
             label: 'Research team',
             description: '',
+            imageUrl: 'https://images.example.test/research.png',
+            tags: ['research'],
+            documentURLs: ['https://docs.example.test/brief'],
+            memberLimit: '25',
+            joinEndsAt: '2099-01-02T03:04',
+            adminAddress: `0x${'34'.repeat(20)}`,
             joinMode: 'open',
             memberVisibility: 'session',
           },
@@ -575,6 +588,7 @@ describe('sessionWizardDraftState', () => {
     expect(payload.deployForm.apiToken).toBeUndefined();
     expect(payload.deployForm.accountId).toBeUndefined();
     expect(payload.workerRequirementProof).toBeUndefined();
+    expect(payload.pendingWorkerGroupDrafts[0].imageFile).toBeUndefined();
     expect(JSON.stringify(payload)).not.toContain('cf-secret');
     expect(JSON.stringify(payload)).not.toContain('"apiToken":"secret"');
   });

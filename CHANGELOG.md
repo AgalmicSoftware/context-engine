@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Brought pre-deployment Cloudflare Worker Group drafts to feature parity with
+  normal Group creation: `/session/new` now queues image URLs or deferred local
+  image uploads, tags, public reference URLs, member limits, join deadlines,
+  admin addresses, join modes, and member visibility. Publish uploads local
+  artwork only after Worker identity verification, merges session default tags,
+  and preserves the uploaded URL for safe retries.
 - Kept answer and additional-comment encryption controls independent by default:
   locking an answer no longer visually or actually encrypts its comments unless
   the user explicitly selects **same as answer** or a mandatory gate applies.

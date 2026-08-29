@@ -33,7 +33,7 @@ import {
   type SessionModeProfile,
 } from '../../utilities/session/sessionModeProfile';
 import type { AnyRecord } from '../shellTypes';
-import { normalizePendingWorkerGroupDrafts } from './sessionWizardPendingWorkerGroups';
+import { serializePendingWorkerGroupDrafts } from './sessionWizardPendingWorkerGroups';
 
 const { getPathRpcUrl } = rpcDefaults;
 
@@ -501,7 +501,7 @@ export const buildSessionWizardCacheWritePayload = ({
     // Regression guard: pending CREATE2 SBT drafts remain tab-memory-only;
     // this durable wizard cache must never contain their deploy or claim secrets.
     pendingSbtDrafts: [],
-    pendingWorkerGroupDrafts: normalizePendingWorkerGroupDrafts(pendingWorkerGroupDrafts),
+    pendingWorkerGroupDrafts: serializePendingWorkerGroupDrafts(pendingWorkerGroupDrafts),
     encryptedFieldGates,
     gateSelections,
     defaultGateId,

@@ -5,6 +5,10 @@ import {
   type PostSignedWorkerGroupRequest,
   type WorkerGroup,
 } from '../../domains/worker/workerGroupPorts';
+import { uploadWorkerGroupImage } from '../../domains/worker/workerGroupImageUpload';
+import { resolveSessionStorageBackend } from '../../utilities/storage/sessionStorageConfig';
+import { STORAGE_BACKENDS } from '../../utilities/storage/storageRefs';
+import { getWorkerSessionToken } from '../../utilities/worker/workerAuth';
 import { postSignedAdminWorkerRequest } from '../Admin/adminPageSignedWorkerRequest';
 import type { AnyRecord } from '../shellTypes';
 import {
@@ -30,13 +34,22 @@ type PublishPendingWorkerGroupsInput = {
   signerAccount: string;
   workerUrl: string;
   signTypedAdminAction: SignPendingWorkerGroupAdminAction;
+  workerAuthContext?: unknown;
+  onDraftImageUploaded?: (groupId: string, imageUrl: string) => void;
+  getWorkerTokenImpl?: typeof getWorkerSessionToken;
   postSignedRequestImpl?: typeof postSignedAdminWorkerRequest;
+  uploadImageImpl?: typeof uploadWorkerGroupImage;
 };
 const comparableGroup = (group: Partial<WorkerGroup>) => ({
   groupId: String(group.groupId || '').trim(),
   label: String(group.label || '').trim(),
   description: String(group.description || '').trim(),
+  imageUrl: String(group.imageUrl || '').trim(),
   tags: Array.isArray(group.tags) ? group.tags : [],
+  documentURLs: Array.isArray(group.documentURLs) ? group.documentURLs : [],
+  memberLimit: Number(group.memberLimit || 0),
+  joinEndsAt: String(group.joinEndsAt || '').trim(),
+  adminAddress: String(group.adminAddress || '').trim().toLowerCase(),
   joinMode: group.joinMode || 'open',
   memberVisibility: group.memberVisibility || 'session',
 });
@@ -55,7 +68,11 @@ export const publishPendingWorkerGroupDrafts = async ({
   signerAccount,
   workerUrl,
   signTypedAdminAction,
+  workerAuthContext,
+  onDraftImageUploaded,
+  getWorkerTokenImpl = getWorkerSessionToken,
   postSignedRequestImpl = postSignedAdminWorkerRequest,
+  uploadImageImpl = uploadWorkerGroupImage,
 }: PublishPendingWorkerGroupsInput): Promise<{ created: number; reused: number }> => {
   const issues = validatePendingWorkerGroupDrafts(drafts);
   if (issues.length) throw new Error(issues[0]);
@@ -83,7 +100,42 @@ export const publishPendingWorkerGroupDrafts = async ({
   let created = 0;
   let reused = 0;
   for (const draft of normalizedDrafts) {
-    const group = buildPendingWorkerGroupInput({ defaultTags, draft });
+    let preparedImageUrl = draft.imageUrl;
+    if (draft.imageFile && !preparedImageUrl) {
+      const uploadSessionConfig = {
+        ...(sessionConfig && typeof sessionConfig === 'object' && !Array.isArray(sessionConfig)
+          ? (sessionConfig as AnyRecord)
+          : {}),
+        slug: sessionSlug,
+        sessionId,
+        corsWorkerUrl: workerUrl,
+      };
+      const credentialToken =
+        resolveSessionStorageBackend(uploadSessionConfig, { resource: 'images', encrypted: false }) ===
+        STORAGE_BACKENDS.CLOUDFLARE
+          ? await getWorkerTokenImpl({
+              sessionSlug,
+              sessionConfig: uploadSessionConfig,
+              context: workerAuthContext || { account: signerAccount },
+              workerUrl,
+            })
+          : '';
+      preparedImageUrl = await uploadImageImpl({
+        file: draft.imageFile,
+        sessionSlug,
+        sessionConfig: uploadSessionConfig,
+        workerUrl,
+        credentialToken,
+        context: workerAuthContext || { account: signerAccount },
+      });
+      onDraftImageUploaded?.(draft.groupId, preparedImageUrl);
+    }
+    const group = buildPendingWorkerGroupInput({
+      defaultAdminAddress: signerAccount,
+      defaultTags,
+      draft,
+      preparedImageUrl,
+    });
     try {
       await createWorkerGroup({ group, sessionId, sessionSlug, postSignedRequest });
       created += 1;

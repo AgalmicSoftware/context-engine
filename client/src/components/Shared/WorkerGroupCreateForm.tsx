@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEraser, faPlus, faTimes } from '@fortawesome/free-solid-svg-icons';
 import type { WorkerGroupJoinMode, WorkerGroupMemberVisibility } from '../../domains/worker/workerGroupPorts';
@@ -11,6 +11,9 @@ import styles from './WorkerGroupCreateForm.module.scss';
 type WorkerGroupCreateFormProps = {
   busy: boolean;
   description: string;
+  embedded?: boolean;
+  deferredImageStatusText?: string;
+  imageFile?: Blob | null;
   imageUrl: string;
   label: string;
   tags?: string[];
@@ -33,6 +36,7 @@ type WorkerGroupCreateFormProps = {
   participantDefaults?: boolean;
   onDescriptionChange: (value: string) => void;
   onDocumentURLsChange?: (value: string[]) => void;
+  onImageFileChange?: (value: Blob | null) => void;
   onImageFileUpload?: (file: Blob) => Promise<string>;
   onImageUrlChange: (value: string) => void;
   onJoinEndsAtChange?: (value: string) => void;
@@ -47,6 +51,7 @@ type WorkerGroupCreateFormProps = {
   deferImageUpload?: boolean;
   submitDisabled?: boolean;
   submitLabel?: string;
+  rootTestId?: string;
 };
 
 type WorkerGroupCreateMessageProps = {
@@ -96,9 +101,12 @@ export const WorkerGroupCreateMessage = ({
 
 const WorkerGroupCreateForm = ({
   busy,
+  deferredImageStatusText = 'Image ready. It will upload after you sign in.',
   description,
   descriptionTestId,
   deferImageUpload = false,
+  embedded = false,
+  imageFile,
   imageTestId,
   imageUrl,
   tags = [],
@@ -115,6 +123,7 @@ const WorkerGroupCreateForm = ({
   memberVisibilityTestId,
   onDescriptionChange,
   onDocumentURLsChange,
+  onImageFileChange,
   onImageFileUpload,
   onImageUrlChange,
   onJoinEndsAtChange,
@@ -133,9 +142,10 @@ const WorkerGroupCreateForm = ({
   submitDisabled = false,
   submitLabel = 'Create Group',
   submitTestId,
+  rootTestId = 'ce-session-worker-group-create',
 }: WorkerGroupCreateFormProps) => {
   const [useImageUrl, setUseImageUrl] = useState(true);
-  const [selectedImageFile, setSelectedImageFile] = useState<Blob | null>(null);
+  const [internalImageFile, setInternalImageFile] = useState<Blob | null>(null);
   const [imageStatus, setImageStatus] = useState('');
   const [imageStatusTone, setImageStatusTone] = useState<'default' | 'loading' | 'error'>('default');
   const [imageUploadBusy, setImageUploadBusy] = useState(false);
@@ -145,6 +155,14 @@ const WorkerGroupCreateForm = ({
   const imageRequestIdRef = useRef(0);
   const previousImageUrlRef = useRef(imageUrl);
   const preserveSelectedFileOnUrlClearRef = useRef(false);
+  const selectedImageFile = imageFile === undefined ? internalImageFile : imageFile;
+  const setSelectedImageFile = useCallback(
+    (nextFile: Blob | null) => {
+      if (imageFile === undefined) setInternalImageFile(nextFile);
+      onImageFileChange?.(nextFile);
+    },
+    [imageFile, onImageFileChange],
+  );
 
   const resetImage = () => {
     imageRequestIdRef.current += 1;
@@ -162,7 +180,7 @@ const WorkerGroupCreateForm = ({
   useEffect(() => {
     imageRequestIdRef.current += 1;
     setUseImageUrl(true);
-    setSelectedImageFile(null);
+    setInternalImageFile(null);
     setImageStatus('');
     setImageStatusTone('default');
     setImageUploadBusy(false);
@@ -183,7 +201,16 @@ const WorkerGroupCreateForm = ({
       }
     }
     previousImageUrlRef.current = imageUrl;
-  }, [imageUrl]);
+  }, [imageUrl, setSelectedImageFile]);
+
+  useEffect(() => {
+    if (!imageFile) return;
+    setUseImageUrl(false);
+    if (deferImageUpload) {
+      setImageStatus(deferredImageStatusText);
+      setImageStatusTone('default');
+    }
+  }, [deferImageUpload, deferredImageStatusText, imageFile]);
 
   const uploadImageFile = async (file: Blob | null | undefined): Promise<string> => {
     const validationError = validateWorkerGroupImageFile(file);
@@ -203,7 +230,7 @@ const WorkerGroupCreateForm = ({
       onImageUrlChange('');
     }
     if (deferImageUpload) {
-      setImageStatus('Image ready. It will upload after you sign in.');
+      setImageStatus(deferredImageStatusText);
       setImageStatusTone('default');
       return '';
     }
@@ -330,27 +357,32 @@ const WorkerGroupCreateForm = ({
   };
 
   return (
-    <section className={createStyles.createGroupExpanded} data-testid="ce-session-worker-group-create">
-      <div className={createStyles.headerContainer}>
-        <div className={createStyles.titleCluster}>
-          <h1 className={createStyles.createGroupTitle}>Create Group</h1>
+    <section
+      className={embedded ? styles.embeddedDraftForm : createStyles.createGroupExpanded}
+      data-testid={rootTestId}
+    >
+      {!embedded ? (
+        <div className={createStyles.headerContainer}>
+          <div className={createStyles.titleCluster}>
+            <h1 className={createStyles.createGroupTitle}>Create Group</h1>
+          </div>
+          {hasDraft ? (
+            <button
+              type="button"
+              className={createStyles.clearFormButton}
+              disabled={busy || imageUploadBusy}
+              onClick={() => {
+                resetImage();
+                onReset();
+              }}
+            >
+              <FontAwesomeIcon icon={faEraser} /> Clear
+            </button>
+          ) : null}
         </div>
-        {hasDraft ? (
-          <button
-            type="button"
-            className={createStyles.clearFormButton}
-            disabled={busy || imageUploadBusy}
-            onClick={() => {
-              resetImage();
-              onReset();
-            }}
-          >
-            <FontAwesomeIcon icon={faEraser} /> Clear
-          </button>
-        ) : null}
-      </div>
+      ) : null}
 
-      <ActiveSessionContext sessionName={sessionName} sessionSlug={sessionSlug} />
+      {!embedded ? <ActiveSessionContext sessionName={sessionName} sessionSlug={sessionSlug} /> : null}
 
       <div className={createStyles.collapsibleSection}>
         <div className={createStyles.inputColumn}>
@@ -638,28 +670,30 @@ const WorkerGroupCreateForm = ({
         </div>
       </div>
 
-      <div className={createStyles.mintingSteps}>
-        <button
-          type="button"
-          className={createStyles.primaryCreateButton}
-          data-testid={submitTestId}
-          disabled={
-            busy ||
-            imageUploadBusy ||
-            imageUrlInvalid ||
-            (imageSelectionPending && !deferImageUpload && !onImageFileUpload) ||
-            memberLimitInvalid ||
-            joinEndsAtInvalid ||
-            adminAddressInvalid ||
-            submitDisabled
-          }
-          onClick={() => void submitForm()}
-        >
-          <span className={createStyles.primaryCreateButtonContent}>
-            {imageUploadBusy ? 'Uploading image…' : busy ? 'Creating…' : submitLabel}
-          </span>
-        </button>
-      </div>
+      {!embedded ? (
+        <div className={createStyles.mintingSteps}>
+          <button
+            type="button"
+            className={createStyles.primaryCreateButton}
+            data-testid={submitTestId}
+            disabled={
+              busy ||
+              imageUploadBusy ||
+              imageUrlInvalid ||
+              (imageSelectionPending && !deferImageUpload && !onImageFileUpload) ||
+              memberLimitInvalid ||
+              joinEndsAtInvalid ||
+              adminAddressInvalid ||
+              submitDisabled
+            }
+            onClick={() => void submitForm()}
+          >
+            <span className={createStyles.primaryCreateButtonContent}>
+              {imageUploadBusy ? 'Uploading image…' : busy ? 'Creating…' : submitLabel}
+            </span>
+          </button>
+        </div>
+      ) : null}
 
       {status ? (
         <div role="status" className={styles.status}>
