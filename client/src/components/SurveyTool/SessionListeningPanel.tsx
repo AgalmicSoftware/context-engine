@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
+  faCaretDown,
   faCircle,
   faMicrophone,
   faPause,
@@ -339,13 +340,14 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     recorder.isRecording ||
     recorder.isPaused ||
     recorder.isBusy ||
+    Number(recorder.pendingSegmentCount || 0) > 0 ||
     hasTranscript ||
     hasGeneratedDraft ||
     failedCount > 0 ||
     Boolean(recorder.errorMessage || generationError);
-  const canGenerate = trimmedTranscript.length >= 50 && !isGenerating;
   const isRecorderSessionActive = recorder.isRecording || recorder.isPaused || recorder.isStopping;
   const hasPendingTranscription = Number(recorder.pendingSegmentCount || 0) > 0;
+  const canGenerate = trimmedTranscript.length >= 50 && !isGenerating && !hasPendingTranscription;
   const isStarting = !isRecorderSessionActive && recorder.isBusy;
   const recorderError = recorder.errorMessage && !hasTranscript ? recorder.errorMessage : '';
   const shouldShowGenericRecorderError = Boolean(
@@ -382,10 +384,8 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     ? 'Stopping recorder'
     : isStarting
       ? 'Starting recorder'
-      : hasTranscript && !isRecorderSessionActive
-        ? 'Transcript ready'
-        : '';
-  const shouldShowMeta = Boolean(statusLabel || hasTranscript || isGenerating);
+      : '';
+  const shouldShowMeta = Boolean(statusLabel || hasPendingTranscription || hasTranscript || isGenerating);
 
   useEffect(() => {
     if (!isGenerating) {
@@ -557,16 +557,33 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       {shouldShowMeta && (
         <div className={styles.sessionListeningMeta} aria-live="polite">
           {statusLabel && <span>{statusLabel}</span>}
+          {hasPendingTranscription && (
+            <span className={styles.sessionListeningTranscribingStatus}>
+              <FontAwesomeIcon icon={faSpinner} spin />
+              <span>Transcribing…</span>
+            </span>
+          )}
           {hasTranscript && (
             <button
               type="button"
               className={styles.sessionListeningTranscriptButton}
               onClick={() => setIsTranscriptOpen((open) => !open)}
               aria-expanded={isTranscriptOpen}
+              aria-busy={hasPendingTranscription}
               data-testid={E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT_DETAILS}
             >
               <span>Transcript</span>
               <span>{trimmedTranscript.length} chars</span>
+              <FontAwesomeIcon
+                icon={faCaretDown}
+                className={[
+                  styles.sessionListeningTranscriptCaret,
+                  isTranscriptOpen ? styles.sessionListeningTranscriptCaretExpanded : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                aria-hidden="true"
+              />
             </button>
           )}
           {isGenerating && <span>{`Generating questions... ${generationElapsedSeconds}s`}</span>}

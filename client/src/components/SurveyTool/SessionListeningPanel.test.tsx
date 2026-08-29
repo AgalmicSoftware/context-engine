@@ -284,6 +284,8 @@ describe('SessionListeningPanel', () => {
     expect(transcriptButton).toHaveTextContent('Transcript');
     expect(transcriptButton).toHaveTextContent(`${transcript.length} chars`);
     expect(transcriptButton).toHaveAttribute('aria-expanded', 'false');
+    expect(transcriptButton.querySelector('[data-icon="caret-down"]')).toBeInTheDocument();
+    expect(screen.queryByText('Transcript ready')).not.toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT)).not.toBeInTheDocument();
 
     fireEvent.click(transcriptButton);
@@ -291,6 +293,28 @@ describe('SessionListeningPanel', () => {
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT)).toHaveValue(transcript);
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_CLEAR));
     expect(clearDraft).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows transcription progress and blocks question generation until pending audio is mapped', () => {
+    const transcript =
+      'The group discussed budget timing, operational risk, ownership, rollout scope, and follow-up evidence.';
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        transcript,
+        pendingSegmentCount: 1,
+        segments: [{ id: 's2', index: 1, status: 'transcribing', text: '', startedAt: 2 }],
+      }),
+    );
+
+    render(<SessionListeningPanel sessionSlug="demo" />);
+
+    expect(screen.getByText('Transcribing…')).toBeInTheDocument();
+    expect(screen.queryByText('Transcript ready')).not.toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT_DETAILS)).toHaveAttribute(
+      'aria-busy',
+      'true',
+    );
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_GENERATE)).toBeDisabled();
   });
 
   it('shows elapsed seconds while question generation is running', async () => {

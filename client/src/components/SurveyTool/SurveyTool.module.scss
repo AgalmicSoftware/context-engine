@@ -2898,20 +2898,27 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   font-weight: 700;
 }
 
-.sessionListeningMeta span {
+.sessionListeningMeta > span {
   border: 1px solid color-mix(in srgb, var(--ce-overlay-surface) 12%, transparent);
   border-radius: var(--ce-radius-pill);
   background: var(--ce-text-inverse);
   padding: 3px 8px;
 }
 
+.sessionListeningTranscribingStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .sessionListeningTranscriptButton {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: 1px solid color-mix(in srgb, var(--ce-overlay-surface) 14%, transparent);
-  border-radius: var(--ce-radius-pill);
-  background: var(--ce-text-inverse);
+  border: 1px solid color-mix(in srgb, var(--ce-overlay-surface) 14%, transparent) !important;
+  border-radius: var(--ce-radius-pill) !important;
+  background: var(--ce-text-inverse) !important;
+  box-shadow: none !important;
   color: var(--ce-document-text);
   padding: 3px 8px;
   font: inherit;
@@ -2923,6 +2930,14 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   color: color-mix(in srgb, var(--ce-overlay-surface) 62%, transparent);
   font-size: 0.78rem;
   font-weight: 700;
+}
+
+.sessionListeningTranscriptCaret {
+  transition: transform 150ms ease;
+}
+
+.sessionListeningTranscriptCaretExpanded {
+  transform: rotate(180deg);
 }
 
 .sessionListeningTranscriptButton:hover,
