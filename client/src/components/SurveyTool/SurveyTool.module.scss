@@ -3476,7 +3476,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   min-height: 48px;
   display: grid;
   gap: 8px;
-  padding: 12px 52px 12px 14px;
+  padding: 12px 52px 44px 14px;
   border: 1px solid var(--ce-card-border);
   border-radius: var(--ce-radius-8);
   background: var(--ce-card-bg);
@@ -3493,6 +3493,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 .sessionAgentKickoffToggle {
   appearance: none;
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -3507,12 +3510,19 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   font-weight: 700;
   text-align: left;
   cursor: pointer;
+  opacity: 0.5;
+  transition: color 150ms ease, opacity 150ms ease;
 
   &:hover,
   &:focus-visible {
     color: var(--ce-action-accent);
+    opacity: 1;
     outline: 2px solid var(--ce-focus-ring);
     outline-offset: 3px;
+  }
+
+  &[aria-expanded='true'] {
+    opacity: 1;
   }
 }
 
