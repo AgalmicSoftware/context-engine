@@ -268,6 +268,7 @@ What the system does:
 - Gated encryption/decrypt uses the worker-mediated Lit Chipotle runtime for supported sessions; legacy Lit payload readers remain for compatibility.
 - Stores per-field metadata encryption decisions via `encryptedFieldGates` (values are `string | string[]`; 1 gate stays legacy `string`, 2+ gates become `string[]`).
 - Stores per-question/per-survey encryption audiences in the payload (`encryption.gates`), and SurveyTool derives response encryption recipients per question from that lock state (with fallback to session response gate policy when a question is not locked).
+- Keeps answer and additional-comment locks independent by default; comments inherit the answer audience only after an explicit **same as answer** selection or when a mandatory session/question gate applies.
 
 Deep-dive docs:
 - `docs/session-registry.md`

@@ -3,6 +3,7 @@ import {
   buildAnswerAudienceSelectionPlan,
   buildEncryptionTogglePlan,
 } from './surveyToolFieldEncryptionController';
+import { normalizeFieldAudienceMode } from './surveyToolAudienceDerivationController';
 import type {
   AudienceSelectionPlan,
   EncryptionTogglePlan,
@@ -150,6 +151,28 @@ describe('surveyToolFieldEncryptionController', () => {
           },
         }),
         makeDeps(),
+      );
+
+      expect(plan.nextAdditionalState).toBeNull();
+    });
+
+    it('keeps a new additional-comment field plaintext when the answer is encrypted', () => {
+      const plan: EncryptionTogglePlan = buildEncryptionTogglePlan(
+        'q1',
+        'answer',
+        true,
+        makeSlice(),
+        makeDeps({
+          buildEmptyResponseFieldState: (_qid, fieldKey = 'answer') => ({
+            value: '',
+            encrypted: false,
+            encryptionAudience: 'self',
+            encryptionGateId: null,
+            audienceMode: normalizeFieldAudienceMode('', fieldKey, {}, () => false),
+          }),
+          normalizeFieldAudienceMode: (value, fieldKey, field) =>
+            normalizeFieldAudienceMode(value, fieldKey, field, () => false),
+        }),
       );
 
       expect(plan.nextAdditionalState).toBeNull();

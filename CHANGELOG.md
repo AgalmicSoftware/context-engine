@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Kept answer and additional-comment encryption controls independent by default:
+  locking an answer no longer visually or actually encrypts its comments unless
+  the user explicitly selects **same as answer** or a mandatory gate applies.
 - Shortened the ordinary Claude/ChatGPT interview-prefill prompt, moved new
   handoffs to a distinct inert catalog URL to avoid stale external fetches, and
   made binary, rating, and multichoice answer formats explicit.

@@ -191,7 +191,7 @@ export const FAQ_ITEMS: readonly FaqItem[] = Object.freeze(
       id: 'private-answers',
       question: 'Can my answers be private?',
       answer:
-        'Yes, when the session enables response encryption. A response can be encrypted for you or for a gated audience, and only an authorized viewer can decrypt the protected fields.',
+        'Yes, when the session enables response encryption. Answers and additional comments have independent locks, can be encrypted for you or for a gated audience, and only an authorized viewer can decrypt the protected fields. Comments follow the answer lock only when you explicitly choose that option.',
     },
     {
       id: 'active-chain',
