@@ -146,8 +146,11 @@
 
 /* AI rewrite button (icon-only) */
 .aiRewriteButton {
-  background: transparent;
-  border: none;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
   padding: 4px;
   cursor: pointer;
   font-size: 1.5em;
@@ -159,8 +162,22 @@
     color 0.2s ease,
     opacity 0.2s ease;
   &:hover {
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
     opacity: 1;
     color: var(--ce-text-muted);
+  }
+
+  &:active {
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 2px;
   }
 }
 
