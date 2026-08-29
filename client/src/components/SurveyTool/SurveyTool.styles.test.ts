@@ -242,7 +242,7 @@ describe('SurveyTool styles', () => {
     expect(scss).toMatch(/#createSurveyButton\s*{[\s\S]*?opacity:\s*1;/);
   });
 
-  it('widens the embedded session toolbar and centers its wrapped controls on tablets', () => {
+  it('widens the embedded session toolbar and spreads controls until the submit CTA appears', () => {
     const scss = readSurveyToolScss();
 
     expect(scss).toMatch(/#surveysRow\.embeddedSessionToolbar\s*{[^}]*margin-top:\s*0;/);
@@ -254,6 +254,9 @@ describe('SurveyTool styles', () => {
     );
     expect(scss).toMatch(
       /@media \(min-width:\s*601px\) and \(max-width:\s*730px\)\s*{[\s\S]*?#surveysRow\.embeddedSessionToolbar\s*{[^}]*justify-content:\s*center;/,
+    );
+    expect(scss).toMatch(
+      /@media \(min-width:\s*601px\) and \(max-width:\s*730px\)\s*{[\s\S]*?#surveysRow\.embeddedSessionToolbar\.toolbarWithoutSubmit\s*{[^}]*justify-content:\s*space-between;/,
     );
   });
 

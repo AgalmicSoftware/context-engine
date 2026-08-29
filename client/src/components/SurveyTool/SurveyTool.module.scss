@@ -1860,6 +1860,10 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   #surveysRow.embeddedSessionToolbar {
     justify-content: center;
   }
+
+  #surveysRow.embeddedSessionToolbar.toolbarWithoutSubmit {
+    justify-content: space-between;
+  }
 }
 
 @media (max-width: 466px) {
