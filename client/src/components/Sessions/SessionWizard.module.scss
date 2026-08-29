@@ -3249,7 +3249,7 @@ $muted-text: var(--ce-panel-text-muted);
   }
 }
 
-.pendingWorkerGroupAddRow {
+.groupWizard .pendingWorkerGroupAddRow {
   display: grid;
   gap: 6px;
 
@@ -3273,7 +3273,7 @@ $muted-text: var(--ce-panel-text-muted);
   input {
     min-width: 0;
     border: 1px solid color-mix(in srgb, var(--ce-control-text) 42%, transparent);
-    background: var(--ce-control-bg);
+    background: $input-bg;
     color: var(--ce-control-text);
     padding: 8px 11px;
   }
