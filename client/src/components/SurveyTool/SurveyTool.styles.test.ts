@@ -237,6 +237,7 @@ describe('SurveyTool styles', () => {
       /@media \(min-width:\s*601px\) and \(max-width:\s*768px\)\s*{[\s\S]*?#surveysRow\s*{[^}]*justify-content:\s*space-between;[\s\S]*?#createSurveyButton\s*{[^}]*margin-left:\s*0 !important;/,
     );
     expect(scss).toMatch(/#dropdownToggle\s*{[\s\S]*?color:\s*var\(--ce-authoring-control-text\);/);
+    expect(scss).toMatch(/#dropdownToggle\s*{[^}]*padding-right:\s*12px;/);
     expect(scss).toMatch(/#filterButton\s*{[\s\S]*?background:\s*var\(--ce-authoring-control-bg\);/);
     expect(scss).toMatch(/#showResultsButton\s*{[\s\S]*?color:\s*var\(--ce-authoring-control-text\);/);
     expect(scss).toMatch(/#createSurveyButton\s*{[\s\S]*?opacity:\s*1;/);
