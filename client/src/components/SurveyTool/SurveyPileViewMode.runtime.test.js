@@ -479,11 +479,13 @@ describe('SurveyPileViewMode runtime surface', () => {
       { platform: 'claude', modelId: 'claude-example', verification: 'self_reported' },
       { promptVersion: 'ce-interview-brief-v4', questionSetHash: 'hash' },
       false,
+      false,
       '  Ada   Example  ',
     );
 
     expect(engine.state.surveysResponseState[0].interviewProvenance.q1).toMatchObject({
       includeAiProvenance: false,
+      includePredictionComparison: false,
       responderName: 'Ada Example',
     });
     expect(engine.state.surveysResponseState[0].interviewProvenance.q1).not.toHaveProperty('source');

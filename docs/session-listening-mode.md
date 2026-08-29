@@ -66,9 +66,15 @@ Drafts open in a review panel. The responder can edit them, select which ones
 to apply, and must explicitly opt into replacing any existing local answer.
 Applying drafts only updates the existing response editor; normal session
 submission and login rules still apply. When the default-on provenance option
-is retained, submitted response metadata keeps the original model prediction,
-the final edited answer, prompt/question-set revision, and self-reported source
-platform/model.
+is retained, submitted response metadata keeps the prompt/question-set revision
+and self-reported source platform/model. A separate accuracy-research checkbox
+is also on by default. It records the original AI prediction, the final submitted
+answer, the fields that changed, and the prediction confidence so model fidelity
+can be evaluated without treating low-confidence drafts as unusable. Responders
+can disable either consent independently before applying the drafts. For an
+encrypted answer or additional comment, the comparison records only an encrypted
+field marker and whether the field changed; it never places the protected text in
+plaintext metadata, and it omits the prediction basis from that metadata.
 An external AI may also include a preferred responder name that it already
 knows from the permitted context. The review modal shows a separate
 **Include “name” as the responder name** checkbox only when a name was supplied,
@@ -155,7 +161,9 @@ Agree/Unsure/Disagree controls. Applied source/model provenance is persisted in
 the anonymous draft together with its answer, so logging in after review does
 not remove the attribution before final submission. An explicitly opted-in
 responder name follows the same draft migration and becomes the report display
-name for that response address.
+name for that response address. The accuracy-research choice and original
+prediction use the same draft migration; final comparison values are captured
+immediately before encryption and normal submission.
 
 The external AI's own memory/source availability is platform-controlled.
 Context Engine neither grants it new access nor verifies the claimed model ID;

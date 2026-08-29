@@ -1,4 +1,8 @@
-import { buildResponsePayload, type BuildResponsePayloadOptions } from './surveyToolResponsePayloadController';
+import {
+  buildResponsePayload,
+  captureInterviewPredictionComparisonSubmissions,
+  type BuildResponsePayloadOptions,
+} from './surveyToolResponsePayloadController';
 
 const defaultOpts = (overrides: Partial<BuildResponsePayloadOptions> = {}): BuildResponsePayloadOptions => ({
   isStandalone: false,
@@ -78,11 +82,16 @@ describe('surveyToolResponsePayloadController', () => {
           interviewProvenance: {
             q1: {
               includeAiProvenance: true,
+              includePredictionComparison: true,
               responderName: '  Ada   Example  ',
               source: { platform: 'claude', modelId: 'claude-example', verification: 'self_reported' },
               promptVersion: 'ce-interview-brief-v1',
               questionSetHash: 'hash',
               originalPrediction: { answer: 'Original agent prediction', confidence: 0.22 },
+              submissionValueSnapshot: {
+                answer: 'Final edited answer',
+                additionalComments: '',
+              },
               appliedAt: 123,
             },
           },
@@ -94,16 +103,147 @@ describe('surveyToolResponsePayloadController', () => {
       expect.objectContaining({
         answer: expect.objectContaining({ value: 'Final edited answer' }),
         responderName: 'Ada Example',
-        interviewProvenance: {
+        interviewProvenance: expect.objectContaining({
           version: 1,
           source: { platform: 'claude', modelId: 'claude-example', verification: 'self_reported' },
           promptVersion: 'ce-interview-brief-v1',
           questionSetHash: 'hash',
-          originalPrediction: { answer: 'Original agent prediction', confidence: 0.22 },
+          originalPrediction: {
+            answer: 'Original agent prediction',
+            additionalComments: '',
+            importance: null,
+            conviction: null,
+            confidence: 0.22,
+            evidence: '',
+          },
+          predictionComparison: {
+            version: 1,
+            original: {
+              answer: 'Original agent prediction',
+              additionalComments: '',
+              importance: null,
+              conviction: null,
+              confidence: 0.22,
+              evidence: '',
+            },
+            submitted: {
+              answer: 'Final edited answer',
+              additionalComments: '',
+              importance: null,
+              conviction: null,
+            },
+            changedFields: ['answer'],
+            redactedFields: [],
+          },
           appliedAt: 123,
-        },
+        }),
       }),
     );
+  });
+
+  it('redacts encrypted comparison values while retaining edit and confidence measurements', () => {
+    const result = buildResponsePayload(
+      defaultOpts({
+        questionPool: [{ id: 'q1', type: 'freeform', prompt: 'What matters?' }],
+        surveyResponseState: {
+          answers: { q1: { value: '*', encrypted: true, encryptedPortion: 'answer-envelope' } },
+          additionalComments: {
+            q1: { value: '*', encrypted: true, encryptedPortion: 'additional-envelope' },
+          },
+          importance: { q1: 80 },
+          conviction: { q1: 70 },
+          interviewProvenance: {
+            q1: {
+              includeAiProvenance: true,
+              includePredictionComparison: true,
+              source: { platform: 'claude', modelId: 'claude-example' },
+              originalPrediction: {
+                answer: 'Original private prediction',
+                additionalComments: 'Original private note',
+                importance: 60,
+                conviction: 70,
+                confidence: 0.3,
+                evidence: 'Indirect support',
+              },
+              submissionValueSnapshot: {
+                answer: 'Final private answer',
+                additionalComments: 'Final private note',
+              },
+            },
+          },
+        } as never,
+        getImportanceFromSlice: () => 80,
+        getConvictionFromSlice: () => 70,
+      }),
+    );
+
+    const provenance = result.responses![0].interviewProvenance as Record<string, any>;
+    expect(provenance.originalPrediction).toEqual(expect.objectContaining({
+      answer: { redacted: true, reason: 'encrypted_field' },
+      additionalComments: { redacted: true, reason: 'encrypted_field' },
+      confidence: 0.3,
+    }));
+    expect(provenance.predictionComparison).toEqual(expect.objectContaining({
+      submitted: expect.objectContaining({
+        answer: { redacted: true, reason: 'encrypted_field' },
+        additionalComments: { redacted: true, reason: 'encrypted_field' },
+        importance: 80,
+        conviction: 70,
+      }),
+      changedFields: ['answer', 'additionalComments', 'importance'],
+      redactedFields: ['answer', 'additionalComments'],
+    }));
+    expect(JSON.stringify(provenance)).not.toContain('private');
+  });
+
+  it('omits prediction values when comparison consent is disabled', () => {
+    const result = buildResponsePayload(
+      defaultOpts({
+        questionPool: [{ id: 'q1', type: 'freeform', prompt: 'What matters?' }],
+        surveyResponseState: {
+          answers: { q1: { value: 'Final answer' } },
+          additionalComments: {},
+          importance: {},
+          conviction: {},
+          interviewProvenance: {
+            q1: {
+              includeAiProvenance: true,
+              includePredictionComparison: false,
+              source: { platform: 'claude', modelId: 'claude-example' },
+              originalPrediction: { answer: 'Original prediction', confidence: 0.4 },
+            },
+          },
+        } as never,
+      }),
+    );
+
+    expect(result.responses![0].interviewProvenance).toEqual(expect.objectContaining({
+      source: expect.objectContaining({ platform: 'claude', modelId: 'claude-example' }),
+    }));
+    expect(result.responses![0].interviewProvenance).not.toHaveProperty('originalPrediction');
+    expect(result.responses![0].interviewProvenance).not.toHaveProperty('predictionComparison');
+  });
+
+  it('captures final plaintext values before response encryption replaces them', () => {
+    const slice = {
+      answers: { q1: { value: 'Final private answer', encrypted: true } },
+      additionalComments: { q1: { value: 'Final private note', encrypted: true } },
+      importance: {},
+      conviction: {},
+      interviewProvenance: {
+        q1: { includePredictionComparison: true, originalPrediction: { answer: 'Original' } },
+        q2: { includePredictionComparison: false, originalPrediction: { answer: 'Ignored' } },
+      },
+    };
+
+    const captured = captureInterviewPredictionComparisonSubmissions(slice, ['q1', 'q2']);
+
+    expect((captured.interviewProvenance as Record<string, any>).q1.submissionValueSnapshot).toEqual({
+      answer: 'Final private answer',
+      additionalComments: 'Final private note',
+    });
+    expect((captured.interviewProvenance as Record<string, any>).q2).not.toHaveProperty('submissionValueSnapshot');
+    expect(slice.interviewProvenance.q1).not.toHaveProperty('submissionValueSnapshot');
   });
 
   it('submits an opted-in responder name without leaking opted-out model provenance', () => {

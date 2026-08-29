@@ -61,7 +61,12 @@ All notable changes to this project will be documented in this file.
   resolves its Worker without exposing a `worker=` query parameter. Claude and
   ChatGPT handoffs may now carry an already-known preferred responder name;
   sharing it with submitted answers requires a separate default-off opt-in, and
-  opted-in names become the participant label in the results report.
+  opted-in names become the participant label in the results report. Interview
+  review also has a separate default-on accuracy-research consent that records
+  the original AI prediction, final submitted response, confidence, and changed
+  fields. Locked answers and comments are represented by redacted markers in
+  that comparison, with final plaintext captured before encryption solely to
+  calculate the edit signal.
 - Refreshed mounted Stats immediately after successful Cloudflare group
   mutations, evicting the affected session's short-lived Worker catalog cache
   before recounting groups and visible participants.

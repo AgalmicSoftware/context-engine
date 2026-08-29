@@ -270,6 +270,7 @@ const E2E_TESTIDS = Object.freeze({
   SESSION_INTERVIEW_DRAFT_REMOVE: 'ce-session-interview-draft-remove',
   SESSION_INTERVIEW_DRAFT_CONFIDENCE: 'ce-session-interview-draft-confidence',
   SESSION_INTERVIEW_DRAFT_BASIS_TOGGLE: 'ce-session-interview-draft-basis-toggle',
+  SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON: 'ce-session-interview-include-prediction-comparison',
   SESSION_INTERVIEW_INCLUDE_NAME: 'ce-session-interview-include-name',
   SESSION_INTERVIEW_APPLY: 'ce-session-interview-apply',
   SURVEY_ADDITIONAL_TOGGLE: 'ce-survey-additional-toggle',

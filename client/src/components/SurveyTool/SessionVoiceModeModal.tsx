@@ -45,6 +45,7 @@ type InterviewDraftApplicationProps = {
     source: InterviewPrefillPacket['source'] | null,
     packet: InterviewPrefillPacket | null,
     included: boolean,
+    includePredictionComparison: boolean,
     responderName: string,
   ) => void | Promise<void>;
 };
@@ -150,6 +151,7 @@ function SessionInterviewPanel({
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [editedAnswers, setEditedAnswers] = useState<Record<string, string>>({});
   const [includeProvenance, setIncludeProvenance] = useState(true);
+  const [includePredictionComparison, setIncludePredictionComparison] = useState(true);
   const [includeResponderName, setIncludeResponderName] = useState(false);
   const [showAgentPrompt, setShowAgentPrompt] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
@@ -315,6 +317,7 @@ function SessionInterviewPanel({
           prefillPacket?.source || directContextSource,
           prefillPacket,
           includeProvenance,
+          includePredictionComparison,
           includeResponderName ? String(prefillPacket?.responderContext?.name || '').trim() : '',
         );
       }
@@ -615,7 +618,7 @@ function SessionInterviewPanel({
             );
           })}
           <div className={styles.sessionInterviewReviewActions}>
-            <div>
+            <div className={styles.sessionInterviewConsentOptions}>
               <Label check className={styles.sessionInterviewProvenance}>
                 <Input
                   type="checkbox"
@@ -623,6 +626,15 @@ function SessionInterviewPanel({
                   onChange={(event) => setIncludeProvenance(event.target.checked)}
                 />{' '}
                 Include self-reported AI platform/model provenance with submitted responses
+              </Label>
+              <Label check className={styles.sessionInterviewProvenance}>
+                <Input
+                  type="checkbox"
+                  checked={includePredictionComparison}
+                  onChange={(event) => setIncludePredictionComparison(event.target.checked)}
+                  data-testid={E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON}
+                />{' '}
+                Include the original AI prediction and final submitted answer for accuracy research
               </Label>
               {importedResponderName ? (
                 <Label check className={styles.sessionInterviewProvenance}>

@@ -184,6 +184,7 @@ describe('SessionVoiceModeModal', () => {
       prefillPacket.source,
       prefillPacket,
       true,
+      true,
       '',
     ));
     await waitFor(() => expect(baseProps.onClose).toHaveBeenCalled());
@@ -235,6 +236,7 @@ describe('SessionVoiceModeModal', () => {
       [expect.objectContaining({ questionId: 'q1', confidence: 0.22 })],
       prefillPacket.source,
       prefillPacket,
+      true,
       true,
       '',
     ));
@@ -325,7 +327,7 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_GENERATE)).toBeInTheDocument();
   });
 
-  it('removes prediction provenance for applied drafts when the responder opts out', async () => {
+  it('keeps prediction comparison on by default and records each consent independently', async () => {
     mockedMapInterviewEvidenceToResponses.mockResolvedValue([
       { questionId: 'q1', answer: 'Draft answer', confidence: 0.76 },
     ]);
@@ -345,13 +347,17 @@ describe('SessionVoiceModeModal', () => {
     );
 
     expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).toBeInTheDocument();
+    const includeComparison = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON);
+    expect(includeComparison).toBeChecked();
     fireEvent.click(screen.getByLabelText(/Include self-reported AI platform\/model provenance/i));
+    fireEvent.click(includeComparison);
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
 
     await waitFor(() => expect(baseProps.onRecordProvenance).toHaveBeenCalledWith(
       expect.arrayContaining([expect.objectContaining({ questionId: 'q1' })]),
       expect.objectContaining({ platform: 'claude' }),
       expect.any(Object),
+      false,
       false,
       '',
     ));
@@ -379,6 +385,7 @@ describe('SessionVoiceModeModal', () => {
       prefillPacket.source,
       prefillPacket,
       true,
+      true,
       '',
     ));
     first.unmount();
@@ -391,6 +398,7 @@ describe('SessionVoiceModeModal', () => {
       expect.any(Array),
       prefillPacket.source,
       prefillPacket,
+      true,
       true,
       'Ada Example',
     ));

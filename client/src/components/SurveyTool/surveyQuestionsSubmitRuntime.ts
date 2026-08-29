@@ -11,6 +11,7 @@ import type {
   SurveyQuestionsSubmitStartControllerResult,
 } from './surveyQuestionsSubmitController.js';
 import { resolveSurveyToolWorkerTargetSignature } from './surveyToolWorkerCacheIsolation.js';
+import { captureInterviewPredictionComparisonSubmissions } from './surveyToolResponsePayloadController.js';
 
 export type SurveyQuestionsSubmitRuntime = SurveyQuestionsLegacyRecord;
 
@@ -304,6 +305,7 @@ export const createSurveyQuestionsSubmitRuntime = (
         importance: {},
         conviction: {},
       };
+      activeSlice = captureInterviewPredictionComparisonSubmissions(activeSlice, changedQids);
 
       // Only encrypt when there are changed encrypted fields
       const pendingStats: SurveyQuestionsSubmitPendingStats = resolveSurveyQuestionsSubmitPendingStats({

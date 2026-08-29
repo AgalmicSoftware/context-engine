@@ -1708,6 +1708,7 @@ export const recordInterviewProvenance = (
   source: InterviewPrefillPacket['source'] | null,
   packet: InterviewPrefillPacket | null,
   included = true,
+  includePredictionComparison = true,
   responderName = '',
 ) => {
   const normalizedSource = source || resolveRealtimeInterviewSource(engine.props?.sessionConfig);
@@ -1720,18 +1721,23 @@ export const recordInterviewProvenance = (
       };
       const provenance = { ...(slice.interviewProvenance || {}) };
       drafts.forEach((draft) => {
-        if (!included && !normalizedResponderName) {
+        if (!included && !includePredictionComparison && !normalizedResponderName) {
           delete provenance[draft.questionId];
           return;
         }
         provenance[draft.questionId] = {
           version: 1,
           includeAiProvenance: included,
+          includePredictionComparison,
           ...(included
             ? {
                 source: normalizedSource,
                 promptVersion: packet?.promptVersion || INTERVIEW_PROMPT_VERSION,
                 questionSetHash: packet?.questionSetHash || '',
+              }
+            : {}),
+          ...(includePredictionComparison
+            ? {
                 originalPrediction: {
                   answer: draft.answer,
                   additionalComments: draft.additionalComments || '',

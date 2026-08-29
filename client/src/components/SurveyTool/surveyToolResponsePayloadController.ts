@@ -3,6 +3,30 @@ import type { ResponseSlice, UnknownRecord } from './surveyToolTypes';
 const asRecord = (value: unknown): UnknownRecord =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : {};
 
+const hasOwn = (value: UnknownRecord, key: string): boolean =>
+  Object.prototype.hasOwnProperty.call(value, key);
+
+const buildStableComparableValue = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(buildStableComparableValue);
+  if (value && typeof value === 'object') {
+    return Object.keys(value as UnknownRecord)
+      .sort()
+      .reduce<UnknownRecord>((result, key) => {
+        result[key] = buildStableComparableValue((value as UnknownRecord)[key]);
+        return result;
+      }, {});
+  }
+  return value === undefined ? null : value;
+};
+
+const responseValuesMatch = (left: unknown, right: unknown): boolean =>
+  JSON.stringify(buildStableComparableValue(left)) === JSON.stringify(buildStableComparableValue(right));
+
+const buildRedactedComparisonValue = (): UnknownRecord => ({
+  redacted: true,
+  reason: 'encrypted_field',
+});
+
 type ResponseFieldState = UnknownRecord & {
   value?: unknown;
   encrypted?: unknown;
@@ -15,6 +39,31 @@ type SurveyResponsePayloadState = Omit<ResponseSlice, 'answers' | 'additionalCom
   answers?: Record<string, ResponseFieldState> | null;
   additionalComments?: Record<string, ResponseFieldState> | null;
   interviewProvenance?: Record<string, UnknownRecord> | null;
+};
+
+export const captureInterviewPredictionComparisonSubmissions = (
+  slice: ResponseSlice,
+  questionIds: Iterable<string>,
+): ResponseSlice => {
+  const provenance = asRecord(slice.interviewProvenance);
+  let nextProvenance: UnknownRecord | null = null;
+
+  for (const rawQuestionId of questionIds) {
+    const questionId = String(rawQuestionId || '');
+    const record = asRecord(provenance[questionId]);
+    if (record.includePredictionComparison !== true) continue;
+
+    if (!nextProvenance) nextProvenance = { ...provenance };
+    nextProvenance[questionId] = {
+      ...record,
+      submissionValueSnapshot: {
+        answer: asRecord(slice.answers?.[questionId]).value ?? '',
+        additionalComments: asRecord(slice.additionalComments?.[questionId]).value ?? '',
+      },
+    };
+  }
+
+  return nextProvenance ? { ...slice, interviewProvenance: nextProvenance } : slice;
 };
 
 type ResponseQuestionSource = UnknownRecord & {
@@ -151,21 +200,82 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
     const interviewProvenanceRecord = asRecord(rawInterviewProvenance);
     const interviewSource = asRecord(interviewProvenanceRecord.source);
     const includeAiProvenance = interviewProvenanceRecord.includeAiProvenance !== false;
+    const includePredictionComparison = interviewProvenanceRecord.includePredictionComparison === true;
+    const originalPrediction = asRecord(interviewProvenanceRecord.originalPrediction);
+    const submissionValueSnapshot = asRecord(interviewProvenanceRecord.submissionValueSnapshot);
     const responderName = String(interviewProvenanceRecord.responderName || '')
       .trim()
       .replace(/\s+/g, ' ')
       .slice(0, 160);
-    const interviewProvenance = includeAiProvenance && rawInterviewProvenance && typeof rawInterviewProvenance === 'object'
+    const originalComparisonValues = {
+      answer: hasOwn(originalPrediction, 'answer') ? originalPrediction.answer : null,
+      additionalComments: hasOwn(originalPrediction, 'additionalComments')
+        ? originalPrediction.additionalComments
+        : '',
+      importance: hasOwn(originalPrediction, 'importance') ? originalPrediction.importance : null,
+      conviction: hasOwn(originalPrediction, 'conviction') ? originalPrediction.conviction : null,
+    };
+    const submittedComparisonValues = {
+      answer: hasOwn(submissionValueSnapshot, 'answer') ? submissionValueSnapshot.answer : answer.value ?? '',
+      additionalComments: hasOwn(submissionValueSnapshot, 'additionalComments')
+        ? submissionValueSnapshot.additionalComments
+        : additional.value ?? '',
+      importance: importance !== null ? importance : null,
+      conviction: conviction !== null ? conviction : null,
+    };
+    const comparisonFields = ['answer', 'additionalComments', 'importance', 'conviction'] as const;
+    const changedFields = comparisonFields.filter(
+      (field) => !responseValuesMatch(originalComparisonValues[field], submittedComparisonValues[field]),
+    );
+    const redactedFields = [
+      ...(answer.encrypted ? ['answer'] : []),
+      ...(additionalEncrypted ? ['additionalComments'] : []),
+    ];
+    const safeOriginalPrediction = includePredictionComparison
+      ? {
+          answer: answer.encrypted ? buildRedactedComparisonValue() : originalComparisonValues.answer,
+          additionalComments: additionalEncrypted
+            ? buildRedactedComparisonValue()
+            : originalComparisonValues.additionalComments,
+          importance: originalComparisonValues.importance,
+          conviction: originalComparisonValues.conviction,
+          confidence: hasOwn(originalPrediction, 'confidence') ? originalPrediction.confidence : null,
+          evidence: redactedFields.length > 0 ? '' : String(originalPrediction.evidence || ''),
+        }
+      : null;
+    const predictionComparison = includePredictionComparison
       ? {
           version: 1,
-          source: {
-            platform: String(interviewSource.platform || 'other').slice(0, 64),
-            modelId: String(interviewSource.modelId || '').slice(0, 256),
-            verification: 'self_reported',
+          original: safeOriginalPrediction,
+          submitted: {
+            answer: answer.encrypted ? buildRedactedComparisonValue() : submittedComparisonValues.answer,
+            additionalComments: additionalEncrypted
+              ? buildRedactedComparisonValue()
+              : submittedComparisonValues.additionalComments,
+            importance: submittedComparisonValues.importance,
+            conviction: submittedComparisonValues.conviction,
           },
-          promptVersion: String(rawInterviewProvenance.promptVersion || '').slice(0, 128),
-          questionSetHash: String(rawInterviewProvenance.questionSetHash || '').slice(0, 256),
-          originalPrediction: rawInterviewProvenance.originalPrediction || null,
+          changedFields,
+          redactedFields,
+        }
+      : null;
+    const interviewProvenance = (includeAiProvenance || includePredictionComparison)
+      && rawInterviewProvenance && typeof rawInterviewProvenance === 'object'
+      ? {
+          version: 1,
+          ...(includeAiProvenance
+            ? {
+                source: {
+                  platform: String(interviewSource.platform || 'other').slice(0, 64),
+                  modelId: String(interviewSource.modelId || '').slice(0, 256),
+                  verification: 'self_reported',
+                },
+                promptVersion: String(rawInterviewProvenance.promptVersion || '').slice(0, 128),
+                questionSetHash: String(rawInterviewProvenance.questionSetHash || '').slice(0, 256),
+              }
+            : {}),
+          ...(safeOriginalPrediction ? { originalPrediction: safeOriginalPrediction } : {}),
+          ...(predictionComparison ? { predictionComparison } : {}),
           appliedAt: Number(rawInterviewProvenance.appliedAt || 0) || null,
         }
       : null;

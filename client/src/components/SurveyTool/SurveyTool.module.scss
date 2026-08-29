@@ -3790,6 +3790,13 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   line-height: 1.35;
 }
 
+.sessionInterviewConsentOptions {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 6px;
+}
+
 @media (max-width: 700px) {
   .sessionVoiceModeChooser {
     grid-template-columns: 1fr;

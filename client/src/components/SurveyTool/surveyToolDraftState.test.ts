@@ -210,6 +210,8 @@ describe('surveyToolDraftState', () => {
   it('round-trips interview model provenance through the anonymous draft entry', () => {
     const provenance = {
       version: 1,
+      includeAiProvenance: true,
+      includePredictionComparison: true,
       source: { platform: 'claude', modelId: 'claude-example', verification: 'self_reported' },
       promptVersion: 'ce-interview-brief-v4',
       questionSetHash: 'abc123',
