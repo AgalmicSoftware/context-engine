@@ -149,7 +149,7 @@ describe('userPageLoadingStateHelpers', () => {
     expect(JSON.stringify({ questionResponses, surveysCreated })).toBe(inputSnapshot);
   });
 
-  it('keeps each incomplete cache lane disabled while preserving visible gated cached data', () => {
+  it('keeps visible profile data analyzable while incomplete cache lanes continue loading', () => {
     const readyInputs = {
       isQuestionCacheReady: true,
       isResponsesCacheReady: true,
@@ -173,14 +173,8 @@ describe('userPageLoadingStateHelpers', () => {
 
       expect(descriptor.loadingState.disabledByCache).toBe(true);
       expect(descriptor.cacheActionKind).toBe('disabled');
-      expect(descriptor.aiActionPlan.analyzeButtonDisplayState).toMatchObject({
-        disabled: true,
-        title: 'Available when the user page fully loads.',
-      });
-      expect(descriptor.aiActionPlan.compareButtonDisplayState).toMatchObject({
-        disabled: true,
-        title: 'Available when the user page fully loads.',
-      });
+      expect(descriptor.aiActionPlan.analyzeButtonDisplayState).toMatchObject({ disabled: false });
+      expect(descriptor.aiActionPlan.compareButtonDisplayState).toMatchObject({ disabled: false });
       expect(descriptor.hasVisibleData).toBe(true);
       expect(descriptor.hasMissingDataFallback).toBe(false);
     });

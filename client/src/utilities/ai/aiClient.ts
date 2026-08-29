@@ -594,8 +594,12 @@ export async function analyzeUserOpinions(userData: unknown, opts: unknown = {})
 
     return { name, summary, details, historicalAlignment };
   } catch (err) {
-    // Let gate-unavailable errors propagate for session-level retry.
-    if (/on-chain gate data unavailable/i.test(readAiErrorMessage(err, ''))) {
+    // User-triggered analysis requests need the real Worker failure so the UI can
+    // explain why analysis did not run instead of presenting a synthetic result.
+    if (
+      readAiOptionThrowOnError(opts) ||
+      /on-chain gate data unavailable/i.test(readAiErrorMessage(err, ''))
+    ) {
       throw err;
     }
     aiLog.error('analyzeUserOpinions error:', err);

@@ -112,6 +112,24 @@ export const POLIS_CLUSTER_COLORS = d3Report.schemeCategory10;
 export const getPolisDemoDatasetForSlug = (...args: Parameters<typeof getPolisDemoDatasetForSlugRuntime>) =>
   getPolisDemoDatasetForSlugRuntime(...args);
 
+export const buildPolisParticipantProfileHref = ({
+  address = '',
+  displayName = '',
+  sessionSlug = '',
+}: {
+  address?: unknown;
+  displayName?: unknown;
+  sessionSlug?: unknown;
+} = {}): string => {
+  const name = String(displayName || '').trim();
+  const addr = String(address || '').trim();
+  const isEth = /^0x[0-9a-fA-F]{40}$/.test(addr);
+  const base = name ? `/su/${encodeURIComponent(name)}` : isEth ? `/u/${encodeURIComponent(addr)}` : '';
+  if (!base) return '';
+  const normalizedSlug = normalizeSessionSlug(sessionSlug || '');
+  return normalizedSlug ? `${base}?session=${encodeURIComponent(normalizedSlug)}` : base;
+};
+
 /***************************************************************
  * The main PolisReport component
  ***************************************************************/
@@ -1182,7 +1200,11 @@ export default function PolisReport({
           const isEth = typeof addr === 'string' && /^0x[0-9a-fA-F]{40}$/.test(addr);
           const imgSrc = displayName ? getPolisHistoricalParticipantAvatar(displayName, addr) : getBlockieFor(addr);
           const shortAddr = getShortenedAddress(addr, false) || addr;
-          const linkHref = displayName ? `/su/${displayName}` : isEth ? `/u/${addr}` : '';
+          const linkHref = buildPolisParticipantProfileHref({
+            address: isEth ? addr : '',
+            displayName,
+            sessionSlug: resolvedSessionSlug,
+          });
           const label = displayName || addr;
           const shortLabel = displayName || shortAddr;
           return (
@@ -1790,7 +1812,11 @@ export default function PolisReport({
                   const isEth = typeof addr === 'string' && /^0x[0-9a-fA-F]{40}$/.test(addr);
                   const displayName = demoDisplayNames?.[addr];
                   const hasLink = isEth || !!displayName;
-                  const linkHref = displayName ? `/su/${displayName}` : `/u/${addr}`;
+                  const linkHref = buildPolisParticipantProfileHref({
+                    address: addr,
+                    displayName,
+                    sessionSlug: resolvedSessionSlug,
+                  });
                   const linkLabel = displayName || getShortenedAddress(addr, false);
                   const historicalAvatar = displayName ? getPolisHistoricalParticipantAvatar(displayName, addr) : '';
 

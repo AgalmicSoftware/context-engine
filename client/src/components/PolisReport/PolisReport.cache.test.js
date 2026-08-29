@@ -4,6 +4,7 @@ import PolisReport, {
   applyFilterStateToAggregator,
   buildClusterAnalysisDataKey,
   buildPolisReportPdfFilename,
+  buildPolisParticipantProfileHref,
   buildPrecomputedDemoClusterState,
   buildRatingMatrixFromRealData,
   buildRatingMatrixFromDemo,
@@ -141,6 +142,23 @@ describe('PolisReport report palette', () => {
   it('keeps opinion-group colors on the original D3 categorical palette', () => {
     expect(POLIS_CLUSTER_COLORS).toBe(d3Report.schemeCategory10);
     expect(POLIS_CLUSTER_COLORS).not.toEqual(expect.arrayContaining([expect.stringContaining('--ce-data-series-')]));
+  });
+});
+
+describe('PolisReport participant profile links', () => {
+  it('keeps the report session attached to user and simulated-user profiles', () => {
+    expect(
+      buildPolisParticipantProfileHref({
+        address: '0x1111111111111111111111111111111111111111',
+        sessionSlug: 'demo interview',
+      }),
+    ).toBe('/u/0x1111111111111111111111111111111111111111?session=demo%20interview');
+    expect(
+      buildPolisParticipantProfileHref({
+        displayName: 'Ada Lovelace',
+        sessionSlug: 'demo-interview',
+      }),
+    ).toBe('/su/Ada%20Lovelace?session=demo-interview');
   });
 });
 

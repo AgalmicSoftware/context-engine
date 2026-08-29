@@ -2917,10 +2917,24 @@ class UserPage extends Component<any, any> {
   };
 
   _getSessionConfigForSlugExact = (slugIn: unknown = ''): UnknownRecord | null => {
+    const slug = normalizeSessionSlug(slugIn || '');
+    const propConfig =
+      this.props.sessionConfig &&
+      typeof this.props.sessionConfig === 'object' &&
+      !Array.isArray(this.props.sessionConfig)
+        ? (this.props.sessionConfig as UnknownRecord)
+        : null;
+    const propSlug = normalizeSessionSlug(
+      resolveActiveSessionSlug(propConfig || {}) || this.props.activeSessionSlug || this.props.sessionSlug || '',
+    );
+    // Profile routes already resolve their explicit session (including a pinned
+    // Worker-backed demo) before rendering. Preserve that authoritative config
+    // instead of dropping it because it is not duplicated in the strict registry.
+    if (propConfig && propSlug === slug) return propConfig;
     return resolveUserPageAnalysisSessionConfigForSlug({
       getSessionConfigBySlug,
       getSessionConfigBySlugOrDefault,
-      slugIn,
+      slugIn: slug,
     });
   };
 
@@ -3197,7 +3211,16 @@ class UserPage extends Component<any, any> {
       this.setState(buildUserPageAnalysisResetStatePatch({ analyzing: true }));
       this.startAnalysisTimer();
 
-      const aiOptions = buildUserPageAnalysisAiOptions({ analysisSession });
+      const analysisAiContext = {
+        account: String(this.props.account || ''),
+        providerLike: this.props.provider,
+        chainId: this.props.network?.id ?? this.props.networkChainId ?? null,
+        lit: getGlobalLitHooks(),
+      };
+      const aiOptions = buildUserPageAnalysisAiOptions({
+        analysisSession,
+        context: analysisAiContext,
+      });
       let result;
       try {
         result = await analyzeUserOpinions(userData, aiOptions);
@@ -3219,6 +3242,7 @@ class UserPage extends Component<any, any> {
         if (hydrateAnalysisCacheIfPresent(cacheContext)) return;
         const fallbackOpts = buildUserPageAnalysisAiOptions({
           analysisSession: fallbackSession,
+          context: analysisAiContext,
           defaultReason: 'fallback-gate-unavailable',
         });
         result = await analyzeUserOpinions(userData, fallbackOpts);
@@ -3249,7 +3273,14 @@ class UserPage extends Component<any, any> {
     } catch (e) {
       accountLog.error('[UserPage] analyzeUser failed:', e);
       if (!this._isMounted) return;
-      this.setState(buildUserPageAnalysisErrorStatePatch());
+      this.setState(
+        buildUserPageAnalysisErrorStatePatch({
+          message: getUserPageErrorMessage(
+            e,
+            'Unable to generate analysis right now. Please try again later.',
+          ),
+        }),
+      );
       this.clearAnalysisTimer();
     }
   };
