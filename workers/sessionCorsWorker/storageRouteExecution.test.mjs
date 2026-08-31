@@ -2230,7 +2230,7 @@ test('storageRoute enforces worker group gates and group upload allowlists', asy
 		sessionId: WORKER_GROUP_SESSION_ID,
 		storageProfile: {
 			backend: 'cloudflare',
-			payloadAccessControl: { gate: 'group_gate', encryption: 'none', groupId: 'reviewers' },
+			payloadAccessControl: { gate: 'group_gate', encryption: 'none' },
 		},
 	};
 	const deniedUpload = await storageRoute({
@@ -2239,7 +2239,7 @@ test('storageRoute enforces worker group gates and group upload allowlists', asy
 		request: new Request('https://worker.example/storage/upload', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ data: 'group payload', resource: 'docsContext' }),
+			body: JSON.stringify({ data: 'group payload', resource: 'docsContext', groupIds: ['reviewers'] }),
 		}),
 		env,
 		config: groupGateConfig,
@@ -2258,7 +2258,7 @@ test('storageRoute enforces worker group gates and group upload allowlists', asy
 		request: new Request('https://worker.example/storage/upload', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ data: 'group payload', resource: 'docsContext' }),
+			body: JSON.stringify({ data: 'group payload', resource: 'docsContext', groupIds: ['reviewers'] }),
 		}),
 		env,
 		config: groupGateConfig,

@@ -58121,6 +58121,7 @@ var cfFetch = async (token, path, options = {}, {
   return { ok: true, data };
 };
 var NEW_KV_NAMESPACE_RETRY_DELAYS_MS = Object.freeze([250, 500, 1e3]);
+var NEW_KV_NAMESPACE_WRITE_RETRY_DELAYS_MS = Object.freeze([250, 500, 1e3, 2e3, 4e3]);
 var FINAL_CONFIG_READBACK_RETRY_DELAYS_MS = Object.freeze([250, 500, 1e3]);
 var isNewKvNamespacePropagationFailure = (result) => {
   if (!result || result.ok || Number(result.status || 0) !== 404) return false;
@@ -58131,7 +58132,7 @@ var isNewKvNamespacePropagationFailure = (result) => {
 };
 var putFreshKvNamespaceValue = async ({ apiToken, path, options, cfFetchOptions }) => {
   let result = await cfFetch(apiToken, path, options, cfFetchOptions);
-  for (const delayMs of NEW_KV_NAMESPACE_RETRY_DELAYS_MS) {
+  for (const delayMs of NEW_KV_NAMESPACE_WRITE_RETRY_DELAYS_MS) {
     if (!isNewKvNamespacePropagationFailure(result)) return result;
     await new Promise((resolve) => setTimeout(resolve, delayMs));
     result = await cfFetch(apiToken, path, options, cfFetchOptions);
@@ -71403,6 +71404,10 @@ var handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, authSc
   if (canWriteR2 && !canUseR2Index) {
     return responseJson(deps, { error: "Cloudflare R2 storage requires an index KV binding." }, 501, baseHeaders);
   }
+  const uploadAccessMetadata = {
+    ...payload.accessConditions ? { accessConditions: payload.accessConditions } : {},
+    ...payload.groupIds?.length ? { groupIds: payload.groupIds } : {}
+  };
   const access = await authorizeCloudflareStorageAccess({
     env,
     config,
@@ -71410,7 +71415,7 @@ var handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, authSc
     resource: payload.resource,
     requesterAddress: uploaderAddress,
     authScopes,
-    metadata: payload.accessConditions ? { accessConditions: payload.accessConditions } : null,
+    metadata: Object.keys(uploadAccessMetadata).length ? uploadAccessMetadata : null,
     baseHeaders,
     deps
   });
@@ -71473,6 +71478,11 @@ var handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, authSc
       return responseJson(deps, { error: error?.message || "Cloudflare worker envelope encryption failed." }, 500, baseHeaders);
     }
   }
+  const effectiveGroupIds = normalizeGroupIdList([
+    ...normalizeGroupIdList(payload.groupIds),
+    ...normalizeGroupIdList(uploadPolicy.groupIds),
+    ...normalizeGroupIdList(payloadAccess.groupIds)
+  ]);
   const metadata = {
     id: id2,
     backend: STORAGE_BACKENDS.CLOUDFLARE,
@@ -71481,11 +71491,7 @@ var handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, authSc
     encrypted: payload.payloadEncrypted === true || payloadAccess.encryption === PAYLOAD_ENCRYPTION_MODES3.WORKER_ENVELOPE,
     gate: trim6(payload.gate),
     tags: payload.tags,
-    groupIds: normalizeGroupIdList([
-      ...normalizeGroupIdList(payload.groupIds),
-      ...normalizeGroupIdList(uploadPolicy.groupIds),
-      ...normalizeGroupIdList(payloadAccess.groupIds)
-    ]),
+    groupIds: effectiveGroupIds,
     uploadPolicy: payload.uploadPolicy?.mode ? payload.uploadPolicy : void 0,
     size: bytesToStore?.length || 0,
     createdAt,
@@ -71494,7 +71500,7 @@ var handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, authSc
     payloadAccessControl: {
       gate: payloadAccess.gate,
       encryption: payloadAccess.encryption,
-      ...payloadAccess.groupIds.length ? { groupIds: payloadAccess.groupIds } : {}
+      ...effectiveGroupIds.length ? { groupIds: effectiveGroupIds } : {}
     },
     ...accessConditions?.conditions?.length ? { accessConditions } : {},
     ...envelope ? { envelope } : {},

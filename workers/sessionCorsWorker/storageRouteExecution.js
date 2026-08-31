@@ -1103,6 +1103,10 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   if (canWriteR2 && !canUseR2Index) {
     return responseJson(deps, { error: 'Cloudflare R2 storage requires an index KV binding.' }, 501, baseHeaders);
   }
+  const uploadAccessMetadata = {
+    ...(payload.accessConditions ? { accessConditions: payload.accessConditions } : {}),
+    ...(payload.groupIds?.length ? { groupIds: payload.groupIds } : {}),
+  };
   const access = await authorizeCloudflareStorageAccess({
     env,
     config,
@@ -1110,7 +1114,7 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     resource: payload.resource,
     requesterAddress: uploaderAddress,
     authScopes,
-    metadata: payload.accessConditions ? { accessConditions: payload.accessConditions } : null,
+    metadata: Object.keys(uploadAccessMetadata).length ? uploadAccessMetadata : null,
     baseHeaders,
     deps,
   });
@@ -1174,6 +1178,11 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
       return responseJson(deps, { error: error?.message || 'Cloudflare worker envelope encryption failed.' }, 500, baseHeaders);
     }
   }
+  const effectiveGroupIds = normalizeGroupIdList([
+    ...normalizeGroupIdList(payload.groupIds),
+    ...normalizeGroupIdList(uploadPolicy.groupIds),
+    ...normalizeGroupIdList(payloadAccess.groupIds),
+  ]);
   const metadata = {
     id,
     backend: STORAGE_BACKENDS.CLOUDFLARE,
@@ -1182,11 +1191,7 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     encrypted: payload.payloadEncrypted === true || payloadAccess.encryption === PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE,
     gate: trim(payload.gate),
     tags: payload.tags,
-    groupIds: normalizeGroupIdList([
-      ...normalizeGroupIdList(payload.groupIds),
-      ...normalizeGroupIdList(uploadPolicy.groupIds),
-      ...normalizeGroupIdList(payloadAccess.groupIds),
-    ]),
+    groupIds: effectiveGroupIds,
     uploadPolicy: payload.uploadPolicy?.mode ? payload.uploadPolicy : undefined,
     size: bytesToStore?.length || 0,
     createdAt,
@@ -1197,7 +1202,7 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     payloadAccessControl: {
       gate: payloadAccess.gate,
       encryption: payloadAccess.encryption,
-      ...(payloadAccess.groupIds.length ? { groupIds: payloadAccess.groupIds } : {}),
+      ...(effectiveGroupIds.length ? { groupIds: effectiveGroupIds } : {}),
     },
     ...(accessConditions?.conditions?.length ? { accessConditions } : {}),
     ...(envelope ? { envelope } : {}),

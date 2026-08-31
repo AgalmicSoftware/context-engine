@@ -2160,16 +2160,21 @@ Scripts: Edit` and `Workers KV Storage: Edit`; the Durable Object module
     exactly one visible account through Cloudflare using the API token and fails
     on zero or multiple accounts; caller-supplied account IDs are ignored.
   - Creator onboarding sends that one deployment token only. The separate
-    `CLOUDFLARE_API_TOKEN` with `API Tokens: Read` used by the two-key live E2E is
-    a separate same-user, E2E-only policy auditor: it reads the dedicated token's
-    policy and permission-group catalog, compares immutable permission IDs, and
-    is never included in a deploy request or required from a session creator.
+    `CLOUDFLARE_TWO_KEY_AUDITOR_API_TOKEN` with `API Tokens: Read` used by the
+    two-key live E2E is a same-user, E2E-only policy auditor: it reads the
+    dedicated token's policy and permission-group catalog, compares immutable
+    permission IDs, and is never included in a deploy request or required from
+    a session creator.
   - First-party callers include `deploymentRequestId` (8-128 safe identifier
     characters). Sequential retries after a lost or gateway-shaped response
     must reuse both that ID and `configRevision`; a definitive terminal response
     or an explicit new attempt rotates them.
   - Provide either `bundleUrl` (release asset) or `bundleText` (raw bundle contents) from the `/new` UI.
 - The helper fetches the latest bundled worker asset and configures KV + bindings.
+- Fresh KV namespace seed writes retry only Cloudflare's transient
+  `namespace not found` propagation response; unrelated write failures still
+  fail immediately, and exhausted retries trigger the normal exact-resource
+  cleanup path before any Worker upload.
 - The helper generates `TOKEN_HMAC_SECRET` and
   `CE_STORAGE_ENVELOPE_KEK` independently with 256 bits from Web Crypto for
   every Session Worker. These

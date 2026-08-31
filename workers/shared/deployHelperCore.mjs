@@ -238,6 +238,7 @@ export const cfFetch = async (
 };
 
 const NEW_KV_NAMESPACE_RETRY_DELAYS_MS = Object.freeze([250, 500, 1000]);
+const NEW_KV_NAMESPACE_WRITE_RETRY_DELAYS_MS = Object.freeze([250, 500, 1000, 2000, 4000]);
 const FINAL_CONFIG_READBACK_RETRY_DELAYS_MS = Object.freeze([250, 500, 1000]);
 
 // A newly created namespace can briefly return 404/10013. Retry only the two
@@ -255,7 +256,7 @@ const isNewKvNamespacePropagationFailure = (result) => {
 
 const putFreshKvNamespaceValue = async ({ apiToken, path, options, cfFetchOptions }) => {
   let result = await cfFetch(apiToken, path, options, cfFetchOptions);
-  for (const delayMs of NEW_KV_NAMESPACE_RETRY_DELAYS_MS) {
+  for (const delayMs of NEW_KV_NAMESPACE_WRITE_RETRY_DELAYS_MS) {
     if (!isNewKvNamespacePropagationFailure(result)) return result;
     await new Promise((resolve) => setTimeout(resolve, delayMs));
     result = await cfFetch(apiToken, path, options, cfFetchOptions);

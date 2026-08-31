@@ -996,6 +996,8 @@ describe('deploy-helper worker', () => {
       propagationFailure(),
       propagationFailure(),
       propagationFailure(),
+      propagationFailure(),
+      propagationFailure(),
       cfFailure(503, 'KV cleanup unavailable.'),
     ]);
     global.fetch = fetchMock;
@@ -1031,7 +1033,7 @@ describe('deploy-helper worker', () => {
         fetchMock.calls.filter(([url, init = {}]) =>
           String(init.method || '').toUpperCase() === 'PUT' && String(url).endsWith(':config'),
         ),
-      ).toHaveLength(4);
+      ).toHaveLength(6);
       expect(
         fetchMock.calls.filter(
           ([url, init = {}]) =>
@@ -1048,7 +1050,7 @@ describe('deploy-helper worker', () => {
     } finally {
       consoleLogSpy.mockRestore();
     }
-  });
+  }, 15_000);
 
   it('does not retry unrelated KV 404 failures', async () => {
     const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
@@ -1154,6 +1156,8 @@ describe('deploy-helper worker', () => {
       propagationFailure(),
       propagationFailure(),
       propagationFailure(),
+      propagationFailure(),
+      propagationFailure(),
     ];
     global.fetch = fetchMock;
 
@@ -1171,7 +1175,7 @@ describe('deploy-helper worker', () => {
       expect(payload?.error).toBe("get namespace: 'namespace not found'");
       expect(fetchMock.calls.filter(([url, init = {}]) => (
         String(init.method || '').toUpperCase() === 'PUT' && String(url).endsWith(':secrets')
-      ))).toHaveLength(4);
+      ))).toHaveLength(6);
       expect(fetchMock.calls.filter(([url, init = {}]) => (
         String(init.method || '').toUpperCase() === 'DELETE' &&
         String(url).endsWith('/storage/kv/namespaces/kv-123')
@@ -1183,7 +1187,7 @@ describe('deploy-helper worker', () => {
     } finally {
       consoleLogSpy.mockRestore();
     }
-  });
+  }, 15_000);
 
   it('does not retry an unrelated secrets envelope write error', async () => {
     const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});

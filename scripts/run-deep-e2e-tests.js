@@ -100,6 +100,12 @@ function isLocalBaseUrl(baseUrl) {
   }
 }
 
+function buildAppServerArgs(baseUrl) {
+  const parsed = new URL(baseUrl);
+  const port = parsed.port || (parsed.protocol === 'https:' ? '443' : '80');
+  return ['run', 'dev', '--', '--port', port, '--strictPort'];
+}
+
 async function waitForHttpOk(url, { timeoutMs = 90_000, intervalMs = 750 } = {}) {
   const deadline = Date.now() + timeoutMs;
   let lastError = null;
@@ -131,7 +137,7 @@ async function ensureAppServer(env) {
   }
 
   console.log(`[test:deep] starting local app server at ${baseUrl}`);
-  const child = spawn('npm', ['run', 'dev'], {
+  const child = spawn('npm', buildAppServerArgs(baseUrl), {
     cwd: path.join(ROOT, 'client'),
     env,
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -212,6 +218,7 @@ if (require.main === module) {
 
 module.exports = {
   ACTIVE_SESSION_FILE,
+  buildAppServerArgs,
   buildDeepE2eSteps,
   ensureAppServer,
   isLocalBaseUrl,
