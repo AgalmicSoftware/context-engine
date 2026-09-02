@@ -2943,9 +2943,17 @@ $muted-text: var(--ce-panel-text-muted);
 
 .modePresetCardHeader {
   display: flex;
-  align-items: flex-start;
+  align-items: baseline;
   justify-content: space-between;
   gap: 12px;
+}
+
+.modePresetCardHeadingText {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  min-width: 0;
 }
 
 .modePresetCardTitle,
@@ -2963,12 +2971,12 @@ $muted-text: var(--ce-panel-text-muted);
 }
 
 .modePresetCardProvider {
-  margin-top: 5px;
+  margin-top: 0;
   color: var(--ce-panel-text);
-  font-size: 0.8rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 .modePresetCardDescription {
@@ -2988,9 +2996,9 @@ $muted-text: var(--ce-panel-text-muted);
 
 .modePresetCardRequirementsLabel {
   color: var(--ce-panel-text);
-  font-size: 0.65rem;
+  font-size: 0.9rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 

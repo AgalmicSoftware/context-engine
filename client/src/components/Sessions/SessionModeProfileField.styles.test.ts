@@ -21,6 +21,18 @@ describe('SessionModeProfileField theme contrast styles', () => {
     expect(source).toMatch(/\.modeProfileArchitectureLink\s*\{[\s\S]*?font-size:\s*0\.9rem;/);
   });
 
+  it('keeps each setup provider inline with its larger card title and enlarges the requirements heading', () => {
+    expect(source).toMatch(
+      /\.modePresetCardHeadingText\s*\{[\s\S]*?display:\s*flex;[\s\S]*?align-items:\s*baseline;[\s\S]*?flex-wrap:\s*wrap;[\s\S]*?gap:\s*6px 12px;/,
+    );
+    expect(source).toMatch(
+      /\.modePresetCardProvider\s*\{[\s\S]*?margin-top:\s*0;[\s\S]*?font-size:\s*1rem;[\s\S]*?font-weight:\s*600;[\s\S]*?text-transform:\s*none;/,
+    );
+    expect(source).toMatch(
+      /\.modePresetCardRequirementsLabel\s*\{[\s\S]*?font-size:\s*0\.9rem;[\s\S]*?font-weight:\s*800;/,
+    );
+  });
+
   it('renders requirements as larger green high-contrast theme pills', () => {
     expect(source).toMatch(/\.modePresetCardRequirementPills\s*\{[\s\S]*?display:\s*flex;[\s\S]*?flex-wrap:\s*wrap;/);
     expect(source).toMatch(

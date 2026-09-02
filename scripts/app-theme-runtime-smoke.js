@@ -33,7 +33,6 @@ const ROUTE_CASES = Object.freeze([
   {
     path: '/session/new',
     label: 'Session Wizard',
-    requiresBottomDockedFooter: true,
     requiresReadableSessionSetup: true,
     requiresSessionColors: true,
   },
@@ -655,6 +654,8 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
 
   if (routeCase.requiresSessionColors) {
     await page.getByTestId('ce-new-preset-fast_cheap_cloudflare').click();
+    await page.getByRole('button', { name: /Optional details/i }).click();
+    await page.getByRole('button', { name: 'Session colors expand' }).click();
     await page.waitForSelector('[data-testid="ce-wizard-session-color-scheme"]', { timeout: 15000 });
     await page.waitForSelector('[data-testid="ce-wizard-session-color-preview"]', { timeout: 15000 });
   }

@@ -6,7 +6,7 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 describe('SessionModeProfileField', () => {
-  it('renders two entry cards with the inputs needed for each setup path', () => {
+  it('renders two entry cards with the inputs needed for each setup path', async () => {
     const onChange = jest.fn();
     render(<SessionModeProfileField registryChainId={11155420} onChange={onChange} entryOnly />);
 
@@ -16,9 +16,17 @@ describe('SessionModeProfileField', () => {
       screen.queryByText('Select the infrastructure path that matches the inputs you have available.'),
     ).not.toBeInTheDocument();
     expect(screen.getByText('Choose a setup')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'View the deployment architecture diagram on GitHub' })).toHaveAttribute(
+    const architectureHelp = screen.getByRole('link', {
+      name: 'View the deployment architecture diagram on GitHub',
+    });
+    expect(architectureHelp).toHaveAttribute(
       'href',
       'https://github.com/AgalmicSoftware/context-engine/blob/main/README.md#architecture-at-a-glance',
+    );
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+    fireEvent.mouseEnter(architectureHelp);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'Compare where session data is stored and which credentials each setup requires.',
     );
     expect(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).toHaveAttribute('aria-checked', 'false');
@@ -44,6 +52,10 @@ describe('SessionModeProfileField', () => {
     expect(
       screen.getByText('Session data is stored on Arweave, with session identity recorded in an EVM registry.'),
     ).toBeInTheDocument();
+    expect(screen.getAllByText("You'll need")).toHaveLength(2);
+    expect(screen.queryByText("What you'll need")).not.toBeInTheDocument();
+    expect(screen.getByText('Centralized').parentElement).toBe(screen.getByText('Cloudflare').parentElement);
+    expect(screen.getByText('Decentralized').parentElement).toBe(screen.getByText('Arweave + EVM').parentElement);
     expect(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).not.toHaveTextContent(/worker/i);
     expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).not.toHaveTextContent(/worker/i);
     expect(screen.queryByText('Recommended')).not.toBeInTheDocument();
