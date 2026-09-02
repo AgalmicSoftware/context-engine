@@ -71,8 +71,8 @@ architecture.
 | Layer | What it does | Profile role | Primary location |
 |-------|-------------|--------------|-----------------|
 | **Client** | React SPA: survey authoring, response collection, SBT management, encryption gates, admin, session wizard | Shared across implemented profiles | `client/src/` |
-| **Session Worker** | Auth, canonical config, AI proxy, transcription, storage routes, controlled URL/image fetch, and profile-enabled chain/Arweave helpers | Canonical authority for Hosted & Fast; service boundary for decentralized/custom profiles | `workers/sessionCorsWorker/` |
-| **Agent Bridge** | Scoped Agent HTTP API plus optional Telegram bot/Mini App adapters; delegates session membership and gate authority to the configured Session Worker where required | Separately deployed, optional sidecar for agent-enabled sessions | `workers/agentBridgeWorker/` |
+| **Session Worker** | Auth, canonical config, AI proxy, transcription, storage routes, and profile-enabled chain/Arweave helpers | Canonical authority for Hosted & Fast; service boundary for decentralized/custom profiles | `workers/sessionCorsWorker/` |
+| **Agent Bridge Worker** | Agent HTTP compatibility plus Telegram webhook, command, queue, and Mini App transport | Transitional adapter; session authority is being consolidated into the Session Worker | `workers/agentBridgeWorker/` |
 | **Cloudflare storage** | Worker KV config, secrets, encrypted payload envelopes/indexes, and optional advanced R2 blobs | Hosted & Fast default | Worker bindings (external) |
 | **Contracts** | Session registry, surveys, SBTs, gates, and factory on supported EVM chains | Trustless & Slower and explicit chain-backed custom profiles | `contracts/` |
 | **Arweave** | Immutable metadata, survey/question payloads, SBT tokenURI, and document-library files | Trustless & Slower and explicit Arweave-backed custom profiles | External |
@@ -226,6 +226,7 @@ manifest is `client/src/variables/contracts.json`, exposed through
 | Chain | SessionRegistry | Surveys | SBTFactory |
 |-------|----------------|---------|------------|
 | OP Sepolia (11155420) | `0xDcB1731984E9F75c6a061c38dD8b67d18De4C0c1` | `0x59664B9dA510a33F2edB7E14Cf0c2749bf506B8A` | `0x8CBeE1EE46603b446b499cb32F63fa9860a50478` |
+| Base Sepolia (84532, legacy/dev compatibility) | `0xD55Aa8fb29964d034d59B90DFFD23790f7B34B00` | `0xcccb5c1a96b3e10f395e318ae75db24e45bd3808` | `0x538A48BC439A36D2A86e63114DCD9c429d2ddEcA` |
 
 OP Sepolia is the current default and the only chain configured in the canonical
 manifest. Its immutable Surveys and SBTFactory deployments predate the current
