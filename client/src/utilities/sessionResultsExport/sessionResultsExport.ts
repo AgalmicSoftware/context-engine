@@ -1,3 +1,10 @@
+import {
+  loadBrowserModuleWithRetry,
+  resolveDefaultExport,
+  resolveJsPdfConstructor,
+  saveCanvasAsPagedPdf,
+} from '../ui/browserPdfExport';
+
 export const SESSION_RESULTS_HTML_SNAPSHOT_TYPE = 'ce_session_results_html_snapshot';
 export const SESSION_RESULTS_HTML_SNAPSHOT_VERSION = 1;
 export const SESSION_RESULTS_HTML_PRIVACY_REDACTED = 'redacted';
@@ -164,18 +171,6 @@ export type BrowserFileDownloadOptions = {
 export type SessionResultsHtmlReportRenderOptions = {
   format?: SessionResultsExportFormat;
   sections?: SessionResultsSectionSelection;
-};
-
-type JsPdfConstructor = new (...args: unknown[]) => {
-  addPage: () => void;
-  addImage: (...args: unknown[]) => void;
-  internal: {
-    pageSize: {
-      getHeight: () => number;
-      getWidth: () => number;
-    };
-  };
-  save: (filename: string) => void;
 };
 
 export type SessionResultsPdfDownloadOptions = {
@@ -809,31 +804,6 @@ export const downloadSessionResultsHtmlReport = (
   });
 };
 
-const loadWithRetry = async <T>(loader: () => Promise<T>, retries = 2): Promise<T> => {
-  for (let attempt = 0; attempt <= retries; attempt += 1) {
-    try {
-      return await loader();
-    } catch (error) {
-      if (attempt === retries) throw error;
-      await new Promise((resolve) => setTimeout(resolve, 250));
-    }
-  }
-  return loader();
-};
-
-const resolveDefaultExport = <T>(moduleValue: unknown): T => {
-  const record = toPlainRecord(moduleValue);
-  return (record.default || moduleValue) as T;
-};
-
-const resolveJsPdfConstructor = (moduleValue: unknown): JsPdfConstructor => {
-  const record = toPlainRecord(moduleValue);
-  const defaultRecord = toPlainRecord(record.default);
-  const candidate = record.jsPDF || defaultRecord.jsPDF || record.default || moduleValue;
-  if (typeof candidate === 'function') return candidate as JsPdfConstructor;
-  throw new Error('jsPDF constructor is unavailable');
-};
-
 export const downloadSessionResultsPdfReport = async ({
   documentRef = document,
   filename,
@@ -868,8 +838,8 @@ export const downloadSessionResultsPdfReport = async ({
     await new Promise((resolve) => setTimeout(resolve, 80));
 
     const [html2canvasModule, jsPdfModule] = await Promise.all([
-      loadWithRetry(html2canvasLoader),
-      loadWithRetry(jsPdfLoader),
+      loadBrowserModuleWithRetry(html2canvasLoader),
+      loadBrowserModuleWithRetry(jsPdfLoader),
     ]);
     const html2canvas =
       resolveDefaultExport<(element: HTMLElement, options?: Record<string, unknown>) => Promise<HTMLCanvasElement>>(
@@ -887,30 +857,7 @@ export const downloadSessionResultsPdfReport = async ({
       windowWidth: captureTarget.scrollWidth,
     });
 
-    const pdf = new JsPdf({ compress: true, format: 'a4', orientation: 'p', unit: 'pt' });
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    if (!canvas.width || !canvas.height) {
-      throw new Error('PDF export capture did not produce a usable canvas.');
-    }
-
-    const imgData = canvas.toDataURL('image/jpeg', 0.82);
-    const imgWidth = pageWidth;
-    const imgHeight = (canvas.height * pageWidth) / canvas.width;
-    let heightLeft = imgHeight;
-    let position = 0;
-
-    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-    heightLeft -= pageHeight;
-
-    while (heightLeft > 0) {
-      pdf.addPage();
-      position = heightLeft - imgHeight;
-      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-      heightLeft -= pageHeight;
-    }
-
-    pdf.save(filename);
+    saveCanvasAsPagedPdf({ canvas, filename, JsPdf });
   } finally {
     if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
   }

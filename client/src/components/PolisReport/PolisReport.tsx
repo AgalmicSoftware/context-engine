@@ -27,6 +27,11 @@ import { QRCodeSVG } from 'qrcode.react';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { FIXED_MEDIA_DARK, FIXED_MEDIA_LIGHT } from '../../utilities/ui/fixedMediaColors';
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
+import {
+  loadBrowserModuleWithRetry,
+  resolveDefaultExport,
+  saveCanvasAsPagedPdf,
+} from '../../utilities/ui/browserPdfExport';
 import { createLogger } from 'utilities/logging.js';
 import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
@@ -1032,22 +1037,11 @@ export default function PolisReport({
     });
 
     try {
-      // Lazy-load heavy PDF deps with retry for chunk loading failures
-      const loadWithRetry = async <T,>(importFn: () => Promise<T>, retries: number = 2): Promise<T> => {
-        for (let i = 0; i <= retries; i++) {
-          try {
-            return await importFn();
-          } catch (e) {
-            if (i === retries) throw e;
-            await new Promise((resolve) => setTimeout(resolve, 500));
-          }
-        }
-        return importFn();
-      };
-      const [{ default: html2canvas }, jsPdfModule] = await Promise.all([
-        loadWithRetry(() => import('html2canvas')),
-        loadWithRetry(() => import('jspdf')),
+      const [html2canvasModule, jsPdfModule] = await Promise.all([
+        loadBrowserModuleWithRetry(() => import('html2canvas'), { delayMs: 500 }),
+        loadBrowserModuleWithRetry(() => import('jspdf'), { delayMs: 500 }),
       ]);
+      const html2canvas = resolveDefaultExport<typeof import('html2canvas')['default']>(html2canvasModule);
       const jsPDF = resolveJsPdfConstructor(jsPdfModule);
 
       // Capture full element
@@ -1062,29 +1056,11 @@ export default function PolisReport({
         ignoreElements: (el) => el.classList && el.classList.contains(styles.pdfIgnore),
       });
 
-      // Build multi-page A4 in points, compressed JPEG to reduce size
-      const pdf = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4', compress: true });
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-
-      const imgData = canvas.toDataURL('image/jpeg', 0.82);
-      const imgWidth = pageWidth;
-      const imgHeight = (canvas.height * pageWidth) / canvas.width;
-
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-      heightLeft -= pageHeight;
-
-      while (heightLeft > 0) {
-        pdf.addPage();
-        position = heightLeft - imgHeight;
-        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-        heightLeft -= pageHeight;
-      }
-
-      pdf.save(buildPolisReportPdfFilename(resolvedSessionName));
+      saveCanvasAsPagedPdf({
+        canvas,
+        filename: buildPolisReportPdfFilename(resolvedSessionName),
+        JsPdf: jsPDF,
+      });
     } catch (e) {
       setErrorMessage('PDF export failed — please try refreshing the page and downloading again.');
     } finally {

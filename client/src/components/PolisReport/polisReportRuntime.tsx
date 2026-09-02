@@ -24,6 +24,8 @@ import {
 import { createLogger } from 'utilities/logging.js';
 import styles from './PolisReport.module.scss';
 
+export { resolveJsPdfConstructor } from '../../utilities/ui/browserPdfExport';
+
 const surveyLog = createLogger('surveys');
 
 export type UnknownRecord = Record<string, unknown>;
@@ -196,20 +198,6 @@ export type D3ReportApi = {
   line(): (points: [number, number][]) => string | null;
 };
 
-export type JsPdfDocument = {
-  internal: {
-    pageSize: {
-      getWidth(): number;
-      getHeight(): number;
-    };
-  };
-  addImage(...args: unknown[]): void;
-  addPage(): void;
-  save(filename: string): void;
-};
-
-export type JsPdfConstructor = new (...args: unknown[]) => JsPdfDocument;
-
 export type RuntimeFunction = (...args: unknown[]) => unknown;
 const d3Runtime = Object(d3) as Record<string, unknown>;
 const getD3Function = (key: string): RuntimeFunction => {
@@ -273,18 +261,6 @@ export const buildPolisReportPdfFilename = (sessionName: unknown, now: Date = ne
   const sessionPart = sanitizePolisReportPdfNamePart(sessionName);
   const timestamp = now.toISOString().replace(/[:.-]/g, '_');
   return `contextEngine_report${sessionPart ? `_${sessionPart}` : ''}_${timestamp}.pdf`;
-};
-
-export const resolveJsPdfConstructor = (module: unknown): JsPdfConstructor => {
-  const record = module && typeof module === 'object' ? (module as UnknownRecord) : {};
-  const defaultExport = record.default;
-  if (typeof defaultExport === 'function') return defaultExport as JsPdfConstructor;
-  if (typeof record.jsPDF === 'function') return record.jsPDF as JsPdfConstructor;
-  if (defaultExport && typeof defaultExport === 'object') {
-    const defaultRecord = defaultExport as UnknownRecord;
-    if (typeof defaultRecord.jsPDF === 'function') return defaultRecord.jsPDF as JsPdfConstructor;
-  }
-  throw new Error('jsPDF constructor is unavailable');
 };
 
 /**************************************************************
