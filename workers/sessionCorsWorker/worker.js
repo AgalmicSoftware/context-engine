@@ -2,7 +2,6 @@ import { ethers } from 'ethers';
 import rpcDefaults from '../../shared/rpcDefaults.cjs';
 import { createWorkerLowLevelHelpersWithWorkerDeps } from './workerLowLevelHelperBinding.js';
 import { createWorkerRouteRuntimeWithWorkerDeps } from './workerRouteRuntimeBinding.js';
-import { resolveWorkerRouteRuntimeInput } from './workerRouteRuntimeInputResolution.js';
 import { resolveWorkerRuntimeDeps } from './workerRuntimeDepResolution.js';
 import { resolveOpenAiTranscribeUrl } from './endpointConfig.js';
 
@@ -158,15 +157,95 @@ export const createWorkerRuntime = (env, overrides = {}) => {
   });
   const workerRouteRuntime = (
     resolvedDeps.createWorkerRouteRuntimeWithWorkerDeps || createWorkerRouteRuntimeWithWorkerDeps
-  )(
-    (resolvedDeps.resolveWorkerRouteRuntimeInput || resolveWorkerRouteRuntimeInput)({
-      deps: resolvedDeps,
-      constants: resolved.constants,
-      defaults,
-      workerLowLevelHelpers,
+  )({
+    deps: {
+      log: resolvedDeps.log,
+      fetch: resolvedDeps.fetch,
+      toStr: resolvedDeps.toStr,
+      now: resolvedDeps.now,
+      parseAllowOrigins: resolvedDeps.parseAllowOrigins,
+      originAllowed: resolvedDeps.originAllowed,
+      corsHeaders: resolvedDeps.corsHeaders,
+      json: resolvedDeps.json,
+      normalizeWorkerSessionSlug: resolvedDeps.normalizeWorkerSessionSlug,
+      getSessionConfig: resolvedDeps.getSessionConfig,
+      verifyToken: resolvedDeps.verifyToken,
+      validateAuthTokenRecord: resolvedDeps.validateAuthTokenRecord,
+      resolveWorkerRequestSlugContext: resolvedDeps.resolveWorkerRequestSlugContext,
+      toChainId: resolvedDeps.toChainId,
+      normalizeRpcUrlList: resolvedDeps.normalizeRpcUrlList,
+      ...workerLowLevelHelpers,
+      readTranscribeRequestPayload: resolvedDeps.readTranscribeRequestPayload,
+      Wallet: resolvedDeps.ethers?.Wallet,
+      normalizeSignedWorkerRequest: resolvedDeps.normalizeSignedWorkerRequest,
+      resolveWorkerBodySlugContext: resolvedDeps.resolveWorkerBodySlugContext,
+      validateRecoveredAddressMatchesRequest: resolvedDeps.validateRecoveredAddressMatchesRequest,
+      parseSiweMessage: resolvedDeps.parseSiweMessage,
+      validateSiwe: resolvedDeps.validateSiwe,
+      validateTrustedLoginRequestOrigin: resolvedDeps.validateTrustedLoginRequestOrigin,
+      validateBrowserLoginOrigin: resolvedDeps.validateBrowserLoginOrigin,
+      resolveTrustedAdminOrigins: resolvedDeps.resolveTrustedAdminOrigins,
+      validateSiweAddressMatchesRequest: resolvedDeps.validateSiweAddressMatchesRequest,
+      consumeNonce: resolvedDeps.consumeNonce,
+      ...(resolvedDeps.recordAbuseEvent ? { recordAbuseEvent: resolvedDeps.recordAbuseEvent } : {}),
+      ...(resolvedDeps.readAbuseCounterSummary
+        ? { readAbuseCounterSummary: resolvedDeps.readAbuseCounterSummary }
+        : {}),
+      buildNonce: resolvedDeps.buildNonce,
+      checkNonceRateLimit: resolvedDeps.checkNonceRateLimit,
+      base64UrlEncode: resolvedDeps.base64UrlEncode,
+      signToken: resolvedDeps.signToken,
+      buildAuthTokenJti: resolvedDeps.buildAuthTokenJti,
+      persistAuthTokenRecord: resolvedDeps.persistAuthTokenRecord,
+      readArweaveBootstrapUploadPayload: resolvedDeps.readArweaveBootstrapUploadPayload,
+      getSessionSecrets: resolvedDeps.getSessionSecrets,
+      mergeWorkerConfigRecords: resolvedDeps.mergeWorkerConfigRecords,
+      mergeWorkerLimitRecords: resolvedDeps.mergeWorkerLimitRecords,
+      putSessionConfig: resolvedDeps.putSessionConfig,
+      normalizeSecretValue: resolvedDeps.normalizeSecretValue,
+      putSessionSecrets: resolvedDeps.putSessionSecrets,
+      dispatchAnonymousRoute: resolvedDeps.dispatchAnonymousRoute,
+      storageRoute: resolvedDeps.storageRoute,
+      readAiRequestPayload: resolvedDeps.readAiRequestPayload,
+      validateAnonymousAiRequest: resolvedDeps.validateAnonymousAiRequest,
+      dispatchAuthenticatedRoute: resolvedDeps.dispatchAuthenticatedRoute,
+      dispatchAuthenticatedSecretPathRoute: resolvedDeps.dispatchAuthenticatedSecretPathRoute,
+      readAuthenticatedActionPayload: resolvedDeps.readAuthenticatedActionPayload,
+      dispatchAuthenticatedNonSecretActionRoute: resolvedDeps.dispatchAuthenticatedNonSecretActionRoute,
+      dispatchAuthenticatedSecretActionRoute: resolvedDeps.dispatchAuthenticatedSecretActionRoute,
+      evaluateAuthenticatedRoutePreflight: resolvedDeps.evaluateAuthenticatedRoutePreflight,
+      resolveAuthenticatedRouteSecrets: resolvedDeps.resolveAuthenticatedRouteSecrets,
+      normalizeAiRequestPayload: resolvedDeps.normalizeAiRequestPayload,
+    },
+    constants: {
+      resourceGateKeys: resolved.constants.RESOURCE_GATE_KEYS,
+      anonymousRateIdHeader: resolved.constants.ANONYMOUS_RATE_ID_HEADER,
+      anonymousGateUnavailableError: resolved.constants.ANONYMOUS_GATE_UNAVAILABLE_ERROR,
+      missingSlugError: resolved.constants.MISSING_SLUG_ERROR,
+      anonymousRouteDeniedError: resolved.constants.ANONYMOUS_ROUTE_DENIED_ERROR,
+      anonymousScopeDisabledError: resolved.constants.ANONYMOUS_SCOPE_DISABLED_ERROR,
       anonymousUnknownIdentity: ANONYMOUS_UNKNOWN_IDENTITY,
-    }),
-  );
+      openAiTranscribeUrl: resolved.constants.OPENAI_TRANSCRIBE_URL,
+      zeroBytes32: resolved.constants.ZERO_BYTES32,
+      slugAliasMismatchError: resolved.constants.SLUG_ALIAS_MISMATCH_ERROR,
+      slugMismatchError: resolved.constants.SLUG_MISMATCH_ERROR,
+      nonceTtlSeconds: resolved.constants.NONCE_TTL_SECONDS,
+      nonceRateLimitMax: resolved.constants.NONCE_RATE_LIMIT_MAX,
+      nonceRateLimitWindowMs: resolved.constants.NONCE_RATE_LIMIT_WINDOW_MS,
+      nonceRateLimitTtlSeconds: resolved.constants.NONCE_RATE_LIMIT_TTL_SECONDS,
+      usedNonceTtlSeconds: resolved.constants.USED_NONCE_TTL_SECONDS,
+      loginSiweMaxAgeMs: resolved.constants.LOGIN_SIWE_MAX_AGE_MS,
+      loginSiweFutureSkewMs: resolved.constants.LOGIN_SIWE_FUTURE_SKEW_MS,
+      tokenTtlSeconds: resolved.constants.TOKEN_TTL_SECONDS,
+      sessionConfigNotFoundError: resolved.constants.SESSION_CONFIG_NOT_FOUND_ERROR,
+      bootstrapSessionConfigRequiredError: resolved.constants.BOOTSTRAP_SESSION_CONFIG_REQUIRED_ERROR,
+    },
+    defaults: {
+      defaultRpcUrl: defaults.DEFAULT_FAUCET_RPC_URL,
+      defaultAmountEth: defaults.DEFAULT_FAUCET_AMOUNT_ETH,
+      defaultThresholdEth: defaults.DEFAULT_FAUCET_BALANCE_THRESHOLD_ETH,
+    },
+  });
   const runtime = {
     workerLowLevelHelpers,
     workerRouteRuntime,

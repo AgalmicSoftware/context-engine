@@ -106,10 +106,13 @@ test('createWorkerRuntime preserves worker globals and static bundle wiring', ()
       });
       return { id: 'low-level' };
     },
-    resolveWorkerRouteRuntimeInput: (value) => ({ id: 'route-input', value }),
-    createWorkerRouteRuntimeWithWorkerDeps: ({ id, value }) => {
-      assert.equal(id, 'route-input');
-      assert.deepEqual(value.workerLowLevelHelpers, { id: 'low-level' });
+    createWorkerRouteRuntimeWithWorkerDeps: (value) => {
+      assert.equal(value.deps.id, 'low-level');
+      assert.deepEqual(value.defaults, {
+        defaultRpcUrl: 'https://op-sepolia-testnet.api.pocket.network',
+        defaultAmountEth: '0.0002',
+        defaultThresholdEth: '0.001',
+      });
       return routeRuntime;
     },
   });
@@ -131,17 +134,16 @@ test('createWorkerRuntime honors env transcription endpoint overrides', () => {
     {
       resolveWorkerRuntimeDeps: (value) => value,
       createWorkerLowLevelHelpersWithWorkerDeps: () => ({}),
-      resolveWorkerRouteRuntimeInput: (value) => {
+      createWorkerRouteRuntimeWithWorkerDeps: (value) => {
         constants = value.constants;
-        return {};
+        return routeRuntime;
       },
-      createWorkerRouteRuntimeWithWorkerDeps: () => routeRuntime,
     },
   );
 
   assert.equal(result.workerRouteRuntime, routeRuntime);
   assert.equal(
-    constants.OPENAI_TRANSCRIBE_URL,
+    constants.openAiTranscribeUrl,
     'https://transcribe.example.test/v1/audio/transcriptions'
   );
 });
