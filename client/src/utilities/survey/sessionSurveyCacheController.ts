@@ -1,4 +1,5 @@
-import contractScripts, { normalizeSessionSlug } from '../web3/chainGateway.js';
+import { canonicalizeSessionSlug as normalizeSessionSlug } from '../session/sessionSlug.js';
+import contractScripts from '../web3/chainGateway.js';
 import { createLogger } from 'utilities/logging.js';
 import { normalizeArweaveFailureMeta, shouldStopPendingMetadataRetry } from '../arweave/arweaveRetryHelpers.js';
 import { prepareSurveyMetadataCacheEntry } from './metadataCacheEntryBuilders.js';

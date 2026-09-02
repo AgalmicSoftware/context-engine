@@ -21,7 +21,11 @@ jest.mock('../web3/chainGateway.js', () => ({
     listenForSurveyEvents: jest.fn(),
     removeSurveyEventsListener: jest.fn(),
   },
-  normalizeSessionSlug: jest.fn((s) => String(s || '')),
+}));
+
+jest.mock('../session/sessionSlug.js', () => ({
+  __esModule: true,
+  canonicalizeSessionSlug: jest.fn((s) => String(s || '')),
 }));
 
 jest.mock('../arweave/arweaveRetryHelpers.js', () => ({
@@ -43,7 +47,7 @@ jest.mock('../session/metadataSessionBinding.js', () => ({
 const { createSessionSurveyCacheController } = require('./sessionSurveyCacheController.js');
 const contractScriptsModule = require('../web3/chainGateway.js');
 const contractScripts = contractScriptsModule.default;
-const { normalizeSessionSlug } = contractScriptsModule;
+const { canonicalizeSessionSlug: normalizeSessionSlug } = require('../session/sessionSlug.js');
 const { normalizeArweaveFailureMeta, shouldStopPendingMetadataRetry } = require('../arweave/arweaveRetryHelpers.js');
 const { prepareSurveyMetadataCacheEntry } = require('./metadataCacheEntryBuilders.js');
 const { resolveScopedMetadataSessionSlug } = require('../session/metadataSessionBinding.js');

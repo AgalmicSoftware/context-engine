@@ -34,7 +34,11 @@ jest.mock('../web3/chainGateway.js', () => ({
     getQuestionResponsesChunkedWithCallback: jest.fn(),
     getResponse: jest.fn(),
   },
-  normalizeSessionSlug: jest.fn((s) => String(s || '')),
+}));
+
+jest.mock('../session/sessionSlug.js', () => ({
+  __esModule: true,
+  canonicalizeSessionSlug: jest.fn((s) => String(s || '')),
 }));
 
 jest.mock('../crypto/cryptography.js', () => ({
@@ -64,7 +68,7 @@ const { createSessionResponseHydrationController } = require('./sessionResponseH
 const { ethers } = require('ethers');
 const contractScriptsModule = require('../web3/chainGateway.js');
 const contractScripts = contractScriptsModule.default;
-const { normalizeSessionSlug } = contractScriptsModule;
+const { canonicalizeSessionSlug: normalizeSessionSlug } = require('../session/sessionSlug.js');
 const { cryptoUtils } = require('../crypto/cryptography.js');
 const {
   ensureQuestionArweaveCacheBranches,

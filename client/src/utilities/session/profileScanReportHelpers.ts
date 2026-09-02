@@ -1,4 +1,4 @@
-import { normalizeSessionSlug } from '../web3/chainGateway.js';
+import { canonicalizeSessionSlug as normalizeSessionSlug } from './sessionSlug.js';
 import { getAllowedSessionSlugs } from './sessionScanScope.js';
 
 type ProfileScanScopeContext = {

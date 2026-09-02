@@ -1,8 +1,8 @@
 import type { SessionPathResolverController } from './sessionPathResolverController';
 
-jest.mock('../../utilities/web3/chainGateway.js', () => ({
+jest.mock('../../utilities/session/sessionSlug.js', () => ({
   __esModule: true,
-  normalizeSessionSlug: jest.fn((value = '') =>
+  canonicalizeSessionSlug: jest.fn((value = '') =>
     String(value || '')
       .trim()
       .toLowerCase(),
@@ -46,7 +46,7 @@ jest.mock('../../variables/appConfig.js', () => ({
 }));
 
 const { createSessionPathResolverController } = require('./sessionPathResolverController.js');
-const contractScriptsModule = require('../../utilities/web3/chainGateway.js');
+const sessionSlugModule = require('../../utilities/session/sessionSlug.js');
 const sessionRegistryModule = require('../../utilities/web3/sessionRegistry.js');
 const litProtocolModule = require('../../utilities/crypto/litProtocol.js');
 const chainsModule = require('../../variables/chains.js');
@@ -124,7 +124,7 @@ describe('createSessionPathResolverController', () => {
     storedConfigsById = {};
     setWindowPath('/');
 
-    contractScriptsModule.normalizeSessionSlug.mockImplementation((value = '') =>
+    sessionSlugModule.canonicalizeSessionSlug.mockImplementation((value = '') =>
       String(value || '')
         .trim()
         .toLowerCase(),

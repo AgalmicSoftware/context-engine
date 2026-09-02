@@ -16,13 +16,13 @@ import styles from './CommunityTab.module.scss';
 import historicalFigures from '../../variables/demo/historical_figure_users.json';
 import { Modal, ModalHeader, ModalBody, Collapse } from 'reactstrap';
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
+import { canonicalizeSessionSlug as normalizeSessionSlug } from '../../utilities/session/sessionSlug.js';
 import contractScripts, {
   getAllSessionSlugs,
   getDemoSessionConfigBySlug,
   getSessionConfigBySlug,
   getSessionChainId,
   getSessionLists,
-  normalizeSessionSlug,
 } from '../../utilities/web3/chainGateway.js';
 import SBTsList from '../SBTs/SBTsList';
 import SBTFilter from '../SBTs/SBTFilter';

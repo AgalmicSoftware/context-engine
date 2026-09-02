@@ -1,4 +1,4 @@
-import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
+import { canonicalizeSessionSlug as normalizeSessionSlug } from '../../utilities/session/sessionSlug.js';
 import { toAnalysisRecord } from './userPageCoreHelpers';
 
 export type ResolveUserPageSurveyCreatedCardStateArgs = {

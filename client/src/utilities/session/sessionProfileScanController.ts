@@ -3,7 +3,7 @@ import { createLogger } from 'utilities/logging.js';
 import { getGlobalLitHooks } from '../crypto/litProtocol.js';
 import { getAllowedSessionSlugs } from './sessionScanScope.js';
 import { resolveSessionRegistryBootstrapChainIds } from './registryBootstrapChainIds.js';
-import { normalizeSessionSlug } from '../web3/chainGateway.js';
+import { canonicalizeSessionSlug as normalizeSessionSlug } from './sessionSlug.js';
 import {
   fetchSessionFromRegistry,
   loadGroupRegistryCache,

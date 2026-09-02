@@ -3,8 +3,8 @@ import {
   getSessionConfigBySlugOrDefault,
   getSessionChainId as resolveSessionChainId,
   getSessionNetwork as resolveSessionNetwork,
-  normalizeSessionSlug,
 } from '../../utilities/web3/chainGateway.js';
+import { canonicalizeSessionSlug as normalizeSessionSlug } from './sessionSlug.js';
 import { resolveStrictSessionValue } from '../../utilities/survey/questionRouting.js';
 
 type NullableChainIdInput = number | string | null | undefined;

@@ -17,14 +17,14 @@ jest.mock('./sessionCacheConstants', () => ({
   DG_PRIMARY_ROUTE_CACHE_NAMES: ['surveysCache', 'questionsCache', 'sbtCache'],
 }));
 
-jest.mock('../../utilities/web3/chainGateway', () => ({
+jest.mock('../session/sessionSlug.js', () => ({
   __esModule: true,
-  normalizeSessionSlug: jest.fn(),
+  canonicalizeSessionSlug: jest.fn(),
 }));
 
 const { createSessionCachePersistenceController } = require('./sessionCachePersistenceController.js');
 const { readCache } = require('../../utilities/cache/cacheScripts');
-const contractScriptsModule = require('../../utilities/web3/chainGateway');
+const sessionSlugModule = require('../session/sessionSlug.js');
 
 const createMockHost = (opts = {}) => {
   const state = { cacheHasLoaded: false, ...opts.initialState };
@@ -54,7 +54,7 @@ const createDeferred = () => {
 describe('createSessionCachePersistenceController', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    contractScriptsModule.normalizeSessionSlug.mockImplementation((slug) =>
+    sessionSlugModule.canonicalizeSessionSlug.mockImplementation((slug) =>
       String(slug || '')
         .trim()
         .toLowerCase(),
@@ -103,7 +103,7 @@ describe('createSessionCachePersistenceController', () => {
       const controller = createSessionCachePersistenceController(createMockHost());
 
       await expect(controller.hasPersistedManagedCacheData(' Test ')).resolves.toBe(true);
-      expect(contractScriptsModule.normalizeSessionSlug).toHaveBeenCalledWith(' Test ');
+      expect(sessionSlugModule.canonicalizeSessionSlug).toHaveBeenCalledWith(' Test ');
       expect(readCache).toHaveBeenCalledTimes(3);
       expect(readCache.mock.calls.map(([namespace]) => namespace)).toEqual([
         'surveysCache',

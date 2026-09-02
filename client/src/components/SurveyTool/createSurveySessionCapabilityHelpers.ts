@@ -1,4 +1,5 @@
-import { getSessionConfigBySlug, normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
+import { canonicalizeSessionSlug as normalizeSessionSlug } from '../../utilities/session/sessionSlug.js';
+import { getSessionConfigBySlug } from '../../utilities/web3/chainGateway.js';
 import { mergeSessionContractMaps, resolveActiveSessionSlug } from '../../utilities/session/sessionNaming.js';
 import {
   claimsWorkerCanonicalAuthority,

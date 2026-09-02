@@ -1,6 +1,6 @@
-jest.mock('../web3/chainGateway.js', () => ({
+jest.mock('./sessionSlug.js', () => ({
   __esModule: true,
-  normalizeSessionSlug: jest.fn((value = '') =>
+  canonicalizeSessionSlug: jest.fn((value = '') =>
     String(value || '')
       .trim()
       .toLowerCase(),

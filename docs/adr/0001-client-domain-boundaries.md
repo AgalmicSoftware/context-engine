@@ -76,8 +76,8 @@ late-binding behavior.
   balance readers, sponsored access, publish reducer/ports/adapters, and session
   registry read/write ports.
 - `client/src/domains/storage/`: admin Arweave reads/uploads/URL helpers.
-- `client/src/domains/surveys/`: survey read ports and question Arweave cache
-  branch merge helpers.
+- `client/src/domains/surveys/`: typed survey read/response-submit ports and
+  question Arweave cache branch merge helpers.
 - `client/src/domains/worker/`: admin worker URL/CORS/auth/SIWE helpers and
   faucet funding ports.
 - `client/src/app/runtime/`: application runtime construction that legitimately

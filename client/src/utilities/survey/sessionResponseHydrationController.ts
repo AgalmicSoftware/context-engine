@@ -1,5 +1,6 @@
 import { ethers } from 'ethers';
-import contractScripts, { normalizeSessionSlug } from '../web3/chainGateway.js';
+import { canonicalizeSessionSlug as normalizeSessionSlug } from '../session/sessionSlug.js';
+import contractScripts from '../web3/chainGateway.js';
 import { cryptoUtils } from '../crypto/cryptography.js';
 import { createLogger } from 'utilities/logging.js';
 import {

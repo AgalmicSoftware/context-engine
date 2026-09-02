@@ -1,6 +1,7 @@
 import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
-import { getSessionConfigBySlug, normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
+import { canonicalizeSessionSlug as normalizeSessionSlug } from '../../utilities/session/sessionSlug.js';
+import { getSessionConfigBySlug } from '../../utilities/web3/chainGateway.js';
 import {
   resolveWorkerCanonicalCacheIdentity,
   type WorkerCanonicalCacheIdentity,
