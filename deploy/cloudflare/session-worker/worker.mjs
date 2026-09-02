@@ -54824,7 +54824,7 @@ var wordlists = {
   en: LangEn.wordlist()
 };
 
-// workers/sessionCorsWorker/workerTopLevelBinding.js
+// workers/sessionCorsWorker/worker.js
 var import_rpcDefaults5 = __toESM(require_rpcDefaults(), 1);
 
 // workers/sessionCorsWorker/rpcDiagnosticSafety.js
@@ -56057,6 +56057,7 @@ var INVALID_SESSION_SLUG_ERROR = 'Invalid session slug. Use lowercase letters, n
 var SLUG_MISMATCH_ERROR = "sessionSlug does not match worker session.";
 var SLUG_ALIAS_MISMATCH_ERROR = "sessionSlug aliases do not match.";
 var MISSING_SLUG_ERROR = "Missing sessionSlug.";
+var DEFAULT_SESSION_STORAGE_KEY = "general";
 var EMPTY_VALIDATION_RESULT = Object.freeze({
   ok: true,
   slug: "",
@@ -56074,6 +56075,7 @@ var normalizeWorkerSessionSlug = (raw) => {
   if (!slug) return "";
   return canonicalizeReservedWorkerAlias(slug);
 };
+var sessionSlugStorageKey = (raw) => normalizeWorkerSessionSlug(raw) || DEFAULT_SESSION_STORAGE_KEY;
 var validateInboundWorkerSessionSlug = (raw) => {
   if (raw == null) return EMPTY_VALIDATION_RESULT;
   const rawStr = toStr8(raw).trim();
@@ -56335,7 +56337,6 @@ var normalizeTimestampMs = (value) => {
 };
 var cloneRecord = (value) => isRecord(value) ? { ...value } : {};
 var toTrimmedString3 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
-var normalizeSlug = (value) => toTrimmedString3(value).toLowerCase() || "general";
 var getCryptoImpl = (deps = {}) => {
   const cryptoImpl = deps.crypto || globalThis.crypto;
   if (!cryptoImpl?.subtle) {
@@ -56381,7 +56382,7 @@ var base64urlToBytes = (value) => {
 var buildAad = (slug) => [
   "ce-session-secrets",
   `v${SESSION_SECRETS_ENVELOPE_VERSION}`,
-  normalizeSlug(slug),
+  sessionSlugStorageKey(slug),
   SESSION_SECRETS_ENVELOPE_KEY_REF
 ].join(":");
 var resolveKek = (env = {}, previous = false, deps = {}) => {
@@ -61019,7 +61020,6 @@ var DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE = 250;
 var MAX_WORKER_GROUP_MEMBER_PAGE_SIZE = 250;
 var WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL = "fresh-template-v2";
 var IMPLEMENTED_JOIN_MODES = /* @__PURE__ */ new Set([WORKER_GROUP_JOIN_MODES.OPEN, WORKER_GROUP_JOIN_MODES.ADMIN_ADD]);
-var safeSlugPart = (value) => trim2(value || "general").toLowerCase().replace(/[^a-z0-9._:-]+/g, "-").replace(/^-+|-+$/g, "") || "general";
 var safeKeyPart = (value) => trim2(value || "id").toLowerCase().replace(/[^a-z0-9._:-]+/g, "-").replace(/^-+|-+$/g, "") || "id";
 var normalizeWorkerGroupId = (value) => {
   const normalized = trim2(value).toLowerCase();
@@ -61042,7 +61042,7 @@ var canonicalSessionIdKeyPart = (value) => {
 var canonicalWorkerGroupSessionSlug = (value) => {
   const validated = validateInboundWorkerSessionSlug(value);
   if (!validated.ok) return "";
-  const slug = normalizeWorkerSessionSlug(validated.slug) || "general";
+  const slug = sessionSlugStorageKey(validated.slug);
   return slug.length <= MAX_WORKER_GROUP_SESSION_SLUG_LENGTH ? slug : "";
 };
 var nowIso = (deps = {}) => new Date(deps.now?.() || Date.now()).toISOString();
@@ -61114,15 +61114,15 @@ var memberKey = ({ slug, sessionId, groupId, principalKey }) => `ce-worker-group
 var memberIndexKey = ({ slug, sessionId, principalKey, groupId }) => `ce-worker-group-principal:${workerGroupIdentityKeyPrefix({ slug, sessionId })}:${encodedPrincipalKeyPart(principalKey)}:${normalizeWorkerGroupId(groupId)}`;
 var memberPrefix = ({ slug, sessionId, groupId }) => `ce-worker-group-member:${workerGroupIdentityKeyPrefix({ slug, sessionId })}:${normalizeWorkerGroupId(groupId)}:`;
 var principalPrefix = ({ slug, sessionId, principalKey }) => `ce-worker-group-principal:${workerGroupIdentityKeyPrefix({ slug, sessionId })}:${encodedPrincipalKeyPart(principalKey)}:`;
-var legacyGroupKey = ({ slug, groupId }) => `ce-worker-group:${safeSlugPart(slug)}:${normalizeWorkerGroupId(groupId)}`;
-var legacyGroupPrefix = ({ slug }) => `ce-worker-group:${safeSlugPart(slug)}:`;
-var legacyGroupIndexKey = ({ slug, groupId }) => `ce-worker-group-index:${safeSlugPart(slug)}:${normalizeWorkerGroupId(groupId)}`;
-var legacyGroupIndexPrefix = ({ slug }) => `ce-worker-group-index:${safeSlugPart(slug)}:`;
-var legacyEncodedMemberKey = ({ slug, groupId, principalKey }) => `ce-worker-group-member:${safeSlugPart(slug)}:${normalizeWorkerGroupId(groupId)}:${encodedPrincipalKeyPart(principalKey)}`;
-var legacyCaseFoldedMemberKey = ({ slug, groupId, principalKey }) => `ce-worker-group-member:${safeSlugPart(slug)}:${normalizeWorkerGroupId(groupId)}:${safeKeyPart(principalKey)}`;
-var legacyMemberPrefix = ({ slug, groupId }) => `ce-worker-group-member:${safeSlugPart(slug)}:${normalizeWorkerGroupId(groupId)}:`;
-var legacyEncodedPrincipalPrefix = ({ slug, principalKey }) => `ce-worker-group-principal:${safeSlugPart(slug)}:${encodedPrincipalKeyPart(principalKey)}:`;
-var legacyCaseFoldedPrincipalPrefix = ({ slug, principalKey }) => `ce-worker-group-principal:${safeSlugPart(slug)}:${safeKeyPart(principalKey)}:`;
+var legacyGroupKey = ({ slug, groupId }) => `ce-worker-group:${sessionSlugStorageKey(slug)}:${normalizeWorkerGroupId(groupId)}`;
+var legacyGroupPrefix = ({ slug }) => `ce-worker-group:${sessionSlugStorageKey(slug)}:`;
+var legacyGroupIndexKey = ({ slug, groupId }) => `ce-worker-group-index:${sessionSlugStorageKey(slug)}:${normalizeWorkerGroupId(groupId)}`;
+var legacyGroupIndexPrefix = ({ slug }) => `ce-worker-group-index:${sessionSlugStorageKey(slug)}:`;
+var legacyEncodedMemberKey = ({ slug, groupId, principalKey }) => `ce-worker-group-member:${sessionSlugStorageKey(slug)}:${normalizeWorkerGroupId(groupId)}:${encodedPrincipalKeyPart(principalKey)}`;
+var legacyCaseFoldedMemberKey = ({ slug, groupId, principalKey }) => `ce-worker-group-member:${sessionSlugStorageKey(slug)}:${normalizeWorkerGroupId(groupId)}:${safeKeyPart(principalKey)}`;
+var legacyMemberPrefix = ({ slug, groupId }) => `ce-worker-group-member:${sessionSlugStorageKey(slug)}:${normalizeWorkerGroupId(groupId)}:`;
+var legacyEncodedPrincipalPrefix = ({ slug, principalKey }) => `ce-worker-group-principal:${sessionSlugStorageKey(slug)}:${encodedPrincipalKeyPart(principalKey)}:`;
+var legacyCaseFoldedPrincipalPrefix = ({ slug, principalKey }) => `ce-worker-group-principal:${sessionSlugStorageKey(slug)}:${safeKeyPart(principalKey)}:`;
 var legacyEncodedMemberIndexKey = ({ slug, principalKey, groupId }) => `${legacyEncodedPrincipalPrefix({ slug, principalKey })}${normalizeWorkerGroupId(groupId)}`;
 var legacyCaseFoldedMemberIndexKey = ({ slug, principalKey, groupId }) => `${legacyCaseFoldedPrincipalPrefix({ slug, principalKey })}${normalizeWorkerGroupId(groupId)}`;
 var jsonResponse = (deps, body, status, headers) => deps?.json?.(body, status, headers) || new Response(JSON.stringify(body), { status, headers });
@@ -64920,12 +64920,6 @@ var normalizeBoundedFutureTimestamp = (value, nowMs, maxAheadMs) => {
   if (!numeric || numeric <= nowMs || numeric > nowMs + maxAheadMs) return 0;
   return numeric;
 };
-var normalizeSessionSlug = (value) => {
-  if (value == null) return "";
-  const result = validateInboundWorkerSessionSlug(value);
-  if (!result?.ok) return "";
-  return result.slug || "general";
-};
 var isBase64url = (value, length) => typeof value === "string" && value.length === length && /^[A-Za-z0-9_-]+$/.test(value);
 var normalizeWrappedSessionKeyRecord = (value, slug) => {
   if (!isObjectRecord(value)) return null;
@@ -65003,7 +64997,7 @@ var WORKER_GROUP_MUTATIONS = /* @__PURE__ */ new Set([
   "join"
 ]);
 var normalizeWorkerGroupMutation = (payload) => {
-  const slug = normalizeSessionSlug(payload?.slug);
+  const slug = sessionSlugStorageKey(payload?.slug);
   const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
   const operation = toTrimmedString9(payload?.operation).toLowerCase();
   const actor = normalizeWorkerGroupPrincipal(payload?.actorPrincipal);
@@ -65450,7 +65444,7 @@ var SessionWriteCoordinator = class {
     });
   }
   async executeWorkerGroupReady(payload) {
-    const slug = normalizeSessionSlug(payload?.slug);
+    const slug = sessionSlugStorageKey(payload?.slug);
     const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
     if (!slug || !sessionId) {
       return jsonResponse2({
@@ -65464,7 +65458,7 @@ var SessionWriteCoordinator = class {
   }
   executeWorkerGroupReconcileEmpty(payload) {
     return this.serializeWorkerGroupOperation(async () => {
-      const slug = normalizeSessionSlug(payload?.slug);
+      const slug = sessionSlugStorageKey(payload?.slug);
       const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
       if (!slug || !sessionId) {
         return jsonResponse2({
@@ -65479,7 +65473,7 @@ var SessionWriteCoordinator = class {
   }
   executeWorkerGroupAuthorization(payload) {
     return this.serializeWorkerGroupOperation(async () => {
-      const slug = normalizeSessionSlug(payload?.slug);
+      const slug = sessionSlugStorageKey(payload?.slug);
       const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
       const groupId = normalizeWorkerGroupId(payload?.groupId);
       const principal = normalizeWorkerGroupPrincipal(payload?.principal);
@@ -65528,7 +65522,7 @@ var SessionWriteCoordinator = class {
   }
   executeWorkerGroupCatalog(payload) {
     return this.serializeWorkerGroupOperation(async () => {
-      const slug = normalizeSessionSlug(payload?.slug);
+      const slug = sessionSlugStorageKey(payload?.slug);
       const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
       const requestedGroupIds = Array.isArray(payload?.groupIds) ? payload.groupIds.map((groupId) => normalizeWorkerGroupId(groupId)) : [];
       const maxGroups = resolveWorkerGroupCaps(this.env).maxGroupsPerSession;
@@ -65578,7 +65572,7 @@ var SessionWriteCoordinator = class {
   }
   executeWorkerGroupMemberships(payload) {
     return this.serializeWorkerGroupOperation(async () => {
-      const slug = normalizeSessionSlug(payload?.slug);
+      const slug = sessionSlugStorageKey(payload?.slug);
       const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
       const principal = normalizeWorkerGroupPrincipal(payload?.principal);
       if (!slug || !sessionId || !principal.ok) {
@@ -65864,7 +65858,7 @@ var SessionWriteCoordinator = class {
   }
   async executeStorageEnvelopeKeyGetOrCreate(payload) {
     return this.serializeSessionConfigOperation(async () => {
-      const slug = normalizeSessionSlug(payload?.slug);
+      const slug = sessionSlugStorageKey(payload?.slug);
       const baseConfig = slug ? normalizePublicSessionConfig(payload?.baseConfig, slug) : null;
       const candidate = normalizeWrappedSessionKeyRecord(payload?.candidateRecord, slug);
       if (!slug || !baseConfig || !candidate) {
@@ -65877,7 +65871,7 @@ var SessionWriteCoordinator = class {
       }
       const reserved = await this.state.storage.transaction(async (transaction) => {
         const existing = await transaction.get(SESSION_CONFIG_AUTHORITY_KEY);
-        if (existing && normalizeSessionSlug(existing.slug) !== slug) {
+        if (existing && sessionSlugStorageKey(existing.slug) !== slug) {
           return { error: "Session config authority identity conflict.", status: 409 };
         }
         const authorityConfig = existing?.config ? normalizePublicSessionConfig(existing.config, slug) : baseConfig;
@@ -65935,7 +65929,7 @@ var SessionWriteCoordinator = class {
   }
   async executeSessionConfigMutation(payload) {
     return this.serializeSessionConfigOperation(async () => {
-      const slug = normalizeSessionSlug(payload?.slug);
+      const slug = sessionSlugStorageKey(payload?.slug);
       const baseConfig = slug ? normalizePublicSessionConfig(payload?.baseConfig, slug) : null;
       if (!slug || !baseConfig || !isObjectRecord(payload?.mutation)) {
         return jsonResponse2({ error: "Invalid session config mutation." }, 400);
@@ -65947,7 +65941,7 @@ var SessionWriteCoordinator = class {
       }
       const reserved = await this.state.storage.transaction(async (transaction) => {
         const existing = await transaction.get(SESSION_CONFIG_AUTHORITY_KEY);
-        if (existing && normalizeSessionSlug(existing.slug) !== slug) {
+        if (existing && sessionSlugStorageKey(existing.slug) !== slug) {
           return { error: "Session config authority identity conflict.", status: 409 };
         }
         const authorityConfig = existing?.config ? normalizePublicSessionConfig(existing.config, slug) : baseConfig;
@@ -66002,7 +65996,7 @@ var SessionWriteCoordinator = class {
   }
   async executeAuthNonceIssue(payload) {
     const nowMs = Number(this.now()) || Date.now();
-    const slug = normalizeSessionSlug(payload?.slug);
+    const slug = sessionSlugStorageKey(payload?.slug);
     const address = toTrimmedString9(payload?.address).toLowerCase();
     const nonce = toTrimmedString9(payload?.nonce);
     const expiresAtMs = normalizeBoundedFutureTimestamp(
@@ -66032,7 +66026,7 @@ var SessionWriteCoordinator = class {
   }
   async executeAuthNonceConsume(payload) {
     const nowMs = Number(this.now()) || Date.now();
-    const slug = normalizeSessionSlug(payload?.slug);
+    const slug = sessionSlugStorageKey(payload?.slug);
     const address = toTrimmedString9(payload?.address).toLowerCase();
     const nonce = toTrimmedString9(payload?.nonce);
     const usedExpiresAtMs = normalizeBoundedFutureTimestamp(
@@ -66068,7 +66062,7 @@ var SessionWriteCoordinator = class {
   }
   async executeAuthRateCheck(payload) {
     const nowMs = Number(this.now()) || Date.now();
-    const slug = normalizeSessionSlug(payload?.slug);
+    const slug = sessionSlugStorageKey(payload?.slug);
     const route = toTrimmedString9(payload?.route).toLowerCase();
     const identity = toTrimmedString9(payload?.identity).toLowerCase();
     const limit = normalizePositiveSafeInteger(payload?.limit);
@@ -66625,7 +66619,7 @@ var getOrCreateCoordinatedStorageEnvelopeSessionKey = async ({
   baseConfig,
   candidateRecord
 } = {}) => {
-  const normalizedSlug = normalizeSessionSlug(slug);
+  const normalizedSlug = sessionSlugStorageKey(slug);
   const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
   if (!stub) throw new Error("Session config coordination is unavailable.");
   let response2;
@@ -66657,7 +66651,7 @@ var executeCoordinatedSessionConfigMutation = async ({
   existingConfig,
   mutation
 } = {}) => {
-  const normalizedSlug = normalizeSessionSlug(slug);
+  const normalizedSlug = sessionSlugStorageKey(slug);
   const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
   if (!stub) {
     return {
@@ -70135,7 +70129,7 @@ var toStr18 = (value) => typeof value === "string" ? value : value == null ? "" 
 var trim5 = (value) => toStr18(value).trim();
 var isObj9 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var cloneJson = (value) => JSON.parse(JSON.stringify(value || {}));
-var safeSlugPart2 = (value) => trim5(value || "general").toLowerCase().replace(/[^a-z0-9._:-]+/g, "-").replace(/^-+|-+$/g, "") || "general";
+var safeSlugPart = (value) => trim5(value || "general").toLowerCase().replace(/[^a-z0-9._:-]+/g, "-").replace(/^-+|-+$/g, "") || "general";
 var bytesToBase64url2 = (bytes2) => {
   const source = bytes2 instanceof Uint8Array ? bytes2 : new Uint8Array(bytes2 || []);
   if (typeof Buffer !== "undefined") {
@@ -70249,12 +70243,12 @@ var isCoordinatorWrappedSessionKeyRecord = (record, slug) => {
   if (!isObj9(record)) return false;
   const createdAt = trim5(record.createdAt);
   const createdAtMs = Date.parse(createdAt);
-  return record.version === ENVELOPE_VERSION && record.keyProvider === "worker_secret" && record.alg === AES_256_GCM && record.wrapAlg === "AES-GCM-KW-v1" && Number.isFinite(createdAtMs) && new Date(createdAtMs).toISOString() === createdAt && trim5(record.keyId) === `session:${safeSlugPart2(slug)}:${createdAt}` && /^[A-Za-z0-9_-]{16}$/.test(trim5(record.iv)) && /^[A-Za-z0-9_-]{64}$/.test(trim5(record.wrappedKey));
+  return record.version === ENVELOPE_VERSION && record.keyProvider === "worker_secret" && record.alg === AES_256_GCM && record.wrapAlg === "AES-GCM-KW-v1" && Number.isFinite(createdAtMs) && new Date(createdAtMs).toISOString() === createdAt && trim5(record.keyId) === `session:${safeSlugPart(slug)}:${createdAt}` && /^[A-Za-z0-9_-]{16}$/.test(trim5(record.iv)) && /^[A-Za-z0-9_-]{64}$/.test(trim5(record.wrappedKey));
 };
 var unwrapSessionKeyBytes = async ({ env, config, slug, deps = {} }) => {
   const record = readSessionKeyRecord(config);
   if (!record) throw new Error("Storage envelope session key is missing.");
-  const aad = `ce-storage-envelope:session:${safeSlugPart2(slug)}`;
+  const aad = `ce-storage-envelope:session:${safeSlugPart(slug)}`;
   const attempts = [false, true];
   let lastError = null;
   for (const previous of attempts) {
@@ -70277,7 +70271,7 @@ var ensureStorageEnvelopeSessionKey = async ({ env, config, slug, deps = {} }) =
     candidateRecord = {
       version: ENVELOPE_VERSION,
       keyProvider: "worker_secret",
-      keyId: `session:${safeSlugPart2(slug)}:${createdAt}`,
+      keyId: `session:${safeSlugPart(slug)}:${createdAt}`,
       createdAt,
       alg: AES_256_GCM,
       wrapAlg: "AES-GCM-KW-v1",
@@ -70291,12 +70285,12 @@ var ensureStorageEnvelopeSessionKey = async ({ env, config, slug, deps = {} }) =
     candidateRecord = {
       version: ENVELOPE_VERSION,
       keyProvider: "worker_secret",
-      keyId: `session:${safeSlugPart2(slug)}:${createdAt}`,
+      keyId: `session:${safeSlugPart(slug)}:${createdAt}`,
       createdAt,
       ...await wrapBytesWithKey({
         wrappingKey: deploymentKey,
         plaintextBytes: keyBytes,
-        aad: `ce-storage-envelope:session:${safeSlugPart2(slug)}`,
+        aad: `ce-storage-envelope:session:${safeSlugPart(slug)}`,
         deps
       })
     };
@@ -70331,7 +70325,7 @@ var encryptPayloadWithStorageEnvelope = async ({
 }) => {
   const sessionKey = await ensureStorageEnvelopeSessionKey({ env, config, slug, deps });
   const dekBytes = randomBytes5(32, deps);
-  const aad = `ce-storage-envelope:payload:${safeSlugPart2(slug)}:${payloadId}`;
+  const aad = `ce-storage-envelope:payload:${safeSlugPart(slug)}:${payloadId}`;
   const encryptedPayload = await aesEncrypt({
     keyBytes: dekBytes,
     plaintextBytes,
@@ -70380,7 +70374,7 @@ var decryptPayloadWithStorageEnvelope = async ({
   }
   const sessionKeyBytes = await unwrapSessionKeyBytes({ env, config, slug, deps });
   const sessionWrappingKey = await importAesKey(sessionKeyBytes, ["decrypt"], deps);
-  const aad = `ce-storage-envelope:payload:${safeSlugPart2(slug)}:${payloadId}`;
+  const aad = `ce-storage-envelope:payload:${safeSlugPart(slug)}:${payloadId}`;
   const dekBytes = await unwrapBytesWithKey({
     wrappingKey: sessionWrappingKey,
     wrapped: envelope.dek,
@@ -70416,7 +70410,7 @@ var writeStorageEnvelopeKeyReleaseAudit = async ({
   const entry = {
     version: ENVELOPE_VERSION,
     event: "storage_envelope_key_release",
-    sessionSlug: safeSlugPart2(slug),
+    sessionSlug: safeSlugPart(slug),
     payloadId: trim5(payloadId),
     principal: trim5(principal).toLowerCase() || "anonymous",
     conditionMatched: isObj9(conditionMatched) ? cloneJson(conditionMatched) : conditionMatched || "gate_fallback",
@@ -70457,7 +70451,6 @@ var DEFAULT_RESOURCE_GATES = Object.freeze({
   media: "docUploads",
   images: "docUploads"
 });
-var safeSlugPart3 = (value) => trim6(value || "general").toLowerCase().replace(/[^a-z0-9._:-]+/g, "-").replace(/^-+|-+$/g, "") || "general";
 var bytesToBase64url3 = (bytes2) => {
   if (typeof Buffer !== "undefined") {
     return Buffer.from(bytes2).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
@@ -70482,11 +70475,11 @@ var buildCloudflareStorageId = ({ randomBytes: randomBytes6, getRandomValues: ge
   bytes2[0] &= 247;
   return bytesToBase64url3(bytes2);
 };
-var buildObjectKey = ({ slug, id: id2 }) => `sessions/${safeSlugPart3(slug)}/storage/${id2}`;
-var buildIndexKey = ({ slug, resource, id: id2 }) => `ce-storage:${safeSlugPart3(slug)}:${trim6(resource) || "docsContext"}:${id2}`;
-var buildIndexPrefix = ({ slug, resource }) => `ce-storage:${safeSlugPart3(slug)}:${trim6(resource) || "docsContext"}:`;
-var buildSessionIndexPrefix = ({ slug }) => `ce-storage:${safeSlugPart3(slug)}:`;
-var buildPayloadKey = ({ slug, id: id2 }) => `ce-storage-payload:${safeSlugPart3(slug)}:${id2}`;
+var buildObjectKey = ({ slug, id: id2 }) => `sessions/${sessionSlugStorageKey(slug)}/storage/${id2}`;
+var buildIndexKey = ({ slug, resource, id: id2 }) => `ce-storage:${sessionSlugStorageKey(slug)}:${trim6(resource) || "docsContext"}:${id2}`;
+var buildIndexPrefix = ({ slug, resource }) => `ce-storage:${sessionSlugStorageKey(slug)}:${trim6(resource) || "docsContext"}:`;
+var buildSessionIndexPrefix = ({ slug }) => `ce-storage:${sessionSlugStorageKey(slug)}:`;
+var buildPayloadKey = ({ slug, id: id2 }) => `ce-storage-payload:${sessionSlugStorageKey(slug)}:${id2}`;
 var safeGroupId = (value) => trim6(value).toLowerCase().replace(/[^a-z0-9._:-]+/g, "-").replace(/^-+|-+$/g, "");
 var normalizeGroupIdList = (value) => {
   let raw = value;
@@ -71971,7 +71964,7 @@ var exportCloudflareEncryptedPayloadEnvelopes = async ({
     version: 1,
     exportScope: "encrypted_envelopes_only",
     storageBackend: STORAGE_BACKENDS.CLOUDFLARE,
-    sessionSlug: safeSlugPart3(slug),
+    sessionSlug: sessionSlugStorageKey(slug),
     resource: trim6(resource) || "all",
     exportedAt: generatedAt,
     exportedPayloadCount: payloads.length,
@@ -77562,165 +77555,6 @@ var createWorkerRouteRuntimeWithWorkerDeps = ({
   };
 };
 
-// workers/sessionCorsWorker/workerLowLevelHelperInputResolution.js
-var resolveWorkerLowLevelHelperInput = ({
-  deps,
-  constants,
-  defaults
-} = {}) => ({
-  deps: {
-    ethers: deps?.ethers,
-    toStr: deps?.toStr,
-    URL: deps?.URL,
-    Headers: deps?.Headers,
-    normalizeWorkerSessionSlug: deps?.normalizeWorkerSessionSlug,
-    normalizeRpcUrlList: deps?.normalizeRpcUrlList,
-    mergeRpcUrlLists: deps?.mergeRpcUrlLists,
-    toChainId: deps?.toChainId,
-    log: deps?.log,
-    fetch: deps?.fetch,
-    rpcFetch: deps?.rpcFetch,
-    now: deps?.now
-  },
-  constants: {
-    zeroBytes32: constants?.ZERO_BYTES32,
-    sessionRegistryAbi: constants?.SESSION_REGISTRY_ABI,
-    erc721Abi: constants?.ERC721_ABI,
-    sbtAdminAbi: constants?.SBT_ADMIN_ABI,
-    hatsAbi: constants?.HATS_ABI,
-    faucetSbtGateAbi: constants?.FAUCET_SBT_GATE_ABI
-  },
-  defaults: {
-    defaultFaucetRpcUrl: defaults?.DEFAULT_FAUCET_RPC_URL
-  }
-});
-
-// workers/sessionCorsWorker/workerRouteRuntimeInputResolution.js
-var resolveWorkerRouteRuntimeInput = ({
-  deps,
-  constants,
-  defaults,
-  workerLowLevelHelpers,
-  anonymousUnknownIdentity = "anon:unknown"
-} = {}) => ({
-  deps: {
-    log: deps?.log,
-    fetch: deps?.fetch,
-    toStr: deps?.toStr,
-    now: deps?.now,
-    parseAllowOrigins: deps?.parseAllowOrigins,
-    originAllowed: deps?.originAllowed,
-    corsHeaders: deps?.corsHeaders,
-    json: deps?.json,
-    normalizeWorkerSessionSlug: deps?.normalizeWorkerSessionSlug,
-    getSessionConfig: deps?.getSessionConfig,
-    verifyToken: deps?.verifyToken,
-    validateAuthTokenRecord: deps?.validateAuthTokenRecord,
-    resolveWorkerRequestSlugContext: deps?.resolveWorkerRequestSlugContext,
-    toChainId: deps?.toChainId,
-    normalizeRpcUrlList: deps?.normalizeRpcUrlList,
-    ...workerLowLevelHelpers || {},
-    readTranscribeRequestPayload: deps?.readTranscribeRequestPayload,
-    Wallet: deps?.ethers?.Wallet,
-    normalizeSignedWorkerRequest: deps?.normalizeSignedWorkerRequest,
-    resolveWorkerBodySlugContext: deps?.resolveWorkerBodySlugContext,
-    validateRecoveredAddressMatchesRequest: deps?.validateRecoveredAddressMatchesRequest,
-    parseSiweMessage: deps?.parseSiweMessage,
-    validateSiwe: deps?.validateSiwe,
-    validateTrustedLoginRequestOrigin: deps?.validateTrustedLoginRequestOrigin,
-    validateBrowserLoginOrigin: deps?.validateBrowserLoginOrigin,
-    resolveTrustedAdminOrigins: deps?.resolveTrustedAdminOrigins,
-    validateSiweAddressMatchesRequest: deps?.validateSiweAddressMatchesRequest,
-    consumeNonce: deps?.consumeNonce,
-    ...deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {},
-    ...deps?.readAbuseCounterSummary ? { readAbuseCounterSummary: deps.readAbuseCounterSummary } : {},
-    buildNonce: deps?.buildNonce,
-    checkNonceRateLimit: deps?.checkNonceRateLimit,
-    base64UrlEncode: deps?.base64UrlEncode,
-    signToken: deps?.signToken,
-    buildAuthTokenJti: deps?.buildAuthTokenJti,
-    persistAuthTokenRecord: deps?.persistAuthTokenRecord,
-    readArweaveBootstrapUploadPayload: deps?.readArweaveBootstrapUploadPayload,
-    getSessionSecrets: deps?.getSessionSecrets,
-    mergeWorkerConfigRecords: deps?.mergeWorkerConfigRecords,
-    mergeWorkerLimitRecords: deps?.mergeWorkerLimitRecords,
-    putSessionConfig: deps?.putSessionConfig,
-    normalizeSecretValue: deps?.normalizeSecretValue,
-    putSessionSecrets: deps?.putSessionSecrets,
-    dispatchAnonymousRoute: deps?.dispatchAnonymousRoute,
-    storageRoute: deps?.storageRoute,
-    readAiRequestPayload: deps?.readAiRequestPayload,
-    validateAnonymousAiRequest: deps?.validateAnonymousAiRequest,
-    dispatchAuthenticatedRoute: deps?.dispatchAuthenticatedRoute,
-    dispatchAuthenticatedSecretPathRoute: deps?.dispatchAuthenticatedSecretPathRoute,
-    readAuthenticatedActionPayload: deps?.readAuthenticatedActionPayload,
-    dispatchAuthenticatedNonSecretActionRoute: deps?.dispatchAuthenticatedNonSecretActionRoute,
-    dispatchAuthenticatedSecretActionRoute: deps?.dispatchAuthenticatedSecretActionRoute,
-    evaluateAuthenticatedRoutePreflight: deps?.evaluateAuthenticatedRoutePreflight,
-    resolveAuthenticatedRouteSecrets: deps?.resolveAuthenticatedRouteSecrets,
-    normalizeAiRequestPayload: deps?.normalizeAiRequestPayload
-  },
-  constants: {
-    resourceGateKeys: constants?.RESOURCE_GATE_KEYS,
-    anonymousRateIdHeader: constants?.ANONYMOUS_RATE_ID_HEADER,
-    anonymousGateUnavailableError: constants?.ANONYMOUS_GATE_UNAVAILABLE_ERROR,
-    missingSlugError: constants?.MISSING_SLUG_ERROR,
-    anonymousRouteDeniedError: constants?.ANONYMOUS_ROUTE_DENIED_ERROR,
-    anonymousScopeDisabledError: constants?.ANONYMOUS_SCOPE_DISABLED_ERROR,
-    anonymousUnknownIdentity,
-    openAiTranscribeUrl: constants?.OPENAI_TRANSCRIBE_URL,
-    zeroBytes32: constants?.ZERO_BYTES32,
-    slugAliasMismatchError: constants?.SLUG_ALIAS_MISMATCH_ERROR,
-    slugMismatchError: constants?.SLUG_MISMATCH_ERROR,
-    nonceTtlSeconds: constants?.NONCE_TTL_SECONDS,
-    nonceRateLimitMax: constants?.NONCE_RATE_LIMIT_MAX,
-    nonceRateLimitWindowMs: constants?.NONCE_RATE_LIMIT_WINDOW_MS,
-    nonceRateLimitTtlSeconds: constants?.NONCE_RATE_LIMIT_TTL_SECONDS,
-    usedNonceTtlSeconds: constants?.USED_NONCE_TTL_SECONDS,
-    loginSiweMaxAgeMs: constants?.LOGIN_SIWE_MAX_AGE_MS,
-    loginSiweFutureSkewMs: constants?.LOGIN_SIWE_FUTURE_SKEW_MS,
-    tokenTtlSeconds: constants?.TOKEN_TTL_SECONDS,
-    sessionConfigNotFoundError: constants?.SESSION_CONFIG_NOT_FOUND_ERROR,
-    bootstrapSessionConfigRequiredError: constants?.BOOTSTRAP_SESSION_CONFIG_REQUIRED_ERROR
-  },
-  defaults: {
-    defaultRpcUrl: defaults?.DEFAULT_FAUCET_RPC_URL,
-    defaultAmountEth: defaults?.DEFAULT_FAUCET_AMOUNT_ETH,
-    defaultThresholdEth: defaults?.DEFAULT_FAUCET_BALANCE_THRESHOLD_ETH
-  }
-});
-
-// workers/sessionCorsWorker/workerRuntimeInputBinding.js
-var ANONYMOUS_UNKNOWN_IDENTITY = "anon:unknown";
-var createWorkerRuntimeInputWithWorkerDeps = ({
-  deps,
-  constants,
-  defaults
-} = {}) => {
-  const createWorkerLowLevelHelpersWithWorkerDeps2 = deps?.createWorkerLowLevelHelpersWithWorkerDeps || createWorkerLowLevelHelpersWithWorkerDeps;
-  const createWorkerRouteRuntimeWithWorkerDeps2 = deps?.createWorkerRouteRuntimeWithWorkerDeps || createWorkerRouteRuntimeWithWorkerDeps;
-  const resolveWorkerLowLevelHelperInput2 = deps?.resolveWorkerLowLevelHelperInput || resolveWorkerLowLevelHelperInput;
-  const resolveWorkerRouteRuntimeInput2 = deps?.resolveWorkerRouteRuntimeInput || resolveWorkerRouteRuntimeInput;
-  const workerLowLevelHelpers = createWorkerLowLevelHelpersWithWorkerDeps2(
-    resolveWorkerLowLevelHelperInput2({ deps, constants, defaults })
-  );
-  const workerRouteRuntime = createWorkerRouteRuntimeWithWorkerDeps2(
-    resolveWorkerRouteRuntimeInput2({
-      deps,
-      constants,
-      defaults,
-      workerLowLevelHelpers,
-      anonymousUnknownIdentity: ANONYMOUS_UNKNOWN_IDENTITY
-    })
-  );
-  return {
-    workerLowLevelHelpers,
-    workerRouteRuntime,
-    workerAuthGateUtils: workerRouteRuntime.workerAuthGateUtils,
-    fetch: workerRouteRuntime.fetch
-  };
-};
-
 // workers/sessionCorsWorker/authenticatedRoutePreflight.js
 var evaluateAuthenticatedRoutePreflight = async ({
   scopes,
@@ -78601,7 +78435,24 @@ var resolveWorkerRuntimeDeps = ({
   };
 };
 
-// workers/sessionCorsWorker/workerTopLevelBinding.js
+// workers/sessionCorsWorker/worker.js
+var workerDebugLogsEnabled = false;
+var isWorkerDebugLogsEnabled = (value) => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value !== "string") return false;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
+};
+var initializeWorkerDebugLogs = (env) => {
+  workerDebugLogsEnabled = isWorkerDebugLogsEnabled(env?.WORKER_DEBUG_LOGS);
+};
+var log = (...args) => {
+  if (!workerDebugLogsEnabled) return;
+  console.log(...args);
+};
+log.warn = (...args) => console.warn(...args);
+log.error = (...args) => console.error(...args);
 var { getPathRpcUrl: getPathRpcUrl3 } = import_rpcDefaults5.default;
 var SESSION_REGISTRY_ABI = [
   "function getResourceGate(string,string) view returns (address[] sbtAddresses, uint256 chainId, uint8 mode, uint256 perMemberLimit)",
@@ -78635,20 +78486,18 @@ var ANONYMOUS_RATE_ID_HEADER = "X-Anonymous-Client-Id";
 var ANONYMOUS_GATE_UNAVAILABLE_ERROR = "Access denied: on-chain gate data unavailable.";
 var ANONYMOUS_ROUTE_DENIED_ERROR = "Anonymous access denied: AI/transcribe require open default+ai gates or a request apiKey.";
 var ANONYMOUS_SCOPE_DISABLED_ERROR = "Anonymous access denied: route scope disabled in session config.";
-var createWorkerTopLevelRuntimeWithWorkerDeps = ({
-  deps,
-  env
-} = {}) => {
-  const createWorkerRuntimeInputWithWorkerDeps2 = deps?.createWorkerRuntimeInputWithWorkerDeps || createWorkerRuntimeInputWithWorkerDeps;
-  const runtimeDeps = {
-    ethers: deps?.ethers,
-    URL: deps?.URL,
-    Headers: deps?.Headers,
-    log: deps?.log,
-    fetch: deps?.fetch,
-    rpcFetch: deps?.rpcFetch,
-    now: deps?.now
-  };
+var ANONYMOUS_UNKNOWN_IDENTITY = "anon:unknown";
+var defaultWorkerOverrides = Object.freeze({
+  ethers: ethers_exports,
+  URL,
+  Headers,
+  log,
+  fetch: (...args) => fetch(...args),
+  rpcFetch: (...args) => globalThis.fetch(...args),
+  now: Date.now
+});
+var createWorkerRuntime = (env, overrides = {}) => {
+  const deps = { ...defaultWorkerOverrides, ...overrides };
   const constants = {
     OPENAI_TRANSCRIBE_URL: resolveOpenAiTranscribeUrl({ env }),
     SESSION_REGISTRY_ABI,
@@ -78673,54 +78522,147 @@ var createWorkerTopLevelRuntimeWithWorkerDeps = ({
     SESSION_CONFIG_NOT_FOUND_ERROR,
     BOOTSTRAP_SESSION_CONFIG_REQUIRED_ERROR
   };
-  const resolved = (deps?.resolveWorkerRuntimeDeps || resolveWorkerRuntimeDeps)({
+  const runtimeDeps = {
+    ethers: deps.ethers,
+    URL: deps.URL,
+    Headers: deps.Headers,
+    log: deps.log,
+    fetch: deps.fetch,
+    rpcFetch: deps.rpcFetch,
+    now: deps.now
+  };
+  const resolved = (deps.resolveWorkerRuntimeDeps || resolveWorkerRuntimeDeps)({
     deps: runtimeDeps,
     constants
   }) || {};
-  return createWorkerRuntimeInputWithWorkerDeps2({
-    deps: resolved.deps,
-    constants: resolved.constants,
+  const resolvedDeps = { ...resolved.deps, ...overrides };
+  const defaults = {
+    DEFAULT_FAUCET_RPC_URL: DEFAULT_FAUCET_RPC_URL2,
+    DEFAULT_FAUCET_AMOUNT_ETH: DEFAULT_FAUCET_AMOUNT_ETH2,
+    DEFAULT_FAUCET_BALANCE_THRESHOLD_ETH: DEFAULT_FAUCET_BALANCE_THRESHOLD_ETH2
+  };
+  const workerLowLevelHelpers = (resolvedDeps.createWorkerLowLevelHelpersWithWorkerDeps || createWorkerLowLevelHelpersWithWorkerDeps)({
+    deps: {
+      ethers: resolvedDeps.ethers,
+      toStr: resolvedDeps.toStr,
+      URL: resolvedDeps.URL,
+      Headers: resolvedDeps.Headers,
+      normalizeWorkerSessionSlug: resolvedDeps.normalizeWorkerSessionSlug,
+      normalizeRpcUrlList: resolvedDeps.normalizeRpcUrlList,
+      mergeRpcUrlLists: resolvedDeps.mergeRpcUrlLists,
+      toChainId: resolvedDeps.toChainId,
+      log: resolvedDeps.log,
+      fetch: resolvedDeps.fetch,
+      rpcFetch: resolvedDeps.rpcFetch,
+      now: resolvedDeps.now
+    },
+    constants: {
+      zeroBytes32: resolved.constants.ZERO_BYTES32,
+      sessionRegistryAbi: resolved.constants.SESSION_REGISTRY_ABI,
+      erc721Abi: resolved.constants.ERC721_ABI,
+      sbtAdminAbi: resolved.constants.SBT_ADMIN_ABI,
+      hatsAbi: resolved.constants.HATS_ABI,
+      faucetSbtGateAbi: resolved.constants.FAUCET_SBT_GATE_ABI
+    },
     defaults: {
-      DEFAULT_FAUCET_RPC_URL: DEFAULT_FAUCET_RPC_URL2,
-      DEFAULT_FAUCET_AMOUNT_ETH: DEFAULT_FAUCET_AMOUNT_ETH2,
-      DEFAULT_FAUCET_BALANCE_THRESHOLD_ETH: DEFAULT_FAUCET_BALANCE_THRESHOLD_ETH2
+      defaultFaucetRpcUrl: defaults.DEFAULT_FAUCET_RPC_URL
     }
   });
+  const workerRouteRuntime = (resolvedDeps.createWorkerRouteRuntimeWithWorkerDeps || createWorkerRouteRuntimeWithWorkerDeps)({
+    deps: {
+      log: resolvedDeps.log,
+      fetch: resolvedDeps.fetch,
+      toStr: resolvedDeps.toStr,
+      now: resolvedDeps.now,
+      parseAllowOrigins: resolvedDeps.parseAllowOrigins,
+      originAllowed: resolvedDeps.originAllowed,
+      corsHeaders: resolvedDeps.corsHeaders,
+      json: resolvedDeps.json,
+      normalizeWorkerSessionSlug: resolvedDeps.normalizeWorkerSessionSlug,
+      getSessionConfig: resolvedDeps.getSessionConfig,
+      verifyToken: resolvedDeps.verifyToken,
+      validateAuthTokenRecord: resolvedDeps.validateAuthTokenRecord,
+      resolveWorkerRequestSlugContext: resolvedDeps.resolveWorkerRequestSlugContext,
+      toChainId: resolvedDeps.toChainId,
+      normalizeRpcUrlList: resolvedDeps.normalizeRpcUrlList,
+      ...workerLowLevelHelpers,
+      readTranscribeRequestPayload: resolvedDeps.readTranscribeRequestPayload,
+      Wallet: resolvedDeps.ethers?.Wallet,
+      normalizeSignedWorkerRequest: resolvedDeps.normalizeSignedWorkerRequest,
+      resolveWorkerBodySlugContext: resolvedDeps.resolveWorkerBodySlugContext,
+      validateRecoveredAddressMatchesRequest: resolvedDeps.validateRecoveredAddressMatchesRequest,
+      parseSiweMessage: resolvedDeps.parseSiweMessage,
+      validateSiwe: resolvedDeps.validateSiwe,
+      validateTrustedLoginRequestOrigin: resolvedDeps.validateTrustedLoginRequestOrigin,
+      validateBrowserLoginOrigin: resolvedDeps.validateBrowserLoginOrigin,
+      resolveTrustedAdminOrigins: resolvedDeps.resolveTrustedAdminOrigins,
+      validateSiweAddressMatchesRequest: resolvedDeps.validateSiweAddressMatchesRequest,
+      consumeNonce: resolvedDeps.consumeNonce,
+      ...resolvedDeps.recordAbuseEvent ? { recordAbuseEvent: resolvedDeps.recordAbuseEvent } : {},
+      ...resolvedDeps.readAbuseCounterSummary ? { readAbuseCounterSummary: resolvedDeps.readAbuseCounterSummary } : {},
+      buildNonce: resolvedDeps.buildNonce,
+      checkNonceRateLimit: resolvedDeps.checkNonceRateLimit,
+      base64UrlEncode: resolvedDeps.base64UrlEncode,
+      signToken: resolvedDeps.signToken,
+      buildAuthTokenJti: resolvedDeps.buildAuthTokenJti,
+      persistAuthTokenRecord: resolvedDeps.persistAuthTokenRecord,
+      readArweaveBootstrapUploadPayload: resolvedDeps.readArweaveBootstrapUploadPayload,
+      getSessionSecrets: resolvedDeps.getSessionSecrets,
+      mergeWorkerConfigRecords: resolvedDeps.mergeWorkerConfigRecords,
+      mergeWorkerLimitRecords: resolvedDeps.mergeWorkerLimitRecords,
+      putSessionConfig: resolvedDeps.putSessionConfig,
+      normalizeSecretValue: resolvedDeps.normalizeSecretValue,
+      putSessionSecrets: resolvedDeps.putSessionSecrets,
+      dispatchAnonymousRoute: resolvedDeps.dispatchAnonymousRoute,
+      storageRoute: resolvedDeps.storageRoute,
+      readAiRequestPayload: resolvedDeps.readAiRequestPayload,
+      validateAnonymousAiRequest: resolvedDeps.validateAnonymousAiRequest,
+      dispatchAuthenticatedRoute: resolvedDeps.dispatchAuthenticatedRoute,
+      dispatchAuthenticatedSecretPathRoute: resolvedDeps.dispatchAuthenticatedSecretPathRoute,
+      readAuthenticatedActionPayload: resolvedDeps.readAuthenticatedActionPayload,
+      dispatchAuthenticatedNonSecretActionRoute: resolvedDeps.dispatchAuthenticatedNonSecretActionRoute,
+      dispatchAuthenticatedSecretActionRoute: resolvedDeps.dispatchAuthenticatedSecretActionRoute,
+      evaluateAuthenticatedRoutePreflight: resolvedDeps.evaluateAuthenticatedRoutePreflight,
+      resolveAuthenticatedRouteSecrets: resolvedDeps.resolveAuthenticatedRouteSecrets,
+      normalizeAiRequestPayload: resolvedDeps.normalizeAiRequestPayload
+    },
+    constants: {
+      resourceGateKeys: resolved.constants.RESOURCE_GATE_KEYS,
+      anonymousRateIdHeader: resolved.constants.ANONYMOUS_RATE_ID_HEADER,
+      anonymousGateUnavailableError: resolved.constants.ANONYMOUS_GATE_UNAVAILABLE_ERROR,
+      missingSlugError: resolved.constants.MISSING_SLUG_ERROR,
+      anonymousRouteDeniedError: resolved.constants.ANONYMOUS_ROUTE_DENIED_ERROR,
+      anonymousScopeDisabledError: resolved.constants.ANONYMOUS_SCOPE_DISABLED_ERROR,
+      anonymousUnknownIdentity: ANONYMOUS_UNKNOWN_IDENTITY,
+      openAiTranscribeUrl: resolved.constants.OPENAI_TRANSCRIBE_URL,
+      zeroBytes32: resolved.constants.ZERO_BYTES32,
+      slugAliasMismatchError: resolved.constants.SLUG_ALIAS_MISMATCH_ERROR,
+      slugMismatchError: resolved.constants.SLUG_MISMATCH_ERROR,
+      nonceTtlSeconds: resolved.constants.NONCE_TTL_SECONDS,
+      nonceRateLimitMax: resolved.constants.NONCE_RATE_LIMIT_MAX,
+      nonceRateLimitWindowMs: resolved.constants.NONCE_RATE_LIMIT_WINDOW_MS,
+      nonceRateLimitTtlSeconds: resolved.constants.NONCE_RATE_LIMIT_TTL_SECONDS,
+      usedNonceTtlSeconds: resolved.constants.USED_NONCE_TTL_SECONDS,
+      loginSiweMaxAgeMs: resolved.constants.LOGIN_SIWE_MAX_AGE_MS,
+      loginSiweFutureSkewMs: resolved.constants.LOGIN_SIWE_FUTURE_SKEW_MS,
+      tokenTtlSeconds: resolved.constants.TOKEN_TTL_SECONDS,
+      sessionConfigNotFoundError: resolved.constants.SESSION_CONFIG_NOT_FOUND_ERROR,
+      bootstrapSessionConfigRequiredError: resolved.constants.BOOTSTRAP_SESSION_CONFIG_REQUIRED_ERROR
+    },
+    defaults: {
+      defaultRpcUrl: defaults.DEFAULT_FAUCET_RPC_URL,
+      defaultAmountEth: defaults.DEFAULT_FAUCET_AMOUNT_ETH,
+      defaultThresholdEth: defaults.DEFAULT_FAUCET_BALANCE_THRESHOLD_ETH
+    }
+  });
+  const runtime = {
+    workerLowLevelHelpers,
+    workerRouteRuntime,
+    workerAuthGateUtils: workerRouteRuntime.workerAuthGateUtils,
+    fetch: workerRouteRuntime.fetch
+  };
+  return Object.freeze(runtime);
 };
-
-// workers/sessionCorsWorker/worker.js
-var workerDebugLogsEnabled = false;
-var isWorkerDebugLogsEnabled = (value) => {
-  if (typeof value === "boolean") return value;
-  if (typeof value === "number") return value !== 0;
-  if (typeof value !== "string") return false;
-  const normalized = value.trim().toLowerCase();
-  return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
-};
-var initializeWorkerDebugLogs = (env) => {
-  workerDebugLogsEnabled = isWorkerDebugLogsEnabled(env?.WORKER_DEBUG_LOGS);
-};
-var log = (...args) => {
-  if (!workerDebugLogsEnabled) return;
-  console.log(...args);
-};
-log.warn = (...args) => console.warn(...args);
-log.error = (...args) => console.error(...args);
-var workerDeps = {
-  deps: {
-    ethers: ethers_exports,
-    URL,
-    Headers,
-    log,
-    fetch: (...args) => fetch(...args),
-    rpcFetch: (...args) => globalThis.fetch(...args),
-    now: Date.now
-  }
-};
-var createWorkerRuntime = (env) => createWorkerTopLevelRuntimeWithWorkerDeps({
-  ...workerDeps,
-  env
-});
 var defaultWorkerRuntime = createWorkerRuntime();
 var workerAuthGateUtils = defaultWorkerRuntime.workerAuthGateUtils;
 var worker_default = {
@@ -78733,6 +78675,7 @@ var worker_default = {
 export {
   SessionWriteCoordinator,
   WorkerGroupWriteCoordinator,
+  createWorkerRuntime,
   worker_default as default,
   workerAuthGateUtils
 };
