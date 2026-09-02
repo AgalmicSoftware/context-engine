@@ -56091,6 +56091,12 @@ var validateInboundWorkerSessionSlug = (raw) => {
   }
   return { ok: true, slug: canonicalizeReservedWorkerAlias(canonicalSlug), error: "" };
 };
+var resolveCoordinatorSessionSlugStorageKey = (raw) => {
+  if (raw == null) return "";
+  const result = validateInboundWorkerSessionSlug(raw);
+  if (!result.ok) return "";
+  return result.slug || DEFAULT_SESSION_STORAGE_KEY;
+};
 var getDefaultWorkerSessionSlug = (env = {}) => normalizeWorkerSessionSlug(env.DEFAULT_SESSION_SLUG ?? env.DEFAULT_GROUP_SLUG);
 var hasExplicitDefaultWorkerSessionSlug = (env = {}) => hasExplicitWorkerSlugInput(env?.DEFAULT_SESSION_SLUG ?? env?.DEFAULT_GROUP_SLUG);
 var resolveWorkerTenantSlug = ({ envSlug, headerSlug, tokenSlug } = {}) => {
@@ -64997,7 +65003,7 @@ var WORKER_GROUP_MUTATIONS = /* @__PURE__ */ new Set([
   "join"
 ]);
 var normalizeWorkerGroupMutation = (payload) => {
-  const slug = sessionSlugStorageKey(payload?.slug);
+  const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
   const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
   const operation = toTrimmedString9(payload?.operation).toLowerCase();
   const actor = normalizeWorkerGroupPrincipal(payload?.actorPrincipal);
@@ -65444,7 +65450,7 @@ var SessionWriteCoordinator = class {
     });
   }
   async executeWorkerGroupReady(payload) {
-    const slug = sessionSlugStorageKey(payload?.slug);
+    const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
     const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
     if (!slug || !sessionId) {
       return jsonResponse2({
@@ -65458,7 +65464,7 @@ var SessionWriteCoordinator = class {
   }
   executeWorkerGroupReconcileEmpty(payload) {
     return this.serializeWorkerGroupOperation(async () => {
-      const slug = sessionSlugStorageKey(payload?.slug);
+      const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
       const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
       if (!slug || !sessionId) {
         return jsonResponse2({
@@ -65473,7 +65479,7 @@ var SessionWriteCoordinator = class {
   }
   executeWorkerGroupAuthorization(payload) {
     return this.serializeWorkerGroupOperation(async () => {
-      const slug = sessionSlugStorageKey(payload?.slug);
+      const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
       const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
       const groupId = normalizeWorkerGroupId(payload?.groupId);
       const principal = normalizeWorkerGroupPrincipal(payload?.principal);
@@ -65522,7 +65528,7 @@ var SessionWriteCoordinator = class {
   }
   executeWorkerGroupCatalog(payload) {
     return this.serializeWorkerGroupOperation(async () => {
-      const slug = sessionSlugStorageKey(payload?.slug);
+      const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
       const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
       const requestedGroupIds = Array.isArray(payload?.groupIds) ? payload.groupIds.map((groupId) => normalizeWorkerGroupId(groupId)) : [];
       const maxGroups = resolveWorkerGroupCaps(this.env).maxGroupsPerSession;
@@ -65572,7 +65578,7 @@ var SessionWriteCoordinator = class {
   }
   executeWorkerGroupMemberships(payload) {
     return this.serializeWorkerGroupOperation(async () => {
-      const slug = sessionSlugStorageKey(payload?.slug);
+      const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
       const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
       const principal = normalizeWorkerGroupPrincipal(payload?.principal);
       if (!slug || !sessionId || !principal.ok) {
@@ -65858,7 +65864,7 @@ var SessionWriteCoordinator = class {
   }
   async executeStorageEnvelopeKeyGetOrCreate(payload) {
     return this.serializeSessionConfigOperation(async () => {
-      const slug = sessionSlugStorageKey(payload?.slug);
+      const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
       const baseConfig = slug ? normalizePublicSessionConfig(payload?.baseConfig, slug) : null;
       const candidate = normalizeWrappedSessionKeyRecord(payload?.candidateRecord, slug);
       if (!slug || !baseConfig || !candidate) {
@@ -65871,7 +65877,7 @@ var SessionWriteCoordinator = class {
       }
       const reserved = await this.state.storage.transaction(async (transaction) => {
         const existing = await transaction.get(SESSION_CONFIG_AUTHORITY_KEY);
-        if (existing && sessionSlugStorageKey(existing.slug) !== slug) {
+        if (existing && resolveCoordinatorSessionSlugStorageKey(existing.slug) !== slug) {
           return { error: "Session config authority identity conflict.", status: 409 };
         }
         const authorityConfig = existing?.config ? normalizePublicSessionConfig(existing.config, slug) : baseConfig;
@@ -65929,7 +65935,7 @@ var SessionWriteCoordinator = class {
   }
   async executeSessionConfigMutation(payload) {
     return this.serializeSessionConfigOperation(async () => {
-      const slug = sessionSlugStorageKey(payload?.slug);
+      const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
       const baseConfig = slug ? normalizePublicSessionConfig(payload?.baseConfig, slug) : null;
       if (!slug || !baseConfig || !isObjectRecord(payload?.mutation)) {
         return jsonResponse2({ error: "Invalid session config mutation." }, 400);
@@ -65941,7 +65947,7 @@ var SessionWriteCoordinator = class {
       }
       const reserved = await this.state.storage.transaction(async (transaction) => {
         const existing = await transaction.get(SESSION_CONFIG_AUTHORITY_KEY);
-        if (existing && sessionSlugStorageKey(existing.slug) !== slug) {
+        if (existing && resolveCoordinatorSessionSlugStorageKey(existing.slug) !== slug) {
           return { error: "Session config authority identity conflict.", status: 409 };
         }
         const authorityConfig = existing?.config ? normalizePublicSessionConfig(existing.config, slug) : baseConfig;
@@ -65996,7 +66002,7 @@ var SessionWriteCoordinator = class {
   }
   async executeAuthNonceIssue(payload) {
     const nowMs = Number(this.now()) || Date.now();
-    const slug = sessionSlugStorageKey(payload?.slug);
+    const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
     const address = toTrimmedString9(payload?.address).toLowerCase();
     const nonce = toTrimmedString9(payload?.nonce);
     const expiresAtMs = normalizeBoundedFutureTimestamp(
@@ -66026,7 +66032,7 @@ var SessionWriteCoordinator = class {
   }
   async executeAuthNonceConsume(payload) {
     const nowMs = Number(this.now()) || Date.now();
-    const slug = sessionSlugStorageKey(payload?.slug);
+    const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
     const address = toTrimmedString9(payload?.address).toLowerCase();
     const nonce = toTrimmedString9(payload?.nonce);
     const usedExpiresAtMs = normalizeBoundedFutureTimestamp(
@@ -66062,7 +66068,7 @@ var SessionWriteCoordinator = class {
   }
   async executeAuthRateCheck(payload) {
     const nowMs = Number(this.now()) || Date.now();
-    const slug = sessionSlugStorageKey(payload?.slug);
+    const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
     const route = toTrimmedString9(payload?.route).toLowerCase();
     const identity = toTrimmedString9(payload?.identity).toLowerCase();
     const limit = normalizePositiveSafeInteger(payload?.limit);
@@ -66619,7 +66625,7 @@ var getOrCreateCoordinatedStorageEnvelopeSessionKey = async ({
   baseConfig,
   candidateRecord
 } = {}) => {
-  const normalizedSlug = sessionSlugStorageKey(slug);
+  const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
   const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
   if (!stub) throw new Error("Session config coordination is unavailable.");
   let response2;
@@ -66651,7 +66657,7 @@ var executeCoordinatedSessionConfigMutation = async ({
   existingConfig,
   mutation
 } = {}) => {
-  const normalizedSlug = sessionSlugStorageKey(slug);
+  const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
   const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
   if (!stub) {
     return {

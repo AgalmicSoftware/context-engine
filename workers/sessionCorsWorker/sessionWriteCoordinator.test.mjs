@@ -170,6 +170,23 @@ test('SessionWriteCoordinator consumes one issued auth nonce exactly once under 
 	assert.doesNotMatch(JSON.stringify([...store.values()]), /session-a|0xabc/i);
 });
 
+test('SessionWriteCoordinator rejects malformed slugs before writing durable state', async () => {
+	const { state, store } = createTransactionalState();
+	const coordinator = new SessionWriteCoordinator(state, {}, { now: () => 1_000 });
+	const response = await coordinator.fetch(
+		createCoordinatorRequest('/auth-state/nonce/issue', {
+			slug: 'Bad Slug',
+			address: '0xabc',
+			nonce: 'nonce-1',
+			expiresAtMs: 301_000,
+			usedExpiresAtMs: 601_000,
+		}),
+	);
+
+	assert.equal(response.status, 400);
+	assert.equal(store.size, 0);
+});
+
 test('SessionWriteCoordinator admits exactly the configured number of concurrent rate checks', async () => {
 	const { state, store } = createTransactionalState();
 	const coordinator = new SessionWriteCoordinator(state, {}, { now: () => 1_000 });

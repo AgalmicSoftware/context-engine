@@ -5,6 +5,7 @@ import {
   INVALID_SESSION_SLUG_ERROR,
   normalizeWorkerSessionSlug,
   resolveRequestedWorkerSlugPayload,
+  resolveCoordinatorSessionSlugStorageKey,
   resolveWorkerBodySlugContext,
   resolveWorkerRequestSlugContext,
   sessionSlugStorageKey,
@@ -34,6 +35,16 @@ test('validateInboundWorkerSessionSlug preserves strict inbound validation', () 
   assert.equal(validateInboundWorkerSessionSlug('Alpha').ok, false);
   assert.equal(validateInboundWorkerSessionSlug('Alpha').error, INVALID_SESSION_SLUG_ERROR);
   assert.equal(validateInboundWorkerSessionSlug('bad slug').error, INVALID_SESSION_SLUG_ERROR);
+});
+
+test('resolveCoordinatorSessionSlugStorageKey preserves strict coordinator validation', () => {
+  assert.equal(resolveCoordinatorSessionSlugStorageKey(null), '');
+  assert.equal(resolveCoordinatorSessionSlugStorageKey(''), 'general');
+  assert.equal(resolveCoordinatorSessionSlugStorageKey('general'), 'general');
+  assert.equal(resolveCoordinatorSessionSlugStorageKey('debate'), 'rxc');
+  assert.equal(resolveCoordinatorSessionSlugStorageKey('alpha'), 'alpha');
+  assert.equal(resolveCoordinatorSessionSlugStorageKey('Alpha'), '');
+  assert.equal(resolveCoordinatorSessionSlugStorageKey('bad slug'), '');
 });
 
 test('resolveRequestedWorkerSlugPayload ignores legacy groupSlug body fields', () => {

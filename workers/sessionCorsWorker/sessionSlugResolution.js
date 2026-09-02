@@ -50,6 +50,13 @@ export const validateInboundWorkerSessionSlug = (raw) => {
   return { ok: true, slug: canonicalizeReservedWorkerAlias(canonicalSlug), error: '' };
 };
 
+export const resolveCoordinatorSessionSlugStorageKey = (raw) => {
+  if (raw == null) return '';
+  const result = validateInboundWorkerSessionSlug(raw);
+  if (!result.ok) return '';
+  return result.slug || DEFAULT_SESSION_STORAGE_KEY;
+};
+
 export const getDefaultWorkerSessionSlug = (env = {}) => (
   normalizeWorkerSessionSlug(env.DEFAULT_SESSION_SLUG ?? env.DEFAULT_GROUP_SLUG)
 );
