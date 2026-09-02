@@ -2007,6 +2007,11 @@ Signed login/bootstrap requests:
     the session's `allowOrigins` or a configured public/app/session URL, and its
     `/session/<slug>` path must match. Existing query and fragment state are
     stripped before the Worker supplies `reviewUrl`.
+- `GET /api/agent/questions` with a session Worker bearer credential returns
+  the same public, access-checked question catalog when
+  `sessionModeProfile.surfaces.agentHttp=true`. This is the first canonical
+  Agent API family on the Session Worker; the Agent Bridge compatibility route
+  remains during the staged transport migration.
 - `POST /realtime/call?slug=<slug>` with JSON `{ "sdp": "v=0...", "instructions": "..." }`
   - Uses the anonymous AI eligibility policy above, then exchanges the bounded
     browser SDP offer for an OpenAI Realtime SDP answer without exposing the

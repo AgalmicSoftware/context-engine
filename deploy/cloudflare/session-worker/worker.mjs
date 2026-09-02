@@ -72283,36 +72283,392 @@ var dispatchAnonymousRouteEntry = async ({
   });
 };
 
-// workers/sessionCorsWorker/anonymousRouteDispatchBinding.js
-var dispatchAnonymousRouteWithWorkerDeps = async ({
-  path,
-  request,
-  anonymousContext,
-  env,
+// workers/sessionCorsWorker/aiRequestNormalization.js
+var ANONYMOUS_CUSTOM_RPC_URL_REQUIRED_ERROR = "Anonymous custom provider requires request rpcUrl when using apiKey bypass.";
+var DEFAULT_MODEL_WHITELIST = {
+  anthropic: ["claude-*"],
+  openai: ["gpt-*", "o1-*", "o3-*", "o4-*", "chatgpt-*"],
+  openrouter: null
+};
+var inferAiProviderFromModel = (modelRaw) => {
+  const model = toTrimmedString2(modelRaw).toLowerCase();
+  if (!model) return "";
+  if (model.startsWith("claude")) return "anthropic";
+  if (/^(gpt-|o[1-9]|chatgpt)/.test(model)) return "openai";
+  if (model.includes("/")) return "openrouter";
+  return "";
+};
+var matchesModelGlob = (model, pattern) => {
+  const normalizedModel = toTrimmedString2(model).toLowerCase();
+  const normalizedPattern = toTrimmedString2(pattern).toLowerCase();
+  if (!normalizedModel || !normalizedPattern) return false;
+  if (!normalizedPattern.includes("*")) return normalizedModel === normalizedPattern;
+  const escapedPattern = normalizedPattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^${escapedPattern.replace(/\*/g, ".*")}$`).test(normalizedModel);
+};
+var isModelAllowed = (model, provider, customWhitelist = null) => {
+  const whitelist = customWhitelist && typeof customWhitelist === "object" ? customWhitelist : DEFAULT_MODEL_WHITELIST;
+  const providerKey = toTrimmedString2(provider).toLowerCase();
+  const patterns = whitelist?.[providerKey];
+  if (patterns == null) return true;
+  if (!Array.isArray(patterns)) return false;
+  return patterns.some((pattern) => matchesModelGlob(model, pattern));
+};
+var resolveAiProvider = (payload) => {
+  const explicit = toTrimmedString2(payload?.provider).toLowerCase();
+  if (explicit && explicit !== "default" && explicit !== "auto") return explicit;
+  return inferAiProviderFromModel(payload?.model) || "openai";
+};
+var normalizeAiRequestPayload = ({ payload } = {}) => ({
+  ok: true,
+  status: 200,
+  error: "",
+  payload,
+  provider: resolveAiProvider(payload),
+  requestApiKey: toTrimmedString2(payload?.apiKey),
+  requestRpcUrl: toTrimmedString2(payload?.rpcUrl)
+});
+var readAiRequestPayload = async ({ request } = {}) => {
+  const contentType = request?.headers?.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    return {
+      ok: false,
+      status: 400,
+      error: "Expected application/json.",
+      payload: null,
+      provider: "",
+      requestApiKey: "",
+      requestRpcUrl: ""
+    };
+  }
+  let payload = null;
+  try {
+    payload = await request.json();
+  } catch {
+    return {
+      ok: false,
+      status: 400,
+      error: "Invalid JSON.",
+      payload: null,
+      provider: "",
+      requestApiKey: "",
+      requestRpcUrl: ""
+    };
+  }
+  return normalizeAiRequestPayload({ payload });
+};
+var validateAnonymousAiRequest = ({
+  provider = "",
+  requestRpcUrl = "",
+  anonymousAccessReason = ""
+} = {}) => {
+  if (anonymousAccessReason === "request-api-key" && provider === "custom" && !toTrimmedString2(requestRpcUrl)) {
+    return {
+      ok: false,
+      status: 400,
+      error: ANONYMOUS_CUSTOM_RPC_URL_REQUIRED_ERROR
+    };
+  }
+  return {
+    ok: true,
+    status: 200,
+    error: ""
+  };
+};
+
+// workers/sessionCorsWorker/realtimeCallExecution.js
+var OPENAI_REALTIME_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
+var DEFAULT_INTERVIEW_REALTIME_MODEL = "gpt-realtime-2.1";
+var trim7 = (value) => String(value == null ? "" : value).trim();
+var isObj11 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var buildRealtimeMultipartBody = ({ sdp, session }) => {
+  const boundary = `----context-engine-realtime-${crypto.randomUUID().replace(/-/g, "")}`;
+  const body = [
+    `--${boundary}\r
+`,
+    'Content-Disposition: form-data; name="sdp"\r\n',
+    "Content-Type: application/sdp\r\n\r\n",
+    sdp,
+    `\r
+--${boundary}\r
+`,
+    'Content-Disposition: form-data; name="session"\r\n',
+    "Content-Type: application/json\r\n\r\n",
+    JSON.stringify(session),
+    `\r
+--${boundary}--\r
+`
+  ].join("");
+  return { body, contentType: `multipart/form-data; boundary=${boundary}` };
+};
+var readRealtimeCallRequestPayload = async ({ request } = {}) => {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return { ok: false, status: 400, error: "Invalid JSON." };
+  }
+  if (!isObj11(body)) return { ok: false, status: 400, error: "Invalid JSON." };
+  const sdp = String(body.sdp == null ? "" : body.sdp);
+  const instructions = trim7(body.instructions);
+  if (!sdp || !/^v=0(?:\r?\n|$)/.test(sdp)) return { ok: false, status: 400, error: "Invalid SDP offer." };
+  if (sdp.length > 64e3) return { ok: false, status: 413, error: "SDP offer is too large." };
+  if (!instructions || instructions.length > 32e3) {
+    return { ok: false, status: instructions ? 413 : 400, error: "Interview instructions are missing or too large." };
+  }
+  return { ok: true, payload: { sdp, instructions } };
+};
+var resolveRealtimeConfig = (config = {}) => {
+  const interview = isObj11(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
+  const provider = trim7(interview.provider || "openai").toLowerCase();
+  const requestedModel = trim7(interview.realtimeModel || config?.ai?.realtimeModel);
+  const model = /^gpt-realtime(?:-[a-z0-9.]+)*$/i.test(requestedModel) ? requestedModel : DEFAULT_INTERVIEW_REALTIME_MODEL;
+  return { provider, model };
+};
+var proxyOpenAiRealtimeCall = async ({
+  payload,
+  secrets,
+  config,
+  baseHeaders,
   deps,
   constants
-} = {}) => deps?.dispatchAnonymousRoute?.({
+} = {}) => {
+  const fetchImpl = deps?.fetch || fetch;
+  const realtime = resolveRealtimeConfig(config);
+  if (realtime.provider !== "openai") {
+    return deps?.json?.({ error: "Realtime interview voice currently requires the OpenAI provider." }, 400, baseHeaders);
+  }
+  const key = trim7(secrets?.openaiKey);
+  if (!key) {
+    return deps?.json?.({ error: "Server misconfigured: openaiKey is missing." }, 401, baseHeaders);
+  }
+  const session = {
+    type: "realtime",
+    model: realtime.model,
+    output_modalities: ["audio"],
+    instructions: payload.instructions,
+    max_output_tokens: 2048,
+    audio: {
+      input: {
+        transcription: { model: "gpt-transcribe" },
+        turn_detection: {
+          type: "server_vad",
+          create_response: true,
+          interrupt_response: true
+        }
+      }
+    }
+  };
+  const multipart = buildRealtimeMultipartBody({ sdp: payload.sdp, session });
+  const response2 = await fetchImpl(constants?.openAiRealtimeCallsUrl || OPENAI_REALTIME_CALLS_URL, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${key}`,
+      "content-type": multipart.contentType
+    },
+    body: multipart.body
+  });
+  const text = await response2.text();
+  if (!response2.ok) {
+    let message = "OpenAI Realtime call failed.";
+    try {
+      message = JSON.parse(text)?.error?.message || message;
+    } catch {
+    }
+    return deps?.json?.({ error: message }, response2.status, baseHeaders);
+  }
+  const headers = new Headers(baseHeaders || {});
+  headers.set("content-type", "application/sdp");
+  headers.set("cache-control", "no-store");
+  return new Response(text, { status: 200, headers });
+};
+
+// workers/sessionCorsWorker/anonymousRouteDispatch.js
+var resolveDefaultModelForProvider = (provider) => {
+  if (provider === "anthropic") return "claude-3-5-sonnet-20240620";
+  if (provider === "openrouter") return "openrouter/auto";
+  if (provider === "openai" || provider === "custom") return "gpt-5";
+  return "";
+};
+var resolveModelForProvider = ({ payload, provider } = {}) => {
+  const rawModel = payload?.model;
+  const model = typeof rawModel === "string" ? rawModel.trim() : rawModel == null ? "" : String(rawModel).trim();
+  return model || resolveDefaultModelForProvider(provider);
+};
+var dispatchAnonymousRoute = async ({
   path,
   request,
   anonymousContext,
-  deps: {
-    readTranscribeRequestPayload: deps?.readTranscribeRequestPayload,
-    storageRoute: deps?.storageRoute,
-    dispatchPublicWorkerGroupListRequest: deps?.dispatchPublicWorkerGroupListRequest,
-    evaluateAnonymousRouteAccess: deps?.evaluateAnonymousRouteAccess,
-    getSessionSecrets: (sessionSlug) => deps?.getSessionSecrets?.(env, sessionSlug),
-    transcribe: deps?.transcribe,
-    readAiRequestPayload: deps?.readAiRequestPayload,
-    validateAnonymousAiRequest: deps?.validateAnonymousAiRequest,
-    proxyAnthropic: deps?.proxyAnthropic,
-    proxyOpenAI: deps?.proxyOpenAI,
-    proxyOpenRouter: deps?.proxyOpenRouter,
-    proxyCustomRPC: deps?.proxyCustomRPC,
-    json: deps?.json,
-    now: deps?.now,
-    ANONYMOUS_ROUTE_DENIED_ERROR: constants?.anonymousRouteDeniedError
+  deps
+} = {}) => {
+  const {
+    slug,
+    config,
+    headers,
+    env
+  } = anonymousContext || {};
+  if (path === "/groups/list") {
+    const dispatchPublicWorkerGroupListRequest2 = deps?.dispatchPublicWorkerGroupListRequest || dispatchPublicWorkerGroupListRequest;
+    return dispatchPublicWorkerGroupListRequest2({
+      request,
+      config,
+      env,
+      slug,
+      baseHeaders: headers,
+      deps: {
+        json: deps?.json
+      }
+    });
   }
-});
+  if ((path === "/storage/read" || path === "/storage/list") && typeof deps?.storageRoute === "function") {
+    return deps.storageRoute({
+      path,
+      method: request?.method || "GET",
+      request,
+      env: env || {},
+      config,
+      slug,
+      uploaderAddress: "",
+      baseHeaders: headers
+    });
+  }
+  const endedResponse = buildSessionEndedResponse({
+    config,
+    headers,
+    json: deps?.json,
+    now: deps?.now
+  });
+  if (endedResponse) return endedResponse;
+  if (path === "/transcribe") {
+    const transcribeRequest = await deps?.readTranscribeRequestPayload?.({ request });
+    if (!transcribeRequest?.ok) {
+      return deps?.json?.(
+        { error: transcribeRequest?.error },
+        transcribeRequest?.status || 400,
+        headers
+      );
+    }
+    const anonymousAccess2 = await deps?.evaluateAnonymousRouteAccess?.({
+      slug,
+      config,
+      route: "transcribe",
+      apiKey: transcribeRequest?.payload?.requestApiKey
+    });
+    if (!anonymousAccess2?.ok) {
+      return deps?.json?.(
+        { error: anonymousAccess2?.error || deps?.ANONYMOUS_ROUTE_DENIED_ERROR },
+        anonymousAccess2?.status || 403,
+        headers
+      );
+    }
+    const secrets2 = anonymousAccess2?.reason === "request-api-key" ? {} : await deps?.getSessionSecrets?.(slug) || {};
+    return deps?.transcribe?.({
+      request: null,
+      secrets: secrets2,
+      baseHeaders: headers,
+      transcribeRequest
+    });
+  }
+  if (path === "/realtime/call") {
+    const readRealtimeCallRequestPayload2 = deps?.readRealtimeCallRequestPayload || readRealtimeCallRequestPayload;
+    const realtimeRequest = await readRealtimeCallRequestPayload2({ request });
+    if (!realtimeRequest?.ok) {
+      return deps?.json?.(
+        { error: realtimeRequest?.error },
+        realtimeRequest?.status || 400,
+        headers
+      );
+    }
+    const anonymousAccess2 = await deps?.evaluateAnonymousRouteAccess?.({
+      slug,
+      config,
+      route: "realtime"
+    });
+    if (!anonymousAccess2?.ok) {
+      return deps?.json?.(
+        { error: anonymousAccess2?.error || deps?.ANONYMOUS_ROUTE_DENIED_ERROR },
+        anonymousAccess2?.status || 403,
+        headers
+      );
+    }
+    const secrets2 = await deps?.getSessionSecrets?.(slug) || {};
+    const proxyOpenAiRealtimeCall2 = deps?.proxyOpenAiRealtimeCall || proxyOpenAiRealtimeCall;
+    return proxyOpenAiRealtimeCall2({
+      payload: realtimeRequest.payload,
+      secrets: secrets2,
+      config,
+      baseHeaders: headers,
+      deps: { json: deps?.json }
+    });
+  }
+  const aiRequest = await deps?.readAiRequestPayload?.({
+    request: typeof request?.clone === "function" ? request.clone() : request
+  });
+  if (!aiRequest?.ok) {
+    return deps?.json?.(
+      { error: aiRequest?.error },
+      aiRequest?.status || 400,
+      headers
+    );
+  }
+  const {
+    payload,
+    provider,
+    requestApiKey,
+    requestRpcUrl
+  } = aiRequest;
+  const anonymousAccess = await deps?.evaluateAnonymousRouteAccess?.({
+    slug,
+    config,
+    route: "ai",
+    apiKey: requestApiKey
+  });
+  if (!anonymousAccess?.ok) {
+    return deps?.json?.(
+      { error: anonymousAccess?.error || deps?.ANONYMOUS_ROUTE_DENIED_ERROR },
+      anonymousAccess?.status || 403,
+      headers
+    );
+  }
+  const aiValidation = deps?.validateAnonymousAiRequest?.({
+    provider,
+    requestRpcUrl,
+    anonymousAccessReason: anonymousAccess?.reason
+  }) || {};
+  if (!aiValidation?.ok) {
+    return deps?.json?.(
+      { error: aiValidation?.error },
+      aiValidation?.status || 400,
+      headers
+    );
+  }
+  const model = resolveModelForProvider({ payload, provider });
+  if (!isModelAllowed(model, provider)) {
+    return deps?.json?.(
+      { error: "Model not allowed for provider" },
+      400,
+      headers
+    );
+  }
+  if (provider === "custom") {
+    return deps?.json?.(
+      { error: "Custom RPC not available for anonymous requests" },
+      403,
+      headers
+    );
+  }
+  const secrets = anonymousAccess?.reason === "request-api-key" ? {} : await deps?.getSessionSecrets?.(slug) || {};
+  if (provider === "anthropic") {
+    return deps?.proxyAnthropic?.({ payload, secrets, baseHeaders: headers });
+  }
+  if (provider === "openai") {
+    return deps?.proxyOpenAI?.({ payload, secrets, baseHeaders: headers });
+  }
+  if (provider === "openrouter") {
+    return deps?.proxyOpenRouter?.({ payload, secrets, baseHeaders: headers });
+  }
+  return deps?.json?.({ error: `Unsupported provider: ${provider}` }, 400, headers);
+};
 
 // workers/sessionCorsWorker/anonymousRouteEntryBinding.js
 var dispatchAnonymousRouteEntryWithWorkerDeps = async ({
@@ -72340,29 +72696,29 @@ var dispatchAnonymousRouteEntryWithWorkerDeps = async ({
     getCorsContext: deps?.getCorsContext,
     resolveAnonymousRateIdentity: deps?.resolveAnonymousRateIdentity,
     checkRateLimit: deps?.checkRateLimit,
-    dispatchAnonymousRoute: (value) => (deps?.dispatchAnonymousRouteWithWorkerDeps || dispatchAnonymousRouteWithWorkerDeps)({
-      ...value,
-      env,
-      deps: {
-        dispatchAnonymousRoute: deps?.dispatchAnonymousRoute,
-        storageRoute: deps?.storageRoute,
-        readTranscribeRequestPayload: deps?.readTranscribeRequestPayload,
-        evaluateAnonymousRouteAccess: deps?.evaluateAnonymousRouteAccess,
-        getSessionSecrets: deps?.getSessionSecrets,
-        transcribe: deps?.transcribe,
-        readAiRequestPayload: deps?.readAiRequestPayload,
-        validateAnonymousAiRequest: deps?.validateAnonymousAiRequest,
-        proxyAnthropic: deps?.proxyAnthropic,
-        proxyOpenAI: deps?.proxyOpenAI,
-        proxyOpenRouter: deps?.proxyOpenRouter,
-        proxyCustomRPC: deps?.proxyCustomRPC,
-        json: deps?.json,
-        now: deps?.now
-      },
-      constants: {
-        anonymousRouteDeniedError: constants?.anonymousRouteDeniedError
-      }
-    })
+    dispatchAnonymousRoute: (value) => {
+      const dispatchAnonymousRoute2 = deps?.dispatchAnonymousRoute || dispatchAnonymousRoute;
+      return dispatchAnonymousRoute2({
+        ...value,
+        deps: {
+          storageRoute: deps?.storageRoute,
+          dispatchPublicWorkerGroupListRequest: deps?.dispatchPublicWorkerGroupListRequest,
+          readTranscribeRequestPayload: deps?.readTranscribeRequestPayload,
+          evaluateAnonymousRouteAccess: deps?.evaluateAnonymousRouteAccess,
+          getSessionSecrets: (sessionSlug) => deps?.getSessionSecrets?.(env, sessionSlug),
+          transcribe: deps?.transcribe,
+          readAiRequestPayload: deps?.readAiRequestPayload,
+          validateAnonymousAiRequest: deps?.validateAnonymousAiRequest,
+          proxyAnthropic: deps?.proxyAnthropic,
+          proxyOpenAI: deps?.proxyOpenAI,
+          proxyOpenRouter: deps?.proxyOpenRouter,
+          proxyCustomRPC: deps?.proxyCustomRPC,
+          json: deps?.json,
+          now: deps?.now,
+          ANONYMOUS_ROUTE_DENIED_ERROR: constants?.anonymousRouteDeniedError
+        }
+      });
+    }
   }
 });
 
@@ -72395,75 +72751,73 @@ var dispatchAuthenticatedRouteEntry = async ({
   });
 };
 
-// workers/sessionCorsWorker/authenticatedRouteDispatchBinding.js
-var dispatchAuthenticatedRouteWithWorkerDeps = async ({
+// workers/sessionCorsWorker/authenticatedRouteDispatch.js
+var dispatchAuthenticatedRoute = async ({
   path,
   method,
   request,
   authenticatedContext,
-  env,
   deps
-} = {}) => deps?.dispatchAuthenticatedRoute?.({
-  path,
-  method,
-  request,
-  authenticatedContext,
-  deps: {
-    dispatchAuthenticatedSecretPathRoute: (value) => deps?.dispatchAuthenticatedSecretPathRoute?.({
-      ...value,
-      env,
-      deps: {
-        evaluateAuthenticatedRoutePreflight: deps?.evaluateAuthenticatedRoutePreflight,
-        computeScopesForLogin: deps?.computeScopesForLogin,
-        resolveAuthenticatedRouteSecrets: deps?.resolveAuthenticatedRouteSecrets,
-        checkRateLimit: deps?.checkRateLimit,
-        getSessionSecrets: deps?.getSessionSecrets,
-        json: deps?.json,
-        isAddress: deps?.isAddress,
-        getAddress: deps?.getAddress,
-        transcribe: deps?.transcribe,
-        arweaveUpload: deps?.arweaveUpload,
-        storageRoute: deps?.storageRoute,
-        now: deps?.now
-      }
-    }),
-    readAuthenticatedActionPayload: deps?.readAuthenticatedActionPayload,
-    dispatchAuthenticatedNonSecretActionRoute: (value) => deps?.dispatchAuthenticatedNonSecretActionRoute?.({
-      ...value,
-      env,
-      deps: {
-        evaluateAuthenticatedRoutePreflight: deps?.evaluateAuthenticatedRoutePreflight,
-        computeScopesForLogin: deps?.computeScopesForLogin,
-        fetchImage: deps?.fetchImage,
-        fetchUrl: deps?.fetchUrl,
-        checkRateLimit: deps?.checkRateLimit,
-        json: deps?.json,
-        now: deps?.now
-      }
-    }),
-    dispatchAuthenticatedSecretActionRoute: (value) => deps?.dispatchAuthenticatedSecretActionRoute?.({
-      ...value,
-      env,
-      deps: {
-        evaluateAuthenticatedRoutePreflight: deps?.evaluateAuthenticatedRoutePreflight,
-        computeScopesForLogin: deps?.computeScopesForLogin,
-        resolveAuthenticatedRouteSecrets: deps?.resolveAuthenticatedRouteSecrets,
-        normalizeAiRequestPayload: deps?.normalizeAiRequestPayload,
-        proxyAnthropic: deps?.proxyAnthropic,
-        proxyOpenAI: deps?.proxyOpenAI,
-        proxyOpenRouter: deps?.proxyOpenRouter,
-        proxyCustomRPC: deps?.proxyCustomRPC,
-        faucet: deps?.faucet,
-        checkRateLimit: deps?.checkRateLimit,
-        getSessionSecrets: deps?.getSessionSecrets,
-        json: deps?.json,
-        toStr: deps?.toStr,
-        now: deps?.now
-      }
-    }),
-    json: deps?.json
+} = {}) => {
+  const {
+    slug,
+    config,
+    headers,
+    scopes,
+    address,
+    limit
+  } = authenticatedContext || {};
+  const secretPathRoute = await deps?.dispatchAuthenticatedSecretPathRoute?.({
+    path,
+    method,
+    request,
+    config,
+    slug,
+    address,
+    limit,
+    headers,
+    scopes
+  });
+  if (secretPathRoute?.handled) return secretPathRoute.response;
+  let body = null;
+  let action = "";
+  if (method === "POST") {
+    const authenticatedAction = await deps?.readAuthenticatedActionPayload?.({ request });
+    if (!authenticatedAction?.ok) {
+      return deps?.json?.(
+        { error: authenticatedAction?.error },
+        authenticatedAction?.status || 400,
+        headers
+      );
+    }
+    body = authenticatedAction.payload;
+    action = authenticatedAction.action;
   }
-});
+  const nonSecretActionRoute = await deps?.dispatchAuthenticatedNonSecretActionRoute?.({
+    action,
+    body,
+    config,
+    slug,
+    address,
+    limit,
+    headers,
+    scopes
+  });
+  if (nonSecretActionRoute?.handled) return nonSecretActionRoute.response;
+  const secretActionRoute = await deps?.dispatchAuthenticatedSecretActionRoute?.({
+    path,
+    action,
+    body,
+    config,
+    slug,
+    address,
+    limit,
+    headers,
+    scopes
+  });
+  if (secretActionRoute?.handled) return secretActionRoute.response;
+  return deps?.json?.({ error: "Not found." }, 404, headers);
+};
 
 // workers/sessionCorsWorker/authenticatedRouteContextResolution.js
 var isWorkerGroupsRequest = (request) => {
@@ -72554,37 +72908,67 @@ var dispatchAuthenticatedRouteEntryWithWorkerDeps = async ({
         SESSION_CONFIG_NOT_FOUND_ERROR: constants?.sessionConfigNotFoundError
       }
     }),
-    dispatchAuthenticatedRoute: (value) => (deps?.dispatchAuthenticatedRouteWithWorkerDeps || dispatchAuthenticatedRouteWithWorkerDeps)({
-      ...value,
-      env,
-      deps: {
-        dispatchAuthenticatedRoute: deps?.dispatchAuthenticatedRoute,
-        dispatchAuthenticatedSecretPathRoute: deps?.dispatchAuthenticatedSecretPathRoute,
-        readAuthenticatedActionPayload: deps?.readAuthenticatedActionPayload,
-        dispatchAuthenticatedNonSecretActionRoute: deps?.dispatchAuthenticatedNonSecretActionRoute,
-        dispatchAuthenticatedSecretActionRoute: deps?.dispatchAuthenticatedSecretActionRoute,
-        evaluateAuthenticatedRoutePreflight: deps?.evaluateAuthenticatedRoutePreflight,
-        computeScopesForLogin: deps?.computeScopesForLogin,
-        resolveAuthenticatedRouteSecrets: deps?.resolveAuthenticatedRouteSecrets,
-        checkRateLimit: deps?.checkRateLimit,
-        getSessionSecrets: deps?.getSessionSecrets,
-        json: deps?.json,
-        isAddress: deps?.isAddress,
-        getAddress: deps?.getAddress,
-        transcribe: deps?.transcribe,
-        arweaveUpload: deps?.arweaveUpload,
-        storageRoute: deps?.storageRoute,
-        fetchImage: deps?.fetchImage,
-        fetchUrl: deps?.fetchUrl,
-        normalizeAiRequestPayload: deps?.normalizeAiRequestPayload,
-        proxyAnthropic: deps?.proxyAnthropic,
-        proxyOpenAI: deps?.proxyOpenAI,
-        proxyOpenRouter: deps?.proxyOpenRouter,
-        proxyCustomRPC: deps?.proxyCustomRPC,
-        faucet: deps?.faucet,
-        toStr: deps?.toStr
-      }
-    })
+    dispatchAuthenticatedRoute: (value) => {
+      const dispatchAuthenticatedRoute2 = deps?.dispatchAuthenticatedRoute || dispatchAuthenticatedRoute;
+      return dispatchAuthenticatedRoute2({
+        ...value,
+        deps: {
+          dispatchAuthenticatedSecretPathRoute: (routeValue) => deps?.dispatchAuthenticatedSecretPathRoute?.({
+            ...routeValue,
+            env,
+            deps: {
+              evaluateAuthenticatedRoutePreflight: deps?.evaluateAuthenticatedRoutePreflight,
+              computeScopesForLogin: deps?.computeScopesForLogin,
+              resolveAuthenticatedRouteSecrets: deps?.resolveAuthenticatedRouteSecrets,
+              checkRateLimit: deps?.checkRateLimit,
+              getSessionSecrets: deps?.getSessionSecrets,
+              json: deps?.json,
+              isAddress: deps?.isAddress,
+              getAddress: deps?.getAddress,
+              transcribe: deps?.transcribe,
+              arweaveUpload: deps?.arweaveUpload,
+              storageRoute: deps?.storageRoute,
+              now: deps?.now
+            }
+          }),
+          readAuthenticatedActionPayload: deps?.readAuthenticatedActionPayload,
+          dispatchAuthenticatedNonSecretActionRoute: (routeValue) => deps?.dispatchAuthenticatedNonSecretActionRoute?.({
+            ...routeValue,
+            env,
+            deps: {
+              evaluateAuthenticatedRoutePreflight: deps?.evaluateAuthenticatedRoutePreflight,
+              computeScopesForLogin: deps?.computeScopesForLogin,
+              fetchImage: deps?.fetchImage,
+              fetchUrl: deps?.fetchUrl,
+              checkRateLimit: deps?.checkRateLimit,
+              json: deps?.json,
+              now: deps?.now
+            }
+          }),
+          dispatchAuthenticatedSecretActionRoute: (routeValue) => deps?.dispatchAuthenticatedSecretActionRoute?.({
+            ...routeValue,
+            env,
+            deps: {
+              evaluateAuthenticatedRoutePreflight: deps?.evaluateAuthenticatedRoutePreflight,
+              computeScopesForLogin: deps?.computeScopesForLogin,
+              resolveAuthenticatedRouteSecrets: deps?.resolveAuthenticatedRouteSecrets,
+              normalizeAiRequestPayload: deps?.normalizeAiRequestPayload,
+              proxyAnthropic: deps?.proxyAnthropic,
+              proxyOpenAI: deps?.proxyOpenAI,
+              proxyOpenRouter: deps?.proxyOpenRouter,
+              proxyCustomRPC: deps?.proxyCustomRPC,
+              faucet: deps?.faucet,
+              checkRateLimit: deps?.checkRateLimit,
+              getSessionSecrets: deps?.getSessionSecrets,
+              json: deps?.json,
+              toStr: deps?.toStr,
+              now: deps?.now
+            }
+          }),
+          json: deps?.json
+        }
+      });
+    }
   }
 });
 
@@ -72985,7 +73369,7 @@ var DEFAULT_PAGE_SIZE = 100;
 var { getPathRpcUrl: getPathRpcUrl2, getPublicRpcUrls: getPublicRpcUrls2 } = import_rpcDefaults4.default;
 var ethersUtils2 = ethers_exports?.utils || ethers_exports;
 var toTrimmedString15 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
-var isObj11 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isObj12 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var normalizeChipotleRpcCandidateList = (value = []) => {
   const out = [];
   const seen = /* @__PURE__ */ new Set();
@@ -73124,7 +73508,7 @@ var parseJsonIfPossible = (value) => {
 };
 var extractChipotleErrorMessage = (status, body, fallback) => {
   if (typeof body === "string" && body.trim()) return body.trim();
-  if (isObj11(body)) {
+  if (isObj12(body)) {
     const nestedError = toTrimmedString15(body.error || body.message || body.detail);
     if (nestedError) return nestedError;
   }
@@ -73168,7 +73552,7 @@ var fetchChipotleJson = async ({
   if (!response2.ok) {
     throw new Error(extractChipotleErrorMessage(response2.status, parsed, "Chipotle request failed"));
   }
-  if (isObj11(parsed) && toTrimmedString15(parsed.error || "").trim()) {
+  if (isObj12(parsed) && toTrimmedString15(parsed.error || "").trim()) {
     throw new Error(extractChipotleErrorMessage(response2.status, parsed, "Chipotle request failed"));
   }
   return parsed;
@@ -73179,8 +73563,8 @@ var resolveLitChipotleRuntime = ({
   secrets = {},
   body = {}
 } = {}) => {
-  const litCredentials = isObj11(config?.litCredentials) ? config.litCredentials : {};
-  const requestBody = isObj11(body) ? body : {};
+  const litCredentials = isObj12(config?.litCredentials) ? config.litCredentials : {};
+  const requestBody = isObj12(body) ? body : {};
   const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
   const envApiKey = toTrimmedString15(env?.LIT_USAGE_API_KEY || env?.LIT_ACCOUNT_API_KEY);
   const requestApiKey = toTrimmedString15(requestBody.litUsageApiKey || requestBody.apiKey);
@@ -73211,8 +73595,8 @@ var resolveLitChipotleProvisioningRuntime = ({
   secrets = {},
   body = {}
 } = {}) => {
-  const litCredentials = isObj11(config?.litCredentials) ? config.litCredentials : {};
-  const requestBody = isObj11(body) ? body : {};
+  const litCredentials = isObj12(config?.litCredentials) ? config.litCredentials : {};
+  const requestBody = isObj12(body) ? body : {};
   const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
   const secretManagementApiKey = toTrimmedString15(secrets?.litAccountApiKey);
   const envManagementApiKey = toTrimmedString15(env?.LIT_ACCOUNT_API_KEY || env?.LIT_USAGE_API_KEY);
@@ -73447,7 +73831,7 @@ var resolveConfigMappedChipotleRpcUrls = ({
 } = {}) => {
   const normalizedChainId = toChainId(chainId);
   if (!normalizedChainId) return [];
-  const map = isObj11(config?.rpcUrlsByChainId) ? config.rpcUrlsByChainId : {};
+  const map = isObj12(config?.rpcUrlsByChainId) ? config.rpcUrlsByChainId : {};
   const mapped = normalizeChipotleRpcCandidateList(
     map[normalizedChainId] || map[String(normalizedChainId)] || []
   );
@@ -73470,7 +73854,7 @@ var resolveSessionChipotleRpcUrl = ({
   chainId = 0,
   op = ""
 } = {}) => {
-  const requestBody = isObj11(request) ? request : {};
+  const requestBody = isObj12(request) ? request : {};
   const normalizedChainId = toChainId(chainId);
   const requestRpcUrl = toTrimmedString15(requestBody.rpcUrl || requestBody.customRpcUrl);
   const candidates = normalizeChipotleRpcCandidateList([
@@ -73511,7 +73895,7 @@ var buildSessionBootstrapMetadata = ({
   request = {},
   sessionSlug = ""
 } = {}) => {
-  const requestBody = isObj11(request) ? request : {};
+  const requestBody = isObj12(request) ? request : {};
   const slugSegment = normalizeSessionScopedNameSegment(
     requestBody.sessionSlug || requestBody.slug || sessionSlug,
     "session"
@@ -73538,7 +73922,7 @@ var createLitChipotleAccount = async ({
   fetchImpl = globalThis.fetch
 } = {}) => {
   const metadata = buildSessionBootstrapMetadata({ request, sessionSlug });
-  const requestBody = isObj11(request) ? request : {};
+  const requestBody = isObj12(request) ? request : {};
   const response2 = await fetchChipotleJson({
     apiBase,
     allowLocalApiBase,
@@ -73769,7 +74153,7 @@ var provisionLitChipotleAction = async ({
   if (!toTrimmedString15(runtime?.litPkpId)) {
     throw new Error("Lit PKP ID not configured.");
   }
-  const actionRequest = isObj11(request) ? request : {};
+  const actionRequest = isObj12(request) ? request : {};
   const actionCode = toTrimmedString15(actionRequest.actionCode || actionRequest.code);
   if (!actionCode) {
     throw new Error("Lit Action code is required.");
@@ -73817,9 +74201,9 @@ var bootstrapLitChipotleSession = async ({
   sessionSlug = "",
   fetchImpl = globalThis.fetch
 } = {}) => {
-  const litCredentials = isObj11(config?.litCredentials) ? config.litCredentials : {};
+  const litCredentials = isObj12(config?.litCredentials) ? config.litCredentials : {};
   const secretAccountApiKey = toTrimmedString15(secrets?.litAccountApiKey);
-  const requestBody = isObj11(request) ? request : {};
+  const requestBody = isObj12(request) ? request : {};
   const requestAccountApiKey = toTrimmedString15(requestBody.litAccountApiKey);
   const envAccountApiKey = toTrimmedString15(env?.LIT_ACCOUNT_API_KEY);
   const existingAccountApiKey = secretAccountApiKey || requestAccountApiKey || envAccountApiKey;
@@ -74097,7 +74481,7 @@ var executeLitChipotleAction = async ({
   fetchImpl = globalThis.fetch
 } = {}) => {
   ensureChipotleApiKey(runtime);
-  const actionRequest = isObj11(request) ? request : {};
+  const actionRequest = isObj12(request) ? request : {};
   const code = toTrimmedString15(actionRequest.code);
   const ipfsId = toTrimmedString15(
     actionRequest.ipfsId || actionRequest.ipfs_id || runtime.litActionCid
@@ -74147,8 +74531,8 @@ var executeSessionLitChipotleAction = async ({
   requesterAddress = "",
   fetchImpl = globalThis.fetch
 } = {}) => {
-  const litCredentials = isObj11(config?.litCredentials) ? config.litCredentials : {};
-  const requestBody = isObj11(request) ? request : {};
+  const litCredentials = isObj12(config?.litCredentials) ? config.litCredentials : {};
+  const requestBody = isObj12(request) ? request : {};
   const runtime = resolveLitChipotleRuntime({
     env,
     config,
@@ -76110,9 +76494,9 @@ var MAX_QUESTIONS = 100;
 var MAX_SCAN_BLOCKS = 2e6;
 var RPC_CHUNK_SIZE = 1e5;
 var BINARY_RESPONSE_OPTIONS = ["Agree", "Unsure", "Disagree"];
-var trim7 = (value) => String(value == null ? "" : value).trim();
-var lower3 = (value) => trim7(value).toLowerCase();
-var isObj12 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var trim8 = (value) => String(value == null ? "" : value).trim();
+var lower3 = (value) => trim8(value).toLowerCase();
+var isObj13 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var hasRestrictedPrompt = (question = {}) => {
   const visibility = lower3(question.visibility || question.access || question.questionVisibility);
   return Boolean(
@@ -76120,13 +76504,13 @@ var hasRestrictedPrompt = (question = {}) => {
   );
 };
 var normalizeQuestion = (value = {}) => {
-  const question = isObj12(value) ? value : {};
+  const question = isObj13(value) ? value : {};
   const id2 = lower3(question.id || question.questionId);
-  const prompt = trim7(question.prompt || question.question || question.title);
+  const prompt = trim8(question.prompt || question.question || question.title);
   if (!id2 || !prompt || hasRestrictedPrompt(question) || /connect.+decrypt|encrypted prompt/i.test(prompt)) return null;
   const type = lower3(question.type || question.questionType || "freeform") || "freeform";
   const rawOptions = question.options || question.choices;
-  const options = type === "binary" ? [...BINARY_RESPONSE_OPTIONS] : (Array.isArray(rawOptions) ? rawOptions : []).map((entry) => trim7(isObj12(entry) ? entry.label || entry.value : entry)).filter(Boolean);
+  const options = type === "binary" ? [...BINARY_RESPONSE_OPTIONS] : (Array.isArray(rawOptions) ? rawOptions : []).map((entry) => trim8(isObj13(entry) ? entry.label || entry.value : entry)).filter(Boolean);
   return {
     id: id2,
     prompt,
@@ -76171,7 +76555,7 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
   const items = Array.isArray(listing?.items) ? listing.items.slice(0, MAX_QUESTIONS) : [];
   const questions = [];
   for (const item of items) {
-    const id2 = trim7(item?.storageRef?.id || item?.metadata?.id || item?.id);
+    const id2 = trim8(item?.storageRef?.id || item?.metadata?.id || item?.id);
     if (!id2) continue;
     const readResponse = await storageRoute2({
       path: "/storage/read",
@@ -76189,22 +76573,22 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
   return dedupeQuestions(questions);
 };
 var pickContractAddress = (config = {}) => {
-  const contracts = isObj12(config.contracts) ? config.contracts : {};
-  const surveys = isObj12(contracts.surveys) ? contracts.surveys.address : contracts.surveys;
-  return trim7(surveys || contracts.survey || config.surveysAddress || config.surveyAddress);
+  const contracts = isObj13(config.contracts) ? config.contracts : {};
+  const surveys = isObj13(contracts.surveys) ? contracts.surveys.address : contracts.surveys;
+  return trim8(surveys || contracts.survey || config.surveysAddress || config.surveyAddress);
 };
 var pickRpcUrls = (config = {}) => {
-  const chainId = trim7(config.networkChainId || config.registryChainId || config.chainId || "11155420");
-  const rpcConfig = isObj12(config.rpc) ? config.rpc : {};
-  const pathProvider = isObj12(rpcConfig?.providers?.path) ? rpcConfig.providers.path : isObj12(rpcConfig.path) ? rpcConfig.path : {};
-  const byChainMap = isObj12(config.rpcUrlsByChainId) ? config.rpcUrlsByChainId : isObj12(pathProvider.rpcUrlsByChainId) ? pathProvider.rpcUrlsByChainId : {};
+  const chainId = trim8(config.networkChainId || config.registryChainId || config.chainId || "11155420");
+  const rpcConfig = isObj13(config.rpc) ? config.rpc : {};
+  const pathProvider = isObj13(rpcConfig?.providers?.path) ? rpcConfig.providers.path : isObj13(rpcConfig.path) ? rpcConfig.path : {};
+  const byChainMap = isObj13(config.rpcUrlsByChainId) ? config.rpcUrlsByChainId : isObj13(pathProvider.rpcUrlsByChainId) ? pathProvider.rpcUrlsByChainId : {};
   const byChain = byChainMap[chainId];
   const source = [
     ...Array.isArray(byChain) ? byChain : [byChain],
     ...Array.isArray(config.rpcUrls) ? config.rpcUrls : [config.rpcUrl],
     ...Array.isArray(pathProvider.rpcUrls) ? pathProvider.rpcUrls : [pathProvider.rpcUrl]
   ];
-  return [...new Set(source.map(trim7).filter((value) => /^https:\/\//i.test(value)))];
+  return [...new Set(source.map(trim8).filter((value) => /^https:\/\//i.test(value)))];
 };
 var rpc = async ({ rpcUrls, method, params, fetchImpl }) => {
   let lastError;
@@ -76224,9 +76608,9 @@ var rpc = async ({ rpcUrls, method, params, fetchImpl }) => {
   }
   throw lastError || new Error(`No RPC URL succeeded for ${method}.`);
 };
-var wordAt = (hex, index) => trim7(hex).replace(/^0x/, "").slice(index * 64, index * 64 + 64);
+var wordAt = (hex, index) => trim8(hex).replace(/^0x/, "").slice(index * 64, index * 64 + 64);
 var decodeQuestionIds = (data = "") => {
-  const clean = trim7(data).replace(/^0x/, "");
+  const clean = trim8(data).replace(/^0x/, "");
   if (clean.length < 128) return [];
   const offsetBytes = Number(BigInt(`0x${wordAt(clean, 0) || "0"}`));
   const lengthWordIndex = offsetBytes / 32;
@@ -76239,7 +76623,7 @@ var decodeQuestionIds = (data = "") => {
   return ids;
 };
 var base64urlFromHex = (hex = "") => {
-  const clean = trim7(hex).replace(/^0x/, "");
+  const clean = trim8(hex).replace(/^0x/, "");
   if (!/^[0-9a-fA-F]{64}$/.test(clean)) return "";
   const bytes2 = new Uint8Array(clean.match(/.{2}/g).map((part) => Number.parseInt(part, 16)));
   let binary = "";
@@ -76249,7 +76633,7 @@ var base64urlFromHex = (hex = "") => {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 };
 var payloadSessionSlug = (payload = {}) => {
-  const session = isObj12(payload.session) ? payload.session : {};
+  const session = isObj13(payload.session) ? payload.session : {};
   for (const candidate of [
     payload.sessionSlug,
     payload.session_slug,
@@ -76271,7 +76655,7 @@ var fetchArweaveQuestion = async (pointer, fetchImpl) => {
       const response2 = await fetchImpl(`${gateway}/${pointer}`, { headers: { accept: "application/json" } });
       if (!response2.ok) continue;
       const payload = await response2.json();
-      if (isObj12(payload)) return payload;
+      if (isObj13(payload)) return payload;
     } catch {
     }
   }
@@ -76340,25 +76724,25 @@ var loadPublicInterviewQuestions = async ({
 
 // workers/sessionCorsWorker/interviewBriefDispatch.js
 var INTERVIEW_PROMPT_VERSION = "ce-interview-brief-v4";
-var trim8 = (value) => String(value == null ? "" : value).trim();
-var isObj13 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var trim9 = (value) => String(value == null ? "" : value).trim();
+var isObj14 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var isInterviewEnabled = (config = {}) => {
-  const interview = isObj13(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
+  const interview = isObj14(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
   return config.interviewModeEnabled !== false && interview.enabled !== false;
 };
 var normalizeAllowedOrigins = (raw) => (Array.isArray(raw) ? raw : [raw]).map((entry) => {
   try {
-    return new URL(trim8(entry)).origin;
+    return new URL(trim9(entry)).origin;
   } catch {
     return "";
   }
 }).filter(Boolean);
 var safeSessionUrl = (value, { slug = "", allowOrigins } = {}) => {
   try {
-    const url = new URL(trim8(value));
+    const url = new URL(trim9(value));
     if (url.protocol !== "https:" && url.hostname !== "localhost") return "";
     const parts = url.pathname.split("/").filter(Boolean).map((part) => decodeURIComponent(part));
-    if (parts.length < 2 || parts.at(-2) !== "session" || parts.at(-1)?.toLowerCase() !== trim8(slug).toLowerCase()) {
+    if (parts.length < 2 || parts.at(-2) !== "session" || parts.at(-1)?.toLowerCase() !== trim9(slug).toLowerCase()) {
       return "";
     }
     const allowedOrigins = normalizeAllowedOrigins(allowOrigins);
@@ -76376,7 +76760,7 @@ var sha2563 = async (value) => {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 };
 var canonicalizeQuestions = (questions = []) => [...questions].sort(
-  (left, right) => trim8(left?.id).localeCompare(trim8(right?.id)) || trim8(left?.prompt).localeCompare(trim8(right?.prompt)) || trim8(left?.type).localeCompare(trim8(right?.type))
+  (left, right) => trim9(left?.id).localeCompare(trim9(right?.id)) || trim9(left?.prompt).localeCompare(trim9(right?.prompt)) || trim9(left?.type).localeCompare(trim9(right?.type))
 );
 var buildInterviewBriefDocument = ({
   slug,
@@ -77337,99 +77721,6 @@ var createWorkerRuntimeInputWithWorkerDeps = ({
   };
 };
 
-// workers/sessionCorsWorker/aiRequestNormalization.js
-var ANONYMOUS_CUSTOM_RPC_URL_REQUIRED_ERROR = "Anonymous custom provider requires request rpcUrl when using apiKey bypass.";
-var DEFAULT_MODEL_WHITELIST = {
-  anthropic: ["claude-*"],
-  openai: ["gpt-*", "o1-*", "o3-*", "o4-*", "chatgpt-*"],
-  openrouter: null
-};
-var inferAiProviderFromModel = (modelRaw) => {
-  const model = toTrimmedString2(modelRaw).toLowerCase();
-  if (!model) return "";
-  if (model.startsWith("claude")) return "anthropic";
-  if (/^(gpt-|o[1-9]|chatgpt)/.test(model)) return "openai";
-  if (model.includes("/")) return "openrouter";
-  return "";
-};
-var matchesModelGlob = (model, pattern) => {
-  const normalizedModel = toTrimmedString2(model).toLowerCase();
-  const normalizedPattern = toTrimmedString2(pattern).toLowerCase();
-  if (!normalizedModel || !normalizedPattern) return false;
-  if (!normalizedPattern.includes("*")) return normalizedModel === normalizedPattern;
-  const escapedPattern = normalizedPattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`^${escapedPattern.replace(/\*/g, ".*")}$`).test(normalizedModel);
-};
-var isModelAllowed = (model, provider, customWhitelist = null) => {
-  const whitelist = customWhitelist && typeof customWhitelist === "object" ? customWhitelist : DEFAULT_MODEL_WHITELIST;
-  const providerKey = toTrimmedString2(provider).toLowerCase();
-  const patterns = whitelist?.[providerKey];
-  if (patterns == null) return true;
-  if (!Array.isArray(patterns)) return false;
-  return patterns.some((pattern) => matchesModelGlob(model, pattern));
-};
-var resolveAiProvider = (payload) => {
-  const explicit = toTrimmedString2(payload?.provider).toLowerCase();
-  if (explicit && explicit !== "default" && explicit !== "auto") return explicit;
-  return inferAiProviderFromModel(payload?.model) || "openai";
-};
-var normalizeAiRequestPayload = ({ payload } = {}) => ({
-  ok: true,
-  status: 200,
-  error: "",
-  payload,
-  provider: resolveAiProvider(payload),
-  requestApiKey: toTrimmedString2(payload?.apiKey),
-  requestRpcUrl: toTrimmedString2(payload?.rpcUrl)
-});
-var readAiRequestPayload = async ({ request } = {}) => {
-  const contentType = request?.headers?.get("content-type") || "";
-  if (!contentType.includes("application/json")) {
-    return {
-      ok: false,
-      status: 400,
-      error: "Expected application/json.",
-      payload: null,
-      provider: "",
-      requestApiKey: "",
-      requestRpcUrl: ""
-    };
-  }
-  let payload = null;
-  try {
-    payload = await request.json();
-  } catch {
-    return {
-      ok: false,
-      status: 400,
-      error: "Invalid JSON.",
-      payload: null,
-      provider: "",
-      requestApiKey: "",
-      requestRpcUrl: ""
-    };
-  }
-  return normalizeAiRequestPayload({ payload });
-};
-var validateAnonymousAiRequest = ({
-  provider = "",
-  requestRpcUrl = "",
-  anonymousAccessReason = ""
-} = {}) => {
-  if (anonymousAccessReason === "request-api-key" && provider === "custom" && !toTrimmedString2(requestRpcUrl)) {
-    return {
-      ok: false,
-      status: 400,
-      error: ANONYMOUS_CUSTOM_RPC_URL_REQUIRED_ERROR
-    };
-  }
-  return {
-    ok: true,
-    status: 200,
-    error: ""
-  };
-};
-
 // workers/sessionCorsWorker/authenticatedRoutePreflight.js
 var evaluateAuthenticatedRoutePreflight = async ({
   scopes,
@@ -77537,10 +77828,17 @@ var dispatchAuthenticatedSecretPathRoute = async ({
 } = {}) => {
   const isTranscribeRoute = path === "/transcribe" && method === "POST";
   const isArweaveUploadRoute = path === "/arweave/upload" && method === "POST";
+  const isAgentQuestionsRoute = path === "/api/agent/questions" && method === "GET";
   const isStorageRoute = path === "/storage/upload" && method === "POST" || path === "/storage/read" && (method === "GET" || method === "POST") || path === "/storage/list" && (method === "GET" || method === "POST") || path === "/storage/export-envelopes" && (method === "GET" || method === "POST");
   const isWorkerGroupsRoute = path === "/groups/my-memberships" && (method === "GET" || method === "POST") || path === "/groups/members" && (method === "GET" || method === "POST") || path === "/groups/list" && (method === "GET" || method === "POST") || path === "/groups/create" && method === "POST" || path === "/groups/join" && method === "POST" || path === "/groups/leave" && method === "POST";
-  if (!isTranscribeRoute && !isArweaveUploadRoute && !isStorageRoute && !isWorkerGroupsRoute) {
+  if (!isTranscribeRoute && !isArweaveUploadRoute && !isStorageRoute && !isWorkerGroupsRoute && !isAgentQuestionsRoute) {
     return { handled: false };
+  }
+  if (isAgentQuestionsRoute && config?.sessionModeProfile?.surfaces?.agentHttp !== true) {
+    return {
+      handled: true,
+      response: deps?.json?.({ error: "Agent HTTP is disabled for this session." }, 404, headers)
+    };
   }
   const isParticipantWrite = isTranscribeRoute || isArweaveUploadRoute || path === "/storage/upload" && method === "POST" || path === "/groups/create" && method === "POST" || path === "/groups/join" && method === "POST" || path === "/groups/leave" && method === "POST";
   const endedResponse = isParticipantWrite ? buildSessionEndedResponse({ config, headers, json: deps?.json, now: deps?.now }) : null;
@@ -77550,7 +77848,7 @@ var dispatchAuthenticatedSecretPathRoute = async ({
       response: endedResponse
     };
   }
-  const route = isTranscribeRoute ? "transcribe" : isStorageRoute ? "storage" : isWorkerGroupsRoute ? "groups" : "arweave";
+  const route = isTranscribeRoute ? "transcribe" : isStorageRoute || isAgentQuestionsRoute ? "storage" : isWorkerGroupsRoute ? "groups" : "arweave";
   const scope = route === "storage" && scopes?.storage !== true ? "arweave" : route;
   const preflight = await deps?.evaluateAuthenticatedRoutePreflight?.({
     scopes,
@@ -77572,6 +77870,34 @@ var dispatchAuthenticatedSecretPathRoute = async ({
     return {
       handled: true,
       response: preflight?.response
+    };
+  }
+  if (isAgentQuestionsRoute) {
+    const loadPublicInterviewQuestions2 = deps?.loadPublicInterviewQuestions || loadPublicInterviewQuestions;
+    const questions = await loadPublicInterviewQuestions2({
+      env,
+      config,
+      slug,
+      storageRoute: deps?.storageRoute,
+      fetch: deps?.fetch
+    });
+    const url = new URL(request.url);
+    const requestedLimit = Number(url.searchParams.get("limit") || url.searchParams.get("count") || 0);
+    const limitCount = Number.isFinite(requestedLimit) && requestedLimit > 0 ? Math.min(100, Math.floor(requestedLimit)) : questions.length;
+    const responseHeaders = new Headers(headers || {});
+    responseHeaders.set("cache-control", "no-store");
+    return {
+      handled: true,
+      response: deps?.json?.({
+        ok: true,
+        sessionSlug: slug,
+        questions: questions.slice(0, limitCount).map((question) => ({
+          questionId: question.id,
+          prompt: question.prompt,
+          questionType: question.type,
+          options: question.options
+        }))
+      }, 200, responseHeaders)
     };
   }
   if (isStorageRoute) {
@@ -77678,16 +78004,16 @@ var dispatchAuthenticatedSecretPathRoute = async ({
 };
 
 // workers/sessionCorsWorker/authenticatedSecretActionRouteDispatch.js
-var resolveDefaultModelForProvider = (provider) => {
+var resolveDefaultModelForProvider2 = (provider) => {
   if (provider === "anthropic") return "claude-3-5-sonnet-20240620";
   if (provider === "openrouter") return "openrouter/auto";
   if (provider === "openai" || provider === "custom") return "gpt-5";
   return "";
 };
-var resolveModelForProvider = ({ payload, provider } = {}) => {
+var resolveModelForProvider2 = ({ payload, provider } = {}) => {
   const rawModel = payload?.model;
   const model = typeof rawModel === "string" ? rawModel.trim() : rawModel == null ? "" : String(rawModel).trim();
-  return model || resolveDefaultModelForProvider(provider);
+  return model || resolveDefaultModelForProvider2(provider);
 };
 var dispatchAuthenticatedSecretActionRoute = async ({
   path,
@@ -77819,7 +78145,7 @@ var dispatchAuthenticatedSecretActionRoute = async ({
     }
     const aiRequest = deps?.normalizeAiRequestPayload?.({ payload: body }) || {};
     const provider = aiRequest.provider;
-    const model = resolveModelForProvider({ payload: aiRequest.payload || body, provider });
+    const model = resolveModelForProvider2({ payload: aiRequest.payload || body, provider });
     if (!isModelAllowed(model, provider)) {
       return {
         handled: true,
@@ -77998,368 +78324,6 @@ var dispatchAuthenticatedNonSecretActionRoute = async ({
     handled: true,
     response: await deps?.fetchUrl?.(body?.url, headers)
   };
-};
-
-// workers/sessionCorsWorker/authenticatedRouteDispatch.js
-var dispatchAuthenticatedRoute = async ({
-  path,
-  method,
-  request,
-  authenticatedContext,
-  deps
-} = {}) => {
-  const {
-    slug,
-    config,
-    headers,
-    scopes,
-    address,
-    limit
-  } = authenticatedContext || {};
-  const secretPathRoute = await deps?.dispatchAuthenticatedSecretPathRoute?.({
-    path,
-    method,
-    request,
-    config,
-    slug,
-    address,
-    limit,
-    headers,
-    scopes
-  });
-  if (secretPathRoute?.handled) return secretPathRoute.response;
-  let body = null;
-  let action = "";
-  if (method === "POST") {
-    const authenticatedAction = await deps?.readAuthenticatedActionPayload?.({ request });
-    if (!authenticatedAction?.ok) {
-      return deps?.json?.(
-        { error: authenticatedAction?.error },
-        authenticatedAction?.status || 400,
-        headers
-      );
-    }
-    body = authenticatedAction.payload;
-    action = authenticatedAction.action;
-  }
-  const nonSecretActionRoute = await deps?.dispatchAuthenticatedNonSecretActionRoute?.({
-    action,
-    body,
-    config,
-    slug,
-    address,
-    limit,
-    headers,
-    scopes
-  });
-  if (nonSecretActionRoute?.handled) return nonSecretActionRoute.response;
-  const secretActionRoute = await deps?.dispatchAuthenticatedSecretActionRoute?.({
-    path,
-    action,
-    body,
-    config,
-    slug,
-    address,
-    limit,
-    headers,
-    scopes
-  });
-  if (secretActionRoute?.handled) return secretActionRoute.response;
-  return deps?.json?.({ error: "Not found." }, 404, headers);
-};
-
-// workers/sessionCorsWorker/realtimeCallExecution.js
-var OPENAI_REALTIME_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
-var DEFAULT_INTERVIEW_REALTIME_MODEL = "gpt-realtime-2.1";
-var trim9 = (value) => String(value == null ? "" : value).trim();
-var isObj14 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-var buildRealtimeMultipartBody = ({ sdp, session }) => {
-  const boundary = `----context-engine-realtime-${crypto.randomUUID().replace(/-/g, "")}`;
-  const body = [
-    `--${boundary}\r
-`,
-    'Content-Disposition: form-data; name="sdp"\r\n',
-    "Content-Type: application/sdp\r\n\r\n",
-    sdp,
-    `\r
---${boundary}\r
-`,
-    'Content-Disposition: form-data; name="session"\r\n',
-    "Content-Type: application/json\r\n\r\n",
-    JSON.stringify(session),
-    `\r
---${boundary}--\r
-`
-  ].join("");
-  return { body, contentType: `multipart/form-data; boundary=${boundary}` };
-};
-var readRealtimeCallRequestPayload = async ({ request } = {}) => {
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return { ok: false, status: 400, error: "Invalid JSON." };
-  }
-  if (!isObj14(body)) return { ok: false, status: 400, error: "Invalid JSON." };
-  const sdp = String(body.sdp == null ? "" : body.sdp);
-  const instructions = trim9(body.instructions);
-  if (!sdp || !/^v=0(?:\r?\n|$)/.test(sdp)) return { ok: false, status: 400, error: "Invalid SDP offer." };
-  if (sdp.length > 64e3) return { ok: false, status: 413, error: "SDP offer is too large." };
-  if (!instructions || instructions.length > 32e3) {
-    return { ok: false, status: instructions ? 413 : 400, error: "Interview instructions are missing or too large." };
-  }
-  return { ok: true, payload: { sdp, instructions } };
-};
-var resolveRealtimeConfig = (config = {}) => {
-  const interview = isObj14(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
-  const provider = trim9(interview.provider || "openai").toLowerCase();
-  const requestedModel = trim9(interview.realtimeModel || config?.ai?.realtimeModel);
-  const model = /^gpt-realtime(?:-[a-z0-9.]+)*$/i.test(requestedModel) ? requestedModel : DEFAULT_INTERVIEW_REALTIME_MODEL;
-  return { provider, model };
-};
-var proxyOpenAiRealtimeCall = async ({
-  payload,
-  secrets,
-  config,
-  baseHeaders,
-  deps,
-  constants
-} = {}) => {
-  const fetchImpl = deps?.fetch || fetch;
-  const realtime = resolveRealtimeConfig(config);
-  if (realtime.provider !== "openai") {
-    return deps?.json?.({ error: "Realtime interview voice currently requires the OpenAI provider." }, 400, baseHeaders);
-  }
-  const key = trim9(secrets?.openaiKey);
-  if (!key) {
-    return deps?.json?.({ error: "Server misconfigured: openaiKey is missing." }, 401, baseHeaders);
-  }
-  const session = {
-    type: "realtime",
-    model: realtime.model,
-    output_modalities: ["audio"],
-    instructions: payload.instructions,
-    max_output_tokens: 2048,
-    audio: {
-      input: {
-        transcription: { model: "gpt-transcribe" },
-        turn_detection: {
-          type: "server_vad",
-          create_response: true,
-          interrupt_response: true
-        }
-      }
-    }
-  };
-  const multipart = buildRealtimeMultipartBody({ sdp: payload.sdp, session });
-  const response2 = await fetchImpl(constants?.openAiRealtimeCallsUrl || OPENAI_REALTIME_CALLS_URL, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${key}`,
-      "content-type": multipart.contentType
-    },
-    body: multipart.body
-  });
-  const text = await response2.text();
-  if (!response2.ok) {
-    let message = "OpenAI Realtime call failed.";
-    try {
-      message = JSON.parse(text)?.error?.message || message;
-    } catch {
-    }
-    return deps?.json?.({ error: message }, response2.status, baseHeaders);
-  }
-  const headers = new Headers(baseHeaders || {});
-  headers.set("content-type", "application/sdp");
-  headers.set("cache-control", "no-store");
-  return new Response(text, { status: 200, headers });
-};
-
-// workers/sessionCorsWorker/anonymousRouteDispatch.js
-var resolveDefaultModelForProvider2 = (provider) => {
-  if (provider === "anthropic") return "claude-3-5-sonnet-20240620";
-  if (provider === "openrouter") return "openrouter/auto";
-  if (provider === "openai" || provider === "custom") return "gpt-5";
-  return "";
-};
-var resolveModelForProvider2 = ({ payload, provider } = {}) => {
-  const rawModel = payload?.model;
-  const model = typeof rawModel === "string" ? rawModel.trim() : rawModel == null ? "" : String(rawModel).trim();
-  return model || resolveDefaultModelForProvider2(provider);
-};
-var dispatchAnonymousRoute = async ({
-  path,
-  request,
-  anonymousContext,
-  deps
-} = {}) => {
-  const {
-    slug,
-    config,
-    headers,
-    env
-  } = anonymousContext || {};
-  if (path === "/groups/list") {
-    const dispatchPublicWorkerGroupListRequest2 = deps?.dispatchPublicWorkerGroupListRequest || dispatchPublicWorkerGroupListRequest;
-    return dispatchPublicWorkerGroupListRequest2({
-      request,
-      config,
-      env,
-      slug,
-      baseHeaders: headers,
-      deps: {
-        json: deps?.json
-      }
-    });
-  }
-  if ((path === "/storage/read" || path === "/storage/list") && typeof deps?.storageRoute === "function") {
-    return deps.storageRoute({
-      path,
-      method: request?.method || "GET",
-      request,
-      env: env || {},
-      config,
-      slug,
-      uploaderAddress: "",
-      baseHeaders: headers
-    });
-  }
-  const endedResponse = buildSessionEndedResponse({
-    config,
-    headers,
-    json: deps?.json,
-    now: deps?.now
-  });
-  if (endedResponse) return endedResponse;
-  if (path === "/transcribe") {
-    const transcribeRequest = await deps?.readTranscribeRequestPayload?.({ request });
-    if (!transcribeRequest?.ok) {
-      return deps?.json?.(
-        { error: transcribeRequest?.error },
-        transcribeRequest?.status || 400,
-        headers
-      );
-    }
-    const anonymousAccess2 = await deps?.evaluateAnonymousRouteAccess?.({
-      slug,
-      config,
-      route: "transcribe",
-      apiKey: transcribeRequest?.payload?.requestApiKey
-    });
-    if (!anonymousAccess2?.ok) {
-      return deps?.json?.(
-        { error: anonymousAccess2?.error || deps?.ANONYMOUS_ROUTE_DENIED_ERROR },
-        anonymousAccess2?.status || 403,
-        headers
-      );
-    }
-    const secrets2 = anonymousAccess2?.reason === "request-api-key" ? {} : await deps?.getSessionSecrets?.(slug) || {};
-    return deps?.transcribe?.({
-      request: null,
-      secrets: secrets2,
-      baseHeaders: headers,
-      transcribeRequest
-    });
-  }
-  if (path === "/realtime/call") {
-    const readRealtimeCallRequestPayload2 = deps?.readRealtimeCallRequestPayload || readRealtimeCallRequestPayload;
-    const realtimeRequest = await readRealtimeCallRequestPayload2({ request });
-    if (!realtimeRequest?.ok) {
-      return deps?.json?.(
-        { error: realtimeRequest?.error },
-        realtimeRequest?.status || 400,
-        headers
-      );
-    }
-    const anonymousAccess2 = await deps?.evaluateAnonymousRouteAccess?.({
-      slug,
-      config,
-      route: "realtime"
-    });
-    if (!anonymousAccess2?.ok) {
-      return deps?.json?.(
-        { error: anonymousAccess2?.error || deps?.ANONYMOUS_ROUTE_DENIED_ERROR },
-        anonymousAccess2?.status || 403,
-        headers
-      );
-    }
-    const secrets2 = await deps?.getSessionSecrets?.(slug) || {};
-    const proxyOpenAiRealtimeCall2 = deps?.proxyOpenAiRealtimeCall || proxyOpenAiRealtimeCall;
-    return proxyOpenAiRealtimeCall2({
-      payload: realtimeRequest.payload,
-      secrets: secrets2,
-      config,
-      baseHeaders: headers,
-      deps: { json: deps?.json }
-    });
-  }
-  const aiRequest = await deps?.readAiRequestPayload?.({
-    request: typeof request?.clone === "function" ? request.clone() : request
-  });
-  if (!aiRequest?.ok) {
-    return deps?.json?.(
-      { error: aiRequest?.error },
-      aiRequest?.status || 400,
-      headers
-    );
-  }
-  const {
-    payload,
-    provider,
-    requestApiKey,
-    requestRpcUrl
-  } = aiRequest;
-  const anonymousAccess = await deps?.evaluateAnonymousRouteAccess?.({
-    slug,
-    config,
-    route: "ai",
-    apiKey: requestApiKey
-  });
-  if (!anonymousAccess?.ok) {
-    return deps?.json?.(
-      { error: anonymousAccess?.error || deps?.ANONYMOUS_ROUTE_DENIED_ERROR },
-      anonymousAccess?.status || 403,
-      headers
-    );
-  }
-  const aiValidation = deps?.validateAnonymousAiRequest?.({
-    provider,
-    requestRpcUrl,
-    anonymousAccessReason: anonymousAccess?.reason
-  }) || {};
-  if (!aiValidation?.ok) {
-    return deps?.json?.(
-      { error: aiValidation?.error },
-      aiValidation?.status || 400,
-      headers
-    );
-  }
-  const model = resolveModelForProvider2({ payload, provider });
-  if (!isModelAllowed(model, provider)) {
-    return deps?.json?.(
-      { error: "Model not allowed for provider" },
-      400,
-      headers
-    );
-  }
-  if (provider === "custom") {
-    return deps?.json?.(
-      { error: "Custom RPC not available for anonymous requests" },
-      403,
-      headers
-    );
-  }
-  const secrets = anonymousAccess?.reason === "request-api-key" ? {} : await deps?.getSessionSecrets?.(slug) || {};
-  if (provider === "anthropic") {
-    return deps?.proxyAnthropic?.({ payload, secrets, baseHeaders: headers });
-  }
-  if (provider === "openai") {
-    return deps?.proxyOpenAI?.({ payload, secrets, baseHeaders: headers });
-  }
-  if (provider === "openrouter") {
-    return deps?.proxyOpenRouter?.({ payload, secrets, baseHeaders: headers });
-  }
-  return deps?.json?.({ error: `Unsupported provider: ${provider}` }, 400, headers);
 };
 
 // workers/sessionCorsWorker/authenticatedActionRequestNormalization.js
@@ -78637,24 +78601,6 @@ var resolveWorkerRuntimeDeps = ({
   };
 };
 
-// workers/sessionCorsWorker/workerRuntimeDepsBinding.js
-var createWorkerRuntimeDepsWithWorkerDeps = ({
-  deps,
-  constants,
-  defaults
-} = {}) => {
-  const createWorkerRuntimeInputWithWorkerDeps2 = deps?.createWorkerRuntimeInputWithWorkerDeps || createWorkerRuntimeInputWithWorkerDeps;
-  const resolved = (deps?.resolveWorkerRuntimeDeps || resolveWorkerRuntimeDeps)({
-    deps,
-    constants
-  }) || {};
-  return createWorkerRuntimeInputWithWorkerDeps2({
-    deps: resolved.deps,
-    constants: resolved.constants,
-    defaults
-  });
-};
-
 // workers/sessionCorsWorker/workerTopLevelBinding.js
 var { getPathRpcUrl: getPathRpcUrl3 } = import_rpcDefaults5.default;
 var SESSION_REGISTRY_ABI = [
@@ -78693,41 +78639,47 @@ var createWorkerTopLevelRuntimeWithWorkerDeps = ({
   deps,
   env
 } = {}) => {
-  const createWorkerRuntimeDepsWithWorkerDeps2 = deps?.createWorkerRuntimeDepsWithWorkerDeps || createWorkerRuntimeDepsWithWorkerDeps;
-  return createWorkerRuntimeDepsWithWorkerDeps2({
-    deps: {
-      ethers: deps?.ethers,
-      URL: deps?.URL,
-      Headers: deps?.Headers,
-      log: deps?.log,
-      fetch: deps?.fetch,
-      rpcFetch: deps?.rpcFetch,
-      now: deps?.now
-    },
-    constants: {
-      OPENAI_TRANSCRIBE_URL: resolveOpenAiTranscribeUrl({ env }),
-      SESSION_REGISTRY_ABI,
-      ERC721_ABI,
-      SBT_ADMIN_ABI,
-      HATS_ABI,
-      FAUCET_SBT_GATE_ABI,
-      TOKEN_TTL_SECONDS,
-      NONCE_TTL_SECONDS,
-      NONCE_RATE_LIMIT_MAX,
-      NONCE_RATE_LIMIT_WINDOW_MS,
-      NONCE_RATE_LIMIT_TTL_SECONDS,
-      USED_NONCE_TTL_SECONDS,
-      LOGIN_SIWE_MAX_AGE_MS,
-      LOGIN_SIWE_FUTURE_SKEW_MS,
-      ZERO_BYTES32: ZERO_BYTES322,
-      RESOURCE_GATE_KEYS,
-      ANONYMOUS_RATE_ID_HEADER,
-      ANONYMOUS_GATE_UNAVAILABLE_ERROR,
-      ANONYMOUS_ROUTE_DENIED_ERROR,
-      ANONYMOUS_SCOPE_DISABLED_ERROR,
-      SESSION_CONFIG_NOT_FOUND_ERROR,
-      BOOTSTRAP_SESSION_CONFIG_REQUIRED_ERROR
-    },
+  const createWorkerRuntimeInputWithWorkerDeps2 = deps?.createWorkerRuntimeInputWithWorkerDeps || createWorkerRuntimeInputWithWorkerDeps;
+  const runtimeDeps = {
+    ethers: deps?.ethers,
+    URL: deps?.URL,
+    Headers: deps?.Headers,
+    log: deps?.log,
+    fetch: deps?.fetch,
+    rpcFetch: deps?.rpcFetch,
+    now: deps?.now
+  };
+  const constants = {
+    OPENAI_TRANSCRIBE_URL: resolveOpenAiTranscribeUrl({ env }),
+    SESSION_REGISTRY_ABI,
+    ERC721_ABI,
+    SBT_ADMIN_ABI,
+    HATS_ABI,
+    FAUCET_SBT_GATE_ABI,
+    TOKEN_TTL_SECONDS,
+    NONCE_TTL_SECONDS,
+    NONCE_RATE_LIMIT_MAX,
+    NONCE_RATE_LIMIT_WINDOW_MS,
+    NONCE_RATE_LIMIT_TTL_SECONDS,
+    USED_NONCE_TTL_SECONDS,
+    LOGIN_SIWE_MAX_AGE_MS,
+    LOGIN_SIWE_FUTURE_SKEW_MS,
+    ZERO_BYTES32: ZERO_BYTES322,
+    RESOURCE_GATE_KEYS,
+    ANONYMOUS_RATE_ID_HEADER,
+    ANONYMOUS_GATE_UNAVAILABLE_ERROR,
+    ANONYMOUS_ROUTE_DENIED_ERROR,
+    ANONYMOUS_SCOPE_DISABLED_ERROR,
+    SESSION_CONFIG_NOT_FOUND_ERROR,
+    BOOTSTRAP_SESSION_CONFIG_REQUIRED_ERROR
+  };
+  const resolved = (deps?.resolveWorkerRuntimeDeps || resolveWorkerRuntimeDeps)({
+    deps: runtimeDeps,
+    constants
+  }) || {};
+  return createWorkerRuntimeInputWithWorkerDeps2({
+    deps: resolved.deps,
+    constants: resolved.constants,
     defaults: {
       DEFAULT_FAUCET_RPC_URL: DEFAULT_FAUCET_RPC_URL2,
       DEFAULT_FAUCET_AMOUNT_ETH: DEFAULT_FAUCET_AMOUNT_ETH2,

@@ -21,6 +21,79 @@ test('dispatchAuthenticatedSecretPathRoute ignores unrelated routes', async () =
   assert.deepEqual(result, { handled: false });
 });
 
+test('authenticated agent questions reuse the session question catalog when agent HTTP is enabled', async () => {
+  let preflightRoute = '';
+  const result = await dispatchAuthenticatedSecretPathRoute({
+    path: '/api/agent/questions',
+    method: 'GET',
+    request: new Request('https://worker.example/api/agent/questions?limit=1'),
+    config: { sessionModeProfile: { surfaces: { agentHttp: true } } },
+    slug: 'session-a',
+    address: '0xabc',
+    env: { SESSION_CONFIG_KV: {} },
+    limit: 7,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    scopes: { storage: true },
+    deps: {
+      evaluateAuthenticatedRoutePreflight: async ({ route }) => {
+        preflightRoute = route;
+        return { ok: true };
+      },
+      loadPublicInterviewQuestions: async ({ slug }) => {
+        assert.equal(slug, 'session-a');
+        return [
+          { id: 'q-1', prompt: 'First?', type: 'binary', options: ['Agree', 'Unsure', 'Disagree'] },
+          { id: 'q-2', prompt: 'Second?', type: 'freeform', options: [] },
+        ];
+      },
+      json: (body, status, headers) => ({ body, status, headers }),
+    },
+  });
+
+  assert.equal(preflightRoute, 'storage');
+  assert.equal(result.handled, true);
+  assert.equal(result.response.status, 200);
+  assert.equal(result.response.headers.get('cache-control'), 'no-store');
+  assert.deepEqual(result.response.body, {
+    ok: true,
+    sessionSlug: 'session-a',
+    questions: [{
+      questionId: 'q-1',
+      prompt: 'First?',
+      questionType: 'binary',
+      options: ['Agree', 'Unsure', 'Disagree'],
+    }],
+  });
+});
+
+test('authenticated agent questions fail closed when the session surface is disabled', async () => {
+  let catalogCalled = false;
+  const result = await dispatchAuthenticatedSecretPathRoute({
+    path: '/api/agent/questions',
+    method: 'GET',
+    request: new Request('https://worker.example/api/agent/questions'),
+    config: { sessionModeProfile: { surfaces: { agentHttp: false } } },
+    headers: {},
+    deps: {
+      loadPublicInterviewQuestions: async () => {
+        catalogCalled = true;
+        return [];
+      },
+      json: (body, status, headers) => ({ body, status, headers }),
+    },
+  });
+
+  assert.equal(catalogCalled, false);
+  assert.deepEqual(result, {
+    handled: true,
+    response: {
+      body: { error: 'Agent HTTP is disabled for this session.' },
+      status: 404,
+      headers: {},
+    },
+  });
+});
+
 test('dispatchAuthenticatedSecretPathRoute blocks participant writes after the session ends but keeps reads open', async () => {
   let groupRouteCalls = 0;
   const deps = {
