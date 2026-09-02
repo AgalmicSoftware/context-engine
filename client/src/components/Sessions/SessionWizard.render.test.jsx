@@ -1063,7 +1063,7 @@ describe('SessionWizard rendered validation', () => {
     fireEvent.change(within(groupDrafts).getByLabelText(/Description/i), {
       target: { value: 'Reviews research questions.' },
     });
-    fireEvent.change(within(groupDrafts).getByLabelText('Joining'), {
+    fireEvent.change(within(groupDrafts).getByLabelText('Who can join'), {
       target: { value: 'admin_add' },
     });
 

@@ -231,7 +231,13 @@ test('canonical legacy demo questions remain stable Worker seed inputs', () => {
     demoPolisData.comments[22].commentBody,
     'If an AI resists modification, should we respect that preference?',
   );
-  assert.equal(demoPolisData.comments[30].options, undefined);
+  assert.deepEqual(demoPolisData.comments[30].options, [
+    'Technical researchers',
+    'AI developers and labs',
+    'Governments and regulators',
+    'The general public',
+    'Affected communities',
+  ]);
 });
 
 test('breakdown type overrides discard stale poll options', async () => {
