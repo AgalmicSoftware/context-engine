@@ -324,12 +324,32 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   const readLoginBackgroundState = async () =>
     page.locator('.modal-login .card').evaluate((card) => {
       const body = card.querySelector('.card-body');
+      const content = card.closest('.modal-content');
       const cardStyle = window.getComputedStyle(card);
       const bodyStyle = body ? window.getComputedStyle(body) : null;
+      const contentStyle = content ? window.getComputedStyle(content) : null;
+      const cardRect = card.getBoundingClientRect();
+      const contentRect = content?.getBoundingClientRect();
       return {
         bodyBackgroundImage: bodyStyle?.backgroundImage || '',
         cardBackgroundColor: cardStyle.backgroundColor,
         cardBackgroundImage: cardStyle.backgroundImage,
+        contentBorderWidths: contentStyle
+          ? [
+              contentStyle.borderTopWidth,
+              contentStyle.borderRightWidth,
+              contentStyle.borderBottomWidth,
+              contentStyle.borderLeftWidth,
+            ]
+          : [],
+        contentCardEdgeGap: contentRect
+          ? Math.max(
+              Math.abs(contentRect.left - cardRect.left),
+              Math.abs(contentRect.right - cardRect.right),
+              Math.abs(contentRect.top - cardRect.top),
+              Math.abs(contentRect.bottom - cardRect.bottom),
+            )
+          : Number.POSITIVE_INFINITY,
         overlayBackgroundImage: window.getComputedStyle(card, '::after').backgroundImage,
       };
     });
@@ -3029,6 +3049,11 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       assert.equal(state.bodyBackgroundImage, 'none', 'Login body should not add a background gradient');
       assert.equal(state.overlayBackgroundImage, 'none', 'Login card should not render a decorative gradient overlay');
       assert.notEqual(state.cardBackgroundColor, 'rgba(0, 0, 0, 0)', 'Login card solid background should be opaque');
+      assert.deepEqual(state.contentBorderWidths, ['0px', '0px', '0px', '0px'], 'Login shell should be borderless');
+      assert.ok(
+        state.contentCardEdgeGap <= 1,
+        `Login card should sit flush with its modal shell; received ${state.contentCardEdgeGap.toFixed(2)}px`,
+      );
     });
   }
   if (classicPreloginSettingsControlLayout && currentPreloginSettingsControlLayout) {

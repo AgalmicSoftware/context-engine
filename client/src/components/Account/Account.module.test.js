@@ -62,6 +62,17 @@ describe('Account.module.scss modal account layout guards', () => {
     expect(scss).not.toMatch(/#loginModalCard::before\s*{/);
   });
 
+  it('keeps the login card flush with a single borderless modal shell', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'Account.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /:global\(\.modal\.modal-login\) \.web3ModalContent\s*{[\s\S]*?padding:\s*0 !important;[\s\S]*?overflow:\s*hidden;[\s\S]*?background:\s*transparent !important;[\s\S]*?border:\s*0;[\s\S]*?box-shadow:\s*none;/,
+    );
+    expect(scss).toMatch(
+      /#loginModalCard\s*{[\s\S]*?width:\s*100%;[\s\S]*?max-width:\s*100%;[\s\S]*?margin:\s*0;/,
+    );
+  });
+
   it('styles preference controls as switches and keeps the session summary in the config control family', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'Account.module.scss'), 'utf8');
 

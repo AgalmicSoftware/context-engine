@@ -3580,12 +3580,25 @@ h1 {
 
 .web3ModalContent {
   width: 100%;
+  max-width: 100%;
+}
+
+:global(.modal.modal-login) .web3ModalContent {
+  padding: 0 !important;
+  overflow: hidden;
+  background: transparent !important;
+  border: 0;
+  border-radius: var(--ce-radius-10);
+  box-shadow: none;
 }
 
 #loginModalCard {
   position: relative;
   z-index: 2101;
+  width: 100%;
+  max-width: 100%;
   overflow: hidden;
+  margin: 0;
   margin-top: 0;
   background: var(--ce-surface);
 
