@@ -1,4 +1,10 @@
-import { safeString, lower } from './runtimePrimitives.mjs';
+import {
+  safeString,
+  lower,
+  nowIso,
+  safeEnvJsonParse,
+  sanitizeSessionSlug,
+} from './runtimePrimitives.mjs';
 import { RISK_CEILINGS } from './constants.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 import { listRegistrySessionsForBridge } from './registrySessions.mjs';
@@ -12,34 +18,6 @@ export const RESULTS_EXPOSURE_TOGGLE_FIELDS = Object.freeze({
   aggregate_results: 'aggregateResultsEnabled',
   anonymized_groups: 'anonymizedGroupsEnabled',
 });
-
-function nowIso(now = null) {
-  if (now instanceof Date) return now.toISOString();
-  if (safeString(now)) return new Date(now).toISOString();
-  return new Date().toISOString();
-}
-
-function safeJsonParse(value, fallback = null) {
-  const text = safeString(value);
-  if (!text) return fallback;
-  try {
-    return JSON.parse(text);
-  } catch {
-    const dotenvEscaped = text.includes('\\"') ? text.replace(/\\"/g, '"').replace(/\\\\/g, '\\') : '';
-    if (dotenvEscaped && dotenvEscaped !== text) {
-      try {
-        return JSON.parse(dotenvEscaped);
-      } catch {
-        return fallback;
-      }
-    }
-    return fallback;
-  }
-}
-
-function sanitizeSessionSlug(value = '') {
-  return lower(value).replace(/[^a-z0-9_-]/g, '').slice(0, 128);
-}
 
 function normalizeResultBoolean(value, fallback = false) {
   if (value === true || value === false) return value;
@@ -83,7 +61,7 @@ export async function readResultsExposureOverride(env = {}, sessionSlug = '') {
   const key = resultExposureOverrideKey(sessionSlug);
   const kv = env?.AGENT_ACTION_KV;
   if (!key || !kv || typeof kv.get !== 'function') return {};
-  const parsed = safeJsonParse(await kv.get(key).catch(() => null), null);
+  const parsed = safeEnvJsonParse(await kv.get(key).catch(() => null), null);
   return normalizeResultsExposureOverride(parsed);
 }
 
@@ -131,7 +109,7 @@ async function applyResultsExposureOverrides(env = {}, policy = {}) {
 export async function readAdminDefaultSessionOverride(env = {}) {
   const kv = env?.AGENT_ACTION_KV;
   if (!kv || typeof kv.get !== 'function') return {};
-  const parsed = safeJsonParse(await kv.get(ADMIN_DEFAULT_SESSION_KV_KEY).catch(() => null), null);
+  const parsed = safeEnvJsonParse(await kv.get(ADMIN_DEFAULT_SESSION_KV_KEY).catch(() => null), null);
   const sessionSlug = sanitizeSessionSlug(parsed?.sessionSlug);
   if (!sessionSlug) return {};
   return {
@@ -211,7 +189,7 @@ export async function loadSessionPolicy(env = {}, {
     includeAdminDefaultOverride,
   };
   const policyNow = env.AGENT_BRIDGE_SESSION_POLICY_NOW || env.AGENT_BRIDGE_NOW || null;
-  const configured = safeJsonParse(env.AGENT_BRIDGE_SESSION_POLICY_JSON, null);
+  const configured = safeEnvJsonParse(env.AGENT_BRIDGE_SESSION_POLICY_JSON, null);
   if (configured && typeof configured === 'object' && !Array.isArray(configured)) {
     return finalizeSessionPolicy(env, normalizeSessionPolicy(configured, { now: policyNow }), finalizeOptions);
   }

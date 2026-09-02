@@ -4,6 +4,8 @@ import {
   safeJsonParse,
   envFlagEnabled,
   envFlagDisabled,
+  nowIso,
+  sanitizeSessionSlug,
 } from './runtimePrimitives.mjs';
 import { AGENT_BRIDGE_EVENT_TYPES, TELEGRAM_BRIDGE_ACTIONS } from './constants.mjs';
 import { deriveManagedDemoAccount } from './managedAccounts.mjs';
@@ -23,14 +25,6 @@ export const SUBMITTED_RESULT_STATUSES = Object.freeze([
   'submit_queued',
   'submit_request_created',
 ]);
-
-function nowIso() {
-  return new Date().toISOString();
-}
-
-function sanitizeSessionSlug(value = '') {
-  return lower(value).replace(/[^a-z0-9_-]/g, '').slice(0, 128);
-}
 
 export function submitRequestKvKey(requestId = '') {
   const id = safeString(requestId);

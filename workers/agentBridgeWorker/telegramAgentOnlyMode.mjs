@@ -5,6 +5,8 @@ import {
   stableJson,
   stableFingerprint,
   kvKeySafePart,
+  nowIsoOrCurrent as nowIso,
+  sanitizeSessionSlug,
 } from './runtimePrimitives.mjs';
 import { assertNoSecretShape, redactSecrets } from './redaction.mjs';
 import {
@@ -123,24 +125,11 @@ function base64EncodeText(value = '') {
   return btoa(binary);
 }
 
-function sanitizeSessionSlug(value = '') {
-  return lower(value).replace(/[^a-z0-9_-]/g, '').slice(0, 128);
-}
-
 function normalizeQuestionId(value = '') {
   const raw = safeString(value);
   if (/^0x[0-9a-fA-F]{64}$/.test(raw)) return raw.toLowerCase();
   const id = raw.replace(/[^A-Za-z0-9_-]+/g, '').slice(0, 96);
   return id.startsWith('ceq_') ? id : '';
-}
-
-function nowIso(now = null) {
-  if (now instanceof Date) return now.toISOString();
-  if (safeString(now)) {
-    const parsed = Date.parse(safeString(now));
-    if (Number.isFinite(parsed)) return new Date(parsed).toISOString();
-  }
-  return new Date().toISOString();
 }
 
 function bytesToHex(bytes) {

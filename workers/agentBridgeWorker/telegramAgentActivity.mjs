@@ -1,4 +1,4 @@
-import { safeString, lower, safeJsonParse } from './runtimePrimitives.mjs';
+import { safeString, lower, safeJsonParse, sanitizeSessionSlug } from './runtimePrimitives.mjs';
 import { assertNoSecretShape, redactSecrets } from './redaction.mjs';
 
 const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
@@ -6,10 +6,6 @@ const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-dec
 export const AGENT_QUESTION_VOTE_RECOMMENDATION_KV_PREFIX = 'telegram:agent-question-vote-recommendation:v1:';
 const PROPOSED_QUESTION_KV_PREFIX = 'telegram:proposed-question:';
 const LIGHTWEIGHT_GROUP_PROPOSAL_KV_PREFIX = 'telegram:lightweight-group-proposal:';
-
-function sanitizeSessionSlug(value = '') {
-  return lower(value).replace(/[^a-z0-9_-]/g, '').slice(0, 128);
-}
 
 async function listKvRecordsByPrefix(env = {}, prefix = '', {
   limit = 200,

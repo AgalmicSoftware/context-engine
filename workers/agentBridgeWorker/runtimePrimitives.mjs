@@ -8,6 +8,13 @@ export function lower(value) {
   return safeString(value).toLowerCase();
 }
 
+// Session slugs are transport identifiers. This intentionally preserves the
+// bridge's existing lowercase/filter/truncate behavior and does not substitute
+// a default-session sentinel.
+export function sanitizeSessionSlug(value = '') {
+  return lower(value).replace(/[^a-z0-9_-]/g, '').slice(0, 128);
+}
+
 export function safeJsonParse(value, fallback = null) {
   const text = safeString(value);
   if (!text) return fallback;
@@ -16,6 +23,33 @@ export function safeJsonParse(value, fallback = null) {
   } catch {
     return fallback;
   }
+}
+
+export function safeEnvJsonParse(value, fallback = null) {
+  const text = safeString(value);
+  if (!text) return fallback;
+  const parseFailed = Symbol('parse-failed');
+  const parsed = safeJsonParse(text, parseFailed);
+  if (parsed !== parseFailed) return parsed;
+  const dotenvEscaped = text.includes('\\"') ? text.replace(/\\"/g, '"').replace(/\\\\/g, '\\') : '';
+  return dotenvEscaped && dotenvEscaped !== text
+    ? safeJsonParse(dotenvEscaped, fallback)
+    : fallback;
+}
+
+export function nowIso(now = null) {
+  if (now instanceof Date) return now.toISOString();
+  if (safeString(now)) return new Date(now).toISOString();
+  return new Date().toISOString();
+}
+
+export function nowIsoOrCurrent(now = null) {
+  if (now instanceof Date) return now.toISOString();
+  if (safeString(now)) {
+    const parsed = new Date(now);
+    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+  }
+  return new Date().toISOString();
 }
 
 export function stableJson(value) {

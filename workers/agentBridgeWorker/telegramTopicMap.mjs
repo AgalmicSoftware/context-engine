@@ -4,6 +4,7 @@ import {
   safeJsonParse,
   stableJson,
   stableFingerprint,
+  sanitizeSessionSlug,
 } from './runtimePrimitives.mjs';
 
 export const TELEGRAM_TOPIC_MAP_CACHE_PREFIX = 'telegram:topic-map:v2:';
@@ -65,10 +66,6 @@ const CONTENT_TOPIC_RULES = Object.freeze([
     terms: ['fast onboarding', 'onboarding', 'controls are simplified', 'microphone', 'mobile', 'interface', 'smoke test', 'pizza preference'],
   },
 ]);
-
-function sanitizeSessionSlug(value = '') {
-  return lower(value).replace(/[^a-z0-9_-]/g, '').slice(0, 128);
-}
 
 function kvKeySafePart(value = '') {
   const text = safeString(value);

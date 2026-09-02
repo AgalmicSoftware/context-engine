@@ -6,6 +6,7 @@ import {
   stableFingerprint,
   kvKeySafePart,
   envFlagEnabled,
+  sanitizeSessionSlug,
 } from './runtimePrimitives.mjs';
 import {
   DOC_VISIBILITY,
@@ -310,10 +311,6 @@ function miniResultsLevelState(exposure = {}) {
       ? 'available'
       : (definition.key === 'anonymized_groups' ? 'admin_can_enable' : 'admin_disabled'),
   }));
-}
-
-function sanitizeSessionSlug(value = '') {
-  return lower(value).replace(/[^a-z0-9_-]/g, '').slice(0, 128);
 }
 
 function miniAppQuestionPageSize(env = {}) {

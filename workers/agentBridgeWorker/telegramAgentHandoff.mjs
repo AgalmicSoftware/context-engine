@@ -5,6 +5,7 @@ import {
   stableJson,
   stableFingerprint,
   kvKeySafePart,
+  sanitizeSessionSlug,
 } from './runtimePrimitives.mjs';
 import { AGENT_BRIDGE_EVENT_TYPES, TELEGRAM_BRIDGE_ACTIONS, TELEGRAM_CHAT_LANES } from './constants.mjs';
 import {
@@ -204,12 +205,6 @@ function normalizeBoolean(value, fallback = false) {
   if (['true', '1', 'yes', 'y', 'on'].includes(normalized)) return true;
   if (['false', '0', 'no', 'n', 'off'].includes(normalized)) return false;
   return fallback;
-}
-
-function sanitizeSessionSlug(value = '') {
-  return lower(value)
-    .replace(/[^a-z0-9_-]/g, '')
-    .slice(0, 128);
 }
 
 function toCanonicalAgentApiPathname(pathname = '') {

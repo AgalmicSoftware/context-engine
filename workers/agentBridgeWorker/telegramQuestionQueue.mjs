@@ -5,6 +5,7 @@ import {
   stableJson,
   stableFingerprint,
   kvKeySafePart,
+  sanitizeSessionSlug,
 } from './runtimePrimitives.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 
@@ -14,10 +15,6 @@ export const TELEGRAM_QUESTION_QUEUE_STATE_KV_PREFIX = 'telegram:question-queue-
 const MAX_SPONSORED_QUESTIONS = 50;
 const MAX_SERVED_QUESTION_IDS = 250;
 const MAX_HISTORY = 50;
-
-function sanitizeSessionSlug(value = '') {
-  return lower(value).replace(/[^a-z0-9_-]/g, '').slice(0, 128);
-}
 
 function normalizeBoolean(value, fallback = false) {
   if (value === undefined || value === null || value === '') return fallback;

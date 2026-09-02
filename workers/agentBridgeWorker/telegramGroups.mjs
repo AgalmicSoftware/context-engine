@@ -4,6 +4,7 @@ import {
   safeJsonParse,
   stableJson,
   stableFingerprint,
+  sanitizeSessionSlug,
 } from './runtimePrimitives.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 import { buildTelegramAgentActivityMetadata } from './telegramAgentActivity.mjs';
@@ -100,10 +101,6 @@ export const DEFAULT_TELEGRAM_GROUP_CATEGORIES = Object.freeze([
     ],
   },
 ]);
-
-function sanitizeSessionSlug(value = '') {
-  return lower(value).replace(/[^a-z0-9_-]/g, '').slice(0, 128);
-}
 
 function sanitizeGroupId(value = '', fallback = '') {
   const normalized = lower(value)

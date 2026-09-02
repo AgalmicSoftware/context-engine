@@ -5,6 +5,9 @@ import {
   stableFingerprint,
   envFlagEnabled,
   envFlagDisabled,
+  nowIso,
+  safeEnvJsonParse as safeJsonParse,
+  sanitizeSessionSlug,
 } from './runtimePrimitives.mjs';
 import {
   AGENT_BRIDGE_EVENT_TYPES,
@@ -279,30 +282,6 @@ function base64ToBytes(value = '') {
   return out;
 }
 
-function nowIso(now = null) {
-  if (now instanceof Date) return now.toISOString();
-  if (safeString(now)) return new Date(now).toISOString();
-  return new Date().toISOString();
-}
-
-function safeJsonParse(value, fallback = null) {
-  const text = safeString(value);
-  if (!text) return fallback;
-  try {
-    return JSON.parse(text);
-  } catch {
-    const maybeDotenvEscaped = text.includes('\\"') ? text.replace(/\\"/g, '"').replace(/\\\\/g, '\\') : '';
-    if (maybeDotenvEscaped && maybeDotenvEscaped !== text) {
-      try {
-        return JSON.parse(maybeDotenvEscaped);
-      } catch {
-        return fallback;
-      }
-    }
-    return fallback;
-  }
-}
-
 export function bridgeOpenAiApiKey(env = {}) {
   return safeString(
     env.AGENT_BRIDGE_OPENAI_API_KEY ||
@@ -319,10 +298,6 @@ export function withBridgeOpenAiApiKey(payload = {}, env = {}) {
 
 function normalizeBotUsername(value = '') {
   return lower(value).replace(/^@/, '');
-}
-
-function sanitizeSessionSlug(value = '') {
-  return lower(value).replace(/[^a-z0-9_-]/g, '').slice(0, 128);
 }
 
 function sessionLabel(session = {}) {

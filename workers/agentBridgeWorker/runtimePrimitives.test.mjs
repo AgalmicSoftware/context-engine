@@ -5,7 +5,11 @@ import {
   envFlagEnabled,
   kvKeySafePart,
   lower,
+  nowIso,
+  nowIsoOrCurrent,
+  safeEnvJsonParse,
   safeJsonParse,
+  sanitizeSessionSlug,
   safeString,
   stableFingerprint,
   stableJson,
@@ -17,6 +21,8 @@ test('runtime string primitives preserve legacy falsy coercion', () => {
   assert.equal(safeString(false), '');
   assert.equal(safeString(null), '');
   assert.equal(lower('  YES  '), 'yes');
+  assert.equal(sanitizeSessionSlug('  Mixed.Session / Name_2  '), 'mixedsessionname_2');
+  assert.equal(sanitizeSessionSlug(`A${'b'.repeat(160)}`).length, 128);
 });
 
 test('safeJsonParse returns parsed values or the supplied fallback', () => {
@@ -25,6 +31,15 @@ test('safeJsonParse returns parsed values or the supplied fallback', () => {
   assert.equal(safeJsonParse('0', fallback), 0);
   assert.equal(safeJsonParse('', fallback), fallback);
   assert.equal(safeJsonParse('{broken', fallback), fallback);
+});
+
+test('environment JSON and timestamp helpers preserve established parsing behavior', () => {
+  const fallback = { fallback: true };
+  assert.deepEqual(safeEnvJsonParse('{\\"ok\\":true}', fallback), { ok: true });
+  assert.equal(safeEnvJsonParse('{broken', fallback), fallback);
+  assert.equal(nowIso('2026-09-02T12:00:00Z'), '2026-09-02T12:00:00.000Z');
+  assert.throws(() => nowIso('not-a-date'), RangeError);
+  assert.match(nowIsoOrCurrent('not-a-date'), /^\d{4}-\d{2}-\d{2}T/);
 });
 
 test('stable JSON and fingerprints remain independent of object key order', () => {

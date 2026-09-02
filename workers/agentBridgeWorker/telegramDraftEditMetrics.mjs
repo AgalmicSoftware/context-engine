@@ -1,4 +1,9 @@
-import { stableJson, stableFingerprint } from './runtimePrimitives.mjs';
+import {
+  safeJsonParse,
+  stableJson,
+  stableFingerprint,
+  sanitizeSessionSlug,
+} from './runtimePrimitives.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 
 export const DRAFT_EDIT_METRIC_KV_PREFIX = 'telegram:draft-edit-metric:v1:';
@@ -10,20 +15,6 @@ function safeString(value) {
 
 function lower(value) {
   return safeString(value).toLowerCase();
-}
-
-function safeJsonParse(value, fallback = null) {
-  const text = safeString(value);
-  if (!text) return fallback;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return fallback;
-  }
-}
-
-function sanitizeSessionSlug(value = '') {
-  return lower(value).replace(/[^a-z0-9_-]/g, '').slice(0, 128);
 }
 
 function questionIdSeedPart(value = '') {

@@ -1,4 +1,4 @@
-import { safeString, safeJsonParse } from './runtimePrimitives.mjs';
+import { safeString, safeJsonParse, nowIso } from './runtimePrimitives.mjs';
 import { AGENT_BRIDGE_WORKER_VERSION } from './constants.mjs';
 import { createOpaqueAgentPrincipalId, normalizeAgentPrincipal } from './agentPrincipal.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
@@ -71,10 +71,6 @@ function normalizeHttpsOrigin(value = '') {
   } catch {
     return '';
   }
-}
-
-function nowIso() {
-  return new Date().toISOString();
 }
 
 function createdAtMs(value = '') {
