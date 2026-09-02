@@ -1,3 +1,4 @@
+import { safeString, safeJsonParse } from './runtimePrimitives.mjs';
 import { AGENT_BRIDGE_WORKER_VERSION } from './constants.mjs';
 import { createOpaqueAgentPrincipalId, normalizeAgentPrincipal } from './agentPrincipal.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
@@ -56,10 +57,6 @@ export const TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_SCOPES = AGENT_CREDENTIAL_D
 
 const textEncoder = new TextEncoder();
 
-function safeString(value) {
-  return String(value || '').trim();
-}
-
 function normalizeSessionId(value = '') {
   const normalized = safeString(value).toLowerCase().replace(/^0x/, '').replace(/-/g, '');
   return /^[0-9a-f]{32}$/.test(normalized) && !/^0+$/.test(normalized) ? `0x${normalized}` : '';
@@ -78,16 +75,6 @@ function normalizeHttpsOrigin(value = '') {
 
 function nowIso() {
   return new Date().toISOString();
-}
-
-function safeJsonParse(value, fallback = null) {
-  const text = safeString(value);
-  if (!text) return fallback;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return fallback;
-  }
 }
 
 function createdAtMs(value = '') {

@@ -1,3 +1,4 @@
+import { safeString } from './runtimePrimitives.mjs';
 import { RISK_CEILINGS, RISK_RANK, TELEGRAM_BRIDGE_ACTIONS } from './constants.mjs';
 
 const SESSION_SLUG_RE = /^[a-z0-9_-]{1,128}$/i;
@@ -11,10 +12,6 @@ const FULL_CE_ACCOUNT_SBT_JOIN_MODES = new Set([
   'non-public',
   'private',
 ]);
-
-function safeString(value) {
-  return String(value || '').trim();
-}
 
 function normalizeCanonicalSessionId(value) {
   const normalized = safeString(value).toLowerCase().replace(/^0x/, '').replace(/-/g, '');

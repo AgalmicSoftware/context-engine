@@ -1,4 +1,12 @@
 import {
+  safeString,
+  lower,
+  safeJsonParse,
+  stableJson,
+  stableFingerprint,
+  kvKeySafePart,
+} from './runtimePrimitives.mjs';
+import {
   DOC_VISIBILITY,
   RISK_CEILINGS,
   SESSION_STORAGE_PROFILES,
@@ -201,10 +209,6 @@ const RESULT_VIEW_LEVELS = Object.freeze([
   },
 ]);
 
-function safeString(value) {
-  return String(value || '').trim();
-}
-
 function normalizeMiniAppLoadingVisual(value = MINI_APP_LOADING_VISUAL_GIF) {
   const normalized = lower(value);
   if (['spinner', 'css', 'loader'].includes(normalized)) return MINI_APP_LOADING_VISUAL_SPINNER;
@@ -254,20 +258,6 @@ function firstAnswerChoice(...values) {
     if (text) return text;
   }
   return '';
-}
-
-function safeJsonParse(value, fallback = null) {
-  const text = safeString(value);
-  if (!text) return fallback;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return fallback;
-  }
-}
-
-function lower(value) {
-  return safeString(value).toLowerCase();
 }
 
 function normalizePositiveInteger(value, fallback) {
@@ -605,33 +595,6 @@ async function buildMiniAppAdminState({
 function questionIdSeedPart(value = '') {
   const text = safeString(value);
   return BYTES32_RE.test(text) ? `${text.slice(2, 10)}${text.slice(-6)}` : text;
-}
-
-function kvKeySafePart(value = '') {
-  const text = safeString(value);
-  if (!text) return '';
-  const safe = text.replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 56);
-  return `${safe || 'ref'}_${stableFingerprint(text)}`;
-}
-
-function stableJson(value) {
-  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
-  if (value && typeof value === 'object') {
-    return `{${Object.keys(value).sort().map((key) => (
-      `${JSON.stringify(key)}:${stableJson(value[key])}`
-    )).join(',')}}`;
-  }
-  return JSON.stringify(value ?? null);
-}
-
-function stableFingerprint(value = {}) {
-  const input = stableJson(value);
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < input.length; index += 1) {
-    hash ^= input.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0).toString(36).padStart(10, '0');
 }
 
 function json(data, init = {}) {

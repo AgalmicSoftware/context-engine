@@ -1,4 +1,12 @@
 import {
+  safeString,
+  lower,
+  stableJson,
+  stableFingerprint,
+  envFlagEnabled,
+  envFlagDisabled,
+} from './runtimePrimitives.mjs';
+import {
   AGENT_BRIDGE_EVENT_TYPES,
   RISK_CEILINGS,
   TELEGRAM_BRIDGE_ACTIONS,
@@ -244,10 +252,6 @@ const LEGACY_COMMAND_ALIASES = Object.freeze({
   '/ce_activity': COMMANDS.ACTIVITY,
 });
 
-function safeString(value) {
-  return String(value || '').trim();
-}
-
 function safeAnswerString(value) {
   if (value === undefined || value === null) return '';
   return String(value).trim();
@@ -255,10 +259,6 @@ function safeAnswerString(value) {
 
 function firstAnswerValue(...values) {
   return values.find((value) => safeAnswerString(value) !== '');
-}
-
-function lower(value) {
-  return safeString(value).toLowerCase();
 }
 
 function bytesToBase64(bytes = new Uint8Array()) {
@@ -346,26 +346,6 @@ function shortQuestionId(value = '') {
 function questionIdSeedPart(value = '') {
   const text = safeString(value);
   return /^0x[0-9a-fA-F]{64}$/.test(text) ? `${text.slice(2, 10)}${text.slice(-6)}` : text;
-}
-
-function stableJson(value) {
-  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
-  if (value && typeof value === 'object') {
-    return `{${Object.keys(value).sort().map((key) => (
-      `${JSON.stringify(key)}:${stableJson(value[key])}`
-    )).join(',')}}`;
-  }
-  return JSON.stringify(value ?? null);
-}
-
-function stableFingerprint(value = {}) {
-  const input = stableJson(value);
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < input.length; index += 1) {
-    hash ^= input.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0).toString(36).padStart(10, '0');
 }
 
 function shortAddress(value = '') {
@@ -917,14 +897,6 @@ async function withTelegramProposedQuestions(env = {}, sessionSlug = '', result 
     questionCount: questions.length,
     proposedQuestionCount: proposed.length,
   };
-}
-
-function envFlagEnabled(value = '') {
-  return ['1', 'true', 'yes', 'on'].includes(lower(value));
-}
-
-function envFlagDisabled(value = '') {
-  return ['0', 'false', 'no', 'off'].includes(lower(value));
 }
 
 function questionSourceMode(env = {}) {

@@ -1,3 +1,4 @@
+import { stableJson, stableFingerprint } from './runtimePrimitives.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 
 export const DRAFT_EDIT_METRIC_KV_PREFIX = 'telegram:draft-edit-metric:v1:';
@@ -28,26 +29,6 @@ function sanitizeSessionSlug(value = '') {
 function questionIdSeedPart(value = '') {
   const text = safeString(value);
   return /^0x[0-9a-fA-F]{64}$/.test(text) ? `${text.slice(2, 10)}${text.slice(-6)}` : text;
-}
-
-function stableJson(value) {
-  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
-  if (value && typeof value === 'object') {
-    return `{${Object.keys(value).sort().map((key) => (
-      `${JSON.stringify(key)}:${stableJson(value[key])}`
-    )).join(',')}}`;
-  }
-  return JSON.stringify(value ?? null);
-}
-
-function stableFingerprint(value = {}) {
-  const input = stableJson(value);
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < input.length; index += 1) {
-    hash ^= input.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0).toString(36).padStart(10, '0');
 }
 
 function firstValue(...values) {

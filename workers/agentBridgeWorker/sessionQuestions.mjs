@@ -1,3 +1,4 @@
+import { safeString, lower, envFlagEnabled } from './runtimePrimitives.mjs';
 import { resolveRegistryRpcUrls, resolveSessionRegistryAddress } from './registrySessions.mjs';
 import { deriveManagedDemoAccount } from './managedAccounts.mjs';
 import {
@@ -37,14 +38,6 @@ const SESSION_CREATED_TOPIC0 = '0xda4a316a58925980f9d609158916dd8a071a29c9118777
 const ZERO_BYTES32 = `0x${'00'.repeat(32)}`;
 const BYTES32_RE = /^0x[0-9a-fA-F]{64}$/;
 
-function safeString(value) {
-  return String(value || '').trim();
-}
-
-function lower(value) {
-  return safeString(value).toLowerCase();
-}
-
 function normalizeChainId(value = '') {
   return safeString(value || DEFAULT_CHAIN_ID) || DEFAULT_CHAIN_ID;
 }
@@ -60,10 +53,6 @@ function normalizeBlock(value) {
   const raw = Number(value);
   if (!Number.isFinite(raw) || raw < 0) return null;
   return Math.floor(raw);
-}
-
-function envFlagEnabled(value = '') {
-  return ['1', 'true', 'yes', 'on'].includes(lower(value));
 }
 
 function normalizeStorageBackend(value = '') {

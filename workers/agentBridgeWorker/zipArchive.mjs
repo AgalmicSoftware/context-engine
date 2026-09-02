@@ -1,8 +1,6 @@
-const textEncoder = new TextEncoder();
+import { safeString } from './runtimePrimitives.mjs';
 
-function safeString(value) {
-  return String(value || '').trim();
-}
+const textEncoder = new TextEncoder();
 
 function concat(parts = []) {
   const out = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));

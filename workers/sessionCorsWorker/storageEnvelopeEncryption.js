@@ -170,9 +170,7 @@ const unwrapSessionKeyBytes = async ({ env, config, slug, deps = {} }) => {
   for (const previous of attempts) {
     if (previous && !trim(readDeploymentSecret({ env, previous, deps }))) continue;
     try {
-      // eslint-disable-next-line no-await-in-loop
       const deploymentKey = await importDeploymentKek({ env, previous, deps });
-      // eslint-disable-next-line no-await-in-loop
       return await unwrapBytesWithKey({ wrappingKey: deploymentKey, wrapped: record, aad, deps });
     } catch (error) {
       lastError = error;

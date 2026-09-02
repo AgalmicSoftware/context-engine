@@ -1,3 +1,4 @@
+import { safeString, lower, safeJsonParse } from './runtimePrimitives.mjs';
 import { buildOpaqueActionId } from './opaqueActions.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 import { buildTelegramAgentActivityMetadata } from './telegramAgentActivity.mjs';
@@ -52,28 +53,10 @@ const TAG_RULES = Object.freeze([
   ['funding', /\b(fund|funding|invest|investor|budget|grant|money|capital)\b/i],
 ]);
 
-function safeString(value) {
-  return String(value || '').trim();
-}
-
-function lower(value) {
-  return safeString(value).toLowerCase();
-}
-
 function nowIso(now = null) {
   if (now instanceof Date) return now.toISOString();
   if (safeString(now)) return new Date(now).toISOString();
   return new Date().toISOString();
-}
-
-function safeJsonParse(value, fallback = null) {
-  const text = safeString(value);
-  if (!text) return fallback;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return fallback;
-  }
 }
 
 function sanitizeSessionSlug(value = '') {

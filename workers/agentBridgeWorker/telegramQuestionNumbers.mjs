@@ -1,10 +1,7 @@
+import { safeString, safeJsonParse } from './runtimePrimitives.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 
 export const TELEGRAM_QUESTION_NUMBER_KV_PREFIX = 'telegram:question-number:';
-
-function safeString(value) {
-  return String(value || '').trim();
-}
 
 function sanitizeSessionSlug(value = '') {
   return safeString(value).toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 128);
@@ -21,16 +18,6 @@ function nowIso(now = null) {
     if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
   }
   return new Date().toISOString();
-}
-
-function safeJsonParse(value, fallback = null) {
-  const text = safeString(value);
-  if (!text) return fallback;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return fallback;
-  }
 }
 
 function questionId(question = {}) {

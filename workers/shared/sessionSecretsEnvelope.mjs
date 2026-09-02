@@ -210,9 +210,7 @@ export const decryptSessionSecretsEnvelope = async (
     if (!toTrimmedString(secret)) continue;
     attempted = true;
     try {
-      // eslint-disable-next-line no-await-in-loop
       const key = await importKek(secret, ['decrypt'], deps);
-      // eslint-disable-next-line no-await-in-loop
       const plaintext = await getCryptoImpl(deps).subtle.decrypt(
         {
           name: AES_GCM,

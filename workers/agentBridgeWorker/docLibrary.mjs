@@ -1,3 +1,4 @@
+import { safeString } from './runtimePrimitives.mjs';
 import {
   AGENT_BRIDGE_WORKER_VERSION,
   DOC_VISIBILITY,
@@ -11,10 +12,6 @@ import { assertNoSecretShape, sanitizeForGroup } from './redaction.mjs';
 
 const VISIBILITY_SET = new Set(Object.values(DOC_VISIBILITY));
 const TYPE_SET = new Set(SUPPORTED_DOC_TYPES);
-
-function safeString(value) {
-  return String(value || '').trim();
-}
 
 function normalizeSessionStorageProfile(value = SESSION_STORAGE_PROFILES.ARWEAVE) {
   return safeString(value).toLowerCase() === SESSION_STORAGE_PROFILES.CLOUDFLARE

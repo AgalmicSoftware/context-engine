@@ -1,14 +1,4 @@
-function safeString(value) {
-  return String(value || '').trim();
-}
-
-function lower(value) {
-  return safeString(value).toLowerCase();
-}
-
-function envFlagDisabled(value = '') {
-  return ['0', 'false', 'no', 'off'].includes(lower(value));
-}
+import { safeString, lower, envFlagDisabled } from './runtimePrimitives.mjs';
 
 function normalizeGroupIdSet(...values) {
   const out = new Set();

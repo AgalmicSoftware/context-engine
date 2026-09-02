@@ -1,3 +1,4 @@
+import { safeString } from './runtimePrimitives.mjs';
 import { listCachedSessionQuestionsForBridge } from './sessionQuestions.mjs';
 import { listTelegramProposedQuestionsForSession } from './telegramQuestionProposals.mjs';
 
@@ -5,10 +6,6 @@ export const WRAPPED_QUESTION_SOURCE_MODES = Object.freeze({
   CANONICAL_SESSION: 'canonical_session',
   AGENT_ONLY_PROPOSALS: 'agent_only_proposals',
 });
-
-function safeString(value) {
-  return String(value || '').trim();
-}
 
 function normalizedMode(value = '') {
   const mode = safeString(value).toLowerCase().replace(/[\s-]+/g, '_');

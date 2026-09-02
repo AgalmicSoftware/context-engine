@@ -1,3 +1,4 @@
+import { safeString, lower } from './runtimePrimitives.mjs';
 import { RISK_CEILINGS } from './constants.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 import { listRegistrySessionsForBridge } from './registrySessions.mjs';
@@ -11,14 +12,6 @@ export const RESULTS_EXPOSURE_TOGGLE_FIELDS = Object.freeze({
   aggregate_results: 'aggregateResultsEnabled',
   anonymized_groups: 'anonymizedGroupsEnabled',
 });
-
-function safeString(value) {
-  return String(value || '').trim();
-}
-
-function lower(value) {
-  return safeString(value).toLowerCase();
-}
 
 function nowIso(now = null) {
   if (now instanceof Date) return now.toISOString();

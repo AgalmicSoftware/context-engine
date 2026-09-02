@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { safeString, envFlagEnabled } from './runtimePrimitives.mjs';
 
 import { existsSync, readFileSync } from 'fs';
 import { createRequire } from 'module';
@@ -23,7 +24,6 @@ const DEFAULT_ENV_FILE = resolve(WORKER_DIR, '.dev.vars');
 const DEFAULT_ENTRYPOINT = 'worker.js';
 const SCRIPT_CONTENT_TYPE = 'application/javascript+module';
 const DEFAULT_TELEGRAM_BOT_NAME = 'Context Engine';
-const TRUE_STRINGS = new Set(['1', 'true', 'yes', 'on']);
 const require = createRequire(import.meta.url);
 const TELEGRAM_BOT_COMMANDS = Object.freeze([
   { command: 'start', description: 'Open the Context Engine bot' },
@@ -35,14 +35,6 @@ const TELEGRAM_BOT_COMMANDS = Object.freeze([
   { command: 'me', description: 'View account / get agent token' },
   { command: 'account', description: 'View your account' },
 ]);
-
-function safeString(value) {
-  return String(value || '').trim();
-}
-
-function envFlagEnabled(value = '') {
-  return TRUE_STRINGS.has(safeString(value).toLowerCase());
-}
 
 function hasTemplatePlaceholder(value = '') {
   return /<[^>]+>/.test(safeString(value));

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { safeString, envFlagEnabled } from './runtimePrimitives.mjs';
 
 import { fileURLToPath } from 'url';
 import { resolve } from 'path';
@@ -92,10 +93,6 @@ export const OPTIONAL_AGENT_BRIDGE_VAR_NAMES = Object.freeze([
   'AGENT_BRIDGE_SESSION_REGISTRY_ADDRESS',
 ]);
 
-function safeString(value) {
-  return String(value || '').trim();
-}
-
 function normalizeWorkerName(value = '') {
   const normalized = safeString(value || DEFAULT_WORKER_NAME)
     .toLowerCase()
@@ -115,10 +112,6 @@ function normalizeWorkersSubdomain(value = '') {
 
 function tokenPresent(value = '') {
   return safeString(value).length > 0;
-}
-
-function envFlagEnabled(value = '') {
-  return ['1', 'true', 'yes', 'on'].includes(safeString(value).toLowerCase());
 }
 
 function redactPresence(value = '') {

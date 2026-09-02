@@ -481,7 +481,6 @@ const evaluateSbtOnchainCondition = async ({ condition, config, requesterAddress
   }
   const mode = normalizeGateMode(condition.anyOrAll || condition.mode || condition.match);
   for (const rpcUrl of rpcUrls) {
-    // eslint-disable-next-line no-await-in-loop
     const ok = await deps.checkSbtGate({
       sbtAddresses,
       address,
@@ -543,7 +542,6 @@ const evaluateWorkerGroupCondition = async ({
   if (!groupIds.length) return { ok: false, reason: 'missing_worker_group', condition: { kind: 'worker_group' } };
   let firstFailure = null;
   for (const groupId of groupIds) {
-    // eslint-disable-next-line no-await-in-loop
     const result = await checkWorkerGroupMembership({
       env,
       slug,
@@ -621,7 +619,6 @@ const evaluateAccessConditionDocument = async ({
   const matched = [];
   let firstFailure = null;
   for (const condition of conditions) {
-    // eslint-disable-next-line no-await-in-loop
     const result = await evaluateAccessCondition({
       condition,
       env,
@@ -678,7 +675,6 @@ const authorizeWorkerGroupAccess = async ({
   }
   let firstFailure = null;
   for (const groupId of groupIds) {
-    // eslint-disable-next-line no-await-in-loop
     const result = await checkWorkerGroupMembership({
       env,
       slug,
@@ -894,7 +890,6 @@ const authorizeCloudflareStorageAccess = async ({
     };
   }
   for (const rpcUrl of rpcUrls) {
-    // eslint-disable-next-line no-await-in-loop
     const ok = await deps.checkSbtGate({
       sbtAddresses: gate.sbtAddresses,
       address,
@@ -988,7 +983,6 @@ const enforceCloudflareUploadPolicy = async ({ env, config, slug, payload, reque
       };
     }
     for (const rpcUrl of rpcUrls) {
-      // eslint-disable-next-line no-await-in-loop
       const ok = await deps.checkSbtGate({
         sbtAddresses: policy.sbtAddresses,
         address,
@@ -1563,7 +1557,6 @@ const listCloudflareMetadataRows = async ({ index, slug, resource = '' }) => {
     : buildSessionIndexPrefix({ slug });
   let cursor = '';
   do {
-    // eslint-disable-next-line no-await-in-loop
     const listed = await index.list({
       prefix,
       ...(cursor ? { cursor } : {}),
@@ -1573,7 +1566,6 @@ const listCloudflareMetadataRows = async ({ index, slug, resource = '' }) => {
       const key = trim(keyEntry?.name || keyEntry);
       if (!key || typeof index.get !== 'function') continue;
       try {
-        // eslint-disable-next-line no-await-in-loop
         const raw = await index.get(key);
         const metadata = typeof raw === 'string' ? JSON.parse(raw) : raw;
         if (isObj(metadata) && trim(metadata.id)) rows.push({ key, metadata });
@@ -1669,7 +1661,6 @@ export const exportCloudflareEncryptedPayloadEnvelopes = async ({
     if (metadataAccess.encryption === PAYLOAD_ENCRYPTION_MODES.NONE) continue;
     encryptedPayloadCount += 1;
     try {
-      // eslint-disable-next-line no-await-in-loop
       const ciphertextBytes = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata: row.metadata });
       if (!ciphertextBytes) {
         readErrors.push({ id: trim(row.metadata.id), error: 'payload_bytes_missing' });

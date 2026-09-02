@@ -1,3 +1,4 @@
+import { safeString, envFlagEnabled } from './runtimePrimitives.mjs';
 import {
   AGENT_BRIDGE_WORKER_VERSION,
   AGENT_SESSION_WRAPPED_PROTOCOL_VERSION,
@@ -28,14 +29,6 @@ function html(text, init = {}) {
       ...(init.headers || {}),
     },
   });
-}
-
-function safeString(value) {
-  return String(value || '').trim();
-}
-
-function envFlagEnabled(value = '') {
-  return ['1', 'true', 'yes', 'on'].includes(safeString(value).toLowerCase());
 }
 
 function telegramPreviewEnabled(env = {}) {

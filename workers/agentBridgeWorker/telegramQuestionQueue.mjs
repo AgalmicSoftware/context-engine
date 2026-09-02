@@ -1,3 +1,11 @@
+import {
+  safeString,
+  lower,
+  safeJsonParse,
+  stableJson,
+  stableFingerprint,
+  kvKeySafePart,
+} from './runtimePrimitives.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 
 export const TELEGRAM_QUESTION_QUEUE_CONFIG_KV_PREFIX = 'telegram:question-queue-config:v1:';
@@ -7,53 +15,8 @@ const MAX_SPONSORED_QUESTIONS = 50;
 const MAX_SERVED_QUESTION_IDS = 250;
 const MAX_HISTORY = 50;
 
-function safeString(value) {
-  return String(value || '').trim();
-}
-
-function lower(value) {
-  return safeString(value).toLowerCase();
-}
-
 function sanitizeSessionSlug(value = '') {
   return lower(value).replace(/[^a-z0-9_-]/g, '').slice(0, 128);
-}
-
-function safeJsonParse(value, fallback = null) {
-  const text = safeString(value);
-  if (!text) return fallback;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return fallback;
-  }
-}
-
-function stableJson(value) {
-  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
-  if (value && typeof value === 'object') {
-    return `{${Object.keys(value).sort().map((key) => (
-      `${JSON.stringify(key)}:${stableJson(value[key])}`
-    )).join(',')}}`;
-  }
-  return JSON.stringify(value ?? null);
-}
-
-function stableFingerprint(value = {}) {
-  const input = stableJson(value);
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < input.length; index += 1) {
-    hash ^= input.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0).toString(36).padStart(10, '0');
-}
-
-function kvKeySafePart(value = '') {
-  const text = safeString(value);
-  if (!text) return '';
-  const safe = text.replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 56);
-  return `${safe || 'ref'}_${stableFingerprint(text)}`;
 }
 
 function normalizeBoolean(value, fallback = false) {

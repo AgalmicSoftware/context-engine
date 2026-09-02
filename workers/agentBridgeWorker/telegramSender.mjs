@@ -1,9 +1,7 @@
+import { safeString } from './runtimePrimitives.mjs';
+
 const TELEGRAM_API_BASE_URL = 'https://api.telegram.org';
 const DEFAULT_TELEGRAM_API_TIMEOUT_MS = 8000;
-
-function safeString(value) {
-  return String(value || '').trim();
-}
 
 function redactTelegramErrorText(value = '', botToken = '') {
   const token = safeString(botToken);
