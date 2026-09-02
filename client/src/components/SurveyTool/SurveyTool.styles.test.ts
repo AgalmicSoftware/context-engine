@@ -102,6 +102,15 @@ describe('SurveyTool styles', () => {
     );
   });
 
+  it('switches pile questions without animating the card stack', () => {
+    const scss = normalizeScssContract(readSurveyToolScss());
+    const pileCardBlock = scss.match(/\.pileCard\s*{[^}]*}/)?.[0] || '';
+
+    expect(pileCardBlock).toContain('transition: none;');
+    expect(pileCardBlock).not.toContain('will-change:');
+    expect(pileCardBlock).not.toMatch(/transition:\s*(?:transform|opacity)/);
+  });
+
   it('renders classic full-question utility icons as one quiet borderless family', () => {
     const scss = readSurveyToolScss();
 
