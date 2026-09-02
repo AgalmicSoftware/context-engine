@@ -105,10 +105,9 @@ Session Worker source trees.
 
 The Worker source keeps runtime wiring explicit so route logic can be tested without Cloudflare bindings or live secrets:
 
-- `worker.js` creates the runtime through `createWorkerTopLevelRuntimeWithWorkerDeps`.
-- `workerTopLevelBinding.js` supplies the static ABI/default/error bundle and resolves the runtime dependency record before invoking runtime-input assembly.
+- `worker.js` owns the static ABI/default/error bundle, resolves the runtime dependency record, and directly assembles the low-level and route runtimes.
 - `workerRuntimeDepResolution.js` resolves imported helpers and worker-local primitives into one canonical dependency record.
-- `workerRuntimeInputBinding.js` splits that record into low-level helpers and route runtime input.
+- `workerLowLevelHelperBinding.js` assembles the low-level RPC, contract, hashing, and outbound-request helpers.
 - `workerRouteRuntimeBinding.js` assembles named route groups: registry/login bootstrap, rate-limit/faucet support, anonymous registry access, auth/CORS/admin adapters, execution services, and the route shell.
 
 The route-shell bundle is intentionally still a large boundary object because it is where authenticated, anonymous, admin, AI, Arweave, storage, fetch, and faucet routes meet. Keep behavior changes inside the smaller route/execution modules when possible, and update the binding tests when the boundary adds or removes a dependency.
@@ -1221,11 +1220,10 @@ Arweave retain their existing roles for decentralized sessions.
 The worker decomposes session handling into ~80 narrow authority/normalization
 modules under `workers/sessionCorsWorker/`. Key boundary files:
 
-- `workerTopLevelBinding.js` — static ABI/default/error bundle
+- `worker.js` — static ABI/default/error bundle and direct runtime assembly
 - `workerRuntimeDepResolution.js` — imported helper wiring
-- `workerRuntimeInputBinding.js` — runtime-input orchestration
-- `workerLowLevelHelperInputResolution.js` — low-level helper bundle shaping
-- `workerRouteRuntimeInputResolution.js` — route-runtime bundle shaping
+- `workerLowLevelHelperBinding.js` — low-level helper assembly
+- `workerRouteRuntimeBinding.js` — route-runtime assembly
 - `authLoginRequestAuthority.js` — /auth/login authority chain
 - `adminRequestAuthority.js` — /admin/* authorization chain
 - `loginGateAuthority.js` — on-chain gate/scope evaluation
@@ -1400,36 +1398,17 @@ modules under `workers/sessionCorsWorker/`. Key boundary files:
   registry/faucet RPC, ethers interface/provider/gate, group-proof hashing,
   and RPC/contract probe composition that feeds the extracted route-runtime
   boundary.
-- Shared top-level worker runtime-input binding now routes through
-  `workers/sessionCorsWorker/workerRuntimeInputBinding.js`, preserving the
-  worker-local `console.log`, `Date.now`, `fetch`, `globalThis.fetch`, and
-  `ethers.Wallet` handoff plus the remaining low-level-helper assembly (now
-  delegated to the extracted low-level-helper input resolution helper) and
-  exported `workerAuthGateUtils` / `fetch` contract while delegating the
-  deeper route-runtime bundle shaping to the extracted helper.
-- Shared worker low-level-helper input resolution now routes through
-  `workers/sessionCorsWorker/workerLowLevelHelperInputResolution.js`,
-  preserving the low-level-helper `deps` / `constants` / `defaults` bundle
-  shaping before the binding hands it to `workerLowLevelHelperBinding.js`.
-- Shared worker route-runtime input resolution now routes through
-  `workers/sessionCorsWorker/workerRouteRuntimeInputResolution.js`,
-  preserving the large low-level-helper-aware route-runtime
-  `deps` / `constants` / `defaults` bundle before the binding hands it to
-  `workerRouteRuntimeBinding.js`.
-- Worker runtime dependency resolution now happens directly in
-  `workers/sessionCorsWorker/workerTopLevelBinding.js`; the former one-caller
-  runtime-deps binding was removed while preserving the runtime-input contract.
+- Top-level runtime assembly now happens directly in
+  `workers/sessionCorsWorker/worker.js`. It resolves the canonical dependency
+  record, passes explicit `deps` / `constants` / `defaults` bundles to the
+  low-level and route-runtime bindings, and exposes the final
+  `workerAuthGateUtils` / `fetch` contract without one-caller input or
+  top-level binding modules.
 - Shared worker runtime dep resolution now routes through
   `workers/sessionCorsWorker/workerRuntimeDepResolution.js`, preserving the
   imported normalization, auth, token, config, Arweave, faucet, and route
   dispatch helper fallback bundle plus missing-slug / slug-mismatch
   constant fallback shaping before runtime-input assembly.
-- Shared top-level worker runtime binding now routes through
-  `workers/sessionCorsWorker/workerTopLevelBinding.js`, preserving the
-  static ABI/default/error bundle plus final worker-global `ethers` / `URL`
-  / `Headers` / `console.log` / `fetch` / `globalThis.fetch` / `Date.now`
-  handoff into the extracted runtime-deps boundary before `worker.js`
-  exposes the final `workerAuthGateUtils` and `fetch` entry contract.
 - Anonymous route-entry setup now routes through
   `workers/sessionCorsWorker/anonymousRouteEntry.js`, preserving anonymous
   slug resolution, missing-slug selection, session-config lookup, CORS
