@@ -1,9 +1,8 @@
 import * as defaultSessionRegistry from '../../../utilities/web3/sessionRegistry.js';
 import {
-  bindSessionRegistryReadsPort,
+  sessionRegistryReadsPort,
   type SessionRegistryCacheTarget,
   type SessionRegistryEntry,
-  type SessionRegistryReadModule,
   type SessionRegistryReadsPort,
   type SessionRegistryRecord,
   type SessionRegistryStore,
@@ -27,16 +26,6 @@ export type AdminSessionRegistryWriteResult = AdminSessionRegistryRecord & {
 export type AdminSessionRegistryCacheTarget = SessionRegistryCacheTarget;
 export type AdminSessionRegistryStore = SessionRegistryStore;
 
-export type AdminSessionRegistryModule = SessionRegistryReadModule & {
-  setSessionFieldsOnChain: (input?: AdminSessionRegistryRecord) => Promise<AdminSessionRegistryWriteResult>;
-  setResourceGatesOnChain: (input?: AdminSessionRegistryRecord) => Promise<AdminSessionRegistryWriteResult>;
-  uploadSessionMetadata: (
-    metadata: AdminSessionRegistryRecord,
-    opts?: AdminSessionRegistryRecord,
-  ) => Promise<AdminSessionRegistryWriteResult>;
-  updateSessionMetadataOnChain: (input?: AdminSessionRegistryRecord) => Promise<AdminSessionRegistryWriteResult>;
-};
-
 export type AdminRegistrySessionFieldsInput = {
   onChainFields?: AdminSessionRegistryRecord;
   sponsoredFields?: AdminSessionRegistryRecord;
@@ -59,29 +48,13 @@ export type AdminSessionRegistryPorts = {
   writes: SessionRegistryAdminWritesPort;
 };
 
-export type BindAdminSessionRegistryPortsArgs = {
-  sessionRegistry: () => AdminSessionRegistryModule;
+export const adminSessionRegistryPorts: AdminSessionRegistryPorts = {
+  reads: sessionRegistryReadsPort,
+  writes: {
+    buildRegistrySessionFields: (input) => buildSessionWizardRegistrySessionFields(input),
+    setSessionFieldsOnChain: (input) => defaultSessionRegistry.setSessionFieldsOnChain(input),
+    setResourceGatesOnChain: (input) => defaultSessionRegistry.setResourceGatesOnChain(input),
+    uploadSessionMetadata: (metadata, opts) => defaultSessionRegistry.uploadSessionMetadata(metadata, opts),
+    updateSessionMetadataOnChain: (input) => defaultSessionRegistry.updateSessionMetadataOnChain(input),
+  },
 };
-
-export const bindAdminSessionRegistryPorts = ({
-  sessionRegistry: readSessionRegistry,
-}: BindAdminSessionRegistryPortsArgs): AdminSessionRegistryPorts => {
-  const reads = bindSessionRegistryReadsPort({
-    sessionRegistry: readSessionRegistry,
-  });
-
-  return {
-    reads,
-    writes: {
-      buildRegistrySessionFields: (input) => buildSessionWizardRegistrySessionFields(input),
-      setSessionFieldsOnChain: (input) => readSessionRegistry().setSessionFieldsOnChain(input),
-      setResourceGatesOnChain: (input) => readSessionRegistry().setResourceGatesOnChain(input),
-      uploadSessionMetadata: (metadata, opts) => readSessionRegistry().uploadSessionMetadata(metadata, opts),
-      updateSessionMetadataOnChain: (input) => readSessionRegistry().updateSessionMetadataOnChain(input),
-    },
-  };
-};
-
-export const adminSessionRegistryPorts = bindAdminSessionRegistryPorts({
-  sessionRegistry: () => defaultSessionRegistry as AdminSessionRegistryModule,
-});

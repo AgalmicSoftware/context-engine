@@ -1,55 +1,33 @@
-import {
-  bindSurveyResponseStoragePort,
-  surveyResponseStoragePort,
-  type SurveyResponseStorageArweaveUrlModule,
-  type SurveyResponseStorageNoLeakModule,
-  type SurveyResponseStorageRefModule,
-} from './surveyResponseStoragePort';
+import * as noLeakPayloads from '../../utilities/arweave/noLeakPayloads.js';
+import * as arweaveUrls from '../../utilities/arweave/arweaveUrls.js';
+import * as storageRefs from '../../utilities/storage/storageRefs.js';
+import { surveyResponseStoragePort } from './surveyResponseStoragePort';
 
 const txId = 'abcdefghijklmnopqrstuvwxyz1234567890ABCDEFG';
 
 describe('survey response storage port', () => {
-  it('routes sanitizer and Arweave helpers through call-time module lookup', () => {
-    const firstNoLeakPayloads: SurveyResponseStorageNoLeakModule = {
-      sanitizeQuestionPromptForResponsePayload: jest.fn(() => 'first-prompt'),
-      sanitizeSurveyTitleForResponsePayload: jest.fn(() => 'first-title'),
-    };
-    const secondNoLeakPayloads: SurveyResponseStorageNoLeakModule = {
-      sanitizeQuestionPromptForResponsePayload: jest.fn(() => 'second-prompt'),
-      sanitizeSurveyTitleForResponsePayload: jest.fn(() => 'second-title'),
-    };
-    const firstArweaveUrls: SurveyResponseStorageArweaveUrlModule = {
-      normalizeArweaveUrl: jest.fn(() => 'first-href'),
-    };
-    const secondArweaveUrls: SurveyResponseStorageArweaveUrlModule = {
-      normalizeArweaveUrl: jest.fn(() => 'second-href'),
-    };
-    const firstStorageRefs: SurveyResponseStorageRefModule = {
-      getLegacyArweaveTxId: jest.fn(() => 'first-tx'),
-    };
-    const secondStorageRefs: SurveyResponseStorageRefModule = {
-      getLegacyArweaveTxId: jest.fn(() => 'second-tx'),
-    };
-    let currentNoLeakPayloads = firstNoLeakPayloads;
-    let currentArweaveUrls = firstArweaveUrls;
-    let currentStorageRefs = firstStorageRefs;
-    const port = bindSurveyResponseStoragePort({
-      noLeakPayloads: () => currentNoLeakPayloads,
-      arweaveUrls: () => currentArweaveUrls,
-      storageRefs: () => currentStorageRefs,
-    });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
-    expect(port.sanitizeQuestionPromptForResponsePayload({ prompt: 'first' })).toBe('first-prompt');
-    expect(port.sanitizeSurveyTitleForResponsePayload({ title: 'first' })).toBe('first-title');
+  it('routes sanitizer and Arweave helpers through call-time module property lookup', () => {
+    const sanitizeQuestionPromptForResponsePayload = jest
+      .spyOn(noLeakPayloads, 'sanitizeQuestionPromptForResponsePayload')
+      .mockReturnValue('first-prompt');
+    const sanitizeSurveyTitleForResponsePayload = jest
+      .spyOn(noLeakPayloads, 'sanitizeSurveyTitleForResponsePayload')
+      .mockReturnValue('first-title');
+    const normalizeArweaveUrl = jest.spyOn(arweaveUrls, 'normalizeArweaveUrl').mockReturnValue('second-href');
+    const getLegacyArweaveTxId = jest.spyOn(storageRefs, 'getLegacyArweaveTxId').mockReturnValue('second-tx');
 
-    currentNoLeakPayloads = secondNoLeakPayloads;
-    currentArweaveUrls = secondArweaveUrls;
-    currentStorageRefs = secondStorageRefs;
-
-    expect(port.getLegacyArweaveTxId({ arweaveTxId: 'second-tx' })).toBe('second-tx');
-    expect(port.normalizeArweaveUrl('second-tx', { contextLabel: 'survey_tool_question_link' })).toBe('second-href');
+    expect(surveyResponseStoragePort.sanitizeQuestionPromptForResponsePayload({ prompt: 'first' })).toBe('first-prompt');
+    expect(surveyResponseStoragePort.sanitizeSurveyTitleForResponsePayload({ title: 'first' })).toBe('first-title');
+    expect(surveyResponseStoragePort.getLegacyArweaveTxId({ arweaveTxId: 'second-tx' })).toBe('second-tx');
     expect(
-      port.buildQuestionArweaveHref(
+      surveyResponseStoragePort.normalizeArweaveUrl('second-tx', { contextLabel: 'survey_tool_question_link' }),
+    ).toBe('second-href');
+    expect(
+      surveyResponseStoragePort.buildQuestionArweaveHref(
         { arweaveTxId: 'second-tx' },
         {
           contextLabel: 'survey_tool_question_link',
@@ -57,16 +35,16 @@ describe('survey response storage port', () => {
       ),
     ).toBe('second-href');
 
-    expect(firstNoLeakPayloads.sanitizeQuestionPromptForResponsePayload).toHaveBeenCalledWith(
+    expect(sanitizeQuestionPromptForResponsePayload).toHaveBeenCalledWith(
       { prompt: 'first' },
       undefined,
     );
-    expect(firstNoLeakPayloads.sanitizeSurveyTitleForResponsePayload).toHaveBeenCalledWith(
+    expect(sanitizeSurveyTitleForResponsePayload).toHaveBeenCalledWith(
       { title: 'first' },
       undefined,
     );
-    expect(secondStorageRefs.getLegacyArweaveTxId).toHaveBeenCalledWith({ arweaveTxId: 'second-tx' });
-    expect(secondArweaveUrls.normalizeArweaveUrl).toHaveBeenCalledWith('second-tx', {
+    expect(getLegacyArweaveTxId).toHaveBeenCalledWith({ arweaveTxId: 'second-tx' });
+    expect(normalizeArweaveUrl).toHaveBeenCalledWith('second-tx', {
       contextLabel: 'survey_tool_question_link',
     });
   });

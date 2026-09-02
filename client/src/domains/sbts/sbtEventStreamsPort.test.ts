@@ -1,31 +1,26 @@
-import { bindSbtEventStreamsPort } from './sbtEventStreamsPort';
+import chainGateway from '../../utilities/web3/chainGateway.js';
+import { sbtEventStreamsPort } from './sbtEventStreamsPort';
 
 describe('SbtEventStreamsPort', () => {
-  it('routes listener cleanup through call-time chainGateway lookup', () => {
-    const firstChainGateway = {
-      removeSBTEventListener: jest.fn(() => 'first-sbt'),
-      removeSurveyEventsListener: jest.fn(() => 'first-survey'),
-      removeSBTInstanceEventsListener: jest.fn(() => 'first-instance'),
-    };
-    const secondChainGateway = {
-      removeSBTEventListener: jest.fn(() => 'second-sbt'),
-      removeSurveyEventsListener: jest.fn(() => 'second-survey'),
-      removeSBTInstanceEventsListener: jest.fn(() => 'second-instance'),
-    };
-    let currentChainGateway = firstChainGateway;
-    const port = bindSbtEventStreamsPort({
-      chainGateway: () => currentChainGateway,
-    });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
-    expect(port.removeSBTEventListener('none', 'alpha')).toBe('first-sbt');
+  it('routes listener cleanup through call-time chainGateway property lookup', () => {
+    const removeSBTEventListener = jest.spyOn(chainGateway, 'removeSBTEventListener').mockReturnValue('first-sbt');
+    const removeSurveyEventsListener = jest
+      .spyOn(chainGateway, 'removeSurveyEventsListener')
+      .mockReturnValue('second-survey');
+    const removeSBTInstanceEventsListener = jest
+      .spyOn(chainGateway, 'removeSBTInstanceEventsListener')
+      .mockReturnValue('second-instance');
 
-    currentChainGateway = secondChainGateway;
+    expect(sbtEventStreamsPort.removeSBTEventListener('none', 'alpha')).toBe('first-sbt');
+    expect(sbtEventStreamsPort.removeSurveyEventsListener('none', 'beta')).toBe('second-survey');
+    expect(sbtEventStreamsPort.removeSBTInstanceEventsListener('none', [], 'gamma')).toBe('second-instance');
 
-    expect(port.removeSurveyEventsListener('none', 'beta')).toBe('second-survey');
-    expect(port.removeSBTInstanceEventsListener('none', [], 'gamma')).toBe('second-instance');
-
-    expect(firstChainGateway.removeSBTEventListener).toHaveBeenCalledWith('none', 'alpha');
-    expect(secondChainGateway.removeSurveyEventsListener).toHaveBeenCalledWith('none', 'beta');
-    expect(secondChainGateway.removeSBTInstanceEventsListener).toHaveBeenCalledWith('none', [], 'gamma');
+    expect(removeSBTEventListener).toHaveBeenCalledWith('none', 'alpha');
+    expect(removeSurveyEventsListener).toHaveBeenCalledWith('none', 'beta');
+    expect(removeSBTInstanceEventsListener).toHaveBeenCalledWith('none', [], 'gamma');
   });
 });

@@ -40,33 +40,23 @@ export type SurveyQuestionReadsGateway = {
 
 export type SurveyQuestionReadsPort = SurveyQuestionReadsGateway;
 
-export type BindSurveyQuestionReadsPortArgs = {
-  chainGateway: () => SurveyQuestionReadsGateway;
-};
-
-export const bindSurveyQuestionReadsPort = ({
-  chainGateway: readChainGateway,
-}: BindSurveyQuestionReadsPortArgs): SurveyQuestionReadsPort => ({
+export const surveyQuestionReadsPort: SurveyQuestionReadsPort = {
   getQuestionData: (provider, questionId, groupKeyOrCfg, options) =>
     options === undefined
-      ? readChainGateway().getQuestionData(provider, questionId, groupKeyOrCfg)
-      : readChainGateway().getQuestionData(provider, questionId, groupKeyOrCfg, options),
+      ? chainGateway.getQuestionData(provider, questionId, groupKeyOrCfg)
+      : chainGateway.getQuestionData(provider, questionId, groupKeyOrCfg, options),
   getSurveyDataById: (provider, surveyId, groupKeyOrCfg, options) =>
     options === undefined
-      ? readChainGateway().getSurveyDataById(provider, surveyId, groupKeyOrCfg)
-      : readChainGateway().getSurveyDataById(provider, surveyId, groupKeyOrCfg, options),
+      ? chainGateway.getSurveyDataById(provider, surveyId, groupKeyOrCfg)
+      : chainGateway.getSurveyDataById(provider, surveyId, groupKeyOrCfg, options),
   getResponse: (provider, responderAddress, questionId, groupKeyOrCfg, options) =>
     options === undefined
-      ? readChainGateway().getResponse(provider, responderAddress, questionId, groupKeyOrCfg)
-      : readChainGateway().getResponse(provider, responderAddress, questionId, groupKeyOrCfg, options),
+      ? chainGateway.getResponse(provider, responderAddress, questionId, groupKeyOrCfg)
+      : chainGateway.getResponse(provider, responderAddress, questionId, groupKeyOrCfg, options),
   getResponseHash: (provider, responderAddress, questionId, groupKeyOrCfg) =>
-    readChainGateway().getResponseHash(provider, responderAddress, questionId, groupKeyOrCfg),
+    chainGateway.getResponseHash(provider, responderAddress, questionId, groupKeyOrCfg),
   getSurveyResponse: (provider, responderAddress, surveyId, groupKeyOrCfg, options) =>
     options === undefined
-      ? readChainGateway().getSurveyResponse(provider, responderAddress, surveyId, groupKeyOrCfg)
-      : readChainGateway().getSurveyResponse(provider, responderAddress, surveyId, groupKeyOrCfg, options),
-});
-
-export const surveyQuestionReadsPort = bindSurveyQuestionReadsPort({
-  chainGateway: () => chainGateway as SurveyQuestionReadsGateway,
-});
+      ? chainGateway.getSurveyResponse(provider, responderAddress, surveyId, groupKeyOrCfg)
+      : chainGateway.getSurveyResponse(provider, responderAddress, surveyId, groupKeyOrCfg, options),
+};

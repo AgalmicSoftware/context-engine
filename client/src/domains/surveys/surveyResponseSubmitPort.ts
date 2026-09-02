@@ -13,15 +13,9 @@ export type SurveyResponseSubmitGateway = {
 
 export type SurveyResponseSubmitPort = SurveyResponseSubmitGateway;
 
-export type BindSurveyResponseSubmitPortArgs = {
-  chainGateway: () => SurveyResponseSubmitGateway;
-};
-
-export const bindSurveyResponseSubmitPort = ({
-  chainGateway: readChainGateway,
-}: BindSurveyResponseSubmitPortArgs): SurveyResponseSubmitPort => ({
+export const surveyResponseSubmitPort: SurveyResponseSubmitPort = {
   submitResponses: (provider, questionIds, questionResponses, surveyId, surveyResponse, submissionGroupKey) =>
-    readChainGateway().submitResponses(
+    chainGateway.submitResponses(
       provider,
       questionIds,
       questionResponses,
@@ -29,8 +23,4 @@ export const bindSurveyResponseSubmitPort = ({
       surveyResponse,
       submissionGroupKey,
     ),
-});
-
-export const surveyResponseSubmitPort = bindSurveyResponseSubmitPort({
-  chainGateway: () => chainGateway as SurveyResponseSubmitGateway,
-});
+};

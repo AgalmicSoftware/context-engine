@@ -1,9 +1,9 @@
-import * as sessionResultsExport from '../../utilities/sessionResultsExport';
+import * as sessionResultsExport from '../../utilities/sessionResultsExport/sessionResultsAnalysisArtifacts';
 import type {
   SessionResultsAnalysisParticipant,
   SessionResultsAnalysisSectionKey,
   SessionResultsGeneratedAnalysisArtifact,
-} from '../../utilities/sessionResultsExport';
+} from '../../utilities/sessionResultsExport/sessionResultsAnalysisArtifacts';
 
 export type SurveyResultsAnalysisArtifactNormalizeArgs = {
   generatedAt?: unknown;
@@ -19,15 +19,6 @@ export type SurveyResultsAnalysisArtifactMergeArgs = {
   sections?: readonly SessionResultsAnalysisSectionKey[];
 };
 
-export type SurveyResultsAnalysisArtifactMergeRuntime = {
-  mergeGeneratedSessionResultsAnalysisArtifacts: (
-    args?: SurveyResultsAnalysisArtifactMergeArgs,
-  ) => SessionResultsGeneratedAnalysisArtifact | null;
-  normalizeGeneratedSessionResultsAnalysisArtifact: (
-    args?: SurveyResultsAnalysisArtifactNormalizeArgs,
-  ) => SessionResultsGeneratedAnalysisArtifact;
-};
-
 export type SurveyResultsAnalysisArtifactMergePort = {
   mergeGeneratedArtifacts: (
     args?: SurveyResultsAnalysisArtifactMergeArgs,
@@ -37,23 +28,13 @@ export type SurveyResultsAnalysisArtifactMergePort = {
   ) => SessionResultsGeneratedAnalysisArtifact;
 };
 
-export type BindSurveyResultsAnalysisArtifactMergePortArgs = {
-  runtime: () => SurveyResultsAnalysisArtifactMergeRuntime;
-};
-
-export const bindSurveyResultsAnalysisArtifactMergePort = ({
-  runtime: readRuntime,
-}: BindSurveyResultsAnalysisArtifactMergePortArgs): SurveyResultsAnalysisArtifactMergePort => ({
+export const surveyResultsAnalysisArtifactMergePort: SurveyResultsAnalysisArtifactMergePort = {
   mergeGeneratedArtifacts: (args) =>
     args === undefined
-      ? readRuntime().mergeGeneratedSessionResultsAnalysisArtifacts()
-      : readRuntime().mergeGeneratedSessionResultsAnalysisArtifacts(args),
+      ? sessionResultsExport.mergeGeneratedSessionResultsAnalysisArtifacts()
+      : sessionResultsExport.mergeGeneratedSessionResultsAnalysisArtifacts(args),
   normalizeGeneratedArtifact: (args) =>
     args === undefined
-      ? readRuntime().normalizeGeneratedSessionResultsAnalysisArtifact()
-      : readRuntime().normalizeGeneratedSessionResultsAnalysisArtifact(args),
-});
-
-export const surveyResultsAnalysisArtifactMergePort = bindSurveyResultsAnalysisArtifactMergePort({
-  runtime: () => sessionResultsExport,
-});
+      ? sessionResultsExport.normalizeGeneratedSessionResultsAnalysisArtifact()
+      : sessionResultsExport.normalizeGeneratedSessionResultsAnalysisArtifact(args),
+};

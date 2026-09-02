@@ -1,45 +1,43 @@
-import { bindSurveyQuestionReadsPort, type SurveyQuestionReadsGateway } from './surveyQuestionReadsPort';
+import chainGateway from '../../utilities/web3/chainGateway.js';
+import { surveyQuestionReadsPort } from './surveyQuestionReadsPort';
 
 describe('surveyQuestionReadsPort', () => {
-  it('routes question and response reads through call-time chain gateway lookup', async () => {
-    const firstGateway: SurveyQuestionReadsGateway = {
-      getQuestionData: jest.fn(async () => ({ id: 'first-question' })),
-      getSurveyDataById: jest.fn(async () => ({ id: 'first-survey' })),
-      getResponse: jest.fn(async () => ({ id: 'first-response' })),
-      getResponseHash: jest.fn(async () => 'first-hash'),
-      getSurveyResponse: jest.fn(async () => ({ id: 'first-survey-response' })),
-    };
-    const secondGateway: SurveyQuestionReadsGateway = {
-      getQuestionData: jest.fn(async () => ({ id: 'second-question' })),
-      getSurveyDataById: jest.fn(async () => ({ id: 'second-survey' })),
-      getResponse: jest.fn(async () => ({ id: 'second-response' })),
-      getResponseHash: jest.fn(async () => 'second-hash'),
-      getSurveyResponse: jest.fn(async () => ({ id: 'second-survey-response' })),
-    };
-    let currentGateway = firstGateway;
-    const port = bindSurveyQuestionReadsPort({
-      chainGateway: () => currentGateway,
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('routes question and response reads through call-time chain gateway property lookup', async () => {
+    const getQuestionData = jest.spyOn(chainGateway, 'getQuestionData').mockResolvedValue({ id: 'first-question' });
+    const getSurveyDataById = jest.spyOn(chainGateway, 'getSurveyDataById').mockResolvedValue({ id: 'first-survey' });
+    const getResponse = jest.spyOn(chainGateway, 'getResponse').mockResolvedValue({ id: 'second-response' });
+    const getResponseHash = jest.spyOn(chainGateway, 'getResponseHash').mockResolvedValue('second-hash');
+    const getSurveyResponse = jest
+      .spyOn(chainGateway, 'getSurveyResponse')
+      .mockResolvedValue({ id: 'second-survey-response' });
+
+    await expect(surveyQuestionReadsPort.getQuestionData('provider-a', 'q1', 'slug-a')).resolves.toEqual({
+      id: 'first-question',
+    });
+    await expect(surveyQuestionReadsPort.getSurveyDataById('provider-a', 's1', 'slug-a')).resolves.toEqual({
+      id: 'first-survey',
     });
 
-    await expect(port.getQuestionData('provider-a', 'q1', 'slug-a')).resolves.toEqual({ id: 'first-question' });
-    await expect(port.getSurveyDataById('provider-a', 's1', 'slug-a')).resolves.toEqual({ id: 'first-survey' });
-
-    currentGateway = secondGateway;
-
-    await expect(port.getResponse('provider-b', '0xabc', 'q2', 'slug-b', { forceArweaveFetch: true })).resolves.toEqual(
-      { id: 'second-response' },
+    await expect(
+      surveyQuestionReadsPort.getResponse('provider-b', '0xabc', 'q2', 'slug-b', { forceArweaveFetch: true }),
+    ).resolves.toEqual({ id: 'second-response' });
+    await expect(surveyQuestionReadsPort.getResponseHash('provider-b', '0xabc', 'q2', 'slug-b')).resolves.toBe(
+      'second-hash',
     );
-    await expect(port.getResponseHash('provider-b', '0xabc', 'q2', 'slug-b')).resolves.toBe('second-hash');
-    await expect(port.getSurveyResponse('provider-b', '0xdef', 's2', 'slug-b')).resolves.toEqual({
+    await expect(surveyQuestionReadsPort.getSurveyResponse('provider-b', '0xdef', 's2', 'slug-b')).resolves.toEqual({
       id: 'second-survey-response',
     });
 
-    expect(firstGateway.getQuestionData).toHaveBeenCalledWith('provider-a', 'q1', 'slug-a');
-    expect(firstGateway.getSurveyDataById).toHaveBeenCalledWith('provider-a', 's1', 'slug-a');
-    expect(secondGateway.getResponse).toHaveBeenCalledWith('provider-b', '0xabc', 'q2', 'slug-b', {
+    expect(getQuestionData).toHaveBeenCalledWith('provider-a', 'q1', 'slug-a');
+    expect(getSurveyDataById).toHaveBeenCalledWith('provider-a', 's1', 'slug-a');
+    expect(getResponse).toHaveBeenCalledWith('provider-b', '0xabc', 'q2', 'slug-b', {
       forceArweaveFetch: true,
     });
-    expect(secondGateway.getResponseHash).toHaveBeenCalledWith('provider-b', '0xabc', 'q2', 'slug-b');
-    expect(secondGateway.getSurveyResponse).toHaveBeenCalledWith('provider-b', '0xdef', 's2', 'slug-b');
+    expect(getResponseHash).toHaveBeenCalledWith('provider-b', '0xabc', 'q2', 'slug-b');
+    expect(getSurveyResponse).toHaveBeenCalledWith('provider-b', '0xdef', 's2', 'slug-b');
   });
 });

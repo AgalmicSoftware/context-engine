@@ -1,5 +1,6 @@
 import type { SbtMintExecutionPort, SbtProviderRef } from './sbtPorts.js';
-import { bindSbtMintExecutionPort } from './sbtMintExecutionPort.js';
+import chainGateway from '../../utilities/web3/chainGateway.js';
+import { sbtMintExecutionPort } from './sbtMintExecutionPort.js';
 
 const executeSbtMintFlows = async (
   port: SbtMintExecutionPort,
@@ -23,6 +24,10 @@ const executeSbtMintFlows = async (
 };
 
 describe('SbtMintExecutionPort', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('supports a fake mint execution port with the legacy call shape', async () => {
     const fakePort: SbtMintExecutionPort = {
       claim: jest.fn(async () => ({ transactionHash: '0xpublic' })),
@@ -45,43 +50,43 @@ describe('SbtMintExecutionPort', () => {
     expect(fakePort.mintWithGroupSignature).toHaveBeenCalledWith(providerRef, sbtAddress, '0xgroupSignature');
   });
 
-  it('binds mint execution through a call-time chainGateway getter', async () => {
-    const firstChainGateway = {
-      claim: jest.fn(async () => ({ transactionHash: '0xfirstClaim' })),
-      claimWithInvite: jest.fn(async () => ({ transactionHash: '0xfirstInvite' })),
-      mintWithGroupSignature: jest.fn(async () => ({ transactionHash: '0xfirstGroup' })),
-    };
-    const secondChainGateway = {
-      claim: jest.fn(async () => ({ transactionHash: '0xsecondClaim' })),
-      claimWithInvite: jest.fn(async () => ({ transactionHash: '0xsecondInvite' })),
-      mintWithGroupSignature: jest.fn(async () => ({ transactionHash: '0xsecondGroup' })),
-    };
-    let currentChainGateway = firstChainGateway;
-    const port = bindSbtMintExecutionPort({
-      chainGateway: () => currentChainGateway,
-    });
-
-    await expect(port.claim('injected', '0x0000000000000000000000000000000000000001')).resolves.toEqual({
-      transactionHash: '0xfirstClaim',
-    });
-
-    currentChainGateway = secondChainGateway;
+  it('delegates mint execution through call-time chainGateway property lookup', async () => {
+    const claim = jest.spyOn(chainGateway, 'claim').mockResolvedValue({ transactionHash: '0xfirstClaim' });
+    const claimWithInvite = jest
+      .spyOn(chainGateway, 'claimWithInvite')
+      .mockResolvedValue({ transactionHash: '0xsecondInvite' });
+    const mintWithGroupSignature = jest
+      .spyOn(chainGateway, 'mintWithGroupSignature')
+      .mockResolvedValue({ transactionHash: '0xsecondGroup' });
 
     await expect(
-      port.claimWithInvite('injected', '0x0000000000000000000000000000000000000002', '8', '0xinviteSignature'),
+      sbtMintExecutionPort.claim('injected', '0x0000000000000000000000000000000000000001'),
+    ).resolves.toEqual({ transactionHash: '0xfirstClaim' });
+
+    await expect(
+      sbtMintExecutionPort.claimWithInvite(
+        'injected',
+        '0x0000000000000000000000000000000000000002',
+        '8',
+        '0xinviteSignature',
+      ),
     ).resolves.toEqual({ transactionHash: '0xsecondInvite' });
     await expect(
-      port.mintWithGroupSignature('injected', '0x0000000000000000000000000000000000000002', '0xgroupSignature'),
+      sbtMintExecutionPort.mintWithGroupSignature(
+        'injected',
+        '0x0000000000000000000000000000000000000002',
+        '0xgroupSignature',
+      ),
     ).resolves.toEqual({ transactionHash: '0xsecondGroup' });
 
-    expect(firstChainGateway.claim).toHaveBeenCalledWith('injected', '0x0000000000000000000000000000000000000001');
-    expect(secondChainGateway.claimWithInvite).toHaveBeenCalledWith(
+    expect(claim).toHaveBeenCalledWith('injected', '0x0000000000000000000000000000000000000001');
+    expect(claimWithInvite).toHaveBeenCalledWith(
       'injected',
       '0x0000000000000000000000000000000000000002',
       '8',
       '0xinviteSignature',
     );
-    expect(secondChainGateway.mintWithGroupSignature).toHaveBeenCalledWith(
+    expect(mintWithGroupSignature).toHaveBeenCalledWith(
       'injected',
       '0x0000000000000000000000000000000000000002',
       '0xgroupSignature',

@@ -1,5 +1,6 @@
 import type { SbtGroupMintAuthorizationPort } from './sbtPorts.js';
-import { bindSbtGroupMintAuthorizationPort } from './sbtGroupMintAuthorizationPort.js';
+import chainGateway from '../../utilities/web3/chainGateway.js';
+import { sbtGroupMintAuthorizationPort } from './sbtGroupMintAuthorizationPort.js';
 
 const buildGroupMintArtifacts = async (
   port: SbtGroupMintAuthorizationPort,
@@ -33,6 +34,10 @@ const buildGroupMintArtifacts = async (
 };
 
 describe('SbtGroupMintAuthorizationPort', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('supports a fake authorization port with scoped group mint inputs', async () => {
     const fakePort: SbtGroupMintAuthorizationPort = {
       computeGroupPasswordHash: jest.fn(() => '0xhash'),
@@ -74,29 +79,22 @@ describe('SbtGroupMintAuthorizationPort', () => {
     });
   });
 
-  it('binds group mint authorization through a call-time chainGateway getter', async () => {
-    const firstChainGateway = {
-      computeGroupPasswordHash: jest.fn(() => '0xfirstHash'),
-      signGroupMintAuthorization: jest.fn(async () => '0xfirstSignature'),
-      generateInvitePayloads: jest.fn(async () => [{ nonce: '1', signature: '0xfirstInvite', inviteCode: 'first' }]),
-    };
-    const secondChainGateway = {
-      computeGroupPasswordHash: jest.fn(() => '0xsecondHash'),
-      signGroupMintAuthorization: jest.fn(async () => '0xsecondSignature'),
-      generateInvitePayloads: jest.fn(async () => [{ nonce: '2', signature: '0xsecondInvite', inviteCode: 'second' }]),
-    };
-    let currentChainGateway = firstChainGateway;
-    const port = bindSbtGroupMintAuthorizationPort({
-      chainGateway: () => currentChainGateway,
-    });
+  it('delegates group mint authorization through call-time chainGateway property lookup', async () => {
+    const computeGroupPasswordHash = jest
+      .spyOn(chainGateway, 'computeGroupPasswordHash')
+      .mockReturnValue('0xfirstHash');
+    const signGroupMintAuthorization = jest
+      .spyOn(chainGateway, 'signGroupMintAuthorization')
+      .mockResolvedValue('0xsecondSignature');
+    const generateInvitePayloads = jest.spyOn(chainGateway, 'generateInvitePayloads').mockResolvedValue([
+      { nonce: '2', signature: '0xsecondInvite', inviteCode: 'second' },
+    ]);
     const firstInput = {
       password: 'first password',
       sbtAddress: '0x0000000000000000000000000000000000000001',
     };
 
-    expect(port.computeGroupPasswordHash(firstInput)).toBe('0xfirstHash');
-
-    currentChainGateway = secondChainGateway;
+    expect(sbtGroupMintAuthorizationPort.computeGroupPasswordHash(firstInput)).toBe('0xfirstHash');
 
     const signInput = {
       password: 'second password',
@@ -111,13 +109,13 @@ describe('SbtGroupMintAuthorizationPort', () => {
       walletScopeSbtAddress: '0x0000000000000000000000000000000000000002',
     };
 
-    await expect(port.signGroupMintAuthorization(signInput)).resolves.toBe('0xsecondSignature');
-    await expect(port.generateInvitePayloads(inviteInput)).resolves.toEqual([
+    await expect(sbtGroupMintAuthorizationPort.signGroupMintAuthorization(signInput)).resolves.toBe('0xsecondSignature');
+    await expect(sbtGroupMintAuthorizationPort.generateInvitePayloads(inviteInput)).resolves.toEqual([
       { nonce: '2', signature: '0xsecondInvite', inviteCode: 'second' },
     ]);
 
-    expect(firstChainGateway.computeGroupPasswordHash).toHaveBeenCalledWith(firstInput);
-    expect(secondChainGateway.signGroupMintAuthorization).toHaveBeenCalledWith(signInput);
-    expect(secondChainGateway.generateInvitePayloads).toHaveBeenCalledWith(inviteInput);
+    expect(computeGroupPasswordHash).toHaveBeenCalledWith(firstInput);
+    expect(signGroupMintAuthorization).toHaveBeenCalledWith(signInput);
+    expect(generateInvitePayloads).toHaveBeenCalledWith(inviteInput);
   });
 });

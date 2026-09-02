@@ -1,9 +1,6 @@
 import * as defaultSessionRegistry from '../../../utilities/web3/sessionRegistry.js';
 import * as defaultSessionConfig from '../sessionConfig.js';
-import {
-  bindSessionRegistryPublishAdapter,
-  type SessionRegistryPublishModule,
-} from '../publish/sessionPublishAdapters.js';
+import { sessionRegistryPublishAdapter } from '../publish/sessionPublishAdapters.js';
 
 export type SessionRegistryRecord = Record<string, unknown>;
 export type SessionRegistryRawEntry = [string, unknown];
@@ -18,15 +15,6 @@ export type SessionRegistryStore = {
   getAllSessionEntries: () => SessionRegistryRawEntry[];
   getSessionConfig: (slug: string) => SessionRegistryRecord | null | undefined;
   getSessionConfigById: (sessionId: string | number) => SessionRegistryRecord | null | undefined;
-};
-
-export type SessionRegistryReadModule = SessionRegistryPublishModule & {
-  SESSION_REGISTRY_CACHE_UPDATED_EVENT: string;
-  loadSessionRegistryCache: (input?: SessionRegistryRecord) => Promise<unknown>;
-  loadGroupRegistryCache: (input?: SessionRegistryRecord) => Promise<unknown>;
-  sessionRegistryStore: SessionRegistryStore;
-  fetchSessionFromRegistry: (input?: SessionRegistryRecord) => Promise<SessionRegistryRecord | null | undefined>;
-  upsertSessionRegistryCache: (input?: SessionRegistryRecord) => unknown;
 };
 
 export type SessionRegistryReadsPort = {
@@ -48,71 +36,33 @@ export type SessionRegistryReadsPort = {
   ) => () => void;
 };
 
-export type SessionRegistryConfigModule = {
-  getAllSessionSlugs: (options?: { includeEmpty?: boolean }) => string[];
-  getSessionConfigBySlug: (slug: unknown) => SessionRegistryRecord | null | undefined;
+const resolveCacheUpdateEvent = (): string =>
+  defaultSessionRegistry.SESSION_REGISTRY_CACHE_UPDATED_EVENT ||
+  String(
+    (defaultSessionRegistry.sessionRegistryUtils as SessionRegistryRecord).SESSION_REGISTRY_CACHE_UPDATED_EVENT || '',
+  );
+
+export const sessionRegistryReadsPort: SessionRegistryReadsPort = {
+  loadSessionRegistryCache: (input) => defaultSessionRegistry.loadSessionRegistryCache(input),
+  loadGroupRegistryCache: (input) => defaultSessionRegistry.loadGroupRegistryCache(input),
+  getAllSessionEntries: () => defaultSessionRegistry.sessionRegistryStore.getAllSessionEntries(),
+  getAllSessionSlugs: (options) => defaultSessionConfig.getAllSessionSlugs(options),
+  getSessionConfig: (slug) => defaultSessionRegistry.sessionRegistryStore.getSessionConfig(slug),
+  getSessionConfigBySlug: (slug) => defaultSessionConfig.getSessionConfigBySlug(slug),
+  getSessionConfigById: (sessionId) => defaultSessionRegistry.sessionRegistryStore.getSessionConfigById(sessionId),
+  fetchSessionFromRegistry: (input) =>
+    sessionRegistryPublishAdapter.fetchSessionFromRegistry(input || {}) as Promise<
+      SessionRegistryRecord | null | undefined
+    >,
+  upsertSessionRegistryCache: (input) => sessionRegistryPublishAdapter.upsertSessionRegistryCache(input || {}),
+  normalizeSessionIdHex: (value) => sessionRegistryPublishAdapter.normalizeSessionIdHex(value),
+  formatSessionId: (value) => sessionRegistryPublishAdapter.formatSessionId(value),
+  toRegistrySlug: (value) => sessionRegistryPublishAdapter.toRegistrySlug(value),
+  subscribeToCacheUpdates: (target, listener) => {
+    const eventName = resolveCacheUpdateEvent();
+    target.addEventListener(eventName, listener);
+    return () => {
+      target.removeEventListener(eventName, listener);
+    };
+  },
 };
-
-export type BindSessionRegistryReadsPortArgs = {
-  sessionRegistry: () => SessionRegistryReadModule;
-  sessionConfig?: () => SessionRegistryConfigModule;
-};
-
-const resolveCacheUpdateEvent = (module: SessionRegistryReadModule): string =>
-  module.SESSION_REGISTRY_CACHE_UPDATED_EVENT ||
-  String((module.sessionRegistryUtils as SessionRegistryRecord).SESSION_REGISTRY_CACHE_UPDATED_EVENT || '');
-
-export const bindSessionRegistryReadsPort = ({
-  sessionRegistry: readSessionRegistry,
-  sessionConfig: readSessionConfig,
-}: BindSessionRegistryReadsPortArgs): SessionRegistryReadsPort => {
-  const publishAdapter = bindSessionRegistryPublishAdapter({
-    sessionRegistry: readSessionRegistry,
-  });
-
-  return {
-    loadSessionRegistryCache: (input) => readSessionRegistry().loadSessionRegistryCache(input),
-    loadGroupRegistryCache: (input) => readSessionRegistry().loadGroupRegistryCache(input),
-    getAllSessionEntries: () => readSessionRegistry().sessionRegistryStore.getAllSessionEntries(),
-    getAllSessionSlugs: (options) => {
-      if (readSessionConfig) return readSessionConfig().getAllSessionSlugs(options);
-      const includeEmpty = options?.includeEmpty !== false;
-      return Array.from(
-        new Set(
-          readSessionRegistry()
-            .sessionRegistryStore.getAllSessionEntries()
-            .map(([key, config]) => {
-              const record = config && typeof config === 'object' ? (config as SessionRegistryRecord) : {};
-              const rawSlug = typeof record.slug === 'string' ? record.slug : key;
-              return rawSlug === 'general' ? '' : String(rawSlug || '');
-            })
-            .filter((slug) => includeEmpty || slug !== ''),
-        ),
-      );
-    },
-    getSessionConfig: (slug) => readSessionRegistry().sessionRegistryStore.getSessionConfig(slug),
-    getSessionConfigBySlug: (slug) =>
-      readSessionConfig
-        ? readSessionConfig().getSessionConfigBySlug(slug)
-        : readSessionRegistry().sessionRegistryStore.getSessionConfig(slug),
-    getSessionConfigById: (sessionId) => readSessionRegistry().sessionRegistryStore.getSessionConfigById(sessionId),
-    fetchSessionFromRegistry: (input) =>
-      publishAdapter.fetchSessionFromRegistry(input || {}) as Promise<SessionRegistryRecord | null | undefined>,
-    upsertSessionRegistryCache: (input) => publishAdapter.upsertSessionRegistryCache(input || {}),
-    normalizeSessionIdHex: (value) => publishAdapter.normalizeSessionIdHex(value),
-    formatSessionId: (value) => publishAdapter.formatSessionId(value),
-    toRegistrySlug: (value) => publishAdapter.toRegistrySlug(value),
-    subscribeToCacheUpdates: (target, listener) => {
-      const eventName = resolveCacheUpdateEvent(readSessionRegistry());
-      target.addEventListener(eventName, listener);
-      return () => {
-        target.removeEventListener(eventName, listener);
-      };
-    },
-  };
-};
-
-export const sessionRegistryReadsPort = bindSessionRegistryReadsPort({
-  sessionRegistry: () => defaultSessionRegistry as SessionRegistryReadModule,
-  sessionConfig: () => defaultSessionConfig as SessionRegistryConfigModule,
-});

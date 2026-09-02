@@ -11,15 +11,6 @@ export type ChainReadProvider = {
 
 export type ChainProviderRef = string | undefined;
 
-type ChainScanReadsChainGateway = {
-  getLatestBlockNumber: (providerName: ChainProviderRef, groupKeyOrCfg?: unknown) => Promise<number>;
-  getRelevantBlockWindowForFilter: (
-    groupKeyOrCfg?: unknown,
-    options?: Record<string, unknown>,
-  ) => Promise<ChainBlockWindow>;
-  getReadProviderForSession?: (sessionSlug: string) => ChainReadProvider | null | undefined;
-};
-
 export type ChainScanReadsPort = {
   getLatestBlockNumber: (providerName: ChainProviderRef, groupKeyOrCfg?: unknown) => Promise<number>;
   getRelevantBlockWindowForFilter: (
@@ -29,22 +20,12 @@ export type ChainScanReadsPort = {
   getReadProviderForSession: (sessionSlug: string) => ChainReadProvider | null | undefined;
 };
 
-type BindChainScanReadsPortArgs = {
-  chainGateway: () => ChainScanReadsChainGateway;
-};
-
-export const bindChainScanReadsPort = ({
-  chainGateway: readChainGateway,
-}: BindChainScanReadsPortArgs): ChainScanReadsPort => ({
+export const chainScanReadsPort: ChainScanReadsPort = {
   getLatestBlockNumber: (providerName, groupKeyOrCfg) =>
-    readChainGateway().getLatestBlockNumber(providerName, groupKeyOrCfg),
+    chainGateway.getLatestBlockNumber(providerName, groupKeyOrCfg),
   getRelevantBlockWindowForFilter: (groupKeyOrCfg, options) =>
     options === undefined
-      ? readChainGateway().getRelevantBlockWindowForFilter(groupKeyOrCfg)
-      : readChainGateway().getRelevantBlockWindowForFilter(groupKeyOrCfg, options),
-  getReadProviderForSession: (sessionSlug) => readChainGateway().getReadProviderForSession?.(sessionSlug) ?? null,
-});
-
-export const chainScanReadsPort = bindChainScanReadsPort({
-  chainGateway: () => chainGateway,
-});
+      ? chainGateway.getRelevantBlockWindowForFilter(groupKeyOrCfg)
+      : chainGateway.getRelevantBlockWindowForFilter(groupKeyOrCfg, options),
+  getReadProviderForSession: (sessionSlug) => chainGateway.getReadProviderForSession?.(sessionSlug) ?? null,
+};

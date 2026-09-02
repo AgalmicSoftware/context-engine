@@ -1,55 +1,54 @@
+import { arweaveClient } from '../../../utilities/arweave/arweaveClient.js';
+import * as publishUploadAuth from '../../../utilities/arweave/publishUploadAuth.js';
+import * as sponsoredBundles from '../../../utilities/arweave/sponsoredBundles.js';
+import * as sbtFactoryReceipt from '../../../utilities/web3/sbtFactoryReceipt.js';
+import * as sessionRegistry from '../../../utilities/web3/sessionRegistry.js';
+import { sbtMetadataReadsPort } from '../../sbts/sbtMetadataReadsPort.js';
 import {
-  bindArweavePublishAdapter,
-  bindSbtFactoryReceiptPublishAdapter,
-  bindSessionPublishSbtMetadataAdapter,
-  bindSessionRegistryPublishAdapter,
-  bindSponsoredBundlePublishAdapter,
   bindWorkerAuthPublishAdapter,
-  type ArweavePublishScripts,
-  type SessionRegistryPublishModule,
-  type SponsoredBundlePublishModule,
+  arweavePublishAdapter,
+  sbtFactoryReceiptPublishAdapter,
+  sessionRegistryPublishAdapter,
+  sessionPublishSbtMetadataAdapter,
+  sponsoredBundlePublishAdapter,
   type WorkerAuthPublishModule,
 } from './sessionPublishAdapters';
-import type { SbtMetadataReadsPort } from '../../sbts/sbtPorts';
 
 describe('session publish adapters', () => {
-  it('binds Arweave upload calls with argument fidelity and late script lookup', async () => {
-    const firstScripts: ArweavePublishScripts = {
-      uploadDataToArweave: jest.fn(async () => 'first-tx'),
-      buildArweaveGatewayUrl: jest.fn(() => 'https://gateway.example/first'),
-    };
-    const secondScripts: ArweavePublishScripts = {
-      uploadDataToArweave: jest.fn(async () => 'second-tx'),
-      buildArweaveGatewayUrl: jest.fn(() => 'https://gateway.example/second'),
-    };
-    let currentScripts = firstScripts;
-    const resolveUploadOptions = jest.fn(async () => ({
-      forceDirectArweaveUpload: true,
-      arweaveJwk: '{"kty":"RSA"}',
-      workerUrl: '',
-      skipAuth: true,
-      adminAuth: null,
-    }));
-    const adapter = bindArweavePublishAdapter({
-      arweaveClient: () => currentScripts,
-      resolveUploadOptions,
-    });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('routes Arweave upload calls with argument fidelity and late property lookup', async () => {
+    const uploadDataToArweave = jest.spyOn(arweaveClient, 'uploadDataToArweave').mockResolvedValue('first-tx');
+    const buildArweaveGatewayUrl = jest
+      .spyOn(arweaveClient, 'buildArweaveGatewayUrl')
+      .mockReturnValue('https://gateway.example/second');
+    const resolveUploadOptions = jest
+      .spyOn(publishUploadAuth, 'resolvePublishArweaveUploadOptions')
+      .mockResolvedValue({
+        forceDirectArweaveUpload: true,
+        arweaveJwk: '{"kty":"RSA"}',
+        workerUrl: '',
+        skipAuth: true,
+        adminAuth: null,
+      });
     const payload = { slug: 'alpha' };
     const options = { requestId: 'arw_meta_test' };
 
     await expect(
-      adapter.uploadDataToArweave({
+      arweavePublishAdapter.uploadDataToArweave({
         data: payload,
         format: 'json',
         options,
       }),
     ).resolves.toBe('first-tx');
 
-    currentScripts = secondScripts;
-
-    await expect(adapter.buildArweaveGatewayUrl({ txId: 'second-tx' })).toBe('https://gateway.example/second');
+    await expect(arweavePublishAdapter.buildArweaveGatewayUrl({ txId: 'second-tx' })).toBe(
+      'https://gateway.example/second',
+    );
     await expect(
-      adapter.resolveUploadOptions({
+      arweavePublishAdapter.resolveUploadOptions({
         arweaveJwk: '{"kty":"RSA"}',
         workerUrl: 'https://worker.example.test',
         preferDirectArweaveUpload: true,
@@ -60,8 +59,8 @@ describe('session publish adapters', () => {
       }),
     );
 
-    expect(firstScripts.uploadDataToArweave).toHaveBeenCalledWith(payload, 'json', options);
-    expect(secondScripts.buildArweaveGatewayUrl).toHaveBeenCalledWith('second-tx');
+    expect(uploadDataToArweave).toHaveBeenCalledWith(payload, 'json', options);
+    expect(buildArweaveGatewayUrl).toHaveBeenCalledWith('second-tx');
     expect(resolveUploadOptions).toHaveBeenCalledWith(
       expect.objectContaining({
         workerUrl: 'https://worker.example.test',
@@ -71,17 +70,10 @@ describe('session publish adapters', () => {
 
   it('propagates Arweave upload errors', async () => {
     const failure = new Error('upload failed');
-    const adapter = bindArweavePublishAdapter({
-      arweaveClient: () => ({
-        uploadDataToArweave: jest.fn(async () => {
-          throw failure;
-        }),
-        buildArweaveGatewayUrl: jest.fn(() => ''),
-      }),
-    });
+    jest.spyOn(arweaveClient, 'uploadDataToArweave').mockRejectedValue(failure);
 
     await expect(
-      adapter.uploadDataToArweave({
+      arweavePublishAdapter.uploadDataToArweave({
         data: { slug: 'broken' },
         format: 'json',
         options: {},
@@ -89,61 +81,43 @@ describe('session publish adapters', () => {
     ).rejects.toBe(failure);
   });
 
-  it('binds registry calls with call-time module lookup', async () => {
-    const firstRegistry: SessionRegistryPublishModule = {
-      registerSessionOnChain: jest.fn(async () => ({ txs: [{ hash: '0xfirst' }] })),
-      sessionRegistryUtils: {
-        getRegistryContract: jest.fn(() => ({ name: 'first-contract' })),
-        fetchSessionFromRegistry: jest.fn(async () => ({ slug: 'first' })),
-        upsertSessionRegistryCache: jest.fn(),
-        normalizeSlug: jest.fn(() => 'first'),
-        formatSessionId: jest.fn(() => 'first-id'),
-        normalizeSessionIdHex: jest.fn(() => '0xfirst'),
-        toRegistrySlug: jest.fn(() => 'first'),
-      },
-    };
-    const secondRegistry: SessionRegistryPublishModule = {
-      registerSessionOnChain: jest.fn(async () => ({ txs: [{ hash: '0xsecond' }] })),
-      sessionRegistryUtils: {
-        getRegistryContract: jest.fn(() => ({ name: 'second-contract' })),
-        fetchSessionFromRegistry: jest.fn(async () => ({ slug: 'second' })),
-        upsertSessionRegistryCache: jest.fn(),
-        normalizeSlug: jest.fn(() => 'second'),
-        formatSessionId: jest.fn(() => 'second-id'),
-        normalizeSessionIdHex: jest.fn(() => '0xsecond'),
-        toRegistrySlug: jest.fn(() => 'second'),
-      },
-    };
-    let currentRegistry = firstRegistry;
-    const adapter = bindSessionRegistryPublishAdapter({
-      sessionRegistry: () => currentRegistry,
-    });
+  it('routes registry calls with call-time module property lookup', async () => {
+    const registerSessionOnChain = jest
+      .spyOn(sessionRegistry, 'registerSessionOnChain')
+      .mockResolvedValue({ txs: [{ action: 'register-session', hash: '0xfirst' }] });
+    const getRegistryContract = jest
+      .spyOn(sessionRegistry.sessionRegistryUtils, 'getRegistryContract')
+      .mockReturnValue({ name: 'second-contract' } as never);
+    jest
+      .spyOn(sessionRegistry.sessionRegistryUtils, 'fetchSessionFromRegistry')
+      .mockResolvedValue({ slug: 'second' });
+    const upsertSessionRegistryCache = jest
+      .spyOn(sessionRegistry.sessionRegistryUtils, 'upsertSessionRegistryCache')
+      .mockReturnValue(null);
     const registerArgs = { slug: 'alpha', metadataURI: 'ar://metadata' };
 
-    await expect(adapter.registerSession(registerArgs)).resolves.toEqual({
-      txs: [{ hash: '0xfirst' }],
+    await expect(sessionRegistryPublishAdapter.registerSession(registerArgs)).resolves.toEqual({
+      txs: [{ action: 'register-session', hash: '0xfirst' }],
     });
 
-    currentRegistry = secondRegistry;
-
     await expect(
-      adapter.getRegistryContract({
+      sessionRegistryPublishAdapter.getRegistryContract({
         chainId: 11155420,
         providerLike: null,
         options: { bootstrapRpc: true },
       }),
     ).toEqual({ name: 'second-contract' });
     await expect(
-      adapter.refreshRegistryCache({
+      sessionRegistryPublishAdapter.refreshRegistryCache({
         fetchArgs: { chainId: 11155420, slug: 'second' },
       }),
     ).resolves.toEqual({ slug: 'second' });
 
-    expect(firstRegistry.registerSessionOnChain).toHaveBeenCalledWith(registerArgs);
-    expect(secondRegistry.sessionRegistryUtils.getRegistryContract).toHaveBeenCalledWith(11155420, null, {
+    expect(registerSessionOnChain).toHaveBeenCalledWith(registerArgs);
+    expect(getRegistryContract).toHaveBeenCalledWith(11155420, null, {
       bootstrapRpc: true,
     });
-    expect(secondRegistry.sessionRegistryUtils.upsertSessionRegistryCache).toHaveBeenCalledWith({
+    expect(upsertSessionRegistryCache).toHaveBeenCalledWith({
       config: { slug: 'second' },
     });
   });
@@ -169,90 +143,58 @@ describe('session publish adapters', () => {
     expect(workerAuth.buildSignedAdminActionAuth).toHaveBeenCalledWith(actionInput);
   });
 
-  it('binds sponsored bundle and receipt helpers without changing their call shape', () => {
-    const sponsoredBundles: SponsoredBundlePublishModule = {
-      normalizeSparseSponsoredBundlePayload: jest.fn(() => ({ openaiKey: 'key' })),
-      hasSponsoredBundleFields: jest.fn(() => true),
-    };
-    const receiptModule = {
-      resolveSbtAddressFromFactoryReceipt: jest.fn(() => '0x0000000000000000000000000000000000000001'),
-    };
-    const sponsoredAdapter = bindSponsoredBundlePublishAdapter({
-      sponsoredBundles: () => sponsoredBundles,
-    });
-    const receiptAdapter = bindSbtFactoryReceiptPublishAdapter({
-      sbtFactoryReceipt: () => receiptModule,
-    });
+  it('routes sponsored bundle and receipt helpers without changing their call shape', () => {
+    const normalizeSparseSponsoredBundlePayload = jest
+      .spyOn(sponsoredBundles, 'normalizeSparseSponsoredBundlePayload')
+      .mockReturnValue({ openaiKey: 'key' });
+    const hasSponsoredBundleFields = jest.spyOn(sponsoredBundles, 'hasSponsoredBundleFields').mockReturnValue(true);
+    const resolveSbtAddressFromFactoryReceipt = jest
+      .spyOn(sbtFactoryReceipt, 'resolveSbtAddressFromFactoryReceipt')
+      .mockReturnValue('0x0000000000000000000000000000000000000001');
     const rawBundle = { openaiKey: 'key' };
     const receipt = { logs: [] };
 
-    expect(sponsoredAdapter.normalizeSparseSponsoredBundlePayload(rawBundle)).toEqual({ openaiKey: 'key' });
-    expect(sponsoredAdapter.hasSponsoredBundleFields({ openaiKey: 'key' })).toBe(true);
-    expect(receiptAdapter.resolveSbtAddressFromFactoryReceipt({ receipt })).toBe(
+    expect(sponsoredBundlePublishAdapter.normalizeSparseSponsoredBundlePayload(rawBundle)).toEqual({ openaiKey: 'key' });
+    expect(sponsoredBundlePublishAdapter.hasSponsoredBundleFields({ openaiKey: 'key' })).toBe(true);
+    expect(sbtFactoryReceiptPublishAdapter.resolveSbtAddressFromFactoryReceipt({ receipt })).toBe(
       '0x0000000000000000000000000000000000000001',
     );
 
-    expect(sponsoredBundles.normalizeSparseSponsoredBundlePayload).toHaveBeenCalledWith(rawBundle);
-    expect(sponsoredBundles.hasSponsoredBundleFields).toHaveBeenCalledWith({ openaiKey: 'key' });
-    expect(receiptModule.resolveSbtAddressFromFactoryReceipt).toHaveBeenCalledWith(receipt);
+    expect(normalizeSparseSponsoredBundlePayload).toHaveBeenCalledWith(rawBundle);
+    expect(hasSponsoredBundleFields).toHaveBeenCalledWith({ openaiKey: 'key' });
+    expect(resolveSbtAddressFromFactoryReceipt).toHaveBeenCalledWith(receipt);
   });
 
-  it('reuses the SBT metadata port through call-time lookup', async () => {
-    const firstPort: SbtMetadataReadsPort = {
-      getSbtMetadata: jest.fn(async () => ({ name: 'first' })),
-      getMintedTokens: jest.fn(async () => []),
-      getGroupPasswordHash: jest.fn(async () => null),
-      getSbtOnChainConfig: jest.fn(async () => ({
-        maxTokens: null,
-        collectionBurnAuth: null,
-        mintingEndTime: null,
-        hasPasswordMint: null,
-        admin: null,
-        owner: null,
-      })),
-    };
-    const secondPort: SbtMetadataReadsPort = {
-      getSbtMetadata: jest.fn(async () => ({ name: 'second' })),
-      getMintedTokens: jest.fn(async () => []),
-      getGroupPasswordHash: jest.fn(async () => null),
-      getSbtOnChainConfig: jest.fn(async () => ({
-        maxTokens: null,
-        collectionBurnAuth: null,
-        mintingEndTime: null,
-        hasPasswordMint: null,
-        admin: null,
-        owner: null,
-      })),
-    };
-    let currentPort = firstPort;
-    const adapter = bindSessionPublishSbtMetadataAdapter({
-      metadataReadsPort: () => currentPort,
-    });
+  it('reuses the SBT metadata port through call-time property lookup', async () => {
+    const getSbtMetadata = jest
+      .spyOn(sbtMetadataReadsPort, 'getSbtMetadata')
+      .mockResolvedValueOnce({ name: 'first' })
+      .mockResolvedValueOnce({ name: 'second' });
 
     await expect(
-      adapter.getSbtMetadata({
+      sessionPublishSbtMetadataAdapter.getSbtMetadata({
         providerName: 'none',
         sbtAddress: '0x0000000000000000000000000000000000000001',
         groupKeyOrCfg: 'alpha',
       }),
     ).resolves.toEqual({ name: 'first' });
 
-    currentPort = secondPort;
-
     await expect(
-      adapter.getSbtMetadata({
+      sessionPublishSbtMetadataAdapter.getSbtMetadata({
         providerName: { selectedAddress: '0x0000000000000000000000000000000000000002' },
         sbtAddress: '0x0000000000000000000000000000000000000003',
         groupKeyOrCfg: { slug: 'beta' },
       }),
     ).resolves.toEqual({ name: 'second' });
 
-    expect(firstPort.getSbtMetadata).toHaveBeenCalledWith(
+    expect(getSbtMetadata).toHaveBeenNthCalledWith(
+      1,
       'none',
       '0x0000000000000000000000000000000000000001',
       'alpha',
     );
-    expect(secondPort.getSbtMetadata).toHaveBeenCalledWith(
+    expect(getSbtMetadata).toHaveBeenNthCalledWith(
+      2,
       { selectedAddress: '0x0000000000000000000000000000000000000002' },
       '0x0000000000000000000000000000000000000003',
       { slug: 'beta' },

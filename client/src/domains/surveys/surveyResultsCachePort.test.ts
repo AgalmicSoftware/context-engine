@@ -1,75 +1,61 @@
-import {
-  bindSurveyResultsCachePort,
-  type SurveyResultsCacheScriptsModule,
-  type SurveyResultsCacheUpdateHandler,
-} from './surveyResultsCachePort';
-
-const createCacheScripts = (): SurveyResultsCacheScriptsModule => ({
-  listNamespaceEntriesSync: jest.fn(() => []),
-  peekCacheSync: jest.fn(() => null),
-  readCache: jest.fn(async () => null),
-  subscribeCacheUpdates: jest.fn(() => jest.fn()),
-  writeCache: jest.fn(async () => true),
-});
+import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
+import { surveyResultsCachePort, type SurveyResultsCacheUpdateHandler } from './surveyResultsCachePort';
 
 describe('surveyResultsCachePort', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('routes cache reads, writes, lists, and subscriptions with unchanged arguments', async () => {
-    const cacheScripts = createCacheScripts();
     const unsubscribe = jest.fn();
     const updateHandler: SurveyResultsCacheUpdateHandler = jest.fn();
-    (cacheScripts.peekCacheSync as jest.Mock).mockReturnValue({ cached: true });
-    (cacheScripts.readCache as jest.Mock).mockResolvedValue({ asyncCached: true });
-    (cacheScripts.writeCache as jest.Mock).mockResolvedValue('written');
-    (cacheScripts.listNamespaceEntriesSync as jest.Mock).mockReturnValue([
+    const peekCacheSync = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({ cached: true });
+    const readCache = jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({ asyncCached: true });
+    const writeCache = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue('written' as never);
+    const listNamespaceEntriesSync = jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockReturnValue([
+      { namespace: 'surveysCache', slug: 'alpha', value: { survey: true } },
+    ] as never);
+    const subscribeCacheUpdates = jest.spyOn(cacheScripts, 'subscribeCacheUpdates').mockReturnValue(unsubscribe);
+
+    expect(surveyResultsCachePort.peekCacheSync('bookmarksCache', 'edge', { clone: false })).toEqual({ cached: true });
+    await expect(surveyResultsCachePort.readCache('analysisCache', 'edge')).resolves.toEqual({ asyncCached: true });
+    await expect(surveyResultsCachePort.writeCache('filters', 'edge', { bookmarkedFilters: [] })).resolves.toBe(
+      'written',
+    );
+    expect(surveyResultsCachePort.listNamespaceEntriesSync('surveysCache', { cloneValues: false })).toEqual([
       { namespace: 'surveysCache', slug: 'alpha', value: { survey: true } },
     ]);
-    (cacheScripts.subscribeCacheUpdates as jest.Mock).mockReturnValue(unsubscribe);
+    expect(surveyResultsCachePort.subscribeCacheUpdates(updateHandler)).toBe(unsubscribe);
 
-    const port = bindSurveyResultsCachePort({
-      cacheScripts: () => cacheScripts,
-    });
-
-    expect(port.peekCacheSync('bookmarksCache', 'edge', { clone: false })).toEqual({ cached: true });
-    await expect(port.readCache('analysisCache', 'edge')).resolves.toEqual({ asyncCached: true });
-    await expect(port.writeCache('filters', 'edge', { bookmarkedFilters: [] })).resolves.toBe('written');
-    expect(port.listNamespaceEntriesSync('surveysCache', { cloneValues: false })).toEqual([
-      { namespace: 'surveysCache', slug: 'alpha', value: { survey: true } },
-    ]);
-    expect(port.subscribeCacheUpdates(updateHandler)).toBe(unsubscribe);
-
-    expect(cacheScripts.peekCacheSync).toHaveBeenCalledWith('bookmarksCache', 'edge', { clone: false });
-    expect(cacheScripts.readCache).toHaveBeenCalledWith('analysisCache', 'edge');
-    expect(cacheScripts.writeCache).toHaveBeenCalledWith('filters', 'edge', { bookmarkedFilters: [] });
-    expect(cacheScripts.listNamespaceEntriesSync).toHaveBeenCalledWith('surveysCache', { cloneValues: false });
-    expect(cacheScripts.subscribeCacheUpdates).toHaveBeenCalledWith(updateHandler);
+    expect(peekCacheSync).toHaveBeenCalledWith('bookmarksCache', 'edge', { clone: false });
+    expect(readCache).toHaveBeenCalledWith('analysisCache', 'edge');
+    expect(writeCache).toHaveBeenCalledWith('filters', 'edge', { bookmarkedFilters: [] });
+    expect(listNamespaceEntriesSync).toHaveBeenCalledWith('surveysCache', { cloneValues: false });
+    expect(subscribeCacheUpdates).toHaveBeenCalledWith(updateHandler);
   });
 
   it('performs call-time cacheScripts lookup so spies and replacements stay live', async () => {
-    const firstRead = jest.fn(async () => 'first');
-    const secondRead = jest.fn(async () => 'second');
-    const firstWrite = jest.fn(async () => 'old-write');
-    const secondWrite = jest.fn(async () => 'new-write');
-    const cacheScripts = {
-      ...createCacheScripts(),
-      readCache: firstRead,
-      writeCache: firstWrite,
-    };
-    const port = bindSurveyResultsCachePort({
-      cacheScripts: () => cacheScripts,
-    });
+    const readCache = jest
+      .spyOn(cacheScripts, 'readCache')
+      .mockResolvedValueOnce('first')
+      .mockResolvedValueOnce('second');
+    const writeCache = jest
+      .spyOn(cacheScripts, 'writeCache')
+      .mockResolvedValueOnce('old-write' as never)
+      .mockResolvedValueOnce('new-write' as never);
 
-    await expect(port.readCache('questionsCache', 'alpha')).resolves.toBe('first');
-    await expect(port.writeCache('bookmarksCache', 'alpha', { questions: [] })).resolves.toBe('old-write');
+    await expect(surveyResultsCachePort.readCache('questionsCache', 'alpha')).resolves.toBe('first');
+    await expect(surveyResultsCachePort.writeCache('bookmarksCache', 'alpha', { questions: [] })).resolves.toBe(
+      'old-write',
+    );
+    await expect(surveyResultsCachePort.readCache('questionsCache', 'beta')).resolves.toBe('second');
+    await expect(surveyResultsCachePort.writeCache('bookmarksCache', 'beta', { questions: ['q1'] })).resolves.toBe(
+      'new-write',
+    );
 
-    cacheScripts.readCache = secondRead;
-    cacheScripts.writeCache = secondWrite;
-
-    await expect(port.readCache('questionsCache', 'beta')).resolves.toBe('second');
-    await expect(port.writeCache('bookmarksCache', 'beta', { questions: ['q1'] })).resolves.toBe('new-write');
-
-    expect(firstRead).toHaveBeenCalledWith('questionsCache', 'alpha');
-    expect(secondRead).toHaveBeenCalledWith('questionsCache', 'beta');
-    expect(firstWrite).toHaveBeenCalledWith('bookmarksCache', 'alpha', { questions: [] });
-    expect(secondWrite).toHaveBeenCalledWith('bookmarksCache', 'beta', { questions: ['q1'] });
+    expect(readCache).toHaveBeenNthCalledWith(1, 'questionsCache', 'alpha');
+    expect(readCache).toHaveBeenNthCalledWith(2, 'questionsCache', 'beta');
+    expect(writeCache).toHaveBeenNthCalledWith(1, 'bookmarksCache', 'alpha', { questions: [] });
+    expect(writeCache).toHaveBeenNthCalledWith(2, 'bookmarksCache', 'beta', { questions: ['q1'] });
   });
 });
