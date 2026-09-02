@@ -1,8 +1,9 @@
 import { ethers } from 'ethers';
 import rpcDefaults from '../../shared/rpcDefaults.cjs';
-import {
-  createWorkerRuntimeInputWithWorkerDeps,
-} from './workerRuntimeInputBinding.js';
+import { createWorkerLowLevelHelpersWithWorkerDeps } from './workerLowLevelHelperBinding.js';
+import { createWorkerRouteRuntimeWithWorkerDeps } from './workerRouteRuntimeBinding.js';
+import { resolveWorkerLowLevelHelperInput } from './workerLowLevelHelperInputResolution.js';
+import { resolveWorkerRouteRuntimeInput } from './workerRouteRuntimeInputResolution.js';
 import { resolveWorkerRuntimeDeps } from './workerRuntimeDepResolution.js';
 import { resolveOpenAiTranscribeUrl } from './endpointConfig.js';
 
@@ -70,6 +71,7 @@ const ANONYMOUS_GATE_UNAVAILABLE_ERROR = 'Access denied: on-chain gate data unav
 const ANONYMOUS_ROUTE_DENIED_ERROR =
   'Anonymous access denied: AI/transcribe require open default+ai gates or a request apiKey.';
 const ANONYMOUS_SCOPE_DISABLED_ERROR = 'Anonymous access denied: route scope disabled in session config.';
+const ANONYMOUS_UNKNOWN_IDENTITY = 'anon:unknown';
 
 const defaultWorkerOverrides = Object.freeze({
   ethers,
@@ -120,15 +122,38 @@ export const createWorkerRuntime = (env, overrides = {}) => {
     deps: runtimeDeps,
     constants,
   }) || {};
-  const runtime = (deps.createWorkerRuntimeInputWithWorkerDeps || createWorkerRuntimeInputWithWorkerDeps)({
-    deps: resolved.deps,
-    constants: resolved.constants,
-    defaults: {
-      DEFAULT_FAUCET_RPC_URL,
-      DEFAULT_FAUCET_AMOUNT_ETH,
-      DEFAULT_FAUCET_BALANCE_THRESHOLD_ETH,
-    },
-  });
+  const resolvedDeps = { ...resolved.deps, ...overrides };
+  const defaults = {
+    DEFAULT_FAUCET_RPC_URL,
+    DEFAULT_FAUCET_AMOUNT_ETH,
+    DEFAULT_FAUCET_BALANCE_THRESHOLD_ETH,
+  };
+  const workerLowLevelHelpers = (
+    resolvedDeps.createWorkerLowLevelHelpersWithWorkerDeps || createWorkerLowLevelHelpersWithWorkerDeps
+  )(
+    (resolvedDeps.resolveWorkerLowLevelHelperInput || resolveWorkerLowLevelHelperInput)({
+      deps: resolvedDeps,
+      constants: resolved.constants,
+      defaults,
+    }),
+  );
+  const workerRouteRuntime = (
+    resolvedDeps.createWorkerRouteRuntimeWithWorkerDeps || createWorkerRouteRuntimeWithWorkerDeps
+  )(
+    (resolvedDeps.resolveWorkerRouteRuntimeInput || resolveWorkerRouteRuntimeInput)({
+      deps: resolvedDeps,
+      constants: resolved.constants,
+      defaults,
+      workerLowLevelHelpers,
+      anonymousUnknownIdentity: ANONYMOUS_UNKNOWN_IDENTITY,
+    }),
+  );
+  const runtime = {
+    workerLowLevelHelpers,
+    workerRouteRuntime,
+    workerAuthGateUtils: workerRouteRuntime.workerAuthGateUtils,
+    fetch: workerRouteRuntime.fetch,
+  };
 
   return Object.freeze(runtime);
 };

@@ -7,22 +7,26 @@ import {
 } from './endpointConfig.js';
 import { createWorkerRuntime } from './worker.js';
 
-test('createWorkerRuntime returns a frozen runtime contract from the runtime-input binding', () => {
-  const runtime = {
+test('createWorkerRuntime returns a frozen runtime contract from the route runtime', () => {
+  const routeRuntime = {
     workerAuthGateUtils: { id: 'workerAuthGateUtils' },
     fetch: 'fetch',
   };
 
   const result = createWorkerRuntime(undefined, {
-    createWorkerRuntimeInputWithWorkerDeps: () => runtime,
+    createWorkerLowLevelHelpersWithWorkerDeps: () => ({ id: 'low-level' }),
+    createWorkerRouteRuntimeWithWorkerDeps: () => routeRuntime,
   });
 
-  assert.equal(result, runtime);
+  assert.deepEqual(result.workerLowLevelHelpers, { id: 'low-level' });
+  assert.equal(result.workerRouteRuntime, routeRuntime);
+  assert.equal(result.workerAuthGateUtils, routeRuntime.workerAuthGateUtils);
+  assert.equal(result.fetch, routeRuntime.fetch);
   assert.equal(Object.isFrozen(result), true);
 });
 
 test('createWorkerRuntime preserves worker globals and static bundle wiring', () => {
-  const runtime = {
+  const routeRuntime = {
     workerAuthGateUtils: { id: 'workerAuthGateUtils' },
     fetch: 'fetch',
   };
@@ -86,25 +90,40 @@ test('createWorkerRuntime preserves worker globals and static bundle wiring', ()
         constants: { id: 'resolved-constants' },
       };
     },
-    createWorkerRuntimeInputWithWorkerDeps: (value) => {
-      assert.deepEqual(value, {
-        deps: { id: 'resolved-deps' },
+    resolveWorkerLowLevelHelperInput: (value) => {
+      assert.equal(value.deps.id, 'resolved-deps');
+      assert.equal(value.deps.ethers, 'ethers');
+      assert.equal(value.deps.fetch, 'fetch');
+      assert.deepEqual({
         constants: { id: 'resolved-constants' },
         defaults: {
           DEFAULT_FAUCET_RPC_URL: 'https://op-sepolia-testnet.api.pocket.network',
           DEFAULT_FAUCET_AMOUNT_ETH: '0.0002',
           DEFAULT_FAUCET_BALANCE_THRESHOLD_ETH: '0.001',
         },
+      }, {
+        constants: value.constants,
+        defaults: value.defaults,
       });
-      return runtime;
+      return { id: 'low-level-input' };
+    },
+    createWorkerLowLevelHelpersWithWorkerDeps: (value) => {
+      assert.deepEqual(value, { id: 'low-level-input' });
+      return { id: 'low-level' };
+    },
+    resolveWorkerRouteRuntimeInput: (value) => ({ id: 'route-input', value }),
+    createWorkerRouteRuntimeWithWorkerDeps: ({ id, value }) => {
+      assert.equal(id, 'route-input');
+      assert.deepEqual(value.workerLowLevelHelpers, { id: 'low-level' });
+      return routeRuntime;
     },
   });
 
-  assert.equal(result, runtime);
+  assert.equal(result.workerRouteRuntime, routeRuntime);
 });
 
 test('createWorkerRuntime honors env transcription endpoint overrides', () => {
-  const runtime = {
+  const routeRuntime = {
     workerAuthGateUtils: { id: 'workerAuthGateUtils' },
     fetch: 'fetch',
   };
@@ -116,14 +135,17 @@ test('createWorkerRuntime honors env transcription endpoint overrides', () => {
     },
     {
       resolveWorkerRuntimeDeps: (value) => value,
-      createWorkerRuntimeInputWithWorkerDeps: (value) => {
+      resolveWorkerLowLevelHelperInput: (value) => {
         constants = value.constants;
-        return runtime;
+        return {};
       },
+      createWorkerLowLevelHelpersWithWorkerDeps: () => ({}),
+      resolveWorkerRouteRuntimeInput: () => ({}),
+      createWorkerRouteRuntimeWithWorkerDeps: () => routeRuntime,
     },
   );
 
-  assert.equal(result, runtime);
+  assert.equal(result.workerRouteRuntime, routeRuntime);
   assert.equal(
     constants.OPENAI_TRANSCRIBE_URL,
     'https://transcribe.example.test/v1/audio/transcriptions'
