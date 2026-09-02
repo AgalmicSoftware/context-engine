@@ -12,14 +12,11 @@ export const DEFAULT_SESSION_STORAGE_KEY = 'general';
 
 const RESERVED_SESSION_SLUG_KEYS = new Set<string>(['__proto__', 'constructor', 'prototype']);
 
-export type ParsedSessionSlug =
-  | { ok: true; slug: string }
-  | { ok: false; error: string };
+export type ParsedSessionSlug = { ok: true; slug: string } | { ok: false; error: string };
 
 export const trimSessionSlug = (raw: unknown): string => toStr(raw).trim();
 
-export const normalizeSessionSlugAliasToken = (raw: unknown): string =>
-  normalizeBaseSlug(trimSessionSlug(raw));
+export const normalizeSessionSlugAliasToken = (raw: unknown): string => normalizeBaseSlug(trimSessionSlug(raw));
 
 export const isReservedSessionSlugKey = (raw: unknown): boolean =>
   RESERVED_SESSION_SLUG_KEYS.has(normalizeSessionSlugAliasToken(raw));

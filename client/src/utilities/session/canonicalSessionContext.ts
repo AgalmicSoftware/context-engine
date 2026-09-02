@@ -21,11 +21,7 @@ import {
   parseWorkerConfig,
   parseLocalResourceOverrides,
 } from './sessionParsers.js';
-import {
-  canonicalizeSessionSlug,
-  isReservedSessionSlugKey,
-  normalizeSessionSlugAliasToken,
-} from './sessionSlug';
+import { canonicalizeSessionSlug, isReservedSessionSlugKey, normalizeSessionSlugAliasToken } from './sessionSlug';
 import { SESSION_WORKER_METADATA_ALIAS_KEYS } from './sessionWorkerUrlCompatibility.js';
 import { resolveSessionCapabilityProjection } from './sessionCapabilityProjection';
 import type {
@@ -273,7 +269,8 @@ const findDemoSessionConfigByAlias = (
     if (allowSessionName && slug && canonicalizeSessionSlug(entry.sessionName || '') === slug)
       return entry as SessionConfigLike;
     if (aliasToken && normalizeSessionSlugAliasToken(key) === aliasToken) return entry as SessionConfigLike;
-    if (aliasToken && normalizeSessionSlugAliasToken(entry.slug || '') === aliasToken) return entry as SessionConfigLike;
+    if (aliasToken && normalizeSessionSlugAliasToken(entry.slug || '') === aliasToken)
+      return entry as SessionConfigLike;
     if (allowSessionName && aliasToken && normalizeSessionSlugAliasToken(entry.sessionName || '') === aliasToken)
       return entry as SessionConfigLike;
   }

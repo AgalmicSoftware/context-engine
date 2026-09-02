@@ -16,9 +16,7 @@ export type SurveyResponseTransactionResult = Record<string, unknown> & {
 };
 
 export type SurveyResponseSubmissionResult =
-  | SurveyResponseTransactionResult
-  | WorkerCanonicalSurveySubmission
-  | undefined;
+  SurveyResponseTransactionResult | WorkerCanonicalSurveySubmission | undefined;
 
 export type SurveyResponseSubmitPort = {
   submitResponses: (

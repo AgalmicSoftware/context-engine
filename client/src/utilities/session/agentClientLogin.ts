@@ -1,9 +1,6 @@
 import { normalizeWorkerUrl } from '../worker/workerUrl.js';
 import { normalizeWorkerCanonicalSessionIdHex } from './sessionWorkerDiscovery.js';
-import {
-  normalizeSessionSlugAlias as normalizeSessionSlug,
-  sessionSlugStorageKey,
-} from './sessionSlug';
+import { normalizeSessionSlugAlias as normalizeSessionSlug, sessionSlugStorageKey } from './sessionSlug';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -80,8 +77,7 @@ const normalizeIdentityTarget = (
   };
 };
 
-const storageSlugPart = (sessionSlug: unknown): string =>
-  encodeURIComponent(sessionSlugStorageKey(sessionSlug));
+const storageSlugPart = (sessionSlug: unknown): string => encodeURIComponent(sessionSlugStorageKey(sessionSlug));
 
 const storageKey = (target: unknown | AgentClientLoginIdentityTarget): string => {
   const identity = normalizeIdentityTarget(target);

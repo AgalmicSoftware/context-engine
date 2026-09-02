@@ -15,9 +15,7 @@ const CONTEXT_INPUT = {
 
 describe('shared envelope v1 compatibility', () => {
   it('pins both shipped context formats and keeps the browser on its field-bound format', () => {
-    expect(computeCcContext(CONTEXT_INPUT)).toBe(
-      '0x4fb37fe5c79758e3876379169801df424c4ccd037955bb9384be8ec64ab20b6a',
-    );
+    expect(computeCcContext(CONTEXT_INPUT)).toBe('0x4fb37fe5c79758e3876379169801df424c4ccd037955bb9384be8ec64ab20b6a');
     expect(computeResponseFieldContext(CONTEXT_INPUT)).toBe(
       '0x6c40aab365e45abd78e8d47008cf12c593f1c434962173ede98d25de324baa25',
     );
