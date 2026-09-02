@@ -4,3 +4,6 @@
   Expires: 0
   Cross-Origin-Opener-Policy: same-origin-allow-popups
   Cross-Origin-Embedder-Policy: unsafe-none
+  Referrer-Policy: strict-origin-when-cross-origin
+  Content-Security-Policy: frame-ancestors 'none'
+  Content-Security-Policy-Report-Only: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: blob: https: ar: ipfs:; font-src 'self' data: https:; connect-src 'self' https: wss: data:; worker-src 'self' blob:; child-src 'self' blob: https:; frame-src https:; media-src 'self' data: blob: https:
