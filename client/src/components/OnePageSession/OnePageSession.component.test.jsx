@@ -1544,6 +1544,8 @@ describe('OnePageSession view gating', () => {
     const sectionHeaderRowBlock = extractMediaBlock(scss, '.sectionHeaderRow {');
     const sectionActionsScrollerBlock = extractMediaBlock(scss, '.sectionHeaderActionsScroller {');
     const miniContentBlock = extractMediaBlock(scss, '.miniSectionContent {');
+    const documentsHeaderBlock = extractMediaBlock(scss, '.documentsSectionHeader {');
+    const documentsContentBlock = extractMediaBlock(scss, '.documentsSectionContent {');
     const sectionsGridBlock = extractMediaBlock(scss, '.sectionsGrid {');
 
     expect(sectionContainerBlock).toContain('box-sizing: border-box;');
@@ -1555,6 +1557,11 @@ describe('OnePageSession view gating', () => {
     expect(sectionHeaderRowBlock).toContain('min-width: 0;');
     expect(sectionActionsScrollerBlock).toContain('box-sizing: border-box;');
     expect(sectionActionsScrollerBlock).toContain('max-width: 100%;');
+    expect(documentsHeaderBlock).toContain('flex: 0 1 auto;');
+    expect(documentsHeaderBlock).toContain('width: auto;');
+    expect(documentsHeaderBlock).not.toContain('width: 100%;');
+    expect(documentsContentBlock).toContain('margin-top: 10px;');
+    expect(documentsContentBlock).toContain('padding-top: 0;');
     expect(miniContentBlock).toContain('box-sizing: border-box;');
     expect(miniContentBlock).toContain('max-width: 100%;');
     expect(miniContentBlock).toContain('min-width: 0;');
@@ -1573,6 +1580,8 @@ describe('OnePageSession view gating', () => {
     expect(phoneBlock).toContain('color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);');
     expect(phoneBlock).toContain('.sectionHeader {');
     expect(phoneBlock).toContain('align-items: center;');
+    expect(phoneBlock).toContain('.documentsSectionHeader {');
+    expect(phoneBlock).toContain('width: 100%;');
     expect(phoneBlock).not.toContain('.documentsSectionHeaderText');
     expect(phoneBlock).not.toContain('.documentsSectionHeaderTitleRow');
     expect(phoneBlock).not.toContain('.documentsSectionHeaderMain');
@@ -1584,6 +1593,8 @@ describe('OnePageSession view gating', () => {
     expect(phoneBlock).toContain('font-size: clamp(1.25rem, 4.7vw, 1.55rem);');
     expect(smallTabletBlock).toContain('.sectionHeader {');
     expect(smallTabletBlock).toContain('align-items: center;');
+    expect(smallTabletBlock).toContain('.documentsSectionHeader {');
+    expect(smallTabletBlock).toContain('width: 100%;');
     expect(smallTabletBlock).toContain('font-size: 1.6em;');
     expect(smallTabletBlock).toContain('.sectionHeader .sectionHeaderText {');
     expect(smallTabletBlock).toContain('flex-direction: row;');

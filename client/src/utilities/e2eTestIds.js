@@ -107,6 +107,15 @@ const E2E_TESTIDS = Object.freeze({
   DATABASE_QUESTION_COUNT_DECREMENT: 'ce-database-question-count-decrement',
   DATABASE_QUESTION_COUNT_INCREMENT: 'ce-database-question-count-increment',
 
+  CONTEXT_TWEET_CARD: 'ce-context-tweet-card',
+  CONTEXT_CROSS_CARD: 'ce-context-cross-card',
+  CONTEXT_POLICY_SURFACE: 'ce-policy-split-layout',
+  CONTEXT_PAPER_CARD: 'ce-context-paper-card',
+  CONTEXT_LESSWRONG_CARD: 'ce-context-lesswrong-card',
+  CONTEXT_INTERVIEW_CARD: 'ce-context-interview-card',
+  CONTEXT_SCIFI_CARD: 'ce-context-scifi-card',
+  CONTEXT_METRIC_CARD: 'ce-context-metric-card',
+
   SESSION_RESULTS_TOGGLE: 'ce-session-results-toggle',
   SESSION_GROUPS_TOGGLE: 'ce-session-groups-toggle',
   MAIN_STATS_TAB: 'ce-main-stats-tab',

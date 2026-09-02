@@ -6,6 +6,7 @@ import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
 
 import CorpusViewer from './CorpusViewer';
 import PolicyGlobe from './PolicyGlobe';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 const mockTagPage = jest.fn();
 
@@ -138,6 +139,7 @@ describe('CorpusViewer', () => {
 
   it('keeps the mobile tab strip, card metadata, and action rows viewport-safe', () => {
     const corpusScss = fs.readFileSync(path.join(__dirname, 'CorpusViewer.module.scss'), 'utf8');
+    const nativeCardScss = fs.readFileSync(path.join(__dirname, 'CorpusNativeCards.module.scss'), 'utf8');
     const mobileBlock = extractMediaBlock(corpusScss, '@media (max-width: 720px)', '.container {');
     const phoneBlock = extractMediaBlock(corpusScss, '@media (max-width: 480px)', '.container {');
     const policyScss = fs.readFileSync(path.join(__dirname, 'PolicyGlobe.module.scss'), 'utf8');
@@ -218,6 +220,12 @@ describe('CorpusViewer', () => {
     expect(corpusScss).toMatch(/\.externalLink\s*{[\s\S]*?box-sizing:\s*border-box;/);
     expect(corpusScss).toMatch(/\.cardFooterLinks\s*{[\s\S]*?width:\s*100%;/);
     expect(corpusScss).toMatch(/\.tweetActionRow\s*{[\s\S]*?justify-content:\s*flex-start;/);
+    expect(nativeCardScss).toMatch(
+      /\.lessWrongCard\s*{[\s\S]*?background:\s*linear-gradient[\s\S]*?var\(--ce-document-canvas\)/,
+    );
+    expect(nativeCardScss).toMatch(/\.lessWrongSummary\s*{[\s\S]*?color:\s*var\(--ce-document-text\);/);
+    expect(nativeCardScss).toMatch(/\.sciFiCard\s*{[\s\S]*?grid-template-columns:\s*118px minmax\(0, 1fr\);/);
+    expect(nativeCardScss).toMatch(/\.metricCard\s*{[\s\S]*?color:\s*var\(--ce-document-text\);/);
     expect(mapScss).toMatch(/\.mapFrameCompact\s*{[\s\S]*?width:\s*100%;[\s\S]*?padding:\s*0;/);
     expect(mapScss).toMatch(
       /\.mapFrameCompact\s*{[\s\S]*?:global\(svg\)\s*{[\s\S]*?display:\s*block;[\s\S]*?max-width:\s*none;[\s\S]*?width:\s*100%;/,
@@ -314,6 +322,9 @@ describe('CorpusViewer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Tweets' }));
 
     expect(screen.getByTestId('ce-context-tweet-list').querySelectorAll('article')).toHaveLength(25);
+    const firstTweet = screen.getAllByTestId(E2E_TESTIDS.CONTEXT_TWEET_CARD)[0];
+    expect(within(firstTweet).getByLabelText('Tweet')).toBeInTheDocument();
+    expect(within(firstTweet).getByLabelText('240 replies')).toBeInTheDocument();
     expect(screen.getByText('@sama')).toBeInTheDocument();
     expect(screen.queryByTestId('ce-context-tweets-view-more')).not.toBeInTheDocument();
     expect(screen.queryByText('5 of 25 tweets shown')).not.toBeInTheDocument();
@@ -514,6 +525,8 @@ describe('CorpusViewer', () => {
     const lessWrongCard = title.closest('article') as HTMLElement;
 
     expect(lessWrongCard).toBeTruthy();
+    expect(lessWrongCard).toHaveAttribute('data-testid', E2E_TESTIDS.CONTEXT_LESSWRONG_CARD);
+    expect(within(lessWrongCard).getByLabelText('Argument path')).toHaveTextContent('ClaimReasoningImplication');
     expect(within(lessWrongCard).getByText('Novel argument')).toBeInTheDocument();
     expect(within(lessWrongCard).getByRole('link', { name: 'View source' })).toHaveAttribute(
       'href',
@@ -534,6 +547,8 @@ describe('CorpusViewer', () => {
     const crossCorpusCard = title.closest('article') as HTMLElement;
 
     expect(crossCorpusCard).toBeTruthy();
+    expect(crossCorpusCard).toHaveAttribute('data-testid', E2E_TESTIDS.CONTEXT_CROSS_CARD);
+    expect(within(crossCorpusCard).getByLabelText('Sources synthesized')).toBeInTheDocument();
     expect(within(crossCorpusCard).getByText('Central tension')).toBeInTheDocument();
     expect(within(crossCorpusCard).getByText(/Synthesizes: METR • Dwarkesh • LessWrong/i)).toBeInTheDocument();
     expect(within(crossCorpusCard).getByRole('link', { name: 'Open dataset' })).toHaveAttribute(
@@ -561,6 +576,24 @@ describe('CorpusViewer', () => {
     expect(
       secondFeaturedTitle.compareDocumentPosition(thirdFeaturedTitle) & window.Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  });
+
+  it('renders sci-fi entries as story covers with a theme constellation', () => {
+    render(
+      <MemoryRouter>
+        <CorpusViewer />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(getTabButton('Sci-Fi'));
+
+    const title = screen.getByText('Frankenstein; or, The Modern Prometheus');
+    const sciFiCard = title.closest('article') as HTMLElement;
+
+    expect(sciFiCard).toHaveAttribute('data-testid', E2E_TESTIDS.CONTEXT_SCIFI_CARD);
+    expect(within(sciFiCard).getByText('Speculative futures archive')).toBeInTheDocument();
+    expect(within(sciFiCard).getByLabelText('Story themes')).toBeInTheDocument();
+    expect(within(sciFiCard).getByRole('button', { name: 'Creation Ethics' })).toBeInTheDocument();
   });
 
   it('sorts policy entries with live items first and filters them by status', () => {
@@ -643,7 +676,7 @@ describe('CorpusViewer', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Laws & Policy' }));
 
-    expect(screen.getByTestId('ce-policy-split-layout')).toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.CONTEXT_POLICY_SURFACE)).toBeInTheDocument();
     expect(screen.getByTestId('demo-analysis-world-map')).toBeInTheDocument();
     expect(screen.getAllByText(/ASEAN Guide on AI Governance and Ethics/i).length).toBeGreaterThan(0);
     expect(within(screen.getByTestId('ce-policy-filter-row')).getByRole('button', { name: 'All' })).toHaveAttribute(
@@ -674,6 +707,11 @@ describe('CorpusViewer', () => {
 
     expect(screen.getAllByText(/Interview date:/i).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('link', { name: 'View interview' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId(E2E_TESTIDS.CONTEXT_INTERVIEW_CARD).length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText('Interview transcript').length).toBeGreaterThan(0);
+
+    const demisCard = screen.getByText('Demis Hassabis').closest('article') as HTMLElement;
+    expect(within(demisCard).getByText(/The frontier probably belongs to hybrids/i)).toBeInTheDocument();
   });
 
   it('keeps the first insider interview slots diversified when the same guest has multiple entries', () => {
@@ -714,7 +752,7 @@ describe('CorpusViewer', () => {
     );
   });
 
-  it('renders METR entries with linked chart preview images when available', () => {
+  it('renders METR entries as native metric charts with linked reports', () => {
     render(
       <MemoryRouter>
         <CorpusViewer />
@@ -723,13 +761,15 @@ describe('CorpusViewer', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Metrics' }));
 
-    const previewImage = screen.getByAltText('Measuring AI Ability to Complete Long Tasks');
-    const metrCard = previewImage.closest('article') as HTMLElement;
+    const title = screen.getByText('Measuring AI Ability to Complete Long Tasks');
+    const metrCard = title.closest('article') as HTMLElement;
 
-    expect(previewImage).toHaveAttribute(
-      'src',
-      'https://metr.org/assets/images/measuring-ai-ability-to-complete-long-tasks/models-are-succeeding-at-increasingly-long-tasks.png',
-    );
+    expect(metrCard).toHaveAttribute('data-testid', E2E_TESTIDS.CONTEXT_METRIC_CARD);
+    expect(
+      within(metrCard).getByLabelText(/Measuring AI Ability to Complete Long Tasks trend chart/i),
+    ).toBeInTheDocument();
+    expect(within(metrCard).getByText('Measured trend • minutes')).toBeInTheDocument();
+    expect(within(metrCard).getByText('2,880')).toBeInTheDocument();
     expect(within(metrCard).getByRole('link', { name: 'Open full report' })).toHaveAttribute(
       'href',
       'https://metr.org/blog/2025-03-19-measuring-ai-ability-to-complete-long-tasks/',

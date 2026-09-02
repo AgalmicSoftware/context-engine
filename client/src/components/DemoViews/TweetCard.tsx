@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faAtlas, faEye, faHeart, faLink, faRetweet } from '@fortawesome/free-solid-svg-icons';
+import { faAtlas, faComment, faEye, faHeart, faLink, faRetweet } from '@fortawesome/free-solid-svg-icons';
+import { faTwitter } from '@fortawesome/free-brands-svg-icons';
 
 import corpusDebateMapLinks from '../../variables/demo/corpus_debate_map_links.json';
 import debateMapData from '../../variables/demo/debate_map_demo_data.json';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildAtlasNodeRoute } from '../../utilities/ui/publicUrl.js';
 import styles from './CorpusViewer.module.scss';
 
@@ -52,6 +54,7 @@ export type CorpusEntry = {
   source_label?: string;
   engagement?: {
     likes?: number | string | null;
+    replies?: number | string | null;
     reposts?: number | string | null;
     views?: number | string | null;
   };
@@ -68,11 +71,13 @@ export type DebateMapSectionProps = {
   onAtlasIssueOpen?: AtlasIssueOpenHandler;
   inline?: boolean;
   showAtlasIcon?: boolean;
+  className?: string;
 };
 
 export type ExternalSourceLinkProps = {
   entry?: Pick<CorpusEntry, 'url' | 'source_label'> | null;
   fallbackLabel?: string;
+  className?: string;
 };
 
 export type TweetCardProps = {
@@ -199,6 +204,7 @@ export const DebateMapSection = ({
   onAtlasIssueOpen,
   inline = false,
   showAtlasIcon = false,
+  className = '',
 }: DebateMapSectionProps) => {
   const location = useLocation();
   const atlasReturnTo = `${location.pathname || ''}${location.search || ''}${location.hash || ''}` || '/';
@@ -211,7 +217,7 @@ export const DebateMapSection = ({
       <button
         key={issue.id}
         type="button"
-        className={`${styles.debateMapLink} ${styles.debateMapLinkButton}`}
+        className={`${styles.debateMapLink} ${styles.debateMapLinkButton} ${className}`.trim()}
         title={issue.pathLabel}
         onClick={() => onAtlasIssueOpen(issue.id)}
       >
@@ -219,7 +225,12 @@ export const DebateMapSection = ({
         <span>{issue.label}</span>
       </button>
     ) : (
-      <Link key={issue.id} to={issue.href} className={styles.debateMapLink} title={issue.pathLabel}>
+      <Link
+        key={issue.id}
+        to={issue.href}
+        className={`${styles.debateMapLink} ${className}`.trim()}
+        title={issue.pathLabel}
+      >
         {showAtlasIcon ? <FontAwesomeIcon icon={faAtlas} className={styles.debateMapIcon} aria-hidden="true" /> : null}
         <span>{issue.label}</span>
       </Link>
@@ -237,11 +248,20 @@ export const DebateMapSection = ({
   );
 };
 
-export const ExternalSourceLink = ({ entry, fallbackLabel = 'View source' }: ExternalSourceLinkProps) => {
+export const ExternalSourceLink = ({
+  entry,
+  fallbackLabel = 'View source',
+  className = '',
+}: ExternalSourceLinkProps) => {
   if (!entry?.url) return null;
 
   return (
-    <a href={entry.url} rel="noopener noreferrer" className={styles.externalLink} target="_blank">
+    <a
+      href={entry.url}
+      rel="noopener noreferrer"
+      className={`${styles.externalLink} ${className}`.trim()}
+      target="_blank"
+    >
       <FontAwesomeIcon icon={faLink} />
       <span>{entry.source_label || fallbackLabel}</span>
     </a>
@@ -271,7 +291,7 @@ const TweetCard = ({ entry = {}, onTagClick, onAtlasIssueOpen }: TweetCardProps)
   const showMetadataRow = tags.length > 0 || resolvedEntry.sentiment;
 
   return (
-    <article className={`${styles.card} ${styles.tweetCard}`}>
+    <article className={`${styles.card} ${styles.tweetCard}`} data-testid={E2E_TESTIDS.CONTEXT_TWEET_CARD}>
       <div className={styles.tweetAuthorRow}>
         <div className={styles.tweetAvatar} aria-hidden="true">
           {getAvatarLetter(handle)}
@@ -283,8 +303,10 @@ const TweetCard = ({ entry = {}, onTagClick, onAtlasIssueOpen }: TweetCardProps)
           </div>
         </div>
         <div className={styles.tweetDate}>{createdAt || 'Undated post'}</div>
+        <FontAwesomeIcon icon={faTwitter} className={styles.tweetPlatformIcon} aria-label="Tweet" />
       </div>
 
+      {resolvedEntry.is_thread ? <div className={styles.tweetThreadLabel}>Thread</div> : null}
       <div className={`${styles.tweetBody} ${shouldTruncate ? styles.tweetBodyClamped : ''}`.trim()}>{displayText}</div>
       {summaryText.length > 280 ? (
         <button type="button" className={styles.tweetReadMore} onClick={() => setExpanded((value) => !value)}>
@@ -312,6 +334,13 @@ const TweetCard = ({ entry = {}, onTagClick, onAtlasIssueOpen }: TweetCardProps)
 
       <div className={styles.tweetEngagement}>
         <div className={styles.engagementRow}>
+          <span
+            className={styles.tweetEngagementIcon}
+            aria-label={`${formatCount(resolvedEntry.engagement?.replies)} replies`}
+          >
+            <FontAwesomeIcon icon={faComment} />
+            <span>{formatCount(resolvedEntry.engagement?.replies)}</span>
+          </span>
           <span className={styles.tweetEngagementIcon}>
             <FontAwesomeIcon icon={faHeart} />
             <span>{formatCount(resolvedEntry.engagement?.likes)}</span>

@@ -22,7 +22,7 @@ Docs can be associated with:
   - Saved Tool Explorer sources are written as encrypted session docs with an audience of either `only me` or the session `docUploads` gate when that gate exists. The closed UI shows this audience behind a lock icon. `only me` uses the local `self-eip712-v1` recipient envelope and does not require Lit hooks; the session audience uses the Chipotle/Lit SBT-gated path.
   - When the save option is enabled, generated surveys store doc-library viewer URLs for those saved extra sources instead of the raw source URLs.
   - `View` defaults to the sample demo corpus viewer used on `/session/demo` when demo surfaces are enabled.
-  - The demo corpus viewer now exposes the full curated tab set, including `LessWrong` and `Cross-Corpus Debates`, instead of keeping those slices hidden.
+  - The demo corpus viewer keeps its Context title and corpus actions on one compact desktop header row, then renders each source in a medium-native form: tweets as social posts, policy as a map/list split, papers as academic summaries, LessWrong as argument essays, interviews as transcript cards, sci-fi as book/timeline cards, metrics as charts, and cross-corpus debates as linked source networks.
   - The local `Demo corpus` checkbox starts checked in demo-enabled mode; unchecking it switches the panel to the real session Doc Library when a session context is available.
   - When demo surfaces are disabled globally, `View` opens directly to the real session Doc Library or its empty state, and the local demo toggle is hidden.
   - In `View`, the session Doc Library is browse-only: upload/link entry controls stay in `Add`.

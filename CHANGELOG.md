@@ -6,16 +6,83 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Added credential-free CI configuration-contract coverage for every reachable
-  session-mode family, plus runtime assurance for generated Cloudflare Worker
-  envelope storage, concurrent multi-agent voting, representative
-  response-encryption paths, and both `/new` infrastructure presets while
-  keeping external-service live suites operator-run.
-- Hardened the operator-local Cloudflare two-key E2E around isolated dev-server
-  ports, exact deployment/auditor credential roles, current preset copy, Worker
-  secret readiness, and fresh-KV propagation. The live proof now verifies the
-  exact restricted token policy, worker-canonical login and encrypted
-  upload/read/export, and exact cleanup of its temporary Worker and namespace.
+- Reworked the demo Context viewer with a compact single-row desktop header so
+  tweets, policy, papers, essays, interviews, sci-fi, metrics, and cross-corpus
+  synthesis each use a distinct medium-native presentation. The Question
+  Results modal now uses a coherent high-contrast overlay palette with a
+  clearly separated light action panel.
+- Brought pre-deployment Cloudflare Worker Group drafts to feature parity with
+  normal Group creation: `/session/new` now queues image URLs or deferred local
+  image uploads, tags, public reference URLs, member limits, join deadlines,
+  admin addresses, join modes, and member visibility. Publish uploads local
+  artwork only after Worker identity verification, merges session default tags,
+  and preserves the uploaded URL for safe retries.
+- Kept answer and additional-comment encryption controls independent by default:
+  locking an answer no longer visually or actually encrypts its comments unless
+  the user explicitly selects **same as answer** or a mandatory gate applies.
+- Shortened the ordinary Claude/ChatGPT interview-prefill prompt, moved new
+  handoffs to a distinct inert catalog URL to avoid stale external fetches, and
+  made binary, rating, and multichoice answer formats explicit.
+- Added default-on, per-session voice modes to the session microphone:
+  `?mode=interview` runs an OpenAI Realtime one-person interview and maps only
+  supported transcript/context evidence into explicitly reviewed response
+  drafts, while `?mode=recordGroup` reuses rolling transcription to generate
+  draft questions. Ordinary ChatGPT or Claude can use a public per-session
+  Worker prompt and base64url fragment link to prefill the same review flow
+  without MCP, plugins, installation, or pre-login account linking. Existing
+  local answers are never replaced silently, normal login/submission remains
+  final authority, and optional source platform/model prediction provenance is
+  retained beside the final edited answer. Session creators can set the OpenAI
+  Realtime voice model in `/new`; it defaults to `gpt-realtime-2.1` and is
+  persisted in the public per-session interview configuration. The Interview
+  modal now uses the session's high-contrast surface tokens, hides responder
+  context unless an AI prefill supplied it, replaces verbose status text with
+  an accessible green/red dot, and presents the Claude/ChatGPT memory handoff
+  in a collapsed-by-default card titled **Paste this prompt to augment interview
+  with history from Claude or ChatGPT**, with a dedicated caret-labelled **View
+  prompt** control, muted prompt preview, and top-right clipboard icon. That
+  zero-install handoff now presents itself
+  as an explicit review-only user request, accepts only a session-approved
+  return origin, requires a readable fact preview before encoding, strips
+  identifying source details, and returns a clean interview link instead of an
+  opaque empty packet when no relevant memory exists. The copied prompt now
+  contains the complete user request while the fetched Worker endpoint returns
+  only an inert JSON question catalog, avoiding fetched-page instruction
+  ambiguity. External agents can include defensible low-confidence predictions
+  with an explained basis; confidence is shown in the review UI and retained in
+  submitted prediction provenance without re-authoring version 3 drafts through
+  another model. The review now uses pile-style binary choices, confidence
+  progress meters, collapsed evidence bases, compact remove/apply actions, and
+  a scroll-bounded sticky apply rail. Copying the external-agent prompt gives
+  immediate checkmark feedback, and the prompt asks Claude/ChatGPT to hide the
+  base64url payload behind an **Open prefilled interview** link. Model provenance
+  now survives the anonymous-review-to-login draft migration before submission.
+  The `demo-interview` poll questions now use question-specific
+  choices while legacy demo fixtures retain their historical choices. Realtime call setup now preserves the browser
+  SDP offer byte-for-byte (including its terminal CRLF) and sends the SDP and
+  JSON as typed multipart fields, avoiding OpenAI's empty-offer parse failure.
+  Voice-mode chooser hover states now keep both titles and descriptions on the
+  high-contrast accent text color, and the modal heading is larger. The
+  interviewer now explicitly invites personal or topic-level insight and tells
+  the responder they can steer the conversation at any point; completed
+  responder speech is available afterward in a collapsed transcript
+  disclosure. Empty evidence-to-response mappings now show a descriptive,
+  high-contrast “not enough information” notice with concrete next steps and
+  hide the unchanged retry action. The bundled `demo-interview` session also
+  resolves its Worker without exposing a `worker=` query parameter. Claude and
+  ChatGPT handoffs may now carry an already-known preferred responder name;
+  sharing it with submitted answers requires a separate default-off opt-in, and
+  opted-in names become the participant label in the results report. Interview
+  review also has a separate default-on accuracy-research consent that records
+  the original AI prediction, final submitted response, confidence, and changed
+  fields. Locked answers and comments are represented by redacted markers in
+  that comparison, with final plaintext captured before encryption solely to
+  calculate the edit signal.
+  External Claude/ChatGPT handoffs now also self-report research coverage:
+  distinct prior chats, memory items, connected sources, and user-authored
+  statements searched or used. The review shows those counts, unknown searched
+  totals remain `null`, and opted-in model provenance retains them beside the
+  final prediction comparison for fidelity analysis.
 - Refreshed mounted Stats immediately after successful Cloudflare group
   mutations, evicting the affected session's short-lived Worker catalog cache
   before recounting groups and visible participants.

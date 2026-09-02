@@ -527,14 +527,23 @@ describe('SurveyResults locked responses banner', () => {
 });
 
 describe('SurveyResults module styles', () => {
-  it('keeps the results modal light while giving the locked banner its own dark high-contrast card', () => {
+  it('keeps the results modal and locked-response surfaces on the semantic high-contrast overlay palette', () => {
     const scssPath = path.join(__dirname, 'SurveyResults.module.scss');
     const scss = fs.readFileSync(scssPath, 'utf8');
 
-    expect(scss).toMatch(/\.resultsModal\s*{[\s\S]*?background-color:\s*var\(--ce-color-white\);/);
-    expect(scss).toMatch(/\.modalBody\s*{[\s\S]*?color:\s*var\(--ce-color-black\) !important;/);
+    expect(scss).toMatch(/\.resultsModal\s*{[\s\S]*?background-color:\s*var\(--ce-overlay-surface\);/);
     expect(scss).toMatch(
-      /\.surveyDocUrlLink\s*{[\s\S]*?background:\s*color-mix\(in srgb,\s*var\(--ce-status-info\) 8%,\s*transparent\);[\s\S]*?color:\s*var\(--ce-status-info\);/,
+      /\.resultsModal\s*{[\s\S]*?:global\(\.modal-content\)\s*{[\s\S]*?background:\s*var\(--ce-overlay-surface\) !important;[\s\S]*?color:\s*var\(--ce-overlay-text\);/,
+    );
+    expect(scss).toMatch(
+      /\.modalBody\s*{[\s\S]*?background:\s*var\(--ce-overlay-surface\);[\s\S]*?color:\s*var\(--ce-overlay-text\) !important;/,
+    );
+    expect(scss).toMatch(/\.modalTitle\s*{[\s\S]*?color:\s*var\(--ce-overlay-text\);/);
+    expect(scss).toMatch(
+      /\.surveyDocUrlLink\s*{[\s\S]*?background:\s*color-mix\(in srgb,\s*var\(--ce-action-accent\) 10%,\s*transparent\);[\s\S]*?color:\s*var\(--ce-action-accent\);/,
+    );
+    expect(scss).toMatch(
+      /\.demoResultsViewButtonActive\s*{[\s\S]*?background:\s*var\(--ce-action-accent\);[\s\S]*?color:\s*var\(--ce-action-accent-text\);/,
     );
     expect(scss).toMatch(/\.aggregatorSummaryCard\s*{[\s\S]*?background-color:\s*transparent !important;/);
     expect(scss).not.toMatch(/\.aggregatorSummaryCard\s*{[\s\S]*?background-color:\s*#dce3f7 !important;/);
@@ -555,20 +564,25 @@ describe('SurveyResults module styles', () => {
     expect(scss).toMatch(
       /\.lockedBannerDetails\s*{[\s\S]*?border-top:\s*1px solid color-mix\(in srgb,\s*var\(--ce-text-inverse\) 12%,\s*transparent\);/,
     );
-    expect(scss).not.toMatch(/\.filterSummaryBox\s*{[\s\S]*?background:\s*rgba\(10,\s*14,\s*43,\s*0\.82\);/);
+    expect(scss).not.toMatch(/\.resultsModal\s*{[\s\S]*?background-color:\s*var\(--ce-color-white\);/);
   });
 
-  it('keeps survey-results controls readable on the light modal surface', () => {
+  it('keeps survey-results controls readable across the dark modal and light action panel', () => {
     const scssPath = path.join(__dirname, 'SurveyResults.module.scss');
     const scss = fs.readFileSync(scssPath, 'utf8');
     const normalizedScss = normalizeScssContract(scss);
 
-    expect(scss).toMatch(/\.toggleLabel\s*{[\s\S]*?color:\s*var\(--ce-document-text\);/);
-    expect(scss).toMatch(/\.exportAndFilterContainer\s*{[\s\S]*?background:\s*var\(--ce-status-info-text\);/);
+    expect(scss).toMatch(/\.toggleLabel\s*{[\s\S]*?color:\s*var\(--ce-overlay-text\);/);
+    expect(scss).toMatch(/\.exportAndFilterContainer\s*{[\s\S]*?background:\s*var\(--ce-document-surface\);/);
     expect(scss).toMatch(
       /\.questionFilterButton\s*{[\s\S]*?background-color:\s*var\(--ce-document-text\) !important;[\s\S]*?color:\s*var\(--ce-document-surface\) !important;/,
     );
-    expect(scss).toMatch(/\.filterSummaryBox\s*{[\s\S]*?color:\s*var\(--ce-document-text-muted\);/);
+    expect(scss).toMatch(
+      /\.filterSummaryBox\s*{[\s\S]*?background:\s*color-mix\(in srgb,\s*var\(--ce-overlay-text\) 6%,\s*transparent\);[\s\S]*?color:\s*var\(--ce-overlay-text-muted\);/,
+    );
+    expect(scss).toMatch(
+      /\.filterSummaryBox\s*{[\s\S]*?p > strong\s*{[\s\S]*?color:\s*var\(--ce-action-accent\) !important;/,
+    );
     expect(scss).toMatch(/\.demoResultsAtlasSurface,\s*\.demoResultsRiskMatrixSurface\s*{[\s\S]*?padding:\s*1rem;/);
     expect(scss).toMatch(
       /\.demoResultsAtlasSurface,\s*\.demoResultsRiskMatrixSurface\s*{[\s\S]*?border:\s*1px solid color-mix\(in srgb,\s*var\(--ce-overlay-surface\) 20%,\s*transparent\);/,
