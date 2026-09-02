@@ -597,7 +597,7 @@ describe('sessionWizardPublishFlow', () => {
       bundleText: 'export default { fetch() { return new Response("ok"); } };',
       bundleUrl: undefined,
       bundleManifestUrl: undefined,
-      bundleSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+      bundleSha256: 'f3c0d9299877e01400697dec5be4e888eafc1ff526d5e5424cb01ad75d4202d9',
       bundleSource: 'upload',
     });
 

@@ -212,6 +212,12 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     window.history.replaceState({}, '', '/');
   });
 
+  it('keeps the class identity without the legacy statics helper', () => {
+    expect(LoginAndSettingsModalSubject.displayName).toBe('LoginAndSettingsModal');
+    expect(LoginAndSettingsModalSubject.propTypes).toBeUndefined();
+    expect(LoginAndSettingsModalSubject.defaultProps).toBeUndefined();
+  });
+
   it('does not update local state after unmount while session restore is pending', async () => {
     let resolveRestore!: (value: string | null) => void;
     mockedPasskeyWallet.restorePasskeyWalletSession.mockImplementationOnce(

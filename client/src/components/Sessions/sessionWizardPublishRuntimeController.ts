@@ -1,4 +1,3 @@
-import sha256 from 'crypto-js/sha256';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { workerAuthPublishAdapter } from '../../domains/sessions/publish/sessionPublishAdapters.js';
 import {
@@ -31,6 +30,7 @@ import {
   matchesSessionWizardWorkerPublishEvidence,
   type SessionWizardWorkerPublishEvidence,
 } from './sessionWizardWorkerPublishEvidence';
+import { canonicalizeSessionWizardJson, fingerprintSessionWizardJson } from './sessionWizardCanonicalJson';
 
 type RuntimeRef = {
   current: SessionWizardWorkerDeployRuntime | null;
@@ -66,23 +66,11 @@ const requireSuccessfulDurableStorageOperation = (result: unknown, message: stri
   throw new Error(status ? `${message} (${status}).` : `${message}.`);
 };
 
-const canonicalize = (value: unknown): unknown => {
-  if (Array.isArray(value)) return value.map(canonicalize);
-  if (!value || typeof value !== 'object') return value;
-  return Object.keys(value as AnyRecord)
-    .sort()
-    .reduce<AnyRecord>((result, key) => {
-      const entry = (value as AnyRecord)[key];
-      if (entry !== undefined) result[key] = canonicalize(entry);
-      return result;
-    }, {});
-};
-
 const hasSameCanonicalValue = (left: unknown, right: unknown): boolean =>
-  JSON.stringify(canonicalize(left)) === JSON.stringify(canonicalize(right));
+  JSON.stringify(canonicalizeSessionWizardJson(left)) === JSON.stringify(canonicalizeSessionWizardJson(right));
 
 const fingerprintCanonicalValue = (value: unknown): string =>
-  sha256(`context-engine:worker-publish-config:v1:${JSON.stringify(canonicalize(value))}`).toString();
+  fingerprintSessionWizardJson('context-engine:worker-publish-config:v1', value);
 
 type PublishRuntimeControllerOptions = {
   runtimeRef: RuntimeRef;

@@ -1,8 +1,6 @@
 import { sanitizeDocumentUrls } from './createQuestionsAndSurveysDocumentUrlHelpers';
 
-export type CreateSurveyHashDigest = (value: unknown) => {
-  toString: () => string;
-};
+export type CreateSurveyHashDigest = (value: string) => string;
 
 export const buildCreateSurveyHashValue = ({
   digest,
@@ -18,5 +16,5 @@ export const buildCreateSurveyHashValue = ({
   if (isStandaloneQuestion) return '';
   const urlsForHash = sanitizeDocumentUrls(Array.isArray(documentURLs) ? documentURLs : []);
   const surveyData = { title, documentURLs: urlsForHash };
-  return `0x${digest(JSON.stringify(surveyData)).toString()}`;
+  return `0x${digest(JSON.stringify(surveyData))}`;
 };

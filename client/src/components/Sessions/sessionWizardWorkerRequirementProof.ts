@@ -1,4 +1,3 @@
-import sha256 from 'crypto-js/sha256';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { normalizeOriginList } from '../../utilities/urlUtils.js';
 import type { SessionModeProfile } from '../../utilities/session/sessionModeProfile';
@@ -8,6 +7,7 @@ import { resolveSessionWizardModeRequirements } from './sessionWizardModeRequire
 import { resolveSessionWizardResourceSecretFields } from './sessionWizardResourceConfig';
 import { CHIPOTLE_LIT_CONFIG_FIELDS } from './sessionWizardWorkerSecretSupport';
 import { normalizeSessionWizardSlug, normalizeSessionWizardWorkerUrl } from './sessionWizardUrlSupport';
+import { canonicalizeSessionWizardJson, fingerprintSessionWizardJson } from './sessionWizardCanonicalJson';
 
 const PROOF_VERSION = 1 as const;
 const FINGERPRINT_PATTERN = /^[a-f0-9]{64}$/;
@@ -59,21 +59,6 @@ const SERVER_MANAGED_WORKER_CONFIG_FIELDS = new Set([
   'workerGroupsBootstrap',
 ]);
 
-const canonicalize = (value: unknown): unknown => {
-  if (Array.isArray(value)) return value.map(canonicalize);
-  if (!value || typeof value !== 'object') return value;
-  return Object.keys(value as AnyRecord)
-    .sort()
-    .reduce<AnyRecord>((result, key) => {
-      const entry = (value as AnyRecord)[key];
-      if (entry !== undefined) result[key] = canonicalize(entry);
-      return result;
-    }, {});
-};
-
-const fingerprint = (namespace: string, value: unknown): string =>
-  sha256(`${namespace}:${JSON.stringify(canonicalize(value))}`).toString();
-
 const createSecretFingerprintSalt = (): string => {
   try {
     const crypto = globalThis.crypto;
@@ -121,11 +106,11 @@ const buildWorkerConfigFingerprint = (value: unknown): string => {
       } else if (field === 'allowOrigins') {
         result[field] = normalizeWorkerAllowOrigins(entry);
       } else {
-        result[field] = canonicalize(entry);
+        result[field] = canonicalizeSessionWizardJson(entry);
       }
       return result;
     }, {});
-  return fingerprint('context-engine:worker-config:v1', normalized);
+  return fingerprintSessionWizardJson('context-engine:worker-config:v1', normalized);
 };
 
 const normalizeLitRuntimeConfig = (value: unknown): Record<string, string> => {
@@ -143,7 +128,7 @@ const buildWorkerIdentityFingerprint = ({ workerUrl, sessionSlug, sessionId }: W
     sessionId: normalizeSessionId(sessionId),
   };
   return Object.values(identity).every(Boolean)
-    ? fingerprint('context-engine:worker-requirement-identity:v1', identity)
+    ? fingerprintSessionWizardJson('context-engine:worker-requirement-identity:v1', identity)
     : '';
 };
 
@@ -176,7 +161,7 @@ const buildRequirementsFingerprint = ({
 }: RequirementContext): string => {
   const requirements = resolveSessionWizardModeRequirements(sessionModeProfile);
   const selectedAiSecretFields = resolveSessionWizardResourceSecretFields('ai', sessionAi).map((field) => field.key);
-  return fingerprint('context-engine:worker-requirements:v1', {
+  return fingerprintSessionWizardJson('context-engine:worker-requirements:v1', {
     authorityMode: requirements.authorityMode,
     isWorkerCanonical: requirements.isWorkerCanonical,
     requiredRequirementIds: [...requirements.requiredRequirementIds].sort(),
@@ -187,7 +172,7 @@ const buildRequirementsFingerprint = ({
     workerAllowOrigins: normalizeWorkerAllowOrigins(workerAllowOrigins),
     // Bind the complete canonical profile and effective provider/model choices.
     // Broad requirement flags alone cannot distinguish edits that reuse the same secrets.
-    sessionModeProfile: canonicalize(sessionModeProfile || null),
+    sessionModeProfile: canonicalizeSessionWizardJson(sessionModeProfile || null),
     aiModelAssignments: normalizeAiModelAssignments(sessionAi),
   });
 };
@@ -318,7 +303,7 @@ export const buildSessionWizardWorkerRequirementProof = ({
   const secretValueFingerprints = normalizedRequiredFields.reduce<Record<string, string>>((result, field) => {
     const value = toStr(secretValues[field]).trim();
     if (value) {
-      result[field] = fingerprint('context-engine:worker-requirement-secret:v1', {
+      result[field] = fingerprintSessionWizardJson('context-engine:worker-requirement-secret:v1', {
         secretFingerprintSalt,
         workerIdentityFingerprint,
         field,
@@ -340,7 +325,7 @@ export const buildSessionWizardWorkerRequirementProof = ({
     secretValueFingerprints,
     remoteManagedSecretFields,
     litRuntimeFingerprint: selection.requirements.requiresLit
-      ? fingerprint('context-engine:worker-requirement-lit-runtime:v1', normalizedLitRuntime)
+      ? fingerprintSessionWizardJson('context-engine:worker-requirement-lit-runtime:v1', normalizedLitRuntime)
       : '',
     workerConfigFingerprint: buildWorkerConfigFingerprint(workerConfig),
   });
@@ -396,7 +381,7 @@ export const resolveSessionWizardWorkerRequirementReadiness = ({
     const value = toStr(secrets[field]).trim();
     if (!value) return proof.remoteManagedSecretFields.includes(field);
     return (
-      fingerprint('context-engine:worker-requirement-secret:v1', {
+      fingerprintSessionWizardJson('context-engine:worker-requirement-secret:v1', {
         secretFingerprintSalt: proof.secretFingerprintSalt,
         workerIdentityFingerprint: proof.workerIdentityFingerprint,
         field,
@@ -411,7 +396,7 @@ export const resolveSessionWizardWorkerRequirementReadiness = ({
       return { verified: false, reason: 'lit-runtime-changed' };
     }
     if (
-      fingerprint('context-engine:worker-requirement-lit-runtime:v1', normalizedLitRuntime) !==
+      fingerprintSessionWizardJson('context-engine:worker-requirement-lit-runtime:v1', normalizedLitRuntime) !==
       proof.litRuntimeFingerprint
     ) {
       return { verified: false, reason: 'lit-runtime-changed' };

@@ -34,7 +34,6 @@ import { LoginSettingsSupportedResourceCard } from './LoginSettingsResourceSumma
 import { LoginSettingsInlineNetworkSummary, LoginSettingsPanelNetworkSummary } from './LoginSettingsNetworkSummary';
 import { LoginSettingsConfigToggleControl, LoginSettingsControlRow } from './LoginSettingsControlRow';
 import LoginSettingsSectionCard from './LoginSettingsSectionCard';
-import { assignLoginAndSettingsModalLegacyStatics } from './loginAndSettingsModalLegacyStatics';
 import LoginModalDisplayBody from './LoginModalDisplayBody';
 import LoginTooltipsToggleControl from './LoginTooltipsToggleControl';
 import LoginPreLoginConfigPanel from './LoginPreLoginConfigPanel';
@@ -321,6 +320,8 @@ const settingsSupportReasoning = (settings: AiSettingsLike = {}) =>
     .some((modelLeaf) => /^(gpt-5|o[13])/.test(toStr(modelLeaf)));
 
 export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps, LoginAndSettingsModalState> {
+  static displayName = 'LoginAndSettingsModal';
+
   state: LoginAndSettingsModalState = (() => {
     const initialSessionScanSlugs = normalizeSessionScanSlugs(
       this.props.selectedSessionSlugs || readSessionScanSlugs(),
@@ -2494,8 +2495,7 @@ const mapStateToProps = (state: RootState) => ({
   tooltipsEnabled: state.sessionState.tooltipsEnabled,
 });
 
-const LoginAndSettingsModalWithWagmiHooks = WagmiHooksHOC(LoginAndSettingsModal);
-assignLoginAndSettingsModalLegacyStatics(LoginAndSettingsModal, LoginAndSettingsModalWithWagmiHooks);
+const LoginAndSettingsModalWithWagmiHooks = Object.assign(WagmiHooksHOC(LoginAndSettingsModal), { displayName: 'LoginAndSettingsModal' });
 
 export default connect(mapStateToProps, {
   changeAccount,

@@ -161,7 +161,6 @@ const manualChunkGroups = [
       '/node_modules/aes-js/',
       '/node_modules/bech32/',
       '/node_modules/bignumber.js/',
-      '/node_modules/crypto-js/',
       '/node_modules/hash.js/',
       '/node_modules/inherits/',
       '/node_modules/js-sha3/',

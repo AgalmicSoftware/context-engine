@@ -1,5 +1,5 @@
-import sha256 from 'crypto-js/sha256';
 import { toStr } from '../../utilities/shared/primitives.js';
+import { fingerprintSessionWizardJson } from './sessionWizardCanonicalJson';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -50,21 +50,6 @@ export const shouldRetainSessionWizardDeployAttemptIdentity = (status: number, r
   return status === 408 || status === 425 || status === 429 || status >= 500;
 };
 
-const canonicalize = (value: unknown): unknown => {
-  if (Array.isArray(value)) return value.map(canonicalize);
-  if (!value || typeof value !== 'object') return value;
-  return Object.keys(value as UnknownRecord)
-    .sort()
-    .reduce<UnknownRecord>((result, key) => {
-      const entry = (value as UnknownRecord)[key];
-      if (entry !== undefined) result[key] = canonicalize(entry);
-      return result;
-    }, {});
-};
-
-const digest = (namespace: string, value: unknown): string =>
-  sha256(`${namespace}:${JSON.stringify(canonicalize(value))}`).toString();
-
 const getStorage = (storage?: StorageLike | null): StorageLike | null => {
   if (storage !== undefined) return storage;
   try {
@@ -112,18 +97,18 @@ export const resolveSessionWizardDeployAttemptIdentity = ({
 }): SessionWizardDeployAttemptIdentity => {
   const storageRef = getStorage(storage);
   if (!storageRef) throw new Error('Durable browser storage is required for safe worker deployment retries.');
-  const scopeDigest = digest('context-engine:worker-deploy-scope:v1', scope);
+  const scopeDigest = fingerprintSessionWizardJson('context-engine:worker-deploy-scope:v1', scope);
   const storageKey = `${STORAGE_KEY_PREFIX}${scopeDigest}`;
   const record = readAttemptRecord(storageRef, storageKey);
   if (!writeAttemptRecord(storageRef, storageKey, record)) {
     throw new Error('Durable browser storage is required for safe worker deployment retries.');
   }
   return {
-    deploymentRequestId: `deploy:${digest('context-engine:worker-deploy-attempt:v1', {
+    deploymentRequestId: `deploy:${fingerprintSessionWizardJson('context-engine:worker-deploy-attempt:v1', {
       scopeDigest,
       generation: record.generation,
     })}`,
-    configRevision: `revision:${digest('context-engine:worker-deploy-config:v1', {
+    configRevision: `revision:${fingerprintSessionWizardJson('context-engine:worker-deploy-config:v1', {
       scopeDigest,
       generation: record.generation,
     })}`,

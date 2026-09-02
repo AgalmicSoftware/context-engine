@@ -5,7 +5,6 @@ export { DEFAULT_REALTIME_INTERVIEW_MODEL } from '../../utilities/audio/realtime
 
 export const INTERVIEW_MODE_QUERY_VALUE = 'interview';
 export const GROUP_CONVERSATION_MODE_QUERY_VALUE = 'recordGroup';
-export const LEGACY_LISTENING_MODE_QUERY_VALUE = 'listening';
 export const INTERVIEW_PREFILL_FRAGMENT_KEY = 'prefill';
 export const INTERVIEW_PROMPT_VERSION = 'ce-interview-brief-v4';
 const SUPPORTED_INTERVIEW_PROMPT_VERSIONS = new Set([

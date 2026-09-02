@@ -1,5 +1,5 @@
 import { toStr } from '../../utilities/shared/primitives.js';
-import sha256 from 'crypto-js/sha256';
+import { sha256Utf8 } from '../../utilities/crypto/sha256';
 import { CLOUDFLARE_WORKER_BUNDLE_URL, CLOUDFLARE_WORKER_RELEASE_MANIFEST_URL } from '../../variables/appConfig.js';
 import {
   hasSponsoredBundleFields,
@@ -470,7 +470,7 @@ export const resolveSessionWizardDeployBundlePayload = async ({
       bundleText,
       bundleUrl: undefined,
       bundleManifestUrl: undefined,
-      bundleSha256: bundleText ? sha256(bundleText).toString() : undefined,
+      bundleSha256: bundleText ? sha256Utf8(bundleText) : undefined,
       bundleSource: bundleText ? 'upload' : 'upload-missing',
     };
   }

@@ -13,6 +13,7 @@ import { WORKER_SECRET_CACHE_SAFE_FIELDS } from './sessionWizardWorkerSecretSupp
 import { sanitizeSessionWizardDraftForBrowserCache } from './sessionWizardBrowserCacheSanitization.js';
 import { normalizeWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery.js';
 import { toStr } from '../../utilities/shared/primitives.js';
+import { canonicalizeSessionWizardJson } from './sessionWizardCanonicalJson.js';
 
 export const SESSION_WIZARD_CACHE_KEY = 'ce:sessionWizardDraft:v1';
 export const SESSION_WIZARD_DRAFT_CACHE_MAX_BYTES = 4 * 1024 * 1024;
@@ -156,21 +157,9 @@ const preserveForeignDraft = (): SessionWizardDraftClearOutcome => ({
   status: 'preserved-foreign-draft',
 });
 
-const canonicalizeJsonValue = (value: unknown): unknown => {
-  if (Array.isArray(value)) return value.map(canonicalizeJsonValue);
-  if (!value || typeof value !== 'object') return value;
-  return Object.keys(value as Record<string, unknown>)
-    .sort()
-    .reduce<Record<string, unknown>>((result, key) => {
-      const entry = (value as Record<string, unknown>)[key];
-      if (entry !== undefined) result[key] = canonicalizeJsonValue(entry);
-      return result;
-    }, {});
-};
-
 const getJsonValueSignature = (value: unknown): string => {
   try {
-    return JSON.stringify(canonicalizeJsonValue(value));
+    return JSON.stringify(canonicalizeSessionWizardJson(value));
   } catch (_) {
     return '';
   }
