@@ -40,6 +40,7 @@ import {
   toChainId,
 } from './chainIdNormalization.js';
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
+import { sessionSlugStorageKey } from './sessionSlugResolution.js';
 
 const encoder = new TextEncoder();
 const RESOLVE_STORAGE_GATE_RUNTIME_CONFIG = Symbol('resolve-storage-gate-runtime-config');
@@ -66,7 +67,6 @@ const DEFAULT_RESOURCE_GATES = Object.freeze({
   images: 'docUploads',
 });
 
-const safeSlugPart = (value) => trim(value || 'general').toLowerCase().replace(/[^a-z0-9._:-]+/g, '-').replace(/^-+|-+$/g, '') || 'general';
 const bytesToBase64url = (bytes) => {
   if (typeof Buffer !== 'undefined') {
     return Buffer.from(bytes).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
@@ -96,11 +96,11 @@ const buildCloudflareStorageId = ({ randomBytes, getRandomValues: getRandomValue
   bytes[0] &= 0xf7;
   return bytesToBase64url(bytes);
 };
-const buildObjectKey = ({ slug, id }) => `sessions/${safeSlugPart(slug)}/storage/${id}`;
-const buildIndexKey = ({ slug, resource, id }) => `ce-storage:${safeSlugPart(slug)}:${trim(resource) || 'docsContext'}:${id}`;
-const buildIndexPrefix = ({ slug, resource }) => `ce-storage:${safeSlugPart(slug)}:${trim(resource) || 'docsContext'}:`;
-const buildSessionIndexPrefix = ({ slug }) => `ce-storage:${safeSlugPart(slug)}:`;
-const buildPayloadKey = ({ slug, id }) => `ce-storage-payload:${safeSlugPart(slug)}:${id}`;
+const buildObjectKey = ({ slug, id }) => `sessions/${sessionSlugStorageKey(slug)}/storage/${id}`;
+const buildIndexKey = ({ slug, resource, id }) => `ce-storage:${sessionSlugStorageKey(slug)}:${trim(resource) || 'docsContext'}:${id}`;
+const buildIndexPrefix = ({ slug, resource }) => `ce-storage:${sessionSlugStorageKey(slug)}:${trim(resource) || 'docsContext'}:`;
+const buildSessionIndexPrefix = ({ slug }) => `ce-storage:${sessionSlugStorageKey(slug)}:`;
+const buildPayloadKey = ({ slug, id }) => `ce-storage-payload:${sessionSlugStorageKey(slug)}:${id}`;
 const safeGroupId = (value) => trim(value).toLowerCase().replace(/[^a-z0-9._:-]+/g, '-').replace(/^-+|-+$/g, '');
 const normalizeGroupIdList = (value) => {
   let raw = value;
@@ -1705,7 +1705,7 @@ export const exportCloudflareEncryptedPayloadEnvelopes = async ({
     version: 1,
     exportScope: 'encrypted_envelopes_only',
     storageBackend: STORAGE_BACKENDS.CLOUDFLARE,
-    sessionSlug: safeSlugPart(slug),
+    sessionSlug: sessionSlugStorageKey(slug),
     resource: trim(resource) || 'all',
     exportedAt: generatedAt,
     exportedPayloadCount: payloads.length,

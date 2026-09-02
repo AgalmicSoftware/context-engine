@@ -7,6 +7,7 @@ import {
   resolveRequestedWorkerSlugPayload,
   resolveWorkerBodySlugContext,
   resolveWorkerRequestSlugContext,
+  sessionSlugStorageKey,
   SLUG_MISMATCH_ERROR,
   validateInboundWorkerSessionSlug,
 } from './sessionSlugResolution.js';
@@ -15,6 +16,13 @@ test('normalizeWorkerSessionSlug keeps reserved alias handling narrow', () => {
   assert.equal(normalizeWorkerSessionSlug(' general '), '');
   assert.equal(normalizeWorkerSessionSlug('DeBaTe'), 'rxc');
   assert.equal(normalizeWorkerSessionSlug('Alpha Beta!'), 'alphabeta');
+});
+
+test('sessionSlugStorageKey maps the identity sentinel to the stable storage sentinel', () => {
+  assert.equal(sessionSlugStorageKey(''), 'general');
+  assert.equal(sessionSlugStorageKey('general'), 'general');
+  assert.equal(sessionSlugStorageKey('debate'), 'rxc');
+  assert.equal(sessionSlugStorageKey('alpha'), 'alpha');
 });
 
 test('validateInboundWorkerSessionSlug preserves strict inbound validation', () => {

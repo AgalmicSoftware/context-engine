@@ -21,6 +21,7 @@ import {
   fetchExpectedWorkerBundleDigest,
   normalizeWorkerBundleSha256,
 } from './workerReleaseManifest.mjs';
+import { normalizeWorkerSessionSlug } from '../sessionCorsWorker/sessionSlugResolution.js';
 
 const { getPathRpcUrl } = rpcDefaults;
 
@@ -147,11 +148,7 @@ export const normalizeAllowList = (list, fallback = DEFAULT_ALLOWED_ORIGINS) => 
   if (normalized.length) return normalized;
   return normalizeOriginList(fallback);
 };
-export const normalizeSlug = (raw) => {
-  const slug = toStr(raw).trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
-  if (!slug) return '';
-  return slug === 'general' ? '' : slug;
-};
+export const normalizeSlug = normalizeWorkerSessionSlug;
 export const validateInboundSlug = (raw) => {
   if (raw == null) return { ok: true, slug: '', error: '' };
   const rawStr = toStr(raw).trim();

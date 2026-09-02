@@ -1,3 +1,5 @@
+import { sessionSlugStorageKey } from '../sessionCorsWorker/sessionSlugResolution.js';
+
 export const SESSION_SECRETS_ENVELOPE_VERSION = 1;
 export const SESSION_SECRETS_ENVELOPE_KIND = 'session-secrets';
 export const SESSION_SECRETS_ENVELOPE_CIPHER = 'AES-256-GCM';
@@ -29,8 +31,6 @@ const cloneRecord = (value) => (
 const toTrimmedString = (value) => (
   typeof value === 'string' ? value.trim() : value == null ? '' : String(value).trim()
 );
-
-const normalizeSlug = (value) => toTrimmedString(value).toLowerCase() || 'general';
 
 const getCryptoImpl = (deps = {}) => {
   const cryptoImpl = deps.crypto || globalThis.crypto;
@@ -81,7 +81,7 @@ const base64urlToBytes = (value) => {
 const buildAad = (slug) => [
   'ce-session-secrets',
   `v${SESSION_SECRETS_ENVELOPE_VERSION}`,
-  normalizeSlug(slug),
+  sessionSlugStorageKey(slug),
   SESSION_SECRETS_ENVELOPE_KEY_REF,
 ].join(':');
 

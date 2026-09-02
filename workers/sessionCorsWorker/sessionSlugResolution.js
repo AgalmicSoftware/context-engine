@@ -4,6 +4,8 @@ export const INVALID_SESSION_SLUG_ERROR = 'Invalid session slug. Use lowercase l
 export const SLUG_MISMATCH_ERROR = 'sessionSlug does not match worker session.';
 export const SLUG_ALIAS_MISMATCH_ERROR = 'sessionSlug aliases do not match.';
 export const MISSING_SLUG_ERROR = 'Missing sessionSlug.';
+export const DEFAULT_SESSION_SLUG = '';
+export const DEFAULT_SESSION_STORAGE_KEY = 'general';
 
 const EMPTY_VALIDATION_RESULT = Object.freeze({
   ok: true,
@@ -27,6 +29,10 @@ export const normalizeWorkerSessionSlug = (raw) => {
   if (!slug) return '';
   return canonicalizeReservedWorkerAlias(slug);
 };
+
+export const sessionSlugStorageKey = (raw) => (
+  normalizeWorkerSessionSlug(raw) || DEFAULT_SESSION_STORAGE_KEY
+);
 
 export const validateInboundWorkerSessionSlug = (raw) => {
   if (raw == null) return EMPTY_VALIDATION_RESULT;

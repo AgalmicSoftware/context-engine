@@ -1,4 +1,8 @@
-import { normalizeWorkerSessionSlug, validateInboundWorkerSessionSlug } from './sessionSlugResolution.js';
+import {
+	normalizeWorkerSessionSlug,
+	sessionSlugStorageKey,
+	validateInboundWorkerSessionSlug,
+} from './sessionSlugResolution.js';
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
 import { workerConfigAllowsAnonymousGroupDiscovery } from '../shared/workerConfigModeValidation.mjs';
 
@@ -33,12 +37,6 @@ export const MAX_WORKER_GROUP_MEMBER_PAGE_SIZE = 250;
 const WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL = 'fresh-template-v2';
 
 const IMPLEMENTED_JOIN_MODES = new Set([WORKER_GROUP_JOIN_MODES.OPEN, WORKER_GROUP_JOIN_MODES.ADMIN_ADD]);
-
-const safeSlugPart = (value) =>
-	trim(value || 'general')
-		.toLowerCase()
-		.replace(/[^a-z0-9._:-]+/g, '-')
-		.replace(/^-+|-+$/g, '') || 'general';
 
 const safeKeyPart = (value) =>
 	trim(value || 'id')
@@ -75,7 +73,7 @@ const canonicalSessionIdKeyPart = (value) => {
 const canonicalWorkerGroupSessionSlug = (value) => {
 	const validated = validateInboundWorkerSessionSlug(value);
 	if (!validated.ok) return '';
-	const slug = normalizeWorkerSessionSlug(validated.slug) || 'general';
+	const slug = sessionSlugStorageKey(validated.slug);
 	return slug.length <= MAX_WORKER_GROUP_SESSION_SLUG_LENGTH ? slug : '';
 };
 
@@ -179,19 +177,19 @@ const memberPrefix = ({ slug, sessionId, groupId }) =>
 const principalPrefix = ({ slug, sessionId, principalKey }) =>
 	`ce-worker-group-principal:${workerGroupIdentityKeyPrefix({ slug, sessionId })}:${encodedPrincipalKeyPart(principalKey)}:`;
 
-const legacyGroupKey = ({ slug, groupId }) => `ce-worker-group:${safeSlugPart(slug)}:${normalizeWorkerGroupId(groupId)}`;
-const legacyGroupPrefix = ({ slug }) => `ce-worker-group:${safeSlugPart(slug)}:`;
-const legacyGroupIndexKey = ({ slug, groupId }) => `ce-worker-group-index:${safeSlugPart(slug)}:${normalizeWorkerGroupId(groupId)}`;
-const legacyGroupIndexPrefix = ({ slug }) => `ce-worker-group-index:${safeSlugPart(slug)}:`;
+const legacyGroupKey = ({ slug, groupId }) => `ce-worker-group:${sessionSlugStorageKey(slug)}:${normalizeWorkerGroupId(groupId)}`;
+const legacyGroupPrefix = ({ slug }) => `ce-worker-group:${sessionSlugStorageKey(slug)}:`;
+const legacyGroupIndexKey = ({ slug, groupId }) => `ce-worker-group-index:${sessionSlugStorageKey(slug)}:${normalizeWorkerGroupId(groupId)}`;
+const legacyGroupIndexPrefix = ({ slug }) => `ce-worker-group-index:${sessionSlugStorageKey(slug)}:`;
 const legacyEncodedMemberKey = ({ slug, groupId, principalKey }) =>
-	`ce-worker-group-member:${safeSlugPart(slug)}:${normalizeWorkerGroupId(groupId)}:${encodedPrincipalKeyPart(principalKey)}`;
+	`ce-worker-group-member:${sessionSlugStorageKey(slug)}:${normalizeWorkerGroupId(groupId)}:${encodedPrincipalKeyPart(principalKey)}`;
 const legacyCaseFoldedMemberKey = ({ slug, groupId, principalKey }) =>
-	`ce-worker-group-member:${safeSlugPart(slug)}:${normalizeWorkerGroupId(groupId)}:${safeKeyPart(principalKey)}`;
-const legacyMemberPrefix = ({ slug, groupId }) => `ce-worker-group-member:${safeSlugPart(slug)}:${normalizeWorkerGroupId(groupId)}:`;
+	`ce-worker-group-member:${sessionSlugStorageKey(slug)}:${normalizeWorkerGroupId(groupId)}:${safeKeyPart(principalKey)}`;
+const legacyMemberPrefix = ({ slug, groupId }) => `ce-worker-group-member:${sessionSlugStorageKey(slug)}:${normalizeWorkerGroupId(groupId)}:`;
 const legacyEncodedPrincipalPrefix = ({ slug, principalKey }) =>
-	`ce-worker-group-principal:${safeSlugPart(slug)}:${encodedPrincipalKeyPart(principalKey)}:`;
+	`ce-worker-group-principal:${sessionSlugStorageKey(slug)}:${encodedPrincipalKeyPart(principalKey)}:`;
 const legacyCaseFoldedPrincipalPrefix = ({ slug, principalKey }) =>
-	`ce-worker-group-principal:${safeSlugPart(slug)}:${safeKeyPart(principalKey)}:`;
+	`ce-worker-group-principal:${sessionSlugStorageKey(slug)}:${safeKeyPart(principalKey)}:`;
 const legacyEncodedMemberIndexKey = ({ slug, principalKey, groupId }) =>
 	`${legacyEncodedPrincipalPrefix({ slug, principalKey })}${normalizeWorkerGroupId(groupId)}`;
 const legacyCaseFoldedMemberIndexKey = ({ slug, principalKey, groupId }) =>
