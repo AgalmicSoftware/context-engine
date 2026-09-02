@@ -7,7 +7,7 @@ import {
 } from './endpointConfig.js';
 import { createWorkerTopLevelRuntimeWithWorkerDeps } from './workerTopLevelBinding.js';
 
-test('createWorkerTopLevelRuntimeWithWorkerDeps returns the runtime contract from the runtime-deps binding', () => {
+test('createWorkerTopLevelRuntimeWithWorkerDeps returns the runtime contract from the runtime-input binding', () => {
   const runtime = {
     workerAuthGateUtils: { id: 'workerAuthGateUtils' },
     fetch: 'fetch',
@@ -15,7 +15,7 @@ test('createWorkerTopLevelRuntimeWithWorkerDeps returns the runtime contract fro
 
   const result = createWorkerTopLevelRuntimeWithWorkerDeps({
     deps: {
-      createWorkerRuntimeDepsWithWorkerDeps: () => runtime,
+      createWorkerRuntimeInputWithWorkerDeps: () => runtime,
     },
   });
 
@@ -37,7 +37,7 @@ test('createWorkerTopLevelRuntimeWithWorkerDeps preserves worker globals and sta
       fetch: 'fetch',
       rpcFetch: 'rpcFetch',
       now: 'now',
-      createWorkerRuntimeDepsWithWorkerDeps: (value) => {
+      resolveWorkerRuntimeDeps: (value) => {
         assert.deepEqual(value, {
           deps: {
             ethers: 'ethers',
@@ -81,6 +81,16 @@ test('createWorkerTopLevelRuntimeWithWorkerDeps preserves worker globals and sta
             BOOTSTRAP_SESSION_CONFIG_REQUIRED_ERROR:
               'Session config not found. Provide arweaveJwk for bootstrap uploads or register session config first.',
           },
+        });
+        return {
+          deps: { id: 'resolved-deps' },
+          constants: { id: 'resolved-constants' },
+        };
+      },
+      createWorkerRuntimeInputWithWorkerDeps: (value) => {
+        assert.deepEqual(value, {
+          deps: { id: 'resolved-deps' },
+          constants: { id: 'resolved-constants' },
           defaults: {
             DEFAULT_FAUCET_RPC_URL: 'https://op-sepolia-testnet.api.pocket.network',
             DEFAULT_FAUCET_AMOUNT_ETH: '0.0002',
@@ -107,7 +117,8 @@ test('createWorkerTopLevelRuntimeWithWorkerDeps honors env transcription endpoin
       [OPENAI_TRANSCRIBE_URL_ENV]: 'https://transcribe.example.test/v1/audio/transcriptions',
     },
     deps: {
-      createWorkerRuntimeDepsWithWorkerDeps: (value) => {
+      resolveWorkerRuntimeDeps: (value) => value,
+      createWorkerRuntimeInputWithWorkerDeps: (value) => {
         constants = value.constants;
         return runtime;
       },

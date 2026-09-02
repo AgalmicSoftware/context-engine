@@ -1,7 +1,10 @@
 import rpcDefaults from '../../shared/rpcDefaults.cjs';
 import {
-  createWorkerRuntimeDepsWithWorkerDeps as createWorkerRuntimeDepsWithWorkerDepsBoundary,
-} from './workerRuntimeDepsBinding.js';
+  createWorkerRuntimeInputWithWorkerDeps as createWorkerRuntimeInputWithWorkerDepsBoundary,
+} from './workerRuntimeInputBinding.js';
+import {
+  resolveWorkerRuntimeDeps as resolveWorkerRuntimeDepsBoundary,
+} from './workerRuntimeDepResolution.js';
 import { resolveOpenAiTranscribeUrl } from './endpointConfig.js';
 
 const { getPathRpcUrl } = rpcDefaults;
@@ -47,45 +50,54 @@ export const createWorkerTopLevelRuntimeWithWorkerDeps = ({
   deps,
   env,
 } = {}) => {
-  const createWorkerRuntimeDepsWithWorkerDeps = (
-    deps?.createWorkerRuntimeDepsWithWorkerDeps ||
-    createWorkerRuntimeDepsWithWorkerDepsBoundary
+  const createWorkerRuntimeInputWithWorkerDeps = (
+    deps?.createWorkerRuntimeInputWithWorkerDeps ||
+    createWorkerRuntimeInputWithWorkerDepsBoundary
   );
+  const runtimeDeps = {
+    ethers: deps?.ethers,
+    URL: deps?.URL,
+    Headers: deps?.Headers,
+    log: deps?.log,
+    fetch: deps?.fetch,
+    rpcFetch: deps?.rpcFetch,
+    now: deps?.now,
+  };
+  const constants = {
+    OPENAI_TRANSCRIBE_URL: resolveOpenAiTranscribeUrl({ env }),
+    SESSION_REGISTRY_ABI,
+    ERC721_ABI,
+    SBT_ADMIN_ABI,
+    HATS_ABI,
+    FAUCET_SBT_GATE_ABI,
+    TOKEN_TTL_SECONDS,
+    NONCE_TTL_SECONDS,
+    NONCE_RATE_LIMIT_MAX,
+    NONCE_RATE_LIMIT_WINDOW_MS,
+    NONCE_RATE_LIMIT_TTL_SECONDS,
+    USED_NONCE_TTL_SECONDS,
+    LOGIN_SIWE_MAX_AGE_MS,
+    LOGIN_SIWE_FUTURE_SKEW_MS,
+    ZERO_BYTES32,
+    RESOURCE_GATE_KEYS,
+    ANONYMOUS_RATE_ID_HEADER,
+    ANONYMOUS_GATE_UNAVAILABLE_ERROR,
+    ANONYMOUS_ROUTE_DENIED_ERROR,
+    ANONYMOUS_SCOPE_DISABLED_ERROR,
+    SESSION_CONFIG_NOT_FOUND_ERROR,
+    BOOTSTRAP_SESSION_CONFIG_REQUIRED_ERROR,
+  };
+  const resolved = (
+    deps?.resolveWorkerRuntimeDeps ||
+    resolveWorkerRuntimeDepsBoundary
+  )({
+    deps: runtimeDeps,
+    constants,
+  }) || {};
 
-  return createWorkerRuntimeDepsWithWorkerDeps({
-    deps: {
-      ethers: deps?.ethers,
-      URL: deps?.URL,
-      Headers: deps?.Headers,
-      log: deps?.log,
-      fetch: deps?.fetch,
-      rpcFetch: deps?.rpcFetch,
-      now: deps?.now,
-    },
-    constants: {
-      OPENAI_TRANSCRIBE_URL: resolveOpenAiTranscribeUrl({ env }),
-      SESSION_REGISTRY_ABI,
-      ERC721_ABI,
-      SBT_ADMIN_ABI,
-      HATS_ABI,
-      FAUCET_SBT_GATE_ABI,
-      TOKEN_TTL_SECONDS,
-      NONCE_TTL_SECONDS,
-      NONCE_RATE_LIMIT_MAX,
-      NONCE_RATE_LIMIT_WINDOW_MS,
-      NONCE_RATE_LIMIT_TTL_SECONDS,
-      USED_NONCE_TTL_SECONDS,
-      LOGIN_SIWE_MAX_AGE_MS,
-      LOGIN_SIWE_FUTURE_SKEW_MS,
-      ZERO_BYTES32,
-      RESOURCE_GATE_KEYS,
-      ANONYMOUS_RATE_ID_HEADER,
-      ANONYMOUS_GATE_UNAVAILABLE_ERROR,
-      ANONYMOUS_ROUTE_DENIED_ERROR,
-      ANONYMOUS_SCOPE_DISABLED_ERROR,
-      SESSION_CONFIG_NOT_FOUND_ERROR,
-      BOOTSTRAP_SESSION_CONFIG_REQUIRED_ERROR,
-    },
+  return createWorkerRuntimeInputWithWorkerDeps({
+    deps: resolved.deps,
+    constants: resolved.constants,
     defaults: {
       DEFAULT_FAUCET_RPC_URL,
       DEFAULT_FAUCET_AMOUNT_ETH,
