@@ -1442,19 +1442,18 @@ modules under `workers/sessionCorsWorker/`. Key boundary files:
 - Anonymous route-entry binding now routes through
   `workers/sessionCorsWorker/anonymousRouteEntryBinding.js`, preserving the
   worker-specific missing-slug/session-config constant binding plus the
-  env-bound handoff from the extracted anonymous route-entry helper into the
-  extracted anonymous route-dispatch binding.
+  env-bound handoff from the extracted anonymous route-entry helper directly
+  into the anonymous dispatcher.
 - Authenticated route-entry binding now routes through
   `workers/sessionCorsWorker/authenticatedRouteEntryBinding.js`,
   preserving the worker-specific authenticated route-context deps bundle,
   missing-config constant binding, and the env-bound handoff from the
   extracted authenticated route-entry helper into the extracted
   authenticated route-dispatch binding.
-- Anonymous route-dispatch binding now routes through
-  `workers/sessionCorsWorker/anonymousRouteDispatchBinding.js`, preserving
-  the worker-specific provider/transcribe helper bundle, env-bound
-  session-secrets lookup, and anonymous route-denied constant handoff into
-  the extracted anonymous dispatcher.
+- The former one-caller anonymous route-dispatch binding has been folded into
+  `workers/sessionCorsWorker/anonymousRouteEntryBinding.js`, which owns the
+  provider/transcribe helper bundle, env-bound session-secrets lookup, and
+  anonymous route-denied constant handoff.
 - Authenticated route-dispatch binding now routes through
   `workers/sessionCorsWorker/authenticatedRouteDispatchBinding.js`,
   preserving the worker-specific secret-path, non-secret action, and

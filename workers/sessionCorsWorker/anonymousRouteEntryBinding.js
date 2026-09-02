@@ -2,8 +2,8 @@ import {
   dispatchAnonymousRouteEntry as dispatchAnonymousRouteEntryBoundary,
 } from './anonymousRouteEntry.js';
 import {
-  dispatchAnonymousRouteWithWorkerDeps as dispatchAnonymousRouteWithWorkerDepsBoundary,
-} from './anonymousRouteDispatchBinding.js';
+  dispatchAnonymousRoute as dispatchAnonymousRouteBoundary,
+} from './anonymousRouteDispatch.js';
 
 export const dispatchAnonymousRouteEntryWithWorkerDeps = async ({
   path,
@@ -31,16 +31,16 @@ export const dispatchAnonymousRouteEntryWithWorkerDeps = async ({
       getCorsContext: deps?.getCorsContext,
       resolveAnonymousRateIdentity: deps?.resolveAnonymousRateIdentity,
       checkRateLimit: deps?.checkRateLimit,
-      dispatchAnonymousRoute: (value) => (
-        (deps?.dispatchAnonymousRouteWithWorkerDeps || dispatchAnonymousRouteWithWorkerDepsBoundary)({
+      dispatchAnonymousRoute: (value) => {
+        const dispatchAnonymousRoute = deps?.dispatchAnonymousRoute || dispatchAnonymousRouteBoundary;
+        return dispatchAnonymousRoute({
           ...value,
-          env,
           deps: {
-            dispatchAnonymousRoute: deps?.dispatchAnonymousRoute,
             storageRoute: deps?.storageRoute,
+            dispatchPublicWorkerGroupListRequest: deps?.dispatchPublicWorkerGroupListRequest,
             readTranscribeRequestPayload: deps?.readTranscribeRequestPayload,
             evaluateAnonymousRouteAccess: deps?.evaluateAnonymousRouteAccess,
-            getSessionSecrets: deps?.getSessionSecrets,
+            getSessionSecrets: (sessionSlug) => deps?.getSessionSecrets?.(env, sessionSlug),
             transcribe: deps?.transcribe,
             readAiRequestPayload: deps?.readAiRequestPayload,
             validateAnonymousAiRequest: deps?.validateAnonymousAiRequest,
@@ -50,12 +50,10 @@ export const dispatchAnonymousRouteEntryWithWorkerDeps = async ({
             proxyCustomRPC: deps?.proxyCustomRPC,
             json: deps?.json,
             now: deps?.now,
+            ANONYMOUS_ROUTE_DENIED_ERROR: constants?.anonymousRouteDeniedError,
           },
-          constants: {
-            anonymousRouteDeniedError: constants?.anonymousRouteDeniedError,
-          },
-        })
-      ),
+        });
+      },
     },
   })
 );

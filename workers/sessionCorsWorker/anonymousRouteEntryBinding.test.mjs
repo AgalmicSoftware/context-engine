@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { dispatchAnonymousRouteEntryWithWorkerDeps } from './anonymousRouteEntryBinding.js';
 
-test('dispatchAnonymousRouteEntryWithWorkerDeps preserves anonymous entry wiring and env-bound dispatch binding', async () => {
+test('dispatchAnonymousRouteEntryWithWorkerDeps preserves entry and env-bound dispatch wiring', async () => {
   const request = new Request('https://worker.example/ai', { method: 'POST' });
   const env = { GROUP_KV: { id: 'kv' } };
   const baseHeaders = { 'Access-Control-Allow-Origin': 'https://allowed.example' };
@@ -47,16 +47,14 @@ test('dispatchAnonymousRouteEntryWithWorkerDeps preserves anonymous entry wiring
 
         return response;
       },
-      dispatchAnonymousRouteWithWorkerDeps: async (value) => {
+      dispatchAnonymousRoute: async (value) => {
         assert.equal(value.path, '/ai');
         assert.equal(value.request, request);
         assert.equal(value.anonymousContext, anonymousContext);
-        assert.equal(value.env, env);
-        assert.equal(value.deps.dispatchAnonymousRoute, 'dispatchAnonymousRoute');
         assert.equal(value.deps.storageRoute, 'storageRoute');
+        assert.equal(value.deps.dispatchPublicWorkerGroupListRequest, 'dispatchPublicWorkerGroupListRequest');
         assert.equal(value.deps.readTranscribeRequestPayload, 'readTranscribeRequestPayload');
         assert.equal(value.deps.evaluateAnonymousRouteAccess, 'evaluateAnonymousRouteAccess');
-        assert.equal(value.deps.getSessionSecrets, 'getSessionSecrets');
         assert.equal(value.deps.transcribe, 'transcribe');
         assert.equal(value.deps.readAiRequestPayload, 'readAiRequestPayload');
         assert.equal(value.deps.validateAnonymousAiRequest, 'validateAnonymousAiRequest');
@@ -65,7 +63,8 @@ test('dispatchAnonymousRouteEntryWithWorkerDeps preserves anonymous entry wiring
         assert.equal(value.deps.proxyOpenRouter, 'proxyOpenRouter');
         assert.equal(value.deps.proxyCustomRPC, 'proxyCustomRPC');
         assert.equal(value.deps.json, 'json');
-        assert.equal(value.constants.anonymousRouteDeniedError, 'Anonymous access denied.');
+        assert.equal(value.deps.ANONYMOUS_ROUTE_DENIED_ERROR, 'Anonymous access denied.');
+        assert.deepEqual(await value.deps.getSessionSecrets('session-a'), { openaiKey: 'sk-worker' });
         return 'anonymousDispatchResponse';
       },
       resolveRequestSlugWithoutToken: 'resolveRequestSlugWithoutToken',
@@ -74,11 +73,15 @@ test('dispatchAnonymousRouteEntryWithWorkerDeps preserves anonymous entry wiring
       getCorsContext: 'getCorsContext',
       resolveAnonymousRateIdentity: 'resolveAnonymousRateIdentity',
       checkRateLimit: 'checkRateLimit',
-      dispatchAnonymousRoute: 'dispatchAnonymousRoute',
       storageRoute: 'storageRoute',
+      dispatchPublicWorkerGroupListRequest: 'dispatchPublicWorkerGroupListRequest',
       readTranscribeRequestPayload: 'readTranscribeRequestPayload',
       evaluateAnonymousRouteAccess: 'evaluateAnonymousRouteAccess',
-      getSessionSecrets: 'getSessionSecrets',
+      getSessionSecrets: async (receivedEnv, slug) => {
+        assert.equal(receivedEnv, env);
+        assert.equal(slug, 'session-a');
+        return { openaiKey: 'sk-worker' };
+      },
       transcribe: 'transcribe',
       readAiRequestPayload: 'readAiRequestPayload',
       validateAnonymousAiRequest: 'validateAnonymousAiRequest',
