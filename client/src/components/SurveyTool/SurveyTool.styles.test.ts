@@ -102,13 +102,16 @@ describe('SurveyTool styles', () => {
     );
   });
 
-  it('switches pile questions without animating the card stack', () => {
+  it('switches pile questions with a short opacity-only transition', () => {
     const scss = normalizeScssContract(readSurveyToolScss());
     const pileCardBlock = scss.match(/\.pileCard\s*{[^}]*}/)?.[0] || '';
 
-    expect(pileCardBlock).toContain('transition: none;');
+    expect(pileCardBlock).toContain('transition: opacity 160ms ease-out;');
     expect(pileCardBlock).not.toContain('will-change:');
-    expect(pileCardBlock).not.toMatch(/transition:\s*(?:transform|opacity)/);
+    expect(pileCardBlock).not.toMatch(/transition:\s*transform/);
+    expect(scss).toMatch(
+      /@media \(prefers-reduced-motion: reduce\)\s*{[\s\S]*?\.pileCard,[\s\S]*?transition-duration: 0\.01ms !important;/,
+    );
   });
 
   it('renders classic full-question utility icons as one quiet borderless family', () => {

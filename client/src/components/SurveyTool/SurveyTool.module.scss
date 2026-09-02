@@ -5438,7 +5438,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   left: 0;
   width: 100%;
   height: 100%;
-  transition: none;
+  transition: opacity 160ms ease-out;
 }
 
 .pileCardActive {
@@ -6213,6 +6213,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   .iconButton,
   .pileIconButton,
   .pileNavArrow,
+  .pileCard,
   .pileActions {
     transition-duration: 0.01ms !important;
   }
