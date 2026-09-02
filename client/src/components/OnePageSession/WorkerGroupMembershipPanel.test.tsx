@@ -136,7 +136,9 @@ describe('WorkerGroupMembershipPanel', () => {
     expect(screen.queryByText(/visible without signing in/i)).not.toBeInTheDocument();
     expect(screen.queryByText('Details')).not.toBeInTheDocument();
     expect(screen.queryByText('Tags: research, reviewers')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Open group details for Open reviewers' }));
+    const openGroupDetailsButton = screen.getByRole('button', { name: 'Open group details for Open reviewers' });
+    expect(openGroupDetailsButton).toHaveAttribute('data-ce-control-appearance', 'frameless');
+    fireEvent.click(openGroupDetailsButton);
     expect(window.open).toHaveBeenCalledWith(
       'http://localhost/group/open-reviewers?sessionName=alpha',
       '_blank',
