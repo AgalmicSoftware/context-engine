@@ -2,8 +2,8 @@ import {
   dispatchAuthenticatedRouteEntry as dispatchAuthenticatedRouteEntryBoundary,
 } from './authenticatedRouteEntry.js';
 import {
-  dispatchAuthenticatedRouteWithWorkerDeps as dispatchAuthenticatedRouteWithWorkerDepsBoundary,
-} from './authenticatedRouteDispatchBinding.js';
+  dispatchAuthenticatedRoute as dispatchAuthenticatedRouteBoundary,
+} from './authenticatedRouteDispatch.js';
 import {
   resolveAuthenticatedRouteContext as resolveAuthenticatedRouteContextBoundary,
 } from './authenticatedRouteContextResolution.js';
@@ -38,39 +38,75 @@ export const dispatchAuthenticatedRouteEntryWithWorkerDeps = async ({
           },
         })
       ),
-      dispatchAuthenticatedRoute: (value) => (
-        (deps?.dispatchAuthenticatedRouteWithWorkerDeps || dispatchAuthenticatedRouteWithWorkerDepsBoundary)({
+      dispatchAuthenticatedRoute: (value) => {
+        const dispatchAuthenticatedRoute = (
+          deps?.dispatchAuthenticatedRoute || dispatchAuthenticatedRouteBoundary
+        );
+        return dispatchAuthenticatedRoute({
           ...value,
-          env,
           deps: {
-            dispatchAuthenticatedRoute: deps?.dispatchAuthenticatedRoute,
-            dispatchAuthenticatedSecretPathRoute: deps?.dispatchAuthenticatedSecretPathRoute,
+            dispatchAuthenticatedSecretPathRoute: (routeValue) => (
+              deps?.dispatchAuthenticatedSecretPathRoute?.({
+                ...routeValue,
+                env,
+                deps: {
+                  evaluateAuthenticatedRoutePreflight: deps?.evaluateAuthenticatedRoutePreflight,
+                  computeScopesForLogin: deps?.computeScopesForLogin,
+                  resolveAuthenticatedRouteSecrets: deps?.resolveAuthenticatedRouteSecrets,
+                  checkRateLimit: deps?.checkRateLimit,
+                  getSessionSecrets: deps?.getSessionSecrets,
+                  json: deps?.json,
+                  isAddress: deps?.isAddress,
+                  getAddress: deps?.getAddress,
+                  transcribe: deps?.transcribe,
+                  arweaveUpload: deps?.arweaveUpload,
+                  storageRoute: deps?.storageRoute,
+                  now: deps?.now,
+                },
+              })
+            ),
             readAuthenticatedActionPayload: deps?.readAuthenticatedActionPayload,
-            dispatchAuthenticatedNonSecretActionRoute: deps?.dispatchAuthenticatedNonSecretActionRoute,
-            dispatchAuthenticatedSecretActionRoute: deps?.dispatchAuthenticatedSecretActionRoute,
-            evaluateAuthenticatedRoutePreflight: deps?.evaluateAuthenticatedRoutePreflight,
-            computeScopesForLogin: deps?.computeScopesForLogin,
-            resolveAuthenticatedRouteSecrets: deps?.resolveAuthenticatedRouteSecrets,
-            checkRateLimit: deps?.checkRateLimit,
-            getSessionSecrets: deps?.getSessionSecrets,
+            dispatchAuthenticatedNonSecretActionRoute: (routeValue) => (
+              deps?.dispatchAuthenticatedNonSecretActionRoute?.({
+                ...routeValue,
+                env,
+                deps: {
+                  evaluateAuthenticatedRoutePreflight: deps?.evaluateAuthenticatedRoutePreflight,
+                  computeScopesForLogin: deps?.computeScopesForLogin,
+                  fetchImage: deps?.fetchImage,
+                  fetchUrl: deps?.fetchUrl,
+                  checkRateLimit: deps?.checkRateLimit,
+                  json: deps?.json,
+                  now: deps?.now,
+                },
+              })
+            ),
+            dispatchAuthenticatedSecretActionRoute: (routeValue) => (
+              deps?.dispatchAuthenticatedSecretActionRoute?.({
+                ...routeValue,
+                env,
+                deps: {
+                  evaluateAuthenticatedRoutePreflight: deps?.evaluateAuthenticatedRoutePreflight,
+                  computeScopesForLogin: deps?.computeScopesForLogin,
+                  resolveAuthenticatedRouteSecrets: deps?.resolveAuthenticatedRouteSecrets,
+                  normalizeAiRequestPayload: deps?.normalizeAiRequestPayload,
+                  proxyAnthropic: deps?.proxyAnthropic,
+                  proxyOpenAI: deps?.proxyOpenAI,
+                  proxyOpenRouter: deps?.proxyOpenRouter,
+                  proxyCustomRPC: deps?.proxyCustomRPC,
+                  faucet: deps?.faucet,
+                  checkRateLimit: deps?.checkRateLimit,
+                  getSessionSecrets: deps?.getSessionSecrets,
+                  json: deps?.json,
+                  toStr: deps?.toStr,
+                  now: deps?.now,
+                },
+              })
+            ),
             json: deps?.json,
-            isAddress: deps?.isAddress,
-            getAddress: deps?.getAddress,
-            transcribe: deps?.transcribe,
-            arweaveUpload: deps?.arweaveUpload,
-            storageRoute: deps?.storageRoute,
-            fetchImage: deps?.fetchImage,
-            fetchUrl: deps?.fetchUrl,
-            normalizeAiRequestPayload: deps?.normalizeAiRequestPayload,
-            proxyAnthropic: deps?.proxyAnthropic,
-            proxyOpenAI: deps?.proxyOpenAI,
-            proxyOpenRouter: deps?.proxyOpenRouter,
-            proxyCustomRPC: deps?.proxyCustomRPC,
-            faucet: deps?.faucet,
-            toStr: deps?.toStr,
           },
-        })
-      ),
+        });
+      },
     },
   })
 );

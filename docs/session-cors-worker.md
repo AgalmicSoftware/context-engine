@@ -1448,17 +1448,16 @@ modules under `workers/sessionCorsWorker/`. Key boundary files:
   `workers/sessionCorsWorker/authenticatedRouteEntryBinding.js`,
   preserving the worker-specific authenticated route-context deps bundle,
   missing-config constant binding, and the env-bound handoff from the
-  extracted authenticated route-entry helper into the extracted
-  authenticated route-dispatch binding.
+  extracted authenticated route-entry helper directly into the authenticated
+  dispatcher.
 - The former one-caller anonymous route-dispatch binding has been folded into
   `workers/sessionCorsWorker/anonymousRouteEntryBinding.js`, which owns the
   provider/transcribe helper bundle, env-bound session-secrets lookup, and
   anonymous route-denied constant handoff.
-- Authenticated route-dispatch binding now routes through
-  `workers/sessionCorsWorker/authenticatedRouteDispatchBinding.js`,
-  preserving the worker-specific secret-path, non-secret action, and
-  secret-action helper bundles plus the existing fetch/AI/faucet helper
-  wiring into the extracted authenticated dispatcher.
+- The former one-caller authenticated route-dispatch binding has been folded
+  into `workers/sessionCorsWorker/authenticatedRouteEntryBinding.js`, which
+  owns the secret-path, non-secret action, and secret-action helper bundles
+  plus the existing fetch/AI/faucet helper wiring.
 - `nonce:{slug}:{address}` → diagnostic nonce mirror (TTL 5m; the Durable Object is authoritative)
 - `usedNonce:{slug}:{nonce}` → diagnostic used mirror (TTL 10m; the Durable Object is authoritative)
 - `authToken:{slug}:{sub}:{jti}` → "1" for minted login tokens (TTL 4h)
