@@ -2,7 +2,6 @@ import { ethers } from 'ethers';
 import rpcDefaults from '../../shared/rpcDefaults.cjs';
 import { createWorkerLowLevelHelpersWithWorkerDeps } from './workerLowLevelHelperBinding.js';
 import { createWorkerRouteRuntimeWithWorkerDeps } from './workerRouteRuntimeBinding.js';
-import { resolveWorkerLowLevelHelperInput } from './workerLowLevelHelperInputResolution.js';
 import { resolveWorkerRouteRuntimeInput } from './workerRouteRuntimeInputResolution.js';
 import { resolveWorkerRuntimeDeps } from './workerRuntimeDepResolution.js';
 import { resolveOpenAiTranscribeUrl } from './endpointConfig.js';
@@ -130,13 +129,33 @@ export const createWorkerRuntime = (env, overrides = {}) => {
   };
   const workerLowLevelHelpers = (
     resolvedDeps.createWorkerLowLevelHelpersWithWorkerDeps || createWorkerLowLevelHelpersWithWorkerDeps
-  )(
-    (resolvedDeps.resolveWorkerLowLevelHelperInput || resolveWorkerLowLevelHelperInput)({
-      deps: resolvedDeps,
-      constants: resolved.constants,
-      defaults,
-    }),
-  );
+  )({
+    deps: {
+      ethers: resolvedDeps.ethers,
+      toStr: resolvedDeps.toStr,
+      URL: resolvedDeps.URL,
+      Headers: resolvedDeps.Headers,
+      normalizeWorkerSessionSlug: resolvedDeps.normalizeWorkerSessionSlug,
+      normalizeRpcUrlList: resolvedDeps.normalizeRpcUrlList,
+      mergeRpcUrlLists: resolvedDeps.mergeRpcUrlLists,
+      toChainId: resolvedDeps.toChainId,
+      log: resolvedDeps.log,
+      fetch: resolvedDeps.fetch,
+      rpcFetch: resolvedDeps.rpcFetch,
+      now: resolvedDeps.now,
+    },
+    constants: {
+      zeroBytes32: resolved.constants.ZERO_BYTES32,
+      sessionRegistryAbi: resolved.constants.SESSION_REGISTRY_ABI,
+      erc721Abi: resolved.constants.ERC721_ABI,
+      sbtAdminAbi: resolved.constants.SBT_ADMIN_ABI,
+      hatsAbi: resolved.constants.HATS_ABI,
+      faucetSbtGateAbi: resolved.constants.FAUCET_SBT_GATE_ABI,
+    },
+    defaults: {
+      defaultFaucetRpcUrl: defaults.DEFAULT_FAUCET_RPC_URL,
+    },
+  });
   const workerRouteRuntime = (
     resolvedDeps.createWorkerRouteRuntimeWithWorkerDeps || createWorkerRouteRuntimeWithWorkerDeps
   )(

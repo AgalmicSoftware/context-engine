@@ -90,25 +90,20 @@ test('createWorkerRuntime preserves worker globals and static bundle wiring', ()
         constants: { id: 'resolved-constants' },
       };
     },
-    resolveWorkerLowLevelHelperInput: (value) => {
-      assert.equal(value.deps.id, 'resolved-deps');
+    createWorkerLowLevelHelpersWithWorkerDeps: (value) => {
       assert.equal(value.deps.ethers, 'ethers');
       assert.equal(value.deps.fetch, 'fetch');
-      assert.deepEqual({
-        constants: { id: 'resolved-constants' },
-        defaults: {
-          DEFAULT_FAUCET_RPC_URL: 'https://op-sepolia-testnet.api.pocket.network',
-          DEFAULT_FAUCET_AMOUNT_ETH: '0.0002',
-          DEFAULT_FAUCET_BALANCE_THRESHOLD_ETH: '0.001',
-        },
-      }, {
-        constants: value.constants,
-        defaults: value.defaults,
+      assert.deepEqual(value.constants, {
+        zeroBytes32: undefined,
+        sessionRegistryAbi: undefined,
+        erc721Abi: undefined,
+        sbtAdminAbi: undefined,
+        hatsAbi: undefined,
+        faucetSbtGateAbi: undefined,
       });
-      return { id: 'low-level-input' };
-    },
-    createWorkerLowLevelHelpersWithWorkerDeps: (value) => {
-      assert.deepEqual(value, { id: 'low-level-input' });
+      assert.deepEqual(value.defaults, {
+        defaultFaucetRpcUrl: 'https://op-sepolia-testnet.api.pocket.network',
+      });
       return { id: 'low-level' };
     },
     resolveWorkerRouteRuntimeInput: (value) => ({ id: 'route-input', value }),
@@ -135,12 +130,11 @@ test('createWorkerRuntime honors env transcription endpoint overrides', () => {
     },
     {
       resolveWorkerRuntimeDeps: (value) => value,
-      resolveWorkerLowLevelHelperInput: (value) => {
+      createWorkerLowLevelHelpersWithWorkerDeps: () => ({}),
+      resolveWorkerRouteRuntimeInput: (value) => {
         constants = value.constants;
         return {};
       },
-      createWorkerLowLevelHelpersWithWorkerDeps: () => ({}),
-      resolveWorkerRouteRuntimeInput: () => ({}),
       createWorkerRouteRuntimeWithWorkerDeps: () => routeRuntime,
     },
   );
