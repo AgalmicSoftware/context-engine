@@ -226,6 +226,13 @@
   font-size: 0.95rem;
 }
 
+.workerGroupsLoadingState {
+  margin: 0 0 24px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
 .telegramListError {
   color: var(--ce-status-danger-text);
   margin-top: 10px;

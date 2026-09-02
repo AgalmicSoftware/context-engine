@@ -49,7 +49,7 @@ describe('WorkerGroupMembershipPanel', () => {
 
     render(<WorkerGroupMembershipPanel envelope={envelope} fetchImpl={fetchImpl as typeof fetch} />);
 
-    expect(screen.getByText('Loading groups…')).toBeInTheDocument();
+    expect(screen.getByText('Loading groups…')).toHaveClass('telegramListEmpty', 'workerGroupsLoadingState');
     expect(screen.queryByText('Loading access groups…')).not.toBeInTheDocument();
   });
 

@@ -879,7 +879,9 @@ const WorkerGroupMembershipPanel = ({
   if (selectedGroupId) {
     return (
       <section className={styles.workerGroupsListPanel} data-testid="ce-session-worker-groups">
-        {status === 'loading' ? <div className={styles.telegramListEmpty}>Loading group…</div> : null}
+        {status === 'loading' ? (
+          <div className={`${styles.telegramListEmpty} ${styles.workerGroupsLoadingState}`}>Loading group…</div>
+        ) : null}
         {error ? <div className={styles.telegramListEmpty}>{error}</div> : null}
         {membershipStatus ? (
           <div className={styles.telegramReportApprox} role="status">
@@ -936,7 +938,9 @@ const WorkerGroupMembershipPanel = ({
           </button>
         </div>
       ) : null}
-      {status === 'loading' ? <div className={styles.telegramListEmpty}>Loading groups…</div> : null}
+      {status === 'loading' ? (
+        <div className={`${styles.telegramListEmpty} ${styles.workerGroupsLoadingState}`}>Loading groups…</div>
+      ) : null}
       {error ? <div className={styles.telegramListEmpty}>{error}</div> : null}
       {membershipStatus ? (
         <div className={styles.telegramReportApprox} role="status">
