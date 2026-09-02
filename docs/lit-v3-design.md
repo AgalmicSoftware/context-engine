@@ -38,7 +38,11 @@ Practical meaning:
 
 ## Why the v2 model does not map directly
 
-The current CE envelope format in `client/src/utilities/crypto/cryptography.ts` stores per-field AES-GCM ciphertext plus Lit recipient entries of type `lit-sbt-v1`. Those entries currently depend on browser Lit hooks with this contract:
+The current CE envelope format is implemented by the repository-level
+`shared/encryption/envelopeV1Core.mjs` primitives and the browser orchestration
+in `client/src/utilities/crypto/cryptography.ts`. It stores per-field AES-GCM
+ciphertext plus Lit recipient entries of type `lit-sbt-v1`. Those entries
+currently depend on browser Lit hooks with this contract:
 
 - `saveKey(cek, { accessControlConditions, chain, ... })`
 - `getKey({ accessControlConditions, ciphertext, dataToEncryptHash, ... })`
@@ -144,6 +148,7 @@ The current browser Lit runtime fans out from `client/src/utilities/crypto/litPr
 
 ### Core runtime and helpers
 
+- `shared/encryption/envelopeV1Core.mjs`
 - `client/src/utilities/crypto/litProtocol.ts`
 - `client/src/utilities/crypto/cryptography.ts`
 - `client/src/utilities/crypto/encryptedFields.ts`

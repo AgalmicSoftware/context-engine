@@ -182,7 +182,7 @@ Lit opt-in:
 | **Utilities** | |
 | Web3 / contracts | `utilities/web3/chainGateway.ts`, `contractScripts.impl.ts`, `contractHelpers.ts`, `chainEventStreams.ts`, `profileChainReads.ts`, `sessionRegistry.ts` |
 | Wallet | `client/src/wallet/` passkey EOA wallet config, encrypted keystore, EIP-1193 provider, and soft-session worker |
-| Crypto / Lit | `utilities/crypto/litProtocol.ts`, `cryptography.ts`, `encryptedFields.ts` |
+| Crypto / Lit | `shared/encryption/envelopeV1Core.mjs` owns the browser/CE-CC envelope-v1 primitives; `utilities/crypto/cryptography.ts`, `litProtocol.ts`, and `encryptedFields.ts` own browser providers, Lit integration, and response orchestration |
 | Arweave | `utilities/arweave/arweaveClient.js`, `arweaveUrls.ts` |
 | Session helpers | `utilities/session/sessionNaming.ts`, `sessionMetadata.ts`, `resourceKeys.ts`, `sessionModeProfile.ts`, `groupCreationPolicy.ts`, `sessionBackendKind.ts`, `agentClientLogin.ts`, `telegramAgentData.ts`, `telegramSessionBackend.ts` |
 | Worker auth | `utilities/worker/workerAuth.ts`, `corsProxy.ts` |
