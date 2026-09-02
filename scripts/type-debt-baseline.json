@@ -84,6 +84,7 @@
     "arrayAny": 0,
     "recordAny": 42,
     "aliasAny": 3,
+    "aliasAnyUsage": 742,
     "mapSetAny": 4
   }
 }

@@ -17,12 +17,14 @@ const PRODUCTION_FILE_RE = /\.(?:js|jsx|ts|tsx)$/;
 const TEST_OR_DECLARATION_FILE_RE = /(?:\.d|\.test|\.spec|\.testUtils|TestUtils)\.(?:js|jsx|ts|tsx)$/;
 const GENERATED_OR_FIXTURE_PATH_RE = /(?:^|\/)(?:__fixtures__|__mocks__|__tests__|fixtures|generated)(?:\/|$)/;
 
-const git = (args, rootDir = ROOT_DIR) =>
+const gitOutput = (args, rootDir = ROOT_DIR) =>
   execFileSync('git', args, {
     cwd: rootDir,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'ignore'],
-  }).trim();
+  });
+
+const git = (args, rootDir = ROOT_DIR) => gitOutput(args, rootDir).trim();
 
 const resolveCommit = (ref, rootDir = ROOT_DIR) => {
   if (!ref) return '';
@@ -65,12 +67,16 @@ const listTrackedClientProductionFiles = (rootDir = ROOT_DIR) =>
     .filter((relativePath) => fs.existsSync(path.join(rootDir, relativePath)))
     .sort();
 
-const countLines = (text) => (text.length === 0 ? 0 : text.split(/\r?\n/).length);
+const countLines = (text) => {
+  if (text.length === 0) return 0;
+  const lineCount = text.split(/\r?\n/).length;
+  return /\r?\n$/.test(text) ? lineCount - 1 : lineCount;
+};
 
 const readBaseLineCount = (baseCommit, relativePath, rootDir = ROOT_DIR) => {
   if (!baseCommit) return null;
   try {
-    return countLines(git(['show', `${baseCommit}:${relativePath}`], rootDir));
+    return countLines(gitOutput(['show', `${baseCommit}:${relativePath}`], rootDir));
   } catch {
     return null;
   }
@@ -136,6 +142,13 @@ test('large-file policy accepts bounded growth and shrinking files', () => {
   );
 });
 
+test('line counts are independent of a trailing newline', () => {
+  assert.equal(countLines('first\nsecond'), 2);
+  assert.equal(countLines('first\nsecond\n'), 2);
+  assert.equal(countLines('first\r\nsecond\r\n'), 2);
+  assert.equal(countLines(''), 0);
+});
+
 test('tracked production client files satisfy the base-diff large-file policy', () => {
   const baseCommit = resolveBaseCommit();
   assert.ok(baseCommit, 'A git base commit is required for the large-file policy.');
@@ -150,6 +163,7 @@ test('tracked production client files satisfy the base-diff large-file policy', 
 });
 
 module.exports = {
+  countLines,
   evaluateLargeFilePolicy,
   resolveBaseCommit,
 };

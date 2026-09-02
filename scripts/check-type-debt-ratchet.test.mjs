@@ -6,10 +6,12 @@ import path from 'node:path';
 import test from 'node:test';
 
 import {
+  collectAnyBackedAliasNames,
   collectStrictDebtFreeDirectoryViolations,
   collectTypeDebt,
   compareTypeDebtCounts,
   compareTypeDebtReductions,
+  countAnyBackedAliasUsages,
   countTypeDebtInText,
   createZeroCounts,
   isProductionTypeScriptFile,
@@ -56,7 +58,21 @@ const set = new Set<any>();
   assert.equal(counts.arrayAny, 1);
   assert.equal(counts.recordAny, 1);
   assert.equal(counts.aliasAny, 2);
+  assert.equal(counts.aliasAnyUsage, 0);
   assert.equal(counts.mapSetAny, 2);
+});
+
+test('any-backed alias discovery covers bare any and Record<string, any>', () => {
+  const source = `
+type BareAlias = any;
+export type RecordAlias = Record<string, any>;
+type SafeAlias = Record<string, unknown>;
+const bare: BareAlias = input;
+const record: RecordAlias = input;
+`;
+
+  assert.deepEqual([...collectAnyBackedAliasNames(source)].sort(), ['BareAlias', 'RecordAlias']);
+  assert.equal(countAnyBackedAliasUsages(source, collectAnyBackedAliasNames(source)), 2);
 });
 
 test('isProductionTypeScriptFile excludes tests and test utilities', () => {
@@ -93,6 +109,22 @@ test('collectTypeDebt only scans tracked production TS and TSX source files', ()
     assert.deepEqual(debt.files.map((file) => file.path), [
       'client/src/components/Production.tsx',
     ]);
+  });
+});
+
+test('collectTypeDebt counts any-backed alias usage across production files', () => {
+  withTempGitRepo((rootDir) => {
+    writeFile(rootDir, 'client/src/types.ts', 'export type LegacyValue = Record<string, any>;\n');
+    writeFile(rootDir, 'client/src/consumer.ts', "import type { LegacyValue } from './types';\nconst value: LegacyValue = {};\n");
+    execFileSync('git', ['add', 'client/src'], { cwd: rootDir, stdio: 'ignore' });
+
+    const debt = collectTypeDebt({ rootDir });
+
+    assert.equal(debt.counts.aliasAnyUsage, 2);
+    assert.equal(
+      debt.files.find((file) => file.path === 'client/src/consumer.ts')?.counts.aliasAnyUsage,
+      2,
+    );
   });
 });
 
@@ -195,6 +227,21 @@ test('collectStrictDebtFreeDirectoryViolations reports debt under protected dire
       },
     },
   ]);
+});
+
+test('strict directories ignore imported alias usage while the global ratchet counts it', () => {
+  const violations = collectStrictDebtFreeDirectoryViolations(
+    [{
+      path: 'client/src/components/Protected/Consumer.tsx',
+      counts: {
+        ...createZeroCounts(),
+        aliasAnyUsage: 2,
+      },
+    }],
+    ['client/src/components/Protected'],
+  );
+
+  assert.deepEqual(violations, []);
 });
 
 test('runTypeDebtRatchet passes and reports baseline headroom', () => {

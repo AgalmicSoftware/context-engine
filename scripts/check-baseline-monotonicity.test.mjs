@@ -151,6 +151,25 @@ test('reports boundary gains and type-debt increases', () => {
   });
 });
 
+test('allows a newly introduced type-debt metric to establish its first baseline', () => {
+  withTempRepo((repoDir) => {
+    writeBaselines(repoDir, {
+      violations: [],
+      counts: { colonAny: 4 },
+    });
+    commitAll(repoDir, 'base baselines');
+    const base = git(repoDir, ['rev-parse', 'HEAD']).trim();
+
+    writeBaselines(repoDir, {
+      violations: [],
+      counts: { colonAny: 4, aliasAnyUsage: 12 },
+    });
+
+    const result = collectBaselineMonotonicityFindings({ repoDir, baseRef: base });
+    assert.deepEqual(result.typeDebtIncreases, []);
+  });
+});
+
 test('reports lowered coverage floors, broadened exclusions, and legacy-universe gains', () => {
   withTempRepo((repoDir) => {
     writeBaselines(repoDir, {
