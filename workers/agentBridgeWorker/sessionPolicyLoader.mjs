@@ -234,27 +234,16 @@ export async function loadSessionPolicy(env = {}, {
       sessions: registry.sessions,
     }, { now: policyNow }), finalizeOptions);
   }
-  const defaultSessionSlug = sanitizeSessionSlug(
-    env.AGENT_BRIDGE_DEFAULT_SESSION_SLUG ||
-    env.DEFAULT_SESSION_SLUG ||
-    'general'
-  ) || 'general';
-  return finalizeSessionPolicy(env, normalizeSessionPolicy({
-    defaultSessionSlug,
-    riskCeiling: RISK_CEILINGS.SUBMIT,
-    allowQuestionGeneration: true,
-    allowGenerateQuestion: true,
-    sessions: [{
-      sessionSlug: defaultSessionSlug,
-      sessionName: defaultSessionSlug,
-      default: true,
-      telegramBridgeEnabled: true,
-      managedAccountSubmitAllowed: true,
-      sponsoredAiAllowed: true,
-      sponsoredRpcAllowed: true,
-      sponsoredFaucetAllowed: true,
-      sbtJoinModes: ['public', 'password'],
-      docLibraryEnabled: true,
-    }],
-  }, { now: policyNow }), finalizeOptions);
+  const unavailablePolicy = normalizeSessionPolicy({
+    defaultSessionSlug: '',
+    riskCeiling: RISK_CEILINGS.READ,
+    allowQuestionGeneration: false,
+    allowGenerateQuestion: false,
+    sessions: [],
+  }, { now: policyNow });
+  return finalizeSessionPolicy(env, {
+    ...unavailablePolicy,
+    registryAvailable: false,
+    registryFailureReason: safeString(registry.reason) || 'session_registry_unavailable',
+  }, finalizeOptions);
 }

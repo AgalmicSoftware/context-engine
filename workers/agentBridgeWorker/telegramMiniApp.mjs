@@ -5,6 +5,7 @@ import {
   stableJson,
   stableFingerprint,
   kvKeySafePart,
+  envFlagEnabled,
 } from './runtimePrimitives.mjs';
 import {
   DOC_VISIBILITY,
@@ -682,34 +683,25 @@ function parseInitUser(params) {
   }
 }
 
-function miniAppInitDataRequired(env = {}) {
-  return Boolean(safeString(env.TELEGRAM_BOT_TOKEN));
-}
-
 export async function validateTelegramMiniAppInitData(initData = '', env = {}, {
   nowMs = Date.now(),
 } = {}) {
   const botToken = safeString(env.TELEGRAM_BOT_TOKEN);
-  const requireInitData = miniAppInitDataRequired(env);
+  const allowPreviewAuth = envFlagEnabled(env.AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH);
   const raw = safeString(initData);
-  if (!botToken && !requireInitData) {
+  if (!botToken && allowPreviewAuth) {
     return {
       ok: true,
-      reason: 'preview_auth_without_bot_token',
+      reason: 'explicit_preview_auth_without_bot_token',
       authMode: 'preview',
       user: { telegramUserId: 'preview-user', username: 'preview' },
     };
   }
-  if (!raw) {
-    return {
-      ok: !requireInitData,
-      reason: requireInitData ? 'telegram_init_data_missing' : 'preview_auth_missing_init_data',
-      authMode: requireInitData ? 'telegram' : 'preview',
-      user: requireInitData ? null : { telegramUserId: 'preview-user', username: 'preview' },
-    };
-  }
   if (!botToken) {
     return { ok: false, reason: 'telegram_bot_token_missing', authMode: 'telegram', user: null };
+  }
+  if (!raw) {
+    return { ok: false, reason: 'telegram_init_data_missing', authMode: 'telegram', user: null };
   }
 
   const params = new URLSearchParams(raw);

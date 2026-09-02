@@ -50,6 +50,18 @@ test('session policy loading finalizes persisted exposure and default-session ov
   });
 });
 
+test('session policy loading fails closed when no configured or registry session is available', async () => {
+  const policy = await loadSessionPolicy({});
+
+  assert.equal(policy.registryAvailable, false);
+  assert.equal(policy.registryFailureReason, 'registry_rpc_url_missing');
+  assert.equal(policy.defaultSessionSlug, '');
+  assert.deepEqual(policy.linkedSessions, []);
+  assert.equal(policy.riskCeiling, 'read');
+  assert.equal(policy.allowQuestionGeneration, false);
+  assert.equal(policy.allowGenerateQuestion, false);
+});
+
 test('transport-neutral handoff imports policy authority from the policy domain', () => {
   const source = readFileSync(fileURLToPath(new URL('./telegramAgentHandoff.mjs', import.meta.url)), 'utf8');
   const loaderSource = readFileSync(fileURLToPath(new URL('./sessionPolicyLoader.mjs', import.meta.url)), 'utf8');

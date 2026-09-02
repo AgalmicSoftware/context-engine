@@ -292,6 +292,7 @@ test('worker preview route is disabled unless explicitly enabled', async () => {
 test('worker preview route renders an interactive mock Telegram surface when enabled', async () => {
   const response = await worker.fetch(new Request('https://bridge.example/mock/telegram/preview'), {
     AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW: 'true',
+    AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH: 'true',
   });
   const text = await response.text();
 
@@ -362,6 +363,7 @@ test('worker preview update exercises command builder without Telegram network c
   }), {
     TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
     AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW: 'true',
+    AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH: 'true',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true, telegramGroupOpenAccess: true }],
@@ -410,6 +412,7 @@ test('worker Mini App state and draft endpoints use opaque question actions', as
     TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
     DEMO_SIGNER_ROOT_SECRET: 'unit-root',
     AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW: 'true',
+    AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH: 'true',
     AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
@@ -578,6 +581,7 @@ test('worker Mini App direct submit broadcasts on-chain when worker and policy a
     BROADCAST_ENABLED: 'true',
     TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
     AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW: 'true',
+    AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH: 'true',
     AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
     DEFAULT_CHAIN_ID: '11155420',
@@ -668,6 +672,7 @@ test('worker Mini App submit returns actionable worker auth failure details', as
     BROADCAST_ENABLED: 'true',
     TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
     AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW: 'true',
+    AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH: 'true',
     AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
     DEFAULT_CHAIN_ID: '11155420',
@@ -743,6 +748,7 @@ test('worker Mini App retries failed direct submit records instead of replaying 
     BROADCAST_ENABLED: 'true',
     TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
     AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW: 'true',
+    AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH: 'true',
     AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
     DEFAULT_CHAIN_ID: '11155420',
@@ -838,6 +844,7 @@ test('worker Mini App handoff keeps question-specific group launches opaque thro
   const env = {
     TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
     AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW: 'true',
+    AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH: 'true',
     AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
@@ -996,6 +1003,7 @@ test('worker Mini App draft endpoint requires a matching opaque launch in Telegr
     TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
     DEMO_SIGNER_ROOT_SECRET: 'unit-root',
     AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW: 'true',
+    AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH: 'true',
     AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({

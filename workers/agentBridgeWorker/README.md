@@ -670,7 +670,10 @@ callback data.
 The command handler uses `AGENT_BRIDGE_SESSION_POLICY_JSON` as the explicit
 Telegram session list when it is configured. Telegram-visible sessions must set
 both `telegramBridgeEnabled=true` and `telegramOnly=true`; standard registry
-sessions are not listed just because they exist on-chain. The policy can carry
+sessions are not listed just because they exist on-chain. When neither explicit
+policy nor registry discovery yields a session, the bridge exposes no linked
+sessions and read-only risk instead of inventing a privileged `general`
+session. The policy can carry
 preloaded `questions` for Cloudflare-native Telegram-only sessions, or point at
 a Cloudflare-backed session worker through `sessionWorkerUrl` plus
 `storageProfile.backend="cloudflare"` so the bridge can load
@@ -858,9 +861,11 @@ configured `TELEGRAM_BOT_TOKEN` before generating stateful question actions or
 trusting Telegram user/chat/session identity on write endpoints. Treat
 `initDataUnsafe`, `web_app_data`, and all browser-submitted fields as untrusted
 client input until validated server-side.
-When `TELEGRAM_BOT_TOKEN` is absent, local tests/previews use a preview auth
-principal. When the bot token is configured, Mini App init data is always
-required; there is no deployable preview-auth bypass.
+When `TELEGRAM_BOT_TOKEN` is absent, Mini App authorization fails closed unless
+local tests/previews explicitly set
+`AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH=true`. The deploy helper rejects that
+local-only flag, so deployed Mini App requests always require a bot token and
+valid init data.
 `AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS` controls accepted init-data age and
 defaults to 24 hours.
 
