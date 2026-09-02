@@ -6,6 +6,7 @@ import {
 import { classifySessionModeProfileSupport, type SessionModeProfile } from '../../utilities/session/sessionModeProfile';
 import { CHIPOTLE_LIT_CONFIG_FIELDS } from './sessionWizardWorkerSecretSupport';
 import { fingerprintSessionWizardJson } from './sessionWizardCanonicalJson';
+import { sanitizeSessionSlug as normalizeSlug } from '../../utilities/session/sessionSlug';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -98,11 +99,6 @@ const LIT_CREDENTIAL_DESCRIPTOR_FIELDS = new Set<string>(CHIPOTLE_LIT_CONFIG_FIE
 
 const toTrimmedString = (value: unknown): string =>
   typeof value === 'string' ? value.trim() : value == null ? '' : String(value).trim();
-
-const normalizeSlug = (value: unknown): string =>
-  toTrimmedString(value)
-    .toLowerCase()
-    .replace(/[^a-z0-9_-]/g, '');
 
 const normalizeSessionId = normalizeWorkerCanonicalSessionIdHex;
 

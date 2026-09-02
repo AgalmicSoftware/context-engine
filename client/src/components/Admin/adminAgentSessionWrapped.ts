@@ -3,6 +3,7 @@ import {
   type AgentSessionWrappedCapability,
 } from '../../utilities/session/agentSessionWrapped.js';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
+import { normalizeBoundedSessionStorageSlug as normalizeSessionSlug } from '../../utilities/session/sessionSlug';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { getUsableSessionWorkerUrl } from '../../utilities/session/sessionWorkerAvailability.js';
 import { AGENT_BRIDGE_WORKER_BUNDLE_URL, WORKER_RELEASE_MANIFEST_URL } from '../../variables/publicDeploymentConfig.js';
@@ -39,11 +40,6 @@ const normalizeHttpsOrigin = (value: unknown): string => {
   } catch {
     return '';
   }
-};
-
-const normalizeSessionSlug = (value: unknown): string => {
-  const slug = toStr(value).trim().toLowerCase() || 'general';
-  return /^[a-z0-9_-]{1,128}$/.test(slug) ? slug : '';
 };
 
 const authorityModeFrom = (sessionConfig: unknown): string =>

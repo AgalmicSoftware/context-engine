@@ -5,7 +5,7 @@
  *
  * Key exports: buildQuestionRoutePath, parseQuestionSessionSlugFromSearch, isMaskedQuestionPayload, hasQuestionDecryption, litReady
  */
-import { normalizeSessionSlug } from '../session/sessionNaming.js';
+import { normalizeSessionSlug as normalizeSlug } from '../session/sessionNaming.js';
 import {
   SESSION_STORAGE_PAYLOAD_ACCESS_MODES,
   normalizeSessionStorageConfig,
@@ -66,7 +66,6 @@ type MaskedQuestionRefreshArgs = {
   next?: RetryContext | null;
 };
 
-const normalizeSlug = (rawSlug: unknown): string => normalizeSessionSlug(rawSlug);
 const toLowerString = (value: unknown): string =>
   String(value || '')
     .trim()

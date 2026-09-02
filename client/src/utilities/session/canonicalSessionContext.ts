@@ -7,7 +7,7 @@
  *              resolveSessionConfigFromSources, resolveCanonicalSessionConfig,
  *              resolveCanonicalSessionContext
  */
-import { toStr, normalizeSlug as normalizeBaseSlug } from '../shared/primitives.js';
+import { toStr } from '../shared/primitives.js';
 import { USE_ONCHAIN_SESSION_REGISTRY } from '../../variables/appConfig.js';
 import {
   AUTHORITY_MATRIX,
@@ -21,7 +21,11 @@ import {
   parseWorkerConfig,
   parseLocalResourceOverrides,
 } from './sessionParsers.js';
-import { canonicalizeLegacySessionAlias } from './sessionDemoCompat.js';
+import {
+  canonicalizeSessionSlug,
+  isReservedSessionSlugKey,
+  normalizeSessionSlugAliasToken,
+} from './sessionSlug';
 import { SESSION_WORKER_METADATA_ALIAS_KEYS } from './sessionWorkerUrlCompatibility.js';
 import { resolveSessionCapabilityProjection } from './sessionCapabilityProjection';
 import type {
@@ -138,11 +142,7 @@ const buildEmptyLocalOverrides = (): LocalResourceOverrides => ({
   faucet: { useLocal: false, privateKey: '' },
 });
 const hasOwnKeys = (value: unknown): value is UnknownRecord => isObj(value) && Object.keys(value).length > 0;
-const readTrimmedSessionSlug = (raw: unknown): string => toStr(raw).trim();
-const normalizeSessionAliasToken = (raw: unknown): string => normalizeBaseSlug(readTrimmedSessionSlug(raw));
-const RESERVED_SESSION_SLUG_KEYS = new Set<string>(['__proto__', 'constructor', 'prototype']);
-export const isReservedSessionSlugKey = (rawSlug: unknown): boolean =>
-  RESERVED_SESSION_SLUG_KEYS.has(normalizeSessionAliasToken(rawSlug));
+export { canonicalizeSessionSlug, isReservedSessionSlugKey } from './sessionSlug';
 // chainId alone is not sufficient — a partial/malformed registry record with only
 // chainId should not suppress the route identity or mark resolution as authoritative.
 const hasIdentityValue = (identity: ParsedSessionIdentity | UnknownRecord | null | undefined): boolean =>
@@ -245,15 +245,6 @@ const stripEffectiveMetadataOverrides = (metadata: unknown): UnknownRecord => {
   return next;
 };
 
-export const canonicalizeSessionSlug = (rawSlug: unknown): string => {
-  const slug = readTrimmedSessionSlug(rawSlug);
-  if (!slug) return '';
-  // Preserve real session slugs verbatim; only canonicalize reserved aliases.
-  const canonicalSlug = canonicalizeLegacySessionAlias(slug);
-  if (isReservedSessionSlugKey(canonicalSlug)) return '';
-  return canonicalSlug;
-};
-
 const findDemoSessionConfigBySlug = (demoSessions: unknown, slugIn: unknown = ''): SessionConfigLike | null => {
   const demo = isObj(demoSessions) ? demoSessions : {};
   const slug = canonicalizeSessionSlug(slugIn);
@@ -273,7 +264,7 @@ const findDemoSessionConfigByAlias = (
 ): SessionConfigLike | null => {
   const demo = isObj(demoSessions) ? demoSessions : {};
   const slug = canonicalizeSessionSlug(slugIn);
-  const aliasToken = normalizeSessionAliasToken(slugIn);
+  const aliasToken = normalizeSessionSlugAliasToken(slugIn);
   const entries = Object.entries(demo);
   for (const [key, entry] of entries) {
     if (!isObj(entry)) continue;
@@ -281,9 +272,9 @@ const findDemoSessionConfigByAlias = (
     if (slug && canonicalizeSessionSlug(entry.slug || '') === slug) return entry as SessionConfigLike;
     if (allowSessionName && slug && canonicalizeSessionSlug(entry.sessionName || '') === slug)
       return entry as SessionConfigLike;
-    if (aliasToken && normalizeSessionAliasToken(key) === aliasToken) return entry as SessionConfigLike;
-    if (aliasToken && normalizeSessionAliasToken(entry.slug || '') === aliasToken) return entry as SessionConfigLike;
-    if (allowSessionName && aliasToken && normalizeSessionAliasToken(entry.sessionName || '') === aliasToken)
+    if (aliasToken && normalizeSessionSlugAliasToken(key) === aliasToken) return entry as SessionConfigLike;
+    if (aliasToken && normalizeSessionSlugAliasToken(entry.slug || '') === aliasToken) return entry as SessionConfigLike;
+    if (allowSessionName && aliasToken && normalizeSessionSlugAliasToken(entry.sessionName || '') === aliasToken)
       return entry as SessionConfigLike;
   }
   return null;

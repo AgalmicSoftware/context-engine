@@ -1,5 +1,9 @@
 import { normalizeWorkerUrl } from '../worker/workerUrl.js';
 import { normalizeWorkerCanonicalSessionIdHex } from './sessionWorkerDiscovery.js';
+import {
+  normalizeSessionSlugAlias as normalizeSessionSlug,
+  sessionSlugStorageKey,
+} from './sessionSlug';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -56,11 +60,6 @@ const toRecord = (value: unknown): UnknownRecord =>
 
 const toStr = (value: unknown): string => String(value ?? '').trim();
 
-const normalizeSessionSlug = (value: unknown): string => {
-  const slug = toStr(value).toLowerCase();
-  return slug === 'general' ? '' : slug;
-};
-
 const normalizeIdentityTarget = (
   target: unknown | AgentClientLoginIdentityTarget,
 ): {
@@ -82,7 +81,7 @@ const normalizeIdentityTarget = (
 };
 
 const storageSlugPart = (sessionSlug: unknown): string =>
-  encodeURIComponent(normalizeSessionSlug(sessionSlug) || 'general');
+  encodeURIComponent(sessionSlugStorageKey(sessionSlug));
 
 const storageKey = (target: unknown | AgentClientLoginIdentityTarget): string => {
   const identity = normalizeIdentityTarget(target);

@@ -1,4 +1,5 @@
 import { hasLegacyTelegramFirstSessionFlags, isSessionModeProfileTelegramFirst } from './sessionModeProfile';
+import { normalizeSessionSlugAlias as normalizeSessionSlug } from './sessionSlug';
 
 export type SessionBackendKind = 'onchain' | 'telegram';
 
@@ -14,13 +15,6 @@ export type ResolveSessionBackendKindArgs = {
   sessionConfig?: unknown;
   probeResult?: TelegramSessionMeta | null;
   sessionSlug?: unknown;
-};
-
-const normalizeSessionSlug = (value: unknown): string => {
-  const slug = String(value || '')
-    .trim()
-    .toLowerCase();
-  return slug === 'general' ? '' : slug;
 };
 
 export const isTelegramFirstSessionConfig = (metadata: unknown): boolean => {
