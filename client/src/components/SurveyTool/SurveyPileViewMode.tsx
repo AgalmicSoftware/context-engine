@@ -1714,12 +1714,16 @@ export const recordInterviewProvenance = (
   const normalizedSource = source || resolveRealtimeInterviewSource(engine.props?.sessionConfig);
   const normalizedResponderName = String(responderName || '').trim().replace(/\s+/g, ' ').slice(0, 160);
   return new Promise<void>((resolve) => {
-    engine.setState((prev: any) => {
+    engine.setState((prev: SurveyQuestionsState) => {
       const states = [...(prev.surveysResponseState || [])];
       const slice = {
         ...(states[0] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }),
       };
-      const provenance = { ...(slice.interviewProvenance || {}) };
+      const currentProvenance = slice.interviewProvenance;
+      const provenance: Record<string, unknown> =
+        currentProvenance && typeof currentProvenance === 'object' && !Array.isArray(currentProvenance)
+          ? { ...currentProvenance }
+          : {};
       drafts.forEach((draft) => {
         if (!included && !includePredictionComparison && !normalizedResponderName) {
           delete provenance[draft.questionId];
@@ -2294,7 +2298,7 @@ const handleAnswerPile = (engine: PileViewModeEngine, questionId: any, answer: a
   engine.handleAnswer(0, questionId, answer, options);
 };
 
-const handleAdditionalPile = (engine: PileViewModeEngine, questionId: any, comments: any, options: any = {}) => {
+const handleAdditionalPile = (engine: PileViewModeEngine, questionId: any, comments: any, options: Record<string, unknown> = {}) => {
   engine.handleAdditional(0, questionId, comments, options);
 };
 

@@ -1093,7 +1093,7 @@ class CommunityTab extends Component<any, any> {
       const questionIdSet: any = new Set();
       const userSet: any = new Set();
       const sbtAddressSet: any = new Set();
-      const workerGroupIdentitySet: any = new Set();
+      const workerGroupIdentitySet = new Set<string>();
       const surveyTitleMap: Record<string, any> = {};
       const surveySlugMap: Record<string, any> = {};
       const surveyRespondersMap: Record<string, any> = {};
@@ -1159,7 +1159,7 @@ class CommunityTab extends Component<any, any> {
           });
         }
 
-        Object.keys(scopeEntry.isWorkerCanonical ? {} : sbtList || {}).forEach((addrLower: any) => {
+        Object.keys(scopeEntry.isWorkerCanonical ? {} : sbtList || {}).forEach((addrLower) => {
           const entry = sbtList[addrLower];
           if (!entry || !entry.sbtAddress) return;
 

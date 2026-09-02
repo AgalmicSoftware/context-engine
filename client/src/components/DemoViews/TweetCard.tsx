@@ -45,7 +45,7 @@ export type CorpusEntry = {
   author?: string;
   author_name?: string;
   display_name?: string;
-  created_at?: string;
+  created_at?: string | number;
   text?: string;
   summary?: string;
   sentiment?: string;

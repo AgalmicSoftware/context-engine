@@ -5,11 +5,11 @@ import { faArrowRight, faBookOpen, faChartLine, faProjectDiagram } from '@fortaw
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import baseStyles from './CorpusViewer.module.scss';
 import nativeStyles from './CorpusNativeCards.module.scss';
-import { DebateMapSection, ExternalSourceLink } from './TweetCard';
+import { DebateMapSection, ExternalSourceLink, type CorpusEntry } from './TweetCard';
 
 const styles = { ...baseStyles, ...nativeStyles };
 
-type NativeCorpusEntry = {
+type NativeCorpusEntry = CorpusEntry & {
   id?: string;
   title?: string;
   author?: string;
@@ -109,10 +109,10 @@ const CardFooter = ({
   actionClassName?: string;
 }) => (
   <div className={styles.cardFooter}>
-    <DebateMapSection entry={entry as any} onAtlasIssueOpen={onAtlasIssueOpen} className={actionClassName} />
+    <DebateMapSection entry={entry} onAtlasIssueOpen={onAtlasIssueOpen} className={actionClassName} />
     {entry.url ? (
       <div className={styles.cardFooterLinks}>
-        <ExternalSourceLink entry={entry as any} fallbackLabel={label} className={actionClassName} />
+        <ExternalSourceLink entry={entry} fallbackLabel={label} className={actionClassName} />
       </div>
     ) : null}
   </div>

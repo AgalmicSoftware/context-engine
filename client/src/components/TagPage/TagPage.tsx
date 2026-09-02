@@ -8,8 +8,7 @@ import { callAI } from '../../utilities/ai/aiClient.js';
 import buildTagInterpretationPrompt from '../../prompts/tagInterpretationPrompt.js';
 import { normalizeTagList } from '../../utilities/defaultTags.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
-import { getDemoSessionConfigBySlug } from '../../domains/sessions/sessionConfig.js';
-import { getSessionConfigBySlug } from '../../utilities/web3/chainGateway.js';
+import { getDemoSessionConfigBySlug, getSessionConfigBySlug } from '../../domains/sessions/sessionConfig.js';
 import { useSessionRegistryReads } from '../../utilities/query/useSessionRegistryReads.js';
 import { normalizeGlobalSessionSelection } from '../../utilities/session/globalSessionState.js';
 import { parseQuestionSessionSlugFromSearch } from '../../utilities/survey/questionRouting.js';
@@ -21,11 +20,11 @@ import { getUsableSessionWorkerUrl } from '../../utilities/session/sessionWorker
 import {
   loadPublicWorkerGroups,
   loadWorkerGroupOverview,
+  getWorkerSessionToken,
   type WorkerGroup,
   type WorkerGroupOverview,
 } from '../../domains/worker/workerGroupPorts';
-import { getWorkerSessionToken } from '../../utilities/worker/workerAuth';
-import { buildWorkerGroupsPath } from '../../utilities/worker/workerGroupRoutes.js';
+import { workerGroupNavigationPort } from '../../domains/worker/workerGroupNavigationPort';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse';
 import SessionChipSelector from '../Shared/SessionChipSelector';
@@ -343,7 +342,7 @@ export const loadTagPageWorkerGroupData = async (
             {
               kind: 'worker' as const,
               address: groupId,
-              href: buildWorkerGroupsPath({ groupId, sessionSlug }),
+              href: workerGroupNavigationPort.buildPath({ groupId, sessionSlug }),
               name: String(group?.label || '').trim() || groupId,
               image: String(group?.imageUrl || '').trim(),
               tags,

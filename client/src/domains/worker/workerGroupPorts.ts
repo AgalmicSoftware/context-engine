@@ -1,6 +1,7 @@
 import { normalizeWorkerUrl } from '../../utilities/worker/workerUrl.js';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
 import { normalizeWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery.js';
+export { getWorkerSessionToken } from '../../utilities/worker/workerAuth.js';
 
 type UnknownRecord = Record<string, unknown>;
 
