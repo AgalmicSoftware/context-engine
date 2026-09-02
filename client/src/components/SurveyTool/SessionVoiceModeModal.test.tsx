@@ -1,13 +1,18 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import SessionVoiceModeModal from './SessionVoiceModeModal';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { hashInterviewQuestions, mapInterviewEvidenceToResponses } from './sessionInterview';
 import { startSessionRealtimeInterview } from '../../utilities/audio/realtimeInterviewClient';
 
-jest.mock('./SessionListeningPanel', () => (props: Record<string, unknown>) => (
-  <div data-testid="mock-group-listening" data-mode={String(props.panelMode || '')} />
-));
+jest.mock('./SessionListeningPanel', () => ({
+  __esModule: true,
+  default: (props: Record<string, unknown>) => (
+    <div data-testid="mock-group-listening" data-mode={String(props.panelMode || '')} />
+  ),
+  SessionListeningWaveform: () => <canvas data-testid="mock-interview-waveform" />,
+  formatSessionRecordingElapsed: (seconds: number) => `0:${String(seconds).padStart(2, '0')}`,
+}));
 
 jest.mock('./sessionInterview', () => {
   const actual = jest.requireActual<typeof import('./sessionInterview')>('./sessionInterview');
@@ -71,6 +76,39 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.getByTestId('mock-group-listening')).toHaveAttribute('data-mode', 'recordGroup');
   });
 
+  it('prevents duplicate realtime sessions and stops a late connection after the modal closes', async () => {
+    const stop = jest.fn(async () => ({ transcript: '', turns: [] }));
+    let resolveSession: ((session: Awaited<ReturnType<typeof startSessionRealtimeInterview>>) => void) | null = null;
+    mockedStartSessionRealtimeInterview.mockImplementation(
+      () => new Promise((resolve) => {
+        resolveSession = resolve;
+      }),
+    );
+    const view = render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+    const start = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START);
+
+    fireEvent.click(start);
+    fireEvent.click(start);
+
+    await waitFor(() => expect(mockedStartSessionRealtimeInterview).toHaveBeenCalledTimes(1));
+    expect(start).toBeDisabled();
+    expect(start).toHaveTextContent('Starting interview…');
+
+    view.unmount();
+    await act(async () => {
+      resolveSession?.({
+        mediaStream: { getTracks: () => [], getAudioTracks: () => [] } as unknown as MediaStream,
+        pause: jest.fn(),
+        resume: jest.fn(),
+        stop,
+        getTranscript: () => '',
+      });
+      await Promise.resolve();
+    });
+
+    expect(stop).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps the copied memory prompt collapsed and confirms clipboard success with a checkmark', async () => {
     render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
 
@@ -112,15 +150,35 @@ describe('SessionVoiceModeModal', () => {
   });
 
   it('shows a collapsed responder transcript disclosure after the voice interview ends', async () => {
-    const stop = jest.fn(async () => ({
-      transcript: 'Responder: Reversible decisions matter.',
-      turns: [{ itemId: 'turn-1', text: 'Reversible decisions matter.', role: 'responder' as const }],
+    let interviewOptions: Parameters<typeof startSessionRealtimeInterview>[0] | null = null;
+    let resolveStop: (() => void) | null = null;
+    const stop = jest.fn(() => new Promise<{
+      transcript: string;
+      turns: Array<{ itemId: string; text: string; role: 'responder' }>;
+    }>((resolve) => {
+      resolveStop = () => resolve({
+        transcript: 'Responder: Reversible decisions matter.',
+        turns: [{ itemId: 'turn-1', text: 'Reversible decisions matter.', role: 'responder' }],
+      });
     }));
+    const pause = jest.fn(() => interviewOptions?.onRecordingState?.('paused'));
+    const resume = jest.fn(() => interviewOptions?.onRecordingState?.('recording'));
+    const mediaStream = {
+      getTracks: () => [],
+      getAudioTracks: () => [],
+    } as unknown as MediaStream;
     mockedStartSessionRealtimeInterview.mockImplementation(async (options) => {
+      interviewOptions = options;
       options.onTranscript?.('Responder: Reversible decisions matter.', [
         { itemId: 'turn-1', text: 'Reversible decisions matter.', role: 'responder' },
       ]);
-      return { stop, getTranscript: () => 'Responder: Reversible decisions matter.' };
+      return {
+        mediaStream,
+        pause,
+        resume,
+        stop,
+        getTranscript: () => 'Responder: Reversible decisions matter.',
+      };
     });
 
     render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
@@ -128,10 +186,36 @@ describe('SessionVoiceModeModal', () => {
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
     expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP)).toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveAccessibleName(
+      'Interview status: Recording',
+    );
+    expect(screen.getByText('0:00')).toBeInTheDocument();
+    expect(screen.getByLabelText('Pause interview')).toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT_TOGGLE)).not.toBeInTheDocument();
 
+    fireEvent.click(screen.getByLabelText('Pause interview'));
+    expect(pause).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveAccessibleName(
+      'Interview status: Paused',
+    );
+    fireEvent.click(screen.getByLabelText('Resume interview'));
+    expect(resume).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveAccessibleName(
+      'Interview status: Recording',
+    );
+
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
+    expect(stop).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText('Pause interview')).toBeDisabled();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveAccessibleName(
+      'Interview status: Stopping',
+    );
+    await act(async () => {
+      resolveStop?.();
+      await Promise.resolve();
+    });
     const toggle = await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT_TOGGLE);
+    expect(screen.queryByLabelText('Pause interview')).not.toBeInTheDocument();
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(toggle).toHaveTextContent('4 words');
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT)).not.toBeInTheDocument();

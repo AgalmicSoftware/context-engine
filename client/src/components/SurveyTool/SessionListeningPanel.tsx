@@ -35,7 +35,7 @@ type BrowserAudioWindow = Window &
     webkitAudioContext?: typeof AudioContext;
   };
 
-const formatElapsed = (secondsRaw: unknown) => {
+export const formatSessionRecordingElapsed = (secondsRaw: unknown) => {
   const seconds = Math.max(0, Math.floor(Number(secondsRaw || 0)));
   const minutes = Math.floor(seconds / 60);
   const rest = seconds % 60;
@@ -68,7 +68,7 @@ const cancelWaveformFrame = (handle: number) => {
   clearTimeout(handle as unknown as ReturnType<typeof setTimeout>);
 };
 
-function SessionListeningWaveform({ streamRef, isActive, isPaused }: SessionListeningWaveformProps) {
+export function SessionListeningWaveform({ streamRef, isActive, isPaused }: SessionListeningWaveformProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -506,7 +506,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
                 className={recorder.isPaused ? styles.sessionListeningTimerDotPaused : styles.sessionListeningTimerDot}
               />
               <span>{recorder.isPaused ? 'Paused' : 'Recording'}</span>
-              <span>{formatElapsed(recorder.elapsedSeconds)}</span>
+              <span>{formatSessionRecordingElapsed(recorder.elapsedSeconds)}</span>
             </div>
           </div>
           <div className={styles.sessionListeningButtonColumn} role="group" aria-label="Recording controls">

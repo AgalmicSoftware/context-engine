@@ -5,9 +5,14 @@ export type RealtimeInterviewTurn = {
 };
 
 export type RealtimeInterviewSession = {
+  mediaStream: MediaStream;
+  pause: () => void;
+  resume: () => void;
   stop: () => Promise<{ transcript: string; turns: RealtimeInterviewTurn[] }>;
   getTranscript: () => string;
 };
+
+export type RealtimeInterviewRecordingState = 'recording' | 'paused' | 'stopped';
 
 type StartRealtimeInterviewOptions = {
   workerUrl: string;
@@ -15,6 +20,7 @@ type StartRealtimeInterviewOptions = {
   instructions: string;
   audioElement: HTMLAudioElement;
   onStatus?: (status: string) => void;
+  onRecordingState?: (state: RealtimeInterviewRecordingState) => void;
   onTranscript?: (transcript: string, turns: RealtimeInterviewTurn[]) => void;
   fetchImpl?: typeof fetch;
   mediaDevices?: Pick<MediaDevices, 'getUserMedia'>;
@@ -68,6 +74,7 @@ export const startSessionRealtimeInterview = async ({
   instructions,
   audioElement,
   onStatus = () => {},
+  onRecordingState = () => {},
   onTranscript = () => {},
   fetchImpl = fetch,
   mediaDevices = navigator.mediaDevices,
@@ -81,6 +88,22 @@ export const startSessionRealtimeInterview = async ({
   const turns: RealtimeInterviewTurn[] = [];
   let stopped = false;
 
+  const stopStreamTracks = (value: unknown) => {
+    if (!value || typeof value !== 'object' || !('getTracks' in value)) return;
+    const getTracks = (value as { getTracks?: () => MediaStreamTrack[] }).getTracks;
+    if (typeof getTracks !== 'function') return;
+    let tracks: MediaStreamTrack[] = [];
+    try {
+      tracks = getTracks.call(value);
+    } catch {
+      return;
+    }
+    tracks.forEach((track) => {
+      try { track.enabled = false; } catch {}
+      try { track.stop(); } catch {}
+    });
+  };
+
   peer.ontrack = (event) => {
     audioElement.autoplay = true;
     audioElement.srcObject = event.streams[0] || new MediaStream([event.track]);
@@ -88,7 +111,8 @@ export const startSessionRealtimeInterview = async ({
   };
   stream.getTracks().forEach((track) => peer.addTrack(track, stream));
   const channel = peer.createDataChannel('oai-events');
-  channel.addEventListener('message', (message) => {
+  const handleMessage = (message: MessageEvent) => {
+    if (stopped) return;
     try {
       const event = JSON.parse(String(message.data || ''));
       const turn = readRealtimeResponderTurn(event);
@@ -96,7 +120,18 @@ export const startSessionRealtimeInterview = async ({
       turns.push(turn);
       onTranscript(buildRealtimeInterviewTranscript(turns), [...turns]);
     } catch {}
-  });
+  };
+  channel.addEventListener('message', handleMessage);
+  const closeRealtimeMedia = () => {
+    channel.removeEventListener('message', handleMessage);
+    peer.ontrack = null;
+    stopStreamTracks(stream);
+    try { channel.close(); } catch {}
+    try { peer.close(); } catch {}
+    try { audioElement.pause(); } catch {}
+    stopStreamTracks(audioElement.srcObject);
+    audioElement.srcObject = null;
+  };
 
   try {
     const offer = await peer.createOffer();
@@ -127,27 +162,46 @@ export const startSessionRealtimeInterview = async ({
       },
     }));
     onStatus('Interview in progress');
+    onRecordingState('recording');
   } catch (error) {
-    stream.getTracks().forEach((track) => track.stop());
-    channel.close();
-    peer.close();
+    stopped = true;
+    closeRealtimeMedia();
+    onRecordingState('stopped');
     throw error;
   }
+
+  const pause = () => {
+    if (stopped) return;
+    stream.getAudioTracks().forEach((track) => {
+      track.enabled = false;
+    });
+    onStatus('Interview paused');
+    onRecordingState('paused');
+  };
+
+  const resume = () => {
+    if (stopped) return;
+    stream.getAudioTracks().forEach((track) => {
+      if (track.readyState !== 'ended') track.enabled = true;
+    });
+    onStatus('Interview in progress');
+    onRecordingState('recording');
+  };
 
   const stop = async () => {
     if (!stopped) {
       stopped = true;
-      stream.getTracks().forEach((track) => track.stop());
-      channel.close();
-      peer.close();
-      audioElement.pause();
-      audioElement.srcObject = null;
+      closeRealtimeMedia();
       onStatus('Interview ended');
+      onRecordingState('stopped');
     }
     return { transcript: buildRealtimeInterviewTranscript(turns), turns: [...turns] };
   };
 
   return {
+    mediaStream: stream,
+    pause,
+    resume,
     stop,
     getTranscript: () => buildRealtimeInterviewTranscript(turns),
   };

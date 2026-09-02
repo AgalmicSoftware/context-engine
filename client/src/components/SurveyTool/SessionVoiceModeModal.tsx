@@ -5,14 +5,21 @@ import {
   faCaretDown,
   faCheck,
   faClipboard,
+  faCircle,
   faComments,
   faMicrophone,
+  faPause,
+  faPlay,
   faSpinner,
+  faStop,
   faTimes,
 } from '@fortawesome/free-solid-svg-icons';
 import styles from './SurveyTool.module.scss';
 import BinaryChoiceInput from './BinaryChoiceInput';
-import SessionListeningPanel from './SessionListeningPanel';
+import SessionListeningPanel, {
+  formatSessionRecordingElapsed,
+  SessionListeningWaveform,
+} from './SessionListeningPanel';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { getCorsProxyUrlOrThrow } from '../../utilities/worker/corsProxy.js';
 import {
@@ -34,6 +41,7 @@ import {
 } from '../../utilities/audio/realtimeInterviewClient';
 
 type UnknownRecord = Record<string, unknown>;
+type InterviewRecorderState = 'idle' | 'starting' | 'recording' | 'paused' | 'stopping';
 
 type InterviewDraftApplicationProps = {
   onClose: () => void;
@@ -156,13 +164,18 @@ function SessionInterviewPanel({
 }: SessionInterviewPanelProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const sessionRef = useRef<RealtimeInterviewSession | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const recordingStateRef = useRef<InterviewRecorderState>('idle');
+  const startAttemptRef = useRef(0);
+  const disposedRef = useRef(false);
   const importedRef = useRef(false);
   const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [resolvedWorkerUrl, setResolvedWorkerUrl] = useState(workerUrl);
   const [responderContext, setResponderContext] = useState(() => displayResponderContext(prefillPacket));
   const [status, setStatus] = useState('Ready');
   const [transcript, setTranscript] = useState('');
-  const [running, setRunning] = useState(false);
+  const [recordingState, setRecordingState] = useState<InterviewRecorderState>('idle');
+  const [recordingElapsedSeconds, setRecordingElapsedSeconds] = useState(0);
   const [mapping, setMapping] = useState(false);
   const [mappingNotice, setMappingNotice] = useState('');
   const [applying, setApplying] = useState(false);
@@ -177,15 +190,42 @@ function SessionInterviewPanel({
   const [showTranscript, setShowTranscript] = useState(false);
   const [promptCopied, setPromptCopied] = useState(false);
   const [expandedEvidence, setExpandedEvidence] = useState<Record<string, boolean>>({});
+  const isStarting = recordingState === 'starting';
+  const isRecording = recordingState === 'recording';
+  const isPaused = recordingState === 'paused';
+  const isStopping = recordingState === 'stopping';
+  const isRecorderSessionActive = isRecording || isPaused || isStopping;
+  const isInterviewBusy = isStarting || isRecorderSessionActive;
+
+  const updateRecordingState = useCallback((nextState: InterviewRecorderState) => {
+    recordingStateRef.current = nextState;
+    setRecordingState(nextState);
+  }, []);
 
   useEffect(() => {
     if (workerUrl) setResolvedWorkerUrl(workerUrl);
   }, [workerUrl]);
 
-  useEffect(() => () => {
-    void sessionRef.current?.stop();
-    if (copyResetRef.current) clearTimeout(copyResetRef.current);
+  useEffect(() => {
+    disposedRef.current = false;
+    return () => {
+      disposedRef.current = true;
+      startAttemptRef.current += 1;
+      const activeSession = sessionRef.current;
+      sessionRef.current = null;
+      mediaStreamRef.current = null;
+      void activeSession?.stop();
+      if (copyResetRef.current) clearTimeout(copyResetRef.current);
+    };
   }, []);
+
+  useEffect(() => {
+    if (!isRecording) return undefined;
+    const timer = setInterval(() => {
+      setRecordingElapsedSeconds((seconds) => seconds + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isRecording]);
 
   const resolveWorkerUrl = useCallback(async () => {
     if (resolvedWorkerUrl) return resolvedWorkerUrl;
@@ -283,30 +323,79 @@ function SessionInterviewPanel({
   }, [prefillPacket, questions.length, runMapping]);
 
   const startInterview = async () => {
-    if (!audioRef.current) return;
+    if (!audioRef.current || recordingStateRef.current !== 'idle') return;
+    const attempt = startAttemptRef.current + 1;
+    startAttemptRef.current = attempt;
+    updateRecordingState('starting');
+    setRecordingElapsedSeconds(0);
+    setStatus('Starting interview…');
     setError('');
     setMappingNotice('');
     try {
       const url = await resolveWorkerUrl();
-      sessionRef.current = await startSessionRealtimeInterview({
+      const nextSession = await startSessionRealtimeInterview({
         workerUrl: url,
         sessionSlug,
         instructions: buildRealtimeInterviewInstructions({ questions, responderContext }),
         audioElement: audioRef.current,
         onStatus: setStatus,
+        onRecordingState: (nextState) => {
+          if (disposedRef.current || startAttemptRef.current !== attempt) return;
+          if (nextState === 'recording') updateRecordingState('recording');
+          if (nextState === 'paused') updateRecordingState('paused');
+          if (nextState === 'stopped' && recordingStateRef.current !== 'stopping') {
+            sessionRef.current = null;
+            mediaStreamRef.current = null;
+            updateRecordingState('idle');
+          }
+        },
         onTranscript: setTranscript,
       });
-      setRunning(true);
+      if (disposedRef.current || startAttemptRef.current !== attempt) {
+        await nextSession.stop();
+        return;
+      }
+      sessionRef.current = nextSession;
+      mediaStreamRef.current = nextSession.mediaStream;
+      updateRecordingState('recording');
     } catch (startError) {
+      if (disposedRef.current || startAttemptRef.current !== attempt) return;
+      sessionRef.current = null;
+      mediaStreamRef.current = null;
+      updateRecordingState('idle');
       setError(startError instanceof Error ? startError.message : 'Could not start the interview.');
       setStatus('Could not start');
     }
   };
 
+  const pauseInterview = () => {
+    if (!sessionRef.current || recordingStateRef.current !== 'recording') return;
+    sessionRef.current.pause();
+    updateRecordingState('paused');
+    setStatus('Interview paused');
+  };
+
+  const resumeInterview = () => {
+    if (!sessionRef.current || recordingStateRef.current !== 'paused') return;
+    sessionRef.current.resume();
+    updateRecordingState('recording');
+    setStatus('Interview in progress');
+  };
+
   const endInterview = async () => {
-    const result = await sessionRef.current?.stop();
+    if (recordingStateRef.current === 'stopping') return;
+    const activeSession = sessionRef.current;
+    if (!activeSession) {
+      mediaStreamRef.current = null;
+      updateRecordingState('idle');
+      return;
+    }
+    updateRecordingState('stopping');
+    setStatus('Stopping interview…');
+    const result = await activeSession.stop();
     sessionRef.current = null;
-    setRunning(false);
+    mediaStreamRef.current = null;
+    updateRecordingState('idle');
     const nextTranscript = result?.transcript || transcript;
     setTranscript(nextTranscript);
     setShowTranscript(false);
@@ -387,7 +476,7 @@ function SessionInterviewPanel({
               setResponderContext(event.target.value);
               setMappingNotice('');
             }}
-            disabled={running || mapping}
+            disabled={isInterviewBusy || mapping}
             className={styles.sessionInterviewContextInput}
             data-testid={E2E_TESTIDS.SESSION_INTERVIEW_CONTEXT}
           />
@@ -409,30 +498,82 @@ function SessionInterviewPanel({
       <audio ref={audioRef} className={styles.sessionListeningSrOnly} aria-label="Realtime interviewer audio" />
       {error ? <div className={styles.sessionListeningError} role="alert">{error}</div> : null}
       <div className={styles.sessionInterviewActions}>
-        <div className={styles.sessionInterviewPrimaryAction}>
-          {!running ? (
+        {!isRecorderSessionActive ? (
+          <div className={styles.sessionInterviewPrimaryAction}>
             <Button
               color="primary"
-              onClick={startInterview}
-              disabled={mapping || !questions.length}
+              onClick={() => {
+                void startInterview();
+              }}
+              disabled={mapping || !questions.length || isStarting}
               data-testid={E2E_TESTIDS.SESSION_INTERVIEW_START}
             >
-              <FontAwesomeIcon icon={faMicrophone} /> Start voice interview
+              <FontAwesomeIcon icon={isStarting ? faSpinner : faMicrophone} spin={isStarting} />
+              {isStarting ? ' Starting interview…' : ' Start voice interview'}
             </Button>
-          ) : (
-            <Button color="danger" onClick={endInterview} data-testid={E2E_TESTIDS.SESSION_INTERVIEW_STOP}>
-              End interview and generate drafts
-            </Button>
-          )}
-          <span
-            className={`${styles.sessionInterviewStatusDot} ${error ? styles.sessionInterviewStatusDotError : ''}`}
-            role="status"
-            aria-label={`Interview status: ${status}`}
-            title={status}
-            data-testid={E2E_TESTIDS.SESSION_INTERVIEW_STATUS}
-          />
-        </div>
-        {!running &&
+            <span
+              className={`${styles.sessionInterviewStatusDot} ${error ? styles.sessionInterviewStatusDotError : ''}`}
+              role="status"
+              aria-label={`Interview status: ${status}`}
+              title={status}
+              data-testid={E2E_TESTIDS.SESSION_INTERVIEW_STATUS}
+            />
+          </div>
+        ) : (
+          <div className={styles.sessionListeningActiveRecorder}>
+            <div className={styles.sessionListeningWaveformShell}>
+              <SessionListeningWaveform
+                streamRef={mediaStreamRef}
+                isActive={isRecorderSessionActive}
+                isPaused={isPaused || isStopping}
+              />
+              <div
+                className={styles.sessionListeningWaveformTimer}
+                role="status"
+                aria-label={`Interview status: ${isStopping ? 'Stopping' : isPaused ? 'Paused' : 'Recording'}`}
+                aria-live="polite"
+                aria-atomic="true"
+                data-testid={E2E_TESTIDS.SESSION_INTERVIEW_STATUS}
+              >
+                <FontAwesomeIcon
+                  icon={isStopping ? faSpinner : faCircle}
+                  spin={isStopping}
+                  className={isPaused ? styles.sessionListeningTimerDotPaused : styles.sessionListeningTimerDot}
+                />
+                <span>{isStopping ? 'Stopping' : isPaused ? 'Paused' : 'Recording'}</span>
+                <span>{formatSessionRecordingElapsed(recordingElapsedSeconds)}</span>
+              </div>
+            </div>
+            <div className={styles.sessionListeningButtonColumn} role="group" aria-label="Interview recording controls">
+              <button
+                type="button"
+                className={[styles.sessionListeningAudioButton, styles.sessionListeningStopButton].join(' ')}
+                onClick={() => {
+                  void endInterview();
+                }}
+                disabled={isStopping}
+                aria-label={isStopping ? 'Stopping interview' : 'Stop interview'}
+                title={isStopping ? 'Stopping interview' : 'Stop interview and generate drafts'}
+                data-testid={E2E_TESTIDS.SESSION_INTERVIEW_STOP}
+              >
+                <FontAwesomeIcon icon={isStopping ? faSpinner : faStop} spin={isStopping} />
+                <span className={styles.sessionListeningSrOnly}>{isStopping ? 'Stopping' : 'Stop'}</span>
+              </button>
+              <button
+                type="button"
+                className={styles.sessionListeningAudioButton}
+                onClick={isPaused ? resumeInterview : pauseInterview}
+                disabled={isStopping}
+                aria-label={isPaused ? 'Resume interview' : 'Pause interview'}
+                title={isPaused ? 'Resume interview' : 'Pause interview'}
+              >
+                <FontAwesomeIcon icon={isPaused ? faPlay : faPause} />
+                <span className={styles.sessionListeningSrOnly}>{isPaused ? 'Resume' : 'Pause'}</span>
+              </button>
+            </div>
+          </div>
+        )}
+        {!isInterviewBusy &&
         !mappingNotice &&
         !Array.isArray(prefillPacket?.responses) &&
         (transcript.trim() || prefillPacket || responderContext.trim()) ? (
@@ -453,7 +594,7 @@ function SessionInterviewPanel({
         </div>
       ) : null}
 
-      {!running && transcript.trim() ? (
+      {!isInterviewBusy && transcript.trim() ? (
         <section className={styles.sessionInterviewTranscriptDisclosure}>
           <button
             type="button"
