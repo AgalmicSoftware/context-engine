@@ -15,6 +15,15 @@ kv_namespaces = [
   { binding = "AGENT_ACTION_KV", id = "YOUR_SHORT_LIVED_ACTION_KV_NAMESPACE_ID" },
 ]
 
+[durable_objects]
+bindings = [
+  { name = "AGENT_INVITE_COORDINATOR", class_name = "AgentInviteRedemptionCoordinator" },
+]
+
+[[migrations]]
+tag = "agent-invite-redemption-v1"
+new_sqlite_classes = ["AgentInviteRedemptionCoordinator"]
+
 # Optional draft lifecycle research metrics (Workers Analytics Engine).
 # When bound, the worker writes one data point per draft_created / draft_edited /
 # draft_submitted / draft_discarded event: blobs = [event, sessionSlug,

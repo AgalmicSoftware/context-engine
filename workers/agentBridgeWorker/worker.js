@@ -11,6 +11,8 @@ import { handleTelegramMiniAppRequest } from './telegramMiniApp.mjs';
 import { processTelegramSubmitQueueBatch } from './telegramSubmitQueue.mjs';
 import { resolvePinnedSessionWorkerAuthority } from './sessionWorkerAuthority.mjs';
 
+export { AgentInviteRedemptionCoordinator } from './agentInviteRedemptionCoordinator.mjs';
+
 function json(data, init = {}) {
   return new Response(JSON.stringify(data, null, 2), {
     ...init,

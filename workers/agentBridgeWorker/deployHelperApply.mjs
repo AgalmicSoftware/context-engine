@@ -466,8 +466,10 @@ export function buildAgentBridgeWorkerUploadForm({
   workerDir = WORKER_DIR,
   readFileImpl = readFileSync,
   existsImpl = existsSync,
+  omitMigrations = false,
 } = {}) {
   const metadata = withCreatedBindings(buildAgentBridgeWorkerUploadMetadata(config), resourceIds);
+  if (omitMigrations) delete metadata.migrations;
   const bundledModule = bundleAgentBridgeWorkerModule({
     workerDir,
     entrypoint: DEFAULT_ENTRYPOINT,
@@ -510,7 +512,34 @@ export async function uploadAgentBridgeWorker({
     method: 'PUT',
     body: upload.form,
   }, { fetchImpl });
-  if (!response.ok) return normalizeCfFailure('worker_upload', response);
+  const migrationAlreadyApplied = Number(response.status || 0) === 412 && /migration tag precondition failed/i.test([
+    response.error,
+    ...(Array.isArray(response.detail)
+      ? response.detail.map((entry) => safeString(entry?.message || entry))
+      : [response.detail]),
+  ].filter(Boolean).join('\n'));
+  if (!response.ok && !migrationAlreadyApplied) return normalizeCfFailure('worker_upload', response);
+  if (migrationAlreadyApplied) {
+    const retry = buildAgentBridgeWorkerUploadForm({
+      config,
+      resourceIds,
+      workerDir,
+      readFileImpl,
+      existsImpl,
+      omitMigrations: true,
+    });
+    const retriedResponse = await cfFetch(apiToken, `/accounts/${accountId}/workers/scripts/${workerName}`, {
+      method: 'PUT',
+      body: retry.form,
+    }, { fetchImpl });
+    if (!retriedResponse.ok) return normalizeCfFailure('worker_upload', retriedResponse);
+    return {
+      ok: true,
+      metadata: retry.metadata,
+      modules: retry.modules,
+      migrationAlreadyApplied: true,
+    };
+  }
   return {
     ok: true,
     metadata: upload.metadata,

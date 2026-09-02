@@ -60,6 +60,11 @@ import { telegramBotApiRequest } from './telegramSender.mjs';
 import { buildOpaqueActionId, createRandomTelegramCallbackAction } from './opaqueActions.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 import {
+  finalizeAgentInviteRedemption,
+  releaseAgentInviteRedemption,
+  reserveAgentInviteRedemption,
+} from './agentInviteRedemptionCoordinator.mjs';
+import {
   loadTelegramLightweightGroups,
   persistTelegramChildSession,
   persistTelegramLightweightGroupProposal,
@@ -345,45 +350,20 @@ function trustedOnboardingInviteValueList(value = '') {
     .filter(Boolean);
 }
 
-const AGENT_INVITE_REDEMPTION_KV_PREFIX = 'agent:invite-redemption:v1:';
+const LEGACY_AGENT_INVITE_REDEMPTION_KV_PREFIX = 'agent:invite-redemption:v1:';
 
-async function readInviteRedemption(env = {}, tokenHash = '') {
+async function legacyInviteAlreadyRedeemed(env = {}, tokenHash = '') {
   const kv = env?.AGENT_ACTION_KV;
   if (!kv || typeof kv.get !== 'function') {
     return { ok: false, status: 503, reason: 'invite_storage_unavailable' };
   }
   try {
-    const parsed = safeJsonParse(await kv.get(`${AGENT_INVITE_REDEMPTION_KV_PREFIX}${tokenHash}`), null);
-    return parsed ? { ok: true, redeemed: true, record: parsed } : { ok: true, redeemed: false };
-  } catch {
-    return { ok: false, status: 503, reason: 'invite_storage_unavailable' };
-  }
-}
-
-async function persistInviteRedemption({ env = {}, tokenHash = '', credential = {}, createdAt = null } = {}) {
-  const kv = env?.AGENT_ACTION_KV;
-  if (!kv || typeof kv.put !== 'function') {
-    return { ok: false, status: 503, reason: 'invite_storage_unavailable' };
-  }
-  const record = {
-    type: 'agent_invite_redemption',
-    version: 1,
-    tokenHash,
-    principalId: safeString(credential.record?.principal?.principalId),
-    sessionSlug: sanitizeSessionSlug(credential.record?.sessionSlug),
-    credentialHash: safeString(credential.tokenHash),
-    redeemedAt: safeString(createdAt) || new Date().toISOString(),
-  };
-  assertNoSecretShape(record, 'Agent invite redemptions must not serialize bearer secrets.');
-  try {
-    await kv.put(`${AGENT_INVITE_REDEMPTION_KV_PREFIX}${tokenHash}`, JSON.stringify(record));
-    return { ok: true, record };
-  } catch {
     return {
-      ok: false,
-      status: 503,
-      reason: 'invite_redemption_persist_failed',
+      ok: true,
+      redeemed: !!(await kv.get(`${LEGACY_AGENT_INVITE_REDEMPTION_KV_PREFIX}${tokenHash}`)),
     };
+  } catch {
+    return { ok: false, status: 503, reason: 'invite_storage_unavailable' };
   }
 }
 
@@ -6490,12 +6470,13 @@ async function handleInviteOnboardRequest({ request, env = {}, createdAt = null 
     assertNoSecretShape(payload, 'Agent invite onboarding denial must not serialize secrets.');
     return json(payload, { status: invite.status || 401 });
   }
-  const redemption = await readInviteRedemption(env, invite.tokenHash);
-  if (!redemption.ok) return json({ ok: false, reason: redemption.reason }, { status: redemption.status });
-  if (redemption.redeemed) {
+  const legacyRedemption = await legacyInviteAlreadyRedeemed(env, invite.tokenHash);
+  if (!legacyRedemption.ok) {
+    return json({ ok: false, reason: legacyRedemption.reason }, { status: legacyRedemption.status });
+  }
+  if (legacyRedemption.redeemed) {
     return json({ ok: false, reason: 'invite_token_redeemed' }, { status: 409 });
   }
-
   const telegramUserId = safeString(
     body.telegramUserId || body.userId || body.telegram?.telegramUserId || body.telegram?.userId,
   );
@@ -6565,6 +6546,21 @@ async function handleInviteOnboardRequest({ request, env = {}, createdAt = null 
   });
   const onboardingMode = lower(body.mode || body.onboardingMode);
   const agentOnly = onboardingMode === 'agent_only';
+  const reservationId = globalThis.crypto.randomUUID();
+  const reservation = await reserveAgentInviteRedemption({
+    env,
+    tokenHash: invite.tokenHash,
+    body: {
+      reservationId,
+      createdAt,
+    },
+  });
+  if (!reservation.ok) {
+    return json(
+      { ok: false, reason: reservation.reason || 'invite_reservation_failed' },
+      { status: reservation.status || 503 },
+    );
+  }
   const issued = await issueAgentCredential({
     env,
     principal,
@@ -6576,6 +6572,11 @@ async function handleInviteOnboardRequest({ request, env = {}, createdAt = null 
     createdAt,
   });
   if (!issued.ok) {
+    await releaseAgentInviteRedemption({
+      env,
+      tokenHash: invite.tokenHash,
+      body: { reservationId },
+    });
     const payload = {
       ok: false,
       reason: issued.reason || 'agent_token_create_failed',
@@ -6584,6 +6585,29 @@ async function handleInviteOnboardRequest({ request, env = {}, createdAt = null 
     return json(payload, {
       status: issued.reason === 'agent_token_storage_unavailable' ? 503 : 500,
     });
+  }
+  const consumed = await finalizeAgentInviteRedemption({
+    env,
+    tokenHash: invite.tokenHash,
+    body: {
+      reservationId,
+      principalId: safeString(issued.record?.principal?.principalId),
+      sessionSlug: sanitizeSessionSlug(issued.record?.sessionSlug),
+      credentialHash: safeString(issued.tokenHash),
+      createdAt,
+    },
+  });
+  if (!consumed.ok) {
+    await revokeAgentCredentialHash({ env, tokenHash: issued.tokenHash });
+    await releaseAgentInviteRedemption({
+      env,
+      tokenHash: invite.tokenHash,
+      body: { reservationId },
+    });
+    return json(
+      { ok: false, reason: consumed.reason || 'invite_redemption_finalize_failed' },
+      { status: consumed.status || 503 },
+    );
   }
   if (telegramUserId && explicitSessionSlug) {
     const followDefault =
@@ -6596,17 +6620,6 @@ async function handleInviteOnboardRequest({ request, env = {}, createdAt = null 
       source: agentOnly ? 'trusted_invite_agent_only_onboarding' : 'trusted_invite_onboarding',
       followDefault,
     });
-  }
-
-  const consumed = await persistInviteRedemption({
-    env,
-    tokenHash: invite.tokenHash,
-    credential: issued,
-    createdAt,
-  });
-  if (!consumed.ok) {
-    await revokeAgentCredentialHash({ env, tokenHash: issued.tokenHash });
-    return json({ ok: false, reason: consumed.reason }, { status: consumed.status || 503 });
   }
 
   const wrappedOnboarding = agentOnly && isSessionWrappedOnboardingRequest(body);

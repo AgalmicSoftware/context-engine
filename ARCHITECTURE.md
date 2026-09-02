@@ -72,7 +72,7 @@ architecture.
 |-------|-------------|--------------|-----------------|
 | **Client** | React SPA: survey authoring, response collection, SBT management, encryption gates, admin, session wizard | Shared across implemented profiles | `client/src/` |
 | **Session Worker** | Auth, canonical config, AI proxy, transcription, storage routes, and profile-enabled chain/Arweave helpers | Canonical authority for Hosted & Fast; service boundary for decentralized/custom profiles | `workers/sessionCorsWorker/` |
-| **Agent Bridge Worker** | Agent HTTP compatibility plus Telegram webhook, command, queue, and Mini App transport | Transitional adapter; session authority is being consolidated into the Session Worker | `workers/agentBridgeWorker/` |
+| **Agent Bridge Worker** | Agent HTTP compatibility plus Telegram webhook, command, queue, Mini App transport, and atomically coordinated one-time invite exchange | Transitional adapter; session authority is being consolidated into the Session Worker | `workers/agentBridgeWorker/` |
 | **Cloudflare storage** | Worker KV config, secrets, encrypted payload envelopes/indexes, and optional advanced R2 blobs | Hosted & Fast default | Worker bindings (external) |
 | **Contracts** | Session registry, surveys, SBTs, gates, and factory on supported EVM chains | Trustless & Slower and explicit chain-backed custom profiles | `contracts/` |
 | **Arweave** | Immutable metadata, survey/question payloads, SBT tokenURI, and document-library files | Trustless & Slower and explicit Arweave-backed custom profiles | External |
