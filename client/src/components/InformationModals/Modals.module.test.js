@@ -136,7 +136,7 @@ describe('Modals contrast styles', () => {
     expect(contextTheme).toContain('welcome-artwork-blend-cutout: screen,');
     expect(classicTheme).toContain('welcome-artwork-blend-soft: normal,');
     expect(classicTheme).toContain('welcome-artwork-blend-intense: normal,');
-    expect(classicTheme).toContain('welcome-artwork-blend-cutout: normal,');
+    expect(classicTheme).toContain('welcome-artwork-blend-cutout: screen,');
     expect(contextTheme).toContain('welcome-artwork-detail-opacity-scale: 1,');
     expect(contextTheme).toContain('welcome-artwork-detail-filter: grayscale(0) contrast(1),');
     expect(classicTheme).toContain('welcome-artwork-detail-opacity-scale: 0.68,');
