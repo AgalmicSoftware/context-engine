@@ -1508,21 +1508,18 @@ const SessionWizard = ({
     setPendingWorkerGroupDrafts((current) => current.filter((entry) => entry.groupId !== groupId));
   }, []);
 
-  const updatePendingWorkerGroupDraft = useCallback(
-    (groupId: string, patch: Partial<PendingWorkerGroupDraft>) => {
-      setPendingWorkerGroupDrafts((current) =>
-        current.map((entry) => {
-          if (entry.groupId !== groupId) return entry;
-          const next = { ...entry, ...patch, groupId: entry.groupId };
-          if (next.joinMode === 'open' && next.memberVisibility === 'admin_only') {
-            next.memberVisibility = 'session';
-          }
-          return next;
-        }),
-      );
-    },
-    [],
-  );
+  const updatePendingWorkerGroupDraft = useCallback((groupId: string, patch: Partial<PendingWorkerGroupDraft>) => {
+    setPendingWorkerGroupDrafts((current) =>
+      current.map((entry) => {
+        if (entry.groupId !== groupId) return entry;
+        const next = { ...entry, ...patch, groupId: entry.groupId };
+        if (next.joinMode === 'open' && next.memberVisibility === 'admin_only') {
+          next.memberVisibility = 'session';
+        }
+        return next;
+      }),
+    );
+  }, []);
 
   const removeEncryptionGate = (gateId: unknown) => {
     const gateIdStr = toStr(gateId).trim();
@@ -2006,9 +2003,7 @@ const SessionWizard = ({
       };
       try {
         const pendingDraftSnapshot = normalizePendingSbtDrafts(pendingSbtDrafts);
-        const pendingWorkerGroupDraftSnapshot = normalizePendingWorkerGroupDrafts(
-          pendingWorkerGroupDraftsRef.current,
-        );
+        const pendingWorkerGroupDraftSnapshot = normalizePendingWorkerGroupDrafts(pendingWorkerGroupDraftsRef.current);
         const pendingWorkerGroupIssues = validatePendingWorkerGroupDrafts(pendingWorkerGroupDraftsRef.current);
         if (pendingWorkerGroupIssues.length) {
           setStatus(pendingWorkerGroupIssues[0]);

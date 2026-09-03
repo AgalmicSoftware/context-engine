@@ -14,18 +14,16 @@ describe('sponsored bundle port', () => {
       .spyOn(sponsoredBundles, 'generateSponsoredBundleSecret')
       .mockReturnValue('first-secret');
     const hasSponsoredBundleFields = jest.spyOn(sponsoredBundles, 'hasSponsoredBundleFields').mockReturnValue(false);
-    const uploadSponsoredBundle = jest
-      .spyOn(sponsoredBundles, 'uploadSponsoredBundle')
-      .mockResolvedValue({
-        txId: 'second-tx',
-        envelope: {
-          type: 'ce_sponsored_bundle',
-          version: 1,
-          cipher: 'AES-GCM',
-          encryptedData: 'ciphertext',
-        },
-        url: 'https://arweave.example/second-tx',
-      });
+    const uploadSponsoredBundle = jest.spyOn(sponsoredBundles, 'uploadSponsoredBundle').mockResolvedValue({
+      txId: 'second-tx',
+      envelope: {
+        type: 'ce_sponsored_bundle',
+        version: 1,
+        cipher: 'AES-GCM',
+        encryptedData: 'ciphertext',
+      },
+      url: 'https://arweave.example/second-tx',
+    });
 
     expect(sponsoredBundlePort.buildSponsoredBundlePlaintext({ openaiKey: 'alpha' })).toEqual({ openaiKey: 'first' });
     expect(sponsoredBundlePort.generateSponsoredBundleSecret()).toBe('first-secret');

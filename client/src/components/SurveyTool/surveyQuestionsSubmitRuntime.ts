@@ -495,10 +495,7 @@ export const createSurveyQuestionsSubmitRuntime = (
             // MainSite's response nonce. Rehydrate once to publish that revision to live Results views.
             const shouldRefreshQuestionResponses =
               !cacheWriteResult?.questionCacheWritten || !!submitContext.workerTargetKey;
-            if (
-              shouldRefreshQuestionResponses &&
-              typeof propsRef.current.refreshQuestionResponses === 'function'
-            ) {
+            if (shouldRefreshQuestionResponses && typeof propsRef.current.refreshQuestionResponses === 'function') {
               const ids: SurveyQuestionsLegacyValue = Array.from(changedQids)
                 .map((id: SurveyQuestionsLegacyValue) => normalizeQuestionIdKey(id))
                 .filter(Boolean);

@@ -57,14 +57,22 @@ const waitForDataChannelOpen = (channel: RTCDataChannel): Promise<void> => {
   if (channel.readyState === 'open') return Promise.resolve();
   return new Promise((resolve, reject) => {
     const timeout = window.setTimeout(() => reject(new Error('Realtime interview connection timed out.')), 15_000);
-    channel.addEventListener('open', () => {
-      window.clearTimeout(timeout);
-      resolve();
-    }, { once: true });
-    channel.addEventListener('error', () => {
-      window.clearTimeout(timeout);
-      reject(new Error('Realtime interview data channel failed.'));
-    }, { once: true });
+    channel.addEventListener(
+      'open',
+      () => {
+        window.clearTimeout(timeout);
+        resolve();
+      },
+      { once: true },
+    );
+    channel.addEventListener(
+      'error',
+      () => {
+        window.clearTimeout(timeout);
+        reject(new Error('Realtime interview data channel failed.'));
+      },
+      { once: true },
+    );
   });
 };
 
@@ -99,8 +107,12 @@ export const startSessionRealtimeInterview = async ({
       return;
     }
     tracks.forEach((track) => {
-      try { track.enabled = false; } catch {}
-      try { track.stop(); } catch {}
+      try {
+        track.enabled = false;
+      } catch {}
+      try {
+        track.stop();
+      } catch {}
     });
   };
 
@@ -126,9 +138,15 @@ export const startSessionRealtimeInterview = async ({
     channel.removeEventListener('message', handleMessage);
     peer.ontrack = null;
     stopStreamTracks(stream);
-    try { channel.close(); } catch {}
-    try { peer.close(); } catch {}
-    try { audioElement.pause(); } catch {}
+    try {
+      channel.close();
+    } catch {}
+    try {
+      peer.close();
+    } catch {}
+    try {
+      audioElement.pause();
+    } catch {}
     stopStreamTracks(audioElement.srcObject);
     audioElement.srcObject = null;
   };
@@ -149,18 +167,22 @@ export const startSessionRealtimeInterview = async ({
     const answerSdp = await response.text();
     if (!response.ok) {
       let message = 'Could not start the realtime interview.';
-      try { message = JSON.parse(answerSdp)?.error || message; } catch {}
+      try {
+        message = JSON.parse(answerSdp)?.error || message;
+      } catch {}
       throw new Error(message);
     }
     await peer.setRemoteDescription({ type: 'answer', sdp: answerSdp });
     await waitForDataChannelOpen(channel);
-    channel.send(JSON.stringify({
-      type: 'response.create',
-      response: {
-        output_modalities: ['audio'],
-        instructions: REALTIME_INTERVIEW_OPENING_INSTRUCTION,
-      },
-    }));
+    channel.send(
+      JSON.stringify({
+        type: 'response.create',
+        response: {
+          output_modalities: ['audio'],
+          instructions: REALTIME_INTERVIEW_OPENING_INSTRUCTION,
+        },
+      }),
+    );
     onStatus('Interview in progress');
     onRecordingState('recording');
   } catch (error) {

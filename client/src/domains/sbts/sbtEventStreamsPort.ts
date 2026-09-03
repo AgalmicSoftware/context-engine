@@ -4,8 +4,7 @@ import type { SbtEventStreamsPort } from './sbtPorts.js';
 export const sbtEventStreamsPort: SbtEventStreamsPort = {
   listenForSBTEvents: (providerName, handler, sessionSlug) =>
     chainGateway.listenForSBTEvents(providerName, handler, sessionSlug),
-  removeSBTEventListener: (providerName, sessionSlug) =>
-    chainGateway.removeSBTEventListener(providerName, sessionSlug),
+  removeSBTEventListener: (providerName, sessionSlug) => chainGateway.removeSBTEventListener(providerName, sessionSlug),
   listenForSurveyEvents: (providerName, handler, sessionSlug) =>
     chainGateway.listenForSurveyEvents(providerName, handler, sessionSlug),
   removeSurveyEventsListener: (providerName, sessionSlug) =>

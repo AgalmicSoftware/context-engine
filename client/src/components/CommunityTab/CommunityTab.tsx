@@ -956,7 +956,9 @@ class CommunityTab extends Component<any, any> {
             if (normalizedGroupId) workerGroupIdentitySet.add(`${slug}:${normalizedGroupId}`);
           });
           (scopeEntry.workerVisibleUserIds || []).forEach((userId: unknown) => {
-            const normalizedUserId = String(userId || '').trim().toLowerCase();
+            const normalizedUserId = String(userId || '')
+              .trim()
+              .toLowerCase();
             if (isDisplayableWorkerUserId(normalizedUserId)) userSet.add(normalizedUserId);
           });
         }
@@ -1056,7 +1058,9 @@ class CommunityTab extends Component<any, any> {
       let sbtsCreatedCount = scopeEntry.isWorkerCanonical ? Number(scopeEntry.workerGroupsCount || 0) : 0;
       if (scopeEntry.isWorkerCanonical) {
         (scopeEntry.workerVisibleUserIds || []).forEach((userId: unknown) => {
-          const normalizedUserId = String(userId || '').trim().toLowerCase();
+          const normalizedUserId = String(userId || '')
+            .trim()
+            .toLowerCase();
           if (isDisplayableWorkerUserId(normalizedUserId)) uniqueUsersSet.add(normalizedUserId);
         });
       }

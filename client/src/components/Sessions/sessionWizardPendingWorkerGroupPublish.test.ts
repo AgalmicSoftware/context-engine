@@ -94,11 +94,13 @@ describe('publishPendingWorkerGroupDrafts', () => {
     const postSignedRequestImpl: jest.MockedFunction<typeof postSignedAdminWorkerRequest> = jest
       .fn()
       .mockRejectedValueOnce(Object.assign(new Error('already exists'), { reason: 'worker_group_exists', status: 409 }))
-      .mockResolvedValueOnce(workerRequestResult({
-        sessionSlug: 'test-session',
-        sessionId: SESSION_ID,
-        groups: [payloadGroup],
-      }));
+      .mockResolvedValueOnce(
+        workerRequestResult({
+          sessionSlug: 'test-session',
+          sessionId: SESSION_ID,
+          groups: [payloadGroup],
+        }),
+      );
 
     await expect(
       publishPendingWorkerGroupDrafts({

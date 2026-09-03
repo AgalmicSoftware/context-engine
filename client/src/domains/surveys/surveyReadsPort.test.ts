@@ -13,9 +13,7 @@ describe('SurveyReadsPort', () => {
     const getSurveyResponse = jest
       .spyOn(chainGateway, 'getSurveyResponse')
       .mockResolvedValue({ id: 'second-survey-response' });
-    const getResponse = jest
-      .spyOn(chainGateway, 'getResponse')
-      .mockResolvedValue({ id: 'second-question-response' });
+    const getResponse = jest.spyOn(chainGateway, 'getResponse').mockResolvedValue({ id: 'second-question-response' });
 
     await expect(surveyReadsPort.getSurveyHash('none', 'survey-1', 'alpha')).resolves.toBe('first-hash');
 
@@ -28,7 +26,9 @@ describe('SurveyReadsPort', () => {
     await expect(surveyReadsPort.getSurveyResponse('none', '0xabc', 'survey-2', 'beta')).resolves.toEqual({
       id: 'second-survey-response',
     });
-    await expect(surveyReadsPort.getResponse('none', '0xdef', 'question-2', 'beta', { strict: false })).resolves.toEqual({
+    await expect(
+      surveyReadsPort.getResponse('none', '0xdef', 'question-2', 'beta', { strict: false }),
+    ).resolves.toEqual({
       id: 'second-question-response',
     });
 

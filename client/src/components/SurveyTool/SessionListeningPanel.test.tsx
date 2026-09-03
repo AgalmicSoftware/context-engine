@@ -310,10 +310,7 @@ describe('SessionListeningPanel', () => {
 
     expect(screen.getByText('Transcribing…')).toBeInTheDocument();
     expect(screen.queryByText('Transcript ready')).not.toBeInTheDocument();
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT_DETAILS)).toHaveAttribute(
-      'aria-busy',
-      'true',
-    );
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT_DETAILS)).toHaveAttribute('aria-busy', 'true');
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_GENERATE)).toBeDisabled();
   });
 

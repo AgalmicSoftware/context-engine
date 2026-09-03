@@ -6,14 +6,7 @@ import { createPendingWorkerGroupDraft } from './sessionWizardPendingWorkerGroup
 describe('SessionWorkerGroupDraftsPanel', () => {
   it('queues a named group and exposes editable access defaults', () => {
     const onAdd = jest.fn();
-    render(
-      <SessionWorkerGroupDraftsPanel
-        drafts={[]}
-        onAdd={onAdd}
-        onRemove={jest.fn()}
-        onUpdate={jest.fn()}
-      />,
-    );
+    render(<SessionWorkerGroupDraftsPanel drafts={[]} onAdd={onAdd} onRemove={jest.fn()} onUpdate={jest.fn()} />);
 
     fireEvent.change(screen.getByTestId('ce-new-worker-group-name'), { target: { value: 'Research team' } });
     fireEvent.click(screen.getByTestId('ce-new-worker-group-add'));
@@ -27,12 +20,7 @@ describe('SessionWorkerGroupDraftsPanel', () => {
     const draft = createPendingWorkerGroupDraft('Research team', { groupId: 'research-team' });
     const onUpdate = jest.fn();
     render(
-      <SessionWorkerGroupDraftsPanel
-        drafts={[draft]}
-        onAdd={jest.fn()}
-        onRemove={jest.fn()}
-        onUpdate={onUpdate}
-      />,
+      <SessionWorkerGroupDraftsPanel drafts={[draft]} onAdd={jest.fn()} onRemove={jest.fn()} onUpdate={onUpdate} />,
     );
 
     expect(screen.getByLabelText('Image URL')).toBeInTheDocument();

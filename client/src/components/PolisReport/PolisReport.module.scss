@@ -506,7 +506,10 @@
   align-items: center;
   justify-content: center;
   box-shadow: 0 4px 12px color-mix(in srgb, var(--ce-action-primary) 30%, transparent);
-  transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
+  transition:
+    background-color 0.2s,
+    border-color 0.2s,
+    box-shadow 0.2s;
 
   &:hover,
   &:focus-visible {

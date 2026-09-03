@@ -206,10 +206,7 @@ describe('SurveySelector display guards', () => {
       tree,
       (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_SUBMIT,
     );
-    const toolbar = findElement(
-      tree,
-      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_TOOLBAR,
-    );
+    const toolbar = findElement(tree, (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_TOOLBAR);
 
     expect(headerSubmitButton).toBeTruthy();
     expect(nodeHasClassName(headerSubmitButton, styles.headerSubmitButton)).toBe(true);

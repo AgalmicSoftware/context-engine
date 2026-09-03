@@ -566,9 +566,7 @@ export function applyFilterStateToAggregator(
         ? (questionNode.questions as Record<string, PolisQuestionMeta>)
         : {};
     const scopedSbtList =
-      sbtNode?.sbtList && typeof sbtNode.sbtList === 'object'
-        ? (sbtNode.sbtList as Record<string, PolisSbtEntry>)
-        : {};
+      sbtNode?.sbtList && typeof sbtNode.sbtList === 'object' ? (sbtNode.sbtList as Record<string, PolisSbtEntry>) : {};
 
     Object.keys(scopedQuestions).forEach((questionId) => {
       const lowerQuestionId = String(questionId || '').toLowerCase();

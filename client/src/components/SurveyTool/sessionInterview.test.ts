@@ -73,9 +73,11 @@ describe('session interview protocol', () => {
       { id: 'q1', prompt: 'What matters?', type: 'freeform', options: [] },
       { id: 'q3', prompt: 'Choose one', type: 'freeform', options: ['A', 'B'] },
     ]);
-    expect(normalizeInterviewQuestions([
-      { id: 'q4', prompt: 'Proceed?', type: 'binary' },
-    ])[0]?.options).toEqual(['Agree', 'Unsure', 'Disagree']);
+    expect(normalizeInterviewQuestions([{ id: 'q4', prompt: 'Proceed?', type: 'binary' }])[0]?.options).toEqual([
+      'Agree',
+      'Unsure',
+      'Disagree',
+    ]);
   });
 
   it('canonicalizes question hashing order and resolves realtime model provenance', () => {
@@ -106,18 +108,30 @@ describe('session interview protocol', () => {
     });
     expect(readInterviewPrefillFromHash(`#prefill=${encoded}`)?.source).toEqual(packet.source);
     expect(hasInterviewPrefillHash(`#prefill=${encoded}`)).toBe(true);
-    expect(clearInterviewPrefillHash({ pathname: '/session/demo', search: '?mode=interview', hash: `#prefill=${encoded}&x=1` } as Location)).toBe(
-      '/session/demo?mode=interview#x=1',
-    );
+    expect(
+      clearInterviewPrefillHash({
+        pathname: '/session/demo',
+        search: '?mode=interview',
+        hash: `#prefill=${encoded}&x=1`,
+      } as Location),
+    ).toBe('/session/demo?mode=interview#x=1');
     expect(decodeInterviewPrefillPacket('not-valid')).toBeNull();
-    expect(decodeInterviewPrefillPacket(encodeInterviewPrefillPacket({
-      ...packet,
-      questionSetHash: '',
-    }))).toBeNull();
-    expect(decodeInterviewPrefillPacket(encodeInterviewPrefillPacket({
-      ...packet,
-      promptVersion: INTERVIEW_PROMPT_VERSION,
-    }))?.promptVersion).toBe('ce-interview-brief-v4');
+    expect(
+      decodeInterviewPrefillPacket(
+        encodeInterviewPrefillPacket({
+          ...packet,
+          questionSetHash: '',
+        }),
+      ),
+    ).toBeNull();
+    expect(
+      decodeInterviewPrefillPacket(
+        encodeInterviewPrefillPacket({
+          ...packet,
+          promptVersion: INTERVIEW_PROMPT_VERSION,
+        }),
+      )?.promptVersion,
+    ).toBe('ce-interview-brief-v4');
   });
 
   it('builds a user-authored no-install kickoff and confidence-aware mapper prompt', () => {
@@ -196,11 +210,13 @@ describe('session interview protocol', () => {
         { questionId: 'unknown', answer: 'Unknown question', confidence: 1 },
       ],
     };
-    expect(readImportedInterviewDraftResponses(directPacket, [
-      { id: 'q1', prompt: 'Choose', type: 'multichoice', options: ['Option A', 'Option B'] },
-      { id: 'q2', prompt: 'Choose', type: 'multichoice', options: ['Allowed'] },
-      { id: 'q3', prompt: 'Explain', type: 'freeform', options: [] },
-    ])).toEqual([
+    expect(
+      readImportedInterviewDraftResponses(directPacket, [
+        { id: 'q1', prompt: 'Choose', type: 'multichoice', options: ['Option A', 'Option B'] },
+        { id: 'q2', prompt: 'Choose', type: 'multichoice', options: ['Allowed'] },
+        { id: 'q3', prompt: 'Explain', type: 'freeform', options: [] },
+      ]),
+    ).toEqual([
       {
         questionId: 'q1',
         answer: 'Option A',
@@ -221,19 +237,25 @@ describe('session interview protocol', () => {
         { questionId: 'rating', answer: 12, confidence: 0.6 },
       ],
     };
-    expect(readImportedInterviewDraftResponses(directPacket, normalizeInterviewQuestions([
-      { id: 'binary', prompt: 'Proceed?', type: 'binary' },
-      { id: 'rating', prompt: 'How much?', type: 'rating' },
-    ]))).toEqual([
+    expect(
+      readImportedInterviewDraftResponses(
+        directPacket,
+        normalizeInterviewQuestions([
+          { id: 'binary', prompt: 'Proceed?', type: 'binary' },
+          { id: 'rating', prompt: 'How much?', type: 'rating' },
+        ]),
+      ),
+    ).toEqual([
       { questionId: 'binary', answer: 'Agree', confidence: 0.8 },
       { questionId: 'rating', answer: 10, confidence: 0.6 },
     ]);
   });
 
   it('drops mapper responses that omit the required confidence measure', () => {
-    expect(parseInterviewDraftResponses(
-      '{"responses":[{"questionId":"q1","answer":"Unsupported"}]}',
-      [{ id: 'q1', prompt: 'What matters?', type: 'freeform', options: [] }],
-    )).toEqual([]);
+    expect(
+      parseInterviewDraftResponses('{"responses":[{"questionId":"q1","answer":"Unsupported"}]}', [
+        { id: 'q1', prompt: 'What matters?', type: 'freeform', options: [] },
+      ]),
+    ).toEqual([]);
   });
 });

@@ -440,10 +440,12 @@ describe('SurveyPileViewMode runtime surface', () => {
       buildWarmPileSeedState: () => null,
     });
 
-    expect(initial.interviewPrefillPacket).toEqual(expect.objectContaining({
-      source: expect.objectContaining({ modelId: 'claude-test' }),
-      responses: [expect.objectContaining({ confidence: 0.22 })],
-    }));
+    expect(initial.interviewPrefillPacket).toEqual(
+      expect.objectContaining({
+        source: expect.objectContaining({ modelId: 'claude-test' }),
+        responses: [expect.objectContaining({ confidence: 0.22 })],
+      }),
+    );
     expect(window.location.hash).toBe(`#prefill=${encoded}`);
 
     const rendered = renderPile({}, { route });
@@ -459,12 +461,14 @@ describe('SurveyPileViewMode runtime surface', () => {
     const engine = {
       props: { sessionConfig: {} },
       state: {
-        surveysResponseState: [{
-          answers: { q1: { value: 'Agree' } },
-          importance: {},
-          conviction: {},
-          additionalComments: {},
-        }],
+        surveysResponseState: [
+          {
+            answers: { q1: { value: 'Agree' } },
+            importance: {},
+            conviction: {},
+            additionalComments: {},
+          },
+        ],
       },
       persistDraft: jest.fn(),
       setState(updater, callback) {

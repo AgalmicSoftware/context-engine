@@ -48,7 +48,9 @@ describe('admin session registry ports', () => {
       }),
     ).resolves.toEqual({ ok: true });
 
-    await expect(adminSessionRegistryPorts.writes.setResourceGatesOnChain({ slug: 'edge', gates: [] })).resolves.toEqual({
+    await expect(
+      adminSessionRegistryPorts.writes.setResourceGatesOnChain({ slug: 'edge', gates: [] }),
+    ).resolves.toEqual({
       ok: true,
       txs: [],
     });

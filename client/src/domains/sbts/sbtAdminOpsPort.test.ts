@@ -73,31 +73,17 @@ describe('SbtAdminOpsPort', () => {
       sbtAdminOpsPort.startClaim('injected', '0x0000000000000000000000000000000000000002', '0xcommit'),
     ).resolves.toEqual({ transactionHash: '0xsecondStart' });
 
-    expect(addHashedPasswords).toHaveBeenCalledWith(
-      'injected',
-      '0x0000000000000000000000000000000000000001',
-      ['0xfirst'],
-    );
-    expect(burnToken).toHaveBeenCalledWith(
-      'injected',
-      '0x0000000000000000000000000000000000000002',
-      '5',
-    );
-    expect(claimWithPassword).toHaveBeenCalledWith(
-      'injected',
-      '0x0000000000000000000000000000000000000002',
-      'pw',
-    );
+    expect(addHashedPasswords).toHaveBeenCalledWith('injected', '0x0000000000000000000000000000000000000001', [
+      '0xfirst',
+    ]);
+    expect(burnToken).toHaveBeenCalledWith('injected', '0x0000000000000000000000000000000000000002', '5');
+    expect(claimWithPassword).toHaveBeenCalledWith('injected', '0x0000000000000000000000000000000000000002', 'pw');
     expect(isPasswordValid).toHaveBeenCalledWith(
       'none',
       '0x0000000000000000000000000000000000000002',
       '0xhash',
       'beta',
     );
-    expect(startClaim).toHaveBeenCalledWith(
-      'injected',
-      '0x0000000000000000000000000000000000000002',
-      '0xcommit',
-    );
+    expect(startClaim).toHaveBeenCalledWith('injected', '0x0000000000000000000000000000000000000002', '0xcommit');
   });
 });

@@ -49,7 +49,9 @@ const comparableGroup = (group: Partial<WorkerGroup>) => ({
   documentURLs: Array.isArray(group.documentURLs) ? group.documentURLs : [],
   memberLimit: Number(group.memberLimit || 0),
   joinEndsAt: String(group.joinEndsAt || '').trim(),
-  adminAddress: String(group.adminAddress || '').trim().toLowerCase(),
+  adminAddress: String(group.adminAddress || '')
+    .trim()
+    .toLowerCase(),
   joinMode: group.joinMode || 'open',
   memberVisibility: group.memberVisibility || 'session',
 });

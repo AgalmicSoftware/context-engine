@@ -162,8 +162,7 @@ const runPostSubmitFollowup = async ({
       }));
       if (!isSubmitContextCurrent(submitContext)) return;
 
-      const shouldRefreshQuestionResponses =
-        !writeResult?.questionCacheWritten || !!submitContext.workerTargetKey;
+      const shouldRefreshQuestionResponses = !writeResult?.questionCacheWritten || !!submitContext.workerTargetKey;
       if (shouldRefreshQuestionResponses) {
         const ids = Array.from(changedQids)
           .map((id) => normalizeQuestionIdKey(id))

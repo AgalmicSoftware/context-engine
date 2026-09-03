@@ -110,13 +110,8 @@ const normalizeResearchCoverage = (value: unknown): InterviewResearchCoverage | 
   };
 };
 
-const normalizeDraftCandidates = (
-  candidates: unknown,
-  questions?: InterviewQuestion[],
-): InterviewDraftResponse[] => {
-  const questionById = questions
-    ? new Map(questions.map((question) => [question.id, question]))
-    : null;
+const normalizeDraftCandidates = (candidates: unknown, questions?: InterviewQuestion[]): InterviewDraftResponse[] => {
+  const questionById = questions ? new Map(questions.map((question) => [question.id, question])) : null;
   const seen = new Set<string>();
   return (Array.isArray(candidates) ? candidates : [])
     .slice(0, questions?.length || 100)
@@ -148,12 +143,8 @@ const normalizeDraftCandidates = (
           : {}),
         ...(clampRating(response.importance) !== undefined ? { importance: clampRating(response.importance) } : {}),
         ...(clampRating(response.conviction) !== undefined ? { conviction: clampRating(response.conviction) } : {}),
-        ...(toTrimmedString(response.evidence)
-          ? { evidence: toTrimmedString(response.evidence).slice(0, 2000) }
-          : {}),
-        ...(Number.isFinite(confidence)
-          ? { confidence: Math.max(0, Math.min(1, confidence)) }
-          : {}),
+        ...(toTrimmedString(response.evidence) ? { evidence: toTrimmedString(response.evidence).slice(0, 2000) } : {}),
+        ...(Number.isFinite(confidence) ? { confidence: Math.max(0, Math.min(1, confidence)) } : {}),
       });
       return normalized;
     }, []);
@@ -212,11 +203,12 @@ export const normalizeInterviewQuestions = (questions: unknown): InterviewQuesti
       const prompt = toTrimmedString(question.prompt || question.question || question.title);
       const type = toTrimmedString(question.type || question.questionType || 'freeform').toLowerCase();
       const rawOptions = question.options || question.choices;
-      const options = type === 'binary'
-        ? [...BINARY_RESPONSE_OPTIONS]
-        : (Array.isArray(rawOptions) ? rawOptions : [])
-          .map((option) => toTrimmedString(asRecord(option).label || asRecord(option).value || option))
-          .filter(Boolean);
+      const options =
+        type === 'binary'
+          ? [...BINARY_RESPONSE_OPTIONS]
+          : (Array.isArray(rawOptions) ? rawOptions : [])
+              .map((option) => toTrimmedString(asRecord(option).label || asRecord(option).value || option))
+              .filter(Boolean);
       return { id, prompt, type, options };
     })
     .filter((question) => {
@@ -269,8 +261,7 @@ export const normalizeInterviewPrefillPacket = (value: unknown): InterviewPrefil
   const responderContext = asRecord(packet.responderContext);
   const questionSetHash = toTrimmedString(packet.questionSetHash).toLowerCase();
   const promptVersion = toTrimmedString(packet.promptVersion);
-  const responses = normalizeDraftCandidates(packet.responses)
-    .filter((response) => response.confidence !== undefined);
+  const responses = normalizeDraftCandidates(packet.responses).filter((response) => response.confidence !== undefined);
   const facts = (Array.isArray(responderContext.facts) ? responderContext.facts : [])
     .slice(0, 100)
     .map((entry) => {
@@ -448,8 +439,7 @@ export const parseInterviewDraftResponses = (
   const json = text.match(/\{[\s\S]*\}/)?.[0] || '';
   if (!json) throw new Error('AI response did not contain a JSON object.');
   const parsed = asRecord(JSON.parse(json));
-  return normalizeDraftCandidates(parsed.responses, questions)
-    .filter((response) => response.confidence !== undefined);
+  return normalizeDraftCandidates(parsed.responses, questions).filter((response) => response.confidence !== undefined);
 };
 
 export const readImportedInterviewDraftResponses = (
@@ -457,8 +447,7 @@ export const readImportedInterviewDraftResponses = (
   questions: InterviewQuestion[],
 ): InterviewDraftResponse[] | null => {
   if (!Array.isArray(packet?.responses)) return null;
-  return normalizeDraftCandidates(packet.responses, questions)
-    .filter((response) => response.confidence !== undefined);
+  return normalizeDraftCandidates(packet.responses, questions).filter((response) => response.confidence !== undefined);
 };
 
 export const mapInterviewEvidenceToResponses = async ({

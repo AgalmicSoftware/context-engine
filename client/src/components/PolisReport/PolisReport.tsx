@@ -1041,7 +1041,7 @@ export default function PolisReport({
         loadBrowserModuleWithRetry(() => import('html2canvas'), { delayMs: 500 }),
         loadBrowserModuleWithRetry(() => import('jspdf'), { delayMs: 500 }),
       ]);
-      const html2canvas = resolveDefaultExport<typeof import('html2canvas')['default']>(html2canvasModule);
+      const html2canvas = resolveDefaultExport<(typeof import('html2canvas'))['default']>(html2canvasModule);
       const jsPDF = resolveJsPdfConstructor(jsPdfModule);
 
       // Capture full element

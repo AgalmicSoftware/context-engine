@@ -86,9 +86,9 @@ describe('surveyResultsAnalysisArtifactMergePort', () => {
     expect(
       surveyResultsAnalysisArtifactMergePort.normalizeGeneratedArtifact({ inputSignature: 'two' }).inputSignature,
     ).toBe('second-normalize');
-    expect(surveyResultsAnalysisArtifactMergePort.mergeGeneratedArtifacts({ sections: ['atlas'] })?.inputSignature).toBe(
-      'second-merge',
-    );
+    expect(
+      surveyResultsAnalysisArtifactMergePort.mergeGeneratedArtifacts({ sections: ['atlas'] })?.inputSignature,
+    ).toBe('second-merge');
     expect(normalizeGeneratedSessionResultsAnalysisArtifact).toHaveBeenNthCalledWith(1, {
       inputSignature: 'one',
     });

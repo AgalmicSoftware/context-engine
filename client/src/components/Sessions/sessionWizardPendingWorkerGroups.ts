@@ -61,13 +61,9 @@ const normalizeDocumentURLs = (value: unknown): string[] => {
     .slice(0, 10);
 };
 
-const normalizeJoinMode = (value: unknown): WorkerGroupJoinMode =>
-  value === 'admin_add' ? 'admin_add' : 'open';
+const normalizeJoinMode = (value: unknown): WorkerGroupJoinMode => (value === 'admin_add' ? 'admin_add' : 'open');
 
-const normalizeMemberVisibility = (
-  value: unknown,
-  joinMode: WorkerGroupJoinMode,
-): WorkerGroupMemberVisibility => {
+const normalizeMemberVisibility = (value: unknown, joinMode: WorkerGroupJoinMode): WorkerGroupMemberVisibility => {
   if (joinMode === 'open' && value === 'admin_only') return 'session';
   if (value === 'admin_only' || value === 'members') return value;
   return 'session';
@@ -199,15 +195,11 @@ export const buildPendingWorkerGroupInput = ({
     ...(adminAddress ? { adminAddress } : {}),
     joinMode: draft.joinMode,
     memberVisibility:
-      draft.joinMode === 'open' && draft.memberVisibility === 'admin_only'
-        ? 'session'
-        : draft.memberVisibility,
+      draft.joinMode === 'open' && draft.memberVisibility === 'admin_only' ? 'session' : draft.memberVisibility,
   };
 };
 
-export const serializePendingWorkerGroupDrafts = (
-  value: unknown,
-): Array<Omit<PendingWorkerGroupDraft, 'imageFile'>> =>
+export const serializePendingWorkerGroupDrafts = (value: unknown): Array<Omit<PendingWorkerGroupDraft, 'imageFile'>> =>
   normalizePendingWorkerGroupDrafts(value).map((draft) => {
     const durableDraft: Partial<PendingWorkerGroupDraft> = { ...draft };
     delete durableDraft.imageFile;

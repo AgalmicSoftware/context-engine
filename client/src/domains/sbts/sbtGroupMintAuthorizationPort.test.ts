@@ -86,9 +86,9 @@ describe('SbtGroupMintAuthorizationPort', () => {
     const signGroupMintAuthorization = jest
       .spyOn(chainGateway, 'signGroupMintAuthorization')
       .mockResolvedValue('0xsecondSignature');
-    const generateInvitePayloads = jest.spyOn(chainGateway, 'generateInvitePayloads').mockResolvedValue([
-      { nonce: '2', signature: '0xsecondInvite', inviteCode: 'second' },
-    ]);
+    const generateInvitePayloads = jest
+      .spyOn(chainGateway, 'generateInvitePayloads')
+      .mockResolvedValue([{ nonce: '2', signature: '0xsecondInvite', inviteCode: 'second' }]);
     const firstInput = {
       password: 'first password',
       sbtAddress: '0x0000000000000000000000000000000000000001',
@@ -109,7 +109,9 @@ describe('SbtGroupMintAuthorizationPort', () => {
       walletScopeSbtAddress: '0x0000000000000000000000000000000000000002',
     };
 
-    await expect(sbtGroupMintAuthorizationPort.signGroupMintAuthorization(signInput)).resolves.toBe('0xsecondSignature');
+    await expect(sbtGroupMintAuthorizationPort.signGroupMintAuthorization(signInput)).resolves.toBe(
+      '0xsecondSignature',
+    );
     await expect(sbtGroupMintAuthorizationPort.generateInvitePayloads(inviteInput)).resolves.toEqual([
       { nonce: '2', signature: '0xsecondInvite', inviteCode: 'second' },
     ]);

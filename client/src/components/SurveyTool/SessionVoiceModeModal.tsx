@@ -99,7 +99,11 @@ const describeConfidence = (value: number): { label: string; percent: number } =
 const parseEditedAnswer = (value: string, original: unknown): unknown => {
   const trimmed = value.trim();
   if (Array.isArray(original) || (original && typeof original === 'object')) {
-    try { return JSON.parse(trimmed); } catch { return value; }
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      return value;
+    }
   }
   if (typeof original === 'boolean') return trimmed.toLowerCase() === 'true';
   if (typeof original === 'number' && Number.isFinite(Number(trimmed))) return Number(trimmed);
@@ -118,11 +122,7 @@ const displayResponderContext = (packet: InterviewPrefillPacket | null): string 
 
 const describeResearchCoverage = (coverage: InterviewResearchCoverage | undefined): string[] => {
   if (!coverage) return [];
-  const describeResource = (
-    label: string,
-    searched: number | null,
-    used: number | null,
-  ): string => {
+  const describeResource = (label: string, searched: number | null, used: number | null): string => {
     if (searched === null && used === null) return '';
     if (searched !== null) return `${label}: ${used === null ? 'unknown' : used} used / ${searched} searched`;
     return `${label}: ${used} used`;
@@ -247,74 +247,87 @@ function SessionInterviewPanel({
     });
   }, [resolveWorkerUrl, resolvedWorkerUrl]);
 
-  const runMapping = useCallback(async ({ nextTranscript = transcript }: { nextTranscript?: string } = {}) => {
-    if (!nextTranscript.trim() && !prefillPacket && !responderContext.trim()) {
+  const runMapping = useCallback(
+    async ({ nextTranscript = transcript }: { nextTranscript?: string } = {}) => {
+      if (!nextTranscript.trim() && !prefillPacket && !responderContext.trim()) {
+        setError('');
+        setMappingNotice(
+          'Not enough information to generate response drafts. Record an interview or add relevant responder context first.',
+        );
+        setStatus('Not enough information');
+        return;
+      }
+      setMapping(true);
       setError('');
-      setMappingNotice(
-        'Not enough information to generate response drafts. Record an interview or add relevant responder context first.',
-      );
-      setStatus('Not enough information');
-      return;
-    }
-    setMapping(true);
-    setError('');
-    setMappingNotice('');
-    setStatus('Mapping evidence to questions…');
-    try {
-      if (prefillPacket?.questionSetHash) {
-        const currentQuestionSetHash = await hashInterviewQuestions(questions);
-        if (currentQuestionSetHash !== prefillPacket.questionSetHash) {
-          throw new Error('This prefill link was created for an older or different question set. Ask the AI for a fresh link.');
-        }
-      }
-      const importedDrafts = readImportedInterviewDraftResponses(prefillPacket, questions);
-      let mapped = importedDrafts;
-      if (mapped === null) {
-        const url = await resolveWorkerUrl();
-        const contextPacket: InterviewPrefillPacket | null = prefillPacket || (responderContext.trim()
-          ? {
-              version: 1,
-              sessionSlug,
-              source: { platform: 'other', modelId: 'direct-user-context', verification: 'self_reported' },
-              responderContext: { summary: responderContext.trim() },
-            }
-          : null);
-        mapped = await mapInterviewEvidenceToResponses({
-          questions,
-          transcript: nextTranscript,
-          prefillPacket: contextPacket,
-          sessionSlug,
-          sessionConfig,
-          workerUrl: url,
-        });
-      }
-      setDrafts(mapped);
-      setEditedAnswers(Object.fromEntries(mapped.map((draft) => [draft.questionId, displayAnswer(draft.answer)])));
-      setSelected(Object.fromEntries(mapped.map((draft) => [
-        draft.questionId,
-        !hasDraftValue(responseFieldValue(existingResponseSlice, 'answers', draft.questionId)),
-      ])));
-      setMappingNotice(mapped.length
-        ? ''
-        : 'Not enough information to generate response drafts. The interview evidence did not contain enough directly relevant detail to answer a session question. Start another interview and share more detail, or augment it with relevant memories from Claude or ChatGPT.');
-      setStatus(mapped.length ? 'Review the proposed drafts' : 'No questions had enough evidence to prefill');
-    } catch (mappingError) {
       setMappingNotice('');
-      setError(mappingError instanceof Error ? mappingError.message : 'Could not generate response drafts.');
-      setStatus('Mapping failed');
-    } finally {
-      setMapping(false);
-    }
-  }, [
-    existingResponseSlice,
-    prefillPacket,
-    questions,
-    resolveWorkerUrl,
-    responderContext,
-    sessionConfig,
-    sessionSlug,
-    transcript,
-  ]);
+      setStatus('Mapping evidence to questions…');
+      try {
+        if (prefillPacket?.questionSetHash) {
+          const currentQuestionSetHash = await hashInterviewQuestions(questions);
+          if (currentQuestionSetHash !== prefillPacket.questionSetHash) {
+            throw new Error(
+              'This prefill link was created for an older or different question set. Ask the AI for a fresh link.',
+            );
+          }
+        }
+        const importedDrafts = readImportedInterviewDraftResponses(prefillPacket, questions);
+        let mapped = importedDrafts;
+        if (mapped === null) {
+          const url = await resolveWorkerUrl();
+          const contextPacket: InterviewPrefillPacket | null =
+            prefillPacket ||
+            (responderContext.trim()
+              ? {
+                  version: 1,
+                  sessionSlug,
+                  source: { platform: 'other', modelId: 'direct-user-context', verification: 'self_reported' },
+                  responderContext: { summary: responderContext.trim() },
+                }
+              : null);
+          mapped = await mapInterviewEvidenceToResponses({
+            questions,
+            transcript: nextTranscript,
+            prefillPacket: contextPacket,
+            sessionSlug,
+            sessionConfig,
+            workerUrl: url,
+          });
+        }
+        setDrafts(mapped);
+        setEditedAnswers(Object.fromEntries(mapped.map((draft) => [draft.questionId, displayAnswer(draft.answer)])));
+        setSelected(
+          Object.fromEntries(
+            mapped.map((draft) => [
+              draft.questionId,
+              !hasDraftValue(responseFieldValue(existingResponseSlice, 'answers', draft.questionId)),
+            ]),
+          ),
+        );
+        setMappingNotice(
+          mapped.length
+            ? ''
+            : 'Not enough information to generate response drafts. The interview evidence did not contain enough directly relevant detail to answer a session question. Start another interview and share more detail, or augment it with relevant memories from Claude or ChatGPT.',
+        );
+        setStatus(mapped.length ? 'Review the proposed drafts' : 'No questions had enough evidence to prefill');
+      } catch (mappingError) {
+        setMappingNotice('');
+        setError(mappingError instanceof Error ? mappingError.message : 'Could not generate response drafts.');
+        setStatus('Mapping failed');
+      } finally {
+        setMapping(false);
+      }
+    },
+    [
+      existingResponseSlice,
+      prefillPacket,
+      questions,
+      resolveWorkerUrl,
+      responderContext,
+      sessionConfig,
+      sessionSlug,
+      transcript,
+    ],
+  );
 
   useEffect(() => {
     if (!prefillPacket || importedRef.current || !questions.length) return;
@@ -418,9 +431,10 @@ function SessionInterviewPanel({
         if (draft.conviction !== undefined) await onApplyConviction(draft.questionId, draft.conviction);
       }
       if (applied.length) {
-        const directContextSource = !prefillPacket && !transcript.trim() && responderContext.trim()
-          ? { platform: 'other' as const, modelId: 'direct-user-context', verification: 'self_reported' as const }
-          : null;
+        const directContextSource =
+          !prefillPacket && !transcript.trim() && responderContext.trim()
+            ? { platform: 'other' as const, modelId: 'direct-user-context', verification: 'self_reported' as const }
+            : null;
         await onRecordProvenance?.(
           applied,
           prefillPacket?.source || directContextSource,
@@ -459,9 +473,7 @@ function SessionInterviewPanel({
   const importedResponderName = String(importedContext?.name || '').trim();
   const researchCoverage = prefillPacket?.source?.researchCoverage;
   const researchCoverageDetails = describeResearchCoverage(researchCoverage);
-  const hasImportedResponderContext = Boolean(
-    importedContext?.summary?.trim() || importedContext?.facts?.length,
-  );
+  const hasImportedResponderContext = Boolean(importedContext?.summary?.trim() || importedContext?.facts?.length);
 
   return (
     <div className={styles.sessionInterviewPanel} data-testid={E2E_TESTIDS.SESSION_INTERVIEW_PANEL}>
@@ -496,7 +508,11 @@ function SessionInterviewPanel({
       ) : null}
 
       <audio ref={audioRef} className={styles.sessionListeningSrOnly} aria-label="Realtime interviewer audio" />
-      {error ? <div className={styles.sessionListeningError} role="alert">{error}</div> : null}
+      {error ? (
+        <div className={styles.sessionListeningError} role="alert">
+          {error}
+        </div>
+      ) : null}
       <div className={styles.sessionInterviewActions}>
         {!isRecorderSessionActive ? (
           <div className={styles.sessionInterviewPrimaryAction}>
@@ -577,8 +593,19 @@ function SessionInterviewPanel({
         !mappingNotice &&
         !Array.isArray(prefillPacket?.responses) &&
         (transcript.trim() || prefillPacket || responderContext.trim()) ? (
-          <Button outline onClick={() => runMapping()} disabled={mapping} data-testid={E2E_TESTIDS.SESSION_INTERVIEW_GENERATE}>
-            {mapping ? <><FontAwesomeIcon icon={faSpinner} spin /> Mapping…</> : 'Generate response drafts'}
+          <Button
+            outline
+            onClick={() => runMapping()}
+            disabled={mapping}
+            data-testid={E2E_TESTIDS.SESSION_INTERVIEW_GENERATE}
+          >
+            {mapping ? (
+              <>
+                <FontAwesomeIcon icon={faSpinner} spin /> Mapping…
+              </>
+            ) : (
+              'Generate response drafts'
+            )}
           </Button>
         ) : null}
       </div>
@@ -650,7 +677,9 @@ function SessionInterviewPanel({
           <button
             type="button"
             className={`${styles.sessionAgentKickoffCopy} ${promptCopied ? styles.sessionAgentKickoffCopied : ''}`}
-            onClick={() => { void copyAgentPrompt(); }}
+            onClick={() => {
+              void copyAgentPrompt();
+            }}
             aria-label={promptCopied ? 'Memory augmentation prompt copied' : 'Copy memory augmentation prompt'}
             title={promptCopied ? 'Copied' : 'Copy memory augmentation prompt'}
             data-testid={E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT}
@@ -673,7 +702,9 @@ function SessionInterviewPanel({
         <div className={styles.sessionInterviewReview} data-testid={E2E_TESTIDS.SESSION_INTERVIEW_REVIEW}>
           <div className={styles.sessionInterviewReviewHeader}>
             <h4>Review proposed responses</h4>
-            <span>{drafts.filter((draft) => selected[draft.questionId]).length} of {drafts.length} selected</span>
+            <span>
+              {drafts.filter((draft) => selected[draft.questionId]).length} of {drafts.length} selected
+            </span>
           </div>
           {drafts.map((draft) => {
             const question = questions.find((candidate) => candidate.id === draft.questionId);
@@ -707,59 +738,67 @@ function SessionInterviewPanel({
                       value={editedAnswers[draft.questionId] ?? ''}
                       inputNamePrefix="interview-draft"
                       showIcons
-                      onChange={(answer) => setEditedAnswers((current) => ({
-                        ...current,
-                        [draft.questionId]: answer,
-                      }))}
+                      onChange={(answer) =>
+                        setEditedAnswers((current) => ({
+                          ...current,
+                          [draft.questionId]: answer,
+                        }))
+                      }
                     />
                   </div>
                 ) : (
                   <Input
                     type="textarea"
                     value={editedAnswers[draft.questionId] ?? ''}
-                    onChange={(event) => setEditedAnswers((current) => ({
-                      ...current,
-                      [draft.questionId]: event.target.value,
-                    }))}
+                    onChange={(event) =>
+                      setEditedAnswers((current) => ({
+                        ...current,
+                        [draft.questionId]: event.target.value,
+                      }))
+                    }
                     className={styles.sessionInterviewAnswerInput}
                     aria-label={`Draft answer for ${question?.prompt || draft.questionId}`}
                   />
                 )}
-                {draft.confidence !== undefined ? (() => {
-                  const confidence = describeConfidence(draft.confidence);
-                  return (
-                    <div
-                      className={styles.sessionInterviewConfidence}
-                      aria-label={`Prediction confidence: ${confidence.percent}% (${confidence.label})`}
-                      data-testid={E2E_TESTIDS.SESSION_INTERVIEW_DRAFT_CONFIDENCE}
-                      data-ce-question-id={draft.questionId}
-                    >
-                      <div className={styles.sessionInterviewConfidenceMeta}>
-                        <strong>{confidence.percent}% confidence</strong>
-                        <span>{confidence.label}</span>
-                      </div>
-                      <div
-                        className={styles.sessionInterviewConfidenceTrack}
-                        role="progressbar"
-                        aria-label={`Confidence for ${question?.prompt || draft.questionId}`}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-valuenow={confidence.percent}
-                      >
-                        <span style={{ width: `${confidence.percent}%` }} />
-                      </div>
-                    </div>
-                  );
-                })() : null}
+                {draft.confidence !== undefined
+                  ? (() => {
+                      const confidence = describeConfidence(draft.confidence);
+                      return (
+                        <div
+                          className={styles.sessionInterviewConfidence}
+                          aria-label={`Prediction confidence: ${confidence.percent}% (${confidence.label})`}
+                          data-testid={E2E_TESTIDS.SESSION_INTERVIEW_DRAFT_CONFIDENCE}
+                          data-ce-question-id={draft.questionId}
+                        >
+                          <div className={styles.sessionInterviewConfidenceMeta}>
+                            <strong>{confidence.percent}% confidence</strong>
+                            <span>{confidence.label}</span>
+                          </div>
+                          <div
+                            className={styles.sessionInterviewConfidenceTrack}
+                            role="progressbar"
+                            aria-label={`Confidence for ${question?.prompt || draft.questionId}`}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-valuenow={confidence.percent}
+                          >
+                            <span style={{ width: `${confidence.percent}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })()
+                  : null}
                 {draft.evidence ? (
                   <div className={styles.sessionInterviewEvidenceDisclosure}>
                     <button
                       type="button"
                       className={styles.sessionInterviewEvidenceToggle}
-                      onClick={() => setExpandedEvidence((current) => ({
-                        ...current,
-                        [draft.questionId]: !current[draft.questionId],
-                      }))}
+                      onClick={() =>
+                        setExpandedEvidence((current) => ({
+                          ...current,
+                          [draft.questionId]: !current[draft.questionId],
+                        }))
+                      }
                       aria-expanded={!!expandedEvidence[draft.questionId]}
                       aria-controls={evidenceId}
                       data-testid={E2E_TESTIDS.SESSION_INTERVIEW_DRAFT_BASIS_TOGGLE}
@@ -774,7 +813,9 @@ function SessionInterviewPanel({
                       Basis
                     </button>
                     {expandedEvidence[draft.questionId] ? (
-                      <div id={evidenceId} className={styles.sessionInterviewEvidence}>{draft.evidence}</div>
+                      <div id={evidenceId} className={styles.sessionInterviewEvidence}>
+                        {draft.evidence}
+                      </div>
                     ) : null}
                   </div>
                 ) : null}
@@ -825,7 +866,9 @@ function SessionInterviewPanel({
             </div>
             <Button
               color="primary"
-              onClick={() => { void applyDrafts(); }}
+              onClick={() => {
+                void applyDrafts();
+              }}
               disabled={applying || !drafts.some((draft) => selected[draft.questionId])}
               data-testid={E2E_TESTIDS.SESSION_INTERVIEW_APPLY}
             >
@@ -855,12 +898,20 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
       <ModalBody>
         {!mode ? (
           <div className={styles.sessionVoiceModeChooser} data-testid={E2E_TESTIDS.SESSION_VOICE_MODE_CHOOSER}>
-            <button type="button" onClick={() => onSelectMode('interview')} data-testid={E2E_TESTIDS.SESSION_VOICE_MODE_INTERVIEW}>
+            <button
+              type="button"
+              onClick={() => onSelectMode('interview')}
+              data-testid={E2E_TESTIDS.SESSION_VOICE_MODE_INTERVIEW}
+            >
               <FontAwesomeIcon icon={faMicrophone} />
               <strong>Interview</strong>
               <span>One person. A voice interviewer generates reviewable response drafts.</span>
             </button>
-            <button type="button" onClick={() => onSelectMode('recordGroup')} data-testid={E2E_TESTIDS.SESSION_VOICE_MODE_GROUP}>
+            <button
+              type="button"
+              onClick={() => onSelectMode('recordGroup')}
+              data-testid={E2E_TESTIDS.SESSION_VOICE_MODE_GROUP}
+            >
               <FontAwesomeIcon icon={faComments} />
               <strong>Group Conversation</strong>
               <span>Record a group discussion and generate new question drafts from it.</span>
@@ -872,7 +923,13 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
           <SessionListeningPanel {...props} panelMode="recordGroup" onClose={onClose} />
         )}
       </ModalBody>
-      {!mode ? <ModalFooter><Button outline onClick={onClose}>Cancel</Button></ModalFooter> : null}
+      {!mode ? (
+        <ModalFooter>
+          <Button outline onClick={onClose}>
+            Cancel
+          </Button>
+        </ModalFooter>
+      ) : null}
     </Modal>
   );
 }

@@ -3275,10 +3275,7 @@ class UserPage extends Component<any, any> {
       if (!this._isMounted) return;
       this.setState(
         buildUserPageAnalysisErrorStatePatch({
-          message: getUserPageErrorMessage(
-            e,
-            'Unable to generate analysis right now. Please try again later.',
-          ),
+          message: getUserPageErrorMessage(e, 'Unable to generate analysis right now. Please try again later.'),
         }),
       );
       this.clearAnalysisTimer();

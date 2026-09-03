@@ -21,8 +21,7 @@ export type ChainScanReadsPort = {
 };
 
 export const chainScanReadsPort: ChainScanReadsPort = {
-  getLatestBlockNumber: (providerName, groupKeyOrCfg) =>
-    chainGateway.getLatestBlockNumber(providerName, groupKeyOrCfg),
+  getLatestBlockNumber: (providerName, groupKeyOrCfg) => chainGateway.getLatestBlockNumber(providerName, groupKeyOrCfg),
   getRelevantBlockWindowForFilter: (groupKeyOrCfg, options) =>
     options === undefined
       ? chainGateway.getRelevantBlockWindowForFilter(groupKeyOrCfg)

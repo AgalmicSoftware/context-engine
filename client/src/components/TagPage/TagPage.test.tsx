@@ -245,9 +245,7 @@ describe('Tag Explorer Worker groups', () => {
         networkId: 'worker',
       }),
     ]);
-    expect(loadPublicWorkerGroups).toHaveBeenCalledWith(
-      expect.objectContaining({ sessionSlug: 'worker-session' }),
-    );
+    expect(loadPublicWorkerGroups).toHaveBeenCalledWith(expect.objectContaining({ sessionSlug: 'worker-session' }));
   });
 });
 

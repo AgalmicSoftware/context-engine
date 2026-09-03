@@ -596,10 +596,7 @@ export async function analyzeUserOpinions(userData: unknown, opts: unknown = {})
   } catch (err) {
     // User-triggered analysis requests need the real Worker failure so the UI can
     // explain why analysis did not run instead of presenting a synthetic result.
-    if (
-      readAiOptionThrowOnError(opts) ||
-      /on-chain gate data unavailable/i.test(readAiErrorMessage(err, ''))
-    ) {
+    if (readAiOptionThrowOnError(opts) || /on-chain gate data unavailable/i.test(readAiErrorMessage(err, ''))) {
       throw err;
     }
     aiLog.error('analyzeUserOpinions error:', err);

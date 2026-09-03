@@ -3531,7 +3531,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   text-align: left;
   cursor: pointer;
   opacity: 0.5;
-  transition: color 150ms ease, opacity 150ms ease;
+  transition:
+    color 150ms ease,
+    opacity 150ms ease;
 
   &:hover,
   &:focus-visible {

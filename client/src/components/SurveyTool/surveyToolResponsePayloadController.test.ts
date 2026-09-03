@@ -206,21 +206,25 @@ describe('surveyToolResponsePayloadController', () => {
     );
 
     const provenance = result.responses![0].interviewProvenance as Record<string, any>;
-    expect(provenance.originalPrediction).toEqual(expect.objectContaining({
-      answer: { redacted: true, reason: 'encrypted_field' },
-      additionalComments: { redacted: true, reason: 'encrypted_field' },
-      confidence: 0.3,
-    }));
-    expect(provenance.predictionComparison).toEqual(expect.objectContaining({
-      submitted: expect.objectContaining({
+    expect(provenance.originalPrediction).toEqual(
+      expect.objectContaining({
         answer: { redacted: true, reason: 'encrypted_field' },
         additionalComments: { redacted: true, reason: 'encrypted_field' },
-        importance: 80,
-        conviction: 70,
+        confidence: 0.3,
       }),
-      changedFields: ['answer', 'additionalComments', 'importance'],
-      redactedFields: ['answer', 'additionalComments'],
-    }));
+    );
+    expect(provenance.predictionComparison).toEqual(
+      expect.objectContaining({
+        submitted: expect.objectContaining({
+          answer: { redacted: true, reason: 'encrypted_field' },
+          additionalComments: { redacted: true, reason: 'encrypted_field' },
+          importance: 80,
+          conviction: 70,
+        }),
+        changedFields: ['answer', 'additionalComments', 'importance'],
+        redactedFields: ['answer', 'additionalComments'],
+      }),
+    );
     expect(JSON.stringify(provenance)).not.toContain('private');
   });
 
@@ -245,9 +249,11 @@ describe('surveyToolResponsePayloadController', () => {
       }),
     );
 
-    expect(result.responses![0].interviewProvenance).toEqual(expect.objectContaining({
-      source: expect.objectContaining({ platform: 'claude', modelId: 'claude-example' }),
-    }));
+    expect(result.responses![0].interviewProvenance).toEqual(
+      expect.objectContaining({
+        source: expect.objectContaining({ platform: 'claude', modelId: 'claude-example' }),
+      }),
+    );
     expect(result.responses![0].interviewProvenance).not.toHaveProperty('originalPrediction');
     expect(result.responses![0].interviewProvenance).not.toHaveProperty('predictionComparison');
   });

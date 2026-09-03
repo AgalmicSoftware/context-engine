@@ -68,8 +68,7 @@ export const resolveCommunityScopeAuthority = ({
     exactCandidate(getDemoSessionConfigBySlug(slug, { allowDemoFallback: true })) ||
     {};
   const projection = resolveSessionCapabilityProjection(sessionConfig);
-  const isWorkerCanonical =
-    projection.source === 'profile' && projection.profileValid && projection.isWorkerCanonical;
+  const isWorkerCanonical = projection.source === 'profile' && projection.profileValid && projection.isWorkerCanonical;
   let workerCanonicalIdentity: WorkerCanonicalCacheIdentity | null = null;
   if (isWorkerCanonical) {
     try {
@@ -98,7 +97,12 @@ export const pickCommunityWorkerCanonicalCache = (
 export const getCommunityWorkerGroupCountCacheKey = (
   identity: WorkerCanonicalCacheIdentity,
   account: unknown,
-): string => `${identity.key}\n${String(account || '').trim().toLowerCase() || 'anonymous'}`;
+): string =>
+  `${identity.key}\n${
+    String(account || '')
+      .trim()
+      .toLowerCase() || 'anonymous'
+  }`;
 
 export const getCommunityWorkerGroupCountState = (
   identity: WorkerCanonicalCacheIdentity | null,
@@ -171,10 +175,7 @@ export const loadCommunityWorkerGroupCount = async ({
 
   const { sessionConfig, slug } = scopeEntry;
   const account = String(runtime.account || '').trim();
-  if (
-    !account &&
-    !sessionModeAllowsAnonymousWorkerGroupDiscovery(sessionConfig.sessionModeProfile)
-  ) {
+  if (!account && !sessionModeAllowsAnonymousWorkerGroupDiscovery(sessionConfig.sessionModeProfile)) {
     cache.set(countCacheKey, {
       count: existing?.count || 0,
       groupIds: existing?.groupIds || [],
@@ -223,7 +224,9 @@ export const loadCommunityWorkerGroupCount = async ({
       const groupIds = Array.from(new Set(groups.map((group) => String(group?.groupId || '').trim()).filter(Boolean)));
       const visibleUserIds = new Set<string>();
       groups.forEach((group) => {
-        const adminAddress = String(group?.adminAddress || '').trim().toLowerCase();
+        const adminAddress = String(group?.adminAddress || '')
+          .trim()
+          .toLowerCase();
         if (isDisplayableWorkerUserId(adminAddress)) visibleUserIds.add(adminAddress);
       });
       // Count only identities already visible to this viewer; aggregate member
@@ -231,7 +234,11 @@ export const loadCommunityWorkerGroupCount = async ({
       overviewMemberships.forEach((membership) => {
         const principal = membership?.member?.principal;
         const principalAddress =
-          principal && 'address' in principal ? String(principal.address || '').trim().toLowerCase() : '';
+          principal && 'address' in principal
+            ? String(principal.address || '')
+                .trim()
+                .toLowerCase()
+            : '';
         if (isDisplayableWorkerUserId(principalAddress)) visibleUserIds.add(principalAddress);
       });
       if (overviewMemberships.length > 0 && isDisplayableWorkerUserId(account)) {

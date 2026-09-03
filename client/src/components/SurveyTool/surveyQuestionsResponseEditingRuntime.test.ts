@@ -163,12 +163,14 @@ describe('surveyQuestionsResponseEditingRuntime', () => {
     const afterImportance = jest.fn();
     const context = createContext({
       stateRef: createStateRef({
-        surveysResponseState: [{
-          answers: {},
-          additionalComments: {},
-          conviction: { q1: 70 },
-          importance: { q1: 80 },
-        }],
+        surveysResponseState: [
+          {
+            answers: {},
+            additionalComments: {},
+            conviction: { q1: 70 },
+            importance: { q1: 80 },
+          },
+        ],
       }),
     });
     const runtime = createSurveyQuestionsResponseEditingRuntime(context);

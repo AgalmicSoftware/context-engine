@@ -28,9 +28,7 @@ export const dispatchWorkerGroupsChanged = (value: unknown): WorkerGroupsChanged
   return detail;
 };
 
-export const subscribeWorkerGroupsChanged = (
-  listener: (detail: WorkerGroupsChangedDetail) => void,
-): (() => void) => {
+export const subscribeWorkerGroupsChanged = (listener: (detail: WorkerGroupsChangedDetail) => void): (() => void) => {
   const target = getWindow();
   if (!target) return () => undefined;
   const handler = (event: Event) => {

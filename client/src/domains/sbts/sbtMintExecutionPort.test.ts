@@ -59,9 +59,9 @@ describe('SbtMintExecutionPort', () => {
       .spyOn(chainGateway, 'mintWithGroupSignature')
       .mockResolvedValue({ transactionHash: '0xsecondGroup' });
 
-    await expect(
-      sbtMintExecutionPort.claim('injected', '0x0000000000000000000000000000000000000001'),
-    ).resolves.toEqual({ transactionHash: '0xfirstClaim' });
+    await expect(sbtMintExecutionPort.claim('injected', '0x0000000000000000000000000000000000000001')).resolves.toEqual(
+      { transactionHash: '0xfirstClaim' },
+    );
 
     await expect(
       sbtMintExecutionPort.claimWithInvite(

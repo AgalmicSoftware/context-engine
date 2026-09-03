@@ -805,10 +805,10 @@ describe('WorkerGroupMembershipPanel', () => {
     const fetchImpl = jest.fn(async (input: RequestInfo | URL) => {
       const pathname = new URL(String(input)).pathname;
       if (pathname.endsWith('/groups/join')) {
-        return new Response(
-          JSON.stringify({ ok: true, sessionId: SESSION_ID, sessionSlug: 'alpha', group }),
-          { status: 200, headers: { 'content-type': 'application/json' } },
-        );
+        return new Response(JSON.stringify({ ok: true, sessionId: SESSION_ID, sessionSlug: 'alpha', group }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
       }
       if (pathname.endsWith('/groups/my-memberships')) {
         return new Response(
@@ -816,10 +816,10 @@ describe('WorkerGroupMembershipPanel', () => {
           { status: 200, headers: { 'content-type': 'application/json' } },
         );
       }
-      return new Response(
-        JSON.stringify({ ok: true, sessionId: SESSION_ID, sessionSlug: 'alpha', groups: [group] }),
-        { status: 200, headers: { 'content-type': 'application/json' } },
-      );
+      return new Response(JSON.stringify({ ok: true, sessionId: SESSION_ID, sessionSlug: 'alpha', groups: [group] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
     });
 
     render(<WorkerGroupMembershipPanel envelope={envelope} fetchImpl={fetchImpl as typeof fetch} />);

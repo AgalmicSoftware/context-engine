@@ -80,9 +80,10 @@ describe('SessionVoiceModeModal', () => {
     const stop = jest.fn(async () => ({ transcript: '', turns: [] }));
     let resolveSession: ((session: Awaited<ReturnType<typeof startSessionRealtimeInterview>>) => void) | null = null;
     mockedStartSessionRealtimeInterview.mockImplementation(
-      () => new Promise((resolve) => {
-        resolveSession = resolve;
-      }),
+      () =>
+        new Promise((resolve) => {
+          resolveSession = resolve;
+        }),
     );
     const view = render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
     const start = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START);
@@ -114,12 +115,10 @@ describe('SessionVoiceModeModal', () => {
 
     expect(screen.queryByText(/A realtime voice interviewer will cover/i)).not.toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_CONTEXT)).not.toBeInTheDocument();
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveAccessibleName(
-      'Interview status: Ready',
-    );
-    expect(screen.getByText(
-      'Copy and Paste this prompt to augment interview with history from Claude or ChatGPT',
-    )).toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveAccessibleName('Interview status: Ready');
+    expect(
+      screen.getByText('Copy and Paste this prompt to augment interview with history from Claude or ChatGPT'),
+    ).toBeInTheDocument();
     const promptToggle = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE);
     expect(promptToggle).toHaveAccessibleName('View prompt');
     expect(promptToggle).toHaveAttribute('aria-expanded', 'false');
@@ -130,9 +129,11 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.queryByText('Copy prompt')).not.toBeInTheDocument();
 
     fireEvent.click(copyButton);
-    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expect.stringContaining(
-      'review-only Context Engine interview prefill',
-    )));
+    await waitFor(() =>
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+        expect.stringContaining('review-only Context Engine interview prefill'),
+      ),
+    );
     expect(copyButton).toHaveAccessibleName('Memory augmentation prompt copied');
     expect(copyButton.querySelector('[data-icon="check"]')).toBeInTheDocument();
 
@@ -152,15 +153,19 @@ describe('SessionVoiceModeModal', () => {
   it('shows a collapsed responder transcript disclosure after the voice interview ends', async () => {
     let interviewOptions: Parameters<typeof startSessionRealtimeInterview>[0] | null = null;
     let resolveStop: (() => void) | null = null;
-    const stop = jest.fn(() => new Promise<{
-      transcript: string;
-      turns: Array<{ itemId: string; text: string; role: 'responder' }>;
-    }>((resolve) => {
-      resolveStop = () => resolve({
-        transcript: 'Responder: Reversible decisions matter.',
-        turns: [{ itemId: 'turn-1', text: 'Reversible decisions matter.', role: 'responder' }],
-      });
-    }));
+    const stop = jest.fn(
+      () =>
+        new Promise<{
+          transcript: string;
+          turns: Array<{ itemId: string; text: string; role: 'responder' }>;
+        }>((resolve) => {
+          resolveStop = () =>
+            resolve({
+              transcript: 'Responder: Reversible decisions matter.',
+              turns: [{ itemId: 'turn-1', text: 'Reversible decisions matter.', role: 'responder' }],
+            });
+        }),
+    );
     const pause = jest.fn(() => interviewOptions?.onRecordingState?.('paused'));
     const resume = jest.fn(() => interviewOptions?.onRecordingState?.('recording'));
     const mediaStream = {
@@ -195,9 +200,7 @@ describe('SessionVoiceModeModal', () => {
 
     fireEvent.click(screen.getByLabelText('Pause interview'));
     expect(pause).toHaveBeenCalledTimes(1);
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveAccessibleName(
-      'Interview status: Paused',
-    );
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveAccessibleName('Interview status: Paused');
     fireEvent.click(screen.getByLabelText('Resume interview'));
     expect(resume).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveAccessibleName(
@@ -207,9 +210,7 @@ describe('SessionVoiceModeModal', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
     expect(stop).toHaveBeenCalledTimes(1);
     expect(screen.getByLabelText('Pause interview')).toBeDisabled();
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveAccessibleName(
-      'Interview status: Stopping',
-    );
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveAccessibleName('Interview status: Stopping');
     await act(async () => {
       resolveStop?.();
       await Promise.resolve();
@@ -225,9 +226,11 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT)).toHaveTextContent(
       'Responder: Reversible decisions matter.',
     );
-    await waitFor(() => expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalledWith(
-      expect.objectContaining({ transcript: 'Responder: Reversible decisions matter.' }),
-    ));
+    await waitFor(() =>
+      expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalledWith(
+        expect.objectContaining({ transcript: 'Responder: Reversible decisions matter.' }),
+      ),
+    );
   });
 
   it('maps imported context into reviewable drafts and never selects replacement of an existing draft silently', async () => {
@@ -263,14 +266,16 @@ describe('SessionVoiceModeModal', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
 
     await waitFor(() => expect(baseProps.onApplyAnswer).toHaveBeenCalledWith('q1', 'Reviewed answer'));
-    await waitFor(() => expect(baseProps.onRecordProvenance).toHaveBeenCalledWith(
-      expect.arrayContaining([expect.objectContaining({ questionId: 'q1', answer: 'Original prediction' })]),
-      prefillPacket.source,
-      prefillPacket,
-      true,
-      true,
-      '',
-    ));
+    await waitFor(() =>
+      expect(baseProps.onRecordProvenance).toHaveBeenCalledWith(
+        expect.arrayContaining([expect.objectContaining({ questionId: 'q1', answer: 'Original prediction' })]),
+        prefillPacket.source,
+        prefillPacket,
+        true,
+        true,
+        '',
+      ),
+    );
     await waitFor(() => expect(baseProps.onClose).toHaveBeenCalled());
   });
 
@@ -296,20 +301,16 @@ describe('SessionVoiceModeModal', () => {
         },
       },
       responderContext: { summary: 'A tentative related signal.' },
-      responses: [{
-        questionId: 'q1',
-        answer: 'A cautious prediction',
-        confidence: 0.22,
-        evidence: 'A related but indirect statement in authorized conversation history.',
-      }],
+      responses: [
+        {
+          questionId: 'q1',
+          answer: 'A cautious prediction',
+          confidence: 0.22,
+          evidence: 'A related but indirect statement in authorized conversation history.',
+        },
+      ],
     };
-    render(
-      <SessionVoiceModeModal
-        {...baseProps}
-        mode="interview"
-        prefillPacket={prefillPacket}
-      />,
-    );
+    render(<SessionVoiceModeModal {...baseProps} mode="interview" prefillPacket={prefillPacket} />);
 
     expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).toBeInTheDocument();
     const coverage = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_RESEARCH_COVERAGE);
@@ -337,14 +338,16 @@ describe('SessionVoiceModeModal', () => {
     expect(mockedMapInterviewEvidenceToResponses).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
-    await waitFor(() => expect(baseProps.onRecordProvenance).toHaveBeenCalledWith(
-      [expect.objectContaining({ questionId: 'q1', confidence: 0.22 })],
-      prefillPacket.source,
-      prefillPacket,
-      true,
-      true,
-      '',
-    ));
+    await waitFor(() =>
+      expect(baseProps.onRecordProvenance).toHaveBeenCalledWith(
+        [expect.objectContaining({ questionId: 'q1', confidence: 0.22 })],
+        prefillPacket.source,
+        prefillPacket,
+        true,
+        true,
+        '',
+      ),
+    );
   });
 
   it('uses the pile-view Agree, Unsure, and Disagree control for binary drafts', async () => {
@@ -458,14 +461,16 @@ describe('SessionVoiceModeModal', () => {
     fireEvent.click(includeComparison);
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
 
-    await waitFor(() => expect(baseProps.onRecordProvenance).toHaveBeenCalledWith(
-      expect.arrayContaining([expect.objectContaining({ questionId: 'q1' })]),
-      expect.objectContaining({ platform: 'claude' }),
-      expect.any(Object),
-      false,
-      false,
-      '',
-    ));
+    await waitFor(() =>
+      expect(baseProps.onRecordProvenance).toHaveBeenCalledWith(
+        expect.arrayContaining([expect.objectContaining({ questionId: 'q1' })]),
+        expect.objectContaining({ platform: 'claude' }),
+        expect.any(Object),
+        false,
+        false,
+        '',
+      ),
+    );
     await waitFor(() => expect(baseProps.onClose).toHaveBeenCalled());
   });
 
@@ -485,28 +490,32 @@ describe('SessionVoiceModeModal', () => {
     expect(includeName).not.toBeChecked();
     expect(screen.getByText(/Include “Ada Example” as the responder name/i)).toBeInTheDocument();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
-    await waitFor(() => expect(baseProps.onRecordProvenance).toHaveBeenCalledWith(
-      expect.any(Array),
-      prefillPacket.source,
-      prefillPacket,
-      true,
-      true,
-      '',
-    ));
+    await waitFor(() =>
+      expect(baseProps.onRecordProvenance).toHaveBeenCalledWith(
+        expect.any(Array),
+        prefillPacket.source,
+        prefillPacket,
+        true,
+        true,
+        '',
+      ),
+    );
     first.unmount();
 
     jest.clearAllMocks();
     render(<SessionVoiceModeModal {...baseProps} mode="interview" prefillPacket={prefillPacket} />);
     fireEvent.click(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME));
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
-    await waitFor(() => expect(baseProps.onRecordProvenance).toHaveBeenCalledWith(
-      expect.any(Array),
-      prefillPacket.source,
-      prefillPacket,
-      true,
-      true,
-      'Ada Example',
-    ));
+    await waitFor(() =>
+      expect(baseProps.onRecordProvenance).toHaveBeenCalledWith(
+        expect.any(Array),
+        prefillPacket.source,
+        prefillPacket,
+        true,
+        true,
+        'Ada Example',
+      ),
+    );
   });
 
   it('rejects stale imported context before calling the mapper', async () => {

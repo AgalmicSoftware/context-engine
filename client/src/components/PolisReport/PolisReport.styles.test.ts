@@ -1,10 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 
-const readPolisReportScss = () =>
-  fs.readFileSync(path.join(__dirname, 'PolisReport.module.scss'), 'utf8');
-const readPolisReportSource = () =>
-  fs.readFileSync(path.join(__dirname, 'PolisReport.tsx'), 'utf8');
+const readPolisReportScss = () => fs.readFileSync(path.join(__dirname, 'PolisReport.module.scss'), 'utf8');
+const readPolisReportSource = () => fs.readFileSync(path.join(__dirname, 'PolisReport.tsx'), 'utf8');
 
 describe('PolisReport graph scroll controls', () => {
   it('keeps the controls close to the graph and large enough to find', () => {

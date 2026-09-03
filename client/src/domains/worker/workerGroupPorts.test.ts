@@ -665,7 +665,9 @@ describe('worker group ports', () => {
       fetchImpl,
     });
 
-    expect(result).toEqual(expect.objectContaining({ ok: true, group: expect.objectContaining({ groupId: 'reviewers' }) }));
+    expect(result).toEqual(
+      expect.objectContaining({ ok: true, group: expect.objectContaining({ groupId: 'reviewers' }) }),
+    );
     expect(result).not.toHaveProperty('memberCount');
     expect(result.group).not.toHaveProperty('memberCount');
   });

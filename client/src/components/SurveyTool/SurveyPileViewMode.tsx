@@ -510,15 +510,15 @@ export const buildPileRuntimeInitialState = (engine: SurveyQuestionsRuntimeEngin
   const props = engine.props || {};
   const interviewEnabled = isInterviewFeatureEnabled(props.sessionConfig);
   const initialVoiceMode =
-    interviewEnabled && typeof window !== 'undefined'
-      ? resolveSessionVoiceMode(window.location.search || '')
-      : null;
+    interviewEnabled && typeof window !== 'undefined' ? resolveSessionVoiceMode(window.location.search || '') : null;
   let initialPrefillPacket: InterviewPrefillPacket | null = null;
   let initialInterviewPrefillError = '';
   if (interviewEnabled && typeof window !== 'undefined') {
     const hasPrefill = hasInterviewPrefillHash(window.location.hash || '');
     const packet = readInterviewPrefillFromHash(window.location.hash || '');
-    const effectiveSlug = String(resolveEffectiveSlug(props) || '').trim().toLowerCase();
+    const effectiveSlug = String(resolveEffectiveSlug(props) || '')
+      .trim()
+      .toLowerCase();
     if (packet && (!effectiveSlug || packet.sessionSlug === effectiveSlug)) {
       initialPrefillPacket = packet;
     } else if (hasPrefill) {
@@ -1692,14 +1692,17 @@ const selectSessionVoiceMode = (engine: PileViewModeEngine, mode: SessionVoiceMo
 };
 
 const closeSessionVoiceModeModal = (engine: PileViewModeEngine) => {
-  engine.setState({
-    showVoiceModeModal: false,
-    sessionVoiceMode: null,
-    interviewPrefillPacket: null,
-    interviewPrefillError: '',
-  }, () => {
-    engine.syncSessionVoiceModeQuery(null);
-  });
+  engine.setState(
+    {
+      showVoiceModeModal: false,
+      sessionVoiceMode: null,
+      interviewPrefillPacket: null,
+      interviewPrefillError: '',
+    },
+    () => {
+      engine.syncSessionVoiceModeQuery(null);
+    },
+  );
 };
 
 export const recordInterviewProvenance = (
@@ -1712,58 +1715,64 @@ export const recordInterviewProvenance = (
   responderName = '',
 ) => {
   const normalizedSource = source || resolveRealtimeInterviewSource(engine.props?.sessionConfig);
-  const normalizedResponderName = String(responderName || '').trim().replace(/\s+/g, ' ').slice(0, 160);
+  const normalizedResponderName = String(responderName || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .slice(0, 160);
   return new Promise<void>((resolve) => {
-    engine.setState((prev: SurveyQuestionsState) => {
-      const states = [...(prev.surveysResponseState || [])];
-      const slice = {
-        ...(states[0] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }),
-      };
-      const currentProvenance = slice.interviewProvenance;
-      const provenance: Record<string, unknown> =
-        currentProvenance && typeof currentProvenance === 'object' && !Array.isArray(currentProvenance)
-          ? { ...currentProvenance }
-          : {};
-      drafts.forEach((draft) => {
-        if (!included && !includePredictionComparison && !normalizedResponderName) {
-          delete provenance[draft.questionId];
-          return;
-        }
-        provenance[draft.questionId] = {
-          version: 1,
-          includeAiProvenance: included,
-          includePredictionComparison,
-          ...(included
-            ? {
-                source: normalizedSource,
-                promptVersion: packet?.promptVersion || INTERVIEW_PROMPT_VERSION,
-                questionSetHash: packet?.questionSetHash || '',
-              }
-            : {}),
-          ...(includePredictionComparison
-            ? {
-                originalPrediction: {
-                  answer: draft.answer,
-                  additionalComments: draft.additionalComments || '',
-                  importance: draft.importance ?? null,
-                  conviction: draft.conviction ?? null,
-                  confidence: draft.confidence ?? null,
-                  evidence: draft.evidence || '',
-                },
-              }
-            : {}),
-          ...(normalizedResponderName ? { responderName: normalizedResponderName } : {}),
-          appliedAt: Date.now(),
+    engine.setState(
+      (prev: SurveyQuestionsState) => {
+        const states = [...(prev.surveysResponseState || [])];
+        const slice = {
+          ...(states[0] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }),
         };
-      });
-      slice.interviewProvenance = provenance;
-      states[0] = slice;
-      return { surveysResponseState: states };
-    }, () => {
-      if (typeof engine.persistDraft === 'function') engine.persistDraft();
-      else engine.persistDraftSafely?.(0);
-      resolve();
-    });
+        const currentProvenance = slice.interviewProvenance;
+        const provenance: Record<string, unknown> =
+          currentProvenance && typeof currentProvenance === 'object' && !Array.isArray(currentProvenance)
+            ? { ...currentProvenance }
+            : {};
+        drafts.forEach((draft) => {
+          if (!included && !includePredictionComparison && !normalizedResponderName) {
+            delete provenance[draft.questionId];
+            return;
+          }
+          provenance[draft.questionId] = {
+            version: 1,
+            includeAiProvenance: included,
+            includePredictionComparison,
+            ...(included
+              ? {
+                  source: normalizedSource,
+                  promptVersion: packet?.promptVersion || INTERVIEW_PROMPT_VERSION,
+                  questionSetHash: packet?.questionSetHash || '',
+                }
+              : {}),
+            ...(includePredictionComparison
+              ? {
+                  originalPrediction: {
+                    answer: draft.answer,
+                    additionalComments: draft.additionalComments || '',
+                    importance: draft.importance ?? null,
+                    conviction: draft.conviction ?? null,
+                    confidence: draft.confidence ?? null,
+                    evidence: draft.evidence || '',
+                  },
+                }
+              : {}),
+            ...(normalizedResponderName ? { responderName: normalizedResponderName } : {}),
+            appliedAt: Date.now(),
+          };
+        });
+        slice.interviewProvenance = provenance;
+        states[0] = slice;
+        return { surveysResponseState: states };
+      },
+      () => {
+        if (typeof engine.persistDraft === 'function') engine.persistDraft();
+        else engine.persistDraftSafely?.(0);
+        resolve();
+      },
+    );
   });
 };
 
@@ -2298,7 +2307,12 @@ const handleAnswerPile = (engine: PileViewModeEngine, questionId: any, answer: a
   engine.handleAnswer(0, questionId, answer, options);
 };
 
-const handleAdditionalPile = (engine: PileViewModeEngine, questionId: any, comments: any, options: Record<string, unknown> = {}) => {
+const handleAdditionalPile = (
+  engine: PileViewModeEngine,
+  questionId: any,
+  comments: any,
+  options: Record<string, unknown> = {},
+) => {
   engine.handleAdditional(0, questionId, comments, options);
 };
 
@@ -3130,18 +3144,26 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
             existingResponseSlice={engine.state.surveysResponseState?.[0] || null}
             prefillPacket={(interviewPrefillPacket as InterviewPrefillPacket | null) || null}
             initialError={String(interviewPrefillError || '')}
-            onApplyAnswer={(questionId: string, answer: unknown) => new Promise<void>((resolve) => {
-              engine.handleAnswerPile(questionId, answer, { persistDraft: false, afterUpdate: resolve });
-            })}
-            onApplyAdditional={(questionId: string, comments: string) => new Promise<void>((resolve) => {
-              engine.handleAdditionalPile(questionId, comments, { persistDraft: false, afterUpdate: resolve });
-            })}
-            onApplyImportance={(questionId: string, importance: number) => new Promise<void>((resolve) => {
-              engine.handleImportance(0, questionId, importance, { persistDraft: false, afterUpdate: resolve });
-            })}
-            onApplyConviction={(questionId: string, conviction: number) => new Promise<void>((resolve) => {
-              engine.handleConviction(0, questionId, conviction, { persistDraft: false, afterUpdate: resolve });
-            })}
+            onApplyAnswer={(questionId: string, answer: unknown) =>
+              new Promise<void>((resolve) => {
+                engine.handleAnswerPile(questionId, answer, { persistDraft: false, afterUpdate: resolve });
+              })
+            }
+            onApplyAdditional={(questionId: string, comments: string) =>
+              new Promise<void>((resolve) => {
+                engine.handleAdditionalPile(questionId, comments, { persistDraft: false, afterUpdate: resolve });
+              })
+            }
+            onApplyImportance={(questionId: string, importance: number) =>
+              new Promise<void>((resolve) => {
+                engine.handleImportance(0, questionId, importance, { persistDraft: false, afterUpdate: resolve });
+              })
+            }
+            onApplyConviction={(questionId: string, conviction: number) =>
+              new Promise<void>((resolve) => {
+                engine.handleConviction(0, questionId, conviction, { persistDraft: false, afterUpdate: resolve });
+              })
+            }
             onRecordProvenance={engine.recordInterviewProvenance}
           />
         </React.Suspense>

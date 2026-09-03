@@ -14,7 +14,9 @@ describe('realtime interview transcript collection', () => {
         transcript: 'Reversible decisions matter.',
       }),
     ).toEqual({ itemId: 'item-1', text: 'Reversible decisions matter.', role: 'responder' });
-    expect(readRealtimeResponderTurn({ type: 'response.output_audio_transcript.done', transcript: 'Assistant' })).toBeNull();
+    expect(
+      readRealtimeResponderTurn({ type: 'response.output_audio_transcript.done', transcript: 'Assistant' }),
+    ).toBeNull();
   });
 
   it('builds a mapper transcript without assistant utterances', () => {
@@ -27,7 +29,9 @@ describe('realtime interview transcript collection', () => {
   });
 
   it('opens with personal-or-topic insight and makes steering explicit', () => {
-    expect(REALTIME_INTERVIEW_OPENING_INSTRUCTION).toContain('either about themselves and their perspective or about the broader topic');
+    expect(REALTIME_INTERVIEW_OPENING_INSTRUCTION).toContain(
+      'either about themselves and their perspective or about the broader topic',
+    );
     expect(REALTIME_INTERVIEW_OPENING_INSTRUCTION).toContain('steer the conversation');
     expect(REALTIME_INTERVIEW_OPENING_INSTRUCTION).toContain('at any point');
   });
@@ -100,24 +104,28 @@ describe('realtime interview transcript collection', () => {
     session.resume();
     expect(localTrack.enabled).toBe(true);
 
-    channel.dispatchEvent(new MessageEvent('message', {
-      data: JSON.stringify({
-        type: 'conversation.item.input_audio_transcription.completed',
-        item_id: 'before-stop',
-        transcript: 'Captured before stopping.',
+    channel.dispatchEvent(
+      new MessageEvent('message', {
+        data: JSON.stringify({
+          type: 'conversation.item.input_audio_transcription.completed',
+          item_id: 'before-stop',
+          transcript: 'Captured before stopping.',
+        }),
       }),
-    }));
+    );
     expect(transcripts).toEqual(['Responder: Captured before stopping.']);
 
     await session.stop();
     await session.stop();
-    channel.dispatchEvent(new MessageEvent('message', {
-      data: JSON.stringify({
-        type: 'conversation.item.input_audio_transcription.completed',
-        item_id: 'after-stop',
-        transcript: 'This must be ignored.',
+    channel.dispatchEvent(
+      new MessageEvent('message', {
+        data: JSON.stringify({
+          type: 'conversation.item.input_audio_transcription.completed',
+          item_id: 'after-stop',
+          transcript: 'This must be ignored.',
+        }),
       }),
-    }));
+    );
 
     expect(localTrack.enabled).toBe(false);
     expect(localTrack.stop).toHaveBeenCalledTimes(1);

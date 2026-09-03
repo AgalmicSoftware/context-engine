@@ -2495,7 +2495,9 @@ const mapStateToProps = (state: RootState) => ({
   tooltipsEnabled: state.sessionState.tooltipsEnabled,
 });
 
-const LoginAndSettingsModalWithWagmiHooks = Object.assign(WagmiHooksHOC(LoginAndSettingsModal), { displayName: 'LoginAndSettingsModal' });
+const LoginAndSettingsModalWithWagmiHooks = Object.assign(WagmiHooksHOC(LoginAndSettingsModal), {
+  displayName: 'LoginAndSettingsModal',
+});
 
 export default connect(mapStateToProps, {
   changeAccount,

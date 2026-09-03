@@ -24,15 +24,13 @@ describe('session publish adapters', () => {
     const buildArweaveGatewayUrl = jest
       .spyOn(arweaveClient, 'buildArweaveGatewayUrl')
       .mockReturnValue('https://gateway.example/second');
-    const resolveUploadOptions = jest
-      .spyOn(publishUploadAuth, 'resolvePublishArweaveUploadOptions')
-      .mockResolvedValue({
-        forceDirectArweaveUpload: true,
-        arweaveJwk: '{"kty":"RSA"}',
-        workerUrl: '',
-        skipAuth: true,
-        adminAuth: null,
-      });
+    const resolveUploadOptions = jest.spyOn(publishUploadAuth, 'resolvePublishArweaveUploadOptions').mockResolvedValue({
+      forceDirectArweaveUpload: true,
+      arweaveJwk: '{"kty":"RSA"}',
+      workerUrl: '',
+      skipAuth: true,
+      adminAuth: null,
+    });
     const payload = { slug: 'alpha' };
     const options = { requestId: 'arw_meta_test' };
 
@@ -88,9 +86,7 @@ describe('session publish adapters', () => {
     const getRegistryContract = jest
       .spyOn(sessionRegistry.sessionRegistryUtils, 'getRegistryContract')
       .mockReturnValue({ name: 'second-contract' } as never);
-    jest
-      .spyOn(sessionRegistry.sessionRegistryUtils, 'fetchSessionFromRegistry')
-      .mockResolvedValue({ slug: 'second' });
+    jest.spyOn(sessionRegistry.sessionRegistryUtils, 'fetchSessionFromRegistry').mockResolvedValue({ slug: 'second' });
     const upsertSessionRegistryCache = jest
       .spyOn(sessionRegistry.sessionRegistryUtils, 'upsertSessionRegistryCache')
       .mockReturnValue(null);
@@ -154,7 +150,9 @@ describe('session publish adapters', () => {
     const rawBundle = { openaiKey: 'key' };
     const receipt = { logs: [] };
 
-    expect(sponsoredBundlePublishAdapter.normalizeSparseSponsoredBundlePayload(rawBundle)).toEqual({ openaiKey: 'key' });
+    expect(sponsoredBundlePublishAdapter.normalizeSparseSponsoredBundlePayload(rawBundle)).toEqual({
+      openaiKey: 'key',
+    });
     expect(sponsoredBundlePublishAdapter.hasSponsoredBundleFields({ openaiKey: 'key' })).toBe(true);
     expect(sbtFactoryReceiptPublishAdapter.resolveSbtAddressFromFactoryReceipt({ receipt })).toBe(
       '0x0000000000000000000000000000000000000001',
@@ -187,12 +185,7 @@ describe('session publish adapters', () => {
       }),
     ).resolves.toEqual({ name: 'second' });
 
-    expect(getSbtMetadata).toHaveBeenNthCalledWith(
-      1,
-      'none',
-      '0x0000000000000000000000000000000000000001',
-      'alpha',
-    );
+    expect(getSbtMetadata).toHaveBeenNthCalledWith(1, 'none', '0x0000000000000000000000000000000000000001', 'alpha');
     expect(getSbtMetadata).toHaveBeenNthCalledWith(
       2,
       { selectedAddress: '0x0000000000000000000000000000000000000002' },

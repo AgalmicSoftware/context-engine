@@ -140,9 +140,7 @@ describe('sessionPublishReducer', () => {
       effect: 'createWorkerGroups',
       result: { createdWorkerGroupCount: 2 },
     });
-    expect(published).toEqual(
-      expect.objectContaining({ status: 'published', createdWorkerGroupCount: 2 }),
-    );
+    expect(published).toEqual(expect.objectContaining({ status: 'published', createdWorkerGroupCount: 2 }));
   });
 
   it('preserves decentralized upload, registration, and registry refresh ordering', () => {

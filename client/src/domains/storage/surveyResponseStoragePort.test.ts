@@ -20,7 +20,9 @@ describe('survey response storage port', () => {
     const normalizeArweaveUrl = jest.spyOn(arweaveUrls, 'normalizeArweaveUrl').mockReturnValue('second-href');
     const getLegacyArweaveTxId = jest.spyOn(storageRefs, 'getLegacyArweaveTxId').mockReturnValue('second-tx');
 
-    expect(surveyResponseStoragePort.sanitizeQuestionPromptForResponsePayload({ prompt: 'first' })).toBe('first-prompt');
+    expect(surveyResponseStoragePort.sanitizeQuestionPromptForResponsePayload({ prompt: 'first' })).toBe(
+      'first-prompt',
+    );
     expect(surveyResponseStoragePort.sanitizeSurveyTitleForResponsePayload({ title: 'first' })).toBe('first-title');
     expect(surveyResponseStoragePort.getLegacyArweaveTxId({ arweaveTxId: 'second-tx' })).toBe('second-tx');
     expect(
@@ -35,14 +37,8 @@ describe('survey response storage port', () => {
       ),
     ).toBe('second-href');
 
-    expect(sanitizeQuestionPromptForResponsePayload).toHaveBeenCalledWith(
-      { prompt: 'first' },
-      undefined,
-    );
-    expect(sanitizeSurveyTitleForResponsePayload).toHaveBeenCalledWith(
-      { title: 'first' },
-      undefined,
-    );
+    expect(sanitizeQuestionPromptForResponsePayload).toHaveBeenCalledWith({ prompt: 'first' }, undefined);
+    expect(sanitizeSurveyTitleForResponsePayload).toHaveBeenCalledWith({ title: 'first' }, undefined);
     expect(getLegacyArweaveTxId).toHaveBeenCalledWith({ arweaveTxId: 'second-tx' });
     expect(normalizeArweaveUrl).toHaveBeenCalledWith('second-tx', {
       contextLabel: 'survey_tool_question_link',

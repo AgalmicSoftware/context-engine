@@ -51,12 +51,7 @@ describe('SbtOwnershipReadsPort', () => {
       .mockResolvedValue({ totalMinted: '10' });
 
     await expect(
-      sbtOwnershipReadsPort.getOwnerByTokenId(
-        'none',
-        '0x0000000000000000000000000000000000000001',
-        '7',
-        'alpha',
-      ),
+      sbtOwnershipReadsPort.getOwnerByTokenId('none', '0x0000000000000000000000000000000000000001', '7', 'alpha'),
     ).resolves.toBe('0x0000000000000000000000000000000000000003');
 
     await expect(
@@ -68,29 +63,16 @@ describe('SbtOwnershipReadsPort', () => {
       ),
     ).resolves.toBe('9');
     await expect(
-      sbtOwnershipReadsPort.getSbtHistorySummary(
-        'none',
-        '0x0000000000000000000000000000000000000002',
-        'beta',
-      ),
+      sbtOwnershipReadsPort.getSbtHistorySummary('none', '0x0000000000000000000000000000000000000002', 'beta'),
     ).resolves.toEqual({ totalMinted: '10' });
 
-    expect(getOwnerByTokenId).toHaveBeenCalledWith(
-      'none',
-      '0x0000000000000000000000000000000000000001',
-      '7',
-      'alpha',
-    );
+    expect(getOwnerByTokenId).toHaveBeenCalledWith('none', '0x0000000000000000000000000000000000000001', '7', 'alpha');
     expect(getSBTTokenIdByOwner).toHaveBeenCalledWith(
       'none',
       '0x0000000000000000000000000000000000000002',
       '0x0000000000000000000000000000000000000005',
       'beta',
     );
-    expect(getSbtHistorySummary).toHaveBeenCalledWith(
-      'none',
-      '0x0000000000000000000000000000000000000002',
-      'beta',
-    );
+    expect(getSbtHistorySummary).toHaveBeenCalledWith('none', '0x0000000000000000000000000000000000000002', 'beta');
   });
 });

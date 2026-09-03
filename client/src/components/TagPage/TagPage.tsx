@@ -913,32 +913,23 @@ export const TagPageView = ({
       sessionRegistrySnapshot.slugs,
     ],
   );
-  const workerGroupSessionSlugs = useMemo(
-    () => {
-      const candidates =
-        effectiveScopeState.filterMode === 'set'
+  const workerGroupSessionSlugs = useMemo(() => {
+    const candidates =
+      effectiveScopeState.filterMode === 'set'
         ? effectiveScopeSlugs
-        : dedupeSessionSlugs([
-            globalSessionSelection.primarySessionSlug || '',
-            ...sessionRegistrySnapshot.slugs,
-          ]);
-      return candidates.filter((slug) => {
-        const config = defaultTagPageWorkerGroupPorts.getSessionConfig(
-          slug,
-          sessionRegistrySnapshot.configsBySlug,
-        );
-        const projection = resolveSessionCapabilityProjection(config);
-        return projection.profileValid && projection.isWorkerCanonical && projection.usesWorkerGroups;
-      });
-    },
-    [
-      effectiveScopeSlugs,
-      effectiveScopeState.filterMode,
-      globalSessionSelection.primarySessionSlug,
-      sessionRegistrySnapshot.configsBySlug,
-      sessionRegistrySnapshot.slugs,
-    ],
-  );
+        : dedupeSessionSlugs([globalSessionSelection.primarySessionSlug || '', ...sessionRegistrySnapshot.slugs]);
+    return candidates.filter((slug) => {
+      const config = defaultTagPageWorkerGroupPorts.getSessionConfig(slug, sessionRegistrySnapshot.configsBySlug);
+      const projection = resolveSessionCapabilityProjection(config);
+      return projection.profileValid && projection.isWorkerCanonical && projection.usesWorkerGroups;
+    });
+  }, [
+    effectiveScopeSlugs,
+    effectiveScopeState.filterMode,
+    globalSessionSelection.primarySessionSlug,
+    sessionRegistrySnapshot.configsBySlug,
+    sessionRegistrySnapshot.slugs,
+  ]);
 
   useEffect(() => {
     if (isDemoCorpusContext || !selectedTags.length || !workerGroupSessionSlugs.length) {
@@ -1526,7 +1517,9 @@ export const TagPageView = ({
                   ))}
                 </div>
               ) : workerGroupsLoading ? (
-                <p className={styles.emptyState} role="status">Loading groups...</p>
+                <p className={styles.emptyState} role="status">
+                  Loading groups...
+                </p>
               ) : (
                 <p className={styles.emptyState}>No groups found with these tags.</p>
               )}

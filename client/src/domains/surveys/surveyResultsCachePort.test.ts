@@ -12,9 +12,9 @@ describe('surveyResultsCachePort', () => {
     const peekCacheSync = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({ cached: true });
     const readCache = jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({ asyncCached: true });
     const writeCache = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue('written' as never);
-    const listNamespaceEntriesSync = jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockReturnValue([
-      { namespace: 'surveysCache', slug: 'alpha', value: { survey: true } },
-    ] as never);
+    const listNamespaceEntriesSync = jest
+      .spyOn(cacheScripts, 'listNamespaceEntriesSync')
+      .mockReturnValue([{ namespace: 'surveysCache', slug: 'alpha', value: { survey: true } }] as never);
     const subscribeCacheUpdates = jest.spyOn(cacheScripts, 'subscribeCacheUpdates').mockReturnValue(unsubscribe);
 
     expect(surveyResultsCachePort.peekCacheSync('bookmarksCache', 'edge', { clone: false })).toEqual({ cached: true });

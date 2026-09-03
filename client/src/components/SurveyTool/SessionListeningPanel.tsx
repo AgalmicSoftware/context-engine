@@ -380,11 +380,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       ? faSpinner
       : faMicrophone;
   const isRecordButtonSpinning = recorder.isStopping || isStarting;
-  const statusLabel = recorder.isStopping
-    ? 'Stopping recorder'
-    : isStarting
-      ? 'Starting recorder'
-      : '';
+  const statusLabel = recorder.isStopping ? 'Stopping recorder' : isStarting ? 'Starting recorder' : '';
   const shouldShowMeta = Boolean(statusLabel || hasPendingTranscription || hasTranscript || isGenerating);
 
   useEffect(() => {

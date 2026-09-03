@@ -737,9 +737,7 @@ const WorkerGroupMembershipPanel = ({
       setMembershipStatusState({ targetKey: mutationTargetKey, status: `Joined ${group.label}.` });
       memberListRequestIdRef.current += 1;
       setMemberListState(emptyMemberListState(mutationTargetKey, group.groupId));
-      const resultMemberCount = Number.isSafeInteger(result.memberCount)
-        ? Number(result.memberCount)
-        : undefined;
+      const resultMemberCount = Number.isSafeInteger(result.memberCount) ? Number(result.memberCount) : undefined;
       applyConfirmedMembership({
         mutationTargetKey,
         group: result.group as WorkerGroup,

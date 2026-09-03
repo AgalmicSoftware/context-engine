@@ -196,7 +196,13 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
         'Slowing frontier capability development',
       ],
       ['Before 2030', '2030–2039', '2040–2059', '2060 or later', 'Never / the concept remains ill-defined'],
-      ['Healthcare', 'Education', 'Scientific research', 'Finance and professional services', 'Creative industries and media'],
+      [
+        'Healthcare',
+        'Education',
+        'Scientific research',
+        'Finance and professional services',
+        'Creative industries and media',
+      ],
       [
         'AI developers and labs',
         'Deploying organizations',
@@ -205,7 +211,9 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
         'A public compensation or insurance system',
       ],
     ]);
-    expect(legacyPolls.every((question) => JSON.stringify(question.options) === JSON.stringify(LEGACY_DEMO_POLL_OPTIONS))).toBe(true);
+    expect(
+      legacyPolls.every((question) => JSON.stringify(question.options) === JSON.stringify(LEGACY_DEMO_POLL_OPTIONS)),
+    ).toBe(true);
   });
 
   it('seeds all 40 typed demo-2 questions with deterministic fixture ids', () => {

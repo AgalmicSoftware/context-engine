@@ -643,9 +643,9 @@ export const buildSessionWizardPublishProgressSteps = ({
                 ? 'Verify Worker Config'
                 : key === 'create-worker-groups'
                   ? 'Create Groups'
-                : key === 'register-session'
-                  ? 'Register On-chain'
-                  : 'Done',
+                  : key === 'register-session'
+                    ? 'Register On-chain'
+                    : 'Done',
       state: isActive ? 'active' : isComplete ? 'complete' : 'pending',
     };
   });

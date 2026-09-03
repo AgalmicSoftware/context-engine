@@ -1421,11 +1421,7 @@ export class SurveySelector extends Component<any, any> {
 
     return (
       <div>
-        <div
-          id={styles.surveysRow}
-          className={toolbarClassName || undefined}
-          data-testid={E2E_TESTIDS.SURVEY_TOOLBAR}
-        >
+        <div id={styles.surveysRow} className={toolbarClassName || undefined} data-testid={E2E_TESTIDS.SURVEY_TOOLBAR}>
           <Dropdown id={styles.surveysDropdown} isOpen={selectorDropdownOpen} toggle={this.toggleSelectorDropdown}>
             <DropdownToggle
               id={styles.dropdownToggle}

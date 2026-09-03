@@ -19,9 +19,7 @@ describe('SurveyTool styles', () => {
     expect(scss).toMatch(
       /\.sessionVoiceModeModal\s*\{[\s\S]*?max-height:\s*min\(90vh, 900px\);[\s\S]*?overflow:\s*hidden;/,
     );
-    expect(scss).toMatch(
-      /:global\(\.modal-body\)\s*\{[\s\S]*?min-height:\s*0;[\s\S]*?overflow-y:\s*auto;/,
-    );
+    expect(scss).toMatch(/:global\(\.modal-body\)\s*\{[\s\S]*?min-height:\s*0;[\s\S]*?overflow-y:\s*auto;/);
     expect(scss).toMatch(
       /:global\(\.modal-header\) :global\(\.btn-close\)\s*\{[\s\S]*?width:\s*32px;[\s\S]*?height:\s*32px;[\s\S]*?margin:\s*0;[\s\S]*?padding:\s*0;/,
     );
@@ -37,18 +35,14 @@ describe('SurveyTool styles', () => {
     expect(scss).toMatch(
       /\.sessionAgentKickoffToggle\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?right:\s*10px;[\s\S]*?bottom:\s*8px;[\s\S]*?opacity:\s*0\.5;[\s\S]*?&:hover,[\s\S]*?&:focus-visible\s*\{[\s\S]*?opacity:\s*1;[\s\S]*?&\[aria-expanded='true'\]\s*\{[\s\S]*?opacity:\s*1;/,
     );
-    expect(scss).toMatch(
-      /\.sessionAgentKickoffCaretExpanded\s*\{[\s\S]*?transform:\s*rotate\(180deg\);/,
-    );
+    expect(scss).toMatch(/\.sessionAgentKickoffCaretExpanded\s*\{[\s\S]*?transform:\s*rotate\(180deg\);/);
     expect(scss).toMatch(
       /\.sessionAgentKickoffPrompt\s*\{[\s\S]*?white-space:\s*normal;[\s\S]*?overflow-wrap:\s*anywhere;[\s\S]*?opacity:\s*0\.5;/,
     );
     expect(scss).toMatch(
       /\.sessionInterviewStatusDot\s*\{[\s\S]*?border-radius:\s*var\(--ce-radius-round\);[\s\S]*?background:\s*var\(--ce-status-success\);/,
     );
-    expect(scss).toMatch(
-      /\.sessionInterviewStatusDotError\s*\{[\s\S]*?background:\s*var\(--ce-status-error\);/,
-    );
+    expect(scss).toMatch(/\.sessionInterviewStatusDotError\s*\{[\s\S]*?background:\s*var\(--ce-status-error\);/);
     expect(scss).toMatch(
       /\.sessionInterviewMappingNotice\s*\{[\s\S]*?border:\s*1px solid color-mix\(in srgb, var\(--ce-status-warning\) 58%, var\(--ce-card-border\)\);[\s\S]*?background:\s*color-mix\(in srgb, var\(--ce-status-warning\) 12%, var\(--ce-surface-sunken\)\);[\s\S]*?color:\s*var\(--ce-panel-text\);/,
     );
