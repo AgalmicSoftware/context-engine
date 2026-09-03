@@ -472,6 +472,9 @@ export const issueWorkerLoginToken = async ({
   global.fetch = buildRpcFetchMock({
     rpcUrl,
     registryAddress,
+    // Login re-attests the configured registry chain before checking gates.
+    // Mirror the requested default gate so non-Base fixtures do not fail closed.
+    chainId: Number(onChainGatesByResource?.default?.chainId || 84532),
     sessionExists: true,
     onChainGatesByResource,
   });

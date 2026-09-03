@@ -11,6 +11,9 @@ All notable changes to this project will be documented in this file.
   canonical Worker sessions through Cloudflare document storage, keeps
   Arweave/Lit behavior scoped to Arweave-backed sessions, and improves queued
   photo removal contrast across themes.
+- Aligned the local Context Engine companion's default session scan with the
+  Cloudflare-canonical `demo-sh` default and made its Worker login integration
+  fixture attest the registry chain it is actually testing.
 - Added credential-free CI configuration-contract coverage for every reachable
   session-mode family, plus runtime assurance for generated Cloudflare Worker
   envelope storage, concurrent multi-agent voting, representative
