@@ -840,11 +840,11 @@
   }
 }
 
-/* The desktop-window profile keeps its compact mobile window inside the
- * viewport; the standard app keeps the taller legacy slide canvas. */
+/* Desktop-window welcome slides share one tall frame. On shorter screens the
+ * page may scroll rather than cropping slide copy to fit the viewport. */
 @container ce-theme style(--ce-layout-profile: desktop-window) {
   .onboardingWalkthrough {
-    --ce-welcome-frame-height: var(--ce-main-welcome-frame-height, clamp(340px, 48dvh, 440px));
+    --ce-welcome-frame-height: clamp(525px, 72dvh, 600px);
   }
 
   .onboardingControls .takeSurveyIcon {

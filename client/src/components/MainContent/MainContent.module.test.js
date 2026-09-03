@@ -92,7 +92,7 @@ describe('Main welcome walkthrough styles', () => {
       /@media \(max-width:\s*768px\)\s*{\s*@container ce-theme style\(--ce-welcome-slide-mode: fixed-window\)\s*{[\s\S]*?\.mainAreaTabsAlt,[\s\S]*?#mainAreaTabs\s*{\s*flex-basis:\s*auto;/,
     );
     expect(scss).toMatch(
-      /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?--ce-welcome-frame-height:\s*var\(--ce-main-welcome-frame-height,\s*clamp\(340px,\s*48dvh,\s*440px\)\);/,
+      /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?--ce-welcome-frame-height:\s*clamp\(525px,\s*72dvh,\s*600px\);/,
     );
     expect(scss).not.toContain('@container ce-theme style(--ce-welcome-slide-mode: fluid)');
   });
