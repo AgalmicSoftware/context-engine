@@ -6,6 +6,21 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Restored direct URL/file/photo context saves in the Tool Explorer without
+  requiring question generation. The action names the active session, routes
+  canonical Worker sessions through Cloudflare document storage, keeps
+  Arweave/Lit behavior scoped to Arweave-backed sessions, and improves queued
+  photo removal contrast across themes.
+- Added credential-free CI configuration-contract coverage for every reachable
+  session-mode family, plus runtime assurance for generated Cloudflare Worker
+  envelope storage, concurrent multi-agent voting, representative
+  response-encryption paths, and both `/new` infrastructure presets while
+  keeping external-service live suites operator-run.
+- Hardened the operator-local Cloudflare two-key E2E around isolated dev-server
+  ports, exact deployment/auditor credential roles, current preset copy, Worker
+  secret readiness, and fresh-KV propagation. The live proof now verifies the
+  exact restricted token policy, worker-canonical login and encrypted
+  upload/read/export, and exact cleanup of its temporary Worker and namespace.
 - Reworked the demo Context viewer with a compact single-row desktop header so
   tweets, policy, papers, essays, interviews, sci-fi, metrics, and cross-corpus
   synthesis each use a distinct medium-native presentation. The Question

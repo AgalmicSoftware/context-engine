@@ -125,6 +125,27 @@ describe('storageClient', () => {
     expect(result.storageRef.backend).toBe('cloudflare');
   });
 
+  test('routes persisted Worker session-mode profiles through Cloudflare instead of requiring Arweave scope', async () => {
+    await uploadDataToSessionStorage(new File(['image'], 'context.png', { type: 'image/png' }), 'file', {
+      sessionSlug: 'demo-sh',
+      sessionConfig: {
+        corsWorkerUrl: 'https://worker.example',
+        sessionModeProfile: {
+          authority: { mode: 'worker_canonical' },
+          storage: {
+            backend: 'cloudflare',
+            payloadAccessControl: { gate: 'none', encryption: 'none' },
+          },
+        },
+      },
+      resource: 'docsContext',
+    });
+
+    expect(arweaveClient.uploadDataToArweave).not.toHaveBeenCalled();
+    expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
+    expect(String(fetchWorkerWithAuth.mock.calls[0][0])).toBe('https://worker.example/storage/upload');
+  });
+
   test.each([
     {
       label: 'public freeform',

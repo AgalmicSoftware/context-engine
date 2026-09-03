@@ -15,11 +15,12 @@ Docs can be associated with:
   - When `:token` is a session id, the app keeps the URL stable (no rewrite to slug) on this subroute.
 - Tool Explorer `Data` panel:
   - `Add` keeps the existing question-generation ingest flow.
-  - In `Add`, manual ingest creates questions through `Generate Questions`; the older direct `Add to Library` action is not shown in this surface.
+  - Queued URL, file, and photo sources can be saved directly to the active session with `Add to <session>`; this does not generate questions. `Generate Questions` remains a separate action.
   - When one or more files/images are uploaded in `Add`, a title field appears at the top of the ingest surface and is reused as the doc title / filename when possible.
   - Files and images share a single upload control in `Add`; image paste stays in the shared compact chooser, the main `Add URL` field is the only URL entry path, and queued images render previews before question generation or context save.
-  - In `Add`, typed or queued extra URL/file/photo sources can optionally be saved into session context on `Generate Questions`.
-  - Saved Tool Explorer sources are written as encrypted session docs with an audience of either `only me` or the session `docUploads` gate when that gate exists. The closed UI shows this audience behind a lock icon. `only me` uses the local `self-eip712-v1` recipient envelope and does not require Lit hooks; the session audience uses the Chipotle/Lit SBT-gated path.
+  - In `Add`, typed or queued extra URL/file/photo sources can optionally also be saved into the active session while `Generate Questions` runs.
+  - Worker-native sessions save those sources through the session Worker and show the actual active-session name as the fixed audience. Arweave-backed sessions retain the encrypted audience choice between `only me` and the session `docUploads` resource gate when that gate exists. `docUploads` names the resource gate, not a session.
+  - On Arweave-backed sessions, `only me` uses the local `self-eip712-v1` recipient envelope and does not require Lit hooks; the session audience uses the Chipotle/Lit SBT-gated path.
   - When the save option is enabled, generated surveys store doc-library viewer URLs for those saved extra sources instead of the raw source URLs.
   - `View` defaults to the sample demo corpus viewer used on `/session/demo` when demo surfaces are enabled.
   - The demo corpus viewer keeps its Context title and corpus actions on one compact desktop header row, then renders each source in a medium-native form: tweets as social posts, policy as a map/list split, papers as academic summaries, LessWrong as argument essays, interviews as transcript cards, sci-fi as book/timeline cards, metrics as charts, and cross-corpus debates as linked source networks.
@@ -56,7 +57,7 @@ Session metadata can select a backend-owned session storage profile. This is sto
 ```
 
 Defaults:
-- If missing, `storageProfile.backend` defaults to `arweave`; worker storage routes also accept legacy `docLibrary.provider = "cloudflare"` as a Cloudflare routing signal when no storage profile backend is present.
+- Storage routing reads `storageProfile`, the legacy `sessionStorageConfig`, or canonical `sessionModeProfile.storage`. If all are missing, the backend defaults to `arweave`; worker storage routes also accept legacy `docLibrary.provider = "cloudflare"` as a Cloudflare routing signal when no storage profile backend is present.
 - `lit-arweave` remains available and represents encrypted Arweave envelope payloads. Selecting it for session docs forces encrypted Doc Library uploads.
 - `cloudflare` routes plaintext session docs/context through the session worker `/storage/*` routes and keeps Cloudflare object identifiers private. Lit-encrypted Cloudflare document upload/read is intentionally blocked until the encrypted-envelope path is implemented.
 - `ipfs` and `local` `docLibrary.provider` values remain stubbed (UI disables list/upload with a “not implemented” notice).

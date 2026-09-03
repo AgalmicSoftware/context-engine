@@ -187,15 +187,17 @@ describe('AudioSurveyGenerator photo and extra source handling', () => {
     setInputValue('input[placeholder="Add URL"]', 'https://example.com/source');
 
     expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`)).toBeTruthy();
-    expect(container.textContent).toContain('Add to session context');
+    expect(container.textContent).toContain('Add to Edge Session when generating questions');
     expect(container.textContent).not.toContain('Session Doc Library');
-    expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_ADD_LIBRARY_BUTTON}"]`)).toBeNull();
+    expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_ADD_LIBRARY_BUTTON}"]`)).toBeTruthy();
+    expect(container.textContent).toContain('Add to Edge Session');
 
     await act(async () => {
       container.querySelector('button[title="Add URL"]').dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
     expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`)).toBeTruthy();
+    expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_ADD_LIBRARY_BUTTON}"]`)).toBeTruthy();
   });
 
   it('queues image URLs through the shared Add URL field', async () => {
@@ -396,7 +398,7 @@ describe('AudioSurveyGenerator photo and extra source handling', () => {
     expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_ADD_LIBRARY_BUTTON}"]`)).toBeNull();
     expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`)).toBeNull();
     expect(container.textContent).not.toContain('Add to Library');
-    expect(container.textContent).not.toContain('Add to session context');
+    expect(container.textContent).not.toContain('when generating questions');
     expect(mockUploadDocLibraryFile).not.toHaveBeenCalled();
   });
 });

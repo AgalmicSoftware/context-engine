@@ -74,7 +74,41 @@ describe('AudioSurveyGenerator session context audience and failures', () => {
 
     expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_SELF}"]`)).toBeTruthy();
     expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_SESSION}"]`)).toBeNull();
-    expect(container.textContent).toContain('Saved docs will stay private to your wallet');
+    expect(container.textContent).toContain('Edge Session has no shared document audience');
+    expect(container.textContent).toContain('Saves stay private to your wallet');
+  });
+
+  it('shows the real session name and fixed session audience for Worker-native document storage', async () => {
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{ request: jest.fn() }}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        activeSessionSlug="demo-sh"
+        sessionConfig={{
+          slug: 'demo-sh',
+          sessionName: 'Demo Session',
+          corsWorkerUrl: 'https://worker.example',
+          sessionModeProfile: {
+            authority: { mode: 'worker_canonical' },
+            storage: {
+              backend: 'cloudflare',
+              payloadAccessControl: { gate: 'none', encryption: 'none' },
+            },
+          },
+        }}
+      />,
+    );
+
+    await addAdditionalUrl('https://example.com/worker-context');
+
+    const audience = container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_BUTTON}"]`);
+    expect(audience.getAttribute('data-ce-doc-save-audience')).toBe('session');
+    expect(audience.getAttribute('aria-label')).toContain('Demo Session');
+    expect(audience.textContent).toContain('Demo Session');
+    expect(container.textContent).not.toContain('docUploads gate unavailable');
   });
 
   it('recomputes the default saved-doc audience when the session doc gate loads later', async () => {

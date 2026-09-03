@@ -189,11 +189,16 @@ export const normalizeSessionStoragePayloadAccessControl = (raw: unknown): Sessi
 
 export const normalizeSessionStorageConfig = (sessionConfig: unknown = null): NormalizedSessionStorageConfig => {
   const cfg = isObj(sessionConfig) ? sessionConfig : {};
+  const sessionModeProfile = isObj(cfg.sessionModeProfile) ? cfg.sessionModeProfile : {};
+  // Persisted/demo Worker configs may expose storage only through sessionModeProfile.
+  // Preserve that declaration so docs never silently fall back to wallet-scoped Arweave uploads.
   const raw = isObj(cfg.storageProfile)
     ? cfg.storageProfile
     : isObj(cfg.sessionStorageConfig)
       ? cfg.sessionStorageConfig
-      : {};
+      : isObj(sessionModeProfile.storage)
+        ? sessionModeProfile.storage
+        : {};
   const backend = normalizeStorageBackend(
     raw.backend || cfg.storageBackend || (cfg.docLibrary as { provider?: unknown } | null | undefined)?.provider,
   );

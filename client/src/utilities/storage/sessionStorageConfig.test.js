@@ -44,6 +44,23 @@ describe('sessionStorageConfig', () => {
     expect(requiresLitForSessionStorage(sessionConfig, { encrypted: true })).toBe(false);
   });
 
+  test('honors the canonical session-mode storage profile used by persisted Worker sessions', () => {
+    const sessionConfig = {
+      sessionModeProfile: {
+        authority: { mode: 'worker_canonical' },
+        storage: {
+          backend: 'cloudflare',
+          resources: { docsContext: 'active' },
+          payloadAccessControl: { gate: 'none', encryption: 'none' },
+        },
+      },
+    };
+
+    expect(resolveSessionStorageBackend(sessionConfig, { resource: 'docsContext' })).toBe(STORAGE_BACKENDS.CLOUDFLARE);
+    expect(usesPublicReadCloudflareStorage(sessionConfig, { resource: 'docsContext' })).toBe(true);
+    expect(requiresLitForSessionStorage(sessionConfig, { resource: 'docsContext' })).toBe(false);
+  });
+
   test('marks Cloudflare lit_encrypted mode as Lit-required while retaining Cloudflare routing', () => {
     const sessionConfig = {
       storageProfile: {
