@@ -21,7 +21,7 @@ const makeWorkerConfig = (workerOrigin: string, sessionId: string) => ({
   },
 });
 
-const createContext = (overrides: SurveyQuestionsLegacyRecord = {}) => ({
+const createContext = (overrides: SurveyQuestionsLegacyRecord = {}): SurveyQuestionsLegacyRecord => ({
   buildCurrentStepState: jest.fn((step) => ({ currentStep: step })),
   buildFieldEncryptionWorkGroupsCore: jest.fn(() => ({
     groups: [],

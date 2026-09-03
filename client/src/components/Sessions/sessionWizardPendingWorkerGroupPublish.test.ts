@@ -1,5 +1,6 @@
 import { publishPendingWorkerGroupDrafts } from './sessionWizardPendingWorkerGroupPublish';
 import type { PendingWorkerGroupDraft } from './sessionWizardPendingWorkerGroups';
+import { postSignedAdminWorkerRequest } from '../Admin/adminPageSignedWorkerRequest';
 
 const SESSION_ID = `0x${'12'.repeat(16)}`;
 const ADMIN_ADDRESS = `0x${'34'.repeat(20)}`;
@@ -33,23 +34,27 @@ const payloadGroup = {
   sessionId: SESSION_ID,
 };
 
+const workerRequestResult = (data: unknown) => ({
+  baseUrl: 'https://worker.example',
+  response: new Response(null, { status: 200 }),
+  data,
+});
+
 describe('publishPendingWorkerGroupDrafts', () => {
   it('creates queued groups with stable IDs and the session default tags', async () => {
-    const signTypedAdminAction = jest.fn(async () => ({ auth: 'signed' }));
-    const postSignedRequestImpl = jest.fn(async (request) => {
+    const signTypedAdminAction = jest.fn(async (_input: unknown) => ({ auth: 'signed' }));
+    const postSignedRequestImpl: jest.MockedFunction<typeof postSignedAdminWorkerRequest> = jest.fn(async (request) => {
       await request.signAdminAction({
-        action: request.action,
-        body: request.body,
+        action: request.action || 'groups/create',
+        body: request.body || {},
         chainId: null,
         workerUrl: 'https://worker.example',
       });
-      return {
-        data: {
-          sessionSlug: 'test-session',
-          sessionId: SESSION_ID,
-          group: payloadGroup,
-        },
-      };
+      return workerRequestResult({
+        sessionSlug: 'test-session',
+        sessionId: SESSION_ID,
+        group: payloadGroup,
+      });
     });
 
     await expect(
@@ -86,16 +91,14 @@ describe('publishPendingWorkerGroupDrafts', () => {
   });
 
   it('reuses an identical stable-ID group after a partial publish retry', async () => {
-    const postSignedRequestImpl = jest
+    const postSignedRequestImpl: jest.MockedFunction<typeof postSignedAdminWorkerRequest> = jest
       .fn()
       .mockRejectedValueOnce(Object.assign(new Error('already exists'), { reason: 'worker_group_exists', status: 409 }))
-      .mockResolvedValueOnce({
-        data: {
-          sessionSlug: 'test-session',
-          sessionId: SESSION_ID,
-          groups: [payloadGroup],
-        },
-      });
+      .mockResolvedValueOnce(workerRequestResult({
+        sessionSlug: 'test-session',
+        sessionId: SESSION_ID,
+        groups: [payloadGroup],
+      }));
 
     await expect(
       publishPendingWorkerGroupDrafts({
@@ -118,16 +121,16 @@ describe('publishPendingWorkerGroupDrafts', () => {
 
   it('uploads a selected draft image after Worker verification and persists its retry URL', async () => {
     const imageFile = new File(['image'], 'research.png', { type: 'image/png' });
-    const uploadImageImpl = jest.fn(async () => 'https://worker.example/storage/read?id=image-1');
-    const getWorkerTokenImpl = jest.fn(async () => 'worker-token');
-    const onDraftImageUploaded = jest.fn();
-    const postSignedRequestImpl = jest.fn(async () => ({
-      data: {
+    const uploadImageImpl = jest.fn(async (_input: unknown) => 'https://worker.example/storage/read?id=image-1');
+    const getWorkerTokenImpl = jest.fn(async (_input: unknown) => 'worker-token');
+    const onDraftImageUploaded = jest.fn((_groupId: string, _imageUrl: string) => undefined);
+    const postSignedRequestImpl: jest.MockedFunction<typeof postSignedAdminWorkerRequest> = jest.fn(async () =>
+      workerRequestResult({
         sessionSlug: 'test-session',
         sessionId: SESSION_ID,
         group: payloadGroup,
-      },
-    }));
+      }),
+    );
     const imageDraft: PendingWorkerGroupDraft = {
       ...draft,
       imageUrl: '',

@@ -208,7 +208,7 @@ describe('Tag Explorer Worker groups', () => {
         },
       },
     };
-    const loadPublicWorkerGroups = jest.fn(async () => [
+    const loadPublicWorkerGroups = jest.fn(async (_input: unknown) => [
       {
         groupId: 'public-reviewers',
         sessionSlug: 'worker-session',

@@ -50,7 +50,7 @@ const createControllerHarness = () => {
     events.push('register');
   });
   const deployPendingSbts = jest.fn(async () => []);
-  const createPendingWorkerGroups = jest.fn(async () => {
+  const createPendingWorkerGroups = jest.fn(async (_input: unknown) => {
     events.push('create-groups');
     return { created: 1, reused: 0 };
   });
