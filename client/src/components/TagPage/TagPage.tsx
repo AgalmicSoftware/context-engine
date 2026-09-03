@@ -8,23 +8,17 @@ import { callAI } from '../../utilities/ai/aiClient.js';
 import buildTagInterpretationPrompt from '../../prompts/tagInterpretationPrompt.js';
 import { normalizeTagList } from '../../utilities/defaultTags.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
-import { getDemoSessionConfigBySlug, getSessionConfigBySlug } from '../../domains/sessions/sessionConfig.js';
+import { getDemoSessionConfigBySlug } from '../../domains/sessions/sessionConfig.js';
 import { useSessionRegistryReads } from '../../utilities/query/useSessionRegistryReads.js';
 import { normalizeGlobalSessionSelection } from '../../utilities/session/globalSessionState.js';
 import { parseQuestionSessionSlugFromSearch } from '../../utilities/survey/questionRouting.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
-import { sessionModeAllowsAnonymousWorkerGroupDiscovery } from '../../utilities/session/sessionModeProfile';
-import { resolveWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery';
-import { getUsableSessionWorkerUrl } from '../../utilities/session/sessionWorkerAvailability';
 import {
-  loadPublicWorkerGroups,
-  loadWorkerGroupOverview,
-  getWorkerSessionToken,
-  type WorkerGroup,
-  type WorkerGroupOverview,
-} from '../../domains/worker/workerGroupPorts';
-import { workerGroupNavigationPort } from '../../domains/worker/workerGroupNavigationPort';
+  defaultTagPageWorkerGroupPorts,
+  loadTagPageWorkerGroupData,
+  type TagPageGroupSummary,
+} from './tagPageWorkerGroups';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse';
 import SessionChipSelector from '../Shared/SessionChipSelector';
@@ -156,17 +150,6 @@ const buildTagAiContentRevision = (questions: QuestionSummary[]): string =>
       ),
   );
 
-type SbtGroupSummary = {
-  kind: 'sbt' | 'worker';
-  address: string;
-  href: string;
-  name: string;
-  image: string;
-  tags: string[];
-  sessionSlug: string;
-  networkId: string;
-};
-
 type TagPageViewProps = {
   account?: unknown;
   isQuestionCacheReady?: boolean;
@@ -222,145 +205,6 @@ type SbtCacheNetworkBucket = {
 type SbtCacheEntry = {
   slug?: string;
   value?: Record<string, SbtCacheNetworkBucket>;
-};
-
-type TagPageWorkerGroupPorts = {
-  getSessionConfig: (slug: string, configsBySlug: Record<string, unknown>) => unknown;
-  getWorkerSessionToken: typeof getWorkerSessionToken;
-  loadPublicWorkerGroups: (args: {
-    workerUrl: unknown;
-    sessionId: unknown;
-    sessionSlug: unknown;
-  }) => Promise<WorkerGroup[]>;
-  loadWorkerGroupOverview: (args: {
-    workerUrl: unknown;
-    credentialToken: unknown;
-    sessionId: unknown;
-    sessionSlug: unknown;
-  }) => Promise<WorkerGroupOverview>;
-};
-
-const defaultTagPageWorkerGroupPorts: TagPageWorkerGroupPorts = {
-  getSessionConfig: (slug, configsBySlug) => resolveTagPageWorkerSessionConfig(slug, configsBySlug),
-  getWorkerSessionToken,
-  loadPublicWorkerGroups,
-  loadWorkerGroupOverview,
-};
-
-export const resolveTagPageWorkerSessionConfig = (
-  slug: string,
-  configsBySlug: Record<string, unknown> = {},
-): unknown => {
-  const registeredConfig = configsBySlug[slug] || getSessionConfigBySlug(slug);
-  if (registeredConfig) return registeredConfig;
-  // Regression guard: a direct tag URL can load before the registry snapshot
-  // contains a known demo Worker, so opt into that exact tracked fallback.
-  return getDemoSessionConfigBySlug(slug, { allowDemoFallback: true });
-};
-
-export const loadTagPageWorkerGroupData = async (
-  {
-    account,
-    network,
-    provider,
-    selectedTags,
-    sessionConfigsBySlug = {},
-    sessionSlugs,
-  }: {
-    account?: unknown;
-    network?: NetworkLike;
-    provider?: unknown;
-    selectedTags?: string[];
-    sessionConfigsBySlug?: Record<string, unknown>;
-    sessionSlugs?: string[];
-  },
-  ports: TagPageWorkerGroupPorts = defaultTagPageWorkerGroupPorts,
-): Promise<SbtGroupSummary[]> => {
-  const normalizedSelectedTags = normalizeTagList(selectedTags);
-  if (!normalizedSelectedTags.length) return [];
-  const normalizedAccount = String(account || '').trim();
-
-  const perSession = await Promise.all(
-    dedupeSessionSlugs(sessionSlugs).map(async (sessionSlug) => {
-      const sessionConfig = ports.getSessionConfig(sessionSlug, sessionConfigsBySlug);
-      const projection = resolveSessionCapabilityProjection(sessionConfig);
-      if (!projection.profileValid || !projection.isWorkerCanonical || !projection.usesWorkerGroups) return [];
-      if (
-        !normalizedAccount &&
-        !sessionModeAllowsAnonymousWorkerGroupDiscovery(
-          (sessionConfig as { sessionModeProfile?: unknown } | null)?.sessionModeProfile,
-        )
-      ) {
-        return [];
-      }
-
-      const workerUrl = getUsableSessionWorkerUrl({
-        slug: sessionSlug,
-        sessionConfig,
-        requireExactWorkerSession: true,
-      });
-      const sessionId = resolveWorkerCanonicalSessionIdHex(sessionConfig);
-      if (!workerUrl || !sessionId) return [];
-
-      try {
-        let groups: WorkerGroup[];
-        // Regression guard: mirror the native Groups visibility boundary—public
-        // catalog when anonymous, account-authorized overview when signed in.
-        if (normalizedAccount) {
-          const credentialToken = await ports.getWorkerSessionToken({
-            sessionSlug,
-            sessionConfig,
-            workerUrl,
-            context: {
-              account: normalizedAccount,
-              providerLike: provider,
-              chainId: network?.chainId || network?.id || projection.chainId || 1,
-            },
-          });
-          const overview = await ports.loadWorkerGroupOverview({
-            workerUrl,
-            credentialToken,
-            sessionId,
-            sessionSlug,
-          });
-          groups = [...(overview.groups || []), ...(overview.memberships || []).map(({ group }) => group)];
-        } else {
-          groups = await ports.loadPublicWorkerGroups({ workerUrl, sessionId, sessionSlug });
-        }
-
-        const seen = new Set<string>();
-        return groups.flatMap((group) => {
-          const groupId = String(group?.groupId || '').trim();
-          if (!groupId || seen.has(groupId)) return [];
-          seen.add(groupId);
-          const tags = Array.isArray(group?.tags)
-            ? group.tags.map((tag) => String(tag || '').trim()).filter(Boolean)
-            : [];
-          const normalizedGroupTags = normalizeTagList(tags);
-          if (!normalizedSelectedTags.every((tag) => normalizedGroupTags.includes(tag))) return [];
-          return [
-            {
-              kind: 'worker' as const,
-              address: groupId,
-              href: workerGroupNavigationPort.buildPath({ groupId, sessionSlug }),
-              name: String(group?.label || '').trim() || groupId,
-              image: String(group?.imageUrl || '').trim(),
-              tags,
-              sessionSlug,
-              networkId: 'worker',
-            },
-          ];
-        });
-      } catch {
-        return [];
-      }
-    }),
-  );
-
-  return perSession.flat().sort((left, right) => {
-    const nameCompare = left.name.localeCompare(right.name);
-    return nameCompare !== 0 ? nameCompare : left.address.localeCompare(right.address);
-  });
 };
 
 const parseTagPath = (pathname = ''): string[] => {
@@ -804,7 +648,7 @@ const collectSbtGroupData = ({
   scopeFilterMode?: FilterMode;
   scopeSlugs?: string[];
   cacheVersion?: number;
-} = {}): SbtGroupSummary[] => {
+} = {}): TagPageGroupSummary[] => {
   const normalizedSelectedTags = normalizeTagList(selectedTags);
   void cacheVersion;
   if (!normalizedSelectedTags.length) return [];
@@ -823,7 +667,7 @@ const collectSbtGroupData = ({
     ? entries.filter((entry) => scopeSlugSet.has(normalizeSessionSlug(entry?.slug)))
     : entries;
   const seen = new Set();
-  const sbtGroups: SbtGroupSummary[] = [];
+  const sbtGroups: TagPageGroupSummary[] = [];
 
   scopedEntries.forEach((entry) => {
     const sessionSlug = normalizeSessionSlug(entry?.slug || '');
@@ -903,7 +747,7 @@ export const TagPageView = ({
   const navigate = useNavigate();
   const [cacheVersion, setCacheVersion] = useState(0);
   const [sbtCacheVersion, setSbtCacheVersion] = useState(0);
-  const [workerGroups, setWorkerGroups] = useState<SbtGroupSummary[]>([]);
+  const [workerGroups, setWorkerGroups] = useState<TagPageGroupSummary[]>([]);
   const [workerGroupsLoading, setWorkerGroupsLoading] = useState(false);
   const [tagPickerOpen, setTagPickerOpen] = useState(false);
   const [sessionSelectorOpen, setSessionSelectorOpen] = useState(false);
@@ -1224,7 +1068,7 @@ export const TagPageView = ({
   const demoCorpusEntries = demoCorpusData.entries;
   const relatedTags = isDemoCorpusContext ? demoCorpusData.relatedTags : questionData.relatedTags;
   const pickerTags = isDemoCorpusContext ? demoCorpusData.pickerTags : questionData.pickerTags;
-  const sbtGroups = useMemo<SbtGroupSummary[]>(
+  const sbtGroups = useMemo<TagPageGroupSummary[]>(
     () =>
       isDemoCorpusContext
         ? []

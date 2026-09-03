@@ -6,12 +6,8 @@ import { createStore } from 'redux';
 import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
 import fs from 'fs';
 import path from 'path';
-import TagPage, {
-  loadTagPageWorkerGroupData,
-  readTagAiCacheEntry,
-  resolveTagPageWorkerSessionConfig,
-  writeTagAiCacheEntry,
-} from './TagPage';
+import TagPage, { readTagAiCacheEntry, writeTagAiCacheEntry } from './TagPage';
+import { loadTagPageWorkerGroupData, resolveTagPageWorkerSessionConfig } from './tagPageWorkerGroups';
 import TagModal from './TagModal';
 import buildTagInterpretationPrompt from '../../prompts/tagInterpretationPrompt.js';
 import { buildDemoCorpusRecords } from '../../utilities/demo/demoCorpusRecords.js';

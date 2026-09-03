@@ -20,7 +20,6 @@ import { canonicalizeSessionSlug as normalizeSessionSlug } from '../../utilities
 import contractScripts, {
   getAllSessionSlugs,
   getDemoSessionConfigBySlug,
-  getSessionConfigBySlug,
   getSessionChainId,
   getSessionLists,
 } from '../../utilities/web3/chainGateway.js';
@@ -51,27 +50,24 @@ import { POLIS_DEMO_DATA_AUTOLOAD_SLUGS } from '../../variables/appConfig.js';
 import { buildRatingMatrixFromDemo, getPolisDemoDatasetForSlug } from '../PolisReport/PolisReport';
 import { persistCommunitySbtHolderHydrationResults } from './communitySbtHolderHydrationCache.js';
 import { buildCommunityBeeswarmPointsFromResults } from './communityBeeswarmPoints';
-import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
-import { sessionModeAllowsAnonymousWorkerGroupDiscovery } from '../../utilities/session/sessionModeProfile';
-import { resolveWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery';
-import { getUsableSessionWorkerUrl } from '../../utilities/session/sessionWorkerAvailability';
 import {
   WORKER_CANONICAL_CACHE_SCOPE_KEY,
-  resolveWorkerCanonicalCacheIdentity,
-  workerCanonicalCacheIdentityMatches,
   type WorkerCanonicalCacheIdentity,
 } from '../../utilities/survey/workerCanonicalCacheIdentity';
-import {
-  loadPublicWorkerGroups,
-  loadWorkerGroupOverview,
-  type WorkerGroup,
-  type WorkerGroupOverview,
-} from '../../domains/worker/workerGroupPorts';
-import { getWorkerSessionToken } from '../../utilities/worker/workerAuth';
 import {
   subscribeWorkerGroupsChanged,
   type WorkerGroupsChangedDetail,
 } from '../../utilities/worker/workerGroupChangeEvents';
+import {
+  getCommunityWorkerGroupCountCacheKey,
+  getCommunityWorkerGroupCountState,
+  invalidateCommunityWorkerGroupCountCache,
+  isDisplayableWorkerUserId,
+  loadCommunityWorkerGroupCount,
+  pickCommunityWorkerCanonicalCache,
+  resolveCommunityScopeAuthority,
+  type CommunityWorkerGroupCountCacheEntry,
+} from './communityWorkerGroupStats';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 const uiLog = createLogger('ui');
@@ -113,24 +109,13 @@ type ContractScriptsWithBlockWindow = typeof contractScripts & {
   getRelevantBlockWindowForFilter: (slug?: string) => Promise<{ toBlock?: unknown }>;
 };
 
-type WorkerGroupCountCacheEntry = {
-  count: number;
-  groupIds: string[];
-  visibleUserIds: string[];
-  status: 'idle' | 'loading' | 'ready' | 'error' | 'unavailable';
-  updatedAtMs: number;
-  promise?: Promise<void>;
-};
-
 const contractScriptsWithBlockWindow = contractScripts as ContractScriptsWithBlockWindow;
-const WORKER_GROUP_COUNT_TTL_MS = 30000;
 const COMMUNITY_STAT_TEST_IDS: Record<string, string> = Object.freeze({
   Users: E2E_TESTIDS.COMMUNITY_STAT_USERS,
   Questions: E2E_TESTIDS.COMMUNITY_STAT_QUESTIONS,
   Surveys: E2E_TESTIDS.COMMUNITY_STAT_SURVEYS,
   Groups: E2E_TESTIDS.COMMUNITY_STAT_GROUPS,
 });
-const isDisplayableWorkerUserId = (value: unknown): boolean => /^0x[0-9a-f]{40}$/i.test(String(value || '').trim());
 
 const getDisplaySessionLists = (slugIn = '') => {
   const strictLists = getSessionLists(slugIn) || {};
@@ -221,7 +206,7 @@ class CommunityTab extends Component<any, any> {
     this._visibilityListenerBound = null;
     this._isUnmounted = false;
     this._beeswarmPoints = [];
-    this._workerGroupCountCache = new Map<string, WorkerGroupCountCacheEntry>();
+    this._workerGroupCountCache = new Map<string, CommunityWorkerGroupCountCacheEntry>();
     this._workerGroupCountCacheRevisions = new Map<string, number>();
     this._workerGroupsChangedUnsubscribe = null;
     this._leaderboardMemo = {
@@ -380,42 +365,12 @@ class CommunityTab extends Component<any, any> {
     }
   };
 
-  _resolveSessionConfigForSlug = (slugIn: unknown): Record<string, unknown> => {
-    const slug = normalizeSessionSlug(slugIn || '');
-    const exactCandidate = (candidate: unknown) => {
-      if (!candidate || typeof candidate !== 'object') return null;
-      const config = candidate as Record<string, unknown>;
-      const candidateSlug = normalizeSessionSlug(config.slug || config.sessionSlug || '');
-      return candidateSlug === slug ? config : null;
-    };
-    return (
-      exactCandidate(this.props.sessionConfig) ||
-      exactCandidate(getSessionConfigBySlug(slug)) ||
-      exactCandidate(getDemoSessionConfigBySlug(slug, { allowDemoFallback: true })) ||
-      {}
-    );
-  };
-
-  _resolveScopeAuthority = (slug: string) => {
-    const sessionConfig = this._resolveSessionConfigForSlug(slug);
-    const projection = resolveSessionCapabilityProjection(sessionConfig);
-    const isWorkerCanonical =
-      projection.source === 'profile' && projection.profileValid && projection.isWorkerCanonical;
-    let workerCanonicalIdentity: WorkerCanonicalCacheIdentity | null = null;
-    if (isWorkerCanonical) {
-      try {
-        workerCanonicalIdentity = resolveWorkerCanonicalCacheIdentity({ sessionConfig, sessionSlug: slug });
-      } catch (_) {
-        workerCanonicalIdentity = null;
-      }
-    }
-    return {
-      cacheScope: isWorkerCanonical ? WORKER_CANONICAL_CACHE_SCOPE_KEY : this._resolveNetKeyForSlug(slug),
-      isWorkerCanonical,
-      sessionConfig,
-      workerCanonicalIdentity,
-    };
-  };
+  _resolveScopeAuthority = (slug: string) =>
+    resolveCommunityScopeAuthority({
+      slugIn: slug,
+      propSessionConfig: this.props.sessionConfig,
+      resolveNetKeyForSlug: this._resolveNetKeyForSlug,
+    });
 
   _readCache = (cacheName: string, slug: string, options: CacheReadOptions = {}): Record<string, unknown> => {
     const shouldClone = options?.clone === true;
@@ -447,56 +402,21 @@ class CommunityTab extends Component<any, any> {
     return {};
   };
 
-  _pickWorkerCanonicalCache = (
-    cacheObj: unknown,
-    identity: WorkerCanonicalCacheIdentity | null,
-  ): Record<string, unknown> => {
-    if (!identity || !cacheObj || typeof cacheObj !== 'object') return {};
-    const cacheNode = (cacheObj as Record<string, unknown>)[WORKER_CANONICAL_CACHE_SCOPE_KEY];
-    if (!workerCanonicalCacheIdentityMatches(cacheNode, identity)) return {};
-    return cacheNode as Record<string, unknown>;
-  };
+  _pickWorkerCanonicalCache = (cacheObj: unknown, identity: WorkerCanonicalCacheIdentity | null) =>
+    pickCommunityWorkerCanonicalCache(cacheObj, identity);
 
   _getWorkerGroupCountCacheKey = (identity: WorkerCanonicalCacheIdentity) =>
-    `${identity.key}\n${
-      String(this.props.account || '')
-        .trim()
-        .toLowerCase() || 'anonymous'
-    }`;
+    getCommunityWorkerGroupCountCacheKey(identity, this.props.account);
 
-  _getWorkerGroupCountState = (identity: WorkerCanonicalCacheIdentity | null) => {
-    const cached = identity ? this._workerGroupCountCache.get(this._getWorkerGroupCountCacheKey(identity)) : null;
-    return {
-      workerGroupIds: Array.isArray(cached?.groupIds) ? cached.groupIds : [],
-      workerVisibleUserIds: Array.isArray(cached?.visibleUserIds) ? cached.visibleUserIds : [],
-      workerGroupsCount: Number(cached?.count || 0),
-      workerGroupsStatus: String(cached?.status || 'idle'),
-    };
-  };
+  _getWorkerGroupCountState = (identity: WorkerCanonicalCacheIdentity | null) =>
+    getCommunityWorkerGroupCountState(identity, this.props.account, this._workerGroupCountCache);
 
-  _invalidateWorkerGroupCountCache = (detail: WorkerGroupsChangedDetail) => {
-    this._workerGroupCountCache.forEach((_entry: WorkerGroupCountCacheEntry, cacheKey: string) => {
-      const identityKeyEnd = cacheKey.indexOf('\n');
-      if (identityKeyEnd < 0) return;
-      try {
-        const identityParts = JSON.parse(cacheKey.slice(0, identityKeyEnd));
-        if (
-          !Array.isArray(identityParts) ||
-          identityParts[1] !== detail.sessionSlug ||
-          String(identityParts[2] || '').toLowerCase() !== detail.sessionId
-        ) {
-          return;
-        }
-        // Regression guard: invalidate the TTL entry before forcing Stats.
-        // The revision also stops an older in-flight read from restoring stale data.
-        this._workerGroupCountCacheRevisions.set(
-          cacheKey,
-          Number(this._workerGroupCountCacheRevisions.get(cacheKey) || 0) + 1,
-        );
-        this._workerGroupCountCache.delete(cacheKey);
-      } catch (_) {}
+  _invalidateWorkerGroupCountCache = (detail: WorkerGroupsChangedDetail) =>
+    invalidateCommunityWorkerGroupCountCache({
+      detail,
+      cache: this._workerGroupCountCache,
+      revisions: this._workerGroupCountCacheRevisions,
     });
-  };
 
   _handleWorkerGroupsChanged = (detail: WorkerGroupsChangedDetail) => {
     if (this._isUnmounted) return;
@@ -544,137 +464,19 @@ class CommunityTab extends Component<any, any> {
     return this._buildScopeEntriesFromSlugs([this._currentSlug()], options);
   };
 
-  _loadWorkerGroupCount = async (scopeEntry: ScopeCacheEntry) => {
-    if (!scopeEntry.isWorkerCanonical || !scopeEntry.workerCanonicalIdentity) return;
-    const identity = scopeEntry.workerCanonicalIdentity;
-    // Keep anonymous and account-authorized projections isolated; otherwise a
-    // sign-in transition can reuse the wrong visible-group count for 30s.
-    const countCacheKey = this._getWorkerGroupCountCacheKey(identity);
-    const requestRevision = Number(this._workerGroupCountCacheRevisions.get(countCacheKey) || 0);
-    const requestIsCurrent = () =>
-      Number(this._workerGroupCountCacheRevisions.get(countCacheKey) || 0) === requestRevision;
-    const existing = this._workerGroupCountCache.get(countCacheKey);
-    if (existing?.promise) {
-      await existing.promise;
-      return;
-    }
-    if (existing && Date.now() - existing.updatedAtMs < WORKER_GROUP_COUNT_TTL_MS) return;
-
-    const { sessionConfig, slug } = scopeEntry;
-    const account = String(this.props.account || '').trim();
-    const allowAnonymousGroupDiscovery = sessionModeAllowsAnonymousWorkerGroupDiscovery(
-      sessionConfig.sessionModeProfile,
-    );
-    // Signed-out Stats never initiates authentication. Signed-in Stats follows
-    // the Groups surface and includes that account's authorized memberships.
-    if (!account && !allowAnonymousGroupDiscovery) {
-      this._workerGroupCountCache.set(countCacheKey, {
-        count: existing?.count || 0,
-        groupIds: existing?.groupIds || [],
-        visibleUserIds: existing?.visibleUserIds || [],
-        status: 'unavailable',
-        updatedAtMs: Date.now(),
-      });
-      return;
-    }
-    const workerUrl = getUsableSessionWorkerUrl({
-      slug,
-      sessionConfig,
-      requireExactWorkerSession: true,
+  _loadWorkerGroupCount = (scopeEntry: ScopeCacheEntry) =>
+    loadCommunityWorkerGroupCount({
+      scopeEntry,
+      runtime: {
+        account: this.props.account,
+        provider: this.props.provider,
+        networkChainId: this.props.networkChainId,
+        network: this.props.network,
+      },
+      cache: this._workerGroupCountCache,
+      revisions: this._workerGroupCountCacheRevisions,
+      onWarning: (message, error) => uiLog.warn(message, error),
     });
-    const sessionId = resolveWorkerCanonicalSessionIdHex(sessionConfig);
-    if (!workerUrl || !sessionId) {
-      this._workerGroupCountCache.set(countCacheKey, {
-        count: existing?.count || 0,
-        groupIds: existing?.groupIds || [],
-        visibleUserIds: existing?.visibleUserIds || [],
-        status: 'error',
-        updatedAtMs: Date.now(),
-      });
-      return;
-    }
-
-    const request = (async () => {
-      try {
-        let groups: WorkerGroup[];
-        let overviewMemberships: WorkerGroupOverview['memberships'] = [];
-        if (account) {
-          const projection = resolveSessionCapabilityProjection(sessionConfig);
-          const credentialToken = await getWorkerSessionToken({
-            sessionSlug: slug,
-            sessionConfig,
-            workerUrl,
-            context: {
-              account,
-              providerLike: this.props.provider,
-              chainId:
-                this.props.networkChainId ||
-                this.props.network?.chainId ||
-                this.props.network?.id ||
-                projection.chainId ||
-                1,
-            },
-          });
-          const overview = await loadWorkerGroupOverview({
-            workerUrl,
-            credentialToken,
-            sessionId,
-            sessionSlug: slug,
-          });
-          overviewMemberships = overview.memberships || [];
-          groups = [...(overview.groups || []), ...(overview.memberships || []).map((membership) => membership.group)];
-        } else {
-          groups = await loadPublicWorkerGroups({ workerUrl, sessionId, sessionSlug: slug });
-        }
-        const groupIds = Array.from(
-          new Set(groups.map((group) => String(group?.groupId || '').trim()).filter(Boolean)),
-        );
-        const visibleUserIds = new Set<string>();
-        groups.forEach((group) => {
-          const adminAddress = String(group?.adminAddress || '').trim().toLowerCase();
-          if (isDisplayableWorkerUserId(adminAddress)) visibleUserIds.add(adminAddress);
-        });
-        // Regression guard: count only identities already visible to this viewer.
-        // Do not turn aggregate memberCount values into guesses or fetch hidden lists.
-        overviewMemberships.forEach((membership) => {
-          const principal = membership?.member?.principal;
-          const principalAddress =
-            principal && 'address' in principal ? String(principal.address || '').trim().toLowerCase() : '';
-          if (isDisplayableWorkerUserId(principalAddress)) visibleUserIds.add(principalAddress);
-        });
-        if (overviewMemberships.length > 0 && isDisplayableWorkerUserId(account)) {
-          visibleUserIds.add(account.toLowerCase());
-        }
-        if (!requestIsCurrent()) return;
-        this._workerGroupCountCache.set(countCacheKey, {
-          count: groupIds.length,
-          groupIds,
-          visibleUserIds: Array.from(visibleUserIds),
-          status: 'ready',
-          updatedAtMs: Date.now(),
-        });
-      } catch (error) {
-        if (!requestIsCurrent()) return;
-        uiLog.warn(`CommunityTab: Worker group count unavailable for ${slug}`, error);
-        this._workerGroupCountCache.set(countCacheKey, {
-          count: existing?.count || 0,
-          groupIds: existing?.groupIds || [],
-          visibleUserIds: existing?.visibleUserIds || [],
-          status: 'error',
-          updatedAtMs: Date.now(),
-        });
-      }
-    })();
-    this._workerGroupCountCache.set(countCacheKey, {
-      count: existing?.count || 0,
-      groupIds: existing?.groupIds || [],
-      visibleUserIds: existing?.visibleUserIds || [],
-      status: 'loading',
-      updatedAtMs: existing?.updatedAtMs || 0,
-      promise: request,
-    });
-    await request;
-  };
 
   _hydrateWorkerGroupCounts = async (scopeEntries: ScopeCacheEntry[]) => {
     await Promise.all(scopeEntries.map((scopeEntry) => this._loadWorkerGroupCount(scopeEntry)));
