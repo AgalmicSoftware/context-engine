@@ -1265,7 +1265,10 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /data-ce-report-settings-toggle/);
   assert.match(html, /data-testid="ce-polis-settings-toggle"/);
   assert.match(html, /data-ce-report-settings-toggle[^>]*aria-label="Show report settings"/);
-  assert.match(html, /data-ce-report-settings-toggle[^>]*style="background:transparent;border:none;padding:0;cursor:pointer;margin-right:10px;color:inherit;"/);
+  assert.match(html, /class="reportSettingsToggle" data-ce-report-settings-toggle/);
+  assert.doesNotMatch(html, /<button(?=[^>]*data-ce-report-settings-toggle(?:\s|>))[^>]*style=/);
+  assert.match(html, /\.reportSettingsToggle \{ appearance: none; background: transparent; border: 0; box-shadow: none; color: inherit; cursor: pointer; line-height: 1; margin-right: 10px; padding: 4px; \}/);
+  assert.match(html, /\.reportSettingsToggle:hover, \.reportSettingsToggle:focus-visible \{ background: transparent; border: 0; box-shadow: none; \}/);
   assert.match(html, /data-ce-report-settings-row/);
   assert.match(html, /class="pdfIgnore settingsRow" data-ce-report-settings-row hidden>/);
   assert.doesNotMatch(html, /class="settingsRow pdfIgnore" data-ce-report-settings-row/);
@@ -1667,9 +1670,10 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /@media \(max-width: 768px\) \{[\s\S]*\.swarmContainer::-webkit-scrollbar \{ display: none; \}/);
   assert.match(html, /data-ce-beeswarm-scroll-viewport/);
   assert.match(html, /class="swarmScrollControls"/);
-  assert.match(html, /\.scrollButton \{ background: #f0f0f0; border: 1px solid var\(--ce-color-border-light\); border-radius: var\(--ce-radius-round\); width: 30px; height: 30px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background-color 0\.2s; \}/);
-  assert.match(html, /\.scrollButton:hover \{ background: #e0e0e0; \}/);
-  assert.doesNotMatch(html, /\.scrollButton \{[^}]*min-width: 32px; min-height: 32px;/);
+  assert.match(html, /\.swarmScrollControls \{ display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 0; \}/);
+  assert.match(html, /\.scrollButton \{ background: #2f6fd4; border: 2px solid #2f6fd4; border-radius: var\(--ce-radius-round\); color: #fff; width: 38px; height: 38px;/);
+  assert.match(html, /\.scrollButton:hover, \.scrollButton:focus-visible \{ background: #245db8; border-color: #245db8;/);
+  assert.match(html, /\.scrollButton:focus-visible \{ outline: 3px solid rgba\(47, 111, 212, 0\.4\); outline-offset: 2px; \}/);
   assert.match(html, /data-ce-beeswarm-scroll-controls/);
   assert.match(html, /data-ce-beeswarm-scroll="right"/);
   assert.match(html, /function updateBeeswarmScrollControls/);

@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
   "kind": "ai_discourse_bench_context_engine_results_sync",
-  "sourceCommit": "1e568011900661e21cc5436318eb1690d4e43430",
+  "sourceCommit": "e084b8233c2637abc81f910cf5b1fe4004fb855b",
   "files": {
-    "client/src/components/OnePageSession/OnePageSessionStandardShell.tsx": "f1478ac9ccaee23d6bc3ccafac4d16d6e057ccafe9eec07ad0478d50789ea5d8",
+    "client/src/components/OnePageSession/OnePageSessionStandardShell.tsx": "e9a941f1b1bf6cc16d2beeab399468e950866add7f3bdc27cb5bff9975c949ca",
     "client/src/components/OnePageSession/OnePageSession.tsx": "ed9a2412dc1fd01928add432414846b0495931700f8dafe24329c000ec19e3c1",
-    "client/src/components/OnePageSession/OnePageSession.module.scss": "5baaf4d424d08a0a9ba2ca8338a311cd8d886aad44359a04e063f88038791e24",
-    "client/src/components/PolisReport/PolisReport.tsx": "24adc4dbc73f8c21a5415b3c9300366b72dc3c38995e7dec552de675f533af3f",
-    "client/src/components/PolisReport/PolisReport.module.scss": "157d66b2584c113fc38d33111f176cacfa2acd2b207073d4f8c6b1082984ffa4",
+    "client/src/components/OnePageSession/OnePageSession.module.scss": "91e0dbbb8d886f30b43f4b0f041dbd103d7a242df1109411e7b6a5b22c3e0c62",
+    "client/src/components/PolisReport/PolisReport.tsx": "26b25c9959d6702cefb618a3fee8f61cb021e63c461b912dd825b4c9821f7a2a",
+    "client/src/components/PolisReport/PolisReport.module.scss": "1fef5fc7a3a1d598e66a3d1738cfba549d88339e7107e02d3b655d2ba4a4588c",
     "client/src/components/DebateMap/DebateMap.tsx": "4942605e6858017a73d1ca5ebf691ac88eddbca54525357fa97dfefc70f3659f",
     "client/src/components/DebateMap/DebateMap.module.scss": "9823edbebdfbf6cdd5343ba24abe378ef6af32439d0011d6c128f47b0415422c",
     "client/src/components/MainContent/RiskMatrix.tsx": "fe194d7184efc3048b5ddc14bd175d4ff777bb39e70580a8594ada899c30d68a",
@@ -24,7 +24,7 @@
     "client/src/components/SurveyTool/QuestionTagDropdown.module.scss": "9ad0daeed56a1f46e9f1cb97019a866e2f9cb701fb4c36fe8c97454e19c4b6fb",
     "client/src/components/SurveyTool/SingleQuestionResponse.tsx": "e91e235ecc8f3021a1ce44f6db14f182bac3e1f11d82697ca2272aa28be59746",
     "client/src/components/SurveyTool/SingleQuestionResponse.module.scss": "e3af971a389b2ca565297ec8d6ae313ddaf9719e8ff8688fab78bad9566f7f1c",
-    "client/src/components/SurveyTool/SurveyResults.module.scss": "389ecb21a303c69d66a4dc39f1ba82503095ba64c36a16f6de5746636642a6d4",
+    "client/src/components/SurveyTool/SurveyResults.module.scss": "745f74cc3d17fb0bd95d0c12795a175d2b68f7c1efecbc7b648236d7cdfe9cec",
     "client/src/utilities/demo/demoAnalysisAdapter.ts": "c33000cb47513e03fc7e79357955651798dd222136093554b56f2ed0a9431df1",
     "client/src/utilities/demo/demoAnalysisMath.ts": "77ba04a211394fd05a044c1f1f25ad4fa40e66b5f424c5f3470ae4ef96712663"
   }

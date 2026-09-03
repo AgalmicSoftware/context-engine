@@ -3877,6 +3877,10 @@ export const renderHtmlReport = (report) => `<!doctype html>
     .reportInnerModern { background: rgba(255, 255, 255, 0.95); border: none; border-radius: var(--ce-radius-6); padding: 24px; box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08); }
     .reportInnerDark { background: #0b1120; border: 1px solid #1f2937; border-radius: var(--ce-radius-6); padding: 24px; box-shadow: 0 18px 36px rgba(3, 6, 14, 0.6); }
     .settingsRow { margin-bottom: 10px; display: flex; flex-direction: row; justify-content: space-between; align-items: center; background: #8080805e; padding: 10px; }
+    .reportSettingsToggle { appearance: none; background: transparent; border: 0; box-shadow: none; color: inherit; cursor: pointer; line-height: 1; margin-right: 10px; padding: 4px; }
+    .reportSettingsToggle:hover, .reportSettingsToggle:focus-visible { background: transparent; border: 0; box-shadow: none; }
+    .reportSettingsToggle:hover { opacity: 0.72; }
+    .reportSettingsToggle:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
     .demoToggleLabel { font-size: 0.9rem; color: #555; cursor: pointer; }
     .demoToggleCheckbox { margin-right: 5px; cursor: pointer; }
     .heading { font-size: 1.4rem; margin-bottom: 10px; color: var(--ce-color-border); }
@@ -3907,7 +3911,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
     .polisReportModern .participantAddressLink { color: #2b3758; }
     .polisReportModern .tooltipIcon { color: #5a6aa3; }
     .polisReportModern .beeTooltip { background: var(--ce-color-white); border: none; color: #2b3758; box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12); }
-    .polisReportModern .scrollButton { background: #eef2ff; border: none; color: #2b3758; }
+    .polisReportModern .scrollButton { background: #2f6fd4; border-color: #2f6fd4; color: #fff; }
     .polisReportModern .polisBoxPlotSvg { border: 1px solid #e4e9f7; }
     .polisReportModern button { background: #f4f6ff; color: #2b3758; border: none; box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08); }
     .polisReportDark .settingsRow { background: #0f172a; border: 1px solid #1f2937; border-radius: var(--ce-radius-6); box-shadow: 0 10px 24px rgba(3, 6, 14, 0.55); justify-content: flex-start; gap: 12px; flex-wrap: wrap; }
@@ -3931,7 +3935,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
     .polisReportDark .participantAddressLink { color: #e5e7eb; }
     .polisReportDark .tooltipIcon { color: #a5b4fc; }
     .polisReportDark .beeTooltip { background: #111827; border: 1px solid #1f2937; color: #e5e7eb; box-shadow: 0 12px 24px rgba(3, 6, 14, 0.6); }
-    .polisReportDark .scrollButton { background: #1f2937; border: 1px solid #2b3446; color: #e5e7eb; }
+    .polisReportDark .scrollButton { background: #5e89ff; border-color: #5e89ff; color: #fff; }
     .polisReportDark .polisBoxPlotSvg { border: 1px solid #2b3446; }
     .polisReportDark button { background: #1f2937; color: #e5e7eb; border: 1px solid #2b3446; box-shadow: 0 8px 18px rgba(3, 6, 14, 0.5); }
     .sectionCollapse { margin-bottom: 20px; }
@@ -4060,10 +4064,11 @@ export const renderHtmlReport = (report) => `<!doctype html>
     .analyzeClustersBtn:disabled { opacity: 0.7; cursor: not-allowed; }
     .swarmLayoutContainer { width: 100%; max-width: 100%; min-width: 0; flex: 1 1 100%; box-sizing: border-box; }
     .swarmContainer { position: relative; overflow-x: auto; overflow-y: hidden; }
-    .swarmScrollControls { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 5px; }
+    .swarmScrollControls { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 0; }
     .swarmScrollControls[hidden] { display: none !important; }
-    .scrollButton { background: #f0f0f0; border: 1px solid var(--ce-color-border-light); border-radius: var(--ce-radius-round); width: 30px; height: 30px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background-color 0.2s; }
-    .scrollButton:hover { background: #e0e0e0; }
+    .scrollButton { background: #2f6fd4; border: 2px solid #2f6fd4; border-radius: var(--ce-radius-round); color: #fff; width: 38px; height: 38px; padding: 0; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(47, 111, 212, 0.3); transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s; }
+    .scrollButton:hover, .scrollButton:focus-visible { background: #245db8; border-color: #245db8; box-shadow: 0 6px 16px rgba(47, 111, 212, 0.38); }
+    .scrollButton:focus-visible { outline: 3px solid rgba(47, 111, 212, 0.4); outline-offset: 2px; }
     .beeswarmSvg { border: 1px solid #ddd; background: var(--ce-color-white); overflow: scroll; }
     .beeswarmSvg text { font-size: 14px; font-weight: 400; fill: #000; }
     .beeswarmSvg line { stroke: #000; }
@@ -4949,7 +4954,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
         <div>
         <div class="polisReportContainer ce-polis-report-shell" data-ce-report-shell="polis">
           <div class="pdfIgnore" data-ce-report-settings-toggle-row style="text-align:right;display:flex;justify-content:flex-end;align-items:center;gap:10px;">
-            <button type="button" data-ce-report-settings-toggle data-testid="ce-polis-settings-toggle" aria-label="Show report settings" title="Toggle settings row" style="background:transparent;border:none;padding:0;cursor:pointer;margin-right:10px;color:inherit;">
+            <button type="button" class="reportSettingsToggle" data-ce-report-settings-toggle data-testid="ce-polis-settings-toggle" aria-label="Show report settings" title="Toggle settings row">
               ${renderFontAwesomeIcon('cog', '', 'style="font-size:1.3rem;"')}
             </button>
           </div>
