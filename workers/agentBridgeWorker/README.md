@@ -4,9 +4,8 @@
 separate from `workers/sessionCorsWorker/` and ships as part of the public
 worker surface. Direct HTTPS agents work without Telegram; Telegram is an
 optional adapter that adds bot, Mini App, and chat-specific interactions.
-The canonical cross-transport HTTP/JSON contract is documented in
-[`docs/agent-native-contract.md`](../../docs/agent-native-contract.md); this
-README records Agent Bridge and Telegram-specific deployment behavior.
+This README records the public cross-transport HTTP/JSON contract together
+with Agent Bridge and Telegram-specific deployment behavior.
 
 ## Boundary
 
