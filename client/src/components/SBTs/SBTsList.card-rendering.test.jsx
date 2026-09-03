@@ -451,13 +451,30 @@ describe('SBTsList card rendering and navigation', () => {
     const activeSessionLink = screen.getByRole('link', { name: 'Open session Alpha' });
     expect(activeSessionLink).toHaveAttribute('href', '/session/alpha');
     expect(activeSessionLink.querySelector('svg')).toBeInTheDocument();
+    const refreshGroupsButton = screen.getByRole('button', { name: 'Refresh groups' });
+    const createGroupButton = (await screen.findAllByRole('button', { name: /create group/i }))[0];
+    expect(sessionHero.parentElement).toContainElement(createGroupButton);
+    expect(sessionHero.parentElement).toContainElement(refreshGroupsButton);
+    expect(mockWorkerGroupCreate).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        refreshNonce: 0,
+        showMembershipListHeader: false,
+      }),
+    );
+    fireEvent.click(refreshGroupsButton);
+    expect(mockWorkerGroupCreate).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        refreshNonce: 1,
+        showMembershipListHeader: false,
+      }),
+    );
     await waitFor(() => {
       const query = new URLSearchParams(window.location.search);
       expect(window.location.pathname).toBe('/groups');
       expect(query.get('sessionName')).toBe('alpha');
       expect(query.get('view')).toBe('public');
     });
-    fireEvent.click((await screen.findAllByRole('button', { name: /create group/i }))[0]);
+    fireEvent.click(createGroupButton);
     expect(await screen.findByTestId('worker-group-create-panel')).toHaveTextContent('Alpha');
     expect(screen.getByTestId('worker-group-create-panel')).toHaveTextContent('/alpha');
     expect(mockWorkerGroupCreate).toHaveBeenLastCalledWith(

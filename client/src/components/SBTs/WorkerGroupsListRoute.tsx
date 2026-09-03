@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faExternalLinkAlt, faPlus } from '@fortawesome/free-solid-svg-icons';
+import { faExternalLinkAlt, faPlus, faSyncAlt } from '@fortawesome/free-solid-svg-icons';
 import { Button } from 'reactstrap';
 
 import WorkerSessionGroupsPanel from '../OnePageSession/WorkerSessionGroupsPanel';
@@ -59,6 +59,7 @@ type WorkerGroupsListRouteProps = {
 
 const WorkerGroupsListRoute = ({ props, workerSessionConfig }: WorkerGroupsListRouteProps) => {
   const [showWorkerCreate, setShowWorkerCreate] = useState(false);
+  const [workerGroupsRefreshNonce, setWorkerGroupsRefreshNonce] = useState(0);
   const sessionSlug = normalizeSessionSlug(props.sessionSlug || workerSessionConfig.slug || '');
   const configuredSessionName = String(workerSessionConfig.sessionName || '').trim();
   const querySessionName =
@@ -122,7 +123,7 @@ const WorkerGroupsListRoute = ({ props, workerSessionConfig }: WorkerGroupsListR
       data-testid="ce-worker-groups-list-route"
     >
       {!props.embeddedMode && !selectedGroupId ? (
-        <>
+        <div className={styles.workerRouteToolbar}>
           <section className={styles.workerRouteSessionHero} data-testid="ce-worker-groups-session-hero">
             <span className={styles.workerRouteSessionEyebrow}>Active session</span>
             <h1 className={styles.workerRouteSessionName}>
@@ -144,8 +145,17 @@ const WorkerGroupsListRoute = ({ props, workerSessionConfig }: WorkerGroupsListR
             >
               <FontAwesomeIcon icon={faPlus} /> {showWorkerCreate ? 'Exit Group Creation' : 'Create Group'}
             </Button>
+            <button
+              type="button"
+              className={styles.workerRouteRefreshButton}
+              aria-label="Refresh groups"
+              title="Refresh groups"
+              onClick={() => setWorkerGroupsRefreshNonce((nonce) => nonce + 1)}
+            >
+              <FontAwesomeIcon icon={faSyncAlt} />
+            </button>
           </div>
-        </>
+        </div>
       ) : null}
       <WorkerSessionGroupsPanel
         account={props.account}
@@ -154,7 +164,9 @@ const WorkerGroupsListRoute = ({ props, workerSessionConfig }: WorkerGroupsListR
         sessionConfig={workerSessionConfig}
         sessionName={sessionName}
         sessionSlug={sessionSlug}
+        refreshNonce={workerGroupsRefreshNonce}
         showCreate={showWorkerCreate}
+        showMembershipListHeader={Boolean(props.embeddedMode)}
         createOnly={false}
         selectedGroupId={selectedGroupId}
         toggleLoginModal={props.toggleLoginModal as ((open: boolean) => void) | undefined}
