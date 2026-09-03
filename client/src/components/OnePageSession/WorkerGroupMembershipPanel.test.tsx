@@ -195,7 +195,7 @@ describe('WorkerGroupMembershipPanel', () => {
 
     expect(await screen.findByTestId('ce-worker-group-detail')).toHaveClass('sbtPage');
     expect(screen.getByRole('article', { name: 'Open reviewers' })).toHaveClass('sbtInfo', 'workerGroupDetailCard');
-    expect(screen.getByText('Visible before sign-in.')).toBeInTheDocument();
+    expect(screen.getByText('Visible before sign-in.').parentElement).toHaveClass('workerGroupDetailDescription');
     expect(screen.getByText('Joining open')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'STATS' })).toBeInTheDocument();
     expect(screen.getByText('Member limit:')).toBeInTheDocument();

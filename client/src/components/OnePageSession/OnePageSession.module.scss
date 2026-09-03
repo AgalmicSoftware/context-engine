@@ -228,6 +228,8 @@
 
 .workerGroupsLoadingState {
   margin: 0 0 24px;
+  color: var(--ce-control-text);
+  font-family: var(--ce-font-body);
   font-size: 1.25rem;
   font-weight: 700;
   line-height: 1.4;
@@ -491,6 +493,15 @@
 
 .workerGroupDetailCard {
   min-width: 0;
+}
+
+.workerGroupDetailDescription {
+  font-family: var(--ce-font-body);
+
+  p {
+    color: var(--ce-control-text);
+    font-family: var(--ce-font-body);
+  }
 }
 
 .workerGroupDetailStatus {

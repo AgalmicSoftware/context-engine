@@ -346,7 +346,7 @@ const WorkerGroupDetailView = ({
               )}
             </div>
           </div>
-          <div className={sbtPageStyles.description}>
+          <div className={`${sbtPageStyles.description} ${styles.workerGroupDetailDescription}`}>
             <h1 id={titleId}>{group.label}</h1>
             {group.description ? <p id={descriptionId}>{group.description}</p> : null}
           </div>
