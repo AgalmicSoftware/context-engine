@@ -439,6 +439,59 @@ describe('WorkerGroupMembershipPanel', () => {
     ).toHaveLength(1);
   });
 
+  it('explains when an older session Worker does not expose the member directory', async () => {
+    const fetchImpl = jest.fn(async (input: RequestInfo | URL) => {
+      const pathname = new URL(String(input)).pathname;
+      if (pathname.endsWith('/groups/my-memberships')) {
+        return new Response(
+          JSON.stringify({ ok: true, sessionId: SESSION_ID, sessionSlug: 'alpha', memberships: [] }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }
+      if (pathname.endsWith('/groups/members')) {
+        return new Response(JSON.stringify({ error: 'Not found.' }), {
+          status: 404,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          sessionId: SESSION_ID,
+          sessionSlug: 'alpha',
+          groups: [
+            {
+              groupId: 'reviewers',
+              sessionSlug: 'alpha',
+              label: 'Reviewers',
+              joinMode: 'open',
+              memberVisibility: 'session',
+              memberCount: 5,
+            },
+          ],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    });
+
+    render(
+      <WorkerGroupMembershipPanel
+        envelope={envelope}
+        selectedGroupId="reviewers"
+        fetchImpl={fetchImpl as typeof fetch}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'View Reviewers members' }));
+    expect(
+      await screen.findByText(
+        'Individual members are not available from this session’s current Worker. The total member count is still available.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText('(5)')).toBeInTheDocument();
+    expect(screen.queryByText(/worker_group_request_failed_404/)).not.toBeInTheDocument();
+  });
+
   it('omits descriptions from minimized cards without changing the full-view default', async () => {
     const fetchImpl = jest.fn(
       async () =>
@@ -739,6 +792,42 @@ describe('WorkerGroupMembershipPanel', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('Left Open reviewers.');
     expect(await screen.findByRole('button', { name: 'Join Open reviewers' })).toBeInTheDocument();
     expect(fetchImpl.mock.calls.some(([url]) => new URL(String(url)).pathname.endsWith('/groups/leave'))).toBe(true);
+  });
+
+  it('keeps a compact-card join successful when an older Worker omits the member count', async () => {
+    const group = {
+      groupId: 'legacy-reviewers',
+      sessionSlug: 'alpha',
+      label: 'Legacy reviewers',
+      joinMode: 'open',
+      memberVisibility: 'session',
+    };
+    const fetchImpl = jest.fn(async (input: RequestInfo | URL) => {
+      const pathname = new URL(String(input)).pathname;
+      if (pathname.endsWith('/groups/join')) {
+        return new Response(
+          JSON.stringify({ ok: true, sessionId: SESSION_ID, sessionSlug: 'alpha', group }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }
+      if (pathname.endsWith('/groups/my-memberships')) {
+        return new Response(
+          JSON.stringify({ ok: true, sessionId: SESSION_ID, sessionSlug: 'alpha', memberships: [] }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }
+      return new Response(
+        JSON.stringify({ ok: true, sessionId: SESSION_ID, sessionSlug: 'alpha', groups: [group] }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    });
+
+    render(<WorkerGroupMembershipPanel envelope={envelope} fetchImpl={fetchImpl as typeof fetch} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Join Legacy reviewers' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('Joined Legacy reviewers.');
+    expect(screen.getByRole('button', { name: 'Leave Legacy reviewers' })).toBeInTheDocument();
+    expect(screen.queryByText(/worker_group_response_member_count_invalid/)).not.toBeInTheDocument();
   });
 
   it('updates only the changed card without reloading the full group collection', async () => {

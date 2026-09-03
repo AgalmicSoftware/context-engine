@@ -170,6 +170,7 @@ const SAFE_LOCAL_WORKER_GROUP_REASONS = new Set([
   'worker_group_response_cursor_invalid',
   'worker_group_response_group_invalid',
   'worker_group_response_group_visibility_invalid',
+  'worker_group_member_directory_unavailable',
   'worker_group_response_member_count_invalid',
   'worker_group_response_member_invalid',
   'worker_group_response_session_identity_mismatch',
@@ -555,20 +556,34 @@ export const loadWorkerGroupMembers = async ({
   ) {
     throw new WorkerGroupRequestError('worker_group_member_page_invalid', 400);
   }
-  const payload = await requestMemberRoute({
-    workerUrl,
-    credentialToken,
-    sessionId: expectedSessionId,
-    sessionSlug: expectedSessionSlug,
-    path: '/groups/members',
-    method: 'POST',
-    body: {
-      groupId: expectedGroupId,
-      ...(cursor ? { cursor } : {}),
-      limit,
-    },
-    fetchImpl,
-  });
+  let payload: UnknownRecord;
+  try {
+    payload = await requestMemberRoute({
+      workerUrl,
+      credentialToken,
+      sessionId: expectedSessionId,
+      sessionSlug: expectedSessionSlug,
+      path: '/groups/members',
+      method: 'POST',
+      body: {
+        groupId: expectedGroupId,
+        ...(cursor ? { cursor } : {}),
+        limit,
+      },
+      fetchImpl,
+    });
+  } catch (error) {
+    // Regression guard: legacy Workers return a generic 404 because this route
+    // did not exist; preserve explicit current-Worker group errors unchanged.
+    if (
+      error instanceof WorkerGroupRequestError &&
+      error.status === 404 &&
+      error.message === 'worker_group_request_failed_404'
+    ) {
+      throw new WorkerGroupRequestError('worker_group_member_directory_unavailable', 404);
+    }
+    throw error;
+  }
   const group = normalizeGroup(payload.group, expectedSessionSlug);
   if (!group || group.groupId !== expectedGroupId) {
     throw new WorkerGroupRequestError('worker_group_response_group_invalid');
@@ -627,8 +642,15 @@ export const joinWorkerGroup = async ({
     if (!group || group.groupId !== toStringValue(groupId)) {
       throw new WorkerGroupRequestError('worker_group_response_group_invalid');
     }
-    const memberCount = normalizeWorkerGroupMemberCount(payload.memberCount);
-    return { ...payload, group: { ...group, memberCount }, memberCount };
+    // Regression guard: Workers deployed before post-mutation counts omit this
+    // field on success. Validate it strictly whenever a Worker does provide it.
+    const hasMemberCount = Object.prototype.hasOwnProperty.call(payload, 'memberCount');
+    const memberCount = hasMemberCount ? normalizeWorkerGroupMemberCount(payload.memberCount) : undefined;
+    return {
+      ...payload,
+      group: memberCount === undefined ? group : { ...group, memberCount },
+      ...(memberCount === undefined ? {} : { memberCount }),
+    };
   });
 };
 

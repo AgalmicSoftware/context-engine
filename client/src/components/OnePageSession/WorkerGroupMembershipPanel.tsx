@@ -148,6 +148,7 @@ const WorkerGroupMembersModal = ({
     </button>
   );
   const showCount = Number.isSafeInteger(memberCount) && Number(memberCount) >= 0;
+  const memberDirectoryUnavailable = error === 'worker_group_member_directory_unavailable';
 
   return (
     <Modal
@@ -176,7 +177,11 @@ const WorkerGroupMembersModal = ({
             </div>
           ) : null}
           {status === 'error' ? (
-            <div className={sbtPageStyles.emptyState}>Members could not be loaded ({error}).</div>
+            <div className={sbtPageStyles.emptyState}>
+              {memberDirectoryUnavailable
+                ? 'Individual members are not available from this session’s current Worker. The total member count is still available.'
+                : `Members could not be loaded (${error}).`}
+            </div>
           ) : null}
           {status === 'ready' && members.length === 0 ? (
             <div className={sbtPageStyles.emptyState}>No members found.</div>
@@ -732,10 +737,13 @@ const WorkerGroupMembershipPanel = ({
       setMembershipStatusState({ targetKey: mutationTargetKey, status: `Joined ${group.label}.` });
       memberListRequestIdRef.current += 1;
       setMemberListState(emptyMemberListState(mutationTargetKey, group.groupId));
+      const resultMemberCount = Number.isSafeInteger(result.memberCount)
+        ? Number(result.memberCount)
+        : undefined;
       applyConfirmedMembership({
         mutationTargetKey,
         group: result.group as WorkerGroup,
-        memberCount: Number(result.memberCount),
+        memberCount: resultMemberCount,
         isMember: true,
         retainGroup: true,
       });
