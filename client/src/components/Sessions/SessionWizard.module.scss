@@ -224,7 +224,7 @@ $muted-text: var(--ce-panel-text-muted);
   font-size: 3.5rem;
   line-height: 1;
   font-weight: 800;
-  color: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
+  color: color-mix(in srgb, var(--ce-control-text) 60%, transparent);
   pointer-events: none;
 }
 
@@ -267,7 +267,7 @@ $muted-text: var(--ce-panel-text-muted);
   box-shadow: 0 6px 22px color-mix(in srgb, var(--ce-compat-dark) 25%, transparent);
 
   .normalModeCardNumber {
-    color: color-mix(in srgb, var(--ce-action-accent) 22%, transparent);
+    color: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
   }
 }
 
