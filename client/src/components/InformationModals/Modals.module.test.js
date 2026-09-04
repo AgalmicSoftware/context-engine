@@ -119,6 +119,22 @@ describe('Modals contrast styles', () => {
     );
   });
 
+  it('compresses welcome copy on short compact-desktop panes', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'Modals.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /@media \(min-width:\s*769px\) and \(max-width:\s*1366px\)\s*\{[\s\S]*?\.welcomeSlideBulletText\s*\{[\s\S]*?font-size:\s*0\.9em !important;/,
+    );
+  });
+
+  it('compresses welcome copy in compact windows', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'Modals.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /@media \(min-width:\s*466px\) and \(max-width:\s*768px\)\s*\{[\s\S]*?\.welcomeSlideBulletText\s*\{[\s\S]*?font-size:\s*0\.95em !important;/,
+    );
+  });
+
   it('resolves both welcome decks through semantic artwork blend tokens', () => {
     const embeddedDeck = fs.readFileSync(path.join(__dirname, 'Modals.module.scss'), 'utf8');
     const overlayDeck = fs.readFileSync(path.resolve(__dirname, '../Onboarding/OnboardingOverlay.module.scss'), 'utf8');

@@ -126,6 +126,8 @@ All notable changes to this project will be documented in this file.
   freeform group-creation policy input with a constrained dropdown there.
 - Restored centered Welcome-slide headings across responsive layouts while
   preserving each theme profile's constant slide-frame and navigation height.
+  Classic 95 now uses a compact viewport-aware frame across every slide, with
+  wrapped titles and copy kept inside the shared content pane.
   On standard full-screen desktops, the opening artwork is centered and sized
   to keep the controls visible while placing the site footer below the fold,
   and the taller navigation strip restores the pre-theme 80px arrow scale.

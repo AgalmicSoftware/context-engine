@@ -92,7 +92,10 @@ describe('Main welcome walkthrough styles', () => {
       /@media \(max-width:\s*768px\)\s*{\s*@container ce-theme style\(--ce-welcome-slide-mode: fixed-window\)\s*{[\s\S]*?\.mainAreaTabsAlt,[\s\S]*?#mainAreaTabs\s*{\s*flex-basis:\s*auto;/,
     );
     expect(scss).toMatch(
-      /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?--ce-welcome-frame-height:\s*clamp\(525px,\s*72dvh,\s*600px\);/,
+      /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?--ce-welcome-frame-height:\s*min\([\s\S]*?500px,[\s\S]*?var\(--ce-main-welcome-frame-height,\s*clamp\(410px,\s*52dvh,\s*500px\)\)[\s\S]*?\);/,
+    );
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.onboardingTitle\s*{[\s\S]*?max-width:\s*100%;[\s\S]*?font-size:\s*clamp\(1\.5rem,\s*4vw,\s*2rem\);[\s\S]*?overflow-wrap:\s*anywhere;/,
     );
     expect(scss).not.toContain('@container ce-theme style(--ce-welcome-slide-mode: fluid)');
   });

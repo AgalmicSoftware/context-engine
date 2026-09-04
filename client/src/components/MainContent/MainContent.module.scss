@@ -840,11 +840,20 @@
   }
 }
 
-/* Desktop-window welcome slides share one tall frame. On shorter screens the
- * page may scroll rather than cropping slide copy to fit the viewport. */
+/* Desktop-window welcome slides share one compact, viewport-aware frame. The
+ * lower bound leaves enough room for the densest slide while the viewport and
+ * upper bounds prevent sparse artwork from turning into a tall empty pane. */
 @container ce-theme style(--ce-layout-profile: desktop-window) {
   .onboardingWalkthrough {
-    --ce-welcome-frame-height: clamp(525px, 72dvh, 600px);
+    --ce-welcome-frame-height: min(500px, var(--ce-main-welcome-frame-height, clamp(410px, 52dvh, 500px)));
+  }
+
+  .onboardingTitle {
+    max-width: 100%;
+    padding: clamp(8px, 1.25dvh, 12px) clamp(12px, 2vw, 24px) 6px;
+    font-size: clamp(1.5rem, 4vw, 2rem);
+    line-height: 1.05;
+    overflow-wrap: anywhere;
   }
 
   .onboardingControls .takeSurveyIcon {
