@@ -380,6 +380,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   _testFundsRequestId: number = 0;
   _passkeyWalletRestoreReqId: number = 0;
   _passkeyWalletActionId: number = 0;
+  _purposefulPasskeyActionId: number | null = null;
   _sponsoredSessionSourcesMemo: { key: string; value: SponsoredSessionSources } | null = null;
   _settingsOverviewMemo: { key: string; value: LoginSettingsOverviewContext } | null = null;
   _sessionCapabilityProjectionResolver: typeof resolveSessionCapabilityProjection = resolveSessionCapabilityProjection;
@@ -396,8 +397,11 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     notifyInfo: (message) => notify.info(message),
     passkeyWallet,
     setActionMode: (passkeyMode) => this.setStateIfMounted({ passkeyMode }),
-    setStatus: (patch) => this.setStateIfMounted(patch),
-    startAction: () => this.startPasskeyWalletAction(),
+    setStatus: (patch) => {
+      if (patch.passkeyWalletStatusTone === 'error') this._purposefulPasskeyActionId = null;
+      this.setStateIfMounted(patch);
+    },
+    startAction: () => this.startPurposefulPasskeyWalletAction(),
     updateLoginInfo: (payload) => this.props.updateLoginInfo(payload),
   });
   syncPasskeyWalletChain = this._passkeyActions.syncPasskeyWalletChain;
@@ -582,6 +586,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     this._isMounted = false;
     this._sponsoredReqId += 1;
     this._testFundsRequestId += 1;
+    this._purposefulPasskeyActionId = null;
     if (this._autoCloseTimer) {
       clearTimeout(this._autoCloseTimer);
       this._autoCloseTimer = null;
@@ -811,11 +816,18 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     return this._passkeyWalletActionId;
   };
 
+  startPurposefulPasskeyWalletAction = (): number => {
+    const actionId = this.startPasskeyWalletAction();
+    this._purposefulPasskeyActionId = actionId;
+    return actionId;
+  };
+
   isCurrentPasskeyWalletAction = (actionId: number): boolean =>
     this._isMounted && actionId === this._passkeyWalletActionId;
 
   handleLogout = async () => {
     this._passkeyWalletActionId += 1;
+    this._purposefulPasskeyActionId = null;
     if (this.props.provider === 'passkey_eoa') {
       await passkeyWallet.logoutPasskeyWallet();
     }
@@ -860,9 +872,16 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }
     if (this.props.loginComplete && !prevProps.loginComplete) {
       needsBalanceCheck = true;
-      this.setStateIfMounted({ firstModalAfterLogin: true });
-      // Auto-close after 1 second of success view
-      if (this.props.loginModalToggled) {
+      const completedPurposefulPasskeyAction =
+        this._purposefulPasskeyActionId !== null && this._purposefulPasskeyActionId === this._passkeyWalletActionId;
+      this._purposefulPasskeyActionId = null;
+
+      // Regression guard: restoring a saved passkey session can complete while
+      // Settings is open. Only an explicit Create/Login click owns auto-close.
+      if (completedPurposefulPasskeyAction) {
+        this.setStateIfMounted({ firstModalAfterLogin: true });
+      }
+      if (completedPurposefulPasskeyAction && this.props.loginModalToggled) {
         if (this._autoCloseTimer) clearTimeout(this._autoCloseTimer);
         this._autoCloseTimer = setTimeout(() => {
           this._autoCloseTimer = null;

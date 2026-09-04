@@ -405,6 +405,68 @@ describe('WorkerSessionGroupsPanel', () => {
     );
   });
 
+  it('re-authenticates a profile membership list for the newly active Cloudflare session', async () => {
+    const nextSessionConfig = {
+      ...sessionConfig,
+      slug: 'next-session',
+      sessionIdHex: OTHER_SESSION_ID,
+      corsWorkerUrl: 'https://next-session-worker.example',
+    };
+    mockGetWorkerSessionToken.mockResolvedValueOnce('first-session-token').mockResolvedValueOnce('next-session-token');
+    const { rerender } = render(
+      <WorkerSessionGroupsPanel
+        account={ADMIN}
+        provider="passkey_eoa"
+        networkChainId={null}
+        sessionConfig={sessionConfig}
+        sessionSlug="demo-sh"
+        showCreate={false}
+        membershipsOnly={true}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(mockMembershipPanel).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          sessionId: SESSION_ID,
+          sessionSlug: 'demo-sh',
+          workerToken: 'first-session-token',
+        }),
+      ),
+    );
+
+    rerender(
+      <WorkerSessionGroupsPanel
+        account={ADMIN}
+        provider="passkey_eoa"
+        networkChainId={null}
+        sessionConfig={nextSessionConfig}
+        sessionSlug="next-session"
+        showCreate={false}
+        membershipsOnly={true}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(mockMembershipPanel).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          membershipsOnly: true,
+          sessionId: OTHER_SESSION_ID,
+          sessionSlug: 'next-session',
+          workerToken: 'next-session-token',
+          workerUrl: 'https://next-session-worker.example',
+        }),
+      ),
+    );
+    expect(mockGetWorkerSessionToken).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        sessionConfig: nextSessionConfig,
+        sessionSlug: 'next-session',
+        workerUrl: 'https://next-session-worker.example',
+      }),
+    );
+  });
+
   it('keeps a private session sign-in-only when participants may create groups', () => {
     const toggleLoginModal = jest.fn();
     render(

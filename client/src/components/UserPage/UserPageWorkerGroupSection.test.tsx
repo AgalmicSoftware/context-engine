@@ -26,7 +26,7 @@ describe('UserPageWorkerGroupSection', () => {
       />,
     );
 
-    expect(screen.getByRole('heading', { name: 'Joined Groups:' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Groups Joined:' })).toBeInTheDocument();
     expect(screen.getByTestId('worker-memberships')).toBeInTheDocument();
     expect(mockWorkerSessionGroupsPanel).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -38,6 +38,38 @@ describe('UserPageWorkerGroupSection', () => {
         showCreate: false,
         showGroupDescriptions: false,
         showMembershipListHeader: false,
+      }),
+    );
+  });
+
+  it('re-scopes memberships when the active Cloudflare session changes', () => {
+    const account = '0x00000000000000000000000000000000000000aa';
+    const firstSessionConfig = { slug: 'first-session' };
+    const nextSessionConfig = { slug: 'next-session' };
+    const { rerender } = render(
+      <UserPageWorkerGroupSection
+        account={account}
+        provider="passkey_eoa"
+        sessionConfig={firstSessionConfig}
+        sessionSlug="first-session"
+      />,
+    );
+
+    rerender(
+      <UserPageWorkerGroupSection
+        account={account}
+        provider="passkey_eoa"
+        sessionConfig={nextSessionConfig}
+        sessionSlug="next-session"
+      />,
+    );
+
+    expect(mockWorkerSessionGroupsPanel).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        account,
+        membershipsOnly: true,
+        sessionConfig: nextSessionConfig,
+        sessionSlug: 'next-session',
       }),
     );
   });

@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Kept Account Settings open when a saved passkey session restores in the
+  background; the one-second success auto-close now belongs only to an explicit
+  passkey **Create** or **Login** action. The signed-in owner's profile labels
+  its session-scoped Cloudflare membership list **Groups Joined** and refreshes
+  that private list when the active Worker session changes.
 - Restored direct URL/file/photo context saves in the Tool Explorer without
   requiring question generation. The action names the active session, routes
   canonical Worker sessions through Cloudflare document storage, keeps
