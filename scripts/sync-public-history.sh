@@ -713,9 +713,10 @@ run_public_npm_script() {
   (
     cd "$TEMP_CLONE"
     if [ -d "$node_path" ]; then
-      NODE_PATH="$node_path${NODE_PATH:+:$NODE_PATH}" npm run "$script_name"
+      CLIENT_LARGE_FILE_BASE_REF="$TARGET_BASE_SHA" \
+        NODE_PATH="$node_path${NODE_PATH:+:$NODE_PATH}" npm run "$script_name"
     else
-      npm run "$script_name"
+      CLIENT_LARGE_FILE_BASE_REF="$TARGET_BASE_SHA" npm run "$script_name"
     fi
   )
 }

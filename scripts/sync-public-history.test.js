@@ -1038,11 +1038,12 @@ test('sync-public-history links source client node_modules for strict public wir
   });
 });
 
-test('sync-public-history pins public wiring checks to the public target base', () => {
+test('sync-public-history pins public wiring and Node checks to the public target base', () => {
   withSourceRepo(({ sourceDir }) => {
     const packagePath = path.join(sourceDir, 'package.json');
     const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
     packageJson.scripts['test:wiring'] = 'node scripts/public-wiring-base-fixture.js';
+    packageJson.scripts['test:node'] = 'node scripts/public-wiring-base-fixture.js';
     fs.writeFileSync(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`);
     writeFile(sourceDir, path.join('scripts', 'verify-test-wiring.js'), "'use strict';\n");
     writeFile(
@@ -1052,10 +1053,10 @@ test('sync-public-history pins public wiring checks to the public target base', 
         "const { execFileSync } = require('node:child_process');",
         "const expected = execFileSync('git', ['rev-parse', 'origin/main'], { encoding: 'utf8' }).trim();",
         "if (process.env.CLIENT_LARGE_FILE_BASE_REF !== expected) {",
-        "  console.error(`unexpected public wiring base: ${process.env.CLIENT_LARGE_FILE_BASE_REF || '<unset>'}`);",
+        "  console.error(`unexpected public test base: ${process.env.CLIENT_LARGE_FILE_BASE_REF || '<unset>'}`);",
         '  process.exit(1);',
         '}',
-        "console.log('public wiring base fixture passed');",
+        "console.log('public test base fixture passed');",
         '',
       ].join('\n'),
     );
@@ -1067,7 +1068,7 @@ test('sync-public-history pins public wiring checks to the public target base', 
     const result = runSyncScript(sourceDir, ['release-candidate']);
 
     assert.equal(result.status, 0, syncFailureMessage(result));
-    assert.match(result.stdout, /public wiring base fixture passed/);
+    assert.equal(result.stdout.match(/public test base fixture passed/g)?.length, 2);
   });
 });
 
