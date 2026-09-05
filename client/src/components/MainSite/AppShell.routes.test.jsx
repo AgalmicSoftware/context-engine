@@ -3401,6 +3401,14 @@ describe('AppShell route render smoke', () => {
     expect(subject.queueSurveyGroupScan).not.toHaveBeenCalled();
   });
 
+  it('passes only the validated address to a profile reached with a trailing slash and query', async () => {
+    const target = '0x00000000000000000000000000000000000000ab';
+    const subject = createSubject({ path: `/u/${target}/?tab=responses` });
+    render(subject.render());
+    await screen.findByTestId('mock-user-page');
+    expect(mockUserPage.mock.calls.at(-1)?.[0].viewAddress).toBe(target);
+  });
+
   it('keeps an active pure Worker user profile free of SBT scans and wallet-chain context', async () => {
     const target = '0x00000000000000000000000000000000000000ab';
     const sessionConfig = buildSessionConfig({

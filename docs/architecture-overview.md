@@ -270,3 +270,5 @@ published source package.
 ## Startup recovery
 
 The entry failure screen automatically performs one cache-busted reload only for recognized stale JavaScript chunk errors. Its cache cleanup removes Cache API entries while preserving local/session storage, including drafts, settings, and reload-loop sentinels. Generic startup failures offer a plain manual reload and leave browser storage and caches untouched. Successful entry/route commits clear only their own recovery markers.
+
+User profiles match only `/u/<valid-address>` or the legacy `/<valid-address>` route, with an optional trailing slash. The shared path helper validates the address for both routing and rendering; unrelated paths, query values, fragments, and extra path segments cannot select a profile. Query parameters such as `tab` keep their existing meaning.

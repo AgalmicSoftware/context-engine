@@ -87,3 +87,10 @@ describe('buildSbtDetailRouteStatePatch', () => {
     });
   });
 });
+
+it.each([
+  `/u/${VALID_ADDRESS}/extra`, `/${VALID_ADDRESS}/extra`, `/other/${VALID_ADDRESS}`,
+  `//u/${VALID_ADDRESS}`, `/u//${VALID_ADDRESS}`, `/u/${VALID_ADDRESS}//`,
+])('does not extract a user from an unrelated or noncanonical path: %s', (path) => {
+  expect(getUserAddressFromPath(path, { isAddress })).toBeNull();
+});

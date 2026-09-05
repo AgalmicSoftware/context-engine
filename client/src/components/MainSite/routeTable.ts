@@ -1,6 +1,6 @@
 import { KNOWN_ROUTE_PREFIXES, VALID_SURVEY_ID_RE, isStaticNonCacheRoute } from './routeConfig.js';
 import { isOnOrWithinRoutePath } from './routePathHelpers.js';
-import { getSbtAddressFromPath, isSbtListRoutePath } from './sbtRoutePathHelpers.js';
+import { getSbtAddressFromPath, getUserAddressFromPath, isSbtListRoutePath } from './sbtRoutePathHelpers.js';
 
 export type MainSiteRouteKey =
   | 'wizard'
@@ -60,6 +60,7 @@ type RouteDefinitionContext = {
   firstPathSegment: string;
   fullPath: string;
   isSbtDetailRoute: boolean;
+  isUserProfileRoute: boolean;
   isSbtsListRoute: boolean;
   pathSegments: string[];
   pathWithoutQuery: string;
@@ -145,7 +146,7 @@ const routeDefinitions: RouteDefinition[] = [
   },
   {
     key: 'userProfile',
-    match: ({ fullPath }) => fullPath.includes('0x'),
+    match: ({ isUserProfileRoute }) => isUserProfileRoute,
   },
   {
     key: 'about',
@@ -219,11 +220,12 @@ export function resolveMainSiteRouteMatch({
     firstPathSegment === 'group' && pathSegments.length === 2 && !!pathSegments[1] && !sbtAddress;
   const isSbtsListRoute = isSbtListRoutePath(pathWithoutQuery) || isWorkerGroupDetailRoute;
   const isSbtDetailRoute = !!sbtAddress || pathWithoutQuery.startsWith('/sbt/');
+  const isUserProfileRoute = !!getUserAddressFromPath(fullPath, { isAddress });
   const isKnownRoutePrefix =
     pathWithoutQuery === '/' ||
     pathWithoutQuery === '' ||
     KNOWN_ROUTE_PREFIXES.has(firstPathSegment) ||
-    pathWithoutQuery.includes('0x');
+    isUserProfileRoute;
   const shouldBypassCacheHydrationWait =
     pathWithoutQuery === '/debate' ||
     pathWithoutQuery === '/debate/' ||
@@ -235,6 +237,7 @@ export function resolveMainSiteRouteMatch({
     firstPathSegment,
     fullPath,
     isSbtDetailRoute,
+    isUserProfileRoute,
     isSbtsListRoute,
     pathSegments,
     pathWithoutQuery,
