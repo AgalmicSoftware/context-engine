@@ -277,31 +277,42 @@ test('createWorkerRouteShellWithWorkerDeps preserves auth-nonce branch wiring', 
         assert.equal(value, env);
         return 'env-slug';
       },
-      dispatchAuthNonceRequestWithWorkerDeps: async (value) => {
+      buildNonce: ({ base64UrlEncode }) => {
+        assert.equal(base64UrlEncode, 'base64UrlEncode');
+        return 'nonce-built';
+      },
+      issueNonce: async (...args) => {
+        assert.deepEqual(args, [
+          env,
+          'session-a',
+          '0xabc',
+          'nonce-built',
+          300,
+          { now: 'now' },
+        ]);
+        return { ok: true };
+      },
+      dispatchAuthNonceRequest: async (value) => {
         assert.equal(value.request, request);
         assert.equal(value.env, env);
         assert.equal(value.baseHeaders, baseHeaders);
         assert.equal(value.slug, 'env-slug');
-        assert.deepEqual(value.deps, {
-          json: 'json',
-          toStr: 'toStr',
-          isAddress: 'isAddress',
-          resolveWorkerBodySlugContext: 'resolveWorkerBodySlugContext',
-          resolveExistingSessionCors: 'resolveExistingSessionCors',
-          validateTrustedLoginRequestOrigin: 'validateTrustedLoginRequestOrigin',
-          resolveTrustedAdminOrigins: 'resolveTrustedAdminOrigins',
-          checkNonceRateLimit: 'checkNonceRateLimit',
-          now: 'now',
-          buildNonce: 'buildNonce',
-          base64UrlEncode: 'base64UrlEncode',
-        });
-        assert.deepEqual(value.constants, {
-          missingSlugError: 'Missing sessionSlug.',
-          nonceTtlSeconds: 300,
-          nonceRateLimitMax: 5,
-          nonceRateLimitWindowMs: 60000,
-          nonceRateLimitTtlSeconds: 60,
-        });
+        assert.equal(value.deps.json, 'json');
+        assert.equal(value.deps.toStr, 'toStr');
+        assert.equal(value.deps.isAddress, 'isAddress');
+        assert.equal(value.deps.resolveWorkerBodySlugContext, 'resolveWorkerBodySlugContext');
+        assert.equal(value.deps.resolveExistingSessionCors, 'resolveExistingSessionCors');
+        assert.equal(value.deps.validateTrustedLoginRequestOrigin, 'validateTrustedLoginRequestOrigin');
+        assert.equal(value.deps.resolveTrustedAdminOrigins, 'resolveTrustedAdminOrigins');
+        assert.equal(value.deps.checkNonceRateLimit, 'checkNonceRateLimit');
+        assert.equal(value.deps.now, 'now');
+        assert.equal(value.deps.MISSING_SLUG_ERROR, 'Missing sessionSlug.');
+        assert.equal(value.deps.NONCE_TTL_SECONDS, 300);
+        assert.equal(value.deps.NONCE_RATE_LIMIT_MAX, 5);
+        assert.equal(value.deps.NONCE_RATE_LIMIT_WINDOW_MS, 60000);
+        assert.equal(value.deps.NONCE_RATE_LIMIT_TTL_SECONDS, 60);
+        assert.equal(value.deps.buildNonce(), 'nonce-built');
+        await value.deps.issueNonce(env, 'session-a', '0xabc', 'nonce-built', 300);
         return response;
       },
     },
@@ -325,40 +336,45 @@ test('createWorkerRouteShellWithWorkerDeps preserves auth-login branch wiring', 
       resolveTopLevelRouteSelection: () => ({ kind: 'auth-login' }),
       getRouteBaseHeaders: () => baseHeaders,
       getDefaultWorkerSessionSlug: () => 'env-slug',
-      dispatchAuthLoginRequestWithWorkerDeps: async (value) => {
+      consumeNonce: async (...args) => {
+        assert.deepEqual(args, [
+          env,
+          'session-a',
+          '0xabc',
+          'nonce-1',
+          { usedNonceTtlSeconds: 600 },
+        ]);
+        return 'consumeNonceResult';
+      },
+      dispatchAuthLoginRequest: async (value) => {
         assert.equal(value.request, request);
         assert.equal(value.env, env);
         assert.equal(value.baseHeaders, baseHeaders);
         assert.equal(value.slug, 'env-slug');
-        assert.deepEqual(value.deps, {
-          json: 'json',
-          normalizeSignedWorkerRequest: 'normalizeSignedWorkerRequest',
-          resolveWorkerBodySlugContext: 'resolveWorkerBodySlugContext',
-          isAddress: 'isAddress',
-          resolveExistingSessionCors: 'resolveExistingSessionCors',
-          verifyMessage: 'verifyMessage',
-          validateRecoveredAddressMatchesRequest: 'validateRecoveredAddressMatchesRequest',
-          parseSiweMessage: 'parseSiweMessage',
-          validateSiwe: 'validateSiwe',
-          validateBrowserLoginOrigin: 'validateBrowserLoginOrigin',
-          resolveTrustedAdminOrigins: 'resolveTrustedAdminOrigins',
-          validateSiweAddressMatchesRequest: 'validateSiweAddressMatchesRequest',
-          consumeNonce: 'consumeNonce',
-          computeScopesForLogin: 'computeScopesForLogin',
-          signToken: 'signToken',
-          getAddress: 'getAddress',
-          buildAuthTokenJti: 'buildAuthTokenJti',
-          persistAuthTokenRecord: 'persistAuthTokenRecord',
-          now: 'now',
-        });
-        assert.deepEqual(value.constants, {
-          usedNonceTtlSeconds: 600,
-          tokenTtlSeconds: 86400,
-          loginSiweMaxAgeMs: 300000,
-          loginSiweFutureSkewMs: 60000,
-          missingSlugError: 'Missing sessionSlug.',
-          sessionConfigNotFoundError: 'Session config not found.',
-        });
+        assert.equal(value.deps.json, 'json');
+        assert.equal(value.deps.normalizeSignedWorkerRequest, 'normalizeSignedWorkerRequest');
+        assert.equal(value.deps.resolveWorkerBodySlugContext, 'resolveWorkerBodySlugContext');
+        assert.equal(value.deps.isAddress, 'isAddress');
+        assert.equal(value.deps.resolveExistingSessionCors, 'resolveExistingSessionCors');
+        assert.equal(value.deps.verifyMessage, 'verifyMessage');
+        assert.equal(value.deps.validateRecoveredAddressMatchesRequest, 'validateRecoveredAddressMatchesRequest');
+        assert.equal(value.deps.parseSiweMessage, 'parseSiweMessage');
+        assert.equal(value.deps.validateSiwe, 'validateSiwe');
+        assert.equal(value.deps.validateBrowserLoginOrigin, 'validateBrowserLoginOrigin');
+        assert.equal(value.deps.resolveTrustedAdminOrigins, 'resolveTrustedAdminOrigins');
+        assert.equal(value.deps.validateSiweAddressMatchesRequest, 'validateSiweAddressMatchesRequest');
+        assert.equal(value.deps.computeScopesForLogin, 'computeScopesForLogin');
+        assert.equal(value.deps.signToken, 'signToken');
+        assert.equal(value.deps.getAddress, 'getAddress');
+        assert.equal(value.deps.buildAuthTokenJti, 'buildAuthTokenJti');
+        assert.equal(value.deps.persistAuthTokenRecord, 'persistAuthTokenRecord');
+        assert.equal(value.deps.now, 'now');
+        assert.equal(value.deps.LOGIN_SIWE_MAX_AGE_MS, 300000);
+        assert.equal(value.deps.LOGIN_SIWE_FUTURE_SKEW_MS, 60000);
+        assert.equal(value.deps.TOKEN_TTL_SECONDS, 86400);
+        assert.equal(value.deps.MISSING_SLUG_ERROR, 'Missing sessionSlug.');
+        assert.equal(value.deps.SESSION_CONFIG_NOT_FOUND_ERROR, 'Session config not found.');
+        assert.equal(await value.deps.consumeNonce(env, 'session-a', '0xabc', 'nonce-1'), 'consumeNonceResult');
         return response;
       },
     },
@@ -374,45 +390,57 @@ test('createWorkerRouteShellWithWorkerDeps preserves bootstrap arweave handled s
   const request = createRequest('/arweave/upload');
   const env = { GROUP_KV: { id: 'kv' } };
   const response = new Response('bootstrap');
+  const warnings = [];
 
   const routeShell = createWorkerRouteShellWithWorkerDeps({
     deps: {
       ...createBaseDeps(),
-      log: 'routeLog',
+      log: {
+        warn: (...args) => warnings.push(args),
+      },
       resolveTopLevelRouteSelection: () => ({
         kind: 'arweave-upload',
         hasAuthorizationHeader: true,
       }),
       getRouteBaseHeaders: () => ({ 'Access-Control-Allow-Origin': 'https://allowed.example' }),
       getDefaultWorkerSessionSlug: () => 'env-slug',
-      dispatchBootstrapArweaveUploadWithWorkerDeps: async (value) => {
+      dispatchBootstrapArweaveUpload: async (value) => {
         assert.equal(value.request, request);
-        assert.equal(value.env, env);
         assert.equal(value.hasAuthorization, true);
-        assert.deepEqual(value.deps, {
-          log: 'routeLog',
-          corsHeaders: 'corsHeaders',
-          readArweaveBootstrapUploadPayload: 'readArweaveBootstrapUploadPayload',
-          resolveWorkerBodySlugContext: 'resolveWorkerBodySlugContext',
-          json: 'json',
-          getSessionConfig: 'getSessionConfig',
-          getCorsContext: 'getCorsContext',
-          verifyAdminSignature: 'verifyAdminSignature',
-          getSessionSecrets: 'getSessionSecrets',
-          arweaveUpload: 'arweaveUpload',
-          storageRoute: 'storageRoute',
+        assert.equal(value.deps.corsHeaders, 'corsHeaders');
+        assert.equal(value.deps.readArweaveBootstrapUploadPayload, 'readArweaveBootstrapUploadPayload');
+        assert.equal(value.deps.json, 'json');
+        assert.equal(value.deps.MISSING_SLUG_ERROR, 'Missing sessionSlug.');
+        assert.equal(
+          value.deps.BOOTSTRAP_SESSION_CONFIG_REQUIRED_ERROR,
+          'Session config not found. Provide arweaveJwk for bootstrap uploads or register session config first.',
+        );
+        assert.equal(value.deps.getCorsContext, 'getCorsContext');
+        value.deps.logBootstrapPayload({
+          requestId: 'bootstrap-1',
+          body: {
+            address: '0xabc',
+            message: 'message',
+            signature: 'sig',
+            sessionSlug: 'session-a',
+            groupSlug: 'legacy-a',
+          },
         });
-        assert.deepEqual(value.constants, {
-          missingSlugError: 'Missing sessionSlug.',
-          bootstrapSessionConfigRequiredError:
-            'Session config not found. Provide arweaveJwk for bootstrap uploads or register session config first.',
+        value.deps.logBootstrapConfigMissing({
+          targetSlug: 'session-a',
+          requestId: 'bootstrap-2',
+        });
+        value.deps.logBootstrapCorsReject({
+          requestId: 'bootstrap-3',
+          targetSlug: 'session-a',
+          allowOrigins: ['https://allowed.example'],
         });
         return {
           handled: true,
           response,
         };
       },
-      dispatchAuthenticatedRouteEntryWithWorkerDeps: async () => {
+      dispatchAuthenticatedRouteEntry: async () => {
         assert.fail('authenticated fallback should not run when bootstrap handled the upload');
       },
     },
@@ -422,6 +450,18 @@ test('createWorkerRouteShellWithWorkerDeps preserves bootstrap arweave handled s
   const result = await routeShell.fetch(request, env);
 
   assert.equal(result, response);
+  assert.deepEqual(warnings, [
+    ['[arweave] bootstrap config missing', {
+      targetSlug: 'session-a',
+      requestId: 'bootstrap-2',
+    }],
+    ['[arweave] cors reject', {
+      requestId: 'bootstrap-3',
+      origin: '',
+      targetSlug: 'session-a',
+      allowOrigins: ['https://allowed.example'],
+    }],
+  ]);
 });
 
 test('createWorkerRouteShellWithWorkerDeps preserves admin and anonymous branch handoff', async (t) => {
@@ -440,38 +480,43 @@ test('createWorkerRouteShellWithWorkerDeps preserves admin and anonymous branch 
         }),
         getRouteBaseHeaders: () => baseHeaders,
         getDefaultWorkerSessionSlug: () => 'env-slug',
-        dispatchAdminRequestWithWorkerDeps: async (value) => {
+        consumeNonce: async (...args) => {
+          assert.deepEqual(args, [
+            env,
+            'session-a',
+            '0xabc',
+            'nonce-1',
+            { usedNonceTtlSeconds: 600 },
+          ]);
+          return 'consumeNonceResult';
+        },
+        dispatchAdminRequest: async (value) => {
           assert.equal(value.request, request);
           assert.equal(value.env, env);
           assert.equal(value.baseHeaders, baseHeaders);
           assert.equal(value.slug, 'env-slug');
           assert.equal(value.action, 'set-config');
-          assert.deepEqual(value.deps, {
-            json: 'json',
-            normalizeSignedWorkerRequest: 'normalizeSignedWorkerRequest',
-            resolveWorkerBodySlugContext: 'resolveWorkerBodySlugContext',
-            isAddress: 'isAddress',
-            getAddress: 'getAddress',
-            resolveExistingSessionCors: 'resolveExistingSessionCors',
-            verifyMessage: 'verifyMessage',
-            validateRecoveredAddressMatchesRequest: 'validateRecoveredAddressMatchesRequest',
-            parseSiweMessage: 'parseSiweMessage',
-            validateSiwe: 'validateSiwe',
-            validateSiweAddressMatchesRequest: 'validateSiweAddressMatchesRequest',
-            consumeNonce: 'consumeNonce',
-            validateBootstrapAdmin: 'validateBootstrapAdmin',
-            validateAdmin: 'validateAdmin',
-            mergeWorkerConfigRecords: 'mergeWorkerConfigRecords',
-            mergeWorkerLimitRecords: 'mergeWorkerLimitRecords',
-            putSessionConfig: 'putSessionConfig',
-            getSessionSecrets: 'getSessionSecrets',
-            normalizeSecretValue: 'normalizeSecretValue',
-            putSessionSecrets: 'putSessionSecrets',
-          });
-          assert.deepEqual(value.constants, {
-            usedNonceTtlSeconds: 600,
-            missingSlugError: 'Missing sessionSlug.',
-          });
+          assert.equal(value.deps.json, 'json');
+          assert.equal(value.deps.normalizeSignedWorkerRequest, 'normalizeSignedWorkerRequest');
+          assert.equal(value.deps.resolveWorkerBodySlugContext, 'resolveWorkerBodySlugContext');
+          assert.equal(value.deps.isAddress, 'isAddress');
+          assert.equal(value.deps.getAddress, 'getAddress');
+          assert.equal(value.deps.resolveExistingSessionCors, 'resolveExistingSessionCors');
+          assert.equal(value.deps.verifyMessage, 'verifyMessage');
+          assert.equal(value.deps.validateRecoveredAddressMatchesRequest, 'validateRecoveredAddressMatchesRequest');
+          assert.equal(value.deps.parseSiweMessage, 'parseSiweMessage');
+          assert.equal(value.deps.validateSiwe, 'validateSiwe');
+          assert.equal(value.deps.validateSiweAddressMatchesRequest, 'validateSiweAddressMatchesRequest');
+          assert.equal(value.deps.validateBootstrapAdmin, 'validateBootstrapAdmin');
+          assert.equal(value.deps.validateAdmin, 'validateAdmin');
+          assert.equal(value.deps.mergeWorkerConfigRecords, 'mergeWorkerConfigRecords');
+          assert.equal(value.deps.mergeWorkerLimitRecords, 'mergeWorkerLimitRecords');
+          assert.equal(value.deps.putSessionConfig, 'putSessionConfig');
+          assert.equal(value.deps.getSessionSecrets, 'getSessionSecrets');
+          assert.equal(value.deps.normalizeSecretValue, 'normalizeSecretValue');
+          assert.equal(value.deps.putSessionSecrets, 'putSessionSecrets');
+          assert.equal(value.deps.MISSING_SLUG_ERROR, 'Missing sessionSlug.');
+          assert.equal(await value.deps.consumeNonce(env, 'session-a', '0xabc', 'nonce-1'), 'consumeNonceResult');
           return response;
         },
       },
@@ -498,41 +543,56 @@ test('createWorkerRouteShellWithWorkerDeps preserves admin and anonymous branch 
         }),
         getRouteBaseHeaders: () => baseHeaders,
         getDefaultWorkerSessionSlug: () => 'env-slug',
-        dispatchAnonymousRouteEntryWithWorkerDeps: async (value) => {
+        getSessionSecrets: async (receivedEnv, slug) => {
+          assert.equal(receivedEnv, env);
+          assert.equal(slug, 'session-a');
+          return { openaiKey: 'sk-worker' };
+        },
+        dispatchAnonymousRouteEntry: async (value) => {
           assert.equal(value.path, '/ai');
           assert.equal(value.anonymousRoute, 'ai');
           assert.equal(value.request, request);
           assert.equal(value.env, env);
           assert.equal(value.slugHint, 'env-slug');
           assert.equal(value.baseHeaders, baseHeaders);
-          assert.deepEqual(value.deps, {
-            resolveRequestSlugWithoutToken: 'resolveRequestSlugWithoutToken',
-            json: 'json',
-            getSessionConfig: 'getSessionConfig',
-            getCorsContext: 'getCorsContext',
-            resolveAnonymousRateIdentity: 'resolveAnonymousRateIdentity',
-            checkRateLimit: 'checkRateLimit',
-            dispatchAnonymousRoute: 'dispatchAnonymousRoute',
-            storageRoute: 'storageRoute',
-            readTranscribeRequestPayload: 'readTranscribeRequestPayload',
-            evaluateAnonymousRouteAccess: 'evaluateAnonymousRouteAccess',
-            getSessionSecrets: 'getSessionSecrets',
-            transcribe: 'transcribe',
-            readAiRequestPayload: 'readAiRequestPayload',
-            validateAnonymousAiRequest: 'validateAnonymousAiRequest',
-            proxyAnthropic: 'proxyAnthropic',
-            proxyOpenAI: 'proxyOpenAI',
-            proxyOpenRouter: 'proxyOpenRouter',
-            proxyCustomRPC: 'proxyCustomRPC',
-            now: 'now',
+          assert.equal(value.deps.resolveRequestSlugWithoutToken, 'resolveRequestSlugWithoutToken');
+          assert.equal(value.deps.json, 'json');
+          assert.equal(value.deps.MISSING_SLUG_ERROR, 'Missing sessionSlug.');
+          assert.equal(value.deps.getSessionConfig, 'getSessionConfig');
+          assert.equal(value.deps.SESSION_CONFIG_NOT_FOUND_ERROR, 'Session config not found.');
+          assert.equal(value.deps.getCorsContext, 'getCorsContext');
+          assert.equal(value.deps.resolveAnonymousRateIdentity, 'resolveAnonymousRateIdentity');
+          assert.equal(value.deps.checkRateLimit, 'checkRateLimit');
+          const dispatchResponse = await value.deps.dispatchAnonymousRoute({
+            path: '/ai',
+            request,
+            anonymousContext: { slug: 'session-a' },
           });
-          assert.deepEqual(value.constants, {
-            missingSlugError: 'Missing sessionSlug.',
-            sessionConfigNotFoundError: 'Session config not found.',
-            anonymousRouteDeniedError:
-              'Anonymous access denied: AI/transcribe require open default+ai gates or a request apiKey.',
-          });
+          assert.equal(dispatchResponse, 'anonymousDispatchResponse');
           return response;
+        },
+        dispatchAnonymousRoute: async (value) => {
+          assert.equal(value.path, '/ai');
+          assert.equal(value.request, request);
+          assert.deepEqual(value.anonymousContext, { slug: 'session-a' });
+          assert.equal(value.deps.storageRoute, 'storageRoute');
+          assert.equal(value.deps.readTranscribeRequestPayload, 'readTranscribeRequestPayload');
+          assert.equal(value.deps.evaluateAnonymousRouteAccess, 'evaluateAnonymousRouteAccess');
+          assert.deepEqual(await value.deps.getSessionSecrets('session-a'), { openaiKey: 'sk-worker' });
+          assert.equal(value.deps.transcribe, 'transcribe');
+          assert.equal(value.deps.readAiRequestPayload, 'readAiRequestPayload');
+          assert.equal(value.deps.validateAnonymousAiRequest, 'validateAnonymousAiRequest');
+          assert.equal(value.deps.proxyAnthropic, 'proxyAnthropic');
+          assert.equal(value.deps.proxyOpenAI, 'proxyOpenAI');
+          assert.equal(value.deps.proxyOpenRouter, 'proxyOpenRouter');
+          assert.equal(value.deps.proxyCustomRPC, 'proxyCustomRPC');
+          assert.equal(value.deps.json, 'json');
+          assert.equal(value.deps.now, 'now');
+          assert.equal(
+            value.deps.ANONYMOUS_ROUTE_DENIED_ERROR,
+            'Anonymous access denied: AI/transcribe require open default+ai gates or a request apiKey.',
+          );
+          return 'anonymousDispatchResponse';
         },
       },
       constants: createBaseConstants(),
@@ -560,47 +620,112 @@ test('createWorkerRouteShellWithWorkerDeps preserves authenticated fallback afte
       }),
       getRouteBaseHeaders: () => baseHeaders,
       getDefaultWorkerSessionSlug: () => 'env-slug',
-      dispatchBootstrapArweaveUploadWithWorkerDeps: async () => ({ handled: false }),
-      dispatchAuthenticatedRouteEntryWithWorkerDeps: async (value) => {
+      resolveAuthenticatedRouteContext: async (value) => {
+        assert.equal(value.request, request);
+        assert.equal(value.env, env);
+        assert.equal(value.baseHeaders, baseHeaders);
+        assert.equal(value.deps.getSessionConfig, 'getSessionConfig');
+        assert.equal(value.deps.getCorsContext, 'getCorsContext');
+        assert.equal(value.deps.json, 'json');
+        assert.equal(value.deps.toStr, 'toStr');
+        assert.equal(value.deps.SESSION_CONFIG_NOT_FOUND_ERROR, 'Session config not found.');
+        return 'contextResponse';
+      },
+      dispatchAuthenticatedRoute: async (value) => {
+        assert.equal(value.path, '/arweave/upload');
+        assert.equal(value.method, 'POST');
+        assert.equal(value.request, request);
+        assert.equal(value.authenticatedContext, 'authenticatedContext');
+        assert.equal(value.deps.readAuthenticatedActionPayload, 'readAuthenticatedActionPayload');
+        assert.equal(value.deps.json, 'json');
+        assert.equal(
+          await value.deps.dispatchAuthenticatedSecretPathRoute({ path: '/transcribe' }),
+          'secretPathResponse',
+        );
+        assert.equal(
+          await value.deps.dispatchAuthenticatedNonSecretActionRoute({ action: 'fetch_url' }),
+          'nonSecretResponse',
+        );
+        assert.equal(
+          await value.deps.dispatchAuthenticatedSecretActionRoute({ action: 'ai' }),
+          'secretActionResponse',
+        );
+        return 'dispatchResponse';
+      },
+      dispatchAuthenticatedSecretPathRoute: async (value) => {
+        assert.equal(value.env, env);
+        assert.equal(value.path, '/transcribe');
+        assert.equal(value.deps.evaluateAuthenticatedRoutePreflight, 'evaluateAuthenticatedRoutePreflight');
+        assert.equal(value.deps.computeScopesForLogin, 'computeScopesForLogin');
+        assert.equal(value.deps.resolveAuthenticatedRouteSecrets, 'resolveAuthenticatedRouteSecrets');
+        assert.equal(value.deps.checkRateLimit, 'checkRateLimit');
+        assert.equal(value.deps.getSessionSecrets, 'getSessionSecrets');
+        assert.equal(value.deps.json, 'json');
+        assert.equal(value.deps.isAddress, 'isAddress');
+        assert.equal(value.deps.getAddress, 'getAddress');
+        assert.equal(value.deps.transcribe, 'transcribe');
+        assert.equal(value.deps.arweaveUpload, 'arweaveUpload');
+        assert.equal(value.deps.storageRoute, 'storageRoute');
+        assert.equal(value.deps.now, 'now');
+        return 'secretPathResponse';
+      },
+      dispatchAuthenticatedNonSecretActionRoute: async (value) => {
+        assert.equal(value.env, env);
+        assert.equal(value.action, 'fetch_url');
+        assert.equal(value.deps.evaluateAuthenticatedRoutePreflight, 'evaluateAuthenticatedRoutePreflight');
+        assert.equal(value.deps.computeScopesForLogin, 'computeScopesForLogin');
+        assert.equal(value.deps.fetchImage, 'fetchImage');
+        assert.equal(value.deps.fetchUrl, 'fetchUrl');
+        assert.equal(value.deps.checkRateLimit, 'checkRateLimit');
+        assert.equal(value.deps.json, 'json');
+        assert.equal(value.deps.now, 'now');
+        return 'nonSecretResponse';
+      },
+      dispatchAuthenticatedSecretActionRoute: async (value) => {
+        assert.equal(value.env, env);
+        assert.equal(value.action, 'ai');
+        assert.equal(value.deps.evaluateAuthenticatedRoutePreflight, 'evaluateAuthenticatedRoutePreflight');
+        assert.equal(value.deps.computeScopesForLogin, 'computeScopesForLogin');
+        assert.equal(value.deps.resolveAuthenticatedRouteSecrets, 'resolveAuthenticatedRouteSecrets');
+        assert.equal(value.deps.normalizeAiRequestPayload, 'normalizeAiRequestPayload');
+        assert.equal(value.deps.proxyAnthropic, 'proxyAnthropic');
+        assert.equal(value.deps.proxyOpenAI, 'proxyOpenAI');
+        assert.equal(value.deps.proxyOpenRouter, 'proxyOpenRouter');
+        assert.equal(value.deps.proxyCustomRPC, 'proxyCustomRPC');
+        assert.equal(value.deps.faucet, 'faucet');
+        assert.equal(value.deps.checkRateLimit, 'checkRateLimit');
+        assert.equal(value.deps.getSessionSecrets, 'getSessionSecrets');
+        assert.equal(value.deps.json, 'json');
+        assert.equal(value.deps.toStr, 'toStr');
+        assert.equal(value.deps.now, 'now');
+        return 'secretActionResponse';
+      },
+      dispatchBootstrapArweaveUpload: async () => ({ handled: false }),
+      dispatchAuthenticatedRouteEntry: async (value) => {
         assert.equal(value.path, '/arweave/upload');
         assert.equal(value.method, 'POST');
         assert.equal(value.request, request);
         assert.equal(value.env, env);
         assert.equal(value.baseHeaders, baseHeaders);
-        assert.deepEqual(value.deps, {
-          json: 'json',
-          requireAuth: 'requireAuth',
-          getSessionConfig: 'getSessionConfig',
-          getCorsContext: 'getCorsContext',
-          computeScopesForLogin: 'computeScopesForLogin',
-          toStr: 'toStr',
-          dispatchAuthenticatedRoute: 'dispatchAuthenticatedRoute',
-          dispatchAuthenticatedSecretPathRoute: 'dispatchAuthenticatedSecretPathRoute',
-          readAuthenticatedActionPayload: 'readAuthenticatedActionPayload',
-          dispatchAuthenticatedNonSecretActionRoute: 'dispatchAuthenticatedNonSecretActionRoute',
-          dispatchAuthenticatedSecretActionRoute: 'dispatchAuthenticatedSecretActionRoute',
-          evaluateAuthenticatedRoutePreflight: 'evaluateAuthenticatedRoutePreflight',
-          resolveAuthenticatedRouteSecrets: 'resolveAuthenticatedRouteSecrets',
-          checkRateLimit: 'checkRateLimit',
-          getSessionSecrets: 'getSessionSecrets',
-          isAddress: 'isAddress',
-          getAddress: 'getAddress',
-          transcribe: 'transcribe',
-          arweaveUpload: 'arweaveUpload',
-          storageRoute: 'storageRoute',
-          fetchImage: 'fetchImage',
-          fetchUrl: 'fetchUrl',
-          now: 'now',
-          normalizeAiRequestPayload: 'normalizeAiRequestPayload',
-          proxyAnthropic: 'proxyAnthropic',
-          proxyOpenAI: 'proxyOpenAI',
-          proxyOpenRouter: 'proxyOpenRouter',
-          proxyCustomRPC: 'proxyCustomRPC',
-          faucet: 'faucet',
-        });
-        assert.deepEqual(value.constants, {
-          sessionConfigNotFoundError: 'Session config not found.',
-        });
+        assert.equal(value.deps.json, 'json');
+        assert.equal(value.deps.requireAuth, 'requireAuth');
+        assert.equal(
+          await value.deps.resolveAuthenticatedRouteContext({
+            request,
+            env,
+            baseHeaders,
+          }),
+          'contextResponse',
+        );
+        assert.equal(
+          await value.deps.dispatchAuthenticatedRoute({
+            path: '/arweave/upload',
+            method: 'POST',
+            request,
+            authenticatedContext: 'authenticatedContext',
+          }),
+          'dispatchResponse',
+        );
         return response;
       },
     },
@@ -630,7 +755,7 @@ test('createWorkerRouteShellWithWorkerDeps converts unhandled route errors into 
       }),
       getRouteBaseHeaders: () => baseHeaders,
       getDefaultWorkerSessionSlug: () => 'env-slug',
-      dispatchAdminRequestWithWorkerDeps: async () => {
+      dispatchAdminRequest: async () => {
         throw new Error('Simulated admin crash');
       },
     },

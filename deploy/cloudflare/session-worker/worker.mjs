@@ -69862,50 +69862,6 @@ var verifyAdminSignature = async ({
   };
 };
 
-// workers/sessionCorsWorker/adminSignatureVerificationBinding.js
-var createVerifyAdminSignatureWithWorkerDeps = ({
-  deps,
-  constants
-} = {}) => (async ({
-  env,
-  baseHeaders,
-  slugHint,
-  body,
-  config,
-  allowBootstrapWithoutConfig = false
-} = {}) => (deps?.verifyAdminSignature || verifyAdminSignature)({
-  env,
-  baseHeaders,
-  slugHint,
-  body,
-  config,
-  allowBootstrapWithoutConfig,
-  deps: {
-    normalizeSignedWorkerRequest: deps?.normalizeSignedWorkerRequest,
-    resolveWorkerBodySlugContext: deps?.resolveWorkerBodySlugContext,
-    toStr: deps?.toStr,
-    isAddress: deps?.isAddress,
-    json: deps?.json,
-    verifyMessage: deps?.verifyMessage,
-    validateRecoveredAddressMatchesRequest: deps?.validateRecoveredAddressMatchesRequest,
-    parseSiweMessage: deps?.parseSiweMessage,
-    validateSiwe: deps?.validateSiwe,
-    validateSiweAddressMatchesRequest: deps?.validateSiweAddressMatchesRequest,
-    consumeNonce: (envArg, slugArg, addressArg, nonceArg) => deps?.consumeNonce?.(
-      envArg,
-      slugArg,
-      addressArg,
-      nonceArg,
-      { usedNonceTtlSeconds: constants?.usedNonceTtlSeconds }
-    ),
-    validateAdmin: deps?.validateAdmin,
-    log: (...args) => (deps?.log || console.log)(...args),
-    MISSING_SLUG_ERROR: constants?.missingSlugError,
-    SLUG_ALIAS_MISMATCH_ERROR: constants?.slugAliasMismatchError,
-    SLUG_MISMATCH_ERROR: constants?.slugMismatchError
-  }
-}));
-
 // workers/sessionCorsWorker/transcribeRequestNormalization.js
 var MISSING_TRANSCRIBE_FILE_ERROR = 'Missing file (use field "file"; "audio" also accepted).';
 var MISSING_TRANSCRIBE_RPC_URL_ERROR = "Missing rpcUrl for custom transcription.";
@@ -72233,7 +72189,21 @@ var createWorkerExecutionServicesWithWorkerDeps = ({
       checkSbtGate: deps?.checkSbtGate
     }
   });
-  const verifyAdminSignature2 = (deps?.createVerifyAdminSignatureWithWorkerDeps || createVerifyAdminSignatureWithWorkerDeps)({
+  const verifyAdminSignatureExecution = deps?.verifyAdminSignature || verifyAdminSignature;
+  const verifyAdminSignature2 = async ({
+    env,
+    baseHeaders,
+    slugHint,
+    body,
+    config,
+    allowBootstrapWithoutConfig = false
+  } = {}) => verifyAdminSignatureExecution({
+    env,
+    baseHeaders,
+    slugHint,
+    body,
+    config,
+    allowBootstrapWithoutConfig,
     deps: {
       normalizeSignedWorkerRequest: deps?.normalizeSignedWorkerRequest,
       resolveWorkerBodySlugContext: deps?.resolveWorkerBodySlugContext,
@@ -72245,15 +72215,18 @@ var createWorkerExecutionServicesWithWorkerDeps = ({
       parseSiweMessage: deps?.parseSiweMessage,
       validateSiwe: deps?.validateSiwe,
       validateSiweAddressMatchesRequest: deps?.validateSiweAddressMatchesRequest,
-      consumeNonce: deps?.consumeNonce,
+      consumeNonce: (envArg, slugArg, addressArg, nonceArg) => deps?.consumeNonce?.(
+        envArg,
+        slugArg,
+        addressArg,
+        nonceArg,
+        { usedNonceTtlSeconds: constants?.usedNonceTtlSeconds }
+      ),
       validateAdmin: deps?.validateAdmin,
-      log: workerLog
-    },
-    constants: {
-      usedNonceTtlSeconds: constants?.usedNonceTtlSeconds,
-      missingSlugError: constants?.missingSlugError,
-      slugAliasMismatchError: constants?.slugAliasMismatchError,
-      slugMismatchError: constants?.slugMismatchError
+      log: workerLog,
+      MISSING_SLUG_ERROR: constants?.missingSlugError,
+      SLUG_ALIAS_MISMATCH_ERROR: constants?.slugAliasMismatchError,
+      SLUG_MISMATCH_ERROR: constants?.slugMismatchError
     }
   });
   return {
@@ -72710,58 +72683,6 @@ var dispatchAnonymousRoute = async ({
   return deps?.json?.({ error: `Unsupported provider: ${provider}` }, 400, headers);
 };
 
-// workers/sessionCorsWorker/anonymousRouteEntryBinding.js
-var dispatchAnonymousRouteEntryWithWorkerDeps = async ({
-  path,
-  anonymousRoute,
-  request,
-  env,
-  slugHint,
-  baseHeaders,
-  deps,
-  constants
-} = {}) => (deps?.dispatchAnonymousRouteEntry || dispatchAnonymousRouteEntry)({
-  path,
-  anonymousRoute,
-  request,
-  env,
-  slugHint,
-  baseHeaders,
-  deps: {
-    resolveRequestSlugWithoutToken: deps?.resolveRequestSlugWithoutToken,
-    json: deps?.json,
-    MISSING_SLUG_ERROR: constants?.missingSlugError,
-    getSessionConfig: deps?.getSessionConfig,
-    SESSION_CONFIG_NOT_FOUND_ERROR: constants?.sessionConfigNotFoundError,
-    getCorsContext: deps?.getCorsContext,
-    resolveAnonymousRateIdentity: deps?.resolveAnonymousRateIdentity,
-    checkRateLimit: deps?.checkRateLimit,
-    dispatchAnonymousRoute: (value) => {
-      const dispatchAnonymousRoute2 = deps?.dispatchAnonymousRoute || dispatchAnonymousRoute;
-      return dispatchAnonymousRoute2({
-        ...value,
-        deps: {
-          storageRoute: deps?.storageRoute,
-          dispatchPublicWorkerGroupListRequest: deps?.dispatchPublicWorkerGroupListRequest,
-          readTranscribeRequestPayload: deps?.readTranscribeRequestPayload,
-          evaluateAnonymousRouteAccess: deps?.evaluateAnonymousRouteAccess,
-          getSessionSecrets: (sessionSlug) => deps?.getSessionSecrets?.(env, sessionSlug),
-          transcribe: deps?.transcribe,
-          readAiRequestPayload: deps?.readAiRequestPayload,
-          validateAnonymousAiRequest: deps?.validateAnonymousAiRequest,
-          proxyAnthropic: deps?.proxyAnthropic,
-          proxyOpenAI: deps?.proxyOpenAI,
-          proxyOpenRouter: deps?.proxyOpenRouter,
-          proxyCustomRPC: deps?.proxyCustomRPC,
-          json: deps?.json,
-          now: deps?.now,
-          ANONYMOUS_ROUTE_DENIED_ERROR: constants?.anonymousRouteDeniedError
-        }
-      });
-    }
-  }
-});
-
 // workers/sessionCorsWorker/authenticatedRouteEntry.js
 var dispatchAuthenticatedRouteEntry = async ({
   path,
@@ -72919,98 +72840,6 @@ var resolveAuthenticatedRouteContext = async ({
     limit: config?.limits?.perWalletPerDay || 0
   };
 };
-
-// workers/sessionCorsWorker/authenticatedRouteEntryBinding.js
-var dispatchAuthenticatedRouteEntryWithWorkerDeps = async ({
-  path,
-  method,
-  request,
-  env,
-  baseHeaders,
-  deps,
-  constants
-} = {}) => (deps?.dispatchAuthenticatedRouteEntry || dispatchAuthenticatedRouteEntry)({
-  path,
-  method,
-  request,
-  env,
-  baseHeaders,
-  deps: {
-    json: deps?.json,
-    requireAuth: deps?.requireAuth,
-    resolveAuthenticatedRouteContext: (value) => (deps?.resolveAuthenticatedRouteContext || resolveAuthenticatedRouteContext)({
-      ...value,
-      deps: {
-        getSessionConfig: deps?.getSessionConfig,
-        getCorsContext: deps?.getCorsContext,
-        json: deps?.json,
-        toStr: deps?.toStr,
-        SESSION_CONFIG_NOT_FOUND_ERROR: constants?.sessionConfigNotFoundError
-      }
-    }),
-    dispatchAuthenticatedRoute: (value) => {
-      const dispatchAuthenticatedRoute2 = deps?.dispatchAuthenticatedRoute || dispatchAuthenticatedRoute;
-      return dispatchAuthenticatedRoute2({
-        ...value,
-        deps: {
-          dispatchAuthenticatedSecretPathRoute: (routeValue) => deps?.dispatchAuthenticatedSecretPathRoute?.({
-            ...routeValue,
-            env,
-            deps: {
-              evaluateAuthenticatedRoutePreflight: deps?.evaluateAuthenticatedRoutePreflight,
-              computeScopesForLogin: deps?.computeScopesForLogin,
-              resolveAuthenticatedRouteSecrets: deps?.resolveAuthenticatedRouteSecrets,
-              checkRateLimit: deps?.checkRateLimit,
-              getSessionSecrets: deps?.getSessionSecrets,
-              json: deps?.json,
-              isAddress: deps?.isAddress,
-              getAddress: deps?.getAddress,
-              transcribe: deps?.transcribe,
-              arweaveUpload: deps?.arweaveUpload,
-              storageRoute: deps?.storageRoute,
-              now: deps?.now
-            }
-          }),
-          readAuthenticatedActionPayload: deps?.readAuthenticatedActionPayload,
-          dispatchAuthenticatedNonSecretActionRoute: (routeValue) => deps?.dispatchAuthenticatedNonSecretActionRoute?.({
-            ...routeValue,
-            env,
-            deps: {
-              evaluateAuthenticatedRoutePreflight: deps?.evaluateAuthenticatedRoutePreflight,
-              computeScopesForLogin: deps?.computeScopesForLogin,
-              fetchImage: deps?.fetchImage,
-              fetchUrl: deps?.fetchUrl,
-              checkRateLimit: deps?.checkRateLimit,
-              json: deps?.json,
-              now: deps?.now
-            }
-          }),
-          dispatchAuthenticatedSecretActionRoute: (routeValue) => deps?.dispatchAuthenticatedSecretActionRoute?.({
-            ...routeValue,
-            env,
-            deps: {
-              evaluateAuthenticatedRoutePreflight: deps?.evaluateAuthenticatedRoutePreflight,
-              computeScopesForLogin: deps?.computeScopesForLogin,
-              resolveAuthenticatedRouteSecrets: deps?.resolveAuthenticatedRouteSecrets,
-              normalizeAiRequestPayload: deps?.normalizeAiRequestPayload,
-              proxyAnthropic: deps?.proxyAnthropic,
-              proxyOpenAI: deps?.proxyOpenAI,
-              proxyOpenRouter: deps?.proxyOpenRouter,
-              proxyCustomRPC: deps?.proxyCustomRPC,
-              faucet: deps?.faucet,
-              checkRateLimit: deps?.checkRateLimit,
-              getSessionSecrets: deps?.getSessionSecrets,
-              json: deps?.json,
-              toStr: deps?.toStr,
-              now: deps?.now
-            }
-          }),
-          json: deps?.json
-        }
-      });
-    }
-  }
-});
 
 // workers/sessionCorsWorker/adminRequestAuthority.js
 var toTrimmedString14 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
@@ -75128,56 +74957,6 @@ var dispatchAdminRequest = async ({
   return deps?.json?.({ error: "Unknown admin action." }, 400, headers);
 };
 
-// workers/sessionCorsWorker/adminRequestBinding.js
-var dispatchAdminRequestWithWorkerDeps = async ({
-  request,
-  env,
-  baseHeaders,
-  slug,
-  action,
-  deps,
-  constants
-} = {}) => (deps?.dispatchAdminRequest || dispatchAdminRequest)({
-  request,
-  env,
-  baseHeaders,
-  slug,
-  action,
-  deps: {
-    json: deps?.json,
-    normalizeSignedWorkerRequest: deps?.normalizeSignedWorkerRequest,
-    resolveWorkerBodySlugContext: deps?.resolveWorkerBodySlugContext,
-    isAddress: deps?.isAddress,
-    getAddress: deps?.getAddress,
-    resolveExistingSessionCors: deps?.resolveExistingSessionCors,
-    verifyMessage: deps?.verifyMessage,
-    validateRecoveredAddressMatchesRequest: deps?.validateRecoveredAddressMatchesRequest,
-    parseSiweMessage: deps?.parseSiweMessage,
-    validateSiwe: deps?.validateSiwe,
-    validateSiweAddressMatchesRequest: deps?.validateSiweAddressMatchesRequest,
-    consumeNonce: (envArg, slugArg, addressArg, nonceArg) => deps?.consumeNonce?.(
-      envArg,
-      slugArg,
-      addressArg,
-      nonceArg,
-      {
-        usedNonceTtlSeconds: constants?.usedNonceTtlSeconds,
-        ...deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {}
-      }
-    ),
-    validateBootstrapAdmin: deps?.validateBootstrapAdmin,
-    validateAdmin: deps?.validateAdmin,
-    mergeWorkerConfigRecords: deps?.mergeWorkerConfigRecords,
-    mergeWorkerLimitRecords: deps?.mergeWorkerLimitRecords,
-    putSessionConfig: deps?.putSessionConfig,
-    getSessionSecrets: deps?.getSessionSecrets,
-    normalizeSecretValue: deps?.normalizeSecretValue,
-    putSessionSecrets: deps?.putSessionSecrets,
-    ...deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {},
-    MISSING_SLUG_ERROR: constants?.missingSlugError
-  }
-});
-
 // workers/sessionCorsWorker/adminAbuseSummaryDispatch.js
 var toTrimmedString17 = (value, deps) => {
   if (typeof deps?.toStr === "function") return deps.toStr(value).trim();
@@ -75796,101 +75575,6 @@ var checkNonceRateLimit = async ({
   return { ok: true };
 };
 
-// workers/sessionCorsWorker/authRequestBinding.js
-var dispatchAuthNonceRequestWithWorkerDeps = async ({
-  request,
-  env,
-  baseHeaders,
-  slug,
-  deps,
-  constants
-} = {}) => (deps?.dispatchAuthNonceRequest || dispatchAuthNonceRequest)({
-  request,
-  env,
-  baseHeaders,
-  slug,
-  deps: {
-    json: deps?.json,
-    toStr: deps?.toStr,
-    isAddress: deps?.isAddress,
-    resolveWorkerBodySlugContext: deps?.resolveWorkerBodySlugContext,
-    resolveExistingSessionCors: deps?.resolveExistingSessionCors,
-    validateTrustedLoginRequestOrigin: deps?.validateTrustedLoginRequestOrigin,
-    resolveTrustedAdminOrigins: deps?.resolveTrustedAdminOrigins,
-    checkNonceRateLimit: deps?.checkNonceRateLimit,
-    ...deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {},
-    now: deps?.now,
-    buildNonce: () => deps?.buildNonce?.({
-      base64UrlEncode: deps?.base64UrlEncode
-    }),
-    issueNonce: (currentEnv, slugArg, addressArg, nonceArg, ttl) => (deps?.issueNonce || issueNonce)(
-      currentEnv,
-      slugArg,
-      addressArg,
-      nonceArg,
-      ttl,
-      {
-        usedNonceTtlSeconds: constants?.usedNonceTtlSeconds,
-        now: deps?.now
-      }
-    ),
-    MISSING_SLUG_ERROR: constants?.missingSlugError,
-    NONCE_TTL_SECONDS: constants?.nonceTtlSeconds,
-    NONCE_RATE_LIMIT_MAX: constants?.nonceRateLimitMax,
-    NONCE_RATE_LIMIT_WINDOW_MS: constants?.nonceRateLimitWindowMs,
-    NONCE_RATE_LIMIT_TTL_SECONDS: constants?.nonceRateLimitTtlSeconds
-  }
-});
-var dispatchAuthLoginRequestWithWorkerDeps = async ({
-  request,
-  env,
-  baseHeaders,
-  slug,
-  deps,
-  constants
-} = {}) => (deps?.dispatchAuthLoginRequest || dispatchAuthLoginRequest)({
-  request,
-  env,
-  baseHeaders,
-  slug,
-  deps: {
-    json: deps?.json,
-    normalizeSignedWorkerRequest: deps?.normalizeSignedWorkerRequest,
-    resolveWorkerBodySlugContext: deps?.resolveWorkerBodySlugContext,
-    isAddress: deps?.isAddress,
-    resolveExistingSessionCors: deps?.resolveExistingSessionCors,
-    verifyMessage: deps?.verifyMessage,
-    validateRecoveredAddressMatchesRequest: deps?.validateRecoveredAddressMatchesRequest,
-    parseSiweMessage: deps?.parseSiweMessage,
-    validateSiwe: deps?.validateSiwe,
-    validateBrowserLoginOrigin: deps?.validateBrowserLoginOrigin,
-    resolveTrustedAdminOrigins: deps?.resolveTrustedAdminOrigins,
-    validateSiweAddressMatchesRequest: deps?.validateSiweAddressMatchesRequest,
-    consumeNonce: (envArg, slugArg, addressArg, nonceArg) => deps?.consumeNonce?.(
-      envArg,
-      slugArg,
-      addressArg,
-      nonceArg,
-      {
-        usedNonceTtlSeconds: constants?.usedNonceTtlSeconds,
-        ...deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {}
-      }
-    ),
-    computeScopesForLogin: deps?.computeScopesForLogin,
-    signToken: deps?.signToken,
-    getAddress: deps?.getAddress,
-    buildAuthTokenJti: deps?.buildAuthTokenJti,
-    persistAuthTokenRecord: deps?.persistAuthTokenRecord,
-    ...deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {},
-    now: deps?.now,
-    LOGIN_SIWE_MAX_AGE_MS: constants?.loginSiweMaxAgeMs,
-    LOGIN_SIWE_FUTURE_SKEW_MS: constants?.loginSiweFutureSkewMs,
-    TOKEN_TTL_SECONDS: constants?.tokenTtlSeconds,
-    MISSING_SLUG_ERROR: constants?.missingSlugError,
-    SESSION_CONFIG_NOT_FOUND_ERROR: constants?.sessionConfigNotFoundError
-  }
-});
-
 // workers/sessionCorsWorker/routeBaseHeaders.js
 var getRouteBaseHeaders = ({
   request,
@@ -75996,64 +75680,6 @@ var dispatchBootstrapArweaveUpload = async ({
       uploaderAddress: adminCheck?.address || ""
     })
   };
-};
-
-// workers/sessionCorsWorker/bootstrapArweaveUploadBinding.js
-var dispatchBootstrapArweaveUploadWithWorkerDeps = async ({
-  request,
-  env,
-  hasAuthorization,
-  deps,
-  constants
-} = {}) => {
-  const log2 = typeof deps?.log === "function" ? deps.log : () => {
-  };
-  const warn = (typeof deps?.log?.warn === "function" ? deps.log.warn : null) || (typeof deps?.warn === "function" ? deps.warn : null) || (typeof deps?.log === "function" ? deps.log : null) || console.warn;
-  const origin = request?.headers?.get?.("Origin") || "";
-  const contentType = request?.headers?.get?.("content-type") || "";
-  log2("[arweave] request", {
-    url: request?.url,
-    hasAuthHeader: !!hasAuthorization,
-    origin,
-    contentType,
-    cfRay: request?.headers?.get?.("CF-Ray") || "",
-    ua: request?.headers?.get?.("User-Agent") || ""
-  });
-  return (deps?.dispatchBootstrapArweaveUpload || dispatchBootstrapArweaveUpload)({
-    request,
-    hasAuthorization,
-    deps: {
-      corsHeaders: deps?.corsHeaders,
-      readArweaveBootstrapUploadPayload: deps?.readArweaveBootstrapUploadPayload,
-      resolveWorkerBodySlugContext: ({ body }) => deps?.resolveWorkerBodySlugContext?.({ body, env }),
-      json: deps?.json,
-      MISSING_SLUG_ERROR: constants?.missingSlugError,
-      getSessionConfig: (slug) => deps?.getSessionConfig?.(env, slug),
-      BOOTSTRAP_SESSION_CONFIG_REQUIRED_ERROR: constants?.bootstrapSessionConfigRequiredError,
-      getCorsContext: deps?.getCorsContext,
-      verifyAdminSignature: (value) => deps?.verifyAdminSignature?.({ ...value, env }),
-      getSessionSecrets: (slug) => deps?.getSessionSecrets?.(env, slug),
-      arweaveUpload: (value) => deps?.arweaveUpload?.({ ...value, env }),
-      logBootstrapPayload: ({ requestId, body }) => log2("[arweave] bootstrap payload", {
-        requestId: requestId || null,
-        hasAddress: !!body?.address,
-        hasMessage: !!body?.message,
-        hasSignature: !!body?.signature,
-        sessionSlug: body?.sessionSlug || "",
-        groupSlug: body?.groupSlug || ""
-      }),
-      logBootstrapConfigMissing: ({ targetSlug, requestId }) => warn("[arweave] bootstrap config missing", {
-        targetSlug,
-        requestId: requestId || null
-      }),
-      logBootstrapCorsReject: ({ requestId, targetSlug, allowOrigins }) => warn("[arweave] cors reject", {
-        requestId: requestId || null,
-        origin,
-        targetSlug,
-        allowOrigins
-      })
-    }
-  });
 };
 
 // workers/sessionCorsWorker/sponsoredBootstrapRedeemDispatch.js
@@ -76986,17 +76612,20 @@ var createWorkerRouteShellWithWorkerDeps = ({
   const resolveTopLevelRouteSelection2 = deps?.resolveTopLevelRouteSelection || resolveTopLevelRouteSelection;
   const getRouteBaseHeaders2 = deps?.getRouteBaseHeaders || getRouteBaseHeaders;
   const getDefaultWorkerSessionSlug2 = deps?.getDefaultWorkerSessionSlug || getDefaultWorkerSessionSlug;
-  const dispatchAuthNonceRequestWithWorkerDeps2 = deps?.dispatchAuthNonceRequestWithWorkerDeps || dispatchAuthNonceRequestWithWorkerDeps;
-  const dispatchAuthLoginRequestWithWorkerDeps2 = deps?.dispatchAuthLoginRequestWithWorkerDeps || dispatchAuthLoginRequestWithWorkerDeps;
-  const dispatchBootstrapArweaveUploadWithWorkerDeps2 = deps?.dispatchBootstrapArweaveUploadWithWorkerDeps || dispatchBootstrapArweaveUploadWithWorkerDeps;
+  const dispatchAuthNonceRequest2 = deps?.dispatchAuthNonceRequest || dispatchAuthNonceRequest;
+  const dispatchAuthLoginRequest2 = deps?.dispatchAuthLoginRequest || dispatchAuthLoginRequest;
+  const dispatchBootstrapArweaveUpload2 = deps?.dispatchBootstrapArweaveUpload || dispatchBootstrapArweaveUpload;
   const dispatchSponsoredBootstrapRedeem2 = deps?.dispatchSponsoredBootstrapRedeem || dispatchSponsoredBootstrapRedeem;
   const dispatchResourcePresenceRequest2 = deps?.dispatchResourcePresenceRequest || dispatchResourcePresenceRequest;
   const dispatchSessionConfigBootstrapRequest2 = deps?.dispatchSessionConfigBootstrapRequest || dispatchSessionConfigBootstrapRequest;
   const dispatchInterviewBriefRequest2 = deps?.dispatchInterviewBriefRequest || dispatchInterviewBriefRequest;
-  const dispatchAdminRequestWithWorkerDeps2 = deps?.dispatchAdminRequestWithWorkerDeps || dispatchAdminRequestWithWorkerDeps;
+  const dispatchAdminRequest2 = deps?.dispatchAdminRequest || dispatchAdminRequest;
   const dispatchAdminAbuseSummaryRequest2 = deps?.dispatchAdminAbuseSummaryRequest || dispatchAdminAbuseSummaryRequest;
-  const dispatchAnonymousRouteEntryWithWorkerDeps2 = deps?.dispatchAnonymousRouteEntryWithWorkerDeps || dispatchAnonymousRouteEntryWithWorkerDeps;
-  const dispatchAuthenticatedRouteEntryWithWorkerDeps2 = deps?.dispatchAuthenticatedRouteEntryWithWorkerDeps || dispatchAuthenticatedRouteEntryWithWorkerDeps;
+  const dispatchAnonymousRouteEntry2 = deps?.dispatchAnonymousRouteEntry || dispatchAnonymousRouteEntry;
+  const dispatchAnonymousRoute2 = deps?.dispatchAnonymousRoute || dispatchAnonymousRoute;
+  const dispatchAuthenticatedRouteEntry2 = deps?.dispatchAuthenticatedRouteEntry || dispatchAuthenticatedRouteEntry;
+  const dispatchAuthenticatedRoute2 = deps?.dispatchAuthenticatedRoute || dispatchAuthenticatedRoute;
+  const resolveAuthenticatedRouteContext2 = deps?.resolveAuthenticatedRouteContext || resolveAuthenticatedRouteContext;
   const log2 = deps?.log || (() => {
   });
   const ResponseCtor = deps?.Response || Response;
@@ -77091,7 +76720,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
         });
       }
       if (routeSelection.kind === "auth-nonce") {
-        return await dispatchAuthNonceRequestWithWorkerDeps2({
+        return await dispatchAuthNonceRequest2({
           request,
           env,
           baseHeaders: routeBaseHeaders,
@@ -77107,20 +76736,29 @@ var createWorkerRouteShellWithWorkerDeps = ({
             checkNonceRateLimit: deps?.checkNonceRateLimit,
             ...deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {},
             now: deps?.now,
-            buildNonce: deps?.buildNonce,
-            base64UrlEncode: deps?.base64UrlEncode
-          },
-          constants: {
-            missingSlugError: constants?.missingSlugError,
-            nonceTtlSeconds: constants?.nonceTtlSeconds,
-            nonceRateLimitMax: constants?.nonceRateLimitMax,
-            nonceRateLimitWindowMs: constants?.nonceRateLimitWindowMs,
-            nonceRateLimitTtlSeconds: constants?.nonceRateLimitTtlSeconds
+            buildNonce: () => deps?.buildNonce?.({
+              base64UrlEncode: deps?.base64UrlEncode
+            }),
+            issueNonce: (currentEnv, slugArg, addressArg, nonceArg, ttl) => (deps?.issueNonce || issueNonce)(
+              currentEnv,
+              slugArg,
+              addressArg,
+              nonceArg,
+              ttl,
+              {
+                now: deps?.now
+              }
+            ),
+            MISSING_SLUG_ERROR: constants?.missingSlugError,
+            NONCE_TTL_SECONDS: constants?.nonceTtlSeconds,
+            NONCE_RATE_LIMIT_MAX: constants?.nonceRateLimitMax,
+            NONCE_RATE_LIMIT_WINDOW_MS: constants?.nonceRateLimitWindowMs,
+            NONCE_RATE_LIMIT_TTL_SECONDS: constants?.nonceRateLimitTtlSeconds
           }
         });
       }
       if (routeSelection.kind === "auth-login") {
-        return await dispatchAuthLoginRequestWithWorkerDeps2({
+        return await dispatchAuthLoginRequest2({
           request,
           env,
           baseHeaders: routeBaseHeaders,
@@ -77138,46 +76776,78 @@ var createWorkerRouteShellWithWorkerDeps = ({
             validateBrowserLoginOrigin: deps?.validateBrowserLoginOrigin,
             resolveTrustedAdminOrigins: deps?.resolveTrustedAdminOrigins,
             validateSiweAddressMatchesRequest: deps?.validateSiweAddressMatchesRequest,
-            consumeNonce: deps?.consumeNonce,
+            consumeNonce: (envArg, slugArg, addressArg, nonceArg) => deps?.consumeNonce?.(
+              envArg,
+              slugArg,
+              addressArg,
+              nonceArg,
+              {
+                usedNonceTtlSeconds: constants?.usedNonceTtlSeconds,
+                ...deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {}
+              }
+            ),
             computeScopesForLogin: deps?.computeScopesForLogin,
             signToken: deps?.signToken,
             getAddress: deps?.getAddress,
             buildAuthTokenJti: deps?.buildAuthTokenJti,
             persistAuthTokenRecord: deps?.persistAuthTokenRecord,
             ...deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {},
-            now: deps?.now
-          },
-          constants: {
-            usedNonceTtlSeconds: constants?.usedNonceTtlSeconds,
-            tokenTtlSeconds: constants?.tokenTtlSeconds,
-            loginSiweMaxAgeMs: constants?.loginSiweMaxAgeMs,
-            loginSiweFutureSkewMs: constants?.loginSiweFutureSkewMs,
-            missingSlugError: constants?.missingSlugError,
-            sessionConfigNotFoundError: constants?.sessionConfigNotFoundError
+            now: deps?.now,
+            LOGIN_SIWE_MAX_AGE_MS: constants?.loginSiweMaxAgeMs,
+            LOGIN_SIWE_FUTURE_SKEW_MS: constants?.loginSiweFutureSkewMs,
+            TOKEN_TTL_SECONDS: constants?.tokenTtlSeconds,
+            MISSING_SLUG_ERROR: constants?.missingSlugError,
+            SESSION_CONFIG_NOT_FOUND_ERROR: constants?.sessionConfigNotFoundError
           }
         });
       }
       if (routeSelection.kind === "arweave-upload") {
-        const bootstrapUpload = await dispatchBootstrapArweaveUploadWithWorkerDeps2({
+        const logBootstrapInfo = typeof log2 === "function" ? log2 : () => {
+        };
+        const warn = (typeof log2?.warn === "function" ? log2.warn : null) || (typeof deps?.warn === "function" ? deps.warn : null) || (typeof log2 === "function" ? log2 : null) || console.warn;
+        const origin = request?.headers?.get?.("Origin") || "";
+        const contentType = request?.headers?.get?.("content-type") || "";
+        logBootstrapInfo("[arweave] request", {
+          url: request?.url,
+          hasAuthHeader: !!routeSelection.hasAuthorizationHeader,
+          origin,
+          contentType,
+          cfRay: request?.headers?.get?.("CF-Ray") || "",
+          ua: request?.headers?.get?.("User-Agent") || ""
+        });
+        const bootstrapUpload = await dispatchBootstrapArweaveUpload2({
           request,
-          env,
           hasAuthorization: routeSelection.hasAuthorizationHeader,
           deps: {
-            log: log2,
             corsHeaders: deps?.corsHeaders,
             readArweaveBootstrapUploadPayload: deps?.readArweaveBootstrapUploadPayload,
-            resolveWorkerBodySlugContext: deps?.resolveWorkerBodySlugContext,
+            resolveWorkerBodySlugContext: ({ body }) => deps?.resolveWorkerBodySlugContext?.({ body, env }),
             json: deps?.json,
-            getSessionConfig: deps?.getSessionConfig,
+            MISSING_SLUG_ERROR: constants?.missingSlugError,
+            getSessionConfig: (slug) => deps?.getSessionConfig?.(env, slug),
+            BOOTSTRAP_SESSION_CONFIG_REQUIRED_ERROR: constants?.bootstrapSessionConfigRequiredError,
             getCorsContext: deps?.getCorsContext,
-            verifyAdminSignature: deps?.verifyAdminSignature,
-            getSessionSecrets: deps?.getSessionSecrets,
-            arweaveUpload: deps?.arweaveUpload,
-            storageRoute: deps?.storageRoute
-          },
-          constants: {
-            missingSlugError: constants?.missingSlugError,
-            bootstrapSessionConfigRequiredError: constants?.bootstrapSessionConfigRequiredError
+            verifyAdminSignature: (value) => deps?.verifyAdminSignature?.({ ...value, env }),
+            getSessionSecrets: (slug) => deps?.getSessionSecrets?.(env, slug),
+            arweaveUpload: (value) => deps?.arweaveUpload?.({ ...value, env }),
+            logBootstrapPayload: ({ requestId, body }) => logBootstrapInfo("[arweave] bootstrap payload", {
+              requestId: requestId || null,
+              hasAddress: !!body?.address,
+              hasMessage: !!body?.message,
+              hasSignature: !!body?.signature,
+              sessionSlug: body?.sessionSlug || "",
+              groupSlug: body?.groupSlug || ""
+            }),
+            logBootstrapConfigMissing: ({ targetSlug, requestId }) => warn("[arweave] bootstrap config missing", {
+              targetSlug,
+              requestId: requestId || null
+            }),
+            logBootstrapCorsReject: ({ requestId, targetSlug, allowOrigins }) => warn("[arweave] cors reject", {
+              requestId: requestId || null,
+              origin,
+              targetSlug,
+              allowOrigins
+            })
           }
         });
         if (bootstrapUpload.handled) return bootstrapUpload.response;
@@ -77216,7 +76886,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
         });
       }
       if (routeSelection.kind === "admin") {
-        return await dispatchAdminRequestWithWorkerDeps2({
+        return await dispatchAdminRequest2({
           request,
           env,
           baseHeaders: routeBaseHeaders,
@@ -77234,7 +76904,16 @@ var createWorkerRouteShellWithWorkerDeps = ({
             parseSiweMessage: deps?.parseSiweMessage,
             validateSiwe: deps?.validateSiwe,
             validateSiweAddressMatchesRequest: deps?.validateSiweAddressMatchesRequest,
-            consumeNonce: deps?.consumeNonce,
+            consumeNonce: (envArg, slugArg, addressArg, nonceArg) => deps?.consumeNonce?.(
+              envArg,
+              slugArg,
+              addressArg,
+              nonceArg,
+              {
+                usedNonceTtlSeconds: constants?.usedNonceTtlSeconds,
+                ...deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {}
+              }
+            ),
             validateBootstrapAdmin: deps?.validateBootstrapAdmin,
             validateAdmin: deps?.validateAdmin,
             mergeWorkerConfigRecords: deps?.mergeWorkerConfigRecords,
@@ -77243,16 +76922,13 @@ var createWorkerRouteShellWithWorkerDeps = ({
             getSessionSecrets: deps?.getSessionSecrets,
             normalizeSecretValue: deps?.normalizeSecretValue,
             putSessionSecrets: deps?.putSessionSecrets,
-            ...deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {}
-          },
-          constants: {
-            usedNonceTtlSeconds: constants?.usedNonceTtlSeconds,
-            missingSlugError: constants?.missingSlugError
+            ...deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {},
+            MISSING_SLUG_ERROR: constants?.missingSlugError
           }
         });
       }
       if (routeSelection.kind === "anonymous") {
-        return await dispatchAnonymousRouteEntryWithWorkerDeps2({
+        return await dispatchAnonymousRouteEntry2({
           path,
           anonymousRoute: routeSelection.anonymousRoute,
           request,
@@ -77262,32 +76938,35 @@ var createWorkerRouteShellWithWorkerDeps = ({
           deps: {
             resolveRequestSlugWithoutToken: deps?.resolveRequestSlugWithoutToken,
             json: deps?.json,
+            MISSING_SLUG_ERROR: constants?.missingSlugError,
             getSessionConfig: deps?.getSessionConfig,
+            SESSION_CONFIG_NOT_FOUND_ERROR: constants?.sessionConfigNotFoundError,
             getCorsContext: deps?.getCorsContext,
             resolveAnonymousRateIdentity: deps?.resolveAnonymousRateIdentity,
             checkRateLimit: deps?.checkRateLimit,
-            dispatchAnonymousRoute: deps?.dispatchAnonymousRoute,
-            storageRoute: deps?.storageRoute,
-            readTranscribeRequestPayload: deps?.readTranscribeRequestPayload,
-            evaluateAnonymousRouteAccess: deps?.evaluateAnonymousRouteAccess,
-            getSessionSecrets: deps?.getSessionSecrets,
-            transcribe: deps?.transcribe,
-            readAiRequestPayload: deps?.readAiRequestPayload,
-            validateAnonymousAiRequest: deps?.validateAnonymousAiRequest,
-            proxyAnthropic: deps?.proxyAnthropic,
-            proxyOpenAI: deps?.proxyOpenAI,
-            proxyOpenRouter: deps?.proxyOpenRouter,
-            proxyCustomRPC: deps?.proxyCustomRPC,
-            now: deps?.now
-          },
-          constants: {
-            missingSlugError: constants?.missingSlugError,
-            sessionConfigNotFoundError: constants?.sessionConfigNotFoundError,
-            anonymousRouteDeniedError: constants?.anonymousRouteDeniedError
+            dispatchAnonymousRoute: (value) => dispatchAnonymousRoute2({
+              ...value,
+              deps: {
+                storageRoute: deps?.storageRoute,
+                readTranscribeRequestPayload: deps?.readTranscribeRequestPayload,
+                evaluateAnonymousRouteAccess: deps?.evaluateAnonymousRouteAccess,
+                getSessionSecrets: (sessionSlug) => deps?.getSessionSecrets?.(env, sessionSlug),
+                transcribe: deps?.transcribe,
+                readAiRequestPayload: deps?.readAiRequestPayload,
+                validateAnonymousAiRequest: deps?.validateAnonymousAiRequest,
+                proxyAnthropic: deps?.proxyAnthropic,
+                proxyOpenAI: deps?.proxyOpenAI,
+                proxyOpenRouter: deps?.proxyOpenRouter,
+                proxyCustomRPC: deps?.proxyCustomRPC,
+                json: deps?.json,
+                now: deps?.now,
+                ANONYMOUS_ROUTE_DENIED_ERROR: constants?.anonymousRouteDeniedError
+              }
+            })
           }
         });
       }
-      return await dispatchAuthenticatedRouteEntryWithWorkerDeps2({
+      return await dispatchAuthenticatedRouteEntry2({
         path,
         method,
         request,
@@ -77296,36 +76975,74 @@ var createWorkerRouteShellWithWorkerDeps = ({
         deps: {
           json: deps?.json,
           requireAuth: deps?.requireAuth,
-          getSessionConfig: deps?.getSessionConfig,
-          getCorsContext: deps?.getCorsContext,
-          computeScopesForLogin: deps?.computeScopesForLogin,
-          toStr: deps?.toStr,
-          dispatchAuthenticatedRoute: deps?.dispatchAuthenticatedRoute,
-          dispatchAuthenticatedSecretPathRoute: deps?.dispatchAuthenticatedSecretPathRoute,
-          readAuthenticatedActionPayload: deps?.readAuthenticatedActionPayload,
-          dispatchAuthenticatedNonSecretActionRoute: deps?.dispatchAuthenticatedNonSecretActionRoute,
-          dispatchAuthenticatedSecretActionRoute: deps?.dispatchAuthenticatedSecretActionRoute,
-          evaluateAuthenticatedRoutePreflight: deps?.evaluateAuthenticatedRoutePreflight,
-          resolveAuthenticatedRouteSecrets: deps?.resolveAuthenticatedRouteSecrets,
-          checkRateLimit: deps?.checkRateLimit,
-          getSessionSecrets: deps?.getSessionSecrets,
-          isAddress: deps?.isAddress,
-          getAddress: deps?.getAddress,
-          transcribe: deps?.transcribe,
-          arweaveUpload: deps?.arweaveUpload,
-          storageRoute: deps?.storageRoute,
-          fetchImage: deps?.fetchImage,
-          fetchUrl: deps?.fetchUrl,
-          now: deps?.now,
-          normalizeAiRequestPayload: deps?.normalizeAiRequestPayload,
-          proxyAnthropic: deps?.proxyAnthropic,
-          proxyOpenAI: deps?.proxyOpenAI,
-          proxyOpenRouter: deps?.proxyOpenRouter,
-          proxyCustomRPC: deps?.proxyCustomRPC,
-          faucet: deps?.faucet
-        },
-        constants: {
-          sessionConfigNotFoundError: constants?.sessionConfigNotFoundError
+          resolveAuthenticatedRouteContext: (value) => resolveAuthenticatedRouteContext2({
+            ...value,
+            deps: {
+              getSessionConfig: deps?.getSessionConfig,
+              getCorsContext: deps?.getCorsContext,
+              json: deps?.json,
+              toStr: deps?.toStr,
+              SESSION_CONFIG_NOT_FOUND_ERROR: constants?.sessionConfigNotFoundError
+            }
+          }),
+          dispatchAuthenticatedRoute: (value) => dispatchAuthenticatedRoute2({
+            ...value,
+            deps: {
+              dispatchAuthenticatedSecretPathRoute: (routeValue) => deps?.dispatchAuthenticatedSecretPathRoute?.({
+                ...routeValue,
+                env,
+                deps: {
+                  evaluateAuthenticatedRoutePreflight: deps?.evaluateAuthenticatedRoutePreflight,
+                  computeScopesForLogin: deps?.computeScopesForLogin,
+                  resolveAuthenticatedRouteSecrets: deps?.resolveAuthenticatedRouteSecrets,
+                  checkRateLimit: deps?.checkRateLimit,
+                  getSessionSecrets: deps?.getSessionSecrets,
+                  json: deps?.json,
+                  isAddress: deps?.isAddress,
+                  getAddress: deps?.getAddress,
+                  transcribe: deps?.transcribe,
+                  arweaveUpload: deps?.arweaveUpload,
+                  storageRoute: deps?.storageRoute,
+                  now: deps?.now
+                }
+              }),
+              readAuthenticatedActionPayload: deps?.readAuthenticatedActionPayload,
+              dispatchAuthenticatedNonSecretActionRoute: (routeValue) => deps?.dispatchAuthenticatedNonSecretActionRoute?.({
+                ...routeValue,
+                env,
+                deps: {
+                  evaluateAuthenticatedRoutePreflight: deps?.evaluateAuthenticatedRoutePreflight,
+                  computeScopesForLogin: deps?.computeScopesForLogin,
+                  fetchImage: deps?.fetchImage,
+                  fetchUrl: deps?.fetchUrl,
+                  checkRateLimit: deps?.checkRateLimit,
+                  json: deps?.json,
+                  now: deps?.now
+                }
+              }),
+              dispatchAuthenticatedSecretActionRoute: (routeValue) => deps?.dispatchAuthenticatedSecretActionRoute?.({
+                ...routeValue,
+                env,
+                deps: {
+                  evaluateAuthenticatedRoutePreflight: deps?.evaluateAuthenticatedRoutePreflight,
+                  computeScopesForLogin: deps?.computeScopesForLogin,
+                  resolveAuthenticatedRouteSecrets: deps?.resolveAuthenticatedRouteSecrets,
+                  normalizeAiRequestPayload: deps?.normalizeAiRequestPayload,
+                  proxyAnthropic: deps?.proxyAnthropic,
+                  proxyOpenAI: deps?.proxyOpenAI,
+                  proxyOpenRouter: deps?.proxyOpenRouter,
+                  proxyCustomRPC: deps?.proxyCustomRPC,
+                  faucet: deps?.faucet,
+                  checkRateLimit: deps?.checkRateLimit,
+                  getSessionSecrets: deps?.getSessionSecrets,
+                  json: deps?.json,
+                  toStr: deps?.toStr,
+                  now: deps?.now
+                }
+              }),
+              json: deps?.json
+            }
+          })
         }
       });
     } catch (error) {
