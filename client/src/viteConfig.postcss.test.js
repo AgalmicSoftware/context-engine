@@ -57,6 +57,20 @@ describe('vite PostCSS compatibility', () => {
     );
   });
 
+  it('resolves shared envelope dependencies from the client install', () => {
+    const config = fs.readFileSync(path.join(clientRoot, 'vite.config.mjs'), 'utf8');
+    const pkg = JSON.parse(fs.readFileSync(path.join(clientRoot, 'package.json'), 'utf8'));
+    const sharedEnvelopeCore = fs.readFileSync(
+      path.join(clientRoot, '..', 'shared', 'encryption', 'envelopeV1Core.mjs'),
+      'utf8',
+    );
+
+    expect(sharedEnvelopeCore).toContain("from 'ethers'");
+    expect(pkg.dependencies.ethers).toBe('5.7.2');
+    expect(config).toContain('find: /^ethers$/');
+    expect(config).toContain("path.resolve(__dirname, 'node_modules', 'ethers', 'lib.esm', 'index.js')");
+  });
+
   it('writes crawler-facing post HTML with the header as a large social image', () => {
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-post-social-preview-'));
     const buildDir = path.join(tempRoot, 'build');
