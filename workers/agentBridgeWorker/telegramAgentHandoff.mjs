@@ -1791,7 +1791,7 @@ async function resolveHandoffContext({
     }
   }
   let permission = { ok: true, mode: 'not_required' };
-  if (requireQuestionAuthoring) {
+  if (requireQuestionAuthoring && policy.registryReadOnly !== true) {
     permission = evaluateTelegramQuestionAuthoringPermission({
       env,
       normalized: storageContext,
@@ -6968,6 +6968,13 @@ async function handleWrappedMemberExchangeRequest({ request, env = {}, fetchImpl
   return json(payload);
 }
 
+const REGISTRY_READ_ROUTES = new Set([
+  '/api/agent/questions', '/api/agent/tags', '/api/agent/results',
+  '/api/agent/admin/status', '/api/agent/admin/metrics',
+  '/api/agent/session-meta', '/api/agent/skill', '/api/agent/skill-version',
+  '/api/agent/session-wrapped/skill', '/api/agent/session-wrapped/skill-version',
+]);
+
 async function handleTelegramAgentHandoffRequestUnsafe({
   request,
   env = {},
@@ -6976,6 +6983,19 @@ async function handleTelegramAgentHandoffRequestUnsafe({
 } = {}) {
   const url = new URL(request.url);
   const routePathname = toCanonicalAgentApiPathname(url.pathname);
+  if (routePathname.startsWith('/api/agent/') && request.method !== 'OPTIONS' && !REGISTRY_READ_ROUTES.has(routePathname)) {
+    const policy = await loadSessionPolicy(env, {
+      includeResultsExposureOverrides: false, includeAdminDefaultOverride: false,
+    });
+    // Some GET routes create grants or perform paid work. Only explicit read
+    // routes may use registry discovery; HTTP method alone is not authority.
+    if (policy.registryReadOnly === true) {
+      return json({ ok: false, reason: 'session_registry_policy_read_only' }, { status: 403 });
+    }
+    if (policy.registryAvailable === false) {
+      return json({ ok: false, reason: 'session_registry_unavailable' }, { status: 503 });
+    }
+  }
   if (routePathname === '/api/agent/credentials/service') {
     return handleServiceCredentialBootstrapRequest({ request, env });
   }

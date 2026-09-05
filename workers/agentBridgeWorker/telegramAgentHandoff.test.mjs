@@ -2632,6 +2632,46 @@ test('Invite onboarding fails closed when the redemption coordinator is unavaila
   );
 });
 
+test('registry discovery cannot authorize credentials or managed writes, including GET actions', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_SESSION_POLICY_JSON: '', DEFAULT_RPC_URL: 'https://read-only-handoff.example',
+    REGISTRY_FETCH: async () => { throw new Error('unexpected registry network access'); },
+  });
+  await env.AGENT_ACTION_KV.put(
+    'telegram:registry-sessions:v1:11155420:0xdcb1731984e9f75c6a061c38dd8b67d18de4c0c1:50',
+    JSON.stringify({ ok: true, sessions: [{ sessionSlug: 'alpha', telegramBridgeEnabled: true }] }),
+  );
+  for (const [path, method] of [
+    ['/credentials/service', 'POST'], ['/invite/onboard', 'POST'], ['/miniapp/onboard', 'POST'],
+    ['/client-login/exchange', 'POST'], ['/wrapped/member-exchange', 'POST'],
+    ['/preferences', 'POST'], ['/questions/create', 'POST'], ['/questions/pose', 'POST'],
+    ['/question-votes/apply', 'POST'], ['/groups/propose', 'POST'], ['/sessions/child', 'POST'],
+    ['/admin/questions/delete', 'POST'], ['/geo-backlink', 'GET'], ['/onboarding', 'GET'],
+  ]) {
+    const response = await handleTelegramAgentHandoffRequest({
+      env, request: agentRequest(`/api/agent${path}?sessionSlug=alpha&telegramUserId=42`, {
+        method, ...(method === 'POST' ? { body: { name: 'Service', sessionSlug: 'alpha' } } : {}),
+      }),
+    });
+    assert.equal(response.status, 403, path);
+    assert.equal((await response.json()).reason, 'session_registry_policy_read_only', path);
+  }
+  assert.equal(env.AGENT_ACTION_KV.store.size, 1);
+  for (const method of ['GET', 'POST']) {
+    const response = await handleTelegramAgentHandoffRequest({
+      env, request: agentRequest('/api/agent/questions?sessionSlug=alpha&telegramUserId=42', { method }),
+    });
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).questions.length, 2);
+  }
+  const unavailable = await handleTelegramAgentHandoffRequest({
+    env: { ...env, AGENT_ACTION_KV: new MemoryKv(), DEFAULT_RPC_URL: 'https://unavailable-policy.example' },
+    request: agentRequest('/api/agent/admin/questions/delete', { method: 'POST', body: { sessionSlug: 'alpha' } }),
+  });
+  assert.equal(unavailable.status, 503);
+  assert.equal((await unavailable.json()).reason, 'session_registry_unavailable');
+});
+
 test('Root bootstrap mints a named scoped service credential', async () => {
   const env = agentHttpOnlyEnv({
     AGENT_BRIDGE_AGENT_API_TOKEN: 'root-bootstrap-token',

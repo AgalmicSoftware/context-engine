@@ -801,6 +801,15 @@ Question cache controls:
 | `AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN`                                       | Emergency/debug only. Allows recent-block fallback when neither metadata nor `SessionCreated` can scope the session; leave unset for normal live smoke                                              |
 | `AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW`                                            | Local/operator debug only. Enables `/mock/telegram/preview` and `/mock/telegram/preview-update`; leave unset in live deployments                                                                    |
 
+Registry discovery supplies session identity for authenticated HTTP reads only.
+It does not opt a session into Telegram or Mini App interactions, credentials,
+managed writes, public joins, document access, or sponsored AI/RPC/faucet use.
+Configure those capabilities explicitly in `AGENT_BRIDGE_SESSION_POLICY_JSON`.
+Cached registry rows are treated the same way as fresh discovery. Privileged
+Agent HTTP routes fail closed on registry outages; discovery permits only the
+question/tag/result and status metadata read routes, including their POST read
+aliases. Stateful GET actions require explicit policy too.
+
 ## Interactive Preview
 
 `GET /mock/telegram/preview` serves a small browser preview for the private demo
