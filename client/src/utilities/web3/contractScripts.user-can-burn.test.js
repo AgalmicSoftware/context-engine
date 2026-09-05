@@ -27,6 +27,17 @@ describe('contractScripts.userCanBurnSBTs', () => {
     userHasSbtSpy = null;
   });
 
+  it('does not treat the zero address as an active admin', async () => {
+    contractSpy = jest.spyOn(ethers, 'Contract').mockImplementation(() => ({
+      admin: jest.fn().mockResolvedValue(ethers.constants.AddressZero),
+      collectionBurnAuth: jest.fn().mockResolvedValue(0),
+    }));
+    userHasSbtSpy = jest.spyOn(contractScripts, 'userHasSBT').mockResolvedValue(false);
+    await expect(contractScripts.userCanBurnSBTs('none', sbtAddress, ethers.constants.AddressZero, {
+      slug: 'edge', networkChainId: 84532, contracts: {},
+    })).resolves.toBe(false);
+  });
+
   it.each([
     {
       label: 'IssuerOnly only allows the admin',

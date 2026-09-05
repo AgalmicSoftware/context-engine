@@ -34,11 +34,14 @@ abstract contract InvariantUtils {
 contract CustomSBTInvariantHandler is TestUtils {
     MySBT internal immutable sbt;
 
+    address public expectedAdmin;
+    bool public authorityViolation;
     address[] private actors;
     mapping(address => bool) private knownActor;
 
     constructor(MySBT sbt_) {
         sbt = sbt_;
+        expectedAdmin = sbt_.admin();
     }
 
     function claim(uint256 seed) external {
@@ -68,6 +71,22 @@ contract CustomSBTInvariantHandler is TestUtils {
         vm.prank(actor);
         (bool ok,) = address(sbt).call(abi.encodeWithSelector(MySBT.burn.selector, tokenId));
         ok;
+    }
+
+    function rotateAdmin(uint256 seed) external {
+        address next = seed % 4 == 0 ? address(0) : deriveAddress(seed);
+        vm.prank(expectedAdmin);
+        (bool ok,) = address(sbt).call(abi.encodeWithSignature("changeAdmin(address)", next));
+        if (ok != (expectedAdmin != address(0))) authorityViolation = true;
+        if (ok) expectedAdmin = next;
+    }
+
+    function unauthorizedRotation(uint256 seed) external {
+        address attacker = deriveAddress(seed);
+        if (attacker == expectedAdmin) return;
+        vm.prank(attacker);
+        (bool ok,) = address(sbt).call(abi.encodeWithSignature("changeAdmin(address)", attacker));
+        if (ok) authorityViolation = true;
     }
 
     function actorCount() external view returns (uint256) {
@@ -118,10 +137,17 @@ contract CustomSBTInvariantTest is TestUtils, InvariantUtils {
         handler = new CustomSBTInvariantHandler(sbt);
         targetContract(address(handler));
 
-        bytes4[] memory selectors = new bytes4[](2);
+        bytes4[] memory selectors = new bytes4[](4);
         selectors[0] = CustomSBTInvariantHandler.claim.selector;
         selectors[1] = CustomSBTInvariantHandler.burn.selector;
+        selectors[2] = CustomSBTInvariantHandler.rotateAdmin.selector;
+        selectors[3] = CustomSBTInvariantHandler.unauthorizedRotation.selector;
         targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
+    }
+
+    function invariant_singleAdminAuthority() public view {
+        assertFalse(handler.authorityViolation(), "rotation must enforce sole nonzero admin authority");
+        assertEq(sbt.admin(), handler.expectedAdmin(), "admin tracks only authorized changes");
     }
 
     function invariant_soulbound() public {

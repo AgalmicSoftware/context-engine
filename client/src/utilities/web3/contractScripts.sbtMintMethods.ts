@@ -598,7 +598,8 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
       );
       const burnAuthNum = ethers.BigNumber.isBigNumber(burnAuth) ? burnAuth.toNumber() : Number(burnAuth);
       const hasSBT = await this.userHasSBT('none', SBTAddress, userAddress, 0, 'latest', groupKeyOrCfg);
-      const isAdmin = normalizeAddress(admin) === normalizeAddress(userAddress);
+      const isAdmin =
+        normalizeAddress(admin) !== ethers.constants.AddressZero && normalizeAddress(admin) === normalizeAddress(userAddress);
 
       if (burnAuthNum === 0) return isAdmin;
       if (burnAuthNum === 1) return hasSBT;

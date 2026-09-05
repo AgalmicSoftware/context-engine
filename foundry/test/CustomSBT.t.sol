@@ -1053,4 +1053,74 @@ contract CustomSBTTest is TestUtils {
         (bool okAdmin,) = address(sbt).call(abi.encodeWithSignature("burn(uint256)", tokenId));
         assertFalse(okAdmin, "admin should not burn in Neither");
     }
+    function testAdminRotationMovesAllIssuerAuthority() public {
+        MySBT sbt = deploySbtWithConfig("ContextEngine", "CE", 0, false, new bytes32[](0), bytes32(0), MySBT.BurnAuth.Both, 0);
+        vm.prank(user);
+        sbt.claim();
+        vm.prank(user);
+        (bool unauthorized,) = address(sbt).call(abi.encodeWithSignature("changeAdmin(address)", user));
+        assertFalse(unauthorized, "only current admin may rotate");
+        vm.prank(admin);
+        (bool rotated,) = address(sbt).call(abi.encodeWithSignature("changeAdmin(address)", userTwo));
+        assertTrue(rotated, "admin rotation must succeed");
+        assertEq(sbt.admin(), userTwo, "new admin is authoritative");
+        vm.prank(admin);
+        vm.expectRevert();
+        sbt.burn(1);
+        vm.prank(admin);
+        vm.expectRevert();
+        sbt.addHashedPasswords(new bytes32[](0));
+        vm.prank(userTwo);
+        sbt.addHashedPasswords(new bytes32[](0));
+        vm.prank(userTwo);
+        sbt.burn(1);
+        assertEq(sbt.getTokenIdByOwner(user), 0, "new admin can burn under issuer policy");
+    }
+
+    function testZeroAdminRemainsZeroAndDisablesIssuerActions() public {
+        admin = address(0);
+        MySBT sbt = deploySbtWithConfig("ContextEngine", "CE", 0, false, new bytes32[](0), bytes32(0), MySBT.BurnAuth.IssuerOnly, 0);
+        assertEq(sbt.admin(), address(0), "zero must not become deployer or factory");
+        vm.prank(user);
+        sbt.claim();
+        vm.prank(address(0));
+        vm.expectRevert();
+        sbt.addHashedPasswords(new bytes32[](0));
+        vm.prank(address(0));
+        vm.expectRevert();
+        sbt.burn(1);
+        (bool ok,) = address(sbt).call(abi.encodeWithSignature("changeAdmin(address)", user));
+        assertFalse(ok, "retired authority cannot be recovered by deployer");
+        assertEq(sbt.ownerOf(1), user, "token still exists");
+    }
+
+    function testAdminRetirementPreservesHolderBurnAndNeitherPolicy() public {
+        for (uint256 i = 1; i < 4; i++) {
+            MySBT sbt = deploySbtWithConfig("ContextEngine", "CE", 0, false, new bytes32[](0), bytes32(0), MySBT.BurnAuth(i), 0);
+            vm.prank(user);
+            sbt.claim();
+            vm.prank(admin);
+            (bool retired,) = address(sbt).call(abi.encodeWithSignature("changeAdmin(address)", address(0)));
+            assertTrue(retired, "admin can retire");
+            vm.prank(admin);
+            (bool restored,) = address(sbt).call(abi.encodeWithSignature("changeAdmin(address)", admin));
+            assertFalse(restored, "retirement is permanent");
+            vm.prank(user);
+            (bool burned,) = address(sbt).call(abi.encodeWithSignature("burn(uint256)", 1));
+            assertTrue(burned == (i != 3), "holder rights follow burn policy after retirement");
+        }
+    }
+
+    function testSbtHasNoTransferableCollectionOwnership() public {
+        MySBT sbt = deploySbt("ContextEngine", "CE", 0, false, new bytes32[](0), bytes32(0));
+        vm.prank(admin);
+        (bool transferred,) = address(sbt).call(abi.encodeWithSignature("transferOwnership(address)", user));
+        assertFalse(transferred, "SBT must not expose transferable collection ownership");
+        vm.prank(admin);
+        (bool renounced,) = address(sbt).call(abi.encodeWithSignature("renounceOwnership()"));
+        assertFalse(renounced, "SBT must have only changeAdmin");
+        (bool hasOwner,) = address(sbt).staticcall(abi.encodeWithSignature("owner()"));
+        assertFalse(hasOwner, "no second collection authority");
+    }
+
 }

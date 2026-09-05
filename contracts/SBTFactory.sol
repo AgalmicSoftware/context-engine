@@ -92,7 +92,7 @@ contract SBTFactory {
     /// @param name The ERC721 collection name.
     /// @param symbol The ERC721 collection symbol.
     /// @param limitedNumber The max token supply, or zero for uncapped minting.
-    /// @param adminAddress The admin and owner address for the new SBT.
+    /// @param adminAddress The admin address for the new SBT; zero disables admin actions.
     /// @param mintingEndTime The mint cutoff timestamp, or zero for no deadline.
     /// @param hasPasswordMint Whether password-based minting is enabled.
     /// @param burnAuth The burn authorization mode for the new SBT.
@@ -136,7 +136,7 @@ contract SBTFactory {
     /// @param name The ERC721 collection name.
     /// @param symbol The ERC721 collection symbol.
     /// @param limitedNumber The max token supply, or zero for uncapped minting.
-    /// @param adminAddress The admin and owner address for the new SBT.
+    /// @param adminAddress The admin address for the new SBT; zero disables admin actions.
     /// @param mintingEndTime The mint cutoff timestamp, or zero for no deadline.
     /// @param hasPasswordMint Whether password-based minting is enabled.
     /// @param burnAuth The burn authorization mode for the new SBT.
@@ -185,7 +185,7 @@ contract SBTFactory {
     /// @param name The ERC721 collection name.
     /// @param symbol The ERC721 collection symbol.
     /// @param limitedNumber The max token supply, or zero for uncapped minting.
-    /// @param adminAddress The admin and owner address for the new SBT.
+    /// @param adminAddress The initial nonzero admin, which must match the caller.
     /// @param mintingEndTime The mint cutoff timestamp, or zero for no deadline.
     /// @param hasPasswordMint Whether password-based minting is enabled.
     /// @param burnAuth The burn authorization mode for the new SBT.
@@ -249,7 +249,7 @@ contract SBTFactory {
     /// @param name The ERC721 collection name.
     /// @param symbol The ERC721 collection symbol.
     /// @param limitedNumber The max token supply, or zero for uncapped minting.
-    /// @param adminAddress The admin and owner address for the new SBT.
+    /// @param adminAddress The admin address for the new SBT; zero disables admin actions.
     /// @param mintingEndTime The mint cutoff timestamp, or zero for no deadline.
     /// @param hasPasswordMint Whether password-based minting is enabled.
     /// @param burnAuth The burn authorization mode for the new SBT.
@@ -295,7 +295,7 @@ contract SBTFactory {
     /// @param name The ERC721 collection name.
     /// @param symbol The ERC721 collection symbol.
     /// @param limitedNumber The max token supply, or zero for uncapped minting.
-    /// @param adminAddress The admin and owner address for the new SBT.
+    /// @param adminAddress The admin address for the new SBT; zero disables admin actions.
     /// @param mintingEndTime The mint cutoff timestamp, or zero for no deadline.
     /// @param hasPasswordMint Whether password-based minting is enabled.
     /// @param burnAuth The burn authorization mode for the new SBT.

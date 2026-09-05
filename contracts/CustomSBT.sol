@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
@@ -21,7 +20,7 @@ error InvalidTokenId();
 /// ERC-5484 (`burnAuth(uint256)` + `Issued`) while also exposing the
 /// app-specific `SBTActivity`, `collectionBurnAuth()`, and `getHistorySummary()`
 /// helpers used by Context Engine history reads.
-contract MySBT is ERC721, ERC721Burnable, Ownable, ReentrancyGuard {
+contract MySBT is ERC721, ERC721Burnable, ReentrancyGuard {
     using ECDSA for bytes32;
     using MessageHashUtils for bytes32;
 
@@ -32,7 +31,7 @@ contract MySBT is ERC721, ERC721Burnable, Ownable, ReentrancyGuard {
 
     uint256 public immutable maxTokens;
     uint256 public mintedTokens;
-    address public immutable admin;
+    address public admin;
     address public immutable deployingFactory;
     uint256 public immutable mintingEndTime;
     bool public immutable hasPasswordMint;
@@ -56,6 +55,7 @@ contract MySBT is ERC721, ERC721Burnable, Ownable, ReentrancyGuard {
     uint256 private _currentHolderCount;
     uint256 private _historicalHolderCount;
 
+    event AdminChanged(address indexed previousAdmin, address indexed newAdmin);
     event TokenURIInitialized(string tokenURI);
     event GroupPasswordHashInitialized(bytes32 groupPasswordHash);
     event Locked(uint256 tokenId);
@@ -79,7 +79,7 @@ contract MySBT is ERC721, ERC721Burnable, Ownable, ReentrancyGuard {
     BurnAuth private immutable _collectionBurnAuth;
 
     modifier onlyAdmin() {
-        require(admin == msg.sender, "Not admin");
+        require(admin != address(0) && admin == msg.sender, "Not admin");
         _;
     }
 
@@ -106,12 +106,12 @@ contract MySBT is ERC721, ERC721Burnable, Ownable, ReentrancyGuard {
         bytes32 _groupPasswordHash,
         bool _allowTokenURIInit,
         bool _allowGroupPasswordHashInit
-    ) ERC721(name, symbol) Ownable(_adminAddress != address(0) ? _adminAddress : msg.sender) {
+    ) ERC721(name, symbol) {
         _validateMintModeConfig(
             _mintMode, _limitedNumber, hashedPasswords, _groupPasswordHash, _allowGroupPasswordHashInit
         );
         maxTokens = _limitedNumber;
-        admin = _adminAddress != address(0) ? _adminAddress : msg.sender;
+        admin = _adminAddress;
         deployingFactory = msg.sender;
         mintingEndTime = _mintingEndTime;
         mintMode = _mintMode;
@@ -124,6 +124,14 @@ contract MySBT is ERC721, ERC721Burnable, Ownable, ReentrancyGuard {
         groupPasswordHashInitAllowed = _allowGroupPasswordHashInit;
 
         _addHashedPasswords(hashedPasswords);
+    }
+
+    /// @notice Rotates the sole collection admin; zero permanently disables admin actions.
+    /// @dev Token-holder burn rights remain governed by the immutable burn policy.
+    function changeAdmin(address newAdmin) external onlyAdmin {
+        address previousAdmin = admin;
+        admin = newAdmin;
+        emit AdminChanged(previousAdmin, newAdmin);
     }
 
     function _validateMintModeConfig(
@@ -377,10 +385,11 @@ contract MySBT is ERC721, ERC721Burnable, Ownable, ReentrancyGuard {
     // and corrupt the summary counters / event ordering.
     function burn(uint256 tokenId) public override nonReentrant {
         address owner = ownerOf(tokenId);
+        bool isAdmin = admin != address(0) && admin == msg.sender;
         require(
             (_collectionBurnAuth == BurnAuth.OwnerOnly && owner == msg.sender)
-                || (_collectionBurnAuth == BurnAuth.Both && (owner == msg.sender || admin == msg.sender))
-                || (_collectionBurnAuth == BurnAuth.IssuerOnly && admin == msg.sender),
+                || (_collectionBurnAuth == BurnAuth.Both && (owner == msg.sender || isAdmin))
+                || (_collectionBurnAuth == BurnAuth.IssuerOnly && isAdmin),
             "Not authorized to burn"
         );
         super.burn(tokenId);
@@ -445,7 +454,10 @@ contract MySBT is ERC721, ERC721Burnable, Ownable, ReentrancyGuard {
         override
         returns (bool)
     {
-        if ((_collectionBurnAuth == BurnAuth.IssuerOnly || _collectionBurnAuth == BurnAuth.Both) && spender == admin) {
+        if (
+            (_collectionBurnAuth == BurnAuth.IssuerOnly || _collectionBurnAuth == BurnAuth.Both)
+                && admin != address(0) && spender == admin
+        ) {
             return true;
         }
         return spender != address(0)
@@ -478,7 +490,7 @@ contract MySBT is ERC721, ERC721Burnable, Ownable, ReentrancyGuard {
     /// @return symbol_ The ERC721 collection symbol.
     /// @return maxTokens_ The maximum mintable supply, or zero when uncapped.
     /// @return mintedTokens_ The number of tokens minted so far.
-    /// @return admin_ The immutable collection admin.
+    /// @return admin_ The current collection admin, or zero when admin actions are disabled.
     /// @return mintingEndTime_ The mint cutoff timestamp, or zero when minting does not expire.
     /// @return hasPasswordMint_ Whether password-based minting is enabled.
     /// @return burnAuth_ The configured burn authorization mode.

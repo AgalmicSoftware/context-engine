@@ -27,6 +27,22 @@ contract CustomSBTFuzzTest is TestUtils {
         signer = vm.addr(signerKey);
     }
 
+    function testFuzz_adminRotation(address nextAdmin) public {
+        MySBT sbt = deploySbtWithConfig("ContextEngine", "CE", 0, false, new bytes32[](0), bytes32(0));
+        vm.prank(admin);
+        sbt.changeAdmin(nextAdmin);
+        assertEq(sbt.admin(), nextAdmin, "rotation must preserve every address including zero");
+        if (nextAdmin != admin) {
+            vm.prank(admin);
+            vm.expectRevert();
+            sbt.changeAdmin(admin);
+        }
+        vm.prank(nextAdmin);
+        if (nextAdmin == address(0)) vm.expectRevert();
+        sbt.changeAdmin(address(0));
+        assertEq(sbt.admin(), address(0), "retired authority stays zero");
+    }
+
     function testFuzz_claimWithInvite_invalidNonce(uint256 nonce) public {
         fuzz_claimWithInvite_invalidNonce(nonce);
     }

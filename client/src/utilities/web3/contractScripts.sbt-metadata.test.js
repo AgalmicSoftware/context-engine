@@ -71,6 +71,28 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
     } catch (_) {}
   });
 
+  it('does not invent an owner authority when the admin read fails', async () => {
+    const stub = baseContractStub(null);
+    stub.admin.mockRejectedValue(new Error('admin read failed'));
+    contractSpy = jest.spyOn(ethers, 'Contract').mockImplementation(() => stub);
+    const meta = await contractScripts.getSbtMetadata('none', sbtAddress, {
+      slug: 'edge', networkChainId: 84532, contracts: {},
+    });
+    expect(meta.admin).toBe(ethers.constants.AddressZero);
+    expect(stub.owner).not.toHaveBeenCalled();
+  });
+
+  it('preserves an explicit zero admin', async () => {
+    const stub = baseContractStub(null);
+    stub.admin.mockResolvedValue(ethers.constants.AddressZero);
+    contractSpy = jest.spyOn(ethers, 'Contract').mockImplementation(() => stub);
+    const meta = await contractScripts.getSbtMetadata('none', sbtAddress, {
+      slug: 'edge', networkChainId: 84532, contracts: {},
+    });
+    expect(meta.admin).toBe(ethers.constants.AddressZero);
+    expect(stub.owner).not.toHaveBeenCalled();
+  });
+
   it('uses extensionless direct-image tokenURI as renderable image when response content-type is image/*', async () => {
     const directImageUrl = 'https://cdn.example.com/sbt-image';
     const stub = baseContractStub(directImageUrl);

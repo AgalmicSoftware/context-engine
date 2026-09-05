@@ -233,6 +233,15 @@ source hardening. The restrictions above become live only after a testnet
 redeploy and corresponding manifest/transaction updates; no mainnet migration
 is in scope.
 
+The current CustomSBT source uses one mutable `admin`, rotated with `changeAdmin`.
+It exposes no transferable collection ownership. Zero admin permanently disables
+issuer actions; holder burns still follow `OwnerOnly`/`Both`, and `Neither`
+remains unburnable. Ordinary deployments preserve an explicit zero admin.
+Configured CREATE2 deployment requires an initial nonzero admin matching the
+sender to prevent capture; that admin may retire to zero after initialization.
+These source changes require a separately deployed factory before use; checked-in
+network addresses do not acquire new bytecode through an ABI update.
+
 CustomSBT instances are deployed per-group via SBTFactory. Configured
 deterministic SBT creation is admin-submitted; sponsored or relayed configured
 creation requires a separate authorization design.
