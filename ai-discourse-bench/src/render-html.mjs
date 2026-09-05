@@ -146,28 +146,6 @@ const scoreLabel = (summary) => {
   return 'mixed / unsure';
 };
 
-const modelStanceLabel = (score) => {
-  if (!Number.isFinite(score)) return 'No model answers';
-  if (score > 0.25) return 'Models lean toward support';
-  if (score < -0.25) return 'Models lean toward opposition';
-  return 'Models are mixed or unsure';
-};
-
-const modelDifferenceLabel = (difference) => {
-  if (!Number.isFinite(difference)) return 'No model comparison yet';
-  if (difference < 0.25) return 'Models are closely aligned';
-  if (difference < 0.75) return 'Models differ somewhat';
-  if (difference < 1.25) return 'Models differ substantially';
-  return 'Models are far apart';
-};
-
-const scoreClass = (score) => {
-  if (!Number.isFinite(score)) return 'aidb-score-empty';
-  if (score > 0.25) return 'aidb-score-agree';
-  if (score < -0.25) return 'aidb-score-disagree';
-  return 'aidb-score-mixed';
-};
-
 const formatScore = (value) => (
   Number.isFinite(value) ? value.toFixed(2) : 'no data'
 );
@@ -313,10 +291,6 @@ const getRiskCommentsForAggregateCell = (comments = [], catX = '', catY = '') =>
   })
 );
 
-const getRiskCommentsForSubCell = (comments = [], catX = '', subX = '', catY = '', subY = '') => (
-  comments.filter((entry) => entry.cell === `${catX}.${subX}.${catY}.${subY}`)
-);
-
 const riskCommentSignedValue = (entry) => (
   (entry?.valence === 'risk' ? -1 : 1) * Number(entry?.intensity || 0)
 );
@@ -328,12 +302,6 @@ const sumRiskComments = (comments = []) => (
 const riskAggregateCellId = (catX = '', catY = '') => `${catX}_vs_${catY}`;
 
 const riskSubCellId = (catX = '', subX = '', catY = '', subY = '') => `${catX}.${subX}.${catY}.${subY}`;
-
-const formatRiskCellPath = (cellId = '') => {
-  const parts = String(cellId || '').split('.');
-  if (parts.length !== 4) return cellId;
-  return `${parts[0]} / ${parts[1]} -> ${parts[2]} / ${parts[3]}`;
-};
 
 const formatRiskSelectionTitle = (cellId = '') => {
   const raw = String(cellId || '');
@@ -921,16 +889,6 @@ const normalizeAnalysisCompasses = (report) => {
       };
     })
     .filter(Boolean);
-};
-
-const renderAnswerBar = (summary = {}) => {
-  const { agree, unsure, disagree, invalid, total } = answerTotals(summary);
-  return `<span class="aidb-answer-bar" aria-label="answer distribution">
-    <i class="aidb-answer-agree" style="width:${(agree / total) * 100}%"></i>
-    <i class="aidb-answer-unsure" style="width:${(unsure / total) * 100}%"></i>
-    <i class="aidb-answer-disagree" style="width:${(disagree / total) * 100}%"></i>
-    <i class="aidb-answer-invalid" style="width:${(invalid / total) * 100}%"></i>
-  </span>`;
 };
 
 const renderPolisBoxPlot = (summary = {}) => {
@@ -1989,44 +1947,6 @@ const renderConsensusAndDifference = (report) => {
     title: 'Consensus and Difference',
     subtitle: 'Beeswarm plus statement-level agreement and difference',
     body: renderBeeswarmChart(report),
-  });
-};
-
-const renderPolisMatrix = (report) => {
-  const questions = getQuestions(report);
-  const participants = report.participants || [];
-  const matrix = report.polisReport?.byModelQuestion || {};
-  const byQuestion = report.polisReport?.byQuestion || {};
-  const rows = participants.map((participant) => {
-    const cells = questions.map((question) => {
-      const summary = matrix[participant.id]?.[question.id] || {};
-      const title = `${participant.label} / ${question.id}: ${scoreLabel(summary)}`;
-      return `<td title="${escapeHtml(title)}" style="background:${stanceColor(summary.meanScore)}">${escapeHtml(formatScore(summary.meanScore))}</td>`;
-    }).join('');
-    return `<tr data-ce-searchable><th>${escapeHtml(participant.label)}</th>${cells}</tr>`;
-  }).join('');
-  const questionBars = questions.map((question, index) => {
-    const summary = byQuestion[question.id] || {};
-    return `<li data-ce-searchable>
-      <span class="rank">${index + 1}</span>
-      <span class="statement">${escapeHtml(question.prompt)}</span>
-      ${renderAnswerBar(summary)}
-    </li>`;
-  }).join('');
-  return renderModePane({
-    id: 'polis-matrix',
-    title: 'Model / Statement Matrix',
-    subtitle: 'Agreement and disagreement across model participants',
-    bodyClassName: 'graphSection aidb-matrix-section',
-    body: `
-      <p class="ce-report-muted">Agreement and disagreement across model participants, normalized across canonical and reversed wording.</p>
-      <div class="polis-grid">
-        <table class="aidb-matrix-table">
-          <thead><tr><th>Participant</th>${questions.map((q) => `<th title="${escapeHtml(q.prompt)}">${escapeHtml(q.id)}</th>`).join('')}</tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-        <ol class="question-bars">${questionBars}</ol>
-      </div>`,
   });
 };
 

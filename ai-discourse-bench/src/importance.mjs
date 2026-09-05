@@ -10,6 +10,7 @@ import {
   IMPORTANCE_PROMPT_TEMPLATE_VERSION,
 } from './config.mjs';
 import { callOpenAiCompatibleChat } from './adapters/openai-compatible.mjs';
+import { jsonObjectCandidates } from './normalize.mjs';
 import { detectHarnessCommit, hashJson, sha256 } from './provenance.mjs';
 
 const nowIso = () => new Date().toISOString();
@@ -74,38 +75,6 @@ export const buildImportanceJsonSchema = (
 });
 
 export const IMPORTANCE_JSON_SCHEMA = Object.freeze(buildImportanceJsonSchema());
-
-const jsonObjectCandidates = (text) => {
-  const candidates = [];
-  let start = -1;
-  let depth = 0;
-  let inString = false;
-  let escaped = false;
-  for (let index = 0; index < text.length; index += 1) {
-    const char = text[index];
-    if (inString) {
-      if (escaped) escaped = false;
-      else if (char === '\\') escaped = true;
-      else if (char === '"') inString = false;
-      continue;
-    }
-    if (char === '"') {
-      inString = true;
-      continue;
-    }
-    if (char === '{') {
-      if (depth === 0) start = index;
-      depth += 1;
-    } else if (char === '}' && depth > 0) {
-      depth -= 1;
-      if (depth === 0 && start >= 0) {
-        candidates.push(text.slice(start, index + 1));
-        start = -1;
-      }
-    }
-  }
-  return candidates;
-};
 
 export const buildImportancePrompt = ({
   questionBank,

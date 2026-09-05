@@ -1,7 +1,5 @@
 import { sha256 } from './provenance.mjs';
 
-const mean = (values) => values.reduce((sum, value) => sum + value, 0) / values.length;
-
 const seededRandom = (seed) => {
   let state = Number.parseInt(sha256(seed).slice(0, 8), 16) || 1;
   return () => {

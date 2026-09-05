@@ -67,6 +67,24 @@ const modelRoster = {
   ],
 };
 
+test('quadratic importance parser skips unrelated JSON with braces inside strings', () => {
+  const parsed = parseImportanceAllocation(
+    'debug {"status":"ready {nested} text"}\n{"allocations":[{"questionId":"q1","votes":2}],"rationale":"valid priority"}',
+    {
+      questionIds: new Set(['q1', 'q2']),
+      budget: 10,
+      maxAllocations: 2,
+      maxVotesPerQuestion: 4,
+    },
+  );
+
+  assert.equal(parsed.parseError, '');
+  assert.equal(parsed.spentCredits, 4);
+  assert.deepEqual(parsed.allocations, [
+    { questionId: 'q1', votes: 2, cost: 4 },
+  ]);
+});
+
 test('quadratic importance parser enforces known ids, integer votes, and squared budget cost', () => {
   const options = {
     questionIds: new Set(['q1', 'q2']),
