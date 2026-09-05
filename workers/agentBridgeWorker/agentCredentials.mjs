@@ -315,7 +315,7 @@ export async function issueAgentCredential({
       metadata,
     });
   } catch {
-    return { ok: false, reason: 'agent_token_create_failed' };
+    return { ok: false, reason: 'agent_token_create_failed', credentialMayExist: true };
   }
 
   const slot = {
@@ -343,7 +343,7 @@ export async function issueAgentCredential({
     });
   } catch {
     await deleteKvBestEffort(kv, recordKey);
-    return { ok: false, reason: 'agent_token_pointer_write_failed' };
+    return { ok: false, reason: 'agent_token_pointer_write_failed', credentialMayExist: true };
   }
 
   if (previous.tokenHash && previous.tokenHash !== tokenHash) {

@@ -59,7 +59,10 @@ The bridge has one versioned `ceagt_` credential model:
   credential used by other agents. Redemption is reserved and finalized by
   the token-hash-named `AGENT_INVITE_COORDINATOR` Durable Object, so concurrent
   requests cannot mint two credentials. Missing coordinator authority fails
-  closed. A read-only compatibility check continues to reject redemption
+  closed. Once credential storage has been attempted, an uncertain write or
+  failed finalization keeps the invite reserved, even if best-effort credential
+  revocation succeeds. Only failures known to precede issuance release it.
+  A read-only compatibility check continues to reject redemption
   records written by the former KV implementation during rollout.
 - `POST /api/agent/client-login/exchange` accepts only a source user or service
   credential for the Bridge audience. It returns a short-lived Bridge browser

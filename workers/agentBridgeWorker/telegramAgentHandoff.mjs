@@ -6567,11 +6567,14 @@ async function handleInviteOnboardRequest({ request, env = {}, createdAt = null 
     createdAt,
   });
   if (!issued.ok) {
-    await releaseAgentInviteRedemption({
-      env,
-      tokenHash: invite.tokenHash,
-      body: { reservationId },
-    });
+    // A failed storage acknowledgement can still leave a live credential.
+    if (!issued.credentialMayExist) {
+      await releaseAgentInviteRedemption({
+        env,
+        tokenHash: invite.tokenHash,
+        body: { reservationId },
+      });
+    }
     const payload = {
       ok: false,
       reason: issued.reason || 'agent_token_create_failed',
@@ -6593,12 +6596,9 @@ async function handleInviteOnboardRequest({ request, env = {}, createdAt = null 
     },
   });
   if (!consumed.ok) {
+    // Keep the reservation even when best-effort revocation reports success:
+    // eventual/failed storage writes cannot prove this invite is safe to reuse.
     await revokeAgentCredentialHash({ env, tokenHash: issued.tokenHash });
-    await releaseAgentInviteRedemption({
-      env,
-      tokenHash: invite.tokenHash,
-      body: { reservationId },
-    });
     return json(
       { ok: false, reason: consumed.reason || 'invite_redemption_finalize_failed' },
       { status: consumed.status || 503 },

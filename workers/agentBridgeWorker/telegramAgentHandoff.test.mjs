@@ -2490,6 +2490,90 @@ test('Invite onboarding atomically rejects concurrent redemption attempts', asyn
   );
 });
 
+test('Invite onboarding keeps reservations after uncertain credential issuance or finalization', async (t) => {
+  for (const failure of ['finalize-and-revoke', 'finalize-only', 'credential-write', 'slot-write']) {
+    await t.test(failure, async () => {
+      const inviteToken = `uncertain-invite-${failure}`;
+      const env = agentHttpOnlyEnv({
+        AGENT_BRIDGE_AGENT_API_TOKEN: '',
+        AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([{
+          tokenHash: sha256Hex(inviteToken), sessionSlug: 'alpha', source: 'browser',
+        }]),
+      });
+      const kv = env.AGENT_ACTION_KV;
+      const put = kv.put.bind(kv);
+      let credentialWrites = 0;
+      kv.put = async (key, value, options) => {
+        await put(key, value, options);
+        if (key.startsWith(AGENT_CREDENTIAL_KV_PREFIX)) {
+          credentialWrites += 1;
+          if (failure === 'credential-write') throw new Error('write acknowledgement lost');
+        }
+        if (failure === 'slot-write' && key.startsWith(AGENT_CREDENTIAL_SLOT_KV_PREFIX)) {
+          throw new Error('slot acknowledgement lost');
+        }
+      };
+      if (failure !== 'finalize-only') {
+        kv.delete = async () => { throw new Error('revocation unavailable'); };
+      }
+      const namespace = env.AGENT_INVITE_COORDINATOR;
+      const getByName = namespace.getByName.bind(namespace);
+      let releases = 0;
+      namespace.getByName = (name) => {
+        const stub = getByName(name);
+        return { fetch: async (input, init) => {
+          const path = new URL(input).pathname;
+          if (path === '/release') releases += 1;
+          if (path === '/finalize') throw new Error('finalization unavailable');
+          return stub.fetch(input, init);
+        } };
+      };
+      const onboard = () => handleTelegramAgentHandoffRequest({
+        env,
+        request: new Request('https://bridge.example/api/agent/invite/onboard', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ inviteToken, label: 'Participant' }),
+        }),
+      });
+      const first = await onboard();
+      assert.equal(first.status, failure.startsWith('finalize') ? 503 : 500);
+      assert.equal((await first.json()).ok, false);
+      const second = await onboard();
+      assert.equal(second.status, 409);
+      assert.equal((await second.json()).reason, 'invite_token_redemption_pending');
+      assert.equal(credentialWrites, 1);
+      assert.equal(releases, 0);
+      const records = [...kv.store.keys()].filter((key) => key.startsWith(AGENT_CREDENTIAL_KV_PREFIX));
+      assert.equal(records.length, failure === 'finalize-only' ? 0 : 1);
+    });
+  }
+});
+
+test('Invite onboarding releases a reservation when credential storage is absent before issuance', async () => {
+  const inviteToken = 'pre-issuance-invite';
+  const env = agentHttpOnlyEnv({
+    AGENT_BRIDGE_AGENT_API_TOKEN: '',
+    AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([{
+      tokenHash: sha256Hex(inviteToken), sessionSlug: 'alpha', source: 'browser',
+    }]),
+  });
+  const kv = env.AGENT_ACTION_KV;
+  const put = kv.put;
+  kv.put = undefined;
+  const onboard = () => handleTelegramAgentHandoffRequest({
+    env,
+    request: new Request('https://bridge.example/api/agent/invite/onboard', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ inviteToken, label: 'Participant' }),
+    }),
+  });
+  const first = await onboard();
+  assert.equal(first.status, 503);
+  assert.equal((await first.json()).reason, 'agent_token_storage_unavailable');
+  kv.put = put;
+  assert.equal((await onboard()).status, 200);
+});
+
 test('Invite onboarding fails closed when the redemption coordinator is unavailable', async () => {
   const env = agentHttpOnlyEnv({
     AGENT_BRIDGE_AGENT_API_TOKEN: '',
