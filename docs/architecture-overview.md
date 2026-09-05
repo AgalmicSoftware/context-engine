@@ -266,3 +266,7 @@ that are absent from that tree.
 The public smoke runner is `npm run test:e2e`, backed by the Vite navigation and
 route-style smoke. Broader workflow validation is maintained separately from the
 published source package.
+
+## Startup recovery
+
+The entry failure screen automatically performs one cache-busted reload only for recognized stale JavaScript chunk errors. Its cache cleanup removes Cache API entries while preserving local/session storage, including drafts, settings, and reload-loop sentinels. Generic startup failures offer a plain manual reload and leave browser storage and caches untouched. Successful entry/route commits clear only their own recovery markers.

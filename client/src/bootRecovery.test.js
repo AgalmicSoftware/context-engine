@@ -83,8 +83,8 @@ describe('bootRecovery', () => {
       }),
     ).toBe(true);
 
-    expect(document.body).toHaveTextContent('A new version of Context Engine is available');
-    expect(document.body).toHaveTextContent('Reloading clears cached app data and loads the latest version.');
+    expect(document.body).toHaveTextContent('Context Engine could not start');
+    expect(document.body).toHaveTextContent('Your drafts and settings will be preserved.');
     expect(document.body).not.toHaveTextContent('stale app chunk');
     expect(document.querySelector('[role="alert"]')).not.toBeNull();
     expect(document.querySelector('[role="alert"]')).toHaveAttribute('data-boot-error', 'stale app chunk');
@@ -98,7 +98,7 @@ describe('bootRecovery', () => {
     document.querySelector('button').click();
     await Promise.resolve();
 
-    expect(clearCaches).toHaveBeenCalledTimes(1);
+    expect(clearCaches).not.toHaveBeenCalled();
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
@@ -106,7 +106,7 @@ describe('bootRecovery', () => {
     const reload = jest.fn();
     const clearCaches = jest.fn().mockResolvedValue(undefined);
 
-    renderBootFailure('module import failed', {
+    renderBootFailure('Failed to fetch dynamically imported module', {
       reload,
       clearCaches,
       autoRefreshDelayMs: -1,
@@ -198,20 +198,26 @@ describe('bootRecovery', () => {
     Date.now.mockRestore();
   });
 
-  it('clears storage and Cache API entries on a best-effort basis', async () => {
+  it('clears Cache API entries while preserving drafts, settings, and recovery sentinels', async () => {
     const fakeWindow = {
       localStorage: { clear: jest.fn() },
       sessionStorage: { clear: jest.fn() },
       caches: {
-        keys: jest.fn().mockResolvedValue(['app-v1', 'app-v2']),
-        delete: jest.fn().mockResolvedValue(true),
+        keys: jest.fn(function () {
+          expect(this).toBe(fakeWindow.caches);
+          return Promise.resolve(['app-v1', 'app-v2']);
+        }),
+        delete: jest.fn(function () {
+          expect(this).toBe(fakeWindow.caches);
+          return Promise.resolve(true);
+        }),
       },
     };
 
     await clearBootCaches(fakeWindow);
 
-    expect(fakeWindow.localStorage.clear).toHaveBeenCalledTimes(1);
-    expect(fakeWindow.sessionStorage.clear).toHaveBeenCalledTimes(1);
+    expect(fakeWindow.localStorage.clear).not.toHaveBeenCalled();
+    expect(fakeWindow.sessionStorage.clear).not.toHaveBeenCalled();
     expect(fakeWindow.caches.keys).toHaveBeenCalledTimes(1);
     expect(fakeWindow.caches.delete).toHaveBeenCalledWith('app-v1');
     expect(fakeWindow.caches.delete).toHaveBeenCalledWith('app-v2');
@@ -275,3 +281,26 @@ describe('bootRecovery', () => {
     expect(reload).not.toHaveBeenCalled();
   });
 });
+
+for (const error of [new Error('configuration missing'), new TypeError('Cannot read properties of undefined')]) {
+  it(`preserves browser state and uses a plain manual reload for ${error.message}`, async () => {
+    jest.useFakeTimers();
+    document.body.innerHTML = '<div id="root"></div>';
+    const fakeWindow = {
+      location: { href: 'https://app.example/session/fixture?draft=1#question', reload: jest.fn(), assign: jest.fn() },
+      localStorage: { clear: jest.fn() }, sessionStorage: { clear: jest.fn() },
+      caches: { keys: jest.fn(), delete: jest.fn() }, setTimeout,
+    };
+    renderBootFailure(error, { window: fakeWindow });
+    jest.advanceTimersByTime(10000);
+    expect(fakeWindow.location.reload).not.toHaveBeenCalled();
+    screenButton('Reload').click();
+    await Promise.resolve();
+    expect(fakeWindow.location.reload).toHaveBeenCalledTimes(1);
+    expect(fakeWindow.location.assign).not.toHaveBeenCalled();
+    expect(fakeWindow.localStorage.clear).not.toHaveBeenCalled();
+    expect(fakeWindow.sessionStorage.clear).not.toHaveBeenCalled();
+    expect(fakeWindow.caches.keys).not.toHaveBeenCalled();
+    jest.useRealTimers();
+  });
+}

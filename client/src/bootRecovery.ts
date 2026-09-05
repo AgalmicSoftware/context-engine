@@ -83,24 +83,12 @@ export const getBootErrorMessage = (error: unknown): string => {
 
 export const clearBootCaches = async (win: BootWindow = globalThis.window): Promise<void> => {
   try {
-    win?.localStorage?.clear?.();
-  } catch {
-    // Best-effort cleanup for broken cached app state.
-  }
-
-  try {
-    win?.sessionStorage?.clear?.();
-  } catch {
-    // Best-effort cleanup for broken cached app state.
-  }
-
-  try {
     const cacheApi = win?.caches;
     const listCaches = cacheApi?.keys;
     const deleteCache = cacheApi?.delete;
     if (listCaches && deleteCache) {
-      const cacheNames = await listCaches();
-      await Promise.all(cacheNames.map((cacheName) => deleteCache(cacheName)));
+      const cacheNames = await listCaches.call(cacheApi);
+      await Promise.all(cacheNames.map((cacheName) => deleteCache.call(cacheApi, cacheName)));
     }
   } catch {
     // Cache API can be unavailable or permission-blocked in embedded browsers.
@@ -239,12 +227,16 @@ export const renderBootFailure = (error: unknown, options: BootRecoveryOptions =
     return false;
   }
 
+  const staleChunk = isStaleChunkLoadError(error);
   const reloadParam = options.reloadParam || BOOT_RELOAD_PARAM;
-  const reload = options.reload || (() => reloadWithCacheBuster(win, reloadParam));
+  const reload = options.reload || (() => {
+    if (staleChunk) reloadWithCacheBuster(win, reloadParam);
+    else win?.location?.reload?.();
+  });
   const clearCaches = options.clearCaches || (() => clearBootCaches(win));
   const requestedAutoReloadDelayMs = typeof options.autoRefreshDelayMs === 'number' ? options.autoRefreshDelayMs : 3000;
   const automaticReloadPaused = hasReloadParam(win, reloadParam);
-  const autoReloadDelayMs = automaticReloadPaused ? -1 : requestedAutoReloadDelayMs;
+  const autoReloadDelayMs = !staleChunk || automaticReloadPaused ? -1 : requestedAutoReloadDelayMs;
   let refreshStarted = false;
   const refresh = async (button: HTMLButtonElement | null) => {
     if (refreshStarted) return;
@@ -254,7 +246,7 @@ export const renderBootFailure = (error: unknown, options: BootRecoveryOptions =
       button.textContent = 'Refreshing...';
     }
     try {
-      await clearCaches();
+      if (staleChunk) await clearCaches();
     } finally {
       reload();
     }
@@ -299,14 +291,16 @@ export const renderBootFailure = (error: unknown, options: BootRecoveryOptions =
     doc,
     panel,
     'h1',
-    'A new version of Context Engine is available',
+    staleChunk ? 'A new version of Context Engine is available' : 'Context Engine could not start',
     'margin:0 0 14px;color:var(--ce-panel-text,CanvasText);font-size:28px;line-height:1.15;font-weight:800',
   );
   appendTextNode(
     doc,
     panel,
     'p',
-    'Reloading clears cached app data and loads the latest version.',
+    staleChunk
+      ? 'Reloading clears cached app data and loads the latest version.'
+      : 'Reload to try again. Your drafts and settings will be preserved.',
     'margin:0 0 20px;color:var(--ce-panel-text-muted,CanvasText);font-size:17px;line-height:1.45',
   );
   const countdownNode = appendTextNode(
