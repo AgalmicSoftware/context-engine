@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { spawnSync } = require('node:child_process');
+const { execFileSync, spawnSync } = require('node:child_process');
 
 const { verifyPublicAssets } = require('./verify-public-assets');
 
@@ -13,6 +13,10 @@ function writeFile(rootDir, relativePath, contents) {
   const absolutePath = path.join(rootDir, relativePath);
   fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
   fs.writeFileSync(absolutePath, contents);
+}
+
+function initGit(rootDir) {
+  execFileSync('git', ['init', '--quiet'], { cwd: rootDir });
 }
 
 function withFixture(run) {
@@ -77,6 +81,87 @@ test('verifyPublicAssets ignores local build-audit output excluded from the clie
     writeFile(rootDir, 'README.md', '# Public project\n');
 
     const result = verifyPublicAssets(rootDir);
+    assert.deepEqual(result.findings, []);
+    assert.equal(result.scannedFiles, 0);
+  });
+});
+
+test('verifyPublicAssets ignores assets hidden by gitignore in a git checkout', () => {
+  withFixture((rootDir) => {
+    initGit(rootDir);
+    writeFile(rootDir, '.gitignore', 'ignored-local/\n');
+    writeFile(rootDir, 'README.md', '# Public project\n');
+    writeFile(rootDir, 'ignored-local/orphan.png', Buffer.from([0, 1, 2]));
+
+    const result = verifyPublicAssets(rootDir);
+
+    assert.deepEqual(result.findings, []);
+    assert.equal(result.scannedFiles, 0);
+  });
+});
+
+test('verifyPublicAssets does not let an ignored owner hide a visible orphan asset', () => {
+  withFixture((rootDir) => {
+    initGit(rootDir);
+    writeFile(rootDir, '.gitignore', 'ignored-local/\n');
+    writeFile(rootDir, 'docs/assets/orphan.png', Buffer.from([0, 1, 2]));
+    writeFile(rootDir, 'ignored-local/owner.md', 'docs/assets/orphan.png\n');
+
+    const result = verifyPublicAssets(rootDir);
+
+    assert.deepEqual(result.findings, [{
+      file: 'docs/assets/orphan.png',
+      kind: 'unreferenced public asset',
+    }]);
+    assert.equal(result.scannedFiles, 1);
+  });
+});
+
+test('verifyPublicAssets does not follow a visible symlink to an ignored owner', () => {
+  withFixture((rootDir) => {
+    initGit(rootDir);
+    writeFile(rootDir, '.gitignore', 'ignored-local/\n');
+    writeFile(rootDir, 'docs/assets/orphan.png', Buffer.from([0, 1, 2]));
+    writeFile(rootDir, 'ignored-local/owner.md', 'docs/assets/orphan.png\n');
+    fs.symlinkSync(path.join(rootDir, 'ignored-local', 'owner.md'), path.join(rootDir, 'visible-owner.md'));
+
+    const result = verifyPublicAssets(rootDir);
+
+    assert.deepEqual(result.findings, [{
+      file: 'docs/assets/orphan.png',
+      kind: 'unreferenced public asset',
+    }]);
+    assert.equal(result.scannedFiles, 1);
+  });
+});
+
+test('verifyPublicAssets rejects tracked and new nonignored orphan assets in a git checkout', () => {
+  withFixture((rootDir) => {
+    initGit(rootDir);
+    writeFile(rootDir, 'README.md', '# Public project\n');
+    writeFile(rootDir, 'client/src/assets/tracked.png', Buffer.from([0, 1, 2]));
+    writeFile(rootDir, 'client/src/assets/new.png', Buffer.from([3, 4, 5]));
+    execFileSync('git', ['add', 'README.md', 'client/src/assets/tracked.png'], { cwd: rootDir });
+
+    const result = verifyPublicAssets(rootDir);
+
+    assert.deepEqual(result.findings.map((finding) => finding.file), [
+      'client/src/assets/new.png',
+      'client/src/assets/tracked.png',
+    ]);
+    assert.equal(result.scannedFiles, 2);
+  });
+});
+
+test('verifyPublicAssets keeps tmp-build-audit excluded in a git checkout', () => {
+  withFixture((rootDir) => {
+    initGit(rootDir);
+    writeFile(rootDir, 'client/.tmp-build-audit/orphan.png', Buffer.from([0, 1, 2]));
+    writeFile(rootDir, 'client/.tmp-build-audit/index.html', '<img src="orphan.png">\n');
+    writeFile(rootDir, 'README.md', '# Public project\n');
+
+    const result = verifyPublicAssets(rootDir);
+
     assert.deepEqual(result.findings, []);
     assert.equal(result.scannedFiles, 0);
   });

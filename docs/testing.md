@@ -132,8 +132,9 @@ npm run verify:public-text:prepared
 ```
 
 The release-surface check rejects retained code that imports a stripped path.
-The asset check rejects image files that have no literal owner in source,
-documentation, or a public asset manifest. Public artifact preparation also
+The asset check rejects Git-visible image files that have no literal owner in
+Git-visible source, documentation, or a public asset manifest, while prepared
+non-Git artifacts use the same recursive tree scan. Public artifact preparation also
 runs the documentation and all-text checks after private paths and package
 commands have been removed; `verify:public-text` is therefore intended for a
 prepared public tree rather than the full development checkout. The

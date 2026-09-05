@@ -170,6 +170,7 @@ function main(argv = process.argv.slice(2)) {
 if (require.main === module) process.exitCode = main();
 
 module.exports = {
+  collectGitVisiblePaths,
   formatFindings,
   verifyPublicText,
 };
