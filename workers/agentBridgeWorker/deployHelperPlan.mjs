@@ -1,10 +1,16 @@
 #!/usr/bin/env node
+import { safeString, envFlagEnabled } from './runtimePrimitives.mjs';
 
 import { fileURLToPath } from 'url';
 import { resolve } from 'path';
 import { randomBytes } from 'crypto';
 import rpcDefaults from '../../shared/rpcDefaults.cjs';
 import { resolvePinnedSessionWorkerAuthority } from './sessionWorkerAuthority.mjs';
+import {
+  AGENT_INVITE_COORDINATOR_BINDING,
+  AGENT_INVITE_COORDINATOR_CLASS,
+  AGENT_INVITE_COORDINATOR_MIGRATION_TAG,
+} from './agentInviteRedemptionCoordinator.mjs';
 
 const DEFAULT_WORKER_NAME = 'ce-agent-bridge-worker';
 const DEFAULT_COMPATIBILITY_DATE = '2024-09-02';
@@ -92,10 +98,6 @@ export const OPTIONAL_AGENT_BRIDGE_VAR_NAMES = Object.freeze([
   'AGENT_BRIDGE_SESSION_REGISTRY_ADDRESS',
 ]);
 
-function safeString(value) {
-  return String(value || '').trim();
-}
-
 function normalizeWorkerName(value = '') {
   const normalized = safeString(value || DEFAULT_WORKER_NAME)
     .toLowerCase()
@@ -115,10 +117,6 @@ function normalizeWorkersSubdomain(value = '') {
 
 function tokenPresent(value = '') {
   return safeString(value).length > 0;
-}
-
-function envFlagEnabled(value = '') {
-  return ['1', 'true', 'yes', 'on'].includes(safeString(value).toLowerCase());
 }
 
 function redactPresence(value = '') {
@@ -530,6 +528,11 @@ export function buildAgentBridgeWorkerUploadMetadata(config = {}) {
     .filter(([name, text]) => !OPTIONAL_AGENT_BRIDGE_VAR_NAMES.includes(name) || !!safeString(text)));
   const bindings = [
     { name: 'AGENT_ACTION_KV', type: 'kv_namespace', namespace_id: '<created-kv-namespace-id>' },
+    {
+      name: AGENT_INVITE_COORDINATOR_BINDING,
+      type: 'durable_object_namespace',
+      class_name: AGENT_INVITE_COORDINATOR_CLASS,
+    },
   ];
   if (config.resources?.enableDocStorage === true) {
     bindings.push(
@@ -549,6 +552,11 @@ export function buildAgentBridgeWorkerUploadMetadata(config = {}) {
     compatibility_date: safeString(config.compatibilityDate || DEFAULT_COMPATIBILITY_DATE),
     compatibility_flags: ['nodejs_compat', 'global_fetch_strictly_public'],
     bindings,
+    migrations: {
+      old_tag: '',
+      new_tag: AGENT_INVITE_COORDINATOR_MIGRATION_TAG,
+      new_sqlite_classes: [AGENT_INVITE_COORDINATOR_CLASS],
+    },
   };
 }
 

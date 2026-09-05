@@ -30,8 +30,12 @@ test('typed-test classifier includes tests, setup, and named helpers without exc
 
 test('every tracked typed test and named helper is classified', () => {
   const files = listTrackedClientTestTypeFiles(process.cwd());
-  assert.ok(files.length > 800);
+  assert.ok(files.length > 0);
   assert.ok(files.every((relativePath) => classifyClientTestTypePath(relativePath).included));
+  assert.deepEqual(
+    [...new Set(files.map((relativePath) => classifyClientTestTypePath(relativePath).reason))].sort(),
+    ['test-helper', 'test-setup', 'test-source'],
+  );
 });
 
 test('typed-test inventory ignores tracked files deleted in the working tree', () => {

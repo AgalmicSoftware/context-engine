@@ -32,6 +32,30 @@
 
 import { Buffer } from 'buffer';
 import { ethers, utils } from 'ethers';
+import {
+  aesGcmDecrypt,
+  aesGcmEncrypt,
+  buildCommitDomainBytes,
+  buildEip712KeyWrap,
+  buildEnvelopeObject,
+  buildResponseFieldAAD,
+  computeResponseFieldContext,
+  computeSaltedCommitments as computeSharedSaltedCommitments,
+  deriveKekFromSig,
+  encodeValueBytes,
+  getContextBytes,
+  hashIdentifier,
+  hexToBytes,
+  importAesGcmKey,
+  normalizePoseidonHashOutput,
+  requireBigInt,
+  safeLower,
+  stableStringify,
+  toField,
+  utf8d,
+  utf8e,
+  wrapCekWithSelfRecipient as wrapCekWithSharedSelfRecipient,
+} from '@ce-shared/encryption/envelopeV1Core.mjs';
 import groupPasswordDerivation from 'utilities/crypto/groupPasswordDerivation.cjs';
 import { createLogger } from '../logging';
 import { perfDebugDecryptEnvelope } from '../web3/rpcDebugStats.js';
@@ -141,7 +165,6 @@ type InviteSignatureVerificationResult = {
   usedFallback?: boolean;
   error?: string;
 };
-type AesGcmOptions = { aadBytes?: BufferSource };
 type LitSaveKeyResult = UnknownRecord & {
   ciphertext?: string;
   dataToEncryptHash?: string;
@@ -334,29 +357,8 @@ const toUint8Array = (value: unknown): Uint8Array => {
 const log = createLogger('crypto');
 const logCryptoFallback = (e: unknown) => log.warn('crypto fallback:', e);
 
-const requireBigInt = () => {
-  if (typeof BigInt !== 'function') {
-    throw new Error(
-      'BigInt is required for commitments. Use a modern browser: Chrome ≥67, Edge ≥79, Firefox ≥68, Safari/iOS ≥14.',
-    );
-  }
-};
-
 /* ----------------------------- Byte helpers ------------------------------ */
 
-const hexToBytes = (hex: Parameters<typeof utils.arrayify>[0]): Uint8Array => utils.arrayify(hex);
-const bytesToHex = (bytes: Parameters<typeof utils.hexlify>[0]): string => utils.hexlify(bytes);
-const concatBytes = (...arrs: Array<Uint8Array | null | undefined>): Uint8Array => {
-  const total = arrs.reduce((n, a) => n + (a ? a.length : 0), 0);
-  const out = new Uint8Array(total);
-  let o = 0;
-  for (const a of arrs) {
-    if (!a) continue;
-    out.set(a, o);
-    o += a.length;
-  }
-  return out;
-};
 const normalizeBufferInput = (bytes: ByteInput): Uint8Array | ArrayLike<number> => {
   if (bytes instanceof ArrayBuffer) return new Uint8Array(bytes);
   if (ArrayBuffer.isView(bytes)) return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -365,32 +367,6 @@ const normalizeBufferInput = (bytes: ByteInput): Uint8Array | ArrayLike<number> 
 const bufferFromBytes = (bytes: ByteInput) => Buffer.from(normalizeBufferInput(bytes));
 const b64encode = (bytes: ByteInput) => bufferFromBytes(bytes).toString('base64');
 const b64decode = (b64: unknown): Uint8Array => new Uint8Array(Buffer.from(String(b64 || ''), 'base64'));
-
-const utf8e = (s: unknown): Uint8Array => new TextEncoder().encode(String(s));
-const utf8d = (b: BufferSource): string => new TextDecoder().decode(b);
-
-/* -------------------------- Crypto primitives ---------------------------- */
-
-const sha256 = async (bytes: BufferSource): Promise<Uint8Array> => {
-  const subtle = globalThis.crypto?.subtle;
-  if (subtle) {
-    try {
-      return new Uint8Array(await subtle.digest('SHA-256', bytes));
-    } catch (e) {
-      logCryptoFallback(e);
-      // Fall through to ethers implementation.
-    }
-  }
-  try {
-    const bytesLike =
-      bytes instanceof ArrayBuffer
-        ? new Uint8Array(bytes)
-        : new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-    return utils.arrayify(utils.sha256(bytesLike));
-  } catch (_) {
-    throw new Error('SHA-256 is not available in this environment.');
-  }
-};
 
 /* ------------------------- Invite + group helpers ------------------------ */
 
@@ -565,36 +541,7 @@ const verifyInviteSignature = ({
   }
 };
 
-/**
- * AES-GCM with AAD (additional authenticated data).
- */
-const aesGcmEncrypt = async (key: CryptoKey, plaintextBytes: BufferSource, { aadBytes }: AesGcmOptions = {}) => {
-  const iv = window.crypto.getRandomValues(new Uint8Array(12));
-  const ciphertext = await window.crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv, ...(aadBytes ? { additionalData: aadBytes } : {}) },
-    key,
-    plaintextBytes,
-  );
-  return { iv, ciphertext: new Uint8Array(ciphertext) };
-};
-
-const aesGcmDecrypt = async (
-  key: CryptoKey,
-  iv: BufferSource,
-  ciphertextBytes: BufferSource,
-  { aadBytes }: AesGcmOptions = {},
-) => {
-  const plaintext = await window.crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv, ...(aadBytes ? { additionalData: aadBytes } : {}) },
-    key,
-    ciphertextBytes,
-  );
-  return new Uint8Array(plaintext);
-};
-
 /* ------------------------ EIP-1193 / provider utils ---------------------- */
-
-const safeLower = (x: unknown) => (typeof x === 'string' ? x.toLowerCase() : x);
 
 /**
  * Determine provider kind by heuristics ('wagmi' | 'passkey-eoa' | 'web3auth').
@@ -719,54 +666,6 @@ const _getProvider = (providerLike: ProviderLike): Eip1193Provider => {
     request: async () => {
       throw new Error('No EIP-1193 provider available.');
     },
-  };
-};
-
-/* --------------------------- EIP-712 helpers ----------------------------- */
-
-const buildEip712KeyWrap = (
-  account: string,
-  chainId: ChainIdInput,
-  contextHex: string,
-  nonce: string | number | null = null,
-) => {
-  const checksummedAccount = utils.getAddress(account);
-  const keyDerivationTypes: Array<{ name: string; type: string }> = [
-    { name: 'app', type: 'string' },
-    { name: 'purpose', type: 'string' },
-    { name: 'account', type: 'address' },
-    { name: 'context', type: 'bytes32' },
-  ];
-  const message: UnknownRecord & {
-    app: string;
-    purpose: string;
-    account: string;
-    context: string;
-    nonce?: string;
-  } = {
-    app: 'SurveyTool',
-    purpose: 'SURVEY_CEK_WRAP_V1',
-    account: checksummedAccount,
-    context: contextHex,
-  };
-
-  if (nonce !== null && nonce !== undefined) {
-    keyDerivationTypes.push({ name: 'nonce', type: 'uint256' });
-    message.nonce = String(nonce);
-  }
-
-  return {
-    domain: {
-      name: 'ContextEngineEncKey',
-      version: '1',
-      chainId: Number(chainId),
-      verifyingContract: '0x0000000000000000000000000000000000000000',
-    },
-    types: {
-      KeyDerivation: keyDerivationTypes,
-    },
-    primaryType: 'KeyDerivation',
-    message,
   };
 };
 
@@ -902,51 +801,10 @@ const signEip712V4 = async (providerLike: ProviderLike, a: unknown, b?: unknown,
  * Compute a deterministic 32-byte context hash for AAD + HKDF info.
  * Includes chainId, account (author), surveyId, qId, and response field slot.
  */
-const computeContext = ({ chainId, account, surveyId, qId, fieldKey }: SurveyContextInput) => {
-  const cid = chainId === 0 || chainId ? String(chainId) : '';
-  const acct = safeLower(account || '');
-  const sid = safeLower(surveyId || utils.hexZeroPad('0x0', 32));
-  const q = safeLower(qId || '');
-  const field = safeLower(fieldKey || '');
-  return utils.keccak256(utf8e(`rxc|v1|chain:${cid}|acct:${acct}|survey:${sid}|qid:${q}|field:${field}`));
-};
-
-const buildAAD = ({ contextHex, chainId, surveyId, qId, fieldKey }: SurveyContextInput & { contextHex: string }) => ({
-  context: contextHex,
-  chainId: chainId ?? null,
-  surveyId: surveyId ?? null,
-  qId: qId ?? null,
-  fieldKey: fieldKey ?? null,
-});
+const computeContext = computeResponseFieldContext;
+const buildAAD = buildResponseFieldAAD;
 
 /* ---------------------- Canonical encoders (commit) ---------------------- */
-
-/**
- * Normalize an arbitrary identifier to a bytes32.
- * - Already 32-byte hex → lowercased passthrough.
- * - Nullish/empty → 0x00…00 (bytes32 zero).
- * - Otherwise → keccak256(toUtf8Bytes(identifier)) via utils.id.
- */
-const hashIdentifier = (identifier: unknown) => {
-  const s = identifier === null || identifier === undefined ? '' : String(identifier);
-
-  // Accept exact 32-byte hex inputs as-is (normalized to lowercase)
-  try {
-    if (utils.isHexString(s, 32)) {
-      return s.toLowerCase();
-    }
-  } catch (_) {
-    /* fall through to hashing */
-  }
-
-  // Empty/null → bytes32 zero
-  if (s.trim() === '') {
-    return utils.hexZeroPad('0x0', 32);
-  }
-
-  // Default: hash string to bytes32
-  return utils.id(s);
-};
 
 /**
  * Resolve question kind/meta from opts.questionPool.
@@ -962,53 +820,6 @@ const getQuestionKindMeta = (qId: unknown, opts: { questionPool?: QuestionLike[]
   return { kind: 'freeform', options: [] };
 };
 
-const encodeFreeform = (value: unknown) => utf8e(value == null ? '' : String(value));
-
-const encodeBinary = (value: unknown) => {
-  const map: Record<string, number> = { Disagree: 0, Unsure: 1, Agree: 2 };
-  const raw = String(value);
-  const v = map[raw] ?? map[raw.charAt(0).toUpperCase() + raw.slice(1)] ?? 1;
-  return new Uint8Array([v & 0xff]);
-};
-
-const encodeRating = (value: unknown) => {
-  let n = Number(value);
-  if (!Number.isFinite(n)) n = 0;
-  if (n < 0) n = 0;
-  if (n > 10) n = 10;
-  return new Uint8Array([n & 0xff]);
-};
-
-const encodeMultichoiceBitset = (valueArr: unknown, options: unknown[]) => {
-  const opts = Array.isArray(options) ? options : [];
-  const chosen = new Set(Array.isArray(valueArr) ? valueArr.map(String) : []);
-  const bitLen = Math.max(opts.length, 1);
-  const byteLen = Math.ceil(bitLen / 8);
-  const bytes = new Uint8Array(byteLen);
-  for (let i = 0; i < opts.length; i++) {
-    if (chosen.has(String(opts[i]))) {
-      const byteIdx = Math.floor(i / 8);
-      const bitIdx = i % 8;
-      bytes[byteIdx] |= 1 << bitIdx;
-    }
-  }
-  return bytes;
-};
-
-const encodeValueBytes = (kind: unknown, value: unknown, { options = [] }: { options?: unknown[] } = {}) => {
-  switch (kind) {
-    case 'binary':
-      return encodeBinary(value);
-    case 'rating':
-      return encodeRating(value);
-    case 'multichoice':
-      return encodeMultichoiceBitset(value, options);
-    case 'freeform':
-    default:
-      return encodeFreeform(value);
-  }
-};
-
 /* ------------------------ Commitments (Keccak, Poseidon) ----------------------- */
 
 /**
@@ -1016,26 +827,6 @@ const encodeValueBytes = (kind: unknown, value: unknown, { options = [] }: { opt
  * - If a real Poseidon is available (e.g., window.poseidon from circomlibjs), we use it.
  * - Otherwise the caller must provide a hasher, or Poseidon commitments are unavailable.
  */
-const BN254_P = BigInt('21888242871839275222246405745257275088548364400416034343698204186575808495617');
-
-const toField = (bytes: Uint8Array) => {
-  // Reduce bytes mod p to a field element.
-  let x = 0n;
-  for (let i = 0; i < bytes.length; i++) {
-    x = (x * 256n + BigInt(bytes[i])) % BN254_P;
-  }
-  return x;
-};
-
-const bigIntToHex32 = (x: bigint) => {
-  let h = x.toString(16);
-  if (h.length % 2) h = '0' + h;
-  if (h.length < 64) h = h.padStart(64, '0');
-  return '0x' + h;
-};
-
-const normalizePoseidonHashOutput = (out: PoseidonHashValue) => bigIntToHex32(BigInt(out) % BN254_P);
-
 const poseidonHashBytes = (
   parts: Uint8Array[],
   customHasher: PoseidonHasher | null = null,
@@ -1073,6 +864,13 @@ const poseidonHashBytes = (
     // fall through to required-hasher error
   }
   throw new Error('Poseidon hasher required but not available');
+};
+
+const resolvePoseidonHasher = (customHasher: PoseidonHasher | null = null): PoseidonHasher | null => {
+  if (typeof customHasher === 'function') return customHasher;
+  const browserHasher =
+    (typeof window !== 'undefined' && (window.poseidon || window.poseidon1 || window.Poseidon)) || null;
+  return typeof browserHasher === 'function' ? browserHasher : null;
 };
 
 /**
@@ -1180,16 +978,6 @@ async function addTopLevelPoseidonIfRequired(
 }
 
 /**
- * Build domain separation bytes for commitments.
- * Spec: include protocol/version & IDs.
- */
-const buildCommitDomainBytes = ({ chainId, surveyId, qId }: SurveyContextInput) => {
-  const sid = safeLower(surveyId || utils.hexZeroPad('0x0', 32));
-  const ds = `rxc|commit|v1|chain:${String(chainId ?? '')}|survey:${sid}|qid:${safeLower(qId || '')}`;
-  return utf8e(ds);
-};
-
-/**
  * Compute salted commitments for a single field (kind-aware canonicalization).
  * Returns: { keccakHex, poseidonHex, saltBytes, saltHex, canonicalBytes }
  */
@@ -1207,26 +995,23 @@ const computeSaltedCommitments = async ({
   optionsForKind?: unknown[];
   hasher?: PoseidonHasher | null;
 }): Promise<Commitments> => {
-  // Random 128-bit salt per field
-  const saltBytes = new Uint8Array(16);
-  window.crypto.getRandomValues(saltBytes);
-  const saltHex = bytesToHex(saltBytes);
-
-  const domainBytes = buildCommitDomainBytes({ chainId, surveyId, qId });
-  const canonicalBytes = encodeValueBytes(kind, value, { options: optionsForKind });
-
-  // keccak256(salt || valueBytes || domain)
-  const keccakHex = utils.keccak256(concatBytes(saltBytes, canonicalBytes, domainBytes));
-
-  // poseidon(salt || valueBytes || domain)
-  let poseidonHex = null;
-  try {
-    poseidonHex = await poseidonHashBytes([saltBytes, canonicalBytes, domainBytes], hasher);
-  } catch (e) {
-    log.warn('Poseidon commitment unavailable, omitting:', toErrorMessage(e) || e);
-  }
-
-  return { keccakHex, poseidonHex, saltBytes, saltHex, canonicalBytes };
+  const shared = await computeSharedSaltedCommitments({
+    chainId,
+    surveyId,
+    qId,
+    kind,
+    value,
+    optionsForKind,
+    hasher: resolvePoseidonHasher(hasher),
+  });
+  const saltBytes = hexToBytes(shared.salt);
+  return {
+    keccakHex: shared.keccak256,
+    poseidonHex: shared.poseidon,
+    saltBytes,
+    saltHex: shared.salt,
+    canonicalBytes: encodeValueBytes(kind, value, { options: optionsForKind }),
+  };
 };
 
 /* -------------------------- v1 envelope utilities ------------------------- */
@@ -1238,36 +1023,6 @@ function assertBytes32Hex(hex: unknown): asserts hex is string {
 }
 
 const isObj = (x: unknown): x is UnknownRecord => isRecord(x);
-
-const stableStringify = (obj: unknown) => {
-  // Deterministic stringify for AAD
-  return JSON.stringify(obj);
-};
-
-const importAesGcmKey = (raw32: BufferSource) =>
-  window.crypto.subtle.importKey('raw', raw32, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
-
-const getContextBytes = (contextHex: string) => hexToBytes(contextHex);
-
-/**
- * HKDF KEK derivation for wrapping (EIP-712 signature → HKDF).
- * IKM := SHA-256(signature)
- * salt := 'surveytool:v1'
- * info := contextBytes (32 bytes)
- */
-const deriveKekFromSig = async (signatureHex: string, contextBytes: BufferSource) => {
-  const sigBytes = hexToBytes(signatureHex);
-  const ikm = await sha256(sigBytes);
-  const hkdfKey = await window.crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveKey']);
-  const kek = await window.crypto.subtle.deriveKey(
-    { name: 'HKDF', salt: utf8e('surveytool:v1'), info: contextBytes, hash: 'SHA-256' },
-    hkdfKey,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt', 'decrypt'],
-  );
-  return kek;
-};
 
 const wrapCekWithSelfRecipient = async ({
   providerLike,
@@ -1287,31 +1042,19 @@ const wrapCekWithSelfRecipient = async ({
   if (!provider || typeof provider.request !== 'function') {
     throw new Error('No EIP-1193 provider available for self recipient.');
   }
-  if (!account) throw new Error('Missing account for self recipient.');
-  if (chainId === undefined || chainId === null) throw new Error('Missing chainId for self recipient.');
-
-  const nonceBytes = window.crypto.getRandomValues(new Uint8Array(32));
-  const nonce = BigInt(bytesToHex(nonceBytes)).toString();
-  const typed = buildEip712KeyWrap(account, chainId, contextHex, nonce);
-  const sig = await signEip712V4(provider, account, typed);
-
-  const contextBytes = getContextBytes(contextHex);
-  const kek = await deriveKekFromSig(sig, contextBytes);
-
-  // AES-GCM wrap (with its own IV), bind context as AAD
-  const wrap_iv = window.crypto.getRandomValues(new Uint8Array(12));
-  const cipher = await window.crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv: wrap_iv, additionalData: contextBytes },
-    kek,
+  return wrapCekWithSharedSelfRecipient({
+    signTypedData: (domain: UnknownRecord, types: UnknownRecord, message: UnknownRecord) =>
+      signEip712V4(provider, String(account || ''), {
+        domain,
+        types,
+        primaryType: 'KeyDerivation',
+        message,
+      }),
+    account,
+    chainId,
+    contextHex,
     cekRaw,
-  );
-  return {
-    type: 'self-eip712-v1',
-    context: contextHex,
-    wrap_iv: b64encode(wrap_iv),
-    wrapped_cek: b64encode(new Uint8Array(cipher)),
-    nonce,
-  };
+  });
 };
 
 const maybeAddOneLitRecipient = async (
@@ -1444,19 +1187,18 @@ const buildEnvelope = ({
   recipients: EnvelopeRecipient[];
   commitments: Commitments;
   kind: unknown;
-}): Envelope => ({
-  v: 1,
-  cipher: 'aes-gcm-256',
-  iv: b64encode(iv),
-  aad: aadObj,
-  ciphertext: b64encode(ciphertextBytes),
-  recipients,
-  commitments: {
-    keccak256: commitments.keccakHex,
-    ...(commitments.poseidonHex ? { poseidon: commitments.poseidonHex } : {}),
-  },
-  meta: { kind },
-});
+}): Envelope =>
+  buildEnvelopeObject({
+    iv,
+    ciphertextBytes,
+    aadObj,
+    recipients,
+    commitments: {
+      keccak256: commitments.keccakHex,
+      poseidon: commitments.poseidonHex,
+    },
+    kind,
+  }) as Envelope;
 
 /**
  * Validate envelope shape and return parsed object.

@@ -72,7 +72,7 @@ architecture.
 |-------|-------------|--------------|-----------------|
 | **Client** | React SPA: survey authoring, response collection, SBT management, encryption gates, admin, session wizard | Shared across implemented profiles | `client/src/` |
 | **Session Worker** | Auth, canonical config, AI proxy, transcription, storage routes, controlled URL/image fetch, and profile-enabled chain/Arweave helpers | Canonical authority for Hosted & Fast; service boundary for decentralized/custom profiles | `workers/sessionCorsWorker/` |
-| **Agent Bridge** | Scoped Agent HTTP API plus optional Telegram bot/Mini App adapters; delegates session membership and gate authority to the configured Session Worker where required | Separately deployed, optional sidecar for agent-enabled sessions | `workers/agentBridgeWorker/` |
+| **Agent Bridge Worker** | Agent HTTP compatibility plus Telegram webhook, command, queue, Mini App transport, and atomically coordinated one-time invite exchange | Transitional adapter; session authority is being consolidated into the Session Worker | `workers/agentBridgeWorker/` |
 | **Cloudflare storage** | Worker KV config, secrets, encrypted payload envelopes/indexes, and optional advanced R2 blobs | Hosted & Fast default | Worker bindings (external) |
 | **Contracts** | Session registry, surveys, SBTs, gates, and factory on supported EVM chains | Trustless & Slower and explicit chain-backed custom profiles | `contracts/` |
 | **Arweave** | Immutable metadata, survey/question payloads, SBT tokenURI, and document-library files | Trustless & Slower and explicit Arweave-backed custom profiles | External |
@@ -182,9 +182,9 @@ Lit opt-in:
 | **Utilities** | |
 | Web3 / contracts | `utilities/web3/chainGateway.ts`, `contractScripts.impl.ts`, `contractHelpers.ts`, `chainEventStreams.ts`, `profileChainReads.ts`, `sessionRegistry.ts` |
 | Wallet | `client/src/wallet/` passkey EOA wallet config, encrypted keystore, EIP-1193 provider, and soft-session worker |
-| Crypto / Lit | `utilities/crypto/litProtocol.ts`, `cryptography.ts`, `encryptedFields.ts` |
+| Crypto / Lit | `shared/encryption/envelopeV1Core.mjs` owns the browser/CE-CC envelope-v1 primitives; `utilities/crypto/cryptography.ts`, `litProtocol.ts`, and `encryptedFields.ts` own browser providers, Lit integration, and response orchestration |
 | Arweave | `utilities/arweave/arweaveClient.js`, `arweaveUrls.ts` |
-| Session helpers | `utilities/session/sessionNaming.ts`, `sessionMetadata.ts`, `resourceKeys.ts`, `sessionModeProfile.ts`, `groupCreationPolicy.ts`, `sessionBackendKind.ts`, `agentClientLogin.ts`, `telegramAgentData.ts`, `telegramSessionBackend.ts` |
+| Session helpers | `utilities/session/sessionSlug.ts` owns identity/transport/storage slug conversions; `sessionNaming.ts`, `sessionMetadata.ts`, `resourceKeys.ts`, `sessionModeProfile.ts`, `groupCreationPolicy.ts`, `sessionBackendKind.ts`, `agentClientLogin.ts`, `telegramAgentData.ts`, and `telegramSessionBackend.ts` own higher-level session behavior |
 | Worker auth | `utilities/worker/workerAuth.ts`, `corsProxy.ts` |
 | Cache | `utilities/cache/cacheScripts.ts` |
 | AI | `utilities/ai/aiClient.ts`, `aiSettings.ts` |
@@ -209,7 +209,7 @@ Lit opt-in:
 |--------|---------|
 | `sessionCorsWorker/worker.js` | Canonical config/auth/storage for Hosted & Fast, plus profile-enabled AI, Arweave, fetch, transcription, and faucet routes |
 | `deploy-helper/worker.js` | Explicit legacy/sponsored Worker-deployment fallback and Agent Wrapped provisioning; not the native `/new` default |
-| `agentBridgeWorker/worker.js` | Separately deployed Agent HTTP service with canonical `/api/agent/*` routes, scoped `ceagt_` credentials, and optional Telegram/Mini App adapters |
+| `agentBridgeWorker/worker.js` | Agent HTTP compatibility and optional Telegram/Mini App transport while session authority consolidates into the Session Worker |
 
 ### Verification
 

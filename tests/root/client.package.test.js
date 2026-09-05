@@ -96,6 +96,15 @@ test('client HTML shell description stays aligned with the README framing', () =
   assert.match(html, /cryptographic access control/);
 });
 
+test('client static headers deny framing and report broader CSP compatibility', () => {
+  const headers = readText('client/public/_headers');
+
+  assert.match(headers, /Referrer-Policy: strict-origin-when-cross-origin/);
+  assert.match(headers, /Content-Security-Policy: frame-ancestors 'none'/);
+  assert.match(headers, /Content-Security-Policy-Report-Only: default-src 'self'/);
+  assert.match(headers, /connect-src 'self' https: wss: data:/);
+});
+
 test('public favicon family uses white circuit C artwork with alpha transparency', () => {
   const expectedHashes = {
     'client/public/favicon-16x16.png': '023aafa47101b75938a54d56d921da32830fb96ab91003f2a280de939d938686',

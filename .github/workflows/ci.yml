@@ -83,6 +83,8 @@ jobs:
             --approval "$BASELINE_MONOTONICITY_APPROVED"
 
       - name: Run wiring and release gate
+        env:
+          CLIENT_LARGE_FILE_BASE_REF: ${{ steps.baseline-monotonicity-base.outputs.base_sha }}
         run: npm run ci:gate -- wiring-and-release
 
       - name: Run public text gate
@@ -278,7 +280,7 @@ jobs:
       - name: Run tracked E2E smoke
         env:
           BASE_URL: http://127.0.0.1:4173
-          SMOKE_ROUTES: /session/pe4,/about,/contracts
+          SMOKE_ROUTES: /session/new,/session/pe4,/about,/contracts
         run: |
           set -euo pipefail
           npm --prefix client run preview -- --host 127.0.0.1 --port 4173 > /tmp/context-engine-vite-preview.log 2>&1 &
@@ -293,6 +295,15 @@ jobs:
           curl -fsS "$BASE_URL" >/dev/null
           npm run ci:gate -- e2e-smoke
 
+      - name: Upload E2E diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: e2e-smoke-diagnostics
+          path: /tmp/context-engine-vite-preview.log
+          if-no-files-found: warn
+          retention-days: 7
+
   cecc-and-node:
     if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository || !startsWith(github.head_ref, 'release-staging') }}
     runs-on: ubuntu-latest
@@ -301,6 +312,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -321,7 +334,21 @@ jobs:
       - name: Install sessionCorsWorker dependencies
         run: npm --prefix workers/sessionCorsWorker ci
 
+      - name: Resolve client growth baseline
+        id: client-growth-base
+        env:
+          BASELINE_EVENT_NAME: ${{ github.event_name }}
+          BASELINE_REF_NAME: ${{ github.ref_name }}
+          BASELINE_PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASELINE_PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          node scripts/resolve-baseline-monotonicity-base.mjs --github-output "$GITHUB_OUTPUT"
+
       - name: Run Context Engine CC and Node gate
+        env:
+          CLIENT_LARGE_FILE_BASE_REF: ${{ steps.client-growth-base.outputs.base_sha }}
         run: npm run ci:gate -- cecc-and-node
 
   test:

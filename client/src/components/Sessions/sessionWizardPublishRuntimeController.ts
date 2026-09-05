@@ -1,4 +1,3 @@
-import sha256 from 'crypto-js/sha256';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { workerAuthPublishAdapter } from '../../domains/sessions/publish/sessionPublishAdapters.js';
 import {
@@ -26,10 +25,12 @@ import {
   type SessionWizardWorkerConfigSignInput,
 } from './sessionWizardWorkerConfigPersistence';
 import type { SessionWizardWorkerSettlementInput } from './sessionWizardWorkerSettlement';
+import type { PendingWorkerGroupDraft } from './sessionWizardPendingWorkerGroups';
 import {
   matchesSessionWizardWorkerPublishEvidence,
   type SessionWizardWorkerPublishEvidence,
 } from './sessionWizardWorkerPublishEvidence';
+import { canonicalizeSessionWizardJson, fingerprintSessionWizardJson } from './sessionWizardCanonicalJson';
 
 type RuntimeRef = {
   current: SessionWizardWorkerDeployRuntime | null;
@@ -65,23 +66,11 @@ const requireSuccessfulDurableStorageOperation = (result: unknown, message: stri
   throw new Error(status ? `${message} (${status}).` : `${message}.`);
 };
 
-const canonicalize = (value: unknown): unknown => {
-  if (Array.isArray(value)) return value.map(canonicalize);
-  if (!value || typeof value !== 'object') return value;
-  return Object.keys(value as AnyRecord)
-    .sort()
-    .reduce<AnyRecord>((result, key) => {
-      const entry = (value as AnyRecord)[key];
-      if (entry !== undefined) result[key] = canonicalize(entry);
-      return result;
-    }, {});
-};
-
 const hasSameCanonicalValue = (left: unknown, right: unknown): boolean =>
-  JSON.stringify(canonicalize(left)) === JSON.stringify(canonicalize(right));
+  JSON.stringify(canonicalizeSessionWizardJson(left)) === JSON.stringify(canonicalizeSessionWizardJson(right));
 
 const fingerprintCanonicalValue = (value: unknown): string =>
-  sha256(`context-engine:worker-publish-config:v1:${JSON.stringify(canonicalize(value))}`).toString();
+  fingerprintSessionWizardJson('context-engine:worker-publish-config:v1', value);
 
 type PublishRuntimeControllerOptions = {
   runtimeRef: RuntimeRef;
@@ -100,6 +89,14 @@ type PublishRuntimeControllerOptions = {
   callbacks: PublishRuntimeCallbacks;
   buildWorkerConfig?: typeof buildSessionWizardWorkerConfigPayload;
   persistWorkerConfig?: typeof persistAndVerifySessionWizardWorkerConfig;
+  createPendingWorkerGroups?: (input: {
+    drafts: PendingWorkerGroupDraft[];
+    sessionConfig: AnyRecord;
+    sessionId: string;
+    sessionSlug: string;
+    signerAccount: string;
+    workerUrl: string;
+  }) => Promise<{ created: number; reused: number }>;
 };
 
 type RunPreparationInput = {
@@ -107,6 +104,7 @@ type RunPreparationInput = {
   publishExecutionPlan: PublishExecutionPlan;
   signerAccountOverride: string;
   runTrackedPublishEffect: RunTrackedPublishEffect;
+  pendingWorkerGroupDrafts?: PendingWorkerGroupDraft[];
 };
 
 type SettleRegistrationInput = {
@@ -157,6 +155,7 @@ export const createSessionWizardPublishRuntimeController = ({
   callbacks,
   buildWorkerConfig = buildSessionWizardWorkerConfigPayload,
   persistWorkerConfig = persistAndVerifySessionWizardWorkerConfig,
+  createPendingWorkerGroups,
 }: PublishRuntimeControllerOptions) => {
   const buildConfigForEvidence = ({
     evidence,
@@ -200,9 +199,10 @@ export const createSessionWizardPublishRuntimeController = ({
     publishExecutionPlan,
     signerAccountOverride,
     runTrackedPublishEffect,
+    pendingWorkerGroupDrafts = [],
   }: RunPreparationInput): Promise<SessionWizardPublishControllerResult> => {
     const runEffect = createEffectRunner({ dispatch, getErrorMessage, runTrackedPublishEffect });
-    return runSessionWizardPublishController({
+    const controllerResult = await runSessionWizardPublishController({
       input: { publishAllowed, publishExecutionPlan, signerAccountOverride },
       ports: {
         deployWorker: () =>
@@ -273,6 +273,30 @@ export const createSessionWizardPublishRuntimeController = ({
       },
       callbacks: { setPublishStep: () => {} },
     });
+    if (controllerResult.status === 'blocked' || !publishExecutionPlan.shouldCreateWorkerGroups) {
+      return controllerResult;
+    }
+    const verifiedWorkerConfig = controllerResult.verifiedWorkerConfig;
+    const evidence = verifiedWorkerConfig?.workerPublishEvidence;
+    const settlementIdentity = evidence?.settlementIdentity;
+    const workerUrl = toStr(verifiedWorkerConfig?.workerUrl).trim();
+    if (!createPendingWorkerGroups || !settlementIdentity || !workerUrl) {
+      throw new Error('Queued Groups require verified Worker session identity before creation.');
+    }
+    await runEffect({
+      effect: 'createWorkerGroups',
+      run: () =>
+        createPendingWorkerGroups({
+          drafts: pendingWorkerGroupDrafts,
+          sessionConfig: evidence.draft,
+          sessionId: settlementIdentity.sessionId,
+          sessionSlug: settlementIdentity.slug,
+          signerAccount: signerAccountOverride,
+          workerUrl,
+        }),
+      result: ({ created, reused }) => ({ createdWorkerGroupCount: created + reused }),
+    });
+    return controllerResult;
   };
 
   const settleRegistration = async ({

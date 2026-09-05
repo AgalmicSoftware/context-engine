@@ -17,6 +17,8 @@ const NON_ZERO_SHA = '1111111111111111111111111111111111111111';
 const ZERO_SHA = '0000000000000000000000000000000000000000';
 const FIXTURE_CLEANUP_MAX_RETRIES = 10;
 const FIXTURE_CLEANUP_RETRY_DELAY_MS = 100;
+const FIXTURE_CLEANUP_MAX_PASSES = 3;
+const FIXTURE_CLEANUP_RETRY_CODES = new Set(['EBUSY', 'ENOTEMPTY', 'EPERM']);
 const joinAt = (left, right) => `${left}@${right}`;
 
 function writeFile(rootDir, relativePath, contents) {
@@ -65,12 +67,25 @@ function withHookFixture(run) {
 }
 
 function removeHookFixture(tempDir, remove = fs.rmSync) {
-  remove(tempDir, {
+  const options = {
     recursive: true,
     force: true,
     maxRetries: FIXTURE_CLEANUP_MAX_RETRIES,
     retryDelay: FIXTURE_CLEANUP_RETRY_DELAY_MS,
-  });
+  };
+
+  // Regression guard: rmSync retries a failed filesystem operation, but Git can
+  // add an object after recursive traversal has passed it. Restart the full walk.
+  for (let pass = 1; pass <= FIXTURE_CLEANUP_MAX_PASSES; pass += 1) {
+    try {
+      remove(tempDir, options);
+      return;
+    } catch (error) {
+      if (!FIXTURE_CLEANUP_RETRY_CODES.has(error?.code) || pass === FIXTURE_CLEANUP_MAX_PASSES) {
+        throw error;
+      }
+    }
+  }
 }
 
 test('hook fixture cleanup retries transient filesystem contention', () => {
@@ -89,6 +104,19 @@ test('hook fixture cleanup retries transient filesystem contention', () => {
       },
     },
   ]);
+});
+
+test('hook fixture cleanup restarts recursive removal after its internal retry budget is exhausted', () => {
+  const calls = [];
+  const contentionError = Object.assign(new Error('directory not empty'), { code: 'ENOTEMPTY' });
+
+  removeHookFixture('/tmp/fixture', (target, options) => {
+    calls.push({ target, options });
+    if (calls.length === 1) throw contentionError;
+  });
+
+  assert.equal(calls.length, 2);
+  assert.deepEqual(calls[0], calls[1]);
 });
 
 function gitDir(rootDir) {

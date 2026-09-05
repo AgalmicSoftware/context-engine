@@ -30,6 +30,7 @@ import { cryptoUtils } from '../crypto/cryptography.js';
 import { normalizeSessionNaming, stripAuthoritativeSessionGateFields } from '../session/sessionMetadata.js';
 import { overlayCachedSessionWorkerConfig } from '../session/sessionWorkerConfigCache.js';
 import { mergeSessionContractMaps, validateRegistrySessionSlugForWrite } from '../session/sessionNaming.js';
+import { normalizeRegistrySessionSlugForRead } from '../session/sessionSlug';
 import { toStr } from '../shared/primitives.js';
 import { createLogger } from '../logging.js';
 import { wrapEthersJsonRpcSend } from './rpcReadCache.js';
@@ -38,6 +39,8 @@ import { sendContractWriteViaProvider } from './contractWrites.js';
 const { getPathRpcUrl } = rpcDefaults;
 
 const surveysLog = createLogger('surveys');
+const normalizeRegistrySlug = (raw: unknown): string =>
+  normalizeRegistrySessionSlugForRead(raw, DEFAULT_SESSION_SLUG_ALIAS);
 
 type AnyRecord = Record<string, any>;
 type TxFeeOverrides = {
@@ -146,12 +149,6 @@ const FIELD_PATHS = {
   [SPONSORED_FIELD_KEYS.arweave]: ['sponsoredKeys', 'arweave'],
   [SPONSORED_FIELD_KEYS.lit]: ['sponsoredKeys', 'lit'],
   [SPONSORED_FIELD_KEYS.transcribe]: ['sponsoredKeys', 'transcribe'],
-};
-
-const normalizeSlug = (raw: unknown) => {
-  const slug = String(raw ?? '').trim();
-  if (!slug) return DEFAULT_SESSION_SLUG;
-  return slug === DEFAULT_SESSION_SLUG_ALIAS ? DEFAULT_SESSION_SLUG : slug;
 };
 
 const notifySessionRegistryCacheUpdated = () => {
@@ -1187,7 +1184,7 @@ const buildSessionConfigFromRegistry = ({
   const sessionId = formatSessionId(sessionIdHex);
   const config: AnyRecord = {
     ...metadataObj,
-    slug: normalizeSlug(session.slug),
+    slug: normalizeRegistrySlug(session.slug),
     ...(sessionId ? { sessionId } : {}),
     networkChainId: Number(session.chainId || metadataObj?.networkChainId || 0) || null,
   };
@@ -1285,7 +1282,7 @@ const mergeSessionFieldsIntoCachedConfig = ({
   const networkChainId = Number(session?.chainId || base.networkChainId || registryMeta.chainId || 0) || null;
   const config: AnyRecord = {
     ...base,
-    slug: normalizeSlug(session?.slug || base.slug),
+    slug: normalizeRegistrySlug(session?.slug || base.slug),
     ...(sessionId ? { sessionId } : {}),
     networkChainId,
   };
@@ -1340,7 +1337,7 @@ const mergeSessionFieldsIntoCachedConfig = ({
 
 const addSessionConfigToCache = (cache: RegistryCache | null, config: AnyRecord | null, opts: AnyRecord = {}) => {
   if (!cache || !config || typeof config !== 'object') return;
-  const slug = normalizeSlug(config.slug);
+  const slug = normalizeRegistrySlug(config.slug);
 
   cache.sessions = cache.sessions || {};
   cache.groups = cache.groups || cache.sessions;
@@ -1521,7 +1518,7 @@ export const fetchSessionFromRegistry = async (
 export const upsertSessionRegistryCache = ({ config } = {} as AnyRecord) => {
   if (typeof window === 'undefined') return null;
   if (!config || typeof config !== 'object') return null;
-  const slug = normalizeSlug(config.slug);
+  const slug = normalizeRegistrySlug(config.slug);
   const registryChainId = Number(config?.__registry?.registryChainId || config?.__registry?.chainId || 0) || null;
   const sessionIdHex = normalizeSessionIdHex(config?.__registry?.sessionIdHex || config?.sessionId);
   const sessionId = sessionIdHex ? formatSessionId(sessionIdHex) : '';
@@ -2478,7 +2475,7 @@ export const sessionRegistryStore = {
     }
   },
   getSessionConfig: (slugIn: unknown) => {
-    const slug = normalizeSlug(slugIn);
+    const slug = normalizeRegistrySlug(slugIn);
     const cache = sessionRegistryStore.readCache();
     if (!cache || !cache.sessions) return null;
     return overlayCachedSessionWorkerConfig({
@@ -2524,7 +2521,7 @@ export const sessionRegistryStore = {
 };
 
 export const sessionRegistryUtils = {
-  normalizeSlug,
+  normalizeSlug: normalizeRegistrySlug,
   SESSION_REGISTRY_CACHE_UPDATED_EVENT,
   toRegistrySlug,
   normalizeSessionIdHex,

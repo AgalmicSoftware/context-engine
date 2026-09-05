@@ -1,4 +1,14 @@
 import {
+  safeString,
+  lower,
+  safeJsonParse,
+  stableJson,
+  stableFingerprint,
+  kvKeySafePart,
+  envFlagEnabled,
+  sanitizeSessionSlug,
+} from './runtimePrimitives.mjs';
+import {
   DOC_VISIBILITY,
   RISK_CEILINGS,
   SESSION_STORAGE_PROFILES,
@@ -201,10 +211,6 @@ const RESULT_VIEW_LEVELS = Object.freeze([
   },
 ]);
 
-function safeString(value) {
-  return String(value || '').trim();
-}
-
 function normalizeMiniAppLoadingVisual(value = MINI_APP_LOADING_VISUAL_GIF) {
   const normalized = lower(value);
   if (['spinner', 'css', 'loader'].includes(normalized)) return MINI_APP_LOADING_VISUAL_SPINNER;
@@ -256,20 +262,6 @@ function firstAnswerChoice(...values) {
   return '';
 }
 
-function safeJsonParse(value, fallback = null) {
-  const text = safeString(value);
-  if (!text) return fallback;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return fallback;
-  }
-}
-
-function lower(value) {
-  return safeString(value).toLowerCase();
-}
-
 function normalizePositiveInteger(value, fallback) {
   const raw = Number(value);
   if (!Number.isFinite(raw) || raw <= 0) return fallback;
@@ -319,10 +311,6 @@ function miniResultsLevelState(exposure = {}) {
       ? 'available'
       : (definition.key === 'anonymized_groups' ? 'admin_can_enable' : 'admin_disabled'),
   }));
-}
-
-function sanitizeSessionSlug(value = '') {
-  return lower(value).replace(/[^a-z0-9_-]/g, '').slice(0, 128);
 }
 
 function miniAppQuestionPageSize(env = {}) {
@@ -607,33 +595,6 @@ function questionIdSeedPart(value = '') {
   return BYTES32_RE.test(text) ? `${text.slice(2, 10)}${text.slice(-6)}` : text;
 }
 
-function kvKeySafePart(value = '') {
-  const text = safeString(value);
-  if (!text) return '';
-  const safe = text.replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 56);
-  return `${safe || 'ref'}_${stableFingerprint(text)}`;
-}
-
-function stableJson(value) {
-  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
-  if (value && typeof value === 'object') {
-    return `{${Object.keys(value).sort().map((key) => (
-      `${JSON.stringify(key)}:${stableJson(value[key])}`
-    )).join(',')}}`;
-  }
-  return JSON.stringify(value ?? null);
-}
-
-function stableFingerprint(value = {}) {
-  const input = stableJson(value);
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < input.length; index += 1) {
-    hash ^= input.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0).toString(36).padStart(10, '0');
-}
-
 function json(data, init = {}) {
   return new Response(JSON.stringify(data, null, 2), {
     ...init,
@@ -719,34 +680,25 @@ function parseInitUser(params) {
   }
 }
 
-function miniAppInitDataRequired(env = {}) {
-  return Boolean(safeString(env.TELEGRAM_BOT_TOKEN));
-}
-
 export async function validateTelegramMiniAppInitData(initData = '', env = {}, {
   nowMs = Date.now(),
 } = {}) {
   const botToken = safeString(env.TELEGRAM_BOT_TOKEN);
-  const requireInitData = miniAppInitDataRequired(env);
+  const allowPreviewAuth = envFlagEnabled(env.AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH);
   const raw = safeString(initData);
-  if (!botToken && !requireInitData) {
+  if (!botToken && allowPreviewAuth) {
     return {
       ok: true,
-      reason: 'preview_auth_without_bot_token',
+      reason: 'explicit_preview_auth_without_bot_token',
       authMode: 'preview',
       user: { telegramUserId: 'preview-user', username: 'preview' },
     };
   }
-  if (!raw) {
-    return {
-      ok: !requireInitData,
-      reason: requireInitData ? 'telegram_init_data_missing' : 'preview_auth_missing_init_data',
-      authMode: requireInitData ? 'telegram' : 'preview',
-      user: requireInitData ? null : { telegramUserId: 'preview-user', username: 'preview' },
-    };
-  }
   if (!botToken) {
     return { ok: false, reason: 'telegram_bot_token_missing', authMode: 'telegram', user: null };
+  }
+  if (!raw) {
+    return { ok: false, reason: 'telegram_init_data_missing', authMode: 'telegram', user: null };
   }
 
   const params = new URLSearchParams(raw);

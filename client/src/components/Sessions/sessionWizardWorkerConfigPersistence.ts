@@ -1,4 +1,3 @@
-import sha256 from 'crypto-js/sha256';
 import {
   normalizeWorkerCanonicalSessionIdHex,
   parseSessionWorkerDiscoveryOrigin,
@@ -6,6 +5,8 @@ import {
 } from '../../utilities/session/sessionWorkerDiscovery';
 import { classifySessionModeProfileSupport, type SessionModeProfile } from '../../utilities/session/sessionModeProfile';
 import { CHIPOTLE_LIT_CONFIG_FIELDS } from './sessionWizardWorkerSecretSupport';
+import { fingerprintSessionWizardJson } from './sessionWizardCanonicalJson';
+import { sanitizeSessionSlug as normalizeSlug } from '../../utilities/session/sessionSlug';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -66,6 +67,8 @@ const PUBLIC_WORKER_CONFIG_FIELDS = Object.freeze([
   'appearance',
   'sessionHeaderImg',
   'sessionEndsAt',
+  'interviewModeEnabled',
+  'interviewMode',
   'defaultTags',
   'defaultGroupTags',
   'defaultSbtTags',
@@ -96,11 +99,6 @@ const LIT_CREDENTIAL_DESCRIPTOR_FIELDS = new Set<string>(CHIPOTLE_LIT_CONFIG_FIE
 
 const toTrimmedString = (value: unknown): string =>
   typeof value === 'string' ? value.trim() : value == null ? '' : String(value).trim();
-
-const normalizeSlug = (value: unknown): string =>
-  toTrimmedString(value)
-    .toLowerCase()
-    .replace(/[^a-z0-9_-]/g, '');
 
 const normalizeSessionId = normalizeWorkerCanonicalSessionIdHex;
 
@@ -200,18 +198,6 @@ const clonePublicConfig = (value: unknown): UnknownRecord => {
   return clonePublicConfigValue(value, 'config', new WeakSet()) as UnknownRecord;
 };
 
-const canonicalizeRevisionInput = (value: unknown): unknown => {
-  if (Array.isArray(value)) return value.map(canonicalizeRevisionInput);
-  if (!value || typeof value !== 'object') return value;
-  return Object.keys(value as UnknownRecord)
-    .sort()
-    .reduce<UnknownRecord>((result, key) => {
-      const entry = (value as UnknownRecord)[key];
-      if (entry !== undefined) result[key] = canonicalizeRevisionInput(entry);
-      return result;
-    }, {});
-};
-
 const buildExpectedPublicConfig = (config: UnknownRecord): UnknownRecord =>
   PUBLIC_WORKER_CONFIG_FIELDS.reduce<UnknownRecord>((expected, key) => {
     if (!Object.prototype.hasOwnProperty.call(config, key)) return expected;
@@ -264,9 +250,7 @@ const buildComparableActualPublicConfig = (config: UnknownRecord, revision: stri
 };
 
 const deriveConfigRevision = (value: UnknownRecord): string =>
-  `config:${sha256(
-    `context-engine:worker-canonical-publication:v1:${JSON.stringify(canonicalizeRevisionInput(value))}`,
-  ).toString()}`;
+  `config:${fingerprintSessionWizardJson('context-engine:worker-canonical-publication:v1', value)}`;
 
 const resolveConfigRevision = ({
   configRevision,

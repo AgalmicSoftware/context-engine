@@ -54,6 +54,12 @@ export const TYPE_DEBT_PATTERNS = Object.freeze([
     pattern: /^\s*(?:export\s+)?type\s+[A-Za-z_$][\w$]*(?:\s*<[^>\n]*>)?\s*=\s*any\s*;?\s*(?=\/\/.*$|$)/gm,
   },
   {
+    key: 'aliasAnyUsage',
+    label: 'any-backed alias usage',
+    pattern: null,
+    enforceInStrictDirectories: false,
+  },
+  {
     key: 'mapSetAny',
     label: 'Map/Set<...any...>',
     pattern: /\b(?:Map|Set)\s*<(?=[^>\n]*\bany\b)[^>\n]*>/g,
@@ -125,10 +131,31 @@ export const countTypeDebtInText = (source) => {
   const counts = createZeroCounts();
 
   for (const { key, pattern } of TYPE_DEBT_PATTERNS) {
+    if (!pattern) continue;
     counts[key] = [...source.matchAll(pattern)].length;
   }
 
   return counts;
+};
+
+const ANY_BACKED_ALIAS_DECLARATION_PATTERN = /^\s*(?:export\s+)?type\s+([A-Za-z_$][\w$]*)(?:\s*<[^>\n]*>)?\s*=\s*(?:any|Record\s*<\s*string\s*,\s*any\s*>)\s*;?\s*(?=\/\/.*$|$)/gm;
+
+export const collectAnyBackedAliasNames = (source) => new Set(
+  [...source.matchAll(ANY_BACKED_ALIAS_DECLARATION_PATTERN)].map((match) => match[1]),
+);
+
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+export const countAnyBackedAliasUsages = (source, aliasNames) => {
+  const declaredNames = collectAnyBackedAliasNames(source);
+  return [...aliasNames].reduce((total, aliasName) => {
+    const identifierPattern = new RegExp(
+      `(?<![A-Za-z0-9_$])${escapeRegExp(aliasName)}(?![A-Za-z0-9_$])`,
+      'g',
+    );
+    const occurrences = [...source.matchAll(identifierPattern)].length;
+    return total + Math.max(0, occurrences - (declaredNames.has(aliasName) ? 1 : 0));
+  }, 0);
 };
 
 export const addCounts = (target, counts) => {
@@ -160,6 +187,7 @@ export const collectTypeDebt = ({
   let filesChecked = 0;
 
   const candidateFiles = listFiles(rootDir).filter(isProductionTypeScriptFile).sort();
+  const sourceFiles = [];
 
   for (const filePath of candidateFiles) {
     const absolutePath = path.join(rootDir, filePath);
@@ -168,7 +196,19 @@ export const collectTypeDebt = ({
     }
 
     filesChecked += 1;
-    const fileCounts = countTypeDebtInText(fs.readFileSync(absolutePath, 'utf8'));
+    sourceFiles.push({
+      path: filePath,
+      source: fs.readFileSync(absolutePath, 'utf8'),
+    });
+  }
+
+  const anyBackedAliasNames = new Set(
+    sourceFiles.flatMap(({ source }) => [...collectAnyBackedAliasNames(source)]),
+  );
+
+  for (const { path: filePath, source } of sourceFiles) {
+    const fileCounts = countTypeDebtInText(source);
+    fileCounts.aliasAnyUsage = countAnyBackedAliasUsages(source, anyBackedAliasNames);
     addCounts(counts, fileCounts);
 
     if (countTotal(fileCounts) > 0) {
@@ -211,7 +251,10 @@ export const collectStrictDebtFreeDirectoryViolations = (filesWithDebt, strictDe
     const directory = strictDebtFreeDirectories.find((strictDirectory) => (
       isPathWithinDirectory(file.path, strictDirectory)
     ));
-    return directory
+    const containsStrictDebt = TYPE_DEBT_PATTERNS.some(({ key, enforceInStrictDirectories = true }) => (
+      enforceInStrictDirectories && file.counts[key] > 0
+    ));
+    return directory && containsStrictDebt
       ? {
           directory,
           path: file.path,

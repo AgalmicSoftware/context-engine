@@ -466,6 +466,45 @@ describe('worker group ports', () => {
     ).rejects.toMatchObject({ message: 'worker_group_response_member_invalid' });
   });
 
+  it('maps an older Worker without the member-directory route to a compatibility reason', async () => {
+    const fetchImpl = jest.fn(
+      async () =>
+        new Response(JSON.stringify({ error: 'Not found.' }), {
+          status: 404,
+          headers: { 'content-type': 'application/json' },
+        }),
+    );
+
+    await expect(
+      loadWorkerGroupMembers({
+        workerUrl: WORKER_URL,
+        credentialToken: WORKER_TOKEN,
+        sessionId: SESSION_ID,
+        sessionSlug: SESSION_SLUG,
+        groupId: 'reviewers',
+        fetchImpl,
+      }),
+    ).rejects.toMatchObject({ message: 'worker_group_member_directory_unavailable', status: 404 });
+
+    const currentWorkerFetch = jest.fn(
+      async () =>
+        new Response(JSON.stringify({ ok: false, reason: 'worker_group_not_found' }), {
+          status: 404,
+          headers: { 'content-type': 'application/json' },
+        }),
+    );
+    await expect(
+      loadWorkerGroupMembers({
+        workerUrl: WORKER_URL,
+        credentialToken: WORKER_TOKEN,
+        sessionId: SESSION_ID,
+        sessionSlug: SESSION_SLUG,
+        groupId: 'missing',
+        fetchImpl: currentWorkerFetch,
+      }),
+    ).rejects.toMatchObject({ message: 'worker_group_not_found', status: 404 });
+  });
+
   it('joins and leaves only through self-service worker routes and preserves explicit failure reasons', async () => {
     const successfulFetch = jest.fn(
       async (_input?: RequestInfo | URL, _init?: RequestInit) =>
@@ -595,6 +634,42 @@ describe('worker group ports', () => {
         fetchImpl: visibleLeaveFetch,
       }),
     ).resolves.toMatchObject({ group: { groupId: 'reviewers', memberVisibility: 'session' }, memberCount: 0 });
+  });
+
+  it('accepts a legacy successful join response without a post-mutation member count', async () => {
+    const fetchImpl = jest.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: SESSION_SLUG,
+            group: {
+              groupId: 'reviewers',
+              sessionSlug: SESSION_SLUG,
+              label: 'Reviewers',
+              joinMode: 'open',
+              memberVisibility: 'session',
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+    );
+
+    const result = await joinWorkerGroup({
+      workerUrl: WORKER_URL,
+      credentialToken: WORKER_TOKEN,
+      sessionId: SESSION_ID,
+      sessionSlug: SESSION_SLUG,
+      groupId: 'reviewers',
+      fetchImpl,
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({ ok: true, group: expect.objectContaining({ groupId: 'reviewers' }) }),
+    );
+    expect(result).not.toHaveProperty('memberCount');
+    expect(result.group).not.toHaveProperty('memberCount');
   });
 
   it.each([

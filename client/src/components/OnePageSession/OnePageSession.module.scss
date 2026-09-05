@@ -226,6 +226,15 @@
   font-size: 0.95rem;
 }
 
+.workerGroupsLoadingState {
+  margin: 0 0 24px;
+  color: var(--ce-control-text);
+  font-family: var(--ce-font-body);
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
 .telegramListError {
   color: var(--ce-status-danger-text);
   margin-top: 10px;
@@ -484,6 +493,15 @@
 
 .workerGroupDetailCard {
   min-width: 0;
+}
+
+.workerGroupDetailDescription {
+  font-family: var(--ce-font-body);
+
+  p {
+    color: var(--ce-control-text);
+    font-family: var(--ce-font-body);
+  }
 }
 
 .workerGroupDetailStatus {
@@ -905,8 +923,9 @@
 }
 
 .documentsSectionHeader {
-  width: 100%;
+  flex: 0 1 auto;
   justify-content: flex-start;
+  width: auto;
 }
 
 .sectionHeaderActionsScroller {
@@ -1131,6 +1150,11 @@
  * survey toolbar as a non-scrolling containing block. */
 .questionsSectionContent {
   overflow: visible;
+}
+
+.documentsSectionContent {
+  margin-top: 10px;
+  padding-top: 0;
 }
 
 .pileHeaderRow {

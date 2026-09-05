@@ -27,6 +27,11 @@ import { QRCodeSVG } from 'qrcode.react';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { FIXED_MEDIA_DARK, FIXED_MEDIA_LIGHT } from '../../utilities/ui/fixedMediaColors';
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
+import {
+  loadBrowserModuleWithRetry,
+  resolveDefaultExport,
+  saveCanvasAsPagedPdf,
+} from '../../utilities/ui/browserPdfExport';
 import { createLogger } from 'utilities/logging.js';
 import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
@@ -112,6 +117,24 @@ export const POLIS_CLUSTER_COLORS = d3Report.schemeCategory10;
 export const getPolisDemoDatasetForSlug = (...args: Parameters<typeof getPolisDemoDatasetForSlugRuntime>) =>
   getPolisDemoDatasetForSlugRuntime(...args);
 
+export const buildPolisParticipantProfileHref = ({
+  address = '',
+  displayName = '',
+  sessionSlug = '',
+}: {
+  address?: unknown;
+  displayName?: unknown;
+  sessionSlug?: unknown;
+} = {}): string => {
+  const name = String(displayName || '').trim();
+  const addr = String(address || '').trim();
+  const isEth = /^0x[0-9a-fA-F]{40}$/.test(addr);
+  const base = name ? `/su/${encodeURIComponent(name)}` : isEth ? `/u/${encodeURIComponent(addr)}` : '';
+  if (!base) return '';
+  const normalizedSlug = normalizeSessionSlug(sessionSlug || '');
+  return normalizedSlug ? `${base}?session=${encodeURIComponent(normalizedSlug)}` : base;
+};
+
 /***************************************************************
  * The main PolisReport component
  ***************************************************************/
@@ -138,6 +161,7 @@ export default function PolisReport({
   networkChainId = null,
   slug = '',
   sessionSlug = '',
+  sessionConfig = null,
 }: PolisReportProps) {
   const [ratingMatrix, setRatingMatrix] = useState<RatingMatrix | null>(null);
   const [allResponders, setAllResponders] = useState<string[]>([]);
@@ -694,7 +718,13 @@ export default function PolisReport({
     try {
       if (!effectiveUseDemoData) {
         // Apply the upstream filterState BEFORE building the matrix
-        const filteredAgg = applyFilterStateToAggregator(questionResponses, network, filterState, activeReportSlug);
+        const filteredAgg = applyFilterStateToAggregator(
+          questionResponses,
+          network,
+          filterState,
+          activeReportSlug,
+          sessionConfig,
+        );
         buildResult = buildRatingMatrixFromRealData(filteredAgg, { sessionSlug: activeReportSlug });
       } else {
         // Demo mode: bypass all filters entirely
@@ -734,6 +764,7 @@ export default function PolisReport({
     questionResponsesNonce,
     activeReportSlug,
     activeDemoData,
+    sessionConfig,
   ]);
 
   useEffect(() => {
@@ -1006,22 +1037,11 @@ export default function PolisReport({
     });
 
     try {
-      // Lazy-load heavy PDF deps with retry for chunk loading failures
-      const loadWithRetry = async <T,>(importFn: () => Promise<T>, retries: number = 2): Promise<T> => {
-        for (let i = 0; i <= retries; i++) {
-          try {
-            return await importFn();
-          } catch (e) {
-            if (i === retries) throw e;
-            await new Promise((resolve) => setTimeout(resolve, 500));
-          }
-        }
-        return importFn();
-      };
-      const [{ default: html2canvas }, jsPdfModule] = await Promise.all([
-        loadWithRetry(() => import('html2canvas')),
-        loadWithRetry(() => import('jspdf')),
+      const [html2canvasModule, jsPdfModule] = await Promise.all([
+        loadBrowserModuleWithRetry(() => import('html2canvas'), { delayMs: 500 }),
+        loadBrowserModuleWithRetry(() => import('jspdf'), { delayMs: 500 }),
       ]);
+      const html2canvas = resolveDefaultExport<(typeof import('html2canvas'))['default']>(html2canvasModule);
       const jsPDF = resolveJsPdfConstructor(jsPdfModule);
 
       // Capture full element
@@ -1036,29 +1056,11 @@ export default function PolisReport({
         ignoreElements: (el) => el.classList && el.classList.contains(styles.pdfIgnore),
       });
 
-      // Build multi-page A4 in points, compressed JPEG to reduce size
-      const pdf = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4', compress: true });
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-
-      const imgData = canvas.toDataURL('image/jpeg', 0.82);
-      const imgWidth = pageWidth;
-      const imgHeight = (canvas.height * pageWidth) / canvas.width;
-
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-      heightLeft -= pageHeight;
-
-      while (heightLeft > 0) {
-        pdf.addPage();
-        position = heightLeft - imgHeight;
-        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-        heightLeft -= pageHeight;
-      }
-
-      pdf.save(buildPolisReportPdfFilename(resolvedSessionName));
+      saveCanvasAsPagedPdf({
+        canvas,
+        filename: buildPolisReportPdfFilename(resolvedSessionName),
+        JsPdf: jsPDF,
+      });
     } catch (e) {
       setErrorMessage('PDF export failed — please try refreshing the page and downloading again.');
     } finally {
@@ -1174,7 +1176,11 @@ export default function PolisReport({
           const isEth = typeof addr === 'string' && /^0x[0-9a-fA-F]{40}$/.test(addr);
           const imgSrc = displayName ? getPolisHistoricalParticipantAvatar(displayName, addr) : getBlockieFor(addr);
           const shortAddr = getShortenedAddress(addr, false) || addr;
-          const linkHref = displayName ? `/su/${displayName}` : isEth ? `/u/${addr}` : '';
+          const linkHref = buildPolisParticipantProfileHref({
+            address: isEth ? addr : '',
+            displayName,
+            sessionSlug: resolvedSessionSlug,
+          });
           const label = displayName || addr;
           const shortLabel = displayName || shortAddr;
           return (
@@ -1782,7 +1788,11 @@ export default function PolisReport({
                   const isEth = typeof addr === 'string' && /^0x[0-9a-fA-F]{40}$/.test(addr);
                   const displayName = demoDisplayNames?.[addr];
                   const hasLink = isEth || !!displayName;
-                  const linkHref = displayName ? `/su/${displayName}` : `/u/${addr}`;
+                  const linkHref = buildPolisParticipantProfileHref({
+                    address: addr,
+                    displayName,
+                    sessionSlug: resolvedSessionSlug,
+                  });
                   const linkLabel = displayName || getShortenedAddress(addr, false);
                   const historicalAvatar = displayName ? getPolisHistoricalParticipantAvatar(displayName, addr) : '';
 
@@ -2229,18 +2239,11 @@ export default function PolisReport({
         )}
         <button
           type="button"
+          className={styles.reportSettingsToggle}
           data-testid={E2E_TESTIDS.POLIS_SETTINGS_TOGGLE}
           aria-label={showSettingsRow ? 'Hide report settings' : 'Show report settings'}
           onClick={() => setShowSettingsRow(!showSettingsRow)}
           title="Toggle settings row"
-          style={{
-            background: 'transparent',
-            border: 'none',
-            padding: 0,
-            cursor: 'pointer',
-            marginRight: '10px',
-            color: 'inherit',
-          }}
         >
           <FontAwesomeIcon icon={faCog} style={{ fontSize: '1.3rem' }} />
         </button>

@@ -741,6 +741,9 @@ export const buildDraftHydrationState = ({
     importance: { ...((normalizedPrevSlice.importance as Record<string, unknown>) || {}) },
     conviction: { ...((normalizedPrevSlice.conviction as Record<string, unknown>) || {}) },
     additionalComments: { ...((normalizedPrevSlice.additionalComments as Record<string, unknown>) || {}) },
+    ...(isRecord(normalizedPrevSlice.interviewProvenance)
+      ? { interviewProvenance: { ...(normalizedPrevSlice.interviewProvenance as Record<string, unknown>) } }
+      : {}),
   };
   const nextBaseline: ResponseSlice =
     typeof cloneBaseline === 'function'

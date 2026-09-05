@@ -19,6 +19,7 @@ import {
   resolveSessionConfigFromSources,
 } from './canonicalSessionContext.js';
 import { getDemoSessionConfigForDisplay } from './sessionSourceResolver.js';
+import { canonicalizeSessionSlug as normalizeSlug } from './sessionSlug';
 import type { SessionConfig, UnknownRecord } from './sessionTypes.js';
 
 type ResourceKeyProviderLike = string | UnknownRecord | null | undefined;
@@ -96,8 +97,6 @@ const buildWorkerKeyMeta = <TKey extends 'apiKey' | 'jwk' | 'privateKey'>(keyNam
     status: 'worker',
     encryptedAvailable: false,
   }) as Record<TKey, string> & { status: string; encryptedAvailable: boolean };
-
-const normalizeSlug = (raw: unknown): string => canonicalizeSessionSlug(raw);
 
 const normalizeJwkValue = (value: unknown): string => {
   if (value == null) return '';

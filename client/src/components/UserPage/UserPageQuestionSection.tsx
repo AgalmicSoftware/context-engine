@@ -4,7 +4,7 @@ import { faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons';
 import { Collapse } from 'reactstrap';
 
 import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse';
-import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
+import { canonicalizeSessionSlug as normalizeSessionSlug } from '../../utilities/session/sessionSlug.js';
 import styles from './UserPage.module.scss';
 
 type SingleQuestionResponseProps = React.ComponentProps<typeof SingleQuestionResponse>;

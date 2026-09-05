@@ -435,9 +435,7 @@ describe('createQuestionsAndSurveysHelpers AI prompt labels', () => {
 
 describe('createQuestionsAndSurveysHelpers survey signatures', () => {
   it('builds survey hash values from title and sanitized document URLs', () => {
-    const digest = jest.fn((value: unknown) => ({
-      toString: () => `digest:${value}`,
-    }));
+    const digest = jest.fn((value: unknown) => `digest:${value}`);
     const scriptUrl = ['java', 'script:alert(1)'].join('');
 
     expect(
@@ -457,9 +455,7 @@ describe('createQuestionsAndSurveysHelpers survey signatures', () => {
   });
 
   it('keeps standalone question mode hashless without calling the digest', () => {
-    const digest = jest.fn((value: unknown) => ({
-      toString: () => `digest:${value}`,
-    }));
+    const digest = jest.fn((value: unknown) => `digest:${value}`);
 
     expect(
       buildCreateSurveyHashValue({

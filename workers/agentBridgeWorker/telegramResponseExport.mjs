@@ -1,3 +1,4 @@
+import { safeString, lower, safeJsonParse } from './runtimePrimitives.mjs';
 import { AGENT_BRIDGE_EVENT_TYPES } from './constants.mjs';
 import { deriveManagedDemoAccount } from './managedAccounts.mjs';
 import {
@@ -13,24 +14,6 @@ import {
 import { buildZipArchive } from './zipArchive.mjs';
 
 const RESPONSE_EXPORT_ALLOWLIST_KV_PREFIX = 'telegram:response-export-allowlist:v1:';
-
-function safeString(value) {
-  return String(value || '').trim();
-}
-
-function lower(value) {
-  return safeString(value).toLowerCase();
-}
-
-function safeJsonParse(value, fallback = null) {
-  const text = safeString(value);
-  if (!text) return fallback;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return fallback;
-  }
-}
 
 function normalizeAddress(value = '') {
   const address = lower(value);
@@ -892,7 +875,6 @@ export async function buildTelegramResponseExportArchive({
   for (const item of storageItems) {
     const id = storageIdFromItem(item);
     if (!id) continue;
-    // eslint-disable-next-line no-await-in-loop
     const read = await readStoragePayload({
       fetchImpl,
       workerUrl: auth.workerUrl,

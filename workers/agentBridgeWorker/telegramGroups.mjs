@@ -1,3 +1,11 @@
+import {
+  safeString,
+  lower,
+  safeJsonParse,
+  stableJson,
+  stableFingerprint,
+  sanitizeSessionSlug,
+} from './runtimePrimitives.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 import { buildTelegramAgentActivityMetadata } from './telegramAgentActivity.mjs';
 
@@ -94,28 +102,6 @@ export const DEFAULT_TELEGRAM_GROUP_CATEGORIES = Object.freeze([
   },
 ]);
 
-function safeString(value) {
-  return String(value || '').trim();
-}
-
-function lower(value) {
-  return safeString(value).toLowerCase();
-}
-
-function safeJsonParse(value, fallback = null) {
-  const text = safeString(value);
-  if (!text) return fallback;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return fallback;
-  }
-}
-
-function sanitizeSessionSlug(value = '') {
-  return lower(value).replace(/[^a-z0-9_-]/g, '').slice(0, 128);
-}
-
 function sanitizeGroupId(value = '', fallback = '') {
   const normalized = lower(value)
     .replace(/&/g, 'and')
@@ -123,26 +109,6 @@ function sanitizeGroupId(value = '', fallback = '') {
     .replace(/^_+|_+$/g, '')
     .slice(0, 80);
   return normalized || fallback;
-}
-
-function stableJson(value) {
-  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
-  if (value && typeof value === 'object') {
-    return `{${Object.keys(value).sort().map((key) => (
-      `${JSON.stringify(key)}:${stableJson(value[key])}`
-    )).join(',')}}`;
-  }
-  return JSON.stringify(value ?? null);
-}
-
-function stableFingerprint(value = {}) {
-  const input = stableJson(value);
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < input.length; index += 1) {
-    hash ^= input.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0).toString(36).padStart(10, '0');
 }
 
 function groupConfigKey(sessionSlug = '') {

@@ -4,7 +4,11 @@ jest.mock('../../utilities/web3/chainGateway.js', () => ({
   getSessionConfigBySlugOrDefault: jest.fn(),
   getSessionChainId: jest.fn(),
   getSessionNetwork: jest.fn(),
-  normalizeSessionSlug: jest.fn(),
+}));
+
+jest.mock('./sessionSlug.js', () => ({
+  __esModule: true,
+  canonicalizeSessionSlug: jest.fn(),
 }));
 
 jest.mock('../../utilities/survey/questionRouting.js', () => ({
@@ -14,12 +18,13 @@ jest.mock('../../utilities/survey/questionRouting.js', () => ({
 
 const { getSessionCfg, getSessionChainId, getSessionNetwork } = require('./mainSiteSessionConfig.js');
 const contractScriptsModule = require('../../utilities/web3/chainGateway.js');
+const sessionSlugModule = require('./sessionSlug.js');
 const questionRoutingModule = require('../../utilities/survey/questionRouting.js');
 
 describe('mainSiteSessionConfig', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    contractScriptsModule.normalizeSessionSlug.mockImplementation((slug) =>
+    sessionSlugModule.canonicalizeSessionSlug.mockImplementation((slug) =>
       String(slug || '')
         .trim()
         .toLowerCase(),
@@ -37,7 +42,7 @@ describe('mainSiteSessionConfig', () => {
     it('normalizes falsy slugs and falls back to the default session config when empty', () => {
       const result = getSessionCfg(null);
 
-      expect(contractScriptsModule.normalizeSessionSlug).toHaveBeenCalledWith('');
+      expect(sessionSlugModule.canonicalizeSessionSlug).toHaveBeenCalledWith('');
       expect(contractScriptsModule.getSessionConfigBySlugOrDefault).toHaveBeenCalledWith('');
       expect(questionRoutingModule.resolveStrictSessionValue).not.toHaveBeenCalled();
       expect(result).toEqual({ slug: '', source: 'default' });
@@ -56,7 +61,7 @@ describe('mainSiteSessionConfig', () => {
 
       const result = getSessionCfg(' Edge ');
 
-      expect(contractScriptsModule.normalizeSessionSlug).toHaveBeenCalledWith(' Edge ');
+      expect(sessionSlugModule.canonicalizeSessionSlug).toHaveBeenCalledWith(' Edge ');
       expect(questionRoutingModule.resolveStrictSessionValue).toHaveBeenCalledWith(
         'edge',
         contractScriptsModule.getSessionConfigBySlug,
@@ -73,7 +78,7 @@ describe('mainSiteSessionConfig', () => {
 
       const result = getSessionChainId(' Edge ');
 
-      expect(contractScriptsModule.normalizeSessionSlug).toHaveBeenCalledWith(' Edge ');
+      expect(sessionSlugModule.canonicalizeSessionSlug).toHaveBeenCalledWith(' Edge ');
       expect(questionRoutingModule.resolveStrictSessionValue).toHaveBeenCalledWith(
         'edge',
         contractScriptsModule.getSessionConfigBySlug,
@@ -96,7 +101,7 @@ describe('mainSiteSessionConfig', () => {
 
       const result = getSessionNetwork(' Edge ');
 
-      expect(contractScriptsModule.normalizeSessionSlug).toHaveBeenCalledWith(' Edge ');
+      expect(sessionSlugModule.canonicalizeSessionSlug).toHaveBeenCalledWith(' Edge ');
       expect(questionRoutingModule.resolveStrictSessionValue).toHaveBeenCalledWith(
         'edge',
         contractScriptsModule.getSessionConfigBySlug,

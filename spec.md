@@ -144,7 +144,8 @@ Legacy note:
 
 What users can do:
 - Open a session by slug or by session id link (`/session/<slug-or-id>`).
-- Open pile-adjacent listening mode with `/session/<slug-or-id>?mode=listening`; the panel starts only after the user clicks Record, then rolls 3-minute transcription chunks into a stitched transcript and draft question suggestions.
+- Open one-person Interview with `/session/<slug-or-id>?mode=interview`, or Group Conversation with `?mode=recordGroup`. The microphone opens a two-choice modal; Interview creates reviewable response drafts from a realtime responder transcript, while Group Conversation creates draft questions from rolling transcription. Legacy `?mode=listening` remains supported for the pile-adjacent recorder.
+- Paste the session's user-authored interview request into ordinary ChatGPT or Claude without installing MCP/plugins. The linked Worker endpoint is an inert JSON catalog with no instructions. The AI searches only already-authorized conversation history, memory, and connected sources directly related to accessible session questions, reports its platform/model, shows the exact response packet before encoding, attaches an explained confidence value to each direct or defensibly inferred response, and returns a fragment-prefill link for local review. If it finds no relevant signal, it returns the clean interview link instead. The Worker accepts only a session-approved return origin and matching session path.
 - Open session-scoped question views via `/session/<slug-or-id>/questions` and `/session/<slug-or-id>/questions/results`.
 - Open the session doc library via `/session/<slug-or-id>/docs`.
 - Create a new session via the Session Wizard (`/session/new` or `/new`), including grant-backed sponsored-bundle entry links.
@@ -267,6 +268,7 @@ What the system does:
 - Gated encryption/decrypt uses the worker-mediated Lit Chipotle runtime for supported sessions; legacy Lit payload readers remain for compatibility.
 - Stores per-field metadata encryption decisions via `encryptedFieldGates` (values are `string | string[]`; 1 gate stays legacy `string`, 2+ gates become `string[]`).
 - Stores per-question/per-survey encryption audiences in the payload (`encryption.gates`), and SurveyTool derives response encryption recipients per question from that lock state (with fallback to session response gate policy when a question is not locked).
+- Keeps answer and additional-comment locks independent by default; comments inherit the answer audience only after an explicit **same as answer** selection or when a mandatory session/question gate applies.
 
 Deep-dive docs:
 - `docs/session-registry.md`
@@ -286,7 +288,7 @@ What users can do (through the app UI):
 What the system does:
 - Enforces CORS and per-session allowlists.
 - Stores session config and secrets in KV.
-- Requires auth for secret-using endpoints by default, but `POST /ai` and `POST /transcribe` also support anonymous access when the session config allows it.
+- Requires auth for secret-using endpoints by default, but `POST /ai`, `POST /transcribe`, and `POST /realtime/call` also support anonymous access when the session config allows it.
 - For worker-canonical sessions, `workerAuthority.anonymousScopes` explicitly
   grants anonymous `ai` and/or `transcribe` access. Browser transcription never
   escalates an anonymous denial into a wallet or passkey signature prompt.
@@ -458,6 +460,8 @@ Worker API (selected endpoints):
 - `POST /auth/login`: Verify signature + gates and mint a session token with scopes.
 - `GET /health`: Authenticated health check.
 - `POST /ai`: AI proxy (provider-based); authenticated by default, with anonymous access supported when the session config allows it. Also supports `POST /` with `{ action: "ai", ... }`.
+- `GET /agent/interview-catalog` (`/agent/interview-brief` compatibility alias): Public inert per-session question catalog for the client-authored, zero-install ChatGPT/Claude prefill handoff. It declares binary, rating, and multichoice answer formats and is disabled by `interviewModeEnabled=false`.
+- `POST /realtime/call`: OpenAI Realtime WebRTC SDP exchange using the session Worker key and the session's anonymous AI eligibility policy.
 - `POST /transcribe`: Transcription proxy; authenticated by default, with anonymous access supported when the session config allows it (`workerAuthority.anonymousScopes` for worker-canonical sessions).
 - `POST /arweave/upload`: Authenticated Arweave upload (also supports an admin-signed bootstrap path when no auth header).
 - `POST /storage/upload`: Profile-aware payload upload to Cloudflare or Arweave.

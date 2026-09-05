@@ -26,4 +26,15 @@ describe('RightSide responsive shell styles', () => {
     );
     expect(scss).toMatch(/\.rightSideCard\s*{[\s\S]*?background:\s*var\(--ce-color-bg\);[\s\S]*?box-shadow:/);
   });
+
+  it('adds a Win95 gutter and divider between the explorer and right sidebar', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'RightSide.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)\s*\{[\s\S]*?\.rightSideContainer\s*\{[\s\S]*?margin-left:\s*24px;[\s\S]*?padding-left:\s*16px;[\s\S]*?border-left:\s*2px solid var\(--ce-edge-shadow\);[\s\S]*?box-shadow:\s*inset 1px 0 0 var\(--ce-edge-highlight\);/,
+    );
+    expect(scss).toMatch(
+      /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)\s*\{[\s\S]*?\.rightSideCard\s*\{[\s\S]*?border-color:\s*var\(--ce-border-raised\);[\s\S]*?background:\s*var\(--ce-canvas\);[\s\S]*?box-shadow:\s*var\(--ce-shadow-raised\);/,
+    );
+  });
 });

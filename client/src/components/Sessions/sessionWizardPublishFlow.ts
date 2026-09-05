@@ -1,5 +1,5 @@
 import { toStr } from '../../utilities/shared/primitives.js';
-import sha256 from 'crypto-js/sha256';
+import { sha256Utf8 } from '../../utilities/crypto/sha256';
 import { CLOUDFLARE_WORKER_BUNDLE_URL, CLOUDFLARE_WORKER_RELEASE_MANIFEST_URL } from '../../variables/appConfig.js';
 import {
   hasSponsoredBundleFields,
@@ -49,11 +49,13 @@ export const resolveSessionWizardShouldAutoDeployWorker = ({
 export const buildSessionWizardPublishPlan = ({
   shouldAutoDeployWorker = false,
   hasPendingDrafts = false,
+  hasPendingWorkerGroupDrafts = false,
   hasManualMetadata = false,
   sessionModeProfile = null,
 }: {
   shouldAutoDeployWorker?: boolean;
   hasPendingDrafts?: boolean;
+  hasPendingWorkerGroupDrafts?: boolean;
   hasManualMetadata?: boolean;
   sessionModeProfile?: SessionModeProfile | null;
 } = {}) => {
@@ -65,6 +67,9 @@ export const buildSessionWizardPublishPlan = ({
   if (shouldDeployPendingSbts) steps.push('deploy-sbts');
   if (modeRequirements.selected && modeRequirements.publish.persistWorkerConfig) {
     steps.push('persist-worker-config');
+  }
+  if (modeRequirements.isWorkerCanonical && hasPendingWorkerGroupDrafts) {
+    steps.push('create-worker-groups');
   }
   if ((!modeRequirements.selected || modeRequirements.publish.uploadMetadata) && !hasManualMetadata) {
     steps.push('upload-metadata');
@@ -154,6 +159,7 @@ export const buildSessionWizardPublishExecutionPlan = ({
   sponsoredAutoDeployReady = false,
   deployComplete = false,
   hasPendingDrafts = false,
+  hasPendingWorkerGroupDrafts = false,
   hasManualMetadata = false,
   canUploadMetadataNow = false,
   sessionModeProfile = null,
@@ -162,6 +168,7 @@ export const buildSessionWizardPublishExecutionPlan = ({
   sponsoredAutoDeployReady?: boolean;
   deployComplete?: boolean;
   hasPendingDrafts?: boolean;
+  hasPendingWorkerGroupDrafts?: boolean;
   hasManualMetadata?: boolean;
   canUploadMetadataNow?: boolean;
   sessionModeProfile?: SessionModeProfile | null;
@@ -182,6 +189,7 @@ export const buildSessionWizardPublishExecutionPlan = ({
     (!!canUploadMetadataNow || !!sponsoredAutoDeployReady) &&
     !hasManualMetadata;
   const shouldPersistWorkerConfig = modeRequirements.selected && modeRequirements.publish.persistWorkerConfig;
+  const shouldCreateWorkerGroups = modeRequirements.isWorkerCanonical && !!hasPendingWorkerGroupDrafts;
   const shouldRegisterSession = !modeRequirements.selected || modeRequirements.publish.registerSession;
   const shouldRefreshRegistryCache = !modeRequirements.selected || modeRequirements.publish.refreshRegistryCache;
   const steps = buildSessionWizardPublishPlan({
@@ -189,6 +197,7 @@ export const buildSessionWizardPublishExecutionPlan = ({
     hasPendingDrafts: shouldDeployPendingSbts,
     hasManualMetadata,
     sessionModeProfile,
+    hasPendingWorkerGroupDrafts: shouldCreateWorkerGroups,
   });
 
   return {
@@ -196,6 +205,7 @@ export const buildSessionWizardPublishExecutionPlan = ({
     shouldDeployPendingSbts,
     shouldUploadMetadata,
     shouldPersistWorkerConfig,
+    shouldCreateWorkerGroups,
     shouldRegisterSession,
     shouldRefreshRegistryCache,
     steps,
@@ -460,7 +470,7 @@ export const resolveSessionWizardDeployBundlePayload = async ({
       bundleText,
       bundleUrl: undefined,
       bundleManifestUrl: undefined,
-      bundleSha256: bundleText ? sha256(bundleText).toString() : undefined,
+      bundleSha256: bundleText ? sha256Utf8(bundleText) : undefined,
       bundleSource: bundleText ? 'upload' : 'upload-missing',
     };
   }
@@ -631,9 +641,11 @@ export const buildSessionWizardPublishProgressSteps = ({
               ? 'Upload Arweave'
               : key === 'persist-worker-config'
                 ? 'Verify Worker Config'
-                : key === 'register-session'
-                  ? 'Register On-chain'
-                  : 'Done',
+                : key === 'create-worker-groups'
+                  ? 'Create Groups'
+                  : key === 'register-session'
+                    ? 'Register On-chain'
+                    : 'Done',
       state: isActive ? 'active' : isComplete ? 'complete' : 'pending',
     };
   });

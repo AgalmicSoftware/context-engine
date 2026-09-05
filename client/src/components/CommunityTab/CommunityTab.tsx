@@ -16,12 +16,12 @@ import styles from './CommunityTab.module.scss';
 import historicalFigures from '../../variables/demo/historical_figure_users.json';
 import { Modal, ModalHeader, ModalBody, Collapse } from 'reactstrap';
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
+import { canonicalizeSessionSlug as normalizeSessionSlug } from '../../utilities/session/sessionSlug.js';
 import contractScripts, {
   getAllSessionSlugs,
   getDemoSessionConfigBySlug,
   getSessionChainId,
   getSessionLists,
-  normalizeSessionSlug,
 } from '../../utilities/web3/chainGateway.js';
 import SBTsList from '../SBTs/SBTsList';
 import SBTFilter from '../SBTs/SBTFilter';
@@ -50,6 +50,25 @@ import { POLIS_DEMO_DATA_AUTOLOAD_SLUGS } from '../../variables/appConfig.js';
 import { buildRatingMatrixFromDemo, getPolisDemoDatasetForSlug } from '../PolisReport/PolisReport';
 import { persistCommunitySbtHolderHydrationResults } from './communitySbtHolderHydrationCache.js';
 import { buildCommunityBeeswarmPointsFromResults } from './communityBeeswarmPoints';
+import {
+  WORKER_CANONICAL_CACHE_SCOPE_KEY,
+  type WorkerCanonicalCacheIdentity,
+} from '../../utilities/survey/workerCanonicalCacheIdentity';
+import {
+  subscribeWorkerGroupsChanged,
+  type WorkerGroupsChangedDetail,
+} from '../../utilities/worker/workerGroupChangeEvents';
+import {
+  getCommunityWorkerGroupCountCacheKey,
+  getCommunityWorkerGroupCountState,
+  invalidateCommunityWorkerGroupCountCache,
+  isDisplayableWorkerUserId,
+  loadCommunityWorkerGroupCount,
+  pickCommunityWorkerCanonicalCache,
+  resolveCommunityScopeAuthority,
+  type CommunityWorkerGroupCountCacheEntry,
+} from './communityWorkerGroupStats';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 const uiLog = createLogger('ui');
 const COMMUNITY_BEESWARM_FALLBACK_DEMO_SLUG = 'demo';
@@ -59,6 +78,14 @@ type SessionSelectorOption = { value: string; label: string };
 type ScopeCacheEntry = {
   slug: string;
   netKey: string;
+  cacheScope: string;
+  isWorkerCanonical: boolean;
+  sessionConfig: Record<string, unknown>;
+  workerCanonicalIdentity: WorkerCanonicalCacheIdentity | null;
+  workerGroupIds: string[];
+  workerVisibleUserIds: string[];
+  workerGroupsCount: number;
+  workerGroupsStatus: string;
   surveysCache: Record<string, unknown>;
   questionsCache: Record<string, unknown>;
   sbtCache: Record<string, unknown>;
@@ -83,6 +110,12 @@ type ContractScriptsWithBlockWindow = typeof contractScripts & {
 };
 
 const contractScriptsWithBlockWindow = contractScripts as ContractScriptsWithBlockWindow;
+const COMMUNITY_STAT_TEST_IDS: Record<string, string> = Object.freeze({
+  Users: E2E_TESTIDS.COMMUNITY_STAT_USERS,
+  Questions: E2E_TESTIDS.COMMUNITY_STAT_QUESTIONS,
+  Surveys: E2E_TESTIDS.COMMUNITY_STAT_SURVEYS,
+  Groups: E2E_TESTIDS.COMMUNITY_STAT_GROUPS,
+});
 
 const getDisplaySessionLists = (slugIn = '') => {
   const strictLists = getSessionLists(slugIn) || {};
@@ -173,6 +206,9 @@ class CommunityTab extends Component<any, any> {
     this._visibilityListenerBound = null;
     this._isUnmounted = false;
     this._beeswarmPoints = [];
+    this._workerGroupCountCache = new Map<string, CommunityWorkerGroupCountCacheEntry>();
+    this._workerGroupCountCacheRevisions = new Map<string, number>();
+    this._workerGroupsChangedUnsubscribe = null;
     this._leaderboardMemo = {
       uniqueUsersRef: null,
       uniqueUsersLength: 0,
@@ -329,6 +365,13 @@ class CommunityTab extends Component<any, any> {
     }
   };
 
+  _resolveScopeAuthority = (slug: string) =>
+    resolveCommunityScopeAuthority({
+      slugIn: slug,
+      propSessionConfig: this.props.sessionConfig,
+      resolveNetKeyForSlug: this._resolveNetKeyForSlug,
+    });
+
   _readCache = (cacheName: string, slug: string, options: CacheReadOptions = {}): Record<string, unknown> => {
     const shouldClone = options?.clone === true;
     const obj = peekCacheSync(cacheName, slug, { clone: shouldClone }) || {};
@@ -359,19 +402,50 @@ class CommunityTab extends Component<any, any> {
     return {};
   };
 
+  _pickWorkerCanonicalCache = (cacheObj: unknown, identity: WorkerCanonicalCacheIdentity | null) =>
+    pickCommunityWorkerCanonicalCache(cacheObj, identity);
+
+  _getWorkerGroupCountCacheKey = (identity: WorkerCanonicalCacheIdentity) =>
+    getCommunityWorkerGroupCountCacheKey(identity, this.props.account);
+
+  _getWorkerGroupCountState = (identity: WorkerCanonicalCacheIdentity | null) =>
+    getCommunityWorkerGroupCountState(identity, this.props.account, this._workerGroupCountCache);
+
+  _invalidateWorkerGroupCountCache = (detail: WorkerGroupsChangedDetail) =>
+    invalidateCommunityWorkerGroupCountCache({
+      detail,
+      cache: this._workerGroupCountCache,
+      revisions: this._workerGroupCountCacheRevisions,
+    });
+
+  _handleWorkerGroupsChanged = (detail: WorkerGroupsChangedDetail) => {
+    if (this._isUnmounted) return;
+    this._invalidateWorkerGroupCountCache(detail);
+    this._queueCacheDrivenRefresh({ force: true });
+  };
+
   _buildScopeEntriesFromSlugs = (slugs: unknown[] = [], options: CacheReadOptions = {}): ScopeCacheEntry[] => {
     const out: ScopeCacheEntry[] = [];
     this._dedupeNormalizedSlugs(slugs).forEach((slug: string) => {
       const netKey = this._resolveNetKeyForSlug(slug);
+      const authority = this._resolveScopeAuthority(slug);
       const surveysCacheAll = this._readCache('surveysCache', slug, options);
       const questionsCacheAll = this._readCache('questionsCache', slug, options);
       const sbtCacheAll = this._readCache('sbtCache', slug, options);
+      // Regression guard: Worker-canonical Stats must use the identity-matched
+      // `worker` node; numeric-chain fallback can surface stale metadata.
+      const pickCache = (cache: Record<string, unknown>) =>
+        authority.isWorkerCanonical
+          ? this._pickWorkerCanonicalCache(cache, authority.workerCanonicalIdentity)
+          : this._pickNet(cache, netKey);
       out.push({
         slug,
         netKey,
-        surveysCache: this._pickNet(surveysCacheAll, netKey),
-        questionsCache: this._pickNet(questionsCacheAll, netKey),
-        sbtCache: this._pickNet(sbtCacheAll, netKey),
+        ...authority,
+        ...this._getWorkerGroupCountState(authority.workerCanonicalIdentity),
+        surveysCache: pickCache(surveysCacheAll),
+        questionsCache: pickCache(questionsCacheAll),
+        sbtCache: pickCache(sbtCacheAll),
       });
     });
     return out;
@@ -388,6 +462,27 @@ class CommunityTab extends Component<any, any> {
       return this._buildScopeEntriesFromSlugs(selectedSlugs, options);
     }
     return this._buildScopeEntriesFromSlugs([this._currentSlug()], options);
+  };
+
+  _loadWorkerGroupCount = (scopeEntry: ScopeCacheEntry) =>
+    loadCommunityWorkerGroupCount({
+      scopeEntry,
+      runtime: {
+        account: this.props.account,
+        provider: this.props.provider,
+        networkChainId: this.props.networkChainId,
+        network: this.props.network,
+      },
+      cache: this._workerGroupCountCache,
+      revisions: this._workerGroupCountCacheRevisions,
+      onWarning: (message, error) => uiLog.warn(message, error),
+    });
+
+  _hydrateWorkerGroupCounts = async (scopeEntries: ScopeCacheEntry[]) => {
+    await Promise.all(scopeEntries.map((scopeEntry) => this._loadWorkerGroupCount(scopeEntry)));
+    scopeEntries.forEach((scopeEntry) => {
+      Object.assign(scopeEntry, this._getWorkerGroupCountState(scopeEntry.workerCanonicalIdentity));
+    });
   };
 
   _hydrateSbtHoldersForUsersModal = async () => {
@@ -415,6 +510,7 @@ class CommunityTab extends Component<any, any> {
   };
 
   _hydrateSbtHoldersForSlug = async (slug: string) => {
+    if (this._resolveScopeAuthority(slug).isWorkerCanonical) return;
     const netKey = this._resolveNetKeyForSlug(slug);
     if (!netKey) return;
 
@@ -642,7 +738,16 @@ class CommunityTab extends Component<any, any> {
 
   _buildCoarseCacheSignature = (scopeEntries: any = []) => {
     const parts: any[] = [];
-    for (const { slug, netKey, surveysCache, questionsCache, sbtCache } of scopeEntries) {
+    for (const {
+      slug,
+      cacheScope,
+      surveysCache,
+      questionsCache,
+      sbtCache,
+      workerGroupsCount,
+      workerGroupsStatus,
+      workerVisibleUserIds,
+    } of scopeEntries) {
       const surveyBlock = Number(surveysCache?.surveysLatestBlock) || Number(surveysCache?.lastBlock) || 0;
       const questionBlock =
         Number(questionsCache?.questionsLatestBlock) ||
@@ -658,7 +763,7 @@ class CommunityTab extends Component<any, any> {
       parts.push(
         [
           String(slug || ''),
-          String(netKey || ''),
+          String(cacheScope || ''),
           surveyBlock,
           questionBlock,
           sbtBlock,
@@ -678,6 +783,9 @@ class CommunityTab extends Component<any, any> {
           sbtMembersSummary.totalEntries,
           sbtMembersSummary.totalMembers,
           sbtMembersSummary.hash,
+          Number(workerGroupsCount || 0),
+          String(workerGroupsStatus || ''),
+          Array.isArray(workerVisibleUserIds) ? workerVisibleUserIds.slice().sort().join(',') : '',
         ].join(':'),
       );
     }
@@ -694,7 +802,16 @@ class CommunityTab extends Component<any, any> {
   _buildCacheSignature = (scopeEntries: any = []) =>
     measureSync('ce.communityTab.cacheSignature', () => {
       const parts: any[] = [];
-      for (const { slug, netKey, surveysCache, questionsCache, sbtCache } of scopeEntries) {
+      for (const {
+        slug,
+        cacheScope,
+        surveysCache,
+        questionsCache,
+        sbtCache,
+        workerGroupsCount,
+        workerGroupsStatus,
+        workerVisibleUserIds,
+      } of scopeEntries) {
         const surveyBlock = Number(surveysCache?.surveysLatestBlock) || Number(surveysCache?.lastBlock) || 0;
         const questionBlock =
           Number(questionsCache?.questionsLatestBlock) ||
@@ -713,7 +830,7 @@ class CommunityTab extends Component<any, any> {
         parts.push(
           [
             String(slug || ''),
-            String(netKey || ''),
+            String(cacheScope || ''),
             surveyBlock,
             questionBlock,
             sbtBlock,
@@ -736,6 +853,9 @@ class CommunityTab extends Component<any, any> {
             surveyRefId,
             questionRefId,
             sbtRefId,
+            Number(workerGroupsCount || 0),
+            String(workerGroupsStatus || ''),
+            Array.isArray(workerVisibleUserIds) ? workerVisibleUserIds.slice().sort().join(',') : '',
           ].join(':'),
         );
       }
@@ -775,11 +895,13 @@ class CommunityTab extends Component<any, any> {
       const questionIdSet: any = new Set();
       const userSet: any = new Set();
       const sbtAddressSet: any = new Set();
+      const workerGroupIdentitySet = new Set<string>();
       const surveyTitleMap: Record<string, any> = {};
       const surveySlugMap: Record<string, any> = {};
       const surveyRespondersMap: Record<string, any> = {};
 
-      for (const { slug, surveysCache, questionsCache, sbtCache } of scopeEntries) {
+      for (const scopeEntry of scopeEntries) {
+        const { slug, surveysCache, questionsCache, sbtCache } = scopeEntry;
         const surveysData = surveysCache?.surveys || {};
         const surveyResponsesData = surveysCache?.surveyResponses || {};
         const questionsData = questionsCache?.questions || {};
@@ -828,7 +950,20 @@ class CommunityTab extends Component<any, any> {
           });
         });
 
-        Object.keys(sbtList || {}).forEach((addrLower: any) => {
+        if (scopeEntry.isWorkerCanonical) {
+          (scopeEntry.workerGroupIds || []).forEach((groupId: unknown) => {
+            const normalizedGroupId = String(groupId || '').trim();
+            if (normalizedGroupId) workerGroupIdentitySet.add(`${slug}:${normalizedGroupId}`);
+          });
+          (scopeEntry.workerVisibleUserIds || []).forEach((userId: unknown) => {
+            const normalizedUserId = String(userId || '')
+              .trim()
+              .toLowerCase();
+            if (isDisplayableWorkerUserId(normalizedUserId)) userSet.add(normalizedUserId);
+          });
+        }
+
+        Object.keys(scopeEntry.isWorkerCanonical ? {} : sbtList || {}).forEach((addrLower) => {
           const entry = sbtList[addrLower];
           if (!entry || !entry.sbtAddress) return;
 
@@ -869,13 +1004,13 @@ class CommunityTab extends Component<any, any> {
         surveyResponsesCount,
         uniqueQuestionsCount: questionIdSet.size,
         surveysList,
-        sbtsCreatedCount: sbtAddressSet.size,
+        sbtsCreatedCount: sbtAddressSet.size + workerGroupIdentitySet.size,
       };
     });
 
   _computeSingleScopeStatsSnapshot = (scopeEntry: any) =>
     measureSync('ce.communityTab.computeSingleScopeStats', () => {
-      if (!scopeEntry || !scopeEntry.netKey) {
+      if (!scopeEntry || !scopeEntry.cacheScope) {
         return {
           uniqueUsers: [],
           surveysCreatedCount: 0,
@@ -920,8 +1055,16 @@ class CommunityTab extends Component<any, any> {
         responders.forEach((r: any) => uniqueUsersSet.add(String(r || '').toLowerCase()));
       }
 
-      let sbtsCreatedCount = 0;
-      for (const sbtAddress in sbtList) {
+      let sbtsCreatedCount = scopeEntry.isWorkerCanonical ? Number(scopeEntry.workerGroupsCount || 0) : 0;
+      if (scopeEntry.isWorkerCanonical) {
+        (scopeEntry.workerVisibleUserIds || []).forEach((userId: unknown) => {
+          const normalizedUserId = String(userId || '')
+            .trim()
+            .toLowerCase();
+          if (isDisplayableWorkerUserId(normalizedUserId)) uniqueUsersSet.add(normalizedUserId);
+        });
+      }
+      for (const sbtAddress in scopeEntry.isWorkerCanonical ? {} : sbtList) {
         const sbtItem = sbtList[sbtAddress];
         if (!sbtItem) continue;
         if (this._shouldCountSbt(sbtItem, scopeEntry.slug)) sbtsCreatedCount += 1;
@@ -965,12 +1108,24 @@ class CommunityTab extends Component<any, any> {
     return this._computeUniverseStatsSnapshot(scopeEntries);
   };
 
+  _isWorkerScopeEntryReady = (scopeEntry: ScopeCacheEntry) => {
+    const groupsSettled = ['ready', 'error', 'unavailable'].includes(scopeEntry.workerGroupsStatus);
+    const questionsReady = this.props.isQuestionCacheReady || this._countKeys(scopeEntry.questionsCache) > 0;
+    const surveysReady = this.props.isSurveyCacheReady || this._countKeys(scopeEntry.surveysCache) > 0;
+    return groupsSettled && questionsReady && surveysReady;
+  };
+
   checkIfInitialLoadDone = async () => {
     // This function checks if the initial load is done by comparing the caches' lastBlock to the latest chain block
     const scopeEntries = this._iterScopeCaches({ clone: false });
     if (scopeEntries.length > 1) {
       try {
-        for (const { slug, surveysCache, questionsCache, sbtCache } of scopeEntries) {
+        for (const scopeEntry of scopeEntries) {
+          const { slug, surveysCache, questionsCache, sbtCache } = scopeEntry;
+          if (scopeEntry.isWorkerCanonical) {
+            if (!this._isWorkerScopeEntryReady(scopeEntry)) return false;
+            continue;
+          }
           // Determine latest block (group-aware)
           let latestBlockNumber = 0;
           try {
@@ -1006,6 +1161,7 @@ class CommunityTab extends Component<any, any> {
     }
 
     const scopeEntry = scopeEntries[0];
+    if (scopeEntry?.isWorkerCanonical) return this._isWorkerScopeEntryReady(scopeEntry);
     const networkID = String(scopeEntry?.netKey || '');
     if (!networkID || !scopeEntry) return false;
 
@@ -1122,6 +1278,7 @@ class CommunityTab extends Component<any, any> {
     let snapshot: any = null;
 
     const scopeEntries = this._iterScopeCaches({ clone: false });
+    await this._hydrateWorkerGroupCounts(scopeEntries);
     const coarseSignature = this._buildCoarseCacheSignature(scopeEntries);
     let signature = this._latestCacheSignature;
     if (force || coarseSignature !== this._latestCoarseCacheSignature) {
@@ -1255,6 +1412,7 @@ class CommunityTab extends Component<any, any> {
         this._queueCacheDrivenRefresh({ force: false });
       }
     });
+    this._workerGroupsChangedUnsubscribe = subscribeWorkerGroupsChanged(this._handleWorkerGroupsChanged);
     if (typeof document !== 'undefined') {
       this._visibilityListenerBound = () => {
         if (this._isUnmounted) return;
@@ -1304,6 +1462,14 @@ class CommunityTab extends Component<any, any> {
       }
     }
     this._cacheUpdateUnsubscribe = null;
+    if (typeof this._workerGroupsChangedUnsubscribe === 'function') {
+      try {
+        this._workerGroupsChangedUnsubscribe();
+      } catch (e) {
+        uiLog.warn('CommunityTab: cleanup', e);
+      }
+    }
+    this._workerGroupsChangedUnsubscribe = null;
     if (this._visibilityListenerBound && typeof document !== 'undefined') {
       try {
         document.removeEventListener('visibilitychange', this._visibilityListenerBound);
@@ -1330,11 +1496,15 @@ class CommunityTab extends Component<any, any> {
     const cacheInputsChanged =
       prevProps.network?.id !== this.props.network?.id ||
       prevProps.provider !== this.props.provider ||
+      prevProps.account !== this.props.account ||
       prevProps.sbtCacheRevision !== this.props.sbtCacheRevision ||
       prevProps.isSBTCacheReady !== this.props.isSBTCacheReady ||
       prevProps.isSurveyCacheReady !== this.props.isSurveyCacheReady ||
       prevProps.isQuestionCacheReady !== this.props.isQuestionCacheReady ||
-      prevProps.activeSessionSlug !== this.props.activeSessionSlug;
+      prevProps.isResponsesCacheReady !== this.props.isResponsesCacheReady ||
+      prevProps.questionResponsesNonce !== this.props.questionResponsesNonce ||
+      prevProps.activeSessionSlug !== this.props.activeSessionSlug ||
+      prevProps.sessionConfig !== this.props.sessionConfig;
 
     if (cacheInputsChanged) {
       this._queueCacheDrivenRefresh({ force: true });
@@ -1402,6 +1572,11 @@ class CommunityTab extends Component<any, any> {
       modalType: !prevState.showModal ? prevState.modalType : null,
       modalTitle: !prevState.showModal ? prevState.modalTitle : '',
     }));
+  };
+
+  _getSingleSelectedWorkerScope = (): ScopeCacheEntry | null => {
+    const scopeEntries = this._iterScopeCaches({ clone: false });
+    return scopeEntries.length === 1 && scopeEntries[0].isWorkerCanonical ? scopeEntries[0] : null;
   };
 
   _buildLeaderboardUsersSignature = (users: any = []) =>
@@ -1956,8 +2131,11 @@ class CommunityTab extends Component<any, any> {
     switch (modalType) {
       case 'sbtgroups':
       case 'sbts':
-      case 'groups':
-        // Render SBTsList directly, passing current props
+      case 'groups': {
+        // Keep the modal on the selected session's authority boundary. The
+        // wrapper projects Worker-native Groups only when it receives the
+        // exact Worker-canonical slug/config pair.
+        const workerScope = this._getSingleSelectedWorkerScope();
         return (
           <SBTsList
             provider={provider}
@@ -1971,11 +2149,15 @@ class CommunityTab extends Component<any, any> {
             sbtRealtimeCoverageBySlug={this.props.sbtRealtimeCoverageBySlug}
             ensureLightSbtDiscovery={this.props.ensureLightSbtDiscovery}
             ensureLightSbtUniverse={this.props.ensureLightSbtUniverse}
+            sessionSlug={workerScope?.slug}
+            sessionConfig={workerScope?.sessionConfig}
             communityTabCompactSettings
             interactiveMiniCards
-            allSessionsMode
+            embeddedMode={!!workerScope}
+            allSessionsMode={!workerScope}
           />
         );
+      }
       case 'users':
         // Render user list with filter
         return (
@@ -2106,7 +2288,13 @@ class CommunityTab extends Component<any, any> {
             </div>
             <div className={styles.statsGrid}>
               {stats.map((stat: any, index: any) => (
-                <div key={index} className={styles.statItem} onClick={() => this.handleStatClick(stat)}>
+                <div
+                  key={index}
+                  className={styles.statItem}
+                  onClick={() => this.handleStatClick(stat)}
+                  data-testid={COMMUNITY_STAT_TEST_IDS[stat.label]}
+                  data-ce-count={String(stat.count)}
+                >
                   <FontAwesomeIcon icon={stat.icon} size="2x" className={styles.statIcon} />
                   <span className={styles.statCount}>
                     {stat.label === 'Groups' && loadingSbtsCreated ? (

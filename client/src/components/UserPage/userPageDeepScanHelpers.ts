@@ -1,4 +1,4 @@
-import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
+import { canonicalizeSessionSlug as normalizeSessionSlug } from '../../utilities/session/sessionSlug.js';
 import { isPlainAnalysisObject, toAnalysisRecord, type UserPageUnknownRecord } from './userPageCoreHelpers';
 
 type UserPageDeepScanSlugReader = (namespace: string) => unknown[];

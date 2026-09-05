@@ -1,3 +1,4 @@
+import { safeString } from './runtimePrimitives.mjs';
 import { TELEGRAM_CHAT_LANES } from './constants.mjs';
 import { assertNoSecretShape, sanitizeForGroup } from './redaction.mjs';
 
@@ -10,8 +11,6 @@ export const AGENT_API_HANDOFF_STATUS = Object.freeze({
   PLANNED_CONTRACT_ONLY: 'planned_contract_only',
   CATALOG_ONLY: 'catalog_scaffold',
 });
-
-const safeString = (value) => String(value || '').trim();
 
 const freezeEntry = (entry) => Object.freeze({
   ...entry,

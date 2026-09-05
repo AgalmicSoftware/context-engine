@@ -1,32 +1,26 @@
-import { bindProfileScanPort } from './profileScanPort';
+import chainGateway from '../../utilities/web3/chainGateway.js';
+import { profileScanPort } from './profileScanPort';
 
 describe('ProfileScanPort', () => {
-  it('routes user profile reads through call-time chainGateway lookup', async () => {
-    const firstChainGateway = {
-      getSBTsForUser: jest.fn(async () => [{ id: 'first-sbt' }]),
-      getUserActivity: jest.fn(async () => ({ surveys: ['first-survey'] })),
-    };
-    const secondChainGateway = {
-      getSBTsForUser: jest.fn(async () => ({ data: [{ id: 'second-sbt' }], hadError: false })),
-      getUserActivity: jest.fn(async () => ({ data: { surveys: ['second-survey'] }, hadError: false })),
-    };
-    let currentChainGateway = firstChainGateway;
-    const port = bindProfileScanPort({
-      chainGateway: () => currentChainGateway,
-    });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
-    await expect(port.getSBTsForUser('0xabc', 'alpha', 10, { returnMeta: true })).resolves.toEqual([
+  it('routes user profile reads through call-time chainGateway property lookup', async () => {
+    const getSBTsForUser = jest.spyOn(chainGateway, 'getSBTsForUser').mockResolvedValue([{ id: 'first-sbt' }]);
+    const getUserActivity = jest
+      .spyOn(chainGateway, 'getUserActivity')
+      .mockResolvedValue({ data: { surveys: ['second-survey'] }, hadError: false });
+
+    await expect(profileScanPort.getSBTsForUser('0xabc', 'alpha', 10, { returnMeta: true })).resolves.toEqual([
       { id: 'first-sbt' },
     ]);
-
-    currentChainGateway = secondChainGateway;
-
-    await expect(port.getUserActivity('0xdef', 'beta', 20, { includeSurveys: true })).resolves.toEqual({
+    await expect(profileScanPort.getUserActivity('0xdef', 'beta', 20, { includeSurveys: true })).resolves.toEqual({
       data: { surveys: ['second-survey'] },
       hadError: false,
     });
 
-    expect(firstChainGateway.getSBTsForUser).toHaveBeenCalledWith('0xabc', 'alpha', 10, { returnMeta: true });
-    expect(secondChainGateway.getUserActivity).toHaveBeenCalledWith('0xdef', 'beta', 20, { includeSurveys: true });
+    expect(getSBTsForUser).toHaveBeenCalledWith('0xabc', 'alpha', 10, { returnMeta: true });
+    expect(getUserActivity).toHaveBeenCalledWith('0xdef', 'beta', 20, { includeSurveys: true });
   });
 });

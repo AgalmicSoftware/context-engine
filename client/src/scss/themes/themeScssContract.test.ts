@@ -52,7 +52,7 @@ describe('runtime SCSS theme contract', () => {
     expect(result.css).toContain('--ce-recognition-logo-border: var(--ce-status-info)');
     expect(result.css).toContain('--ce-welcome-artwork-blend-soft: normal');
     expect(result.css).toContain('--ce-welcome-artwork-blend-intense: normal');
-    expect(result.css).toContain('--ce-welcome-artwork-blend-cutout: normal');
+    expect(result.css).toContain('--ce-welcome-artwork-blend-cutout: screen');
     expect(result.css).toContain('--ce-welcome-artwork-detail-opacity-scale: 0.68');
     expect(result.css).toContain('--ce-welcome-artwork-detail-filter: grayscale(0.35) contrast(1.12)');
     expect(result.css).toContain('--ce-welcome-artwork-backdrop: linear-gradient(90deg, #5b8cff');

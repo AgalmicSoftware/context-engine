@@ -80,6 +80,12 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
       failures.push(`CI workflow must not include ${description}`);
     }
   };
+  const ceccJob = workflow.slice(workflow.indexOf('  cecc-and-node:'), workflow.indexOf('  test:'));
+  const expectCeccJobContains = (expected, description = expected) => {
+    if (!ceccJob.includes(expected)) {
+      failures.push(`CI cecc-and-node job must include ${description}`);
+    }
+  };
   const gateCommandText = (gateName) => (
     (gateManifest.gates?.[gateName]?.commands || [])
       .map((entry) => [entry.command, ...(entry.args || [])].join(' '))
@@ -272,6 +278,19 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
 
   expectWorkflowContains('wiring-and-release:', 'the wiring-and-release job');
   expectWorkflowContains('run: npm run ci:gate -- wiring-and-release', 'the manifest-backed wiring-and-release gate');
+  expectWorkflowContains(
+    'CLIENT_LARGE_FILE_BASE_REF: ${{ steps.baseline-monotonicity-base.outputs.base_sha }}',
+    'public baseline for the large-file inventory gate',
+  );
+  expectCeccJobContains('fetch-depth: 0', 'complete history for client growth comparison');
+  expectCeccJobContains(
+    'node scripts/resolve-baseline-monotonicity-base.mjs --github-output "$GITHUB_OUTPUT"',
+    'the client growth baseline resolver',
+  );
+  expectCeccJobContains(
+    'CLIENT_LARGE_FILE_BASE_REF: ${{ steps.client-growth-base.outputs.base_sha }}',
+    'the resolved client growth baseline',
+  );
   expectWorkflowContains('run: npm run ci:gate -- public-text', 'the hosted public-text gate');
   expectWorkflowContains('node scripts/resolve-baseline-monotonicity-base.mjs', 'baseline monotonicity base resolver');
   expectWorkflowContains(

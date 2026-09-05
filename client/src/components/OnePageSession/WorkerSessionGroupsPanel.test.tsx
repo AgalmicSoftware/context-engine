@@ -2,6 +2,7 @@ import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 import { buildSignedAdminActionAuth, getWorkerSessionToken } from '../../utilities/worker/workerAuth';
+import { dispatchWorkerGroupsChanged } from '../../utilities/worker/workerGroupChangeEvents';
 import { postSignedAdminWorkerRequest } from '../Admin/adminPageSignedWorkerRequest';
 import WorkerSessionGroupsPanel from './WorkerSessionGroupsPanel';
 
@@ -11,6 +12,9 @@ const mockParticipantCreatePanel = jest.fn();
 jest.mock('../../utilities/worker/workerAuth', () => ({
   buildSignedAdminActionAuth: jest.fn(),
   getWorkerSessionToken: jest.fn(),
+}));
+jest.mock('../../utilities/worker/workerGroupChangeEvents', () => ({
+  dispatchWorkerGroupsChanged: jest.fn(),
 }));
 jest.mock('../Admin/adminPageSignedWorkerRequest', () => ({
   postSignedAdminWorkerRequest: jest.fn(),
@@ -30,6 +34,9 @@ const mockBuildSignedAdminActionAuth = buildSignedAdminActionAuth as jest.Mocked
 >;
 const mockPostSignedAdminWorkerRequest = postSignedAdminWorkerRequest as jest.MockedFunction<
   typeof postSignedAdminWorkerRequest
+>;
+const mockDispatchWorkerGroupsChanged = dispatchWorkerGroupsChanged as jest.MockedFunction<
+  typeof dispatchWorkerGroupsChanged
 >;
 
 const ADMIN = '0x00000000000000000000000000000000000000aa';
@@ -158,6 +165,10 @@ describe('WorkerSessionGroupsPanel', () => {
       ),
     );
     expect(await screen.findByText('Group created.')).toBeInTheDocument();
+    expect(mockDispatchWorkerGroupsChanged).toHaveBeenCalledWith({
+      sessionSlug: 'demo-sh',
+      sessionId: SESSION_ID,
+    });
     expect(mockBuildSignedAdminActionAuth).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'groups/create',
@@ -391,6 +402,68 @@ describe('WorkerSessionGroupsPanel', () => {
           workerToken: 'profile-membership-token',
         }),
       ),
+    );
+  });
+
+  it('re-authenticates a profile membership list for the newly active Cloudflare session', async () => {
+    const nextSessionConfig = {
+      ...sessionConfig,
+      slug: 'next-session',
+      sessionIdHex: OTHER_SESSION_ID,
+      corsWorkerUrl: 'https://next-session-worker.example',
+    };
+    mockGetWorkerSessionToken.mockResolvedValueOnce('first-session-token').mockResolvedValueOnce('next-session-token');
+    const { rerender } = render(
+      <WorkerSessionGroupsPanel
+        account={ADMIN}
+        provider="passkey_eoa"
+        networkChainId={null}
+        sessionConfig={sessionConfig}
+        sessionSlug="demo-sh"
+        showCreate={false}
+        membershipsOnly={true}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(mockMembershipPanel).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          sessionId: SESSION_ID,
+          sessionSlug: 'demo-sh',
+          workerToken: 'first-session-token',
+        }),
+      ),
+    );
+
+    rerender(
+      <WorkerSessionGroupsPanel
+        account={ADMIN}
+        provider="passkey_eoa"
+        networkChainId={null}
+        sessionConfig={nextSessionConfig}
+        sessionSlug="next-session"
+        showCreate={false}
+        membershipsOnly={true}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(mockMembershipPanel).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          membershipsOnly: true,
+          sessionId: OTHER_SESSION_ID,
+          sessionSlug: 'next-session',
+          workerToken: 'next-session-token',
+          workerUrl: 'https://next-session-worker.example',
+        }),
+      ),
+    );
+    expect(mockGetWorkerSessionToken).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        sessionConfig: nextSessionConfig,
+        sessionSlug: 'next-session',
+        workerUrl: 'https://next-session-worker.example',
+      }),
     );
   });
 

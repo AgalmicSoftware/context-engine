@@ -30,7 +30,7 @@ export type SurveyResultsCacheUpdate = {
 export type SurveyResultsCacheUpdateHandler = (update: SurveyResultsCacheUpdate) => void;
 export type SurveyResultsCacheUnsubscribe = () => void;
 
-export type SurveyResultsCacheScriptsModule = {
+export type SurveyResultsCachePort = {
   listNamespaceEntriesSync: (
     namespace: SurveyResultsManagedCacheNamespace | string,
     options?: SurveyResultsCacheListOptions,
@@ -49,35 +49,7 @@ export type SurveyResultsCacheScriptsModule = {
   ) => Promise<unknown>;
 };
 
-export type SurveyResultsCachePort = SurveyResultsCacheScriptsModule;
-
-export type BindSurveyResultsCachePortArgs = {
-  cacheScripts: () => SurveyResultsCacheScriptsModule;
-};
-
-export const bindSurveyResultsCachePort = ({
-  cacheScripts: readCacheScripts,
-}: BindSurveyResultsCachePortArgs): SurveyResultsCachePort => ({
-  listNamespaceEntriesSync: (namespace, options) =>
-    options === undefined
-      ? readCacheScripts().listNamespaceEntriesSync(namespace)
-      : readCacheScripts().listNamespaceEntriesSync(namespace, options),
-  peekCacheSync: (namespace, slug, options) => {
-    if (slug === undefined) return readCacheScripts().peekCacheSync(namespace);
-    if (options === undefined) return readCacheScripts().peekCacheSync(namespace, slug);
-    return readCacheScripts().peekCacheSync(namespace, slug, options);
-  },
-  readCache: (namespace, slug) =>
-    slug === undefined ? readCacheScripts().readCache(namespace) : readCacheScripts().readCache(namespace, slug),
-  subscribeCacheUpdates: (handler) => readCacheScripts().subscribeCacheUpdates(handler),
-  writeCache: (namespace, slug, value) => {
-    if (slug === undefined) return readCacheScripts().writeCache(namespace);
-    if (value === undefined) return readCacheScripts().writeCache(namespace, slug);
-    return readCacheScripts().writeCache(namespace, slug, value);
-  },
-});
-
-const readDefaultCacheScripts = (): SurveyResultsCacheScriptsModule => ({
+export const surveyResultsCachePort: SurveyResultsCachePort = {
   listNamespaceEntriesSync: (namespace, options) =>
     options === undefined
       ? cacheScriptsModule.listNamespaceEntriesSync(namespace)
@@ -91,13 +63,9 @@ const readDefaultCacheScripts = (): SurveyResultsCacheScriptsModule => ({
     slug === undefined ? cacheScriptsModule.readCache(namespace) : cacheScriptsModule.readCache(namespace, slug),
   subscribeCacheUpdates: (handler) => cacheScriptsModule.subscribeCacheUpdates(handler),
   writeCache: (namespace, slug, value) => {
-    const writeCache = cacheScriptsModule.writeCache as SurveyResultsCacheScriptsModule['writeCache'];
+    const writeCache = cacheScriptsModule.writeCache as SurveyResultsCachePort['writeCache'];
     if (slug === undefined) return writeCache(namespace);
     if (value === undefined) return writeCache(namespace, slug);
     return writeCache(namespace, slug, value);
   },
-});
-
-export const surveyResultsCachePort = bindSurveyResultsCachePort({
-  cacheScripts: readDefaultCacheScripts,
-});
+};

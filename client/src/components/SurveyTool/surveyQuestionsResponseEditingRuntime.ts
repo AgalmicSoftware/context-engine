@@ -126,6 +126,7 @@ export const createSurveyQuestionsResponseEditingRuntime = (
       buildUpdatePlanDeps(),
     );
     if (!plan.changed) {
+      if (afterUpdate) afterUpdate();
       return;
     }
 
@@ -165,10 +166,14 @@ export const createSurveyQuestionsResponseEditingRuntime = (
     surveyIndex: SurveyQuestionsLegacyValue,
     questionId: SurveyQuestionsLegacyValue,
     additionalComments: SurveyQuestionsLegacyValue,
+    options: SurveyQuestionsLegacyValue = {},
   ) => {
     surveyIndex = propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : surveyIndex;
     questionId = normalizeQuestionIdKey(questionId);
     if (!questionId) return;
+    const shouldPersistDraft: SurveyQuestionsLegacyValue = options?.persistDraft !== false;
+    const afterUpdate: SurveyQuestionsLegacyValue =
+      typeof options?.afterUpdate === 'function' ? options.afterUpdate : null;
 
     const sourceSlice: SurveyQuestionsLegacyValue = stateRef.current.surveysResponseState?.[surveyIndex] || {
       answers: {},
@@ -183,6 +188,7 @@ export const createSurveyQuestionsResponseEditingRuntime = (
       buildUpdatePlanDeps(),
     );
     if (!plan.changed) {
+      if (afterUpdate) afterUpdate();
       return;
     }
 
@@ -205,7 +211,8 @@ export const createSurveyQuestionsResponseEditingRuntime = (
       ),
       () => {
         scheduleJsonPreviewUpdate();
-        persistDraftSafely();
+        if (shouldPersistDraft) persistDraftSafely();
+        if (afterUpdate) afterUpdate();
       },
     );
   };
@@ -224,7 +231,10 @@ export const createSurveyQuestionsResponseEditingRuntime = (
       typeof options?.afterUpdate === 'function' ? options.afterUpdate : null;
     const priorValue: SurveyQuestionsLegacyValue =
       stateRef.current.surveysResponseState?.[surveyIndex]?.conviction?.[questionId];
-    if (priorValue === conviction) return;
+    if (priorValue === conviction) {
+      if (afterUpdate) afterUpdate();
+      return;
+    }
     if (inst._draftDirtyQids) inst._draftDirtyQids.add(questionId);
     invalidateDiffCaches();
 
@@ -267,7 +277,10 @@ export const createSurveyQuestionsResponseEditingRuntime = (
       typeof options?.afterUpdate === 'function' ? options.afterUpdate : null;
     const priorValue: SurveyQuestionsLegacyValue =
       stateRef.current.surveysResponseState?.[surveyIndex]?.importance?.[questionId];
-    if (priorValue === importance) return;
+    if (priorValue === importance) {
+      if (afterUpdate) afterUpdate();
+      return;
+    }
     if (inst._draftDirtyQids) inst._draftDirtyQids.add(questionId);
     invalidateDiffCaches();
 

@@ -70,6 +70,7 @@ export type BuildUserPageAnalysisResetStatePatchArgs = {
 
 export type BuildUserPageAnalysisAiOptionsArgs = {
   analysisSession?: unknown;
+  context?: unknown;
   defaultReason?: unknown;
 };
 
@@ -312,12 +313,15 @@ export const buildUserPageAnalysisElapsedStatePatch = ({
 
 export const buildUserPageAnalysisAiOptions = ({
   analysisSession = {},
+  context,
   defaultReason = 'unknown',
 }: BuildUserPageAnalysisAiOptionsArgs = {}): UserPageUnknownRecord => {
   const session = toAnalysisRecord(analysisSession);
   return {
+    context,
     sessionSlug: String(session.slug || ''),
     sessionConfig: session.sessionConfig,
+    throwOnError: true,
     sessionSelection: {
       gateStatus: String(session.status || 'unknown'),
       reason: String(session.reason || defaultReason || 'unknown'),

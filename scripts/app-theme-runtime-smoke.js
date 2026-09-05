@@ -33,7 +33,6 @@ const ROUTE_CASES = Object.freeze([
   {
     path: '/session/new',
     label: 'Session Wizard',
-    requiresBottomDockedFooter: true,
     requiresReadableSessionSetup: true,
     requiresSessionColors: true,
   },
@@ -325,12 +324,32 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   const readLoginBackgroundState = async () =>
     page.locator('.modal-login .card').evaluate((card) => {
       const body = card.querySelector('.card-body');
+      const content = card.closest('.modal-content');
       const cardStyle = window.getComputedStyle(card);
       const bodyStyle = body ? window.getComputedStyle(body) : null;
+      const contentStyle = content ? window.getComputedStyle(content) : null;
+      const cardRect = card.getBoundingClientRect();
+      const contentRect = content?.getBoundingClientRect();
       return {
         bodyBackgroundImage: bodyStyle?.backgroundImage || '',
         cardBackgroundColor: cardStyle.backgroundColor,
         cardBackgroundImage: cardStyle.backgroundImage,
+        contentBorderWidths: contentStyle
+          ? [
+              contentStyle.borderTopWidth,
+              contentStyle.borderRightWidth,
+              contentStyle.borderBottomWidth,
+              contentStyle.borderLeftWidth,
+            ]
+          : [],
+        contentCardEdgeGap: contentRect
+          ? Math.max(
+              Math.abs(contentRect.left - cardRect.left),
+              Math.abs(contentRect.right - cardRect.right),
+              Math.abs(contentRect.top - cardRect.top),
+              Math.abs(contentRect.bottom - cardRect.bottom),
+            )
+          : Number.POSITIVE_INFINITY,
         overlayBackgroundImage: window.getComputedStyle(card, '::after').backgroundImage,
       };
     });
@@ -655,6 +674,8 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
 
   if (routeCase.requiresSessionColors) {
     await page.getByTestId('ce-new-preset-fast_cheap_cloudflare').click();
+    await page.getByRole('button', { name: /Optional details/i }).click();
+    await page.getByRole('button', { name: 'Session colors expand' }).click();
     await page.waitForSelector('[data-testid="ce-wizard-session-color-scheme"]', { timeout: 15000 });
     await page.waitForSelector('[data-testid="ce-wizard-session-color-preview"]', { timeout: 15000 });
   }
@@ -3028,6 +3049,11 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       assert.equal(state.bodyBackgroundImage, 'none', 'Login body should not add a background gradient');
       assert.equal(state.overlayBackgroundImage, 'none', 'Login card should not render a decorative gradient overlay');
       assert.notEqual(state.cardBackgroundColor, 'rgba(0, 0, 0, 0)', 'Login card solid background should be opaque');
+      assert.deepEqual(state.contentBorderWidths, ['0px', '0px', '0px', '0px'], 'Login shell should be borderless');
+      assert.ok(
+        state.contentCardEdgeGap <= 1,
+        `Login card should sit flush with its modal shell; received ${state.contentCardEdgeGap.toFixed(2)}px`,
+      );
     });
   }
   if (classicPreloginSettingsControlLayout && currentPreloginSettingsControlLayout) {
@@ -3791,15 +3817,25 @@ async function assertWelcomeSlideGeometry(browser, baseUrl, viewport, themeId) {
             info: rect(info),
             controls: rect(controls),
             controlIcons: controlIcons.map(rect),
-            title: rect(title),
+            title: title
+              ? {
+                  ...rect(title),
+                  clientWidth: title.clientWidth,
+                  scrollWidth: title.scrollWidth,
+                  clientHeight: title.clientHeight,
+                  scrollHeight: title.scrollHeight,
+                }
+              : null,
             slideLayout: rect(slideLayout),
             slideImage: rect(slideImage),
-            bulletTexts: bulletTexts.map((element) => ({
-              text: element.textContent?.trim() || '',
-              ...rect(element),
-              clientWidth: element.clientWidth,
-              scrollWidth: element.scrollWidth,
-            })),
+            bulletTexts: bulletTexts
+              .filter((element) => element.getClientRects().length > 0)
+              .map((element) => ({
+                text: element.textContent?.trim() || '',
+                ...rect(element),
+                clientWidth: element.clientWidth,
+                scrollWidth: element.scrollWidth,
+              })),
             slideImageBlendMode: slideImageStyle?.mixBlendMode || '',
             slideImageObjectPosition: slideImageStyle?.objectPosition || '',
             slideImageOpacity: slideImageStyle ? Number.parseFloat(slideImageStyle.opacity) : null,
@@ -3823,6 +3859,10 @@ async function assertWelcomeSlideGeometry(browser, baseUrl, viewport, themeId) {
         assert.ok(
           fit.footerBottom <= fit.clientHeight + 1 && fit.scrollHeight <= fit.clientHeight + 1,
           `${slideLabel} should fit the viewport; received footer bottom ${fit.footerBottom.toFixed(1)}px, scroll height ${fit.scrollHeight}px, viewport ${fit.clientHeight}px`,
+        );
+        assert.ok(
+          fit.walkthrough.height <= Math.min(501, fit.clientHeight * 0.6),
+          `${slideLabel} should use a compact shared frame; received ${fit.walkthrough.height.toFixed(1)}px in a ${fit.clientHeight}px viewport`,
         );
       } else if (viewport.width >= 1367 && fit.slideKey === 'intro') {
         assert.ok(
@@ -3862,6 +3902,10 @@ async function assertWelcomeSlideGeometry(browser, baseUrl, viewport, themeId) {
           `${slideLabel} title should not overlap the slide artwork`,
         );
         assert.ok(
+          fit.title.scrollWidth <= fit.title.clientWidth + 1 && fit.title.scrollHeight <= fit.title.clientHeight + 1,
+          `${slideLabel} title should wrap without clipping`,
+        );
+        assert.ok(
           Math.abs((fit.title.left + fit.title.right) / 2 - (fit.info.left + fit.info.right) / 2) <= 2,
           `${slideLabel} title should remain horizontally centered in the slide frame`,
         );
@@ -3872,6 +3916,16 @@ async function assertWelcomeSlideGeometry(browser, baseUrl, viewport, themeId) {
           `${slideLabel} artwork should remain inside its slide panel`,
         );
       }
+      fit.bulletTexts.forEach((bullet) => {
+        assert.ok(
+          bullet.scrollWidth <= bullet.clientWidth + 1,
+          `${slideLabel} ${bullet.text} should wrap without horizontal clipping`,
+        );
+        assert.ok(
+          bullet.top >= fit.slideLayout.top + 1 && bullet.bottom <= fit.slideLayout.bottom - 1,
+          `${slideLabel} ${bullet.text} should remain vertically inside the slide panel; received ${JSON.stringify({ bulletTop: bullet.top, bulletBottom: bullet.bottom, panelTop: fit.slideLayout.top, panelBottom: fit.slideLayout.bottom })}`,
+        );
+      });
       if (themeId === 'context-engine' && viewport.width >= 1367 && fit.slideKey === 'intro') {
         assert.equal(
           fit.slideImageObjectPosition,
@@ -3895,16 +3949,6 @@ async function assertWelcomeSlideGeometry(browser, baseUrl, viewport, themeId) {
           ideasBullet.right <= fit.slideLayout.right - 10,
           `${slideLabel} Ideas bullet should keep a right inset; received ${JSON.stringify({ bulletRight: ideasBullet.right, panelRight: fit.slideLayout.right })}`,
         );
-        fit.bulletTexts.forEach((bullet) => {
-          assert.ok(
-            bullet.scrollWidth <= bullet.clientWidth + 1,
-            `${slideLabel} ${bullet.text} should wrap without horizontal clipping`,
-          );
-          assert.ok(
-            bullet.top >= fit.slideLayout.top + 1 && bullet.bottom <= fit.slideLayout.bottom - 1,
-            `${slideLabel} ${bullet.text} should remain vertically inside the slide panel; received ${JSON.stringify({ bulletTop: bullet.top, bulletBottom: bullet.bottom, panelTop: fit.slideLayout.top, panelBottom: fit.slideLayout.bottom })}`,
-          );
-        });
         assert.equal(fit.finalAction?.text, 'See Tools', `${slideLabel} should expose the final action`);
         if (themeId === 'classic-95') {
           assert.equal(

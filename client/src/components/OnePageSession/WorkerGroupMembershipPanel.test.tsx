@@ -49,7 +49,7 @@ describe('WorkerGroupMembershipPanel', () => {
 
     render(<WorkerGroupMembershipPanel envelope={envelope} fetchImpl={fetchImpl as typeof fetch} />);
 
-    expect(screen.getByText('Loading groups…')).toBeInTheDocument();
+    expect(screen.getByText('Loading groups…')).toHaveClass('telegramListEmpty', 'workerGroupsLoadingState');
     expect(screen.queryByText('Loading access groups…')).not.toBeInTheDocument();
   });
 
@@ -136,7 +136,9 @@ describe('WorkerGroupMembershipPanel', () => {
     expect(screen.queryByText(/visible without signing in/i)).not.toBeInTheDocument();
     expect(screen.queryByText('Details')).not.toBeInTheDocument();
     expect(screen.queryByText('Tags: research, reviewers')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Open group details for Open reviewers' }));
+    const openGroupDetailsButton = screen.getByRole('button', { name: 'Open group details for Open reviewers' });
+    expect(openGroupDetailsButton).toHaveAttribute('data-ce-control-appearance', 'frameless');
+    fireEvent.click(openGroupDetailsButton);
     expect(window.open).toHaveBeenCalledWith(
       'http://localhost/group/open-reviewers?sessionName=alpha',
       '_blank',
@@ -193,7 +195,7 @@ describe('WorkerGroupMembershipPanel', () => {
 
     expect(await screen.findByTestId('ce-worker-group-detail')).toHaveClass('sbtPage');
     expect(screen.getByRole('article', { name: 'Open reviewers' })).toHaveClass('sbtInfo', 'workerGroupDetailCard');
-    expect(screen.getByText('Visible before sign-in.')).toBeInTheDocument();
+    expect(screen.getByText('Visible before sign-in.').parentElement).toHaveClass('workerGroupDetailDescription');
     expect(screen.getByText('Joining open')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'STATS' })).toBeInTheDocument();
     expect(screen.getByText('Member limit:')).toBeInTheDocument();
@@ -435,6 +437,59 @@ describe('WorkerGroupMembershipPanel', () => {
     expect(
       fetchImpl.mock.calls.filter(([url]) => new URL(String(url)).pathname.endsWith('/groups/members')),
     ).toHaveLength(1);
+  });
+
+  it('explains when an older session Worker does not expose the member directory', async () => {
+    const fetchImpl = jest.fn(async (input: RequestInfo | URL) => {
+      const pathname = new URL(String(input)).pathname;
+      if (pathname.endsWith('/groups/my-memberships')) {
+        return new Response(
+          JSON.stringify({ ok: true, sessionId: SESSION_ID, sessionSlug: 'alpha', memberships: [] }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }
+      if (pathname.endsWith('/groups/members')) {
+        return new Response(JSON.stringify({ error: 'Not found.' }), {
+          status: 404,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          sessionId: SESSION_ID,
+          sessionSlug: 'alpha',
+          groups: [
+            {
+              groupId: 'reviewers',
+              sessionSlug: 'alpha',
+              label: 'Reviewers',
+              joinMode: 'open',
+              memberVisibility: 'session',
+              memberCount: 5,
+            },
+          ],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    });
+
+    render(
+      <WorkerGroupMembershipPanel
+        envelope={envelope}
+        selectedGroupId="reviewers"
+        fetchImpl={fetchImpl as typeof fetch}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'View Reviewers members' }));
+    expect(
+      await screen.findByText(
+        'Individual members are not available from this session’s current Worker. The total member count is still available.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText('(5)')).toBeInTheDocument();
+    expect(screen.queryByText(/worker_group_request_failed_404/)).not.toBeInTheDocument();
   });
 
   it('omits descriptions from minimized cards without changing the full-view default', async () => {
@@ -739,8 +794,45 @@ describe('WorkerGroupMembershipPanel', () => {
     expect(fetchImpl.mock.calls.some(([url]) => new URL(String(url)).pathname.endsWith('/groups/leave'))).toBe(true);
   });
 
+  it('keeps a compact-card join successful when an older Worker omits the member count', async () => {
+    const group = {
+      groupId: 'legacy-reviewers',
+      sessionSlug: 'alpha',
+      label: 'Legacy reviewers',
+      joinMode: 'open',
+      memberVisibility: 'session',
+    };
+    const fetchImpl = jest.fn(async (input: RequestInfo | URL) => {
+      const pathname = new URL(String(input)).pathname;
+      if (pathname.endsWith('/groups/join')) {
+        return new Response(JSON.stringify({ ok: true, sessionId: SESSION_ID, sessionSlug: 'alpha', group }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (pathname.endsWith('/groups/my-memberships')) {
+        return new Response(
+          JSON.stringify({ ok: true, sessionId: SESSION_ID, sessionSlug: 'alpha', memberships: [] }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }
+      return new Response(JSON.stringify({ ok: true, sessionId: SESSION_ID, sessionSlug: 'alpha', groups: [group] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+
+    render(<WorkerGroupMembershipPanel envelope={envelope} fetchImpl={fetchImpl as typeof fetch} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Join Legacy reviewers' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('Joined Legacy reviewers.');
+    expect(screen.getByRole('button', { name: 'Leave Legacy reviewers' })).toBeInTheDocument();
+    expect(screen.queryByText(/worker_group_response_member_count_invalid/)).not.toBeInTheDocument();
+  });
+
   it('updates only the changed card without reloading the full group collection', async () => {
     let membershipReadCount = 0;
+    const onGroupsChanged = jest.fn();
     const group = {
       groupId: 'open-reviewers',
       sessionSlug: 'alpha',
@@ -805,6 +897,7 @@ describe('WorkerGroupMembershipPanel', () => {
         fetchImpl={fetchImpl as typeof fetch}
         showDescriptions={false}
         showListHeader={false}
+        onGroupsChanged={onGroupsChanged}
       />,
     );
 
@@ -812,11 +905,13 @@ describe('WorkerGroupMembershipPanel', () => {
 
     expect(await screen.findByRole('status')).toHaveTextContent('Joined Open reviewers.');
     expect(await screen.findByRole('button', { name: 'Leave Open reviewers' })).toHaveTextContent(/^Leave$/);
+    expect(onGroupsChanged).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByRole('button', { name: 'Leave Open reviewers' }));
 
     expect(await screen.findByRole('status')).toHaveTextContent('Left Open reviewers.');
     expect(await screen.findByRole('button', { name: 'Join Open reviewers' })).toHaveTextContent(/^Join$/);
+    expect(onGroupsChanged).toHaveBeenCalledTimes(2);
     expect(membershipReadCount).toBe(1);
     expect(fetchImpl).toHaveBeenCalledTimes(4);
   });

@@ -141,6 +141,10 @@ export type SessionWizardShellProps = {
   onToggleMoreOptions: MetadataEditorProps['onToggleMoreOptions'];
   onTogglePublishAdvanced: PublishSectionProps['onTogglePublishAdvanced'];
   pendingSbtDrafts: EncryptionPanelBoundaryProps['pendingSbtDrafts'];
+  pendingWorkerGroupDrafts: EncryptionPanelBoundaryProps['pendingWorkerGroupDrafts'];
+  onAddPendingWorkerGroupDraft: EncryptionPanelBoundaryProps['onAddPendingWorkerGroupDraft'];
+  onRemovePendingWorkerGroupDraft: EncryptionPanelBoundaryProps['onRemovePendingWorkerGroupDraft'];
+  onUpdatePendingWorkerGroupDraft: EncryptionPanelBoundaryProps['onUpdatePendingWorkerGroupDraft'];
   pendingSbtSelectorOptions: EncryptionPanelBoundaryProps['pendingSbtSelectorOptions'];
   primaryDraftEntries: MetadataEditorProps['primaryEntries'];
   provider: WizardModalsProps['provider'];
@@ -314,6 +318,10 @@ const SessionWizardShell = ({
   onToggleMoreOptions,
   onTogglePublishAdvanced,
   pendingSbtDrafts,
+  pendingWorkerGroupDrafts,
+  onAddPendingWorkerGroupDraft,
+  onRemovePendingWorkerGroupDraft,
+  onUpdatePendingWorkerGroupDraft,
   pendingSbtSelectorOptions,
   primaryDraftEntries,
   provider,
@@ -484,6 +492,10 @@ const SessionWizardShell = ({
             ensureLightSbtUniverse={ensureLightSbtUniverse}
             addEncryptionGate={addEncryptionGate}
             pendingSbtDrafts={pendingSbtDrafts}
+            pendingWorkerGroupDrafts={pendingWorkerGroupDrafts}
+            onAddPendingWorkerGroupDraft={onAddPendingWorkerGroupDraft}
+            onRemovePendingWorkerGroupDraft={onRemovePendingWorkerGroupDraft}
+            onUpdatePendingWorkerGroupDraft={onUpdatePendingWorkerGroupDraft}
             removePendingSbtDraft={removePendingSbtDraft}
             isWorkerCanonical={isWorkerCanonical}
             showOnChainGateControls={showOnChainGateControls}

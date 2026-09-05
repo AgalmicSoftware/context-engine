@@ -383,7 +383,7 @@ test('validateAgentBridgeTokenScope treats Account Settings: Edit as workers.dev
   assert.equal(withWorkersDevSetup.ok, true);
 });
 
-test('buildAgentBridgeWorkerUploadMetadata defaults to the KV-only runtime shape', () => {
+test('buildAgentBridgeWorkerUploadMetadata defaults to KV plus atomic invite coordination', () => {
   const config = resolveAgentBridgeDeployConfig({
     env: completeEnv({ ADDITIONAL_RPC_URL: 'https://infura.example.test/op-sepolia' }),
   });
@@ -395,8 +395,16 @@ test('buildAgentBridgeWorkerUploadMetadata defaults to the KV-only runtime shape
   assert.equal(metadata.bindings.some((binding) => binding.name === 'AGENT_ACTION_KV' && binding.type === 'kv_namespace'), true);
   assert.equal(metadata.bindings.some((binding) => binding.name === 'AGENT_DOCS_R2'), false);
   assert.equal(metadata.bindings.some((binding) => binding.name === 'AGENT_DOCS_D1'), false);
-  assert.equal(metadata.bindings.some((binding) => binding.type === 'durable_object_namespace'), false);
-  assert.equal(Object.hasOwn(metadata, 'migrations'), false);
+  assert.deepEqual(metadata.bindings.find((binding) => binding.type === 'durable_object_namespace'), {
+    name: 'AGENT_INVITE_COORDINATOR',
+    type: 'durable_object_namespace',
+    class_name: 'AgentInviteRedemptionCoordinator',
+  });
+  assert.deepEqual(metadata.migrations, {
+    old_tag: '',
+    new_tag: 'agent-invite-redemption-v1',
+    new_sqlite_classes: ['AgentInviteRedemptionCoordinator'],
+  });
   assert.equal(metadata.bindings.some((binding) => (
     binding.name === 'AGENT_BRIDGE_PUBLIC_URL' &&
     binding.text === 'https://ce-agent-bridge-worker.tenant-subdomain.workers.dev'

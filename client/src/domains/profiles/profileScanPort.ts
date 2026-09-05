@@ -13,7 +13,7 @@ export type ProfileScanMetaResult<T> = {
 };
 export type ProfileScanOptions = Record<string, unknown>;
 
-type ProfileScanChainGateway = {
+export type ProfileScanPort = {
   getSBTsForUser: (
     userAddress: string,
     groupKeyOrCfg?: unknown,
@@ -28,19 +28,9 @@ type ProfileScanChainGateway = {
   ) => Promise<ProfileScanActivityPayload | ProfileScanMetaResult<ProfileScanActivityPayload>>;
 };
 
-export type ProfileScanPort = ProfileScanChainGateway;
-
-type BindProfileScanPortArgs = {
-  chainGateway: () => ProfileScanChainGateway;
-};
-
-export const bindProfileScanPort = ({ chainGateway: readChainGateway }: BindProfileScanPortArgs): ProfileScanPort => ({
+export const profileScanPort: ProfileScanPort = {
   getSBTsForUser: (userAddress, groupKeyOrCfg, fromBlock, options) =>
-    readChainGateway().getSBTsForUser(userAddress, groupKeyOrCfg, fromBlock, options),
+    chainGateway.getSBTsForUser(userAddress, groupKeyOrCfg, fromBlock, options),
   getUserActivity: (userAddress, groupKeyOrCfg, fromBlock, options) =>
-    readChainGateway().getUserActivity(userAddress, groupKeyOrCfg, fromBlock, options),
-});
-
-export const profileScanPort = bindProfileScanPort({
-  chainGateway: () => chainGateway,
-});
+    chainGateway.getUserActivity(userAddress, groupKeyOrCfg, fromBlock, options),
+};

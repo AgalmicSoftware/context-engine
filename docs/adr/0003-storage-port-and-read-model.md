@@ -9,7 +9,8 @@ Accepted.
 On 2026-07-02, and reaffirmed on 2026-07-05, the project chose stable
 session-storage route names for uploaded metadata and payload reads. Earlier
 planning used fetch/query wording, but the implemented route contract uses
-upload, read, list, and export-envelopes names.
+upload/read/list names. The encrypted-envelope export route was added later as
+a ciphertext-only portability surface.
 
 ## Decision
 
@@ -26,6 +27,8 @@ changes.
 
 ## Consequences
 
-Docs and future storage adapters should describe the
-upload/read/list/export-envelopes route contract. Any future backend portability
-work must preserve these route names or ship an explicit migration plan.
+Docs and future storage adapters should describe the upload/read/list route
+contract. `/storage/export-envelopes` exports encrypted payload envelopes and
+metadata without decrypting them or returning session key material. Any future
+backend portability work must preserve these route names or ship an explicit
+migration plan.

@@ -1,3 +1,4 @@
+import { safeString } from './runtimePrimitives.mjs';
 import {
   DEFAULT_RATING_SCALE,
   QUESTION_VISIBILITY,
@@ -107,10 +108,6 @@ export const TELEGRAM_SCREEN_LAUNCHES = Object.freeze({
   event_log_summary: { command: '/events', callback: OPAQUE_CALLBACK_LAUNCH },
   error_retry: { callback: OPAQUE_CALLBACK_LAUNCH },
 });
-
-function safeString(value) {
-  return String(value || '').trim();
-}
 
 function numberOrFallback(value, fallback) {
   const numeric = Number(value);

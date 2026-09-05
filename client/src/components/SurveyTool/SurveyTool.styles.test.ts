@@ -4,9 +4,70 @@ import { normalizeScssContract } from 'testUtils/scssContractAssertions';
 
 const readSurveyToolScss = () => fs.readFileSync(path.join(__dirname, 'SurveyTool.module.scss'), 'utf8');
 
+const readAudioInputScss = () =>
+  fs.readFileSync(path.join(__dirname, '../Shared/AudioInput/AudioInput.module.scss'), 'utf8');
+
 const readFinalSubmitCtaScss = () => fs.readFileSync(path.join(__dirname, '../../scss/_finalSubmitCta.scss'), 'utf8');
 
 describe('SurveyTool styles', () => {
+  it('keeps the compact interview modal readable and its icon controls normally sized', () => {
+    const scss = readSurveyToolScss();
+
+    expect(scss).toMatch(
+      /\.sessionVoiceModeModal\s*\{[\s\S]*?background:\s*var\(--ce-surface-sunken\) !important;[\s\S]*?color:\s*var\(--ce-panel-text\) !important;[\s\S]*?border:\s*1px solid var\(--ce-card-border\) !important;/,
+    );
+    expect(scss).toMatch(
+      /\.sessionVoiceModeModal\s*\{[\s\S]*?max-height:\s*min\(90vh, 900px\);[\s\S]*?overflow:\s*hidden;/,
+    );
+    expect(scss).toMatch(/:global\(\.modal-body\)\s*\{[\s\S]*?min-height:\s*0;[\s\S]*?overflow-y:\s*auto;/);
+    expect(scss).toMatch(
+      /:global\(\.modal-header\) :global\(\.btn-close\)\s*\{[\s\S]*?width:\s*32px;[\s\S]*?height:\s*32px;[\s\S]*?margin:\s*0;[\s\S]*?padding:\s*0;/,
+    );
+    expect(scss).toMatch(
+      /:global\(\.modal-title\)\s*\{[\s\S]*?font-size:\s*clamp\(1\.35rem, 2\.4vw, 1\.6rem\);[\s\S]*?font-weight:\s*800;/,
+    );
+    expect(scss).toMatch(
+      /\.sessionVoiceModeChooser\s*\{[\s\S]*?button:hover,[\s\S]*?strong,[\s\S]*?span,[\s\S]*?svg\s*\{[\s\S]*?color:\s*var\(--ce-action-accent-text\) !important;/,
+    );
+    expect(scss).toMatch(
+      /\.sessionAgentKickoffCopy\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*8px;[\s\S]*?right:\s*8px;[\s\S]*?width:\s*32px;[\s\S]*?height:\s*32px;/,
+    );
+    expect(scss).toMatch(
+      /\.sessionAgentKickoffToggle\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?right:\s*10px;[\s\S]*?bottom:\s*8px;[\s\S]*?opacity:\s*0\.5;[\s\S]*?&:hover,[\s\S]*?&:focus-visible\s*\{[\s\S]*?opacity:\s*1;[\s\S]*?&\[aria-expanded='true'\]\s*\{[\s\S]*?opacity:\s*1;/,
+    );
+    expect(scss).toMatch(/\.sessionAgentKickoffCaretExpanded\s*\{[\s\S]*?transform:\s*rotate\(180deg\);/);
+    expect(scss).toMatch(
+      /\.sessionAgentKickoffPrompt\s*\{[\s\S]*?white-space:\s*normal;[\s\S]*?overflow-wrap:\s*anywhere;[\s\S]*?opacity:\s*0\.5;/,
+    );
+    expect(scss).toMatch(
+      /\.sessionInterviewStatusDot\s*\{[\s\S]*?border-radius:\s*var\(--ce-radius-round\);[\s\S]*?background:\s*var\(--ce-status-success\);/,
+    );
+    expect(scss).toMatch(/\.sessionInterviewStatusDotError\s*\{[\s\S]*?background:\s*var\(--ce-status-error\);/);
+    expect(scss).toMatch(
+      /\.sessionInterviewMappingNotice\s*\{[\s\S]*?border:\s*1px solid color-mix\(in srgb, var\(--ce-status-warning\) 58%, var\(--ce-card-border\)\);[\s\S]*?background:\s*color-mix\(in srgb, var\(--ce-status-warning\) 12%, var\(--ce-surface-sunken\)\);[\s\S]*?color:\s*var\(--ce-panel-text\);/,
+    );
+    expect(scss).toMatch(
+      /\.sessionInterviewTranscriptToggle\s*\{[\s\S]*?color:\s*var\(--ce-panel-text\);[\s\S]*?&:hover,[\s\S]*?color:\s*var\(--ce-action-accent\);/,
+    );
+    expect(scss).toMatch(
+      /\.sessionInterviewTranscript\s*\{[\s\S]*?background:\s*var\(--ce-input-bg\);[\s\S]*?color:\s*var\(--ce-panel-text\);[\s\S]*?white-space:\s*pre-wrap;/,
+    );
+    expect(scss).toMatch(
+      /\.sessionInterviewConfidenceTrack\s*\{[\s\S]*?height:\s*9px;[\s\S]*?overflow:\s*hidden;[\s\S]*?border-radius:\s*var\(--ce-radius-round\);/,
+    );
+    expect(scss).toMatch(
+      /\.sessionInterviewReviewActions\s*\{[\s\S]*?position:\s*sticky;[\s\S]*?bottom:\s*-18px;[\s\S]*?justify-content:\s*space-between;/,
+    );
+    expect(scss).toMatch(
+      /\.sessionInterviewAnswerInput\s*\{[\s\S]*?background:\s*var\(--ce-input-bg\) !important;[\s\S]*?color:\s*var\(--ce-panel-text\) !important;[\s\S]*?opacity:\s*1;/,
+    );
+
+    const audioScss = readAudioInputScss();
+    expect(audioScss).toMatch(
+      /\.audioTextarea\s*\{[\s\S]*?font-weight:\s*500;[\s\S]*?color:\s*var\(--ce-panel-text, var\(--ce-text\)\) !important;[\s\S]*?caret-color:\s*var\(--ce-panel-text, var\(--ce-text\)\) !important;/,
+    );
+  });
+
   it('keeps binary responses on their dedicated green, yellow, and red theme palette', () => {
     const scss = readSurveyToolScss();
 
@@ -32,6 +93,18 @@ describe('SurveyTool styles', () => {
     );
     expect(scss).toMatch(
       /#binaryChoice \.radioOptionText\s*{[\s\S]*?background:\s*var\(--ce-control-face\);[\s\S]*?box-shadow:\s*var\(--ce-shadow-raised\);/,
+    );
+  });
+
+  it('switches pile questions with a short opacity-only transition', () => {
+    const scss = normalizeScssContract(readSurveyToolScss());
+    const pileCardBlock = scss.match(/\.pileCard\s*{[^}]*}/)?.[0] || '';
+
+    expect(pileCardBlock).toContain('transition: opacity 160ms ease-out;');
+    expect(pileCardBlock).not.toContain('will-change:');
+    expect(pileCardBlock).not.toMatch(/transition:\s*transform/);
+    expect(scss).toMatch(
+      /@media \(prefers-reduced-motion: reduce\)\s*{[\s\S]*?\.pileCard,[\s\S]*?transition-duration: 0\.01ms !important;/,
     );
   });
 
@@ -170,12 +243,13 @@ describe('SurveyTool styles', () => {
       /@media \(min-width:\s*601px\) and \(max-width:\s*768px\)\s*{[\s\S]*?#surveysRow\s*{[^}]*justify-content:\s*space-between;[\s\S]*?#createSurveyButton\s*{[^}]*margin-left:\s*0 !important;/,
     );
     expect(scss).toMatch(/#dropdownToggle\s*{[\s\S]*?color:\s*var\(--ce-authoring-control-text\);/);
+    expect(scss).toMatch(/#dropdownToggle\s*{[^}]*padding-right:\s*12px;/);
     expect(scss).toMatch(/#filterButton\s*{[\s\S]*?background:\s*var\(--ce-authoring-control-bg\);/);
     expect(scss).toMatch(/#showResultsButton\s*{[\s\S]*?color:\s*var\(--ce-authoring-control-text\);/);
     expect(scss).toMatch(/#createSurveyButton\s*{[\s\S]*?opacity:\s*1;/);
   });
 
-  it('widens the embedded session toolbar and centers its wrapped controls on tablets', () => {
+  it('widens the embedded session toolbar and spreads controls until the submit CTA appears', () => {
     const scss = readSurveyToolScss();
 
     expect(scss).toMatch(/#surveysRow\.embeddedSessionToolbar\s*{[^}]*margin-top:\s*0;/);
@@ -187,6 +261,9 @@ describe('SurveyTool styles', () => {
     );
     expect(scss).toMatch(
       /@media \(min-width:\s*601px\) and \(max-width:\s*730px\)\s*{[\s\S]*?#surveysRow\.embeddedSessionToolbar\s*{[^}]*justify-content:\s*center;/,
+    );
+    expect(scss).toMatch(
+      /@media \(min-width:\s*601px\) and \(max-width:\s*730px\)\s*{[\s\S]*?#surveysRow\.embeddedSessionToolbar\.toolbarWithoutSubmit\s*{[^}]*justify-content:\s*space-between;/,
     );
   });
 

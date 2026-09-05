@@ -5,7 +5,7 @@ import { normalizeSessionNaming } from '../../utilities/session/sessionMetadata.
 import { normalizeSponsoredFieldSnapshot } from '../../utilities/session/sponsoredFlags.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { toStr } from '../../utilities/shared/primitives.js';
-import { SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS } from './sessionWizardOnChainCompat.js';
+import { SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS } from '../../domains/sessions/registry/sessionRegistryWriteNormalization.js';
 import { normalizeSbtSelection } from './sessionWizardSbtSelections';
 import type { AnyRecord, ChainIdLike, NetworkLike, SessionConfigLike } from '../shellTypes';
 

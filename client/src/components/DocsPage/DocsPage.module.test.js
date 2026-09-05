@@ -30,6 +30,14 @@ describe('Docs page theme readability styles', () => {
     );
   });
 
+  it('keeps contract-card links and labels readable on the document surface', () => {
+    expect(scss).toMatch(
+      /\.contractHeader\s*\{[\s\S]*?a\s*\{[\s\S]*?color:\s*var\(--docs-document-text\);[\s\S]*?text-decoration:\s*underline;[\s\S]*?text-decoration-color:\s*var\(--docs-link\);/,
+    );
+    expect(scss).toMatch(/\.testnetLabel\s*\{[\s\S]*?color:\s*var\(--docs-document-text\);/);
+    expect(scss).toMatch(/\.contractToggleIcon\s*\{[\s\S]*?color:\s*var\(--docs-document-text\);/);
+  });
+
   it('keeps the Docs GitHub action beside the title with a visible focus treatment', () => {
     expect(scss).toMatch(
       /\.docsHeaderTitleRow\s*\{[\s\S]*?display:\s*flex;[\s\S]*?align-items:\s*center;[\s\S]*?gap:\s*14px;/,

@@ -5,8 +5,10 @@ import {
   INVALID_SESSION_SLUG_ERROR,
   normalizeWorkerSessionSlug,
   resolveRequestedWorkerSlugPayload,
+  resolveCoordinatorSessionSlugStorageKey,
   resolveWorkerBodySlugContext,
   resolveWorkerRequestSlugContext,
+  sessionSlugStorageKey,
   SLUG_MISMATCH_ERROR,
   validateInboundWorkerSessionSlug,
 } from './sessionSlugResolution.js';
@@ -15,6 +17,13 @@ test('normalizeWorkerSessionSlug keeps reserved alias handling narrow', () => {
   assert.equal(normalizeWorkerSessionSlug(' general '), '');
   assert.equal(normalizeWorkerSessionSlug('DeBaTe'), 'rxc');
   assert.equal(normalizeWorkerSessionSlug('Alpha Beta!'), 'alphabeta');
+});
+
+test('sessionSlugStorageKey maps the identity sentinel to the stable storage sentinel', () => {
+  assert.equal(sessionSlugStorageKey(''), 'general');
+  assert.equal(sessionSlugStorageKey('general'), 'general');
+  assert.equal(sessionSlugStorageKey('debate'), 'rxc');
+  assert.equal(sessionSlugStorageKey('alpha'), 'alpha');
 });
 
 test('validateInboundWorkerSessionSlug preserves strict inbound validation', () => {
@@ -26,6 +35,16 @@ test('validateInboundWorkerSessionSlug preserves strict inbound validation', () 
   assert.equal(validateInboundWorkerSessionSlug('Alpha').ok, false);
   assert.equal(validateInboundWorkerSessionSlug('Alpha').error, INVALID_SESSION_SLUG_ERROR);
   assert.equal(validateInboundWorkerSessionSlug('bad slug').error, INVALID_SESSION_SLUG_ERROR);
+});
+
+test('resolveCoordinatorSessionSlugStorageKey preserves strict coordinator validation', () => {
+  assert.equal(resolveCoordinatorSessionSlugStorageKey(null), '');
+  assert.equal(resolveCoordinatorSessionSlugStorageKey(''), 'general');
+  assert.equal(resolveCoordinatorSessionSlugStorageKey('general'), 'general');
+  assert.equal(resolveCoordinatorSessionSlugStorageKey('debate'), 'rxc');
+  assert.equal(resolveCoordinatorSessionSlugStorageKey('alpha'), 'alpha');
+  assert.equal(resolveCoordinatorSessionSlugStorageKey('Alpha'), '');
+  assert.equal(resolveCoordinatorSessionSlugStorageKey('bad slug'), '');
 });
 
 test('resolveRequestedWorkerSlugPayload ignores legacy groupSlug body fields', () => {

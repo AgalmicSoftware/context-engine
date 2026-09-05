@@ -90,7 +90,6 @@ const passesLoginGate = async ({ address, config, env, slug, policy, deps }) => 
   for (const condition of gate.conditions) {
     // Deliberately sequential: membership reads can share an eventually-consistent
     // worker store, and preserving config order keeps diagnostics deterministic.
-    // eslint-disable-next-line no-await-in-loop
     results.push(await evaluateLoginCondition({ condition, address, config, env, slug, deps }));
   }
   return gate.match === 'all' ? results.every(Boolean) : results.some(Boolean);

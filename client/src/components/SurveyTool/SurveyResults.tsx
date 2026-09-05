@@ -30,6 +30,11 @@ import {
   resolveSurveyResultsSessionContext,
   scanSurveyResultsSessionSlugFromCache,
 } from './surveyResultsSessionResolution.js';
+import {
+  readSurveyToolScopedCacheNode,
+  resolveSurveyToolWorkerTargetSignature,
+} from './surveyToolWorkerCacheIsolation';
+import { WORKER_CANONICAL_CACHE_SCOPE_KEY } from '../../utilities/survey/workerCanonicalCacheIdentity';
 import { normalizeSurveyResultsBlockNumber } from './surveyResultsBlockNumbers.js';
 import {
   buildSurveyResultsBookmarkedQuestionIdsPatch,
@@ -667,8 +672,46 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
   function getEffectiveSessionContext(): SurveyResultsSessionContext {
     return resolveSurveyResultsSessionContext({
       sessionSlug: getEffectiveSlug(),
+      sessionConfig: propsRef.current.sessionConfig,
       resolveBySlug: getSessionConfigBySlug,
     });
+  }
+
+  function resolveResultsSessionConfigBySlug(slug: string): unknown {
+    if (slug === getEffectiveSlug() && propsRef.current.sessionConfig) return propsRef.current.sessionConfig;
+    return getSessionConfigBySlug(slug);
+  }
+
+  function getEffectiveCacheScope(): string {
+    const workerTarget = resolveSurveyToolWorkerTargetSignature({
+      sessionSlug: getEffectiveSlug(),
+      sessionConfig: getEffectiveSessionContext().sessionConfig,
+    });
+    if (workerTarget.isWorkerCanonical) {
+      return workerTarget.valid ? WORKER_CANONICAL_CACHE_SCOPE_KEY : '';
+    }
+    return String(propsRef.current.network?.id ?? propsRef.current.networkChainId ?? '');
+  }
+
+  function readResultsScopedCacheNode(
+    cache: unknown,
+    slug: string,
+    cacheScope: string,
+    fallback: SurveyResultsRecord,
+  ): SurveyResultsRecord {
+    const node = readSurveyToolScopedCacheNode({
+      cache,
+      cacheScope,
+      sessionConfig: resolveResultsSessionConfigBySlug(slug),
+      sessionSlug: slug,
+    });
+    return (node || fallback) as SurveyResultsRecord;
+  }
+
+  function filterResultsCacheRoot(cache: unknown, slug: string, cacheScope: string): unknown {
+    if (cacheScope !== WORKER_CANONICAL_CACHE_SCOPE_KEY) return cache;
+    const node = readResultsScopedCacheNode(cache, slug, cacheScope, {});
+    return Object.keys(node).length > 0 ? { [cacheScope]: node } : {};
   }
 
   function resolveBaseQuestionReadScopeContextFor({
@@ -755,7 +798,7 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
   function getScopedQuestionNetworkDataSync(
     viewMode: unknown = stateRef.current.viewMode || propsRef.current.viewMode || 'questions',
   ): SurveyResultsScopedQuestionNetworkData {
-    const netIdStr = String(propsRef.current.network?.id ?? propsRef.current.networkChainId ?? '');
+    const netIdStr = getEffectiveCacheScope();
     if (!netIdStr) return EMPTY_SCOPED_QUESTION_NETWORK_DATA;
     const questionReadSlugs = getQuestionReadSlugs(viewMode);
     const requireAuthoritativeBinding = shouldRequireAuthoritativeQuestionScope(viewMode);
@@ -768,8 +811,9 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
       ports: {
         readQuestionBucket: (slug, networkId) =>
           applyBuiltInDemoQuestionMetadataFallbackToBucket(
-            resolveNetBucketReadOnly(
+            readResultsScopedCacheNode(
               surveyResultsCachePort.peekCacheSync('questionsCache', slug, { clone: false }) || {},
+              slug,
               networkId,
               {
                 questionsLatestBlock: 0,
@@ -792,7 +836,7 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
   async function getScopedQuestionNetworkData(
     viewMode: unknown = stateRef.current.viewMode || propsRef.current.viewMode || 'questions',
   ): Promise<SurveyResultsScopedQuestionNetworkData> {
-    const netIdStr = String(propsRef.current.network?.id ?? propsRef.current.networkChainId ?? '');
+    const netIdStr = getEffectiveCacheScope();
     if (!netIdStr) return EMPTY_SCOPED_QUESTION_NETWORK_DATA;
     const questionReadSlugs = getQuestionReadSlugs(viewMode);
     const requireAuthoritativeBinding = shouldRequireAuthoritativeQuestionScope(viewMode);
@@ -802,8 +846,9 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
       requireAuthoritativeBinding,
       ports: {
         peekQuestionBucket: (slug, networkId) => {
-          const bucket = resolveNetBucketReadOnly(
+          const bucket = readResultsScopedCacheNode(
             surveyResultsCachePort.peekCacheSync('questionsCache', slug, { clone: false }) || {},
+            slug,
             networkId,
             {},
           ) as SurveyResultsQuestionBucketRecord;
@@ -813,8 +858,9 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
         },
         readQuestionBucket: async (slug, networkId) =>
           applyBuiltInDemoQuestionMetadataFallbackToBucket(
-            resolveNetBucketReadOnly(
+            readResultsScopedCacheNode(
               (await surveyResultsCachePort.readCache('questionsCache', slug)) || {},
+              slug,
               networkId,
               {
                 questionsLatestBlock: 0,
@@ -933,6 +979,12 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
   };
 
   const runNonceTickRefresh = async (): Promise<void> => {
+    if (getEffectiveCacheScope() === WORKER_CANONICAL_CACHE_SCOPE_KEY) {
+      pollLocalStorageForUpdates();
+      resetLocalStoragePollingBackoff('nonce-tick-worker');
+      queueResultsRefresh('nonce-tick-worker');
+      return;
+    }
     try {
       const slug = getEffectiveSlug();
       const latest = await chainScanReadsPort.getLatestBlockNumber(
@@ -1137,6 +1189,7 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
       applyStatePatch: (patch: unknown, afterApply?: () => void) => {
         setState(asSurveyResultsStatePatch(patch), afterApply);
       },
+      getCacheScope: getEffectiveCacheScope,
       getEffectiveSlug,
       getFetchRuntimeSnapshot: () => fetchResponsesRuntime.getSnapshot(),
       getProps: () => propsRef.current,
@@ -1148,9 +1201,18 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
       readLatestBlock: (provider: string | undefined, slug: string) =>
         chainScanReadsPort.getLatestBlockNumber(provider, slug),
       readQuestionCacheSync: (slug: string) =>
-        surveyResultsCachePort.peekCacheSync('questionsCache', slug, { clone: false }),
+        filterResultsCacheRoot(
+          surveyResultsCachePort.peekCacheSync('questionsCache', slug, { clone: false }),
+          slug,
+          getEffectiveCacheScope(),
+        ),
       readSurveyCacheSync: (slug: string) =>
-        surveyResultsCachePort.peekCacheSync('surveysCache', slug, { clone: false }),
+        filterResultsCacheRoot(
+          surveyResultsCachePort.peekCacheSync('surveysCache', slug, { clone: false }),
+          slug,
+          getEffectiveCacheScope(),
+        ),
+      shouldReadLatestBlock: () => getEffectiveCacheScope() !== WORKER_CANONICAL_CACHE_SCOPE_KEY,
     },
   });
 
@@ -1202,7 +1264,9 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
     return networkData.questions;
   };
 
-  const getEffectiveNetworkId = (): unknown => propsRef.current.network?.id ?? propsRef.current.networkChainId ?? '';
+  // Regression guard: pure Worker sessions deliberately have no chain ID. Results
+  // availability follows the validated cache authority, not wallet/network presence.
+  const getEffectiveNetworkId = (): unknown => getEffectiveCacheScope();
 
   const hasEffectiveNetworkId = (): boolean => String(getEffectiveNetworkId() ?? '').trim() !== '';
 
@@ -1231,6 +1295,7 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
       instance: inst,
       ports: {
         applyStatePatch: (patch, afterApply) => setState(asSurveyResultsStatePatch(patch), afterApply),
+        getCacheScope: getEffectiveCacheScope,
         getEffectiveSlug,
         getNetworkQuestionsForCurrentContext,
         getProps: () => propsRef.current,
@@ -1238,8 +1303,18 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
         getState: () => stateRef.current,
         logWarn: (...args) => surveyLog.warn(...args),
         parseResponse,
-        readSurveyCache: (slug) => surveyResultsCachePort.readCache('surveysCache', slug),
-        readSurveyCacheSync: (slug) => surveyResultsCachePort.peekCacheSync('surveysCache', slug, { clone: false }),
+        readSurveyCache: async (slug) =>
+          filterResultsCacheRoot(
+            await surveyResultsCachePort.readCache('surveysCache', slug),
+            slug,
+            getEffectiveCacheScope(),
+          ),
+        readSurveyCacheSync: (slug) =>
+          filterResultsCacheRoot(
+            surveyResultsCachePort.peekCacheSync('surveysCache', slug, { clone: false }),
+            slug,
+            getEffectiveCacheScope(),
+          ),
         reapplyQuestionFilters: () => {
           if (questionFilterRef.current) questionFilterRef.current.handleApplyFilters(true);
         },
@@ -1252,6 +1327,7 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
       instance: inst,
       ports: {
         applyStatePatch: (patch, afterApply) => setState(asSurveyResultsStatePatch(patch), afterApply),
+        getCacheScope: getEffectiveCacheScope,
         getEffectiveSlug,
         getNetworkQuestionsForCurrentContext,
         getProps: () => propsRef.current,
@@ -1259,8 +1335,18 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
         getState: () => stateRef.current,
         logWarn: (...args) => surveyLog.warn(...args),
         parseResponse,
-        readSurveyCache: (slug) => surveyResultsCachePort.readCache('surveysCache', slug),
-        readSurveyCacheSync: (slug) => surveyResultsCachePort.peekCacheSync('surveysCache', slug, { clone: false }),
+        readSurveyCache: async (slug) =>
+          filterResultsCacheRoot(
+            await surveyResultsCachePort.readCache('surveysCache', slug),
+            slug,
+            getEffectiveCacheScope(),
+          ),
+        readSurveyCacheSync: (slug) =>
+          filterResultsCacheRoot(
+            surveyResultsCachePort.peekCacheSync('surveysCache', slug, { clone: false }),
+            slug,
+            getEffectiveCacheScope(),
+          ),
         reapplyQuestionFilters: () => {
           if (questionFilterRef.current) questionFilterRef.current.handleApplyFilters(true);
         },
@@ -2084,7 +2170,9 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
           pollLocalStorageForUpdates,
           queueResultsRefresh,
           readLatestBlock: () =>
-            chainScanReadsPort.getLatestBlockNumber(propsRef.current.provider as string | undefined, slug),
+            getEffectiveCacheScope() === WORKER_CANONICAL_CACHE_SCOPE_KEY
+              ? Promise.resolve(0)
+              : chainScanReadsPort.getLatestBlockNumber(propsRef.current.provider as string | undefined, slug),
           resetLocalStoragePollingBackoff,
         },
       });

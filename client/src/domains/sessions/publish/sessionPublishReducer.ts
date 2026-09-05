@@ -6,6 +6,7 @@ export type SessionPublishStatus =
   | 'uploadingMetadata'
   | 'deployingPendingSbts'
   | 'persistingWorkerConfig'
+  | 'creatingWorkerGroups'
   | 'registeringOnChain'
   | 'published'
   | 'failedRecoverable'
@@ -16,6 +17,7 @@ export type SessionPublishEffect =
   | 'deployWorker'
   | 'deployPendingSbts'
   | 'persistWorkerConfig'
+  | 'createWorkerGroups'
   | 'uploadMetadata'
   | 'registerSession'
   | 'refreshRegistryCache';
@@ -24,6 +26,7 @@ export type SessionPublishPlan = {
   autoDeployWorker?: boolean;
   deployPendingSbts?: boolean;
   persistWorkerConfig?: boolean;
+  createWorkerGroups?: boolean;
   uploadMetadata?: boolean;
   registerSession?: boolean;
   refreshRegistryCache?: boolean;
@@ -46,6 +49,7 @@ export type SessionPublishState = {
   workerUrl: string;
   metadataUri: string;
   deployedPendingSbtCount: number;
+  createdWorkerGroupCount: number;
   error: SessionPublishFailure | null;
   cancelled: boolean;
 };
@@ -75,6 +79,7 @@ export type SessionPublishEffectSucceededAction = {
     workerUrl?: string;
     metadataUri?: string;
     deployedPendingSbtCount?: number;
+    createdWorkerGroupCount?: number;
   };
 };
 
@@ -99,6 +104,7 @@ const EFFECT_STATUSES: Record<SessionPublishEffect, SessionPublishStatus> = {
   deployWorker: 'deployingWorker',
   deployPendingSbts: 'deployingPendingSbts',
   persistWorkerConfig: 'persistingWorkerConfig',
+  createWorkerGroups: 'creatingWorkerGroups',
   uploadMetadata: 'uploadingMetadata',
   registerSession: 'registeringOnChain',
   refreshRegistryCache: 'registeringOnChain',
@@ -115,6 +121,7 @@ export const createInitialSessionPublishState = (
   workerUrl: '',
   metadataUri: '',
   deployedPendingSbtCount: 0,
+  createdWorkerGroupCount: 0,
   error: null,
   cancelled: false,
   ...overrides,
@@ -125,6 +132,7 @@ export const buildSessionPublishEffectQueue = (plan: SessionPublishPlan = {}): S
   if (plan.autoDeployWorker) queue.push('deployWorker');
   if (plan.deployPendingSbts) queue.push('deployPendingSbts');
   if (plan.persistWorkerConfig) queue.push('persistWorkerConfig');
+  if (plan.createWorkerGroups) queue.push('createWorkerGroups');
   if (plan.uploadMetadata) queue.push('uploadMetadata');
   if (plan.registerSession !== false) queue.push('registerSession');
   if (plan.refreshRegistryCache) queue.push('refreshRegistryCache');
@@ -242,6 +250,9 @@ export const sessionPublishReducer = (
         deployedPendingSbtCount: Number.isFinite(action.result?.deployedPendingSbtCount)
           ? Number(action.result?.deployedPendingSbtCount)
           : state.deployedPendingSbtCount,
+        createdWorkerGroupCount: Number.isFinite(action.result?.createdWorkerGroupCount)
+          ? Number(action.result?.createdWorkerGroupCount)
+          : state.createdWorkerGroupCount,
       },
       completed,
     );

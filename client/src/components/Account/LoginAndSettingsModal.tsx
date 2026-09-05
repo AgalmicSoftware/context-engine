@@ -34,13 +34,12 @@ import { LoginSettingsSupportedResourceCard } from './LoginSettingsResourceSumma
 import { LoginSettingsInlineNetworkSummary, LoginSettingsPanelNetworkSummary } from './LoginSettingsNetworkSummary';
 import { LoginSettingsConfigToggleControl, LoginSettingsControlRow } from './LoginSettingsControlRow';
 import LoginSettingsSectionCard from './LoginSettingsSectionCard';
-import { assignLoginAndSettingsModalLegacyStatics } from './loginAndSettingsModalLegacyStatics';
 import LoginModalDisplayBody from './LoginModalDisplayBody';
 import LoginTooltipsToggleControl from './LoginTooltipsToggleControl';
 import LoginPreLoginConfigPanel from './LoginPreLoginConfigPanel';
 import LoginPreLoginSettingsDisplay from './LoginPreLoginSettingsDisplay';
 import LoginDemoSurfaceToggleControl from './LoginDemoSurfaceToggleControl';
-import LoginThemeSettingsSection from './LoginThemeSettingsSection';
+import LoginThemeQuickControl from './LoginThemeQuickControl';
 import { DEFAULT_AUTO_REQUEST_TESTNET_FUNDS, DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 import contractScripts, {
   getAllSessionSlugs,
@@ -321,6 +320,8 @@ const settingsSupportReasoning = (settings: AiSettingsLike = {}) =>
     .some((modelLeaf) => /^(gpt-5|o[13])/.test(toStr(modelLeaf)));
 
 export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps, LoginAndSettingsModalState> {
+  static displayName = 'LoginAndSettingsModal';
+
   state: LoginAndSettingsModalState = (() => {
     const initialSessionScanSlugs = normalizeSessionScanSlugs(
       this.props.selectedSessionSlugs || readSessionScanSlugs(),
@@ -343,7 +344,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       aiSettingsStatus: '',
       aiSettingsOpen: false,
       aiSettingsSectionsOpen: {
-        appTheme: true,
         aiConfig: true,
         aiPerTask: false,
         aiAdvanced: false,
@@ -379,6 +379,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   _testFundsRequestId: number = 0;
   _passkeyWalletRestoreReqId: number = 0;
   _passkeyWalletActionId: number = 0;
+  _purposefulPasskeyActionId: number | null = null;
   _sponsoredSessionSourcesMemo: { key: string; value: SponsoredSessionSources } | null = null;
   _settingsOverviewMemo: { key: string; value: LoginSettingsOverviewContext } | null = null;
   _sessionCapabilityProjectionResolver: typeof resolveSessionCapabilityProjection = resolveSessionCapabilityProjection;
@@ -395,8 +396,11 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     notifyInfo: (message) => notify.info(message),
     passkeyWallet,
     setActionMode: (passkeyMode) => this.setStateIfMounted({ passkeyMode }),
-    setStatus: (patch) => this.setStateIfMounted(patch),
-    startAction: () => this.startPasskeyWalletAction(),
+    setStatus: (patch) => {
+      if (patch.passkeyWalletStatusTone === 'error') this._purposefulPasskeyActionId = null;
+      this.setStateIfMounted(patch);
+    },
+    startAction: () => this.startPurposefulPasskeyWalletAction(),
     updateLoginInfo: (payload) => this.props.updateLoginInfo(payload),
   });
   syncPasskeyWalletChain = this._passkeyActions.syncPasskeyWalletChain;
@@ -581,6 +585,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     this._isMounted = false;
     this._sponsoredReqId += 1;
     this._testFundsRequestId += 1;
+    this._purposefulPasskeyActionId = null;
     if (this._autoCloseTimer) {
       clearTimeout(this._autoCloseTimer);
       this._autoCloseTimer = null;
@@ -810,11 +815,18 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     return this._passkeyWalletActionId;
   };
 
+  startPurposefulPasskeyWalletAction = (): number => {
+    const actionId = this.startPasskeyWalletAction();
+    this._purposefulPasskeyActionId = actionId;
+    return actionId;
+  };
+
   isCurrentPasskeyWalletAction = (actionId: number): boolean =>
     this._isMounted && actionId === this._passkeyWalletActionId;
 
   handleLogout = async () => {
     this._passkeyWalletActionId += 1;
+    this._purposefulPasskeyActionId = null;
     if (this.props.provider === 'passkey_eoa') {
       await passkeyWallet.logoutPasskeyWallet();
     }
@@ -859,9 +871,16 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }
     if (this.props.loginComplete && !prevProps.loginComplete) {
       needsBalanceCheck = true;
-      this.setStateIfMounted({ firstModalAfterLogin: true });
-      // Auto-close after 1 second of success view
-      if (this.props.loginModalToggled) {
+      const completedPurposefulPasskeyAction =
+        this._purposefulPasskeyActionId !== null && this._purposefulPasskeyActionId === this._passkeyWalletActionId;
+      this._purposefulPasskeyActionId = null;
+
+      // Regression guard: restoring a saved passkey session can complete while
+      // Settings is open. Only an explicit Create/Login click owns auto-close.
+      if (completedPurposefulPasskeyAction) {
+        this.setStateIfMounted({ firstModalAfterLogin: true });
+      }
+      if (completedPurposefulPasskeyAction && this.props.loginModalToggled) {
         if (this._autoCloseTimer) clearTimeout(this._autoCloseTimer);
         this._autoCloseTimer = setTimeout(() => {
           this._autoCloseTimer = null;
@@ -1556,6 +1575,8 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     containerClassName = '',
     rowClassName = '',
     showSession = true,
+    layout = 'row',
+    themeControl = null,
   }: any = {}) =>
     LoginSettingsControlRow({
       activeSession,
@@ -1575,10 +1596,12 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         demoSurfaceEnabled: this.props.demoSurfaceMode !== false,
         onToggle: () => this.props.setDemoSurfaceMode?.(this.props.demoSurfaceMode === false),
       }),
+      layout,
       containerClassName,
       rowClassName,
       showSession,
       sessionHref: buildSettingsSessionHref(activeSession.slug),
+      themeControl,
     });
 
   handleActiveSessionChange = (event: any) => {
@@ -2128,6 +2151,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         {this.renderSettingsControlRow({
           activeSession,
           configOpen: this.state.aiSettingsOpen,
+          layout: 'quick-grid',
           onToggleConfig: this.toggleAiSettingsPanel,
           betweenSessionAndTooltips:
             cryptoTerminology && overview.capabilities.showNetworkControls
@@ -2146,6 +2170,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
             ) : null,
           tooltipsInfoId: 'postLoginTooltipsToggleTooltip',
           tooltipPlacement: 'right',
+          themeControl: <LoginThemeQuickControl />,
         })}
 
         {this.state.aiSettingsOpen &&
@@ -2252,10 +2277,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
                       ),
                     })
                   : null}
-                <LoginThemeSettingsSection
-                  isOpen={this.isAiSettingsSectionOpen('appTheme')}
-                  onToggle={() => this.toggleAiSettingsSection('appTheme')}
-                />
               </>
             ),
           })}
@@ -2494,8 +2515,9 @@ const mapStateToProps = (state: RootState) => ({
   tooltipsEnabled: state.sessionState.tooltipsEnabled,
 });
 
-const LoginAndSettingsModalWithWagmiHooks = WagmiHooksHOC(LoginAndSettingsModal);
-assignLoginAndSettingsModalLegacyStatics(LoginAndSettingsModal, LoginAndSettingsModalWithWagmiHooks);
+const LoginAndSettingsModalWithWagmiHooks = Object.assign(WagmiHooksHOC(LoginAndSettingsModal), {
+  displayName: 'LoginAndSettingsModal',
+});
 
 export default connect(mapStateToProps, {
   changeAccount,

@@ -65,6 +65,39 @@ test('resolveTopLevelRouteSelection preserves options, auth, and admin route cla
   );
 });
 
+test('resolveTopLevelRouteSelection exposes the per-session interview brief without authentication', () => {
+  assert.deepEqual(
+    resolveTopLevelRouteSelection({
+      path: '/agent/interview-brief',
+      method: 'GET',
+      request: createRequest(),
+      deps: { toStr: String },
+    }),
+    { kind: 'interview-brief' },
+  );
+  assert.deepEqual(
+    resolveTopLevelRouteSelection({
+      path: '/agent/interview-catalog',
+      method: 'GET',
+      request: createRequest(),
+      deps: { toStr: String },
+    }),
+    { kind: 'interview-brief' },
+  );
+});
+
+test('resolveTopLevelRouteSelection classifies realtime SDP exchange as anonymous AI work', () => {
+  assert.deepEqual(
+    resolveTopLevelRouteSelection({
+      path: '/realtime/call',
+      method: 'POST',
+      request: createRequest(),
+      deps: { toStr: String },
+    }),
+    { kind: 'anonymous', anonymousRoute: 'realtime' },
+  );
+});
+
 test('resolveTopLevelRouteSelection preserves raw authorization-header truthiness for arweave upload handoff', () => {
   assert.deepEqual(
     resolveTopLevelRouteSelection({

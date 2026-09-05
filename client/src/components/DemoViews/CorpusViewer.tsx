@@ -15,6 +15,7 @@ import {
 import { faGithub, faTwitter } from '@fortawesome/free-brands-svg-icons';
 
 import corpusSample from '../../variables/demo/corpus_sample.json';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import styles from './CorpusViewer.module.scss';
 import ArxivCard from './ArxivCard';
 import InsiderCard from './InsiderCard';
@@ -30,6 +31,7 @@ import PolicyGlobe, {
 } from './PolicyGlobe';
 import policyStyles from './PolicyGlobe.module.scss';
 import TweetCard, { DebateMapSection, ExternalSourceLink } from './TweetCard';
+import { CrossCorpusCard, LessWrongCard, MetricCard, SciFiCard } from './CorpusNativeCards';
 import {
   buildPublicRepoBlobUrl,
   buildPublicRepoRawUrl,
@@ -837,6 +839,29 @@ const CorpusViewer = ({
           onTagClick={setActiveTag}
           onAtlasIssueOpen={onAtlasIssueOpen || undefined}
         />
+      ) : activeCorpus.key === 'lesswrong_posts' ? (
+        <LessWrongCard
+          key={key}
+          entry={entry}
+          onTagClick={setActiveTag}
+          onAtlasIssueOpen={onAtlasIssueOpen || undefined}
+        />
+      ) : activeCorpus.key === 'ai_scifi_books' ? (
+        <SciFiCard key={key} entry={entry} onTagClick={setActiveTag} onAtlasIssueOpen={onAtlasIssueOpen || undefined} />
+      ) : activeCorpus.key === 'cross_corpus' ? (
+        <CrossCorpusCard
+          key={key}
+          entry={entry}
+          onTagClick={setActiveTag}
+          onAtlasIssueOpen={onAtlasIssueOpen || undefined}
+        />
+      ) : activeCorpus.key === 'metr_evals_metrics' ? (
+        <MetricCard
+          key={key}
+          entry={entry}
+          onTagClick={setActiveTag}
+          onAtlasIssueOpen={onAtlasIssueOpen || undefined}
+        />
       ) : (
         <EntryCard
           key={key}
@@ -959,7 +984,7 @@ const CorpusViewer = ({
         {activeCorpus.key === 'ai_laws_policy' ? (
           <PolicyGlobe entries={activeCorpus.entries}>
             {({ filteredEntries, filterStatus, FilterControlsElement }) => (
-              <div className={styles.policySplitLayout} data-testid="ce-policy-split-layout">
+              <div className={styles.policySplitLayout} data-testid={E2E_TESTIDS.CONTEXT_POLICY_SURFACE}>
                 <div className={styles.policyListColumn}>
                   <div className={styles.policyListHeader}>
                     <div>

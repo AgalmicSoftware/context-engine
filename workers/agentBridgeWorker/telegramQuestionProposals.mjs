@@ -1,3 +1,10 @@
+import {
+  safeString,
+  lower,
+  nowIso,
+  safeJsonParse,
+  sanitizeSessionSlug,
+} from './runtimePrimitives.mjs';
 import { buildOpaqueActionId } from './opaqueActions.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 import { buildTelegramAgentActivityMetadata } from './telegramAgentActivity.mjs';
@@ -51,34 +58,6 @@ const TAG_RULES = Object.freeze([
   ['location', /\b(country|city|local|citizen|resident|live in|location)\b/i],
   ['funding', /\b(fund|funding|invest|investor|budget|grant|money|capital)\b/i],
 ]);
-
-function safeString(value) {
-  return String(value || '').trim();
-}
-
-function lower(value) {
-  return safeString(value).toLowerCase();
-}
-
-function nowIso(now = null) {
-  if (now instanceof Date) return now.toISOString();
-  if (safeString(now)) return new Date(now).toISOString();
-  return new Date().toISOString();
-}
-
-function safeJsonParse(value, fallback = null) {
-  const text = safeString(value);
-  if (!text) return fallback;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return fallback;
-  }
-}
-
-function sanitizeSessionSlug(value = '') {
-  return lower(value).replace(/[^a-z0-9_-]/g, '').slice(0, 128);
-}
 
 function normalizeQuestionType(value = '') {
   const type = lower(value).replace(/_/g, '-');

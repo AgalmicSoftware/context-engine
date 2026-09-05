@@ -3,6 +3,10 @@ import {
   dispatchPublicWorkerGroupListRequest as dispatchPublicWorkerGroupListRequestBoundary,
 } from './workerGroups.js';
 import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
+import {
+  proxyOpenAiRealtimeCall as proxyOpenAiRealtimeCallBoundary,
+  readRealtimeCallRequestPayload as readRealtimeCallRequestPayloadBoundary,
+} from './realtimeCallExecution.js';
 
 const resolveDefaultModelForProvider = (provider) => {
   if (provider === 'anthropic') return 'claude-3-5-sonnet-20240620';
@@ -102,6 +106,39 @@ export const dispatchAnonymousRoute = async ({
       secrets,
       baseHeaders: headers,
       transcribeRequest,
+    });
+  }
+
+  if (path === '/realtime/call') {
+    const readRealtimeCallRequestPayload = deps?.readRealtimeCallRequestPayload || readRealtimeCallRequestPayloadBoundary;
+    const realtimeRequest = await readRealtimeCallRequestPayload({ request });
+    if (!realtimeRequest?.ok) {
+      return deps?.json?.(
+        { error: realtimeRequest?.error },
+        realtimeRequest?.status || 400,
+        headers,
+      );
+    }
+    const anonymousAccess = await deps?.evaluateAnonymousRouteAccess?.({
+      slug,
+      config,
+      route: 'realtime',
+    });
+    if (!anonymousAccess?.ok) {
+      return deps?.json?.(
+        { error: anonymousAccess?.error || deps?.ANONYMOUS_ROUTE_DENIED_ERROR },
+        anonymousAccess?.status || 403,
+        headers,
+      );
+    }
+    const secrets = (await deps?.getSessionSecrets?.(slug)) || {};
+    const proxyOpenAiRealtimeCall = deps?.proxyOpenAiRealtimeCall || proxyOpenAiRealtimeCallBoundary;
+    return proxyOpenAiRealtimeCall({
+      payload: realtimeRequest.payload,
+      secrets,
+      config,
+      baseHeaders: headers,
+      deps: { json: deps?.json },
     });
   }
 

@@ -63,6 +63,7 @@ const WorkerGroupCard = ({
       <button
         type="button"
         className={styles.workerGroupCardBodyButton}
+        data-ce-control-appearance="frameless"
         onClick={() => onOpenDetails(group.groupId)}
         aria-label={`Open group details for ${group.label}`}
       >

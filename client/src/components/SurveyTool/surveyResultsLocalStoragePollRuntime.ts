@@ -55,6 +55,7 @@ export type SurveyResultsLocalStoragePollInstance = {
 
 export type SurveyResultsLocalStoragePollPorts = {
   applyStatePatch: (patch: unknown, afterApply?: () => void) => void;
+  getCacheScope?: () => string;
   getEffectiveSlug: () => string;
   getFetchRuntimeSnapshot: () => { inFlight?: unknown };
   getProps: () => SurveyResultsProps;
@@ -66,6 +67,7 @@ export type SurveyResultsLocalStoragePollPorts = {
   readLatestBlock: (provider: string | undefined, slug: string) => Promise<unknown>;
   readQuestionCacheSync: (slug: string) => unknown;
   readSurveyCacheSync: (slug: string) => unknown;
+  shouldReadLatestBlock?: () => boolean;
 };
 
 export type SurveyResultsLocalStoragePollConfig = {
@@ -87,6 +89,7 @@ export const maybeRefreshSurveyResultsNetworkLatestBlockFromPolling = ({
   const state = ports.getState();
   const props = ports.getProps();
   if (normalizeSurveyResultsBlockNumber(state.networkLatestBlock) > 0) return;
+  if (ports.shouldReadLatestBlock?.() === false) return;
   if (instance._pollLatestBlockFetchInFlight) return;
   const now = Date.now();
   if (
@@ -183,7 +186,7 @@ export const pollSurveyResultsLocalStorageForUpdates = ({
   measureSync('ce.surveyResults.pollLocalStorageForUpdates', () => {
     const props = ports.getProps();
     const state = ports.getState();
-    const netIdStr = String(props.network?.id ?? props.networkChainId ?? '');
+    const netIdStr = ports.getCacheScope?.() || String(props.network?.id ?? props.networkChainId ?? '');
     if (!netIdStr) return false;
     const slug = ports.getEffectiveSlug();
     const currentSurveyId = state.viewMode === 'survey' ? String(state.surveyId || '').toLowerCase() : '';

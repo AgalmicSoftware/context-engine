@@ -108,6 +108,41 @@ describe('sessionPublishReducer', () => {
     });
   });
 
+  it('creates queued Worker Groups only after config verification and tracks retryable progress', () => {
+    const plan = publishPlan({
+      persistWorkerConfig: true,
+      createWorkerGroups: true,
+      uploadMetadata: false,
+      registerSession: false,
+      refreshRegistryCache: false,
+    });
+    expect(buildSessionPublishEffectQueue(plan)).toEqual([
+      'checkRequirements',
+      'persistWorkerConfig',
+      'createWorkerGroups',
+    ]);
+
+    const afterRequirements = reduceActions([
+      { type: 'beginPublish', plan },
+      { type: 'effectSucceeded', effect: 'checkRequirements' },
+    ]);
+    const afterConfig = sessionPublishReducer(afterRequirements, {
+      type: 'effectSucceeded',
+      effect: 'persistWorkerConfig',
+      result: { workerUrl: 'https://worker.example.test' },
+    });
+    expect(afterConfig).toEqual(
+      expect.objectContaining({ status: 'creatingWorkerGroups', currentEffect: 'createWorkerGroups' }),
+    );
+
+    const published = sessionPublishReducer(afterConfig, {
+      type: 'effectSucceeded',
+      effect: 'createWorkerGroups',
+      result: { createdWorkerGroupCount: 2 },
+    });
+    expect(published).toEqual(expect.objectContaining({ status: 'published', createdWorkerGroupCount: 2 }));
+  });
+
   it('preserves decentralized upload, registration, and registry refresh ordering', () => {
     expect(buildSessionPublishEffectQueue(publishPlan())).toEqual([
       'checkRequirements',

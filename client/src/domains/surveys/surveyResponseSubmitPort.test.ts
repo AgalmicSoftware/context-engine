@@ -1,26 +1,30 @@
-import { bindSurveyResponseSubmitPort, type SurveyResponseSubmitGateway } from './surveyResponseSubmitPort';
+import chainGateway from '../../utilities/web3/chainGateway.js';
+import { surveyResponseSubmitPort } from './surveyResponseSubmitPort';
 
 describe('surveyResponseSubmitPort', () => {
-  it('routes submitResponses through call-time chain gateway lookup', async () => {
-    const firstGateway: SurveyResponseSubmitGateway = {
-      submitResponses: jest.fn(async () => ({ transactionHash: '0xfirst' })),
-    };
-    const secondGateway: SurveyResponseSubmitGateway = {
-      submitResponses: jest.fn(async () => ({ transactionHash: '0xsecond' })),
-    };
-    let currentGateway = firstGateway;
-    const port = bindSurveyResponseSubmitPort({
-      chainGateway: () => currentGateway,
-    });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('routes submitResponses through call-time chain gateway property lookup', async () => {
+    const submitResponses = jest
+      .spyOn(chainGateway, 'submitResponses')
+      .mockResolvedValueOnce({ transactionHash: '0xfirst' })
+      .mockResolvedValueOnce({ transactionHash: '0xsecond' });
 
     await expect(
-      port.submitResponses('provider-a', ['q1'], [{ questionID: 'q1' }], 'survey-a', { responses: [] }, 'slug-a'),
+      surveyResponseSubmitPort.submitResponses(
+        'provider-a',
+        ['q1'],
+        [{ questionID: 'q1' }],
+        'survey-a',
+        { responses: [] },
+        'slug-a',
+      ),
     ).resolves.toEqual({ transactionHash: '0xfirst' });
 
-    currentGateway = secondGateway;
-
     await expect(
-      port.submitResponses(
+      surveyResponseSubmitPort.submitResponses(
         'provider-b',
         ['q2'],
         [{ questionID: 'q2' }],
@@ -30,7 +34,8 @@ describe('surveyResponseSubmitPort', () => {
       ),
     ).resolves.toEqual({ transactionHash: '0xsecond' });
 
-    expect(firstGateway.submitResponses).toHaveBeenCalledWith(
+    expect(submitResponses).toHaveBeenNthCalledWith(
+      1,
       'provider-a',
       ['q1'],
       [{ questionID: 'q1' }],
@@ -38,7 +43,8 @@ describe('surveyResponseSubmitPort', () => {
       { responses: [] },
       'slug-a',
     );
-    expect(secondGateway.submitResponses).toHaveBeenCalledWith(
+    expect(submitResponses).toHaveBeenNthCalledWith(
+      2,
       'provider-b',
       ['q2'],
       [{ questionID: 'q2' }],

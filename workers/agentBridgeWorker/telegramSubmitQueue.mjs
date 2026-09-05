@@ -1,3 +1,12 @@
+import {
+  safeString,
+  lower,
+  safeJsonParse,
+  envFlagEnabled,
+  envFlagDisabled,
+  nowIso,
+  sanitizeSessionSlug,
+} from './runtimePrimitives.mjs';
 import { AGENT_BRIDGE_EVENT_TYPES, TELEGRAM_BRIDGE_ACTIONS } from './constants.mjs';
 import { deriveManagedDemoAccount } from './managedAccounts.mjs';
 import { submitTelegramResponseOnChain } from './onChainResponses.mjs';
@@ -16,40 +25,6 @@ export const SUBMITTED_RESULT_STATUSES = Object.freeze([
   'submit_queued',
   'submit_request_created',
 ]);
-
-function safeString(value) {
-  return String(value || '').trim();
-}
-
-function nowIso() {
-  return new Date().toISOString();
-}
-
-function lower(value) {
-  return safeString(value).toLowerCase();
-}
-
-function envFlagEnabled(value = '') {
-  return ['1', 'true', 'yes', 'on'].includes(lower(value));
-}
-
-function envFlagDisabled(value = '') {
-  return ['0', 'false', 'no', 'off'].includes(lower(value));
-}
-
-function safeJsonParse(value, fallback = null) {
-  const text = safeString(value);
-  if (!text) return fallback;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return fallback;
-  }
-}
-
-function sanitizeSessionSlug(value = '') {
-  return lower(value).replace(/[^a-z0-9_-]/g, '').slice(0, 128);
-}
 
 export function submitRequestKvKey(requestId = '') {
   const id = safeString(requestId);

@@ -6,7 +6,11 @@ jest.mock('utilities/logging.js', () => ({
 jest.mock('../../utilities/web3/chainGateway.js', () => ({
   __esModule: true,
   getAllSessionSlugs: jest.fn(),
-  normalizeSessionSlug: jest.fn(),
+}));
+
+jest.mock('./sessionSlug.js', () => ({
+  __esModule: true,
+  canonicalizeSessionSlug: jest.fn(),
 }));
 
 jest.mock('../../utilities/session/sessionScanScope.js', () => ({
@@ -48,6 +52,7 @@ const setWindowValue = (value) => {
 };
 
 let contractScriptsModule;
+let sessionSlugModule;
 let scanScopeModule;
 let listenersModule;
 let fullScanModule;
@@ -66,6 +71,7 @@ describe('createSessionScanPolicy', () => {
     jest.resetModules();
 
     contractScriptsModule = jest.requireMock('../../utilities/web3/chainGateway.js');
+    sessionSlugModule = jest.requireMock('./sessionSlug.js');
     scanScopeModule = jest.requireMock('../../utilities/session/sessionScanScope.js');
     listenersModule = jest.requireMock('../../utilities/sbt/sbtInstanceListenersMode.js');
     fullScanModule = jest.requireMock('../../utilities/sbt/sbtFullScanPolicy.js');
@@ -84,7 +90,7 @@ describe('createSessionScanPolicy', () => {
     };
     loggingModule.createLogger.mockReturnValue(mockLogger);
 
-    contractScriptsModule.normalizeSessionSlug.mockImplementation((slug) =>
+    sessionSlugModule.canonicalizeSessionSlug.mockImplementation((slug) =>
       String(slug || '')
         .trim()
         .toLowerCase(),

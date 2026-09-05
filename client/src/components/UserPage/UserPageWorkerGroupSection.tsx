@@ -17,7 +17,7 @@ const UserPageWorkerGroupSection = ({
   sessionSlug,
 }: UserPageWorkerGroupSectionProps): React.ReactElement => (
   <section className={styles.sbtSection} aria-labelledby="user-profile-worker-groups-heading">
-    <h2 id="user-profile-worker-groups-heading">Joined Groups:</h2>
+    <h2 id="user-profile-worker-groups-heading">Groups Joined:</h2>
     <WorkerSessionGroupsPanel
       account={account}
       provider={provider}

@@ -280,6 +280,34 @@
   padding: 10px;
 }
 
+.reportSettingsToggle {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: inherit;
+  cursor: pointer;
+  line-height: 1;
+  margin-right: 10px;
+  padding: 4px;
+
+  &:hover,
+  &:focus-visible {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+  }
+
+  &:hover {
+    opacity: 0.72;
+  }
+
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+}
+
 /* PDF Mode classes */
 .pdfMode {
   /* Show/hide pieces specifically for PDF if needed */
@@ -461,22 +489,38 @@
   justify-content: center;
   align-items: center;
   gap: 10px;
-  margin-top: 5px;
+  margin-top: 0;
 }
 
 .scrollButton {
-  background: var(--ce-surface-subtle);
-  border: 1px solid var(--ce-color-border-light);
+  background: var(--ce-action-primary);
+  border: 2px solid var(--ce-action-primary);
   border-radius: var(--ce-radius-round);
-  width: 30px;
-  height: 30px;
+  color: var(--ce-action-primary-text);
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  font-size: 1rem;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.2s;
-  &:hover {
-    background: var(--ce-document-border);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--ce-action-primary) 30%, transparent);
+  transition:
+    background-color 0.2s,
+    border-color 0.2s,
+    box-shadow 0.2s;
+
+  &:hover,
+  &:focus-visible {
+    background: var(--ce-action-primary-hover);
+    border-color: var(--ce-action-primary-hover);
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--ce-action-primary) 38%, transparent);
+  }
+
+  &:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--ce-action-primary) 40%, var(--ce-color-white));
+    outline-offset: 2px;
   }
 }
 
@@ -904,13 +948,16 @@
   }
 
   .scrollButton {
-    background: var(--ce-status-info-text);
-    border: none;
-    color: var(--ce-status-info);
+    background: var(--ce-action-primary);
+    border: 2px solid var(--ce-action-primary);
+    color: var(--ce-action-primary-text);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--ce-action-primary) 30%, transparent);
   }
 
-  .scrollButton:hover {
-    background: var(--ce-status-info-text);
+  .scrollButton:hover,
+  .scrollButton:focus-visible {
+    background: var(--ce-action-primary-hover);
+    border-color: var(--ce-action-primary-hover);
   }
 
   .reportBeeswarm {
@@ -975,6 +1022,15 @@
 
   button:hover {
     background: var(--ce-status-info-text);
+  }
+
+  .reportSettingsToggle,
+  .reportSettingsToggle:hover,
+  .reportSettingsToggle:focus-visible {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    color: var(--ce-document-text);
   }
 
   input[type='checkbox'] {
@@ -1173,13 +1229,16 @@
   }
 
   .scrollButton {
-    background: var(--ce-document-border-strong);
-    border: 1px solid var(--ce-document-text-muted);
-    color: var(--ce-document-border);
+    background: var(--ce-action-primary);
+    border: 2px solid var(--ce-action-primary);
+    color: var(--ce-action-primary-text);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--ce-action-primary) 35%, transparent);
   }
 
-  .scrollButton:hover {
-    background: var(--ce-overlay-surface);
+  .scrollButton:hover,
+  .scrollButton:focus-visible {
+    background: var(--ce-action-primary-hover);
+    border-color: var(--ce-action-primary-hover);
   }
 
   .analysisNote {
@@ -1238,6 +1297,15 @@
 
   button:hover {
     background: var(--ce-overlay-surface);
+  }
+
+  .reportSettingsToggle,
+  .reportSettingsToggle:hover,
+  .reportSettingsToggle:focus-visible {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    color: var(--ce-document-surface);
   }
 
   input[type='checkbox'] {

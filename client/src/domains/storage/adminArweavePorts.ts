@@ -17,17 +17,6 @@ export type AdminNormalizeArweaveUrlOptions = {
   contextLabel?: unknown;
 };
 
-export type AdminArweaveClientModule = {
-  readArweaveWalletBalance: (jwk: unknown, opts?: AdminArweaveRecord) => Promise<AdminArweaveWalletBalance>;
-  formatWinstonToAr: (winston: unknown, decimals?: number) => string;
-  uploadDataToArweave: (data: unknown, format: string, opts?: AdminArweaveUploadOptions) => Promise<string | undefined>;
-  buildArweaveGatewayUrl: (txId: unknown, gateway?: unknown) => string;
-};
-
-export type AdminArweaveUrlsModule = {
-  normalizeArweaveUrl: (value: unknown, options?: AdminNormalizeArweaveUrlOptions) => string;
-};
-
 export type AdminArweavePort = {
   readArweaveWalletBalance: (jwk: unknown, opts?: AdminArweaveRecord) => Promise<AdminArweaveWalletBalance>;
   formatWinstonToAr: (winston: unknown, decimals?: number) => string;
@@ -36,36 +25,25 @@ export type AdminArweavePort = {
   normalizeArweaveUrl: (value: unknown, options?: AdminNormalizeArweaveUrlOptions) => string;
 };
 
-export type BindAdminArweavePortsArgs = {
-  client: () => AdminArweaveClientModule;
-  urls: () => AdminArweaveUrlsModule;
-};
-
-export const bindAdminArweavePorts = ({
-  client: readScripts,
-  urls: readUrls,
-}: BindAdminArweavePortsArgs): AdminArweavePort => ({
+export const adminArweavePort: AdminArweavePort = {
   readArweaveWalletBalance: (jwk, opts) =>
     opts === undefined
-      ? readScripts().readArweaveWalletBalance(jwk)
-      : readScripts().readArweaveWalletBalance(jwk, opts),
+      ? defaultArweaveClient.readArweaveWalletBalance(jwk)
+      : defaultArweaveClient.readArweaveWalletBalance(jwk, opts),
   formatWinstonToAr: (winston, decimals) =>
     decimals === undefined
-      ? readScripts().formatWinstonToAr(winston)
-      : readScripts().formatWinstonToAr(winston, decimals),
+      ? defaultArweaveClient.formatWinstonToAr(winston)
+      : defaultArweaveClient.formatWinstonToAr(winston, decimals),
   uploadDataToArweave: (data, format, opts) =>
     opts === undefined
-      ? readScripts().uploadDataToArweave(data, format)
-      : readScripts().uploadDataToArweave(data, format, opts),
+      ? defaultArweaveClient.uploadDataToArweave(data, format)
+      : defaultArweaveClient.uploadDataToArweave(data, format, opts),
   buildArweaveGatewayUrl: (txId, gateway) =>
     gateway === undefined
-      ? readScripts().buildArweaveGatewayUrl(txId)
-      : readScripts().buildArweaveGatewayUrl(txId, gateway),
+      ? defaultArweaveClient.buildArweaveGatewayUrl(txId)
+      : defaultArweaveClient.buildArweaveGatewayUrl(txId, gateway),
   normalizeArweaveUrl: (value, options) =>
-    options === undefined ? readUrls().normalizeArweaveUrl(value) : readUrls().normalizeArweaveUrl(value, options),
-});
-
-export const adminArweavePort = bindAdminArweavePorts({
-  client: () => defaultArweaveClient,
-  urls: () => defaultArweaveUrls,
-});
+    options === undefined
+      ? defaultArweaveUrls.normalizeArweaveUrl(value)
+      : defaultArweaveUrls.normalizeArweaveUrl(value, options),
+};

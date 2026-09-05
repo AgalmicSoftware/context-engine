@@ -1,6 +1,6 @@
 {
   "name": "contextEngine",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Context Engine — an OSS toolkit for groups",
   "author": "Context Engine Contributors",
   "license": "MPL-2.0",
@@ -63,7 +63,9 @@
     "client-boundaries:check": "node scripts/check-client-boundaries.mjs",
     "dead-exports:check": "node scripts/check-dead-exports-advisory.mjs --check",
     "test:hygiene": "node scripts/check-text-hygiene.mjs",
-    "test:wiring": "node scripts/verify-test-wiring.js && node scripts/verify-test-inventory.js && npm run -s client-boundaries:check && npm run -s dead-exports:check && npm run -s test:hygiene && node --test scripts/client-large-file-inventory.test.js",
+    "docs:maps": "node scripts/generate-map-docs.mjs",
+    "docs:maps:check": "node scripts/generate-map-docs.mjs --check",
+    "test:wiring": "node scripts/verify-test-wiring.js && node scripts/verify-test-inventory.js && npm run -s docs:maps:check && npm run -s client-boundaries:check && npm run -s dead-exports:check && npm run -s test:hygiene && node --test scripts/client-large-file-inventory.test.js",
     "test:release:client": "cd client && npm test -- --watchAll=false --runInBand",
     "typecheck:client": "npm --prefix client run typecheck",
     "typecheck:client-tests": "node scripts/check-client-test-types.mjs",

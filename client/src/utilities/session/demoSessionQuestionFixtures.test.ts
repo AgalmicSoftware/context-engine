@@ -147,6 +147,75 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
     expect(classifySessionModeProfileSupport(config.sessionModeProfile).status).toBe('reachable');
   });
 
+  it('attaches the realtime demo Worker to a clean demo-interview session route', () => {
+    const config = (demoSessions as Record<string, any>)['demo-interview'];
+    const questions = getTemporaryDemoSessionQuestionFixtures('demo-interview', config);
+
+    expect(questions).toHaveLength(42);
+    expect(questions.map((question) => question.id)).toEqual(demo1OnchainQuestionIds);
+    expect(questions[0]).toMatchObject({
+      sessionSlug: 'demo-interview',
+      temporaryDemoSeed: false,
+      cloudflareDemoSeed: true,
+    });
+    expect(config).toMatchObject({
+      sessionId: '0x2674707b833b57909d68a73895f3cd60',
+      corsWorkerUrl: 'https://ce-demo-interview-fa80b8f34b49.agalmic.workers.dev/',
+      interviewMode: {
+        enabled: true,
+        provider: 'openai',
+        realtimeModel: 'gpt-realtime-2.1',
+      },
+      sessionModeProfile: {
+        authority: { mode: 'worker_canonical' },
+        evm: { registryChainId: null },
+      },
+    });
+    expect(classifySessionModeProfileSupport(config.sessionModeProfile).status).toBe('reachable');
+  });
+
+  it('uses question-specific poll choices for demo-interview without changing legacy demo sessions', () => {
+    const interviewPolls = getTemporaryDemoSessionQuestionFixtures(
+      'demo-interview',
+      (demoSessions as Record<string, any>)['demo-interview'],
+    ).filter((question) => question.type === 'multichoice');
+    const legacyPolls = getTemporaryDemoSessionQuestionFixtures(
+      'demo-sh',
+      (demoSessions as Record<string, any>)['demo-sh'],
+    ).filter((question) => question.type === 'multichoice');
+
+    expect(interviewPolls).toHaveLength(5);
+    expect(new Set(interviewPolls.map((question) => JSON.stringify(question.options))).size).toBe(5);
+    expect(interviewPolls.map((question) => question.options)).toEqual([
+      LEGACY_DEMO_POLL_OPTIONS,
+      [
+        'Technical alignment research',
+        'Regulation and oversight',
+        'Independent evaluation and auditing',
+        'Transparency and open research',
+        'Slowing frontier capability development',
+      ],
+      ['Before 2030', '2030–2039', '2040–2059', '2060 or later', 'Never / the concept remains ill-defined'],
+      [
+        'Healthcare',
+        'Education',
+        'Scientific research',
+        'Finance and professional services',
+        'Creative industries and media',
+      ],
+      [
+        'AI developers and labs',
+        'Deploying organizations',
+        'Individual users or operators',
+        'Shared liability across the supply chain',
+        'A public compensation or insurance system',
+      ],
+    ]);
+    expect(
+      legacyPolls.every((question) => JSON.stringify(question.options) === JSON.stringify(LEGACY_DEMO_POLL_OPTIONS)),
+    ).toBe(true);
+  });
+
   it('seeds all 40 typed demo-2 questions with deterministic fixture ids', () => {
     const questions = getTemporaryDemoSessionQuestionFixtures('demo-2', {
       sessionName: 'Living With Artificial Minds',

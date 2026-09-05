@@ -1,3 +1,13 @@
+import {
+  safeString,
+  lower,
+  safeJsonParse,
+  stableJson,
+  stableFingerprint,
+  kvKeySafePart,
+  nowIsoOrCurrent as nowIso,
+  sanitizeSessionSlug,
+} from './runtimePrimitives.mjs';
 import { assertNoSecretShape, redactSecrets } from './redaction.mjs';
 import {
   SESSION_LAB_LOGO_REFERENCE_BASE64,
@@ -96,32 +106,6 @@ The final chat output must start with exactly one Markdown image line using imag
 
 After the image line, say only: "Your Session Wrapped is ready. Use the session's configured Session Wrapped interface to inspect or change the agent's responses. Want the optional Agent Norms Compass meme too?" Do not include process notes, debugging, script names, parallelization, killed jobs, retries, validation failures, window id, confidences, rationales, privacy skip count, token details, extra links, or where the principal lives/is from/currently is unless asked. Abstract location evidence into non-location preferences.`;
 
-function safeString(value) {
-  return String(value || '').trim();
-}
-
-function lower(value) {
-  return safeString(value).toLowerCase();
-}
-
-function safeJsonParse(value, fallback = null) {
-  const text = safeString(value);
-  if (!text) return fallback;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return fallback;
-  }
-}
-
-function stableJson(value) {
-  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
-  if (value && typeof value === 'object') {
-    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(',')}}`;
-  }
-  return JSON.stringify(value ?? null);
-}
-
 function base64ToUint8Array(base64 = '') {
   const binary = atob(safeString(base64));
   const bytes = new Uint8Array(binary.length);
@@ -141,41 +125,11 @@ function base64EncodeText(value = '') {
   return btoa(binary);
 }
 
-function stableFingerprint(value = {}) {
-  const input = stableJson(value);
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < input.length; index += 1) {
-    hash ^= input.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0).toString(36).padStart(10, '0');
-}
-
-function sanitizeSessionSlug(value = '') {
-  return lower(value).replace(/[^a-z0-9_-]/g, '').slice(0, 128);
-}
-
 function normalizeQuestionId(value = '') {
   const raw = safeString(value);
   if (/^0x[0-9a-fA-F]{64}$/.test(raw)) return raw.toLowerCase();
   const id = raw.replace(/[^A-Za-z0-9_-]+/g, '').slice(0, 96);
   return id.startsWith('ceq_') ? id : '';
-}
-
-function kvKeySafePart(value = '') {
-  const text = safeString(value);
-  if (!text) return '';
-  const safe = text.replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 56);
-  return `${safe || 'ref'}_${stableFingerprint(text)}`;
-}
-
-function nowIso(now = null) {
-  if (now instanceof Date) return now.toISOString();
-  if (safeString(now)) {
-    const parsed = Date.parse(safeString(now));
-    if (Number.isFinite(parsed)) return new Date(parsed).toISOString();
-  }
-  return new Date().toISOString();
 }
 
 function bytesToHex(bytes) {

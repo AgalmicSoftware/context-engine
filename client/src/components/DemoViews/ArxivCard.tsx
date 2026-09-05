@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import styles from './CorpusViewer.module.scss';
 import { DebateMapSection, ExternalSourceLink } from './TweetCard';
 
@@ -109,7 +110,7 @@ const ArxivCard = ({ entry = null, onTagClick, onAtlasIssueOpen }: ArxivCardProp
   const tags = Array.isArray(entry?.tags) ? entry.tags : [];
 
   return (
-    <article className={`${styles.card} ${styles.arxivCard}`}>
+    <article className={`${styles.card} ${styles.arxivCard}`} data-testid={E2E_TESTIDS.CONTEXT_PAPER_CARD}>
       <div className={styles.entryHeader}>
         <div className={styles.entryHeaderContent}>
           {arxivId || entry?.category ? (

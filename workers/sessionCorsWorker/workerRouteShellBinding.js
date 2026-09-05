@@ -27,6 +27,9 @@ import {
   dispatchSessionConfigBootstrapRequest as dispatchSessionConfigBootstrapRequestBoundary,
 } from './sessionConfigBootstrapDispatch.js';
 import {
+  dispatchInterviewBriefRequest as dispatchInterviewBriefRequestBoundary,
+} from './interviewBriefDispatch.js';
+import {
   getRouteBaseHeaders as getRouteBaseHeadersBoundary,
 } from './routeBaseHeaders.js';
 import {
@@ -64,6 +67,9 @@ export const createWorkerRouteShellWithWorkerDeps = ({
   );
   const dispatchSessionConfigBootstrapRequest = (
     deps?.dispatchSessionConfigBootstrapRequest || dispatchSessionConfigBootstrapRequestBoundary
+  );
+  const dispatchInterviewBriefRequest = (
+    deps?.dispatchInterviewBriefRequest || dispatchInterviewBriefRequestBoundary
   );
   const dispatchAdminRequestWithWorkerDeps = (
     deps?.dispatchAdminRequestWithWorkerDeps || dispatchAdminRequestWithWorkerDepsBoundary
@@ -119,6 +125,29 @@ export const createWorkerRouteShellWithWorkerDeps = ({
             resolveRequestSlugWithoutToken: deps?.resolveRequestSlugWithoutToken,
             getSessionConfig: deps?.getSessionConfig,
             getCorsContext: deps?.getCorsContext,
+            json: deps?.json,
+          },
+          constants: {
+            missingSlugError: constants?.missingSlugError,
+            sessionConfigNotFoundError: constants?.sessionConfigNotFoundError,
+          },
+        });
+      }
+
+      if (routeSelection.kind === 'interview-brief') {
+        return await dispatchInterviewBriefRequest({
+          request,
+          env,
+          slugHint: envSlug,
+          baseHeaders: routeBaseHeaders,
+          deps: {
+            resolveRequestSlugWithoutToken: deps?.resolveRequestSlugWithoutToken,
+            getSessionConfig: deps?.getSessionConfig,
+            getCorsContext: deps?.getCorsContext,
+            resolveAnonymousRateIdentity: deps?.resolveAnonymousRateIdentity,
+            checkRateLimit: deps?.checkRateLimit,
+            storageRoute: deps?.storageRoute,
+            fetch: deps?.fetch,
             json: deps?.json,
           },
           constants: {

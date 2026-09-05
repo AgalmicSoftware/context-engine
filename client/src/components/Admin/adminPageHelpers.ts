@@ -1,7 +1,9 @@
 import { getChainById } from '../../variables/chains.js';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
-import { normalizeSlug as canonicalizeSlug, toStr } from '../../utilities/shared/primitives.js';
+import { toStr } from '../../utilities/shared/primitives.js';
 import { normalizeWorkerUrl as normalizeWorkerBaseUrl } from '../../utilities/worker/workerUrl.js';
+
+export { normalizeSessionSlugToken as normalizeSlug } from '../../utilities/session/sessionSlug';
 
 type AdminCapabilitySessionConfig = {
   adminAddress?: unknown;
@@ -20,11 +22,6 @@ export const getChainName = (value: unknown): string => {
   if (!id) return '';
   const chain = getChainById(id);
   return toStr(chain?.name).trim();
-};
-
-export const normalizeSlug = (raw: unknown): string => {
-  const slug = canonicalizeSlug(raw);
-  return slug === 'general' ? '' : slug;
 };
 
 export const countSessionsForChain = (entries: unknown = [], chainId: unknown = null): number => {

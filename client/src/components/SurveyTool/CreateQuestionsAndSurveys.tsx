@@ -1,7 +1,7 @@
 /** @file CreateQuestionsAndSurveys.tsx */
 
 import React, { Component } from 'react';
-import sha256 from 'crypto-js/sha256';
+import { sha256Utf8 } from '../../utilities/crypto/sha256';
 import { Button, Label, Input, FormGroup } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -26,7 +26,8 @@ import { arweaveClient as arweaveClient } from '../../utilities/arweave/arweaveC
 import CETooltip from '../Shared/CETooltip';
 import CEConfirmDialog from '../Shared/CEConfirmDialog';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
-import contractScripts, { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
+import { canonicalizeSessionSlug as normalizeSessionSlug } from '../../utilities/session/sessionSlug.js';
+import contractScripts from '../../utilities/web3/chainGateway.js';
 import {
   buildSbtAccessControlConditions,
   createLitHooks,
@@ -214,10 +215,6 @@ export {
   resolveCreateSurveyToggleKnobStyle,
 } from './createQuestionsAndSurveysDisplayHelpers';
 
-type CreateSurveySha256Digest = {
-  toString: () => string;
-};
-type CreateSurveySha256 = (value: unknown) => CreateSurveySha256Digest;
 type GetEffectiveAiConfigForCreateSurveyArgs = {
   sessionSlug?: string;
   context?: CreateSurveyAiRequestOptions['context'];
@@ -229,7 +226,7 @@ type EffectiveAiConfigForCreateSurvey = {
   [key: string]: unknown;
 };
 
-const createSurveySha256 = sha256 as CreateSurveySha256;
+const createSurveySha256 = sha256Utf8;
 const getEffectiveAiConfigForCreateSurvey = getEffectiveAiConfig as (
   args?: GetEffectiveAiConfigForCreateSurveyArgs,
 ) => Promise<EffectiveAiConfigForCreateSurvey>;

@@ -25,6 +25,63 @@ import {
 describe('AudioSurveyGenerator session context saves', () => {
   setupAudioSurveyGeneratorTestLifecycle();
 
+  it('adds a photo directly to the active Worker session without generating questions or using Arweave encryption', async () => {
+    const photo = new File(['photo-source'], 'session-photo.png', { type: 'image/png' });
+    mockUploadDocLibraryFile.mockResolvedValueOnce({
+      txId: 'cf_photo_01',
+      url: '/storage/read?id=cf_photo_01',
+      storage: 'cloudflare',
+      kind: 'file',
+    });
+
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{ request: jest.fn() }}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        activeSessionSlug="demo-sh"
+        sessionConfig={{
+          slug: 'demo-sh',
+          sessionName: 'Demo Session',
+          corsWorkerUrl: 'https://worker.example',
+          sessionModeProfile: {
+            authority: { mode: 'worker_canonical' },
+            storage: {
+              backend: 'cloudflare',
+              payloadAccessControl: { gate: 'none', encryption: 'none' },
+            },
+          },
+        }}
+      />,
+    );
+
+    addAdditionalPhoto(photo);
+    toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_LIBRARY_ANALYZE_TOGGLE}"]`));
+    const addButton = container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_ADD_LIBRARY_BUTTON}"]`);
+    expect(addButton.textContent).toContain('Add to Demo Session');
+
+    await act(async () => {
+      addButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    expect(mockUploadDocLibraryFile).toHaveBeenCalledTimes(1);
+    expect(mockUploadDocLibraryFile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        file: photo,
+        sessionSlug: 'demo-sh',
+        chainId: null,
+        tags: expect.arrayContaining([{ name: 'CE-DocStorage', value: 'cloudflare' }]),
+      }),
+    );
+    expect(mockUploadDocLibraryFile.mock.calls[0][0]).not.toHaveProperty('encryption');
+    expect(mockAnalyzePhotoForQuestionGeneration).not.toHaveBeenCalled();
+    expect(mockCallAI).not.toHaveBeenCalled();
+    expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_PHOTO_SOURCE_CARD}"]`)).toBeNull();
+  });
+
   it('defaults generate-time OP Sepolia session context saves to the session doc gate', async () => {
     delete window.__litHooks;
     const scopedSaveKey = jest.fn(async () => ({ ciphertext: 'ciphertext', dataToEncryptHash: 'hash' }));

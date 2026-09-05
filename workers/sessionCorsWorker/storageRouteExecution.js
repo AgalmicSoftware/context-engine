@@ -40,6 +40,7 @@ import {
   toChainId,
 } from './chainIdNormalization.js';
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
+import { sessionSlugStorageKey } from './sessionSlugResolution.js';
 
 const encoder = new TextEncoder();
 const RESOLVE_STORAGE_GATE_RUNTIME_CONFIG = Symbol('resolve-storage-gate-runtime-config');
@@ -66,7 +67,6 @@ const DEFAULT_RESOURCE_GATES = Object.freeze({
   images: 'docUploads',
 });
 
-const safeSlugPart = (value) => trim(value || 'general').toLowerCase().replace(/[^a-z0-9._:-]+/g, '-').replace(/^-+|-+$/g, '') || 'general';
 const bytesToBase64url = (bytes) => {
   if (typeof Buffer !== 'undefined') {
     return Buffer.from(bytes).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
@@ -96,11 +96,11 @@ const buildCloudflareStorageId = ({ randomBytes, getRandomValues: getRandomValue
   bytes[0] &= 0xf7;
   return bytesToBase64url(bytes);
 };
-const buildObjectKey = ({ slug, id }) => `sessions/${safeSlugPart(slug)}/storage/${id}`;
-const buildIndexKey = ({ slug, resource, id }) => `ce-storage:${safeSlugPart(slug)}:${trim(resource) || 'docsContext'}:${id}`;
-const buildIndexPrefix = ({ slug, resource }) => `ce-storage:${safeSlugPart(slug)}:${trim(resource) || 'docsContext'}:`;
-const buildSessionIndexPrefix = ({ slug }) => `ce-storage:${safeSlugPart(slug)}:`;
-const buildPayloadKey = ({ slug, id }) => `ce-storage-payload:${safeSlugPart(slug)}:${id}`;
+const buildObjectKey = ({ slug, id }) => `sessions/${sessionSlugStorageKey(slug)}/storage/${id}`;
+const buildIndexKey = ({ slug, resource, id }) => `ce-storage:${sessionSlugStorageKey(slug)}:${trim(resource) || 'docsContext'}:${id}`;
+const buildIndexPrefix = ({ slug, resource }) => `ce-storage:${sessionSlugStorageKey(slug)}:${trim(resource) || 'docsContext'}:`;
+const buildSessionIndexPrefix = ({ slug }) => `ce-storage:${sessionSlugStorageKey(slug)}:`;
+const buildPayloadKey = ({ slug, id }) => `ce-storage-payload:${sessionSlugStorageKey(slug)}:${id}`;
 const safeGroupId = (value) => trim(value).toLowerCase().replace(/[^a-z0-9._:-]+/g, '-').replace(/^-+|-+$/g, '');
 const normalizeGroupIdList = (value) => {
   let raw = value;
@@ -481,7 +481,6 @@ const evaluateSbtOnchainCondition = async ({ condition, config, requesterAddress
   }
   const mode = normalizeGateMode(condition.anyOrAll || condition.mode || condition.match);
   for (const rpcUrl of rpcUrls) {
-    // eslint-disable-next-line no-await-in-loop
     const ok = await deps.checkSbtGate({
       sbtAddresses,
       address,
@@ -543,7 +542,6 @@ const evaluateWorkerGroupCondition = async ({
   if (!groupIds.length) return { ok: false, reason: 'missing_worker_group', condition: { kind: 'worker_group' } };
   let firstFailure = null;
   for (const groupId of groupIds) {
-    // eslint-disable-next-line no-await-in-loop
     const result = await checkWorkerGroupMembership({
       env,
       slug,
@@ -621,7 +619,6 @@ const evaluateAccessConditionDocument = async ({
   const matched = [];
   let firstFailure = null;
   for (const condition of conditions) {
-    // eslint-disable-next-line no-await-in-loop
     const result = await evaluateAccessCondition({
       condition,
       env,
@@ -678,7 +675,6 @@ const authorizeWorkerGroupAccess = async ({
   }
   let firstFailure = null;
   for (const groupId of groupIds) {
-    // eslint-disable-next-line no-await-in-loop
     const result = await checkWorkerGroupMembership({
       env,
       slug,
@@ -894,7 +890,6 @@ const authorizeCloudflareStorageAccess = async ({
     };
   }
   for (const rpcUrl of rpcUrls) {
-    // eslint-disable-next-line no-await-in-loop
     const ok = await deps.checkSbtGate({
       sbtAddresses: gate.sbtAddresses,
       address,
@@ -988,7 +983,6 @@ const enforceCloudflareUploadPolicy = async ({ env, config, slug, payload, reque
       };
     }
     for (const rpcUrl of rpcUrls) {
-      // eslint-disable-next-line no-await-in-loop
       const ok = await deps.checkSbtGate({
         sbtAddresses: policy.sbtAddresses,
         address,
@@ -1103,6 +1097,10 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   if (canWriteR2 && !canUseR2Index) {
     return responseJson(deps, { error: 'Cloudflare R2 storage requires an index KV binding.' }, 501, baseHeaders);
   }
+  const uploadAccessMetadata = {
+    ...(payload.accessConditions ? { accessConditions: payload.accessConditions } : {}),
+    ...(payload.groupIds?.length ? { groupIds: payload.groupIds } : {}),
+  };
   const access = await authorizeCloudflareStorageAccess({
     env,
     config,
@@ -1110,7 +1108,7 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     resource: payload.resource,
     requesterAddress: uploaderAddress,
     authScopes,
-    metadata: payload.accessConditions ? { accessConditions: payload.accessConditions } : null,
+    metadata: Object.keys(uploadAccessMetadata).length ? uploadAccessMetadata : null,
     baseHeaders,
     deps,
   });
@@ -1174,6 +1172,11 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
       return responseJson(deps, { error: error?.message || 'Cloudflare worker envelope encryption failed.' }, 500, baseHeaders);
     }
   }
+  const effectiveGroupIds = normalizeGroupIdList([
+    ...normalizeGroupIdList(payload.groupIds),
+    ...normalizeGroupIdList(uploadPolicy.groupIds),
+    ...normalizeGroupIdList(payloadAccess.groupIds),
+  ]);
   const metadata = {
     id,
     backend: STORAGE_BACKENDS.CLOUDFLARE,
@@ -1182,11 +1185,7 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     encrypted: payload.payloadEncrypted === true || payloadAccess.encryption === PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE,
     gate: trim(payload.gate),
     tags: payload.tags,
-    groupIds: normalizeGroupIdList([
-      ...normalizeGroupIdList(payload.groupIds),
-      ...normalizeGroupIdList(uploadPolicy.groupIds),
-      ...normalizeGroupIdList(payloadAccess.groupIds),
-    ]),
+    groupIds: effectiveGroupIds,
     uploadPolicy: payload.uploadPolicy?.mode ? payload.uploadPolicy : undefined,
     size: bytesToStore?.length || 0,
     createdAt,
@@ -1197,7 +1196,7 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     payloadAccessControl: {
       gate: payloadAccess.gate,
       encryption: payloadAccess.encryption,
-      ...(payloadAccess.groupIds.length ? { groupIds: payloadAccess.groupIds } : {}),
+      ...(effectiveGroupIds.length ? { groupIds: effectiveGroupIds } : {}),
     },
     ...(accessConditions?.conditions?.length ? { accessConditions } : {}),
     ...(envelope ? { envelope } : {}),
@@ -1558,7 +1557,6 @@ const listCloudflareMetadataRows = async ({ index, slug, resource = '' }) => {
     : buildSessionIndexPrefix({ slug });
   let cursor = '';
   do {
-    // eslint-disable-next-line no-await-in-loop
     const listed = await index.list({
       prefix,
       ...(cursor ? { cursor } : {}),
@@ -1568,7 +1566,6 @@ const listCloudflareMetadataRows = async ({ index, slug, resource = '' }) => {
       const key = trim(keyEntry?.name || keyEntry);
       if (!key || typeof index.get !== 'function') continue;
       try {
-        // eslint-disable-next-line no-await-in-loop
         const raw = await index.get(key);
         const metadata = typeof raw === 'string' ? JSON.parse(raw) : raw;
         if (isObj(metadata) && trim(metadata.id)) rows.push({ key, metadata });
@@ -1664,7 +1661,6 @@ export const exportCloudflareEncryptedPayloadEnvelopes = async ({
     if (metadataAccess.encryption === PAYLOAD_ENCRYPTION_MODES.NONE) continue;
     encryptedPayloadCount += 1;
     try {
-      // eslint-disable-next-line no-await-in-loop
       const ciphertextBytes = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata: row.metadata });
       if (!ciphertextBytes) {
         readErrors.push({ id: trim(row.metadata.id), error: 'payload_bytes_missing' });
@@ -1709,7 +1705,7 @@ export const exportCloudflareEncryptedPayloadEnvelopes = async ({
     version: 1,
     exportScope: 'encrypted_envelopes_only',
     storageBackend: STORAGE_BACKENDS.CLOUDFLARE,
-    sessionSlug: safeSlugPart(slug),
+    sessionSlug: sessionSlugStorageKey(slug),
     resource: trim(resource) || 'all',
     exportedAt: generatedAt,
     exportedPayloadCount: payloads.length,

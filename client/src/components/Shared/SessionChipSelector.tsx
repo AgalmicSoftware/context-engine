@@ -1,6 +1,7 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
+import { trimSessionSlug as normalizeSlug } from '../../utilities/session/sessionSlug';
 import styles from './SessionChipSelector.module.scss';
 
 type CSSVariableStyle = React.CSSProperties & {
@@ -49,8 +50,6 @@ type SessionChipSelectorProps = {
   collapseLabel?: string;
   expandToggleTestId?: string;
 };
-
-const normalizeSlug = (slug?: string | null) => String(slug || '').trim();
 
 const SessionChipSelector = ({
   options = [],

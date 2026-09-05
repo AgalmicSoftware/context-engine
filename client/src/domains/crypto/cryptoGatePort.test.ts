@@ -1,15 +1,17 @@
-import { bindCryptoGatePort } from './cryptoGatePort';
+import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
+import { cryptoGatePort } from './cryptoGatePort';
 
 describe('cryptoGatePort', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('routes decrypt requests with unchanged envelope and Lit options', async () => {
-    const decryptEnvelopeValue = jest.fn(async () => 'decrypted value');
+    const decryptEnvelopeValue = jest.spyOn(cryptoUtils, 'decryptEnvelopeValue').mockResolvedValue('decrypted value');
     const getKey = jest.fn(async () => 'lit-key');
-    const port = bindCryptoGatePort({
-      crypto: () => ({ decryptEnvelopeValue }),
-    });
 
     await expect(
-      port.decryptEnvelopeValue('{"ciphertext":"abc"}', {
+      cryptoGatePort.decryptEnvelopeValue('{"ciphertext":"abc"}', {
         account: '0xabc',
         chainId: 11155420,
         litOpts: { getKey },
@@ -26,20 +28,15 @@ describe('cryptoGatePort', () => {
   });
 
   it('performs call-time crypto lookup so spies keep intercepting', async () => {
-    const firstDecrypt = jest.fn(async () => 'first');
-    const secondDecrypt = jest.fn(async () => 'second');
-    const crypto = {
-      decryptEnvelopeValue: firstDecrypt,
-    };
-    const port = bindCryptoGatePort({
-      crypto: () => crypto,
-    });
+    const decryptEnvelopeValue = jest
+      .spyOn(cryptoUtils, 'decryptEnvelopeValue')
+      .mockResolvedValueOnce('first')
+      .mockResolvedValueOnce('second');
 
-    await expect(port.decryptEnvelopeValue('first-envelope')).resolves.toBe('first');
-    crypto.decryptEnvelopeValue = secondDecrypt;
-    await expect(port.decryptEnvelopeValue('second-envelope')).resolves.toBe('second');
+    await expect(cryptoGatePort.decryptEnvelopeValue('first-envelope')).resolves.toBe('first');
+    await expect(cryptoGatePort.decryptEnvelopeValue('second-envelope')).resolves.toBe('second');
 
-    expect(firstDecrypt).toHaveBeenCalledWith('first-envelope', undefined);
-    expect(secondDecrypt).toHaveBeenCalledWith('second-envelope', undefined);
+    expect(decryptEnvelopeValue).toHaveBeenNthCalledWith(1, 'first-envelope', undefined);
+    expect(decryptEnvelopeValue).toHaveBeenNthCalledWith(2, 'second-envelope', undefined);
   });
 });

@@ -3,6 +3,7 @@ import {
   parseSessionWorkerDiscoveryOrigin,
 } from '../../utilities/session/sessionWorkerDiscovery';
 import { toStr } from '../../utilities/shared/primitives.js';
+import { sanitizeSessionSlug as normalizeSlug } from '../../utilities/session/sessionSlug';
 import { persistAndVerifySessionWizardWorkerConfig } from './sessionWizardWorkerConfigPersistence';
 import { resolveSessionWizardModeRequirements } from './sessionWizardModeRequirements';
 import type { AnyRecord, WorkerSecretSyncResult } from '../shellTypes';
@@ -18,12 +19,6 @@ export type VerifySessionWizardWorkerPublicDeploymentInput = {
   fetchImpl?: typeof fetch;
   browserOrigin?: unknown;
 };
-
-const normalizeSlug = (value: unknown): string =>
-  toStr(value)
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9_-]/g, '');
 
 const readJsonRecord = async (response: Response): Promise<AnyRecord> => {
   const value = await response.json().catch(() => ({}));

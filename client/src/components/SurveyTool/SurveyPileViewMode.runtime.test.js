@@ -3,7 +3,11 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import PileHologramAssistant from './PileHologramAssistant';
 import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
-import { createPileViewRuntimeStrategy } from './SurveyPileViewMode';
+import {
+  buildPileRuntimeInitialState,
+  createPileViewRuntimeStrategy,
+  recordInterviewProvenance,
+} from './SurveyPileViewMode';
 import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
 import {
   buildNoPendingPileSubmitFeedbackPlan,
@@ -21,6 +25,7 @@ import {
 } from './surveyQuestionSubmitFeedback.js';
 import { buildSurveyQuestionPoolLoadState } from './surveyQuestionsTypes.js';
 import { buildListeningModeSearch, isListeningModeQueryEnabled } from '../../utilities/audio/rollingTranscription';
+import { encodeInterviewPrefillPacket, resolveSessionVoiceMode } from './sessionInterview';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 jest.mock('./CreateQuestionsAndSurveys', () => {
@@ -43,6 +48,22 @@ jest.mock('./SessionListeningPanel', () => {
       React.createElement('div', {
         'data-testid': 'mock-listening-panel',
       }),
+  };
+});
+
+jest.mock('./SessionVoiceModeModal', () => {
+  const React = require('react');
+  return {
+    __esModule: true,
+    default: (props) =>
+      props.isOpen
+        ? React.createElement('div', {
+            'data-testid': 'mock-voice-mode-modal',
+            'data-mode': props.mode || 'chooser',
+            'data-prefill-model': props.prefillPacket?.source?.modelId || '',
+            'data-prefill-confidence': String(props.prefillPacket?.responses?.[0]?.confidence ?? ''),
+          })
+        : null,
   };
 });
 
@@ -347,7 +368,7 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(engine.state.pileSubmitTempText).toBeNull();
   });
 
-  it('opens listening mode from the query string and keeps the URL synchronized', async () => {
+  it('keeps the legacy listening query compatible while the microphone opens the new chooser', async () => {
     const originalMatchMedia = window.matchMedia;
     const originalScrollIntoView = Element.prototype.scrollIntoView;
     const scrollIntoView = jest.fn();
@@ -377,11 +398,10 @@ describe('SurveyPileViewMode runtime surface', () => {
       expect(isListeningModeQueryEnabled(window.location.search)).toBe(false);
 
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TOGGLE));
-      await waitFor(() => {
-        expect(window.location.search).toBe('?foo=1&mode=listening');
-      });
+      expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'chooser');
+      expect(window.location.search).toBe('?foo=1');
       expect(buildListeningModeSearch('?foo=1', true)).toBe('?foo=1&mode=listening');
-      expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+      expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'auto', block: 'start' });
     } finally {
       Object.defineProperty(window, 'matchMedia', {
         writable: true,
@@ -390,6 +410,90 @@ describe('SurveyPileViewMode runtime surface', () => {
       });
       Element.prototype.scrollIntoView = originalScrollIntoView;
     }
+  });
+
+  it('opens interview and group conversation directly from their mode query values', async () => {
+    const first = renderPile({}, { route: '/session/demo?foo=1&mode=interview' });
+    expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'interview');
+    expect(resolveSessionVoiceMode(window.location.search)).toBe('interview');
+    first.unmount();
+
+    renderPile({}, { route: '/session/demo?mode=recordGroup' });
+    expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'recordGroup');
+    expect(resolveSessionVoiceMode(window.location.search)).toBe('recordGroup');
+  });
+
+  it('keeps an imported prefill through initialization and clears it only after mount', async () => {
+    const encoded = encodeInterviewPrefillPacket({
+      version: 1,
+      sessionSlug: 'demo',
+      questionSetHash: 'a'.repeat(64),
+      promptVersion: 'ce-interview-brief-v3',
+      source: { platform: 'claude', modelId: 'claude-test', verification: 'self_reported' },
+      responderContext: { summary: 'Synthetic test context.' },
+      responses: [{ questionId: 'q1', answer: 'Draft', confidence: 0.22 }],
+    });
+    const route = `/session/demo?mode=interview#prefill=${encoded}`;
+    window.history.replaceState({}, '', route);
+    const initial = buildPileRuntimeInitialState({
+      props: {},
+      buildWarmPileSeedState: () => null,
+    });
+
+    expect(initial.interviewPrefillPacket).toEqual(
+      expect.objectContaining({
+        source: expect.objectContaining({ modelId: 'claude-test' }),
+        responses: [expect.objectContaining({ confidence: 0.22 })],
+      }),
+    );
+    expect(window.location.hash).toBe(`#prefill=${encoded}`);
+
+    const rendered = renderPile({}, { route });
+    const modal = await screen.findByTestId('mock-voice-mode-modal');
+    expect(modal).toHaveAttribute('data-mode', 'interview');
+    expect(modal).toHaveAttribute('data-prefill-model', 'claude-test');
+    expect(modal).toHaveAttribute('data-prefill-confidence', '0.22');
+    await waitFor(() => expect(window.location.hash).toBe(''));
+    rendered.unmount();
+  });
+
+  it('records opted-in names independently from optional model provenance', async () => {
+    const engine = {
+      props: { sessionConfig: {} },
+      state: {
+        surveysResponseState: [
+          {
+            answers: { q1: { value: 'Agree' } },
+            importance: {},
+            conviction: {},
+            additionalComments: {},
+          },
+        ],
+      },
+      persistDraft: jest.fn(),
+      setState(updater, callback) {
+        this.state = { ...this.state, ...updater(this.state) };
+        callback?.();
+      },
+    };
+
+    await recordInterviewProvenance(
+      engine,
+      [{ questionId: 'q1', answer: 'Agree', confidence: 0.8 }],
+      { platform: 'claude', modelId: 'claude-example', verification: 'self_reported' },
+      { promptVersion: 'ce-interview-brief-v4', questionSetHash: 'hash' },
+      false,
+      false,
+      '  Ada   Example  ',
+    );
+
+    expect(engine.state.surveysResponseState[0].interviewProvenance.q1).toMatchObject({
+      includeAiProvenance: false,
+      includePredictionComparison: false,
+      responderName: 'Ada Example',
+    });
+    expect(engine.state.surveysResponseState[0].interviewProvenance.q1).not.toHaveProperty('source');
+    expect(engine.persistDraft).toHaveBeenCalled();
   });
 
   it('shows and clears the pile submit empty-state feedback without submitting', async () => {

@@ -13,9 +13,9 @@ jest.mock(
   { virtual: true },
 );
 
-jest.mock('../../utilities/web3/chainGateway', () => ({
+jest.mock('../session/sessionSlug.js', () => ({
   __esModule: true,
-  normalizeSessionSlug: jest.fn(),
+  canonicalizeSessionSlug: jest.fn(),
 }));
 
 const { createSessionCacheReadinessController } = require('./sessionCacheReadinessController.js');
@@ -25,7 +25,7 @@ const {
   startCeRuntimeStats,
   stopCeRuntimeStats,
 } = require('../../utilities/ui/uiRuntimeStats.js');
-const contractScriptsModule = require('../../utilities/web3/chainGateway');
+const sessionSlugModule = require('../session/sessionSlug.js');
 
 const createMockHost = (overrides = {}) => {
   const { initialState, mounted, activeSlug, ...rest } = overrides;
@@ -124,7 +124,7 @@ describe('createSessionCacheReadinessController', () => {
     jest.clearAllMocks();
     stopCeRuntimeStats();
     resetCeRuntimeStats();
-    contractScriptsModule.normalizeSessionSlug.mockImplementation((slug) =>
+    sessionSlugModule.canonicalizeSessionSlug.mockImplementation((slug) =>
       String(slug || '')
         .trim()
         .toLowerCase(),

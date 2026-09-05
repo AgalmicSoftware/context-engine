@@ -12,9 +12,10 @@ const TRACKED_ANCHOR_FILES = Object.freeze([
   'ARCHITECTURE.md',
   'client/src/variables/demo/LOOPHOLE_SCHEMA.md',
   'client/src/variables/demo/README.md',
-  'docs/MainSite.MAP.md',
-  'docs/SessionWizard.MAP.md',
-  'docs/SurveyTool.MAP.md',
+  'docs/maps/AdminPage.intro.md',
+  'docs/maps/MainSite.intro.md',
+  'docs/maps/SessionWizard.intro.md',
+  'docs/maps/SurveyTool.intro.md',
   'docs/arweave-payloads.md',
   'docs/e2e-testid-api.md',
   'docs/lit-v3-design.md',
@@ -74,8 +75,8 @@ const MIGRATED_UTILITY_DOC_PATHS = Object.freeze([
 const UTILITY_ANCHOR_FILES = Object.freeze([
   'ARCHITECTURE.md',
   'client/src/utilities/ai/aiClient.ts',
-  'docs/AdminPage.MAP.md',
-  'docs/MainSite.MAP.md',
+  'docs/maps/AdminPage.intro.md',
+  'docs/maps/MainSite.intro.md',
 ]);
 
 const toLegacyJsxPath = (relativePath) => relativePath.replace(/\.tsx$/, '.jsx');

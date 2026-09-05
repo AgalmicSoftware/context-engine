@@ -10,6 +10,7 @@ AGENTS.md
 docs/agent-native*.md
 docs/ai-agent-bootstrap.md
 docs/*.MAP.md
+docs/maps
 docs/commonground-export.md
 docs/dead-code-disposition.md
 docs/dependency-audit*.md

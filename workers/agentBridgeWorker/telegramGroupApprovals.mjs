@@ -1,19 +1,8 @@
+import { safeString, safeJsonParse } from './runtimePrimitives.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 import { evaluateTelegramGroupSessionAccess } from './sessionPolicy.mjs';
 
 export const TELEGRAM_GROUP_APPROVAL_KV_PREFIX = 'telegram:group-approval:';
-
-function safeString(value) {
-  return String(value || '').trim();
-}
-
-function safeJsonParse(text, fallback = null) {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return fallback;
-  }
-}
 
 export function telegramGroupApprovalKey({
   sessionSlug = '',

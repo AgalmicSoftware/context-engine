@@ -1,5 +1,56 @@
 import type { ResponseSlice, UnknownRecord } from './surveyToolTypes';
 
+const asRecord = (value: unknown): UnknownRecord =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : {};
+
+const hasOwn = (value: UnknownRecord, key: string): boolean => Object.prototype.hasOwnProperty.call(value, key);
+
+const buildStableComparableValue = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(buildStableComparableValue);
+  if (value && typeof value === 'object') {
+    return Object.keys(value as UnknownRecord)
+      .sort()
+      .reduce<UnknownRecord>((result, key) => {
+        result[key] = buildStableComparableValue((value as UnknownRecord)[key]);
+        return result;
+      }, {});
+  }
+  return value === undefined ? null : value;
+};
+
+const responseValuesMatch = (left: unknown, right: unknown): boolean =>
+  JSON.stringify(buildStableComparableValue(left)) === JSON.stringify(buildStableComparableValue(right));
+
+const buildRedactedComparisonValue = (): UnknownRecord => ({
+  redacted: true,
+  reason: 'encrypted_field',
+});
+
+const normalizeResearchCoverageCount = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0) return null;
+  return Math.min(1_000_000, Math.floor(number));
+};
+
+const buildSubmittedResearchCoverage = (value: unknown): UnknownRecord | null => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const coverage = asRecord(value);
+  const searchScopeNote = String(coverage.searchScopeNote || '')
+    .trim()
+    .slice(0, 500);
+  return {
+    historyChatsSearched: normalizeResearchCoverageCount(coverage.historyChatsSearched),
+    historyChatsUsed: normalizeResearchCoverageCount(coverage.historyChatsUsed),
+    memoryItemsSearched: normalizeResearchCoverageCount(coverage.memoryItemsSearched),
+    memoryItemsUsed: normalizeResearchCoverageCount(coverage.memoryItemsUsed),
+    connectedSourcesSearched: normalizeResearchCoverageCount(coverage.connectedSourcesSearched),
+    connectedSourcesUsed: normalizeResearchCoverageCount(coverage.connectedSourcesUsed),
+    userStatementsUsed: normalizeResearchCoverageCount(coverage.userStatementsUsed),
+    ...(searchScopeNote ? { searchScopeNote } : {}),
+  };
+};
+
 type ResponseFieldState = UnknownRecord & {
   value?: unknown;
   encrypted?: unknown;
@@ -11,6 +62,32 @@ type ResponseFieldState = UnknownRecord & {
 type SurveyResponsePayloadState = Omit<ResponseSlice, 'answers' | 'additionalComments'> & {
   answers?: Record<string, ResponseFieldState> | null;
   additionalComments?: Record<string, ResponseFieldState> | null;
+  interviewProvenance?: Record<string, UnknownRecord> | null;
+};
+
+export const captureInterviewPredictionComparisonSubmissions = (
+  slice: ResponseSlice,
+  questionIds: Iterable<string>,
+): ResponseSlice => {
+  const provenance = asRecord(slice.interviewProvenance);
+  let nextProvenance: UnknownRecord | null = null;
+
+  for (const rawQuestionId of questionIds) {
+    const questionId = String(rawQuestionId || '');
+    const record = asRecord(provenance[questionId]);
+    if (record.includePredictionComparison !== true) continue;
+
+    if (!nextProvenance) nextProvenance = { ...provenance };
+    nextProvenance[questionId] = {
+      ...record,
+      submissionValueSnapshot: {
+        answer: asRecord(slice.answers?.[questionId]).value ?? '',
+        additionalComments: asRecord(slice.additionalComments?.[questionId]).value ?? '',
+      },
+    };
+  }
+
+  return nextProvenance ? { ...slice, interviewProvenance: nextProvenance } : slice;
 };
 
 type ResponseQuestionSource = UnknownRecord & {
@@ -44,6 +121,8 @@ type ResponsePayloadEntry = UnknownRecord & {
   importance: number | null;
   answer: ResponsePayloadField;
   additional: ResponsePayloadField;
+  interviewProvenance?: UnknownRecord;
+  responderName?: string;
 };
 
 type ResponsePayload = UnknownRecord & {
@@ -141,6 +220,91 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
     const conviction = opts.getConvictionFromSlice(surveyResponseState, q.id);
     const importance = opts.getImportanceFromSlice(surveyResponseState, q.id);
     const importanceForPayload = importance !== null ? importance : conviction;
+    const rawInterviewProvenance = surveyResponseState.interviewProvenance?.[q.id];
+    const interviewProvenanceRecord = asRecord(rawInterviewProvenance);
+    const interviewSource = asRecord(interviewProvenanceRecord.source);
+    const researchCoverage = buildSubmittedResearchCoverage(interviewSource.researchCoverage);
+    const includeAiProvenance = interviewProvenanceRecord.includeAiProvenance !== false;
+    const includePredictionComparison = interviewProvenanceRecord.includePredictionComparison === true;
+    const originalPrediction = asRecord(interviewProvenanceRecord.originalPrediction);
+    const submissionValueSnapshot = asRecord(interviewProvenanceRecord.submissionValueSnapshot);
+    const responderName = String(interviewProvenanceRecord.responderName || '')
+      .trim()
+      .replace(/\s+/g, ' ')
+      .slice(0, 160);
+    const originalComparisonValues = {
+      answer: hasOwn(originalPrediction, 'answer') ? originalPrediction.answer : null,
+      additionalComments: hasOwn(originalPrediction, 'additionalComments') ? originalPrediction.additionalComments : '',
+      importance: hasOwn(originalPrediction, 'importance') ? originalPrediction.importance : null,
+      conviction: hasOwn(originalPrediction, 'conviction') ? originalPrediction.conviction : null,
+    };
+    const submittedComparisonValues = {
+      answer: hasOwn(submissionValueSnapshot, 'answer') ? submissionValueSnapshot.answer : (answer.value ?? ''),
+      additionalComments: hasOwn(submissionValueSnapshot, 'additionalComments')
+        ? submissionValueSnapshot.additionalComments
+        : (additional.value ?? ''),
+      importance: importance !== null ? importance : null,
+      conviction: conviction !== null ? conviction : null,
+    };
+    const comparisonFields = ['answer', 'additionalComments', 'importance', 'conviction'] as const;
+    const changedFields = comparisonFields.filter(
+      (field) => !responseValuesMatch(originalComparisonValues[field], submittedComparisonValues[field]),
+    );
+    const redactedFields = [
+      ...(answer.encrypted ? ['answer'] : []),
+      ...(additionalEncrypted ? ['additionalComments'] : []),
+    ];
+    const safeOriginalPrediction = includePredictionComparison
+      ? {
+          answer: answer.encrypted ? buildRedactedComparisonValue() : originalComparisonValues.answer,
+          additionalComments: additionalEncrypted
+            ? buildRedactedComparisonValue()
+            : originalComparisonValues.additionalComments,
+          importance: originalComparisonValues.importance,
+          conviction: originalComparisonValues.conviction,
+          confidence: hasOwn(originalPrediction, 'confidence') ? originalPrediction.confidence : null,
+          evidence: redactedFields.length > 0 ? '' : String(originalPrediction.evidence || ''),
+        }
+      : null;
+    const predictionComparison = includePredictionComparison
+      ? {
+          version: 1,
+          original: safeOriginalPrediction,
+          submitted: {
+            answer: answer.encrypted ? buildRedactedComparisonValue() : submittedComparisonValues.answer,
+            additionalComments: additionalEncrypted
+              ? buildRedactedComparisonValue()
+              : submittedComparisonValues.additionalComments,
+            importance: submittedComparisonValues.importance,
+            conviction: submittedComparisonValues.conviction,
+          },
+          changedFields,
+          redactedFields,
+        }
+      : null;
+    const interviewProvenance =
+      (includeAiProvenance || includePredictionComparison) &&
+      rawInterviewProvenance &&
+      typeof rawInterviewProvenance === 'object'
+        ? {
+            version: 1,
+            ...(includeAiProvenance
+              ? {
+                  source: {
+                    platform: String(interviewSource.platform || 'other').slice(0, 64),
+                    modelId: String(interviewSource.modelId || '').slice(0, 256),
+                    verification: 'self_reported',
+                    ...(researchCoverage ? { researchCoverage } : {}),
+                  },
+                  promptVersion: String(rawInterviewProvenance.promptVersion || '').slice(0, 128),
+                  questionSetHash: String(rawInterviewProvenance.questionSetHash || '').slice(0, 256),
+                }
+              : {}),
+            ...(safeOriginalPrediction ? { originalPrediction: safeOriginalPrediction } : {}),
+            ...(predictionComparison ? { predictionComparison } : {}),
+            appliedAt: Number(rawInterviewProvenance.appliedAt || 0) || null,
+          }
+        : null;
 
     return {
       questionID: q.id,
@@ -171,6 +335,8 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
         hash: additional.hash || '',
         encryptedPortion: additionalEncrypted ? additional.encryptedPortion || '' : '',
       },
+      ...(responderName ? { responderName } : {}),
+      ...(interviewProvenance ? { interviewProvenance } : {}),
     };
   });
 

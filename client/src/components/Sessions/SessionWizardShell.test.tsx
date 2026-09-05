@@ -261,7 +261,10 @@ const baseProps = (): SessionWizardShellProps => ({
     },
     publishExecutionPlan: {
       shouldAutoDeployWorker: false,
+      shouldCreateWorkerGroups: false,
       shouldDeployPendingSbts: false,
+      shouldPersistWorkerConfig: false,
+      shouldRefreshRegistryCache: false,
       shouldRegisterSession: true,
       shouldUploadMetadata: false,
       stepNumbers: {},

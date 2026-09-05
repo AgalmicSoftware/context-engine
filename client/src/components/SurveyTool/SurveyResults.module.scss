@@ -6,14 +6,19 @@
 .modalBody {
   display: flex;
   flex-direction: column;
-  color: var(--ce-color-black) !important;
+  background: var(--ce-overlay-surface);
+  color: var(--ce-overlay-text) !important;
   max-width: 95vw;
+
+  > p {
+    color: var(--ce-overlay-text);
+  }
 }
 
 .resultsModal {
   max-width: 80%;
   width: 100%;
-  background-color: var(--ce-color-white);
+  background-color: var(--ce-overlay-surface);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -30,7 +35,16 @@
        max-height: 90vh;
        overflow-y: auto; */
     border-radius: var(--ce-radius-12);
+    background: var(--ce-overlay-surface) !important;
+    border: 1px solid color-mix(in srgb, var(--ce-overlay-text) 16%, transparent) !important;
+    box-shadow: 0 28px 80px color-mix(in srgb, var(--ce-overlay-base) 56%, transparent) !important;
+    color: var(--ce-overlay-text);
     /* keep it looking round */
+  }
+
+  :global(.modal-footer) {
+    background: var(--ce-overlay-surface);
+    border-top-color: color-mix(in srgb, var(--ce-overlay-text) 12%, transparent);
   }
 }
 
@@ -42,7 +56,8 @@
   overflow-wrap: anywhere;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid var(--ce-document-border);
+  background: var(--ce-overlay-surface-alt);
+  border-bottom: 1px solid color-mix(in srgb, var(--ce-overlay-text) 12%, transparent);
   padding-right: 4.5rem;
   padding-bottom: 1rem;
   border-top-left-radius: var(--ce-radius-12);
@@ -57,9 +72,10 @@
   right: 0.85rem;
   z-index: 2;
   background: transparent;
-  border: 0;
+  border: 1px solid color-mix(in srgb, var(--ce-overlay-text) 18%, transparent);
+  border-radius: var(--ce-radius-8);
   box-shadow: none;
-  color: var(--ce-overlay-base);
+  color: var(--ce-overlay-text);
   opacity: 1;
   margin: 0;
   padding: 0.25rem;
@@ -71,7 +87,7 @@
 .modalHeader :global(.btn-close):hover,
 .modalHeader :global(.btn-close):focus {
   background: transparent;
-  color: var(--ce-overlay-base);
+  color: var(--ce-action-accent);
 }
 
 .modalHeaderContent {
@@ -103,7 +119,7 @@
   font-size: 2.5rem;
   font-weight: bold;
   margin: 0;
-  color: var(--ce-color-black);
+  color: var(--ce-overlay-text);
 }
 
 .demoResultsViewNav {
@@ -117,9 +133,9 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  border: 1px solid color-mix(in srgb, var(--ce-status-info) 18%, transparent);
-  background: color-mix(in srgb, var(--ce-status-info) 8%, transparent);
-  color: var(--ce-status-info);
+  border: 1px solid color-mix(in srgb, var(--ce-overlay-text) 18%, transparent);
+  background: color-mix(in srgb, var(--ce-overlay-text) 6%, transparent);
+  color: var(--ce-overlay-text);
   border-radius: var(--ce-radius-pill);
   padding: 0.45rem 0.85rem;
   font-size: 0.9rem;
@@ -133,24 +149,24 @@
 
   &:hover,
   &:focus {
-    background: color-mix(in srgb, var(--ce-status-info) 14%, transparent);
-    border-color: color-mix(in srgb, var(--ce-status-info) 28%, transparent);
-    color: var(--ce-status-info);
+    background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
+    border-color: color-mix(in srgb, var(--ce-action-accent) 42%, transparent);
+    color: var(--ce-overlay-text);
     transform: translateY(-1px);
   }
 }
 
 .demoResultsViewButtonActive {
-  background: var(--ce-status-info);
-  border-color: var(--ce-status-info);
-  color: var(--ce-color-white);
-  box-shadow: 0 10px 24px color-mix(in srgb, var(--ce-status-info) 20%, transparent);
+  background: var(--ce-action-accent);
+  border-color: var(--ce-action-accent);
+  color: var(--ce-action-accent-text);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--ce-action-accent) 18%, transparent);
 
   &:hover,
   &:focus {
-    background: var(--ce-status-info);
-    border-color: var(--ce-status-info);
-    color: var(--ce-color-white);
+    background: var(--ce-action-accent-hover);
+    border-color: var(--ce-action-accent-hover);
+    color: var(--ce-action-accent-text);
   }
 }
 
@@ -201,7 +217,7 @@
 
 .modalSubtitle {
   font-size: 0.9rem;
-  color: var(--ce-color-text-muted) !important;
+  color: var(--ce-overlay-text-muted) !important;
   margin-top: 0.5rem;
   display: flex;
   align-items: center;
@@ -212,17 +228,17 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  color: var(--ce-document-text-muted);
+  color: var(--ce-overlay-text-muted);
 }
 
 .surveyIdLink {
-  color: var(--ce-status-info);
+  color: var(--ce-action-accent);
   text-decoration: none;
   font-weight: 600;
 
   &:hover,
   &:focus {
-    color: var(--ce-status-info);
+    color: var(--ce-action-accent-hover);
     text-decoration: underline;
   }
 }
@@ -241,9 +257,9 @@
   max-width: 100%;
   padding: 0.3rem 0.5rem;
   border-radius: var(--ce-radius-8);
-  border: 1px solid color-mix(in srgb, var(--ce-status-info) 18%, transparent);
-  background: color-mix(in srgb, var(--ce-status-info) 8%, transparent);
-  color: var(--ce-status-info);
+  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 26%, transparent);
+  background: color-mix(in srgb, var(--ce-action-accent) 10%, transparent);
+  color: var(--ce-action-accent);
   font-size: 0.82rem;
   font-weight: 600;
   text-decoration: none;
@@ -255,9 +271,9 @@
 
   &:hover,
   &:focus {
-    background: color-mix(in srgb, var(--ce-status-info) 14%, transparent);
-    border-color: color-mix(in srgb, var(--ce-status-info) 28%, transparent);
-    color: var(--ce-status-info);
+    background: color-mix(in srgb, var(--ce-action-accent) 16%, transparent);
+    border-color: color-mix(in srgb, var(--ce-action-accent) 44%, transparent);
+    color: var(--ce-action-accent-hover);
     text-decoration: underline;
   }
 }
@@ -270,7 +286,7 @@
   margin-top: 20px;
   font-size: 1.5em;
   font-weight: 600;
-  color: var(--ce-document-text);
+  color: var(--ce-overlay-text);
   max-width: 95vw;
 }
 
@@ -1020,10 +1036,15 @@
   align-items: center;
   position: relative;
   padding: 0.75rem 1.25rem;
-  background-color: color-mix(in srgb, var(--ce-status-info) 58.8%, transparent) !important;
+  background: linear-gradient(135deg, var(--ce-overlay-surface-alt), var(--ce-overlay-surface)) !important;
+  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 22%, transparent);
   padding: 15px 54px 15px 15px !important;
   &:hover {
-    background-color: color-mix(in srgb, var(--ce-compat-dark) 6%, transparent);
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--ce-overlay-surface-alt) 88%, var(--ce-action-accent)),
+      var(--ce-overlay-surface)
+    ) !important;
   }
 }
 
@@ -1864,14 +1885,14 @@ grey background, white text, bigger icons, etc.
   margin-bottom: 10px;
   width: fit-content;
   padding: 0.65rem 0.85rem;
-  border: 1px solid color-mix(in srgb, var(--ce-document-text) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-overlay-text) 14%, transparent);
   border-radius: var(--ce-radius-12);
-  background: color-mix(in srgb, var(--ce-document-text) 4%, transparent);
+  background: color-mix(in srgb, var(--ce-overlay-text) 6%, transparent);
 }
 
 .toggleLabel {
   font-size: 1.05em;
-  color: var(--ce-document-text);
+  color: var(--ce-overlay-text);
   font-weight: 600;
   margin-bottom: 0 !important;
 }
@@ -1910,7 +1931,7 @@ grey background, white text, bigger icons, etc.
   justify-content: space-between;
   gap: 14px;
   border: 1px solid color-mix(in srgb, var(--ce-document-text) 14%, transparent);
-  background: var(--ce-status-info-text);
+  background: var(--ce-document-surface);
   padding: 14px;
   border-radius: var(--ce-radius-12);
   box-shadow: 0 6px 18px color-mix(in srgb, var(--ce-document-text) 6%, transparent);
@@ -2297,14 +2318,19 @@ grey background, white text, bigger icons, etc.
 }
 
 .filterSummaryBox {
-  color: var(--ce-document-text-muted);
+  background: color-mix(in srgb, var(--ce-overlay-text) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-overlay-text) 12%, transparent);
+  border-radius: var(--ce-radius-8);
+  color: var(--ce-overlay-text-muted);
+  margin: 0 0 12px;
+  padding: 10px 12px;
 
   p {
     margin-bottom: 0;
   }
 
   p > strong {
-    color: var(--ce-color-black) !important;
+    color: var(--ce-action-accent) !important;
     font-weight: 700 !important;
     opacity: 1;
   }

@@ -533,7 +533,7 @@ export default function OnePageSessionStandardShell({
               )}
             </div>
             {showDocuments && (
-              <div className={styles.miniSectionContent}>
+              <div className={`${styles.miniSectionContent} ${styles.documentsSectionContent}`.trim()}>
                 <Suspense fallback={<LazyFallback label="Loading Corpus..." minHeight="20vh" />}>
                   <CorpusViewer
                     onAtlasIssueOpen={onCorpusAtlasIssueOpen}
@@ -638,6 +638,7 @@ export default function OnePageSessionStandardShell({
                       questionScanProgress={questionScanProgress}
                       questionResponsesNonce={questionResponsesNonce}
                       sessionSlug={displaySessionSlug}
+                      sessionConfig={resolvedSessionConfig}
                       demoDataFirstLoad={isDemoSlug}
                       demoDataBySlug={resolvedPolisDemoDataBySlug}
                       contracts={contracts}

@@ -179,6 +179,103 @@ describe('cryptoUtils Lit multi-gate envelopes', () => {
     expect(getKey).toHaveBeenCalledTimes(4);
   });
 
+  it.each([
+    {
+      label: 'rating answer plus additional text',
+      question: { id: 'q-rating-matrix', type: 'rating' },
+      answer: 8,
+      additional: 'Rating context',
+    },
+    {
+      label: 'multichoice answer',
+      question: {
+        id: 'q-multichoice-matrix',
+        type: 'multichoice',
+        options: ['Alpha', 'Beta', 'Gamma'],
+      },
+      answer: ['Alpha', 'Gamma'],
+      additional: undefined,
+    },
+  ])('round-trips a Lit-encrypted $label without expanding the full Cartesian matrix', async (fixture) => {
+    const providerEncrypt = makeProvider(SIG_A);
+    const providerDecrypt = makeRejectingSignerProvider();
+    const recipient = {
+      accessControlConditions: buildSbtAccessControlConditions({
+        sbtAddresses: [GATE_A],
+        chainId: CHAIN_ID,
+        litChain: 'baseSepolia',
+        mode: 'any',
+      }),
+      chain: 'baseSepolia',
+    };
+    const cekByCiphertext = new Map();
+    const saveKey = jest.fn(async (cekRaw) => {
+      const ciphertext = `${fixture.question.id}-cek-${cekByCiphertext.size + 1}`;
+      cekByCiphertext.set(ciphertext, new Uint8Array(cekRaw));
+      return {
+        ciphertext,
+        dataToEncryptHash: `${fixture.question.id}-hash-${cekByCiphertext.size}`,
+      };
+    });
+    const surveyState = {
+      answers: {
+        [fixture.question.id]: { encrypted: true, value: fixture.answer },
+      },
+      additionalComments:
+        fixture.additional === undefined
+          ? {}
+          : { [fixture.question.id]: { encrypted: true, value: fixture.additional } },
+      importance: {},
+    };
+
+    const encrypted = await cryptoUtils.encryptMultipleAnswers(surveyState, {
+      providerKind: providerEncrypt,
+      account: ACCOUNT,
+      chainId: CHAIN_ID,
+      surveyId: SURVEY_ID,
+      questionPool: [fixture.question],
+      lit: { saveKey, recipients: [recipient] },
+    });
+    const answerEnvelope = JSON.parse(encrypted.answers[fixture.question.id].encryptedPortion);
+
+    expect(encrypted.answers[fixture.question.id]).toEqual(
+      expect.objectContaining({
+        encrypted: true,
+        value: '*',
+        hash: expect.stringMatching(/^0x[0-9a-f]{64}$/i),
+      }),
+    );
+    expect(answerEnvelope.meta.kind).toBe(fixture.question.type);
+    expect(answerEnvelope.recipients.some((entry) => entry.type === 'lit-sbt-v1')).toBe(true);
+    if (fixture.additional !== undefined) {
+      const additionalEnvelope = JSON.parse(encrypted.additionalComments[fixture.question.id].encryptedPortion);
+      expect(encrypted.additionalComments[fixture.question.id].value).toBe('*');
+      expect(additionalEnvelope.meta.kind).toBe('freeform');
+    }
+
+    const getKey = jest.fn(async ({ ciphertext }) => {
+      const key = cekByCiphertext.get(ciphertext);
+      if (!key) throw new Error('missing CEK');
+      return key;
+    });
+    const decrypted = await cryptoUtils.decryptMultipleAnswers(encrypted, [fixture.question], {
+      provider: providerDecrypt,
+      account: ACCOUNT,
+      chainId: CHAIN_ID,
+      surveyId: SURVEY_ID,
+      lit: { getKey },
+      throwOnError: true,
+    });
+
+    expect(decrypted.answers[fixture.question.id].value).toEqual(fixture.answer);
+    if (fixture.additional !== undefined) {
+      expect(decrypted.additionalComments[fixture.question.id].value).toBe(fixture.additional);
+    }
+    const encryptedFieldCount = fixture.additional === undefined ? 1 : 2;
+    expect(saveKey).toHaveBeenCalledTimes(encryptedFieldCount);
+    expect(getKey).toHaveBeenCalledTimes(encryptedFieldCount);
+  });
+
   it('falls back to Lit recipients when self-recipient signing fails', async () => {
     const providerEncrypt = makeProvider(SIG_A);
     const providerDecrypt = makeRejectingSignerProvider();

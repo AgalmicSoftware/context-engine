@@ -8,6 +8,8 @@ import SBTSelector from '../SBTs/SBTSelector';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
+import SessionWorkerGroupDraftsPanel from './SessionWorkerGroupDraftsPanel';
+import type { PendingWorkerGroupDraft } from './sessionWizardPendingWorkerGroups';
 
 type EncryptionGate = {
   id: string;
@@ -63,6 +65,10 @@ export type EncryptionPanelProps = {
   removePendingSbtDraft: (address?: string) => void;
   isWorkerCanonical?: boolean;
   showOnChainGateControls?: boolean;
+  pendingWorkerGroupDrafts?: PendingWorkerGroupDraft[];
+  onAddPendingWorkerGroupDraft?: (label: string) => void;
+  onRemovePendingWorkerGroupDraft?: (groupId: string) => void;
+  onUpdatePendingWorkerGroupDraft?: (groupId: string, patch: Partial<PendingWorkerGroupDraft>) => void;
 };
 
 const EncryptionPanel = ({
@@ -93,6 +99,10 @@ const EncryptionPanel = ({
   removePendingSbtDraft,
   isWorkerCanonical = false,
   showOnChainGateControls = true,
+  pendingWorkerGroupDrafts = [],
+  onAddPendingWorkerGroupDraft = () => {},
+  onRemovePendingWorkerGroupDraft = () => {},
+  onUpdatePendingWorkerGroupDraft = () => {},
 }: EncryptionPanelProps) => {
   const translate = typeof t === 'function' ? t : (key: string) => key;
   const gates = Array.isArray(encryptionGates) ? encryptionGates : [];
@@ -147,10 +157,12 @@ const EncryptionPanel = ({
       {!isCollapsed && (
         <div className={styles.panelBody}>
           {isWorkerCanonical && !showOnChainGateControls ? (
-            <div className={styles.modeSummaryList} data-testid="ce-new-worker-native-access-summary">
-              Passkey identity, Session Worker roles, and Worker-native Groups control access. Optional SBT/Lit
-              conditions are available only in Advanced hybrid settings.
-            </div>
+            <SessionWorkerGroupDraftsPanel
+              drafts={pendingWorkerGroupDrafts}
+              onAdd={onAddPendingWorkerGroupDraft}
+              onRemove={onRemovePendingWorkerGroupDraft}
+              onUpdate={onUpdatePendingWorkerGroupDraft}
+            />
           ) : null}
           {showOnChainGateControls ? (
             <>

@@ -21,7 +21,7 @@ const makeWorkerConfig = (workerOrigin: string, sessionId: string) => ({
   },
 });
 
-const createContext = (overrides: SurveyQuestionsLegacyRecord = {}) => ({
+const createContext = (overrides: SurveyQuestionsLegacyRecord = {}): SurveyQuestionsLegacyRecord => ({
   buildCurrentStepState: jest.fn((step) => ({ currentStep: step })),
   buildFieldEncryptionWorkGroupsCore: jest.fn(() => ({
     groups: [],
@@ -283,6 +283,40 @@ describe('surveyQuestionsSubmitRuntime', () => {
         }),
         onlyTheseQids: ['q1'],
       }),
+    );
+  });
+
+  it('passes a pre-encryption prediction comparison snapshot into submission', async () => {
+    const context = createContext();
+    context.stateRef.current.surveysResponseState[2] = {
+      additionalComments: { q1: { value: 'Final note', encrypted: true } },
+      answers: { q1: { value: 'Final answer', encrypted: true } },
+      conviction: {},
+      importance: {},
+      interviewProvenance: {
+        q1: {
+          includePredictionComparison: true,
+          originalPrediction: { answer: 'Original answer' },
+        },
+      },
+    };
+
+    const runtime = createSurveyQuestionsSubmitRuntime(context);
+    await runtime.encryptAndUpload();
+
+    expect(context.submitSurveyResponse).toHaveBeenCalledWith(
+      expect.objectContaining({
+        interviewProvenance: {
+          q1: expect.objectContaining({
+            submissionValueSnapshot: {
+              answer: 'Final answer',
+              additionalComments: 'Final note',
+            },
+          }),
+        },
+      }),
+      expect.any(Set),
+      expect.any(Object),
     );
   });
 

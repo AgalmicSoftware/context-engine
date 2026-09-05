@@ -166,7 +166,11 @@ describe('userPageAnalysisStateHelpers', () => {
   });
 
   it('builds AI options and visible response analysis fields', () => {
-    const sessionConfig = { ai: { provider: 'openai' } };
+    const sessionConfig = {
+      ai: { provider: 'openai' },
+      corsWorkerUrl: 'https://worker.example',
+    };
+    const context = { account: '0x123', chainId: 84532 };
     expect(
       buildUserPageAnalysisAiOptions({
         analysisSession: {
@@ -175,10 +179,13 @@ describe('userPageAnalysisStateHelpers', () => {
           status: 'allowed',
           reason: 'selected',
         },
+        context,
       }),
     ).toEqual({
+      context,
       sessionSlug: 'analysis-session',
       sessionConfig,
+      throwOnError: true,
       sessionSelection: {
         gateStatus: 'allowed',
         reason: 'selected',

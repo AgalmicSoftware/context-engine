@@ -1,7 +1,5 @@
-import {
-  bindSurveyResultsAnalysisArtifactMergePort,
-  type SurveyResultsAnalysisArtifactMergeRuntime,
-} from './surveyResultsAnalysisArtifactMergePort';
+import * as sessionResultsExport from '../../utilities/sessionResultsExport/sessionResultsAnalysisArtifacts';
+import { surveyResultsAnalysisArtifactMergePort } from './surveyResultsAnalysisArtifactMergePort';
 
 const createArtifact = (inputSignature: string) => ({
   generatedAt: '2026-01-01T00:00:00.000Z',
@@ -25,22 +23,23 @@ const createArtifact = (inputSignature: string) => ({
   version: 1 as const,
 });
 
-const createRuntime = (): SurveyResultsAnalysisArtifactMergeRuntime => ({
-  mergeGeneratedSessionResultsAnalysisArtifacts: jest.fn(() => createArtifact('merged')),
-  normalizeGeneratedSessionResultsAnalysisArtifact: jest.fn(() => createArtifact('normalized')),
-});
-
 describe('surveyResultsAnalysisArtifactMergePort', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('routes generated artifact normalization and merge with unchanged arguments', () => {
-    const runtime = createRuntime();
-    const port = bindSurveyResultsAnalysisArtifactMergePort({
-      runtime: () => runtime,
-    });
+    const normalizeGeneratedSessionResultsAnalysisArtifact = jest
+      .spyOn(sessionResultsExport, 'normalizeGeneratedSessionResultsAnalysisArtifact')
+      .mockReturnValue(createArtifact('normalized'));
+    const mergeGeneratedSessionResultsAnalysisArtifacts = jest
+      .spyOn(sessionResultsExport, 'mergeGeneratedSessionResultsAnalysisArtifacts')
+      .mockReturnValue(createArtifact('merged'));
     const base = createArtifact('base');
     const next = createArtifact('next');
 
     expect(
-      port.normalizeGeneratedArtifact({
+      surveyResultsAnalysisArtifactMergePort.normalizeGeneratedArtifact({
         generatedAt: '2026-02-02T00:00:00.000Z',
         inputSignature: 'input-a',
         participants: [],
@@ -48,62 +47,57 @@ describe('surveyResultsAnalysisArtifactMergePort', () => {
       }).inputSignature,
     ).toBe('normalized');
     expect(
-      port.mergeGeneratedArtifacts({
+      surveyResultsAnalysisArtifactMergePort.mergeGeneratedArtifacts({
         base,
         next,
         sections: ['breakdown'],
       })?.inputSignature,
     ).toBe('merged');
 
-    expect(runtime.normalizeGeneratedSessionResultsAnalysisArtifact).toHaveBeenCalledWith({
+    expect(normalizeGeneratedSessionResultsAnalysisArtifact).toHaveBeenCalledWith({
       generatedAt: '2026-02-02T00:00:00.000Z',
       inputSignature: 'input-a',
       participants: [],
       rawOutput: { sections: { breakdown: { groups: [] } } },
     });
-    expect(runtime.mergeGeneratedSessionResultsAnalysisArtifacts).toHaveBeenCalledWith({
+    expect(mergeGeneratedSessionResultsAnalysisArtifacts).toHaveBeenCalledWith({
       base,
       next,
       sections: ['breakdown'],
     });
   });
 
-  it('uses call-time runtime lookup for normalize and merge helpers', () => {
-    const firstRuntime = createRuntime();
-    const secondRuntime = createRuntime();
-    (firstRuntime.normalizeGeneratedSessionResultsAnalysisArtifact as jest.Mock).mockReturnValue(
-      createArtifact('first-normalize'),
-    );
-    (secondRuntime.normalizeGeneratedSessionResultsAnalysisArtifact as jest.Mock).mockReturnValue(
-      createArtifact('second-normalize'),
-    );
-    (firstRuntime.mergeGeneratedSessionResultsAnalysisArtifacts as jest.Mock).mockReturnValue(
-      createArtifact('first-merge'),
-    );
-    (secondRuntime.mergeGeneratedSessionResultsAnalysisArtifacts as jest.Mock).mockReturnValue(
-      createArtifact('second-merge'),
-    );
-    let currentRuntime = firstRuntime;
-    const port = bindSurveyResultsAnalysisArtifactMergePort({
-      runtime: () => currentRuntime,
-    });
+  it('uses call-time runtime property lookup for normalize and merge helpers', () => {
+    const normalizeGeneratedSessionResultsAnalysisArtifact = jest
+      .spyOn(sessionResultsExport, 'normalizeGeneratedSessionResultsAnalysisArtifact')
+      .mockReturnValueOnce(createArtifact('first-normalize'))
+      .mockReturnValueOnce(createArtifact('second-normalize'));
+    const mergeGeneratedSessionResultsAnalysisArtifacts = jest
+      .spyOn(sessionResultsExport, 'mergeGeneratedSessionResultsAnalysisArtifacts')
+      .mockReturnValueOnce(createArtifact('first-merge'))
+      .mockReturnValueOnce(createArtifact('second-merge'));
 
-    expect(port.normalizeGeneratedArtifact({ inputSignature: 'one' }).inputSignature).toBe('first-normalize');
-    expect(port.mergeGeneratedArtifacts({ sections: ['riskMatrix'] })?.inputSignature).toBe('first-merge');
-
-    currentRuntime = secondRuntime;
-
-    expect(port.normalizeGeneratedArtifact({ inputSignature: 'two' }).inputSignature).toBe('second-normalize');
-    expect(port.mergeGeneratedArtifacts({ sections: ['atlas'] })?.inputSignature).toBe('second-merge');
-    expect(firstRuntime.normalizeGeneratedSessionResultsAnalysisArtifact).toHaveBeenCalledWith({
+    expect(
+      surveyResultsAnalysisArtifactMergePort.normalizeGeneratedArtifact({ inputSignature: 'one' }).inputSignature,
+    ).toBe('first-normalize');
+    expect(
+      surveyResultsAnalysisArtifactMergePort.mergeGeneratedArtifacts({ sections: ['riskMatrix'] })?.inputSignature,
+    ).toBe('first-merge');
+    expect(
+      surveyResultsAnalysisArtifactMergePort.normalizeGeneratedArtifact({ inputSignature: 'two' }).inputSignature,
+    ).toBe('second-normalize');
+    expect(
+      surveyResultsAnalysisArtifactMergePort.mergeGeneratedArtifacts({ sections: ['atlas'] })?.inputSignature,
+    ).toBe('second-merge');
+    expect(normalizeGeneratedSessionResultsAnalysisArtifact).toHaveBeenNthCalledWith(1, {
       inputSignature: 'one',
     });
-    expect(secondRuntime.normalizeGeneratedSessionResultsAnalysisArtifact).toHaveBeenCalledWith({
+    expect(normalizeGeneratedSessionResultsAnalysisArtifact).toHaveBeenNthCalledWith(2, {
       inputSignature: 'two',
     });
-    expect(firstRuntime.mergeGeneratedSessionResultsAnalysisArtifacts).toHaveBeenCalledWith({
+    expect(mergeGeneratedSessionResultsAnalysisArtifacts).toHaveBeenNthCalledWith(1, {
       sections: ['riskMatrix'],
     });
-    expect(secondRuntime.mergeGeneratedSessionResultsAnalysisArtifacts).toHaveBeenCalledWith({ sections: ['atlas'] });
+    expect(mergeGeneratedSessionResultsAnalysisArtifacts).toHaveBeenNthCalledWith(2, { sections: ['atlas'] });
   });
 });

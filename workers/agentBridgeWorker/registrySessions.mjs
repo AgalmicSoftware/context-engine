@@ -1,3 +1,5 @@
+import { safeString, safeJsonParse } from './runtimePrimitives.mjs';
+
 const DEFAULT_CHAIN_ID = '11155420';
 const DEFAULT_RPC_TIMEOUT_MS = 5_000;
 const SESSION_REGISTRY_BY_CHAIN = Object.freeze({
@@ -14,10 +16,6 @@ const REGISTRY_SESSION_CACHE_TTL_MS = 2 * 60 * 1000;
 const REGISTRY_SESSION_KV_PREFIX = 'telegram:registry-sessions:v1:';
 const registrySessionCache = new Map();
 
-function safeString(value) {
-  return String(value || '').trim();
-}
-
 function normalizeChainId(value = '') {
   return safeString(value || DEFAULT_CHAIN_ID) || DEFAULT_CHAIN_ID;
 }
@@ -32,16 +30,6 @@ function splitRpcUrls(value = '') {
     .split(/[\s,]+/)
     .map((entry) => safeString(entry))
     .filter((entry) => /^https:\/\/[^/\s]+(?:\/.*)?$/i.test(entry));
-}
-
-function safeJsonParse(value, fallback = null) {
-  const text = safeString(value);
-  if (!text) return fallback;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return fallback;
-  }
 }
 
 function normalizePositiveInteger(value, fallback) {

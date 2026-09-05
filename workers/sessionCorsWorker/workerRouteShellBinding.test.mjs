@@ -220,6 +220,48 @@ test('createWorkerRouteShellWithWorkerDeps preserves session-config bootstrap br
   assert.equal(await routeShell.fetch(request, env), response);
 });
 
+test('createWorkerRouteShellWithWorkerDeps preserves interview brief branch wiring', async () => {
+  const request = createRequest('/agent/interview-brief?slug=demo-1', 'GET');
+  const env = { SESSION_CONFIGS: { id: 'kv' }, DEFAULT_SESSION_SLUG: 'demo-1' };
+  const baseHeaders = { 'Access-Control-Allow-Origin': 'https://allowed.example' };
+  const response = new Response('interview brief');
+  const fetchImpl = async () => new Response();
+
+  const routeShell = createWorkerRouteShellWithWorkerDeps({
+    deps: {
+      ...createBaseDeps(),
+      fetch: fetchImpl,
+      resolveTopLevelRouteSelection: () => ({ kind: 'interview-brief' }),
+      getRouteBaseHeaders: () => baseHeaders,
+      getDefaultWorkerSessionSlug: () => 'demo-1',
+      dispatchInterviewBriefRequest: async (value) => {
+        assert.equal(value.request, request);
+        assert.equal(value.env, env);
+        assert.equal(value.slugHint, 'demo-1');
+        assert.equal(value.baseHeaders, baseHeaders);
+        assert.deepEqual(value.deps, {
+          resolveRequestSlugWithoutToken: 'resolveRequestSlugWithoutToken',
+          getSessionConfig: 'getSessionConfig',
+          getCorsContext: 'getCorsContext',
+          resolveAnonymousRateIdentity: 'resolveAnonymousRateIdentity',
+          checkRateLimit: 'checkRateLimit',
+          storageRoute: 'storageRoute',
+          fetch: fetchImpl,
+          json: 'json',
+        });
+        assert.deepEqual(value.constants, {
+          missingSlugError: 'Missing sessionSlug.',
+          sessionConfigNotFoundError: 'Session config not found.',
+        });
+        return response;
+      },
+    },
+    constants: createBaseConstants(),
+  });
+
+  assert.equal(await routeShell.fetch(request, env), response);
+});
+
 test('createWorkerRouteShellWithWorkerDeps preserves auth-nonce branch wiring', async () => {
   const request = createRequest('/auth/nonce');
   const env = { GROUP_KV: { id: 'kv' } };

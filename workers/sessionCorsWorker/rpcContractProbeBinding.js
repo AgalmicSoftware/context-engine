@@ -141,7 +141,6 @@ export const createRpcContractProbeHelpersWithWorkerDeps = ({
   const probeRpcUrls = async ({ rpcUrls, label }) => {
     const list = Array.isArray(rpcUrls) ? rpcUrls : [];
     for (const rpcUrl of list) {
-      // eslint-disable-next-line no-await-in-loop
       await probeRpcUrl({ rpcUrl, label });
     }
   };

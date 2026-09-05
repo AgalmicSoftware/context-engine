@@ -1601,8 +1601,10 @@ input[type='radio']:checked:after {
   }
 
   .welcomeSlideBulletText {
-    padding: 10px;
-    font-size: 1.05em !important;
+    margin: 0 0 4px;
+    padding: 3px 6px;
+    font-size: 0.95em !important;
+    line-height: 1.15;
   }
 
   .welcomeSlideMediaButton[data-slide-key='looking-for'] {
@@ -1645,6 +1647,7 @@ input[type='radio']:checked:after {
   .welcomeSlideBulletText {
     margin: 0 0 6px;
     padding: 3px 8px;
+    font-size: 0.9em !important;
     line-height: 1.2;
   }
 

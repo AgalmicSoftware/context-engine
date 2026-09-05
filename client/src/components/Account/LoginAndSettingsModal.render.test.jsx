@@ -573,15 +573,15 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(screen.queryByRole('button', { name: /Resource keys/i })).not.toBeInTheDocument();
   });
 
-  it('keeps the simplified theme control as the final signed-in settings section', () => {
-    const subject = buildWrongNetworkSubject({ aiSettingsOpen: true });
+  it('keeps the theme selector visible beside the signed-in quick controls when config is collapsed', () => {
+    const subject = buildWrongNetworkSubject({ aiSettingsOpen: false });
 
     render(subject.getSettingsDisplay());
 
-    const aiConfigSection = screen.getByRole('button', { name: /AI config/i });
-    const appearanceSection = screen.getByRole('button', { name: /Appearance & colors/i });
-    expect(aiConfigSection.compareDocumentPosition(appearanceSection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByTestId('ce-settings-quick-controls').children).toHaveLength(4);
     expect(screen.getByTestId('ce-settings-theme')).toHaveAccessibleName('App theme');
+    expect(screen.getByText('Theme')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Appearance & colors/i })).not.toBeInTheDocument();
     expect(screen.queryByText('Bundled app themes')).not.toBeInTheDocument();
     expect(screen.queryByText(/Changes the complete app appearance/i)).not.toBeInTheDocument();
   });

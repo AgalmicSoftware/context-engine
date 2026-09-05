@@ -13,6 +13,8 @@ import {
   isReservedSessionSlugKey,
   resolveCanonicalSessionConfig,
 } from './canonicalSessionContext.js';
+import { normalizeRegistrySessionSlugForWriteValue } from './sessionSlug';
+export { canonicalizeSessionSlug as normalizeSessionSlug } from './sessionSlug';
 import type { SessionConfig, SessionContractRef as BoundarySessionContractRef, UnknownRecord } from './sessionTypes.js';
 
 type SessionContractRef = {
@@ -63,18 +65,8 @@ const CONTRACT_CHAINID_ALIASES = Object.freeze({
   sbtFactory: ['sbtFactoryChainId', 'factoryChainId'],
 } as const);
 
-export const normalizeSessionSlug = (rawSlug: unknown): string => {
-  return canonicalizeSessionSlug(rawSlug);
-};
-
 export const normalizeRegistrySessionSlugForWrite = (rawSlug: unknown): string => {
-  const normalized = toStr(rawSlug).trim().toLowerCase();
-  const defaultAlias =
-    toStr(DEFAULT_SESSION_SLUG_ALIAS || 'general')
-      .trim()
-      .toLowerCase() || 'general';
-  if (!normalized || normalized === defaultAlias) return defaultAlias;
-  return normalized;
+  return normalizeRegistrySessionSlugForWriteValue(rawSlug, DEFAULT_SESSION_SLUG_ALIAS);
 };
 
 export const validateRegistrySessionSlugForWrite = (rawSlug: unknown, { allowDefault = true } = {}) => {
@@ -151,17 +143,17 @@ export const resolveSessionSlugFromPathname = (pathname: unknown = ''): string |
   const match = path.match(/^\/session(?:\/([^/?#]+))?(?:[/?#]|$)/i);
   if (!match) return null;
   try {
-    return normalizeSessionSlug(decodeURIComponent(toStr(match[1] || '')));
+    return canonicalizeSessionSlug(decodeURIComponent(toStr(match[1] || '')));
   } catch {
-    return normalizeSessionSlug(match[1] || '');
+    return canonicalizeSessionSlug(match[1] || '');
   }
 };
 
 export const resolveActiveSessionSlug = (input: UnknownRecord = {}): string =>
-  normalizeSessionSlug(input.activeSessionSlug ?? input.sessionSlug ?? input.slug);
+  canonicalizeSessionSlug(input.activeSessionSlug ?? input.sessionSlug ?? input.slug);
 
 export const resolveSessionSlug = (input: UnknownRecord = {}): string =>
-  normalizeSessionSlug(input.sessionSlug ?? input.activeSessionSlug ?? input.slug);
+  canonicalizeSessionSlug(input.sessionSlug ?? input.activeSessionSlug ?? input.slug);
 
 export const resolveSessionSlugPinned = (input: UnknownRecord = {}): boolean => !!input.sessionSlugPinned;
 
@@ -169,7 +161,7 @@ export const resolveSessionName = (input: UnknownRecord = {}): string => toStr(i
 
 export const resolveSessionAliases = (input: UnknownRecord = {}) => {
   const activeSessionSlug = resolveActiveSessionSlug(input);
-  const sessionSlug = normalizeSessionSlug(input.sessionSlug ?? activeSessionSlug);
+  const sessionSlug = canonicalizeSessionSlug(input.sessionSlug ?? activeSessionSlug);
   const sessionSlugPinned = resolveSessionSlugPinned(input);
   const sessionName = resolveSessionName(input);
   return {

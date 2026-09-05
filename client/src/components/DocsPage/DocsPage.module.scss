@@ -474,13 +474,18 @@
   gap: 10px;
 
   a {
-    text-decoration: none;
-    color: var(--docs-link);
+    color: var(--docs-document-text);
     font-weight: 600;
+    text-decoration: underline;
+    text-decoration-color: var(--docs-link);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
   }
 
-  a:hover {
-    text-decoration: underline;
+  a:hover,
+  a:focus-visible {
+    color: var(--docs-document-text);
+    text-decoration-thickness: 3px;
   }
 }
 
@@ -494,7 +499,7 @@
 
 .testnetLabel {
   font-weight: 700;
-  color: var(--ce-action-primary);
+  color: var(--docs-document-text);
 }
 
 .contractDetails {
@@ -525,7 +530,7 @@
   justify-content: space-between;
   padding: 6px 10px;
   border-radius: var(--ce-radius-6);
-  border: 1px dashed var(--ce-action-primary);
+  border: 1px dashed var(--docs-document-border);
   color: var(--docs-document-muted);
   font-size: 1rem;
   font-weight: 700;
@@ -536,7 +541,7 @@
 .contractToggleIcon {
   font-size: 1.15rem;
   font-weight: 900;
-  color: var(--ce-action-primary);
+  color: var(--docs-document-text);
 }
 
 .backButton {

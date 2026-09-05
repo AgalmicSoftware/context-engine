@@ -460,6 +460,13 @@
       "moderated": 1,
       "commentBody": "Who should most influence AI development decisions?",
       "type": "poll",
+      "options": [
+        "Technical researchers",
+        "AI developers and labs",
+        "Governments and regulators",
+        "The general public",
+        "Affected communities"
+      ],
       "category": "GOVERNANCE MECHANISMS & INSTITUTIONS",
       "key_tension": "Tech companies have expertise but conflicts of interest; governments have legitimacy but lag behind; publics have stake but lack technical knowledge",
       "sources": "tweets, atlas, laws, insiders",
@@ -475,6 +482,13 @@
       "moderated": 1,
       "commentBody": "Most promising approach to AI safety?",
       "type": "poll",
+      "options": [
+        "Technical alignment research",
+        "Regulation and oversight",
+        "Independent evaluation and auditing",
+        "Transparency and open research",
+        "Slowing frontier capability development"
+      ],
       "category": "ALIGNMENT & INTERPRETABILITY APPROACHES",
       "key_tension": "Technical methods may not scale; regulation may lag; self-regulation may be captured; transparency may enable misuse; slowdowns may not hold",
       "sources": "tweets, arxiv, LessWrong, insiders",
@@ -490,6 +504,13 @@
       "moderated": 1,
       "commentBody": "When will AGI arrive?",
       "type": "poll",
+      "options": [
+        "Before 2030",
+        "2030–2039",
+        "2040–2059",
+        "2060 or later",
+        "Never / the concept remains ill-defined"
+      ],
       "category": "CAPABILITY ASSESSMENT & MEASUREMENT",
       "key_tension": "Timeline disagreements drive radically different policy urgency — near-term believers want immediate action, long-term skeptics want patience",
       "sources": "tweets, arxiv, LessWrong, insiders",
@@ -505,6 +526,13 @@
       "moderated": 1,
       "commentBody": "Which sector will AI transform most this decade?",
       "type": "poll",
+      "options": [
+        "Healthcare",
+        "Education",
+        "Scientific research",
+        "Finance and professional services",
+        "Creative industries and media"
+      ],
       "category": "LABOR, ECONOMICS & INEQUALITY",
       "key_tension": "Different sectors face different adoption speeds — regulated industries lag, creative and knowledge work may transform fastest",
       "sources": "tweets, insiders",
@@ -520,6 +548,13 @@
       "moderated": 1,
       "commentBody": "Who's liable when AI causes significant harm?",
       "type": "poll",
+      "options": [
+        "AI developers and labs",
+        "Deploying organizations",
+        "Individual users or operators",
+        "Shared liability across the supply chain",
+        "A public compensation or insurance system"
+      ],
       "category": "GOVERNANCE OF AI AGENTS & AUTONOMOUS SYSTEMS",
       "key_tension": "Liability allocation shapes incentives — developer liability encourages safety, deployer liability encourages oversight, no liability encourages speed",
       "sources": "tweets, laws, insiders",

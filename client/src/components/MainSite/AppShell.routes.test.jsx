@@ -1258,6 +1258,10 @@ describe('AppShell route render smoke', () => {
     });
     subject.handleNetworkChange = jest.fn();
     subject.syncSessionFallbackRedirectConsumption = jest.fn();
+    // Regression guard: this test manually drives componentDidUpdate to verify
+    // route/Lit wiring. Keep its fire-and-forget cache hydration from leaking
+    // Worker requests into the following fail-closed discovery test under CI load.
+    subject.initializeWorkerCanonicalCachesForGroup = jest.fn(async () => false);
 
     const view = render(subject.render());
 

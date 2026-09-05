@@ -7,6 +7,7 @@ import {
   collectAgentBridgeWorkerModules,
   executeAgentBridgeDeployApply,
   parseAgentBridgeEnvText,
+  uploadAgentBridgeWorker,
   verifyAgentBridgeHealth,
   writeAgentBridgeWorkerSecrets,
 } from './deployHelperApply.mjs';
@@ -242,14 +243,48 @@ test('bundleAgentBridgeWorkerModule folds package imports into one upload module
   assert.equal(bundle.source.includes("from './onChainResponses.mjs'"), false);
 });
 
-test('buildAgentBridgeWorkerUploadForm has no Durable Object binding or migration', () => {
+test('buildAgentBridgeWorkerUploadForm includes atomic invite coordination', () => {
   const upload = buildAgentBridgeWorkerUploadForm({
     config: { resources: {}, vars: {} },
     resourceIds: { kvNamespaceId: 'kv-id' },
   });
 
-  assert.equal(upload.metadata.bindings.some((binding) => binding.type === 'durable_object_namespace'), false);
-  assert.equal(Object.hasOwn(upload.metadata, 'migrations'), false);
+  assert.deepEqual(upload.metadata.bindings.find((binding) => binding.type === 'durable_object_namespace'), {
+    name: 'AGENT_INVITE_COORDINATOR',
+    type: 'durable_object_namespace',
+    class_name: 'AgentInviteRedemptionCoordinator',
+  });
+  assert.deepEqual(upload.metadata.migrations?.new_sqlite_classes, ['AgentInviteRedemptionCoordinator']);
+});
+
+test('uploadAgentBridgeWorker retries without an already-applied invite coordinator migration', async () => {
+  const metadata = [];
+  let uploadCount = 0;
+  const result = await uploadAgentBridgeWorker({
+    apiToken: 'cf-test-token',
+    accountId: 'account-123',
+    workerName: 'ce-agent-bridge-worker',
+    config: { resources: {}, vars: {} },
+    resourceIds: { kvNamespaceId: 'kv-id' },
+    fetchImpl: async (_url, options = {}) => {
+      uploadCount += 1;
+      metadata.push(JSON.parse(await options.body.get('metadata').text()));
+      if (uploadCount === 1) {
+        return jsonResponse({
+          success: false,
+          errors: [{ message: 'migration tag precondition failed' }],
+        }, { status: 412 });
+      }
+      return jsonResponse({ success: true, result: { id: 'script-created' } });
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.migrationAlreadyApplied, true);
+  assert.equal(uploadCount, 2);
+  assert.equal(Object.hasOwn(metadata[0], 'migrations'), true);
+  assert.equal(Object.hasOwn(metadata[1], 'migrations'), false);
+  assert.equal(metadata[1].bindings.some((binding) => binding.name === 'AGENT_INVITE_COORDINATOR'), true);
 });
 
 test('deploy apply creates smoke resources without requiring R2/D1, uploads modules, writes secrets, sets webhook, and checks health', async () => {

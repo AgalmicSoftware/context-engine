@@ -81,6 +81,7 @@ describe('sessionWizardPublishFlow', () => {
       shouldDeployPendingSbts: true,
       shouldUploadMetadata: true,
       shouldPersistWorkerConfig: false,
+      shouldCreateWorkerGroups: false,
       shouldRegisterSession: true,
       shouldRefreshRegistryCache: true,
       steps: ['deploy-worker', 'deploy-sbts', 'upload-metadata', 'register-session', 'done'],
@@ -108,6 +109,7 @@ describe('sessionWizardPublishFlow', () => {
         shouldDeployPendingSbts: false,
         shouldUploadMetadata: false,
         shouldPersistWorkerConfig: false,
+        shouldCreateWorkerGroups: false,
         shouldRegisterSession: true,
         shouldRefreshRegistryCache: true,
       }),
@@ -132,6 +134,7 @@ describe('sessionWizardPublishFlow', () => {
       shouldDeployPendingSbts: false,
       shouldUploadMetadata: false,
       shouldPersistWorkerConfig: true,
+      shouldCreateWorkerGroups: false,
       shouldRegisterSession: false,
       shouldRefreshRegistryCache: false,
       steps: ['persist-worker-config', 'done'],
@@ -140,6 +143,31 @@ describe('sessionWizardPublishFlow', () => {
         done: 2,
       },
     });
+  });
+
+  it('adds queued Groups after Worker config verification for Cloudflare sessions', () => {
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+
+    expect(
+      buildSessionWizardPublishExecutionPlan({
+        workerMode: 'custom',
+        deployComplete: true,
+        canUploadMetadataNow: true,
+        sessionModeProfile,
+        hasPendingWorkerGroupDrafts: true,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        shouldPersistWorkerConfig: true,
+        shouldCreateWorkerGroups: true,
+        steps: ['persist-worker-config', 'create-worker-groups', 'done'],
+        stepNumbers: {
+          'persist-worker-config': 1,
+          'create-worker-groups': 2,
+          done: 3,
+        },
+      }),
+    );
   });
 
   it('preserves decentralized upload, registration, and registry refresh behavior', () => {
@@ -160,6 +188,7 @@ describe('sessionWizardPublishFlow', () => {
       shouldDeployPendingSbts: false,
       shouldUploadMetadata: true,
       shouldPersistWorkerConfig: false,
+      shouldCreateWorkerGroups: false,
       shouldRegisterSession: true,
       shouldRefreshRegistryCache: true,
       steps: ['upload-metadata', 'register-session', 'done'],
@@ -568,7 +597,7 @@ describe('sessionWizardPublishFlow', () => {
       bundleText: 'export default { fetch() { return new Response("ok"); } };',
       bundleUrl: undefined,
       bundleManifestUrl: undefined,
-      bundleSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+      bundleSha256: 'f3c0d9299877e01400697dec5be4e888eafc1ff526d5e5424cb01ad75d4202d9',
       bundleSource: 'upload',
     });
 

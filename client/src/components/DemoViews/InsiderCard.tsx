@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import styles from './CorpusViewer.module.scss';
 import { DebateMapSection, ExternalSourceLink } from './TweetCard';
 
@@ -102,7 +103,7 @@ const InsiderCard = ({ entry = {}, onTagClick, onAtlasIssueOpen }: InsiderCardPr
     shouldClampSummary && !expanded ? `${summaryText.slice(0, INSIDER_SUMMARY_PREVIEW_LENGTH)}…` : summaryText;
 
   return (
-    <article className={`${styles.card} ${styles.insiderCard}`}>
+    <article className={`${styles.card} ${styles.insiderCard}`} data-testid={E2E_TESTIDS.CONTEXT_INTERVIEW_CARD}>
       <div className={styles.tweetAuthorRow}>
         <div className={styles.insiderPortrait} aria-hidden="true">
           {buildInitials(intervieweeName)}
@@ -124,6 +125,15 @@ const InsiderCard = ({ entry = {}, onTagClick, onAtlasIssueOpen }: InsiderCardPr
           <span>{leadQuote}</span>
         </div>
       ) : null}
+
+      <div className={styles.interviewTimeline} aria-label="Interview transcript">
+        <span>Transcript</span>
+        <div aria-hidden="true">
+          {[18, 34, 24, 42, 28, 48, 22, 38, 30].map((height, index) => (
+            <i key={`${height}-${index}`} style={{ height }} />
+          ))}
+        </div>
+      </div>
 
       {tags.length > 0 ? (
         <div className={styles.pillRow}>

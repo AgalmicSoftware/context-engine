@@ -1,36 +1,15 @@
+import {
+  safeString,
+  safeJsonParse,
+  nowIsoOrCurrent,
+  sanitizeSessionSlug,
+} from './runtimePrimitives.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 
 export const TELEGRAM_QUESTION_NUMBER_KV_PREFIX = 'telegram:question-number:';
 
-function safeString(value) {
-  return String(value || '').trim();
-}
-
-function sanitizeSessionSlug(value = '') {
-  return safeString(value).toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 128);
-}
-
 function normalizeQuestionId(value = '') {
   return safeString(value).slice(0, 256);
-}
-
-function nowIso(now = null) {
-  if (now instanceof Date) return now.toISOString();
-  if (safeString(now)) {
-    const parsed = new Date(now);
-    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
-  }
-  return new Date().toISOString();
-}
-
-function safeJsonParse(value, fallback = null) {
-  const text = safeString(value);
-  if (!text) return fallback;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return fallback;
-  }
 }
 
 function questionId(question = {}) {
@@ -97,7 +76,7 @@ async function persistQuestionNumberMap(env = {}, map = {}, createdAt = null) {
   const key = telegramQuestionNumberKvKey(map.sessionSlug);
   const kv = env?.AGENT_ACTION_KV;
   if (!key || !kv || typeof kv.put !== 'function') return { ok: false, reason: 'action_kv_unavailable' };
-  const record = normalizeTelegramQuestionNumberMap({ ...map, updatedAt: nowIso(createdAt) }, map.sessionSlug);
+  const record = normalizeTelegramQuestionNumberMap({ ...map, updatedAt: nowIsoOrCurrent(createdAt) }, map.sessionSlug);
   assertNoSecretShape(record, 'Telegram question number map must not serialize secrets.');
   await kv.put(key, JSON.stringify(record));
   return { ok: true, key, record };

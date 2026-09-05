@@ -1,3 +1,9 @@
+import {
+  safeString,
+  lower,
+  envFlagEnabled,
+  envFlagDisabled,
+} from './runtimePrimitives.mjs';
 import { ethers } from 'ethers';
 import {
   TELEGRAM_BRIDGE_ACTIONS,
@@ -18,14 +24,6 @@ const SUBMIT_RESPONSES_ABI = [
 ];
 const DEFAULT_LOGIN_ORIGIN = 'http://localhost:7391';
 
-function safeString(value) {
-  return String(value || '').trim();
-}
-
-function lower(value) {
-  return safeString(value).toLowerCase();
-}
-
 function normalizeCanonicalWorkerSessionId(value) {
   const normalized = lower(value).replace(/^0x/, '').replace(/-/g, '');
   return /^[0-9a-f]{32}$/.test(normalized) && !/^0+$/.test(normalized)
@@ -38,14 +36,6 @@ function resolveCanonicalWorkerSessionId(session = {}) {
   const normalized = rawValues.map(normalizeCanonicalWorkerSessionId);
   const unique = new Set(normalized.filter(Boolean));
   return normalized.some((value) => !value) || unique.size !== 1 ? '' : [...unique][0];
-}
-
-function envFlagEnabled(value = '') {
-  return ['1', 'true', 'yes', 'on'].includes(lower(value));
-}
-
-function envFlagDisabled(value = '') {
-  return ['0', 'false', 'no', 'off'].includes(lower(value));
 }
 
 function jsonHeaders(origin = '') {

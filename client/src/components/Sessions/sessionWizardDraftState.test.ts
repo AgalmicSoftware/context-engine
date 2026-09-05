@@ -27,6 +27,12 @@ describe('sessionWizardDraftState', () => {
         sessionInfo: 'Draft Info',
         sessionHeader: 'https://example.test/header.png',
         autoFeatureSBTsBySessionSlug: true,
+        interviewModeEnabled: true,
+        interviewMode: {
+          enabled: true,
+          provider: 'openai',
+          realtimeModel: 'gpt-realtime-2.1',
+        },
         embeddedDeployHelperEnabled: true,
       }),
     );
@@ -49,6 +55,12 @@ describe('sessionWizardDraftState', () => {
         corsWorkerUrl: '',
         defaultSbtTags: expect.any(String),
         appearance: { colorSchemeId: 'context-engine' },
+        interviewModeEnabled: true,
+        interviewMode: {
+          enabled: true,
+          provider: 'openai',
+          realtimeModel: 'gpt-realtime-2.1',
+        },
       }),
     );
     expect(template.ai).toEqual(
@@ -64,6 +76,30 @@ describe('sessionWizardDraftState', () => {
     expect(template.telegramOnly).toBeUndefined();
     expect(template.sessionMode).toBeUndefined();
     expect(template.telegramBridgeEnabled).toBeUndefined();
+  });
+
+  it('preserves an explicit per-session interview-mode opt-out', () => {
+    expect(normalizeSessionWizardDraftShape({ interviewModeEnabled: false })).toEqual(
+      expect.objectContaining({
+        interviewModeEnabled: false,
+        interviewMode: {
+          enabled: false,
+          provider: 'openai',
+          realtimeModel: 'gpt-realtime-2.1',
+        },
+      }),
+    );
+  });
+
+  it('preserves a valid realtime model and normalizes unsupported values to the OpenAI default', () => {
+    expect(
+      normalizeSessionWizardDraftShape({ interviewMode: { realtimeModel: ' gpt-realtime-custom ' } }).interviewMode,
+    ).toEqual({ enabled: true, provider: 'openai', realtimeModel: 'gpt-realtime-custom' });
+    expect(normalizeSessionWizardDraftShape({ interviewMode: { realtimeModel: 'gpt-5' } }).interviewMode).toEqual({
+      enabled: true,
+      provider: 'openai',
+      realtimeModel: 'gpt-realtime-2.1',
+    });
   });
 
   it('preserves a cached color scheme id and normalizes invalid ids without palette values', () => {
@@ -469,6 +505,22 @@ describe('sessionWizardDraftState', () => {
       sessionId: 'session-1',
       draft: { sessionName: 'Draft' },
       pendingSbtDrafts: [{ address: '0xpending' }],
+      pendingWorkerGroupDrafts: [
+        {
+          groupId: 'draft-group-1',
+          label: 'Research team',
+          description: '',
+          imageUrl: 'https://images.example.test/research.png',
+          imageFile: new File(['image'], 'research.png', { type: 'image/png' }),
+          tags: ['research'],
+          documentURLs: ['https://docs.example.test/brief'],
+          memberLimit: '25',
+          joinEndsAt: '2099-01-02T03:04',
+          adminAddress: `0x${'34'.repeat(20)}`,
+          joinMode: 'open',
+          memberVisibility: 'session',
+        },
+      ],
       effectivePersistWorkerSecrets: false,
       workerSecrets: {
         apiToken: 'secret',
@@ -503,6 +555,21 @@ describe('sessionWizardDraftState', () => {
         sessionId: 'session-1',
         draft: { sessionName: 'Draft' },
         pendingSbtDrafts: [],
+        pendingWorkerGroupDrafts: [
+          {
+            groupId: 'draft-group-1',
+            label: 'Research team',
+            description: '',
+            imageUrl: 'https://images.example.test/research.png',
+            tags: ['research'],
+            documentURLs: ['https://docs.example.test/brief'],
+            memberLimit: '25',
+            joinEndsAt: '2099-01-02T03:04',
+            adminAddress: `0x${'34'.repeat(20)}`,
+            joinMode: 'open',
+            memberVisibility: 'session',
+          },
+        ],
         persistWorkerSecrets: false,
         workerSecrets: {
           litApiBase: 'https://api.chipotle.litprotocol.com',
@@ -521,6 +588,7 @@ describe('sessionWizardDraftState', () => {
     expect(payload.deployForm.apiToken).toBeUndefined();
     expect(payload.deployForm.accountId).toBeUndefined();
     expect(payload.workerRequirementProof).toBeUndefined();
+    expect(payload.pendingWorkerGroupDrafts[0].imageFile).toBeUndefined();
     expect(JSON.stringify(payload)).not.toContain('cf-secret');
     expect(JSON.stringify(payload)).not.toContain('"apiToken":"secret"');
   });

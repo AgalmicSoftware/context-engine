@@ -48,6 +48,12 @@ export type DraftState = UnknownRecord &
     sponsored?: DraftSponsoredState;
     sessionModeProfile?: UnknownRecord;
     groupCreationPolicy?: string;
+    interviewModeEnabled?: boolean;
+    interviewMode?: {
+      enabled?: boolean;
+      provider?: string;
+      realtimeModel?: string;
+    };
     __registry?: UnknownRecord;
   };
 

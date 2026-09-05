@@ -37,7 +37,13 @@ Type-debt ratchet:
 npm run type-debt:check
 ```
 
-This counts production `client/src` TS/TSX `@ts-nocheck`, explicit-`any`, and double-cast `as unknown as` markers against `scripts/type-debt-baseline.json`. Tests, test utilities, and `*Harness.ts(x)` files are excluded. Use `node scripts/check-type-debt-ratchet.mjs --write-baseline` only after intentional cleanup or a reviewed baseline change.
+This counts production `client/src` TS/TSX `@ts-nocheck`, explicit-`any`,
+double-cast `as unknown as`, and repo-wide uses of aliases backed by `any` or
+`Record<string, any>` against `scripts/type-debt-baseline.json`. Tests, test
+utilities, and `*Harness.ts(x)` files are excluded. A newly introduced metric
+establishes its first baseline once; every later comparison is monotonic. Use
+`node scripts/check-type-debt-ratchet.mjs --write-baseline` only after
+intentional cleanup or a reviewed baseline change.
 
 Client boundary checker:
 

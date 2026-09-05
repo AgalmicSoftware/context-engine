@@ -13,6 +13,13 @@ import { useSessionRegistryReads } from '../../utilities/query/useSessionRegistr
 import { normalizeGlobalSessionSelection } from '../../utilities/session/globalSessionState.js';
 import { parseQuestionSessionSlugFromSearch } from '../../utilities/survey/questionRouting.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
+import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
+import {
+  defaultTagPageWorkerGroupPorts,
+  loadTagPageWorkerGroupData,
+  type TagPageGroupSummary,
+} from './tagPageWorkerGroups';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse';
 import SessionChipSelector from '../Shared/SessionChipSelector';
 import { buildTagPagePath } from '../SurveyTool/QuestionTagDropdown';
@@ -143,18 +150,11 @@ const buildTagAiContentRevision = (questions: QuestionSummary[]): string =>
       ),
   );
 
-type SbtGroupSummary = {
-  address: string;
-  name: string;
-  image: string;
-  tags: string[];
-  sessionSlug: string;
-  networkId: string;
-};
-
 type TagPageViewProps = {
+  account?: unknown;
   isQuestionCacheReady?: boolean;
   network?: NetworkLike;
+  provider?: unknown;
   questionResponsesNonce?: number;
   sessionState?: SessionSelectionState;
   selectedTagsOverride?: string[] | string | null;
@@ -648,7 +648,7 @@ const collectSbtGroupData = ({
   scopeFilterMode?: FilterMode;
   scopeSlugs?: string[];
   cacheVersion?: number;
-} = {}): SbtGroupSummary[] => {
+} = {}): TagPageGroupSummary[] => {
   const normalizedSelectedTags = normalizeTagList(selectedTags);
   void cacheVersion;
   if (!normalizedSelectedTags.length) return [];
@@ -667,7 +667,7 @@ const collectSbtGroupData = ({
     ? entries.filter((entry) => scopeSlugSet.has(normalizeSessionSlug(entry?.slug)))
     : entries;
   const seen = new Set();
-  const sbtGroups: SbtGroupSummary[] = [];
+  const sbtGroups: TagPageGroupSummary[] = [];
 
   scopedEntries.forEach((entry) => {
     const sessionSlug = normalizeSessionSlug(entry?.slug || '');
@@ -708,7 +708,9 @@ const collectSbtGroupData = ({
         seen.add(dedupeKey);
 
         sbtGroups.push({
+          kind: 'sbt',
           address,
+          href: buildSbtDetailPath(address, sessionSlug),
           name: String(sbtInfo?.name || '').trim() || address,
           image: String(sbtInfo?.image || '').trim(),
           tags: displayTags,
@@ -727,8 +729,10 @@ const collectSbtGroupData = ({
 };
 
 export const TagPageView = ({
+  account = '',
   isQuestionCacheReady = true,
   network = null,
+  provider = null,
   questionResponsesNonce = 0,
   sessionState = {},
   selectedTagsOverride = null,
@@ -743,6 +747,8 @@ export const TagPageView = ({
   const navigate = useNavigate();
   const [cacheVersion, setCacheVersion] = useState(0);
   const [sbtCacheVersion, setSbtCacheVersion] = useState(0);
+  const [workerGroups, setWorkerGroups] = useState<TagPageGroupSummary[]>([]);
+  const [workerGroupsLoading, setWorkerGroupsLoading] = useState(false);
   const [tagPickerOpen, setTagPickerOpen] = useState(false);
   const [sessionSelectorOpen, setSessionSelectorOpen] = useState(false);
   const [expandedDemoEntryKeys, setExpandedDemoEntryKeys] = useState<Record<string, boolean>>({});
@@ -907,6 +913,58 @@ export const TagPageView = ({
       sessionRegistrySnapshot.slugs,
     ],
   );
+  const workerGroupSessionSlugs = useMemo(() => {
+    const candidates =
+      effectiveScopeState.filterMode === 'set'
+        ? effectiveScopeSlugs
+        : dedupeSessionSlugs([globalSessionSelection.primarySessionSlug || '', ...sessionRegistrySnapshot.slugs]);
+    return candidates.filter((slug) => {
+      const config = defaultTagPageWorkerGroupPorts.getSessionConfig(slug, sessionRegistrySnapshot.configsBySlug);
+      const projection = resolveSessionCapabilityProjection(config);
+      return projection.profileValid && projection.isWorkerCanonical && projection.usesWorkerGroups;
+    });
+  }, [
+    effectiveScopeSlugs,
+    effectiveScopeState.filterMode,
+    globalSessionSelection.primarySessionSlug,
+    sessionRegistrySnapshot.configsBySlug,
+    sessionRegistrySnapshot.slugs,
+  ]);
+
+  useEffect(() => {
+    if (isDemoCorpusContext || !selectedTags.length || !workerGroupSessionSlugs.length) {
+      setWorkerGroups([]);
+      setWorkerGroupsLoading(false);
+      return undefined;
+    }
+    let cancelled = false;
+    setWorkerGroupsLoading(true);
+    void loadTagPageWorkerGroupData({
+      account,
+      network,
+      provider,
+      selectedTags,
+      sessionConfigsBySlug: sessionRegistrySnapshot.configsBySlug,
+      sessionSlugs: workerGroupSessionSlugs,
+    }).then((nextGroups) => {
+      if (cancelled) return;
+      setWorkerGroups(nextGroups);
+      setWorkerGroupsLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    account,
+    effectiveScopeCacheKey,
+    isDemoCorpusContext,
+    network,
+    provider,
+    selectedTags,
+    selectedTagsCacheKey,
+    sessionRegistrySnapshot.configsBySlug,
+    workerGroupSessionSlugs,
+  ]);
 
   useEffect(() => {
     if (!routePinned) return;
@@ -1001,7 +1059,7 @@ export const TagPageView = ({
   const demoCorpusEntries = demoCorpusData.entries;
   const relatedTags = isDemoCorpusContext ? demoCorpusData.relatedTags : questionData.relatedTags;
   const pickerTags = isDemoCorpusContext ? demoCorpusData.pickerTags : questionData.pickerTags;
-  const sbtGroups = useMemo<SbtGroupSummary[]>(
+  const sbtGroups = useMemo<TagPageGroupSummary[]>(
     () =>
       isDemoCorpusContext
         ? []
@@ -1012,6 +1070,14 @@ export const TagPageView = ({
             cacheVersion: sbtCacheVersion,
           }),
     [effectiveScopeState.filterMode, effectiveScopeSlugs, isDemoCorpusContext, sbtCacheVersion, selectedTags],
+  );
+  const groups = useMemo(
+    () =>
+      [...sbtGroups, ...workerGroups].sort((left, right) => {
+        const nameCompare = left.name.localeCompare(right.name);
+        return nameCompare !== 0 ? nameCompare : left.address.localeCompare(right.address);
+      }),
+    [sbtGroups, workerGroups],
   );
   const showQuestionLoadingState = !isDemoCorpusContext && !isQuestionCacheReady && !questions.length;
   const demoCorpusEmptyText = useMemo(() => buildDemoCorpusEmptyText(selectedTags), [selectedTags]);
@@ -1421,17 +1487,17 @@ export const TagPageView = ({
               )}
             </section>
 
-            <section className={styles.section}>
+            <section className={styles.section} data-testid={E2E_TESTIDS.TAG_GROUPS_SECTION}>
               <div className={styles.sectionHeader}>
-                <h2 className={styles.sectionTitle}>SBT Groups</h2>
-                <span className={styles.sectionMeta}>{sbtGroups.length}</span>
+                <h2 className={styles.sectionTitle}>Groups</h2>
+                <span className={styles.sectionMeta}>{groups.length}</span>
               </div>
-              {sbtGroups.length ? (
+              {groups.length ? (
                 <div className={styles.sbtGroupList}>
-                  {sbtGroups.map((group) => (
+                  {groups.map((group) => (
                     <a
-                      key={`${group.sessionSlug || 'general'}-${group.networkId}-${group.address}`}
-                      href={buildSbtDetailPath(group.address, group.sessionSlug)}
+                      key={`${group.kind}-${group.sessionSlug || 'general'}-${group.networkId}-${group.address}`}
+                      href={group.href}
                       className={styles.sbtGroupCard}
                     >
                       {group.image ? <img src={group.image} alt="" className={styles.sbtGroupImage} /> : null}
@@ -1450,8 +1516,12 @@ export const TagPageView = ({
                     </a>
                   ))}
                 </div>
+              ) : workerGroupsLoading ? (
+                <p className={styles.emptyState} role="status">
+                  Loading groups...
+                </p>
               ) : (
-                <p className={styles.emptyState}>No SBT groups found with these tags.</p>
+                <p className={styles.emptyState}>No groups found with these tags.</p>
               )}
             </section>
 
@@ -1504,8 +1574,12 @@ export const TagPageView = ({
   );
 };
 
-const mapStateToProps = (state: RootState): Pick<TagPageViewProps, 'network' | 'sessionState'> => ({
+const mapStateToProps = (
+  state: RootState,
+): Pick<TagPageViewProps, 'account' | 'network' | 'provider' | 'sessionState'> => ({
+  account: state?.profile?.account || '',
   network: (state?.profile?.network || null) as NetworkLike,
+  provider: state?.profile?.provider || null,
   sessionState: (state?.sessionState || {}) as SessionSelectionState,
 });
 

@@ -48,6 +48,7 @@ export type WorkerGroupMembershipPanelProps = {
   sessionSlug?: string;
   allowAnonymousGroupDiscovery?: boolean;
   onSignIn?: () => void;
+  onGroupsChanged?: () => void;
   selectedGroupId?: string;
   showDescriptions?: boolean;
   showListHeader?: boolean;
@@ -147,6 +148,7 @@ const WorkerGroupMembersModal = ({
     </button>
   );
   const showCount = Number.isSafeInteger(memberCount) && Number(memberCount) >= 0;
+  const memberDirectoryUnavailable = error === 'worker_group_member_directory_unavailable';
 
   return (
     <Modal
@@ -175,7 +177,11 @@ const WorkerGroupMembersModal = ({
             </div>
           ) : null}
           {status === 'error' ? (
-            <div className={sbtPageStyles.emptyState}>Members could not be loaded ({error}).</div>
+            <div className={sbtPageStyles.emptyState}>
+              {memberDirectoryUnavailable
+                ? 'Individual members are not available from this session’s current Worker. The total member count is still available.'
+                : `Members could not be loaded (${error}).`}
+            </div>
           ) : null}
           {status === 'ready' && members.length === 0 ? (
             <div className={sbtPageStyles.emptyState}>No members found.</div>
@@ -340,7 +346,7 @@ const WorkerGroupDetailView = ({
               )}
             </div>
           </div>
-          <div className={sbtPageStyles.description}>
+          <div className={`${sbtPageStyles.description} ${styles.workerGroupDetailDescription}`}>
             <h1 id={titleId}>{group.label}</h1>
             {group.description ? <p id={descriptionId}>{group.description}</p> : null}
           </div>
@@ -463,6 +469,7 @@ const WorkerGroupMembershipPanel = ({
   sessionSlug: sessionSlugProp = '',
   allowAnonymousGroupDiscovery = false,
   onSignIn,
+  onGroupsChanged,
   selectedGroupId: selectedGroupIdProp = '',
   showDescriptions = true,
   showListHeader = true,
@@ -730,13 +737,15 @@ const WorkerGroupMembershipPanel = ({
       setMembershipStatusState({ targetKey: mutationTargetKey, status: `Joined ${group.label}.` });
       memberListRequestIdRef.current += 1;
       setMemberListState(emptyMemberListState(mutationTargetKey, group.groupId));
+      const resultMemberCount = Number.isSafeInteger(result.memberCount) ? Number(result.memberCount) : undefined;
       applyConfirmedMembership({
         mutationTargetKey,
         group: result.group as WorkerGroup,
-        memberCount: Number(result.memberCount),
+        memberCount: resultMemberCount,
         isMember: true,
         retainGroup: true,
       });
+      onGroupsChanged?.();
     } catch (joinError) {
       if (!isMembershipMutationCurrent(mutation)) return;
       setViewState((current) => ({
@@ -778,6 +787,7 @@ const WorkerGroupMembershipPanel = ({
         isMember: false,
         retainGroup: Boolean(retainedGroup),
       });
+      onGroupsChanged?.();
     } catch (leaveError) {
       if (!isMembershipMutationCurrent(mutation)) return;
       setViewState((current) => ({
@@ -875,7 +885,9 @@ const WorkerGroupMembershipPanel = ({
   if (selectedGroupId) {
     return (
       <section className={styles.workerGroupsListPanel} data-testid="ce-session-worker-groups">
-        {status === 'loading' ? <div className={styles.telegramListEmpty}>Loading group…</div> : null}
+        {status === 'loading' ? (
+          <div className={`${styles.telegramListEmpty} ${styles.workerGroupsLoadingState}`}>Loading group…</div>
+        ) : null}
         {error ? <div className={styles.telegramListEmpty}>{error}</div> : null}
         {membershipStatus ? (
           <div className={styles.telegramReportApprox} role="status">
@@ -932,7 +944,9 @@ const WorkerGroupMembershipPanel = ({
           </button>
         </div>
       ) : null}
-      {status === 'loading' ? <div className={styles.telegramListEmpty}>Loading groups…</div> : null}
+      {status === 'loading' ? (
+        <div className={`${styles.telegramListEmpty} ${styles.workerGroupsLoadingState}`}>Loading groups…</div>
+      ) : null}
       {error ? <div className={styles.telegramListEmpty}>{error}</div> : null}
       {membershipStatus ? (
         <div className={styles.telegramReportApprox} role="status">

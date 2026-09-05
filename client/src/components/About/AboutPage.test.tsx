@@ -475,6 +475,9 @@ describe('AboutPage', () => {
       /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)\s*{[\s\S]*?\.aboutPageContainer\s*{[\s\S]*?font-family:\s*var\(--ce-font-body\);/,
     );
     expect(scss).toMatch(
+      /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)\s*{[\s\S]*?\.recognitionModalTitle\s*{[\s\S]*?color:\s*var\(--ce-titlebar-text\);/,
+    );
+    expect(scss).toMatch(
       /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)\s*{[\s\S]*?\.heroPrimaryButton,\s*\.tertiaryLink,\s*\.titleRepoLink\s*{[\s\S]*?border:\s*2px solid;[\s\S]*?box-shadow:\s*var\(--ce-shadow-raised\);[\s\S]*?font-family:\s*var\(--ce-font-body\);/,
     );
     expect(scss).toMatch(/\.heroPrimaryButton\s*{[\s\S]*?min-width:\s*148px;[\s\S]*?min-height:\s*48px;/);

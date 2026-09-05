@@ -84,7 +84,11 @@ the settings that most sessions can leave at their defaults. **Session colors**
 is the final field group and starts collapsed there; expand it to choose a
 curated color scheme and see its preview. **Who can create groups?** is a
 dropdown in the same area, constrained to **All participants** or **Admins
-only** rather than accepting freeform config text.
+only** rather than accepting freeform config text. **Voice interview modes**
+defaults on. Its adjacent **Interview voice settings** group exposes the
+OpenAI **Realtime voice model**, defaulting to `gpt-realtime-2.1`; `/new`
+publishes this as `interviewMode.realtimeModel` for both Worker-canonical and
+Arweave-backed sessions.
 
 The optional **Session end time** is a timestamp for Worker-canonical sessions.
 It must be in the future when the session is published. At that instant the
@@ -377,6 +381,8 @@ AI configuration also lives in the session metadata draft:
 - `ai.models.fast`
 - `ai.models.thinking`
 - `ai.models.transcription`
+- `interviewMode.realtimeModel` (OpenAI Realtime voice; defaults to
+  `gpt-realtime-2.1`)
 
 What gets stored where:
 
@@ -444,8 +450,24 @@ version-1 `workerAuthority` policy. It does not require an SBT, registry, RPC,
 or Lit key. Participant and anonymous scopes, plus any login gate, are evaluated
 by the session worker.
 
-After publishing a worker-canonical session, its Groups section manages native
-Cloudflare records. The worker admin supplies the group name, optional
+Before publishing a worker-canonical session, the **Session Access** section can
+queue Groups through the same form used by normal Worker Group creation. Each
+draft supports a name, description, image URL or local image file, tags, public
+HTTPS reference URLs, member limit, self-join deadline, group-admin address,
+join mode, and member visibility. Durable text and URL metadata stays in the
+recoverable browser wizard state. A selected local image file stays only in the
+current tab; after the canonical Worker origin, slug, and session ID are
+verified, publish uploads it through the selected session storage and writes
+the resulting public URL back into the draft before creating the Group. Publish
+then creates queued Groups with stable IDs and merges the session's default
+Group tags with each draft's tags. If creation is interrupted, retrying reuses
+an identical already-created ID and continues instead of duplicating it. A
+conflicting record, failed image upload, or other Worker error leaves the
+wizard recoverable and reports the failure instead of marking the session
+complete.
+
+After publishing, the session's Groups section manages those native Cloudflare
+records and adds the full editing surface. The worker admin supplies the group name, optional
 description and HTTPS image, tags, public HTTPS reference URLs, an optional
 per-group member limit, an optional self-join deadline, group-admin address,
 join mode, and visibility. The deadline closes participant self-join; configured

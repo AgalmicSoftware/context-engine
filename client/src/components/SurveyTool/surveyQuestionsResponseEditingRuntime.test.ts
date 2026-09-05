@@ -156,6 +156,36 @@ describe('surveyQuestionsResponseEditingRuntime', () => {
     expect(afterUpdate).toHaveBeenCalledTimes(1);
   });
 
+  it('completes no-op response callbacks so sequenced draft application cannot stall', () => {
+    const afterAnswer = jest.fn();
+    const afterAdditional = jest.fn();
+    const afterConviction = jest.fn();
+    const afterImportance = jest.fn();
+    const context = createContext({
+      stateRef: createStateRef({
+        surveysResponseState: [
+          {
+            answers: {},
+            additionalComments: {},
+            conviction: { q1: 70 },
+            importance: { q1: 80 },
+          },
+        ],
+      }),
+    });
+    const runtime = createSurveyQuestionsResponseEditingRuntime(context);
+
+    runtime.handleAnswer(0, 'q1', 'same', { afterUpdate: afterAnswer });
+    runtime.handleAdditional(0, 'q1', 'same', { afterUpdate: afterAdditional });
+    runtime.handleConviction(0, 'q1', 70, { afterUpdate: afterConviction });
+    runtime.handleImportance(0, 'q1', 80, { afterUpdate: afterImportance });
+
+    expect(afterAnswer).toHaveBeenCalledTimes(1);
+    expect(afterAdditional).toHaveBeenCalledTimes(1);
+    expect(afterConviction).toHaveBeenCalledTimes(1);
+    expect(afterImportance).toHaveBeenCalledTimes(1);
+  });
+
   it('routes answer encryption toggles through the normalized builder input', () => {
     const toggleInputs: SurveyQuestionsLegacyRecord[] = [];
     const buildAnswerEncryptionToggleResponseState = jest.fn((prev, input) => {

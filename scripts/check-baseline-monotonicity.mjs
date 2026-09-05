@@ -144,10 +144,12 @@ function toFiniteCount(value, pattern, baselinePath) {
 function typeDebtIncreases(baseBaseline, currentBaseline) {
   const baseCounts = baseBaseline?.counts || {};
   const currentCounts = currentBaseline?.counts || {};
-  const patterns = [...new Set([
-    ...Object.keys(baseCounts),
-    ...Object.keys(currentCounts),
-  ])].sort();
+  // A newly introduced metric has no historical value to compare against.
+  // Its first checked-in count establishes the baseline; subsequent changes
+  // are monotonic because the metric is then present on both sides.
+  const patterns = Object.keys(currentCounts)
+    .filter((pattern) => Object.prototype.hasOwnProperty.call(baseCounts, pattern))
+    .sort();
 
   return patterns.flatMap((pattern) => {
     const base = toFiniteCount(baseCounts[pattern], pattern, TYPE_DEBT_BASELINE);

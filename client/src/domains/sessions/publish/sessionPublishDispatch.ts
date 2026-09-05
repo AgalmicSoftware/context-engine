@@ -9,6 +9,7 @@ export type SessionPublishExecutionPlanInput = {
   shouldAutoDeployWorker?: boolean;
   shouldDeployPendingSbts?: boolean;
   shouldPersistWorkerConfig?: boolean;
+  shouldCreateWorkerGroups?: boolean;
   shouldUploadMetadata?: boolean;
   shouldRegisterSession?: boolean;
   shouldRefreshRegistryCache?: boolean;
@@ -33,6 +34,7 @@ export const buildSessionPublishReducerPlan = (
   autoDeployWorker: !!publishExecutionPlan.shouldAutoDeployWorker,
   deployPendingSbts: !!publishExecutionPlan.shouldDeployPendingSbts,
   persistWorkerConfig: !!publishExecutionPlan.shouldPersistWorkerConfig,
+  createWorkerGroups: !!publishExecutionPlan.shouldCreateWorkerGroups,
   uploadMetadata: !!publishExecutionPlan.shouldUploadMetadata,
   registerSession: publishExecutionPlan.shouldRegisterSession !== false,
   refreshRegistryCache: publishExecutionPlan.shouldRefreshRegistryCache !== false,

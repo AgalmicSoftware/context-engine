@@ -1,14 +1,11 @@
 #!/usr/bin/env node
+import { safeString } from './runtimePrimitives.mjs';
 
 import { performance } from 'node:perf_hooks';
 
 const DEFAULT_PRINCIPALS = 200;
 const DEFAULT_CONCURRENCY = 25;
 const DEFAULT_TIMEOUT_MS = 15000;
-
-function safeString(value) {
-  return String(value || '').trim();
-}
 
 function parseArgs(argv = process.argv.slice(2), env = process.env) {
   const flags = {};

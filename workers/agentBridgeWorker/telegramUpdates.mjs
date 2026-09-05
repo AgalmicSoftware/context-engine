@@ -1,7 +1,6 @@
+import { safeString } from './runtimePrimitives.mjs';
 import { TELEGRAM_CHAT_LANES } from './constants.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
-
-const safeString = (value) => String(value || '').trim();
 
 export function normalizeTelegramMockUpdate(update = {}) {
   const message = update.message || null;

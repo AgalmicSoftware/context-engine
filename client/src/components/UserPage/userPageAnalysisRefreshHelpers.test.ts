@@ -438,6 +438,7 @@ describe('userPage analysis refresh helpers', () => {
       analysisElapsedMs: 250,
     });
     const sessionConfig = { ai: { provider: 'openai' } };
+    const context = { account: '0x123', chainId: 84532 };
     expect(
       buildUserPageAnalysisAiOptions({
         analysisSession: {
@@ -446,10 +447,13 @@ describe('userPage analysis refresh helpers', () => {
           status: 'allowed',
           reason: 'selected',
         },
+        context,
       }),
     ).toEqual({
+      context,
       sessionSlug: 'analysis-session',
       sessionConfig,
+      throwOnError: true,
       sessionSelection: {
         gateStatus: 'allowed',
         reason: 'selected',
@@ -463,8 +467,10 @@ describe('userPage analysis refresh helpers', () => {
         defaultReason: 'fallback-gate-unavailable',
       }),
     ).toEqual({
+      context: undefined,
       sessionSlug: '',
       sessionConfig,
+      throwOnError: true,
       sessionSelection: {
         gateStatus: 'unknown',
         reason: 'fallback-gate-unavailable',

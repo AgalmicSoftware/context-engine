@@ -14,6 +14,7 @@ export type SessionWizardPublishExecutionPlanLike = {
   shouldAutoDeployWorker?: boolean;
   shouldDeployPendingSbts?: boolean;
   shouldPersistWorkerConfig?: boolean;
+  shouldCreateWorkerGroups?: boolean;
   shouldUploadMetadata?: boolean;
   stepNumbers?: Record<string, number>;
 };

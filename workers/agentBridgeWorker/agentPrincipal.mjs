@@ -1,11 +1,9 @@
+import { safeString } from './runtimePrimitives.mjs';
+
 export const AGENT_PRINCIPAL_KINDS = Object.freeze({
   USER: 'user',
   SERVICE: 'service',
 });
-
-function safeString(value) {
-  return String(value || '').trim();
-}
 
 function randomSecret(byteLength = 18) {
   const bytes = new Uint8Array(byteLength);

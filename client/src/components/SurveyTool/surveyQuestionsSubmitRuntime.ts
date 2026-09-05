@@ -11,6 +11,7 @@ import type {
   SurveyQuestionsSubmitStartControllerResult,
 } from './surveyQuestionsSubmitController.js';
 import { resolveSurveyToolWorkerTargetSignature } from './surveyToolWorkerCacheIsolation.js';
+import { captureInterviewPredictionComparisonSubmissions } from './surveyToolResponsePayloadController.js';
 
 export type SurveyQuestionsSubmitRuntime = SurveyQuestionsLegacyRecord;
 
@@ -304,6 +305,7 @@ export const createSurveyQuestionsSubmitRuntime = (
         importance: {},
         conviction: {},
       };
+      activeSlice = captureInterviewPredictionComparisonSubmissions(activeSlice, changedQids);
 
       // Only encrypt when there are changed encrypted fields
       const pendingStats: SurveyQuestionsSubmitPendingStats = resolveSurveyQuestionsSubmitPendingStats({
@@ -489,10 +491,11 @@ export const createSurveyQuestionsSubmitRuntime = (
             });
             if (!isSubmitContextCurrent(submitContext)) return;
 
-            if (
-              !cacheWriteResult?.questionCacheWritten &&
-              typeof propsRef.current.refreshQuestionResponses === 'function'
-            ) {
+            // Worker write-through updates IndexedDB directly, so there is no chain event to advance
+            // MainSite's response nonce. Rehydrate once to publish that revision to live Results views.
+            const shouldRefreshQuestionResponses =
+              !cacheWriteResult?.questionCacheWritten || !!submitContext.workerTargetKey;
+            if (shouldRefreshQuestionResponses && typeof propsRef.current.refreshQuestionResponses === 'function') {
               const ids: SurveyQuestionsLegacyValue = Array.from(changedQids)
                 .map((id: SurveyQuestionsLegacyValue) => normalizeQuestionIdKey(id))
                 .filter(Boolean);

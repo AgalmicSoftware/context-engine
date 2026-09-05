@@ -173,6 +173,7 @@ describe('SurveySelector display guards', () => {
 
     expect(toolbar).toBeTruthy();
     expect(nodeHasClassName(toolbar, styles.embeddedSessionToolbar)).toBe(true);
+    expect(nodeHasClassName(toolbar, styles.toolbarWithoutSubmit)).toBe(true);
   });
 
   it('renders the SurveySelector header submit CTA with submitGlow when pending edits exist', () => {
@@ -184,6 +185,7 @@ describe('SurveySelector display guards', () => {
       singleQuestionMode: false,
       network: { id: 84532 },
       activeSessionSlug: 'edge',
+      embeddedSessionToolbar: true,
     });
     syncClassSetState(subject);
     subject.state = {
@@ -204,9 +206,12 @@ describe('SurveySelector display guards', () => {
       tree,
       (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_SUBMIT,
     );
+    const toolbar = findElement(tree, (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_TOOLBAR);
 
     expect(headerSubmitButton).toBeTruthy();
     expect(nodeHasClassName(headerSubmitButton, styles.headerSubmitButton)).toBe(true);
     expect(nodeHasClassName(headerSubmitButton, styles.submitGlow)).toBe(true);
+    expect(nodeHasClassName(toolbar, styles.embeddedSessionToolbar)).toBe(true);
+    expect(nodeHasClassName(toolbar, styles.toolbarWithoutSubmit)).toBe(false);
   });
 });

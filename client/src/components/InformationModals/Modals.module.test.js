@@ -119,6 +119,22 @@ describe('Modals contrast styles', () => {
     );
   });
 
+  it('compresses welcome copy on short compact-desktop panes', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'Modals.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /@media \(min-width:\s*769px\) and \(max-width:\s*1366px\)\s*\{[\s\S]*?\.welcomeSlideBulletText\s*\{[\s\S]*?font-size:\s*0\.9em !important;/,
+    );
+  });
+
+  it('compresses welcome copy in compact windows', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'Modals.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /@media \(min-width:\s*466px\) and \(max-width:\s*768px\)\s*\{[\s\S]*?\.welcomeSlideBulletText\s*\{[\s\S]*?font-size:\s*0\.95em !important;/,
+    );
+  });
+
   it('resolves both welcome decks through semantic artwork blend tokens', () => {
     const embeddedDeck = fs.readFileSync(path.join(__dirname, 'Modals.module.scss'), 'utf8');
     const overlayDeck = fs.readFileSync(path.resolve(__dirname, '../Onboarding/OnboardingOverlay.module.scss'), 'utf8');
@@ -136,7 +152,7 @@ describe('Modals contrast styles', () => {
     expect(contextTheme).toContain('welcome-artwork-blend-cutout: screen,');
     expect(classicTheme).toContain('welcome-artwork-blend-soft: normal,');
     expect(classicTheme).toContain('welcome-artwork-blend-intense: normal,');
-    expect(classicTheme).toContain('welcome-artwork-blend-cutout: normal,');
+    expect(classicTheme).toContain('welcome-artwork-blend-cutout: screen,');
     expect(contextTheme).toContain('welcome-artwork-detail-opacity-scale: 1,');
     expect(contextTheme).toContain('welcome-artwork-detail-filter: grayscale(0) contrast(1),');
     expect(classicTheme).toContain('welcome-artwork-detail-opacity-scale: 0.68,');

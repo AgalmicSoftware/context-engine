@@ -1,10 +1,8 @@
+import { safeString } from './runtimePrimitives.mjs';
+
 const SESSION_SLUG_RE = /^[a-z0-9_-]{1,128}$/;
 const ELIGIBLE_PRINCIPAL_KINDS = new Set(['evm_address', 'passkey_account']);
 export const SESSION_WORKER_MEMBER_EXCHANGE_KV_PREFIX = 'agent:member-exchange:v1:';
-
-function safeString(value) {
-  return String(value || '').trim();
-}
 
 function parseJsonObject(value = '') {
   try {

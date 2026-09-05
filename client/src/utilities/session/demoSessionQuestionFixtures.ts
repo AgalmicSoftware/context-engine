@@ -44,6 +44,7 @@ const DEMO_FIXTURES_BY_SLUG: Readonly<Record<string, DemoFixtureRegistryEntry>> 
     sourceSessionSlug: 'demo-2',
   },
   'demo-sh': LEGACY_DEMO_FIXTURE,
+  'demo-interview': LEGACY_DEMO_FIXTURE,
 });
 
 const uniqueStrings = (values: unknown[]): string[] => {
@@ -60,8 +61,12 @@ const uniqueStrings = (values: unknown[]): string[] => {
   return out;
 };
 
-const readCommentPollOptions = (fixture: DemoFixtureRegistryEntry, comment: DemoComment): string[] =>
-  fixture === LEGACY_DEMO_FIXTURE
+const readCommentPollOptions = (
+  fixture: DemoFixtureRegistryEntry,
+  comment: DemoComment,
+  targetSlug: string,
+): string[] =>
+  fixture === LEGACY_DEMO_FIXTURE && targetSlug !== 'demo-interview'
     ? [...LEGACY_DEMO_POLL_OPTIONS]
     : uniqueStrings(Array.isArray(comment.options) ? comment.options : []);
 
@@ -127,7 +132,7 @@ const buildDemoQuestionFromComment = (
     },
   };
   if (type === 'multichoice') {
-    question.options = readCommentPollOptions(fixture, comment);
+    question.options = readCommentPollOptions(fixture, comment, targetSlug);
     question.singleSelect = true;
   }
   if (type === 'rating' && comment.scale && typeof comment.scale === 'object' && !Array.isArray(comment.scale)) {

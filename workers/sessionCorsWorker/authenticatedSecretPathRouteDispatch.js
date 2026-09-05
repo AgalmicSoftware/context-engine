@@ -1,6 +1,7 @@
 import { readArweaveUploadRequestPayload } from './arweaveUploadRequestNormalization.js';
 import { resolveMaxUploadBytes } from './uploadSizeLimits.js';
 import { workerGroupsRoute as workerGroupsRouteBoundary } from './workerGroups.js';
+import { loadPublicInterviewQuestions as loadPublicInterviewQuestionsBoundary } from './interviewQuestionCatalog.js';
 import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
 
 export const dispatchAuthenticatedSecretPathRoute = async ({
@@ -18,6 +19,7 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
 } = {}) => {
   const isTranscribeRoute = path === '/transcribe' && method === 'POST';
   const isArweaveUploadRoute = path === '/arweave/upload' && method === 'POST';
+  const isAgentQuestionsRoute = path === '/api/agent/questions' && method === 'GET';
   const isStorageRoute = (
     (path === '/storage/upload' && method === 'POST') ||
     (path === '/storage/read' && (method === 'GET' || method === 'POST')) ||
@@ -32,8 +34,14 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
     (path === '/groups/join' && method === 'POST') ||
     (path === '/groups/leave' && method === 'POST')
   );
-  if (!isTranscribeRoute && !isArweaveUploadRoute && !isStorageRoute && !isWorkerGroupsRoute) {
+  if (!isTranscribeRoute && !isArweaveUploadRoute && !isStorageRoute && !isWorkerGroupsRoute && !isAgentQuestionsRoute) {
     return { handled: false };
+  }
+  if (isAgentQuestionsRoute && config?.sessionModeProfile?.surfaces?.agentHttp !== true) {
+    return {
+      handled: true,
+      response: deps?.json?.({ error: 'Agent HTTP is disabled for this session.' }, 404, headers),
+    };
   }
   const isParticipantWrite = (
     isTranscribeRoute ||
@@ -55,7 +63,7 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
 
   const route = isTranscribeRoute
     ? 'transcribe'
-    : (isStorageRoute ? 'storage' : (isWorkerGroupsRoute ? 'groups' : 'arweave'));
+    : ((isStorageRoute || isAgentQuestionsRoute) ? 'storage' : (isWorkerGroupsRoute ? 'groups' : 'arweave'));
   const scope = route === 'storage' && scopes?.storage !== true ? 'arweave' : route;
   const preflight = await deps?.evaluateAuthenticatedRoutePreflight?.({
     scopes,
@@ -77,6 +85,37 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
     return {
       handled: true,
       response: preflight?.response,
+    };
+  }
+
+  if (isAgentQuestionsRoute) {
+    const loadPublicInterviewQuestions = deps?.loadPublicInterviewQuestions || loadPublicInterviewQuestionsBoundary;
+    const questions = await loadPublicInterviewQuestions({
+      env,
+      config,
+      slug,
+      storageRoute: deps?.storageRoute,
+      fetch: deps?.fetch,
+    });
+    const url = new URL(request.url);
+    const requestedLimit = Number(url.searchParams.get('limit') || url.searchParams.get('count') || 0);
+    const limitCount = Number.isFinite(requestedLimit) && requestedLimit > 0
+      ? Math.min(100, Math.floor(requestedLimit))
+      : questions.length;
+    const responseHeaders = new Headers(headers || {});
+    responseHeaders.set('cache-control', 'no-store');
+    return {
+      handled: true,
+      response: deps?.json?.({
+        ok: true,
+        sessionSlug: slug,
+        questions: questions.slice(0, limitCount).map((question) => ({
+          questionId: question.id,
+          prompt: question.prompt,
+          questionType: question.type,
+          options: question.options,
+        })),
+      }, 200, responseHeaders),
     };
   }
 

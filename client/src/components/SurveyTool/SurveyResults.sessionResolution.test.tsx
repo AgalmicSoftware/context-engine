@@ -11,6 +11,11 @@ import {
 } from './surveyResultsSessionResolution';
 import { renderSurveyResults } from './surveyResultsTestHarness';
 import { getPolisDemoQuestionPool } from './surveyPolisDemoQuestionPool';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
+import {
+  resolveWorkerCanonicalCacheIdentity,
+  withWorkerCanonicalCacheIdentity,
+} from '../../utilities/survey/workerCanonicalCacheIdentity';
 
 const cacheScripts: any = cacheScriptsModule;
 const sessionScanScope: any = sessionScanScopeModule;
@@ -316,6 +321,65 @@ afterEach(() => {
 });
 
 describe('SurveyResults session resolution', () => {
+  it('hydrates pure Worker question and response totals without a chain ID or RPC read', async () => {
+    const sessionConfig = {
+      slug: 'worker-session',
+      sessionId: `0x${'1'.repeat(32)}`,
+      corsWorkerUrl: 'https://results-worker.example.test',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      storageProfile: {
+        backend: 'cloudflare',
+        resources: { questions: 'active', surveys: 'active' },
+        payloadAccessControl: {
+          gate: 'role_gate',
+          encryption: 'worker_envelope',
+          mode: 'authorized_read',
+        },
+      },
+    };
+    const identity = resolveWorkerCanonicalCacheIdentity({
+      sessionConfig,
+      sessionSlug: 'worker-session',
+    });
+    seedCacheEnvironment({
+      questionsBySlug: {
+        'worker-session': {
+          worker: withWorkerCanonicalCacheIdentity(
+            {
+              questionsLatestBlock: 0,
+              questionResponsesLatestBlock: 0,
+              questions: {
+                qWorker: { id: 'qWorker', prompt: 'Worker-only question', type: 'freeform' },
+              },
+              questionResponses: {
+                qWorker: {
+                  [RESPONDER_ONE]: { answer: { value: 'Worker-only answer', encrypted: false } },
+                },
+              },
+            },
+            identity,
+          ),
+        },
+      },
+    });
+
+    renderQuestionResults(
+      {
+        activeSessionSlug: 'worker-session',
+        network: { id: null, chainId: null },
+        networkChainId: null,
+        sessionConfig,
+        sessionSlug: 'worker-session',
+        sessionSlugPinned: true,
+      },
+      '/session/worker-session/questions/results',
+    );
+
+    await waitForPrompt('Worker-only question');
+    expectQuestionResponseCounts(1, 1);
+    expect(contractScriptsDefault.getLatestBlockNumber).not.toHaveBeenCalled();
+  });
+
   it('does not rewrite route-owned results URLs on unmount', async () => {
     seedCacheEnvironment();
     const view = renderQuestionResults(

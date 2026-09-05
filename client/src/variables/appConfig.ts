@@ -35,9 +35,6 @@ export const CE_DEFAULT_THEME = readPublicEnv('REACT_APP_CE_DEFAULT_THEME', 'con
 // Opt-in exposure gate. Keep false until the deployment's route and
 // accessibility matrix has passed for every bundled app theme.
 export const CE_THEME_SELECTOR_ENABLED = readPublicBoolEnv('REACT_APP_CE_THEME_SELECTOR_ENABLED', true);
-// MetaMask/RainbowKit is excluded from the default passkey-only client bundle.
-// Deployments that need browser-wallet login must opt in at build time.
-export const CE_ENABLE_METAMASK_CONNECTOR = readPublicBoolEnv('REACT_APP_CE_ENABLE_METAMASK_CONNECTOR', false);
 // RainbowKit's MetaMask wallet falls back to WalletConnect when MetaMask is not injected.
 // Keep that external bridge opt-in so local startup does not open WalletConnect sockets.
 export const CE_ENABLE_WALLETCONNECT_FALLBACK = readPublicBoolEnv('REACT_APP_CE_ENABLE_WALLETCONNECT_FALLBACK', false);
@@ -83,7 +80,6 @@ export const CE_USE_INFURA_RPC = readPublicBoolEnv('REACT_APP_CE_USE_INFURA_RPC'
 // - "fallback" (default): keep existing fallback ordering
 // - "infura_only": Base Sepolia providers use the configured paid RPC only (diagnostics)
 export const CE_RPC_PROVIDER_MODE = readPublicEnv('REACT_APP_CE_RPC_PROVIDER_MODE', 'fallback');
-export const TERMINOLOGY_MODE = readPublicEnv('REACT_APP_TERMINOLOGY_MODE', 'plain');
 // Bounded concurrency for getLogs split scans (lower is safer against RPC storms).
 export const CE_GETLOGS_MAX_CONCURRENCY = readPublicIntEnv('REACT_APP_CE_GETLOGS_MAX_CONCURRENCY', 1);
 // Retry cap for eth_getLogs requests (separate from the generic retry wrapper).

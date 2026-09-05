@@ -4,6 +4,8 @@
 separate from `workers/sessionCorsWorker/` and ships as part of the public
 worker surface. Direct HTTPS agents work without Telegram; Telegram is an
 optional adapter that adds bot, Mini App, and chat-specific interactions.
+This README records the public cross-transport HTTP/JSON contract together
+with Agent Bridge and Telegram-specific deployment behavior.
 
 ## Boundary
 
@@ -54,7 +56,11 @@ The bridge has one versioned `ceagt_` credential model:
 - `POST /api/agent/invite/onboard` redeems a configured invite once from the
   JSON request body. Telegram fields are optional. Without them, the worker
   creates an opaque user principal and the same managed testnet account and
-  credential used by other agents.
+  credential used by other agents. Redemption is reserved and finalized by
+  the token-hash-named `AGENT_INVITE_COORDINATOR` Durable Object, so concurrent
+  requests cannot mint two credentials. Missing coordinator authority fails
+  closed. A read-only compatibility check continues to reject redemption
+  records written by the former KV implementation during rollout.
 - `POST /api/agent/client-login/exchange` accepts only a source user or service
   credential for the Bridge audience. It returns a short-lived Bridge browser
   credential and a separate session-worker JWT; the child credential cannot be
@@ -607,7 +613,7 @@ Required values:
 | `DEMO_SIGNER_ROOT_SECRET` random high-entropy string          | Paste into `.dev.vars`; `deploy:apply -- --apply` writes deployed Worker secret `DEMO_SIGNER_ROOT_SECRET`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `AGENT_BRIDGE_AGENT_API_TOKEN` random high-entropy string     | Paste into `.dev.vars`; `deploy:apply -- --apply` writes the root/bootstrap and break-glass secret. Use it to mint named service credentials; do not distribute it as an integration token                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | Production web client origins                                 | Set `AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS=https://contextengine.sh,https://www.contextengine.sh,https://contextengine.xyz,https://www.contextengine.xyz` so the canonical `.sh` clients can exchange agent credentials and read result-view cache entries while the redirecting `.xyz` origins remain compatible during migration. Result-view cache writes require root authority. Add Mini App origins to `AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS`; those origins are also accepted for client-login exchanges                                                                                                                                                                                                                                                                  |
-| Optional one-time onboarding invite                           | Store a SHA-256 hash in `AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITE_TOKEN_HASHES`, or use `AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON` records with `tokenHash`, `sessionSlug`, `label`, and `source`. The agent sends the plaintext invite only in the JSON body of `POST /api/agent/invite/onboard`. Telegram identity may be included by a Telegram adapter but is not required                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Optional one-time onboarding invite                           | Store a SHA-256 hash in `AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITE_TOKEN_HASHES`, or use `AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON` records with `tokenHash`, `sessionSlug`, `label`, and `source`. The agent sends the plaintext invite only in the JSON body of `POST /api/agent/invite/onboard`. Telegram identity may be included by a Telegram adapter but is not required. `deploy:apply` binds `AGENT_INVITE_COORDINATOR`; redemption fails closed if that atomic authority is unavailable                                                                                                                                                                                                                                                                                                                  |
 | Optional OpenAI key for Telegram AI                           | Paste into untracked `.dev.vars` as `AGENT_BRIDGE_OPENAI_API_KEY` or `OPENAI_API_KEY`; `deploy:apply -- --apply` writes deployed Worker secret `AGENT_BRIDGE_OPENAI_API_KEY`. Telegram question generation, AI search, add-question formatting, group analysis, and transcription pass it as a request-local `apiKey` to the configured session worker when that session worker has no per-session `openaiKey` secret                                                                                                                                                                                                                                                                                                                                                                |
 | Optional OpenAI key for Wrapped posters                       | The deterministic local SVG renderer is the default and needs no key. To opt into OpenAI poster generation, set `AGENT_BRIDGE_WRAPPED_POSTER_RENDERER=openai` and provide only `AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY`; the deploy helper writes that separately named Worker secret and never copies the general Bridge or session-Worker AI key into it                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | Public deployed `agentBridgeWorker` URL                       | Paste or derive the Workers.dev base URL as `AGENT_BRIDGE_PUBLIC_URL`, for example `https://ce-agent-bridge-worker.<workers-subdomain>.workers.dev`; live apply can derive it when the token can read the account workers.dev subdomain                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
@@ -668,7 +674,10 @@ callback data.
 The command handler uses `AGENT_BRIDGE_SESSION_POLICY_JSON` as the explicit
 Telegram session list when it is configured. Telegram-visible sessions must set
 both `telegramBridgeEnabled=true` and `telegramOnly=true`; standard registry
-sessions are not listed just because they exist on-chain. The policy can carry
+sessions are not listed just because they exist on-chain. When neither explicit
+policy nor registry discovery yields a session, the bridge exposes no linked
+sessions and read-only risk instead of inventing a privileged `general`
+session. The policy can carry
 preloaded `questions` for Cloudflare-native Telegram-only sessions, or point at
 a Cloudflare-backed session worker through `sessionWorkerUrl` plus
 `storageProfile.backend="cloudflare"` so the bridge can load
@@ -856,9 +865,11 @@ configured `TELEGRAM_BOT_TOKEN` before generating stateful question actions or
 trusting Telegram user/chat/session identity on write endpoints. Treat
 `initDataUnsafe`, `web_app_data`, and all browser-submitted fields as untrusted
 client input until validated server-side.
-When `TELEGRAM_BOT_TOKEN` is absent, local tests/previews use a preview auth
-principal. When the bot token is configured, Mini App init data is always
-required; there is no deployable preview-auth bypass.
+When `TELEGRAM_BOT_TOKEN` is absent, Mini App authorization fails closed unless
+local tests/previews explicitly set
+`AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH=true`. The deploy helper rejects that
+local-only flag, so deployed Mini App requests always require a bot token and
+valid init data.
 `AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS` controls accepted init-data age and
 defaults to 24 hours.
 
@@ -1234,7 +1245,9 @@ or caller-selected origins fail before any mutation. This guarantees the
 registry/default fallback in the generic policy loader cannot activate for a
 dedicated Bridge.
 
-- Workers script upload with vars and bindings.
+- Workers script upload with vars, KV, and the mandatory
+  `AGENT_INVITE_COORDINATOR` Durable Object binding. The coordinator stores
+  only token/credential hashes and identifiers, never bearer values.
 - KV namespace for opaque action IDs and webhook replay cache.
 - R2 bucket for demo artifacts only when `AGENT_BRIDGE_ENABLE_DOC_STORAGE=true`
   or `--enable-doc-storage`.

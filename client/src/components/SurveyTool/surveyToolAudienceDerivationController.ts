@@ -54,7 +54,11 @@ export const normalizeFieldAudienceMode = (
 
   const hasPersistedState =
     hasMeaningfulFieldValue(field) || !!fieldState.encrypted || !!fieldState.encryptedPortion || !!fieldState.hash;
-  return hasPersistedState ? 'explicit' : 'inherit';
+  if (hasPersistedState) return 'explicit';
+
+  // Regression guard: blank comments are independent by default. Only an explicit
+  // follow/inherit selection may mirror the answer lock into the comments field.
+  return 'explicit';
 };
 
 export const buildInheritedAdditionalFieldState = (

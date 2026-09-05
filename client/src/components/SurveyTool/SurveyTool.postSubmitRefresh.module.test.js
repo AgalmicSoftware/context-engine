@@ -162,7 +162,8 @@ const runPostSubmitFollowup = async ({
       }));
       if (!isSubmitContextCurrent(submitContext)) return;
 
-      if (!writeResult?.questionCacheWritten) {
+      const shouldRefreshQuestionResponses = !writeResult?.questionCacheWritten || !!submitContext.workerTargetKey;
+      if (shouldRefreshQuestionResponses) {
         const ids = Array.from(changedQids)
           .map((id) => normalizeQuestionIdKey(id))
           .filter(Boolean);
@@ -250,6 +251,21 @@ describe('SurveyTool post-submit refresh', () => {
       responder: '0xabc',
     });
     expect(outcome.refreshSurveyResponsesByID).toHaveBeenCalledWith('0xsurvey');
+  });
+
+  it('refreshes Worker-canonical responses after cache write-through so Results sees the new revision', async () => {
+    const outcome = await runPostSubmitFollowup({
+      submitContext: createSubmitContext({
+        chainId: null,
+        workerTargetKey: 'https://worker.example.test|0x00112233445566778899aabbccddeeff|edge',
+      }),
+    });
+
+    expect(outcome.refreshQuestionResponses).toHaveBeenCalledWith(['q1'], {
+      slug: 'edge',
+      responder: '0xabc',
+    });
+    expect(outcome.refreshSurveyResponsesByID).not.toHaveBeenCalled();
   });
 
   it('does not run submit fallback refreshes after the submit context changes', async () => {

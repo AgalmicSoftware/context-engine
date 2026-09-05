@@ -1,5 +1,6 @@
 import type { SbtOwnershipReadsPort } from './sbtPorts.js';
-import { bindSbtOwnershipReadsPort } from './sbtOwnershipReadsPort.js';
+import chainGateway from '../../utilities/web3/chainGateway.js';
+import { sbtOwnershipReadsPort } from './sbtOwnershipReadsPort.js';
 
 const readSbtOwnershipSnapshot = async (port: SbtOwnershipReadsPort, sbtAddress: string, sessionSlug: string) => {
   const [owner, tokenId, historySummary] = await Promise.all([
@@ -12,6 +13,10 @@ const readSbtOwnershipSnapshot = async (port: SbtOwnershipReadsPort, sbtAddress:
 };
 
 describe('SbtOwnershipReadsPort', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('supports a fake ownership reads port with the legacy call shape', async () => {
     const fakePort: SbtOwnershipReadsPort = {
       getOwnerByTokenId: jest.fn(async () => '0x0000000000000000000000000000000000000002'),
@@ -36,30 +41,21 @@ describe('SbtOwnershipReadsPort', () => {
     expect(fakePort.getSbtHistorySummary).toHaveBeenCalledWith('none', sbtAddress, 'alpha');
   });
 
-  it('binds ownership reads through a call-time chainGateway getter', async () => {
-    const firstChainGateway = {
-      getOwnerByTokenId: jest.fn(async () => '0x0000000000000000000000000000000000000003'),
-      getSBTTokenIdByOwner: jest.fn(async () => '7'),
-      getSbtHistorySummary: jest.fn(async () => ({ totalMinted: '8' })),
-    };
-    const secondChainGateway = {
-      getOwnerByTokenId: jest.fn(async () => '0x0000000000000000000000000000000000000004'),
-      getSBTTokenIdByOwner: jest.fn(async () => '9'),
-      getSbtHistorySummary: jest.fn(async () => ({ totalMinted: '10' })),
-    };
-    let currentChainGateway = firstChainGateway;
-    const port = bindSbtOwnershipReadsPort({
-      chainGateway: () => currentChainGateway,
-    });
+  it('delegates ownership reads through call-time chainGateway property lookup', async () => {
+    const getOwnerByTokenId = jest
+      .spyOn(chainGateway, 'getOwnerByTokenId')
+      .mockResolvedValue('0x0000000000000000000000000000000000000003');
+    const getSBTTokenIdByOwner = jest.spyOn(chainGateway, 'getSBTTokenIdByOwner').mockResolvedValue('9');
+    const getSbtHistorySummary = jest
+      .spyOn(chainGateway, 'getSbtHistorySummary')
+      .mockResolvedValue({ totalMinted: '10' });
 
     await expect(
-      port.getOwnerByTokenId('none', '0x0000000000000000000000000000000000000001', '7', 'alpha'),
+      sbtOwnershipReadsPort.getOwnerByTokenId('none', '0x0000000000000000000000000000000000000001', '7', 'alpha'),
     ).resolves.toBe('0x0000000000000000000000000000000000000003');
 
-    currentChainGateway = secondChainGateway;
-
     await expect(
-      port.getSBTTokenIdByOwner(
+      sbtOwnershipReadsPort.getSBTTokenIdByOwner(
         'none',
         '0x0000000000000000000000000000000000000002',
         '0x0000000000000000000000000000000000000005',
@@ -67,25 +63,16 @@ describe('SbtOwnershipReadsPort', () => {
       ),
     ).resolves.toBe('9');
     await expect(
-      port.getSbtHistorySummary('none', '0x0000000000000000000000000000000000000002', 'beta'),
+      sbtOwnershipReadsPort.getSbtHistorySummary('none', '0x0000000000000000000000000000000000000002', 'beta'),
     ).resolves.toEqual({ totalMinted: '10' });
 
-    expect(firstChainGateway.getOwnerByTokenId).toHaveBeenCalledWith(
-      'none',
-      '0x0000000000000000000000000000000000000001',
-      '7',
-      'alpha',
-    );
-    expect(secondChainGateway.getSBTTokenIdByOwner).toHaveBeenCalledWith(
+    expect(getOwnerByTokenId).toHaveBeenCalledWith('none', '0x0000000000000000000000000000000000000001', '7', 'alpha');
+    expect(getSBTTokenIdByOwner).toHaveBeenCalledWith(
       'none',
       '0x0000000000000000000000000000000000000002',
       '0x0000000000000000000000000000000000000005',
       'beta',
     );
-    expect(secondChainGateway.getSbtHistorySummary).toHaveBeenCalledWith(
-      'none',
-      '0x0000000000000000000000000000000000000002',
-      'beta',
-    );
+    expect(getSbtHistorySummary).toHaveBeenCalledWith('none', '0x0000000000000000000000000000000000000002', 'beta');
   });
 });

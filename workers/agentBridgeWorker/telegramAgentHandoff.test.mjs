@@ -27,6 +27,7 @@ import { AGENT_ONLY_MODE_CONFIG_KV_PREFIX, AGENT_ONLY_WINDOW_KV_PREFIX } from '.
 import { deriveTelegramResponseExportAccount } from './telegramResponseExport.mjs';
 import { persistTelegramSubmitRecord } from './telegramSubmitQueue.mjs';
 import { persistTelegramProposedQuestion } from './telegramQuestionProposals.mjs';
+import { AgentInviteRedemptionCoordinator } from './agentInviteRedemptionCoordinator.mjs';
 
 const HISTORICAL_AGENT_ONLY_WINDOWING = Object.freeze({
   launchOpensAt: '2026-06-12T08:00:00-07:00',
@@ -90,6 +91,58 @@ class MemoryKv {
   }
 }
 
+class SerializedMemoryStorage {
+  constructor() {
+    this.values = new Map();
+    this.tail = Promise.resolve();
+  }
+
+  async transaction(callback) {
+    const previous = this.tail;
+    let release;
+    this.tail = new Promise((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    try {
+      return await callback(this);
+    } finally {
+      release();
+    }
+  }
+
+  async get(key) {
+    return this.values.get(key);
+  }
+
+  async put(key, value) {
+    this.values.set(key, value);
+  }
+
+  async delete(key) {
+    this.values.delete(key);
+  }
+}
+
+class MemoryInviteCoordinatorNamespace {
+  constructor() {
+    this.coordinators = new Map();
+  }
+
+  getByName(tokenHash) {
+    if (!this.coordinators.has(tokenHash)) {
+      this.coordinators.set(
+        tokenHash,
+        new AgentInviteRedemptionCoordinator({ storage: new SerializedMemoryStorage() }),
+      );
+    }
+    const coordinator = this.coordinators.get(tokenHash);
+    return {
+      fetch: (input, init) => coordinator.fetch(input instanceof Request ? input : new Request(input, init)),
+    };
+  }
+}
+
 function baseEnv(overrides = {}) {
   return {
     TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
@@ -128,6 +181,7 @@ function baseEnv(overrides = {}) {
       },
     ]),
     AGENT_ACTION_KV: new MemoryKv(),
+    AGENT_INVITE_COORDINATOR: new MemoryInviteCoordinatorNamespace(),
     ...overrides,
   };
 }
@@ -2366,6 +2420,103 @@ test('Invite onboarding creates a transport-neutral user credential and rejects 
   const replay = await jsonBody(replayResponse);
   assert.equal(replayResponse.status, 409);
   assert.equal(replay.reason, 'invite_token_redeemed');
+});
+
+test('Invite onboarding preserves replay denial for legacy KV redemption records', async () => {
+  const inviteHash = sha256Hex('legacy-redeemed-invite');
+  const env = agentHttpOnlyEnv({
+    AGENT_BRIDGE_AGENT_API_TOKEN: '',
+    AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([{
+      tokenHash: inviteHash,
+      sessionSlug: 'alpha',
+      label: 'Legacy invite',
+      source: 'browser',
+    }]),
+  });
+  await env.AGENT_ACTION_KV.put(
+    `agent:invite-redemption:v1:${inviteHash}`,
+    JSON.stringify({ type: 'agent_invite_redemption', version: 1, tokenHash: inviteHash }),
+  );
+
+  const response = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/api/agent/invite/onboard', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ inviteToken: 'legacy-redeemed-invite', label: 'Participant' }),
+    }),
+    env,
+  });
+  const body = await jsonBody(response);
+
+  assert.equal(response.status, 409);
+  assert.equal(body.reason, 'invite_token_redeemed');
+  assert.equal(
+    [...env.AGENT_ACTION_KV.store.keys()].some((key) => key.startsWith(AGENT_CREDENTIAL_KV_PREFIX)),
+    false,
+  );
+});
+
+test('Invite onboarding atomically rejects concurrent redemption attempts', async () => {
+  const env = agentHttpOnlyEnv({
+    AGENT_BRIDGE_AGENT_API_TOKEN: '',
+    AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
+    AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([{
+      tokenHash: sha256Hex('concurrent-browser-invite'),
+      sessionSlug: 'alpha',
+      label: 'Concurrent browser invite',
+      source: 'browser',
+    }]),
+  });
+  const onboardRequest = () => new Request('https://bridge.example/api/agent/invite/onboard', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ inviteToken: 'concurrent-browser-invite', label: 'Participant' }),
+  });
+
+  const responses = await Promise.all([
+    handleTelegramAgentHandoffRequest({ request: onboardRequest(), env }),
+    handleTelegramAgentHandoffRequest({ request: onboardRequest(), env }),
+  ]);
+  const bodies = await Promise.all(responses.map((response) => jsonBody(response)));
+
+  assert.deepEqual(responses.map((response) => response.status).sort(), [200, 409]);
+  assert.equal(
+    bodies.some((body) => ['invite_token_redemption_pending', 'invite_token_redeemed'].includes(body.reason)),
+    true,
+  );
+  assert.equal(
+    [...env.AGENT_ACTION_KV.store.keys()].filter((key) => key.startsWith(AGENT_CREDENTIAL_KV_PREFIX)).length,
+    1,
+  );
+});
+
+test('Invite onboarding fails closed when the redemption coordinator is unavailable', async () => {
+  const env = agentHttpOnlyEnv({
+    AGENT_BRIDGE_AGENT_API_TOKEN: '',
+    AGENT_INVITE_COORDINATOR: null,
+    AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([{
+      tokenHash: sha256Hex('coordinator-missing-invite'),
+      sessionSlug: 'alpha',
+      label: 'Browser invite',
+      source: 'browser',
+    }]),
+  });
+  const response = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/api/agent/invite/onboard', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ inviteToken: 'coordinator-missing-invite', label: 'Participant' }),
+    }),
+    env,
+  });
+  const body = await jsonBody(response);
+
+  assert.equal(response.status, 503);
+  assert.equal(body.reason, 'invite_coordinator_unavailable');
+  assert.equal(
+    [...env.AGENT_ACTION_KV.store.keys()].some((key) => key.startsWith(AGENT_CREDENTIAL_KV_PREFIX)),
+    false,
+  );
 });
 
 test('Root bootstrap mints a named scoped service credential', async () => {

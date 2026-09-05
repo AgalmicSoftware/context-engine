@@ -1,4 +1,6 @@
 import { listSessionStorageRefsPage, readSessionStorageBlob, uploadDataToSessionStorage } from './storageClient.js';
+import { normalizeSessionStorageConfig } from './sessionStorageConfig.js';
+import { buildResponsePayload } from '../../components/SurveyTool/surveyToolResponsePayloadController';
 
 jest.mock('../arweave/arweaveClient.js', () => ({
   arweaveClient: {
@@ -20,6 +22,32 @@ const { getCorsProxyUrlOrThrow } = require('../worker/corsProxy.js');
 const { fetchWorkerWithAuth } = require('../worker/workerAuth.js');
 
 const TX_ID = 'abc123abc123abc123abc123abc123abc123abc1230';
+
+const buildSingleQuestionResponsePayload = ({ answer, additional, questionType }) =>
+  buildResponsePayload({
+    isStandalone: false,
+    singleQuestionMode: true,
+    surveyId: undefined,
+    account: '0x00000000000000000000000000000000000000aa',
+    surveyIndex: 0,
+    surveyResponseState: {
+      answers: { q1: { value: answer, encrypted: false } },
+      additionalComments: { q1: { value: additional, encrypted: false } },
+      importance: {},
+      conviction: {},
+    },
+    questionPool: [{ id: 'q1', type: questionType, prompt: 'Matrix question' }],
+    pileQuestions: [],
+    resolveFieldEncryptionAudience: () => 'self',
+    getQuestionEncryptionGates: () => [],
+    resolveFieldEncryptionGateId: () => null,
+    normalizeFieldAudienceMode: () => 'default',
+    getSurveyMetadataForJson: () => null,
+    resolveSessionContext: () => ({ sessionName: 'matrix-session' }),
+    getConvictionFromSlice: () => null,
+    getImportanceFromSlice: () => null,
+    sanitizeQuestionPromptForResponsePayload: (question) => question.prompt,
+  });
 
 describe('storageClient', () => {
   beforeEach(() => {
@@ -95,6 +123,100 @@ describe('storageClient', () => {
     );
     expect(JSON.stringify(result)).not.toMatch(/account|bucket|token|secret|r2:\/\//i);
     expect(result.storageRef.backend).toBe('cloudflare');
+  });
+
+  test('routes persisted Worker session-mode profiles through Cloudflare instead of requiring Arweave scope', async () => {
+    await uploadDataToSessionStorage(new File(['image'], 'context.png', { type: 'image/png' }), 'file', {
+      sessionSlug: 'demo-sh',
+      sessionConfig: {
+        corsWorkerUrl: 'https://worker.example',
+        sessionModeProfile: {
+          authority: { mode: 'worker_canonical' },
+          storage: {
+            backend: 'cloudflare',
+            payloadAccessControl: { gate: 'none', encryption: 'none' },
+          },
+        },
+      },
+      resource: 'docsContext',
+    });
+
+    expect(arweaveClient.uploadDataToArweave).not.toHaveBeenCalled();
+    expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
+    expect(String(fetchWorkerWithAuth.mock.calls[0][0])).toBe('https://worker.example/storage/upload');
+  });
+
+  test.each([
+    {
+      label: 'public freeform',
+      questionType: 'freeform',
+      answer: 'Public answer',
+      additional: 'Public note',
+      accessControl: { gate: 'none', encryption: 'none' },
+      expectedMode: 'public_read',
+    },
+    {
+      label: 'Worker-envelope rating',
+      questionType: 'rating',
+      answer: 8,
+      additional: 'Protected by the Worker',
+      accessControl: {
+        gate: 'role_gate',
+        encryption: 'worker_envelope',
+        accessConditions: {
+          match: 'any',
+          conditions: [{ kind: 'worker_role', role: 'member' }],
+        },
+      },
+      expectedMode: 'worker_sbt_gate',
+    },
+  ])('normalizes and uploads $label survey responses at the correct encryption boundary', async (fixture) => {
+    const payload = buildSingleQuestionResponsePayload(fixture);
+    const sessionConfig = {
+      storageProfile: {
+        backend: 'cloudflare',
+        resources: { responses: 'active' },
+        payloadAccessControl: fixture.accessControl,
+      },
+    };
+    const normalized = normalizeSessionStorageConfig(sessionConfig);
+
+    expect(normalized.payloadAccessControl).toEqual(
+      expect.objectContaining({
+        gate: fixture.accessControl.gate,
+        encryption: fixture.accessControl.encryption,
+        mode: fixture.expectedMode,
+      }),
+    );
+    expect(payload.answer).toEqual(
+      expect.objectContaining({
+        value: fixture.answer,
+        encrypted: false,
+        encryptedPortion: '',
+      }),
+    );
+    expect(payload.additional).toEqual(
+      expect.objectContaining({
+        value: fixture.additional,
+        encrypted: false,
+        encryptedPortion: '',
+      }),
+    );
+
+    await uploadDataToSessionStorage(payload, 'json', {
+      sessionSlug: 'matrix-session',
+      sessionConfig,
+      resource: 'responses',
+    });
+
+    const requestBody = JSON.parse(fetchWorkerWithAuth.mock.calls[0][1].body);
+    expect(requestBody).toEqual(
+      expect.objectContaining({
+        resource: 'responses',
+        payloadEncrypted: false,
+        data: payload,
+      }),
+    );
   });
 
   test('uses an existing Worker credential for Cloudflare file uploads without triggering another auth flow', async () => {

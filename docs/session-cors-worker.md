@@ -105,9 +105,9 @@ Session Worker source trees.
 
 The Worker source keeps runtime wiring explicit so route logic can be tested without Cloudflare bindings or live secrets:
 
-- `worker.js` creates the runtime through `createWorkerRuntimeDepsWithWorkerDeps`.
+- `worker.js` owns the static ABI/default/error bundle, resolves the runtime dependency record, and directly assembles the low-level and route runtimes.
 - `workerRuntimeDepResolution.js` resolves imported helpers and worker-local primitives into one canonical dependency record.
-- `workerRuntimeInputBinding.js` splits that record into low-level helpers and route runtime input.
+- `workerLowLevelHelperBinding.js` assembles the low-level RPC, contract, hashing, and outbound-request helpers.
 - `workerRouteRuntimeBinding.js` assembles named route groups: registry/login bootstrap, rate-limit/faucet support, anonymous registry access, auth/CORS/admin adapters, execution services, and the route shell.
 
 The route-shell bundle is intentionally still a large boundary object because it is where authenticated, anonymous, admin, AI, Arweave, storage, fetch, and faucet routes meet. Keep behavior changes inside the smaller route/execution modules when possible, and update the binding tests when the boundary adds or removes a dependency.
@@ -1220,11 +1220,10 @@ Arweave retain their existing roles for decentralized sessions.
 The worker decomposes session handling into ~80 narrow authority/normalization
 modules under `workers/sessionCorsWorker/`. Key boundary files:
 
-- `workerTopLevelBinding.js` — static ABI/default/error bundle
-- `workerRuntimeDepsBinding.js` — imported helper wiring
-- `workerRuntimeInputBinding.js` — runtime-input orchestration
-- `workerLowLevelHelperInputResolution.js` — low-level helper bundle shaping
-- `workerRouteRuntimeInputResolution.js` — route-runtime bundle shaping
+- `worker.js` — static ABI/default/error bundle and direct runtime assembly
+- `workerRuntimeDepResolution.js` — imported helper wiring
+- `workerLowLevelHelperBinding.js` — low-level helper assembly
+- `workerRouteRuntimeBinding.js` — route-runtime assembly
 - `authLoginRequestAuthority.js` — /auth/login authority chain
 - `adminRequestAuthority.js` — /admin/* authorization chain
 - `loginGateAuthority.js` — on-chain gate/scope evaluation
@@ -1399,38 +1398,17 @@ modules under `workers/sessionCorsWorker/`. Key boundary files:
   registry/faucet RPC, ethers interface/provider/gate, group-proof hashing,
   and RPC/contract probe composition that feeds the extracted route-runtime
   boundary.
-- Shared top-level worker runtime-input binding now routes through
-  `workers/sessionCorsWorker/workerRuntimeInputBinding.js`, preserving the
-  worker-local `console.log`, `Date.now`, `fetch`, `globalThis.fetch`, and
-  `ethers.Wallet` handoff plus the remaining low-level-helper assembly (now
-  delegated to the extracted low-level-helper input resolution helper) and
-  exported `workerAuthGateUtils` / `fetch` contract while delegating the
-  deeper route-runtime bundle shaping to the extracted helper.
-- Shared worker low-level-helper input resolution now routes through
-  `workers/sessionCorsWorker/workerLowLevelHelperInputResolution.js`,
-  preserving the low-level-helper `deps` / `constants` / `defaults` bundle
-  shaping before the binding hands it to `workerLowLevelHelperBinding.js`.
-- Shared worker route-runtime input resolution now routes through
-  `workers/sessionCorsWorker/workerRouteRuntimeInputResolution.js`,
-  preserving the large low-level-helper-aware route-runtime
-  `deps` / `constants` / `defaults` bundle before the binding hands it to
-  `workerRouteRuntimeBinding.js`.
-- Shared worker runtime-deps binding now routes through
-  `workers/sessionCorsWorker/workerRuntimeDepsBinding.js`, preserving the
-  thinner handoff into the extracted runtime dep-resolution helper and the
-  unchanged runtime-input contract before `worker.js` applies only the
-  remaining static constants/defaults and export shell.
+- Top-level runtime assembly now happens directly in
+  `workers/sessionCorsWorker/worker.js`. It resolves the canonical dependency
+  record, passes explicit `deps` / `constants` / `defaults` bundles to the
+  low-level and route-runtime bindings, and exposes the final
+  `workerAuthGateUtils` / `fetch` contract without one-caller input or
+  top-level binding modules.
 - Shared worker runtime dep resolution now routes through
   `workers/sessionCorsWorker/workerRuntimeDepResolution.js`, preserving the
   imported normalization, auth, token, config, Arweave, faucet, and route
   dispatch helper fallback bundle plus missing-slug / slug-mismatch
   constant fallback shaping before runtime-input assembly.
-- Shared top-level worker runtime binding now routes through
-  `workers/sessionCorsWorker/workerTopLevelBinding.js`, preserving the
-  static ABI/default/error bundle plus final worker-global `ethers` / `URL`
-  / `Headers` / `console.log` / `fetch` / `globalThis.fetch` / `Date.now`
-  handoff into the extracted runtime-deps boundary before `worker.js`
-  exposes the final `workerAuthGateUtils` and `fetch` entry contract.
 - Anonymous route-entry setup now routes through
   `workers/sessionCorsWorker/anonymousRouteEntry.js`, preserving anonymous
   slug resolution, missing-slug selection, session-config lookup, CORS
@@ -1443,24 +1421,22 @@ modules under `workers/sessionCorsWorker/`. Key boundary files:
 - Anonymous route-entry binding now routes through
   `workers/sessionCorsWorker/anonymousRouteEntryBinding.js`, preserving the
   worker-specific missing-slug/session-config constant binding plus the
-  env-bound handoff from the extracted anonymous route-entry helper into the
-  extracted anonymous route-dispatch binding.
+  env-bound handoff from the extracted anonymous route-entry helper directly
+  into the anonymous dispatcher.
 - Authenticated route-entry binding now routes through
   `workers/sessionCorsWorker/authenticatedRouteEntryBinding.js`,
   preserving the worker-specific authenticated route-context deps bundle,
   missing-config constant binding, and the env-bound handoff from the
-  extracted authenticated route-entry helper into the extracted
-  authenticated route-dispatch binding.
-- Anonymous route-dispatch binding now routes through
-  `workers/sessionCorsWorker/anonymousRouteDispatchBinding.js`, preserving
-  the worker-specific provider/transcribe helper bundle, env-bound
-  session-secrets lookup, and anonymous route-denied constant handoff into
-  the extracted anonymous dispatcher.
-- Authenticated route-dispatch binding now routes through
-  `workers/sessionCorsWorker/authenticatedRouteDispatchBinding.js`,
-  preserving the worker-specific secret-path, non-secret action, and
-  secret-action helper bundles plus the existing fetch/AI/faucet helper
-  wiring into the extracted authenticated dispatcher.
+  extracted authenticated route-entry helper directly into the authenticated
+  dispatcher.
+- The former one-caller anonymous route-dispatch binding has been folded into
+  `workers/sessionCorsWorker/anonymousRouteEntryBinding.js`, which owns the
+  provider/transcribe helper bundle, env-bound session-secrets lookup, and
+  anonymous route-denied constant handoff.
+- The former one-caller authenticated route-dispatch binding has been folded
+  into `workers/sessionCorsWorker/authenticatedRouteEntryBinding.js`, which
+  owns the secret-path, non-secret action, and secret-action helper bundles
+  plus the existing fetch/AI/faucet helper wiring.
 - `nonce:{slug}:{address}` → diagnostic nonce mirror (TTL 5m; the Durable Object is authoritative)
 - `usedNonce:{slug}:{nonce}` → diagnostic used mirror (TTL 10m; the Durable Object is authoritative)
 - `authToken:{slug}:{sub}:{jti}` → "1" for minted login tokens (TTL 4h)
@@ -1665,15 +1641,19 @@ Authenticated requests must include:
 - Authenticated route dispatch ordering now also routes through a shared helper:
   it preserves secret path-route checks before authenticated JSON parsing, keeps authenticated parse errors on the existing `Expected application/json.` / `Invalid JSON.` path with authenticated headers, runs non-secret action routes before secret action routes, and retains the final authenticated `404 Not found.` response contract.
 
-Anonymous exception (AI/transcribe only):
+Anonymous exception (AI/transcribe/realtime interview only):
 
 - `POST /ai` and `POST /transcribe` may run without `Authorization` only when either:
   - request includes a non-empty `apiKey`, or
   - on-chain gate authority is available and both `default` + `ai` gates are explicitly open.
+- `POST /realtime/call` does not accept a browser-supplied provider key. It may
+  run without `Authorization` only when worker-canonical anonymous AI access is
+  enabled or on-chain `default` + `ai` gates are explicitly open.
 - Anonymous `apiKey` bypass does not inherit worker secrets:
   - For `provider: "custom"` on `POST /ai`, request must include `rpcUrl` (no fallback to secret `customRpcUrl`).
 - Session scope overrides still apply to anonymous requests:
   - `scopes.ai=false` denies anonymous `POST /ai` (even when a request `apiKey` is present).
+  - `scopes.ai=false` also denies anonymous `POST /realtime/call`.
   - `scopes.transcribe=false` denies anonymous `POST /transcribe`.
 - If on-chain gate authority is unavailable/unresolved, anonymous access fails closed.
 - For the canonical default session slug (`""`), clients should send `X-Session-Slug: general` on anonymous-first attempts.
@@ -1685,9 +1665,9 @@ Anonymous exception (AI/transcribe only):
     it prefers `X-Session-Slug`, still accepts legacy `X-Group-Slug`, and preserves the current
     fail-closed missing-slug behavior when no explicit anonymous slug is provided.
   - Anonymous route dispatch now also routes through a shared helper:
-    it preserves `/transcribe` multipart parse failures before anonymous gate evaluation, keeps
+    it preserves `/transcribe` multipart and realtime SDP parse failures before anonymous gate evaluation, keeps
     request-`apiKey` bypass from touching worker secrets, retains the anonymous custom-provider
-    `rpcUrl` validation for `/ai`, and preserves downstream provider/transcribe dispatch behavior.
+    `rpcUrl` validation for `/ai`, and preserves downstream provider/transcribe/realtime dispatch behavior.
 
 ## Admin endpoints
 
@@ -1980,6 +1960,50 @@ Signed login/bootstrap requests:
     still requires on-chain `default` and `ai` gates to be explicitly open.
   - Request parsing/provider inference now routes through the AI helper:
     omitted/`default`/`auto` providers infer from `model` (`claude*` => Anthropic, slash models => OpenRouter, `gpt-*`/`o*`/`chatgpt` => OpenAI) before falling back to OpenAI.
+- `GET /agent/interview-catalog?slug=<slug>&sessionUrl=<https-session-url>`
+  (`/agent/interview-brief` remains a compatibility alias)
+  - Public, CORS-scoped, and disabled when `interviewModeEnabled=false` or
+    `interviewMode.enabled=false`.
+  - Returns only an inert JSON question catalog: `type`, `version`,
+    `sessionSlug`, `reviewUrl`, `questionSetHash`, `prefillPromptVersion`,
+    `answerContract`, `researchCoverageContract`, and `questions`. Binary options,
+    the 0-10 rating range, and the additive self-reported research-coverage count
+    fields are explicit. It deliberately contains no agent instructions; the
+    client-side clipboard prompt carries the user's request.
+  - Reads at most 100 accessible public questions. Cloudflare-native questions
+    pass through `/storage/list` and each `/storage/read` authorization check;
+    on-chain discovery requires configured block limits and is capped at a
+    two-million-block range.
+  - Applies the session's anonymous rate-limit bucket before reading questions.
+  - The compact client clipboard prompt tells ordinary ChatGPT/Claude to search only
+    already-authorized history, memory, and connected sources directly related
+    to those questions. It rejects stale catalog versions, requests reviewable
+    response drafts with per-answer confidence and basis, shows the exact JSON
+    before encoding, asks for distinct searched/used chat, memory, source, and
+    user-statement counts (`null` when a platform cannot expose a searched count),
+    and returns a clean interview link when no relevant signal exists.
+  - The supplied return URL must be HTTPS (or localhost), its origin must match
+    the session's `allowOrigins` or a configured public/app/session URL, and its
+    `/session/<slug>` path must match. Existing query and fragment state are
+    stripped before the Worker supplies `reviewUrl`.
+- `GET /api/agent/questions` with a session Worker bearer credential returns
+  the same public, access-checked question catalog when
+  `sessionModeProfile.surfaces.agentHttp=true`. This is the first canonical
+  Agent API family on the Session Worker; the Agent Bridge compatibility route
+  remains during the staged transport migration.
+- `POST /realtime/call?slug=<slug>` with JSON `{ "sdp": "v=0...", "instructions": "..." }`
+  - Uses the anonymous AI eligibility policy above, then exchanges the bounded
+    browser SDP offer for an OpenAI Realtime SDP answer without exposing the
+    Worker-held `openaiKey`.
+  - Preserves the browser offer byte-for-byte, including its terminal CRLF,
+    then forwards it as a filename-free `application/sdp` multipart field and
+    sends the session configuration as `application/json`, matching OpenAI's
+    Realtime call contract. Trimming the SDP can make an otherwise valid offer
+    fail with an unexpected EOF.
+  - Defaults to `gpt-realtime-2.1`, `gpt-transcribe`, server VAD, and audio
+    output. A session may set `interviewMode.realtimeModel` to another
+    `gpt-realtime*` ID. `interviewMode.provider` is reserved for future
+    providers; values other than `openai` currently return `400`.
 - `POST /transcribe` (multipart/form-data, file field `file` or `audio`)
   - Anonymous access is allowed only under the rules above (request `apiKey`, or explicit open `default+ai` gates with available on-chain authority).
   - Optional overrides: `provider` (`openai` or `custom`), `apiKey`, `rpcUrl` (custom only).
@@ -2117,16 +2141,21 @@ Scripts: Edit` and `Workers KV Storage: Edit`; the Durable Object module
     exactly one visible account through Cloudflare using the API token and fails
     on zero or multiple accounts; caller-supplied account IDs are ignored.
   - Creator onboarding sends that one deployment token only. The separate
-    `CLOUDFLARE_API_TOKEN` with `API Tokens: Read` used by the two-key live E2E is
-    a separate same-user, E2E-only policy auditor: it reads the dedicated token's
-    policy and permission-group catalog, compares immutable permission IDs, and
-    is never included in a deploy request or required from a session creator.
+    `CLOUDFLARE_TWO_KEY_AUDITOR_API_TOKEN` with `API Tokens: Read` used by the
+    two-key live E2E is a same-user, E2E-only policy auditor: it reads the
+    dedicated token's policy and permission-group catalog, compares immutable
+    permission IDs, and is never included in a deploy request or required from
+    a session creator.
   - First-party callers include `deploymentRequestId` (8-128 safe identifier
     characters). Sequential retries after a lost or gateway-shaped response
     must reuse both that ID and `configRevision`; a definitive terminal response
     or an explicit new attempt rotates them.
   - Provide either `bundleUrl` (release asset) or `bundleText` (raw bundle contents) from the `/new` UI.
 - The helper fetches the latest bundled worker asset and configures KV + bindings.
+- Fresh KV namespace seed writes retry only Cloudflare's transient
+  `namespace not found` propagation response; unrelated write failures still
+  fail immediately, and exhausted retries trigger the normal exact-resource
+  cleanup path before any Worker upload.
 - The helper generates `TOKEN_HMAC_SECRET` and
   `CE_STORAGE_ENVELOPE_KEK` independently with 256 bits from Web Crypto for
   every Session Worker. These

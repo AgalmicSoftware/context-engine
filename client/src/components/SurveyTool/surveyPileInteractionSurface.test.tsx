@@ -332,12 +332,13 @@ describe('surveyPileInteractionSurface', () => {
     const renderActiveQuestion = jest.fn((question: PileQuestionLike) => (
       <div data-testid={`active-${question.id}`}>{question.prompt}</div>
     ));
-    const toggleListeningPanel = jest.fn();
+    const toggleVoiceModeModal = jest.fn();
     const tree = renderPileInteractionSurface({
       ...buildBaseProps(),
       showMiniBackgroundSpinner: true,
-      showListeningPanel: true,
-      toggleListeningPanel,
+      showVoiceModeControl: true,
+      voiceModeActive: true,
+      toggleVoiceModeModal,
       pileQuestions: [
         { id: 'q1', prompt: 'Q1' },
         { id: 'q2', prompt: 'Q2' },
@@ -383,7 +384,7 @@ describe('surveyPileInteractionSurface', () => {
     expect(listeningToggle?.props['aria-pressed']).toBe(true);
     expect(nodeHasClassName(listeningToggle, 'actionButtonActive')).toBe(true);
     (listeningToggle?.props.onClick as () => void)();
-    expect(toggleListeningPanel).toHaveBeenCalledTimes(1);
+    expect(toggleVoiceModeModal).toHaveBeenCalledTimes(1);
   });
 
   it('marks every icon-only pile toolbar button as frameless across app themes', () => {

@@ -4,8 +4,8 @@ import { createHmac } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import {
-  __test__telegramMiniApp,
-  handleTelegramMiniAppRequest,
+  __test__telegramMiniApp as rawTelegramMiniAppTestApi,
+  handleTelegramMiniAppRequest as rawHandleTelegramMiniAppRequest,
   validateTelegramMiniAppInitData,
 } from './telegramMiniApp.mjs';
 import {
@@ -26,6 +26,29 @@ import {
 const HISTORICAL_AGENT_ONLY_WINDOWING = Object.freeze({
   launchOpensAt: '2026-06-12T08:00:00-07:00',
   launchClosesAt: '2026-06-15T08:00:00-07:00',
+});
+
+const MINI_APP_TEST_PREVIEW_AUTH = Object.freeze({
+  AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH: 'true',
+});
+
+function withMiniAppTestPreviewAuth(env = {}) {
+  return { ...MINI_APP_TEST_PREVIEW_AUTH, ...env };
+}
+
+function handleTelegramMiniAppRequest(options = {}) {
+  return rawHandleTelegramMiniAppRequest({
+    ...options,
+    env: withMiniAppTestPreviewAuth(options.env),
+  });
+}
+
+const __test__telegramMiniApp = Object.freeze({
+  ...rawTelegramMiniAppTestApi,
+  buildMiniAppState: (options = {}) => rawTelegramMiniAppTestApi.buildMiniAppState({
+    ...options,
+    env: withMiniAppTestPreviewAuth(options.env),
+  }),
 });
 
 class MemoryKv {
@@ -118,6 +141,28 @@ test('validateTelegramMiniAppInitData accepts current Telegram HMAC init data', 
   assert.equal(result.user.telegramUserId, '42');
   assert.equal(result.user.username, 'participant');
   assert.equal(result.queryId, 'mini-query-1');
+});
+
+test('validateTelegramMiniAppInitData fails closed without a bot token unless preview auth is explicit', async () => {
+  const missingToken = await validateTelegramMiniAppInitData('', {});
+  const disabledPreview = await validateTelegramMiniAppInitData('', {
+    AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH: 'false',
+  });
+  const explicitPreview = await validateTelegramMiniAppInitData('', {
+    AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH: 'true',
+  });
+
+  assert.deepEqual(missingToken, {
+    ok: false,
+    reason: 'telegram_bot_token_missing',
+    authMode: 'telegram',
+    user: null,
+  });
+  assert.equal(disabledPreview.ok, false);
+  assert.equal(disabledPreview.reason, 'telegram_bot_token_missing');
+  assert.equal(explicitPreview.ok, true);
+  assert.equal(explicitPreview.reason, 'explicit_preview_auth_without_bot_token');
+  assert.equal(explicitPreview.user.telegramUserId, 'preview-user');
 });
 
 test('validateTelegramMiniAppInitData rejects tampered and expired init data', async () => {

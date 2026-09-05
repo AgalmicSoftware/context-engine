@@ -840,11 +840,20 @@
   }
 }
 
-/* The desktop-window profile keeps its compact mobile window inside the
- * viewport; the standard app keeps the taller legacy slide canvas. */
+/* Desktop-window welcome slides share one compact, viewport-aware frame. The
+ * lower bound leaves enough room for the densest slide while the viewport and
+ * upper bounds prevent sparse artwork from turning into a tall empty pane. */
 @container ce-theme style(--ce-layout-profile: desktop-window) {
   .onboardingWalkthrough {
-    --ce-welcome-frame-height: var(--ce-main-welcome-frame-height, clamp(340px, 48dvh, 440px));
+    --ce-welcome-frame-height: min(500px, var(--ce-main-welcome-frame-height, clamp(410px, 52dvh, 500px)));
+  }
+
+  .onboardingTitle {
+    max-width: 100%;
+    padding: clamp(8px, 1.25dvh, 12px) clamp(12px, 2vw, 24px) 6px;
+    font-size: clamp(1.5rem, 4vw, 2rem);
+    line-height: 1.05;
+    overflow-wrap: anywhere;
   }
 
   .onboardingControls .takeSurveyIcon {

@@ -10,15 +10,77 @@ import {
 } from '../../utilities/cache/cacheScripts.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import contractScripts from '../../utilities/web3/chainGateway.js';
+import * as workerGroupPorts from '../../domains/worker/workerGroupPorts';
+import * as workerAuth from '../../utilities/worker/workerAuth';
+import { dispatchWorkerGroupsChanged } from '../../utilities/worker/workerGroupChangeEvents';
+import {
+  WORKER_CANONICAL_CACHE_SCOPE_KEY,
+  resolveWorkerCanonicalCacheIdentity,
+  withWorkerCanonicalCacheIdentity,
+} from '../../utilities/survey/workerCanonicalCacheIdentity';
 import BeeswarmPlot from '../Shared/BeeswarmPlot/BeeswarmPlot';
 import SBTsList from '../SBTs/SBTsList';
 import { POLIS_DEMO_DATA_AUTOLOAD_SLUGS } from '../../variables/appConfig.js';
+import demoSessions from '../../variables/demo/demo_sessions.json';
 
 const ORIGINAL_SESSION_SCAN_SCOPE = globalThis.CE_SESSION_SCAN_SCOPE;
 const ORIGINAL_SESSION_SCAN_SLUGS = globalThis.CE_SESSION_SCAN_SLUGS;
 
 const MANAGED_NAMESPACES = ['questionsCache', 'surveysCache', 'bookmarksCache', 'filters', 'sbtCache', 'userCache'];
+const WORKER_SESSION_CONFIG = demoSessions['demo-sh'];
 let canvasCreateElementSpy;
+
+const writeWorkerStatsCaches = async ({
+  numericQuestions = { staleNumericQuestion: { type: 'binary', prompt: 'Stale numeric question' } },
+  workerQuestions = { workerQuestion: { type: 'binary', prompt: 'Worker question', creator: '0xabc' } },
+  workerQuestionResponses = {
+    workerQuestion: {
+      '0xdef': { type: 'binary', answer: { value: 'Agree' } },
+    },
+  },
+  numericSurveys = { staleNumericSurvey: { title: 'Stale numeric survey' } },
+  workerSurveys = { workerSurvey: { title: 'Worker survey', creator: '0xabc', questionIDs: ['workerQuestion'] } },
+} = {}) => {
+  const identity = resolveWorkerCanonicalCacheIdentity({
+    sessionConfig: WORKER_SESSION_CONFIG,
+    sessionSlug: 'demo-sh',
+  });
+  const numericKey = String(WORKER_SESSION_CONFIG.networkChainId);
+  await writeCache('questionsCache', 'demo-sh', {
+    [numericKey]: {
+      questions: numericQuestions,
+      questionResponses: {},
+    },
+    [WORKER_CANONICAL_CACHE_SCOPE_KEY]: withWorkerCanonicalCacheIdentity(
+      {
+        questions: workerQuestions,
+        questionResponses: workerQuestionResponses,
+      },
+      identity,
+    ),
+  });
+  await writeCache('surveysCache', 'demo-sh', {
+    [numericKey]: {
+      surveys: numericSurveys,
+      surveyResponses: {},
+    },
+    [WORKER_CANONICAL_CACHE_SCOPE_KEY]: withWorkerCanonicalCacheIdentity(
+      {
+        surveys: workerSurveys,
+        surveyResponses: {},
+      },
+      identity,
+    ),
+  });
+  await writeCache('sbtCache', 'demo-sh', {
+    [numericKey]: {
+      sbtList: {
+        '0x1': { sbtAddress: '0x1', sbtInfo: {}, mintedAddresses: [], burnedAddresses: [] },
+      },
+    },
+    [WORKER_CANONICAL_CACHE_SCOPE_KEY]: withWorkerCanonicalCacheIdentity({}, identity),
+  });
+};
 
 const clearManagedCaches = async () => {
   await initCacheManager();
@@ -171,6 +233,255 @@ describe('CommunityTab helpers', () => {
     jest.spyOn(contractScripts, 'getRelevantBlockWindowForFilter').mockResolvedValue({ toBlock: 0 });
 
     await expect(instance.checkIfInitialLoadDone()).resolves.toBe(false);
+  });
+
+  it('uses authority-scoped Worker caches for Cloudflare questions and surveys', async () => {
+    await writeWorkerStatsCaches({
+      numericQuestions: {
+        staleOne: { type: 'binary', prompt: 'Stale one' },
+        staleTwo: { type: 'binary', prompt: 'Stale two' },
+      },
+      workerQuestions: {
+        workerOne: { type: 'binary', prompt: 'Worker one' },
+        workerTwo: { type: 'binary', prompt: 'Worker two' },
+        workerThree: { type: 'multichoice', prompt: 'Worker three' },
+      },
+      numericSurveys: {
+        staleOne: { title: 'Stale one' },
+        staleTwo: { title: 'Stale two' },
+      },
+      workerSurveys: { workerSurvey: { title: 'Worker survey', questionIDs: ['workerOne'] } },
+    });
+    const instance = new CommunityTab({
+      activeSessionSlug: 'demo-sh',
+      sessionConfig: WORKER_SESSION_CONFIG,
+    });
+
+    const [scopeEntry] = instance._iterScopeCaches({ clone: false });
+    const snapshot = instance._computeStatsSnapshot([scopeEntry]);
+
+    expect(scopeEntry).toEqual(
+      expect.objectContaining({
+        slug: 'demo-sh',
+        cacheScope: WORKER_CANONICAL_CACHE_SCOPE_KEY,
+        isWorkerCanonical: true,
+      }),
+    );
+    expect(Object.keys(scopeEntry.questionsCache.questions)).toEqual(['workerOne', 'workerTwo', 'workerThree']);
+    expect(Object.keys(scopeEntry.surveysCache.surveys)).toEqual(['workerSurvey']);
+    expect(snapshot.uniqueQuestionsCount).toBe(3);
+    expect(snapshot.surveysCreatedCount).toBe(1);
+  });
+
+  it('counts the public Worker group catalog for an active Cloudflare session', async () => {
+    await writeWorkerStatsCaches();
+    jest.spyOn(workerGroupPorts, 'loadPublicWorkerGroups').mockResolvedValue([
+      {
+        groupId: 'reviewers',
+        sessionSlug: 'demo-sh',
+        label: 'Reviewers',
+        adminAddress: '0x0000000000000000000000000000000000000011',
+        joinMode: 'open',
+        memberVisibility: 'session',
+      },
+      {
+        groupId: 'facilitators',
+        sessionSlug: 'demo-sh',
+        label: 'Facilitators',
+        joinMode: 'open',
+        memberVisibility: 'session',
+      },
+    ]);
+    const instance = attachMutableSetState(
+      new CommunityTab({
+        activeSessionSlug: 'demo-sh',
+        sessionConfig: WORKER_SESSION_CONFIG,
+        isQuestionCacheReady: true,
+        isSurveyCacheReady: true,
+      }),
+    );
+    jest.spyOn(instance, '_shouldUseDemoBeeswarmData').mockReturnValue(false);
+
+    await instance._runStatsRefreshCycle({ force: true, markLoading: false });
+
+    expect(workerGroupPorts.loadPublicWorkerGroups).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: WORKER_SESSION_CONFIG.sessionId,
+        sessionSlug: 'demo-sh',
+      }),
+    );
+    expect(instance.state.stats.find((stat) => stat.label === 'Questions').count).toBe(1);
+    expect(instance.state.stats.find((stat) => stat.label === 'Surveys').count).toBe(1);
+    expect(instance.state.stats.find((stat) => stat.label === 'Groups').count).toBe(2);
+    expect(instance.state.stats.find((stat) => stat.label === 'Users').count).toBe(3);
+    expect(instance.state.uniqueUsers).toContain('0x0000000000000000000000000000000000000011');
+  });
+
+  it('counts authorized Worker groups for a signed-in Cloudflare session', async () => {
+    await writeWorkerStatsCaches();
+    jest.spyOn(workerAuth, 'getWorkerSessionToken').mockResolvedValue('worker-token');
+    jest.spyOn(workerGroupPorts, 'loadPublicWorkerGroups');
+    jest.spyOn(workerGroupPorts, 'loadWorkerGroupOverview').mockResolvedValue({
+      groups: [
+        {
+          groupId: 'session-visible',
+          sessionSlug: 'demo-sh',
+          label: 'Session visible',
+          adminAddress: '0x00000000000000000000000000000000000000bb',
+          joinMode: 'open',
+          memberVisibility: 'session',
+        },
+      ],
+      memberships: [
+        {
+          group: {
+            groupId: 'member-only',
+            sessionSlug: 'demo-sh',
+            label: 'Member only',
+            joinMode: 'admin_add',
+            memberVisibility: 'members',
+          },
+          member: {
+            groupId: 'member-only',
+            sessionSlug: 'demo-sh',
+            principal: {
+              kind: 'passkey_account',
+              address: '0x00000000000000000000000000000000000000aa',
+            },
+          },
+        },
+      ],
+    });
+    const instance = attachMutableSetState(
+      new CommunityTab({
+        activeSessionSlug: 'demo-sh',
+        sessionConfig: WORKER_SESSION_CONFIG,
+        account: '0x00000000000000000000000000000000000000aa',
+        provider: 'passkey-provider',
+        isQuestionCacheReady: true,
+        isSurveyCacheReady: true,
+      }),
+    );
+    jest.spyOn(instance, '_shouldUseDemoBeeswarmData').mockReturnValue(false);
+
+    await instance._runStatsRefreshCycle({ force: true, markLoading: false });
+
+    expect(workerAuth.getWorkerSessionToken).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionSlug: 'demo-sh',
+        sessionConfig: WORKER_SESSION_CONFIG,
+        context: expect.objectContaining({
+          account: '0x00000000000000000000000000000000000000aa',
+          providerLike: 'passkey-provider',
+        }),
+      }),
+    );
+    expect(workerGroupPorts.loadWorkerGroupOverview).toHaveBeenCalledWith(
+      expect.objectContaining({ credentialToken: 'worker-token', sessionSlug: 'demo-sh' }),
+    );
+    expect(workerGroupPorts.loadPublicWorkerGroups).not.toHaveBeenCalled();
+    expect(instance.state.stats.find((stat) => stat.label === 'Groups').count).toBe(2);
+    expect(instance.state.stats.find((stat) => stat.label === 'Users').count).toBe(4);
+    expect(instance.state.uniqueUsers).toEqual(
+      expect.arrayContaining([
+        '0x00000000000000000000000000000000000000aa',
+        '0x00000000000000000000000000000000000000bb',
+      ]),
+    );
+  });
+
+  it('evicts a matching Worker group count as soon as that session mutates', () => {
+    const instance = attachMutableSetState(
+      new CommunityTab({
+        activeSessionSlug: 'demo-sh',
+        sessionConfig: WORKER_SESSION_CONFIG,
+      }),
+    );
+    const identity = resolveWorkerCanonicalCacheIdentity({
+      sessionConfig: WORKER_SESSION_CONFIG,
+      sessionSlug: 'demo-sh',
+    });
+    const cacheKey = instance._getWorkerGroupCountCacheKey(identity);
+    instance._workerGroupCountCache.set(cacheKey, {
+      count: 1,
+      groupIds: ['stale-group'],
+      visibleUserIds: [],
+      status: 'ready',
+      updatedAtMs: Date.now(),
+    });
+    instance._scheduleNextStatsPoll = jest.fn();
+    instance._queueCacheDrivenRefresh = jest.fn();
+
+    instance.componentDidMount();
+    dispatchWorkerGroupsChanged({
+      sessionSlug: 'demo-sh',
+      sessionId: WORKER_SESSION_CONFIG.sessionId,
+    });
+
+    expect(instance._workerGroupCountCache.has(cacheKey)).toBe(false);
+    expect(instance._queueCacheDrivenRefresh).toHaveBeenCalledWith({ force: true });
+    instance.componentWillUnmount();
+  });
+
+  it('does not let an in-flight Worker catalog read restore an invalidated count', async () => {
+    let resolveGroups;
+    const groupsPromise = new Promise((resolve) => {
+      resolveGroups = resolve;
+    });
+    jest.spyOn(workerGroupPorts, 'loadPublicWorkerGroups').mockReturnValue(groupsPromise);
+    const instance = new CommunityTab({
+      activeSessionSlug: 'demo-sh',
+      sessionConfig: WORKER_SESSION_CONFIG,
+    });
+    const [scopeEntry] = instance._iterScopeCaches({ clone: false });
+    const identity = scopeEntry.workerCanonicalIdentity;
+    const cacheKey = instance._getWorkerGroupCountCacheKey(identity);
+
+    const loadPromise = instance._loadWorkerGroupCount(scopeEntry);
+    expect(instance._workerGroupCountCache.get(cacheKey)?.status).toBe('loading');
+    instance._queueCacheDrivenRefresh = jest.fn();
+    instance._handleWorkerGroupsChanged({
+      sessionSlug: 'demo-sh',
+      sessionId: WORKER_SESSION_CONFIG.sessionId,
+    });
+    resolveGroups([
+      {
+        groupId: 'stale-group',
+        sessionSlug: 'demo-sh',
+        label: 'Stale group',
+        joinMode: 'open',
+        memberVisibility: 'session',
+      },
+    ]);
+    await loadPromise;
+
+    expect(instance._workerGroupCountCache.has(cacheKey)).toBe(false);
+  });
+
+  it('does not wait for EVM block readiness for a Worker-canonical scope', async () => {
+    const instance = new CommunityTab({
+      activeSessionSlug: 'demo-sh',
+      sessionConfig: WORKER_SESSION_CONFIG,
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+    });
+    instance._iterScopeCaches = jest.fn(() => [
+      {
+        slug: 'demo-sh',
+        cacheScope: WORKER_CANONICAL_CACHE_SCOPE_KEY,
+        isWorkerCanonical: true,
+        surveysCache: { surveys: {} },
+        questionsCache: { questions: {} },
+        sbtCache: {},
+        workerGroupsStatus: 'ready',
+      },
+    ]);
+    const blockSpy = jest
+      .spyOn(contractScripts, 'getRelevantBlockWindowForFilter')
+      .mockRejectedValue(new Error('EVM should not be queried'));
+
+    await expect(instance.checkIfInitialLoadDone()).resolves.toBe(true);
+    expect(blockSpy).not.toHaveBeenCalled();
   });
 
   it('uses demo beeswarm data for auto-demo sessions in list scope when caches are empty', () => {
@@ -676,6 +987,30 @@ describe('CommunityTab helpers', () => {
     expect(sbtListNode.props.miniaturized).toBe(true);
     expect(sbtListNode.props.viewMode).toBe('modal');
     expect(sbtListNode.props.sbtRealtimeCoverageBySlug).toEqual({ alpha: true });
+  });
+
+  it('routes the Groups modal through the exact active Worker session', () => {
+    const instance = new CommunityTab({
+      activeSessionSlug: 'demo-sh',
+      sessionConfig: WORKER_SESSION_CONFIG,
+      provider: 'mock-provider',
+      network: { id: 11155420, name: 'OP Sepolia' },
+      account: '',
+      loginComplete: false,
+      toggleLoginModal: jest.fn(),
+    });
+    instance.state = {
+      ...instance.state,
+      modalType: 'groups',
+    };
+
+    const tree = instance.renderModalContent();
+    const [sbtListNode] = collectTreeNodes(tree, (node) => node?.type === SBTsList);
+
+    expect(sbtListNode.props.sessionSlug).toBe('demo-sh');
+    expect(sbtListNode.props.sessionConfig).toBe(WORKER_SESSION_CONFIG);
+    expect(sbtListNode.props.embeddedMode).toBe(true);
+    expect(sbtListNode.props.allSessionsMode).toBe(false);
   });
 
   it('canonicalizes reserved session aliases in modal survey links', () => {

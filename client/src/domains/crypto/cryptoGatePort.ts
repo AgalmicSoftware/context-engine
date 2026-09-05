@@ -12,10 +12,6 @@ export type CryptoGateDecryptOptions = {
   providerLike?: unknown;
 };
 
-export type CryptoGateCryptoUtilsModule = {
-  decryptEnvelopeValue: (envelopeJson: unknown, options?: CryptoGateDecryptOptions) => Promise<unknown>;
-};
-
 export type CryptoGatePort = {
   /**
    * Shared Lit/SBT-gated envelope decrypt execution seam for results surfaces.
@@ -25,14 +21,6 @@ export type CryptoGatePort = {
   decryptEnvelopeValue: (envelopeJson: unknown, options?: CryptoGateDecryptOptions) => Promise<unknown>;
 };
 
-export type BindCryptoGatePortArgs = {
-  crypto: () => CryptoGateCryptoUtilsModule;
+export const cryptoGatePort: CryptoGatePort = {
+  decryptEnvelopeValue: (envelopeJson, options) => cryptoUtils.decryptEnvelopeValue(envelopeJson, options),
 };
-
-export const bindCryptoGatePort = ({ crypto }: BindCryptoGatePortArgs): CryptoGatePort => ({
-  decryptEnvelopeValue: (envelopeJson, options) => crypto().decryptEnvelopeValue(envelopeJson, options),
-});
-
-export const cryptoGatePort = bindCryptoGatePort({
-  crypto: () => cryptoUtils as CryptoGateCryptoUtilsModule,
-});

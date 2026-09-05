@@ -10,6 +10,11 @@ import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { isResponseAllowedForSessionSlug } from '../../utilities/session/responseSessionScope.js';
 import { canonicalizeLegacySessionAlias } from '../../utilities/session/sessionDemoCompat.js';
+import {
+  readSurveyToolScopedCacheNode,
+  resolveSurveyToolWorkerTargetSignature,
+} from '../SurveyTool/surveyToolWorkerCacheIsolation';
+import { WORKER_CANONICAL_CACHE_SCOPE_KEY } from '../../utilities/survey/workerCanonicalCacheIdentity';
 import { resolveDemoPolisDataset } from '../../utilities/demo/demoPolisDatasets';
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
 import {
@@ -18,6 +23,8 @@ import {
 } from 'utilities/ui/historicalFigureAvatars.js';
 import { createLogger } from 'utilities/logging.js';
 import styles from './PolisReport.module.scss';
+
+export { resolveJsPdfConstructor } from '../../utilities/ui/browserPdfExport';
 
 const surveyLog = createLogger('surveys');
 
@@ -164,6 +171,7 @@ export interface PolisReportProps {
   networkChainId?: number | string | null;
   slug?: string;
   sessionSlug?: string;
+  sessionConfig?: unknown;
 }
 
 export type DoUMAPFn = (data: number[][], nNeighbors: number, randomSeed: number) => [number, number][];
@@ -189,20 +197,6 @@ export type D3ReportApi = {
   scaleLinear(): D3LinearScale;
   line(): (points: [number, number][]) => string | null;
 };
-
-export type JsPdfDocument = {
-  internal: {
-    pageSize: {
-      getWidth(): number;
-      getHeight(): number;
-    };
-  };
-  addImage(...args: unknown[]): void;
-  addPage(): void;
-  save(filename: string): void;
-};
-
-export type JsPdfConstructor = new (...args: unknown[]) => JsPdfDocument;
 
 export type RuntimeFunction = (...args: unknown[]) => unknown;
 const d3Runtime = Object(d3) as Record<string, unknown>;
@@ -267,18 +261,6 @@ export const buildPolisReportPdfFilename = (sessionName: unknown, now: Date = ne
   const sessionPart = sanitizePolisReportPdfNamePart(sessionName);
   const timestamp = now.toISOString().replace(/[:.-]/g, '_');
   return `contextEngine_report${sessionPart ? `_${sessionPart}` : ''}_${timestamp}.pdf`;
-};
-
-export const resolveJsPdfConstructor = (module: unknown): JsPdfConstructor => {
-  const record = module && typeof module === 'object' ? (module as UnknownRecord) : {};
-  const defaultExport = record.default;
-  if (typeof defaultExport === 'function') return defaultExport as JsPdfConstructor;
-  if (typeof record.jsPDF === 'function') return record.jsPDF as JsPdfConstructor;
-  if (defaultExport && typeof defaultExport === 'object') {
-    const defaultRecord = defaultExport as UnknownRecord;
-    if (typeof defaultRecord.jsPDF === 'function') return defaultRecord.jsPDF as JsPdfConstructor;
-  }
-  throw new Error('jsPDF constructor is unavailable');
 };
 
 /**************************************************************
@@ -520,10 +502,9 @@ export function applyFilterStateToAggregator(
   network: UnknownRecord | null | undefined,
   filterState: PolisFilterState | null | undefined,
   sessionSlug: unknown,
+  sessionConfig?: unknown,
 ): PolisQuestionResponses {
   if (!questionResponses || typeof questionResponses !== 'object') return {};
-
-  const netId = network?.id != null ? String(network.id) : null;
 
   // Resolve group slug (optional param -> URL path fallback)
   const resolveSlug = () => {
@@ -545,6 +526,14 @@ export function applyFilterStateToAggregator(
   };
   const slug = resolveSlug();
   const readSlugs = resolvePolisReadSlugs(slug);
+  const workerTarget = resolveSurveyToolWorkerTargetSignature({ sessionConfig, sessionSlug: slug });
+  const cacheScope = workerTarget.isWorkerCanonical
+    ? workerTarget.valid
+      ? WORKER_CANONICAL_CACHE_SCOPE_KEY
+      : null
+    : network?.id != null
+      ? String(network.id)
+      : null;
 
   // Safe cache reads (group-aware dg:* keys)
   const qMap: Record<string, PolisQuestionMeta> = {};
@@ -554,8 +543,30 @@ export function applyFilterStateToAggregator(
     const sParsed = peekCacheSync('sbtCache', readSlug, { clone: false });
     const qCache = (qParsed || null) as Record<string, { questions?: Record<string, PolisQuestionMeta> }> | null;
     const sCache = (sParsed || null) as Record<string, { sbtList?: Record<string, PolisSbtEntry> }> | null;
-    const scopedQuestions = netId && qCache && qCache[netId] && qCache[netId].questions ? qCache[netId].questions : {};
-    const scopedSbtList = netId && sCache && sCache[netId] && sCache[netId].sbtList ? sCache[netId].sbtList : {};
+    // Regression guard: Worker sessions have no numeric network ID, and their
+    // shared `worker` bucket is readable only when its canonical identity matches.
+    const questionNode = cacheScope
+      ? readSurveyToolScopedCacheNode({
+          cache: qCache,
+          cacheScope,
+          sessionConfig,
+          sessionSlug: readSlug,
+        })
+      : null;
+    const sbtNode = cacheScope
+      ? readSurveyToolScopedCacheNode({
+          cache: sCache,
+          cacheScope,
+          sessionConfig,
+          sessionSlug: readSlug,
+        })
+      : null;
+    const scopedQuestions =
+      questionNode?.questions && typeof questionNode.questions === 'object'
+        ? (questionNode.questions as Record<string, PolisQuestionMeta>)
+        : {};
+    const scopedSbtList =
+      sbtNode?.sbtList && typeof sbtNode.sbtList === 'object' ? (sbtNode.sbtList as Record<string, PolisSbtEntry>) : {};
 
     Object.keys(scopedQuestions).forEach((questionId) => {
       const lowerQuestionId = String(questionId || '').toLowerCase();
@@ -823,7 +834,7 @@ export function buildRatingMatrixFromRealData(
   options: { sessionSlug?: unknown } = {},
 ): RatingMatrixBuildResult {
   if (!realQR || typeof realQR !== 'object') {
-    return { matrix: null, responders: [], questions: [], promptsMap: {} };
+    return { matrix: null, responders: [], questions: [], promptsMap: {}, displayNamesMap: {} };
   }
   const sessionSlug = options.sessionSlug || '';
 
@@ -831,6 +842,7 @@ export function buildRatingMatrixFromRealData(
   const participantsSet = new Set<string>();
   const binaryQuestions: Array<{ qId: string; prompt: string }> = [];
   const promptsMap: StringMap = {};
+  const displayNamesMap: StringMap = {};
 
   Object.entries(realQR).forEach(([qId, arr]) => {
     if (!Array.isArray(arr) || arr.length === 0) return;
@@ -859,14 +871,20 @@ export function buildRatingMatrixFromRealData(
       if (isPolisDemoFixturePayload(parsed)) continue;
       if (!isPolisRealRowAllowedForSession(r, parsed, sessionSlug)) continue;
       if (r?.responder) {
-        participantsSet.add(String(r.responder).toLowerCase());
+        const responder = String(r.responder).toLowerCase();
+        participantsSet.add(responder);
+        const responderName = String(parsed?.responderName || '')
+          .trim()
+          .replace(/\s+/g, ' ')
+          .slice(0, 160);
+        if (responderName && !displayNamesMap[responder]) displayNamesMap[responder] = responderName;
       }
     }
   });
 
   // No usable questions or participants => bail out
   if (binaryQuestions.length === 0 || participantsSet.size === 0) {
-    return { matrix: null, responders: [], questions: [], promptsMap: {} };
+    return { matrix: null, responders: [], questions: [], promptsMap: {}, displayNamesMap: {} };
   }
 
   // Deterministic ordering
@@ -916,6 +934,7 @@ export function buildRatingMatrixFromRealData(
     responders: respondersSorted,
     questions: questionsSorted,
     promptsMap,
+    displayNamesMap,
   };
 }
 

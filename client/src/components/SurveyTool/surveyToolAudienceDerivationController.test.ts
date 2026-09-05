@@ -66,8 +66,8 @@ describe('surveyToolAudienceDerivationController', () => {
       ).toBe('explicit');
     });
 
-    it('returns inherit for additional with no persisted state and empty value', () => {
-      expect(normalizeFieldAudienceMode('', 'additional', {}, () => false)).toBe('inherit');
+    it('returns explicit for additional with no persisted state and empty value', () => {
+      expect(normalizeFieldAudienceMode('', 'additional', {}, () => false)).toBe('explicit');
     });
   });
 
@@ -185,12 +185,13 @@ describe('surveyToolAudienceDerivationController', () => {
         getDefaultAudienceForQid: () => 'self',
         getDefaultAudience: () => 'self',
         resolveFieldEncryptionGateId: () => null,
-        normalizeFieldAudienceMode: () => 'inherit',
+        normalizeFieldAudienceMode: (value, fieldKey, field) =>
+          normalizeFieldAudienceMode(value, fieldKey, field, () => false),
       });
 
       expect(result.encrypted).toBe(false);
       expect(result.encryptionGateId).toBeNull();
-      expect(result.audienceMode).toBe('inherit');
+      expect(result.audienceMode).toBe('explicit');
     });
   });
 

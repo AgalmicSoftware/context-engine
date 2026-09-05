@@ -47,8 +47,9 @@
 .audioTextarea {
   width: 100%;
   font-size: 1.2em;
-  color: var(--ce-text);
-  caret-color: var(--ce-text);
+  font-weight: 500;
+  color: var(--ce-panel-text, var(--ce-text)) !important;
+  caret-color: var(--ce-panel-text, var(--ce-text)) !important;
   padding: 10px;
   background: color-mix(in srgb, var(--ce-compat-dark) 20%, transparent);
   border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
@@ -62,7 +63,7 @@
 
 .audioTextarea::placeholder {
   opacity: 1;
-  color: color-mix(in srgb, var(--ce-text) 72%, transparent);
+  color: color-mix(in srgb, var(--ce-panel-text, var(--ce-text)) 78%, transparent) !important;
 }
 
 .audioTextarea:focus,
@@ -145,8 +146,11 @@
 
 /* AI rewrite button (icon-only) */
 .aiRewriteButton {
-  background: transparent;
-  border: none;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
   padding: 4px;
   cursor: pointer;
   font-size: 1.5em;
@@ -158,8 +162,22 @@
     color 0.2s ease,
     opacity 0.2s ease;
   &:hover {
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
     opacity: 1;
     color: var(--ce-text-muted);
+  }
+
+  &:active {
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 2px;
   }
 }
 

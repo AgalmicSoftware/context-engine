@@ -1,4 +1,3 @@
-import sha256 from 'crypto-js/sha256';
 import { toStr } from '../../utilities/shared/primitives.js';
 import type { SessionModeProfile } from '../../utilities/session/sessionModeProfile';
 import type { AnyRecord, WorkerSecretsLike } from '../shellTypes';
@@ -9,6 +8,7 @@ import {
 } from './sessionWizardWorkerRequirementProof';
 import { normalizeSessionWizardWorkerUrl } from './sessionWizardUrlSupport';
 import { buildSessionWizardWorkerVerificationConfig } from './sessionWizardWorkerVerificationConfig';
+import { fingerprintSessionWizardJson } from './sessionWizardCanonicalJson';
 
 export type SessionWizardWorkerPublishEvidence = {
   verified: boolean;
@@ -27,18 +27,6 @@ export type SessionWizardWorkerPublishEvidence = {
 
 const cloneRecord = <T extends AnyRecord>(value: T): T => JSON.parse(JSON.stringify(value || {})) as T;
 
-const canonicalize = (value: unknown): unknown => {
-  if (Array.isArray(value)) return value.map(canonicalize);
-  if (!value || typeof value !== 'object') return value;
-  return Object.keys(value as AnyRecord)
-    .sort()
-    .reduce<AnyRecord>((result, key) => {
-      const entry = (value as AnyRecord)[key];
-      if (entry !== undefined) result[key] = canonicalize(entry);
-      return result;
-    }, {});
-};
-
 const buildPublishInputFingerprint = ({
   runtime,
   draft,
@@ -52,33 +40,29 @@ const buildPublishInputFingerprint = ({
   workerUrl: string;
   proof?: SessionWizardWorkerRequirementProof | null;
 }): string =>
-  sha256(
-    `context-engine:worker-publish-input:v1:${JSON.stringify(
-      canonicalize({
-        workerUrl,
-        draft,
-        workerSecrets,
-        proof: proof || null,
-        runtime: {
-          adminAddress: toStr(runtime.account || runtime.resolvedAdminAddress)
-            .trim()
-            .toLowerCase(),
-          deployComplete: runtime.deployComplete === true,
-          deployWorkerUrl: normalizeSessionWizardWorkerUrl(runtime.deployWorkerUrl),
-          embeddedDeployHelperEnabled: runtime.embeddedDeployHelperEnabled,
-          latestChainBlock: runtime.latestChainBlock,
-          registryAddress: toStr(runtime.registryAddress).trim(),
-          registryChainId: Number(runtime.registryChainId || 0) || 0,
-          sessionId: toStr(runtime.sessionId).trim(),
-          sessionIdHex: toStr(runtime.sessionIdHex).trim(),
-          workerLimitPerWallet: Number(runtime.workerLimitPerWallet || 0) || 0,
-          workerMode: runtime.workerMode || '',
-          workerAllowOrigins: toStr(runtime.workerAllowOrigins).trim(),
-          workerSecretsEnabled: runtime.workerSecretsEnabled !== false,
-        },
-      }),
-    )}`,
-  ).toString();
+  fingerprintSessionWizardJson('context-engine:worker-publish-input:v1', {
+    workerUrl,
+    draft,
+    workerSecrets,
+    proof: proof || null,
+    runtime: {
+      adminAddress: toStr(runtime.account || runtime.resolvedAdminAddress)
+        .trim()
+        .toLowerCase(),
+      deployComplete: runtime.deployComplete === true,
+      deployWorkerUrl: normalizeSessionWizardWorkerUrl(runtime.deployWorkerUrl),
+      embeddedDeployHelperEnabled: runtime.embeddedDeployHelperEnabled,
+      latestChainBlock: runtime.latestChainBlock,
+      registryAddress: toStr(runtime.registryAddress).trim(),
+      registryChainId: Number(runtime.registryChainId || 0) || 0,
+      sessionId: toStr(runtime.sessionId).trim(),
+      sessionIdHex: toStr(runtime.sessionIdHex).trim(),
+      workerLimitPerWallet: Number(runtime.workerLimitPerWallet || 0) || 0,
+      workerMode: runtime.workerMode || '',
+      workerAllowOrigins: toStr(runtime.workerAllowOrigins).trim(),
+      workerSecretsEnabled: runtime.workerSecretsEnabled !== false,
+    },
+  });
 
 export const matchesSessionWizardWorkerPublishEvidence = (
   expected: SessionWizardWorkerPublishEvidence | null | undefined,

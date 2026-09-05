@@ -39,6 +39,8 @@ const HIDDEN_PATHS = new Set([
   'faucet.rpcUrl',
   'faucet.privateKey',
   'faucet.encryptedPrivateKey',
+  'interviewMode.enabled',
+  'interviewMode.provider',
 ]);
 
 const TOP_LEVEL_FIELD_ORDER = [
@@ -49,6 +51,8 @@ const TOP_LEVEL_FIELD_ORDER = [
   'appearance',
   'groupCreationPolicy',
   'sessionModeProfile',
+  'interviewModeEnabled',
+  'interviewMode',
   'sessionHeader',
   'sessionEndsAt',
   'storageProfile',
@@ -72,6 +76,8 @@ const WORKER_ONLY_DRAFT_FIELDS = new Set(['embeddedDeployHelperEnabled']);
 
 const MORE_OPTIONS_FIELDS = new Set([
   'appearance',
+  'interviewModeEnabled',
+  'interviewMode',
   'groupCreationPolicy',
   'sessionEndsAt',
   'defaultTags',
@@ -90,6 +96,11 @@ const FIELD_TOOLTIPS: Record<string, string> = {
   sessionInfo: 'A short description people will see on the session page, cards, and headers.',
   sessionModeProfile:
     'The session mode profile controls authority, storage, identity, authorization, encryption, surfaces, results, and export behavior.',
+  interviewModeEnabled:
+    'Allow participants to open Interview or Group Conversation from the session microphone. Interview uses the session Worker AI key and remains review-only until normal submission.',
+  interviewMode:
+    'Configure the realtime voice connection used by Interview mode. The provider is OpenAI for now and can be extended without changing the session link contract.',
+  'interviewMode.realtimeModel': 'OpenAI Realtime voice model used for this session. The default is gpt-realtime-2.1.',
   corsWorkerUrl: 'Base URL for the worker (AI, transcription, Arweave uploads, faucet).',
   sessionHeader: 'The banner image for this session. Use an image URL; Arweave-backed sessions can also upload a file.',
   sessionEndsAt:
@@ -128,6 +139,9 @@ const FIELD_LABELS: Record<string, string> = {
   sessionName: 'Session Name',
   sessionInfo: 'Session Description',
   sessionModeProfile: 'Session Mode',
+  interviewModeEnabled: 'Voice interview modes',
+  interviewMode: 'Interview voice settings',
+  'interviewMode.realtimeModel': 'Realtime voice model',
   corsWorkerUrl: 'Worker URL',
   sessionHeader: 'Header Image',
   sessionEndsAt: 'Session end time',

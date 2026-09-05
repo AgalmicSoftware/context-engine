@@ -120,13 +120,12 @@ describe('SurveyQuestions lock audience controls', () => {
     expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_FOLLOW)).not.toBeInTheDocument();
   });
 
-  it('keeps the answer encrypted when additional comments opt out', async () => {
+  it('keeps additional comments unlocked when the answer is encrypted', async () => {
     renderStandaloneQuestion();
     await screen.findByTestId(E2E_TESTIDS.SURVEY_ANSWER_LOCK);
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SURVEY_ANSWER_LOCK));
     fireEvent.click(screen.getByTitle('Additional comments'));
-    fireEvent.click(await screen.findByTestId(E2E_TESTIDS.SURVEY_ADDITIONAL_LOCK));
 
     expect(getAnswerLockIconName()).toBe('lock');
     expect(getAdditionalLockIconName()).toBe('unlock');

@@ -115,12 +115,13 @@ copy instead of placing Windows control text over the navy overlay palette.
 The runtime theme smoke opens the complete question generator on desktop and
 mobile and checks its visible control/text pairs at 4.5:1.
 
-When the bundled-theme selector is enabled, Settings exposes it as the final
-`Appearance & colors` section both before and after sign-in. This selector
-changes the complete app theme; it is separate from a session's curated color
-scheme and does not accept arbitrary color values. Its deployment option reads
-`Deployment theme: <theme label>` for a valid embedded choice, or
-`Deployment theme: default` when that choice cannot be named.
+When the bundled-theme selector is enabled, signed-in Settings exposes it
+directly beneath the equal 2×2 Config, Session, Explainers, and Demo Mode quick
+controls. Signed-out Settings keeps it in the final `Appearance & colors`
+section. This selector changes the complete app theme; it is separate from a
+session's curated color scheme and does not accept arbitrary color values. Its
+deployment option reads `Deployment theme: <theme label>` for a valid embedded
+choice, or `Deployment theme: default` when that choice cannot be named.
 
 ## Session Color Schemes
 

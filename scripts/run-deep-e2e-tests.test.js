@@ -8,6 +8,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const {
+  buildAppServerArgs,
   buildDeepE2eSteps,
   isLocalBaseUrl,
   resolveDeepE2eEnv,
@@ -51,6 +52,17 @@ test('isLocalBaseUrl limits automatic app-server startup to local targets', () =
   assert.equal(isLocalBaseUrl('http://localhost:3000'), true);
   assert.equal(isLocalBaseUrl('https://contextengine.xyz'), false);
   assert.equal(isLocalBaseUrl('not a url'), false);
+});
+
+test('app server launch honors the requested E2E port and refuses silent fallback', () => {
+  assert.deepEqual(
+    buildAppServerArgs('http://127.0.0.1:43117'),
+    ['run', 'dev', '--', '--port', '43117', '--strictPort'],
+  );
+  assert.deepEqual(
+    buildAppServerArgs('http://localhost:3000'),
+    ['run', 'dev', '--', '--port', '3000', '--strictPort'],
+  );
 });
 
 test('buildDeepE2eSteps only includes private bridge checks when the root script is available', () => {

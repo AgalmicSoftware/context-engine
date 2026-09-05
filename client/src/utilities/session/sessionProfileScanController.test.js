@@ -28,9 +28,9 @@ jest.mock('../../utilities/session/registryBootstrapChainIds.js', () => ({
   resolveSessionRegistryBootstrapChainIds: jest.fn(() => undefined),
 }));
 
-jest.mock('../../utilities/web3/chainGateway.js', () => ({
+jest.mock('./sessionSlug.js', () => ({
   __esModule: true,
-  normalizeSessionSlug: jest.fn((s) =>
+  canonicalizeSessionSlug: jest.fn((s) =>
     String(s || '')
       .trim()
       .toLowerCase(),
@@ -83,7 +83,7 @@ const { createSessionProfileScanController } = require('./sessionProfileScanCont
 const litProtocolModule = require('../../utilities/crypto/litProtocol.js');
 const sessionScanScopeModule = require('../../utilities/session/sessionScanScope.js');
 const registryBootstrapModule = require('../../utilities/session/registryBootstrapChainIds.js');
-const contractScriptsModule = require('../../utilities/web3/chainGateway.js');
+const sessionSlugModule = require('./sessionSlug.js');
 const sessionRegistryModule = require('../../utilities/web3/sessionRegistry.js');
 const chainsModule = require('../../variables/chains.js');
 const debugTelemetryModule = require('./profileScanTelemetry.js');
@@ -193,7 +193,7 @@ describe('createSessionProfileScanController', () => {
     litProtocolModule.getGlobalLitHooks.mockReturnValue({});
     sessionScanScopeModule.getAllowedSessionSlugs.mockReturnValue([]);
     registryBootstrapModule.resolveSessionRegistryBootstrapChainIds.mockReturnValue(undefined);
-    contractScriptsModule.normalizeSessionSlug.mockImplementation((slug) =>
+    sessionSlugModule.canonicalizeSessionSlug.mockImplementation((slug) =>
       String(slug || '')
         .trim()
         .toLowerCase(),

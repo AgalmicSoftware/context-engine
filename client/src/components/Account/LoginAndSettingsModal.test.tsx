@@ -212,6 +212,12 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     window.history.replaceState({}, '', '/');
   });
 
+  it('keeps the class identity without the legacy statics helper', () => {
+    expect(LoginAndSettingsModalSubject.displayName).toBe('LoginAndSettingsModal');
+    expect(LoginAndSettingsModalSubject.propTypes).toBeUndefined();
+    expect(LoginAndSettingsModalSubject.defaultProps).toBeUndefined();
+  });
+
   it('does not update local state after unmount while session restore is pending', async () => {
     let resolveRestore!: (value: string | null) => void;
     mockedPasskeyWallet.restorePasskeyWalletSession.mockImplementationOnce(
@@ -390,6 +396,67 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     subject.componentDidUpdate(prevProps, subject.state);
 
     expect(getWorkerSessionToken).not.toHaveBeenCalled();
+  });
+
+  it('keeps Settings open when passive passkey restoration completes', () => {
+    jest.useFakeTimers();
+    try {
+      const prevProps = buildProps({
+        account: PASSKEY_ADDRESS,
+        provider: 'passkey_eoa',
+        loginComplete: false,
+        loginModalToggled: true,
+      });
+      const nextProps = buildProps({
+        account: PASSKEY_ADDRESS,
+        provider: 'passkey_eoa',
+        loginComplete: true,
+        loginModalToggled: true,
+      });
+      const subject = mountClassSubject(new LoginAndSettingsModalSubject(nextProps));
+      subject.checkAndSendTestFundsIfNeeded = jest.fn();
+
+      subject.componentDidUpdate(prevProps, subject.state);
+      jest.advanceTimersByTime(1000);
+
+      expect(nextProps.toggleLoginModal).not.toHaveBeenCalled();
+      expect(subject.state.firstModalAfterLogin).toBe(false);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('auto-closes after an explicit passkey Create or Login action completes', () => {
+    jest.useFakeTimers();
+    try {
+      const prevProps = buildProps({
+        account: PASSKEY_ADDRESS,
+        provider: 'passkey_eoa',
+        loginComplete: false,
+        loginModalToggled: true,
+      });
+      const nextProps = buildProps({
+        account: PASSKEY_ADDRESS,
+        provider: 'passkey_eoa',
+        loginComplete: true,
+        loginModalToggled: true,
+      });
+      const subject = mountClassSubject(new LoginAndSettingsModalSubject(nextProps));
+      subject.checkAndSendTestFundsIfNeeded = jest.fn();
+      subject.startPurposefulPasskeyWalletAction();
+
+      subject.componentDidUpdate(prevProps, subject.state);
+
+      expect(subject.state.firstModalAfterLogin).toBe(true);
+      expect(nextProps.toggleLoginModal).not.toHaveBeenCalled();
+
+      jest.advanceTimersByTime(1000);
+
+      expect(nextProps.toggleLoginModal).toHaveBeenCalledWith(false);
+      expect(subject.state.firstModalAfterLogin).toBe(false);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('uses the explicit worker route slug when requesting a passkey session token', async () => {

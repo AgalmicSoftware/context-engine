@@ -1407,6 +1407,13 @@ export class SurveySelector extends Component<any, any> {
       pendingSubmitStats.total > 0 &&
       !pendingSubmitStats.submittedSinceLastEdit &&
       (viewMode === 'questions' || !!selectedSurvey);
+    const isEmbeddedSessionToolbar = Boolean(this.props.embeddedSessionToolbar);
+    const toolbarClassName = [
+      isEmbeddedSessionToolbar ? styles.embeddedSessionToolbar : '',
+      isEmbeddedSessionToolbar && !showHeaderSubmitButton ? styles.toolbarWithoutSubmit : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
 
     const filterButtonStyle = resolveSurveySelectorFilterButtonStyle(isFilterActive);
     const filterIconStyle = resolveSurveySelectorFilterIconStyle(isFilterActive);
@@ -1414,11 +1421,7 @@ export class SurveySelector extends Component<any, any> {
 
     return (
       <div>
-        <div
-          id={styles.surveysRow}
-          className={this.props.embeddedSessionToolbar ? styles.embeddedSessionToolbar : undefined}
-          data-testid={E2E_TESTIDS.SURVEY_TOOLBAR}
-        >
+        <div id={styles.surveysRow} className={toolbarClassName || undefined} data-testid={E2E_TESTIDS.SURVEY_TOOLBAR}>
           <Dropdown id={styles.surveysDropdown} isOpen={selectorDropdownOpen} toggle={this.toggleSelectorDropdown}>
             <DropdownToggle
               id={styles.dropdownToggle}

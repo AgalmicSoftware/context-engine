@@ -45,7 +45,6 @@ const uploadTransactionWithFallback = async ({ arweave, tx, deps }) => {
   try {
     const uploader = await arweave.transactions.getUploader(tx);
     while (!uploader.isComplete) {
-      // eslint-disable-next-line no-await-in-loop
       await uploader.uploadChunk();
     }
     return;
@@ -83,7 +82,6 @@ export const resolveArweaveCtor = async ({ deps } = {}) => {
 
   for (const candidate of candidates) {
     try {
-      // eslint-disable-next-line no-await-in-loop
       const moduleValue = await candidate.loader();
       const ctor = resolveCtorFromModule(moduleValue);
       if (ctor) {

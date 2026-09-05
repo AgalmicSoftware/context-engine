@@ -449,11 +449,20 @@ export const buildUserPageCacheRefreshDisplayState = ({
     loadingSBTs,
     loadingSurveys,
   });
+  const hasVisibleData = [
+    questionCreationInfo,
+    questionResponseInfo,
+    sbtList,
+    surveyCreationInfo,
+    surveyResponseInfo,
+  ].some((value) => readUserPageDisplayLength(value) > 0);
   const aiActionPlan = resolveUserPageAiActionPlan({
     aiAvailable,
     analyzing,
     collapseOpen,
-    disabledByCache: loadingState.disabledByCache,
+    // Analysis operates on the visible profile snapshot. Do not leave it blocked by an
+    // unrelated cache lane once useful profile data has already been hydrated.
+    disabledByCache: loadingState.disabledByCache && !hasVisibleData,
     walletLabel,
   });
   const sectionLoadingEmptyState = buildUserPageSectionLoadingEmptyState({
@@ -480,13 +489,6 @@ export const buildUserPageCacheRefreshDisplayState = ({
   });
   const hasAnyLoading =
     loadingState.isQuestionLoadingAny || loadingState.isSbtLoadingAny || loadingState.isSurveyLoadingAny;
-  const hasVisibleData = [
-    questionCreationInfo,
-    questionResponseInfo,
-    sbtList,
-    surveyCreationInfo,
-    surveyResponseInfo,
-  ].some((value) => readUserPageDisplayLength(value) > 0);
   const cacheReadinessDisplayPlan = resolveUserPageCacheReadinessDisplayPlan({
     disabledByCache: loadingState.disabledByCache,
     hasAnyLoading,

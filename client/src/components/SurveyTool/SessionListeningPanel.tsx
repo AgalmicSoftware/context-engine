@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
+  faCaretDown,
   faCircle,
   faMicrophone,
   faPause,
@@ -26,6 +27,7 @@ type SessionListeningPanelProps = Record<string, unknown> & {
   workerUrl?: string;
   defaultTags?: string | string[] | null;
   onClose?: () => void;
+  panelMode?: 'recordGroup' | 'listening';
 };
 type CreateQuestionsAndSurveysPanelProps = React.ComponentProps<typeof CreateQuestionsAndSurveys>;
 type BrowserAudioWindow = Window &
@@ -33,7 +35,7 @@ type BrowserAudioWindow = Window &
     webkitAudioContext?: typeof AudioContext;
   };
 
-const formatElapsed = (secondsRaw: unknown) => {
+export const formatSessionRecordingElapsed = (secondsRaw: unknown) => {
   const seconds = Math.max(0, Math.floor(Number(secondsRaw || 0)));
   const minutes = Math.floor(seconds / 60);
   const rest = seconds % 60;
@@ -66,7 +68,7 @@ const cancelWaveformFrame = (handle: number) => {
   clearTimeout(handle as unknown as ReturnType<typeof setTimeout>);
 };
 
-function SessionListeningWaveform({ streamRef, isActive, isPaused }: SessionListeningWaveformProps) {
+export function SessionListeningWaveform({ streamRef, isActive, isPaused }: SessionListeningWaveformProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -285,7 +287,15 @@ function SessionListeningWaveform({ streamRef, isActive, isPaused }: SessionList
 }
 
 export default function SessionListeningPanel(props: SessionListeningPanelProps) {
-  const { sessionSlug = '', sessionConfig = null, context, workerUrl, defaultTags = null, onClose } = props;
+  const {
+    sessionSlug = '',
+    sessionConfig = null,
+    context,
+    workerUrl,
+    defaultTags = null,
+    onClose,
+    panelMode = 'listening',
+  } = props;
   const recorder = useRollingTranscriptionRecorder({
     sessionSlug,
     sessionConfig,
@@ -330,13 +340,14 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     recorder.isRecording ||
     recorder.isPaused ||
     recorder.isBusy ||
+    Number(recorder.pendingSegmentCount || 0) > 0 ||
     hasTranscript ||
     hasGeneratedDraft ||
     failedCount > 0 ||
     Boolean(recorder.errorMessage || generationError);
-  const canGenerate = trimmedTranscript.length >= 50 && !isGenerating;
   const isRecorderSessionActive = recorder.isRecording || recorder.isPaused || recorder.isStopping;
   const hasPendingTranscription = Number(recorder.pendingSegmentCount || 0) > 0;
+  const canGenerate = trimmedTranscript.length >= 50 && !isGenerating && !hasPendingTranscription;
   const isStarting = !isRecorderSessionActive && recorder.isBusy;
   const recorderError = recorder.errorMessage && !hasTranscript ? recorder.errorMessage : '';
   const shouldShowGenericRecorderError = Boolean(
@@ -369,17 +380,8 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       ? faSpinner
       : faMicrophone;
   const isRecordButtonSpinning = recorder.isStopping || isStarting;
-  const statusLabel = recorder.isStopping
-    ? 'Stopping recorder'
-    : recorder.isPaused
-      ? 'Paused'
-      : recorder.isRecording
-        ? 'Recording'
-        : isStarting
-          ? 'Starting recorder'
-          : hasTranscript
-            ? 'Transcript ready'
-            : '';
+  const statusLabel = recorder.isStopping ? 'Stopping recorder' : isStarting ? 'Starting recorder' : '';
+  const shouldShowMeta = Boolean(statusLabel || hasPendingTranscription || hasTranscript || isGenerating);
 
   useEffect(() => {
     if (!isGenerating) {
@@ -467,7 +469,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
         {hasVisibleStatus ? (
           <div className={styles.sessionListeningTitle}>
             <FontAwesomeIcon icon={faMicrophone} />
-            <span>Listening</span>
+            <span>{panelMode === 'recordGroup' ? 'Group Conversation' : 'Listening'}</span>
           </div>
         ) : (
           <div aria-hidden="true" />
@@ -500,7 +502,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
                 className={recorder.isPaused ? styles.sessionListeningTimerDotPaused : styles.sessionListeningTimerDot}
               />
               <span>{recorder.isPaused ? 'Paused' : 'Recording'}</span>
-              <span>{formatElapsed(recorder.elapsedSeconds)}</span>
+              <span>{formatSessionRecordingElapsed(recorder.elapsedSeconds)}</span>
             </div>
           </div>
           <div className={styles.sessionListeningButtonColumn} role="group" aria-label="Recording controls">
@@ -548,19 +550,36 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
         </div>
       )}
 
-      {hasVisibleStatus && (
+      {shouldShowMeta && (
         <div className={styles.sessionListeningMeta} aria-live="polite">
           {statusLabel && <span>{statusLabel}</span>}
+          {hasPendingTranscription && (
+            <span className={styles.sessionListeningTranscribingStatus}>
+              <FontAwesomeIcon icon={faSpinner} spin />
+              <span>Transcribing…</span>
+            </span>
+          )}
           {hasTranscript && (
             <button
               type="button"
               className={styles.sessionListeningTranscriptButton}
               onClick={() => setIsTranscriptOpen((open) => !open)}
               aria-expanded={isTranscriptOpen}
+              aria-busy={hasPendingTranscription}
               data-testid={E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT_DETAILS}
             >
               <span>Transcript</span>
               <span>{trimmedTranscript.length} chars</span>
+              <FontAwesomeIcon
+                icon={faCaretDown}
+                className={[
+                  styles.sessionListeningTranscriptCaret,
+                  isTranscriptOpen ? styles.sessionListeningTranscriptCaretExpanded : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                aria-hidden="true"
+              />
             </button>
           )}
           {isGenerating && <span>{`Generating questions... ${generationElapsedSeconds}s`}</span>}

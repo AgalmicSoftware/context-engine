@@ -161,7 +161,6 @@ const manualChunkGroups = [
       '/node_modules/aes-js/',
       '/node_modules/bech32/',
       '/node_modules/bignumber.js/',
-      '/node_modules/crypto-js/',
       '/node_modules/hash.js/',
       '/node_modules/inherits/',
       '/node_modules/js-sha3/',
@@ -544,6 +543,12 @@ export default defineConfig(({ mode }) => {
         { find: '@ce-shared', replacement: path.resolve(__dirname, '..', 'shared') },
         { find: /^buffer$/, replacement: path.resolve(__dirname, 'node_modules', 'buffer', 'index.js') },
         { find: /^node:buffer$/, replacement: path.resolve(__dirname, 'node_modules', 'buffer', 'index.js') },
+        // Shared sources live above the Vite root, so bare imports resolve toward
+        // root/node_modules unless browser dependencies are pinned to the client install.
+        {
+          find: /^ethers$/,
+          replacement: path.resolve(__dirname, 'node_modules', 'ethers', 'lib.esm', 'index.js'),
+        },
         { find: /^@metamask\/superstruct$/, replacement: path.resolve(srcDir, 'shims', 'metamask-superstruct.ts') },
         { find: /^zod-validation-error$/, replacement: path.resolve(__dirname, 'node_modules', 'zod-validation-error', 'dist', 'index.js') },
         { find: /^worker_threads$/, replacement: path.resolve(srcDir, 'shims', 'node-worker-threads.ts') },

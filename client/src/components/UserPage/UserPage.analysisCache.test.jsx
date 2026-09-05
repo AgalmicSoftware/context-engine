@@ -492,8 +492,13 @@ describe('UserPage analysis cache and routing', () => {
     expect(analyzeUserOpinions).toHaveBeenCalledWith(
       expect.any(Object),
       expect.objectContaining({
+        context: expect.objectContaining({
+          account: '0x00000000000000000000000000000000000000bb',
+          chainId: 84532,
+        }),
         sessionSlug: inScopeSlug,
         sessionConfig: expect.objectContaining({ slug: inScopeSlug }),
+        throwOnError: true,
         sessionSelection: expect.objectContaining({
           gateStatus: 'no-gate',
           reason: 'open-ai-gate',
@@ -547,7 +552,7 @@ describe('UserPage analysis cache and routing', () => {
 
       expect(analyzeUserOpinions).not.toHaveBeenCalled();
       expect(instance.state.analyzing).toBe(false);
-      expect(instance.state.analysisError).toContain('Unable to generate analysis');
+      expect(instance.state.analysisError).toContain('No valid AI session configuration');
       expect(consoleErrorSpy).toHaveBeenCalledWith('[account]', '[UserPage] analyzeUser failed:', expect.any(Error));
     } finally {
       consoleErrorSpy.mockRestore();
@@ -579,6 +584,36 @@ describe('UserPage analysis cache and routing', () => {
       exactSpy.mockRestore();
       demoSpy.mockRestore();
     }
+  });
+
+  it('uses the profile route session config for Worker-backed analysis', async () => {
+    const sessionConfig = {
+      slug: 'demo-interview',
+      corsWorkerUrl: 'https://worker.example',
+      ai: { provider: 'openai', model: 'gpt-4o-mini' },
+    };
+    const instance = makeInstance({
+      account: '0x00000000000000000000000000000000000000bb',
+      activeSessionSlug: 'demo-interview',
+      sessionConfig,
+    });
+    jest.spyOn(instance, '_getAiSessionSlugCandidates').mockReturnValue(['demo-interview']);
+    checkSponsoredAccess.mockResolvedValue({
+      status: 'no-gate',
+      gate: null,
+      resourceKey: 'ai',
+    });
+
+    await instance.analyzeUser();
+
+    expect(analyzeUserOpinions).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        sessionSlug: 'demo-interview',
+        sessionConfig,
+        throwOnError: true,
+      }),
+    );
   });
 
   it('does not treat demo-only alias session keys as valid analyze-session configs', () => {

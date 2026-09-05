@@ -13,7 +13,8 @@ import {
   hasUsableSessionWorkerConfig,
 } from '../../utilities/session/sessionWorkerAvailability.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { toStr, normalizeSlug as canonicalizeSlug } from '../../utilities/shared/primitives.js';
+import { normalizeSessionSlugToken as normalizeSlug } from '../../utilities/session/sessionSlug';
+import { toStr } from '../../utilities/shared/primitives.js';
 import { notify } from '../../utilities/ui/notify.js';
 import { SponsorHandoffResult } from './SponsorHandoffResult';
 
@@ -124,10 +125,6 @@ const getErrorMessage = (error: unknown, fallback = 'Unknown error') => {
   return String(error || fallback);
 };
 
-const normalizeSlug = (raw: unknown) => {
-  const slug = canonicalizeSlug(raw);
-  return slug === 'general' ? '' : slug;
-};
 const parseChainIdInput = (raw: unknown) => {
   const matches = toStr(raw).match(/\d+/g);
   if (!matches || !matches.length) return 0;

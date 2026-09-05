@@ -4,6 +4,7 @@ const { URL } = require('node:url');
 
 const DEFAULT_BASE_URL = 'http://127.0.0.1:3000';
 const DEFAULT_ROUTES = Object.freeze([
+  '/session/new',
   '/session/demo',
   '/session/pe4',
   '/admin',
@@ -135,12 +136,66 @@ async function dismissOnboardingIfPresent(page, { timeoutMs }) {
   await overlay.waitFor({ state: 'detached', timeout: timeoutMs });
 }
 
+async function probeSessionModePresets(page, { timeoutMs }) {
+  await dismissOnboardingIfPresent(page, { timeoutMs });
+
+  const presetIds = [
+    'fast_cheap_cloudflare',
+    'trustless_public_decentralized',
+  ];
+  const failures = [];
+
+  for (const [index, presetId] of presetIds.entries()) {
+    const preset = page.getByTestId(`ce-new-preset-${presetId}`);
+    await preset.waitFor({ state: 'visible', timeout: timeoutMs });
+    if (index > 0) {
+      page.once('dialog', (dialog) => dialog.accept());
+    }
+    await preset.click();
+    const selected = await preset.getAttribute('aria-checked');
+    if (selected !== 'true') {
+      failures.push(`${presetId} did not become the selected session mode`);
+    }
+  }
+
+  return failures;
+}
+
+const DEFAULT_ROUTE_PROBES = Object.freeze({
+  '/session/new': probeSessionModePresets,
+});
+
 async function inspectRoute(browser, baseUrl, route, options = {}) {
   const page = await browser.newPage({ viewport: options.viewport || resolveViewport() });
   const consoleIssues = [];
   const pageErrors = [];
   const failedRequests = [];
   const badResponses = [];
+
+  if (route === '/session/new') {
+    // Preset selection is credential-free; the default demo cache is unrelated to this route probe.
+    await page.route('https://*.workers.dev/storage/list?*', (requestRoute) => requestRoute.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ items: [], listComplete: true }),
+    }));
+    await page.route('https://op-sepolia-testnet.api.pocket.network/**', async (requestRoute) => {
+      const payload = requestRoute.request().postDataJSON();
+      const results = {
+        eth_blockNumber: '0x1',
+        eth_chainId: '0xaa37dc',
+      };
+      if (!payload || !Object.hasOwn(results, payload.method)) {
+        await requestRoute.abort('failed');
+        return;
+      }
+      await requestRoute.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ jsonrpc: '2.0', id: payload.id, result: results[payload.method] }),
+      });
+    });
+  }
 
   page.on('console', (msg) => {
     if (msg.type() === 'error' || msg.type() === 'warning') {
@@ -376,7 +431,7 @@ async function runSmoke(options = {}) {
         timeoutMs: options.timeoutMs,
         viewport,
         layoutProbeSelectors: options.layoutProbeSelectors,
-        routeProbe: options.routeProbes?.[route],
+        routeProbe: options.routeProbes?.[route] || DEFAULT_ROUTE_PROBES[route],
       }));
     }
 
@@ -412,6 +467,7 @@ if (require.main === module) {
 module.exports = {
   DEFAULT_BASE_URL,
   DEFAULT_LAYOUT_PROBE_SELECTORS,
+  DEFAULT_ROUTE_PROBES,
   DEFAULT_ROUTES,
   DEFAULT_ROUTE_TEXT,
   compactSmokeSummary,
@@ -424,6 +480,7 @@ module.exports = {
   normalizeBaseUrl,
   normalizeLayoutProbeSelectors,
   normalizeRoutes,
+  probeSessionModePresets,
   resolveViewport,
   routeUrl,
   runRouteProbe,

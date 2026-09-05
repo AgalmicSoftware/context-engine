@@ -51,6 +51,7 @@ describe('sessionWizardFieldDescriptors', () => {
       [
         ['sessionName', 'Demo'],
         ['appearance', { colorSchemeId: 'amber' }],
+        ['interviewMode', { realtimeModel: 'gpt-realtime-2.1' }],
         ['groupCreationPolicy', 'participants'],
         ['sessionEndsAt', '2099-01-01T00:00:00.000Z'],
         ['blockLimits', { start: 1, end: 2 }],
@@ -61,6 +62,7 @@ describe('sessionWizardFieldDescriptors', () => {
 
     expect(primaryEntries.map(([key]) => key)).toEqual(['sessionName']);
     expect(moreOptionsEntries.map(([key]) => key)).toEqual([
+      'interviewMode',
       'groupCreationPolicy',
       'sessionEndsAt',
       'blockLimits',
@@ -73,6 +75,8 @@ describe('sessionWizardFieldDescriptors', () => {
     expect(getSessionWizardFieldLabel('sessionName', 'sessionName')).toBe('Session Name');
     expect(getSessionWizardFieldLabel('appearance', 'appearance')).toBe('Session colors');
     expect(getSessionWizardFieldLabel('groupCreationPolicy', 'groupCreationPolicy')).toBe('Who can create groups?');
+    expect(getSessionWizardFieldLabel('interviewMode.realtimeModel', 'realtimeModel')).toBe('Realtime voice model');
+    expect(getSessionWizardFieldTooltip(['interviewMode', 'realtimeModel'], '')).toContain('gpt-realtime-2.1');
     expect(getSessionWizardFieldTooltip(['sessionEndsAt'], '')).toContain('participant writes stop');
   });
 
@@ -112,6 +116,15 @@ describe('sessionWizardFieldDescriptors', () => {
         wizardMode: 'advanced',
       }),
     ).toBe(false);
+
+    expect(
+      shouldHideSessionWizardField({
+        key: 'provider',
+        path: ['interviewMode'],
+        currentPath: ['interviewMode', 'provider'],
+        wizardMode: 'normal',
+      }),
+    ).toBe(true);
   });
 
   it('keeps capability-hidden fields hidden even when guided controls force rendering', () => {

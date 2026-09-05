@@ -20,7 +20,11 @@ jest.mock('../web3/chainGateway.js', () => ({
     getQuestionResponsesChunkedWithCallback: jest.fn(),
     decryptQuestionPayloadInPlace: jest.fn(),
   },
-  normalizeSessionSlug: jest.fn((s) => String(s || '')),
+}));
+
+jest.mock('../session/sessionSlug.js', () => ({
+  __esModule: true,
+  canonicalizeSessionSlug: jest.fn((s) => String(s || '')),
 }));
 
 jest.mock('../arweave/arweaveRetryHelpers.js', () => ({
@@ -77,7 +81,7 @@ jest.mock('./questionRouting.js', () => ({
 const { createSessionQuestionCacheController } = require('./sessionQuestionCacheController.js');
 const contractScriptsModule = require('../web3/chainGateway.js');
 const contractScripts = contractScriptsModule.default;
-const { normalizeSessionSlug } = contractScriptsModule;
+const { canonicalizeSessionSlug: normalizeSessionSlug } = require('../session/sessionSlug.js');
 const {
   ensureQuestionArweaveCacheBranches,
   mergeQuestionArweaveCacheBranches,

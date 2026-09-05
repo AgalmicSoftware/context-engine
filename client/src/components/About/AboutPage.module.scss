@@ -1478,6 +1478,10 @@ $modal-muted: var(--ce-panel-text-muted);
     font-family: var(--ce-font-body);
   }
 
+  .recognitionModalTitle {
+    color: var(--ce-titlebar-text);
+  }
+
   .mainTitle,
   .tagline,
   .heroActions,

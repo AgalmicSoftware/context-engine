@@ -7,94 +7,58 @@ const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
+const HARD_FILE_LINE_LIMIT = 5000;
+const NEW_FILE_LINE_LIMIT = 1500;
 const LARGE_FILE_LINE_LIMIT = 1000;
-const LARGE_FILE_GROWTH_TOLERANCE = 25;
-const LARGE_FILE_SHRINK_TOLERANCE = 100;
-
-const LARGE_CLIENT_FILE_BASELINE = Object.freeze({
-  'client/src/components/Account/LoginAndSettingsModal.tsx': 2489,
-  'client/src/components/Admin/AdminPage.tsx': 2915,
-  'client/src/components/CommunityTab/CommunityTab.tsx': 2137,
-  'client/src/components/DebateMap/DebateMap.tsx': 2610,
-  'client/src/components/DemoViews/CorpusViewer.tsx': 1031,
-  'client/src/components/DocumentLibrary/DocumentLibraryPanel.tsx': 1697,
-  'client/src/components/MainContent/RiskMatrix.tsx': 1220,
-  // Event/cache atomic ports stay co-located to avoid an unrelated MainSite refactor.
-  'client/src/components/MainSite/AppShell.tsx': 4272,
-  'client/src/components/MainSite/mainSiteProfileScanRuntime.ts': 1503,
-  'client/src/components/MainSite/mainSiteRouteRenderers.tsx': 1372,
-  'client/src/components/OnePageSession/OnePageSession.tsx': 2497,
-  'client/src/components/PolisReport/PolisReport.tsx': 2787,
-  'client/src/components/PolisReport/polisReportRuntime.tsx': 1268,
-  'client/src/components/SBTs/CreateSBTGroup.tsx': 4664,
-  'client/src/components/SBTs/SBTFilter.tsx': 1398,
-  'client/src/components/SBTs/SBTPage.tsx': 4510,
-  'client/src/components/SBTs/SBTSelector.tsx': 2215,
-  'client/src/components/SBTs/SBTsList.tsx': 2999,
-  'client/src/components/SBTs/createSbtGroupHelpers.ts': 1042,
-  'client/src/components/SBTs/sbtFilterHelpers.ts': 1069,
-  'client/src/components/SBTs/sbtPageActionDisplayHelpers.ts': 1588,
-  'client/src/components/SBTs/sbtPageHelpers.ts': 1260,
-  'client/src/components/SBTs/sbtSelectorHelpers.ts': 1319,
-  'client/src/components/Sessions/SessionWizard.tsx': 2949,
-  'client/src/components/Shared/AudioInput/AudioInput.tsx': 1202,
-  'client/src/components/Sponsor/SponsorPage.tsx': 1356,
-  'client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx': 3999,
-  'client/src/components/SurveyTool/QuestionFilter.tsx': 3000,
-  'client/src/components/SurveyTool/SingleQuestionResponse.tsx': 1494,
-  'client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.tsx': 2113,
-  'client/src/components/SurveyTool/SurveyPileViewMode.tsx': 3032,
-  'client/src/components/SurveyTool/SurveyQuestions.tsx': 2238,
-  'client/src/components/SurveyTool/SurveyResults.tsx': 2276,
-  'client/src/components/SurveyTool/SurveySelector.tsx': 2073,
-  'client/src/components/SurveyTool/SurveyTool.tsx': 1264,
-  'client/src/components/SurveyTool/createQuestionsAndSurveysHelpers.ts': 1238,
-  'client/src/components/SurveyTool/surveyQuestionsDataRuntime.ts': 1527,
-  'client/src/components/SurveyTool/surveyQuestionsRuntimeMethods.tsx': 2975,
-  'client/src/components/SurveyTool/surveyQuestionsTypes.ts': 2312,
-  'client/src/components/SurveyTool/surveyToolDraftState.ts': 1354,
-  'client/src/components/SurveyTool/surveyToolHydrationFlow.ts': 2880,
-  'client/src/components/TagPage/TagPage.tsx': 1493,
-  'client/src/components/UserPage/CompareAddresses.tsx': 2106,
-  'client/src/components/UserPage/UserPage.tsx': 3848,
-  'client/src/components/UserPage/userPageGateHelpers.ts': 1070,
-  'client/src/components/UserPage/userPageHelpers.ts': 1481,
-  'client/src/utilities/ai/aiSettings.ts': 1125,
-  'client/src/utilities/arweave/arweaveClient.js': 1678,
-  'client/src/utilities/cache/cacheScripts.ts': 1088,
-  'client/src/utilities/crypto/cryptography.ts': 2406,
-  'client/src/utilities/crypto/litProtocol.ts': 2156,
-  'client/src/utilities/sbt/sessionSbtCacheController.js': 2036,
-  'client/src/utilities/session/sessionProfileScanController.ts': 1197,
-  'client/src/utilities/survey/compareUsers.ts': 1118,
-  'client/src/utilities/survey/consensusReportMath.ts': 1147,
-  // Controller-owned atomic deltas stay beside their scan/retry state machines.
-  'client/src/utilities/survey/sessionQuestionCacheController.ts': 2348,
-  'client/src/utilities/survey/sessionResponseHydrationController.ts': 1780,
-  'client/src/utilities/survey/sessionSurveyCacheController.ts': 1263,
-  'client/src/utilities/web3/contractScripts.impl.ts': 1147,
-  'client/src/utilities/web3/contractScripts.sbtRegistryMethods.ts': 1277,
-  'client/src/utilities/web3/profileChainReads.ts': 1115,
-  'client/src/utilities/web3/rpcDebugStats.ts': 1015,
-  'client/src/utilities/web3/rpcProviders.ts': 1054,
-  'client/src/utilities/web3/sessionRegistry.ts': 2540,
-});
+const MIN_GROWTH_ALLOWANCE = 100;
+const GROWTH_ALLOWANCE_RATIO = 0.1;
 
 const PRODUCTION_FILE_RE = /\.(?:js|jsx|ts|tsx)$/;
 const TEST_OR_DECLARATION_FILE_RE = /(?:\.d|\.test|\.spec|\.testUtils|TestUtils)\.(?:js|jsx|ts|tsx)$/;
 const GENERATED_OR_FIXTURE_PATH_RE = /(?:^|\/)(?:__fixtures__|__mocks__|__tests__|fixtures|generated)(?:\/|$)/;
 
-function hasGitMetadata(rootDir = ROOT_DIR) {
-  return fs.existsSync(path.join(rootDir, '.git'));
-}
+const gitOutput = (args, rootDir = ROOT_DIR) =>
+  execFileSync('git', args, {
+    cwd: rootDir,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+  });
 
-function listTrackedClientProductionFiles(rootDir = ROOT_DIR) {
-  const output = execFileSync(
-    'git',
-    ['ls-files', 'client/src/components', 'client/src/utilities'],
-    { cwd: rootDir, encoding: 'utf8' }
-  );
-  return output
+const git = (args, rootDir = ROOT_DIR) => gitOutput(args, rootDir).trim();
+
+const resolveCommit = (ref, rootDir = ROOT_DIR) => {
+  if (!ref) return '';
+  try {
+    return git(['rev-parse', '--verify', `${ref}^{commit}`], rootDir);
+  } catch {
+    return '';
+  }
+};
+
+const resolveBaseCommit = (rootDir = ROOT_DIR, env = process.env) => {
+  const head = resolveCommit('HEAD', rootDir);
+  const candidates = [
+    env.CLIENT_LARGE_FILE_BASE_REF,
+    env.GITHUB_BASE_SHA,
+    env.GITHUB_BASE_REF ? `origin/${env.GITHUB_BASE_REF}` : '',
+    'dev',
+  ];
+
+  for (const candidate of candidates) {
+    const commit = resolveCommit(candidate, rootDir);
+    if (!commit || commit === head) continue;
+    try {
+      return git(['merge-base', commit, head], rootDir);
+    } catch {
+      // Try the next explicit base before falling back to the previous commit.
+    }
+  }
+
+  return resolveCommit('HEAD^', rootDir);
+};
+
+const listTrackedClientProductionFiles = (rootDir = ROOT_DIR) =>
+  git(['ls-files', 'client/src/components', 'client/src/utilities'], rootDir)
     .split('\n')
     .filter(Boolean)
     .filter((relativePath) => PRODUCTION_FILE_RE.test(relativePath))
@@ -102,61 +66,104 @@ function listTrackedClientProductionFiles(rootDir = ROOT_DIR) {
     .filter((relativePath) => !GENERATED_OR_FIXTURE_PATH_RE.test(relativePath))
     .filter((relativePath) => fs.existsSync(path.join(rootDir, relativePath)))
     .sort();
-}
 
-function countLines(rootDir, relativePath) {
-  const text = fs.readFileSync(path.join(rootDir, relativePath), 'utf8');
-  return text.split(/\r?\n/).length;
-}
+const countLines = (text) => {
+  if (text.length === 0) return 0;
+  const lineCount = text.split(/\r?\n/).length;
+  return /\r?\n$/.test(text) ? lineCount - 1 : lineCount;
+};
 
-test('large production client files stay within the explicit inventory', (t) => {
-  if (!hasGitMetadata()) {
-    t.skip('large-file inventory guard requires git metadata');
-    return;
+const readBaseLineCount = (baseCommit, relativePath, rootDir = ROOT_DIR) => {
+  if (!baseCommit) return null;
+  try {
+    return countLines(gitOutput(['show', `${baseCommit}:${relativePath}`], rootDir));
+  } catch {
+    return null;
+  }
+};
+
+const evaluateLargeFilePolicy = (records) => {
+  const failures = [];
+
+  for (const { relativePath, currentLineCount, baseLineCount } of records) {
+    if (currentLineCount > HARD_FILE_LINE_LIMIT) {
+      failures.push(`${relativePath} has ${currentLineCount} lines; the hard limit is ${HARD_FILE_LINE_LIMIT}.`);
+      continue;
+    }
+
+    if (baseLineCount == null) {
+      if (currentLineCount > NEW_FILE_LINE_LIMIT) {
+        failures.push(
+          `${relativePath} is a new ${currentLineCount}-line file; new files may not exceed ${NEW_FILE_LINE_LIMIT} lines.`,
+        );
+      }
+      continue;
+    }
+
+    if (currentLineCount <= LARGE_FILE_LINE_LIMIT) continue;
+    const allowance = Math.max(MIN_GROWTH_ALLOWANCE, Math.ceil(baseLineCount * GROWTH_ALLOWANCE_RATIO));
+    if (currentLineCount > baseLineCount + allowance) {
+      failures.push(
+        `${relativePath} grew from ${baseLineCount} to ${currentLineCount} lines; ` +
+          `the allowed change from this base is ${allowance} lines.`,
+      );
+    }
   }
 
-  const failures = [];
-  const currentFiles = listTrackedClientProductionFiles();
-  const currentLineCounts = new Map(
-    currentFiles.map((relativePath) => [relativePath, countLines(ROOT_DIR, relativePath)])
+  return failures;
+};
+
+test('large-file policy rejects new monoliths and material growth', () => {
+  assert.deepEqual(
+    evaluateLargeFilePolicy([
+      { relativePath: 'hard.ts', baseLineCount: 4999, currentLineCount: 5001 },
+      { relativePath: 'new.ts', baseLineCount: null, currentLineCount: 1501 },
+      { relativePath: 'fixed-growth.ts', baseLineCount: 1000, currentLineCount: 1101 },
+      { relativePath: 'ratio-growth.ts', baseLineCount: 2000, currentLineCount: 2201 },
+    ]),
+    [
+      'hard.ts has 5001 lines; the hard limit is 5000.',
+      'new.ts is a new 1501-line file; new files may not exceed 1500 lines.',
+      'fixed-growth.ts grew from 1000 to 1101 lines; the allowed change from this base is 100 lines.',
+      'ratio-growth.ts grew from 2000 to 2201 lines; the allowed change from this base is 200 lines.',
+    ],
   );
-  const baselineEntries = Object.entries(LARGE_CLIENT_FILE_BASELINE);
-  const baselinePaths = new Set(baselineEntries.map(([relativePath]) => relativePath));
-
-  currentLineCounts.forEach((lineCount, relativePath) => {
-    if (lineCount > LARGE_FILE_LINE_LIMIT && !baselinePaths.has(relativePath)) {
-      failures.push(
-        `${relativePath} has ${lineCount} lines and is not in LARGE_CLIENT_FILE_BASELINE. ` +
-          'Extract a helper/component/hook, or intentionally add it to the baseline with a short review rationale.'
-      );
-    }
-  });
-
-  baselineEntries.forEach(([relativePath, baselineLineCount]) => {
-    const currentLineCount = currentLineCounts.get(relativePath);
-    if (currentLineCount == null) {
-      failures.push(`${relativePath} is still listed in LARGE_CLIENT_FILE_BASELINE but is no longer tracked.`);
-      return;
-    }
-    if (currentLineCount <= LARGE_FILE_LINE_LIMIT) {
-      failures.push(
-        `${relativePath} is now ${currentLineCount} lines and should be removed from LARGE_CLIENT_FILE_BASELINE.`
-      );
-      return;
-    }
-    if (currentLineCount > baselineLineCount + LARGE_FILE_GROWTH_TOLERANCE) {
-      failures.push(
-        `${relativePath} grew from ${baselineLineCount} to ${currentLineCount} lines. ` +
-          'Extract code to avoid growth, or intentionally update LARGE_CLIENT_FILE_BASELINE after review.'
-      );
-    }
-    if (currentLineCount < baselineLineCount - LARGE_FILE_SHRINK_TOLERANCE) {
-      failures.push(
-        `${relativePath} shrank from ${baselineLineCount} to ${currentLineCount} lines. ` +
-          'Update LARGE_CLIENT_FILE_BASELINE so future growth is measured from the new size.'
-      );
-    }
-  });
-
-  assert.deepEqual(failures, []);
 });
+
+test('large-file policy accepts bounded growth and shrinking files', () => {
+  assert.deepEqual(
+    evaluateLargeFilePolicy([
+      { relativePath: 'new.ts', baseLineCount: null, currentLineCount: 1500 },
+      { relativePath: 'fixed-growth.ts', baseLineCount: 1000, currentLineCount: 1100 },
+      { relativePath: 'ratio-growth.ts', baseLineCount: 2000, currentLineCount: 2200 },
+      { relativePath: 'shrinking.ts', baseLineCount: 3000, currentLineCount: 1200 },
+    ]),
+    [],
+  );
+});
+
+test('line counts are independent of a trailing newline', () => {
+  assert.equal(countLines('first\nsecond'), 2);
+  assert.equal(countLines('first\nsecond\n'), 2);
+  assert.equal(countLines('first\r\nsecond\r\n'), 2);
+  assert.equal(countLines(''), 0);
+});
+
+test('tracked production client files satisfy the base-diff large-file policy', () => {
+  const baseCommit = resolveBaseCommit();
+  assert.ok(baseCommit, 'A git base commit is required for the large-file policy.');
+
+  const records = listTrackedClientProductionFiles().map((relativePath) => ({
+    relativePath,
+    currentLineCount: countLines(fs.readFileSync(path.join(ROOT_DIR, relativePath), 'utf8')),
+    baseLineCount: readBaseLineCount(baseCommit, relativePath),
+  }));
+
+  assert.deepEqual(evaluateLargeFilePolicy(records), []);
+});
+
+module.exports = {
+  countLines,
+  evaluateLargeFilePolicy,
+  resolveBaseCommit,
+};

@@ -224,7 +224,7 @@ $muted-text: var(--ce-panel-text-muted);
   font-size: 3.5rem;
   line-height: 1;
   font-weight: 800;
-  color: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
+  color: color-mix(in srgb, var(--ce-control-text) 60%, transparent);
   pointer-events: none;
 }
 
@@ -267,7 +267,7 @@ $muted-text: var(--ce-panel-text-muted);
   box-shadow: 0 6px 22px color-mix(in srgb, var(--ce-compat-dark) 25%, transparent);
 
   .normalModeCardNumber {
-    color: color-mix(in srgb, var(--ce-action-accent) 22%, transparent);
+    color: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
   }
 }
 
@@ -2943,9 +2943,17 @@ $muted-text: var(--ce-panel-text-muted);
 
 .modePresetCardHeader {
   display: flex;
-  align-items: flex-start;
+  align-items: baseline;
   justify-content: space-between;
   gap: 12px;
+}
+
+.modePresetCardHeadingText {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  min-width: 0;
 }
 
 .modePresetCardTitle,
@@ -2963,12 +2971,12 @@ $muted-text: var(--ce-panel-text-muted);
 }
 
 .modePresetCardProvider {
-  margin-top: 5px;
+  margin-top: 0;
   color: var(--ce-panel-text);
-  font-size: 0.8rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 .modePresetCardDescription {
@@ -2988,9 +2996,9 @@ $muted-text: var(--ce-panel-text-muted);
 
 .modePresetCardRequirementsLabel {
   color: var(--ce-panel-text);
-  font-size: 0.65rem;
+  font-size: 0.9rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
@@ -3213,6 +3221,123 @@ $muted-text: var(--ce-panel-text-muted);
   padding-left: 1.15rem;
   color: color-mix(in srgb, var(--ce-control-text) 76%, transparent);
   font-size: 0.82rem;
+}
+
+.pendingWorkerGroups {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--ce-control-text) 28%, transparent);
+  border-radius: var(--ce-radius-10);
+  background: color-mix(in srgb, var(--ce-session-chrome) 82%, transparent);
+  color: var(--ce-control-text);
+}
+
+.pendingWorkerGroupsHeader {
+  display: grid;
+  gap: 5px;
+
+  > div {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  strong {
+    font-size: 1rem;
+  }
+
+  span,
+  p {
+    margin: 0;
+    color: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
+    font-size: 0.82rem;
+  }
+}
+
+.groupWizard .pendingWorkerGroupAddRow {
+  display: grid;
+  gap: 6px;
+
+  > label {
+    font-size: 0.82rem;
+    font-weight: 800;
+  }
+
+  > div {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+  input,
+  button {
+    min-height: 42px;
+    border-radius: var(--ce-radius-8);
+  }
+
+  input {
+    min-width: 0;
+    border: 1px solid color-mix(in srgb, var(--ce-control-text) 42%, transparent);
+    background: $input-bg;
+    color: var(--ce-control-text);
+    padding: 8px 11px;
+  }
+
+  button {
+    border: 1px solid var(--ce-session-accent);
+    background: var(--ce-session-accent);
+    color: var(--ce-session-accent-contrast);
+    padding: 8px 13px;
+    font-weight: 800;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+}
+
+.pendingWorkerGroupList {
+  display: grid;
+  gap: 10px;
+}
+
+.pendingWorkerGroupCard {
+  display: grid;
+  gap: 10px;
+  padding: 13px;
+  border: 1px solid color-mix(in srgb, var(--ce-control-text) 24%, transparent);
+  border-radius: var(--ce-radius-8);
+  background: color-mix(in srgb, var(--ce-session-chrome) 58%, transparent);
+}
+
+.pendingWorkerGroupCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  button {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: var(--ce-control-text);
+    opacity: 0.72;
+  }
+
+  button:hover,
+  button:focus-visible {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 640px) {
+  .pendingWorkerGroupAddRow > div {
+    grid-template-columns: 1fr;
+  }
 }
 
 .modeFieldLabel {
