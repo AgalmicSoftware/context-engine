@@ -24,6 +24,16 @@ const readStoredJson = (kv, key) => {
   return raw ? JSON.parse(raw) : null;
 };
 
+// Regression guard: randomized ciphertext can coincidentally contain short
+// plaintext fragments, so leak checks must inspect only unencrypted metadata.
+const expectNoPlaintextSecretMetadata = (stored, plaintextFragments) => {
+  const { encryptedSecrets, ...storedMetadata } = stored;
+  expect(encryptedSecrets).toMatch(/^[A-Za-z0-9_-]+$/);
+  plaintextFragments.forEach((fragment) => {
+    expect(JSON.stringify(storedMetadata)).not.toContain(fragment);
+  });
+};
+
 const createCoordinatorEnv = (kv, overrides = {}) => {
   const env = {
     GROUP_KV: kv,
@@ -88,6 +98,13 @@ describe('sessionCorsWorker admin routes', () => {
       configurable: true,
       value: originalCrypto,
     });
+  });
+
+  it('ignores plaintext-looking fragments inside opaque ciphertext during leak checks', () => {
+    expectNoPlaintextSecretMetadata({
+      kind: 'session-secrets',
+      encryptedSecrets: 'ciphertext_RSA_fragment',
+    }, ['RSA']);
   });
 
   it('bootstraps worker config when deployment binds the signer as requested admin', async () => {
@@ -544,7 +561,7 @@ describe('sessionCorsWorker admin routes', () => {
       encryptedSecrets: expect.any(String),
     }));
     expect(stored.secrets).toBeUndefined();
-    expect(JSON.stringify(stored)).not.toMatch(/sk-openai|rpc\.example|RSA/);
+    expectNoPlaintextSecretMetadata(stored, ['sk-openai', 'rpc.example', 'RSA']);
     expect(await getSessionSecrets(env, sessionSlug)).toEqual({
       openaiKey: 'sk-openai',
       customRpcUrl: 'https://rpc.example',
@@ -590,7 +607,7 @@ describe('sessionCorsWorker admin routes', () => {
       encryptedSecrets: expect.any(String),
     }));
     expect(stored.secrets).toBeUndefined();
-    expect(JSON.stringify(stored)).not.toMatch(/sk-openai|RSA|12345/);
+    expectNoPlaintextSecretMetadata(stored, ['sk-openai', 'RSA', '12345']);
     expect(await getSessionSecrets(env, sessionSlug)).toEqual({
       openaiKey: 'sk-openai',
       arweaveJwk: '{"kty":"RSA","n":"abc"}',
@@ -639,7 +656,7 @@ describe('sessionCorsWorker admin routes', () => {
       encryptedSecrets: expect.any(String),
     }));
     expect(stored.secrets).toBeUndefined();
-    expect(JSON.stringify(stored)).not.toContain('sk-existing');
+    expectNoPlaintextSecretMetadata(stored, ['sk-existing']);
     expect(await getSessionSecrets(env, sessionSlug)).toEqual(existingSecrets);
   });
 
