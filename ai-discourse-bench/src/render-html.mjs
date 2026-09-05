@@ -1344,21 +1344,21 @@ const renderComparisonReport = (report, selectedQuestion, groupsOverride = null)
         <div class="legendPills">${legend}</div>
       </div>
       <div class="sectionCollapse comparisonReportSectionCollapse">
-        <div class="sectionHeaderRow">
-          <h5 class="sectionTitle">${renderFontAwesomeIcon('caret-up')} Similarity &amp; Difference Spectrum</h5>
-        </div>
+        <h5 class="sectionTitle">
+          <button type="button" class="sectionHeaderRow" aria-expanded="true" data-ce-comparison-section-toggle>${renderFontAwesomeIcon('caret-up')} Similarity &amp; Difference Spectrum</button>
+        </h5>
         ${renderComparisonBeeswarm(rows)}
       </div>
       <div class="sectionCollapse comparisonReportSectionCollapse">
-        <div class="sectionHeaderRow">
-          <h5 class="sectionTitle">${renderFontAwesomeIcon('caret-up')} Top Similar Items</h5>
-        </div>
+        <h5 class="sectionTitle">
+          <button type="button" class="sectionHeaderRow" aria-expanded="true" data-ce-comparison-section-toggle>${renderFontAwesomeIcon('caret-up')} Top Similar Items</button>
+        </h5>
         <ul class="analysisList">${topSimilar.map((row) => renderComparisonAnalysisItem(row, 'Similarity')).join('') || '<li class="noData">No significant items found for this selection.</li>'}</ul>
       </div>
       <div class="sectionCollapse comparisonReportSectionCollapse">
-        <div class="sectionHeaderRow">
-          <h5 class="sectionTitle">${renderFontAwesomeIcon('caret-up')} Top Divergent Items</h5>
-        </div>
+        <h5 class="sectionTitle">
+          <button type="button" class="sectionHeaderRow" aria-expanded="true" data-ce-comparison-section-toggle>${renderFontAwesomeIcon('caret-up')} Top Divergent Items</button>
+        </h5>
         <ul class="analysisList">${topDivergent.map((row) => renderComparisonAnalysisItem(row, 'Divergence')).join('') || '<li class="noData">No significant items found for this selection.</li>'}</ul>
       </div>
     </div>
@@ -4515,8 +4515,10 @@ export const renderHtmlReport = (report) => `<!doctype html>
     .reportCollapseBody { display: grid; gap: 0; }
     .comparisonReportContainer .sectionCollapse,
     .comparisonReportSectionCollapse { margin-bottom: 1rem; padding: 0; border: 1px solid #e0e0e0; border-radius: var(--ce-radius-8, 8px); background-color: var(--ce-color-white, #ffffff); overflow: hidden; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); }
-    .comparisonReportSectionCollapse .sectionHeaderRow { display: flex; align-items: center; justify-content: flex-start; padding: 0.75rem 1.25rem; cursor: pointer; border-bottom: 1px solid var(--ce-color-light, #f1f3f5); margin-bottom: 0; }
+    .comparisonReportSectionCollapse .sectionHeaderRow { width: 100%; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; display: flex; align-items: center; justify-content: flex-start; padding: 0.75rem 1.25rem; cursor: pointer; border-bottom: 1px solid var(--ce-color-light, #f1f3f5); margin-bottom: 0; }
     .comparisonReportSectionCollapse .sectionHeaderRow:hover { background-color: var(--ce-color-surface-light, #f8f9fa); }
+    .comparisonReportSectionCollapse > [hidden] { display: none !important; }
+    .comparisonReportSectionCollapse .sectionHeaderRow[aria-expanded="false"] svg { transform: rotate(180deg); }
     .comparisonReportSectionCollapse .sectionTitle { margin: 0; font-size: 1.1rem; font-weight: 500; color: var(--ce-color-dark, #212529); line-height: 1.2; }
     .comparisonReportSectionCollapse .sectionTitle svg { margin-right: 10px; width: 1em; height: 1em; display: inline-block; overflow: visible; vertical-align: -0.125em; }
     .comparisonBeeswarmSvg { width: 700px; min-width: 700px; max-width: none; }
@@ -6534,9 +6536,9 @@ export const renderHtmlReport = (report) => `<!doctype html>
           '</button>' +
           '<div id="demo-analysis-comparison-report-body" class="reportCollapseBody" data-testid="demo-analysis-comparison-report-body">' +
             '<div class="legendContainer"><span class="legendTitle">Comparing Groups:</span><div class="legendPills">' + legend + '</div></div>' +
-            '<div class="sectionCollapse comparisonReportSectionCollapse"><div class="sectionHeaderRow"><h5 class="sectionTitle">Similarity &amp; Difference Spectrum</h5></div>' + breakdownRenderBeeswarm(rows.slice(0, 12)) + '</div>' +
-            '<div class="sectionCollapse comparisonReportSectionCollapse"><div class="sectionHeaderRow"><h5 class="sectionTitle">Top Similar Items</h5></div><ul class="analysisList">' + (topSimilar.map(breakdownRenderAnalysisItem).join('') || '<li class="noData">No significant items found for this selection.</li>') + '</ul></div>' +
-            '<div class="sectionCollapse comparisonReportSectionCollapse"><div class="sectionHeaderRow"><h5 class="sectionTitle">Top Divergent Items</h5></div><ul class="analysisList">' + (topDivergent.map(breakdownRenderAnalysisItem).join('') || '<li class="noData">No significant items found for this selection.</li>') + '</ul></div>' +
+            '<div class="sectionCollapse comparisonReportSectionCollapse"><h5 class="sectionTitle"><button type="button" class="sectionHeaderRow" aria-expanded="true" data-ce-comparison-section-toggle>Similarity &amp; Difference Spectrum</button></h5>' + breakdownRenderBeeswarm(rows.slice(0, 12)) + '</div>' +
+            '<div class="sectionCollapse comparisonReportSectionCollapse"><h5 class="sectionTitle"><button type="button" class="sectionHeaderRow" aria-expanded="true" data-ce-comparison-section-toggle>Top Similar Items</button></h5><ul class="analysisList">' + (topSimilar.map(breakdownRenderAnalysisItem).join('') || '<li class="noData">No significant items found for this selection.</li>') + '</ul></div>' +
+            '<div class="sectionCollapse comparisonReportSectionCollapse"><h5 class="sectionTitle"><button type="button" class="sectionHeaderRow" aria-expanded="true" data-ce-comparison-section-toggle>Top Divergent Items</button></h5><ul class="analysisList">' + (topDivergent.map(breakdownRenderAnalysisItem).join('') || '<li class="noData">No significant items found for this selection.</li>') + '</ul></div>' +
           '</div>' +
         '</section>';
       }
@@ -6955,6 +6957,15 @@ export const renderHtmlReport = (report) => `<!doctype html>
           }
         });
       }
+      if (breakdownComparisonReport) breakdownComparisonReport.addEventListener('click', function (event) {
+        var button = event.target.closest('[data-ce-comparison-section-toggle]');
+        if (!button || !breakdownComparisonReport.contains(button)) return;
+        var body = button.parentElement.nextElementSibling;
+        if (!body) return;
+        var nextOpen = button.getAttribute('aria-expanded') !== 'true';
+        button.setAttribute('aria-expanded', String(nextOpen));
+        body.hidden = !nextOpen;
+      });
       breakdownActiveSuggestion = null;
       updateInteractiveBreakdown(null);
       document.querySelectorAll('[data-ce-risk-matrix-cell]').forEach(function (cell) {
