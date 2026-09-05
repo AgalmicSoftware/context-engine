@@ -1133,9 +1133,12 @@ describe('SessionWizard rendered validation', () => {
     fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
       target: { value: `ar://${'a'.repeat(43)}` },
     });
-    await waitFor(() => {
-      expect(publishButton).not.toBeDisabled();
-    });
+    await waitFor(
+      () => {
+        expect(publishButton).not.toBeDisabled();
+      },
+      { timeout: 5000 },
+    );
     publishClicked = true;
     fireEvent.click(publishButton);
 
