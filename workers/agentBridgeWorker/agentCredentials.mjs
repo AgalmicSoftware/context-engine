@@ -1,6 +1,6 @@
 import { safeString, safeJsonParse, nowIso } from './runtimePrimitives.mjs';
 import { AGENT_BRIDGE_WORKER_VERSION } from './constants.mjs';
-import { createOpaqueAgentPrincipalId, normalizeAgentPrincipal, isPreviewPrincipal } from './agentPrincipal.mjs';
+import { createOpaqueAgentPrincipalId, normalizeAgentPrincipal } from './agentPrincipal.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 
 export { createOpaqueAgentPrincipalId, normalizeAgentPrincipal } from './agentPrincipal.mjs';
@@ -215,7 +215,6 @@ export async function issueAgentCredential({
     return { ok: false, reason: 'agent_token_storage_unavailable' };
   }
   const normalizedPrincipal = normalizeAgentPrincipal(principal);
-  if (isPreviewPrincipal(normalizedPrincipal)) return { ok: false, reason: 'preview_credential_forbidden' };
   const slug = safeString(sessionSlug);
   if (!normalizedPrincipal.principalId) return { ok: false, reason: 'agent_principal_required' };
   if (!slug) return { ok: false, reason: 'session_required' };
@@ -316,7 +315,7 @@ export async function issueAgentCredential({
       metadata,
     });
   } catch {
-    return { ok: false, reason: 'agent_token_create_failed', credentialMayExist: true };
+    return { ok: false, reason: 'agent_token_create_failed' };
   }
 
   const slot = {
@@ -344,7 +343,7 @@ export async function issueAgentCredential({
     });
   } catch {
     await deleteKvBestEffort(kv, recordKey);
-    return { ok: false, reason: 'agent_token_pointer_write_failed', credentialMayExist: true };
+    return { ok: false, reason: 'agent_token_pointer_write_failed' };
   }
 
   if (previous.tokenHash && previous.tokenHash !== tokenHash) {

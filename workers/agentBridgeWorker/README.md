@@ -59,10 +59,7 @@ The bridge has one versioned `ceagt_` credential model:
   credential used by other agents. Redemption is reserved and finalized by
   the token-hash-named `AGENT_INVITE_COORDINATOR` Durable Object, so concurrent
   requests cannot mint two credentials. Missing coordinator authority fails
-  closed. Once credential storage has been attempted, an uncertain write or
-  failed finalization keeps the invite reserved, even if best-effort credential
-  revocation succeeds. Only failures known to precede issuance release it.
-  A read-only compatibility check continues to reject redemption
+  closed. A read-only compatibility check continues to reject redemption
   records written by the former KV implementation during rollout.
 - `POST /api/agent/client-login/exchange` accepts only a source user or service
   credential for the Bridge audience. It returns a short-lived Bridge browser
@@ -801,15 +798,6 @@ Question cache controls:
 | `AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN`                                       | Emergency/debug only. Allows recent-block fallback when neither metadata nor `SessionCreated` can scope the session; leave unset for normal live smoke                                              |
 | `AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW`                                            | Local/operator debug only. Enables `/mock/telegram/preview` and `/mock/telegram/preview-update`; leave unset in live deployments                                                                    |
 
-Registry discovery supplies session identity for authenticated HTTP reads only.
-It does not opt a session into Telegram or Mini App interactions, credentials,
-managed writes, public joins, document access, or sponsored AI/RPC/faucet use.
-Configure those capabilities explicitly in `AGENT_BRIDGE_SESSION_POLICY_JSON`.
-Cached registry rows are treated the same way as fresh discovery. Privileged
-Agent HTTP routes fail closed on registry outages; discovery permits only the
-question/tag/result and status metadata read routes, including their POST read
-aliases. Stateful GET actions require explicit policy too.
-
 ## Interactive Preview
 
 `GET /mock/telegram/preview` serves a small browser preview for the private demo
@@ -820,13 +808,7 @@ navigation, and future Mini App payloads before setting or reusing the live
 webhook.
 
 The preview routes are disabled unless `AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW`
-is set to `true`. When enabled, both routes also require the dedicated operator
-`X-CE-Preview-Secret` header matching `AGENT_BRIDGE_PREVIEW_SECRET`; an unset
-secret fails closed. Preview responses use `Cache-Control: no-store`. Send the
-header when opening the preview page (for example with an operator browser
-header tool), then enter it in the page's password field for callback requests.
-The page never embeds or persists the configured secret.
-Leave preview unset in live deployments; preview callbacks can
+is set to `true`. Leave this unset in live deployments; preview callbacks can
 create the same short-lived KV action records as real bot callbacks.
 The product deploy helper intentionally omits this local-only flag from Worker
 upload metadata and rejects configs that try to include it.
@@ -885,11 +867,9 @@ trusting Telegram user/chat/session identity on write endpoints. Treat
 client input until validated server-side.
 When `TELEGRAM_BOT_TOKEN` is absent, Mini App authorization fails closed unless
 local tests/previews explicitly set
-`AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH=true` and supply the dedicated
-`X-CE-Preview-Secret` header matching `AGENT_BRIDGE_PREVIEW_SECRET`. The synthetic
-preview identity cannot obtain Bridge or Session Worker credentials. Credential
-onboarding always requires signed Telegram init data, even in preview mode.
-The deploy helper continues to reject both local-only preview flags.
+`AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH=true`. The deploy helper rejects that
+local-only flag, so deployed Mini App requests always require a bot token and
+valid init data.
 `AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS` controls accepted init-data age and
 defaults to 24 hours.
 

@@ -30,50 +30,23 @@ const HISTORICAL_AGENT_ONLY_WINDOWING = Object.freeze({
 
 const MINI_APP_TEST_PREVIEW_AUTH = Object.freeze({
   AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH: 'true',
-  AGENT_BRIDGE_PREVIEW_SECRET: 'operator-preview-fixture',
 });
 
 function withMiniAppTestPreviewAuth(env = {}) {
   return { ...MINI_APP_TEST_PREVIEW_AUTH, ...env };
 }
 
-function withPreviewRequest(request) {
-  const headers = new Headers(request.headers);
-  headers.set('X-CE-Preview-Secret', MINI_APP_TEST_PREVIEW_AUTH.AGENT_BRIDGE_PREVIEW_SECRET);
-  return new Request(request, { headers });
-}
-
 function handleTelegramMiniAppRequest(options = {}) {
   return rawHandleTelegramMiniAppRequest({
     ...options,
-    request: withPreviewRequest(options.request),
     env: withMiniAppTestPreviewAuth(options.env),
   });
-}
-
-async function handleSignedMiniAppRequest(options) {
-  const env = options.env;
-  env.AGENT_ACTION_KV ||= new MemoryKv();
-  const launch = 'cecb_1234567890';
-  await env.AGENT_ACTION_KV.put(`telegram:action:${launch}`, JSON.stringify({
-    type: 'agent_bridge_opaque_action', actionId: launch, action: 'view_questions',
-    lane: 'telegram_mini_app', miniAppLaunch: true, serverContextRef: { sessionPicker: true },
-  }));
-  const url = new URL(options.request.url);
-  url.searchParams.set('launch', launch);
-  const headers = new Headers(options.request.headers);
-  headers.set('X-Telegram-Init-Data', signInitData({
-    auth_date: String(Math.floor(Date.now() / 1000)),
-    user: JSON.stringify({ id: 42, username: 'participant' }),
-  }, options.env.TELEGRAM_BOT_TOKEN));
-  return handleTelegramMiniAppRequest({ ...options, request: new Request(new Request(url, options.request), { headers }) });
 }
 
 const __test__telegramMiniApp = Object.freeze({
   ...rawTelegramMiniAppTestApi,
   buildMiniAppState: (options = {}) => rawTelegramMiniAppTestApi.buildMiniAppState({
     ...options,
-    request: withPreviewRequest(options.request),
     env: withMiniAppTestPreviewAuth(options.env),
   }),
 });
@@ -136,12 +109,11 @@ function dotenvEscapedJson(value = {}) {
 }
 
 async function seedPreviewPrivateSession(env, sessionSlug = 'alpha') {
-  const telegramUserId = env.TELEGRAM_BOT_TOKEN ? '42' : 'preview-user';
   await persistTelegramUserSessionBinding({
     env,
     normalized: {
-      user: { telegramUserId, username: 'participant' },
-      chat: { chatId: telegramUserId, type: 'private', isPrivate: true },
+      user: { telegramUserId: 'preview-user', username: 'preview' },
+      chat: { chatId: 'preview-user', type: 'private', isPrivate: true },
     },
     session: { sessionSlug, sessionName: sessionSlug },
     source: 'test_private_chat',
@@ -176,8 +148,8 @@ test('validateTelegramMiniAppInitData fails closed without a bot token unless pr
   const disabledPreview = await validateTelegramMiniAppInitData('', {
     AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH: 'false',
   });
-  const explicitPreview = await validateTelegramMiniAppInitData('', MINI_APP_TEST_PREVIEW_AUTH, {
-    previewSecret: MINI_APP_TEST_PREVIEW_AUTH.AGENT_BRIDGE_PREVIEW_SECRET,
+  const explicitPreview = await validateTelegramMiniAppInitData('', {
+    AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH: 'true',
   });
 
   assert.deepEqual(missingToken, {
@@ -2086,7 +2058,6 @@ test('Mini App documents endpoint lists fixture docs and stores lightweight uplo
     env,
   });
   assert.equal(imagePreviewResponse.status, 200);
-  assert.equal(imagePreviewResponse.headers.get('cache-control'), 'no-store');
   assert.equal(imagePreviewResponse.headers.get('content-type'), 'image/png');
   assert.deepEqual(Array.from(new Uint8Array(await imagePreviewResponse.arrayBuffer())), Array.from(imageBytes));
 
@@ -2111,7 +2082,6 @@ test('Mini App documents endpoint lists fixture docs and stores lightweight uplo
     env,
   });
   assert.equal(pdfPreviewResponse.status, 200);
-  assert.equal(pdfPreviewResponse.headers.get('cache-control'), 'no-store');
   assert.equal(pdfPreviewResponse.headers.get('content-type'), 'application/pdf');
   assert.deepEqual(Array.from(new Uint8Array(await pdfPreviewResponse.arrayBuffer())), Array.from(pdfBytes));
 
@@ -4054,7 +4024,6 @@ test('Mini App search falls back to semantic food-preference matching when AI is
 
 test('Mini App search ranks questions through the session worker AI route when allowed', async () => {
   const env = {
-    TELEGRAM_BOT_TOKEN: '123456:test-token',
     AGENT_BRIDGE_DEPLOYMENT_ID: 'test-deploy',
     DEMO_SIGNER_ROOT_SECRET: 'test-root-secret',
     AGENT_BRIDGE_OPENAI_API_KEY: 'sk-bridge-openai',
@@ -4110,7 +4079,7 @@ test('Mini App search ranks questions through the session worker AI route when a
     });
   };
 
-  const response = await handleSignedMiniAppRequest({
+  const response = await handleTelegramMiniAppRequest({
     request: new Request('https://bridge.example/telegram/mini-app/api/search', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -4208,7 +4177,6 @@ test('Mini App transcribe endpoint uses bridge OpenAI key before session worker 
 test('Mini App transcribe endpoint accepts session-scoped AI search dictation without a question key', async () => {
   const kv = new MemoryKv();
   const env = {
-    TELEGRAM_BOT_TOKEN: '123456:test-token',
     AGENT_ACTION_KV: kv,
     AGENT_BRIDGE_DEPLOYMENT_ID: 'test-deploy',
     DEMO_SIGNER_ROOT_SECRET: 'test-root-secret',
@@ -4261,7 +4229,7 @@ test('Mini App transcribe endpoint accepts session-scoped AI search dictation wi
   form.append('sessionSlug', 'alpha');
   form.append('audio', new File(['audio-bytes'], 'search.webm', { type: 'audio/webm' }));
 
-  const response = await handleSignedMiniAppRequest({
+  const response = await handleTelegramMiniAppRequest({
     request: new Request('https://bridge.example/telegram/mini-app/api/transcribe', {
       method: 'POST',
       body: form,
@@ -4307,7 +4275,6 @@ test('Mini App transcribe endpoint rejects oversized microphone audio before ups
 test('Mini App transcribe endpoint rate limits repeated microphone requests per user and session', async () => {
   const kv = new MemoryKv();
   const env = {
-    TELEGRAM_BOT_TOKEN: '123456:test-token',
     AGENT_ACTION_KV: kv,
     AGENT_BRIDGE_DEPLOYMENT_ID: 'test-deploy',
     DEMO_SIGNER_ROOT_SECRET: 'test-root-secret',
@@ -4355,7 +4322,7 @@ test('Mini App transcribe endpoint rate limits repeated microphone requests per 
     const form = new FormData();
     form.append('sessionSlug', 'alpha');
     form.append('audio', new File(['audio-bytes'], 'search.webm', { type: 'audio/webm' }));
-    return handleSignedMiniAppRequest({
+    return handleTelegramMiniAppRequest({
       request: new Request('https://bridge.example/telegram/mini-app/api/transcribe', {
         method: 'POST',
         body: form,
@@ -4683,7 +4650,6 @@ test('Mini App add question endpoint persists Telegram-only proposed questions',
 
 test('Mini App add question formatter uses session worker AI to shape dictation by question type', async () => {
   const env = {
-    TELEGRAM_BOT_TOKEN: '123456:test-token',
     AGENT_BRIDGE_DEPLOYMENT_ID: 'test-deploy',
     DEMO_SIGNER_ROOT_SECRET: 'test-root-secret',
     AGENT_BRIDGE_OPENAI_API_KEY: 'sk-bridge-openai',
@@ -4754,7 +4720,7 @@ test('Mini App add question formatter uses session worker AI to shape dictation 
     });
   };
 
-  const response = await handleSignedMiniAppRequest({
+  const response = await handleTelegramMiniAppRequest({
     request: new Request('https://bridge.example/telegram/mini-app/api/questions/format', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -4782,7 +4748,6 @@ test('Mini App add question formatter uses session worker AI to shape dictation 
 
 test('Mini App add question voice formatter can infer multichoice type and options with AI', async () => {
   const env = {
-    TELEGRAM_BOT_TOKEN: '123456:test-token',
     AGENT_BRIDGE_DEPLOYMENT_ID: 'test-deploy',
     DEMO_SIGNER_ROOT_SECRET: 'test-root-secret',
     AGENT_BRIDGE_OPENAI_API_KEY: 'sk-bridge-openai',
@@ -4843,7 +4808,7 @@ test('Mini App add question voice formatter can infer multichoice type and optio
     });
   };
 
-  const response = await handleSignedMiniAppRequest({
+  const response = await handleTelegramMiniAppRequest({
     request: new Request('https://bridge.example/telegram/mini-app/api/questions/format', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -4908,7 +4873,6 @@ test('Mini App add question voice formatter locally infers multichoice when AI i
 test('Mini App URL question generation endpoint returns AI candidate drafts', async () => {
   const kv = new MemoryKv();
   const env = {
-    TELEGRAM_BOT_TOKEN: '123456:test-token',
     AGENT_ACTION_KV: kv,
     AGENT_BRIDGE_DEPLOYMENT_ID: 'test-deploy',
     DEMO_SIGNER_ROOT_SECRET: 'test-root-secret',
@@ -4994,7 +4958,7 @@ test('Mini App URL question generation endpoint returns AI candidate drafts', as
     });
   };
 
-  const response = await handleSignedMiniAppRequest({
+  const response = await handleTelegramMiniAppRequest({
     request: new Request('https://bridge.example/telegram/mini-app/api/questions/generate-from-url', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

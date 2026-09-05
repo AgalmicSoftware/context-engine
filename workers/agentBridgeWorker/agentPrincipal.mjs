@@ -45,9 +45,3 @@ export function createOpaqueAgentPrincipalId(kind = AGENT_PRINCIPAL_KINDS.USER) 
   const prefix = kind === AGENT_PRINCIPAL_KINDS.SERVICE ? 'cesvc' : 'cep';
   return `${prefix}_${randomSecret()}`;
 }
-
-export function isPreviewPrincipal(input = {}) {
-  const principal = normalizeAgentPrincipal(input);
-  return principal.principalId === 'telegram:preview-user' ||
-    (principal.adapter === 'telegram' && principal.adapterUserId === 'preview-user');
-}

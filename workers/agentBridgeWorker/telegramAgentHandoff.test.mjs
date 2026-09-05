@@ -2017,35 +2017,6 @@ test('Telegram agent onboarding keeps topic and bucket data opt-in', async () =>
   assert.equal(await env.AGENT_ACTION_KV.get('telegram:lightweight-group-membership:alpha:42'), null);
 });
 
-test('preview identities cannot receive a Bridge credential', async () => {
-  const env = baseEnv();
-  const result = await issueAgentCredential({
-    env, principal: telegramAgentPrincipal({ telegramUserId: 'preview-user' }), sessionSlug: 'alpha',
-  });
-  assert.equal(result.ok, false);
-  assert.equal(result.reason, 'preview_credential_forbidden');
-  assert.equal(env.AGENT_ACTION_KV.store.size, 0);
-});
-
-test('Mini App onboarding cannot exchange operator preview auth for a credential', async () => {
-  const env = telegramOnlyEnv({
-    TELEGRAM_BOT_TOKEN: '',
-    AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH: 'true',
-    AGENT_BRIDGE_PREVIEW_SECRET: 'operator-preview-secret',
-  });
-  const response = await handleTelegramAgentHandoffRequest({
-    request: new Request('https://bridge.example/api/agent/miniapp/onboard', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'X-CE-Preview-Secret': env.AGENT_BRIDGE_PREVIEW_SECRET },
-      body: JSON.stringify({ startParam: 'onboard__alpha' }),
-    }),
-    env,
-  });
-  assert.equal(response.status, 401);
-  assert.equal((await response.json()).ok, false);
-  assert.equal([...env.AGENT_ACTION_KV.store.keys()].some((key) => key.startsWith(AGENT_CREDENTIAL_KV_PREFIX)), false);
-});
-
 test('Mini App onboarding endpoint validates Telegram initData and mints a scoped user token', async () => {
   const nowSeconds = Math.floor(Date.now() / 1000);
   const env = telegramOnlyEnv({
@@ -2519,90 +2490,6 @@ test('Invite onboarding atomically rejects concurrent redemption attempts', asyn
   );
 });
 
-test('Invite onboarding keeps reservations after uncertain credential issuance or finalization', async (t) => {
-  for (const failure of ['finalize-and-revoke', 'finalize-only', 'credential-write', 'slot-write']) {
-    await t.test(failure, async () => {
-      const inviteToken = `uncertain-invite-${failure}`;
-      const env = agentHttpOnlyEnv({
-        AGENT_BRIDGE_AGENT_API_TOKEN: '',
-        AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([{
-          tokenHash: sha256Hex(inviteToken), sessionSlug: 'alpha', source: 'browser',
-        }]),
-      });
-      const kv = env.AGENT_ACTION_KV;
-      const put = kv.put.bind(kv);
-      let credentialWrites = 0;
-      kv.put = async (key, value, options) => {
-        await put(key, value, options);
-        if (key.startsWith(AGENT_CREDENTIAL_KV_PREFIX)) {
-          credentialWrites += 1;
-          if (failure === 'credential-write') throw new Error('write acknowledgement lost');
-        }
-        if (failure === 'slot-write' && key.startsWith(AGENT_CREDENTIAL_SLOT_KV_PREFIX)) {
-          throw new Error('slot acknowledgement lost');
-        }
-      };
-      if (failure !== 'finalize-only') {
-        kv.delete = async () => { throw new Error('revocation unavailable'); };
-      }
-      const namespace = env.AGENT_INVITE_COORDINATOR;
-      const getByName = namespace.getByName.bind(namespace);
-      let releases = 0;
-      namespace.getByName = (name) => {
-        const stub = getByName(name);
-        return { fetch: async (input, init) => {
-          const path = new URL(input).pathname;
-          if (path === '/release') releases += 1;
-          if (path === '/finalize') throw new Error('finalization unavailable');
-          return stub.fetch(input, init);
-        } };
-      };
-      const onboard = () => handleTelegramAgentHandoffRequest({
-        env,
-        request: new Request('https://bridge.example/api/agent/invite/onboard', {
-          method: 'POST', headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ inviteToken, label: 'Participant' }),
-        }),
-      });
-      const first = await onboard();
-      assert.equal(first.status, failure.startsWith('finalize') ? 503 : 500);
-      assert.equal((await first.json()).ok, false);
-      const second = await onboard();
-      assert.equal(second.status, 409);
-      assert.equal((await second.json()).reason, 'invite_token_redemption_pending');
-      assert.equal(credentialWrites, 1);
-      assert.equal(releases, 0);
-      const records = [...kv.store.keys()].filter((key) => key.startsWith(AGENT_CREDENTIAL_KV_PREFIX));
-      assert.equal(records.length, failure === 'finalize-only' ? 0 : 1);
-    });
-  }
-});
-
-test('Invite onboarding releases a reservation when credential storage is absent before issuance', async () => {
-  const inviteToken = 'pre-issuance-invite';
-  const env = agentHttpOnlyEnv({
-    AGENT_BRIDGE_AGENT_API_TOKEN: '',
-    AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([{
-      tokenHash: sha256Hex(inviteToken), sessionSlug: 'alpha', source: 'browser',
-    }]),
-  });
-  const kv = env.AGENT_ACTION_KV;
-  const put = kv.put;
-  kv.put = undefined;
-  const onboard = () => handleTelegramAgentHandoffRequest({
-    env,
-    request: new Request('https://bridge.example/api/agent/invite/onboard', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ inviteToken, label: 'Participant' }),
-    }),
-  });
-  const first = await onboard();
-  assert.equal(first.status, 503);
-  assert.equal((await first.json()).reason, 'agent_token_storage_unavailable');
-  kv.put = put;
-  assert.equal((await onboard()).status, 200);
-});
-
 test('Invite onboarding fails closed when the redemption coordinator is unavailable', async () => {
   const env = agentHttpOnlyEnv({
     AGENT_BRIDGE_AGENT_API_TOKEN: '',
@@ -2630,46 +2517,6 @@ test('Invite onboarding fails closed when the redemption coordinator is unavaila
     [...env.AGENT_ACTION_KV.store.keys()].some((key) => key.startsWith(AGENT_CREDENTIAL_KV_PREFIX)),
     false,
   );
-});
-
-test('registry discovery cannot authorize credentials or managed writes, including GET actions', async () => {
-  const env = baseEnv({
-    AGENT_BRIDGE_SESSION_POLICY_JSON: '', DEFAULT_RPC_URL: 'https://read-only-handoff.example',
-    REGISTRY_FETCH: async () => { throw new Error('unexpected registry network access'); },
-  });
-  await env.AGENT_ACTION_KV.put(
-    'telegram:registry-sessions:v1:11155420:0xdcb1731984e9f75c6a061c38dd8b67d18de4c0c1:50',
-    JSON.stringify({ ok: true, sessions: [{ sessionSlug: 'alpha', telegramBridgeEnabled: true }] }),
-  );
-  for (const [path, method] of [
-    ['/credentials/service', 'POST'], ['/invite/onboard', 'POST'], ['/miniapp/onboard', 'POST'],
-    ['/client-login/exchange', 'POST'], ['/wrapped/member-exchange', 'POST'],
-    ['/preferences', 'POST'], ['/questions/create', 'POST'], ['/questions/pose', 'POST'],
-    ['/question-votes/apply', 'POST'], ['/groups/propose', 'POST'], ['/sessions/child', 'POST'],
-    ['/admin/questions/delete', 'POST'], ['/geo-backlink', 'GET'], ['/onboarding', 'GET'],
-  ]) {
-    const response = await handleTelegramAgentHandoffRequest({
-      env, request: agentRequest(`/api/agent${path}?sessionSlug=alpha&telegramUserId=42`, {
-        method, ...(method === 'POST' ? { body: { name: 'Service', sessionSlug: 'alpha' } } : {}),
-      }),
-    });
-    assert.equal(response.status, 403, path);
-    assert.equal((await response.json()).reason, 'session_registry_policy_read_only', path);
-  }
-  assert.equal(env.AGENT_ACTION_KV.store.size, 1);
-  for (const method of ['GET', 'POST']) {
-    const response = await handleTelegramAgentHandoffRequest({
-      env, request: agentRequest('/api/agent/questions?sessionSlug=alpha&telegramUserId=42', { method }),
-    });
-    assert.equal(response.status, 200);
-    assert.equal((await response.json()).questions.length, 2);
-  }
-  const unavailable = await handleTelegramAgentHandoffRequest({
-    env: { ...env, AGENT_ACTION_KV: new MemoryKv(), DEFAULT_RPC_URL: 'https://unavailable-policy.example' },
-    request: agentRequest('/api/agent/admin/questions/delete', { method: 'POST', body: { sessionSlug: 'alpha' } }),
-  });
-  assert.equal(unavailable.status, 503);
-  assert.equal((await unavailable.json()).reason, 'session_registry_unavailable');
 });
 
 test('Root bootstrap mints a named scoped service credential', async () => {

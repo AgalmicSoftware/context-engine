@@ -139,15 +139,6 @@ test('listRegistrySessionsForBridge lists real registry slugs through additive R
   assert.deepEqual(result.sessions.map((session) => session.sessionSlug), ['alpha', 'beta-room']);
   assert.equal(result.sessions[0].default, true);
   assert.equal(result.sessions[0].source, 'session_registry');
-  assert.equal(result.sessions[0].agentHttpEnabled, true);
-  assert.equal(result.sessions[0].telegramBridgeEnabled, false);
-  assert.equal(result.sessions[0].miniAppEnabled, false);
-  assert.equal(result.sessions[0].managedAccountSubmitAllowed, false);
-  assert.equal(result.sessions[0].sponsoredAiAllowed, false);
-  assert.equal(result.sessions[0].sponsoredRpcAllowed, false);
-  assert.equal(result.sessions[0].sponsoredFaucetAllowed, false);
-  assert.equal(result.sessions[0].docLibraryEnabled, false);
-  assert.deepEqual(result.sessions[0].sbtJoinModes, []);
   assert.equal(calls[0][0], defaultRpc);
   assert.equal(calls[1][0], 'https://infura.example/op-sepolia');
 });

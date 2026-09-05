@@ -1,4 +1,4 @@
-import { safeString, envFlagEnabled, operatorPreviewSecretMatches } from './runtimePrimitives.mjs';
+import { safeString, envFlagEnabled } from './runtimePrimitives.mjs';
 import {
   AGENT_BRIDGE_WORKER_VERSION,
   AGENT_SESSION_WRAPPED_PROTOCOL_VERSION,
@@ -39,8 +39,8 @@ function telegramPreviewEnabled(env = {}) {
 
 function buildPreviewUpdate(body = {}) {
   const chatType = safeString(body.chatType || 'supergroup') || 'supergroup';
-  const chatId = chatType === 'private' ? 'preview-user' : -100123;
-  const from = { id: 'preview-user', username: 'preview_user' };
+  const chatId = chatType === 'private' ? 42 : -100123;
+  const from = { id: 42, username: 'preview_user' };
   if (body.callbackData) {
     return {
       update_id: Date.now(),
@@ -102,8 +102,6 @@ function telegramPreviewHtml() {
   <main>
     <aside>
       <h1>CE Telegram Preview</h1>
-      <label for="previewSecret">Operator preview secret</label>
-      <input id="previewSecret" type="password" autocomplete="off">
       <label for="chatType">Lane</label>
       <select id="chatType">
         <option value="supergroup">Group lobby</option>
@@ -152,7 +150,7 @@ function telegramPreviewHtml() {
       error.textContent = '';
       const response = await fetch('/mock/telegram/preview-update', {
         method: 'POST',
-        headers: { 'content-type': 'application/json', 'X-CE-Preview-Secret': document.getElementById('previewSecret').value },
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ chatType: chatType.value, messageId, ...payload }),
       });
       const body = await response.json();
@@ -238,21 +236,15 @@ export default {
         deploymentId: body.deploymentId || env.AGENT_BRIDGE_DEPLOYMENT_ID || 'local-demo',
       }));
     }
-    const previewRoute = url.pathname === '/mock/telegram/preview' || url.pathname === '/mock/telegram/preview-update';
-    const previewHeaders = { 'cache-control': 'no-store' };
-    if (previewRoute && telegramPreviewEnabled(env) &&
-        !operatorPreviewSecretMatches(request.headers.get('X-CE-Preview-Secret'), env)) {
-      return json({ ok: false, error: 'telegram_preview_unauthorized' }, { status: 401, headers: previewHeaders });
-    }
     if (url.pathname === '/mock/telegram/preview' && request.method === 'GET') {
       if (!telegramPreviewEnabled(env)) {
-        return json({ ok: false, error: 'telegram_preview_disabled' }, { status: 404, headers: previewHeaders });
+        return json({ ok: false, error: 'telegram_preview_disabled' }, { status: 404 });
       }
-      return html(telegramPreviewHtml(), { headers: previewHeaders });
+      return html(telegramPreviewHtml());
     }
     if (url.pathname === '/mock/telegram/preview-update' && request.method === 'POST') {
       if (!telegramPreviewEnabled(env)) {
-        return json({ ok: false, error: 'telegram_preview_disabled' }, { status: 404, headers: previewHeaders });
+        return json({ ok: false, error: 'telegram_preview_disabled' }, { status: 404 });
       }
       const body = await request.json().catch(() => ({}));
       const preview = await buildTelegramCommandResponse({
@@ -269,7 +261,7 @@ export default {
           reason: preview.reason || null,
           response: preview.response || null,
         },
-      }, { status: preview.ok === true ? 200 : 400, headers: previewHeaders });
+      }, { status: preview.ok === true ? 200 : 400 });
     }
     if (url.pathname.startsWith('/telegram/result-photo/') && request.method === 'GET') {
       const id = safeString(url.pathname.split('/').pop());

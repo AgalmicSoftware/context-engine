@@ -79,12 +79,6 @@ const listSourceFiles = (relativeRoot) => {
   return files;
 };
 
-const lineCount = (source) => {
-  if (source.length === 0) return 0;
-  const lines = source.split(/\r?\n/).length;
-  return /\r?\n$/.test(source) ? lines - 1 : lines;
-};
-
 const cleanComment = (comment) =>
   comment
     .split(/\r?\n/)
@@ -177,7 +171,6 @@ const renderMap = ({ title, output, intro, sourceRoots }) => {
       .sort((left, right) => left.localeCompare(right));
     return {
       file,
-      lines: lineCount(source),
       description: describeSource(source),
       exports: exportedNames(source),
       edges,
@@ -187,8 +180,8 @@ const renderMap = ({ title, output, intro, sourceRoots }) => {
   const sourceSummary = sourceRoots.map((sourceRoot) => `\`${sourceRoot}/\``).join(', ');
   const introSource = fs.readFileSync(path.join(ROOT, intro), 'utf8').trim();
   const tableRows = rows.map(
-    ({ file, lines, description, exports, edges }) =>
-      `| \`${file}\` | ${lines} | ${escapeCell(description)} | ${exports.length ? exports.map((name) => `\`${name}\``).join(', ') : '—'} | ${edges.length ? edges.map((edge) => `\`${edge}\``).join('<br>') : '—'} |`,
+    ({ file, description, exports, edges }) =>
+      `| \`${file}\` | ${escapeCell(description)} | ${exports.length ? exports.map((name) => `\`${name}\``).join(', ') : '—'} | ${edges.length ? edges.map((edge) => `\`${edge}\``).join('<br>') : '—'} |`,
   );
 
   return [
@@ -201,10 +194,10 @@ const renderMap = ({ title, output, intro, sourceRoots }) => {
     '',
     '## Generated inventory',
     '',
-    `Source roots: ${sourceSummary}. Files are sorted by repository-relative path. Line counts, exports, and intra-area imports are derived from the current tree.`,
+    `Source roots: ${sourceSummary}. Files are sorted by repository-relative path. Exports and intra-area imports are derived from the current tree.`,
     '',
-    '| File | Lines | Description | Exports | Intra-area imports |',
-    '|---|---:|---|---|---|',
+    '| File | Description | Exports | Intra-area imports |',
+    '|---|---|---|---|',
     ...tableRows,
     '',
   ].join('\n');
