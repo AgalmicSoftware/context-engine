@@ -1865,3 +1865,65 @@ describe('setSessionFieldsOnChain gas fallback', () => {
     expect(result).toEqual({ ok: true });
   });
 });
+
+describe('registry listing pages', () => {
+  let contract;
+  const load = (options = {}) => jest.requireActual('./sessionRegistry.js').loadSessionRegistryCache({
+    chainIds: [CONFIGURED_REGISTRY_CHAIN_ID], force: true, ...options,
+  });
+  beforeEach(() => {
+    localStorage.removeItem('dg:sessionRegistryCache:v1');
+    contract = {
+      getSessionCount: jest.fn().mockResolvedValue(301),
+      getSessionSlugByIndex: jest.fn(async index => `fixture-${index}`),
+      getSessionBySlug: jest.fn(async slug => [slug, CONFIGURED_REGISTRY_CHAIN_ID, '', '', TEST_SIGNER_ADDRESS, 1, 2, '0x00000000000000000000000000000055']),
+      getResourceGate: jest.fn(async () => [[], 0, 0, 0]),
+      getSessionFields: jest.fn(async (_slug, keys) => keys.map(() => '')),
+    };
+    jest.spyOn(ethers.providers, 'JsonRpcProvider').mockImplementation(() => ({ send: jest.fn() }));
+    jest.spyOn(ethers.providers, 'FallbackProvider').mockImplementation(configs => configs[0].provider);
+    jest.spyOn(ethers, 'Contract').mockImplementation(() => contract);
+  });
+  afterEach(() => { localStorage.removeItem('dg:sessionRegistryCache:v1'); jest.restoreAllMocks(); });
+
+  it('loads only the newest 100 entries by default and caps explicit pages at 250', async () => {
+    const first = await load();
+    expect(contract.getSessionSlugByIndex.mock.calls.map(([index]) => index)).toEqual(Array.from({ length: 100 }, (_, i) => 300 - i));
+    expect(first.__loadMeta.hasOlder).toBe(true);
+    contract.getSessionSlugByIndex.mockClear();
+    await load({ pageSize: 10000 });
+    expect(contract.getSessionSlugByIndex).toHaveBeenCalledTimes(250);
+  });
+
+  it('retains loaded pages, resumes by index, and does not advance the cursor on partial failure', async () => {
+    contract.getSessionCount.mockResolvedValue(5);
+    await load({ pageSize: 2 });
+    contract.getSessionSlugByIndex.mockClear();
+    contract.getSessionBySlug.mockRejectedValueOnce(new Error('temporary RPC failure'));
+    const failed = await load({ pageSize: 2, loadOlder: true });
+    expect(failed.__loadMeta.hadLoadErrors).toBe(true);
+    expect(failed.sessions['fixture-4']).toBeDefined();
+    expect(contract.getSessionSlugByIndex.mock.calls.map(([index]) => index)).toEqual([2, 1]);
+    contract.getSessionSlugByIndex.mockClear();
+    await load({ pageSize: 2, loadOlder: true });
+    expect(contract.getSessionSlugByIndex.mock.calls.map(([index]) => index)).toEqual([2, 1]);
+    const complete = await load({ pageSize: 2, loadOlder: true });
+    expect(Object.keys(complete.sessions)).toHaveLength(5);
+    expect(complete.__loadMeta.hasOlder).toBe(false);
+    contract.getSessionSlugByIndex.mockClear();
+    await load({ pageSize: 2, loadOlder: true });
+    expect(contract.getSessionSlugByIndex).not.toHaveBeenCalled();
+  });
+
+  it('keeps direct slug lookups direct and preserves the listing cursor', async () => {
+    contract.getSessionCount.mockResolvedValue(5);
+    await load({ pageSize: 2 });
+    contract.getSessionCount.mockClear();
+    contract.getSessionSlugByIndex.mockClear();
+    await load({ slugs: ['fixture-0'] });
+    expect(contract.getSessionCount).not.toHaveBeenCalled();
+    expect(contract.getSessionSlugByIndex).not.toHaveBeenCalled();
+    await load({ pageSize: 2, loadOlder: true });
+    expect(contract.getSessionSlugByIndex.mock.calls.map(([index]) => index)).toEqual([2, 1]);
+  });
+});

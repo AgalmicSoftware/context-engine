@@ -228,6 +228,7 @@ const AdminPageRuntime = ({
   const [sessionLookupStatus, setSessionLookupStatus] = useState('');
   const [sessionsRefreshStatus, setSessionsRefreshStatus] = useState('');
   const [sessionsRefreshBusy, setSessionsRefreshBusy] = useState(false);
+  const [hasOlderSessions, setHasOlderSessions] = useState(false);
   const [defaultGateTouched, setDefaultGateTouched] = useState(false);
   const [gateConfigDirty, setGateConfigDirty] = useState(false);
   const [metadataBlockLimitsDraft, setMetadataBlockLimitsDraft] = useState<AdminMetadataBlockLimitsDraft>({
@@ -350,7 +351,7 @@ const AdminPageRuntime = ({
   }, [mergeInitialWorkerCanonicalSession]);
 
   const loadSessions = useCallback(
-    async ({ forceOnChain }: any = {}) => {
+    async ({ forceOnChain, loadOlder = false }: any = {}) => {
       const cached = syncSessionsFromRegistryCache();
       if (initialWorkerCanonicalConfigRef.current) return cached;
 
@@ -361,6 +362,7 @@ const AdminPageRuntime = ({
           return await adminSessionRegistryPorts.reads.loadSessionRegistryCache({
             ...(chainIds ? { chainIds } : {}),
             force: shouldForceRegistryRead,
+            loadOlder,
             // In /admin, never auto-decrypt registry metadata; keep wallet prompts behind user actions.
             providerLike: null,
             account: '',
@@ -378,15 +380,32 @@ const AdminPageRuntime = ({
       const primaryLoadHadErrors = !!primaryResult?.__error || primaryResult?.__loadMeta?.hadLoadErrors === true;
       const shouldRetryWithDefaultRpc = primaryCount <= 0 || primaryLoadHadErrors;
 
+      let finalResult = primaryResult;
       if (shouldRetryWithDefaultRpc) {
-        await runRegistryLoad(false);
+        finalResult = await runRegistryLoad(false);
         refreshed = syncSessionsFromRegistryCache();
       }
 
+      if (typeof finalResult?.__loadMeta?.hasOlder === 'boolean') setHasOlderSessions(finalResult.__loadMeta.hasOlder);
+      if (loadOlder && (finalResult?.__error || finalResult?.__loadMeta?.hadLoadErrors)) {
+        throw new Error('Unable to load older sessions. Try again.');
+      }
       return refreshed;
     },
     [requestedChainId, syncSessionsFromRegistryCache],
   );
+
+  const handleLoadOlderSessions = useCallback(async () => {
+    setSessionsRefreshBusy(true);
+    try {
+      await loadSessions({ forceOnChain: true, loadOlder: true });
+      setSessionsRefreshStatus('Session list updated.');
+    } catch (error) {
+      setSessionsRefreshStatus(getErrorMessage(error, 'Failed to load older sessions.'));
+    } finally {
+      setSessionsRefreshBusy(false);
+    }
+  }, [loadSessions]);
 
   const handleRefreshSessions = useCallback(async () => {
     setSessionsRefreshBusy(true);
@@ -2351,6 +2370,12 @@ const AdminPageRuntime = ({
                   )}
                 </div>
                 <div className={styles.heroCardHeaderActions}>
+                  {hasOlderSessions && (
+                    <Button size="sm" color="secondary" outline className={styles.actionButton}
+                      onClick={handleLoadOlderSessions} disabled={sessionsRefreshBusy} data-testid="ce-admin-load-older">
+                      Load older
+                    </Button>
+                  )}
                   <button
                     type="button"
                     className={styles.heroCardIconButton}

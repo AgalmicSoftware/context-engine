@@ -88,6 +88,17 @@ Lookup helpers:
 - `getSessionById(bytes16)` returns the same tuple as `getSessionBySlug`, keyed by sessionId.
 - `sessionIdExists(bytes16)` is a quick guard before creating a new session.
 
+Registry list reads load newest indices first in pages of 100 sessions, with a
+hard maximum of 250 per page. Admin and Sponsor expose **Load older** while more
+indices remain. Previously loaded pages stay in the existing local registry
+cache; refresh loads the newest page without discarding older sessions. Failed
+rows leave the page cursor available for retry. Explicit slug lookups remain
+direct and do not enumerate the registry or advance the list cursor.
+
+Run `node scripts/session-registry-pagination-smoke.js` against a local frontend
+(`BASE_URL` defaults to `http://127.0.0.1:3000`) to verify both page controls with
+101 non-identifying sessions supplied by an intercepted RPC fixture.
+
 Admin is the only on-chain role in this version. There is no Hats dependency
 in SessionRegistry; you can revoke edits by setting admin to `0x0`.
 Future: we may re-introduce Hats-based owner/admin/editor roles and per-field

@@ -225,6 +225,20 @@ describe('AdminPage rendered interactions', () => {
     web3ProviderSpy?.mockRestore();
   });
 
+  it('loads older registry sessions without dropping the current page', async () => {
+    mockLoadSessionRegistryCache.mockImplementation(async ({ loadOlder } = {}) => {
+      if (loadOlder) sessionEntries = [...sessionEntries, ['older', buildSessionConfig({ slug: 'older', sessionName: 'Older session' })]];
+      return { __loadMeta: { hasOlder: !loadOlder } };
+    });
+    await renderAdminPage();
+    const older = await screen.findByRole('button', { name: 'Load older' });
+    await act(async () => { fireEvent.click(older); });
+    await waitFor(() => expect(mockLoadSessionRegistryCache).toHaveBeenCalledWith(expect.objectContaining({ loadOlder: true })));
+    expect(screen.getByRole('option', { name: /Older session/ })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Edge Session/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Load older' })).not.toBeInTheDocument();
+  });
+
   it('renders the selected session controls inline and lets the admin unlock the worker URL for editing', async () => {
     await renderAdminPage();
 

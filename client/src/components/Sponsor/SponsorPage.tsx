@@ -79,6 +79,7 @@ type CancelOptions = {
 
 type LoadSessionsOptions = CancelOptions & {
   forceOnChain?: boolean;
+  loadOlder?: boolean;
 };
 
 type WorkerUrlOverride = {
@@ -399,6 +400,7 @@ const SponsorPage = ({
   const [sessionLookupStatus, setSessionLookupStatus] = useState('');
   const [sessionsRefreshStatus, setSessionsRefreshStatus] = useState('');
   const [sessionsRefreshBusy, setSessionsRefreshBusy] = useState(false);
+  const [hasOlderSessions, setHasOlderSessions] = useState(false);
   const [workerUrl, setWorkerUrl] = useState('');
   const [workerUrlEditable, setWorkerUrlEditable] = useState(false);
   const [persistBundleDraft, setPersistBundleDraft] = useState(initialCache.persistBundleDraft);
@@ -441,7 +443,7 @@ const SponsorPage = ({
   }, []);
 
   const loadSessions = useCallback(
-    async ({ forceOnChain, isCancelled }: LoadSessionsOptions = {}) => {
+    async ({ forceOnChain, isCancelled, loadOlder = false }: LoadSessionsOptions = {}) => {
       const cached = syncSessionsFromRegistryCache({ isCancelled });
 
       const chainIds = requestedChainId ? [requestedChainId] : undefined;
@@ -451,6 +453,7 @@ const SponsorPage = ({
           const result = await sessionRegistryReadsPort.loadSessionRegistryCache({
             ...(chainIds ? { chainIds } : {}),
             force: shouldForceRegistryRead,
+            loadOlder,
             providerLike: null,
             account: '',
             lit: null,
@@ -469,14 +472,33 @@ const SponsorPage = ({
       const loadMeta = isRecord(primaryResult.__loadMeta) ? primaryResult.__loadMeta : null;
       const primaryLoadHadErrors = !!primaryResult?.__error || loadMeta?.hadLoadErrors === true;
       const shouldRetryWithDefaultRpc = primaryCount <= 0 || primaryLoadHadErrors;
+      let finalResult = primaryResult;
       if (shouldRetryWithDefaultRpc) {
-        await runRegistryLoad(false);
+        finalResult = await runRegistryLoad(false);
         refreshed = syncSessionsFromRegistryCache({ isCancelled });
+      }
+      if (typeof isCancelled === 'function' && isCancelled()) return refreshed;
+      const finalMeta = isRecord(finalResult.__loadMeta) ? finalResult.__loadMeta : null;
+      if (typeof finalMeta?.hasOlder === 'boolean') setHasOlderSessions(finalMeta.hasOlder);
+      if (loadOlder && (finalResult.__error || finalMeta?.hadLoadErrors)) {
+        throw new Error('Unable to load older sessions. Try again.');
       }
       return refreshed;
     },
     [requestedChainId, syncSessionsFromRegistryCache],
   );
+
+  const handleLoadOlderSessions = useCallback(async () => {
+    setSessionsRefreshBusy(true);
+    try {
+      await loadSessions({ forceOnChain: true, loadOlder: true });
+      setSessionsRefreshStatus('Session list updated.');
+    } catch (error) {
+      setSessionsRefreshStatus(getErrorMessage(error, 'Failed to load older sessions.'));
+    } finally {
+      setSessionsRefreshBusy(false);
+    }
+  }, [loadSessions]);
 
   const handleRefreshSessions = useCallback(async () => {
     setSessionsRefreshBusy(true);
@@ -1091,6 +1113,12 @@ const SponsorPage = ({
                     <div className={styles.heroStatValue}>No sessions found.</div>
                   )}
                 </div>
+                {hasOlderSessions && (
+                  <Button size="sm" color="secondary" outline className={styles.actionButton}
+                    onClick={handleLoadOlderSessions} disabled={sessionsRefreshBusy} data-testid="ce-sponsor-load-older">
+                    Load older
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   color="secondary"
