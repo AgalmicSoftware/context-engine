@@ -4,14 +4,51 @@ const { ReadableStream } = require('node:stream/web');
 const { TextEncoder } = require('node:util');
 const { webcrypto: nodeWebCrypto } = require('crypto');
 
+const normalizeDigestInput = (value) => {
+  if (Buffer.isBuffer(value)) return value;
+  if (ArrayBuffer.isView(value)) return Buffer.from(value);
+  return Buffer.from(new Uint8Array(value));
+};
+
+const createWebCryptoAdapter = () => {
+  const subtle = {};
+  for (const property of Object.getOwnPropertyNames(Object.getPrototypeOf(nodeWebCrypto.subtle))) {
+    if (property === 'constructor') continue;
+    const member = nodeWebCrypto.subtle[property];
+    Object.defineProperty(subtle, property, {
+      value: property === 'digest'
+        ? (algorithm, value) => member.call(nodeWebCrypto.subtle, algorithm, normalizeDigestInput(value))
+        : member.bind(nodeWebCrypto.subtle),
+      configurable: true,
+      writable: true,
+    });
+  }
+
+  const cryptoAdapter = {};
+  Object.defineProperties(cryptoAdapter, {
+    subtle: { value: subtle, configurable: true, writable: true },
+    getRandomValues: {
+      value: nodeWebCrypto.getRandomValues.bind(nodeWebCrypto),
+      configurable: true,
+      writable: true,
+    },
+    randomUUID: {
+      value: nodeWebCrypto.randomUUID.bind(nodeWebCrypto),
+      configurable: true,
+      writable: true,
+    },
+  });
+  return cryptoAdapter;
+};
+
 const installWebCrypto = (target) => {
   if (!target || !nodeWebCrypto) return;
+  const cryptoAdapter = createWebCryptoAdapter();
   const currentCrypto = target.crypto;
-  if (currentCrypto?.subtle && currentCrypto?.getRandomValues) return;
 
   try {
     Object.defineProperty(target, 'crypto', {
-      value: nodeWebCrypto,
+      value: cryptoAdapter,
       configurable: true,
       writable: true,
     });
@@ -22,15 +59,13 @@ const installWebCrypto = (target) => {
 
   if (!currentCrypto) return;
 
-  if (!currentCrypto.subtle) {
-    try {
-      Object.defineProperty(currentCrypto, 'subtle', {
-        value: nodeWebCrypto.subtle,
-        configurable: true,
-      });
-    } catch (error) {
-      // Leave crypto untouched if the host object refuses polyfills.
-    }
+  try {
+    Object.defineProperty(currentCrypto, 'subtle', {
+      value: cryptoAdapter.subtle,
+      configurable: true,
+    });
+  } catch (error) {
+    // Leave crypto untouched if the host object refuses polyfills.
   }
 
   if (!currentCrypto.getRandomValues) {
