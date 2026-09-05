@@ -74,6 +74,21 @@ const readBodyAsText = async (body) => {
   return String(body);
 };
 
+const readBodyAsBytes = async (body) => {
+  if (ArrayBuffer.isView(body)) return new Uint8Array(body.buffer, body.byteOffset, body.byteLength);
+  if (body instanceof ArrayBuffer) return new Uint8Array(body);
+  if (typeof body?.arrayBuffer === 'function') return new Uint8Array(await body.arrayBuffer());
+  if (typeof Blob !== 'undefined' && body instanceof Blob && typeof FileReader !== 'undefined') {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(new Uint8Array(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsArrayBuffer(body);
+    });
+  }
+  return new TextEncoder().encode(await readBodyAsText(body));
+};
+
 // node-fetch v2 exposes Node streams/Buffers. Supply the Web Streams reader
 // used by Workers without changing the ponyfill's own JSON/text consumers.
 class JestRequest extends fetchPonyfill.Request {
@@ -105,7 +120,7 @@ class JestResponse {
     this._webBody ||= new ReadableStream({
       start: async (controller) => {
         try {
-          controller.enqueue(new TextEncoder().encode(await readBodyAsText(this._body)));
+          controller.enqueue(await readBodyAsBytes(this._body));
           controller.close();
         } catch (error) { controller.error(error); }
       },
