@@ -87,11 +87,19 @@ test('Context Engine CC and Node gate installs client parser dependencies', () =
   const workflow = fs.readFileSync(path.join(rootDir, '.github/workflows/ci.yml'), 'utf8');
   const ceccJob = workflow.slice(workflow.indexOf('  cecc-and-node:'), workflow.indexOf('  test:'));
   const installIndex = ceccJob.indexOf('npm --prefix client ci');
+  const resolveIndex = ceccJob.indexOf('node scripts/resolve-baseline-monotonicity-base.mjs');
   const gateIndex = ceccJob.indexOf('npm run ci:gate -- cecc-and-node');
 
   assert.match(ceccJob, /cache-dependency-path:[\s\S]*client\/package-lock\.json/);
+  assert.match(ceccJob, /fetch-depth: 0/);
+  assert.match(
+    ceccJob,
+    /CLIENT_LARGE_FILE_BASE_REF: \$\{\{ steps\.client-growth-base\.outputs\.base_sha \}\}/,
+  );
   assert.notEqual(installIndex, -1, 'cecc-and-node must install client dependencies');
+  assert.notEqual(resolveIndex, -1, 'cecc-and-node must resolve the large-file comparison base');
   assert.ok(installIndex < gateIndex, 'client dependencies must be installed before the gate runs');
+  assert.ok(resolveIndex < gateIndex, 'client growth baseline must be resolved before the gate runs');
 });
 
 test('release-staging PR events do not duplicate the authoritative push matrix', () => {
@@ -164,7 +172,7 @@ test('release workflow fetches preserve public ancestry for exact release refs',
     (match) => match[1].trim(),
   );
 
-  assert.equal(fetchCommands.length, 4, 'expected every release no-tags fetch command');
+  assert.equal(fetchCommands.length, 5, 'expected every release no-tags fetch command');
 
   withTempRepo((rootDir) => {
     const originDir = path.join(rootDir, 'origin.git');
@@ -365,7 +373,15 @@ test('public-release style copies without .git still pass wiring checks', () => 
         '      - run: npm run ci:gate -- e2e-smoke',
         '  cecc-and-node:',
         '    steps:',
-        '      - run: npm run ci:gate -- cecc-and-node',
+        '      - uses: actions/checkout@1111111111111111111111111111111111111111',
+        '        with:',
+        '          fetch-depth: 0',
+        '      - run: |',
+        '          git fetch --no-tags origin main',
+        '          node scripts/resolve-baseline-monotonicity-base.mjs --github-output "$GITHUB_OUTPUT"',
+        '      - env:',
+        '          CLIENT_LARGE_FILE_BASE_REF: ${{ steps.client-growth-base.outputs.base_sha }}',
+        '        run: npm run ci:gate -- cecc-and-node',
         '  test:',
         '    needs:',
         '      - wiring-and-release',

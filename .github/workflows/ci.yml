@@ -312,6 +312,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -332,7 +334,21 @@ jobs:
       - name: Install sessionCorsWorker dependencies
         run: npm --prefix workers/sessionCorsWorker ci
 
+      - name: Resolve client growth baseline
+        id: client-growth-base
+        env:
+          BASELINE_EVENT_NAME: ${{ github.event_name }}
+          BASELINE_REF_NAME: ${{ github.ref_name }}
+          BASELINE_PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASELINE_PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          node scripts/resolve-baseline-monotonicity-base.mjs --github-output "$GITHUB_OUTPUT"
+
       - name: Run Context Engine CC and Node gate
+        env:
+          CLIENT_LARGE_FILE_BASE_REF: ${{ steps.client-growth-base.outputs.base_sha }}
         run: npm run ci:gate -- cecc-and-node
 
   test:
