@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
 
-import { base64urlToHex, generateQuestionId, hexToBase64url } from './questionUtils.mjs';
+import { base64urlToBase64, base64urlToHex, generateQuestionId, hexToBase64url } from './questionUtils.mjs';
 
 describe('questionUtils', () => {
   it('generates stable question ids for multichoice prompts', () => {
@@ -20,6 +20,7 @@ describe('questionUtils', () => {
     const encoded = hexToBase64url(hex);
 
     expect(encoded).toBe('EjSrzQ');
+    expect(base64urlToBase64('-_8')).toBe('+/8');
     expect(base64urlToHex(encoded)).toBe(hex);
   });
 

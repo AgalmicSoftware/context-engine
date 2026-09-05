@@ -759,7 +759,6 @@
     "client/src/utilities/arweave/arweaveClientCaches.ts",
     "client/src/utilities/arweave/arweaveClientHostContracts.ts",
     "client/src/utilities/arweave/arweaveDownload.ts",
-    "client/src/utilities/arweave/arweaveEncoding.ts",
     "client/src/utilities/arweave/arweaveFailureCache.ts",
     "client/src/utilities/arweave/arweaveFailureClassifiers.ts",
     "client/src/utilities/arweave/arweaveFetchErrors.ts",

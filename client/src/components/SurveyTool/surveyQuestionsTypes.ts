@@ -546,7 +546,6 @@ export type SurveyQuestionsState = SurveyQuestionsLegacyRecord & {
   copiedResponseJson: boolean;
   isLoadingResponse: boolean;
   parsedViewAddressAnswers: unknown;
-  decryptionNonce: number;
   bookmarkedQuestions: Set<string>;
   showSurveyJson: boolean;
   copiedSurveyJson: boolean;
@@ -2283,7 +2282,6 @@ export const buildInitialSurveyQuestionsState = (props: SurveyQuestionsProps = {
   copiedResponseJson: false,
   isLoadingResponse: false,
   parsedViewAddressAnswers: null,
-  decryptionNonce: 0,
   ...buildBookmarkedQuestionsState(),
   showSurveyJson: false,
   copiedSurveyJson: false,

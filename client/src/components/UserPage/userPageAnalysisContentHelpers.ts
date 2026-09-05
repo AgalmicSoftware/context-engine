@@ -198,7 +198,7 @@ export const buildUserPageAnalysisQuestions = ({
         id: q.id,
         type: q.type,
         prompt: q.prompt,
-        answer: Array.isArray(ans) ? ans : ans,
+        answer: ans,
         importance: extractUserPageAnalysisImportance(resp),
         additionalComment: extractUserPageAnalysisAdditionalComment(resp) || undefined,
       };
@@ -224,7 +224,7 @@ export const buildUserPageAnalysisSurveys = ({
       return {
         prompt: questionData.prompt,
         type: questionData.type || responseData.type || 'unknown',
-        answer: Array.isArray(v) ? v : v,
+        answer: v,
         importance: extractUserPageAnalysisImportance(responseData),
         additionalComment: extractUserPageAnalysisAdditionalComment(responseData) || undefined,
       };

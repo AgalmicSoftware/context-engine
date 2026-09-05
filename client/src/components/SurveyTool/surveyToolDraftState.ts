@@ -907,17 +907,13 @@ export const loadPreviousPersistedDraftSnapshot = (
       prevBaseline: (parsed && typeof parsed === 'object' ? parsed.baseline : {}) || {},
       prevDraftRaw: String(draftParseCache?.raw || ''),
       prevSemanticSignature: lastDraftSemanticSignature || buildSemanticSignature(parsed),
-      nextDraftParseCache: draftParseCache,
     };
   }
 
   try {
     const raw = String(readDraftRaw(normalizedKey) || '');
     if (!raw) {
-      return {
-        ...emptyResult,
-        nextDraftParseCache: draftParseCache,
-      };
+      return emptyResult;
     }
 
     const cacheHit =
