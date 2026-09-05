@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp, faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './Account.module.scss';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 type SessionDescriptor = {
   label?: string;
@@ -67,10 +68,12 @@ export const LoginSettingsControlRow = ({
   configTestId = '',
   containerClassName = '',
   demoControl = null,
+  layout = 'row',
   onToggleConfig = null,
   rowClassName = '',
   sessionHref = '/session',
   showSession = true,
+  themeControl = null,
   tooltipsControl = null,
 }: {
   activeSession?: SessionDescriptor;
@@ -81,21 +84,56 @@ export const LoginSettingsControlRow = ({
   configTestId?: string;
   containerClassName?: string;
   demoControl?: React.ReactNode;
+  layout?: 'row' | 'quick-grid';
   onToggleConfig?: (() => void) | null;
   rowClassName?: string;
   sessionHref?: string;
   showSession?: boolean;
+  themeControl?: React.ReactNode;
   tooltipsControl?: React.ReactNode;
-}): React.ReactElement => (
-  <div className={[styles.settingsContainer, containerClassName].filter(Boolean).join(' ')}>
-    <div className={[styles.settingsRow, rowClassName].filter(Boolean).join(' ')}>
-      {beforeConfig}
-      <LoginSettingsConfigToggleControl expanded={configOpen} onToggle={onToggleConfig} testId={configTestId} />
-      {showSession ? <LoginSettingsSessionSummary activeSession={activeSession} sessionHref={sessionHref} /> : null}
-      {betweenSessionAndTooltips}
-      {tooltipsControl}
-      {demoControl}
-      {afterDemo}
+}): React.ReactElement => {
+  const configControl = (
+    <LoginSettingsConfigToggleControl expanded={configOpen} onToggle={onToggleConfig} testId={configTestId} />
+  );
+  const sessionControl = showSession ? (
+    <LoginSettingsSessionSummary activeSession={activeSession} sessionHref={sessionHref} />
+  ) : null;
+  const quickControls = [
+    { key: 'config', control: configControl },
+    { key: 'session', control: sessionControl },
+    { key: 'explainers', control: tooltipsControl },
+    { key: 'demo', control: demoControl },
+  ];
+
+  if (layout === 'quick-grid') {
+    return (
+      <div className={[styles.settingsContainer, containerClassName].filter(Boolean).join(' ')}>
+        {beforeConfig}
+        <div className={styles.settingsQuickControlsGrid} data-testid={E2E_TESTIDS.SETTINGS_QUICK_CONTROLS}>
+          {quickControls.map(({ key, control }) => (
+            <div className={styles.settingsQuickControlCell} key={key}>
+              {control}
+            </div>
+          ))}
+        </div>
+        {themeControl ? <div className={styles.settingsThemeQuickSlot}>{themeControl}</div> : null}
+        {betweenSessionAndTooltips}
+        {afterDemo}
+      </div>
+    );
+  }
+
+  return (
+    <div className={[styles.settingsContainer, containerClassName].filter(Boolean).join(' ')}>
+      <div className={[styles.settingsRow, rowClassName].filter(Boolean).join(' ')}>
+        {beforeConfig}
+        {configControl}
+        {sessionControl}
+        {betweenSessionAndTooltips}
+        {tooltipsControl}
+        {demoControl}
+        {afterDemo}
+      </div>
     </div>
-  </div>
-);
+  );
+};

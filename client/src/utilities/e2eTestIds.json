@@ -122,6 +122,7 @@
   "WIZARD_SESSION_INFO": "ce-wizard-session-info",
   "WIZARD_SESSION_COLOR_SCHEME": "ce-wizard-session-color-scheme",
   "WIZARD_SESSION_COLOR_PREVIEW": "ce-wizard-session-color-preview",
+  "SETTINGS_QUICK_CONTROLS": "ce-settings-quick-controls",
   "SETTINGS_THEME": "ce-settings-theme",
   "WIZARD_SESSION_HEADER_INLINE_BAR": "ce-wizard-session-header-inline-bar",
   "WIZARD_SESSION_HEADER_URL_TOGGLE": "ce-wizard-session-header-url-toggle",

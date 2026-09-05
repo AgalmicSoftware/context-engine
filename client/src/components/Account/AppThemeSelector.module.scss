@@ -2,14 +2,15 @@
   display: block;
 }
 
-.select {
+.field select.select {
   width: 100%;
   min-height: 42px;
-  border: var(--ce-border-control-width) solid var(--ce-input-border);
+  border: var(--ce-settings-control-border-width) solid var(--ce-settings-control-border);
   border-radius: var(--ce-radius-6);
-  background: var(--ce-input-bg);
-  color: var(--ce-text);
-  font-family: var(--ce-font-ui);
+  background: var(--ce-settings-field-bg);
+  color: var(--ce-settings-text);
+  font-family: var(--ce-font-button);
+  font-weight: 700;
   padding: var(--ce-control-padding-y) var(--ce-control-padding-x);
 
   &:focus-visible {

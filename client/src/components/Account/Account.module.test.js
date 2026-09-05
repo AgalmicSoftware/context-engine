@@ -117,20 +117,22 @@ describe('Account.module.scss modal account layout guards', () => {
     });
   });
 
-  it('wraps settings controls into non-overlapping half rows at medium widths', () => {
+  it('uses an equal two-by-two quick-control grid in every theme profile', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'Account.module.scss'), 'utf8');
+    const themeSelectorScss = fs.readFileSync(path.join(__dirname, 'AppThemeSelector.module.scss'), 'utf8');
 
     expect(scss).toMatch(
-      /@media \(min-width:\s*769px\) and \(max-width:\s*1023px\)\s*{[\s\S]*?\.settingsRow\s*{[\s\S]*?flex-wrap:\s*wrap;[\s\S]*?justify-content:\s*center;/,
+      /\.settingsQuickControlsGrid\s*{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/,
     );
     expect(scss).toMatch(
-      /@media \(min-width:\s*769px\) and \(max-width:\s*1023px\)[\s\S]*?\.settingsRow > \*\s*{[\s\S]*?flex:\s*1 1 calc\(50% - 6px\);[\s\S]*?min-width:\s*0;[\s\S]*?max-width:\s*100%;/,
+      /\.settingsQuickControlCell\s*{[\s\S]*?display:\s*flex;[\s\S]*?min-width:\s*0;[\s\S]*?min-height:\s*56px;/,
     );
+    expect(scss).toMatch(/\.settingsQuickControlCell\s*>\s*\*\s*{[\s\S]*?width:\s*100%;[\s\S]*?height:\s*100%;/);
     expect(scss).toMatch(
-      /@media \(min-width:\s*769px\) and \(max-width:\s*1023px\)[\s\S]*?\.settingsSessionRoute,[\s\S]*?\.settingsConfigToggleButton\s*{[\s\S]*?width:\s*100%;[\s\S]*?justify-content:\s*center;/,
+      /\.settingsThemeQuickControl\s*{[\s\S]*?background:\s*var\(--ce-settings-control-bg\);[\s\S]*?color:\s*var\(--ce-settings-control-text\);[\s\S]*?opacity:\s*1;/,
     );
-    expect(scss).toMatch(
-      /@media \(min-width:\s*769px\) and \(max-width:\s*1023px\)[\s\S]*?\.tooltipsToggleButton\s*{[\s\S]*?flex:\s*1 1 auto;[\s\S]*?width:\s*auto;[\s\S]*?min-width:\s*0;[\s\S]*?justify-content:\s*center;/,
+    expect(themeSelectorScss).toMatch(
+      /\.field select\.select\s*{[\s\S]*?background:\s*var\(--ce-settings-field-bg\);[\s\S]*?color:\s*var\(--ce-settings-text\);/,
     );
   });
 

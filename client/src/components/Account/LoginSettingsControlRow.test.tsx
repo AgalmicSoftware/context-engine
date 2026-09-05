@@ -52,6 +52,34 @@ describe('LoginSettingsControlRow', () => {
     expect(screen.getByText('After')).toBeInTheDocument();
   });
 
+  it('groups the four primary settings controls into one equal quick-control grid', () => {
+    render(
+      <LoginSettingsControlRow
+        activeSession={{ label: 'General', slug: '' }}
+        layout="quick-grid"
+        tooltipsControl={<button type="button">Explainers</button>}
+        demoControl={<button type="button">Demo</button>}
+        themeControl={
+          <label htmlFor="theme-test">
+            Theme
+            <select id="theme-test">
+              <option>Context Engine</option>
+            </select>
+          </label>
+        }
+      />,
+    );
+
+    const grid = screen.getByTestId('ce-settings-quick-controls');
+    expect(grid.children).toHaveLength(4);
+    expect(grid).toContainElement(screen.getByRole('button', { name: 'Config' }));
+    expect(grid).toContainElement(screen.getByLabelText('Active session: General'));
+    expect(grid).toContainElement(screen.getByRole('button', { name: 'Explainers' }));
+    expect(grid).toContainElement(screen.getByRole('button', { name: 'Demo' }));
+    expect(screen.getByLabelText('Theme')).not.toBe(grid);
+    expect(grid.parentElement).toContainElement(screen.getByLabelText('Theme'));
+  });
+
   it('can omit the session summary from a settings-only control row', () => {
     render(
       <LoginSettingsControlRow

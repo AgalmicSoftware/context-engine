@@ -39,7 +39,7 @@ import LoginTooltipsToggleControl from './LoginTooltipsToggleControl';
 import LoginPreLoginConfigPanel from './LoginPreLoginConfigPanel';
 import LoginPreLoginSettingsDisplay from './LoginPreLoginSettingsDisplay';
 import LoginDemoSurfaceToggleControl from './LoginDemoSurfaceToggleControl';
-import LoginThemeSettingsSection from './LoginThemeSettingsSection';
+import LoginThemeQuickControl from './LoginThemeQuickControl';
 import { DEFAULT_AUTO_REQUEST_TESTNET_FUNDS, DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 import contractScripts, {
   getAllSessionSlugs,
@@ -344,7 +344,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       aiSettingsStatus: '',
       aiSettingsOpen: false,
       aiSettingsSectionsOpen: {
-        appTheme: true,
         aiConfig: true,
         aiPerTask: false,
         aiAdvanced: false,
@@ -1576,6 +1575,8 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     containerClassName = '',
     rowClassName = '',
     showSession = true,
+    layout = 'row',
+    themeControl = null,
   }: any = {}) =>
     LoginSettingsControlRow({
       activeSession,
@@ -1595,10 +1596,12 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         demoSurfaceEnabled: this.props.demoSurfaceMode !== false,
         onToggle: () => this.props.setDemoSurfaceMode?.(this.props.demoSurfaceMode === false),
       }),
+      layout,
       containerClassName,
       rowClassName,
       showSession,
       sessionHref: buildSettingsSessionHref(activeSession.slug),
+      themeControl,
     });
 
   handleActiveSessionChange = (event: any) => {
@@ -2148,6 +2151,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         {this.renderSettingsControlRow({
           activeSession,
           configOpen: this.state.aiSettingsOpen,
+          layout: 'quick-grid',
           onToggleConfig: this.toggleAiSettingsPanel,
           betweenSessionAndTooltips:
             cryptoTerminology && overview.capabilities.showNetworkControls
@@ -2166,6 +2170,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
             ) : null,
           tooltipsInfoId: 'postLoginTooltipsToggleTooltip',
           tooltipPlacement: 'right',
+          themeControl: <LoginThemeQuickControl />,
         })}
 
         {this.state.aiSettingsOpen &&
@@ -2272,10 +2277,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
                       ),
                     })
                   : null}
-                <LoginThemeSettingsSection
-                  isOpen={this.isAiSettingsSectionOpen('appTheme')}
-                  onToggle={() => this.toggleAiSettingsSection('appTheme')}
-                />
               </>
             ),
           })}
