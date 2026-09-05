@@ -1,5 +1,7 @@
 import {
   safeString,
+  timingSafeEqualString,
+  operatorPreviewSecretMatches,
   lower,
   safeJsonParse,
   stableJson,
@@ -622,17 +624,6 @@ function bytesToHex(bytes) {
   return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-function timingSafeEqualString(left = '', right = '') {
-  const a = safeString(left);
-  const b = safeString(right);
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let index = 0; index < a.length; index += 1) {
-    diff |= a.charCodeAt(index) ^ b.charCodeAt(index);
-  }
-  return diff === 0;
-}
-
 async function hmacSha256Bytes(keyBytes, data = '') {
   if (!globalThis.crypto?.subtle) throw new Error('webcrypto_unavailable');
   const key = await globalThis.crypto.subtle.importKey(
@@ -683,11 +674,15 @@ function parseInitUser(params) {
 
 export async function validateTelegramMiniAppInitData(initData = '', env = {}, {
   nowMs = Date.now(),
+  previewSecret = '',
 } = {}) {
   const botToken = safeString(env.TELEGRAM_BOT_TOKEN);
   const allowPreviewAuth = envFlagEnabled(env.AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH);
   const raw = safeString(initData);
   if (!botToken && allowPreviewAuth) {
+    if (!operatorPreviewSecretMatches(previewSecret, env)) {
+      return { ok: false, reason: 'telegram_preview_unauthorized', authMode: 'preview', user: null };
+    }
     return {
       ok: true,
       reason: 'explicit_preview_auth_without_bot_token',
@@ -768,7 +763,9 @@ function telegramInitDataFromRequest(request) {
 }
 
 async function authorizeMiniAppRequest(request, env = {}) {
-  return validateTelegramMiniAppInitData(telegramInitDataFromRequest(request), env);
+  return validateTelegramMiniAppInitData(telegramInitDataFromRequest(request), env, {
+    previewSecret: request.headers.get('X-CE-Preview-Secret'),
+  });
 }
 
 async function resolveLaunchRecord(env = {}, launch = '') {
@@ -4690,7 +4687,7 @@ async function handleDocumentPreviewRequest({
     status: 200,
     headers: {
       'content-type': contentType,
-      'cache-control': 'private, max-age=300',
+      'cache-control': context.auth.authMode === 'preview' ? 'no-store' : 'private, max-age=300',
       'content-disposition': `inline; filename="${(safeString(preview.title) || docId || 'document').replace(/[^A-Za-z0-9_.-]/g, '_')}.${fileType || 'bin'}"`,
     },
   });

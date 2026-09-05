@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { loadSessionPolicy } from './sessionPolicyLoader.mjs';
+import { evaluateSbtJoinPolicy, evaluateSponsoredResourceEligibility, resolveAgentHttpSessionInvocation,
+  resolveSessionInvocation, resolveMiniAppSessionInvocation } from './sessionPolicy.mjs';
 
 class MemoryKv {
   constructor(entries = []) {
@@ -60,6 +62,44 @@ test('session policy loading fails closed when no configured or registry session
   assert.equal(policy.riskCeiling, 'read');
   assert.equal(policy.allowQuestionGeneration, false);
   assert.equal(policy.allowGenerateQuestion, false);
+});
+
+test('registry discovery and stale cached capability flags grant only HTTP reads', async () => {
+  const env = {
+    DEFAULT_RPC_URL: 'https://read-only-policy.example',
+    REGISTRY_FETCH: async () => { throw new Error('cache should satisfy discovery'); },
+    AGENT_ACTION_KV: { get: async (key) => key.startsWith('telegram:registry-sessions:')
+      ? JSON.stringify({ ok: true, sessions: [{
+        sessionSlug: 'alpha', sessionName: 'Alpha', default: true, telegramBridgeEnabled: true,
+        managedAccountSubmitAllowed: true, sponsoredAiAllowed: true, sponsoredRpcAllowed: true,
+        sponsoredFaucetAllowed: true, sbtJoinModes: ['public'], docLibraryEnabled: true,
+      }] }) : null },
+  };
+  for (const cacheLayer of ['kv', 'memory']) {
+    const policy = await loadSessionPolicy(env);
+    assert.equal(policy.registryReadOnly, true, cacheLayer);
+    assert.equal(policy.riskCeiling, 'read');
+    assert.equal(policy.allowQuestionGeneration, false);
+    assert.equal(policy.allowGenerateQuestion, false);
+    const resolved = resolveAgentHttpSessionInvocation(policy, 'alpha');
+    assert.equal(resolved.ok, true);
+    assert.equal(resolved.session.managedAccountSubmitAllowed, false);
+    assert.equal(resolved.session.docLibraryEnabled, false);
+    assert.equal(evaluateSbtJoinPolicy(resolved.session).ok, false);
+    assert.equal(resolveSessionInvocation(policy, 'alpha').ok, false);
+    assert.equal(resolveMiniAppSessionInvocation(policy, 'alpha').ok, false);
+    for (const resource of ['ai', 'rpc', 'faucet']) {
+      assert.equal(evaluateSponsoredResourceEligibility(resolved.session, { resource }).ok, false);
+    }
+  }
+  env.AGENT_BRIDGE_SESSION_POLICY_JSON = JSON.stringify({
+    riskCeiling: 'submit', allowQuestionGeneration: true,
+    sessions: [{ sessionSlug: 'alpha', telegramBridgeEnabled: true, managedAccountSubmitAllowed: true }],
+  });
+  const explicit = await loadSessionPolicy(env);
+  assert.notEqual(explicit.registryReadOnly, true);
+  assert.equal(explicit.riskCeiling, 'submit');
+  assert.equal(explicit.linkedSessions[0].managedAccountSubmitAllowed, true);
 });
 
 test('transport-neutral handoff imports policy authority from the policy domain', () => {

@@ -87,3 +87,19 @@ export function envFlagEnabled(value = '') {
 export function envFlagDisabled(value = '') {
   return ['0', 'false', 'no', 'off'].includes(lower(value));
 }
+
+export function timingSafeEqualString(left = '', right = '') {
+  const a = safeString(left);
+  const b = safeString(right);
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let index = 0; index < a.length; index += 1) {
+    diff |= a.charCodeAt(index) ^ b.charCodeAt(index);
+  }
+  return diff === 0;
+}
+
+export function operatorPreviewSecretMatches(supplied, env = {}) {
+  const expected = safeString(env.AGENT_BRIDGE_PREVIEW_SECRET);
+  return Boolean(expected) && timingSafeEqualString(supplied, expected);
+}

@@ -14,6 +14,7 @@ const ASSET_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-assets.js
 const TEXT_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-text.js');
 const PII_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-release-pii.sh');
 const PACKAGE_SCRUBBER_SOURCE_PATH = path.join(__dirname, 'scrub-public-package-json.js');
+const WORKFLOW_SCRUBBER_SOURCE_PATH = path.join(__dirname, 'scrub-public-workflows.mjs');
 const PII_SCRUBBER_SOURCE_PATH = path.join(__dirname, 'scrub-public-pii-text.mjs');
 const RELEASE_VERSION_SOURCE_PATH = path.join(__dirname, 'release-version.mjs');
 const DEAD_EXPORT_CHECKER_SOURCE_PATH = path.join(__dirname, 'check-dead-exports-advisory.mjs');
@@ -72,6 +73,11 @@ function installSyncScriptFixture(sourceDir) {
     sourceDir,
     path.join('scripts', 'scrub-public-package-json.js'),
     fs.readFileSync(PACKAGE_SCRUBBER_SOURCE_PATH, 'utf8'),
+  );
+  writeFile(
+    sourceDir,
+    path.join('scripts', 'scrub-public-workflows.mjs'),
+    fs.readFileSync(WORKFLOW_SCRUBBER_SOURCE_PATH, 'utf8'),
   );
   writeFile(
     sourceDir,
@@ -184,6 +190,11 @@ function setupSourceRepo() {
       }, null, 2)}\n`,
     );
     writeFile(sourceDir, path.join('scripts', 'public-node-test-fixture.js'), "console.log('public node fixture passed');\n");
+    writeFile(
+      sourceDir,
+      path.join('.github', 'workflows', 'ci.yml'),
+      ['steps:', '  - name: Run public checks', '    run: npm test', ''].join('\n'),
+    );
     commitAll(sourceDir, 'Initial public base', {
       authorDate: '2025-01-01T00:00:00Z',
       committerDate: '2025-01-01T00:00:00Z',
@@ -275,6 +286,19 @@ function setupSourceRepo() {
       )}\n`,
     );
     writeFile(sourceDir, path.join('scripts', 'vendor-cecc-ethers-bundle.js'), 'private companion vendoring\n');
+    writeFile(
+      sourceDir,
+      path.join('.github', 'workflows', 'ci.yml'),
+      [
+        'steps:',
+        '  - name: Run public checks',
+        '    run: npm test',
+        '  - name: Audit private companion production dependencies',
+        "    if: ${{ hashFiles('contextEngine-cc/package-lock.json') != '' }}",
+        '    run: npm --prefix contextEngine-cc audit --omit=dev --audit-level=high',
+        '',
+      ].join('\n'),
+    );
     commitAll(sourceDir, 'Mixed commit', {
       authorDate: '2025-01-04T05:06:07Z',
       committerDate: '2025-01-04T05:06:07Z',
@@ -644,6 +668,7 @@ test('sync-public-history replays public commits, skips private-only commits, an
     assert.match(trackedPaths, /^workers\/agentBridgeWorker\//m);
     assert.match(trackedPaths, /^scripts\/run-agent-bridge-worker-tests\.js$/m);
     assert.doesNotMatch(trackedPaths, /^scripts\/vendor-cecc-ethers-bundle\.js$/m);
+    assert.match(trackedPaths, /^scripts\/scrub-public-workflows\.mjs$/m);
     assert.doesNotMatch(trackedPaths, /^\.tmp-review\//m);
     assert.doesNotMatch(trackedPaths, /^\.secrets\.baseline$/m);
     assert.doesNotMatch(trackedPaths, /^\.env\.e2e$/m);
@@ -653,6 +678,9 @@ test('sync-public-history replays public commits, skips private-only commits, an
 
     const publicFile = git(sourceDir, ['show', 'release-staging:public.txt']);
     assert.equal(publicFile, 'public one\npublic two\n');
+    const publicWorkflow = git(sourceDir, ['show', 'release-staging:.github/workflows/ci.yml']);
+    assert.match(publicWorkflow, /Run public checks/);
+    assert.doesNotMatch(publicWorkflow, /contextEngine-cc|CE_PUBLIC_RELEASE_STRIP/);
   });
 });
 

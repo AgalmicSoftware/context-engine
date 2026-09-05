@@ -110,6 +110,15 @@ scrub_public_package_json() {
   node "$SCRIPT_DIR/scrub-public-package-json.js" "$package_json"
 }
 
+scrub_public_workflows() {
+  if ! command -v node >/dev/null 2>&1; then
+    printf 'node is required to scrub public workflows.\n' >&2
+    return 1
+  fi
+
+  node "$SCRIPT_DIR/scrub-public-workflows.mjs" "$STAGING_ROOT"
+}
+
 scrub_public_pii_text() {
   if ! command -v node >/dev/null 2>&1; then
     printf 'node is required to scrub public PII text.\n' >&2
@@ -260,6 +269,7 @@ while IFS= read -r path; do
 done < "$MATCHED_PATHS_FILE"
 
 scrub_public_package_json
+scrub_public_workflows
 scrub_public_pii_text
 refresh_public_benchmark_source_hashes
 

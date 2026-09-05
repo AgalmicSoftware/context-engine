@@ -51,6 +51,7 @@
     "cloudflare:token-link": "npm run -s ai:node -- scripts/cloudflare-token-link.js",
     "chain:deploy": "forge build && node scripts/sync-abis.mjs && forge script foundry/script/DeployLocal.s.sol --tc DeployLocal --rpc-url http://127.0.0.1:8545 --broadcast --sender 0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266 --unlocked",
     "test:contracts": "bash -c 'set -euo pipefail; if [ ! -d node_modules/@openzeppelin/contracts ]; then echo \"Error: @openzeppelin/contracts not found. Run npm install first.\"; exit 1; fi; forge test --match-contract \"^(SurveysTest|CustomSBTTest|SessionRegistryTest|SurveysFuzzTest|CustomSBTFuzzTest|SessionRegistryFuzzTest|CustomSBTInvariantTest)$\"'",
+    "test:sbt:authorization-smoke": "node scripts/sbt-authorization-smoke.js",
     "test:client": "npm --prefix client run test:coverage:full-universe",
     "test:root:jest": "cd client && npm test -- --watchAll=false --runInBand --testMatch '<rootDir>/../tests/root/deployHelper.worker.test.js' '<rootDir>/../tests/root/sessionCorsWorker.admin.test.js' '<rootDir>/../tests/root/sessionCorsWorker.arweave.test.js' '<rootDir>/../tests/root/sessionCorsWorker.auth.test.js' '<rootDir>/../tests/root/sessionCorsWorker.authenticatedActions.test.js' '<rootDir>/../tests/root/sessionCorsWorker.authenticatedRoutes.test.js' '<rootDir>/../tests/root/sessionCorsWorker.gates.test.js' '<rootDir>/../tests/root/sessionCorsWorker.health.test.js'",
     "test:worker:session-cors": "npm --prefix workers/sessionCorsWorker test",
@@ -97,8 +98,7 @@
     "ai:test-session:color-schemes": "npm run -s ai:node -- scripts/session-color-schemes-smoke.js",
     "lint": "cd client && npm run lint",
     "lint:workers": "node scripts/run-workers-lint.js",
-    "test:cache-guard": "bash ./scripts/check-managed-cache-localstorage.sh",
-    "test:sbt:authorization-smoke": "node scripts/sbt-authorization-smoke.js"
+    "test:cache-guard": "bash ./scripts/check-managed-cache-localstorage.sh"
   },
   "devDependencies": {
     "@openzeppelin/contracts": "5.4.0",

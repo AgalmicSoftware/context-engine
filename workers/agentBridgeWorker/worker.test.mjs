@@ -2,7 +2,72 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { Buffer } from 'node:buffer';
-import worker from './worker.js';
+import rawWorker from './worker.js';
+import { buildTelegramCommandResponse } from './telegramCommands.mjs';
+
+const worker = { ...rawWorker, fetch(request, env = {}, ctx) {
+  const preview = env.AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW || env.AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH;
+  if (!preview) return rawWorker.fetch(request, env, ctx);
+  const headers = new Headers(request.headers);
+  headers.set('X-CE-Preview-Secret', 'operator-preview-fixture');
+  return rawWorker.fetch(new Request(request, { headers }), {
+    ...env, AGENT_BRIDGE_PREVIEW_SECRET: 'operator-preview-fixture',
+  }, ctx);
+} };
+
+function signedWorkerFetch(request, env) {
+  const headers = new Headers(request.headers);
+  headers.set('X-Telegram-Init-Data', signInitData({
+    auth_date: String(Math.floor(Date.now() / 1000)),
+    user: JSON.stringify({ id: 42, username: 'participant' }),
+  }, env.TELEGRAM_BOT_TOKEN));
+  return worker.fetch(new Request(request, { headers }), env);
+}
+
+async function participantStartPreview(env) {
+  return { preview: await buildTelegramCommandResponse({
+    env,
+    update: { update_id: 1, message: {
+      message_id: 1, text: '/start', chat: { id: 42, type: 'private' },
+      from: { id: 42, username: 'participant' },
+    } },
+  }) };
+}
+
+test('preview routes require the dedicated operator header and never cache responses', async () => {
+  for (const [path, method] of [
+    ['/mock/telegram/preview', 'GET'],
+    ['/mock/telegram/preview-update', 'POST'],
+    ['/telegram/mini-app/api/state', 'GET'],
+  ]) {
+    for (const supplied of ['', 'incorrect', 'operator-preview-secret']) {
+      const env = {
+        AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW: 'true',
+        AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH: 'true',
+        AGENT_BRIDGE_PREVIEW_SECRET: 'operator-preview-secret',
+        AGENT_ACTION_KV: new MemoryKv(),
+      };
+      const response = await rawWorker.fetch(new Request(`https://bridge.example${path}`, {
+        method,
+        headers: { 'X-CE-Preview-Secret': supplied },
+        ...(method === 'POST' ? { body: JSON.stringify({ text: '/start' }) } : {}),
+      }), env);
+      assert.equal(response.headers.get('cache-control'), 'no-store');
+      if (supplied !== env.AGENT_BRIDGE_PREVIEW_SECRET) {
+        assert.equal(response.status, 401);
+        assert.equal(env.AGENT_ACTION_KV.store.size, 0);
+      } else {
+        assert.notEqual(response.status, 401);
+      }
+      assert.equal((await response.text()).includes(env.AGENT_BRIDGE_PREVIEW_SECRET), false);
+    }
+    const unconfigured = await rawWorker.fetch(new Request(`https://bridge.example${path}`, { method }), {
+      AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW: 'true',
+      AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH: 'true',
+    });
+    assert.equal(unconfigured.status, 401);
+  }
+});
 
 class MemoryKv {
   constructor() {
@@ -578,6 +643,7 @@ test('worker Mini App direct submit broadcasts on-chain when worker and policy a
   const submitted = {};
   const bytes32QuestionId = `0x${'23'.repeat(32)}`;
   const env = {
+    TELEGRAM_BOT_TOKEN: '123456:test-token',
     BROADCAST_ENABLED: 'true',
     TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
     AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW: 'true',
@@ -619,20 +685,15 @@ test('worker Mini App direct submit broadcasts on-chain when worker and policy a
       },
     }),
   };
-  const previewResponse = await worker.fetch(new Request('https://bridge.example/mock/telegram/preview-update', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ chatType: 'private', text: '/start' }),
-  }), env);
-  const preview = await previewResponse.json();
+  const preview = await participantStartPreview(env);
   const miniButton = preview.preview.response.replyMarkup.inline_keyboard
     .flat()
     .find((button) => button.text === 'Mini App');
   const launch = launchFromMiniButton(miniButton);
-  const stateResponse = await worker.fetch(new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha`), env);
+  const stateResponse = await signedWorkerFetch(new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha`), env);
   const state = await stateResponse.json();
 
-  const draftResponse = await worker.fetch(new Request('https://bridge.example/telegram/mini-app/api/draft', {
+  const draftResponse = await signedWorkerFetch(new Request('https://bridge.example/telegram/mini-app/api/draft', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
@@ -669,6 +730,7 @@ test('worker Mini App submit returns actionable worker auth failure details', as
   const calls = [];
   const bytes32QuestionId = `0x${'24'.repeat(32)}`;
   const env = {
+    TELEGRAM_BOT_TOKEN: '123456:test-token',
     BROADCAST_ENABLED: 'true',
     TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
     AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW: 'true',
@@ -705,19 +767,14 @@ test('worker Mini App submit returns actionable worker auth failure details', as
       throw new Error(`unexpected session worker call ${url}`);
     },
   };
-  const previewResponse = await worker.fetch(new Request('https://bridge.example/mock/telegram/preview-update', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ chatType: 'private', text: '/start' }),
-  }), env);
-  const preview = await previewResponse.json();
+  const preview = await participantStartPreview(env);
   const launch = launchFromMiniButton(preview.preview.response.replyMarkup.inline_keyboard
     .flat()
     .find((button) => button.text === 'Mini App'));
-  const stateResponse = await worker.fetch(new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha`), env);
+  const stateResponse = await signedWorkerFetch(new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha`), env);
   const state = await stateResponse.json();
 
-  const draftResponse = await worker.fetch(new Request('https://bridge.example/telegram/mini-app/api/draft', {
+  const draftResponse = await signedWorkerFetch(new Request('https://bridge.example/telegram/mini-app/api/draft', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
@@ -745,6 +802,7 @@ test('worker Mini App retries failed direct submit records instead of replaying 
   let authFails = true;
   let submitCount = 0;
   const env = {
+    TELEGRAM_BOT_TOKEN: '123456:test-token',
     BROADCAST_ENABLED: 'true',
     TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
     AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW: 'true',
@@ -790,16 +848,11 @@ test('worker Mini App retries failed direct submit records instead of replaying 
       },
     }),
   };
-  const previewResponse = await worker.fetch(new Request('https://bridge.example/mock/telegram/preview-update', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ chatType: 'private', text: '/start' }),
-  }), env);
-  const preview = await previewResponse.json();
+  const preview = await participantStartPreview(env);
   const launch = launchFromMiniButton(preview.preview.response.replyMarkup.inline_keyboard
     .flat()
     .find((button) => button.text === 'Mini App'));
-  const stateResponse = await worker.fetch(new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha`), env);
+  const stateResponse = await signedWorkerFetch(new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha`), env);
   const state = await stateResponse.json();
   const submitBody = {
     launch,
@@ -808,7 +861,7 @@ test('worker Mini App retries failed direct submit records instead of replaying 
     submit: true,
   };
 
-  const failedResponse = await worker.fetch(new Request('https://bridge.example/telegram/mini-app/api/draft', {
+  const failedResponse = await signedWorkerFetch(new Request('https://bridge.example/telegram/mini-app/api/draft', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(submitBody),
@@ -823,7 +876,7 @@ test('worker Mini App retries failed direct submit records instead of replaying 
   assert.match(failed.message, /worker_nonce_failed: temporarily missing nonce route/);
 
   authFails = false;
-  const retryResponse = await worker.fetch(new Request('https://bridge.example/telegram/mini-app/api/draft', {
+  const retryResponse = await signedWorkerFetch(new Request('https://bridge.example/telegram/mini-app/api/draft', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(submitBody),
