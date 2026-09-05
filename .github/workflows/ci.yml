@@ -83,6 +83,8 @@ jobs:
             --approval "$BASELINE_MONOTONICITY_APPROVED"
 
       - name: Run wiring and release gate
+        env:
+          CLIENT_LARGE_FILE_BASE_REF: ${{ steps.baseline-monotonicity-base.outputs.base_sha }}
         run: npm run ci:gate -- wiring-and-release
 
       - name: Run public text gate

@@ -272,6 +272,10 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
 
   expectWorkflowContains('wiring-and-release:', 'the wiring-and-release job');
   expectWorkflowContains('run: npm run ci:gate -- wiring-and-release', 'the manifest-backed wiring-and-release gate');
+  expectWorkflowContains(
+    'CLIENT_LARGE_FILE_BASE_REF: ${{ steps.baseline-monotonicity-base.outputs.base_sha }}',
+    'public baseline for the large-file inventory gate',
+  );
   expectWorkflowContains('run: npm run ci:gate -- public-text', 'the hosted public-text gate');
   expectWorkflowContains('node scripts/resolve-baseline-monotonicity-base.mjs', 'baseline monotonicity base resolver');
   expectWorkflowContains(
