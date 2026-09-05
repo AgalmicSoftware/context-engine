@@ -1,5 +1,6 @@
 import {
   safeString,
+  timingSafeEqualString,
   lower,
   safeJsonParse,
   stableJson,
@@ -223,17 +224,6 @@ function bytesToHex(bytes) {
 async function sha256Hex(input = '') {
   const digest = await globalThis.crypto.subtle.digest('SHA-256', textEncoder.encode(String(input || '')));
   return bytesToHex(new Uint8Array(digest));
-}
-
-function timingSafeEqualString(left = '', right = '') {
-  const a = safeString(left);
-  const b = safeString(right);
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let index = 0; index < a.length; index += 1) {
-    diff |= a.charCodeAt(index) ^ b.charCodeAt(index);
-  }
-  return diff === 0;
 }
 
 function json(data, init = {}) {
@@ -6324,8 +6314,11 @@ async function handleMiniAppOnboardRequest({ request, env = {}, createdAt = null
     AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS:
       Number.isFinite(ttlSeconds) && ttlSeconds > 0 ? String(Math.floor(ttlSeconds)) : '3600',
   };
-  const validated = await validateTelegramMiniAppInitData(input.initData, validationEnv);
-  if (!validated.ok) {
+  // Credential issuance always requires a real Telegram identity, including in operator previews.
+  const validated = await validateTelegramMiniAppInitData(input.initData, {
+    ...validationEnv, AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH: 'false',
+  });
+  if (!validated.ok || validated.authMode !== 'telegram') {
     const reason =
       validated.reason === 'telegram_init_data_expired' ? 'miniapp_initdata_expired' : 'miniapp_initdata_invalid';
     return jsonMiniAppOnboard(request, env, { ok: false, reason }, { status: 401 });

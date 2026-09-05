@@ -811,7 +811,13 @@ navigation, and future Mini App payloads before setting or reusing the live
 webhook.
 
 The preview routes are disabled unless `AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW`
-is set to `true`. Leave this unset in live deployments; preview callbacks can
+is set to `true`. When enabled, both routes also require the dedicated operator
+`X-CE-Preview-Secret` header matching `AGENT_BRIDGE_PREVIEW_SECRET`; an unset
+secret fails closed. Preview responses use `Cache-Control: no-store`. Send the
+header when opening the preview page (for example with an operator browser
+header tool), then enter it in the page's password field for callback requests.
+The page never embeds or persists the configured secret.
+Leave preview unset in live deployments; preview callbacks can
 create the same short-lived KV action records as real bot callbacks.
 The product deploy helper intentionally omits this local-only flag from Worker
 upload metadata and rejects configs that try to include it.
@@ -870,9 +876,11 @@ trusting Telegram user/chat/session identity on write endpoints. Treat
 client input until validated server-side.
 When `TELEGRAM_BOT_TOKEN` is absent, Mini App authorization fails closed unless
 local tests/previews explicitly set
-`AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH=true`. The deploy helper rejects that
-local-only flag, so deployed Mini App requests always require a bot token and
-valid init data.
+`AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH=true` and supply the dedicated
+`X-CE-Preview-Secret` header matching `AGENT_BRIDGE_PREVIEW_SECRET`. The synthetic
+preview identity cannot obtain Bridge or Session Worker credentials. Credential
+onboarding always requires signed Telegram init data, even in preview mode.
+The deploy helper continues to reject both local-only preview flags.
 `AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS` controls accepted init-data age and
 defaults to 24 hours.
 

@@ -2017,6 +2017,35 @@ test('Telegram agent onboarding keeps topic and bucket data opt-in', async () =>
   assert.equal(await env.AGENT_ACTION_KV.get('telegram:lightweight-group-membership:alpha:42'), null);
 });
 
+test('preview identities cannot receive a Bridge credential', async () => {
+  const env = baseEnv();
+  const result = await issueAgentCredential({
+    env, principal: telegramAgentPrincipal({ telegramUserId: 'preview-user' }), sessionSlug: 'alpha',
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'preview_credential_forbidden');
+  assert.equal(env.AGENT_ACTION_KV.store.size, 0);
+});
+
+test('Mini App onboarding cannot exchange operator preview auth for a credential', async () => {
+  const env = telegramOnlyEnv({
+    TELEGRAM_BOT_TOKEN: '',
+    AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH: 'true',
+    AGENT_BRIDGE_PREVIEW_SECRET: 'operator-preview-secret',
+  });
+  const response = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/api/agent/miniapp/onboard', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'X-CE-Preview-Secret': env.AGENT_BRIDGE_PREVIEW_SECRET },
+      body: JSON.stringify({ startParam: 'onboard__alpha' }),
+    }),
+    env,
+  });
+  assert.equal(response.status, 401);
+  assert.equal((await response.json()).ok, false);
+  assert.equal([...env.AGENT_ACTION_KV.store.keys()].some((key) => key.startsWith(AGENT_CREDENTIAL_KV_PREFIX)), false);
+});
+
 test('Mini App onboarding endpoint validates Telegram initData and mints a scoped user token', async () => {
   const nowSeconds = Math.floor(Date.now() / 1000);
   const env = telegramOnlyEnv({

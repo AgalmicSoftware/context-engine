@@ -1,3 +1,4 @@
+import { isPreviewPrincipal } from './agentPrincipal.mjs';
 import {
   safeString,
   lower,
@@ -435,6 +436,7 @@ export async function authenticateSessionWorker({
   ethersLib = ethers,
   now = new Date(),
 } = {}) {
+  if (isPreviewPrincipal(principal)) return { ok: false, reason: 'preview_credential_forbidden' };
   const workerCanonical = lower(session?.sessionModeProfile?.authority?.mode) === 'worker_canonical';
   const baseUrl = workerCanonical
     ? resolveCanonicalSessionWorkerOrigin(session)
