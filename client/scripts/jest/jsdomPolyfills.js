@@ -1,4 +1,7 @@
 const fetchPonyfill = require('node-fetch');
+const { Readable } = require('node:stream');
+const { ReadableStream } = require('node:stream/web');
+const { TextEncoder } = require('node:util');
 const { webcrypto: nodeWebCrypto } = require('crypto');
 
 const installWebCrypto = (target) => {
@@ -71,6 +74,22 @@ const readBodyAsText = async (body) => {
   return String(body);
 };
 
+// node-fetch v2 exposes Node streams/Buffers. Supply the Web Streams reader
+// used by Workers without changing the ponyfill's own JSON/text consumers.
+class JestRequest extends fetchPonyfill.Request {
+  get body() {
+    const body = super.body;
+    if (body && typeof body.getReader !== 'function') {
+      let webBody;
+      body.getReader = () => {
+        webBody ||= Readable.toWeb(body instanceof Readable ? body : Readable.from([body]));
+        return webBody.getReader();
+      };
+    }
+    return body;
+  }
+}
+
 class JestResponse {
   constructor(body = '', init = {}) {
     this._body = body;
@@ -78,6 +97,20 @@ class JestResponse {
     this.statusText = init.statusText || '';
     this.ok = this.status >= 200 && this.status < 300;
     this.headers = new globalThis.Headers(init.headers || {});
+  }
+
+  get body() {
+    if (this._body == null) return null;
+    if (typeof this._body.getReader === 'function') return this._body;
+    this._webBody ||= new ReadableStream({
+      start: async (controller) => {
+        try {
+          controller.enqueue(new TextEncoder().encode(await readBodyAsText(this._body)));
+          controller.close();
+        } catch (error) { controller.error(error); }
+      },
+    });
+    return this._webBody;
   }
 
   async text() {
@@ -113,7 +146,7 @@ if (typeof globalThis.Headers !== 'function') {
 }
 
 if (typeof globalThis.Request !== 'function') {
-  globalThis.Request = fetchPonyfill.Request;
+  globalThis.Request = JestRequest;
 }
 
 globalThis.Response = JestResponse;

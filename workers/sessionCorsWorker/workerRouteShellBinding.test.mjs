@@ -651,3 +651,45 @@ test('createWorkerRouteShellWithWorkerDeps converts unhandled route errors into 
     },
   ]]);
 });
+
+for (const contentLength of [null, '1']) {
+  test(`request boundary rejects oversized bytes before route parsing, content-length=${contentLength}`, async () => {
+    let cancelled = false;
+    let dispatched = false;
+    const headers = { 'content-type': 'application/json' };
+    if (contentLength) headers['content-length'] = contentLength;
+    const request = new Request('https://worker.example/auth/login', {
+      method: 'POST', headers, duplex: 'half',
+      body: new ReadableStream({
+        pull(controller) { controller.enqueue(new Uint8Array(9)); },
+        cancel() { cancelled = true; },
+      }),
+    });
+    const shell = createWorkerRouteShellWithWorkerDeps({ deps: {
+      getRouteBaseHeaders: () => ({ 'X-Test': 'cors' }),
+      dispatchAuthLoginRequestWithWorkerDeps: () => { dispatched = true; return new Response(); },
+    } });
+    const result = await shell.fetch(request, { CE_MAX_UPLOAD_BYTES: '8' });
+    assert.equal(result.status, 413);
+    assert.equal(result.headers.get('X-Test'), 'cors');
+    assert.equal(dispatched, false);
+    assert.equal(cancelled, true);
+  });
+}
+
+test('request boundary preserves exact UTF-8 signature bytes and request metadata at the limit', async () => {
+  const body = '{ "message": "é\\r\\n", "signature": "0x1234" }';
+  const shell = createWorkerRouteShellWithWorkerDeps({ deps: {
+    getRouteBaseHeaders: () => ({}),
+    dispatchAuthLoginRequestWithWorkerDeps: async ({ request }) => {
+      assert.equal(request.headers.get('Authorization'), 'Bearer fixture');
+      assert.equal(request.url, 'https://worker.example/auth/login?sessionSlug=fixture');
+      assert.equal(await request.text(), body);
+      return new Response('preserved');
+    },
+  } });
+  const response = await shell.fetch(new Request('https://worker.example/auth/login?sessionSlug=fixture', {
+    method: 'POST', body, headers: { Authorization: 'Bearer fixture', 'content-type': 'application/json' },
+  }), { CE_MAX_UPLOAD_BYTES: new TextEncoder().encode(body).byteLength });
+  assert.equal(await response.text(), 'preserved');
+});

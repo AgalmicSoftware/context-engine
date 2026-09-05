@@ -535,7 +535,8 @@ Authenticated clients can use the worker as the session storage boundary:
     refs are returned, the client completes without an on-chain transaction.
   - For `responses`, the Worker records the authenticated uploader as trusted
     responder metadata. The payload's own `responder` field is not authoritative.
-  - Upload bodies are capped at 25 MB by default before Arweave or Cloudflare storage handoff. Set `CE_MAX_UPLOAD_BYTES` on the Worker to lower or raise that limit for `/storage/upload` and `/arweave/upload`.
+  - Request bodies are capped at 25 MiB by default at the route shell, before JSON, text, or multipart parsing. `CE_MAX_UPLOAD_BYTES` configures this cap, including `/storage/upload` and `/arweave/upload`. The Worker counts actual streamed bytes even when `Content-Length` is absent or understated, cancels oversized bodies, and returns `413`. Accepted request bytes remain unchanged for signature validation.
+  - URL fetches and image fetches count actual response bytes up to 10 MiB before parsing or returning content. Oversized responses return `413`; image responses are buffered within this limit so they cannot return a partial success before detecting oversize.
   - KV-only payloads have a separate hard ceiling after base64/envelope JSON
     encoding: the serialized value must be at most 24 MiB, leaving 1 MiB below
     Cloudflare KV's 25 MiB value limit. Oversized encoded media/images and other

@@ -1,3 +1,5 @@
+import { BodyByteLimitError, readBodyBytes } from '../shared/bodyByteLimit.mjs';
+import { resolveMaxUploadBytes } from './uploadSizeLimits.js';
 import {
   dispatchAnonymousRouteEntryWithWorkerDeps as dispatchAnonymousRouteEntryWithWorkerDepsBoundary,
 } from './anonymousRouteEntryBinding.js';
@@ -113,6 +115,10 @@ export const createWorkerRouteShellWithWorkerDeps = ({
         return new ResponseCtor(null, { status: 204, headers: routeBaseHeaders });
       }
 
+      if (request.body) {
+        const bytes = await readBodyBytes(request, resolveMaxUploadBytes({ env }));
+        request = new Request(request, { body: bytes });
+      }
       const envSlug = getDefaultWorkerSessionSlug(env);
 
       if (routeSelection.kind === 'session-config') {
@@ -423,6 +429,11 @@ export const createWorkerRouteShellWithWorkerDeps = ({
         },
       });
     } catch (error) {
+      if (error instanceof BodyByteLimitError) {
+        return new ResponseCtor(JSON.stringify({ error: error.message }), {
+          status: 413, headers: { ...routeBaseHeaders, 'Content-Type': 'application/json' },
+        });
+      }
       log?.error?.('[worker] unhandled route error', {
         path,
         method,

@@ -1,3 +1,4 @@
+import { BodyByteLimitError, readBodyBytes } from '../shared/bodyByteLimit.mjs';
 import { normalizeFetchTargetUrl } from './fetchRequestNormalization.js';
 import {
   json as jsonResponse,
@@ -50,7 +51,13 @@ const fetchNormalizedTarget = async ({
   };
 };
 
-const parseContentLength = (response) => parseInt(response?.headers?.get?.('content-length') || '0', 10);
+const readFetchBytes = async (response) => {
+  try { return await readBodyBytes(response, MAX_RESPONSE_BYTES); }
+  catch (error) {
+    if (error instanceof BodyByteLimitError) return null;
+    throw error;
+  }
+};
 
 const stripHtml = (html) => (
   String(html || '')
@@ -73,10 +80,6 @@ export const fetchImage = async ({
   if (!fetchResult?.ok) return fetchResult?.response;
 
   const { response, json } = fetchResult;
-  const contentLength = parseContentLength(response);
-  if (contentLength > MAX_RESPONSE_BYTES) {
-    return json({ error: 'Response too large' }, 413, baseHeaders);
-  }
   if (!response.ok) {
     return json({ error: `HTTP ${response.status}` }, 400, baseHeaders);
   }
@@ -86,9 +89,11 @@ export const fetchImage = async ({
     return json({ error: 'URL must return an image' }, 400, baseHeaders);
   }
 
+  const bytes = await readFetchBytes(response);
+  if (!bytes) return json({ error: 'Response too large' }, 413, baseHeaders);
   const headers = new Headers(baseHeaders);
   headers.set('Content-Type', type);
-  return new Response(response.body, { status: 200, headers });
+  return new Response(bytes, { status: 200, headers });
 };
 
 export const fetchUrl = async ({
@@ -100,10 +105,6 @@ export const fetchUrl = async ({
   if (!fetchResult?.ok) return fetchResult?.response;
 
   const { response, json } = fetchResult;
-  const contentLength = parseContentLength(response);
-  if (contentLength > MAX_RESPONSE_BYTES) {
-    return json({ error: 'Response too large' }, 413, baseHeaders);
-  }
   if (!response.ok) {
     return json({ error: `HTTP ${response.status}` }, 400, baseHeaders);
   }
@@ -113,12 +114,15 @@ export const fetchUrl = async ({
     return json({ error: 'URL must return HTML or JSON' }, 400, baseHeaders);
   }
 
+  const bytes = await readFetchBytes(response);
+  if (!bytes) return json({ error: 'Response too large' }, 413, baseHeaders);
+  const text = new TextDecoder().decode(bytes);
   if (type.includes('application/json')) {
-    const data = await response.json();
+    const data = JSON.parse(text);
     return json({ content: JSON.stringify(data), status: 'success', contentType: type }, 200, baseHeaders);
   }
 
-  const stripped = stripHtml(await response.text());
+  const stripped = stripHtml(text);
   if (!stripped || stripped.length < 50) {
     return json({ error: 'Insufficient content extracted' }, 400, baseHeaders);
   }

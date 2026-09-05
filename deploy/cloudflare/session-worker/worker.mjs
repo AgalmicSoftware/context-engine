@@ -69420,6 +69420,50 @@ var faucet = async ({
   );
 };
 
+// workers/shared/bodyByteLimit.mjs
+var BodyByteLimitError = class extends Error {
+  constructor(maxBytes) {
+    super(`Body exceeds ${maxBytes} bytes.`);
+    this.name = "BodyByteLimitError";
+    this.status = 413;
+  }
+};
+var readBodyBytes = async (source, maxBytes) => {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0) throw new RangeError("Invalid byte limit.");
+  const reader = source.body?.getReader();
+  const declaredLength = Number(source.headers?.get("content-length"));
+  let total = 0;
+  const chunks = [];
+  try {
+    if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+      throw new BodyByteLimitError(maxBytes);
+    }
+    if (!reader) return new Uint8Array();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) throw new BodyByteLimitError(maxBytes);
+      chunks.push(value);
+    }
+    const bytes2 = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes2.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return bytes2;
+  } catch (error) {
+    try {
+      await reader?.cancel(error);
+    } catch {
+    }
+    throw error;
+  } finally {
+    reader?.releaseLock();
+  }
+};
+
 // workers/sessionCorsWorker/fetchRequestNormalization.js
 var normalizeFetchTargetUrl = ({ url, deps } = {}) => {
   const input = toTrimmedString2(url);
@@ -69506,7 +69550,14 @@ var fetchNormalizedTarget = async ({
     json: json2
   };
 };
-var parseContentLength = (response2) => parseInt(response2?.headers?.get?.("content-length") || "0", 10);
+var readFetchBytes = async (response2) => {
+  try {
+    return await readBodyBytes(response2, MAX_RESPONSE_BYTES);
+  } catch (error) {
+    if (error instanceof BodyByteLimitError) return null;
+    throw error;
+  }
+};
 var stripHtml = (html) => String(html || "").replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "").replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "").replace(/<head\b[^<]*(?:(?!<\/head>)<[^<]*)*<\/head>/gi, "").replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, "").replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 var fetchImage = async ({
   url,
@@ -69516,10 +69567,6 @@ var fetchImage = async ({
   const fetchResult = await fetchNormalizedTarget({ url, baseHeaders, deps });
   if (!fetchResult?.ok) return fetchResult?.response;
   const { response: response2, json: json2 } = fetchResult;
-  const contentLength = parseContentLength(response2);
-  if (contentLength > MAX_RESPONSE_BYTES) {
-    return json2({ error: "Response too large" }, 413, baseHeaders);
-  }
   if (!response2.ok) {
     return json2({ error: `HTTP ${response2.status}` }, 400, baseHeaders);
   }
@@ -69527,9 +69574,11 @@ var fetchImage = async ({
   if (!type.startsWith("image/")) {
     return json2({ error: "URL must return an image" }, 400, baseHeaders);
   }
+  const bytes2 = await readFetchBytes(response2);
+  if (!bytes2) return json2({ error: "Response too large" }, 413, baseHeaders);
   const headers = new Headers(baseHeaders);
   headers.set("Content-Type", type);
-  return new Response(response2.body, { status: 200, headers });
+  return new Response(bytes2, { status: 200, headers });
 };
 var fetchUrl = async ({
   url,
@@ -69539,10 +69588,6 @@ var fetchUrl = async ({
   const fetchResult = await fetchNormalizedTarget({ url, baseHeaders, deps });
   if (!fetchResult?.ok) return fetchResult?.response;
   const { response: response2, json: json2 } = fetchResult;
-  const contentLength = parseContentLength(response2);
-  if (contentLength > MAX_RESPONSE_BYTES) {
-    return json2({ error: "Response too large" }, 413, baseHeaders);
-  }
   if (!response2.ok) {
     return json2({ error: `HTTP ${response2.status}` }, 400, baseHeaders);
   }
@@ -69550,11 +69595,14 @@ var fetchUrl = async ({
   if (!/text\/html|application\/json/i.test(type)) {
     return json2({ error: "URL must return HTML or JSON" }, 400, baseHeaders);
   }
+  const bytes2 = await readFetchBytes(response2);
+  if (!bytes2) return json2({ error: "Response too large" }, 413, baseHeaders);
+  const text = new TextDecoder().decode(bytes2);
   if (type.includes("application/json")) {
-    const data = await response2.json();
+    const data = JSON.parse(text);
     return json2({ content: JSON.stringify(data), status: "success", contentType: type }, 200, baseHeaders);
   }
-  const stripped = stripHtml(await response2.text());
+  const stripped = stripHtml(text);
   if (!stripped || stripped.length < 50) {
     return json2({ error: "Insufficient content extracted" }, 400, baseHeaders);
   }
@@ -76985,6 +77033,10 @@ var createWorkerRouteShellWithWorkerDeps = ({
         }
         return new ResponseCtor(null, { status: 204, headers: routeBaseHeaders });
       }
+      if (request.body) {
+        const bytes2 = await readBodyBytes(request, resolveMaxUploadBytes({ env }));
+        request = new Request(request, { body: bytes2 });
+      }
       const envSlug = getDefaultWorkerSessionSlug2(env);
       if (routeSelection.kind === "session-config") {
         return await dispatchSessionConfigBootstrapRequest2({
@@ -77284,6 +77336,12 @@ var createWorkerRouteShellWithWorkerDeps = ({
         }
       });
     } catch (error) {
+      if (error instanceof BodyByteLimitError) {
+        return new ResponseCtor(JSON.stringify({ error: error.message }), {
+          status: 413,
+          headers: { ...routeBaseHeaders, "Content-Type": "application/json" }
+        });
+      }
       log2?.error?.("[worker] unhandled route error", {
         path,
         method,
