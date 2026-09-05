@@ -1,6 +1,6 @@
 {
   "name": "client",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Context Engine — React client for sessions, surveys, and SBT-gated encryption",
   "author": "Context Engine Contributors",
   "license": "MPL-2.0",
