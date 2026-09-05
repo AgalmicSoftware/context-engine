@@ -4,6 +4,12 @@ The client build keeps the HTML entry small and moves the route shell behind a
 lazy import. Further shell splitting is intentionally not hidden behind a higher
 Vite warning limit.
 
+PDF/canvas exports remain runtime `import()` calls. Vite leaves these packages
+and their document-only dependencies out of manual vendor chunks. Every build
+checks the emitted manifest's static import graph, including the boot shell
+and lazy application routes, against the actual chunk module lists. Eager
+PDF/canvas code fails the build even if a vendor chunk is renamed.
+
 ## Budget
 
 - App entry JavaScript: <= 250 kB gzip.

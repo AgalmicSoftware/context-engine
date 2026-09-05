@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv, transformWithEsbuild } from 'vite';
 import { createBundleReportPlugin } from './scripts/bundle-report.mjs';
+import { isDocumentExportModule, lazyDocumentBuildPlugin } from './scripts/lazy-document-build.mjs';
 import { writePostSocialPreviewHtml } from './scripts/post-social-preview.mjs';
 import { transformGroupPasswordDerivationCommonJs } from './scripts/source-commonjs-compatibility.mjs';
 import { normalizeThemeIdForHtml } from './scripts/theme-registry-core.mjs';
@@ -140,21 +141,7 @@ const manualChunkGroups = [
       '/node_modules/umap-js/',
     ],
   },
-  {
-    name: 'vendor-canvas',
-    patterns: [
-      '/node_modules/canvg/',
-      '/node_modules/dompurify/',
-      '/node_modules/fast-png/',
-      '/node_modules/fflate/',
-      '/node_modules/iobuffer/',
-      '/node_modules/performance-now/',
-      '/node_modules/raf/',
-      '/node_modules/rgbcolor/',
-      '/node_modules/stackblur-canvas/',
-      '/node_modules/svg-pathdata/',
-    ],
-  },
+
   {
     name: 'vendor-crypto-core',
     patterns: [
@@ -174,18 +161,8 @@ const manualChunkGroups = [
       '/node_modules/poseidon-lite/',
     ],
   },
-  {
-    name: 'vendor-media-canvas-export',
-    patterns: [
-      '/node_modules/html2canvas/',
-    ],
-  },
-  {
-    name: 'vendor-media-pdf',
-    patterns: [
-      '/node_modules/jspdf/',
-    ],
-  },
+
+
   {
     name: 'vendor-media-audio',
     patterns: [
@@ -235,6 +212,8 @@ export const resolveManualChunk = (id) => {
     return 'demo-2-question-seed';
   }
   if (!normalizedId.includes('/node_modules/')) return undefined;
+  // Preserve import() boundaries for document export and its dependencies.
+  if (isDocumentExportModule(normalizedId)) return undefined;
 
   const group = manualChunkGroups.find(({ patterns }) => (
     patterns.some((pattern) => normalizedId.includes(pattern))
@@ -517,6 +496,7 @@ export default defineConfig(({ mode }) => {
       jsToTsCompatibilityPlugin(),
       litContractsSubpathShim(),
       walletProfileBundleGuardPlugin(walletRuntimeProfile),
+      lazyDocumentBuildPlugin(),
       ...(process.env.CE_BUNDLE_REPORT === '1'
         ? [createBundleReportPlugin({ rootDir: __dirname })]
         : []),
