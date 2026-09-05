@@ -43,7 +43,11 @@ describe('contractWrites gas override fallbacks', () => {
       getNetwork: jest.fn().mockResolvedValue({ chainId: 11155420 }),
       getCode: jest.fn().mockResolvedValue('0x6000'),
       send: jest.fn().mockResolvedValue('0xaa37dc'),
-      waitForTransaction: jest.fn().mockResolvedValue({ status: 1, to: '0x00000000000000000000000000000000000000bb', transactionHash: '0xtxhash' }),
+      waitForTransaction: jest.fn().mockResolvedValue({
+        status: 1,
+        to: '0x00000000000000000000000000000000000000bb',
+        transactionHash: '0xtxhash',
+      }),
     };
     const signer = {
       getAddress: jest.fn().mockResolvedValue('0x00000000000000000000000000000000000000aa'),
@@ -108,7 +112,11 @@ describe('contractWrites gas override fallbacks', () => {
       getNetwork: jest.fn().mockResolvedValue({ chainId: 11155420 }),
       getCode: jest.fn().mockResolvedValue('0x6000'),
       send: jest.fn().mockResolvedValue('0xaa37dc'),
-      waitForTransaction: jest.fn().mockResolvedValue({ status: 1, to: '0x00000000000000000000000000000000000000bb', transactionHash: '0xtxhash' }),
+      waitForTransaction: jest.fn().mockResolvedValue({
+        status: 1,
+        to: '0x00000000000000000000000000000000000000bb',
+        transactionHash: '0xtxhash',
+      }),
     };
     const signer = {
       getAddress: jest.fn().mockResolvedValue('0x00000000000000000000000000000000000000aa'),
@@ -286,10 +294,15 @@ describe('raw contract write target checks', () => {
       send: jest.fn().mockResolvedValue('0xaa37dc'),
       waitForTransaction: jest.fn().mockResolvedValue({ status: 1, to, transactionHash: '0xtxhash', logs: [] }),
     },
-    contract: { address: to, interface: new ethers.utils.Interface([
-      'function claim()', 'event Transfer(address indexed from,address indexed to,uint256 indexed tokenId)',
-    ]) },
-    method: 'claim', expectedChainId: 11155420,
+    contract: {
+      address: to,
+      interface: new ethers.utils.Interface([
+        'function claim()',
+        'event Transfer(address indexed from,address indexed to,uint256 indexed tokenId)',
+      ]),
+    },
+    method: 'claim',
+    expectedChainId: 11155420,
   });
 
   it.each(['0x', '0x0', 'garbage'])('never broadcasts to absent or malformed deployed code %s', async (code) => {
@@ -306,21 +319,32 @@ describe('raw contract write target checks', () => {
     expect(options.signingProvider.request).not.toHaveBeenCalled();
   });
 
-  it.each([{ status: undefined, to }, { status: 1, to: from }, { status: 1 }])('rejects an unverified receipt %j', async (receipt) => {
-    const options = makeOptions();
-    options.ethersProvider.waitForTransaction.mockResolvedValue(receipt);
-    await expect(sendContractWriteViaProvider(options)).rejects.toThrow();
-  });
+  it.each([{ status: undefined, to }, { status: 1, to: from }, { status: 1 }])(
+    'rejects an unverified receipt %j',
+    async (receipt) => {
+      const options = makeOptions();
+      options.ethersProvider.waitForTransaction.mockResolvedValue(receipt);
+      await expect(sendContractWriteViaProvider(options)).rejects.toThrow();
+    },
+  );
 
   it('requires the expected event to originate from the destination contract', async () => {
     const options = { ...makeOptions(), expectedEvent: 'Transfer' };
-    const log = options.contract.interface.encodeEventLog(options.contract.interface.getEvent('Transfer'), [ethers.constants.AddressZero, from, 1]);
+    const log = options.contract.interface.encodeEventLog(options.contract.interface.getEvent('Transfer'), [
+      ethers.constants.AddressZero,
+      from,
+      1,
+    ]);
     options.ethersProvider.waitForTransaction.mockResolvedValue({ status: 1, to, logs: [{ ...log, address: from }] });
     await expect(sendContractWriteViaProvider(options)).rejects.toThrow(/Transfer/);
     options.ethersProvider.waitForTransaction.mockResolvedValue({ status: 1, to, logs: [{ ...log, address: to }] });
-    await expect(sendContractWriteViaProvider(options)).resolves.toEqual(expect.objectContaining({ txHash: '0xtxhash' }));
-    expect(options.signingProvider.request).toHaveBeenLastCalledWith(expect.objectContaining({
-      params: [expect.objectContaining({ chainId: '0xaa37dc', to })],
-    }));
+    await expect(sendContractWriteViaProvider(options)).resolves.toEqual(
+      expect.objectContaining({ txHash: '0xtxhash' }),
+    );
+    expect(options.signingProvider.request).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        params: [expect.objectContaining({ chainId: '0xaa37dc', to })],
+      }),
+    );
   });
 });

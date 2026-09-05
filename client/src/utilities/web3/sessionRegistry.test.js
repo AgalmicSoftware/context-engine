@@ -85,7 +85,7 @@ const installWeb3ProviderMock = ({
   network = { chainId: CONFIGURED_REGISTRY_CHAIN_ID },
 } = {}) => {
   receipt.to ||= getSessionRegistryAddress(network.chainId);
-  receipt.logs ||= ['SessionCreated', 'SessionMetadataUpdated'].map(event => ({ address: receipt.to, event }));
+  receipt.logs ||= ['SessionCreated', 'SessionMetadataUpdated'].map((event) => ({ address: receipt.to, event }));
   const providerMock = {
     getCode: jest.fn().mockResolvedValue('0x6000'),
     send: jest.fn().mockResolvedValue(ethers.utils.hexValue(network.chainId)),
@@ -108,7 +108,7 @@ const makeRegistryWriteContractMock = ({
     address: getSessionRegistryAddress(chainId) || '0x1111111111111111111111111111111111111111',
     interface: {
       encodeFunctionData: jest.fn(() => txData),
-      parseLog: jest.fn(entry => ({ name: entry.event })),
+      parseLog: jest.fn((entry) => ({ name: entry.event })),
     },
     estimateGas: {},
   };
@@ -1161,7 +1161,12 @@ describe('registerSessionOnChain creation fee overrides', () => {
       { action: 'createSession', hash: txHash },
     ]);
 
-    resolveReceipt({ status: 1, to: getSessionRegistryAddress(CONFIGURED_REGISTRY_CHAIN_ID), transactionHash: txHash, logs: [{ address: getSessionRegistryAddress(CONFIGURED_REGISTRY_CHAIN_ID), event: 'SessionCreated' }] });
+    resolveReceipt({
+      status: 1,
+      to: getSessionRegistryAddress(CONFIGURED_REGISTRY_CHAIN_ID),
+      transactionHash: txHash,
+      logs: [{ address: getSessionRegistryAddress(CONFIGURED_REGISTRY_CHAIN_ID), event: 'SessionCreated' }],
+    });
 
     await expect(pendingResult).resolves.toEqual({
       txs: [{ action: 'createSession', hash: txHash }],
@@ -1868,27 +1873,44 @@ describe('setSessionFieldsOnChain gas fallback', () => {
 
 describe('registry listing pages', () => {
   let contract;
-  const load = (options = {}) => jest.requireActual('./sessionRegistry.js').loadSessionRegistryCache({
-    chainIds: [CONFIGURED_REGISTRY_CHAIN_ID], force: true, ...options,
-  });
+  const load = (options = {}) =>
+    jest.requireActual('./sessionRegistry.js').loadSessionRegistryCache({
+      chainIds: [CONFIGURED_REGISTRY_CHAIN_ID],
+      force: true,
+      ...options,
+    });
   beforeEach(() => {
     localStorage.removeItem('dg:sessionRegistryCache:v1');
     contract = {
       getSessionCount: jest.fn().mockResolvedValue(301),
-      getSessionSlugByIndex: jest.fn(async index => `fixture-${index}`),
-      getSessionBySlug: jest.fn(async slug => [slug, CONFIGURED_REGISTRY_CHAIN_ID, '', '', TEST_SIGNER_ADDRESS, 1, 2, '0x00000000000000000000000000000055']),
+      getSessionSlugByIndex: jest.fn(async (index) => `fixture-${index}`),
+      getSessionBySlug: jest.fn(async (slug) => [
+        slug,
+        CONFIGURED_REGISTRY_CHAIN_ID,
+        '',
+        '',
+        TEST_SIGNER_ADDRESS,
+        1,
+        2,
+        '0x00000000000000000000000000000055',
+      ]),
       getResourceGate: jest.fn(async () => [[], 0, 0, 0]),
       getSessionFields: jest.fn(async (_slug, keys) => keys.map(() => '')),
     };
     jest.spyOn(ethers.providers, 'JsonRpcProvider').mockImplementation(() => ({ send: jest.fn() }));
-    jest.spyOn(ethers.providers, 'FallbackProvider').mockImplementation(configs => configs[0].provider);
+    jest.spyOn(ethers.providers, 'FallbackProvider').mockImplementation((configs) => configs[0].provider);
     jest.spyOn(ethers, 'Contract').mockImplementation(() => contract);
   });
-  afterEach(() => { localStorage.removeItem('dg:sessionRegistryCache:v1'); jest.restoreAllMocks(); });
+  afterEach(() => {
+    localStorage.removeItem('dg:sessionRegistryCache:v1');
+    jest.restoreAllMocks();
+  });
 
   it('loads only the newest 100 entries by default and caps explicit pages at 250', async () => {
     const first = await load();
-    expect(contract.getSessionSlugByIndex.mock.calls.map(([index]) => index)).toEqual(Array.from({ length: 100 }, (_, i) => 300 - i));
+    expect(contract.getSessionSlugByIndex.mock.calls.map(([index]) => index)).toEqual(
+      Array.from({ length: 100 }, (_, i) => 300 - i),
+    );
     expect(first.__loadMeta.hasOlder).toBe(true);
     contract.getSessionSlugByIndex.mockClear();
     await load({ pageSize: 10000 });

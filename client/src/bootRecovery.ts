@@ -229,10 +229,12 @@ export const renderBootFailure = (error: unknown, options: BootRecoveryOptions =
 
   const staleChunk = isStaleChunkLoadError(error);
   const reloadParam = options.reloadParam || BOOT_RELOAD_PARAM;
-  const reload = options.reload || (() => {
-    if (staleChunk) reloadWithCacheBuster(win, reloadParam);
-    else win?.location?.reload?.();
-  });
+  const reload =
+    options.reload ||
+    (() => {
+      if (staleChunk) reloadWithCacheBuster(win, reloadParam);
+      else win?.location?.reload?.();
+    });
   const clearCaches = options.clearCaches || (() => clearBootCaches(win));
   const requestedAutoReloadDelayMs = typeof options.autoRefreshDelayMs === 'number' ? options.autoRefreshDelayMs : 3000;
   const automaticReloadPaused = hasReloadParam(win, reloadParam);

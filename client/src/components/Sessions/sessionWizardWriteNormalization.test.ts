@@ -486,7 +486,9 @@ describe('sessionWizardWriteNormalization', () => {
       getNetwork: jest.fn().mockResolvedValue({ chainId: DEFAULT_CONFIG_CHAIN_ID }),
       getCode: jest.fn().mockResolvedValue('0x6000'),
       send: jest.fn().mockResolvedValue(ethers.utils.hexValue(DEFAULT_CONFIG_CHAIN_ID)),
-      waitForTransaction: jest.fn().mockResolvedValue({ status: 1, to: contractMock.address, transactionHash: '0xtxhash' }),
+      waitForTransaction: jest
+        .fn()
+        .mockResolvedValue({ status: 1, to: contractMock.address, transactionHash: '0xtxhash' }),
     };
 
     jest.spyOn(ethers.providers, 'Web3Provider').mockImplementation(function MockWeb3Provider() {

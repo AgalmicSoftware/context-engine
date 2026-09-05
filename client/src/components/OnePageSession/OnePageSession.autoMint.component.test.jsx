@@ -750,7 +750,9 @@ describe('OnePageSession auto-mint queue', () => {
       ...subject.state,
       autoMintTargets: [{ sbt: sbtAddress, inv: 'invite-token' }],
     };
-    subject.decodeInviteInput = jest.fn().mockReturnValue({ chainId: '84532', sbtAddress, nonce: '7', signature: '0xinvite' });
+    subject.decodeInviteInput = jest
+      .fn()
+      .mockReturnValue({ chainId: '84532', sbtAddress, nonce: '7', signature: '0xinvite' });
     subject.waitForSufficientBalance = jest.fn().mockResolvedValue(true);
 
     jest.spyOn(contractScriptsModule, 'getAllSessionSlugs').mockReturnValue([]);
@@ -786,7 +788,9 @@ describe('OnePageSession auto-mint queue', () => {
       ...subject.state,
       autoMintTargets: [{ sbt: sbtAddress, inv: 'invite-token' }],
     };
-    subject.decodeInviteInput = jest.fn().mockReturnValue({ chainId: '84532', sbtAddress, nonce: '7', signature: secretSentinel });
+    subject.decodeInviteInput = jest
+      .fn()
+      .mockReturnValue({ chainId: '84532', sbtAddress, nonce: '7', signature: secretSentinel });
     subject.waitForSufficientBalance = jest.fn().mockResolvedValue(true);
 
     jest.spyOn(contractScriptsModule, 'getAllSessionSlugs').mockReturnValue([]);

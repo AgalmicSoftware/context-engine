@@ -278,7 +278,8 @@ const DISTRIBUTION_OPTION_CONFIGS = Object.freeze([
     label: 'Group Password',
     helpText: 'Use a shared password for unlimited claims or private signing for one-use invite codes.',
     tooltipId: 'groupPasswordTooltip',
-    tooltipText: 'For a limited group, keep this password private and share the exported invite codes. For unlimited claims, share the password.',
+    tooltipText:
+      'For a limited group, keep this password private and share the exported invite codes. For unlimited claims, share the password.',
   },
   {
     value: 'anyoneCanMint',
@@ -3430,13 +3431,15 @@ class CreateSBTGroup extends Component<any, any> {
       }
 
       const codesToStore = usesInviteCodes
-        ? (await sbtGroupMintAuthorizationPort.generateInvitePayloads({
-            password: groupPassword,
-            sbtAddress,
-            chainId: Number(groupCfg.networkChainId),
-            nonces: Array.from({ length: limitedCount }, (_, index) => String(index + 1)),
-            walletScopeSbtAddress: deploymentExpectation ? sbtAddress : '',
-          })).map(({ inviteCode }) => inviteCode)
+        ? (
+            await sbtGroupMintAuthorizationPort.generateInvitePayloads({
+              password: groupPassword,
+              sbtAddress,
+              chainId: Number(groupCfg.networkChainId),
+              nonces: Array.from({ length: limitedCount }, (_, index) => String(index + 1)),
+              walletScopeSbtAddress: deploymentExpectation ? sbtAddress : '',
+            })
+          ).map(({ inviteCode }) => inviteCode)
         : finalPasswordList;
       this.persistCreatedSbtCodes({ sbtAddress, hasPasswordMintOnChain, codesToStore });
       this.suppressFormCachePersistenceAfterSuccess();
@@ -4527,7 +4530,9 @@ class CreateSBTGroup extends Component<any, any> {
               <>
                 {/* Auto-Join URL (Group Password) */}
                 {this.renderShareableBlock(
-                  sbtDistribution.isLimited ? 'Claim URL (Invite Code Entered Separately)' : 'Claim URL (Password Entered Separately)',
+                  sbtDistribution.isLimited
+                    ? 'Claim URL (Invite Code Entered Separately)'
+                    : 'Claim URL (Password Entered Separately)',
                   sbtDistribution.isLimited
                     ? 'This link identifies the group only. Send one exported invite code separately; it permits one claim.'
                     : 'This link identifies the group only. Send the group password separately; the recipient enters it in the claim form.',

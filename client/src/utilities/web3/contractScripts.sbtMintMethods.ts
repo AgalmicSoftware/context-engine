@@ -255,7 +255,13 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
       });
     },
 
-    async generateInvitePayloads({ password, sbtAddress, nonces, chainId, walletScopeSbtAddress }: GenerateInvitePayloadsInput) {
+    async generateInvitePayloads({
+      password,
+      sbtAddress,
+      nonces,
+      chainId,
+      walletScopeSbtAddress,
+    }: GenerateInvitePayloadsInput) {
       if (!Array.isArray(nonces) || nonces.length === 0) {
         throw new Error('generateInvitePayloads requires a non-empty nonces array.');
       }
@@ -283,11 +289,18 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
           walletScopeSbtAddress: resolvedWalletScopeSbtAddress,
         });
         const payload: EncodedInvitePayload = {
-          c: String(chainId), a: String(sbtAddress), n: String(nonce), s: signature,
+          c: String(chainId),
+          a: String(sbtAddress),
+          n: String(nonce),
+          s: signature,
         };
         const inviteCode = cryptoUtils.encodeInvite(payload);
         out.push({
-          chainId: String(chainId), sbtAddress: String(sbtAddress), nonce: String(nonce), signature, inviteCode,
+          chainId: String(chainId),
+          sbtAddress: String(sbtAddress),
+          nonce: String(nonce),
+          signature,
+          inviteCode,
         });
       }
       return out;
@@ -612,7 +625,8 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
       const burnAuthNum = ethers.BigNumber.isBigNumber(burnAuth) ? burnAuth.toNumber() : Number(burnAuth);
       const hasSBT = await this.userHasSBT('none', SBTAddress, userAddress, 0, 'latest', groupKeyOrCfg);
       const isAdmin =
-        normalizeAddress(admin) !== ethers.constants.AddressZero && normalizeAddress(admin) === normalizeAddress(userAddress);
+        normalizeAddress(admin) !== ethers.constants.AddressZero &&
+        normalizeAddress(admin) === normalizeAddress(userAddress);
 
       if (burnAuthNum === 0) return isAdmin;
       if (burnAuthNum === 1) return hasSBT;

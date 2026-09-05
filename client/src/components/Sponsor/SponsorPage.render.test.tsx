@@ -234,13 +234,21 @@ describe('SponsorPage', () => {
 
   it('loads older registry sessions without dropping the current page', async () => {
     mockLoadSessionRegistryCache.mockImplementation(async ({ loadOlder }: { loadOlder?: boolean } = {}) => {
-      if (loadOlder) sessionEntries = [...sessionEntries, ['older', buildSessionConfig({ slug: 'older', sessionName: 'Older session' })]];
+      if (loadOlder)
+        sessionEntries = [
+          ...sessionEntries,
+          ['older', buildSessionConfig({ slug: 'older', sessionName: 'Older session' })],
+        ];
       return { __loadMeta: { hasOlder: !loadOlder } };
     });
     await renderSponsorPage();
     const older = await screen.findByRole('button', { name: 'Load older' });
-    await act(async () => { fireEvent.click(older); });
-    await waitFor(() => expect(mockLoadSessionRegistryCache).toHaveBeenCalledWith(expect.objectContaining({ loadOlder: true })));
+    await act(async () => {
+      fireEvent.click(older);
+    });
+    await waitFor(() =>
+      expect(mockLoadSessionRegistryCache).toHaveBeenCalledWith(expect.objectContaining({ loadOlder: true })),
+    );
     expect(screen.getByRole('option', { name: /Older session/ })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: /Edge Session/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Load older' })).not.toBeInTheDocument();

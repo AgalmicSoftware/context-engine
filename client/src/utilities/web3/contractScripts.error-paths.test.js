@@ -65,16 +65,36 @@ jest.mock('ethers', () => {
       return actual.ethers.BigNumber.from('300000');
     }
 
-    async getNetwork() { return { chainId: 84532 }; }
-    async getCode(to) { this.target = to; return '0x6000'; }
-    async send(method, params) { return this.provider.request({ method, params }); }
+    async getNetwork() {
+      return { chainId: 84532 };
+    }
+    async getCode(to) {
+      this.target = to;
+      return '0x6000';
+    }
+    async send(method, params) {
+      return this.provider.request({ method, params });
+    }
     async waitForTransaction(txHash) {
       const event = {
-        createSBT: 'SBTCreated', createSBTDeterministic: 'SBTCreated', createSBTDeterministicConfigured: 'SBTCreated',
-        addSurvey: 'SurveyAdded', addQuestions: 'QuestionsAdded', submitResponses: 'ResponsesSubmitted',
-        claim: 'Transfer', claimWithPassword: 'Transfer', claimWithInvite: 'Transfer', mintWithGroupSignature: 'Transfer', burn: 'Transfer',
+        createSBT: 'SBTCreated',
+        createSBTDeterministic: 'SBTCreated',
+        createSBTDeterministicConfigured: 'SBTCreated',
+        addSurvey: 'SurveyAdded',
+        addQuestions: 'QuestionsAdded',
+        submitResponses: 'ResponsesSubmitted',
+        claim: 'Transfer',
+        claimWithPassword: 'Transfer',
+        claimWithInvite: 'Transfer',
+        mintWithGroupSignature: 'Transfer',
+        burn: 'Transfer',
       }[mockLastWriteMethod];
-      return { status: 1, to: this.target, transactionHash: txHash, logs: event ? [{ address: this.target, event }] : [] };
+      return {
+        status: 1,
+        to: this.target,
+        transactionHash: txHash,
+        logs: event ? [{ address: this.target, event }] : [],
+      };
     }
   }
 
@@ -194,8 +214,11 @@ const makeWriteContractMock = ({ address = TEST_ADDRESS, data = '0xdeadbeef', me
   const contract = {
     address,
     interface: {
-      encodeFunctionData: jest.fn((method) => { mockLastWriteMethod = method; return data; }),
-      parseLog: jest.fn(entry => ({ name: entry.event, args: { sbtAddress: TEST_ADDRESS } })),
+      encodeFunctionData: jest.fn((method) => {
+        mockLastWriteMethod = method;
+        return data;
+      }),
+      parseLog: jest.fn((entry) => ({ name: entry.event, args: { sbtAddress: TEST_ADDRESS } })),
     },
     estimateGas: {},
   };
@@ -662,8 +685,11 @@ describe('error paths', () => {
     const mockFactory = {
       address: GROUP_CFG.contracts.sbtFactory.address,
       interface: {
-        encodeFunctionData: jest.fn((method) => { mockLastWriteMethod = method; return '0xfeedbeef'; }),
-      parseLog: jest.fn(entry => ({ name: entry.event, args: { sbtAddress: TEST_ADDRESS } })),
+        encodeFunctionData: jest.fn((method) => {
+          mockLastWriteMethod = method;
+          return '0xfeedbeef';
+        }),
+        parseLog: jest.fn((entry) => ({ name: entry.event, args: { sbtAddress: TEST_ADDRESS } })),
       },
       estimateGas: {
         createSBT: jest.fn(async () => ethers.BigNumber.from('1500000')),
@@ -720,8 +746,11 @@ describe('error paths', () => {
     const mockFactory = {
       address: GROUP_CFG.contracts.sbtFactory.address,
       interface: {
-        encodeFunctionData: jest.fn((method) => { mockLastWriteMethod = method; return '0xfeedbeef'; }),
-      parseLog: jest.fn(entry => ({ name: entry.event, args: { sbtAddress: TEST_ADDRESS } })),
+        encodeFunctionData: jest.fn((method) => {
+          mockLastWriteMethod = method;
+          return '0xfeedbeef';
+        }),
+        parseLog: jest.fn((entry) => ({ name: entry.event, args: { sbtAddress: TEST_ADDRESS } })),
       },
       estimateGas: {
         createSBT: jest.fn(async () => {
@@ -964,8 +993,11 @@ describe('error paths', () => {
     const mockSurveyContract = {
       address: GROUP_CFG.contracts.surveys.address,
       interface: {
-        encodeFunctionData: jest.fn((method) => { mockLastWriteMethod = method; return '0xdeadbeef'; }),
-      parseLog: jest.fn(entry => ({ name: entry.event, args: { sbtAddress: TEST_ADDRESS } })),
+        encodeFunctionData: jest.fn((method) => {
+          mockLastWriteMethod = method;
+          return '0xdeadbeef';
+        }),
+        parseLog: jest.fn((entry) => ({ name: entry.event, args: { sbtAddress: TEST_ADDRESS } })),
       },
       estimateGas: {
         addSurvey: jest.fn(async () => ethers.BigNumber.from('250000')),
@@ -1244,8 +1276,11 @@ describe('error paths', () => {
     const mockSbtContract = {
       address: TEST_ADDRESS,
       interface: {
-        encodeFunctionData: jest.fn((method) => { mockLastWriteMethod = method; return '0xfacefeed'; }),
-      parseLog: jest.fn(entry => ({ name: entry.event, args: { sbtAddress: TEST_ADDRESS } })),
+        encodeFunctionData: jest.fn((method) => {
+          mockLastWriteMethod = method;
+          return '0xfacefeed';
+        }),
+        parseLog: jest.fn((entry) => ({ name: entry.event, args: { sbtAddress: TEST_ADDRESS } })),
       },
       estimateGas: {
         claim: jest.fn(async () => ethers.BigNumber.from('100000')),

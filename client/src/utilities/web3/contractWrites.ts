@@ -321,10 +321,17 @@ const sendContractWriteViaProvider = async ({
   if (String(receipt.to || '').toLowerCase() !== String(to).toLowerCase()) {
     throw new Error(`Transaction receipt destination does not match ${methodName}.`);
   }
-  if (expectedEvent && !(receipt.logs || []).some((entry: { address?: string }) => {
-    if (String(entry?.address || '').toLowerCase() !== String(to).toLowerCase()) return false;
-    try { return contract.interface.parseLog(entry)?.name === expectedEvent; } catch { return false; }
-  })) {
+  if (
+    expectedEvent &&
+    !(receipt.logs || []).some((entry: { address?: string }) => {
+      if (String(entry?.address || '').toLowerCase() !== String(to).toLowerCase()) return false;
+      try {
+        return contract.interface.parseLog(entry)?.name === expectedEvent;
+      } catch {
+        return false;
+      }
+    })
+  ) {
     throw new Error(`Expected ${expectedEvent} event was not emitted by ${methodName}.`);
   }
   return { txHash, receipt };

@@ -213,8 +213,14 @@ describe('exact user profile routing', () => {
     expect(resolveMainSiteRouteMatch({ fullPath, isAddress }).key).toBe('userProfile');
   });
   it.each([
-    `/unrelated/${ADDRESS}`, `/unrelated?user=${ADDRESS}`, `/unrelated#${ADDRESS}`,
-    `/u/${ADDRESS}/extra`, `/${ADDRESS}/extra`, `/u/0xinvalid`, `//u/${ADDRESS}`, `/u//${ADDRESS}`,
+    `/unrelated/${ADDRESS}`,
+    `/unrelated?user=${ADDRESS}`,
+    `/unrelated#${ADDRESS}`,
+    `/u/${ADDRESS}/extra`,
+    `/${ADDRESS}/extra`,
+    `/u/0xinvalid`,
+    `//u/${ADDRESS}`,
+    `/u//${ADDRESS}`,
     `/u/${ADDRESS}//`,
   ])('rejects %s', (fullPath) => {
     const route = resolveMainSiteRouteMatch({ fullPath, isAddress });

@@ -32,8 +32,12 @@ describe('SBTPage auto-mint routing', () => {
 
   it('never derives a fresh slot from a reusable secret at claim time', async () => {
     const sbtAddress = '0x0000000000000000000000000000000000000114';
-    const subject = createSubject({ SBTAddress: sbtAddress,
-      account: '0x0000000000000000000000000000000000000abc', loginComplete: true, sessionSlug: 'edge' });
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      account: '0x0000000000000000000000000000000000000abc',
+      loginComplete: true,
+      sessionSlug: 'edge',
+    });
     subject.state = { ...subject.state, sbtInfo: { hasPasswordMint: true, maxTokens: 2 } };
     subject.isMintTargetContextCurrent = jest.fn(() => true);
     subject.completeMintSuccessForTarget = jest.fn();
@@ -42,9 +46,9 @@ describe('SBTPage auto-mint routing', () => {
     jest.spyOn(cryptoUtils, 'resolveGroupPasswordWalletScopeAddress').mockReturnValue(sbtAddress);
     jest.spyOn(contractScripts, 'computeGroupPasswordHash').mockReturnValue(hash);
     jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue('0');
-    const generate = jest.spyOn(contractScripts, 'generateInvitePayloads').mockResolvedValue([
-      { nonce: '1', signature: '0xsig' },
-    ]);
+    const generate = jest
+      .spyOn(contractScripts, 'generateInvitePayloads')
+      .mockResolvedValue([{ nonce: '1', signature: '0xsig' }]);
     const claim = jest.spyOn(contractScripts, 'claimWithInvite').mockResolvedValue({ transactionHash: '0xinvite' });
     expect(await subject.claimWithInviteCode('shared-secret')).toBe(false);
     expect(generate).not.toHaveBeenCalled();
@@ -52,15 +56,24 @@ describe('SBTPage auto-mint routing', () => {
   });
 
   it.each([{ chainId: '11155420' }, { sbtAddress: '0x00000000000000000000000000000000000000b2' }])(
-    'rejects an invite scoped to a different target %j', async (mismatch) => {
+    'rejects an invite scoped to a different target %j',
+    async (mismatch) => {
       const sbtAddress = '0x0000000000000000000000000000000000000114';
-      const subject = createSubject({ SBTAddress: sbtAddress,
-        account: '0x0000000000000000000000000000000000000abc', loginComplete: true, sessionSlug: 'edge' });
+      const subject = createSubject({
+        SBTAddress: sbtAddress,
+        account: '0x0000000000000000000000000000000000000abc',
+        loginComplete: true,
+        sessionSlug: 'edge',
+      });
       subject.isMintTargetContextCurrent = jest.fn(() => true);
       subject.completeMintSuccessForTarget = jest.fn();
       const claim = jest.spyOn(contractScripts, 'claimWithInvite').mockResolvedValue({ transactionHash: '0xinvite' });
       const result = await subject.claimWithInvitePayload({
-        chainId: '84532', sbtAddress, nonce: '1', signature: '0xsig', ...mismatch,
+        chainId: '84532',
+        sbtAddress,
+        nonce: '1',
+        signature: '0xsig',
+        ...mismatch,
       });
       expect(result.ok).toBe(false);
       expect(claim).not.toHaveBeenCalled();
@@ -429,12 +442,23 @@ describe('SBTPage auto-mint routing', () => {
   it('does not send a signed slot when the captured wallet no longer matches', async () => {
     const sbtAddress = '0x0000000000000000000000000000000000000114';
     const startAccount = '0x0000000000000000000000000000000000000abc';
-    const subject = createSubject({ SBTAddress: sbtAddress,
-      account: '0x0000000000000000000000000000000000000def', loginComplete: true, sessionSlug: 'edge' });
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      account: '0x0000000000000000000000000000000000000def',
+      loginComplete: true,
+      sessionSlug: 'edge',
+    });
     const claimSpy = jest.spyOn(contractScripts, 'claimWithInvite').mockResolvedValue({ transactionHash: '0xinvite' });
-    const result = await subject.claimWithInvitePayload({
-      chainId: '84532', sbtAddress, nonce: '1', signature: '0xsig',
-    }, sbtAddress, { accountLowerOverride: startAccount, sessionSlugOverride: 'edge' });
+    const result = await subject.claimWithInvitePayload(
+      {
+        chainId: '84532',
+        sbtAddress,
+        nonce: '1',
+        signature: '0xsig',
+      },
+      sbtAddress,
+      { accountLowerOverride: startAccount, sessionSlugOverride: 'edge' },
+    );
     expect(result.ok).toBe(false);
     expect(claimSpy).not.toHaveBeenCalled();
   });
@@ -465,9 +489,13 @@ describe('SBTPage auto-mint routing', () => {
     const localSuccessSpy = jest.spyOn(subject, 'applyLocalMintSuccess');
     const refreshSpy = jest.spyOn(subject, 'refreshSbtDataWithSlug').mockReturnValue(undefined);
 
-    const result = await subject.claimWithInvitePayload({ chainId: '84532', sbtAddress, nonce: '1', signature: '0xsig' }, sbtAddress, {
-      sessionSlugOverride: 'edge',
-    });
+    const result = await subject.claimWithInvitePayload(
+      { chainId: '84532', sbtAddress, nonce: '1', signature: '0xsig' },
+      sbtAddress,
+      {
+        sessionSlugOverride: 'edge',
+      },
+    );
 
     expect(result.ok).toBe(true);
     expect(contractScripts.claimWithInvite).toHaveBeenCalledWith('mock', sbtAddress, '1', '0xsig');
@@ -496,9 +524,13 @@ describe('SBTPage auto-mint routing', () => {
       .spyOn(contractScripts, 'claimWithInvite')
       .mockRejectedValue(new Error(`RPC request failed with calldata containing ${rawCredential}`));
 
-    const result = await subject.claimWithInvitePayload({ chainId: '84532', sbtAddress, nonce: '1', signature: rawCredential }, sbtAddress, {
-      sessionSlugOverride: 'edge',
-    });
+    const result = await subject.claimWithInvitePayload(
+      { chainId: '84532', sbtAddress, nonce: '1', signature: rawCredential },
+      sbtAddress,
+      {
+        sessionSlugOverride: 'edge',
+      },
+    );
 
     expect(result.ok).toBe(false);
     expect(result.error.message).toBe('Claim failed. Verify the credential and network, then retry.');

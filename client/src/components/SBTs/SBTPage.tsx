@@ -1337,10 +1337,12 @@ class SBTPage extends Component<any, any> {
               .toLowerCase();
       mintChainId =
         options?.chainIdOverride != null ? String(options.chainIdOverride || '').trim() : this.getMintTargetChainId();
-      if (String(payload.chainId || '') !== mintChainId || String(payload.sbtAddress || '').toLowerCase() !== sbt.toLowerCase()) {
+      if (
+        String(payload.chainId || '') !== mintChainId ||
+        String(payload.sbtAddress || '').toLowerCase() !== sbt.toLowerCase()
+      ) {
         throw new Error('Invite code does not match this collection and chain.');
       }
-
 
       if (
         !this.isMintTargetContextCurrent({

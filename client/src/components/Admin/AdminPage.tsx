@@ -2371,8 +2371,15 @@ const AdminPageRuntime = ({
                 </div>
                 <div className={styles.heroCardHeaderActions}>
                   {hasOlderSessions && (
-                    <Button size="sm" color="secondary" outline className={styles.actionButton}
-                      onClick={handleLoadOlderSessions} disabled={sessionsRefreshBusy} data-testid="ce-admin-load-older">
+                    <Button
+                      size="sm"
+                      color="secondary"
+                      outline
+                      className={styles.actionButton}
+                      onClick={handleLoadOlderSessions}
+                      disabled={sessionsRefreshBusy}
+                      data-testid="ce-admin-load-older"
+                    >
                       Load older
                     </Button>
                   )}

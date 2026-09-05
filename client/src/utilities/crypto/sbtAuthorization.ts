@@ -24,7 +24,10 @@ export const positiveSbtUint = (value: unknown): string => {
 };
 
 const hashSbtAuthorization = (
-  domain: 'GroupMint' | 'Invite', chainId: unknown, sbtAddress: unknown, subject: unknown,
+  domain: 'GroupMint' | 'Invite',
+  chainId: unknown,
+  sbtAddress: unknown,
+  subject: unknown,
 ): string => {
   const collection = String(sbtAddress || '');
   if (!ethers.utils.isAddress(collection) || collection === ethers.constants.AddressZero) {
@@ -35,18 +38,28 @@ const hashSbtAuthorization = (
     throw new Error('Invalid SBT authorization claimant');
   }
   // Keep the protocol domains and abi.encode layout aligned with CustomSBT.sol.
-  return ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode(
-    ['bytes32', 'uint256', 'address', domain === 'GroupMint' ? 'address' : 'uint256'],
-    [ethers.utils.id(`ContextEngine.SBT.${domain}:1`), positiveSbtUint(chainId), collection,
-      domain === 'GroupMint' ? claimant : positiveSbtUint(subject)],
-  ));
+  return ethers.utils.keccak256(
+    ethers.utils.defaultAbiCoder.encode(
+      ['bytes32', 'uint256', 'address', domain === 'GroupMint' ? 'address' : 'uint256'],
+      [
+        ethers.utils.id(`ContextEngine.SBT.${domain}:1`),
+        positiveSbtUint(chainId),
+        collection,
+        domain === 'GroupMint' ? claimant : positiveSbtUint(subject),
+      ],
+    ),
+  );
 };
 
 export const computeGroupMintMessageHash = (sbtAddress: string, userAddress: string, chainId: unknown) =>
   hashSbtAuthorization('GroupMint', chainId, sbtAddress, userAddress);
 
 export const signGroupMintAuthorization = async ({
-  password, sbtAddress, userAddress, chainId, walletScopeSbtAddress = sbtAddress,
+  password,
+  sbtAddress,
+  userAddress,
+  chainId,
+  walletScopeSbtAddress = sbtAddress,
 }: SbtAuthorizationInput) => {
   const messageHash = computeGroupMintMessageHash(String(sbtAddress || ''), String(userAddress || ''), chainId);
   const tmpWallet = deriveGroupPasswordWallet({ password, sbtAddress: walletScopeSbtAddress });
@@ -56,7 +69,13 @@ export const signGroupMintAuthorization = async ({
 export const buildInviteMessageHash = ({ sbtAddress, nonce, chainId }: SbtAuthorizationInput) =>
   hashSbtAuthorization('Invite', chainId, sbtAddress, nonce);
 
-export const signInvite = async ({ password, sbtAddress, nonce, chainId, walletScopeSbtAddress = sbtAddress }: SbtAuthorizationInput) => {
+export const signInvite = async ({
+  password,
+  sbtAddress,
+  nonce,
+  chainId,
+  walletScopeSbtAddress = sbtAddress,
+}: SbtAuthorizationInput) => {
   const messageHash = buildInviteMessageHash({ sbtAddress, nonce, chainId });
   const tmpWallet = deriveGroupPasswordWallet({ password, sbtAddress: walletScopeSbtAddress });
   return tmpWallet.signMessage(ethers.utils.arrayify(messageHash));

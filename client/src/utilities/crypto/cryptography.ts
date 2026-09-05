@@ -393,11 +393,8 @@ const decodeBase64Field = (value: unknown, fieldName: string): Uint8Array => {
   return new Uint8Array(Buffer.from(value, 'base64'));
 };
 
-const {
-  buildGroupPasswordSalt,
-  computeGroupPasswordHash,
-  resolveGroupPasswordWalletScopeAddress,
-} = groupPasswordDerivation.createGroupPasswordDerivation(ethers);
+const { buildGroupPasswordSalt, computeGroupPasswordHash, resolveGroupPasswordWalletScopeAddress } =
+  groupPasswordDerivation.createGroupPasswordDerivation(ethers);
 
 const encodeInvite = (payload: UnknownRecord) => {
   const json = JSON.stringify(payload || {});

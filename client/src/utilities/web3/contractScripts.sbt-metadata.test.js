@@ -76,7 +76,9 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
     stub.admin.mockRejectedValue(new Error('admin read failed'));
     contractSpy = jest.spyOn(ethers, 'Contract').mockImplementation(() => stub);
     const meta = await contractScripts.getSbtMetadata('none', sbtAddress, {
-      slug: 'edge', networkChainId: 84532, contracts: {},
+      slug: 'edge',
+      networkChainId: 84532,
+      contracts: {},
     });
     expect(meta.admin).toBe(ethers.constants.AddressZero);
     expect(stub.owner).not.toHaveBeenCalled();
@@ -87,7 +89,9 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
     stub.admin.mockResolvedValue(ethers.constants.AddressZero);
     contractSpy = jest.spyOn(ethers, 'Contract').mockImplementation(() => stub);
     const meta = await contractScripts.getSbtMetadata('none', sbtAddress, {
-      slug: 'edge', networkChainId: 84532, contracts: {},
+      slug: 'edge',
+      networkChainId: 84532,
+      contracts: {},
     });
     expect(meta.admin).toBe(ethers.constants.AddressZero);
     expect(stub.owner).not.toHaveBeenCalled();

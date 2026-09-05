@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
   "kind": "ai_discourse_bench_context_engine_results_sync",
-  "sourceCommit": "684d85f5185ddf76595c5256e0336cc6d46e4d20",
+  "sourceCommit": "15bdf836813a21d90ca60c82a0e9e5ae5806bbd5",
   "files": {
     "client/src/components/OnePageSession/OnePageSessionStandardShell.tsx": "e9a941f1b1bf6cc16d2beeab399468e950866add7f3bdc27cb5bff9975c949ca",
-    "client/src/components/OnePageSession/OnePageSession.tsx": "48b0deae870129b6e4f09f03d801b358a1037dc904f4003bc9608e6d66c098e3",
+    "client/src/components/OnePageSession/OnePageSession.tsx": "562623a17145e43a818490189fb71c3d5cc37bbe1184780606dcf48e149d98b9",
     "client/src/components/OnePageSession/OnePageSession.module.scss": "2b431bfc852725d8a45d5259bbafe9b62851dbc3481ef61714c5aa6e6af64ff4",
     "client/src/components/PolisReport/PolisReport.tsx": "7f3e3022a2b0f95367662dd42cb2e006e5051f7d7e3a4d6cc28382db5e4ed071",
     "client/src/components/PolisReport/PolisReport.module.scss": "ef2fb92d76b17209fbeb0de8e4af2be4af878b6e9f055dcb49a2523edbe480c0",
@@ -14,7 +14,7 @@
     "client/src/components/MainContent/RiskMatrix.module.scss": "bf813b0769cbed10e719316f191bcc261dcbe6372239198b9d493824797a24ac",
     "client/src/components/DemoViews/DemoAnalysis/DemoAnalysisWorkspace.tsx": "ab4c0550517c6582e6a02cad2663dac9577b4590c786e85ea98e993d2ef1efe3",
     "client/src/components/DemoViews/DemoAnalysis/DemoAnalysisWorkspace.module.scss": "ade4d5cd83d797e0eb1875893c3b9fdad641dcc48daf903a304742a155896516",
-    "client/src/components/DemoViews/DemoAnalysis/ComparisonReport.tsx": "ab75ee2f3e974f2477b06072ba4bf6cb65ec1fbdaaf62c53cfdf4287392edd6a",
+    "client/src/components/DemoViews/DemoAnalysis/ComparisonReport.tsx": "dd148f6236b662d47bec141dd4e119fd17b4ff44b8929c70bb5d62fc6a009dfc",
     "client/src/components/DemoViews/DemoAnalysis/ComparisonReport.module.scss": "9631c99346847e1b7a3a8d8a6fb11a837983e8b3aa8f4b07eac040ab1899f8ce",
     "client/src/components/DemoViews/DemoAnalysis/ComparisonSuggestions.tsx": "7f01edc30fe95c3a72d15eff88b0b220530568bbd192a4bdf782d1c31e117f10",
     "client/src/components/DemoViews/DemoAnalysis/DemographicSelector.tsx": "6800478dcdce1a220de755b5404a2b19beb0391915a4925283c0e57b703278c0",

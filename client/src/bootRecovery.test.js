@@ -288,8 +288,10 @@ for (const error of [new Error('configuration missing'), new TypeError('Cannot r
     document.body.innerHTML = '<div id="root"></div>';
     const fakeWindow = {
       location: { href: 'https://app.example/session/fixture?draft=1#question', reload: jest.fn(), assign: jest.fn() },
-      localStorage: { clear: jest.fn() }, sessionStorage: { clear: jest.fn() },
-      caches: { keys: jest.fn(), delete: jest.fn() }, setTimeout,
+      localStorage: { clear: jest.fn() },
+      sessionStorage: { clear: jest.fn() },
+      caches: { keys: jest.fn(), delete: jest.fn() },
+      setTimeout,
     };
     renderBootFailure(error, { window: fakeWindow });
     jest.advanceTimersByTime(10000);

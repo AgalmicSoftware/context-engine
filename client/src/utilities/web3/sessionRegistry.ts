@@ -842,7 +842,12 @@ const sendRegistryContractWriteViaProvider = async (
     signer,
     contract,
     method,
-    expectedEvent: method === 'createSession' ? 'SessionCreated' : method === 'updateSessionMetadata' ? 'SessionMetadataUpdated' : undefined,
+    expectedEvent:
+      method === 'createSession'
+        ? 'SessionCreated'
+        : method === 'updateSessionMetadata'
+          ? 'SessionMetadataUpdated'
+          : undefined,
     args,
     txOverrides,
     onBroadcastTxHash,
@@ -1631,15 +1636,27 @@ export const refreshSessionRegistryFieldsCache = async ({
 };
 
 export const loadSessionRegistryCache = async (
-  { chainIds, slugs, providerLike, account, lit, force, bootstrapRpc, pageSize = 100, loadOlder = false } = {} as AnyRecord,
+  {
+    chainIds,
+    slugs,
+    providerLike,
+    account,
+    lit,
+    force,
+    bootstrapRpc,
+    pageSize = 100,
+    loadOlder = false,
+  } = {} as AnyRecord,
 ) => {
   if (!USE_ONCHAIN_SESSION_REGISTRY && !force) return null;
   const useBootstrapRpc = typeof bootstrapRpc === 'boolean' ? bootstrapRpc : true;
 
   const previousCache = sessionRegistryStore.readCache();
   const requestedPageSize = Number(pageSize);
-  const boundedPageSize = Number.isFinite(requestedPageSize) && requestedPageSize > 0
-    ? Math.min(250, Math.max(1, Math.floor(requestedPageSize))) : 100;
+  const boundedPageSize =
+    Number.isFinite(requestedPageSize) && requestedPageSize > 0
+      ? Math.min(250, Math.max(1, Math.floor(requestedPageSize)))
+      : 100;
   let hadLoadErrors = false;
   let walletProvider: ethers.providers.Web3Provider | null = null;
   let walletChainId = 0;
@@ -1693,8 +1710,8 @@ export const loadSessionRegistryCache = async (
         return { chainId, chainEntry: null, configs: [], hadLoadErrors: true };
       }
       const priorNext = previousCache?.chains?.[String(chainId)]?.pagination?.nextIndex;
-      const startIndex = loadOlder && Number.isSafeInteger(priorNext) && priorNext >= 0
-        ? Math.min(priorNext, count) : count;
+      const startIndex =
+        loadOlder && Number.isSafeInteger(priorNext) && priorNext >= 0 ? Math.min(priorNext, count) : count;
       const nextIndex = Math.max(0, startIndex - boundedPageSize);
       pagination = { totalCount: count, nextIndex, startIndex };
       sessionSources = Array.from({ length: startIndex - nextIndex }, (_entry, index) => startIndex - index - 1);
@@ -1783,7 +1800,9 @@ export const loadSessionRegistryCache = async (
       // Retry the same page after any failed row; loaded rows remain available.
       chainEntry.pagination = {
         totalCount: pagination.totalCount,
-        nextIndex: sessionResults.some(result => result?.hadLoadErrors) ? pagination.startIndex : pagination.nextIndex,
+        nextIndex: sessionResults.some((result) => result?.hadLoadErrors)
+          ? pagination.startIndex
+          : pagination.nextIndex,
       };
     }
     return {
@@ -1834,7 +1853,9 @@ export const loadSessionRegistryCache = async (
       cache.chains[chainId].pagination = (previousChain as RegistryCache)?.pagination;
     }
   }
-  const hasOlder = Object.values(cache.chains).some(entry => Number((entry as RegistryCache)?.pagination?.nextIndex) > 0);
+  const hasOlder = Object.values(cache.chains).some(
+    (entry) => Number((entry as RegistryCache)?.pagination?.nextIndex) > 0,
+  );
   cache.__hadLoadErrors = !!hadLoadErrors;
   try {
     localStorage.setItem(REGISTRY_CACHE_KEY, JSON.stringify(cache));

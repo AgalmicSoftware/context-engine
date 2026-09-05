@@ -1114,8 +1114,15 @@ const SponsorPage = ({
                   )}
                 </div>
                 {hasOlderSessions && (
-                  <Button size="sm" color="secondary" outline className={styles.actionButton}
-                    onClick={handleLoadOlderSessions} disabled={sessionsRefreshBusy} data-testid="ce-sponsor-load-older">
+                  <Button
+                    size="sm"
+                    color="secondary"
+                    outline
+                    className={styles.actionButton}
+                    onClick={handleLoadOlderSessions}
+                    disabled={sessionsRefreshBusy}
+                    data-testid="ce-sponsor-load-older"
+                  >
                     Load older
                   </Button>
                 )}

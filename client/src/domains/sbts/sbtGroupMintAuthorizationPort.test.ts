@@ -45,8 +45,20 @@ describe('SbtGroupMintAuthorizationPort', () => {
       computeGroupPasswordHash: jest.fn(() => '0xhash'),
       signGroupMintAuthorization: jest.fn(async () => '0xsignature'),
       generateInvitePayloads: jest.fn(async () => [
-        { chainId: '11155420', sbtAddress: '0x0000000000000000000000000000000000000001', nonce: '1', signature: '0xinvite1', inviteCode: 'inv1' },
-        { chainId: '11155420', sbtAddress: '0x0000000000000000000000000000000000000001', nonce: '2', signature: '0xinvite2', inviteCode: 'inv2' },
+        {
+          chainId: '11155420',
+          sbtAddress: '0x0000000000000000000000000000000000000001',
+          nonce: '1',
+          signature: '0xinvite1',
+          inviteCode: 'inv1',
+        },
+        {
+          chainId: '11155420',
+          sbtAddress: '0x0000000000000000000000000000000000000001',
+          nonce: '2',
+          signature: '0xinvite2',
+          inviteCode: 'inv2',
+        },
       ]),
     };
     const sbtAddress = '0x0000000000000000000000000000000000000001';
@@ -58,8 +70,20 @@ describe('SbtGroupMintAuthorizationPort', () => {
       groupPasswordHash: '0xhash',
       signature: '0xsignature',
       invites: [
-        { chainId: '11155420', sbtAddress: '0x0000000000000000000000000000000000000001', nonce: '1', signature: '0xinvite1', inviteCode: 'inv1' },
-        { chainId: '11155420', sbtAddress: '0x0000000000000000000000000000000000000001', nonce: '2', signature: '0xinvite2', inviteCode: 'inv2' },
+        {
+          chainId: '11155420',
+          sbtAddress: '0x0000000000000000000000000000000000000001',
+          nonce: '1',
+          signature: '0xinvite1',
+          inviteCode: 'inv1',
+        },
+        {
+          chainId: '11155420',
+          sbtAddress: '0x0000000000000000000000000000000000000001',
+          nonce: '2',
+          signature: '0xinvite2',
+          inviteCode: 'inv2',
+        },
       ],
     });
 
@@ -78,7 +102,7 @@ describe('SbtGroupMintAuthorizationPort', () => {
       password: 'group password',
       sbtAddress,
       chainId: 11155420,
-    nonces: ['1', 2],
+      nonces: ['1', 2],
       walletScopeSbtAddress: sbtAddress,
     });
   });

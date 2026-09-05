@@ -539,7 +539,12 @@ const ComparisonReport = ({
 
           <div className={styles.sectionCollapse}>
             <h5 className={styles.sectionTitle}>
-              <button type="button" className={styles.sectionHeaderRow} onClick={() => setBeeswarmOpen((value) => !value)} aria-expanded={beeswarmOpen}>
+              <button
+                type="button"
+                className={styles.sectionHeaderRow}
+                onClick={() => setBeeswarmOpen((value) => !value)}
+                aria-expanded={beeswarmOpen}
+              >
                 <FontAwesomeIcon icon={beeswarmOpen ? faCaretUp : faCaretDown} />
                 Similarity & Difference Spectrum
               </button>
@@ -582,7 +587,12 @@ const ComparisonReport = ({
 
           <div className={styles.sectionCollapse}>
             <h5 className={styles.sectionTitle}>
-              <button type="button" className={styles.sectionHeaderRow} onClick={() => setConsensusOpen((value) => !value)} aria-expanded={consensusOpen}>
+              <button
+                type="button"
+                className={styles.sectionHeaderRow}
+                onClick={() => setConsensusOpen((value) => !value)}
+                aria-expanded={consensusOpen}
+              >
                 <FontAwesomeIcon icon={consensusOpen ? faCaretUp : faCaretDown} />
                 Top Similar Items
               </button>
@@ -594,7 +604,12 @@ const ComparisonReport = ({
 
           <div className={styles.sectionCollapse}>
             <h5 className={styles.sectionTitle}>
-              <button type="button" className={styles.sectionHeaderRow} onClick={() => setDivergenceOpen((value) => !value)} aria-expanded={divergenceOpen}>
+              <button
+                type="button"
+                className={styles.sectionHeaderRow}
+                onClick={() => setDivergenceOpen((value) => !value)}
+                aria-expanded={divergenceOpen}
+              >
                 <FontAwesomeIcon icon={divergenceOpen ? faCaretUp : faCaretDown} />
                 Top Divergent Items
               </button>

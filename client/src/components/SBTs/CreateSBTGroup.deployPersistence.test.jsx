@@ -177,7 +177,9 @@ describe('CreateSBTGroup deploy and persistence flows', () => {
     expect(instance.generateSBTInviteLinks).toHaveBeenCalledWith(sbtAddress, instance.state.passwordList);
     expect(instance.state.passwordList).toHaveLength(1);
     expect(cryptoUtils.decodeInvite(instance.state.passwordList[0])).toMatchObject({
-      chainId: '84532', sbtAddress, nonce: '1',
+      chainId: '84532',
+      sbtAddress,
+      nonce: '1',
     });
     expect(JSON.stringify(instance.state.passwordList)).not.toContain('shared-secret');
     expect(localStorage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY)).toBeNull();

@@ -33,9 +33,13 @@ describe('contractScripts.userCanBurnSBTs', () => {
       collectionBurnAuth: jest.fn().mockResolvedValue(0),
     }));
     userHasSbtSpy = jest.spyOn(contractScripts, 'userHasSBT').mockResolvedValue(false);
-    await expect(contractScripts.userCanBurnSBTs('none', sbtAddress, ethers.constants.AddressZero, {
-      slug: 'edge', networkChainId: 84532, contracts: {},
-    })).resolves.toBe(false);
+    await expect(
+      contractScripts.userCanBurnSBTs('none', sbtAddress, ethers.constants.AddressZero, {
+        slug: 'edge',
+        networkChainId: 84532,
+        contracts: {},
+      }),
+    ).resolves.toBe(false);
   });
 
   it.each([

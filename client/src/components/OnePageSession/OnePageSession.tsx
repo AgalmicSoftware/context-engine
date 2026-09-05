@@ -761,12 +761,15 @@ class OnePageSession extends Component<any, any> {
   }
 
   getAutoMintChainId(): number {
-    return Number(
-      this.props.sessionConfig?.networkChainId ||
-      this.props.networkChainId ||
-      this.props.network?.id ||
-      this.props.network?.chainId || 0,
-    ) || 0;
+    return (
+      Number(
+        this.props.sessionConfig?.networkChainId ||
+          this.props.networkChainId ||
+          this.props.network?.id ||
+          this.props.network?.chainId ||
+          0,
+      ) || 0
+    );
   }
 
   getAutoMintAttemptStorageKey(sbtAddress: any, account: any = this.props.account) {
@@ -1663,13 +1666,19 @@ class OnePageSession extends Component<any, any> {
           this.onSbtMintSuccess(sbtAddr);
         } else if (path === 'invite') {
           const payload = invitePayload;
-          if (!payload || String(payload.chainId) !== String(mintChainId)
-            || String(payload.sbtAddress).toLowerCase() !== sbtKey) {
+          if (
+            !payload ||
+            String(payload.chainId) !== String(mintChainId) ||
+            String(payload.sbtAddress).toLowerCase() !== sbtKey
+          ) {
             throw new Error('Invite code does not match this collection and chain');
           }
           if (!queuedAccountIsCurrent()) throw new Error('Wallet changed during auto-join');
           await sbtMintExecutionPort.claimWithInvite(
-            autoMintProvider, sbtAddr, String(payload.nonce), String(payload.signature),
+            autoMintProvider,
+            sbtAddr,
+            String(payload.nonce),
+            String(payload.signature),
           );
           this.consumeAutoMintAttempt(sbtAddr, userAddr);
           updateStatus(sbtKey, { status: 'success', name: `Joined: ${sbtName || 'Group'}` });
@@ -1736,8 +1745,11 @@ class OnePageSession extends Component<any, any> {
     const mintChainId = this.getAutoMintChainId();
     const normalizedExpectedAccount = normalizeAutoMintAccount(expectedAccount);
     const assertExpectedAccountCurrent = () => {
-      if (!normalizedExpectedAccount || normalizeAutoMintAccount(this.props.account) !== normalizedExpectedAccount
-        || this.getAutoMintChainId() !== mintChainId) {
+      if (
+        !normalizedExpectedAccount ||
+        normalizeAutoMintAccount(this.props.account) !== normalizedExpectedAccount ||
+        this.getAutoMintChainId() !== mintChainId
+      ) {
         throw new Error('Wallet changed during auto-join');
       }
     };
