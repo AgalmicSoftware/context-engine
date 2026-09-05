@@ -739,9 +739,10 @@ verify_public_test_wiring() {
   (
     cd "$TEMP_CLONE"
     if [ -d "$node_path" ]; then
-      NODE_PATH="$node_path${NODE_PATH:+:$NODE_PATH}" npm run test:wiring
+      CLIENT_LARGE_FILE_BASE_REF="$TARGET_BASE_SHA" \
+        NODE_PATH="$node_path${NODE_PATH:+:$NODE_PATH}" npm run test:wiring
     else
-      npm run test:wiring
+      CLIENT_LARGE_FILE_BASE_REF="$TARGET_BASE_SHA" npm run test:wiring
     fi
   )
 }
