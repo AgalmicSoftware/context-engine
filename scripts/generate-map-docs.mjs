@@ -36,6 +36,24 @@ const MAPS = Object.freeze([
   },
 ]);
 
+const mapDocPaths = MAPS.flatMap(({ output, intro }) => [output, intro]);
+const presentMapDocPaths = mapDocPaths.filter((relativePath) => fs.existsSync(path.join(ROOT, relativePath)));
+
+// Public release copies intentionally strip both the generated runtime maps and
+// their private intro sources. Keep the shared wiring command useful there,
+// while still treating a partially stripped or accidentally deleted map set as
+// an error in development checkouts.
+if (CHECK_ONLY && presentMapDocPaths.length === 0) {
+  console.log('Runtime map check skipped: map documentation is not included in this release surface.');
+  process.exit(0);
+}
+
+if (presentMapDocPaths.length !== mapDocPaths.length) {
+  const missing = mapDocPaths.filter((relativePath) => !fs.existsSync(path.join(ROOT, relativePath)));
+  console.error(`Runtime map documentation is incomplete; missing: ${missing.join(', ')}`);
+  process.exit(1);
+}
+
 const toPosixPath = (value) => value.split(path.sep).join('/');
 
 const listSourceFiles = (relativeRoot) => {
