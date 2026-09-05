@@ -96,13 +96,20 @@ describe('SurveyTool styles', () => {
     );
   });
 
-  it('switches pile questions with a short opacity-only transition', () => {
+  it('switches pile questions with restrained motion that stays within the card', () => {
     const scss = normalizeScssContract(readSurveyToolScss());
     const pileCardBlock = scss.match(/\.pileCard\s*{[^}]*}/)?.[0] || '';
+    const pileCardInnerBlock = scss.match(/\.pileCardInner\s*{[^}]*}/)?.[0] || '';
+    const previousCardBlock = scss.match(/\.pileCardPrev\s*{[^}]*}/)?.[0] || '';
 
-    expect(pileCardBlock).toContain('transition: opacity 160ms ease-out;');
+    expect(pileCardBlock).toContain(
+      'transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1), opacity 140ms ease-out;',
+    );
     expect(pileCardBlock).not.toContain('will-change:');
-    expect(pileCardBlock).not.toMatch(/transition:\s*transform/);
+    expect(pileCardInnerBlock).not.toContain('var(--ce-status-info)');
+    expect(pileCardInnerBlock).not.toMatch(/transition:\s*transform/);
+    expect(previousCardBlock).toContain('transform: translateY(-4px) scale(0.98);');
+    expect(previousCardBlock).not.toMatch(/scale\((?:1\.[0-9]+|[2-9])/);
     expect(scss).toMatch(
       /@media \(prefers-reduced-motion: reduce\)\s*{[\s\S]*?\.pileCard,[\s\S]*?transition-duration: 0\.01ms !important;/,
     );

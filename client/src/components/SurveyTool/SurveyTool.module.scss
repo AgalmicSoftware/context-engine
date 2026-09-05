@@ -3927,9 +3927,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   border-radius: var(--ce-radius-20);
   background: var(--ce-color-surface);
   box-shadow:
-    7px 7px 14px var(--ce-overlay-surface),
-    -7px -7px 14px var(--ce-status-info);
-  transition: transform 0.3s ease;
+    0 8px 18px color-mix(in srgb, var(--ce-overlay-base) 24%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--ce-card-border) 65%, transparent);
   overflow: visible;
 }
 
@@ -5440,7 +5439,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   left: 0;
   width: 100%;
   height: 100%;
-  transition: opacity 160ms ease-out;
+  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1), opacity 140ms ease-out;
 }
 
 .pileCardActive {
@@ -5452,21 +5451,21 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 .pileCardNext {
   z-index: 4;
-  transform: scale(0.95) translateY(15px);
+  transform: translateY(4px) scale(0.98);
   opacity: 0.6;
   pointer-events: none;
 }
 
 .pileCardPrev {
   z-index: 4;
-  transform: scale(1.1) translateY(-20px);
+  transform: translateY(-4px) scale(0.98);
   opacity: 0;
   pointer-events: none;
 }
 
 .pileCardAfter {
   z-index: 3;
-  transform: scale(0.9) translateY(30px);
+  transform: translateY(8px) scale(0.96);
   opacity: 0.3;
   pointer-events: none;
 }
