@@ -810,6 +810,7 @@ const toBroadcastTxResponse = ({ txHash, receipt } = {} as AnyRecord): TxLike =>
 
 const sendRegistryContractWriteViaProvider = async (
   {
+    expectedChainId,
     signingProvider,
     ethersProvider,
     signer,
@@ -821,6 +822,7 @@ const sendRegistryContractWriteViaProvider = async (
     rpcFunction = method,
     revertMessage = `${method} transaction reverted on-chain.`,
   } = {} as {
+    expectedChainId?: number;
     signingProvider?: AnyRecord;
     ethersProvider?: ethers.providers.Web3Provider;
     signer?: AnyRecord;
@@ -834,11 +836,13 @@ const sendRegistryContractWriteViaProvider = async (
   },
 ): Promise<TxLike> => {
   const { txHash, receipt } = await sendContractWriteViaProvider({
+    expectedChainId,
     signingProvider,
     ethersProvider,
     signer,
     contract,
     method,
+    expectedEvent: method === 'createSession' ? 'SessionCreated' : method === 'updateSessionMetadata' ? 'SessionMetadataUpdated' : undefined,
     args,
     txOverrides,
     onBroadcastTxHash,
@@ -2024,6 +2028,7 @@ export const registerSessionOnChain = async (
     estimate: null,
     send: (overrides: TxFeeOverrides) =>
       sendRegistryContractWriteViaProvider({
+        expectedChainId: writeChainId,
         signingProvider,
         ethersProvider,
         signer,
@@ -2061,6 +2066,7 @@ export const registerSessionOnChain = async (
         estimate: null,
         send: (overrides: TxFeeOverrides) =>
           sendRegistryContractWriteViaProvider({
+            expectedChainId: writeChainId,
             signingProvider,
             ethersProvider,
             signer,
@@ -2089,6 +2095,7 @@ export const registerSessionOnChain = async (
           estimate: null,
           send: (overrides: TxFeeOverrides) =>
             sendRegistryContractWriteViaProvider({
+              expectedChainId: writeChainId,
               signingProvider,
               ethersProvider,
               signer,
@@ -2121,6 +2128,7 @@ export const registerSessionOnChain = async (
         estimate: null,
         send: (overrides: TxFeeOverrides) =>
           sendRegistryContractWriteViaProvider({
+            expectedChainId: writeChainId,
             signingProvider,
             ethersProvider,
             signer,
@@ -2153,6 +2161,7 @@ export const registerSessionOnChain = async (
           estimate: null,
           send: (overrides: TxFeeOverrides) =>
             sendRegistryContractWriteViaProvider({
+              expectedChainId: writeChainId,
               signingProvider,
               ethersProvider,
               signer,
@@ -2224,6 +2233,7 @@ export const setSessionFieldsOnChain = async (
       estimate: null,
       send: (overrides: TxFeeOverrides) =>
         sendRegistryContractWriteViaProvider({
+          expectedChainId: writeChainId,
           signingProvider,
           ethersProvider,
           signer,
@@ -2256,6 +2266,7 @@ export const setSessionFieldsOnChain = async (
       estimate: null,
       send: (overrides: TxFeeOverrides) =>
         sendRegistryContractWriteViaProvider({
+          expectedChainId: writeChainId,
           signingProvider,
           ethersProvider,
           signer,
@@ -2318,6 +2329,7 @@ export const updateSessionMetadataOnChain = async (
     estimate: null,
     send: (overrides: TxFeeOverrides) =>
       sendRegistryContractWriteViaProvider({
+        expectedChainId: writeChainId,
         signingProvider,
         ethersProvider,
         signer,
@@ -2394,6 +2406,7 @@ export const setResourceGatesOnChain = async (
       estimate: null,
       send: (overrides: TxFeeOverrides) =>
         sendRegistryContractWriteViaProvider({
+          expectedChainId: writeChainId,
           signingProvider,
           ethersProvider,
           signer,
@@ -2424,6 +2437,7 @@ export const setResourceGatesOnChain = async (
         estimate: null,
         send: (overrides: TxFeeOverrides) =>
           sendRegistryContractWriteViaProvider({
+            expectedChainId: writeChainId,
             signingProvider,
             ethersProvider,
             signer,

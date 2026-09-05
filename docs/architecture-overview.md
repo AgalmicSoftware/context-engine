@@ -272,3 +272,7 @@ published source package.
 The entry failure screen automatically performs one cache-busted reload only for recognized stale JavaScript chunk errors. Its cache cleanup removes Cache API entries while preserving local/session storage, including drafts, settings, and reload-loop sentinels. Generic startup failures offer a plain manual reload and leave browser storage and caches untouched. Successful entry/route commits clear only their own recovery markers.
 
 User profiles match only `/u/<valid-address>` or the legacy `/<valid-address>` route, with an optional trailing slash. The shared path helper validates the address for both routing and rendering; unrelated paths, query values, fragments, and extra path segments cannot select a profile. Query parameters such as `tab` keep their existing meaning.
+
+## Browser contract writes
+
+Raw contract writes retain wallet/passkey approval and EVM execution as their authority. The shared writer verifies deployed code and the expected chain, includes that chain in the wallet transaction, and requires a successful receipt for the destination contract. Session-aware callers supply their configured chain; address-only SBT calls pin the connected chain for the operation. Creation, mint/burn, survey/response, and registry creation/metadata operations also require their expected event from the target contract. Calldata, signatures, storage keys, and registry payloads remain unchanged.

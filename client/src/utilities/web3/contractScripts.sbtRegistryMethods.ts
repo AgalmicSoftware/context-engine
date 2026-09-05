@@ -319,6 +319,8 @@ export const createContractScriptsSbtRegistryMethods = (deps: ContractScriptsRun
           ethersProvider,
           signer,
           contract: SBTFactory,
+          expectedChainId: gAddrs.sbtFactory?.chainId || cfg?.networkChainId,
+          expectedEvent: 'SBTCreated',
           method: createMethod,
           args: createArgs,
           txOverrides,

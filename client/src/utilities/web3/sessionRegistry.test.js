@@ -84,7 +84,11 @@ const installWeb3ProviderMock = ({
   receipt = { status: 1, transactionHash: '0xtxhash' },
   network = { chainId: CONFIGURED_REGISTRY_CHAIN_ID },
 } = {}) => {
+  receipt.to ||= getSessionRegistryAddress(network.chainId);
+  receipt.logs ||= ['SessionCreated', 'SessionMetadataUpdated'].map(event => ({ address: receipt.to, event }));
   const providerMock = {
+    getCode: jest.fn().mockResolvedValue('0x6000'),
+    send: jest.fn().mockResolvedValue(ethers.utils.hexValue(network.chainId)),
     getSigner: () => signer,
     waitForTransaction: jest.fn().mockResolvedValue(receipt),
     getNetwork: jest.fn().mockResolvedValue(network),
@@ -104,6 +108,7 @@ const makeRegistryWriteContractMock = ({
     address: getSessionRegistryAddress(chainId) || '0x1111111111111111111111111111111111111111',
     interface: {
       encodeFunctionData: jest.fn(() => txData),
+      parseLog: jest.fn(entry => ({ name: entry.event })),
     },
     estimateGas: {},
   };
@@ -1156,7 +1161,7 @@ describe('registerSessionOnChain creation fee overrides', () => {
       { action: 'createSession', hash: txHash },
     ]);
 
-    resolveReceipt({ status: 1, transactionHash: txHash });
+    resolveReceipt({ status: 1, to: getSessionRegistryAddress(CONFIGURED_REGISTRY_CHAIN_ID), transactionHash: txHash, logs: [{ address: getSessionRegistryAddress(CONFIGURED_REGISTRY_CHAIN_ID), event: 'SessionCreated' }] });
 
     await expect(pendingResult).resolves.toEqual({
       txs: [{ action: 'createSession', hash: txHash }],
