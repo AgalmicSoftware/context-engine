@@ -1935,9 +1935,9 @@ const SuggestNodeModal = ({ isOpen, onClose, parentNode, parentPath = [], onSubm
       <div className={`${styles.modalContent} ${styles.suggestModalContainer}`}>
         <div className={styles.modalHeader}>
           <h2 className={styles.modalTitle}>Suggest New Topic</h2>
-          <div className={styles.closeIcon} onClick={onClose}>
+          <button type="button" className={styles.closeIcon} onClick={onClose} aria-label="Close suggestion dialog">
             <FontAwesomeIcon icon={faTimes} />
-          </div>
+          </button>
         </div>
 
         <div className={styles.lineageDisplay}>

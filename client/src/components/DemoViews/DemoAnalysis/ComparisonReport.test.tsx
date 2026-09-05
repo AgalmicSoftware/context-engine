@@ -1,5 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import ComparisonReport from './ComparisonReport';
 
 const comparisonGroups = [
@@ -94,5 +95,23 @@ describe('ComparisonReport', () => {
     expect(screen.getByTestId('demo-analysis-report-summary')).toHaveTextContent('Era: Industrial');
     expect(screen.queryByTestId('demo-analysis-comparison-report-body')).not.toBeInTheDocument();
     expect(screen.queryByText('Similarity & Difference Spectrum')).not.toBeInTheDocument();
+  });
+
+  it('exposes each report section as a keyboard-operable disclosure button inside its heading', async () => {
+    const user = userEvent.setup();
+    render(
+      <ComparisonReport flatResponses={flatResponses} questions={questions} comparisonGroups={comparisonGroups} />,
+    );
+
+    for (const name of ['Similarity & Difference Spectrum', 'Top Similar Items', 'Top Divergent Items']) {
+      const toggle = screen.getByRole('button', { name });
+      expect(screen.getByRole('heading', { name, level: 5 })).toContainElement(toggle);
+      expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      toggle.focus();
+      await user.keyboard(' ');
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      await user.keyboard('{Enter}');
+      expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    }
   });
 });

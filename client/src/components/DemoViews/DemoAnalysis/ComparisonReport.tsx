@@ -538,12 +538,12 @@ const ComparisonReport = ({
           <TagLegend selectedTags={selectedTagsForLegend} colorScale={tagColorScale} />
 
           <div className={styles.sectionCollapse}>
-            <div className={styles.sectionHeaderRow} onClick={() => setBeeswarmOpen((value) => !value)}>
-              <h5 className={styles.sectionTitle}>
+            <h5 className={styles.sectionTitle}>
+              <button type="button" className={styles.sectionHeaderRow} onClick={() => setBeeswarmOpen((value) => !value)} aria-expanded={beeswarmOpen}>
                 <FontAwesomeIcon icon={beeswarmOpen ? faCaretUp : faCaretDown} />
                 Similarity & Difference Spectrum
-              </h5>
-            </div>
+              </button>
+            </h5>
             <Collapse isOpen={beeswarmOpen}>
               {tagInfo.displayTags.length > 0 && (
                 <div className={styles.reportTagFilter}>
@@ -581,24 +581,24 @@ const ComparisonReport = ({
           </div>
 
           <div className={styles.sectionCollapse}>
-            <div className={styles.sectionHeaderRow} onClick={() => setConsensusOpen((value) => !value)}>
-              <h5 className={styles.sectionTitle}>
+            <h5 className={styles.sectionTitle}>
+              <button type="button" className={styles.sectionHeaderRow} onClick={() => setConsensusOpen((value) => !value)} aria-expanded={consensusOpen}>
                 <FontAwesomeIcon icon={consensusOpen ? faCaretUp : faCaretDown} />
                 Top Similar Items
-              </h5>
-            </div>
+              </button>
+            </h5>
             <Collapse isOpen={consensusOpen}>
               {renderAnalysisList(analysisResults.topConsensus.slice(0, 5), 'Consensus')}
             </Collapse>
           </div>
 
           <div className={styles.sectionCollapse}>
-            <div className={styles.sectionHeaderRow} onClick={() => setDivergenceOpen((value) => !value)}>
-              <h5 className={styles.sectionTitle}>
+            <h5 className={styles.sectionTitle}>
+              <button type="button" className={styles.sectionHeaderRow} onClick={() => setDivergenceOpen((value) => !value)} aria-expanded={divergenceOpen}>
                 <FontAwesomeIcon icon={divergenceOpen ? faCaretUp : faCaretDown} />
                 Top Divergent Items
-              </h5>
-            </div>
+              </button>
+            </h5>
             <Collapse isOpen={divergenceOpen}>
               {renderAnalysisList(analysisResults.topDivergence.slice(0, 5), 'Divergence')}
             </Collapse>

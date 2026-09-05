@@ -17,6 +17,17 @@ $card-shadow: var(--ce-card-shadow);
 /* NEW: standardized icon size for copy & bookmark */
 $icon-size-standard: 1.25rem;
 
+.statItem {
+  display: block;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
 .userPage {
   display: flex;
   flex-direction: column;

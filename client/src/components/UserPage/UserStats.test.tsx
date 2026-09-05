@@ -17,7 +17,10 @@ describe('UserStats', () => {
     expect(screen.getByText('Novel idea')).toBeInTheDocument();
     expect(screen.getByText('More details about the most unique idea...')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText(/MostUniqueIdea:/));
+    const toggle = screen.getByRole('button', { name: /MostUniqueIdea:/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(toggle).toHaveAttribute('aria-controls');
+    fireEvent.click(toggle);
 
     expect(toggleCollapse).toHaveBeenCalledWith('mostUniqueIdea');
   });

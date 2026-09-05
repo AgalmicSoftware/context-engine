@@ -2,6 +2,7 @@ import { QuestionFilter as QuestionFilterComponent, shouldEnableQuestionFilterSb
 import {
   QuestionFilterQuestionTypesSection,
   QuestionFilterSbtSection,
+  QuestionFilterSummaryControls,
   QuestionFilterTagsSection,
 } from './QuestionFilterSections';
 import {
@@ -181,6 +182,35 @@ describe('QuestionFilterQuestionTypesSection', () => {
     expect(getNodeText(ratingButton)).toContain('10');
     expect(freeformButton).toBeTruthy();
     expect(getNodeText(freeformButton)).toContain('Write an answer...');
+  });
+});
+
+describe('QuestionFilterSummaryControls', () => {
+  it('renders removable filter chips as native buttons', () => {
+    const onRemove = jest.fn();
+    const summary = QuestionFilterSummaryControls({
+      copiedUrlSuccess: false,
+      filterBookmarkedFeedback: false,
+      filterUrlInput: '',
+      isCurrentFilterBookmarked: false,
+      isDefault: false,
+      onBookmarkCurrentFilter: jest.fn(),
+      onClearFilters: jest.fn(),
+      onCopyFilterUrl: jest.fn(),
+      onFilterUrlInputChange: jest.fn(),
+      onLoadFilter: jest.fn(),
+      showLoadInput: false,
+      summaryItems: [{ label: 'Rating', onRemove, type: 'questionType' }],
+    });
+    const removeButton = findElement(
+      summary,
+      (element) => element?.type === 'button' && element?.props?.['aria-label'] === 'Remove filter: Rating',
+    );
+
+    expect(removeButton).toBeTruthy();
+    expect(removeButton.props.type).toBe('button');
+    removeButton.props.onClick();
+    expect(onRemove).toHaveBeenCalledTimes(1);
   });
 });
 

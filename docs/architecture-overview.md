@@ -4,6 +4,12 @@ Start here when reviewing the repo for runtime boundaries, deployment surfaces,
 and verification gates. This document links the source-of-truth docs instead of
 duplicating their full detail.
 
+Interactive disclosure headers, removable question-filter chips, sync refresh,
+user statistics, and the Debate Map suggestion close control use native buttons.
+Disclosures expose their expanded state and report sections retain their heading
+semantics. The standalone `/debate` route remains a public-surface placeholder;
+the Debate Map component's keyboard interactions are verified independently.
+
 ## Client Boundary Model
 
 The client follows the boundary accepted in

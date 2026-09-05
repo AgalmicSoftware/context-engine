@@ -97,10 +97,15 @@ const SurveyResultsSyncDetailsDisplay = ({
           track={response}
         />
       </div>
-      <div className={styles.syncStatus__refreshAction} onClick={onManualRefresh} title="Refresh Data from Cache/Chain">
+      <button
+        type="button"
+        className={styles.syncStatus__refreshAction}
+        onClick={onManualRefresh}
+        title="Refresh Data from Cache/Chain"
+      >
         <FontAwesomeIcon icon={faSyncAlt} />
         <span>Refresh Now</span>
-      </div>
+      </button>
     </div>
   );
 };

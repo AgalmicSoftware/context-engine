@@ -57,7 +57,9 @@ describe('SurveyResultsSyncDetailsDisplay', () => {
     expect(screen.getByText('In Sync (Current: 20 / Latest: 20)')).toBeInTheDocument();
     expect(onManualRefresh).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByTitle('Refresh Data from Cache/Chain'));
+    const refreshButton = screen.getByRole('button', { name: 'Refresh Now' });
+    expect(refreshButton).toHaveAttribute('title', 'Refresh Data from Cache/Chain');
+    fireEvent.click(refreshButton);
     expect(onManualRefresh).toHaveBeenCalledTimes(1);
   });
 

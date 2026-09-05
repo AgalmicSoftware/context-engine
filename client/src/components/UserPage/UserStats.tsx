@@ -10,6 +10,7 @@ type UserStatsProps = {
 };
 
 const UserStats = ({ userStats, collapseOpen, toggleCollapse }: UserStatsProps) => {
+  const detailIdPrefix = React.useId();
   const renderStatItemCollapse = (statType: string) => {
     switch (statType) {
       case 'mostUniqueIdea':
@@ -23,13 +24,27 @@ const UserStats = ({ userStats, collapseOpen, toggleCollapse }: UserStatsProps) 
 
   return (
     <div className={styles.stats}>
-      {Object.entries(userStats).map(([key, value]) => (
-        <div key={key} className={styles.statItem} onClick={() => toggleCollapse(key)}>
-          {`${key.charAt(0).toUpperCase() + key.slice(1)}: `}
-          <span>{value}</span>
-          <Collapse isOpen={collapseOpen === key}>{renderStatItemCollapse(key)}</Collapse>
-        </div>
-      ))}
+      {Object.entries(userStats).map(([key, value], index) => {
+        const detailId = `${detailIdPrefix}-${index}`;
+        const isOpen = collapseOpen === key;
+        return (
+          <div key={key}>
+            <button
+              type="button"
+              className={styles.statItem}
+              onClick={() => toggleCollapse(key)}
+              aria-expanded={isOpen}
+              aria-controls={detailId}
+            >
+              {`${key.charAt(0).toUpperCase() + key.slice(1)}: `}
+              <span>{value}</span>
+            </button>
+            <Collapse id={detailId} isOpen={isOpen}>
+              {renderStatItemCollapse(key)}
+            </Collapse>
+          </div>
+        );
+      })}
     </div>
   );
 };

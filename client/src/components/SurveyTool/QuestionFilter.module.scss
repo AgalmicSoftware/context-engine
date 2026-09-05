@@ -137,6 +137,9 @@ $text-color: var(--ce-border);
 }
 
 .filterBubble {
+  border: 0;
+  font-family: inherit;
+  line-height: inherit;
   display: inline-flex;
   align-items: center;
   background: $pastel-highlight;

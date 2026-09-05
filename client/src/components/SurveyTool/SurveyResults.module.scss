@@ -2082,6 +2082,12 @@ grey background, white text, bigger icons, etc.
 }
 
 .syncStatus__refreshAction {
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  font-family: inherit;
+  line-height: inherit;
   margin-top: 1rem;
   padding-top: 0.75rem;
   border-top: 1px solid var(--ce-border-light);
