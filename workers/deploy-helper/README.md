@@ -105,10 +105,21 @@ Wrangler is the preferred deploy path. The checked-in `worker.js` imports `../sh
     response-loss retries, and rejects reuse of the ID with a conflicting
     immutable identity. Coordinator and journal state contain no raw tokens,
     secrets, or bundle bytes
-  - release-manifest provenance is resolved before request coordination, so
-    the expected digest is part of the stable request identity. The manifest
-    and downloaded bytes are rechecked before account lookup or resource
-    mutation; a moved `latest` pointer cannot silently change retry bytes
+  - local validation and Cloudflare token/account authentication precede every
+    remote artifact read. Caller-supplied account fields grant no authority.
+    Manifest provenance is then resolved before coordination, keeping the
+    expected digest in the stable request identity. The manifest and downloaded
+    bytes are rechecked before resource mutation; a moved `latest` pointer cannot
+    silently change retry bytes
+  - manifest and bundle URLs require HTTPS, no URL credentials, and a public
+    hostname. Literal IPs, private/local hostnames, and unsafe redirects are
+    rejected. Each of up to five redirects is checked before fetching. No
+    Cloudflare token is sent with artifact requests. Actual streamed bytes are
+    capped at 1 MiB for manifests and 10 MiB for bundles before parsing/hashing,
+    even with absent or false `Content-Length`
+  - JSON request bodies use the shared streamed byte counter before parsing
+    (25 MiB by default, configured by `CE_MAX_UPLOAD_BYTES`); oversize returns
+    `413` without Cloudflare access
   - if Cloudflare definitively rejects an uploaded bundle after the stable KV
     namespace is staged, the helper retains a separate non-secret recovery
     marker. The same request may retry corrected bundle bytes while every

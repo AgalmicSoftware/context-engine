@@ -1,3 +1,4 @@
+import { fetchArtifactText, MAX_MANIFEST_BYTES } from './artifactFetch.mjs';
 const SHA_PATTERN = /^[a-f0-9]{40}$/;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 const RELEASE_MANIFEST_FILE = 'worker-release-manifest.json';
@@ -67,15 +68,10 @@ export const fetchExpectedWorkerBundleDigest = async ({
     return { ok: false, error: 'Worker release manifest URL must be an explicit HTTPS manifest asset URL.' };
   }
   try {
-    const response = await fetchImpl(normalizedUrl, {
-      method: 'GET',
-      headers: { Accept: 'application/json' },
-      cache: 'no-store',
+    const text = await fetchArtifactText(normalizedUrl, {
+      fetchImpl, maxBytes: MAX_MANIFEST_BYTES, accept: 'application/json',
     });
-    if (!response.ok) {
-      return { ok: false, error: `Failed to fetch Worker release manifest (${response.status}).` };
-    }
-    const manifest = await response.json();
+    const manifest = JSON.parse(text);
     return readWorkerBundleDigestFromManifest(manifest, { artifactFile, artifactKind });
   } catch (error) {
     return { ok: false, error: `Failed to read Worker release manifest: ${toStr(error?.message || error)}` };

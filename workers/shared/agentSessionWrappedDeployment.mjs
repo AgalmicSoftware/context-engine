@@ -1,3 +1,4 @@
+import { fetchArtifactText } from './artifactFetch.mjs';
 import {
   fetchExpectedWorkerBundleDigest,
   normalizeWorkerBundleSha256,
@@ -122,9 +123,7 @@ const readBundle = async ({ body, env, fetchImpl }) => {
   const url = normalizeHttpsUrl(body?.bundleUrl || env?.AGENT_BRIDGE_BUNDLE_URL);
   if (!url) return { ok: false, error: 'Missing a trusted Agent Bridge bundle.' };
   try {
-    const result = await fetchImpl(url, { method: 'GET', cache: 'no-store' });
-    if (!result.ok) return { ok: false, error: `Failed to fetch Agent Bridge bundle (${result.status}).` };
-    const source = await result.text();
+    const source = await fetchArtifactText(url, { fetchImpl });
     return source.trim() ? { ok: true, source } : { ok: false, error: 'Agent Bridge bundle is empty.' };
   } catch (error) {
     return { ok: false, error: `Failed to fetch Agent Bridge bundle: ${toStr(error?.message || error)}` };

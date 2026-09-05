@@ -1,3 +1,5 @@
+import { BodyByteLimitError, readBodyBytes } from '../shared/bodyByteLimit.mjs';
+import { resolveMaxUploadBytes } from '../sessionCorsWorker/uploadSizeLimits.js';
 // deploy-helper worker (trusted) for one-click ContextEngineSessionCorsWorker deploys
 
 import {
@@ -46,6 +48,10 @@ const handleResolvedRequest = async ({ request, env, origin, url, allowListInfo,
 
   if (!originAllowed(origin, allowList)) {
     return json({ error: 'Origin not allowed.' }, 403, headers);
+  }
+
+  if (request.body) {
+    request = new Request(request, { body: await readBodyBytes(request, resolveMaxUploadBytes({ env })) });
   }
 
   if (url.pathname === '/admin/origins') {
@@ -139,7 +145,8 @@ export default {
       headers = corsHeaders(origin, allowList);
       allowListResolved = true;
       return await handleResolvedRequest({ request, env, origin, url, allowListInfo, allowList, headers });
-    } catch {
+    } catch (error) {
+      if (error instanceof BodyByteLimitError) return json({ error: error.message }, 413, headers);
       return allowListResolved
         ? json({ error: 'Deploy helper request failed.' }, 500, headers)
         : json({ error: 'Deploy helper configuration unavailable.' }, 503, headers);
