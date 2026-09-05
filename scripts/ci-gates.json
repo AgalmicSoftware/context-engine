@@ -205,6 +205,14 @@
             "run",
             "abi:check"
           ]
+        },
+        {
+          "label": "Exercise client SBT signatures on local contracts",
+          "command": "npm",
+          "args": [
+            "run",
+            "test:sbt:authorization-smoke"
+          ]
         }
       ]
     },

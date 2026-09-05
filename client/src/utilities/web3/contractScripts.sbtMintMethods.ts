@@ -4,23 +4,29 @@ type SbtReadProviderRef = string | Record<string, unknown>;
 type SbtReadGroupKeyOrConfig = string | Record<string, unknown> | null | undefined;
 type SbtReadOptions = { allowInjectedReadFallback?: boolean; [key: string]: unknown };
 type SignGroupMintAuthorizationInput = {
+  chainId: string | number;
   password?: unknown;
   sbtAddress?: string | null;
   userAddress?: string | null;
   walletScopeSbtAddress?: string | null;
 };
 type GenerateInvitePayloadsInput = {
+  chainId: string | number;
   password?: unknown;
   sbtAddress?: string | null;
   nonces?: Array<string | number>;
   walletScopeSbtAddress?: string | null;
 };
 type InvitePayloadResult = {
+  chainId: string;
+  sbtAddress: string;
   nonce: string;
   signature: string;
   inviteCode: string;
 };
 type EncodedInvitePayload = {
+  c: string;
+  a: string;
   n: string;
   s: string;
 };
@@ -227,6 +233,7 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
       password,
       sbtAddress,
       userAddress,
+      chainId,
       walletScopeSbtAddress,
     }: SignGroupMintAuthorizationInput) {
       const resolvedWalletScopeSbtAddress = await resolveGroupPasswordWalletScopeSbtAddress({
@@ -243,11 +250,12 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
         password,
         sbtAddress,
         userAddress,
+        chainId,
         walletScopeSbtAddress: resolvedWalletScopeSbtAddress,
       });
     },
 
-    async generateInvitePayloads({ password, sbtAddress, nonces, walletScopeSbtAddress }: any) {
+    async generateInvitePayloads({ password, sbtAddress, nonces, chainId, walletScopeSbtAddress }: GenerateInvitePayloadsInput) {
       if (!Array.isArray(nonces) || nonces.length === 0) {
         throw new Error('generateInvitePayloads requires a non-empty nonces array.');
       }
@@ -271,11 +279,16 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
           password: normalizedPassword,
           sbtAddress,
           nonce,
+          chainId,
           walletScopeSbtAddress: resolvedWalletScopeSbtAddress,
         });
-        const payload: EncodedInvitePayload = { n: String(nonce), s: signature };
+        const payload: EncodedInvitePayload = {
+          c: String(chainId), a: String(sbtAddress), n: String(nonce), s: signature,
+        };
         const inviteCode = cryptoUtils.encodeInvite(payload);
-        out.push({ nonce: String(nonce), signature, inviteCode });
+        out.push({
+          chainId: String(chainId), sbtAddress: String(sbtAddress), nonce: String(nonce), signature, inviteCode,
+        });
       }
       return out;
     },
@@ -403,8 +416,8 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
       }
     },
 
-    computeGroupMintMessageHash: function (sbtAddress: any, userAddress: any) {
-      return cryptoUtils.computeGroupMintMessageHash(sbtAddress, userAddress);
+    computeGroupMintMessageHash: function (sbtAddress: string, userAddress: string, chainId: string | number) {
+      return cryptoUtils.computeGroupMintMessageHash(sbtAddress, userAddress, chainId);
     },
 
     mintWithGroupSignature: async function (providerName: any, SBTAddress: any, signature: any) {

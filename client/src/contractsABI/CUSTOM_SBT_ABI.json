@@ -755,6 +755,25 @@
     "stateMutability": "nonpayable"
   },
   {
+    "type": "function",
+    "name": "usedInviteSlots",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
     "type": "event",
     "name": "AdminChanged",
     "inputs": [
@@ -1080,15 +1099,10 @@
   },
   {
     "type": "error",
-    "name": "InvalidNonce",
+    "name": "InvalidInviteSlot",
     "inputs": [
       {
-        "name": "expected",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "got",
+        "name": "slot",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -1103,6 +1117,17 @@
     "type": "error",
     "name": "InvalidTokenId",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InviteSlotUsed",
+    "inputs": [
+      {
+        "name": "slot",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
   },
   {
     "type": "error",

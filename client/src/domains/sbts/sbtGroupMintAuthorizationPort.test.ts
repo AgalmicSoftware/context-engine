@@ -16,12 +16,14 @@ const buildGroupMintArtifacts = async (
   const signature = await port.signGroupMintAuthorization({
     password,
     sbtAddress,
+    chainId: 11155420,
     userAddress,
     walletScopeSbtAddress,
   });
   const invites = await port.generateInvitePayloads({
     password,
     sbtAddress,
+    chainId: 11155420,
     nonces: ['1', 2],
     walletScopeSbtAddress,
   });
@@ -43,8 +45,8 @@ describe('SbtGroupMintAuthorizationPort', () => {
       computeGroupPasswordHash: jest.fn(() => '0xhash'),
       signGroupMintAuthorization: jest.fn(async () => '0xsignature'),
       generateInvitePayloads: jest.fn(async () => [
-        { nonce: '1', signature: '0xinvite1', inviteCode: 'inv1' },
-        { nonce: '2', signature: '0xinvite2', inviteCode: 'inv2' },
+        { chainId: '11155420', sbtAddress: '0x0000000000000000000000000000000000000001', nonce: '1', signature: '0xinvite1', inviteCode: 'inv1' },
+        { chainId: '11155420', sbtAddress: '0x0000000000000000000000000000000000000001', nonce: '2', signature: '0xinvite2', inviteCode: 'inv2' },
       ]),
     };
     const sbtAddress = '0x0000000000000000000000000000000000000001';
@@ -56,8 +58,8 @@ describe('SbtGroupMintAuthorizationPort', () => {
       groupPasswordHash: '0xhash',
       signature: '0xsignature',
       invites: [
-        { nonce: '1', signature: '0xinvite1', inviteCode: 'inv1' },
-        { nonce: '2', signature: '0xinvite2', inviteCode: 'inv2' },
+        { chainId: '11155420', sbtAddress: '0x0000000000000000000000000000000000000001', nonce: '1', signature: '0xinvite1', inviteCode: 'inv1' },
+        { chainId: '11155420', sbtAddress: '0x0000000000000000000000000000000000000001', nonce: '2', signature: '0xinvite2', inviteCode: 'inv2' },
       ],
     });
 
@@ -69,12 +71,14 @@ describe('SbtGroupMintAuthorizationPort', () => {
       password: 'group password',
       sbtAddress,
       userAddress,
+      chainId: 11155420,
       walletScopeSbtAddress: sbtAddress,
     });
     expect(fakePort.generateInvitePayloads).toHaveBeenCalledWith({
       password: 'group password',
       sbtAddress,
-      nonces: ['1', 2],
+      chainId: 11155420,
+    nonces: ['1', 2],
       walletScopeSbtAddress: sbtAddress,
     });
   });
@@ -98,12 +102,14 @@ describe('SbtGroupMintAuthorizationPort', () => {
 
     const signInput = {
       password: 'second password',
+      chainId: 11155420,
       sbtAddress: '0x0000000000000000000000000000000000000002',
       userAddress: '0x0000000000000000000000000000000000000003',
       walletScopeSbtAddress: '0x0000000000000000000000000000000000000002',
     };
     const inviteInput = {
       password: 'second password',
+      chainId: 11155420,
       sbtAddress: '0x0000000000000000000000000000000000000002',
       nonces: ['2'],
       walletScopeSbtAddress: '0x0000000000000000000000000000000000000002',

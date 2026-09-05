@@ -380,8 +380,8 @@ describe('createSbtGroupFormArtifactHelpers', () => {
         sbtSymbol: 'BET',
       }),
     ).toEqual({
-      content: 'index,groupPassword,inviteLink\n0,gp1,fallback',
-      fileName: 'BET_Beta_group-passwords_2026-05-05.csv',
+      content: 'index,inviteCode,inviteLink\n0,gp1,fallback',
+      fileName: 'BET_Beta_invites_2026-05-05.csv',
       mimeType: 'text/csv',
     });
 

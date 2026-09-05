@@ -30,6 +30,13 @@
 
 /* eslint-env es2020 */
 
+import {
+  positiveSbtUint,
+  computeGroupMintMessageHash,
+  signGroupMintAuthorization,
+  buildInviteMessageHash,
+  signInvite,
+} from './sbtAuthorization';
 import { Buffer } from 'buffer';
 import { ethers, utils } from 'ethers';
 import {
@@ -150,11 +157,8 @@ type GroupPasswordInput = {
   sbtAddress?: unknown;
   groupPasswordHash?: unknown;
 };
-type GroupMintAuthorizationInput = GroupPasswordInput & {
-  userAddress?: unknown;
-  walletScopeSbtAddress?: unknown;
-};
 type InviteInput = GroupPasswordInput & {
+  chainId?: unknown;
   nonce?: unknown;
   signature?: unknown;
   walletScopeSbtAddress?: unknown;
@@ -162,7 +166,6 @@ type InviteInput = GroupPasswordInput & {
 type InviteSignatureVerificationResult = {
   ok: boolean;
   signer?: string;
-  usedFallback?: boolean;
   error?: string;
 };
 type LitSaveKeyResult = UnknownRecord & {
@@ -341,16 +344,16 @@ const toUint8Array = (value: unknown): Uint8Array => {
  * @property {(envelopeJson: string | Record<string, unknown>, opts?: CryptoDecryptOptions) => Promise<unknown>} decryptEnvelopeValue
  * @property {(input: { password?: string, sbtAddress?: string }) => string} computeGroupPasswordHash
  * @property {(input: { password?: string, sbtAddress?: string, groupPasswordHash?: string }) => string | null} resolveGroupPasswordWalletScopeAddress
- * @property {(sbtAddress: string, userAddress: string) => string} computeGroupMintMessageHash
- * @property {(input: { password?: string, sbtAddress?: string, userAddress?: string, walletScopeSbtAddress?: string }) => Promise<string>} signGroupMintAuthorization
- * @property {(input: { sbtAddress?: string, nonce?: string | number }) => string} buildInviteMessageHash
- * @property {(input: { password?: string, sbtAddress?: string, nonce?: string | number, walletScopeSbtAddress?: string }) => Promise<string>} signInvite
+ * @property {(sbtAddress: string, userAddress: string, chainId: unknown) => string} computeGroupMintMessageHash
+ * @property {(input: { chainId?: unknown, password?: string, sbtAddress?: string, userAddress?: string, walletScopeSbtAddress?: string }) => Promise<string>} signGroupMintAuthorization
+ * @property {(input: { chainId?: unknown, sbtAddress?: string, nonce?: string | number }) => string} buildInviteMessageHash
+ * @property {(input: { chainId?: unknown, password?: string, sbtAddress?: string, nonce?: string | number, walletScopeSbtAddress?: string }) => Promise<string>} signInvite
  * @property {(payload: Record<string, unknown>) => string} encodeInvite
- * @property {(inviteCode: string) => ({ nonce: string, signature: string } | null)} decodeInvite
+ * @property {(inviteCode: string) => ({ chainId: string, sbtAddress: string, nonce: string, signature: string } | null)} decodeInvite
  * @property {() => string} generateInviteNonce
  * @property {(raw: unknown) => string} normalizeGroupPasswordInput
  * @property {(raw: unknown) => string} encodeGroupPasswordForUrl
- * @property {(input: { sbtAddress?: string, nonce?: string | number, signature?: string, groupPasswordHash?: string }) => InviteSignatureVerificationResult} verifyInviteSignature
+ * @property {(input: { chainId?: unknown, sbtAddress?: string, nonce?: string | number, signature?: string, groupPasswordHash?: string }) => InviteSignatureVerificationResult} verifyInviteSignature
  * @property {CryptoUtilsTestApi} __test
  */
 
@@ -393,53 +396,8 @@ const decodeBase64Field = (value: unknown, fieldName: string): Uint8Array => {
 const {
   buildGroupPasswordSalt,
   computeGroupPasswordHash,
-  deriveGroupPasswordWallet,
   resolveGroupPasswordWalletScopeAddress,
 } = groupPasswordDerivation.createGroupPasswordDerivation(ethers);
-
-const computeGroupMintMessageHash = (sbtAddress: string, userAddress: string) => {
-  if (!ethers.utils.isAddress(sbtAddress) || !ethers.utils.isAddress(userAddress)) {
-    throw new Error('Invalid address passed to computeGroupMintMessageHash');
-  }
-  return ethers.utils.solidityKeccak256(['address', 'address'], [sbtAddress, userAddress]);
-};
-
-const signGroupMintAuthorization = async ({
-  password,
-  sbtAddress,
-  userAddress,
-  walletScopeSbtAddress = sbtAddress,
-}: GroupMintAuthorizationInput) => {
-  const tmpWallet = deriveGroupPasswordWallet({ password, sbtAddress: walletScopeSbtAddress });
-  const messageHash = computeGroupMintMessageHash(String(sbtAddress || ''), String(userAddress || ''));
-  const signature = await tmpWallet.signMessage(ethers.utils.arrayify(messageHash));
-  try {
-    return ethers.utils.joinSignature(ethers.utils.splitSignature(signature));
-  } catch (e) {
-    logCryptoFallback(e);
-    return signature;
-  }
-};
-
-const buildInviteMessageHash = ({ sbtAddress, nonce }: InviteInput) => {
-  const normalizedSbtAddress = String(sbtAddress || '');
-  if (!ethers.utils.isAddress(normalizedSbtAddress)) {
-    throw new Error('Invalid sbtAddress passed to buildInviteMessageHash');
-  }
-  return ethers.utils.solidityKeccak256(['address', 'uint256'], [normalizedSbtAddress, nonce]);
-};
-
-const signInvite = async ({ password, sbtAddress, nonce, walletScopeSbtAddress = sbtAddress }: InviteInput) => {
-  const tmpWallet = deriveGroupPasswordWallet({ password, sbtAddress: walletScopeSbtAddress });
-  const messageHash = buildInviteMessageHash({ sbtAddress, nonce });
-  const signature = await tmpWallet.signMessage(ethers.utils.arrayify(messageHash));
-  try {
-    return ethers.utils.joinSignature(ethers.utils.splitSignature(signature));
-  } catch (e) {
-    logCryptoFallback(e);
-    return signature;
-  }
-};
 
 const encodeInvite = (payload: UnknownRecord) => {
   const json = JSON.stringify(payload || {});
@@ -447,23 +405,17 @@ const encodeInvite = (payload: UnknownRecord) => {
 };
 
 const decodeInvite = (inviteCode: unknown) => {
+  if (typeof inviteCode !== 'string' || inviteCode.length > 4096) return null;
   try {
-    const raw = base64UrlDecode(inviteCode);
-    const text = raw.toString('utf8');
-    const parsed = JSON.parse(text);
-    if (!parsed || typeof parsed !== 'object') return null;
-    const parsedRecord = isRecord(parsed) ? parsed : {};
-    const nonce = parsedRecord.n;
-    const signature = parsedRecord.s;
-    if (nonce === undefined || nonce === null) return null;
-    if (!signature || typeof signature !== 'string') return null;
-    if (parsedRecord.c !== undefined && parsedRecord.c !== null) return null; // legacy chain-bound invites are not supported
-    return {
-      nonce: typeof nonce === 'string' ? nonce : String(nonce),
-      signature,
-    };
-  } catch (e) {
-    logCryptoFallback(e);
+    const parsed: unknown = JSON.parse(base64UrlDecode(inviteCode).toString('utf8'));
+    if (!isRecord(parsed) || Object.keys(parsed).sort().join(',') !== 'a,c,n,s') return null;
+    const chainId = positiveSbtUint(parsed.c);
+    const nonce = positiveSbtUint(parsed.n);
+    const sbtAddress = ethers.utils.getAddress(String(parsed.a || ''));
+    if (sbtAddress === ethers.constants.AddressZero || !ethers.utils.isHexString(parsed.s, 65)) return null;
+    const signature = ethers.utils.joinSignature(ethers.utils.splitSignature(String(parsed.s)));
+    return { chainId, sbtAddress, nonce, signature };
+  } catch {
     return null;
   }
 };
@@ -511,6 +463,7 @@ const verifyInviteSignature = ({
   nonce,
   signature,
   groupPasswordHash,
+  chainId,
 }: InviteInput): InviteSignatureVerificationResult => {
   try {
     if (!ethers.utils.isAddress(String(sbtAddress || ''))) {
@@ -529,11 +482,9 @@ const verifyInviteSignature = ({
       return derived.toLowerCase() === expectedHash;
     };
 
-    const messageHashNoChain = buildInviteMessageHash({ sbtAddress, nonce });
-    const signerNoChain = ethers.utils.verifyMessage(ethers.utils.arrayify(messageHashNoChain), signature);
-    if (matchesHash(signerNoChain)) {
-      return { ok: true, signer: signerNoChain, usedFallback: true };
-    }
+    const messageHash = buildInviteMessageHash({ sbtAddress, nonce, chainId });
+    const signer = ethers.utils.verifyMessage(ethers.utils.arrayify(messageHash), signature);
+    if (matchesHash(signer)) return { ok: true, signer };
 
     return { ok: false, error: 'Invite signature does not match this group.' };
   } catch (err) {

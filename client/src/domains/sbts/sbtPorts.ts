@@ -166,6 +166,7 @@ export type SbtGroupPasswordHashInput = {
 };
 
 export type SbtGroupMintAuthorizationInput = {
+  chainId: string | number;
   password: string;
   sbtAddress: string;
   userAddress: string;
@@ -173,12 +174,15 @@ export type SbtGroupMintAuthorizationInput = {
 };
 
 export type SbtInvitePayload = {
+  chainId: string;
+  sbtAddress: string;
   nonce: string;
   signature: string;
   inviteCode: string;
 };
 
 export type SbtInvitePayloadsInput = {
+  chainId: string | number;
   password: string;
   sbtAddress: string;
   nonces: Array<string | number>;

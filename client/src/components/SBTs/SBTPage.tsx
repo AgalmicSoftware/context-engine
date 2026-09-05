@@ -903,7 +903,7 @@ class SBTPage extends Component<any, any> {
 
     if (!isUrlAutoMintTargetCurrent()) return false;
     if (sbtInfo?.hasPasswordMint) {
-      const minted = await this.claimWithGroupPassword(targetPassword, currentSbtAddress, {
+      const minted = await this.claimWithInviteCode(targetPassword, currentSbtAddress, {
         accountLowerOverride: targetAccountLower,
         chainIdOverride: targetChainId,
         sessionSlugOverride: slug,
@@ -1337,6 +1337,10 @@ class SBTPage extends Component<any, any> {
               .toLowerCase();
       mintChainId =
         options?.chainIdOverride != null ? String(options.chainIdOverride || '').trim() : this.getMintTargetChainId();
+      if (String(payload.chainId || '') !== mintChainId || String(payload.sbtAddress || '').toLowerCase() !== sbt.toLowerCase()) {
+        throw new Error('Invite code does not match this collection and chain.');
+      }
+
 
       if (
         !this.isMintTargetContextCurrent({
@@ -1389,253 +1393,6 @@ class SBTPage extends Component<any, any> {
     }
   };
 
-  claimWithGroupPassword = async (
-    rawPassword: unknown,
-    sbtOverride?: unknown,
-    options: SbtPageGroupPasswordClaimOptions = {},
-  ): Promise<boolean> => {
-    let sbt = '';
-    let slug = '';
-    let mintAccountLower = '';
-    let mintChainId = '';
-    try {
-      if (!this.props.account) {
-        this.props.toggleLoginModal(true);
-        return false;
-      }
-      const password = cryptoUtils.normalizeGroupPasswordInput(rawPassword);
-      if (!password) {
-        if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: 'Group password is required.' }));
-        return false;
-      }
-
-      sbt = String(sbtOverride || resolveSbtAddressString(this.props.SBTAddress) || '');
-
-      if (!sbt) return false;
-
-      slug =
-        options?.sessionSlugOverride != null
-          ? String(options.sessionSlugOverride || '')
-          : this.getEffectiveSessionSlug();
-      mintAccountLower =
-        options?.accountLowerOverride != null
-          ? String(options.accountLowerOverride || '')
-              .trim()
-              .toLowerCase()
-          : String(this.props.account || '')
-              .trim()
-              .toLowerCase();
-      mintChainId =
-        options?.chainIdOverride != null ? String(options.chainIdOverride || '').trim() : this.getMintTargetChainId();
-      let sbtInfo = this.state.sbtInfo;
-      if (!sbtInfo || typeof sbtInfo !== 'object') sbtInfo = {};
-
-      if (
-        !this.isMintTargetContextCurrent({
-          accountLower: mintAccountLower,
-          chainId: mintChainId,
-          sbtAddress: sbt,
-          sessionSlug: slug,
-        })
-      ) {
-        return false;
-      }
-
-      let onchainHash =
-        options?.groupPasswordHashOverride || (sbtOverride ? null : this.state.groupPasswordHash) || null;
-      if (!onchainHash) {
-        try {
-          onchainHash = await sbtMetadataReadsPort.getGroupPasswordHash('none', sbt, slug);
-        } catch (e) {
-          sbtLog.warn('SBTPage: fallback', e);
-        }
-      }
-      if (
-        !this.isMintTargetContextCurrent({
-          accountLower: mintAccountLower,
-          chainId: mintChainId,
-          sbtAddress: sbt,
-          sessionSlug: slug,
-        })
-      ) {
-        return false;
-      }
-      let walletScopeSbtAddress: string | null = sbt;
-      if (onchainHash && onchainHash !== ethers.constants.HashZero) {
-        walletScopeSbtAddress = cryptoUtils.resolveGroupPasswordWalletScopeAddress({
-          password,
-          sbtAddress: sbt,
-          groupPasswordHash: onchainHash,
-        });
-        const localHash =
-          walletScopeSbtAddress === null
-            ? null
-            : sbtGroupMintAuthorizationPort.computeGroupPasswordHash({
-                password,
-                sbtAddress: walletScopeSbtAddress,
-              });
-        if (!localHash || String(localHash).toLowerCase() !== String(onchainHash).toLowerCase()) {
-          if (this._isMounted) {
-            this.setState(buildSbtPageMintFailurePatch({ error: 'Group password mismatch.' }));
-          }
-          return false;
-        }
-      }
-
-      let maxTokens: ethers.BigNumber | null = null;
-      try {
-        const rawMax = sbtInfo?.maxTokens;
-        if (rawMax !== undefined && rawMax !== null && rawMax !== '' && rawMax !== '0') {
-          maxTokens = ethers.BigNumber.from(rawMax);
-        }
-      } catch (_) {
-        maxTokens = null;
-      }
-
-      const maxAttempts = 3;
-
-      for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        if (
-          !this.isMintTargetContextCurrent({
-            accountLower: mintAccountLower,
-            chainId: mintChainId,
-            sbtAddress: sbt,
-            sessionSlug: slug,
-          })
-        ) {
-          return false;
-        }
-        let mintedTokens: unknown = null;
-        try {
-          mintedTokens = await sbtMetadataReadsPort.getMintedTokens('none', sbt, slug);
-        } catch (_) {
-          mintedTokens = null;
-        }
-        if (
-          !this.isMintTargetContextCurrent({
-            accountLower: mintAccountLower,
-            chainId: mintChainId,
-            sbtAddress: sbt,
-            sessionSlug: slug,
-          })
-        ) {
-          return false;
-        }
-
-        if (mintedTokens === null) {
-          if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: 'Unable to load minted count.' }));
-          return false;
-        }
-
-        let mintedBig: ethers.BigNumber | null = null;
-        try {
-          mintedBig = ethers.BigNumber.from(mintedTokens);
-        } catch (_) {
-          mintedBig = null;
-        }
-
-        if (mintedBig === null) {
-          if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: 'Unable to parse minted count.' }));
-          return false;
-        }
-
-        if (maxTokens && mintedBig.gte(maxTokens)) {
-          if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: 'Group limit reached.' }));
-          return false;
-        }
-
-        const nonce = mintedBig.add(1).toString();
-        const invites = await sbtGroupMintAuthorizationPort.generateInvitePayloads({
-          password,
-          sbtAddress: sbt,
-          nonces: [nonce],
-          walletScopeSbtAddress,
-        });
-        if (
-          !this.isMintTargetContextCurrent({
-            accountLower: mintAccountLower,
-            chainId: mintChainId,
-            sbtAddress: sbt,
-            sessionSlug: slug,
-          })
-        ) {
-          return false;
-        }
-        const payload = invites && invites[0];
-        if (!payload) {
-          if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: 'Failed to generate invite.' }));
-          return false;
-        }
-
-        const suppressErrors = attempt < maxAttempts - 1;
-        const result = await this.claimWithInvitePayload(payload, sbt, {
-          accountLowerOverride: mintAccountLower,
-          chainIdOverride: mintChainId,
-          suppressErrors,
-          sessionSlugOverride: slug,
-        });
-        if (result && result.ok) return true;
-
-        if (
-          !this.isMintTargetContextCurrent({
-            accountLower: mintAccountLower,
-            chainId: mintChainId,
-            sbtAddress: sbt,
-            sessionSlug: slug,
-          })
-        ) {
-          return false;
-        }
-
-        let mintedAfter: unknown = null;
-        try {
-          mintedAfter = await sbtMetadataReadsPort.getMintedTokens('none', sbt, slug);
-        } catch (_) {
-          mintedAfter = null;
-        }
-
-        let mintedAfterBig: ethers.BigNumber | null = null;
-        try {
-          mintedAfterBig = mintedAfter !== null ? ethers.BigNumber.from(mintedAfter) : null;
-        } catch (_) {
-          mintedAfterBig = null;
-        }
-        if (
-          !this.isMintTargetContextCurrent({
-            accountLower: mintAccountLower,
-            chainId: mintChainId,
-            sbtAddress: sbt,
-            sessionSlug: slug,
-          })
-        ) {
-          return false;
-        }
-
-        if (mintedAfterBig === null || mintedAfterBig.lte(mintedBig)) {
-          if (this._isMounted && suppressErrors) {
-            this.setState(buildSbtPageMintFailurePatch({ error: SBT_CLAIM_FAILURE_MESSAGE }));
-          }
-          return false;
-        }
-      }
-    } catch {
-      inviteLog.error('[INVITE] claimWithGroupPassword failed.');
-      if (
-        this._isMounted &&
-        this.isMintTargetContextCurrent({
-          accountLower: mintAccountLower,
-          chainId: mintChainId,
-          sbtAddress: sbt,
-          sessionSlug: slug,
-        })
-      ) {
-        this.setState(buildSbtPageMintFailurePatch({ error: SBT_CLAIM_FAILURE_MESSAGE }));
-      }
-      return false;
-    }
-    return false;
-  };
-
   claimWithInviteCode = async (
     rawCode: unknown,
     sbtOverride?: unknown,
@@ -1646,7 +1403,8 @@ class SBTPage extends Component<any, any> {
       const result = await this.claimWithInvitePayload(payload, sbtOverride, options);
       return !!result?.ok;
     }
-    return await this.claimWithGroupPassword(rawCode, sbtOverride, options);
+    if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: 'Invalid invite code.' }));
+    return false;
   };
 
   // Helpers
@@ -1818,7 +1576,7 @@ class SBTPage extends Component<any, any> {
           const didApply = await applyMintInputForTarget('groupPasswordInput', fallbackPassword);
           if (!didApply) return;
           if (!isCurrentTarget()) return;
-          await this.claimWithGroupPassword(fallbackPassword, sbtAddressOriginalCase, targetOptions);
+          await this.claimWithInviteCode(fallbackPassword, sbtAddressOriginalCase, targetOptions);
           return;
         }
       }
@@ -3226,6 +2984,7 @@ class SBTPage extends Component<any, any> {
         password,
         sbtAddress: sbt,
         userAddress: String(mintAccount || ''),
+        chainId: mintChainId,
         walletScopeSbtAddress,
       });
 
@@ -3881,8 +3640,8 @@ class SBTPage extends Component<any, any> {
   exportPasswords = (): void => {
     const { exportFormat, includePreviousPasswords, cachedPasswords, adminGeneratedPasswords } = this.state;
     const isInvite = !!this.state.hasInviteMint;
-    const codeLabel = isInvite ? 'groupPassword' : 'password';
-    const fileLabel = isInvite ? 'group-passwords' : 'passwords';
+    const codeLabel = isInvite ? 'inviteCode' : 'password';
+    const fileLabel = isInvite ? 'invites' : 'passwords';
 
     const sbtAddr = resolveSbtAddressString(this.props.SBTAddress).toLowerCase();
 

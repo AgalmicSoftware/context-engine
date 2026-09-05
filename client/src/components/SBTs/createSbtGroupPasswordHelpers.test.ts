@@ -54,8 +54,8 @@ describe('createSbtGroupPasswordHelpers', () => {
         sbtSymbol: 'BET',
       }),
     ).toEqual({
-      content: 'index,groupPassword,inviteLink\n0,gp1,fallback',
-      fileName: 'BET_Beta_group-passwords_2026-05-05.csv',
+      content: 'index,inviteCode,inviteLink\n0,gp1,fallback',
+      fileName: 'BET_Beta_invites_2026-05-05.csv',
       mimeType: 'text/csv',
     });
     expect(
@@ -71,12 +71,12 @@ describe('createSbtGroupPasswordHelpers', () => {
       }),
     ).toEqual({
       content: [
-        'index,groupPassword,inviteLink',
+        'index,inviteCode,inviteLink',
         '0,"alpha,beta",https://app.example/session',
         '1,"quote""code",https://app.example/session',
         '2,"line\nbreak",https://app.example/session?fallback=1',
       ].join('\n'),
-      fileName: 'BET_Beta_group-passwords_2026-05-05.csv',
+      fileName: 'BET_Beta_invites_2026-05-05.csv',
       mimeType: 'text/csv',
     });
   });

@@ -8,7 +8,8 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 error NoGroupPassword();
-error InvalidNonce(uint256 expected, uint256 got);
+error InvalidInviteSlot(uint256 slot);
+error InviteSlotUsed(uint256 slot);
 error InvalidSignature();
 error MaxTokensReached();
 error AlreadyOwns();
@@ -29,6 +30,10 @@ contract MySBT is ERC721, ERC721Burnable, ReentrancyGuard {
     bytes4 private constant _INTERFACE_ID_ERC5192 = 0xb45a3c0e;
     bytes4 private constant _INTERFACE_ID_ERC5484 = 0x0489b56f;
 
+    bytes32 private constant GROUP_MINT_DOMAIN = keccak256("ContextEngine.SBT.GroupMint:1");
+    bytes32 private constant INVITE_DOMAIN = keccak256("ContextEngine.SBT.Invite:1");
+
+    mapping(uint256 => bool) public usedInviteSlots;
     uint256 public immutable maxTokens;
     uint256 public mintedTokens;
     address public admin;
@@ -244,7 +249,7 @@ contract MySBT is ERC721, ERC721Burnable, ReentrancyGuard {
     }
 
     /// @notice Mints an SBT using a reusable group signature tied to the caller address.
-    /// @dev The signature must be an EIP-191 signature over `keccak256(abi.encodePacked(address(this), msg.sender))`.
+    /// @dev EIP-191 over abi.encode(GROUP_MINT_DOMAIN, chain ID, collection, claimant).
     /// @param signature The signed authorization proving the invite signer approved the caller.
     function mintWithGroupSignature(bytes calldata signature) external mintingActive nonReentrant {
         require(mintMode == MintMode.UnlimitedGroupSignature, "Group signature mint not enabled");
@@ -252,31 +257,26 @@ contract MySBT is ERC721, ERC721Burnable, ReentrancyGuard {
         require(maxTokens == 0 || mintedTokens < maxTokens, "Max tokens reached");
         require(_userTokens[msg.sender] == 0, "Address already owns an SBT");
 
-        bytes32 message = keccak256(abi.encodePacked(address(this), msg.sender));
+        bytes32 message = keccak256(abi.encode(GROUP_MINT_DOMAIN, block.chainid, address(this), msg.sender));
         address signer = ECDSA.recover(message.toEthSignedMessageHash(), signature);
         require(keccak256(abi.encodePacked(signer)) == groupPasswordHash, "Invalid signature");
 
         _mintSoulbound(msg.sender);
     }
 
-    /// @notice Mints an SBT using a one-time invite signature tied to the next sequential nonce.
-    /// @dev Reverts with `NoGroupPassword` when invite signing is disabled, `InvalidNonce` when `nonce`
-    /// does not equal `mintedTokens + 1`, `InvalidSignature` when recovery fails or the recovered signer
-    /// hash does not match `groupPasswordHash`, `MaxTokensReached` when the collection is full, and
-    /// `AlreadyOwns` when the caller already owns an SBT.
-    /// @param nonce The expected invite nonce for this mint, which must equal `mintedTokens + 1`.
-    /// @param signature The EIP-191 signature over `keccak256(abi.encodePacked(address(this), nonce))`.
+    /// @notice Redeems one pre-signed transferable slot, independently of other slots.
+    /// @dev Slots are positive, bounded by maxTokens and consumed before receiver hooks.
+    /// @param nonce The one-use slot, independent of the token ID assigned at mint.
+    /// @param signature EIP-191 over abi.encode(INVITE_DOMAIN, chain ID, collection, slot).
     function claimWithInvite(uint256 nonce, bytes calldata signature) external mintingActive nonReentrant {
         require(mintMode == MintMode.LimitedInviteSignature, "Invite mint not enabled");
-        if (groupPasswordHash == bytes32(0)) {
-            revert NoGroupPassword();
-        }
+        if (groupPasswordHash == bytes32(0)) revert NoGroupPassword();
+        if (mintedTokens >= maxTokens) revert MaxTokensReached();
+        if (nonce == 0 || nonce > maxTokens) revert InvalidInviteSlot(nonce);
+        if (usedInviteSlots[nonce]) revert InviteSlotUsed(nonce);
+        if (balanceOf(msg.sender) > 0) revert AlreadyOwns();
 
-        if (nonce != mintedTokens + 1) {
-            revert InvalidNonce(mintedTokens + 1, nonce);
-        }
-
-        bytes32 message = keccak256(abi.encodePacked(address(this), nonce));
+        bytes32 message = keccak256(abi.encode(INVITE_DOMAIN, block.chainid, address(this), nonce));
         (address signer, ECDSA.RecoverError err,) = ECDSA.tryRecover(message.toEthSignedMessageHash(), signature);
         if (err != ECDSA.RecoverError.NoError) {
             revert InvalidSignature();
@@ -286,13 +286,9 @@ contract MySBT is ERC721, ERC721Burnable, ReentrancyGuard {
             revert InvalidSignature();
         }
 
-        if (maxTokens != 0 && mintedTokens >= maxTokens) {
-            revert MaxTokensReached();
-        }
-        if (balanceOf(msg.sender) > 0) {
-            revert AlreadyOwns();
-        }
-
+        // Slots must not follow mintedTokens: a later invitation can redeem first.
+        // A failed safe mint reverts this consumption along with the token state.
+        usedInviteSlots[nonce] = true;
         _mintSoulbound(msg.sender);
     }
 

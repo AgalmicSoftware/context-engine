@@ -721,6 +721,24 @@ describe('OnePageSession auto-mint queue', () => {
     expect(window.sessionStorage.getItem(getAutoMintStorageKey(account, sbtAddress, 8453))).toBe('done');
   });
 
+  it('does not treat same-address holdings on another chain as membership in the target collection', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000c1';
+    const account = '0x00000000000000000000000000000000000000c2';
+    const subject = createSubject({ account, loginComplete: true, slug: 'edge' });
+    subject.state = { ...subject.state, autoMintTargets: [{ sbt: sbtAddress }] };
+    subject.waitForSufficientBalance = jest.fn().mockResolvedValue(true);
+    const info = { name: 'Local chain group', tokenURI: 'ar://local-group', hasPasswordMint: false, maxTokens: '0' };
+    jest.spyOn(contractScriptsModule, 'getAllSessionSlugs').mockReturnValue([]);
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({
+      1: { sbtList: { [sbtAddress]: { sbtInfo: info, mintedAddresses: [account], burnedAddresses: [] } } },
+    });
+    jest.spyOn(contractScripts, 'getSbtMetadata').mockResolvedValue(info);
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
+    const claim = jest.spyOn(contractScripts, 'claim').mockResolvedValue({ transactionHash: '0xlocalclaim' });
+    await subject.runAutoMintQueue();
+    expect(claim).toHaveBeenCalledWith('wagmi', sbtAddress);
+  });
+
   it('auto-mints invite-code SBTs through the session queue', async () => {
     const sbtAddress = '0x00000000000000000000000000000000000000c1';
     const subject = createSubject({
@@ -732,7 +750,7 @@ describe('OnePageSession auto-mint queue', () => {
       ...subject.state,
       autoMintTargets: [{ sbt: sbtAddress, inv: 'invite-token' }],
     };
-    subject.decodeInviteInput = jest.fn().mockReturnValue({ nonce: '7', signature: '0xinvite' });
+    subject.decodeInviteInput = jest.fn().mockReturnValue({ chainId: '84532', sbtAddress, nonce: '7', signature: '0xinvite' });
     subject.waitForSufficientBalance = jest.fn().mockResolvedValue(true);
 
     jest.spyOn(contractScriptsModule, 'getAllSessionSlugs').mockReturnValue([]);
@@ -768,7 +786,7 @@ describe('OnePageSession auto-mint queue', () => {
       ...subject.state,
       autoMintTargets: [{ sbt: sbtAddress, inv: 'invite-token' }],
     };
-    subject.decodeInviteInput = jest.fn().mockReturnValue({ nonce: '7', signature: secretSentinel });
+    subject.decodeInviteInput = jest.fn().mockReturnValue({ chainId: '84532', sbtAddress, nonce: '7', signature: secretSentinel });
     subject.waitForSufficientBalance = jest.fn().mockResolvedValue(true);
 
     jest.spyOn(contractScriptsModule, 'getAllSessionSlugs').mockReturnValue([]);
@@ -792,7 +810,7 @@ describe('OnePageSession auto-mint queue', () => {
     expect(JSON.stringify(status)).not.toContain(secretSentinel);
   });
 
-  it('auto-mints limited password SBTs through generated invite payloads in the session queue', async () => {
+  it('rejects reusable limited-group secrets without deriving or sending a slot', async () => {
     const sbtAddress = '0x00000000000000000000000000000000000000d1';
     const subject = createSubject({
       account: '0x00000000000000000000000000000000000000d2',
@@ -824,17 +842,9 @@ describe('OnePageSession auto-mint queue', () => {
 
     await subject.runAutoMintQueue();
 
-    expect(generateInviteSpy).toHaveBeenCalledWith({
-      password: 'shared-secret',
-      sbtAddress,
-      nonces: ['1'],
-      walletScopeSbtAddress: sbtAddress,
-    });
-    expect(claimInviteSpy).toHaveBeenCalledWith('wagmi', sbtAddress, '1', '0xlimitedinvite');
-    expect(subject.state.autoMintStatuses[sbtAddress.toLowerCase()]).toMatchObject({
-      status: 'success',
-      name: 'Joined: Limited Badge',
-    });
+    expect(generateInviteSpy).not.toHaveBeenCalled();
+    expect(claimInviteSpy).not.toHaveBeenCalled();
+    expect(subject.state.autoMintStatuses[sbtAddress.toLowerCase()].status).not.toBe('success');
   });
 
   it('auto-mints unlimited group-password SBTs through the session queue', async () => {

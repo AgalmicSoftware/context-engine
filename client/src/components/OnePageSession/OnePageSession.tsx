@@ -760,6 +760,15 @@ class OnePageSession extends Component<any, any> {
     return newKey;
   }
 
+  getAutoMintChainId(): number {
+    return Number(
+      this.props.sessionConfig?.networkChainId ||
+      this.props.networkChainId ||
+      this.props.network?.id ||
+      this.props.network?.chainId || 0,
+    ) || 0;
+  }
+
   getAutoMintAttemptStorageKey(sbtAddress: any, account: any = this.props.account) {
     const normalized = String(sbtAddress || '')
       .trim()
@@ -767,14 +776,7 @@ class OnePageSession extends Component<any, any> {
     const accountLower = String(account || '')
       .trim()
       .toLowerCase();
-    const chainId =
-      Number(
-        this.props.sessionConfig?.networkChainId ||
-          this.props.networkChainId ||
-          this.props.network?.id ||
-          this.props.network?.chainId ||
-          0,
-      ) || 0;
+    const chainId = this.getAutoMintChainId();
     return normalized && accountLower ? `autoMint:${accountLower}:${chainId || 'unknown'}:${normalized}` : '';
   }
 
@@ -1354,6 +1356,7 @@ class OnePageSession extends Component<any, any> {
     const targets = this.filterUnconsumedAutoMintTargets(this.state.autoMintTargets || [], autoMintAccount).map(
       (target: any) => ({ ...target, autoMintAccount }),
     );
+    const mintChainId = this.getAutoMintChainId();
     const currentSlug = resolveEffectiveSlug(this.props); // use effective slug ('' for general)
     const queuedNameUpdates: Record<string, any> = {};
     const queuedImageUpdates: Record<string, any> = {};
@@ -1439,7 +1442,9 @@ class OnePageSession extends Component<any, any> {
       const sbtKey = sbtAddr.toLowerCase();
       const queuedAccount = t.autoMintAccount;
       const queuedAccountIsCurrent = () =>
-        !!queuedAccount && normalizeAutoMintAccount(this.props.account) === queuedAccount;
+        !!queuedAccount &&
+        normalizeAutoMintAccount(this.props.account) === queuedAccount &&
+        this.getAutoMintChainId() === mintChainId;
 
       if (this.hasConsumedAutoMintAttempt(sbtAddr, queuedAccount)) {
         continue;
@@ -1449,7 +1454,6 @@ class OnePageSession extends Component<any, any> {
       let sbtName = 'Group';
       let path = 'unknown';
       let invitePayload: any = null;
-      let invitePassword: any = null;
       let sbtInfo: any = null;
 
       try {
@@ -1459,8 +1463,9 @@ class OnePageSession extends Component<any, any> {
           try {
             const parsed = peekCacheSync<OnePageSbtCache>('sbtCache', s, { clone: false });
             if (!parsed || typeof parsed !== 'object') continue;
-            // Iterate all networks in this cache (e.g. "84532", "1")
+            // The same address on another chain is a different collection.
             for (const netKey of Object.keys(parsed)) {
+              if (String(netKey) !== String(mintChainId)) continue;
               const entry = parsed[netKey]?.sbtList?.[sbtKey];
               // Must have tokenURI to be considered a valid hit for minting flows
               if (entry?.sbtInfo && entry.sbtInfo.tokenURI) {
@@ -1513,6 +1518,7 @@ class OnePageSession extends Component<any, any> {
               const parsed = peekCacheSync<OnePageSbtCache>('sbtCache', s, { clone: false });
               if (!parsed || typeof parsed !== 'object') continue;
               for (const netKey of Object.keys(parsed)) {
+                if (String(netKey) !== String(mintChainId)) continue;
                 const entry = parsed[netKey]?.sbtList?.[sbtKey];
                 if (entry) {
                   const checkpointBackedPartialCounts =
@@ -1562,9 +1568,7 @@ class OnePageSession extends Component<any, any> {
         // Runtime detection: public vs unlimited vs limited vs invite
         if (t.inv) {
           invitePayload = this.decodeInviteInput(t.inv);
-          if (!invitePayload) {
-            invitePassword = t.inv;
-          }
+          if (!invitePayload) throw new Error('Invalid invite code');
           path = 'invite';
         } else {
           const gph = await sbtMetadataReadsPort.getGroupPasswordHash('none', sbtAddr, currentSlug);
@@ -1609,9 +1613,8 @@ class OnePageSession extends Component<any, any> {
 
             if (isLimitedByMax) {
               path = 'invite';
-              if (!invitePayload && t.gp) {
-                invitePassword = t.gp;
-              }
+              invitePayload = this.decodeInviteInput(t.gp);
+              if (!invitePayload) throw new Error('Invite code required for this group');
             } else if (hasGroupPassword) {
               path = 'unlimited';
               // Optional: verify binding pre-tx (kept); tx phase will re-check
@@ -1659,124 +1662,15 @@ class OnePageSession extends Component<any, any> {
           updateStatus(sbtKey, { status: 'success', name: `Joined: ${sbtName || 'Group'}` });
           this.onSbtMintSuccess(sbtAddr);
         } else if (path === 'invite') {
-          let payload = invitePayload;
-          if (!payload) {
-            const password = cryptoUtils.normalizeGroupPasswordInput(invitePassword);
-            if (!password) throw new Error('Invalid group password');
-            let walletScopeSbtAddress = sbtAddr;
-            const onchainHash = await sbtMetadataReadsPort.getGroupPasswordHash('none', sbtAddr, currentSlug);
-            if (onchainHash && onchainHash !== ethers.constants.HashZero) {
-              walletScopeSbtAddress = cryptoUtils.resolveGroupPasswordWalletScopeAddress({
-                password,
-                sbtAddress: sbtAddr,
-                groupPasswordHash: onchainHash,
-              });
-              const localHash =
-                walletScopeSbtAddress === null
-                  ? null
-                  : sbtGroupMintAuthorizationPort.computeGroupPasswordHash({
-                      password,
-                      sbtAddress: walletScopeSbtAddress,
-                    });
-              if (!localHash || String(localHash).toLowerCase() !== String(onchainHash).toLowerCase()) {
-                throw new Error('Group password mismatch');
-              }
-            }
-            let maxTokens: any = null;
-            try {
-              const rawMax = sbtInfo?.maxTokens;
-              if (rawMax !== undefined && rawMax !== null && rawMax !== '' && rawMax !== '0') {
-                maxTokens = ethers.BigNumber.from(rawMax);
-              }
-            } catch (_) {
-              maxTokens = null;
-            }
-
-            const maxAttempts = 3;
-            let lastError: any = null;
-
-            for (let attempt = 0; attempt < maxAttempts; attempt++) {
-              let mintedTokens: any = null;
-              try {
-                mintedTokens = await sbtMetadataReadsPort.getMintedTokens('none', sbtAddr, currentSlug);
-              } catch (_) {
-                mintedTokens = null;
-              }
-
-              if (mintedTokens === null) {
-                throw new Error('Unable to load minted count');
-              }
-
-              let mintedBig: any = null;
-              try {
-                mintedBig = ethers.BigNumber.from(mintedTokens);
-              } catch (_) {
-                mintedBig = null;
-              }
-
-              if (mintedBig === null) {
-                throw new Error('Unable to parse minted count');
-              }
-
-              if (maxTokens && mintedBig.gte(maxTokens)) {
-                throw new Error('Group limit reached');
-              }
-
-              const nonce = mintedBig.add(1).toString();
-              const invites = await sbtGroupMintAuthorizationPort.generateInvitePayloads({
-                password,
-                sbtAddress: sbtAddr,
-                nonces: [nonce],
-                walletScopeSbtAddress,
-              });
-              payload = invites && invites[0];
-              if (!payload) throw new Error('Failed to generate invite');
-
-              try {
-                if (!queuedAccountIsCurrent()) throw new Error('Wallet changed during auto-join');
-                await sbtMintExecutionPort.claimWithInvite(
-                  autoMintProvider,
-                  sbtAddr,
-                  String(payload.nonce),
-                  String(payload.signature),
-                );
-                lastError = null;
-                break;
-              } catch (err) {
-                lastError = err;
-              }
-
-              let mintedAfter: any = null;
-              try {
-                mintedAfter = await sbtMetadataReadsPort.getMintedTokens('none', sbtAddr, currentSlug);
-              } catch (_) {
-                mintedAfter = null;
-              }
-
-              let mintedAfterBig: any = null;
-              try {
-                mintedAfterBig = mintedAfter !== null ? ethers.BigNumber.from(mintedAfter) : null;
-              } catch (_) {
-                mintedAfterBig = null;
-              }
-
-              if (mintedAfterBig === null || mintedAfterBig.lte(mintedBig)) {
-                throw lastError || new Error('Invite claim failed');
-              }
-            }
-
-            if (lastError) {
-              throw lastError;
-            }
-          } else {
-            if (!queuedAccountIsCurrent()) throw new Error('Wallet changed during auto-join');
-            await sbtMintExecutionPort.claimWithInvite(
-              autoMintProvider,
-              sbtAddr,
-              String(payload.nonce),
-              String(payload.signature),
-            );
+          const payload = invitePayload;
+          if (!payload || String(payload.chainId) !== String(mintChainId)
+            || String(payload.sbtAddress).toLowerCase() !== sbtKey) {
+            throw new Error('Invite code does not match this collection and chain');
           }
+          if (!queuedAccountIsCurrent()) throw new Error('Wallet changed during auto-join');
+          await sbtMintExecutionPort.claimWithInvite(
+            autoMintProvider, sbtAddr, String(payload.nonce), String(payload.signature),
+          );
           this.consumeAutoMintAttempt(sbtAddr, userAddr);
           updateStatus(sbtKey, { status: 'success', name: `Joined: ${sbtName || 'Group'}` });
           this.onSbtMintSuccess(sbtAddr);
@@ -1839,9 +1733,11 @@ class OnePageSession extends Component<any, any> {
     if (!pw) {
       throw new Error('Group password is required.');
     }
+    const mintChainId = this.getAutoMintChainId();
     const normalizedExpectedAccount = normalizeAutoMintAccount(expectedAccount);
     const assertExpectedAccountCurrent = () => {
-      if (!normalizedExpectedAccount || normalizeAutoMintAccount(this.props.account) !== normalizedExpectedAccount) {
+      if (!normalizedExpectedAccount || normalizeAutoMintAccount(this.props.account) !== normalizedExpectedAccount
+        || this.getAutoMintChainId() !== mintChainId) {
         throw new Error('Wallet changed during auto-join');
       }
     };
@@ -1877,6 +1773,7 @@ class OnePageSession extends Component<any, any> {
       password: pw,
       sbtAddress,
       userAddress: normalizedExpectedAccount,
+      chainId: mintChainId,
       walletScopeSbtAddress,
     });
 

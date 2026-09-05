@@ -39,6 +39,32 @@ describe('CreateSBTGroup deterministic deploy payloads', () => {
     delete window.litHooks;
   });
 
+  it('exports pre-signed independent slots instead of the reusable limited-group secret', async () => {
+    const instance = makeInstance({ provider: 'mock-provider', account: '0xCreator', loginComplete: true,
+      network: { id: 84532, name: 'Base Sepolia' } });
+    instance.state = { ...instance.state, sbtName: 'Invite Group', tokenURI: 'ar://metadata',
+      groupPassword: 'creator-only-secret', create2Salt: 'invite-salt',
+      sbtDistribution: { ...instance.state.sbtDistribution, burnAuth: 'Neither',
+        distributionOption: 'groupPassword', isLimited: true, limitedNumber: 2 } };
+    const address = '0x00000000000000000000000000000000000000f1';
+    instance.getSessionConfigForNetwork = jest.fn(() => ({ slug: 'test', networkChainId: 84532 }));
+    jest.spyOn(contractScripts, 'predictSBTAddress').mockResolvedValue(address);
+    jest.spyOn(contractScripts, 'computeGroupPasswordHash').mockReturnValue(`0x${'11'.repeat(32)}`);
+    jest.spyOn(contractScripts, 'createSBT').mockResolvedValue({
+      logs: [makeFactoryReceiptLog('SBTCreated', [address])],
+    });
+    const generate = jest.spyOn(contractScripts, 'generateInvitePayloads').mockResolvedValue([
+      { nonce: '1', inviteCode: 'signed-slot-one' }, { nonce: '2', inviteCode: 'signed-slot-two' },
+    ]);
+    await instance.mintSBT();
+    expect(generate).toHaveBeenCalledWith(expect.objectContaining({
+      password: 'creator-only-secret', sbtAddress: address, chainId: 84532, nonces: ['1', '2'],
+    }));
+    expect(instance.state.passwordList).toEqual(['signed-slot-one', 'signed-slot-two']);
+    expect(instance.state.sbtInviteLinks).toHaveLength(2);
+    expect(JSON.stringify(instance.state.passwordList)).not.toContain('creator-only-secret');
+  });
+
   it('uses the predicted address when group-password hashes are computed for deterministic deploys', async () => {
     const instance = makeInstance({
       provider: 'mock-provider',
