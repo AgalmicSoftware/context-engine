@@ -5,6 +5,10 @@ const readPolisReportScss = () => fs.readFileSync(path.join(__dirname, 'PolisRep
 const readPolisReportSource = () => fs.readFileSync(path.join(__dirname, 'PolisReport.tsx'), 'utf8');
 
 describe('PolisReport graph scroll controls', () => {
+  it('lets the plot size naturally so the arrow row stays inside its section', () => {
+    expect(readPolisReportScss()).toMatch(/\.reportBeeswarm\s*{[^}]*min-height:\s*0;/s);
+  });
+
   it('keeps the controls close to the graph and large enough to find', () => {
     const scss = readPolisReportScss();
 

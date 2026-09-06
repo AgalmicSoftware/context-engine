@@ -482,6 +482,11 @@
   min-width: 0;
   flex: 1 1 100%;
   box-sizing: border-box;
+
+  .reportBeeswarm {
+    // Leave room for the sibling arrow row instead of filling its flex parent.
+    min-height: 0;
+  }
 }
 
 .swarmScrollControls {
