@@ -209,6 +209,7 @@ describe('CorpusViewer', () => {
     expect(policyMobileBlock).toContain('.filterButton {');
     expect(policyMobileBlock).toContain('font-size: 11px;');
     expect(policyMobileBlock).toContain('white-space: normal;');
+    expect(policyScss).toMatch(/\.policyMetaRow\s*{[\s\S]*?display:\s*flex;[\s\S]*?flex-wrap:\s*wrap;/);
     expect(corpusScss).toMatch(/\.tabIcon\s*{[\s\S]*?font-size:\s*24px;/);
     expect(corpusScss).toMatch(
       /\.container\s*{[\s\S]*?box-sizing:\s*border-box;[\s\S]*?max-width:\s*100%;[\s\S]*?width:\s*100%;/,
@@ -704,6 +705,25 @@ describe('CorpusViewer', () => {
 
     expect(screen.getByText(/Safe and Secure Innovation for Frontier AI/i)).toBeInTheDocument();
     expect(screen.queryByText(/Brazil AI Bill/i)).not.toBeInTheDocument();
+  });
+
+  it('keeps policy metadata and the source action in one compact row', () => {
+    render(
+      <MemoryRouter>
+        <CorpusViewer />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Laws & Policy' }));
+
+    const policyCard = screen
+      .getByText('South Korea Framework Act on the Development of AI and Establishment of Trust')
+      .closest('article') as HTMLElement;
+    const metadataRow = within(policyCard).getByText('2024').parentElement as HTMLElement;
+
+    expect(metadataRow).toContainElement(within(policyCard).getByText('Enacted'));
+    expect(metadataRow).toHaveTextContent('South Korea');
+    expect(metadataRow).toContainElement(within(policyCard).getByRole('link', { name: 'View source' }));
   });
 
   it('renders insider interview cards when the Insider Interviews tab is selected', () => {

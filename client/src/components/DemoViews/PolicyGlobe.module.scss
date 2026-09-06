@@ -220,11 +220,19 @@
   gap: 10px;
 }
 
-.policyBadgeRow {
-  align-items: flex-end;
+.policyMetaRow {
+  align-items: center;
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 8px;
+  margin-bottom: 12px;
+}
+
+.policyMetaRow .policySourceLink {
+  flex: 0 1 auto;
+  min-height: 32px;
+  padding: 5px 10px;
+  width: auto;
 }
 
 .jurisdictionFlag {
@@ -309,10 +317,6 @@
   }
 
   .policyTitleRow {
-    align-items: flex-start;
-  }
-
-  .policyBadgeRow {
     align-items: flex-start;
   }
 }

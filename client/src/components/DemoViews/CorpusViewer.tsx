@@ -600,19 +600,24 @@ const EntryCard = ({ corpusKey, entry, onTagClick, onAtlasIssueOpen }: EntryCard
           ) : (
             <div className={styles.entryTitle}>{entry.title || entry.id || 'Untitled entry'}</div>
           )}
-          {meta.length > 0 && <div className={styles.entryMeta}>{meta.join(' • ')}</div>}
+          {!isPolicyCorpus && meta.length > 0 ? <div className={styles.entryMeta}>{meta.join(' • ')}</div> : null}
         </div>
-        {isPolicyCorpus ? (
-          <div className={policyStyles.policyBadgeRow}>
-            <span className={`${policyStyles.statusBadge} ${policyStatusBadgeClassName}`.trim()}>
-              {policyStatusLabel}
-            </span>
-            {entry.jurisdiction ? (
-              <span className={`${styles.pill} ${styles.jurisdictionBadge}`}>{entry.jurisdiction}</span>
-            ) : null}
-          </div>
-        ) : null}
       </div>
+
+      {isPolicyCorpus ? (
+        <div className={policyStyles.policyMetaRow}>
+          {meta.length > 0 ? <span className={styles.entryMeta}>{meta.join(' • ')}</span> : null}
+          <span className={`${policyStyles.statusBadge} ${policyStatusBadgeClassName}`.trim()}>
+            {policyStatusLabel}
+          </span>
+          {entry.jurisdiction ? (
+            <span className={`${styles.pill} ${styles.jurisdictionBadge}`}>{entry.jurisdiction}</span>
+          ) : null}
+          {entry?.url ? (
+            <ExternalSourceLink entry={entry} fallbackLabel={sourceLabel} className={policyStyles.policySourceLink} />
+          ) : null}
+        </div>
+      ) : null}
 
       {entry?.image_url ? (
         <div className={styles.entryMediaBlock}>
@@ -670,7 +675,7 @@ const EntryCard = ({ corpusKey, entry, onTagClick, onAtlasIssueOpen }: EntryCard
 
       <div className={styles.cardFooter}>
         <DebateMapSection entry={entry as any} onAtlasIssueOpen={onAtlasIssueOpen || undefined} />
-        {entry?.url ? (
+        {entry?.url && !isPolicyCorpus ? (
           <div className={styles.cardFooterLinks}>
             {isMetrCorpus ? (
               <a
