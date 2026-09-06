@@ -237,7 +237,8 @@
 
 .jurisdictionFlag {
   display: inline-flex;
-  font-size: 18px;
+  flex-shrink: 0;
+  font-size: 30px;
   line-height: 1;
 }
 
