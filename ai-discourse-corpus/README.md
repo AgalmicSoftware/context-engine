@@ -11,12 +11,12 @@ This corpus is maintained as part of [Context Engine](https://github.com/Agalmic
 | `ai-forecasting-economics-corpus.json` | 17 | AI forecasting and economics: compute/capability trend data, crowd and tournament forecasts, and the formal economics of transformative AI. |
 | `ai-laws-policy-corpus.json` | 227 | Global AI legislation, regulatory proposals, policy frameworks, agency guidance, and official reports with governance-focused analysis. |
 | `ai-scifi-books-corpus.json` | 156 | Science fiction works curated for AI safety, alignment, ethics, and policy discourse. |
-| `arxiv-ai-safety-corpus.json` | 285 | Academic papers on AI safety, alignment, interpretability, and governance. |
+| `arxiv-ai-safety-corpus.json` | 309 | Academic papers on AI safety, alignment, interpretability, and governance. |
 | `cross-corpus-debates.json` | 16 | Structured debate trees that synthesize evidence across multiple AI discourse sources. |
-| `dwarkesh-lab-insiders-corpus.json` | 151 | Interviews and writings from AI lab insiders and practitioners on frontier AI development. |
+| `dwarkesh-lab-insiders-corpus.json` | 159 | Interviews and writings from AI lab insiders and practitioners on frontier AI development. |
 | `enriched-tweets.json` | 4140 | Enriched social-media discourse from 2018-09-21 through 2026-07-11, with summaries, tags, relevance signals, and linked context. |
 | `lab-primary-docs-corpus.json` | 38 | Primary safety/governance documents from frontier labs: safety frameworks (RSP, Preparedness, FSF), system cards, framework compliance reports, model specs, and deployment updates. |
-| `lesswrong-posts-corpus.json` | 232 | Influential LessWrong, Alignment Forum, EA Forum, and related AI safety/rationalist writing. |
+| `lesswrong-posts-corpus.json` | 241 | Influential LessWrong, Alignment Forum, EA Forum, and related AI safety/rationalist writing. |
 | `metr-evals-metrics-corpus.json` | 103 | METR publications, benchmarks, evaluation reports, and measurement-oriented policy material. |
 | `loophole-historical-cases.json` | 40 | Mirrored copy of Context Engine's Loophole historical-case dataset, generated via the methodology from [brendanhogan/loophole](https://github.com/brendanhogan/loophole). Explores regulatory edge cases through adversarial scenario generation. |
 

@@ -15,17 +15,17 @@
       "arxiv_ai_safety": {
         "label": "AI Safety Papers",
         "sample_count": 20,
-        "full_count": 285
+        "full_count": 309
       },
       "lesswrong_posts": {
         "label": "LessWrong & Alignment",
         "sample_count": 20,
-        "full_count": 232
+        "full_count": 241
       },
       "dwarkesh_lab_insiders": {
         "label": "Insider Interviews",
         "sample_count": 20,
-        "full_count": 151
+        "full_count": 159
       },
       "ai_scifi_books": {
         "label": "AI in Sci-Fi",
@@ -1597,7 +1597,7 @@
     "arxiv_ai_safety": {
       "label": "AI Safety Papers",
       "icon": "file-text",
-      "count_full": 285,
+      "count_full": 309,
       "entries": [
         {
           "id": "gpt3_language_models_few_shot",
@@ -2109,7 +2109,7 @@
     "lesswrong_posts": {
       "label": "LessWrong & Alignment",
       "icon": "brain",
-      "count_full": 232,
+      "count_full": 241,
       "entries": [
         {
           "id": "yudkowsky_ai_box",
@@ -2429,7 +2429,7 @@
     "dwarkesh_lab_insiders": {
       "label": "Insider Interviews",
       "icon": "mic",
-      "count_full": 151,
+      "count_full": 159,
       "entries": [
         {
           "id": "amodei_dario_dwarkesh_2026_end_of_exponential",
