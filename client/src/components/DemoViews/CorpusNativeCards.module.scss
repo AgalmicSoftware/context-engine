@@ -158,6 +158,24 @@ $text: var(--ce-overlay-text);
   letter-spacing: 0.04em;
 }
 
+.sciFiAction {
+  background: transparent;
+  border: 0;
+  color: var(--ce-action-accent);
+  flex: 0 0 auto;
+  font-size: 11px;
+  min-height: 0;
+  padding: 0;
+  white-space: nowrap;
+  width: auto;
+}
+
+.sciFiAction:hover,
+.sciFiAction:focus-visible {
+  color: var(--ce-overlay-text);
+  text-decoration: underline;
+}
+
 .sciFiSummary {
   color: color-mix(in srgb, var(--ce-overlay-text) 78%, transparent);
   line-height: 1.62;

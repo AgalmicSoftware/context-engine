@@ -186,6 +186,7 @@ export const SciFiCard = ({ entry = {}, onTagClick, onAtlasIssueOpen }: NativeCo
             <FontAwesomeIcon icon={faBookOpen} aria-hidden="true" />
             <span>{formatYear(resolvedEntry) || 'FUTURE'}</span>
           </span>
+          <ExternalSourceLink entry={resolvedEntry} fallbackLabel="Explore story" className={styles.sciFiAction} />
         </div>
         {resolvedEntry.summary ? <p className={styles.sciFiSummary}>{resolvedEntry.summary}</p> : null}
 
@@ -200,7 +201,7 @@ export const SciFiCard = ({ entry = {}, onTagClick, onAtlasIssueOpen }: NativeCo
           </div>
         ) : null}
 
-        <CardFooter entry={resolvedEntry} label="Explore story" onAtlasIssueOpen={onAtlasIssueOpen} />
+        <DebateMapSection entry={resolvedEntry} onAtlasIssueOpen={onAtlasIssueOpen} />
       </div>
     </article>
   );

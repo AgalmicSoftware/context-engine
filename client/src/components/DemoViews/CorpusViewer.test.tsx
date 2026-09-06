@@ -604,10 +604,12 @@ describe('CorpusViewer', () => {
     const sciFiCard = title.closest('article') as HTMLElement;
     const author = within(sciFiCard).getByText('Mary Shelley');
     const year = within(sciFiCard).getByText('1818');
+    const sourceLink = within(sciFiCard).getByRole('link', { name: 'Explore story' });
 
     expect(sciFiCard).toHaveAttribute('data-testid', E2E_TESTIDS.CONTEXT_SCIFI_CARD);
     expect(within(sciFiCard).queryByText('Speculative futures archive')).not.toBeInTheDocument();
     expect(author.parentElement).toContainElement(year);
+    expect(author.parentElement).toContainElement(sourceLink);
     expect(within(sciFiCard).getByLabelText('Story themes')).toBeInTheDocument();
     expect(within(sciFiCard).getByRole('button', { name: 'Creation Ethics' })).toBeInTheDocument();
   });
