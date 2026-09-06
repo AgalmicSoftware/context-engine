@@ -126,15 +126,6 @@ const InsiderCard = ({ entry = {}, onTagClick, onAtlasIssueOpen }: InsiderCardPr
         </div>
       ) : null}
 
-      <div className={styles.interviewTimeline} aria-label="Interview transcript">
-        <span>Transcript</span>
-        <div aria-hidden="true">
-          {[18, 34, 24, 42, 28, 48, 22, 38, 30].map((height, index) => (
-            <i key={`${height}-${index}`} style={{ height }} />
-          ))}
-        </div>
-      </div>
-
       {tags.length > 0 ? (
         <div className={styles.pillRow}>
           {tags.slice(0, 6).map((tag) => (
@@ -152,23 +143,34 @@ const InsiderCard = ({ entry = {}, onTagClick, onAtlasIssueOpen }: InsiderCardPr
 
       <div className={styles.insiderDetails}>
         <div className={styles.entrySummary}>{visibleSummary}</div>
-        {shouldClampSummary ? (
-          <button type="button" className={styles.insiderExpandBtn} onClick={() => setExpanded((value) => !value)}>
-            {expanded ? 'Collapse' : 'Expand'}
-          </button>
-        ) : null}
         {interviewDate ? <div className={styles.entryMeta}>Interview date: {interviewDate}</div> : null}
-        {resolvedEntry?.url ||
-        (Array.isArray(resolvedEntry?.debate_map_issues) && resolvedEntry.debate_map_issues.length > 0) ? (
+        {Array.isArray(resolvedEntry?.debate_map_issues) && resolvedEntry.debate_map_issues.length > 0 ? (
           <div className={styles.cardFooter}>
             <DebateMapSection entry={resolvedEntry} onAtlasIssueOpen={onAtlasIssueOpen} />
-            {resolvedEntry?.url ? (
-              <div className={styles.cardFooterLinks}>
-                <ExternalSourceLink entry={resolvedEntry} fallbackLabel="View interview" />
-              </div>
-            ) : null}
           </div>
         ) : null}
+        <div className={styles.insiderActionRow}>
+          <div className={styles.interviewTimeline} aria-label="Interview transcript">
+            <span>Transcript</span>
+            <div aria-hidden="true">
+              {[18, 34, 24, 42, 28, 48, 22, 38, 30].map((height, index) => (
+                <i key={`${height}-${index}`} style={{ height }} />
+              ))}
+            </div>
+          </div>
+          {shouldClampSummary ? (
+            <button type="button" className={styles.insiderExpandBtn} onClick={() => setExpanded((value) => !value)}>
+              {expanded ? 'Collapse' : 'Expand'}
+            </button>
+          ) : null}
+          {resolvedEntry?.url ? (
+            <ExternalSourceLink
+              entry={resolvedEntry}
+              fallbackLabel="View interview"
+              className={styles.insiderSourceLink}
+            />
+          ) : null}
+        </div>
       </div>
     </article>
   );

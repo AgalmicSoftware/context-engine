@@ -921,14 +921,19 @@ $text: var(--ce-panel-text);
 }
 
 .insiderExpandBtn {
-  background: transparent;
-  border: none;
+  align-items: center;
+  background: var(--ce-document-surface);
+  border: 1px solid var(--ce-status-info-text);
+  border-radius: var(--ce-radius-pill);
   color: var(--ce-status-info);
   cursor: pointer;
+  display: inline-flex;
+  flex: 0 1 auto;
   font-size: 13px;
   font-weight: 600;
-  margin-top: 14px;
-  padding: 0;
+  justify-content: center;
+  min-height: 40px;
+  padding: 8px 12px;
 }
 
 .insiderExpandBtn:hover {
@@ -949,6 +954,19 @@ $text: var(--ce-panel-text);
   gap: 10px;
   margin-top: 12px;
   padding-top: 12px;
+}
+
+.insiderActionRow {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.insiderActionRow .insiderSourceLink {
+  flex: 0 1 auto;
+  width: auto;
 }
 
 .insiderCard .entrySummary {
@@ -1362,13 +1380,14 @@ $text: var(--ce-panel-text);
 
 .interviewTimeline {
   align-items: center;
-  border-bottom: 1px solid var(--ce-document-border);
-  border-top: 1px solid var(--ce-document-border);
-  display: grid;
-  gap: 12px;
-  grid-template-columns: auto minmax(0, 1fr);
-  margin-bottom: 14px;
-  padding: 10px 0;
+  background: var(--ce-document-surface);
+  border: 1px solid var(--ce-status-info-text);
+  border-radius: var(--ce-radius-pill);
+  display: inline-flex;
+  flex: 0 1 auto;
+  gap: 8px;
+  min-height: 40px;
+  padding: 5px 10px;
 }
 
 .interviewTimeline > span {
@@ -1382,18 +1401,18 @@ $text: var(--ce-panel-text);
 .interviewTimeline > div {
   align-items: center;
   display: flex;
-  gap: 4px;
-  height: 32px;
+  gap: 2px;
+  height: 20px;
 }
 
 .interviewTimeline i {
   background: linear-gradient(180deg, var(--ce-status-info), $accent);
   border-radius: 999px;
   display: block;
-  max-height: 28px;
+  max-height: 18px;
   min-height: 5px;
   opacity: 0.78;
-  width: 4px;
+  width: 3px;
 }
 
 .tweetAuthorRow {
