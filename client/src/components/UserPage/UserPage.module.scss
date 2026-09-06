@@ -785,11 +785,15 @@ $icon-size-standard: 1.25rem;
     margin-right: 10px;
   }
 
-  /* Make header buttons full-width when wrapping on small screens */
+  /* Keep the two profile actions together below the address on small screens. */
   .headerActionsRight {
+    width: 100%;
+
     .collapseButton,
     .analyzeButton {
-      width: 100%;
+      flex: 1 1 0;
+      min-width: 0;
+      width: auto;
     }
   }
 
