@@ -97,6 +97,26 @@ const getNodeText = (node: TreeNode): string => {
   return getNodeText(node?.props?.children);
 };
 
+describe('question filter loaded metadata', () => {
+  it('derives tags only from question records', () => {
+    const instance = new QuestionFilter({ questions: [
+      { id: 'q1', tags: ['Question topic'] },
+      { id: 'q2', tags: ['question topic', 'Another topic'] },
+    ] });
+    expect(instance.getAllTagsWithCounts()).toEqual(['question topic', 'another topic']);
+  });
+
+  it('shows a locally calculated count while the question cache is still syncing', () => {
+    const instance = new QuestionFilter({
+      questions: [{ id: 'q1', tags: ['topic'] }], questionResponses: {},
+      filterModalOpen: true, isQuestionCacheReady: false,
+    });
+    instance.buildFilterPipelineResult = jest.fn(() => ({ finalQuestions: [{ id: 'q1' }], count: 1 }));
+    instance.getAiAccessState = jest.fn(() => ({ enabled: false, localKeyAvailable: false }));
+    expect(getNodeText(instance.render())).toContain('Filter Questions (1');
+  });
+});
+
 describe('isFreeformBlankAnswer', () => {
   it('returns true for freeform answers with blank text', () => {
     expect(

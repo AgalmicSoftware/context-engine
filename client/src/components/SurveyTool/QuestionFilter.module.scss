@@ -172,19 +172,20 @@ $text-color: var(--ce-border);
 .modalHeader {
   border-bottom: 1px solid $pastel-border;
   padding: 1.25rem 3.5rem 1.25rem 1.5rem;
-  background: $pastel-bg;
+  background: var(--ce-titlebar-bg);
+  color: var(--ce-titlebar-text);
   position: relative;
   :global(.modal-title) {
     font-size: 1.25rem;
     font-weight: 600;
-    color: $heading-color;
+    color: var(--ce-titlebar-text);
   }
 
   :global(.close),
   :global(.btn-close) {
     background: transparent !important;
     border: none !important;
-    color: var(--ce-compat-dark) !important;
+    color: var(--ce-titlebar-text) !important;
     opacity: 1 !important;
     box-shadow: none !important;
     position: absolute;
@@ -200,7 +201,7 @@ $text-color: var(--ce-border);
   }
 
   :global(.close) span {
-    color: var(--ce-compat-dark) !important;
+    color: var(--ce-titlebar-text) !important;
     font-size: 1.8rem;
     line-height: 1;
   }
