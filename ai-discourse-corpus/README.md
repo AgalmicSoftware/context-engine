@@ -13,7 +13,7 @@ This corpus is maintained as part of [Context Engine](https://github.com/Agalmic
 | `ai-scifi-books-corpus.json` | 156 | Science fiction works curated for AI safety, alignment, ethics, and policy discourse. |
 | `arxiv-ai-safety-corpus.json` | 285 | Academic papers on AI safety, alignment, interpretability, and governance. |
 | `cross-corpus-debates.json` | 16 | Structured debate trees that synthesize evidence across multiple AI discourse sources. |
-| `dwarkesh-lab-insiders-corpus.json` | 160 | Interviews and writings from AI lab insiders and practitioners on frontier AI development. |
+| `dwarkesh-lab-insiders-corpus.json` | 151 | Interviews and writings from AI lab insiders and practitioners on frontier AI development. |
 | `enriched-tweets.json` | 4140 | Enriched social-media discourse from 2018-09-21 through 2026-07-11, with summaries, tags, relevance signals, and linked context. |
 | `lab-primary-docs-corpus.json` | 38 | Primary safety/governance documents from frontier labs: safety frameworks (RSP, Preparedness, FSF), system cards, framework compliance reports, model specs, and deployment updates. |
 | `lesswrong-posts-corpus.json` | 232 | Influential LessWrong, Alignment Forum, EA Forum, and related AI safety/rationalist writing. |
@@ -22,7 +22,9 @@ This corpus is maintained as part of [Context Engine](https://github.com/Agalmic
 
 ## Format
 
-Each sub-corpus is a JSON file containing an array of entries or a top-level object with metadata plus an entries array. Entry schema varies by source but generally includes: title/text, author/source, URL, tags, and metadata.
+Each sub-corpus is a JSON file containing an array of entries or a top-level object with metadata plus an entries array. Entry schema varies by source but generally includes: title/text, author/source, URL, tags, and metadata. Entries added or revised since mid-2026 also carry `verification_status` (`verified` when the primary page was fetched and read, `partially_verified` when drafted from secondary coverage or search excerpts) and `verification_notes` describing the sources used, so consumers can weight them accordingly.
+
+`lab-primary-docs` includes an `incident_report` document type for the July–August 2026 evaluation-escape disclosures (Hugging Face, OpenAI, Anthropic), and `cross-corpus-debates.json` positions now draw on that sub-corpus as well.
 
 The Loophole mirror in [`corpuses/loophole-historical-cases.json`](./corpuses/loophole-historical-cases.json) is intentionally duplicated from [`client/src/variables/demo/loophole_historical_cases.json`](../client/src/variables/demo/loophole_historical_cases.json) so the corpus package and demo runtime stay aligned. Each case preserves its `source_label` and `url`, including citation of the upstream [brendanhogan/loophole](https://github.com/brendanhogan/loophole) repo.
 

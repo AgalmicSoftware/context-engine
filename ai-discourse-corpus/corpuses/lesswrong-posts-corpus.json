@@ -8206,9 +8206,7 @@
       "karma_score": null,
       "category": "AI Capabilities / Forecasting",
       "frequently_cited_by": [
-        "AI safety commentators",
-        "AGI timeline forecasters",
-        "Rationalist community discourse"
+        "zvi_on_dwarkesh_greenblatt_podcast_2026"
       ],
       "responses_and_critiques": [
         "Discussion threads on LessWrong debating the sincerity vs. strategic nature of Amodei's claims",
@@ -8243,8 +8241,7 @@
       "karma_score": null,
       "category": "AI Alignment",
       "frequently_cited_by": [
-        "AI safety researchers arguing for continued urgency",
-        "Critics of premature alignment optimism"
+        "zvi_what_happened_openai_huggingface_2026"
       ],
       "responses_and_critiques": [
         "Counterarguments from researchers at major labs pointing to empirical alignment progress",
@@ -8671,7 +8668,10 @@
       "influence_score": 8,
       "karma_score": 725,
       "category": "alignment_research",
-      "frequently_cited_by": [],
+      "frequently_cited_by": [
+        "byrnes_four_loss_functions_four_misalignments_2026",
+        "zvi_on_dwarkesh_greenblatt_podcast_2026"
+      ],
       "responses_and_critiques": [
         "Sam Marks' extended comment response arguing for positive alignment updates on non-scheming behaviors, with Greenblatt's reply (83-comment thread)"
       ],
@@ -8750,7 +8750,9 @@
       "influence_score": 7,
       "karma_score": 263,
       "category": "governance",
-      "frequently_cited_by": [],
+      "frequently_cited_by": [
+        "zvi_what_happened_openai_huggingface_2026"
+      ],
       "responses_and_critiques": [
         "Positioned as a response in the AI 2040: Plan A debate (appears among Plan A's linked posts)",
         "27-comment thread; visible commenters include ryan_greenblatt, scasper (Stephen Casper), Mass_Driver, Chris_Leong (comment content not reviewed)"

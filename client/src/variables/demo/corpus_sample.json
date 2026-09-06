@@ -25,7 +25,7 @@
       "dwarkesh_lab_insiders": {
         "label": "Insider Interviews",
         "sample_count": 20,
-        "full_count": 160
+        "full_count": 151
       },
       "ai_scifi_books": {
         "label": "AI in Sci-Fi",
@@ -2429,7 +2429,7 @@
     "dwarkesh_lab_insiders": {
       "label": "Insider Interviews",
       "icon": "mic",
-      "count_full": 160,
+      "count_full": 151,
       "entries": [
         {
           "id": "amodei_dario_dwarkesh_2026_end_of_exponential",

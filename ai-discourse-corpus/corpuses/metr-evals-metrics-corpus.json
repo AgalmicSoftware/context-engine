@@ -1241,7 +1241,9 @@
       ],
       "influence_score": 6,
       "citation_context": "Cited in discussions of GPT-4.5 capabilities and deployment considerations; referenced in frontier model capability comparisons",
-      "source_links": [],
+      "source_links": [
+        "https://metr.org/blog/2025-02-27-gpt-4-5-evals/"
+      ],
       "methodology": {
         "evaluation_framework": "Comparative benchmarking with autonomy and RE-Bench suites",
         "benchmark_suite": "General autonomy tasks and Research Engineering Benchmark",
@@ -1330,7 +1332,9 @@
       ],
       "influence_score": 8,
       "citation_context": "Foundational evaluation for reward hacking research; referenced in discussions of frontier model planning capabilities and optimization pathologies; cited for time horizon methodology",
-      "source_links": [],
+      "source_links": [
+        "https://evaluations.metr.org/openai-o3-report/"
+      ],
       "methodology": {
         "evaluation_framework": "Time horizon measurement with reward hacking assessment",
         "primary_metrics": [
@@ -1419,7 +1423,9 @@
       ],
       "influence_score": 6,
       "citation_context": "Referenced in discussions of Claude 3.5 Sonnet capabilities and limitations; cited for methodology of measuring human-baseline-equivalent performance; used in comparisons with o1 evaluation from same date",
-      "source_links": [],
+      "source_links": [
+        "https://evaluations.metr.org/claude-3-5-sonnet-report/"
+      ],
       "methodology": {
         "evaluation_framework": "Autonomous task execution with behavioral failure mode analysis",
         "baseline_comparison": "Human expert task execution timing",
@@ -1511,7 +1517,9 @@
       ],
       "influence_score": 7,
       "citation_context": "Key baseline for METR time horizon paper; referenced in discussions of frontier model capabilities and research automation potential; cited for RE-Bench performance metrics",
-      "source_links": [],
+      "source_links": [
+        "https://evaluations.metr.org/claude-3-7-report/"
+      ],
       "methodology": {
         "evaluation_framework": "Time horizon measurement with AI R&D capability assessment",
         "primary_metrics": [
@@ -1604,7 +1612,9 @@
       ],
       "influence_score": 7,
       "citation_context": "Referenced for frontier capability benchmarking; cited in discussions of autonomous planning scaling; used in projections of future autonomy capabilities",
-      "source_links": [],
+      "source_links": [
+        "https://evaluations.metr.org/"
+      ],
       "methodology": {
         "evaluation_framework": "Time horizon measurement with extended autonomy assessment",
         "primary_metrics": [
@@ -1697,7 +1707,9 @@
       ],
       "influence_score": 6,
       "citation_context": "Referenced in discussions of open-source catching frontier; cited for evidence of capability proliferation; used in debates about global AI governance",
-      "source_links": [],
+      "source_links": [
+        "https://evaluations.metr.org/deepseek-r1-report/"
+      ],
       "methodology": {
         "evaluation_framework": "Comparative capability assessment with frontier model benchmarking",
         "comparison_baselines": [
@@ -1796,7 +1808,9 @@
       ],
       "influence_score": 5,
       "citation_context": "Referenced for open-source capability milestones; cited in discussions of capability diffusion timelines; used in policy debates about governance horizons",
-      "source_links": [],
+      "source_links": [
+        "https://evaluations.metr.org/deepseek-v3-report/"
+      ],
       "methodology": {
         "evaluation_framework": "Frontier-comparable capability assessment with temporal positioning",
         "primary_metrics": [
@@ -1889,7 +1903,9 @@
       ],
       "influence_score": 5,
       "citation_context": "Referenced in discussions of open-source advancement velocity; cited for evidence of accelerating capability diffusion; used in projections of future capability availability",
-      "source_links": [],
+      "source_links": [
+        "https://evaluations.metr.org/"
+      ],
       "methodology": {
         "evaluation_framework": "Longitudinal tracking of open-source capability advancement",
         "primary_metrics": [
@@ -1981,7 +1997,9 @@
       ],
       "influence_score": 4,
       "citation_context": "Referenced for Chinese open-source capability assessment; cited for evidence of multilingual frontier AI; used in discussions of capability proliferation",
-      "source_links": [],
+      "source_links": [
+        "https://evaluations.metr.org/deepseek-qwen-report/"
+      ],
       "methodology": {
         "evaluation_framework": "Comparative capability assessment with specialty focus evaluation",
         "primary_metrics": [
@@ -2079,7 +2097,9 @@
       ],
       "influence_score": 5,
       "citation_context": "Referenced for frontier capability comparison; cited for Google DeepMind capability positioning; used in discussions of frontier tier membership",
-      "source_links": [],
+      "source_links": [
+        "https://evaluations.metr.org/"
+      ],
       "methodology": {
         "evaluation_framework": "Frontier tier parity assessment with capability specialization analysis",
         "primary_metrics": [
@@ -2180,7 +2200,9 @@
       ],
       "influence_score": 5,
       "citation_context": "Referenced for o1-preview capability assessment; cited in discussions of reasoning vs autonomy capabilities; used in evaluations of reasoning-specialized architectures",
-      "source_links": [],
+      "source_links": [
+        "https://evaluations.metr.org/openai-o1-preview-report/"
+      ],
       "methodology": {
         "evaluation_framework": "Comparative capability assessment with architectural specialization analysis",
         "primary_metrics": [
@@ -2271,7 +2293,9 @@
       ],
       "influence_score": 5,
       "citation_context": "Referenced for mid-2024 frontier capability assessment; cited in efficiency-capability tradeoff discussions; used in comparative frontier model analysis",
-      "source_links": [],
+      "source_links": [
+        "https://metr.org/blog/2024-08-06-update-on-evaluations/"
+      ],
       "methodology": {
         "evaluation_framework": "General frontier capability assessment with efficiency analysis",
         "primary_metrics": [
@@ -2366,7 +2390,9 @@
       ],
       "influence_score": 7,
       "citation_context": "Referenced for Claude Opus 4 sabotage risk assessment; cited in discussions of independent safety review; used in arguments about frontier model safety",
-      "source_links": [],
+      "source_links": [
+        "https://metr.org/assets/2025_pilot_risk_report_metr_review.pdf"
+      ],
       "methodology": {
         "evaluation_framework": "Independent third-party review of internal safety evaluation",
         "assessment_criteria": [
@@ -2458,7 +2484,9 @@
       ],
       "influence_score": 6,
       "citation_context": "Referenced in discussions of AI R&D automation potential; cited for expert consensus on acceleration feasibility; used in governance preparation discussions",
-      "source_links": [],
+      "source_links": [
+        "https://metr.org/blog/2025-08-20-forecasting-impacts-of-ai-acceleration/"
+      ],
       "methodology": {
         "evaluation_framework": "Structured expert forecasting with diverse expert panel",
         "expert_composition": [
@@ -5145,12 +5173,15 @@
       ],
       "influence_score": 7,
       "citation_context": "Cited in discussions of AI governance timelines and the urgency of policy development.",
-      "source_links": [],
+      "source_links": [
+        "https://metr.org/blog/2026-05-19-frontier-risk-report/"
+      ],
       "methodology": "Synthesis from METR's timelines modeling research, extrapolating capability growth trends and automation feasibility assessments.",
       "related_work": [
         "metr_exponential_trend_evidence",
         "metr_risk_thresholds_framework",
-        "metr_pre_deployment_eval_model"
+        "metr_pre_deployment_eval_model",
+        "metr_redwood_hugging_face_incident_investigation_2026"
       ]
     },
     {
@@ -5215,7 +5246,8 @@
       "related_work": [
         "metr_eval_integrity_metascience",
         "metr_benchmark_saturation_problem",
-        "metr_pre_deployment_eval_model"
+        "metr_pre_deployment_eval_model",
+        "metr_redwood_hugging_face_incident_investigation_2026"
       ]
     },
     {
@@ -5598,7 +5630,9 @@
       ],
       "influence_score": 8,
       "citation_context": "Influential in establishing evaluation integrity as critical concern in AI governance.",
-      "source_links": [],
+      "source_links": [
+        "https://metr.org/blog/2025-10-14-malt-dataset-of-natural-and-prompted-behaviors/"
+      ],
       "methodology": "Synthesis of METR's research on evaluation validity problems, framing as metascience challenge.",
       "related_work": [
         "metr_monitoring_arms_race",
@@ -5664,7 +5698,9 @@
       ],
       "influence_score": 9,
       "citation_context": "Most cited quantitative claim about AI progress in timelines and governance literature.",
-      "source_links": [],
+      "source_links": [
+        "https://metr.org/blog/2025-03-19-measuring-ai-ability-to-complete-long-tasks/"
+      ],
       "methodology": "Time horizon measurements across multiple model releases 2019-2025, statistical analysis of doubling period consistency and acceleration trends.",
       "related_work": [
         "metr_benchmark_saturation_problem",
@@ -6209,7 +6245,8 @@
       ],
       "methodology": "Structured red-team exercises against production monitoring infrastructure",
       "related_work": [
-        "metr_monitorability_evals_2026"
+        "metr_monitorability_evals_2026",
+        "metr_redwood_hugging_face_incident_investigation_2026"
       ],
       "themes": [
         "Red Teaming",
@@ -6567,7 +6604,9 @@
         "metr_time_horizon_paper_2025",
         "metr_time_horizon_1_1_2026",
         "metr_gpt5_eval_2025",
-        "metr_gpt51_codex_max_eval_2025"
+        "metr_gpt51_codex_max_eval_2025",
+        "metr_redwood_hugging_face_incident_investigation_2026",
+        "metr_investigating_propensities_after_incidents_2026"
       ],
       "themes": [
         "Cooperative safety assessment",
@@ -6793,7 +6832,8 @@
         "metr_gpt5_eval_2025",
         "metr_gpt51_codex_max_eval_2025",
         "metr_time_horizon_paper_2025",
-        "metr_time_horizon_1_1_2026"
+        "metr_time_horizon_1_1_2026",
+        "metr_redwood_hugging_face_incident_investigation_2026"
       ],
       "themes": [
         "Pre-deployment evaluation",
@@ -6858,7 +6898,9 @@
         "type": "process_description",
         "description": "Narrative account of METR's internal confidentiality policy framework, infrastructure setup, and organizational norms, plus its security control stack; a transparency post rather than an empirical study."
       },
-      "related_work": [],
+      "related_work": [
+        "metr_security_update_2026_08"
+      ],
       "themes": [
         "third_party_evaluation",
         "evaluator_access",
@@ -6994,7 +7036,7 @@
         "Releasing original and updated review versions demonstrates a correction-friendly norm for public evaluation documents."
       ],
       "debate_connections": [
-        "ai_rd_automation",
+        "debate_ai_rd_automation",
         "existential_risk_debate",
         "regulation_timing"
       ],
@@ -7086,8 +7128,8 @@
         "Golden-baseline calibration should be standard practice whenever human review is used as ground truth in evaluations."
       ],
       "debate_connections": [
-        "benchmark_validity",
-        "ai_rd_automation"
+        "debate_benchmark_validity",
+        "debate_ai_rd_automation"
       ],
       "methodology": {
         "design": "Blind-style maintainer review of AI-generated and golden human PRs on GitHub, without CI tools and with testing requirements waived (generous to AI).",
@@ -7161,8 +7203,8 @@
         "Assessments extrapolating small-scale R&D results to frontier-scale automation risk should account for the unknown transferability of small-scale pretraining insights."
       ],
       "debate_connections": [
-        "ai_rd_automation",
-        "benchmark_validity"
+        "debate_ai_rd_automation",
+        "debate_benchmark_validity"
       ],
       "methodology": {
         "design": "Retrospective classification of NanoGPT speedrun leaderboard records.",
@@ -7239,7 +7281,7 @@
         "If researcher uplift and compute are both growing exponentially, R&D-acceleration triggers in frontier safety policies may be approached sooner than single-metric readings suggest."
       ],
       "debate_connections": [
-        "ai_rd_automation",
+        "debate_ai_rd_automation",
         "existential_risk_debate"
       ],
       "methodology": {

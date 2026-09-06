@@ -1121,7 +1121,8 @@
         "eu_digital_services_act",
         "eu_digital_markets_act",
         "eu_gdpr_article_22",
-        "coe_framework_convention_ai"
+        "coe_framework_convention_ai",
+        "eu_digital_omnibus_ai_2026"
       ],
       "source_links": [
         "https://artificialintelligenceact.eu/implementation-timeline/",
@@ -4065,7 +4066,8 @@
       ],
       "relevance_to_ai_discourse": "Shows technical safety approach complementing regulatory frameworks",
       "related_legislation": [
-        "Supporting institutions: UK government policy framework"
+        "Supporting institutions: UK government policy framework",
+        "uk_aisi_incident_report_unsanctioned_agent_behaviour_2026"
       ],
       "source_links": [
         "https://www.aisi.gov.uk",
@@ -4863,7 +4865,9 @@
         "CREATE AI Act",
         "AI LEAD Act",
         "AI PLAN Act",
-        "All previously discussed bills"
+        "All previously discussed bills",
+        "us_ai_kill_switch_act_2026",
+        "us_house_oversight_letter_openai_hugging_face_2026"
       ],
       "source_links": [
         "https://www.ncsl.org/technology-and-communication/artificial-intelligence-2025-legislation",
@@ -5718,7 +5722,8 @@
       "related_legislation": [
         "california_ab_2013",
         "california_ab_2655",
-        "california_ab_2885"
+        "california_ab_2885",
+        "us_ai_kill_switch_act_2026"
       ],
       "source_links": [
         "https://www.pillsburylaw.com/en/news-and-insights/sb-1047-california-ai-laws.html",
@@ -9327,7 +9332,8 @@
       "relevance_to_ai_discourse": "This draft represents the most ambitious attempt at comprehensive federal AI legislation in the United States and will likely serve as the baseline for congressional debate through 2026-2027. Its development-vs-deployment preemption framework proposes a novel solution to the federalism challenges that have plagued AI governance, and the IVO concept could reshape how third-party AI auditing is structured. The bill's interaction with the concurrent executive order on AI innovation and security highlights the evolving relationship between executive and legislative approaches to AI governance, with the former favoring voluntary cooperation and the latter imposing binding obligations. Whether the discussion draft advances through committee will be a bellwether for the political viability of comprehensive federal AI regulation.",
       "related_legislation": [
         "us_eo_ai_innovation_security_2026",
-        "california_sb_1047"
+        "california_sb_1047",
+        "us_ai_kill_switch_act_2026"
       ],
       "source_links": [
         "https://obernolte.house.gov/media/press-releases/obernolte-trahan-release-discussion-draft-great-american-ai-act",

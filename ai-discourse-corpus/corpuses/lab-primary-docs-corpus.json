@@ -4,7 +4,7 @@
     "version": "1.0",
     "date_generated": "2026-07-08",
     "entry_count": 38,
-    "curation_notes": "All URLs and dates verified via web search/fetch on 2026-07-08. Entries with date_precision \"month\" have no published day-level date. Lab research papers already present in arxiv-ai-safety (e.g. Constitutional AI, superalignment posts, GPT-4 system card) are intentionally excluded to avoid cross-corpus duplication. Six documents also exist as thinner entries in dwarkesh-lab-insiders (RSP v1, RSP v2, Preparedness Framework v2, GPT-5 system card, Claude Opus 4.5 system card, Claude Opus 4.6 system card); ids here are version-qualified and primary urls kept distinct, and consolidating those entries into this corpus is a suggested follow-up. 2026-09-05 update: added incident_report doc_type and Hugging Face as a lab to cover the July 2026 evaluation-escape incident disclosures (Hugging Face, OpenAI, Anthropic) and OpenAI's Astra/pacing safeguard documents; entries drafted from fetched primary pages where noted in verification_notes.",
+    "curation_notes": "All URLs and dates verified via web search/fetch on 2026-07-08. Entries with date_precision \"month\" have no published day-level date. Lab research papers already present in arxiv-ai-safety (e.g. Constitutional AI, superalignment posts, GPT-4 system card) are intentionally excluded to avoid cross-corpus duplication. Six documents also exist as thinner entries in dwarkesh-lab-insiders (RSP v1, RSP v2, Preparedness Framework v2, GPT-5 system card, Claude Opus 4.5 system card, Claude Opus 4.6 system card); ids here are version-qualified and primary urls kept distinct, and consolidating those entries into this corpus is a suggested follow-up. 2026-09-05 update: added incident_report doc_type and Hugging Face as a lab to cover the July 2026 evaluation-escape incident disclosures (Hugging Face, OpenAI, Anthropic) and OpenAI's Astra/pacing safeguard documents; entries drafted from fetched primary pages where noted in verification_notes. 2026-09-05: the nine METR blog stubs formerly duplicated in dwarkesh-lab-insiders were removed from that corpus; the six lab-document duplicates listed above remain there pending consolidation.",
     "coverage": {
       "labs": [
         "Amazon",
@@ -379,7 +379,12 @@
         "system_card"
       ],
       "influence_score": 6,
-      "source_links": []
+      "source_links": [
+        {
+          "title": "Primary source",
+          "url": "https://www.anthropic.com/claude-sonnet-4-6-system-card"
+        }
+      ]
     },
     {
       "id": "anthropic_claude_fable5_mythos5_2026",
@@ -518,7 +523,12 @@
         "reporting"
       ],
       "influence_score": 6,
-      "source_links": []
+      "source_links": [
+        {
+          "title": "Primary source",
+          "url": "https://www.anthropic.com/transparency"
+        }
+      ]
     },
     {
       "id": "openai_how_we_think_safety_alignment_2025",
@@ -556,7 +566,12 @@
         "iterative_deployment"
       ],
       "influence_score": 8,
-      "source_links": []
+      "source_links": [
+        {
+          "title": "Primary source",
+          "url": "https://openai.com/safety/how-we-think-about-safety-alignment/"
+        }
+      ]
     },
     {
       "id": "openai_preparedness_framework_v2_2025",
@@ -649,7 +664,12 @@
         "preparedness"
       ],
       "influence_score": 7,
-      "source_links": []
+      "source_links": [
+        {
+          "title": "Primary source",
+          "url": "https://openai.com/index/o3-o4-mini-system-card/"
+        }
+      ]
     },
     {
       "id": "openai_gpt5_system_card_aug_2025",
@@ -741,7 +761,12 @@
         "agentic_coding"
       ],
       "influence_score": 7,
-      "source_links": []
+      "source_links": [
+        {
+          "title": "Primary source",
+          "url": "https://cdn.openai.com/pdf/ac7c37ae-7f4c-4442-b741-2eabdeaf77e0/oai_5_2_Codex.pdf"
+        }
+      ]
     },
     {
       "id": "openai_gpt56_preview_system_card_2026",
@@ -820,7 +845,12 @@
         "behavior_specification"
       ],
       "influence_score": 8,
-      "source_links": []
+      "source_links": [
+        {
+          "title": "Primary source",
+          "url": "https://model-spec.openai.com/2025-12-18.html"
+        }
+      ]
     },
     {
       "id": "deepmind_fsf_v1_2024",
@@ -858,7 +888,12 @@
         "safety_framework"
       ],
       "influence_score": 8,
-      "source_links": []
+      "source_links": [
+        {
+          "title": "Primary source",
+          "url": "https://deepmind.google/blog/introducing-the-frontier-safety-framework/"
+        }
+      ]
     },
     {
       "id": "deepmind_fsf_v2_2025",
@@ -946,7 +981,12 @@
         "ml_rd"
       ],
       "influence_score": 8,
-      "source_links": []
+      "source_links": [
+        {
+          "title": "Primary source",
+          "url": "https://deepmind.google/blog/strengthening-our-frontier-safety-framework/"
+        }
+      ]
     },
     {
       "id": "deepmind_gemini3_pro_model_card_2025",
@@ -1072,7 +1112,12 @@
         "research_agenda"
       ],
       "influence_score": 8,
-      "source_links": []
+      "source_links": [
+        {
+          "title": "Primary source",
+          "url": "https://arxiv.org/abs/2504.01849"
+        }
+      ]
     },
     {
       "id": "meta_frontier_ai_framework_2025",
@@ -1112,7 +1157,12 @@
         "threat_modeling"
       ],
       "influence_score": 8,
-      "source_links": []
+      "source_links": [
+        {
+          "title": "Primary source",
+          "url": "https://ai.meta.com/static-resource/meta-frontier-ai-framework/"
+        }
+      ]
     },
     {
       "id": "meta_advanced_ai_scaling_framework_v2_2026",
@@ -1151,7 +1201,12 @@
         "open_weights"
       ],
       "influence_score": 7,
-      "source_links": []
+      "source_links": [
+        {
+          "title": "Primary source",
+          "url": "https://ai.meta.com/static-resource/Meta_Advanced-AI-Scaling-Framework-v2"
+        }
+      ]
     },
     {
       "id": "xai_risk_management_framework_2025",
@@ -1268,7 +1323,12 @@
         "platform_governance"
       ],
       "influence_score": 6,
-      "source_links": []
+      "source_links": [
+        {
+          "title": "Primary source",
+          "url": "https://cdn-dynmedia-1.microsoft.com/is/content/microsoftcorp/microsoft/final/en-us/microsoft-brand/documents/Microsoft-Frontier-Governance-Framework.pdf"
+        }
+      ]
     },
     {
       "id": "amazon_frontier_model_safety_framework_2025",
