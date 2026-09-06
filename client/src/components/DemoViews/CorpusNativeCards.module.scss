@@ -233,11 +233,6 @@ $text: var(--ce-overlay-text);
   box-shadow: 0 16px 34px color-mix(in srgb, var(--ce-overlay-base) 30%, transparent);
 }
 
-.crossCorpusCard .nativeCardEyebrow {
-  color: var(--ce-overlay-text-muted);
-  margin-bottom: 9px;
-}
-
 .crossCorpusTitle {
   color: var(--ce-overlay-text);
   font-size: 20px;

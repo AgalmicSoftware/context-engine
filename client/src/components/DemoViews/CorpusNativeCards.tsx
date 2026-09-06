@@ -215,10 +215,6 @@ export const CrossCorpusCard = ({ entry = {}, onTagClick, onAtlasIssueOpen }: Na
 
   return (
     <article className={`${styles.card} ${styles.crossCorpusCard}`} data-testid={E2E_TESTIDS.CONTEXT_CROSS_CARD}>
-      <div className={styles.nativeCardEyebrow}>
-        <span>Cross-corpus debate</span>
-        {resolvedEntry.category ? <span>{resolvedEntry.category}</span> : null}
-      </div>
       <h3 className={styles.crossCorpusTitle}>{resolvedEntry.title || resolvedEntry.id || 'Untitled debate'}</h3>
       {resolvedEntry.summary ? <p className={styles.crossCorpusQuestion}>{resolvedEntry.summary}</p> : null}
 
