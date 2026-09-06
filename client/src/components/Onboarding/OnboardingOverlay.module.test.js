@@ -4,6 +4,11 @@ import path from 'path';
 describe('Onboarding overlay welcome slide styles', () => {
   const scss = fs.readFileSync(path.join(__dirname, 'OnboardingOverlay.module.scss'), 'utf8');
 
+  it('contains overflowing slide content above the reserved navigation area', () => {
+    expect(scss).toMatch(/\.onboardingInfo\s*{[^}]*overflow-y:\s*auto;/);
+    expect(scss).toMatch(/\.onboardingTitleArea\s*{[^}]*flex-shrink:\s*0;/);
+  });
+
   it('uses the main-site Welcome backdrop without duplicate panel paint layers', () => {
     expect(scss).toMatch(/\.panelFrame\s*{[\s\S]*?background-image:\s*var\(--ce-welcome-artwork-backdrop\);/);
     expect(scss).toMatch(/\.panel\s*{[\s\S]*?background:\s*transparent;/);
