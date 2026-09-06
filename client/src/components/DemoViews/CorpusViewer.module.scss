@@ -6,14 +6,13 @@ $surface: var(--ce-card-bg);
 $text: var(--ce-panel-text);
 
 .container {
-  background: $surface;
+  background: transparent;
   box-sizing: border-box;
-  border: 1px solid $card-border;
-  border-radius: var(--ce-radius-12);
+  border: 0;
   color: $text;
   max-width: 100%;
   overflow: hidden;
-  padding: 16px;
+  padding: 0;
   width: 100%;
 }
 
@@ -1455,8 +1454,7 @@ $text: var(--ce-panel-text);
 
 @media (max-width: 720px) {
   .container {
-    border-radius: var(--ce-radius-12);
-    padding: 10px;
+    padding: 0;
   }
 
   .tabBar {
@@ -1705,7 +1703,7 @@ $text: var(--ce-panel-text);
 
 @media (max-width: 480px) {
   .container {
-    padding: 8px;
+    padding: 0;
   }
 
   .tabBar {

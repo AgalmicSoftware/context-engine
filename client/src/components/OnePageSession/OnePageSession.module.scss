@@ -1157,6 +1157,12 @@
   padding-top: 0;
 }
 
+@media (max-width: 720px) {
+  .miniSectionContent.documentsSectionContent {
+    padding-inline: 0;
+  }
+}
+
 .pileHeaderRow {
   width: 100%;
   margin-top: 10px;
