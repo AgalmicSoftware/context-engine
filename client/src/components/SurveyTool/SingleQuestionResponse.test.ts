@@ -651,6 +651,19 @@ describe('SingleQuestionResponse encrypted answer CTA variants', () => {
   });
 });
 
+describe('profile response decryption', () => {
+  it.each(['answer', 'additional'])('decrypts the encrypted %s in place through the profile handler', (field) => {
+    const onDecryptQuestion = jest.fn();
+    const response = { [field]: { value: '*', encrypted: true, encryptedPortion: 'encrypted-fixture' } };
+    const subject = createSubject({
+      question: { id: 'q1', type: 'freeform' }, response, mode: 'mini',
+      canDecryptOtherResponses: true, onDecryptQuestion,
+    });
+    subject.handleDecryptClick(field);
+    expect(onDecryptQuestion).toHaveBeenCalledWith('q1', field, response);
+  });
+});
+
 describe('SingleQuestionResponse encrypted additional CTA variants', () => {
   it('renders compact encrypted-additional CTA with the same green button style', () => {
     const subject = createSubject({

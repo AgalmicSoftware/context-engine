@@ -604,8 +604,8 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
 
   /**
    * Wire up the decrypt buttons. If the chosen field is masked ('*') and marked encrypted,
-   * delegate to the parent onDecryptQuestion(question.id, field). For mini/profile views,
-   * redirect to the full question page instead of decrypting in-place.
+   * delegate to the parent onDecryptQuestion(question.id, field). Compact views without
+   * an eligible decrypt handler fall back to the full question page.
    */
   handleDecryptClick = (field: string): void => {
     const {
@@ -619,8 +619,9 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
       questionOnly,
     } = this.props;
 
-    // Redirect for mini/profile views
-    if (mode === 'mini' || questionOnly) {
+    const canDecrypt = !!isOwnResponse || !!canDecryptOtherResponses || responseHasLitSbtRecipient(response);
+    // Profile cards supply a handler that updates their locally decrypted response.
+    if ((mode === 'mini' || questionOnly) && (!onDecryptQuestion || !canDecrypt)) {
       const rAddr = responderAddress || null;
       const sessionSlug = this.resolveGroupSlug();
       if (question?.id && rAddr) {
@@ -632,7 +633,6 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
       }
     }
 
-    const canDecrypt = !!isOwnResponse || !!canDecryptOtherResponses || responseHasLitSbtRecipient(response);
     if (!onDecryptQuestion || !question?.id || !response || !canDecrypt) return;
 
     const target = field === 'additional' ? response.additional || {} : response.answer || {};
