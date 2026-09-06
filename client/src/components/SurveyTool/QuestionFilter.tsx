@@ -2956,11 +2956,7 @@ class QuestionFilter extends React.Component<any, any> {
                 <span style={QUESTION_FILTER_MODAL_TITLE_ROW_STYLE}>
                   <span>
                     Filter Questions (
-                    {awaitingQuestionMetadata ? (
-                      <FontAwesomeIcon icon={faSpinner} spin />
-                    ) : (
-                      filteredQuestionsCount
-                    )}
+                    {awaitingQuestionMetadata ? <FontAwesomeIcon icon={faSpinner} spin /> : filteredQuestionsCount}
                     {renderEncryptedCountBadge('6px')})
                   </span>
                   {/* Place + icon inline with the title to avoid overlaying the close X */}

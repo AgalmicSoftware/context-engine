@@ -656,8 +656,11 @@ describe('profile response decryption', () => {
     const onDecryptQuestion = jest.fn();
     const response = { [field]: { value: '*', encrypted: true, encryptedPortion: 'encrypted-fixture' } };
     const subject = createSubject({
-      question: { id: 'q1', type: 'freeform' }, response, mode: 'mini',
-      canDecryptOtherResponses: true, onDecryptQuestion,
+      question: { id: 'q1', type: 'freeform' },
+      response,
+      mode: 'mini',
+      canDecryptOtherResponses: true,
+      onDecryptQuestion,
     });
     subject.handleDecryptClick(field);
     expect(onDecryptQuestion).toHaveBeenCalledWith('q1', field, response);
