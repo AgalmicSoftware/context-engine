@@ -372,7 +372,7 @@ $text: var(--ce-panel-text);
 }
 
 .tweetCard {
-  background: linear-gradient(180deg, var(--ce-text-inverse) 0%, var(--ce-status-info-text) 100%);
+  background: var(--ce-text-inverse);
   border-color: var(--ce-status-info-text);
   border-radius: var(--ce-radius-18);
   box-shadow: 0 12px 28px color-mix(in srgb, var(--ce-document-text) 8%, transparent);
@@ -766,7 +766,7 @@ $text: var(--ce-panel-text);
 }
 
 .tweetActionRow .externalLink {
-  margin-left: auto;
+  margin-left: 0;
 }
 
 .cardFooter:empty,
@@ -1676,6 +1676,12 @@ $text: var(--ce-panel-text);
     overflow-wrap: anywhere;
     padding: 9px 12px;
     width: 100%;
+  }
+
+  .tweetActionRow .debateMapLink,
+  .tweetActionRow .externalLink {
+    flex: 0 1 auto;
+    width: auto;
   }
 
   .externalLink span {

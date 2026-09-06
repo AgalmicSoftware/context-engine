@@ -180,6 +180,10 @@ describe('CorpusViewer', () => {
     expect(mobileBlock).toContain('flex-direction: column;');
     expect(mobileBlock).toContain('.tweetPreviewControl {');
     expect(mobileBlock).toContain('margin-top: 2px;');
+    expect(mobileBlock).toContain('.tweetActionRow .debateMapLink,');
+    expect(mobileBlock).toContain('.tweetActionRow .externalLink {');
+    expect(mobileBlock).toContain('flex: 0 1 auto;');
+    expect(mobileBlock).toContain('width: auto;');
     expect(mobileBlock).toContain('.debateMapLink,');
     expect(mobileBlock).toContain('overflow-wrap: anywhere;');
     expect(mobileBlock).toContain('.externalLink span {');
@@ -212,6 +216,7 @@ describe('CorpusViewer', () => {
     expect(corpusScss).toMatch(
       /\.metrCard\s*{[\s\S]*?background:\s*linear-gradient\(180deg,\s*var\(--ce-text-inverse\) 0%,\s*var\(--ce-status-info-text\) 100%\);/,
     );
+    expect(corpusScss).toMatch(/\.tweetCard\s*{[\s\S]*?background:\s*var\(--ce-text-inverse\);/);
     expect(corpusScss).toMatch(/\.metrCard \.entrySummary\s*{[\s\S]*?color:\s*var\(--ce-document-text-muted\);/);
     expect(corpusScss).toMatch(/\.policyMapLens\s*{[\s\S]*?padding:\s*4px 4px 0;/);
     expect(corpusScss).toMatch(/\.policyMapPanel\s*{[\s\S]*?padding:\s*10px 10px 12px;/);
