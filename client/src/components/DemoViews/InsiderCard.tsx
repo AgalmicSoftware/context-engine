@@ -109,7 +109,14 @@ const InsiderCard = ({ entry = {}, onTagClick, onAtlasIssueOpen }: InsiderCardPr
           {buildInitials(intervieweeName)}
         </div>
         <div className={styles.entryHeaderContent}>
-          <div className={styles.insiderName}>{intervieweeName}</div>
+          <div className={styles.insiderTitleRow}>
+            <div className={styles.insiderName}>{intervieweeName}</div>
+            <div className={styles.interviewWaveform} role="img" aria-label="Interview transcript">
+              {[18, 34, 24, 42, 28, 48, 22, 38, 30].map((height, index) => (
+                <i key={`${height}-${index}`} style={{ height }} />
+              ))}
+            </div>
+          </div>
           {roleCompany ? <div className={styles.insiderRole}>{roleCompany}</div> : null}
           {resolvedEntry.interviewer ? (
             <div className={styles.insiderInterviewer}>with {resolvedEntry.interviewer}</div>
@@ -150,14 +157,6 @@ const InsiderCard = ({ entry = {}, onTagClick, onAtlasIssueOpen }: InsiderCardPr
           </div>
         ) : null}
         <div className={styles.insiderActionRow}>
-          <div className={styles.interviewTimeline} aria-label="Interview transcript">
-            <span>Transcript</span>
-            <div aria-hidden="true">
-              {[18, 34, 24, 42, 28, 48, 22, 38, 30].map((height, index) => (
-                <i key={`${height}-${index}`} style={{ height }} />
-              ))}
-            </div>
-          </div>
           {shouldClampSummary ? (
             <button type="button" className={styles.insiderExpandBtn} onClick={() => setExpanded((value) => !value)}>
               {expanded ? 'Collapse' : 'Expand'}

@@ -226,6 +226,7 @@ describe('CorpusViewer', () => {
     expect(corpusScss).toMatch(/\.externalLink\s*{[\s\S]*?box-sizing:\s*border-box;/);
     expect(corpusScss).toMatch(/\.cardFooterLinks\s*{[\s\S]*?width:\s*100%;/);
     expect(corpusScss).toMatch(/\.tweetActionRow\s*{[\s\S]*?justify-content:\s*flex-start;/);
+    expect(corpusScss).toMatch(/\.insiderTitleRow\s*{[\s\S]*?align-items:\s*center;[\s\S]*?display:\s*flex;/);
     expect(corpusScss).toMatch(/\.insiderActionRow\s*{[\s\S]*?display:\s*flex;[\s\S]*?flex-wrap:\s*wrap;/);
     expect(nativeCardScss).toMatch(
       /\.lessWrongCard\s*{[\s\S]*?background:\s*linear-gradient[\s\S]*?var\(--ce-document-canvas\)/,
@@ -745,7 +746,7 @@ describe('CorpusViewer', () => {
     expect(within(demisCard).getByText(/The frontier probably belongs to hybrids/i)).toBeInTheDocument();
   });
 
-  it('keeps transcript, expansion, and interview actions in one compact footer row', () => {
+  it('places the transcript waveform beside the name and keeps actions in a compact footer row', () => {
     render(
       <MemoryRouter>
         <CorpusViewer />
@@ -755,13 +756,15 @@ describe('CorpusViewer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Insider Interviews' }));
 
     const darioCard = screen.getAllByText('Dario Amodei')[0].closest('article') as HTMLElement;
+    const name = within(darioCard).getAllByText('Dario Amodei')[0];
     const transcript = within(darioCard).getByLabelText('Interview transcript');
     const expand = within(darioCard).getByRole('button', { name: 'Expand' });
     const interviewLink = within(darioCard).getByRole('link', { name: 'View interview' });
 
-    expect(transcript.parentElement).toBe(expand.parentElement);
-    expect(transcript.parentElement).toBe(interviewLink.parentElement);
-    expect(transcript.parentElement).toBe(darioCard.lastElementChild?.lastElementChild);
+    expect(transcript.parentElement).toBe(name.parentElement);
+    expect(transcript).not.toHaveTextContent('Transcript');
+    expect(expand.parentElement).toBe(interviewLink.parentElement);
+    expect(expand.parentElement).toBe(darioCard.lastElementChild?.lastElementChild);
   });
 
   it('keeps the first insider interview slots diversified when the same guest has multiple entries', () => {

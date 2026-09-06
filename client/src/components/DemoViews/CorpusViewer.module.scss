@@ -897,6 +897,18 @@ $text: var(--ce-panel-text);
   margin-bottom: 4px;
 }
 
+.insiderTitleRow {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.insiderTitleRow .insiderName {
+  margin-bottom: 0;
+}
+
 .insiderRole {
   color: var(--ce-document-text-muted);
   font-size: 16px;
@@ -1378,34 +1390,15 @@ $text: var(--ce-panel-text);
   line-height: 0.8;
 }
 
-.interviewTimeline {
+.interviewWaveform {
   align-items: center;
-  background: var(--ce-document-surface);
-  border: 1px solid var(--ce-status-info-text);
-  border-radius: var(--ce-radius-pill);
   display: inline-flex;
-  flex: 0 1 auto;
-  gap: 8px;
-  min-height: 40px;
-  padding: 5px 10px;
-}
-
-.interviewTimeline > span {
-  color: var(--ce-document-text-muted);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
-
-.interviewTimeline > div {
-  align-items: center;
-  display: flex;
+  flex: 0 0 auto;
   gap: 2px;
   height: 20px;
 }
 
-.interviewTimeline i {
+.interviewWaveform i {
   background: linear-gradient(180deg, var(--ce-status-info), $accent);
   border-radius: 999px;
   display: block;
