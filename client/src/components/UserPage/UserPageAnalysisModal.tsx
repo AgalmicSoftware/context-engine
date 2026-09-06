@@ -51,14 +51,28 @@ const UserPageAnalysisModal = ({
   onRefreshAnalysis,
   onToggle,
 }: UserPageAnalysisModalProps): React.ReactElement => (
-  <Modal isOpen={isOpen} toggle={onToggle} className={styles.modalContent}>
-    <ModalHeader toggle={onToggle} className={styles.modalHeader}>
-      {/* Close "X" is intentionally hidden via CSS; do not delete this feature. */}
+  <Modal isOpen={isOpen} toggle={onToggle} contentClassName={styles.analysisModalContent}>
+    <ModalHeader
+      toggle={onToggle}
+      className={styles.modalHeader}
+      close={
+        <button
+          type="button"
+          className={styles.analysisCloseButton}
+          data-ce-control-appearance="frameless"
+          aria-label="Close"
+          onClick={onToggle}
+        >
+          <span aria-hidden="true">×</span>
+        </button>
+      }
+    >
       <div className={styles.modalTitleRow}>
         {analysisName || 'User Analysis'}
         <button
           type="button"
           className={styles.refreshIconButton}
+          data-ce-control-appearance="frameless"
           onClick={onRefreshAnalysis}
           title="Refresh analysis"
           disabled={analyzing}

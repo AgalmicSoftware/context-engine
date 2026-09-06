@@ -7,11 +7,21 @@ jest.mock('reactstrap', () => ({
   Modal: ({ children, isOpen }: { children: React.ReactNode; isOpen: boolean }) =>
     isOpen ? <div data-testid="analysis-modal">{children}</div> : null,
   ModalBody: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  ModalHeader: ({ children, toggle }: { children: React.ReactNode; toggle: () => void }) => (
+  ModalHeader: ({
+    children,
+    toggle,
+    close,
+  }: {
+    children: React.ReactNode;
+    toggle: () => void;
+    close?: React.ReactNode;
+  }) => (
     <div>
-      <button type="button" onClick={toggle}>
-        close
-      </button>
+      {close || (
+        <button type="button" onClick={toggle}>
+          close
+        </button>
+      )}
       {children}
     </div>
   ),
@@ -68,7 +78,13 @@ describe('UserPageAnalysisModal', () => {
     expect(screen.getByText('Reasoning text')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Refresh analysis' }));
-    fireEvent.click(screen.getByText('close'));
+    const close = screen.getByRole('button', { name: 'Close' });
+    expect(close).toHaveAttribute('data-ce-control-appearance', 'frameless');
+    expect(screen.getByRole('button', { name: 'Refresh analysis' })).toHaveAttribute(
+      'data-ce-control-appearance',
+      'frameless',
+    );
+    fireEvent.click(close);
 
     expect(onRefreshAnalysis).toHaveBeenCalledTimes(1);
     expect(onToggle).toHaveBeenCalledTimes(1);
