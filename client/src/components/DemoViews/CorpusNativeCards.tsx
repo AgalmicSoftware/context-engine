@@ -178,13 +178,15 @@ export const SciFiCard = ({ entry = {}, onTagClick, onAtlasIssueOpen }: NativeCo
 
   return (
     <article className={`${styles.card} ${styles.sciFiCard}`} data-testid={E2E_TESTIDS.CONTEXT_SCIFI_CARD}>
-      <div className={styles.sciFiCover} aria-hidden="true">
-        <FontAwesomeIcon icon={faBookOpen} />
-        <span>{formatYear(resolvedEntry) || 'FUTURE'}</span>
-      </div>
       <div className={styles.sciFiContent}>
         <h3 className={styles.sciFiTitle}>{resolvedEntry.title || resolvedEntry.id || 'Untitled story'}</h3>
-        <div className={styles.sciFiByline}>{resolvedEntry.author || 'Unknown author'}</div>
+        <div className={styles.sciFiByline}>
+          <span>{resolvedEntry.author || 'Unknown author'}</span>
+          <span className={styles.sciFiEdition}>
+            <FontAwesomeIcon icon={faBookOpen} aria-hidden="true" />
+            <span>{formatYear(resolvedEntry) || 'FUTURE'}</span>
+          </span>
+        </div>
         {resolvedEntry.summary ? <p className={styles.sciFiSummary}>{resolvedEntry.summary}</p> : null}
 
         {themes.length > 0 ? (

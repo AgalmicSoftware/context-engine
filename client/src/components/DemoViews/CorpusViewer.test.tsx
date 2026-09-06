@@ -232,7 +232,7 @@ describe('CorpusViewer', () => {
       /\.lessWrongCard\s*{[\s\S]*?background:\s*linear-gradient[\s\S]*?var\(--ce-document-canvas\)/,
     );
     expect(nativeCardScss).toMatch(/\.lessWrongSummary\s*{[\s\S]*?color:\s*var\(--ce-document-text\);/);
-    expect(nativeCardScss).toMatch(/\.sciFiCard\s*{[\s\S]*?grid-template-columns:\s*118px minmax\(0, 1fr\);/);
+    expect(nativeCardScss).toMatch(/\.sciFiCard\s*{[\s\S]*?display:\s*block;/);
     expect(nativeCardScss).toMatch(/\.metricCard\s*{[\s\S]*?color:\s*var\(--ce-document-text\);/);
     expect(mapScss).toMatch(/\.mapFrameCompact\s*{[\s\S]*?width:\s*100%;[\s\S]*?padding:\s*0;/);
     expect(mapScss).toMatch(
@@ -602,9 +602,12 @@ describe('CorpusViewer', () => {
 
     const title = screen.getByText('Frankenstein; or, The Modern Prometheus');
     const sciFiCard = title.closest('article') as HTMLElement;
+    const author = within(sciFiCard).getByText('Mary Shelley');
+    const year = within(sciFiCard).getByText('1818');
 
     expect(sciFiCard).toHaveAttribute('data-testid', E2E_TESTIDS.CONTEXT_SCIFI_CARD);
     expect(within(sciFiCard).queryByText('Speculative futures archive')).not.toBeInTheDocument();
+    expect(author.parentElement).toContainElement(year);
     expect(within(sciFiCard).getByLabelText('Story themes')).toBeInTheDocument();
     expect(within(sciFiCard).getByRole('button', { name: 'Creation Ethics' })).toBeInTheDocument();
   });
