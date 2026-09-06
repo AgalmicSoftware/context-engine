@@ -218,6 +218,13 @@ export const CrossCorpusCard = ({ entry = {}, onTagClick, onAtlasIssueOpen }: Na
       <h3 className={styles.crossCorpusTitle}>{resolvedEntry.title || resolvedEntry.id || 'Untitled debate'}</h3>
       {resolvedEntry.summary ? <p className={styles.crossCorpusQuestion}>{resolvedEntry.summary}</p> : null}
 
+      {resolvedEntry.central_tension ? (
+        <aside className={styles.crossCorpusTension}>
+          <div className={styles.entryInsightLabel}>Central tension</div>
+          <div>{truncate(resolvedEntry.central_tension, 260)}</div>
+        </aside>
+      ) : null}
+
       <div className={styles.sourceNetwork} aria-label="Sources synthesized">
         <div className={styles.sourceNetworkNodes}>
           {corpora.slice(0, 4).map((corpus) => (
@@ -231,13 +238,6 @@ export const CrossCorpusCard = ({ entry = {}, onTagClick, onAtlasIssueOpen }: Na
           {corpora.length > 0 ? `Synthesizes: ${corpora.slice(0, 4).join(' • ')}` : 'Cross-source synthesis'}
         </div>
       </div>
-
-      {resolvedEntry.central_tension ? (
-        <aside className={styles.crossCorpusTension}>
-          <div className={styles.entryInsightLabel}>Central tension</div>
-          <div>{truncate(resolvedEntry.central_tension, 260)}</div>
-        </aside>
-      ) : null}
 
       {featuredSource ? <div className={styles.crossCorpusSource}>Featured source: {featuredSource}</div> : null}
       {Number(resolvedEntry.confirmed_agreement_count || 0) > 0 ? (

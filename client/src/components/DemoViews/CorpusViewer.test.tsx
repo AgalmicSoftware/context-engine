@@ -550,8 +550,11 @@ describe('CorpusViewer', () => {
     expect(crossCorpusCard).toHaveAttribute('data-testid', E2E_TESTIDS.CONTEXT_CROSS_CARD);
     expect(within(crossCorpusCard).queryByText('Cross-corpus debate')).not.toBeInTheDocument();
     expect(within(crossCorpusCard).queryByText('Empirical Dispute')).not.toBeInTheDocument();
-    expect(within(crossCorpusCard).getByLabelText('Sources synthesized')).toBeInTheDocument();
-    expect(within(crossCorpusCard).getByText('Central tension')).toBeInTheDocument();
+    const sourceNetwork = within(crossCorpusCard).getByLabelText('Sources synthesized');
+    const centralTension = within(crossCorpusCard).getByText('Central tension').closest('aside');
+    expect(sourceNetwork).toBeInTheDocument();
+    expect(centralTension).toBeInTheDocument();
+    expect(sourceNetwork.previousElementSibling).toBe(centralTension);
     expect(within(crossCorpusCard).getByText(/Synthesizes: METR • Dwarkesh • LessWrong/i)).toBeInTheDocument();
     expect(within(crossCorpusCard).getByRole('link', { name: 'Open dataset' })).toHaveAttribute(
       'href',
