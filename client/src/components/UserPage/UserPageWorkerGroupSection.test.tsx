@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 
 import UserPageWorkerGroupSection from './UserPageWorkerGroupSection';
+import { renderUserPageMembershipSections } from './UserPageMembershipSections';
 
 const mockWorkerSessionGroupsPanel = jest.fn();
 
@@ -11,6 +12,32 @@ jest.mock('../OnePageSession/WorkerSessionGroupsPanel', () => (props: unknown) =
 });
 
 describe('UserPageWorkerGroupSection', () => {
+  it('keeps a groups section when membership data is unavailable without loading private memberships', () => {
+    render(
+      <>
+        {renderUserPageMembershipSections({
+          account: '',
+          activeSessionSlug: '',
+          isOwner: false,
+          isSimulated: false,
+          onChainProfileEnabled: false,
+          provider: null,
+          sessionConfig: {},
+          sbtSectionProps: {
+            heading: 'SBTs',
+            onRefreshSbtData: jest.fn(),
+            sbtDisplayState: {},
+            sbtEmptyText: '',
+            sbtEntries: [],
+          },
+        })}
+      </>,
+    );
+    expect(screen.getByRole('heading', { name: 'Groups Joined:' })).toBeInTheDocument();
+    expect(screen.getByText('No groups to display.')).toBeInTheDocument();
+    expect(mockWorkerSessionGroupsPanel).not.toHaveBeenCalled();
+  });
+
   afterEach(() => {
     jest.clearAllMocks();
   });
