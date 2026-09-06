@@ -183,7 +183,6 @@ export const SciFiCard = ({ entry = {}, onTagClick, onAtlasIssueOpen }: NativeCo
         <span>{formatYear(resolvedEntry) || 'FUTURE'}</span>
       </div>
       <div className={styles.sciFiContent}>
-        <div className={styles.nativeCardEyebrow}>Speculative futures archive</div>
         <h3 className={styles.sciFiTitle}>{resolvedEntry.title || resolvedEntry.id || 'Untitled story'}</h3>
         <div className={styles.sciFiByline}>{resolvedEntry.author || 'Unknown author'}</div>
         {resolvedEntry.summary ? <p className={styles.sciFiSummary}>{resolvedEntry.summary}</p> : null}

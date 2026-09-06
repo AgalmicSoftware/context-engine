@@ -604,7 +604,7 @@ describe('CorpusViewer', () => {
     const sciFiCard = title.closest('article') as HTMLElement;
 
     expect(sciFiCard).toHaveAttribute('data-testid', E2E_TESTIDS.CONTEXT_SCIFI_CARD);
-    expect(within(sciFiCard).getByText('Speculative futures archive')).toBeInTheDocument();
+    expect(within(sciFiCard).queryByText('Speculative futures archive')).not.toBeInTheDocument();
     expect(within(sciFiCard).getByLabelText('Story themes')).toBeInTheDocument();
     expect(within(sciFiCard).getByRole('button', { name: 'Creation Ethics' })).toBeInTheDocument();
   });
