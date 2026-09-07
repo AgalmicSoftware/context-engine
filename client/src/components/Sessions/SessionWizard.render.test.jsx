@@ -16,6 +16,7 @@ import {
 } from '../DocsPage/contractMetadata.js';
 import { buildContractViewerContracts } from '../DocsPage/contractViewerUtils.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
+import { SESSION_SLUG_AVAILABILITY_DEBOUNCE_MS } from './hooks/useSessionSlugState.js';
 import {
   clearSessionWizardPendingSbtDraftsCache,
   readSessionWizardPendingSbtDraftsCache,
@@ -1112,41 +1113,55 @@ describe('SessionWizard rendered validation', () => {
     const { arweaveClient } = require('../../utilities/arweave/arweaveClient.js');
     let publishClicked = false;
     mockSessionExists.mockImplementation(async () => publishClicked);
-    renderLoggedInSessionWizard();
-    selectDecentralizedPreset();
-    enableAdvancedMode();
-    const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    const slugInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG);
+    jest.useFakeTimers();
+    const view = renderLoggedInSessionWizard();
+    try {
+      selectDecentralizedPreset();
+      enableAdvancedMode();
+      const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+      const slugInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG);
 
-    fireEvent.change(sessionNameInput, {
-      target: { value: 'Duplicate Session' },
-    });
-    fireEvent.change(slugInput, {
-      target: { value: 'duplicate-session' },
-    });
-    await createPendingFeaturedDraft();
-    await deployVerifiedWorkerForCurrentDraft();
+      fireEvent.change(sessionNameInput, {
+        target: { value: 'Duplicate Session' },
+      });
+      fireEvent.change(slugInput, {
+        target: { value: 'duplicate-session' },
+      });
+      // Settle the preview debounce before testing the independent publish-time check.
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(SESSION_SLUG_AVAILABILITY_DEBOUNCE_MS);
+      });
+      expect(mockSessionExists).toHaveBeenCalledWith('duplicate-session');
+      await createPendingFeaturedDraft();
+      await deployVerifiedWorkerForCurrentDraft();
 
-    fireEvent.click(screen.getByText('Publish').closest('button'));
-    const publishButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
-    fireEvent.click(screen.getByLabelText('Advanced publish settings'));
-    fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
-      target: { value: `ar://${'a'.repeat(43)}` },
-    });
-    await waitFor(
-      () => {
-        expect(publishButton).not.toBeDisabled();
-      },
-      { timeout: 5000 },
-    );
-    publishClicked = true;
-    fireEvent.click(publishButton);
+      fireEvent.click(screen.getByText('Publish').closest('button'));
+      const publishButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
+      fireEvent.click(screen.getByLabelText('Advanced publish settings'));
+      fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
+        target: { value: `ar://${'a'.repeat(43)}` },
+      });
+      await waitFor(
+        () => {
+          expect(publishButton).not.toBeDisabled();
+        },
+        { timeout: 5000 },
+      );
+      mockSessionExists.mockClear();
+      publishClicked = true;
+      fireEvent.click(publishButton);
 
-    expect(await screen.findByText('Session slug already exists on-chain: duplicate-session')).toBeInTheDocument();
-    expect(mockSessionExists).toHaveBeenCalledWith('duplicate-session');
-    expect(mockCreateSBT).not.toHaveBeenCalled();
-    expect(arweaveClient.uploadDataToArweave).not.toHaveBeenCalled();
-    expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
+      expect(await screen.findByText('Session slug already exists on-chain: duplicate-session')).toBeInTheDocument();
+      expect(mockSessionExists).toHaveBeenCalledWith('duplicate-session');
+      expect(mockSessionExists).toHaveBeenCalledTimes(1);
+      expect(mockCreateSBT).not.toHaveBeenCalled();
+      expect(arweaveClient.uploadDataToArweave).not.toHaveBeenCalled();
+      expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
+    } finally {
+      view.unmount();
+      jest.clearAllTimers();
+      jest.useRealTimers();
+    }
   });
 
   it('shows and clears the reserved slug error in the rendered form', async () => {
