@@ -792,7 +792,7 @@ for (const contentLength of [null, '1']) {
     });
     const shell = createWorkerRouteShellWithWorkerDeps({ deps: {
       getRouteBaseHeaders: () => ({ 'X-Test': 'cors' }),
-      dispatchAuthLoginRequestWithWorkerDeps: () => { dispatched = true; return new Response(); },
+      dispatchAuthLoginRequest: () => { dispatched = true; return new Response(); },
     } });
     const result = await shell.fetch(request, { CE_MAX_UPLOAD_BYTES: '8' });
     assert.equal(result.status, 413);
@@ -806,7 +806,7 @@ test('request boundary preserves exact UTF-8 signature bytes and request metadat
   const body = '{ "message": "é\\r\\n", "signature": "0x1234" }';
   const shell = createWorkerRouteShellWithWorkerDeps({ deps: {
     getRouteBaseHeaders: () => ({}),
-    dispatchAuthLoginRequestWithWorkerDeps: async ({ request }) => {
+    dispatchAuthLoginRequest: async ({ request }) => {
       assert.equal(request.headers.get('Authorization'), 'Bearer fixture');
       assert.equal(request.url, 'https://worker.example/auth/login?sessionSlug=fixture');
       assert.equal(await request.text(), body);
