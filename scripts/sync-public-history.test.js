@@ -310,17 +310,51 @@ function setupSourceRepo() {
       sourceDir,
     };
   } catch (error) {
-    fs.rmSync(tempRoot, { recursive: true, force: true });
+    removeSourceFixture(tempRoot);
     throw error;
   }
 }
+
+function removeSourceFixture(tempRoot, remove = fs.rmSync) {
+  // Git may finish writing an object after recursive removal has visited its directory.
+  // Retry the full traversal, but keep persistent failures visible to the test runner.
+  for (let pass = 1; pass <= 3; pass += 1) {
+    try {
+      remove(tempRoot, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+      return;
+    } catch (error) {
+      if (!['ENOTEMPTY', 'EBUSY', 'EPERM'].includes(error?.code) || pass === 3) throw error;
+    }
+  }
+}
+
+test('source fixture cleanup retries a full traversal after transient contention', () => {
+  let calls = 0;
+  removeSourceFixture('/tmp/fixture', () => {
+    calls += 1;
+    if (calls === 1) throw Object.assign(new Error('directory not empty'), { code: 'ENOTEMPTY' });
+  });
+  assert.equal(calls, 2);
+});
+
+test('source fixture cleanup surfaces persistent contention and unrelated errors', () => {
+  for (const code of ['ENOTEMPTY', 'EINVAL']) {
+    let calls = 0;
+    const error = Object.assign(new Error('cleanup failed'), { code });
+    assert.throws(() => removeSourceFixture('/tmp/fixture', () => {
+      calls += 1;
+      throw error;
+    }), (actual) => actual === error);
+    assert.equal(calls, code === 'ENOTEMPTY' ? 3 : 1);
+  }
+});
 
 function withSourceRepo(run) {
   const repo = setupSourceRepo();
   try {
     return run(repo);
   } finally {
-    fs.rmSync(repo.tempRoot, { recursive: true, force: true });
+    removeSourceFixture(repo.tempRoot);
   }
 }
 
