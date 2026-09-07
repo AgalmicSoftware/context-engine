@@ -16,7 +16,7 @@ const normalizeConfidence = (value) => {
     : null;
 };
 
-const jsonObjectCandidates = (text) => {
+export const jsonObjectCandidates = (text) => {
   const candidates = [];
   let start = -1;
   let depth = 0;

@@ -8,6 +8,7 @@ const { spawnSync } = require('node:child_process');
 
 const SCRIPT_SOURCE_PATH = path.join(__dirname, 'prepare-public-release.sh');
 const PACKAGE_SCRUBBER_SOURCE_PATH = path.join(__dirname, 'scrub-public-package-json.js');
+const WORKFLOW_SCRUBBER_SOURCE_PATH = path.join(__dirname, 'scrub-public-workflows.mjs');
 const PII_SCRUBBER_SOURCE_PATH = path.join(__dirname, 'scrub-public-pii-text.mjs');
 const BENCHMARK_HASH_REFRESHER_SOURCE_PATH = path.join(__dirname, 'refresh-public-benchmark-source-hashes.mjs');
 const HELPER_SOURCE_PATH = path.join(__dirname, 'lib', 'public-release-strip-patterns.sh');
@@ -47,6 +48,11 @@ test('prepare-public-release strips private surfaces without publishing an inven
       sourceDir,
       path.join('scripts', 'scrub-public-package-json.js'),
       fs.readFileSync(PACKAGE_SCRUBBER_SOURCE_PATH, 'utf8'),
+    );
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'scrub-public-workflows.mjs'),
+      fs.readFileSync(WORKFLOW_SCRUBBER_SOURCE_PATH, 'utf8'),
     );
     writeFile(
       sourceDir,
@@ -107,6 +113,21 @@ test('prepare-public-release strips private surfaces without publishing an inven
       sourceDir,
       'public.txt',
       `keep [redacted-email] and /redacted-home and contextengine${'@'}protonmail.com and ContextEngine${'@'}Protonmail.COM and agalmicsoftware${'@'}protonmail.com and contextengine+tag${'@'}protonmail.com\n`,
+    );
+    writeFile(
+      sourceDir,
+      path.join('.github', 'workflows', 'ci.yml'),
+      [
+        'steps:',
+        '  - name: Run public checks',
+        '    run: npm test',
+        '  # CE_PUBLIC_RELEASE_STRIP_START',
+        '  - name: Audit private companion production dependencies',
+        "    if: ${{ hashFiles('contextEngine-cc/package-lock.json') != '' }}",
+        '    run: npm --prefix contextEngine-cc audit --omit=dev --audit-level=high',
+        '  # CE_PUBLIC_RELEASE_STRIP_END',
+        '',
+      ].join('\n'),
     );
     const generatedWorkerBytes = `const wordlist = "Rfe${'@'}Rm.Rs"; // me${'@'}ricmoo.com\n`;
     writeFile(
@@ -233,6 +254,9 @@ test('prepare-public-release strips private surfaces without publishing an inven
       fs.readFileSync(path.join(outputDir, 'public.txt'), 'utf8'),
       `keep [redacted-email] and /redacted-home and contextengine${'@'}protonmail.com and ContextEngine${'@'}Protonmail.COM and agalmicsoftware${'@'}protonmail.com and [redacted-email]\n`,
     );
+    const publicWorkflow = fs.readFileSync(path.join(outputDir, '.github', 'workflows', 'ci.yml'), 'utf8');
+    assert.match(publicWorkflow, /Run public checks/);
+    assert.doesNotMatch(publicWorkflow, /contextEngine-cc|CE_PUBLIC_RELEASE_STRIP/);
     assert.match(
       fs.readFileSync(path.join(outputDir, '.github/ISSUE_TEMPLATE/config.yml'), 'utf8'),
       /mailto:contextengine@protonmail\.com/,
@@ -350,6 +374,7 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'e2e-env-example.test.js')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'vendor-cecc-ethers-bundle.js')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'restore-private-pack.sh')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'scrub-public-workflows.mjs')), true);
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'audit-deferred-findings.txt')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'lib', 'passkey-wallet-derivation.js')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'private-pack.manifest.json')), false);
@@ -377,6 +402,11 @@ test('prepare-public-release fails if private planning paths survive strip rules
       sourceDir,
       path.join('scripts', 'scrub-public-package-json.js'),
       fs.readFileSync(PACKAGE_SCRUBBER_SOURCE_PATH, 'utf8'),
+    );
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'scrub-public-workflows.mjs'),
+      fs.readFileSync(WORKFLOW_SCRUBBER_SOURCE_PATH, 'utf8'),
     );
     writeFile(
       sourceDir,

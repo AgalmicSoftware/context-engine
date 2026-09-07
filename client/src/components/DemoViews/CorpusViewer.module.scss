@@ -6,14 +6,13 @@ $surface: var(--ce-card-bg);
 $text: var(--ce-panel-text);
 
 .container {
-  background: $surface;
+  background: transparent;
   box-sizing: border-box;
-  border: 1px solid $card-border;
-  border-radius: var(--ce-radius-12);
+  border: 0;
   color: $text;
   max-width: 100%;
   overflow: hidden;
-  padding: 16px;
+  padding: 0;
   width: 100%;
 }
 
@@ -372,7 +371,7 @@ $text: var(--ce-panel-text);
 }
 
 .tweetCard {
-  background: linear-gradient(180deg, var(--ce-text-inverse) 0%, var(--ce-status-info-text) 100%);
+  background: var(--ce-text-inverse);
   border-color: var(--ce-status-info-text);
   border-radius: var(--ce-radius-18);
   box-shadow: 0 12px 28px color-mix(in srgb, var(--ce-document-text) 8%, transparent);
@@ -766,7 +765,7 @@ $text: var(--ce-panel-text);
 }
 
 .tweetActionRow .externalLink {
-  margin-left: auto;
+  margin-left: 0;
 }
 
 .cardFooter:empty,
@@ -897,6 +896,18 @@ $text: var(--ce-panel-text);
   margin-bottom: 4px;
 }
 
+.insiderTitleRow {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.insiderTitleRow .insiderName {
+  margin-bottom: 0;
+}
+
 .insiderRole {
   color: var(--ce-document-text-muted);
   font-size: 16px;
@@ -921,14 +932,19 @@ $text: var(--ce-panel-text);
 }
 
 .insiderExpandBtn {
-  background: transparent;
-  border: none;
+  align-items: center;
+  background: var(--ce-document-surface);
+  border: 1px solid var(--ce-status-info-text);
+  border-radius: var(--ce-radius-pill);
   color: var(--ce-status-info);
   cursor: pointer;
+  display: inline-flex;
+  flex: 0 1 auto;
   font-size: 13px;
   font-weight: 600;
-  margin-top: 14px;
-  padding: 0;
+  justify-content: center;
+  min-height: 40px;
+  padding: 8px 12px;
 }
 
 .insiderExpandBtn:hover {
@@ -949,6 +965,19 @@ $text: var(--ce-panel-text);
   gap: 10px;
   margin-top: 12px;
   padding-top: 12px;
+}
+
+.insiderActionRow {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.insiderActionRow .insiderSourceLink {
+  flex: 0 1 auto;
+  width: auto;
 }
 
 .insiderCard .entrySummary {
@@ -1360,40 +1389,22 @@ $text: var(--ce-panel-text);
   line-height: 0.8;
 }
 
-.interviewTimeline {
+.interviewWaveform {
   align-items: center;
-  border-bottom: 1px solid var(--ce-document-border);
-  border-top: 1px solid var(--ce-document-border);
-  display: grid;
-  gap: 12px;
-  grid-template-columns: auto minmax(0, 1fr);
-  margin-bottom: 14px;
-  padding: 10px 0;
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 2px;
+  height: 20px;
 }
 
-.interviewTimeline > span {
-  color: var(--ce-document-text-muted);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
-
-.interviewTimeline > div {
-  align-items: center;
-  display: flex;
-  gap: 4px;
-  height: 32px;
-}
-
-.interviewTimeline i {
+.interviewWaveform i {
   background: linear-gradient(180deg, var(--ce-status-info), $accent);
   border-radius: 999px;
   display: block;
-  max-height: 28px;
+  max-height: 18px;
   min-height: 5px;
   opacity: 0.78;
-  width: 4px;
+  width: 3px;
 }
 
 .tweetAuthorRow {
@@ -1443,8 +1454,7 @@ $text: var(--ce-panel-text);
 
 @media (max-width: 720px) {
   .container {
-    border-radius: var(--ce-radius-12);
-    padding: 10px;
+    padding: 0;
   }
 
   .tabBar {
@@ -1459,22 +1469,24 @@ $text: var(--ce-panel-text);
   }
 
   .tabButton {
-    align-items: flex-start;
-    flex-direction: column;
+    align-items: center;
+    flex-direction: row;
     gap: 8px;
     max-width: none;
-    min-height: 104px;
+    min-height: 48px;
     min-width: 0;
-    padding: 12px 12px 13px;
+    padding: 8px 10px;
+    text-align: left;
     width: 100%;
   }
 
   .tabIcon {
-    font-size: 28px;
+    flex-shrink: 0;
+    font-size: 20px;
   }
 
   .tabLabel {
-    font-size: 18px;
+    font-size: 14px;
     line-height: 1.18;
     white-space: normal;
   }
@@ -1678,6 +1690,12 @@ $text: var(--ce-panel-text);
     width: 100%;
   }
 
+  .tweetActionRow .debateMapLink,
+  .tweetActionRow .externalLink {
+    flex: 0 1 auto;
+    width: auto;
+  }
+
   .externalLink span {
     min-width: 0;
   }
@@ -1685,7 +1703,7 @@ $text: var(--ce-panel-text);
 
 @media (max-width: 480px) {
   .container {
-    padding: 8px;
+    padding: 0;
   }
 
   .tabBar {
@@ -1693,16 +1711,15 @@ $text: var(--ce-panel-text);
   }
 
   .tabButton {
-    min-height: 96px;
-    padding: 11px 10px 12px;
+    padding: 8px;
   }
 
   .tabIcon {
-    font-size: 26px;
+    font-size: 18px;
   }
 
   .tabLabel {
-    font-size: 17px;
+    font-size: 13px;
     line-height: 1.16;
   }
 

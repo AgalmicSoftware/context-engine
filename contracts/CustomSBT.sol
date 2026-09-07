@@ -3,13 +3,13 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 error NoGroupPassword();
-error InvalidNonce(uint256 expected, uint256 got);
+error InvalidInviteSlot(uint256 slot);
+error InviteSlotUsed(uint256 slot);
 error InvalidSignature();
 error MaxTokensReached();
 error AlreadyOwns();
@@ -21,7 +21,7 @@ error InvalidTokenId();
 /// ERC-5484 (`burnAuth(uint256)` + `Issued`) while also exposing the
 /// app-specific `SBTActivity`, `collectionBurnAuth()`, and `getHistorySummary()`
 /// helpers used by Context Engine history reads.
-contract MySBT is ERC721, ERC721Burnable, Ownable, ReentrancyGuard {
+contract MySBT is ERC721, ERC721Burnable, ReentrancyGuard {
     using ECDSA for bytes32;
     using MessageHashUtils for bytes32;
 
@@ -30,9 +30,13 @@ contract MySBT is ERC721, ERC721Burnable, Ownable, ReentrancyGuard {
     bytes4 private constant _INTERFACE_ID_ERC5192 = 0xb45a3c0e;
     bytes4 private constant _INTERFACE_ID_ERC5484 = 0x0489b56f;
 
+    bytes32 private constant GROUP_MINT_DOMAIN = keccak256("ContextEngine.SBT.GroupMint:1");
+    bytes32 private constant INVITE_DOMAIN = keccak256("ContextEngine.SBT.Invite:1");
+
+    mapping(uint256 => bool) public usedInviteSlots;
     uint256 public immutable maxTokens;
     uint256 public mintedTokens;
-    address public immutable admin;
+    address public admin;
     address public immutable deployingFactory;
     uint256 public immutable mintingEndTime;
     bool public immutable hasPasswordMint;
@@ -56,6 +60,7 @@ contract MySBT is ERC721, ERC721Burnable, Ownable, ReentrancyGuard {
     uint256 private _currentHolderCount;
     uint256 private _historicalHolderCount;
 
+    event AdminChanged(address indexed previousAdmin, address indexed newAdmin);
     event TokenURIInitialized(string tokenURI);
     event GroupPasswordHashInitialized(bytes32 groupPasswordHash);
     event Locked(uint256 tokenId);
@@ -79,7 +84,7 @@ contract MySBT is ERC721, ERC721Burnable, Ownable, ReentrancyGuard {
     BurnAuth private immutable _collectionBurnAuth;
 
     modifier onlyAdmin() {
-        require(admin == msg.sender, "Not admin");
+        require(admin != address(0) && admin == msg.sender, "Not admin");
         _;
     }
 
@@ -106,12 +111,12 @@ contract MySBT is ERC721, ERC721Burnable, Ownable, ReentrancyGuard {
         bytes32 _groupPasswordHash,
         bool _allowTokenURIInit,
         bool _allowGroupPasswordHashInit
-    ) ERC721(name, symbol) Ownable(_adminAddress != address(0) ? _adminAddress : msg.sender) {
+    ) ERC721(name, symbol) {
         _validateMintModeConfig(
             _mintMode, _limitedNumber, hashedPasswords, _groupPasswordHash, _allowGroupPasswordHashInit
         );
         maxTokens = _limitedNumber;
-        admin = _adminAddress != address(0) ? _adminAddress : msg.sender;
+        admin = _adminAddress;
         deployingFactory = msg.sender;
         mintingEndTime = _mintingEndTime;
         mintMode = _mintMode;
@@ -124,6 +129,14 @@ contract MySBT is ERC721, ERC721Burnable, Ownable, ReentrancyGuard {
         groupPasswordHashInitAllowed = _allowGroupPasswordHashInit;
 
         _addHashedPasswords(hashedPasswords);
+    }
+
+    /// @notice Rotates the sole collection admin; zero permanently disables admin actions.
+    /// @dev Token-holder burn rights remain governed by the immutable burn policy.
+    function changeAdmin(address newAdmin) external onlyAdmin {
+        address previousAdmin = admin;
+        admin = newAdmin;
+        emit AdminChanged(previousAdmin, newAdmin);
     }
 
     function _validateMintModeConfig(
@@ -236,7 +249,7 @@ contract MySBT is ERC721, ERC721Burnable, Ownable, ReentrancyGuard {
     }
 
     /// @notice Mints an SBT using a reusable group signature tied to the caller address.
-    /// @dev The signature must be an EIP-191 signature over `keccak256(abi.encodePacked(address(this), msg.sender))`.
+    /// @dev EIP-191 over abi.encode(GROUP_MINT_DOMAIN, chain ID, collection, claimant).
     /// @param signature The signed authorization proving the invite signer approved the caller.
     function mintWithGroupSignature(bytes calldata signature) external mintingActive nonReentrant {
         require(mintMode == MintMode.UnlimitedGroupSignature, "Group signature mint not enabled");
@@ -244,31 +257,26 @@ contract MySBT is ERC721, ERC721Burnable, Ownable, ReentrancyGuard {
         require(maxTokens == 0 || mintedTokens < maxTokens, "Max tokens reached");
         require(_userTokens[msg.sender] == 0, "Address already owns an SBT");
 
-        bytes32 message = keccak256(abi.encodePacked(address(this), msg.sender));
+        bytes32 message = keccak256(abi.encode(GROUP_MINT_DOMAIN, block.chainid, address(this), msg.sender));
         address signer = ECDSA.recover(message.toEthSignedMessageHash(), signature);
         require(keccak256(abi.encodePacked(signer)) == groupPasswordHash, "Invalid signature");
 
         _mintSoulbound(msg.sender);
     }
 
-    /// @notice Mints an SBT using a one-time invite signature tied to the next sequential nonce.
-    /// @dev Reverts with `NoGroupPassword` when invite signing is disabled, `InvalidNonce` when `nonce`
-    /// does not equal `mintedTokens + 1`, `InvalidSignature` when recovery fails or the recovered signer
-    /// hash does not match `groupPasswordHash`, `MaxTokensReached` when the collection is full, and
-    /// `AlreadyOwns` when the caller already owns an SBT.
-    /// @param nonce The expected invite nonce for this mint, which must equal `mintedTokens + 1`.
-    /// @param signature The EIP-191 signature over `keccak256(abi.encodePacked(address(this), nonce))`.
+    /// @notice Redeems one pre-signed transferable slot, independently of other slots.
+    /// @dev Slots are positive, bounded by maxTokens and consumed before receiver hooks.
+    /// @param nonce The one-use slot, independent of the token ID assigned at mint.
+    /// @param signature EIP-191 over abi.encode(INVITE_DOMAIN, chain ID, collection, slot).
     function claimWithInvite(uint256 nonce, bytes calldata signature) external mintingActive nonReentrant {
         require(mintMode == MintMode.LimitedInviteSignature, "Invite mint not enabled");
-        if (groupPasswordHash == bytes32(0)) {
-            revert NoGroupPassword();
-        }
+        if (groupPasswordHash == bytes32(0)) revert NoGroupPassword();
+        if (mintedTokens >= maxTokens) revert MaxTokensReached();
+        if (nonce == 0 || nonce > maxTokens) revert InvalidInviteSlot(nonce);
+        if (usedInviteSlots[nonce]) revert InviteSlotUsed(nonce);
+        if (balanceOf(msg.sender) > 0) revert AlreadyOwns();
 
-        if (nonce != mintedTokens + 1) {
-            revert InvalidNonce(mintedTokens + 1, nonce);
-        }
-
-        bytes32 message = keccak256(abi.encodePacked(address(this), nonce));
+        bytes32 message = keccak256(abi.encode(INVITE_DOMAIN, block.chainid, address(this), nonce));
         (address signer, ECDSA.RecoverError err,) = ECDSA.tryRecover(message.toEthSignedMessageHash(), signature);
         if (err != ECDSA.RecoverError.NoError) {
             revert InvalidSignature();
@@ -278,13 +286,9 @@ contract MySBT is ERC721, ERC721Burnable, Ownable, ReentrancyGuard {
             revert InvalidSignature();
         }
 
-        if (maxTokens != 0 && mintedTokens >= maxTokens) {
-            revert MaxTokensReached();
-        }
-        if (balanceOf(msg.sender) > 0) {
-            revert AlreadyOwns();
-        }
-
+        // Slots must not follow mintedTokens: a later invitation can redeem first.
+        // A failed safe mint reverts this consumption along with the token state.
+        usedInviteSlots[nonce] = true;
         _mintSoulbound(msg.sender);
     }
 
@@ -377,10 +381,11 @@ contract MySBT is ERC721, ERC721Burnable, Ownable, ReentrancyGuard {
     // and corrupt the summary counters / event ordering.
     function burn(uint256 tokenId) public override nonReentrant {
         address owner = ownerOf(tokenId);
+        bool isAdmin = admin != address(0) && admin == msg.sender;
         require(
             (_collectionBurnAuth == BurnAuth.OwnerOnly && owner == msg.sender)
-                || (_collectionBurnAuth == BurnAuth.Both && (owner == msg.sender || admin == msg.sender))
-                || (_collectionBurnAuth == BurnAuth.IssuerOnly && admin == msg.sender),
+                || (_collectionBurnAuth == BurnAuth.Both && (owner == msg.sender || isAdmin))
+                || (_collectionBurnAuth == BurnAuth.IssuerOnly && isAdmin),
             "Not authorized to burn"
         );
         super.burn(tokenId);
@@ -445,7 +450,10 @@ contract MySBT is ERC721, ERC721Burnable, Ownable, ReentrancyGuard {
         override
         returns (bool)
     {
-        if ((_collectionBurnAuth == BurnAuth.IssuerOnly || _collectionBurnAuth == BurnAuth.Both) && spender == admin) {
+        if (
+            (_collectionBurnAuth == BurnAuth.IssuerOnly || _collectionBurnAuth == BurnAuth.Both)
+                && admin != address(0) && spender == admin
+        ) {
             return true;
         }
         return spender != address(0)
@@ -478,7 +486,7 @@ contract MySBT is ERC721, ERC721Burnable, Ownable, ReentrancyGuard {
     /// @return symbol_ The ERC721 collection symbol.
     /// @return maxTokens_ The maximum mintable supply, or zero when uncapped.
     /// @return mintedTokens_ The number of tokens minted so far.
-    /// @return admin_ The immutable collection admin.
+    /// @return admin_ The current collection admin, or zero when admin actions are disabled.
     /// @return mintingEndTime_ The mint cutoff timestamp, or zero when minting does not expire.
     /// @return hasPasswordMint_ Whether password-based minting is enabled.
     /// @return burnAuth_ The configured burn authorization mode.

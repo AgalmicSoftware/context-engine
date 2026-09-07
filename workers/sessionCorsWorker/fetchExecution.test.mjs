@@ -268,3 +268,33 @@ test('fetchUrl preserves html stripping success and insufficient-content failure
     headers: baseHeaders,
   });
 });
+
+for (const contentLength of [null, '1']) {
+  for (const contentType of ['image/png', 'text/html', 'application/json']) {
+    test(`fetch caps actual ${contentType} bytes with content-length=${contentLength}`, async () => {
+      let cancelled = false;
+      let pulls = 0;
+      const stream = new ReadableStream({
+        pull(controller) {
+          pulls += 1;
+          if (pulls <= 11) controller.enqueue(new Uint8Array(1024 * 1024).fill(32));
+          else controller.close();
+        },
+        cancel() { cancelled = true; },
+      }, { highWaterMark: 0 });
+      const headers = { 'content-type': contentType };
+      if (contentLength) headers['content-length'] = contentLength;
+      const execute = contentType.startsWith('image/') ? fetchImage : fetchUrl;
+      const result = await execute({
+        url: 'https://example.com/data',
+        deps: {
+          json: createJsonStub(),
+          safeFetch: async () => new Response(stream, { headers }),
+        },
+      });
+      assert.equal(result.status, 413);
+      assert.equal(cancelled, true);
+      assert.equal(pulls, 11);
+    });
+  }
+}

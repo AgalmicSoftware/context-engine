@@ -36,18 +36,15 @@ export const renderUserPageMembershipSections = ({
     Boolean(activeSessionSlug);
   const showOnChainSbts = onChainProfileEnabled !== false;
 
-  if (!showWorkerGroups && !showOnChainSbts) return null;
-
   return (
     <div className={styles.rightColumn}>
-      {showWorkerGroups ? (
-        <UserPageWorkerGroupSection
-          account={account}
-          provider={provider}
-          sessionConfig={sessionConfig}
-          sessionSlug={activeSessionSlug}
-        />
-      ) : null}
+      <UserPageWorkerGroupSection
+        account={account}
+        provider={provider}
+        sessionConfig={sessionConfig}
+        sessionSlug={activeSessionSlug}
+        showMemberships={showWorkerGroups}
+      />
       {showOnChainSbts ? (
         <UserPageSbtSection {...sbtSectionProps} account={account} provider={provider} wrapColumn={false} />
       ) : null}

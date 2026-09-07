@@ -535,7 +535,8 @@ Authenticated clients can use the worker as the session storage boundary:
     refs are returned, the client completes without an on-chain transaction.
   - For `responses`, the Worker records the authenticated uploader as trusted
     responder metadata. The payload's own `responder` field is not authoritative.
-  - Upload bodies are capped at 25 MB by default before Arweave or Cloudflare storage handoff. Set `CE_MAX_UPLOAD_BYTES` on the Worker to lower or raise that limit for `/storage/upload` and `/arweave/upload`.
+  - Request bodies are capped at 25 MiB by default at the route shell, before JSON, text, or multipart parsing. `CE_MAX_UPLOAD_BYTES` configures this cap, including `/storage/upload` and `/arweave/upload`. The Worker counts actual streamed bytes even when `Content-Length` is absent or understated, cancels oversized bodies, and returns `413`. Accepted request bytes remain unchanged for signature validation.
+  - URL fetches and image fetches count actual response bytes up to 10 MiB before parsing or returning content. Oversized responses return `413`; image responses are buffered within this limit so they cannot return a partial success before detecting oversize.
   - KV-only payloads have a separate hard ceiling after base64/envelope JSON
     encoding: the serialized value must be at most 24 MiB, leaving 1 MiB below
     Cloudflare KV's 25 MiB value limit. Oversized encoded media/images and other
@@ -1259,34 +1260,34 @@ modules under `workers/sessionCorsWorker/`. Key boundary files:
   `OPTIONS`, auth, admin, bootstrap/authenticated Arweave, anonymous, and
   authenticated-fallback branch matching plus admin-action trimming and the
   current authorization-header classification used before deeper helpers run.
-- Shared auth request binding now routes through
-  `workers/sessionCorsWorker/authRequestBinding.js`, preserving the
-  worker-specific `/auth/nonce` nonce-builder/KV-write binding plus the
-  `/auth/login` used-nonce/token-ttl binding into the extracted auth
+- Auth request routing is composed in
+  `workers/sessionCorsWorker/workerRouteShellBinding.js`, which passes the
+  worker-specific `/auth/nonce` nonce-builder/KV-write deps and the
+  `/auth/login` used-nonce/token-ttl deps directly into the extracted auth
   request dispatch helpers.
 - Shared auth login request authority now routes through
   `workers/sessionCorsWorker/authLoginRequestAuthority.js`, preserving
   signed slug resolution, existing-session CORS passthrough,
   SIWE/signature/nonce validation, missing-config `404`, and on-chain scope
   computation before token signing runs.
-- Shared admin request binding now routes through
-  `workers/sessionCorsWorker/adminRequestBinding.js`, preserving the
+- Admin request routing is composed in
+  `workers/sessionCorsWorker/workerRouteShellBinding.js`, which passes the
   used-nonce ttl binding plus the worker-specific admin auth/config/secrets
-  helper bundle into the extracted admin request dispatcher.
+  helper bundle directly into the extracted admin request dispatcher.
 - Shared admin request authority now routes through
   `workers/sessionCorsWorker/adminRequestAuthority.js`, preserving signed
   slug resolution, existing-session CORS passthrough, SIWE/signature/nonce
   validation, bootstrap-vs-configured-admin authorization sequencing, and
   the final `Admin authorization failed.` contract before config/secrets/
   limits writes.
-- Shared bootstrap Arweave upload binding now routes through
-  `workers/sessionCorsWorker/bootstrapArweaveUploadBinding.js`,
-  preserving the bootstrap request log plus the env-bound slug/config/admin/
-  secrets helper bundle into the extracted bootstrap upload dispatcher.
-- Shared bootstrap admin-signature binding now routes through
-  `workers/sessionCorsWorker/adminSignatureVerificationBinding.js`,
-  preserving used-nonce ttl binding plus the worker-specific logging and
-  slug-mismatch constant bundle into the extracted bootstrap admin-signature
+- Bootstrap Arweave upload routing is composed in
+  `workers/sessionCorsWorker/workerRouteShellBinding.js`, which preserves the
+  bootstrap request log plus the env-bound slug/config/admin/secrets helper
+  bundle before calling the extracted bootstrap upload dispatcher.
+- Bootstrap admin-signature verification is composed in
+  `workers/sessionCorsWorker/workerExecutionServiceBinding.js`, which passes
+  used-nonce ttl binding plus the worker-specific logging and slug-mismatch
+  constant bundle directly into the extracted bootstrap admin-signature
   verifier.
 - Shared Arweave upload execution now routes through
   `workers/sessionCorsWorker/arweaveUploadExecution.js`, preserving
@@ -1418,25 +1419,16 @@ modules under `workers/sessionCorsWorker/`. Key boundary files:
   `workers/sessionCorsWorker/authenticatedRouteEntry.js`, preserving
   `requireAuth(...)`, authenticated `/health` success, authenticated route
   context resolution, and the final authenticated route dispatcher handoff.
-- Anonymous route-entry binding now routes through
-  `workers/sessionCorsWorker/anonymousRouteEntryBinding.js`, preserving the
-  worker-specific missing-slug/session-config constant binding plus the
-  env-bound handoff from the extracted anonymous route-entry helper directly
-  into the anonymous dispatcher.
-- Authenticated route-entry binding now routes through
-  `workers/sessionCorsWorker/authenticatedRouteEntryBinding.js`,
-  preserving the worker-specific authenticated route-context deps bundle,
-  missing-config constant binding, and the env-bound handoff from the
-  extracted authenticated route-entry helper directly into the authenticated
-  dispatcher.
-- The former one-caller anonymous route-dispatch binding has been folded into
-  `workers/sessionCorsWorker/anonymousRouteEntryBinding.js`, which owns the
-  provider/transcribe helper bundle, env-bound session-secrets lookup, and
-  anonymous route-denied constant handoff.
-- The former one-caller authenticated route-dispatch binding has been folded
-  into `workers/sessionCorsWorker/authenticatedRouteEntryBinding.js`, which
-  owns the secret-path, non-secret action, and secret-action helper bundles
-  plus the existing fetch/AI/faucet helper wiring.
+- Anonymous route-entry composition now happens in
+  `workers/sessionCorsWorker/workerRouteShellBinding.js`, which preserves the
+  worker-specific missing-slug/session-config constants plus the env-bound
+  session-secrets lookup and provider/transcribe helper bundle before calling
+  the anonymous route-entry and route dispatchers.
+- Authenticated route-entry composition now happens in
+  `workers/sessionCorsWorker/workerRouteShellBinding.js`, which preserves the
+  worker-specific authenticated route-context deps, missing-config constant,
+  and env-bound secret-path, non-secret action, and secret-action helper
+  bundles before calling the authenticated route-entry and route dispatchers.
 - `nonce:{slug}:{address}` → diagnostic nonce mirror (TTL 5m; the Durable Object is authoritative)
 - `usedNonce:{slug}:{nonce}` → diagnostic used mirror (TTL 10m; the Durable Object is authoritative)
 - `authToken:{slug}:{sub}:{jti}` → "1" for minted login tokens (TTL 4h)
@@ -2036,9 +2028,10 @@ Signed login/bootstrap requests:
     bootstrap-no-config bypass for caller-supplied `arweaveJwk` uploads,
     and the final `Admin authorization failed.` gate before upload
     execution.
-  - The remaining worker-specific bootstrap admin-signature binding now also routes through
-    `workers/sessionCorsWorker/adminSignatureVerificationBinding.js`, preserving the used-nonce ttl binding
-    plus the current logging and slug-mismatch constants before the verifier runs.
+  - Worker-specific bootstrap admin-signature composition now happens in
+    `workers/sessionCorsWorker/workerExecutionServiceBinding.js`, preserving
+    the used-nonce ttl binding plus the current logging and slug-mismatch
+    constants before the verifier runs.
   - Authenticated/bootstrap Arweave upload execution now also routes through
     `workers/sessionCorsWorker/arweaveUploadExecution.js`, preserving module resolution,
     upload-start/success/error logging, tag/association rejection logs, and the `transactions.post(...)`

@@ -78,7 +78,7 @@ test('fetches and validates the explicit manifest asset', async () => {
     artifactKind: 'session-cors-worker',
     fetchImpl: async (url, options) => {
       calls.push({ url, options });
-      return { ok: true, json: async () => manifest() };
+      return new Response(JSON.stringify(manifest()));
     },
   });
   assert.deepEqual(result, { ok: true, digest: DIGEST });

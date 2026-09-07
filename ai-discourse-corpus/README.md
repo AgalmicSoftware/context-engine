@@ -9,20 +9,22 @@ This corpus is maintained as part of [Context Engine](https://github.com/Agalmic
 | Sub-corpus | Items | Description |
 |------------|-------|-------------|
 | `ai-forecasting-economics-corpus.json` | 17 | AI forecasting and economics: compute/capability trend data, crowd and tournament forecasts, and the formal economics of transformative AI. |
-| `ai-laws-policy-corpus.json` | 224 | Global AI legislation, regulatory proposals, policy frameworks, agency guidance, and official reports with governance-focused analysis. |
+| `ai-laws-policy-corpus.json` | 227 | Global AI legislation, regulatory proposals, policy frameworks, agency guidance, and official reports with governance-focused analysis. |
 | `ai-scifi-books-corpus.json` | 156 | Science fiction works curated for AI safety, alignment, ethics, and policy discourse. |
-| `arxiv-ai-safety-corpus.json` | 279 | Academic papers on AI safety, alignment, interpretability, and governance. |
+| `arxiv-ai-safety-corpus.json` | 309 | Academic papers on AI safety, alignment, interpretability, and governance. |
 | `cross-corpus-debates.json` | 16 | Structured debate trees that synthesize evidence across multiple AI discourse sources. |
-| `dwarkesh-lab-insiders-corpus.json` | 154 | Interviews and writings from AI lab insiders and practitioners on frontier AI development. |
+| `dwarkesh-lab-insiders-corpus.json` | 159 | Interviews and writings from AI lab insiders and practitioners on frontier AI development. |
 | `enriched-tweets.json` | 4140 | Enriched social-media discourse from 2018-09-21 through 2026-07-11, with summaries, tags, relevance signals, and linked context. |
-| `lab-primary-docs-corpus.json` | 30 | Primary safety/governance documents from frontier labs: safety frameworks (RSP, Preparedness, FSF), system cards, framework compliance reports, model specs, and deployment updates. |
-| `lesswrong-posts-corpus.json` | 225 | Influential LessWrong, Alignment Forum, EA Forum, and related AI safety/rationalist writing. |
-| `metr-evals-metrics-corpus.json` | 100 | METR publications, benchmarks, evaluation reports, and measurement-oriented policy material. |
+| `lab-primary-docs-corpus.json` | 38 | Primary safety/governance documents from frontier labs: safety frameworks (RSP, Preparedness, FSF), system cards, framework compliance reports, model specs, and deployment updates. |
+| `lesswrong-posts-corpus.json` | 241 | Influential LessWrong, Alignment Forum, EA Forum, and related AI safety/rationalist writing. |
+| `metr-evals-metrics-corpus.json` | 103 | METR publications, benchmarks, evaluation reports, and measurement-oriented policy material. |
 | `loophole-historical-cases.json` | 40 | Mirrored copy of Context Engine's Loophole historical-case dataset, generated via the methodology from [brendanhogan/loophole](https://github.com/brendanhogan/loophole). Explores regulatory edge cases through adversarial scenario generation. |
 
 ## Format
 
-Each sub-corpus is a JSON file containing an array of entries or a top-level object with metadata plus an entries array. Entry schema varies by source but generally includes: title/text, author/source, URL, tags, and metadata.
+Each sub-corpus is a JSON file containing an array of entries or a top-level object with metadata plus an entries array. Entry schema varies by source but generally includes: title/text, author/source, URL, tags, and metadata. Entries added or revised since mid-2026 also carry `verification_status` (`verified` when the primary page was fetched and read, `partially_verified` when drafted from secondary coverage or search excerpts) and `verification_notes` describing the sources used, so consumers can weight them accordingly.
+
+`lab-primary-docs` includes an `incident_report` document type for the July–August 2026 evaluation-escape disclosures (Hugging Face, OpenAI, Anthropic), and `cross-corpus-debates.json` positions now draw on that sub-corpus as well.
 
 The Loophole mirror in [`corpuses/loophole-historical-cases.json`](./corpuses/loophole-historical-cases.json) is intentionally duplicated from [`client/src/variables/demo/loophole_historical_cases.json`](../client/src/variables/demo/loophole_historical_cases.json) so the corpus package and demo runtime stay aligned. Each case preserves its `source_label` and `url`, including citation of the upstream [brendanhogan/loophole](https://github.com/brendanhogan/loophole) repo.
 

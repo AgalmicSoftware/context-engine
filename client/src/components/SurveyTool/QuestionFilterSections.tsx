@@ -745,10 +745,16 @@ export function QuestionFilterSummaryControls({
 
       <div className={styles.summaryItemsRow}>
         {summaryItems.map((item, index) => (
-          <div key={index} className={styles.filterBubble} onClick={item.onRemove}>
+          <button
+            key={index}
+            type="button"
+            className={styles.filterBubble}
+            onClick={item.onRemove}
+            aria-label={`Remove filter: ${item.label}`}
+          >
             <span>{item.label}</span>
             <FontAwesomeIcon icon={faTimes} className={styles.removeIcon} />
-          </div>
+          </button>
         ))}
       </div>
 

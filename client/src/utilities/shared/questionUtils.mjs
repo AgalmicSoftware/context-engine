@@ -97,3 +97,7 @@ export function base64DecodeURL(b64urlstring) {
   const b64string = b64urlstring.replace(/-/g, '+').replace(/_/g, '/');
   return decodeBase64ToBytes(b64string);
 }
+
+export function base64urlToBase64(b64urlstring) {
+  return b64urlstring.replace(/-/g, '+').replace(/_/g, '/');
+}

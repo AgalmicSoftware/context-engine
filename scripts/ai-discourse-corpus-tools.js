@@ -188,6 +188,7 @@ const TAXONOMY_ENUMS = Object.freeze({
       'Anthropic',
       'Frontier Model Forum',
       'Google DeepMind',
+      'Hugging Face',
       'Meta',
       'Microsoft',
       'OpenAI',
@@ -196,6 +197,7 @@ const TAXONOMY_ENUMS = Object.freeze({
     doc_type: Object.freeze([
       'deployment_update',
       'framework_report',
+      'incident_report',
       'model_spec',
       'policy_statement',
       'safety_framework',

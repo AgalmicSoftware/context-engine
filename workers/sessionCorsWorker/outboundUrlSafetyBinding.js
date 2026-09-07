@@ -8,6 +8,8 @@ const toStr = (value, deps) => (
         : String(value)
 );
 
+export const PUBLIC_HTTPS_ARTIFACT_POLICY = 'public-https-artifact';
+
 export const STRICT_HTTPS_NO_CREDENTIALS_POLICY = 'strict-https-no-credentials';
 
 const normalizeOutboundHostname = (value, deps) => (
@@ -137,10 +139,14 @@ export const createOutboundUrlSafetyHelpersWithWorkerDeps = ({
 
   const isBlockedByPolicy = (urlString, policy) => {
     if (isBlockedOutboundUrl(urlString)) return true;
-    if (policy !== STRICT_HTTPS_NO_CREDENTIALS_POLICY) return false;
+    if (![STRICT_HTTPS_NO_CREDENTIALS_POLICY, PUBLIC_HTTPS_ARTIFACT_POLICY].includes(policy)) return false;
     try {
       const parsed = new URLWithCtor(urlString);
-      return parsed.protocol !== 'https:' || !!parsed.username || !!parsed.password;
+      if (parsed.protocol !== 'https:' || parsed.username || parsed.password) return true;
+      if (policy !== PUBLIC_HTTPS_ARTIFACT_POLICY) return false;
+      const hostname = normalizeOutboundHostname(parsed.hostname, deps);
+      return !hostname.includes('.') || hostname.includes(':') || !!parseIpv4Octets(hostname, deps) ||
+        /(^|\.)(localhost|local|internal|lan|home|home\.arpa)$/.test(hostname);
     } catch {
       return true;
     }
@@ -162,32 +168,26 @@ export const createOutboundUrlSafetyHelpersWithWorkerDeps = ({
     if (isBlockedByPolicy(url, outboundUrlPolicy)) {
       return { ok: false, error: 'Outbound target is not allowed', status: 403 };
     }
-    const requestOptions = { ...fetchOptions, redirect: 'manual' };
-    const r = await fetchImpl(url, requestOptions);
-    if (r.status < 300 || r.status >= 400) return r;
-
-    const location = toStr(r.headers.get('location'), deps).trim();
-    let redirectUrl = '';
-    if (location) {
-      try {
-        redirectUrl = new URLWithCtor(location, url).toString();
-      } catch {
-        redirectUrl = '';
+    let requestOptions = { ...fetchOptions, redirect: 'manual' };
+    let target = url;
+    const maxRedirects = outboundUrlPolicy === PUBLIC_HTTPS_ARTIFACT_POLICY ? 5 : 1;
+    for (let redirects = 0; ; redirects += 1) {
+      const response = await fetchImpl(target, requestOptions);
+      if (response.status < 300 || response.status >= 400) return response;
+      // Release redirect bodies; their content is never an artifact or response.
+      await response.body?.cancel?.();
+      if (redirects >= maxRedirects) return { ok: false, error: 'Too many redirects', status: 403 };
+      const location = toStr(response.headers.get('location'), deps).trim();
+      let redirectUrl = '';
+      if (location) {
+        try { redirectUrl = new URLWithCtor(location, target).toString(); } catch { /* Reject below. */ }
       }
+      if (!redirectUrl || isBlockedByPolicy(redirectUrl, outboundUrlPolicy)) {
+        return { ok: false, error: 'Redirect to blocked target', status: 403 };
+      }
+      target = redirectUrl;
+      requestOptions = { ...requestOptions, headers: buildSafeRedirectHeaders(requestOptions.headers) };
     }
-    if (!redirectUrl || isBlockedByPolicy(redirectUrl, outboundUrlPolicy)) {
-      return { ok: false, error: 'Redirect to blocked target', status: 403 };
-    }
-
-    const redirectOptions = {
-      ...requestOptions,
-      headers: buildSafeRedirectHeaders(requestOptions.headers),
-    };
-    const r2 = await fetchImpl(redirectUrl, redirectOptions);
-    if (r2.status >= 300 && r2.status < 400) {
-      return { ok: false, error: 'Too many redirects', status: 403 };
-    }
-    return r2;
   };
 
   return {

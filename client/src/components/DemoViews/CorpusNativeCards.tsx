@@ -178,14 +178,16 @@ export const SciFiCard = ({ entry = {}, onTagClick, onAtlasIssueOpen }: NativeCo
 
   return (
     <article className={`${styles.card} ${styles.sciFiCard}`} data-testid={E2E_TESTIDS.CONTEXT_SCIFI_CARD}>
-      <div className={styles.sciFiCover} aria-hidden="true">
-        <FontAwesomeIcon icon={faBookOpen} />
-        <span>{formatYear(resolvedEntry) || 'FUTURE'}</span>
-      </div>
       <div className={styles.sciFiContent}>
-        <div className={styles.nativeCardEyebrow}>Speculative futures archive</div>
         <h3 className={styles.sciFiTitle}>{resolvedEntry.title || resolvedEntry.id || 'Untitled story'}</h3>
-        <div className={styles.sciFiByline}>{resolvedEntry.author || 'Unknown author'}</div>
+        <div className={styles.sciFiByline}>
+          <span>{resolvedEntry.author || 'Unknown author'}</span>
+          <span className={styles.sciFiEdition}>
+            <FontAwesomeIcon icon={faBookOpen} aria-hidden="true" />
+            <span>{formatYear(resolvedEntry) || 'FUTURE'}</span>
+          </span>
+          <ExternalSourceLink entry={resolvedEntry} fallbackLabel="Explore story" className={styles.sciFiAction} />
+        </div>
         {resolvedEntry.summary ? <p className={styles.sciFiSummary}>{resolvedEntry.summary}</p> : null}
 
         {themes.length > 0 ? (
@@ -199,7 +201,7 @@ export const SciFiCard = ({ entry = {}, onTagClick, onAtlasIssueOpen }: NativeCo
           </div>
         ) : null}
 
-        <CardFooter entry={resolvedEntry} label="Explore story" onAtlasIssueOpen={onAtlasIssueOpen} />
+        <DebateMapSection entry={resolvedEntry} onAtlasIssueOpen={onAtlasIssueOpen} />
       </div>
     </article>
   );
@@ -215,12 +217,15 @@ export const CrossCorpusCard = ({ entry = {}, onTagClick, onAtlasIssueOpen }: Na
 
   return (
     <article className={`${styles.card} ${styles.crossCorpusCard}`} data-testid={E2E_TESTIDS.CONTEXT_CROSS_CARD}>
-      <div className={styles.nativeCardEyebrow}>
-        <span>Cross-corpus debate</span>
-        {resolvedEntry.category ? <span>{resolvedEntry.category}</span> : null}
-      </div>
       <h3 className={styles.crossCorpusTitle}>{resolvedEntry.title || resolvedEntry.id || 'Untitled debate'}</h3>
       {resolvedEntry.summary ? <p className={styles.crossCorpusQuestion}>{resolvedEntry.summary}</p> : null}
+
+      {resolvedEntry.central_tension ? (
+        <aside className={styles.crossCorpusTension}>
+          <div className={styles.entryInsightLabel}>Central tension</div>
+          <div>{truncate(resolvedEntry.central_tension, 260)}</div>
+        </aside>
+      ) : null}
 
       <div className={styles.sourceNetwork} aria-label="Sources synthesized">
         <div className={styles.sourceNetworkNodes}>
@@ -235,13 +240,6 @@ export const CrossCorpusCard = ({ entry = {}, onTagClick, onAtlasIssueOpen }: Na
           {corpora.length > 0 ? `Synthesizes: ${corpora.slice(0, 4).join(' • ')}` : 'Cross-source synthesis'}
         </div>
       </div>
-
-      {resolvedEntry.central_tension ? (
-        <aside className={styles.crossCorpusTension}>
-          <div className={styles.entryInsightLabel}>Central tension</div>
-          <div>{truncate(resolvedEntry.central_tension, 260)}</div>
-        </aside>
-      ) : null}
 
       {featuredSource ? <div className={styles.crossCorpusSource}>Featured source: {featuredSource}</div> : null}
       {Number(resolvedEntry.confirmed_agreement_count || 0) > 0 ? (

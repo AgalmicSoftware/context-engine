@@ -810,6 +810,7 @@ const toBroadcastTxResponse = ({ txHash, receipt } = {} as AnyRecord): TxLike =>
 
 const sendRegistryContractWriteViaProvider = async (
   {
+    expectedChainId,
     signingProvider,
     ethersProvider,
     signer,
@@ -821,6 +822,7 @@ const sendRegistryContractWriteViaProvider = async (
     rpcFunction = method,
     revertMessage = `${method} transaction reverted on-chain.`,
   } = {} as {
+    expectedChainId?: number;
     signingProvider?: AnyRecord;
     ethersProvider?: ethers.providers.Web3Provider;
     signer?: AnyRecord;
@@ -834,11 +836,18 @@ const sendRegistryContractWriteViaProvider = async (
   },
 ): Promise<TxLike> => {
   const { txHash, receipt } = await sendContractWriteViaProvider({
+    expectedChainId,
     signingProvider,
     ethersProvider,
     signer,
     contract,
     method,
+    expectedEvent:
+      method === 'createSession'
+        ? 'SessionCreated'
+        : method === 'updateSessionMetadata'
+          ? 'SessionMetadataUpdated'
+          : undefined,
     args,
     txOverrides,
     onBroadcastTxHash,
@@ -1627,12 +1636,27 @@ export const refreshSessionRegistryFieldsCache = async ({
 };
 
 export const loadSessionRegistryCache = async (
-  { chainIds, slugs, providerLike, account, lit, force, bootstrapRpc } = {} as AnyRecord,
+  {
+    chainIds,
+    slugs,
+    providerLike,
+    account,
+    lit,
+    force,
+    bootstrapRpc,
+    pageSize = 100,
+    loadOlder = false,
+  } = {} as AnyRecord,
 ) => {
   if (!USE_ONCHAIN_SESSION_REGISTRY && !force) return null;
   const useBootstrapRpc = typeof bootstrapRpc === 'boolean' ? bootstrapRpc : true;
 
   const previousCache = sessionRegistryStore.readCache();
+  const requestedPageSize = Number(pageSize);
+  const boundedPageSize =
+    Number.isFinite(requestedPageSize) && requestedPageSize > 0
+      ? Math.min(250, Math.max(1, Math.floor(requestedPageSize)))
+      : 100;
   let hadLoadErrors = false;
   let walletProvider: ethers.providers.Web3Provider | null = null;
   let walletChainId = 0;
@@ -1676,14 +1700,21 @@ export const loadSessionRegistryCache = async (
     if (!contract) return null;
 
     let sessionSources: Array<number | string> = requestedSlugs;
+    let pagination: { totalCount: number; nextIndex: number; startIndex: number } | undefined;
     if (!sessionSources.length) {
       let count = 0;
       try {
         count = Number(await contract.getSessionCount());
+        if (!Number.isSafeInteger(count) || count < 0) throw new Error('Invalid registry count.');
       } catch (_) {
         return { chainId, chainEntry: null, configs: [], hadLoadErrors: true };
       }
-      sessionSources = Array.from({ length: Math.max(0, Math.floor(count)) }, (_entry, index) => index);
+      const priorNext = previousCache?.chains?.[String(chainId)]?.pagination?.nextIndex;
+      const startIndex =
+        loadOlder && Number.isSafeInteger(priorNext) && priorNext >= 0 ? Math.min(priorNext, count) : count;
+      const nextIndex = Math.max(0, startIndex - boundedPageSize);
+      pagination = { totalCount: count, nextIndex, startIndex };
+      sessionSources = Array.from({ length: startIndex - nextIndex }, (_entry, index) => startIndex - index - 1);
     }
 
     const chainEntry: RegistryCache = {
@@ -1765,6 +1796,15 @@ export const loadSessionRegistryCache = async (
       },
     );
 
+    if (pagination) {
+      // Retry the same page after any failed row; loaded rows remain available.
+      chainEntry.pagination = {
+        totalCount: pagination.totalCount,
+        nextIndex: sessionResults.some((result) => result?.hadLoadErrors)
+          ? pagination.startIndex
+          : pagination.nextIndex,
+      };
+    }
     return {
       chainId,
       chainEntry,
@@ -1786,20 +1826,16 @@ export const loadSessionRegistryCache = async (
     cache.chains[String(result.chainId)] = result.chainEntry;
   });
 
+  const latestCache = sessionRegistryStore.readCache() || previousCache;
   const previousSessions =
-    previousCache?.sessions && typeof previousCache.sessions === 'object' ? previousCache.sessions : null;
+    latestCache?.sessions && typeof latestCache.sessions === 'object' ? latestCache.sessions : null;
   const requestedChainIds = new Set(
     (Array.isArray(ids) ? ids : [])
       .map((id) => Number(id))
       .filter((id) => Number.isFinite(id) && id > 0)
       .map((id) => Math.floor(id)),
   );
-  const previousCount = previousSessions ? Object.keys(previousSessions).length : 0;
-  const currentCount = Object.keys(cache.sessions || {}).length;
-  const shouldMergePrevious =
-    requestedSlugs.length > 0 || hadLoadErrors || (previousCount && currentCount < previousCount);
-
-  if (shouldMergePrevious && previousSessions) {
+  if (previousSessions) {
     Object.entries(previousSessions).forEach(([slug, cfg]) => {
       const previousConfig = cfg as AnyRecord;
       const previousChainId = getCachedSessionRegistryChainId(previousConfig);
@@ -1812,6 +1848,14 @@ export const loadSessionRegistryCache = async (
     });
   }
 
+  for (const [chainId, previousChain] of Object.entries(latestCache?.chains || {})) {
+    if (cache.chains[chainId] && !cache.chains[chainId].pagination) {
+      cache.chains[chainId].pagination = (previousChain as RegistryCache)?.pagination;
+    }
+  }
+  const hasOlder = Object.values(cache.chains).some(
+    (entry) => Number((entry as RegistryCache)?.pagination?.nextIndex) > 0,
+  );
   cache.__hadLoadErrors = !!hadLoadErrors;
   try {
     localStorage.setItem(REGISTRY_CACHE_KEY, JSON.stringify(cache));
@@ -1824,6 +1868,8 @@ export const loadSessionRegistryCache = async (
     Object.defineProperty(cache, '__loadMeta', {
       value: {
         hadLoadErrors: !!hadLoadErrors,
+        hasOlder,
+        pageSize: boundedPageSize,
         loadedChainIds: Array.isArray(ids) ? [...ids] : [],
         requestedSlugs: [...requestedSlugs],
         sessionCount: Object.keys(cache.sessions || {}).length,
@@ -1836,6 +1882,8 @@ export const loadSessionRegistryCache = async (
   } catch (_) {
     cache.__loadMeta = {
       hadLoadErrors: !!hadLoadErrors,
+      hasOlder,
+      pageSize: boundedPageSize,
       loadedChainIds: Array.isArray(ids) ? [...ids] : [],
       requestedSlugs: [...requestedSlugs],
       sessionCount: Object.keys(cache.sessions || {}).length,
@@ -2024,6 +2072,7 @@ export const registerSessionOnChain = async (
     estimate: null,
     send: (overrides: TxFeeOverrides) =>
       sendRegistryContractWriteViaProvider({
+        expectedChainId: writeChainId,
         signingProvider,
         ethersProvider,
         signer,
@@ -2061,6 +2110,7 @@ export const registerSessionOnChain = async (
         estimate: null,
         send: (overrides: TxFeeOverrides) =>
           sendRegistryContractWriteViaProvider({
+            expectedChainId: writeChainId,
             signingProvider,
             ethersProvider,
             signer,
@@ -2089,6 +2139,7 @@ export const registerSessionOnChain = async (
           estimate: null,
           send: (overrides: TxFeeOverrides) =>
             sendRegistryContractWriteViaProvider({
+              expectedChainId: writeChainId,
               signingProvider,
               ethersProvider,
               signer,
@@ -2121,6 +2172,7 @@ export const registerSessionOnChain = async (
         estimate: null,
         send: (overrides: TxFeeOverrides) =>
           sendRegistryContractWriteViaProvider({
+            expectedChainId: writeChainId,
             signingProvider,
             ethersProvider,
             signer,
@@ -2153,6 +2205,7 @@ export const registerSessionOnChain = async (
           estimate: null,
           send: (overrides: TxFeeOverrides) =>
             sendRegistryContractWriteViaProvider({
+              expectedChainId: writeChainId,
               signingProvider,
               ethersProvider,
               signer,
@@ -2224,6 +2277,7 @@ export const setSessionFieldsOnChain = async (
       estimate: null,
       send: (overrides: TxFeeOverrides) =>
         sendRegistryContractWriteViaProvider({
+          expectedChainId: writeChainId,
           signingProvider,
           ethersProvider,
           signer,
@@ -2256,6 +2310,7 @@ export const setSessionFieldsOnChain = async (
       estimate: null,
       send: (overrides: TxFeeOverrides) =>
         sendRegistryContractWriteViaProvider({
+          expectedChainId: writeChainId,
           signingProvider,
           ethersProvider,
           signer,
@@ -2318,6 +2373,7 @@ export const updateSessionMetadataOnChain = async (
     estimate: null,
     send: (overrides: TxFeeOverrides) =>
       sendRegistryContractWriteViaProvider({
+        expectedChainId: writeChainId,
         signingProvider,
         ethersProvider,
         signer,
@@ -2394,6 +2450,7 @@ export const setResourceGatesOnChain = async (
       estimate: null,
       send: (overrides: TxFeeOverrides) =>
         sendRegistryContractWriteViaProvider({
+          expectedChainId: writeChainId,
           signingProvider,
           ethersProvider,
           signer,
@@ -2424,6 +2481,7 @@ export const setResourceGatesOnChain = async (
         estimate: null,
         send: (overrides: TxFeeOverrides) =>
           sendRegistryContractWriteViaProvider({
+            expectedChainId: writeChainId,
             signingProvider,
             ethersProvider,
             signer,

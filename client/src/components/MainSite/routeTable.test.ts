@@ -207,3 +207,24 @@ describe('MainSite route table', () => {
     );
   });
 });
+
+describe('exact user profile routing', () => {
+  it.each([`/u/${ADDRESS}`, `/u/${ADDRESS}/?tab=responses`, `/${ADDRESS}#stats`])('accepts %s', (fullPath) => {
+    expect(resolveMainSiteRouteMatch({ fullPath, isAddress }).key).toBe('userProfile');
+  });
+  it.each([
+    `/unrelated/${ADDRESS}`,
+    `/unrelated?user=${ADDRESS}`,
+    `/unrelated#${ADDRESS}`,
+    `/u/${ADDRESS}/extra`,
+    `/${ADDRESS}/extra`,
+    `/u/0xinvalid`,
+    `//u/${ADDRESS}`,
+    `/u//${ADDRESS}`,
+    `/u/${ADDRESS}//`,
+  ])('rejects %s', (fullPath) => {
+    const route = resolveMainSiteRouteMatch({ fullPath, isAddress });
+    expect(route.key).toBe('notFound');
+    if (fullPath.startsWith('/unrelated')) expect(route.isKnownRoutePrefix).toBe(false);
+  });
+});

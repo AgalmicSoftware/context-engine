@@ -45,6 +45,7 @@ import CreateSbtShareableBlock from './CreateSbtShareableBlock';
 import { SbtEncryptedRecoveryControl, selectCreateEncryptedRecovery } from './SbtEncryptedRecoveryControl';
 
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
+import { sbtGroupMintAuthorizationPort } from '../../domains/sbts/sbtGroupMintAuthorizationPort';
 import { getGlobalLitHooks, uploadEncryptedArweaveData } from '../../utilities/crypto/litProtocol.js';
 import { createLogger } from '../../utilities/logging.js';
 import { peekCacheSync, writeCache } from '../../utilities/cache/cacheScripts.js';
@@ -275,9 +276,10 @@ const DISTRIBUTION_OPTION_CONFIGS = Object.freeze([
   {
     value: 'groupPassword',
     label: 'Group Password',
-    helpText: 'Share one password with the whole group.',
+    helpText: 'Use a shared password for unlimited claims or private signing for one-use invite codes.',
     tooltipId: 'groupPasswordTooltip',
-    tooltipText: 'Create a single shared password for the group.',
+    tooltipText:
+      'For a limited group, keep this password private and share the exported invite codes. For unlimited claims, share the password.',
   },
   {
     value: 'anyoneCanMint',
@@ -3428,7 +3430,17 @@ class CreateSBTGroup extends Component<any, any> {
         );
       }
 
-      const codesToStore = usesInviteCodes ? [groupPassword] : finalPasswordList;
+      const codesToStore = usesInviteCodes
+        ? (
+            await sbtGroupMintAuthorizationPort.generateInvitePayloads({
+              password: groupPassword,
+              sbtAddress,
+              chainId: Number(groupCfg.networkChainId),
+              nonces: Array.from({ length: limitedCount }, (_, index) => String(index + 1)),
+              walletScopeSbtAddress: deploymentExpectation ? sbtAddress : '',
+            })
+          ).map(({ inviteCode }) => inviteCode)
+        : finalPasswordList;
       this.persistCreatedSbtCodes({ sbtAddress, hasPasswordMintOnChain, codesToStore });
       this.suppressFormCachePersistenceAfterSuccess();
 
@@ -3446,7 +3458,7 @@ class CreateSBTGroup extends Component<any, any> {
         this.setState(buildCreateSbtShareableUrlPatch({ autoJoinUrl: publicAutoJoinUrl }));
       } else if (distributionOption === 'groupPassword' && isLimited) {
         this.setState(buildCreateSbtShareableUrlPatch({ autoJoinUrl: publicAutoJoinUrl }));
-        await this.generateSBTInviteLinks(sbtAddress, [groupPassword]);
+        await this.generateSBTInviteLinks(sbtAddress, codesToStore);
       } else if (distributionOption === 'anyoneCanMint') {
         const autoJoinUrl = publicAutoJoinUrl;
         this.setState(buildCreateSbtShareableUrlPatch({ autoJoinUrl }));
@@ -3988,6 +4000,7 @@ class CreateSBTGroup extends Component<any, any> {
       currentStep,
       sbtMinted,
     });
+    const isInvite = sbtDistribution.isLimited && sbtDistribution.distributionOption === 'groupPassword';
     const successDisplayState = resolveCreateSbtSuccessDisplayState({
       distributionOption: sbtDistribution.distributionOption,
       openMintAutoJoinUrl,
@@ -4517,8 +4530,12 @@ class CreateSBTGroup extends Component<any, any> {
               <>
                 {/* Auto-Join URL (Group Password) */}
                 {this.renderShareableBlock(
-                  'Claim URL (Password Entered Separately)',
-                  'This link identifies the group only. Send the exported claim password separately; the recipient enters it in the claim form.',
+                  sbtDistribution.isLimited
+                    ? 'Claim URL (Invite Code Entered Separately)'
+                    : 'Claim URL (Password Entered Separately)',
+                  sbtDistribution.isLimited
+                    ? 'This link identifies the group only. Send one exported invite code separately; it permits one claim.'
+                    : 'This link identifies the group only. Send the group password separately; the recipient enters it in the claim form.',
                   null,
                   autoJoinUrl,
                   'qr-code-one-click',
@@ -4551,7 +4568,7 @@ class CreateSBTGroup extends Component<any, any> {
 
         {successDisplayState.shouldRenderPasswordRecovery && (
           <div className={styles.sbtInviteLinks}>
-            <h3>Password Export &amp; Tab Recovery</h3>
+            <h3>{isInvite ? 'Invite Export & Tab Recovery' : 'Password Export & Tab Recovery'}</h3>
             <SbtEncryptedRecoveryControl
               checked={this.state.encryptedRecoveryEnabled === true}
               mode="create"
@@ -4568,7 +4585,7 @@ class CreateSBTGroup extends Component<any, any> {
                 <option value="csv">CSV</option>
               </select>
               <button onClick={this.exportPasswords} className={styles.exportButton}>
-                Export Passwords
+                {isInvite ? 'Export Invite Codes' : 'Export Passwords'}
               </button>
             </div>
           </div>
@@ -4609,7 +4626,7 @@ class CreateSBTGroup extends Component<any, any> {
                 <option value="csv">CSV</option>
               </select>
               <button onClick={this.exportPasswords} className={styles.exportButton}>
-                Export Passwords
+                {isInvite ? 'Export Invite Codes' : 'Export Passwords'}
               </button>
             </div>
           </div>

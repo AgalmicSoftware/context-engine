@@ -132,7 +132,7 @@ describe('Account.module.scss modal account layout guards', () => {
       /\.settingsThemeQuickControl\s*{[\s\S]*?background:\s*var\(--ce-settings-control-bg\);[\s\S]*?color:\s*var\(--ce-settings-control-text\);[\s\S]*?opacity:\s*1;/,
     );
     expect(themeSelectorScss).toMatch(
-      /\.field select\.select\s*{[\s\S]*?background:\s*var\(--ce-settings-field-bg\);[\s\S]*?color:\s*var\(--ce-settings-text\);/,
+      /\.field select\.select\s*{[\s\S]*?background:\s*var\(--ce-settings-control-bg\);[\s\S]*?color:\s*var\(--ce-settings-text\);/,
     );
   });
 

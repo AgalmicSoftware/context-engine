@@ -156,11 +156,11 @@ describe('CorpusViewer', () => {
     expect(mobileBlock).toContain('max-width: none;');
     expect(mobileBlock).toContain('min-width: 0;');
     expect(mobileBlock).toContain('width: 100%;');
-    expect(mobileBlock).toContain('min-height: 104px;');
+    expect(mobileBlock).toMatch(/\.tabButton\s*{[^}]*flex-direction: row;[^}]*min-height: 48px;/);
     expect(mobileBlock).toContain('.tabIcon {');
-    expect(mobileBlock).toContain('font-size: 28px;');
+    expect(mobileBlock).toContain('font-size: 20px;');
     expect(mobileBlock).toContain('.tabLabel {');
-    expect(mobileBlock).toContain('font-size: 18px;');
+    expect(mobileBlock).toContain('font-size: 14px;');
     expect(mobileBlock).toContain('line-height: 1.18;');
     expect(mobileBlock).toContain('white-space: normal;');
     expect(mobileBlock).toContain('.policyMapColumn {');
@@ -180,6 +180,10 @@ describe('CorpusViewer', () => {
     expect(mobileBlock).toContain('flex-direction: column;');
     expect(mobileBlock).toContain('.tweetPreviewControl {');
     expect(mobileBlock).toContain('margin-top: 2px;');
+    expect(mobileBlock).toContain('.tweetActionRow .debateMapLink,');
+    expect(mobileBlock).toContain('.tweetActionRow .externalLink {');
+    expect(mobileBlock).toContain('flex: 0 1 auto;');
+    expect(mobileBlock).toContain('width: auto;');
     expect(mobileBlock).toContain('.debateMapLink,');
     expect(mobileBlock).toContain('overflow-wrap: anywhere;');
     expect(mobileBlock).toContain('.externalLink span {');
@@ -189,11 +193,11 @@ describe('CorpusViewer', () => {
     expect(phoneBlock).toContain('.tabButton {');
     expect(phoneBlock).toContain('.tabBar {');
     expect(phoneBlock).toContain('gap: 8px;');
-    expect(phoneBlock).toContain('min-height: 96px;');
+    expect(phoneBlock).not.toMatch(/\.tabButton\s*{[^}]*min-height:/);
     expect(phoneBlock).toContain('.tabIcon {');
-    expect(phoneBlock).toContain('font-size: 26px;');
+    expect(phoneBlock).toContain('font-size: 18px;');
     expect(phoneBlock).toContain('.tabLabel {');
-    expect(phoneBlock).toContain('font-size: 17px;');
+    expect(phoneBlock).toContain('font-size: 13px;');
     expect(phoneBlock).toContain('line-height: 1.16;');
     expect(phoneBlock).toContain('.tweetCard .tweetAuthorRow {');
     expect(phoneBlock).toContain('grid-template-columns: 40px minmax(0, 1fr);');
@@ -205,6 +209,7 @@ describe('CorpusViewer', () => {
     expect(policyMobileBlock).toContain('.filterButton {');
     expect(policyMobileBlock).toContain('font-size: 11px;');
     expect(policyMobileBlock).toContain('white-space: normal;');
+    expect(policyScss).toMatch(/\.policyMetaRow\s*{[\s\S]*?display:\s*flex;[\s\S]*?flex-wrap:\s*wrap;/);
     expect(corpusScss).toMatch(/\.tabIcon\s*{[\s\S]*?font-size:\s*24px;/);
     expect(corpusScss).toMatch(
       /\.container\s*{[\s\S]*?box-sizing:\s*border-box;[\s\S]*?max-width:\s*100%;[\s\S]*?width:\s*100%;/,
@@ -212,6 +217,7 @@ describe('CorpusViewer', () => {
     expect(corpusScss).toMatch(
       /\.metrCard\s*{[\s\S]*?background:\s*linear-gradient\(180deg,\s*var\(--ce-text-inverse\) 0%,\s*var\(--ce-status-info-text\) 100%\);/,
     );
+    expect(corpusScss).toMatch(/\.tweetCard\s*{[\s\S]*?background:\s*var\(--ce-text-inverse\);/);
     expect(corpusScss).toMatch(/\.metrCard \.entrySummary\s*{[\s\S]*?color:\s*var\(--ce-document-text-muted\);/);
     expect(corpusScss).toMatch(/\.policyMapLens\s*{[\s\S]*?padding:\s*4px 4px 0;/);
     expect(corpusScss).toMatch(/\.policyMapPanel\s*{[\s\S]*?padding:\s*10px 10px 12px;/);
@@ -220,11 +226,13 @@ describe('CorpusViewer', () => {
     expect(corpusScss).toMatch(/\.externalLink\s*{[\s\S]*?box-sizing:\s*border-box;/);
     expect(corpusScss).toMatch(/\.cardFooterLinks\s*{[\s\S]*?width:\s*100%;/);
     expect(corpusScss).toMatch(/\.tweetActionRow\s*{[\s\S]*?justify-content:\s*flex-start;/);
+    expect(corpusScss).toMatch(/\.insiderTitleRow\s*{[\s\S]*?align-items:\s*center;[\s\S]*?display:\s*flex;/);
+    expect(corpusScss).toMatch(/\.insiderActionRow\s*{[\s\S]*?display:\s*flex;[\s\S]*?flex-wrap:\s*wrap;/);
     expect(nativeCardScss).toMatch(
       /\.lessWrongCard\s*{[\s\S]*?background:\s*linear-gradient[\s\S]*?var\(--ce-document-canvas\)/,
     );
     expect(nativeCardScss).toMatch(/\.lessWrongSummary\s*{[\s\S]*?color:\s*var\(--ce-document-text\);/);
-    expect(nativeCardScss).toMatch(/\.sciFiCard\s*{[\s\S]*?grid-template-columns:\s*118px minmax\(0, 1fr\);/);
+    expect(nativeCardScss).toMatch(/\.sciFiCard\s*{[\s\S]*?display:\s*block;/);
     expect(nativeCardScss).toMatch(/\.metricCard\s*{[\s\S]*?color:\s*var\(--ce-document-text\);/);
     expect(mapScss).toMatch(/\.mapFrameCompact\s*{[\s\S]*?width:\s*100%;[\s\S]*?padding:\s*0;/);
     expect(mapScss).toMatch(
@@ -548,8 +556,13 @@ describe('CorpusViewer', () => {
 
     expect(crossCorpusCard).toBeTruthy();
     expect(crossCorpusCard).toHaveAttribute('data-testid', E2E_TESTIDS.CONTEXT_CROSS_CARD);
-    expect(within(crossCorpusCard).getByLabelText('Sources synthesized')).toBeInTheDocument();
-    expect(within(crossCorpusCard).getByText('Central tension')).toBeInTheDocument();
+    expect(within(crossCorpusCard).queryByText('Cross-corpus debate')).not.toBeInTheDocument();
+    expect(within(crossCorpusCard).queryByText('Empirical Dispute')).not.toBeInTheDocument();
+    const sourceNetwork = within(crossCorpusCard).getByLabelText('Sources synthesized');
+    const centralTension = within(crossCorpusCard).getByText('Central tension').closest('aside');
+    expect(sourceNetwork).toBeInTheDocument();
+    expect(centralTension).toBeInTheDocument();
+    expect(sourceNetwork.previousElementSibling).toBe(centralTension);
     expect(within(crossCorpusCard).getByText(/Synthesizes: METR • Dwarkesh • LessWrong/i)).toBeInTheDocument();
     expect(within(crossCorpusCard).getByRole('link', { name: 'Open dataset' })).toHaveAttribute(
       'href',
@@ -589,9 +602,14 @@ describe('CorpusViewer', () => {
 
     const title = screen.getByText('Frankenstein; or, The Modern Prometheus');
     const sciFiCard = title.closest('article') as HTMLElement;
+    const author = within(sciFiCard).getByText('Mary Shelley');
+    const year = within(sciFiCard).getByText('1818');
+    const sourceLink = within(sciFiCard).getByRole('link', { name: 'Explore story' });
 
     expect(sciFiCard).toHaveAttribute('data-testid', E2E_TESTIDS.CONTEXT_SCIFI_CARD);
-    expect(within(sciFiCard).getByText('Speculative futures archive')).toBeInTheDocument();
+    expect(within(sciFiCard).queryByText('Speculative futures archive')).not.toBeInTheDocument();
+    expect(author.parentElement).toContainElement(year);
+    expect(author.parentElement).toContainElement(sourceLink);
     expect(within(sciFiCard).getByLabelText('Story themes')).toBeInTheDocument();
     expect(within(sciFiCard).getByRole('button', { name: 'Creation Ethics' })).toBeInTheDocument();
   });
@@ -696,6 +714,25 @@ describe('CorpusViewer', () => {
     expect(screen.queryByText(/Brazil AI Bill/i)).not.toBeInTheDocument();
   });
 
+  it('keeps policy metadata and the source action in one compact row', () => {
+    render(
+      <MemoryRouter>
+        <CorpusViewer />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Laws & Policy' }));
+
+    const policyCard = screen
+      .getByText('South Korea Framework Act on the Development of AI and Establishment of Trust')
+      .closest('article') as HTMLElement;
+    const metadataRow = within(policyCard).getByText('2024').parentElement as HTMLElement;
+
+    expect(metadataRow).toContainElement(within(policyCard).getByText('Enacted'));
+    expect(metadataRow).toHaveTextContent('South Korea');
+    expect(metadataRow).toContainElement(within(policyCard).getByRole('link', { name: 'View source' }));
+  });
+
   it('renders insider interview cards when the Insider Interviews tab is selected', () => {
     render(
       <MemoryRouter>
@@ -712,6 +749,27 @@ describe('CorpusViewer', () => {
 
     const demisCard = screen.getByText('Demis Hassabis').closest('article') as HTMLElement;
     expect(within(demisCard).getByText(/The frontier probably belongs to hybrids/i)).toBeInTheDocument();
+  });
+
+  it('places the transcript waveform beside the name and keeps actions in a compact footer row', () => {
+    render(
+      <MemoryRouter>
+        <CorpusViewer />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Insider Interviews' }));
+
+    const darioCard = screen.getAllByText('Dario Amodei')[0].closest('article') as HTMLElement;
+    const name = within(darioCard).getAllByText('Dario Amodei')[0];
+    const transcript = within(darioCard).getByLabelText('Interview transcript');
+    const expand = within(darioCard).getByRole('button', { name: 'Expand' });
+    const interviewLink = within(darioCard).getByRole('link', { name: 'View interview' });
+
+    expect(transcript.parentElement).toBe(name.parentElement);
+    expect(transcript).not.toHaveTextContent('Transcript');
+    expect(expand.parentElement).toBe(interviewLink.parentElement);
+    expect(expand.parentElement).toBe(darioCard.lastElementChild?.lastElementChild);
   });
 
   it('keeps the first insider interview slots diversified when the same guest has multiple entries', () => {

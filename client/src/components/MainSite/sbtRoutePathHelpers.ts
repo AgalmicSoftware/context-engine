@@ -54,14 +54,10 @@ export const getSbtListRouteSessionSlug = (
 };
 
 export const getUserAddressFromPath = (path: string, opts: { isAddress: AddressValidator }): string | null => {
-  const parts = splitCleanPath(path);
-  if (!parts.length) return null;
-  if (parts[0] === 'u' && parts[1]) {
-    const address = parts[1];
-    return opts.isAddress(address) ? address : null;
-  }
-  const address = parts[0];
-  return opts.isAddress(address) ? address : null;
+  const pathname = String(path || '').split(/[?#]/, 1)[0];
+  const match = /^\/(?:u\/)?(0x[0-9a-fA-F]{40})\/?$/.exec(pathname);
+  const address = match?.[1];
+  return address && opts.isAddress(address) ? address : null;
 };
 
 export const buildSbtDetailRouteStatePatch = ({

@@ -319,6 +319,8 @@ export const createContractScriptsSbtRegistryMethods = (deps: ContractScriptsRun
           ethersProvider,
           signer,
           contract: SBTFactory,
+          expectedChainId: gAddrs.sbtFactory?.chainId || cfg?.networkChainId,
+          expectedEvent: 'SBTCreated',
           method: createMethod,
           args: createArgs,
           txOverrides,
@@ -931,17 +933,7 @@ export const createContractScriptsSbtRegistryMethods = (deps: ContractScriptsRun
         const [name, symbol, admin, tokenURI_raw] = await Promise.all([
           callWithRetry(() => sbt.name(), 'SBT.name').catch(() => null),
           callWithRetry(() => sbt.symbol(), 'SBT.symbol').catch(() => null),
-          (async () => {
-            try {
-              return await callWithRetry(() => sbt.admin(), 'SBT.admin');
-            } catch {
-              try {
-                return await callWithRetry(() => sbt.owner(), 'SBT.owner');
-              } catch {
-                return ethers.constants.AddressZero;
-              }
-            }
-          })(),
+          callWithRetry(() => sbt.admin(), 'SBT.admin').catch(() => ethers.constants.AddressZero),
           readCollectionTokenURI(),
         ]);
 

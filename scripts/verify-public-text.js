@@ -16,6 +16,7 @@ const EXEMPT_PATHS = new Set([
   'scripts/prepare-public-release.test.js',
   'scripts/scrub-public-package-json.js',
   'scripts/scrub-public-package-json.test.js',
+  'scripts/scrub-public-workflows.mjs',
   'scripts/sync-public-history.sh',
   'scripts/sync-public-history.test.js',
   'scripts/verify-public-assets.js',
@@ -170,6 +171,7 @@ function main(argv = process.argv.slice(2)) {
 if (require.main === module) process.exitCode = main();
 
 module.exports = {
+  collectGitVisiblePaths,
   formatFindings,
   verifyPublicText,
 };

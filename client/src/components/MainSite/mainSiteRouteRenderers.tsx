@@ -459,7 +459,6 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
 
   _renderUserProfileRoute: (ctx: RouteRenderCtx) => {
     const { fullPath, defaultSlug, defaultSessionNetwork } = ctx;
-    const profilePath = fullPath;
     const profileSearchStr = (typeof window !== 'undefined' ? window.location.search : '') || '';
     const profileSearchParams = new URLSearchParams(profileSearchStr);
     const profileSessionConfig = defaultSlug ? host.getDisplaySessionCfg(defaultSlug) : null;
@@ -469,7 +468,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     });
     const onChainProfileEnabled = !defaultSlug || profileCapabilityContext.capabilities.usesOnChainSbt;
 
-    const viewAddress = profilePath.slice(1).replace('u/', '');
+    const viewAddress = host.getUserAddressFromPath(fullPath);
     const defaultTab = profileSearchParams.get('tab');
 
     return (

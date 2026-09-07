@@ -55333,6 +55333,7 @@ var createGroupProofAddressHashHelpersWithWorkerDeps = ({
 
 // workers/sessionCorsWorker/outboundUrlSafetyBinding.js
 var toStr5 = (value, deps) => typeof deps?.toStr === "function" ? deps.toStr(value) : typeof value === "string" ? value : value == null ? "" : String(value);
+var PUBLIC_HTTPS_ARTIFACT_POLICY = "public-https-artifact";
 var STRICT_HTTPS_NO_CREDENTIALS_POLICY = "strict-https-no-credentials";
 var normalizeOutboundHostname = (value, deps) => toStr5(value, deps).trim().toLowerCase().replace(/\.+$/, "");
 var stripIpv6HostnameDecorators = (value, deps) => normalizeOutboundHostname(value, deps).replace(/^\[/, "").replace(/\]$/, "").split("%")[0];
@@ -55445,10 +55446,13 @@ var createOutboundUrlSafetyHelpersWithWorkerDeps = ({
   };
   const isBlockedByPolicy = (urlString, policy) => {
     if (isBlockedOutboundUrl(urlString)) return true;
-    if (policy !== STRICT_HTTPS_NO_CREDENTIALS_POLICY) return false;
+    if (![STRICT_HTTPS_NO_CREDENTIALS_POLICY, PUBLIC_HTTPS_ARTIFACT_POLICY].includes(policy)) return false;
     try {
       const parsed = new URLWithCtor(urlString);
-      return parsed.protocol !== "https:" || !!parsed.username || !!parsed.password;
+      if (parsed.protocol !== "https:" || parsed.username || parsed.password) return true;
+      if (policy !== PUBLIC_HTTPS_ARTIFACT_POLICY) return false;
+      const hostname = normalizeOutboundHostname(parsed.hostname, deps);
+      return !hostname.includes(".") || hostname.includes(":") || !!parseIpv4Octets(hostname, deps) || /(^|\.)(localhost|local|internal|lan|home|home\.arpa)$/.test(hostname);
     } catch {
       return true;
     }
@@ -55468,30 +55472,28 @@ var createOutboundUrlSafetyHelpersWithWorkerDeps = ({
     if (isBlockedByPolicy(url, outboundUrlPolicy)) {
       return { ok: false, error: "Outbound target is not allowed", status: 403 };
     }
-    const requestOptions = { ...fetchOptions, redirect: "manual" };
-    const r = await fetchImpl(url, requestOptions);
-    if (r.status < 300 || r.status >= 400) return r;
-    const location2 = toStr5(r.headers.get("location"), deps).trim();
-    let redirectUrl = "";
-    if (location2) {
-      try {
-        redirectUrl = new URLWithCtor(location2, url).toString();
-      } catch {
-        redirectUrl = "";
+    let requestOptions = { ...fetchOptions, redirect: "manual" };
+    let target = url;
+    const maxRedirects = outboundUrlPolicy === PUBLIC_HTTPS_ARTIFACT_POLICY ? 5 : 1;
+    for (let redirects = 0; ; redirects += 1) {
+      const response2 = await fetchImpl(target, requestOptions);
+      if (response2.status < 300 || response2.status >= 400) return response2;
+      await response2.body?.cancel?.();
+      if (redirects >= maxRedirects) return { ok: false, error: "Too many redirects", status: 403 };
+      const location2 = toStr5(response2.headers.get("location"), deps).trim();
+      let redirectUrl = "";
+      if (location2) {
+        try {
+          redirectUrl = new URLWithCtor(location2, target).toString();
+        } catch {
+        }
       }
+      if (!redirectUrl || isBlockedByPolicy(redirectUrl, outboundUrlPolicy)) {
+        return { ok: false, error: "Redirect to blocked target", status: 403 };
+      }
+      target = redirectUrl;
+      requestOptions = { ...requestOptions, headers: buildSafeRedirectHeaders(requestOptions.headers) };
     }
-    if (!redirectUrl || isBlockedByPolicy(redirectUrl, outboundUrlPolicy)) {
-      return { ok: false, error: "Redirect to blocked target", status: 403 };
-    }
-    const redirectOptions = {
-      ...requestOptions,
-      headers: buildSafeRedirectHeaders(requestOptions.headers)
-    };
-    const r2 = await fetchImpl(redirectUrl, redirectOptions);
-    if (r2.status >= 300 && r2.status < 400) {
-      return { ok: false, error: "Too many redirects", status: 403 };
-    }
-    return r2;
   };
   return {
     normalizeOutboundHostname: (value) => normalizeOutboundHostname(value, deps),
@@ -56212,6 +56214,75 @@ var resolveWorkerRequestSlugContext = ({
   };
 };
 
+// workers/shared/bodyByteLimit.mjs
+var BodyByteLimitError = class extends Error {
+  constructor(maxBytes) {
+    super(`Body exceeds ${maxBytes} bytes.`);
+    this.name = "BodyByteLimitError";
+    this.status = 413;
+  }
+};
+var readBodyBytes = async (source, maxBytes) => {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0) throw new RangeError("Invalid byte limit.");
+  const reader = source.body?.getReader();
+  const declaredLength = Number(source.headers?.get("content-length"));
+  let total = 0;
+  const chunks = [];
+  try {
+    if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+      throw new BodyByteLimitError(maxBytes);
+    }
+    if (!reader) return new Uint8Array();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) throw new BodyByteLimitError(maxBytes);
+      chunks.push(value);
+    }
+    const bytes2 = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes2.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return bytes2;
+  } catch (error) {
+    try {
+      await reader?.cancel(error);
+    } catch {
+    }
+    throw error;
+  } finally {
+    reader?.releaseLock();
+  }
+};
+var readBodyText = async (source, maxBytes) => new TextDecoder().decode(await readBodyBytes(source, maxBytes));
+
+// workers/shared/artifactFetch.mjs
+var MAX_ARTIFACT_BYTES = 10 * 1024 * 1024;
+var MAX_MANIFEST_BYTES = 1024 * 1024;
+var fetchArtifactText = async (url, {
+  fetchImpl = globalThis.fetch,
+  maxBytes = MAX_ARTIFACT_BYTES,
+  accept = "application/javascript"
+} = {}) => {
+  const { safeFetch } = createOutboundUrlSafetyHelpersWithWorkerDeps({ deps: { fetch: fetchImpl } });
+  const response2 = await safeFetch(url, {
+    method: "GET",
+    headers: { Accept: accept },
+    cache: "no-store",
+    outboundUrlPolicy: PUBLIC_HTTPS_ARTIFACT_POLICY
+  });
+  if (!response2.ok) {
+    await response2.body?.cancel?.();
+    const error = new Error(response2.error || `Artifact fetch failed (${response2.status}).`);
+    error.status = response2.status;
+    throw error;
+  }
+  return readBodyText(response2, maxBytes);
+};
+
 // workers/shared/deployHelperCore.mjs
 var import_rpcDefaults3 = __toESM(require_rpcDefaults(), 1);
 
@@ -56550,15 +56621,12 @@ var fetchExpectedWorkerBundleDigest = async ({
     return { ok: false, error: "Worker release manifest URL must be an explicit HTTPS manifest asset URL." };
   }
   try {
-    const response2 = await fetchImpl(normalizedUrl, {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      cache: "no-store"
+    const text = await fetchArtifactText(normalizedUrl, {
+      fetchImpl,
+      maxBytes: MAX_MANIFEST_BYTES,
+      accept: "application/json"
     });
-    if (!response2.ok) {
-      return { ok: false, error: `Failed to fetch Worker release manifest (${response2.status}).` };
-    }
-    const manifest = await response2.json();
+    const manifest = JSON.parse(text);
     return readWorkerBundleDigestFromManifest(manifest, { artifactFile, artifactKind });
   } catch (error) {
     return { ok: false, error: `Failed to read Worker release manifest: ${toStr10(error?.message || error)}` };
@@ -56669,9 +56737,7 @@ var readBundle = async ({ body, env, fetchImpl }) => {
   const url = normalizeHttpsUrl(body?.bundleUrl || env?.AGENT_BRIDGE_BUNDLE_URL);
   if (!url) return { ok: false, error: "Missing a trusted Agent Bridge bundle." };
   try {
-    const result = await fetchImpl(url, { method: "GET", cache: "no-store" });
-    if (!result.ok) return { ok: false, error: `Failed to fetch Agent Bridge bundle (${result.status}).` };
-    const source = await result.text();
+    const source = await fetchArtifactText(url, { fetchImpl });
     return source.trim() ? { ok: true, source } : { ok: false, error: "Agent Bridge bundle is empty." };
   } catch (error) {
     return { ok: false, error: `Failed to fetch Agent Bridge bundle: ${toStr11(error?.message || error)}` };
@@ -59017,31 +59083,14 @@ var executeDeployHelperRequestCore = async ({
   resolvedAccountId = ""
 } = {}) => {
   const sessionSlugCheck = validateInboundSlug(body?.sessionSlug);
-  if (!sessionSlugCheck.ok) {
-    return buildFailure(400, { error: sessionSlugCheck.error });
-  }
-  if (body?.groupSlug != null && body?.sessionSlug == null) {
-    return buildFailure(400, {
-      error: "Legacy groupSlug is no longer accepted. Use sessionSlug instead."
-    });
-  }
   const apiToken = toStr13(body?.apiToken || body?.token).trim();
   const apiBaseUrl = resolveCloudflareApiBaseUrl({ env });
   const cfFetchOptions = { fetchImpl, apiBaseUrl };
   if (body?.deploymentKind === AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND) {
-    if (!apiToken) return buildFailure(400, { error: "Missing apiToken." });
-    const accountLookup2 = toStr13(resolvedAccountId).trim() ? { ok: true, accountId: toStr13(resolvedAccountId).trim() } : await resolveDeploymentAccountId({ body, fetchImpl, apiBaseUrl, env });
-    if (!accountLookup2.ok) {
-      const lookupStatus = Number(accountLookup2.status || 0);
-      return buildFailure(lookupStatus === 404 || lookupStatus === 409 ? lookupStatus : 502, {
-        error: accountLookup2.error || "Failed to resolve Cloudflare account.",
-        detail: accountLookup2.detail
-      }, { fallbackEligible: accountLookup2.fallbackEligible === true });
-    }
     return executeAgentSessionWrappedDeployment({
       body,
       env,
-      accountId: toStr13(accountLookup2.accountId).trim(),
+      accountId: toStr13(resolvedAccountId).trim(),
       cfFetchImpl: (token, path, options) => cfFetch(token, path, options, cfFetchOptions),
       fetchImpl,
       markMutationStarted: idempotencyContext?.markMutationStarted
@@ -59050,9 +59099,6 @@ var executeDeployHelperRequestCore = async ({
   const requestedWorkerName = toStr13(body?.workerName).trim();
   const defaultSlugInput = env?.DEFAULT_SESSION_SLUG ?? env?.DEFAULT_GROUP_SLUG ?? "";
   const defaultSlugCheck = validateInboundSlug(defaultSlugInput);
-  if (body?.sessionSlug == null && !defaultSlugCheck.ok) {
-    return buildFailure(400, { error: defaultSlugCheck.error });
-  }
   const defaultSlug = defaultSlugCheck.slug;
   const sessionSlug = body?.sessionSlug != null ? sessionSlugCheck.slug : defaultSlug;
   const displaySlug = sessionSlug || "general";
@@ -59065,30 +59111,13 @@ var executeDeployHelperRequestCore = async ({
   let bundleSource = hasBundleText ? bundleText : "";
   const bundleSourceKind = hasBundleText ? "bundleText" : "bundleUrl";
   let bundleDiagnostics = null;
-  if (!apiToken) return buildFailure(400, { error: "Missing apiToken." });
-  if (!requestedWorkerName) return buildFailure(400, { error: "Missing workerName." });
-  if (suppliedBundleSha256 && !expectedBundleSha256) {
-    return buildFailure(400, { error: "bundleSha256 must be a complete SHA-256 hex digest." });
-  }
-  if (!hasBundleText && !bundleUrl) {
-    return buildFailure(400, {
-      error: "Missing bundleText or bundleUrl (set WORKER_BUNDLE_URL or pass bundleUrl)."
-    });
-  }
   const allowOriginsInput = Array.isArray(body?.allowOrigins) ? body.allowOrigins : [];
   const rpcUrl = toStr13(body?.rpcUrl).trim();
   const rpcUrlsByChainId = body?.rpcUrlsByChainId && typeof body.rpcUrlsByChainId === "object" ? body.rpcUrlsByChainId : {};
   const faucetInput = body?.faucet && typeof body.faucet === "object" ? body.faucet : {};
   const rawStorageProfile = body?.storageProfile ?? body?.storageBackend ?? null;
-  const modeValidation = validateDeploymentModeValues(body);
-  if (!modeValidation.ok) {
-    return buildFailure(400, { error: `Invalid deployment mode at ${modeValidation.path}.` });
-  }
   const storageProfile = normalizeDeployStorageProfile(rawStorageProfile);
   const storageBindingPlan = resolveDeployStorageBindingPlan(rawStorageProfile, storageProfile);
-  if (!storageBindingPlan.ok) {
-    return buildFailure(400, { error: storageBindingPlan.error });
-  }
   if (!hasBundleText && toStr13(body?.bundleManifestUrl).trim()) {
     const manifestDigest = await fetchExpectedWorkerBundleDigest({
       manifestUrl: toStr13(body.bundleManifestUrl).trim(),
@@ -59105,20 +59134,13 @@ var executeDeployHelperRequestCore = async ({
     expectedBundleSha256 = manifestDigest.digest;
   }
   if (expectedBundleSha256 && !bundleSource) {
-    let bundleResponse;
     try {
-      bundleResponse = await fetchImpl(bundleUrl);
+      bundleSource = await fetchArtifactText(bundleUrl, { fetchImpl });
     } catch (error) {
       return buildFailure(502, {
         error: `Failed to fetch bundle: ${toStr13(error?.message || error).trim() || "Unknown error."}`
-      }, { fallbackEligible: true });
+      }, { fallbackEligible: shouldAllowFallbackForCloudflareFailure(error) });
     }
-    if (!bundleResponse.ok) {
-      return buildFailure(502, { error: `Failed to fetch bundle (${bundleResponse.status}).` }, {
-        fallbackEligible: bundleResponse.status >= 500 || bundleResponse.status === 429
-      });
-    }
-    bundleSource = await bundleResponse.text();
     bundleDiagnostics = await buildBundleDiagnostics(bundleSource, bundleSourceKind);
   }
   if (expectedBundleSha256 && (bundleDiagnostics?.sha256 || expectedInlineBundleSha256) !== expectedBundleSha256) {
@@ -59126,26 +59148,7 @@ var executeDeployHelperRequestCore = async ({
       error: "Worker bundle SHA-256 does not match the verified release manifest."
     });
   }
-  const accountLookup = toStr13(resolvedAccountId).trim() ? { ok: true, accountId: toStr13(resolvedAccountId).trim() } : await resolveDeploymentAccountId({
-    body: {
-      ...body,
-      apiToken
-    },
-    fetchImpl,
-    apiBaseUrl,
-    env
-  });
-  if (!accountLookup.ok) {
-    const lookupStatus = Number(accountLookup.status || 0);
-    const responseStatus = lookupStatus === 404 || lookupStatus === 409 ? lookupStatus : 502;
-    return buildFailure(responseStatus, {
-      error: accountLookup.error || "Failed to resolve Cloudflare account.",
-      detail: accountLookup.detail
-    }, {
-      fallbackEligible: accountLookup.fallbackEligible === true
-    });
-  }
-  const accountId = toStr13(accountLookup.accountId).trim();
+  const accountId = toStr13(resolvedAccountId).trim();
   if (!accountId) {
     return buildFailure(404, { error: "No accounts found for token." });
   }
@@ -59231,28 +59234,16 @@ var executeDeployHelperRequestCore = async ({
   const prepareBundleDiagnostics = async () => {
     if (bundleDiagnostics) return { ok: true };
     if (!bundleSource) {
-      let bundleResp;
       try {
-        bundleResp = await fetchImpl(bundleUrl);
+        bundleSource = await fetchArtifactText(bundleUrl, { fetchImpl });
       } catch (err) {
         return {
           ok: false,
           result: buildFailure(502, {
             error: `Failed to fetch bundle: ${toStr13(err?.message || err).trim() || "Unknown error."}`
-          }, { fallbackEligible: true })
+          }, { fallbackEligible: shouldAllowFallbackForCloudflareFailure(err) })
         };
       }
-      if (!bundleResp.ok) {
-        return {
-          ok: false,
-          result: buildFailure(502, {
-            error: `Failed to fetch bundle (${bundleResp.status}).`
-          }, {
-            fallbackEligible: bundleResp.status >= 500 || bundleResp.status === 429
-          })
-        };
-      }
-      bundleSource = await bundleResp.text();
     }
     bundleDiagnostics = await buildBundleDiagnostics(bundleSource, bundleSourceKind);
     if (expectedBundleSha256 && bundleDiagnostics.sha256 !== expectedBundleSha256) {
@@ -60197,11 +60188,57 @@ var resolveDeploymentBundleProvenance = async ({ body = {}, env = {}, fetchImpl 
   }
   return { ok: true, body: resolvedBody };
 };
-var executeDeployHelperRequest = async (options = {}) => {
-  const publicConfigValidationError = validateDeployHelperPublicConfigInputs(options?.body);
-  if (publicConfigValidationError) {
-    return buildFailure(400, { error: publicConfigValidationError });
+var validateDeployHelperLocalInputs = (body = {}, env = {}) => {
+  const publicConfigError = validateDeployHelperPublicConfigInputs(body);
+  if (publicConfigError) return publicConfigError;
+  const slugCheck = validateInboundSlug(body?.sessionSlug);
+  if (!slugCheck.ok) return slugCheck.error;
+  if (body?.groupSlug != null && body?.sessionSlug == null) {
+    return "Legacy groupSlug is no longer accepted. Use sessionSlug instead.";
   }
+  if (!toStr13(body?.apiToken || body?.token).trim()) return "Missing apiToken.";
+  if (body?.deploymentKind === AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND) return "";
+  if (!toStr13(body?.workerName).trim()) return "Missing workerName.";
+  const defaultSlugCheck = validateInboundSlug(env?.DEFAULT_SESSION_SLUG ?? env?.DEFAULT_GROUP_SLUG ?? "");
+  if (body?.sessionSlug == null && !defaultSlugCheck.ok) return defaultSlugCheck.error;
+  if (toStr13(body?.bundleSha256).trim() && !normalizeWorkerBundleSha256(body.bundleSha256)) {
+    return "bundleSha256 must be a complete SHA-256 hex digest.";
+  }
+  if (!toStr13(body?.bundleText).trim() && !toStr13(body?.bundleUrl || env?.WORKER_BUNDLE_URL).trim()) {
+    return "Missing bundleText or bundleUrl (set WORKER_BUNDLE_URL or pass bundleUrl).";
+  }
+  const mode = validateDeploymentModeValues(body);
+  if (!mode.ok) return `Invalid deployment mode at ${mode.path}.`;
+  const rawStorageProfile = body?.storageProfile ?? body?.storageBackend ?? null;
+  const bindings = resolveDeployStorageBindingPlan(rawStorageProfile, normalizeDeployStorageProfile(rawStorageProfile));
+  return bindings.ok ? "" : bindings.error;
+};
+var executeDeployHelperRequest = async (options = {}) => {
+  const localError = validateDeployHelperLocalInputs(options.body, options.env);
+  if (localError) return buildFailure(400, { error: localError });
+  const requestId = toStr13(options.body?.deploymentRequestId).trim();
+  if (requestId && !normalizeDeploymentRequestId(requestId)) {
+    return buildFailure(400, { error: "deploymentRequestId must contain 8-128 safe identifier characters." });
+  }
+  const coordinator = options.env?.CE_SESSION_COORDINATOR;
+  if (requestId && options.coordinationBypass !== true && (!coordinator?.idFromName || !coordinator?.get)) {
+    return buildFailure(503, {
+      error: "CE_SESSION_COORDINATOR is required for stable deployment requests; no Cloudflare mutation was attempted.",
+      deploymentRequestPending: true
+    }, { fallbackEligible: true });
+  }
+  const accountLookup = toStr13(options.resolvedAccountId).trim() ? { ok: true, accountId: toStr13(options.resolvedAccountId).trim() } : await resolveDeploymentAccountId({
+    body: options.body,
+    env: options.env,
+    fetchImpl: options.fetchImpl || globalThis.fetch
+  });
+  if (!accountLookup.ok) {
+    const lookupStatus = Number(accountLookup.status || 0);
+    return buildFailure(lookupStatus === 404 || lookupStatus === 409 ? lookupStatus : 502, {
+      error: redactKnownCredentials(accountLookup.error || "Failed to resolve Cloudflare account.", collectKnownRequestCredentials(options.body))
+    }, { fallbackEligible: accountLookup.fallbackEligible === true });
+  }
+  options = { ...options, resolvedAccountId: accountLookup.accountId };
   const provenance = await resolveDeploymentBundleProvenance({
     body: options?.body,
     env: options?.env,
@@ -60225,15 +60262,15 @@ var executeDeployHelperRequest = async (options = {}) => {
     context.requestDigest = coordinatedRequestDigest;
   }
   if (options?.coordinationBypass !== true) {
-    const coordinator = options?.env?.CE_SESSION_COORDINATOR;
-    if (!coordinator?.idFromName || !coordinator?.get) {
+    const coordinator2 = options?.env?.CE_SESSION_COORDINATOR;
+    if (!coordinator2?.idFromName || !coordinator2?.get) {
       return buildFailure(503, {
         error: "CE_SESSION_COORDINATOR is required for stable deployment requests; no Cloudflare mutation was attempted.",
         deploymentRequestPending: true
       }, { fallbackEligible: true });
     }
     const coordinatorName = await sha256Hex2(`direct-deploy:${context.deploymentId}`);
-    const stub = coordinator.get(coordinator.idFromName(coordinatorName));
+    const stub = coordinator2.get(coordinator2.idFromName(coordinatorName));
     let response2;
     try {
       response2 = await stub.fetch("https://session-coordinator.internal/deploy-helper", {
@@ -69506,7 +69543,14 @@ var fetchNormalizedTarget = async ({
     json: json2
   };
 };
-var parseContentLength = (response2) => parseInt(response2?.headers?.get?.("content-length") || "0", 10);
+var readFetchBytes = async (response2) => {
+  try {
+    return await readBodyBytes(response2, MAX_RESPONSE_BYTES);
+  } catch (error) {
+    if (error instanceof BodyByteLimitError) return null;
+    throw error;
+  }
+};
 var stripHtml = (html) => String(html || "").replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "").replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "").replace(/<head\b[^<]*(?:(?!<\/head>)<[^<]*)*<\/head>/gi, "").replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, "").replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 var fetchImage = async ({
   url,
@@ -69516,10 +69560,6 @@ var fetchImage = async ({
   const fetchResult = await fetchNormalizedTarget({ url, baseHeaders, deps });
   if (!fetchResult?.ok) return fetchResult?.response;
   const { response: response2, json: json2 } = fetchResult;
-  const contentLength = parseContentLength(response2);
-  if (contentLength > MAX_RESPONSE_BYTES) {
-    return json2({ error: "Response too large" }, 413, baseHeaders);
-  }
   if (!response2.ok) {
     return json2({ error: `HTTP ${response2.status}` }, 400, baseHeaders);
   }
@@ -69527,9 +69567,11 @@ var fetchImage = async ({
   if (!type.startsWith("image/")) {
     return json2({ error: "URL must return an image" }, 400, baseHeaders);
   }
+  const bytes2 = await readFetchBytes(response2);
+  if (!bytes2) return json2({ error: "Response too large" }, 413, baseHeaders);
   const headers = new Headers(baseHeaders);
   headers.set("Content-Type", type);
-  return new Response(response2.body, { status: 200, headers });
+  return new Response(bytes2, { status: 200, headers });
 };
 var fetchUrl = async ({
   url,
@@ -69539,10 +69581,6 @@ var fetchUrl = async ({
   const fetchResult = await fetchNormalizedTarget({ url, baseHeaders, deps });
   if (!fetchResult?.ok) return fetchResult?.response;
   const { response: response2, json: json2 } = fetchResult;
-  const contentLength = parseContentLength(response2);
-  if (contentLength > MAX_RESPONSE_BYTES) {
-    return json2({ error: "Response too large" }, 413, baseHeaders);
-  }
   if (!response2.ok) {
     return json2({ error: `HTTP ${response2.status}` }, 400, baseHeaders);
   }
@@ -69550,11 +69588,14 @@ var fetchUrl = async ({
   if (!/text\/html|application\/json/i.test(type)) {
     return json2({ error: "URL must return HTML or JSON" }, 400, baseHeaders);
   }
+  const bytes2 = await readFetchBytes(response2);
+  if (!bytes2) return json2({ error: "Response too large" }, 413, baseHeaders);
+  const text = new TextDecoder().decode(bytes2);
   if (type.includes("application/json")) {
-    const data = await response2.json();
+    const data = JSON.parse(text);
     return json2({ content: JSON.stringify(data), status: "success", contentType: type }, 200, baseHeaders);
   }
-  const stripped = stripHtml(await response2.text());
+  const stripped = stripHtml(text);
   if (!stripped || stripped.length < 50) {
     return json2({ error: "Insufficient content extracted" }, 400, baseHeaders);
   }
@@ -69820,50 +69861,6 @@ var verifyAdminSignature = async ({
     address: authorityResult?.address
   };
 };
-
-// workers/sessionCorsWorker/adminSignatureVerificationBinding.js
-var createVerifyAdminSignatureWithWorkerDeps = ({
-  deps,
-  constants
-} = {}) => (async ({
-  env,
-  baseHeaders,
-  slugHint,
-  body,
-  config,
-  allowBootstrapWithoutConfig = false
-} = {}) => (deps?.verifyAdminSignature || verifyAdminSignature)({
-  env,
-  baseHeaders,
-  slugHint,
-  body,
-  config,
-  allowBootstrapWithoutConfig,
-  deps: {
-    normalizeSignedWorkerRequest: deps?.normalizeSignedWorkerRequest,
-    resolveWorkerBodySlugContext: deps?.resolveWorkerBodySlugContext,
-    toStr: deps?.toStr,
-    isAddress: deps?.isAddress,
-    json: deps?.json,
-    verifyMessage: deps?.verifyMessage,
-    validateRecoveredAddressMatchesRequest: deps?.validateRecoveredAddressMatchesRequest,
-    parseSiweMessage: deps?.parseSiweMessage,
-    validateSiwe: deps?.validateSiwe,
-    validateSiweAddressMatchesRequest: deps?.validateSiweAddressMatchesRequest,
-    consumeNonce: (envArg, slugArg, addressArg, nonceArg) => deps?.consumeNonce?.(
-      envArg,
-      slugArg,
-      addressArg,
-      nonceArg,
-      { usedNonceTtlSeconds: constants?.usedNonceTtlSeconds }
-    ),
-    validateAdmin: deps?.validateAdmin,
-    log: (...args) => (deps?.log || console.log)(...args),
-    MISSING_SLUG_ERROR: constants?.missingSlugError,
-    SLUG_ALIAS_MISMATCH_ERROR: constants?.slugAliasMismatchError,
-    SLUG_MISMATCH_ERROR: constants?.slugMismatchError
-  }
-}));
 
 // workers/sessionCorsWorker/transcribeRequestNormalization.js
 var MISSING_TRANSCRIBE_FILE_ERROR = 'Missing file (use field "file"; "audio" also accepted).';
@@ -72192,7 +72189,21 @@ var createWorkerExecutionServicesWithWorkerDeps = ({
       checkSbtGate: deps?.checkSbtGate
     }
   });
-  const verifyAdminSignature2 = (deps?.createVerifyAdminSignatureWithWorkerDeps || createVerifyAdminSignatureWithWorkerDeps)({
+  const verifyAdminSignatureExecution = deps?.verifyAdminSignature || verifyAdminSignature;
+  const verifyAdminSignature2 = async ({
+    env,
+    baseHeaders,
+    slugHint,
+    body,
+    config,
+    allowBootstrapWithoutConfig = false
+  } = {}) => verifyAdminSignatureExecution({
+    env,
+    baseHeaders,
+    slugHint,
+    body,
+    config,
+    allowBootstrapWithoutConfig,
     deps: {
       normalizeSignedWorkerRequest: deps?.normalizeSignedWorkerRequest,
       resolveWorkerBodySlugContext: deps?.resolveWorkerBodySlugContext,
@@ -72204,15 +72215,18 @@ var createWorkerExecutionServicesWithWorkerDeps = ({
       parseSiweMessage: deps?.parseSiweMessage,
       validateSiwe: deps?.validateSiwe,
       validateSiweAddressMatchesRequest: deps?.validateSiweAddressMatchesRequest,
-      consumeNonce: deps?.consumeNonce,
+      consumeNonce: (envArg, slugArg, addressArg, nonceArg) => deps?.consumeNonce?.(
+        envArg,
+        slugArg,
+        addressArg,
+        nonceArg,
+        { usedNonceTtlSeconds: constants?.usedNonceTtlSeconds }
+      ),
       validateAdmin: deps?.validateAdmin,
-      log: workerLog
-    },
-    constants: {
-      usedNonceTtlSeconds: constants?.usedNonceTtlSeconds,
-      missingSlugError: constants?.missingSlugError,
-      slugAliasMismatchError: constants?.slugAliasMismatchError,
-      slugMismatchError: constants?.slugMismatchError
+      log: workerLog,
+      MISSING_SLUG_ERROR: constants?.missingSlugError,
+      SLUG_ALIAS_MISMATCH_ERROR: constants?.slugAliasMismatchError,
+      SLUG_MISMATCH_ERROR: constants?.slugMismatchError
     }
   });
   return {
@@ -72669,58 +72683,6 @@ var dispatchAnonymousRoute = async ({
   return deps?.json?.({ error: `Unsupported provider: ${provider}` }, 400, headers);
 };
 
-// workers/sessionCorsWorker/anonymousRouteEntryBinding.js
-var dispatchAnonymousRouteEntryWithWorkerDeps = async ({
-  path,
-  anonymousRoute,
-  request,
-  env,
-  slugHint,
-  baseHeaders,
-  deps,
-  constants
-} = {}) => (deps?.dispatchAnonymousRouteEntry || dispatchAnonymousRouteEntry)({
-  path,
-  anonymousRoute,
-  request,
-  env,
-  slugHint,
-  baseHeaders,
-  deps: {
-    resolveRequestSlugWithoutToken: deps?.resolveRequestSlugWithoutToken,
-    json: deps?.json,
-    MISSING_SLUG_ERROR: constants?.missingSlugError,
-    getSessionConfig: deps?.getSessionConfig,
-    SESSION_CONFIG_NOT_FOUND_ERROR: constants?.sessionConfigNotFoundError,
-    getCorsContext: deps?.getCorsContext,
-    resolveAnonymousRateIdentity: deps?.resolveAnonymousRateIdentity,
-    checkRateLimit: deps?.checkRateLimit,
-    dispatchAnonymousRoute: (value) => {
-      const dispatchAnonymousRoute2 = deps?.dispatchAnonymousRoute || dispatchAnonymousRoute;
-      return dispatchAnonymousRoute2({
-        ...value,
-        deps: {
-          storageRoute: deps?.storageRoute,
-          dispatchPublicWorkerGroupListRequest: deps?.dispatchPublicWorkerGroupListRequest,
-          readTranscribeRequestPayload: deps?.readTranscribeRequestPayload,
-          evaluateAnonymousRouteAccess: deps?.evaluateAnonymousRouteAccess,
-          getSessionSecrets: (sessionSlug) => deps?.getSessionSecrets?.(env, sessionSlug),
-          transcribe: deps?.transcribe,
-          readAiRequestPayload: deps?.readAiRequestPayload,
-          validateAnonymousAiRequest: deps?.validateAnonymousAiRequest,
-          proxyAnthropic: deps?.proxyAnthropic,
-          proxyOpenAI: deps?.proxyOpenAI,
-          proxyOpenRouter: deps?.proxyOpenRouter,
-          proxyCustomRPC: deps?.proxyCustomRPC,
-          json: deps?.json,
-          now: deps?.now,
-          ANONYMOUS_ROUTE_DENIED_ERROR: constants?.anonymousRouteDeniedError
-        }
-      });
-    }
-  }
-});
-
 // workers/sessionCorsWorker/authenticatedRouteEntry.js
 var dispatchAuthenticatedRouteEntry = async ({
   path,
@@ -72878,98 +72840,6 @@ var resolveAuthenticatedRouteContext = async ({
     limit: config?.limits?.perWalletPerDay || 0
   };
 };
-
-// workers/sessionCorsWorker/authenticatedRouteEntryBinding.js
-var dispatchAuthenticatedRouteEntryWithWorkerDeps = async ({
-  path,
-  method,
-  request,
-  env,
-  baseHeaders,
-  deps,
-  constants
-} = {}) => (deps?.dispatchAuthenticatedRouteEntry || dispatchAuthenticatedRouteEntry)({
-  path,
-  method,
-  request,
-  env,
-  baseHeaders,
-  deps: {
-    json: deps?.json,
-    requireAuth: deps?.requireAuth,
-    resolveAuthenticatedRouteContext: (value) => (deps?.resolveAuthenticatedRouteContext || resolveAuthenticatedRouteContext)({
-      ...value,
-      deps: {
-        getSessionConfig: deps?.getSessionConfig,
-        getCorsContext: deps?.getCorsContext,
-        json: deps?.json,
-        toStr: deps?.toStr,
-        SESSION_CONFIG_NOT_FOUND_ERROR: constants?.sessionConfigNotFoundError
-      }
-    }),
-    dispatchAuthenticatedRoute: (value) => {
-      const dispatchAuthenticatedRoute2 = deps?.dispatchAuthenticatedRoute || dispatchAuthenticatedRoute;
-      return dispatchAuthenticatedRoute2({
-        ...value,
-        deps: {
-          dispatchAuthenticatedSecretPathRoute: (routeValue) => deps?.dispatchAuthenticatedSecretPathRoute?.({
-            ...routeValue,
-            env,
-            deps: {
-              evaluateAuthenticatedRoutePreflight: deps?.evaluateAuthenticatedRoutePreflight,
-              computeScopesForLogin: deps?.computeScopesForLogin,
-              resolveAuthenticatedRouteSecrets: deps?.resolveAuthenticatedRouteSecrets,
-              checkRateLimit: deps?.checkRateLimit,
-              getSessionSecrets: deps?.getSessionSecrets,
-              json: deps?.json,
-              isAddress: deps?.isAddress,
-              getAddress: deps?.getAddress,
-              transcribe: deps?.transcribe,
-              arweaveUpload: deps?.arweaveUpload,
-              storageRoute: deps?.storageRoute,
-              now: deps?.now
-            }
-          }),
-          readAuthenticatedActionPayload: deps?.readAuthenticatedActionPayload,
-          dispatchAuthenticatedNonSecretActionRoute: (routeValue) => deps?.dispatchAuthenticatedNonSecretActionRoute?.({
-            ...routeValue,
-            env,
-            deps: {
-              evaluateAuthenticatedRoutePreflight: deps?.evaluateAuthenticatedRoutePreflight,
-              computeScopesForLogin: deps?.computeScopesForLogin,
-              fetchImage: deps?.fetchImage,
-              fetchUrl: deps?.fetchUrl,
-              checkRateLimit: deps?.checkRateLimit,
-              json: deps?.json,
-              now: deps?.now
-            }
-          }),
-          dispatchAuthenticatedSecretActionRoute: (routeValue) => deps?.dispatchAuthenticatedSecretActionRoute?.({
-            ...routeValue,
-            env,
-            deps: {
-              evaluateAuthenticatedRoutePreflight: deps?.evaluateAuthenticatedRoutePreflight,
-              computeScopesForLogin: deps?.computeScopesForLogin,
-              resolveAuthenticatedRouteSecrets: deps?.resolveAuthenticatedRouteSecrets,
-              normalizeAiRequestPayload: deps?.normalizeAiRequestPayload,
-              proxyAnthropic: deps?.proxyAnthropic,
-              proxyOpenAI: deps?.proxyOpenAI,
-              proxyOpenRouter: deps?.proxyOpenRouter,
-              proxyCustomRPC: deps?.proxyCustomRPC,
-              faucet: deps?.faucet,
-              checkRateLimit: deps?.checkRateLimit,
-              getSessionSecrets: deps?.getSessionSecrets,
-              json: deps?.json,
-              toStr: deps?.toStr,
-              now: deps?.now
-            }
-          }),
-          json: deps?.json
-        }
-      });
-    }
-  }
-});
 
 // workers/sessionCorsWorker/adminRequestAuthority.js
 var toTrimmedString14 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
@@ -75087,56 +74957,6 @@ var dispatchAdminRequest = async ({
   return deps?.json?.({ error: "Unknown admin action." }, 400, headers);
 };
 
-// workers/sessionCorsWorker/adminRequestBinding.js
-var dispatchAdminRequestWithWorkerDeps = async ({
-  request,
-  env,
-  baseHeaders,
-  slug,
-  action,
-  deps,
-  constants
-} = {}) => (deps?.dispatchAdminRequest || dispatchAdminRequest)({
-  request,
-  env,
-  baseHeaders,
-  slug,
-  action,
-  deps: {
-    json: deps?.json,
-    normalizeSignedWorkerRequest: deps?.normalizeSignedWorkerRequest,
-    resolveWorkerBodySlugContext: deps?.resolveWorkerBodySlugContext,
-    isAddress: deps?.isAddress,
-    getAddress: deps?.getAddress,
-    resolveExistingSessionCors: deps?.resolveExistingSessionCors,
-    verifyMessage: deps?.verifyMessage,
-    validateRecoveredAddressMatchesRequest: deps?.validateRecoveredAddressMatchesRequest,
-    parseSiweMessage: deps?.parseSiweMessage,
-    validateSiwe: deps?.validateSiwe,
-    validateSiweAddressMatchesRequest: deps?.validateSiweAddressMatchesRequest,
-    consumeNonce: (envArg, slugArg, addressArg, nonceArg) => deps?.consumeNonce?.(
-      envArg,
-      slugArg,
-      addressArg,
-      nonceArg,
-      {
-        usedNonceTtlSeconds: constants?.usedNonceTtlSeconds,
-        ...deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {}
-      }
-    ),
-    validateBootstrapAdmin: deps?.validateBootstrapAdmin,
-    validateAdmin: deps?.validateAdmin,
-    mergeWorkerConfigRecords: deps?.mergeWorkerConfigRecords,
-    mergeWorkerLimitRecords: deps?.mergeWorkerLimitRecords,
-    putSessionConfig: deps?.putSessionConfig,
-    getSessionSecrets: deps?.getSessionSecrets,
-    normalizeSecretValue: deps?.normalizeSecretValue,
-    putSessionSecrets: deps?.putSessionSecrets,
-    ...deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {},
-    MISSING_SLUG_ERROR: constants?.missingSlugError
-  }
-});
-
 // workers/sessionCorsWorker/adminAbuseSummaryDispatch.js
 var toTrimmedString17 = (value, deps) => {
   if (typeof deps?.toStr === "function") return deps.toStr(value).trim();
@@ -75755,101 +75575,6 @@ var checkNonceRateLimit = async ({
   return { ok: true };
 };
 
-// workers/sessionCorsWorker/authRequestBinding.js
-var dispatchAuthNonceRequestWithWorkerDeps = async ({
-  request,
-  env,
-  baseHeaders,
-  slug,
-  deps,
-  constants
-} = {}) => (deps?.dispatchAuthNonceRequest || dispatchAuthNonceRequest)({
-  request,
-  env,
-  baseHeaders,
-  slug,
-  deps: {
-    json: deps?.json,
-    toStr: deps?.toStr,
-    isAddress: deps?.isAddress,
-    resolveWorkerBodySlugContext: deps?.resolveWorkerBodySlugContext,
-    resolveExistingSessionCors: deps?.resolveExistingSessionCors,
-    validateTrustedLoginRequestOrigin: deps?.validateTrustedLoginRequestOrigin,
-    resolveTrustedAdminOrigins: deps?.resolveTrustedAdminOrigins,
-    checkNonceRateLimit: deps?.checkNonceRateLimit,
-    ...deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {},
-    now: deps?.now,
-    buildNonce: () => deps?.buildNonce?.({
-      base64UrlEncode: deps?.base64UrlEncode
-    }),
-    issueNonce: (currentEnv, slugArg, addressArg, nonceArg, ttl) => (deps?.issueNonce || issueNonce)(
-      currentEnv,
-      slugArg,
-      addressArg,
-      nonceArg,
-      ttl,
-      {
-        usedNonceTtlSeconds: constants?.usedNonceTtlSeconds,
-        now: deps?.now
-      }
-    ),
-    MISSING_SLUG_ERROR: constants?.missingSlugError,
-    NONCE_TTL_SECONDS: constants?.nonceTtlSeconds,
-    NONCE_RATE_LIMIT_MAX: constants?.nonceRateLimitMax,
-    NONCE_RATE_LIMIT_WINDOW_MS: constants?.nonceRateLimitWindowMs,
-    NONCE_RATE_LIMIT_TTL_SECONDS: constants?.nonceRateLimitTtlSeconds
-  }
-});
-var dispatchAuthLoginRequestWithWorkerDeps = async ({
-  request,
-  env,
-  baseHeaders,
-  slug,
-  deps,
-  constants
-} = {}) => (deps?.dispatchAuthLoginRequest || dispatchAuthLoginRequest)({
-  request,
-  env,
-  baseHeaders,
-  slug,
-  deps: {
-    json: deps?.json,
-    normalizeSignedWorkerRequest: deps?.normalizeSignedWorkerRequest,
-    resolveWorkerBodySlugContext: deps?.resolveWorkerBodySlugContext,
-    isAddress: deps?.isAddress,
-    resolveExistingSessionCors: deps?.resolveExistingSessionCors,
-    verifyMessage: deps?.verifyMessage,
-    validateRecoveredAddressMatchesRequest: deps?.validateRecoveredAddressMatchesRequest,
-    parseSiweMessage: deps?.parseSiweMessage,
-    validateSiwe: deps?.validateSiwe,
-    validateBrowserLoginOrigin: deps?.validateBrowserLoginOrigin,
-    resolveTrustedAdminOrigins: deps?.resolveTrustedAdminOrigins,
-    validateSiweAddressMatchesRequest: deps?.validateSiweAddressMatchesRequest,
-    consumeNonce: (envArg, slugArg, addressArg, nonceArg) => deps?.consumeNonce?.(
-      envArg,
-      slugArg,
-      addressArg,
-      nonceArg,
-      {
-        usedNonceTtlSeconds: constants?.usedNonceTtlSeconds,
-        ...deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {}
-      }
-    ),
-    computeScopesForLogin: deps?.computeScopesForLogin,
-    signToken: deps?.signToken,
-    getAddress: deps?.getAddress,
-    buildAuthTokenJti: deps?.buildAuthTokenJti,
-    persistAuthTokenRecord: deps?.persistAuthTokenRecord,
-    ...deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {},
-    now: deps?.now,
-    LOGIN_SIWE_MAX_AGE_MS: constants?.loginSiweMaxAgeMs,
-    LOGIN_SIWE_FUTURE_SKEW_MS: constants?.loginSiweFutureSkewMs,
-    TOKEN_TTL_SECONDS: constants?.tokenTtlSeconds,
-    MISSING_SLUG_ERROR: constants?.missingSlugError,
-    SESSION_CONFIG_NOT_FOUND_ERROR: constants?.sessionConfigNotFoundError
-  }
-});
-
 // workers/sessionCorsWorker/routeBaseHeaders.js
 var getRouteBaseHeaders = ({
   request,
@@ -75955,64 +75680,6 @@ var dispatchBootstrapArweaveUpload = async ({
       uploaderAddress: adminCheck?.address || ""
     })
   };
-};
-
-// workers/sessionCorsWorker/bootstrapArweaveUploadBinding.js
-var dispatchBootstrapArweaveUploadWithWorkerDeps = async ({
-  request,
-  env,
-  hasAuthorization,
-  deps,
-  constants
-} = {}) => {
-  const log2 = typeof deps?.log === "function" ? deps.log : () => {
-  };
-  const warn = (typeof deps?.log?.warn === "function" ? deps.log.warn : null) || (typeof deps?.warn === "function" ? deps.warn : null) || (typeof deps?.log === "function" ? deps.log : null) || console.warn;
-  const origin = request?.headers?.get?.("Origin") || "";
-  const contentType = request?.headers?.get?.("content-type") || "";
-  log2("[arweave] request", {
-    url: request?.url,
-    hasAuthHeader: !!hasAuthorization,
-    origin,
-    contentType,
-    cfRay: request?.headers?.get?.("CF-Ray") || "",
-    ua: request?.headers?.get?.("User-Agent") || ""
-  });
-  return (deps?.dispatchBootstrapArweaveUpload || dispatchBootstrapArweaveUpload)({
-    request,
-    hasAuthorization,
-    deps: {
-      corsHeaders: deps?.corsHeaders,
-      readArweaveBootstrapUploadPayload: deps?.readArweaveBootstrapUploadPayload,
-      resolveWorkerBodySlugContext: ({ body }) => deps?.resolveWorkerBodySlugContext?.({ body, env }),
-      json: deps?.json,
-      MISSING_SLUG_ERROR: constants?.missingSlugError,
-      getSessionConfig: (slug) => deps?.getSessionConfig?.(env, slug),
-      BOOTSTRAP_SESSION_CONFIG_REQUIRED_ERROR: constants?.bootstrapSessionConfigRequiredError,
-      getCorsContext: deps?.getCorsContext,
-      verifyAdminSignature: (value) => deps?.verifyAdminSignature?.({ ...value, env }),
-      getSessionSecrets: (slug) => deps?.getSessionSecrets?.(env, slug),
-      arweaveUpload: (value) => deps?.arweaveUpload?.({ ...value, env }),
-      logBootstrapPayload: ({ requestId, body }) => log2("[arweave] bootstrap payload", {
-        requestId: requestId || null,
-        hasAddress: !!body?.address,
-        hasMessage: !!body?.message,
-        hasSignature: !!body?.signature,
-        sessionSlug: body?.sessionSlug || "",
-        groupSlug: body?.groupSlug || ""
-      }),
-      logBootstrapConfigMissing: ({ targetSlug, requestId }) => warn("[arweave] bootstrap config missing", {
-        targetSlug,
-        requestId: requestId || null
-      }),
-      logBootstrapCorsReject: ({ requestId, targetSlug, allowOrigins }) => warn("[arweave] cors reject", {
-        requestId: requestId || null,
-        origin,
-        targetSlug,
-        allowOrigins
-      })
-    }
-  });
 };
 
 // workers/sessionCorsWorker/sponsoredBootstrapRedeemDispatch.js
@@ -76945,17 +76612,20 @@ var createWorkerRouteShellWithWorkerDeps = ({
   const resolveTopLevelRouteSelection2 = deps?.resolveTopLevelRouteSelection || resolveTopLevelRouteSelection;
   const getRouteBaseHeaders2 = deps?.getRouteBaseHeaders || getRouteBaseHeaders;
   const getDefaultWorkerSessionSlug2 = deps?.getDefaultWorkerSessionSlug || getDefaultWorkerSessionSlug;
-  const dispatchAuthNonceRequestWithWorkerDeps2 = deps?.dispatchAuthNonceRequestWithWorkerDeps || dispatchAuthNonceRequestWithWorkerDeps;
-  const dispatchAuthLoginRequestWithWorkerDeps2 = deps?.dispatchAuthLoginRequestWithWorkerDeps || dispatchAuthLoginRequestWithWorkerDeps;
-  const dispatchBootstrapArweaveUploadWithWorkerDeps2 = deps?.dispatchBootstrapArweaveUploadWithWorkerDeps || dispatchBootstrapArweaveUploadWithWorkerDeps;
+  const dispatchAuthNonceRequest2 = deps?.dispatchAuthNonceRequest || dispatchAuthNonceRequest;
+  const dispatchAuthLoginRequest2 = deps?.dispatchAuthLoginRequest || dispatchAuthLoginRequest;
+  const dispatchBootstrapArweaveUpload2 = deps?.dispatchBootstrapArweaveUpload || dispatchBootstrapArweaveUpload;
   const dispatchSponsoredBootstrapRedeem2 = deps?.dispatchSponsoredBootstrapRedeem || dispatchSponsoredBootstrapRedeem;
   const dispatchResourcePresenceRequest2 = deps?.dispatchResourcePresenceRequest || dispatchResourcePresenceRequest;
   const dispatchSessionConfigBootstrapRequest2 = deps?.dispatchSessionConfigBootstrapRequest || dispatchSessionConfigBootstrapRequest;
   const dispatchInterviewBriefRequest2 = deps?.dispatchInterviewBriefRequest || dispatchInterviewBriefRequest;
-  const dispatchAdminRequestWithWorkerDeps2 = deps?.dispatchAdminRequestWithWorkerDeps || dispatchAdminRequestWithWorkerDeps;
+  const dispatchAdminRequest2 = deps?.dispatchAdminRequest || dispatchAdminRequest;
   const dispatchAdminAbuseSummaryRequest2 = deps?.dispatchAdminAbuseSummaryRequest || dispatchAdminAbuseSummaryRequest;
-  const dispatchAnonymousRouteEntryWithWorkerDeps2 = deps?.dispatchAnonymousRouteEntryWithWorkerDeps || dispatchAnonymousRouteEntryWithWorkerDeps;
-  const dispatchAuthenticatedRouteEntryWithWorkerDeps2 = deps?.dispatchAuthenticatedRouteEntryWithWorkerDeps || dispatchAuthenticatedRouteEntryWithWorkerDeps;
+  const dispatchAnonymousRouteEntry2 = deps?.dispatchAnonymousRouteEntry || dispatchAnonymousRouteEntry;
+  const dispatchAnonymousRoute2 = deps?.dispatchAnonymousRoute || dispatchAnonymousRoute;
+  const dispatchAuthenticatedRouteEntry2 = deps?.dispatchAuthenticatedRouteEntry || dispatchAuthenticatedRouteEntry;
+  const dispatchAuthenticatedRoute2 = deps?.dispatchAuthenticatedRoute || dispatchAuthenticatedRoute;
+  const resolveAuthenticatedRouteContext2 = deps?.resolveAuthenticatedRouteContext || resolveAuthenticatedRouteContext;
   const log2 = deps?.log || (() => {
   });
   const ResponseCtor = deps?.Response || Response;
@@ -76984,6 +76654,10 @@ var createWorkerRouteShellWithWorkerDeps = ({
           });
         }
         return new ResponseCtor(null, { status: 204, headers: routeBaseHeaders });
+      }
+      if (request.body) {
+        const bytes2 = await readBodyBytes(request, resolveMaxUploadBytes({ env }));
+        request = new Request(request, { body: bytes2 });
       }
       const envSlug = getDefaultWorkerSessionSlug2(env);
       if (routeSelection.kind === "session-config") {
@@ -77046,7 +76720,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
         });
       }
       if (routeSelection.kind === "auth-nonce") {
-        return await dispatchAuthNonceRequestWithWorkerDeps2({
+        return await dispatchAuthNonceRequest2({
           request,
           env,
           baseHeaders: routeBaseHeaders,
@@ -77062,20 +76736,29 @@ var createWorkerRouteShellWithWorkerDeps = ({
             checkNonceRateLimit: deps?.checkNonceRateLimit,
             ...deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {},
             now: deps?.now,
-            buildNonce: deps?.buildNonce,
-            base64UrlEncode: deps?.base64UrlEncode
-          },
-          constants: {
-            missingSlugError: constants?.missingSlugError,
-            nonceTtlSeconds: constants?.nonceTtlSeconds,
-            nonceRateLimitMax: constants?.nonceRateLimitMax,
-            nonceRateLimitWindowMs: constants?.nonceRateLimitWindowMs,
-            nonceRateLimitTtlSeconds: constants?.nonceRateLimitTtlSeconds
+            buildNonce: () => deps?.buildNonce?.({
+              base64UrlEncode: deps?.base64UrlEncode
+            }),
+            issueNonce: (currentEnv, slugArg, addressArg, nonceArg, ttl) => (deps?.issueNonce || issueNonce)(
+              currentEnv,
+              slugArg,
+              addressArg,
+              nonceArg,
+              ttl,
+              {
+                now: deps?.now
+              }
+            ),
+            MISSING_SLUG_ERROR: constants?.missingSlugError,
+            NONCE_TTL_SECONDS: constants?.nonceTtlSeconds,
+            NONCE_RATE_LIMIT_MAX: constants?.nonceRateLimitMax,
+            NONCE_RATE_LIMIT_WINDOW_MS: constants?.nonceRateLimitWindowMs,
+            NONCE_RATE_LIMIT_TTL_SECONDS: constants?.nonceRateLimitTtlSeconds
           }
         });
       }
       if (routeSelection.kind === "auth-login") {
-        return await dispatchAuthLoginRequestWithWorkerDeps2({
+        return await dispatchAuthLoginRequest2({
           request,
           env,
           baseHeaders: routeBaseHeaders,
@@ -77093,46 +76776,78 @@ var createWorkerRouteShellWithWorkerDeps = ({
             validateBrowserLoginOrigin: deps?.validateBrowserLoginOrigin,
             resolveTrustedAdminOrigins: deps?.resolveTrustedAdminOrigins,
             validateSiweAddressMatchesRequest: deps?.validateSiweAddressMatchesRequest,
-            consumeNonce: deps?.consumeNonce,
+            consumeNonce: (envArg, slugArg, addressArg, nonceArg) => deps?.consumeNonce?.(
+              envArg,
+              slugArg,
+              addressArg,
+              nonceArg,
+              {
+                usedNonceTtlSeconds: constants?.usedNonceTtlSeconds,
+                ...deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {}
+              }
+            ),
             computeScopesForLogin: deps?.computeScopesForLogin,
             signToken: deps?.signToken,
             getAddress: deps?.getAddress,
             buildAuthTokenJti: deps?.buildAuthTokenJti,
             persistAuthTokenRecord: deps?.persistAuthTokenRecord,
             ...deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {},
-            now: deps?.now
-          },
-          constants: {
-            usedNonceTtlSeconds: constants?.usedNonceTtlSeconds,
-            tokenTtlSeconds: constants?.tokenTtlSeconds,
-            loginSiweMaxAgeMs: constants?.loginSiweMaxAgeMs,
-            loginSiweFutureSkewMs: constants?.loginSiweFutureSkewMs,
-            missingSlugError: constants?.missingSlugError,
-            sessionConfigNotFoundError: constants?.sessionConfigNotFoundError
+            now: deps?.now,
+            LOGIN_SIWE_MAX_AGE_MS: constants?.loginSiweMaxAgeMs,
+            LOGIN_SIWE_FUTURE_SKEW_MS: constants?.loginSiweFutureSkewMs,
+            TOKEN_TTL_SECONDS: constants?.tokenTtlSeconds,
+            MISSING_SLUG_ERROR: constants?.missingSlugError,
+            SESSION_CONFIG_NOT_FOUND_ERROR: constants?.sessionConfigNotFoundError
           }
         });
       }
       if (routeSelection.kind === "arweave-upload") {
-        const bootstrapUpload = await dispatchBootstrapArweaveUploadWithWorkerDeps2({
+        const logBootstrapInfo = typeof log2 === "function" ? log2 : () => {
+        };
+        const warn = (typeof log2?.warn === "function" ? log2.warn : null) || (typeof deps?.warn === "function" ? deps.warn : null) || (typeof log2 === "function" ? log2 : null) || console.warn;
+        const origin = request?.headers?.get?.("Origin") || "";
+        const contentType = request?.headers?.get?.("content-type") || "";
+        logBootstrapInfo("[arweave] request", {
+          url: request?.url,
+          hasAuthHeader: !!routeSelection.hasAuthorizationHeader,
+          origin,
+          contentType,
+          cfRay: request?.headers?.get?.("CF-Ray") || "",
+          ua: request?.headers?.get?.("User-Agent") || ""
+        });
+        const bootstrapUpload = await dispatchBootstrapArweaveUpload2({
           request,
-          env,
           hasAuthorization: routeSelection.hasAuthorizationHeader,
           deps: {
-            log: log2,
             corsHeaders: deps?.corsHeaders,
             readArweaveBootstrapUploadPayload: deps?.readArweaveBootstrapUploadPayload,
-            resolveWorkerBodySlugContext: deps?.resolveWorkerBodySlugContext,
+            resolveWorkerBodySlugContext: ({ body }) => deps?.resolveWorkerBodySlugContext?.({ body, env }),
             json: deps?.json,
-            getSessionConfig: deps?.getSessionConfig,
+            MISSING_SLUG_ERROR: constants?.missingSlugError,
+            getSessionConfig: (slug) => deps?.getSessionConfig?.(env, slug),
+            BOOTSTRAP_SESSION_CONFIG_REQUIRED_ERROR: constants?.bootstrapSessionConfigRequiredError,
             getCorsContext: deps?.getCorsContext,
-            verifyAdminSignature: deps?.verifyAdminSignature,
-            getSessionSecrets: deps?.getSessionSecrets,
-            arweaveUpload: deps?.arweaveUpload,
-            storageRoute: deps?.storageRoute
-          },
-          constants: {
-            missingSlugError: constants?.missingSlugError,
-            bootstrapSessionConfigRequiredError: constants?.bootstrapSessionConfigRequiredError
+            verifyAdminSignature: (value) => deps?.verifyAdminSignature?.({ ...value, env }),
+            getSessionSecrets: (slug) => deps?.getSessionSecrets?.(env, slug),
+            arweaveUpload: (value) => deps?.arweaveUpload?.({ ...value, env }),
+            logBootstrapPayload: ({ requestId, body }) => logBootstrapInfo("[arweave] bootstrap payload", {
+              requestId: requestId || null,
+              hasAddress: !!body?.address,
+              hasMessage: !!body?.message,
+              hasSignature: !!body?.signature,
+              sessionSlug: body?.sessionSlug || "",
+              groupSlug: body?.groupSlug || ""
+            }),
+            logBootstrapConfigMissing: ({ targetSlug, requestId }) => warn("[arweave] bootstrap config missing", {
+              targetSlug,
+              requestId: requestId || null
+            }),
+            logBootstrapCorsReject: ({ requestId, targetSlug, allowOrigins }) => warn("[arweave] cors reject", {
+              requestId: requestId || null,
+              origin,
+              targetSlug,
+              allowOrigins
+            })
           }
         });
         if (bootstrapUpload.handled) return bootstrapUpload.response;
@@ -77171,7 +76886,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
         });
       }
       if (routeSelection.kind === "admin") {
-        return await dispatchAdminRequestWithWorkerDeps2({
+        return await dispatchAdminRequest2({
           request,
           env,
           baseHeaders: routeBaseHeaders,
@@ -77189,7 +76904,16 @@ var createWorkerRouteShellWithWorkerDeps = ({
             parseSiweMessage: deps?.parseSiweMessage,
             validateSiwe: deps?.validateSiwe,
             validateSiweAddressMatchesRequest: deps?.validateSiweAddressMatchesRequest,
-            consumeNonce: deps?.consumeNonce,
+            consumeNonce: (envArg, slugArg, addressArg, nonceArg) => deps?.consumeNonce?.(
+              envArg,
+              slugArg,
+              addressArg,
+              nonceArg,
+              {
+                usedNonceTtlSeconds: constants?.usedNonceTtlSeconds,
+                ...deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {}
+              }
+            ),
             validateBootstrapAdmin: deps?.validateBootstrapAdmin,
             validateAdmin: deps?.validateAdmin,
             mergeWorkerConfigRecords: deps?.mergeWorkerConfigRecords,
@@ -77198,16 +76922,13 @@ var createWorkerRouteShellWithWorkerDeps = ({
             getSessionSecrets: deps?.getSessionSecrets,
             normalizeSecretValue: deps?.normalizeSecretValue,
             putSessionSecrets: deps?.putSessionSecrets,
-            ...deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {}
-          },
-          constants: {
-            usedNonceTtlSeconds: constants?.usedNonceTtlSeconds,
-            missingSlugError: constants?.missingSlugError
+            ...deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {},
+            MISSING_SLUG_ERROR: constants?.missingSlugError
           }
         });
       }
       if (routeSelection.kind === "anonymous") {
-        return await dispatchAnonymousRouteEntryWithWorkerDeps2({
+        return await dispatchAnonymousRouteEntry2({
           path,
           anonymousRoute: routeSelection.anonymousRoute,
           request,
@@ -77217,32 +76938,35 @@ var createWorkerRouteShellWithWorkerDeps = ({
           deps: {
             resolveRequestSlugWithoutToken: deps?.resolveRequestSlugWithoutToken,
             json: deps?.json,
+            MISSING_SLUG_ERROR: constants?.missingSlugError,
             getSessionConfig: deps?.getSessionConfig,
+            SESSION_CONFIG_NOT_FOUND_ERROR: constants?.sessionConfigNotFoundError,
             getCorsContext: deps?.getCorsContext,
             resolveAnonymousRateIdentity: deps?.resolveAnonymousRateIdentity,
             checkRateLimit: deps?.checkRateLimit,
-            dispatchAnonymousRoute: deps?.dispatchAnonymousRoute,
-            storageRoute: deps?.storageRoute,
-            readTranscribeRequestPayload: deps?.readTranscribeRequestPayload,
-            evaluateAnonymousRouteAccess: deps?.evaluateAnonymousRouteAccess,
-            getSessionSecrets: deps?.getSessionSecrets,
-            transcribe: deps?.transcribe,
-            readAiRequestPayload: deps?.readAiRequestPayload,
-            validateAnonymousAiRequest: deps?.validateAnonymousAiRequest,
-            proxyAnthropic: deps?.proxyAnthropic,
-            proxyOpenAI: deps?.proxyOpenAI,
-            proxyOpenRouter: deps?.proxyOpenRouter,
-            proxyCustomRPC: deps?.proxyCustomRPC,
-            now: deps?.now
-          },
-          constants: {
-            missingSlugError: constants?.missingSlugError,
-            sessionConfigNotFoundError: constants?.sessionConfigNotFoundError,
-            anonymousRouteDeniedError: constants?.anonymousRouteDeniedError
+            dispatchAnonymousRoute: (value) => dispatchAnonymousRoute2({
+              ...value,
+              deps: {
+                storageRoute: deps?.storageRoute,
+                readTranscribeRequestPayload: deps?.readTranscribeRequestPayload,
+                evaluateAnonymousRouteAccess: deps?.evaluateAnonymousRouteAccess,
+                getSessionSecrets: (sessionSlug) => deps?.getSessionSecrets?.(env, sessionSlug),
+                transcribe: deps?.transcribe,
+                readAiRequestPayload: deps?.readAiRequestPayload,
+                validateAnonymousAiRequest: deps?.validateAnonymousAiRequest,
+                proxyAnthropic: deps?.proxyAnthropic,
+                proxyOpenAI: deps?.proxyOpenAI,
+                proxyOpenRouter: deps?.proxyOpenRouter,
+                proxyCustomRPC: deps?.proxyCustomRPC,
+                json: deps?.json,
+                now: deps?.now,
+                ANONYMOUS_ROUTE_DENIED_ERROR: constants?.anonymousRouteDeniedError
+              }
+            })
           }
         });
       }
-      return await dispatchAuthenticatedRouteEntryWithWorkerDeps2({
+      return await dispatchAuthenticatedRouteEntry2({
         path,
         method,
         request,
@@ -77251,39 +76975,83 @@ var createWorkerRouteShellWithWorkerDeps = ({
         deps: {
           json: deps?.json,
           requireAuth: deps?.requireAuth,
-          getSessionConfig: deps?.getSessionConfig,
-          getCorsContext: deps?.getCorsContext,
-          computeScopesForLogin: deps?.computeScopesForLogin,
-          toStr: deps?.toStr,
-          dispatchAuthenticatedRoute: deps?.dispatchAuthenticatedRoute,
-          dispatchAuthenticatedSecretPathRoute: deps?.dispatchAuthenticatedSecretPathRoute,
-          readAuthenticatedActionPayload: deps?.readAuthenticatedActionPayload,
-          dispatchAuthenticatedNonSecretActionRoute: deps?.dispatchAuthenticatedNonSecretActionRoute,
-          dispatchAuthenticatedSecretActionRoute: deps?.dispatchAuthenticatedSecretActionRoute,
-          evaluateAuthenticatedRoutePreflight: deps?.evaluateAuthenticatedRoutePreflight,
-          resolveAuthenticatedRouteSecrets: deps?.resolveAuthenticatedRouteSecrets,
-          checkRateLimit: deps?.checkRateLimit,
-          getSessionSecrets: deps?.getSessionSecrets,
-          isAddress: deps?.isAddress,
-          getAddress: deps?.getAddress,
-          transcribe: deps?.transcribe,
-          arweaveUpload: deps?.arweaveUpload,
-          storageRoute: deps?.storageRoute,
-          fetchImage: deps?.fetchImage,
-          fetchUrl: deps?.fetchUrl,
-          now: deps?.now,
-          normalizeAiRequestPayload: deps?.normalizeAiRequestPayload,
-          proxyAnthropic: deps?.proxyAnthropic,
-          proxyOpenAI: deps?.proxyOpenAI,
-          proxyOpenRouter: deps?.proxyOpenRouter,
-          proxyCustomRPC: deps?.proxyCustomRPC,
-          faucet: deps?.faucet
-        },
-        constants: {
-          sessionConfigNotFoundError: constants?.sessionConfigNotFoundError
+          resolveAuthenticatedRouteContext: (value) => resolveAuthenticatedRouteContext2({
+            ...value,
+            deps: {
+              getSessionConfig: deps?.getSessionConfig,
+              getCorsContext: deps?.getCorsContext,
+              json: deps?.json,
+              toStr: deps?.toStr,
+              SESSION_CONFIG_NOT_FOUND_ERROR: constants?.sessionConfigNotFoundError
+            }
+          }),
+          dispatchAuthenticatedRoute: (value) => dispatchAuthenticatedRoute2({
+            ...value,
+            deps: {
+              dispatchAuthenticatedSecretPathRoute: (routeValue) => deps?.dispatchAuthenticatedSecretPathRoute?.({
+                ...routeValue,
+                env,
+                deps: {
+                  evaluateAuthenticatedRoutePreflight: deps?.evaluateAuthenticatedRoutePreflight,
+                  computeScopesForLogin: deps?.computeScopesForLogin,
+                  resolveAuthenticatedRouteSecrets: deps?.resolveAuthenticatedRouteSecrets,
+                  checkRateLimit: deps?.checkRateLimit,
+                  getSessionSecrets: deps?.getSessionSecrets,
+                  json: deps?.json,
+                  isAddress: deps?.isAddress,
+                  getAddress: deps?.getAddress,
+                  transcribe: deps?.transcribe,
+                  arweaveUpload: deps?.arweaveUpload,
+                  storageRoute: deps?.storageRoute,
+                  now: deps?.now
+                }
+              }),
+              readAuthenticatedActionPayload: deps?.readAuthenticatedActionPayload,
+              dispatchAuthenticatedNonSecretActionRoute: (routeValue) => deps?.dispatchAuthenticatedNonSecretActionRoute?.({
+                ...routeValue,
+                env,
+                deps: {
+                  evaluateAuthenticatedRoutePreflight: deps?.evaluateAuthenticatedRoutePreflight,
+                  computeScopesForLogin: deps?.computeScopesForLogin,
+                  fetchImage: deps?.fetchImage,
+                  fetchUrl: deps?.fetchUrl,
+                  checkRateLimit: deps?.checkRateLimit,
+                  json: deps?.json,
+                  now: deps?.now
+                }
+              }),
+              dispatchAuthenticatedSecretActionRoute: (routeValue) => deps?.dispatchAuthenticatedSecretActionRoute?.({
+                ...routeValue,
+                env,
+                deps: {
+                  evaluateAuthenticatedRoutePreflight: deps?.evaluateAuthenticatedRoutePreflight,
+                  computeScopesForLogin: deps?.computeScopesForLogin,
+                  resolveAuthenticatedRouteSecrets: deps?.resolveAuthenticatedRouteSecrets,
+                  normalizeAiRequestPayload: deps?.normalizeAiRequestPayload,
+                  proxyAnthropic: deps?.proxyAnthropic,
+                  proxyOpenAI: deps?.proxyOpenAI,
+                  proxyOpenRouter: deps?.proxyOpenRouter,
+                  proxyCustomRPC: deps?.proxyCustomRPC,
+                  faucet: deps?.faucet,
+                  checkRateLimit: deps?.checkRateLimit,
+                  getSessionSecrets: deps?.getSessionSecrets,
+                  json: deps?.json,
+                  toStr: deps?.toStr,
+                  now: deps?.now
+                }
+              }),
+              json: deps?.json
+            }
+          })
         }
       });
     } catch (error) {
+      if (error instanceof BodyByteLimitError) {
+        return new ResponseCtor(JSON.stringify({ error: error.message }), {
+          status: 413,
+          headers: { ...routeBaseHeaders, "Content-Type": "application/json" }
+        });
+      }
       log2?.error?.("[worker] unhandled route error", {
         path,
         method,

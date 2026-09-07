@@ -1,4 +1,5 @@
 import React from 'react';
+import userEvent from '@testing-library/user-event';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
@@ -314,6 +315,30 @@ describe('DebateMap', () => {
     expect(
       getAtlasNodeElementById('0x1000000000000000000000000000000000000000000000000000000000000000', 'packed'),
     ).toBeTruthy();
+  });
+
+  it('uses a native close button for the suggestion dialog', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <DebateMapComponent
+          account=""
+          provider=""
+          network={{ id: 11155420 }}
+          activeSessionSlug=""
+          toggleLoginModal={jest.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(getDebateViewModeButton('tree'));
+    fireEvent.click(screen.getAllByRole('button', { name: /AI Safety/i })[0]);
+    fireEvent.click((await screen.findAllByTitle('Suggest sub-topic'))[0]);
+
+    const closeButton = screen.getByRole('button', { name: 'Close suggestion dialog' });
+    closeButton.focus();
+    await user.keyboard('{Enter}');
+    expect(screen.queryByRole('heading', { name: 'Suggest New Topic' })).not.toBeInTheDocument();
   });
 
   it('ignores wrong-shaped bookmark storage before rendering bookmarkable list nodes', async () => {

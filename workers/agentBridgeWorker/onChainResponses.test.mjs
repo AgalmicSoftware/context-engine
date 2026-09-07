@@ -71,6 +71,20 @@ function makeWorkerFetch(calls = [], {
   };
 }
 
+test('preview identities cannot obtain a session Worker credential', async () => {
+  const principal = normalizeTelegramPrincipal({ telegramUserId: 'preview-user' });
+  const account = await deriveManagedDemoAccount({ principal, deploymentId: 'deploy-a', rootSecret: 'root-a' });
+  const calls = [];
+  const result = await authenticateSessionWorker({
+    env: { DEMO_SIGNER_ROOT_SECRET: 'root-a', AGENT_BRIDGE_DEPLOYMENT_ID: 'deploy-a', DEFAULT_CHAIN_ID: '11155420' },
+    session: { sessionSlug: 'alpha', sessionWorkerUrl: 'https://session.example' },
+    principal, account, fetchImpl: makeWorkerFetch(calls),
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'preview_credential_forbidden');
+  assert.equal(calls.length, 0);
+});
+
 test('authenticates managed Telegram account against the session worker without exposing key material', async () => {
   const { principal, account } = await makeAccount();
   const calls = [];

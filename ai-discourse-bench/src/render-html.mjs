@@ -146,28 +146,6 @@ const scoreLabel = (summary) => {
   return 'mixed / unsure';
 };
 
-const modelStanceLabel = (score) => {
-  if (!Number.isFinite(score)) return 'No model answers';
-  if (score > 0.25) return 'Models lean toward support';
-  if (score < -0.25) return 'Models lean toward opposition';
-  return 'Models are mixed or unsure';
-};
-
-const modelDifferenceLabel = (difference) => {
-  if (!Number.isFinite(difference)) return 'No model comparison yet';
-  if (difference < 0.25) return 'Models are closely aligned';
-  if (difference < 0.75) return 'Models differ somewhat';
-  if (difference < 1.25) return 'Models differ substantially';
-  return 'Models are far apart';
-};
-
-const scoreClass = (score) => {
-  if (!Number.isFinite(score)) return 'aidb-score-empty';
-  if (score > 0.25) return 'aidb-score-agree';
-  if (score < -0.25) return 'aidb-score-disagree';
-  return 'aidb-score-mixed';
-};
-
 const formatScore = (value) => (
   Number.isFinite(value) ? value.toFixed(2) : 'no data'
 );
@@ -313,10 +291,6 @@ const getRiskCommentsForAggregateCell = (comments = [], catX = '', catY = '') =>
   })
 );
 
-const getRiskCommentsForSubCell = (comments = [], catX = '', subX = '', catY = '', subY = '') => (
-  comments.filter((entry) => entry.cell === `${catX}.${subX}.${catY}.${subY}`)
-);
-
 const riskCommentSignedValue = (entry) => (
   (entry?.valence === 'risk' ? -1 : 1) * Number(entry?.intensity || 0)
 );
@@ -328,12 +302,6 @@ const sumRiskComments = (comments = []) => (
 const riskAggregateCellId = (catX = '', catY = '') => `${catX}_vs_${catY}`;
 
 const riskSubCellId = (catX = '', subX = '', catY = '', subY = '') => `${catX}.${subX}.${catY}.${subY}`;
-
-const formatRiskCellPath = (cellId = '') => {
-  const parts = String(cellId || '').split('.');
-  if (parts.length !== 4) return cellId;
-  return `${parts[0]} / ${parts[1]} -> ${parts[2]} / ${parts[3]}`;
-};
 
 const formatRiskSelectionTitle = (cellId = '') => {
   const raw = String(cellId || '');
@@ -923,16 +891,6 @@ const normalizeAnalysisCompasses = (report) => {
     .filter(Boolean);
 };
 
-const renderAnswerBar = (summary = {}) => {
-  const { agree, unsure, disagree, invalid, total } = answerTotals(summary);
-  return `<span class="aidb-answer-bar" aria-label="answer distribution">
-    <i class="aidb-answer-agree" style="width:${(agree / total) * 100}%"></i>
-    <i class="aidb-answer-unsure" style="width:${(unsure / total) * 100}%"></i>
-    <i class="aidb-answer-disagree" style="width:${(disagree / total) * 100}%"></i>
-    <i class="aidb-answer-invalid" style="width:${(invalid / total) * 100}%"></i>
-  </span>`;
-};
-
 const renderPolisBoxPlot = (summary = {}) => {
   const { agree, unsure, disagree } = answerTotals(summary);
   const totalConcrete = agree + unsure + disagree;
@@ -1344,21 +1302,21 @@ const renderComparisonReport = (report, selectedQuestion, groupsOverride = null)
         <div class="legendPills">${legend}</div>
       </div>
       <div class="sectionCollapse comparisonReportSectionCollapse">
-        <div class="sectionHeaderRow">
-          <h5 class="sectionTitle">${renderFontAwesomeIcon('caret-up')} Similarity &amp; Difference Spectrum</h5>
-        </div>
+        <h5 class="sectionTitle">
+          <button type="button" class="sectionHeaderRow" aria-expanded="true" data-ce-comparison-section-toggle>${renderFontAwesomeIcon('caret-up')} Similarity &amp; Difference Spectrum</button>
+        </h5>
         ${renderComparisonBeeswarm(rows)}
       </div>
       <div class="sectionCollapse comparisonReportSectionCollapse">
-        <div class="sectionHeaderRow">
-          <h5 class="sectionTitle">${renderFontAwesomeIcon('caret-up')} Top Similar Items</h5>
-        </div>
+        <h5 class="sectionTitle">
+          <button type="button" class="sectionHeaderRow" aria-expanded="true" data-ce-comparison-section-toggle>${renderFontAwesomeIcon('caret-up')} Top Similar Items</button>
+        </h5>
         <ul class="analysisList">${topSimilar.map((row) => renderComparisonAnalysisItem(row, 'Similarity')).join('') || '<li class="noData">No significant items found for this selection.</li>'}</ul>
       </div>
       <div class="sectionCollapse comparisonReportSectionCollapse">
-        <div class="sectionHeaderRow">
-          <h5 class="sectionTitle">${renderFontAwesomeIcon('caret-up')} Top Divergent Items</h5>
-        </div>
+        <h5 class="sectionTitle">
+          <button type="button" class="sectionHeaderRow" aria-expanded="true" data-ce-comparison-section-toggle>${renderFontAwesomeIcon('caret-up')} Top Divergent Items</button>
+        </h5>
         <ul class="analysisList">${topDivergent.map((row) => renderComparisonAnalysisItem(row, 'Divergence')).join('') || '<li class="noData">No significant items found for this selection.</li>'}</ul>
       </div>
     </div>
@@ -1989,44 +1947,6 @@ const renderConsensusAndDifference = (report) => {
     title: 'Consensus and Difference',
     subtitle: 'Beeswarm plus statement-level agreement and difference',
     body: renderBeeswarmChart(report),
-  });
-};
-
-const renderPolisMatrix = (report) => {
-  const questions = getQuestions(report);
-  const participants = report.participants || [];
-  const matrix = report.polisReport?.byModelQuestion || {};
-  const byQuestion = report.polisReport?.byQuestion || {};
-  const rows = participants.map((participant) => {
-    const cells = questions.map((question) => {
-      const summary = matrix[participant.id]?.[question.id] || {};
-      const title = `${participant.label} / ${question.id}: ${scoreLabel(summary)}`;
-      return `<td title="${escapeHtml(title)}" style="background:${stanceColor(summary.meanScore)}">${escapeHtml(formatScore(summary.meanScore))}</td>`;
-    }).join('');
-    return `<tr data-ce-searchable><th>${escapeHtml(participant.label)}</th>${cells}</tr>`;
-  }).join('');
-  const questionBars = questions.map((question, index) => {
-    const summary = byQuestion[question.id] || {};
-    return `<li data-ce-searchable>
-      <span class="rank">${index + 1}</span>
-      <span class="statement">${escapeHtml(question.prompt)}</span>
-      ${renderAnswerBar(summary)}
-    </li>`;
-  }).join('');
-  return renderModePane({
-    id: 'polis-matrix',
-    title: 'Model / Statement Matrix',
-    subtitle: 'Agreement and disagreement across model participants',
-    bodyClassName: 'graphSection aidb-matrix-section',
-    body: `
-      <p class="ce-report-muted">Agreement and disagreement across model participants, normalized across canonical and reversed wording.</p>
-      <div class="polis-grid">
-        <table class="aidb-matrix-table">
-          <thead><tr><th>Participant</th>${questions.map((q) => `<th title="${escapeHtml(q.prompt)}">${escapeHtml(q.id)}</th>`).join('')}</tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-        <ol class="question-bars">${questionBars}</ol>
-      </div>`,
   });
 };
 
@@ -4515,8 +4435,10 @@ export const renderHtmlReport = (report) => `<!doctype html>
     .reportCollapseBody { display: grid; gap: 0; }
     .comparisonReportContainer .sectionCollapse,
     .comparisonReportSectionCollapse { margin-bottom: 1rem; padding: 0; border: 1px solid #e0e0e0; border-radius: var(--ce-radius-8, 8px); background-color: var(--ce-color-white, #ffffff); overflow: hidden; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); }
-    .comparisonReportSectionCollapse .sectionHeaderRow { display: flex; align-items: center; justify-content: flex-start; padding: 0.75rem 1.25rem; cursor: pointer; border-bottom: 1px solid var(--ce-color-light, #f1f3f5); margin-bottom: 0; }
+    .comparisonReportSectionCollapse .sectionHeaderRow { width: 100%; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; display: flex; align-items: center; justify-content: flex-start; padding: 0.75rem 1.25rem; cursor: pointer; border-bottom: 1px solid var(--ce-color-light, #f1f3f5); margin-bottom: 0; }
     .comparisonReportSectionCollapse .sectionHeaderRow:hover { background-color: var(--ce-color-surface-light, #f8f9fa); }
+    .comparisonReportSectionCollapse > [hidden] { display: none !important; }
+    .comparisonReportSectionCollapse .sectionHeaderRow[aria-expanded="false"] svg { transform: rotate(180deg); }
     .comparisonReportSectionCollapse .sectionTitle { margin: 0; font-size: 1.1rem; font-weight: 500; color: var(--ce-color-dark, #212529); line-height: 1.2; }
     .comparisonReportSectionCollapse .sectionTitle svg { margin-right: 10px; width: 1em; height: 1em; display: inline-block; overflow: visible; vertical-align: -0.125em; }
     .comparisonBeeswarmSvg { width: 700px; min-width: 700px; max-width: none; }
@@ -6534,9 +6456,9 @@ export const renderHtmlReport = (report) => `<!doctype html>
           '</button>' +
           '<div id="demo-analysis-comparison-report-body" class="reportCollapseBody" data-testid="demo-analysis-comparison-report-body">' +
             '<div class="legendContainer"><span class="legendTitle">Comparing Groups:</span><div class="legendPills">' + legend + '</div></div>' +
-            '<div class="sectionCollapse comparisonReportSectionCollapse"><div class="sectionHeaderRow"><h5 class="sectionTitle">Similarity &amp; Difference Spectrum</h5></div>' + breakdownRenderBeeswarm(rows.slice(0, 12)) + '</div>' +
-            '<div class="sectionCollapse comparisonReportSectionCollapse"><div class="sectionHeaderRow"><h5 class="sectionTitle">Top Similar Items</h5></div><ul class="analysisList">' + (topSimilar.map(breakdownRenderAnalysisItem).join('') || '<li class="noData">No significant items found for this selection.</li>') + '</ul></div>' +
-            '<div class="sectionCollapse comparisonReportSectionCollapse"><div class="sectionHeaderRow"><h5 class="sectionTitle">Top Divergent Items</h5></div><ul class="analysisList">' + (topDivergent.map(breakdownRenderAnalysisItem).join('') || '<li class="noData">No significant items found for this selection.</li>') + '</ul></div>' +
+            '<div class="sectionCollapse comparisonReportSectionCollapse"><h5 class="sectionTitle"><button type="button" class="sectionHeaderRow" aria-expanded="true" data-ce-comparison-section-toggle>Similarity &amp; Difference Spectrum</button></h5>' + breakdownRenderBeeswarm(rows.slice(0, 12)) + '</div>' +
+            '<div class="sectionCollapse comparisonReportSectionCollapse"><h5 class="sectionTitle"><button type="button" class="sectionHeaderRow" aria-expanded="true" data-ce-comparison-section-toggle>Top Similar Items</button></h5><ul class="analysisList">' + (topSimilar.map(breakdownRenderAnalysisItem).join('') || '<li class="noData">No significant items found for this selection.</li>') + '</ul></div>' +
+            '<div class="sectionCollapse comparisonReportSectionCollapse"><h5 class="sectionTitle"><button type="button" class="sectionHeaderRow" aria-expanded="true" data-ce-comparison-section-toggle>Top Divergent Items</button></h5><ul class="analysisList">' + (topDivergent.map(breakdownRenderAnalysisItem).join('') || '<li class="noData">No significant items found for this selection.</li>') + '</ul></div>' +
           '</div>' +
         '</section>';
       }
@@ -6955,6 +6877,15 @@ export const renderHtmlReport = (report) => `<!doctype html>
           }
         });
       }
+      if (breakdownComparisonReport) breakdownComparisonReport.addEventListener('click', function (event) {
+        var button = event.target.closest('[data-ce-comparison-section-toggle]');
+        if (!button || !breakdownComparisonReport.contains(button)) return;
+        var body = button.parentElement.nextElementSibling;
+        if (!body) return;
+        var nextOpen = button.getAttribute('aria-expanded') !== 'true';
+        button.setAttribute('aria-expanded', String(nextOpen));
+        body.hidden = !nextOpen;
+      });
       breakdownActiveSuggestion = null;
       updateInteractiveBreakdown(null);
       document.querySelectorAll('[data-ce-risk-matrix-cell]').forEach(function (cell) {

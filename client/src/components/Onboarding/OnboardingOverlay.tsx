@@ -94,7 +94,7 @@ const OnboardingOverlay = () => {
             data-slide-key={slideKey}
             data-slide-layout={slideLayout}
           >
-            <div className={styles.onboardingInfo}>
+            <div key={slideKey} className={styles.onboardingInfo}>
               {title ? (
                 <div className={styles.onboardingTitleArea}>
                   <h2 className={styles.onboardingTitle} data-testid="ce-onboarding-title">

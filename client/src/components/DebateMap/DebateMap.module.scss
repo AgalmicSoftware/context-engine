@@ -1270,6 +1270,15 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
 
     &.suggestModalContainer {
       max-width: 500px;
+
+      .closeIcon {
+        border: 0;
+        padding: 0;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+      }
     }
 
     /* --- Modal Header & Compact Vote Controls --- */

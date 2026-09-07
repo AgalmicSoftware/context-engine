@@ -17,6 +17,17 @@ $card-shadow: var(--ce-card-shadow);
 /* NEW: standardized icon size for copy & bookmark */
 $icon-size-standard: 1.25rem;
 
+.statItem {
+  display: block;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
 .userPage {
   display: flex;
   flex-direction: column;
@@ -774,11 +785,15 @@ $icon-size-standard: 1.25rem;
     margin-right: 10px;
   }
 
-  /* Make header buttons full-width when wrapping on small screens */
+  /* Keep the two profile actions together below the address on small screens. */
   .headerActionsRight {
+    width: 100%;
+
     .collapseButton,
     .analyzeButton {
-      width: 100%;
+      flex: 1 1 0;
+      min-width: 0;
+      width: auto;
     }
   }
 
@@ -1667,4 +1682,54 @@ $icon-size-standard: 1.25rem;
 
 .headerChevron {
   margin-right: 8px;
+}
+
+// Keep the analysis reading surface paired with document text in either theme.
+:global(:root) :global(.modal-dialog) > .analysisModalContent:global(.modal-content) {
+  background: var(--ce-document-canvas);
+  color: var(--ce-document-text);
+
+  .modalHeader,
+  .modalTitleRow,
+  .analysisCacheStatus {
+    color: var(--ce-titlebar-text);
+  }
+
+  .modalHeader h5 {
+    color: inherit;
+  }
+
+  .modalBody,
+  .historicalAlignment,
+  .historicalAlignment h4 {
+    color: var(--ce-document-text);
+  }
+
+  .placeholderNote {
+    color: var(--ce-document-text-muted);
+  }
+
+  .historicalAlignment {
+    background: var(--ce-document-surface);
+  }
+
+  .refreshIconButton,
+  .analysisCloseButton {
+    background: transparent;
+    color: var(--ce-titlebar-text);
+    min-width: 32px;
+    min-height: 32px;
+    padding: 4px;
+
+    &:disabled {
+      opacity: 0.65;
+    }
+  }
+
+  .analysisCloseButton {
+    font-size: 1.75rem;
+    line-height: 1;
+    margin-left: 12px;
+    cursor: pointer;
+  }
 }

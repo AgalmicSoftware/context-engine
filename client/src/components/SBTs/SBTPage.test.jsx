@@ -635,7 +635,7 @@ describe('SBTPage session routing and holder loading', () => {
 
     expect(inviteAction).not.toBeNull();
     expect(inviteAction.props.disabled).toBe(false);
-    expect(inviteAction.props.placeholder).toBe('Group Password');
+    expect(inviteAction.props.placeholder).toBe('Invite Code');
 
     inviteAction.props.onAction({ preventDefault: jest.fn() });
 

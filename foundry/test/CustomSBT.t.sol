@@ -55,6 +55,31 @@ contract BurnOnReceiveReceiver is IERC721Receiver {
     }
 }
 
+contract InviteReceiver is IERC721Receiver {
+    MySBT private immutable SBT;
+    bool private immutable REJECT_MINT;
+    bool public observedConsumed;
+    bool public reentryBlocked;
+    uint256 private slot;
+    bytes private signature;
+
+    constructor(MySBT sbt_, bool rejectMint_) { SBT = sbt_; REJECT_MINT = rejectMint_; }
+
+    function claim(uint256 slot_, bytes memory signature_) external {
+        slot = slot_;
+        signature = signature_;
+        SBT.claimWithInvite(slot, signature);
+    }
+
+    function onERC721Received(address, address, uint256, bytes calldata) external returns (bytes4) {
+        require(!REJECT_MINT, "Receiver rejected mint");
+        observedConsumed = SBT.usedInviteSlots(slot);
+        (bool ok,) = address(SBT).call(abi.encodeWithSelector(MySBT.claimWithInvite.selector, slot, signature));
+        reentryBlocked = !ok;
+        return IERC721Receiver.onERC721Received.selector;
+    }
+}
+
 contract CustomSBTTest is TestUtils {
     using MessageHashUtils for bytes32;
 
@@ -133,14 +158,14 @@ contract CustomSBTTest is TestUtils {
     }
 
     function signGroupMint(MySBT sbt, address minter, uint256 key) internal returns (bytes memory) {
-        bytes32 message = keccak256(abi.encodePacked(address(sbt), minter));
+        bytes32 message = keccak256(abi.encode(keccak256("ContextEngine.SBT.GroupMint:1"), block.chainid, address(sbt), minter));
         bytes32 digest = message.toEthSignedMessageHash();
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(key, digest);
         return abi.encodePacked(r, s, v);
     }
 
     function signInvite(MySBT sbt, uint256 nonce, uint256 key) internal returns (bytes memory) {
-        bytes32 message = keccak256(abi.encodePacked(address(sbt), nonce));
+        bytes32 message = keccak256(abi.encode(keccak256("ContextEngine.SBT.Invite:1"), block.chainid, address(sbt), nonce));
         bytes32 digest = message.toEthSignedMessageHash();
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(key, digest);
         return abi.encodePacked(r, s, v);
@@ -640,7 +665,7 @@ contract CustomSBTTest is TestUtils {
         bytes32[] memory empty = new bytes32[](0);
         MySBT sbt = deploySbt("ContextEngine", "CE", 0, false, empty, groupPasswordHash);
 
-        bytes32 message = keccak256(abi.encodePacked(address(sbt), user));
+        bytes32 message = keccak256(abi.encode(keccak256("ContextEngine.SBT.GroupMint:1"), block.chainid, address(sbt), user));
         bytes32 digest = message.toEthSignedMessageHash();
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digest);
         bytes memory signature = abi.encodePacked(r, s, v);
@@ -663,7 +688,7 @@ contract CustomSBTTest is TestUtils {
         assertEq(sbt.mintedTokens(), 0, "mintedTokens should stay 0");
     }
 
-    function testInviteClaimMintsAndBlocksWrongNonce() public {
+    function testInviteClaimMintsAndBlocksConsumedSlot() public {
         bytes32 groupPasswordHash = keccak256(abi.encodePacked(signer));
         bytes32[] memory empty = new bytes32[](0);
         MySBT sbt = deploySbt("ContextEngine", "CE", 2, true, empty, groupPasswordHash);
@@ -677,7 +702,7 @@ contract CustomSBTTest is TestUtils {
         assertEq(sbt.mintedTokens(), 1, "mintedTokens should be 1");
 
         vm.prank(userTwo);
-        vm.expectRevert(abi.encodeWithSelector(InvalidNonce.selector, 2, 1));
+        vm.expectRevert(abi.encodeWithSelector(InviteSlotUsed.selector, 1));
         sbt.claimWithInvite(1, signature);
 
         assertEq(sbt.mintedTokens(), 1, "mintedTokens should stay 1");
@@ -918,7 +943,7 @@ contract CustomSBTTest is TestUtils {
         assertEq(sbt.mintedTokens(), 0, "mintedTokens should stay 0");
     }
 
-    function testInviteClaimRejectsWrongNonce() public {
+    function testInviteClaimRejectsOutOfRangeSlot() public {
         bytes32 groupPasswordHash = keccak256(abi.encodePacked(signer));
         bytes32[] memory empty = new bytes32[](0);
         MySBT sbt = deploySbt("ContextEngine", "CE", 1, true, empty, groupPasswordHash);
@@ -926,7 +951,7 @@ contract CustomSBTTest is TestUtils {
         bytes memory signature = signInvite(sbt, 2, signerKey);
 
         vm.prank(user);
-        vm.expectRevert(abi.encodeWithSelector(InvalidNonce.selector, 1, 2));
+        vm.expectRevert(abi.encodeWithSelector(InvalidInviteSlot.selector, 2));
         sbt.claimWithInvite(2, signature);
 
         assertEq(sbt.mintedTokens(), 0, "mintedTokens should stay 0");
@@ -1053,4 +1078,167 @@ contract CustomSBTTest is TestUtils {
         (bool okAdmin,) = address(sbt).call(abi.encodeWithSignature("burn(uint256)", tokenId));
         assertFalse(okAdmin, "admin should not burn in Neither");
     }
+    function testAdminRotationMovesAllIssuerAuthority() public {
+        MySBT sbt = deploySbtWithConfig("ContextEngine", "CE", 0, false, new bytes32[](0), bytes32(0), MySBT.BurnAuth.Both, 0);
+        vm.prank(user);
+        sbt.claim();
+        vm.prank(user);
+        (bool unauthorized,) = address(sbt).call(abi.encodeWithSignature("changeAdmin(address)", user));
+        assertFalse(unauthorized, "only current admin may rotate");
+        vm.prank(admin);
+        (bool rotated,) = address(sbt).call(abi.encodeWithSignature("changeAdmin(address)", userTwo));
+        assertTrue(rotated, "admin rotation must succeed");
+        assertEq(sbt.admin(), userTwo, "new admin is authoritative");
+        vm.prank(admin);
+        vm.expectRevert();
+        sbt.burn(1);
+        vm.prank(admin);
+        vm.expectRevert();
+        sbt.addHashedPasswords(new bytes32[](0));
+        vm.prank(userTwo);
+        sbt.addHashedPasswords(new bytes32[](0));
+        vm.prank(userTwo);
+        sbt.burn(1);
+        assertEq(sbt.getTokenIdByOwner(user), 0, "new admin can burn under issuer policy");
+    }
+
+    function testZeroAdminRemainsZeroAndDisablesIssuerActions() public {
+        admin = address(0);
+        MySBT sbt = deploySbtWithConfig("ContextEngine", "CE", 0, false, new bytes32[](0), bytes32(0), MySBT.BurnAuth.IssuerOnly, 0);
+        assertEq(sbt.admin(), address(0), "zero must not become deployer or factory");
+        vm.prank(user);
+        sbt.claim();
+        vm.prank(address(0));
+        vm.expectRevert();
+        sbt.addHashedPasswords(new bytes32[](0));
+        vm.prank(address(0));
+        vm.expectRevert();
+        sbt.burn(1);
+        (bool ok,) = address(sbt).call(abi.encodeWithSignature("changeAdmin(address)", user));
+        assertFalse(ok, "retired authority cannot be recovered by deployer");
+        assertEq(sbt.ownerOf(1), user, "token still exists");
+    }
+
+    function testAdminRetirementPreservesHolderBurnAndNeitherPolicy() public {
+        for (uint256 i = 1; i < 4; i++) {
+            MySBT sbt = deploySbtWithConfig("ContextEngine", "CE", 0, false, new bytes32[](0), bytes32(0), MySBT.BurnAuth(i), 0);
+            vm.prank(user);
+            sbt.claim();
+            vm.prank(admin);
+            (bool retired,) = address(sbt).call(abi.encodeWithSignature("changeAdmin(address)", address(0)));
+            assertTrue(retired, "admin can retire");
+            vm.prank(admin);
+            (bool restored,) = address(sbt).call(abi.encodeWithSignature("changeAdmin(address)", admin));
+            assertFalse(restored, "retirement is permanent");
+            vm.prank(user);
+            (bool burned,) = address(sbt).call(abi.encodeWithSignature("burn(uint256)", 1));
+            assertTrue(burned == (i != 3), "holder rights follow burn policy after retirement");
+        }
+    }
+
+    function testSbtHasNoTransferableCollectionOwnership() public {
+        MySBT sbt = deploySbt("ContextEngine", "CE", 0, false, new bytes32[](0), bytes32(0));
+        vm.prank(admin);
+        (bool transferred,) = address(sbt).call(abi.encodeWithSignature("transferOwnership(address)", user));
+        assertFalse(transferred, "SBT must not expose transferable collection ownership");
+        vm.prank(admin);
+        (bool renounced,) = address(sbt).call(abi.encodeWithSignature("renounceOwnership()"));
+        assertFalse(renounced, "SBT must have only changeAdmin");
+        (bool hasOwner,) = address(sbt).staticcall(abi.encodeWithSignature("owner()"));
+        assertFalse(hasOwner, "no second collection authority");
+    }
+
+    function testInviteSlotsRedeemIndependentlyAndCannotReplay() public {
+        MySBT sbt = deploySbt("ContextEngine", "CE", 3, true, new bytes32[](0), keccak256(abi.encodePacked(signer)));
+        bytes memory second = signInvite(sbt, 2, signerKey);
+        vm.prank(user);
+        sbt.claimWithInvite(2, second);
+        bytes memory first = signInvite(sbt, 1, signerKey);
+        vm.prank(userTwo);
+        sbt.claimWithInvite(1, first);
+        vm.prank(address(0xC0DE));
+        vm.expectRevert();
+        sbt.claimWithInvite(2, second);
+        assertEq(sbt.mintedTokens(), 2, "slots are consumed independently");
+    }
+
+    function testGroupSignatureIsBoundToChainClaimantAndCollection() public {
+        uint256 originalChain = 11155420;
+        vm.chainId(originalChain);
+        MySBT sbt = deploySbt("ContextEngine", "CE", 0, false, new bytes32[](0), keccak256(abi.encodePacked(signer)));
+        MySBT other = deploySbt("ContextEngine", "CE", 0, false, new bytes32[](0), keccak256(abi.encodePacked(signer)));
+        bytes memory signature = signGroupMint(sbt, user, signerKey);
+        vm.prank(userTwo);
+        vm.expectRevert();
+        sbt.mintWithGroupSignature(signature);
+        vm.prank(user);
+        vm.expectRevert();
+        other.mintWithGroupSignature(signature);
+        vm.chainId(originalChain + 1);
+        vm.prank(user);
+        vm.expectRevert();
+        sbt.mintWithGroupSignature(signature);
+        vm.chainId(originalChain);
+        vm.prank(user);
+        sbt.mintWithGroupSignature(signature);
+    }
+
+    function testInviteSignatureIsBoundToChainCollectionAndSlot() public {
+        uint256 originalChain = 11155420;
+        vm.chainId(originalChain);
+        MySBT sbt = deploySbt("ContextEngine", "CE", 3, true, new bytes32[](0), keccak256(abi.encodePacked(signer)));
+        MySBT other = deploySbt("ContextEngine", "CE", 3, true, new bytes32[](0), keccak256(abi.encodePacked(signer)));
+        bytes memory signature = signInvite(sbt, 1, signerKey);
+        vm.prank(user);
+        vm.expectRevert();
+        sbt.claimWithInvite(2, signature);
+        vm.prank(user);
+        vm.expectRevert();
+        other.claimWithInvite(1, signature);
+        vm.chainId(originalChain + 1);
+        vm.prank(user);
+        vm.expectRevert();
+        sbt.claimWithInvite(1, signature);
+        vm.chainId(originalChain);
+        vm.prank(user);
+        sbt.claimWithInvite(1, signature);
+    }
+
+    function testAHolderCanClaimInAnotherCollection() public {
+        MySBT first = deploySbt("ContextEngine", "CE", 0, false, new bytes32[](0), bytes32(0));
+        MySBT second = deploySbt("ContextEngine", "CE", 0, false, new bytes32[](0), bytes32(0));
+        vm.prank(user);
+        first.claim();
+        vm.prank(user);
+        second.claim();
+        assertEq(first.balanceOf(user), 1, "first collection membership remains");
+        assertEq(second.balanceOf(user), 1, "other collection holdings do not block a claim");
+        vm.prank(user);
+        vm.expectRevert();
+        second.claim();
+    }
+
+    function testInviteSlotConsumptionIsAtomicWithSafeMint() public {
+        MySBT sbt = deploySbt("ContextEngine", "CE", 3, true, new bytes32[](0), keccak256(abi.encodePacked(signer)));
+        bytes memory signature = signInvite(sbt, 2, signerKey);
+        InviteReceiver rejecting = new InviteReceiver(sbt, true);
+        vm.expectRevert();
+        rejecting.claim(2, signature);
+        assertFalse(sbt.usedInviteSlots(2), "failed receiver must roll back slot consumption");
+        assertEq(sbt.mintedTokens(), 0, "failed receiver must roll back token state");
+        InviteReceiver accepting = new InviteReceiver(sbt, false);
+        accepting.claim(2, signature);
+        assertTrue(accepting.observedConsumed(), "slot must be consumed before receiver code");
+        assertTrue(accepting.reentryBlocked(), "receiver must not redeem recursively");
+        assertTrue(sbt.usedInviteSlots(2), "successful mint permanently consumes slot");
+    }
+
+    function testInviteSlotZeroIsNeverValid() public {
+        MySBT sbt = deploySbt("ContextEngine", "CE", 3, true, new bytes32[](0), keccak256(abi.encodePacked(signer)));
+        bytes memory signature = signInvite(sbt, 0, signerKey);
+        vm.prank(user);
+        vm.expectRevert(abi.encodeWithSelector(InvalidInviteSlot.selector, 0));
+        sbt.claimWithInvite(0, signature);
+    }
+
 }

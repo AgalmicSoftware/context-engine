@@ -2756,7 +2756,6 @@ class QuestionFilter extends React.Component<any, any> {
       pendingShowTopQuestionsByResponses,
       pendingTopQuestionsCount,
       selectedTags,
-      filteredQuestionsCount,
       showAllTags,
       filterUrlInput,
       showLoadInput,
@@ -2775,6 +2774,8 @@ class QuestionFilter extends React.Component<any, any> {
     const aiControlsDisabled = isTopQuestionsModeActive || !aiAccessState.enabled || aiApplying;
     const aiApplyButtonLabel = aiApplying ? `Applying... ${Math.max(0, Number(aiApplyingElapsedSec || 0))}s` : 'Apply';
     const pipelineForRender = this.buildFilterPipelineResult(false);
+    const filteredQuestionsCount = this.buildFilterPipelineResult(true).count;
+    const awaitingQuestionMetadata = !this.props.isQuestionCacheReady && this.state.mergedQuestions.length === 0;
     const encryptedCount = getEncryptedQuestionCount(pipelineForRender.finalQuestions);
     const encryptedQuestionGateTooltip = this.getEncryptedQuestionGateTooltipProps();
     const renderEncryptedCountBadge = (marginLeft: string = '8px') => {
@@ -2918,7 +2919,7 @@ class QuestionFilter extends React.Component<any, any> {
             {/* Count row with + icon to open load input */}
             <div className={styles.inlineCountRow}>
               <div className={styles.inlineCountText}>
-                {!this.props.isQuestionCacheReady ? (
+                {awaitingQuestionMetadata ? (
                   <FontAwesomeIcon icon={faSpinner} spin />
                 ) : (
                   <>
@@ -2955,11 +2956,7 @@ class QuestionFilter extends React.Component<any, any> {
                 <span style={QUESTION_FILTER_MODAL_TITLE_ROW_STYLE}>
                   <span>
                     Filter Questions (
-                    {!this.props.isQuestionCacheReady ? (
-                      <FontAwesomeIcon icon={faSpinner} spin />
-                    ) : (
-                      filteredQuestionsCount
-                    )}
+                    {awaitingQuestionMetadata ? <FontAwesomeIcon icon={faSpinner} spin /> : filteredQuestionsCount}
                     {renderEncryptedCountBadge('6px')})
                   </span>
                   {/* Place + icon inline with the title to avoid overlaying the close X */}

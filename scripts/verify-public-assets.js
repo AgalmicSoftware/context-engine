@@ -2,6 +2,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { collectGitVisiblePaths } = require('./verify-public-text');
 
 const IMAGE_RE = /\.(?:png|jpe?g|gif|webp|svg|ico|avif)$/i;
 const SKIP_DIRS = new Set([
@@ -36,6 +37,11 @@ function normalizePath(relativePath) {
   return relativePath.split(path.sep).join('/');
 }
 
+function pathHasSkippedDirectory(relativePath) {
+  const segments = normalizePath(relativePath).split('/');
+  return segments.slice(0, -1).some((segment) => SKIP_DIRS.has(segment));
+}
+
 function walkFiles(rootDir) {
   const files = [];
   const walk = (absoluteDir) => {
@@ -50,6 +56,19 @@ function walkFiles(rootDir) {
   };
   walk(rootDir);
   return files.sort();
+}
+
+function collectScannableFiles(rootDir) {
+  const gitVisiblePaths = collectGitVisiblePaths(rootDir);
+  if (gitVisiblePaths) {
+    return gitVisiblePaths
+      .filter((relativePath) => !pathHasSkippedDirectory(relativePath))
+      .map((relativePath) => path.join(rootDir, relativePath))
+      .filter((absolutePath) => fs.existsSync(absolutePath) && fs.lstatSync(absolutePath).isFile())
+      .sort();
+  }
+
+  return walkFiles(rootDir);
 }
 
 function isTextFile(absolutePath) {
@@ -101,7 +120,7 @@ function findUnreferencedAssets(rootDir, files, images) {
 
 function verifyPublicAssets(rootDir = path.resolve(__dirname, '..')) {
   const absoluteRoot = path.resolve(rootDir);
-  const files = walkFiles(absoluteRoot);
+  const files = collectScannableFiles(absoluteRoot);
   const images = files.filter((absolutePath) => IMAGE_RE.test(absolutePath));
   const unreferencedAssets = new Set(findUnreferencedAssets(absoluteRoot, files, images));
 

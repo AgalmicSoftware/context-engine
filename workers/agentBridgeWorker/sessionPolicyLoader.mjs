@@ -200,17 +200,18 @@ export async function loadSessionPolicy(env = {}, {
     sessions: [],
   }));
   if (registry.ok && registry.sessions.length) {
-    return finalizeSessionPolicy(env, normalizeSessionPolicy({
+    const registryPolicy = normalizeSessionPolicy({
       defaultSessionSlug: (
         sanitizeSessionSlug(env.AGENT_BRIDGE_DEFAULT_SESSION_SLUG || env.DEFAULT_SESSION_SLUG) ||
         registry.sessions.find((session) => session.default)?.sessionSlug ||
         registry.sessions[0]?.sessionSlug
       ),
-      riskCeiling: RISK_CEILINGS.SUBMIT,
-      allowQuestionGeneration: true,
-      allowGenerateQuestion: true,
+      riskCeiling: RISK_CEILINGS.READ,
+      allowQuestionGeneration: false,
+      allowGenerateQuestion: false,
       sessions: registry.sessions,
-    }, { now: policyNow }), finalizeOptions);
+    }, { now: policyNow });
+    return finalizeSessionPolicy(env, { ...registryPolicy, registryReadOnly: true }, finalizeOptions);
   }
   const unavailablePolicy = normalizeSessionPolicy({
     defaultSessionSlug: '',

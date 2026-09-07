@@ -38,8 +38,8 @@ export const buildCreateSbtPasswordExportFile = ({
   let fileName = '';
   const distribution = isPlainCreateSbtPasswordObject(sbtDistribution) ? sbtDistribution : {};
   const isInvite = !!(distribution.isLimited && distribution.distributionOption === 'groupPassword');
-  const codeLabel = isInvite ? 'groupPassword' : 'password';
-  const fileLabel = isInvite ? 'group-passwords' : 'passwords';
+  const codeLabel = isInvite ? 'inviteCode' : 'password';
+  const fileLabel = isInvite ? 'invites' : 'passwords';
   const codes = Array.isArray(passwordList) ? passwordList.map((code: unknown) => String(code || '')) : [];
   const links = Array.isArray(sbtInviteLinks)
     ? sbtInviteLinks.map((link: unknown) => sanitizeSbtClaimIdentityUrl(link))

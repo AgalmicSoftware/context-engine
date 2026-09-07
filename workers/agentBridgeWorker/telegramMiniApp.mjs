@@ -1,5 +1,7 @@
 import {
   safeString,
+  timingSafeEqualString,
+  operatorPreviewSecretMatches,
   lower,
   safeJsonParse,
   stableJson,
@@ -8,6 +10,7 @@ import {
   envFlagEnabled,
   sanitizeSessionSlug,
 } from './runtimePrimitives.mjs';
+import { listKvRecordsByPrefix } from './kvReadHelpers.mjs';
 import {
   DOC_VISIBILITY,
   RISK_CEILINGS,
@@ -621,17 +624,6 @@ function bytesToHex(bytes) {
   return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-function timingSafeEqualString(left = '', right = '') {
-  const a = safeString(left);
-  const b = safeString(right);
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let index = 0; index < a.length; index += 1) {
-    diff |= a.charCodeAt(index) ^ b.charCodeAt(index);
-  }
-  return diff === 0;
-}
-
 async function hmacSha256Bytes(keyBytes, data = '') {
   if (!globalThis.crypto?.subtle) throw new Error('webcrypto_unavailable');
   const key = await globalThis.crypto.subtle.importKey(
@@ -682,11 +674,15 @@ function parseInitUser(params) {
 
 export async function validateTelegramMiniAppInitData(initData = '', env = {}, {
   nowMs = Date.now(),
+  previewSecret = '',
 } = {}) {
   const botToken = safeString(env.TELEGRAM_BOT_TOKEN);
   const allowPreviewAuth = envFlagEnabled(env.AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH);
   const raw = safeString(initData);
   if (!botToken && allowPreviewAuth) {
+    if (!operatorPreviewSecretMatches(previewSecret, env)) {
+      return { ok: false, reason: 'telegram_preview_unauthorized', authMode: 'preview', user: null };
+    }
     return {
       ok: true,
       reason: 'explicit_preview_auth_without_bot_token',
@@ -767,7 +763,9 @@ function telegramInitDataFromRequest(request) {
 }
 
 async function authorizeMiniAppRequest(request, env = {}) {
-  return validateTelegramMiniAppInitData(telegramInitDataFromRequest(request), env);
+  return validateTelegramMiniAppInitData(telegramInitDataFromRequest(request), env, {
+    previewSecret: request.headers.get('X-CE-Preview-Secret'),
+  });
 }
 
 async function resolveLaunchRecord(env = {}, launch = '') {
@@ -1163,37 +1161,6 @@ function emptyMiniAppGroupState(sessionSlug = '') {
     proposals: [],
     updatedAt: null,
   };
-}
-
-async function listKvRecordsByPrefix(env = {}, prefix = '', {
-  limit = 500,
-} = {}) {
-  const kv = env?.AGENT_ACTION_KV;
-  if (!kv || typeof kv.list !== 'function' || typeof kv.get !== 'function') return [];
-  const records = [];
-  const maxRecords = Number.isFinite(Number(limit)) && Number(limit) > 0
-    ? Math.floor(Number(limit))
-    : Infinity;
-  let cursor = undefined;
-  do {
-    const page = await kv.list({
-      prefix,
-      limit: Math.min(1000, Math.max(1, Number.isFinite(maxRecords) ? maxRecords : 1000)),
-      ...(cursor ? { cursor } : {}),
-    }).catch(() => null);
-    const keys = Array.isArray(page?.keys) ? page.keys : [];
-    for (const entry of keys) {
-      const key = safeString(entry?.name || entry);
-      if (!key) continue;
-      const record = safeJsonParse(await kv.get(key).catch(() => null), null);
-      if (record && typeof record === 'object' && !Array.isArray(record)) {
-        records.push({ ...record, key });
-      }
-      if (records.length >= maxRecords) return records;
-    }
-    cursor = page?.list_complete === false ? safeString(page.cursor) : '';
-  } while (cursor);
-  return records;
 }
 
 function dedupeRecordsByRequestId(records = []) {
@@ -4720,7 +4687,7 @@ async function handleDocumentPreviewRequest({
     status: 200,
     headers: {
       'content-type': contentType,
-      'cache-control': 'private, max-age=300',
+      'cache-control': context.auth.authMode === 'preview' ? 'no-store' : 'private, max-age=300',
       'content-disposition': `inline; filename="${(safeString(preview.title) || docId || 'document').replace(/[^A-Za-z0-9_.-]/g, '_')}.${fileType || 'bin'}"`,
     },
   });

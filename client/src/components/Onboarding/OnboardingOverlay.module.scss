@@ -55,11 +55,14 @@
   min-width: 0;
   min-height: 0;
   height: 100%;
+  // Long slides scroll within the content area, clear of Skip and the arrows.
+  overflow-y: auto;
   background-size: auto;
   background-blend-mode: hue;
 }
 
 .onboardingTitleArea {
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   flex-wrap: wrap;
@@ -351,7 +354,7 @@
   .onboardingWalkthrough {
     display: flex;
     flex-direction: column;
-    min-height: unset;
+    min-height: 0;
     padding-right: 0;
   }
 
@@ -462,6 +465,7 @@
 
   .deck {
     flex-direction: column;
+    flex-shrink: 0;
     align-items: center;
     gap: 14px;
     min-height: unset;

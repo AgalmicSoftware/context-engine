@@ -1,6 +1,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { execFileSync } = require('node:child_process');
 let renderPostSocialPreviewHtml;
 let writePostSocialPreviewHtml;
 
@@ -57,18 +58,26 @@ describe('vite PostCSS compatibility', () => {
     );
   });
 
-  it('resolves shared envelope dependencies from the client install', () => {
-    const config = fs.readFileSync(path.join(clientRoot, 'vite.config.mjs'), 'utf8');
-    const pkg = JSON.parse(fs.readFileSync(path.join(clientRoot, 'package.json'), 'utf8'));
-    const sharedEnvelopeCore = fs.readFileSync(
-      path.join(clientRoot, '..', 'shared', 'encryption', 'envelopeV1Core.mjs'),
-      'utf8',
-    );
+  it.each(['serve', 'build'])('resolves shared envelope dependencies from the client install during %s', (command) => {
+    const resolved = execFileSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        `
+      import { resolveConfig } from 'vite';
+      import path from 'node:path';
+      const config = await resolveConfig({}, process.argv[1]);
+      const importer = path.resolve('../shared/encryption/envelopeV1Core.mjs');
+      console.log(await config.createResolver()('ethers', importer));
+    `,
+        command,
+      ],
+      { cwd: clientRoot, encoding: 'utf8', timeout: 15000 },
+    ).trim();
+    const ethersDir = fs.realpathSync(path.join(clientRoot, 'node_modules', 'ethers'));
 
-    expect(sharedEnvelopeCore).toContain("from 'ethers'");
-    expect(pkg.dependencies.ethers).toBe('5.7.2');
-    expect(config).toContain('find: /^ethers$/');
-    expect(config).toContain("path.resolve(__dirname, 'node_modules', 'ethers', 'lib.esm', 'index.js')");
+    expect(resolved.startsWith(`${ethersDir}${path.sep}`)).toBe(true);
   });
 
   it('writes crawler-facing post HTML with the header as a large social image', () => {

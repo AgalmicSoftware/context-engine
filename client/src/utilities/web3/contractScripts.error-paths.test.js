@@ -1,3 +1,4 @@
+let mockLastWriteMethod;
 jest.mock('../../variables/appConfig.js', () => {
   const actual = jest.requireActual('../../variables/appConfig.js');
   return {
@@ -42,7 +43,8 @@ jest.mock('ethers', () => {
   const mockUtils = {
     ...actual.utils,
     Interface: class MockInterface {
-      encodeFunctionData() {
+      encodeFunctionData(method) {
+        mockLastWriteMethod = method;
         return '0xdeadbeef';
       }
     },
@@ -63,8 +65,36 @@ jest.mock('ethers', () => {
       return actual.ethers.BigNumber.from('300000');
     }
 
+    async getNetwork() {
+      return { chainId: 84532 };
+    }
+    async getCode(to) {
+      this.target = to;
+      return '0x6000';
+    }
+    async send(method, params) {
+      return this.provider.request({ method, params });
+    }
     async waitForTransaction(txHash) {
-      return { status: 1, transactionHash: txHash };
+      const event = {
+        createSBT: 'SBTCreated',
+        createSBTDeterministic: 'SBTCreated',
+        createSBTDeterministicConfigured: 'SBTCreated',
+        addSurvey: 'SurveyAdded',
+        addQuestions: 'QuestionsAdded',
+        submitResponses: 'ResponsesSubmitted',
+        claim: 'Transfer',
+        claimWithPassword: 'Transfer',
+        claimWithInvite: 'Transfer',
+        mintWithGroupSignature: 'Transfer',
+        burn: 'Transfer',
+      }[mockLastWriteMethod];
+      return {
+        status: 1,
+        to: this.target,
+        transactionHash: txHash,
+        logs: event ? [{ address: this.target, event }] : [],
+      };
     }
   }
 
@@ -184,7 +214,11 @@ const makeWriteContractMock = ({ address = TEST_ADDRESS, data = '0xdeadbeef', me
   const contract = {
     address,
     interface: {
-      encodeFunctionData: jest.fn(() => data),
+      encodeFunctionData: jest.fn((method) => {
+        mockLastWriteMethod = method;
+        return data;
+      }),
+      parseLog: jest.fn((entry) => ({ name: entry.event, args: { sbtAddress: TEST_ADDRESS } })),
     },
     estimateGas: {},
   };
@@ -651,7 +685,11 @@ describe('error paths', () => {
     const mockFactory = {
       address: GROUP_CFG.contracts.sbtFactory.address,
       interface: {
-        encodeFunctionData: jest.fn(() => '0xfeedbeef'),
+        encodeFunctionData: jest.fn((method) => {
+          mockLastWriteMethod = method;
+          return '0xfeedbeef';
+        }),
+        parseLog: jest.fn((entry) => ({ name: entry.event, args: { sbtAddress: TEST_ADDRESS } })),
       },
       estimateGas: {
         createSBT: jest.fn(async () => ethers.BigNumber.from('1500000')),
@@ -708,7 +746,11 @@ describe('error paths', () => {
     const mockFactory = {
       address: GROUP_CFG.contracts.sbtFactory.address,
       interface: {
-        encodeFunctionData: jest.fn(() => '0xfeedbeef'),
+        encodeFunctionData: jest.fn((method) => {
+          mockLastWriteMethod = method;
+          return '0xfeedbeef';
+        }),
+        parseLog: jest.fn((entry) => ({ name: entry.event, args: { sbtAddress: TEST_ADDRESS } })),
       },
       estimateGas: {
         createSBT: jest.fn(async () => {
@@ -951,7 +993,11 @@ describe('error paths', () => {
     const mockSurveyContract = {
       address: GROUP_CFG.contracts.surveys.address,
       interface: {
-        encodeFunctionData: jest.fn(() => '0xdeadbeef'),
+        encodeFunctionData: jest.fn((method) => {
+          mockLastWriteMethod = method;
+          return '0xdeadbeef';
+        }),
+        parseLog: jest.fn((entry) => ({ name: entry.event, args: { sbtAddress: TEST_ADDRESS } })),
       },
       estimateGas: {
         addSurvey: jest.fn(async () => ethers.BigNumber.from('250000')),
@@ -991,7 +1037,7 @@ describe('error paths', () => {
       GROUP_CFG,
     );
 
-    expect(surveyResult.receipt).toEqual({ status: 1, transactionHash: '0xtxhash' });
+    expect(surveyResult.receipt).toEqual(expect.objectContaining({ status: 1, transactionHash: '0xtxhash' }));
     expect(surveyResult.surveyArweaveTxId).toBe(SURVEY_TX_ID);
     expect(surveyResult.surveyStorageRef).toEqual({
       backend: 'arweave',
@@ -1010,7 +1056,7 @@ describe('error paths', () => {
         }),
       }),
     );
-    expect(questionsResult.receipt).toEqual({ status: 1, transactionHash: '0xtxhash' });
+    expect(questionsResult.receipt).toEqual(expect.objectContaining({ status: 1, transactionHash: '0xtxhash' }));
     expect(questionsResult.uploadedQuestions).toHaveLength(1);
     expect(questionsResult.uploadedQuestions[0]).toEqual(
       expect.objectContaining({
@@ -1230,7 +1276,11 @@ describe('error paths', () => {
     const mockSbtContract = {
       address: TEST_ADDRESS,
       interface: {
-        encodeFunctionData: jest.fn(() => '0xfacefeed'),
+        encodeFunctionData: jest.fn((method) => {
+          mockLastWriteMethod = method;
+          return '0xfacefeed';
+        }),
+        parseLog: jest.fn((entry) => ({ name: entry.event, args: { sbtAddress: TEST_ADDRESS } })),
       },
       estimateGas: {
         claim: jest.fn(async () => ethers.BigNumber.from('100000')),
@@ -1257,9 +1307,9 @@ describe('error paths', () => {
     const addPasswordsReceipt = await contractScripts.addHashedPasswords('wagmi', TEST_ADDRESS, [hashedPassword]);
     const burnReceipt = await contractScripts.burnToken('wagmi', TEST_ADDRESS, 7);
 
-    expect(claimReceipt).toEqual({ status: 1, transactionHash: '0xtxhash' });
-    expect(addPasswordsReceipt).toEqual({ status: 1, transactionHash: '0xtxhash' });
-    expect(burnReceipt).toEqual({ status: 1, transactionHash: '0xtxhash' });
+    expect(claimReceipt).toEqual(expect.objectContaining({ status: 1, transactionHash: '0xtxhash' }));
+    expect(addPasswordsReceipt).toEqual(expect.objectContaining({ status: 1, transactionHash: '0xtxhash' }));
+    expect(burnReceipt).toEqual(expect.objectContaining({ status: 1, transactionHash: '0xtxhash' }));
     expect(mockSbtContract.claim).not.toHaveBeenCalled();
     expect(mockSbtContract.addHashedPasswords).not.toHaveBeenCalled();
     expect(mockSbtContract.burn).not.toHaveBeenCalled();

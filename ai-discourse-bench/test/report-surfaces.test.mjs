@@ -2264,11 +2264,15 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /\.demoAnalysisWorkspace \.noData, \.comparisonReportContainer \.noData \{ padding: 1\.5rem; text-align: center; color: var\(--ce-color-text-muted, #6c757d\); font-style: italic; \}/);
   assert.doesNotMatch(html, /\n\s*\.noData \{ padding: 1\.5rem; text-align: center; color: var\(--ce-color-text-muted, #6c757d\); font-style: italic; \}/);
   assert.match(html, /\.reportCollapseBody \{ display: grid; gap: 0; \}/);
+  assert.match(html, /<h5 class="sectionTitle">\s*<button type="button" class="sectionHeaderRow" aria-expanded="true" data-ce-comparison-section-toggle>/);
+  assert.doesNotMatch(html, /<div class="sectionHeaderRow">\s*<h5 class="sectionTitle">/);
+  assert.match(html, /button\.parentElement\.nextElementSibling/);
+  assert.match(html, /body\.hidden = !nextOpen/);
   assert.match(html, /\.reportCollapseHeader \{ display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; width: 100%; margin: 0 0 1rem; padding: 0; border: 0; background: transparent; color: var\(--ce-color-dark, #212529\); text-align: left; cursor: pointer; \}/);
   assert.match(html, /\.reportCollapseHeader:hover \.mainReportTitle,\s*\.reportCollapseHeader:focus-visible \.mainReportTitle \{ color: #0f5ec7; \}/);
   assert.match(html, /\.reportCollapseHeader:focus-visible \{ outline: 2px solid #0f5ec7; outline-offset: 4px; border-radius: var\(--ce-radius-6, 6px\); \}/);
   assert.match(html, /\.comparisonReportContainer \.sectionCollapse,\s*\.comparisonReportSectionCollapse \{ margin-bottom: 1rem; padding: 0; border: 1px solid #e0e0e0; border-radius: var\(--ce-radius-8, 8px\); background-color: var\(--ce-color-white, #ffffff\); overflow: hidden; box-shadow: 0 2px 4px rgba\(0, 0, 0, 0\.05\); \}/);
-  assert.match(html, /\.comparisonReportSectionCollapse \.sectionHeaderRow \{ display: flex; align-items: center; justify-content: flex-start; padding: 0\.75rem 1\.25rem; cursor: pointer; border-bottom: 1px solid var\(--ce-color-light, #f1f3f5\); margin-bottom: 0; \}/);
+  assert.match(html, /\.comparisonReportSectionCollapse \.sectionHeaderRow \{ width: 100%; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; display: flex; align-items: center; justify-content: flex-start; padding: 0\.75rem 1\.25rem; cursor: pointer; border-bottom: 1px solid var\(--ce-color-light, #f1f3f5\); margin-bottom: 0; \}/);
   assert.match(html, /\.comparisonReportSectionCollapse \.sectionHeaderRow:hover \{ background-color: var\(--ce-color-surface-light, #f8f9fa\); \}/);
   assert.match(html, /\.comparisonReportSectionCollapse \.sectionTitle \{ margin: 0; font-size: 1\.1rem; font-weight: 500; color: var\(--ce-color-dark, #212529\); line-height: 1\.2; \}/);
   assert.match(html, /\.comparisonReportSectionCollapse \.sectionTitle svg \{ margin-right: 10px; width: 1em; height: 1em; display: inline-block; overflow: visible; vertical-align: -0\.125em; \}/);

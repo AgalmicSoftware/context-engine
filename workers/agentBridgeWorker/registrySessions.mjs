@@ -150,6 +150,19 @@ async function callWithRpcFallback({
   };
 }
 
+// Cached rows from older Workers may still contain permissive capability flags.
+// Reconstruct discovery identities so neither cache layer can restore authority.
+function readOnlyDiscovery(result) {
+  return { ...result, sessions: result.sessions.map((session) => ({
+    sessionSlug: session.sessionSlug, sessionName: session.sessionName,
+    default: session.default === true, chainId: session.chainId, source: 'session_registry',
+    telegramBridgeEnabled: false, miniAppEnabled: false, agentHttpEnabled: true,
+    managedAccountSubmitAllowed: false, sponsoredAiAllowed: false,
+    sponsoredRpcAllowed: false, sponsoredFaucetAllowed: false,
+    sbtJoinModes: [], docLibraryEnabled: false,
+  })) };
+}
+
 export async function listRegistrySessionsForBridge({
   env = {},
   fetchImpl = env.REGISTRY_FETCH || globalThis.fetch,
@@ -163,7 +176,7 @@ export async function listRegistrySessionsForBridge({
   const kvCacheKey = `${REGISTRY_SESSION_KV_PREFIX}${chainId}:${registryAddress.toLowerCase()}:${maxSessions}`;
   const cached = registrySessionCache.get(cacheKey);
   if (!forceRefresh && cached && Date.now() - cached.cachedAt < REGISTRY_SESSION_CACHE_TTL_MS) {
-    return { ...cached.result, cached: true, cacheLayer: 'memory' };
+    return { ...readOnlyDiscovery(cached.result), cached: true, cacheLayer: 'memory' };
   }
   if (!registryAddress) {
     return { ok: false, reason: 'session_registry_address_missing', sessions: [] };
@@ -175,7 +188,7 @@ export async function listRegistrySessionsForBridge({
     const kvCached = safeJsonParse(await env.AGENT_ACTION_KV.get(kvCacheKey), null);
     if (kvCached && Array.isArray(kvCached.sessions)) {
       registrySessionCache.set(cacheKey, { cachedAt: Date.now(), result: kvCached });
-      return { ...kvCached, cached: true, cacheLayer: 'kv' };
+      return { ...readOnlyDiscovery(kvCached), cached: true, cacheLayer: 'kv' };
     }
   }
   const countResult = await callWithRpcFallback({
@@ -207,18 +220,11 @@ export async function listRegistrySessionsForBridge({
       sessionSlug: slug.toLowerCase(),
       sessionName: slug,
       default: sessions.length === 0,
-      telegramBridgeEnabled: true,
-      managedAccountSubmitAllowed: true,
-      sponsoredAiAllowed: true,
-      sponsoredRpcAllowed: true,
-      sponsoredFaucetAllowed: true,
-      sbtJoinModes: ['public'],
-      docLibraryEnabled: true,
       source: 'session_registry',
       chainId,
     });
   }
-  const result = {
+  const result = readOnlyDiscovery({
     ok: sessions.length > 0,
     reason: sessions.length ? 'session_registry_loaded' : 'session_registry_empty',
     sessions,
@@ -228,7 +234,7 @@ export async function listRegistrySessionsForBridge({
     chainId,
     registryAddress,
     rpcFallbackCount: rpcUrls.length,
-  };
+  });
   if (result.ok) {
     registrySessionCache.set(cacheKey, { cachedAt: Date.now(), result });
     if (env?.AGENT_ACTION_KV && typeof env.AGENT_ACTION_KV.put === 'function') {

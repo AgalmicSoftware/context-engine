@@ -233,6 +233,31 @@ source hardening. The restrictions above become live only after a testnet
 redeploy and corresponding manifest/transaction updates; no mainnet migration
 is in scope.
 
+Group-claim signatures use EIP-191 over `keccak256(abi.encode(domain, chainId,
+collection, claimant))`. Invite signatures replace the claimant with a positive
+one-use slot bounded by the collection limit. The domain is the keccak256 hash
+of `ContextEngine.SBT.GroupMint:1` or `ContextEngine.SBT.Invite:1`, respectively.
+Slots redeem independently of mint order and remain consumed after burns.
+A wallet can hold tokens from other collections; only another live token in
+the same collection prevents claiming.
+
+Limited-group creators keep their signing password private and export one
+pre-signed code per slot. Each code contains only chain ID, collection address,
+slot and signature (`c`, `a`, `n`, `s` in base64url JSON). Recipients cannot use
+a reusable password to generate fresh slots. Claim links still identify the
+group, with the code entered separately. `sbtAuthorization.ts` supplies the
+same signing implementation to the browser and the local contract smoke test;
+there is no legacy signature fallback or alternate contract generation.
+
+The current CustomSBT source uses one mutable `admin`, rotated with `changeAdmin`.
+It exposes no transferable collection ownership. Zero admin permanently disables
+issuer actions; holder burns still follow `OwnerOnly`/`Both`, and `Neither`
+remains unburnable. Ordinary deployments preserve an explicit zero admin.
+Configured CREATE2 deployment requires an initial nonzero admin matching the
+sender to prevent capture; that admin may retire to zero after initialization.
+These source changes require a separately deployed factory before use; checked-in
+network addresses do not acquire new bytecode through an ABI update.
+
 CustomSBT instances are deployed per-group via SBTFactory. Configured
 deterministic SBT creation is admin-submitted; sponsored or relayed configured
 creation requires a separate authorization design.

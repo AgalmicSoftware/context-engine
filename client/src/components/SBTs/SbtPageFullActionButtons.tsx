@@ -106,7 +106,7 @@ export const SbtPageMintActionSurface = ({
         inputType="password"
         inputValue={groupPasswordInput || ''}
         onInputChange={onGroupPasswordInputChange}
-        placeholder="Group Password"
+        placeholder="Invite Code"
         onAction={(event) =>
           runSbtPageMintActionController({
             disabled: passwordJoinButtonState.disabled,

@@ -398,6 +398,9 @@ strip_private_paths_from_clone() {
       "$REPO_ROOT/scripts/scrub-public-package-json.js" \
       "$TEMP_CLONE/package.json" \
       "$TMP_ROOT/public-package-source.json"
+    node \
+      "$REPO_ROOT/scripts/scrub-public-workflows.mjs" \
+      "$TEMP_CLONE"
 
     # The canonical artifact redacts non-public emails and local home paths.
     # Apply the same transformation to each changed replay delta so no

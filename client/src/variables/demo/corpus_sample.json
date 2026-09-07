@@ -10,22 +10,22 @@
       "ai_laws_policy": {
         "label": "AI Laws & Policy",
         "sample_count": 20,
-        "full_count": 224
+        "full_count": 227
       },
       "arxiv_ai_safety": {
         "label": "AI Safety Papers",
         "sample_count": 20,
-        "full_count": 279
+        "full_count": 309
       },
       "lesswrong_posts": {
         "label": "LessWrong & Alignment",
         "sample_count": 20,
-        "full_count": 225
+        "full_count": 241
       },
       "dwarkesh_lab_insiders": {
         "label": "Insider Interviews",
         "sample_count": 20,
-        "full_count": 154
+        "full_count": 159
       },
       "ai_scifi_books": {
         "label": "AI in Sci-Fi",
@@ -35,7 +35,7 @@
       "metr_evals_metrics": {
         "label": "METR Evals & Metrics",
         "sample_count": 15,
-        "full_count": 100
+        "full_count": 103
       },
       "cross_corpus": {
         "label": "Cross-Corpus Debates",
@@ -1236,7 +1236,7 @@
     "ai_laws_policy": {
       "label": "AI Laws & Policy",
       "icon": "gavel",
-      "count_full": 224,
+      "count_full": 227,
       "entries": [
         {
           "id": "eu_ai_act",
@@ -1597,7 +1597,7 @@
     "arxiv_ai_safety": {
       "label": "AI Safety Papers",
       "icon": "file-text",
-      "count_full": 279,
+      "count_full": 309,
       "entries": [
         {
           "id": "gpt3_language_models_few_shot",
@@ -2109,7 +2109,7 @@
     "lesswrong_posts": {
       "label": "LessWrong & Alignment",
       "icon": "brain",
-      "count_full": 225,
+      "count_full": 241,
       "entries": [
         {
           "id": "yudkowsky_ai_box",
@@ -2429,7 +2429,7 @@
     "dwarkesh_lab_insiders": {
       "label": "Insider Interviews",
       "icon": "mic",
-      "count_full": 154,
+      "count_full": 159,
       "entries": [
         {
           "id": "amodei_dario_dwarkesh_2026_end_of_exponential",
@@ -3375,7 +3375,7 @@
     "metr_evals_metrics": {
       "label": "METR Evals & Metrics",
       "icon": "chart",
-      "count_full": 100,
+      "count_full": 103,
       "entries": [
         {
           "id": "metr_time_horizon_paper_2025",

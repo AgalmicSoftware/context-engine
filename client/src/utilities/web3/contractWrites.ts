@@ -33,6 +33,8 @@ type ResolveTxGasOverridesOptions = {
   preferFallbackGasLimit?: boolean;
 };
 type SendContractWriteViaProviderOptions = {
+  expectedChainId?: unknown;
+  expectedEvent?: string;
   signingProvider?: AnyRecord | null;
   ethersProvider?: AnyRecord | null;
   signer?: AnyRecord | null;
@@ -163,6 +165,8 @@ const resolveTxGasOverrides = async ({
 // only need a hash + receipt, broadcast through raw `eth_sendTransaction`
 // instead of relying on ethers' transaction response normalization.
 const sendContractWriteViaProvider = async ({
+  expectedChainId,
+  expectedEvent,
   signingProvider,
   ethersProvider,
   signer,
@@ -188,9 +192,24 @@ const sendContractWriteViaProvider = async ({
     throw new Error(`sendContractWriteViaProvider requires a signer for ${methodName}.`);
   }
 
+  if (!ethersProvider?.getNetwork || !ethersProvider?.getCode || !ethersProvider?.send) {
+    throw new Error('Connected wallet provider cannot verify the contract target.');
+  }
+  // Pin the configured chain where supplied, otherwise the wallet's current
+  // chain. Include it in the approved transaction to guard a later wallet switch.
+  const chainId = Number(expectedChainId ?? (await ethersProvider.getNetwork()).chainId);
+  if (!Number.isSafeInteger(chainId) || chainId <= 0) throw new Error('Invalid expected chain ID.');
+  const code = await ethersProvider.getCode(to);
+  if (typeof code !== 'string' || !/^0x(?:[0-9a-f]{2})+$/i.test(code)) {
+    throw new Error(`No contract bytecode is deployed at ${to}.`);
+  }
+  if (Number(await ethersProvider.send('eth_chainId', [])) !== chainId) {
+    throw new Error(`Wrong network for ${methodName}: expected chain ${chainId}.`);
+  }
   const from = await signer.getAddress();
   const data = contract.interface.encodeFunctionData(methodName, args);
   const txParams: AnyRecord = {
+    chainId: ethers.BigNumber.from(chainId).toHexString(),
     from,
     to,
     data,
@@ -283,7 +302,7 @@ const sendContractWriteViaProvider = async ({
     }
     throw error;
   }
-  if (!receipt || (receipt.status !== undefined && receipt.status !== 1)) {
+  if (!receipt || Number(receipt.status) !== 1) {
     const resolvedRevertMessage = sensitiveArgs
       ? revertMessage
       : await resolveReceiptRevertMessage({
@@ -298,6 +317,22 @@ const sendContractWriteViaProvider = async ({
           fallbackMessage: revertMessage,
         });
     throw new Error(resolvedRevertMessage);
+  }
+  if (String(receipt.to || '').toLowerCase() !== String(to).toLowerCase()) {
+    throw new Error(`Transaction receipt destination does not match ${methodName}.`);
+  }
+  if (
+    expectedEvent &&
+    !(receipt.logs || []).some((entry: { address?: string }) => {
+      if (String(entry?.address || '').toLowerCase() !== String(to).toLowerCase()) return false;
+      try {
+        return contract.interface.parseLog(entry)?.name === expectedEvent;
+      } catch {
+        return false;
+      }
+    })
+  ) {
+    throw new Error(`Expected ${expectedEvent} event was not emitted by ${methodName}.`);
   }
   return { txHash, receipt };
 };

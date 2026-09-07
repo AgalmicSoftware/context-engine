@@ -1,3 +1,4 @@
+import { fetchArtifactText } from './artifactFetch.mjs';
 import rpcDefaults from '../../shared/rpcDefaults.cjs';
 import {
   STORAGE_BACKENDS,
@@ -1271,34 +1272,14 @@ const executeDeployHelperRequestCore = async ({
   resolvedAccountId = '',
 } = {}) => {
   const sessionSlugCheck = validateInboundSlug(body?.sessionSlug);
-  if (!sessionSlugCheck.ok) {
-    return buildFailure(400, { error: sessionSlugCheck.error });
-  }
-  if (body?.groupSlug != null && body?.sessionSlug == null) {
-    return buildFailure(400, {
-      error: 'Legacy groupSlug is no longer accepted. Use sessionSlug instead.',
-    });
-  }
-
   const apiToken = toStr(body?.apiToken || body?.token).trim();
   const apiBaseUrl = resolveCloudflareApiBaseUrl({ env });
   const cfFetchOptions = { fetchImpl, apiBaseUrl };
   if (body?.deploymentKind === AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND) {
-    if (!apiToken) return buildFailure(400, { error: 'Missing apiToken.' });
-    const accountLookup = toStr(resolvedAccountId).trim()
-      ? { ok: true, accountId: toStr(resolvedAccountId).trim() }
-      : await resolveDeploymentAccountId({ body, fetchImpl, apiBaseUrl, env });
-    if (!accountLookup.ok) {
-      const lookupStatus = Number(accountLookup.status || 0);
-      return buildFailure(lookupStatus === 404 || lookupStatus === 409 ? lookupStatus : 502, {
-        error: accountLookup.error || 'Failed to resolve Cloudflare account.',
-        detail: accountLookup.detail,
-      }, { fallbackEligible: accountLookup.fallbackEligible === true });
-    }
     return executeAgentSessionWrappedDeployment({
       body,
       env,
-      accountId: toStr(accountLookup.accountId).trim(),
+      accountId: toStr(resolvedAccountId).trim(),
       cfFetchImpl: (token, path, options) => cfFetch(token, path, options, cfFetchOptions),
       fetchImpl,
       markMutationStarted: idempotencyContext?.markMutationStarted,
@@ -1307,9 +1288,6 @@ const executeDeployHelperRequestCore = async ({
   const requestedWorkerName = toStr(body?.workerName).trim();
   const defaultSlugInput = env?.DEFAULT_SESSION_SLUG ?? env?.DEFAULT_GROUP_SLUG ?? '';
   const defaultSlugCheck = validateInboundSlug(defaultSlugInput);
-  if (body?.sessionSlug == null && !defaultSlugCheck.ok) {
-    return buildFailure(400, { error: defaultSlugCheck.error });
-  }
   const defaultSlug = defaultSlugCheck.slug;
   const sessionSlug = body?.sessionSlug != null ? sessionSlugCheck.slug : defaultSlug;
   const displaySlug = sessionSlug || 'general';
@@ -1325,17 +1303,6 @@ const executeDeployHelperRequestCore = async ({
   const bundleSourceKind = hasBundleText ? 'bundleText' : 'bundleUrl';
   let bundleDiagnostics = null;
 
-  if (!apiToken) return buildFailure(400, { error: 'Missing apiToken.' });
-  if (!requestedWorkerName) return buildFailure(400, { error: 'Missing workerName.' });
-  if (suppliedBundleSha256 && !expectedBundleSha256) {
-    return buildFailure(400, { error: 'bundleSha256 must be a complete SHA-256 hex digest.' });
-  }
-  if (!hasBundleText && !bundleUrl) {
-    return buildFailure(400, {
-      error: 'Missing bundleText or bundleUrl (set WORKER_BUNDLE_URL or pass bundleUrl).',
-    });
-  }
-
   const allowOriginsInput = Array.isArray(body?.allowOrigins) ? body.allowOrigins : [];
   const rpcUrl = toStr(body?.rpcUrl).trim();
   const rpcUrlsByChainId = (body?.rpcUrlsByChainId && typeof body.rpcUrlsByChainId === 'object')
@@ -1344,15 +1311,8 @@ const executeDeployHelperRequestCore = async ({
   const faucetInput = body?.faucet && typeof body.faucet === 'object' ? body.faucet : {};
 
   const rawStorageProfile = body?.storageProfile ?? body?.storageBackend ?? null;
-  const modeValidation = validateDeploymentModeValues(body);
-  if (!modeValidation.ok) {
-    return buildFailure(400, { error: `Invalid deployment mode at ${modeValidation.path}.` });
-  }
   const storageProfile = normalizeDeployStorageProfile(rawStorageProfile);
   const storageBindingPlan = resolveDeployStorageBindingPlan(rawStorageProfile, storageProfile);
-  if (!storageBindingPlan.ok) {
-    return buildFailure(400, { error: storageBindingPlan.error });
-  }
 
   if (!hasBundleText && toStr(body?.bundleManifestUrl).trim()) {
     const manifestDigest = await fetchExpectedWorkerBundleDigest({
@@ -1371,20 +1331,13 @@ const executeDeployHelperRequestCore = async ({
   }
 
   if (expectedBundleSha256 && !bundleSource) {
-    let bundleResponse;
     try {
-      bundleResponse = await fetchImpl(bundleUrl);
+      bundleSource = await fetchArtifactText(bundleUrl, { fetchImpl });
     } catch (error) {
       return buildFailure(502, {
         error: `Failed to fetch bundle: ${toStr(error?.message || error).trim() || 'Unknown error.'}`,
-      }, { fallbackEligible: true });
+      }, { fallbackEligible: shouldAllowFallbackForCloudflareFailure(error) });
     }
-    if (!bundleResponse.ok) {
-      return buildFailure(502, { error: `Failed to fetch bundle (${bundleResponse.status}).` }, {
-        fallbackEligible: bundleResponse.status >= 500 || bundleResponse.status === 429,
-      });
-    }
-    bundleSource = await bundleResponse.text();
     bundleDiagnostics = await buildBundleDiagnostics(bundleSource, bundleSourceKind);
   }
   if (
@@ -1396,28 +1349,7 @@ const executeDeployHelperRequestCore = async ({
     });
   }
 
-  const accountLookup = toStr(resolvedAccountId).trim()
-    ? { ok: true, accountId: toStr(resolvedAccountId).trim() }
-    : await resolveDeploymentAccountId({
-        body: {
-          ...body,
-          apiToken,
-        },
-        fetchImpl,
-        apiBaseUrl,
-        env,
-      });
-  if (!accountLookup.ok) {
-    const lookupStatus = Number(accountLookup.status || 0);
-    const responseStatus = lookupStatus === 404 || lookupStatus === 409 ? lookupStatus : 502;
-    return buildFailure(responseStatus, {
-      error: accountLookup.error || 'Failed to resolve Cloudflare account.',
-      detail: accountLookup.detail,
-    }, {
-      fallbackEligible: accountLookup.fallbackEligible === true,
-    });
-  }
-  const accountId = toStr(accountLookup.accountId).trim();
+  const accountId = toStr(resolvedAccountId).trim();
   if (!accountId) {
     return buildFailure(404, { error: 'No accounts found for token.' });
   }
@@ -1524,28 +1456,16 @@ const executeDeployHelperRequestCore = async ({
   const prepareBundleDiagnostics = async () => {
     if (bundleDiagnostics) return { ok: true };
     if (!bundleSource) {
-      let bundleResp;
       try {
-        bundleResp = await fetchImpl(bundleUrl);
+        bundleSource = await fetchArtifactText(bundleUrl, { fetchImpl });
       } catch (err) {
         return {
           ok: false,
           result: buildFailure(502, {
             error: `Failed to fetch bundle: ${toStr(err?.message || err).trim() || 'Unknown error.'}`,
-          }, { fallbackEligible: true }),
+          }, { fallbackEligible: shouldAllowFallbackForCloudflareFailure(err) }),
         };
       }
-      if (!bundleResp.ok) {
-        return {
-          ok: false,
-          result: buildFailure(502, {
-            error: `Failed to fetch bundle (${bundleResp.status}).`,
-          }, {
-            fallbackEligible: bundleResp.status >= 500 || bundleResp.status === 429,
-          }),
-        };
-      }
-      bundleSource = await bundleResp.text();
     }
     bundleDiagnostics = await buildBundleDiagnostics(bundleSource, bundleSourceKind);
     if (expectedBundleSha256 && bundleDiagnostics.sha256 !== expectedBundleSha256) {
@@ -2699,11 +2619,60 @@ const resolveDeploymentBundleProvenance = async ({ body = {}, env = {}, fetchImp
   return { ok: true, body: resolvedBody };
 };
 
-export const executeDeployHelperRequest = async (options = {}) => {
-  const publicConfigValidationError = validateDeployHelperPublicConfigInputs(options?.body);
-  if (publicConfigValidationError) {
-    return buildFailure(400, { error: publicConfigValidationError });
+const validateDeployHelperLocalInputs = (body = {}, env = {}) => {
+  const publicConfigError = validateDeployHelperPublicConfigInputs(body);
+  if (publicConfigError) return publicConfigError;
+  const slugCheck = validateInboundSlug(body?.sessionSlug);
+  if (!slugCheck.ok) return slugCheck.error;
+  if (body?.groupSlug != null && body?.sessionSlug == null) {
+    return 'Legacy groupSlug is no longer accepted. Use sessionSlug instead.';
   }
+  if (!toStr(body?.apiToken || body?.token).trim()) return 'Missing apiToken.';
+  if (body?.deploymentKind === AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND) return '';
+  if (!toStr(body?.workerName).trim()) return 'Missing workerName.';
+  const defaultSlugCheck = validateInboundSlug(env?.DEFAULT_SESSION_SLUG ?? env?.DEFAULT_GROUP_SLUG ?? '');
+  if (body?.sessionSlug == null && !defaultSlugCheck.ok) return defaultSlugCheck.error;
+  if (toStr(body?.bundleSha256).trim() && !normalizeWorkerBundleSha256(body.bundleSha256)) {
+    return 'bundleSha256 must be a complete SHA-256 hex digest.';
+  }
+  if (!toStr(body?.bundleText).trim() && !toStr(body?.bundleUrl || env?.WORKER_BUNDLE_URL).trim()) {
+    return 'Missing bundleText or bundleUrl (set WORKER_BUNDLE_URL or pass bundleUrl).';
+  }
+  const mode = validateDeploymentModeValues(body);
+  if (!mode.ok) return `Invalid deployment mode at ${mode.path}.`;
+  const rawStorageProfile = body?.storageProfile ?? body?.storageBackend ?? null;
+  const bindings = resolveDeployStorageBindingPlan(rawStorageProfile, normalizeDeployStorageProfile(rawStorageProfile));
+  return bindings.ok ? '' : bindings.error;
+};
+
+export const executeDeployHelperRequest = async (options = {}) => {
+  const localError = validateDeployHelperLocalInputs(options.body, options.env);
+  if (localError) return buildFailure(400, { error: localError });
+  const requestId = toStr(options.body?.deploymentRequestId).trim();
+  if (requestId && !normalizeDeploymentRequestId(requestId)) {
+    return buildFailure(400, { error: 'deploymentRequestId must contain 8-128 safe identifier characters.' });
+  }
+  const coordinator = options.env?.CE_SESSION_COORDINATOR;
+  if (requestId && options.coordinationBypass !== true && (!coordinator?.idFromName || !coordinator?.get)) {
+    return buildFailure(503, {
+      error: 'CE_SESSION_COORDINATOR is required for stable deployment requests; no Cloudflare mutation was attempted.',
+      deploymentRequestPending: true,
+    }, { fallbackEligible: true });
+  }
+  // Only an internal coordinator option may carry an already verified account.
+  // Request body fields never bypass token/account authority before remote reads.
+  const accountLookup = toStr(options.resolvedAccountId).trim()
+    ? { ok: true, accountId: toStr(options.resolvedAccountId).trim() }
+    : await resolveDeploymentAccountId({
+        body: options.body, env: options.env, fetchImpl: options.fetchImpl || globalThis.fetch,
+      });
+  if (!accountLookup.ok) {
+    const lookupStatus = Number(accountLookup.status || 0);
+    return buildFailure(lookupStatus === 404 || lookupStatus === 409 ? lookupStatus : 502, {
+      error: redactKnownCredentials(accountLookup.error || 'Failed to resolve Cloudflare account.', collectKnownRequestCredentials(options.body)),
+    }, { fallbackEligible: accountLookup.fallbackEligible === true });
+  }
+  options = { ...options, resolvedAccountId: accountLookup.accountId };
   const provenance = await resolveDeploymentBundleProvenance({
     body: options?.body,
     env: options?.env,

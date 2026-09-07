@@ -577,7 +577,7 @@ describe('deploy-helper worker', () => {
     });
   });
 
-  it('rejects release-manifest bundle drift before any Cloudflare request or mutation', async () => {
+  it('authenticates then rejects release-manifest bundle drift before any Cloudflare mutation', async () => {
     const calls = [];
     const manifestUrl = 'https://bundles.example.test/worker-release-manifest.json';
     const bundleUrl = 'https://bundles.example.test/sessionCorsWorker.bundle.js';
@@ -606,7 +606,8 @@ describe('deploy-helper worker', () => {
       if (String(url) === bundleUrl) {
         return new Response('export default { fetch() {} };', { status: 200 });
       }
-      throw new Error(`Cloudflare must not be reached: ${url}`);
+      if (String(url).endsWith('/accounts?per_page=5')) return cfSuccess([{ id: 'acc-123' }]);
+      throw new Error(`Cloudflare mutation must not be reached: ${url}`);
     };
 
     const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
@@ -621,7 +622,7 @@ describe('deploy-helper worker', () => {
 
     expect(response.status).toBe(409);
     expect(payload.error).toMatch(/does not match the verified release manifest/i);
-    expect(calls).toEqual([manifestUrl, manifestUrl, bundleUrl]);
+    expect(calls).toEqual(['https://api.cloudflare.com/client/v4/accounts?per_page=5', manifestUrl, manifestUrl, bundleUrl]);
   });
 
   it.each([
@@ -3853,9 +3854,9 @@ describe('deploy-helper worker', () => {
         deploymentRequestConflict: true,
         deploymentRequestTerminal: true,
       }));
-      // The coordinator re-derives the current token account before comparing
-      // immutable identity, but performs no deployment mutation.
-      expect(fetchMock).toHaveBeenCalledTimes(cloudflareCallsBeforeConflict + 1);
+      // The entry point and coordinator both authenticate the current token
+      // account, but perform no deployment mutation on an identity conflict.
+      expect(fetchMock).toHaveBeenCalledTimes(cloudflareCallsBeforeConflict + 2);
       expect(fetchMock.getNamespaceCreateCount()).toBe(1);
       expect(fetchMock.getScriptUploadCount()).toBe(1);
     } finally {
@@ -4682,4 +4683,16 @@ describe('deploy-helper worker', () => {
     });
     expect(kv.store.has('deploy-helper:origins')).toBe(false);
   });
+});
+
+it('deploy-helper bounds actual JSON request bytes before parsing or fetching', async () => {
+  const originalFetch = global.fetch;
+  global.fetch = jest.fn(() => { throw new Error('must not fetch'); });
+  try {
+    const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+      apiToken: 'fixture-token', workerName: 'fixture', bundleText: 'x'.repeat(64),
+    }, { headers: { 'content-length': '1' } }), { CE_MAX_UPLOAD_BYTES: '32' }, {});
+    expect(response.status).toBe(413);
+    expect(global.fetch).not.toHaveBeenCalled();
+  } finally { global.fetch = originalFetch; }
 });

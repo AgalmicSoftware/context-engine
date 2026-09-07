@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "./TestUtils.sol";
 import "../../contracts/SBTFactory.sol";
 import "../../contracts/CustomSBT.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 struct FuzzSelector {
     address addr;
@@ -34,11 +35,14 @@ abstract contract InvariantUtils {
 contract CustomSBTInvariantHandler is TestUtils {
     MySBT internal immutable sbt;
 
+    address public expectedAdmin;
+    bool public authorityViolation;
     address[] private actors;
     mapping(address => bool) private knownActor;
 
     constructor(MySBT sbt_) {
         sbt = sbt_;
+        expectedAdmin = sbt_.admin();
     }
 
     function claim(uint256 seed) external {
@@ -70,6 +74,22 @@ contract CustomSBTInvariantHandler is TestUtils {
         ok;
     }
 
+    function rotateAdmin(uint256 seed) external {
+        address next = seed % 4 == 0 ? address(0) : deriveAddress(seed);
+        vm.prank(expectedAdmin);
+        (bool ok,) = address(sbt).call(abi.encodeWithSignature("changeAdmin(address)", next));
+        if (ok != (expectedAdmin != address(0))) authorityViolation = true;
+        if (ok) expectedAdmin = next;
+    }
+
+    function unauthorizedRotation(uint256 seed) external {
+        address attacker = deriveAddress(seed);
+        if (attacker == expectedAdmin) return;
+        vm.prank(attacker);
+        (bool ok,) = address(sbt).call(abi.encodeWithSignature("changeAdmin(address)", attacker));
+        if (ok) authorityViolation = true;
+    }
+
     function actorCount() external view returns (uint256) {
         return actors.length;
     }
@@ -93,10 +113,47 @@ contract CustomSBTInvariantHandler is TestUtils {
     }
 }
 
+contract InviteSlotInvariantHandler is TestUtils {
+    using MessageHashUtils for bytes32;
+    MySBT public immutable SBT;
+    uint256 public successfulClaims;
+    bool public violation;
+    mapping(uint256 => bool) public expectedUsed;
+
+    constructor() {
+        SBT = new MySBT("Slots", "SLOT", 8, address(0), 0, MySBT.MintMode.LimitedInviteSignature,
+            MySBT.BurnAuth.OwnerOnly, new bytes32[](0), "", keccak256(abi.encodePacked(vm.addr(0xD1))), false, false);
+    }
+
+    function claim(uint8 slotSeed, uint8 actorSeed, bool validDomain) external {
+        uint256 slot = uint256(slotSeed) % 10;
+        address actor = address(0x1000 + uint160(actorSeed) % 8);
+        bytes32 domain = validDomain ? keccak256("ContextEngine.SBT.Invite:1") : keccak256("Wrong domain");
+        bytes32 hash = keccak256(abi.encode(domain, block.chainid, address(SBT), slot)).toEthSignedMessageHash();
+        (uint8 v, bytes32 r, bytes32 sigS) = vm.sign(0xD1, hash);
+        vm.prank(actor);
+        (bool ok,) = address(SBT).call(abi.encodeWithSelector(MySBT.claimWithInvite.selector, slot, abi.encodePacked(r, sigS, v)));
+        if (ok) {
+            if (!validDomain || slot == 0 || slot > 8 || expectedUsed[slot]) violation = true;
+            expectedUsed[slot] = true;
+            successfulClaims++;
+        }
+    }
+
+    function burn(uint8 actorSeed) external {
+        address actor = address(0x1000 + uint160(actorSeed) % 8);
+        uint256 id = SBT.getTokenIdByOwner(actor);
+        if (id == 0) return;
+        vm.prank(actor);
+        SBT.burn(id);
+    }
+}
+
 contract CustomSBTInvariantTest is TestUtils, InvariantUtils {
     SBTFactory private factory;
     MySBT private sbt;
     CustomSBTInvariantHandler private handler;
+    InviteSlotInvariantHandler private inviteHandler;
 
     address private admin;
     address private immutableHolder;
@@ -118,10 +175,35 @@ contract CustomSBTInvariantTest is TestUtils, InvariantUtils {
         handler = new CustomSBTInvariantHandler(sbt);
         targetContract(address(handler));
 
-        bytes4[] memory selectors = new bytes4[](2);
+        bytes4[] memory selectors = new bytes4[](4);
         selectors[0] = CustomSBTInvariantHandler.claim.selector;
         selectors[1] = CustomSBTInvariantHandler.burn.selector;
+        selectors[2] = CustomSBTInvariantHandler.rotateAdmin.selector;
+        selectors[3] = CustomSBTInvariantHandler.unauthorizedRotation.selector;
         targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
+        inviteHandler = new InviteSlotInvariantHandler();
+        targetContract(address(inviteHandler));
+        bytes4[] memory inviteSelectors = new bytes4[](2);
+        inviteSelectors[0] = InviteSlotInvariantHandler.claim.selector;
+        inviteSelectors[1] = InviteSlotInvariantHandler.burn.selector;
+        targetSelector(FuzzSelector({addr: address(inviteHandler), selectors: inviteSelectors}));
+    }
+
+    function invariant_invitesStayConsumedAcrossBurnsAndArbitraryOrder() public view {
+        assertFalse(inviteHandler.violation(), "invalid or duplicate authorization succeeded");
+        MySBT invites = inviteHandler.SBT();
+        assertEq(invites.mintedTokens(), inviteHandler.successfulClaims(), "lifetime claims track successful slots");
+        for (uint256 slot = 0; slot <= 9; slot++) {
+            assertTrue(invites.usedInviteSlots(slot) == inviteHandler.expectedUsed(slot), "slot consumption changed");
+        }
+        for (uint160 i = 0; i < 8; i++) {
+            assertTrue(invites.balanceOf(address(0x1000 + i)) <= 1, "one live token per collection");
+        }
+    }
+
+    function invariant_singleAdminAuthority() public view {
+        assertFalse(handler.authorityViolation(), "rotation must enforce sole nonzero admin authority");
+        assertEq(sbt.admin(), handler.expectedAdmin(), "admin tracks only authorized changes");
     }
 
     function invariant_soulbound() public {

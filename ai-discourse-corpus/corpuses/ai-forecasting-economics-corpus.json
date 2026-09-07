@@ -104,7 +104,12 @@
         "2030"
       ],
       "influence_score": 8,
-      "source_links": []
+      "source_links": [
+        {
+          "title": "Primary source",
+          "url": "https://epoch.ai/blog/can-ai-scaling-continue-through-2030"
+        }
+      ]
     },
     {
       "id": "epoch_gate_model_2025",
@@ -232,7 +237,12 @@
         "organization"
       ],
       "influence_score": 5,
-      "source_links": []
+      "source_links": [
+        {
+          "title": "Primary source",
+          "url": "https://epoch.ai/blog/epoch-impact-report-2025"
+        }
+      ]
     },
     {
       "id": "metaculus_weak_agi_question",
@@ -316,7 +326,12 @@
         "forecasting"
       ],
       "influence_score": 7,
-      "source_links": []
+      "source_links": [
+        {
+          "title": "Primary source",
+          "url": "https://www.metaculus.com/questions/5121/when-will-the-first-general-ai-system-be-devised-tested-and-publicly-announced/"
+        }
+      ]
     },
     {
       "id": "fri_xpt_2023",
@@ -545,7 +560,12 @@
         "macroeconomics"
       ],
       "influence_score": 6,
-      "source_links": []
+      "source_links": [
+        {
+          "title": "Primary source",
+          "url": "https://www.nber.org/system/files/working_papers/w35046/w35046.pdf"
+        }
+      ]
     },
     {
       "id": "nber_research_agenda_transformative_ai_2025",
@@ -715,7 +735,12 @@
         "forecaster_tracking"
       ],
       "influence_score": 5,
-      "source_links": []
+      "source_links": [
+        {
+          "title": "Primary source",
+          "url": "https://futuresearch.ai/blog/agi-timeline-tracker/"
+        }
+      ]
     },
     {
       "id": "owid_artificial_intelligence_data",
@@ -751,7 +776,12 @@
         "trends"
       ],
       "influence_score": 6,
-      "source_links": []
+      "source_links": [
+        {
+          "title": "Primary source",
+          "url": "https://ourworldindata.org/artificial-intelligence"
+        }
+      ]
     }
   ]
 }

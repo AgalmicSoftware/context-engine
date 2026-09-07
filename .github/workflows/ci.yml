@@ -52,6 +52,15 @@ jobs:
       - name: Install sessionCorsWorker dependencies
         run: npm --prefix workers/sessionCorsWorker ci
 
+      - name: Audit root production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Audit client production dependencies
+        run: npm --prefix client audit --omit=dev --audit-level=high
+
+      - name: Audit Session Worker production dependencies
+        run: npm --prefix workers/sessionCorsWorker audit --omit=dev --audit-level=high
+
       - name: Resolve baseline growth approval
         id: baseline-growth-approval
         env:
@@ -333,6 +342,7 @@ jobs:
 
       - name: Install sessionCorsWorker dependencies
         run: npm --prefix workers/sessionCorsWorker ci
+
 
       - name: Resolve client growth baseline
         id: client-growth-base

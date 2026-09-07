@@ -11,7 +11,7 @@ import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
 import { createLogger } from '../logging';
-import { base64DecodeURL, base64urlToBase64, base64urlToHex, hexToBase64url } from './arweaveEncoding.js';
+import { base64DecodeURL, base64urlToBase64, base64urlToHex, hexToBase64url } from '../shared/questionUtils.mjs';
 import {
   buildFetchTimeoutError,
   classifyStatusKind,

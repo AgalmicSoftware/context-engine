@@ -27,8 +27,37 @@ contract CustomSBTFuzzTest is TestUtils {
         signer = vm.addr(signerKey);
     }
 
-    function testFuzz_claimWithInvite_invalidNonce(uint256 nonce) public {
-        fuzz_claimWithInvite_invalidNonce(nonce);
+    function testFuzz_inviteSlotOrder(uint8 offset, uint8 count) public {
+        uint256 size = uint256(count) % 8 + 1;
+        MySBT sbt = deploySbtWithConfig("ContextEngine", "CE", size, true, new bytes32[](0), keccak256(abi.encodePacked(signer)));
+        for (uint256 i = 0; i < size; i++) {
+            uint256 slot = (i + offset) % size + 1;
+            bytes memory signature = signInvite(sbt, slot, signerKey);
+            vm.prank(deriveAddress(i));
+            sbt.claimWithInvite(slot, signature);
+            assertTrue(sbt.usedInviteSlots(slot), "redeemed slot must remain consumed");
+        }
+        assertEq(sbt.mintedTokens(), size, "any cyclic slot order fills the collection");
+    }
+
+    function testFuzz_adminRotation(address nextAdmin) public {
+        MySBT sbt = deploySbtWithConfig("ContextEngine", "CE", 0, false, new bytes32[](0), bytes32(0));
+        vm.prank(admin);
+        sbt.changeAdmin(nextAdmin);
+        assertEq(sbt.admin(), nextAdmin, "rotation must preserve every address including zero");
+        if (nextAdmin != admin) {
+            vm.prank(admin);
+            vm.expectRevert();
+            sbt.changeAdmin(admin);
+        }
+        vm.prank(nextAdmin);
+        if (nextAdmin == address(0)) vm.expectRevert();
+        sbt.changeAdmin(address(0));
+        assertEq(sbt.admin(), address(0), "retired authority stays zero");
+    }
+
+    function testFuzz_claimWithInvite_invalidSlot(uint256 nonce) public {
+        fuzz_claimWithInvite_invalidSlot(nonce);
     }
 
     function testFuzz_claimWithInvite_randomSignature(bytes memory sig) public {
@@ -43,15 +72,15 @@ contract CustomSBTFuzzTest is TestUtils {
         fuzz_maxTokens_enforced(maxTokens);
     }
 
-    function fuzz_claimWithInvite_invalidNonce(uint256 nonce) internal {
-        nonce = (nonce % type(uint64).max) + 2;
+    function fuzz_claimWithInvite_invalidSlot(uint256 nonce) internal {
+        nonce = (nonce % type(uint64).max) + 101;
 
         bytes32[] memory empty = new bytes32[](0);
         MySBT sbt = deploySbtWithConfig("ContextEngine", "CE", 100, true, empty, keccak256(abi.encodePacked(signer)));
         bytes memory signature = signInvite(sbt, nonce, signerKey);
 
         vm.prank(user);
-        vm.expectRevert(abi.encodeWithSelector(InvalidNonce.selector, 1, nonce));
+        vm.expectRevert(abi.encodeWithSelector(InvalidInviteSlot.selector, nonce));
         sbt.claimWithInvite(nonce, signature);
 
         assertEq(sbt.mintedTokens(), 0, "mintedTokens should remain 0");
@@ -60,7 +89,7 @@ contract CustomSBTFuzzTest is TestUtils {
     function fuzz_claimWithInvite_randomSignature(bytes memory sig) internal {
         bytes32[] memory empty = new bytes32[](0);
         MySBT sbt = deploySbtWithConfig("ContextEngine", "CE", 100, true, empty, keccak256(abi.encodePacked(signer)));
-        bytes32 digest = keccak256(abi.encodePacked(address(sbt), uint256(1))).toEthSignedMessageHash();
+        bytes32 digest = keccak256(abi.encode(keccak256("ContextEngine.SBT.Invite:1"), block.chainid, address(sbt), uint256(1))).toEthSignedMessageHash();
 
         if (sig.length == 65) {
             (address recoveredSigner, ECDSA.RecoverError err,) = ECDSA.tryRecover(digest, sig);
@@ -166,7 +195,7 @@ contract CustomSBTFuzzTest is TestUtils {
     }
 
     function signInvite(MySBT sbt, uint256 nonce, uint256 key) internal returns (bytes memory) {
-        bytes32 message = keccak256(abi.encodePacked(address(sbt), nonce));
+        bytes32 message = keccak256(abi.encode(keccak256("ContextEngine.SBT.Invite:1"), block.chainid, address(sbt), nonce));
         bytes32 digest = message.toEthSignedMessageHash();
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(key, digest);
         return abi.encodePacked(r, s, v);

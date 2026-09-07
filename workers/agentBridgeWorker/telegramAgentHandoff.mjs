@@ -1,5 +1,6 @@
 import {
   safeString,
+  timingSafeEqualString,
   lower,
   safeJsonParse,
   stableJson,
@@ -223,17 +224,6 @@ function bytesToHex(bytes) {
 async function sha256Hex(input = '') {
   const digest = await globalThis.crypto.subtle.digest('SHA-256', textEncoder.encode(String(input || '')));
   return bytesToHex(new Uint8Array(digest));
-}
-
-function timingSafeEqualString(left = '', right = '') {
-  const a = safeString(left);
-  const b = safeString(right);
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let index = 0; index < a.length; index += 1) {
-    diff |= a.charCodeAt(index) ^ b.charCodeAt(index);
-  }
-  return diff === 0;
 }
 
 function json(data, init = {}) {
@@ -1801,7 +1791,7 @@ async function resolveHandoffContext({
     }
   }
   let permission = { ok: true, mode: 'not_required' };
-  if (requireQuestionAuthoring) {
+  if (requireQuestionAuthoring && policy.registryReadOnly !== true) {
     permission = evaluateTelegramQuestionAuthoringPermission({
       env,
       normalized: storageContext,
@@ -6324,8 +6314,11 @@ async function handleMiniAppOnboardRequest({ request, env = {}, createdAt = null
     AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS:
       Number.isFinite(ttlSeconds) && ttlSeconds > 0 ? String(Math.floor(ttlSeconds)) : '3600',
   };
-  const validated = await validateTelegramMiniAppInitData(input.initData, validationEnv);
-  if (!validated.ok) {
+  // Credential issuance always requires a real Telegram identity, including in operator previews.
+  const validated = await validateTelegramMiniAppInitData(input.initData, {
+    ...validationEnv, AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH: 'false',
+  });
+  if (!validated.ok || validated.authMode !== 'telegram') {
     const reason =
       validated.reason === 'telegram_init_data_expired' ? 'miniapp_initdata_expired' : 'miniapp_initdata_invalid';
     return jsonMiniAppOnboard(request, env, { ok: false, reason }, { status: 401 });
@@ -6567,11 +6560,14 @@ async function handleInviteOnboardRequest({ request, env = {}, createdAt = null 
     createdAt,
   });
   if (!issued.ok) {
-    await releaseAgentInviteRedemption({
-      env,
-      tokenHash: invite.tokenHash,
-      body: { reservationId },
-    });
+    // A failed storage acknowledgement can still leave a live credential.
+    if (!issued.credentialMayExist) {
+      await releaseAgentInviteRedemption({
+        env,
+        tokenHash: invite.tokenHash,
+        body: { reservationId },
+      });
+    }
     const payload = {
       ok: false,
       reason: issued.reason || 'agent_token_create_failed',
@@ -6593,12 +6589,9 @@ async function handleInviteOnboardRequest({ request, env = {}, createdAt = null 
     },
   });
   if (!consumed.ok) {
+    // Keep the reservation even when best-effort revocation reports success:
+    // eventual/failed storage writes cannot prove this invite is safe to reuse.
     await revokeAgentCredentialHash({ env, tokenHash: issued.tokenHash });
-    await releaseAgentInviteRedemption({
-      env,
-      tokenHash: invite.tokenHash,
-      body: { reservationId },
-    });
     return json(
       { ok: false, reason: consumed.reason || 'invite_redemption_finalize_failed' },
       { status: consumed.status || 503 },
@@ -6975,6 +6968,13 @@ async function handleWrappedMemberExchangeRequest({ request, env = {}, fetchImpl
   return json(payload);
 }
 
+const REGISTRY_READ_ROUTES = new Set([
+  '/api/agent/questions', '/api/agent/tags', '/api/agent/results',
+  '/api/agent/admin/status', '/api/agent/admin/metrics',
+  '/api/agent/session-meta', '/api/agent/skill', '/api/agent/skill-version',
+  '/api/agent/session-wrapped/skill', '/api/agent/session-wrapped/skill-version',
+]);
+
 async function handleTelegramAgentHandoffRequestUnsafe({
   request,
   env = {},
@@ -6983,6 +6983,19 @@ async function handleTelegramAgentHandoffRequestUnsafe({
 } = {}) {
   const url = new URL(request.url);
   const routePathname = toCanonicalAgentApiPathname(url.pathname);
+  if (routePathname.startsWith('/api/agent/') && request.method !== 'OPTIONS' && !REGISTRY_READ_ROUTES.has(routePathname)) {
+    const policy = await loadSessionPolicy(env, {
+      includeResultsExposureOverrides: false, includeAdminDefaultOverride: false,
+    });
+    // Some GET routes create grants or perform paid work. Only explicit read
+    // routes may use registry discovery; HTTP method alone is not authority.
+    if (policy.registryReadOnly === true) {
+      return json({ ok: false, reason: 'session_registry_policy_read_only' }, { status: 403 });
+    }
+    if (policy.registryAvailable === false) {
+      return json({ ok: false, reason: 'session_registry_unavailable' }, { status: 503 });
+    }
+  }
   if (routePathname === '/api/agent/credentials/service') {
     return handleServiceCredentialBootstrapRequest({ request, env });
   }

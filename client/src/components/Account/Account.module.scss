@@ -2288,7 +2288,6 @@ h1 {
     box-shadow 0.18s ease,
     opacity 0.18s ease;
 
-  &:hover,
   &:focus-within {
     border-color: color-mix(in srgb, var(--ce-action-accent) 78%, transparent);
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--ce-action-accent) 16%, transparent);

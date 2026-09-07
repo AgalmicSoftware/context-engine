@@ -5,9 +5,10 @@
 .field select.select {
   width: 100%;
   min-height: 42px;
-  border: var(--ce-settings-control-border-width) solid var(--ce-settings-control-border);
+  border: var(--ce-settings-control-border-width) solid
+    color-mix(in srgb, var(--ce-settings-control-border) 50%, transparent);
   border-radius: var(--ce-radius-6);
-  background: var(--ce-settings-field-bg);
+  background: var(--ce-settings-control-bg);
   color: var(--ce-settings-text);
   font-family: var(--ce-font-button);
   font-weight: 700;

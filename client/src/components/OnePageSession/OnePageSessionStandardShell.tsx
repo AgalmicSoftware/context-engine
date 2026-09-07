@@ -483,7 +483,7 @@ export default function OnePageSessionStandardShell({
             className={`${styles.sectionContainer} ${showDocuments ? styles.sectionExpanded : ''}`}
             data-testid="ce-demo-documents-section"
           >
-            <div className={styles.sectionHeaderRow}>
+            <div className={`${styles.sectionHeaderRow} ${showDocuments ? styles.documentsHeaderRow : ''}`}>
               <h2
                 onClick={onToggleDocuments}
                 className={`${styles.sectionHeader} ${styles.documentsSectionHeader}`.trim()}

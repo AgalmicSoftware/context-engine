@@ -15,8 +15,8 @@ import {
   fetchUrl as fetchUrlBoundary,
 } from './fetchExecution.js';
 import {
-  createVerifyAdminSignatureWithWorkerDeps as createVerifyAdminSignatureWithWorkerDepsBoundary,
-} from './adminSignatureVerificationBinding.js';
+  verifyAdminSignature as verifyAdminSignatureBoundary,
+} from './adminSignatureVerification.js';
 import {
   transcribe as transcribeBoundary,
 } from './transcribeExecution.js';
@@ -168,9 +168,21 @@ export const createWorkerExecutionServicesWithWorkerDeps = ({
     },
   });
 
-  const verifyAdminSignature = (
-    deps?.createVerifyAdminSignatureWithWorkerDeps || createVerifyAdminSignatureWithWorkerDepsBoundary
-  )({
+  const verifyAdminSignatureExecution = deps?.verifyAdminSignature || verifyAdminSignatureBoundary;
+  const verifyAdminSignature = async ({
+    env,
+    baseHeaders,
+    slugHint,
+    body,
+    config,
+    allowBootstrapWithoutConfig = false,
+  } = {}) => verifyAdminSignatureExecution({
+    env,
+    baseHeaders,
+    slugHint,
+    body,
+    config,
+    allowBootstrapWithoutConfig,
     deps: {
       normalizeSignedWorkerRequest: deps?.normalizeSignedWorkerRequest,
       resolveWorkerBodySlugContext: deps?.resolveWorkerBodySlugContext,
@@ -182,15 +194,18 @@ export const createWorkerExecutionServicesWithWorkerDeps = ({
       parseSiweMessage: deps?.parseSiweMessage,
       validateSiwe: deps?.validateSiwe,
       validateSiweAddressMatchesRequest: deps?.validateSiweAddressMatchesRequest,
-      consumeNonce: deps?.consumeNonce,
+      consumeNonce: (envArg, slugArg, addressArg, nonceArg) => deps?.consumeNonce?.(
+        envArg,
+        slugArg,
+        addressArg,
+        nonceArg,
+        { usedNonceTtlSeconds: constants?.usedNonceTtlSeconds },
+      ),
       validateAdmin: deps?.validateAdmin,
       log: workerLog,
-    },
-    constants: {
-      usedNonceTtlSeconds: constants?.usedNonceTtlSeconds,
-      missingSlugError: constants?.missingSlugError,
-      slugAliasMismatchError: constants?.slugAliasMismatchError,
-      slugMismatchError: constants?.slugMismatchError,
+      MISSING_SLUG_ERROR: constants?.missingSlugError,
+      SLUG_ALIAS_MISMATCH_ERROR: constants?.slugAliasMismatchError,
+      SLUG_MISMATCH_ERROR: constants?.slugMismatchError,
     },
   });
 

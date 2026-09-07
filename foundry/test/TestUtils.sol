@@ -12,6 +12,7 @@ interface Vm {
     function prank(address sender) external;
     function deal(address account, uint256 newBalance) external;
     function warp(uint256 newTimestamp) external;
+    function chainId(uint256 newChainId) external;
     function sign(uint256 privateKey, bytes32 digest) external returns (uint8 v, bytes32 r, bytes32 s);
     function recordLogs() external;
     function getRecordedLogs() external returns (Log[] memory entries);

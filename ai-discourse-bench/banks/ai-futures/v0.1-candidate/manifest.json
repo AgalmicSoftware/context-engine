@@ -5,13 +5,13 @@
   "version": "0.1.0-candidate.1",
   "releaseStatus": "candidate",
   "benchmarkId": "ai-discourse-bench-ai-futures-v0.1-candidate",
-  "questionBankHash": "cc442e11af1794116cbab693146150e88512464e72368618e31a18f2e991bdd5",
-  "sourceCorpusRevision": "79b19bbd9826b42968abbffb05e402949417a88c",
+  "questionBankHash": "7cf0c1469485a62c676c9db7ab23b791cc8f5a71c68411e792267406cacb0522",
+  "sourceCorpusRevision": "ebbc5130624ac3272cd7ee433075698eb941d13e",
   "sourceFiles": [
     {
       "corpus": "ai-laws-policy",
       "relativePath": "ai-discourse-corpus/corpuses/ai-laws-policy-corpus.json",
-      "sha256": "0610808b9c7401971536f3c4549384d8b5b0fd2da9c4052fc015b007b3cdc3f1"
+      "sha256": "811d10cdc46590ab7df22762eaded0df9a5607db2c89435bdd8a36e8dcd47e25"
     },
     {
       "corpus": "ai-scifi-books",
@@ -21,27 +21,32 @@
     {
       "corpus": "arxiv-ai-safety",
       "relativePath": "ai-discourse-corpus/corpuses/arxiv-ai-safety-corpus.json",
-      "sha256": "554a865a8dbd2fe1934f5d9449d0ec027477814abe28010892061fb19f8ccca6"
+      "sha256": "d337d3a95255ff1d55d4969c115319286849871592f4173a104412ccae7d2c6b"
     },
     {
       "corpus": "cross-corpus",
       "relativePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
-      "sha256": "ea5e502cd8f32ba07df951d57cd75df7fdfbe1bf8f38995f310c2ed3877d5eae"
+      "sha256": "491f146ecbb1b2ec26aeeb150fc99c51014fed986e136620d5e21d1bd7e9b438"
     },
     {
       "corpus": "dwarkesh-lab-insiders",
       "relativePath": "ai-discourse-corpus/corpuses/dwarkesh-lab-insiders-corpus.json",
-      "sha256": "d5bf806545f2c026c7c6b5dafad078474067db5afe43f83512540a041159cb74"
+      "sha256": "f0e278dcc7e10cad10a839f0c614a4ca3310a7c7c7a52781b9b6868c8eec2134"
     },
     {
       "corpus": "tweets",
       "relativePath": "ai-discourse-corpus/corpuses/enriched-tweets.json",
-      "sha256": "a02090cfa9fb4b24bf6aebd8d0f1e6093d3d8bc82d0e6fc269dbd8f39d49074b"
+      "sha256": "2e05aeb90c3957e293d49a5b4e2b7c891e11c0fb9d0eaff76ad520afaabba88c"
+    },
+    {
+      "corpus": "lab-primary-docs",
+      "relativePath": "ai-discourse-corpus/corpuses/lab-primary-docs-corpus.json",
+      "sha256": "be91c64f28a288743c19b9f0e7863e54a05dcc799203ee3235ff908d8cd9dae5"
     },
     {
       "corpus": "lesswrong-posts",
       "relativePath": "ai-discourse-corpus/corpuses/lesswrong-posts-corpus.json",
-      "sha256": "a78e236307c5971c953f6cc20c63932b28f94e75a011df6335c9f6dd2a688899"
+      "sha256": "b81137e32286d2a48688b06338a04ba77631ab661aa564232dcbd238bd2e39d9"
     },
     {
       "corpus": "loophole-historical-cases",
@@ -51,7 +56,7 @@
     {
       "corpus": "metr-evals-metrics",
       "relativePath": "ai-discourse-corpus/corpuses/metr-evals-metrics-corpus.json",
-      "sha256": "3d630e3882632ada1a7d90695d0ee930ff840aa476b0a49dab43198d3091c179"
+      "sha256": "85723bf956909306d23a9fb228e8e37ca5554c320cd1a4c1d64a264d4de2188e"
     }
   ],
   "reviewStatus": "pending-human-review"
