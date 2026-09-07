@@ -1685,7 +1685,7 @@ $icon-size-standard: 1.25rem;
 }
 
 // Keep the analysis reading surface paired with document text in either theme.
-:global(:root[data-ce-theme]) .analysisModalContent {
+:global(:root) :global(.modal-dialog) > .analysisModalContent:global(.modal-content) {
   background: var(--ce-document-canvas);
   color: var(--ce-document-text);
 
