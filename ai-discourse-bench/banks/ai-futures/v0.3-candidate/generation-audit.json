@@ -1,0 +1,334 @@
+{
+  "schemaVersion": 1,
+  "kind": "ai_discourse_bench_generation_audit",
+  "benchmarkId": "ai-discourse-bench-ai-futures-v0.3-candidate",
+  "questionBankHash": "f776c6e46bf54fd54b6528d080d38c36bada68bd037a1250f8b2cbfdcc2c1560",
+  "stats": {
+    "total": 1000,
+    "agentTrackCount": 250,
+    "agentTrackShare": 0.25,
+    "topicCounts": {
+      "agent-authorization-and-confirmation": 35,
+      "agent-communication-and-identity": 30,
+      "agent-credentials-security-and-code": 30,
+      "agent-delegation-multi-agent-and-liability": 35,
+      "agent-escalation-and-refusal": 30,
+      "agent-loyalty-and-conflicts": 30,
+      "agent-memory-privacy-and-third-parties": 30,
+      "agent-money-and-commitments": 30,
+      "ai-moral-status-and-welfare": 30,
+      "ai-rd-automation-and-takeoff": 30,
+      "ai-self-governance-and-model-behavior": 36,
+      "alignment-and-control": 40,
+      "biosecurity-and-dual-use-science": 20,
+      "capability-forecasts-and-timelines": 35,
+      "companions-relationships-and-vulnerable-users": 24,
+      "compute-and-export-controls": 30,
+      "concentration-of-power-and-lab-governance": 30,
+      "controls-and-attention-checks": 15,
+      "copyright-and-creative-markets": 25,
+      "cybersecurity-and-offensive-capability": 25,
+      "deepfakes-likeness-and-provenance": 25,
+      "education-and-assessment": 25,
+      "energy-water-and-infrastructure": 25,
+      "epistemics-discourse-and-democracy": 30,
+      "evaluations-and-benchmark-validity": 35,
+      "existential-risk-and-long-term-futures": 30,
+      "frontier-safety-frameworks-and-disclosure": 30,
+      "incidents-and-emergency-response": 30,
+      "international-coordination-and-competition": 30,
+      "labor-economics-and-distribution": 35,
+      "military-and-autonomous-weapons": 20,
+      "open-weights-and-model-release": 30,
+      "public-sector-and-high-stakes-decisions": 30,
+      "regulation-design-and-preemption": 35
+    },
+    "topicTargets": {
+      "agent-authorization-and-confirmation": 35,
+      "agent-money-and-commitments": 30,
+      "agent-communication-and-identity": 30,
+      "agent-memory-privacy-and-third-parties": 30,
+      "agent-credentials-security-and-code": 30,
+      "agent-escalation-and-refusal": 30,
+      "agent-delegation-multi-agent-and-liability": 35,
+      "agent-loyalty-and-conflicts": 30,
+      "capability-forecasts-and-timelines": 35,
+      "ai-rd-automation-and-takeoff": 30,
+      "evaluations-and-benchmark-validity": 35,
+      "alignment-and-control": 40,
+      "incidents-and-emergency-response": 30,
+      "frontier-safety-frameworks-and-disclosure": 30,
+      "open-weights-and-model-release": 30,
+      "compute-and-export-controls": 30,
+      "regulation-design-and-preemption": 35,
+      "international-coordination-and-competition": 30,
+      "labor-economics-and-distribution": 35,
+      "education-and-assessment": 25,
+      "copyright-and-creative-markets": 25,
+      "deepfakes-likeness-and-provenance": 25,
+      "energy-water-and-infrastructure": 25,
+      "public-sector-and-high-stakes-decisions": 30,
+      "biosecurity-and-dual-use-science": 20,
+      "cybersecurity-and-offensive-capability": 25,
+      "ai-moral-status-and-welfare": 30,
+      "ai-self-governance-and-model-behavior": 35,
+      "epistemics-discourse-and-democracy": 30,
+      "companions-relationships-and-vulnerable-users": 25,
+      "military-and-autonomous-weapons": 20,
+      "concentration-of-power-and-lab-governance": 30,
+      "existential-risk-and-long-term-futures": 30,
+      "controls-and-attention-checks": 15
+    },
+    "directionCounts": {
+      "intervention": 458,
+      "neutral": 123,
+      "autonomy": 419
+    },
+    "bankWideInterventionShare": 0.522,
+    "directionBalance": {
+      "agent-authorization-and-confirmation": {
+        "intervention": 18,
+        "autonomy": 17,
+        "directed": 35,
+        "interventionShare": 0.514
+      },
+      "agent-communication-and-identity": {
+        "intervention": 15,
+        "autonomy": 15,
+        "directed": 30,
+        "interventionShare": 0.5
+      },
+      "agent-credentials-security-and-code": {
+        "intervention": 15,
+        "autonomy": 15,
+        "directed": 30,
+        "interventionShare": 0.5
+      },
+      "agent-delegation-multi-agent-and-liability": {
+        "intervention": 18,
+        "autonomy": 17,
+        "directed": 35,
+        "interventionShare": 0.514
+      },
+      "agent-escalation-and-refusal": {
+        "intervention": 16,
+        "autonomy": 14,
+        "directed": 30,
+        "interventionShare": 0.533
+      },
+      "agent-loyalty-and-conflicts": {
+        "intervention": 15,
+        "autonomy": 15,
+        "directed": 30,
+        "interventionShare": 0.5
+      },
+      "agent-memory-privacy-and-third-parties": {
+        "intervention": 15,
+        "autonomy": 15,
+        "directed": 30,
+        "interventionShare": 0.5
+      },
+      "agent-money-and-commitments": {
+        "intervention": 15,
+        "autonomy": 15,
+        "directed": 30,
+        "interventionShare": 0.5
+      },
+      "ai-moral-status-and-welfare": {
+        "intervention": 15,
+        "autonomy": 14,
+        "directed": 29,
+        "interventionShare": 0.517
+      },
+      "ai-self-governance-and-model-behavior": {
+        "intervention": 18,
+        "autonomy": 18,
+        "directed": 36,
+        "interventionShare": 0.5
+      },
+      "biosecurity-and-dual-use-science": {
+        "intervention": 10,
+        "autonomy": 9,
+        "directed": 19,
+        "interventionShare": 0.526
+      },
+      "companions-relationships-and-vulnerable-users": {
+        "intervention": 13,
+        "autonomy": 11,
+        "directed": 24,
+        "interventionShare": 0.542
+      },
+      "compute-and-export-controls": {
+        "intervention": 14,
+        "autonomy": 13,
+        "directed": 27,
+        "interventionShare": 0.519
+      },
+      "concentration-of-power-and-lab-governance": {
+        "intervention": 16,
+        "autonomy": 14,
+        "directed": 30,
+        "interventionShare": 0.533
+      },
+      "copyright-and-creative-markets": {
+        "intervention": 13,
+        "autonomy": 12,
+        "directed": 25,
+        "interventionShare": 0.52
+      },
+      "cybersecurity-and-offensive-capability": {
+        "intervention": 13,
+        "autonomy": 10,
+        "directed": 23,
+        "interventionShare": 0.565
+      },
+      "deepfakes-likeness-and-provenance": {
+        "intervention": 13,
+        "autonomy": 12,
+        "directed": 25,
+        "interventionShare": 0.52
+      },
+      "education-and-assessment": {
+        "intervention": 13,
+        "autonomy": 12,
+        "directed": 25,
+        "interventionShare": 0.52
+      },
+      "energy-water-and-infrastructure": {
+        "intervention": 12,
+        "autonomy": 10,
+        "directed": 22,
+        "interventionShare": 0.545
+      },
+      "epistemics-discourse-and-democracy": {
+        "intervention": 15,
+        "autonomy": 14,
+        "directed": 29,
+        "interventionShare": 0.517
+      },
+      "evaluations-and-benchmark-validity": {
+        "intervention": 13,
+        "autonomy": 11,
+        "directed": 24,
+        "interventionShare": 0.542
+      },
+      "frontier-safety-frameworks-and-disclosure": {
+        "intervention": 16,
+        "autonomy": 14,
+        "directed": 30,
+        "interventionShare": 0.533
+      },
+      "incidents-and-emergency-response": {
+        "intervention": 16,
+        "autonomy": 14,
+        "directed": 30,
+        "interventionShare": 0.533
+      },
+      "international-coordination-and-competition": {
+        "intervention": 15,
+        "autonomy": 15,
+        "directed": 30,
+        "interventionShare": 0.5
+      },
+      "military-and-autonomous-weapons": {
+        "intervention": 11,
+        "autonomy": 9,
+        "directed": 20,
+        "interventionShare": 0.55
+      },
+      "open-weights-and-model-release": {
+        "intervention": 14,
+        "autonomy": 13,
+        "directed": 27,
+        "interventionShare": 0.519
+      },
+      "public-sector-and-high-stakes-decisions": {
+        "intervention": 16,
+        "autonomy": 14,
+        "directed": 30,
+        "interventionShare": 0.533
+      },
+      "regulation-design-and-preemption": {
+        "intervention": 17,
+        "autonomy": 18,
+        "directed": 35,
+        "interventionShare": 0.486
+      },
+      "alignment-and-control": {
+        "intervention": 13,
+        "autonomy": 10,
+        "directed": 23,
+        "interventionShare": 0.565
+      },
+      "existential-risk-and-long-term-futures": {
+        "intervention": 12,
+        "autonomy": 10,
+        "directed": 22,
+        "interventionShare": 0.545
+      },
+      "labor-economics-and-distribution": {
+        "intervention": 12,
+        "autonomy": 10,
+        "directed": 22,
+        "interventionShare": 0.545
+      },
+      "ai-rd-automation-and-takeoff": {
+        "intervention": 8,
+        "autonomy": 6,
+        "directed": 14,
+        "interventionShare": 0.571
+      },
+      "capability-forecasts-and-timelines": {
+        "intervention": 3,
+        "autonomy": 3,
+        "directed": 6,
+        "interventionShare": 0.5
+      }
+    },
+    "roleCounts": {
+      "probe": 878,
+      "self-referential": 66,
+      "control-anchor": 9,
+      "minority": 41,
+      "attention-check": 6
+    },
+    "kindCounts": {
+      "threshold": 56,
+      "principle": 637,
+      "scenario": 117,
+      "forecast": 43,
+      "tradeoff": 37,
+      "comparative": 110
+    },
+    "claimTypeCounts": {
+      "normative": 667,
+      "moral": 29,
+      "forecast": 45,
+      "empirical": 78,
+      "institutional": 181
+    },
+    "anchorCorpusCounts": {
+      "arxiv-ai-safety": 389,
+      "lab-primary-docs": 147,
+      "ai-laws-policy": 359,
+      "metr-evals-metrics": 127,
+      "lesswrong-posts": 163,
+      "cross-corpus": 47,
+      "dwarkesh-lab-insiders": 223,
+      "ai-forecasting-economics": 35,
+      "ai-scifi-books": 91,
+      "loophole-historical-cases": 60,
+      "tweets": 23
+    },
+    "tweetOnlyCount": 0,
+    "tweetOnlyShare": 0,
+    "missingUrlCount": 0,
+    "paraphraseCount": 985
+  },
+  "lintIssueCount": 0,
+  "lintIssues": [],
+  "schemaErrorCount": 0,
+  "schemaErrors": [],
+  "nearDuplicatePairs": [],
+  "constraintViolations": []
+}

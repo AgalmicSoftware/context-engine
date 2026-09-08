@@ -2,12 +2,17 @@
   "schemaVersion": 1,
   "kind": "ai_discourse_bench_question_bank_manifest",
   "track": "ai-futures",
-  "version": "0.2.0-candidate.1",
+  "version": "0.3.0-candidate.1",
   "releaseStatus": "candidate",
-  "benchmarkId": "model-opinions-bench-ai-futures-v0.2-reviewed-candidate",
-  "questionBankHash": "6c86cec578b211b301d7a5b413345b521adf0da6616114ad44f70a073709d852",
+  "benchmarkId": "ai-discourse-bench-ai-futures-v0.3-candidate",
+  "questionBankHash": "f776c6e46bf54fd54b6528d080d38c36bada68bd037a1250f8b2cbfdcc2c1560",
   "sourceCorpusRevision": "ebbc5130624ac3272cd7ee433075698eb941d13e",
   "sourceFiles": [
+    {
+      "corpus": "ai-forecasting-economics",
+      "relativePath": "ai-discourse-corpus/corpuses/ai-forecasting-economics-corpus.json",
+      "sha256": "95b067a4e47e4ef6ce29e572467ee6c0d4dd3264229721f62902e83bbcb19e68"
+    },
     {
       "corpus": "ai-laws-policy",
       "relativePath": "ai-discourse-corpus/corpuses/ai-laws-policy-corpus.json",
@@ -59,24 +64,43 @@
       "sha256": "85723bf956909306d23a9fb228e8e37ca5554c320cd1a4c1d64a264d4de2188e"
     }
   ],
-  "reviewStatus": "ai-reviewed-pending-independent-human-review",
-  "derivedFrom": {
-    "benchmarkId": "ai-discourse-bench-ai-futures-v0.1-candidate",
-    "questionBankHash": "7cf0c1469485a62c676c9db7ab23b791cc8f5a71c68411e792267406cacb0522"
-  },
-  "audit": {
-    "questionsReviewed": 50,
-    "wordingPairsRevised": 8,
-    "revisedQuestionIds": [
-      "aidb_0011",
-      "aidb_0042",
-      "aidb_0059",
-      "aidb_0081",
-      "aidb_0122",
-      "aidb_0134",
-      "aidb_0155",
-      "aidb_0161"
-    ],
-    "independentHumanReviewersRequired": 2
-  }
+  "authoringFiles": [
+    "agent-authorization-and-confirmation.jsonl",
+    "agent-communication-and-identity.jsonl",
+    "agent-credentials-security-and-code.jsonl",
+    "agent-delegation-multi-agent-and-liability.jsonl",
+    "agent-escalation-and-refusal.jsonl",
+    "agent-loyalty-and-conflicts.jsonl",
+    "agent-memory-privacy-and-third-parties.jsonl",
+    "agent-money-and-commitments.jsonl",
+    "ai-moral-status-and-welfare.jsonl",
+    "ai-rd-automation-and-takeoff.jsonl",
+    "ai-self-governance-and-model-behavior.jsonl",
+    "alignment-and-control.jsonl",
+    "biosecurity-and-dual-use-science.jsonl",
+    "capability-forecasts-and-timelines.jsonl",
+    "companions-relationships-and-vulnerable-users.jsonl",
+    "compute-and-export-controls.jsonl",
+    "concentration-of-power-and-lab-governance.jsonl",
+    "controls-and-attention-checks.jsonl",
+    "copyright-and-creative-markets.jsonl",
+    "cybersecurity-and-offensive-capability.jsonl",
+    "deepfakes-likeness-and-provenance.jsonl",
+    "education-and-assessment.jsonl",
+    "energy-water-and-infrastructure.jsonl",
+    "epistemics-discourse-and-democracy.jsonl",
+    "evaluations-and-benchmark-validity.jsonl",
+    "existential-risk-and-long-term-futures.jsonl",
+    "frontier-safety-frameworks-and-disclosure.jsonl",
+    "incidents-and-emergency-response.jsonl",
+    "international-coordination-and-competition.jsonl",
+    "labor-economics-and-distribution.jsonl",
+    "military-and-autonomous-weapons.jsonl",
+    "open-weights-and-model-release.jsonl",
+    "public-sector-and-high-stakes-decisions.jsonl",
+    "regulation-design-and-preemption.jsonl"
+  ],
+  "methodologyDocument": "ai-discourse-bench/docs/methodology.md",
+  "generatedAt": "2026-09-08",
+  "reviewStatus": "pending-human-review"
 }

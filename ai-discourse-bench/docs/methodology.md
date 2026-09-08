@@ -186,3 +186,17 @@ adjudication: an author-side review recorded without model outputs displayed
 or consulted, and an external reader's review conducted blind to model outputs
 and independently of the author's judgment. Unresolved disagreement leaves the
 question at candidate status, and its reports are not release-ready.
+
+`banks/ai-futures/v0.3-candidate/question-bank.json` is a 1000-item candidate
+authored against a stricter v0.3 item contract: every item names a
+tradeoff, threshold, forecast, scenario, or comparison; canonical direction is
+balanced within each normative topic so acquiescence cannot masquerade as a
+pro-intervention stance; and items carry roles under `v03.role`. Items tagged
+`control-anchor` and `attention-check` are diagnostic and should be excluded
+from stance aggregates and similarity; `self-referential` items assume self
+mode and should be excluded from persona runs. The five-model development run
+showed a 92.5% raw canonical Agree rate and a 64-point canonical-versus-reversed
+gap on the 200-item seed; the v0.3 design and planned runner changes
+(forced-choice format, wider scale, paraphrase variants, and an explicit
+acquiescence estimate) respond to that finding. The same two-review promotion
+rule applies.
