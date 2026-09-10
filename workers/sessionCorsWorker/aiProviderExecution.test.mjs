@@ -752,3 +752,24 @@ test('proxyCustomRPC allows authenticated requests without custom_rpc scope and 
     },
   ]]);
 });
+
+test('proxyOpenAI sends fast Astra mapping to Responses with low reasoning effort', async () => {
+  let request;
+  const result = await proxyOpenAI({
+    payload: { model: 'gpt-6-astra', messages: [{ role: 'user', content: 'Map rating four.' }], reasoning_effort: 'low', service_tier: 'fast', temperature: 0.1, max_output_tokens: 8000, response_format: { type: 'json_object' } },
+    secrets: { openaiKey: 'worker-test-key' },
+    deps: { json: createJsonStub(), fetch: async (url, init) => {
+      request = { url, body: JSON.parse(init.body) };
+      return new Response(JSON.stringify({ output_text: '{"responses":[{"questionId":"trust","answer":4,"confidence":1}]}' }));
+    } },
+  });
+  assert.equal(result.status, 200);
+  assert.equal(request.url, 'https://api.openai.com/v1/responses');
+  assert.equal(request.body.model, 'gpt-6-astra');
+  assert.equal(request.body.service_tier, 'fast');
+  assert.deepEqual(request.body.reasoning, { effort: 'low' });
+  assert.deepEqual(request.body.text, { format: { type: 'json_object' } });
+  assert.equal(request.body.max_output_tokens, 8000);
+  assert.equal('temperature' in request.body, false);
+  assert.equal('max_tokens' in request.body, false);
+});

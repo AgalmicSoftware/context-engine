@@ -18,6 +18,7 @@ const AI_REQUEST_OPTION_KEYS = [
   'response_format',
   'temperature',
   'endpoint',
+  'service_tier',
   'reasoning_effort',
   'reasoningEffort',
   'taskType',

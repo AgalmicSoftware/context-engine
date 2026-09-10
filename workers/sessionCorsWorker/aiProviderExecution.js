@@ -168,6 +168,8 @@ export const proxyOpenAI = async ({
         messages: messages || [{ role: 'user', content: String(prompt || '') }],
       };
 
+  if (['fast', 'priority', 'default', 'auto'].includes(payload?.service_tier)) body.service_tier = payload.service_tier;
+
   if (useResponses) {
     if (response_format) body.text = { format: response_format };
     if (payload?.tools) body.tools = payload.tools;

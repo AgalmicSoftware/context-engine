@@ -76,12 +76,14 @@ The interviewer opens by asking for an important insight either about the
 responder and their perspective or about the broader topic behind the
 questions. It explicitly tells the responder that they can steer the
 conversation at any point, follows that direction, and then covers the
-accessible session questions conversationally. Only responder speech becomes mapping evidence. Live input transcript fragments
-are retained exactly, deduplicated by event ID, and ordered by session time;
-legacy Realtime sessions use completed input transcriptions. Assistant speech
-is excluded. A new interview clears the previous transcript and review drafts.
+accessible session questions conversationally. Only responder speech becomes
+answer evidence. Interviewer questions are retained as context so short replies
+such as “four” can be matched to the question asked. Live input and output
+transcript fragments are retained exactly, deduplicated by event ID, and ordered
+by session time; legacy Realtime sessions use completed input transcriptions.
+A new interview clears the previous transcript and review drafts.
 New speech is mapped even if the interview started with imported predictions. When the call ends, the responder can
-expand a read-only transcript disclosure while the session's existing AI lane
+expand a read-only transcript disclosure while `gpt-6-astra` with low reasoning effort and Fast mode (`service_tier: fast`)
 maps the transcript and any responder context imported by an AI prefill link
 to response drafts. Imported context remains editable but the context field
 stays hidden during a normal voice-only interview. Drafts may include comments,
@@ -254,3 +256,10 @@ by default.
 - `workers/sessionCorsWorker/interviewBriefDispatch.js`
 - `workers/sessionCorsWorker/interviewQuestionCatalog.js`
 - `workers/sessionCorsWorker/realtimeCallExecution.js`
+
+
+Interview mapping uses the Worker-side OpenAI key and the Responses API. It sends
+`reasoning.effort: low`, `service_tier: fast`, and JSON output formatting, without
+unsupported sampling parameters. GPT-Live remains the voice interviewer. See
+[OpenAI’s Astra guide](https://developers.openai.com/api/docs/guides/latest-model)
+and [Fast mode](https://developers.openai.com/api/docs/guides/fast-mode).

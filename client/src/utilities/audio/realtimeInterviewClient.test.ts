@@ -151,10 +151,10 @@ describe('interview connection lifecycle', () => {
     h.channel.emit({ type: 'session.input_transcript.delta', event_id: 'b', start_ms: 20, delta: ' choice.' });
     h.channel.emit(first);
     h.channel.emit(first);
-    expect(session.getTranscript()).toBe('Responder: I value choice.');
+    expect(session.getTranscript()).toBe('Responder: I value choice.\nInterviewer: What?');
     await session.stop();
     h.channel.emit({ type: 'session.input_transcript.delta', event_id: 'late', delta: 'Ignored' });
-    expect(session.getTranscript()).toBe('Responder: I value choice.');
+    expect(session.getTranscript()).toBe('Responder: I value choice.\nInterviewer: What?');
   });
 
   it('preserves the legacy Realtime opening and completed responder events', async () => {
@@ -344,4 +344,37 @@ describe('interview startup recovery', () => {
     expect(h.channel.send).not.toHaveBeenCalled();
     expect(h.track.stop).toHaveBeenCalledTimes(1);
   });
+});
+
+it('retains interviewer context and timestamp order for a short numeric reply, rejecting late text', async () => {
+  const h = harness();
+  const session = await startSessionRealtimeInterview(h.options);
+  h.channel.emit({
+    type: 'session.input_transcript.delta',
+    event_id: 'answer',
+    delta: 'Four.',
+    start_ms: 5000,
+    end_ms: 5500,
+  });
+  h.channel.emit({
+    type: 'session.output_transcript.delta',
+    event_id: 'question',
+    delta: 'How much do you trust AI companies to self-regulate?',
+    start_ms: 1000,
+    end_ms: 3000,
+  });
+  h.channel.emit({
+    type: 'session.output_transcript.delta',
+    event_id: 'scale',
+    delta: ' From one to ten.',
+    start_ms: 3000,
+    end_ms: 4000,
+  });
+  const result = await session.stop();
+  expect(result.transcript).toBe(
+    'Interviewer: How much do you trust AI companies to self-regulate? From one to ten.\nResponder: Four.',
+  );
+  expect(result.turns[0]).toMatchObject({ role: 'responder', startMs: 5000, endMs: 5500 });
+  h.channel.emit({ type: 'session.output_transcript.delta', event_id: 'late', delta: 'Ignore this', start_ms: 6000 });
+  expect(session.getTranscript()).toBe(result.transcript);
 });

@@ -1,8 +1,9 @@
 export type RealtimeInterviewTurn = {
   itemId: string;
   text: string;
-  role: 'responder';
+  role: 'responder' | 'interviewer';
   startMs?: number;
+  endMs?: number;
   fragment?: boolean;
 };
 
@@ -48,6 +49,7 @@ export const readRealtimeResponderTurn = (event: unknown): RealtimeInterviewTurn
       role: 'responder',
       fragment: true,
       startMs: typeof record.start_ms === 'number' ? record.start_ms : undefined,
+      endMs: typeof record.end_ms === 'number' ? record.end_ms : undefined,
     };
   }
   if (record.type !== 'conversation.item.input_audio_transcription.completed' || !trim(record.transcript)) return null;
@@ -55,15 +57,20 @@ export const readRealtimeResponderTurn = (event: unknown): RealtimeInterviewTurn
 };
 
 export const buildRealtimeInterviewTranscript = (turns: RealtimeInterviewTurn[]): string => {
-  if (turns.some((turn) => turn.fragment)) {
-    const ordered = [...turns].sort((a, b) => (a.startMs ?? Infinity) - (b.startMs ?? Infinity));
-    const text = ordered
-      .map((turn) => turn.text)
-      .join('')
-      .trim();
-    return text ? `Responder: ${text}` : '';
+  const ordered = turns.some((turn) => turn.fragment)
+    ? [...turns].sort((a, b) => (a.startMs ?? Infinity) - (b.startMs ?? Infinity))
+    : turns;
+  const rows: Array<{ role: RealtimeInterviewTurn['role']; text: string; fragment?: boolean }> = [];
+  for (const turn of ordered) {
+    const previous = rows[rows.length - 1];
+    // Preserve exact deltas and speaker boundaries so a short reply retains its question context.
+    if (turn.fragment && previous?.fragment && previous.role === turn.role) previous.text += turn.text;
+    else rows.push({ role: turn.role, text: turn.text, fragment: turn.fragment });
   }
-  return turns.map((turn) => `Responder: ${turn.text}`).join('\n');
+  return rows
+    .filter((row) => row.text.trim())
+    .map((row) => `${row.role === 'interviewer' ? 'Interviewer' : 'Responder'}: ${row.text.trim()}`)
+    .join('\n');
 };
 
 const stopTracks = (stream: MediaStream | null) => {
@@ -218,7 +225,13 @@ export const startSessionRealtimeInterview = async ({
           }),
         );
     }
-    const turn = readRealtimeResponderTurn(event);
+    const turn: RealtimeInterviewTurn | null =
+      event.type === 'session.output_transcript.delta'
+        ? (() => {
+            const fragment = readRealtimeResponderTurn({ ...event, type: 'session.input_transcript.delta' });
+            return fragment ? { ...fragment, role: 'interviewer' } : null;
+          })()
+        : readRealtimeResponderTurn(event);
     if (!turn || (turn.itemId && turns.some((entry) => entry.itemId === turn.itemId))) return;
     turns.push({ ...turn, itemId: turn.itemId || `fragment-${turns.length}` });
     onTranscript(buildRealtimeInterviewTranscript(turns), [...turns]);

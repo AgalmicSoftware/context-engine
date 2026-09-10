@@ -414,7 +414,8 @@ export const buildInterviewResponseMappingPrompt = ({
 Rules:
 - Use only the supplied transcript and responder context. Never invent evidence.
 - Include a reviewable draft when there is a direct statement or a defensible indirect signal. Low-confidence inference is allowed only when the evidence field explains its basis. Omit only questions with no relevant signal at all.
-- Match the question type and listed options exactly when options exist.
+- Match the question type and listed options exactly when options exist. For rating questions, return a JSON number on the stated scale (for example, 4), not prose or "4/10".
+- Interviewer turns supply question context only; never treat their suggestions as the responder's beliefs. Resolve short replies such as "four", "yes", or "no" against the preceding question. Check every explicit responder answer, including numeric ratings, before returning drafts.
 - Use additionalComments for relevant explanations, qualifications, or examples from the interview that do not fit the main answer, especially for binary, rating, and choice questions. Preserve the responder's meaning without inventing details or repeating the main answer. importance (0-100) and conviction (0-100) are optional and require explicit evidence.
 - Keep the responder's meaning and uncertainty. Do not improve their opinion into a stronger claim.
 - confidence is required for every response and ranges from 0 to 1: 0.00-0.39 weak inference, 0.40-0.69 moderate support, and 0.70-1.00 direct or repeated support.
@@ -469,7 +470,12 @@ export const mapInterviewEvidenceToResponses = async ({
     sessionConfig,
     workerUrl,
     taskType: 'interview-map',
-    temperature: 0.1,
+    provider: 'openai',
+    model: 'gpt-6-astra',
+    preferLocal: false,
+    reasoningEffort: 'low',
+    service_tier: 'fast',
+    response_format: { type: 'json_object' },
     maxTokens: 8000,
   });
   return parseInterviewDraftResponses(raw, questions);

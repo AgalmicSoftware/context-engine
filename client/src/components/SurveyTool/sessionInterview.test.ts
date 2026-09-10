@@ -1,3 +1,5 @@
+import { callAI } from '../../utilities/ai/aiClient.js';
+jest.mock('../../utilities/ai/aiClient.js', () => ({ callAI: jest.fn() }));
 import {
   buildExternalInterviewKickoff,
   buildInterviewResponseMappingPrompt,
@@ -11,6 +13,7 @@ import {
   INTERVIEW_PROMPT_VERSION,
   isInterviewFeatureEnabled,
   normalizeInterviewQuestions,
+  mapInterviewEvidenceToResponses,
   parseInterviewDraftResponses,
   readImportedInterviewDraftResponses,
   readInterviewPrefillFromHash,
@@ -264,4 +267,28 @@ describe('session interview protocol', () => {
       ]),
     ).toEqual([]);
   });
+});
+
+it('maps a numeric reply using fast Astra and keeps the rating value', async () => {
+  jest
+    .mocked(callAI)
+    .mockResolvedValue(JSON.stringify({ responses: [{ questionId: 'trust', answer: 4, confidence: 1 }] }));
+  const questions = normalizeInterviewQuestions([
+    { id: 'trust', type: 'rating', prompt: 'How much do you trust AI companies to self-regulate? (1-10)' },
+  ]);
+  const result = await mapInterviewEvidenceToResponses({
+    questions,
+    transcript: 'Interviewer: How much do you trust AI companies to self-regulate? From one to ten.\nResponder: Four.',
+  });
+  expect(callAI).toHaveBeenCalledWith(
+    expect.stringContaining('Responder: Four.'),
+    expect.objectContaining({
+      model: 'gpt-6-astra',
+      provider: 'openai',
+      preferLocal: false,
+      reasoningEffort: 'low',
+      service_tier: 'fast',
+    }),
+  );
+  expect(result).toEqual([{ questionId: 'trust', answer: 4, confidence: 1 }]);
 });

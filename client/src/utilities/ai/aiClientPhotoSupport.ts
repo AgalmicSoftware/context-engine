@@ -67,7 +67,7 @@ export const usesOpenAiResponsesApi = (providerRaw: unknown = '', modelRaw: unkn
   const provider = String(providerRaw || '')
     .trim()
     .toLowerCase();
-  return provider === 'openai' && /^gpt-5/.test(modelLeaf(modelRaw));
+  return provider === 'openai' && /^(gpt-5|gpt-6-astra(?:$|-))/.test(modelLeaf(modelRaw));
 };
 
 export const resolvePhotoAnalysisSupport = ({

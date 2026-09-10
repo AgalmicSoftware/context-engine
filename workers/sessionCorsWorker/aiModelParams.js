@@ -5,7 +5,7 @@ export const usesOpenAiResponsesApi = ({ provider = '', model = '', endpoint = '
   const normalizedEndpoint = String(endpoint || '').trim().toLowerCase();
   if (normalizedProvider !== 'openai') return false;
   if (normalizedEndpoint.includes('/responses') || normalizedEndpoint === 'responses') return true;
-  return /^gpt-5/.test(toModelLeaf(model));
+  return /^(gpt-5|gpt-6-astra(?:$|-))/.test(toModelLeaf(model));
 };
 
 export const isChatReasoningModel = ({ model = '', thinking = false } = {}) => (
