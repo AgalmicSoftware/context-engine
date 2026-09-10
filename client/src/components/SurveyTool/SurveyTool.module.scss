@@ -3411,6 +3411,15 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   background: var(--ce-action-accent);
   color: var(--ce-action-accent-text);
   border-color: var(--ce-action-accent);
+
+  &:hover:not(:disabled),
+  &:focus:not(:disabled),
+  &:active:not(:disabled) {
+    // Override the global Bootstrap gradient together with its text color.
+    background: var(--ce-action-accent-hover) !important;
+    color: var(--ce-action-accent-text) !important;
+    border-color: var(--ce-action-accent-hover);
+  }
 }
 
 .sessionInterviewPanel :global(.btn-outline-secondary) {
