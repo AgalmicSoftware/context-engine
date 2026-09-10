@@ -1713,8 +1713,11 @@ export const recordInterviewProvenance = (
   included = true,
   includePredictionComparison = true,
   responderName = '',
+  review: Array<InterviewDraftResponse & { selected: boolean; original: InterviewDraftResponse }> = [],
 ) => {
   const normalizedSource = source || resolveRealtimeInterviewSource(engine.props?.sessionConfig);
+  const pendingQuestionIds = engine.getChangedQidsAndFields?.(0)?.changedQids;
+  const researchAnchor = drafts.find((draft) => pendingQuestionIds?.has(draft.questionId)) || drafts[0];
   const normalizedResponderName = String(responderName || '')
     .trim()
     .replace(/\s+/g, ' ')
@@ -1757,6 +1760,7 @@ export const recordInterviewProvenance = (
                     confidence: draft.confidence ?? null,
                     evidence: draft.evidence || '',
                   },
+                  ...(draft === researchAnchor ? { unselectedDrafts: review.filter((entry) => !entry.selected) } : {}),
                 }
               : {}),
             ...(normalizedResponderName ? { responderName: normalizedResponderName } : {}),
@@ -2534,8 +2538,19 @@ const notifyPileSubmitRailVisibility = (engine: PileViewModeEngine) => {
 
 const renderPileResponseInput = (
   engine: PileViewModeEngine,
-  { question, answer, glowAnswer, maskedAnswer, allowDecryptAnswer, decryptTooltip, isAnswerDecrypting }: any,
+  {
+    question,
+    answer,
+    glowAnswer,
+    maskedAnswer,
+    allowDecryptAnswer,
+    decryptTooltip,
+    isAnswerDecrypting,
+    onAnswerChange,
+    inputNamePrefix = 'q',
+  }: any,
 ) => {
+  const updateAnswer = onAnswerChange || ((value: unknown) => engine.handleAnswerPile(question.id, value));
   if (maskedAnswer) {
     return engine.renderQuestionFieldDecryptControl({
       questionId: question.id,
@@ -2555,8 +2570,8 @@ const renderPileResponseInput = (
         <BinaryChoiceInput
           questionId={question.id}
           value={answer.value}
-          inputNamePrefix="q"
-          onChange={(option: any) => engine.handleAnswerPile(question.id, option)}
+          inputNamePrefix={inputNamePrefix}
+          onChange={updateAnswer}
           disabled={engine.state.isSubmitting}
         />
       );
@@ -2572,7 +2587,7 @@ const renderPileResponseInput = (
           selectedValues={selectedValues}
           isSingleSelect={isSingleSelect}
           disabled={engine.state.isSubmitting}
-          onChange={(nextValues: any) => engine.handleAnswerPile(question.id, nextValues)}
+          onChange={updateAnswer}
         />
       );
     }
@@ -2587,7 +2602,9 @@ const renderPileResponseInput = (
             step={1}
             value={ratingValue}
             onChange={(val: any, event: any) =>
-              engine.handleAnswerPile(question.id, val, buildSliderPersistOptions(event))
+              onAnswerChange
+                ? onAnswerChange(val)
+                : engine.handleAnswerPile(question.id, val, buildSliderPersistOptions(event))
             }
             onChangeComplete={engine.flushDraftPersistAfterSliderChange}
             disabled={engine.state.isSubmitting}
@@ -2605,7 +2622,7 @@ const renderPileResponseInput = (
           {...engine.getAudioInputWorkerProps()}
           placeholder={'Your response...'}
           value={answer.value || ''}
-          updateFunction={(val: any) => engine.handleAnswerPile(question.id, val)}
+          updateFunction={updateAnswer}
           toggleEncryption={(newState: any) => engine.toggleAnswerEncryption(0, question.id, newState)}
           disabled={engine.state.isSubmitting}
           forceGlow={glowAnswer}
@@ -2656,13 +2673,16 @@ const renderPileSliderSection = (
   );
 };
 
-const renderPileAdditionalInput = (engine: PileViewModeEngine, { questionId, additional, glowAdditional }: any) => {
+const renderPileAdditionalInput = (
+  engine: PileViewModeEngine,
+  { questionId, additional, glowAdditional, onChange }: any,
+) => {
   return (
     <SurveyAudioFieldInput
       {...engine.getAudioInputWorkerProps()}
       placeholder="Additional comments..."
       value={additional.value || ''}
-      updateFunction={(val: any) => engine.handleAdditionalPile(questionId, val)}
+      updateFunction={onChange || ((val: any) => engine.handleAdditionalPile(questionId, val))}
       toggleEncryption={(newState: any) => engine.toggleAdditionalCommentsEncryption(0, questionId, newState)}
       dataTestId={E2E_TESTIDS.SURVEY_ADDITIONAL_INPUT}
       dataCeQuestionId={String(questionId || '')
@@ -3165,6 +3185,45 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
               })
             }
             onRecordProvenance={engine.recordInterviewProvenance}
+            onSubmitResponses={() => engine.handlePileSubmitClick()}
+            renderAnswerInput={(questionId, value, onAnswerChange) =>
+              engine.renderPileResponseInput({
+                question: (engine.state.allQuestionsForFilter || fallbackQuestionPool).find(
+                  (question: { id: string }) => question.id === questionId,
+                ) || { id: questionId, type: 'freeform' },
+                answer: { value },
+                onAnswerChange,
+                inputNamePrefix: 'interview-draft',
+              })
+            }
+            renderAdditionalInput={(questionId, value, onChange) =>
+              engine.renderPileAdditionalInput({
+                questionId,
+                additional: {
+                  ...((engine.state.surveysResponseState?.[0]?.additionalComments?.[questionId] || {}) as Record<
+                    string,
+                    unknown
+                  >),
+                  value,
+                },
+                onChange,
+              })
+            }
+            renderFieldLock={(questionId, field) => {
+              const slice = engine.state.surveysResponseState?.[0];
+              const options = {
+                surveyIndex: 0,
+                questionId,
+                visualContext: 'pile',
+                lockDisabled: engine.state.isSubmitting,
+              };
+              return field === 'answer'
+                ? engine.renderQuestionAnswerLockControl({ ...options, answer: slice?.answers?.[questionId] || {} })
+                : engine.renderQuestionAdditionalLockControl({
+                    ...options,
+                    additional: slice?.additionalComments?.[questionId] || {},
+                  });
+            }}
           />
         </React.Suspense>
       ) : null}

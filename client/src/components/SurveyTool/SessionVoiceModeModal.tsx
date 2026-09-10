@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Input, Label, Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
+import { Button, Input, Label, Modal, ModalBody, ModalFooter, ModalHeader, UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faCaretDown,
@@ -12,10 +12,10 @@ import {
   faPlay,
   faSpinner,
   faStop,
-  faTimes,
+  faQuestionCircle,
 } from '@fortawesome/free-solid-svg-icons';
 import styles from './SurveyTool.module.scss';
-import BinaryChoiceInput from './BinaryChoiceInput';
+import SessionInterviewDraftCard, { type InterviewQuestionControls } from './SessionInterviewDraftCard';
 import SessionListeningPanel, {
   formatSessionRecordingElapsed,
   SessionListeningWaveform,
@@ -39,7 +39,8 @@ import { useSessionInterviewRecorder } from './useSessionInterviewRecorder';
 
 type UnknownRecord = Record<string, unknown>;
 
-type InterviewDraftApplicationProps = {
+type InterviewDraftApplicationProps = InterviewQuestionControls & {
+  onSubmitResponses?: () => void | Promise<void>;
   onClose: () => void;
   onApplyAnswer: (questionId: string, answer: unknown) => void | Promise<void>;
   onApplyAdditional: (questionId: string, comments: string) => void | Promise<void>;
@@ -52,6 +53,7 @@ type InterviewDraftApplicationProps = {
     included: boolean,
     includePredictionComparison: boolean,
     responderName: string,
+    review?: Array<InterviewDraftResponse & { selected: boolean; original: InterviewDraftResponse }>,
   ) => void | Promise<void>;
 };
 
@@ -77,34 +79,6 @@ const responseFieldValue = (slice: UnknownRecord | null | undefined, field: stri
 
 const hasDraftValue = (value: unknown): boolean =>
   value !== undefined && value !== null && value !== '' && (!Array.isArray(value) || value.length > 0);
-
-const displayAnswer = (value: unknown): string => {
-  if (typeof value === 'string') return value;
-  if (value == null) return '';
-  return typeof value === 'object' ? JSON.stringify(value) : String(value);
-};
-
-const describeConfidence = (value: number): { label: string; percent: number } => {
-  const confidence = Math.max(0, Math.min(1, value));
-  return {
-    percent: Math.round(confidence * 100),
-    label: confidence < 0.4 ? 'Weak inference' : confidence < 0.7 ? 'Moderate support' : 'Strong support',
-  };
-};
-
-const parseEditedAnswer = (value: string, original: unknown): unknown => {
-  const trimmed = value.trim();
-  if (Array.isArray(original) || (original && typeof original === 'object')) {
-    try {
-      return JSON.parse(trimmed);
-    } catch {
-      return value;
-    }
-  }
-  if (typeof original === 'boolean') return trimmed.toLowerCase() === 'true';
-  if (typeof original === 'number' && Number.isFinite(Number(trimmed))) return Number(trimmed);
-  return value;
-};
 
 const displayResponderContext = (packet: InterviewPrefillPacket | null): string => {
   if (!packet) return '';
@@ -156,6 +130,10 @@ function SessionInterviewPanel({
   onApplyImportance,
   onApplyConviction,
   onRecordProvenance,
+  onSubmitResponses,
+  renderAnswerInput,
+  renderAdditionalInput,
+  renderFieldLock,
   onClose,
 }: SessionInterviewPanelProps) {
   const disposedRef = useRef(false);
@@ -171,14 +149,13 @@ function SessionInterviewPanel({
   const [error, setError] = useState(initialError);
   const [drafts, setDrafts] = useState<InterviewDraftResponse[]>([]);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
-  const [editedAnswers, setEditedAnswers] = useState<Record<string, string>>({});
+  const [editedDrafts, setEditedDrafts] = useState<Record<string, InterviewDraftResponse>>({});
   const [includeProvenance, setIncludeProvenance] = useState(true);
   const [includePredictionComparison, setIncludePredictionComparison] = useState(true);
   const [includeResponderName, setIncludeResponderName] = useState(false);
   const [showAgentPrompt, setShowAgentPrompt] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
   const [promptCopied, setPromptCopied] = useState(false);
-  const [expandedEvidence, setExpandedEvidence] = useState<Record<string, boolean>>({});
   useEffect(() => {
     if (workerUrl) setResolvedWorkerUrl(workerUrl);
   }, [workerUrl]);
@@ -224,6 +201,7 @@ function SessionInterviewPanel({
   const stopControlRef = useRef<HTMLButtonElement | null>(null);
   const previousRecordingState = useRef(recordingState);
   const mappingRef = useRef(false);
+  const applyingRef = useRef(false);
   const isStarting = recordingState === 'starting';
   const isRecording = recordingState === 'recording';
   const isPaused = recordingState === 'paused';
@@ -291,7 +269,19 @@ function SessionInterviewPanel({
         }
         if (disposedRef.current) return;
         setDrafts(mapped);
-        setEditedAnswers(Object.fromEntries(mapped.map((draft) => [draft.questionId, displayAnswer(draft.answer)])));
+        setEditedDrafts(
+          Object.fromEntries(
+            mapped.map((draft) => [
+              draft.questionId,
+              {
+                ...draft,
+                additionalComments:
+                  draft.additionalComments ||
+                  String(responseFieldValue(existingResponseSlice, 'additionalComments', draft.questionId) || ''),
+              },
+            ]),
+          ),
+        );
         setSelected(
           Object.fromEntries(
             mapped.map((draft) => [
@@ -368,21 +358,23 @@ function SessionInterviewPanel({
   };
 
   const applyDrafts = async () => {
-    if (applying || isInterviewBusy || mappingRef.current) return;
+    if (applyingRef.current || isInterviewBusy || mappingRef.current) return;
     const applied = drafts.filter((draft) => selected[draft.questionId]);
+    if (!applied.length) return;
+    applyingRef.current = true;
     setApplying(true);
     setError('');
-    setStatus('Applying selected drafts…');
+    setStatus('Preparing submission…');
     try {
-      for (const draft of applied) {
-        await onApplyAnswer(
-          draft.questionId,
-          parseEditedAnswer(editedAnswers[draft.questionId] ?? displayAnswer(draft.answer), draft.answer),
-        );
-        if (draft.additionalComments) await onApplyAdditional(draft.questionId, draft.additionalComments);
+      for (const original of applied) {
+        if (disposedRef.current) return;
+        const draft = editedDrafts[original.questionId] || original;
+        await onApplyAnswer(draft.questionId, draft.answer);
+        await onApplyAdditional(draft.questionId, draft.additionalComments || '');
         if (draft.importance !== undefined) await onApplyImportance(draft.questionId, draft.importance);
         if (draft.conviction !== undefined) await onApplyConviction(draft.questionId, draft.conviction);
       }
+      if (disposedRef.current) return;
       if (applied.length) {
         const directContextSource =
           !prefillPacket && !transcript.trim() && responderContext.trim()
@@ -392,17 +384,26 @@ function SessionInterviewPanel({
           applied,
           prefillPacket?.source || directContextSource,
           prefillPacket,
-          includeProvenance,
+          Boolean(prefillPacket) && includeProvenance,
           includePredictionComparison,
           includeResponderName ? String(prefillPacket?.responderContext?.name || '').trim() : '',
+          drafts.map((draft) => ({
+            ...editedDrafts[draft.questionId],
+            original: draft,
+            selected: Boolean(selected[draft.questionId]),
+          })),
         );
       }
+      if (disposedRef.current) return;
       onClose();
+      await onSubmitResponses?.();
     } catch (applyError) {
+      if (disposedRef.current) return;
       setError(applyError instanceof Error ? applyError.message : 'Could not apply the selected drafts.');
       setStatus('Draft application failed');
     } finally {
-      setApplying(false);
+      applyingRef.current = false;
+      if (!disposedRef.current) setApplying(false);
     }
   };
 
@@ -479,8 +480,8 @@ function SessionInterviewPanel({
             : isStarting
               ? 'Connecting your microphone and voice session. Close this dialog to cancel.'
               : drafts.length
-                ? 'Review and edit the drafts below. Apply selected drafts adds them to the response editor; submit answers separately.'
-                : 'Speak with an AI interviewer. Stopping prepares drafts for your review; answers are submitted separately.'}
+                ? 'Review and edit your answers and privacy settings, then select Submit responses. You will be asked to sign in if needed.'
+                : 'Speak with an AI interviewer. Stopping prepares drafts for your review. You choose when to submit responses.'}
       </p>
       {!questions.length ? <p>No accessible questions are available for this interview.</p> : null}
       <audio ref={audioRef} className={styles.sessionListeningSrOnly} aria-label="Realtime interviewer audio" />
@@ -673,152 +674,68 @@ function SessionInterviewPanel({
               {drafts.filter((draft) => selected[draft.questionId]).length} of {drafts.length} selected
             </span>
           </div>
-          {drafts.map((draft) => {
-            const question = questions.find((candidate) => candidate.id === draft.questionId);
-            const existing = hasDraftValue(responseFieldValue(existingResponseSlice, 'answers', draft.questionId));
-            const isSelected = !!selected[draft.questionId];
-            const evidenceId = `ce-session-interview-basis-${draft.questionId}`;
-            return (
-              <article
-                className={`${styles.sessionInterviewDraft} ${!isSelected ? styles.sessionInterviewDraftRemoved : ''}`}
-                key={draft.questionId}
-                data-testid={E2E_TESTIDS.SESSION_INTERVIEW_DRAFT}
-                data-ce-question-id={draft.questionId}
-              >
-                <button
-                  type="button"
-                  className={styles.sessionInterviewDraftRemove}
-                  onClick={() => setSelected((current) => ({ ...current, [draft.questionId]: false }))}
-                  aria-label={`Remove draft for ${question?.prompt || draft.questionId}`}
-                  title="Remove draft"
-                  disabled={!isSelected}
-                  data-testid={E2E_TESTIDS.SESSION_INTERVIEW_DRAFT_REMOVE}
-                  data-ce-question-id={draft.questionId}
-                >
-                  <FontAwesomeIcon icon={faTimes} />
-                </button>
-                <div className={styles.sessionInterviewQuestion}>{question?.prompt || draft.questionId}</div>
-                {question?.type === 'binary' ? (
-                  <div className={styles.sessionInterviewBinaryAnswer}>
-                    <BinaryChoiceInput
-                      questionId={draft.questionId}
-                      value={editedAnswers[draft.questionId] ?? ''}
-                      inputNamePrefix="interview-draft"
-                      showIcons
-                      onChange={(answer) =>
-                        setEditedAnswers((current) => ({
-                          ...current,
-                          [draft.questionId]: answer,
-                        }))
-                      }
-                    />
-                  </div>
-                ) : (
-                  <Input
-                    type="textarea"
-                    value={editedAnswers[draft.questionId] ?? ''}
-                    onChange={(event) =>
-                      setEditedAnswers((current) => ({
-                        ...current,
-                        [draft.questionId]: event.target.value,
-                      }))
-                    }
-                    className={styles.sessionInterviewAnswerInput}
-                    aria-label={`Draft answer for ${question?.prompt || draft.questionId}`}
-                  />
-                )}
-                {draft.confidence !== undefined
-                  ? (() => {
-                      const confidence = describeConfidence(draft.confidence);
-                      return (
-                        <div
-                          className={styles.sessionInterviewConfidence}
-                          aria-label={`Prediction confidence: ${confidence.percent}% (${confidence.label})`}
-                          data-testid={E2E_TESTIDS.SESSION_INTERVIEW_DRAFT_CONFIDENCE}
-                          data-ce-question-id={draft.questionId}
-                        >
-                          <div className={styles.sessionInterviewConfidenceMeta}>
-                            <strong>{confidence.percent}% confidence</strong>
-                            <span>{confidence.label}</span>
-                          </div>
-                          <div
-                            className={styles.sessionInterviewConfidenceTrack}
-                            role="progressbar"
-                            aria-label={`Confidence for ${question?.prompt || draft.questionId}`}
-                            aria-valuemin={0}
-                            aria-valuemax={100}
-                            aria-valuenow={confidence.percent}
-                          >
-                            <span style={{ width: `${confidence.percent}%` }} />
-                          </div>
-                        </div>
-                      );
-                    })()
-                  : null}
-                {draft.evidence ? (
-                  <div className={styles.sessionInterviewEvidenceDisclosure}>
-                    <button
-                      type="button"
-                      className={styles.sessionInterviewEvidenceToggle}
-                      onClick={() =>
-                        setExpandedEvidence((current) => ({
-                          ...current,
-                          [draft.questionId]: !current[draft.questionId],
-                        }))
-                      }
-                      aria-expanded={!!expandedEvidence[draft.questionId]}
-                      aria-controls={evidenceId}
-                      data-testid={E2E_TESTIDS.SESSION_INTERVIEW_DRAFT_BASIS_TOGGLE}
-                      data-ce-question-id={draft.questionId}
-                    >
-                      <FontAwesomeIcon
-                        icon={faCaretDown}
-                        className={`${styles.sessionInterviewEvidenceCaret} ${
-                          expandedEvidence[draft.questionId] ? styles.sessionInterviewEvidenceCaretExpanded : ''
-                        }`}
-                      />
-                      Basis
-                    </button>
-                    {expandedEvidence[draft.questionId] ? (
-                      <div id={evidenceId} className={styles.sessionInterviewEvidence}>
-                        {draft.evidence}
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-                <div className={styles.sessionInterviewDraftActions}>
-                  <button
-                    type="button"
-                    className={`${styles.sessionInterviewDraftApply} ${isSelected ? styles.sessionInterviewDraftApplySelected : ''}`}
-                    onClick={() => setSelected((current) => ({ ...current, [draft.questionId]: true }))}
-                    aria-pressed={isSelected}
-                  >
-                    {isSelected ? <FontAwesomeIcon icon={faCheck} /> : null}
-                    {existing ? 'Replace with draft' : isSelected ? 'Draft selected' : 'Select draft'}
-                  </button>
-                </div>
-              </article>
-            );
-          })}
+          {drafts.map((draft) => (
+            <SessionInterviewDraftCard
+              key={draft.questionId}
+              draft={draft}
+              edited={editedDrafts[draft.questionId] || draft}
+              question={questions.find((question) => question.id === draft.questionId)}
+              selected={Boolean(selected[draft.questionId])}
+              existing={hasDraftValue(responseFieldValue(existingResponseSlice, 'answers', draft.questionId))}
+              disabled={applying}
+              onSelect={(value) => setSelected((current) => ({ ...current, [draft.questionId]: value }))}
+              onEdit={(patch) =>
+                setEditedDrafts((current) => ({
+                  ...current,
+                  [draft.questionId]: { ...current[draft.questionId], ...patch },
+                }))
+              }
+              renderAnswerInput={renderAnswerInput}
+              renderAdditionalInput={renderAdditionalInput}
+              renderFieldLock={renderFieldLock}
+            />
+          ))}
           <div className={styles.sessionInterviewReviewActions}>
             <div className={styles.sessionInterviewConsentOptions}>
-              <Label check className={styles.sessionInterviewProvenance}>
-                <Input
-                  type="checkbox"
-                  checked={includeProvenance}
-                  onChange={(event) => setIncludeProvenance(event.target.checked)}
-                />{' '}
-                Include self-reported AI platform/model provenance with submitted responses
-              </Label>
-              <Label check className={styles.sessionInterviewProvenance}>
-                <Input
-                  type="checkbox"
-                  checked={includePredictionComparison}
-                  onChange={(event) => setIncludePredictionComparison(event.target.checked)}
-                  data-testid={E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON}
-                />{' '}
-                Include the original AI prediction and final submitted answer for accuracy research
-              </Label>
+              {prefillPacket ? (
+                <Label check className={styles.sessionInterviewProvenance}>
+                  <Input
+                    type="checkbox"
+                    checked={includeProvenance}
+                    onChange={(event) => setIncludeProvenance(event.target.checked)}
+                  />{' '}
+                  Include self-reported AI platform/model provenance with submitted responses
+                </Label>
+              ) : null}
+              <div className={styles.sessionInterviewResearchConsent}>
+                <Label check className={styles.sessionInterviewProvenance}>
+                  <Input
+                    type="checkbox"
+                    checked={includePredictionComparison}
+                    onChange={(event) => setIncludePredictionComparison(event.target.checked)}
+                    data-testid={E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON}
+                  />{' '}
+                  <span>Include the original AI prediction and final submitted answer for accuracy research</span>
+                </Label>
+                <button
+                  type="button"
+                  id="ce-interview-research-help"
+                  className={styles.sessionInterviewResearchHelp}
+                  aria-label="About accuracy research"
+                  aria-describedby="ce-interview-research-description"
+                >
+                  <FontAwesomeIcon icon={faQuestionCircle} />
+                </button>
+              </div>
+              <span id="ce-interview-research-description" className={styles.sessionListeningSrOnly}>
+                Includes original predictions, your edits, and drafts you did not select. Unselected drafts are recorded
+                as research metadata, not submitted answers. Final answers are compared at submission; encrypted answer
+                and comment text is excluded from research metadata.
+              </span>
+              <UncontrolledTooltip target="ce-interview-research-help" placement="top" trigger="hover focus">
+                Includes original predictions, your edits, and unselected drafts. Unselected drafts are research
+                metadata, not submitted answers. Encrypted answer and comment text is excluded.
+              </UncontrolledTooltip>
               {importedResponderName ? (
                 <Label check className={styles.sessionInterviewProvenance}>
                   <Input
@@ -839,7 +756,7 @@ function SessionInterviewPanel({
               disabled={applying || mapping || isInterviewBusy || !drafts.some((draft) => selected[draft.questionId])}
               data-testid={E2E_TESTIDS.SESSION_INTERVIEW_APPLY}
             >
-              Apply selected drafts
+              {applying ? 'Preparing submission…' : 'Submit responses'}
             </Button>
           </div>
         </div>

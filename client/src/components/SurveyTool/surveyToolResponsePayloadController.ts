@@ -1,4 +1,5 @@
 import type { ResponseSlice, UnknownRecord } from './surveyToolTypes';
+import { buildUnselectedInterviewResearch } from './sessionInterviewResearch';
 
 const asRecord = (value: unknown): UnknownRecord =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : {};
@@ -70,9 +71,10 @@ export const captureInterviewPredictionComparisonSubmissions = (
   questionIds: Iterable<string>,
 ): ResponseSlice => {
   const provenance = asRecord(slice.interviewProvenance);
+  const submittedIds = new Set(questionIds);
   let nextProvenance: UnknownRecord | null = null;
 
-  for (const rawQuestionId of questionIds) {
+  for (const rawQuestionId of submittedIds) {
     const questionId = String(rawQuestionId || '');
     const record = asRecord(provenance[questionId]);
     if (record.includePredictionComparison !== true) continue;
@@ -84,6 +86,31 @@ export const captureInterviewPredictionComparisonSubmissions = (
         answer: asRecord(slice.answers?.[questionId]).value ?? '',
         additionalComments: asRecord(slice.additionalComments?.[questionId]).value ?? '',
       },
+      ...(Array.isArray(record.unselectedDrafts)
+        ? {
+            unselectedDrafts: record.unselectedDrafts.map((raw) => {
+              const draft = asRecord(raw);
+              const id = String(draft.questionId || '');
+              const answer = asRecord(slice.answers?.[id]);
+              const additional = asRecord(slice.additionalComments?.[id]);
+              return {
+                ...draft,
+                answerEncrypted: Boolean(answer.encrypted),
+                commentsEncrypted: Boolean(
+                  additional.encrypted || (additional.audienceMode !== 'explicit' && answer.encrypted),
+                ),
+                submissionValueSnapshot: submittedIds.has(id)
+                  ? {
+                      answer: answer.value ?? '',
+                      additionalComments: additional.value ?? '',
+                      importance: slice.importance?.[id] ?? null,
+                      conviction: slice.conviction?.[id] ?? null,
+                    }
+                  : null,
+              };
+            }),
+          }
+        : {}),
     };
   }
 
@@ -302,6 +329,14 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
               : {}),
             ...(safeOriginalPrediction ? { originalPrediction: safeOriginalPrediction } : {}),
             ...(predictionComparison ? { predictionComparison } : {}),
+            ...(includePredictionComparison && Array.isArray(interviewProvenanceRecord.unselectedDrafts)
+              ? {
+                  unselectedPredictions: buildUnselectedInterviewResearch(
+                    interviewProvenanceRecord.unselectedDrafts,
+                    surveyResponseState,
+                  ),
+                }
+              : {}),
             appliedAt: Number(rawInterviewProvenance.appliedAt || 0) || null,
           }
         : null;

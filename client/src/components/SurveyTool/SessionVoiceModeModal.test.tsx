@@ -36,6 +36,7 @@ const baseProps = {
   mode: null,
   onSelectMode: jest.fn(),
   onClose: jest.fn(),
+  onSubmitResponses: jest.fn(),
   sessionSlug: 'demo',
   workerUrl: 'https://worker.example',
   questionPool: [{ id: 'q1', prompt: 'What matters?', type: 'freeform' }],
@@ -61,6 +62,64 @@ describe('SessionVoiceModeModal', () => {
     });
     mockedHashInterviewQuestions.mockResolvedValue('a'.repeat(64));
     mockedMapInterviewEvidenceToResponses.mockResolvedValue([]);
+  });
+
+  it('submits reviewed values and retains edited unselected predictions only as consented metadata', async () => {
+    const prefillPacket = {
+      version: 1 as const,
+      sessionSlug: 'demo',
+      questionSetHash: 'a'.repeat(64),
+      promptVersion: 'ce-interview-brief-v4',
+      source: { platform: 'claude' as const, modelId: 'example', verification: 'self_reported' as const },
+      responderContext: {},
+      responses: [
+        { questionId: 'q1', answer: 'Original one', additionalComments: 'Relevant explanation', confidence: 0.8 },
+        { questionId: 'q2', answer: 'Original two', confidence: 0.8 },
+      ],
+    };
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        prefillPacket={prefillPacket}
+        questionPool={[...baseProps.questionPool, { id: 'q2', prompt: 'Second question?', type: 'freeform' }]}
+        renderFieldLock={(id, field) => <button type="button" aria-label={`Privacy ${id} ${field}`} />}
+      />,
+    );
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    expect(screen.getByLabelText(/Include self-reported AI platform/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Privacy q1 answer' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Privacy q1 additional' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'About accuracy research' })).toHaveAccessibleDescription(
+      /drafts you did not select/,
+    );
+    fireEvent.change(screen.getByDisplayValue('Original one'), { target: { value: 'Edited one' } });
+    fireEvent.change(screen.getByDisplayValue('Relevant explanation'), { target: { value: 'Edited explanation' } });
+    fireEvent.change(screen.getByDisplayValue('Original two'), { target: { value: 'Edited two' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Remove draft for Second question?' }));
+    expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Submit responses' }));
+    await waitFor(() => expect(baseProps.onSubmitResponses).toHaveBeenCalledTimes(1));
+    expect(baseProps.onApplyAnswer).toHaveBeenCalledTimes(1);
+    expect(baseProps.onApplyAnswer).toHaveBeenCalledWith('q1', 'Edited one');
+    expect(baseProps.onApplyAdditional).toHaveBeenCalledWith('q1', 'Edited explanation');
+    expect(baseProps.onRecordProvenance.mock.calls[0][6]).toEqual([
+      expect.objectContaining({
+        questionId: 'q1',
+        answer: 'Edited one',
+        selected: true,
+        original: prefillPacket.responses[0],
+      }),
+      expect.objectContaining({
+        questionId: 'q2',
+        answer: 'Edited two',
+        selected: false,
+        original: prefillPacket.responses[1],
+      }),
+    ]);
+    expect(baseProps.onRecordProvenance.mock.invocationCallOrder[0]).toBeLessThan(
+      baseProps.onSubmitResponses.mock.invocationCallOrder[0],
+    );
   });
 
   it('offers the two large requested voice-mode choices', () => {
@@ -158,6 +217,7 @@ describe('SessionVoiceModeModal', () => {
   });
 
   it('shows a collapsed responder transcript disclosure after the voice interview ends', async () => {
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([{ questionId: 'q1', answer: 'A relevant answer' }]);
     let interviewOptions: Parameters<typeof startSessionRealtimeInterview>[0] | null = null;
     let resolveStop: (() => void) | null = null;
     const stop = jest.fn(
@@ -231,6 +291,10 @@ describe('SessionVoiceModeModal', () => {
       await Promise.resolve();
     });
     const toggle = await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT_TOGGLE);
+    expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Include self-reported AI platform/)).not.toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON)).toBeInTheDocument();
+    expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
     expect(screen.queryByLabelText('Pause interview')).not.toBeInTheDocument();
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(toggle).toHaveTextContent('4 words');
@@ -265,7 +329,10 @@ describe('SessionVoiceModeModal', () => {
         {...baseProps}
         mode="interview"
         prefillPacket={prefillPacket}
-        existingResponseSlice={{ answers: { q1: { value: 'Existing local draft' } } }}
+        existingResponseSlice={{
+          answers: { q1: { value: 'Existing local draft' } },
+          additionalComments: { q1: { value: 'Existing explanation' } },
+        }}
       />,
     );
 
@@ -281,6 +348,7 @@ describe('SessionVoiceModeModal', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
 
     await waitFor(() => expect(baseProps.onApplyAnswer).toHaveBeenCalledWith('q1', 'Reviewed answer'));
+    expect(baseProps.onApplyAdditional).toHaveBeenCalledWith('q1', 'Existing explanation');
     await waitFor(() =>
       expect(baseProps.onRecordProvenance).toHaveBeenCalledWith(
         expect.arrayContaining([expect.objectContaining({ questionId: 'q1', answer: 'Original prediction' })]),
@@ -289,6 +357,7 @@ describe('SessionVoiceModeModal', () => {
         true,
         true,
         '',
+        expect.any(Array),
       ),
     );
     await waitFor(() => expect(baseProps.onClose).toHaveBeenCalled());
@@ -361,6 +430,7 @@ describe('SessionVoiceModeModal', () => {
         true,
         true,
         '',
+        expect.any(Array),
       ),
     );
   });
@@ -482,6 +552,7 @@ describe('SessionVoiceModeModal', () => {
         false,
         false,
         '',
+        expect.any(Array),
       ),
     );
     await waitFor(() => expect(baseProps.onClose).toHaveBeenCalled());
@@ -511,6 +582,7 @@ describe('SessionVoiceModeModal', () => {
         true,
         true,
         '',
+        expect.any(Array),
       ),
     );
     first.unmount();
@@ -527,6 +599,7 @@ describe('SessionVoiceModeModal', () => {
         true,
         true,
         'Ada Example',
+        expect.any(Array),
       ),
     );
   });

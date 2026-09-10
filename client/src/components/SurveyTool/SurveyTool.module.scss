@@ -358,7 +358,18 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     }
 
     input[type='radio'] {
-      display: none;
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+    }
+
+    &:has(input:focus-visible) {
+      outline: 2px solid var(--ce-focus-ring);
+      outline-offset: 3px;
     }
 
     &:hover {
@@ -367,7 +378,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
     &.agree {
       background-color: var(--ce-binary-choice-agree-bg);
-      color: var(--ce-color-white);
+      color: var(--ce-color-black);
       &:before {
         font-weight: 900;
         margin-right: 0.5rem;
@@ -380,7 +391,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
     &.disagree {
       background-color: var(--ce-binary-choice-disagree-bg);
-      color: var(--ce-color-white);
+      color: var(--ce-color-black);
       &:before {
         font-weight: 900;
         margin-right: 0.5rem;
@@ -3407,6 +3418,44 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   white-space: normal;
 }
 
+.sessionInterviewPanel button {
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.sessionInterviewQuestionEditor {
+  min-width: 0;
+  font-family: var(--ce-font-body);
+
+  button:not(:disabled),
+  .importanceSlider {
+    opacity: 1 !important;
+  }
+
+  #binaryChoice {
+    justify-content: flex-start;
+    margin: 4px 0;
+  }
+}
+
+.sessionInterviewResearchHelp {
+  align-self: flex-start;
+  padding: 2px 4px;
+  background: transparent;
+  color: var(--ce-panel-text);
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+.sessionInterviewResearchConsent {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+
 .sessionInterviewPanel :global(.btn-primary) {
   background: var(--ce-action-accent);
   color: var(--ce-action-accent-text);
@@ -3727,15 +3776,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   font-weight: 600;
   line-height: 1.5;
   opacity: 1;
-}
-
-.sessionInterviewBinaryAnswer {
-  min-width: 0;
-
-  #binaryChoice {
-    justify-content: flex-start;
-    margin: 4px 0;
-  }
 }
 
 .sessionInterviewConfidence {

@@ -31,6 +31,60 @@ const defaultOpts = (overrides: Partial<BuildResponsePayloadOptions> = {}): Buil
 });
 
 describe('surveyToolResponsePayloadController', () => {
+  it('includes unselected research without adding an answer and honors withdrawal of research consent', () => {
+    const slice = {
+      answers: { q1: { value: 'Final selected answer' }, q2: { value: '', encrypted: true } },
+      additionalComments: {},
+      importance: {},
+      conviction: {},
+      interviewProvenance: {
+        q1: {
+          includeAiProvenance: false,
+          includePredictionComparison: true,
+          originalPrediction: { answer: 'Selected original' },
+          unselectedDrafts: [
+            {
+              questionId: 'q2',
+              answer: 'Rejected edit',
+              original: { answer: 'Rejected original', evidence: 'Private basis' },
+            },
+          ],
+        },
+      },
+    };
+    const captured = captureInterviewPredictionComparisonSubmissions(slice, ['q1']);
+    const opts = defaultOpts({
+      isStandalone: true,
+      surveyResponseState: captured,
+      questionPool: [{ id: 'q1' }, { id: 'q2' }],
+    });
+    const result = buildResponsePayload(opts);
+    expect(result.responses).toHaveLength(1);
+    expect(result.responses![0].questionID).toBe('q1');
+    expect(result.responses![0].interviewProvenance).toMatchObject({
+      predictionComparison: {
+        original: { answer: 'Selected original' },
+        submitted: { answer: 'Final selected answer' },
+        changedFields: ['answer'],
+      },
+      unselectedPredictions: [
+        {
+          questionId: 'q2',
+          selection: 'not_selected',
+          submitted: null,
+          original: { answer: { redacted: true }, evidence: '' },
+        },
+      ],
+    });
+    expect(JSON.stringify(result)).not.toMatch(/Rejected edit|Rejected original|Private basis/);
+    const declined = {
+      ...slice,
+      interviewProvenance: { q1: { ...slice.interviewProvenance.q1, includePredictionComparison: false } },
+    };
+    expect(buildResponsePayload({ ...opts, surveyResponseState: declined }).responses![0]).not.toHaveProperty(
+      'interviewProvenance',
+    );
+  });
   it('returns empty object when surveyResponseState is null', () => {
     expect(
       buildResponsePayload(

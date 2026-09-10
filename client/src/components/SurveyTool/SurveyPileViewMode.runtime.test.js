@@ -496,6 +496,29 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(engine.persistDraft).toHaveBeenCalled();
   });
 
+  it('persists unselected research once on a changed selected answer and removes it on opt-out', async () => {
+    const engine = {
+      props: { sessionConfig: {} },
+      state: { surveysResponseState: [{ answers: { q1: { value: 'Agree' }, q2: { value: 'Edited answer' } } }] },
+      getChangedQidsAndFields: () => ({ changedQids: new Set(['q2']) }),
+      persistDraft: jest.fn(),
+      setState(updater, callback) {
+        this.state = { ...this.state, ...updater(this.state) };
+        callback?.();
+      },
+    };
+    const selected = [{ questionId: 'q1', answer: 'Agree' }, { questionId: 'q2', answer: 'Original answer' }];
+    const rejected = { questionId: 'q3', answer: 'Rejected edit', selected: false, original: { questionId: 'q3', answer: 'Original rejected prediction' } };
+    await recordInterviewProvenance(engine, selected, null, null, false, true, '', [rejected]);
+    const slice = engine.state.surveysResponseState[0];
+    expect(slice.interviewProvenance.q1).not.toHaveProperty('unselectedDrafts');
+    expect(slice.interviewProvenance.q2.unselectedDrafts).toEqual([rejected]);
+    expect(slice.answers).not.toHaveProperty('q3');
+    expect(slice.interviewProvenance.q2.originalPrediction.answer).toBe('Original answer');
+    await recordInterviewProvenance(engine, selected, null, null, false, false, '', [rejected]);
+    expect(engine.state.surveysResponseState[0].interviewProvenance).toEqual({});
+  });
+
   it('shows and clears the pile submit empty-state feedback without submitting', async () => {
     jest.useFakeTimers();
     const encryptAndUpload = jest.fn();

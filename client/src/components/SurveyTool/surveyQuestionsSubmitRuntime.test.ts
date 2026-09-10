@@ -288,6 +288,11 @@ describe('surveyQuestionsSubmitRuntime', () => {
 
   it('passes a pre-encryption prediction comparison snapshot into submission', async () => {
     const context = createContext();
+    context.getPendingEditStats.mockReturnValue({ encrypted: 1, total: 1 });
+    context.buildFieldEncryptionWorkGroupsCore.mockReturnValue({
+      groups: [{ qids: ['q1'], recipients: [], slice: { answers: { q1: { value: 'Final answer' } } } }],
+      missingRecipients: [],
+    });
     context.stateRef.current.surveysResponseState[2] = {
       additionalComments: { q1: { value: 'Final note', encrypted: true } },
       answers: { q1: { value: 'Final answer', encrypted: true } },
@@ -304,8 +309,10 @@ describe('surveyQuestionsSubmitRuntime', () => {
     const runtime = createSurveyQuestionsSubmitRuntime(context);
     await runtime.encryptAndUpload();
 
+    expect(context.cryptoUtils.encryptMultipleAnswers).toHaveBeenCalled();
     expect(context.submitSurveyResponse).toHaveBeenCalledWith(
       expect.objectContaining({
+        answers: { q1: { encrypted: true, value: 'encrypted-answer' } },
         interviewProvenance: {
           q1: expect.objectContaining({
             submissionValueSnapshot: {

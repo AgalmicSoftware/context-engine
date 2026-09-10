@@ -95,16 +95,25 @@ is not enough information, explains that no directly relevant detail was
 found, and suggests another interview or relevant Claude/ChatGPT memories. It
 does not present an unchanged generate button as though more input had arrived.
 
-Drafts open in a review panel. The responder can edit them, select which ones
-to apply, and must explicitly opt into replacing any existing local answer.
-Applying drafts only updates the existing response editor; normal session
-submission and login rules still apply. When the default-on provenance option
-is retained, submitted response metadata keeps the prompt/question-set revision
+Drafts open in a review panel with the session's answer inputs, additional
+comments, conviction/importance control, and answer/comment lock menus. Relevant
+interview explanations appear as editable additional comments. The responder
+selects which drafts to submit and must explicitly opt into replacing an existing
+local answer. **Submit responses** saves reviewed values and enters the normal
+submission flow, opening sign-in when necessary. Drafts survive that sign-in;
+the responder can finish submission through the session's normal Submit control.
+Stopping alone never submits answers. The default-on platform provenance option
+appears only when an AI augmentation packet was imported. When it is retained,
+submitted response metadata keeps the prompt/question-set revision
 and self-reported source platform/model. A separate accuracy-research checkbox
 is also on by default. It records the original AI prediction, the final submitted
 answer, the fields that changed, and the prediction confidence so model fidelity
 can be evaluated without treating low-confidence drafts as unusable. Responders
-can disable either consent independently before applying the drafts. For an
+can disable either consent independently before submitting. Its question-mark
+tooltip explains that edited and unselected drafts are included. Unselected
+predictions are stored once as research metadata alongside a selected submitted
+response, with their original and edited values and selection status; they do
+not become answers. An unsubmitted draft has a null final submitted value. For an
 encrypted answer or additional comment, the comparison records only an encrypted
 field marker and whether the field changed; it never places the protected text in
 plaintext metadata, and it omits the prediction basis from that metadata.

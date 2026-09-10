@@ -415,7 +415,7 @@ Rules:
 - Use only the supplied transcript and responder context. Never invent evidence.
 - Include a reviewable draft when there is a direct statement or a defensible indirect signal. Low-confidence inference is allowed only when the evidence field explains its basis. Omit only questions with no relevant signal at all.
 - Match the question type and listed options exactly when options exist.
-- additionalComments, importance (0-100), and conviction (0-100) are optional. Include them only when explicitly supported by the evidence.
+- Use additionalComments for relevant explanations, qualifications, or examples from the interview that do not fit the main answer, especially for binary, rating, and choice questions. Preserve the responder's meaning without inventing details or repeating the main answer. importance (0-100) and conviction (0-100) are optional and require explicit evidence.
 - Keep the responder's meaning and uncertainty. Do not improve their opinion into a stronger claim.
 - confidence is required for every response and ranges from 0 to 1: 0.00-0.39 weak inference, 0.40-0.69 moderate support, and 0.70-1.00 direct or repeated support.
 - Return JSON only, with shape {"responses":[{"questionId":"...","answer":...,"additionalComments":"...","importance":50,"conviction":50,"evidence":"short basis","confidence":0.0}]}.

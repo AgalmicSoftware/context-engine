@@ -360,6 +360,8 @@ export const createSurveyQuestionsSubmitRuntime = (
           const newArr: SurveyQuestionsLegacyValue = [...stateRef.current.surveysResponseState];
           const base: SurveyQuestionsLegacyValue = {
             ...(newArr[surveyIndex] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }),
+            // Keep research snapshots captured before encryption replaces plaintext fields.
+            interviewProvenance: activeSlice.interviewProvenance,
           };
 
           Object.keys(encState.answers || {}).forEach((qid: SurveyQuestionsLegacyValue) => {
