@@ -317,7 +317,7 @@ describe('sessionWizardWriteNormalization', () => {
         interviewMode: {
           enabled: true,
           provider: 'openai',
-          realtimeModel: 'gpt-realtime-custom',
+          realtimeModel: 'gpt-realtime-2',
         },
       },
       { fieldOrder: ['slug', 'interviewModeEnabled', 'interviewMode'] },
@@ -329,7 +329,7 @@ describe('sessionWizardWriteNormalization', () => {
       interviewMode: {
         enabled: true,
         provider: 'openai',
-        realtimeModel: 'gpt-realtime-custom',
+        realtimeModel: 'gpt-realtime-2',
       },
     });
   });
@@ -767,7 +767,7 @@ describe('sessionWizardWriteNormalization', () => {
     expect(payload.interviewMode).toEqual({
       enabled: true,
       provider: 'openai',
-      realtimeModel: 'gpt-realtime-2.1',
+      realtimeModel: 'gpt-live-1',
     });
   });
 
@@ -777,7 +777,7 @@ describe('sessionWizardWriteNormalization', () => {
       draft: {
         sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
         interviewModeEnabled: false,
-        interviewMode: { realtimeModel: 'gpt-realtime-custom' },
+        interviewMode: { realtimeModel: 'gpt-realtime-2' },
       },
       account: '0x00000000000000000000000000000000000000aa',
       sessionId: '123e4567-e89b-12d3-a456-426614174000',
@@ -788,7 +788,7 @@ describe('sessionWizardWriteNormalization', () => {
     expect(payload.interviewMode).toEqual({
       enabled: false,
       provider: 'openai',
-      realtimeModel: 'gpt-realtime-custom',
+      realtimeModel: 'gpt-realtime-2',
     });
   });
 

@@ -2,6 +2,8 @@ export type RealtimeInterviewTurn = {
   itemId: string;
   text: string;
   role: 'responder';
+  startMs?: number;
+  fragment?: boolean;
 };
 
 export type RealtimeInterviewSession = {
@@ -19,7 +21,9 @@ type StartRealtimeInterviewOptions = {
   sessionSlug: string;
   instructions: string;
   audioElement: HTMLAudioElement;
+  signal?: AbortSignal;
   onStatus?: (status: string) => void;
+  onError?: (error: Error) => void;
   onRecordingState?: (state: RealtimeInterviewRecordingState) => void;
   onTranscript?: (transcript: string, turns: RealtimeInterviewTurn[]) => void;
   fetchImpl?: typeof fetch;
@@ -27,52 +31,87 @@ type StartRealtimeInterviewOptions = {
   createPeerConnection?: () => RTCPeerConnection;
 };
 
-type UnknownRecord = Record<string, unknown>;
-
-const asRecord = (value: unknown): UnknownRecord =>
-  value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : {};
-
 const trim = (value: unknown) => String(value == null ? '' : value).trim();
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
 
 export const REALTIME_INTERVIEW_OPENING_INSTRUCTION =
-  'Begin with a short welcome, then ask what important insight the responder wants to share—either about themselves and their perspective or about the broader topic. Mention that they can steer the conversation toward what matters most to them at any point.';
+  'Greet immediately without waiting for the responder. Begin with a short welcome, then ask what important insight the responder wants to share—either about themselves and their perspective or about the broader topic. Mention that they can steer the conversation toward what matters most to them at any point. Then pause and listen.';
 
 export const readRealtimeResponderTurn = (event: unknown): RealtimeInterviewTurn | null => {
   const record = asRecord(event);
-  const type = trim(record.type);
-  if (type !== 'conversation.item.input_audio_transcription.completed') return null;
-  const text = trim(record.transcript);
-  if (!text) return null;
-  return {
-    itemId: trim(record.item_id || record.itemId) || `turn-${Date.now()}`,
-    text,
-    role: 'responder',
-  };
+  if (record.type === 'session.input_transcript.delta') {
+    if (typeof record.delta !== 'string' || !record.delta) return null;
+    return {
+      itemId: trim(record.event_id),
+      text: record.delta,
+      role: 'responder',
+      fragment: true,
+      startMs: typeof record.start_ms === 'number' ? record.start_ms : undefined,
+    };
+  }
+  if (record.type !== 'conversation.item.input_audio_transcription.completed' || !trim(record.transcript)) return null;
+  return { itemId: trim(record.item_id || record.itemId), text: trim(record.transcript), role: 'responder' };
 };
 
-export const buildRealtimeInterviewTranscript = (turns: RealtimeInterviewTurn[]): string =>
-  turns.map((turn) => `Responder: ${turn.text}`).join('\n');
+export const buildRealtimeInterviewTranscript = (turns: RealtimeInterviewTurn[]): string => {
+  if (turns.some((turn) => turn.fragment)) {
+    const ordered = [...turns].sort((a, b) => (a.startMs ?? Infinity) - (b.startMs ?? Infinity));
+    const text = ordered
+      .map((turn) => turn.text)
+      .join('')
+      .trim();
+    return text ? `Responder: ${text}` : '';
+  }
+  return turns.map((turn) => `Responder: ${turn.text}`).join('\n');
+};
 
-const waitForDataChannelOpen = (channel: RTCDataChannel): Promise<void> => {
-  if (channel.readyState === 'open') return Promise.resolve();
-  return new Promise((resolve, reject) => {
-    const timeout = window.setTimeout(() => reject(new Error('Realtime interview connection timed out.')), 15_000);
-    channel.addEventListener(
-      'open',
-      () => {
-        window.clearTimeout(timeout);
+const stopTracks = (stream: MediaStream | null) => {
+  stream?.getTracks().forEach((track) => {
+    track.onended = null;
+    track.onmute = null;
+    try {
+      track.enabled = false;
+    } catch {}
+    try {
+      track.stop();
+    } catch {}
+  });
+};
+
+// Abort every await, including non-cancellable browser promises; late media grants are stopped separately.
+const abortable = <T>(promise: Promise<T>, signal: AbortSignal): Promise<T> =>
+  new Promise((resolve, reject) => {
+    const abort = () => reject(signal.reason || new DOMException('Interview cancelled.', 'AbortError'));
+    promise.then(resolve, reject).finally(() => signal.removeEventListener('abort', abort));
+    if (signal.aborted) {
+      abort();
+      return;
+    }
+    signal.addEventListener('abort', abort, { once: true });
+  });
+
+const waitFor = (target: EventTarget, event: string, ready: () => boolean, signal: AbortSignal) => {
+  if (ready()) return Promise.resolve();
+  return new Promise<void>((resolve, reject) => {
+    const cleanup = () => {
+      target.removeEventListener(event, check);
+      signal.removeEventListener('abort', abort);
+    };
+    const check = () => {
+      if (ready()) {
+        cleanup();
         resolve();
-      },
-      { once: true },
-    );
-    channel.addEventListener(
-      'error',
-      () => {
-        window.clearTimeout(timeout);
-        reject(new Error('Realtime interview data channel failed.'));
-      },
-      { once: true },
-    );
+      }
+    };
+    const abort = () => {
+      cleanup();
+      reject(signal.reason);
+    };
+    target.addEventListener(event, check);
+    signal.addEventListener('abort', abort, { once: true });
+    if (signal.aborted) abort();
+    else check();
   });
 };
 
@@ -81,7 +120,9 @@ export const startSessionRealtimeInterview = async ({
   sessionSlug,
   instructions,
   audioElement,
+  signal,
   onStatus = () => {},
+  onError = () => {},
   onRecordingState = () => {},
   onTranscript = () => {},
   fetchImpl = fetch,
@@ -89,142 +130,264 @@ export const startSessionRealtimeInterview = async ({
   createPeerConnection = () => new RTCPeerConnection(),
 }: StartRealtimeInterviewOptions): Promise<RealtimeInterviewSession> => {
   const baseUrl = trim(workerUrl).replace(/\/+$/, '').replace(/\/ai$/i, '');
-  if (!baseUrl) throw new Error('Session Worker URL is unavailable.');
-  onStatus('Requesting microphone access…');
-  const stream = await mediaDevices.getUserMedia({ audio: true });
-  const peer = createPeerConnection();
-  const turns: RealtimeInterviewTurn[] = [];
+  if (!baseUrl) throw new Error('Session Worker URL is unavailable. Ask the session owner to configure it.');
+  if (!mediaDevices?.getUserMedia)
+    throw new Error('Microphone access requires HTTPS or localhost and a supported browser.');
+  const controller = new AbortController();
+  let stream: MediaStream | null = null;
+  let peer: RTCPeerConnection | null = null;
+  let channel: RTCDataChannel | null = null;
   let stopped = false;
-
-  const stopStreamTracks = (value: unknown) => {
-    if (!value || typeof value !== 'object' || !('getTracks' in value)) return;
-    const getTracks = (value as { getTracks?: () => MediaStreamTrack[] }).getTracks;
-    if (typeof getTracks !== 'function') return;
-    let tracks: MediaStreamTrack[] = [];
-    try {
-      tracks = getTracks.call(value);
-    } catch {
-      return;
-    }
-    tracks.forEach((track) => {
-      try {
-        track.enabled = false;
-      } catch {}
-      try {
-        track.stop();
-      } catch {}
-    });
-  };
-
-  peer.ontrack = (event) => {
-    audioElement.autoplay = true;
-    audioElement.srcObject = event.streams[0] || new MediaStream([event.track]);
-    void audioElement.play().catch(() => {});
-  };
-  stream.getTracks().forEach((track) => peer.addTrack(track, stream));
-  const channel = peer.createDataChannel('oai-events');
-  const handleMessage = (message: MessageEvent) => {
+  let ready = false;
+  let live = true;
+  let started = false;
+  let paused = false;
+  const turns: RealtimeInterviewTurn[] = [];
+  const sessionEvents = new EventTarget();
+  const remoteStreams = new Set<MediaStream>();
+  const timeout = setTimeout(
+    () => controller.abort(new Error('Interview connection timed out. Check your connection and try again.')),
+    30_000,
+  );
+  const externalAbort = () => controller.abort(new DOMException('Interview cancelled.', 'AbortError'));
+  const cleanup = () => {
     if (stopped) return;
+    stopped = true;
+    clearTimeout(timeout);
+    signal?.removeEventListener('abort', externalAbort);
+    stopTracks(stream);
+    if (peer) {
+      peer.ontrack = null;
+      peer.onconnectionstatechange = null;
+    }
+    if (channel) {
+      channel.removeEventListener('message', handleMessage);
+      channel.removeEventListener('close', connectionFailed);
+      channel.removeEventListener('error', connectionFailed);
+      try {
+        channel.close();
+      } catch {}
+    }
     try {
-      const event = JSON.parse(String(message.data || ''));
-      const turn = readRealtimeResponderTurn(event);
-      if (!turn || turns.some((entry) => entry.itemId === turn.itemId)) return;
-      turns.push(turn);
-      onTranscript(buildRealtimeInterviewTranscript(turns), [...turns]);
-    } catch {}
-  };
-  channel.addEventListener('message', handleMessage);
-  const closeRealtimeMedia = () => {
-    channel.removeEventListener('message', handleMessage);
-    peer.ontrack = null;
-    stopStreamTracks(stream);
-    try {
-      channel.close();
-    } catch {}
-    try {
-      peer.close();
+      peer?.close();
     } catch {}
     try {
       audioElement.pause();
     } catch {}
-    stopStreamTracks(audioElement.srcObject);
+    remoteStreams.forEach(stopTracks);
     audioElement.srcObject = null;
+    onRecordingState('stopped');
   };
+  const fail = (error: Error) => {
+    if (stopped) return;
+    controller.abort(error);
+    if (ready) onError(error);
+  };
+  const connectionFailed = () =>
+    fail(
+      new Error('Interview connection lost. Generate drafts from the captured transcript or start a new interview.'),
+    );
+  const handleMessage = (message: MessageEvent) => {
+    if (stopped) return;
+    let event: Record<string, unknown>;
+    try {
+      event = asRecord(JSON.parse(String(message.data || '')));
+    } catch {
+      return;
+    }
+    if (event.type === 'session.started' || (!live && event.type === 'session.created')) {
+      started = true;
+      sessionEvents.dispatchEvent(new Event('started'));
+    } else if (event.type === 'error' || event.type === 'conversation.item.input_audio_transcription.failed') {
+      fail(
+        new Error(
+          'The voice service could not continue the interview. Try again; contact the session owner if it persists.',
+        ),
+      );
+    } else if (event.type === 'session.closed') {
+      connectionFailed();
+    } else if (event.type === 'session.delegation.created' && live) {
+      const id = asRecord(event.delegation).id;
+      if (typeof id === 'string' && channel?.readyState === 'open')
+        channel.send(
+          JSON.stringify({
+            type: 'session.commentary.append',
+            delegation_id: id,
+            content:
+              'This interview only collects responses. No external task was performed. Drafts will be prepared after the responder stops the interview. Continue asking the interview questions.',
+          }),
+        );
+    }
+    const turn = readRealtimeResponderTurn(event);
+    if (!turn || (turn.itemId && turns.some((entry) => entry.itemId === turn.itemId))) return;
+    turns.push({ ...turn, itemId: turn.itemId || `fragment-${turns.length}` });
+    onTranscript(buildRealtimeInterviewTranscript(turns), [...turns]);
+  };
+  controller.signal.addEventListener('abort', cleanup, { once: true });
+  signal?.addEventListener('abort', externalAbort, { once: true });
+  if (signal?.aborted) externalAbort();
+  const run = <T>(promise: Promise<T>) => abortable(promise, controller.signal);
 
   try {
-    const offer = await peer.createOffer();
-    await peer.setLocalDescription(offer);
-    const sdp = peer.localDescription?.sdp || offer.sdp || '';
-    onStatus('Connecting to the interviewer…');
-    const response = await fetchImpl(`${baseUrl}/realtime/call?slug=${encodeURIComponent(sessionSlug)}`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-session-slug': sessionSlug,
-      },
-      body: JSON.stringify({ sdp, instructions }),
+    controller.signal.throwIfAborted();
+    onStatus('Connecting — allow microphone access');
+    const mediaPromise = mediaDevices.getUserMedia({ audio: true }).then((value) => {
+      if (stopped) stopTracks(value);
+      else {
+        stream = value;
+        value.getAudioTracks().forEach((track) => {
+          track.enabled = false;
+        });
+      }
+      return value;
     });
-    const answerSdp = await response.text();
+    await run(mediaPromise);
+    peer = createPeerConnection();
+    const activePeer = peer;
+    peer.ontrack = (event) => {
+      const remote = event.streams[0] || new MediaStream([event.track]);
+      if (stopped) {
+        stopTracks(remote);
+        return;
+      }
+      remoteStreams.add(remote);
+      audioElement.autoplay = true;
+      audioElement.srcObject = remote;
+      void audioElement
+        .play()
+        .catch(() =>
+          fail(new Error('Audio playback was blocked. Allow sound for this site and start the interview again.')),
+        );
+    };
+    peer.onconnectionstatechange = () => {
+      if (['failed', 'disconnected', 'closed'].includes(activePeer.connectionState)) connectionFailed();
+    };
+    const microphone = stream as unknown as MediaStream;
+    if (!microphone.getAudioTracks().some((track) => track.readyState === 'live'))
+      throw new Error('No active microphone was found. Connect a microphone and try again.');
+    microphone.getAudioTracks().forEach((track) => {
+      track.onended = () => fail(new Error('Microphone disconnected. Reconnect it and start a new interview.'));
+      track.onmute = () =>
+        fail(new Error('Microphone input was interrupted. Check the microphone and start a new interview.'));
+      activePeer.addTrack(track, microphone);
+    });
+    channel = peer.createDataChannel('oai-events');
+    const activeChannel = channel;
+    channel.addEventListener('message', handleMessage);
+    channel.addEventListener('close', connectionFailed);
+    channel.addEventListener('error', connectionFailed);
+    const offer = await run(peer.createOffer());
+    await run(peer.setLocalDescription(offer));
+    await waitFor(
+      peer,
+      'icegatheringstatechange',
+      () => activePeer.iceGatheringState === 'complete',
+      controller.signal,
+    );
+    onStatus('Connecting to the interviewer…');
+    const response = await run(
+      fetchImpl(`${baseUrl}/realtime/call?slug=${encodeURIComponent(sessionSlug)}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-session-slug': sessionSlug },
+        body: JSON.stringify({ sdp: peer.localDescription?.sdp || offer.sdp || '', instructions }),
+        signal: controller.signal,
+      }),
+    );
+    const answerSdp = await run(response.text());
     if (!response.ok) {
-      let message = 'Could not start the realtime interview.';
+      let message = 'Could not connect to the session Worker. Try again or contact the session owner.';
       try {
-        message = JSON.parse(answerSdp)?.error || message;
+        const body = JSON.parse(answerSdp);
+        if (typeof body.error === 'string') message = body.error;
       } catch {}
       throw new Error(message);
     }
-    await peer.setRemoteDescription({ type: 'answer', sdp: answerSdp });
-    await waitForDataChannelOpen(channel);
+    const protocol = response.headers.get('x-interview-protocol');
+    if (protocol !== 'live' && protocol !== 'realtime')
+      throw new Error(
+        'The session Worker needs an Interview update. Ask the session owner to redeploy the current Worker.',
+      );
+    live = protocol === 'live';
+    await run(peer.setRemoteDescription({ type: 'answer', sdp: answerSdp }));
+    await waitFor(channel, 'open', () => activeChannel.readyState === 'open', controller.signal);
+    await waitFor(peer, 'connectionstatechange', () => activePeer.connectionState === 'connected', controller.signal);
+    await waitFor(sessionEvents, 'started', () => started, controller.signal);
+    controller.signal.throwIfAborted();
+    if (!microphone.getAudioTracks().some((track) => track.readyState === 'live' && !track.muted))
+      throw new Error('Microphone is unavailable. Check its permissions and try again.');
+    microphone.getAudioTracks().forEach((track) => {
+      track.enabled = true;
+    });
+    audioElement.muted = false;
     channel.send(
-      JSON.stringify({
-        type: 'response.create',
-        response: {
-          output_modalities: ['audio'],
-          instructions: REALTIME_INTERVIEW_OPENING_INSTRUCTION,
-        },
-      }),
+      JSON.stringify(
+        live
+          ? {
+              type: 'session.instructions.append',
+              delegation_id: null,
+              content: REALTIME_INTERVIEW_OPENING_INSTRUCTION,
+            }
+          : {
+              type: 'response.create',
+              response: { output_modalities: ['audio'], instructions: REALTIME_INTERVIEW_OPENING_INSTRUCTION },
+            },
+      ),
     );
-    onStatus('Interview in progress');
+    clearTimeout(timeout);
+    ready = true;
+    onStatus('Listening');
     onRecordingState('recording');
   } catch (error) {
-    stopped = true;
-    closeRealtimeMedia();
-    onRecordingState('stopped');
+    controller.abort(error);
+    if (error instanceof DOMException && error.name === 'NotAllowedError')
+      throw new Error(
+        'Microphone permission was denied. Allow microphone access in your browser settings, then try again.',
+      );
+    if (error instanceof DOMException && ['NotFoundError', 'NotReadableError'].includes(error.name))
+      throw new Error('Microphone is unavailable or in use. Check the device and try again.');
     throw error;
   }
 
-  const pause = () => {
-    if (stopped) return;
-    stream.getAudioTracks().forEach((track) => {
-      track.enabled = false;
-    });
-    onStatus('Interview paused');
-    onRecordingState('paused');
-  };
-
-  const resume = () => {
-    if (stopped) return;
-    stream.getAudioTracks().forEach((track) => {
-      if (track.readyState !== 'ended') track.enabled = true;
-    });
-    onStatus('Interview in progress');
-    onRecordingState('recording');
-  };
-
-  const stop = async () => {
-    if (!stopped) {
-      stopped = true;
-      closeRealtimeMedia();
-      onStatus('Interview ended');
-      onRecordingState('stopped');
-    }
-    return { transcript: buildRealtimeInterviewTranscript(turns), turns: [...turns] };
-  };
-
   return {
-    mediaStream: stream,
-    pause,
-    resume,
-    stop,
+    mediaStream: stream as unknown as MediaStream,
+    pause: () => {
+      if (stopped || paused) return;
+      paused = true;
+      stream?.getAudioTracks().forEach((track) => {
+        track.enabled = false;
+      });
+      audioElement.muted = true;
+      onStatus('Paused');
+      onRecordingState('paused');
+    },
+    resume: () => {
+      if (stopped || !paused) return;
+      if (
+        !stream?.getAudioTracks().some((track) => track.readyState === 'live' && !track.muted) ||
+        peer?.connectionState !== 'connected' ||
+        channel?.readyState !== 'open'
+      ) {
+        connectionFailed();
+        return;
+      }
+      paused = false;
+      stream.getAudioTracks().forEach((track) => {
+        track.enabled = true;
+      });
+      audioElement.muted = false;
+      onStatus('Listening');
+      onRecordingState('recording');
+    },
+    stop: async () => {
+      if (!stopped) {
+        // Stop means immediate privacy cleanup, not waiting for final usage or late transcript events.
+        try {
+          if (live && channel?.readyState === 'open') channel.send(JSON.stringify({ type: 'session.close' }));
+        } catch {}
+        controller.abort();
+      }
+      return { transcript: buildRealtimeInterviewTranscript(turns), turns: [...turns] };
+    },
     getTranscript: () => buildRealtimeInterviewTranscript(turns),
   };
 };

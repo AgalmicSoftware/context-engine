@@ -100,7 +100,7 @@ const FIELD_TOOLTIPS: Record<string, string> = {
     'Allow participants to open Interview or Group Conversation from the session microphone. Interview uses the session Worker AI key and remains review-only until normal submission.',
   interviewMode:
     'Configure the realtime voice connection used by Interview mode. The provider is OpenAI for now and can be extended without changing the session link contract.',
-  'interviewMode.realtimeModel': 'OpenAI Realtime voice model used for this session. The default is gpt-realtime-2.1.',
+  'interviewMode.realtimeModel': 'OpenAI voice model for Interview mode. Defaults to gpt-live-1 (Live API); supported legacy gpt-realtime models use the Realtime API.',
   corsWorkerUrl: 'Base URL for the worker (AI, transcription, Arweave uploads, faucet).',
   sessionHeader: 'The banner image for this session. Use an image URL; Arweave-backed sessions can also upload a file.',
   sessionEndsAt:
@@ -141,7 +141,7 @@ const FIELD_LABELS: Record<string, string> = {
   sessionModeProfile: 'Session Mode',
   interviewModeEnabled: 'Voice interview modes',
   interviewMode: 'Interview voice settings',
-  'interviewMode.realtimeModel': 'Realtime voice model',
+  'interviewMode.realtimeModel': 'Interview voice model',
   corsWorkerUrl: 'Worker URL',
   sessionHeader: 'Header Image',
   sessionEndsAt: 'Session end time',

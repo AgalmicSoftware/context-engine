@@ -1,4 +1,5 @@
 import { stableCanonicalSerialize } from '../shared/deployHelperCore.mjs';
+import { isRealtimeInterviewModel } from '../../shared/realtimeInterviewConfig.mjs';
 import {
   findForbiddenCloudflareDeploymentTokenPath,
   findForbiddenWorkerConfigSecretPath,
@@ -89,7 +90,7 @@ const validInterviewModeConfig = (config) => {
   if (hasOwn(interview, 'provider') && interview.provider !== 'openai') return false;
   if (
     hasOwn(interview, 'realtimeModel') &&
-    (typeof interview.realtimeModel !== 'string' || !/^gpt-realtime(?:-[a-z0-9.]+)*$/i.test(interview.realtimeModel))
+    !isRealtimeInterviewModel(interview.realtimeModel)
   ) return false;
   return true;
 };

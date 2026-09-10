@@ -86,7 +86,7 @@ curated color scheme and see its preview. **Who can create groups?** is a
 dropdown in the same area, constrained to **All participants** or **Admins
 only** rather than accepting freeform config text. **Voice interview modes**
 defaults on. Its adjacent **Interview voice settings** group exposes the
-OpenAI **Realtime voice model**, defaulting to `gpt-realtime-2.1`; `/new`
+OpenAI **Interview voice model**, defaulting to `gpt-live-1`; `/new`
 publishes this as `interviewMode.realtimeModel` for both Worker-canonical and
 Arweave-backed sessions.
 
@@ -381,8 +381,8 @@ AI configuration also lives in the session metadata draft:
 - `ai.models.fast`
 - `ai.models.thinking`
 - `ai.models.transcription`
-- `interviewMode.realtimeModel` (OpenAI Realtime voice; defaults to
-  `gpt-realtime-2.1`)
+- `interviewMode.realtimeModel` (OpenAI interview voice; defaults to
+  `gpt-live-1`)
 
 What gets stored where:
 

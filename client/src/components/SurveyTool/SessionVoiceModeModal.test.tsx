@@ -93,7 +93,14 @@ describe('SessionVoiceModeModal', () => {
 
     await waitFor(() => expect(mockedStartSessionRealtimeInterview).toHaveBeenCalledTimes(1));
     expect(start).toBeDisabled();
-    expect(start).toHaveTextContent('Starting interview…');
+    expect(start).toHaveTextContent('Connecting…');
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveFocus();
+    fireEvent.keyUp(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS), {
+      key: 'Escape',
+      keyCode: 27,
+      which: 27,
+    });
+    expect(baseProps.onClose).toHaveBeenCalledTimes(1);
 
     view.unmount();
     await act(async () => {
@@ -166,14 +173,22 @@ describe('SessionVoiceModeModal', () => {
             });
         }),
     );
-    const pause = jest.fn(() => interviewOptions?.onRecordingState?.('paused'));
-    const resume = jest.fn(() => interviewOptions?.onRecordingState?.('recording'));
+    const pause = jest.fn(() => {
+      interviewOptions?.onRecordingState?.('paused');
+      interviewOptions?.onStatus?.('Paused');
+    });
+    const resume = jest.fn(() => {
+      interviewOptions?.onRecordingState?.('recording');
+      interviewOptions?.onStatus?.('Listening');
+    });
     const mediaStream = {
       getTracks: () => [],
       getAudioTracks: () => [],
     } as unknown as MediaStream;
     mockedStartSessionRealtimeInterview.mockImplementation(async (options) => {
       interviewOptions = options;
+      options.onStatus?.('Listening');
+      options.onRecordingState?.('recording');
       options.onTranscript?.('Responder: Reversible decisions matter.', [
         { itemId: 'turn-1', text: 'Reversible decisions matter.', role: 'responder' },
       ]);
@@ -192,7 +207,7 @@ describe('SessionVoiceModeModal', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
     expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP)).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveAccessibleName(
-      'Interview status: Recording',
+      'Interview status: Listening',
     );
     expect(screen.getByText('0:00')).toBeInTheDocument();
     expect(screen.getByLabelText('Pause interview')).toBeInTheDocument();
@@ -204,13 +219,13 @@ describe('SessionVoiceModeModal', () => {
     fireEvent.click(screen.getByLabelText('Resume interview'));
     expect(resume).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveAccessibleName(
-      'Interview status: Recording',
+      'Interview status: Listening',
     );
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
     expect(stop).toHaveBeenCalledTimes(1);
     expect(screen.getByLabelText('Pause interview')).toBeDisabled();
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveAccessibleName('Interview status: Stopping');
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveAccessibleName('Interview status: Ending');
     await act(async () => {
       resolveStop?.();
       await Promise.resolve();
@@ -395,7 +410,7 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.getByText('0 of 1 selected')).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toBeDisabled();
 
-    const restore = screen.getByRole('button', { name: 'Apply draft' });
+    const restore = screen.getByRole('button', { name: 'Select draft' });
     expect(restore).toHaveAttribute('aria-pressed', 'false');
     fireEvent.click(restore);
     expect(screen.getByText('1 of 1 selected')).toBeInTheDocument();
@@ -424,9 +439,7 @@ describe('SessionVoiceModeModal', () => {
     expect(notice).toHaveTextContent('Start another interview and share more detail');
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).not.toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_GENERATE)).not.toBeInTheDocument();
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveAccessibleName(
-      'Interview status: No questions had enough evidence to prefill',
-    );
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveAccessibleName('Interview status: Ready');
 
     fireEvent.change(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_CONTEXT), {
       target: { value: 'Detailed evidence directly related to the question.' },
@@ -536,9 +549,160 @@ describe('SessionVoiceModeModal', () => {
     );
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/older or different question set/i);
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveAccessibleName(
-      'Interview status: Mapping failed',
-    );
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveAccessibleName('Interview status: Error');
     expect(mapInterviewEvidenceToResponses).not.toHaveBeenCalled();
+  });
+});
+
+describe('Interview cancellation and recovery', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([{ questionId: 'q1', answer: 'New evidence' }]);
+  });
+
+  function sessionMock() {
+    let options!: Parameters<typeof startSessionRealtimeInterview>[0];
+    const stop = jest.fn(async () => ({ transcript: 'Responder: New evidence.', turns: [] }));
+    mockedStartSessionRealtimeInterview.mockImplementation(async (value) => {
+      options = value;
+      value.onStatus?.('Listening');
+      value.onRecordingState?.('recording');
+      return {
+        mediaStream: {} as MediaStream,
+        stop,
+        pause: () => {
+          value.onStatus?.('Paused');
+          value.onRecordingState?.('paused');
+        },
+        resume: () => {
+          value.onStatus?.('Listening');
+          value.onRecordingState?.('recording');
+        },
+        getTranscript: () => 'Responder: New evidence.',
+      };
+    });
+    return { stop, options: () => options };
+  }
+
+  it('aborts startup on isOpen=false and ignores callbacks after reopening', async () => {
+    let options!: Parameters<typeof startSessionRealtimeInterview>[0];
+    let finish!: (session: Awaited<ReturnType<typeof startSessionRealtimeInterview>>) => void;
+    mockedStartSessionRealtimeInterview.mockImplementation((value) => {
+      options = value;
+      return new Promise((resolve) => {
+        finish = resolve;
+      });
+    });
+    const view = render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    await waitFor(() => expect(options).toBeDefined());
+    view.rerender(<SessionVoiceModeModal {...baseProps} mode="interview" isOpen={false} />);
+    expect(options.signal?.aborted).toBe(true);
+    view.rerender(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+    const stop = jest.fn(async () => ({ transcript: 'Old transcript', turns: [] }));
+    await act(async () => {
+      options.onStatus?.('Listening');
+      options.onRecordingState?.('recording');
+      options.onTranscript?.('Old transcript', []);
+      finish({ mediaStream: {} as MediaStream, stop, pause: jest.fn(), resume: jest.fn(), getTranscript: () => '' });
+    });
+    expect(stop).toHaveBeenCalled();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Ready');
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT_TOGGLE)).not.toBeInTheDocument();
+    sessionMock();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    expect(await screen.findByLabelText('Pause interview')).toBeInTheDocument();
+  });
+
+  it.each([false, true])('stops on close and never starts mapping (paused=%s)', async (paused) => {
+    const h = sessionMock();
+    const view = render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    await screen.findByLabelText('Pause interview');
+    if (paused) fireEvent.click(screen.getByLabelText('Pause interview'));
+    view.rerender(<SessionVoiceModeModal {...baseProps} mode="interview" isOpen={false} />);
+    expect(h.options().signal?.aborted).toBe(true);
+    expect(h.stop).toHaveBeenCalledTimes(1);
+    expect(mockedMapInterviewEvidenceToResponses).not.toHaveBeenCalled();
+  });
+
+  it('stops a paused interview, announces preparing/review, focuses drafts, and never submits', async () => {
+    const h = sessionMock();
+    let finish!: (drafts: { questionId: string; answer: string }[]) => void;
+    mockedMapInterviewEvidenceToResponses.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    fireEvent.click(await screen.findByLabelText('Pause interview'));
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
+    await waitFor(() =>
+      expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Preparing drafts'),
+    );
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toBeDisabled();
+    act(() => {
+      h.options().onStatus?.('Listening');
+      h.options().onTranscript?.('Stale evidence', []);
+    });
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Preparing drafts');
+    await act(async () => finish([{ questionId: 'q1', answer: 'New evidence' }]));
+    expect(screen.getByRole('heading', { name: 'Review proposed responses' })).toHaveFocus();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Review drafts');
+    expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();
+    expect(baseProps.onClose).not.toHaveBeenCalled();
+  });
+
+  it('ignores stop completion after closing and exposes a retry after failure', async () => {
+    const h = sessionMock();
+    let finish!: () => void;
+    h.stop.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = () => resolve({ transcript: 'Responder: Old', turns: [] });
+        }),
+    );
+    const view = render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    await screen.findByLabelText('Pause interview');
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
+    view.rerender(<SessionVoiceModeModal {...baseProps} mode="interview" isOpen={false} />);
+    await act(async () => finish());
+    expect(mockedMapInterviewEvidenceToResponses).not.toHaveBeenCalled();
+    mockedStartSessionRealtimeInterview.mockRejectedValue(new Error('Allow microphone access and try again.'));
+    view.rerender(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Allow microphone access');
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toBeEnabled();
+  });
+
+  it('maps new speech instead of reusing imported response predictions', async () => {
+    sessionMock();
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        prefillPacket={{
+          version: 1,
+          sessionSlug: 'demo',
+          source: { platform: 'other', modelId: 'fixture', verification: 'self_reported' },
+          responderContext: {},
+          responses: [{ questionId: 'q1', answer: 'Old prediction', confidence: 0.5 }],
+        }}
+      />,
+    );
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).not.toBeInTheDocument();
+    await screen.findByLabelText('Pause interview');
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
+    await waitFor(() =>
+      expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalledWith(
+        expect.objectContaining({ transcript: 'Responder: New evidence.' }),
+      ),
+    );
+    expect(await screen.findByDisplayValue('New evidence')).toBeInTheDocument();
   });
 });

@@ -1984,18 +1984,29 @@ Signed login/bootstrap requests:
   Agent API family on the Session Worker; the Agent Bridge compatibility route
   remains during the staged transport migration.
 - `POST /realtime/call?slug=<slug>` with JSON `{ "sdp": "v=0...", "instructions": "..." }`
-  - Uses the anonymous AI eligibility policy above, then exchanges the bounded
-    browser SDP offer for an OpenAI Realtime SDP answer without exposing the
-    Worker-held `openaiKey`.
-  - Preserves the browser offer byte-for-byte, including its terminal CRLF,
-    then forwards it as a filename-free `application/sdp` multipart field and
-    sends the session configuration as `application/json`, matching OpenAI's
-    Realtime call contract. Trimming the SDP can make an otherwise valid offer
-    fail with an unexpected EOF.
-  - Defaults to `gpt-realtime-2.1`, `gpt-transcribe`, server VAD, and audio
-    output. A session may set `interviewMode.realtimeModel` to another
-    `gpt-realtime*` ID. `interviewMode.provider` is reserved for future
-    providers; values other than `openai` currently return `400`.
+  - Uses the anonymous AI eligibility policy above and the Worker-held
+    `openaiKey`. The key is never accepted from or returned to the browser.
+  - Defaults to `gpt-live-1`. Posts JSON to OpenAI `/v1/live/sessions` with
+    `{ session: { model, instructions, store: false, delegation: { type: "client" } },
+    transport: { type: "webrtc", sdp } }`. Preserves the SDP offer verbatim,
+    including terminal CRLF, and reads the answer from `transport.sdp`.
+    Live negotiates audio through WebRTC and uses native continuous speech and
+    transcripts; no Realtime `type`, `output_modalities`, transcription model,
+    `turn_detection`, or `max_output_tokens` fields are sent.
+  - Explicit supported legacy aliases (`gpt-realtime-2.1`,
+    `gpt-realtime-2.1-mini`, `gpt-realtime-2`, `gpt-realtime-1.5`) use
+    `/v1/realtime/calls` with filename-free SDP/JSON multipart fields,
+    `type: realtime`, audio output, `gpt-transcribe`, and `server_vad` with
+    `create_response` and `interrupt_response` enabled. Other old model values
+    resolve to Live; new config writes reject unsupported IDs.
+  - Returns `application/sdp` with `cache-control: no-store` and the
+    CORS-exposed `x-interview-protocol: live|realtime` header so the client uses
+    the actual Worker-selected protocol. Non-OpenAI providers return `400`;
+    malformed upstream SDP answers return `502`. Provider errors are sanitized.
+  - Existing deployments must rebuild/redeploy the canonical Session Worker
+    before using the new client. This code change does not mutate deployed
+    Worker configuration or secrets. See [Session Voice Modes](session-listening-mode.md)
+    for startup, transcript, stop, and review behavior and the official sources.
 - `POST /transcribe` (multipart/form-data, file field `file` or `audio`)
   - Anonymous access is allowed only under the rules above (request `apiKey`, or explicit open `default+ai` gates with available on-chain authority).
   - Optional overrides: `provider` (`openai` or `custom`), `apiKey`, `rpcUrl` (custom only).

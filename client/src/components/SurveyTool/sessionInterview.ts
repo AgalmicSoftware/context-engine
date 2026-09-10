@@ -1,5 +1,5 @@
 import { callAI } from '../../utilities/ai/aiClient.js';
-import { DEFAULT_REALTIME_INTERVIEW_MODEL } from '../../utilities/audio/realtimeInterviewConfig';
+import { resolveRealtimeInterviewModel } from '../../utilities/audio/realtimeInterviewConfig';
 
 export { DEFAULT_REALTIME_INTERVIEW_MODEL } from '../../utilities/audio/realtimeInterviewConfig';
 
@@ -185,11 +185,9 @@ export const isInterviewFeatureEnabled = (sessionConfig: unknown): boolean => {
 
 export const resolveRealtimeInterviewSource = (sessionConfig: unknown): InterviewSource => {
   const config = asRecord(sessionConfig);
-  const interview = asRecord(config.interviewMode || config.interview);
-  const configuredModel = toTrimmedString(interview.realtimeModel);
   return {
     platform: 'other',
-    modelId: configuredModel || DEFAULT_REALTIME_INTERVIEW_MODEL,
+    modelId: resolveRealtimeInterviewModel(config),
     verification: 'self_reported',
   };
 };

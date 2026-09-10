@@ -3217,12 +3217,14 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 
   :global(.modal-header) {
+    background: var(--ce-titlebar-bg) !important;
+    color: var(--ce-titlebar-text) !important;
     align-items: center;
     padding: 14px 16px;
   }
 
   :global(.modal-title) {
-    color: var(--ce-panel-text) !important;
+    color: var(--ce-titlebar-text) !important;
     font-size: clamp(1.35rem, 2.4vw, 1.6rem);
     font-weight: 800;
     line-height: 1.2;
@@ -3249,15 +3251,15 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     border: 0;
     border-radius: var(--ce-radius-6);
     background: transparent;
-    color: var(--ce-panel-text);
+    color: var(--ce-titlebar-text);
     filter: none;
     opacity: 0.82;
   }
 
   :global(.modal-header) :global(.btn-close):hover,
   :global(.modal-header) :global(.btn-close):focus-visible {
-    background: var(--ce-card-bg);
-    color: var(--ce-action-accent);
+    color: var(--ce-titlebar-text);
+    background: var(--ce-titlebar-bg);
     opacity: 1;
     outline: 2px solid var(--ce-focus-ring);
     outline-offset: 1px;
@@ -3388,20 +3390,47 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   gap: 10px;
 }
 
-.sessionInterviewStatusDot {
-  width: 12px;
-  height: 12px;
-  flex: 0 0 12px;
-  border: 2px solid color-mix(in srgb, var(--ce-status-success) 72%, var(--ce-panel-text));
-  border-radius: var(--ce-radius-round);
-  background: var(--ce-status-success);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ce-status-success) 18%, transparent);
+.sessionInterviewHint {
+  margin: 0;
+  color: var(--ce-panel-text);
+  line-height: 1.5;
 }
 
-.sessionInterviewStatusDotError {
-  border-color: color-mix(in srgb, var(--ce-status-error) 72%, var(--ce-panel-text));
-  background: var(--ce-status-error);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ce-status-error) 18%, transparent);
+.sessionInterviewPanel .sessionListeningWaveformTimer {
+  background: var(--ce-control-face);
+  color: var(--ce-control-text);
+  border-color: var(--ce-input-border);
+}
+
+.sessionInterviewPanel :global(.btn) {
+  min-height: 44px;
+  white-space: normal;
+}
+
+.sessionInterviewPanel :global(.btn-primary) {
+  background: var(--ce-action-accent);
+  color: var(--ce-action-accent-text);
+  border-color: var(--ce-action-accent);
+}
+
+.sessionInterviewPanel :global(.btn-outline-secondary) {
+  background: var(--ce-card-bg) !important;
+  color: var(--ce-panel-text) !important;
+  border-color: var(--ce-card-border);
+}
+
+.sessionInterviewPanel :global(.btn):focus-visible {
+  outline: 2px solid var(--ce-focus-ring);
+  outline-offset: 2px;
+}
+
+.sessionInterviewPanel :global(.btn):disabled {
+  transition: none;
+  opacity: 1 !important;
+  cursor: not-allowed;
+  background: var(--ce-control-face) !important;
+  color: var(--ce-control-text) !important;
+  border-color: var(--ce-input-border);
 }
 
 .sessionInterviewPanel .sessionListeningError {
@@ -3715,7 +3744,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   gap: 8px;
 
   strong {
-    color: var(--ce-action-accent);
+    color: var(--ce-panel-text);
   }
 
   span {
@@ -3819,7 +3848,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .sessionInterviewDraftApplySelected {
   border-color: color-mix(in srgb, var(--ce-status-success) 68%, var(--ce-card-border));
   background: color-mix(in srgb, var(--ce-status-success) 14%, var(--ce-card-bg));
-  color: var(--ce-status-success);
+  color: var(--ce-panel-text);
 }
 
 .sessionInterviewReviewActions {
@@ -3838,7 +3867,16 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .sessionInterviewProvenance {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   margin: 0;
+
+  input {
+    position: static;
+    flex-shrink: 0;
+    margin: 3px 0 0 !important;
+  }
   color: var(--ce-panel-text);
   font-size: 0.82rem;
   line-height: 1.35;
@@ -3865,6 +3903,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 
   .sessionInterviewReviewActions {
+    position: static;
+    margin: 0;
+    padding: 14px 0;
     align-items: stretch;
     flex-direction: column;
   }

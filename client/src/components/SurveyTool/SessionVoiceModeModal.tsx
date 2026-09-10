@@ -35,13 +35,9 @@ import {
   type InterviewResearchCoverage,
   type SessionVoiceMode,
 } from './sessionInterview';
-import {
-  startSessionRealtimeInterview,
-  type RealtimeInterviewSession,
-} from '../../utilities/audio/realtimeInterviewClient';
+import { useSessionInterviewRecorder } from './useSessionInterviewRecorder';
 
 type UnknownRecord = Record<string, unknown>;
-type InterviewRecorderState = 'idle' | 'starting' | 'recording' | 'paused' | 'stopping';
 
 type InterviewDraftApplicationProps = {
   onClose: () => void;
@@ -162,20 +158,13 @@ function SessionInterviewPanel({
   onRecordProvenance,
   onClose,
 }: SessionInterviewPanelProps) {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const sessionRef = useRef<RealtimeInterviewSession | null>(null);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
-  const recordingStateRef = useRef<InterviewRecorderState>('idle');
-  const startAttemptRef = useRef(0);
   const disposedRef = useRef(false);
   const importedRef = useRef(false);
   const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [resolvedWorkerUrl, setResolvedWorkerUrl] = useState(workerUrl);
   const [responderContext, setResponderContext] = useState(() => displayResponderContext(prefillPacket));
-  const [status, setStatus] = useState('Ready');
+  const [status, setStatus] = useState(initialError ? 'Error' : 'Ready');
   const [transcript, setTranscript] = useState('');
-  const [recordingState, setRecordingState] = useState<InterviewRecorderState>('idle');
-  const [recordingElapsedSeconds, setRecordingElapsedSeconds] = useState(0);
   const [mapping, setMapping] = useState(false);
   const [mappingNotice, setMappingNotice] = useState('');
   const [applying, setApplying] = useState(false);
@@ -190,18 +179,6 @@ function SessionInterviewPanel({
   const [showTranscript, setShowTranscript] = useState(false);
   const [promptCopied, setPromptCopied] = useState(false);
   const [expandedEvidence, setExpandedEvidence] = useState<Record<string, boolean>>({});
-  const isStarting = recordingState === 'starting';
-  const isRecording = recordingState === 'recording';
-  const isPaused = recordingState === 'paused';
-  const isStopping = recordingState === 'stopping';
-  const isRecorderSessionActive = isRecording || isPaused || isStopping;
-  const isInterviewBusy = isStarting || isRecorderSessionActive;
-
-  const updateRecordingState = useCallback((nextState: InterviewRecorderState) => {
-    recordingStateRef.current = nextState;
-    setRecordingState(nextState);
-  }, []);
-
   useEffect(() => {
     if (workerUrl) setResolvedWorkerUrl(workerUrl);
   }, [workerUrl]);
@@ -210,22 +187,9 @@ function SessionInterviewPanel({
     disposedRef.current = false;
     return () => {
       disposedRef.current = true;
-      startAttemptRef.current += 1;
-      const activeSession = sessionRef.current;
-      sessionRef.current = null;
-      mediaStreamRef.current = null;
-      void activeSession?.stop();
       if (copyResetRef.current) clearTimeout(copyResetRef.current);
     };
   }, []);
-
-  useEffect(() => {
-    if (!isRecording) return undefined;
-    const timer = setInterval(() => {
-      setRecordingElapsedSeconds((seconds) => seconds + 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [isRecording]);
 
   const resolveWorkerUrl = useCallback(async () => {
     if (resolvedWorkerUrl) return resolvedWorkerUrl;
@@ -235,7 +199,7 @@ function SessionInterviewPanel({
       context,
       allowDemoFallback: false,
     });
-    setResolvedWorkerUrl(value);
+    if (!disposedRef.current) setResolvedWorkerUrl(value);
     return value;
   }, [context, resolvedWorkerUrl, sessionConfig, sessionSlug]);
 
@@ -247,8 +211,35 @@ function SessionInterviewPanel({
     });
   }, [resolveWorkerUrl, resolvedWorkerUrl]);
 
+  const recorder = useSessionInterviewRecorder({
+    sessionSlug,
+    resolveWorkerUrl,
+    onStatus: setStatus,
+    onError: setError,
+    onTranscript: setTranscript,
+  });
+  const { audioRef, mediaStreamRef, recordingState, recordingElapsedSeconds } = recorder;
+  const reviewRef = useRef<HTMLHeadingElement | null>(null);
+  const statusRef = useRef<HTMLDivElement | null>(null);
+  const stopControlRef = useRef<HTMLButtonElement | null>(null);
+  const previousRecordingState = useRef(recordingState);
+  const mappingRef = useRef(false);
+  const isStarting = recordingState === 'starting';
+  const isRecording = recordingState === 'recording';
+  const isPaused = recordingState === 'paused';
+  const isStopping = recordingState === 'stopping';
+  const isRecorderSessionActive = isRecording || isPaused || isStopping;
+  const isInterviewBusy = isStarting || isRecorderSessionActive;
+
+  useEffect(() => {
+    if (isStarting || mapping) statusRef.current?.focus();
+    else if (isRecording && previousRecordingState.current === 'starting') stopControlRef.current?.focus();
+    previousRecordingState.current = recordingState;
+  }, [isStarting, isRecording, recordingState, mapping]);
+
   const runMapping = useCallback(
     async ({ nextTranscript = transcript }: { nextTranscript?: string } = {}) => {
+      if (disposedRef.current || mappingRef.current) return;
       if (!nextTranscript.trim() && !prefillPacket && !responderContext.trim()) {
         setError('');
         setMappingNotice(
@@ -257,23 +248,28 @@ function SessionInterviewPanel({
         setStatus('Not enough information');
         return;
       }
+      mappingRef.current = true;
       setMapping(true);
       setError('');
       setMappingNotice('');
-      setStatus('Mapping evidence to questions…');
+      setStatus('Preparing drafts');
       try {
         if (prefillPacket?.questionSetHash) {
           const currentQuestionSetHash = await hashInterviewQuestions(questions);
+          if (disposedRef.current) return;
           if (currentQuestionSetHash !== prefillPacket.questionSetHash) {
             throw new Error(
               'This prefill link was created for an older or different question set. Ask the AI for a fresh link.',
             );
           }
         }
-        const importedDrafts = readImportedInterviewDraftResponses(prefillPacket, questions);
+        const importedDrafts = nextTranscript.trim()
+          ? null
+          : readImportedInterviewDraftResponses(prefillPacket, questions);
         let mapped = importedDrafts;
         if (mapped === null) {
           const url = await resolveWorkerUrl();
+          if (disposedRef.current) return;
           const contextPacket: InterviewPrefillPacket | null =
             prefillPacket ||
             (responderContext.trim()
@@ -293,6 +289,7 @@ function SessionInterviewPanel({
             workerUrl: url,
           });
         }
+        if (disposedRef.current) return;
         setDrafts(mapped);
         setEditedAnswers(Object.fromEntries(mapped.map((draft) => [draft.questionId, displayAnswer(draft.answer)])));
         setSelected(
@@ -308,13 +305,15 @@ function SessionInterviewPanel({
             ? ''
             : 'Not enough information to generate response drafts. The interview evidence did not contain enough directly relevant detail to answer a session question. Start another interview and share more detail, or augment it with relevant memories from Claude or ChatGPT.',
         );
-        setStatus(mapped.length ? 'Review the proposed drafts' : 'No questions had enough evidence to prefill');
+        setStatus(mapped.length ? 'Review drafts' : 'Ready');
       } catch (mappingError) {
+        if (disposedRef.current) return;
         setMappingNotice('');
         setError(mappingError instanceof Error ? mappingError.message : 'Could not generate response drafts.');
-        setStatus('Mapping failed');
+        setStatus('Error');
       } finally {
-        setMapping(false);
+        mappingRef.current = false;
+        if (!disposedRef.current) setMapping(false);
       }
     },
     [
@@ -335,87 +334,41 @@ function SessionInterviewPanel({
     void runMapping({ nextTranscript: '' });
   }, [prefillPacket, questions.length, runMapping]);
 
-  const startInterview = async () => {
-    if (!audioRef.current || recordingStateRef.current !== 'idle') return;
-    const attempt = startAttemptRef.current + 1;
-    startAttemptRef.current = attempt;
-    updateRecordingState('starting');
-    setRecordingElapsedSeconds(0);
-    setStatus('Starting interview…');
-    setError('');
-    setMappingNotice('');
-    try {
-      const url = await resolveWorkerUrl();
-      const nextSession = await startSessionRealtimeInterview({
-        workerUrl: url,
-        sessionSlug,
-        instructions: buildRealtimeInterviewInstructions({ questions, responderContext }),
-        audioElement: audioRef.current,
-        onStatus: setStatus,
-        onRecordingState: (nextState) => {
-          if (disposedRef.current || startAttemptRef.current !== attempt) return;
-          if (nextState === 'recording') updateRecordingState('recording');
-          if (nextState === 'paused') updateRecordingState('paused');
-          if (nextState === 'stopped' && recordingStateRef.current !== 'stopping') {
-            sessionRef.current = null;
-            mediaStreamRef.current = null;
-            updateRecordingState('idle');
-          }
-        },
-        onTranscript: setTranscript,
-      });
-      if (disposedRef.current || startAttemptRef.current !== attempt) {
-        await nextSession.stop();
-        return;
-      }
-      sessionRef.current = nextSession;
-      mediaStreamRef.current = nextSession.mediaStream;
-      updateRecordingState('recording');
-    } catch (startError) {
-      if (disposedRef.current || startAttemptRef.current !== attempt) return;
-      sessionRef.current = null;
-      mediaStreamRef.current = null;
-      updateRecordingState('idle');
-      setError(startError instanceof Error ? startError.message : 'Could not start the interview.');
-      setStatus('Could not start');
+  useEffect(() => {
+    if (drafts.length && !mapping) {
+      reviewRef.current?.focus();
+      reviewRef.current?.scrollIntoView?.({ block: 'start' });
     }
-  };
+  }, [drafts, mapping]);
 
-  const pauseInterview = () => {
-    if (!sessionRef.current || recordingStateRef.current !== 'recording') return;
-    sessionRef.current.pause();
-    updateRecordingState('paused');
-    setStatus('Interview paused');
-  };
-
-  const resumeInterview = () => {
-    if (!sessionRef.current || recordingStateRef.current !== 'paused') return;
-    sessionRef.current.resume();
-    updateRecordingState('recording');
-    setStatus('Interview in progress');
+  const startInterview = () => {
+    if (isInterviewBusy || mappingRef.current || applying) return;
+    setMappingNotice('');
+    setDrafts([]);
+    setShowTranscript(false);
+    void recorder.start(buildRealtimeInterviewInstructions({ questions, responderContext }));
   };
 
   const endInterview = async () => {
-    if (recordingStateRef.current === 'stopping') return;
-    const activeSession = sessionRef.current;
-    if (!activeSession) {
-      mediaStreamRef.current = null;
-      updateRecordingState('idle');
-      return;
+    try {
+      const result = await recorder.stop();
+      if (!result || disposedRef.current) return;
+      setTranscript(result.transcript);
+      setShowTranscript(false);
+      await runMapping({ nextTranscript: result.transcript });
+    } catch (stopError) {
+      if (disposedRef.current) return;
+      setError(
+        stopError instanceof Error
+          ? stopError.message
+          : 'Could not finish the interview. Retry draft generation from the captured transcript.',
+      );
+      setStatus('Error');
     }
-    updateRecordingState('stopping');
-    setStatus('Stopping interview…');
-    const result = await activeSession.stop();
-    sessionRef.current = null;
-    mediaStreamRef.current = null;
-    updateRecordingState('idle');
-    const nextTranscript = result?.transcript || transcript;
-    setTranscript(nextTranscript);
-    setShowTranscript(false);
-    await runMapping({ nextTranscript });
   };
 
   const applyDrafts = async () => {
+    if (applying || isInterviewBusy || mappingRef.current) return;
     const applied = drafts.filter((draft) => selected[draft.questionId]);
     setApplying(true);
     setError('');
@@ -507,6 +460,29 @@ function SessionInterviewPanel({
         </section>
       ) : null}
 
+      <div
+        ref={statusRef}
+        tabIndex={-1}
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        aria-label={`Interview status: ${status}`}
+        data-testid={E2E_TESTIDS.SESSION_INTERVIEW_STATUS}
+      >
+        <strong>{status}</strong>
+      </div>
+      <p className={styles.sessionInterviewHint}>
+        {isPaused
+          ? 'Microphone and interviewer sound are paused. Resume to continue, or stop to prepare drafts.'
+          : isRecording
+            ? 'Microphone is on. Stop when you are ready to review your drafts.'
+            : isStarting
+              ? 'Connecting your microphone and voice session. Close this dialog to cancel.'
+              : drafts.length
+                ? 'Review and edit the drafts below. Apply selected drafts adds them to the response editor; submit answers separately.'
+                : 'Speak with an AI interviewer. Stopping prepares drafts for your review; answers are submitted separately.'}
+      </p>
+      {!questions.length ? <p>No accessible questions are available for this interview.</p> : null}
       <audio ref={audioRef} className={styles.sessionListeningSrOnly} aria-label="Realtime interviewer audio" />
       {error ? (
         <div className={styles.sessionListeningError} role="alert">
@@ -517,23 +493,17 @@ function SessionInterviewPanel({
         {!isRecorderSessionActive ? (
           <div className={styles.sessionInterviewPrimaryAction}>
             <Button
-              color="primary"
+              color={drafts.length ? 'secondary' : 'primary'}
+              outline={drafts.length > 0}
               onClick={() => {
                 void startInterview();
               }}
-              disabled={mapping || !questions.length || isStarting}
+              disabled={mapping || applying || !questions.length || isStarting}
               data-testid={E2E_TESTIDS.SESSION_INTERVIEW_START}
             >
               <FontAwesomeIcon icon={isStarting ? faSpinner : faMicrophone} spin={isStarting} />
-              {isStarting ? ' Starting interview…' : ' Start voice interview'}
+              {isStarting ? ' Connecting…' : drafts.length ? ' Start another interview' : ' Start voice interview'}
             </Button>
-            <span
-              className={`${styles.sessionInterviewStatusDot} ${error ? styles.sessionInterviewStatusDotError : ''}`}
-              role="status"
-              aria-label={`Interview status: ${status}`}
-              title={status}
-              data-testid={E2E_TESTIDS.SESSION_INTERVIEW_STATUS}
-            />
           </div>
         ) : (
           <div className={styles.sessionListeningActiveRecorder}>
@@ -543,26 +513,20 @@ function SessionInterviewPanel({
                 isActive={isRecorderSessionActive}
                 isPaused={isPaused || isStopping}
               />
-              <div
-                className={styles.sessionListeningWaveformTimer}
-                role="status"
-                aria-label={`Interview status: ${isStopping ? 'Stopping' : isPaused ? 'Paused' : 'Recording'}`}
-                aria-live="polite"
-                aria-atomic="true"
-                data-testid={E2E_TESTIDS.SESSION_INTERVIEW_STATUS}
-              >
+              <div className={styles.sessionListeningWaveformTimer}>
                 <FontAwesomeIcon
                   icon={isStopping ? faSpinner : faCircle}
                   spin={isStopping}
                   className={isPaused ? styles.sessionListeningTimerDotPaused : styles.sessionListeningTimerDot}
                 />
-                <span>{isStopping ? 'Stopping' : isPaused ? 'Paused' : 'Recording'}</span>
+                <span>{isStopping ? 'Ending' : isPaused ? 'Paused' : 'Listening'}</span>
                 <span>{formatSessionRecordingElapsed(recordingElapsedSeconds)}</span>
               </div>
             </div>
             <div className={styles.sessionListeningButtonColumn} role="group" aria-label="Interview recording controls">
               <button
                 type="button"
+                ref={stopControlRef}
                 className={[styles.sessionListeningAudioButton, styles.sessionListeningStopButton].join(' ')}
                 onClick={() => {
                   void endInterview();
@@ -578,7 +542,7 @@ function SessionInterviewPanel({
               <button
                 type="button"
                 className={styles.sessionListeningAudioButton}
-                onClick={isPaused ? resumeInterview : pauseInterview}
+                onClick={isPaused ? recorder.resume : recorder.pause}
                 disabled={isStopping}
                 aria-label={isPaused ? 'Resume interview' : 'Pause interview'}
                 title={isPaused ? 'Resume interview' : 'Pause interview'}
@@ -590,8 +554,9 @@ function SessionInterviewPanel({
           </div>
         )}
         {!isInterviewBusy &&
+        !drafts.length &&
         !mappingNotice &&
-        !Array.isArray(prefillPacket?.responses) &&
+        (transcript.trim() || !Array.isArray(prefillPacket?.responses)) &&
         (transcript.trim() || prefillPacket || responderContext.trim()) ? (
           <Button
             outline
@@ -698,10 +663,12 @@ function SessionInterviewPanel({
         </div>
       ) : null}
 
-      {drafts.length ? (
+      {drafts.length && !isInterviewBusy && !mapping ? (
         <div className={styles.sessionInterviewReview} data-testid={E2E_TESTIDS.SESSION_INTERVIEW_REVIEW}>
           <div className={styles.sessionInterviewReviewHeader}>
-            <h4>Review proposed responses</h4>
+            <h4 ref={reviewRef} tabIndex={-1}>
+              Review proposed responses
+            </h4>
             <span>
               {drafts.filter((draft) => selected[draft.questionId]).length} of {drafts.length} selected
             </span>
@@ -827,7 +794,7 @@ function SessionInterviewPanel({
                     aria-pressed={isSelected}
                   >
                     {isSelected ? <FontAwesomeIcon icon={faCheck} /> : null}
-                    {existing ? 'Replace with draft' : 'Apply draft'}
+                    {existing ? 'Replace with draft' : isSelected ? 'Draft selected' : 'Select draft'}
                   </button>
                 </div>
               </article>
@@ -869,7 +836,7 @@ function SessionInterviewPanel({
               onClick={() => {
                 void applyDrafts();
               }}
-              disabled={applying || !drafts.some((draft) => selected[draft.questionId])}
+              disabled={applying || mapping || isInterviewBusy || !drafts.some((draft) => selected[draft.questionId])}
               data-testid={E2E_TESTIDS.SESSION_INTERVIEW_APPLY}
             >
               Apply selected drafts
@@ -891,10 +858,14 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
       toggle={onClose}
       size="lg"
       centered
+      labelledBy="ce-session-voice-mode-title"
+      returnFocusAfterClose
       contentClassName={styles.sessionVoiceModeModal}
       data-testid={E2E_TESTIDS.SESSION_VOICE_MODE_MODAL}
     >
-      <ModalHeader toggle={onClose}>{title}</ModalHeader>
+      <ModalHeader id="ce-session-voice-mode-title" toggle={onClose}>
+        {title}
+      </ModalHeader>
       <ModalBody>
         {!mode ? (
           <div className={styles.sessionVoiceModeChooser} data-testid={E2E_TESTIDS.SESSION_VOICE_MODE_CHOOSER}>
@@ -918,7 +889,9 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
             </button>
           </div>
         ) : mode === 'interview' ? (
-          <SessionInterviewPanel {...props} questions={questions} />
+          isOpen ? (
+            <SessionInterviewPanel {...props} questions={questions} />
+          ) : null
         ) : (
           <SessionListeningPanel {...props} panelMode="recordGroup" onClose={onClose} />
         )}

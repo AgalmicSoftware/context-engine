@@ -24,16 +24,46 @@ public interview-brief endpoint return `404`.
 ## Interview
 
 Interview mode sends an SDP offer and interviewer instructions to the
-session's own Cloudflare Worker. The Worker creates the OpenAI Realtime call
-with its own `openaiKey`; the browser never receives that key. The default
-model is `gpt-realtime-2.1`, with a per-session `interviewMode.realtimeModel`
-override restricted to OpenAI realtime model IDs. The config shape keeps a
-provider field so another realtime provider can be added later, but only
-OpenAI is implemented now. The Worker preserves the browser SDP verbatim and
-uses the typed, filename-free multipart fields required by OpenAI. Session
-creators can change the model in `/new`
-under **Optional details** (or **More options** in Customize) → **Interview
-voice settings** → **Realtime voice model**.
+session's own Cloudflare Worker. The Worker creates a GPT-Live session through
+`POST https://api.openai.com/v1/live/sessions` using its own `openaiKey`; the
+browser never receives that key. New sessions and the Interview demo default
+to `gpt-live-1`. The JSON request carries `session: { model, instructions,
+store: false, delegation: { type: "client" } }` and `transport: { type: "webrtc",
+sdp }`. Audio is negotiated through WebRTC; Realtime session type, output
+modalities, VAD, and transcription-model fields are not sent to Live.
+
+The per-session `interviewMode.realtimeModel` setting also accepts the supported
+legacy aliases `gpt-realtime-2.1`, `gpt-realtime-2.1-mini`, `gpt-realtime-2`, and
+`gpt-realtime-1.5`. Those retain the Realtime multipart call contract. Invented
+or retired model IDs normalize to `gpt-live-1` when reading old configurations;
+Worker config writes reject unsupported values. The provider remains OpenAI.
+Session creators can change the model in `/new` under **Optional details**
+(or **More options** in Customize) → **Interview voice settings** →
+**Interview voice model**.
+
+The UI shows Ready, Connecting, Listening, Paused, Ending, Preparing drafts,
+Review drafts, or Error. Listening requires a connected peer, an open data
+channel, a started voice session, and a live enabled microphone. Connecting
+keeps the microphone track disabled until readiness. Pause disables microphone
+transmission and mutes interviewer playback; it keeps the session connected.
+Stop and close immediately stop local tracks, close the peer/channel, and clear
+remote audio. Closing during startup also cancels the request and stops a late
+microphone grant. Connection, microphone, and playback failures stop capture
+and offer recovery. Reopening starts a fresh interview.
+
+Stop requests `session.close` on Live as a best effort before immediate teardown.
+It does not wait for `session.closed`, so final API usage and any undelivered
+transcript tail are unconfirmed. Drafts use only text received before Stop;
+review the transcript and edit drafts if the final words are missing. Stopping
+prepares drafts; closing discards the modal session without preparing drafts.
+
+The contract follows OpenAI's [WebRTC guide](https://developers.openai.com/api/docs/guides/voice-webrtc?api=live),
+[session lifecycle guide](https://developers.openai.com/api/docs/guides/live-conversations),
+and [Live migration guide](https://developers.openai.com/api/docs/guides/live-migration),
+verified September 10, 2026. Live waits for `session.started` and requests a
+greeting through `session.instructions.append`; it does not send
+`response.create` or a second `session.start`. No live task backend is invoked:
+a client delegation receives a factual notice that drafting happens after Stop.
 
 The shipped `demo-interview` client record pins its deployed Worker, so its
 route is simply `/session/demo-interview?mode=interview`; it does not require a
@@ -46,8 +76,11 @@ The interviewer opens by asking for an important insight either about the
 responder and their perspective or about the broader topic behind the
 questions. It explicitly tells the responder that they can steer the
 conversation at any point, follows that direction, and then covers the
-accessible session questions conversationally. Only completed responder
-transcriptions become mapping evidence. When the call ends, the responder can
+accessible session questions conversationally. Only responder speech becomes mapping evidence. Live input transcript fragments
+are retained exactly, deduplicated by event ID, and ordered by session time;
+legacy Realtime sessions use completed input transcriptions. Assistant speech
+is excluded. A new interview clears the previous transcript and review drafts.
+New speech is mapped even if the interview started with imported predictions. When the call ends, the responder can
 expand a read-only transcript disclosure while the session's existing AI lane
 maps the transcript and any responder context imported by an AI prefill link
 to response drafts. Imported context remains editable but the context field

@@ -164,7 +164,7 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
       interviewMode: {
         enabled: true,
         provider: 'openai',
-        realtimeModel: 'gpt-realtime-2.1',
+        realtimeModel: 'gpt-live-1',
       },
       sessionModeProfile: {
         authority: { mode: 'worker_canonical' },

@@ -728,9 +728,9 @@ describe('SessionWizard rendered validation', () => {
     expect(policy).toHaveValue('participants');
     expect(screen.queryByRole('textbox', { name: 'Who can create groups?' })).not.toBeInTheDocument();
     const realtimeModel = screen.getByTestId(E2E_TESTIDS.WIZARD_INTERVIEW_REALTIME_MODEL);
-    expect(realtimeModel).toHaveValue('gpt-realtime-2.1');
-    fireEvent.change(realtimeModel, { target: { value: 'gpt-realtime-custom' } });
-    expect(realtimeModel).toHaveValue('gpt-realtime-custom');
+    expect(realtimeModel).toHaveValue('gpt-live-1');
+    fireEvent.change(realtimeModel, { target: { value: 'gpt-realtime-2' } });
+    expect(realtimeModel).toHaveValue('gpt-realtime-2');
 
     const colorsToggle = screen.getByRole('button', { name: 'Session colors expand' });
     expect(colorsToggle).toHaveAttribute('aria-expanded', 'false');

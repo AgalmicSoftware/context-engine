@@ -60531,6 +60531,19 @@ var executeDeployHelperRequest = async (options = {}) => {
   return safeResult;
 };
 
+// shared/realtimeInterviewConfig.mjs
+var DEFAULT_REALTIME_INTERVIEW_MODEL = "gpt-live-1";
+var models = /* @__PURE__ */ new Set(["gpt-live-1", "gpt-realtime-2.1", "gpt-realtime-2.1-mini", "gpt-realtime-2", "gpt-realtime-1.5"]);
+var isRealtimeInterviewModel = (value) => typeof value === "string" && models.has(value);
+var normalizeRealtimeInterviewModel = (value) => {
+  const model = String(value ?? "").trim();
+  return isRealtimeInterviewModel(model) ? model : DEFAULT_REALTIME_INTERVIEW_MODEL;
+};
+var resolveRealtimeInterviewModel = (config = {}) => {
+  const interview = config?.interviewMode || config?.interview;
+  return normalizeRealtimeInterviewModel(interview?.realtimeModel || config?.ai?.realtimeModel);
+};
+
 // workers/shared/sessionColorSchemeConfig.mjs
 var WORKER_SESSION_COLOR_SCHEME_IDS = Object.freeze(["context-engine", "ocean", "amber"]);
 var ALLOWED_IDS = new Set(WORKER_SESSION_COLOR_SCHEME_IDS);
@@ -60755,7 +60768,7 @@ var validInterviewModeConfig = (config) => {
   if (Object.keys(interview).some((key) => !["enabled", "provider", "realtimeModel"].includes(key))) return false;
   if (hasOwn3(interview, "enabled") && typeof interview.enabled !== "boolean") return false;
   if (hasOwn3(interview, "provider") && interview.provider !== "openai") return false;
-  if (hasOwn3(interview, "realtimeModel") && (typeof interview.realtimeModel !== "string" || !/^gpt-realtime(?:-[a-z0-9.]+)*$/i.test(interview.realtimeModel))) return false;
+  if (hasOwn3(interview, "realtimeModel") && !isRealtimeInterviewModel(interview.realtimeModel)) return false;
   return true;
 };
 var getWorkerAuthorityMode = (config) => toTrimmedString6(
@@ -72390,8 +72403,8 @@ var validateAnonymousAiRequest = ({
 };
 
 // workers/sessionCorsWorker/realtimeCallExecution.js
+var OPENAI_LIVE_SESSIONS_URL = "https://api.openai.com/v1/live/sessions";
 var OPENAI_REALTIME_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
-var DEFAULT_INTERVIEW_REALTIME_MODEL = "gpt-realtime-2.1";
 var trim7 = (value) => String(value == null ? "" : value).trim();
 var isObj11 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var buildRealtimeMultipartBody = ({ sdp, session }) => {
@@ -72434,8 +72447,7 @@ var readRealtimeCallRequestPayload = async ({ request } = {}) => {
 var resolveRealtimeConfig = (config = {}) => {
   const interview = isObj11(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
   const provider = trim7(interview.provider || "openai").toLowerCase();
-  const requestedModel = trim7(interview.realtimeModel || config?.ai?.realtimeModel);
-  const model = /^gpt-realtime(?:-[a-z0-9.]+)*$/i.test(requestedModel) ? requestedModel : DEFAULT_INTERVIEW_REALTIME_MODEL;
+  const model = resolveRealtimeInterviewModel(config);
   return { provider, model };
 };
 var proxyOpenAiRealtimeCall = async ({
@@ -72455,7 +72467,13 @@ var proxyOpenAiRealtimeCall = async ({
   if (!key) {
     return deps?.json?.({ error: "Server misconfigured: openaiKey is missing." }, 401, baseHeaders);
   }
-  const session = {
+  const live = realtime.model === "gpt-live-1";
+  const session = live ? {
+    model: realtime.model,
+    instructions: payload.instructions,
+    store: false,
+    delegation: { type: "client" }
+  } : {
     type: "realtime",
     model: realtime.model,
     output_modalities: ["audio"],
@@ -72473,27 +72491,37 @@ var proxyOpenAiRealtimeCall = async ({
     }
   };
   const multipart = buildRealtimeMultipartBody({ sdp: payload.sdp, session });
-  const response2 = await fetchImpl(constants?.openAiRealtimeCallsUrl || OPENAI_REALTIME_CALLS_URL, {
+  const url = live ? constants?.openAiLiveSessionsUrl || OPENAI_LIVE_SESSIONS_URL : constants?.openAiRealtimeCallsUrl || OPENAI_REALTIME_CALLS_URL;
+  const response2 = await fetchImpl(url, {
     method: "POST",
     headers: {
       authorization: `Bearer ${key}`,
-      "content-type": multipart.contentType
+      "content-type": live ? "application/json" : multipart.contentType
     },
-    body: multipart.body
+    body: live ? JSON.stringify({ session, transport: { type: "webrtc", sdp: payload.sdp } }) : multipart.body
   });
   const text = await response2.text();
   if (!response2.ok) {
-    let message = "OpenAI Realtime call failed.";
-    try {
-      message = JSON.parse(text)?.error?.message || message;
-    } catch {
-    }
+    const message = response2.status === 401 || response2.status === 403 ? "OpenAI denied the interview. Ask the session owner to check the Worker key and model access." : response2.status === 429 ? "OpenAI is at its usage limit. Try again later or contact the session owner." : "OpenAI could not connect the interview. Try again or contact the session owner.";
     return deps?.json?.({ error: message }, response2.status, baseHeaders);
+  }
+  let answerSdp = text;
+  if (live) {
+    try {
+      answerSdp = JSON.parse(text)?.transport?.sdp;
+    } catch {
+      answerSdp = "";
+    }
+  }
+  if (typeof answerSdp !== "string" || !/^v=0(?:\r?\n|$)/.test(answerSdp)) {
+    return deps?.json?.({ error: "OpenAI returned an invalid connection answer. Try again." }, 502, baseHeaders);
   }
   const headers = new Headers(baseHeaders || {});
   headers.set("content-type", "application/sdp");
   headers.set("cache-control", "no-store");
-  return new Response(text, { status: 200, headers });
+  headers.set("x-interview-protocol", live ? "live" : "realtime");
+  headers.set("access-control-expose-headers", [headers.get("access-control-expose-headers"), "x-interview-protocol"].filter(Boolean).join(", "));
+  return new Response(answerSdp, { status: 200, headers });
 };
 
 // workers/sessionCorsWorker/anonymousRouteDispatch.js

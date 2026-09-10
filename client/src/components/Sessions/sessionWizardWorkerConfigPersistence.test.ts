@@ -20,7 +20,7 @@ const baseConfig = () => ({
   sessionName: 'Worker Canonical Session',
   appearance: { colorSchemeId: 'amber' },
   interviewModeEnabled: true,
-  interviewMode: { enabled: true, provider: 'openai', realtimeModel: 'gpt-realtime-2.1' },
+  interviewMode: { enabled: true, provider: 'openai', realtimeModel: 'gpt-live-1' },
   sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
   storageProfile: { backend: 'cloudflare' },
   ai: { models: { fast: { provider: 'openai', model: 'gpt-test' } } },

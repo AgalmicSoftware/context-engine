@@ -245,7 +245,7 @@ test('projectPublicWorkerSessionConfig keeps worker-canonical editable text meta
   const projected = projectPublicWorkerSessionConfig({
     sessionEndsAt: '2099-01-02T03:04:00.000Z',
     interviewModeEnabled: false,
-    interviewMode: { enabled: false, provider: 'openai', realtimeModel: 'gpt-realtime-2.1' },
+    interviewMode: { enabled: false, provider: 'openai', realtimeModel: 'gpt-live-1' },
     defaultTags: 'worker, canonical',
     defaultGroupTags: 'facilitators,reviewers',
     defaultSbtTags: 'member',
@@ -264,7 +264,7 @@ test('projectPublicWorkerSessionConfig keeps worker-canonical editable text meta
   assert.deepEqual(projected, {
     sessionEndsAt: '2099-01-02T03:04:00.000Z',
     interviewModeEnabled: false,
-    interviewMode: { enabled: false, provider: 'openai', realtimeModel: 'gpt-realtime-2.1' },
+    interviewMode: { enabled: false, provider: 'openai', realtimeModel: 'gpt-live-1' },
     defaultTags: 'worker, canonical',
     defaultGroupTags: 'facilitators,reviewers',
     defaultSbtTags: 'member',
