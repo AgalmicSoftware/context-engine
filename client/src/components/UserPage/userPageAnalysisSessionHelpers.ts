@@ -1,3 +1,4 @@
+import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
 import { canonicalizeSessionSlug as normalizeSessionSlug } from '../../utilities/session/sessionSlug.js';
 import { isPlainAnalysisObject, toAnalysisRecord, type UserPageUnknownRecord } from './userPageCoreHelpers';
 
@@ -242,8 +243,8 @@ export const deriveAnalysisAiContextFromSessionConfig = (
     String(
       (isPlainAnalysisObject(thinkingModel)
         ? thinkingModelRecord.model || thinkingModelRecord.name || thinkingModelRecord.value
-        : thinkingModel) || 'gpt-5',
-    ).trim() || 'gpt-5';
+        : thinkingModel) || DEFAULT_AI_MODEL,
+    ).trim() || DEFAULT_AI_MODEL;
   return {
     sessionSlug: String(sessionSlug || ''),
     provider,
@@ -271,7 +272,7 @@ export const resolveUserPageAnalysisAiContext = async ({
         String(effective?.provider || fallback.provider || 'openai')
           .trim()
           .toLowerCase() || 'openai',
-      model: String(effective?.model || fallback.model || 'gpt-5').trim() || 'gpt-5',
+      model: String(effective?.model || fallback.model || DEFAULT_AI_MODEL).trim() || DEFAULT_AI_MODEL,
     };
   } catch (error) {
     logger?.warn?.('[UserPage] analysis AI context fallback:', error);

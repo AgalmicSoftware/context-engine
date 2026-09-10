@@ -942,7 +942,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     ).toBeInTheDocument();
   });
 
-  it('saves an OpenAI pre-login key and activates the local GPT-5 preset', async () => {
+  it('saves an OpenAI pre-login key and activates the local Terra preset', async () => {
     render(<LoginAndSettingsModal {...buildProps()} />);
 
     await openPreLoginSettingsDrawer();
@@ -955,11 +955,11 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
       expect(saveLocalAiSettings).toHaveBeenCalledWith(
         expect.objectContaining({
           useLocal: true,
-          preset: 'gpt-5',
+          preset: 'gpt-5.6-terra',
           mode: 'openai',
           models: expect.objectContaining({
-            fast: 'gpt-5',
-            thinking: 'gpt-5',
+            fast: 'gpt-5.6-terra',
+            thinking: 'gpt-5.6-terra',
           }),
           providers: expect.objectContaining({
             openai: expect.objectContaining({

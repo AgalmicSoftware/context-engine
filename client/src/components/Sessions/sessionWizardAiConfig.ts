@@ -1,10 +1,8 @@
+import { DEFAULT_AI_MODELS as SHARED_AI_MODELS } from '../../../../shared/aiDefaults.mjs';
 import { toStr } from '../../utilities/shared/primitives.js';
 import type { AnyRecord } from '../shellTypes';
 
-export const DEFAULT_AI_MODELS = Object.freeze({
-  fast: 'gpt-5',
-  thinking: 'gpt-5',
-});
+export const DEFAULT_AI_MODELS = SHARED_AI_MODELS;
 
 export const AI_PROVIDER_OPTIONS = [
   { value: 'openai', label: 'OpenAI' },
@@ -19,8 +17,8 @@ export const AI_MODEL_OPTIONS = Object.freeze({
     thinking: ['claude-3-5-sonnet-20240620', 'claude-sonnet-4-5-20250929'],
   },
   openai: {
-    fast: ['gpt-5', 'gpt-4o', 'gpt-4o-mini', 'o3-mini'],
-    thinking: ['gpt-5', 'o3-mini', 'gpt-4o', 'gpt-4o-mini'],
+    fast: ['gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-6-astra', 'gpt-5', 'gpt-4o', 'gpt-4o-mini', 'o3-mini'],
+    thinking: ['gpt-5.6-terra', 'gpt-5.6-sol', 'gpt-6-astra', 'gpt-5', 'o3-mini', 'gpt-4o', 'gpt-4o-mini'],
   },
   openrouter: {
     fast: [],

@@ -83,7 +83,7 @@ transcript fragments are retained exactly, deduplicated by event ID, and ordered
 by session time; legacy Realtime sessions use completed input transcriptions.
 A new interview clears the previous transcript and review drafts.
 New speech is mapped even if the interview started with imported predictions. When the call ends, the responder can
-expand a read-only transcript disclosure while `gpt-6-astra` with low reasoning effort and Fast mode (`service_tier: fast`)
+expand a read-only transcript disclosure while `gpt-5.6-terra` with low reasoning effort and standard processing (`service_tier: default`)
 maps the transcript and any responder context imported by an AI prefill link
 to response drafts. Imported context remains editable but the context field
 stays hidden during a normal voice-only interview. Drafts may include comments,
@@ -259,7 +259,9 @@ by default.
 
 
 Interview mapping uses the Worker-side OpenAI key and the Responses API. It sends
-`reasoning.effort: low`, `service_tier: fast`, and JSON output formatting, without
+`reasoning.effort: low`, `service_tier: default`, and JSON output formatting, without
 unsupported sampling parameters. GPT-Live remains the voice interviewer. See
-[OpenAI’s Astra guide](https://developers.openai.com/api/docs/guides/latest-model)
-and [Fast mode](https://developers.openai.com/api/docs/guides/fast-mode).
+[OpenAI’s Terra model documentation](https://developers.openai.com/api/docs/models/gpt-5.6-terra).
+Mapping targets roughly ten seconds for ordinary interviews, but latency depends
+on transcript length, number of drafts, and provider load; it is not a deadline
+that discards partial work.

@@ -1,3 +1,4 @@
+import { DEFAULT_AI_MODEL } from '../../shared/aiDefaults.mjs';
 import {
   applyChatCompletionBudget,
   isChatReasoningModel,
@@ -150,7 +151,7 @@ export const proxyOpenAI = async ({
     reasoning_effort,
   } = payload || {};
   const requestedEndpoint = toStr(payload?.endpoint).trim();
-  const defaultModel = model || 'gpt-5';
+  const defaultModel = model || DEFAULT_AI_MODEL;
   const useResponses = usesOpenAiResponsesApi({
     provider: 'openai',
     model: defaultModel,
@@ -164,17 +165,17 @@ export const proxyOpenAI = async ({
         input: messages || prompt || '',
       }
     : {
-        model: model || (isReasoning ? 'o3-mini' : 'gpt-5'),
+        model: model || (isReasoning ? 'o3-mini' : DEFAULT_AI_MODEL),
         messages: messages || [{ role: 'user', content: String(prompt || '') }],
       };
 
-  if (['fast', 'priority', 'default', 'auto'].includes(payload?.service_tier)) body.service_tier = payload.service_tier;
+  body.service_tier = ['fast', 'priority', 'default', 'auto'].includes(payload?.service_tier) ? payload.service_tier : 'default';
 
   if (useResponses) {
     if (response_format) body.text = { format: response_format };
     if (payload?.tools) body.tools = payload.tools;
     if (payload?.functions && !payload?.tools) body.functions = payload.functions;
-    if (reasoning_effort) body.reasoning = { effort: reasoning_effort };
+    body.reasoning = { effort: reasoning_effort || 'low' };
     body.max_output_tokens = resolveResponsesOutputTokens({
       max_output_tokens,
       max_completion_tokens,
@@ -348,7 +349,7 @@ export const proxyCustomRPC = async ({
   const isReasoning = isChatReasoningModel({ model, thinking: payload?.thinking === true });
 
   const body = {
-    model: model || 'gpt-5',
+    model: model || DEFAULT_AI_MODEL,
     messages: messages || [{ role: 'user', content: String(prompt || '') }],
   };
   if (response_format) body.response_format = response_format;

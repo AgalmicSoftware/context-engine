@@ -1,3 +1,4 @@
+import { DEFAULT_AI_MODEL } from '../../shared/aiDefaults.mjs';
 import { isModelAllowed } from './aiRequestNormalization.js';
 import { executeSessionLitChipotleAction } from './chipotleClient.js';
 import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
@@ -5,7 +6,7 @@ import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
 const resolveDefaultModelForProvider = (provider) => {
   if (provider === 'anthropic') return 'claude-3-5-sonnet-20240620';
   if (provider === 'openrouter') return 'openrouter/auto';
-  if (provider === 'openai' || provider === 'custom') return 'gpt-5';
+  if (provider === 'openai' || provider === 'custom') return DEFAULT_AI_MODEL;
   return '';
 };
 

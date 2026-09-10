@@ -52,6 +52,15 @@ describe('aiSettings secret resolution', () => {
     );
   };
 
+  it('defaults both interactive and group-analysis model lanes to Terra with low effort', async () => {
+    seedSessionAiSettings({});
+    expect(getLocalAiSettings().models).toEqual({ fast: 'gpt-5.6-terra', thinking: 'gpt-5.6-terra' });
+    for (const thinking of [false, true]) {
+      const config = await getEffectiveAiConfig({ sessionSlug: '', preferLocal: false, thinking, resolveSecrets: false });
+      expect(config).toMatchObject({ model: 'gpt-5.6-terra', provider: 'openai', reasoningEffort: 'low' });
+    }
+  });
+
   const seedEncryptedLocalOpenAiSettings = ({ useLocal = true } = {}) => {
     saveLocalAiSettings({
       useLocal,
@@ -272,7 +281,7 @@ describe('aiSettings secret resolution', () => {
     expect(settings.modelProviders.thinking).toBe('openrouter');
   });
 
-  it('activates the local OpenAI GPT-5 preset after a pre-login OpenAI key edit', async () => {
+  it('activates the local OpenAI Terra preset after a pre-login OpenAI key edit', async () => {
     saveLocalAiSettings(
       applyPreLoginAiProviderKeyChange(getLocalAiSettings(), {
         provider: 'openai',
@@ -288,7 +297,7 @@ describe('aiSettings secret resolution', () => {
     expect(getLocalAiSettings()).toEqual(
       expect.objectContaining({
         useLocal: true,
-        preset: 'gpt-5',
+        preset: 'gpt-5.6-terra',
         mode: 'openai',
         providers: expect.objectContaining({
           openai: expect.objectContaining({
@@ -298,7 +307,7 @@ describe('aiSettings secret resolution', () => {
       }),
     );
     expect(cfg.provider).toBe('openai');
-    expect(cfg.model).toBe('gpt-5');
+    expect(cfg.model).toBe('gpt-5.6-terra');
     expect(cfg.apiKey).toBe('sk-open-test');
     expect(cfg.apiKeySource).toBe('local');
   });

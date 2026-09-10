@@ -1,3 +1,4 @@
+import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
 import { callAI } from '../../utilities/ai/aiClient.js';
 import { resolveRealtimeInterviewModel } from '../../utilities/audio/realtimeInterviewConfig';
 
@@ -471,10 +472,10 @@ export const mapInterviewEvidenceToResponses = async ({
     workerUrl,
     taskType: 'interview-map',
     provider: 'openai',
-    model: 'gpt-6-astra',
+    model: DEFAULT_AI_MODEL,
     preferLocal: false,
     reasoningEffort: 'low',
-    service_tier: 'fast',
+    service_tier: 'default',
     response_format: { type: 'json_object' },
     maxTokens: 8000,
   });

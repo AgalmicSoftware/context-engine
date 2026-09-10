@@ -1,3 +1,4 @@
+import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
 /** @file AdminPage.tsx */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Input, Label, FormGroup, FormText } from 'reactstrap';
@@ -1829,12 +1830,12 @@ const AdminPageRuntime = ({
         providerModelCandidate ||
         (legacyModelMatchesProvider ? legacyModelCandidate : '') ||
         (providerMode === 'openai'
-          ? 'gpt-4o-mini'
+          ? DEFAULT_AI_MODEL
           : providerMode === 'openrouter'
-            ? 'openai/gpt-4o-mini'
+            ? `openai/${DEFAULT_AI_MODEL}`
             : providerMode === 'anthropic'
               ? 'claude-3-haiku-20240307'
-              : 'gpt-4o-mini');
+              : DEFAULT_AI_MODEL);
 
       const payload = {
         action: 'ai',

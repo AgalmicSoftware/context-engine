@@ -111,3 +111,14 @@ it('routes fast Astra mapping through Responses with low effort and no sampling 
   expect(plan.requestBody).not.toHaveProperty('temperature');
   expect(plan.requestBody).not.toHaveProperty('max_tokens');
 });
+
+it('requests standard processing for Terra unless explicitly overridden', () => {
+  const plan = buildAiWorkerRequestPlan({ ai: { model: 'gpt-5.6-terra', provider: 'openai', reasoningEffort: 'low' } });
+  expect(plan.requestBody).toMatchObject({
+    endpoint: 'responses',
+    model: 'gpt-5.6-terra',
+    service_tier: 'default',
+    reasoning_effort: 'low',
+  });
+  expect(plan.requestBody).not.toHaveProperty('temperature');
+});

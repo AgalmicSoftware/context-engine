@@ -1044,3 +1044,13 @@ Typical symptoms:
 
 - `Failed to fetch` or `Load failed` from worker auth endpoints usually means the origin is missing from `allowOrigins`
 - `SIWE domain does not match URI host.` means the login or admin signature was created for a different host than the one receiving the request
+
+
+### Default AI models
+
+New sessions default both text-model lanes to `gpt-5.6-terra` with low reasoning
+effort. This includes group/cluster identification, summaries, question generation,
+and Interview response mapping. OpenAI requests use standard processing
+(`service_tier: default`) unless a caller explicitly selects another tier.
+GPT-Live voice and transcription settings are separate. Existing explicit session
+models and local overrides remain available; bundled demo defaults use Terra.

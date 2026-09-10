@@ -1,3 +1,4 @@
+import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
 /** @file LoginAndSettingsModal.tsx */
 import React, { Component, Suspense } from 'react';
 import { connect } from 'react-redux';
@@ -267,7 +268,8 @@ const readChainIdLike = (value: ChainIdLike): unknown =>
 const readWagmiBalanceValue = (value: WagmiBalanceLike): unknown =>
   value && typeof value === 'object' ? (value.data?.value ?? value.value ?? null) : null;
 const AI_PRESET_LABELS: Record<string, { label: string; badgeLabel: string }> = Object.freeze({
-  'gpt-5': { label: 'GPT-5 (default)', badgeLabel: 'GPT-5' },
+  [DEFAULT_AI_MODEL]: { label: 'GPT-5.6 Terra (default)', badgeLabel: 'GPT-5.6 Terra' },
+  'gpt-5': { label: 'GPT-5', badgeLabel: 'GPT-5' },
   'gpt-4o': { label: 'GPT-4o', badgeLabel: 'GPT-4o' },
   'claude-sonnet': { label: 'Claude Sonnet 4.6', badgeLabel: 'Claude Sonnet 4.6' },
   'claude-opus': { label: 'Claude Opus 4.6', badgeLabel: 'Claude Opus 4.6' },
@@ -303,7 +305,7 @@ const getAiPresetMeta = (presetKey: unknown = ''): AiPresetOption =>
 const formatAiPresetBadgeLabel = (settings: AiSettingsLike = {}) => {
   const hasModelShape = !!(settings?.models?.fast || settings?.models?.thinking || settings?.mode);
   if (!hasModelShape) {
-    return getAiPresetMeta('gpt-5').badgeLabel;
+    return getAiPresetMeta(DEFAULT_AI_MODEL).badgeLabel;
   }
   const presetKey = deriveAiPresetKey(settings);
   if (presetKey !== 'custom') {
@@ -2081,7 +2083,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       aiDisplay?.preset ||
       (aiDisplay?.models?.fast || aiDisplay?.models?.thinking || aiDisplay?.mode
         ? deriveAiPresetKey(aiDisplay)
-        : 'gpt-5');
+        : DEFAULT_AI_MODEL);
     const aiPresetLabel = formatAiPresetBadgeLabel(aiDisplay);
     const showReasoningControls = settingsSupportReasoning(aiDisplay);
     const reasoningEffort =

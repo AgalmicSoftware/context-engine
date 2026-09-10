@@ -269,7 +269,7 @@ describe('session interview protocol', () => {
   });
 });
 
-it('maps a numeric reply using fast Astra and keeps the rating value', async () => {
+it('maps a numeric reply using standard Terra and keeps the rating value', async () => {
   jest
     .mocked(callAI)
     .mockResolvedValue(JSON.stringify({ responses: [{ questionId: 'trust', answer: 4, confidence: 1 }] }));
@@ -283,11 +283,11 @@ it('maps a numeric reply using fast Astra and keeps the rating value', async () 
   expect(callAI).toHaveBeenCalledWith(
     expect.stringContaining('Responder: Four.'),
     expect.objectContaining({
-      model: 'gpt-6-astra',
+      model: 'gpt-5.6-terra',
       provider: 'openai',
       preferLocal: false,
       reasoningEffort: 'low',
-      service_tier: 'fast',
+      service_tier: 'default',
     }),
   );
   expect(result).toEqual([{ questionId: 'trust', answer: 4, confidence: 1 }]);

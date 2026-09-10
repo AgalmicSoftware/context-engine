@@ -262,7 +262,7 @@ describe('userPageAnalysisSessionHelpers', () => {
     expect(deriveAnalysisAiContextFromSessionConfig('', {})).toEqual({
       sessionSlug: '',
       provider: 'openai',
-      model: 'gpt-5',
+      model: 'gpt-5.6-terra',
     });
   });
 

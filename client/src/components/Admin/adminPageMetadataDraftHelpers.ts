@@ -1,3 +1,4 @@
+import { DEFAULT_AI_MODELS as SHARED_AI_MODELS } from '../../../../shared/aiDefaults.mjs';
 import { ethers } from 'ethers';
 
 import { normalizeBlockLimitsForConfig } from '../../utilities/session/blockLimits.js';
@@ -14,10 +15,7 @@ import { dedupeSbtSelections } from './adminPageSbtGateSelectionHelpers';
 
 const deepClone = (value: any) => JSON.parse(JSON.stringify(value || {}));
 
-export const ADMIN_DEFAULT_AI_MODELS = Object.freeze({
-  fast: 'gpt-5',
-  thinking: 'gpt-5',
-});
+export const ADMIN_DEFAULT_AI_MODELS = SHARED_AI_MODELS;
 
 export const ADMIN_AI_PROVIDER_OPTIONS = Object.freeze([
   { value: 'openai', label: 'OpenAI' },

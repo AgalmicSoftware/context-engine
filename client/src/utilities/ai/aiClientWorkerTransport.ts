@@ -68,7 +68,9 @@ export const buildAiWorkerRequestPlan = ({
       : {}),
     ...(provider === 'openai' && ['fast', 'priority', 'default', 'auto'].includes(String(opts.service_tier))
       ? { service_tier: opts.service_tier }
-      : {}),
+      : provider === 'openai'
+        ? { service_tier: 'default' }
+        : {}),
     messages,
     ...(opts.thinking && provider === 'anthropic' ? { thinking: true } : {}),
   };
