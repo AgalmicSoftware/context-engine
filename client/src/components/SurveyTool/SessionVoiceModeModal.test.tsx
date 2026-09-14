@@ -64,6 +64,23 @@ describe('SessionVoiceModeModal', () => {
     mockedMapInterviewEvidenceToResponses.mockResolvedValue([]);
   });
 
+  it('puts guidance and the live status in accessible header tooltips', async () => {
+    render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+    const help = screen.getByRole('button', { name: 'About Interview' });
+    const status = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS);
+    expect(help.closest('.modal-header')).not.toBeNull();
+    expect(status.closest('.modal-header')).not.toBeNull();
+    expect(status).toHaveAttribute('aria-live', 'polite');
+    expect(screen.queryByText(/Speak with an AI interviewer/)).not.toBeInTheDocument();
+    fireEvent.focus(help);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Stopping prepares drafts for your review');
+    fireEvent.blur(help);
+    await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
+    fireEvent.focus(screen.getByRole('button', { name: 'Interview status: Ready' }));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Ready');
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toHaveAccessibleName('Start voice interview');
+  });
+
   it('submits reviewed values and retains edited unselected predictions only as consented metadata', async () => {
     const prefillPacket = {
       version: 1 as const,
@@ -153,7 +170,7 @@ describe('SessionVoiceModeModal', () => {
     await waitFor(() => expect(mockedStartSessionRealtimeInterview).toHaveBeenCalledTimes(1));
     expect(start).toBeDisabled();
     expect(start).toHaveTextContent('Connecting…');
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Interview status: Connecting' })).toHaveFocus();
     fireEvent.keyUp(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS), {
       key: 'Escape',
       keyCode: 27,

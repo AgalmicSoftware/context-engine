@@ -197,7 +197,7 @@ function SessionInterviewPanel({
   });
   const { audioRef, mediaStreamRef, recordingState, recordingElapsedSeconds } = recorder;
   const reviewRef = useRef<HTMLHeadingElement | null>(null);
-  const statusRef = useRef<HTMLDivElement | null>(null);
+  const statusRef = useRef<HTMLButtonElement | null>(null);
   const stopControlRef = useRef<HTMLButtonElement | null>(null);
   const previousRecordingState = useRef(recordingState);
   const mappingRef = useRef(false);
@@ -429,339 +429,386 @@ function SessionInterviewPanel({
   const researchCoverageDetails = describeResearchCoverage(researchCoverage);
   const hasImportedResponderContext = Boolean(importedContext?.summary?.trim() || importedContext?.facts?.length);
 
+  const guidance = isPaused
+    ? 'Microphone and interviewer sound are paused. Resume to continue, or stop to prepare drafts.'
+    : isRecording
+      ? 'Microphone is on. Stop when you are ready to review your drafts.'
+      : isStarting
+        ? 'Connecting your microphone and voice session. Close this dialog to cancel.'
+        : drafts.length
+          ? 'Review and edit your answers and privacy settings, then select Submit responses. You will be asked to sign in if needed.'
+          : 'Speak with an AI interviewer. Stopping prepares drafts for your review. You choose when to submit responses.';
+  const statusTone = error
+    ? 'error'
+    : isStarting || isPaused || isStopping || mapping || applying
+      ? 'pending'
+      : 'ready';
+  const startLabel = isStarting ? 'Connecting…' : drafts.length ? 'Start another interview' : 'Start voice interview';
+
   return (
-    <div className={styles.sessionInterviewPanel} data-testid={E2E_TESTIDS.SESSION_INTERVIEW_PANEL}>
-      {hasImportedResponderContext ? (
-        <div className={styles.sessionInterviewContext}>
-          <Label for="ce-interview-context">Imported responder context</Label>
-          <Input
-            id="ce-interview-context"
-            type="textarea"
-            value={responderContext}
-            onChange={(event) => {
-              setResponderContext(event.target.value);
-              setMappingNotice('');
-            }}
-            disabled={isInterviewBusy || mapping}
-            className={styles.sessionInterviewContextInput}
-            data-testid={E2E_TESTIDS.SESSION_INTERVIEW_CONTEXT}
-          />
-        </div>
-      ) : null}
-
-      {researchCoverage ? (
-        <section
-          className={styles.sessionInterviewResearchCoverage}
-          aria-label="Self-reported agent research coverage"
-          data-testid={E2E_TESTIDS.SESSION_INTERVIEW_RESEARCH_COVERAGE}
-        >
-          <strong>Self-reported agent research coverage</strong>
-          <span>{researchCoverageDetails.join(' · ') || 'Coverage counts unavailable'}</span>
-          {researchCoverage.searchScopeNote ? <small>{researchCoverage.searchScopeNote}</small> : null}
-        </section>
-      ) : null}
-
-      <div
-        ref={statusRef}
-        tabIndex={-1}
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-        aria-label={`Interview status: ${status}`}
-        data-testid={E2E_TESTIDS.SESSION_INTERVIEW_STATUS}
-      >
-        <strong>{status}</strong>
-      </div>
-      <p className={styles.sessionInterviewHint}>
-        {isPaused
-          ? 'Microphone and interviewer sound are paused. Resume to continue, or stop to prepare drafts.'
-          : isRecording
-            ? 'Microphone is on. Stop when you are ready to review your drafts.'
-            : isStarting
-              ? 'Connecting your microphone and voice session. Close this dialog to cancel.'
-              : drafts.length
-                ? 'Review and edit your answers and privacy settings, then select Submit responses. You will be asked to sign in if needed.'
-                : 'Speak with an AI interviewer. Stopping prepares drafts for your review. You choose when to submit responses.'}
-      </p>
-      {!questions.length ? <p>No accessible questions are available for this interview.</p> : null}
-      <audio ref={audioRef} className={styles.sessionListeningSrOnly} aria-label="Realtime interviewer audio" />
-      {error ? (
-        <div className={styles.sessionListeningError} role="alert">
-          {error}
-        </div>
-      ) : null}
-      <div className={styles.sessionInterviewActions}>
-        {!isRecorderSessionActive ? (
-          <div className={styles.sessionInterviewPrimaryAction}>
-            <Button
-              color={drafts.length ? 'secondary' : 'primary'}
-              outline={drafts.length > 0}
-              onClick={() => {
-                void startInterview();
-              }}
-              disabled={mapping || applying || !questions.length || isStarting}
-              data-testid={E2E_TESTIDS.SESSION_INTERVIEW_START}
+    <>
+      <ModalHeader toggle={onClose}>
+        <span className={styles.sessionInterviewHeader}>
+          <span id="ce-session-voice-mode-title">Interview</span>
+          <button
+            type="button"
+            id="ce-interview-help"
+            className={styles.sessionInterviewHeaderButton}
+            aria-label="About Interview"
+          >
+            <FontAwesomeIcon icon={faQuestionCircle} />
+          </button>
+          <UncontrolledTooltip target="ce-interview-help" placement="bottom" trigger="hover focus" autohide={false}>
+            {guidance}
+          </UncontrolledTooltip>
+          <span
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            aria-label={`Interview status: ${status}`}
+            data-testid={E2E_TESTIDS.SESSION_INTERVIEW_STATUS}
+          >
+            <button
+              type="button"
+              id="ce-interview-status-help"
+              ref={statusRef}
+              className={styles.sessionInterviewHeaderButton}
+              aria-label={`Interview status: ${status}`}
             >
-              <FontAwesomeIcon icon={isStarting ? faSpinner : faMicrophone} spin={isStarting} />
-              {isStarting ? ' Connecting…' : drafts.length ? ' Start another interview' : ' Start voice interview'}
-            </Button>
-          </div>
-        ) : (
-          <div className={styles.sessionListeningActiveRecorder}>
-            <div className={styles.sessionListeningWaveformShell}>
-              <SessionListeningWaveform
-                streamRef={mediaStreamRef}
-                isActive={isRecorderSessionActive}
-                isPaused={isPaused || isStopping}
-              />
-              <div className={styles.sessionListeningWaveformTimer}>
-                <FontAwesomeIcon
-                  icon={isStopping ? faSpinner : faCircle}
-                  spin={isStopping}
-                  className={isPaused ? styles.sessionListeningTimerDotPaused : styles.sessionListeningTimerDot}
-                />
-                <span>{isStopping ? 'Ending' : isPaused ? 'Paused' : 'Listening'}</span>
-                <span>{formatSessionRecordingElapsed(recordingElapsedSeconds)}</span>
-              </div>
-            </div>
-            <div className={styles.sessionListeningButtonColumn} role="group" aria-label="Interview recording controls">
-              <button
-                type="button"
-                ref={stopControlRef}
-                className={[styles.sessionListeningAudioButton, styles.sessionListeningStopButton].join(' ')}
-                onClick={() => {
-                  void endInterview();
+              <span className={styles.sessionInterviewStatusDot} data-tone={statusTone} aria-hidden="true" />
+              <span className={styles.sessionListeningSrOnly}>{status}</span>
+            </button>
+          </span>
+          <UncontrolledTooltip
+            target="ce-interview-status-help"
+            placement="bottom"
+            trigger="hover focus"
+            autohide={false}
+          >
+            {status}
+          </UncontrolledTooltip>
+        </span>
+      </ModalHeader>
+      <ModalBody>
+        <div className={styles.sessionInterviewPanel} data-testid={E2E_TESTIDS.SESSION_INTERVIEW_PANEL}>
+          {hasImportedResponderContext ? (
+            <div className={styles.sessionInterviewContext}>
+              <Label for="ce-interview-context">Imported responder context</Label>
+              <Input
+                id="ce-interview-context"
+                type="textarea"
+                value={responderContext}
+                onChange={(event) => {
+                  setResponderContext(event.target.value);
+                  setMappingNotice('');
                 }}
-                disabled={isStopping}
-                aria-label={isStopping ? 'Stopping interview' : 'Stop interview'}
-                title={isStopping ? 'Stopping interview' : 'Stop interview and generate drafts'}
-                data-testid={E2E_TESTIDS.SESSION_INTERVIEW_STOP}
+                disabled={isInterviewBusy || mapping}
+                className={styles.sessionInterviewContextInput}
+                data-testid={E2E_TESTIDS.SESSION_INTERVIEW_CONTEXT}
+              />
+            </div>
+          ) : null}
+
+          {researchCoverage ? (
+            <section
+              className={styles.sessionInterviewResearchCoverage}
+              aria-label="Self-reported agent research coverage"
+              data-testid={E2E_TESTIDS.SESSION_INTERVIEW_RESEARCH_COVERAGE}
+            >
+              <strong>Self-reported agent research coverage</strong>
+              <span>{researchCoverageDetails.join(' · ') || 'Coverage counts unavailable'}</span>
+              {researchCoverage.searchScopeNote ? <small>{researchCoverage.searchScopeNote}</small> : null}
+            </section>
+          ) : null}
+
+          {!questions.length ? <p>No accessible questions are available for this interview.</p> : null}
+          <audio ref={audioRef} className={styles.sessionListeningSrOnly} aria-label="Realtime interviewer audio" />
+          {error ? (
+            <div className={styles.sessionListeningError} role="alert">
+              {error}
+            </div>
+          ) : null}
+          <div className={styles.sessionInterviewActions}>
+            {!isRecorderSessionActive ? (
+              <div className={styles.sessionInterviewPrimaryAction}>
+                <Button
+                  color="link"
+                  className={styles.sessionInterviewMicrophone}
+                  aria-label={startLabel}
+                  onClick={() => {
+                    void startInterview();
+                  }}
+                  disabled={mapping || applying || !questions.length || isStarting}
+                  data-testid={E2E_TESTIDS.SESSION_INTERVIEW_START}
+                >
+                  <FontAwesomeIcon icon={isStarting ? faSpinner : faMicrophone} spin={isStarting} />
+                  <span>{startLabel}</span>
+                </Button>
+              </div>
+            ) : (
+              <div className={styles.sessionListeningActiveRecorder}>
+                <div className={styles.sessionListeningWaveformShell}>
+                  <SessionListeningWaveform
+                    streamRef={mediaStreamRef}
+                    isActive={isRecorderSessionActive}
+                    isPaused={isPaused || isStopping}
+                  />
+                  <div className={styles.sessionListeningWaveformTimer}>
+                    <FontAwesomeIcon
+                      icon={isStopping ? faSpinner : faCircle}
+                      spin={isStopping}
+                      className={isPaused ? styles.sessionListeningTimerDotPaused : styles.sessionListeningTimerDot}
+                    />
+                    <span>{isStopping ? 'Ending' : isPaused ? 'Paused' : 'Listening'}</span>
+                    <span>{formatSessionRecordingElapsed(recordingElapsedSeconds)}</span>
+                  </div>
+                </div>
+                <div
+                  className={styles.sessionListeningButtonColumn}
+                  role="group"
+                  aria-label="Interview recording controls"
+                >
+                  <button
+                    type="button"
+                    ref={stopControlRef}
+                    className={[styles.sessionListeningAudioButton, styles.sessionListeningStopButton].join(' ')}
+                    onClick={() => {
+                      void endInterview();
+                    }}
+                    disabled={isStopping}
+                    aria-label={isStopping ? 'Stopping interview' : 'Stop interview'}
+                    title={isStopping ? 'Stopping interview' : 'Stop interview and generate drafts'}
+                    data-testid={E2E_TESTIDS.SESSION_INTERVIEW_STOP}
+                  >
+                    <FontAwesomeIcon icon={isStopping ? faSpinner : faStop} spin={isStopping} />
+                    <span className={styles.sessionListeningSrOnly}>{isStopping ? 'Stopping' : 'Stop'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.sessionListeningAudioButton}
+                    onClick={isPaused ? recorder.resume : recorder.pause}
+                    disabled={isStopping}
+                    aria-label={isPaused ? 'Resume interview' : 'Pause interview'}
+                    title={isPaused ? 'Resume interview' : 'Pause interview'}
+                  >
+                    <FontAwesomeIcon icon={isPaused ? faPlay : faPause} />
+                    <span className={styles.sessionListeningSrOnly}>{isPaused ? 'Resume' : 'Pause'}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+            {!isInterviewBusy &&
+            !drafts.length &&
+            !mappingNotice &&
+            (transcript.trim() || !Array.isArray(prefillPacket?.responses)) &&
+            (transcript.trim() || prefillPacket || responderContext.trim()) ? (
+              <Button
+                outline
+                onClick={() => runMapping()}
+                disabled={mapping}
+                data-testid={E2E_TESTIDS.SESSION_INTERVIEW_GENERATE}
               >
-                <FontAwesomeIcon icon={isStopping ? faSpinner : faStop} spin={isStopping} />
-                <span className={styles.sessionListeningSrOnly}>{isStopping ? 'Stopping' : 'Stop'}</span>
+                {mapping ? (
+                  <>
+                    <FontAwesomeIcon icon={faSpinner} spin /> Mapping…
+                  </>
+                ) : (
+                  'Generate response drafts'
+                )}
+              </Button>
+            ) : null}
+          </div>
+
+          {mappingNotice ? (
+            <div
+              className={styles.sessionInterviewMappingNotice}
+              role="status"
+              aria-live="polite"
+              data-testid={E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE}
+            >
+              {mappingNotice}
+            </div>
+          ) : null}
+
+          {!isInterviewBusy && transcript.trim() ? (
+            <section className={styles.sessionInterviewTranscriptDisclosure}>
+              <button
+                type="button"
+                className={styles.sessionInterviewTranscriptToggle}
+                onClick={() => setShowTranscript((current) => !current)}
+                aria-expanded={showTranscript}
+                aria-controls="ce-session-interview-transcript-content"
+                data-testid={E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT_TOGGLE}
+              >
+                <FontAwesomeIcon
+                  icon={faCaretDown}
+                  className={`${styles.sessionInterviewTranscriptCaret} ${
+                    showTranscript ? '' : styles.sessionInterviewTranscriptCaretCollapsed
+                  }`}
+                />
+                <strong>Interview transcript</strong>
+                <span>{transcript.trim().split(/\s+/).length} words</span>
+              </button>
+              {showTranscript ? (
+                <pre
+                  id="ce-session-interview-transcript-content"
+                  className={styles.sessionInterviewTranscript}
+                  aria-label="Interview transcript"
+                  data-testid={E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT}
+                >
+                  {transcript}
+                </pre>
+              ) : null}
+            </section>
+          ) : null}
+
+          {kickoff ? (
+            <div className={styles.sessionAgentKickoff}>
+              <strong className={styles.sessionAgentKickoffTitle}>
+                Copy and Paste this prompt to augment interview with history from Claude or ChatGPT
+              </strong>
+              <button
+                type="button"
+                className={styles.sessionAgentKickoffToggle}
+                onClick={() => setShowAgentPrompt((current) => !current)}
+                aria-expanded={showAgentPrompt}
+                aria-controls="ce-session-interview-agent-prompt"
+                data-testid={E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE}
+              >
+                <span>{showAgentPrompt ? 'Hide prompt' : 'View prompt'}</span>
+                <FontAwesomeIcon
+                  icon={faCaretDown}
+                  className={`${styles.sessionAgentKickoffCaret} ${
+                    showAgentPrompt ? styles.sessionAgentKickoffCaretExpanded : ''
+                  }`}
+                />
               </button>
               <button
                 type="button"
-                className={styles.sessionListeningAudioButton}
-                onClick={isPaused ? recorder.resume : recorder.pause}
-                disabled={isStopping}
-                aria-label={isPaused ? 'Resume interview' : 'Pause interview'}
-                title={isPaused ? 'Resume interview' : 'Pause interview'}
+                className={`${styles.sessionAgentKickoffCopy} ${promptCopied ? styles.sessionAgentKickoffCopied : ''}`}
+                onClick={() => {
+                  void copyAgentPrompt();
+                }}
+                aria-label={promptCopied ? 'Memory augmentation prompt copied' : 'Copy memory augmentation prompt'}
+                title={promptCopied ? 'Copied' : 'Copy memory augmentation prompt'}
+                data-testid={E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT}
               >
-                <FontAwesomeIcon icon={isPaused ? faPlay : faPause} />
-                <span className={styles.sessionListeningSrOnly}>{isPaused ? 'Resume' : 'Pause'}</span>
+                <FontAwesomeIcon icon={promptCopied ? faCheck : faClipboard} />
               </button>
-            </div>
-          </div>
-        )}
-        {!isInterviewBusy &&
-        !drafts.length &&
-        !mappingNotice &&
-        (transcript.trim() || !Array.isArray(prefillPacket?.responses)) &&
-        (transcript.trim() || prefillPacket || responderContext.trim()) ? (
-          <Button
-            outline
-            onClick={() => runMapping()}
-            disabled={mapping}
-            data-testid={E2E_TESTIDS.SESSION_INTERVIEW_GENERATE}
-          >
-            {mapping ? (
-              <>
-                <FontAwesomeIcon icon={faSpinner} spin /> Mapping…
-              </>
-            ) : (
-              'Generate response drafts'
-            )}
-          </Button>
-        ) : null}
-      </div>
-
-      {mappingNotice ? (
-        <div
-          className={styles.sessionInterviewMappingNotice}
-          role="status"
-          aria-live="polite"
-          data-testid={E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE}
-        >
-          {mappingNotice}
-        </div>
-      ) : null}
-
-      {!isInterviewBusy && transcript.trim() ? (
-        <section className={styles.sessionInterviewTranscriptDisclosure}>
-          <button
-            type="button"
-            className={styles.sessionInterviewTranscriptToggle}
-            onClick={() => setShowTranscript((current) => !current)}
-            aria-expanded={showTranscript}
-            aria-controls="ce-session-interview-transcript-content"
-            data-testid={E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT_TOGGLE}
-          >
-            <FontAwesomeIcon
-              icon={faCaretDown}
-              className={`${styles.sessionInterviewTranscriptCaret} ${
-                showTranscript ? '' : styles.sessionInterviewTranscriptCaretCollapsed
-              }`}
-            />
-            <strong>Interview transcript</strong>
-            <span>{transcript.trim().split(/\s+/).length} words</span>
-          </button>
-          {showTranscript ? (
-            <pre
-              id="ce-session-interview-transcript-content"
-              className={styles.sessionInterviewTranscript}
-              aria-label="Interview transcript"
-              data-testid={E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT}
-            >
-              {transcript}
-            </pre>
-          ) : null}
-        </section>
-      ) : null}
-
-      {kickoff ? (
-        <div className={styles.sessionAgentKickoff}>
-          <strong className={styles.sessionAgentKickoffTitle}>
-            Copy and Paste this prompt to augment interview with history from Claude or ChatGPT
-          </strong>
-          <button
-            type="button"
-            className={styles.sessionAgentKickoffToggle}
-            onClick={() => setShowAgentPrompt((current) => !current)}
-            aria-expanded={showAgentPrompt}
-            aria-controls="ce-session-interview-agent-prompt"
-            data-testid={E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE}
-          >
-            <span>{showAgentPrompt ? 'Hide prompt' : 'View prompt'}</span>
-            <FontAwesomeIcon
-              icon={faCaretDown}
-              className={`${styles.sessionAgentKickoffCaret} ${
-                showAgentPrompt ? styles.sessionAgentKickoffCaretExpanded : ''
-              }`}
-            />
-          </button>
-          <button
-            type="button"
-            className={`${styles.sessionAgentKickoffCopy} ${promptCopied ? styles.sessionAgentKickoffCopied : ''}`}
-            onClick={() => {
-              void copyAgentPrompt();
-            }}
-            aria-label={promptCopied ? 'Memory augmentation prompt copied' : 'Copy memory augmentation prompt'}
-            title={promptCopied ? 'Copied' : 'Copy memory augmentation prompt'}
-            data-testid={E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT}
-          >
-            <FontAwesomeIcon icon={promptCopied ? faCheck : faClipboard} />
-          </button>
-          {showAgentPrompt ? (
-            <code
-              id="ce-session-interview-agent-prompt"
-              className={styles.sessionAgentKickoffPrompt}
-              data-testid={E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT}
-            >
-              {kickoff}
-            </code>
-          ) : null}
-        </div>
-      ) : null}
-
-      {drafts.length && !isInterviewBusy && !mapping ? (
-        <div className={styles.sessionInterviewReview} data-testid={E2E_TESTIDS.SESSION_INTERVIEW_REVIEW}>
-          <div className={styles.sessionInterviewReviewHeader}>
-            <h4 ref={reviewRef} tabIndex={-1}>
-              Review proposed responses
-            </h4>
-            <span>
-              {drafts.filter((draft) => selected[draft.questionId]).length} of {drafts.length} selected
-            </span>
-          </div>
-          {drafts.map((draft) => (
-            <SessionInterviewDraftCard
-              key={draft.questionId}
-              draft={draft}
-              edited={editedDrafts[draft.questionId] || draft}
-              question={questions.find((question) => question.id === draft.questionId)}
-              selected={Boolean(selected[draft.questionId])}
-              existing={hasDraftValue(responseFieldValue(existingResponseSlice, 'answers', draft.questionId))}
-              disabled={applying}
-              onSelect={(value) => setSelected((current) => ({ ...current, [draft.questionId]: value }))}
-              onEdit={(patch) =>
-                setEditedDrafts((current) => ({
-                  ...current,
-                  [draft.questionId]: { ...current[draft.questionId], ...patch },
-                }))
-              }
-              renderAnswerInput={renderAnswerInput}
-              renderAdditionalInput={renderAdditionalInput}
-              renderFieldLock={renderFieldLock}
-            />
-          ))}
-          <div className={styles.sessionInterviewReviewActions}>
-            <div className={styles.sessionInterviewConsentOptions}>
-              {prefillPacket ? (
-                <Label check className={styles.sessionInterviewProvenance}>
-                  <Input
-                    type="checkbox"
-                    checked={includeProvenance}
-                    onChange={(event) => setIncludeProvenance(event.target.checked)}
-                  />{' '}
-                  Include self-reported AI platform/model provenance with submitted responses
-                </Label>
-              ) : null}
-              <div className={styles.sessionInterviewResearchConsent}>
-                <Label check className={styles.sessionInterviewProvenance}>
-                  <Input
-                    type="checkbox"
-                    checked={includePredictionComparison}
-                    onChange={(event) => setIncludePredictionComparison(event.target.checked)}
-                    data-testid={E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON}
-                  />{' '}
-                  <span>Include the original AI prediction and final submitted answer for accuracy research</span>
-                </Label>
-                <button
-                  type="button"
-                  id="ce-interview-research-help"
-                  className={styles.sessionInterviewResearchHelp}
-                  aria-label="About accuracy research"
-                  aria-describedby="ce-interview-research-description"
+              {showAgentPrompt ? (
+                <code
+                  id="ce-session-interview-agent-prompt"
+                  className={styles.sessionAgentKickoffPrompt}
+                  data-testid={E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT}
                 >
-                  <FontAwesomeIcon icon={faQuestionCircle} />
-                </button>
-              </div>
-              <span id="ce-interview-research-description" className={styles.sessionListeningSrOnly}>
-                Includes original predictions, your edits, and drafts you did not select. Unselected drafts are recorded
-                as research metadata, not submitted answers. Final answers are compared at submission; encrypted answer
-                and comment text is excluded from research metadata.
-              </span>
-              <UncontrolledTooltip target="ce-interview-research-help" placement="top" trigger="hover focus">
-                Includes original predictions, your edits, and unselected drafts. Unselected drafts are research
-                metadata, not submitted answers. Encrypted answer and comment text is excluded.
-              </UncontrolledTooltip>
-              {importedResponderName ? (
-                <Label check className={styles.sessionInterviewProvenance}>
-                  <Input
-                    type="checkbox"
-                    checked={includeResponderName}
-                    onChange={(event) => setIncludeResponderName(event.target.checked)}
-                    data-testid={E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME}
-                  />{' '}
-                  Include “{importedResponderName}” as the responder name with submitted responses
-                </Label>
+                  {kickoff}
+                </code>
               ) : null}
             </div>
-            <Button
-              color="primary"
-              onClick={() => {
-                void applyDrafts();
-              }}
-              disabled={applying || mapping || isInterviewBusy || !drafts.some((draft) => selected[draft.questionId])}
-              data-testid={E2E_TESTIDS.SESSION_INTERVIEW_APPLY}
-            >
-              {applying ? 'Preparing submission…' : 'Submit responses'}
-            </Button>
-          </div>
+          ) : null}
+
+          {drafts.length && !isInterviewBusy && !mapping ? (
+            <div className={styles.sessionInterviewReview} data-testid={E2E_TESTIDS.SESSION_INTERVIEW_REVIEW}>
+              <div className={styles.sessionInterviewReviewHeader}>
+                <h4 ref={reviewRef} tabIndex={-1}>
+                  Review proposed responses
+                </h4>
+                <span>
+                  {drafts.filter((draft) => selected[draft.questionId]).length} of {drafts.length} selected
+                </span>
+              </div>
+              {drafts.map((draft) => (
+                <SessionInterviewDraftCard
+                  key={draft.questionId}
+                  draft={draft}
+                  edited={editedDrafts[draft.questionId] || draft}
+                  question={questions.find((question) => question.id === draft.questionId)}
+                  selected={Boolean(selected[draft.questionId])}
+                  existing={hasDraftValue(responseFieldValue(existingResponseSlice, 'answers', draft.questionId))}
+                  disabled={applying}
+                  onSelect={(value) => setSelected((current) => ({ ...current, [draft.questionId]: value }))}
+                  onEdit={(patch) =>
+                    setEditedDrafts((current) => ({
+                      ...current,
+                      [draft.questionId]: { ...current[draft.questionId], ...patch },
+                    }))
+                  }
+                  renderAnswerInput={renderAnswerInput}
+                  renderAdditionalInput={renderAdditionalInput}
+                  renderFieldLock={renderFieldLock}
+                />
+              ))}
+              <div className={styles.sessionInterviewReviewActions}>
+                <div className={styles.sessionInterviewConsentOptions}>
+                  {prefillPacket ? (
+                    <Label check className={styles.sessionInterviewProvenance}>
+                      <Input
+                        type="checkbox"
+                        checked={includeProvenance}
+                        onChange={(event) => setIncludeProvenance(event.target.checked)}
+                      />{' '}
+                      Include self-reported AI platform/model provenance with submitted responses
+                    </Label>
+                  ) : null}
+                  <div className={styles.sessionInterviewResearchConsent}>
+                    <Label check className={styles.sessionInterviewProvenance}>
+                      <Input
+                        type="checkbox"
+                        checked={includePredictionComparison}
+                        onChange={(event) => setIncludePredictionComparison(event.target.checked)}
+                        data-testid={E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON}
+                      />{' '}
+                      <span>Include the original AI prediction and final submitted answer for accuracy research</span>
+                    </Label>
+                    <button
+                      type="button"
+                      id="ce-interview-research-help"
+                      className={styles.sessionInterviewResearchHelp}
+                      aria-label="About accuracy research"
+                      aria-describedby="ce-interview-research-description"
+                    >
+                      <FontAwesomeIcon icon={faQuestionCircle} />
+                    </button>
+                  </div>
+                  <span id="ce-interview-research-description" className={styles.sessionListeningSrOnly}>
+                    Includes original predictions, your edits, and drafts you did not select. Unselected drafts are
+                    recorded as research metadata, not submitted answers. Final answers are compared at submission;
+                    encrypted answer and comment text is excluded from research metadata.
+                  </span>
+                  <UncontrolledTooltip target="ce-interview-research-help" placement="top" trigger="hover focus">
+                    Includes original predictions, your edits, and unselected drafts. Unselected drafts are research
+                    metadata, not submitted answers. Encrypted answer and comment text is excluded.
+                  </UncontrolledTooltip>
+                  {importedResponderName ? (
+                    <Label check className={styles.sessionInterviewProvenance}>
+                      <Input
+                        type="checkbox"
+                        checked={includeResponderName}
+                        onChange={(event) => setIncludeResponderName(event.target.checked)}
+                        data-testid={E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME}
+                      />{' '}
+                      Include “{importedResponderName}” as the responder name with submitted responses
+                    </Label>
+                  ) : null}
+                </div>
+                <Button
+                  color="primary"
+                  onClick={() => {
+                    void applyDrafts();
+                  }}
+                  disabled={
+                    applying || mapping || isInterviewBusy || !drafts.some((draft) => selected[draft.questionId])
+                  }
+                  data-testid={E2E_TESTIDS.SESSION_INTERVIEW_APPLY}
+                >
+                  {applying ? 'Preparing submission…' : 'Submit responses'}
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </div>
-      ) : null}
-    </div>
+      </ModalBody>
+    </>
   );
 }
 
@@ -780,39 +827,43 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
       contentClassName={styles.sessionVoiceModeModal}
       data-testid={E2E_TESTIDS.SESSION_VOICE_MODE_MODAL}
     >
-      <ModalHeader id="ce-session-voice-mode-title" toggle={onClose}>
-        {title}
-      </ModalHeader>
-      <ModalBody>
-        {!mode ? (
-          <div className={styles.sessionVoiceModeChooser} data-testid={E2E_TESTIDS.SESSION_VOICE_MODE_CHOOSER}>
-            <button
-              type="button"
-              onClick={() => onSelectMode('interview')}
-              data-testid={E2E_TESTIDS.SESSION_VOICE_MODE_INTERVIEW}
-            >
-              <FontAwesomeIcon icon={faMicrophone} />
-              <strong>Interview</strong>
-              <span>One person. A voice interviewer generates reviewable response drafts.</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => onSelectMode('recordGroup')}
-              data-testid={E2E_TESTIDS.SESSION_VOICE_MODE_GROUP}
-            >
-              <FontAwesomeIcon icon={faComments} />
-              <strong>Group Conversation</strong>
-              <span>Record a group discussion and generate new question drafts from it.</span>
-            </button>
-          </div>
-        ) : mode === 'interview' ? (
-          isOpen ? (
-            <SessionInterviewPanel {...props} questions={questions} />
-          ) : null
-        ) : (
-          <SessionListeningPanel {...props} panelMode="recordGroup" onClose={onClose} />
-        )}
-      </ModalBody>
+      {mode === 'interview' ? (
+        isOpen ? (
+          <SessionInterviewPanel {...props} questions={questions} />
+        ) : null
+      ) : (
+        <>
+          <ModalHeader id="ce-session-voice-mode-title" toggle={onClose}>
+            {title}
+          </ModalHeader>
+          <ModalBody>
+            {!mode ? (
+              <div className={styles.sessionVoiceModeChooser} data-testid={E2E_TESTIDS.SESSION_VOICE_MODE_CHOOSER}>
+                <button
+                  type="button"
+                  onClick={() => onSelectMode('interview')}
+                  data-testid={E2E_TESTIDS.SESSION_VOICE_MODE_INTERVIEW}
+                >
+                  <FontAwesomeIcon icon={faMicrophone} />
+                  <strong>Interview</strong>
+                  <span>One person. A voice interviewer generates reviewable response drafts.</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSelectMode('recordGroup')}
+                  data-testid={E2E_TESTIDS.SESSION_VOICE_MODE_GROUP}
+                >
+                  <FontAwesomeIcon icon={faComments} />
+                  <strong>Group Conversation</strong>
+                  <span>Record a group discussion and generate new question drafts from it.</span>
+                </button>
+              </div>
+            ) : (
+              <SessionListeningPanel {...props} panelMode="recordGroup" onClose={onClose} />
+            )}
+          </ModalBody>
+        </>
+      )}
       {!mode ? (
         <ModalFooter>
           <Button outline onClick={onClose}>

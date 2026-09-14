@@ -3401,10 +3401,80 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   gap: 10px;
 }
 
-.sessionInterviewHint {
-  margin: 0;
+.sessionInterviewHeader {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sessionInterviewHeaderButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px;
+  border: 0 !important;
+  box-shadow: none !important;
+  border-radius: var(--ce-radius-6);
+  background: transparent !important;
+  color: var(--ce-titlebar-text) !important;
+  font-size: 1rem;
+
+  &:hover {
+    background: color-mix(in srgb, currentColor 12%, transparent) !important;
+  }
+
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+}
+
+.sessionInterviewStatusDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--ce-status-success-bright);
+  box-shadow: 0 0 0 1px var(--ce-titlebar-text);
+
+  &[data-tone='pending'] {
+    background: var(--ce-status-warning);
+  }
+  &[data-tone='error'] {
+    background: var(--ce-status-error);
+  }
+}
+
+.sessionInterviewPanel .sessionInterviewMicrophone {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 24px;
+  background: transparent;
   color: var(--ce-panel-text);
-  line-height: 1.5;
+  font-family: var(--ce-font-body);
+  font-weight: 700;
+  text-decoration: none;
+
+  svg {
+    font-size: 3.5rem;
+    color: var(--ce-action-accent);
+  }
+
+  &:hover:not(:disabled),
+  &:focus:not(:disabled),
+  &:active:not(:disabled) {
+    background: var(--ce-card-bg) !important;
+    color: var(--ce-panel-text) !important;
+    text-decoration: none;
+  }
+
+  &:disabled svg {
+    color: var(--ce-control-text);
+  }
 }
 
 .sessionInterviewPanel .sessionListeningWaveformTimer {

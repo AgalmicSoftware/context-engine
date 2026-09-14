@@ -41,8 +41,14 @@ Session creators can change the model in `/new` under **Optional details**
 (or **More options** in Customize) → **Interview voice settings** →
 **Interview voice model**.
 
-The UI shows Ready, Connecting, Listening, Paused, Ending, Preparing drafts,
-Review drafts, or Error. Listening requires a connected peer, an open data
+The Interview header has a status dot whose tooltip shows Ready, Connecting,
+Listening, Paused, Ending, Preparing drafts, Review drafts, or Error. The dot
+is green when ready or listening, amber during transitions or pauses, and red
+on errors. Status changes are also announced to screen readers. The adjacent
+question-mark tooltip explains the current phase; both tooltips work on hover,
+keyboard focus, or tap. A large microphone starts the interview.
+
+Listening requires a connected peer, an open data
 channel, a started voice session, and a live enabled microphone. Connecting
 keeps the microphone track disabled until readiness. Pause disables microphone
 transmission and mutes interviewer playback; it keeps the session connected.
