@@ -2,7 +2,11 @@ import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import SessionVoiceModeModal from './SessionVoiceModeModal';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { hashInterviewQuestions, mapInterviewEvidenceToResponses } from './sessionInterview';
+import {
+  buildExternalInterviewKickoff,
+  hashInterviewQuestions,
+  mapInterviewEvidenceToResponses,
+} from './sessionInterview';
 import { startSessionRealtimeInterview } from '../../utilities/audio/realtimeInterviewClient';
 
 jest.mock('./SessionListeningPanel', () => ({
@@ -222,6 +226,24 @@ describe('SessionVoiceModeModal', () => {
 
     fireEvent.click(promptToggle);
     expect(promptToggle).toHaveAccessibleName('Hide prompt');
+    const displayedPrompt = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT);
+    const plainPrompt = buildExternalInterviewKickoff({
+      workerUrl: baseProps.workerUrl,
+      sessionSlug: baseProps.sessionSlug,
+      sessionUrl: `${window.location.origin}${window.location.pathname}`,
+    });
+    const displayedParagraphs = Array.from(displayedPrompt.querySelectorAll('p'));
+    expect(displayedParagraphs.length).toBeGreaterThan(8);
+    expect(displayedPrompt.querySelectorAll('strong').length).toBeGreaterThan(3);
+    expect(
+      displayedParagraphs
+        .map((paragraph) => paragraph.textContent)
+        .join(' ')
+        .replace(/\s+/g, ' '),
+    ).toBe(plainPrompt.replace(/\s+/g, ' '));
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(plainPrompt);
+    expect(plainPrompt).not.toMatch(/<strong>|\*\*/);
+
     expect(promptToggle).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT)).toHaveTextContent(
       /review-only Context Engine interview prefill.*https:\/\/worker\.example\/agent\/interview-catalog/,

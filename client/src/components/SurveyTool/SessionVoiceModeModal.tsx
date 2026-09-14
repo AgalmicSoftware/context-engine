@@ -15,6 +15,7 @@ import {
   faQuestionCircle,
 } from '@fortawesome/free-solid-svg-icons';
 import styles from './SurveyTool.module.scss';
+import SessionInterviewPrompt from './SessionInterviewPrompt';
 import SessionInterviewDraftCard, { type InterviewQuestionControls } from './SessionInterviewDraftCard';
 import SessionListeningPanel, {
   formatSessionRecordingElapsed,
@@ -696,13 +697,13 @@ function SessionInterviewPanel({
                 <FontAwesomeIcon icon={promptCopied ? faCheck : faClipboard} />
               </button>
               {showAgentPrompt ? (
-                <code
+                <div
                   id="ce-session-interview-agent-prompt"
                   className={styles.sessionAgentKickoffPrompt}
                   data-testid={E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT}
                 >
-                  {kickoff}
-                </code>
+                  <SessionInterviewPrompt prompt={kickoff} />
+                </div>
               ) : null}
             </div>
           ) : null}

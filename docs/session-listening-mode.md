@@ -47,6 +47,8 @@ is green when ready or listening, amber during transitions or pauses, and red
 on errors. Status changes are also announced to screen readers. The adjacent
 question-mark tooltip explains the current phase; both tooltips work on hover,
 keyboard focus, or tap. A large microphone starts the interview.
+The augmentation prompt displays paragraphs and bold key points for readability;
+its Copy button copies the original plain text without formatting.
 
 Listening requires a connected peer, an open data
 channel, a started voice session, and a live enabled microphone. Connecting
