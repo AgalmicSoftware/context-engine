@@ -621,12 +621,12 @@ describe('SessionVoiceModeModal', () => {
     expect(metadata).toHaveTextContent('Memories: 4 used / 20 searched');
     expect(metadata).toHaveTextContent('Chat search did not expose a total scanned count.');
     expect(screen.getByDisplayValue('A cautious prediction')).toBeInTheDocument();
-    expect(screen.getByLabelText('Prediction confidence: 22% (Weak inference)')).toBeInTheDocument();
-    expect(screen.getByRole('progressbar', { name: 'Confidence for What matters?' })).toHaveAttribute(
+    expect(screen.getByLabelText('AI-estimated confidence: 22% (Weak inference)')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: 'AI-estimated confidence for What matters?' })).toHaveAttribute(
       'aria-valuenow',
       '22',
     );
-    expect(screen.getByText('22% confidence')).toBeInTheDocument();
+    expect(screen.getByText('22% AI-estimated confidence')).toBeInTheDocument();
     expect(screen.getByText('Weak inference')).toBeInTheDocument();
     expect(screen.queryByText(/related but indirect statement/i)).not.toBeInTheDocument();
     const basisToggle = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_DRAFT_BASIS_TOGGLE);

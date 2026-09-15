@@ -118,8 +118,9 @@ to response drafts. Imported context remains editable but the context field
 stays hidden during a normal voice-only interview. Drafts may include comments,
 importance, and conviction only when the evidence explicitly supports them.
 Every generated draft also carries a confidence value from 0 to 1. The review
-panel renders it as weak inference (0–39%), moderate support (40–69%), or strong
-support (70–100%) so a responder can keep, edit, or reject tentative answers
+panel labels this **AI-estimated confidence**, describing the AI’s estimate of
+how well the evidence supports its draft. It renders the estimate as weak
+inference (0–39%), moderate support (40–69%), or strong support (70–100%) so a responder can keep, edit, or reject tentative answers
 instead of losing useful low-confidence signal.
 If the evidence cannot support any session answer, the modal says that there
 is not enough information, explains that no directly relevant detail was

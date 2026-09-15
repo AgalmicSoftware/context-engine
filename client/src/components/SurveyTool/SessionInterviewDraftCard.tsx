@@ -161,18 +161,19 @@ export default function SessionInterviewDraftCard({
       {draft.confidence !== undefined ? (
         <div
           className={styles.sessionInterviewConfidence}
-          aria-label={`Prediction confidence: ${percent}% (${confidenceLabel})`}
+          title="The AI’s estimate of how well this draft is supported by the available evidence."
+          aria-label={`AI-estimated confidence: ${percent}% (${confidenceLabel})`}
           data-testid={E2E_TESTIDS.SESSION_INTERVIEW_DRAFT_CONFIDENCE}
           data-ce-question-id={draft.questionId}
         >
           <div className={styles.sessionInterviewConfidenceMeta}>
-            <strong>{percent}% confidence</strong>
+            <strong>{percent}% AI-estimated confidence</strong>
             <span>{confidenceLabel}</span>
           </div>
           <div
             className={styles.sessionInterviewConfidenceTrack}
             role="progressbar"
-            aria-label={`Confidence for ${prompt}`}
+            aria-label={`AI-estimated confidence for ${prompt}`}
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={percent}
