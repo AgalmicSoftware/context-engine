@@ -1,6 +1,7 @@
 import { useInterviewQuestionUpdates } from './useInterviewQuestionUpdates';
 import SessionInterviewSuggestions from './SessionInterviewSuggestions';
 import SessionInterviewReviewSection from './SessionInterviewReviewSection';
+import SessionInterviewResearchConsent from './SessionInterviewResearchConsent';
 import type { GeneratedSurveyStatement } from './SurveyGenerator/surveyGeneratorHelpers';
 import { useInterviewOpening } from './useInterviewOpening';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -165,6 +166,7 @@ function SessionInterviewPanel({
   const [drafts, setDrafts] = useState<InterviewDraftResponse[]>([]);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [editedDrafts, setEditedDrafts] = useState<Record<string, InterviewDraftResponse>>({});
+  const hasAiPrefill = Boolean(prefillPacket && prefillPacket.source.modelId !== 'direct-user-context');
   const [includeProvenance, setIncludeProvenance] = useState(true);
   const [includePredictionComparison, setIncludePredictionComparison] = useState(true);
   const [includeResponderName, setIncludeResponderName] = useState(false);
@@ -418,8 +420,8 @@ function SessionInterviewPanel({
           applied,
           prefillPacket?.source || directContextSource,
           prefillPacket,
-          Boolean(prefillPacket) && includeProvenance,
-          includePredictionComparison,
+          hasAiPrefill && includeProvenance,
+          hasAiPrefill && includePredictionComparison,
           includeResponderName ? String(prefillPacket?.responderContext?.name || '').trim() : '',
           drafts.map((draft) => ({
             ...editedDrafts[draft.questionId],
@@ -779,45 +781,19 @@ function SessionInterviewPanel({
               ))}
               <div className={styles.sessionInterviewReviewActions}>
                 <div className={styles.sessionInterviewConsentOptions}>
-                  {prefillPacket ? (
-                    <Label check className={styles.sessionInterviewProvenance}>
-                      <Input
-                        type="checkbox"
-                        checked={includeProvenance}
-                        onChange={(event) => setIncludeProvenance(event.target.checked)}
-                      />{' '}
-                      Include self-reported AI platform/model provenance with submitted responses
-                    </Label>
+                  {hasAiPrefill && prefillPacket ? (
+                    <SessionInterviewResearchConsent
+                      packet={prefillPacket}
+                      includeProvenance={includeProvenance}
+                      includeComparison={includePredictionComparison}
+                      onProvenanceChange={setIncludeProvenance}
+                      onComparisonChange={setIncludePredictionComparison}
+                      coverageDetails={researchCoverageDetails}
+                      selectedCount={drafts.filter((draft) => selected[draft.questionId]).length}
+                      unselectedCount={drafts.filter((draft) => !selected[draft.questionId]).length}
+                      disabled={applying}
+                    />
                   ) : null}
-                  <div className={styles.sessionInterviewResearchConsent}>
-                    <Label check className={styles.sessionInterviewProvenance}>
-                      <Input
-                        type="checkbox"
-                        checked={includePredictionComparison}
-                        onChange={(event) => setIncludePredictionComparison(event.target.checked)}
-                        data-testid={E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON}
-                      />{' '}
-                      <span>Include the original AI prediction and final submitted answer for accuracy research</span>
-                    </Label>
-                    <button
-                      type="button"
-                      id="ce-interview-research-help"
-                      className={styles.sessionInterviewResearchHelp}
-                      aria-label="About accuracy research"
-                      aria-describedby="ce-interview-research-description"
-                    >
-                      <FontAwesomeIcon icon={faQuestionCircle} />
-                    </button>
-                  </div>
-                  <span id="ce-interview-research-description" className={styles.sessionListeningSrOnly}>
-                    Includes original predictions, your edits, and drafts you did not select. Unselected drafts are
-                    recorded as research metadata, not submitted answers. Final answers are compared at submission;
-                    encrypted answer and comment text is excluded from research metadata.
-                  </span>
-                  <UncontrolledTooltip target="ce-interview-research-help" placement="top" trigger="hover focus">
-                    Includes original predictions, your edits, and unselected drafts. Unselected drafts are research
-                    metadata, not submitted answers. Encrypted answer and comment text is excluded.
-                  </UncontrolledTooltip>
                   {importedResponderName ? (
                     <Label check className={styles.sessionInterviewProvenance}>
                       <Input

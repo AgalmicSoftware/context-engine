@@ -132,7 +132,13 @@ Stopping alone never submits answers. The default-on platform provenance option
 appears only when an AI augmentation packet was imported. When it is retained,
 submitted response metadata keeps the prompt/question-set revision
 and self-reported source platform/model. A separate accuracy-research checkbox
-is also on by default. It records the original AI prediction, the final submitted
+also appears only for imported AI prefill and is on by default. Ordinary voice
+interviews neither show this option nor enable prediction-comparison metadata.
+An **AI prefill metadata · model** disclosure shows the self-reported model and
+expands to explain the included platform, revision, question-set hash, coverage
+counts, prediction fields, and selected/unselected draft counts. Its contents
+reflect both consent checkboxes, including which metadata is excluded.
+Accuracy research records the original AI prediction, the final submitted
 answer, the fields that changed, and the prediction confidence so model fidelity
 can be evaluated without treating low-confidence drafts as unusable. Responders
 can disable either consent independently before submitting. Its question-mark

@@ -3527,6 +3527,37 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   gap: 4px;
 }
 
+.sessionInterviewMetadata {
+  padding: 12px;
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-surface-sunken);
+  color: var(--ce-panel-text);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+
+  summary {
+    cursor: pointer;
+    font-weight: 700;
+
+    &:focus-visible {
+      outline: 2px solid var(--ce-focus-ring);
+      outline-offset: 4px;
+    }
+  }
+
+  dl, p, ul {
+    margin: 12px 0 0;
+  }
+
+  dd {
+    margin: 0 0 8px;
+  }
+
+  ul {
+    padding-left: 20px;
+  }
+}
+
 .sessionInterviewPanel :global(.btn-primary) {
   background: var(--ce-action-accent);
   color: var(--ce-action-accent-text);
@@ -3695,7 +3726,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   &:hover,
   &:focus-visible {
-    color: var(--ce-action-accent);
+    color: var(--ce-panel-text);
     opacity: 1;
     outline: 2px solid var(--ce-focus-ring);
     outline-offset: 3px;
@@ -4056,6 +4087,16 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   border-top: 1px solid var(--ce-card-border);
   background: var(--ce-surface-sunken);
   box-shadow: 0 -10px 24px color-mix(in srgb, var(--ce-overlay-base) 18%, transparent);
+
+  &:has(.sessionInterviewMetadata) {
+    position: relative;
+    bottom: auto;
+    flex-direction: column;
+    align-items: stretch;
+    margin: 0;
+    padding: 12px 0 0;
+    box-shadow: none;
+  }
 }
 
 .sessionInterviewProvenance {

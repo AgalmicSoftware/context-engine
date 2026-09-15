@@ -164,6 +164,37 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.getByText(/Edited comments/)).toHaveTextContent('User: Edited comments');
   });
 
+  it('does not treat direct user context as an AI prefill for research consent', async () => {
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        prefillPacket={{
+          version: 1,
+          sessionSlug: 'demo',
+          responderContext: { summary: 'My own context' },
+          source: { platform: 'other', modelId: 'direct-user-context', verification: 'self_reported' },
+          responses: [{ questionId: 'q1', answer: 'A reviewed answer', confidence: 0.8 }],
+        }}
+      />,
+    );
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON)).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'AI prefill metadata' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    await waitFor(() =>
+      expect(baseProps.onRecordProvenance).toHaveBeenCalledWith(
+        expect.any(Array),
+        expect.any(Object),
+        expect.any(Object),
+        false,
+        false,
+        '',
+        expect.any(Array),
+      ),
+    );
+  });
+
   it('puts guidance and the live status in accessible header tooltips', async () => {
     render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
     const help = screen.getByRole('button', { name: 'About Interview' });
@@ -210,10 +241,21 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.getByRole('button', { name: 'About accuracy research' })).toHaveAccessibleDescription(
       /drafts you did not select/,
     );
+    const metadata = screen.getByRole('group', { name: 'AI prefill metadata' });
+    expect(metadata).not.toHaveAttribute('open');
+    expect(metadata.querySelector('summary')).toHaveTextContent('AI prefill metadata · example');
+    fireEvent.click(metadata.querySelector('summary')!);
+    expect(metadata).toHaveAttribute('open');
+    expect(metadata).toHaveTextContent('Claude');
+    expect(metadata).toHaveTextContent('Self-reported');
+    expect(metadata).toHaveTextContent('ce-interview-brief-v4');
+    expect(metadata).toHaveTextContent('a'.repeat(64));
+    expect(metadata).toHaveTextContent('2 selected drafts and 0 unselected drafts');
     fireEvent.change(screen.getByDisplayValue('Original one'), { target: { value: 'Edited one' } });
     fireEvent.change(screen.getByDisplayValue('Relevant explanation'), { target: { value: 'Edited explanation' } });
     fireEvent.change(screen.getByDisplayValue('Original two'), { target: { value: 'Edited two' } });
     fireEvent.click(screen.getByRole('button', { name: 'Remove draft for Second question?' }));
+    expect(metadata).toHaveTextContent('1 selected draft and 1 unselected draft');
     expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Submit responses' }));
     await waitFor(() => expect(baseProps.onSubmitResponses).toHaveBeenCalledTimes(1));
@@ -428,7 +470,8 @@ describe('SessionVoiceModeModal', () => {
     const toggle = await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT_TOGGLE);
     expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).toBeInTheDocument();
     expect(screen.queryByLabelText(/Include self-reported AI platform/)).not.toBeInTheDocument();
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON)).toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON)).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'AI prefill metadata' })).not.toBeInTheDocument();
     expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
     expect(screen.queryByLabelText('Pause interview')).not.toBeInTheDocument();
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
@@ -443,6 +486,18 @@ describe('SessionVoiceModeModal', () => {
     await waitFor(() =>
       expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalledWith(
         expect.objectContaining({ transcript: 'Responder: Reversible decisions matter.' }),
+      ),
+    );
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    await waitFor(() =>
+      expect(baseProps.onRecordProvenance).toHaveBeenCalledWith(
+        expect.any(Array),
+        null,
+        null,
+        false,
+        false,
+        '',
+        expect.any(Array),
       ),
     );
   });
@@ -539,6 +594,10 @@ describe('SessionVoiceModeModal', () => {
     expect(coverage).toHaveTextContent('Connected sources: 1 used / 3 searched');
     expect(coverage).toHaveTextContent('15 user statements used');
     expect(coverage).toHaveTextContent('Chat search did not expose a total scanned count.');
+    const metadata = screen.getByRole('group', { name: 'AI prefill metadata' });
+    fireEvent.click(metadata.querySelector('summary')!);
+    expect(metadata).toHaveTextContent('Memories: 4 used / 20 searched');
+    expect(metadata).toHaveTextContent('Chat search did not expose a total scanned count.');
     expect(screen.getByDisplayValue('A cautious prediction')).toBeInTheDocument();
     expect(screen.getByLabelText('Prediction confidence: 22% (Weak inference)')).toBeInTheDocument();
     expect(screen.getByRole('progressbar', { name: 'Confidence for What matters?' })).toHaveAttribute(
@@ -676,7 +735,12 @@ describe('SessionVoiceModeModal', () => {
     const includeComparison = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON);
     expect(includeComparison).toBeChecked();
     fireEvent.click(screen.getByLabelText(/Include self-reported AI platform\/model provenance/i));
+    const metadata = screen.getByRole('group', { name: 'AI prefill metadata' });
+    fireEvent.click(metadata.querySelector('summary')!);
+    expect(metadata).toHaveTextContent('Platform, model, revision, and coverage details will not be included.');
+    expect(metadata).not.toHaveTextContent('a'.repeat(64));
     fireEvent.click(includeComparison);
+    expect(metadata).toHaveTextContent('Predictions, edits, and unselected drafts will not be included.');
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
 
     await waitFor(() =>
