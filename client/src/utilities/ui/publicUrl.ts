@@ -13,6 +13,9 @@ const BUNDLED_PUBLIC_URL_PROCESS: ProcWithEnv = { env: process.env };
 export const readPublicUrlBasePath = (proc: ProcWithEnv = BUNDLED_PUBLIC_URL_PROCESS): string => {
   const raw = toStr(proc?.env?.PUBLIC_URL || '').trim();
   if (!raw) return '';
+  // Relative deployment paths are already paths. Parsing them as absolute URLs
+  // throws on every route lookup, which becomes expensive across a question list.
+  if (!/^[a-z][a-z\d+.-]*:/i.test(raw)) return raw.replace(/\/+$/, '');
   try {
     return toStr(new URL(raw).pathname || '')
       .trim()
