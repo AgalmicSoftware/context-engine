@@ -1520,3 +1520,82 @@ $user-page-background: var(--ce-surface-sunken);
     transition-duration: 0.01ms !important;
   }
 }
+
+// Interview reviews show the proposed questions, with the normal upload and tag editor underneath.
+.interviewQuestionReview.createSurveyContainer {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+
+  .questionContainer {
+    position: relative;
+    padding: 20px;
+    border-radius: var(--ce-radius-20);
+    background: var(--ce-color-surface);
+    box-shadow: var(--ce-card-shadow);
+  }
+
+  .questionHeader {
+    justify-content: flex-end;
+    margin-bottom: 0;
+  }
+
+  .filterBubble {
+    color: var(--ce-panel-text);
+  }
+
+  .questionMetadata {
+    margin-top: 24px;
+  }
+
+  .tagsContainer {
+    flex-wrap: wrap;
+  }
+
+  .tagInputGroup {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .tagInputField {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+.interviewQuestionPrompt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--ce-panel-text);
+  font-family: var(--ce-font-body);
+
+  h3 {
+    flex: 1 1 180px;
+    color: var(--ce-panel-text);
+    margin: 0;
+    font-family: inherit;
+    font-size: 1.4rem;
+    font-weight: 800;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+  }
+
+  button {
+    border: 0;
+    background: transparent;
+    color: var(--ce-panel-text);
+    font: inherit;
+    padding: 6px;
+    cursor: pointer;
+    &:focus-visible {
+      outline: 2px solid var(--ce-focus-ring);
+      outline-offset: 2px;
+    }
+  }
+}

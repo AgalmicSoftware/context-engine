@@ -43,7 +43,11 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
   });
 
   it('supports the Interview upload label and styling through the existing submit handler', () => {
-    const instance = makeInstance({ questionSubmitLabel: 'Upload Questions', submitClassName: 'interviewSubmit' });
+    const instance = makeInstance({
+      interviewQuestionReview: true,
+      questionSubmitLabel: 'Upload Questions',
+      submitClassName: 'interviewSubmit',
+    });
     instance.state.isStandaloneQuestion = true;
     instance.state.showAutoTool = false;
     instance.state.questions = [
@@ -57,6 +61,12 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     expect(treeHasText(buttons[0], 'Upload Questions')).toBe(true);
     expect(nodeHasClassName(buttons[0], 'interviewSubmit')).toBe(true);
     expect(buttons[0].props.onClick).toBe(instance.handleSubmitButtonClick);
+    const tree = instance.render();
+    expect(treeHasText(tree, 'Choose Question Type')).toBe(false);
+    expect(collectTreeNodes(tree, (node) => nodeHasClassName(node, 'modeHeader'))).toHaveLength(0);
+    expect(
+      collectTreeNodes(tree, (node) => node?.props?.['data-testid'] === E2E_TESTIDS.CREATE_QUESTION_TAG_INPUT),
+    ).toHaveLength(1);
   });
 
   it('renders the survey/questions toggle immediately on initial load', () => {

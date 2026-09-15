@@ -16,12 +16,14 @@ export default function SessionInterviewSuggestions({
     <SessionInterviewReviewSection
       title={`Suggested new questions (${questions.length})`}
       className={styles.sessionInterviewSuggestions}
+      helpId="ce-interview-suggestions-help"
+      help="Review and edit these question drafts and tags before uploading them. They have not been added to the session."
     >
-      <p>Review and edit these question drafts before uploading them. They have not been added to the session.</p>
       <CreateQuestionsAndSurveys
         {...creatorProps}
         preformedQuestions={questions}
         preformedMode="questions"
+        interviewQuestionReview
         questionSubmitLabel="Upload Questions"
         submitClassName={styles.sessionInterviewSubmitButton}
         documentURLs={[]}

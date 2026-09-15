@@ -302,7 +302,11 @@ it('returns reviewable novel question drafts only when enabled', async () => {
     JSON.stringify({
       responses: [],
       questions: [
-        { questionType: 'freeform', prompt: 'Novel AI question?' },
+        {
+          questionType: 'freeform',
+          prompt: 'Novel AI question?',
+          tags: [' governance ', 'Governance', '', 7, 'institutions'],
+        },
         { questionType: 'freeform', prompt: 'Novel AI question?' },
         { questionType: 'freeform', prompt: 'Existing question?' },
       ],
@@ -315,8 +319,17 @@ it('returns reviewable novel question drafts only when enabled', async () => {
   };
   await mapInterviewEvidenceToResponses(options);
   expect(onSuggestedQuestions).not.toHaveBeenCalled();
-  await mapInterviewEvidenceToResponses({ ...options, sessionConfig: { interviewMode: { suggestQuestions: true } } });
+  await mapInterviewEvidenceToResponses({
+    ...options,
+    sessionConfig: {
+      defaultTags: ['governance'],
+      questionsGenPrompt: 'Prefer policy questions.',
+      interviewMode: { suggestQuestions: true },
+    },
+  });
+  expect(jest.mocked(callAI).mock.calls.at(-1)?.[0]).toContain('Session default tags: ["governance"]');
+  expect(jest.mocked(callAI).mock.calls.at(-1)?.[0]).toContain('Prefer policy questions.');
   expect(onSuggestedQuestions).toHaveBeenCalledWith([
-    expect.objectContaining({ type: 'freeform', prompt: 'Novel AI question?' }),
+    expect.objectContaining({ type: 'freeform', prompt: 'Novel AI question?', tags: ['Governance', 'institutions'] }),
   ]);
 });

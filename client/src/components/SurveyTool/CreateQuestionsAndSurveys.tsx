@@ -22,6 +22,7 @@ import {
   faQuestionCircle,
 } from '@fortawesome/free-solid-svg-icons';
 import styles from './CreateQuestionsAndSurveys.module.scss';
+import InterviewSuggestedQuestionPrompt from './InterviewSuggestedQuestionPrompt';
 import { arweaveClient as arweaveClient } from '../../utilities/arweave/arweaveClient';
 import CETooltip from '../Shared/CETooltip';
 import CEConfirmDialog from '../Shared/CEConfirmDialog';
@@ -496,6 +497,7 @@ interface CreateQuestionsAndSurveysProps {
     [key: string]: unknown;
   } | null;
   preformedMode?: 'questions' | 'survey';
+  interviewQuestionReview?: boolean;
   questionSubmitLabel?: string;
   submitClassName?: string;
   miniaturized?: boolean;
@@ -3392,11 +3394,13 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
               data-ce-question-index={qIndex}
             >
               <div className={styles.questionHeader}>
-                <strong className={styles.questionTypeText}>
-                  #{qIndex + 1}:{' '}
-                  {question.type ? question.type.charAt(0).toUpperCase() + question.type.slice(1) : 'Unknown Type'}{' '}
-                  Question
-                </strong>
+                {!this.props.interviewQuestionReview && (
+                  <strong className={styles.questionTypeText}>
+                    #{qIndex + 1}:{' '}
+                    {question.type ? question.type.charAt(0).toUpperCase() + question.type.slice(1) : 'Unknown Type'}{' '}
+                    Question
+                  </strong>
+                )}
                 <div className={styles.questionHeaderActions}>
                   {(() => {
                     const lockKey = `q-lock:${question.uiKey || qIndex}`;
@@ -3482,27 +3486,37 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                     ) : null;
                   })()}
 
-                  <Button className={styles.removeQuestionButton} onClick={() => this.removeQuestion(qIndex)}>
+                  <Button
+                    className={styles.removeQuestionButton}
+                    aria-label="Remove question"
+                    onClick={() => this.removeQuestion(qIndex)}
+                  >
                     <FontAwesomeIcon icon={faTimes} />
                   </Button>
                 </div>
               </div>
 
-              {/* Ref attached to the prompt textarea for auto-focus */}
-              <Input
-                innerRef={(el: FocusablePromptElement | null) => {
-                  this._promptRefs[question.uiKey] = el;
-                }}
-                type="textarea"
-                rows="2"
-                className={styles.questionPromptInput}
-                placeholder="Question prompt"
-                data-testid={E2E_TESTIDS.CREATE_QUESTION_PROMPT}
-                value={question.prompt || ''}
-                onChange={(e: CreateSurveyInputValueEvent) =>
-                  this.handleQuestionChange(qIndex, 'prompt', e.target.value)
-                }
-              />
+              {this.props.interviewQuestionReview ? (
+                <InterviewSuggestedQuestionPrompt
+                  prompt={question.prompt || ''}
+                  onChange={(value) => this.handleQuestionChange(qIndex, 'prompt', value)}
+                />
+              ) : (
+                <Input
+                  innerRef={(el: FocusablePromptElement | null) => {
+                    this._promptRefs[question.uiKey] = el;
+                  }}
+                  type="textarea"
+                  rows="2"
+                  className={styles.questionPromptInput}
+                  placeholder="Question prompt"
+                  data-testid={E2E_TESTIDS.CREATE_QUESTION_PROMPT}
+                  value={question.prompt || ''}
+                  onChange={(e: CreateSurveyInputValueEvent) =>
+                    this.handleQuestionChange(qIndex, 'prompt', e.target.value)
+                  }
+                />
+              )}
 
               {question.type === 'multichoice' && (
                 <div className={styles.optionsContainer}>
@@ -3629,7 +3643,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         })}
 
         {/* Visual type selector */}
-        {this.renderTypeSelector()}
+        {!this.props.interviewQuestionReview && this.renderTypeSelector()}
 
         {/* Submit Button: only render if at least one question exists */}
         {questions.length > 0 && (
@@ -3931,53 +3945,55 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
 
     return (
       <div
-        className={buildCreateSurveyContainerClassName(styles, this.props.miniaturized)}
+        className={`${buildCreateSurveyContainerClassName(styles, this.props.miniaturized)} ${this.props.interviewQuestionReview ? styles.interviewQuestionReview : ''}`}
         data-testid={E2E_TESTIDS.CREATE_PANEL}
       >
         {/* Header: Survey/Questions toggle + single context-aware mode switch */}
-        <div className={styles.modeHeader}>
-          {showModeToggle && (
-            <div className={styles.modeToggle}>
-              <Label className={styles.toggleLabel}> Survey</Label>
-              <div className={styles.toggleSwitch} onClick={this.toggleStandaloneQuestion}>
-                <div className={styles.toggleKnob} style={resolveCreateSurveyToggleKnobStyle(isStandaloneQuestion)} />
+        {!this.props.interviewQuestionReview && (
+          <div className={styles.modeHeader}>
+            {showModeToggle && (
+              <div className={styles.modeToggle}>
+                <Label className={styles.toggleLabel}> Survey</Label>
+                <div className={styles.toggleSwitch} onClick={this.toggleStandaloneQuestion}>
+                  <div className={styles.toggleKnob} style={resolveCreateSurveyToggleKnobStyle(isStandaloneQuestion)} />
+                </div>
+                <Label className={styles.toggleLabel} style={CREATE_SURVEY_TRAILING_TOGGLE_LABEL_STYLE}>
+                  Questions
+                </Label>
               </div>
-              <Label className={styles.toggleLabel} style={CREATE_SURVEY_TRAILING_TOGGLE_LABEL_STYLE}>
-                Questions
-              </Label>
-            </div>
-          )}
-
-          {!this.props.miniaturized && !this.props.preformedQuestions && (
-            <Button
-              className={styles.modeSwitchButton}
-              data-testid={E2E_TESTIDS.CREATE_MODE_SWITCH}
-              onClick={this.toggleAutoTool}
-              color="secondary"
-              outline
-            >
-              <FontAwesomeIcon icon={showAutoTool ? faPenNib : faMagic} style={CREATE_SURVEY_HEADER_ICON_STYLE} />
-              {showAutoTool ? 'Manual' : 'from URL / Content'}
-            </Button>
-          )}
-
-          {/* Clear Form Button */}
-          {!this.props.preformedQuestions &&
-            !this.state.showAutoTool &&
-            (this.state.questions.length > 0 || this.state.title.trim() !== '') && (
-              <button
-                type="button"
-                className={styles.clearFormButton}
-                data-testid={E2E_TESTIDS.CREATE_CLEAR}
-                onClick={this.handleClearForm}
-                title="Clear entire form"
-                style={CREATE_SURVEY_CLEAR_FORM_BUTTON_STYLE}
-              >
-                <FontAwesomeIcon icon={faEraser} style={CREATE_SURVEY_HEADER_ICON_STYLE} />
-                Clear
-              </button>
             )}
-        </div>
+
+            {!this.props.miniaturized && !this.props.preformedQuestions && (
+              <Button
+                className={styles.modeSwitchButton}
+                data-testid={E2E_TESTIDS.CREATE_MODE_SWITCH}
+                onClick={this.toggleAutoTool}
+                color="secondary"
+                outline
+              >
+                <FontAwesomeIcon icon={showAutoTool ? faPenNib : faMagic} style={CREATE_SURVEY_HEADER_ICON_STYLE} />
+                {showAutoTool ? 'Manual' : 'from URL / Content'}
+              </Button>
+            )}
+
+            {/* Clear Form Button */}
+            {!this.props.preformedQuestions &&
+              !this.state.showAutoTool &&
+              (this.state.questions.length > 0 || this.state.title.trim() !== '') && (
+                <button
+                  type="button"
+                  className={styles.clearFormButton}
+                  data-testid={E2E_TESTIDS.CREATE_CLEAR}
+                  onClick={this.handleClearForm}
+                  title="Clear entire form"
+                  style={CREATE_SURVEY_CLEAR_FORM_BUTTON_STYLE}
+                >
+                  <FontAwesomeIcon icon={faEraser} style={CREATE_SURVEY_HEADER_ICON_STYLE} />
+                  Clear
+                </button>
+              )}
+          </div>
+        )}
 
         {this.state.showAutoTool && !this.props.miniaturized && !this.props.preformedQuestions ? (
           <div style={CREATE_SURVEY_AUTO_TOOL_PANEL_STYLE}>
