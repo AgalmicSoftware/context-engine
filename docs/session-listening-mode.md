@@ -110,7 +110,7 @@ answer evidence. Interviewer questions are retained as context so short replies
 such as “four” can be matched to the question asked. Live input and output
 transcript fragments are retained exactly, deduplicated by event ID, and ordered
 by session time; legacy Realtime sessions use completed input transcriptions.
-A new interview clears the previous transcript and review drafts.
+Starting another interview continues the existing conversation. Each round appends to the transcript, and mapping uses the combined evidence. Existing matches are retained, untouched AI fields can be refined, and user edits and excluded drafts are preserved. Suggested question prompts and tags also survive continuation; only novel suggestions are appended. A failed connection or a round with no new speech leaves the previous review intact. Closing the Interview dialog still ends this in-memory review.
 New speech is mapped even if the interview started with imported predictions. When the call ends, the responder can
 expand a read-only transcript disclosure while `gpt-5.6-terra` with medium reasoning effort and standard processing (`service_tier: default`)
 maps the transcript and any responder context imported by an AI prefill link

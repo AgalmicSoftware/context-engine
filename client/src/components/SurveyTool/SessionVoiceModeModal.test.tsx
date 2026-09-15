@@ -981,6 +981,82 @@ describe('Interview cancellation and recovery', () => {
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toBeEnabled();
   });
 
+  it('continues the transcript across interviews and preserves edits, removed drafts, and unmatched answers', async () => {
+    const rounds: Parameters<typeof startSessionRealtimeInterview>[0][] = [];
+    mockedStartSessionRealtimeInterview.mockImplementation(async (options) => {
+      rounds.push(options);
+      const text = `Responder: Round ${rounds.length}.`;
+      options.onRecordingState?.('recording');
+      options.onTranscript?.(text, []);
+      return {
+        mediaStream: {} as MediaStream,
+        stop: jest.fn(async () => ({ transcript: text, turns: [] })),
+        pause: jest.fn(),
+        resume: jest.fn(),
+        getTranscript: () => text,
+      };
+    });
+    mockedMapInterviewEvidenceToResponses
+      .mockResolvedValueOnce([
+        { questionId: 'q1', answer: 'First answer', confidence: 0.6 },
+        { questionId: 'q2', answer: 'Keep this', confidence: 0.8 },
+      ])
+      .mockResolvedValueOnce([
+        { questionId: 'q1', answer: 'Refined AI answer', confidence: 0.9 },
+        { questionId: 'q3', answer: 'Additional match', confidence: 0.8 },
+      ]);
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        questionPool={[
+          ...baseProps.questionPool,
+          { id: 'q2', prompt: 'Second question?', type: 'freeform' },
+          { id: 'q3', prompt: 'Third question?', type: 'freeform' },
+        ]}
+      />,
+    );
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    await screen.findByLabelText('Pause interview');
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
+    fireEvent.change(await screen.findByDisplayValue('First answer'), { target: { value: 'My edit' } });
+    fireEvent.click(screen.getAllByTestId(E2E_TESTIDS.SESSION_INTERVIEW_DRAFT_REMOVE)[1]);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    await screen.findByLabelText('Pause interview');
+    expect(rounds[1].instructions).toContain('Responder: Round 1.');
+    expect(rounds[1].instructions).toContain('Continue the prior interview');
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
+    expect(await screen.findByDisplayValue('Additional match')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('My edit')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Keep this')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Restore draft' })).toBeInTheDocument();
+    expect(mockedMapInterviewEvidenceToResponses).toHaveBeenLastCalledWith(
+      expect.objectContaining({ transcript: 'Responder: Round 1.\n\nResponder: Round 2.' }),
+    );
+    mockedStartSessionRealtimeInterview.mockImplementationOnce(async (options) => {
+      options.onRecordingState?.('recording');
+      return {
+        mediaStream: {} as MediaStream,
+        stop: jest.fn(async () => ({ transcript: '', turns: [] })),
+        pause: jest.fn(),
+        resume: jest.fn(),
+        getTranscript: () => '',
+      };
+    });
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    await screen.findByLabelText('Pause interview');
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
+    await screen.findByDisplayValue('My edit');
+    expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalledTimes(2);
+    mockedStartSessionRealtimeInterview.mockRejectedValueOnce(new Error('Connection failed'));
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Connection failed');
+    expect(screen.getByDisplayValue('My edit')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT_TOGGLE));
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT)).toHaveTextContent('Responder: Round 1.');
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT)).toHaveTextContent('Responder: Round 2.');
+  });
+
   it('maps new speech instead of reusing imported response predictions', async () => {
     sessionMock();
     render(

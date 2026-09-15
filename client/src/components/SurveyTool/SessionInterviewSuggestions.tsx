@@ -8,12 +8,15 @@ type CreatorProps = React.ComponentProps<typeof CreateQuestionsAndSurveys>;
 export default function SessionInterviewSuggestions({
   questions,
   creatorProps,
+  hidden,
 }: {
   questions: GeneratedSurveyStatement[];
+  hidden?: boolean;
   creatorProps: Partial<CreatorProps>;
 }) {
   return (
     <SessionInterviewReviewSection
+      hidden={hidden}
       title={`Suggested new questions (${questions.length})`}
       className={styles.sessionInterviewSuggestions}
       helpId="ce-interview-suggestions-help"

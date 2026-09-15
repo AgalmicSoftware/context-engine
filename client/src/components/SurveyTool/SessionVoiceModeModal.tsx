@@ -1,3 +1,4 @@
+import { appendInterviewTranscript, mergeInterviewReview } from './sessionInterviewReviewState';
 import { useInterviewReadiness } from './useInterviewReadiness';
 import { useInterviewQuestionUpdates } from './useInterviewQuestionUpdates';
 import SessionInterviewSuggestions from './SessionInterviewSuggestions';
@@ -160,6 +161,13 @@ function SessionInterviewPanel({
   const [responderContext, setResponderContext] = useState(() => displayResponderContext(prefillPacket));
   const [status, setStatus] = useState(initialError ? 'Error' : 'Ready');
   const [transcript, setTranscript] = useState('');
+  const transcriptRef = useRef('');
+  const roundBaseTranscriptRef = useRef('');
+  const receiveTranscript = (current: string) => {
+    const combined = appendInterviewTranscript(roundBaseTranscriptRef.current, current);
+    transcriptRef.current = combined;
+    setTranscript(combined);
+  };
   const [mapping, setMapping] = useState(false);
   const [mappingNotice, setMappingNotice] = useState('');
   const [applying, setApplying] = useState(false);
@@ -212,7 +220,7 @@ function SessionInterviewPanel({
     resolveWorkerUrl,
     onStatus: setStatus,
     onError: setError,
-    onTranscript: setTranscript,
+    onTranscript: receiveTranscript,
   });
   const { audioRef, mediaStreamRef, recordingState, recordingElapsedSeconds } = recorder;
   const reviewRef = useRef<HTMLElement | null>(null);
@@ -300,37 +308,43 @@ function SessionInterviewPanel({
           });
         }
         if (disposedRef.current) return;
-        setSuggestedQuestions(proposedQuestions);
-        setDrafts(mapped);
-        setEditedDrafts(
-          Object.fromEntries(
-            mapped.map((draft) => [
-              draft.questionId,
-              {
-                ...draft,
-                additionalComments:
-                  draft.additionalComments ||
-                  String(responseFieldValue(existingResponseSlice, 'additionalComments', draft.questionId) || ''),
-              },
-            ]),
-          ),
+        const combinedQuestions = [...suggestedQuestions];
+        const knownPrompts = new Set(combinedQuestions.map((question) => question.prompt.trim().toLowerCase()));
+        for (const question of proposedQuestions) {
+          if (!knownPrompts.has(question.prompt.trim().toLowerCase())) {
+            combinedQuestions.push(question);
+            knownPrompts.add(question.prompt.trim().toLowerCase());
+          }
+        }
+        setSuggestedQuestions(combinedQuestions);
+        const review = mergeInterviewReview(
+          drafts,
+          editedDrafts,
+          selected,
+          mapped,
+          (id) => !hasDraftValue(responseFieldValue(existingResponseSlice, 'answers', id)),
         );
-        setSelected(
-          Object.fromEntries(
-            mapped.map((draft) => [
-              draft.questionId,
-              !hasDraftValue(responseFieldValue(existingResponseSlice, 'answers', draft.questionId)),
-            ]),
-          ),
-        );
+        for (const draft of review.drafts) {
+          if (!editedDrafts[draft.questionId] && !review.edited[draft.questionId]?.additionalComments) {
+            review.edited[draft.questionId] = {
+              ...review.edited[draft.questionId],
+              additionalComments: String(
+                responseFieldValue(existingResponseSlice, 'additionalComments', draft.questionId) || '',
+              ),
+            };
+          }
+        }
+        setDrafts(review.drafts);
+        setEditedDrafts(review.edited);
+        setSelected(review.selected);
         setMappingNotice(
-          mapped.length
+          review.drafts.length
             ? ''
-            : proposedQuestions.length
+            : combinedQuestions.length
               ? 'No response drafts matched the current bank. Review the suggested new questions below.'
               : 'Not enough information to generate response drafts. The interview evidence did not contain enough directly relevant detail to answer a session question. Start another interview and share more detail, or augment it with relevant memories from Claude or ChatGPT.',
         );
-        setStatus(mapped.length || proposedQuestions.length ? 'Review drafts' : 'Ready');
+        setStatus(review.drafts.length || combinedQuestions.length ? 'Review drafts' : 'Ready');
       } catch (mappingError) {
         if (disposedRef.current) return;
         setMappingNotice('');
@@ -342,6 +356,10 @@ function SessionInterviewPanel({
       }
     },
     [
+      drafts,
+      editedDrafts,
+      selected,
+      suggestedQuestions,
       existingResponseSlice,
       prefillPacket,
       questions,
@@ -369,11 +387,15 @@ function SessionInterviewPanel({
   const startInterview = () => {
     if (isInterviewBusy || mappingRef.current || applying) return;
     setMappingNotice('');
-    setDrafts([]);
-    setSuggestedQuestions([]);
+    roundBaseTranscriptRef.current = transcriptRef.current;
     setShowTranscript(false);
     void recorder.start(
-      buildRealtimeInterviewInstructions({ questions, responderContext, openingPrompt: interviewOpening.opening }),
+      buildRealtimeInterviewInstructions({
+        questions,
+        responderContext,
+        openingPrompt: interviewOpening.opening,
+        previousTranscript: transcriptRef.current,
+      }),
     );
   };
 
@@ -381,9 +403,15 @@ function SessionInterviewPanel({
     try {
       const result = await recorder.stop();
       if (!result || disposedRef.current) return;
-      setTranscript(result.transcript);
+      const combined = appendInterviewTranscript(roundBaseTranscriptRef.current, result.transcript);
+      transcriptRef.current = combined;
+      setTranscript(combined);
       setShowTranscript(false);
-      await runMapping({ nextTranscript: result.transcript });
+      if (!result.transcript.trim() && roundBaseTranscriptRef.current.trim()) {
+        setStatus(drafts.length || suggestedQuestions.length ? 'Review drafts' : 'Ready');
+        return;
+      }
+      await runMapping({ nextTranscript: combined });
     } catch (stopError) {
       if (disposedRef.current) return;
       setError(
@@ -858,8 +886,12 @@ function SessionInterviewPanel({
               </div>
             </SessionInterviewReviewSection>
           ) : null}
-          {suggestedQuestions.length > 0 && !isInterviewBusy && !mapping ? (
-            <SessionInterviewSuggestions questions={suggestedQuestions} creatorProps={questionCreatorProps || {}} />
+          {suggestedQuestions.length > 0 ? (
+            <SessionInterviewSuggestions
+              questions={suggestedQuestions}
+              creatorProps={questionCreatorProps || {}}
+              hidden={isInterviewBusy || mapping}
+            />
           ) : null}
         </div>
       </ModalBody>

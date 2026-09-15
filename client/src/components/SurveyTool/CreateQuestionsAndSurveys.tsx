@@ -1069,6 +1069,30 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   };
 
   componentDidUpdate(prevProps: CreateQuestionsAndSurveysProps, prevState: CreateQuestionsAndSurveysState) {
+    if (this.props.interviewQuestionReview && prevProps.preformedQuestions !== this.props.preformedQuestions) {
+      const previousIds = new Set(
+        (prevProps.preformedQuestions || []).map((question) => question.id || question.prompt),
+      );
+      const added = (this.props.preformedQuestions || []).filter(
+        (question) => !previousIds.has(question.id || question.prompt),
+      );
+      if (added.length) {
+        // Append new suggestions without resetting edited prompts/tags or restoring removed questions.
+        this.setState((state) => ({
+          questions: [
+            ...state.questions,
+            ...added.map((question) => ({
+              ...question,
+              uiKey: question.uiKey || `interview-${question.id}`,
+              tags: normalizeTagList(question.tags),
+              aiGeneratedTagsFromSource: normalizeTagList(question.tags),
+              currentTagInputValue: '',
+              isGeneratingTags: false,
+            })),
+          ],
+        }));
+      }
+    }
     // Keep documentURLs synced from props if they change externally (e.g. AudioSurveyGenerator generation)
     if (prevProps.documentURLs !== this.props.documentURLs && Array.isArray(this.props.documentURLs)) {
       // If props update, we overwrite local state to match

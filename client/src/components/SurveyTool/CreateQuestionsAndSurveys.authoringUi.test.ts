@@ -69,6 +69,25 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     ).toHaveLength(1);
   });
 
+  it('appends only new Interview suggestions without undoing question edits or removals', () => {
+    const original = { id: 'q1', type: 'freeform', prompt: 'Original?', tags: ['original'] };
+    const removed = { id: 'q2', type: 'freeform', prompt: 'Removed?' };
+    const added = { id: 'q3', type: 'freeform', prompt: 'New?', tags: ['new'] };
+    const instance = makeInstance({
+      interviewQuestionReview: true,
+      preformedQuestions: [original, removed],
+      preformedMode: 'questions',
+    });
+    instance.state.questions = [{ ...original, prompt: 'My edited question?', tags: ['manual'] }];
+    const prevProps = instance.props;
+    const prevState = instance.state;
+    Object.assign(instance, { props: { ...prevProps, preformedQuestions: [original, removed, added] } });
+    instance.componentDidUpdate(prevProps, prevState);
+    expect(instance.state.questions.map(({ id }) => id)).toEqual(['q1', 'q3']);
+    expect(instance.state.questions[0]).toMatchObject({ prompt: 'My edited question?', tags: ['manual'] });
+    expect(instance.state.questions[1]).toMatchObject({ prompt: 'New?', tags: ['new'] });
+  });
+
   it('renders the survey/questions toggle immediately on initial load', () => {
     const instance = makeInstance();
 

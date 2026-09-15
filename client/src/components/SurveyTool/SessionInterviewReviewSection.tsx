@@ -6,6 +6,7 @@ import styles from './SurveyTool.module.scss';
 
 type Props = {
   title: string;
+  hidden?: boolean;
   help?: string;
   helpId?: string;
   count?: React.ReactNode;
@@ -17,6 +18,7 @@ type Props = {
 
 export default function SessionInterviewReviewSection({
   title,
+  hidden,
   help,
   helpId,
   count,
@@ -26,7 +28,13 @@ export default function SessionInterviewReviewSection({
   summaryRef,
 }: Props) {
   return (
-    <details open className={`${styles.sessionInterviewReview} ${className}`} data-testid={testId}>
+    <details
+      open
+      hidden={hidden}
+      style={hidden ? { display: 'none' } : undefined}
+      className={`${styles.sessionInterviewReview} ${className}`}
+      data-testid={testId}
+    >
       <summary ref={summaryRef} className={styles.sessionInterviewReviewHeader}>
         <FontAwesomeIcon icon={faCaretDown} className={styles.sessionInterviewReviewCaret} />
         <h4>{title}</h4>
