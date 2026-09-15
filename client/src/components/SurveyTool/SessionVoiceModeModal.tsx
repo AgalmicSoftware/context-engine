@@ -850,6 +850,7 @@ function SessionInterviewPanel({
                   disabled={
                     applying || mapping || isInterviewBusy || !drafts.some((draft) => selected[draft.questionId])
                   }
+                  className={styles.sessionInterviewSubmitButton}
                   data-testid={E2E_TESTIDS.SESSION_INTERVIEW_APPLY}
                 >
                   {applying ? 'Preparing submission…' : 'Submit responses'}

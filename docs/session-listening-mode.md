@@ -139,7 +139,10 @@ offers **Restore draft**, or **Replace with draft** when a local answer already
 exists. There is no redundant selected-state button. **Submit responses** saves reviewed values and enters the normal
 submission flow, opening sign-in when necessary. Drafts survive that sign-in;
 the responder can finish submission through the session's normal Submit control.
-Stopping alone never submits answers. The default-on platform provenance option
+The **Submit responses** and **Upload Questions** actions share the pile view’s
+submit styling. **Upload Questions** remains inside Suggested new questions and
+uses the normal question upload flow. Stopping alone never submits answers.
+The default-on platform provenance option
 appears only when an AI augmentation packet was imported. When it is retained,
 submitted response metadata keeps the prompt/question-set revision
 and self-reported source platform/model. A separate accuracy-research checkbox

@@ -496,6 +496,8 @@ interface CreateQuestionsAndSurveysProps {
     [key: string]: unknown;
   } | null;
   preformedMode?: 'questions' | 'survey';
+  questionSubmitLabel?: string;
+  submitClassName?: string;
   miniaturized?: boolean;
   onUploadComplete?: (surveyHash: string | null) => void;
   hideSurveyQuestionToggleUntilAuthoring?: boolean;
@@ -3633,7 +3635,12 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         {questions.length > 0 && (
           <>
             <Button
-              className={buildCreateSurveySubmitButtonClassName(styles, isSubmitting, submissionError)}
+              className={[
+                buildCreateSurveySubmitButtonClassName(styles, isSubmitting, submissionError),
+                this.props.submitClassName,
+              ]
+                .filter(Boolean)
+                .join(' ')}
               data-testid={E2E_TESTIDS.CREATE_SUBMIT}
               onClick={
                 !isPureWorkerCanonicalAuthoring &&
@@ -3682,7 +3689,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                   this.props.loginComplete ? (
                   'Switch to correct network → Submit'
                 ) : isStandaloneQuestion ? (
-                  'Create Questions'
+                  this.props.questionSubmitLabel || 'Create Questions'
                 ) : (
                   'Create Survey'
                 )}

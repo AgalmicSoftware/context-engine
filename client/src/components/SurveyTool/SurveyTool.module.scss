@@ -4099,6 +4099,22 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
+.sessionInterviewPanel .sessionInterviewSubmitButton {
+  @include finalSubmitCta.final-submit-cta-shell(
+    $padding: 12px 24px,
+    $min-height: 48px,
+    $font-size: 1rem,
+    $border-radius: var(--ce-radius-8)
+  );
+  & {
+    width: 100%;
+    text-transform: uppercase;
+  }
+  > span {
+    color: inherit;
+  }
+}
+
 .sessionInterviewReviewActions {
   position: sticky;
   bottom: -18px;

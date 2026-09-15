@@ -42,6 +42,23 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     } catch (_) {}
   });
 
+  it('supports the Interview upload label and styling through the existing submit handler', () => {
+    const instance = makeInstance({ questionSubmitLabel: 'Upload Questions', submitClassName: 'interviewSubmit' });
+    instance.state.isStandaloneQuestion = true;
+    instance.state.showAutoTool = false;
+    instance.state.questions = [
+      { id: 'q1', type: 'freeform', prompt: 'Which AI impact matters?' },
+    ] as typeof instance.state.questions;
+    const buttons = collectTreeNodes(
+      instance.render(),
+      (node) => node?.props?.['data-testid'] === E2E_TESTIDS.CREATE_SUBMIT,
+    );
+    expect(buttons).toHaveLength(1);
+    expect(treeHasText(buttons[0], 'Upload Questions')).toBe(true);
+    expect(nodeHasClassName(buttons[0], 'interviewSubmit')).toBe(true);
+    expect(buttons[0].props.onClick).toBe(instance.handleSubmitButtonClick);
+  });
+
   it('renders the survey/questions toggle immediately on initial load', () => {
     const instance = makeInstance();
 
