@@ -818,6 +818,15 @@ function SessionInterviewPanel({
                 >
                   <FontAwesomeIcon icon={promptCopied ? faCheck : faClipboard} />
                 </button>
+                {showAgentPrompt ? (
+                  <div
+                    id="ce-session-interview-agent-prompt"
+                    className={styles.sessionAgentKickoffPrompt}
+                    data-testid={E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT}
+                  >
+                    <SessionInterviewPrompt prompt={kickoff} />
+                  </div>
+                ) : null}
               </div>
             ) : null}
 
@@ -830,15 +839,6 @@ function SessionInterviewPanel({
               >
                 {transcript}
               </pre>
-            ) : null}
-            {showAgentPrompt ? (
-              <div
-                id="ce-session-interview-agent-prompt"
-                className={styles.sessionAgentKickoffPrompt}
-                data-testid={E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT}
-              >
-                <SessionInterviewPrompt prompt={kickoff} />
-              </div>
             ) : null}
           </div>
 

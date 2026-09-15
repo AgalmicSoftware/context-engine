@@ -407,6 +407,7 @@ describe('SessionVoiceModeModal', () => {
     fireEvent.click(promptToggle);
     expect(promptToggle).toHaveAccessibleName('Prompt');
     const displayedPrompt = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT);
+    expect(copyButton.parentElement).toContainElement(displayedPrompt);
     const plainPrompt = buildExternalInterviewKickoff({
       workerUrl: baseProps.workerUrl,
       sessionSlug: baseProps.sessionSlug,

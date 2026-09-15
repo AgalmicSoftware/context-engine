@@ -6568,8 +6568,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   > :only-child,
   > .sessionAgentKickoff:first-child,
-  > .sessionInterviewTranscript,
-  > .sessionAgentKickoffPrompt {
+  > .sessionInterviewTranscript {
     grid-column: 1 / -1;
   }
 
@@ -6583,15 +6582,29 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 
   .sessionAgentKickoff {
-    padding: 10px 38px 34px 10px;
+    padding: 10px;
     min-width: 0;
+  }
+
+  .sessionAgentKickoffToggle {
+    position: static;
+    justify-self: end;
+  }
+
+  .sessionAgentKickoffPrompt {
+    border-top: 1px solid var(--ce-card-border);
+    padding-top: 12px;
+  }
+
+  .sessionInterviewTranscriptDisclosure {
+    align-self: start;
   }
 
   .sessionAgentKickoffTitle {
     appearance: none;
     background: transparent;
     border: 0;
-    padding: 0;
+    padding: 0 28px 0 0;
     color: var(--ce-panel-text);
     font-family: var(--ce-font-body);
     font-size: 0.85rem;

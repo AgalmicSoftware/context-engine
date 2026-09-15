@@ -251,7 +251,7 @@ The account used at final normal submission owns the response. If an older
 packet contains context facts but not responses, the session AI mapping lane
 still converts those facts into drafts.
 
-The **Transcript** and copy-prompt cards share one row. Without a transcript, the prompt card fills the row even while its preview is expanded. Both the copy text and clipboard icon copy the plain prompt; **Prompt** expands its readable preview below.
+The **Transcript** and copy-prompt cards share one row. Without a transcript, the prompt card fills the row even while its preview is expanded. Both the copy text and clipboard icon copy the plain prompt; **Prompt** expands its readable preview beneath the controls, inside the same bordered card.
 
 In the full question list, rating sliders update locally during a drag and save
 the final value on release. Loaded lists retain the Questions label during
