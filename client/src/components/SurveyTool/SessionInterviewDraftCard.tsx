@@ -108,6 +108,7 @@ export default function SessionInterviewDraftCard({
               importanceToggleEnabled
               isSubmitting={disabled}
               sliderOpen={sliderOpen}
+              sliderToggleExpandedByQuestion={{ [`interview-${draft.questionId}`]: sliderOpen }}
               sliderMode={sliderMode}
               convictionValue={(edited.conviction ?? 0) / 10}
               importanceValue={(edited.importance ?? 0) / 10}

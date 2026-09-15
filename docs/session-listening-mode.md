@@ -256,7 +256,9 @@ The **Transcript** and copy-prompt cards share one row. Both the copy text and c
 The review surface shows confidence as a progress meter and keeps each evidence
 basis and AI-estimated support level collapsed under **Basis** until requested.
 Binary drafts reuse the normal pile-view
-Agree/Unsure/Disagree controls. Applied source/model provenance is persisted in
+Agree/Unsure/Disagree controls. The bullhorn opens both Conviction and Importance
+choices, with the same button opacity and hover styling as pile view. Both values
+remain editable through review and are carried into submission. Applied source/model provenance is persisted in
 the anonymous draft together with its answer, so logging in after review does
 not remove the attribution before final submission. An explicitly opted-in
 responder name follows the same draft migration and becomes the report display

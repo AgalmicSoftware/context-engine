@@ -3526,11 +3526,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   min-width: 0;
   font-family: var(--ce-font-body);
 
-  button:not(:disabled),
-  .importanceSlider {
-    opacity: 1 !important;
-  }
-
   #binaryChoice {
     justify-content: flex-start;
     margin: 4px 0;
