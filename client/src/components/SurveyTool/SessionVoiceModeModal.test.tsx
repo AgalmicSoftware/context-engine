@@ -1,3 +1,4 @@
+import { useInterviewReadiness } from './useInterviewReadiness';
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import SessionVoiceModeModal from './SessionVoiceModeModal';
@@ -12,6 +13,10 @@ import { startSessionRealtimeInterview } from '../../utilities/audio/realtimeInt
 jest.mock('./CreateQuestionsAndSurveys', () => ({
   __esModule: true,
   default: () => <div>Question creation editor</div>,
+}));
+
+jest.mock('./useInterviewReadiness', () => ({
+  useInterviewReadiness: jest.fn(() => ({ state: 'ready', detail: 'Voice setup ready.', retry: jest.fn() })),
 }));
 
 jest.mock('./useInterviewOpening', () => ({
@@ -69,12 +74,26 @@ const mockedStartSessionRealtimeInterview = jest.mocked(startSessionRealtimeInte
 describe('SessionVoiceModeModal', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest
+      .mocked(useInterviewReadiness)
+      .mockReturnValue({ state: 'ready', detail: 'Voice setup ready.', retry: jest.fn() });
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
       value: { writeText: jest.fn(async () => undefined) },
     });
     mockedHashInterviewQuestions.mockResolvedValue('a'.repeat(64));
     mockedMapInterviewEvidenceToResponses.mockResolvedValue([]);
+  });
+
+  it.each([
+    ['checking', 'Checking setup', 'pending'],
+    ['unavailable', 'Setup needed', 'error'],
+    ['unknown', 'Not checked', 'pending'],
+  ] as const)('shows %s readiness without a misleading green pill', (state, label, tone) => {
+    jest.mocked(useInterviewReadiness).mockReturnValue({ state, detail: 'Check setup.', retry: jest.fn() });
+    render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent(label);
+    expect(screen.getByRole('button', { name: `Interview status: ${label}` })).toHaveAttribute('data-tone', tone);
   });
 
   it('shows suggested questions in an expanded section without submitting anything', async () => {
@@ -196,7 +215,7 @@ describe('SessionVoiceModeModal', () => {
     );
   });
 
-  it('puts guidance and the live status in accessible header tooltips', async () => {
+  it('shows the live status pill with setup details available in its tooltip', async () => {
     render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
     const help = screen.getByRole('button', { name: 'About Interview' });
     const status = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS);
@@ -209,7 +228,9 @@ describe('SessionVoiceModeModal', () => {
     fireEvent.blur(help);
     await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
     fireEvent.focus(screen.getByRole('button', { name: 'Interview status: Ready' }));
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('Ready');
+    expect(status).toHaveTextContent('Ready');
+    expect(screen.getByRole('button', { name: 'Interview status: Ready' })).toHaveAttribute('data-tone', 'ready');
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Voice setup ready.');
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toHaveAccessibleName('Start voice interview');
   });
 
@@ -790,6 +811,9 @@ describe('SessionVoiceModeModal', () => {
     first.unmount();
 
     jest.clearAllMocks();
+    jest
+      .mocked(useInterviewReadiness)
+      .mockReturnValue({ state: 'ready', detail: 'Voice setup ready.', retry: jest.fn() });
     render(<SessionVoiceModeModal {...baseProps} mode="interview" prefillPacket={prefillPacket} />);
     fireEvent.click(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME));
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
@@ -832,6 +856,9 @@ describe('SessionVoiceModeModal', () => {
 describe('Interview cancellation and recovery', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest
+      .mocked(useInterviewReadiness)
+      .mockReturnValue({ state: 'ready', detail: 'Voice setup ready.', retry: jest.fn() });
     mockedMapInterviewEvidenceToResponses.mockResolvedValue([{ questionId: 'q1', answer: 'New evidence' }]);
   });
 

@@ -67,3 +67,30 @@ test('dispatchResourcePresenceRequest validates session CORS and never returns s
   assert.equal(JSON.stringify(response).includes('sk-secret'), false);
   assert.equal(JSON.stringify(response).includes('private'), false);
 });
+
+for (const [name, config, secrets, access, ready] of [
+  ['configured voice', {}, { openaiKey: 'fixture-openai' }, true, true],
+  ['another AI provider key only', {}, { anthropicKey: 'fixture-anthropic' }, true, false],
+  ['blank key', {}, { openaiKey: '  ' }, true, false],
+  ['voice disabled', { interviewMode: { enabled: false } }, { openaiKey: 'fixture-openai' }, true, false],
+  ['unsupported provider', { interviewMode: { provider: 'other' } }, { openaiKey: 'fixture-openai' }, true, false],
+  ['access denied', {}, { openaiKey: 'fixture-openai' }, false, false],
+  ['ended session', { sessionEndsAt: '2000-01-01T00:00:00Z' }, { openaiKey: 'fixture-openai' }, true, false],
+]) {
+  test(`voice readiness: ${name}`, async () => {
+    const result = await dispatchResourcePresenceRequest({
+      request: new Request('https://worker.example/resource-presence?interview=1'), env: {},
+      deps: {
+        resolveRequestSlugWithoutToken: () => ({ ok: true, explicitSlugProvided: true, slug: 'demo' }),
+        getSessionConfig: async () => config,
+        getCorsContext: async () => ({ ok: true, headers: {} }),
+        getSessionSecrets: async () => secrets,
+        evaluateAnonymousRouteAccess: async ({ route }) => { assert.equal(route, 'realtime'); return { ok: access }; },
+        json: (body) => body,
+      },
+    });
+    assert.equal(result.interview.ready, ready);
+    if (!ready) assert.ok(result.interview.reason);
+    assert.equal(JSON.stringify(result).includes('fixture-'), false);
+  });
+}

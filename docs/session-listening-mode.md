@@ -41,12 +41,17 @@ Session creators can change the model in `/new` under **Optional details**
 (or **More options** in Customize) → **Interview settings** →
 **Interview voice model**.
 
-The Interview header has a status dot whose tooltip shows Ready, Connecting,
-Listening, Paused, Ending, Preparing drafts, Review drafts, or Error. The dot
-is green when ready or listening, amber during transitions or pauses, and red
-on errors. Status changes are also announced to screen readers. The adjacent
-question-mark tooltip explains the current phase; both tooltips work on hover,
-keyboard focus, or tap. A large microphone starts the interview.
+The Interview header shows a colored pill with its status always visible: Ready,
+Connecting, Listening, Paused, Ending, Preparing drafts, Review drafts, or Error.
+Green readiness requires a reachable Worker that confirms an OpenAI key, voice
+provider, and session access, plus browser microphone support and no known
+permission denial. This setup check does not call OpenAI or request microphone
+permission; the live connection still validates the key when Start is clicked.
+Yellow indicates loading, pauses, or readiness that could not be verified; red
+indicates an error or missing setup. Older Workers show **Not checked** rather
+than green. Click the idle pill to retry the check. Status changes are also
+announced to screen readers. The adjacent question-mark tooltip explains the
+current phase. A large microphone starts the interview.
 The augmentation prompt displays paragraphs and bold key points for readability;
 its Copy button copies the original plain text without formatting.
 

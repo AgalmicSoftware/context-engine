@@ -169,6 +169,7 @@ test('createWorkerRouteShellWithWorkerDeps preserves resource-presence branch wi
           getSessionConfig: 'getSessionConfig',
           getCorsContext: 'getCorsContext',
           getSessionSecrets: 'getSessionSecrets',
+          evaluateAnonymousRouteAccess: 'evaluateAnonymousRouteAccess',
           json: 'json',
         });
         assert.deepEqual(value.constants, {

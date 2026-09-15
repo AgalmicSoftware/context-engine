@@ -194,6 +194,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
             getSessionConfig: deps?.getSessionConfig,
             getCorsContext: deps?.getCorsContext,
             getSessionSecrets: deps?.getSessionSecrets,
+            evaluateAnonymousRouteAccess: deps?.evaluateAnonymousRouteAccess,
             json: deps?.json,
           },
           constants: {

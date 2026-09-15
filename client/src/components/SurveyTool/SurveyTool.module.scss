@@ -3433,12 +3433,40 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
+.sessionInterviewStatusPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 0 !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  background: var(--ce-status-success-soft) !important;
+  color: var(--ce-color-black) !important;
+  font-family: var(--ce-font-body);
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1.3;
+
+  &[data-tone='pending'] {
+    background: var(--ce-status-warning-soft) !important;
+  }
+  &[data-tone='error'] {
+    background: color-mix(in srgb, var(--ce-status-error) 35%, var(--ce-color-white)) !important;
+  }
+  &:focus-visible {
+    outline: 2px solid var(--ce-titlebar-text);
+    outline-offset: 2px;
+  }
+}
+
 .sessionInterviewStatusDot {
   width: 12px;
   height: 12px;
   border-radius: 50%;
   background: var(--ce-status-success-bright);
-  box-shadow: 0 0 0 1px var(--ce-titlebar-text);
+  box-shadow: 0 0 0 1px currentColor;
 
   &[data-tone='pending'] {
     background: var(--ce-status-warning);
@@ -3545,7 +3573,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     }
   }
 
-  dl, p, ul {
+  dl,
+  p,
+  ul {
     margin: 12px 0 0;
   }
 

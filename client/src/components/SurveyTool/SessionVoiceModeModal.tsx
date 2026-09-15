@@ -1,3 +1,4 @@
+import { useInterviewReadiness } from './useInterviewReadiness';
 import { useInterviewQuestionUpdates } from './useInterviewQuestionUpdates';
 import SessionInterviewSuggestions from './SessionInterviewSuggestions';
 import SessionInterviewReviewSection from './SessionInterviewReviewSection';
@@ -149,6 +150,7 @@ function SessionInterviewPanel({
   const importedRef = useRef(false);
   const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [resolvedWorkerUrl, setResolvedWorkerUrl] = useState(workerUrl);
+  const readiness = useInterviewReadiness(resolvedWorkerUrl, sessionSlug);
   const interviewOpening = useInterviewOpening({
     config: sessionConfig,
     workerUrl: resolvedWorkerUrl,
@@ -200,8 +202,8 @@ function SessionInterviewPanel({
   useEffect(() => {
     if (resolvedWorkerUrl) return;
     void resolveWorkerUrl().catch(() => {
-      // Voice start and draft generation surface an actionable worker error.
-      // The ordinary-AI handoff stays hidden until a session Worker is known.
+      if (!disposedRef.current)
+        setError('The session Worker is unavailable. Check the session connection and try again.');
     });
   }, [resolveWorkerUrl, resolvedWorkerUrl]);
 
@@ -474,11 +476,35 @@ function SessionInterviewPanel({
         : drafts.length
           ? 'Review and edit your answers and privacy settings, then select Submit responses. You will be asked to sign in if needed.'
           : 'Speak with an AI interviewer. Stopping prepares drafts for your review. You choose when to submit responses.';
-  const statusTone = error
-    ? 'error'
-    : isStarting || isPaused || isStopping || mapping || applying
-      ? 'pending'
-      : 'ready';
+  const idle = !isInterviewBusy && !mapping && !applying;
+  const statusLabel = error
+    ? 'Error'
+    : mapping
+      ? 'Preparing drafts'
+      : applying
+        ? 'Submitting'
+        : idle && !questions.length
+          ? 'No questions'
+          : idle && readiness.state === 'checking'
+            ? 'Checking setup'
+            : idle && readiness.state === 'unavailable'
+              ? 'Setup needed'
+              : idle && readiness.state === 'unknown'
+                ? 'Not checked'
+                : idle && interviewOpening.loading
+                  ? 'Preparing opening'
+                  : status;
+  const statusTone =
+    error || (idle && (!questions.length || readiness.state === 'unavailable'))
+      ? 'error'
+      : isStarting ||
+          isPaused ||
+          isStopping ||
+          mapping ||
+          applying ||
+          (idle && (readiness.state !== 'ready' || interviewOpening.loading))
+        ? 'pending'
+        : 'ready';
   const startLabel = interviewOpening.loading
     ? 'Preparing opening…'
     : isStarting
@@ -507,18 +533,20 @@ function SessionInterviewPanel({
             role="status"
             aria-live="polite"
             aria-atomic="true"
-            aria-label={`Interview status: ${status}`}
+            aria-label={`Interview status: ${statusLabel}`}
             data-testid={E2E_TESTIDS.SESSION_INTERVIEW_STATUS}
           >
             <button
               type="button"
               id="ce-interview-status-help"
               ref={statusRef}
-              className={styles.sessionInterviewHeaderButton}
-              aria-label={`Interview status: ${status}`}
+              className={styles.sessionInterviewStatusPill}
+              data-tone={statusTone}
+              onClick={idle ? readiness.retry : undefined}
+              aria-label={`Interview status: ${statusLabel}`}
             >
               <span className={styles.sessionInterviewStatusDot} data-tone={statusTone} aria-hidden="true" />
-              <span className={styles.sessionListeningSrOnly}>{status}</span>
+              <span>{statusLabel}</span>
             </button>
           </span>
           <UncontrolledTooltip
@@ -527,7 +555,7 @@ function SessionInterviewPanel({
             trigger="hover focus"
             autohide={false}
           >
-            {status}
+            {idle ? `${readiness.detail} Click to check again.` : guidance}
           </UncontrolledTooltip>
         </span>
       </ModalHeader>
@@ -567,6 +595,14 @@ function SessionInterviewPanel({
           {interviewOpening.notice ? <p>{interviewOpening.notice}</p> : null}
           {!questions.length ? <p>No accessible questions are available for this interview.</p> : null}
           <audio ref={audioRef} className={styles.sessionListeningSrOnly} aria-label="Realtime interviewer audio" />
+          {idle && readiness.state === 'unavailable' && !error ? (
+            <p role="alert">
+              {readiness.detail}{' '}
+              <button type="button" onClick={readiness.retry}>
+                Check again
+              </button>
+            </p>
+          ) : null}
           {error ? (
             <div className={styles.sessionListeningError} role="alert">
               {error}

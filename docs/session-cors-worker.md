@@ -1926,6 +1926,7 @@ Signed login/bootstrap requests:
     `Origin` and `X-Session-Slug`.
 - `GET /health` (requires Authorization token; does not require session KV config, so it works for newly registered sessions during bootstrap)
 - `GET /resource-presence` with `X-Session-Slug`
+  - Optional `?interview=1` adds `interview: { ready, reason? }` after checking the voice provider, server-side OpenAI key presence, session lifecycle, and anonymous realtime access. No key values are returned and no OpenAI request is made.
   - Validates the selected session and its browser-origin CORS policy.
   - Returns only `{ ai, arweave, rpc, txGas }` booleans derived from worker-held
     secrets. It never returns secret names, values, previews, or provider URLs.
