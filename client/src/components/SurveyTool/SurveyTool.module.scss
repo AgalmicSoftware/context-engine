@@ -4068,12 +4068,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
-.sessionInterviewDraftApplySelected {
-  border-color: color-mix(in srgb, var(--ce-status-success) 68%, var(--ce-card-border));
-  background: color-mix(in srgb, var(--ce-status-success) 14%, var(--ce-card-bg));
-  color: var(--ce-panel-text);
-}
-
 .sessionInterviewReviewActions {
   position: sticky;
   bottom: -18px;

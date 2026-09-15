@@ -122,10 +122,15 @@ found, and suggests another interview or relevant Claude/ChatGPT memories. It
 does not present an unchanged generate button as though more input had arrived.
 
 Drafts open in a collapsible **Review proposed responses** section with the session's answer inputs, additional
-comments, conviction/importance control, and answer/comment lock menus. Relevant
-interview explanations appear as editable additional comments. Answers and comments matching the agent draft are labeled **Agent:**; edits are labeled **User:**. Existing user comments carry no prefix. These labels are display-only and are never inserted into submitted values. The responder
+comments, conviction/importance control, and answer/comment lock menus. Additional
+comment controls remain interactive: the microphone appends dictated text, AI
+rewrite cleans up wording with a revert action, and the lock chooses the comment
+audience. Icon tooltips explain these actions on hover and keyboard focus.
+Relevant interview explanations appear as editable additional comments. Answers and comments matching the agent draft are labeled **Agent:**; edits are labeled **User:**. Existing user comments carry no prefix. These labels are display-only and are never inserted into submitted values. The responder
 selects which drafts to submit and must explicitly opt into replacing an existing
-local answer. **Submit responses** saves reviewed values and enters the normal
+local answer. Selected drafts have an **X** to exclude them; an excluded draft
+offers **Restore draft**, or **Replace with draft** when a local answer already
+exists. There is no redundant selected-state button. **Submit responses** saves reviewed values and enters the normal
 submission flow, opening sign-in when necessary. Drafts survive that sign-in;
 the responder can finish submission through the session's normal Submit control.
 Stopping alone never submits answers. The default-on platform provenance option

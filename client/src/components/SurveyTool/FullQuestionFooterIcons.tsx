@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useRef } from 'react';
+import CETooltip from '../Shared/CETooltip';
 import type { ReactNode } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faComment } from '@fortawesome/free-solid-svg-icons';
@@ -32,26 +33,33 @@ const FullQuestionFooterIcons = ({
   onToggleComments,
   questionId = '',
   children = null,
-}: FullQuestionFooterIconsProps) => (
-  <div className={styles.fullQuestionIcons}>
-    <button
-      type="button"
-      className={buildFullQuestionCommentButtonClassName(styles, hasAdditionalContent)}
-      onClick={onToggleComments}
-      aria-pressed={commentsOpen}
-      title="Additional comments"
-      data-testid={E2E_TESTIDS.SURVEY_ADDITIONAL_TOGGLE}
-      data-ce-question-id={String(questionId || '')
-        .trim()
-        .toLowerCase()}
-    >
-      <FontAwesomeIcon
-        icon={faComment}
-        className={resolveFullQuestionCommentIconClassName(styles, hasAdditionalContent)}
-      />
-    </button>
-    {children}
-  </div>
-);
+}: FullQuestionFooterIconsProps) => {
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  return (
+    <div className={styles.fullQuestionIcons}>
+      <button
+        ref={buttonRef}
+        type="button"
+        className={buildFullQuestionCommentButtonClassName(styles, hasAdditionalContent)}
+        onClick={onToggleComments}
+        aria-pressed={commentsOpen}
+        title="Additional comments"
+        data-testid={E2E_TESTIDS.SURVEY_ADDITIONAL_TOGGLE}
+        data-ce-question-id={String(questionId || '')
+          .trim()
+          .toLowerCase()}
+      >
+        <FontAwesomeIcon
+          icon={faComment}
+          className={resolveFullQuestionCommentIconClassName(styles, hasAdditionalContent)}
+        />
+      </button>
+      <CETooltip target={buttonRef} placement="top" trigger="hover focus">
+        {commentsOpen ? 'Hide additional comments.' : 'Add or edit additional comments.'}
+      </CETooltip>
+      {children}
+    </div>
+  );
+};
 
 export default FullQuestionFooterIcons;

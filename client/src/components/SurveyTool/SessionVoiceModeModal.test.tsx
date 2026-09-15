@@ -136,7 +136,8 @@ describe('SessionVoiceModeModal', () => {
     fireEvent.click(summary);
     expect(review).toHaveAttribute('open');
     expect(screen.getByDisplayValue('My edited answer')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Draft selected' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByRole('button', { name: 'Draft selected' })).not.toBeInTheDocument();
+    expect(screen.getByText('1 of 1 selected')).toBeInTheDocument();
     fireEvent.change(screen.getByDisplayValue('An explanation'), { target: { value: 'My own comment' } });
     expect(screen.getByText(/Edited comments/)).toHaveTextContent('User: Edited comments');
     fireEvent.click(screen.getByRole('button', { name: 'Submit responses' }));
@@ -529,7 +530,7 @@ describe('SessionVoiceModeModal', () => {
     expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_CONTEXT)).toHaveValue('Relevant context');
     const replacement = screen.getByRole('button', { name: 'Replace with draft' });
-    expect(replacement).toHaveAttribute('aria-pressed', 'false');
+    expect(replacement).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Remove draft for What matters?' })).toBeDisabled();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toBeDisabled();
 
@@ -674,11 +675,13 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.getByText('0 of 1 selected')).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toBeDisabled();
 
-    const restore = screen.getByRole('button', { name: 'Select draft' });
-    expect(restore).toHaveAttribute('aria-pressed', 'false');
+    const restore = screen.getByRole('button', { name: 'Restore draft' });
+    expect(restore).toBeEnabled();
     fireEvent.click(restore);
     expect(screen.getByText('1 of 1 selected')).toBeInTheDocument();
     expect(remove).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Restore draft' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Draft selected' })).not.toBeInTheDocument();
   });
 
   it('explains when the evidence is insufficient and does not offer a futile retry', async () => {

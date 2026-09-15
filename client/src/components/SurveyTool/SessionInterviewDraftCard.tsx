@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Input } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCaretDown, faCheck, faTimes } from '@fortawesome/free-solid-svg-icons';
+import { faCaretDown, faTimes } from '@fortawesome/free-solid-svg-icons';
 import BinaryChoiceInput from './BinaryChoiceInput';
 import FullQuestionFooterIcons from './FullQuestionFooterIcons';
 import AdditionalCommentsInlineRow from './AdditionalCommentsInlineRow';
@@ -129,30 +129,32 @@ export default function SessionInterviewDraftCard({
             </FullQuestionFooterIcons>
           </div>
           {showComments ? (
-            <>
-              {comments && (commentsAreAgentDraft || commentsEdited) ? (
-                <p className={styles.sessionInterviewFieldOrigin}>
-                  <strong>{commentsAreAgentDraft ? 'Agent:' : 'User:'}</strong>{' '}
-                  {commentsAreAgentDraft ? 'Auto-filled comments' : 'Edited comments'}
-                </p>
-              ) : null}
-              <AdditionalCommentsInlineRow
-                lockControl={renderFieldLock?.(draft.questionId, 'additional')}
-                input={
-                  renderAdditionalInput ? (
-                    renderAdditionalInput(draft.questionId, comments, onCommentsChange)
-                  ) : (
-                    <Input
-                      type="textarea"
-                      value={comments}
-                      onChange={(event) => onCommentsChange(event.target.value)}
-                      disabled={disabled}
-                      aria-label={`Additional comments for ${prompt}`}
-                    />
-                  )
-                }
-              />
-            </>
+            <div className={styles.pileCommentsRow}>
+              <div className={styles.pileAdditionalEditor}>
+                {comments && (commentsAreAgentDraft || commentsEdited) ? (
+                  <p className={styles.sessionInterviewFieldOrigin}>
+                    <strong>{commentsAreAgentDraft ? 'Agent:' : 'User:'}</strong>{' '}
+                    {commentsAreAgentDraft ? 'Auto-filled comments' : 'Edited comments'}
+                  </p>
+                ) : null}
+                <AdditionalCommentsInlineRow
+                  lockControl={renderFieldLock?.(draft.questionId, 'additional')}
+                  input={
+                    renderAdditionalInput ? (
+                      renderAdditionalInput(draft.questionId, comments, onCommentsChange)
+                    ) : (
+                      <Input
+                        type="textarea"
+                        value={comments}
+                        onChange={(event) => onCommentsChange(event.target.value)}
+                        disabled={disabled}
+                        aria-label={`Additional comments for ${prompt}`}
+                      />
+                    )
+                  }
+                />
+              </div>
+            </div>
           ) : null}
         </div>
       </div>
@@ -203,18 +205,18 @@ export default function SessionInterviewDraftCard({
           ) : null}
         </div>
       ) : null}
-      <div className={styles.sessionInterviewDraftActions}>
-        <button
-          type="button"
-          className={`${styles.sessionInterviewDraftApply} ${selected ? styles.sessionInterviewDraftApplySelected : ''}`}
-          onClick={() => onSelect(!selected)}
-          aria-pressed={selected}
-          disabled={disabled}
-        >
-          {selected ? <FontAwesomeIcon icon={faCheck} /> : null}
-          {existing && !selected ? 'Replace with draft' : selected ? 'Draft selected' : 'Select draft'}
-        </button>
-      </div>
+      {!selected ? (
+        <div className={styles.sessionInterviewDraftActions}>
+          <button
+            type="button"
+            className={styles.sessionInterviewDraftApply}
+            onClick={() => onSelect(true)}
+            disabled={disabled}
+          >
+            {existing ? 'Replace with draft' : 'Restore draft'}
+          </button>
+        </div>
+      ) : null}
     </article>
   );
 }

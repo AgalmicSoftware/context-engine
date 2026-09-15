@@ -6,6 +6,32 @@ import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceCon
 import styles from './SurveyTool.module.scss';
 
 describe('SurveyQuestionsLockAudienceControl', () => {
+  it('explains the additional-comments lock on keyboard focus', async () => {
+    render(
+      <SurveyQuestionsLockAudienceControl
+        qid="q1"
+        effectiveFieldKey="additional"
+        buttonTitle="Comments encryption audience"
+        hasAudienceMenu
+      />,
+    );
+    screen.getByTestId(E2E_TESTIDS.SURVEY_ADDITIONAL_LOCK).focus();
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Choose who can read additional comments.');
+  });
+
+  it('explains that clicking an encrypted comment lock removes encryption', async () => {
+    render(
+      <SurveyQuestionsLockAudienceControl
+        qid="q1"
+        effectiveFieldKey="additional"
+        fieldState={{ encrypted: true }}
+        hasAudienceMenu
+      />,
+    );
+    screen.getByTestId(E2E_TESTIDS.SURVEY_ADDITIONAL_LOCK).focus();
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Remove encryption from additional comments.');
+  });
+
   it('renders the pile lock button pressed state and forwards lock clicks', () => {
     const onLockClick = jest.fn();
     render(

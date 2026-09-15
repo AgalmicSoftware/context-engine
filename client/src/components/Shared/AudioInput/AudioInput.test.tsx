@@ -1,6 +1,7 @@
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
+import { fireEvent, screen } from '@testing-library/react';
 
 import AudioInput from './AudioInput';
 import { requestAiRewrite } from '../../../utilities/ai/aiClient';
@@ -297,6 +298,22 @@ describe('AudioInput', () => {
 
     expect(startRecording).toHaveBeenCalledTimes(1);
     expect(container.textContent).not.toContain('Recording is temporarily disabled');
+  });
+
+  it('explains microphone and AI rewrite controls on hover and keyboard focus', async () => {
+    act(() => {
+      root.render(<AudioInput value="Draft comments" updateFunction={jest.fn()} hideEncryption />);
+    });
+    const rewrite = requireElement(container.querySelector('button[aria-label="AI rewrite"]'));
+    fireEvent.mouseOver(rewrite);
+    expect(
+      await screen.findByText('AI rewrite: remove filler words and improve punctuation. You can revert the result.'),
+    ).toBeInTheDocument();
+    fireEvent.mouseOut(rewrite);
+    act(() => {
+      requireElement(container.querySelector('button[aria-label="Start recording"]')).focus();
+    });
+    expect(await screen.findByText('Record speech and add its transcript to this text.')).toBeInTheDocument();
   });
 
   it('hides the download dock by default even when text and audio exist', () => {
