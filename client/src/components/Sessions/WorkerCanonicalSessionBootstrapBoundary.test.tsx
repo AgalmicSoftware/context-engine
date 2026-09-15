@@ -102,7 +102,7 @@ describe('WorkerCanonicalSessionBootstrapBoundary', () => {
       />,
     );
 
-    expect(screen.getByRole('status')).toHaveTextContent('Loading worker session…');
+    expect(screen.getByRole('status')).toHaveTextContent(/^Loading Session$/);
     expect(window.sessionStorage.getItem(STALE_CHUNK_RELOAD_STORAGE_KEY)).toBe('true');
     const discoveryArgs = mockFetchBootstrap.mock.calls[0][0];
     expect(discoveryArgs).toEqual(

@@ -84,14 +84,14 @@ const WorkerCanonicalSessionBootstrapBoundary = ({
   const [retryNonce, setRetryNonce] = useState(0);
   const [viewState, setViewState] = useState<BootstrapViewState>({
     kind: 'loading',
-    message: 'Loading worker session…',
+    message: 'Loading Session',
   });
 
   useEffect(() => {
     const abortController = new AbortController();
     let active = true;
 
-    setViewState({ kind: 'loading', message: 'Loading worker session…' });
+    setViewState({ kind: 'loading', message: 'Loading Session' });
 
     const resolveBootstrap = async () => {
       try {
