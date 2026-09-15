@@ -252,7 +252,8 @@ packet contains context facts but not responses, the session AI mapping lane
 still converts those facts into drafts.
 
 The review surface shows confidence as a progress meter and keeps each evidence
-basis collapsed until requested. Binary drafts reuse the normal pile-view
+basis and AI-estimated support level collapsed under **Basis** until requested.
+Binary drafts reuse the normal pile-view
 Agree/Unsure/Disagree controls. Applied source/model provenance is persisted in
 the anonymous draft together with its answer, so logging in after review does
 not remove the attribution before final submission. An explicitly opted-in

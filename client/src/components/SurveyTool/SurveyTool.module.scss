@@ -4045,7 +4045,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   &:hover,
   &:focus-visible {
-    color: var(--ce-action-accent);
+    color: var(--ce-panel-text);
     outline: 2px solid var(--ce-focus-ring);
     outline-offset: 2px;
   }
