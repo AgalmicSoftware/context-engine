@@ -3398,6 +3398,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .sessionInterviewPrimaryAction {
   display: inline-flex;
   align-items: center;
+  margin-inline: auto;
   gap: 10px;
 }
 
