@@ -788,11 +788,7 @@ function SessionInterviewPanel({
                     void copyAgentPrompt();
                   }}
                 >
-                  Copy and paste this prompt (into your Claude or ChatGPT) to augment interview with relevant memories
-                  <span className={styles.sessionAgentKickoffExplanation}>
-                    {' '}
-                    – this allows your agent to predict your responses
-                  </span>
+                  Copy and paste this prompt (into Claude or ChatGPT) to augment interview – allows your agent to predict your responses
                 </button>
                 <button
                   type="button"

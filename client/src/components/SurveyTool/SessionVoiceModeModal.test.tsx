@@ -382,7 +382,7 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_CONTEXT)).not.toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveAccessibleName('Interview status: Ready');
     expect(
-      screen.getByRole('button', { name: /Copy and paste this prompt \(into your Claude or ChatGPT\)/ }),
+      screen.getByRole('button', { name: /Copy and paste this prompt \(into Claude or ChatGPT\)/ }),
     ).toBeInTheDocument();
     const promptToggle = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE);
     expect(promptToggle).toHaveAccessibleName('Prompt');
@@ -393,7 +393,7 @@ describe('SessionVoiceModeModal', () => {
     expect(copyButton).toHaveTextContent('');
     expect(screen.queryByText('Copy prompt')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Copy and paste this prompt \(into your Claude or ChatGPT\)/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Copy and paste this prompt (into Claude or ChatGPT) to augment interview – allows your agent to predict your responses' }));
     await waitFor(() =>
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
         expect.stringContaining('review-only Context Engine interview prefill'),

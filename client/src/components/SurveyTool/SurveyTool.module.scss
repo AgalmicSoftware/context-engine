@@ -6567,6 +6567,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   align-items: stretch;
 
   > :only-child,
+  > .sessionAgentKickoff:first-child,
   > .sessionInterviewTranscript,
   > .sessionAgentKickoffPrompt {
     grid-column: 1 / -1;
@@ -6602,8 +6603,4 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
       outline-offset: 3px;
     }
   }
-}
-
-.sessionAgentKickoffExplanation {
-  opacity: 0.5;
 }
