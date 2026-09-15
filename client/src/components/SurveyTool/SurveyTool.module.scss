@@ -6028,6 +6028,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   justify-content: center;
   gap: 1rem;
   width: 100%;
+  .ratingSlider {
+    margin-block: 0 !important;
+  }
   .rangeslider {
     flex: 0 1 260px;
     width: 260px;
