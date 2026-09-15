@@ -289,13 +289,31 @@ describe('SessionVoiceModeModal', () => {
         questionId: 'q1',
         answer: 'Edited one',
         selected: true,
-        original: prefillPacket.responses[0],
+        original: {
+          ...prefillPacket.responses[0],
+          revisions: [
+            expect.objectContaining({
+              revision: 1,
+              answer: prefillPacket.responses[0].answer,
+              modelId: prefillPacket.source.modelId,
+            }),
+          ],
+        },
       }),
       expect.objectContaining({
         questionId: 'q2',
         answer: 'Edited two',
         selected: false,
-        original: prefillPacket.responses[1],
+        original: {
+          ...prefillPacket.responses[1],
+          revisions: [
+            expect.objectContaining({
+              revision: 1,
+              answer: prefillPacket.responses[1].answer,
+              modelId: prefillPacket.source.modelId,
+            }),
+          ],
+        },
       }),
     ]);
     expect(baseProps.onRecordProvenance.mock.invocationCallOrder[0]).toBeLessThan(
@@ -364,10 +382,10 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_CONTEXT)).not.toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveAccessibleName('Interview status: Ready');
     expect(
-      screen.getByText('Copy and Paste this prompt to augment interview with history from Claude or ChatGPT'),
+      screen.getByRole('button', { name: /Copy and paste this prompt \(into your Claude or ChatGPT\)/ }),
     ).toBeInTheDocument();
     const promptToggle = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE);
-    expect(promptToggle).toHaveAccessibleName('View prompt');
+    expect(promptToggle).toHaveAccessibleName('Prompt');
     expect(promptToggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT)).not.toBeInTheDocument();
     const copyButton = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT);
@@ -375,7 +393,7 @@ describe('SessionVoiceModeModal', () => {
     expect(copyButton).toHaveTextContent('');
     expect(screen.queryByText('Copy prompt')).not.toBeInTheDocument();
 
-    fireEvent.click(copyButton);
+    fireEvent.click(screen.getByRole('button', { name: /Copy and paste this prompt \(into your Claude or ChatGPT\)/ }));
     await waitFor(() =>
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
         expect.stringContaining('review-only Context Engine interview prefill'),
@@ -383,9 +401,11 @@ describe('SessionVoiceModeModal', () => {
     );
     expect(copyButton).toHaveAccessibleName('Memory augmentation prompt copied');
     expect(copyButton.querySelector('[data-icon="check"]')).toBeInTheDocument();
+    await act(async () => fireEvent.click(copyButton));
+    expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(2);
 
     fireEvent.click(promptToggle);
-    expect(promptToggle).toHaveAccessibleName('Hide prompt');
+    expect(promptToggle).toHaveAccessibleName('Prompt');
     const displayedPrompt = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT);
     const plainPrompt = buildExternalInterviewKickoff({
       workerUrl: baseProps.workerUrl,
@@ -410,7 +430,7 @@ describe('SessionVoiceModeModal', () => {
     );
 
     fireEvent.click(promptToggle);
-    expect(promptToggle).toHaveAccessibleName('View prompt');
+    expect(promptToggle).toHaveAccessibleName('Prompt');
     expect(promptToggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT)).not.toBeInTheDocument();
   });
@@ -762,7 +782,7 @@ describe('SessionVoiceModeModal', () => {
     fireEvent.click(screen.getByLabelText(/Include self-reported AI platform\/model provenance/i));
     const metadata = screen.getByRole('group', { name: 'AI prefill metadata' });
     fireEvent.click(metadata.querySelector('summary')!);
-    expect(metadata).toHaveTextContent('Platform, model, revision, and coverage details will not be included.');
+    expect(metadata).toHaveTextContent('Source platform and coverage details will not be included.');
     expect(metadata).not.toHaveTextContent('a'.repeat(64));
     fireEvent.click(includeComparison);
     expect(metadata).toHaveTextContent('Predictions, edits, and unselected drafts will not be included.');
@@ -1027,6 +1047,16 @@ describe('Interview cancellation and recovery', () => {
     expect(rounds[1].instructions).toContain('Continue the prior interview');
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
     expect(await screen.findByDisplayValue('Additional match')).toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toHaveAccessibleName('Continue interview');
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON)).toBeInTheDocument();
+    expect(mockedMapInterviewEvidenceToResponses.mock.calls.at(-1)?.[0].previousResponses).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          prediction: expect.objectContaining({ answer: 'First answer' }),
+          reviewed: expect.objectContaining({ answer: 'My edit' }),
+        }),
+      ]),
+    );
     expect(screen.getByDisplayValue('My edit')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Keep this')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Restore draft' })).toBeInTheDocument();

@@ -1,3 +1,4 @@
+import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
 import { appendInterviewTranscript, mergeInterviewReview } from './sessionInterviewReviewState';
 import { useInterviewReadiness } from './useInterviewReadiness';
 import { useInterviewQuestionUpdates } from './useInterviewQuestionUpdates';
@@ -177,6 +178,14 @@ function SessionInterviewPanel({
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [editedDrafts, setEditedDrafts] = useState<Record<string, InterviewDraftResponse>>({});
   const hasAiPrefill = Boolean(prefillPacket && prefillPacket.source.modelId !== 'direct-user-context');
+  const hasPredictionRevisions = drafts.some((draft) => (draft.revisions?.length || 0) > 1);
+  const researchAvailable = hasAiPrefill || hasPredictionRevisions;
+  const researchPacket: InterviewPrefillPacket = prefillPacket || {
+    version: 1,
+    sessionSlug,
+    source: { platform: 'other', modelId: DEFAULT_AI_MODEL, verification: 'self_reported' },
+    responderContext: {},
+  };
   const [includeProvenance, setIncludeProvenance] = useState(true);
   const [includePredictionComparison, setIncludePredictionComparison] = useState(true);
   const [includeResponderName, setIncludeResponderName] = useState(false);
@@ -302,6 +311,14 @@ function SessionInterviewPanel({
             sessionSlug,
             sessionConfig,
             workerUrl: url,
+            previousResponses: drafts.map(({ revisions: _revisions, ...prediction }) => ({
+              prediction,
+              reviewed: {
+                answer: editedDrafts[prediction.questionId]?.answer,
+                additionalComments: editedDrafts[prediction.questionId]?.additionalComments,
+              },
+              selected: selected[prediction.questionId],
+            })),
             onSuggestedQuestions: (next) => {
               proposedQuestions = next;
             },
@@ -323,6 +340,7 @@ function SessionInterviewPanel({
           selected,
           mapped,
           (id) => !hasDraftValue(responseFieldValue(existingResponseSlice, 'answers', id)),
+          importedDrafts ? prefillPacket?.source.modelId : DEFAULT_AI_MODEL,
         );
         for (const draft of review.drafts) {
           if (!editedDrafts[draft.questionId] && !review.edited[draft.questionId]?.additionalComments) {
@@ -451,7 +469,7 @@ function SessionInterviewPanel({
           prefillPacket?.source || directContextSource,
           prefillPacket,
           hasAiPrefill && includeProvenance,
-          hasAiPrefill && includePredictionComparison,
+          researchAvailable && includePredictionComparison,
           includeResponderName ? String(prefillPacket?.responderContext?.name || '').trim() : '',
           drafts.map((draft) => ({
             ...editedDrafts[draft.questionId],
@@ -537,8 +555,8 @@ function SessionInterviewPanel({
     ? 'Preparing opening…'
     : isStarting
       ? 'Connecting…'
-      : drafts.length
-        ? 'Start another interview'
+      : transcript.trim()
+        ? 'Continue interview'
         : 'Start voice interview';
 
   return (
@@ -738,82 +756,95 @@ function SessionInterviewPanel({
             </div>
           ) : null}
 
-          {!isInterviewBusy && transcript.trim() ? (
-            <section className={styles.sessionInterviewTranscriptDisclosure}>
-              <button
-                type="button"
-                className={styles.sessionInterviewTranscriptToggle}
-                onClick={() => setShowTranscript((current) => !current)}
-                aria-expanded={showTranscript}
-                aria-controls="ce-session-interview-transcript-content"
-                data-testid={E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT_TOGGLE}
-              >
-                <FontAwesomeIcon
-                  icon={faCaretDown}
-                  className={`${styles.sessionInterviewTranscriptCaret} ${
-                    showTranscript ? '' : styles.sessionInterviewTranscriptCaretCollapsed
-                  }`}
-                />
-                <strong>Interview transcript</strong>
-                <span>{transcript.trim().split(/\s+/).length} words</span>
-              </button>
-              {showTranscript ? (
-                <pre
-                  id="ce-session-interview-transcript-content"
-                  className={styles.sessionInterviewTranscript}
-                  aria-label="Interview transcript"
-                  data-testid={E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT}
+          <div className={styles.sessionInterviewResources}>
+            {!isInterviewBusy && transcript.trim() ? (
+              <section className={styles.sessionInterviewTranscriptDisclosure}>
+                <button
+                  type="button"
+                  className={styles.sessionInterviewTranscriptToggle}
+                  onClick={() => setShowTranscript((current) => !current)}
+                  aria-expanded={showTranscript}
+                  aria-controls="ce-session-interview-transcript-content"
+                  data-testid={E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT_TOGGLE}
                 >
-                  {transcript}
-                </pre>
-              ) : null}
-            </section>
-          ) : null}
+                  <FontAwesomeIcon
+                    icon={faCaretDown}
+                    className={`${styles.sessionInterviewTranscriptCaret} ${
+                      showTranscript ? '' : styles.sessionInterviewTranscriptCaretCollapsed
+                    }`}
+                  />
+                  <strong>Transcript</strong>
+                  <span>{transcript.trim().split(/\s+/).length} words</span>
+                </button>
+              </section>
+            ) : null}
 
-          {kickoff ? (
-            <div className={styles.sessionAgentKickoff}>
-              <strong className={styles.sessionAgentKickoffTitle}>
-                Copy and Paste this prompt to augment interview with history from Claude or ChatGPT
-              </strong>
-              <button
-                type="button"
-                className={styles.sessionAgentKickoffToggle}
-                onClick={() => setShowAgentPrompt((current) => !current)}
-                aria-expanded={showAgentPrompt}
-                aria-controls="ce-session-interview-agent-prompt"
-                data-testid={E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE}
-              >
-                <span>{showAgentPrompt ? 'Hide prompt' : 'View prompt'}</span>
-                <FontAwesomeIcon
-                  icon={faCaretDown}
-                  className={`${styles.sessionAgentKickoffCaret} ${
-                    showAgentPrompt ? styles.sessionAgentKickoffCaretExpanded : ''
-                  }`}
-                />
-              </button>
-              <button
-                type="button"
-                className={`${styles.sessionAgentKickoffCopy} ${promptCopied ? styles.sessionAgentKickoffCopied : ''}`}
-                onClick={() => {
-                  void copyAgentPrompt();
-                }}
-                aria-label={promptCopied ? 'Memory augmentation prompt copied' : 'Copy memory augmentation prompt'}
-                title={promptCopied ? 'Copied' : 'Copy memory augmentation prompt'}
-                data-testid={E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT}
-              >
-                <FontAwesomeIcon icon={promptCopied ? faCheck : faClipboard} />
-              </button>
-              {showAgentPrompt ? (
-                <div
-                  id="ce-session-interview-agent-prompt"
-                  className={styles.sessionAgentKickoffPrompt}
-                  data-testid={E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT}
+            {kickoff ? (
+              <div className={styles.sessionAgentKickoff}>
+                <button
+                  type="button"
+                  className={styles.sessionAgentKickoffTitle}
+                  onClick={() => {
+                    void copyAgentPrompt();
+                  }}
                 >
-                  <SessionInterviewPrompt prompt={kickoff} />
-                </div>
-              ) : null}
-            </div>
-          ) : null}
+                  Copy and paste this prompt (into your Claude or ChatGPT) to augment interview with relevant memories
+                  <span className={styles.sessionAgentKickoffExplanation}>
+                    {' '}
+                    – this allows your agent to predict your responses
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className={styles.sessionAgentKickoffToggle}
+                  onClick={() => setShowAgentPrompt((current) => !current)}
+                  aria-expanded={showAgentPrompt}
+                  aria-controls="ce-session-interview-agent-prompt"
+                  data-testid={E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE}
+                >
+                  <span>Prompt</span>
+                  <FontAwesomeIcon
+                    icon={faCaretDown}
+                    className={`${styles.sessionAgentKickoffCaret} ${
+                      showAgentPrompt ? styles.sessionAgentKickoffCaretExpanded : ''
+                    }`}
+                  />
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.sessionAgentKickoffCopy} ${promptCopied ? styles.sessionAgentKickoffCopied : ''}`}
+                  onClick={() => {
+                    void copyAgentPrompt();
+                  }}
+                  aria-label={promptCopied ? 'Memory augmentation prompt copied' : 'Copy memory augmentation prompt'}
+                  title={promptCopied ? 'Copied' : 'Copy memory augmentation prompt'}
+                  data-testid={E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT}
+                >
+                  <FontAwesomeIcon icon={promptCopied ? faCheck : faClipboard} />
+                </button>
+              </div>
+            ) : null}
+
+            {showTranscript ? (
+              <pre
+                id="ce-session-interview-transcript-content"
+                className={styles.sessionInterviewTranscript}
+                aria-label="Transcript"
+                data-testid={E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT}
+              >
+                {transcript}
+              </pre>
+            ) : null}
+            {showAgentPrompt ? (
+              <div
+                id="ce-session-interview-agent-prompt"
+                className={styles.sessionAgentKickoffPrompt}
+                data-testid={E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT}
+              >
+                <SessionInterviewPrompt prompt={kickoff} />
+              </div>
+            ) : null}
+          </div>
 
           {drafts.length && !isInterviewBusy && !mapping ? (
             <SessionInterviewReviewSection
@@ -845,9 +876,11 @@ function SessionInterviewPanel({
               ))}
               <div className={styles.sessionInterviewReviewActions}>
                 <div className={styles.sessionInterviewConsentOptions}>
-                  {hasAiPrefill && prefillPacket ? (
+                  {researchAvailable ? (
                     <SessionInterviewResearchConsent
-                      packet={prefillPacket}
+                      packet={researchPacket}
+                      showProvenance={hasAiPrefill}
+                      revisionCount={drafts.reduce((count, draft) => count + (draft.revisions?.length || 0), 0)}
                       includeProvenance={includeProvenance}
                       includeComparison={includePredictionComparison}
                       onProvenanceChange={setIncludeProvenance}

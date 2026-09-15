@@ -1735,6 +1735,7 @@ export const recordInterviewProvenance = (
             ? { ...currentProvenance }
             : {};
         drafts.forEach((draft) => {
+          const original = draft.revisions?.[0] || draft;
           if (!included && !includePredictionComparison && !normalizedResponderName) {
             delete provenance[draft.questionId];
             return;
@@ -1753,13 +1754,14 @@ export const recordInterviewProvenance = (
             ...(includePredictionComparison
               ? {
                   originalPrediction: {
-                    answer: draft.answer,
-                    additionalComments: draft.additionalComments || '',
-                    importance: draft.importance ?? null,
-                    conviction: draft.conviction ?? null,
-                    confidence: draft.confidence ?? null,
-                    evidence: draft.evidence || '',
+                    answer: original.answer,
+                    additionalComments: original.additionalComments || '',
+                    importance: original.importance ?? null,
+                    conviction: original.conviction ?? null,
+                    confidence: original.confidence ?? null,
+                    evidence: original.evidence || '',
                   },
+                  predictionRevisions: draft.revisions || [],
                   ...(draft === researchAnchor ? { unselectedDrafts: review.filter((entry) => !entry.selected) } : {}),
                 }
               : {}),

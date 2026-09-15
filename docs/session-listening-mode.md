@@ -110,7 +110,7 @@ answer evidence. Interviewer questions are retained as context so short replies
 such as “four” can be matched to the question asked. Live input and output
 transcript fragments are retained exactly, deduplicated by event ID, and ordered
 by session time; legacy Realtime sessions use completed input transcriptions.
-Starting another interview continues the existing conversation. Each round appends to the transcript, and mapping uses the combined evidence. Existing matches are retained, untouched AI fields can be refined, and user edits and excluded drafts are preserved. Suggested question prompts and tags also survive continuation; only novel suggestions are appended. A failed connection or a round with no new speech leaves the previous review intact. Closing the Interview dialog still ends this in-memory review.
+**Continue interview** continues the existing conversation. Each round appends to the transcript, and mapping reviews the combined evidence alongside earlier predictions and user-reviewed responses. Changed predictions retain numbered versions with model IDs in local review state; consented research submission includes those versions and applies the same answer/comment encryption redaction to every version. Research controls also appear after a voice-only continuation revises a prediction. Declining research excludes the history from submitted metadata. Existing matches are retained, untouched AI fields can be refined, and user edits and excluded drafts are preserved. Suggested question prompts and tags also survive continuation; only novel suggestions are appended. A failed connection or a round with no new speech leaves the previous review intact. Closing the Interview dialog still ends this in-memory review.
 New speech is mapped even if the interview started with imported predictions. When the call ends, the responder can
 expand a read-only transcript disclosure while `gpt-5.6-terra` with medium reasoning effort and standard processing (`service_tier: default`)
 maps the transcript and any responder context imported by an AI prefill link
@@ -250,6 +250,8 @@ faithful to the external AI. Every proposed answer remains a local review draft.
 The account used at final normal submission owns the response. If an older
 packet contains context facts but not responses, the session AI mapping lane
 still converts those facts into drafts.
+
+The **Transcript** and copy-prompt cards share one row. Both the copy text and clipboard icon copy the plain prompt; **Prompt** expands its readable preview below.
 
 The review surface shows confidence as a progress meter and keeps each evidence
 basis and AI-estimated support level collapsed under **Basis** until requested.

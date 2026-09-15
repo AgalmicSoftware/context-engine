@@ -10,6 +10,16 @@ describe('unselected interview research', () => {
       additionalComments: 'Original note',
       evidence: 'Basis',
       confidence: 0.6,
+      revisions: [
+        {
+          revision: 1,
+          modelId: 'fixture',
+          answer: 'Original prediction',
+          additionalComments: 'Original note',
+          evidence: 'Basis',
+        },
+        { revision: 2, modelId: 'fixture', answer: 'Revised prediction' },
+      ],
     },
   };
 
@@ -17,6 +27,10 @@ describe('unselected interview research', () => {
     expect(buildUnselectedInterviewResearch([draft])[0]).toMatchObject({
       questionId: 'q2',
       selection: 'not_selected',
+      revisions: [
+        expect.objectContaining({ answer: 'Original prediction' }),
+        expect.objectContaining({ answer: 'Revised prediction' }),
+      ],
       submitted: null,
       original: { answer: 'Original prediction' },
       reviewed: { answer: 'Edited but rejected' },
@@ -38,7 +52,7 @@ describe('unselected interview research', () => {
       redactedFields: ['answer', 'additionalComments'],
     });
     expect(JSON.stringify(result)).not.toMatch(
-      /Original prediction|Edited but rejected|Final private answer|Original note|Edited note|Basis/,
+      /Revised prediction|Original prediction|Edited but rejected|Final private answer|Original note|Edited note|Basis/,
     );
   });
 });

@@ -33,6 +33,7 @@ export const buildUnselectedInterviewResearch = (
       return {
         questionId: String(draft.questionId || ''),
         selection: 'not_selected',
+        revisions: buildInterviewRevisionResearch(original.revisions, encryptedAnswer, encryptedComments),
         original: {
           ...protect(original),
           confidence: original.confidence ?? null,
@@ -44,3 +45,22 @@ export const buildUnselectedInterviewResearch = (
       };
     })
     .filter((draft) => draft.questionId);
+
+export const buildInterviewRevisionResearch = (
+  value: unknown,
+  answerEncrypted: boolean,
+  commentsEncrypted: boolean,
+): RecordValue[] =>
+  (Array.isArray(value) ? value : []).map((entry) => {
+    const revision = record(entry);
+    return {
+      revision: Number(revision.revision) || 1,
+      modelId: String(revision.modelId || 'unknown').slice(0, 256),
+      answer: answerEncrypted ? redacted() : (revision.answer ?? null),
+      additionalComments: commentsEncrypted ? redacted() : (revision.additionalComments ?? ''),
+      importance: revision.importance ?? null,
+      conviction: revision.conviction ?? null,
+      confidence: revision.confidence ?? null,
+      evidence: answerEncrypted || commentsEncrypted ? '' : String(revision.evidence || ''),
+    };
+  });

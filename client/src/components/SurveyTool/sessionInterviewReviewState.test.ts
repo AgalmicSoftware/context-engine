@@ -19,6 +19,8 @@ it('updates untouched AI fields, preserves edits and exclusions, and retains unm
   expect(result.drafts.map((draft) => draft.questionId)).toEqual(['q1', 'q2', 'q3']);
   expect(result.edited.q1).toMatchObject({ answer: 'My edited answer', additionalComments: '', confidence: 0.9 });
   expect(result.edited.q2).toEqual(retained);
+  expect(result.drafts[0].revisions?.map(({ answer }) => answer)).toEqual(['Old answer', 'New prediction']);
+  expect(mergeInterviewReview(result.drafts, result.edited, result.selected, [result.drafts[0]], () => true).drafts[0].revisions).toHaveLength(2);
   expect(result.selected).toEqual({ q1: false, q2: true, q3: true });
   expect(
     mergeInterviewReview(

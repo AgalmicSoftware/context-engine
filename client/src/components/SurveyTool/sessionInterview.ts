@@ -64,8 +64,20 @@ export type InterviewPrefillPacket = {
   responses?: InterviewDraftResponse[];
 };
 
+export type InterviewPredictionRevision = {
+  revision: number;
+  modelId: string;
+  answer: unknown;
+  additionalComments?: string;
+  importance?: number;
+  conviction?: number;
+  evidence?: string;
+  confidence?: number;
+};
+
 export type InterviewDraftResponse = {
   questionId: string;
+  revisions?: InterviewPredictionRevision[];
   answer: unknown;
   additionalComments?: string;
   importance?: number;
@@ -419,10 +431,12 @@ export const buildInterviewResponseMappingPrompt = ({
   questions,
   transcript,
   prefillPacket,
+  previousResponses,
 }: {
   questions: InterviewQuestion[];
   transcript?: unknown;
   prefillPacket?: InterviewPrefillPacket | null;
+  previousResponses?: unknown;
 }): string => `You map evidence about one responder into reviewable Context Engine response drafts.
 
 Rules:
@@ -431,6 +445,7 @@ Rules:
 - Match the question type and listed options exactly when options exist. For rating questions, return a JSON number on the stated scale (for example, 4), not prose or "4/10".
 - Interviewer turns supply question context only; never treat their suggestions as the responder's beliefs. Resolve short replies such as "four", "yes", or "no" against the preceding question. Check every explicit responder answer, including numeric ratings, before returning drafts.
 - Use additionalComments for relevant explanations, qualifications, or examples from the interview that do not fit the main answer, especially for binary, rating, and choice questions. Preserve the responder's meaning without inventing details or repeating the main answer. importance (0-100) and conviction (0-100) are optional and require explicit evidence.
+- Reconsider earlier predictions against the complete transcript, giving new corrections and clarifications priority. Refine prior answers when supported; prior predictions are not independent evidence. Reviewed user edits are supplied as context and should not be silently contradicted.
 - Keep the responder's meaning and uncertainty. Do not improve their opinion into a stronger claim.
 - confidence is required for every response and ranges from 0 to 1: 0.00-0.39 weak inference, 0.40-0.69 moderate support, and 0.70-1.00 direct or repeated support.
 - Return JSON only, with shape {"responses":[{"questionId":"...","answer":...,"additionalComments":"...","importance":50,"conviction":50,"evidence":"short basis","confidence":0.0}]}.
@@ -442,7 +457,10 @@ Interview transcript:
 ${toTrimmedString(transcript) || '(none)'}
 
 Responder context packet:
-${prefillPacket ? JSON.stringify(prefillPacket) : '(none)'}`;
+${prefillPacket ? JSON.stringify(prefillPacket) : '(none)'}
+
+Previous predictions and reviewed responses (context, not independent evidence):
+${previousResponses ? JSON.stringify(previousResponses) : '(none)'}`;
 
 export const parseInterviewDraftResponses = (
   raw: unknown,
@@ -471,6 +489,7 @@ export const mapInterviewEvidenceToResponses = async ({
   sessionConfig,
   workerUrl,
   onSuggestedQuestions,
+  previousResponses,
 }: {
   questions: InterviewQuestion[];
   transcript?: unknown;
@@ -479,6 +498,7 @@ export const mapInterviewEvidenceToResponses = async ({
   sessionConfig?: unknown;
   workerUrl?: unknown;
   onSuggestedQuestions?: (questions: GeneratedSurveyStatement[]) => void;
+  previousResponses?: unknown;
 }): Promise<InterviewDraftResponse[]> => {
   if (!questions.length) throw new Error('No accessible questions are available for interview mapping.');
   const suggest =
@@ -503,7 +523,8 @@ export const mapInterviewEvidenceToResponses = async ({
         : '')
     : '';
   const raw = await callAI(
-    buildInterviewResponseMappingPrompt({ questions, transcript, prefillPacket }) + suggestionInstruction,
+    buildInterviewResponseMappingPrompt({ questions, transcript, prefillPacket, previousResponses }) +
+      suggestionInstruction,
     {
       sessionSlug,
       sessionConfig,

@@ -6564,3 +6564,51 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   margin-left: 0.35rem;
   opacity: 0.5;
 }
+
+.sessionInterviewResources {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 12px;
+  align-items: stretch;
+
+  > :only-child,
+  > .sessionInterviewTranscript,
+  > .sessionAgentKickoffPrompt {
+    grid-column: 1 / -1;
+  }
+
+  .sessionInterviewTranscriptToggle {
+    flex-wrap: wrap;
+    justify-content: center;
+    height: 100%;
+    align-content: center;
+    padding: 10px;
+    span { margin-left: 0; }
+  }
+
+  .sessionAgentKickoff {
+    padding: 10px 38px 34px 10px;
+    min-width: 0;
+  }
+
+  .sessionAgentKickoffTitle {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    color: var(--ce-panel-text);
+    font-family: var(--ce-font-body);
+    font-size: 0.85rem;
+    text-align: left;
+    cursor: pointer;
+    &:hover,
+    &:focus-visible {
+      outline: 2px solid var(--ce-focus-ring);
+      outline-offset: 3px;
+    }
+  }
+}
+
+.sessionAgentKickoffExplanation {
+  opacity: 0.5;
+}

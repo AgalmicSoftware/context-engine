@@ -507,7 +507,8 @@ describe('SurveyPileViewMode runtime surface', () => {
         callback?.();
       },
     };
-    const selected = [{ questionId: 'q1', answer: 'Agree' }, { questionId: 'q2', answer: 'Original answer' }];
+    const revisions = [{ revision: 1, modelId: 'fixture-model', answer: 'Original answer' }, { revision: 2, modelId: 'fixture-model', answer: 'Revised prediction' }];
+    const selected = [{ questionId: 'q1', answer: 'Agree' }, { questionId: 'q2', answer: 'Revised prediction', revisions }];
     const rejected = { questionId: 'q3', answer: 'Rejected edit', selected: false, original: { questionId: 'q3', answer: 'Original rejected prediction' } };
     await recordInterviewProvenance(engine, selected, null, null, false, true, '', [rejected]);
     const slice = engine.state.surveysResponseState[0];
@@ -515,6 +516,7 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(slice.interviewProvenance.q2.unselectedDrafts).toEqual([rejected]);
     expect(slice.answers).not.toHaveProperty('q3');
     expect(slice.interviewProvenance.q2.originalPrediction.answer).toBe('Original answer');
+    expect(slice.interviewProvenance.q2.predictionRevisions).toEqual(revisions);
     await recordInterviewProvenance(engine, selected, null, null, false, false, '', [rejected]);
     expect(engine.state.surveysResponseState[0].interviewProvenance).toEqual({});
   });

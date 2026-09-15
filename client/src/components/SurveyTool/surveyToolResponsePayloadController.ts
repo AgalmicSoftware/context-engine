@@ -1,5 +1,5 @@
 import type { ResponseSlice, UnknownRecord } from './surveyToolTypes';
-import { buildUnselectedInterviewResearch } from './sessionInterviewResearch';
+import { buildUnselectedInterviewResearch, buildInterviewRevisionResearch } from './sessionInterviewResearch';
 
 const asRecord = (value: unknown): UnknownRecord =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : {};
@@ -277,14 +277,17 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
     const changedFields = comparisonFields.filter(
       (field) => !responseValuesMatch(originalComparisonValues[field], submittedComparisonValues[field]),
     );
+    // Historical comments can contain text even when the final comment was cleared.
+    const researchAdditionalEncrypted = additional.encrypted === true ||
+      (additional.audienceMode !== 'explicit' && answer.encrypted === true);
     const redactedFields = [
       ...(answer.encrypted ? ['answer'] : []),
-      ...(additionalEncrypted ? ['additionalComments'] : []),
+      ...(researchAdditionalEncrypted ? ['additionalComments'] : []),
     ];
     const safeOriginalPrediction = includePredictionComparison
       ? {
           answer: answer.encrypted ? buildRedactedComparisonValue() : originalComparisonValues.answer,
-          additionalComments: additionalEncrypted
+          additionalComments: researchAdditionalEncrypted
             ? buildRedactedComparisonValue()
             : originalComparisonValues.additionalComments,
           importance: originalComparisonValues.importance,
@@ -297,9 +300,19 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
       ? {
           version: 1,
           original: safeOriginalPrediction,
+          ...(Array.isArray(interviewProvenanceRecord.predictionRevisions) &&
+          interviewProvenanceRecord.predictionRevisions.length
+            ? {
+                revisions: buildInterviewRevisionResearch(
+                  interviewProvenanceRecord.predictionRevisions,
+                  answer.encrypted === true,
+                  researchAdditionalEncrypted,
+                ),
+              }
+            : {}),
           submitted: {
             answer: answer.encrypted ? buildRedactedComparisonValue() : submittedComparisonValues.answer,
-            additionalComments: additionalEncrypted
+            additionalComments: researchAdditionalEncrypted
               ? buildRedactedComparisonValue()
               : submittedComparisonValues.additionalComments,
             importance: submittedComparisonValues.importance,

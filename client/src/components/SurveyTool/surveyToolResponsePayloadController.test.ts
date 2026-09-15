@@ -554,3 +554,40 @@ describe('surveyToolResponsePayloadController', () => {
     expect(result.sessionName).toBe('pool-session');
   });
 });
+
+it.each([false, true])(
+  'includes prediction revisions only with consent and redacts locked text (encrypted=%s)',
+  (encrypted) => {
+    const revisions = [
+      {
+        revision: 1,
+        modelId: 'fixture-model',
+        answer: 'private original',
+        additionalComments: 'private note',
+        evidence: 'private basis',
+      },
+      { revision: 2, modelId: 'fixture-model', answer: 'private revised' },
+    ];
+    const slice = {
+      answers: { q1: { value: 'Final answer', encrypted } },
+      additionalComments: { q1: { value: '', encrypted } },
+      interviewProvenance: {
+        q1: { includeAiProvenance: true, includePredictionComparison: true, predictionRevisions: revisions },
+      },
+    };
+    const opts = defaultOpts({ questionPool: [{ id: 'q1' }], surveyResponseState: slice as never });
+    const provenance = buildResponsePayload(opts).responses![0].interviewProvenance as any;
+    expect(provenance.predictionComparison.revisions).toHaveLength(2);
+    expect(provenance.predictionComparison.revisions[0].modelId).toBe('fixture-model');
+    if (encrypted) expect(JSON.stringify(provenance)).not.toContain('private');
+    else
+      expect(provenance.predictionComparison.revisions.map((entry: any) => entry.answer)).toEqual([
+        'private original',
+        'private revised',
+      ]);
+    slice.interviewProvenance.q1.includePredictionComparison = false;
+    expect(JSON.stringify(buildResponsePayload(opts).responses![0].interviewProvenance)).not.toMatch(
+      /private|revisions/,
+    );
+  },
+);
