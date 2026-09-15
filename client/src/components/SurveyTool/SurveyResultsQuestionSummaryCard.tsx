@@ -54,6 +54,7 @@ const SurveyResultsQuestionSummaryCard = ({
           <button
             type="button"
             className={styleMap.questionBookmarkButton}
+            data-ce-control-appearance="frameless"
             onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
               e.stopPropagation();
               onToggleBookmark();
