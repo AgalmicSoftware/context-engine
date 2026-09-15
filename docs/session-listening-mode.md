@@ -253,6 +253,10 @@ still converts those facts into drafts.
 
 The **Transcript** and copy-prompt cards share one row. Both the copy text and clipboard icon copy the plain prompt; **Prompt** expands its readable preview below.
 
+In the full question list, rating sliders update locally during a drag and save
+the final value on release. Loaded lists retain the Questions label during
+background refreshes; the spinner still indicates refresh activity.
+
 The review surface shows confidence as a progress meter and keeps each evidence
 basis and AI-estimated support level collapsed under **Basis** until requested.
 Binary drafts reuse the normal pile-view

@@ -133,7 +133,7 @@ export const SurveyQuestionsFullQuestionResponseInput = ({
       );
     }
     case 'rating': {
-      return inputDescriptor.useDeferredRating ? (
+      return inputDescriptor.useDeferredRating || onDeferredRatingCommit ? (
         <DeferredRatingSlider
           value={inputDescriptor.ratingValue}
           disabled={inputDescriptor.disabled}

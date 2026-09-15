@@ -1325,7 +1325,7 @@ export class SurveySelector extends Component<any, any> {
         });
       } else if (questionSelectorLoading) {
         dropdownTitle = this.renderQuestionSelectorLabel({
-          prefixLabel: 'Loading...',
+          prefixLabel: questionSelectorCounts.count > 0 && filteredQuestionCount > 0 ? 'Questions' : 'Loading...',
           count: questionSelectorCounts.count,
           encryptedCount: questionSelectorCounts.encryptedCount,
           showEncryptedCount: false,

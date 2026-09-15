@@ -43,6 +43,29 @@ jest.mock('./SurveyAudioFieldInput', () => {
 });
 
 describe('SurveyQuestionsFullQuestionResponseInput', () => {
+  it('keeps list rating drags local and commits the final value on release', () => {
+    const onCommit = jest.fn();
+    const onChange = jest.fn();
+    render(
+      <SurveyQuestionsFullQuestionResponseInput
+        question={{ id: 'q-rating', type: 'rating' }}
+        answer={{ value: 4 }}
+        onDeferredRatingCommit={onCommit}
+        onRatingChange={onChange}
+      />,
+    );
+    const slider = screen.getByRole('slider');
+    fireEvent.mouseDown(slider);
+    fireEvent.change(slider, { target: { value: '6' } });
+    fireEvent.change(slider, { target: { value: '8' } });
+    expect(slider).toHaveValue('8');
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.mouseUp(slider);
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit).toHaveBeenCalledWith(8);
+  });
+
   beforeEach(() => {
     mockSurveyAudioFieldInputProps.length = 0;
   });
