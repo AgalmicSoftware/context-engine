@@ -1307,7 +1307,7 @@ describe('OnePageSession view gating', () => {
   });
 
   it('moves the full questions title into the top back-button header', async () => {
-    const questionsHeaderName = /Questions(?:\s+[-–]\s+|\s+)Answer or Add/i;
+    const questionsHeaderName = /^Questions$/;
 
     render(<OnePageSession {...buildProps()} />);
 
@@ -1353,7 +1353,8 @@ describe('OnePageSession view gating', () => {
 
     const fullHeader = await screen.findByTestId(E2E_TESTIDS.SESSION_QUESTIONS_FULL_HEADER);
     expect(within(fullHeader).getByText('Questions')).toHaveClass(styles.sectionHeaderTitle);
-    expect(within(fullHeader).getByText('Answer or Add')).toHaveClass(styles.sectionHeaderSubtitle);
+    expect(within(fullHeader).queryByText('Answer or Add')).not.toBeInTheDocument();
+    expect(fullHeader.querySelector(`.${styles.sectionHeaderSubtitle}`)).toBeNull();
   });
 
   it('renders the Context header title and View subtitle with the shared section header classes', async () => {

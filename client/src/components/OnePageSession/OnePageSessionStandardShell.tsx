@@ -146,10 +146,10 @@ type OnePageSessionStandardShellProps = {
   onViewAllQuestionsClick: () => void;
 };
 
-const renderSectionHeading = (title: React.ReactNode, subtitle: React.ReactNode) => (
+const renderSectionHeading = (title: React.ReactNode, subtitle?: React.ReactNode) => (
   <span className={styles.sectionHeaderText}>
     <span className={styles.sectionHeaderTitle}>{title}</span>
-    <span className={styles.sectionHeaderSubtitle}>{subtitle}</span>
+    {subtitle ? <span className={styles.sectionHeaderSubtitle}>{subtitle}</span> : null}
   </span>
 );
 
@@ -281,7 +281,7 @@ export default function OnePageSessionStandardShell({
   ]
     .filter(Boolean)
     .join(' ');
-  const questionsSectionTitle = renderSectionHeading('Questions', 'Answer or Add');
+  const questionsSectionTitle = renderSectionHeading('Questions');
   const questionsSectionTooltip =
     'Survey and question platform allowing detailed responses, advanced question formats, preference weighing, and group filtering.';
   const documentsSectionTooltip =
