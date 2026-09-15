@@ -2132,3 +2132,46 @@ test('dispatchAdminRequest bootstraps Lit config and secrets through the real wo
   assert.equal(Object.prototype.hasOwnProperty.call(result.body, 'litCredentials'), false);
   assert.equal(Object.prototype.hasOwnProperty.call(result.body, 'secretOutputs'), false);
 });
+
+test('opening refresh requires admin authority and respects the session switch', async () => {
+  const request = { json: async () => createSignedBody() };
+  let generationCalls = 0;
+  const args = {
+    request,
+    env: { GROUP_KV: createMemoryKv() },
+    baseHeaders: {},
+    slug: 'session-a',
+    action: 'refresh-interview-opening',
+  };
+  const deps = createAdminDeps({
+    loadPublicInterviewQuestions: async () => [{ id: 'q1', prompt: 'An AI question' }],
+    proxyOpenAI: async () => {
+      generationCalls++;
+      return Response.json({ completion: 'What is your AI expertise?' });
+    },
+  });
+  const unauthorized = await dispatchAdminRequest({
+    ...args,
+    deps: { ...deps, resolveAdminRequestAuthority: async () => ({ ok: false, response: { status: 403 } }) },
+  });
+  assert.equal(unauthorized.status, 403);
+  assert.equal(generationCalls, 0);
+  const disabled = await dispatchAdminRequest({
+    ...args,
+    deps: {
+      ...deps,
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        existingConfig: { interviewMode: { allowManualRefresh: false } },
+        targetSlug: 'session-a',
+        headers: {},
+      }),
+    },
+  });
+  assert.equal(disabled.status, 400);
+  assert.equal(generationCalls, 0);
+  const refreshed = await dispatchAdminRequest({ ...args, deps });
+  assert.equal(refreshed.status, 200);
+  assert.equal(refreshed.body.openingPrompt, 'What is your AI expertise?');
+  assert.equal(generationCalls, 1);
+});

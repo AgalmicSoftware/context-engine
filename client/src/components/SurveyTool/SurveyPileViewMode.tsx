@@ -3150,6 +3150,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
       {isInterviewFeatureEnabled(engine.props?.sessionConfig) ? (
         <React.Suspense fallback={null}>
           <LazySessionVoiceModeModal
+            questionCreatorProps={{ ...engine.props, ...engine.getAudioInputWorkerProps() }}
             {...engine.props}
             {...engine.getAudioInputWorkerProps()}
             isOpen={!!showVoiceModeModal}

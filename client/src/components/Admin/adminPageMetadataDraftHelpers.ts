@@ -1,3 +1,4 @@
+import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 import { DEFAULT_AI_MODELS as SHARED_AI_MODELS } from '../../../../shared/aiDefaults.mjs';
 import { ethers } from 'ethers';
 
@@ -12,6 +13,9 @@ import {
   parseDelimitedDraftList,
 } from './adminPageDraftFormattingHelpers';
 import { dedupeSbtSelections } from './adminPageSbtGateSelectionHelpers';
+
+const asInterviewRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
 
 const deepClone = (value: any) => JSON.parse(JSON.stringify(value || {}));
 
@@ -76,6 +80,7 @@ export const buildAdminMetadataDraft = (metadata: any = {}) => {
     'whisper-1';
 
   return {
+    interviewMode: { ...metadata?.interviewMode, ...normalizeInterviewSettings(metadata?.interviewMode) },
     defaultTags: toStr(metadata?.defaultTags).trim(),
     questionsGenPrompt: toStr(metadata?.questionsGenPrompt).trim(),
     defaultSbtTags: toStr(metadata?.defaultSbtTags).trim(),
@@ -120,6 +125,10 @@ export const applyAdminMetadataDraft = (
 ) => {
   const next = deepClone(metadata && typeof metadata === 'object' ? metadata : {});
 
+  next.interviewMode = {
+    ...asInterviewRecord(draft.interviewMode),
+    ...normalizeInterviewSettings(draft.interviewMode),
+  };
   next.defaultTags = toStr(draft.defaultTags).trim();
   next.questionsGenPrompt = toStr(draft.questionsGenPrompt).trim();
   next.defaultFilterState = parseDefaultFilterStateDraft(draft.defaultFilterState);
@@ -232,6 +241,7 @@ export const resolveAutoFeatureBySessionSlug = (metadata: any) =>
     : metadata?.autoFeatureSBTsWithFeaturedSbtTags;
 
 const WORKER_CANONICAL_METADATA_PATCH_KEYS = Object.freeze([
+  'interviewMode',
   'defaultTags',
   'defaultSbtTags',
   'questionsGenPrompt',

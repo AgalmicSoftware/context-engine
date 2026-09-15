@@ -31,6 +31,8 @@ export const resolveTopLevelRouteSelection = ({
     return { kind: 'resource-presence' };
   }
 
+  if (path === '/interview/starter' && method === 'POST') return { kind: 'interview-starter' };
+
   if (path === '/session-config' && method === 'GET') {
     return { kind: 'session-config' };
   }

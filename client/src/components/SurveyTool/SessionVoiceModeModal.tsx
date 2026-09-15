@@ -1,3 +1,7 @@
+import { useInterviewQuestionUpdates } from './useInterviewQuestionUpdates';
+import SessionInterviewSuggestions from './SessionInterviewSuggestions';
+import type { GeneratedSurveyStatement } from './SurveyGenerator/surveyGeneratorHelpers';
+import { useInterviewOpening } from './useInterviewOpening';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Input, Label, Modal, ModalBody, ModalFooter, ModalHeader, UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -41,6 +45,7 @@ import { useSessionInterviewRecorder } from './useSessionInterviewRecorder';
 type UnknownRecord = Record<string, unknown>;
 
 type InterviewDraftApplicationProps = InterviewQuestionControls & {
+  questionCreatorProps?: React.ComponentProps<typeof SessionInterviewSuggestions>['creatorProps'];
   onSubmitResponses?: () => void | Promise<void>;
   onClose: () => void;
   onApplyAnswer: (questionId: string, answer: unknown) => void | Promise<void>;
@@ -118,7 +123,7 @@ type SessionInterviewPanelProps = InterviewDraftApplicationProps & {
 };
 
 function SessionInterviewPanel({
-  questions,
+  questions: initialQuestions,
   sessionSlug = '',
   sessionConfig = null,
   context,
@@ -126,6 +131,7 @@ function SessionInterviewPanel({
   existingResponseSlice = null,
   prefillPacket = null,
   initialError = '',
+  questionCreatorProps,
   onApplyAnswer,
   onApplyAdditional,
   onApplyImportance,
@@ -141,6 +147,12 @@ function SessionInterviewPanel({
   const importedRef = useRef(false);
   const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [resolvedWorkerUrl, setResolvedWorkerUrl] = useState(workerUrl);
+  const interviewOpening = useInterviewOpening({
+    config: sessionConfig,
+    workerUrl: resolvedWorkerUrl,
+    sessionSlug,
+    hasQuestions: initialQuestions.length > 0,
+  });
   const [responderContext, setResponderContext] = useState(() => displayResponderContext(prefillPacket));
   const [status, setStatus] = useState(initialError ? 'Error' : 'Ready');
   const [transcript, setTranscript] = useState('');
@@ -148,6 +160,7 @@ function SessionInterviewPanel({
   const [mappingNotice, setMappingNotice] = useState('');
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState(initialError);
+  const [suggestedQuestions, setSuggestedQuestions] = useState<GeneratedSurveyStatement[]>([]);
   const [drafts, setDrafts] = useState<InterviewDraftResponse[]>([]);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [editedDrafts, setEditedDrafts] = useState<Record<string, InterviewDraftResponse>>({});
@@ -209,6 +222,15 @@ function SessionInterviewPanel({
   const isStopping = recordingState === 'stopping';
   const isRecorderSessionActive = isRecording || isPaused || isStopping;
   const isInterviewBusy = isStarting || isRecorderSessionActive;
+  const updates = useInterviewQuestionUpdates({
+    initialQuestions,
+    config: sessionConfig,
+    workerUrl: resolvedWorkerUrl,
+    sessionSlug,
+    active: isRecording,
+    append: recorder.appendInstructions,
+  });
+  const questions = updates.questions;
 
   useEffect(() => {
     if (isStarting || mapping) statusRef.current?.focus();
@@ -246,6 +268,7 @@ function SessionInterviewPanel({
           ? null
           : readImportedInterviewDraftResponses(prefillPacket, questions);
         let mapped = importedDrafts;
+        let proposedQuestions: GeneratedSurveyStatement[] = [];
         if (mapped === null) {
           const url = await resolveWorkerUrl();
           if (disposedRef.current) return;
@@ -266,9 +289,13 @@ function SessionInterviewPanel({
             sessionSlug,
             sessionConfig,
             workerUrl: url,
+            onSuggestedQuestions: (next) => {
+              proposedQuestions = next;
+            },
           });
         }
         if (disposedRef.current) return;
+        setSuggestedQuestions(proposedQuestions);
         setDrafts(mapped);
         setEditedDrafts(
           Object.fromEntries(
@@ -294,9 +321,11 @@ function SessionInterviewPanel({
         setMappingNotice(
           mapped.length
             ? ''
-            : 'Not enough information to generate response drafts. The interview evidence did not contain enough directly relevant detail to answer a session question. Start another interview and share more detail, or augment it with relevant memories from Claude or ChatGPT.',
+            : proposedQuestions.length
+              ? 'No response drafts matched the current bank. Review the suggested new questions below.'
+              : 'Not enough information to generate response drafts. The interview evidence did not contain enough directly relevant detail to answer a session question. Start another interview and share more detail, or augment it with relevant memories from Claude or ChatGPT.',
         );
-        setStatus(mapped.length ? 'Review drafts' : 'Ready');
+        setStatus(mapped.length || proposedQuestions.length ? 'Review drafts' : 'Ready');
       } catch (mappingError) {
         if (disposedRef.current) return;
         setMappingNotice('');
@@ -336,8 +365,11 @@ function SessionInterviewPanel({
     if (isInterviewBusy || mappingRef.current || applying) return;
     setMappingNotice('');
     setDrafts([]);
+    setSuggestedQuestions([]);
     setShowTranscript(false);
-    void recorder.start(buildRealtimeInterviewInstructions({ questions, responderContext }));
+    void recorder.start(
+      buildRealtimeInterviewInstructions({ questions, responderContext, openingPrompt: interviewOpening.opening }),
+    );
   };
 
   const endInterview = async () => {
@@ -444,7 +476,13 @@ function SessionInterviewPanel({
     : isStarting || isPaused || isStopping || mapping || applying
       ? 'pending'
       : 'ready';
-  const startLabel = isStarting ? 'Connecting…' : drafts.length ? 'Start another interview' : 'Start voice interview';
+  const startLabel = interviewOpening.loading
+    ? 'Preparing opening…'
+    : isStarting
+      ? 'Connecting…'
+      : drafts.length
+        ? 'Start another interview'
+        : 'Start voice interview';
 
   return (
     <>
@@ -522,6 +560,8 @@ function SessionInterviewPanel({
             </section>
           ) : null}
 
+          {updates.notice ? <p role="status">{updates.notice}</p> : null}
+          {interviewOpening.notice ? <p>{interviewOpening.notice}</p> : null}
           {!questions.length ? <p>No accessible questions are available for this interview.</p> : null}
           <audio ref={audioRef} className={styles.sessionListeningSrOnly} aria-label="Realtime interviewer audio" />
           {error ? (
@@ -539,7 +579,7 @@ function SessionInterviewPanel({
                   onClick={() => {
                     void startInterview();
                   }}
-                  disabled={mapping || applying || !questions.length || isStarting}
+                  disabled={mapping || applying || !questions.length || isStarting || interviewOpening.loading}
                   data-testid={E2E_TESTIDS.SESSION_INTERVIEW_START}
                 >
                   <FontAwesomeIcon icon={isStarting ? faSpinner : faMicrophone} spin={isStarting} />
@@ -706,6 +746,10 @@ function SessionInterviewPanel({
                 </div>
               ) : null}
             </div>
+          ) : null}
+
+          {suggestedQuestions.length > 0 && !isInterviewBusy && !mapping ? (
+            <SessionInterviewSuggestions questions={suggestedQuestions} creatorProps={questionCreatorProps || {}} />
           ) : null}
 
           {drafts.length && !isInterviewBusy && !mapping ? (

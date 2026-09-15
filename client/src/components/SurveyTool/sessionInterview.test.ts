@@ -182,13 +182,16 @@ describe('session interview protocol', () => {
     expect(mappingPrompt).toContain('confidence is required for every response');
   });
 
-  it('opens by inviting personal or topic insight and preserves responder steering', () => {
+  it('opens directly on topic and preserves a configured opening', () => {
+    const questions = [{ id: 'q1', prompt: 'What matters?', type: 'freeform', options: [] }];
+    expect(buildRealtimeInterviewInstructions({ questions })).toContain('Begin directly with one relevant question');
     const instructions = buildRealtimeInterviewInstructions({
-      questions: [{ id: 'q1', prompt: 'What matters?', type: 'freeform', options: [] }],
+      questions,
+      openingPrompt: 'What is your uncommon AI view?',
     });
-    expect(instructions).toContain('either about themselves and their perspective or about the broader topic');
-    expect(instructions).toContain('steer the conversation toward what matters most to them at any point');
-    expect(instructions).toContain('Follow that direction before naturally covering');
+    expect(instructions).toContain('What is your uncommon AI view?');
+    expect(instructions).toContain('Ask useful follow-ups');
+    expect(instructions).not.toContain('important insight');
   });
 
   it('keeps only known question drafts and clamps optional supported ratings', () => {
@@ -291,4 +294,29 @@ it('maps a numeric reply using standard Terra and keeps the rating value', async
     }),
   );
   expect(result).toEqual([{ questionId: 'trust', answer: 4, confidence: 1 }]);
+});
+
+it('returns reviewable novel question drafts only when enabled', async () => {
+  const onSuggestedQuestions = jest.fn();
+  jest.mocked(callAI).mockResolvedValue(
+    JSON.stringify({
+      responses: [],
+      questions: [
+        { questionType: 'freeform', prompt: 'Novel AI question?' },
+        { questionType: 'freeform', prompt: 'Novel AI question?' },
+        { questionType: 'freeform', prompt: 'Existing question?' },
+      ],
+    }),
+  );
+  const options = {
+    questions: [{ id: 'q1', type: 'freeform', prompt: 'Existing question?', options: [] }],
+    transcript: 'Responder: AI could change our institutions.',
+    onSuggestedQuestions,
+  };
+  await mapInterviewEvidenceToResponses(options);
+  expect(onSuggestedQuestions).not.toHaveBeenCalled();
+  await mapInterviewEvidenceToResponses({ ...options, sessionConfig: { interviewMode: { suggestQuestions: true } } });
+  expect(onSuggestedQuestions).toHaveBeenCalledWith([
+    expect.objectContaining({ type: 'freeform', prompt: 'Novel AI question?' }),
+  ]);
 });

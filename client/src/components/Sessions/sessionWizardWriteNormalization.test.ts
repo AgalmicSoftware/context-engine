@@ -1,3 +1,4 @@
+import { DEFAULT_INTERVIEW_SETTINGS } from '../../../../shared/interviewSettings.mjs';
 import { ethers } from 'ethers';
 import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 
@@ -765,6 +766,7 @@ describe('sessionWizardWriteNormalization', () => {
     expect(payload.groupCreationPolicy).toBe('admin_only');
     expect(payload.interviewModeEnabled).toBe(true);
     expect(payload.interviewMode).toEqual({
+      ...DEFAULT_INTERVIEW_SETTINGS,
       enabled: true,
       provider: 'openai',
       realtimeModel: 'gpt-live-1',
@@ -786,6 +788,7 @@ describe('sessionWizardWriteNormalization', () => {
 
     expect(payload.interviewModeEnabled).toBe(false);
     expect(payload.interviewMode).toEqual({
+      ...DEFAULT_INTERVIEW_SETTINGS,
       enabled: false,
       provider: 'openai',
       realtimeModel: 'gpt-realtime-2',

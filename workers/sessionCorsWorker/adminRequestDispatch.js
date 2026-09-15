@@ -1,3 +1,4 @@
+import { resolveInterviewStarter } from './interviewStarter.js';
 import {
   resolveAdminRequestAuthority,
 } from './adminRequestAuthority.js';
@@ -195,6 +196,14 @@ export const dispatchAdminRequest = async ({
       },
     });
     if (response) return response;
+  }
+
+  if (action === 'refresh-interview-opening') {
+    try {
+      return deps.json(await resolveInterviewStarter({ env, slug: targetSlug, config: existingConfig, deps, refresh: true }), 200, headers);
+    } catch (error) {
+      return deps.json({ error: error.message }, 400, headers);
+    }
   }
 
   if (action === 'set-config') {

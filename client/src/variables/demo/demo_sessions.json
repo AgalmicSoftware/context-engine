@@ -265,7 +265,9 @@
     "interviewMode": {
       "enabled": true,
       "provider": "openai",
-      "realtimeModel": "gpt-live-1"
+      "realtimeModel": "gpt-live-1",
+      "openingMode": "auto",
+      "suggestQuestions": true
     },
     "defaultTags": "",
     "questionsGenPrompt": "",

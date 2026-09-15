@@ -28,12 +28,9 @@ describe('realtime interview transcript collection', () => {
     ).toBe('Responder: First point.\nResponder: Second point.');
   });
 
-  it('opens with personal-or-topic insight and makes steering explicit', () => {
-    expect(REALTIME_INTERVIEW_OPENING_INSTRUCTION).toContain(
-      'either about themselves and their perspective or about the broader topic',
-    );
-    expect(REALTIME_INTERVIEW_OPENING_INSTRUCTION).toContain('steer the conversation');
-    expect(REALTIME_INTERVIEW_OPENING_INSTRUCTION).toContain('at any point');
+  it('starts immediately with the configured topic opening, without a greeting', () => {
+    expect(REALTIME_INTERVIEW_OPENING_INSTRUCTION).toContain('opening question specified in your session instructions');
+    expect(REALTIME_INTERVIEW_OPENING_INSTRUCTION).toContain('No greeting or preamble');
   });
 });
 
@@ -116,6 +113,35 @@ const tick = async () => {
 };
 
 describe('interview connection lifecycle', () => {
+  it('adds a system context item to supported legacy Realtime sessions without starting another response', async () => {
+    const h = harness('realtime');
+    const session = await h.start();
+    h.channel.send.mockClear();
+    expect(session.appendInstructions?.('A new question is available.')).toBe(true);
+    expect(h.channel.send).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(h.channel.send.mock.calls[0][0])).toEqual({
+      type: 'conversation.item.create',
+      item: { type: 'message', role: 'system', content: [{ type: 'input_text', text: 'A new question is available.' }] },
+    });
+    await session.stop();
+  });
+
+  it('can steer an active Live session without reopening it, and rejects paused or stale updates', async () => {
+    const h = harness();
+    const session = await h.start();
+    expect(session.appendInstructions?.('Consider this new question.')).toBe(true);
+    expect(JSON.parse(h.channel.send.mock.calls.at(-1)![0])).toEqual({
+      type: 'session.instructions.append',
+      delegation_id: null,
+      content: 'Consider this new question.',
+    });
+    session.pause();
+    expect(session.appendInstructions?.('Paused update')).toBe(false);
+    session.resume();
+    await session.stop();
+    expect(session.appendInstructions?.('Late update')).toBe(false);
+  });
+
   it('waits for session.started and the peer before enabling capture and sending a Live greeting', async () => {
     const h = harness();
     h.peer.connectionState = 'connecting';

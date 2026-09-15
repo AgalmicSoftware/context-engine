@@ -165,6 +165,8 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
         enabled: true,
         provider: 'openai',
         realtimeModel: 'gpt-live-1',
+        openingMode: 'auto',
+        suggestQuestions: true,
       },
       sessionModeProfile: {
         authority: { mode: 'worker_canonical' },

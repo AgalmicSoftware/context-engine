@@ -1,3 +1,4 @@
+import InterviewSettingsFields from '../Sessions/InterviewSettingsFields';
 import React from 'react';
 import { Button, FormGroup, FormText, Input, Label } from 'reactstrap';
 import SBTSelector from '../SBTs/SBTSelector';
@@ -97,6 +98,11 @@ const AdminPageMetadataEditor = ({
     <div className={styles.metadataSectionGrid}>
       <div className={styles.metadataSectionCard}>
         <div className={styles.panelSubtitle}>Session defaults</div>
+        <InterviewSettingsFields
+          value={metadataConfigDraft.interviewMode}
+          onChange={(value) => updateMetadataConfigDraft('interviewMode', value)}
+          disabled={metadataUpdateBusy}
+        />
         <div className={styles.metadataEditorGrid}>
           <FormGroup>
             <Label>Default tags</Label>

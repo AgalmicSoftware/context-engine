@@ -38,7 +38,7 @@ legacy aliases `gpt-realtime-2.1`, `gpt-realtime-2.1-mini`, `gpt-realtime-2`, an
 or retired model IDs normalize to `gpt-live-1` when reading old configurations;
 Worker config writes reject unsupported values. The provider remains OpenAI.
 Session creators can change the model in `/new` under **Optional details**
-(or **More options** in Customize) → **Interview voice settings** →
+(or **More options** in Customize) → **Interview settings** →
 **Interview voice model**.
 
 The Interview header has a status dot whose tooltip shows Ready, Connecting,
@@ -73,18 +73,34 @@ greeting through `session.instructions.append`; it does not send
 `response.create` or a second `session.start`. No live task backend is invoked:
 a client delegation receives a factual notice that drafting happens after Stop.
 
-The shipped `demo-interview` client record pins its deployed Worker, so its
+The shipped `demo-interview` client record enables question suggestions and pins its deployed Worker, so its
 route is simply `/session/demo-interview?mode=interview`; it does not require a
 `worker=` discovery parameter. Registry-backed sessions likewise read
 `corsWorkerUrl` from registered session metadata. A newly shared,
 Worker-canonical session still needs an explicit discovery link unless its app
 deployment bundles the Worker origin or serves the session from that origin.
 
-The interviewer opens by asking for an important insight either about the
-responder and their perspective or about the broader topic behind the
-questions. It explicitly tells the responder that they can steer the
-conversation at any point, follows that direction, and then covers the
-accessible session questions conversationally. Only responder speech becomes
+The interviewer starts directly with a topic-relevant question, without a greeting or preamble. It follows the responder's direction, chooses relevant existing questions, and asks useful follow-ups.
+
+Session `interviewMode` settings are available in the wizard and admin metadata editor:
+
+| Setting | Default | Behavior |
+| --- | --- | --- |
+| `openingMode` | `auto` | Generate an opening from session information and public questions; `owner` uses the owner's text. |
+| `openingPrompt` | empty | Owner-written opening, required in owner mode. |
+| `autoRegenerate` | `false` | Refresh the generated opening when enough questions have been added. |
+| `questionGrowthPercent` | `20` | Additions needed since the last successful generation or conversation update, rounded up to at least one. |
+| `followNewQuestions` | `false` | Check the public question catalog every 30 seconds during active recording and append qualifying additions to the interviewer's context. |
+| `suggestQuestions` | `false` | Propose up to three new freeform question drafts from respondent evidence when preparing responses. |
+| `allowManualRefresh` | `true` | Enable **Regenerate interview opening** for session admins. |
+
+Auto mode generates on the first Interview opening with available public questions and permitted session AI access. No separate admin setup step is needed for an open AI-enabled session. An empty bank waits until questions exist. The Worker uses its OpenAI key and caches the result at `session:<slug>:interview-opening`, with the generation time and baseline question count, separately from owner configuration. The default reuses this opening even as the bank grows; enabling regeneration checks the threshold on the next Interview opening. For example, 42 questions require nine additions at 20%. A failed refresh retains the previous opening. Initial failure visibly falls back to an existing session question.
+
+Live updates use [`session.instructions.append`](https://developers.openai.com/api/reference/typescript/resources/live); supported legacy sessions use [`conversation.item.create` system messages](https://developers.openai.com/api/reference/typescript/resources/realtime). These updates never restart the conversation or replace its opening. Pause and Stop cancel polling and discard late results. Discovery uses the existing public catalog's visibility checks and 100-question limit; private questions are not added through this public discovery path. There are no edit-based or scheduled regeneration conditions.
+
+Suggested questions appear in an expandable **Suggested new questions** section, initially open, using the existing question creation editor. They can be edited or removed and require the normal explicit creation/sign-in/permission flow; stopping an interview and submitting response drafts do not create questions. Suggestions share the response-mapping request, avoiding an extra model round trip.
+
+Only responder speech becomes
 answer evidence. Interviewer questions are retained as context so short replies
 such as “four” can be matched to the question asked. Live input and output
 transcript fragments are retained exactly, deduplicated by event ID, and ordered

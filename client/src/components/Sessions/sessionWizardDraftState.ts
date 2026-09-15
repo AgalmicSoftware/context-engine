@@ -1,3 +1,4 @@
+import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 import { getDefaultHttpRpc } from '../../variables/chains.js';
 import {
   CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED,
@@ -202,6 +203,7 @@ export const normalizeSessionWizardDraftShape = (draftIn: AnyRecord = {}): AnyRe
     draft.interviewModeEnabled = typeof interviewMode.enabled === 'boolean' ? interviewMode.enabled : true;
   }
   draft.interviewMode = {
+    ...normalizeInterviewSettings(draft.interviewMode),
     enabled: draft.interviewModeEnabled !== false,
     provider: REALTIME_INTERVIEW_PROVIDER,
     realtimeModel: normalizeRealtimeInterviewModel(interviewMode.realtimeModel),
@@ -264,6 +266,7 @@ export const buildSessionWizardDefaultTemplate = (): AnyRecord => {
   draft.autoFeatureSBTsBySessionSlug = true;
   draft.interviewModeEnabled = true;
   draft.interviewMode = {
+    ...normalizeInterviewSettings(draft.interviewMode),
     enabled: true,
     provider: REALTIME_INTERVIEW_PROVIDER,
     realtimeModel: DEFAULT_REALTIME_INTERVIEW_MODEL,

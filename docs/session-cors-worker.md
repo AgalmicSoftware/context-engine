@@ -1983,6 +1983,13 @@ Signed login/bootstrap requests:
   `sessionModeProfile.surfaces.agentHttp=true`. This is the first canonical
   Agent API family on the Session Worker; the Agent Bridge compatibility route
   remains during the staged transport migration.
+- `POST /interview/starter?slug=<slug>`
+  - Uses session CORS, anonymous AI eligibility, expiry, and rate limits; never accepts a caller-supplied generation prompt or forced refresh.
+  - Returns `{ openingPrompt, source, questionCount?, generatedAt?, warning? }`. Owner mode returns configured text. Auto mode waits for public questions and lazily generates with Worker-held OpenAI credentials using `gpt-5.6-terra`, low reasoning effort, and standard processing.
+  - Stores the generated opening and baseline count in `session:<slug>:interview-opening`, separate from owner configuration. Reuses it by default; optional regeneration uses `interviewMode.questionGrowthPercent` (20% by default). Concurrent requests within one Worker isolate share generation; Cloudflare KV remains eventually consistent across isolates.
+  - Failed regeneration preserves the last successful opening; initial failure returns a recoverable error. The client bounds waiting to ten seconds and can start with an existing session question.
+- `POST /admin/refresh-interview-opening`
+  - Uses the existing signed admin request body and authority checks. Regenerates the cached opening when `interviewMode.allowManualRefresh` is enabled (default true). Owner-written openings are preserved.
 - `POST /realtime/call?slug=<slug>` with JSON `{ "sdp": "v=0...", "instructions": "..." }`
   - Uses the anonymous AI eligibility policy above and the Worker-held
     `openaiKey`. The key is never accepted from or returned to the browser.

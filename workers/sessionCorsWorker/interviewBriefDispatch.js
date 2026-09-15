@@ -19,7 +19,7 @@ const normalizeAllowedOrigins = (raw) => (Array.isArray(raw) ? raw : [raw])
 const safeSessionUrl = (value, { slug = '', allowOrigins } = {}) => {
   try {
     const url = new URL(trim(value));
-    if (url.protocol !== 'https:' && url.hostname !== 'localhost') return '';
+    if (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))) return '';
     const parts = url.pathname.split('/').filter(Boolean).map((part) => decodeURIComponent(part));
     if (parts.length < 2 || parts.at(-2) !== 'session' || parts.at(-1)?.toLowerCase() !== trim(slug).toLowerCase()) {
       return '';

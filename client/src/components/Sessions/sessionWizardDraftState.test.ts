@@ -1,3 +1,4 @@
+import { DEFAULT_INTERVIEW_SETTINGS } from '../../../../shared/interviewSettings.mjs';
 import {
   applySessionWizardRegistryChainDraftDefaults,
   buildSessionWizardCacheWritePayload,
@@ -29,6 +30,7 @@ describe('sessionWizardDraftState', () => {
         autoFeatureSBTsBySessionSlug: true,
         interviewModeEnabled: true,
         interviewMode: {
+          ...DEFAULT_INTERVIEW_SETTINGS,
           enabled: true,
           provider: 'openai',
           realtimeModel: 'gpt-live-1',
@@ -57,6 +59,7 @@ describe('sessionWizardDraftState', () => {
         appearance: { colorSchemeId: 'context-engine' },
         interviewModeEnabled: true,
         interviewMode: {
+          ...DEFAULT_INTERVIEW_SETTINGS,
           enabled: true,
           provider: 'openai',
           realtimeModel: 'gpt-live-1',
@@ -67,8 +70,8 @@ describe('sessionWizardDraftState', () => {
       expect.objectContaining({
         reasoningEffort: 'low',
         models: expect.objectContaining({
-          fast: expect.objectContaining({ provider: 'openai', model: 'gpt-5' }),
-          thinking: expect.objectContaining({ provider: 'openai', model: 'gpt-5' }),
+          fast: expect.objectContaining({ provider: 'openai', model: 'gpt-5.6-terra' }),
+          thinking: expect.objectContaining({ provider: 'openai', model: 'gpt-5.6-terra' }),
         }),
       }),
     );
@@ -83,6 +86,7 @@ describe('sessionWizardDraftState', () => {
       expect.objectContaining({
         interviewModeEnabled: false,
         interviewMode: {
+          ...DEFAULT_INTERVIEW_SETTINGS,
           enabled: false,
           provider: 'openai',
           realtimeModel: 'gpt-live-1',
@@ -94,8 +98,9 @@ describe('sessionWizardDraftState', () => {
   it('preserves a valid realtime model and normalizes unsupported values to the OpenAI default', () => {
     expect(
       normalizeSessionWizardDraftShape({ interviewMode: { realtimeModel: ' gpt-realtime-2 ' } }).interviewMode,
-    ).toEqual({ enabled: true, provider: 'openai', realtimeModel: 'gpt-realtime-2' });
+    ).toEqual({ ...DEFAULT_INTERVIEW_SETTINGS, enabled: true, provider: 'openai', realtimeModel: 'gpt-realtime-2' });
     expect(normalizeSessionWizardDraftShape({ interviewMode: { realtimeModel: 'gpt-5' } }).interviewMode).toEqual({
+      ...DEFAULT_INTERVIEW_SETTINGS,
       enabled: true,
       provider: 'openai',
       realtimeModel: 'gpt-live-1',

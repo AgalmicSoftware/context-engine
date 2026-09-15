@@ -76,6 +76,8 @@ describe('sessionWizardFieldDescriptors', () => {
     expect(getSessionWizardFieldLabel('appearance', 'appearance')).toBe('Session colors');
     expect(getSessionWizardFieldLabel('groupCreationPolicy', 'groupCreationPolicy')).toBe('Who can create groups?');
     expect(getSessionWizardFieldLabel('interviewMode.realtimeModel', 'realtimeModel')).toBe('Interview voice model');
+    expect(getSessionWizardFieldLabel('interviewMode', 'interviewMode')).toBe('Interview settings');
+    expect(getSessionWizardFieldTooltip(['interviewMode'], '')).toContain('suggested question drafts');
     expect(getSessionWizardFieldTooltip(['interviewMode', 'realtimeModel'], '')).toContain('gpt-live-1');
     expect(getSessionWizardFieldTooltip(['sessionEndsAt'], '')).toContain('participant writes stop');
   });

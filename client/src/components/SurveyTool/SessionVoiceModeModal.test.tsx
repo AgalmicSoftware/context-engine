@@ -9,6 +9,19 @@ import {
 } from './sessionInterview';
 import { startSessionRealtimeInterview } from '../../utilities/audio/realtimeInterviewClient';
 
+jest.mock('./SessionInterviewSuggestions', () => ({
+  __esModule: true,
+  default: ({ questions }: { questions: unknown[] }) => (
+    <details open>
+      <summary>Suggested new questions ({questions.length})</summary>
+    </details>
+  ),
+}));
+
+jest.mock('./useInterviewOpening', () => ({
+  useInterviewOpening: () => ({ opening: '', notice: '', loading: false }),
+}));
+
 jest.mock('./SessionListeningPanel', () => ({
   __esModule: true,
   default: (props: Record<string, unknown>) => (
@@ -66,6 +79,32 @@ describe('SessionVoiceModeModal', () => {
     });
     mockedHashInterviewQuestions.mockResolvedValue('a'.repeat(64));
     mockedMapInterviewEvidenceToResponses.mockResolvedValue([]);
+  });
+
+  it('shows suggested questions in an expanded section without submitting anything', async () => {
+    mockedMapInterviewEvidenceToResponses.mockImplementation(async ({ onSuggestedQuestions }) => {
+      onSuggestedQuestions?.([{ id: 'new', type: 'freeform', prompt: 'Which AI risks are overlooked?', tags: [] }]);
+      return [];
+    });
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        sessionConfig={{ interviewMode: { suggestQuestions: true } }}
+        prefillPacket={{
+          version: 1,
+          sessionSlug: 'demo',
+          source: { platform: 'other', modelId: 'unknown', verification: 'self_reported' },
+          responderContext: { summary: 'AI risks deserve discussion.' },
+        }}
+      />,
+    );
+    const section = await screen.findByText('Suggested new questions (1)');
+    expect(section.closest('details')).toHaveAttribute('open');
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Review drafts');
+    expect(screen.getByText(/No response drafts matched the current bank/)).toBeInTheDocument();
+    expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();
+    expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
   });
 
   it('puts guidance and the live status in accessible header tooltips', async () => {

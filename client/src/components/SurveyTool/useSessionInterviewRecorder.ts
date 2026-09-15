@@ -137,5 +137,16 @@ export function useSessionInterviewRecorder({
   };
   const pause = () => sessionRef.current?.pause();
   const resume = () => sessionRef.current?.resume();
-  return { audioRef, mediaStreamRef, recordingState, recordingElapsedSeconds, start, stop, pause, resume };
+  const appendInstructions = (content: string) => sessionRef.current?.appendInstructions?.(content) || false;
+  return {
+    appendInstructions,
+    audioRef,
+    mediaStreamRef,
+    recordingState,
+    recordingElapsedSeconds,
+    start,
+    stop,
+    pause,
+    resume,
+  };
 }

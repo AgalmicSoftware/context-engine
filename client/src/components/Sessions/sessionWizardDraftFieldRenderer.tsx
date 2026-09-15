@@ -1,3 +1,4 @@
+import InterviewSettingsFields from './InterviewSettingsFields';
 import { type MutableRefObject, type ReactNode } from 'react';
 import { Button, FormGroup, Input, Label } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -500,6 +501,15 @@ export const buildSessionWizardDraftFieldRenderer = ({
         />
       );
     }
+
+    if (path.length === 0 && key === 'interviewMode')
+      return (
+        <InterviewSettingsFields
+          key={keyString}
+          value={value}
+          onChange={(next) => updateDraftValue(['interviewMode'], next)}
+        />
+      );
 
     if (path.length === 0 && key === 'groupCreationPolicy') {
       const sessionModeProfile = draft.sessionModeProfile as { authority?: { mode?: unknown } } | null | undefined;

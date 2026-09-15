@@ -181,3 +181,12 @@ test('dispatchInterviewBriefRequest applies the anonymous rate limit before load
   assert.equal(response.status, 429);
   assert.equal(questionsLoaded, false);
 });
+
+test('catalog accepts approved loopback HTTP URLs but rejects other protocols', () => {
+  const safe = __test__interviewBriefDispatch.safeSessionUrl;
+  const options = { slug: 'demo', allowOrigins: ['http://127.0.0.1:3000', 'http://[::1]:3000', 'ftp://127.0.0.1'] };
+  assert.equal(safe('http://127.0.0.1:3000/session/demo', options), 'http://127.0.0.1:3000/session/demo');
+  assert.equal(safe('http://[::1]:3000/session/demo', options), 'http://[::1]:3000/session/demo');
+  assert.equal(safe('ftp://127.0.0.1/session/demo', options), '');
+  assert.equal(safe('http://unapproved.example/session/demo', options), '');
+});

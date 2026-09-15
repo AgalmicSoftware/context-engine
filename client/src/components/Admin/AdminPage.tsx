@@ -1,3 +1,4 @@
+import AdminInterviewOpening from './AdminInterviewOpening';
 import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
 /** @file AdminPage.tsx */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -2637,6 +2638,20 @@ const AdminPageRuntime = ({
                   Session metadata could not be loaded, so the contract addresses below are currently synthesized from
                   chain defaults. Verify them before publishing any metadata update.
                 </div>
+              )}
+              {canAdminWorker && (
+                <AdminInterviewOpening
+                  key={selectedSlug}
+                  settings={groupMetadata?.interviewMode}
+                  onRefresh={async () => {
+                    const { data } = await postSignedAdminRequest({
+                      action: 'refresh-interview-opening',
+                      path: '/admin/refresh-interview-opening',
+                      body: { sessionSlug: normalizeSlug(selectedSlug) },
+                    });
+                    return data;
+                  }}
+                />
               )}
               {(canAdminWorker || canAdminRegistry) && (
                 <AdminPageMetadataEditor

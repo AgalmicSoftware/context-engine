@@ -256,3 +256,19 @@ describe('adminPageMetadataDraftHelpers', () => {
     ].forEach((key) => expect(patch).not.toHaveProperty(key));
   });
 });
+
+it('persists Interview settings through the admin editor and Worker metadata patch', () => {
+  const source = { interviewMode: { realtimeModel: 'gpt-live-1' } };
+  const draft = buildAdminMetadataDraft(source);
+  draft.interviewMode = {
+    ...draft.interviewMode,
+    openingMode: 'owner',
+    openingPrompt: 'Which AI view is overlooked?',
+    followNewQuestions: true,
+    suggestQuestions: true,
+    questionGrowthPercent: 30,
+  };
+  const metadata = applyAdminMetadataDraft(source, draft);
+  const patch = buildWorkerCanonicalMetadataConfigPatch({ metadata, slug: 'demo', adminAddress: '0xabc' });
+  expect(patch.interviewMode).toEqual({ ...draft.interviewMode, autoRegenerate: false, allowManualRefresh: true });
+});

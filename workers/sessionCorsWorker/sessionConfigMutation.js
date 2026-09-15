@@ -1,3 +1,4 @@
+import { DEFAULT_INTERVIEW_SETTINGS, validInterviewSettings } from '../../shared/interviewSettings.mjs';
 import { stableCanonicalSerialize } from '../shared/deployHelperCore.mjs';
 import { isRealtimeInterviewModel } from '../../shared/realtimeInterviewConfig.mjs';
 import {
@@ -85,7 +86,8 @@ const validInterviewModeConfig = (config) => {
   if (!hasOwn(config, 'interviewMode')) return true;
   const interview = config.interviewMode;
   if (!interview || typeof interview !== 'object' || Array.isArray(interview)) return false;
-  if (Object.keys(interview).some((key) => !['enabled', 'provider', 'realtimeModel'].includes(key))) return false;
+  if (Object.keys(interview).some((key) => !['enabled', 'provider', 'realtimeModel', ...Object.keys(DEFAULT_INTERVIEW_SETTINGS)].includes(key))) return false;
+  if (!validInterviewSettings(interview)) return false;
   if (hasOwn(interview, 'enabled') && typeof interview.enabled !== 'boolean') return false;
   if (hasOwn(interview, 'provider') && interview.provider !== 'openai') return false;
   if (

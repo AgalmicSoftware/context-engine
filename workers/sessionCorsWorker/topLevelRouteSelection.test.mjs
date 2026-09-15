@@ -261,3 +261,7 @@ test('resolveTopLevelRouteSelection lets unsigned group discovery try the anonym
     { kind: 'authenticated' }
   );
 });
+
+test('routes cached interview opening generation to its dedicated handler', () => {
+  assert.deepEqual(resolveTopLevelRouteSelection({ path: '/interview/starter', method: 'POST', request: createRequest(), deps: { toStr: String } }), { kind: 'interview-starter' });
+});

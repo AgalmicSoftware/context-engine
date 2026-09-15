@@ -1,3 +1,4 @@
+import { dispatchInterviewStarterRequest } from './interviewStarter.js';
 import { BodyByteLimitError, readBodyBytes } from '../shared/bodyByteLimit.mjs';
 import { resolveMaxUploadBytes } from './uploadSizeLimits.js';
 import {
@@ -155,8 +156,8 @@ export const createWorkerRouteShellWithWorkerDeps = ({
         });
       }
 
-      if (routeSelection.kind === 'interview-brief') {
-        return await dispatchInterviewBriefRequest({
+      if (routeSelection.kind === 'interview-brief' || routeSelection.kind === 'interview-starter') {
+        return await (routeSelection.kind === 'interview-starter' ? dispatchInterviewStarterRequest : dispatchInterviewBriefRequest)({
           request,
           env,
           slugHint: envSlug,
@@ -165,6 +166,10 @@ export const createWorkerRouteShellWithWorkerDeps = ({
             resolveRequestSlugWithoutToken: deps?.resolveRequestSlugWithoutToken,
             getSessionConfig: deps?.getSessionConfig,
             getCorsContext: deps?.getCorsContext,
+            ...(routeSelection.kind === 'interview-starter' ? {
+              getSessionSecrets: deps?.getSessionSecrets,
+              evaluateAnonymousRouteAccess: deps?.evaluateAnonymousRouteAccess,
+            } : {}),
             resolveAnonymousRateIdentity: deps?.resolveAnonymousRateIdentity,
             checkRateLimit: deps?.checkRateLimit,
             storageRoute: deps?.storageRoute,
@@ -418,6 +423,8 @@ export const createWorkerRouteShellWithWorkerDeps = ({
             mergeWorkerLimitRecords: deps?.mergeWorkerLimitRecords,
             putSessionConfig: deps?.putSessionConfig,
             getSessionSecrets: deps?.getSessionSecrets,
+            storageRoute: deps?.storageRoute,
+            fetch: deps?.fetch,
             normalizeSecretValue: deps?.normalizeSecretValue,
             putSessionSecrets: deps?.putSessionSecrets,
             ...(deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {}),

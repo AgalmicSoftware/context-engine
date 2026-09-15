@@ -3778,6 +3778,33 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
+.sessionInterviewSuggestions {
+  :global([class*='jsonPromptBar']),
+  :global([class*='typeSelectorLabel']) {
+    color: var(--ce-panel-text);
+    opacity: 1;
+  }
+
+  :global([class*='jsonToggleButton']),
+  :global([class*='typeButton']) {
+    background: var(--ce-control-face) !important;
+    color: var(--ce-control-text) !important;
+    opacity: 1;
+
+    &:hover,
+    &:focus-visible {
+      outline: 2px solid var(--ce-focus-ring);
+      outline-offset: 2px;
+    }
+  }
+
+  :global([class*='typeTitle']),
+  :global([class*='pill']) {
+    color: var(--ce-control-text);
+    opacity: 1;
+  }
+}
+
 .sessionInterviewReviewHeader {
   display: flex;
   align-items: baseline;

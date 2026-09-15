@@ -13,6 +13,7 @@ export type RealtimeInterviewSession = {
   resume: () => void;
   stop: () => Promise<{ transcript: string; turns: RealtimeInterviewTurn[] }>;
   getTranscript: () => string;
+  appendInstructions?: (content: string) => boolean;
 };
 
 export type RealtimeInterviewRecordingState = 'recording' | 'paused' | 'stopped';
@@ -37,7 +38,7 @@ const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
 
 export const REALTIME_INTERVIEW_OPENING_INSTRUCTION =
-  'Greet immediately without waiting for the responder. Begin with a short welcome, then ask what important insight the responder wants to share—either about themselves and their perspective or about the broader topic. Mention that they can steer the conversation toward what matters most to them at any point. Then pause and listen.';
+  'Begin immediately with the opening question specified in your session instructions, or one directly relevant session question. No greeting or preamble. Then listen.';
 
 export const readRealtimeResponderTurn = (event: unknown): RealtimeInterviewTurn | null => {
   const record = asRecord(event);
@@ -142,6 +143,7 @@ export const startSessionRealtimeInterview = async ({
     throw new Error('Microphone access requires HTTPS or localhost and a supported browser.');
   const controller = new AbortController();
   let stream: MediaStream | null = null;
+  let microphone: MediaStream;
   let peer: RTCPeerConnection | null = null;
   let channel: RTCDataChannel | null = null;
   let stopped = false;
@@ -254,7 +256,7 @@ export const startSessionRealtimeInterview = async ({
       }
       return value;
     });
-    await run(mediaPromise);
+    microphone = await run(mediaPromise);
     peer = createPeerConnection();
     const activePeer = peer;
     peer.ontrack = (event) => {
@@ -275,7 +277,6 @@ export const startSessionRealtimeInterview = async ({
     peer.onconnectionstatechange = () => {
       if (['failed', 'disconnected', 'closed'].includes(activePeer.connectionState)) connectionFailed();
     };
-    const microphone = stream as unknown as MediaStream;
     if (!microphone.getAudioTracks().some((track) => track.readyState === 'live'))
       throw new Error('No active microphone was found. Connect a microphone and try again.');
     microphone.getAudioTracks().forEach((track) => {
@@ -362,7 +363,7 @@ export const startSessionRealtimeInterview = async ({
   }
 
   return {
-    mediaStream: stream as unknown as MediaStream,
+    mediaStream: microphone,
     pause: () => {
       if (stopped || paused) return;
       paused = true;
@@ -400,6 +401,28 @@ export const startSessionRealtimeInterview = async ({
         controller.abort();
       }
       return { transcript: buildRealtimeInterviewTranscript(turns), turns: [...turns] };
+    },
+    appendInstructions: (content) => {
+      if (stopped || paused || channel?.readyState !== 'open' || !content.trim()) return false;
+      try {
+        channel.send(
+          JSON.stringify(
+            live
+              ? { type: 'session.instructions.append', delegation_id: null, content: content.slice(0, 450) }
+              : {
+                  type: 'conversation.item.create',
+                  item: {
+                    type: 'message',
+                    role: 'system',
+                    content: [{ type: 'input_text', text: content.slice(0, 450) }],
+                  },
+                },
+          ),
+        );
+        return true;
+      } catch {
+        return false;
+      }
     },
     getTranscript: () => buildRealtimeInterviewTranscript(turns),
   };

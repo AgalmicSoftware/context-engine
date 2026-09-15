@@ -302,6 +302,9 @@ test('set-config rejects malformed or unsupported interview mode config', () => 
     { interviewMode: { provider: 'openrouter' } },
     { interviewMode: { realtimeModel: 'gpt-5' } },
     { interviewMode: { enabled: true, apiKey: 'must-not-be-public' } },
+    { interviewMode: { openingMode: 'owner', openingPrompt: '' } },
+    { interviewMode: { followNewQuestions: 'true' } },
+    { interviewMode: { questionGrowthPercent: 0 } },
   ]) {
     const result = applySessionConfigMutation({
       existingConfig: cloneJson(profileBearingConfig),
@@ -578,4 +581,25 @@ test('accepts gpt-live-1 and documented legacy models while rejecting invented o
     const result = applySessionConfigMutation({ existingConfig: cloneJson(profileBearingConfig), mutation: { kind: 'set-config', incomingConfig: { interviewMode: { realtimeModel: model } } }, slug: 'session-a' });
     assert.equal(result.ok, false); assert.equal(result.status, 400);
   }
+});
+
+test('set-config preserves owner opening and optional interview features', () => {
+  const interviewMode = {
+    enabled: true,
+    realtimeModel: 'gpt-live-1',
+    openingMode: 'owner',
+    openingPrompt: 'Which AI view is overlooked?',
+    autoRegenerate: false,
+    questionGrowthPercent: 20,
+    followNewQuestions: true,
+    suggestQuestions: true,
+    allowManualRefresh: false,
+  };
+  const result = applySessionConfigMutation({
+    existingConfig: cloneJson(profileBearingConfig),
+    mutation: { kind: 'set-config', incomingConfig: { interviewMode } },
+    slug: 'session-a',
+  });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.config.interviewMode, interviewMode);
 });

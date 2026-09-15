@@ -85,10 +85,10 @@ is the final field group and starts collapsed there; expand it to choose a
 curated color scheme and see its preview. **Who can create groups?** is a
 dropdown in the same area, constrained to **All participants** or **Admins
 only** rather than accepting freeform config text. **Voice interview modes**
-defaults on. Its adjacent **Interview voice settings** group exposes the
+defaults on. Its adjacent **Interview settings** group exposes the
 OpenAI **Interview voice model**, defaulting to `gpt-live-1`; `/new`
 publishes this as `interviewMode.realtimeModel` for both Worker-canonical and
-Arweave-backed sessions.
+Arweave-backed sessions. It also lets owners supply an opening question or use the default generated opening. Automatic regeneration and discovery of new questions during a call are off by default; when enabled their default addition threshold is 20%. Question suggestions are optional and off by default. Admin refresh is on by default. Generation waits for public questions and uses the session Worker's OpenAI key. See [Interview settings and lifecycle](session-listening-mode.md#interview).
 
 The optional **Session end time** is a timestamp for Worker-canonical sessions.
 It must be in the future when the session is published. At that instant the

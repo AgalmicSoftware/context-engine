@@ -1,3 +1,4 @@
+import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 import { AUTHORITY_MATRIX } from '../../utilities/session/sessionAuthorityMatrix.js';
 import {
   normalizeLitMetadataNetwork,
@@ -390,6 +391,7 @@ export const buildSessionWizardWorkerConfigPayload = ({
     ...(publishedAppearance ? { appearance: publishedAppearance } : {}),
     interviewModeEnabled: resolvedDraft.interviewModeEnabled !== false,
     interviewMode: {
+      ...normalizeInterviewSettings(resolvedDraft.interviewMode),
       enabled: resolvedDraft.interviewModeEnabled !== false,
       provider: REALTIME_INTERVIEW_PROVIDER,
       realtimeModel: normalizeRealtimeInterviewModel(
