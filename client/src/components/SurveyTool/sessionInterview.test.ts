@@ -272,7 +272,7 @@ describe('session interview protocol', () => {
   });
 });
 
-it('maps a numeric reply using standard Terra and keeps the rating value', async () => {
+it('maps a numeric reply using standard Terra with medium effort and keeps the rating value', async () => {
   jest
     .mocked(callAI)
     .mockResolvedValue(JSON.stringify({ responses: [{ questionId: 'trust', answer: 4, confidence: 1 }] }));
@@ -289,7 +289,7 @@ it('maps a numeric reply using standard Terra and keeps the rating value', async
       model: 'gpt-5.6-terra',
       provider: 'openai',
       preferLocal: false,
-      reasoningEffort: 'low',
+      reasoningEffort: 'medium',
       service_tier: 'default',
     }),
   );

@@ -122,3 +122,17 @@ it('requests standard processing for Terra unless explicitly overridden', () => 
   });
   expect(plan.requestBody).not.toHaveProperty('temperature');
 });
+
+it('sends the higher interview mapping effort even when the session default is low', () => {
+  const plan = buildAiWorkerRequestPlan({
+    ai: { model: 'gpt-5.6-terra', provider: 'openai', reasoningEffort: 'low' },
+    taskType: 'interview-map',
+    opts: { reasoningEffort: 'medium', service_tier: 'default' },
+  });
+  expect(plan.requestBody).toMatchObject({
+    model: 'gpt-5.6-terra',
+    endpoint: 'responses',
+    reasoning_effort: 'medium',
+    service_tier: 'default',
+  });
+});

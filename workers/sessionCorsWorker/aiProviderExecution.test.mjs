@@ -790,3 +790,17 @@ test('proxyOpenAI defaults missing model and processing options to standard Terr
   assert.equal(body.service_tier, 'default');
   assert.deepEqual(body.reasoning, { effort: 'low' });
 });
+
+test('proxyOpenAI preserves medium reasoning for standard Terra interview mapping', async () => {
+  let body;
+  await proxyOpenAI({ payload: { model: 'gpt-5.6-terra', prompt: 'Map interview evidence.', reasoning_effort: 'medium', service_tier: 'default' }, secrets: { openaiKey: 'test-worker-key' }, deps: {
+    json: createJsonStub(), fetch: async (url, init) => {
+      assert.equal(url, 'https://api.openai.com/v1/responses');
+      body = JSON.parse(init.body);
+      return new Response(JSON.stringify({ output_text: '{"responses":[]}' }));
+    },
+  } });
+  assert.equal(body.model, 'gpt-5.6-terra');
+  assert.equal(body.service_tier, 'default');
+  assert.deepEqual(body.reasoning, { effort: 'medium' });
+});

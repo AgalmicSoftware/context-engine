@@ -492,7 +492,7 @@ export const mapInterviewEvidenceToResponses = async ({
       provider: 'openai',
       model: DEFAULT_AI_MODEL,
       preferLocal: false,
-      reasoningEffort: 'low',
+      reasoningEffort: 'medium',
       service_tier: 'default',
       response_format: { type: 'json_object' },
       maxTokens: 8000,

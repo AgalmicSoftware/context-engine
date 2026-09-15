@@ -98,7 +98,7 @@ Auto mode generates on the first Interview opening with available public questio
 
 Live updates use [`session.instructions.append`](https://developers.openai.com/api/reference/typescript/resources/live); supported legacy sessions use [`conversation.item.create` system messages](https://developers.openai.com/api/reference/typescript/resources/realtime). These updates never restart the conversation or replace its opening. Pause and Stop cancel polling and discard late results. Discovery uses the existing public catalog's visibility checks and 100-question limit; private questions are not added through this public discovery path. There are no edit-based or scheduled regeneration conditions.
 
-Suggested questions appear in an expandable **Suggested new questions** section, initially open, using the existing question creation editor. They can be edited or removed and require the normal explicit creation/sign-in/permission flow; stopping an interview and submitting response drafts do not create questions. Suggestions share the response-mapping request, avoiding an extra model round trip.
+Suggested questions follow the response drafts in an expandable **Suggested new questions** section, initially open, using the existing question creation editor. Both review sections use matching headings and support keyboard collapse/expand without losing edits. Questions can be edited or removed and require the normal explicit creation/sign-in/permission flow; stopping an interview and submitting response drafts do not create questions. Suggestions share the response-mapping request, avoiding an extra model round trip.
 
 Only responder speech becomes
 answer evidence. Interviewer questions are retained as context so short replies
@@ -107,7 +107,7 @@ transcript fragments are retained exactly, deduplicated by event ID, and ordered
 by session time; legacy Realtime sessions use completed input transcriptions.
 A new interview clears the previous transcript and review drafts.
 New speech is mapped even if the interview started with imported predictions. When the call ends, the responder can
-expand a read-only transcript disclosure while `gpt-5.6-terra` with low reasoning effort and standard processing (`service_tier: default`)
+expand a read-only transcript disclosure while `gpt-5.6-terra` with medium reasoning effort and standard processing (`service_tier: default`)
 maps the transcript and any responder context imported by an AI prefill link
 to response drafts. Imported context remains editable but the context field
 stays hidden during a normal voice-only interview. Drafts may include comments,
@@ -121,9 +121,9 @@ is not enough information, explains that no directly relevant detail was
 found, and suggests another interview or relevant Claude/ChatGPT memories. It
 does not present an unchanged generate button as though more input had arrived.
 
-Drafts open in a review panel with the session's answer inputs, additional
+Drafts open in a collapsible **Review proposed responses** section with the session's answer inputs, additional
 comments, conviction/importance control, and answer/comment lock menus. Relevant
-interview explanations appear as editable additional comments. The responder
+interview explanations appear as editable additional comments. Answers and comments matching the agent draft are labeled **Agent:**; edits are labeled **User:**. Existing user comments carry no prefix. These labels are display-only and are never inserted into submitted values. The responder
 selects which drafts to submit and must explicitly opt into replacing an existing
 local answer. **Submit responses** saves reviewed values and enters the normal
 submission flow, opening sign-in when necessary. Drafts survive that sign-in;
@@ -283,7 +283,7 @@ by default.
 
 
 Interview mapping uses the Worker-side OpenAI key and the Responses API. It sends
-`reasoning.effort: low`, `service_tier: default`, and JSON output formatting, without
+`reasoning.effort: medium`, `service_tier: default`, and JSON output formatting, without
 unsupported sampling parameters. GPT-Live remains the voice interviewer. See
 [OpenAI’s Terra model documentation](https://developers.openai.com/api/docs/models/gpt-5.6-terra).
 Mapping targets roughly ten seconds for ordinary interviews, but latency depends

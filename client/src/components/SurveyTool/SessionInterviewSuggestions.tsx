@@ -1,5 +1,6 @@
 import React from 'react';
 import CreateQuestionsAndSurveys from './CreateQuestionsAndSurveys';
+import SessionInterviewReviewSection from './SessionInterviewReviewSection';
 import styles from './SurveyTool.module.scss';
 import type { GeneratedSurveyStatement } from './SurveyGenerator/surveyGeneratorHelpers';
 
@@ -12,10 +13,10 @@ export default function SessionInterviewSuggestions({
   creatorProps: Partial<CreatorProps>;
 }) {
   return (
-    <details open className={`${styles.sessionInterviewReview} ${styles.sessionInterviewSuggestions}`}>
-      <summary>
-        <strong>Suggested new questions ({questions.length})</strong>
-      </summary>
+    <SessionInterviewReviewSection
+      title={`Suggested new questions (${questions.length})`}
+      className={styles.sessionInterviewSuggestions}
+    >
       <p>Review and edit these question drafts before creating them. They have not been added to the session.</p>
       <CreateQuestionsAndSurveys
         {...creatorProps}
@@ -23,6 +24,6 @@ export default function SessionInterviewSuggestions({
         preformedMode="questions"
         documentURLs={[]}
       />
-    </details>
+    </SessionInterviewReviewSection>
   );
 }

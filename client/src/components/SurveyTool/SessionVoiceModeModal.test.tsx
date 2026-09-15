@@ -9,13 +9,9 @@ import {
 } from './sessionInterview';
 import { startSessionRealtimeInterview } from '../../utilities/audio/realtimeInterviewClient';
 
-jest.mock('./SessionInterviewSuggestions', () => ({
+jest.mock('./CreateQuestionsAndSurveys', () => ({
   __esModule: true,
-  default: ({ questions }: { questions: unknown[] }) => (
-    <details open>
-      <summary>Suggested new questions ({questions.length})</summary>
-    </details>
-  ),
+  default: () => <div>Question creation editor</div>,
 }));
 
 jest.mock('./useInterviewOpening', () => ({
@@ -105,6 +101,67 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.getByText(/No response drafts matched the current bank/)).toBeInTheDocument();
     expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();
     expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
+  });
+
+  it('puts collapsible responses before suggested questions and preserves edits when collapsed', async () => {
+    mockedMapInterviewEvidenceToResponses.mockImplementation(async ({ onSuggestedQuestions }) => {
+      onSuggestedQuestions?.([{ id: 'new', type: 'freeform', prompt: 'Which AI risks are overlooked?', tags: [] }]);
+      return [{ questionId: 'q1', answer: 'Original draft', additionalComments: 'An explanation', confidence: 0.8 }];
+    });
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        prefillPacket={{
+          version: 1,
+          sessionSlug: 'demo',
+          source: { platform: 'other', modelId: 'unknown', verification: 'self_reported' },
+          responderContext: { summary: 'AI risks deserve discussion.' },
+        }}
+      />,
+    );
+    const review = await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    const suggestions = screen.getByRole('heading', { name: 'Suggested new questions (1)' }).closest('details');
+    expect(review).toHaveAttribute('open');
+    expect(suggestions).toHaveAttribute('open');
+    expect(review.compareDocumentPosition(suggestions!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(screen.getByText(/Auto-filled answer/)).toHaveTextContent('Agent: Auto-filled answer');
+    expect(screen.getByText(/Auto-filled comments/)).toHaveTextContent('Agent: Auto-filled comments');
+    fireEvent.change(screen.getByDisplayValue('Original draft'), { target: { value: 'My edited answer' } });
+    expect(screen.getByText(/Edited answer/)).toHaveTextContent('User: Edited answer');
+    expect(screen.getByText(/Auto-filled comments/)).toHaveTextContent('Agent: Auto-filled comments');
+    const summary = review.querySelector('summary')!;
+    fireEvent.click(summary);
+    expect(review).not.toHaveAttribute('open');
+    fireEvent.click(summary);
+    expect(review).toHaveAttribute('open');
+    expect(screen.getByDisplayValue('My edited answer')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Draft selected' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.change(screen.getByDisplayValue('An explanation'), { target: { value: 'My own comment' } });
+    expect(screen.getByText(/Edited comments/)).toHaveTextContent('User: Edited comments');
+    fireEvent.click(screen.getByRole('button', { name: 'Submit responses' }));
+    await waitFor(() => expect(baseProps.onApplyAnswer).toHaveBeenCalledWith('q1', 'My edited answer'));
+    expect(baseProps.onApplyAdditional).toHaveBeenCalledWith('q1', 'My own comment');
+  });
+
+  it('keeps existing user comments unprefixed until edited', async () => {
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        existingResponseSlice={{ additionalComments: { q1: { value: 'My existing comment' } } }}
+        prefillPacket={{
+          version: 1,
+          sessionSlug: 'demo',
+          source: { platform: 'other', modelId: 'unknown', verification: 'self_reported' },
+          responses: [{ questionId: 'q1', answer: 'Agent draft', confidence: 0.8 }],
+        }}
+      />,
+    );
+    await screen.findByDisplayValue('My existing comment');
+    expect(screen.queryByText(/Auto-filled comments|Edited comments/)).not.toBeInTheDocument();
+    fireEvent.change(screen.getByDisplayValue('My existing comment'), { target: { value: 'My revised comment' } });
+    expect(screen.getByText(/Edited comments/)).toHaveTextContent('User: Edited comments');
   });
 
   it('puts guidance and the live status in accessible header tooltips', async () => {
@@ -800,7 +857,7 @@ describe('Interview cancellation and recovery', () => {
     });
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Preparing drafts');
     await act(async () => finish([{ questionId: 'q1', answer: 'New evidence' }]));
-    expect(screen.getByRole('heading', { name: 'Review proposed responses' })).toHaveFocus();
+    expect(screen.getByRole('heading', { name: 'Review proposed responses' }).closest('summary')).toHaveFocus();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Review drafts');
     expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();
     expect(baseProps.onClose).not.toHaveBeenCalled();

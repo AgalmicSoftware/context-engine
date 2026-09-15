@@ -44,13 +44,19 @@ export default function SessionInterviewDraftCard({
   const [showEvidence, setShowEvidence] = useState(false);
   const [sliderMode, setSliderMode] = useState<'conviction' | 'importance'>('conviction');
   const [sliderOpen, setSliderOpen] = useState(false);
+  const [commentsEdited, setCommentsEdited] = useState(false);
   const prompt = question?.prompt || draft.questionId;
   const evidenceId = `ce-session-interview-basis-${draft.questionId}`;
   const percent = Math.round(Math.max(0, Math.min(1, draft.confidence || 0)) * 100);
   const confidenceLabel = percent < 40 ? 'Weak inference' : percent < 70 ? 'Moderate support' : 'Strong support';
   const comments = edited.additionalComments || '';
+  const answerIsAgentDraft = JSON.stringify(edited.answer) === JSON.stringify(draft.answer);
+  const commentsAreAgentDraft = Boolean(draft.additionalComments) && comments === draft.additionalComments;
   const onAnswerChange = (answer: unknown) => onEdit({ answer });
-  const onCommentsChange = (additionalComments: string) => onEdit({ additionalComments });
+  const onCommentsChange = (additionalComments: string) => {
+    setCommentsEdited(true);
+    onEdit({ additionalComments });
+  };
   return (
     <article
       className={`${styles.sessionInterviewDraft} ${selected ? '' : styles.sessionInterviewDraftRemoved}`}
@@ -71,6 +77,10 @@ export default function SessionInterviewDraftCard({
       </button>
       <div className={styles.sessionInterviewQuestion}>{prompt}</div>
       <div className={styles.sessionInterviewQuestionEditor}>
+        <p className={styles.sessionInterviewFieldOrigin}>
+          <strong>{answerIsAgentDraft ? 'Agent:' : 'User:'}</strong>{' '}
+          {answerIsAgentDraft ? 'Auto-filled answer' : 'Edited answer'}
+        </p>
         {renderAnswerInput ? (
           renderAnswerInput(draft.questionId, edited.answer, onAnswerChange)
         ) : question?.type === 'binary' ? (
@@ -119,22 +129,30 @@ export default function SessionInterviewDraftCard({
             </FullQuestionFooterIcons>
           </div>
           {showComments ? (
-            <AdditionalCommentsInlineRow
-              lockControl={renderFieldLock?.(draft.questionId, 'additional')}
-              input={
-                renderAdditionalInput ? (
-                  renderAdditionalInput(draft.questionId, comments, onCommentsChange)
-                ) : (
-                  <Input
-                    type="textarea"
-                    value={comments}
-                    onChange={(event) => onCommentsChange(event.target.value)}
-                    disabled={disabled}
-                    aria-label={`Additional comments for ${prompt}`}
-                  />
-                )
-              }
-            />
+            <>
+              {comments && (commentsAreAgentDraft || commentsEdited) ? (
+                <p className={styles.sessionInterviewFieldOrigin}>
+                  <strong>{commentsAreAgentDraft ? 'Agent:' : 'User:'}</strong>{' '}
+                  {commentsAreAgentDraft ? 'Auto-filled comments' : 'Edited comments'}
+                </p>
+              ) : null}
+              <AdditionalCommentsInlineRow
+                lockControl={renderFieldLock?.(draft.questionId, 'additional')}
+                input={
+                  renderAdditionalInput ? (
+                    renderAdditionalInput(draft.questionId, comments, onCommentsChange)
+                  ) : (
+                    <Input
+                      type="textarea"
+                      value={comments}
+                      onChange={(event) => onCommentsChange(event.target.value)}
+                      disabled={disabled}
+                      aria-label={`Additional comments for ${prompt}`}
+                    />
+                  )
+                }
+              />
+            </>
           ) : null}
         </div>
       </div>

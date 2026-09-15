@@ -1,5 +1,6 @@
 import { useInterviewQuestionUpdates } from './useInterviewQuestionUpdates';
 import SessionInterviewSuggestions from './SessionInterviewSuggestions';
+import SessionInterviewReviewSection from './SessionInterviewReviewSection';
 import type { GeneratedSurveyStatement } from './SurveyGenerator/surveyGeneratorHelpers';
 import { useInterviewOpening } from './useInterviewOpening';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -210,7 +211,7 @@ function SessionInterviewPanel({
     onTranscript: setTranscript,
   });
   const { audioRef, mediaStreamRef, recordingState, recordingElapsedSeconds } = recorder;
-  const reviewRef = useRef<HTMLHeadingElement | null>(null);
+  const reviewRef = useRef<HTMLElement | null>(null);
   const statusRef = useRef<HTMLButtonElement | null>(null);
   const stopControlRef = useRef<HTMLButtonElement | null>(null);
   const previousRecordingState = useRef(recordingState);
@@ -748,20 +749,13 @@ function SessionInterviewPanel({
             </div>
           ) : null}
 
-          {suggestedQuestions.length > 0 && !isInterviewBusy && !mapping ? (
-            <SessionInterviewSuggestions questions={suggestedQuestions} creatorProps={questionCreatorProps || {}} />
-          ) : null}
-
           {drafts.length && !isInterviewBusy && !mapping ? (
-            <div className={styles.sessionInterviewReview} data-testid={E2E_TESTIDS.SESSION_INTERVIEW_REVIEW}>
-              <div className={styles.sessionInterviewReviewHeader}>
-                <h4 ref={reviewRef} tabIndex={-1}>
-                  Review proposed responses
-                </h4>
-                <span>
-                  {drafts.filter((draft) => selected[draft.questionId]).length} of {drafts.length} selected
-                </span>
-              </div>
+            <SessionInterviewReviewSection
+              title="Review proposed responses"
+              summaryRef={reviewRef}
+              testId={E2E_TESTIDS.SESSION_INTERVIEW_REVIEW}
+              count={`${drafts.filter((draft) => selected[draft.questionId]).length} of ${drafts.length} selected`}
+            >
               {drafts.map((draft) => (
                 <SessionInterviewDraftCard
                   key={draft.questionId}
@@ -849,7 +843,10 @@ function SessionInterviewPanel({
                   {applying ? 'Preparing submission…' : 'Submit responses'}
                 </Button>
               </div>
-            </div>
+            </SessionInterviewReviewSection>
+          ) : null}
+          {suggestedQuestions.length > 0 && !isInterviewBusy && !mapping ? (
+            <SessionInterviewSuggestions questions={suggestedQuestions} creatorProps={questionCreatorProps || {}} />
           ) : null}
         </div>
       </ModalBody>

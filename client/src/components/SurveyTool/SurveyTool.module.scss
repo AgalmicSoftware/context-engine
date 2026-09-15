@@ -3768,8 +3768,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .sessionInterviewReview {
-  display: grid;
-  gap: 14px;
   padding-top: 14px;
   border-top: 1px solid var(--ce-card-border);
 
@@ -3777,6 +3775,12 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     margin: 0;
     color: var(--ce-panel-text);
   }
+}
+
+.sessionInterviewReviewContent {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
 }
 
 .sessionInterviewSuggestions {
@@ -3809,14 +3813,47 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .sessionInterviewReviewHeader {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
+  color: var(--ce-panel-text);
+  cursor: pointer;
+  list-style: none;
 
-  span {
+  &::-webkit-details-marker {
+    display: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 4px;
+  }
+
+  h4 {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .sessionInterviewReviewCount {
     color: var(--ce-panel-text-muted);
     font-size: 0.8rem;
     font-weight: 700;
   }
+}
+
+.sessionInterviewReviewCaret {
+  flex-shrink: 0;
+  transform: rotate(-90deg);
+
+  .sessionInterviewReview[open] > summary & {
+    transform: rotate(0deg);
+  }
+}
+
+.sessionInterviewFieldOrigin {
+  margin: 8px 0;
+  color: var(--ce-panel-text);
+  font-size: 0.875rem;
+  line-height: 1.4;
 }
 
 .sessionInterviewDraft {
