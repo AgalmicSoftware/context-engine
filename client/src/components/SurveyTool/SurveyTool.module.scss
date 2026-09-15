@@ -378,7 +378,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
     &.agree {
       background-color: var(--ce-binary-choice-agree-bg);
-      color: var(--ce-color-black);
+      color: var(--ce-color-white);
       &:before {
         font-weight: 900;
         margin-right: 0.5rem;
@@ -391,7 +391,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
     &.disagree {
       background-color: var(--ce-binary-choice-disagree-bg);
-      color: var(--ce-color-black);
+      color: var(--ce-color-white);
       &:before {
         font-weight: 900;
         margin-right: 0.5rem;
