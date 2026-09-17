@@ -3230,6 +3230,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   :global(.modal-header) {
     background: var(--ce-surface-sunken) !important;
     color: var(--ce-panel-text) !important;
+    border-bottom: 0;
     align-items: center;
     padding: 14px 16px;
   }
@@ -3389,17 +3390,31 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .sessionInterviewActions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 16px 12px;
+
+  > :only-child,
+  > .sessionListeningActiveRecorder,
+  > .sessionAgentKickoff,
+  > :global(.btn) {
+    grid-column: 1 / -1;
+  }
 }
 
 .sessionInterviewPrimaryAction {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  margin-inline: auto;
-  gap: 10px;
+  justify-content: center;
+  min-width: 0;
+}
+
+.sessionInterviewPromptAction {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
 }
 
 .sessionInterviewHeader {
@@ -3464,12 +3479,16 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   display: inline-flex;
   flex-direction: column;
   align-items: center;
+  width: 100%;
   gap: 12px;
-  padding: 18px 24px;
-  background: transparent;
+  padding: 10px 4px;
+  background: transparent !important;
   color: var(--ce-panel-text);
   font-family: var(--ce-font-body);
+  font-size: 0.9rem;
   font-weight: 700;
+  line-height: 1.4;
+  cursor: pointer;
   text-decoration: none;
 
   svg {
@@ -3480,14 +3499,34 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   &:hover:not(:disabled),
   &:focus:not(:disabled),
   &:active:not(:disabled) {
-    background: var(--ce-card-bg) !important;
     color: var(--ce-panel-text) !important;
     text-decoration: none;
+
+    .sessionInterviewActionCircle {
+      background: var(--ce-card-bg);
+      border-color: var(--ce-action-accent);
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 2px;
   }
 
   &:disabled svg {
     color: var(--ce-control-text);
   }
+}
+
+.sessionInterviewActionCircle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 104px;
+  width: 104px;
+  height: 104px;
+  border: 2px solid var(--ce-panel-text-muted);
+  border-radius: 50%;
 }
 
 .sessionInterviewPanel .sessionListeningWaveformTimer {
@@ -3694,7 +3733,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   min-height: 48px;
   display: grid;
   gap: 8px;
-  padding: 12px 52px 44px 14px;
+  min-width: 0;
+  padding: 14px;
   border: 1px solid var(--ce-card-border);
   border-radius: var(--ce-radius-8);
   background: var(--ce-card-bg);
@@ -3703,10 +3743,23 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .sessionAgentKickoffTitle {
+  appearance: none;
   display: block;
+  background: transparent;
+  padding: 0 54px 0 0;
   color: var(--ce-panel-text);
+  font-family: var(--ce-font-body);
+  font-size: 0.85rem;
   font-weight: 700;
   line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 3px;
+  }
 }
 
 .sessionAgentKickoffActions {
@@ -3722,9 +3775,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 .sessionAgentKickoffToggle {
   appearance: none;
-  position: absolute;
-  right: 10px;
-  bottom: 8px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -3768,7 +3818,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 .sessionAgentKickoffPrompt {
   display: block;
-  padding-left: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--ce-card-border);
   color: var(--ce-panel-text);
   font-family: var(--ce-font-body);
   font-size: 0.9rem;
@@ -3790,8 +3841,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   position: absolute;
   top: 8px;
   right: 8px;
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3801,6 +3852,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   background: transparent;
   color: var(--ce-panel-text);
   cursor: pointer;
+  font-size: 1.5rem;
   opacity: 0.78;
 
   &:hover,
@@ -6557,60 +6609,15 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 .sessionInterviewResources {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
-  align-items: stretch;
-
-  > :only-child,
-  > .sessionAgentKickoff:first-child,
-  > .sessionInterviewTranscript {
-    grid-column: 1 / -1;
-  }
 
   .sessionInterviewTranscriptToggle {
     flex-wrap: wrap;
     justify-content: center;
-    height: 100%;
-    align-content: center;
     padding: 10px;
     span {
       margin-left: 0;
-    }
-  }
-
-  .sessionAgentKickoff {
-    padding: 10px;
-    min-width: 0;
-  }
-
-  .sessionAgentKickoffToggle {
-    position: static;
-    justify-self: end;
-  }
-
-  .sessionAgentKickoffPrompt {
-    border-top: 1px solid var(--ce-card-border);
-    padding-top: 12px;
-  }
-
-  .sessionInterviewTranscriptDisclosure {
-    align-self: start;
-  }
-
-  .sessionAgentKickoffTitle {
-    appearance: none;
-    background: transparent;
-    border: 0;
-    padding: 0 28px 0 0;
-    color: var(--ce-panel-text);
-    font-family: var(--ce-font-body);
-    font-size: 0.85rem;
-    text-align: left;
-    cursor: pointer;
-    &:hover,
-    &:focus-visible {
-      outline: 2px solid var(--ce-focus-ring);
-      outline-offset: 3px;
     }
   }
 }

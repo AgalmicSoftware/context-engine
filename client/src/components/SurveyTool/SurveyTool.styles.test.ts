@@ -30,14 +30,14 @@ describe('SurveyTool styles', () => {
       /\.sessionVoiceModeChooser\s*\{[\s\S]*?button:hover,[\s\S]*?strong,[\s\S]*?span,[\s\S]*?svg\s*\{[\s\S]*?color:\s*var\(--ce-action-accent-text\) !important;/,
     );
     expect(scss).toMatch(
-      /\.sessionAgentKickoffCopy\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*8px;[\s\S]*?right:\s*8px;[\s\S]*?width:\s*32px;[\s\S]*?height:\s*32px;/,
+      /\.sessionAgentKickoffCopy\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*8px;[\s\S]*?right:\s*8px;[\s\S]*?width:\s*44px;[\s\S]*?height:\s*44px;/,
     );
     expect(scss).toMatch(
-      /\.sessionAgentKickoffToggle\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?right:\s*10px;[\s\S]*?bottom:\s*8px;[\s\S]*?opacity:\s*0\.5;[\s\S]*?&:hover,[\s\S]*?&:focus-visible\s*\{[\s\S]*?opacity:\s*1;[\s\S]*?&\[aria-expanded='true'\]\s*\{[\s\S]*?opacity:\s*1;/,
+      /\.sessionAgentKickoffToggle\s*\{[\s\S]*?opacity:\s*0\.5;[\s\S]*?&:hover,[\s\S]*?&:focus-visible\s*\{[\s\S]*?opacity:\s*1;[\s\S]*?&\[aria-expanded='true'\]\s*\{[\s\S]*?opacity:\s*1;/,
     );
     expect(scss).toMatch(/\.sessionAgentKickoffCaretExpanded\s*\{[\s\S]*?transform:\s*rotate\(180deg\);/);
     expect(scss).toMatch(
-      /\.sessionAgentKickoffPrompt\s*\{[\s\S]*?white-space:\s*normal;[\s\S]*?overflow-wrap:\s*anywhere;[\s\S]*?opacity:\s*0\.5;/,
+      /\.sessionAgentKickoffPrompt\s*\{[\s\S]*?white-space:\s*pre-line;[\s\S]*?overflow-wrap:\s*anywhere;/,
     );
     expect(scss).toMatch(
       /\.sessionInterviewStatusPill\s*\{[\s\S]*?background:\s*var\(--ce-status-success-bright\) !important;/,

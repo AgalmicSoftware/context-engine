@@ -44,7 +44,7 @@ Session creators can change the model in `/new` under **Optional details**
 The Interview header shows a colored pill with its status always visible: Ready,
 Connecting, Listening, Paused, Ending, Preparing drafts, Review drafts, or Error.
 The pill itself carries the status color without a separate dot. The header
-shares the dialog background, and its close icon is half-opacity until hovered
+shares the dialog background without a dividing line, and its close icon is half-opacity until hovered
 or keyboard-focused.
 Green readiness requires a reachable Worker that confirms an OpenAI key, voice
 provider, and session access, plus browser microphone support and no known
@@ -54,7 +54,8 @@ Yellow indicates loading, pauses, or readiness that could not be verified; red
 indicates an error or missing setup. Older Workers show **Not checked** rather
 than green. Click the idle pill to retry the check. Status changes are also
 announced to screen readers. The adjacent question-mark tooltip explains the
-current phase. A large microphone starts the interview.
+current phase. Two large circular controls sit side by side: **Copy prompt** on
+the left and the microphone to start or continue the interview on the right.
 The augmentation prompt displays paragraphs and bold key points for readability;
 its Copy button copies the original plain text without formatting.
 
@@ -175,11 +176,12 @@ platform/model provenance choice.
 
 ## Ordinary ChatGPT or Claude, without MCP
 
-Interview mode displays a **Copy and paste this prompt (into Claude or ChatGPT)
-to augment interview** card. Clicking that text or the top-right clipboard icon
-copies the same explicit user request without opening the preview. The **Prompt**
-button expands the exact instruction inside the card and collapses it again;
-the preview starts collapsed. A question-mark tooltip to the left of **Prompt** explains:
+Interview mode shows a large **Copy prompt** clipboard button beside the microphone.
+It copies the request directly without opening the preview. The **Prompt** button
+beneath the clipboard expands a full-width card with the instruction, then
+collapses it again. The card starts hidden; its **Copy and paste this prompt
+(into Claude or ChatGPT) to augment interview** heading and enlarged top-right
+clipboard also copy the same request. A question-mark tooltip to the left of **Prompt** explains:
 “Allows your agent to predict your responses and raise better interview questions.”
 The tooltip is available on hover and keyboard focus. The copied request begins:
 
@@ -255,7 +257,9 @@ The account used at final normal submission owns the response. If an older
 packet contains context facts but not responses, the session AI mapping lane
 still converts those facts into drafts.
 
-The **Transcript** and copy-prompt cards share one row. Without a transcript, the prompt card fills the row even while its preview is expanded. Both the copy text and clipboard icon copy the plain prompt; **Prompt** expands its readable preview beneath the controls, inside the same bordered card.
+The expanded prompt card fills the row beneath the two circular controls, keeping
+its copy heading and preview inside one bordered card. After an interview, the
+separate **Transcript** disclosure appears below these controls.
 
 In the full question list, rating sliders update locally during a drag and save
 the final value on release. Loaded lists retain the Questions label during
