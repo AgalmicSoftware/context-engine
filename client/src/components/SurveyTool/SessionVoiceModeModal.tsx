@@ -791,25 +791,43 @@ function SessionInterviewPanel({
                     void copyAgentPrompt();
                   }}
                 >
-                  Copy and paste this prompt (into Claude or ChatGPT) to augment interview – allows your agent to
-                  predict your responses
+                  Copy and paste this prompt (into Claude or ChatGPT) to augment interview
                 </button>
-                <button
-                  type="button"
-                  className={styles.sessionAgentKickoffToggle}
-                  onClick={() => setShowAgentPrompt((current) => !current)}
-                  aria-expanded={showAgentPrompt}
-                  aria-controls="ce-session-interview-agent-prompt"
-                  data-testid={E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE}
-                >
-                  <span>Prompt</span>
-                  <FontAwesomeIcon
-                    icon={faCaretDown}
-                    className={`${styles.sessionAgentKickoffCaret} ${
-                      showAgentPrompt ? styles.sessionAgentKickoffCaretExpanded : ''
-                    }`}
-                  />
-                </button>
+                <div className={styles.sessionAgentKickoffActions}>
+                  <button
+                    type="button"
+                    className={styles.sessionAgentKickoffToggle}
+                    onClick={() => setShowAgentPrompt((current) => !current)}
+                    aria-expanded={showAgentPrompt}
+                    aria-controls="ce-session-interview-agent-prompt"
+                    data-testid={E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE}
+                  >
+                    <span>Prompt</span>
+                    <FontAwesomeIcon
+                      icon={faCaretDown}
+                      className={`${styles.sessionAgentKickoffCaret} ${
+                        showAgentPrompt ? styles.sessionAgentKickoffCaretExpanded : ''
+                      }`}
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    id="ce-interview-agent-prompt-help"
+                    className={styles.sessionInterviewHeaderButton}
+                    aria-label="About the interview prompt"
+                  >
+                    <FontAwesomeIcon icon={faQuestionCircle} />
+                  </button>
+                  <UncontrolledTooltip
+                    target="ce-interview-agent-prompt-help"
+                    placement="top-end"
+                    fade={false}
+                    trigger="hover focus"
+                    autohide={false}
+                  >
+                    Allows your agent to predict your responses and raise better interview questions.
+                  </UncontrolledTooltip>
+                </div>
                 <button
                   type="button"
                   className={`${styles.sessionAgentKickoffCopy} ${promptCopied ? styles.sessionAgentKickoffCopied : ''}`}

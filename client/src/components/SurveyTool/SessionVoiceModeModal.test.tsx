@@ -387,6 +387,8 @@ describe('SessionVoiceModeModal', () => {
     ).toBeInTheDocument();
     const promptToggle = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE);
     expect(promptToggle).toHaveAccessibleName('Prompt');
+    expect(screen.getByRole('button', { name: 'About the interview prompt' })).toBeInTheDocument();
+    expect(screen.queryByText(/allows your agent to predict your responses/i)).not.toBeInTheDocument();
     expect(promptToggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT)).not.toBeInTheDocument();
     const copyButton = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT);
@@ -396,7 +398,7 @@ describe('SessionVoiceModeModal', () => {
 
     fireEvent.click(
       screen.getByRole('button', {
-        name: 'Copy and paste this prompt (into Claude or ChatGPT) to augment interview – allows your agent to predict your responses',
+        name: 'Copy and paste this prompt (into Claude or ChatGPT) to augment interview',
       }),
     );
     await waitFor(() =>

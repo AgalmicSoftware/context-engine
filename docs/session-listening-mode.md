@@ -172,12 +172,13 @@ platform/model provenance choice.
 
 ## Ordinary ChatGPT or Claude, without MCP
 
-Interview mode displays a compact **Paste this prompt to augment interview with
-history from Claude or ChatGPT** card. Its prompt is collapsed by default. A
-**View prompt** button with a downward caret reveals the exact instruction at
-reduced opacity and changes to **Hide prompt** while expanded. The top-right
-clipboard icon copies the same explicit user request without requiring the
-preview to be open:
+Interview mode displays a **Copy and paste this prompt (into Claude or ChatGPT)
+to augment interview** card. Clicking that text or the top-right clipboard icon
+copies the same explicit user request without opening the preview. The **Prompt**
+button expands the exact instruction inside the card and collapses it again;
+the preview starts collapsed. A question-mark tooltip beside **Prompt** explains:
+“Allows your agent to predict your responses and raise better interview questions.”
+The tooltip is available on hover and keyboard focus. The copied request begins:
 
 ```text
 Help me prepare a review-only Context Engine interview prefill. Fetch

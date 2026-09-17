@@ -3725,6 +3725,17 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   line-height: 1.35;
 }
 
+.sessionAgentKickoffActions {
+  display: flex;
+  align-items: center;
+  justify-self: end;
+  gap: 8px;
+
+  .sessionInterviewHeaderButton {
+    color: var(--ce-panel-text) !important;
+  }
+}
+
 .sessionAgentKickoffToggle {
   appearance: none;
   position: absolute;
