@@ -290,7 +290,9 @@ describe('AudioInput', () => {
       root.render(<AudioInput updateFunction={jest.fn()} value="" placeholder="Speak" />);
     });
 
-    const micButton = requireElement(container.querySelector('button[aria-label="Start recording"]'));
+    const micButton = requireElement(
+      container.querySelector<HTMLButtonElement>('button[aria-label="Start recording"]'),
+    );
 
     act(() => {
       clickElement(micButton);
@@ -311,7 +313,7 @@ describe('AudioInput', () => {
     ).toBeInTheDocument();
     fireEvent.mouseOut(rewrite);
     act(() => {
-      requireElement(container.querySelector('button[aria-label="Start recording"]')).focus();
+      requireElement(container.querySelector<HTMLButtonElement>('button[aria-label="Start recording"]')).focus();
     });
     expect(await screen.findByText('Record speech and add its transcript to this text.')).toBeInTheDocument();
   });

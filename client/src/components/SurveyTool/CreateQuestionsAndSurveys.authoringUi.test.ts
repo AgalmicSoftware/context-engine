@@ -48,11 +48,11 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       questionSubmitLabel: 'Upload Questions',
       submitClassName: 'interviewSubmit',
     });
-    instance.state.isStandaloneQuestion = true;
-    instance.state.showAutoTool = false;
-    instance.state.questions = [
-      { id: 'q1', type: 'freeform', prompt: 'Which AI impact matters?' },
-    ] as typeof instance.state.questions;
+    instance.setState({
+      isStandaloneQuestion: true,
+      showAutoTool: false,
+      questions: [{ id: 'q1', type: 'freeform', prompt: 'Which AI impact matters?' }],
+    });
     const buttons = collectTreeNodes(
       instance.render(),
       (node) => node?.props?.['data-testid'] === E2E_TESTIDS.CREATE_SUBMIT,
@@ -60,7 +60,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     expect(buttons).toHaveLength(1);
     expect(treeHasText(buttons[0], 'Upload Questions')).toBe(true);
     expect(nodeHasClassName(buttons[0], 'interviewSubmit')).toBe(true);
-    expect(buttons[0].props.onClick).toBe(instance.handleSubmitButtonClick);
+    expect(buttons[0]).toHaveProperty('props.onClick', instance.handleSubmitButtonClick);
     const tree = instance.render();
     expect(treeHasText(tree, 'Choose Question Type')).toBe(false);
     expect(collectTreeNodes(tree, (node) => nodeHasClassName(node, 'modeHeader'))).toHaveLength(0);
@@ -78,7 +78,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       preformedQuestions: [original, removed],
       preformedMode: 'questions',
     });
-    instance.state.questions = [{ ...original, prompt: 'My edited question?', tags: ['manual'] }];
+    instance.setState({ questions: [{ ...original, prompt: 'My edited question?', tags: ['manual'] }] });
     const prevProps = instance.props;
     const prevState = instance.state;
     Object.assign(instance, { props: { ...prevProps, preformedQuestions: [original, removed, added] } });

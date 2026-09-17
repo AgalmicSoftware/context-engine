@@ -233,7 +233,7 @@ describe('UserPage analysis cache and routing', () => {
         aiContext: {
           sessionSlug: slug,
           provider: 'openai',
-          model: 'gpt-5',
+          model: 'gpt-5.6-terra',
         },
         result,
       });

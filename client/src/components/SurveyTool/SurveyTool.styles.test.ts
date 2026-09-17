@@ -40,9 +40,11 @@ describe('SurveyTool styles', () => {
       /\.sessionAgentKickoffPrompt\s*\{[\s\S]*?white-space:\s*normal;[\s\S]*?overflow-wrap:\s*anywhere;[\s\S]*?opacity:\s*0\.5;/,
     );
     expect(scss).toMatch(
-      /\.sessionInterviewStatusDot\s*\{[\s\S]*?border-radius:\s*var\(--ce-radius-round\);[\s\S]*?background:\s*var\(--ce-status-success\);/,
+      /\.sessionInterviewStatusDot\s*\{[\s\S]*?border-radius:\s*50%;[\s\S]*?background:\s*var\(--ce-status-success-bright\);/,
     );
-    expect(scss).toMatch(/\.sessionInterviewStatusDotError\s*\{[\s\S]*?background:\s*var\(--ce-status-error\);/);
+    expect(scss).toMatch(
+      /\.sessionInterviewStatusDot\s*\{[\s\S]*?&\[data-tone='error'\]\s*\{[\s\S]*?background:\s*var\(--ce-status-error\);/,
+    );
     expect(scss).toMatch(
       /\.sessionInterviewMappingNotice\s*\{[\s\S]*?border:\s*1px solid color-mix\(in srgb, var\(--ce-status-warning\) 58%, var\(--ce-card-border\)\);[\s\S]*?background:\s*color-mix\(in srgb, var\(--ce-status-warning\) 12%, var\(--ce-surface-sunken\)\);[\s\S]*?color:\s*var\(--ce-panel-text\);/,
     );

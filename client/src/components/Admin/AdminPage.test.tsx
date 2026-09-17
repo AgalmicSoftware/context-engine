@@ -239,13 +239,13 @@ describe('AdminPage', () => {
     expect(draft.defaultFeaturedSBTs).toEqual([expect.objectContaining({ address: expectedFeatured })]);
   });
 
-  it('defaults admin AI metadata drafts to GPT-5 when metadata is missing AI settings', () => {
+  it('defaults admin AI metadata drafts to Terra when metadata is missing AI settings', () => {
     const draft = adminPageTestUtils.buildAdminMetadataDraft({});
 
     expect(draft.aiFastProvider).toBe('openai');
-    expect(draft.aiFastModel).toBe('gpt-5');
+    expect(draft.aiFastModel).toBe('gpt-5.6-terra');
     expect(draft.aiThinkingProvider).toBe('openai');
-    expect(draft.aiThinkingModel).toBe('gpt-5');
+    expect(draft.aiThinkingModel).toBe('gpt-5.6-terra');
     expect(draft.aiTranscriptionProvider).toBe('openai');
     expect(draft.aiTranscriptionModel).toBe('whisper-1');
   });
