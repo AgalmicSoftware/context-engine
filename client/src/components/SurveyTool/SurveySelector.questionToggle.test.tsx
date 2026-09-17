@@ -82,7 +82,10 @@ describe('SurveySelector question toggle', () => {
     subject.getParsedQuestionsCacheForRender = jest.fn(() => ({}));
     subject.handleFilteredQuestionCountUpdate(42, 0);
     subject.state = { ...subject.state, loading: true, viewMode: 'questions' };
-    const toggle = findElement(subject.render(), (el) => el?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_TOGGLE);
+    const toggle = findElement(
+      subject.render(),
+      (el) => el?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_TOGGLE,
+    );
     expect(treeHasText(toggle, 'Questions')).toBe(true);
     expect(treeHasText(toggle, 'Loading...')).toBe(false);
     expect(findElement(toggle, (el) => el?.props?.icon?.iconName === 'spinner')).toBeTruthy();

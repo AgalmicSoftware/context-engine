@@ -6578,7 +6578,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     height: 100%;
     align-content: center;
     padding: 10px;
-    span { margin-left: 0; }
+    span {
+      margin-left: 0;
+    }
   }
 
   .sessionAgentKickoff {

@@ -278,8 +278,8 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
       (field) => !responseValuesMatch(originalComparisonValues[field], submittedComparisonValues[field]),
     );
     // Historical comments can contain text even when the final comment was cleared.
-    const researchAdditionalEncrypted = additional.encrypted === true ||
-      (additional.audienceMode !== 'explicit' && answer.encrypted === true);
+    const researchAdditionalEncrypted =
+      additional.encrypted === true || (additional.audienceMode !== 'explicit' && answer.encrypted === true);
     const redactedFields = [
       ...(answer.encrypted ? ['answer'] : []),
       ...(researchAdditionalEncrypted ? ['additionalComments'] : []),

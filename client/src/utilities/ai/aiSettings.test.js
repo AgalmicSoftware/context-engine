@@ -56,7 +56,12 @@ describe('aiSettings secret resolution', () => {
     seedSessionAiSettings({});
     expect(getLocalAiSettings().models).toEqual({ fast: 'gpt-5.6-terra', thinking: 'gpt-5.6-terra' });
     for (const thinking of [false, true]) {
-      const config = await getEffectiveAiConfig({ sessionSlug: '', preferLocal: false, thinking, resolveSecrets: false });
+      const config = await getEffectiveAiConfig({
+        sessionSlug: '',
+        preferLocal: false,
+        thinking,
+        resolveSecrets: false,
+      });
       expect(config).toMatchObject({ model: 'gpt-5.6-terra', provider: 'openai', reasoningEffort: 'low' });
     }
   });

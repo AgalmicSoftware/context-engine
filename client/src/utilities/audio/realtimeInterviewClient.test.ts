@@ -121,7 +121,11 @@ describe('interview connection lifecycle', () => {
     expect(h.channel.send).toHaveBeenCalledTimes(1);
     expect(JSON.parse(h.channel.send.mock.calls[0][0])).toEqual({
       type: 'conversation.item.create',
-      item: { type: 'message', role: 'system', content: [{ type: 'input_text', text: 'A new question is available.' }] },
+      item: {
+        type: 'message',
+        role: 'system',
+        content: [{ type: 'input_text', text: 'A new question is available.' }],
+      },
     });
     await session.stop();
   });

@@ -507,9 +507,20 @@ describe('SurveyPileViewMode runtime surface', () => {
         callback?.();
       },
     };
-    const revisions = [{ revision: 1, modelId: 'fixture-model', answer: 'Original answer' }, { revision: 2, modelId: 'fixture-model', answer: 'Revised prediction' }];
-    const selected = [{ questionId: 'q1', answer: 'Agree' }, { questionId: 'q2', answer: 'Revised prediction', revisions }];
-    const rejected = { questionId: 'q3', answer: 'Rejected edit', selected: false, original: { questionId: 'q3', answer: 'Original rejected prediction' } };
+    const revisions = [
+      { revision: 1, modelId: 'fixture-model', answer: 'Original answer' },
+      { revision: 2, modelId: 'fixture-model', answer: 'Revised prediction' },
+    ];
+    const selected = [
+      { questionId: 'q1', answer: 'Agree' },
+      { questionId: 'q2', answer: 'Revised prediction', revisions },
+    ];
+    const rejected = {
+      questionId: 'q3',
+      answer: 'Rejected edit',
+      selected: false,
+      original: { questionId: 'q3', answer: 'Original rejected prediction' },
+    };
     await recordInterviewProvenance(engine, selected, null, null, false, true, '', [rejected]);
     const slice = engine.state.surveysResponseState[0];
     expect(slice.interviewProvenance.q1).not.toHaveProperty('unselectedDrafts');
