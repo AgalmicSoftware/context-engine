@@ -225,9 +225,9 @@ comparison. Low-confidence responses are allowed when the AI
 has a defensible indirect signal and explains its basis; only questions with no
 relevant signal are omitted. Model identity is collected to measure prediction
 fidelity across models and may be `unknown` when the interface does not expose
-one. A packet may include a preferred name only when the external AI already
-knows it; the prompt forbids inference and the client does not submit it unless
-the responder enables the default-off name control. The packet contains no
+one. The copied prompt does not request a responder name. Previously generated
+packets may still include one; the client does not submit it unless the responder
+enables the default-off name control. The packet contains no
 credential and is carried in `#prefill=...`, so it
 is not sent to the web host as an HTTP request target. The fragment is still
 intentionally readable by scripts on the destination page, which is why source

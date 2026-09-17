@@ -159,13 +159,15 @@ describe('session interview protocol', () => {
     expect(kickoff).toContain('reasonable inferences');
     expect(kickoff).toContain('binary and multichoice answers must match one listed option');
     expect(kickoff).toContain('Every response needs confidence from 0 to 1');
+    expect(kickoff).toContain('additionalComments is text');
     expect(kickoff).toContain('Platform/model are self-reported fidelity metadata');
     expect(kickoff).toContain('historyChatsSearched');
     expect(kickoff).toContain('count distinct prior chats/memories/sources searched and actually used');
     expect(kickoff).toContain('do not count your own prior output');
     expect(kickoff).toContain('Use null when the platform does not reveal a searched count');
-    expect(kickoff).toContain('responderContext.name');
-    expect(kickoff).toContain('keeps name sharing off');
+    expect(kickoff).not.toContain('responderContext.name');
+    expect(kickoff).not.toContain('preferred name');
+    expect(kickoff).toContain('"responderContext":{"summary":"optional"}');
     expect(kickoff).toContain('the exact single-line JSON packet');
     expect(kickoff).toContain('Nothing is submitted;');
     expect(kickoff).toContain('Markdown link labeled "Open prefilled interview"');
