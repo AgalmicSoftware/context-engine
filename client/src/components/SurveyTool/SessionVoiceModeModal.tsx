@@ -657,60 +657,6 @@ function SessionInterviewPanel({
             </div>
           ) : null}
           <div className={styles.sessionInterviewActions}>
-            {kickoff ? (
-              <div className={styles.sessionInterviewPromptAction}>
-                <button
-                  type="button"
-                  className={styles.sessionInterviewMicrophone}
-                  onClick={() => {
-                    void copyAgentPrompt();
-                  }}
-                  aria-label={promptCopied ? 'Memory augmentation prompt copied' : 'Copy memory augmentation prompt'}
-                  title={promptCopied ? 'Copied' : 'Copy prompt for Claude or ChatGPT'}
-                  data-testid={E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT}
-                >
-                  <span className={styles.sessionInterviewActionCircle} aria-hidden="true">
-                    <FontAwesomeIcon icon={promptCopied ? faCheck : faClipboard} />
-                  </span>
-                  <span>{promptCopied ? 'Copied' : 'Copy prompt'}</span>
-                </button>
-                <div className={styles.sessionAgentKickoffActions}>
-                  <button
-                    type="button"
-                    id="ce-interview-agent-prompt-help"
-                    className={styles.sessionInterviewHeaderButton}
-                    aria-label="About the interview prompt"
-                  >
-                    <FontAwesomeIcon icon={faQuestionCircle} />
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.sessionAgentKickoffToggle}
-                    onClick={() => setShowAgentPrompt((current) => !current)}
-                    aria-expanded={showAgentPrompt}
-                    aria-controls="ce-session-interview-agent-prompt"
-                    data-testid={E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE}
-                  >
-                    <span>Prompt</span>
-                    <FontAwesomeIcon
-                      icon={faCaretDown}
-                      className={`${styles.sessionAgentKickoffCaret} ${
-                        showAgentPrompt ? styles.sessionAgentKickoffCaretExpanded : ''
-                      }`}
-                    />
-                  </button>
-                  <UncontrolledTooltip
-                    target="ce-interview-agent-prompt-help"
-                    placement="top-end"
-                    fade={false}
-                    trigger="hover focus"
-                    autohide={false}
-                  >
-                    Allows your agent to predict your responses and raise better interview questions.
-                  </UncontrolledTooltip>
-                </div>
-              </div>
-            ) : null}
             {!isRecorderSessionActive ? (
               <div className={styles.sessionInterviewPrimaryAction}>
                 <Button
@@ -781,37 +727,6 @@ function SessionInterviewPanel({
                 </div>
               </div>
             )}
-            {kickoff && showAgentPrompt ? (
-              <div className={styles.sessionAgentKickoff}>
-                <button
-                  type="button"
-                  className={styles.sessionAgentKickoffTitle}
-                  onClick={() => {
-                    void copyAgentPrompt();
-                  }}
-                >
-                  Copy and paste this prompt (into Claude or ChatGPT) to augment interview
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.sessionAgentKickoffCopy} ${promptCopied ? styles.sessionAgentKickoffCopied : ''}`}
-                  onClick={() => {
-                    void copyAgentPrompt();
-                  }}
-                  aria-label={promptCopied ? 'Displayed prompt copied' : 'Copy displayed prompt'}
-                  title={promptCopied ? 'Copied' : 'Copy memory augmentation prompt'}
-                >
-                  <FontAwesomeIcon icon={promptCopied ? faCheck : faClipboard} />
-                </button>
-                <div
-                  id="ce-session-interview-agent-prompt"
-                  className={styles.sessionAgentKickoffPrompt}
-                  data-testid={E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT}
-                >
-                  <SessionInterviewPrompt prompt={kickoff} />
-                </div>
-              </div>
-            ) : null}
             {!isInterviewBusy &&
             !drafts.length &&
             !mappingNotice &&
@@ -845,42 +760,110 @@ function SessionInterviewPanel({
             </div>
           ) : null}
 
-          {(!isInterviewBusy && transcript.trim()) || showTranscript ? (
-            <div className={styles.sessionInterviewResources}>
-              {!isInterviewBusy && transcript.trim() ? (
-                <section className={styles.sessionInterviewTranscriptDisclosure}>
+          <div className={styles.sessionInterviewResources}>
+            {!isInterviewBusy && transcript.trim() ? (
+              <section className={styles.sessionInterviewTranscriptDisclosure}>
+                <button
+                  type="button"
+                  className={styles.sessionInterviewTranscriptToggle}
+                  onClick={() => setShowTranscript((current) => !current)}
+                  aria-expanded={showTranscript}
+                  aria-controls="ce-session-interview-transcript-content"
+                  data-testid={E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT_TOGGLE}
+                >
+                  <FontAwesomeIcon
+                    icon={faCaretDown}
+                    className={`${styles.sessionInterviewTranscriptCaret} ${
+                      showTranscript ? '' : styles.sessionInterviewTranscriptCaretCollapsed
+                    }`}
+                  />
+                  <strong>Transcript</strong>
+                  <span>{transcript.trim().split(/\s+/).length} words</span>
+                </button>
+              </section>
+            ) : null}
+
+            {kickoff ? (
+              <div className={styles.sessionAgentKickoff}>
+                <button
+                  type="button"
+                  className={styles.sessionAgentKickoffTitle}
+                  onClick={() => {
+                    void copyAgentPrompt();
+                  }}
+                >
+                  Copy and paste this prompt (into Claude or ChatGPT) to augment interview
+                </button>
+                <div className={styles.sessionAgentKickoffActions}>
                   <button
                     type="button"
-                    className={styles.sessionInterviewTranscriptToggle}
-                    onClick={() => setShowTranscript((current) => !current)}
-                    aria-expanded={showTranscript}
-                    aria-controls="ce-session-interview-transcript-content"
-                    data-testid={E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT_TOGGLE}
+                    id="ce-interview-agent-prompt-help"
+                    className={styles.sessionInterviewHeaderButton}
+                    aria-label="About the interview prompt"
                   >
+                    <FontAwesomeIcon icon={faQuestionCircle} />
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.sessionAgentKickoffToggle}
+                    onClick={() => setShowAgentPrompt((current) => !current)}
+                    aria-expanded={showAgentPrompt}
+                    aria-controls="ce-session-interview-agent-prompt"
+                    data-testid={E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE}
+                  >
+                    <span>Prompt</span>
                     <FontAwesomeIcon
                       icon={faCaretDown}
-                      className={`${styles.sessionInterviewTranscriptCaret} ${
-                        showTranscript ? '' : styles.sessionInterviewTranscriptCaretCollapsed
+                      className={`${styles.sessionAgentKickoffCaret} ${
+                        showAgentPrompt ? styles.sessionAgentKickoffCaretExpanded : ''
                       }`}
                     />
-                    <strong>Transcript</strong>
-                    <span>{transcript.trim().split(/\s+/).length} words</span>
                   </button>
-                </section>
-              ) : null}
-
-              {showTranscript ? (
-                <pre
-                  id="ce-session-interview-transcript-content"
-                  className={styles.sessionInterviewTranscript}
-                  aria-label="Transcript"
-                  data-testid={E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT}
+                  <UncontrolledTooltip
+                    target="ce-interview-agent-prompt-help"
+                    placement="top-end"
+                    fade={false}
+                    trigger="hover focus"
+                    autohide={false}
+                  >
+                    Allows your agent to predict your responses and raise better interview questions.
+                  </UncontrolledTooltip>
+                </div>
+                <button
+                  type="button"
+                  className={`${styles.sessionAgentKickoffCopy} ${promptCopied ? styles.sessionAgentKickoffCopied : ''}`}
+                  onClick={() => {
+                    void copyAgentPrompt();
+                  }}
+                  aria-label={promptCopied ? 'Memory augmentation prompt copied' : 'Copy memory augmentation prompt'}
+                  title={promptCopied ? 'Copied' : 'Copy memory augmentation prompt'}
+                  data-testid={E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT}
                 >
-                  {transcript}
-                </pre>
-              ) : null}
-            </div>
-          ) : null}
+                  <FontAwesomeIcon icon={promptCopied ? faCheck : faClipboard} />
+                </button>
+                {showAgentPrompt ? (
+                  <div
+                    id="ce-session-interview-agent-prompt"
+                    className={styles.sessionAgentKickoffPrompt}
+                    data-testid={E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT}
+                  >
+                    <SessionInterviewPrompt prompt={kickoff} />
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {showTranscript ? (
+              <pre
+                id="ce-session-interview-transcript-content"
+                className={styles.sessionInterviewTranscript}
+                aria-label="Transcript"
+                data-testid={E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT}
+              >
+                {transcript}
+              </pre>
+            ) : null}
+          </div>
 
           {drafts.length && !isInterviewBusy && !mapping ? (
             <SessionInterviewReviewSection

@@ -54,8 +54,7 @@ Yellow indicates loading, pauses, or readiness that could not be verified; red
 indicates an error or missing setup. Older Workers show **Not checked** rather
 than green. Click the idle pill to retry the check. Status changes are also
 announced to screen readers. The adjacent question-mark tooltip explains the
-current phase. Two large circular controls sit side by side: **Copy prompt** on
-the left and the microphone to start or continue the interview on the right.
+current phase. A large circular microphone control starts or continues the interview.
 The augmentation prompt displays paragraphs and bold key points for readability;
 its Copy button copies the original plain text without formatting.
 
@@ -176,12 +175,11 @@ platform/model provenance choice.
 
 ## Ordinary ChatGPT or Claude, without MCP
 
-Interview mode shows a large **Copy prompt** clipboard button beside the microphone.
-It copies the request directly without opening the preview. The **Prompt** button
-beneath the clipboard expands a full-width card with the instruction, then
-collapses it again. The card starts hidden; its **Copy and paste this prompt
-(into Claude or ChatGPT) to augment interview** heading and enlarged top-right
-clipboard also copy the same request. A question-mark tooltip to the left of **Prompt** explains:
+Interview mode displays a **Copy and paste this prompt (into Claude or ChatGPT)
+to augment interview** footer card beneath the microphone. Clicking its heading
+or enlarged top-right clipboard copies the request without opening the preview.
+The **Prompt** dropdown inside the card expands the instruction and collapses it
+again; the preview starts collapsed. A question-mark tooltip to the left of **Prompt** explains:
 “Allows your agent to predict your responses and raise better interview questions.”
 The tooltip is available on hover and keyboard focus. The copied request begins:
 
@@ -257,9 +255,9 @@ The account used at final normal submission owns the response. If an older
 packet contains context facts but not responses, the session AI mapping lane
 still converts those facts into drafts.
 
-The expanded prompt card fills the row beneath the two circular controls, keeping
-its copy heading and preview inside one bordered card. After an interview, the
-separate **Transcript** disclosure appears below these controls.
+The **Transcript** and prompt footer cards share one row. Without a transcript,
+the prompt card fills the row, including when expanded. The heading, copy icon,
+dropdown, help tooltip and preview remain inside the same bordered card.
 
 In the full question list, rating sliders update locally during a drag and save
 the final value on release. Loaded lists retain the Questions label during
