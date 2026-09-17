@@ -3800,6 +3800,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
     .reportSettingsToggle { appearance: none; background: transparent; border: 0; box-shadow: none; color: inherit; cursor: pointer; line-height: 1; margin-right: 10px; padding: 4px; }
     .reportSettingsToggle:hover, .reportSettingsToggle:focus-visible { background: transparent; border: 0; box-shadow: none; }
     .reportSettingsToggle:hover { opacity: 0.72; }
+    .reportSettingsToggle:focus:not(:focus-visible) { outline: none; }
     .reportSettingsToggle:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
     .demoToggleLabel { font-size: 0.9rem; color: #555; cursor: pointer; }
     .demoToggleCheckbox { margin-right: 5px; cursor: pointer; }
