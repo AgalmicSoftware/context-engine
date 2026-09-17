@@ -76488,12 +76488,27 @@ var dispatchResourcePresenceRequest = async ({
   const corsContext = await deps?.getCorsContext?.({ request, config });
   if (!corsContext?.ok) return corsContext?.response;
   const secrets = await deps?.getSessionSecrets?.(env, slug) || {};
+  let interview;
+  if (request?.url && new URL(request.url).searchParams.get("interview") === "1") {
+    const settings = config.interviewMode || config.interview || {};
+    let reason = "";
+    if (resolveSessionLifecycle(config).ended) reason = "This session has ended.";
+    else if (config.interviewModeEnabled === false || settings.enabled === false) reason = "Interview mode is disabled for this session.";
+    else if (String(settings.provider || "openai").trim().toLowerCase() !== "openai") reason = "Voice interviews require the OpenAI provider.";
+    else if (!String(secrets.openaiKey || "").trim()) reason = "The session owner needs to configure an OpenAI key for voice interviews.";
+    else {
+      const access = await deps?.evaluateAnonymousRouteAccess?.({ slug, config, route: "realtime" });
+      if (!access?.ok) reason = "Voice interview access is unavailable. Ask the session owner to check AI access settings.";
+    }
+    interview = { ready: !reason, ...reason ? { reason } : {} };
+  }
   return deps?.json?.(
     {
       ok: true,
       sessionSlug: slug,
       // Presence is intentionally resource-level only; never expose secret names or values.
-      resources: buildSponsoredResourcePresence(secrets)
+      resources: buildSponsoredResourcePresence(secrets),
+      ...interview ? { interview } : {}
     },
     200,
     corsContext.headers
@@ -76903,6 +76918,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
             getSessionConfig: deps?.getSessionConfig,
             getCorsContext: deps?.getCorsContext,
             getSessionSecrets: deps?.getSessionSecrets,
+            evaluateAnonymousRouteAccess: deps?.evaluateAnonymousRouteAccess,
             json: deps?.json
           },
           constants: {
