@@ -43,6 +43,9 @@ Session creators can change the model in `/new` under **Optional details**
 
 The Interview header shows a colored pill with its status always visible: Ready,
 Connecting, Listening, Paused, Ending, Preparing drafts, Review drafts, or Error.
+The pill itself carries the status color without a separate dot. The header
+shares the dialog background, and its close icon is half-opacity until hovered
+or keyboard-focused.
 Green readiness requires a reachable Worker that confirms an OpenAI key, voice
 provider, and session access, plus browser microphone support and no known
 permission denial. This setup check does not call OpenAI or request microphone
@@ -176,7 +179,7 @@ Interview mode displays a **Copy and paste this prompt (into Claude or ChatGPT)
 to augment interview** card. Clicking that text or the top-right clipboard icon
 copies the same explicit user request without opening the preview. The **Prompt**
 button expands the exact instruction inside the card and collapses it again;
-the preview starts collapsed. A question-mark tooltip beside **Prompt** explains:
+the preview starts collapsed. A question-mark tooltip to the left of **Prompt** explains:
 “Allows your agent to predict your responses and raise better interview questions.”
 The tooltip is available on hover and keyboard focus. The copied request begins:
 

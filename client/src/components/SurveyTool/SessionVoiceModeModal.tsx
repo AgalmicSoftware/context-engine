@@ -594,7 +594,6 @@ function SessionInterviewPanel({
               onClick={idle ? readiness.retry : undefined}
               aria-label={`Interview status: ${statusLabel}`}
             >
-              <span className={styles.sessionInterviewStatusDot} data-tone={statusTone} aria-hidden="true" />
               <span>{statusLabel}</span>
             </button>
           </span>
@@ -796,6 +795,14 @@ function SessionInterviewPanel({
                 <div className={styles.sessionAgentKickoffActions}>
                   <button
                     type="button"
+                    id="ce-interview-agent-prompt-help"
+                    className={styles.sessionInterviewHeaderButton}
+                    aria-label="About the interview prompt"
+                  >
+                    <FontAwesomeIcon icon={faQuestionCircle} />
+                  </button>
+                  <button
+                    type="button"
                     className={styles.sessionAgentKickoffToggle}
                     onClick={() => setShowAgentPrompt((current) => !current)}
                     aria-expanded={showAgentPrompt}
@@ -809,14 +816,6 @@ function SessionInterviewPanel({
                         showAgentPrompt ? styles.sessionAgentKickoffCaretExpanded : ''
                       }`}
                     />
-                  </button>
-                  <button
-                    type="button"
-                    id="ce-interview-agent-prompt-help"
-                    className={styles.sessionInterviewHeaderButton}
-                    aria-label="About the interview prompt"
-                  >
-                    <FontAwesomeIcon icon={faQuestionCircle} />
                   </button>
                   <UncontrolledTooltip
                     target="ce-interview-agent-prompt-help"
