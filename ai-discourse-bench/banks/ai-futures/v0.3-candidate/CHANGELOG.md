@@ -3,7 +3,7 @@
 ## 0.3.0-candidate.1 (2026-09-06)
 
 - New 1000-item hand-authored bank built from `authoring/*.jsonl` by
-  `scripts/build-v03-candidate-bank.mjs` under the v0.3 item design contract.
+  [the candidate bank builder](../../../scripts/build-v03-candidate-bank.mjs) under the v0.3 item design contract.
 - 34 topics: eight `agent-*` topics (250 items, the human-agent norms track)
   plus 26 AI-futures topics and a `controls-and-attention-checks` topic.
 - Every item is a tradeoff, threshold, forecast, scenario, comparison, or

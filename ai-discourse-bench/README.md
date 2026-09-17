@@ -107,7 +107,7 @@ comparison; canonical direction is balanced per topic; items carry a role
 (`probe`, `self-referential`, `minority`, `control-anchor`, `attention-check`)
 and paraphrases under `v03`. The current harness runs it unchanged (the `v03`
 fields are ignored). Design rationale, methodology changes, and the slice plan
-are summarized in `docs/methodology.md`. Like v0.2, it is `candidate` until
+are summarized in [the methodology](docs/methodology.md). Like v0.2, it is `candidate` until
 two independent human reviews are recorded.
 
 Before launching calls, inspect the experiment plan:
