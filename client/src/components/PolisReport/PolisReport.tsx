@@ -2240,6 +2240,7 @@ export default function PolisReport({
         <button
           type="button"
           className={styles.reportSettingsToggle}
+          data-ce-control-appearance="frameless"
           data-testid={E2E_TESTIDS.POLIS_SETTINGS_TOGGLE}
           aria-label={showSettingsRow ? 'Hide report settings' : 'Show report settings'}
           onClick={() => setShowSettingsRow(!showSettingsRow)}
