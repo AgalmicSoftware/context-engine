@@ -324,10 +324,16 @@ describe('SessionVoiceModeModal', () => {
 
   it('offers the two large requested voice-mode choices', () => {
     render(<SessionVoiceModeModal {...baseProps} />);
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_INTERVIEW)).toHaveTextContent(
+      'One person. A voice interviewer drafts responses and may suggest new questions for review.',
+    );
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_INTERVIEW));
     expect(baseProps.onSelectMode).toHaveBeenCalledWith('interview');
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_GROUP));
     expect(baseProps.onSelectMode).toHaveBeenCalledWith('recordGroup');
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(baseProps.onClose).toHaveBeenCalledTimes(1);
   });
 
   it('opens Group Conversation directly for recordGroup mode', () => {

@@ -8,7 +8,7 @@ import SessionInterviewResearchConsent from './SessionInterviewResearchConsent';
 import type { GeneratedSurveyStatement } from './SurveyGenerator/surveyGeneratorHelpers';
 import { useInterviewOpening } from './useInterviewOpening';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Input, Label, Modal, ModalBody, ModalFooter, ModalHeader, UncontrolledTooltip } from 'reactstrap';
+import { Button, Input, Label, Modal, ModalBody, ModalHeader, UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faCaretDown,
@@ -985,7 +985,9 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
                 >
                   <FontAwesomeIcon icon={faMicrophone} />
                   <strong>Interview</strong>
-                  <span>One person. A voice interviewer generates reviewable response drafts.</span>
+                  <span>
+                    One person. A voice interviewer drafts responses and may suggest new questions for review.
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -1003,13 +1005,6 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
           </ModalBody>
         </>
       )}
-      {!mode ? (
-        <ModalFooter>
-          <Button outline onClick={onClose}>
-            Cancel
-          </Button>
-        </ModalFooter>
-      ) : null}
     </Modal>
   );
 }

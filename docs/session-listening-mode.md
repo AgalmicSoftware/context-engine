@@ -2,7 +2,7 @@
 
 The microphone on `/session/<slug>` opens a modal with two participant workflows:
 
-- **Interview** — one responder speaks with a realtime interviewer. Context Engine maps the completed responder transcript into reviewable response drafts.
+- **Interview** — one responder speaks with a realtime interviewer. Context Engine maps the completed responder transcript into reviewable response drafts and may suggest new questions for review.
 - **Group Conversation** — records a discussion, creates a rolling transcript, and generates reviewable question drafts.
 
 The session links are:
@@ -13,7 +13,9 @@ The session links are:
 ```
 
 The direct links open the selected modal panel. Clicking the microphone without
-a mode query opens the two-choice launcher. The older
+a mode query opens the two-choice launcher. Its cards sit side by side with
+centered icons; the header close button dismisses it without a separate footer.
+The older
 `?mode=listening` link remains supported and opens the original pile-adjacent
 group recorder.
 

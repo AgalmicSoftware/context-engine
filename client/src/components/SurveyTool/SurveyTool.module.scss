@@ -3297,11 +3297,12 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .sessionVoiceModeChooser {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
+  gap: 12px;
 
   button {
     min-height: 220px;
-    padding: 28px;
+    min-width: 0;
+    padding: clamp(14px, 3vw, 28px);
     border: 1px solid var(--ce-card-border);
     border-radius: var(--ce-radius-8);
     background: var(--ce-card-bg);
@@ -3309,10 +3310,10 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     box-shadow: var(--ce-card-shadow);
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    justify-content: center;
+    align-items: center;
+    justify-content: flex-start;
     gap: 14px;
-    text-align: left;
+    text-align: center;
     cursor: pointer;
   }
 
@@ -3331,14 +3332,19 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 
   svg {
+    flex-shrink: 0;
     font-size: 2.4rem;
   }
 
   strong {
-    font-size: 1.5rem;
+    max-width: 100%;
+    font-size: clamp(1.05rem, 2.6vw, 1.5rem);
+    line-height: 1.25;
+    overflow-wrap: anywhere;
   }
 
   span {
+    font-size: clamp(0.9rem, 2vw, 1rem);
     line-height: 1.45;
   }
 }
@@ -4196,14 +4202,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 @media (max-width: 700px) {
-  .sessionVoiceModeChooser {
-    grid-template-columns: 1fr;
-
-    button {
-      min-height: 150px;
-    }
-  }
-
   .sessionInterviewDraft {
     padding: 12px 42px 12px 12px;
   }
