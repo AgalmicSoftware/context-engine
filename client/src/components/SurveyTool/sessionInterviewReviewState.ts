@@ -30,14 +30,21 @@ export function mergeInterviewReview(
     }
     draft.revisions = revisions;
     let reviewed = { ...draft };
+    const userEditedFields = new Set(edited[draft.questionId]?.userEditedFields || []);
     if (prior && edited[draft.questionId]) {
       // Refresh AI-owned fields, but keep every field the responder changed during review.
       for (const field of ['answer', 'additionalComments', 'importance', 'conviction'] as const) {
-        if (JSON.stringify(edited[draft.questionId][field]) !== JSON.stringify(prior[field])) {
+        if (
+          userEditedFields.has(field) ||
+          JSON.stringify(edited[draft.questionId][field]) !== JSON.stringify(prior[field])
+        ) {
+          userEditedFields.add(field);
           reviewed = { ...reviewed, [field]: edited[draft.questionId][field] };
         }
       }
     }
+    // An AI prediction agreeing with an edit must not give later predictions ownership of that field.
+    if (userEditedFields.size) reviewed.userEditedFields = [...userEditedFields];
     drafts.set(draft.questionId, draft);
     nextEdited[draft.questionId] = reviewed;
     if (!(draft.questionId in nextSelected)) nextSelected[draft.questionId] = isInitiallySelected(draft.questionId);

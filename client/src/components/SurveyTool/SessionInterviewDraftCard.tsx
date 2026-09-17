@@ -50,8 +50,12 @@ export default function SessionInterviewDraftCard({
   const percent = Math.round(Math.max(0, Math.min(1, draft.confidence || 0)) * 100);
   const confidenceLabel = percent < 40 ? 'Weak inference' : percent < 70 ? 'Moderate support' : 'Strong support';
   const comments = edited.additionalComments || '';
-  const answerIsAgentDraft = JSON.stringify(edited.answer) === JSON.stringify(draft.answer);
-  const commentsAreAgentDraft = Boolean(draft.additionalComments) && comments === draft.additionalComments;
+  const answerIsAgentDraft =
+    !edited.userEditedFields?.includes('answer') && JSON.stringify(edited.answer) === JSON.stringify(draft.answer);
+  const commentsAreAgentDraft =
+    !edited.userEditedFields?.includes('additionalComments') &&
+    Boolean(draft.additionalComments) &&
+    comments === draft.additionalComments;
   const onAnswerChange = (answer: unknown) => onEdit({ answer });
   const onCommentsChange = (additionalComments: string) => {
     setCommentsEdited(true);
@@ -132,7 +136,8 @@ export default function SessionInterviewDraftCard({
           {showComments ? (
             <div className={styles.pileCommentsRow}>
               <div className={styles.pileAdditionalEditor}>
-                {comments && (commentsAreAgentDraft || commentsEdited) ? (
+                {comments &&
+                (commentsAreAgentDraft || commentsEdited || edited.userEditedFields?.includes('additionalComments')) ? (
                   <p className={styles.sessionInterviewFieldOrigin}>
                     <strong>{commentsAreAgentDraft ? 'Agent:' : 'User:'}</strong>{' '}
                     {commentsAreAgentDraft ? 'Auto-filled comments' : 'Edited comments'}

@@ -318,3 +318,7 @@ unsupported sampling parameters. GPT-Live remains the voice interviewer. See
 Mapping targets roughly ten seconds for ordinary interviews, but latency depends
 on transcript length, number of drafts, and provider load; it is not a deadline
 that discards partial work.
+
+Continued interviews retain user-edited fields even when an intermediate AI
+prediction agrees with the edit. A valid imported prefill is checked against the
+question bank once; later question additions can be included in the ongoing interview.

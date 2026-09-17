@@ -150,6 +150,7 @@ function SessionInterviewPanel({
 }: SessionInterviewPanelProps) {
   const disposedRef = useRef(false);
   const importedRef = useRef(false);
+  const validatedPrefillRef = useRef<InterviewPrefillPacket | null>(null);
   const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [resolvedWorkerUrl, setResolvedWorkerUrl] = useState(workerUrl);
   const readiness = useInterviewReadiness(resolvedWorkerUrl, sessionSlug);
@@ -277,7 +278,7 @@ function SessionInterviewPanel({
       setMappingNotice('');
       setStatus('Preparing drafts');
       try {
-        if (prefillPacket?.questionSetHash) {
+        if (prefillPacket?.questionSetHash && validatedPrefillRef.current !== prefillPacket) {
           const currentQuestionSetHash = await hashInterviewQuestions(questions);
           if (disposedRef.current) return;
           if (currentQuestionSetHash !== prefillPacket.questionSetHash) {
@@ -285,6 +286,8 @@ function SessionInterviewPanel({
               'This prefill link was created for an older or different question set. Ask the AI for a fresh link.',
             );
           }
+          // Validate imported evidence once; later additions must not block continued interviews.
+          validatedPrefillRef.current = prefillPacket;
         }
         const importedDrafts = nextTranscript.trim()
           ? null
@@ -788,7 +791,8 @@ function SessionInterviewPanel({
                     void copyAgentPrompt();
                   }}
                 >
-                  Copy and paste this prompt (into Claude or ChatGPT) to augment interview – allows your agent to predict your responses
+                  Copy and paste this prompt (into Claude or ChatGPT) to augment interview – allows your agent to
+                  predict your responses
                 </button>
                 <button
                   type="button"

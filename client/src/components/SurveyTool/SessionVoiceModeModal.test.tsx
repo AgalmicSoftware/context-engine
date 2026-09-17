@@ -174,6 +174,7 @@ describe('SessionVoiceModeModal', () => {
           version: 1,
           sessionSlug: 'demo',
           source: { platform: 'other', modelId: 'unknown', verification: 'self_reported' },
+          responderContext: {},
           responses: [{ questionId: 'q1', answer: 'Agent draft', confidence: 0.8 }],
         }}
       />,
@@ -393,7 +394,11 @@ describe('SessionVoiceModeModal', () => {
     expect(copyButton).toHaveTextContent('');
     expect(screen.queryByText('Copy prompt')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Copy and paste this prompt (into Claude or ChatGPT) to augment interview – allows your agent to predict your responses' }));
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Copy and paste this prompt (into Claude or ChatGPT) to augment interview – allows your agent to predict your responses',
+      }),
+    );
     await waitFor(() =>
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
         expect.stringContaining('review-only Context Engine interview prefill'),
@@ -1000,6 +1005,39 @@ describe('Interview cancellation and recovery', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
     expect(await screen.findByRole('alert')).toHaveTextContent('Allow microphone access');
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toBeEnabled();
+  });
+
+  it('continues a validated prefill when new questions arrive during the interview', async () => {
+    sessionMock();
+    mockedHashInterviewQuestions.mockResolvedValue('a'.repeat(64));
+    const prefillPacket = {
+      version: 1 as const,
+      sessionSlug: 'demo',
+      questionSetHash: 'a'.repeat(64),
+      source: { platform: 'other' as const, modelId: 'fixture', verification: 'self_reported' as const },
+      responderContext: {},
+      responses: [{ questionId: 'q1', answer: 'Imported answer', confidence: 0.8 }],
+    };
+    const view = render(<SessionVoiceModeModal {...baseProps} mode="interview" prefillPacket={prefillPacket} />);
+    await screen.findByDisplayValue('Imported answer');
+    mockedHashInterviewQuestions.mockResolvedValue('b'.repeat(64));
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([
+      { questionId: 'q2', answer: 'Newly answered', confidence: 0.8 },
+    ]);
+    view.rerender(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        prefillPacket={prefillPacket}
+        questionPool={[...baseProps.questionPool, { id: 'q2', prompt: 'New question?', type: 'freeform' }]}
+      />,
+    );
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    await screen.findByLabelText('Pause interview');
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
+    expect(await screen.findByDisplayValue('Newly answered')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Imported answer')).toBeInTheDocument();
+    expect(mockedHashInterviewQuestions).toHaveBeenCalledTimes(1);
   });
 
   it('continues the transcript across interviews and preserves edits, removed drafts, and unmatched answers', async () => {

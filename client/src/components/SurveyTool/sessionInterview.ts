@@ -78,6 +78,7 @@ export type InterviewPredictionRevision = {
 export type InterviewDraftResponse = {
   questionId: string;
   revisions?: InterviewPredictionRevision[];
+  userEditedFields?: Array<'answer' | 'additionalComments' | 'importance' | 'conviction'>;
   answer: unknown;
   additionalComments?: string;
   importance?: number;
