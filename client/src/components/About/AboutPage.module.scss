@@ -14,6 +14,15 @@ $modal-border: var(--ce-card-border);
 $modal-shadow: var(--ce-card-shadow);
 $modal-text: var(--ce-panel-text);
 $modal-muted: var(--ce-panel-text-muted);
+$logo-light-bg: var(--ce-text-inverse);
+$logo-dark-bg: var(--ce-overlay-surface);
+$related-pill-border: color-mix(in srgb, var(--ce-status-info) 45%, var(--ce-text-inverse));
+$related-pill-bg: color-mix(in srgb, var(--ce-status-info-text) 82%, var(--ce-text-inverse));
+$related-pill-text: color-mix(in srgb, var(--ce-overlay-surface) 78%, var(--ce-status-info));
+$modal-close-text: var(--ce-text-inverse);
+$modal-cta-bg: var(--ce-action-submit);
+$modal-cta-hover-bg: var(--ce-action-submit-hover);
+$modal-cta-text: var(--ce-action-submit-text);
 
 .aboutPageContainer {
   position: relative;
@@ -676,14 +685,14 @@ $modal-muted: var(--ce-panel-text-muted);
 .practicePartnerLogos {
   width: 96px;
   grid-template-rows: 1fr 1fr;
-  background: #fff;
+  background: $logo-light-bg;
   padding: 6px;
   box-sizing: border-box;
 
   img {
     min-height: 0;
     padding: 3px;
-    background: #fff;
+    background: $logo-light-bg;
   }
 }
 
@@ -691,12 +700,12 @@ $modal-muted: var(--ce-panel-text-muted);
   width: 112px;
 
   img {
-    background: #fff;
+    background: $logo-light-bg;
   }
 }
 
 .practiceWordmarkDark img {
-  background: #17213c;
+  background: $logo-dark-bg;
 }
 
 .recognitionSubheading {
@@ -782,10 +791,10 @@ $modal-muted: var(--ce-panel-text-muted);
   align-items: center;
   width: fit-content;
   padding: 4px 9px;
-  border: 1px solid #9acbf3;
+  border: 1px solid $related-pill-border;
   border-radius: 999px;
-  background: #b8ddfa;
-  color: #163453;
+  background: $related-pill-bg;
+  color: $related-pill-text;
   font-size: 0.9rem;
   font-weight: 600;
   line-height: 1.3;
@@ -1254,7 +1263,7 @@ button.recognitionModalCloseButton {
   margin-left: 12px;
   border: 0;
   background: transparent;
-  color: #fff;
+  color: $modal-close-text;
   box-shadow: none;
   display: inline-flex;
   align-items: center;
@@ -1270,7 +1279,7 @@ button.recognitionModalCloseButton {
   &:hover,
   &:focus {
     background: transparent;
-    color: #fff;
+    color: $modal-close-text;
     box-shadow: none;
   }
 
@@ -1340,14 +1349,14 @@ button.recognitionModalCloseButton {
 
 @container ce-theme style(--ce-layout-profile: standard-app) {
   .recognitionModalLink {
-    background: #285fc7;
+    background: $modal-cta-bg;
     border-color: var(--ce-status-info);
-    color: #fff;
+    color: $modal-cta-text;
 
     &:hover,
     &:focus {
-      background: #3474df;
-      color: #fff;
+      background: $modal-cta-hover-bg;
+      color: $modal-cta-text;
     }
   }
 }
