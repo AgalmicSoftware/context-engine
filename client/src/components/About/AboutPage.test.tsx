@@ -45,16 +45,16 @@ describe('AboutPage', () => {
       const categories = screen.getByTestId('ce-about-use-cases');
       const scrollIntoView = jest.fn();
       categories.scrollIntoView = scrollIntoView;
-      fireEvent.click(screen.getByRole('button', { name: 'Uses', exact: true }));
+      fireEvent.click(screen.getByRole('button', { name: /^Uses$/ }));
       expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
       resize(754, 1000);
-      expect(screen.queryByRole('button', { name: 'Uses', exact: true })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^Uses$/ })).not.toBeInTheDocument();
       resize(474, 803);
-      expect(screen.queryByRole('button', { name: 'Uses', exact: true })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^Uses$/ })).not.toBeInTheDocument();
       resize(1280, 803);
-      expect(screen.queryByRole('button', { name: 'Uses', exact: true })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^Uses$/ })).not.toBeInTheDocument();
       resize(754, 803);
-      expect(screen.getByRole('button', { name: 'Uses', exact: true })).toBeVisible();
+      expect(screen.getByRole('button', { name: /^Uses$/ })).toBeVisible();
     } finally {
       rect.mockRestore();
       window.innerWidth = originalWidth;
