@@ -317,6 +317,65 @@ describe('DebateMap', () => {
     ).toBeTruthy();
   });
 
+  it('renders explicit generated tree data read-only without fixture metrics or demo controls', () => {
+    render(
+      <MemoryRouter>
+        <DebateMapComponent
+          activeSessionSlug="generated-session"
+          atlasRootLabel="Session Results Atlas"
+          hideDemoModeToggle={true}
+          readOnly={true}
+          treeData={[
+            {
+              id: 'generated-topic',
+              name: 'Generated Session Topic',
+              votes: { up: 42, down: 3 },
+              comments: [{ id: 'generated-summary', comment: 'Generated evidence summary.' }],
+              children: [
+                {
+                  id: 'generated-claim',
+                  name: 'Generated Session Claim',
+                  votes: { up: 12, down: 6 },
+                },
+              ],
+            },
+          ]}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText('Generated Session Topic')).toBeInTheDocument();
+    expect(screen.queryByText('AI Safety')).not.toBeInTheDocument();
+    expect(screen.queryByText('Top Debates')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Demo Mode/i)).not.toBeInTheDocument();
+
+    fireEvent.click(getDebateViewModeButton('list'));
+    expect(screen.queryByLabelText(/Order by Upvotes/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('42')).not.toBeInTheDocument();
+
+    fireEvent.click(getDebateViewModeButton('tree'));
+    fireEvent.click(screen.getByRole('button', { name: 'Generated Session Topic' }));
+    expect(screen.queryByText('12')).not.toBeInTheDocument();
+
+    fireEvent.click(getDebateViewModeButton('circles'));
+    fireEvent.click(getAtlasNodeElementById('generated-topic', 'packed') as HTMLElement);
+    fireEvent.click(screen.getByLabelText('Open Generated Session Topic'));
+    expect(screen.getByRole('heading', { name: 'Generated Session Topic' })).toBeInTheDocument();
+    expect(screen.queryByTitle('Cast Upvotes')).not.toBeInTheDocument();
+    expect(screen.queryByText('42')).not.toBeInTheDocument();
+  });
+
+  it('does not fall back to demo fixtures for explicit empty generated tree data', () => {
+    render(
+      <MemoryRouter>
+        <DebateMapComponent hideDemoModeToggle={true} readOnly={true} treeData={[]} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByText('AI Safety')).not.toBeInTheDocument();
+    expect(screen.queryAllByTestId(E2E_TESTIDS.ATLAS_NODE)).toHaveLength(0);
+  });
+
   it('uses a native close button for the suggestion dialog', async () => {
     const user = userEvent.setup();
     render(
@@ -923,6 +982,19 @@ describe('DebateMap', () => {
     expect(topLevelSize).toBeGreaterThanOrEqual(32);
     expect(topLevelSize).toBeGreaterThan(childSize);
     expect(childSize).toBeGreaterThan(leafSize);
+  });
+
+  it('fits compact packed labels to small visible circle diameters', () => {
+    const generatedSmallTopLevelSize = getPackedAtlasLabelFontSizePxAny(
+      { hierarchyDepth: 1, isCenter: false },
+      120,
+      true,
+    );
+    const compactChildSize = getPackedAtlasLabelFontSizePxAny({ hierarchyDepth: 2, isCenter: false }, 96, true);
+
+    expect(generatedSmallTopLevelSize).toBeLessThanOrEqual(11);
+    expect(generatedSmallTopLevelSize).toBeGreaterThanOrEqual(10);
+    expect(compactChildSize).toBeLessThanOrEqual(10);
   });
 
   it('lifts drilled packed circles upward when invisible root slack leaves too much empty space', () => {

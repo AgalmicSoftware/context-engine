@@ -6,6 +6,11 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp, faExternalLinkAlt, faNetworkWired } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './RiskMatrix.module.scss';
+import RiskMatrixGeneratedSeverity, {
+  type RiskMatrixSeverityAssessment,
+  type RiskMatrixSeverityAxes,
+  type RiskSeverityLevel,
+} from './RiskMatrixGeneratedSeverity';
 import {
   getRiskMatrixAtlasScenarioCountForCell,
   getRiskMatrixAtlasScenariosForCell,
@@ -44,14 +49,20 @@ export type RiskMatrixRestoreState = {
   activeSubcategoryY?: string | null;
 };
 
-type RiskCategory = {
+export type RiskCategory = {
   name: string;
   subcategories: string[];
 };
 
 type RiskMatrixProps = {
+  categories?: RiskCategory[] | null;
+  commentEyebrow?: string;
   embedded?: boolean;
+  generatedSeverityAssessments?: RiskMatrixSeverityAssessment[] | null;
+  generatedSeverityAxes?: RiskMatrixSeverityAxes | null;
+  initialComments?: RiskCommentRecord[] | null;
   onOpenAtlasNode?: ((nodeId: string, restoreState?: RiskMatrixRestoreState) => void) | null;
+  readOnly?: boolean;
   restoreState?: RiskMatrixRestoreState | null;
   onRestoreApplied?: (() => void) | null;
 };
@@ -117,6 +128,7 @@ export const RISK_MATRIX_CATEGORIES: RiskCategory[] = [
 const DEFAULT_VALENCE: RiskValence = 'opportunity';
 const DEFAULT_INTENSITY = 5;
 const VALID_VALENCES = new Set(['opportunity', 'risk']);
+const SEVERITY_LEVELS: RiskSeverityLevel[] = ['low', 'medium', 'high'];
 
 const clsx = (...args: Array<string | false | null | undefined>) => args.filter(Boolean).join(' ');
 
@@ -235,9 +247,17 @@ const getCommentsForCellRecords = (cellId: string, comments: RiskCommentRecord[]
 const hasRestoreState = (restoreState: RiskMatrixRestoreState | null | undefined) =>
   Boolean(restoreState && typeof restoreState === 'object' && Object.keys(restoreState).length > 0);
 
-const buildInitialRiskMatrixState = (restoreState: RiskMatrixRestoreState | null | undefined): RiskMatrixState => {
+const normalizeRiskMatrixComments = (comments: unknown): RiskCommentRecord[] =>
+  Array.isArray(comments) ? comments.filter(isValidCommentRecord).map(normalizeCommentRecord).map(enrichRiskMatrixCommentRecord) : [];
+
+const buildInitialRiskMatrixState = (
+  restoreState: RiskMatrixRestoreState | null | undefined,
+  initialComments: RiskCommentRecord[] | null | undefined = null,
+): RiskMatrixState => {
   const nextComments = Array.isArray(restoreState?.comments)
     ? restoreState.comments.filter(isValidCommentRecord).map(normalizeCommentRecord).map(enrichRiskMatrixCommentRecord)
+    : Array.isArray(initialComments)
+      ? normalizeRiskMatrixComments(initialComments)
     : INITIAL_COMMENTS;
   const rawSelectedCellId = String(restoreState?.selectedCellId || '').trim();
   const selectedCellId =
@@ -284,7 +304,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
   constructor(props: RiskMatrixProps) {
     super(props);
 
-    this.state = buildInitialRiskMatrixState(props.restoreState);
+    this.state = buildInitialRiskMatrixState(props.restoreState, props.initialComments);
   }
 
   componentDidMount() {
@@ -293,6 +313,35 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
       onRestoreApplied();
     }
   }
+
+  componentDidUpdate(prevProps: RiskMatrixProps) {
+    if (prevProps.initialComments === this.props.initialComments || hasRestoreState(this.props.restoreState)) return;
+    const comments = normalizeRiskMatrixComments(this.props.initialComments);
+    if (comments.length === 0 && !Array.isArray(this.props.initialComments)) return;
+    this.setState({
+      comments,
+      heatmap: buildHeatmapFromComments(comments),
+      existingComments: this.getCommentsForCell(this.state.selectedCellId, comments),
+    });
+  }
+
+  getCategories = (): RiskCategory[] =>
+    Array.isArray(this.props.categories) ? this.props.categories : RISK_MATRIX_CATEGORIES;
+
+  getGeneratedSeverityAssessments = (): RiskMatrixSeverityAssessment[] =>
+    Array.isArray(this.props.generatedSeverityAssessments)
+      ? this.props.generatedSeverityAssessments.filter(
+          (entry) =>
+            entry &&
+            typeof entry === 'object' &&
+            ((typeof entry.xLevelId === 'string' && entry.xLevelId.trim() &&
+              typeof entry.yLevelId === 'string' && entry.yLevelId.trim()) ||
+              (SEVERITY_LEVELS.includes(entry.likelihood as RiskSeverityLevel) &&
+                SEVERITY_LEVELS.includes(entry.impact as RiskSeverityLevel))) &&
+            typeof entry.summary === 'string' &&
+            entry.summary.trim(),
+        )
+      : [];
 
   closeModal = () => {
     this.setState({
@@ -500,7 +549,8 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
 
   renderMainGrid = () => {
     const { activeCategoryX, activeCategoryY, hoveredColIndex, hoveredRowIndex } = this.state;
-    const numCategories = RISK_MATRIX_CATEGORIES.length;
+    const categories = this.getCategories();
+    const numCategories = categories.length;
 
     return (
       <section className={styles.sectionCard}>
@@ -516,7 +566,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
               <span>Y / X</span>
             </div>
 
-            {RISK_MATRIX_CATEGORIES.map((catX, index) => (
+            {categories.map((catX, index) => (
               <button
                 key={`header-x-${catX.name}`}
                 type="button"
@@ -535,7 +585,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
               </button>
             ))}
 
-            {RISK_MATRIX_CATEGORIES.map((catY, rowIndex) => (
+            {categories.map((catY, rowIndex) => (
               <React.Fragment key={`row-${catY.name}`}>
                 <button
                   type="button"
@@ -553,7 +603,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
                   {catY.name}
                 </button>
 
-                {RISK_MATRIX_CATEGORIES.map((catX, colIndex) => {
+                {categories.map((catX, colIndex) => {
                   const isDiagonal = rowIndex === colIndex;
                   const cellValue = isDiagonal ? 0 : this.getCellValue(catY.name, catX.name);
                   const selectedCellId = `${catX.name}_vs_${catY.name}`;
@@ -614,8 +664,9 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
   renderSubcategorySelectors = () => {
     const { activeCategoryX, activeCategoryY, activeSubcategoryX, activeSubcategoryY } = this.state;
 
-    const categoryX = RISK_MATRIX_CATEGORIES.find((cat) => cat.name === activeCategoryX);
-    const categoryY = RISK_MATRIX_CATEGORIES.find((cat) => cat.name === activeCategoryY);
+    const categories = this.getCategories();
+    const categoryX = categories.find((cat) => cat.name === activeCategoryX);
+    const categoryY = categories.find((cat) => cat.name === activeCategoryY);
 
     if (!categoryX || !categoryY) return null;
 
@@ -692,8 +743,9 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
       hoveredSubRowIndex,
     } = this.state;
 
-    const categoryX = RISK_MATRIX_CATEGORIES.find((cat) => cat.name === activeCategoryX);
-    const categoryY = RISK_MATRIX_CATEGORIES.find((cat) => cat.name === activeCategoryY);
+    const categories = this.getCategories();
+    const categoryX = categories.find((cat) => cat.name === activeCategoryX);
+    const categoryY = categories.find((cat) => cat.name === activeCategoryY);
 
     if (!categoryX || !categoryY) return null;
     const activeCategoryXKey = activeCategoryX || '';
@@ -818,8 +870,9 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
 
   renderCommentComposer = () => {
     const { comment, intensity, selectedCellId, valence } = this.state;
+    const { readOnly = false } = this.props;
 
-    if (isAggregateCellId(selectedCellId)) return null;
+    if (readOnly || isAggregateCellId(selectedCellId)) return null;
 
     return (
       <div className={styles.modalComposer}>
@@ -1010,6 +1063,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
 
     const isOpen = this.state.openCommentGroups[valence] !== false;
     const listId = `ce-risk-matrix-comment-list-${valence}`;
+    const commentEyebrow = this.props.commentEyebrow || 'Seeded note';
 
     return (
       <section
@@ -1055,7 +1109,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
                     <div className={styles.commentHeader}>
                       <div className={styles.commentHeaderMain}>
                         <span className={styles.commentEyebrow}>
-                          {isAggregateSelection ? 'Sub-overlap' : 'Seeded note'}
+                          {isAggregateSelection ? 'Sub-overlap' : commentEyebrow}
                         </span>
                         <h5 className={styles.commentCardTitle}>
                           {isAggregateSelection
@@ -1126,9 +1180,10 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
 
   renderModal = () => {
     const { comment, existingComments, modal, selectedCellId } = this.state;
+    const { readOnly = false } = this.props;
 
     const isAggregateSelection = isAggregateCellId(selectedCellId);
-    const canSaveComment = !isAggregateSelection && comment.trim().length > 0;
+    const canSaveComment = !readOnly && !isAggregateSelection && comment.trim().length > 0;
     const modalTitle = formatSelectionTitle(selectedCellId);
     const atlasScenarios = getRiskMatrixAtlasScenariosForCell(selectedCellId) as RiskMatrixAtlasScenario[];
     const commentsLabel = existingComments.length === 1 ? '1 note' : `${existingComments.length} notes`;
@@ -1182,7 +1237,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
             >
               Close
             </button>
-            {!isAggregateSelection && (
+            {!readOnly && !isAggregateSelection && (
               <button
                 type="button"
                 className={clsx(styles.modalButton, styles.modalButtonPrimary)}
@@ -1202,15 +1257,25 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
   render() {
     const { activeCategoryX, activeCategoryY } = this.state;
     const { embedded = false } = this.props;
+    const generatedSeverityAssessments = this.getGeneratedSeverityAssessments();
 
     return (
       <div className={clsx(styles.container, embedded && styles.embedded)} data-testid="ce-risk-matrix">
         <div className={styles.shell}>
-          {this.renderMainGrid()}
-          {activeCategoryX && activeCategoryY && this.renderSubGrid()}
+          {generatedSeverityAssessments.length > 0 ? (
+            <RiskMatrixGeneratedSeverity
+              assessments={generatedSeverityAssessments}
+              axes={this.props.generatedSeverityAxes || null}
+            />
+          ) : (
+            <>
+              {this.renderMainGrid()}
+              {activeCategoryX && activeCategoryY && this.renderSubGrid()}
+            </>
+          )}
         </div>
 
-        {this.renderModal()}
+        {generatedSeverityAssessments.length === 0 && this.renderModal()}
       </div>
     );
   }

@@ -151,11 +151,25 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
     gap: 25px;
     align-items: center;
     margin-bottom: 25px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+
+    &::-webkit-scrollbar {
+      height: 5px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
+      border-radius: var(--ce-radius-pill);
+    }
+
     .primaryControls,
     .secondaryControls {
       display: flex;
       align-items: center;
       gap: 14px;
+      flex: 0 0 auto;
       flex-wrap: wrap;
     }
 
@@ -732,13 +746,20 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
           text-align: center;
           white-space: normal;
           line-height: 1.06;
+          max-width: 100%;
+          max-height: 100%;
+          overflow: hidden;
+          overflow-wrap: anywhere;
+          word-break: normal;
+          hyphens: auto;
+          text-wrap: balance;
           padding: 0;
           transform: scale(0.94);
           text-shadow: 0 2px 10px color-mix(in srgb, var(--ce-overlay-base) 55%, transparent);
           background: transparent;
           border-radius: var(--ce-radius-0);
           font-weight: 700;
-          letter-spacing: 0.02em;
+          letter-spacing: 0.01em;
         }
 
         &.depthCenter {

@@ -376,8 +376,8 @@ export const getTopAtlasNodesByHeat = (nodes: DebateNode[] = [], limit = 3): Deb
   return topCandidates.map((candidate) => candidate.node);
 };
 
-const getAtlasCenterNode = (atlasRoot: DebateNode | null, data: DebateNode[]): DebateNode =>
-  atlasRoot ? atlasRoot : { id: 'virtual-root', name: 'AI Policy Atlas', children: data, depth: -1 };
+const getAtlasCenterNode = (atlasRoot: DebateNode | null, data: DebateNode[], rootLabel = 'AI Policy Atlas'): DebateNode =>
+  atlasRoot ? atlasRoot : { id: 'virtual-root', name: rootLabel, children: data, depth: -1 };
 
 const measureAtlasContainer = (
   node: HTMLElement | null,
@@ -449,21 +449,21 @@ export const getPackedAtlasLabelFontSizePx = (
   const hierarchyDepth = Math.max(0, Number(node?.hierarchyDepth) || 0);
 
   let ratio = 0.038;
-  let minSize = 9;
-  let maxSize = 15;
+  let minSize = 8;
+  let maxSize = 14;
 
   if (node?.isCenter) {
-    ratio = 0.058;
-    minSize = 18;
+    ratio = 0.052;
+    minSize = normalizedDiameter < 180 ? 11 : 16;
     maxSize = 30;
   } else if (hierarchyDepth <= 1) {
     ratio = 0.066;
-    minSize = 22;
+    minSize = normalizedDiameter < 150 ? 10 : normalizedDiameter < 240 ? 14 : 22;
     maxSize = 34;
   } else if (hierarchyDepth === 2) {
-    ratio = 0.05;
-    minSize = 12;
-    maxSize = 20;
+    ratio = 0.047;
+    minSize = normalizedDiameter < 130 ? 9 : 11;
+    maxSize = 18;
   }
 
   const boostedSize = normalizedDiameter * ratio * (alwaysVisible ? 1.08 : 1);
@@ -575,6 +575,7 @@ const AtlasChrome = ({
   atlasRoot,
   handleBack,
   onNodeClick,
+  readOnly = false,
   showActiveDebates,
   setShowActiveDebates,
   topNodes,
@@ -586,48 +587,50 @@ const AtlasChrome = ({
       </button>
     )}
 
-    {!atlasRoot && (
+    {!atlasRoot && !readOnly && (
       <button type="button" className={styles.hotDebatesBtn} onClick={() => setShowActiveDebates((prev) => !prev)}>
         <FontAwesomeIcon icon={faFire} /> Top Debates
       </button>
     )}
 
-    <div className={`${styles.topNodesOverlay} ${showActiveDebates ? styles.visible : ''}`}>
-      <h3>
-        <span>
-          <FontAwesomeIcon icon={faFire} /> Active Debates
-        </span>
-        <button
-          type="button"
-          className={styles.minimizeBtn}
-          aria-label="Minimize active debates"
-          onClick={() => setShowActiveDebates(false)}
-        >
-          <FontAwesomeIcon icon={faTimes} />
-        </button>
-      </h3>
-      {topNodes.map((node, index, list) => (
-        <button
-          key={getDebateNodeListStableKeys(list, 'top-node')[index] || getDebateNodeStableKey(node, 'top-node')}
-          type="button"
-          className={styles.topNodeItem}
-          onClick={(event) => {
-            event.stopPropagation();
-            onNodeClick(node);
-          }}
-        >
-          <span className={styles.nodeTitle}>{node.name}</span>
-          <div className={styles.nodeStats}>
-            <span>
-              <FontAwesomeIcon icon={faThumbsUp} /> {calculateNetUpvotes(node.votes)}
-            </span>
-            <span>
-              <FontAwesomeIcon icon={faComment} /> {getAtlasCommentCount(node)}
-            </span>
-          </div>
-        </button>
-      ))}
-    </div>
+    {!readOnly && (
+      <div className={`${styles.topNodesOverlay} ${showActiveDebates ? styles.visible : ''}`}>
+        <h3>
+          <span>
+            <FontAwesomeIcon icon={faFire} /> Active Debates
+          </span>
+          <button
+            type="button"
+            className={styles.minimizeBtn}
+            aria-label="Minimize active debates"
+            onClick={() => setShowActiveDebates(false)}
+          >
+            <FontAwesomeIcon icon={faTimes} />
+          </button>
+        </h3>
+        {topNodes.map((node, index, list) => (
+          <button
+            key={getDebateNodeListStableKeys(list, 'top-node')[index] || getDebateNodeStableKey(node, 'top-node')}
+            type="button"
+            className={styles.topNodeItem}
+            onClick={(event) => {
+              event.stopPropagation();
+              onNodeClick(node);
+            }}
+          >
+            <span className={styles.nodeTitle}>{node.name}</span>
+            <div className={styles.nodeStats}>
+              <span>
+                <FontAwesomeIcon icon={faThumbsUp} /> {calculateNetUpvotes(node.votes)}
+              </span>
+              <span>
+                <FontAwesomeIcon icon={faComment} /> {getAtlasCommentCount(node)}
+              </span>
+            </div>
+          </button>
+        ))}
+      </div>
+    )}
   </>
 );
 
@@ -639,10 +642,12 @@ const OrbitalAtlasView = ({
   handleAtlasNodeClick,
   handleBack,
   onNodeClick,
+  readOnly = false,
+  rootLabel,
   showActiveDebates,
   setShowActiveDebates,
   topNodes,
-}: AtlasLayoutViewProps) => {
+}: AtlasLayoutViewProps & { rootLabel?: string }) => {
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [startPan, setStartPan] = useState({ x: 0, y: 0 });
@@ -658,7 +663,7 @@ const OrbitalAtlasView = ({
     const links: AtlasLink[] = [];
 
     // The "Virtual Root" is the global center point.
-    const centerNode = getAtlasCenterNode(atlasRoot, data);
+    const centerNode = getAtlasCenterNode(atlasRoot, data, rootLabel);
 
     nodes.push(
       buildAtlasRenderNode(centerNode, atlasRoot, 0, {
@@ -749,11 +754,15 @@ const OrbitalAtlasView = ({
 
     processRing(centerNode, 0, 0, 0, Math.PI * 2, 1);
 
-    nodes.sort((a, b) => a.heat - b.heat);
+    if (!readOnly) {
+      nodes.sort((a, b) => a.heat - b.heat);
+    }
 
-    const disagreementScores = nodes
-      .filter((node) => node.id !== 'virtual-root' && !node.isCenter)
-      .map((node) => Number(node.disagreementScore) || 0);
+    const disagreementScores = readOnly
+      ? []
+      : nodes
+          .filter((node) => node.id !== 'virtual-root' && !node.isCenter)
+          .map((node) => Number(node.disagreementScore) || 0);
 
     const disagreementRange =
       disagreementScores.length > 0
@@ -764,7 +773,7 @@ const OrbitalAtlasView = ({
         : { min: 0, max: 0 };
 
     return { nodes, links, disagreementRange };
-  }, [data, atlasRoot, dimensions.w]);
+  }, [data, atlasRoot, dimensions.w, readOnly, rootLabel]);
 
   // Mouse/Touch Handlers
   const onMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -809,6 +818,7 @@ const OrbitalAtlasView = ({
         atlasRoot={atlasRoot}
         handleBack={handleBack}
         onNodeClick={onNodeClick}
+        readOnly={readOnly}
         showActiveDebates={showActiveDebates}
         setShowActiveDebates={setShowActiveDebates}
         topNodes={topNodes}
@@ -853,7 +863,7 @@ const OrbitalAtlasView = ({
             onMouseLeave={() => setHoveredNodeId(null)}
           >
             <div
-              className={`${styles.nodeDot} ${node.heat > 10 ? styles.hot : ''}`}
+              className={`${styles.nodeDot} ${!readOnly && node.heat > 10 ? styles.hot : ''}`}
               style={{ width: `${totalSize}px`, height: `${totalSize}px` }}
             >
               {(node.depth === 0 || node.isCenter) && <FontAwesomeIcon icon={faNetworkWired} />}
@@ -877,10 +887,12 @@ const PackedAtlasView = ({
   handleAtlasNodeClick,
   handleBack,
   onNodeClick,
+  readOnly = false,
+  rootLabel,
   showActiveDebates,
   setShowActiveDebates,
   topNodes,
-}: AtlasLayoutViewProps) => {
+}: AtlasLayoutViewProps & { rootLabel?: string }) => {
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [hoveredGroupId, setHoveredGroupId] = useState('');
   const isMobile = dimensions.w < 768;
@@ -895,7 +907,7 @@ const PackedAtlasView = ({
           depth: atlasRoot.depth,
           children: Array.isArray(atlasRoot.children) ? atlasRoot.children : [],
         }
-      : getAtlasCenterNode(atlasRoot, data);
+      : getAtlasCenterNode(atlasRoot, data, rootLabel);
     const inset = isMobile ? 12 : 18;
     const headerHeight = atlasRoot ? (isMobile ? 34 : 28) : 0;
     const desiredTopGutter = atlasRoot ? (isMobile ? 10 : 8) : isMobile ? 14 : 18;
@@ -908,8 +920,8 @@ const PackedAtlasView = ({
     const hierarchy = d3Hierarchy(centerNode, (node: any) =>
       Array.isArray(node?.children) && node.children.length > 0 ? node.children : null,
     )
-      .sum((node: any) => calculateAtlasPackValue(node))
-      .sort((a: any, b: any) => (Number(b.value) || 0) - (Number(a.value) || 0));
+      .sum((node: any) => (readOnly ? 1 : calculateAtlasPackValue(node)))
+      .sort((a: any, b: any) => (readOnly ? 0 : (Number(b.value) || 0) - (Number(a.value) || 0)));
 
     const packedRoot = packLayout(hierarchy);
 
@@ -932,7 +944,7 @@ const PackedAtlasView = ({
       });
 
     return { nodes };
-  }, [atlasRoot, data, dimensions.h, dimensions.w, isMobile]);
+  }, [atlasRoot, data, dimensions.h, dimensions.w, isMobile, readOnly, rootLabel]);
   const layoutNodeMap = useMemo(
     () => new Map(layout.nodes.map((node) => [String(node.id || '').trim(), node])),
     [layout.nodes],
@@ -944,6 +956,7 @@ const PackedAtlasView = ({
         atlasRoot={atlasRoot}
         handleBack={handleBack}
         onNodeClick={onNodeClick}
+        readOnly={readOnly}
         showActiveDebates={showActiveDebates}
         setShowActiveDebates={setShowActiveDebates}
         topNodes={topNodes}
@@ -1010,7 +1023,7 @@ const PackedAtlasView = ({
             }}
           >
             <div
-              className={`${styles.nodeDot} ${styles.packedNodeDot} ${node.heat > 10 ? styles.hot : ''}`}
+              className={`${styles.nodeDot} ${styles.packedNodeDot} ${!readOnly && node.heat > 10 ? styles.hot : ''}`}
               style={{ width: `${diameter}px`, height: `${diameter}px` }}
             >
               <div
@@ -1027,7 +1040,13 @@ const PackedAtlasView = ({
   );
 };
 
-export const AtlasView = ({ data, onNodeClick, atlasLayoutMode = ATLAS_LAYOUT_MODES.ORBITAL }: AtlasViewProps) => {
+export const AtlasView = ({
+  data,
+  rootLabel = 'AI Policy Atlas',
+  onNodeClick,
+  atlasLayoutMode = ATLAS_LAYOUT_MODES.ORBITAL,
+  readOnly = false,
+}: AtlasViewProps) => {
   const { containerRef, dimensions } = useAtlasContainerDimensions(atlasLayoutMode);
   const { atlasRoot, showActiveDebates, setShowActiveDebates, topNodes, handleAtlasNodeClick, handleBack } =
     useAtlasNavigationState(data, onNodeClick);
@@ -1042,6 +1061,8 @@ export const AtlasView = ({ data, onNodeClick, atlasLayoutMode = ATLAS_LAYOUT_MO
         handleAtlasNodeClick={handleAtlasNodeClick}
         handleBack={handleBack}
         onNodeClick={onNodeClick}
+        readOnly={readOnly}
+        rootLabel={rootLabel}
         showActiveDebates={showActiveDebates}
         setShowActiveDebates={setShowActiveDebates}
         topNodes={topNodes}
@@ -1058,6 +1079,8 @@ export const AtlasView = ({ data, onNodeClick, atlasLayoutMode = ATLAS_LAYOUT_MO
       handleAtlasNodeClick={handleAtlasNodeClick}
       handleBack={handleBack}
       onNodeClick={onNodeClick}
+      readOnly={readOnly}
+      rootLabel={rootLabel}
       showActiveDebates={showActiveDebates}
       setShowActiveDebates={setShowActiveDebates}
       topNodes={topNodes}
@@ -1066,7 +1089,7 @@ export const AtlasView = ({ data, onNodeClick, atlasLayoutMode = ATLAS_LAYOUT_MO
 };
 
 // 2. Flat Node (Search/List View)
-const FlatNode = ({ node, parentPath = [], onNodeClick, onBookmark, bookmarkedNodes }: FlatNodeProps) => {
+const FlatNode = ({ node, parentPath = [], onNodeClick, readOnly = false, onBookmark, bookmarkedNodes }: FlatNodeProps) => {
   const netUpvotes = calculateNetUpvotes(node.votes);
   const nodeId = String(node.id || '').trim();
   const isBookmarked = nodeId ? bookmarkedNodes.includes(nodeId) : false;
@@ -1092,9 +1115,11 @@ const FlatNode = ({ node, parentPath = [], onNodeClick, onBookmark, bookmarkedNo
       </div>
 
       <div className={styles.metaInfo}>
-        <span className={styles.upvotes}>
-          <FontAwesomeIcon icon={faThumbsUp} /> {netUpvotes}
-        </span>
+        {!readOnly && (
+          <span className={styles.upvotes}>
+            <FontAwesomeIcon icon={faThumbsUp} /> {netUpvotes}
+          </span>
+        )}
         <span className={styles.comments}>
           <FontAwesomeIcon icon={faComment} /> {commentCount}
         </span>
@@ -1113,7 +1138,7 @@ const FlatNode = ({ node, parentPath = [], onNodeClick, onBookmark, bookmarkedNo
 };
 
 // 3. Detail Modal
-const Modal = ({ isOpen, onClose, content, onVote, copied, onCopy, onTagClick }: ModalProps) => {
+const Modal = ({ isOpen, onClose, content, onVote, readOnly = false, copied, onCopy, onTagClick }: ModalProps) => {
   const modalContentRef = useRef<HTMLDivElement | null>(null);
   const defaultArgumentData = content?.arguments && typeof content.arguments === 'object' ? content.arguments : null;
   const hasDefaultArguments = Boolean(defaultArgumentData);
@@ -1335,7 +1360,7 @@ const Modal = ({ isOpen, onClose, content, onVote, copied, onCopy, onTagClick }:
   const depthLabel = depthLabels[Math.min(depthIndex, 3)] || 'Node';
   const depthClass = `depth${Math.min(depthIndex, 3)}`; // used for color mapping
 
-  const tags = ['AI Safety', 'Policy'];
+  const tags = readOnly ? [] : ['AI Safety', 'Policy'];
   const tagStableKeys = getDebateTagStableKeys(tags);
 
   // Calculate Counts from Content
@@ -1348,7 +1373,7 @@ const Modal = ({ isOpen, onClose, content, onVote, copied, onCopy, onTagClick }:
       ? [...new Set(argumentVotes[argumentId].filter(Boolean))]
       : [];
 
-    if (voters.length === 0) return null;
+    if (readOnly || voters.length === 0) return null;
 
     const visibleVoters = voters.slice(0, 5);
     const overflowCount = Math.max(voters.length - visibleVoters.length, 0);
@@ -1386,13 +1411,15 @@ const Modal = ({ isOpen, onClose, content, onVote, copied, onCopy, onTagClick }:
     return (
       <div key={treeKey} className={styles.argumentCard} data-side={side}>
         <div className={styles.argumentClaim}>{claim}</div>
-        <div
-          className={styles.argumentStrength}
-          title={`Strength ${clampedStrength}/10`}
-          aria-label={`Strength ${clampedStrength} out of 10`}
-        >
-          <span style={{ width: strengthPercent }} />
-        </div>
+        {!readOnly && (
+          <div
+            className={styles.argumentStrength}
+            title={`Strength ${clampedStrength}/10`}
+            aria-label={`Strength ${clampedStrength} out of 10`}
+          >
+            <span style={{ width: strengthPercent }} />
+          </div>
+        )}
         {source && <div className={styles.argumentSource}>{source}</div>}
         {argument.id ? renderVoterAvatars(argument.id) : null}
         {children.length > 0 && (
@@ -1669,7 +1696,7 @@ const Modal = ({ isOpen, onClose, content, onVote, copied, onCopy, onTagClick }:
           </div>
 
           {/* Center: Compact Vote Controls */}
-          <div className={styles.headerVoteSection}>
+          {!readOnly && <div className={styles.headerVoteSection}>
             {activeVoteType === null ? (
               <div className={styles.voteDisplay}>
                 <div
@@ -1730,7 +1757,7 @@ const Modal = ({ isOpen, onClose, content, onVote, copied, onCopy, onTagClick }:
                 </button>
               </div>
             )}
-          </div>
+          </div>}
 
           {/* Right: Close Control Only */}
           <div className={styles.modalControls}>
@@ -1983,6 +2010,7 @@ const TreeNode = ({
   depth = 0,
   parentPath = [],
   onNodeClick,
+  readOnly = false,
   onBookmark,
   bookmarkedNodes,
   onSuggestNode,
@@ -1997,7 +2025,9 @@ const TreeNode = ({
   const fullLabel = cleanAtlasCategoryName(node.name);
   const compactLabel = getCompactTreeNodeLabel(node.name);
   const sortedChildren = hasChildren
-    ? [...(node.children || [])].sort((a, b) => calculateNetUpvotes(b.votes) - calculateNetUpvotes(a.votes))
+    ? readOnly
+      ? [...(node.children || [])]
+      : [...(node.children || [])].sort((a, b) => calculateNetUpvotes(b.votes) - calculateNetUpvotes(a.votes))
     : [];
   const childColumns = getTreeChildColumnCount(depth, sortedChildren.length);
   const childBranchSpans = sortedChildren.map((child) => getTreeSubtreeSpan(child));
@@ -2031,9 +2061,11 @@ const TreeNode = ({
           <span className={styles.nodeTitle}>{compactLabel || fullLabel}</span>
         </div>
         <div className={styles.cardStats}>
-          <span>
-            <FontAwesomeIcon icon={faThumbsUp} /> {netUpvotes}
-          </span>
+          {!readOnly && (
+            <span>
+              <FontAwesomeIcon icon={faThumbsUp} /> {netUpvotes}
+            </span>
+          )}
           <FontAwesomeIcon
             icon={faBookmark}
             className={`${styles.bookmark} ${isBookmarked ? styles.bookmarked : ''}`}
@@ -2044,16 +2076,18 @@ const TreeNode = ({
           />
         </div>
 
-        <div
-          className={styles.suggestBtn}
-          onClick={(e) => {
-            e.stopPropagation();
-            onSuggestNode(node, parentPath);
-          }}
-          title="Suggest sub-topic"
-        >
-          <FontAwesomeIcon icon={faPlus} />
-        </div>
+        {!readOnly && (
+          <div
+            className={styles.suggestBtn}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSuggestNode(node, parentPath);
+            }}
+            title="Suggest sub-topic"
+          >
+            <FontAwesomeIcon icon={faPlus} />
+          </div>
+        )}
 
         {hasChildren && (
           <div
@@ -2083,6 +2117,7 @@ const TreeNode = ({
                 depth={depth + 1}
                 parentPath={[...parentPath, node]}
                 onNodeClick={onNodeClick}
+                readOnly={readOnly}
                 onBookmark={onBookmark}
                 bookmarkedNodes={bookmarkedNodes}
                 onSuggestNode={onSuggestNode}
@@ -2122,12 +2157,17 @@ const Legend = () => (
 // --- MAIN PARENT ---
 const DebateMap = ({
   activeSessionSlug = '',
+  atlasRootLabel = 'AI Policy Atlas',
   demoMode: externalDemoMode = false,
   embedded = false,
+  hideDemoModeToggle = false,
+  readOnly = false,
   requestedModalNodeId = null,
   onModalClose = null,
   atlasLayoutMode = ATLAS_LAYOUT_MODES.PACKED,
+  treeData = null,
 }: DebateMapProps) => {
+  const explicitTreeData = Array.isArray(treeData) ? treeData : null;
   const externalDemoEnabled =
     externalDemoMode && typeof externalDemoMode === 'object' ? !!externalDemoMode.tools : !!externalDemoMode;
   // Routing Hooks
@@ -2142,7 +2182,9 @@ const DebateMap = ({
   const [orderByUpvotes, setOrderByUpvotes] = useState(false);
   const [bookmarkedNodes, setBookmarkedNodes] = useState<string[]>([]);
   const [demoMode, setDemoMode] = useState(() => initialDemoEnabled);
-  const [treeDataState, setTreeDataState] = useState<DebateNode[]>(() => buildAtlasTreeData(initialDemoEnabled));
+  const [treeDataState, setTreeDataState] = useState<DebateNode[]>(() =>
+    explicitTreeData ? explicitTreeData : buildAtlasTreeData(initialDemoEnabled),
+  );
   const [localVoteDeltas, setLocalVoteDeltas] = useState<LocalVoteDeltas>({});
   const [nodeTypeFilter, setNodeTypeFilter] = useState('all');
   const [copied, setCopied] = useState(false);
@@ -2185,8 +2227,14 @@ const DebateMap = ({
   }, []);
 
   useEffect(() => {
+    if (explicitTreeData) return;
     setTreeDataState(applyLocalVoteDeltasToTree(buildAtlasTreeData(demoMode), localVoteDeltasRef.current));
-  }, [demoMode]);
+  }, [demoMode, explicitTreeData]);
+
+  useEffect(() => {
+    if (!explicitTreeData) return;
+    setTreeDataState(explicitTreeData);
+  }, [explicitTreeData]);
 
   useEffect(() => {
     setDemoMode(initialDemoEnabled);
@@ -2225,7 +2273,7 @@ const DebateMap = ({
       let found = findAtlasNodeById(treeDataState, effectiveNodeId);
 
       // 2. Fallback: If not found in active state, check raw treeData.
-      if (!found && treeDataState !== atlasTreeData) {
+      if (!found && !explicitTreeData && treeDataState !== atlasTreeData) {
         found = findAtlasNodeById(atlasTreeData, effectiveNodeId);
       }
 
@@ -2234,7 +2282,7 @@ const DebateMap = ({
         hasHandledDeepLink.current = true; // Mark as handled so it doesn't re-open on re-renders (like Demo toggle)
       }
     }
-  }, [effectiveNodeId, treeDataState]);
+  }, [effectiveNodeId, explicitTreeData, treeDataState]);
 
   const handleNodeClick = useCallback((node: DebateNode) => setModalNodeId(String(node?.id || '').trim() || null), []);
   const closeModal = useCallback(() => {
@@ -2357,8 +2405,8 @@ const DebateMap = ({
         if (nodeTypeFilter === 'subcategory' && n.parentPath.length !== 1) return false;
         return true;
       })
-      .sort((a, b) => (orderByUpvotes ? calculateNetUpvotes(b.votes) - calculateNetUpvotes(a.votes) : 0));
-  }, [treeDataState, orderByUpvotes, flattenTree, nodeTypeFilter, visualMode]);
+      .sort((a, b) => (orderByUpvotes && !readOnly ? calculateNetUpvotes(b.votes) - calculateNetUpvotes(a.votes) : 0));
+  }, [treeDataState, orderByUpvotes, flattenTree, nodeTypeFilter, readOnly, visualMode]);
 
   const updateTreeFit = useCallback(() => {
     if (visualMode !== DEBATE_VISUAL_MODES.TREE || !selectedCategory) {
@@ -2497,7 +2545,7 @@ const DebateMap = ({
 
           <div className={styles.secondaryControls}>
             <div className={styles.controlGroup}>
-              {visualMode === DEBATE_VISUAL_MODES.LIST && (
+              {visualMode === DEBATE_VISUAL_MODES.LIST && !readOnly && (
                 <label>
                   <input
                     type="checkbox"
@@ -2507,9 +2555,12 @@ const DebateMap = ({
                   Order by Upvotes
                 </label>
               )}
-              <label>
-                <input type="checkbox" checked={demoMode} onChange={(e) => setDemoMode(e.target.checked)} /> Demo Mode
-              </label>
+              {!hideDemoModeToggle && !explicitTreeData && (
+                <label>
+                  <input type="checkbox" checked={demoMode} onChange={(e) => setDemoMode(e.target.checked)} /> Demo
+                  Mode
+                </label>
+              )}
             </div>
 
             {visualMode === DEBATE_VISUAL_MODES.LIST && (
@@ -2548,13 +2599,20 @@ const DebateMap = ({
                   node={node}
                   parentPath={node.parentPath}
                   onNodeClick={handleNodeClick}
+                  readOnly={readOnly}
                   onBookmark={handleBookmark}
                   bookmarkedNodes={bookmarkedNodes}
                 />
               ))}
             </div>
           ) : isAtlasVisualMode ? (
-            <AtlasView data={treeDataState} onNodeClick={handleNodeClick} atlasLayoutMode={atlasViewLayoutMode} />
+            <AtlasView
+              data={treeDataState}
+              rootLabel={atlasRootLabel}
+              onNodeClick={handleNodeClick}
+              atlasLayoutMode={atlasViewLayoutMode}
+              readOnly={readOnly}
+            />
           ) : (
             <div className={styles.orgChartContainer} ref={treeContainerRef}>
               {selectedCategory ? (
@@ -2570,6 +2628,7 @@ const DebateMap = ({
                       depth={0}
                       parentPath={[]}
                       onNodeClick={handleNodeClick}
+                      readOnly={readOnly}
                       onBookmark={handleBookmark}
                       bookmarkedNodes={bookmarkedNodes}
                       onSuggestNode={handleSuggestNode}
@@ -2588,6 +2647,7 @@ const DebateMap = ({
           onClose={closeModal}
           content={modalContent}
           onVote={handleVote}
+          readOnly={readOnly}
           onCopy={copyToClipboard}
           copied={copied}
           onTagClick={handleTagClick}
