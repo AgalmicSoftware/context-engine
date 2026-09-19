@@ -137,6 +137,7 @@ interface LoginAndSettingsModalProps extends Partial<Omit<WagmiInjectedProps, 'n
   network: WagmiInjectedProps['network'] | null;
   account: string;
   loginModalToggled: boolean;
+  loginModalFocus: string;
   loginInProgress: boolean;
   loginComplete: boolean;
   demoMode: RootState['sessionState']['demoMode'];
@@ -544,6 +545,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
   async componentDidMount() {
     this._isMounted = true;
+    this.applyLoginModalFocus(this.props.loginModalFocus);
     this.checkAndSendTestFundsIfNeeded();
 
     // Passkey wallet session rehydration
@@ -860,6 +862,10 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       this.getTestFundsRequestContextKey(prevProps, prevState);
     const accountChanged = this.props.account !== prevProps.account;
     const settingsOpened = this.props.loginModalToggled && !prevProps.loginModalToggled;
+    const focusChanged = this.props.loginModalFocus !== prevProps.loginModalFocus;
+    if (this.props.loginModalToggled && (settingsOpened || focusChanged)) {
+      this.applyLoginModalFocus(this.props.loginModalFocus);
+    }
     const needsSponsoredAccessRefresh = accountChanged || activeSessionChanged || settingsOpened;
     if (this.getWalletChainId() !== this.getWalletChainId(prevProps)) needsBalanceCheck = true;
     if (accountChanged) {
@@ -1479,6 +1485,21 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       aiSettingsDirty: false,
       aiSettingsStatus: '',
     });
+  };
+
+  applyLoginModalFocus = (focus: unknown) => {
+    const focusKey = toStr(focus).trim();
+    if (focusKey !== 'ai-config') return;
+    this.setStateIfMounted((prevState: Readonly<LoginAndSettingsModalState>) => ({
+      aiSettingsOpen: true,
+      preLoginSettingsOpen: true,
+      preLoginConfigOpen: true,
+      aiSettingsSectionsOpen: {
+        ...(prevState.aiSettingsSectionsOpen || {}),
+        aiConfig: true,
+      },
+    }));
+    this.props.toggleLoginModal?.({ isOpen: true, focus: '' });
   };
 
   toggleAiSettingsSection = (sectionKey: any) => {
@@ -2505,6 +2526,7 @@ const mapStateToProps = (state: RootState) => ({
   network: state.profile.network,
   account: state.profile.account,
   loginModalToggled: state.sessionState.loginModalToggled,
+  loginModalFocus: state.sessionState.loginModalFocus,
   loginInProgress: state.sessionState.loginInProgress,
   loginComplete: state.sessionState.loginComplete,
   demoMode: state.sessionState.demoMode,

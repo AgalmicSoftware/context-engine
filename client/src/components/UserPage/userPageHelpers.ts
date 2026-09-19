@@ -262,6 +262,7 @@ export type {
 } from './userPageSectionDisplayHelpers';
 export {
   buildUserPageAnalysisAiOptions,
+  buildUserPageAnalysisErrorPresentation,
   buildUserPageAnalysisElapsedStatePatch,
   buildUserPageAnalysisErrorStatePatch,
   buildUserPageAnalysisFingerprint,
@@ -281,8 +282,10 @@ export {
 } from './userPageAnalysisStateHelpers';
 export type {
   BuildUserPageAnalysisAiOptionsArgs,
+  BuildUserPageAnalysisErrorAction,
   BuildUserPageAnalysisElapsedStatePatchArgs,
   BuildUserPageAnalysisErrorStatePatchArgs,
+  UserPageAnalysisErrorPresentation,
   BuildUserPageAnalysisResultStatePatchArgs,
   BuildUserPageAnalysisResetStatePatchArgs,
   ResolveUserPageAnalysisCacheStatusStateArgs,

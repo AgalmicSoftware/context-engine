@@ -1733,3 +1733,29 @@ $icon-size-standard: 1.25rem;
     cursor: pointer;
   }
 }
+
+.analysisErrorNotice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.analysisSettingsLink {
+  min-height: 40px;
+  border: 1px solid var(--ce-action-accent);
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-action-accent);
+  color: var(--ce-action-accent-text);
+  font: inherit;
+  font-weight: 700;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.analysisSettingsLink:hover,
+.analysisSettingsLink:focus-visible {
+  filter: brightness(1.08);
+  outline: 2px solid color-mix(in srgb, var(--ce-action-accent) 64%, transparent);
+  outline-offset: 2px;
+}

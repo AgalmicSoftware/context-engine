@@ -1,5 +1,6 @@
 import {
   buildUserPageAnalysisAiOptions,
+  buildUserPageAnalysisErrorPresentation,
   buildUserPageAnalysisElapsedStatePatch,
   buildUserPageAnalysisErrorStatePatch,
   buildUserPageAnalysisFingerprint,
@@ -160,8 +161,34 @@ describe('userPageAnalysisStateHelpers', () => {
     });
     expect(buildUserPageAnalysisErrorStatePatch({ message: 'Try again' })).toMatchObject({
       analysisError: 'Try again',
+      analysisErrorAction: '',
       analyzing: false,
       showAnalysisModal: true,
+    });
+  });
+
+
+
+  it('classifies AI missing-key and connectivity analysis errors separately', () => {
+    expect(buildUserPageAnalysisErrorPresentation(new Error('Server misconfigured: openaiKey is missing.'))).toEqual({
+      action: 'add-ai-key',
+      message: 'AI analysis needs a configured AI provider key. Add an AI key in Account Settings, then refresh this analysis.',
+    });
+    expect(buildUserPageAnalysisErrorPresentation(new TypeError('Failed to fetch'))).toEqual({
+      action: 'open-ai-settings',
+      message: 'Unable to reach the AI service. Check your connection or AI settings, then try again.',
+    });
+    expect(buildUserPageAnalysisErrorPresentation(new Error('No AI provider key available.'))).toEqual({
+      action: 'add-ai-key',
+      message: 'AI analysis needs a configured AI provider key. Add an AI key in Account Settings, then refresh this analysis.',
+    });
+    expect(buildUserPageAnalysisErrorPresentation(new Error('Encrypted session key is locked for this wallet.'))).toEqual({
+      action: '',
+      message: 'Encrypted session key is locked for this wallet.',
+    });
+    expect(buildUserPageAnalysisErrorPresentation(new Error('OpenAI rate limit exceeded'))).toEqual({
+      action: '',
+      message: 'OpenAI rate limit exceeded',
     });
   });
 

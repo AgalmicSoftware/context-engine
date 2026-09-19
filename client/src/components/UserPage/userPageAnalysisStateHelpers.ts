@@ -74,7 +74,15 @@ export type BuildUserPageAnalysisAiOptionsArgs = {
   defaultReason?: unknown;
 };
 
+export type BuildUserPageAnalysisErrorAction = '' | 'add-ai-key' | 'open-ai-settings';
+
+export type UserPageAnalysisErrorPresentation = {
+  action: BuildUserPageAnalysisErrorAction;
+  message: string;
+};
+
 export type BuildUserPageAnalysisErrorStatePatchArgs = {
+  action?: BuildUserPageAnalysisErrorAction;
   message?: unknown;
 };
 
@@ -104,6 +112,30 @@ export const getUserPageErrorMessage = (error: unknown, fallback = 'Unknown erro
     if (typeof message === 'string') return message;
   }
   return fallback;
+};
+
+const AI_KEY_ERROR_RE = /(?:server misconfigured:\s*)?(?:openaiKey|anthropicKey|openrouterKey|customRpcKey|ai provider key|provider key|api key)\s+(?:is\s+)?missing|missing\s+(?:required\s+)?(?:ai\s+)?(?:provider\s+)?(?:api\s+)?key|no\s+(?:ai\s+)?(?:provider\s+)?(?:api\s+)?key\s+available|enter the required ai provider key/i;
+const AI_CONNECTIVITY_ERROR_RE = /^(?:failed to fetch|load failed|networkerror when attempting to fetch resource)$/i;
+
+export const buildUserPageAnalysisErrorPresentation = (error: unknown): UserPageAnalysisErrorPresentation => {
+  const rawMessage = getUserPageErrorMessage(error, '').trim();
+  const normalizedMessage = rawMessage || 'Unable to generate analysis right now. Please try again later.';
+  if (AI_KEY_ERROR_RE.test(normalizedMessage)) {
+    return {
+      action: 'add-ai-key',
+      message: 'AI analysis needs a configured AI provider key. Add an AI key in Account Settings, then refresh this analysis.',
+    };
+  }
+  if (AI_CONNECTIVITY_ERROR_RE.test(normalizedMessage)) {
+    return {
+      action: 'open-ai-settings',
+      message: 'Unable to reach the AI service. Check your connection or AI settings, then try again.',
+    };
+  }
+  return {
+    action: '',
+    message: normalizedMessage,
+  };
 };
 
 export const sortUserAnalysisKeys = (value: unknown): unknown => {
@@ -281,7 +313,7 @@ export const buildUserPageAnalysisResultStatePatch = ({
     analysisHistoricalFigure: normalizedResult.historicalAlignment.figure,
     analysisHistoricalReasoning: normalizedResult.historicalAlignment.reasoning,
     ...(includeElapsed ? { analysisElapsedMs: 0 } : {}),
-    ...(includeError ? { analysisError: '' } : {}),
+    ...(includeError ? { analysisError: '', analysisErrorAction: '' } : {}),
     analyzing: false,
     analysisServedFromCache: servedFromCache === true,
     analysisCachedAt: Number(cachedAt || 0) || null,
@@ -294,6 +326,7 @@ export const buildUserPageAnalysisResetStatePatch = ({
   showAnalysisModal: true,
   analyzing: analyzing === true,
   analysisError: '',
+  analysisErrorAction: '',
   aiAnalysis: '',
   analysisDetails: '',
   analysisName: '',
@@ -330,10 +363,12 @@ export const buildUserPageAnalysisAiOptions = ({
 };
 
 export const buildUserPageAnalysisErrorStatePatch = ({
+  action = '',
   message = 'Unable to generate analysis right now. Please try again later.',
 }: BuildUserPageAnalysisErrorStatePatchArgs = {}): UserPageUnknownRecord => ({
   analyzing: false,
   analysisError: String(message || 'Unable to generate analysis right now. Please try again later.'),
+  analysisErrorAction: action || '',
   showAnalysisModal: true,
   analysisServedFromCache: false,
   analysisCachedAt: null,

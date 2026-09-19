@@ -65,6 +65,7 @@ describe('sessionStateReducer', () => {
       demoMode: { tools: false },
       demoSurfaceMode: false,
       loginModalToggled: false,
+      loginModalFocus: '',
       afterLoginModalToggled: false,
       primarySessionSlug: initialSelection.primarySessionSlug,
       primarySessionExplicit: initialSelection.primarySessionExplicit,
@@ -240,10 +241,11 @@ describe('sessionStateReducer', () => {
   it('toggles login modal for structured payloads', () => {
     const opened = reducer(undefined, {
       type: TOGGLE_LOGIN_MODAL,
-      payload: { isOpen: true },
+      payload: { isOpen: true, focus: 'ai-config' },
     });
 
     expect(opened.loginModalToggled).toBe(true);
+    expect(opened.loginModalFocus).toBe('ai-config');
 
     const closed = reducer(opened, {
       type: TOGGLE_LOGIN_MODAL,
@@ -251,6 +253,7 @@ describe('sessionStateReducer', () => {
     });
 
     expect(closed.loginModalToggled).toBe(false);
+    expect(closed.loginModalFocus).toBe('');
   });
 
   it('toggles login modal for legacy boolean payloads', () => {

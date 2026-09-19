@@ -26,12 +26,14 @@ type UserPageAnalysisModalProps = {
   analysisDetails?: React.ReactNode;
   analysisElapsedMs?: number;
   analysisError?: React.ReactNode;
+  analysisErrorAction?: string;
   analysisHistoricalFigure?: React.ReactNode;
   analysisHistoricalReasoning?: React.ReactNode;
   analysisModalDisplayState: UserPageAnalysisModalDisplayState;
   analysisName?: React.ReactNode;
   analyzing?: boolean;
   isOpen: boolean;
+  onOpenAiSettings?: React.MouseEventHandler<HTMLButtonElement>;
   onRefreshAnalysis: React.MouseEventHandler<HTMLButtonElement>;
   onToggle: () => void;
 };
@@ -42,12 +44,14 @@ const UserPageAnalysisModal = ({
   analysisDetails,
   analysisElapsedMs = 0,
   analysisError,
+  analysisErrorAction = '',
   analysisHistoricalFigure,
   analysisHistoricalReasoning,
   analysisModalDisplayState,
   analysisName,
   analyzing = false,
   isOpen,
+  onOpenAiSettings,
   onRefreshAnalysis,
   onToggle,
 }: UserPageAnalysisModalProps): React.ReactElement => (
@@ -94,7 +98,16 @@ const UserPageAnalysisModal = ({
           <span>Generating insights… {(analysisElapsedMs / 1000).toFixed(1)}s</span>
         </div>
       )}
-      {analysisModalDisplayState.shouldRenderError && <p className={styles.placeholderNote}>{analysisError}</p>}
+      {analysisModalDisplayState.shouldRenderError && (
+        <div className={styles.analysisErrorNotice} role="alert">
+          <p className={styles.placeholderNote}>{analysisError}</p>
+          {(analysisErrorAction === 'add-ai-key' || analysisErrorAction === 'open-ai-settings') && onOpenAiSettings ? (
+            <button type="button" className={styles.analysisSettingsLink} onClick={onOpenAiSettings}>
+              {analysisErrorAction === 'add-ai-key' ? 'Add AI key' : 'Open AI settings'}
+            </button>
+          ) : null}
+        </div>
+      )}
       {analysisModalDisplayState.shouldRenderAnalysisBody && (
         <>
           <p className={styles.placeholderNote}>{aiAnalysis}</p>
