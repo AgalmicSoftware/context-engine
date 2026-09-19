@@ -2,7 +2,9 @@ import type { MainSiteProps, MainSiteState } from './MainSiteTypes';
 
 export type MainSiteWalletViewProps = Pick<MainSiteProps, 'account' | 'provider'>;
 
-export type MainSiteLoginViewProps = Pick<MainSiteProps, 'toggleLoginModal' | 'loginComplete'> & { loginModalToggled?: boolean };
+export type MainSiteLoginViewProps = Pick<MainSiteProps, 'toggleLoginModal' | 'loginComplete'> & {
+  loginModalToggled?: boolean;
+};
 
 export type MainSiteAuthViewProps = MainSiteWalletViewProps &
   MainSiteLoginViewProps &

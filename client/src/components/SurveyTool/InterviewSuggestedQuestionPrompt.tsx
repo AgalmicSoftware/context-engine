@@ -13,7 +13,9 @@ const QUESTION_TYPE_LABELS: Record<string, string> = {
 };
 
 const normalizeQuestionTypeLabel = (type: unknown): string => {
-  const key = String(type || 'freeform').trim().toLowerCase();
+  const key = String(type || 'freeform')
+    .trim()
+    .toLowerCase();
   return QUESTION_TYPE_LABELS[key] || 'Freeform';
 };
 
@@ -21,15 +23,13 @@ const readOptionText = (option: unknown): string => {
   if (typeof option === 'string' || typeof option === 'number') return String(option).trim();
   if (!option || typeof option !== 'object' || Array.isArray(option)) return '';
   const record = option as { label?: unknown; value?: unknown };
-  const candidate = typeof record.label === 'string' ? record.label : typeof record.value === 'string' ? record.value : '';
+  const candidate =
+    typeof record.label === 'string' ? record.label : typeof record.value === 'string' ? record.value : '';
   return candidate.trim();
 };
 
 const normalizeOptions = (options: unknown): string[] =>
-  (Array.isArray(options) ? options : [])
-    .map(readOptionText)
-    .filter(Boolean)
-    .slice(0, 10);
+  (Array.isArray(options) ? options : []).map(readOptionText).filter(Boolean).slice(0, 10);
 
 export default function InterviewSuggestedQuestionPrompt({
   prompt,

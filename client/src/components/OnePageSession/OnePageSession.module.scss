@@ -1626,6 +1626,40 @@
   }
 }
 
+@media only screen and (max-width: 420px) {
+  .sectionHeaderRow {
+    gap: 8px;
+  }
+
+  .sectionHeader {
+    flex-wrap: nowrap;
+    gap: 6px;
+    font-size: 1.125rem;
+    line-height: 1;
+    padding-left: 8px;
+  }
+
+  .sectionHeader .sectionHeaderText {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+
+  .sectionHeader .sectionHeaderTitle,
+  .sectionHeader .sectionHeaderSubtitle {
+    line-height: 1;
+  }
+
+  .sectionHeader .sectionHeaderSubtitle {
+    font-size: 1em;
+  }
+
+  .sectionToggleIcon {
+    flex: 0 0 auto;
+  }
+}
+
 /* -------------------------------------------
      NEW: Additional mid-range (tablet) styling     Adjust so it doesn't mirror the phone layout
   ------------------------------------------- */

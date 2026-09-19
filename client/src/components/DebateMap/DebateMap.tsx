@@ -376,8 +376,11 @@ export const getTopAtlasNodesByHeat = (nodes: DebateNode[] = [], limit = 3): Deb
   return topCandidates.map((candidate) => candidate.node);
 };
 
-const getAtlasCenterNode = (atlasRoot: DebateNode | null, data: DebateNode[], rootLabel = 'AI Policy Atlas'): DebateNode =>
-  atlasRoot ? atlasRoot : { id: 'virtual-root', name: rootLabel, children: data, depth: -1 };
+const getAtlasCenterNode = (
+  atlasRoot: DebateNode | null,
+  data: DebateNode[],
+  rootLabel = 'AI Policy Atlas',
+): DebateNode => (atlasRoot ? atlasRoot : { id: 'virtual-root', name: rootLabel, children: data, depth: -1 });
 
 export const measureAtlasContainer = (
   node: HTMLElement | null,
@@ -1114,7 +1117,14 @@ export const AtlasView = ({
 };
 
 // 2. Flat Node (Search/List View)
-const FlatNode = ({ node, parentPath = [], onNodeClick, readOnly = false, onBookmark, bookmarkedNodes }: FlatNodeProps) => {
+const FlatNode = ({
+  node,
+  parentPath = [],
+  onNodeClick,
+  readOnly = false,
+  onBookmark,
+  bookmarkedNodes,
+}: FlatNodeProps) => {
   const netUpvotes = calculateNetUpvotes(node.votes);
   const nodeId = String(node.id || '').trim();
   const isBookmarked = nodeId ? bookmarkedNodes.includes(nodeId) : false;
@@ -1726,68 +1736,72 @@ const Modal = ({ isOpen, onClose, content, onVote, readOnly = false, copied, onC
           </div>
 
           {/* Center: Compact Vote Controls */}
-          {!readOnly && <div className={styles.headerVoteSection}>
-            {activeVoteType === null ? (
-              <div className={styles.voteDisplay}>
-                <div
-                  className={`${styles.voteArrow} ${styles.up}`}
-                  onClick={() => setActiveVoteType('up')}
-                  title="Cast Upvotes"
-                >
-                  <FontAwesomeIcon icon={faArrowUp} />
-                </div>
+          {!readOnly && (
+            <div className={styles.headerVoteSection}>
+              {activeVoteType === null ? (
+                <div className={styles.voteDisplay}>
+                  <div
+                    className={`${styles.voteArrow} ${styles.up}`}
+                    onClick={() => setActiveVoteType('up')}
+                    title="Cast Upvotes"
+                  >
+                    <FontAwesomeIcon icon={faArrowUp} />
+                  </div>
 
-                <div
-                  className={styles.netScoreContainer}
-                  onMouseEnter={() => setShowVoteBreakdown(true)}
-                  onMouseLeave={() => setShowVoteBreakdown(false)}
-                  onClick={() => setShowVoteBreakdown(!showVoteBreakdown)}
-                >
-                  <span className={styles.netScoreValue}>{netVotes}</span>
+                  <div
+                    className={styles.netScoreContainer}
+                    onMouseEnter={() => setShowVoteBreakdown(true)}
+                    onMouseLeave={() => setShowVoteBreakdown(false)}
+                    onClick={() => setShowVoteBreakdown(!showVoteBreakdown)}
+                  >
+                    <span className={styles.netScoreValue}>{netVotes}</span>
 
-                  {/* Hover Breakdown Tooltip */}
-                  <div className={`${styles.voteBreakdown} ${showVoteBreakdown ? styles.visible : ''}`}>
-                    <span className={styles.breakdownUp}>+{upVotes}</span>
-                    <span className={styles.breakdownDivider}>/</span>
-                    <span className={styles.breakdownDown}>-{downVotes}</span>
+                    {/* Hover Breakdown Tooltip */}
+                    <div className={`${styles.voteBreakdown} ${showVoteBreakdown ? styles.visible : ''}`}>
+                      <span className={styles.breakdownUp}>+{upVotes}</span>
+                      <span className={styles.breakdownDivider}>/</span>
+                      <span className={styles.breakdownDown}>-{downVotes}</span>
+                    </div>
+                  </div>
+
+                  <div
+                    className={`${styles.voteArrow} ${styles.down}`}
+                    onClick={() => setActiveVoteType('down')}
+                    title="Cast Downvotes"
+                  >
+                    <FontAwesomeIcon icon={faArrowDown} />
                   </div>
                 </div>
-
+              ) : (
                 <div
-                  className={`${styles.voteArrow} ${styles.down}`}
-                  onClick={() => setActiveVoteType('down')}
-                  title="Cast Downvotes"
+                  className={`${styles.voteInputContainer} ${activeVoteType === 'up' ? styles.isUp : styles.isDown}`}
                 >
-                  <FontAwesomeIcon icon={faArrowDown} />
+                  <input
+                    type="number"
+                    autoFocus
+                    className={styles.voteInput}
+                    value={voteCount}
+                    onChange={(e) => setVoteCount(e.target.value)}
+                    placeholder="#"
+                    min="0"
+                    onKeyDown={(e) => e.key === 'Enter' && handleCastVotes()}
+                  />
+                  <button className={styles.confirmBtn} onClick={handleCastVotes}>
+                    <FontAwesomeIcon icon={faCheck} />
+                  </button>
+                  <button
+                    className={styles.cancelBtn}
+                    onClick={() => {
+                      setActiveVoteType(null);
+                      setVoteCount('');
+                    }}
+                  >
+                    <FontAwesomeIcon icon={faTimes} />
+                  </button>
                 </div>
-              </div>
-            ) : (
-              <div className={`${styles.voteInputContainer} ${activeVoteType === 'up' ? styles.isUp : styles.isDown}`}>
-                <input
-                  type="number"
-                  autoFocus
-                  className={styles.voteInput}
-                  value={voteCount}
-                  onChange={(e) => setVoteCount(e.target.value)}
-                  placeholder="#"
-                  min="0"
-                  onKeyDown={(e) => e.key === 'Enter' && handleCastVotes()}
-                />
-                <button className={styles.confirmBtn} onClick={handleCastVotes}>
-                  <FontAwesomeIcon icon={faCheck} />
-                </button>
-                <button
-                  className={styles.cancelBtn}
-                  onClick={() => {
-                    setActiveVoteType(null);
-                    setVoteCount('');
-                  }}
-                >
-                  <FontAwesomeIcon icon={faTimes} />
-                </button>
-              </div>
-            )}
-          </div>}
+              )}
+            </div>
+          )}
 
           {/* Right: Close Control Only */}
           <div className={styles.modalControls}>
@@ -2596,8 +2610,7 @@ const DebateMap = ({
               )}
               {!hideDemoModeToggle && !explicitTreeData && (
                 <label>
-                  <input type="checkbox" checked={demoMode} onChange={(e) => setDemoMode(e.target.checked)} /> Demo
-                  Mode
+                  <input type="checkbox" checked={demoMode} onChange={(e) => setDemoMode(e.target.checked)} /> Demo Mode
                 </label>
               )}
             </div>

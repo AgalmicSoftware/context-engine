@@ -48,7 +48,15 @@ export type SessionInterviewRecommendedGroupsProps = {
 
 type RecommendationGroupView = Pick<
   WorkerGroup,
-  'groupId' | 'sessionSlug' | 'label' | 'description' | 'joinMode' | 'memberVisibility' | 'joinEndsAt' | 'memberLimit' | 'memberCount'
+  | 'groupId'
+  | 'sessionSlug'
+  | 'label'
+  | 'description'
+  | 'joinMode'
+  | 'memberVisibility'
+  | 'joinEndsAt'
+  | 'memberLimit'
+  | 'memberCount'
 >;
 
 type RecommendationView = {
@@ -102,10 +110,15 @@ const emptyJoinedGroupState = (targetKey: string, account: string): JoinedGroupS
 const toRecord = (value: unknown): UnknownRecord =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : {};
 
-const toText = (value: unknown, maxLength = 280): string => String(value ?? '').trim().slice(0, maxLength);
+const toText = (value: unknown, maxLength = 280): string =>
+  String(value ?? '')
+    .trim()
+    .slice(0, maxLength);
 
 const normalizeAddress = (value: unknown): string => {
-  const text = String(value ?? '').trim().toLowerCase();
+  const text = String(value ?? '')
+    .trim()
+    .toLowerCase();
   return /^0x[0-9a-f]{40}$/.test(text) ? text : '';
 };
 
@@ -208,7 +221,9 @@ export function SessionInterviewRecommendedGroups({
 }: SessionInterviewRecommendedGroupsProps) {
   const normalizedRecommendations = useMemo(() => normalizeRecommendations(recommendations), [recommendations]);
   const recommendedIdsKey = normalizedRecommendations
-    .map((recommendation) => [recommendation.groupId, recommendation.reason || '', recommendation.evidence || ''].join('\u0000'))
+    .map((recommendation) =>
+      [recommendation.groupId, recommendation.reason || '', recommendation.evidence || ''].join('\u0000'),
+    )
     .join('|');
   const normalizedAccount = normalizeAddress(account);
   const config = toRecord(sessionConfig);
@@ -259,12 +274,19 @@ export function SessionInterviewRecommendedGroups({
       const cached = cacheKey
         ? readScopedTokenCache(cacheKey, { workerUrl, sessionSlug, sessionId, address: normalizedAccount })
         : null;
-      const overview = cached?.ok && cached.token
-        ? await loadWorkerGroupOverview({ workerUrl, credentialToken: cached.token, sessionId, sessionSlug, fetchImpl })
-        : {
-            groups: await loadPublicWorkerGroups({ workerUrl, sessionId, sessionSlug, fetchImpl }),
-            memberships: [],
-          };
+      const overview =
+        cached?.ok && cached.token
+          ? await loadWorkerGroupOverview({
+              workerUrl,
+              credentialToken: cached.token,
+              sessionId,
+              sessionSlug,
+              fetchImpl,
+            })
+          : {
+              groups: await loadPublicWorkerGroups({ workerUrl, sessionId, sessionSlug, fetchImpl }),
+              memberships: [],
+            };
       if (targetKeyRef.current !== requestTargetKey || requestIdRef.current !== requestId) return;
       setViewState({ targetKey: requestTargetKey, overview, status: 'ready', error: '' });
     } catch (error) {
@@ -336,7 +358,9 @@ export function SessionInterviewRecommendedGroups({
           setJoinedGroupState((current) => ({
             targetKey: requestTargetKey,
             account: requestAccount,
-            groupIds: Array.from(new Set([...(current.targetKey === requestTargetKey ? current.groupIds : []), groupId])),
+            groupIds: Array.from(
+              new Set([...(current.targetKey === requestTargetKey ? current.groupIds : []), groupId]),
+            ),
           }));
           setJoinState(emptyJoinState(requestTargetKey));
           if (loginOpenedForJoinRef.current) {
@@ -456,7 +480,11 @@ export function SessionInterviewRecommendedGroups({
                   disabled={joinInProgress || joined}
                   data-testid={`ce-session-interview-join-group-${group.groupId}`}
                 >
-                  {joining ? <FontAwesomeIcon icon={faSpinner} spin /> : joined ? <FontAwesomeIcon icon={faCheck} /> : null}
+                  {joining ? (
+                    <FontAwesomeIcon icon={faSpinner} spin />
+                  ) : joined ? (
+                    <FontAwesomeIcon icon={faCheck} />
+                  ) : null}
                   {joining ? ' Joining…' : joined ? ' Joined' : waitingLogin ? ' Login required' : 'Join'}
                 </Button>
               </div>

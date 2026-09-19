@@ -36,7 +36,16 @@ describe('sessionResultsAnalysisController', () => {
           lastGood: {
             draftId: 'draft-1',
             generatedAt: '2026-09-17T12:00:00.000Z',
-            source: { kind: 'worker-canonical', responseCount: 4, participantCount: 2, aiInputResponseCount: 3, aiInputQuestionCount: 1, totalQuestionCount: 2, excludedCount: 1, lockedCount: 1 },
+            source: {
+              kind: 'worker-canonical',
+              responseCount: 4,
+              participantCount: 2,
+              aiInputResponseCount: 3,
+              aiInputQuestionCount: 1,
+              totalQuestionCount: 2,
+              excludedCount: 1,
+              lockedCount: 1,
+            },
             artifact: {
               kind: 'ce_session_results_analysis_artifact',
               source: 'ai-generated',
@@ -48,12 +57,21 @@ describe('sessionResultsAnalysisController', () => {
                 argumentMap: { available: true, debates: [] },
                 atlas: { available: false, nodes: [], edges: [], reason: 'empty' },
                 breakdown: { available: true, dimensions: [], groups: [], summary: { overview: 'ok' } },
-                riskMatrix: { available: false, categories: [], comments: [], heatmap: {}, scenarioLinks: [], reason: 'not returned' },
+                riskMatrix: {
+                  available: false,
+                  categories: [],
+                  comments: [],
+                  heatmap: {},
+                  scenarioLinks: [],
+                  reason: 'not returned',
+                },
               },
             },
             snapshot: {
               questions: [{ questionId: 'q1', prompt: 'What matters?', type: 'text' }],
-              responses: [{ questionId: 'q1', answer: 'Clarity', additionalComments: 'Make it readable', participantId: 'p1' }],
+              responses: [
+                { questionId: 'q1', answer: 'Clarity', additionalComments: 'Make it readable', participantId: 'p1' },
+              ],
             },
           },
         },
@@ -72,7 +90,6 @@ describe('sessionResultsAnalysisController', () => {
     expect(state.questions[0]).toEqual(expect.objectContaining({ id: 'q1', prompt: 'What matters?' }));
     expect(state.responses[0]).toEqual(expect.objectContaining({ additional: 'Make it readable' }));
   });
-
 
   it('renders viewer-visible artifacts without enabling admin generation', () => {
     const state = resolveGeneratedResultsControllerState({
@@ -115,7 +132,6 @@ describe('sessionResultsAnalysisController', () => {
     expect(state.viewOptions.map((option) => option.key)).toEqual(['circles', 'breakdown', 'riskMatrix']);
   });
 
-
   it('treats queued jobs as running without exposing another generation action', () => {
     const queued = resolveGeneratedResultsControllerState({
       statusBody: {
@@ -139,7 +155,6 @@ describe('sessionResultsAnalysisController', () => {
     expect(queued.canGenerate).toBe(false);
     expect(queued.lastFailure).toBe('Provider failed.');
   });
-
 
   it('allows retry for automatic-only sessions only after a failed run is no longer active', () => {
     const state = resolveGeneratedResultsControllerState({

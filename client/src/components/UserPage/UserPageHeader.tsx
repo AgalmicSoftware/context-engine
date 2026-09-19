@@ -158,6 +158,7 @@ const UserPageHeader = ({
               className={styles.copyButton}
               aria-label="Edit nickname"
               title="Edit nickname"
+              data-ce-control-appearance="frameless"
             >
               <FontAwesomeIcon icon={faPen} />
             </button>
@@ -168,6 +169,7 @@ const UserPageHeader = ({
               className={styles.copyButton}
               aria-label="Set username"
               title="Set username"
+              data-ce-control-appearance="frameless"
             >
               <FontAwesomeIcon icon={faPen} />
             </button>
@@ -183,7 +185,7 @@ const UserPageHeader = ({
             </CETooltip>
           )}
           {headerActionVisibility.showCopyAddressButton && (
-            <button onClick={onCopyAddress} className={styles.copyButton}>
+            <button onClick={onCopyAddress} className={styles.copyButton} data-ce-control-appearance="frameless">
               <FontAwesomeIcon icon={faCheck} style={copyIconDisplayState.copiedIconStyle} />
               <FontAwesomeIcon icon={faCopy} style={copyIconDisplayState.defaultIconStyle} />
             </button>
@@ -196,6 +198,7 @@ const UserPageHeader = ({
               className={styles.expandButton}
               aria-label="View address on explorer"
               title="View address on explorer"
+              data-ce-control-appearance="frameless"
             >
               <FontAwesomeIcon icon={faExternalLinkAlt} />
             </a>
@@ -207,6 +210,7 @@ const UserPageHeader = ({
               style={bookmarkButtonDisplayState.iconStyle}
               aria-label={bookmarkButtonDisplayState.ariaLabel}
               title={bookmarkButtonDisplayState.title}
+              data-ce-control-appearance="frameless"
             >
               <FontAwesomeIcon icon={faBookmark} />
             </button>

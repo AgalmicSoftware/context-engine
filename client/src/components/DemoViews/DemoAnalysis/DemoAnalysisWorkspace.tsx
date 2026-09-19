@@ -106,14 +106,11 @@ const DemoAnalysisWorkspace = ({
   metadataByXid = historicalFigureDemographics,
   sessionSlug = '',
 }: DemoAnalysisWorkspaceProps) => {
-  const analysisData = useMemo<DemoAnalysisWorkspaceData>(
-    () => {
-      if (explicitAnalysisData === null) return EMPTY_ANALYSIS_DATA;
-      if (explicitAnalysisData !== undefined) return explicitAnalysisData;
-      return getDemoAnalysisData(demoData, metadataByXid);
-    },
-    [demoData, explicitAnalysisData, metadataByXid],
-  );
+  const analysisData = useMemo<DemoAnalysisWorkspaceData>(() => {
+    if (explicitAnalysisData === null) return EMPTY_ANALYSIS_DATA;
+    if (explicitAnalysisData !== undefined) return explicitAnalysisData;
+    return getDemoAnalysisData(demoData, metadataByXid);
+  }, [demoData, explicitAnalysisData, metadataByXid]);
 
   const questionMap = useMemo(
     () => new Map(analysisData.questions.map((question) => [question.id, question])),

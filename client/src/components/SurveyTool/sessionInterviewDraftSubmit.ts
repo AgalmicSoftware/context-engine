@@ -2,9 +2,7 @@ import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import type { InterviewDraftResponse, InterviewPrefillPacket } from './sessionInterview';
 
 export type InterviewSubmitResult =
-  | { status: 'submitted' }
-  | { status: 'login-required' }
-  | { status: 'failed' | 'pending' | 'stale'; message?: string };
+  { status: 'submitted' } | { status: 'login-required' } | { status: 'failed' | 'pending' | 'stale'; message?: string };
 
 type SubmitStatusSetter = (status: string) => void;
 

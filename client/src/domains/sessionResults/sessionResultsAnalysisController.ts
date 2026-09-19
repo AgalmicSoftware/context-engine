@@ -3,9 +3,7 @@ import {
   SESSION_GENERATED_RESULTS_VIEW_KEYS,
   type SessionGeneratedResultsViewKey,
 } from './sessionResultsGeneratedViewTypes';
-import type {
-  SessionResultsGeneratedAnalysisArtifact,
-} from '../../utilities/sessionResultsExport/sessionResultsAnalysisArtifacts';
+import type { SessionResultsGeneratedAnalysisArtifact } from '../../utilities/sessionResultsExport/sessionResultsAnalysisArtifacts';
 
 export type GeneratedResultsViewOption = {
   key: SessionGeneratedResultsViewKey;
@@ -148,7 +146,6 @@ export const buildInitialGeneratedResultsControllerState = (): GeneratedResultsC
   viewStates: {},
 });
 
-
 export const shouldOfferGeneratedResultsAuthorization = ({
   account,
   sessionConfig,
@@ -196,10 +193,16 @@ export const resolveGeneratedResultsControllerState = ({
   const lastGood = toRecord(state.lastGood);
   const source = toRecord(lastGood.source);
   const snapshot = toRecord(lastGood.snapshot);
-  const artifact = (toRecord(lastGood.artifact).kind ? lastGood.artifact : null) as SessionResultsGeneratedAnalysisArtifact | null;
-  const viewOptions = VIEW_OPTIONS.filter((option) => settings.views[option.key as keyof typeof settings.views] === true);
+  const artifact = (
+    toRecord(lastGood.artifact).kind ? lastGood.artifact : null
+  ) as SessionResultsGeneratedAnalysisArtifact | null;
+  const viewOptions = VIEW_OPTIONS.filter(
+    (option) => settings.views[option.key as keyof typeof settings.views] === true,
+  );
   const viewStates = VIEW_OPTIONS.reduce<Record<string, { available: boolean; reason: string }>>((acc, option) => {
-    const section = toRecord(artifact?.sections?.[option.sourceSection as keyof SessionResultsGeneratedAnalysisArtifact['sections']]);
+    const section = toRecord(
+      artifact?.sections?.[option.sourceSection as keyof SessionResultsGeneratedAnalysisArtifact['sections']],
+    );
     acc[option.key] = {
       available: section.available === true,
       reason: toText(section.reason),
@@ -218,7 +221,12 @@ export const resolveGeneratedResultsControllerState = ({
   const hasActiveJob = jobState === 'running' || jobState === 'queued' || !!active.attemptId || !!active.requestId;
   const canRetryAutomaticFailure = !!lastFailure && settings.generationMode === 'automatic';
   const canCheckStatus = viewerAuthorized && pollExpired;
-  const canGenerate = adminAuthorized && !canCheckStatus && !hasActiveJob && (manualMode || canRetryAutomaticFailure) && manualCapability.supported !== false;
+  const canGenerate =
+    adminAuthorized &&
+    !canCheckStatus &&
+    !hasActiveJob &&
+    (manualMode || canRetryAutomaticFailure) &&
+    manualCapability.supported !== false;
   const isRunning = hasActiveJob && !pollExpired;
   const generatedAtLabel = formatGeneratedAt(lastGood.generatedAt || artifact?.generatedAt);
   const coverageLabel = buildCoverageLabel(source);
@@ -252,7 +260,10 @@ export const resolveGeneratedResultsControllerState = ({
           : adminAuthorized && canGenerate
             ? 'No generated view yet.'
             : 'No generated view is available yet.',
-    unsupportedReason: adminAuthorized && !canGenerate && !canCheckStatus ? readError(manualCapability) || 'Manual generated views are disabled for this session.' : '',
+    unsupportedReason:
+      adminAuthorized && !canGenerate && !canCheckStatus
+        ? readError(manualCapability) || 'Manual generated views are disabled for this session.'
+        : '',
     viewOptions,
     viewStates,
   };

@@ -77,15 +77,25 @@ const getCellTestId = (axes: RiskMatrixSeverityAxes, xLevelId: string, yLevelId:
   return `ce-risk-matrix-axis-cell-x-${toTestIdFragment(xLevelId)}-y-${toTestIdFragment(yLevelId)}`;
 };
 
-const getAssessmentPanelId = (assessmentId: string) => `ce-risk-matrix-generated-assessment-${toTestIdFragment(assessmentId)}`;
+const getAssessmentPanelId = (assessmentId: string) =>
+  `ce-risk-matrix-generated-assessment-${toTestIdFragment(assessmentId)}`;
 
 const normalizeSourceRefs = (sourceRefs: string[] | undefined): string[] =>
-  Array.from(new Set((Array.isArray(sourceRefs) ? sourceRefs : []).map((sourceRef) => sourceRef.trim()).filter(Boolean)));
+  Array.from(
+    new Set((Array.isArray(sourceRefs) ? sourceRefs : []).map((sourceRef) => sourceRef.trim()).filter(Boolean)),
+  );
 
 const normalizeAxes = (axes: RiskMatrixSeverityAxes | null | undefined): RiskMatrixSeverityAxes => {
   const xLevels = Array.isArray(axes?.x?.levels) ? axes.x.levels.filter((level) => level?.id && level?.label) : [];
   const yLevels = Array.isArray(axes?.y?.levels) ? axes.y.levels.filter((level) => level?.id && level?.label) : [];
-  if (!axes?.x?.id || !axes?.x?.label || !axes?.y?.id || !axes?.y?.label || xLevels.length === 0 || yLevels.length === 0) {
+  if (
+    !axes?.x?.id ||
+    !axes?.x?.label ||
+    !axes?.y?.id ||
+    !axes?.y?.label ||
+    xLevels.length === 0 ||
+    yLevels.length === 0
+  ) {
     return DEFAULT_AXES;
   }
   return {
@@ -130,7 +140,8 @@ const RiskMatrixGeneratedSeverity = ({ assessments, axes: inputAxes = null }: Ri
       <div className={styles.subgridHeader}>
         <h3 className={styles.sectionTitle}>Generated risk matrix</h3>
         <p className={styles.subgridSummary}>
-          AI-generated qualitative assessments from the session snapshot, organized by generated axes. These are not measured response counts.
+          AI-generated qualitative assessments from the session snapshot, organized by generated axes. These are not
+          measured response counts.
         </p>
       </div>
       <div className={styles.gridScroll}>
@@ -144,7 +155,9 @@ const RiskMatrixGeneratedSeverity = ({ assessments, axes: inputAxes = null }: Ri
           }}
         >
           <div className={clsx(styles.cell, styles.cornerCell)} style={{ gridColumn: 1, gridRow: 1 }}>
-            <span>{axes.y.label} / {axes.x.label}</span>
+            <span>
+              {axes.y.label} / {axes.x.label}
+            </span>
           </div>
           {axes.x.levels.map((xLevel, index) => (
             <div
@@ -185,7 +198,9 @@ const RiskMatrixGeneratedSeverity = ({ assessments, axes: inputAxes = null }: Ri
                               onClick={() => toggleAssessment(assessment.id)}
                             >
                               <span className={styles.generatedSeverityCategory}>{assessment.category}</span>
-                              <span className={styles.generatedSeverityCue}>{expanded ? 'Hide details' : 'Show details'}</span>
+                              <span className={styles.generatedSeverityCue}>
+                                {expanded ? 'Hide details' : 'Show details'}
+                              </span>
                             </button>
                             {expanded ? (
                               <div id={panelId} className={styles.generatedSeverityDetails}>

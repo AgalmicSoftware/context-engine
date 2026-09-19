@@ -63,6 +63,7 @@ const QuestionCardLinks = ({
       aria-label={isQuestionBookmarked ? 'Remove bookmark' : 'Bookmark question'}
       aria-pressed={isQuestionBookmarked}
       title={isQuestionBookmarked ? 'Remove Bookmark' : 'Bookmark Question'}
+      data-ce-control-appearance="frameless"
     >
       <FontAwesomeIcon icon={faBookmark} style={resolveQuestionCardBookmarkIconStyle(isQuestionBookmarked)} />
     </button>
@@ -73,6 +74,7 @@ const QuestionCardLinks = ({
         rel="noopener noreferrer"
         className={styles.cardLinkButton}
         title="View on Arweave"
+        data-ce-control-appearance="frameless"
       >
         <FontAwesomeIcon icon={faExternalLinkAlt} />
       </a>
@@ -84,6 +86,7 @@ const QuestionCardLinks = ({
         rel="noopener noreferrer"
         className={styles.cardLinkButton}
         title="View question page"
+        data-ce-control-appearance="frameless"
       >
         <FontAwesomeIcon icon={faExpand} />
       </a>

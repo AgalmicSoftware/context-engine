@@ -564,7 +564,6 @@ class OnePageSession extends Component<any, any> {
     });
   }
 
-
   resetGeneratedResultsAnalysis() {
     resetGeneratedResultsAnalysis(this);
   }
@@ -618,7 +617,11 @@ class OnePageSession extends Component<any, any> {
       sessionConfig: previousSessionConfig,
       sessionSlug: prevSlug,
     });
-    const currentGeneratedIdentityKey = buildGeneratedResultsIdentityForHost(this, currentGeneratedRuntime, currentSessionConfig);
+    const currentGeneratedIdentityKey = buildGeneratedResultsIdentityForHost(
+      this,
+      currentGeneratedRuntime,
+      currentSessionConfig,
+    );
     const previousGeneratedIdentityKey = buildGeneratedResultsIdentityForHost(
       { ...this, props: prevProps },
       previousGeneratedRuntime,
@@ -736,7 +739,10 @@ class OnePageSession extends Component<any, any> {
     }
 
     maybeScheduleAggregatorRebuild();
-    if (showResultsOpened || (showResultsVisible && (loginJustCompleted || generatedIdentityChanged || aggregatorInvalidated))) {
+    if (
+      showResultsOpened ||
+      (showResultsVisible && (loginJustCompleted || generatedIdentityChanged || aggregatorInvalidated))
+    ) {
       void this.loadGeneratedResultsArtifact();
     }
 

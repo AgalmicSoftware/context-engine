@@ -74,6 +74,7 @@ For testing, run modes, and deeper setup:
 - Voice-to-text input
 - Question generation from file, URL, or text input
 - Summaries and analysis of survey results and response clusters
+- Optional interview research metadata for comparing AI draft predictions with reviewed submitted responses; see [the interview research diagrams](docs/assets/interview-research/README.md) and [schema notes](docs/session-interview-research.md)
 - Export deliberation snapshots and consensus statistics as evaluation / preference datasets for AI benchmarking and training
 - OpenAI, Anthropic, OpenRouter, and custom provider paths
 
@@ -122,6 +123,7 @@ The default public deployment supports hundreds to low thousands of concurrent p
 - Testing guide: [docs/testing.md](docs/testing.md)
 - Run modes: [docs/run-modes.md](docs/run-modes.md)
 - Public client config and current defaults: [docs/public-client-config.md](docs/public-client-config.md)
+- Session interview research metadata: [docs/session-interview-research.md](docs/session-interview-research.md)
 - PATH / RPC behavior: [docs/path-rpc.md](docs/path-rpc.md)
 - Cloudflare worker docs: [docs/session-cors-worker.md](docs/session-cors-worker.md)
 - Agent Bridge worker docs: [workers/agentBridgeWorker/README.md](workers/agentBridgeWorker/README.md)

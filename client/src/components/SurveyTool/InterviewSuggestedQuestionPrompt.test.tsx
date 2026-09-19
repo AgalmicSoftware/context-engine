@@ -17,7 +17,6 @@ it('shows a question heading and lets the owner edit it explicitly', () => {
   expect(screen.getByRole('heading', { name: 'Which policy matters?' })).toBeInTheDocument();
 });
 
-
 it('shows the normalized type and multichoice options for review cards', () => {
   render(
     <InterviewSuggestedQuestionPrompt

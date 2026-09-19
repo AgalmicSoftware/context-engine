@@ -35,46 +35,50 @@ export type InterviewGroupRecommendation = {
 };
 
 export type InterviewGroupRecommendationUnavailableReason =
-  | 'empty_eligible_catalog'
-  | 'ai_authentication_required'
-  | 'ai_recommendation_failed';
+  'empty_eligible_catalog' | 'ai_authentication_required' | 'ai_recommendation_failed';
 
-export type InterviewGroupRecommendationResult = {
-  status: 'ready';
-  recommendations: InterviewGroupRecommendation[];
-} | {
-  status: 'unavailable';
-  recommendations: [];
-  reason: InterviewGroupRecommendationUnavailableReason;
-};
+export type InterviewGroupRecommendationResult =
+  | {
+      status: 'ready';
+      recommendations: InterviewGroupRecommendation[];
+    }
+  | {
+      status: 'unavailable';
+      recommendations: [];
+      reason: InterviewGroupRecommendationUnavailableReason;
+    };
 
-export type InterviewWorkerGroupTarget = {
-  supported: true;
-  sessionId: string;
-  sessionSlug: string;
-  workerUrl: string;
-  anonymousDiscoveryAllowed: boolean;
-} | {
-  supported: false;
-  reason:
-    | 'worker_groups_profile_required'
-    | 'registry_groups_inline_join_unsupported'
-    | 'worker_group_session_identity_missing'
-    | 'worker_group_worker_url_missing';
-};
+export type InterviewWorkerGroupTarget =
+  | {
+      supported: true;
+      sessionId: string;
+      sessionSlug: string;
+      workerUrl: string;
+      anonymousDiscoveryAllowed: boolean;
+    }
+  | {
+      supported: false;
+      reason:
+        | 'worker_groups_profile_required'
+        | 'registry_groups_inline_join_unsupported'
+        | 'worker_group_session_identity_missing'
+        | 'worker_group_worker_url_missing';
+    };
 
-export type InterviewGroupCandidateLoadResult = {
-  status: 'ready';
-  candidates: InterviewGroupCandidate[];
-  source: 'public' | 'authenticated';
-  sessionId: string;
-  sessionSlug: string;
-  workerUrl: string;
-} | {
-  status: 'unsupported' | 'error';
-  candidates: [];
-  reason: string;
-};
+export type InterviewGroupCandidateLoadResult =
+  | {
+      status: 'ready';
+      candidates: InterviewGroupCandidate[];
+      source: 'public' | 'authenticated';
+      sessionId: string;
+      sessionSlug: string;
+      workerUrl: string;
+    }
+  | {
+      status: 'unsupported' | 'error';
+      candidates: [];
+      reason: string;
+    };
 
 export type LoadInterviewWorkerGroupCandidatesArgs = {
   sessionConfig: unknown;
@@ -101,7 +105,7 @@ const MAX_PROMPT_DRAFTS = 12;
 const MAX_PROMPT_GROUPS = 100;
 const MAX_RECOMMENDATIONS = 4;
 
-const chunkCandidates = <T,>(items: T[], size: number): T[][] => {
+const chunkCandidates = <T>(items: T[], size: number): T[][] => {
   const chunks: T[][] = [];
   for (let index = 0; index < items.length; index += size) {
     chunks.push(items.slice(index, index + size));
@@ -466,7 +470,11 @@ export const parseInterviewGroupRecommendations = (
   opts: { evidenceSourceText?: unknown } = {},
 ): InterviewGroupRecommendation[] => {
   const parsed = parseJsonObject(raw);
-  const rows = Array.isArray(parsed.groups) ? parsed.groups : Array.isArray(parsed.recommendations) ? parsed.recommendations : [];
+  const rows = Array.isArray(parsed.groups)
+    ? parsed.groups
+    : Array.isArray(parsed.recommendations)
+      ? parsed.recommendations
+      : [];
   const candidateById = new Map(candidates.map((candidate) => [candidate.groupId, candidate]));
   const seen = new Set<string>();
   return rows.reduce<InterviewGroupRecommendation[]>((items, row) => {
@@ -512,13 +520,22 @@ export const recommendInterviewGroups = async ({
 }: RecommendInterviewGroupsArgs): Promise<InterviewGroupRecommendationResult> => {
   const eligible = candidates.slice();
   if (!eligible.length) return { status: 'unavailable', recommendations: [], reason: 'empty_eligible_catalog' };
-  const evidenceSourceText = buildInterviewGroupRecommendationEvidenceText({ transcript, prefillPacket, draftResponses });
+  const evidenceSourceText = buildInterviewGroupRecommendationEvidenceText({
+    transcript,
+    prefillPacket,
+    draftResponses,
+  });
   const recommendations: InterviewGroupRecommendation[] = [];
   const seen = new Set<string>();
   try {
     for (const candidateChunk of chunkCandidates(eligible, MAX_PROMPT_GROUPS)) {
       const raw = await callAI(
-        buildInterviewGroupRecommendationPrompt({ candidates: candidateChunk, transcript, prefillPacket, draftResponses }),
+        buildInterviewGroupRecommendationPrompt({
+          candidates: candidateChunk,
+          transcript,
+          prefillPacket,
+          draftResponses,
+        }),
         {
           sessionSlug,
           sessionConfig,

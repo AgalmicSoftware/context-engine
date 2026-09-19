@@ -248,7 +248,9 @@ const hasRestoreState = (restoreState: RiskMatrixRestoreState | null | undefined
   Boolean(restoreState && typeof restoreState === 'object' && Object.keys(restoreState).length > 0);
 
 const normalizeRiskMatrixComments = (comments: unknown): RiskCommentRecord[] =>
-  Array.isArray(comments) ? comments.filter(isValidCommentRecord).map(normalizeCommentRecord).map(enrichRiskMatrixCommentRecord) : [];
+  Array.isArray(comments)
+    ? comments.filter(isValidCommentRecord).map(normalizeCommentRecord).map(enrichRiskMatrixCommentRecord)
+    : [];
 
 const buildInitialRiskMatrixState = (
   restoreState: RiskMatrixRestoreState | null | undefined,
@@ -258,7 +260,7 @@ const buildInitialRiskMatrixState = (
     ? restoreState.comments.filter(isValidCommentRecord).map(normalizeCommentRecord).map(enrichRiskMatrixCommentRecord)
     : Array.isArray(initialComments)
       ? normalizeRiskMatrixComments(initialComments)
-    : INITIAL_COMMENTS;
+      : INITIAL_COMMENTS;
   const rawSelectedCellId = String(restoreState?.selectedCellId || '').trim();
   const selectedCellId =
     isAggregateCellId(rawSelectedCellId) || isCanonicalCellId(rawSelectedCellId) ? rawSelectedCellId : '';
@@ -334,8 +336,10 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
           (entry) =>
             entry &&
             typeof entry === 'object' &&
-            ((typeof entry.xLevelId === 'string' && entry.xLevelId.trim() &&
-              typeof entry.yLevelId === 'string' && entry.yLevelId.trim()) ||
+            ((typeof entry.xLevelId === 'string' &&
+              entry.xLevelId.trim() &&
+              typeof entry.yLevelId === 'string' &&
+              entry.yLevelId.trim()) ||
               (SEVERITY_LEVELS.includes(entry.likelihood as RiskSeverityLevel) &&
                 SEVERITY_LEVELS.includes(entry.impact as RiskSeverityLevel))) &&
             typeof entry.summary === 'string' &&

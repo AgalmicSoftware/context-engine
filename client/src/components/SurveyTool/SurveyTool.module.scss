@@ -2417,7 +2417,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 .cardLinkButton {
   background: none;
-  border: none;
+  border: 0 !important;
+  box-shadow: none !important;
   padding: 5px;
   cursor: pointer;
   opacity: 0.15;
@@ -2426,6 +2427,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   transition: opacity 0.2s ease-in-out;
   &:hover {
     opacity: 1;
+    box-shadow: none !important;
+  }
+  &:focus-visible {
+    outline: 2px dotted var(--ce-focus-ring);
+    outline-offset: 2px;
   }
 }
 
@@ -3746,8 +3752,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .sessionAgentKickoffCopyTarget {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  justify-content: flex-start;
   min-width: 0;
   min-height: 48px;
   padding: 6px 0;
@@ -3786,6 +3791,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
+  vertical-align: middle;
+  margin-block: 3px;
+  margin-inline-end: 6px;
   gap: 6px;
   min-height: 30px;
   padding: 5px 9px;

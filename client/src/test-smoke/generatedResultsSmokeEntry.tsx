@@ -6,15 +6,17 @@ import { BrowserRouter } from 'react-router-dom';
 import store from '../store';
 import { LOGIN_ACCOUNT } from '../actions/types';
 import OnePageSession from '../components/OnePageSession/OnePageSession';
-import { authorizeGeneratedResultsForHost, generateResultsForHost } from '../components/OnePageSession/onePageSessionGeneratedResultsRuntime';
-import { adminWorkerPorts } from '../domains/worker/adminWorkerPorts';
-import { readSessionResultsAnalysisStatus, startSessionResultsAnalysisGeneration } from '../domains/sessionResults/sessionResultsAnalysisWorkerClient';
-import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../utilities/session/sessionModeProfile';
 import {
-  buildTokenCacheEnvelope,
-  buildTokenCacheKey,
-  writeTokenCache,
-} from '../utilities/worker/workerAuthTokenCache';
+  authorizeGeneratedResultsForHost,
+  generateResultsForHost,
+} from '../components/OnePageSession/onePageSessionGeneratedResultsRuntime';
+import { adminWorkerPorts } from '../domains/worker/adminWorkerPorts';
+import {
+  readSessionResultsAnalysisStatus,
+  startSessionResultsAnalysisGeneration,
+} from '../domains/sessionResults/sessionResultsAnalysisWorkerClient';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../utilities/session/sessionModeProfile';
+import { buildTokenCacheEnvelope, buildTokenCacheKey, writeTokenCache } from '../utilities/worker/workerAuthTokenCache';
 
 import 'assets/css/contextEngine.scss';
 import './generatedResultsSmokeEntry.css';
@@ -22,7 +24,8 @@ import './generatedResultsSmokeEntry.css';
 const sessionSlug = 'synthetic-generated-results-smoke';
 const sessionId = '0x11111111111111111111111111111111';
 const adminAccount = '0x0000000000000000000000000000000000000abc';
-const isAnonymousViewer = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('viewer') === 'anonymous';
+const isAnonymousViewer =
+  typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('viewer') === 'anonymous';
 const account = isAnonymousViewer ? '' : adminAccount;
 const workerUrl = 'https://worker.example';
 
@@ -32,7 +35,8 @@ const syntheticProvider = {
   address: adminAccount,
   request: async ({ method }: { method: string; params?: unknown[] }) => {
     if (method === 'eth_accounts') return [adminAccount];
-    if (method === 'personal_sign' || method === 'eth_sign' || method === 'eth_signTypedData_v4') return '0xsyntheticsignature';
+    if (method === 'personal_sign' || method === 'eth_sign' || method === 'eth_signTypedData_v4')
+      return '0xsyntheticsignature';
     return null;
   },
 };
@@ -75,7 +79,6 @@ store.dispatch({
     network: { id: 11155420, chainId: 11155420, name: 'OP Sepolia' },
   },
 });
-
 
 const smokeAuthHeaders = async () => ({ Authorization: 'Bearer synthetic-viewer-token', 'X-Group-Slug': sessionSlug });
 const smokeRuntimePorts = {
@@ -145,32 +148,32 @@ createRoot(document.getElementById('root') as HTMLElement).render(
   <Provider store={store}>
     <BrowserRouter>
       <main className="smokePage" data-testid="ce-real-generated-results-smoke" data-provider="redux">
-      <OnePageSession
-        account={account}
-        blockLimits={{}}
-        cacheHasLoaded={true}
-        contracts={{}}
-        defaultFilterState={{ includedSBTs: [], excludedSBTs: [], onlyVerifiedHumans: false }}
-        isQuestionCacheReady={true}
-        isResponsesCacheReady={true}
-        isSBTCacheReady={true}
-        isSurveyCacheReady={true}
-        litHooks={{}}
-        loginComplete={!isAnonymousViewer}
-        network={{ id: 11155420, chainId: 11155420, name: 'OP Sepolia' }}
-        provider={isAnonymousViewer ? 'none' : 'passkey_eoa'}
-        questionResponsesNonce={1}
-        questionScanProgress={null}
-        refreshQuestionMetadata={noop}
-        refreshQuestionResponses={noop}
-        refreshSbtData={noop}
-        refreshSurveyResponsesByID={noop}
-        sbtCacheRevision={1}
-        sbtScanProgressBySlug={{}}
-        sessionConfig={sessionConfig}
-        slug={sessionSlug}
-        toggleLoginModal={noop}
-      />
+        <OnePageSession
+          account={account}
+          blockLimits={{}}
+          cacheHasLoaded={true}
+          contracts={{}}
+          defaultFilterState={{ includedSBTs: [], excludedSBTs: [], onlyVerifiedHumans: false }}
+          isQuestionCacheReady={true}
+          isResponsesCacheReady={true}
+          isSBTCacheReady={true}
+          isSurveyCacheReady={true}
+          litHooks={{}}
+          loginComplete={!isAnonymousViewer}
+          network={{ id: 11155420, chainId: 11155420, name: 'OP Sepolia' }}
+          provider={isAnonymousViewer ? 'none' : 'passkey_eoa'}
+          questionResponsesNonce={1}
+          questionScanProgress={null}
+          refreshQuestionMetadata={noop}
+          refreshQuestionResponses={noop}
+          refreshSbtData={noop}
+          refreshSurveyResponsesByID={noop}
+          sbtCacheRevision={1}
+          sbtScanProgressBySlug={{}}
+          sessionConfig={sessionConfig}
+          slug={sessionSlug}
+          toggleLoginModal={noop}
+        />
       </main>
     </BrowserRouter>
   </Provider>,

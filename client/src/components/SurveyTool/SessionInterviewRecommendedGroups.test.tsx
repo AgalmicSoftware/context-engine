@@ -28,9 +28,9 @@ jest.mock('../../utilities/worker/workerGroupChangeEvents', () => ({
   dispatchWorkerGroupsChanged: jest.fn(),
 }));
 
-const actualRecommendationsModule = jest.requireActual<
-  typeof import('./SessionInterviewRecommendedGroups')
->('./SessionInterviewRecommendedGroups');
+const actualRecommendationsModule = jest.requireActual<typeof import('./SessionInterviewRecommendedGroups')>(
+  './SessionInterviewRecommendedGroups',
+);
 const { SessionInterviewRecommendedGroups } = actualRecommendationsModule;
 
 const sessionId = `0x${'1'.repeat(32)}`;
@@ -70,7 +70,10 @@ const renderRecommendations = (props: Partial<React.ComponentProps<typeof Sessio
     />,
   );
 
-const overview = (groups: WorkerGroup[], memberships: WorkerGroupOverview['memberships'] = []): WorkerGroupOverview => ({
+const overview = (
+  groups: WorkerGroup[],
+  memberships: WorkerGroupOverview['memberships'] = [],
+): WorkerGroupOverview => ({
   groups,
   memberships,
 });
@@ -86,14 +89,20 @@ describe('SessionInterviewRecommendedGroups', () => {
   });
 
   it('renders only eligible recommended public groups without signing in', async () => {
-    jest.mocked(loadPublicWorkerGroups).mockResolvedValue([
-      group(),
-      group({ groupId: 'restricted', label: 'Restricted', joinMode: 'admin_add' }),
-      group({ groupId: 'expired', label: 'Expired', joinEndsAt: '2020-01-01T00:00:00.000Z' }),
-      group({ groupId: 'unrecommended', label: 'Unrecommended' }),
-    ]);
+    jest
+      .mocked(loadPublicWorkerGroups)
+      .mockResolvedValue([
+        group(),
+        group({ groupId: 'restricted', label: 'Restricted', joinMode: 'admin_add' }),
+        group({ groupId: 'expired', label: 'Expired', joinEndsAt: '2020-01-01T00:00:00.000Z' }),
+        group({ groupId: 'unrecommended', label: 'Unrecommended' }),
+      ]);
     renderRecommendations({
-      recommendations: [recommendation(), recommendation({ groupId: 'restricted' }), recommendation({ groupId: 'expired' })],
+      recommendations: [
+        recommendation(),
+        recommendation({ groupId: 'restricted' }),
+        recommendation({ groupId: 'expired' }),
+      ],
     });
 
     expect(await screen.findByRole('heading', { name: 'Suggested groups (1)' })).toBeInTheDocument();
@@ -222,9 +231,11 @@ describe('SessionInterviewRecommendedGroups', () => {
         address: account,
       }),
     );
-    jest.mocked(loadWorkerGroupOverview).mockResolvedValue(
-      overview([group()], [{ group: group(), member: { groupId: 'ai-optimists', sessionSlug: 'demo' } }]),
-    );
+    jest
+      .mocked(loadWorkerGroupOverview)
+      .mockResolvedValue(
+        overview([group()], [{ group: group(), member: { groupId: 'ai-optimists', sessionSlug: 'demo' } }]),
+      );
     renderRecommendations({ account, loginComplete: true });
 
     await waitFor(() => expect(loadWorkerGroupOverview).toHaveBeenCalledTimes(1));
@@ -233,14 +244,15 @@ describe('SessionInterviewRecommendedGroups', () => {
     expect(screen.queryByTestId('ce-session-interview-join-group-ai-optimists')).not.toBeInTheDocument();
   });
 
-
   it('drops a pending join when the same group recommendation evidence changes before login completes', async () => {
     const view = renderRecommendations();
     fireEvent.click(await screen.findByTestId('ce-session-interview-join-group-ai-optimists'));
 
     view.rerender(
       <SessionInterviewRecommendedGroups
-        recommendations={[recommendation({ evidence: 'Question: AI governance? Answer: I changed this support claim.' })]}
+        recommendations={[
+          recommendation({ evidence: 'Question: AI governance? Answer: I changed this support claim.' }),
+        ]}
         account={account}
         loginComplete
         sessionConfig={{ slug: 'demo', sessionId }}

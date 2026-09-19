@@ -2,9 +2,18 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import OnePageSessionTelegramShell from './OnePageSessionTelegramShell';
 
-jest.mock('./telegram/TelegramQuestionPile', () => ({ __esModule: true, default: () => <div data-testid="telegram-question-pile" /> }));
-jest.mock('./telegram/TelegramBucketCards', () => ({ __esModule: true, default: () => <div data-testid="telegram-bucket-cards" /> }));
-jest.mock('./WorkerGroupMembershipPanel', () => ({ __esModule: true, default: () => <div data-testid="worker-group-membership-panel" /> }));
+jest.mock('./telegram/TelegramQuestionPile', () => ({
+  __esModule: true,
+  default: () => <div data-testid="telegram-question-pile" />,
+}));
+jest.mock('./telegram/TelegramBucketCards', () => ({
+  __esModule: true,
+  default: () => <div data-testid="telegram-bucket-cards" />,
+}));
+jest.mock('./WorkerGroupMembershipPanel', () => ({
+  __esModule: true,
+  default: () => <div data-testid="worker-group-membership-panel" />,
+}));
 
 const baseProps = {
   account: '0xabc',

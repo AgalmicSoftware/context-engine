@@ -19,7 +19,10 @@ import { hasDemoAnalysisFixture } from '../../utilities/demo/demoPolisDatasets';
 import type { RiskMatrixRestoreState } from '../MainContent/RiskMatrix';
 import type { SessionGeneratedResultsViewKey } from '../../domains/sessionResults/sessionResultsGeneratedViewTypes';
 import type { SessionResultsGeneratedAnalysisArtifact } from '../../utilities/sessionResultsExport/sessionResultsAnalysisArtifacts';
-import type { GeneratedResultsSnapshotQuestion, GeneratedResultsSnapshotResponse } from '../../domains/sessionResults/sessionResultsAnalysisController';
+import type {
+  GeneratedResultsSnapshotQuestion,
+  GeneratedResultsSnapshotResponse,
+} from '../../domains/sessionResults/sessionResultsAnalysisController';
 import styles from './OnePageSession.module.scss';
 import OnePageSessionAutoMintAlerts, { type OnePageSessionAutoMintAlertsProps } from './OnePageSessionAutoMintAlerts';
 
@@ -283,32 +286,42 @@ export default function OnePageSessionStandardShell({
 }: OnePageSessionStandardShellProps) {
   const basePath = readPublicUrlBasePath();
   const showDemoAnalysisView = isDemoSlug && hasDemoAnalysisFixture(displaySessionSlug);
-  const generatedState = (generatedResultsAnalysis && typeof generatedResultsAnalysis === 'object' ? generatedResultsAnalysis : {}) as UnknownRecord;
+  const generatedState = (
+    generatedResultsAnalysis && typeof generatedResultsAnalysis === 'object' ? generatedResultsAnalysis : {}
+  ) as UnknownRecord;
   const generatedHasArtifact = !!generatedState.artifact;
-  const generatedViewOptions = generatedState.viewerAuthorized === true && generatedHasArtifact
-    ? (Array.isArray(generatedState.viewOptions) ? generatedState.viewOptions : []).map((option: unknown) => {
-        const record = option && typeof option === 'object' ? (option as UnknownRecord) : {};
-        const key = String(record.key || '');
-        return {
-          key,
-          label: String(record.label || key),
-          icon: key === 'circles' ? '◎' : key === 'breakdown' ? '📊' : '⚠️',
-        };
-      }).filter((option) => option.key)
-    : [];
+  const generatedViewOptions =
+    generatedState.viewerAuthorized === true && generatedHasArtifact
+      ? (Array.isArray(generatedState.viewOptions) ? generatedState.viewOptions : [])
+          .map((option: unknown) => {
+            const record = option && typeof option === 'object' ? (option as UnknownRecord) : {};
+            const key = String(record.key || '');
+            return {
+              key,
+              label: String(record.label || key),
+              icon: key === 'circles' ? '◎' : key === 'breakdown' ? '📊' : '⚠️',
+            };
+          })
+          .filter((option) => option.key)
+      : [];
   const generatedViewKeys = new Set(generatedViewOptions.map((option) => option.key));
   const requestedResultsViewMode = resultsViewMode;
   const effectiveResultsViewMode = generatedViewKeys.has(requestedResultsViewMode)
     ? requestedResultsViewMode
     : isDemoSlug
-      ? requestedResultsViewMode === 'analysis' && !showDemoAnalysisView ? 'polis' : requestedResultsViewMode
-      : requestedResultsViewMode === 'polis' ? requestedResultsViewMode : 'polis';
+      ? requestedResultsViewMode === 'analysis' && !showDemoAnalysisView
+        ? 'polis'
+        : requestedResultsViewMode
+      : requestedResultsViewMode === 'polis'
+        ? requestedResultsViewMode
+        : 'polis';
   const resultsViewOptions = buildResultsViewOptions(isDemoSlug, showDemoAnalysisView, generatedViewOptions);
   const generatedStatus = String(generatedState.status || 'idle');
   const generatedIsRunning = generatedState.isRunning === true || generatedStatus === 'running';
   const generatedCanCheckStatus = generatedState.canCheckStatus === true;
   const generatedCanGenerate = generatedState.canGenerate === true && !generatedIsRunning;
-  const showGeneratedCheckAction = generatedCanCheckStatus || (generatedResultsAuthAvailable && generatedState.adminAuthorized !== true);
+  const showGeneratedCheckAction =
+    generatedCanCheckStatus || (generatedResultsAuthAvailable && generatedState.adminAuthorized !== true);
   const showGeneratedGenerateAction = generatedState.adminAuthorized === true && !generatedCanCheckStatus;
   const generatedCheckActionLabel = generatedCanCheckStatus ? 'Recheck AI Views' : 'Check AI Views';
   const generatedActionLabel = generatedIsRunning
@@ -758,16 +771,18 @@ export default function OnePageSessionStandardShell({
                     </div>
                   </Suspense>
                 )}
-                {isDemoSlug && effectiveResultsViewMode === 'riskMatrix' && !generatedViewKeys.has(effectiveResultsViewMode) && (
-                  <Suspense fallback={<LazyFallback label="Loading Risk Matrix..." minHeight="30vh" />}>
-                    <RiskMatrix
-                      embedded={true}
-                      onOpenAtlasNode={onCorpusAtlasIssueOpen}
-                      restoreState={riskMatrixRestoreState}
-                      onRestoreApplied={onRiskMatrixRestoreApplied}
-                    />
-                  </Suspense>
-                )}
+                {isDemoSlug &&
+                  effectiveResultsViewMode === 'riskMatrix' &&
+                  !generatedViewKeys.has(effectiveResultsViewMode) && (
+                    <Suspense fallback={<LazyFallback label="Loading Risk Matrix..." minHeight="30vh" />}>
+                      <RiskMatrix
+                        embedded={true}
+                        onOpenAtlasNode={onCorpusAtlasIssueOpen}
+                        restoreState={riskMatrixRestoreState}
+                        onRestoreApplied={onRiskMatrixRestoreApplied}
+                      />
+                    </Suspense>
+                  )}
                 {generatedViewKeys.has(effectiveResultsViewMode) && (
                   <div className={styles.generatedResultsPanel} data-testid="ce-session-generated-results-panel">
                     <div className={styles.generatedResultsStatus}>
@@ -778,15 +793,29 @@ export default function OnePageSessionStandardShell({
                       <Suspense fallback={<LazyFallback label="Loading generated AI view..." minHeight="30vh" />}>
                         <SessionGeneratedResultsViews
                           artifact={generatedState.artifact as SessionResultsGeneratedAnalysisArtifact}
-                          questions={(Array.isArray(generatedState.questions) ? generatedState.questions : []) as GeneratedResultsSnapshotQuestion[]}
-                          responses={(Array.isArray(generatedState.responses) ? generatedState.responses : []) as GeneratedResultsSnapshotResponse[]}
+                          questions={
+                            (Array.isArray(generatedState.questions)
+                              ? generatedState.questions
+                              : []) as GeneratedResultsSnapshotQuestion[]
+                          }
+                          responses={
+                            (Array.isArray(generatedState.responses)
+                              ? generatedState.responses
+                              : []) as GeneratedResultsSnapshotResponse[]
+                          }
                           selectedView={effectiveResultsViewMode as SessionGeneratedResultsViewKey}
                           sessionSlug={displaySessionSlug}
                         />
                       </Suspense>
                     ) : (
                       <div className={styles.generatedResultsEmpty} data-testid="ce-session-generated-results-empty">
-                        <p>{String(generatedState.unsupportedReason || generatedState.statusLabel || 'No generated view is available yet.')}</p>
+                        <p>
+                          {String(
+                            generatedState.unsupportedReason ||
+                              generatedState.statusLabel ||
+                              'No generated view is available yet.',
+                          )}
+                        </p>
                       </div>
                     )}
                   </div>

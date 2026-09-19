@@ -169,12 +169,18 @@ describe('sessionResultsGeneratedViewAdapters', () => {
             x: {
               id: 'readiness_uncertainty',
               label: 'Readiness uncertainty',
-              levels: [{ id: 'settled', label: 'Settled' }, { id: 'uncertain', label: 'Uncertain' }],
+              levels: [
+                { id: 'settled', label: 'Settled' },
+                { id: 'uncertain', label: 'Uncertain' },
+              ],
             },
             y: {
               id: 'coordination_load',
               label: 'Coordination load',
-              levels: [{ id: 'light', label: 'Light' }, { id: 'heavy', label: 'Heavy' }],
+              levels: [
+                { id: 'light', label: 'Light' },
+                { id: 'heavy', label: 'Heavy' },
+              ],
             },
           },
           assessments: [

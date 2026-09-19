@@ -70,15 +70,15 @@ export default function SessionInterviewResearchConsent({
         </button>
       </div>
       <span id="ce-interview-research-description" className={styles.srOnly}>
-        Includes original predictions, AI revisions from continued interviews, reviewed final values, changed fields, and
-        drafts you did not select. Unselected drafts are recorded as research metadata, not submitted answers. Edits are
-        not treated as agreement. Encrypted answer and comment text, full interview transcripts, and imported
+        Includes original predictions, AI revisions from continued interviews, reviewed final values, changed fields,
+        and drafts you did not select. Unselected drafts are recorded as research metadata, not submitted answers. Edits
+        are not treated as agreement. Encrypted answer and comment text, full interview transcripts, and imported
         conversation history are excluded.
       </span>
       <UncontrolledTooltip target="ce-interview-research-help" placement="top" trigger="hover focus" autohide={false}>
         Includes original predictions, AI revisions, reviewed final values, changed fields, and unselected drafts.
-        Unselected drafts are research metadata, not submitted answers. Edits are not treated as agreement.
-        Encrypted text, transcripts, and imported conversation history are excluded.{' '}
+        Unselected drafts are research metadata, not submitted answers. Edits are not treated as agreement. Encrypted
+        text, transcripts, and imported conversation history are excluded.{' '}
         <a
           href="https://github.com/AgalmicSoftware/context-engine/blob/main/client/src/components/SurveyTool/surveyToolResponsePayloadController.ts"
           target="_blank"
@@ -87,10 +87,7 @@ export default function SessionInterviewResearchConsent({
           How research data is handled
         </a>
       </UncontrolledTooltip>
-      <details
-        className={styles.metadata}
-        aria-label={showProvenance ? 'AI prefill metadata' : 'AI research metadata'}
-      >
+      <details className={styles.metadata} aria-label={showProvenance ? 'AI prefill metadata' : 'AI research metadata'}>
         <summary>
           {showProvenance ? 'AI prefill metadata' : 'AI research metadata'} · {model}
         </summary>

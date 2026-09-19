@@ -79361,10 +79361,21 @@ var normalizeAllowedOrigins = (raw) => (Array.isArray(raw) ? raw : [raw]).map((e
     return "";
   }
 }).filter(Boolean);
+var isLocalHttpHostname = (hostname = "") => ["localhost", "127.0.0.1", "[::1]", "::1"].includes(String(hostname));
+var safeServedWorkerOrigin = (value) => {
+  try {
+    const url = new URL(trim10(value));
+    if (url.protocol === "https:" || url.protocol === "http:" && isLocalHttpHostname(url.hostname)) {
+      return url.origin;
+    }
+  } catch {
+  }
+  return "";
+};
 var safeSessionUrl = (value, { slug = "", allowOrigins } = {}) => {
   try {
     const url = new URL(trim10(value));
-    if (url.protocol !== "https:" && !(url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))) return "";
+    if (url.protocol !== "https:" && !(url.protocol === "http:" && isLocalHttpHostname(url.hostname))) return "";
     const parts = url.pathname.split("/").filter(Boolean).map((part) => decodeURIComponent(part));
     if (parts.length < 2 || parts.at(-2) !== "session" || parts.at(-1)?.toLowerCase() !== trim10(slug).toLowerCase()) {
       return "";
@@ -79386,16 +79397,24 @@ var sha2563 = async (value) => {
 var canonicalizeQuestions = (questions = []) => [...questions].sort(
   (left, right) => trim10(left?.id).localeCompare(trim10(right?.id)) || trim10(left?.prompt).localeCompare(trim10(right?.prompt)) || trim10(left?.type).localeCompare(trim10(right?.type))
 );
+var buildReviewUrl = ({ sessionUrl, servedWorkerOrigin } = {}) => {
+  const url = new URL(sessionUrl);
+  const workerOrigin = safeServedWorkerOrigin(servedWorkerOrigin);
+  if (workerOrigin) url.searchParams.set("worker", workerOrigin);
+  url.searchParams.set("mode", "interview");
+  return url.toString();
+};
 var buildInterviewBriefDocument = ({
   slug,
   sessionUrl,
+  servedWorkerOrigin,
   questions,
   questionSetHash
 } = {}) => ({
   type: "context-engine.interview-question-catalog",
   version: 1,
   sessionSlug: slug,
-  reviewUrl: `${sessionUrl}?mode=interview`,
+  reviewUrl: buildReviewUrl({ sessionUrl, servedWorkerOrigin }),
   questionSetHash,
   prefillPromptVersion: INTERVIEW_PROMPT_VERSION,
   answerContract: {
@@ -79480,7 +79499,13 @@ var dispatchInterviewBriefRequest = async ({
   }
   const questionSetHash = await (deps?.sha256 || sha2563)(JSON.stringify(canonicalizeQuestions(questions)));
   return deps?.json?.(
-    buildInterviewBriefDocument({ slug, sessionUrl, questions, questionSetHash }),
+    buildInterviewBriefDocument({
+      slug,
+      sessionUrl,
+      servedWorkerOrigin: safeServedWorkerOrigin(request.url),
+      questions,
+      questionSetHash
+    }),
     200,
     headers
   );

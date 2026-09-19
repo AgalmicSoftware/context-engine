@@ -737,10 +737,7 @@ const attachPileViewRuntimeEngine = (engine: PileViewModeEngine): PileViewModeEn
     checkCacheAgainstBaseline: bindPileEngineMethod(engine, checkCacheAgainstBaseline),
     prefillUserAnswersFromCache: bindPileEngineMethod(engine, prefillUserAnswersFromCache),
     buildSessionInterviewSubmitContextToken,
-    getSessionInterviewResponseReadinessToken: bindPileEngineMethod(
-      engine,
-      getSessionInterviewResponseReadinessToken,
-    ),
+    getSessionInterviewResponseReadinessToken: bindPileEngineMethod(engine, getSessionInterviewResponseReadinessToken),
     loadAndSortQuestions: bindPileEngineMethod(engine, loadAndSortQuestions),
     markSessionInterviewResponsesReady: bindPileEngineMethod(engine, markSessionInterviewResponsesReady),
     shouldAbortPileHydrationRequest: bindPileEngineMethod(engine, shouldAbortPileHydrationRequest),
@@ -1759,9 +1756,10 @@ export const recordInterviewProvenance = (
             return;
           }
           const originalDraft = reviewed.original || draft;
-          const revisionSource = Array.isArray(originalDraft.revisions) && originalDraft.revisions.length
-            ? originalDraft.revisions[0]
-            : originalDraft;
+          const revisionSource =
+            Array.isArray(originalDraft.revisions) && originalDraft.revisions.length
+              ? originalDraft.revisions[0]
+              : originalDraft;
           provenance[draft.questionId] = {
             version: 1,
             includeAiProvenance: included,
@@ -2364,9 +2362,7 @@ export const buildSessionInterviewSubmitContextToken = (props: Record<string, un
   const storageResources = readPlainRecord(storageProfile.resources);
   const slug = String(resolveEffectiveSlug(props) || sessionConfig.slug || '').trim();
   const network = readPlainRecord(props.network);
-  const networkId = String(
-    network.id || network.chainId || sessionConfig.networkChainId || '',
-  ).trim();
+  const networkId = String(network.id || network.chainId || sessionConfig.networkChainId || '').trim();
   const workerUrl =
     getUsableSessionWorkerUrl({
       slug,
@@ -2399,7 +2395,9 @@ export const buildSessionInterviewSubmitContextToken = (props: Record<string, un
 const buildSessionInterviewActiveSubmitContextToken = (engine: PileViewModeEngine, baseToken: string) =>
   [
     baseToken,
-    String(engine.props.account || '').trim().toLowerCase(),
+    String(engine.props.account || '')
+      .trim()
+      .toLowerCase(),
     String(Boolean(engine.props.loginComplete)),
   ].join('|');
 
@@ -3258,8 +3256,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
         <React.Suspense fallback={null}>
           {(() => {
             const submitContextToken = engine.buildSessionInterviewSubmitContextToken(engine.props);
-            const responseReadinessContextToken =
-              engine.getSessionInterviewResponseReadinessToken(submitContextToken);
+            const responseReadinessContextToken = engine.getSessionInterviewResponseReadinessToken(submitContextToken);
             return (
               <LazySessionVoiceModeModal
                 questionCreatorProps={{ ...engine.props, ...engine.getAudioInputWorkerProps() }}
@@ -3322,8 +3319,10 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
                   engine.renderPileAdditionalInput({
                     questionId,
                     additional: {
-                      ...((engine.state.surveysResponseState?.[0]?.additionalComments?.[questionId] ||
-                        {}) as Record<string, unknown>),
+                      ...((engine.state.surveysResponseState?.[0]?.additionalComments?.[questionId] || {}) as Record<
+                        string,
+                        unknown
+                      >),
                       value,
                     },
                     onChange,

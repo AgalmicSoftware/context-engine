@@ -22,7 +22,6 @@ const buildStableComparableValue = (value: unknown): unknown => {
 const responseValuesMatch = (left: unknown, right: unknown): boolean =>
   JSON.stringify(buildStableComparableValue(left)) === JSON.stringify(buildStableComparableValue(right));
 
-
 const normalizeResearchCoverageCount = (value: unknown): number | null => {
   if (value === null || value === undefined || value === '') return null;
   const number = Number(value);

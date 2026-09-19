@@ -42,13 +42,16 @@ describe('CreateQuestionsAndSurveys.module.scss final submit CTA guards', () => 
   });
 });
 
-
 describe('CreateQuestionsAndSurveys.module.scss interview suggestion review guards', () => {
   it('keeps review cards compact and lets the add-tag field expand only after activation', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'CreateQuestionsAndSurveys.module.scss'), 'utf8');
 
-    expect(scss).toMatch(/\.interviewQuestionReview\.createSurveyContainer\s*{[\s\S]*?\.questionContainer\s*{[\s\S]*?padding:\s*14px\s+16px\s+16px;/);
-    expect(scss).toMatch(/\.interviewQuestionReview\.createSurveyContainer\s*{[\s\S]*?\.tagInputGroup\s*{[\s\S]*?max-width:\s*38px;/);
+    expect(scss).toMatch(
+      /\.interviewQuestionReview\.createSurveyContainer\s*{[\s\S]*?\.questionContainer\s*{[\s\S]*?padding:\s*14px\s+16px\s+16px;/,
+    );
+    expect(scss).toMatch(
+      /\.interviewQuestionReview\.createSurveyContainer\s*{[\s\S]*?\.tagInputGroup\s*{[\s\S]*?max-width:\s*38px;/,
+    );
     expect(scss).toMatch(/&\.tagInputGroupActive\s*{[\s\S]*?max-width:\s*min\(100%,\s*260px\);/);
     expect(scss).toMatch(/\.revealTagInputButton\s*{[\s\S]*?width:\s*28px;/);
     expect(scss).not.toMatch(/:focus-within\s+\.revealTagInputButton/);

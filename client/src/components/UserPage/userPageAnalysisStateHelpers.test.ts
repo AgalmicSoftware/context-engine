@@ -167,12 +167,11 @@ describe('userPageAnalysisStateHelpers', () => {
     });
   });
 
-
-
   it('classifies AI missing-key and connectivity analysis errors separately', () => {
     expect(buildUserPageAnalysisErrorPresentation(new Error('Server misconfigured: openaiKey is missing.'))).toEqual({
       action: 'add-ai-key',
-      message: 'AI analysis needs a configured AI provider key. Add an AI key in Account Settings, then refresh this analysis.',
+      message:
+        'AI analysis needs a configured AI provider key. Add an AI key in Account Settings, then refresh this analysis.',
     });
     expect(buildUserPageAnalysisErrorPresentation(new TypeError('Failed to fetch'))).toEqual({
       action: 'open-ai-settings',
@@ -180,9 +179,12 @@ describe('userPageAnalysisStateHelpers', () => {
     });
     expect(buildUserPageAnalysisErrorPresentation(new Error('No AI provider key available.'))).toEqual({
       action: 'add-ai-key',
-      message: 'AI analysis needs a configured AI provider key. Add an AI key in Account Settings, then refresh this analysis.',
+      message:
+        'AI analysis needs a configured AI provider key. Add an AI key in Account Settings, then refresh this analysis.',
     });
-    expect(buildUserPageAnalysisErrorPresentation(new Error('Encrypted session key is locked for this wallet.'))).toEqual({
+    expect(
+      buildUserPageAnalysisErrorPresentation(new Error('Encrypted session key is locked for this wallet.')),
+    ).toEqual({
       action: '',
       message: 'Encrypted session key is locked for this wallet.',
     });

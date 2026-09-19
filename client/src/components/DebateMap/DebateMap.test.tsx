@@ -402,7 +402,9 @@ describe('DebateMap', () => {
 
     expect(screen.getByRole('heading', { name: 'Reload latest successful analysis for viewers' })).toBeInTheDocument();
     expect(screen.getByText('AI-generated summary')).toBeInTheDocument();
-    expect(screen.getByText('Viewers should see the latest published artifact without admin signing.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Viewers should see the latest published artifact without admin signing.'),
+    ).toBeInTheDocument();
     expect(screen.queryByTitle('Cast Upvotes')).not.toBeInTheDocument();
   });
 

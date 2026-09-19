@@ -69,7 +69,6 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     ).toHaveLength(1);
   });
 
-
   it('shows interview suggestion type, options, and compact tag authoring while keeping review-only chrome hidden', () => {
     const instance = makeInstance({
       interviewQuestionReview: true,
@@ -113,8 +112,9 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     const preventDefault = jest.fn();
     focus.mockClear();
     instance.setState({ activeTagInputKey: '' });
-    (revealButtons[0] as { props?: { onKeyDown?: (event: { key: string; preventDefault: () => void }) => void } })
-      ?.props?.onKeyDown?.({ key: 'Enter', preventDefault });
+    (
+      revealButtons[0] as { props?: { onKeyDown?: (event: { key: string; preventDefault: () => void }) => void } }
+    )?.props?.onKeyDown?.({ key: 'Enter', preventDefault });
     expect(preventDefault).toHaveBeenCalledTimes(1);
     expect(focus).toHaveBeenCalledTimes(1);
   });

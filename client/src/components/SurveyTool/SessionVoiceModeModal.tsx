@@ -87,15 +87,11 @@ type InterviewDraftApplicationProps = InterviewQuestionControls & {
   ) => void | Promise<void>;
 };
 
-type SessionVoiceModeModalProps = InterviewDraftApplicationProps & {
-  isOpen: boolean;
-  mode: SessionVoiceMode | null;
-  onSelectMode: (mode: SessionVoiceMode) => void;
+type SessionInterviewPanelBaseProps = InterviewDraftApplicationProps & {
   sessionSlug?: string;
   sessionConfig?: UnknownRecord | null;
   context?: unknown;
   workerUrl?: string;
-  questionPool?: unknown[];
   existingResponseSlice?: UnknownRecord | null;
   prefillPacket?: InterviewPrefillPacket | null;
   initialError?: string;
@@ -110,24 +106,15 @@ type SessionVoiceModeModalProps = InterviewDraftApplicationProps & {
   submitContextToken?: string;
 };
 
-type SessionInterviewPanelProps = InterviewDraftApplicationProps & {
+type SessionVoiceModeModalProps = SessionInterviewPanelBaseProps & {
+  isOpen: boolean;
+  mode: SessionVoiceMode | null;
+  onSelectMode: (mode: SessionVoiceMode) => void;
+  questionPool?: unknown[];
+};
+
+type SessionInterviewPanelProps = SessionInterviewPanelBaseProps & {
   questions: InterviewQuestion[];
-  sessionSlug?: string;
-  sessionConfig?: UnknownRecord | null;
-  context?: unknown;
-  workerUrl?: string;
-  existingResponseSlice?: UnknownRecord | null;
-  prefillPacket?: InterviewPrefillPacket | null;
-  initialError?: string;
-  account?: unknown;
-  provider?: unknown;
-  network?: unknown;
-  loginComplete?: boolean;
-  loginModalToggled?: boolean;
-  toggleLoginModal?: (open?: boolean) => void;
-  isResponsesCacheReady?: boolean;
-  responseReadinessContextToken?: string;
-  submitContextToken?: string;
 };
 
 function SessionInterviewPanel({
@@ -274,7 +261,9 @@ function SessionInterviewPanel({
   const baseSubmitContextToken = submitContextToken || sessionSlug;
   const activeSubmitContextToken = [
     baseSubmitContextToken,
-    String(account || '').trim().toLowerCase(),
+    String(account || '')
+      .trim()
+      .toLowerCase(),
     String(Boolean(loginComplete)),
   ].join('|');
   const hasReadinessContextToken =
@@ -313,8 +302,7 @@ function SessionInterviewPanel({
     if (
       !pendingSubmitAfterLogin ||
       (pendingSubmitBaseContextRef.current === baseSubmitContextToken &&
-        (!pendingSubmitActiveContextRef.current ||
-          pendingSubmitActiveContextRef.current === activeSubmitContextToken))
+        (!pendingSubmitActiveContextRef.current || pendingSubmitActiveContextRef.current === activeSubmitContextToken))
     ) {
       return;
     }
@@ -615,7 +603,8 @@ function SessionInterviewPanel({
       return;
     }
     if (pendingSubmitBaseContextRef.current !== baseSubmitContextToken) return;
-    if (pendingSubmitActiveContextRef.current && pendingSubmitActiveContextRef.current !== activeSubmitContextToken) return;
+    if (pendingSubmitActiveContextRef.current && pendingSubmitActiveContextRef.current !== activeSubmitContextToken)
+      return;
     void applyDrafts();
   }, [
     activeSubmitContextToken,
@@ -902,11 +891,15 @@ function SessionInterviewPanel({
                     data-testid={E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT}
                   >
                     <span className={styles.sessionAgentKickoffTitle}>
-                      Copy and paste this prompt into Claude or ChatGPT to augment interview
-                    </span>
-                    <span className={styles.sessionAgentKickoffCopyBadge} aria-hidden="true">
-                      <FontAwesomeIcon icon={promptCopied ? faCheck : faCopy} />
-                      <span>{promptCopied ? 'Copied' : 'Copy'}</span>
+                      <span className={styles.sessionAgentKickoffCopyBadge} aria-hidden="true">
+                        <FontAwesomeIcon icon={promptCopied ? faCheck : faCopy} />
+                        <span>{promptCopied ? 'Copied' : 'Copy'}</span>
+                      </span>
+                      <span>
+                        {promptCopied
+                          ? ' prompt to clipboard'
+                          : ' and paste this prompt into Claude or ChatGPT to augment interview'}
+                      </span>
                     </span>
                   </div>
                   <div className={styles.sessionAgentKickoffActions}>
@@ -1038,7 +1031,11 @@ function SessionInterviewPanel({
                   className={styles.sessionInterviewSubmitButton}
                   data-testid={E2E_TESTIDS.SESSION_INTERVIEW_APPLY}
                 >
-                  {applying ? 'Preparing submission…' : pendingSubmitAfterLogin && !authenticatedForSubmit ? 'Submit after login' : 'Submit responses'}
+                  {applying
+                    ? 'Preparing submission…'
+                    : pendingSubmitAfterLogin && !authenticatedForSubmit
+                      ? 'Submit after login'
+                      : 'Submit responses'}
                 </Button>
               </div>
             </SessionInterviewReviewSection>
@@ -1051,7 +1048,9 @@ function SessionInterviewPanel({
             />
           ) : null}
           {!isInterviewBusy && !mapping && drafts.length && !groupRecommendationRequest ? (
-            <Button outline onClick={refreshGroupRecommendations}>Refresh group suggestions</Button>
+            <Button outline onClick={refreshGroupRecommendations}>
+              Refresh group suggestions
+            </Button>
           ) : null}
           {!isInterviewBusy && !mapping ? (
             <SessionInterviewRecommendedGroups

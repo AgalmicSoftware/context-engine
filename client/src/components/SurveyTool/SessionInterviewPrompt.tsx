@@ -32,13 +32,15 @@ export default function SessionInterviewPrompt({ prompt }: { prompt: string }) {
     <>
       {prompt.split(/\n\n+| (?=Coverage counts are|Platform\/model are|Present it as)/).map((paragraph, index) => (
         <p key={index}>
-          {paragraph.split(emphasis).map((part, partIndex) =>
-            partIndex % 2 ? (
-              <strong key={partIndex}>{renderPlainTextWithLinks(part, `${index}-${partIndex}`)}</strong>
-            ) : (
-              renderPlainTextWithLinks(part, `${index}-${partIndex}`)
-            ),
-          )}
+          {paragraph
+            .split(emphasis)
+            .map((part, partIndex) =>
+              partIndex % 2 ? (
+                <strong key={partIndex}>{renderPlainTextWithLinks(part, `${index}-${partIndex}`)}</strong>
+              ) : (
+                renderPlainTextWithLinks(part, `${index}-${partIndex}`)
+              ),
+            )}
         </p>
       ))}
     </>

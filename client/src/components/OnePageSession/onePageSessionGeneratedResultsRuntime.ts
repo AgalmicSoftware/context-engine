@@ -145,7 +145,9 @@ export const resolveGeneratedResultsRuntime = (
     allowSharedFallback: false,
     requireExactWorkerSession: isWorkerCanonical,
   });
-  const sessionId = toText(resolveWorkerCanonicalSessionIdHex(sessionConfig) || sessionConfig.sessionId || sessionConfig.sessionIdHex);
+  const sessionId = toText(
+    resolveWorkerCanonicalSessionIdHex(sessionConfig) || sessionConfig.sessionId || sessionConfig.sessionIdHex,
+  );
   const sourceKind: GeneratedResultsRuntime['sourceKind'] = isWorkerCanonical ? 'worker-canonical' : 'admin-snapshot';
   let snapshotResult: ResultsAnalysisBrowserSnapshotResult | null = null;
 
@@ -178,8 +180,6 @@ export const resolveGeneratedResultsRuntime = (
   };
 };
 
-
-
 const preserveViewerArtifactOnAdminAuthFailure = ({
   fallbackBody,
   previousStatusBody,
@@ -209,7 +209,9 @@ const preserveViewerArtifactOnAdminAuthFailure = ({
       ...previousState,
       active: null,
       jobState: 'idle',
-      lastFailure: { error: readErrorMessage(fallbackBody, 'Authenticate with the session Worker to refresh generated views.') },
+      lastFailure: {
+        error: readErrorMessage(fallbackBody, 'Authenticate with the session Worker to refresh generated views.'),
+      },
       lastGood: previousState.lastGood,
     },
   };
@@ -229,19 +231,20 @@ const normalizeArtifactResponseBody = ({
   const stateLastGood = toRecord(bodyState.lastGood);
   const draft = toRecord(body.draft);
   const artifact = toRecord(body.artifact);
-  const lastGood = stateLastGood.kind || stateLastGood.artifact
-    ? stateLastGood
-    : draft.artifact
-      ? draft
-      : artifact.kind
-        ? {
-            draftId: body.draftId || body.requestId || '',
-            generatedAt: body.generatedAt || artifact.generatedAt || '',
-            source: body.source || {},
-            artifact,
-            snapshot: body.snapshot || {},
-          }
-        : {};
+  const lastGood =
+    stateLastGood.kind || stateLastGood.artifact
+      ? stateLastGood
+      : draft.artifact
+        ? draft
+        : artifact.kind
+          ? {
+              draftId: body.draftId || body.requestId || '',
+              generatedAt: body.generatedAt || artifact.generatedAt || '',
+              source: body.source || {},
+              artifact,
+              snapshot: body.snapshot || {},
+            }
+          : {};
   return {
     ...previous,
     ok: true,
@@ -249,7 +252,9 @@ const normalizeArtifactResponseBody = ({
     adminAuthorized: previous.adminAuthorized === true,
     viewerAuthorized: true,
     settings: body.settings || previous.settings,
-    capability: previous.capability || { manual: { supported: false, reason: 'Sign in as an admin to generate or refresh.' } },
+    capability: previous.capability || {
+      manual: { supported: false, reason: 'Sign in as an admin to generate or refresh.' },
+    },
     state: {
       ...toRecord(previous.state),
       ...bodyState,
@@ -282,7 +287,9 @@ const normalizePendingArtifactResponseBody = ({
     adminAuthorized: previous.adminAuthorized === true,
     viewerAuthorized: true,
     settings: body.settings || previous.settings || toRecord(sessionConfig).resultsAnalysis,
-    capability: previous.capability || { manual: { supported: false, reason: 'Sign in as an admin to generate or refresh.' } },
+    capability: previous.capability || {
+      manual: { supported: false, reason: 'Sign in as an admin to generate or refresh.' },
+    },
     state: {
       ...previousState,
       ...bodyState,
@@ -323,7 +330,6 @@ const markGeneratedResultsPollExpired = ({
   );
 };
 
-
 const normalizeTransientStatusFailureBody = ({
   failureBody,
   previousStatusBody,
@@ -346,7 +352,6 @@ const normalizeTransientStatusFailureBody = ({
     },
   };
 };
-
 
 export const resetGeneratedResultsAnalysis = (host: OnePageGeneratedResultsHost): void => {
   host._generatedResultsRequestSeq = Number(host._generatedResultsRequestSeq || 0) + 1;
@@ -376,7 +381,11 @@ export const authorizeGeneratedResultsForHost = async (
 ): Promise<void> => {
   const mergedPorts = { ...defaultPorts, ...ports };
   const sessionConfig = host.resolveCurrentSessionConfig();
-  const runtime = resolveGeneratedResultsRuntime(host, { ports, sessionConfig, sessionSlug: host.resolveCurrentSessionSlug() });
+  const runtime = resolveGeneratedResultsRuntime(host, {
+    ports,
+    sessionConfig,
+    sessionSlug: host.resolveCurrentSessionSlug(),
+  });
   if (!runtime.workerUrl) {
     const body = { ok: false, unsupported: true, error: runtime.unsupportedReason };
     host.setState({
@@ -625,7 +634,11 @@ export const generateResultsForHost = async (
   const current = host.state.generatedResultsAnalysis;
   if (current?.isRunning) return;
   const sessionConfig = host.resolveCurrentSessionConfig();
-  const runtime = resolveGeneratedResultsRuntime(host, { ports, sessionConfig, sessionSlug: host.resolveCurrentSessionSlug() });
+  const runtime = resolveGeneratedResultsRuntime(host, {
+    ports,
+    sessionConfig,
+    sessionSlug: host.resolveCurrentSessionSlug(),
+  });
   if (!runtime.workerUrl || (runtime.sourceKind === 'admin-snapshot' && !runtime.snapshotResult?.ok)) {
     const body = { ok: false, unsupported: true, error: runtime.unsupportedReason };
     host.setState({
@@ -718,7 +731,10 @@ export const generateResultsForHost = async (
     },
   };
   applyGeneratedResultsStatusBody(host, nextStatusBody, result.draft);
-  if (((result.jobState === 'running' || result.jobState === 'queued') || toStatusCode(result) === 202) && !transientFailure) {
+  if (
+    (result.jobState === 'running' || result.jobState === 'queued' || toStatusCode(result) === 202) &&
+    !transientFailure
+  ) {
     await pollGeneratedResultsStatusForHost({ host, mergedPorts, requestSeq, runtime, sessionConfig });
   }
 };

@@ -188,6 +188,14 @@ function isAllowedGeneratedWorkerEmail(relativePath, email) {
     && allowedGeneratedWorkerEmails.has(email.toLowerCase());
 }
 
+function isJavaScriptFile(relativePath) {
+  return /\.(?:cjs|mjs|js)$/i.test(relativePath);
+}
+
+function isJavaScriptExpressionInitializer(relativePath, value) {
+  return isJavaScriptFile(relativePath) && value === 'Object.freeze([';
+}
+
 // Intentionally public addresses (e.g. the SECURITY.md vulnerability-reporting
 // contact). Keep in sync with the allowlist in scripts/prepare-public-release.sh.
 const allowedPublicEmailAddresses = new Set([
@@ -201,6 +209,7 @@ function scanTextFile(relativePath, text, findings, warnings) {
   const homePathRe = /(?:^|[\s"'(=:{])((?:\/Users|\/home)\/[A-Za-z0-9._-]+(?:\/[^\s"'`<>\\)]*)?)/g;
   const pemRe = /-----BEGIN [A-Z0-9 ]*(?:PRIVATE KEY|RSA PRIVATE KEY|EC PRIVATE KEY|OPENSSH PRIVATE KEY)[A-Z0-9 ]*-----/i;
   const envSecretLineRe = /^\s*(?:export\s+)?([A-Z0-9_]*(?:API_KEY|SECRET|TOKEN|PASSWORD|PRIVATE_KEY|PRIVATEKEY|CREDENTIAL)[A-Z0-9_]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s#;]+))\s*(?:#.*)?$/;
+  const quotedEnvSecretLiteralRe = /['"]([A-Z0-9_]*(?:API_KEY|SECRET|TOKEN|PASSWORD|PRIVATE_KEY|PRIVATEKEY|CREDENTIAL)[A-Z0-9_]*)\s*=\s*([^'"\s][^'"]*)['"]/g;
   const codeSecretRe = /\b([A-Za-z_$][A-Za-z0-9_$]*(?:apiKey|api_key|secret|token|password|privateKey|private_key|credential)[A-Za-z0-9_$]*)\b\s*[:=]\s*['"]([^'"\n]{12,})['"]/g;
   const privateKeyContextRe = /\b(private[_-]?key|privateKey|new\s+ethers\.Wallet|litPayerPrivateKey|cachedLitKey)\b[^'"\n]{0,120}['"]?(0x)?([a-f0-9]{64})['"]?/ig;
   const bare0xRe = /\b0x[a-fA-F0-9]{40,64}\b/g;
@@ -235,9 +244,21 @@ function scanTextFile(relativePath, text, findings, warnings) {
     if (match !== null) {
       const [, name, doubleQuotedValue, singleQuotedValue, unquotedValue] = match;
       const value = doubleQuotedValue ?? singleQuotedValue ?? unquotedValue ?? '';
-      if (value.length >= 12 && !isSafePlaceholder(value) && !isAllowedFixtureHex(value)) {
+      if (
+        !(unquotedValue && isJavaScriptExpressionInitializer(relativePath, value))
+        && value.length >= 12
+        && !isSafePlaceholder(value)
+        && !isAllowedFixtureHex(value)
+      ) {
         addFinding(findings, 'secret-assignment', relativePath, lineNumber, `${name}=${redactSecret(value)}`);
       }
+    }
+
+    quotedEnvSecretLiteralRe.lastIndex = 0;
+    while ((match = quotedEnvSecretLiteralRe.exec(line)) !== null) {
+      const [, name, value] = match;
+      if (value.length < 12 || isSafePlaceholder(value) || isAllowedFixtureHex(value)) continue;
+      addFinding(findings, 'secret-assignment', relativePath, lineNumber, `${name}=${redactSecret(value)}`);
     }
 
     codeSecretRe.lastIndex = 0;

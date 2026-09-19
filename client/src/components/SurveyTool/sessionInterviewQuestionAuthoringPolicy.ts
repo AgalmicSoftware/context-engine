@@ -25,13 +25,25 @@ const asRecord = (value: unknown): UnknownRecord =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : {};
 
 const normalizeAddressText = (value: unknown): string => {
-  const address = String(value || '').trim().toLowerCase();
+  const address = String(value || '')
+    .trim()
+    .toLowerCase();
   return /^0x[0-9a-f]{40}$/.test(address) ? address : '';
 };
 
 const normalizeScopeList = (value: unknown): string[] =>
   Array.isArray(value)
-    ? Array.from(new Set(value.map((scope) => String(scope || '').trim().toLowerCase()).filter(Boolean)))
+    ? Array.from(
+        new Set(
+          value
+            .map((scope) =>
+              String(scope || '')
+                .trim()
+                .toLowerCase(),
+            )
+            .filter(Boolean),
+        ),
+      )
     : [];
 
 const isSessionEnded = (config: UnknownRecord): boolean => {
@@ -45,7 +57,6 @@ const isSessionEnded = (config: UnknownRecord): boolean => {
 
 const questionStorageResolvesTo = (config: UnknownRecord, backend: string): boolean =>
   resolveSessionStorageBackend(config, { resource: 'questions' }) === backend;
-
 
 const workerScopeAllowed = (config: UnknownRecord, scope: 'storage' | 'arweave'): boolean => {
   const participantScopes = normalizeScopeList(asRecord(config.workerAuthority).participantScopes);
@@ -65,7 +76,10 @@ const listAddresses = (value: unknown): string[] => {
 };
 
 const resolveRoleAddressSet = (config: UnknownRecord, role: unknown = 'admin'): Set<string> => {
-  const normalizedRole = String(role || 'admin').trim().toLowerCase() || 'admin';
+  const normalizedRole =
+    String(role || 'admin')
+      .trim()
+      .toLowerCase() || 'admin';
   const addresses = new Set<string>();
   if (normalizedRole === 'admin') {
     listAddresses(config.adminAddress).forEach((address) => addresses.add(address));
@@ -104,7 +118,12 @@ const normalizeAccessConditions = (value: unknown): { match: 'any' | 'all'; cond
     ? source.conditions.map(asRecord).filter((condition) => Object.keys(condition).length > 0)
     : [];
   return {
-    match: String(source.match || '').trim().toLowerCase() === 'all' ? 'all' : 'any',
+    match:
+      String(source.match || '')
+        .trim()
+        .toLowerCase() === 'all'
+        ? 'all'
+        : 'any',
     conditions,
   };
 };
@@ -121,14 +140,25 @@ const configuredAccessConditions = (config: UnknownRecord): { match: 'any' | 'al
   );
 };
 
-const conditionIsPubliclyProvable = (condition: UnknownRecord, config: UnknownRecord, account: string): boolean | null => {
-  const kind = String(condition.kind || '').trim().toLowerCase();
+const conditionIsPubliclyProvable = (
+  condition: UnknownRecord,
+  config: UnknownRecord,
+  account: string,
+): boolean | null => {
+  const kind = String(condition.kind || '')
+    .trim()
+    .toLowerCase();
   if (kind === 'worker_role') {
-    const role = String(condition.role || condition.name || 'admin').trim().toLowerCase() || 'admin';
+    const role =
+      String(condition.role || condition.name || 'admin')
+        .trim()
+        .toLowerCase() || 'admin';
     return resolveRoleAddressSet(config, role).has(account);
   }
   if (kind === 'agent_grant_scope') {
-    const scope = String(condition.scope || condition.value || '').trim().toLowerCase();
+    const scope = String(condition.scope || condition.value || '')
+      .trim()
+      .toLowerCase();
     return scope === 'storage' ? hasEffectiveStorageScope(config) : null;
   }
   if (kind === 'sbt_onchain' || kind === 'worker_group') return null;

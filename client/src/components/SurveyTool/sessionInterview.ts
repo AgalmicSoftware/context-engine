@@ -102,23 +102,24 @@ const normalizePlatform = (value: unknown): InterviewSource['platform'] => {
   return 'other';
 };
 
-
 const readSuggestedQuestionOptionText = (option: unknown): string => {
   if (typeof option === 'string' || typeof option === 'number') return String(option).trim();
   if (!option || typeof option !== 'object' || Array.isArray(option)) return '';
   const record = option as { label?: unknown; value?: unknown };
-  const candidate = typeof record.label === 'string' ? record.label : typeof record.value === 'string' ? record.value : '';
+  const candidate =
+    typeof record.label === 'string' ? record.label : typeof record.value === 'string' ? record.value : '';
   return candidate.trim();
 };
 
-const normalizeSuggestedQuestionOptions = (value: unknown): string[] => [
-  ...new Map(
-    (Array.isArray(value) ? value : [])
-      .map(readSuggestedQuestionOptionText)
-      .filter((option) => option.length > 0 && option.length <= 120)
-      .map((option) => [option.toLowerCase(), option]),
-  ).values(),
-].slice(0, 8);
+const normalizeSuggestedQuestionOptions = (value: unknown): string[] =>
+  [
+    ...new Map(
+      (Array.isArray(value) ? value : [])
+        .map(readSuggestedQuestionOptionText)
+        .filter((option) => option.length > 0 && option.length <= 120)
+        .map((option) => [option.toLowerCase(), option]),
+    ).values(),
+  ].slice(0, 8);
 
 const normalizeSuggestedQuestionType = (value: unknown): (typeof SUGGESTED_QUESTION_TYPES)[number] => {
   const type = toTrimmedString(value || 'freeform').toLowerCase();

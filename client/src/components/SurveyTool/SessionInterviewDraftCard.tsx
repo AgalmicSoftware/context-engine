@@ -71,8 +71,7 @@ const DraftEditableText = ({
     const computed = window.getComputedStyle(node);
     const borderBoxAdjustment =
       computed.boxSizing === 'border-box'
-        ? (Number.parseFloat(computed.borderTopWidth) || 0) +
-          (Number.parseFloat(computed.borderBottomWidth) || 0)
+        ? (Number.parseFloat(computed.borderTopWidth) || 0) + (Number.parseFloat(computed.borderBottomWidth) || 0)
         : 0;
     node.style.height = 'auto';
     node.style.overflow = 'hidden';
@@ -116,11 +115,14 @@ const DraftEditableText = ({
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, [editing, renderEditor, scheduleInjectedResize]);
-  useEffect(() => () => {
-    if (injectedResizeFrameRef.current !== null && typeof window.cancelAnimationFrame === 'function') {
-      window.cancelAnimationFrame(injectedResizeFrameRef.current);
-    }
-  }, []);
+  useEffect(
+    () => () => {
+      if (injectedResizeFrameRef.current !== null && typeof window.cancelAnimationFrame === 'function') {
+        window.cancelAnimationFrame(injectedResizeFrameRef.current);
+      }
+    },
+    [],
+  );
 
   if (editing && !disabled && renderEditor) {
     return (

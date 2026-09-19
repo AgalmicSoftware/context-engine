@@ -10,9 +10,17 @@ describe('sessionResultsAnalysisBrowserSnapshot', () => {
         },
         questionResponses: {
           q1: {
-            '0xaaa': { answer: { value: 'Use clearer reports' }, additional: { value: 'Add source counts' }, sessionSlug: 'edge' },
+            '0xaaa': {
+              answer: { value: 'Use clearer reports' },
+              additional: { value: 'Add source counts' },
+              sessionSlug: 'edge',
+            },
             '0xbbb': { answer: { value: '*', encrypted: true }, sessionSlug: 'edge' },
-            '0xbbc': { answer: { value: 'Visible answer' }, additionalComments: { encryptedPortion: 'ciphertext' }, sessionSlug: 'edge' },
+            '0xbbc': {
+              answer: { value: 'Visible answer' },
+              additionalComments: { encryptedPortion: 'ciphertext' },
+              sessionSlug: 'edge',
+            },
             '0xccc': { source: 'demo-polis-data', answer: { value: 'seeded' }, sessionSlug: 'edge' },
             '0xddd': { answer: { value: 'foreign' }, sessionSlug: 'other' },
           },
@@ -26,7 +34,9 @@ describe('sessionResultsAnalysisBrowserSnapshot', () => {
       expect(result.snapshot.responses).toEqual([
         expect.objectContaining({ questionId: 'q1', participantId: '0xaaa', answer: 'Use clearer reports' }),
       ]);
-      expect(result.snapshot.responses[0]).toEqual(expect.objectContaining({ additionalComments: 'Add source counts' }));
+      expect(result.snapshot.responses[0]).toEqual(
+        expect.objectContaining({ additionalComments: 'Add source counts' }),
+      );
       expect(result.counts.lockedCount).toBe(2);
     }
   });

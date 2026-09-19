@@ -569,9 +569,8 @@ Admin test panel:
 Use the generated-results smoke to verify the real session results UI without
 live AI, provider keys, Worker secrets, or a deployed session. The script mocks
 Worker responses, including the viewer artifact, admin status, and refresh
-request, and writes screenshots under
-`artifacts/session-generated-results-smoke/screenshots`. Run it against an
-isolated Vite instance on port 3100:
+request, and writes screenshots to its configured local screenshot directory.
+Run it against an isolated Vite instance on port 3100:
 
 ```bash
 # terminal 1
@@ -2060,6 +2059,10 @@ Signed login/bootstrap requests:
     the session's `allowOrigins` or a configured public/app/session URL, and its
     `/session/<slug>` path must match. Existing query and fragment state are
     stripped before the Worker supplies `reviewUrl`.
+  - `reviewUrl` includes a `worker=<origin>` discovery hint derived from the
+    Worker endpoint that served the catalog, followed by `mode=interview`. The
+    Worker does not copy any `worker` query supplied in `sessionUrl`; the client
+    still verifies the Worker-canonical session config before using that hint.
 - `GET /api/agent/questions` with a session Worker bearer credential returns
   the same public, access-checked question catalog when
   `sessionModeProfile.surfaces.agentHttp=true`. This is the first canonical

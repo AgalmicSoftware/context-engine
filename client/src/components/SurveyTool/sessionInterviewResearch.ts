@@ -86,9 +86,10 @@ export const buildSelectedInterviewResearch = (
   const draft = record(value);
   const questionId = String(draft.questionId || '');
   if (!questionId) return null;
-  const original = draft.original && typeof draft.original === 'object' && !Array.isArray(draft.original)
-    ? record(draft.original)
-    : draft;
+  const original =
+    draft.original && typeof draft.original === 'object' && !Array.isArray(draft.original)
+      ? record(draft.original)
+      : draft;
   const { encryptedAnswer, encryptedComments } = resolveFieldProtection(questionId, fields, draft);
   return {
     questionId,
@@ -98,7 +99,11 @@ export const buildSelectedInterviewResearch = (
       confidence: original.confidence ?? null,
       evidence: encryptedAnswer || encryptedComments ? '' : String(original.evidence || ''),
     },
-    predictionRevisions: buildInterviewRevisionResearch(original.revisions || draft.revisions, encryptedAnswer, encryptedComments),
+    predictionRevisions: buildInterviewRevisionResearch(
+      original.revisions || draft.revisions,
+      encryptedAnswer,
+      encryptedComments,
+    ),
     finalSubmitted: protectSnapshot(draft, encryptedAnswer, encryptedComments),
     changedFields: buildInterviewChangedFields(original, draft),
     userEditedFields: buildInterviewUserEditedFields(draft),

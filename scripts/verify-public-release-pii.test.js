@@ -115,7 +115,7 @@ test('verify-public-release-pii fails emails, home paths, secrets, PEMs, and pri
     writeFile(rootDir, 'docs/leak.md', [
       `Contact ${email}`,
       `Local path: ${homePath}`,
-      'SECRET_TOKEN=super-secret-value-12345',
+      `${'SECRET'}_${'TOKEN'}=super-secret-value-12345`,
       privateKeyPemHeader,
       `privateKey: "${privateKeyHex}"`,
       `Near-miss of the allowlisted contact: contextengine+tag${'@'}protonmail.com`,
@@ -137,6 +137,52 @@ test('verify-public-release-pii fails emails, home paths, secrets, PEMs, and pri
     assert.match(result.stderr, /FAIL secret-assignment: docs\/leak\.md:3/);
     assert.match(result.stderr, /FAIL pem-private-key: docs\/leak\.md:4/);
     assert.match(result.stderr, /FAIL hex-private-key: docs\/leak\.md:5/);
+  });
+});
+
+test('verify-public-release-pii allows generated JavaScript frozen name arrays', () => {
+  withFixture((rootDir) => {
+    const requiredSecretNames = `${'REQUIRED'}_${'SECRET'}_NAMES = Object.freeze([`;
+    const litCredentialFields = `WORKER_LIT_${'CREDENTIAL'}_DESCRIPTOR_FIELDS = Object.freeze([`;
+    writeFile(rootDir, 'deploy/cloudflare/session-worker/worker.mjs', [
+      requiredSecretNames,
+      '  "DEMO_SIGNER_ROOT_SECRET",',
+      '  "AGENT_BRIDGE_AGENT_API_TOKEN"',
+      ']);',
+      litCredentialFields,
+      '  "litApiBase",',
+      '  "litGroupId",',
+      '  "litPkpId",',
+      '  "litActionCid"',
+      ']);',
+      '',
+    ].join('\n'));
+
+    const result = runScanner(rootDir);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /public release PII scan passed/);
+  });
+});
+
+test('verify-public-release-pii still rejects real assignments near frozen arrays', () => {
+  withFixture((rootDir) => {
+    const requiredSecretNames = `${'REQUIRED'}_${'SECRET'}_NAMES = Object.freeze([`;
+    const apiTokenAssignment = `${'API'}_${'TOKEN'}=synthetic-live-credential-material`;
+    const sessionSecretAssignment = `${'SESSION'}_${'SECRET'}=synthetic-live-credential-material`;
+    writeFile(rootDir, 'deploy/cloudflare/session-worker/worker.mjs', [
+      requiredSecretNames,
+      `  "${apiTokenAssignment}",`,
+      ']);',
+      sessionSecretAssignment,
+      '',
+    ].join('\n'));
+
+    const result = runScanner(rootDir);
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /FAIL secret-assignment: deploy\/cloudflare\/session-worker\/worker\.mjs:2/);
+    assert.match(result.stderr, /FAIL secret-assignment: deploy\/cloudflare\/session-worker\/worker\.mjs:4/);
   });
 });
 

@@ -75,7 +75,8 @@ export function useSessionInterviewGroupRecommendations({
     const load = async () => {
       const catalog = await loadInterviewWorkerGroupCandidates({ sessionConfig, sessionSlug, workerUrl });
       if (canceled || requestRef.current !== requestId || catalog.status !== 'ready' || !catalog.candidates.length) {
-        if (!canceled && requestRef.current === requestId) setRecommendationState({ key: requestKey, recommendations: [] });
+        if (!canceled && requestRef.current === requestId)
+          setRecommendationState({ key: requestKey, recommendations: [] });
         return;
       }
       const result = await recommendInterviewGroups({
@@ -95,7 +96,8 @@ export function useSessionInterviewGroupRecommendations({
     };
 
     void load().catch(() => {
-      if (!canceled && requestRef.current === requestId) setRecommendationState({ key: requestKey, recommendations: [] });
+      if (!canceled && requestRef.current === requestId)
+        setRecommendationState({ key: requestKey, recommendations: [] });
     });
 
     return () => {

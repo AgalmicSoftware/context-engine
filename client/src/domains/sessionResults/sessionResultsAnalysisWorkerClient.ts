@@ -44,9 +44,9 @@ export type SessionResultsAnalysisGenerateRequest = {
 const toTrimmedString = (value: unknown): string => (value == null ? '' : String(value).trim());
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
-const toRecord = (value: unknown): Record<string, unknown> =>
-  isRecord(value) ? value : {};
-const normalizeSessionId = (value: unknown): string => toTrimmedString(value).toLowerCase().replace(/^0x/, '').replace(/-/g, '');
+const toRecord = (value: unknown): Record<string, unknown> => (isRecord(value) ? value : {});
+const normalizeSessionId = (value: unknown): string =>
+  toTrimmedString(value).toLowerCase().replace(/^0x/, '').replace(/-/g, '');
 
 const readJson = async (response: Response): Promise<Record<string, unknown>> => {
   const data = await response.json().catch(() => ({}));
@@ -90,7 +90,6 @@ export const buildResultsAnalysisArtifactUrl = ({
   url.searchParams.set('includeSnapshot', includeSnapshot ? 'true' : 'false');
   return url.toString();
 };
-
 
 export const getCachedWorkerAuthHeaders = ({
   account,
@@ -256,7 +255,8 @@ export const readSessionResultsAnalysisArtifact = async ({
   const actualSessionId = normalizeSessionId(data.sessionId || data.sessionIdHex);
   const jobState = toTrimmedString(data.jobState || toRecord(data.state).jobState).toLowerCase();
   const hasRunningJob = jobState === 'running' || jobState === 'queued';
-  const hasArtifact = isRecord(data.artifact) || isRecord(data.draft) || isRecord(toRecord(data.state).lastGood) || hasRunningJob;
+  const hasArtifact =
+    isRecord(data.artifact) || isRecord(data.draft) || isRecord(toRecord(data.state).lastGood) || hasRunningJob;
   const hasExpectedShape =
     data.ok === true &&
     (!expectedSlug || actualSlug === expectedSlug) &&

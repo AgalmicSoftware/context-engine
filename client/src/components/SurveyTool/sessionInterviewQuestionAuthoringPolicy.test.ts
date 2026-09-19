@@ -219,7 +219,10 @@ describe('session interview suggested question authoring policy', () => {
               encryption: 'none',
               accessConditions: {
                 match: 'any',
-                conditions: [{ kind: 'worker_role', role: 'admin' }, { kind: 'worker_group', groupId: 'reviewers' }],
+                conditions: [
+                  { kind: 'worker_role', role: 'admin' },
+                  { kind: 'worker_group', groupId: 'reviewers' },
+                ],
               },
             },
           },
@@ -362,5 +365,4 @@ describe('session interview suggested question authoring policy', () => {
       }),
     ).toBe('denied');
   });
-
 });

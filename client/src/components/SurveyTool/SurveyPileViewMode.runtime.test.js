@@ -700,7 +700,6 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(pileTimer).toBeNull();
   });
 
-
   it('includes exact Worker and session identity in the interview submit context token', () => {
     const baseProps = {
       network: { id: 11155420 },

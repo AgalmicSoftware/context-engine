@@ -99,7 +99,12 @@ const buildGeneratedBreakdownItems = (values: unknown[], fallbackPrefix: string)
       const record = toRecord(value);
       const label = toText(record.label ?? record.name ?? record.title ?? record.group ?? record.dimension);
       const body = toText(
-        record.summary ?? record.description ?? record.interpretation ?? record.insight ?? record.finding ?? record.body,
+        record.summary ??
+          record.description ??
+          record.interpretation ??
+          record.insight ??
+          record.finding ??
+          record.body,
       );
       if (!label && !body) return null;
       return {
@@ -142,18 +147,17 @@ const renderGeneratedBreakdownItems = (title: string, items: GeneratedBreakdownI
     </div>
   ) : null;
 
-const GeneratedBreakdownInterpretation = ({
-  artifact,
-}: {
-  artifact: SessionResultsGeneratedAnalysisArtifact;
-}) => {
+const GeneratedBreakdownInterpretation = ({ artifact }: { artifact: SessionResultsGeneratedAnalysisArtifact }) => {
   const section = getBreakdownSection(artifact);
   const available = section.available === true;
   const reason = toText(section.reason) || 'Generated breakdown interpretation is unavailable for this artifact.';
 
   if (!available) {
     return (
-      <section className={styles.generatedBreakdownInterpretation} data-testid="ce-session-generated-breakdown-interpretation">
+      <section
+        className={styles.generatedBreakdownInterpretation}
+        data-testid="ce-session-generated-breakdown-interpretation"
+      >
         <p className={styles.generatedBreakdownEyebrow}>Generated interpretation</p>
         <h3>Breakdown interpretation unavailable</h3>
         <p className={styles.generatedBreakdownCopy}>{reason}</p>
@@ -176,11 +180,15 @@ const GeneratedBreakdownInterpretation = ({
   const hasContent = Boolean(overview || themes.length > 0 || dimensions.length > 0 || groups.length > 0);
 
   return (
-    <section className={styles.generatedBreakdownInterpretation} data-testid="ce-session-generated-breakdown-interpretation">
+    <section
+      className={styles.generatedBreakdownInterpretation}
+      data-testid="ce-session-generated-breakdown-interpretation"
+    >
       <p className={styles.generatedBreakdownEyebrow}>Generated interpretation</p>
       <h3>Breakdown interpretation</h3>
       <p className={styles.generatedBreakdownCopy}>
-        AI-generated themes and groups from the frozen session snapshot. Measured distributions render separately below when submitted response counts are available.
+        AI-generated themes and groups from the frozen session snapshot. Measured distributions render separately below
+        when submitted response counts are available.
       </p>
       {overview ? <p className={styles.generatedBreakdownOverview}>{overview}</p> : null}
       {renderGeneratedBreakdownItems('Themes', themes)}
@@ -230,11 +238,7 @@ const SessionGeneratedResultsViews = ({
         <DebateMap
           {...props}
           activeSessionSlug={sessionSlug}
-          atlasLayoutMode={
-            selectedView === SESSION_GENERATED_RESULTS_VIEW_KEYS.ATLAS
-              ? 'orbital'
-              : 'packed'
-          }
+          atlasLayoutMode={selectedView === SESSION_GENERATED_RESULTS_VIEW_KEYS.ATLAS ? 'orbital' : 'packed'}
           embedded={true}
         />
       );

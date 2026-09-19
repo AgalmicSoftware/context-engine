@@ -133,7 +133,8 @@ $icon-size-standard: 1.25rem;
 .expandButton,
 .bookmarkButton {
   background: none;
-  border: none;
+  border: 0 !important;
+  box-shadow: none !important;
   color: $button-color;
   cursor: pointer;
   /* Unified Layout & Spacing */
@@ -156,6 +157,11 @@ $icon-size-standard: 1.25rem;
     outline: none;
     color: $clickable-color;
     transform: scale(1.05);
+    box-shadow: none !important;
+  }
+  &:focus-visible {
+    outline: 2px dotted var(--ce-focus-ring);
+    outline-offset: 2px;
   }
 }
 

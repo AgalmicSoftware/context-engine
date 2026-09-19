@@ -37,7 +37,9 @@ describe('SessionInterviewResearchConsent', () => {
     renderConsent();
     expect(screen.getByText(/Edits are not treated as agreement/i)).toBeInTheDocument();
     expect(screen.getByText(/full interview transcript and imported conversation history/i)).toBeInTheDocument();
-    expect(screen.getByText(/Predictions, reviewed values, changed fields, and unselected drafts will not be included/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Predictions, reviewed values, changed fields, and unselected drafts will not be included/i),
+    ).toBeInTheDocument();
   });
 
   it('links to the branch documentation and shows selected/unselected counts when opted in', () => {

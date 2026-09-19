@@ -6,17 +6,25 @@ import {
   readSessionResultsAnalysisStatus,
   startSessionResultsAnalysisGeneration,
 } from './sessionResultsAnalysisWorkerClient';
-import { buildTokenCacheEnvelope, buildTokenCacheKey, clearAllTokenCaches, writeTokenCache } from '../../utilities/worker/workerAuthTokenCache';
+import {
+  buildTokenCacheEnvelope,
+  buildTokenCacheKey,
+  clearAllTokenCaches,
+  writeTokenCache,
+} from '../../utilities/worker/workerAuthTokenCache';
 
 describe('sessionResultsAnalysisWorkerClient', () => {
   it('builds status URL with session slug and includeDraft query', () => {
-    expect(buildResultsAnalysisStatusUrl({ workerUrl: 'https://worker.example/admin/set-config', sessionSlug: 'edge' })).toBe(
-      'https://worker.example/admin/results-analysis/status?sessionSlug=edge&includeDraft=true',
-    );
+    expect(
+      buildResultsAnalysisStatusUrl({ workerUrl: 'https://worker.example/admin/set-config', sessionSlug: 'edge' }),
+    ).toBe('https://worker.example/admin/results-analysis/status?sessionSlug=edge&includeDraft=true');
   });
 
   it('reads status using supplied JWT headers without signing itself', async () => {
-    const getAuthHeaders = jest.fn(async (_args: unknown) => ({ Authorization: 'Bearer cached-token', 'X-Group-Slug': 'edge' }));
+    const getAuthHeaders = jest.fn(async (_args: unknown) => ({
+      Authorization: 'Bearer cached-token',
+      'X-Group-Slug': 'edge',
+    }));
     const fetchImpl = jest.fn(async () => ({
       ok: true,
       status: 200,
@@ -38,14 +46,17 @@ describe('sessionResultsAnalysisWorkerClient', () => {
     });
 
     expect(result.adminAuthorized).toBe(true);
-    expect(getAuthHeaders).toHaveBeenCalledWith(expect.objectContaining({ sessionSlug: 'edge', workerUrl: 'https://worker.example' }));
+    expect(getAuthHeaders).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionSlug: 'edge', workerUrl: 'https://worker.example' }),
+    );
     expect(fetchImpl).toHaveBeenCalledWith(
       'https://worker.example/admin/results-analysis/status?sessionSlug=edge&includeDraft=true',
-      expect.objectContaining({ method: 'GET', headers: expect.objectContaining({ Authorization: 'Bearer cached-token' }) }),
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.objectContaining({ Authorization: 'Bearer cached-token' }),
+      }),
     );
   });
-
-
 
   it('does not authorize malformed 200 responses', async () => {
     const fetchImpl = jest.fn(async () => ({
@@ -64,7 +75,6 @@ describe('sessionResultsAnalysisWorkerClient', () => {
     expect(result.adminAuthorized).toBe(false);
     expect(result.ok).toBe(false);
   });
-
 
   it('rejects null-shaped 200 responses and mismatched session ids', async () => {
     const fetchImpl = jest
@@ -113,7 +123,6 @@ describe('sessionResultsAnalysisWorkerClient', () => {
     expect(wrongSession.adminAuthorized).toBe(false);
   });
 
-
   it('reads viewer artifacts without admin status authorization', async () => {
     expect(buildResultsAnalysisArtifactUrl({ workerUrl: 'https://worker.example', sessionSlug: 'edge' })).toBe(
       'https://worker.example/results-analysis/artifact?sessionSlug=edge&includeSnapshot=true',
@@ -144,7 +153,6 @@ describe('sessionResultsAnalysisWorkerClient', () => {
     );
   });
 
-
   it('uses cached viewer auth headers for artifact reads without invoking signing auth', async () => {
     clearAllTokenCaches();
     const sessionId = `0x${'1'.repeat(32)}`;
@@ -154,14 +162,17 @@ describe('sessionResultsAnalysisWorkerClient', () => {
       sessionId,
       address: '0x0000000000000000000000000000000000000abc',
     });
-    writeTokenCache(cacheKey, buildTokenCacheEnvelope({
-      token: 'cached-viewer-token',
-      exp: Math.floor(Date.now() / 1000) + 3600,
-      workerUrl: 'https://worker.example',
-      sessionId,
-      sessionSlug: 'edge',
-      address: '0x0000000000000000000000000000000000000abc',
-    }));
+    writeTokenCache(
+      cacheKey,
+      buildTokenCacheEnvelope({
+        token: 'cached-viewer-token',
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        workerUrl: 'https://worker.example',
+        sessionId,
+        sessionSlug: 'edge',
+        address: '0x0000000000000000000000000000000000000abc',
+      }),
+    );
     const fetchImpl = jest.fn(async () => ({
       ok: true,
       status: 200,
@@ -193,7 +204,14 @@ describe('sessionResultsAnalysisWorkerClient', () => {
 
   it('keeps artifact reads anonymous when no cached viewer token exists', async () => {
     clearAllTokenCaches();
-    expect(getCachedWorkerAuthHeaders({ account: '0x0000000000000000000000000000000000000abc', sessionSlug: 'edge', sessionId: `0x${'1'.repeat(32)}`, workerUrl: 'https://worker.example' })).toEqual({});
+    expect(
+      getCachedWorkerAuthHeaders({
+        account: '0x0000000000000000000000000000000000000abc',
+        sessionSlug: 'edge',
+        sessionId: `0x${'1'.repeat(32)}`,
+        workerUrl: 'https://worker.example',
+      }),
+    ).toEqual({});
   });
 
   it('posts generation through the signed admin request channel', async () => {

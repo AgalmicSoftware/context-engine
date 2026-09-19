@@ -107,7 +107,9 @@ describe('RiskMatrix', () => {
     expect(screen.queryByTestId('ce-risk-matrix-save-comment')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText('Close'));
-    fireEvent.click(screen.getByTestId('ce-risk-matrix-subcell-session-evidence-generated-vs-rehearsal-readiness-generated'));
+    fireEvent.click(
+      screen.getByTestId('ce-risk-matrix-subcell-session-evidence-generated-vs-rehearsal-readiness-generated'),
+    );
 
     expect(screen.getByText('Generated note')).toBeInTheDocument();
   });

@@ -12,7 +12,6 @@ import {
 import { startSessionRealtimeInterview } from '../../utilities/audio/realtimeInterviewClient';
 import { useSessionInterviewGroupRecommendations } from './useSessionInterviewGroupRecommendations';
 
-
 jest.mock('./SessionInterviewRecommendedGroups', () => ({
   __esModule: true,
   default: (props: { recommendations?: unknown[] }) =>
@@ -323,7 +322,9 @@ describe('SessionVoiceModeModal', () => {
     expect(metadata).toHaveTextContent('Self-reported');
     expect(metadata).toHaveTextContent('ce-interview-brief-v4');
     expect(metadata).toHaveTextContent('a'.repeat(64));
-    expect(metadata).toHaveTextContent('Predictions, reviewed values, changed fields, and unselected drafts will not be included.');
+    expect(metadata).toHaveTextContent(
+      'Predictions, reviewed values, changed fields, and unselected drafts will not be included.',
+    );
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON));
     expect(metadata).toHaveTextContent('2 selected drafts and 0 unselected drafts');
     await editReadableDraftText('Draft answer for What matters?', 'Edited one');
@@ -374,7 +375,6 @@ describe('SessionVoiceModeModal', () => {
     );
   });
 
-
   it('waits for an identity-bound response readiness token after login', async () => {
     mockedMapInterviewEvidenceToResponses.mockResolvedValue([
       { questionId: 'q1', answer: 'Original prediction', evidence: 'Related memory', confidence: 0.81 },
@@ -424,7 +424,9 @@ describe('SessionVoiceModeModal', () => {
       />,
     );
 
-    await waitFor(() => expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Waiting for session data'));
+    await waitFor(() =>
+      expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Waiting for session data'),
+    );
     expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();
     expect(onSubmitResponses).toHaveBeenCalledTimes(1);
 
@@ -479,7 +481,6 @@ describe('SessionVoiceModeModal', () => {
     expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Log in to submit');
   });
-
 
   it('preserves reviewed drafts while logged out and submits them after login completes', async () => {
     mockedMapInterviewEvidenceToResponses.mockResolvedValue([
@@ -555,7 +556,6 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Responses submitted');
   });
 
-
   it('cancels deferred submit when login is dismissed before authentication', async () => {
     mockedMapInterviewEvidenceToResponses.mockResolvedValue([
       { questionId: 'q1', answer: 'Original prediction', evidence: 'Related memory', confidence: 0.81 },
@@ -570,21 +570,56 @@ describe('SessionVoiceModeModal', () => {
       responderContext: { summary: 'Relevant context' },
     };
     const view = render(
-      <SessionVoiceModeModal {...baseProps} mode="interview" loginComplete={false} account="" prefillPacket={prefillPacket} onSubmitResponses={onSubmitResponses} />,
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        loginComplete={false}
+        account=""
+        prefillPacket={prefillPacket}
+        onSubmitResponses={onSubmitResponses}
+      />,
     );
     await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
     await waitFor(() => expect(onSubmitResponses).toHaveBeenCalledTimes(1));
 
-    view.rerender(<SessionVoiceModeModal {...baseProps} mode="interview" loginComplete={false} account="" loginModalToggled prefillPacket={prefillPacket} onSubmitResponses={onSubmitResponses} />);
-    view.rerender(<SessionVoiceModeModal {...baseProps} mode="interview" loginComplete={false} account="" loginModalToggled={false} prefillPacket={prefillPacket} onSubmitResponses={onSubmitResponses} />);
+    view.rerender(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        loginComplete={false}
+        account=""
+        loginModalToggled
+        prefillPacket={prefillPacket}
+        onSubmitResponses={onSubmitResponses}
+      />,
+    );
+    view.rerender(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        loginComplete={false}
+        account=""
+        loginModalToggled={false}
+        prefillPacket={prefillPacket}
+        onSubmitResponses={onSubmitResponses}
+      />,
+    );
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Login required');
 
-    view.rerender(<SessionVoiceModeModal {...baseProps} mode="interview" loginComplete account="0x0000000000000000000000000000000000000001" prefillPacket={prefillPacket} onSubmitResponses={onSubmitResponses} />);
+    view.rerender(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        loginComplete
+        account="0x0000000000000000000000000000000000000001"
+        prefillPacket={prefillPacket}
+        onSubmitResponses={onSubmitResponses}
+      />,
+    );
     await waitFor(() => expect(onSubmitResponses).toHaveBeenCalledTimes(1));
     expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();
   });
-
 
   it('does not apply signed-in drafts after the hydrated account changes', async () => {
     mockedMapInterviewEvidenceToResponses.mockResolvedValue([
@@ -599,17 +634,35 @@ describe('SessionVoiceModeModal', () => {
       responderContext: { summary: 'Relevant context' },
     };
     const view = render(
-      <SessionVoiceModeModal {...baseProps} mode="interview" loginComplete account="0x0000000000000000000000000000000000000001" isResponsesCacheReady={false} submitContextToken="demo|111" prefillPacket={prefillPacket} />,
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        loginComplete
+        account="0x0000000000000000000000000000000000000001"
+        isResponsesCacheReady={false}
+        submitContextToken="demo|111"
+        prefillPacket={prefillPacket}
+      />,
     );
     await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Waiting for session data');
 
     view.rerender(
-      <SessionVoiceModeModal {...baseProps} mode="interview" loginComplete account="0x0000000000000000000000000000000000000002" isResponsesCacheReady submitContextToken="demo|111" prefillPacket={prefillPacket} />,
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        loginComplete
+        account="0x0000000000000000000000000000000000000002"
+        isResponsesCacheReady
+        submitContextToken="demo|111"
+        prefillPacket={prefillPacket}
+      />,
     );
 
-    await waitFor(() => expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Review drafts'));
+    await waitFor(() =>
+      expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Review drafts'),
+    );
     expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();
     expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
   });
@@ -631,21 +684,38 @@ describe('SessionVoiceModeModal', () => {
       responderContext: { summary: 'Relevant context' },
     };
     const view = render(
-      <SessionVoiceModeModal {...baseProps} mode="interview" loginComplete={false} account="" submitContextToken="demo|1" prefillPacket={prefillPacket} onSubmitResponses={onSubmitResponses} />,
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        loginComplete={false}
+        account=""
+        submitContextToken="demo|1"
+        prefillPacket={prefillPacket}
+        onSubmitResponses={onSubmitResponses}
+      />,
     );
     await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
     await waitFor(() => expect(onSubmitResponses).toHaveBeenCalledTimes(1));
 
     view.rerender(
-      <SessionVoiceModeModal {...baseProps} mode="interview" loginComplete account="0x0000000000000000000000000000000000000001" submitContextToken="other-session|1" prefillPacket={prefillPacket} onSubmitResponses={onSubmitResponses} />,
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        loginComplete
+        account="0x0000000000000000000000000000000000000001"
+        submitContextToken="other-session|1"
+        prefillPacket={prefillPacket}
+        onSubmitResponses={onSubmitResponses}
+      />,
     );
 
-    await waitFor(() => expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Review drafts'));
+    await waitFor(() =>
+      expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Review drafts'),
+    );
     expect(onSubmitResponses).toHaveBeenCalledTimes(1);
     expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();
   });
-
 
   it('drops deferred interview drafts when Worker identity changes on the same route before login completes', async () => {
     mockedMapInterviewEvidenceToResponses.mockResolvedValue([
@@ -692,7 +762,9 @@ describe('SessionVoiceModeModal', () => {
       />,
     );
 
-    await waitFor(() => expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Review drafts'));
+    await waitFor(() =>
+      expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Review drafts'),
+    );
     expect(onSubmitResponses).toHaveBeenCalledTimes(1);
     expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();
   });
@@ -748,7 +820,9 @@ describe('SessionVoiceModeModal', () => {
     );
 
     expect(screen.queryByRole('heading', { name: 'Suggested new questions (1)' })).not.toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Suggested new questions (1)', hidden: true }).closest('details')).not.toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: 'Suggested new questions (1)', hidden: true }).closest('details'),
+    ).not.toBeVisible();
     expect(screen.getByTestId('mock-create-questions')).not.toBeVisible();
   });
 
@@ -910,7 +984,10 @@ describe('SessionVoiceModeModal', () => {
         .replace(/\s+/g, ' '),
     ).toContain('Fetch this URL: worker.example/agent/interview-catalog…');
     const promptLink = displayedPrompt.querySelector('a');
-    expect(promptLink).toHaveAttribute('href', expect.stringContaining('https://worker.example/agent/interview-catalog'));
+    expect(promptLink).toHaveAttribute(
+      'href',
+      expect.stringContaining('https://worker.example/agent/interview-catalog'),
+    );
     fireEvent.click(promptLink!);
     fireEvent.click(displayedPrompt);
     expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(3);
@@ -1278,7 +1355,9 @@ describe('SessionVoiceModeModal', () => {
     fireEvent.click(metadata.querySelector('summary')!);
     expect(metadata).toHaveTextContent('Source platform and coverage details will not be included.');
     expect(metadata).not.toHaveTextContent('a'.repeat(64));
-    expect(metadata).toHaveTextContent('Predictions, reviewed values, changed fields, and unselected drafts will not be included.');
+    expect(metadata).toHaveTextContent(
+      'Predictions, reviewed values, changed fields, and unselected drafts will not be included.',
+    );
     fireEvent.click(includeComparison);
     expect(metadata).toHaveTextContent('1 selected draft and 0 unselected drafts');
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));

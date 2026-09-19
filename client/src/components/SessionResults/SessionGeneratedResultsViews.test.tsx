@@ -13,7 +13,13 @@ jest.mock('../../components/DemoViews/DemoAnalysis/DemoAnalysisWorkspace', () =>
   const React = require('react');
   return {
     __esModule: true,
-    default: ({ analysisData, emptyReason }: { analysisData?: { flatResponses?: unknown[] } | null; emptyReason?: string }) =>
+    default: ({
+      analysisData,
+      emptyReason,
+    }: {
+      analysisData?: { flatResponses?: unknown[] } | null;
+      emptyReason?: string;
+    }) =>
       React.createElement(
         'div',
         { 'data-testid': 'demo-analysis-workspace' },
@@ -62,7 +68,6 @@ const validArtifact: SessionResultsGeneratedAnalysisArtifact = {
   source: 'ai-generated',
   version: SESSION_RESULTS_ANALYSIS_ARTIFACT_VERSION,
 };
-
 
 const submittedQuestions = [
   {
@@ -198,5 +203,4 @@ describe('SessionGeneratedResultsViews', () => {
     expect(await screen.findByTestId('demo-analysis-workspace')).toBeInTheDocument();
     expect(screen.queryByTestId('generated-breakdown-unavailable')).not.toBeInTheDocument();
   });
-
 });

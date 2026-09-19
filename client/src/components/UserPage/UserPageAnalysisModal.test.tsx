@@ -125,8 +125,6 @@ describe('UserPageAnalysisModal', () => {
     expect(onRefreshAnalysis).not.toHaveBeenCalled();
   });
 
-
-
   it('renders an AI settings action only for missing-key analysis errors', () => {
     const onOpenAiSettings = jest.fn();
     const { rerender } = render(

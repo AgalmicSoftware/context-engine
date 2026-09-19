@@ -60,7 +60,12 @@ export default function SessionInterviewModalHeader({
             <span>{statusLabel}</span>
           </button>
         </span>
-        <UncontrolledTooltip target="ce-interview-status-help" placement="bottom" trigger="hover focus" autohide={false}>
+        <UncontrolledTooltip
+          target="ce-interview-status-help"
+          placement="bottom"
+          trigger="hover focus"
+          autohide={false}
+        >
           {idle ? `${readinessDetail} Click to check again.` : guidance}
         </UncontrolledTooltip>
       </span>

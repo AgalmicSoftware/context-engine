@@ -1,10 +1,6 @@
 import type { DebateMapProps, DebateNode } from '../DebateMap/debateMapTypes';
 import type { DemoAnalysisWorkspaceData } from '../DemoViews/DemoAnalysis/DemoAnalysisWorkspace';
-import type {
-  RiskCategory,
-  RiskCommentRecord,
-  RiskMatrixRestoreState,
-} from '../MainContent/RiskMatrix';
+import type { RiskCategory, RiskCommentRecord, RiskMatrixRestoreState } from '../MainContent/RiskMatrix';
 import type {
   RiskMatrixSeverityAssessment,
   RiskMatrixSeverityAxes,
@@ -65,11 +61,7 @@ const toRecord = (value: unknown): PlainRecord =>
 const toArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 
 const toText = (value: unknown): string =>
-  value === null || value === undefined
-    ? ''
-    : String(value)
-        .replace(/\s+/g, ' ')
-        .trim();
+  value === null || value === undefined ? '' : String(value).replace(/\s+/g, ' ').trim();
 
 const slugify = (value: unknown, fallback = 'item'): string => {
   const slug = toText(value)
@@ -97,20 +89,18 @@ const collectSourceRefs = (...values: unknown[]): string[] =>
 const isAvailableArtifact = (artifact: unknown): artifact is SessionResultsGeneratedAnalysisArtifact =>
   Boolean(
     artifact &&
-      typeof artifact === 'object' &&
-      (artifact as PlainRecord).source === 'ai-generated' &&
-      (artifact as PlainRecord).sections &&
-      typeof (artifact as PlainRecord).sections === 'object' &&
-      !Array.isArray((artifact as PlainRecord).sections),
+    typeof artifact === 'object' &&
+    (artifact as PlainRecord).source === 'ai-generated' &&
+    (artifact as PlainRecord).sections &&
+    typeof (artifact as PlainRecord).sections === 'object' &&
+    !Array.isArray((artifact as PlainRecord).sections),
   );
 
 const getArtifactSectionsRecord = (artifact: SessionResultsGeneratedAnalysisArtifact): PlainRecord =>
   toRecord(artifact.sections);
 
-const getArtifactSectionRecord = (
-  artifact: SessionResultsGeneratedAnalysisArtifact,
-  sectionKey: string,
-): PlainRecord => toRecord(getArtifactSectionsRecord(artifact)[sectionKey]);
+const getArtifactSectionRecord = (artifact: SessionResultsGeneratedAnalysisArtifact, sectionKey: string): PlainRecord =>
+  toRecord(getArtifactSectionsRecord(artifact)[sectionKey]);
 
 const getArtifactSectionArray = (
   artifact: SessionResultsGeneratedAnalysisArtifact,
@@ -118,15 +108,11 @@ const getArtifactSectionArray = (
   arrayKey: string,
 ): unknown[] => toArray(getArtifactSectionRecord(artifact, sectionKey)[arrayKey]);
 
-const getArtifactSectionAvailable = (
-  artifact: SessionResultsGeneratedAnalysisArtifact,
-  sectionKey: string,
-): boolean => getArtifactSectionRecord(artifact, sectionKey).available === true;
+const getArtifactSectionAvailable = (artifact: SessionResultsGeneratedAnalysisArtifact, sectionKey: string): boolean =>
+  getArtifactSectionRecord(artifact, sectionKey).available === true;
 
-const getArtifactSectionReason = (
-  artifact: SessionResultsGeneratedAnalysisArtifact,
-  sectionKey: string,
-): string => toText(getArtifactSectionRecord(artifact, sectionKey).reason);
+const getArtifactSectionReason = (artifact: SessionResultsGeneratedAnalysisArtifact, sectionKey: string): string =>
+  toText(getArtifactSectionRecord(artifact, sectionKey).reason);
 
 const buildQuestionRefs = (questionIds: unknown): DebateNode['questions'] =>
   uniqueTexts(toArray(questionIds)).map((questionId) => ({
@@ -171,7 +157,8 @@ const normalizeDebateNode = (debate: unknown, index: number): DebateNode | null 
   };
 };
 
-const normalizeAtlasNodeLabel = (node: PlainRecord): string => toText(node.label ?? node.name ?? node.title ?? node.summary);
+const normalizeAtlasNodeLabel = (node: PlainRecord): string =>
+  toText(node.label ?? node.name ?? node.title ?? node.summary);
 
 const buildAtlasNodes = (nodes: unknown[], edges: unknown[]): { nodes: DebateNode[]; rejectedReason: string } => {
   const nodeMap = new Map<string, DebateNode>();
@@ -224,17 +211,15 @@ const buildAtlasNodes = (nodes: unknown[], edges: unknown[]): { nodes: DebateNod
   return { nodes: roots, rejectedReason: '' };
 };
 
-export const buildGeneratedDebateMapAdapter = (
-  artifact: unknown,
-): GeneratedDebateMapAdapterResult => {
+export const buildGeneratedDebateMapAdapter = (artifact: unknown): GeneratedDebateMapAdapterResult => {
   if (!isAvailableArtifact(artifact)) {
     return { props: null, unavailableReason: 'Generated session analysis is not available.' };
   }
 
   const debateNodes = getArtifactSectionAvailable(artifact, 'argumentMap')
-    ? getArtifactSectionArray(artifact, 'argumentMap', 'debates')
+    ? (getArtifactSectionArray(artifact, 'argumentMap', 'debates')
         .map((debate, index) => normalizeDebateNode(debate, index))
-        .filter(Boolean) as DebateNode[]
+        .filter(Boolean) as DebateNode[])
     : [];
   const atlasResult =
     debateNodes.length === 0 && getArtifactSectionAvailable(artifact, 'atlas')
@@ -382,7 +367,8 @@ export const buildGeneratedBreakdownAnalysisData = ({
   if (finalQuestions.length === 0 || flatResponses.length === 0) {
     return {
       analysisData: null,
-      unavailableReason: 'Submitted responses are required before Breakdown can render generated session distributions.',
+      unavailableReason:
+        'Submitted responses are required before Breakdown can render generated session distributions.',
     };
   }
 
@@ -402,9 +388,7 @@ export const buildGeneratedBreakdownAnalysisData = ({
       questionTagsData: Object.fromEntries(
         finalQuestions.map((question) => [
           question.id,
-          question.category
-            ? [{ tagID: `category:${slugify(question.category)}`, tagName: question.category }]
-            : [],
+          question.category ? [{ tagID: `category:${slugify(question.category)}`, tagName: question.category }] : [],
         ]),
       ),
     },
@@ -435,7 +419,10 @@ const normalizeSeverityLevel = (value: unknown): RiskSeverityLevel | null => {
   return normalized === 'low' || normalized === 'medium' || normalized === 'high' ? normalized : null;
 };
 
-const normalizeGeneratedRiskCategory = (category: unknown, index: number): { id: string; category: RiskCategory } | null => {
+const normalizeGeneratedRiskCategory = (
+  category: unknown,
+  index: number,
+): { id: string; category: RiskCategory } | null => {
   const record = toRecord(category);
   const label = toText(record.label ?? record.name ?? record.title);
   if (!label) return null;
@@ -458,7 +445,9 @@ const normalizeRiskAxisLevels = (levels: unknown[]): RiskMatrixSeverityAxes['x']
       return {
         id: slugify(record.id ?? label, `level_${index + 1}`),
         label,
-        ...(toText(record.description ?? record.summary) ? { description: toText(record.description ?? record.summary) } : {}),
+        ...(toText(record.description ?? record.summary)
+          ? { description: toText(record.description ?? record.summary) }
+          : {}),
       };
     })
     .filter(Boolean) as RiskMatrixSeverityAxes['x']['levels'];
@@ -509,9 +498,7 @@ const buildGeneratedRiskAssessmentsFromAxes = (
     .filter(Boolean) as RiskMatrixSeverityAssessment[];
 };
 
-export const buildGeneratedRiskMatrixAdapter = (
-  artifact: unknown,
-): GeneratedRiskMatrixAdapterResult => {
+export const buildGeneratedRiskMatrixAdapter = (artifact: unknown): GeneratedRiskMatrixAdapterResult => {
   if (!isAvailableArtifact(artifact)) {
     return { props: null, unavailableReason: 'Generated session risk analysis is not available.' };
   }
@@ -523,9 +510,10 @@ export const buildGeneratedRiskMatrixAdapter = (
 
   const sectionCategories = toArray(section.categories);
   const sectionComments = toArray(section.comments);
-  const generatedCategories = sectionCategories
-    .map(normalizeGeneratedRiskCategory)
-    .filter(Boolean) as Array<{ id: string; category: RiskCategory }>;
+  const generatedCategories = sectionCategories.map(normalizeGeneratedRiskCategory).filter(Boolean) as Array<{
+    id: string;
+    category: RiskCategory;
+  }>;
   const categoriesByName = new Map<string, RiskCategory>();
   const rememberCategory = (category: RiskCategory) => {
     if (!categoriesByName.has(category.name)) categoriesByName.set(category.name, category);

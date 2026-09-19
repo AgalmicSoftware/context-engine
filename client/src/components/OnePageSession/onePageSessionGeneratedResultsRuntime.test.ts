@@ -35,25 +35,26 @@ const settings = {
   publication: 'latest_success_visible',
 };
 
-const buildStatusBody = (overrides: UnknownRecord = {}): TestStatusBody => ({
-  ok: true,
-  adminAuthorized: true,
-  sessionSlug: 'edge',
-  sessionId: `0x${'1'.repeat(32)}`,
-  settings,
-  capability: { manual: { supported: true, sourceKinds: ['worker-canonical'] } },
-  state: {
-    jobState: 'idle',
-    lastGood: {
-      draftId: 'draft-previous',
-      generatedAt: '2026-09-17T12:00:00.000Z',
-      source: { kind: 'worker-canonical', responseCount: 2, participantCount: 2 },
-      artifact,
-      snapshot: { questions: [], responses: [] },
+const buildStatusBody = (overrides: UnknownRecord = {}): TestStatusBody =>
+  ({
+    ok: true,
+    adminAuthorized: true,
+    sessionSlug: 'edge',
+    sessionId: `0x${'1'.repeat(32)}`,
+    settings,
+    capability: { manual: { supported: true, sourceKinds: ['worker-canonical'] } },
+    state: {
+      jobState: 'idle',
+      lastGood: {
+        draftId: 'draft-previous',
+        generatedAt: '2026-09-17T12:00:00.000Z',
+        source: { kind: 'worker-canonical', responseCount: 2, participantCount: 2 },
+        artifact,
+        snapshot: { questions: [], responses: [] },
+      },
     },
-  },
-  ...overrides,
-}) as TestStatusBody;
+    ...overrides,
+  }) as TestStatusBody;
 
 const getLastGoodStatusDraft = (): unknown => buildStatusBody().state.lastGood;
 
@@ -126,7 +127,12 @@ describe('onePageSessionGeneratedResultsRuntime', () => {
         randomUUID: () => 'request-1',
         readQuestionsCache: () => ({}),
         readStatus,
-        startGeneration: async () => ({ ok: true, httpStatus: 202, jobState: 'running', reservation: { requestId: 'request-1' } }),
+        startGeneration: async () => ({
+          ok: true,
+          httpStatus: 202,
+          jobState: 'running',
+          reservation: { requestId: 'request-1' },
+        }),
       },
     });
 
@@ -135,13 +141,13 @@ describe('onePageSessionGeneratedResultsRuntime', () => {
     expect(host.state.generatedResultsAnalysis?.status).toBe('ready');
   });
 
-
-
   it('polls running admin status checks until the latest artifact is ready', async () => {
     const host = buildHost({ ok: false });
     const readStatus = jest
       .fn()
-      .mockResolvedValueOnce(buildStatusBody({ state: { jobState: 'running', active: { requestId: 'queued' }, lastGood: null } }))
+      .mockResolvedValueOnce(
+        buildStatusBody({ state: { jobState: 'running', active: { requestId: 'queued' }, lastGood: null } }),
+      )
       .mockResolvedValueOnce(buildStatusBody());
 
     await authorizeGeneratedResultsForHost(host, {
@@ -164,7 +170,12 @@ describe('onePageSessionGeneratedResultsRuntime', () => {
     await loadGeneratedResultsArtifactForHost(host, {
       ports: {
         readQuestionsCache: () => ({}),
-        readArtifact: async () => ({ ok: false, status: 403, viewerAuthorized: false, error: 'Viewer access revoked.' }),
+        readArtifact: async () => ({
+          ok: false,
+          status: 403,
+          viewerAuthorized: false,
+          error: 'Viewer access revoked.',
+        }),
       },
     });
 
@@ -198,10 +209,12 @@ describe('onePageSessionGeneratedResultsRuntime', () => {
     expect(host.state.generatedResultsAnalysis?.artifact).not.toBeNull();
   });
 
-
-
   it('reloads viewer artifacts even when stale prior session state was running', async () => {
-    const host = buildHost(buildStatusBody({ state: { jobState: 'running', active: { requestId: 'old-session' }, lastGood: getLastGoodStatusDraft() } }));
+    const host = buildHost(
+      buildStatusBody({
+        state: { jobState: 'running', active: { requestId: 'old-session' }, lastGood: getLastGoodStatusDraft() },
+      }),
+    );
     const readArtifact = jest.fn(async () => ({
       ok: true,
       viewerAuthorized: true,
@@ -294,7 +307,6 @@ describe('onePageSessionGeneratedResultsRuntime', () => {
     expect(host.state.generatedResultsAnalysis?.canGenerate).toBe(false);
   });
 
-
   it('stops polling and preserves viewer artifacts when cached admin auth becomes pending', async () => {
     const host = buildHost(buildStatusBody({ viewerAuthorized: true }));
 
@@ -305,7 +317,12 @@ describe('onePageSessionGeneratedResultsRuntime', () => {
         randomUUID: () => 'request-auth-pending',
         readQuestionsCache: () => ({}),
         readStatus: async () => ({ ok: false, authPending: true, error: 'Authenticate with the session Worker.' }),
-        startGeneration: async () => ({ ok: true, httpStatus: 202, jobState: 'running', reservation: { requestId: 'request-auth-pending' } }),
+        startGeneration: async () => ({
+          ok: true,
+          httpStatus: 202,
+          jobState: 'running',
+          reservation: { requestId: 'request-auth-pending' },
+        }),
       },
     });
 
@@ -315,12 +332,13 @@ describe('onePageSessionGeneratedResultsRuntime', () => {
     expect(host.state.generatedResultsAnalysis?.canGenerate).toBe(false);
   });
 
-
   it('keeps polling queued generation status until it succeeds', async () => {
     const host = buildHost();
     const readStatus = jest
       .fn()
-      .mockResolvedValueOnce(buildStatusBody({ state: { jobState: 'queued', active: { requestId: 'queued' }, lastGood: null } }))
+      .mockResolvedValueOnce(
+        buildStatusBody({ state: { jobState: 'queued', active: { requestId: 'queued' }, lastGood: null } }),
+      )
       .mockResolvedValueOnce(buildStatusBody({ state: { jobState: 'succeeded', lastGood: getLastGoodStatusDraft() } }));
 
     await generateResultsForHost(host, {
@@ -330,7 +348,12 @@ describe('onePageSessionGeneratedResultsRuntime', () => {
         randomUUID: () => 'request-queued',
         readQuestionsCache: () => ({}),
         readStatus,
-        startGeneration: async () => ({ ok: true, httpStatus: 202, jobState: 'queued', reservation: { requestId: 'request-queued' } }),
+        startGeneration: async () => ({
+          ok: true,
+          httpStatus: 202,
+          jobState: 'queued',
+          reservation: { requestId: 'request-queued' },
+        }),
       },
     });
 
@@ -364,7 +387,10 @@ describe('onePageSessionGeneratedResultsRuntime', () => {
       },
     });
 
-    expect(host.state.generatedResultsAnalysis?.viewOptions.map((option) => option.key)).toEqual(['circles', 'riskMatrix']);
+    expect(host.state.generatedResultsAnalysis?.viewOptions.map((option) => option.key)).toEqual([
+      'circles',
+      'riskMatrix',
+    ]);
   });
 
   it('keeps the previous successful artifact visible after a transient refresh failure', async () => {
@@ -388,7 +414,13 @@ describe('onePageSessionGeneratedResultsRuntime', () => {
     const host = buildHost({ ok: false });
     const readArtifact = jest
       .fn()
-      .mockResolvedValueOnce({ ok: false, status: 404, viewerAuthorized: true, jobState: 'queued', requestId: 'viewer-queued' })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        viewerAuthorized: true,
+        jobState: 'queued',
+        requestId: 'viewer-queued',
+      })
       .mockResolvedValueOnce({
         ok: true,
         viewerAuthorized: true,
@@ -421,14 +453,23 @@ describe('onePageSessionGeneratedResultsRuntime', () => {
     expect(host.state.generatedResultsAnalysis?.artifact).not.toBeNull();
   });
 
-
-
   it('expires viewer polling after a transient artifact failure while preserving the last good artifact', async () => {
     const host = buildHost(buildStatusBody({ viewerAuthorized: true }));
     const readArtifact = jest
       .fn()
-      .mockResolvedValueOnce({ ok: false, status: 404, viewerAuthorized: true, jobState: 'queued', requestId: 'viewer-refresh' })
-      .mockResolvedValueOnce({ ok: false, status: 503, viewerAuthorized: true, error: 'Worker temporarily unavailable.' });
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        viewerAuthorized: true,
+        jobState: 'queued',
+        requestId: 'viewer-refresh',
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        viewerAuthorized: true,
+        error: 'Worker temporarily unavailable.',
+      });
     const readStatus = jest.fn();
 
     await loadGeneratedResultsArtifactForHost(host, {
@@ -516,9 +557,11 @@ describe('onePageSessionGeneratedResultsRuntime', () => {
 
   it('marks long running admin polls recheckable instead of leaving generation controls stuck running', async () => {
     const host = buildHost();
-    const readStatus = jest.fn(async () => buildStatusBody({
-      state: { jobState: 'queued', active: { requestId: 'still-queued' }, lastGood: getLastGoodStatusDraft() },
-    }));
+    const readStatus = jest.fn(async () =>
+      buildStatusBody({
+        state: { jobState: 'queued', active: { requestId: 'still-queued' }, lastGood: getLastGoodStatusDraft() },
+      }),
+    );
 
     await generateResultsForHost(host, {
       ports: {
@@ -527,7 +570,12 @@ describe('onePageSessionGeneratedResultsRuntime', () => {
         randomUUID: () => 'request-timeout',
         readQuestionsCache: () => ({}),
         readStatus,
-        startGeneration: async () => ({ ok: true, httpStatus: 202, jobState: 'queued', reservation: { requestId: 'request-timeout' } }),
+        startGeneration: async () => ({
+          ok: true,
+          httpStatus: 202,
+          jobState: 'queued',
+          reservation: { requestId: 'request-timeout' },
+        }),
       },
     });
 
@@ -538,5 +586,4 @@ describe('onePageSessionGeneratedResultsRuntime', () => {
     expect(host.state.generatedResultsAnalysis?.statusLabel).toContain('Check again');
     expect(host.state.generatedResultsAnalysis?.artifact).not.toBeNull();
   });
-
 });

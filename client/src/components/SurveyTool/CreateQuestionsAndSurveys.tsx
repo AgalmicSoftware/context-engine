@@ -3627,9 +3627,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                         });
                       };
                       return (
-                        <div
-                          className={`${styles.tagInputGroup} ${tagInputActive ? styles.tagInputGroupActive : ''}`}
-                        >
+                        <div className={`${styles.tagInputGroup} ${tagInputActive ? styles.tagInputGroupActive : ''}`}>
                           {this.props.interviewQuestionReview && !tagInputActive && (
                             <button
                               type="button"
@@ -3675,20 +3673,20 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                           />
 
                           {/* Checkmark: Only visible when user is typing */}
-                      {(question.currentTagInputValue || '').trim() !== '' && (
-                        <button
-                          type="button"
-                          className={styles.addTagButton}
-                          data-testid={E2E_TESTIDS.CREATE_QUESTION_ADD_TAG}
-                          onClick={() => this.processTagInput(qIndex)}
-                          title="Add Tag"
-                        >
-                          <FontAwesomeIcon icon={faCheck} />
-                        </button>
-                      )}
+                          {(question.currentTagInputValue || '').trim() !== '' && (
+                            <button
+                              type="button"
+                              className={styles.addTagButton}
+                              data-testid={E2E_TESTIDS.CREATE_QUESTION_ADD_TAG}
+                              onClick={() => this.processTagInput(qIndex)}
+                              title="Add Tag"
+                            >
+                              <FontAwesomeIcon icon={faCheck} />
+                            </button>
+                          )}
 
-                      {/* Magic Wand: Replaces old generate button, hidden if tags populated */}
-                      {showGenerateTagsButton && (
+                          {/* Magic Wand: Replaces old generate button, hidden if tags populated */}
+                          {showGenerateTagsButton && (
                             <button
                               type="button"
                               className={styles.magicTagButton}

@@ -1,7 +1,11 @@
 import { isResponseAllowedForSessionSlug } from '../../utilities/session/responseSessionScope';
 
 export type ResultsAnalysisBrowserSnapshotResult =
-  | { ok: true; snapshot: { sessionSlug: string; questions: unknown[]; responses: unknown[] }; counts: Record<string, number> }
+  | {
+      ok: true;
+      snapshot: { sessionSlug: string; questions: unknown[]; responses: unknown[] };
+      counts: Record<string, number>;
+    }
   | { ok: false; reason: string };
 
 type RecordLike = Record<string, unknown>;
@@ -11,7 +15,8 @@ const toRecord = (value: unknown): RecordLike =>
 const toArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 const toText = (value: unknown): string => (value == null ? '' : String(value).replace(/\s+/g, ' ').trim());
 
-const normalizeSlug = (value: unknown): string => toText(value).toLowerCase() === 'general' ? '' : toText(value).toLowerCase();
+const normalizeSlug = (value: unknown): string =>
+  toText(value).toLowerCase() === 'general' ? '' : toText(value).toLowerCase();
 
 const valueLooksLocked = (value: unknown): boolean => {
   const record = toRecord(value);
@@ -24,7 +29,7 @@ const valueLooksLocked = (value: unknown): boolean => {
   );
 };
 
-const responseLooksLocked = (response: RecordLike): boolean => (
+const responseLooksLocked = (response: RecordLike): boolean =>
   response.encrypted === true ||
   response.payloadEncrypted === true ||
   response.locked === true ||
@@ -34,13 +39,16 @@ const responseLooksLocked = (response: RecordLike): boolean => (
   valueLooksLocked(response.additional) ||
   valueLooksLocked(response.additionalComments) ||
   valueLooksLocked(response.comments) ||
-  valueLooksLocked(response.comment)
-);
+  valueLooksLocked(response.comment);
 
 const getAnswerValue = (value: unknown): unknown => {
   if (value == null) return '';
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
-  if (Array.isArray(value)) return value.map(getAnswerValue).filter((entry) => toText(entry)).join('; ');
+  if (Array.isArray(value))
+    return value
+      .map(getAnswerValue)
+      .filter((entry) => toText(entry))
+      .join('; ');
   const record = toRecord(value);
   if (Object.prototype.hasOwnProperty.call(record, 'value')) return getAnswerValue(record.value);
   if (Object.prototype.hasOwnProperty.call(record, 'answer')) return getAnswerValue(record.answer);
@@ -51,7 +59,11 @@ const getAnswerValue = (value: unknown): unknown => {
 const questionIsHydratedForSession = (question: RecordLike, sessionSlug: string): boolean => {
   if (question.__ceQuestionMetadataPending === true) return false;
   const questionSlug = normalizeSlug(question.sessionSlug || '');
-  if (Object.prototype.hasOwnProperty.call(question, 'sessionSlug') && questionSlug && question.sessionSlugExplicit !== false) {
+  if (
+    Object.prototype.hasOwnProperty.call(question, 'sessionSlug') &&
+    questionSlug &&
+    question.sessionSlugExplicit !== false
+  ) {
     return questionSlug === normalizeSlug(sessionSlug);
   }
   return true;
@@ -107,7 +119,9 @@ export const buildResultsAnalysisBrowserSnapshotFromCacheNode = ({
         return;
       }
       const answer = getAnswerValue(record.answer ?? record.value ?? record.response);
-      const additional = getAnswerValue(record.additional ?? record.additionalComments ?? record.comments ?? record.comment);
+      const additional = getAnswerValue(
+        record.additional ?? record.additionalComments ?? record.comments ?? record.comment,
+      );
       if (!toText(answer) && !toText(additional)) {
         skippedCount += 1;
         return;
@@ -125,7 +139,8 @@ export const buildResultsAnalysisBrowserSnapshotFromCacheNode = ({
   });
 
   if (questions.length === 0) return { ok: false, reason: 'Question cache is not hydrated for this session.' };
-  if (responses.length === 0) return { ok: false, reason: 'No unlocked submitted responses are available in the local cache.' };
+  if (responses.length === 0)
+    return { ok: false, reason: 'No unlocked submitted responses are available in the local cache.' };
 
   return {
     ok: true,

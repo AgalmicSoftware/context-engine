@@ -218,7 +218,8 @@ const OnePageSessionTelegramShell = ({
               </div>
             </div>
             <div className={styles.telegramListEmpty} data-testid="ce-session-telegram-generated-results-unsupported">
-              AI-generated Circles, Breakdown, and Risk Matrix views are not available in the Telegram web shell yet. Use a standard session page with admin Worker access to generate those private drafts.
+              AI-generated Circles, Breakdown, and Risk Matrix views are not available in the Telegram web shell yet.
+              Use a standard session page with admin Worker access to generate those private drafts.
             </div>
             {telegramAgentResultsStatus === 'loading' ? (
               <div className={styles.telegramListEmpty}>Loading results...</div>

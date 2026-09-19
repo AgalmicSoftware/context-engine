@@ -114,6 +114,7 @@ const UserPageSurveySection = ({
             className={styles.switchWordInactive}
             onClick={onShowQuestionsTab}
             aria-label="Show Questions"
+            data-ce-control-appearance="frameless"
           >
             Questions
           </button>
@@ -243,6 +244,7 @@ const UserPageSurveySection = ({
             className={styles.switchWordInactive}
             onClick={onShowQuestionsTab}
             aria-label="Show Questions"
+            data-ce-control-appearance="frameless"
           >
             Questions
           </button>

@@ -522,7 +522,7 @@ const OPINION_GROUPS_TOOLTIP_TEXT = "Choose a deterministic K-medoids grouping o
 const D3_CATEGORY10 = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'];
 const WORLD_MAP_ANSWER_COLORS = Object.freeze({
   Agree: '#4dffa4',
-  Unsure: '#ffd166',
+  Unsure: '#ffeb3b',
   Disagree: '#ff6b6b',
 });
 const WORLD_MAP_DEFAULT_COUNTRY_FILL = 'rgba(226, 232, 255, 0.08)';
@@ -3543,7 +3543,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
       --panel:#ffffff;
       --agree:#149488;
       --disagree:#e85b43;
-      --unsure:#ffd166;
+      --unsure:#ffeb3b;
       --invalid:#111827;
       --blue:#5e72e4;
       --indigo:#5603ad;
@@ -4824,6 +4824,15 @@ export const renderHtmlReport = (report) => `<!doctype html>
       .riskMatrixSectionCard { padding: 12px; }
       .riskMatrixContainer { padding: 0; }
       .htmlReportSectionTable th, .htmlReportSectionTable td { min-width: 5.75rem; padding: 8px 9px; }
+    }
+    @media only screen and (max-width: 420px) {
+      .ce-session-results-section > .sectionHeaderRow { gap: 8px; }
+      .ce-session-results-section > .sectionHeaderRow > .sectionHeader { flex-wrap: nowrap; gap: 6px; font-size: 1.125rem; line-height: 1; padding-left: 8px; }
+      .ce-session-results-section > .sectionHeaderRow > .sectionHeader .sectionHeaderText { flex-direction: row; align-items: center; flex-wrap: nowrap; gap: 6px; }
+      .ce-session-results-section > .sectionHeaderRow > .sectionHeader .sectionHeaderTitle,
+      .ce-session-results-section > .sectionHeaderRow > .sectionHeader .sectionHeaderSubtitle { line-height: 1; }
+      .ce-session-results-section > .sectionHeaderRow > .sectionHeader .sectionHeaderSubtitle { font-size: 1em; }
+      .ce-session-results-section > .sectionHeaderRow > .sectionHeader .sectionToggleIcon { flex: 0 0 auto; }
     }
     @media (prefers-reduced-motion: reduce) {
       .debateMap,

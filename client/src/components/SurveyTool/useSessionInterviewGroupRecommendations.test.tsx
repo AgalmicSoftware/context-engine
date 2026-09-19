@@ -93,9 +93,9 @@ describe('useSessionInterviewGroupRecommendations', () => {
     const secondRecommendation = recommendation('new-group');
     const first = deferred<InterviewGroupRecommendationResult>();
     const second = deferred<InterviewGroupRecommendationResult>();
-    jest.mocked(recommendInterviewGroups).mockImplementation(({ transcript }) =>
-      transcript === 'first' ? first.promise : second.promise,
-    );
+    jest
+      .mocked(recommendInterviewGroups)
+      .mockImplementation(({ transcript }) => (transcript === 'first' ? first.promise : second.promise));
 
     const { result, rerender } = renderHook((props) => useSessionInterviewGroupRecommendations(props), {
       initialProps: {

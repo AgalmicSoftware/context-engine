@@ -16,6 +16,7 @@ test('buildInterviewBriefDocument returns only an inert question catalog', () =>
   const document = buildInterviewBriefDocument({
     slug: 'demo',
     sessionUrl: 'https://app.example/session/demo',
+    servedWorkerOrigin: 'https://worker.example',
     questionSetHash: 'hash',
     questions: [{ id: 'q1', type: 'freeform', prompt: 'What matters?', options: [] }],
   });
@@ -23,7 +24,7 @@ test('buildInterviewBriefDocument returns only an inert question catalog', () =>
     type: 'context-engine.interview-question-catalog',
     version: 1,
     sessionSlug: 'demo',
-    reviewUrl: 'https://app.example/session/demo?mode=interview',
+    reviewUrl: 'https://app.example/session/demo?worker=https%3A%2F%2Fworker.example&mode=interview',
     questionSetHash: 'hash',
     prefillPromptVersion: INTERVIEW_PROMPT_VERSION,
     answerContract: {
@@ -47,6 +48,29 @@ test('buildInterviewBriefDocument returns only an inert question catalog', () =>
     questions: [{ id: 'q1', type: 'freeform', prompt: 'What matters?', options: [] }],
   });
   assert.equal('instructions' in document, false);
+});
+
+
+test('catalog review URLs include only the trusted serving Worker discovery origin', () => {
+  const { buildReviewUrl, safeServedWorkerOrigin } = __test__interviewBriefDispatch;
+  assert.equal(safeServedWorkerOrigin('https://worker.example/agent/interview-catalog?slug=demo'), 'https://worker.example');
+  assert.equal(safeServedWorkerOrigin('http://localhost:8787/agent/interview-catalog?slug=demo'), 'http://localhost:8787');
+  assert.equal(safeServedWorkerOrigin('http://remote.example/agent/interview-catalog?slug=demo'), '');
+  assert.equal(safeServedWorkerOrigin('ftp://worker.example/agent/interview-catalog?slug=demo'), '');
+  assert.equal(
+    buildReviewUrl({
+      sessionUrl: 'https://app.example/session/demo',
+      servedWorkerOrigin: 'https://worker.example/agent/interview-catalog?slug=demo',
+    }),
+    'https://app.example/session/demo?worker=https%3A%2F%2Fworker.example&mode=interview',
+  );
+  assert.equal(
+    buildReviewUrl({
+      sessionUrl: 'https://app.example/session/demo',
+      servedWorkerOrigin: 'http://remote.example/agent/interview-catalog?slug=demo',
+    }),
+    'https://app.example/session/demo?mode=interview',
+  );
 });
 
 test('canonicalizes question order before calculating a revision hash', () => {
@@ -85,7 +109,7 @@ test('dispatchInterviewBriefRequest returns public questions and a stable revisi
   assert.equal(body.type, 'context-engine.interview-question-catalog');
   assert.equal(body.prefillPromptVersion, INTERVIEW_PROMPT_VERSION);
   assert.equal(body.questionSetHash, 'question-hash');
-  assert.equal(body.reviewUrl, 'https://app.example/session/demo?mode=interview');
+  assert.equal(body.reviewUrl, 'https://app.example/session/demo?worker=https%3A%2F%2Fworker.example&mode=interview');
   assert.deepEqual(body.answerContract.binary, ['Agree', 'Unsure', 'Disagree']);
   assert.deepEqual(body.answerContract.rating, { min: 0, max: 10, step: 1 });
   assert.equal(body.researchCoverageContract.verification, 'self_reported');
@@ -136,7 +160,7 @@ test('dispatchInterviewBriefRequest honors per-session disablement and requires 
 
 test('dispatchInterviewBriefRequest strips query and fragment state from the supplied return URL', async () => {
   const response = await dispatchInterviewBriefRequest({
-    request: new Request('https://worker.example/agent/interview-brief?slug=demo&format=json&sessionUrl=https%3A%2F%2Fapp.example%2Fsession%2Fdemo%3Fmode%3DrecordGroup%23private'),
+    request: new Request('https://worker.example/agent/interview-brief?slug=demo&format=json&sessionUrl=https%3A%2F%2Fapp.example%2Fsession%2Fdemo%3Fworker%3Dhttps%253A%252F%252Fattacker.example%26mode%3DrecordGroup%23private'),
     deps: {
       resolveRequestSlugWithoutToken: () => ({ ok: true, explicitSlugProvided: true, slug: 'demo' }),
       getSessionConfig: async () => ({ allowOrigins: ['https://app.example'] }),
@@ -147,7 +171,8 @@ test('dispatchInterviewBriefRequest strips query and fragment state from the sup
     },
   });
   const body = await response.json();
-  assert.equal(body.reviewUrl, 'https://app.example/session/demo?mode=interview');
+  assert.equal(body.reviewUrl, 'https://app.example/session/demo?worker=https%3A%2F%2Fworker.example&mode=interview');
+  assert.equal(body.reviewUrl.includes('attacker.example'), false);
   assert.equal('instructions' in body, false);
 });
 

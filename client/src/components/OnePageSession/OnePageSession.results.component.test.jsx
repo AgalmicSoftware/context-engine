@@ -604,8 +604,6 @@ describe('OnePageSession results routing', () => {
     }
   });
 
-
-
   it('does not show generated AI controls until an explicit plausible-admin check', async () => {
     render(
       <OnePageSession
@@ -635,7 +633,6 @@ describe('OnePageSession results routing', () => {
     expect(screen.getByRole('button', { name: /^Report$/i })).toBeInTheDocument();
   });
 
-
   it('shows real generated artifacts ahead of seeded demo result fixtures for demo-interview-3', async () => {
     const props = buildProps();
     const demoSessionId = `0x${'2'.repeat(32)}`;
@@ -664,7 +661,12 @@ describe('OnePageSession results routing', () => {
           sections: {
             argumentMap: { available: true, debates: [] },
             atlas: { available: true, nodes: [], edges: [] },
-            breakdown: { available: true, summary: { overview: 'Generated demo artifact' }, dimensions: [], groups: [] },
+            breakdown: {
+              available: true,
+              summary: { overview: 'Generated demo artifact' },
+              dimensions: [],
+              groups: [],
+            },
             riskMatrix: { available: true, categories: [], comments: [], heatmap: {}, scenarioLinks: [] },
           },
         },
@@ -714,7 +716,9 @@ describe('OnePageSession results routing', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Circles$/i }));
 
     await waitFor(() => {
-      expect(screen.getByTestId('session-generated-results-view')).toHaveTextContent('Generated circles for demo-interview-3');
+      expect(screen.getByTestId('session-generated-results-view')).toHaveTextContent(
+        'Generated circles for demo-interview-3',
+      );
     });
     expect(screen.queryByTestId('ai-policy-atlas')).not.toBeInTheDocument();
   });
@@ -747,8 +751,6 @@ describe('OnePageSession results routing', () => {
     expect(screen.queryByTestId('ce-session-generated-results-generate')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Circles$/i })).not.toBeInTheDocument();
   });
-
-
 
   it('invokes anonymous generated-results recheck with the rendered session host bound', async () => {
     let callbackThis = null;
@@ -785,8 +787,6 @@ describe('OnePageSession results routing', () => {
     expect(loadSpy).toHaveBeenCalledTimes(1);
     expect(callbackThis).toBe(sessionRef.current);
   });
-
-
 
   it('shows a Retry action for automatic-only generated analysis failures and a Recheck action after polling expires', async () => {
     const baseGeneratedState = {
@@ -928,7 +928,6 @@ describe('OnePageSession results routing', () => {
     expect(check).toHaveBeenCalledTimes(1);
     expect(authorize).not.toHaveBeenCalled();
 
-
     view.rerender(
       <OnePageSessionStandardShell
         {...shellProps}
@@ -985,7 +984,6 @@ describe('OnePageSession results routing', () => {
     expect(tabletResultsBlock).toContain('padding: 6px 10px;');
   });
 
-
   it('renders generated Risk Matrix instead of seeded demo RiskMatrix when a demo artifact provides it', async () => {
     const props = buildProps();
     const demoSessionId = `0x${'3'.repeat(32)}`;
@@ -1011,7 +1009,12 @@ describe('OnePageSession results routing', () => {
           sections: {
             argumentMap: { available: true, debates: [] },
             atlas: { available: true, nodes: [], edges: [] },
-            breakdown: { available: true, summary: { overview: 'Generated demo artifact' }, dimensions: [], groups: [] },
+            breakdown: {
+              available: true,
+              summary: { overview: 'Generated demo artifact' },
+              dimensions: [],
+              groups: [],
+            },
             riskMatrix: { available: true, categories: [], comments: [], heatmap: {}, scenarioLinks: [] },
           },
         },
@@ -1032,7 +1035,10 @@ describe('OnePageSession results routing', () => {
             sessionId: demoSessionId,
             corsWorkerUrl: 'https://worker.example',
             sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
-            storageProfile: { backend: 'cloudflare', resources: { questions: 'active', surveys: 'active', responses: 'active' } },
+            storageProfile: {
+              backend: 'cloudflare',
+              resources: { questions: 'active', surveys: 'active', responses: 'active' },
+            },
           }}
         />
       </MemoryRouter>,
@@ -1043,7 +1049,9 @@ describe('OnePageSession results routing', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Risk Matrix$/i }));
 
     await waitFor(() => {
-      expect(screen.getByTestId('session-generated-results-view')).toHaveTextContent('Generated riskMatrix for demo-interview-3');
+      expect(screen.getByTestId('session-generated-results-view')).toHaveTextContent(
+        'Generated riskMatrix for demo-interview-3',
+      );
     });
     expect(screen.queryByTestId('risk-matrix-view')).not.toBeInTheDocument();
   });
@@ -1588,7 +1596,6 @@ describe('OnePageSession results routing', () => {
       selectedTags: [],
     });
   });
-
 
   it('invalidates pending generated viewer loads and reloads when the visible results session changes', async () => {
     const prevProps = buildProps();

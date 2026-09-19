@@ -114,7 +114,8 @@ export const getUserPageErrorMessage = (error: unknown, fallback = 'Unknown erro
   return fallback;
 };
 
-const AI_KEY_ERROR_RE = /(?:server misconfigured:\s*)?(?:openaiKey|anthropicKey|openrouterKey|customRpcKey|ai provider key|provider key|api key)\s+(?:is\s+)?missing|missing\s+(?:required\s+)?(?:ai\s+)?(?:provider\s+)?(?:api\s+)?key|no\s+(?:ai\s+)?(?:provider\s+)?(?:api\s+)?key\s+available|enter the required ai provider key/i;
+const AI_KEY_ERROR_RE =
+  /(?:server misconfigured:\s*)?(?:openaiKey|anthropicKey|openrouterKey|customRpcKey|ai provider key|provider key|api key)\s+(?:is\s+)?missing|missing\s+(?:required\s+)?(?:ai\s+)?(?:provider\s+)?(?:api\s+)?key|no\s+(?:ai\s+)?(?:provider\s+)?(?:api\s+)?key\s+available|enter the required ai provider key/i;
 const AI_CONNECTIVITY_ERROR_RE = /^(?:failed to fetch|load failed|networkerror when attempting to fetch resource)$/i;
 
 export const buildUserPageAnalysisErrorPresentation = (error: unknown): UserPageAnalysisErrorPresentation => {
@@ -123,7 +124,8 @@ export const buildUserPageAnalysisErrorPresentation = (error: unknown): UserPage
   if (AI_KEY_ERROR_RE.test(normalizedMessage)) {
     return {
       action: 'add-ai-key',
-      message: 'AI analysis needs a configured AI provider key. Add an AI key in Account Settings, then refresh this analysis.',
+      message:
+        'AI analysis needs a configured AI provider key. Add an AI key in Account Settings, then refresh this analysis.',
     };
   }
   if (AI_CONNECTIVITY_ERROR_RE.test(normalizedMessage)) {
