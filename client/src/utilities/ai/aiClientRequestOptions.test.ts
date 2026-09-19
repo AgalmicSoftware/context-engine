@@ -23,6 +23,7 @@ describe('aiClientRequestOptions', () => {
         context: { requestId: 'req-1' },
         ignored: 'drop-me',
         messages: [{ role: 'user', content: 'hello' }],
+        anonymousOnly: true,
         provider: 'openai',
         sessionSlug: 'alpha-session',
         taskType: 'rank',
@@ -30,6 +31,7 @@ describe('aiClientRequestOptions', () => {
     ).toEqual({
       context: { requestId: 'req-1' },
       messages: [{ role: 'user', content: 'hello' }],
+      anonymousOnly: true,
       provider: 'openai',
       sessionSlug: 'alpha-session',
       taskType: 'rank',

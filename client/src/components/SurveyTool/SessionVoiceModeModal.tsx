@@ -3,8 +3,15 @@ import { appendInterviewTranscript, mergeInterviewReview } from './sessionInterv
 import { useInterviewReadiness } from './useInterviewReadiness';
 import { useInterviewQuestionUpdates } from './useInterviewQuestionUpdates';
 import SessionInterviewSuggestions from './SessionInterviewSuggestions';
+import SessionInterviewRecommendedGroups from './SessionInterviewRecommendedGroups';
 import SessionInterviewReviewSection from './SessionInterviewReviewSection';
+import SessionInterviewModalHeader from './SessionInterviewModalHeader';
 import SessionInterviewResearchConsent from './SessionInterviewResearchConsent';
+import SessionVoiceModeChooser from './SessionVoiceModeChooser';
+import {
+  useSessionInterviewGroupRecommendations,
+  type SessionInterviewGroupRecommendationRequest,
+} from './useSessionInterviewGroupRecommendations';
 import type { GeneratedSurveyStatement } from './SurveyGenerator/surveyGeneratorHelpers';
 import { useInterviewOpening } from './useInterviewOpening';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -15,7 +22,6 @@ import {
   faCheck,
   faCopy,
   faCircle,
-  faComments,
   faMicrophone,
   faPause,
   faPlay,
@@ -94,6 +100,8 @@ type SessionVoiceModeModalProps = InterviewDraftApplicationProps & {
   prefillPacket?: InterviewPrefillPacket | null;
   initialError?: string;
   account?: unknown;
+  provider?: unknown;
+  network?: unknown;
   loginComplete?: boolean;
   loginModalToggled?: boolean;
   toggleLoginModal?: (open?: boolean) => void;
@@ -112,6 +120,8 @@ type SessionInterviewPanelProps = InterviewDraftApplicationProps & {
   prefillPacket?: InterviewPrefillPacket | null;
   initialError?: string;
   account?: unknown;
+  provider?: unknown;
+  network?: unknown;
   loginComplete?: boolean;
   loginModalToggled?: boolean;
   toggleLoginModal?: (open?: boolean) => void;
@@ -130,6 +140,8 @@ function SessionInterviewPanel({
   prefillPacket = null,
   initialError = '',
   account = '',
+  provider,
+  network,
   loginComplete = false,
   loginModalToggled = false,
   toggleLoginModal,
@@ -180,6 +192,8 @@ function SessionInterviewPanel({
   const previousLoginModalToggledRef = useRef(Boolean(loginModalToggled));
   const [error, setError] = useState(initialError);
   const [suggestedQuestions, setSuggestedQuestions] = useState<GeneratedSurveyStatement[]>([]);
+  const [groupRecommendationRequest, setGroupRecommendationRequest] =
+    useState<SessionInterviewGroupRecommendationRequest | null>(null);
   const [drafts, setDrafts] = useState<InterviewDraftResponse[]>([]);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [editedDrafts, setEditedDrafts] = useState<Record<string, InterviewDraftResponse>>({});
@@ -274,6 +288,14 @@ function SessionInterviewPanel({
     sessionConfig,
     sessionSlug,
   });
+  const generatedGroupRecommendations = useSessionInterviewGroupRecommendations({
+    active: !isInterviewBusy && !mapping,
+    request: groupRecommendationRequest,
+    questions,
+    sessionConfig,
+    sessionSlug,
+    workerUrl: resolvedWorkerUrl,
+  });
 
   useEffect(() => {
     if (isStarting || mapping) statusRef.current?.focus();
@@ -347,21 +369,21 @@ function SessionInterviewPanel({
         const importedDrafts = nextTranscript.trim()
           ? null
           : readImportedInterviewDraftResponses(prefillPacket, questions);
+        const contextPacket: InterviewPrefillPacket | null =
+          prefillPacket ||
+          (responderContext.trim()
+            ? {
+                version: 1,
+                sessionSlug,
+                source: { platform: 'other', modelId: 'direct-user-context', verification: 'self_reported' },
+                responderContext: { summary: responderContext.trim() },
+              }
+            : null);
         let mapped = importedDrafts;
         let proposedQuestions: GeneratedSurveyStatement[] = [];
         if (mapped === null) {
           const url = await resolveWorkerUrl();
           if (disposedRef.current) return;
-          const contextPacket: InterviewPrefillPacket | null =
-            prefillPacket ||
-            (responderContext.trim()
-              ? {
-                  version: 1,
-                  sessionSlug,
-                  source: { platform: 'other', modelId: 'direct-user-context', verification: 'self_reported' },
-                  responderContext: { summary: responderContext.trim() },
-                }
-              : null);
           mapped = await mapInterviewEvidenceToResponses({
             questions,
             transcript: nextTranscript,
@@ -413,6 +435,15 @@ function SessionInterviewPanel({
         setDrafts(review.drafts);
         setEditedDrafts(review.edited);
         setSelected(review.selected);
+        setGroupRecommendationRequest({
+          requestId: Date.now(),
+          transcript: nextTranscript,
+          prefillPacket: contextPacket,
+          draftResponses: review.drafts.map((draft) => ({
+            ...draft,
+            ...(review.edited[draft.questionId] || {}),
+          })),
+        });
         setMappingNotice(
           review.drafts.length
             ? ''
@@ -446,6 +477,16 @@ function SessionInterviewPanel({
       transcript,
     ],
   );
+
+  const refreshGroupRecommendations = useCallback(() => {
+    if (!drafts.length || isInterviewBusy || mapping) return;
+    setGroupRecommendationRequest({
+      requestId: Date.now(),
+      transcript,
+      prefillPacket,
+      draftResponses: drafts.map((draft) => ({ ...draft, ...(editedDrafts[draft.questionId] || {}) })),
+    });
+  }, [drafts, editedDrafts, isInterviewBusy, mapping, prefillPacket, transcript]);
 
   useEffect(() => {
     if (!prefillPacket || importedRef.current || !questions.length) return;
@@ -657,49 +698,16 @@ function SessionInterviewPanel({
 
   return (
     <>
-      <ModalHeader toggle={onClose}>
-        <span className={styles.sessionInterviewHeader}>
-          <span id="ce-session-voice-mode-title">Interview</span>
-          <button
-            type="button"
-            id="ce-interview-help"
-            className={styles.sessionInterviewHeaderButton}
-            aria-label="About Interview"
-          >
-            <FontAwesomeIcon icon={faQuestionCircle} />
-          </button>
-          <UncontrolledTooltip target="ce-interview-help" placement="bottom" trigger="hover focus" autohide={false}>
-            {guidance}
-          </UncontrolledTooltip>
-          <span
-            role="status"
-            aria-live="polite"
-            aria-atomic="true"
-            aria-label={`Interview status: ${statusLabel}`}
-            data-testid={E2E_TESTIDS.SESSION_INTERVIEW_STATUS}
-          >
-            <button
-              type="button"
-              id="ce-interview-status-help"
-              ref={statusRef}
-              className={styles.sessionInterviewStatusPill}
-              data-tone={statusTone}
-              onClick={idle ? readiness.retry : undefined}
-              aria-label={`Interview status: ${statusLabel}`}
-            >
-              <span>{statusLabel}</span>
-            </button>
-          </span>
-          <UncontrolledTooltip
-            target="ce-interview-status-help"
-            placement="bottom"
-            trigger="hover focus"
-            autohide={false}
-          >
-            {idle ? `${readiness.detail} Click to check again.` : guidance}
-          </UncontrolledTooltip>
-        </span>
-      </ModalHeader>
+      <SessionInterviewModalHeader
+        guidance={guidance}
+        idle={idle}
+        onClose={onClose}
+        readinessDetail={readiness.detail}
+        readinessRetry={readiness.retry}
+        statusLabel={statusLabel}
+        statusTone={statusTone}
+        statusRef={statusRef}
+      />
       <ModalBody>
         <div className={styles.sessionInterviewPanel} data-testid={E2E_TESTIDS.SESSION_INTERVIEW_PANEL}>
           {hasImportedResponderContext ? (
@@ -978,12 +986,13 @@ function SessionInterviewPanel({
                   existing={hasDraftValue(responseFieldValue(existingResponseSlice, 'answers', draft.questionId))}
                   disabled={applying}
                   onSelect={(value) => setSelected((current) => ({ ...current, [draft.questionId]: value }))}
-                  onEdit={(patch) =>
+                  onEdit={(patch) => {
+                    setGroupRecommendationRequest(null);
                     setEditedDrafts((current) => ({
                       ...current,
                       [draft.questionId]: { ...current[draft.questionId], ...patch },
-                    }))
-                  }
+                    }));
+                  }}
                   renderAnswerInput={renderAnswerInput}
                   renderAdditionalInput={renderAdditionalInput}
                   renderFieldLock={renderFieldLock}
@@ -1041,6 +1050,23 @@ function SessionInterviewPanel({
               hidden={isInterviewBusy || mapping || shouldHideSuggestedQuestionSection(suggestedQuestionAuthoringState)}
             />
           ) : null}
+          {!isInterviewBusy && !mapping && drafts.length && !groupRecommendationRequest ? (
+            <Button outline onClick={refreshGroupRecommendations}>Refresh group suggestions</Button>
+          ) : null}
+          {!isInterviewBusy && !mapping ? (
+            <SessionInterviewRecommendedGroups
+              recommendations={generatedGroupRecommendations}
+              account={account}
+              provider={provider}
+              network={network}
+              loginComplete={loginComplete}
+              loginModalToggled={loginModalToggled}
+              toggleLoginModal={toggleLoginModal}
+              sessionConfig={sessionConfig}
+              sessionSlug={sessionSlug}
+              workerUrl={resolvedWorkerUrl}
+            />
+          ) : null}
         </div>
       </ModalBody>
     </>
@@ -1073,28 +1099,7 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
           </ModalHeader>
           <ModalBody>
             {!mode ? (
-              <div className={styles.sessionVoiceModeChooser} data-testid={E2E_TESTIDS.SESSION_VOICE_MODE_CHOOSER}>
-                <button
-                  type="button"
-                  onClick={() => onSelectMode('interview')}
-                  data-testid={E2E_TESTIDS.SESSION_VOICE_MODE_INTERVIEW}
-                >
-                  <FontAwesomeIcon icon={faMicrophone} />
-                  <strong>Interview</strong>
-                  <span>
-                    One person. A voice interviewer drafts responses and may suggest new questions for review.
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onSelectMode('recordGroup')}
-                  data-testid={E2E_TESTIDS.SESSION_VOICE_MODE_GROUP}
-                >
-                  <FontAwesomeIcon icon={faComments} />
-                  <strong>Group Conversation</strong>
-                  <span>Record a group discussion and generate new question drafts from it.</span>
-                </button>
-              </div>
+              <SessionVoiceModeChooser onSelectMode={onSelectMode} />
             ) : (
               <SessionListeningPanel {...props} panelMode="recordGroup" onClose={onClose} />
             )}

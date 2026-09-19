@@ -248,6 +248,7 @@ export const callAI = async (prompt: unknown, opts: unknown = {}): Promise<strin
         context,
         workerUrl: baseUrl,
         preferAnonymous: shouldUseAnonymousFirst,
+        anonymousOnly: aiRequestOpts.anonymousOnly === true,
         fallbackOnGateUnavailable,
         allowDemoFallback: defaultStrictAllowDemoFallback(),
       },

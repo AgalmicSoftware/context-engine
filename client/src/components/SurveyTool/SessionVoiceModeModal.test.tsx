@@ -10,6 +10,18 @@ import {
   mapInterviewEvidenceToResponses,
 } from './sessionInterview';
 import { startSessionRealtimeInterview } from '../../utilities/audio/realtimeInterviewClient';
+import { useSessionInterviewGroupRecommendations } from './useSessionInterviewGroupRecommendations';
+
+
+jest.mock('./SessionInterviewRecommendedGroups', () => ({
+  __esModule: true,
+  default: (props: { recommendations?: unknown[] }) =>
+    props.recommendations?.length ? <div data-testid="mock-group-recommendations" /> : null,
+}));
+
+jest.mock('./useSessionInterviewGroupRecommendations', () => ({
+  useSessionInterviewGroupRecommendations: jest.fn(() => []),
+}));
 
 jest.mock('./CreateQuestionsAndSurveys', () => ({
   __esModule: true,
@@ -74,6 +86,7 @@ const baseProps = {
 const mockedHashInterviewQuestions = jest.mocked(hashInterviewQuestions);
 const mockedMapInterviewEvidenceToResponses = jest.mocked(mapInterviewEvidenceToResponses);
 const mockedStartSessionRealtimeInterview = jest.mocked(startSessionRealtimeInterview);
+const mockedUseSessionInterviewGroupRecommendations = jest.mocked(useSessionInterviewGroupRecommendations);
 
 const buildAllowedSuggestionSessionConfig = () => ({
   slug: 'demo',
@@ -737,6 +750,49 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.queryByRole('heading', { name: 'Suggested new questions (1)' })).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Suggested new questions (1)', hidden: true }).closest('details')).not.toBeVisible();
     expect(screen.getByTestId('mock-create-questions')).not.toBeVisible();
+  });
+
+  it('does not mount group recommendations while interview mapping is still running', async () => {
+    mockedUseSessionInterviewGroupRecommendations.mockReturnValue([
+      {
+        groupId: 'ai-optimists',
+        reason: 'They asked for accountability groups.',
+        evidence: 'I want AI accountability groups.',
+      },
+    ]);
+    let finishMapping: ((value: []) => void) | null = null;
+    mockedMapInterviewEvidenceToResponses.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishMapping = resolve;
+        }),
+    );
+    mockedStartSessionRealtimeInterview.mockImplementation(async (options) => {
+      options.onStatus?.('Listening');
+      options.onRecordingState?.('recording');
+      return {
+        mediaStream: { getTracks: () => [], getAudioTracks: () => [] } as unknown as MediaStream,
+        pause: jest.fn(),
+        resume: jest.fn(),
+        stop: jest.fn(async () => ({
+          transcript: 'Responder: I want AI accountability groups.',
+          turns: [{ itemId: 'turn-1', role: 'responder' as const, text: 'I want AI accountability groups.' }],
+        })),
+        getTranscript: () => 'Responder: I want AI accountability groups.',
+      };
+    });
+    render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    await screen.findByLabelText('Pause interview');
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
+    await waitFor(() => expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTestId('mock-group-recommendations')).not.toBeInTheDocument();
+
+    await act(async () => {
+      finishMapping?.([]);
+    });
+    expect(await screen.findByTestId('mock-group-recommendations')).toBeInTheDocument();
   });
 
   it('offers the two large requested voice-mode choices', () => {

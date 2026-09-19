@@ -6,6 +6,7 @@ const AI_REQUEST_OPTION_KEYS = [
   'sessionConfig',
   'context',
   'workerUrl',
+  'anonymousOnly',
   'preferLocal',
   'provider',
   'model',
@@ -26,6 +27,7 @@ const AI_REQUEST_OPTION_KEYS = [
 ] as const;
 
 export type AiClientOptionRecord = UnknownRecord & {
+  anonymousOnly?: unknown;
   apiKey?: unknown;
   arweaveJwk?: unknown;
   context?: unknown;

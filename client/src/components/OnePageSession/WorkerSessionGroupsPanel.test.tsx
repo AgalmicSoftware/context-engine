@@ -2,7 +2,11 @@ import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 import { buildSignedAdminActionAuth, getWorkerSessionToken } from '../../utilities/worker/workerAuth';
-import { dispatchWorkerGroupsChanged } from '../../utilities/worker/workerGroupChangeEvents';
+import {
+  dispatchWorkerGroupsChanged,
+  subscribeWorkerGroupsChanged,
+  type WorkerGroupsChangedDetail,
+} from '../../utilities/worker/workerGroupChangeEvents';
 import { postSignedAdminWorkerRequest } from '../../utilities/worker/signedAdminWorkerRequest';
 import WorkerSessionGroupsPanel from './WorkerSessionGroupsPanel';
 
@@ -13,8 +17,17 @@ jest.mock('../../utilities/worker/workerAuth', () => ({
   buildSignedAdminActionAuth: jest.fn(),
   getWorkerSessionToken: jest.fn(),
 }));
+const mockWorkerGroupChangeListeners = new Set<(detail: WorkerGroupsChangedDetail) => void>();
+
 jest.mock('../../utilities/worker/workerGroupChangeEvents', () => ({
-  dispatchWorkerGroupsChanged: jest.fn(),
+  dispatchWorkerGroupsChanged: jest.fn((detail: WorkerGroupsChangedDetail) => {
+    mockWorkerGroupChangeListeners.forEach((listener) => listener(detail));
+    return detail;
+  }),
+  subscribeWorkerGroupsChanged: jest.fn((listener: (detail: WorkerGroupsChangedDetail) => void) => {
+    mockWorkerGroupChangeListeners.add(listener);
+    return () => mockWorkerGroupChangeListeners.delete(listener);
+  }),
 }));
 jest.mock('../../utilities/worker/signedAdminWorkerRequest', () => ({
   postSignedAdminWorkerRequest: jest.fn(),
@@ -37,6 +50,9 @@ const mockPostSignedAdminWorkerRequest = postSignedAdminWorkerRequest as jest.Mo
 >;
 const mockDispatchWorkerGroupsChanged = dispatchWorkerGroupsChanged as jest.MockedFunction<
   typeof dispatchWorkerGroupsChanged
+>;
+const mockSubscribeWorkerGroupsChanged = subscribeWorkerGroupsChanged as jest.MockedFunction<
+  typeof subscribeWorkerGroupsChanged
 >;
 
 const ADMIN = '0x00000000000000000000000000000000000000aa';
@@ -112,6 +128,7 @@ describe('WorkerSessionGroupsPanel', () => {
   });
 
   afterEach(() => {
+    mockWorkerGroupChangeListeners.clear();
     jest.clearAllMocks();
   });
 
@@ -230,6 +247,66 @@ describe('WorkerSessionGroupsPanel', () => {
         showListHeader: false,
       }),
     );
+  });
+
+  it('refreshes the mounted membership list after an exact worker group change event', async () => {
+    render(
+      <WorkerSessionGroupsPanel
+        account=""
+        provider={null}
+        networkChainId={null}
+        sessionConfig={{
+          ...sessionConfig,
+          sessionModeProfile: publicSessionModeProfile,
+        }}
+        sessionSlug="demo-sh"
+        showCreate={false}
+        refreshNonce={7}
+      />,
+    );
+
+    expect(await screen.findByTestId('membership-panel')).toBeInTheDocument();
+    expect(mockSubscribeWorkerGroupsChanged).toHaveBeenCalledTimes(1);
+    expect(mockMembershipPanel).toHaveBeenLastCalledWith(expect.objectContaining({ refreshNonce: 7 }));
+
+    act(() => {
+      dispatchWorkerGroupsChanged({ sessionSlug: 'other-session', sessionId: SESSION_ID });
+      dispatchWorkerGroupsChanged({ sessionSlug: 'demo-sh', sessionId: OTHER_SESSION_ID });
+    });
+    expect(mockMembershipPanel).toHaveBeenLastCalledWith(expect.objectContaining({ refreshNonce: 7 }));
+
+    act(() => {
+      dispatchWorkerGroupsChanged({ sessionSlug: 'demo-sh', sessionId: SESSION_ID });
+    });
+    await waitFor(() =>
+      expect(mockMembershipPanel).toHaveBeenLastCalledWith(expect.objectContaining({ refreshNonce: 8 })),
+    );
+  });
+
+  it('unsubscribes the mounted membership list from worker group change events', async () => {
+    const view = render(
+      <WorkerSessionGroupsPanel
+        account=""
+        provider={null}
+        networkChainId={null}
+        sessionConfig={{
+          ...sessionConfig,
+          sessionModeProfile: publicSessionModeProfile,
+        }}
+        sessionSlug="demo-sh"
+        showCreate={false}
+      />,
+    );
+
+    expect(await screen.findByTestId('membership-panel')).toBeInTheDocument();
+    const beforeUnmountCallCount = mockMembershipPanel.mock.calls.length;
+    view.unmount();
+
+    act(() => {
+      dispatchWorkerGroupsChanged({ sessionSlug: 'demo-sh', sessionId: SESSION_ID });
+    });
+
+    expect(mockMembershipPanel).toHaveBeenCalledTimes(beforeUnmountCallCount);
   });
 
   it('asks a signed-out visitor to sign in without rendering contract management', () => {
