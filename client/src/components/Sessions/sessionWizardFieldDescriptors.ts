@@ -53,6 +53,7 @@ const TOP_LEVEL_FIELD_ORDER = [
   'sessionModeProfile',
   'interviewModeEnabled',
   'interviewMode',
+  'resultsAnalysis',
   'sessionHeader',
   'sessionEndsAt',
   'storageProfile',
@@ -78,6 +79,7 @@ const MORE_OPTIONS_FIELDS = new Set([
   'appearance',
   'interviewModeEnabled',
   'interviewMode',
+  'resultsAnalysis',
   'groupCreationPolicy',
   'sessionEndsAt',
   'defaultTags',
@@ -100,6 +102,8 @@ const FIELD_TOOLTIPS: Record<string, string> = {
     'Allow participants to open Interview or Group Conversation from the session microphone. Interview uses the session Worker AI key and remains review-only until normal submission.',
   interviewMode:
     'Configure the Interview voice model, opening question, optional updates as the question bank grows, and suggested question drafts.',
+  resultsAnalysis:
+    'Choose which AI-generated result views can be prepared for this session. Automatic background runs require a Worker-canonical Cloudflare session.',
   'interviewMode.realtimeModel':
     'OpenAI voice model for Interview mode. Defaults to gpt-live-1 (Live API); supported legacy gpt-realtime models use the Realtime API.',
   corsWorkerUrl: 'Base URL for the worker (AI, transcription, Arweave uploads, faucet).',
@@ -142,6 +146,7 @@ const FIELD_LABELS: Record<string, string> = {
   sessionModeProfile: 'Session Mode',
   interviewModeEnabled: 'Voice interview modes',
   interviewMode: 'Interview settings',
+  resultsAnalysis: 'Results analysis',
   'interviewMode.realtimeModel': 'Interview voice model',
   corsWorkerUrl: 'Worker URL',
   sessionHeader: 'Header Image',

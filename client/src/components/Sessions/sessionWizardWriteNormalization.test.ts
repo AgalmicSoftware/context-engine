@@ -1,4 +1,5 @@
 import { DEFAULT_INTERVIEW_SETTINGS } from '../../../../shared/interviewSettings.mjs';
+import { DEFAULT_RESULTS_ANALYSIS_SETTINGS } from '../../../../shared/resultsAnalysisSettings.mjs';
 import { ethers } from 'ethers';
 import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 
@@ -771,6 +772,59 @@ describe('sessionWizardWriteNormalization', () => {
       provider: 'openai',
       realtimeModel: 'gpt-live-1',
     });
+    expect(payload.resultsAnalysis).toEqual(DEFAULT_RESULTS_ANALYSIS_SETTINGS);
+  });
+
+  test('buildSessionWizardWorkerConfigPayload preserves valid results analysis settings', () => {
+    const resultsAnalysis = {
+      version: 1,
+      generationMode: 'both',
+      views: { circles: true, breakdown: false, riskMatrix: true },
+      autoAfter: { threshold: 20, unit: 'distinctParticipants' },
+      inputScope: 'submitted',
+      publication: 'latest_success_visible',
+    };
+    const payload = buildSessionWizardWorkerConfigPayload({
+      slug: 'results-analysis',
+      draft: {
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        resultsAnalysis,
+      },
+      account: '0x00000000000000000000000000000000000000aa',
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      workerUrl: 'https://worker.example',
+    });
+
+    expect(payload.resultsAnalysis).toEqual(resultsAnalysis);
+  });
+
+  test('write payload builders reject invalid results analysis settings', () => {
+    const invalidResultsAnalysis = {
+      version: 1,
+      generationMode: 'automatic',
+      views: { circles: true, breakdown: true, riskMatrix: true },
+      autoAfter: { threshold: 0, unit: 'distinctParticipants' },
+      inputScope: 'submitted',
+      publication: 'latest_success_visible',
+    };
+
+    expect(() =>
+      buildSessionWizardWorkerConfigPayload({
+        slug: 'bad-results-analysis',
+        draft: {
+          sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+          resultsAnalysis: invalidResultsAnalysis,
+        },
+      }),
+    ).toThrow('Session results analysis settings are invalid.');
+    expect(() =>
+      sanitizeSessionWizardMetadataPayload({
+        slug: 'bad-results-analysis',
+        sessionName: 'Bad Results Analysis',
+        resultsAnalysis: invalidResultsAnalysis,
+        blockLimits: { start: 1 },
+      }),
+    ).toThrow('Session results analysis settings are invalid.');
   });
 
   test('buildSessionWizardWorkerConfigPayload preserves an explicit interview-mode opt-out', () => {

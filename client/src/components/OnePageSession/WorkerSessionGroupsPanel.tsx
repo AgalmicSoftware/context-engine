@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AdminWorkerGroupsPanel from '../Admin/AdminWorkerGroupsPanel';
 import { resolveAdminCapabilities } from '../Admin/adminPageHelpers';
-import { postSignedAdminWorkerRequest } from '../Admin/adminPageSignedWorkerRequest';
+import { postSignedAdminWorkerRequest } from '../../utilities/worker/signedAdminWorkerRequest';
 import { getUsableSessionWorkerUrl } from '../../utilities/session/sessionWorkerAvailability';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection.js';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';

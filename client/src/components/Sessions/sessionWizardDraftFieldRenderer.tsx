@@ -1,4 +1,5 @@
 import InterviewSettingsFields from './InterviewSettingsFields';
+import ResultsAnalysisSettingsFields from './ResultsAnalysisSettingsFields';
 import { type MutableRefObject, type ReactNode } from 'react';
 import { Button, FormGroup, Input, Label } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -38,6 +39,10 @@ import type { SessionWizardModeFieldPolicy } from './sessionWizardModeFieldPolic
 import { applyStorageProfileChangeToModeDraft } from './sessionWizardModeProfileDraftController';
 import { normalizeSbtSelection, serializeDefaultFeaturedSbtSelections } from './sessionWizardSbtSelections';
 import { getChainName } from './sessionWizardCoreUtils';
+import {
+  getBackgroundResultsAnalysisUnsupportedReason,
+  supportsBackgroundResultsAnalysis,
+} from './resultsAnalysisSettingsSupport';
 import { isSecretFieldPath, isStringArray, shouldLockable } from './sessionWizardGateUtils';
 import type { MetadataObjectCollapsedState } from './hooks/useSessionWizardChromeState';
 import type { ChainIdLike, NetworkLike, SessionConfigLike, SessionContractsLike } from '../shellTypes';
@@ -510,6 +515,19 @@ export const buildSessionWizardDraftFieldRenderer = ({
           onChange={(next) => updateDraftValue(['interviewMode'], next)}
         />
       );
+
+    if (path.length === 0 && key === 'resultsAnalysis') {
+      const backgroundAutoSupported = supportsBackgroundResultsAnalysis(draft);
+      return (
+        <ResultsAnalysisSettingsFields
+          key={keyString}
+          value={value}
+          onChange={(next) => updateDraftValue(['resultsAnalysis'], next)}
+          backgroundAutoSupported={backgroundAutoSupported}
+          unsupportedReason={backgroundAutoSupported ? '' : getBackgroundResultsAnalysisUnsupportedReason(draft)}
+        />
+      );
+    }
 
     if (path.length === 0 && key === 'groupCreationPolicy') {
       const sessionModeProfile = draft.sessionModeProfile as { authority?: { mode?: unknown } } | null | undefined;

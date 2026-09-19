@@ -85,6 +85,12 @@ $card-shadow: var(--ce-card-shadow);
   min-width: 980px;
 }
 
+.generatedSeverityGridContainer {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+
 .subgridContainer {
   min-width: 100%;
   width: 100%;
@@ -1251,7 +1257,8 @@ button.cell {
   }
 
   .gridContainer,
-  .subgridContainer {
+  .subgridContainer,
+  .generatedSeverityGridContainer {
     gap: 6px;
   }
 

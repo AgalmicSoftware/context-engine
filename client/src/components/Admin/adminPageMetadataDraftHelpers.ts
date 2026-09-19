@@ -1,4 +1,8 @@
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
+import {
+  normalizeResultsAnalysisSettings,
+  validResultsAnalysisSettings,
+} from '../../../../shared/resultsAnalysisSettings.mjs';
 import { DEFAULT_AI_MODELS as SHARED_AI_MODELS } from '../../../../shared/aiDefaults.mjs';
 import { ethers } from 'ethers';
 
@@ -18,6 +22,9 @@ const asInterviewRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
 
 const deepClone = (value: any) => JSON.parse(JSON.stringify(value || {}));
+
+const buildResultsAnalysisDraft = (value: unknown) =>
+  validResultsAnalysisSettings(value) ? normalizeResultsAnalysisSettings(value) : value;
 
 export const ADMIN_DEFAULT_AI_MODELS = SHARED_AI_MODELS;
 
@@ -81,6 +88,7 @@ export const buildAdminMetadataDraft = (metadata: any = {}) => {
 
   return {
     interviewMode: { ...metadata?.interviewMode, ...normalizeInterviewSettings(metadata?.interviewMode) },
+    resultsAnalysis: buildResultsAnalysisDraft(metadata?.resultsAnalysis),
     defaultTags: toStr(metadata?.defaultTags).trim(),
     questionsGenPrompt: toStr(metadata?.questionsGenPrompt).trim(),
     defaultSbtTags: toStr(metadata?.defaultSbtTags).trim(),
@@ -129,6 +137,10 @@ export const applyAdminMetadataDraft = (
     ...asInterviewRecord(draft.interviewMode),
     ...normalizeInterviewSettings(draft.interviewMode),
   };
+  if (!validResultsAnalysisSettings(draft.resultsAnalysis)) {
+    throw new Error('Session results analysis settings are invalid.');
+  }
+  next.resultsAnalysis = normalizeResultsAnalysisSettings(draft.resultsAnalysis);
   next.defaultTags = toStr(draft.defaultTags).trim();
   next.questionsGenPrompt = toStr(draft.questionsGenPrompt).trim();
   next.defaultFilterState = parseDefaultFilterStateDraft(draft.defaultFilterState);
@@ -242,6 +254,7 @@ export const resolveAutoFeatureBySessionSlug = (metadata: any) =>
 
 const WORKER_CANONICAL_METADATA_PATCH_KEYS = Object.freeze([
   'interviewMode',
+  'resultsAnalysis',
   'defaultTags',
   'defaultSbtTags',
   'questionsGenPrompt',

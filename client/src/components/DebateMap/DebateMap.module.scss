@@ -1802,6 +1802,29 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
       }
     }
 
+    .generatedSummarySection {
+      margin: 0 20px 16px;
+      padding: 14px 16px;
+      border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
+      border-radius: var(--ce-radius-10);
+      background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
+
+      p {
+        margin: 6px 0 0;
+        color: $text-main;
+        font-size: 0.95rem;
+        line-height: 1.55;
+      }
+    }
+
+    .generatedSummaryEyebrow {
+      color: color-mix(in srgb, var(--ce-status-info) 88%, transparent);
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
     .argumentClaim {
       font-size: 0.95rem;
       line-height: 1.45;

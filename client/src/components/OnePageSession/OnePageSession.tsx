@@ -57,6 +57,18 @@ import {
 } from './onePageSessionTelegramActions';
 import OnePageSessionStandardShell, { DEFAULT_CORPUS_VIEWER_LOAD_STATE } from './OnePageSessionStandardShell';
 import {
+  buildInitialGeneratedResultsControllerState,
+  shouldOfferGeneratedResultsAuthorization,
+} from '../../domains/sessionResults/sessionResultsAnalysisController';
+import {
+  authorizeGeneratedResultsForHost,
+  buildGeneratedResultsIdentityForHost,
+  generateResultsForHost,
+  loadGeneratedResultsArtifactForHost,
+  resetGeneratedResultsAnalysis,
+  resolveGeneratedResultsRuntime,
+} from './onePageSessionGeneratedResultsRuntime';
+import {
   buildOnePageSessionCanonicalBaseUrl,
   buildOnePageSessionRawResultsRoute,
   resolveOnePageSessionAggregatorCacheScope,
@@ -224,6 +236,8 @@ class OnePageSession extends Component<any, any> {
       pileSubmitRailVisible: false,
       corpusViewerLoadRequestNonce: 0,
       corpusViewerLoadState: DEFAULT_CORPUS_VIEWER_LOAD_STATE,
+      generatedResultsAnalysis: buildInitialGeneratedResultsControllerState(),
+      generatedResultsStatusBody: null,
 
       // Legacy (limited) group password flow state
       // Auto-mint
@@ -267,6 +281,8 @@ class OnePageSession extends Component<any, any> {
     this._autoMintCountdownTimer = null;
     this._autoMintParseCachedTargets = [];
     this._autoOpenResultsTimer = null;
+    this._generatedResultsIdentityKey = '';
+    this._generatedResultsRequestSeq = 0;
     this.originalURL = '';
 
     // refs
@@ -287,6 +303,9 @@ class OnePageSession extends Component<any, any> {
     this.toggleDocuments = this.toggleDocuments.bind(this);
     this.handleCorpusViewerLoadStateChange = this.handleCorpusViewerLoadStateChange.bind(this);
     this.handleLoadFullCorpusClick = this.handleLoadFullCorpusClick.bind(this);
+    this.handleGeneratedResultsAuthorize = this.handleGeneratedResultsAuthorize.bind(this);
+    this.loadGeneratedResultsArtifact = this.loadGeneratedResultsArtifact.bind(this);
+    this.handleGeneratedResultsGenerate = this.handleGeneratedResultsGenerate.bind(this);
     this.handleGroupsViewAll = this.handleGroupsViewAll.bind(this);
     this.handlePileSubmitRailVisibilityChange = this.handlePileSubmitRailVisibilityChange.bind(this);
     // Removed toggleResultsAbout bind
@@ -404,6 +423,8 @@ class OnePageSession extends Component<any, any> {
       clearTimeout(this._autoOpenResultsTimer);
       this._autoOpenResultsTimer = null;
     }
+    this._generatedResultsIdentityKey = '';
+    this._generatedResultsRequestSeq = 0;
     if (this._autoMintCountdownTimer) {
       clearInterval(this._autoMintCountdownTimer);
       this._autoMintCountdownTimer = null;
@@ -543,6 +564,30 @@ class OnePageSession extends Component<any, any> {
     });
   }
 
+
+  resetGeneratedResultsAnalysis() {
+    resetGeneratedResultsAnalysis(this);
+  }
+
+  handleGeneratedResultsAuthorize() {
+    return authorizeGeneratedResultsForHost(this, {
+      ports: { readQuestionsCache: (candidateSlug) => peekCacheSync('questionsCache', candidateSlug) },
+    });
+  }
+
+  loadGeneratedResultsArtifact() {
+    return loadGeneratedResultsArtifactForHost(this, {
+      ports: { readQuestionsCache: (candidateSlug) => peekCacheSync('questionsCache', candidateSlug) },
+    });
+  }
+
+  handleGeneratedResultsGenerate(refresh: boolean = true) {
+    return generateResultsForHost(this, {
+      refresh,
+      ports: { readQuestionsCache: (candidateSlug) => peekCacheSync('questionsCache', candidateSlug) },
+    });
+  }
+
   componentDidUpdate(prevProps: any, prevState: any) {
     const prevSlug = normalizeOnePageSessionSlug(prevProps.slug || prevProps.sessionConfig?.slug || '');
     const nextSlug = normalizeOnePageSessionSlug(this.props.slug || this.props.sessionConfig?.slug || '');
@@ -561,6 +606,29 @@ class OnePageSession extends Component<any, any> {
         }),
       );
     const telegramIdentityChanged = slugChanged || telegramTargetChanged;
+    const currentSessionConfig = this.resolveCurrentSessionConfig(this.props);
+    const previousSessionConfig = this.resolveCurrentSessionConfig(prevProps);
+    const currentGeneratedRuntime = resolveGeneratedResultsRuntime(this, {
+      ports: { readQuestionsCache: () => ({}) },
+      sessionConfig: currentSessionConfig,
+      sessionSlug: nextSlug,
+    });
+    const previousGeneratedRuntime = resolveGeneratedResultsRuntime(this, {
+      ports: { readQuestionsCache: () => ({}) },
+      sessionConfig: previousSessionConfig,
+      sessionSlug: prevSlug,
+    });
+    const currentGeneratedIdentityKey = buildGeneratedResultsIdentityForHost(this, currentGeneratedRuntime, currentSessionConfig);
+    const previousGeneratedIdentityKey = buildGeneratedResultsIdentityForHost(
+      { ...this, props: prevProps },
+      previousGeneratedRuntime,
+      previousSessionConfig,
+    );
+    const generatedIdentityChanged = currentGeneratedIdentityKey !== previousGeneratedIdentityKey;
+    if (generatedIdentityChanged) {
+      this._generatedResultsIdentityKey = currentGeneratedIdentityKey;
+      this.resetGeneratedResultsAnalysis();
+    }
     if (telegramIdentityChanged) {
       this.handleTelegramComponentDidUpdate({
         slugChanged: true,
@@ -668,6 +736,9 @@ class OnePageSession extends Component<any, any> {
     }
 
     maybeScheduleAggregatorRebuild();
+    if (showResultsOpened || (showResultsVisible && (loginJustCompleted || generatedIdentityChanged || aggregatorInvalidated))) {
+      void this.loadGeneratedResultsArtifact();
+    }
 
     // Start automint right after login
     if (runLoginTransitionAutoMint()) {
@@ -2249,6 +2320,11 @@ class OnePageSession extends Component<any, any> {
         expandedImages={this.state.expandedImages || {}}
         filterState={this.state.filterState}
         isDemoSlug={isDemoSlug}
+        generatedResultsAnalysis={this.state.generatedResultsAnalysis}
+        generatedResultsAuthAvailable={shouldOfferGeneratedResultsAuthorization({
+          account: this.props.account,
+          sessionConfig: resolvedSessionConfig,
+        })}
         isQuestionCacheReady={this.props.isQuestionCacheReady}
         isResponsesCacheReady={this.props.isResponsesCacheReady}
         isSBTCacheReady={this.props.isSBTCacheReady}
@@ -2299,6 +2375,9 @@ class OnePageSession extends Component<any, any> {
         onEmbeddedAtlasModalClose={this.handleEmbeddedAtlasModalClose}
         onFilterChange={this.handleFilterChange}
         onGroupsViewAll={this.handleGroupsViewAll}
+        onGeneratedResultsAuthorize={this.handleGeneratedResultsAuthorize}
+        onGeneratedResultsCheck={this.loadGeneratedResultsArtifact}
+        onGeneratedResultsGenerate={this.handleGeneratedResultsGenerate}
         onKickoffAutoMintIfNeeded={this.kickoffAutoMintIfNeeded}
         onLoadFullCorpusClick={this.handleLoadFullCorpusClick}
         onOpenResults={this.handleOpenResults}

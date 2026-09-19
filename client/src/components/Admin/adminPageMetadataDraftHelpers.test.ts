@@ -7,6 +7,10 @@ import {
   shouldShowInlineResourceSummary,
 } from './adminPageMetadataDraftHelpers';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
+import {
+  DEFAULT_RESULTS_ANALYSIS_SETTINGS,
+  resolveResultsAnalysisSectionKeys,
+} from '../../../../shared/resultsAnalysisSettings.mjs';
 
 describe('adminPageMetadataDraftHelpers', () => {
   it('round-trips editable metadata and preserves contract chain fallback', () => {
@@ -40,6 +44,89 @@ describe('adminPageMetadataDraftHelpers', () => {
       provider: 'openrouter',
       model: 'openrouter/fast',
     });
+  });
+
+  it('round-trips results analysis settings through editable metadata and worker patches', () => {
+    const sourceMetadata = {
+      resultsAnalysis: {
+        version: 1,
+        generationMode: 'both',
+        views: { circles: true, breakdown: false, riskMatrix: true },
+        autoAfter: { threshold: 12, unit: 'distinctParticipants' },
+        inputScope: 'submitted',
+        publication: 'latest_success_visible',
+      },
+    };
+    const draft = buildAdminMetadataDraft(sourceMetadata);
+    const applied = applyAdminMetadataDraft(sourceMetadata, draft);
+    const patch = buildWorkerCanonicalMetadataConfigPatch({
+      metadata: applied,
+      slug: 'results-session',
+      adminAddress: '0x00000000000000000000000000000000000000aa',
+    });
+
+    expect(draft.resultsAnalysis).toEqual(sourceMetadata.resultsAnalysis);
+    expect(applied.resultsAnalysis).toEqual(sourceMetadata.resultsAnalysis);
+    expect(patch.resultsAnalysis).toEqual(sourceMetadata.resultsAnalysis);
+    expect(resolveResultsAnalysisSectionKeys(applied.resultsAnalysis)).toEqual(['riskMatrix', 'argumentMap', 'atlas']);
+  });
+
+  it('preserves existing results analysis settings during unrelated metadata edits', () => {
+    const existingResultsAnalysis = {
+      version: 1,
+      generationMode: 'automatic',
+      views: { circles: true, breakdown: true, riskMatrix: false },
+      autoAfter: { threshold: 18, unit: 'distinctParticipants' },
+      inputScope: 'submitted',
+      publication: 'latest_success_visible',
+    };
+    const payload = buildEditableSessionMetadataPayload({
+      sessionConfig: {
+        slug: 'preserve-results-analysis',
+        sessionName: 'Original title',
+        defaultTags: 'old',
+        blockLimits: { start: 100 },
+        resultsAnalysis: existingResultsAnalysis,
+      },
+      blockLimits: { start: 100 },
+      advancedDraft: {
+        ...buildAdminMetadataDraft({
+          defaultTags: 'old',
+          resultsAnalysis: existingResultsAnalysis,
+        }),
+        defaultTags: 'new tag',
+      },
+    });
+
+    expect(payload.defaultTags).toBe('new tag');
+    expect(payload.resultsAnalysis).toEqual(existingResultsAnalysis);
+  });
+
+  it('defaults missing results analysis settings without enabling automatic generation', () => {
+    const draft = buildAdminMetadataDraft({});
+    expect(draft.resultsAnalysis).toEqual(DEFAULT_RESULTS_ANALYSIS_SETTINGS);
+    expect(applyAdminMetadataDraft({}, draft).resultsAnalysis.generationMode).toBe('manual');
+  });
+
+  it('rejects invalid results analysis settings before admin normalization can mask them', () => {
+    const sourceInvalid = {
+      generationMode: 'automatic',
+      autoAfter: { threshold: 0, unit: 'distinctParticipants' },
+    };
+    expect(buildAdminMetadataDraft({ resultsAnalysis: sourceInvalid }).resultsAnalysis).toBe(sourceInvalid);
+    const draft = {
+      ...buildAdminMetadataDraft({}),
+      resultsAnalysis: {
+        version: 1,
+        generationMode: 'automatic',
+        views: { circles: true, breakdown: true, riskMatrix: true },
+        autoAfter: { threshold: 0, unit: 'distinctParticipants' },
+        inputScope: 'submitted',
+        publication: 'latest_success_visible',
+      },
+    };
+
+    expect(() => applyAdminMetadataDraft({}, draft)).toThrow('Session results analysis settings are invalid.');
   });
 
   it('builds sanitized editable payloads and resource summary state', () => {

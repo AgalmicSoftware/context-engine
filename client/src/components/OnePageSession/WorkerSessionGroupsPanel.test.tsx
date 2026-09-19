@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 import { buildSignedAdminActionAuth, getWorkerSessionToken } from '../../utilities/worker/workerAuth';
 import { dispatchWorkerGroupsChanged } from '../../utilities/worker/workerGroupChangeEvents';
-import { postSignedAdminWorkerRequest } from '../Admin/adminPageSignedWorkerRequest';
+import { postSignedAdminWorkerRequest } from '../../utilities/worker/signedAdminWorkerRequest';
 import WorkerSessionGroupsPanel from './WorkerSessionGroupsPanel';
 
 const mockMembershipPanel = jest.fn();
@@ -16,7 +16,7 @@ jest.mock('../../utilities/worker/workerAuth', () => ({
 jest.mock('../../utilities/worker/workerGroupChangeEvents', () => ({
   dispatchWorkerGroupsChanged: jest.fn(),
 }));
-jest.mock('../Admin/adminPageSignedWorkerRequest', () => ({
+jest.mock('../../utilities/worker/signedAdminWorkerRequest', () => ({
   postSignedAdminWorkerRequest: jest.fn(),
 }));
 jest.mock('./WorkerGroupMembershipPanel', () => (props: unknown) => {

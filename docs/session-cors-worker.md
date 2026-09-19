@@ -523,6 +523,70 @@ Admin test panel:
   `Session config not found.` and retry once.
 - The faucet test sends a micro transfer (0.0000001) to a fresh random address; it does not fund the connected wallet.
 - The SBT gate negative tests expect a 403 on login when you connect a wallet without the sponsored SBT.
+- Admin-generated Results views split viewer reads from admin controls.
+  `GET /results-analysis/artifact?sessionSlug=<slug>&includeSnapshot=true`
+  returns the latest successful generated artifact plus a safe frozen submitted
+  snapshot only when the session profile has `results.visibility: "public_full_if_storage_public"`, `aggregateResultsEnabled: true`, and the
+  caller passes the existing Cloudflare read gates for all three resources:
+  `generatedArtifacts`, `questions`, and `responses`. This prevents a broader
+  generated-artifact gate from exposing raw snapshot source rows. The viewer
+  response includes a safe `jobState` such as `succeeded`/`idle`, the canonical
+  `sessionId`, artifact metadata, and the snapshot when requested. It must not
+  include active reservations, request ledgers, failure internals, wallet
+  mappings, or admin-only status. Failed or active generation continues to show
+  the last successful artifact.
+  `GET /admin/results-analysis/status?sessionSlug=<slug>&includeDraft=true`
+  requires a cached Worker JWT and then runs server-side `validateAdmin` before
+  returning normalized `settings`, `capability`, and private admin job state for
+  Generate/Refresh controls. Clients must treat malformed or mismatched 200
+  responses as unavailable.
+- Manual generation uses signed admin action
+  `POST /admin/results-analysis/generate` with action
+  `results-analysis/generate`. Worker-canonical Cloudflare sessions can request
+  `{ "source": { "kind": "worker-canonical" } }`; non-canonical
+  registry/Arweave profiles may use `{ "source": { "kind":
+  "admin-snapshot", "snapshot": ... } }` only when the browser has a
+  same-session, unlocked submitted-response snapshot. The Worker sanitizes the
+  snapshot and rejects encrypted or locked rows. A successful run immediately
+  replaces the latest visible artifact for authorized viewers; Generate and
+  Refresh remain admin-only actions.
+- Automatic generated-results work is durable background work only for
+  Worker-canonical Cloudflare storage. The Worker counts authoritative submitted
+  distinct participants since the last successful run, defaults to threshold
+  `10`, and queues SessionWriteCoordinator alarm work. It does not rely on
+  browser snapshots, does not use `waitUntil` for provider work, and does not
+  run for registry/Arweave profiles. If automatic generation fails,
+  `automatic`-only sessions allow an explicit admin manual retry as recovery;
+  otherwise repeated submissions do not thrash provider calls.
+- Generated-results AI calls inherit the session's existing AI provider/model
+  routing, especially the analysis/thinking assignment. They do not hardcode a
+  separate provider or model. Inputs are submitted responses only; Circles is
+  the DebateMap argument-map plus atlas view, and Risk Matrix axes are generated
+  from the session subject matter.
+
+### Local mocked generated-results browser smoke
+
+Use the generated-results smoke to verify the real session results UI without
+live AI, provider keys, Worker secrets, or a deployed session. The script mocks
+Worker responses, including the viewer artifact, admin status, and refresh
+request, and writes screenshots under
+`artifacts/session-generated-results-smoke/screenshots`. Run it against an
+isolated Vite instance on port 3100:
+
+```bash
+# terminal 1
+cd client
+PUBLIC_URL=/ ./node_modules/.bin/vite --host 127.0.0.1 --port 3100
+
+# terminal 2, from the repo root
+BASE_URL=http://127.0.0.1:3100 node scripts/session-generated-results-real-ui-smoke.js
+```
+
+The fixture uses synthetic submitted questions/responses and synthetic
+generated artifacts. It exercises real OnePageSession refresh success, provider
+timeout with the newer artifact preserved, admin-auth `403` with the allowed
+viewer artifact preserved, a second anonymous viewer plus reload, mobile Risk
+Matrix scroll/detail behavior, and Circles hover/drill interactions.
 
 ## Session Storage Routes
 
@@ -1096,6 +1160,14 @@ Runtime:
       "version": 1,
       "participantScopes": ["ai", "storage"],
       "anonymousScopes": []
+    },
+    "resultsAnalysis": {
+      "version": 1,
+      "generationMode": "manual",
+      "views": { "circles": true, "breakdown": true, "riskMatrix": true },
+      "autoAfter": { "threshold": 10, "unit": "distinctParticipants" },
+      "inputScope": "submitted",
+      "publication": "latest_success_visible"
     },
     "storageProfile": {
       "backend": "cloudflare",

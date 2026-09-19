@@ -6,6 +6,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { ethers } from 'ethers';
 import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
 import OnePageSession from './OnePageSession';
+import OnePageSessionStandardShell, { DEFAULT_CORPUS_VIEWER_LOAD_STATE } from './OnePageSessionStandardShell';
 import styles from './OnePageSession.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import contractScripts from '../../utilities/web3/chainGateway.js';
@@ -147,6 +148,14 @@ jest.mock('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace', () => ({
     mockDemoAnalysisWorkspace(props);
     return <div data-testid="demo-analysis-workspace-view">Demo Analysis</div>;
   },
+}));
+jest.mock('../SessionResults/SessionGeneratedResultsViews', () => ({
+  __esModule: true,
+  default: (props) => (
+    <div data-testid="session-generated-results-view">
+      Generated {props.selectedView} for {props.sessionSlug}
+    </div>
+  ),
 }));
 jest.mock('../DemoViews/CorpusViewer', () => {
   const React = require('react');
@@ -595,6 +604,351 @@ describe('OnePageSession results routing', () => {
     }
   });
 
+
+
+  it('does not show generated AI controls until an explicit plausible-admin check', async () => {
+    render(
+      <OnePageSession
+        {...buildProps()}
+        account="0xnotadmin"
+        loginComplete={true}
+        sessionConfig={{
+          ...buildProps().sessionConfig,
+          adminAddress: '0xadmin',
+          corsWorkerUrl: 'https://worker.example',
+          resultsAnalysis: {
+            version: 1,
+            generationMode: 'manual',
+            views: { circles: true, breakdown: true, riskMatrix: true },
+            autoAfter: { threshold: 10, unit: 'distinctParticipants' },
+            inputScope: 'submitted',
+            publication: 'latest_success_visible',
+          },
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+
+    expect(screen.queryByTestId('ce-session-generated-results-check')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-session-generated-results-generate')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Report$/i })).toBeInTheDocument();
+  });
+
+
+  it('shows real generated artifacts ahead of seeded demo result fixtures for demo-interview-3', async () => {
+    const props = buildProps();
+    const demoSessionId = `0x${'2'.repeat(32)}`;
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        ok: true,
+        sessionSlug: 'demo-interview-3',
+        sessionId: demoSessionId,
+        settings: {
+          version: 1,
+          generationMode: 'manual',
+          views: { circles: true, breakdown: true, riskMatrix: true },
+          autoAfter: { threshold: 10, unit: 'distinctParticipants' },
+          inputScope: 'submitted',
+          publication: 'latest_success_visible',
+        },
+        artifact: {
+          kind: 'ce_session_results_analysis_artifact',
+          source: 'ai-generated',
+          version: 1,
+          generatedAt: '2026-09-19T10:00:00.000Z',
+          inputSignature: 'synthetic-demo-real-artifact',
+          participants: [],
+          sections: {
+            argumentMap: { available: true, debates: [] },
+            atlas: { available: true, nodes: [], edges: [] },
+            breakdown: { available: true, summary: { overview: 'Generated demo artifact' }, dimensions: [], groups: [] },
+            riskMatrix: { available: true, categories: [], comments: [], heatmap: {}, scenarioLinks: [] },
+          },
+        },
+        snapshot: { questions: [], responses: [] },
+        source: { responseCount: 2, participantCount: 2 },
+      }),
+    });
+    Object.defineProperty(global, 'fetch', {
+      writable: true,
+      value: fetchMock,
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/session/demo-interview-3']}>
+        <OnePageSession
+          {...props}
+          slug="demo-interview-3"
+          sessionConfig={{
+            ...props.sessionConfig,
+            slug: 'demo-interview-3',
+            sessionId: demoSessionId,
+            corsWorkerUrl: 'https://worker.example',
+            sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+            storageProfile: {
+              backend: 'cloudflare',
+              resources: { questions: 'active', surveys: 'active', responses: 'active' },
+            },
+          }}
+        />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('https://worker.example/results-analysis/artifact?'),
+        expect.objectContaining({ method: 'GET' }),
+      );
+    });
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^Circles$/i })).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole('button', { name: /^Debate Map$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Breakdown$/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Circles$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('session-generated-results-view')).toHaveTextContent('Generated circles for demo-interview-3');
+    });
+    expect(screen.queryByTestId('ai-policy-atlas')).not.toBeInTheDocument();
+  });
+
+  it('offers only the explicit generated AI status check for a plausible admin hint', async () => {
+    render(
+      <OnePageSession
+        {...buildProps()}
+        account="0xabc"
+        loginComplete={true}
+        sessionConfig={{
+          ...buildProps().sessionConfig,
+          adminAddress: '0xAbC',
+          corsWorkerUrl: 'https://worker.example',
+          resultsAnalysis: {
+            version: 1,
+            generationMode: 'manual',
+            views: { circles: true, breakdown: true, riskMatrix: true },
+            autoAfter: { threshold: 10, unit: 'distinctParticipants' },
+            inputScope: 'submitted',
+            publication: 'latest_success_visible',
+          },
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+
+    expect(screen.getByTestId('ce-session-generated-results-check')).toHaveTextContent('Check AI Views');
+    expect(screen.queryByTestId('ce-session-generated-results-generate')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Circles$/i })).not.toBeInTheDocument();
+  });
+
+
+
+  it('invokes anonymous generated-results recheck with the rendered session host bound', async () => {
+    let callbackThis = null;
+    const loadSpy = jest
+      .spyOn(OnePageSession.prototype, 'loadGeneratedResultsArtifact')
+      .mockImplementation(function mockLoadGeneratedResultsArtifact() {
+        callbackThis = this;
+        return Promise.resolve();
+      });
+    const sessionRef = React.createRef();
+    render(<OnePageSession {...buildProps()} ref={sessionRef} />);
+
+    act(() => {
+      sessionRef.current.setState({
+        showResults: true,
+        generatedResultsAnalysis: {
+          adminAuthorized: false,
+          viewerAuthorized: true,
+          artifact: null,
+          canCheckStatus: true,
+          canGenerate: false,
+          isRunning: false,
+          status: 'ready',
+          statusLabel: 'Generated AI views are still being prepared. Check again for the latest status.',
+          viewOptions: [],
+        },
+      });
+    });
+    loadSpy.mockClear();
+    callbackThis = null;
+
+    fireEvent.click(screen.getByTestId('ce-session-generated-results-check'));
+
+    expect(loadSpy).toHaveBeenCalledTimes(1);
+    expect(callbackThis).toBe(sessionRef.current);
+  });
+
+
+
+  it('shows a Retry action for automatic-only generated analysis failures and a Recheck action after polling expires', async () => {
+    const baseGeneratedState = {
+      adminAuthorized: true,
+      viewerAuthorized: true,
+      artifact: null,
+      viewOptions: [],
+      status: 'ready',
+      statusLabel: 'No generated view yet.',
+    };
+    const authorize = jest.fn();
+    const check = jest.fn();
+    const generate = jest.fn();
+    const shellProps = {
+      account: '0xabc',
+      aggregatorData: {},
+      autoMintCountdown: null,
+      autoMintingMode: false,
+      autoMintStatuses: [],
+      autoMintTargets: [],
+      autoOpenResults: false,
+      blockLimits: {},
+      cacheHasLoaded: true,
+      contracts: {},
+      corpusViewerLoadRequestNonce: 0,
+      corpusViewerLoadState: DEFAULT_CORPUS_VIEWER_LOAD_STATE,
+      defaultFeaturedSBTs: [],
+      defaultFilterState: {},
+      defaultSbtTags: [],
+      defaultTags: [],
+      disclaimersActive: false,
+      displaySessionSlug: 'edge',
+      dismissedLoginBanner: false,
+      dismissedStatusItems: {},
+      effectiveSlug: 'edge',
+      embeddedAtlasNodeId: null,
+      embeddedAtlasReturnState: null,
+      embeddedGroupsSessionConfig: {},
+      embeddedGroupsSessionSlug: 'edge',
+      embeddedQuestionSessionSlug: 'edge',
+      expandedImages: {},
+      filterState: {},
+      generatedResultsAnalysis: {
+        ...baseGeneratedState,
+        canGenerate: true,
+        generationMode: 'automatic',
+        lastFailure: 'Provider failed.',
+      },
+      generatedResultsAuthAvailable: true,
+      isDemoSlug: false,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+      isSBTCacheReady: true,
+      isSurveyCacheReady: true,
+      litHooks: {},
+      loginComplete: true,
+      needsLoginForAutoMint: false,
+      network: {},
+      networkChainId: 11155420,
+      pileSubmitRailVisible: false,
+      provider: {},
+      questionPool: [],
+      questionResponsesNonce: 1,
+      questionScanProgress: null,
+      questionsSectionRef: React.createRef(),
+      refreshQuestionMetadata: jest.fn(),
+      refreshQuestionResponses: jest.fn(),
+      refreshSbtData: jest.fn(),
+      refreshSurveyResponsesByID: jest.fn(),
+      resolvedPolisDemoDataBySlug: {},
+      resolvedSessionConfig: {},
+      resultsViewMode: 'polis',
+      riskMatrixRestoreState: null,
+      sbtCacheRevision: 1,
+      sbtImages: {},
+      sbtNames: {},
+      sbtRealtimeCoverageBySlug: {},
+      sbtScanProgressBySlug: {},
+      sessionHeader: '',
+      sessionInfo: '',
+      sessionName: 'Edge',
+      sharedQuestionPool: [],
+      showDocuments: false,
+      showEmbeddedCreateGroup: false,
+      showGroups: false,
+      showQuestions: false,
+      showResults: true,
+      slug: 'edge',
+      titleText: 'edge',
+      toggleLoginModal: jest.fn(),
+      onCancelAutoMintCountdown: jest.fn(),
+      onCorpusAtlasIssueOpen: jest.fn(),
+      onCorpusViewerLoadStateChange: jest.fn(),
+      onDismissLoginBanner: jest.fn(),
+      onDismissStatusItem: jest.fn(),
+      onEmbeddedAtlasModalClose: jest.fn(),
+      onFilterChange: jest.fn(),
+      onGroupsViewAll: jest.fn(),
+      onGeneratedResultsAuthorize: authorize,
+      onGeneratedResultsCheck: check,
+      onGeneratedResultsGenerate: generate,
+      onKickoffAutoMintIfNeeded: jest.fn(),
+      onLoadFullCorpusClick: jest.fn(),
+      onOpenResults: jest.fn(),
+      onPileSubmitRailVisibilityChange: jest.fn(),
+      onResultsModalClose: jest.fn(),
+      onResultsModeChange: jest.fn(),
+      onRiskMatrixRestoreApplied: jest.fn(),
+      onToggleDocuments: jest.fn(),
+      onToggleEmbeddedCreateGroup: jest.fn(),
+      onToggleGroups: jest.fn(),
+      onToggleQuestions: jest.fn(),
+      onToggleResults: jest.fn(),
+      onToggleStatusImagePreview: jest.fn(),
+      onViewAllQuestionsClick: jest.fn(),
+    };
+
+    const view = render(<OnePageSessionStandardShell {...shellProps} />);
+    fireEvent.click(screen.getByTestId('ce-session-generated-results-generate'));
+    expect(screen.getByTestId('ce-session-generated-results-generate')).toHaveTextContent('Retry AI Views');
+    expect(generate).toHaveBeenCalledWith(true);
+
+    view.rerender(
+      <OnePageSessionStandardShell
+        {...shellProps}
+        generatedResultsAnalysis={{
+          ...baseGeneratedState,
+          canCheckStatus: true,
+          canGenerate: false,
+          lastFailure: '',
+          statusLabel: 'Generated AI views are still being prepared. Check again for the latest status.',
+        }}
+      />,
+    );
+
+    expect(screen.queryByTestId('ce-session-generated-results-generate')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ce-session-generated-results-check')).toHaveTextContent('Recheck AI Views');
+    fireEvent.click(screen.getByTestId('ce-session-generated-results-check'));
+    expect(check).toHaveBeenCalledTimes(1);
+    expect(authorize).not.toHaveBeenCalled();
+
+
+    view.rerender(
+      <OnePageSessionStandardShell
+        {...shellProps}
+        generatedResultsAuthAvailable={false}
+        generatedResultsAnalysis={{
+          ...baseGeneratedState,
+          adminAuthorized: false,
+          viewerAuthorized: true,
+          canCheckStatus: true,
+          canGenerate: false,
+          lastFailure: '',
+          statusLabel: 'Generated AI views are still being prepared. Check again for the latest status.',
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('ce-session-generated-results-check'));
+    expect(check).toHaveBeenCalledTimes(2);
+    expect(authorize).not.toHaveBeenCalled();
+  });
   it('renders the Raw Results action only while results are expanded and styles it like the other demo mode buttons', async () => {
     render(<OnePageSession {...buildProps()} />);
 
@@ -629,6 +983,69 @@ describe('OnePageSession results routing', () => {
     expect(tabletResultsBlock).toContain('overflow-x: auto;');
     expect(tabletResultsBlock).toContain('overflow-y: hidden;');
     expect(tabletResultsBlock).toContain('padding: 6px 10px;');
+  });
+
+
+  it('renders generated Risk Matrix instead of seeded demo RiskMatrix when a demo artifact provides it', async () => {
+    const props = buildProps();
+    const demoSessionId = `0x${'3'.repeat(32)}`;
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        ok: true,
+        sessionSlug: 'demo-interview-3',
+        sessionId: demoSessionId,
+        settings: {
+          version: 1,
+          generationMode: 'manual',
+          views: { circles: true, breakdown: true, riskMatrix: true },
+          autoAfter: { threshold: 10, unit: 'distinctParticipants' },
+          inputScope: 'submitted',
+          publication: 'latest_success_visible',
+        },
+        artifact: {
+          kind: 'ce_session_results_analysis_artifact',
+          source: 'ai-generated',
+          version: 1,
+          sections: {
+            argumentMap: { available: true, debates: [] },
+            atlas: { available: true, nodes: [], edges: [] },
+            breakdown: { available: true, summary: { overview: 'Generated demo artifact' }, dimensions: [], groups: [] },
+            riskMatrix: { available: true, categories: [], comments: [], heatmap: {}, scenarioLinks: [] },
+          },
+        },
+        snapshot: { questions: [], responses: [] },
+        source: { responseCount: 2, participantCount: 2 },
+      }),
+    });
+    Object.defineProperty(global, 'fetch', { writable: true, value: fetchMock });
+
+    render(
+      <MemoryRouter initialEntries={['/session/demo-interview-3']}>
+        <OnePageSession
+          {...props}
+          slug="demo-interview-3"
+          sessionConfig={{
+            ...props.sessionConfig,
+            slug: 'demo-interview-3',
+            sessionId: demoSessionId,
+            corsWorkerUrl: 'https://worker.example',
+            sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+            storageProfile: { backend: 'cloudflare', resources: { questions: 'active', surveys: 'active', responses: 'active' } },
+          }}
+        />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+    await screen.findByRole('button', { name: /^Risk Matrix$/i });
+    fireEvent.click(screen.getByRole('button', { name: /^Risk Matrix$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('session-generated-results-view')).toHaveTextContent('Generated riskMatrix for demo-interview-3');
+    });
+    expect(screen.queryByTestId('risk-matrix-view')).not.toBeInTheDocument();
   });
 
   it('renders the shared risk matrix view in embedded mode for demo results', async () => {
@@ -1170,6 +1587,35 @@ describe('OnePageSession results routing', () => {
       aiCombine: false,
       selectedTags: [],
     });
+  });
+
+
+  it('invalidates pending generated viewer loads and reloads when the visible results session changes', async () => {
+    const prevProps = buildProps();
+    const nextProps = {
+      ...buildProps(),
+      slug: 'next-session',
+      sessionConfig: { ...buildProps().sessionConfig, slug: 'next-session' },
+    };
+    const subject = createSubject(nextProps);
+    subject.state = {
+      ...subject.state,
+      showResults: true,
+      generatedResultsAnalysis: { status: 'idle' },
+    };
+    const previousSeq = subject._generatedResultsRequestSeq;
+    const loadSpy = jest.spyOn(subject, 'loadGeneratedResultsArtifact').mockResolvedValue(undefined);
+    subject.kickoffLightSbtUniverseScan = jest.fn();
+    subject.clearUnsupportedAutoMintState = jest.fn();
+    subject.scheduleBuildAggregator = jest.fn();
+
+    subject.componentDidUpdate(
+      { ...prevProps, slug: 'prev-session', sessionConfig: { ...prevProps.sessionConfig, slug: 'prev-session' } },
+      { ...subject.state, showResults: true },
+    );
+
+    expect(subject._generatedResultsRequestSeq).toBeGreaterThan(previousSeq);
+    expect(loadSpy).toHaveBeenCalledTimes(1);
   });
 
   it('resyncs local filter state when defaultFilterState changes across session switch', async () => {

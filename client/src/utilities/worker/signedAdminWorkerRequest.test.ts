@@ -1,4 +1,4 @@
-import { postSignedAdminWorkerRequest } from './adminPageSignedWorkerRequest';
+import { postSignedAdminWorkerRequest } from './signedAdminWorkerRequest';
 
 describe('postSignedAdminWorkerRequest', () => {
   it('normalizes the worker URL and retries a nonce race with a fresh signature', async () => {

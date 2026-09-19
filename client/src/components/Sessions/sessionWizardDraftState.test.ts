@@ -1,4 +1,5 @@
 import { DEFAULT_INTERVIEW_SETTINGS } from '../../../../shared/interviewSettings.mjs';
+import { DEFAULT_RESULTS_ANALYSIS_SETTINGS } from '../../../../shared/resultsAnalysisSettings.mjs';
 import {
   applySessionWizardRegistryChainDraftDefaults,
   buildSessionWizardCacheWritePayload,
@@ -35,6 +36,7 @@ describe('sessionWizardDraftState', () => {
           provider: 'openai',
           realtimeModel: 'gpt-live-1',
         },
+        resultsAnalysis: DEFAULT_RESULTS_ANALYSIS_SETTINGS,
         embeddedDeployHelperEnabled: true,
       }),
     );
@@ -64,6 +66,7 @@ describe('sessionWizardDraftState', () => {
           provider: 'openai',
           realtimeModel: 'gpt-live-1',
         },
+        resultsAnalysis: DEFAULT_RESULTS_ANALYSIS_SETTINGS,
       }),
     );
     expect(template.ai).toEqual(
@@ -93,6 +96,28 @@ describe('sessionWizardDraftState', () => {
         },
       }),
     );
+  });
+
+  it('normalizes cached results analysis settings without enabling automatic generation by default', () => {
+    expect(normalizeSessionWizardDraftShape({}).resultsAnalysis).toEqual(DEFAULT_RESULTS_ANALYSIS_SETTINGS);
+    expect(
+      buildSessionWizardInitialDraftFromCache({
+        cachedWizard: {
+          draft: {
+            resultsAnalysis: {
+              generationMode: 'automatic',
+              views: { circles: false, breakdown: true, riskMatrix: false },
+              autoAfter: { threshold: 15, unit: 'distinctParticipants' },
+            },
+          },
+        },
+      }).resultsAnalysis,
+    ).toEqual({
+      ...DEFAULT_RESULTS_ANALYSIS_SETTINGS,
+      generationMode: 'automatic',
+      views: { circles: false, breakdown: true, riskMatrix: false },
+      autoAfter: { threshold: 15, unit: 'distinctParticipants' },
+    });
   });
 
   it('preserves a valid realtime model and normalizes unsupported values to the OpenAI default', () => {

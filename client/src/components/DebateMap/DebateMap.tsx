@@ -379,15 +379,18 @@ export const getTopAtlasNodesByHeat = (nodes: DebateNode[] = [], limit = 3): Deb
 const getAtlasCenterNode = (atlasRoot: DebateNode | null, data: DebateNode[], rootLabel = 'AI Policy Atlas'): DebateNode =>
   atlasRoot ? atlasRoot : { id: 'virtual-root', name: rootLabel, children: data, depth: -1 };
 
-const measureAtlasContainer = (
+export const measureAtlasContainer = (
   node: HTMLElement | null,
   fallback: AtlasDimensions = DEFAULT_ATLAS_DIMENSIONS,
 ): AtlasDimensions => {
   const width = Number(node?.offsetWidth) || 0;
   const height = Number(node?.offsetHeight) || 0;
+  const fallbackWidth = Number(fallback?.w) || DEFAULT_ATLAS_DIMENSIONS.w;
+  const fallbackHeight = Number(fallback?.h) || DEFAULT_ATLAS_DIMENSIONS.h;
+
   return {
-    w: width > 0 ? width : fallback.w,
-    h: height > 0 ? height : fallback.h,
+    w: width > 1 ? width : fallbackWidth,
+    h: height > 1 ? height : fallbackHeight,
   };
 };
 
@@ -512,13 +515,35 @@ const useAtlasContainerDimensions = (measureKey: AtlasLayoutMode) => {
   const [dimensions, setDimensions] = useState<AtlasDimensions>(DEFAULT_ATLAS_DIMENSIONS);
 
   useEffect(() => {
+    let animationFrame = 0;
+    let resizeObserver: ResizeObserver | null = null;
+
     const measure = () => {
-      setDimensions((prev) => measureAtlasContainer(containerRef.current, prev));
+      setDimensions((prev) => {
+        const next = measureAtlasContainer(containerRef.current, prev);
+        return next.w === prev.w && next.h === prev.h ? prev : next;
+      });
+    };
+    const scheduleMeasure = () => {
+      if (animationFrame) window.cancelAnimationFrame(animationFrame);
+      animationFrame = window.requestAnimationFrame(() => {
+        animationFrame = 0;
+        measure();
+      });
     };
 
     measure();
-    window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
+    scheduleMeasure();
+    if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
+      resizeObserver = new ResizeObserver(scheduleMeasure);
+      resizeObserver.observe(containerRef.current);
+    }
+    window.addEventListener('resize', scheduleMeasure);
+    return () => {
+      if (animationFrame) window.cancelAnimationFrame(animationFrame);
+      if (resizeObserver) resizeObserver.disconnect();
+      window.removeEventListener('resize', scheduleMeasure);
+    };
   }, [measureKey]);
 
   return { containerRef, dimensions };
@@ -1341,6 +1366,11 @@ const Modal = ({ isOpen, onClose, content, onVote, readOnly = false, copied, onC
 
   if (!isOpen || !content) return null;
 
+  const generatedSummaryComments = readOnly
+    ? (Array.isArray(content.comments) ? content.comments : [])
+        .map((comment) => String(comment?.comment || '').trim())
+        .filter(Boolean)
+    : [];
   const questions = Array.isArray(content.questions) ? content.questions : [];
   const questionSearchKeys = getDebateQuestionListStableKeys(questions, 'question-search');
   const questionCardKeys = getDebateQuestionListStableKeys(questions, 'question-card');
@@ -1784,6 +1814,15 @@ const Modal = ({ isOpen, onClose, content, onVote, readOnly = false, copied, onC
             </button>
           ))}
         </div>
+
+        {generatedSummaryComments.length > 0 && (
+          <section className={styles.generatedSummarySection} aria-label="AI-generated summary">
+            <div className={styles.generatedSummaryEyebrow}>AI-generated summary</div>
+            {generatedSummaryComments.map((comment, index) => (
+              <p key={`${content.id || 'generated-summary'}-${index}`}>{comment}</p>
+            ))}
+          </section>
+        )}
 
         {compassData && (
           <div className={styles.collapseSection}>

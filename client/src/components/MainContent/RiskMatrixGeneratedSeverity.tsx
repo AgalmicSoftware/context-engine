@@ -35,6 +35,8 @@ export type RiskMatrixSeverityAssessment = {
 };
 
 const SEVERITY_LEVELS: RiskSeverityLevel[] = ['low', 'medium', 'high'];
+const GENERATED_AXIS_HEADER_WIDTH = 104;
+const GENERATED_AXIS_COLUMN_WIDTH = 160;
 const DEFAULT_AXES: RiskMatrixSeverityAxes = {
   x: {
     id: 'likelihood',
@@ -106,6 +108,7 @@ type RiskMatrixGeneratedSeverityProps = {
 const RiskMatrixGeneratedSeverity = ({ assessments, axes: inputAxes = null }: RiskMatrixGeneratedSeverityProps) => {
   const axes = normalizeAxes(inputAxes);
   const [expandedAssessmentIds, setExpandedAssessmentIds] = React.useState<Record<string, boolean>>({});
+  const generatedGridMinWidth = GENERATED_AXIS_HEADER_WIDTH + axes.x.levels.length * GENERATED_AXIS_COLUMN_WIDTH;
   const assessmentsByCell = new Map<string, RiskMatrixSeverityAssessment[]>();
 
   assessments.forEach((assessment) => {
@@ -132,10 +135,12 @@ const RiskMatrixGeneratedSeverity = ({ assessments, axes: inputAxes = null }: Ri
       </div>
       <div className={styles.gridScroll}>
         <div
-          className={styles.gridContainer}
+          className={styles.generatedSeverityGridContainer}
+          data-testid="ce-risk-matrix-generated-severity-grid"
           style={{
-            gridTemplateColumns: `122px repeat(${axes.x.levels.length}, minmax(136px, 1fr))`,
+            gridTemplateColumns: `${GENERATED_AXIS_HEADER_WIDTH}px repeat(${axes.x.levels.length}, minmax(144px, 1fr))`,
             gridTemplateRows: `auto repeat(${axes.y.levels.length}, minmax(104px, auto))`,
+            minWidth: `${generatedGridMinWidth}px`,
           }}
         >
           <div className={clsx(styles.cell, styles.cornerCell)} style={{ gridColumn: 1, gridRow: 1 }}>

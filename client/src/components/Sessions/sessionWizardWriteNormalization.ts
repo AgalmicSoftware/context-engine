@@ -1,4 +1,8 @@
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
+import {
+  normalizeResultsAnalysisSettings,
+  validResultsAnalysisSettings,
+} from '../../../../shared/resultsAnalysisSettings.mjs';
 import { AUTHORITY_MATRIX } from '../../utilities/session/sessionAuthorityMatrix.js';
 import {
   normalizeLitMetadataNetwork,
@@ -113,6 +117,12 @@ const defaultNormalizeAiModels = (raw: AnyRecord = {}): AnyRecord => (isObj(raw)
 const defaultNormalizeAiModelForProvider = (_modelType: string, _providerValue: string, modelValue: unknown): string =>
   trimString(modelValue);
 
+const assertValidResultsAnalysisSettings = (value: unknown): void => {
+  if (!validResultsAnalysisSettings(value)) {
+    throw new Error('Session results analysis settings are invalid.');
+  }
+};
+
 const buildSessionWizardPublicAiConfig = (value: unknown): AnyRecord => {
   const next = isObj(value) ? (cloneValue(value) as AnyRecord) : {};
   if (!isObj(next.models) || !isObj(next.models.transcription)) return next;
@@ -219,6 +229,11 @@ export const sanitizeSessionWizardMetadataPayload = (
         model: trimString(ai.models.transcription.model || 'whisper-1'),
       };
     }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(next, 'resultsAnalysis')) {
+    assertValidResultsAnalysisSettings(next.resultsAnalysis);
+    next.resultsAnalysis = normalizeResultsAnalysisSettings(next.resultsAnalysis);
   }
 
   if (Object.prototype.hasOwnProperty.call(next, 'sessionModeProfile') && !isObj(next.sessionModeProfile)) {
@@ -398,6 +413,11 @@ export const buildSessionWizardWorkerConfigPayload = ({
         isObj(resolvedDraft.interviewMode) ? resolvedDraft.interviewMode.realtimeModel : undefined,
       ),
     },
+    resultsAnalysis: (() => {
+      const value = resolvedDraft.resultsAnalysis;
+      assertValidResultsAnalysisSettings(value);
+      return normalizeResultsAnalysisSettings(value);
+    })(),
     defaultTags: trimString(resolvedDraft.defaultTags),
     defaultGroupTags: trimString(resolvedDraft.defaultGroupTags),
     questionsGenPrompt: trimString(resolvedDraft.questionsGenPrompt),

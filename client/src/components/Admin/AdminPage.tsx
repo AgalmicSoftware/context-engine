@@ -50,6 +50,10 @@ import AdminPageWorkerSecretsPanel from './AdminPageWorkerSecretsPanel';
 import AdminAgentSessionWrappedPanel from './AdminAgentSessionWrappedPanel';
 import { resolveAdminAgentSessionWrappedWorkerOrigin } from './adminAgentSessionWrapped';
 import AdminWorkerGroupsPanel from './AdminWorkerGroupsPanel';
+import {
+  getBackgroundResultsAnalysisUnsupportedReason,
+  supportsBackgroundResultsAnalysis,
+} from '../Sessions/resultsAnalysisSettingsSupport';
 import { resolveAdminCapabilityRoute, resolveAdminSessionRecoveryMessage } from './adminPageCapabilityRoutingHelpers';
 import { createLogger } from '../../utilities/logging';
 import { notify } from '../../utilities/ui/notify.js';
@@ -593,6 +597,10 @@ const AdminPageRuntime = ({
   }, [availableSessions, selectedSlug]);
   const adminCapabilityRoute = useMemo(() => resolveAdminCapabilityRoute(selectedConfig), [selectedConfig]);
   const { sessionCapabilities, selectedWorkerSessionId, signedWorkerSessionId } = adminCapabilityRoute;
+  const resultsAnalysisBackgroundAutoSupported = supportsBackgroundResultsAnalysis(selectedConfig);
+  const resultsAnalysisBackgroundAutoUnsupportedReason = resultsAnalysisBackgroundAutoSupported
+    ? ''
+    : getBackgroundResultsAnalysisUnsupportedReason(selectedConfig);
   const effectiveWorkerCorsState = useMemo(() => {
     if (!selectedConfig) return { origins: [], reported: false };
     const cachedWorkerConfig: any =
@@ -2683,6 +2691,8 @@ const AdminPageRuntime = ({
                   handleSaveSessionMetadata={handleSaveSessionMetadata}
                   metadataUpdateStatus={metadataUpdateStatus}
                   showChainFields={sessionCapabilities.usesChainMetadata}
+                  resultsAnalysisBackgroundAutoSupported={resultsAnalysisBackgroundAutoSupported}
+                  resultsAnalysisBackgroundAutoUnsupportedReason={resultsAnalysisBackgroundAutoUnsupportedReason}
                 />
               )}
               <div className={styles.metadataJsonSection}>
