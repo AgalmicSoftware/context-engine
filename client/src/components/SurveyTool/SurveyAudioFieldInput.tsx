@@ -20,6 +20,7 @@ type SurveyAudioFieldInputProps = SurveyAudioWorkerProps & {
   disabled?: boolean;
   disableEncryption?: boolean;
   enableDownloads?: boolean;
+  enableAiRewrite?: boolean;
   updateFunction: (value: string) => void;
   toggleEncryption: (encrypted: boolean) => void;
 };
@@ -35,6 +36,7 @@ const SurveyAudioFieldInput = ({
   disabled = false,
   disableEncryption = true,
   enableDownloads = false,
+  enableAiRewrite = true,
   updateFunction,
   toggleEncryption,
   sessionSlug,
@@ -60,6 +62,7 @@ const SurveyAudioFieldInput = ({
     forceGlow={forceGlow}
     disableEncryption={disableEncryption}
     enableDownloads={enableDownloads}
+    enableAiRewrite={enableAiRewrite}
   />
 );
 

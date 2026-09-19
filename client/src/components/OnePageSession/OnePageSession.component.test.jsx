@@ -1643,7 +1643,7 @@ describe('OnePageSession view gating', () => {
       /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.sectionsGrid \.sectionExpanded \.sectionHeaderActionsScroller\s*{[\s\S]*?flex:\s*0 0 auto;[\s\S]*?width:\s*auto;[\s\S]*?max-width:\s*100%;[\s\S]*?padding-left:\s*0;/,
     );
     expect(scss).toMatch(
-      /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.sectionsGrid \.sectionExpanded \.resultsModeActionsScroller\s*{[\s\S]*?flex:\s*1 1 260px;[\s\S]*?width:\s*auto;[\s\S]*?min-width:\s*0;/,
+      /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.sectionsGrid \.sectionExpanded \.resultsModeActionsScroller\s*{[\s\S]*?flex:\s*0 0 100%;[\s\S]*?justify-content:\s*flex-start;[\s\S]*?width:\s*100%;[\s\S]*?max-width:\s*100%;[\s\S]*?min-width:\s*0;/,
     );
     expect(scss).toMatch(
       /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.sectionsGrid \.sectionExpanded \.resultsModeActions\s*{[\s\S]*?display:\s*flex;[\s\S]*?min-width:\s*max-content;/,

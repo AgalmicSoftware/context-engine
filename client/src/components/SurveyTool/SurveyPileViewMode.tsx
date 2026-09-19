@@ -1711,7 +1711,7 @@ export const recordInterviewProvenance = (
   source: InterviewPrefillPacket['source'] | null,
   packet: InterviewPrefillPacket | null,
   included = true,
-  includePredictionComparison = true,
+  includePredictionComparison = false,
   responderName = '',
   review: Array<InterviewDraftResponse & { selected: boolean; original: InterviewDraftResponse }> = [],
 ) => {
@@ -1734,12 +1734,22 @@ export const recordInterviewProvenance = (
           currentProvenance && typeof currentProvenance === 'object' && !Array.isArray(currentProvenance)
             ? { ...currentProvenance }
             : {};
+        const reviewedByQuestionId = new Map(review.map((entry) => [entry.questionId, entry]));
         drafts.forEach((draft) => {
-          const original = draft.revisions?.[0] || draft;
+          const reviewed =
+            reviewedByQuestionId.get(draft.questionId) ||
+            ({ ...draft, original: draft, selected: true } as InterviewDraftResponse & {
+              selected: boolean;
+              original: InterviewDraftResponse;
+            });
           if (!included && !includePredictionComparison && !normalizedResponderName) {
             delete provenance[draft.questionId];
             return;
           }
+          const originalDraft = reviewed.original || draft;
+          const revisionSource = Array.isArray(originalDraft.revisions) && originalDraft.revisions.length
+            ? originalDraft.revisions[0]
+            : originalDraft;
           provenance[draft.questionId] = {
             version: 1,
             includeAiProvenance: included,
@@ -1753,16 +1763,23 @@ export const recordInterviewProvenance = (
               : {}),
             ...(includePredictionComparison
               ? {
+                  questionId: draft.questionId,
+                  selection: 'selected',
                   originalPrediction: {
-                    answer: original.answer,
-                    additionalComments: original.additionalComments || '',
-                    importance: original.importance ?? null,
-                    conviction: original.conviction ?? null,
-                    confidence: original.confidence ?? null,
-                    evidence: original.evidence || '',
+                    answer: revisionSource.answer ?? null,
+                    additionalComments: revisionSource.additionalComments ?? '',
+                    importance: revisionSource.importance ?? null,
+                    conviction: revisionSource.conviction ?? null,
+                    confidence: revisionSource.confidence ?? null,
+                    evidence: revisionSource.evidence || '',
                   },
-                  predictionRevisions: draft.revisions || [],
-                  ...(draft === researchAnchor ? { unselectedDrafts: review.filter((entry) => !entry.selected) } : {}),
+                  predictionRevisions: originalDraft.revisions || draft.revisions || [],
+                  userEditedFields: reviewed.userEditedFields || [],
+                }
+              : {}),
+            ...(includePredictionComparison && draft === researchAnchor
+              ? {
+                  unselectedDrafts: review.filter((entry) => !entry.selected),
                 }
               : {}),
             ...(normalizedResponderName ? { responderName: normalizedResponderName } : {}),
@@ -2550,6 +2567,7 @@ const renderPileResponseInput = (
     isAnswerDecrypting,
     onAnswerChange,
     inputNamePrefix = 'q',
+    enableAiRewrite = true,
   }: any,
 ) => {
   const updateAnswer = onAnswerChange || ((value: unknown) => engine.handleAnswerPile(question.id, value));
@@ -2630,6 +2648,7 @@ const renderPileResponseInput = (
           forceGlow={glowAnswer}
           disableEncryption={true}
           enableDownloads={false}
+          enableAiRewrite={enableAiRewrite}
         />
       );
   }
@@ -2677,7 +2696,7 @@ const renderPileSliderSection = (
 
 const renderPileAdditionalInput = (
   engine: PileViewModeEngine,
-  { questionId, additional, glowAdditional, onChange }: any,
+  { questionId, additional, glowAdditional, onChange, enableAiRewrite = true }: any,
 ) => {
   return (
     <SurveyAudioFieldInput
@@ -2695,6 +2714,7 @@ const renderPileAdditionalInput = (
       encrypted={additional.encrypted || false}
       disableEncryption={true}
       enableDownloads={false}
+      enableAiRewrite={enableAiRewrite}
     />
   );
 };
@@ -3197,6 +3217,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
                 answer: { value },
                 onAnswerChange,
                 inputNamePrefix: 'interview-draft',
+                enableAiRewrite: false,
               })
             }
             renderAdditionalInput={(questionId, value, onChange) =>
@@ -3210,6 +3231,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
                   value,
                 },
                 onChange,
+                enableAiRewrite: false,
               })
             }
             renderFieldLock={(questionId, field) => {

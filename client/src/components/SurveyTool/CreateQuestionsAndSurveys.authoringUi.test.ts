@@ -69,6 +69,56 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     ).toHaveLength(1);
   });
 
+
+  it('shows interview suggestion type, options, and compact tag authoring while keeping review-only chrome hidden', () => {
+    const instance = makeInstance({
+      interviewQuestionReview: true,
+      preformedQuestions: [
+        {
+          id: 'q-choice',
+          type: 'multichoice',
+          prompt: 'Which path should the group compare?',
+          options: ['Pilot', 'Full launch'],
+          tags: ['governance'],
+        },
+      ],
+      preformedMode: 'questions',
+    });
+
+    const tree = instance.render();
+    const markup = renderToStaticMarkup(tree);
+
+    expect(markup).toContain('Multichoice');
+    expect(markup).toContain('Options: Pilot · Full launch');
+    expect(treeHasText(tree, 'Survey')).toBe(false);
+    expect(treeHasText(tree, 'from URL / Content')).toBe(false);
+    expect(markup).toContain('interviewQuestionPromptEditButton');
+    expect(collectTreeNodes(tree, (node) => nodeHasClassName(node, 'removeQuestionButton'))).toHaveLength(1);
+    expect(markup).toContain('revealTagInputButton');
+    expect(markup).toContain('aria-label="Add tag"');
+    expect(markup).toContain('tagInputGroup');
+    const tagInputs = collectTreeNodes(
+      tree,
+      (node) => node?.props?.['data-testid'] === E2E_TESTIDS.CREATE_QUESTION_TAG_INPUT,
+    );
+    expect(tagInputs).toHaveLength(1);
+    const revealButtons = collectTreeNodes(tree, (node) => node?.props?.['aria-label'] === 'Add tag');
+    expect(revealButtons).toHaveLength(1);
+    const focus = jest.fn();
+    const tagInputInnerRef = (tagInputs[0] as { props?: { innerRef?: (element: unknown) => void } })?.props?.innerRef;
+    tagInputInnerRef?.({ focus });
+    (revealButtons[0] as { props?: { onClick?: () => void } })?.props?.onClick?.();
+    expect(focus).toHaveBeenCalledTimes(1);
+
+    const preventDefault = jest.fn();
+    focus.mockClear();
+    instance.setState({ activeTagInputKey: '' });
+    (revealButtons[0] as { props?: { onKeyDown?: (event: { key: string; preventDefault: () => void }) => void } })
+      ?.props?.onKeyDown?.({ key: 'Enter', preventDefault });
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+    expect(focus).toHaveBeenCalledTimes(1);
+  });
+
   it('appends only new Interview suggestions without undoing question edits or removals', () => {
     const original = { id: 'q1', type: 'freeform', prompt: 'Original?', tags: ['original'] };
     const removed = { id: 'q2', type: 'freeform', prompt: 'Removed?' };

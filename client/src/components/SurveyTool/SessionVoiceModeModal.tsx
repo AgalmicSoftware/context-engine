@@ -13,7 +13,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faCaretDown,
   faCheck,
-  faClipboard,
+  faCopy,
   faCircle,
   faComments,
   faMicrophone,
@@ -116,6 +116,15 @@ const describeResearchCoverage = (coverage: InterviewResearchCoverage | undefine
   ].filter(Boolean);
 };
 
+
+const shouldIgnorePromptCopyEvent = (target: EventTarget | null): boolean => {
+  if (!(target instanceof HTMLElement)) return true;
+  if (target.closest('button, a, input, textarea, select, [contenteditable="true"]')) return true;
+  if (target.closest('[data-ce-no-background-copy="true"]')) return true;
+  const selection = target.ownerDocument.defaultView?.getSelection?.();
+  return Boolean(selection?.toString().trim());
+};
+
 type SessionInterviewPanelProps = InterviewDraftApplicationProps & {
   questions: InterviewQuestion[];
   sessionSlug?: string;
@@ -178,9 +187,11 @@ function SessionInterviewPanel({
   const [drafts, setDrafts] = useState<InterviewDraftResponse[]>([]);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [editedDrafts, setEditedDrafts] = useState<Record<string, InterviewDraftResponse>>({});
-  const hasAiPrefill = Boolean(prefillPacket && prefillPacket.source.modelId !== 'direct-user-context');
+  const isDirectUserContextPrefill = prefillPacket?.source.modelId === 'direct-user-context';
+  const hasAiPrefill = Boolean(prefillPacket && !isDirectUserContextPrefill);
   const hasPredictionRevisions = drafts.some((draft) => (draft.revisions?.length || 0) > 1);
-  const researchAvailable = hasAiPrefill || hasPredictionRevisions;
+  const hasAiGeneratedReview = drafts.length > 0 && !isDirectUserContextPrefill;
+  const researchAvailable = hasAiPrefill || hasPredictionRevisions || hasAiGeneratedReview;
   const researchPacket: InterviewPrefillPacket = prefillPacket || {
     version: 1,
     sessionSlug,
@@ -188,7 +199,7 @@ function SessionInterviewPanel({
     responderContext: {},
   };
   const [includeProvenance, setIncludeProvenance] = useState(true);
-  const [includePredictionComparison, setIncludePredictionComparison] = useState(true);
+  const [includePredictionComparison, setIncludePredictionComparison] = useState(false);
   const [includeResponderName, setIncludeResponderName] = useState(false);
   const [showAgentPrompt, setShowAgentPrompt] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
@@ -276,7 +287,7 @@ function SessionInterviewPanel({
       setMapping(true);
       setError('');
       setMappingNotice('');
-      setStatus('Preparing drafts');
+      setStatus('Preparing responses…');
       try {
         if (prefillPacket?.questionSetHash && validatedPrefillRef.current !== prefillPacket) {
           const currentQuestionSetHash = await hashInterviewQuestions(questions);
@@ -457,7 +468,7 @@ function SessionInterviewPanel({
         if (disposedRef.current) return;
         const draft = editedDrafts[original.questionId] || original;
         await onApplyAnswer(draft.questionId, draft.answer);
-        await onApplyAdditional(draft.questionId, draft.additionalComments || '');
+        await onApplyAdditional(draft.questionId, String(draft.additionalComments || ''));
         if (draft.importance !== undefined) await onApplyImportance(draft.questionId, draft.importance);
         if (draft.conviction !== undefined) await onApplyConviction(draft.questionId, draft.conviction);
       }
@@ -474,11 +485,16 @@ function SessionInterviewPanel({
           hasAiPrefill && includeProvenance,
           researchAvailable && includePredictionComparison,
           includeResponderName ? String(prefillPacket?.responderContext?.name || '').trim() : '',
-          drafts.map((draft) => ({
-            ...editedDrafts[draft.questionId],
-            original: draft,
-            selected: Boolean(selected[draft.questionId]),
-          })),
+          drafts.map((draft) => {
+            const reviewed = editedDrafts[draft.questionId] || draft;
+            return {
+              ...reviewed,
+              answer: reviewed.answer,
+              additionalComments: String(reviewed.additionalComments || ''),
+              original: draft,
+              selected: Boolean(selected[draft.questionId]),
+            };
+          }),
         );
       }
       if (disposedRef.current) return;
@@ -529,7 +545,7 @@ function SessionInterviewPanel({
   const statusLabel = error
     ? 'Error'
     : mapping
-      ? 'Preparing drafts'
+      ? 'Preparing responses…'
       : applying
         ? 'Submitting'
         : idle && !questions.length
@@ -729,22 +745,12 @@ function SessionInterviewPanel({
             )}
             {!isInterviewBusy &&
             !drafts.length &&
+            !mapping &&
             !mappingNotice &&
             (transcript.trim() || !Array.isArray(prefillPacket?.responses)) &&
             (transcript.trim() || prefillPacket || responderContext.trim()) ? (
-              <Button
-                outline
-                onClick={() => runMapping()}
-                disabled={mapping}
-                data-testid={E2E_TESTIDS.SESSION_INTERVIEW_GENERATE}
-              >
-                {mapping ? (
-                  <>
-                    <FontAwesomeIcon icon={faSpinner} spin /> Mapping…
-                  </>
-                ) : (
-                  'Generate response drafts'
-                )}
+              <Button outline onClick={() => runMapping()} data-testid={E2E_TESTIDS.SESSION_INTERVIEW_GENERATE}>
+                Generate response drafts
               </Button>
             ) : null}
           </div>
@@ -784,68 +790,82 @@ function SessionInterviewPanel({
             ) : null}
 
             {kickoff ? (
-              <div className={styles.sessionAgentKickoff}>
-                <button
-                  type="button"
-                  className={styles.sessionAgentKickoffTitle}
-                  onClick={() => {
-                    void copyAgentPrompt();
-                  }}
-                >
-                  Copy and paste this prompt (into Claude or ChatGPT) to augment interview
-                </button>
-                <div className={styles.sessionAgentKickoffActions}>
-                  <button
-                    type="button"
-                    id="ce-interview-agent-prompt-help"
-                    className={styles.sessionInterviewHeaderButton}
-                    aria-label="About the interview prompt"
+              <div
+                className={styles.sessionAgentKickoff}
+                onClick={(event) => {
+                  if (!shouldIgnorePromptCopyEvent(event.target)) void copyAgentPrompt();
+                }}
+              >
+                <div className={styles.sessionAgentKickoffRow}>
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    className={`${styles.sessionAgentKickoffCopyTarget} ${promptCopied ? styles.sessionAgentKickoffCopied : ''}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void copyAgentPrompt();
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        void copyAgentPrompt();
+                      }
+                    }}
+                    aria-label={promptCopied ? 'Memory augmentation prompt copied' : 'Copy memory augmentation prompt'}
+                    title={promptCopied ? 'Copied' : 'Copy memory augmentation prompt'}
+                    data-ce-control-appearance="frameless"
+                    data-testid={E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT}
                   >
-                    <FontAwesomeIcon icon={faQuestionCircle} />
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.sessionAgentKickoffToggle}
-                    onClick={() => setShowAgentPrompt((current) => !current)}
-                    aria-expanded={showAgentPrompt}
-                    aria-controls="ce-session-interview-agent-prompt"
-                    data-testid={E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE}
-                  >
-                    <span>Prompt</span>
-                    <FontAwesomeIcon
-                      icon={faCaretDown}
-                      className={`${styles.sessionAgentKickoffCaret} ${
-                        showAgentPrompt ? styles.sessionAgentKickoffCaretExpanded : ''
-                      }`}
-                    />
-                  </button>
-                  <UncontrolledTooltip
-                    target="ce-interview-agent-prompt-help"
-                    placement="top-end"
-                    fade={false}
-                    trigger="hover focus"
-                    autohide={false}
-                  >
-                    Allows your agent to predict your responses and raise better interview questions.
-                  </UncontrolledTooltip>
+                    <span className={styles.sessionAgentKickoffTitle}>
+                      Copy and paste this prompt into Claude or ChatGPT to augment interview
+                    </span>
+                    <span className={styles.sessionAgentKickoffCopyBadge} aria-hidden="true">
+                      <FontAwesomeIcon icon={promptCopied ? faCheck : faCopy} />
+                      <span>{promptCopied ? 'Copied' : 'Copy'}</span>
+                    </span>
+                  </div>
+                  <div className={styles.sessionAgentKickoffActions}>
+                    <button
+                      type="button"
+                      id="ce-interview-agent-prompt-help"
+                      className={styles.sessionInterviewHeaderButton}
+                      aria-label="About the interview prompt"
+                    >
+                      <FontAwesomeIcon icon={faQuestionCircle} />
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.sessionAgentKickoffToggle}
+                      onClick={() => setShowAgentPrompt((current) => !current)}
+                      aria-expanded={showAgentPrompt}
+                      aria-controls="ce-session-interview-agent-prompt"
+                      data-testid={E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE}
+                    >
+                      <span>Prompt</span>
+                      <FontAwesomeIcon
+                        icon={faCaretDown}
+                        className={`${styles.sessionAgentKickoffCaret} ${
+                          showAgentPrompt ? styles.sessionAgentKickoffCaretExpanded : ''
+                        }`}
+                      />
+                    </button>
+                    <UncontrolledTooltip
+                      target="ce-interview-agent-prompt-help"
+                      placement="top-end"
+                      fade={false}
+                      trigger="hover focus"
+                      autohide={false}
+                    >
+                      Allows your agent to predict your responses and raise better interview questions.
+                    </UncontrolledTooltip>
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  className={`${styles.sessionAgentKickoffCopy} ${promptCopied ? styles.sessionAgentKickoffCopied : ''}`}
-                  onClick={() => {
-                    void copyAgentPrompt();
-                  }}
-                  aria-label={promptCopied ? 'Memory augmentation prompt copied' : 'Copy memory augmentation prompt'}
-                  title={promptCopied ? 'Copied' : 'Copy memory augmentation prompt'}
-                  data-testid={E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT}
-                >
-                  <FontAwesomeIcon icon={promptCopied ? faCheck : faClipboard} />
-                </button>
                 {showAgentPrompt ? (
                   <div
                     id="ce-session-interview-agent-prompt"
                     className={styles.sessionAgentKickoffPrompt}
                     data-testid={E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT}
+                    data-ce-no-background-copy="true"
                   >
                     <SessionInterviewPrompt prompt={kickoff} />
                   </div>
@@ -870,7 +890,6 @@ function SessionInterviewPanel({
               title="Review proposed responses"
               summaryRef={reviewRef}
               testId={E2E_TESTIDS.SESSION_INTERVIEW_REVIEW}
-              count={`${drafts.filter((draft) => selected[draft.questionId]).length} of ${drafts.length} selected`}
             >
               {drafts.map((draft) => (
                 <SessionInterviewDraftCard

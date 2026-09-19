@@ -9,6 +9,7 @@ import { resolveGeneratedResultsControllerState } from '../../domains/sessionRes
 
 type GeneratedHost = Parameters<typeof generateResultsForHost>[0];
 type UnknownRecord = Record<string, unknown>;
+type TestStatusBody = UnknownRecord & { state: UnknownRecord };
 
 const artifact = {
   kind: 'ce_session_results_analysis_artifact',
@@ -34,7 +35,7 @@ const settings = {
   publication: 'latest_success_visible',
 };
 
-const buildStatusBody = (overrides: UnknownRecord = {}): UnknownRecord => ({
+const buildStatusBody = (overrides: UnknownRecord = {}): TestStatusBody => ({
   ok: true,
   adminAuthorized: true,
   sessionSlug: 'edge',
@@ -52,7 +53,9 @@ const buildStatusBody = (overrides: UnknownRecord = {}): UnknownRecord => ({
     },
   },
   ...overrides,
-});
+}) as TestStatusBody;
+
+const getLastGoodStatusDraft = (): unknown => buildStatusBody().state.lastGood;
 
 const buildSessionConfig = (): UnknownRecord => ({
   slug: 'edge',
@@ -198,7 +201,7 @@ describe('onePageSessionGeneratedResultsRuntime', () => {
 
 
   it('reloads viewer artifacts even when stale prior session state was running', async () => {
-    const host = buildHost(buildStatusBody({ state: { jobState: 'running', active: { requestId: 'old-session' }, lastGood: buildStatusBody().state.lastGood } }));
+    const host = buildHost(buildStatusBody({ state: { jobState: 'running', active: { requestId: 'old-session' }, lastGood: getLastGoodStatusDraft() } }));
     const readArtifact = jest.fn(async () => ({
       ok: true,
       viewerAuthorized: true,
@@ -318,7 +321,7 @@ describe('onePageSessionGeneratedResultsRuntime', () => {
     const readStatus = jest
       .fn()
       .mockResolvedValueOnce(buildStatusBody({ state: { jobState: 'queued', active: { requestId: 'queued' }, lastGood: null } }))
-      .mockResolvedValueOnce(buildStatusBody({ state: { jobState: 'succeeded', lastGood: buildStatusBody().state.lastGood } }));
+      .mockResolvedValueOnce(buildStatusBody({ state: { jobState: 'succeeded', lastGood: getLastGoodStatusDraft() } }));
 
     await generateResultsForHost(host, {
       ports: {
@@ -448,7 +451,7 @@ describe('onePageSessionGeneratedResultsRuntime', () => {
 
   it('continues polling viewer artifact 200 responses that report a running refresh with lastGood', async () => {
     const host = buildHost(buildStatusBody({ viewerAuthorized: true }));
-    const runningLastGood = buildStatusBody().state.lastGood;
+    const runningLastGood = getLastGoodStatusDraft();
     const readArtifact = jest
       .fn()
       .mockResolvedValueOnce({
@@ -483,7 +486,7 @@ describe('onePageSessionGeneratedResultsRuntime', () => {
     expect(readArtifact).toHaveBeenCalledTimes(2);
     expect(host.state.generatedResultsAnalysis?.isRunning).toBe(false);
     expect(host.state.generatedResultsAnalysis?.artifact).not.toBeNull();
-    expect(host.state.generatedResultsStatusBody?.pollExpired).toBe(false);
+    expect((host.state.generatedResultsStatusBody as UnknownRecord | undefined)?.pollExpired).toBe(false);
   });
   it('keeps the previous artifact visible while a same-session viewer reload is queued', async () => {
     const host = buildHost(buildStatusBody({ viewerAuthorized: true }));
@@ -514,7 +517,7 @@ describe('onePageSessionGeneratedResultsRuntime', () => {
   it('marks long running admin polls recheckable instead of leaving generation controls stuck running', async () => {
     const host = buildHost();
     const readStatus = jest.fn(async () => buildStatusBody({
-      state: { jobState: 'queued', active: { requestId: 'still-queued' }, lastGood: buildStatusBody().state.lastGood },
+      state: { jobState: 'queued', active: { requestId: 'still-queued' }, lastGood: getLastGoodStatusDraft() },
     }));
 
     await generateResultsForHost(host, {

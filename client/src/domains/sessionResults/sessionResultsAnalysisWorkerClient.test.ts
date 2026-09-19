@@ -16,7 +16,7 @@ describe('sessionResultsAnalysisWorkerClient', () => {
   });
 
   it('reads status using supplied JWT headers without signing itself', async () => {
-    const getAuthHeaders = jest.fn(async () => ({ Authorization: 'Bearer cached-token', 'X-Group-Slug': 'edge' }));
+    const getAuthHeaders = jest.fn(async (_args: unknown) => ({ Authorization: 'Bearer cached-token', 'X-Group-Slug': 'edge' }));
     const fetchImpl = jest.fn(async () => ({
       ok: true,
       status: 200,
@@ -197,7 +197,7 @@ describe('sessionResultsAnalysisWorkerClient', () => {
   });
 
   it('posts generation through the signed admin request channel', async () => {
-    const signAdminAction = jest.fn(async () => ({ signature: 'sig', address: '0xabc' }));
+    const signAdminAction = jest.fn(async (_args: unknown) => ({ signature: 'sig', address: '0xabc' }));
     const fetchImpl = jest.fn(async (_url, init) => ({
       ok: true,
       status: 200,

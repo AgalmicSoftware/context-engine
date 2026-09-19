@@ -20,7 +20,7 @@ describe('postSignedAdminWorkerRequest', () => {
           headers: { 'Content-Type': 'application/json' },
         }),
       );
-    const sleepImpl = jest.fn(async () => undefined);
+    const sleepImpl = jest.fn(async (_ms: unknown) => undefined);
 
     const result = await postSignedAdminWorkerRequest({
       action: 'set-config',

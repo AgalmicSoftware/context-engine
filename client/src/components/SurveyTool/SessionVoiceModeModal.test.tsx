@@ -71,6 +71,23 @@ const mockedHashInterviewQuestions = jest.mocked(hashInterviewQuestions);
 const mockedMapInterviewEvidenceToResponses = jest.mocked(mapInterviewEvidenceToResponses);
 const mockedStartSessionRealtimeInterview = jest.mocked(startSessionRealtimeInterview);
 
+
+const editableButtonName = (label: string) => `${label}. Activate to edit.`;
+
+const expectReadableDraftText = async (label: string, value: string) => {
+  const button = await screen.findByRole('button', { name: editableButtonName(label) });
+  expect(button).toHaveTextContent(value);
+  return button;
+};
+
+const editReadableDraftText = async (label: string, value: string) => {
+  const button = await screen.findByRole('button', { name: editableButtonName(label) });
+  fireEvent.click(button);
+  const editor = screen.getByLabelText(label);
+  fireEvent.change(editor, { target: { value } });
+  fireEvent.blur(editor);
+};
+
 describe('SessionVoiceModeModal', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -144,21 +161,21 @@ describe('SessionVoiceModeModal', () => {
     expect(review).toHaveAttribute('open');
     expect(suggestions).toHaveAttribute('open');
     expect(review.compareDocumentPosition(suggestions!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(screen.getByText(/Auto-filled answer/)).toHaveTextContent('Agent: Auto-filled answer');
-    expect(screen.getByText(/Auto-filled comments/)).toHaveTextContent('Agent: Auto-filled comments');
-    fireEvent.change(screen.getByDisplayValue('Original draft'), { target: { value: 'My edited answer' } });
-    expect(screen.getByText(/Edited answer/)).toHaveTextContent('User: Edited answer');
-    expect(screen.getByText(/Auto-filled comments/)).toHaveTextContent('Agent: Auto-filled comments');
+    await expectReadableDraftText('Draft answer for What matters?', 'Original draft');
+    expect(screen.getByLabelText('AI-proposed response')).toBeInTheDocument();
+    await editReadableDraftText('Draft answer for What matters?', 'My edited answer');
+    await expectReadableDraftText('Draft answer for What matters?', 'My edited answer');
+    expect(screen.queryByLabelText('AI-proposed response')).not.toBeInTheDocument();
     const summary = review.querySelector('summary')!;
     fireEvent.click(summary);
     expect(review).not.toHaveAttribute('open');
     fireEvent.click(summary);
     expect(review).toHaveAttribute('open');
-    expect(screen.getByDisplayValue('My edited answer')).toBeInTheDocument();
+    await expectReadableDraftText('Draft answer for What matters?', 'My edited answer');
     expect(screen.queryByRole('button', { name: 'Draft selected' })).not.toBeInTheDocument();
-    expect(screen.getByText('1 of 1 selected')).toBeInTheDocument();
-    fireEvent.change(screen.getByDisplayValue('An explanation'), { target: { value: 'My own comment' } });
-    expect(screen.getByText(/Edited comments/)).toHaveTextContent('User: Edited comments');
+    expect(screen.queryByText('1 of 1 selected')).not.toBeInTheDocument();
+    await editReadableDraftText('Additional comments for What matters?', 'My own comment');
+    await expectReadableDraftText('Additional comments for What matters?', 'My own comment');
     fireEvent.click(screen.getByRole('button', { name: 'Submit responses' }));
     await waitFor(() => expect(baseProps.onApplyAnswer).toHaveBeenCalledWith('q1', 'My edited answer'));
     expect(baseProps.onApplyAdditional).toHaveBeenCalledWith('q1', 'My own comment');
@@ -179,10 +196,10 @@ describe('SessionVoiceModeModal', () => {
         }}
       />,
     );
-    await screen.findByDisplayValue('My existing comment');
-    expect(screen.queryByText(/Auto-filled comments|Edited comments/)).not.toBeInTheDocument();
-    fireEvent.change(screen.getByDisplayValue('My existing comment'), { target: { value: 'My revised comment' } });
-    expect(screen.getByText(/Edited comments/)).toHaveTextContent('User: Edited comments');
+    await expectReadableDraftText('Additional comments for What matters?', 'My existing comment');
+    expect(screen.queryByLabelText('AI-proposed comment')).not.toBeInTheDocument();
+    await editReadableDraftText('Additional comments for What matters?', 'My revised comment');
+    await expectReadableDraftText('Additional comments for What matters?', 'My revised comment');
   });
 
   it('does not treat direct user context as an AI prefill for research consent', async () => {
@@ -195,23 +212,24 @@ describe('SessionVoiceModeModal', () => {
           sessionSlug: 'demo',
           responderContext: { summary: 'My own context' },
           source: { platform: 'other', modelId: 'direct-user-context', verification: 'self_reported' },
-          responses: [{ questionId: 'q1', answer: 'A reviewed answer', confidence: 0.8 }],
+          responses: [{ questionId: 'q1', answer: 'Agent: A reviewed answer', confidence: 0.8 }],
         }}
       />,
     );
     await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON)).not.toBeInTheDocument();
-    expect(screen.queryByRole('group', { name: 'AI prefill metadata' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'AI research metadata' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    await waitFor(() => expect(baseProps.onApplyAnswer).toHaveBeenCalledWith('q1', 'Agent: A reviewed answer'));
     await waitFor(() =>
       expect(baseProps.onRecordProvenance).toHaveBeenCalledWith(
-        expect.any(Array),
+        [expect.objectContaining({ questionId: 'q1', answer: 'Agent: A reviewed answer' })],
         expect.any(Object),
         expect.any(Object),
         false,
         false,
         '',
-        expect.any(Array),
+        expect.arrayContaining([expect.objectContaining({ questionId: 'q1', answer: 'Agent: A reviewed answer' })]),
       ),
     );
   });
@@ -273,10 +291,12 @@ describe('SessionVoiceModeModal', () => {
     expect(metadata).toHaveTextContent('Self-reported');
     expect(metadata).toHaveTextContent('ce-interview-brief-v4');
     expect(metadata).toHaveTextContent('a'.repeat(64));
+    expect(metadata).toHaveTextContent('Predictions, reviewed values, changed fields, and unselected drafts will not be included.');
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON));
     expect(metadata).toHaveTextContent('2 selected drafts and 0 unselected drafts');
-    fireEvent.change(screen.getByDisplayValue('Original one'), { target: { value: 'Edited one' } });
-    fireEvent.change(screen.getByDisplayValue('Relevant explanation'), { target: { value: 'Edited explanation' } });
-    fireEvent.change(screen.getByDisplayValue('Original two'), { target: { value: 'Edited two' } });
+    await editReadableDraftText('Draft answer for What matters?', 'Edited one');
+    await editReadableDraftText('Additional comments for What matters?', 'Edited explanation');
+    await editReadableDraftText('Draft answer for Second question?', 'Edited two');
     fireEvent.click(screen.getByRole('button', { name: 'Remove draft for Second question?' }));
     expect(metadata).toHaveTextContent('1 selected draft and 1 unselected draft');
     expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
@@ -388,9 +408,7 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.queryByText(/A realtime voice interviewer will cover/i)).not.toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_CONTEXT)).not.toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveAccessibleName('Interview status: Ready');
-    expect(
-      screen.getByRole('button', { name: /Copy and paste this prompt \(into Claude or ChatGPT\)/ }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy memory augmentation prompt' })).toBeInTheDocument();
     const promptToggle = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE);
     expect(promptToggle).toHaveAccessibleName('Prompt');
     expect(screen.getByRole('button', { name: 'About the interview prompt' })).toBeInTheDocument();
@@ -399,14 +417,11 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT)).not.toBeInTheDocument();
     const copyButton = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT);
     expect(copyButton).toHaveAccessibleName('Copy memory augmentation prompt');
-    expect(copyButton).toHaveTextContent('');
+    expect(copyButton).toHaveTextContent('Copy and paste this prompt into Claude or ChatGPT to augment interview');
+    expect(copyButton).toHaveTextContent('Copy');
     expect(screen.queryByText('Copy prompt')).not.toBeInTheDocument();
 
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: 'Copy and paste this prompt (into Claude or ChatGPT) to augment interview',
-      }),
-    );
+    await act(async () => fireEvent.click(copyButton));
     await waitFor(() =>
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
         expect.stringContaining('review-only Context Engine interview prefill'),
@@ -414,13 +429,19 @@ describe('SessionVoiceModeModal', () => {
     );
     expect(copyButton).toHaveAccessibleName('Memory augmentation prompt copied');
     expect(copyButton.querySelector('[data-icon="check"]')).toBeInTheDocument();
-    await act(async () => fireEvent.click(copyButton));
+    fireEvent.click(screen.getByRole('button', { name: 'About the interview prompt' }));
+    expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1);
+    await act(async () => fireEvent.keyDown(copyButton, { key: ' ', code: 'Space' }));
     expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(2);
+    const promptCard = copyButton.parentElement?.parentElement;
+    expect(promptCard).not.toBeNull();
+    await act(async () => fireEvent.click(promptCard!));
+    expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(3);
 
     fireEvent.click(promptToggle);
     expect(promptToggle).toHaveAccessibleName('Prompt');
     const displayedPrompt = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT);
-    expect(copyButton.parentElement).toContainElement(displayedPrompt);
+    expect(copyButton.closest('[class]')?.parentElement?.parentElement).toContainElement(displayedPrompt);
     const plainPrompt = buildExternalInterviewKickoff({
       workerUrl: baseProps.workerUrl,
       sessionSlug: baseProps.sessionSlug,
@@ -434,13 +455,18 @@ describe('SessionVoiceModeModal', () => {
         .map((paragraph) => paragraph.textContent)
         .join(' ')
         .replace(/\s+/g, ' '),
-    ).toBe(plainPrompt.replace(/\s+/g, ' '));
+    ).toContain('Fetch this URL: worker.example/agent/interview-catalog…');
+    const promptLink = displayedPrompt.querySelector('a');
+    expect(promptLink).toHaveAttribute('href', expect.stringContaining('https://worker.example/agent/interview-catalog'));
+    fireEvent.click(promptLink!);
+    fireEvent.click(displayedPrompt);
+    expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(3);
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(plainPrompt);
     expect(plainPrompt).not.toMatch(/<strong>|\*\*/);
 
     expect(promptToggle).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT)).toHaveTextContent(
-      /review-only Context Engine interview prefill.*https:\/\/worker\.example\/agent\/interview-catalog/,
+      /review-only Context Engine interview prefill.*worker\.example\/agent\/interview-catalog…/,
     );
 
     fireEvent.click(promptToggle);
@@ -526,8 +552,8 @@ describe('SessionVoiceModeModal', () => {
     const toggle = await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT_TOGGLE);
     expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).toBeInTheDocument();
     expect(screen.queryByLabelText(/Include self-reported AI platform/)).not.toBeInTheDocument();
-    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON)).not.toBeInTheDocument();
-    expect(screen.queryByRole('group', { name: 'AI prefill metadata' })).not.toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON)).not.toBeChecked();
+    expect(screen.getByRole('group', { name: 'AI research metadata' })).toBeInTheDocument();
     expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
     expect(screen.queryByLabelText('Pause interview')).not.toBeInTheDocument();
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
@@ -590,7 +616,7 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toBeDisabled();
 
     fireEvent.click(replacement);
-    fireEvent.change(screen.getByDisplayValue('Original prediction'), { target: { value: 'Reviewed answer' } });
+    await editReadableDraftText('Draft answer for What matters?', 'Reviewed answer');
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
 
     await waitFor(() => expect(baseProps.onApplyAnswer).toHaveBeenCalledWith('q1', 'Reviewed answer'));
@@ -601,7 +627,7 @@ describe('SessionVoiceModeModal', () => {
         prefillPacket.source,
         prefillPacket,
         true,
-        true,
+        false,
         '',
         expect.any(Array),
       ),
@@ -654,7 +680,7 @@ describe('SessionVoiceModeModal', () => {
     fireEvent.click(metadata.querySelector('summary')!);
     expect(metadata).toHaveTextContent('Memories: 4 used / 20 searched');
     expect(metadata).toHaveTextContent('Chat search did not expose a total scanned count.');
-    expect(screen.getByDisplayValue('A cautious prediction')).toBeInTheDocument();
+    await expectReadableDraftText('Draft answer for What matters?', 'A cautious prediction');
     expect(screen.getByLabelText('AI-estimated confidence: 22%')).toBeInTheDocument();
     expect(screen.getByRole('progressbar', { name: 'AI-estimated confidence for What matters?' })).toHaveAttribute(
       'aria-valuenow',
@@ -679,7 +705,7 @@ describe('SessionVoiceModeModal', () => {
         prefillPacket.source,
         prefillPacket,
         true,
-        true,
+        false,
         '',
         expect.any(Array),
       ),
@@ -728,13 +754,13 @@ describe('SessionVoiceModeModal', () => {
     const remove = await screen.findByRole('button', { name: 'Remove draft for What matters?' });
     expect(remove).toBeEnabled();
     fireEvent.click(remove);
-    expect(screen.getByText('0 of 1 selected')).toBeInTheDocument();
+    expect(screen.queryByText('0 of 1 selected')).not.toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toBeDisabled();
 
     const restore = screen.getByRole('button', { name: 'Restore draft' });
     expect(restore).toBeEnabled();
     fireEvent.click(restore);
-    expect(screen.getByText('1 of 1 selected')).toBeInTheDocument();
+    expect(screen.queryByText('1 of 1 selected')).not.toBeInTheDocument();
     expect(remove).toBeEnabled();
     expect(screen.queryByRole('button', { name: 'Restore draft' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Draft selected' })).not.toBeInTheDocument();
@@ -771,7 +797,7 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_GENERATE)).toBeInTheDocument();
   });
 
-  it('keeps prediction comparison on by default and records each consent independently', async () => {
+  it('keeps prediction comparison off by default and records each consent independently', async () => {
     mockedMapInterviewEvidenceToResponses.mockResolvedValue([
       { questionId: 'q1', answer: 'Draft answer', confidence: 0.76 },
     ]);
@@ -792,14 +818,15 @@ describe('SessionVoiceModeModal', () => {
 
     expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).toBeInTheDocument();
     const includeComparison = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON);
-    expect(includeComparison).toBeChecked();
+    expect(includeComparison).not.toBeChecked();
     fireEvent.click(screen.getByLabelText(/Include self-reported AI platform\/model provenance/i));
     const metadata = screen.getByRole('group', { name: 'AI prefill metadata' });
     fireEvent.click(metadata.querySelector('summary')!);
     expect(metadata).toHaveTextContent('Source platform and coverage details will not be included.');
     expect(metadata).not.toHaveTextContent('a'.repeat(64));
+    expect(metadata).toHaveTextContent('Predictions, reviewed values, changed fields, and unselected drafts will not be included.');
     fireEvent.click(includeComparison);
-    expect(metadata).toHaveTextContent('Predictions, edits, and unselected drafts will not be included.');
+    expect(metadata).toHaveTextContent('1 selected draft and 0 unselected drafts');
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
 
     await waitFor(() =>
@@ -808,7 +835,7 @@ describe('SessionVoiceModeModal', () => {
         expect.objectContaining({ platform: 'claude' }),
         expect.any(Object),
         false,
-        false,
+        true,
         '',
         expect.any(Array),
       ),
@@ -838,7 +865,7 @@ describe('SessionVoiceModeModal', () => {
         prefillPacket.source,
         prefillPacket,
         true,
-        true,
+        false,
         '',
         expect.any(Array),
       ),
@@ -858,7 +885,7 @@ describe('SessionVoiceModeModal', () => {
         prefillPacket.source,
         prefillPacket,
         true,
-        true,
+        false,
         'Ada Example',
         expect.any(Array),
       ),
@@ -977,14 +1004,14 @@ describe('Interview cancellation and recovery', () => {
     fireEvent.click(await screen.findByLabelText('Pause interview'));
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
     await waitFor(() =>
-      expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Preparing drafts'),
+      expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Preparing responses…'),
     );
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toBeDisabled();
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_GENERATE)).not.toBeInTheDocument();
     act(() => {
       h.options().onStatus?.('Listening');
       h.options().onTranscript?.('Stale evidence', []);
     });
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Preparing drafts');
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Preparing responses…');
     await act(async () => finish([{ questionId: 'q1', answer: 'New evidence' }]));
     expect(screen.getByRole('heading', { name: 'Review proposed responses' }).closest('summary')).toHaveFocus();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Review drafts');
@@ -1027,7 +1054,7 @@ describe('Interview cancellation and recovery', () => {
       responses: [{ questionId: 'q1', answer: 'Imported answer', confidence: 0.8 }],
     };
     const view = render(<SessionVoiceModeModal {...baseProps} mode="interview" prefillPacket={prefillPacket} />);
-    await screen.findByDisplayValue('Imported answer');
+    await expectReadableDraftText('Draft answer for What matters?', 'Imported answer');
     mockedHashInterviewQuestions.mockResolvedValue('b'.repeat(64));
     mockedMapInterviewEvidenceToResponses.mockResolvedValue([
       { questionId: 'q2', answer: 'Newly answered', confidence: 0.8 },
@@ -1043,8 +1070,8 @@ describe('Interview cancellation and recovery', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
     await screen.findByLabelText('Pause interview');
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
-    expect(await screen.findByDisplayValue('Newly answered')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Imported answer')).toBeInTheDocument();
+    await expectReadableDraftText('Draft answer for New question?', 'Newly answered');
+    await expectReadableDraftText('Draft answer for What matters?', 'Imported answer');
     expect(mockedHashInterviewQuestions).toHaveBeenCalledTimes(1);
   });
 
@@ -1086,14 +1113,14 @@ describe('Interview cancellation and recovery', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
     await screen.findByLabelText('Pause interview');
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
-    fireEvent.change(await screen.findByDisplayValue('First answer'), { target: { value: 'My edit' } });
+    await editReadableDraftText('Draft answer for What matters?', 'My edit');
     fireEvent.click(screen.getAllByTestId(E2E_TESTIDS.SESSION_INTERVIEW_DRAFT_REMOVE)[1]);
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
     await screen.findByLabelText('Pause interview');
     expect(rounds[1].instructions).toContain('Responder: Round 1.');
     expect(rounds[1].instructions).toContain('Continue the prior interview');
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
-    expect(await screen.findByDisplayValue('Additional match')).toBeInTheDocument();
+    await expectReadableDraftText('Draft answer for Third question?', 'Additional match');
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toHaveAccessibleName('Continue interview');
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON)).toBeInTheDocument();
     expect(mockedMapInterviewEvidenceToResponses.mock.calls.at(-1)?.[0].previousResponses).toEqual(
@@ -1104,8 +1131,8 @@ describe('Interview cancellation and recovery', () => {
         }),
       ]),
     );
-    expect(screen.getByDisplayValue('My edit')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Keep this')).toBeInTheDocument();
+    await expectReadableDraftText('Draft answer for What matters?', 'My edit');
+    await expectReadableDraftText('Draft answer for Second question?', 'Keep this');
     expect(screen.getByRole('button', { name: 'Restore draft' })).toBeInTheDocument();
     expect(mockedMapInterviewEvidenceToResponses).toHaveBeenLastCalledWith(
       expect.objectContaining({ transcript: 'Responder: Round 1.\n\nResponder: Round 2.' }),
@@ -1123,12 +1150,12 @@ describe('Interview cancellation and recovery', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
     await screen.findByLabelText('Pause interview');
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
-    await screen.findByDisplayValue('My edit');
+    await expectReadableDraftText('Draft answer for What matters?', 'My edit');
     expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalledTimes(2);
     mockedStartSessionRealtimeInterview.mockRejectedValueOnce(new Error('Connection failed'));
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
     expect(await screen.findByRole('alert')).toHaveTextContent('Connection failed');
-    expect(screen.getByDisplayValue('My edit')).toBeInTheDocument();
+    await expectReadableDraftText('Draft answer for What matters?', 'My edit');
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT_TOGGLE));
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT)).toHaveTextContent('Responder: Round 1.');
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT)).toHaveTextContent('Responder: Round 2.');
@@ -1159,6 +1186,6 @@ describe('Interview cancellation and recovery', () => {
         expect.objectContaining({ transcript: 'Responder: New evidence.' }),
       ),
     );
-    expect(await screen.findByDisplayValue('New evidence')).toBeInTheDocument();
+    await expectReadableDraftText('Draft answer for What matters?', 'New evidence');
   });
 });

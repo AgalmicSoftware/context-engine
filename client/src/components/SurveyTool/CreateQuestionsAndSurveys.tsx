@@ -547,6 +547,7 @@ interface CreateQuestionsAndSurveysState {
   showClearFormConfirm: boolean;
   surveyLockGateIds: string[];
   openLockKey: string;
+  activeTagInputKey: string;
   [key: string]: unknown;
 }
 
@@ -683,6 +684,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   _draftSaveTimer: ReturnType<typeof setTimeout> | null = null;
   _copySuccessResetTimers: Partial<Record<CreateSurveyCopySuccessStateKey, ReturnType<typeof setTimeout> | null>> = {};
   _promptRefs: Record<string, FocusablePromptElement | null> = {};
+  _tagInputRefs: Record<string, FocusablePromptElement | null> = {};
   _lastSavedUnfinishedSurveyJson: string | null = null;
 
   constructor(props: CreateQuestionsAndSurveysProps) {
@@ -741,6 +743,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       // Lock-driven Lit encryption
       surveyLockGateIds: [],
       openLockKey: '',
+      activeTagInputKey: '',
     };
 
     let initialQuestions: CreateQuestionsAndSurveysQuestion[] = [];
@@ -3523,6 +3526,8 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
               {this.props.interviewQuestionReview ? (
                 <InterviewSuggestedQuestionPrompt
                   prompt={question.prompt || ''}
+                  type={question.type || 'freeform'}
+                  options={question.options || []}
                   onChange={(value) => this.handleQuestionChange(qIndex, 'prompt', value)}
                 />
               ) : (
@@ -3612,20 +3617,64 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                     ))}
 
                     {/* Updated Tag Input UX */}
-                    <div className={styles.tagInputGroup}>
-                      <Input
-                        type="text"
-                        placeholder="Add tag"
-                        data-testid={E2E_TESTIDS.CREATE_QUESTION_TAG_INPUT}
-                        value={question.currentTagInputValue || ''}
-                        onChange={(e: CreateSurveyInputValueEvent) =>
-                          this.handleCurrentTagInputChange(qIndex, e.target.value)
-                        }
-                        onKeyDown={(e: CreateSurveyTagInputKeyEvent) => this.handleTagInputKeyDown(qIndex, e)}
-                        className={styles.tagInputField}
-                      />
+                    {(() => {
+                      const tagInputKey = String(question.uiKey || qIndex);
+                      const tagInputActive =
+                        this.state.activeTagInputKey === tagInputKey || !!(question.currentTagInputValue || '').trim();
+                      const activateTagInput = () => {
+                        this.setState({ activeTagInputKey: tagInputKey }, () => {
+                          this._tagInputRefs[tagInputKey]?.focus?.();
+                        });
+                      };
+                      return (
+                        <div
+                          className={`${styles.tagInputGroup} ${tagInputActive ? styles.tagInputGroupActive : ''}`}
+                        >
+                          {this.props.interviewQuestionReview && !tagInputActive && (
+                            <button
+                              type="button"
+                              className={styles.revealTagInputButton}
+                              aria-label="Add tag"
+                              title="Add tag"
+                              onClick={activateTagInput}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                  event.preventDefault();
+                                  activateTagInput();
+                                }
+                              }}
+                            >
+                              <FontAwesomeIcon icon={faPlus} />
+                            </button>
+                          )}
+                          <Input
+                            innerRef={(el: FocusablePromptElement | null) => {
+                              this._tagInputRefs[tagInputKey] = el;
+                            }}
+                            type="text"
+                            placeholder="Add tag"
+                            data-testid={E2E_TESTIDS.CREATE_QUESTION_TAG_INPUT}
+                            value={question.currentTagInputValue || ''}
+                            onFocus={() => {
+                              if (this.props.interviewQuestionReview && this.state.activeTagInputKey !== tagInputKey) {
+                                this.setState({ activeTagInputKey: tagInputKey });
+                              }
+                            }}
+                            onBlur={() => {
+                              if (this.props.interviewQuestionReview && !(question.currentTagInputValue || '').trim()) {
+                                this.setState((state) =>
+                                  state.activeTagInputKey === tagInputKey ? { activeTagInputKey: '' } : null,
+                                );
+                              }
+                            }}
+                            onChange={(e: CreateSurveyInputValueEvent) =>
+                              this.handleCurrentTagInputChange(qIndex, e.target.value)
+                            }
+                            onKeyDown={(e: CreateSurveyTagInputKeyEvent) => this.handleTagInputKeyDown(qIndex, e)}
+                            className={styles.tagInputField}
+                          />
 
-                      {/* Checkmark: Only visible when user is typing */}
+                          {/* Checkmark: Only visible when user is typing */}
                       {(question.currentTagInputValue || '').trim() !== '' && (
                         <button
                           type="button"
@@ -3640,25 +3689,27 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
 
                       {/* Magic Wand: Replaces old generate button, hidden if tags populated */}
                       {showGenerateTagsButton && (
-                        <button
-                          type="button"
-                          className={styles.magicTagButton}
-                          onClick={() => this.suggestTagsForQuestion(qIndex)}
-                          disabled={question.isGeneratingTags || !question.prompt.trim()}
-                          title={
-                            !question.prompt.trim()
-                              ? 'Enter a question prompt to generate tags'
-                              : 'Generate tags using AI'
-                          }
-                        >
-                          {question.isGeneratingTags ? (
-                            <FontAwesomeIcon icon={faSpinner} spin />
-                          ) : (
-                            <FontAwesomeIcon icon={faMagic} />
+                            <button
+                              type="button"
+                              className={styles.magicTagButton}
+                              onClick={() => this.suggestTagsForQuestion(qIndex)}
+                              disabled={question.isGeneratingTags || !question.prompt.trim()}
+                              title={
+                                !question.prompt.trim()
+                                  ? 'Enter a question prompt to generate tags'
+                                  : 'Generate tags using AI'
+                              }
+                            >
+                              {question.isGeneratingTags ? (
+                                <FontAwesomeIcon icon={faSpinner} spin />
+                              ) : (
+                                <FontAwesomeIcon icon={faMagic} />
+                              )}
+                            </button>
                           )}
-                        </button>
-                      )}
-                    </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>

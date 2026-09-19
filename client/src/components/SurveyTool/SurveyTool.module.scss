@@ -2775,6 +2775,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 .sessionListeningActiveRecorder {
   display: flex;
+  align-items: center;
   gap: 10px;
   width: 100%;
   padding: 10px;
@@ -2786,6 +2787,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 .sessionListeningWaveformShell {
   position: relative;
+  display: flex;
+  align-items: center;
   flex-basis: 90%;
   flex-grow: 1;
   min-width: 0;
@@ -2798,6 +2801,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 .sessionListeningWaveformCanvas {
   display: block;
+  align-self: center;
   width: 100%;
   height: 100%;
   background-color: var(--ce-border-light);
@@ -3721,12 +3725,10 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .sessionAgentKickoff {
-  position: relative;
-  min-height: 48px;
   display: grid;
   gap: 8px;
   min-width: 0;
-  padding: 14px;
+  padding: 12px;
   border: 1px solid var(--ce-card-border);
   border-radius: var(--ce-radius-8);
   background: var(--ce-card-bg);
@@ -3734,31 +3736,73 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   box-shadow: var(--ce-card-shadow);
 }
 
-.sessionAgentKickoffTitle {
-  appearance: none;
-  display: block;
+.sessionAgentKickoffRow {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(150px, 3fr);
+  align-items: stretch;
+  gap: 10px;
+}
+
+.sessionAgentKickoffCopyTarget {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 6px 0;
+  border: 0;
+  border-radius: 0;
+  outline: none;
   background: transparent;
-  padding: 0 54px 0 0;
   color: var(--ce-panel-text);
   font-family: var(--ce-font-body);
+  cursor: copy;
+
+  &:hover .sessionAgentKickoffCopyBadge,
+  &:focus-visible .sessionAgentKickoffCopyBadge {
+    border-color: var(--ce-action-accent-hover);
+    background: var(--ce-action-accent-hover);
+    color: var(--ce-action-accent-text);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 4px;
+  }
+}
+
+.sessionAgentKickoffTitle {
+  min-width: 0;
+  color: var(--ce-panel-text);
   font-size: 0.85rem;
   font-weight: 700;
   line-height: 1.35;
   text-align: left;
-  cursor: pointer;
+}
 
-  &:hover,
-  &:focus-visible {
-    outline: 2px solid var(--ce-focus-ring);
-    outline-offset: 3px;
-  }
+.sessionAgentKickoffCopyBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  gap: 6px;
+  min-height: 30px;
+  padding: 5px 9px;
+  border: 1px solid var(--ce-action-accent);
+  border-radius: var(--ce-radius-pill);
+  color: var(--ce-action-accent);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .sessionAgentKickoffActions {
   display: flex;
   align-items: center;
-  justify-self: end;
+  justify-content: flex-end;
   gap: 8px;
+  min-width: 0;
 
   .sessionInterviewHeaderButton {
     color: var(--ce-panel-text) !important;
@@ -3819,6 +3863,13 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   white-space: pre-line;
   overflow-wrap: anywhere;
 
+  a {
+    color: var(--ce-action-accent);
+    overflow-wrap: anywhere;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
   p {
     margin: 0 0 1em;
   }
@@ -3828,38 +3879,13 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
-.sessionAgentKickoffCopy {
-  appearance: none;
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 44px;
-  height: 44px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 0;
-  border-radius: var(--ce-radius-6);
-  background: transparent;
-  color: var(--ce-panel-text);
-  cursor: pointer;
-  font-size: 1.5rem;
-  opacity: 0.78;
-
-  &:hover,
-  &:focus-visible {
-    background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
-    color: var(--ce-action-accent);
-    opacity: 1;
-    outline: 2px solid var(--ce-focus-ring);
-    outline-offset: 1px;
-  }
-}
-
 .sessionAgentKickoffCopied {
-  color: var(--ce-status-success);
-  opacity: 1;
+  border-color: var(--ce-status-success);
+
+  .sessionAgentKickoffCopyBadge {
+    border-color: var(--ce-status-success);
+    color: var(--ce-status-success);
+  }
 }
 
 .sessionInterviewReview {
@@ -4201,7 +4227,15 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   gap: 6px;
 }
 
-@media (max-width: 700px) {
+@media (max-width: 480px) {
+  .sessionAgentKickoffRow {
+    grid-template-columns: 1fr;
+  }
+
+  .sessionAgentKickoffActions {
+    justify-content: space-between;
+  }
+
   .sessionInterviewDraft {
     padding: 12px 42px 12px 12px;
   }

@@ -496,6 +496,52 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(engine.persistDraft).toHaveBeenCalled();
   });
 
+  it('does not store interview research comparison when the comparison flag is omitted', async () => {
+    const engine = {
+      props: { sessionConfig: {} },
+      state: {
+        surveysResponseState: [
+          {
+            answers: { q1: { value: 'Reviewed answer' } },
+            importance: {},
+            conviction: {},
+            additionalComments: {},
+          },
+        ],
+      },
+      getChangedQidsAndFields: () => ({ changedQids: new Set(['q1']) }),
+      persistDraft: jest.fn(),
+      setState(updater, callback) {
+        this.state = { ...this.state, ...updater(this.state) };
+        callback?.();
+      },
+    };
+
+    await recordInterviewProvenance(
+      engine,
+      [
+        {
+          questionId: 'q1',
+          answer: 'Reviewed answer',
+          revisions: [{ revision: 1, modelId: 'fixture-model', answer: 'Original AI answer' }],
+        },
+      ],
+      { platform: 'claude', modelId: 'claude-example', verification: 'self_reported' },
+      { promptVersion: 'ce-interview-brief-v4', questionSetHash: 'hash' },
+      true,
+    );
+
+    const provenance = engine.state.surveysResponseState[0].interviewProvenance.q1;
+    expect(provenance).toMatchObject({
+      includeAiProvenance: true,
+      includePredictionComparison: false,
+      source: { platform: 'claude', modelId: 'claude-example', verification: 'self_reported' },
+    });
+    expect(provenance).not.toHaveProperty('originalPrediction');
+    expect(provenance).not.toHaveProperty('predictionRevisions');
+    expect(provenance).not.toHaveProperty('unselectedDrafts');
+  });
+
   it('persists unselected research once on a changed selected answer and removes it on opt-out', async () => {
     const engine = {
       props: { sessionConfig: {} },

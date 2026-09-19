@@ -33,7 +33,6 @@ describe('SurveyAudioFieldInput', () => {
   it('forwards survey audio field props to AudioInput with SurveyTool defaults', () => {
     render(
       <SurveyAudioFieldInput
-        qIndex={3}
         placeholder="response (optional)"
         value="hello"
         encrypted

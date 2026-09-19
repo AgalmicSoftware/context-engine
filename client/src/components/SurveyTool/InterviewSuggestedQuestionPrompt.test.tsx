@@ -16,3 +16,19 @@ it('shows a question heading and lets the owner edit it explicitly', () => {
   fireEvent.click(screen.getByRole('button', { name: 'Done editing' }));
   expect(screen.getByRole('heading', { name: 'Which policy matters?' })).toBeInTheDocument();
 });
+
+
+it('shows the normalized type and multichoice options for review cards', () => {
+  render(
+    <InterviewSuggestedQuestionPrompt
+      prompt="Which launch mode fits?"
+      type="multichoice"
+      options={['Pilot', 'Full launch', { unexpected: true } as never]}
+      onChange={jest.fn()}
+    />,
+  );
+
+  expect(screen.getByText('Multichoice')).toBeInTheDocument();
+  expect(screen.getByText('Options: Pilot · Full launch')).toBeInTheDocument();
+  expect(screen.queryByText(/object Object/)).not.toBeInTheDocument();
+});

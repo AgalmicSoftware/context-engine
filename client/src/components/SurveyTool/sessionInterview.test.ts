@@ -182,6 +182,8 @@ describe('session interview protocol', () => {
     expect(mappingPrompt).toContain('defensible indirect signal');
     expect(mappingPrompt).toContain('Low-confidence inference is allowed');
     expect(mappingPrompt).toContain('confidence is required for every response');
+    expect(mappingPrompt).toContain('first person');
+    expect(mappingPrompt).toContain('Do not add an "(Agent):" prefix');
   });
 
   it('opens directly on topic and preserves a configured opening', () => {
@@ -193,6 +195,9 @@ describe('session interview protocol', () => {
     });
     expect(instructions).toContain('What is your uncommon AI view?');
     expect(instructions).toContain('Ask useful follow-ups');
+    expect(instructions).toContain('ask what topics or questions the responder thinks should be asked more');
+    expect(instructions).toContain('one question at a time');
+    expect(instructions).toContain('which session question they would most like to see other people answer');
     expect(instructions).not.toContain('important insight');
   });
 
@@ -305,11 +310,13 @@ it('returns reviewable novel question drafts only when enabled', async () => {
       responses: [],
       questions: [
         {
-          questionType: 'freeform',
-          prompt: 'Novel AI question?',
+          questionType: 'multichoice',
+          prompt: 'Which governance path fits?',
+          options: [' Pilot ', 'Full launch', 'Pilot', { unexpected: true }],
           tags: [' governance ', 'Governance', '', 7, 'institutions'],
         },
-        { questionType: 'freeform', prompt: 'Novel AI question?' },
+        { questionType: 'rating', prompt: 'How ready is the team?' },
+        { questionType: 'multichoice', prompt: 'Which invalid choice set?', options: ['Only one'] },
         { questionType: 'freeform', prompt: 'Existing question?' },
       ],
     }),
@@ -331,7 +338,14 @@ it('returns reviewable novel question drafts only when enabled', async () => {
   });
   expect(jest.mocked(callAI).mock.calls.at(-1)?.[0]).toContain('Session default tags: ["governance"]');
   expect(jest.mocked(callAI).mock.calls.at(-1)?.[0]).toContain('Prefer policy questions.');
+  expect(jest.mocked(callAI).mock.calls.at(-1)?.[0]).toContain('freeform|rating|multichoice|binary');
   expect(onSuggestedQuestions).toHaveBeenCalledWith([
-    expect.objectContaining({ type: 'freeform', prompt: 'Novel AI question?', tags: ['Governance', 'institutions'] }),
+    expect.objectContaining({
+      type: 'multichoice',
+      prompt: 'Which governance path fits?',
+      options: ['Pilot', 'Full launch'],
+      tags: ['Governance', 'institutions'],
+    }),
+    expect.objectContaining({ type: 'rating', prompt: 'How ready is the team?' }),
   ]);
 });

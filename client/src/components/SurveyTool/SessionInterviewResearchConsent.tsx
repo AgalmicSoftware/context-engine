@@ -4,7 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { INTERVIEW_PROMPT_VERSION, type InterviewPrefillPacket } from './sessionInterview';
-import styles from './SurveyTool.module.scss';
+import styles from './SessionInterviewResearchConsent.module.scss';
 
 type Props = {
   packet: InterviewPrefillPacket;
@@ -38,7 +38,7 @@ export default function SessionInterviewResearchConsent({
   return (
     <>
       {showProvenance && (
-        <Label check className={styles.sessionInterviewProvenance}>
+        <Label check className={styles.provenanceOption}>
           <Input
             type="checkbox"
             checked={includeProvenance}
@@ -48,8 +48,8 @@ export default function SessionInterviewResearchConsent({
           Include self-reported AI platform/model provenance with submitted responses
         </Label>
       )}
-      <div className={styles.sessionInterviewResearchConsent}>
-        <Label check className={styles.sessionInterviewProvenance}>
+      <div className={styles.researchConsent}>
+        <Label check className={styles.provenanceOption}>
           <Input
             type="checkbox"
             checked={includeComparison}
@@ -57,29 +57,38 @@ export default function SessionInterviewResearchConsent({
             onChange={(event) => onComparisonChange(event.target.checked)}
             data-testid={E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON}
           />{' '}
-          <span>Include AI predictions, revisions, and final submitted answers for accuracy research</span>
+          <span>Share AI draft changes for research</span>
         </Label>
         <button
           type="button"
           id="ce-interview-research-help"
-          className={styles.sessionInterviewResearchHelp}
+          className={styles.researchHelp}
           aria-label="About accuracy research"
           aria-describedby="ce-interview-research-description"
         >
           <FontAwesomeIcon icon={faQuestionCircle} />
         </button>
       </div>
-      <span id="ce-interview-research-description" className={styles.sessionListeningSrOnly}>
-        Includes original predictions, AI revisions from continued interviews, your edits, and drafts you did not
-        select. Unselected drafts are recorded as research metadata, not submitted answers. Final answers are compared
-        at submission; encrypted answer and comment text is excluded from research metadata.
+      <span id="ce-interview-research-description" className={styles.srOnly}>
+        Includes original predictions, AI revisions from continued interviews, reviewed final values, changed fields, and
+        drafts you did not select. Unselected drafts are recorded as research metadata, not submitted answers. Edits are
+        not treated as agreement. Encrypted answer and comment text, full interview transcripts, and imported
+        conversation history are excluded.
       </span>
-      <UncontrolledTooltip target="ce-interview-research-help" placement="top" trigger="hover focus">
-        Includes original predictions, AI revisions from continued interviews, your edits, and unselected drafts.
-        Unselected drafts are research metadata, not submitted answers. Encrypted answer and comment text is excluded.
+      <UncontrolledTooltip target="ce-interview-research-help" placement="top" trigger="hover focus" autohide={false}>
+        Includes original predictions, AI revisions, reviewed final values, changed fields, and unselected drafts.
+        Unselected drafts are research metadata, not submitted answers. Edits are not treated as agreement.
+        Encrypted text, transcripts, and imported conversation history are excluded.{' '}
+        <a
+          href="https://github.com/AgalmicSoftware/context-engine/blob/main/client/src/components/SurveyTool/surveyToolResponsePayloadController.ts"
+          target="_blank"
+          rel="noreferrer"
+        >
+          How research data is handled
+        </a>
       </UncontrolledTooltip>
       <details
-        className={styles.sessionInterviewMetadata}
+        className={styles.metadata}
         aria-label={showProvenance ? 'AI prefill metadata' : 'AI research metadata'}
       >
         <summary>
@@ -124,21 +133,35 @@ export default function SessionInterviewResearchConsent({
                 {revisionCount} saved prediction versions, including model IDs and revised answers, comments,
                 confidence, and basis.
               </li>
-              <li>Final submitted values and which fields changed.</li>
+              <li>
+                Reviewed final values and which fields changed. Unchanged fields are labeled unchanged, not human
+                agreement.
+              </li>
               <li>
                 Unselected drafts, including original and edited values and selection status. Their final value is empty
                 unless submitted separately.
               </li>
             </ul>
-            <p>Encrypted answer and comment text is excluded, along with its prediction basis.</p>
+            <p>
+              Encrypted answer and comment text is excluded, along with its prediction basis. Edits are not treated as
+              agreement.
+            </p>
           </>
         ) : (
-          <p>Predictions, edits, and unselected drafts will not be included.</p>
+          <p>Predictions, reviewed values, changed fields, and unselected drafts will not be included.</p>
         )}
         {includeProvenance || includeComparison ? (
           <p>
             Also includes the time drafts were applied. The full interview transcript and imported conversation history
-            are not attached.
+            are not attached. See{' '}
+            <a
+              href="https://github.com/AgalmicSoftware/context-engine/blob/main/client/src/components/SurveyTool/surveyToolResponsePayloadController.ts"
+              target="_blank"
+              rel="noreferrer"
+            >
+              How research data is handled
+            </a>
+            .
           </p>
         ) : null}
       </details>

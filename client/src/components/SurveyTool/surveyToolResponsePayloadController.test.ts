@@ -198,6 +198,15 @@ describe('surveyToolResponsePayloadController', () => {
             confidence: 0.22,
             evidence: '',
           },
+          finalSubmitted: {
+            answer: 'Final edited answer',
+            additionalComments: '',
+            importance: null,
+            conviction: null,
+          },
+          changedFields: ['answer'],
+          userEditedFields: [],
+          redactedFields: [],
           predictionComparison: {
             version: 1,
             original: {
@@ -215,6 +224,7 @@ describe('surveyToolResponsePayloadController', () => {
               conviction: null,
             },
             changedFields: ['answer'],
+            userEditedFields: [],
             redactedFields: [],
           },
           appliedAt: 123,
@@ -276,6 +286,7 @@ describe('surveyToolResponsePayloadController', () => {
           conviction: 70,
         }),
         changedFields: ['answer', 'additionalComments', 'importance'],
+        userEditedFields: [],
         redactedFields: ['answer', 'additionalComments'],
       }),
     );
@@ -310,6 +321,9 @@ describe('surveyToolResponsePayloadController', () => {
     );
     expect(result.responses![0].interviewProvenance).not.toHaveProperty('originalPrediction');
     expect(result.responses![0].interviewProvenance).not.toHaveProperty('predictionComparison');
+    expect(result.responses![0].interviewProvenance).not.toHaveProperty('finalSubmitted');
+    expect(result.responses![0].interviewProvenance).not.toHaveProperty('changedFields');
+    expect(result.responses![0].interviewProvenance).not.toHaveProperty('userEditedFields');
   });
 
   it('captures final plaintext values before response encryption replaces them', () => {
@@ -332,6 +346,68 @@ describe('surveyToolResponsePayloadController', () => {
     });
     expect((captured.interviewProvenance as Record<string, any>).q2).not.toHaveProperty('submissionValueSnapshot');
     expect(slice.interviewProvenance.q1).not.toHaveProperty('submissionValueSnapshot');
+  });
+
+  it('serializes reviewed values and user-touched fields only at the final payload boundary', () => {
+    const result = buildResponsePayload(
+      defaultOpts({
+        questionPool: [{ id: 'q1', type: 'freeform', prompt: 'What matters?' }],
+        surveyResponseState: {
+          answers: { q1: { value: 'Original answer' } },
+          additionalComments: { q1: { value: 'Reviewed note' } },
+          importance: {},
+          conviction: {},
+          interviewProvenance: {
+            q1: {
+              includeAiProvenance: false,
+              includePredictionComparison: true,
+              originalPrediction: { answer: 'Original answer', additionalComments: 'Original note' },
+              predictionRevisions: [
+                {
+                  revision: 1,
+                  modelId: 'fixture-model',
+                  answer: 'Original answer',
+                  additionalComments: 'Original note',
+                },
+              ],
+              userEditedFields: ['answer', 'additionalComments'],
+              unselectedDrafts: [
+                {
+                  questionId: 'q2',
+                  answer: 'Rejected reviewed',
+                  additionalComments: 'Rejected note',
+                  userEditedFields: ['answer'],
+                  original: { answer: 'Rejected original', additionalComments: 'Rejected original note' },
+                },
+              ],
+            },
+          },
+        } as never,
+      }),
+    );
+
+    const provenance = result.responses![0].interviewProvenance as Record<string, any>;
+    expect(provenance).toMatchObject({
+      originalPrediction: { answer: 'Original answer', additionalComments: 'Original note' },
+      predictionRevisions: [expect.objectContaining({ answer: 'Original answer' })],
+      finalSubmitted: { answer: 'Original answer', additionalComments: 'Reviewed note' },
+      changedFields: ['additionalComments'],
+      userEditedFields: ['answer', 'additionalComments'],
+    });
+    expect(provenance.unselectedPredictions[0]).toMatchObject({
+      reviewed: {
+        answer: 'Rejected reviewed',
+        additionalComments: 'Rejected note',
+        importance: null,
+        conviction: null,
+      },
+      changedFields: ['answer', 'additionalComments'],
+      userEditedFields: ['answer'],
+    });
+    expect(provenance.predictionComparison).toMatchObject({
+      changedFields: ['additionalComments'],
+      userEditedFields: ['answer', 'additionalComments'],
+    });
   });
 
   it('submits an opted-in responder name without leaking opted-out model provenance', () => {
@@ -577,6 +653,7 @@ it.each([false, true])(
     };
     const opts = defaultOpts({ questionPool: [{ id: 'q1' }], surveyResponseState: slice as never });
     const provenance = buildResponsePayload(opts).responses![0].interviewProvenance as any;
+    expect(provenance.predictionRevisions).toHaveLength(2);
     expect(provenance.predictionComparison.revisions).toHaveLength(2);
     expect(provenance.predictionComparison.revisions[0].modelId).toBe('fixture-model');
     if (encrypted) expect(JSON.stringify(provenance)).not.toContain('private');
@@ -587,7 +664,7 @@ it.each([false, true])(
       ]);
     slice.interviewProvenance.q1.includePredictionComparison = false;
     expect(JSON.stringify(buildResponsePayload(opts).responses![0].interviewProvenance)).not.toMatch(
-      /private|revisions/,
+      /private|revisions|finalSubmitted|changedFields|userEditedFields/,
     );
   },
 );

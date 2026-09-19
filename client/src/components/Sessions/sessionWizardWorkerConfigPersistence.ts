@@ -92,6 +92,7 @@ const PUBLIC_WORKER_CONFIG_FIELDS = Object.freeze([
   'registryChainId',
   'networkChainId',
   'embeddedDeployHelperEnabled',
+  'resultsAnalysis',
 ]);
 const ADDRESS_PATTERN = /^0x[0-9a-f]{40}$/;
 const REVISION_PATTERN = /^[a-z0-9._:-]{1,128}$/i;

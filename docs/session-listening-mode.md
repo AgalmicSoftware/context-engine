@@ -101,12 +101,21 @@ Session `interviewMode` settings are available in the wizard and admin metadata 
 | `autoRegenerate` | `false` | Refresh the generated opening when enough questions have been added. |
 | `questionGrowthPercent` | `20` | Additions needed since the last successful generation or conversation update, rounded up to at least one. |
 | `followNewQuestions` | `false` | Check the public question catalog every 30 seconds during active recording and append qualifying additions to the interviewer's context. |
-| `suggestQuestions` | `false` | Propose up to three new freeform question drafts from respondent evidence when preparing responses. |
+| `suggestQuestions` | `false` | Propose up to three new respondent-grounded question drafts when preparing responses. Drafts may be freeform, rating, binary, or multichoice; multichoice drafts include suggested options for review. |
 | `allowManualRefresh` | `true` | Enable **Regenerate interview opening** for session admins. |
 
 Auto mode generates on the first Interview opening with available public questions and permitted session AI access. No separate admin setup step is needed for an open AI-enabled session. An empty bank waits until questions exist. The Worker uses its OpenAI key and caches the result at `session:<slug>:interview-opening`, with the generation time and baseline question count, separately from owner configuration. The default reuses this opening even as the bank grows; enabling regeneration checks the threshold on the next Interview opening. For example, 42 questions require nine additions at 20%. A failed refresh retains the previous opening. Initial failure visibly falls back to an existing session question.
 
 Live updates use [`session.instructions.append`](https://developers.openai.com/api/reference/typescript/resources/live); supported legacy sessions use [`conversation.item.create` system messages](https://developers.openai.com/api/reference/typescript/resources/realtime). These updates never restart the conversation or replace its opening. Pause and Stop cancel polling and discard late results. Discovery uses the existing public catalog's visibility checks and 100-question limit; private questions are not added through this public discovery path. There are no edit-based or scheduled regeneration conditions.
+
+Live capacity notes for 100-person tests, checked September 19, 2026:
+
+- [`gpt-live-1`](https://developers.openai.com/api/docs/models/gpt-live-1) rate limits are measured in concurrent sessions. The published tiers are Tier 1: 25, Tier 2: 50, Tier 3: 200, Tier 4: 300, and Tier 5: 500 concurrent sessions; Free is not supported. A 100-user live-voice test therefore needs at least Tier 3 for the live model itself.
+- OpenAI's [rate-limit guide](https://developers.openai.com/api/docs/guides/rate-limits) also applies to the backend text/model calls used after Stop. Confirm the organization's actual Limits dashboard before the test because limits vary by model and can include RPM, TPM, and audio-minute ceilings. The current account tier and remaining allocation are not knowable from this repository.
+- Organization and project limits both matter. OpenAI documents org/project rate limits and project-scoped headers, while [spend limits](https://developers.openai.com/api/docs/guides/spend-limits) can be configured at either org or project level; project settings cannot make traffic succeed after an applicable organization limit or approved usage limit is exhausted.
+- Context Engine does not currently enforce app-level voice spend or duration caps. The practical cap is the configured OpenAI allocation plus the session Worker and browser paths.
+- Authenticated submission paths still request Worker nonces. The Worker constants set `NONCE_RATE_LIMIT_MAX = 5` per minute, and nonce issuance uses the trusted Cloudflare/anonymous rate identity in `authNonceRequestDispatch`. A same-venue Wi-Fi test can bottleneck on nonce issuance before it demonstrates 100 independent live voices or submissions.
+- A read-only 100-browser GET test is not equivalent to 100 live voice sessions plus response submissions. Headless browser coverage can use virtual WebAuthn PRF for auth flows, but it should be planned as a separate load profile from read-only page fetches.
 
 Suggested questions follow the response drafts in an expandable **Suggested new questions** section, initially open, using pile-style question cards with editable prompts and tags. Interview review hides the survey/questions toggle and manual question-type selector; the normal authoring surface retains them. A help tooltip beside the section heading explains that suggestions remain drafts until uploaded. Both review sections use matching headings and support keyboard collapse/expand without losing edits. Questions can be edited or removed and require the normal explicit creation/sign-in/permission flow; stopping an interview and submitting response drafts do not create questions. Suggestions share the response-mapping request, avoiding an extra model round trip. That request also generates short, non-identifying tags, prefers relevant session `defaultTags`, and incorporates `questionsGenPrompt` guidance. Default tags are suggestions rather than a restricted vocabulary; users can add or remove tags before upload.
 
@@ -133,41 +142,48 @@ found, and suggests another interview or relevant Claude/ChatGPT memories. It
 does not present an unchanged generate button as though more input had arrived.
 
 Drafts open in a collapsible **Review proposed responses** section with the session's answer inputs, additional
-comments, conviction/importance control, and answer/comment lock menus. Additional
-comment controls remain interactive: the microphone appends dictated text, AI
-rewrite cleans up wording with a revert action, and the lock chooses the comment
-audience. Icon tooltips explain these actions on hover and keyboard focus.
-Relevant interview explanations appear as editable additional comments. Answers and comments matching the agent draft are labeled **Agent:**; edits are labeled **User:**. Existing user comments carry no prefix. These labels are display-only and are never inserted into submitted values. The responder
-selects which drafts to submit and must explicitly opt into replacing an existing
-local answer. Selected drafts have an **X** to exclude them; an excluded draft
-offers **Restore draft**, or **Replace with draft** when a local answer already
-exists. There is no redundant selected-state button. **Submit responses** saves reviewed values and enters the normal
-submission flow, opening sign-in when necessary. Drafts survive that sign-in;
-the responder can finish submission through the session's normal Submit control.
-The **Submit responses** and **Upload Questions** actions share the pile view’s
-submit styling. **Upload Questions** remains inside Suggested new questions and
-uses the normal question upload flow. Stopping alone never submits answers.
-The default-on platform provenance option
-appears only when an AI augmentation packet was imported. When it is retained,
-submitted response metadata keeps the prompt/question-set revision
-and self-reported source platform/model. A separate accuracy-research checkbox
-also appears only for imported AI prefill and is on by default. Ordinary voice
-interviews neither show this option nor enable prediction-comparison metadata.
-An **AI prefill metadata · model** disclosure shows the self-reported model and
-expands to explain the included platform, revision, question-set hash, coverage
-counts, prediction fields, and selected/unselected draft counts. Its contents
-reflect both consent checkboxes, including which metadata is excluded.
-Accuracy research records the original AI prediction, the final submitted
-answer, the fields that changed, and the prediction confidence so model fidelity
-can be evaluated without treating low-confidence drafts as unusable. Responders
-can disable either consent independently before submitting. Its question-mark
-tooltip explains that edited and unselected drafts are included. Unselected
+comments, conviction/importance control, and answer/comment lock menus. The
+readable answer and comment text is shown by default; tapping or pressing Enter
+opens editing. Prose draft editors keep microphone dictation and autosize to the
+full text, but hide the AI rewrite/cleanup action inside interview draft review.
+Icon tooltips explain the remaining actions on hover and keyboard focus.
+Relevant interview explanations appear as editable additional comments. The
+review body no longer adds **Agent:** or **User:** labels, and it does not remove
+literal text that happens to begin with those words. A single glowing robot icon
+beside the footer/comment controls marks an untouched AI-proposed response; it
+stays through focus-only review and disappears after any real answer, comment,
+importance, or conviction edit. The responder selects which drafts to submit and
+must explicitly opt into replacing an existing local answer. Selected drafts have
+an **X** to exclude them; an excluded draft offers **Restore draft**, or
+**Replace with draft** when a local answer already exists. There is no redundant
+selected-state button. **Submit responses** saves reviewed values and enters the
+normal submission flow, opening sign-in when necessary. Drafts survive that
+sign-in; the responder can finish submission through the session's normal Submit
+control. The **Submit responses** and **Upload Questions** actions share the pile
+view’s submit styling. **Upload Questions** remains inside Suggested new
+questions and uses the normal question upload flow. Stopping alone never submits
+answers.
+The platform provenance option appears only when an AI augmentation packet was
+imported. When it is retained, submitted response metadata keeps the
+prompt/question-set revision and self-reported source platform/model. A separate
+**Share AI draft changes for research** checkbox appears when imported or
+voice-generated AI drafts or prediction revisions are being reviewed, and it is
+off by default. An **AI prefill metadata · model** or **AI research metadata**
+disclosure explains the included platform, revision, question-set hash, coverage
+counts, prediction fields, selected/unselected draft counts, and excluded
+metadata according to the visible consent controls.
+Consented research records the original AI prediction, saved prediction
+revisions, reviewed final values, fields whose final values changed, fields the
+reviewer touched, selected/unselected draft status, and prediction confidence.
+It does not treat unchanged values as scientific agreement. Unselected
 predictions are stored once as research metadata alongside a selected submitted
-response, with their original and edited values and selection status; they do
-not become answers. An unsubmitted draft has a null final submitted value. For an
-encrypted answer or additional comment, the comparison records only an encrypted
-field marker and whether the field changed; it never places the protected text in
-plaintext metadata, and it omits the prediction basis from that metadata.
+response; they do not become answers. An unsubmitted draft has a null final
+submitted value. For an encrypted answer or additional comment, the comparison
+records only an encrypted field marker and whether the field changed; it never
+places the protected text in plaintext metadata, and it omits the prediction
+basis from that metadata. See [Session interview research metadata](session-interview-research.md)
+for the submitted JSON shape and the differences from the Edge2026 agent-village
+agent-only experiment.
 An external AI may also include a preferred responder name that it already
 knows from the permitted context. The review modal shows a separate
 **Include “name” as the responder name** checkbox only when a name was supplied,

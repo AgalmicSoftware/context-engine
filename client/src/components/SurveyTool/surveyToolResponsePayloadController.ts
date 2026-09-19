@@ -1,5 +1,5 @@
 import type { ResponseSlice, UnknownRecord } from './surveyToolTypes';
-import { buildUnselectedInterviewResearch, buildInterviewRevisionResearch } from './sessionInterviewResearch';
+import { buildSelectedInterviewResearch, buildUnselectedInterviewResearch } from './sessionInterviewResearch';
 
 const asRecord = (value: unknown): UnknownRecord =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : {};
@@ -22,10 +22,6 @@ const buildStableComparableValue = (value: unknown): unknown => {
 const responseValuesMatch = (left: unknown, right: unknown): boolean =>
   JSON.stringify(buildStableComparableValue(left)) === JSON.stringify(buildStableComparableValue(right));
 
-const buildRedactedComparisonValue = (): UnknownRecord => ({
-  redacted: true,
-  reason: 'encrypted_field',
-});
 
 const normalizeResearchCoverageCount = (value: unknown): number | null => {
   if (value === null || value === undefined || value === '') return null;
@@ -284,42 +280,47 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
       ...(answer.encrypted ? ['answer'] : []),
       ...(researchAdditionalEncrypted ? ['additionalComments'] : []),
     ];
-    const safeOriginalPrediction = includePredictionComparison
-      ? {
-          answer: answer.encrypted ? buildRedactedComparisonValue() : originalComparisonValues.answer,
-          additionalComments: researchAdditionalEncrypted
-            ? buildRedactedComparisonValue()
-            : originalComparisonValues.additionalComments,
-          importance: originalComparisonValues.importance,
-          conviction: originalComparisonValues.conviction,
-          confidence: hasOwn(originalPrediction, 'confidence') ? originalPrediction.confidence : null,
-          evidence: redactedFields.length > 0 ? '' : String(originalPrediction.evidence || ''),
-        }
+    const selectedInterviewResearch = includePredictionComparison
+      ? buildSelectedInterviewResearch(
+          {
+            questionId: q.id,
+            ...submittedComparisonValues,
+            userEditedFields: interviewProvenanceRecord.userEditedFields,
+            original: {
+              ...originalComparisonValues,
+              confidence: hasOwn(originalPrediction, 'confidence') ? originalPrediction.confidence : null,
+              evidence: originalPrediction.evidence || '',
+              revisions: interviewProvenanceRecord.predictionRevisions,
+            },
+          },
+          surveyResponseState,
+        )
       : null;
+    const safeOriginalPrediction = selectedInterviewResearch
+      ? asRecord(selectedInterviewResearch.originalPrediction)
+      : null;
+    const safeFinalSubmitted = selectedInterviewResearch ? asRecord(selectedInterviewResearch.finalSubmitted) : null;
+    const safePredictionRevisions = Array.isArray(selectedInterviewResearch?.predictionRevisions)
+      ? selectedInterviewResearch.predictionRevisions
+      : [];
+    const safeChangedFields = Array.isArray(selectedInterviewResearch?.changedFields)
+      ? selectedInterviewResearch.changedFields
+      : changedFields;
+    const safeUserEditedFields = Array.isArray(selectedInterviewResearch?.userEditedFields)
+      ? selectedInterviewResearch.userEditedFields
+      : [];
+    const safeRedactedFields = Array.isArray(selectedInterviewResearch?.redactedFields)
+      ? selectedInterviewResearch.redactedFields
+      : redactedFields;
     const predictionComparison = includePredictionComparison
       ? {
           version: 1,
           original: safeOriginalPrediction,
-          ...(Array.isArray(interviewProvenanceRecord.predictionRevisions) &&
-          interviewProvenanceRecord.predictionRevisions.length
-            ? {
-                revisions: buildInterviewRevisionResearch(
-                  interviewProvenanceRecord.predictionRevisions,
-                  answer.encrypted === true,
-                  researchAdditionalEncrypted,
-                ),
-              }
-            : {}),
-          submitted: {
-            answer: answer.encrypted ? buildRedactedComparisonValue() : submittedComparisonValues.answer,
-            additionalComments: researchAdditionalEncrypted
-              ? buildRedactedComparisonValue()
-              : submittedComparisonValues.additionalComments,
-            importance: submittedComparisonValues.importance,
-            conviction: submittedComparisonValues.conviction,
-          },
-          changedFields,
-          redactedFields,
+          ...(safePredictionRevisions.length ? { revisions: safePredictionRevisions } : {}),
+          submitted: safeFinalSubmitted,
+          changedFields: safeChangedFields,
+          userEditedFields: safeUserEditedFields,
+          redactedFields: safeRedactedFields,
         }
       : null;
     const interviewProvenance =
@@ -341,6 +342,11 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
                 }
               : {}),
             ...(safeOriginalPrediction ? { originalPrediction: safeOriginalPrediction } : {}),
+            ...(safePredictionRevisions.length ? { predictionRevisions: safePredictionRevisions } : {}),
+            ...(safeFinalSubmitted ? { finalSubmitted: safeFinalSubmitted } : {}),
+            ...(includePredictionComparison ? { changedFields: safeChangedFields } : {}),
+            ...(includePredictionComparison ? { userEditedFields: safeUserEditedFields } : {}),
+            ...(includePredictionComparison ? { redactedFields: safeRedactedFields } : {}),
             ...(predictionComparison ? { predictionComparison } : {}),
             ...(includePredictionComparison && Array.isArray(interviewProvenanceRecord.unselectedDrafts)
               ? {
