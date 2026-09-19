@@ -136,4 +136,3 @@ Small but readable caption at very bottom:
 
 Composition constraints: Keep all content within safe margins. Use concise lines verbatim. Every arrow must clarify the flow. Consent does not gate AI provider processing. Excluded drafts are never portrayed as submitted answers. Do not claim encryption hides the entire record. This is an explanatory diagram, not a form screenshot.
 ```
-
