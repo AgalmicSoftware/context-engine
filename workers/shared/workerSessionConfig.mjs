@@ -43,6 +43,7 @@ const PUBLIC_CONFIG_KEYS = Object.freeze([
   'registryChainId',
   'networkChainId',
   'embeddedDeployHelperEnabled',
+  'resultsAnalysis',
 ]);
 
 const DEPLOY_CANONICAL_CONFIG_KEYS = Object.freeze([
@@ -69,6 +70,7 @@ const DEPLOY_CANONICAL_CONFIG_KEYS = Object.freeze([
   'ai',
   'networkChainId',
   'contracts',
+  'resultsAnalysis',
 ]);
 
 const OPEN_CONFIG_SUBTREE_KEYS = Object.freeze([

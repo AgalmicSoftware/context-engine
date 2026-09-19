@@ -23,6 +23,12 @@ import {
 import {
   storageRoute as storageRouteBoundary,
 } from './storageRouteExecution.js';
+import {
+  maybeTriggerAutomaticResultsAnalysis as maybeTriggerAutomaticResultsAnalysisBoundary,
+} from './resultsAnalysisGeneration.js';
+import {
+  enqueueCoordinatedResultsAnalysisAutoJob as enqueueCoordinatedResultsAnalysisAutoJobBoundary,
+} from './sessionWriteCoordinator.js';
 
 export const createWorkerExecutionServicesWithWorkerDeps = ({
   deps,
@@ -165,6 +171,17 @@ export const createWorkerExecutionServicesWithWorkerDeps = ({
       toRegistrySessionSlug: deps?.toRegistrySessionSlug,
       resolveRpcUrlListForGate: deps?.resolveRpcUrlListForGate,
       checkSbtGate: deps?.checkSbtGate,
+      proxyAnthropic: aiProxies.proxyAnthropic,
+      proxyOpenAI: aiProxies.proxyOpenAI,
+      proxyOpenRouter: aiProxies.proxyOpenRouter,
+      proxyCustomRPC: aiProxies.proxyCustomRPC,
+      reserveCoordinatedResultsAnalysis: deps?.reserveCoordinatedResultsAnalysis,
+      finalizeCoordinatedResultsAnalysis: deps?.finalizeCoordinatedResultsAnalysis,
+      readCoordinatedResultsAnalysisStatus: deps?.readCoordinatedResultsAnalysisStatus,
+      generateAnalysisArtifact: deps?.generateAnalysisArtifact,
+      maybeTriggerAutomaticResultsAnalysis: deps?.maybeTriggerAutomaticResultsAnalysis || maybeTriggerAutomaticResultsAnalysisBoundary,
+      enqueueResultsAnalysisAutoJob: deps?.enqueueResultsAnalysisAutoJob || enqueueCoordinatedResultsAnalysisAutoJobBoundary,
+      waitUntil: deps?.waitUntil,
     },
   });
 

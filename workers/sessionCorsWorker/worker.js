@@ -115,6 +115,7 @@ export const createWorkerRuntime = (env, overrides = {}) => {
     fetch: deps.fetch,
     rpcFetch: deps.rpcFetch,
     now: deps.now,
+    waitUntil: deps.waitUntil,
   };
   const resolved = (deps.resolveWorkerRuntimeDeps || resolveWorkerRuntimeDeps)({
     deps: runtimeDeps,
@@ -216,6 +217,14 @@ export const createWorkerRuntime = (env, overrides = {}) => {
       evaluateAuthenticatedRoutePreflight: resolvedDeps.evaluateAuthenticatedRoutePreflight,
       resolveAuthenticatedRouteSecrets: resolvedDeps.resolveAuthenticatedRouteSecrets,
       normalizeAiRequestPayload: resolvedDeps.normalizeAiRequestPayload,
+      authorizeCloudflareStorageResourceRead: resolvedDeps.authorizeCloudflareStorageResourceRead,
+      readPublishedResultsAnalysisArtifact: resolvedDeps.readPublishedResultsAnalysisArtifact,
+      evaluateResultsAnalysisViewerEligibility: resolvedDeps.evaluateResultsAnalysisViewerEligibility,
+      readCoordinatedResultsAnalysisStatus: resolvedDeps.readCoordinatedResultsAnalysisStatus,
+      dispatchResultsAnalysisArtifactRequest: resolvedDeps.dispatchResultsAnalysisArtifactRequest,
+      createAnonymousRegistrySupportAdaptersWithWorkerDeps: resolvedDeps.createAnonymousRegistrySupportAdaptersWithWorkerDeps,
+      createAuthCorsAdminAdaptersWithWorkerDeps: resolvedDeps.createAuthCorsAdminAdaptersWithWorkerDeps,
+      waitUntil: resolvedDeps.waitUntil,
     },
     constants: {
       resourceGateKeys: resolved.constants.RESOURCE_GATE_KEYS,
@@ -263,7 +272,9 @@ export const workerAuthGateUtils = defaultWorkerRuntime.workerAuthGateUtils;
 export default {
   fetch(request, env, ctx) {
     initializeWorkerDebugLogs(env);
-    const workerRuntime = createWorkerRuntime(env);
+    const workerRuntime = createWorkerRuntime(env, {
+      waitUntil: typeof ctx?.waitUntil === 'function' ? ctx.waitUntil.bind(ctx) : undefined,
+    });
     return workerRuntime.fetch(request, env, ctx);
   },
 };

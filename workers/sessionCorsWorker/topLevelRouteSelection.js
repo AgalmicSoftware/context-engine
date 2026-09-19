@@ -59,6 +59,14 @@ export const resolveTopLevelRouteSelection = ({
     return { kind: 'admin-abuse-summary' };
   }
 
+  if (path === '/admin/results-analysis/status' && method === 'GET') {
+    return { kind: 'admin-results-analysis-status' };
+  }
+
+  if (path === '/results-analysis/artifact' && method === 'GET') {
+    return { kind: 'results-analysis-artifact' };
+  }
+
   if (path.startsWith('/admin/') && method === 'POST') {
     return {
       kind: 'admin',

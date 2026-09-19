@@ -1,6 +1,7 @@
 import { normalizeWorkerSessionSlug } from './sessionSlugResolution.js';
 import { trimIfString } from './stringCoercion.js';
 import { normalizeWorkerSessionAppearance } from '../shared/sessionColorSchemeConfig.mjs';
+import { normalizeResultsAnalysisSettings } from '../../shared/resultsAnalysisSettings.mjs';
 
 const toStr = (value) => (typeof value === 'string' ? value : value == null ? '' : String(value));
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -83,6 +84,9 @@ export const normalizeWorkerConfigRecord = (raw, { slug } = {}) => {
     const appearance = normalizeWorkerSessionAppearance(normalized.appearance);
     if (appearance) normalized.appearance = appearance;
     else delete normalized.appearance;
+  }
+  if (hasOwn(normalized, 'resultsAnalysis')) {
+    normalized.resultsAnalysis = normalizeResultsAnalysisSettings(normalized.resultsAnalysis);
   }
   delete normalized.theme;
   const embeddedDeployHelperEnabledRaw = hasOwn(normalized, 'embeddedDeployHelperEnabled')

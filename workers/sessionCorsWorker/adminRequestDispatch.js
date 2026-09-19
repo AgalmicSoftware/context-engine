@@ -33,6 +33,7 @@ import {
   findForbiddenWorkerConfigSecretPath,
 } from '../shared/workerSessionConfig.mjs';
 import { executeCoordinatedSessionConfigMutation } from './sessionWriteCoordinator.js';
+import { generateResultsAnalysisDraft } from './resultsAnalysisGeneration.js';
 
 const ALLOWED_SECRET_KEYS = [
   'openaiKey',
@@ -64,6 +65,12 @@ const recordAuthFailure = async ({ env, deps } = {}) => {
   } catch {
     // Admin auth telemetry must not alter the original failure response.
   }
+};
+
+const withPrivateNoStoreHeaders = (headers = {}) => {
+  const next = new Headers(headers || {});
+  next.set('Cache-Control', 'private, no-store');
+  return next;
 };
 
 const buildSecretPresenceManifest = (secrets) => {
@@ -196,6 +203,28 @@ export const dispatchAdminRequest = async ({
       },
     });
     if (response) return response;
+  }
+
+  if (action === 'results-analysis/generate') {
+    const privateHeaders = withPrivateNoStoreHeaders(headers);
+    try {
+      const result = await (deps?.generateResultsAnalysisDraft || generateResultsAnalysisDraft)({
+        env,
+        slug: targetSlug,
+        config: existingConfig,
+        body,
+        headers: privateHeaders,
+        trigger: 'manual',
+        deps,
+      });
+      return deps?.json?.(
+        result?.ok ? result : { ...result, error: result?.error || 'Results analysis generation failed.' },
+        result?.status || (result?.ok ? 200 : 500),
+        privateHeaders,
+      );
+    } catch (error) {
+      return deps?.json?.({ error: error?.message || 'Results analysis generation failed.' }, 500, privateHeaders);
+    }
   }
 
   if (action === 'refresh-interview-opening') {

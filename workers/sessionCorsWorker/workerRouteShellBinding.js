@@ -23,6 +23,12 @@ import {
   dispatchAdminAbuseSummaryRequest as dispatchAdminAbuseSummaryRequestBoundary,
 } from './adminAbuseSummaryDispatch.js';
 import {
+  dispatchAdminResultsAnalysisStatusRequest as dispatchAdminResultsAnalysisStatusRequestBoundary,
+} from './adminResultsAnalysisDispatch.js';
+import {
+  dispatchResultsAnalysisArtifactRequest as dispatchResultsAnalysisArtifactRequestBoundary,
+} from './resultsAnalysisArtifactDispatch.js';
+import {
   dispatchAuthNonceRequest as dispatchAuthNonceRequestBoundary,
 } from './authNonceRequestDispatch.js';
 import {
@@ -87,6 +93,12 @@ export const createWorkerRouteShellWithWorkerDeps = ({
   const dispatchAdminRequest = deps?.dispatchAdminRequest || dispatchAdminRequestBoundary;
   const dispatchAdminAbuseSummaryRequest = (
     deps?.dispatchAdminAbuseSummaryRequest || dispatchAdminAbuseSummaryRequestBoundary
+  );
+  const dispatchAdminResultsAnalysisStatusRequest = (
+    deps?.dispatchAdminResultsAnalysisStatusRequest || dispatchAdminResultsAnalysisStatusRequestBoundary
+  );
+  const dispatchResultsAnalysisArtifactRequest = (
+    deps?.dispatchResultsAnalysisArtifactRequest || dispatchResultsAnalysisArtifactRequestBoundary
   );
   const dispatchAnonymousRouteEntry = (
     deps?.dispatchAnonymousRouteEntry || dispatchAnonymousRouteEntryBoundary
@@ -389,6 +401,27 @@ export const createWorkerRouteShellWithWorkerDeps = ({
       });
       }
 
+      if (routeSelection.kind === 'admin-results-analysis-status') {
+        return await dispatchAdminResultsAnalysisStatusRequest({
+          request,
+          env,
+          baseHeaders: routeBaseHeaders,
+          slug: envSlug,
+          deps: {
+            json: deps?.json,
+            requireAuth: deps?.requireAuth,
+            getSessionConfig: deps?.getSessionConfig,
+            getCorsContext: deps?.getCorsContext,
+            validateAdmin: deps?.validateAdmin,
+            readResultsAnalysisAdminStatus: deps?.readResultsAnalysisAdminStatus,
+            readCoordinatedResultsAnalysisStatus: deps?.readCoordinatedResultsAnalysisStatus,
+            ...(deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {}),
+            toStr: deps?.toStr,
+            now: deps?.now,
+          },
+        });
+      }
+
       if (routeSelection.kind === 'admin') {
         return await dispatchAdminRequest({
           request,
@@ -425,11 +458,77 @@ export const createWorkerRouteShellWithWorkerDeps = ({
             putSessionConfig: deps?.putSessionConfig,
             getSessionSecrets: deps?.getSessionSecrets,
             storageRoute: deps?.storageRoute,
+            readCoordinatedResultsAnalysisStatus: deps?.readCoordinatedResultsAnalysisStatus,
+            reserveCoordinatedResultsAnalysis: deps?.reserveCoordinatedResultsAnalysis,
+            finalizeCoordinatedResultsAnalysis: deps?.finalizeCoordinatedResultsAnalysis,
+            generateAnalysisArtifact: deps?.generateAnalysisArtifact,
+            proxyAnthropic: deps?.proxyAnthropic,
+            proxyOpenAI: deps?.proxyOpenAI,
+            proxyOpenRouter: deps?.proxyOpenRouter,
+            proxyCustomRPC: deps?.proxyCustomRPC,
             fetch: deps?.fetch,
             normalizeSecretValue: deps?.normalizeSecretValue,
             putSessionSecrets: deps?.putSessionSecrets,
             ...(deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {}),
             MISSING_SLUG_ERROR: constants?.missingSlugError,
+          },
+        });
+      }
+
+
+      if (routeSelection.kind === 'results-analysis-artifact') {
+        const withQuerySlugHeader = (() => {
+          try {
+            const params = new URL(request.url).searchParams;
+            const querySlug = deps?.toStr?.(params.get('sessionSlug') || params.get('slug'))?.trim?.() || '';
+            if (!querySlug || request.headers.get('x-session-slug')) return request;
+            const headers = new Headers(request.headers);
+            headers.set('x-session-slug', querySlug);
+            return new Request(request, { headers });
+          } catch {
+            return request;
+          }
+        })();
+        const slugResolution = deps?.resolveRequestSlugWithoutToken?.({ request: withQuerySlugHeader, env, slugHint: envSlug }) || {
+          ok: false,
+          error: constants?.missingSlugError || 'Missing session slug.',
+        };
+        if (!slugResolution?.ok || !slugResolution?.explicitSlugProvided) {
+          return deps?.json?.({ error: slugResolution?.error || constants?.missingSlugError }, 400, routeBaseHeaders);
+        }
+        const targetSlug = slugResolution.slug;
+        const config = await deps?.getSessionConfig?.(env, targetSlug);
+        if (!config) return deps?.json?.({ error: constants?.sessionConfigNotFoundError }, 404, routeBaseHeaders);
+        const corsContext = await deps?.getCorsContext?.({ request: withQuerySlugHeader, config, baseHeaders: routeBaseHeaders });
+        if (corsContext && !corsContext.ok) return corsContext.response;
+        const hasAuth = !!deps?.toStr?.(withQuerySlugHeader.headers.get('authorization') || '').trim();
+        let address = '';
+        let scopes = {};
+        if (hasAuth) {
+          const auth = await deps?.requireAuth?.({ request: withQuerySlugHeader, env, baseHeaders: corsContext?.headers || routeBaseHeaders, slugHint: targetSlug });
+          if (!auth?.ok) return auth?.response;
+          address = deps?.toStr?.(auth.payload?.sub || '')?.trim?.().toLowerCase?.() || '';
+          scopes = auth.scopes || auth.payload?.scopes || {};
+        }
+        return await dispatchResultsAnalysisArtifactRequest({
+          request: withQuerySlugHeader,
+          env,
+          config,
+          slug: targetSlug,
+          address,
+          scopes,
+          headers: corsContext?.headers || routeBaseHeaders,
+          deps: {
+            json: deps?.json,
+            authorizeCloudflareStorageResourceRead: deps?.authorizeCloudflareStorageResourceRead,
+            readPublishedResultsAnalysisArtifact: deps?.readPublishedResultsAnalysisArtifact,
+            readCoordinatedResultsAnalysisStatus: deps?.readCoordinatedResultsAnalysisStatus,
+            evaluateResultsAnalysisViewerEligibility: deps?.evaluateResultsAnalysisViewerEligibility,
+            readResourceGateOnChain: deps?.readResourceGateOnChain,
+            resolveRegistryRpcUrls: deps?.resolveRegistryRpcUrls,
+            toRegistrySessionSlug: deps?.toRegistrySessionSlug,
+            resolveRpcUrlListForGate: deps?.resolveRpcUrlListForGate,
+            checkSbtGate: deps?.checkSbtGate,
           },
         });
       }
@@ -512,6 +611,15 @@ export const createWorkerRouteShellWithWorkerDeps = ({
                     transcribe: deps?.transcribe,
                     arweaveUpload: deps?.arweaveUpload,
                     storageRoute: deps?.storageRoute,
+                    authorizeCloudflareStorageResourceRead: deps?.authorizeCloudflareStorageResourceRead,
+                    readPublishedResultsAnalysisArtifact: deps?.readPublishedResultsAnalysisArtifact,
+                    readCoordinatedResultsAnalysisStatus: deps?.readCoordinatedResultsAnalysisStatus,
+                    evaluateResultsAnalysisViewerEligibility: deps?.evaluateResultsAnalysisViewerEligibility,
+                    readResourceGateOnChain: deps?.readResourceGateOnChain,
+                    resolveRegistryRpcUrls: deps?.resolveRegistryRpcUrls,
+                    toRegistrySessionSlug: deps?.toRegistrySessionSlug,
+                    resolveRpcUrlListForGate: deps?.resolveRpcUrlListForGate,
+                    checkSbtGate: deps?.checkSbtGate,
                     now: deps?.now,
                   },
                 })

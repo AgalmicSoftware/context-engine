@@ -115,6 +115,7 @@ export const resolveWorkerRuntimeDeps = ({
       fetch: deps?.fetch,
       rpcFetch: deps?.rpcFetch,
       now: deps?.now,
+      waitUntil: deps?.waitUntil,
       toStr: resolveDep('toStr', toStrBoundary),
       normalizeWorkerSessionSlug: resolveDep('normalizeWorkerSessionSlug', normalizeWorkerSessionSlugBoundary),
       normalizeRpcUrlList: resolveDep('normalizeRpcUrlList', normalizeRpcUrlListBoundary),

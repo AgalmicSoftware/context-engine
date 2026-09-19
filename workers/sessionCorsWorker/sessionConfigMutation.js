@@ -7,6 +7,7 @@ import {
 } from '../shared/workerSessionConfig.mjs';
 import { validateWorkerConfigModeValues } from '../shared/workerConfigModeValidation.mjs';
 import { normalizeWorkerSessionAppearance } from '../shared/sessionColorSchemeConfig.mjs';
+import { validResultsAnalysisSettings } from '../../shared/resultsAnalysisSettings.mjs';
 import {
   mergeWorkerConfigRecords,
   mergeWorkerLimitRecords,
@@ -59,6 +60,7 @@ const WORKER_CANONICAL_SET_CONFIG_KEYS = new Set([
   'contracts',
   'embeddedDeployHelperEnabled',
   'litCredentials',
+  'resultsAnalysis',
   WORKER_GROUPS_BOOTSTRAP_KEY,
 ]);
 
@@ -81,6 +83,11 @@ const validAllowOrigins = (config) =>
   config.allowOrigins.every((origin) => typeof origin !== 'string' || !origin.includes('*'));
 const validAppearanceConfig = (config) =>
   !hasOwn(config, 'appearance') || normalizeWorkerSessionAppearance(config.appearance) !== null;
+const validResultsAnalysisSettingsConfig = (config) => {
+  if (!hasOwn(config, 'resultsAnalysis')) return true;
+  return validResultsAnalysisSettings(config.resultsAnalysis);
+};
+
 const validInterviewModeConfig = (config) => {
   if (hasOwn(config, 'interviewModeEnabled') && typeof config.interviewModeEnabled !== 'boolean') return false;
   if (!hasOwn(config, 'interviewMode')) return true;
@@ -301,6 +308,9 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
     if (!validInterviewModeConfig(incomingConfig)) {
       return { ok: false, status: 400, error: 'Invalid interview mode config.' };
     }
+    if (!validResultsAnalysisSettingsConfig(incomingConfig)) {
+      return { ok: false, status: 400, error: 'Invalid results analysis settings config.' };
+    }
     // A patch may update the profile without resending the already-persisted
     // canonical storage object. The complete merged record below remains
     // strict and is the only record eligible for persistence.
@@ -360,6 +370,9 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
   }
   if (!validInterviewModeConfig(mergedConfig)) {
     return { ok: false, status: 400, error: 'Invalid interview mode config.' };
+  }
+  if (!validResultsAnalysisSettingsConfig(mergedConfig)) {
+    return { ok: false, status: 400, error: 'Invalid results analysis settings config.' };
   }
   const mergedModeValidation = validateWorkerConfigModeValues(mergedConfig);
   if (!mergedModeValidation.ok) {

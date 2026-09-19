@@ -2087,3 +2087,252 @@ test('SessionWriteCoordinator retries retryable direct deployment after mutable 
 	assert.equal(store.get('direct-deploy').state, 'terminal');
 	assert.doesNotMatch(JSON.stringify([...store.values()]), /token-before-drift|token-after-drift/);
 });
+
+test('SessionWriteCoordinator stores results-analysis drafts outside request ledger and replays by draft id', async () => {
+	const { state, store } = createTransactionalState();
+	const coordinator = new SessionWriteCoordinator(state, {}, { now: () => 1_000, crypto: { randomUUID: () => 'attempt-1' } });
+	const reservation = await coordinator.reserveResultsAnalysis({
+		requestId: 'req-1',
+		reservationKey: 'rk-1',
+		sourceSignature: 'source-1',
+		viewSignature: 'view-1',
+		refresh: true,
+		trigger: 'manual',
+	});
+	assert.deepEqual(reservation, { kind: 'execute', attemptId: 'attempt-1' });
+	const largeDraft = {
+		draftId: 'draft-1',
+		generatedAt: '2026-09-17T00:00:00.000Z',
+		artifact: { large: 'x'.repeat(130_000) },
+		snapshot: { responses: [{ answer: 'x'.repeat(130_000) }] },
+		source: { signature: 'source-1' },
+		sections: ['breakdown'],
+		participantWatermark: ['p1', 'p2'],
+	};
+	await coordinator.finalizeResultsAnalysis({
+		requestId: 'req-1',
+		reservationKey: 'rk-1',
+		attemptId: 'attempt-1',
+		success: true,
+		receipt: { ok: true, draft: largeDraft },
+	});
+	const ledger = store.get('results-analysis-v1');
+	assert.equal(ledger.requests['req-1'].draftId, 'draft-1');
+	assert.equal(ledger.requests['req-1'].receipt, undefined);
+	assert.equal(ledger.lastGood.participantWatermark, undefined);
+	const draftMeta = store.get('results-analysis-draft-v1');
+	assert.equal(draftMeta.chunked, true);
+	assert.ok(draftMeta.chunkCount > 1);
+	for (let index = 0; index < draftMeta.chunkCount; index += 1) {
+		assert.ok(new TextEncoder().encode(store.get(`results-analysis-draft-v1:chunk:${index}`)).length < 120_000);
+	}
+	const status = await coordinator.readResultsAnalysisStatus();
+	assert.equal(status.lastGood.artifact.large.length, 130_000);
+	assert.deepEqual(status.lastGood.participantWatermark, ['p1', 'p2']);
+	const replay = await coordinator.reserveResultsAnalysis({
+		requestId: 'req-1',
+		reservationKey: 'rk-1',
+		sourceSignature: 'source-1',
+		viewSignature: 'view-1',
+		refresh: true,
+		trigger: 'manual',
+	});
+	assert.equal(replay.kind, 'terminal');
+	assert.equal(replay.draft.draftId, 'draft-1');
+
+	const secondSuccess = await coordinator.reserveResultsAnalysis({
+		requestId: 'req-2',
+		reservationKey: 'rk-2',
+		sourceSignature: 'source-2',
+		viewSignature: 'view-1',
+		refresh: true,
+		trigger: 'manual',
+	});
+	assert.equal(secondSuccess.kind, 'execute');
+	await coordinator.finalizeResultsAnalysis({
+		requestId: 'req-2',
+		reservationKey: 'rk-2',
+		attemptId: secondSuccess.attemptId,
+		success: true,
+		receipt: { ok: true, draft: { ...largeDraft, draftId: 'draft-2', source: { signature: 'source-2' } } },
+	});
+	const oldReplay = await coordinator.reserveResultsAnalysis({
+		requestId: 'req-1',
+		reservationKey: 'rk-1',
+		sourceSignature: 'source-1',
+		viewSignature: 'view-1',
+		refresh: true,
+		trigger: 'manual',
+	});
+	assert.equal(oldReplay.kind, 'failed');
+	assert.equal(oldReplay.status, 409);
+
+	const second = await coordinator.reserveResultsAnalysis({
+		requestId: 'req-oversized',
+		reservationKey: 'rk-oversized',
+		sourceSignature: 'source-oversized',
+		viewSignature: 'view-1',
+		refresh: true,
+		trigger: 'manual',
+	});
+	assert.equal(second.kind, 'execute');
+	const oversizedResult = await coordinator.finalizeResultsAnalysis({
+		requestId: 'req-oversized',
+		reservationKey: 'rk-oversized',
+		attemptId: 'attempt-1',
+		success: true,
+		receipt: { ok: true, draft: { ...largeDraft, draftId: 'draft-too-large', artifact: { large: 'z'.repeat(1_700_000) } } },
+	});
+	assert.equal(oversizedResult.ok, false);
+	assert.equal(oversizedResult.status, 413);
+	const preserved = await coordinator.readResultsAnalysisStatus();
+	assert.equal(preserved.lastGood.draftId, 'draft-2');
+	assert.equal(preserved.jobState, 'failed');
+	assert.equal(preserved.active, null);
+	assert.equal(preserved.lastFailure.status, 413);
+	assert.equal(store.get('results-analysis-v1').requests['req-oversized'].state, 'failed');
+});
+
+test('SessionWriteCoordinator preserves queued results-analysis ACL and lock metadata', async () => {
+	const { state, store } = createTransactionalState();
+	const coordinator = new SessionWriteCoordinator(state, {}, { now: () => 1_000 });
+	const result = await coordinator.enqueueResultsAnalysisAutoJob({
+		slug: 'session-a',
+		requestId: 'auto-1',
+		committedResponses: [{
+			metadata: {
+				id: 'r1',
+				responder: '0x1111111111111111111111111111111111111111',
+				createdAt: '2026-09-17T00:00:00.000Z',
+				payloadAccessControl: { gate: 'group_gate', encryption: 'none', groupIds: ['private'] },
+			},
+			payload: { sessionSlug: 'session-a', questionId: 'q1', answer: { value: 'secret', ciphertext: 'cipher' }, additional: 'plain fragment' },
+		}],
+	});
+	assert.equal(result.ok, true);
+	const job = store.get('results-analysis-auto-job-v1');
+	assert.deepEqual(job.committedResponses[0].metadata.payloadAccessControl, { gate: 'group_gate', encryption: 'none', groupIds: ['private'] });
+	assert.equal(job.committedResponses[0].payload.locked, true);
+});
+
+
+test('SessionWriteCoordinator keeps below-threshold automatic jobs for bounded delayed rechecks', async () => {
+	let now = 1_000;
+	const alarms = [];
+	const { state, store } = createTransactionalState();
+	state.storage.setAlarm = async (timestamp) => alarms.push(timestamp);
+	const coordinator = new SessionWriteCoordinator(state, {}, {
+		now: () => now,
+		runResultsAnalysisAutoJob: async () => ({ ok: true, skipped: true, reason: 'threshold_not_met', newDistinctCount: 12, threshold: 100 }),
+	});
+	await coordinator.enqueueResultsAnalysisAutoJob({
+		slug: 'session-a',
+		requestId: 'auto-threshold',
+		committedResponses: [{
+			metadata: { id: 'r1', responder: '0x1111111111111111111111111111111111111111', createdAt: '2026-09-17T00:00:00.000Z' },
+			payload: { sessionSlug: 'session-a', questionId: 'q1', answer: 'a' },
+		}],
+	});
+	alarms.length = 0;
+	const first = await coordinator.runQueuedResultsAnalysisAutoJob();
+	assert.equal(first.reason, 'threshold_not_met');
+	assert.equal(first.recheckScheduled, true);
+	assert.equal(first.thresholdRecheckAttempts, 1);
+	assert.equal(alarms[0], 31_000);
+	assert.equal(store.get('results-analysis-auto-job-v1').thresholdRecheckAttempts, 1);
+	assert.equal((await coordinator.readResultsAnalysisStatus()).jobState, 'queued');
+
+	now = 2_000;
+	alarms.length = 0;
+	const second = await coordinator.runQueuedResultsAnalysisAutoJob();
+	assert.equal(second.recheckScheduled, true);
+	assert.equal(second.thresholdRecheckAttempts, 2);
+	assert.equal(alarms[0], 62_000);
+	assert.equal(store.get('results-analysis-auto-job-v1').thresholdRecheckAttempts, 2);
+
+	now = 3_000;
+	alarms.length = 0;
+	const terminalBelowThreshold = await coordinator.runQueuedResultsAnalysisAutoJob();
+	assert.equal(terminalBelowThreshold.reason, 'threshold_not_met');
+	assert.equal(terminalBelowThreshold.recheckScheduled, undefined);
+	assert.equal(store.has('results-analysis-auto-job-v1'), false);
+	assert.equal(alarms.length, 0);
+});
+
+test('SessionWriteCoordinator clears failed automatic queues so status surfaces retry state', async () => {
+	const { state, store } = createTransactionalState();
+	const coordinator = new SessionWriteCoordinator(state, {}, {
+		now: () => 1_000,
+		runResultsAnalysisAutoJob: async () => { throw new Error('provider unavailable'); },
+	});
+	await coordinator.enqueueResultsAnalysisAutoJob({
+		slug: 'session-a',
+		requestId: 'auto-fail',
+		committedResponses: [{
+			metadata: { id: 'r1', responder: '0x1111111111111111111111111111111111111111', createdAt: '2026-09-17T00:00:00.000Z' },
+			payload: { sessionSlug: 'session-a', questionId: 'q1', answer: 'a' },
+		}],
+	});
+	await coordinator.alarm();
+	assert.equal(store.has('results-analysis-auto-job-v1'), false);
+	const status = await coordinator.readResultsAnalysisStatus();
+	assert.equal(status.jobState, 'failed');
+	assert.equal(status.queued, null);
+	assert.equal(status.lastFailure.requestId, 'auto-fail');
+	assert.equal(status.lastFailure.error, 'provider unavailable');
+});
+
+test('SessionWriteCoordinator expires abandoned results-analysis leases and treats failed request replay as terminal', async () => {
+	let now = 1_000;
+	let attempt = 0;
+	const { state } = createTransactionalState();
+	const coordinator = new SessionWriteCoordinator(state, {}, {
+		now: () => now,
+		crypto: { randomUUID: () => `attempt-${++attempt}` },
+	});
+	const first = await coordinator.reserveResultsAnalysis({
+		requestId: 'req-1',
+		reservationKey: 'rk-1',
+		sourceSignature: 'source-1',
+		viewSignature: 'view-1',
+		refresh: true,
+		trigger: 'manual',
+	});
+	assert.equal(first.kind, 'execute');
+	const pending = await coordinator.reserveResultsAnalysis({
+		requestId: 'req-2',
+		reservationKey: 'rk-2',
+		sourceSignature: 'source-2',
+		viewSignature: 'view-1',
+		refresh: true,
+		trigger: 'manual',
+	});
+	assert.equal(pending.kind, 'pending');
+	now += 15 * 60 * 1000;
+	const recovered = await coordinator.reserveResultsAnalysis({
+		requestId: 'req-2',
+		reservationKey: 'rk-2',
+		sourceSignature: 'source-2',
+		viewSignature: 'view-1',
+		refresh: true,
+		trigger: 'manual',
+	});
+	assert.equal(recovered.kind, 'execute');
+	await coordinator.finalizeResultsAnalysis({
+		requestId: 'req-2',
+		reservationKey: 'rk-2',
+		attemptId: recovered.attemptId,
+		success: false,
+		receipt: { ok: false, status: 502, error: 'provider failed' },
+	});
+	const failedReplay = await coordinator.reserveResultsAnalysis({
+		requestId: 'req-2',
+		reservationKey: 'rk-2',
+		sourceSignature: 'source-2',
+		viewSignature: 'view-1',
+		refresh: true,
+		trigger: 'manual',
+	});
+	assert.equal(failedReplay.kind, 'failed');
+	assert.equal(failedReplay.error, 'provider failed');
+});

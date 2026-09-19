@@ -97,7 +97,7 @@ test('resolveWorkerRuntimeDeps preserves worker-local and imported dependency wi
   assert.deepEqual(
     resolveWorkerRuntimeDeps({ deps, constants }),
     {
-      deps,
+      deps: { ...deps, waitUntil: undefined },
       constants,
     },
   );

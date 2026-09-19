@@ -3600,3 +3600,58 @@ test('storageRoute lists Cloudflare refs from the metadata index without raw obj
 	assert.equal(body.items[0].storageRef.backend, 'cloudflare');
 	assert.doesNotMatch(JSON.stringify(body), /sessions\/session-a\/storage|bucket|token|secret/i);
 });
+
+test('storageRoute enqueues automatic results analysis after response upload without waitUntil generation', async () => {
+	const kv = createMockKv();
+	let enqueueArgs = null;
+	const config = {
+		storageProfile: {
+			backend: 'cloudflare',
+			payloadAccessControl: { gate: 'none', encryption: 'none' },
+		},
+		sessionModeProfile: {
+			authority: { mode: 'worker_canonical' },
+			storage: { backend: 'cloudflare' },
+		},
+		resultsAnalysis: {
+			version: 1,
+			generationMode: 'automatic',
+			views: { circles: true, breakdown: true, riskMatrix: true },
+			autoAfter: { threshold: 1, unit: 'distinctParticipants' },
+			inputScope: 'submitted',
+			publication: 'latest_success_visible',
+		},
+	};
+	const uploadResponse = await storageRoute({
+		path: '/storage/upload',
+		method: 'POST',
+		request: new Request('https://worker.example/storage/upload', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				data: { sessionSlug: 'session-a', questionId: 'q1', answer: 'yes' },
+				contentType: 'application/json',
+				resource: 'responses',
+			}),
+		}),
+		env: { CE_STORAGE_INDEX_KV: kv },
+		config,
+		slug: 'session-a',
+		uploaderAddress: '0x0000000000000000000000000000000000000abc',
+		baseHeaders: {},
+		deps: {
+			json,
+			randomBytes: fixedRandomBytes,
+			now: () => Date.parse('2026-01-02T03:04:05.000Z'),
+			enqueueResultsAnalysisAutoJob: async (args) => {
+				enqueueArgs = args;
+				return { ok: true, status: 202, queued: true };
+			},
+			waitUntil: () => { throw new Error('response uploads must not schedule provider generation with waitUntil'); },
+		},
+	});
+	assert.equal(uploadResponse.status, 200);
+	assert.equal(enqueueArgs.job.committedResponses.length, 1);
+	assert.equal(enqueueArgs.job.committedResponses[0].metadata.responder, '0x0000000000000000000000000000000000000abc');
+	assert.equal(enqueueArgs.job.requestId.startsWith('auto-upload:'), true);
+});

@@ -49,6 +49,7 @@ test('createWorkerRuntime preserves worker globals and static bundle wiring', ()
           fetch: 'fetch',
           rpcFetch: 'rpcFetch',
           now: 'now',
+          waitUntil: undefined,
         },
         constants: {
           OPENAI_TRANSCRIBE_URL: DEFAULT_OPENAI_TRANSCRIBE_URL,
