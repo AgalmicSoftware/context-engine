@@ -69,6 +69,7 @@ test('createWorkerRuntime preserves worker globals and static bundle wiring', ()
           TOKEN_TTL_SECONDS: 14400,
           NONCE_TTL_SECONDS: 300,
           NONCE_RATE_LIMIT_MAX: 5,
+          NONCE_SHARED_NETWORK_RATE_LIMIT_MAX: 300,
           NONCE_RATE_LIMIT_WINDOW_MS: 60000,
           NONCE_RATE_LIMIT_TTL_SECONDS: 60,
           USED_NONCE_TTL_SECONDS: 600,

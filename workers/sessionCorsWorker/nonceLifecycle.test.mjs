@@ -95,7 +95,7 @@ test('consumeNonce records durable replay verdicts without mutating KV mirrors',
   assert.equal(events[0].type, 'nonce_replays');
 });
 
-test('checkNonceRateLimit uses the caller identity and durable fixed-window verdict', async () => {
+test('checkNonceRateLimit enforces wallet and shared-network buckets separately', async () => {
   const calls = [];
   const result = await checkNonceRateLimit({
     env: {},
@@ -103,12 +103,17 @@ test('checkNonceRateLimit uses the caller identity and durable fixed-window verd
     identity: 'anon:cid:client_abc12345',
     address: '0xVictimWallet',
     limit: 2,
+    sharedNetworkLimit: 300,
     now: () => 123_456,
     windowMs: 60_000,
     ttlSeconds: 61,
     checkCoordinatedAuthRateLimit: async (value) => {
       calls.push(value);
-      return { ok: true, allowed: false, status: 200 };
+      return {
+        ok: true,
+        allowed: value.route === 'authNonceWallet',
+        status: 200,
+      };
     },
   });
 
@@ -117,9 +122,30 @@ test('checkNonceRateLimit uses the caller identity and durable fixed-window verd
     error: 'Too many nonce requests. Try again shortly.',
     retryAfterSeconds: 61,
   });
-  assert.equal(calls[0].identity, 'anon:cid:client_abc12345');
-  assert.equal(calls[0].route, 'authNonce');
+  assert.deepEqual(calls.map(({ route, identity }) => [route, identity]), [
+    ['authNonceWallet', '0xvictimwallet'],
+    ['authNonceNetwork', 'anon:cid:client_abc12345'],
+  ]);
   assert.equal(calls[0].windowMs, 60_000);
+});
+
+test('checkNonceRateLimit blocks a hot wallet before consuming shared-network headroom', async () => {
+  const calls = [];
+  const result = await checkNonceRateLimit({
+    env: {},
+    slug: 'session-a',
+    identity: 'anon:198.51.100.7',
+    address: '0xVictimWallet',
+    limit: 5,
+    sharedNetworkLimit: 300,
+    checkCoordinatedAuthRateLimit: async (value) => {
+      calls.push(value);
+      return { ok: true, allowed: false, status: 200 };
+    },
+  });
+
+  assert.equal(result.ok, false);
+  assert.deepEqual(calls.map(({ route }) => route), ['authNonceWallet']);
 });
 
 test('checkNonceRateLimit fails closed distinctly when durable coordination is unavailable', async () => {

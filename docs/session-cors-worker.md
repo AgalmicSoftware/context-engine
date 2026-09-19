@@ -1627,6 +1627,12 @@ login, and signed admin request bodies must carry that config's canonical
      `Nonce mismatch or expired.`, `Nonce already used.`, used-nonce TTL writes,
      and delete-on-success behavior across login, signed admin requests, and
      bootstrap admin verification.
+   - Nonce request rate limiting uses two coordinated fixed-window buckets per
+     session: a strict wallet bucket capped at 5 requests per address per
+     minute, and a shared-network bucket capped at 300 requests per minute.
+     In native Cloudflare runtime the shared-network bucket uses the platform
+     `CF-Connecting-IP`; outside that runtime, forwarded IP headers are ignored
+     and requests fall back to the bounded `anon:unknown` bucket.
 2. Build a SIWE message client-side and sign with `personal_sign`.
 3. `POST /auth/login` body:
    `{ address, message, signature, sessionSlug, sessionId }` for
@@ -1915,7 +1921,10 @@ Signed login/bootstrap requests:
   requirement for registry-canonical anonymous access.
 - Anonymous rate-identity normalization also routes through a shared helper:
   it preserves the existing Cloudflare-only `CF-Connecting-IP` trust rule, `X-Anonymous-Client-Id`
-  lowercasing/validation, and `anon:unknown` fallback used for anonymous rate limiting.
+  lowercasing/validation, and `anon:unknown` fallback used for anonymous route
+  rate limiting. Auth nonce shared-network limiting uses Cloudflare runtime IPs
+  or the bounded `anon:unknown` bucket; it does not use caller-controlled shard
+  ids.
 - Anonymous request slug resolution also routes through a shared helper:
   it preserves `X-Session-Slug` before legacy `X-Group-Slug`, still routes through worker slug canonicalization,
   and keeps the anonymous missing-explicit-slug contract before config lookup.

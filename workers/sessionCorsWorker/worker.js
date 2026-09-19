@@ -49,6 +49,7 @@ const FAUCET_SBT_GATE_ABI = [
 const TOKEN_TTL_SECONDS = 60 * 60 * 4;
 const NONCE_TTL_SECONDS = 60 * 5;
 const NONCE_RATE_LIMIT_MAX = 5;
+const NONCE_SHARED_NETWORK_RATE_LIMIT_MAX = 300;
 const NONCE_RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const NONCE_RATE_LIMIT_TTL_SECONDS = 60;
 const USED_NONCE_TTL_SECONDS = 60 * 10;
@@ -93,6 +94,7 @@ export const createWorkerRuntime = (env, overrides = {}) => {
     TOKEN_TTL_SECONDS,
     NONCE_TTL_SECONDS,
     NONCE_RATE_LIMIT_MAX,
+    NONCE_SHARED_NETWORK_RATE_LIMIT_MAX,
     NONCE_RATE_LIMIT_WINDOW_MS,
     NONCE_RATE_LIMIT_TTL_SECONDS,
     USED_NONCE_TTL_SECONDS,
@@ -240,6 +242,7 @@ export const createWorkerRuntime = (env, overrides = {}) => {
       slugMismatchError: resolved.constants.SLUG_MISMATCH_ERROR,
       nonceTtlSeconds: resolved.constants.NONCE_TTL_SECONDS,
       nonceRateLimitMax: resolved.constants.NONCE_RATE_LIMIT_MAX,
+      nonceSharedNetworkRateLimitMax: resolved.constants.NONCE_SHARED_NETWORK_RATE_LIMIT_MAX,
       nonceRateLimitWindowMs: resolved.constants.NONCE_RATE_LIMIT_WINDOW_MS,
       nonceRateLimitTtlSeconds: resolved.constants.NONCE_RATE_LIMIT_TTL_SECONDS,
       usedNonceTtlSeconds: resolved.constants.USED_NONCE_TTL_SECONDS,

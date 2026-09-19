@@ -357,15 +357,17 @@ test('dispatchAuthNonceRequest applies nonce rate limits before nonce creation',
     deps: createNonceDeps({
       now: () => 1234567890,
       NONCE_RATE_LIMIT_MAX: 5,
+      NONCE_SHARED_NETWORK_RATE_LIMIT_MAX: 300,
       NONCE_RATE_LIMIT_WINDOW_MS: 60000,
       NONCE_RATE_LIMIT_TTL_SECONDS: 60,
       checkNonceRateLimit: async (value) => {
         assert.deepEqual(value, {
           env: { GROUP_KV: {} },
           slug: 'session-a',
-          identity: 'anon:cid:client_abc12345',
+          identity: 'anon:unknown',
           address: '0xAbC',
           limit: 5,
+          sharedNetworkLimit: 300,
           now: value.now,
           windowMs: 60000,
           ttlSeconds: 60,
@@ -427,7 +429,7 @@ test('dispatchAuthNonceRequest preserves trusted admin nonce recovery when LOGIN
   });
 });
 
-test('dispatchAuthNonceRequest rate limits by requester identity rather than the claimed wallet address', async () => {
+test('dispatchAuthNonceRequest does not use caller-controlled ids for auth nonce shared-network limits', async () => {
   const identities = [];
   const env = { GROUP_KV: {} };
   const createRequest = (anonymousClientId) => ({
@@ -466,10 +468,7 @@ test('dispatchAuthNonceRequest rate limits by requester identity rather than the
 
   assert.equal(first.status, 200);
   assert.equal(second.status, 200);
-  assert.deepEqual(identities, [
-    'anon:cid:client_alpha01',
-    'anon:cid:client_beta0002',
-  ]);
+  assert.deepEqual(identities, ['anon:unknown', 'anon:unknown']);
 });
 
 

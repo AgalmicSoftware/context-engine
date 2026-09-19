@@ -251,6 +251,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
             MISSING_SLUG_ERROR: constants?.missingSlugError,
             NONCE_TTL_SECONDS: constants?.nonceTtlSeconds,
             NONCE_RATE_LIMIT_MAX: constants?.nonceRateLimitMax,
+            NONCE_SHARED_NETWORK_RATE_LIMIT_MAX: constants?.nonceSharedNetworkRateLimitMax,
             NONCE_RATE_LIMIT_WINDOW_MS: constants?.nonceRateLimitWindowMs,
             NONCE_RATE_LIMIT_TTL_SECONDS: constants?.nonceRateLimitTtlSeconds,
           },

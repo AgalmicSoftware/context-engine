@@ -286,6 +286,7 @@ export const createWorkerRouteRuntimeWithWorkerDeps = ({
       missingSlugError: constants?.missingSlugError,
       nonceTtlSeconds: constants?.nonceTtlSeconds,
       nonceRateLimitMax: constants?.nonceRateLimitMax,
+      nonceSharedNetworkRateLimitMax: constants?.nonceSharedNetworkRateLimitMax,
       nonceRateLimitWindowMs: constants?.nonceRateLimitWindowMs,
       nonceRateLimitTtlSeconds: constants?.nonceRateLimitTtlSeconds,
       usedNonceTtlSeconds: constants?.usedNonceTtlSeconds,

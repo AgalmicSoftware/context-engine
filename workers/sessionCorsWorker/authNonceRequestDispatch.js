@@ -1,10 +1,16 @@
 import {
-  resolveAnonymousRateIdentity,
-} from './anonymousRateIdentityNormalization.js';
-import {
   validateTrustedLoginRequestOrigin,
 } from './siweMessageValidation.js';
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
+
+const resolveAuthNonceSharedNetworkIdentity = ({ request, deps } = {}) => {
+  const isCloudflareRuntime = !!(request?.cf && typeof request.cf === 'object');
+  if (isCloudflareRuntime) {
+    const cfIp = String(deps?.toStr?.(request?.headers?.get('CF-Connecting-IP')) ?? '').trim().toLowerCase();
+    if (cfIp) return `anon:${cfIp}`;
+  }
+  return 'anon:unknown';
+};
 
 export const dispatchAuthNonceRequest = async ({
   request,
@@ -91,22 +97,14 @@ export const dispatchAuthNonceRequest = async ({
     return deps?.json?.({ error: 'Session identity does not match worker session.' }, 409, headers);
   }
 
-  const rateLimitIdentity = (
-    typeof deps?.resolveAnonymousRateIdentity === 'function'
-      ? deps.resolveAnonymousRateIdentity(request)
-      : resolveAnonymousRateIdentity({
-        request,
-        deps: {
-          toStr: deps?.toStr,
-        },
-      })
-  );
+  const rateLimitIdentity = resolveAuthNonceSharedNetworkIdentity({ request, deps });
   const rateLimitResult = await deps?.checkNonceRateLimit?.({
     env,
     slug: targetSlug,
     identity: rateLimitIdentity,
     address,
     limit: deps?.NONCE_RATE_LIMIT_MAX,
+    sharedNetworkLimit: deps?.NONCE_SHARED_NETWORK_RATE_LIMIT_MAX,
     now: deps?.now,
     windowMs: deps?.NONCE_RATE_LIMIT_WINDOW_MS,
     ttlSeconds: deps?.NONCE_RATE_LIMIT_TTL_SECONDS,

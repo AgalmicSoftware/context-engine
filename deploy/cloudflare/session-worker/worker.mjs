@@ -78175,6 +78175,14 @@ var dispatchResultsAnalysisArtifactRequest = async ({
 
 // workers/sessionCorsWorker/authNonceRequestDispatch.js
 init_sessionConfigMutation();
+var resolveAuthNonceSharedNetworkIdentity = ({ request, deps } = {}) => {
+  const isCloudflareRuntime = !!(request?.cf && typeof request.cf === "object");
+  if (isCloudflareRuntime) {
+    const cfIp = String(deps?.toStr?.(request?.headers?.get("CF-Connecting-IP")) ?? "").trim().toLowerCase();
+    if (cfIp) return `anon:${cfIp}`;
+  }
+  return "anon:unknown";
+};
 var dispatchAuthNonceRequest = async ({
   request,
   env,
@@ -78247,18 +78255,14 @@ var dispatchAuthNonceRequest = async ({
   if (workerCanonical && requestedSessionId !== sessionId) {
     return deps?.json?.({ error: "Session identity does not match worker session." }, 409, headers);
   }
-  const rateLimitIdentity = typeof deps?.resolveAnonymousRateIdentity === "function" ? deps.resolveAnonymousRateIdentity(request) : resolveAnonymousRateIdentity({
-    request,
-    deps: {
-      toStr: deps?.toStr
-    }
-  });
+  const rateLimitIdentity = resolveAuthNonceSharedNetworkIdentity({ request, deps });
   const rateLimitResult = await deps?.checkNonceRateLimit?.({
     env,
     slug: targetSlug,
     identity: rateLimitIdentity,
     address,
     limit: deps?.NONCE_RATE_LIMIT_MAX,
+    sharedNetworkLimit: deps?.NONCE_SHARED_NETWORK_RATE_LIMIT_MAX,
     now: deps?.now,
     windowMs: deps?.NONCE_RATE_LIMIT_WINDOW_MS,
     ttlSeconds: deps?.NONCE_RATE_LIMIT_TTL_SECONDS,
@@ -78584,6 +78588,7 @@ var DEFAULT_USED_NONCE_TTL_SECONDS = 60 * 10;
 var DEFAULT_NONCE_RATE_LIMIT_WINDOW_MS = 60 * 1e3;
 var DEFAULT_NONCE_RATE_LIMIT_TTL_SECONDS = 60;
 var DEFAULT_NONCE_RATE_LIMIT_MAX = 5;
+var DEFAULT_NONCE_SHARED_NETWORK_RATE_LIMIT_MAX = 300;
 var recordAbuseEventBestEffort = async ({
   env,
   type,
@@ -78674,38 +78679,59 @@ var checkNonceRateLimit = async ({
   identity,
   address,
   limit = DEFAULT_NONCE_RATE_LIMIT_MAX,
+  sharedNetworkLimit = DEFAULT_NONCE_SHARED_NETWORK_RATE_LIMIT_MAX,
   now,
   windowMs = DEFAULT_NONCE_RATE_LIMIT_WINDOW_MS,
   ttlSeconds = DEFAULT_NONCE_RATE_LIMIT_TTL_SECONDS,
   recordAbuseEvent: recordAbuseEvent2,
   checkCoordinatedAuthRateLimit: checkCoordinatedAuthRateLimit2
 } = {}) => {
-  const numericLimit = Number(limit);
-  if (!Number.isFinite(numericLimit) || numericLimit <= 0) return { ok: true };
+  const numericWalletLimit = Number(limit);
+  const numericSharedNetworkLimit = Number(sharedNetworkLimit);
+  if ((!Number.isFinite(numericWalletLimit) || numericWalletLimit <= 0) && (!Number.isFinite(numericSharedNetworkLimit) || numericSharedNetworkLimit <= 0)) {
+    return { ok: true };
+  }
   const numericWindowMs = Number.isFinite(Number(windowMs)) && Number(windowMs) > 0 ? Number(windowMs) : DEFAULT_NONCE_RATE_LIMIT_WINDOW_MS;
   const normalizedIdentity = String(identity || "").trim().toLowerCase();
   const fallbackIdentity = String(address || "").trim().toLowerCase();
-  const rateIdentity = normalizedIdentity || fallbackIdentity || "unknown";
+  const walletIdentity = fallbackIdentity || "unknown-wallet";
+  const networkIdentity = normalizedIdentity || "unknown-network";
   const sessionSlug = String(slug || "").trim();
   const expirationTtl = Number.isFinite(Number(ttlSeconds)) && Number(ttlSeconds) > 0 ? Number(ttlSeconds) : DEFAULT_NONCE_RATE_LIMIT_TTL_SECONDS;
   const coordinate = checkCoordinatedAuthRateLimit2 || checkCoordinatedAuthRateLimit;
-  const result = await coordinate({
-    env,
-    slug: sessionSlug,
-    route: "authNonce",
-    identity: rateIdentity,
-    limit: numericLimit,
-    windowMs: numericWindowMs,
-    now
+  const runLimitCheck = async ({ route, rateIdentity, numericLimit }) => {
+    if (!Number.isFinite(numericLimit) || numericLimit <= 0) return { ok: true, allowed: true };
+    const result = await coordinate({
+      env,
+      slug: sessionSlug,
+      route,
+      identity: rateIdentity,
+      limit: numericLimit,
+      windowMs: numericWindowMs,
+      now
+    });
+    if (!result?.ok) {
+      return {
+        ok: false,
+        status: Number(result?.status || 0) || 503,
+        error: result?.error || "Authorization state coordination is unavailable."
+      };
+    }
+    return result;
+  };
+  const walletResult = await runLimitCheck({
+    route: "authNonceWallet",
+    rateIdentity: walletIdentity,
+    numericLimit: numericWalletLimit
   });
-  if (!result?.ok) {
-    return {
-      ok: false,
-      status: Number(result?.status || 0) || 503,
-      error: result?.error || "Authorization state coordination is unavailable."
-    };
-  }
-  if (!result?.allowed) {
+  if (!walletResult?.ok) return walletResult;
+  const networkResult = walletResult?.allowed ? await runLimitCheck({
+    route: "authNonceNetwork",
+    rateIdentity: networkIdentity,
+    numericLimit: numericSharedNetworkLimit
+  }) : walletResult;
+  if (!networkResult?.ok) return networkResult;
+  if (!walletResult?.allowed || !networkResult?.allowed) {
     await recordAbuseEventBestEffort({
       env,
       type: ABUSE_COUNTER_TYPES.RATE_LIMIT_TRIP,
@@ -79701,6 +79727,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
             MISSING_SLUG_ERROR: constants?.missingSlugError,
             NONCE_TTL_SECONDS: constants?.nonceTtlSeconds,
             NONCE_RATE_LIMIT_MAX: constants?.nonceRateLimitMax,
+            NONCE_SHARED_NETWORK_RATE_LIMIT_MAX: constants?.nonceSharedNetworkRateLimitMax,
             NONCE_RATE_LIMIT_WINDOW_MS: constants?.nonceRateLimitWindowMs,
             NONCE_RATE_LIMIT_TTL_SECONDS: constants?.nonceRateLimitTtlSeconds
           }
@@ -80363,6 +80390,7 @@ var createWorkerRouteRuntimeWithWorkerDeps = ({
       missingSlugError: constants?.missingSlugError,
       nonceTtlSeconds: constants?.nonceTtlSeconds,
       nonceRateLimitMax: constants?.nonceRateLimitMax,
+      nonceSharedNetworkRateLimitMax: constants?.nonceSharedNetworkRateLimitMax,
       nonceRateLimitWindowMs: constants?.nonceRateLimitWindowMs,
       nonceRateLimitTtlSeconds: constants?.nonceRateLimitTtlSeconds,
       usedNonceTtlSeconds: constants?.usedNonceTtlSeconds,
@@ -81299,6 +81327,7 @@ var resolveWorkerRuntimeDeps = ({
       TOKEN_TTL_SECONDS: constants?.TOKEN_TTL_SECONDS,
       NONCE_TTL_SECONDS: constants?.NONCE_TTL_SECONDS,
       NONCE_RATE_LIMIT_MAX: constants?.NONCE_RATE_LIMIT_MAX,
+      NONCE_SHARED_NETWORK_RATE_LIMIT_MAX: constants?.NONCE_SHARED_NETWORK_RATE_LIMIT_MAX,
       NONCE_RATE_LIMIT_WINDOW_MS: constants?.NONCE_RATE_LIMIT_WINDOW_MS,
       NONCE_RATE_LIMIT_TTL_SECONDS: constants?.NONCE_RATE_LIMIT_TTL_SECONDS,
       USED_NONCE_TTL_SECONDS: constants?.USED_NONCE_TTL_SECONDS,
@@ -81355,6 +81384,7 @@ var FAUCET_SBT_GATE_ABI = [
 var TOKEN_TTL_SECONDS = 60 * 60 * 4;
 var NONCE_TTL_SECONDS = 60 * 5;
 var NONCE_RATE_LIMIT_MAX = 5;
+var NONCE_SHARED_NETWORK_RATE_LIMIT_MAX = 300;
 var NONCE_RATE_LIMIT_WINDOW_MS = 60 * 1e3;
 var NONCE_RATE_LIMIT_TTL_SECONDS = 60;
 var USED_NONCE_TTL_SECONDS = 60 * 10;
@@ -81393,6 +81423,7 @@ var createWorkerRuntime = (env, overrides = {}) => {
     TOKEN_TTL_SECONDS,
     NONCE_TTL_SECONDS,
     NONCE_RATE_LIMIT_MAX,
+    NONCE_SHARED_NETWORK_RATE_LIMIT_MAX,
     NONCE_RATE_LIMIT_WINDOW_MS,
     NONCE_RATE_LIMIT_TTL_SECONDS,
     USED_NONCE_TTL_SECONDS,
@@ -81534,6 +81565,7 @@ var createWorkerRuntime = (env, overrides = {}) => {
       slugMismatchError: resolved.constants.SLUG_MISMATCH_ERROR,
       nonceTtlSeconds: resolved.constants.NONCE_TTL_SECONDS,
       nonceRateLimitMax: resolved.constants.NONCE_RATE_LIMIT_MAX,
+      nonceSharedNetworkRateLimitMax: resolved.constants.NONCE_SHARED_NETWORK_RATE_LIMIT_MAX,
       nonceRateLimitWindowMs: resolved.constants.NONCE_RATE_LIMIT_WINDOW_MS,
       nonceRateLimitTtlSeconds: resolved.constants.NONCE_RATE_LIMIT_TTL_SECONDS,
       usedNonceTtlSeconds: resolved.constants.USED_NONCE_TTL_SECONDS,
