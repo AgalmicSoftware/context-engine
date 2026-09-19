@@ -2,6 +2,7 @@ import { useInterviewReadiness } from './useInterviewReadiness';
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import SessionVoiceModeModal from './SessionVoiceModeModal';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
   buildExternalInterviewKickoff,
@@ -12,7 +13,7 @@ import { startSessionRealtimeInterview } from '../../utilities/audio/realtimeInt
 
 jest.mock('./CreateQuestionsAndSurveys', () => ({
   __esModule: true,
-  default: () => <div>Question creation editor</div>,
+  default: () => <div data-testid="mock-create-questions">Question creation editor</div>,
 }));
 
 jest.mock('./useInterviewReadiness', () => ({
@@ -55,7 +56,10 @@ const baseProps = {
   onSelectMode: jest.fn(),
   onClose: jest.fn(),
   onSubmitResponses: jest.fn(),
+  toggleLoginModal: jest.fn(),
   sessionSlug: 'demo',
+  account: '0x0000000000000000000000000000000000000001',
+  loginComplete: true,
   workerUrl: 'https://worker.example',
   questionPool: [{ id: 'q1', prompt: 'What matters?', type: 'freeform' }],
   existingResponseSlice: null,
@@ -71,6 +75,19 @@ const mockedHashInterviewQuestions = jest.mocked(hashInterviewQuestions);
 const mockedMapInterviewEvidenceToResponses = jest.mocked(mapInterviewEvidenceToResponses);
 const mockedStartSessionRealtimeInterview = jest.mocked(startSessionRealtimeInterview);
 
+const buildAllowedSuggestionSessionConfig = () => ({
+  slug: 'demo',
+  sessionId: `0x${'1'.repeat(32)}`,
+  corsWorkerUrl: 'https://worker.example/',
+  interviewMode: { suggestQuestions: true },
+  sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+  workerAuthority: { version: 1, participantScopes: ['storage'], anonymousScopes: [] },
+  storageProfile: {
+    backend: 'cloudflare',
+    resources: { questions: 'active', surveys: 'active' },
+    payloadAccessControl: { gate: 'none', encryption: 'none' },
+  },
+});
 
 const editableButtonName = (label: string) => `${label}. Activate to edit.`;
 
@@ -98,6 +115,7 @@ describe('SessionVoiceModeModal', () => {
       configurable: true,
       value: { writeText: jest.fn(async () => undefined) },
     });
+    baseProps.onSubmitResponses.mockResolvedValue({ status: 'submitted' });
     mockedHashInterviewQuestions.mockResolvedValue('a'.repeat(64));
     mockedMapInterviewEvidenceToResponses.mockResolvedValue([]);
   });
@@ -122,7 +140,7 @@ describe('SessionVoiceModeModal', () => {
       <SessionVoiceModeModal
         {...baseProps}
         mode="interview"
-        sessionConfig={{ interviewMode: { suggestQuestions: true } }}
+        sessionConfig={buildAllowedSuggestionSessionConfig()}
         prefillPacket={{
           version: 1,
           sessionSlug: 'demo',
@@ -148,6 +166,7 @@ describe('SessionVoiceModeModal', () => {
       <SessionVoiceModeModal
         {...baseProps}
         mode="interview"
+        sessionConfig={buildAllowedSuggestionSessionConfig()}
         prefillPacket={{
           version: 1,
           sessionSlug: 'demo',
@@ -340,6 +359,384 @@ describe('SessionVoiceModeModal', () => {
     expect(baseProps.onRecordProvenance.mock.invocationCallOrder[0]).toBeLessThan(
       baseProps.onSubmitResponses.mock.invocationCallOrder[0],
     );
+  });
+
+
+  it('waits for an identity-bound response readiness token after login', async () => {
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([
+      { questionId: 'q1', answer: 'Original prediction', evidence: 'Related memory', confidence: 0.81 },
+    ]);
+    const onSubmitResponses = jest
+      .fn()
+      .mockResolvedValueOnce({ status: 'login-required' })
+      .mockResolvedValueOnce({ status: 'submitted' });
+    const prefillPacket = {
+      version: 1 as const,
+      sessionSlug: 'demo',
+      questionSetHash: 'a'.repeat(64),
+      promptVersion: 'ce-interview-brief-v1',
+      source: { platform: 'chatgpt' as const, modelId: 'gpt-example', verification: 'self_reported' as const },
+      responderContext: { summary: 'Relevant context' },
+    };
+    const submitContextToken = 'demo|111|worker-a|session-a';
+    const account = '0x0000000000000000000000000000000000000001';
+    const view = render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        loginComplete={false}
+        account=""
+        submitContextToken={submitContextToken}
+        prefillPacket={prefillPacket}
+        onSubmitResponses={onSubmitResponses}
+      />,
+    );
+
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    await editReadableDraftText('Draft answer for What matters?', 'Reviewed after login');
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    await waitFor(() => expect(onSubmitResponses).toHaveBeenCalledTimes(1));
+
+    view.rerender(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        loginComplete
+        account={account}
+        isResponsesCacheReady
+        responseReadinessContextToken=""
+        submitContextToken={submitContextToken}
+        prefillPacket={prefillPacket}
+        onSubmitResponses={onSubmitResponses}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Waiting for session data'));
+    expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();
+    expect(onSubmitResponses).toHaveBeenCalledTimes(1);
+
+    view.rerender(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        loginComplete
+        account={account}
+        isResponsesCacheReady
+        responseReadinessContextToken={`${submitContextToken}|${account}|true`}
+        submitContextToken={submitContextToken}
+        prefillPacket={prefillPacket}
+        onSubmitResponses={onSubmitResponses}
+      />,
+    );
+
+    await waitFor(() => expect(baseProps.onApplyAnswer).toHaveBeenCalledWith('q1', 'Reviewed after login'));
+    expect(onSubmitResponses).toHaveBeenCalledTimes(2);
+  });
+
+  it('opens the normal login modal when a logged-out draft submit is deferred', async () => {
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([
+      { questionId: 'q1', answer: 'Original prediction', evidence: 'Related memory', confidence: 0.81 },
+    ]);
+    const onSubmitResponses = jest.fn().mockResolvedValue(undefined);
+    const prefillPacket = {
+      version: 1 as const,
+      sessionSlug: 'demo',
+      questionSetHash: 'a'.repeat(64),
+      promptVersion: 'ce-interview-brief-v1',
+      source: { platform: 'chatgpt' as const, modelId: 'gpt-example', verification: 'self_reported' as const },
+      responderContext: { summary: 'Relevant context' },
+    };
+
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        loginComplete={false}
+        account=""
+        prefillPacket={prefillPacket}
+        onSubmitResponses={onSubmitResponses}
+      />,
+    );
+
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+
+    await waitFor(() => expect(onSubmitResponses).toHaveBeenCalledTimes(1));
+    expect(baseProps.toggleLoginModal).toHaveBeenCalledWith(true);
+    expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Log in to submit');
+  });
+
+
+  it('preserves reviewed drafts while logged out and submits them after login completes', async () => {
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([
+      { questionId: 'q1', answer: 'Original prediction', evidence: 'Related memory', confidence: 0.81 },
+    ]);
+    const onSubmitResponses = jest
+      .fn()
+      .mockResolvedValueOnce({ status: 'login-required' })
+      .mockResolvedValueOnce({ status: 'submitted' });
+    const prefillPacket = {
+      version: 1 as const,
+      sessionSlug: 'demo',
+      questionSetHash: 'a'.repeat(64),
+      promptVersion: 'ce-interview-brief-v1',
+      source: { platform: 'chatgpt' as const, modelId: 'gpt-example', verification: 'self_reported' as const },
+      responderContext: { summary: 'Relevant context' },
+    };
+    const view = render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        loginComplete={false}
+        account=""
+        prefillPacket={prefillPacket}
+        onSubmitResponses={onSubmitResponses}
+      />,
+    );
+
+    expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).toBeInTheDocument();
+    await editReadableDraftText('Draft answer for What matters?', 'Reviewed after login');
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+
+    await waitFor(() => expect(onSubmitResponses).toHaveBeenCalledTimes(1));
+    expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();
+    expect(baseProps.onRecordProvenance).not.toHaveBeenCalled();
+    expect(baseProps.onClose).not.toHaveBeenCalled();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Log in to submit');
+    expect(await screen.findByRole('button', { name: /Draft answer for What matters/i })).toHaveTextContent(
+      'Reviewed after login',
+    );
+
+    view.rerender(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        loginComplete
+        account="0x0000000000000000000000000000000000000001"
+        isResponsesCacheReady={false}
+        prefillPacket={prefillPacket}
+        onSubmitResponses={onSubmitResponses}
+      />,
+    );
+
+    await waitFor(() => expect(onSubmitResponses).toHaveBeenCalledTimes(1));
+    expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();
+
+    view.rerender(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        loginComplete
+        account="0x0000000000000000000000000000000000000001"
+        isResponsesCacheReady
+        prefillPacket={prefillPacket}
+        onSubmitResponses={onSubmitResponses}
+      />,
+    );
+
+    await waitFor(() => expect(baseProps.onApplyAnswer).toHaveBeenCalledWith('q1', 'Reviewed after login'));
+    await waitFor(() => expect(onSubmitResponses).toHaveBeenCalledTimes(2));
+    expect(baseProps.onRecordProvenance).toHaveBeenCalled();
+    expect(baseProps.onClose).not.toHaveBeenCalled();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Responses submitted');
+  });
+
+
+  it('cancels deferred submit when login is dismissed before authentication', async () => {
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([
+      { questionId: 'q1', answer: 'Original prediction', evidence: 'Related memory', confidence: 0.81 },
+    ]);
+    const onSubmitResponses = jest.fn().mockResolvedValue({ status: 'login-required' });
+    const prefillPacket = {
+      version: 1 as const,
+      sessionSlug: 'demo',
+      questionSetHash: 'a'.repeat(64),
+      promptVersion: 'ce-interview-brief-v1',
+      source: { platform: 'chatgpt' as const, modelId: 'gpt-example', verification: 'self_reported' as const },
+      responderContext: { summary: 'Relevant context' },
+    };
+    const view = render(
+      <SessionVoiceModeModal {...baseProps} mode="interview" loginComplete={false} account="" prefillPacket={prefillPacket} onSubmitResponses={onSubmitResponses} />,
+    );
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    await waitFor(() => expect(onSubmitResponses).toHaveBeenCalledTimes(1));
+
+    view.rerender(<SessionVoiceModeModal {...baseProps} mode="interview" loginComplete={false} account="" loginModalToggled prefillPacket={prefillPacket} onSubmitResponses={onSubmitResponses} />);
+    view.rerender(<SessionVoiceModeModal {...baseProps} mode="interview" loginComplete={false} account="" loginModalToggled={false} prefillPacket={prefillPacket} onSubmitResponses={onSubmitResponses} />);
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Login required');
+
+    view.rerender(<SessionVoiceModeModal {...baseProps} mode="interview" loginComplete account="0x0000000000000000000000000000000000000001" prefillPacket={prefillPacket} onSubmitResponses={onSubmitResponses} />);
+    await waitFor(() => expect(onSubmitResponses).toHaveBeenCalledTimes(1));
+    expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();
+  });
+
+
+  it('does not apply signed-in drafts after the hydrated account changes', async () => {
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([
+      { questionId: 'q1', answer: 'Original prediction', evidence: 'Related memory', confidence: 0.81 },
+    ]);
+    const prefillPacket = {
+      version: 1 as const,
+      sessionSlug: 'demo',
+      questionSetHash: 'a'.repeat(64),
+      promptVersion: 'ce-interview-brief-v1',
+      source: { platform: 'chatgpt' as const, modelId: 'gpt-example', verification: 'self_reported' as const },
+      responderContext: { summary: 'Relevant context' },
+    };
+    const view = render(
+      <SessionVoiceModeModal {...baseProps} mode="interview" loginComplete account="0x0000000000000000000000000000000000000001" isResponsesCacheReady={false} submitContextToken="demo|111" prefillPacket={prefillPacket} />,
+    );
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Waiting for session data');
+
+    view.rerender(
+      <SessionVoiceModeModal {...baseProps} mode="interview" loginComplete account="0x0000000000000000000000000000000000000002" isResponsesCacheReady submitContextToken="demo|111" prefillPacket={prefillPacket} />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Review drafts'));
+    expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();
+    expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
+  });
+
+  it('drops deferred interview drafts when the session context changes before login completes', async () => {
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([
+      { questionId: 'q1', answer: 'Original prediction', evidence: 'Related memory', confidence: 0.81 },
+    ]);
+    const onSubmitResponses = jest
+      .fn()
+      .mockResolvedValueOnce({ status: 'login-required' })
+      .mockResolvedValueOnce({ status: 'submitted' });
+    const prefillPacket = {
+      version: 1 as const,
+      sessionSlug: 'demo',
+      questionSetHash: 'a'.repeat(64),
+      promptVersion: 'ce-interview-brief-v1',
+      source: { platform: 'chatgpt' as const, modelId: 'gpt-example', verification: 'self_reported' as const },
+      responderContext: { summary: 'Relevant context' },
+    };
+    const view = render(
+      <SessionVoiceModeModal {...baseProps} mode="interview" loginComplete={false} account="" submitContextToken="demo|1" prefillPacket={prefillPacket} onSubmitResponses={onSubmitResponses} />,
+    );
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    await waitFor(() => expect(onSubmitResponses).toHaveBeenCalledTimes(1));
+
+    view.rerender(
+      <SessionVoiceModeModal {...baseProps} mode="interview" loginComplete account="0x0000000000000000000000000000000000000001" submitContextToken="other-session|1" prefillPacket={prefillPacket} onSubmitResponses={onSubmitResponses} />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Review drafts'));
+    expect(onSubmitResponses).toHaveBeenCalledTimes(1);
+    expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();
+  });
+
+
+  it('drops deferred interview drafts when Worker identity changes on the same route before login completes', async () => {
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([
+      { questionId: 'q1', answer: 'Original prediction', evidence: 'Related memory', confidence: 0.81 },
+    ]);
+    const onSubmitResponses = jest
+      .fn()
+      .mockResolvedValueOnce({ status: 'login-required' })
+      .mockResolvedValueOnce({ status: 'submitted' });
+    const prefillPacket = {
+      version: 1 as const,
+      sessionSlug: 'demo',
+      questionSetHash: 'a'.repeat(64),
+      promptVersion: 'ce-interview-brief-v1',
+      source: { platform: 'chatgpt' as const, modelId: 'gpt-example', verification: 'self_reported' as const },
+      responderContext: { summary: 'Relevant context' },
+    };
+    const view = render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        loginComplete={false}
+        account=""
+        submitContextToken="demo|111|worker-a|session-a"
+        prefillPacket={prefillPacket}
+        onSubmitResponses={onSubmitResponses}
+      />,
+    );
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    await waitFor(() => expect(onSubmitResponses).toHaveBeenCalledTimes(1));
+
+    view.rerender(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        loginComplete
+        account="0x0000000000000000000000000000000000000001"
+        isResponsesCacheReady
+        responseReadinessContextToken="demo|111|worker-b|session-b|0x0000000000000000000000000000000000000001|true"
+        submitContextToken="demo|111|worker-b|session-b"
+        prefillPacket={prefillPacket}
+        onSubmitResponses={onSubmitResponses}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Review drafts'));
+    expect(onSubmitResponses).toHaveBeenCalledTimes(1);
+    expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();
+  });
+
+  it('keeps suggested questions mounted but read-only when the signed-in account cannot author', async () => {
+    mockedMapInterviewEvidenceToResponses.mockImplementation(async ({ onSuggestedQuestions }) => {
+      onSuggestedQuestions?.([{ id: 'new', type: 'freeform', prompt: 'Which AI risks are overlooked?', tags: [] }]);
+      return [];
+    });
+    const view = render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        loginComplete={false}
+        account=""
+        sessionConfig={{
+          interviewMode: { suggestQuestions: true },
+          sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+          workerAuthority: { version: 1, participantScopes: ['storage'] },
+          storageProfile: { backend: 'cloudflare', resources: { questions: 'active' } },
+        }}
+        prefillPacket={{
+          version: 1,
+          sessionSlug: 'demo',
+          source: { platform: 'other', modelId: 'unknown', verification: 'self_reported' },
+          responderContext: { summary: 'AI risks deserve discussion.' },
+        }}
+      />,
+    );
+
+    await screen.findByText('Suggested new questions (1)');
+    expect(screen.getByTestId('mock-create-questions')).toBeVisible();
+
+    view.rerender(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        loginComplete
+        account="0x0000000000000000000000000000000000000002"
+        sessionConfig={{
+          interviewMode: { suggestQuestions: true },
+          sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+          workerAuthority: { version: 1, participantScopes: ['ai'] },
+          storageProfile: { backend: 'cloudflare', resources: { questions: 'active' } },
+        }}
+        prefillPacket={{
+          version: 1,
+          sessionSlug: 'demo',
+          source: { platform: 'other', modelId: 'unknown', verification: 'self_reported' },
+          responderContext: { summary: 'AI risks deserve discussion.' },
+        }}
+      />,
+    );
+
+    expect(screen.queryByRole('heading', { name: 'Suggested new questions (1)' })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Suggested new questions (1)', hidden: true }).closest('details')).not.toBeVisible();
+    expect(screen.getByTestId('mock-create-questions')).not.toBeVisible();
   });
 
   it('offers the two large requested voice-mode choices', () => {
@@ -632,7 +1029,8 @@ describe('SessionVoiceModeModal', () => {
         expect.any(Array),
       ),
     );
-    await waitFor(() => expect(baseProps.onClose).toHaveBeenCalled());
+    expect(baseProps.onClose).not.toHaveBeenCalled();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Responses submitted');
   });
 
   it('reviews agent-authored predictions with confidence without remapping or misattributing them', async () => {
@@ -840,7 +1238,8 @@ describe('SessionVoiceModeModal', () => {
         expect.any(Array),
       ),
     );
-    await waitFor(() => expect(baseProps.onClose).toHaveBeenCalled());
+    expect(baseProps.onClose).not.toHaveBeenCalled();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Responses submitted');
   });
 
   it('keeps an imported responder name private until the responder opts in', async () => {

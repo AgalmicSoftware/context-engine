@@ -25,6 +25,7 @@ type SurveyPageProps = {
   provider?: unknown;
   loginComplete?: boolean;
   loginInProgress?: boolean;
+  loginModalToggled?: boolean;
   network?: { id?: number; chainId?: number; name?: string };
   isSBTCacheReady?: boolean;
   isSurveyCacheReady?: boolean;

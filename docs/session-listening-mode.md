@@ -117,7 +117,7 @@ Live capacity notes for 100-person tests, checked September 19, 2026:
 - Authenticated submission paths still request Worker nonces. The Worker constants set `NONCE_RATE_LIMIT_MAX = 5` per minute, and nonce issuance uses the trusted Cloudflare/anonymous rate identity in `authNonceRequestDispatch`. A same-venue Wi-Fi test can bottleneck on nonce issuance before it demonstrates 100 independent live voices or submissions.
 - A read-only 100-browser GET test is not equivalent to 100 live voice sessions plus response submissions. Headless browser coverage can use virtual WebAuthn PRF for auth flows, but it should be planned as a separate load profile from read-only page fetches.
 
-Suggested questions follow the response drafts in an expandable **Suggested new questions** section, initially open, using pile-style question cards with editable prompts and tags. Interview review hides the survey/questions toggle and manual question-type selector; the normal authoring surface retains them. A help tooltip beside the section heading explains that suggestions remain drafts until uploaded. Both review sections use matching headings and support keyboard collapse/expand without losing edits. Questions can be edited or removed and require the normal explicit creation/sign-in/permission flow; stopping an interview and submitting response drafts do not create questions. Suggestions share the response-mapping request, avoiding an extra model round trip. That request also generates short, non-identifying tags, prefers relevant session `defaultTags`, and incorporates `questionsGenPrompt` guidance. Default tags are suggestions rather than a restricted vocabulary; users can add or remove tags before upload.
+Suggested questions follow the response drafts in an expandable **Suggested new questions** section, initially open, using pile-style question cards with editable prompts and tags. Interview review hides the survey/questions toggle and manual question-type selector; the normal authoring surface retains them. A help tooltip beside the section heading explains that suggestions remain drafts until uploaded. Both review sections use matching headings and support keyboard collapse/expand without losing edits. Questions can be edited or removed and require the normal explicit creation/sign-in/permission flow; stopping an interview and submitting response drafts do not create questions. Suggested questions are visible before sign-in so the responder can review them, but after sign-in the section stays hidden unless the connected participant is allowed to create questions for that session. Unresolved group, SBT, or custom permissions keep the section hidden in the UI, and the backend still enforces the upload. Suggestions share the response-mapping request, avoiding an extra model round trip. That request also generates short, non-identifying tags, prefers relevant session `defaultTags`, and incorporates `questionsGenPrompt` guidance. Default tags are suggestions rather than a restricted vocabulary; users can add or remove tags before upload.
 
 Only responder speech becomes
 answer evidence. Interviewer questions are retained as context so short replies
@@ -157,12 +157,14 @@ must explicitly opt into replacing an existing local answer. Selected drafts hav
 an **X** to exclude them; an excluded draft offers **Restore draft**, or
 **Replace with draft** when a local answer already exists. There is no redundant
 selected-state button. **Submit responses** saves reviewed values and enters the
-normal submission flow, opening sign-in when necessary. Drafts survive that
-sign-in; the responder can finish submission through the session's normal Submit
-control. The **Submit responses** and **Upload Questions** actions share the pile
-view’s submit styling. **Upload Questions** remains inside Suggested new
-questions and uses the normal question upload flow. Stopping alone never submits
-answers.
+normal submission flow, opening sign-in when necessary. Drafts survive sign-in,
+and the modal resumes the normal response upload after the authenticated
+response state has rehydrated. Canceling sign-in leaves the review open without
+submitting; after a successful submit the modal remains open so suggested
+questions can still be reviewed or uploaded separately. The **Submit responses**
+and **Upload Questions** actions share the pile view’s submit styling. **Upload
+Questions** remains inside Suggested new questions and uses the normal question
+upload flow. Stopping alone never submits answers.
 The platform provenance option appears only when an AI augmentation packet was
 imported. When it is retained, submitted response metadata keeps the
 prompt/question-set revision and self-reported source platform/model. A separate

@@ -2331,6 +2331,7 @@ class OnePageSession extends Component<any, any> {
         isSurveyCacheReady={this.props.isSurveyCacheReady}
         litHooks={scopedLitHooks}
         loginComplete={this.props.loginComplete}
+        loginModalToggled={Boolean((this.props.sessionState || {}).loginModalToggled)}
         needsLoginForAutoMint={this.state.needsLoginForAutoMint}
         network={routedNetwork}
         networkChainId={routedNetworkChainId}

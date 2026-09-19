@@ -146,6 +146,11 @@ import {
   type SessionVoiceMode,
 } from './sessionInterview';
 import {
+  getUsableSessionWorkerUrl,
+  resolveConfiguredSessionWorkerUrlFromConfig,
+} from '../../utilities/session/sessionWorkerAvailability';
+import { resolveWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery';
+import {
   applyDecryptedQuestionResponseValues as applyDecryptedQuestionResponseValuesHelper,
   applyDecryptedQuestionResponseValuesToContainer as applyDecryptedQuestionResponseValuesToContainerHelper,
   applyDecryptedQuestionStateToSurveySlice as applyDecryptedQuestionStateToSurveySliceHelper,
@@ -731,7 +736,13 @@ const attachPileViewRuntimeEngine = (engine: PileViewModeEngine): PileViewModeEn
     openConvictionSlider: bindPileEngineMethod(engine, openConvictionSlider),
     checkCacheAgainstBaseline: bindPileEngineMethod(engine, checkCacheAgainstBaseline),
     prefillUserAnswersFromCache: bindPileEngineMethod(engine, prefillUserAnswersFromCache),
+    buildSessionInterviewSubmitContextToken,
+    getSessionInterviewResponseReadinessToken: bindPileEngineMethod(
+      engine,
+      getSessionInterviewResponseReadinessToken,
+    ),
     loadAndSortQuestions: bindPileEngineMethod(engine, loadAndSortQuestions),
+    markSessionInterviewResponsesReady: bindPileEngineMethod(engine, markSessionInterviewResponsesReady),
     shouldAbortPileHydrationRequest: bindPileEngineMethod(engine, shouldAbortPileHydrationRequest),
     resetPileAutoDecryptLedger: bindPileEngineMethod(engine, resetPileAutoDecryptLedger),
     rehydrateVisiblePileWindow: bindPileEngineMethod(engine, rehydrateVisiblePileWindow),
@@ -1448,6 +1459,7 @@ const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps: any, p
     engine._lastLoadAndSortResultSignature = '';
     engine._lastInitializeResponseSig = '';
     engine._emptyReadyProbeStartedAtMs = 0;
+    engine._sessionInterviewResponseReadyToken = '';
 
     // If context changes, we must reset optimistic flags and reload immediately
     // We do engine regardless of edits because the context (wallet/chain) invalidates the current session
@@ -2166,6 +2178,7 @@ const loadAndSortQuestions = async (engine: PileViewModeEngine) => {
         autoDecryptReason: 'pile-hydration',
         autoDecryptResetReason: 'pile-hydration-reset',
       });
+      engine.markSessionInterviewResponsesReady(engine.buildSessionInterviewSubmitContextToken(engine.props));
     };
 
     if (!loadResultPlan.shouldUpdateState) {
@@ -2339,6 +2352,76 @@ const handleAdditionalPile = (
   engine.handleAdditional(0, questionId, comments, options);
 };
 
+const readPlainRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+
+export const buildSessionInterviewSubmitContextToken = (props: Record<string, unknown> = {}) => {
+  const sessionConfig = readPlainRecord(props.sessionConfig);
+  const sessionModeProfile = readPlainRecord(sessionConfig.sessionModeProfile);
+  const sessionAuthority = readPlainRecord(sessionModeProfile.authority);
+  const sessionStorage = readPlainRecord(sessionModeProfile.storage);
+  const storageProfile = readPlainRecord(sessionConfig.storageProfile);
+  const storageResources = readPlainRecord(storageProfile.resources);
+  const slug = String(resolveEffectiveSlug(props) || sessionConfig.slug || '').trim();
+  const network = readPlainRecord(props.network);
+  const networkId = String(
+    network.id || network.chainId || sessionConfig.networkChainId || '',
+  ).trim();
+  const workerUrl =
+    getUsableSessionWorkerUrl({
+      slug,
+      sessionConfig,
+      allowSharedFallback: false,
+      requireExactWorkerSession: true,
+    }) ||
+    getUsableSessionWorkerUrl({
+      slug,
+      sessionConfig,
+      allowSharedFallback: false,
+    }) ||
+    resolveConfiguredSessionWorkerUrlFromConfig(sessionConfig);
+  const sessionId = resolveWorkerCanonicalSessionIdHex(sessionConfig);
+  const identityParts = [
+    slug,
+    networkId,
+    sessionId,
+    workerUrl,
+    String(sessionConfig.metadataURI || ''),
+    String(sessionModeProfile.preset || ''),
+    String(sessionAuthority.mode || ''),
+    String(sessionStorage.backend || storageProfile.backend || ''),
+    String(storageResources.questions || ''),
+    String(storageResources.surveys || ''),
+  ];
+  return identityParts.join('|');
+};
+
+const buildSessionInterviewActiveSubmitContextToken = (engine: PileViewModeEngine, baseToken: string) =>
+  [
+    baseToken,
+    String(engine.props.account || '').trim().toLowerCase(),
+    String(Boolean(engine.props.loginComplete)),
+  ].join('|');
+
+const markSessionInterviewResponsesReady = (engine: PileViewModeEngine, baseToken: string) => {
+  engine._sessionInterviewResponseReadyToken = buildSessionInterviewActiveSubmitContextToken(engine, baseToken);
+};
+
+const getSessionInterviewReadinessIdentity = (token: string) => token.split('|').slice(0, -1).join('|');
+
+const getSessionInterviewResponseReadinessToken = (engine: PileViewModeEngine, baseToken: string) => {
+  if (!engine.props.isResponsesCacheReady || engine.state.loading || engine.state.isSubmitting) return '';
+  const activeToken = buildSessionInterviewActiveSubmitContextToken(engine, baseToken);
+  const readyToken = String(engine._sessionInterviewResponseReadyToken || '');
+  if (
+    !readyToken ||
+    getSessionInterviewReadinessIdentity(readyToken) === getSessionInterviewReadinessIdentity(activeToken)
+  ) {
+    engine._sessionInterviewResponseReadyToken = activeToken;
+  }
+  return engine._sessionInterviewResponseReadyToken === activeToken ? activeToken : '';
+};
+
 const getSubmitCount = (engine: PileViewModeEngine) => {
   const stats = engine.getPendingEditStats?.() || engine.computePendingEditStatsAtIndex?.(0) || { total: 0 };
   return Number(stats.total || 0);
@@ -2381,16 +2464,18 @@ const handlePileSubmitClick = async (engine: PileViewModeEngine) => {
   });
 
   if (!engine.props.loginComplete) {
-    await engine.encryptAndUpload();
-    return;
+    return engine.encryptAndUpload();
   }
-  if (pileSubmittedStateActive) return;
+  if (engine.state.isSubmitting) {
+    return { status: 'pending' as const, message: 'Responses are already being submitted.' };
+  }
   const currentPending = engine.getSubmitCount();
   if (currentPending === 0) {
+    if (pileSubmittedStateActive) return { status: 'submitted' as const };
     engine.showNoPendingPileSubmitFeedback(pileSubmitLabel);
-    return;
+    return { status: 'failed' as const, message: 'No new or changed responses to submit.' };
   }
-  await engine.encryptAndUpload();
+  return engine.encryptAndUpload();
 };
 
 const getPileFilterQuestionResponses = (engine: PileViewModeEngine) => {
@@ -3171,85 +3256,101 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
 
       {isInterviewFeatureEnabled(engine.props?.sessionConfig) ? (
         <React.Suspense fallback={null}>
-          <LazySessionVoiceModeModal
-            questionCreatorProps={{ ...engine.props, ...engine.getAudioInputWorkerProps() }}
-            {...engine.props}
-            {...engine.getAudioInputWorkerProps()}
-            isOpen={!!showVoiceModeModal}
-            mode={(sessionVoiceMode as SessionVoiceMode | null) || null}
-            onSelectMode={engine.selectSessionVoiceMode}
-            onClose={engine.closeSessionVoiceModeModal}
-            questionPool={
-              Array.isArray(engine.state.allQuestionsForFilter) && engine.state.allQuestionsForFilter.length > 0
-                ? engine.state.allQuestionsForFilter
-                : fallbackQuestionPool
-            }
-            existingResponseSlice={engine.state.surveysResponseState?.[0] || null}
-            prefillPacket={(interviewPrefillPacket as InterviewPrefillPacket | null) || null}
-            initialError={String(interviewPrefillError || '')}
-            onApplyAnswer={(questionId: string, answer: unknown) =>
-              new Promise<void>((resolve) => {
-                engine.handleAnswerPile(questionId, answer, { persistDraft: false, afterUpdate: resolve });
-              })
-            }
-            onApplyAdditional={(questionId: string, comments: string) =>
-              new Promise<void>((resolve) => {
-                engine.handleAdditionalPile(questionId, comments, { persistDraft: false, afterUpdate: resolve });
-              })
-            }
-            onApplyImportance={(questionId: string, importance: number) =>
-              new Promise<void>((resolve) => {
-                engine.handleImportance(0, questionId, importance, { persistDraft: false, afterUpdate: resolve });
-              })
-            }
-            onApplyConviction={(questionId: string, conviction: number) =>
-              new Promise<void>((resolve) => {
-                engine.handleConviction(0, questionId, conviction, { persistDraft: false, afterUpdate: resolve });
-              })
-            }
-            onRecordProvenance={engine.recordInterviewProvenance}
-            onSubmitResponses={() => engine.handlePileSubmitClick()}
-            renderAnswerInput={(questionId, value, onAnswerChange) =>
-              engine.renderPileResponseInput({
-                question: (engine.state.allQuestionsForFilter || fallbackQuestionPool).find(
-                  (question: { id: string }) => question.id === questionId,
-                ) || { id: questionId, type: 'freeform' },
-                answer: { value },
-                onAnswerChange,
-                inputNamePrefix: 'interview-draft',
-                enableAiRewrite: false,
-              })
-            }
-            renderAdditionalInput={(questionId, value, onChange) =>
-              engine.renderPileAdditionalInput({
-                questionId,
-                additional: {
-                  ...((engine.state.surveysResponseState?.[0]?.additionalComments?.[questionId] || {}) as Record<
-                    string,
-                    unknown
-                  >),
-                  value,
-                },
-                onChange,
-                enableAiRewrite: false,
-              })
-            }
-            renderFieldLock={(questionId, field) => {
-              const slice = engine.state.surveysResponseState?.[0];
-              const options = {
-                surveyIndex: 0,
-                questionId,
-                visualContext: 'pile',
-                lockDisabled: engine.state.isSubmitting,
-              };
-              return field === 'answer'
-                ? engine.renderQuestionAnswerLockControl({ ...options, answer: slice?.answers?.[questionId] || {} })
-                : engine.renderQuestionAdditionalLockControl({
-                    ...options,
-                    additional: slice?.additionalComments?.[questionId] || {},
-                  });
-            }}
-          />
+          {(() => {
+            const submitContextToken = engine.buildSessionInterviewSubmitContextToken(engine.props);
+            const responseReadinessContextToken =
+              engine.getSessionInterviewResponseReadinessToken(submitContextToken);
+            return (
+              <LazySessionVoiceModeModal
+                questionCreatorProps={{ ...engine.props, ...engine.getAudioInputWorkerProps() }}
+                {...engine.props}
+                {...engine.getAudioInputWorkerProps()}
+                isResponsesCacheReady={Boolean(responseReadinessContextToken)}
+                responseReadinessContextToken={responseReadinessContextToken}
+                submitContextToken={submitContextToken}
+                isOpen={!!showVoiceModeModal}
+                mode={(sessionVoiceMode as SessionVoiceMode | null) || null}
+                onSelectMode={engine.selectSessionVoiceMode}
+                onClose={engine.closeSessionVoiceModeModal}
+                questionPool={
+                  Array.isArray(engine.state.allQuestionsForFilter) && engine.state.allQuestionsForFilter.length > 0
+                    ? engine.state.allQuestionsForFilter
+                    : fallbackQuestionPool
+                }
+                existingResponseSlice={engine.state.surveysResponseState?.[0] || null}
+                prefillPacket={(interviewPrefillPacket as InterviewPrefillPacket | null) || null}
+                initialError={String(interviewPrefillError || '')}
+                onApplyAnswer={(questionId: string, answer: unknown) =>
+                  new Promise<void>((resolve) => {
+                    engine.handleAnswerPile(questionId, answer, { persistDraft: false, afterUpdate: resolve });
+                  })
+                }
+                onApplyAdditional={(questionId: string, comments: string) =>
+                  new Promise<void>((resolve) => {
+                    engine.handleAdditionalPile(questionId, comments, { persistDraft: false, afterUpdate: resolve });
+                  })
+                }
+                onApplyImportance={(questionId: string, importance: number) =>
+                  new Promise<void>((resolve) => {
+                    engine.handleImportance(0, questionId, importance, { persistDraft: false, afterUpdate: resolve });
+                  })
+                }
+                onApplyConviction={(questionId: string, conviction: number) =>
+                  new Promise<void>((resolve) => {
+                    engine.handleConviction(0, questionId, conviction, { persistDraft: false, afterUpdate: resolve });
+                  })
+                }
+                onRecordProvenance={engine.recordInterviewProvenance}
+                onSubmitResponses={async () => {
+                  const result = await engine.handlePileSubmitClick();
+                  if (result && typeof result === 'object' && 'status' in result) return result;
+                  if (!engine.props.loginComplete) return { status: 'login-required' as const };
+                  return { status: 'failed' as const, message: 'Submission did not complete.' };
+                }}
+                renderAnswerInput={(questionId, value, onAnswerChange) =>
+                  engine.renderPileResponseInput({
+                    question: (engine.state.allQuestionsForFilter || fallbackQuestionPool).find(
+                      (question: { id: string }) => question.id === questionId,
+                    ) || { id: questionId, type: 'freeform' },
+                    answer: { value },
+                    onAnswerChange,
+                    inputNamePrefix: 'interview-draft',
+                    enableAiRewrite: false,
+                  })
+                }
+                renderAdditionalInput={(questionId, value, onChange) =>
+                  engine.renderPileAdditionalInput({
+                    questionId,
+                    additional: {
+                      ...((engine.state.surveysResponseState?.[0]?.additionalComments?.[questionId] ||
+                        {}) as Record<string, unknown>),
+                      value,
+                    },
+                    onChange,
+                    enableAiRewrite: false,
+                  })
+                }
+                renderFieldLock={(questionId, field) => {
+                  const slice = engine.state.surveysResponseState?.[0];
+                  const options = {
+                    surveyIndex: 0,
+                    questionId,
+                    visualContext: 'pile',
+                    lockDisabled: engine.state.isSubmitting,
+                  };
+                  return field === 'answer'
+                    ? engine.renderQuestionAnswerLockControl({
+                        ...options,
+                        answer: slice?.answers?.[questionId] || {},
+                      })
+                    : engine.renderQuestionAdditionalLockControl({
+                        ...options,
+                        additional: slice?.additionalComments?.[questionId] || {},
+                      });
+                }}
+              />
+            );
+          })()}
         </React.Suspense>
       ) : null}
 

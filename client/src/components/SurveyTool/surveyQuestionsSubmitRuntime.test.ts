@@ -307,7 +307,7 @@ describe('surveyQuestionsSubmitRuntime', () => {
     };
 
     const runtime = createSurveyQuestionsSubmitRuntime(context);
-    await runtime.encryptAndUpload();
+    await expect(runtime.encryptAndUpload()).resolves.toEqual({ status: 'submitted' });
 
     expect(context.cryptoUtils.encryptMultipleAnswers).toHaveBeenCalled();
     expect(context.submitSurveyResponse).toHaveBeenCalledWith(
@@ -338,10 +338,27 @@ describe('surveyQuestionsSubmitRuntime', () => {
     });
     const runtime = createSurveyQuestionsSubmitRuntime(context);
 
-    await runtime.encryptAndUpload();
+    await expect(runtime.encryptAndUpload()).resolves.toEqual({ status: 'login-required' });
 
     expect(context.inst._submitGuard).toBe(false);
     expect(context.propsRef.current.toggleLoginModal).toHaveBeenCalledWith(true);
     expect(context.submitSurveyResponse).not.toHaveBeenCalled();
+  });
+
+  it('returns a failed outcome instead of reporting success when there is nothing to submit', async () => {
+    const context = createContext({
+      getAnsweredQuestionsCount: jest.fn(() => 0),
+    });
+    const runtime = createSurveyQuestionsSubmitRuntime(context);
+
+    await expect(runtime.encryptAndUpload()).resolves.toEqual({
+      status: 'failed',
+      message: 'No responses to submit.',
+    });
+
+    expect(context.submitSurveyResponse).not.toHaveBeenCalled();
+    expect(context.setState).toHaveBeenCalledWith({ submissionError: 'No responses to submit.' });
+    clearTimeout(context.inst._emptySubmitTimer);
+    context.inst._emptySubmitTimer = null;
   });
 });

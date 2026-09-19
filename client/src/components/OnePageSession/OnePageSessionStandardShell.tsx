@@ -92,6 +92,7 @@ type OnePageSessionStandardShellProps = {
   isSurveyCacheReady: unknown;
   litHooks: unknown;
   loginComplete: unknown;
+  loginModalToggled?: boolean;
   needsLoginForAutoMint: boolean;
   network: UnknownRecord | null;
   networkChainId: string | number | null;
@@ -217,6 +218,7 @@ export default function OnePageSessionStandardShell({
   isSurveyCacheReady,
   litHooks,
   loginComplete,
+  loginModalToggled,
   needsLoginForAutoMint,
   network,
   networkChainId,
@@ -410,6 +412,7 @@ export default function OnePageSessionStandardShell({
               network={network}
               toggleLoginModal={toggleLoginModal}
               loginComplete={loginComplete}
+              loginModalToggled={loginModalToggled}
               isSBTCacheReady={isSBTCacheReady}
               isSurveyCacheReady={isSurveyCacheReady}
               isQuestionCacheReady={isQuestionCacheReady}
@@ -460,6 +463,7 @@ export default function OnePageSessionStandardShell({
                 network={network}
                 toggleLoginModal={toggleLoginModal}
                 loginComplete={loginComplete}
+                loginModalToggled={loginModalToggled}
                 sessionInfo={sessionInfo}
                 sessionName={sessionName}
                 sessionHeader={sessionHeader}

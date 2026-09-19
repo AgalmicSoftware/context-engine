@@ -42,16 +42,29 @@ import {
   type InterviewDraftResponse,
   type InterviewPrefillPacket,
   type InterviewQuestion,
-  type InterviewResearchCoverage,
   type SessionVoiceMode,
 } from './sessionInterview';
 import { useSessionInterviewRecorder } from './useSessionInterviewRecorder';
+import {
+  resolveSuggestedQuestionAuthoringState,
+  shouldHideSuggestedQuestionSection,
+} from './sessionInterviewQuestionAuthoringPolicy';
+import { runInterviewDraftSubmit, type InterviewSubmitResult } from './sessionInterviewDraftSubmit';
+import {
+  buildResearchPacket,
+  describeResearchCoverage,
+  displayResponderContext,
+  hasDraftValue,
+  responseFieldValue,
+  shouldIgnorePromptCopyEvent,
+  type SessionInterviewModalRecord,
+} from './sessionInterviewModalState';
 
-type UnknownRecord = Record<string, unknown>;
+type UnknownRecord = SessionInterviewModalRecord;
 
 type InterviewDraftApplicationProps = InterviewQuestionControls & {
   questionCreatorProps?: React.ComponentProps<typeof SessionInterviewSuggestions>['creatorProps'];
-  onSubmitResponses?: () => void | Promise<void>;
+  onSubmitResponses?: () => InterviewSubmitResult | Promise<InterviewSubmitResult>;
   onClose: () => void;
   onApplyAnswer: (questionId: string, answer: unknown) => void | Promise<void>;
   onApplyAdditional: (questionId: string, comments: string) => void | Promise<void>;
@@ -80,49 +93,13 @@ type SessionVoiceModeModalProps = InterviewDraftApplicationProps & {
   existingResponseSlice?: UnknownRecord | null;
   prefillPacket?: InterviewPrefillPacket | null;
   initialError?: string;
-};
-
-const asRecord = (value: unknown): UnknownRecord =>
-  value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : {};
-
-const responseFieldValue = (slice: UnknownRecord | null | undefined, field: string, questionId: string): unknown =>
-  asRecord(asRecord(asRecord(slice)[field])[questionId]).value;
-
-const hasDraftValue = (value: unknown): boolean =>
-  value !== undefined && value !== null && value !== '' && (!Array.isArray(value) || value.length > 0);
-
-const displayResponderContext = (packet: InterviewPrefillPacket | null): string => {
-  if (!packet) return '';
-  const summary = String(packet.responderContext?.summary || '').trim();
-  if (summary) return summary;
-  return (packet.responderContext?.facts || [])
-    .map((entry) => String(entry?.fact || '').trim())
-    .filter(Boolean)
-    .join('\n');
-};
-
-const describeResearchCoverage = (coverage: InterviewResearchCoverage | undefined): string[] => {
-  if (!coverage) return [];
-  const describeResource = (label: string, searched: number | null, used: number | null): string => {
-    if (searched === null && used === null) return '';
-    if (searched !== null) return `${label}: ${used === null ? 'unknown' : used} used / ${searched} searched`;
-    return `${label}: ${used} used`;
-  };
-  return [
-    describeResource('History chats', coverage.historyChatsSearched, coverage.historyChatsUsed),
-    describeResource('Memories', coverage.memoryItemsSearched, coverage.memoryItemsUsed),
-    describeResource('Connected sources', coverage.connectedSourcesSearched, coverage.connectedSourcesUsed),
-    coverage.userStatementsUsed !== null ? `${coverage.userStatementsUsed} user statements used` : '',
-  ].filter(Boolean);
-};
-
-
-const shouldIgnorePromptCopyEvent = (target: EventTarget | null): boolean => {
-  if (!(target instanceof HTMLElement)) return true;
-  if (target.closest('button, a, input, textarea, select, [contenteditable="true"]')) return true;
-  if (target.closest('[data-ce-no-background-copy="true"]')) return true;
-  const selection = target.ownerDocument.defaultView?.getSelection?.();
-  return Boolean(selection?.toString().trim());
+  account?: unknown;
+  loginComplete?: boolean;
+  loginModalToggled?: boolean;
+  toggleLoginModal?: (open?: boolean) => void;
+  isResponsesCacheReady?: boolean;
+  responseReadinessContextToken?: string;
+  submitContextToken?: string;
 };
 
 type SessionInterviewPanelProps = InterviewDraftApplicationProps & {
@@ -134,6 +111,13 @@ type SessionInterviewPanelProps = InterviewDraftApplicationProps & {
   existingResponseSlice?: UnknownRecord | null;
   prefillPacket?: InterviewPrefillPacket | null;
   initialError?: string;
+  account?: unknown;
+  loginComplete?: boolean;
+  loginModalToggled?: boolean;
+  toggleLoginModal?: (open?: boolean) => void;
+  isResponsesCacheReady?: boolean;
+  responseReadinessContextToken?: string;
+  submitContextToken?: string;
 };
 
 function SessionInterviewPanel({
@@ -145,6 +129,13 @@ function SessionInterviewPanel({
   existingResponseSlice = null,
   prefillPacket = null,
   initialError = '',
+  account = '',
+  loginComplete = false,
+  loginModalToggled = false,
+  toggleLoginModal,
+  isResponsesCacheReady,
+  responseReadinessContextToken,
+  submitContextToken = '',
   questionCreatorProps,
   onApplyAnswer,
   onApplyAdditional,
@@ -182,6 +173,11 @@ function SessionInterviewPanel({
   const [mapping, setMapping] = useState(false);
   const [mappingNotice, setMappingNotice] = useState('');
   const [applying, setApplying] = useState(false);
+  const [pendingSubmitAfterLogin, setPendingSubmitAfterLogin] = useState(false);
+  const pendingSubmitBaseContextRef = useRef('');
+  const pendingSubmitActiveContextRef = useRef('');
+  const submitContextTokenRef = useRef('');
+  const previousLoginModalToggledRef = useRef(Boolean(loginModalToggled));
   const [error, setError] = useState(initialError);
   const [suggestedQuestions, setSuggestedQuestions] = useState<GeneratedSurveyStatement[]>([]);
   const [drafts, setDrafts] = useState<InterviewDraftResponse[]>([]);
@@ -192,12 +188,7 @@ function SessionInterviewPanel({
   const hasPredictionRevisions = drafts.some((draft) => (draft.revisions?.length || 0) > 1);
   const hasAiGeneratedReview = drafts.length > 0 && !isDirectUserContextPrefill;
   const researchAvailable = hasAiPrefill || hasPredictionRevisions || hasAiGeneratedReview;
-  const researchPacket: InterviewPrefillPacket = prefillPacket || {
-    version: 1,
-    sessionSlug,
-    source: { platform: 'other', modelId: DEFAULT_AI_MODEL, verification: 'self_reported' },
-    responderContext: {},
-  };
+  const researchPacket = buildResearchPacket(prefillPacket, sessionSlug);
   const [includeProvenance, setIncludeProvenance] = useState(true);
   const [includePredictionComparison, setIncludePredictionComparison] = useState(false);
   const [includeResponderName, setIncludeResponderName] = useState(false);
@@ -265,12 +256,65 @@ function SessionInterviewPanel({
     append: recorder.appendInstructions,
   });
   const questions = updates.questions;
+  const authenticatedForSubmit = Boolean(loginComplete && String(account || '').trim());
+  const baseSubmitContextToken = submitContextToken || sessionSlug;
+  const activeSubmitContextToken = [
+    baseSubmitContextToken,
+    String(account || '').trim().toLowerCase(),
+    String(Boolean(loginComplete)),
+  ].join('|');
+  const hasReadinessContextToken =
+    responseReadinessContextToken !== undefined && responseReadinessContextToken !== null;
+  const responseStateReadyForSubmit =
+    isResponsesCacheReady !== false &&
+    (!hasReadinessContextToken || responseReadinessContextToken === activeSubmitContextToken);
+  const suggestedQuestionAuthoringState = resolveSuggestedQuestionAuthoringState({
+    account,
+    loginComplete,
+    sessionConfig,
+    sessionSlug,
+  });
 
   useEffect(() => {
     if (isStarting || mapping) statusRef.current?.focus();
     else if (isRecording && previousRecordingState.current === 'starting') stopControlRef.current?.focus();
     previousRecordingState.current = recordingState;
   }, [isStarting, isRecording, recordingState, mapping]);
+  useEffect(() => {
+    submitContextTokenRef.current = activeSubmitContextToken;
+  }, [activeSubmitContextToken]);
+  const isSubmitContextCurrent = useCallback(
+    (token: string) => !disposedRef.current && submitContextTokenRef.current === token,
+    [],
+  );
+  useEffect(() => {
+    if (
+      !pendingSubmitAfterLogin ||
+      (pendingSubmitBaseContextRef.current === baseSubmitContextToken &&
+        (!pendingSubmitActiveContextRef.current ||
+          pendingSubmitActiveContextRef.current === activeSubmitContextToken))
+    ) {
+      return;
+    }
+    pendingSubmitBaseContextRef.current = '';
+    pendingSubmitActiveContextRef.current = '';
+    setPendingSubmitAfterLogin(false);
+    setStatus('Review drafts');
+  }, [activeSubmitContextToken, baseSubmitContextToken, pendingSubmitAfterLogin]);
+  useEffect(() => {
+    const wasOpen = previousLoginModalToggledRef.current;
+    const isOpen = Boolean(loginModalToggled);
+    previousLoginModalToggledRef.current = isOpen;
+    if (!pendingSubmitAfterLogin || !wasOpen || isOpen || authenticatedForSubmit) return;
+    pendingSubmitBaseContextRef.current = '';
+    pendingSubmitActiveContextRef.current = '';
+    setPendingSubmitAfterLogin(false);
+    setStatus('Login required');
+  }, [authenticatedForSubmit, loginModalToggled, pendingSubmitAfterLogin]);
+  useEffect(() => {
+    if (!pendingSubmitAfterLogin || !authenticatedForSubmit || responseStateReadyForSubmit || applying) return;
+    setStatus('Waiting for session data…');
+  }, [applying, authenticatedForSubmit, pendingSubmitAfterLogin, responseStateReadyForSubmit]);
 
   const runMapping = useCallback(
     async ({ nextTranscript = transcript }: { nextTranscript?: string } = {}) => {
@@ -455,60 +499,93 @@ function SessionInterviewPanel({
     }
   };
 
-  const applyDrafts = async () => {
-    if (applyingRef.current || isInterviewBusy || mappingRef.current) return;
-    const applied = drafts.filter((draft) => selected[draft.questionId]);
-    if (!applied.length) return;
-    applyingRef.current = true;
-    setApplying(true);
-    setError('');
-    setStatus('Preparing submission…');
-    try {
-      for (const original of applied) {
-        if (disposedRef.current) return;
-        const draft = editedDrafts[original.questionId] || original;
-        await onApplyAnswer(draft.questionId, draft.answer);
-        await onApplyAdditional(draft.questionId, String(draft.additionalComments || ''));
-        if (draft.importance !== undefined) await onApplyImportance(draft.questionId, draft.importance);
-        if (draft.conviction !== undefined) await onApplyConviction(draft.questionId, draft.conviction);
-      }
-      if (disposedRef.current) return;
-      if (applied.length) {
-        const directContextSource =
-          !prefillPacket && !transcript.trim() && responderContext.trim()
-            ? { platform: 'other' as const, modelId: 'direct-user-context', verification: 'self_reported' as const }
-            : null;
-        await onRecordProvenance?.(
-          applied,
-          prefillPacket?.source || directContextSource,
-          prefillPacket,
-          hasAiPrefill && includeProvenance,
-          researchAvailable && includePredictionComparison,
-          includeResponderName ? String(prefillPacket?.responderContext?.name || '').trim() : '',
-          drafts.map((draft) => {
-            const reviewed = editedDrafts[draft.questionId] || draft;
-            return {
-              ...reviewed,
-              answer: reviewed.answer,
-              additionalComments: String(reviewed.additionalComments || ''),
-              original: draft,
-              selected: Boolean(selected[draft.questionId]),
-            };
-          }),
-        );
-      }
-      if (disposedRef.current) return;
-      onClose();
-      await onSubmitResponses?.();
-    } catch (applyError) {
-      if (disposedRef.current) return;
-      setError(applyError instanceof Error ? applyError.message : 'Could not apply the selected drafts.');
-      setStatus('Draft application failed');
-    } finally {
-      applyingRef.current = false;
-      if (!disposedRef.current) setApplying(false);
+  const applyDrafts = useCallback(async () => {
+    await runInterviewDraftSubmit({
+      activeSubmitContextToken,
+      authenticatedForSubmit,
+      baseSubmitContextToken,
+      drafts,
+      editedDrafts,
+      hasAiPrefill,
+      includePredictionComparison,
+      includeProvenance,
+      includeResponderName,
+      isInterviewBusy,
+      researchAvailable,
+      responderContext,
+      responseStateReadyForSubmit,
+      selected,
+      transcript,
+      applyingRef,
+      disposedRef,
+      mappingRef,
+      pendingSubmitActiveContextRef,
+      pendingSubmitBaseContextRef,
+      prefillPacket,
+      isSubmitContextCurrent,
+      onApplyAdditional,
+      onApplyAnswer,
+      onApplyConviction,
+      onApplyImportance,
+      onRecordProvenance,
+      onSubmitResponses,
+      onRequestLogin: () => toggleLoginModal?.(true),
+      setApplying,
+      setError,
+      setPendingSubmitAfterLogin,
+      setStatus,
+    });
+  }, [
+    activeSubmitContextToken,
+    authenticatedForSubmit,
+    baseSubmitContextToken,
+    drafts,
+    editedDrafts,
+    hasAiPrefill,
+    includePredictionComparison,
+    includeProvenance,
+    includeResponderName,
+    isInterviewBusy,
+    isSubmitContextCurrent,
+    onApplyAdditional,
+    onApplyAnswer,
+    onApplyConviction,
+    onApplyImportance,
+    onRecordProvenance,
+    onSubmitResponses,
+    prefillPacket,
+    researchAvailable,
+    responderContext,
+    responseStateReadyForSubmit,
+    selected,
+    toggleLoginModal,
+    transcript,
+  ]);
+
+  useEffect(() => {
+    if (
+      !pendingSubmitAfterLogin ||
+      !authenticatedForSubmit ||
+      !responseStateReadyForSubmit ||
+      applying ||
+      isInterviewBusy ||
+      mappingRef.current
+    ) {
+      return;
     }
-  };
+    if (pendingSubmitBaseContextRef.current !== baseSubmitContextToken) return;
+    if (pendingSubmitActiveContextRef.current && pendingSubmitActiveContextRef.current !== activeSubmitContextToken) return;
+    void applyDrafts();
+  }, [
+    activeSubmitContextToken,
+    applyDrafts,
+    applying,
+    authenticatedForSubmit,
+    baseSubmitContextToken,
+    isInterviewBusy,
+    pendingSubmitAfterLogin,
+    responseStateReadyForSubmit,
+  ]);
 
   const copyAgentPrompt = async () => {
     if (!kickoff || !navigator.clipboard?.writeText) return;
@@ -952,7 +1029,7 @@ function SessionInterviewPanel({
                   className={styles.sessionInterviewSubmitButton}
                   data-testid={E2E_TESTIDS.SESSION_INTERVIEW_APPLY}
                 >
-                  {applying ? 'Preparing submission…' : 'Submit responses'}
+                  {applying ? 'Preparing submission…' : pendingSubmitAfterLogin && !authenticatedForSubmit ? 'Submit after login' : 'Submit responses'}
                 </Button>
               </div>
             </SessionInterviewReviewSection>
@@ -961,7 +1038,7 @@ function SessionInterviewPanel({
             <SessionInterviewSuggestions
               questions={suggestedQuestions}
               creatorProps={questionCreatorProps || {}}
-              hidden={isInterviewBusy || mapping}
+              hidden={isInterviewBusy || mapping || shouldHideSuggestedQuestionSection(suggestedQuestionAuthoringState)}
             />
           ) : null}
         </div>
