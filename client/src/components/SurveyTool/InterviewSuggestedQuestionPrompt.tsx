@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, type ReactNode } from 'react';
 import { Input } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPenNib } from '@fortawesome/free-solid-svg-icons';
@@ -36,11 +36,13 @@ export default function InterviewSuggestedQuestionPrompt({
   type = 'freeform',
   options = [],
   onChange,
+  actions = null,
 }: {
   prompt: string;
   type?: string;
   options?: string[];
   onChange: (value: string) => void;
+  actions?: ReactNode;
 }) {
   const [editing, setEditing] = useState(false);
   const label = normalizeQuestionTypeLabel(type);
@@ -69,8 +71,10 @@ export default function InterviewSuggestedQuestionPrompt({
           </button>
         </>
       ) : (
-        <>
-          <h3>{prompt || 'Question prompt'}</h3>
+        <h3>{prompt || 'Question prompt'}</h3>
+      )}
+      <div className={styles.interviewQuestionPromptActions}>
+        {!editing ? (
           <button
             type="button"
             aria-label="Edit suggested question"
@@ -80,8 +84,9 @@ export default function InterviewSuggestedQuestionPrompt({
           >
             <FontAwesomeIcon icon={faPenNib} />
           </button>
-        </>
-      )}
+        ) : null}
+        {actions}
+      </div>
     </div>
   );
 }

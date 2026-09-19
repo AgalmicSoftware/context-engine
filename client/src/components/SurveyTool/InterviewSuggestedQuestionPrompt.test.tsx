@@ -31,3 +31,23 @@ it('shows the normalized type and multichoice options for review cards', () => {
   expect(screen.getByText('Options: Pilot · Full launch')).toBeInTheDocument();
   expect(screen.queryByText(/object Object/)).not.toBeInTheDocument();
 });
+
+it('keeps owner actions available while the suggested question is being edited', () => {
+  const onRemove = jest.fn();
+  render(
+    <InterviewSuggestedQuestionPrompt
+      prompt="Which AI impact matters?"
+      onChange={jest.fn()}
+      actions={
+        <button type="button" aria-label="Remove question" onClick={onRemove}>
+          Remove
+        </button>
+      }
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: 'Edit suggested question' }));
+  expect(screen.getByRole('textbox', { name: 'Edit suggested question' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Remove question' }));
+  expect(onRemove).toHaveBeenCalledTimes(1);
+});

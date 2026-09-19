@@ -1080,6 +1080,8 @@ describe('SessionVoiceModeModal', () => {
       await Promise.resolve();
     });
     const toggle = await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT_TOGGLE);
+    const copyPromptButton = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT);
+    expect(toggle.compareDocumentPosition(copyPromptButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).toBeInTheDocument();
     expect(screen.queryByLabelText(/Include self-reported AI platform/)).not.toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON)).not.toBeChecked();
@@ -1092,9 +1094,9 @@ describe('SessionVoiceModeModal', () => {
 
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT)).toHaveTextContent(
-      'Responder: Reversible decisions matter.',
-    );
+    const transcriptContent = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT);
+    expect(transcriptContent).toHaveTextContent('Responder: Reversible decisions matter.');
+    expect(transcriptContent.compareDocumentPosition(copyPromptButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     await waitFor(() =>
       expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalledWith(
         expect.objectContaining({ transcript: 'Responder: Reversible decisions matter.' }),

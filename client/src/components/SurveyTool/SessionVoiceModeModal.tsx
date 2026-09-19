@@ -818,6 +818,26 @@ function SessionInterviewPanel({
             ) : null}
           </div>
 
+          {!isInterviewBusy && transcript.trim() ? (
+            <div className={styles.sessionInterviewTranscriptArea}>
+              <SessionInterviewTranscriptDisclosure
+                showTranscript={showTranscript}
+                transcript={transcript}
+                onToggleTranscript={() => setShowTranscript((current) => !current)}
+              />
+              {showTranscript ? (
+                <pre
+                  id="ce-session-interview-transcript-content"
+                  className={styles.sessionInterviewTranscript}
+                  aria-label="Transcript"
+                  data-testid={E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT}
+                >
+                  {transcript}
+                </pre>
+              ) : null}
+            </div>
+          ) : null}
+
           {mappingNotice ? (
             <div
               className={styles.sessionInterviewMappingNotice}
@@ -829,38 +849,17 @@ function SessionInterviewPanel({
             </div>
           ) : null}
 
-          <div className={styles.sessionInterviewResources}>
-            {!isInterviewBusy && transcript.trim() ? (
-              <SessionInterviewTranscriptDisclosure
-                showTranscript={showTranscript}
-                transcript={transcript}
-                onToggleTranscript={() => setShowTranscript((current) => !current)}
-              />
-            ) : null}
-
-            {kickoff ? (
-              <SessionInterviewMemoryKickoffCard
-                kickoff={kickoff}
-                promptCopied={promptCopied}
-                showAgentPrompt={showAgentPrompt}
-                onCopyPrompt={() => {
-                  void copyAgentPrompt();
-                }}
-                onTogglePrompt={() => setShowAgentPrompt((current) => !current)}
-              />
-            ) : null}
-
-            {showTranscript ? (
-              <pre
-                id="ce-session-interview-transcript-content"
-                className={styles.sessionInterviewTranscript}
-                aria-label="Transcript"
-                data-testid={E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT}
-              >
-                {transcript}
-              </pre>
-            ) : null}
-          </div>
+          {kickoff ? (
+            <SessionInterviewMemoryKickoffCard
+              kickoff={kickoff}
+              promptCopied={promptCopied}
+              showAgentPrompt={showAgentPrompt}
+              onCopyPrompt={() => {
+                void copyAgentPrompt();
+              }}
+              onTogglePrompt={() => setShowAgentPrompt((current) => !current)}
+            />
+          ) : null}
 
           {drafts.length && !isInterviewBusy && !mapping ? (
             <SessionInterviewReviewSection

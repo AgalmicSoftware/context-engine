@@ -64,9 +64,10 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     const tree = instance.render();
     expect(treeHasText(tree, 'Choose Question Type')).toBe(false);
     expect(collectTreeNodes(tree, (node) => nodeHasClassName(node, 'modeHeader'))).toHaveLength(0);
+    expect(collectTreeNodes(tree, (node) => node?.props?.['aria-label'] === 'Add tag')).toHaveLength(1);
     expect(
       collectTreeNodes(tree, (node) => node?.props?.['data-testid'] === E2E_TESTIDS.CREATE_QUESTION_TAG_INPUT),
-    ).toHaveLength(1);
+    ).toHaveLength(0);
   });
 
   it('shows interview suggestion type, options, and compact tag authoring while keeping review-only chrome hidden', () => {
@@ -92,31 +93,38 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     expect(treeHasText(tree, 'Survey')).toBe(false);
     expect(treeHasText(tree, 'from URL / Content')).toBe(false);
     expect(markup).toContain('interviewQuestionPromptEditButton');
-    expect(collectTreeNodes(tree, (node) => nodeHasClassName(node, 'removeQuestionButton'))).toHaveLength(1);
+    const promptNodes = collectTreeNodes(tree, (node) =>
+      String((node as { type?: { name?: string } })?.type?.name || '').includes('InterviewSuggestedQuestionPrompt'),
+    );
+    expect(promptNodes).toHaveLength(1);
+    expect(
+      nodeHasClassName((promptNodes[0] as { props?: { actions?: unknown } })?.props?.actions, 'removeQuestionButton'),
+    ).toBe(true);
     expect(markup).toContain('revealTagInputButton');
     expect(markup).toContain('aria-label="Add tag"');
-    expect(markup).toContain('tagInputGroup');
-    const tagInputs = collectTreeNodes(
-      tree,
-      (node) => node?.props?.['data-testid'] === E2E_TESTIDS.CREATE_QUESTION_TAG_INPUT,
-    );
-    expect(tagInputs).toHaveLength(1);
+    expect(markup).not.toContain('tagInputGroup');
+    expect(
+      collectTreeNodes(tree, (node) => node?.props?.['data-testid'] === E2E_TESTIDS.CREATE_QUESTION_TAG_INPUT),
+    ).toHaveLength(0);
     const revealButtons = collectTreeNodes(tree, (node) => node?.props?.['aria-label'] === 'Add tag');
     expect(revealButtons).toHaveLength(1);
-    const focus = jest.fn();
-    const tagInputInnerRef = (tagInputs[0] as { props?: { innerRef?: (element: unknown) => void } })?.props?.innerRef;
-    tagInputInnerRef?.({ focus });
     (revealButtons[0] as { props?: { onClick?: () => void } })?.props?.onClick?.();
-    expect(focus).toHaveBeenCalledTimes(1);
+    let activeTree = instance.render();
+    expect(collectTreeNodes(activeTree, (node) => nodeHasClassName(node, 'revealTagInputButton'))).toHaveLength(0);
+    expect(
+      collectTreeNodes(activeTree, (node) => node?.props?.['data-testid'] === E2E_TESTIDS.CREATE_QUESTION_TAG_INPUT),
+    ).toHaveLength(1);
 
     const preventDefault = jest.fn();
-    focus.mockClear();
     instance.setState({ activeTagInputKey: '' });
     (
       revealButtons[0] as { props?: { onKeyDown?: (event: { key: string; preventDefault: () => void }) => void } }
     )?.props?.onKeyDown?.({ key: 'Enter', preventDefault });
     expect(preventDefault).toHaveBeenCalledTimes(1);
-    expect(focus).toHaveBeenCalledTimes(1);
+    activeTree = instance.render();
+    expect(
+      collectTreeNodes(activeTree, (node) => node?.props?.['data-testid'] === E2E_TESTIDS.CREATE_QUESTION_TAG_INPUT),
+    ).toHaveLength(1);
   });
 
   it('appends only new Interview suggestions without undoing question edits or removals', () => {

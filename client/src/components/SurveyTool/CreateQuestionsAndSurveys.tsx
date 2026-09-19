@@ -3413,6 +3413,16 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           }
           if (question.isGeneratingTags) showGenerateTagsButton = true;
 
+          const removeQuestionButton = (
+            <Button
+              className={styles.removeQuestionButton}
+              aria-label="Remove question"
+              onClick={() => this.removeQuestion(qIndex)}
+            >
+              <FontAwesomeIcon icon={faTimes} />
+            </Button>
+          );
+
           return (
             <div
               key={question.uiKey || `question-${qIndex}`}
@@ -3513,13 +3523,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                     ) : null;
                   })()}
 
-                  <Button
-                    className={styles.removeQuestionButton}
-                    aria-label="Remove question"
-                    onClick={() => this.removeQuestion(qIndex)}
-                  >
-                    <FontAwesomeIcon icon={faTimes} />
-                  </Button>
+                  {!this.props.interviewQuestionReview ? removeQuestionButton : null}
                 </div>
               </div>
 
@@ -3529,6 +3533,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                   type={question.type || 'freeform'}
                   options={question.options || []}
                   onChange={(value) => this.handleQuestionChange(qIndex, 'prompt', value)}
+                  actions={removeQuestionButton}
                 />
               ) : (
                 <Input
@@ -3626,25 +3631,27 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                           this._tagInputRefs[tagInputKey]?.focus?.();
                         });
                       };
+                      if (this.props.interviewQuestionReview && !tagInputActive) {
+                        return (
+                          <button
+                            type="button"
+                            className={styles.revealTagInputButton}
+                            aria-label="Add tag"
+                            title="Add tag"
+                            onClick={activateTagInput}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault();
+                                activateTagInput();
+                              }
+                            }}
+                          >
+                            <FontAwesomeIcon icon={faPlus} />
+                          </button>
+                        );
+                      }
                       return (
                         <div className={`${styles.tagInputGroup} ${tagInputActive ? styles.tagInputGroupActive : ''}`}>
-                          {this.props.interviewQuestionReview && !tagInputActive && (
-                            <button
-                              type="button"
-                              className={styles.revealTagInputButton}
-                              aria-label="Add tag"
-                              title="Add tag"
-                              onClick={activateTagInput}
-                              onKeyDown={(event) => {
-                                if (event.key === 'Enter' || event.key === ' ') {
-                                  event.preventDefault();
-                                  activateTagInput();
-                                }
-                              }}
-                            >
-                              <FontAwesomeIcon icon={faPlus} />
-                            </button>
-                          )}
                           <Input
                             innerRef={(el: FocusablePromptElement | null) => {
                               this._tagInputRefs[tagInputKey] = el;

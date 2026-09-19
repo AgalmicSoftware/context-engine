@@ -3743,9 +3743,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .sessionAgentKickoffRow {
-  display: grid;
-  grid-template-columns: minmax(0, 7fr) minmax(150px, 3fr);
-  align-items: stretch;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 10px;
 }
 
@@ -3753,7 +3753,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  min-width: 0;
+  flex: 1 1 320px;
+  min-width: min(100%, 260px);
   min-height: 48px;
   padding: 6px 0;
   border: 0;
@@ -3809,6 +3810,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
   gap: 8px;
   min-width: 0;
 
@@ -6633,30 +6636,18 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   opacity: 0.5;
 }
 
-.sessionInterviewResources {
+.sessionInterviewTranscriptArea {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
-  gap: 12px;
-  align-items: stretch;
+  justify-items: center;
+  gap: 10px;
+}
 
-  > :only-child,
-  > .sessionAgentKickoff:first-child,
-  > .sessionInterviewTranscript {
-    grid-column: 1 / -1;
-  }
+.sessionInterviewTranscriptArea .sessionInterviewTranscriptDisclosure {
+  width: min(100%, 260px);
+}
 
-  .sessionInterviewTranscriptToggle {
-    flex-wrap: wrap;
-    justify-content: center;
-    height: 100%;
-    align-content: center;
-    padding: 10px;
-    span {
-      margin-left: 0;
-    }
-  }
-
-  .sessionInterviewTranscriptDisclosure {
-    align-self: start;
-  }
+.sessionInterviewTranscriptArea .sessionInterviewTranscript {
+  width: 100%;
+  border: 1px solid var(--ce-card-border);
+  border-radius: var(--ce-radius-8);
 }
