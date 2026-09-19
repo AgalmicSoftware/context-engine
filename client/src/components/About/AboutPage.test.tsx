@@ -32,11 +32,12 @@ describe('AboutPage', () => {
     const originalWidth = window.innerWidth;
     const originalHeight = window.innerHeight;
     const rect = jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ bottom: 900 } as DOMRect);
-    const resize = (width: number, height: number) => act(() => {
-      window.innerWidth = width;
-      window.innerHeight = height;
-      window.dispatchEvent(new Event('resize'));
-    });
+    const resize = (width: number, height: number) =>
+      act(() => {
+        window.innerWidth = width;
+        window.innerHeight = height;
+        window.dispatchEvent(new Event('resize'));
+      });
     try {
       window.innerWidth = 754;
       window.innerHeight = 803;
@@ -332,26 +333,37 @@ describe('AboutPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Recognition' }));
     const related = within(screen.getByTestId('ce-about-related-work'));
     expect(related.getByRole('link', { name: 'AI Opinions Benchmark' })).toHaveAttribute('href', '/benchmarks');
-    expect(related.getByRole('link', { name: 'The Agent Mirror Test' })).toHaveAttribute('href', '/posts/agent-village-wrapped');
+    expect(related.getByRole('link', { name: 'The Agent Mirror Test' })).toHaveAttribute(
+      'href',
+      '/posts/agent-village-wrapped',
+    );
     expect(related.getByRole('heading', { name: 'Ladders Made of Numbers' })).toBeVisible();
     expect(related.getByRole('link', { name: 'CommonGround · Prime Intellect' })).toHaveAttribute(
-      'href', 'https://app.primeintellect.ai/dashboard/environments',
+      'href',
+      'https://app.primeintellect.ai/dashboard/environments',
     );
     const practice = within(screen.getByTestId('ce-about-used-by'));
     expect(practice.getByRole('link', { name: 'Cosmos × FIRE grants' })).toHaveAttribute(
-      'href', 'https://blog.cosmos-institute.org/p/announcing-80-new-cosmos-grantees',
+      'href',
+      'https://blog.cosmos-institute.org/p/announcing-80-new-cosmos-grantees',
     );
     expect(practice.getByText(/Context Engine was selected for a Cosmos × FIRE/)).toBeVisible();
     expect(practice.getByRole('link', { name: 'Foresight Institute grant · 2026' })).toHaveAttribute(
-      'href', 'https://foresight.org/grants/ai-science-safety-nodes-rfp/',
+      'href',
+      'https://foresight.org/grants/ai-science-safety-nodes-rfp/',
     );
     expect(practice.getByText(/Context Engine received a grant through Foresight Institute/)).toBeVisible();
-    expect(practice.getByRole('link', { name: 'Agent Village 2026' })).toHaveAttribute('href', '/posts/agent-village-wrapped');
+    expect(practice.getByRole('link', { name: 'Agent Village 2026' })).toHaveAttribute(
+      'href',
+      '/posts/agent-village-wrapped',
+    );
     expect(practice.getByRole('link', { name: 'EDDY 2026 demo' })).toHaveAttribute(
-      'href', 'https://www.eddy-network.eu/in-person-events/eddy-2026-vienna/program',
+      'href',
+      'https://www.eddy-network.eu/in-person-events/eddy-2026-vienna/program',
     );
     expect(practice.getByRole('link', { name: /d\/acc residency/ })).toHaveAttribute(
-      'href', 'https://www.edgecity.live/blog/the-d-acc-residency-at-edge-city-patagonia-2025',
+      'href',
+      'https://www.edgecity.live/blog/the-d-acc-residency-at-edge-city-patagonia-2025',
     );
     const artwork = practice.getAllByRole('presentation', { hidden: true });
     expect(artwork).toHaveLength(6);
@@ -447,7 +459,11 @@ describe('AboutPage', () => {
     ['ethereum', /^Ethereum is an open, decentralized network/, /^Context Engine uses Ethereum-compatible accounts/],
     ['radicalxchange', /^RadicalxChange is a movement/, /^Context Engine draws on these ideas/],
     ['pol-is', /^Pol.is is an open-source tool/, /^Context Engine builds on this approach/],
-    ['collective-intelligence-project', /^The Collective Intelligence Project studies/, /^Context Engine shares this focus/],
+    [
+      'collective-intelligence-project',
+      /^The Collective Intelligence Project studies/,
+      /^Context Engine shares this focus/,
+    ],
     ['edge-city', /^Edge City brings people together/, /^Context Engine was developed and tested/],
   ])(
     'introduces %s before explaining its connection to Context Engine',
@@ -465,7 +481,10 @@ describe('AboutPage', () => {
         expect(first).toHaveTextContent('pop-up communities');
         expect(second).toHaveTextContent('(Sponsored by Protocol Labs).');
         expect(second).not.toHaveTextContent('Feedback');
-        expect(within(dialog).getByRole('link', { name: 'Residency blog post' })).toHaveAttribute('href', 'https://www.edgecity.live/blog/the-d-acc-residency-at-edge-city-patagonia-2025');
+        expect(within(dialog).getByRole('link', { name: 'Residency blog post' })).toHaveAttribute(
+          'href',
+          'https://www.edgecity.live/blog/the-d-acc-residency-at-edge-city-patagonia-2025',
+        );
       }
       fireEvent.click(within(dialog).getByRole('button', { name: /close acknowledgement details/i }));
       await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());

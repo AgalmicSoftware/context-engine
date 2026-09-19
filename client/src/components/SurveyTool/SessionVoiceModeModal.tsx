@@ -7,6 +7,8 @@ import SessionInterviewRecommendedGroups from './SessionInterviewRecommendedGrou
 import SessionInterviewReviewSection from './SessionInterviewReviewSection';
 import SessionInterviewModalHeader from './SessionInterviewModalHeader';
 import SessionInterviewResearchConsent from './SessionInterviewResearchConsent';
+import SessionInterviewMemoryKickoffCard from './SessionInterviewMemoryKickoffCard';
+import SessionInterviewTranscriptDisclosure from './SessionInterviewTranscriptDisclosure';
 import SessionVoiceModeChooser from './SessionVoiceModeChooser';
 import {
   useSessionInterviewGroupRecommendations,
@@ -15,22 +17,10 @@ import {
 import type { GeneratedSurveyStatement } from './SurveyGenerator/surveyGeneratorHelpers';
 import { useInterviewOpening } from './useInterviewOpening';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Input, Label, Modal, ModalBody, ModalHeader, UncontrolledTooltip } from 'reactstrap';
+import { Button, Input, Label, Modal, ModalBody, ModalHeader } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faCaretDown,
-  faCheck,
-  faCopy,
-  faCircle,
-  faMicrophone,
-  faPause,
-  faPlay,
-  faSpinner,
-  faStop,
-  faQuestionCircle,
-} from '@fortawesome/free-solid-svg-icons';
+import { faCircle, faMicrophone, faPause, faPlay, faSpinner, faStop } from '@fortawesome/free-solid-svg-icons';
 import styles from './SurveyTool.module.scss';
-import SessionInterviewPrompt from './SessionInterviewPrompt';
 import SessionInterviewDraftCard, { type InterviewQuestionControls } from './SessionInterviewDraftCard';
 import SessionListeningPanel, {
   formatSessionRecordingElapsed,
@@ -62,7 +52,6 @@ import {
   displayResponderContext,
   hasDraftValue,
   responseFieldValue,
-  shouldIgnorePromptCopyEvent,
   type SessionInterviewModalRecord,
 } from './sessionInterviewModalState';
 
@@ -842,113 +831,23 @@ function SessionInterviewPanel({
 
           <div className={styles.sessionInterviewResources}>
             {!isInterviewBusy && transcript.trim() ? (
-              <section className={styles.sessionInterviewTranscriptDisclosure}>
-                <button
-                  type="button"
-                  className={styles.sessionInterviewTranscriptToggle}
-                  onClick={() => setShowTranscript((current) => !current)}
-                  aria-expanded={showTranscript}
-                  aria-controls="ce-session-interview-transcript-content"
-                  data-testid={E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT_TOGGLE}
-                >
-                  <FontAwesomeIcon
-                    icon={faCaretDown}
-                    className={`${styles.sessionInterviewTranscriptCaret} ${
-                      showTranscript ? '' : styles.sessionInterviewTranscriptCaretCollapsed
-                    }`}
-                  />
-                  <strong>Transcript</strong>
-                  <span>{transcript.trim().split(/\s+/).length} words</span>
-                </button>
-              </section>
+              <SessionInterviewTranscriptDisclosure
+                showTranscript={showTranscript}
+                transcript={transcript}
+                onToggleTranscript={() => setShowTranscript((current) => !current)}
+              />
             ) : null}
 
             {kickoff ? (
-              <div
-                className={styles.sessionAgentKickoff}
-                onClick={(event) => {
-                  if (!shouldIgnorePromptCopyEvent(event.target)) void copyAgentPrompt();
+              <SessionInterviewMemoryKickoffCard
+                kickoff={kickoff}
+                promptCopied={promptCopied}
+                showAgentPrompt={showAgentPrompt}
+                onCopyPrompt={() => {
+                  void copyAgentPrompt();
                 }}
-              >
-                <div className={styles.sessionAgentKickoffRow}>
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    className={`${styles.sessionAgentKickoffCopyTarget} ${promptCopied ? styles.sessionAgentKickoffCopied : ''}`}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      void copyAgentPrompt();
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        void copyAgentPrompt();
-                      }
-                    }}
-                    aria-label={promptCopied ? 'Memory augmentation prompt copied' : 'Copy memory augmentation prompt'}
-                    title={promptCopied ? 'Copied' : 'Copy memory augmentation prompt'}
-                    data-ce-control-appearance="frameless"
-                    data-testid={E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT}
-                  >
-                    <span className={styles.sessionAgentKickoffTitle}>
-                      <span className={styles.sessionAgentKickoffCopyBadge} aria-hidden="true">
-                        <FontAwesomeIcon icon={promptCopied ? faCheck : faCopy} />
-                        <span>{promptCopied ? 'Copied' : 'Copy'}</span>
-                      </span>
-                      <span>
-                        {promptCopied
-                          ? ' prompt to clipboard'
-                          : ' and paste this prompt into Claude or ChatGPT to augment interview'}
-                      </span>
-                    </span>
-                  </div>
-                  <div className={styles.sessionAgentKickoffActions}>
-                    <button
-                      type="button"
-                      id="ce-interview-agent-prompt-help"
-                      className={styles.sessionInterviewHeaderButton}
-                      aria-label="About the interview prompt"
-                    >
-                      <FontAwesomeIcon icon={faQuestionCircle} />
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.sessionAgentKickoffToggle}
-                      onClick={() => setShowAgentPrompt((current) => !current)}
-                      aria-expanded={showAgentPrompt}
-                      aria-controls="ce-session-interview-agent-prompt"
-                      data-testid={E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE}
-                    >
-                      <span>Prompt</span>
-                      <FontAwesomeIcon
-                        icon={faCaretDown}
-                        className={`${styles.sessionAgentKickoffCaret} ${
-                          showAgentPrompt ? styles.sessionAgentKickoffCaretExpanded : ''
-                        }`}
-                      />
-                    </button>
-                    <UncontrolledTooltip
-                      target="ce-interview-agent-prompt-help"
-                      placement="top-end"
-                      fade={false}
-                      trigger="hover focus"
-                      autohide={false}
-                    >
-                      Allows your agent to predict your responses and raise better interview questions.
-                    </UncontrolledTooltip>
-                  </div>
-                </div>
-                {showAgentPrompt ? (
-                  <div
-                    id="ce-session-interview-agent-prompt"
-                    className={styles.sessionAgentKickoffPrompt}
-                    data-testid={E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT}
-                    data-ce-no-background-copy="true"
-                  >
-                    <SessionInterviewPrompt prompt={kickoff} />
-                  </div>
-                ) : null}
-              </div>
+                onTogglePrompt={() => setShowAgentPrompt((current) => !current)}
+              />
             ) : null}
 
             {showTranscript ? (
