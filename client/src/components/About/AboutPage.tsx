@@ -830,7 +830,7 @@ const AboutPage = () => {
           {showRelatedWork && (
             <div className={`${styles.collapsibleContent} ${styles.unframedContent}`} id="ce-about-related-content">
               <ul className={styles.featureList}>
-                <li className={`${styles.featureItem} ${styles.relatedCard}`}>
+                <li className={styles.featureItem}>
                   <div className={styles.relatedCardHeading}>
                     <span className={styles.relatedPill}>benchmark</span>
                     <h3 className={styles.featureLabel}><Link to="/benchmarks">AI Opinions Benchmark</Link></h3>
@@ -841,7 +841,7 @@ const AboutPage = () => {
                     reversed question wording, making model opinions available to explore alongside human perspectives.
                   </p>
                 </li>
-                <li className={`${styles.featureItem} ${styles.relatedCard}`}>
+                <li className={styles.featureItem}>
                   <div className={styles.relatedCardHeading}>
                     <span className={styles.relatedPill}>eval</span>
                     <h3 className={styles.featureLabel}><Link to="/posts/agent-village-wrapped">The Agent Mirror Test</Link></h3>
@@ -851,7 +851,7 @@ const AboutPage = () => {
                     users’ own responses. The evaluation examines how faithfully agents represent the people they act for.
                   </p>
                 </li>
-                <li className={`${styles.featureItem} ${styles.relatedCard}`}>
+                <li className={styles.featureItem}>
                   <div className={styles.relatedCardHeading}>
                     <span className={styles.relatedPill}>eval</span>
                     <h3 className={styles.featureLabel}>
@@ -864,7 +864,7 @@ const AboutPage = () => {
                     scores. This work connects a company’s stakeholder feedback to tests of how well its AI represents those preferences.
                   </p>
                 </li>
-                <li className={`${styles.featureItem} ${styles.relatedCard}`}>
+                <li className={styles.featureItem}>
                   <div className={styles.relatedCardHeading}>
                     <span className={styles.relatedPill}>media</span>
                     <h3 className={styles.featureLabel}>Ladders Made of Numbers</h3>
