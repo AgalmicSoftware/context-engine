@@ -61,6 +61,10 @@ const SessionWizardHeader = ({
   sessionModeProfileSelectionStep = false,
   showNetworkSelector = true,
 }: SessionWizardHeaderProps): React.ReactElement => {
+  const showInlineProfileControl = !sessionModeProfileSelectionStep && !!sessionModeProfileControl;
+  const showHeaderActions =
+    sessionModeProfileSelectionStep || (!sessionModeProfileSelectionStep && !isNormalMode && showNetworkSelector);
+
   return (
     <header className={`${styles.header} ${sessionModeProfileSelectionStep ? styles.headerProfileSelectionStep : ''}`}>
       <div
@@ -83,6 +87,7 @@ const SessionWizardHeader = ({
           Session Setup
           {!sessionModeProfileSelectionStep && sessionModeProfileLabel ? ` (${sessionModeProfileLabel})` : ''}
         </h1>
+        {showInlineProfileControl ? <div className={styles.headerTitleInlineControl}>{sessionModeProfileControl}</div> : null}
         {sessionModeProfileSelectionStep ? (
           <>
             <a
@@ -109,43 +114,45 @@ const SessionWizardHeader = ({
           </>
         ) : null}
       </div>
-      <div className={styles.headerActions}>
-        <div className={styles.headerControlStack}>
-          {sessionModeProfileControl}
-          {!sessionModeProfileSelectionStep && !isNormalMode && showNetworkSelector ? (
-            <div className={styles.headerSecondaryActions}>
-              <div className={styles.headerChainSelector}>
-                <span className={styles.headerChainLabel}>Network:</span>
-                <Input
-                  type="select"
-                  value={registryChainId || ''}
-                  onChange={(event) => onRegistryChainIdChange(event.target.value)}
-                  className={styles.headerChainInput}
-                >
-                  {registryChainOptions.length ? (
-                    registryChainOptions.map((chain) => (
-                      <option key={chain.id} value={chain.id}>
-                        {chain.name} ({chain.id})
+      {showHeaderActions ? (
+        <div className={styles.headerActions}>
+          <div className={styles.headerControlStack}>
+            {sessionModeProfileSelectionStep ? sessionModeProfileControl : null}
+            {!sessionModeProfileSelectionStep && !isNormalMode && showNetworkSelector ? (
+              <div className={styles.headerSecondaryActions}>
+                <div className={styles.headerChainSelector}>
+                  <span className={styles.headerChainLabel}>Network:</span>
+                  <Input
+                    type="select"
+                    value={registryChainId || ''}
+                    onChange={(event) => onRegistryChainIdChange(event.target.value)}
+                    className={styles.headerChainInput}
+                  >
+                    {registryChainOptions.length ? (
+                      registryChainOptions.map((chain) => (
+                        <option key={chain.id} value={chain.id}>
+                          {chain.name} ({chain.id})
+                        </option>
+                      ))
+                    ) : (
+                      <option value={registryChainId || ''}>
+                        {registryChainName || registryChainId || 'Select a chain'}
                       </option>
-                    ))
-                  ) : (
-                    <option value={registryChainId || ''}>
-                      {registryChainName || registryChainId || 'Select a chain'}
-                    </option>
-                  )}
-                </Input>
-                {renderInfoTooltip({
-                  id: 'gw-registry-chain',
-                  content: `Chain for session deployment. Registry: ${registryAddress || 'Unavailable'}`,
-                  placement: 'bottom',
-                  testId: 'ce-wizard-tooltip-gw-registry-chain',
-                  ariaLabel: 'Registry chain info',
-                })}
+                    )}
+                  </Input>
+                  {renderInfoTooltip({
+                    id: 'gw-registry-chain',
+                    content: `Chain for session deployment. Registry: ${registryAddress || 'Unavailable'}`,
+                    placement: 'bottom',
+                    testId: 'ce-wizard-tooltip-gw-registry-chain',
+                    ariaLabel: 'Registry chain info',
+                  })}
+                </div>
               </div>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
         </div>
-      </div>
+      ) : null}
     </header>
   );
 };

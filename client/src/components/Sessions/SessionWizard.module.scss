@@ -112,6 +112,14 @@ $muted-text: var(--ce-panel-text-muted);
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
+}
+
+.headerTitleInlineControl {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  min-width: 0;
 }
 
 .headerBackButton {
@@ -1384,8 +1392,26 @@ $muted-text: var(--ce-panel-text-muted);
   }
 
   .header h1 {
-    font-size: 24px;
+    font-size: clamp(20px, 3.5vw, 24px);
     white-space: normal;
+  }
+
+  .header:not(.headerProfileSelectionStep) {
+    align-items: center;
+  }
+
+  .header:not(.headerProfileSelectionStep) .headerTitleBlock {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .header:not(.headerProfileSelectionStep) .headerTitleBlockWithBack {
+    flex-wrap: nowrap;
+    gap: 9px;
+  }
+
+  .header:not(.headerProfileSelectionStep) .headerBackButton {
+    padding-inline: 8px;
   }
 
   .headerActions {
@@ -1411,6 +1437,12 @@ $muted-text: var(--ce-panel-text-muted);
 
   .sessionIdentityRow {
     grid-template-columns: 1fr;
+  }
+
+  @media (max-width: 480px) {
+    .header:not(.headerProfileSelectionStep) .headerTitleBlockWithBack {
+      flex-wrap: wrap;
+    }
   }
 
   .normalModeCard {
