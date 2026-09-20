@@ -568,6 +568,14 @@ Admin test panel:
   separate provider or model. Inputs are submitted responses only; Circles is
   the DebateMap argument-map plus atlas view, and Risk Matrix axes are generated
   from the session subject matter.
+- The Worker source snapshot keeps the full submitted-response counts distinct
+  from the bounded AI input counts. The AI input keeps rating endpoint metadata
+  (`scale.min`/`max` and endpoint labels) and quadratic `voiceCredits`, then
+  applies a deterministic cap that samples across questions and participants
+  instead of taking the first sorted rows. Public response envelopes may contain
+  empty encryption placeholders such as `encryptedPortion: ""`; those
+  placeholders are not treated as locked. Explicit locked flags or non-empty
+  encrypted envelope fields are still excluded from generated-results input.
 
 ### Local mocked generated-results browser smoke
 

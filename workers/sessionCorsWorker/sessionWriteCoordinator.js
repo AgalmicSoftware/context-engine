@@ -392,8 +392,16 @@ export class SessionWriteCoordinator {
     if (!isObjectRecord(value)) return false;
     if (value.encrypted === true || value.locked === true || value.payloadEncrypted === true) return true;
     const encryptedKeys = new Set(['ciphertext', 'cipherText', 'encryptedContent', 'encryptedKey', 'encryptedPortion', 'keyCipher', 'payloadCiphertext', 'wrappedKey']);
-    if (Object.keys(value).some((key) => encryptedKeys.has(key))) return true;
+    if (Object.entries(value).some(([key, entry]) => encryptedKeys.has(key) && this.resultsAnalysisEncryptedEnvelopeValueHasContent(entry))) return true;
     return Object.values(value).some((entry) => this.resultsAnalysisPayloadLooksLocked(entry, depth + 1));
+  }
+
+  resultsAnalysisEncryptedEnvelopeValueHasContent(value) {
+    if (value == null || value === false) return false;
+    if (typeof value === 'string') return value.trim() !== '';
+    if (Array.isArray(value)) return value.length > 0;
+    if (isObjectRecord(value)) return Object.keys(value).length > 0;
+    return true;
   }
 
   sanitizeResultsAnalysisAutoJob(payload = {}) {
