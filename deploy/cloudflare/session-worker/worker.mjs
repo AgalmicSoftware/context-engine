@@ -75325,6 +75325,57 @@ var BINARY_RESPONSE_OPTIONS = ["Agree", "Unsure", "Disagree"];
 var trim8 = (value) => String(value == null ? "" : value).trim();
 var lower4 = (value) => trim8(value).toLowerCase();
 var isObj15 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var RATING_SCALE_METADATA_KEYS = [
+  "min",
+  "minimum",
+  "max",
+  "maximum",
+  "minLabel",
+  "lowLabel",
+  "maxLabel",
+  "highLabel"
+];
+var hasMetadataValue = (value) => value !== void 0 && value !== null && trim8(value) !== "";
+var recordHasRatingScaleMetadata = (record = {}) => RATING_SCALE_METADATA_KEYS.some((key) => hasMetadataValue(record[key]));
+var pickRatingScaleRecord = (question = {}) => {
+  const scale = isObj15(question.scale) ? question.scale : null;
+  if (scale && recordHasRatingScaleMetadata(scale)) return scale;
+  const ratingScale = isObj15(question.ratingScale) ? question.ratingScale : null;
+  if (ratingScale && recordHasRatingScaleMetadata(ratingScale)) return ratingScale;
+  return scale || ratingScale || question;
+};
+var hasRatingScaleMetadata = (question = {}) => recordHasRatingScaleMetadata(pickRatingScaleRecord(question)) || recordHasRatingScaleMetadata(question);
+var toFiniteNumber = (value) => {
+  const number2 = Number(value);
+  return Number.isFinite(number2) ? number2 : null;
+};
+var normalizeRatingLabel = (value, fallback) => {
+  const label = trim8(value);
+  return label || String(fallback);
+};
+var normalizeRatingScale = (question = {}) => {
+  if (!hasRatingScaleMetadata(question)) return null;
+  const scale = pickRatingScaleRecord(question);
+  const min = toFiniteNumber(scale.min ?? scale.minimum ?? question.min ?? question.minimum);
+  const max = toFiniteNumber(scale.max ?? scale.maximum ?? question.max ?? question.maximum);
+  const normalizedMin = min ?? 0;
+  const normalizedMax = max ?? 10;
+  if (normalizedMax <= normalizedMin) {
+    return { min: 0, max: 10, minLabel: "0", maxLabel: "10" };
+  }
+  return {
+    min: normalizedMin,
+    max: normalizedMax,
+    minLabel: normalizeRatingLabel(
+      scale.minLabel ?? scale.lowLabel ?? question.minLabel ?? question.lowLabel,
+      normalizedMin
+    ),
+    maxLabel: normalizeRatingLabel(
+      scale.maxLabel ?? scale.highLabel ?? question.maxLabel ?? question.highLabel,
+      normalizedMax
+    )
+  };
+};
 var hasRestrictedPrompt = (question = {}) => {
   const visibility = lower4(question.visibility || question.access || question.questionVisibility);
   return Boolean(
@@ -75339,11 +75390,14 @@ var normalizeQuestion = (value = {}) => {
   const type = lower4(question.type || question.questionType || "freeform") || "freeform";
   const rawOptions = question.options || question.choices;
   const options = type === "binary" ? [...BINARY_RESPONSE_OPTIONS] : (Array.isArray(rawOptions) ? rawOptions : []).map((entry) => trim8(isObj15(entry) ? entry.label || entry.value : entry)).filter(Boolean);
+  const ratingScale = type === "rating" ? normalizeRatingScale(question) : null;
   return {
     id: id2,
     prompt,
     type,
-    options
+    options,
+    ...ratingScale ? { scale: ratingScale } : {},
+    ...type === "quadratic" ? { voiceCredits: Number(question.voiceCredits ?? 99) } : {}
   };
 };
 var dedupeQuestions = (questions = []) => {
@@ -80000,6 +80054,20 @@ var normalizeAllowedOrigins = (raw) => (Array.isArray(raw) ? raw : [raw]).map((e
   }
 }).filter(Boolean);
 var isLocalHttpHostname = (hostname = "") => ["localhost", "127.0.0.1", "[::1]", "::1"].includes(String(hostname));
+var normalizeRecruitmentSource = (value) => {
+  const normalized = trim10(value).replace(/\s+/g, "-").slice(0, 128);
+  return /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(normalized) ? normalized : "";
+};
+var normalizeJoinGroup = (value) => {
+  const normalized = trim10(value).toLowerCase();
+  return /^[a-z0-9][a-z0-9._-]{0,79}$/.test(normalized) ? normalized : "";
+};
+var copySafeReturnParams = (sourceUrl, targetUrl) => {
+  const recruitmentSources = sourceUrl.searchParams.getAll("src").map(normalizeRecruitmentSource).filter(Boolean);
+  if (recruitmentSources.length === 1) targetUrl.searchParams.set("src", recruitmentSources[0]);
+  const joinGroups = sourceUrl.searchParams.getAll("joinGroup").map(normalizeJoinGroup).filter(Boolean);
+  if (joinGroups.length === 1) targetUrl.searchParams.set("joinGroup", joinGroups[0]);
+};
 var safeServedWorkerOrigin = (value) => {
   try {
     const url = new URL(trim10(value));
@@ -80020,9 +80088,9 @@ var safeSessionUrl = (value, { slug = "", allowOrigins } = {}) => {
     }
     const allowedOrigins = normalizeAllowedOrigins(allowOrigins);
     if (!allowedOrigins.length || !allowedOrigins.includes(url.origin)) return "";
-    url.search = "";
-    url.hash = "";
-    return url.toString().replace(/\/$/, "");
+    const safeUrl = new URL(`${url.origin}${url.pathname}`);
+    copySafeReturnParams(url, safeUrl);
+    return safeUrl.toString().replace(/\/$/, "");
   } catch {
     return "";
   }
@@ -80058,6 +80126,7 @@ var buildInterviewBriefDocument = ({
   answerContract: {
     binary: ["Agree", "Unsure", "Disagree"],
     rating: { min: 0, max: 10, step: 1 },
+    ratingScaleOverrides: "Use a question.scale object when present; otherwise use the default rating contract.",
     multichoice: "Use one exact question option.",
     quadratic: "Signed integer array in option order; sum(vote\xB2) <= voiceCredits (99 default). Zero is neutral; unused credits are allowed."
   },
